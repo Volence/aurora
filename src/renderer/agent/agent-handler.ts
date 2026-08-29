@@ -38,6 +38,7 @@ import {
 import { regenerateShiftCommand } from '../providers/bg-anim-art';
 import { makeSetBgOverrideTilesCommand } from '../../core/editing/bg-override-art';
 import { buildStampCommand } from '../../core/editing/map-stamp';
+import { withLinkBreaks } from '../../core/editing/chunk-links';
 import { ensureCollisionPlanes } from '../../core/collision/collision-cell-resolve';
 import {
   paintCollisionRectBothPlanes, paintCollisionCellsBothPlanes,
@@ -418,12 +419,16 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
           });
         }
       }
-      executeAmbientCommand({
+      // A PAINTED TILE STOPS TRACKING ITS CHUNK (owner ruling d-18c) — the same
+      // rule the human brush follows in MapViewport. An agent bulk-paint over a
+      // stamped region is exactly the case where a surviving link would have the
+      // next chunk edit overwrite work the agent was asked to do.
+      executeAmbientCommand(withLinkBreaks(section, {
         type: 'set-tiles',
         description: `agent: paint ${req.w}x${req.h} at (${req.x},${req.y})`,
         sectionIndex: req.section,
         entries,
-      }, ctx.level);
+      }), ctx.level);
       return { painted: entries.length, budget: budgetSummary(ctx) };
     }
 
@@ -633,10 +638,14 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
 
       // Unlike the UI tool, agent stamps do NOT snap to the chunk's own grid —
       // callers pass explicit tile coords (validated even, above), by design.
+      // The checkbox's wire form (d-18c). Absent means KEEP the link, which is
+      // the ruling's default and matches what the UI checkbox does unchecked —
+      // the two surfaces must not disagree about what a plain stamp means.
+      const detached = req.detach === true;
       const cmd = buildStampCommand({
         chunk, section, sectionIndex: req.section,
-        baseCol: req.x, baseRow: req.y, artOnly: false,
-        description: `agent: stamp ${chunk.id} at (${req.x},${req.y})`,
+        baseCol: req.x, baseRow: req.y, artOnly: false, detached,
+        description: `agent: stamp ${chunk.id} at (${req.x},${req.y})${detached ? ' (detached)' : ''}`,
       });
 
       let changed = 0;

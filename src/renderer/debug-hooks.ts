@@ -22,6 +22,7 @@ import { useWorkspaceStore } from './workspace/workspaceStore';
 import { switchFacet } from './workspace/facet-tools';
 import type { FacetCapability } from '../core/project/adapter';
 import { ensureCollisionPlanes } from '../core/collision/collision-cell-resolve';
+import { chunkOriginAt } from '../core/editing/chunk-links';
 import { selectedCollisionWord } from '../core/collision/collision-cell-word';
 import { openAeonProject } from './state/aeon-open';
 import { bandBudget, bandRows } from './providers/bg-anim-aeon';
@@ -554,6 +555,55 @@ interface AeonProbeApi {
   crossoverRefusal(plane: 'a' | 'b', crossover: string): string | null;
   /** The armed stamp source (editorStore.selectedChunkId). Read-only. */
   selectedChunk(): string | null;
+  /**
+   * CHUNK IDENTITY, as the document holds it (owner ruling d-18c) — READ-ONLY,
+   * and the whole surface is read-only ON PURPOSE.
+   *
+   * Nothing here has a setter, not even the checkbox. `stampDetached()` reports
+   * the store field the real `<input type="checkbox">` writes, so a harness has
+   * to CLICK the control and this is what proves the click reached the store; a
+   * setter would let a green row coexist with a dead checkbox — the rule
+   * `marqueeGranularity` states for the same reason.
+   *
+   * `chunkLinkAt` goes through `chunkOriginAt` itself rather than reading the
+   * plane here: a probe with its own copy of "plane id -> placement" could agree
+   * with itself while disagreeing with the app.
+   *
+   * It takes COL/ROW, not a flat index, for the reason bar 8 gives: a harness
+   * that multiplied by its own idea of the section width would be asserting
+   * against a number it typed. `SECTION_TILES_WIDE` is 256 and every ad-hoc
+   * copy of it in a script is a defect waiting for the day it changes.
+   */
+  chunkLinkAt(sectionIndex: number, col: number, row: number):
+    { id: number; chunkId: string; baseCol: number; baseRow: number; collision: boolean } | null;
+  /** Every placement recorded in one section, in placement order. `[]` is a real
+   *  answer and is distinct from a section that has no identity layer at all —
+   *  `hasChunkLinks` separates them, which is what keeps a "nothing is linked"
+   *  row from passing on a section the feature never touched. */
+  chunkPlacements(sectionIndex: number):
+    { id: number; chunkId: string; baseCol: number; baseRow: number; collision: boolean }[];
+  hasChunkLinks(sectionIndex: number): boolean;
+  /** The stamp-time checkbox's live state. Read-only — see above. */
+  stampDetached(): boolean;
+  /** The latched "placement under the cursor" the Chunk links panel reads. */
+  linkHover(): { sectionIndex: number; placementId: number; chunkId: string } | null;
+  /**
+   * THE ART COMPOSER'S OPEN CHUNK DOCUMENT — read-only, the chunk counterpart
+   * to `bgArtOpen()` (which returns null for anything that is not a BG-override
+   * doc, so it cannot serve here).
+   *
+   * A propagation harness needs three things that exist nowhere on screen in a
+   * readable form: WHICH chunk the composer opened (the canvas looks the same
+   * for any of them), whether the doc is DIRTY (the anti-vacuous control — a
+   * "Save propagated it" row means nothing if the tile stamp never landed), and
+   * the armed `brushTile`, which is drawn into a canvas HUD chip and is
+   * therefore invisible to the DOM. No setters: arming the tool and the tile are
+   * real clicks on the real rail and the real tileset panel.
+   */
+  artChunkOpen(): {
+    chunkId: string | null; name: string; widthTiles: number; heightTiles: number;
+    dirty: boolean; tool: string; brushTile: number;
+  } | null;
   /** Every chunk-library id, in library order. Read-only. */
   chunkIds(): string[];
   /** One library chunk's shape + how much of it is actually art (nonzero
@@ -1049,6 +1099,34 @@ function installAeonProbe(): AeonProbeApi {
       };
     },
     selectedChunk: () => useEditorStore.getState().selectedChunkId,
+    chunkLinkAt: (sectionIndex, col, row) => {
+      const s = section(sectionIndex);
+      if (!s) return null;
+      const p = chunkOriginAt(s, row * SECTION_TILES_WIDE + col);
+      return p ? { ...p } : null;
+    },
+    chunkPlacements: (sectionIndex) =>
+      (section(sectionIndex)?.chunkLinks?.placements ?? []).map((p) => ({ ...p })),
+    hasChunkLinks: (sectionIndex) => !!section(sectionIndex)?.chunkLinks,
+    stampDetached: () => useEditorStore.getState().stampDetached,
+    artChunkOpen: () => {
+      const a = useArtStore.getState();
+      const o = a.open;
+      if (!o || o.bgOverride) return null;
+      return {
+        chunkId: o.chunkId,
+        name: o.name,
+        widthTiles: o.doc.widthTiles,
+        heightTiles: o.doc.heightTiles,
+        dirty: o.dirty,
+        tool: a.tool,
+        brushTile: a.brushTile,
+      };
+    },
+    linkHover: () => {
+      const h = useEditorStore.getState().linkHover;
+      return h ? { ...h } : null;
+    },
     chunkIds: () => (useProjectStore.getState().project?.chunkLibrary ?? []).map((c) => c.id),
     chunkInfo: (id) => {
       const c = useProjectStore.getState().project?.chunkLibrary.find((k) => k.id === id);

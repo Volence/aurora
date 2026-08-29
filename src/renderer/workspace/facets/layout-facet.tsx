@@ -5,6 +5,7 @@
 import React from 'react';
 import SectionGridNav from '../../components/SectionGridNav';
 import ChunkLibrary from '../../components/ChunkLibrary';
+import ChunkLinkOptions from '../../components/ChunkLinkOptions';
 import MarqueePasteOptions from '../../components/MarqueePasteOptions';
 import TileBrushOptions from '../../components/TileBrushOptions';
 import ArtBrowser from '../../components/ArtBrowser';
@@ -33,6 +34,16 @@ function LayoutPanels() {
           classic's `classic.chunks` / `classic.artChunks` established. */}
       {!pasting && tool === 'stamp-chunk' && (
         <CollapsibleSection id="aeon.layoutOptions" title="Chunks" variant="list"><ChunkLibrary /></CollapsibleSection>
+      )}
+      {/* CHUNK LINKS gets its OWN slot rather than joining the retitling one
+          above, and the reason is the rule that slot's own note states: the
+          shared id is correct only for contents that are MUTUALLY EXCLUSIVE.
+          This panel is shown at the same time as the Chunks grid, not instead
+          of it — the checkbox arms the stamp the grid is picking a source for —
+          so a shared collapse preference would be a preference about two
+          things. See ChunkLinkOptions.tsx for the d-18c argument. */}
+      {!pasting && tool === 'stamp-chunk' && (
+        <CollapsibleSection id="aeon.chunkLinks" title="Chunk links"><ChunkLinkOptions /></CollapsibleSection>
       )}
       {(tool === 'marquee' || pasting) && (
         <CollapsibleSection id="aeon.layoutOptions" title={pasting ? 'Paste' : 'Marquee'}>

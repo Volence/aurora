@@ -22,6 +22,7 @@ import { docFromTile, docFromSectionRegion } from '../../core/art/composer-buffe
 import { seedDocCollisionFromSection } from '../../core/art/composer-collision';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import { buildStampCommand } from '../../core/editing/map-stamp';
+import { withLinkBreaks, chunkOriginAt } from '../../core/editing/chunk-links';
 import {
   snapMarquee, copyFromSection, buildPasteCommand, isBlockAligned,
   effectivePasteLayers, pasteBaseStep, selectionSizeLabel, artOnlyReason,
@@ -2432,12 +2433,19 @@ export default function MapViewport() {
     const level = getActiveLevel();
     if (!level) return;
     if (stroke.kind === 'tiles') {
-      executeCommand({
+      const cmd: AnyCommand = {
         type: 'set-tiles',
         description: `Paint ${stroke.entries.size} tile${stroke.entries.size === 1 ? '' : 's'}`,
         sectionIndex: stroke.sectionIndex,
         entries: [...stroke.entries].map(([index, e]) => ({ index, ...e })),
-      }, level);
+      };
+      // A HAND-PAINTED TILE STOPS TRACKING ITS CHUNK (owner ruling d-18c).
+      // `withLinkBreaks` returns `cmd` unchanged when the section has no
+      // identity layer or the stroke touched no linked tile, so this costs
+      // nothing on the common path — and without it a later chunk edit would
+      // propagate library art back over the stroke the author just made.
+      const strokeSection = getSectionByIndex(stroke.sectionIndex);
+      executeCommand(strokeSection ? withLinkBreaks(strokeSection, cmd) : cmd, level);
     } else {
       const both = stroke.otherEntries.size > 0;
       // The description is what the undo stack shows, so it names the SECOND
@@ -2867,12 +2875,14 @@ export default function MapViewport() {
       }
 
       if (entries.length > 0) {
-        executeCommand({
+        // Same rule as the tile stroke above: a block painted by hand no longer
+        // comes from whatever chunk was stamped there (d-18c).
+        executeCommand(withLinkBreaks(section, {
           type: 'set-tiles',
           description: `Paint block at (${baseCol}, ${baseRow})`,
           sectionIndex: info.sectionIndex,
           entries,
-        }, level);
+        }), level);
         sectionRenderer.markDirty(info.sectionIndex, dirtyIndices);
       }
       useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
@@ -2899,10 +2909,16 @@ export default function MapViewport() {
       // (unless Alt/artOnly), mirroring paintCollisionCell's seed-on-first-touch.
       ensureCollisionPlanes(section);
 
+      // THE CHECKBOX (d-18c). Read from the store at click time rather than
+      // captured earlier: the panel is beside the map and the author can toggle
+      // it between two stamps. Default false = the stamp REMEMBERS its chunk.
+      const detached = useEditorStore.getState().stampDetached;
       const cmd = buildStampCommand({
         chunk, section, sectionIndex: info.sectionIndex,
-        baseCol, baseRow, artOnly: e.altKey,
-        description: `Stamp chunk ${selectedChunkId} at (${baseCol}, ${baseRow})`,
+        baseCol, baseRow, artOnly: e.altKey, detached,
+        description: detached
+          ? `Stamp chunk ${selectedChunkId} at (${baseCol}, ${baseRow}) (detached)`
+          : `Stamp chunk ${selectedChunkId} at (${baseCol}, ${baseRow})`,
       });
 
       // Same as the paste path: the listener walks batches, so this no longer
@@ -3133,6 +3149,28 @@ export default function MapViewport() {
       }
       if (onEdge !== frameHoverRef.current) setFrameHover(onEdge);
       if (onEdge) return;
+    }
+
+    // WHAT IS THIS REGION MADE OF (d-18): while the stamp is armed, report the
+    // placement under the pointer so the Chunk links panel can offer Detach on
+    // it. Read through `chunkOriginAt`, never a second copy of the plane
+    // arithmetic — and it is a HOVER because the only click this tool has is a
+    // stamp, so hovering is the one non-destructive gesture available.
+    //
+    // NOT cleared when the pointer leaves the canvas: the Detach button lives
+    // off the map, and a readout that emptied on the way to its own button
+    // would be unusable. `setLinkHover` de-duplicates, so this is one store
+    // write per placement crossed, not one per mousemove.
+    if (tool === 'stamp-chunk') {
+      const world = screenToWorld(e.clientX, e.clientY);
+      const info = worldToSectionTile(world.x, world.y);
+      const hoverSection = info ? getSectionByIndex(info.sectionIndex) : null;
+      if (info && hoverSection) {
+        const origin = chunkOriginAt(hoverSection, info.row * SECTION_TILES_WIDE + info.col);
+        useEditorStore.getState().setLinkHover(origin
+          ? { sectionIndex: info.sectionIndex, placementId: origin.id, chunkId: origin.chunkId }
+          : null);
+      }
     }
 
     // Stamp ghost: track where the chunk would land, snapped to its own size.

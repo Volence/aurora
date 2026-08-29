@@ -381,6 +381,34 @@ interface EditorState {
    *  ref (like the collision-paint hover), since nothing else needs it. */
   pasting: boolean;
 
+  /**
+   * THE STAMP-TIME CHECKBOX (owner ruling d-18c). False — keep the link — is the
+   * ruling's own default and must stay it: a stamp REMEMBERS its chunk unless
+   * the author says otherwise.
+   *
+   * It arms the NEXT stamp, exactly like the tile brush's flip/priority chips
+   * arm the next stroke, and like them it is live chrome rather than document
+   * state: nothing about a placement records which way the checkbox was set,
+   * only whether a link exists.
+   */
+  stampDetached: boolean;
+  /**
+   * THE PLACEMENT UNDER THE CURSOR — the read `chunkOriginAt` answers, latched
+   * so the panel's Detach button is reachable.
+   *
+   * WHY LATCHED, and it is the whole reason this is a store field rather than a
+   * MapViewport-local ref like the stamp ghost's footprint: to press Detach the
+   * pointer has to LEAVE the map, and a value cleared on mouseleave would name
+   * nothing by the time the button was under the cursor. So MapViewport writes
+   * it while the pointer is over the map (including `null` for an unlinked
+   * tile, which is a real answer) and leaving the canvas does not clear it.
+   *
+   * EPHEMERAL, like `bandReveal`: never part of the document, and setting it
+   * must not create an undo step. Written only when the value actually changes,
+   * so a mousemove across one placement is one store write, not sixty.
+   */
+  linkHover: { sectionIndex: number; placementId: number; chunkId: string } | null;
+
   setTool: (tool: EditorTool) => void;
   setSelection: (selection: Selection | null) => void;
   setActiveSectionIndex: (index: number) => void;
@@ -476,6 +504,8 @@ interface EditorState {
   setMapClipboard: (clipboard: MapClipboard | null) => void;
   setPasteLayers: (layers: PasteLayers) => void;
   setPasting: (pasting: boolean) => void;
+  setStampDetached: (detached: boolean) => void;
+  setLinkHover: (hover: { sectionIndex: number; placementId: number; chunkId: string } | null) => void;
   markDirty: () => void;
   /** Everything clean — a discard, or a project going away. */
   markClean: () => void;
@@ -618,6 +648,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   mapClipboard: null,
   pasteLayers: 'both',
   pasting: false,
+  // KEEP THE LINK is the ruling's default. Do not flip this to `true` for
+  // convenience: `d-18c` says a stamp remembers its chunk unless told not to.
+  stampDetached: false,
+  linkHover: null,
 
   // An explicit tool switch cancels an in-progress paste (repeat pastes never
   // call setTool, so they aren't affected) — picking a different tool while
@@ -719,6 +753,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setMapClipboard: (mapClipboard) => set({ mapClipboard }),
   setPasteLayers: (pasteLayers) => set({ pasteLayers }),
   setPasting: (pasting) => set({ pasting }),
+  setStampDetached: (stampDetached) => set({ stampDetached }),
+  setLinkHover: (linkHover) => set((s) => {
+    // Identity-compare before writing: mousemove fires at pointer rate and the
+    // panel subscribes to this. Moving across one placement must cost ONE
+    // render, not one per tile.
+    const prev = s.linkHover;
+    if (prev === linkHover) return {};
+    if (prev && linkHover
+      && prev.sectionIndex === linkHover.sectionIndex
+      && prev.placementId === linkHover.placementId) return {};
+    return { linkHover };
+  }),
   markDirty: () => set((s) => {
     const p = useProjectStore.getState();
     if (!p.currentZoneId || !p.currentActId) return { dirty: true };

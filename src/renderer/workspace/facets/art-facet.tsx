@@ -14,6 +14,8 @@ import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useAeonHistoryVersion } from '../../hooks/useHistoryVersion';
 import { useToastStore } from '../../state/toastStore';
 import type { ChunkDef } from '../../../core/model/s4-types';
+import type { AnyCommand } from '../../../core/editing/commands';
+import { buildActPropagationCommand } from '../../../core/editing/chunk-links';
 import { Panel, CollapsibleSection, T } from '../../components/ui';
 import ArtToolDock from '../../shell/ArtToolDock';
 import ArtToolOptions from '../../shell/ArtToolOptions';
@@ -115,7 +117,7 @@ function handleSave() {
   let saved: ChunkDef | undefined;
   if (o.chunkId !== null) {
     const chunk = existingChunk!;
-    executeCommand({
+    const setChunk: AnyCommand = {
       type: 'set-chunk',
       description: `art: edit chunk ${chunk.name}`,
       sectionIndex: -1,
@@ -126,7 +128,58 @@ function handleSave() {
       newCollisionA: new Uint16Array(o.doc.collisionA),
       oldCollisionB: new Uint16Array(chunk.collisionB),
       newCollisionB: new Uint16Array(o.doc.collisionB),
-    }, level);
+    };
+
+    // ═══ PROPAGATION — owner ruling d-18c, the payoff half ═══
+    //
+    // Every tile in this act that still REMEMBERS a placement of this chunk is
+    // rewritten to the chunk's new contents. Tiles whose link was broken —
+    // hand-painted, pasted, flipped, or buried by a later stamp — are left
+    // alone; that refusal is the whole reason the identity plane exists, and
+    // `withLinkBreaks` at the brush sites (previous commit on this branch) is
+    // what makes it true. THIS CALL MUST NOT LAND WITHOUT THAT ONE: it would
+    // silently overwrite art the author had already corrected by hand.
+    //
+    // ⚠ BUILT HERE, AT CONSTRUCTION TIME, NOT INSIDE AN APPLIER. A command has
+    // to carry BOTH states — the applier is handed no way to record what it
+    // overwrote, so a propagation assembled there could never be undone. It is
+    // built from a chunk carrying the NEW contents and the OLD sections, before
+    // `setChunk` runs; `set-chunk` touches only the library, so the section
+    // words this reads are the same either way.
+    //
+    // ONE UNDO STEP, deliberately: a chunk edit that propagated into four
+    // sections and then took five presses to undo would leave the level in a
+    // state the author never authored. The batch is mixed-scope (`set-chunk` is
+    // zone data, the propagation children are act data) — `isZoneScopedCommand`
+    // anticipates exactly this and pins a mixed batch to the ACT stack. Here it
+    // changes nothing, because this call site uses `executeCommand`, which
+    // routes by focus rather than by scope, and did so for the bare `set-chunk`
+    // too. When nothing is linked the batch is not built at all, so the common
+    // case is byte-for-byte the command this used to issue.
+    //
+    // ACT-SCOPED, and that is a real limit rather than an oversight: the chunk
+    // library is project-wide, so copies of this chunk stamped in OTHER acts
+    // keep their links and are not updated here. `buildActPropagationCommand`
+    // is indexed by flat act slot and one command belongs to one act's undo
+    // stack; a cross-act step would be undoable from a tab it did not belong to.
+    const propagation = buildActPropagationCommand({
+      chunk: {
+        ...chunk,
+        nametable: new Uint16Array(slice.nametable),
+        collisionA: new Uint16Array(o.doc.collisionA),
+        collisionB: new Uint16Array(o.doc.collisionB),
+      },
+      sections: level.sections,
+      description: `art: edit chunk ${chunk.name}`,
+    });
+    executeCommand(propagation
+      ? {
+        type: 'batch',
+        description: `art: edit chunk ${chunk.name}`,
+        sectionIndex: propagation.sectionIndex,
+        commands: [setChunk, propagation],
+      }
+      : setChunk, level);
     saved = chunk;
   } else {
     saved = {
