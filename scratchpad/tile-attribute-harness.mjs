@@ -83,6 +83,23 @@
 // (shell/close-guard.ts says so). Every paint is undone before exit and the
 // words are asserted back to what they were.
 //
+// ═══ THE SECOND ROAD: THE AGENT (ROADMAP O12, 2026-08-29) ═══
+//
+// The [w*] rows drive `editor/paint_region` over the REAL Aether HTTP binding —
+// no mouse at all — because the agent's copy of this defect lived on a road no
+// gesture reaches. `NametableEntrySpec.pri` is OPTIONAL, and `!!spec.pri`
+// collapsed an OMITTED field into an authored `false`, so an agent bulk-painting
+// over authored art cleared every priority bit it covered.
+//
+// Those rows cross the express route, the zod layer and the IPC bridge, which no
+// node test touches, and they read the answer back out of the DOCUMENT through
+// `__dbg.aeon.ntAt` — never off the tool's own reply.
+//
+// [w1] and [w4] are the discriminators (they FAIL on the pre-O12 handler).
+// [w2] [w3] [w5] [w6] are green BOTH WAYS and say so out loud where they run:
+// they rule out the cheap green-paths and pin the ruling that the FLIPS are not
+// a defect, and they are not evidence of the fix.
+//
 // ⚠ NO EMULATOR. Nothing here touches oracle or any emulator MCP tool.
 //
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npx electron-vite build
@@ -90,9 +107,10 @@
 //                     (or) node scratchpad/tile-attribute-harness.mjs
 
 import { spawn } from 'node:child_process';
-import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, existsSync, rmSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
+import { homedir } from 'node:os';
 import * as http from 'node:http';
 
 const PORT = Number(process.env.PORT ?? 9411);
@@ -167,6 +185,106 @@ function sectionTilesWide() {
   return Number(m[1]);
 }
 const STW = sectionTilesWide();
+
+// ── §WIRE — the AGENT road (ROADMAP O12) ───────────────────────────────────
+//
+// Everything above drives a MOUSE. The agent never touches one: it POSTs
+// `editor/paint_region` to the Aether binding, which crosses the express route,
+// the zod layer (`entrySchema`), the Electron IPC bridge and only then reaches
+// `handleAgentRequest`. NONE of that is reachable from the node suite, and it is
+// exactly where "an optional field quietly becomes false" would live — the
+// defect O12 fixes IS an optional field quietly becoming false.
+//
+// So the [w*] rows send the real request over the real socket and read the
+// result back out of the DOCUMENT through `__dbg.aeon.ntAt` — never off the
+// reply, which is the tool reporting on itself.
+//
+// ═══ PROVENANCE, AND THE THING THAT ACTUALLY BIT ═══
+//
+// The app publishes its port to ~/.aurora/mcp.json (and the legacy
+// ~/.sonic-level-editor/mcp.json). That file is SHARED — the owner's own Aurora
+// writes it too. Measured on 2026-08-29 while building this phase: the owner's
+// Aurora held the default port 38473 and was serving a live project. Painting
+// through a port found in that file would have mutated HIS open document and
+// then read ours back; every row would have gone green describing nothing.
+//
+// So the port is NOT taken from the file's value alone. It is taken from the
+// file and then CHECKED: the `pid` it names must be a descendant of the process
+// this harness spawned. Nothing else is accepted, and the phase reports
+// UNMEASURABLE rather than guessing.
+//
+// ═══ AND THE FILE IS PUT BACK ═══
+//
+// Two hazards were observed in the first run of this phase, BOTH of which
+// predate it and hit every harness in this repo that launches the app:
+//
+//   1. the launched app OVERWRITES the shared discovery file, so the owner's
+//      tooling starts resolving to the harness's throwaway instance;
+//   2. `child.kill()` kills the `xvfb-run` wrapper, NOT the Electron under it,
+//      so the throwaway instance SURVIVES the harness and keeps holding both
+//      the port and the file it wrote.
+//
+// `snapshotDiscovery()`/`restoreDiscovery()` put the files back byte for byte
+// (or delete them if they did not exist), and `killTree()` kills the actual
+// Electron. Both run in the same `finally` as the CDP teardown.
+const DISCOVERY_FILES = ['.aurora', '.sonic-level-editor']
+  .map((sub) => join(homedir(), sub, 'mcp.json'));
+
+function snapshotDiscovery() {
+  return DISCOVERY_FILES.map((f) => {
+    try { return { f, content: readFileSync(f, 'utf8') }; } catch { return { f, content: null }; }
+  });
+}
+function restoreDiscovery(snap) {
+  for (const { f, content } of snap) {
+    try {
+      if (content === null) rmSync(f, { force: true });
+      else writeFileSync(f, content);
+    } catch (e) { console.log(`        WARN: could not restore ${f}: ${e.message}`); }
+  }
+}
+
+/** Every pid descended from `root`, `root` included. Linux /proc only. */
+function descendants(root) {
+  const parent = new Map();
+  for (const d of readdirSync('/proc')) {
+    if (!/^\d+$/.test(d)) continue;
+    try {
+      const m = /^PPid:\s*(\d+)$/m.exec(readFileSync(`/proc/${d}/status`, 'utf8'));
+      if (m) parent.set(Number(d), Number(m[1]));
+    } catch { /* raced with exit */ }
+  }
+  const out = new Set([root]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const [pid, ppid] of parent) {
+      if (!out.has(pid) && out.has(ppid)) { out.add(pid); grew = true; }
+    }
+  }
+  return out;
+}
+
+/** SIGKILL a pid list, deepest first. Must be a list captured BEFORE any kill:
+ *  once the wrapper dies its children reparent to init and become unfindable. */
+function killPids(pids) {
+  let n = 0;
+  for (const pid of [...pids].reverse()) {
+    try { process.kill(pid, 'SIGKILL'); n++; } catch { /* already gone */ }
+  }
+  return n;
+}
+
+let rpcId = 1;
+/** One JSON-RPC call over the REAL Aether HTTP binding. Returns the envelope. */
+async function rpc(port, method, params) {
+  const res = await fetch(`http://127.0.0.1:${port}/aether`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', host: `127.0.0.1:${port}` },
+    body: JSON.stringify({ jsonrpc: '2.0', id: rpcId++, method, params }),
+  });
+  return { status: res.status, body: await res.json() };
+}
 /** A VDP pattern is 8x8 and a nametable word is one. */
 const TILE_PX = 8;
 /** One 8px tile becomes 32 canvas px, so the tile CENTRE is 16px clear of the
@@ -320,6 +438,12 @@ async function main() {
   console.log(`  SECTION_TILES_WIDE = ${STW}`);
 
   if (!(await portFree())) throw new Error(`port ${PORT} already serving a CDP target — kill it first`);
+  // §WIRE: the launched app will OVERWRITE the shared discovery files. Take a
+  // byte-for-byte snapshot now and put them back in the `finally` — the owner's
+  // Aurora publishes to the same paths.
+  const discoverySnapshot = snapshotDiscovery();
+  console.log(`  discovery snapshot: ${discoverySnapshot
+    .map((d) => `${d.f} ${d.content === null ? '(absent)' : `${d.content.length}B`}`).join(' · ')}`);
 
   const child = spawn('/usr/bin/xvfb-run', [
     '-a', '--server-args=-screen 0 1600x1000x24',
@@ -716,6 +840,203 @@ async function main() {
       `${describe(afterF)} → ${describe(afterF2)}`);
     await shot(c, 'b6-brush-chips');
 
+    // ═══ [w] THE AGENT ROAD — editor/paint_region over the REAL Aether wire ═
+    //
+    // Same rule, same document, NO MOUSE. See §WIRE for the provenance guards
+    // and for why the port is derived rather than typed.
+    //
+    // dpr is IRRELEVANT to this whole phase: nothing here sends a coordinate.
+    // That is worth saying rather than assuming — [aim] above still governs the
+    // mouse rows, and these rows are immune to the trap it defends against.
+    //
+    // WHICH ROWS DISCRIMINATE (measured, not asserted — see the run log):
+    //   [w1] [w4]  FAIL on the pre-O12 handler. These are the fix.
+    //   [w2] [w3] [w5] [w6]  GREEN BOTH WAYS. They pin the rule and rule out the
+    //             cheap green-paths ("the app always sets bit 15" / "never sets
+    //             it" / "nothing was painted"), and they are NOT evidence of the
+    //             fix. The header prints this; so does the packet.
+    console.log('\n=== [w] the AGENT road: editor/paint_region over the real socket ===');
+    await undoAll('before the agent phase');
+
+    {
+      // THE PORT IS OURS OR THE PHASE DOES NOT RUN. The discovery file is
+      // shared with the owner's Aurora (see §WIRE), so its `port` is only
+      // accepted once its `pid` is shown to be a descendant of the process this
+      // harness spawned. `ours` is recomputed on every poll: the app writes the
+      // file a beat after launch, and the pid set grows as Electron forks.
+      let disc = null;
+      for (let i = 0; i < 60 && !disc; i++) {
+        const ours = descendants(child.pid);
+        for (const f of DISCOVERY_FILES) {
+          try {
+            const j = JSON.parse(readFileSync(f, 'utf8'));
+            if (j.port && ours.has(j.pid)) { disc = { ...j, from: f }; break; }
+          } catch { /* not written yet, or not ours */ }
+        }
+        if (!disc) await sleep(250);
+      }
+      const MCP_PORT = disc?.port ?? -1;
+      const info = disc ? await rpc(MCP_PORT, 'editor/get_project_info', {}) : null;
+      const dbgState = await c.json('window.__dbg.aeon.state()');
+      const wireSections = info?.body?.result?.sections?.filter(Boolean).length ?? -1;
+      note('agent wire', disc
+        ? `${disc.from} port=${disc.port} pid=${disc.pid} (a descendant of ${child.pid}) · `
+          + `wire sections=${wireSections} · CDP sections=${dbgState.sections} · `
+          + `zone=${info?.body?.result?.zone}`
+        : `no discovery file naming a pid under ${child.pid} — refusing to use anyone else's port`);
+      check('w0', 'the Aether wire is THIS app, looking at THIS document',
+        !!disc && wireSections === dbgState.sections
+          && info?.body?.result?.zone === dbgState.zone,
+        disc ? `port ${disc.port} pid ${disc.pid} · sections wire ${wireSections} vs cdp ${dbgState.sections}`
+             : 'no discovery file owned by this run');
+
+      if (!disc || wireSections !== dbgState.sections) {
+        unmeasurable('w1', 'the agent path preserves priority',
+          'provenance failed — every row below would be describing another app');
+      } else {
+        const tilesetSize = info.body.result.tilesetSize;
+        note('tileset', `${tilesetSize} tiles — every armed index below is taken modulo this`);
+        /** A tile index guaranteed to differ from `w`'s and to be in range. */
+        const otherTile = (w) => (((w & F.TILE) + 1) % tilesetSize) || 1;
+
+        // ── [w1] OMITTED pri over a REAL priority cell ────────────────────
+        const wBefore = await ntAt(c, SEC, idxPF);
+        check('w1-pre', 'the agent phase\'s destination REALLY carries priority',
+          (wBefore & F.PRI) === F.PRI, describe(wBefore));
+        const t1 = otherTile(wBefore);
+        const r1 = await rpc(MCP_PORT, 'editor/paint_region', {
+          section: SEC, x: priFlip.col, y: priFlip.row, w: 1, h: 1,
+          entries: [{ tile: t1, pal: 1 }],       // NO pri, NO hf, NO vf
+        });
+        const wAfter = await ntAt(c, SEC, idxPF);
+        note('w1 word', `before ${describe(wBefore)}\n        after  ${describe(wAfter)}`
+          + `\n        reply  ${JSON.stringify(r1.body.result ?? r1.body.error)}`);
+        // ANTI-VACUOUS FIRST: if the request never landed, nothing below is a
+        // measurement of preservation — it is a measurement of silence.
+        check('w1a', 'the wire request actually painted the tile it named',
+          (wAfter & F.TILE) === t1,
+          `sent tile ${t1}, document now holds ${wAfter & F.TILE} (was ${wBefore & F.TILE})`);
+        check('w1', 'an OMITTED pri PRESERVES the destination\'s priority bit (THE DEFECT)',
+          (wAfter & F.PRI) === (wBefore & F.PRI),
+          `before PRI=${!!(wBefore & F.PRI)}  after PRI=${!!(wAfter & F.PRI)}`);
+        check('w5', 'an OMITTED hf/vf lands UNFLIPPED — a flip is which PICTURE, not the cell',
+          (wAfter & (F.HF | F.VF)) === 0,
+          `before flips=${hex(wBefore & (F.HF | F.VF))}  after flips=${hex(wAfter & (F.HF | F.VF))}`);
+        note('NON-DISCRIMINATING ON THE BROKEN BUILD',
+          '[w5] is green before the fix too — the old handler also cleared the flip bits, which is '
+          + 'accidentally what the rule asks for when the request names no flip. It PINS the '
+          + 'ruling (the flips are NOT a defect) and is not evidence of the fix.');
+
+        // ── [w2] pri:false must still CLEAR — keep has to stay honest ──────
+        //
+        // REWIND FIRST. Without it this row's destination is the cell [w1] just
+        // painted, so on a BROKEN build it would be reading a cell whose bit
+        // [w1] destroyed — the "green on an absence an earlier row created"
+        // failure mode this file's header warns about. (Measured: the planted
+        // red-first run turned [w2-pre] red for exactly that reason, which is
+        // the guard working, but an ambiguous red is worth one rewind to avoid.)
+        await undoAll('before the pri:false row');
+        const c2Before = await ntAt(c, SEC, idxPF);
+        const t2 = otherTile(c2Before);
+        await rpc(MCP_PORT, 'editor/paint_region', {
+          section: SEC, x: priFlip.col, y: priFlip.row, w: 1, h: 1,
+          entries: [{ tile: t2, pal: 1, pri: false }],
+        });
+        const c2After = await ntAt(c, SEC, idxPF);
+        check('w2-pre', 'the pri:false destination REALLY carries priority first',
+          (c2Before & F.PRI) === F.PRI, describe(c2Before));
+        check('w2', 'an EXPLICIT pri:false CLEARS a set bit — an agent can still author "off"',
+          (c2After & F.PRI) === 0 && (c2After & F.TILE) === t2,
+          `${describe(c2Before)} → ${describe(c2After)}`);
+        note('NON-DISCRIMINATING', '[w2] is green on the broken build too (it cleared bit 15 '
+          + 'unconditionally). It rules out the green-path "the app always sets priority"; its '
+          + 'discriminator is [w1].');
+
+        // ── [w3] pri:true must SET it on a cell that had none ─────────────
+        await undoAll('before the pri:true row');
+        const c3Before = await ntAt(c, SEC, idxPC);
+        const t3 = otherTile(c3Before);
+        await rpc(MCP_PORT, 'editor/paint_region', {
+          section: SEC, x: priClear.col, y: priClear.row, w: 1, h: 1,
+          entries: [{ tile: t3, pal: 1, pri: true }],
+        });
+        const c3After = await ntAt(c, SEC, idxPC);
+        check('w3-pre', 'the pri:true destination REALLY lacks priority first',
+          (c3Before & F.PRI) === 0, describe(c3Before));
+        check('w3', 'an EXPLICIT pri:true SETS it on a cell that had none',
+          (c3After & F.PRI) === F.PRI && (c3After & F.TILE) === t3,
+          `${describe(c3Before)} → ${describe(c3After)}`);
+        note('NON-DISCRIMINATING', '[w3] is green on the broken build too (`!!true` is true). It '
+          + 'rules out "the app never sets priority".');
+
+        // ── [w4] THE SHAPE OF THE REPORTED BUG: a BULK region ─────────────
+        //
+        // One request covering cells whose priority DIFFERS. A rule applied
+        // once per request rather than once per cell passes [w1] and fails
+        // here, which is why a 1x1 row is not enough.
+        await undoAll('before the bulk agent row');
+        const RW = 3, RH = 2;
+        let rect = null;
+        const live = await ntRect(c, SEC, 0, 0, STW, 64);
+        for (let r = 0; r < 62 && !rect; r++) {
+          for (let cc = 0; cc + RW <= STW && !rect; cc++) {
+            const words = [];
+            for (let dr = 0; dr < RH; dr++) {
+              for (let dc = 0; dc < RW; dc++) words.push(live[(r + dr) * STW + cc + dc]);
+            }
+            const anyPri = words.some((w) => w & F.PRI), anyNot = words.some((w) => !(w & F.PRI));
+            if (words.every((w) => w & F.TILE) && anyPri && anyNot) rect = { col: cc, row: r, words };
+          }
+        }
+        if (!rect) {
+          unmeasurable('w4', 'a bulk region decides PER CELL',
+            `no ${RW}x${RH} rect of drawn cells with MIXED priority found in rows 0..63 — the row `
+            + 'would be vacuous');
+        } else {
+          note('w4 subject', `(${rect.col},${rect.row}) ${RW}x${RH}: `
+            + rect.words.map((w) => (w & F.PRI ? 'PRI' : '---')).join(' '));
+          const t4 = otherTile(rect.words[0]);
+          await rpc(MCP_PORT, 'editor/paint_region', {
+            section: SEC, x: rect.col, y: rect.row, w: RW, h: RH,
+            entries: Array.from({ length: RW * RH }, () => ({ tile: t4, pal: 0 })),
+          });
+          const after4 = [];
+          for (let dr = 0; dr < RH; dr++) {
+            for (let dc = 0; dc < RW; dc++) {
+              after4.push(await ntAt(c, SEC, (rect.row + dr) * STW + rect.col + dc));
+            }
+          }
+          check('w4a', 'the bulk request painted every cell it named',
+            after4.every((w) => (w & F.TILE) === t4),
+            `sent tile ${t4}; cells now ${after4.map((w) => w & F.TILE).join(',')}`);
+          check('w4', 'a BULK region keeps EACH cell\'s own priority — per cell, not per request',
+            after4.every((w, i) => (w & F.PRI) === (rect.words[i] & F.PRI)),
+            `before ${rect.words.map((w) => (w & F.PRI ? 1 : 0)).join('')}  `
+            + `after ${after4.map((w) => (w & F.PRI ? 1 : 0)).join('')}`);
+
+          // ── [w6] one request = one undo step, and it restores the WORD ──
+          const canUndo = await c.evalExpr('window.__dbg.aeon.canUndo()');
+          await key(c, 'z', 'KeyZ', 90, 2);
+          await sleep(200);
+          const undone = [];
+          for (let dr = 0; dr < RH; dr++) {
+            for (let dc = 0; dc < RW; dc++) {
+              undone.push(await ntAt(c, SEC, (rect.row + dr) * STW + rect.col + dc));
+            }
+          }
+          check('w6', 'ONE undo restores the whole 3x2 request, priority bits included',
+            canUndo === true && undone.every((w, i) => w === rect.words[i]),
+            `canUndo=${canUndo}  restored ${undone.map(hex).join(' ')}`);
+          note('NON-DISCRIMINATING', '[w6] is green on the broken build too — `oldNt` was always '
+            + 'captured whole. It is the anti-vacuous guard for [w4]: it proves the words [w4] '
+            + 'read were really written by the request and are really undoable.');
+        }
+        await shot(c, 'w-agent-paint-region');
+      }
+      await undoAll('after the agent phase');
+    }
+
+
     // ═══ [bg] the FOURTH site — the background plane (MapViewport ~:1755) ══
     //
     // WHICH FIXTURE THIS PHASE USES, AND WHY IT IS NOT A REAL CELL.
@@ -836,9 +1157,21 @@ async function main() {
     note('disk', 'no save was issued; the app has no autosave (shell/close-guard.ts)');
   } finally {
     try { c?.close(); } catch { /* already gone */ }
+    // SNAPSHOT THE TREE FIRST, THEN KILL. `child` is the xvfb-run WRAPPER, and
+    // the Electron under it survives a kill on the wrapper — it keeps holding
+    // its port and the discovery file it wrote. Reading the tree AFTER the
+    // SIGTERM finds nothing: the orphans have already been reparented to init,
+    // so they are no longer descendants of anything this harness knows about.
+    // (Measured: two Electron processes outlived the first two runs of this
+    // phase exactly that way.)
+    const tree = [...descendants(child.pid)];
     child.kill('SIGTERM');
     await sleep(500);
-    child.kill('SIGKILL');
+    const killed = killPids(tree);
+    await sleep(300);
+    console.log(`\ncleanup: SIGKILLed ${killed} process(es) under pid ${child.pid}`);
+    restoreDiscovery(discoverySnapshot);
+    console.log(`cleanup: restored ${discoverySnapshot.length} discovery file(s) to their pre-run state`);
   }
 
   const passed = results.filter((r) => r.ok).length;
