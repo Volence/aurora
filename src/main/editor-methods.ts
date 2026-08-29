@@ -252,8 +252,11 @@ export const EDITOR_METHODS: EditorMethod[] = [
     },
     description: 'Save a reusable w*h pattern into the chunk library (row-major entries; the chunk is created fresh, so an omitted "pri" means no priority), optionally with collisionA/collisionB cell-word planes ((w/2)*(h/2) words each; omitted planes default to air). Returns the chunk id.' },
   { name: 'stamp_chunk', kind: 'stamp-chunk', result: 'json',
-    params: { chunkId: z.string(), section: z.number().int().min(0), x: z.number().int().min(0), y: z.number().int().min(0) },
-    description: 'Stamp a library chunk (art + collision) onto a section at tile coordinates. x/y must be even (collision cells are 16px/2-tile aligned). One undo step.' },
+    params: {
+      chunkId: z.string(), section: z.number().int().min(0), x: z.number().int().min(0), y: z.number().int().min(0),
+      detach: z.boolean().optional().describe('place plain tiles instead of a linked copy: the stamp will NOT follow later edits to the chunk (owner ruling d-18c; default false = the stamp remembers its chunk)'),
+    },
+    description: 'Stamp a library chunk (art + collision) onto a section at tile coordinates. x/y must be even (collision cells are 16px/2-tile aligned). One undo step. By default the stamp REMEMBERS which chunk it came from, so editing that chunk later updates every copy that has not been painted over; pass detach:true for plain tiles.' },
   { name: 'goto', kind: 'goto', result: 'json',
     params: { section: z.number().int().min(0), x: z.number().int().min(0).optional(), y: z.number().int().min(0).optional(), zoom: z.number().min(0.125).max(8).optional() },
     description: 'Set the active section and scroll the shared viewport to tile coords (x,y) at optional zoom (0.125-8).' },

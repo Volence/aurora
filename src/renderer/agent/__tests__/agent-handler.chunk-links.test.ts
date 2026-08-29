@@ -146,6 +146,37 @@ describe('paint-region breaks the chunk link of every tile it rewrites (d-18c)',
     expect(originAt(1, 1)?.id).toBe(id);
   });
 
+  it('the DETACHED stamp records no placement, and it is opt-in', async () => {
+    // The wire form of the checkbox. `detach` absent must mean KEEP — the two
+    // surfaces (this and the panel's unchecked box) have to agree about what a
+    // plain stamp means, and the ruling's default is remember.
+    await handleAgentRequest({
+      kind: 'stamp-chunk', chunkId: 'chunk-a', section: 0, x: 0, y: 0, detach: true,
+    } as never);
+
+    // The ART still landed — otherwise "no placement" would be true of a stamp
+    // that did nothing at all.
+    expect(wordAt(0, 0)).toBe(chunk.nametable[0]);
+    expect(wordAt(0, 0)).not.toBe(0);
+    expect(placementsOfChunk(live().chunkLinks, 'chunk-a')).toEqual([]);
+    expect(originAt(0, 0)).toBeNull();
+  });
+
+  it('a DETACHED stamp CLEARS the links of the placement it lands on top of', async () => {
+    // Not the same as "records nothing": the tiles genuinely no longer come
+    // from the old chunk, and a surviving link would have the next propagation
+    // overwrite this stamp.
+    const id = await stampAtOrigin();
+    expect(originAt(1, 1)?.id).toBe(id);
+
+    await handleAgentRequest({
+      kind: 'stamp-chunk', chunkId: 'chunk-a', section: 0, x: 0, y: 0, detach: true,
+    } as never);
+
+    expect(originAt(1, 1)).toBeNull();
+    expect(placementsOfChunk(live().chunkLinks, 'chunk-a')).toEqual([]);
+  });
+
   it('a paint on a section with NO identity layer is left exactly as it was', async () => {
     // The common path, and the reason `withLinkBreaks` returns its input
     // unchanged rather than wrapping everything in a batch.

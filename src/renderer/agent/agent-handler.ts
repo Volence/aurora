@@ -638,10 +638,14 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
 
       // Unlike the UI tool, agent stamps do NOT snap to the chunk's own grid —
       // callers pass explicit tile coords (validated even, above), by design.
+      // The checkbox's wire form (d-18c). Absent means KEEP the link, which is
+      // the ruling's default and matches what the UI checkbox does unchecked —
+      // the two surfaces must not disagree about what a plain stamp means.
+      const detached = req.detach === true;
       const cmd = buildStampCommand({
         chunk, section, sectionIndex: req.section,
-        baseCol: req.x, baseRow: req.y, artOnly: false,
-        description: `agent: stamp ${chunk.id} at (${req.x},${req.y})`,
+        baseCol: req.x, baseRow: req.y, artOnly: false, detached,
+        description: `agent: stamp ${chunk.id} at (${req.x},${req.y})${detached ? ' (detached)' : ''}`,
       });
 
       let changed = 0;

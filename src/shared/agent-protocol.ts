@@ -68,7 +68,7 @@ export type AgentRequest =
   // say it exactly. `validateCollisionReadPlane` refuses `'both'` in prose.
   | { kind: 'get-collision-region'; section: number; plane: 'a' | 'b'; x: number; y: number; w: number; h: number; ascii?: boolean }
   | { kind: 'save-chunk'; name: string; w: number; h: number; entries: NametableEntrySpec[]; collisionA?: number[]; collisionB?: number[] }
-  | { kind: 'stamp-chunk'; chunkId: string; section: number; x: number; y: number }
+  | { kind: 'stamp-chunk'; chunkId: string; section: number; x: number; y: number; detach?: boolean }
   | { kind: 'goto'; section: number; x?: number; y?: number; zoom?: number }
   | { kind: 'get-bg' }
   // layout: the engine's 64x64 nametable (BG_LAYOUT_WORDS words), or the legacy

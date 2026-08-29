@@ -22,7 +22,7 @@ import { docFromTile, docFromSectionRegion } from '../../core/art/composer-buffe
 import { seedDocCollisionFromSection } from '../../core/art/composer-collision';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import { buildStampCommand } from '../../core/editing/map-stamp';
-import { withLinkBreaks } from '../../core/editing/chunk-links';
+import { withLinkBreaks, chunkOriginAt } from '../../core/editing/chunk-links';
 import {
   snapMarquee, copyFromSection, buildPasteCommand, isBlockAligned,
   effectivePasteLayers, pasteBaseStep, selectionSizeLabel, artOnlyReason,
@@ -2909,10 +2909,16 @@ export default function MapViewport() {
       // (unless Alt/artOnly), mirroring paintCollisionCell's seed-on-first-touch.
       ensureCollisionPlanes(section);
 
+      // THE CHECKBOX (d-18c). Read from the store at click time rather than
+      // captured earlier: the panel is beside the map and the author can toggle
+      // it between two stamps. Default false = the stamp REMEMBERS its chunk.
+      const detached = useEditorStore.getState().stampDetached;
       const cmd = buildStampCommand({
         chunk, section, sectionIndex: info.sectionIndex,
-        baseCol, baseRow, artOnly: e.altKey,
-        description: `Stamp chunk ${selectedChunkId} at (${baseCol}, ${baseRow})`,
+        baseCol, baseRow, artOnly: e.altKey, detached,
+        description: detached
+          ? `Stamp chunk ${selectedChunkId} at (${baseCol}, ${baseRow}) (detached)`
+          : `Stamp chunk ${selectedChunkId} at (${baseCol}, ${baseRow})`,
       });
 
       // Same as the paste path: the listener walks batches, so this no longer
@@ -3143,6 +3149,28 @@ export default function MapViewport() {
       }
       if (onEdge !== frameHoverRef.current) setFrameHover(onEdge);
       if (onEdge) return;
+    }
+
+    // WHAT IS THIS REGION MADE OF (d-18): while the stamp is armed, report the
+    // placement under the pointer so the Chunk links panel can offer Detach on
+    // it. Read through `chunkOriginAt`, never a second copy of the plane
+    // arithmetic — and it is a HOVER because the only click this tool has is a
+    // stamp, so hovering is the one non-destructive gesture available.
+    //
+    // NOT cleared when the pointer leaves the canvas: the Detach button lives
+    // off the map, and a readout that emptied on the way to its own button
+    // would be unusable. `setLinkHover` de-duplicates, so this is one store
+    // write per placement crossed, not one per mousemove.
+    if (tool === 'stamp-chunk') {
+      const world = screenToWorld(e.clientX, e.clientY);
+      const info = worldToSectionTile(world.x, world.y);
+      const hoverSection = info ? getSectionByIndex(info.sectionIndex) : null;
+      if (info && hoverSection) {
+        const origin = chunkOriginAt(hoverSection, info.row * SECTION_TILES_WIDE + info.col);
+        useEditorStore.getState().setLinkHover(origin
+          ? { sectionIndex: info.sectionIndex, placementId: origin.id, chunkId: origin.chunkId }
+          : null);
+      }
     }
 
     // Stamp ghost: track where the chunk would land, snapped to its own size.
