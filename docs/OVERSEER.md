@@ -713,7 +713,30 @@ window) rather than adopting their reading — the standing practice in this fil
   The motivating defect is now impossible: two binaries from different commits can no longer be
   identical on the wire. **`serverName` is still `"oracle-next"` and `serverVersion` still `0.0.0`** —
   both unchanged, both still proving nothing; read `implementation`, never `serverName`.
-- **Condition (2): STRONGLY CORROBORATED, NOT PROVEN FROM OUTSIDE — say it that way.** `source:"vcs"`
+- ⚠ **CONDITION (2) UPGRADED 2026-08-29 — barred by contract AND by a source-level test, both read
+  firsthand at oracle `fee8f12` (ancestor of their `origin/main`, checked). BUT ONE JOINT IS UNASSERTED
+  AND IT IS THE LOAD-BEARING ONE.** What they built is genuinely strong: `build.rs` computes the values
+  at COMPILE time in two branches, and the no-git fallback emits `no-vcs+pkg=…` which cannot be mistaken
+  for a SHA rather than fabricating one; `dirty` is an `Option` OMITTED under `"declared"`, so **a
+  `dirty:false` on the wire can only have come from a real working-tree measurement** — the exact thing
+  wire-reading could not settle. `_COMPILE_TIME_OR_NOTHING` is stronger than a test: a runtime-read
+  value cannot sit in a `const` initialiser, so that failure is a BUILD error.
+  **The gap, found here by reading their three tests against each other rather than one at a time —
+  this file's own bar 18b, the uncited joint, in someone else's repo.** The property splits three ways
+  and the join is asserted by nobody: (a) `_COMPILE_TIME_OR_NOTHING` proves the CONSTANTS are
+  compile-time; (b) `neither_identity_value_is_reachable_from_configuration` proves the constant NAMES
+  appear only in `build_info.rs` and `engine.rs`; (c) `initialize_names_the_implementation_and_the_build`
+  proves the WIRE `serverBuild.id` is a non-empty string with a valid `source`. **Nothing asserts that
+  the string on the wire IS that constant** — and `engine.rs`, the one file allowed to mention both, is
+  exactly where a divergence would live. An override written there as
+  `config.override.unwrap_or(SERVER_BUILD_ID)` keeps the name inside an ALLOWED file, keeps the const
+  compile-time, and emits a valid non-empty string: **all three tests green.** Reported to them; the fix
+  is one line per value (`assert_eq!(id, SERVER_BUILD_ID)`), and both constants are already imported in
+  that test file. **Until it lands, treat (2) as barred-by-construction with an unasserted join, not as
+  proven.** Their anti-vacuity guards are present and correct, which is why this needed reading ACROSS
+  the tests to find.
+- **Superseded reading, kept as the record of what was believed before the source was read — condition
+  (2): STRONGLY CORROBORATED, NOT PROVEN FROM OUTSIDE.** `source:"vcs"`
   and `dirty:false` are build-time captures, and the id's SHA is a **real commit, reachable from
   oracle `origin/main`** (checked here). That is good evidence it is VCS-derived rather than
   config-supplied. It is **not proof**: nothing observable on the wire can rule out a config
