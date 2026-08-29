@@ -137,9 +137,38 @@ export const EDITOR_METHODS: EditorMethod[] = [
       x: z.number().int().min(0).max(127).describe('cell col (16px units, 0-127)'),
       y: z.number().int().min(0).max(127).describe('cell row (16px units, 0-127)'),
       w: z.number().int().min(1).max(128), h: z.number().int().min(1).max(128),
-      word: z.number().int().min(0).max(0xFFFF).describe('packed collision cell word (shape 9:0, xflip 10, yflip 11, solidity 13:12); 0 = air'),
+      word: z.number().int().min(0).max(0xFFFF).optional()
+        .describe('FILL form: one packed collision cell word (shape 9:0, xflip 10, yflip 11, solidity 13:12); 0 = air. Give this OR "words", never both'),
+      words: z.array(z.number().int().min(0).max(0xFFFF).nullable()).optional()
+        .describe('PER-CELL form: w*h packed cell words, row-major; null leaves that cell alone. This is get_collision_region\'s reply "words" unchanged. Give this OR "word", never both'),
     },
-    description: 'Fill a w*h CELL rectangle (16px units) of one collision plane with a packed cell word. One undo step. Reply\'s "painted" counts 8px sub-tile entries actually changed, up to 4 per cell.' },
+    description: 'Paint a w*h CELL rectangle (16px units) of one collision plane. Pass EITHER "word" '
+      + '(fill the whole rectangle with that packed cell word) OR "words" (one word per cell, row-major, '
+      + 'w*h long, null = leave that cell alone) — exactly one; both or neither is refused. "words" is '
+      + 'get_collision_region\'s reply "words" fed straight back, so read then write restores a region '
+      + 'exactly. A paint AUTHORS shape/xflip/yflip/solidity and KEEPS whatever else each destination cell '
+      + 'held (bits 15:14 are owned by no Aurora field), so copying words to a DIFFERENT place carries those '
+      + 'four fields and not the source\'s spare bits. One undo step. Reply: "painted" counts 8px sub-tile '
+      + 'entries actually changed (up to 4 per cell), "skipped" counts null cells.' },
+  { name: 'get_collision_region', kind: 'get-collision-region', result: 'json',
+    params: {
+      section: z.number().int().min(0),
+      plane: z.enum(['a', 'b']),
+      x: z.number().int().min(0).max(127).describe('cell col (16px units, 0-127) — SAME units as paint_collision, NOT the 8px tile units get_nametable_region uses'),
+      y: z.number().int().min(0).max(127).describe('cell row (16px units, 0-127)'),
+      w: z.number().int().min(1).max(128), h: z.number().int().min(1).max(128),
+      ascii: z.boolean().optional().describe('also return a one-char-per-cell glyph grid with a legend, for a human to glance at'),
+    },
+    description: 'READ a w*h CELL rectangle (16px units, the same coordinates paint_collision writes) of one '
+      + 'collision plane — judge a layout from data instead of a screenshot. Returns "cells" (h rows of w '
+      + 'objects: word, shape, xFlip, yFlip, solidity, known, angle) and "words" (those same raw words flat, '
+      + 'row-major, w*h long) — pass "words" back to paint_collision as its "words" to restore the region. '
+      + 'A 16px cell is STORED as four 8px sub-tiles: when they disagree the cell is reported honestly as '
+      + '{word:null, mixed:true, sub:[tl,tr,bl,br]} with NO shape/flip/solidity, never by sampling one of the '
+      + 'four, and "mixedCells" counts them (a null in "words" is what paint_collision skips). "word" is all '
+      + '16 raw bits including 15:14, which no Aurora field owns and which a paint preserves; '
+      + '"cellsWithUnownedBits" counts cells carrying them. "profilesLoaded" false means no collision shape '
+      + 'tables are loaded, so "known" is false and "angle" null everywhere. Max 4096 cells per call.' },
   { name: 'save_chunk', kind: 'save-chunk', result: 'json',
     params: {
       name: z.string().min(1), w: z.number().int().min(1).max(64), h: z.number().int().min(1).max(64), entries: z.array(entrySchema),

@@ -26,7 +26,16 @@ export type AgentRequest =
   | { kind: 'set-palette'; line: number; colors: number[] }   // 16 Genesis CRAM words
   | { kind: 'write-tiles'; tiles: number[][]; at?: number }   // each tile: 64 values 0-15
   | { kind: 'paint-region'; section: number; x: number; y: number; w: number; h: number; entries: NametableEntrySpec[] }
-  | { kind: 'paint-collision'; section: number; plane: 'a' | 'b'; x: number; y: number; w: number; h: number; word: number }
+  // EITHER `word` (fill the rectangle) OR `words` (one packed cell word per
+  // CELL, row-major, w*h long; null = leave that cell alone). Exactly one —
+  // enforced by `validateCollisionWrite`, not by this type, because a union of
+  // two request shapes here would have to be re-narrowed at every hop.
+  // `words` is the write half of `get-collision-region`: its reply's `words`
+  // array is this field, unchanged.
+  | { kind: 'paint-collision'; section: number; plane: 'a' | 'b'; x: number; y: number; w: number; h: number; word?: number; words?: (number | null)[] }
+  // The READ half. Same 16px CELL units as paint-collision. `ascii` adds a
+  // glyph grid a human can glance at; the JSON is the same either way.
+  | { kind: 'get-collision-region'; section: number; plane: 'a' | 'b'; x: number; y: number; w: number; h: number; ascii?: boolean }
   | { kind: 'save-chunk'; name: string; w: number; h: number; entries: NametableEntrySpec[]; collisionA?: number[]; collisionB?: number[] }
   | { kind: 'stamp-chunk'; chunkId: string; section: number; x: number; y: number }
   | { kind: 'goto'; section: number; x?: number; y?: number; zoom?: number }
