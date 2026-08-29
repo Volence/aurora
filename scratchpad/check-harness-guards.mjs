@@ -217,7 +217,10 @@ for (const path of listMjs(DIR)) {
   // ── G2 ───────────────────────────────────────────────────────────────────
   if (!isThisChecker && /\bpkill\b/.test(tok)) {
     fails.push(`G2 ${rel}: calls pkill. A pattern match on a command line is not an ownership test — `
-      + "it matches the OWNER'S Aurora and misses this run's own orphan.");
+      + "it matches ANY Aurora whose argv carries the main tree's dist path -- another "
+      + "agent's harness run (observed killing one three times, 2026-08-16), or a "
+      + "production launch from the main tree -- while MISSING this run's own orphan, "
+      + "whose worktree path does not match. Backwards in both directions.");
   }
 
   // ── G3 ───────────────────────────────────────────────────────────────────
