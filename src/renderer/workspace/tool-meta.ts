@@ -41,7 +41,7 @@ export const TOOL_LABELS: Record<ToolId, string> = {
 export const TOOL_HINTS: Record<ToolId, string> = {
   view: 'Click + drag to pan, scroll to zoom',
   select: 'Click to select, drag to move, Del to remove',
-  marquee: 'drag to select · Ctrl+C copy · Ctrl+V paste · S save as chunk · Esc clear',
+  marquee: 'drag to select · Ctrl+C copy · Ctrl+V paste · X/Y flip · S save as chunk · Esc clear',
   'paint-tile': 'Click to place the selected tile, right-click to pick',
   'paint-block': 'Click to place a 16×16 px block (2×2 tiles)',
   'stamp-chunk': 'Select a chunk, then click or drag to stamp it',

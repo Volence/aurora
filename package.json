@@ -15,7 +15,8 @@
     "harness:vsplit-advisory": "node scratchpad/vsplit-advisory-harness.mjs",
     "harness:marquee-snap-modifier": "node scratchpad/marquee-snap-modifier-harness.mjs",
     "harness:paste-pan": "node scratchpad/paste-pan-harness.mjs",
-    "harness:collision-preservation": "node scratchpad/collision-preservation-harness.mjs"
+    "harness:collision-preservation": "node scratchpad/collision-preservation-harness.mjs",
+    "harness:marquee-flip": "node scratchpad/marquee-flip-harness.mjs"
   },
   "keywords": [],
   "author": "",
