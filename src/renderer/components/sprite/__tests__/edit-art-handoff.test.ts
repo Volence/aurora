@@ -24,6 +24,7 @@ import { decodeGenesisColor } from '../../../../core/formats/palette';
 import { resolveObjectAnims } from '../../../../core/project/profiles/s1-object-anims';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { referenceFile, skipUnlessPresent } from '../../../../../test/support/fixture-tree';
 import type { DiscoveredSpriteSet } from '../../../../core/import/sprite-discovery';
 import type { CompressionKind } from '../../../../core/compress';
 import { useClassicProjectStore } from '../../../state/classicProjectStore';
@@ -413,16 +414,21 @@ describe('editObjectArtCheckout', () => {
     expect(palReads).toEqual([`${DIR}|palette/Level Select.bin`]);
   });
 
-  it('a palFile row seeds the standalone palette from the DECLARED LINE of the real palette file', async () => {
+  it('a palFile row seeds the standalone palette from the DECLARED LINE of the real palette file', async (ctx) => {
     // titlesonic declares pal line 1 (Tile_Pal2 in obGfx, _incObj/0E,0F:28) of
     // palette/Title Screen.bin. Feed the REAL s1disasm bytes through the seam
     // and demand the seeded colors equal that file's SECOND 32-byte line —
     // derived here from the same bytes, not hardcoded.
-    const S1DIR = '/home/volence/sonic_hacks/s1disasm';
-    if (!existsSync(join(S1DIR, 'palette/Title Screen.bin'))) return; // tree absent — the render suite already skips
+    // Was: `if (!existsSync(…)) return; // the render suite already skips`.
+    // Two things wrong with that. A bare `return` from a test body is a PASS,
+    // not a skip — so with no s1disasm checkout this row reported green while
+    // touching none of its subject. And it delegated its own honesty to a
+    // DIFFERENT file's skip, which says nothing about this row's total.
+    const PAL = referenceFile('s1disasm', 'palette/Title Screen.bin');
+    if (skipUnlessPresent(ctx, PAL, "s1disasm's palette/Title Screen.bin")) return;
     useClassicLevelStore.setState({ ref: null, doc: null });
     __setSpriteSetOpenerForTest(stubOpener([], 8));
-    const bytes = new Uint8Array(readFileSync(join(S1DIR, 'palette/Title Screen.bin')));
+    const bytes = new Uint8Array(readFileSync(PAL!));
     __setPalFileReaderForTest(async () => bytes);
 
     const ok = await editObjectArtCheckout('titlesonic');

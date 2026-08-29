@@ -14,7 +14,7 @@
 // before renderFrameToIndices' later-overwrites-earlier compositing), and a
 // transparent pixel of a top piece never claims the pixel.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
@@ -154,8 +154,19 @@ describe('priMask against real s1disasm data (Newtron frame 8)', { skip: !S1_PRE
   // from the standalone .nem, so they can't exercise the mask. Expectations
   // below are DERIVED from the parsed pieces' geometry, not hardcoded pixels:
   // a pixel covered by exactly one piece inherits that piece's bit.
-  const mapText = fs.readFileSync(path.join(S1DIR, '_maps/Newtron.asm'), 'utf8');
-  const artBytes = new Uint8Array(fs.readFileSync(path.join(S1DIR, 'artnem/Enemy Newtron.nem')));
+  // ⚠ Read in `beforeAll`, NOT in this describe body. `describe(name, { skip },
+  // fn)` STILL RUNS `fn` at collection — the option marks the collected tests
+  // skipped, it does not stop the callback executing. These two reads used to
+  // sit here, so on a machine with no s1disasm they threw during collection and
+  // took the WHOLE FILE (all 7 tests) as a file-level FAIL. `beforeAll` does not
+  // run inside a skipped describe, so the rows survive as reasoned skips.
+  // Measured 2026-08-29, docs/reviews/2026-08-29-fixture-absent-honesty.md.
+  let mapText!: string;
+  let artBytes!: Uint8Array;
+  beforeAll(() => {
+    mapText = fs.readFileSync(path.join(S1DIR, '_maps/Newtron.asm'), 'utf8');
+    artBytes = new Uint8Array(fs.readFileSync(path.join(S1DIR, 'artnem/Enemy Newtron.nem')));
+  });
   const FRAME = 8;
 
   it('frame 8 mask is present and mixed, and single-piece pixels match their piece bit', () => {

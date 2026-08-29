@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
+import { declareUnenumerated } from '../../../../test/support/fixture-tree';
 import {
   packBlockCell,
   unpackBlockCell,
@@ -316,6 +317,12 @@ describe('real bg layouts fit the 64x8 bg limit', { skip: !fs.existsSync(`${S1DI
   it('found bg layout files', () => {
     expect(bgFiles.length).toBeGreaterThan(0);
   });
+
+  // The per-file rows below are generated from `bgFiles`. Over an empty list
+  // they are never REGISTERED at all — not failed, not skipped, simply absent,
+  // so 10 rows left the suite total with no line anywhere saying they had.
+  // Measured 2026-08-29, docs/reviews/2026-08-29-fixture-absent-honesty.md.
+  declareUnenumerated(bgFiles.length, dir, 's1disasm\u2019s per-act bg layout binaries');
 
   for (const f of bgFiles) {
     it(`${f} is within 64 wide × 8 tall`, () => {
