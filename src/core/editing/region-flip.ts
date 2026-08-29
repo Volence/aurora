@@ -46,7 +46,7 @@
 //     hFlip      bit 11                 xFlip      bit 10
 //     vFlip      bit 12                 yFlip      bit 11
 //     palette    bits 14:13             solidity   bits 13:12
-//     priority   bit 15                 (spare)    bits 15:14
+//     priority   bit 15                 unowned    bits 15:14
 //
 // Getting these crossed would flip art against palette bits and collision
 // against solidity bits — output that still renders, still saves, and is wrong.
@@ -56,13 +56,27 @@
 //
 // ═══ WHY XOR, AND NOT UNPACK/REPACK ═══
 //
-// `packCollisionCell` writes four fields and DROPS bits 15:14, which the engine
-// reserves (`collision_pipeline.py` reads them as path B's solidity shift, and
-// a loop feature is being designed on top). A flip must transform the bits it
-// OWNS and carry every other bit through untouched, so it XORs one mask rather
-// than round-tripping through a codec that would answer for fields it was never
-// asked about. Same rule on the art side: palette and priority survive a flip
-// because nothing here rebuilds the word.
+// THE SIBLING RULE, OBEYED RATHER THAN RESTATED: `collision-word.ts` (landed
+// 2026-08-28) declares that a collision writer authors the fields it OWNS and
+// the cell keeps the rest, with `COLLISION_CELL_OWNED_MASK` derived from
+// `packCollisionCell` itself. A flip is such a writer. It XORs ONE owned bit,
+// so every unowned bit survives BY CONSTRUCTION — there is no merge step here
+// to get wrong, and `region-flip.test.ts` rows 1d/1f assert the property
+// against that module's own mask rather than against a literal.
+//
+// Round-tripping through the codec would have broken exactly that:
+// `packCollisionCell` writes four fields and emits zeros everywhere else, so
+// unpack/repack silently answers for bits it was never asked about. (Planted
+// and measured: it reds 1d and 1f, `expected +0 to be 49152`.)
+//
+// What those bits ARE is recorded by the sibling module, grounded at aeon
+// `b76576ea` — `bake_cell`'s legacy single-word encoding makes 15:14 path-B
+// solidity (`PATH_B_SOL_SHIFT = 14`, a live field), while `bake_plane_cell`,
+// which is the encoding Aurora's data actually feeds, reads them not at all.
+// This file encodes NO meaning for them either; it preserves them.
+//
+// Same rule on the art side: palette and priority survive a flip because
+// nothing here rebuilds the word.
 //
 // ═══ AIR IS AIR, ON THE COLLISION PLANE ONLY ═══
 //

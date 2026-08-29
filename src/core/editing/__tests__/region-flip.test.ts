@@ -11,6 +11,7 @@ import {
 } from '../../model/s4-types';
 import type { Section } from '../../model/s4-types';
 import { packCollisionCell, unpackCollisionCell } from '../../collision/collision-cell-word';
+import { COLLISION_CELL_UNOWNED_MASK, unownedCollisionBits } from '../collision-word';
 import { cellTileIndices } from '../../collision/collision-cell';
 import type { AnyCommand, SetTilesCommand, SetCollisionEditCommand } from '../commands';
 
@@ -176,7 +177,7 @@ describe('region-flip · derived bit masks', () => {
   });
 
   it('1d: a flip carries every bit it does not own — palette, priority, solidity, '
-    + 'and the engine-RESERVED bits 15:14 of a collision word', () => {
+    + 'and the UNOWNED bits of a collision word', () => {
     const a = art(0x123, { pal: 3, pri: true });
     for (const axis of ['h', 'v'] as const) {
       const f = unpackNametableWord(flipArtWord(a, axis));
@@ -184,16 +185,39 @@ describe('region-flip · derived bit masks', () => {
       expect(f.palette).toBe(3);
       expect(f.priority).toBe(true);
     }
-    // Bits 15:14 are RESERVED (a loop feature is being designed on them) and
-    // `packCollisionCell` drops them — so this word is built by OR, exactly the
-    // way an unknown-bit-preserving writer would leave it.
-    const RESERVED = 0xC000;
-    const c = coll(0x2AA, { x: true, sol: 'sides-bottom' }) | RESERVED;
+    // THE SIBLING RULE (collision-word.ts, 2026-08-28): a collision writer
+    // authors the fields it owns and the cell keeps the rest. The unowned mask
+    // is that module's, DERIVED from `packCollisionCell` — not `0xC000` typed
+    // here, which is the copied-pin defect one field-move away from being
+    // confidently wrong. A destination is authored with those bits SET on
+    // purpose: every cell in every shipped act holds zero there, so a row that
+    // does not author them is vacuous by construction.
+    expect(COLLISION_CELL_UNOWNED_MASK).not.toBe(0);
+    const c = coll(0x2AA, { x: true, sol: 'sides-bottom' }) | COLLISION_CELL_UNOWNED_MASK;
     for (const axis of ['h', 'v'] as const) {
       const f = flipCollisionWord(c, axis);
-      expect(f & RESERVED).toBe(RESERVED);
+      expect(unownedCollisionBits(f)).toBe(COLLISION_CELL_UNOWNED_MASK);
       expect(unpackCollisionCell(f).shape).toBe(0x2AA);
       expect(unpackCollisionCell(f).solidity).toBe('sides-bottom');
+    }
+    // ...and the property holds BY CONSTRUCTION, not by luck: the bit a flip
+    // XORs is inside the owned mask, so no unowned bit can ever be reached.
+    expect(FLIP_MASKS.collX & COLLISION_CELL_UNOWNED_MASK).toBe(0);
+    expect(FLIP_MASKS.collY & COLLISION_CELL_UNOWNED_MASK).toBe(0);
+  });
+
+  it('1f: A WHOLE-PLANE FLIP PRESERVES UNOWNED BITS CELL BY CELL — the property '
+    + 'stated over the transform the app actually calls, not just the word helper', () => {
+    const src = fixture();
+    src.collisionA = Uint16Array.from(src.collisionA, (w, i) => (
+      i === 0 ? (w | COLLISION_CELL_UNOWNED_MASK) : w));
+    for (const axis of ['h', 'v'] as const) {
+      const out = flipClipboard(src, axis);
+      const before = [...src.collisionA].map(unownedCollisionBits).sort();
+      const after = [...out.collisionA].map(unownedCollisionBits).sort();
+      expect(after).toEqual(before);
+      // ANTI-VACUOUS: there really is an unowned value in play.
+      expect(before.some((b) => b !== 0)).toBe(true);
     }
   });
 
