@@ -72,6 +72,53 @@ export const PRIORITY_FILL = 'rgba(200, 90, 255, 0.42)';
  *  enough to survive light art). */
 export const PRIORITY_EDGE = 'rgba(245, 215, 255, 0.9)';
 
+// ---------- both-planes lens (canvas/both-planes-lens.ts) ----------
+// Marks 16px collision cells that are solid on path A AND path B — what the
+// "Both planes" collision brush authors, and the thing an author otherwise
+// cannot see, because the collision overlay shows ONE plane at a time.
+//
+// TEAL, and the choice is constrained rather than free. Green/amber/blue with
+// red ticks are the collision solidity fills, violet is priority, pink is the
+// band lens and orange is the screen frame. Teal is the remaining hue that
+// reads as "related to collision" (it is green's neighbour) without being any
+// solidity class's own colour — which matters because this lens draws ON TOP OF
+// the collision overlay and must not be mistaken for a fifth solidity.
+//
+// Same 0.42 fill alpha and edge-vs-fill split as the priority lens, so the two
+// lenses stack legibly and an author who has learned "the fill is the area, the
+// edge is the shape" in one has learned it in both.
+/** Translucent veil over each cell that is solid on both collision planes. */
+export const BOTH_PLANES_FILL = 'rgba(45, 210, 205, 0.42)';
+/** Crisp stroke on both↔not-both boundaries. */
+export const BOTH_PLANES_EDGE = 'rgba(190, 250, 248, 0.9)';
+
+// ---------- crossover lens (canvas/crossover-lens.ts) ----------
+// Marks 16px collision cells whose word carries a LOOP CROSSOVER — standing
+// there hands the player to the other collision path.
+//
+// AMBER, and it is the loudest hue left, deliberately. The other lenses mark
+// things an author can also infer some other way (priority from playing,
+// both-planes from toggling the two collision overlays). A crossover has NO
+// other depiction anywhere in the editor: it is two bits whose only observable
+// consequence is which plane the player is on seconds later. It also has a
+// failure mode the others do not — a mark on one plane and not the other looks
+// identical on screen to a correct pair, and plays correctly in exactly one
+// direction. So this one is allowed to shout.
+//
+// It is drawn OVER the both-planes lens on purpose: a loop's crossover cells
+// are usually also solid-on-both (the shared ground), and the crossover is the
+// rarer and more consequential of the two facts.
+/** Veil over each cell carrying a crossover on the plane being shown. */
+export const CROSSOVER_FILL = 'rgba(255, 176, 32, 0.46)';
+/** Crisp stroke on crossover↔plain boundaries. */
+export const CROSSOVER_EDGE = 'rgba(255, 232, 170, 0.95)';
+/** Veil for a crossover marked on ONE plane only — a legal but suspicious
+ *  state (a two-way loop needs the pair). Red-shifted from the amber so the
+ *  two read as "a crossover" and "a crossover that is probably half-painted"
+ *  rather than as two unrelated marks. */
+export const CROSSOVER_ONE_WAY_FILL = 'rgba(255, 96, 48, 0.46)';
+export const CROSSOVER_ONE_WAY_EDGE = 'rgba(255, 190, 160, 0.95)';
+
 // ---------- sprite occlusion ghost (classic-overlays drawObjects) ----------
 // The occluded portion of an object preview — sprite pixels the game hides
 // behind high-priority plane tiles — stays discoverable as a translucent ghost

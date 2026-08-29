@@ -148,6 +148,46 @@ export function validateCollisionWrite(
   return null;
 }
 
+/**
+ * `get_collision_region`'s plane, and the ONE combination the 2026-08-29 merge
+ * of the collision-read and loop-paint parcels REFUSED rather than invented
+ * (docs/reviews/2026-08-29-paint-collision-reconcile.md).
+ *
+ * `paint_collision` grew `plane: "both"` — a MODE that writes A and B in one
+ * undo step, each cell merged against its own plane's word. An agent that has
+ * just used it will reach for the same value on the read, and the read cannot
+ * honour it:
+ *
+ *   • MERGING the two planes into one grid is exactly the flattening this very
+ *     method already refuses one level down. A cell whose four 8px sub-tiles
+ *     disagree reports `{word: null, mixed: true}` rather than a sampled guess,
+ *     on the argument that an instrument which averages away disagreement
+ *     cannot report the one thing it was built to catch. Two planes disagreeing
+ *     is the same disagreement one level up, and the same answer applies.
+ *   • RETURNING TWO GRIDS makes the reply's shape depend on a parameter, and
+ *     leaves `words` — whose whole purpose is to feed straight back into
+ *     `paint_collision` — with no single value.
+ *
+ * Two calls express it exactly and cost nothing. So this refuses, and refuses
+ * in prose: an agent gets the method description and nothing else, and a bare
+ * enum error would teach it the read is missing a feature rather than that the
+ * asymmetry is deliberate. That gap cost this repo a parcel on 2026-08-28
+ * (docs/reviews/2026-08-29-agent-paint-priority.md §4).
+ */
+export function validateCollisionReadPlane(plane: unknown): string | null {
+  if (plane === 'a' || plane === 'b') return null;
+  if (plane === 'both') {
+    return 'get_collision_region reads ONE plane: pass plane "a" or "b", not "both". '
+      + 'paint_collision accepts "both" because a WRITE can touch two planes in one undo step, '
+      + 'but a read of "both" would have to merge the two planes into one grid — the same '
+      + 'flattening this method already refuses for a cell whose four 8px sub-tiles disagree, '
+      + 'where it reports null rather than sampling one of them — or return two grids, which '
+      + 'would make the reply shape depend on a parameter and leave "words" (the array '
+      + 'paint_collision takes straight back) with no single value. Call it twice.';
+  }
+  return `plane must be "a" or "b", got ${JSON.stringify(plane)}`;
+}
+
 export function validatePaintRegion(
   section: number,
   x: number, y: number, w: number, h: number,

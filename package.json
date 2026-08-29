@@ -19,7 +19,8 @@
     "harness:marquee-flip": "node scratchpad/marquee-flip-harness.mjs",
     "harness:collision-read": "node scratchpad/collision-read-harness.mjs",
     "check:harness-guards": "node scratchpad/check-harness-guards.mjs",
-    "harness:guard-proof": "node scratchpad/harness-guard-proof.mjs"
+    "harness:guard-proof": "node scratchpad/harness-guard-proof.mjs",
+    "harness:loop-paint": "node scratchpad/loop-paint-harness.mjs"
   },
   "keywords": [],
   "author": "",

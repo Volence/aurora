@@ -21,6 +21,19 @@ export interface OverlayOptions {
    *  core/level-classic/priority-mask.ts; aeon reads the flat 8px nametable
    *  through core/model/nametable-priority.ts). */
   showPriority: boolean;
+  /** The per-16px-CELL "solid on both collision planes" lens (aeon only): a teal
+   *  veil over cells that stop the player on path A AND path B. The thing the
+   *  "Both planes" collision brush authors, and otherwise invisible — the
+   *  collision overlay shows one plane at a time by design. Derived from the two
+   *  planes, never stored; see canvas/both-planes-lens.ts. */
+  showSolidBothPlanes: boolean;
+  /** The per-16px-CELL LOOP CROSSOVER lens (aeon only): an amber veil over
+   *  cells whose word hands the player to the other collision path, and a RED
+   *  one where that mark exists on the shown plane but not the other — a
+   *  crossover that will work in one direction only. It is the ONLY depiction
+   *  of a field that changes no shape, colour, solidity or overlay; see
+   *  canvas/crossover-lens.ts. */
+  showCrossover: boolean;
   /** Occlusion-correct object previews (classic-only): re-draw high-priority
    *  map-tile PIXELS above low-priority sprite pieces — what the VDP shows —
    *  with the hidden portion kept discoverable as a translucent violet ghost.
@@ -101,6 +114,13 @@ export const OVERLAY_KEYS_BY_ENGINE: Record<OpenEngine, readonly (keyof OverlayO
     // SAME violet veil through the SAME shared depiction (canvas/tile-lens.ts),
     // so this is a registration, not a second lens.
     'showPriority',
+    // AEON ONLY, and structurally so: it compares path A against path B, and
+    // classic's viewport has one collision plane. Registered beside the
+    // collision keys because it is a statement about them.
+    'showSolidBothPlanes',
+    // AEON ONLY for the same structural reason, and armed automatically the
+    // moment the crossover brush stops being `keep`.
+    'showCrossover',
     // PROMOTED for the BgAnim band preview (ROADMAP item 42), per
     // docs/reviews/2026-08-22-preview-posture-ruling.md §2 Q3. The key, the
     // toggle plumbing and the OFF-by-default posture already existed and were
@@ -158,6 +178,12 @@ export const useViewStore = create<ViewState>((set) => ({
     showStart: true,
     // A lens, not ambient chrome: off until asked for, like the collision lens.
     showPriority: false,
+    // A lens: OFF until asked for — but armed automatically the moment the
+    // "Both planes" brush is switched on, because that stroke writes a plane
+    // the author is not looking at (editorStore setCollisionPaintBothPlanes).
+    showSolidBothPlanes: false,
+    // A lens: OFF until asked for — armed by `setCollisionCrossoverBrush`.
+    showCrossover: false,
     // NOT a lens: occlusion-correct previews are what the game shows, so the
     // default is ON; the toggle exists to compare against the flat composite.
     occludeSprites: true,

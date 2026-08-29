@@ -133,41 +133,116 @@ export const EDITOR_METHODS: EditorMethod[] = [
   { name: 'paint_collision', kind: 'paint-collision', result: 'json',
     params: {
       section: z.number().int().min(0),
-      plane: z.enum(['a', 'b']),
+      // "both" is a MODE, not a third plane: it writes A and B in ONE undo
+      // step, each cell merged against its OWN plane's existing word. It is
+      // named on this enum rather than as a separate boolean because an agent
+      // reading the schema learns the whole choice in one place, and because a
+      // boolean beside a plane would let a caller send the contradictory
+      // `plane: "b", both: true` and expect something the tool cannot mean.
+      plane: z.enum(['a', 'b', 'both'])
+        .describe('collision plane to write: "a", "b", or "both" — one stroke over BOTH planes, '
+          + 'as one undo step, for shared ground (ordinary floors and walls that stop the player '
+          + 'whichever path he is on). Prefer "both" for ordinary geometry: painting each plane '
+          + 'separately is what leaves a second plane half-finished.'),
       x: z.number().int().min(0).max(127).describe('cell col (16px units, 0-127)'),
       y: z.number().int().min(0).max(127).describe('cell row (16px units, 0-127)'),
       w: z.number().int().min(1).max(128), h: z.number().int().min(1).max(128),
       word: z.number().int().min(0).max(0xFFFF).optional()
         .describe('FILL form: one packed collision cell word (shape 9:0, xflip 10, yflip 11, solidity 13:12); 0 = air. Give this OR "words", never both'),
       words: z.array(z.number().int().min(0).max(0xFFFF).nullable()).optional()
-        .describe('PER-CELL form: w*h packed cell words, row-major; null leaves that cell alone. This is get_collision_region\'s reply "words" unchanged. Give this OR "word", never both'),
+        .describe('PER-CELL form: w*h packed cell words, row-major; null leaves that cell alone (on BOTH planes when plane is "both"). This is get_collision_region\'s reply "words" unchanged. Give this OR "word", never both'),
+      // OPTIONAL, and ABSENT MEANS "keep" — not "none". A request that names a
+      // shape has said nothing about layer handoff, and collapsing "no opinion"
+      // into "definitely no crossover" is how the nametable road silently
+      // cleared every priority bit it painted over
+      // (docs/reviews/2026-08-29-agent-paint-priority.md).
+      //
+      // There is no "to path A" / "to path B" here on purpose: per plane the
+      // field has only two legal values, because a plane-A cell saying "go to
+      // A" is a provable no-op that aeon's bake REFUSES with a hard error
+      // (LOOP_CROSSOVER_ENCODING.md rule R2). "hand-off" is whichever value
+      // leaves the plane being written, so an agent cannot author an illegal
+      // one, and with plane:"both" one call writes both halves of a two-way
+      // loop crossover correctly.
+      //
+      // ⚠ IT IS ONE AXIS, INDEPENDENT OF THE FILL/PER-CELL FORM. With "words"
+      // it applies to every cell the call WRITES and to no cell it skips —
+      // stated in the description because an agent cannot read this comment.
+      crossover: z.enum(['keep', 'clear', 'hand-off']).optional()
+        .describe('what to do with each cell\'s LOOP CROSSOVER (the field that hands the player '
+          + 'to the other collision path, for a loop): "keep" (default, and what omitting it means) '
+          + 'leaves it alone; "hand-off" marks each cell so a player on the plane being painted is '
+          + 'moved to the other one; "clear" erases it. With plane:"both" this writes the correct '
+          + 'opposite value on each plane, which is a complete TWO-WAY crossover — the pair a loop '
+          + 'needs to be traversable in both directions. With the "words" form it applies to every '
+          + 'cell that is WRITTEN and to no cell whose word is null (a skipped cell keeps its own '
+          + 'crossover even under "clear").'),
     },
-    description: 'Paint a w*h CELL rectangle (16px units) of one collision plane. Pass EITHER "word" '
-      + '(fill the whole rectangle with that packed cell word) OR "words" (one word per cell, row-major, '
-      + 'w*h long, null = leave that cell alone) — exactly one; both or neither is refused. "words" is '
-      + 'get_collision_region\'s reply "words" fed straight back, so read then write restores a region '
-      + 'exactly. A paint AUTHORS shape/xflip/yflip/solidity and KEEPS whatever else each destination cell '
-      + 'held (bits 15:14 are owned by no Aurora field), so copying words to a DIFFERENT place carries those '
-      + 'four fields and not the source\'s spare bits. One undo step. Reply: "painted" counts 8px sub-tile '
-      + 'entries actually changed (up to 4 per cell), "skipped" counts null cells.' },
+    description: 'Paint a w*h CELL rectangle (16px units) of one or BOTH collision planes. '
+      + 'THE FORM: pass EITHER "word" (fill the whole rectangle with that packed cell word) OR "words" '
+      + '(one word per cell, row-major, w*h long, null = leave that cell alone) — exactly one; both or '
+      + 'neither is refused. "words" is get_collision_region\'s reply "words" fed straight back, so read '
+      + 'then write restores a region exactly. '
+      + 'THE PLANE: "a" or "b" writes one plane; "both" writes A and B in ONE undo step, each cell merged '
+      + 'against its OWN plane\'s existing word — prefer it for ordinary geometry, since painting each '
+      + 'plane separately is what leaves a second plane half-finished. '
+      + 'THE COMBINATIONS ARE ALL LEGAL AND EACH AXIS KEEPS ITS MEANING: "words" with plane:"both" writes '
+      + 'the same per-cell word into both planes, each merged against that plane\'s own cell, and a null '
+      + 'cell is skipped on BOTH planes; "words" with a crossover applies that crossover to every cell it '
+      + 'writes and to none it skips. '
+      + 'WHAT A PAINT AUTHORS: shape/xflip/yflip/solidity from the word, plus the crossover when you ask '
+      + 'for one — and it KEEPS whatever else each destination cell held. So bits 15:14 INSIDE a "words" '
+      + 'value are IGNORED: they are the loop crossover, they are not copied from the array, and the '
+      + 'destination keeps its own. Round-tripping a region OVER ITSELF is therefore exact, but copying '
+      + 'words to a DIFFERENT place carries the four picture fields only — use "crossover" to author the '
+      + 'crossover there. '
+      + 'Reply: "painted" counts 8px sub-tile entries actually changed on the aimed plane (up to 4 per '
+      + 'cell) and "paintedOther" counts them on the second plane when plane is "both" — reported '
+      + 'separately, never summed, so "wrote one plane" and "wrote two" cannot look alike. "skipped" '
+      + 'counts null cells. The reply also carries "crossoverAudit" for the whole section — '
+      + 'marksA/marksB/pairs/oneWay plus a severity and a note. CHECK "oneWay": a loop crossover marked '
+      + 'on one plane only is legal, is invisible, and plays correctly in exactly one direction. Aeon\'s '
+      + 'build does NOT check this; this reply is where it is checked.' },
   { name: 'get_collision_region', kind: 'get-collision-region', result: 'json',
     params: {
       section: z.number().int().min(0),
-      plane: z.enum(['a', 'b']),
+      // ⚠ 'a' | 'b' AND NOT 'both', though paint_collision takes 'both'. The
+      // asymmetry is decided, not an oversight, and the reason is on the param
+      // so an agent meets it before it calls rather than after. See
+      // `validateCollisionReadPlane`, which refuses 'both' in prose for any
+      // road that reaches the handler without passing this schema.
+      plane: z.enum(['a', 'b'])
+        .describe('collision plane to read: "a" or "b". NOT "both" — paint_collision accepts "both" '
+          + 'because a write can touch two planes in one undo step, but a READ of "both" has no honest '
+          + 'single answer: it would have to merge the two planes into one grid (the same flattening '
+          + 'this method already refuses one level down, where a cell whose four 8px sub-tiles disagree '
+          + 'reports null instead of a sampled guess) or return two grids, which would make the reply '
+          + 'shape depend on a parameter and leave "words" ambiguous. Call it twice; the two replies say '
+          + 'it exactly.'),
       x: z.number().int().min(0).max(127).describe('cell col (16px units, 0-127) — SAME units as paint_collision, NOT the 8px tile units get_nametable_region uses'),
       y: z.number().int().min(0).max(127).describe('cell row (16px units, 0-127)'),
       w: z.number().int().min(1).max(128), h: z.number().int().min(1).max(128),
       ascii: z.boolean().optional().describe('also return a one-char-per-cell glyph grid with a legend, for a human to glance at'),
     },
-    description: 'READ a w*h CELL rectangle (16px units, the same coordinates paint_collision writes) of one '
-      + 'collision plane — judge a layout from data instead of a screenshot. Returns "cells" (h rows of w '
-      + 'objects: word, shape, xFlip, yFlip, solidity, known, angle) and "words" (those same raw words flat, '
-      + 'row-major, w*h long) — pass "words" back to paint_collision as its "words" to restore the region. '
+    description: 'READ a w*h CELL rectangle (16px units, the same coordinates paint_collision writes) of ONE '
+      + 'collision plane ("a" or "b" — never "both"; see the plane parameter for why, and call it twice) — '
+      + 'judge a layout from data instead of a screenshot. Returns "cells" (h rows of w '
+      + 'objects: word, shape, xFlip, yFlip, solidity, known, angle, crossover) and "words" (those same raw '
+      + 'words flat, row-major, w*h long) — pass "words" back to paint_collision as its "words" to restore '
+      + 'the region. '
       + 'A 16px cell is STORED as four 8px sub-tiles: when they disagree the cell is reported honestly as '
       + '{word:null, mixed:true, sub:[tl,tr,bl,br]} with NO shape/flip/solidity, never by sampling one of the '
       + 'four, and "mixedCells" counts them (a null in "words" is what paint_collision skips). "word" is all '
-      + '16 raw bits including 15:14, which no Aurora field owns and which a paint preserves; '
-      + '"cellsWithUnownedBits" counts cells carrying them. "profilesLoaded" false means no collision shape '
+      + '16 raw bits, including bits 15:14 — the LOOP CROSSOVER, reported by name as "crossover" per cell '
+      + '("none" / "to-a" / "to-b", or "reserved" for the illegal value 3 that aeon\'s bake hard-errors on, '
+      + 'which is reported rather than normalised away). "crossoverCells" counts the cells carrying one and '
+      + '"cellsWithUnownedBits" counts the cells with any bit outside the four picture fields — the same '
+      + 'bits, counted from the encoder\'s own mask rather than from the crossover\'s. '
+      + '⚠ A CROSSOVER DOES NOT TRAVEL IN "words": paint_collision masks those bits off and keeps the '
+      + 'destination\'s, so writing this reply\'s "words" back over ITSELF is exact, but writing it '
+      + 'SOMEWHERE ELSE moves the picture and not the crossover — author that with paint_collision\'s '
+      + '"crossover" parameter. '
+      + '"profilesLoaded" false means no collision shape '
       + 'tables are loaded, so "known" is false and "angle" null everywhere. Max 4096 cells per call.' },
   { name: 'save_chunk', kind: 'save-chunk', result: 'json',
     params: {

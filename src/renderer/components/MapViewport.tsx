@@ -63,6 +63,8 @@ import {
   screenFrameRect, type ScreenFrameAnchor,
 } from '../canvas/screen-frame';
 import { publishPriorityLensReport } from '../canvas/priority-lens';
+import { publishBothPlanesLensReport } from '../canvas/both-planes-lens';
+import { publishCrossoverLensReport } from '../canvas/crossover-lens';
 import {
   resolveSelectedScene, setLayerFieldCommand, clampLayerTop, layerTopSpace,
   setSceneFieldCommand, clampVOffset, guideBoundNotice,
@@ -87,6 +89,8 @@ import { cellTileIndices } from '../../core/collision/collision-cell';
 import { collisionPaintTargets } from '../../core/collision/collision-paint';
 import { unpackCollisionCell, selectedCollisionWord } from '../../core/collision/collision-cell-word';
 import { collisionPaintWord } from '../../core/editing/collision-word';
+import { buildBothPlanesEntries, otherPlane } from '../../core/collision/both-planes-paint';
+import type { CrossoverBrush } from '../../core/collision/layer-transition';
 import { resolveCell, resolvePlaneWords, ensureCollisionPlanes, SECTION_PLANE_WORDS } from '../../core/collision/collision-cell-resolve';
 import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
 import type { ShapeDrawCtx, ShapeDrawOpts } from '../../core/collision/collision-shape-draw';
@@ -331,7 +335,15 @@ export default function MapViewport() {
    */
   const paintStroke = useRef<
     | { kind: 'tiles'; sectionIndex: number; entries: Map<number, { oldNt: number; newNt: number }> }
-    | { kind: 'collision'; sectionIndex: number; plane: 'a' | 'b'; blocks: number; entries: Map<number, { oldColl: number; newColl: number }> }
+    | {
+      kind: 'collision'; sectionIndex: number; plane: 'a' | 'b'; blocks: number;
+      entries: Map<number, { oldColl: number; newColl: number }>;
+      /** The OTHER plane's cells, when the stroke is a "Both planes" one. Kept
+       *  in the SAME stroke so the whole gesture stays one undo step — undoing
+       *  a both-planes drag must not leave the geometry on one plane, which is
+       *  the half-finished second plane this brush exists to prevent. */
+      otherEntries: Map<number, { oldColl: number; newColl: number }>;
+    }
     | null
   >(null);
   // Screen pos at mousedown — used to tell a View-mode click (select the section
@@ -343,6 +355,15 @@ export default function MapViewport() {
   // block; default = just the clicked block), so toggling Alt mid-drag can't
   // switch a single stroke between local and reuse.
   const paintPropagate = useRef(false);
+  // "Solid on both planes" latched at mousedown, for the same reason `propagate`
+  // is: toggling the chip mid-drag would make one gesture write one plane for
+  // part of its length and two for the rest, and its single undo step would then
+  // restore an inconsistent pair of planes.
+  const paintBothPlanes = useRef(false);
+  // The crossover tri-state, latched for the same reason: half a stroke
+  // authoring a layer handoff and half of it preserving one would produce a
+  // gesture whose single undo step reverts an inconsistent set of cells.
+  const paintCrossover = useRef<CrossoverBrush>('keep');
   // Marquee tool: the drag-start tile + section, fixed for the whole drag so the
   // marquee always resolves against the section the drag STARTED in even if the
   // cursor wanders over another section's world space.
@@ -1166,6 +1187,18 @@ export default function MapViewport() {
       publishPriorityLensReport({
         active: false, reason: 'bg-layer', sections: 0, veils: 0, segments: 0,
       });
+      // Same for the both-planes lens, and for the same reason: the overlay
+      // pass that would draw it does not run on this branch at all, so leaving
+      // the previous frame's numbers standing would report a lens that is not
+      // on screen.
+      publishBothPlanesLensReport({
+        active: false, reason: 'bg-layer', sections: 0, sectionsWithPlaneB: 0,
+        veils: 0, segments: 0,
+      });
+      publishCrossoverLensReport({
+        active: false, reason: 'bg-layer', plane: ed.collisionPaintPlane, sections: 0,
+        pairedVeils: 0, oneWayVeils: 0, segments: 0,
+      });
     } else {
       // showBgPlane: paint Plane B first, then composite the foreground over
       // it (empty FG words are transparent in the section canvases). Only
@@ -1209,7 +1242,8 @@ export default function MapViewport() {
         sectionInfos.push({ section, offsetX: offset.x, offsetY: offset.y });
       }
 
-      const lens = overlayRenderer.render(ctx, sectionInfos, overlayOpts, viewport, state.objectSprites, state.collisionProfiles);
+      const lens = overlayRenderer.render(ctx, sectionInfos, overlayOpts, viewport, state.objectSprites, state.collisionProfiles,
+        ed.collisionPaintPlane);
       // THE PRIORITY LENS REPORT — published from the draw body, like the
       // guides' and the frame's, so `active` and `veils` describe what HAPPENED
       // rather than what would happen. `reason: 'off'` with the toggle off is a
@@ -1218,7 +1252,33 @@ export default function MapViewport() {
         active: overlayOpts.showPriority,
         reason: overlayOpts.showPriority ? null : 'off',
         sections: sectionInfos.length,
-        veils: lens.veils, segments: lens.segments,
+        veils: lens.priority.veils, segments: lens.priority.segments,
+      });
+      // THE BOTH-PLANES LENS REPORT, published from the same draw body for the
+      // same reason. `no-plane-b` is a DISTINCT reason from `off`: it means the
+      // lens ran and had nothing to compare against, which a row must be able
+      // to fail on rather than reading as a quiet zero.
+      publishBothPlanesLensReport({
+        active: overlayOpts.showSolidBothPlanes,
+        reason: !overlayOpts.showSolidBothPlanes
+          ? 'off'
+          : (lens.bothPlanes.sectionsWithPlaneB === 0 ? 'no-plane-b' : null),
+        sections: sectionInfos.length,
+        sectionsWithPlaneB: lens.bothPlanes.sectionsWithPlaneB,
+        veils: lens.bothPlanes.veils, segments: lens.bothPlanes.segments,
+      });
+      // THE CROSSOVER LENS REPORT. `pairedVeils` and `oneWayVeils` stay apart
+      // all the way to the harness: a non-zero `oneWayVeils` is a loop that
+      // will work in one direction, and summing them into "crossovers marked"
+      // would hide the only failure this lens exists to show.
+      publishCrossoverLensReport({
+        active: overlayOpts.showCrossover,
+        reason: overlayOpts.showCrossover ? null : 'off',
+        plane: ed.collisionPaintPlane,
+        sections: sectionInfos.length,
+        pairedVeils: lens.crossover.pairedVeils,
+        oneWayVeils: lens.crossover.oneWayVeils,
+        segments: lens.crossover.segments,
       });
     }
 
@@ -2126,6 +2186,10 @@ export default function MapViewport() {
   function recordPaint(
     kind: 'tiles' | 'collision', sectionIndex: number, plane: 'a' | 'b',
     changes: Array<{ index: number; oldValue: number; newValue: number }>,
+    /** The other plane's changes, for a "Both planes" collision stroke. Already
+     *  merged against THAT plane's own cells by both-planes-paint.ts — this
+     *  function only batches, it decides nothing. */
+    otherChanges?: Array<{ index: number; oldValue: number; newValue: number }>,
   ): void {
     const cur = paintStroke.current;
     const sameRun = cur && cur.kind === kind && cur.sectionIndex === sectionIndex
@@ -2134,7 +2198,7 @@ export default function MapViewport() {
       endPaintStroke();
       paintStroke.current = kind === 'tiles'
         ? { kind, sectionIndex, entries: new Map() }
-        : { kind, sectionIndex, plane, blocks: 0, entries: new Map() };
+        : { kind, sectionIndex, plane, blocks: 0, entries: new Map(), otherEntries: new Map() };
     }
     const stroke = paintStroke.current!;
     if (stroke.kind === 'collision') stroke.blocks++;
@@ -2146,6 +2210,16 @@ export default function MapViewport() {
         stroke.entries.set(c.index, { oldNt: c.oldValue, newNt: c.newValue });
       } else {
         stroke.entries.set(c.index, { oldColl: c.oldValue, newColl: c.newValue });
+      }
+    }
+    // Same FIRST-value-wins rule on the other plane, for the same reason: a
+    // both-planes stroke crossing its own path must undo to what was there
+    // before the gesture on BOTH planes.
+    if (otherChanges && stroke.kind === 'collision') {
+      for (const c of otherChanges) {
+        const seen = stroke.otherEntries.get(c.index);
+        if (seen) seen.newColl = c.newValue;
+        else stroke.otherEntries.set(c.index, { oldColl: c.oldValue, newColl: c.newValue });
       }
     }
     // No command yet, so nothing bumps the history clock — the overlay and the
@@ -2365,12 +2439,21 @@ export default function MapViewport() {
         entries: [...stroke.entries].map(([index, e]) => ({ index, ...e })),
       }, level);
     } else {
+      const both = stroke.otherEntries.size > 0;
+      // The description is what the undo stack shows, so it names the SECOND
+      // plane when there was one: "undo" on a both-planes stroke reverts twice
+      // as much data as the plane chip suggests, and the list is where that is
+      // discoverable.
+      const where = both
+        ? `A+B (${stroke.blocks} block${stroke.blocks === 1 ? '' : 's'}, both planes)`
+        : `${stroke.plane.toUpperCase()} (${stroke.blocks} block${stroke.blocks === 1 ? '' : 's'})`;
       executeCommand({
         type: 'set-collision-edit',
         plane: stroke.plane,
-        description: `Paint collision ${stroke.plane.toUpperCase()} (${stroke.blocks} block${stroke.blocks === 1 ? '' : 's'})`,
+        description: `Paint collision ${where}`,
         sectionIndex: stroke.sectionIndex,
         entries: [...stroke.entries].map(([index, e]) => ({ index, ...e })),
+        ...(both ? { otherPlaneEntries: [...stroke.otherEntries].map(([index, e]) => ({ index, ...e })) } : {}),
       }, level);
     }
   }
@@ -2429,6 +2512,17 @@ export default function MapViewport() {
     // shared with the stamp paths via ensureCollisionPlanes.
     ensureCollisionPlanes(section);
     const ce = (plane === 'b' ? section.collisionEditB : section.collisionEdit)!;
+    // "Solid on both planes": the other plane's words, so the SAME stroke can
+    // author it. Latched at mousedown (paintBothPlanes) exactly like Alt's
+    // propagate, so toggling the chip mid-drag cannot split one gesture into
+    // two modes. `otherCe` is read even when the mode is off — it costs nothing
+    // and keeps the two branches from reading different things.
+    const otherCe = (plane === 'b' ? section.collisionEdit : section.collisionEditB)!;
+    const bothPlanes = paintBothPlanes.current;
+    // The loop-crossover tri-state, latched at mousedown with the rest of the
+    // mode. `keep` — the default — is a no-op inside `collisionPaintWord`,
+    // because the crossover bits fall outside the mask the brush owns.
+    const crossover = paintCrossover.current;
     const cellCol = info.col >> 1, cellRow = info.row >> 1;
     const cellKey = `${info.sectionIndex}:${cellCol}:${cellRow}`;
     if (lastPaintedCell.current === cellKey) return; // same cursor cell — skip
@@ -2447,9 +2541,18 @@ export default function MapViewport() {
     // Cheap no-op guard for the expensive reuse scan: if the clicked block is
     // already fully the selected word, its matches were painted when first
     // touched — return before collisionPaintTargets does the per-section scan.
+    //
+    // ⚠ IT MUST CONSIDER BOTH PLANES WHEN THE STROKE WRITES BOTH. Aimed-plane
+    // satisfaction is not the gesture's no-op condition in that mode: a cell
+    // already correct on A but air on B is precisely the half-finished second
+    // plane this brush exists to fix, and short-circuiting on A alone would
+    // make the Both chip silently do nothing on exactly that cell.
     if (brush === 1 && propagate) {
       const clicked = cellTileIndices(cellCol, cellRow, SECTION_TILES_WIDE);
-      if (clicked.every((i) => ce[i] === collisionPaintWord(word, ce[i]))) return;
+      const aimedDone = clicked.every((i) => ce[i] === collisionPaintWord(word, ce[i], crossover, plane));
+      const otherDone = !bothPlanes
+        || clicked.every((i) => otherCe[i] === collisionPaintWord(word, otherCe[i], crossover, otherPlane(plane)));
+      if (aimedDone && otherDone) return;
     }
 
     // Same target set the hover preview shows (collisionPaintTargets) — paint and
@@ -2458,24 +2561,29 @@ export default function MapViewport() {
       cellCol, cellRow, brush, propagate,
       nametable: section.tileGrid.nametable, width: SECTION_TILES_WIDE, cellsW, cellsH,
     });
-    const entries: Array<{ index: number; oldColl: number; newColl: number }> = [];
+    const indices: number[] = [];
     for (const t of targets) {
-      for (const index of cellTileIndices(t.cellCol, t.cellRow, SECTION_TILES_WIDE)) {
-        const oldColl = ce[index]!;
-        // The brush owns its fields; the cell keeps the rest. Never `newColl:
-        // word` — that replaced the whole 16-bit cell and zeroed everything the
-        // palette word did not carry. See core/editing/collision-word.ts.
-        const newColl = collisionPaintWord(word, oldColl);
-        if (oldColl !== newColl) entries.push({ index, oldColl, newColl });
-      }
+      for (const index of cellTileIndices(t.cellCol, t.cellRow, SECTION_TILES_WIDE)) indices.push(index);
     }
-    if (entries.length === 0) return;
+    // The brush owns its fields; each cell keeps the rest. Never `newColl:
+    // word` — that replaced the whole 16-bit cell and zeroed everything the
+    // palette word did not carry (core/editing/collision-word.ts) — and never
+    // one merged word broadcast to two planes, which would copy plane A's
+    // reserved bits onto plane B (core/collision/both-planes-paint.ts). ONE
+    // decider, called once per destination, is what buildBothPlanesEntries is.
+    const { aimed: entries, other: otherEntries } = buildBothPlanesEntries({
+      aimedPlaneWords: ce, otherPlaneWords: otherCe, indices, brushWord: word, bothPlanes,
+      aimedPlaneId: plane, crossover,
+    });
+    if (entries.length === 0 && otherEntries.length === 0) return;
     // Live, and recorded: a collision drag is one edit, not one per cell. (The
     // per-cell "this block"/"N matching blocks" wording went with it — the
     // command now names how many blocks the whole gesture covered.)
     for (const e of entries) ce[e.index] = e.newColl;
+    for (const e of otherEntries) otherCe[e.index] = e.newColl;
     recordPaint('collision', info.sectionIndex, plane,
-      entries.map((e) => ({ index: e.index, oldValue: e.oldColl, newValue: e.newColl })));
+      entries.map((e) => ({ index: e.index, oldValue: e.oldColl, newValue: e.newColl })),
+      otherEntries.map((e) => ({ index: e.index, oldValue: e.oldColl, newValue: e.newColl })));
     useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
   }
 
@@ -2824,6 +2932,8 @@ export default function MapViewport() {
       useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
       lastPaintedCell.current = null;
       paintPropagate.current = e.altKey; // latch the mode for the whole stroke
+      paintBothPlanes.current = useEditorStore.getState().collisionPaintBothPlanes;
+      paintCrossover.current = useEditorStore.getState().collisionCrossoverBrush;
       paintCollisionCell(info, paintPropagate.current);
       isPaintDragging.current = true;
       e.preventDefault();
