@@ -35,6 +35,7 @@ import { loadBgOverride } from '../../formats/bg-override/bg-override-io';
 import { buildPalette } from '../../formats/palette';
 import { parseNametable } from '../../formats/s4-nametable';
 import { parseCollAttr } from '../../formats/s4-collattr';
+import { parseSectionChunkLinks } from '../../formats/section-chunk-links';
 import { parseStrips, STRIP_COLS, STRIP_ROWS } from '../../formats/s4-strips';
 import { createSection, SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../model/s4-types';
 import { migrateChunkTilesIntoTileset } from '../../art/atlas-migration';
@@ -366,6 +367,27 @@ async function loadFullProject(
             section.sceneRef = meta.sceneRef;
           } catch (e) {
             await markUnreadable(fa, section, `${prefix}.meta.json`, 'meta.json', e, notices);
+          }
+
+          // Load the chunk-identity sidecar (owner ruling d-18c). ABSENT is the
+          // ordinary case — every section saved before this field existed, and
+          // every section with no linked stamp — and markUnreadable stays
+          // silent for it. A document that EXISTS and does not parse marks the
+          // suffix unreadable, which makes the save skip the file: a refused
+          // identity layer is left on disk to be fixed by hand, never
+          // overwritten with "no links".
+          //
+          // The tile count comes from this section's OWN nametable rather than
+          // the SECTION_TILES_* constants, so the length the parser checks and
+          // the plane it must match are the same figure by construction.
+          try {
+            const linksRaw = await fa.read(`${prefix}.chunklinks.json`);
+            section.chunkLinks = parseSectionChunkLinks(
+              new TextDecoder().decode(linksRaw),
+              section.tileGrid.nametable.length,
+            );
+          } catch (e) {
+            await markUnreadable(fa, section, `${prefix}.chunklinks.json`, 'chunklinks.json', e, notices);
           }
 
           sections.push(section);
