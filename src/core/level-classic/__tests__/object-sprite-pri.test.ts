@@ -25,6 +25,8 @@ import type { SpriteFrame } from '../../model/sprite-types';
 import type { Tile } from '../../model/s4-types';
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const S1_PRESENT = fs.existsSync(S1DIR);
 
 /** A synthetic 8x8 tile whose every pixel is `v` (0 = fully transparent). */
@@ -143,7 +145,7 @@ describe('composeObjectFrames priMask (synthetic)', () => {
   });
 });
 
-describe.skipIf(!S1_PRESENT)('priMask against real s1disasm data (Newtron frame 8)', () => {
+describe('priMask against real s1disasm data (Newtron frame 8)', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, () => {
   // Measured over every linked object's mappings with parseAsmMappings (the
   // same parser production uses): _maps/Newtron.asm frame 8 is the real MIXED
   // case whose priority piece's tiles actually RESOLVE in its art file (tile

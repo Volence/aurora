@@ -259,6 +259,8 @@ describe('createIpcFileAccess rel-path safety', () => {
 // ---------------------------------------------------------------------------
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const S1_PRESENT = nodeFsMod.existsSync(S1DIR);
 
 function nodeFileAccess(root: string): FileAccess {
@@ -296,7 +298,7 @@ const nodeBridge: ClassicBridge = {
   },
 };
 
-describe.skipIf(!S1_PRESENT)('classicProjectStore integration (real s1disasm)', () => {
+describe('classicProjectStore integration (real s1disasm)', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, () => {
   beforeEach(() => {
     useClassicProjectStore.getState().reset();
     __setClassicBridgeForTest(nodeBridge);

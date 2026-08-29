@@ -6,6 +6,8 @@ import {
 } from '../../../compress/nemesis';
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 
 /** Deterministic PRNG (mulberry32) so the round-trip vectors are reproducible. */
 function mulberry32(seed: number): () => number {
@@ -154,7 +156,7 @@ describe('nemesis round-trip vectors (CI-safe, no fixtures)', () => {
  * them, prove they survive real Sonic 1 data: every map256 chunk table and every
  * 8x8 art bank decodes to a sanely-sized buffer and round-trips byte-for-byte.
  */
-describe.skipIf(!fs.existsSync(S1DIR))('kosinski/nemesis goldens over real s1disasm data', () => {
+describe('kosinski/nemesis goldens over real s1disasm data', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
   const map256Dir = `${S1DIR}/map256`;
   const kosFiles = fs.existsSync(map256Dir)
     ? fs.readdirSync(map256Dir).filter((f) => f.toLowerCase().endsWith('.kos'))

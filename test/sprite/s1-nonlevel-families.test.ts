@@ -24,6 +24,8 @@ import type { ObjectArtLink } from '../../src/core/project/profiles/s1-object-ar
 import type { Tile } from '../../src/core/model/s4-types';
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const read = (rel: string) => new Uint8Array(fs.readFileSync(path.join(S1DIR, rel)));
 const readText = (rel: string) => fs.readFileSync(path.join(S1DIR, rel), 'utf8');
 const decode = (rel: string, comp: 'nemesis' | 'uncompressed') =>
@@ -112,7 +114,7 @@ function expectedFrameCount(key: string, link: ObjectArtLink): number {
   return FRAME_COUNTS[key];
 }
 
-describe.skipIf(!fs.existsSync(S1DIR))('S1 non-level families — every row: real files, real render', () => {
+describe('S1 non-level families — every row: real files, real render', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
   it('covers exactly the transcribed family set (a new row must bring its pins)', () => {
     expect([...Object.keys(FRAME_COUNTS), ...Object.keys(GRID_GEOMETRY)].sort())
       .toEqual(FAMILIES.map(([k]) => k).sort());
@@ -200,7 +202,7 @@ describe.skipIf(!fs.existsSync(S1DIR))('S1 non-level families — every row: rea
   });
 });
 
-describe.skipIf(!fs.existsSync(S1DIR))('family-specific pins (hand-transcribed from the disasm)', () => {
+describe('family-specific pins (hand-transcribed from the disasm)', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
   it('shield: stars frames 4-7 index Nem_Stars frame-local — tile $23 max, beyond Shield.nem\'s 27 tiles', () => {
     // _maps/Shield and Invincibility.asm .stars3/.stars4 reference tiles up to
     // $1B+9-1; Shield.nem decodes to 27 tiles ($1B) so WITHOUT the per-frame

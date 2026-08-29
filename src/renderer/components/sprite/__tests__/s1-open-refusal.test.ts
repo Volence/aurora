@@ -26,6 +26,8 @@ import { parseTiles } from '../../../../core/formats/tiles';
 import { compressionFor } from '../../../../core/compress';
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 
 // window.api over fs (read-only: s1disasm must never be written by a test).
 function stubWindowApi(): () => void {
@@ -71,7 +73,7 @@ const SPRING_SET: DiscoveredSpriteSet = {
   frameSources: [{ firstFrame: 3, lastFrame: 5, art: 'artnem/Spring Vertical.nem', compression: 'nemesis' }],
 };
 
-describe.skipIf(!fs.existsSync(S1DIR))('openDiscoveredSet — Sonic DPLC open captures a save-back target', () => {
+describe('openDiscoveredSet — Sonic DPLC open captures a save-back target', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
   it('opens 88 frames and captures an in-place target carrying compression + DPLC lists', async () => {
     const ok = await openDiscoveredSet(S1DIR, SONIC_SET, 'uncompressed');
     expect(ok).toBe(true);
@@ -108,7 +110,7 @@ describe.skipIf(!fs.existsSync(S1DIR))('openDiscoveredSet — Sonic DPLC open ca
   });
 });
 
-describe.skipIf(!fs.existsSync(S1DIR))('openDiscoveredSet — Spring per-frame art swap', () => {
+describe('openDiscoveredSet — Spring per-frame art swap', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
   it('frames 3-5 draw Nem_VSpring (hand-derived pixels); frames 0-2 keep Nem_HSpring; save refuses honestly', async () => {
     // Control open: the OLD single-pool behavior (no frameSources).
     await openDiscoveredSet(S1DIR, { ...SPRING_SET, frameSources: undefined }, 'nemesis');
@@ -170,7 +172,7 @@ describe.skipIf(!fs.existsSync(S1DIR))('openDiscoveredSet — Spring per-frame a
   });
 });
 
-describe.skipIf(!fs.existsSync(S1DIR))('openDiscoveredSet — positive control: the capture guard is not over-tightened', () => {
+describe('openDiscoveredSet — positive control: the capture guard is not over-tightened', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
   it('Signpost (plain non-DPLC Nemesis) still captures an in-place target, no refusal recorded', async () => {
     const ok = await openDiscoveredSet(S1DIR, {
       name: 'Signpost', game: 's1', mappings: '_maps/Signpost.asm', art: 'artnem/Signpost.nem',

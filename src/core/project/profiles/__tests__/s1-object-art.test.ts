@@ -11,6 +11,8 @@ import {
 import { objectHasSubtypeRule } from '../object-subtype-rules';
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 
 function allLinks(): { where: string; id: number; link: ObjectArtLink }[] {
   const out: { where: string; id: number; link: ObjectArtLink }[] = [];
@@ -150,7 +152,7 @@ describe('s1-object-art linkage table', () => {
     expect(new Set(ghz).size).toBe(ghz.length);
   });
 
-  describe.skipIf(!fs.existsSync(S1DIR))('against real s1disasm', () => {
+  describe('against real s1disasm', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
     it('every linked art + mappings file exists on disk', () => {
       const missing: string[] = [];
       for (const { where, id, link } of allLinks()) {
@@ -266,7 +268,7 @@ describe('boss-family art rows', () => {
     expect(resolveObjectArt(0x76)).toBeUndefined();
   });
 
-  describe.skipIf(!fs.existsSync(S1DIR))('against real s1disasm', () => {
+  describe('against real s1disasm', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
     it('every boss mapAsm parses and the linked default frame exists', () => {
       for (const [tag, zone, id] of BOSS_ROWS) {
         const link = resolveObjectArt(id, zone)!;

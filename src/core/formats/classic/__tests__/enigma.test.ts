@@ -3,6 +3,8 @@ import * as fs from 'fs';
 import { enigmaCompress, enigmaDecompress } from '../enigma';
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 
 /** Deterministic PRNG (mulberry32) so the round-trip property is reproducible. */
 function mulberry32(seed: number): () => number {
@@ -117,13 +119,13 @@ describe('enigma decoder byte vectors (CI-safe, no fixtures)', () => {
   });
 });
 
-describe.skipIf(!fs.existsSync(S1DIR))('enigma against s1disasm goldens', () => {
+describe('enigma against s1disasm goldens', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
   const map16Dir = `${S1DIR}/map16`;
   const eniFiles = fs.existsSync(map16Dir)
     ? fs.readdirSync(map16Dir).filter((f) => f.toLowerCase().endsWith('.eni'))
     : [];
 
-  it.skipIf(!fs.existsSync(`${map16Dir}/GHZ.eni`))('decodes GHZ.eni to a non-empty block table (length divisible by 8)', () => {
+  it('decodes GHZ.eni to a non-empty block table (length divisible by 8)', { skip: !fs.existsSync(`${map16Dir}/GHZ.eni`), meta: { skipReason: `${map16Dir}/GHZ.eni is absent — this machine has no s1disasm checkout` } }, () => {
     const decoded = enigmaDecompress(new Uint8Array(fs.readFileSync(`${map16Dir}/GHZ.eni`)));
     expect(decoded.length).toBeGreaterThan(0);
     expect(decoded.length % 8).toBe(0);

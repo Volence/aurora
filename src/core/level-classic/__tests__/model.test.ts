@@ -307,7 +307,7 @@ describe('validateLevelDoc', () => {
 // (skipIf-gated so CI without the disasm tree stays green.)
 // ---------------------------------------------------------------------------
 
-describe.skipIf(!fs.existsSync(`${S1DIR}/levels`))('real bg layouts fit the 64x8 bg limit', () => {
+describe('real bg layouts fit the 64x8 bg limit', { skip: !fs.existsSync(`${S1DIR}/levels`), meta: { skipReason: `${S1DIR}/levels is absent — this machine has no s1disasm checkout` } }, () => {
   const dir = `${S1DIR}/levels`;
   const bgFiles = fs.existsSync(dir)
     ? fs.readdirSync(dir).filter((f) => /bg.*\.bin$/i.test(f))

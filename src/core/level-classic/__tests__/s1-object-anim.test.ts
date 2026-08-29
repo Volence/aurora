@@ -29,6 +29,8 @@ import { parseS1DisasmAnimScript } from '../../import/anim-import';
 import { syncedTimelineAnims } from '../../../renderer/components/sprite/export-sprite';
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const S1_PRESENT = fs.existsSync(S1DIR);
 if (!S1_PRESENT) {
   // eslint-disable-next-line no-console
@@ -133,7 +135,7 @@ describe('synced anims are phase-locked to the shared channel counter', () => {
 });
 
 describe('script preview control handling (derived from real scripts)', () => {
-  it.skipIf(!S1_PRESENT)('afEnd loops the whole sequence (Moto Bug .drive vs timeline sim)', () => {
+  it('afEnd loops the whole sequence (Moto Bug .drive vs timeline sim)', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, () => {
     const anims = parseAnimFile('_anim/Moto Bug.asm');
     const drive = buildScriptPreview(anims, 1)!; // curated locomotion anim
     expect(drive.loopStart).toBe(0);
@@ -150,7 +152,7 @@ describe('script preview control handling (derived from real scripts)', () => {
     expect(frameAt(drive, raw + 1)).toBe(drive.steps[1].frame);
   });
 
-  it.skipIf(!S1_PRESENT)('afBack N re-enters N steps from the end (Newtron .drop)', () => {
+  it('afBack N re-enters N steps from the end (Newtron .drop)', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, () => {
     const anims = parseAnimFile('_anim/Newtron.asm');
     expect(anims[1].control).toEqual({ kind: 'back', count: 1 });
     const drop = buildScriptPreview(anims, 1)!;
@@ -167,7 +169,7 @@ describe('script preview control handling (derived from real scripts)', () => {
     expect(frameAt(drop, stepHoldTicks(raw))).toBe(drop.steps[1].frame);
   });
 
-  it.skipIf(!S1_PRESENT)('a control that hands off to state code freezes on the last frame (Bumper .touched)', () => {
+  it('a control that hands off to state code freezes on the last frame (Bumper .touched)', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, () => {
     const anims = parseAnimFile('_anim/Bumper.asm');
     expect(anims[1].control?.kind).toBe('change');
     const touched = buildScriptPreview(anims, 1)!;
@@ -176,7 +178,7 @@ describe('script preview control handling (derived from real scripts)', () => {
   });
 });
 
-describe.skipIf(!S1_PRESENT)('curation table integrity (every row resolves against the real scripts)', () => {
+describe('curation table integrity (every row resolves against the real scripts)', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, () => {
   it('every script row parses, indexes in range, and yields playable steps', () => {
     for (const [idStr, rule] of Object.entries(S1_PREVIEW_ANIMS)) {
       const id = Number(idStr);

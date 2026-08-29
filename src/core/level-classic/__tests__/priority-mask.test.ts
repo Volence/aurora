@@ -30,6 +30,8 @@ import { unpackBlockCell, unpackChunkCell, type BlockDef, type ChunkCell, type L
 import { blockPriorityQuad, chunkPriorityMask, CHUNK_TILES } from '../priority-mask';
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const S1_PRESENT = fs.existsSync(S1DIR);
 
 /** Decode SBZ's real map16 into BlockDefs via the same unpacker s1-io uses. */
@@ -61,7 +63,7 @@ const SBZ_B6_WORDS = [0xd91a, 0x4915, 0xc8f6, 0xc917];
 
 const quad = (tl: number, tr: number, bl: number, br: number) => [!!tl, !!tr, !!bl, !!br];
 
-describe.skipIf(!S1_PRESENT)('priority bits of real SBZ blocks (hand-derived)', () => {
+describe('priority bits of real SBZ blocks (hand-derived)', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, () => {
   const blocks = S1_PRESENT ? loadSbzBlocks() : [];
 
   it('block $11 decodes to the hand-derived words and pri [0,0,1,1]', () => {

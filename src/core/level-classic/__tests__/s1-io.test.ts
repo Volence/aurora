@@ -45,6 +45,8 @@ function memFsWithMtime(files: Record<string, Uint8Array>, mtimes: Record<string
 }
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const S1_PRESENT = fs.existsSync(S1DIR);
 
 function realFs(root: string): FileAccess {
@@ -125,7 +127,7 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
 // ===========================================================================
 
 describe('s1-io (a) GHZ1 golden', () => {
-  it.skipIf(!S1_PRESENT)('reads a full GHZ act 1 LevelDoc from real files', async () => {
+  it('reads a full GHZ act 1 LevelDoc from real files', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, async () => {
     const fa = realFs(S1DIR);
     const act = s1Profile.zones[0].acts[0];
     const { doc } = await readS1Level(act, realPaths(act), fa);
@@ -196,7 +198,7 @@ describe('s1-io (b) numeric audit (all 18 acts)', () => {
     }
   });
 
-  it.skipIf(!S1_PRESENT)('read() succeeds on every act', async () => {
+  it('read() succeeds on every act', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, async () => {
     const fa = realFs(S1DIR);
     for (const { zone, act } of allActs()) {
       const { doc } = await readS1Level(act, realPaths(act), fa);
@@ -270,8 +272,9 @@ describe('s1-io (c) zero-edit round-trip (all 18 acts)', () => {
   /** Incremented by each case body; the coverage gate below reads it. */
   let actsExercised = 0;
 
-  it.skipIf(!S1_PRESENT).each(roundTripCases)(
+  it.each(roundTripCases)(
     '$name re-encodes every domain identically (decode-identical for compressed)',
+    { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } },
     async ({ zone, act }) => {
       // Counted here, at the top: the gate below asks "did every act's body
       // RUN", not "did every act pass". A genuine round-trip regression must
@@ -312,7 +315,7 @@ describe('s1-io (c) zero-edit round-trip (all 18 acts)', () => {
   // tests in declaration order). Splitting a loop into N cases can silently
   // drop acts — a case list built wrong registers fewer tests and the suite
   // still reads green. This counts the bodies that actually ran.
-  it.skipIf(!S1_PRESENT)('exercised every act in the profile — none silently dropped', () => {
+  it('exercised every act in the profile — none silently dropped', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, () => {
     const declared = s1Profile.zones.reduce((n, z) => n + z.acts.length, 0);
     expect(roundTripCases.length).toBe(declared);
     expect(actsExercised).toBe(declared);
@@ -324,7 +327,7 @@ describe('s1-io (c) zero-edit round-trip (all 18 acts)', () => {
 // ===========================================================================
 
 describe('s1-io (d) self-check gate', () => {
-  it.skipIf(!S1_PRESENT)('a broken nemesis encoder fails tiles but not blocks/chunks', async () => {
+  it('a broken nemesis encoder fails tiles but not blocks/chunks', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, async () => {
     const fa = realFs(S1DIR);
     const act = s1Profile.zones[0].acts[0];
     const state = await readS1Level(act, realPaths(act), fa);

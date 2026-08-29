@@ -35,6 +35,8 @@ import {
 } from '../s1-anim-art';
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const S1_PRESENT = fs.existsSync(S1DIR);
 
 function fam(id: string) {
@@ -191,7 +193,7 @@ describe('tile patches', () => {
   });
 });
 
-describe.skipIf(!S1_PRESENT)('real s1disasm sources', () => {
+describe('real s1disasm sources', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, () => {
   it('every family file exists and is frames × tiles × 32 bytes', () => {
     const frameCounts: Record<string, number> = {
       'ghz-waterfall': 2, 'ghz-flower-large': 2, 'ghz-flower-small': 3,
