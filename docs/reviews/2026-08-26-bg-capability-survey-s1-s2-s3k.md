@@ -9,6 +9,30 @@ Sonic 3&K and see if there's anything so far we couldn't do that they do for bac
 `2fcd861` (`sonic3k.asm` + `Lockon S3/Screen Events.asm`). Every line number below is from those
 revisions. No emulator was used; nothing here is a runtime measurement.
 
+> ## ⚠ THIS SURVEY IS PERISHABLE, AND ONE ROW IS ALREADY KNOWN STALE
+>
+> *(Added 2026-08-29 by the aurora overseer, after a peer planned a parcel off a stale row.)*
+>
+> Every "aeon" verdict below is a measurement of **another lane's source at a pinned revision**
+> — the content with the shortest half-life in this repo. It is written as a snapshot and it
+> gets read as a standing fact. **Re-check the named constant at `origin/master` before
+> planning off any row**; `git -C ../aeon grep -n <SYMBOL> origin/master` takes under a minute.
+>
+> **Known stale — row 4 (many strips on screen).** The row says the engine caps a scene at
+> **8 layers**. `MAX_PARALLAX_BANDS` went **8 → 16 and that landed** (aeon
+> `docs/DEFERRED_WORK.md` at `origin/master`), and empyrean's contract schema already carries
+> `layers.maxItems: 16` — so contract and engine agree at 16 and the row's "hard cap 8" is
+> wrong. Its *reasoning* still holds: the cap is per scene = per 512-line plane, not per screen.
+> Rows 6 and 11's engine verdicts have not been re-checked and may have moved the same way.
+>
+> **And read each row's own verdict column, not a summary of it.** Row 6 (time-driven drift)
+> was proposed to this lane as editor-only work; the row itself says **Engine M + Schema S**,
+> with the one Aurora field arriving *after* those. Both of that proposal's premises were
+> visible in this document and contradicted it.
+>
+> A full staleness pass over all 21 rows is queued as **O19**; this banner is only the part
+> that was measured on 2026-08-29.
+
 Abbreviations: **S1** `s1disasm/_inc/DeformLayers (REV01).asm` unless another file is named;
 **S2** `s2disasm/s2.asm`; **S3K** `skdisasm/sonic3k.asm`, **SE** `skdisasm/Lockon S3/Screen
 Events.asm`; **pd** `aeon/engine/level/parallax_dsl.emp`; **sd** `aeon/engine/level/scene_dsl.emp`;
