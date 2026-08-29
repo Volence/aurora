@@ -50,7 +50,7 @@ const ANNOTATION_KEYWORDS = [
 const ASSERTION_KEYWORDS = [
   '$ref', 'type', 'const', 'enum', 'pattern', 'minimum', 'maximum',
   'properties', 'required', 'unevaluatedProperties',
-  'items', 'minItems', 'maxItems', 'oneOf',
+  'items', 'minItems', 'maxItems', 'oneOf', 'not',
 ] as const;
 
 export const SUPPORTED_KEYWORDS: ReadonlySet<string> = new Set<string>([
@@ -233,6 +233,37 @@ function validateNode(
           issues.push({ path, message: `unknown property "${key}" (the schema is closed)` });
         }
       }
+    }
+  }
+
+  // `not` — the schema conforms when the subschema does NOT.
+  //
+  // ARRIVED WITH `drift` (empyrean 988638f): `rate` is an integer -4096..4096
+  // with `"not": {"const": 0}`, because `Rate(0)` and `None` are indistinguishable
+  // in ROM and aeon refuses `Rate(0)` at build time. A hole in a range is exactly
+  // what `not` is for, and there is no other keyword in this subset that can
+  // express one.
+  //
+  // NO ANNOTATION QUESTION ARISES, which is why implementing it here does not
+  // weaken the `unevaluatedProperties` equivalence the header rests on: `not`
+  // succeeds precisely when its subschema FAILS, and a failing subschema
+  // contributes no annotations. `not` nevertheless stays in IN_PLACE_APPLICATORS
+  // above — the conservative refusal costs nothing (the committed schema never
+  // puts the two together) and a refusal is the safe side of that judgement.
+  if (schema.not !== undefined) {
+    const excluded = schema.not as JsonSchema;
+    const sub: SchemaIssue[] = [];
+    validateNode(value, excluded, path, root, sub);
+    if (sub.length === 0) {
+      // The committed schema's only use is a single forbidden constant, and
+      // "0 is refused" reads better to an author than a schema fragment does.
+      const soleConst = Object.keys(excluded).length === 1 && excluded.const !== undefined;
+      issues.push({
+        path,
+        message: soleConst
+          ? `${JSON.stringify(value)} is refused: the schema forbids the constant ${JSON.stringify(excluded.const)}`
+          : `${JSON.stringify(value)} is refused by "not": ${JSON.stringify(excluded)}`,
+      });
     }
   }
 

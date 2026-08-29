@@ -10,6 +10,7 @@ import {
   type JsonSchema,
 } from '../../src/core/formats/effects/json-schema-subset';
 import { EFFECTS_SCENE_SCHEMA } from '../../src/core/formats/effects/scene';
+import { peerRepo, resolveRev, readAtRev, isAncestor } from '../support/peer-repo';
 
 /**
  * The vendored-schema drift gate.
@@ -104,20 +105,60 @@ import { EFFECTS_SCENE_SCHEMA } from '../../src/core/formats/effects/scene';
  * name. Theirs to land; recorded here only because it is why the two halves
  * want to land close together.)
  *
+ * WHY IT MOVED A FIFTH TIME (dd972cf0 -> 4adfbb40). empyrean 988638f added
+ * `$defs.layer.properties.drift` — a per-layer, camera-independent horizontal
+ * rate, `"none" | {rate}` in the same `oneOf` shape as `curve` and `vsplit`,
+ * per aeon's band-drift design §7 at aeon e0ce6011.
+ *
+ * AND THIS RE-PIN CARRIED A HAZARD THE OTHERS DID NOT. The same commit reflowed
+ * the WHOLE FILE to one key per line, so its diff is 365 insertions / 81
+ * deletions for a one-field change — a shape that invites "looks like a
+ * reformat, ship it" and would hide a real change inside it. The two were
+ * separated by MEASUREMENT, not by reading the diff: a recursive comparison of
+ * the two PARSED documents (988638f~1 vs 988638f), key by key at every depth,
+ * reports exactly one difference, the added `drift` node. Both documents were
+ * extracted with `git show`; neither was retyped. See
+ * docs/reviews/2026-08-29-drift-codec.md.
+ *
+ * AURORA NEEDED TWO EDITS, both of which THIS SUITE NAMED rather than a human
+ * noticing: the coverage gate below went red on `not` (the schema spells "0 is
+ * refused" as `"not": {"const": 0}`, and this evaluator implemented no such
+ * keyword — refusing to validate rather than ignoring it, exactly as designed),
+ * and the shape-coverage golden went red naming `drift` (effects-scene-golden
+ * derives "every declared layer key is exercised" from the schema).
+ *
  * WHAT THIS GATE CANNOT DO, said plainly: it proves the vendored copy is
- * byte-identical to the blob Aurora pinned. It cannot notice that empyrean has
- * since changed the schema — nothing inside this repo can, without the sibling
- * tree. Re-pinning is a deliberate step of the contract's own change protocol
- * (§8: the doc, the schema and aeon's consumer list amend together, and Aurora
- * re-pins), not something a test discovers.
+ * byte-identical to the blob Aurora pinned. It cannot, on its own, notice that
+ * empyrean has since changed the schema — a pin equals itself by construction.
+ * That question has its own instrument now, the CURRENCY block at the bottom of
+ * this file, which reads empyrean at a COMMITTED revision through git objects
+ * (never the sibling working tree — docs/reviews/2026-08-28-golden-live-tree.md)
+ * and SKIPS LOUDLY when it cannot run. Re-pinning itself stays a deliberate step
+ * of the contract's own change protocol (§8: the doc, the schema and aeon's
+ * consumer list amend together, and Aurora re-pins).
+ *
+ * WHERE THE PIN LIVES. In the sidecar, `aurora-effects-scene.schema.provenance.json`,
+ * read below — NOT as a constant here. It used to be a `const` in this file,
+ * with prose copies in scene.ts's header and effects-scene-golden's header;
+ * scene.ts's copy went THREE re-pins stale without anything going red, because
+ * nothing hashes a comment. One machine-readable copy, and the prose says it is
+ * prose.
  */
 
 const SCHEMA_PATH = resolve(
   __dirname, '../../src/core/formats/effects/aurora-effects-scene.schema.json',
 );
+const PROVENANCE_PATH = resolve(
+  __dirname, '../../src/core/formats/effects/aurora-effects-scene.schema.provenance.json',
+);
+
+const PROV = JSON.parse(readFileSync(PROVENANCE_PATH, 'utf8')) as {
+  empyrean: { path: string; revision: string; blob: string; branch_that_answers_currency: string };
+  vendored: { git_blob: string; bytes: number };
+};
 
 /** empyrean contract/schema/aurora-effects-scene.schema.json, blob hash. */
-const PINNED_BLOB = 'dd972cf0e203a11330dfcec60b8c3ca59eac5b49';
+const PINNED_BLOB = PROV.empyrean.blob;
 
 /** git's object id: sha1 over "blob <bytelen>\0" + the file's bytes. */
 function gitBlobHash(bytes: Buffer): string {
@@ -133,7 +174,23 @@ describe('effects scene schema — vendored copy drift gate', () => {
     expect(bytes.length).toBeGreaterThan(1000);
     expect(JSON.parse(bytes.toString('utf8')).$id)
       .toBe('https://empyrean/contract/aurora-effects-scene.schema.json');
+    expect(PINNED_BLOB, 'the sidecar records no 40-hex empyrean blob').toMatch(/^[0-9a-f]{40}$/);
     expect(gitBlobHash(bytes)).toBe(PINNED_BLOB);
+  });
+
+  /**
+   * The sidecar cannot describe a file other than the one on disk. Catches a
+   * schema edited by hand to make something else pass, and a provenance record
+   * edited away from it. `empyrean.blob` and `vendored.git_blob` are the same
+   * object id said twice on purpose — one is "what empyrean stores", the other
+   * "what Aurora holds", and the whole vendoring claim is that they are equal.
+   */
+  it('the provenance sidecar describes the schema actually on disk', () => {
+    const bytes = readFileSync(SCHEMA_PATH);
+    expect(PROV.empyrean.revision, 'no 40-hex empyrean revision').toMatch(/^[0-9a-f]{40}$/);
+    expect(PROV.empyrean.path).toBe('contract/schema/aurora-effects-scene.schema.json');
+    expect(PROV.vendored.git_blob).toBe(PROV.empyrean.blob);
+    expect(PROV.vendored.bytes).toBe(bytes.length);
   });
 
   it('the module validates against the vendored file, not a restatement', () => {
@@ -194,5 +251,116 @@ describe('effects scene schema — vendored copy drift gate', () => {
     const bad: JsonSchema = { type: 'object', patternProperties: { '^x': { type: 'string' } } };
     expect(() => validateAgainstSchema({ xa: 1 }, bad))
       .toThrow(/"patternProperties".*is not implemented/s);
+  });
+
+  /**
+   * `not` — implemented at empyrean 988638f's re-pin, because `drift.rate`
+   * spells "0 is refused" as a hole in a range and no other keyword in this
+   * subset can express one.
+   *
+   * ASSERTED ON THE COMMITTED SCHEMA'S OWN NODE, not on a hand-built fragment:
+   * a locally written `{not: {const: 0}}` would prove the evaluator can do
+   * something, not that it does it to the field that needs it.
+   */
+  it('implements `not` as a refusal, on the committed schema\'s own rate node', () => {
+    const layer = (EFFECTS_SCENE_SCHEMA.$defs as Record<string, JsonSchema>).layer;
+    const drift = (layer.properties as Record<string, JsonSchema>).drift;
+    const rateForm = (drift.oneOf as JsonSchema[])
+      .find(b => (b.properties as Record<string, unknown> | undefined)?.rate !== undefined);
+    // Anti-vacuous: the branch really exists and really carries a `not`.
+    expect(rateForm, 'no drift branch declares `rate`').toBeDefined();
+    const rate = (rateForm!.properties as Record<string, JsonSchema>).rate;
+    expect(rate.not).toEqual({ const: 0 });
+
+    // The excluded value is refused, and the message names it.
+    const refused = validateAgainstSchema(0, rate, EFFECTS_SCENE_SCHEMA);
+    expect(refused).toHaveLength(1);
+    expect(refused[0].message).toMatch(/forbids the constant 0/);
+
+    // ...and a neighbouring value is not, so this is a hole and not a wall.
+    expect(validateAgainstSchema(1, rate, EFFECTS_SCENE_SCHEMA)).toEqual([]);
+    expect(validateAgainstSchema(-1, rate, EFFECTS_SCENE_SCHEMA)).toEqual([]);
+  });
+});
+
+/**
+ * CURRENCY — the question a pinned blob can never answer, for the SCHEMA.
+ *
+ * The gate above proves the vendored copy equals the blob Aurora pinned; it
+ * equals itself by construction and so can never notice that empyrean has moved
+ * on. This block asks the other question, under the three rules
+ * test/formats/aeon-fixture-currency.test.ts established for the aeon fixture
+ * (docs/reviews/2026-08-28-golden-live-tree.md):
+ *
+ *   1. Read empyrean at a COMMITTED REVISION through git objects. Never the
+ *      sibling working tree — on this machine `../empyrean` is a peer lane's
+ *      live checkout, and a test that opens it by path has its colour decided
+ *      by whatever that peer has not committed yet.
+ *   2. NAME the revision it read, in every message.
+ *   3. When it cannot run — no empyrean checkout, branch unfetched — SKIP
+ *      LOUDLY, saying what could not be measured. Never green-and-silent.
+ *
+ * A failure here is NOT an Aurora regression: it means the contract moved and
+ * the pin needs re-vendoring. The message says how.
+ */
+describe('CURRENCY: is the vendored schema still what empyrean publishes?', () => {
+  const empyrean = peerRepo('empyrean');
+  const TIP = PROV.empyrean.branch_that_answers_currency;
+  const NOT_OURS = 'NOT AN AURORA REGRESSION — the vendored effects contract schema is stale.';
+
+  it(`matches ${PROV.empyrean.path} at empyrean ${TIP}`, (ctx) => {
+    if (empyrean === null) {
+      ctx.skip('SKIPPED, NOT PASSED: no empyrean checkout beside this repo (set '
+        + 'AURORA_EMPYREAN_REPO) — CANNOT MEASURE whether the pin '
+        + `${PROV.empyrean.revision} is still current`);
+      return;
+    }
+    const tip = resolveRev(empyrean, TIP);
+    if (tip === null) {
+      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${empyrean} — CANNOT MEASURE `
+        + `currency of pin ${PROV.empyrean.revision}`);
+      return;
+    }
+    const at = readAtRev(empyrean, tip, PROV.empyrean.path);
+    // Not a skip: the revision resolved, so this WAS measured, and "the contract
+    // schema is gone at empyrean's tip" is drift of the loudest kind.
+    expect(at.ok, at.ok ? '' : `${NOT_OURS} ${at.why}`).toBe(true);
+    if (!at.ok) return;
+    expect(
+      at.blob,
+      `${NOT_OURS}\n`
+      + `  pinned at empyrean ${PROV.empyrean.revision} (blob ${PROV.empyrean.blob})\n`
+      + `  empyrean ${TIP} is now ${tip} (blob ${at.blob})\n`
+      + `  ${PROV.empyrean.path} changed between them.\n`
+      + `  Re-vendor:  git -C ${empyrean} show ${tip}:${PROV.empyrean.path} `
+      + '> src/core/formats/effects/aurora-effects-scene.schema.json\n'
+      + '  then update src/core/formats/effects/aurora-effects-scene.schema.provenance.json,\n'
+      + '  and let the coverage gate and the golden\'s derived key sweeps tell you what else moved.',
+    ).toBe(PROV.empyrean.blob);
+  });
+
+  /**
+   * The revision you PINNED AT is an anchor too, and it is the one nobody
+   * checks, because it reads as provenance rather than payload. A pin at a
+   * local-only SHA looks perfect from this machine and is unresolvable from
+   * anywhere else.
+   */
+  it('the pinned empyrean revision is PUBLISHED, not local-only', (ctx) => {
+    if (empyrean === null) {
+      ctx.skip('SKIPPED, NOT PASSED: no empyrean checkout beside this repo — CANNOT MEASURE '
+        + `whether ${PROV.empyrean.revision} is reachable from ${TIP}`);
+      return;
+    }
+    const tip = resolveRev(empyrean, TIP);
+    if (tip === null) {
+      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${empyrean} — CANNOT MEASURE `
+        + 'reachability');
+      return;
+    }
+    expect(
+      isAncestor(empyrean, PROV.empyrean.revision, tip),
+      `${PROV.empyrean.revision} is NOT reachable from empyrean ${TIP} (${tip}) — local-only, or `
+      + 'the branch was rewritten; a peer cannot check a pin at a SHA they cannot fetch',
+    ).toBe(true);
   });
 });

@@ -72,6 +72,9 @@
           }
         }
       },
+      "drift": {
+        "rate": 32
+      },
       "fa": "FACTOR_3_8",
       "fb": "FACTOR_3_16",
       "world_y": 160
@@ -88,6 +91,7 @@
           }
         }
       },
+      "drift": "none",
       "fa": "FACTOR_7_16",
       "fb": "FACTOR_15_16",
       "vsplit": "none",

@@ -10,20 +10,50 @@
         {
           "type": "string",
           "enum": [
-            "FACTOR_LOCKED", "FACTOR_0", "FACTOR_1", "FACTOR_1_2", "FACTOR_1_4",
-            "FACTOR_1_8", "FACTOR_1_16", "FACTOR_1_32", "FACTOR_3_4", "FACTOR_3_8",
-            "FACTOR_3_16", "FACTOR_5_8", "FACTOR_5_16", "FACTOR_7_8", "FACTOR_7_16",
+            "FACTOR_LOCKED",
+            "FACTOR_0",
+            "FACTOR_1",
+            "FACTOR_1_2",
+            "FACTOR_1_4",
+            "FACTOR_1_8",
+            "FACTOR_1_16",
+            "FACTOR_1_32",
+            "FACTOR_3_4",
+            "FACTOR_3_8",
+            "FACTOR_3_16",
+            "FACTOR_5_8",
+            "FACTOR_5_16",
+            "FACTOR_7_8",
+            "FACTOR_7_16",
             "FACTOR_15_16"
           ]
         },
         {
           "type": "object",
           "properties": {
-            "s1": { "type": "integer", "minimum": 0, "maximum": 15 },
-            "s2": { "type": "integer", "minimum": 0, "maximum": 15 },
-            "op": { "type": "integer", "enum": [0, 1] }
+            "s1": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 15
+            },
+            "s2": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 15
+            },
+            "op": {
+              "type": "integer",
+              "enum": [
+                0,
+                1
+              ]
+            }
           },
-          "required": ["s1", "s2", "op"],
+          "required": [
+            "s1",
+            "s2",
+            "op"
+          ],
           "unevaluatedProperties": false
         }
       ]
@@ -34,55 +64,114 @@
         {
           "type": "object",
           "properties": {
-            "generator": { "const": "sine" },
-            "amplitude": { "type": "integer", "minimum": 1, "maximum": 127 },
-            "period": { "type": "integer", "minimum": 1, "maximum": 256 }
+            "generator": {
+              "const": "sine"
+            },
+            "amplitude": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 127
+            },
+            "period": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            }
           },
-          "required": ["generator", "amplitude", "period"],
+          "required": [
+            "generator",
+            "amplitude",
+            "period"
+          ],
           "unevaluatedProperties": false
         },
         {
           "type": "object",
           "properties": {
-            "generator": { "const": "triangle" },
-            "amplitude": { "type": "integer", "minimum": 1, "maximum": 127 },
-            "period": { "type": "integer", "minimum": 1, "maximum": 256 }
+            "generator": {
+              "const": "triangle"
+            },
+            "amplitude": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 127
+            },
+            "period": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            }
           },
-          "required": ["generator", "amplitude", "period"],
-          "unevaluatedProperties": false
-        },
-        {
-          "type": "object",
-          "properties": { "generator": { "const": "zero" } },
-          "required": ["generator"],
-          "unevaluatedProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "generator": { "const": "v_column_perspective" },
-            "focal": { "type": "integer" },
-            "max_offset": { "type": "integer" }
-          },
-          "required": ["generator", "focal", "max_offset"],
-          "unevaluatedProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "generator": { "const": "v_column_floor" },
-            "center": { "type": "integer" },
-            "max_offset": { "type": "integer" }
-          },
-          "required": ["generator", "center", "max_offset"],
+          "required": [
+            "generator",
+            "amplitude",
+            "period"
+          ],
           "unevaluatedProperties": false
         },
         {
           "type": "object",
           "properties": {
-            "bin": { "type": "string", "pattern": "^(?!.*\\.\\.)[A-Za-z0-9_./-]+\\.bin$" }
+            "generator": {
+              "const": "zero"
+            }
           },
-          "required": ["bin"],
+          "required": [
+            "generator"
+          ],
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "generator": {
+              "const": "v_column_perspective"
+            },
+            "focal": {
+              "type": "integer"
+            },
+            "max_offset": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "generator",
+            "focal",
+            "max_offset"
+          ],
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "generator": {
+              "const": "v_column_floor"
+            },
+            "center": {
+              "type": "integer"
+            },
+            "max_offset": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "generator",
+            "center",
+            "max_offset"
+          ],
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "bin": {
+              "type": "string",
+              "pattern": "^(?!.*\\.\\.)[A-Za-z0-9_./-]+\\.bin$"
+            }
+          },
+          "required": [
+            "bin"
+          ],
           "unevaluatedProperties": false
         }
       ]
@@ -90,24 +179,50 @@
     "layerDeform": {
       "description": "Per-layer H-deform attachment (SceneDeform at layer level): \"none\" or Own(table, shift_a, shift_b, phase, speed). When own is present the layer's dsa/dsb/phase must be absent or at defaults — they lower into the same record fields (two-sources guard; sigil enforces).",
       "oneOf": [
-        { "const": "none" },
+        {
+          "const": "none"
+        },
         {
           "type": "object",
           "properties": {
             "own": {
               "type": "object",
               "properties": {
-                "table": { "$ref": "#/$defs/tableRef" },
-                "shift_a": { "type": "integer", "minimum": 0, "maximum": 15 },
-                "shift_b": { "type": "integer", "minimum": 0, "maximum": 15 },
-                "phase": { "type": "integer", "minimum": 0, "maximum": 255 },
-                "speed": { "type": "integer" }
+                "table": {
+                  "$ref": "#/$defs/tableRef"
+                },
+                "shift_a": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 15
+                },
+                "shift_b": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 15
+                },
+                "phase": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                },
+                "speed": {
+                  "type": "integer"
+                }
               },
-              "required": ["table", "shift_a", "shift_b", "phase", "speed"],
+              "required": [
+                "table",
+                "shift_a",
+                "shift_b",
+                "phase",
+                "speed"
+              ],
               "unevaluatedProperties": false
             }
           },
-          "required": ["own"],
+          "required": [
+            "own"
+          ],
           "unevaluatedProperties": false
         }
       ]
@@ -115,21 +230,32 @@
     "sceneDeform": {
       "description": "Scene-level shared H-deform attachment (SceneDeform.Shared): \"none\" or one table both planes sample.",
       "oneOf": [
-        { "const": "none" },
+        {
+          "const": "none"
+        },
         {
           "type": "object",
           "properties": {
             "shared": {
               "type": "object",
               "properties": {
-                "table": { "$ref": "#/$defs/tableRef" },
-                "speed": { "type": "integer" }
+                "table": {
+                  "$ref": "#/$defs/tableRef"
+                },
+                "speed": {
+                  "type": "integer"
+                }
               },
-              "required": ["table", "speed"],
+              "required": [
+                "table",
+                "speed"
+              ],
               "unevaluatedProperties": false
             }
           },
-          "required": ["shared"],
+          "required": [
+            "shared"
+          ],
           "unevaluatedProperties": false
         }
       ]
@@ -137,21 +263,58 @@
     "layer": {
       "type": "object",
       "properties": {
-        "world_y": { "type": "integer", "minimum": 0, "maximum": 32767 },
-        "fa": { "$ref": "#/$defs/factor" },
-        "fb": { "$ref": "#/$defs/factor" },
-        "dsa": { "type": "integer", "minimum": 0, "maximum": 15, "default": 15 },
-        "dsb": { "type": "integer", "minimum": 0, "maximum": 15, "default": 15 },
-        "phase": { "type": "integer", "minimum": 0, "maximum": 255, "default": 0 },
-        "enabled": { "type": "boolean", "default": true },
-        "deform": { "$ref": "#/$defs/layerDeform", "default": "none" },
+        "world_y": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32767
+        },
+        "fa": {
+          "$ref": "#/$defs/factor"
+        },
+        "fb": {
+          "$ref": "#/$defs/factor"
+        },
+        "dsa": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "default": 15
+        },
+        "dsb": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15,
+          "default": 15
+        },
+        "phase": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255,
+          "default": 0
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "deform": {
+          "$ref": "#/$defs/layerDeform",
+          "default": "none"
+        },
         "curve": {
           "oneOf": [
-            { "const": "none" },
+            {
+              "const": "none"
+            },
             {
               "type": "object",
-              "properties": { "to": { "$ref": "#/$defs/factor" } },
-              "required": ["to"],
+              "properties": {
+                "to": {
+                  "$ref": "#/$defs/factor"
+                }
+              },
+              "required": [
+                "to"
+              ],
               "unevaluatedProperties": false
             }
           ],
@@ -159,68 +322,150 @@
         },
         "vsplit": {
           "oneOf": [
-            { "const": "none" },
+            {
+              "const": "none"
+            },
             {
               "type": "object",
-              "properties": { "at": { "type": "integer", "minimum": 0, "maximum": 511 } },
-              "required": ["at"],
+              "properties": {
+                "at": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 511
+                }
+              },
+              "required": [
+                "at"
+              ],
+              "unevaluatedProperties": false
+            }
+          ],
+          "default": "none"
+        },
+        "drift": {
+          "description": "Time-driven drift of this layer: a constant horizontal rate added to the band's scroll every frame, independent of the camera (S1 GHZ clouds, S2 WFZ/HTZ clouds, S3K AIZ1 clouds). \"none\" or absent = the layer does not drift (lowers to a zero tail). rate is a signed integer in units of 1/256 px per FRAME: 1 px/frame = 256; S3K AIZ1's clouds = 32; corpus max 6 px/frame = 1536. The bound +/-4096 (16 px/frame) is a taste bound, not a correctness bound. 0 is refused (indistinguishable from none in ROM; aeon refuses Rate(0) at build time, scene_dsl.emp layer() ensure). UNIT HAZARD: an author writing 1 meaning 1 px/frame gets 1/256 px/frame; the editor SHOULD present px/frame and multiply by 256 on export. Engine contract: aeon docs/superpowers/specs/2026-08-29-band-drift-design.md section 7 rows 1, 2 and 10 at aeon e0ce6011; the field is authorable only once aeon's CAP_BAND_DRIFT emission parcel lands (the bit arrives WITH its gated block), and until then effects_gen.py refuses the key.",
+          "oneOf": [
+            {
+              "const": "none"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "rate": {
+                  "type": "integer",
+                  "minimum": -4096,
+                  "maximum": 4096,
+                  "not": {
+                    "const": 0
+                  }
+                }
+              },
+              "required": [
+                "rate"
+              ],
               "unevaluatedProperties": false
             }
           ],
           "default": "none"
         }
       },
-      "required": ["world_y", "fa", "fb"],
+      "required": [
+        "world_y",
+        "fa",
+        "fb"
+      ],
       "unevaluatedProperties": false
     }
   },
   "type": "object",
   "properties": {
-    "schema": { "const": 1 },
-    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$" },
-    "name": { "type": "string" },
+    "schema": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,31}$"
+    },
+    "name": {
+      "type": "string"
+    },
     "layers": {
       "type": "array",
-      "items": { "$ref": "#/$defs/layer" },
+      "items": {
+        "$ref": "#/$defs/layer"
+      },
       "minItems": 1,
       "maxItems": 16
     },
     "v_factor": {
       "description": "Whole-plane Plane-B vertical scroll, as a RIGHT-SHIFT AMOUNT — not a packed factor. The engine computes target_b = ((camY - v_center) >> v_factor) + v_offset (engine/level/parallax.emp). 15 is the LOCK SENTINEL: it is tested before the shift and pins the BG plane to v_offset regardless of the camera. This is a different space from a layer's fa/fb, where locked is the packed value $0FF; do not spell this field with a FACTOR_* name.",
-      "type": "integer", "minimum": 0, "maximum": 15
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 15
     },
     "v_center": {
       "description": "World Y the vertical mapping is centred on; same space as a layer's world_y. 0..32767: camera Y is clamped to 0..act extent and every act asserts extent <= 32768, so a value of $8000 or above would read negative after the sub.w (engine/level/parallax.emp, Parallax_Step5_Vscroll). Bounded 2026-08-26 with aeon's VOFFSET landing, on the v_factor precedent.",
-      "type": "integer", "minimum": 0, "maximum": 32767, "default": 0
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 32767,
+      "default": 0
     },
     "v_offset": {
       "description": "SIGNED vertical scroll offset in pixels, added after the shift: target_b = ((camY - v_center) >> v_factor) + v_offset, a 16-bit add.w into Vscroll_BG (the locked plane pins Vscroll_BG to it). It was always signed in the engine math; the unsigned field type was the error. Bounded 2026-08-26 with aeon's VOFFSET landing.",
-      "type": "integer", "minimum": -32768, "maximum": 32767, "default": 0
+      "type": "integer",
+      "minimum": -32768,
+      "maximum": 32767,
+      "default": 0
     },
     "v_factor_fg": {
       "description": "Plane-A counterpart of v_factor, same shift encoding. RESERVED in the v1 runtime — the pipeline always sets fg_vscroll = camY (engine/structs.emp) — and authored for identity only. Typed here so a v2 that starts consuming it does not inherit the packed-factor mistake.",
-      "type": "integer", "minimum": 0, "maximum": 15, "default": 0
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 15,
+      "default": 0
     },
-    "deform_fg": { "$ref": "#/$defs/sceneDeform", "default": "none" },
-    "deform_bg": { "$ref": "#/$defs/sceneDeform", "default": "none" },
+    "deform_fg": {
+      "$ref": "#/$defs/sceneDeform",
+      "default": "none"
+    },
+    "deform_bg": {
+      "$ref": "#/$defs/sceneDeform",
+      "default": "none"
+    },
     "v_deform": {
       "oneOf": [
-        { "const": "none" },
+        {
+          "const": "none"
+        },
         {
           "type": "object",
           "properties": {
             "columns": {
               "type": "object",
               "properties": {
-                "table": { "$ref": "#/$defs/tableRef" },
-                "speed": { "type": "integer" },
-                "amp_shift": { "type": "integer", "minimum": 0, "maximum": 15 }
+                "table": {
+                  "$ref": "#/$defs/tableRef"
+                },
+                "speed": {
+                  "type": "integer"
+                },
+                "amp_shift": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 15
+                }
               },
-              "required": ["table", "speed", "amp_shift"],
+              "required": [
+                "table",
+                "speed",
+                "amp_shift"
+              ],
               "unevaluatedProperties": false
             }
           },
-          "required": ["columns"],
+          "required": [
+            "columns"
+          ],
           "unevaluatedProperties": false
         }
       ],
@@ -228,22 +473,42 @@
     },
     "anchor": {
       "oneOf": [
-        { "const": "none" },
+        {
+          "const": "none"
+        },
         {
           "type": "object",
           "properties": {
             "at": {
               "type": "object",
               "properties": {
-                "channel": { "type": "integer", "minimum": 0, "maximum": 3 },
-                "dsa": { "type": "integer", "minimum": 0, "maximum": 15 },
-                "dsb": { "type": "integer", "minimum": 0, "maximum": 15 }
+                "channel": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3
+                },
+                "dsa": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 15
+                },
+                "dsb": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 15
+                }
               },
-              "required": ["channel", "dsa", "dsb"],
+              "required": [
+                "channel",
+                "dsa",
+                "dsb"
+              ],
               "unevaluatedProperties": false
             }
           },
-          "required": ["at"],
+          "required": [
+            "at"
+          ],
           "unevaluatedProperties": false
         }
       ],
@@ -251,12 +516,31 @@
     },
     "left_column_mask": {
       "type": "string",
-      "enum": ["undeclared", "sprite_mask", "factor0_lock", "accept"],
+      "enum": [
+        "undeclared",
+        "sprite_mask",
+        "factor0_lock",
+        "accept"
+      ],
       "default": "undeclared"
     },
-    "transition": { "type": "string", "enum": ["smooth", "instant"], "default": "smooth" },
-    "budget_class": { "type": "string" }
+    "transition": {
+      "type": "string",
+      "enum": [
+        "smooth",
+        "instant"
+      ],
+      "default": "smooth"
+    },
+    "budget_class": {
+      "type": "string"
+    }
   },
-  "required": ["schema", "id", "layers", "v_factor"],
+  "required": [
+    "schema",
+    "id",
+    "layers",
+    "v_factor"
+  ],
   "unevaluatedProperties": false
 }

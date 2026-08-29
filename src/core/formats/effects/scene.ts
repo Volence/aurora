@@ -9,7 +9,7 @@
 //     (golden protocol) — read at empyrean 069cf59, an ancestor of c2c81e2.
 //   • empyrean contract/schema/aurora-effects-scene.schema.json — the
 //     machine-readable half, vendored beside this file. Its git blob hash is
-//     dd972cf0e203a11330dfcec60b8c3ca59eac5b49 and the vendored copy is pinned
+//     4adfbb40d20d0f0b3fea27fe933601ec14fc442e and the vendored copy is pinned
 //     against that hash by test/formats/effects-schema-drift.test.ts. The BLOB
 //     hash, not a commit citation, is the load-bearing invariant: the schema
 //     doc has moved twice (2f3b6fd, 069cf59) with the schema JSON byte-identical
@@ -27,7 +27,13 @@
 //     was a defect and not a preference) → d4345af5 (5c930d6, `v_center` and
 //     `v_offset` bounded) → 0f661b70 (277bc15, `layers` maxItems 8 → 16) →
 //     dd972cf0 (0bd4753, `precision` RETIRED — the engine deleted the storage,
-//     so this is a delete and not a reservation; ROADMAP row 59).
+//     so this is a delete and not a reservation; ROADMAP row 59) →
+//     4adfbb40 (988638f, `$defs.layer.properties.drift` ADDED — see EffectsDrift
+//     below, and note that this re-pin's byte diff is enormous and almost
+//     entirely cosmetic: the same commit reflowed the whole file one key per
+//     line. Structural equality was CHECKED, not assumed — a recursive diff of
+//     the two parsed documents reports exactly one difference, the added
+//     `drift` node. docs/reviews/2026-08-29-drift-codec.md).
 //   • aeon tools/EFFECTS_CONSUMER_CONTRACT.md §2.1/§2.3 at aeon 00607dd5 — the
 //     consumer's read set, and the drift rule that governs both directions.
 //
@@ -105,6 +111,34 @@ export type EffectsVDeform =
   | { columns: { table: EffectsTableRef; speed: number; amp_shift: number } };
 export type EffectsAnchor = 'none' | { at: { channel: number; dsa: number; dsb: number } };
 
+/**
+ * Time-driven drift: a constant horizontal rate added to a band's scroll every
+ * frame, independent of the camera (S1 GHZ clouds, S2 WFZ/HTZ, S3K AIZ1).
+ *
+ * `rate` IS NOT PIXELS PER FRAME. It is 1/256 px per frame — the schema's own
+ * description names the hazard ("an author writing 1 meaning 1 px/frame gets
+ * 1/256 px/frame") and asks the editor to present px/frame and multiply on
+ * export. Aurora takes that SHOULD: see `driftPxPerFrameToRate` /
+ * `driftRateToPxPerFrame` in scene-ui.ts, which are the ONLY two places the
+ * factor is applied, and `EFFECTS_DRIFT_UNITS_PER_PIXEL`, which is the only
+ * place it is spelled — derived out of this schema's description, not typed.
+ *
+ * `0` IS NOT A VALUE. It is refused by the schema (`"not": {"const": 0}`)
+ * because `Rate(0)` and `None` are indistinguishable in ROM; aeon refuses it at
+ * build time too (`scene_dsl.emp` `layer()` ensure). A layer that should not
+ * drift spells `"none"` or omits the key.
+ *
+ * NOT AUTHORABLE FROM AURORA, DELIBERATELY, and this is the whole reason there
+ * is a type here and no control anywhere. aeon's `tools/effects_gen.py` REFUSES
+ * the key until their `CAP_BAND_DRIFT` emission parcel lands, so a scene
+ * carrying `drift` does not build today. Shipping a spinner for it would
+ * originate a value the build rejects for EVERY input — the open defect ROADMAP
+ * row O13 already tracks for the curve dropdown, in a worse form. What Aurora
+ * owes the field now is the other thing: reading it, round-tripping it, and not
+ * destroying it. See docs/reviews/2026-08-29-drift-codec.md.
+ */
+export type EffectsDrift = 'none' | { rate: number };
+
 export interface EffectsLayer {
   world_y: number;
   fa: EffectsFactor;
@@ -116,6 +150,7 @@ export interface EffectsLayer {
   deform?: EffectsLayerDeform;
   curve?: EffectsCurve;
   vsplit?: EffectsVSplit;
+  drift?: EffectsDrift;
 }
 
 export interface EffectsScene {
