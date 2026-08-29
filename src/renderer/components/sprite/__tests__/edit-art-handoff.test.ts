@@ -260,8 +260,13 @@ describe('editObjectArtCheckout', () => {
   });
 
   const S1TREE = '/home/volence/sonic_hacks/s1disasm';
-  (existsSync(join(S1TREE, '_anim/Sonic.asm')) ? it : it.skip)(
-    'Sonic ($01): the sonani-dialect timeline opens — every table anim listed, specials DYNAMIC', async () => {
+  it(
+    'Sonic ($01): the sonani-dialect timeline opens — every table anim listed, specials DYNAMIC', {
+      skip: !existsSync(join(S1TREE, '_anim/Sonic.asm')),
+      meta: {
+        skipReason: `${join(S1TREE, '_anim/Sonic.asm')} is absent — no s1disasm checkout on this machine`,
+      },
+    }, async () => {
     // The sonani parcel closes the audit §1.4 exclusion: the checkout parses
     // `_anim/Sonic.asm` with the DEDICATED dialect parser and lists the whole
     // table. Entry count is DERIVED from the file's own sonani rows.
@@ -472,8 +477,13 @@ describe('editObjectArtCheckout — animation auto-load', () => {
   const S1DIR = '/home/volence/sonic_hacks/s1disasm';
   const realReader = async (_base: string, rel: string) => readFileSync(join(S1DIR, rel), 'utf8');
   const treePresent = existsSync(join(S1DIR, '_anim'));
+  /** Why the two rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+  const ANIM_ABSENT = {
+    skip: !treePresent,
+    meta: { skipReason: `${join(S1DIR, '_anim')} is absent — no s1disasm checkout on this machine` },
+  };
 
-  (treePresent ? it : it.skip)('Crabmeat: loads all 8 anims with flips into the picker + timeline', async () => {
+  it('Crabmeat: loads all 8 anims with flips into the picker + timeline', ANIM_ABSENT, async () => {
     __setSpriteSetOpenerForTest(stubOpener([], 7)); // Crabmeat art has 7 frames (0..6)
     const reads: string[] = [];
     __setAnimScriptReaderForTest(async (base, rel) => { reads.push(`${base}|${rel}`); return realReader(base, rel); });
@@ -509,7 +519,7 @@ describe('editObjectArtCheckout — animation auto-load', () => {
     expect(useSpriteStore.getState().steps).toEqual([]);
   });
 
-  (treePresent ? it : it.skip)('Ring: the synced spin LEADS the picker, then the scripted sparkle', async () => {
+  it('Ring: the synced spin LEADS the picker, then the scripted sparkle', ANIM_ABSENT, async () => {
     __setSpriteSetOpenerForTest(stubOpener([], 9)); // Map_Ring (REV01) has 9 frames (4 spin + 4 sparkle + blank)
     __setAnimScriptReaderForTest(realReader);
 

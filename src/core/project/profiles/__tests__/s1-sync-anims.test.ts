@@ -21,7 +21,15 @@ import type { SyncAnimEntry } from '../s1-object-anims';
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
 const treePresent = existsSync(join(S1DIR, 'sonic.asm'));
-const guarded = treePresent ? it : it.skip;
+/**
+ * `it`, but a skip here says WHY — read by scripts/skip-report-reporter.mjs.
+ * The bare `treePresent ? it : it.skip` this replaces produced rows that were
+ * indistinguishable from a pass to anyone reading a suite total.
+ */
+const guarded = (name: string, fn: () => void | Promise<void>): void => it(name, {
+  skip: !treePresent,
+  meta: { skipReason: `${join(S1DIR, 'sonic.asm')} is absent — no s1disasm checkout on this machine` },
+}, fn);
 
 /** Every sync row in the table, flattened with its object id. */
 const allSyncRows: { id: number; entry: SyncAnimEntry }[] = Object.entries(S1_OBJECT_ANIMS)
