@@ -246,32 +246,6 @@ export default function MarqueePasteOptions() {
         })}
       </div>
 
-      {/* THE RULE IN FORCE, at the moment it matters — beside the control it
-          constrains, not buried in a tooltip. */}
-      {layersLocked && (
-        <div style={styles.warnLine}>
-          {pasting
-            ? 'Clipboard is art only — it was copied from a selection that is not block-aligned.'
-            : reason}
-        </div>
-      )}
-
-      {/* THE SELECTION ITSELF (owner item 2). Not shown while pasting: there the
-          question is "where does this land", and the answer is the ghost under
-          the cursor on the map. */}
-      {!pasting && marquee && (
-        <>
-          <div style={styles.sizeLine}>
-            <span style={{ color: aligned ? T.textBase : T.warning }}>{sizeLabel}</span>
-            <span style={styles.dim}>{` at (${marquee.col}, ${marquee.row}) · section ${marquee.sectionIndex}`}</span>
-          </div>
-          <SelectionPreview
-            sectionIndex={marquee.sectionIndex}
-            col={marquee.col} row={marquee.row} w={marquee.w} h={marquee.h}
-          />
-        </>
-      )}
-
       {/* FLIP — always MOUNTED, disabled when nothing is eligible. A control
           that vanishes teaches nothing about when it applies, and "when does
           flip apply" is the whole subtlety here: mirroring the pending paste
@@ -299,6 +273,32 @@ export default function MarqueePasteOptions() {
           </button>
         ))}
       </div>
+
+      {/* THE RULE IN FORCE, at the moment it matters — beside the control it
+          constrains, not buried in a tooltip. */}
+      {layersLocked && (
+        <div style={styles.warnLine}>
+          {pasting
+            ? 'Clipboard is art only — it was copied from a selection that is not block-aligned.'
+            : reason}
+        </div>
+      )}
+
+      {/* THE SELECTION ITSELF (owner item 2). Not shown while pasting: there the
+          question is "where does this land", and the answer is the ghost under
+          the cursor on the map. */}
+      {!pasting && marquee && (
+        <>
+          <div style={styles.sizeLine}>
+            <span style={{ color: aligned ? T.textBase : T.warning }}>{sizeLabel}</span>
+            <span style={styles.dim}>{` at (${marquee.col}, ${marquee.row}) · section ${marquee.sectionIndex}`}</span>
+          </div>
+          <SelectionPreview
+            sectionIndex={marquee.sectionIndex}
+            col={marquee.col} row={marquee.row} w={marquee.w} h={marquee.h}
+          />
+        </>
+      )}
 
       {/* AN UNLISTED KEY IS AN UNDISCOVERABLE FEATURE. Both states name the
           flip, because the same two letters mean the same mirror at both
