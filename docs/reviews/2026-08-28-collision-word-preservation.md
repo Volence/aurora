@@ -267,8 +267,13 @@ FAIL paintDocCollision > CONTROL: reports no change when the cell already holds 
      AssertionError: expected true to be false
 ```
 
-Restored: **21 passed** in that file; **whole suite 5,377 passed / 0 failed / 7 skipped**
-(baseline on this tree 5,356 / 0 / 7 — this parcel adds 21).
+Restored: **21 passed** in that file.
+
+Whole suite, **re-verified on the MERGED tree after rebasing onto `origin/master` 4f36936**
+(which landed row 81's marquee-snap/paste-pan parcel mid-parcel): **5,383 passed / 0 failed /
+7 skipped**, `tsc` clean. Branch-side before the rebase it was 5,377 / 0 / 7 against the older
+baseline of 5,356 — this parcel adds 21 rows either way, and the two parcels compose without
+interference.
 
 ### Red-first, running app — commit `cbf896e`, 10/12
 
@@ -282,13 +287,16 @@ FAIL [d2] a real DRAG preserves the far cell's unowned bits
 with `[p1]`/`[d1]` **green** — the stroke really did write the armed brush `0x3401` over the
 seeded `0x1aa5` — so neither red is "nothing happened".
 
-### Green, running app — three consecutive runs, 12/12 each
+### Green, running app — three consecutive runs, 12/12 each, twice over
+
+Three runs branch-side before the rebase, and **three more on the MERGED tree afterwards**,
+all 12/12.
 
 Each total read **whole from its own run**; no row from one run was ever paired with a row from
 another. Post-fix the cell reads `0xf401` = armed owned `0x3401` | preserved unowned `0xc000`.
 
-`dpr` was **1.35 on two of the three runs** (and differed between runs, as this box does).
-Every aim is computed from `view()` read back off the store through the app's own transform,
+`dpr` was **1.35 on two of the three branch-side runs and 1 on all three merged-tree runs** —
+it genuinely varies on this box, which is the trap. Every aim is computed from `view()` read back off the store through the app's own transform,
 rounded to an integer, and then **verified by inverting that transform** — an off-by-one is a
 thrown refusal, never a red feature row. Row `[aim]` prints dpr, the rect and `canvas.width`
 and asserts `canvas.width === Math.floor(rect.width)`.
