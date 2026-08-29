@@ -16,7 +16,8 @@
     "harness:marquee-snap-modifier": "node scratchpad/marquee-snap-modifier-harness.mjs",
     "harness:paste-pan": "node scratchpad/paste-pan-harness.mjs",
     "harness:collision-preservation": "node scratchpad/collision-preservation-harness.mjs",
-    "harness:marquee-flip": "node scratchpad/marquee-flip-harness.mjs"
+    "harness:marquee-flip": "node scratchpad/marquee-flip-harness.mjs",
+    "harness:collision-read": "node scratchpad/collision-read-harness.mjs"
   },
   "keywords": [],
   "author": "",
