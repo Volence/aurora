@@ -1250,6 +1250,18 @@ interface DebugApi {
    */
   view(): { x: number; y: number; zoom: number };
   setView(x: number, y: number, zoom: number): void;
+  /** Every View-menu overlay toggle, as the store holds them. Read-only. */
+  overlays(): Record<string, boolean>;
+  /**
+   * Flip one overlay toggle, exactly as the View menu's checkbox does.
+   *
+   * A harness needs this because two of the three lenses this repo now carries
+   * are ARMED AS A SIDE EFFECT of arming a brush — so a row that turned a lens
+   * on by reaching past the store could not tell "the app armed it" from "the
+   * harness did". This goes through `setOverlay`, the same action the menu
+   * calls, and rows that are about the arming read `overlays()` instead.
+   */
+  setOverlay(key: string, value: boolean): void;
   /**
    * Open an act the way the UI does — through the tab activation guard, which is
    * what carries the per-tab viewport snapshot/restore. `openAct` above goes
@@ -1497,6 +1509,9 @@ export function installDebugHooks(): void {
       return { x: v.vpX, y: v.vpY, zoom: v.zoom };
     },
     setView: (x, y, zoom) => useViewStore.getState().setViewport(x, y, zoom),
+    overlays: () => ({ ...useViewStore.getState().overlays }) as unknown as Record<string, boolean>,
+    setOverlay: (k, v) => useViewStore.getState()
+      .setOverlay(k as keyof ReturnType<typeof useViewStore.getState>['overlays'], v),
     activate: (zone, act) => activateLevelTarget(levelDocId(zone, String(act))),
     resetLevel: () => useClassicLevelStore.getState().reset(),
     // setState rather than setCurrentAct: the store action takes an act id, and
