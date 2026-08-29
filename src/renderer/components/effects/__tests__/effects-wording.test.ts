@@ -146,6 +146,50 @@ describe('the panels render the constants rather than a second copy of the words
     // The read-only extras line no longer says "no control yet" for these two.
     expect(scenePanel).not.toMatch(/no control yet/);
   });
+  // ROADMAP row 13 — the curve picker must not OFFER the value the build
+  // refuses. The provider decides which one that is; this holds the wiring,
+  // which is the half a node suite can otherwise never see (`disabled` marked
+  // in the provider and dropped on the floor by the component renders a
+  // completely normal, fully green, still-broken dropdown).
+  it('EffectsScenePanel greys the refused curve option — curveFieldOptions reaches the <option>', () => {
+    // The narrowed list is asked for, on the CURVE row and nowhere else:
+    // `fa`/`fb` are the factor space itself and have no refused member.
+    expect(scenePanel).toMatch(/options=\{curveFieldOptions\(layer\)\}/);
+    expect(scenePanel.match(/curveFieldOptions\(/g)!.length).toBe(1);
+    // The flag has to REACH the option and the reason has to reach its title,
+    // or the value the engine refuses stays pickable however carefully the
+    // provider marked it.
+    // ⚠ BOUNDED TO `FactorField` ITSELF, AND THE FIRST CUT WAS NOT. Slicing
+    // from `function FactorField` to end-of-file swept in the `left_column_mask`
+    // and `period` pickers, which render the IDENTICAL `disabled={o.disabled}`
+    // line — so the plant that deleted the flag from THIS component came back
+    // green on the strength of two other components' correctness. Two code
+    // paths, one observable: the classic vacuous row.
+    const ffStart = scenePanel.indexOf('function FactorField');
+    const ffEnd = scenePanel.indexOf('\nfunction ', ffStart + 1);
+    expect(ffStart, 'FactorField must exist to be measured').toBeGreaterThan(-1);
+    expect(ffEnd, 'FactorField must be followed by another top-level function').toBeGreaterThan(ffStart);
+    const factorField = scenePanel.slice(ffStart, ffEnd);
+    // The bound is real: the NEXT picker's own options must be outside it.
+    expect(factorField).not.toMatch(/leftColumnMaskOptions|tableRefParamOptions/);
+    expect(factorField).toMatch(/<option[^>]*disabled=\{o\.disabled\}/);
+    expect(factorField).toMatch(/title=\{o\.title\}/);
+    // Said in the list, not only in a tooltip — the same suffix the
+    // `left_column_mask` and `period` pickers use, so one card does not carry
+    // three idioms for one idea.
+    expect(factorField).toMatch(/o\.disabled \? ' \(engine refuses\)' : ''/);
+
+    // DERIVED, NEVER COPIED. The comparison lives in `curveGoesNowhere` alone;
+    // a component that re-derived "to equals fb" could drift from the advisory
+    // after any edit to either. Comments are stripped first — this file's own
+    // prose above names the rule, and a bare `not.toMatch` would pass on the
+    // strength of a comment rather than the code.
+    const code = scenePanel.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    expect(code).toMatch(/export default function EffectsScenePanel/);   // anti-vacuous strip
+    expect(code).not.toMatch(/JSON\.stringify\([^)]*\bfb\b/);
+    expect(code).not.toMatch(/===\s*layer\.fb/);
+    expect(code).not.toMatch(/layer\.fb\s*===/);
+  });
   it('EffectsScenePanel renders the four deform rows and writes all four keys', () => {
     for (const c of ['SCENE_DEFORM_ROWS', 'SCENE_DEFORM_ROW_SHARED', 'V_DEFORM_ROW', 'LAYER_DEFORM_ROW', 'TABLE_REF_ROW']) {
       expect(scenePanel, c).toMatch(new RegExp(`\\b${c}\\b`));

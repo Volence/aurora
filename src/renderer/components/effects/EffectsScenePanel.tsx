@@ -55,6 +55,7 @@ import type { AnyCommand } from '../../../core/editing/commands';
 import type {
   EffectsScene, EffectsSceneLibrary, EffectsLayer, EffectsPackedFactor, EffectsTableRef,
 } from '../../../core/formats/effects/scene';
+import type { FactorOption, FactorFieldOption } from '../../providers/effects-aeon';
 // THE ADVISORY NOTHING CALLED. `advisoryLayerDeformConflicts` has been a pure
 // function in the codec since wave 1 with no caller anywhere — the Aurora side
 // of §2.2's two-sources guard, written and then never wired. The layer card is
@@ -63,7 +64,8 @@ import { advisoryLayerDeformConflicts } from '../../../core/formats/effects/scen
 import {
   factorOptions, clampPackedField,
   factorFieldSelectValue, factorFieldFromSelect, NONE_FACTOR_VALUE,
-  curveFieldValue, curveFromField, vsplitFieldValue, vsplitFromToggle, curveAdvisory, clampVSplitAt,
+  curveFieldValue, curveFromField, curveFieldOptions,
+  vsplitFieldValue, vsplitFromToggle, curveAdvisory, clampVSplitAt,
   LAYER_CURVE_ROW, LAYER_VSPLIT_ROW, EFFECTS_VSPLIT_AT_BOUNDS,
   clampVFactor, clampVCenter, clampVOffset,
   layerTopBounds, clampLayerTop, planeLineOf, fireLineAdvisory, vsplitOrderAdvisory,
@@ -179,21 +181,35 @@ function run(command: AnyCommand | null): void {
  * schema spells `"none"` | `{to: factor}` — the SAME factor space as `fb`, so
  * the picker is reused rather than cloned. `fa`/`fb` are required and never
  * pass it; the type keeps 'none' out of their onChange.
+ *
+ * `options` (ROADMAP row 13) lets a CALLER narrow the list to what the engine
+ * will take from THAT field, disabled-with-a-reason rather than dropped — the
+ * `leftColumnMaskOptions` / `tableRefParamOptions` idiom, third instance. Only
+ * the curve row passes it: `fa`/`fb` are the factor space itself and have no
+ * value the engine refuses, so they keep the plain list. The none option is
+ * never among them — "no curve" is always legal.
  */
-function FactorField<N extends string | undefined = undefined>({ value, onChange, title, noneLabel }: {
+function FactorField<N extends string | undefined = undefined>({ value, onChange, title, noneLabel, options }: {
   value: N extends string ? EffectsLayer['fa'] | 'none' : EffectsLayer['fa'];
   onChange: (f: N extends string ? EffectsLayer['fa'] | 'none' : EffectsLayer['fa']) => void;
   title: string;
   noneLabel?: N;
+  options?: readonly FactorFieldOption[];
 }) {
   type V = N extends string ? EffectsLayer['fa'] | 'none' : EffectsLayer['fa'];
   const selected = factorFieldSelectValue(value);
+  const opts: readonly (FactorOption & { disabled?: boolean; title?: string })[]
+    = options ?? factorOptions();
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: T.s2, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
       <Select title={title} value={selected}
               onChange={(v) => onChange(factorFieldFromSelect(v, value) as V)} style={{ flex: 1, minWidth: 128 }}>
         {noneLabel !== undefined && <option value={NONE_FACTOR_VALUE}>{noneLabel}</option>}
-        {factorOptions().map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        {opts.map((o) => (
+          <option key={o.value} value={o.value} disabled={o.disabled} title={o.title}>
+            {o.label}{o.disabled ? ' (engine refuses)' : ''}
+          </option>
+        ))}
       </Select>
       {typeof value !== 'string' && (() => {
         // The packed triple's own fields, shown only when the factor IS packed.
@@ -774,9 +790,25 @@ export default function EffectsScenePanel(): React.ReactElement {
               {/* THE CURVE (parcel H). `curve.to` is a factor in the same space
                   as fb, so it is the same picker with a none state; the hint
                   is the engine's sentence. The advisory below it is the
-                  engine's own refusal (to == fb), said before the build says it. */}
+                  engine's own refusal (to == fb), said before the build says it.
+
+                  THE PICKER NO LONGER OFFERS THAT REFUSAL AS A CHOICE (row 13).
+                  Until this parcel an author could SELECT the one value the
+                  engine rejects and only then read the sentence saying so.
+                  `curveFieldOptions` greys it, with the engine's own reason on
+                  the option — DISABLED, never dropped: a select missing its own
+                  value shows a different one, so a file already carrying
+                  `to == fb` would have drawn as `none` (the `leftColumnMask`
+                  and `period` rows take the identical shape, and the reason is
+                  written out over `curveFieldOptions`).
+
+                  DERIVED, NOT COPIED: the greying and the sentence below both
+                  come from `curveGoesNowhere` / `curveFlatReason`. The
+                  comparison is nowhere in this component, so the option and the
+                  advisory cannot come to disagree. */}
               <Field label={LAYER_CURVE_ROW.label} title={LAYER_CURVE_ROW.title}>
                 <FactorField title={`Layer ${i} ${LAYER_CURVE_ROW.title}`} noneLabel={LAYER_CURVE_ROW.none}
+                  options={curveFieldOptions(layer)}
                   value={curveFieldValue(layer)}
                   onChange={(f) => run(setLayerFieldCommand(
                     library, selected.id, i, 'curve', curveFromField(f)))} />

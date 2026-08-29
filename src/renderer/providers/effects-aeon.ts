@@ -180,16 +180,117 @@ export function vsplitFromToggle(on: boolean, layer: Pick<EffectsLayer, 'world_y
 }
 
 /**
+ * THE ENGINE'S layer() GUARD 4, AS ONE PREDICATE — the only place the rule is
+ * spelled. `curveAdvisory` (what a document already CARRIES) and
+ * `curveFieldOptions` (what the picker may LAND on) both read it, and neither
+ * restates it, so the sentence under the row and the greyed row in the list
+ * cannot come to disagree after an edit to one of them.
+ *
+ * Equality is BY VALUE, so a packed triple spelled twice is caught too — the
+ * comparison a `===` would miss and the reason this is `JSON.stringify` rather
+ * than the obvious operator. Both operands are schema-shaped (a `FACTOR_*`
+ * string, or `{s1,s2,op}` written in that key order by every producer in this
+ * module), so key order is not a hazard here.
+ */
+export function curveGoesNowhere(fb: EffectsFactor, to: EffectsFactor): boolean {
+  return JSON.stringify(to) === JSON.stringify(fb);
+}
+
+/**
+ * The engine's reason, in one sentence, for one candidate far end.
+ *
+ * ALSO ONLY SPELLED ONCE, for the same reason the predicate is: the advisory
+ * under the row and the disabled option's own tooltip say the identical thing
+ * about the identical value, because they ARE the same string.
+ */
+export function curveFlatReason(to: EffectsFactor): string {
+  return `curve to ${factorLabel(to)} is the same factor as Plane B — the ramp goes nowhere and the build refuses it`;
+}
+
+/**
  * Advice, not enforcement: the engine's layer() guard 4 refuses a curve whose
  * far end equals `fb` ("the ramp's two ends are equal and the emitted HScroll
- * is byte-identical to the flat path"). Equality is by value, so a packed
- * triple spelled twice is caught too.
+ * is byte-identical to the flat path").
+ *
+ * STILL LOAD-BEARING NOW THAT THE PICKER DISABLES THAT OPTION (ROADMAP row 13).
+ * The picker governs what an author can LAND on; this governs what a document
+ * already CARRIES — a hand-edited file, an MCP write, a scene authored before
+ * the option was disabled, and the PACKED path, which no dropdown option can
+ * express at all (see `curveFieldOptions`). That is the same two-paths split
+ * `tableRefAdvisory` keeps beside its own picker, and removing either half
+ * re-opens the path it covers.
  */
 export function curveAdvisory(layer: Pick<EffectsLayer, 'fb' | 'curve'>): string | null {
   const to = curveFieldValue(layer);
   if (to === 'none') return null;
-  if (JSON.stringify(to) !== JSON.stringify(layer.fb)) return null;
-  return `curve to ${factorLabel(to)} is the same factor as Plane B — the ramp goes nowhere and the build refuses it`;
+  if (!curveGoesNowhere(layer.fb, to)) return null;
+  return curveFlatReason(to);
+}
+
+/** A factor `<select>` option that can carry the engine's refusal of itself. */
+export interface FactorFieldOption extends FactorOption {
+  /** True for a value the ENGINE refuses outright HERE; the picker must not take it. */
+  disabled: boolean;
+  /** The engine's reason, for the option's own title. Empty for a plain value. */
+  title: string;
+}
+
+/**
+ * What the CURVE picker offers for one layer — `factorOptions()`, with the one
+ * value the engine refuses on THIS layer rendered disabled and carrying why.
+ *
+ * ═══ WHY DISABLED AND NOT DROPPED (the row-13 remedy, named by the drift-codec
+ * packet as the shape two later parcels copy) ═══
+ *
+ * A `<select>` whose current value has no option silently shows a DIFFERENT
+ * one. Drop `FACTOR_1_4` here and a file that already carries `curve.to
+ * FACTOR_1_4` beside `fb FACTOR_1_4` draws the picker on `none` — the author
+ * reads "no curve" while the build reads a curve and refuses it. That is the
+ * quiet lie `leftColumnMaskOptions` and `tableRefParamOptions` both exist to
+ * stop, and it is why "merely hidden" was ruled out rather than preferred.
+ *
+ * ═══ THE STRICTNESS QUESTION, ON `tableRefParamOptions`' OWN TEST ═══
+ *
+ * That test disables an option only when NO scene content can make it legal,
+ * and it rules `factor0_lock` the other way precisely because that value's
+ * precondition is about the rest of the scene. `curve.to == fb` passes the
+ * test, and the reason is worth stating because it looks at first like the
+ * `factor0_lock` case:
+ *
+ *   • THE REFUSED VALUE IS RECOMPUTED FROM `fb` ON EVERY RENDER. It is not a
+ *     claim about the scene that an author might declare now and make true
+ *     later — the ONLY way to make `to == fb` build is to change `fb`, which
+ *     is two rows up on the same card and immediately moves which option is
+ *     disabled. So the picker never withholds something the build would have
+ *     taken from the document as it stands.
+ *   • guard 4 IS UNCONDITIONAL on the pair. No other key, on the layer or the
+ *     scene, can license it.
+ *   • THE DOCUMENT STILL SAVES. Nothing here refuses a write; `curveAdvisory`
+ *     is untouched and sigil stays the rulebook (row 58's posture).
+ *
+ * ═══ THE PACKED ESCAPE HATCH IS NEVER DISABLED, AND THAT IS CORRECT ═══
+ *
+ * `CUSTOM_FACTOR_VALUE` is a SENTINEL, not a factor — picking it opens the
+ * s1/s2/op spinners rather than committing a value, so there is no refusal to
+ * attach to it. And when `fb` is itself packed, `curveGoesNowhere` compares an
+ * object against a `FACTOR_*` string for every named option and disables NONE
+ * of them, which is right: no named factor equals a packed triple by value.
+ * The packed collision is reachable only through the spinners, where there is
+ * no option to grey, and `curveAdvisory` is what covers it.
+ */
+export function curveFieldOptions(layer: Pick<EffectsLayer, 'fb'>): FactorFieldOption[] {
+  return factorOptions().map((o) => {
+    if (o.value === CUSTOM_FACTOR_VALUE) {
+      return { ...o, disabled: false, title: 'a packed shift-add factor, spelled by hand' };
+    }
+    const to = o.value as EffectsFactor;
+    const refused = curveGoesNowhere(layer.fb, to);
+    return {
+      ...o,
+      disabled: refused,
+      title: refused ? curveFlatReason(to) : `Plane B ramps to ${factorLabel(to)} at this strip's bottom`,
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
