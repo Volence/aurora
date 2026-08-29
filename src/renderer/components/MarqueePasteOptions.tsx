@@ -9,7 +9,30 @@ import {
 } from '../../core/editing/map-clipboard';
 import { selectionToChunk } from '../../core/editing/selection-to-chunk';
 import { regionPreviewCanvas } from '../canvas/region-preview';
+import { performMapFlip, resolveFlip } from './map-flip';
+import type { FlipAxis } from '../../core/editing/region-flip';
 import { T } from './ui';
+
+/**
+ * THE FLIP BUTTONS — the owner's *"I think a button on the right panel would be
+ * nice too"* (2026-08-28), on top of the `X`/`Y` keys row 83 shipped.
+ *
+ * ⚠ THE PROSE BELOW IS NOT DELETED AND THE BUTTONS ARE LABELLED WITH THE KEYS.
+ * A sentence in a panel is documentation, not an affordance — he found those
+ * keys because he was told, not because the UI offered them — but a button that
+ * hides the shortcut trades one undiscoverable thing for another. `Ctrl+S` on
+ * Save and `Ctrl+Shift+B` on Build & Run (shell/commands.ts) already set that
+ * convention here, so the label carries the letter.
+ *
+ * The glyphs match the collision palette's own `H ⇄` / `V ⇅` pair rather than
+ * inventing a control style; the LETTERS are X/Y because that is both the key
+ * and the engine's own word for the axis (collision-cell-word.ts bit 10
+ * `xFlip`, "mirror horizontally"), which is the vocabulary map-flip.ts defends.
+ */
+const FLIP_OPTS: ReadonlyArray<{ axis: FlipAxis; label: string; what: string }> = [
+  { axis: 'h', label: 'X ⇄', what: 'left↔right' },
+  { axis: 'v', label: 'Y ⇅', what: 'top↕bottom' },
+];
 
 const LAYER_OPTS: ReadonlyArray<{ value: PasteLayers; label: string; title: string }> = [
   { value: 'both', label: 'Both', title: 'Paste art + collision (default)' },
@@ -107,6 +130,13 @@ export default function MarqueePasteOptions() {
   const pasting = useEditorStore((s) => s.pasting);
   const marquee = useEditorStore((s) => s.marquee);
   const clipboard = useEditorStore((s) => s.mapClipboard);
+  // The flip buttons' enablement is `resolveFlip`'s verdict, NOT a second
+  // reading of the same state: the button must be dead in exactly the cases the
+  // key is a no-op, or the panel starts teaching a rule the map does not keep.
+  // `tool` is subscribed for this alone — flip-in-place is narrower than
+  // Ctrl+C on purpose (see map-flip.ts), so the marquee tool has to be armed.
+  const tool = useEditorStore((s) => s.tool);
+  const flipTarget = resolveFlip({ pasting, mapClipboard: clipboard, tool, marquee });
   const [nameInput, setNameInput] = useState('');
 
   // WHICH RULE IS IN FORCE, derived from the RECT rather than the armed mode —
@@ -214,6 +244,34 @@ export default function MarqueePasteOptions() {
               }}>{label}</button>
           );
         })}
+      </div>
+
+      {/* FLIP — always MOUNTED, disabled when nothing is eligible. A control
+          that vanishes teaches nothing about when it applies, and "when does
+          flip apply" is the whole subtlety here: mirroring the pending paste
+          works from any tool, mirroring a committed selection IN PLACE needs
+          the marquee tool armed, because that one rewrites the map. The
+          disabled title says which of those is missing. */}
+      <div style={styles.planes}>
+        <span style={styles.planeLabel}>Flip</span>
+        {FLIP_OPTS.map(({ axis, label, what }) => (
+          <button key={axis}
+            onClick={() => performMapFlip(axis)}
+            disabled={flipTarget === null}
+            title={flipTarget === 'clipboard'
+              ? `Mirror what you are about to paste, ${what}. Shortcut: ${label[0]}`
+              : flipTarget === 'selection'
+                ? `Mirror the selected region in place, ${what} — one undo step. `
+                  + `Shortcut: ${label[0]}`
+                : marquee
+                  ? 'Flipping a selection in place rewrites the map, so it needs the marquee '
+                    + 'tool armed. Pick the marquee tool, or press Ctrl+V to paste and flip that.'
+                  : 'Nothing to flip yet — drag a selection with the marquee tool, or press '
+                    + 'Ctrl+V to start a paste and mirror that.'}
+            style={{ ...styles.planeBtn, ...(flipTarget === null ? styles.planeDead : {}) }}>
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* THE RULE IN FORCE, at the moment it matters — beside the control it

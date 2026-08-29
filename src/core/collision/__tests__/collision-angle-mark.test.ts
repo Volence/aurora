@@ -15,7 +15,9 @@ import { describe, it, expect } from 'vitest';
 import {
   angleMark, angleMarkFromColumns, angleTangent, outwardNormal,
   surfaceAnchor, columnSurfaceY, drawAngleMark,
-  BAR_HALF, BARB_LEN, MIN_CELL_PX_FOR_MARK,
+  BAR_HALF, NORMAL_LEN, MIN_CELL_PX_FOR_MARK,
+  ARROW_WIDTH_SCALE, DETAIL_CELL_PX, SILHOUETTE_BLIND_RAD,
+  MARK_BOX_MARGIN, markTier, fitCellSizeToBox, markPadPx,
   type MarkDrawCtx,
 } from '../collision-angle-mark';
 import { angleNeedle } from '../../../renderer/components/classic/collision-needle';
@@ -182,6 +184,20 @@ describe('outwardNormal — the barb points OUT of the solid', () => {
     expect(256 - WALL_ANGLES.length).toBe(254);
   });
 
+  // THE HONESTY FLAG, PINNED TO THE SAME SET AS THE EXCEPTION. `known` must be
+  // false for EXACTLY the bytes the rule above excludes — if the two ever drift
+  // apart, either a wall gets a confident arrow or a real slope gets a
+  // double-ended one, and both are lies.
+  it('normalKnown is false for exactly the two wall bytes, at every height sign', () => {
+    const unknown: number[] = [];
+    for (let b = 0; b < 256; b++) {
+      const f = outwardNormal(b, 8), c = outwardNormal(b, -8);
+      expect(f.known).toBe(c.known);
+      if (!f.known) unknown.push(b);
+    }
+    expect(unknown).toEqual(WALL_ANGLES);
+  });
+
   it('a vertical normal (a wall) keeps the angle-derived perpendicular', () => {
     // ny === 0 <=> cos a === 0 <=> a = $40 or $c0. Nothing in the cell says
     // which side is open, so the candidate must survive untouched.
@@ -261,26 +277,56 @@ describe('drawAngleMark — casing under core, and the geometry that reaches can
     };
     return { ctx, ops, strokes, pts };
   }
-  const OPTS = { color: '#f00', casing: '#000', coreWidth: 1, casingWidth: 3 };
+  /** Detail tier (>= DETAIL_CELL_PX): stem AND bar. */
+  const OPTS = { color: '#f00', casing: '#000', coreWidth: 1, casingWidth: 3, cellScreenPx: DETAIL_CELL_PX };
+  /** Compact tier: at the gate exactly, so it is the smallest size that draws. */
+  const OPTS_COMPACT = { ...OPTS, cellScreenPx: MIN_CELL_PX_FOR_MARK };
 
   // ITEM 4 IS THIS ROW. A single stroke is invisible wherever the art matches
   // it; the casing is what makes the mark readable over arbitrary pixel art.
-  it('strokes twice — dark casing FIRST, then the bright core', () => {
+  // The order is ALL casings, then ALL cores — see drawAngleMark's docblock: a
+  // per-element casing-then-core would let the fat stem casing chew a notch out
+  // of the thin bar core where the two cross.
+  it('strokes every casing FIRST, then every bright core', () => {
     const r = recorder();
     drawAngleMark(r.ctx, 0, 0, 16, angleMark(profile(RISING_FLOOR, 0x20))!, OPTS);
-    expect(r.strokes).toEqual([
-      { style: '#000', width: 3 },
-      { style: '#f00', width: 1 },
-    ]);
-    expect(r.strokes[0].width).toBeGreaterThan(r.strokes[1].width);
+    expect(r.strokes.map((s) => s.style)).toEqual(['#000', '#000', '#f00', '#f00']);
+    // ...and each core is thinner than the casing it sits in.
+    expect(r.strokes[2].width).toBeLessThan(r.strokes[0].width);
+    expect(r.strokes[3].width).toBeLessThan(r.strokes[1].width);
   });
 
-  it('draws a bar AND a barb — two subpaths, not one line', () => {
+  // ⭐ THE HEADLINE ROW OF THIS PARCEL. "The direction arrows are kind of
+  // useless" was the mark spending its ink on the tangent. Both weights are
+  // derived from the module's own constants, never read off a picture.
+  it('⭐ the outward stem OUT-WEIGHS the tangent bar, in length and in width', () => {
     const r = recorder();
     drawAngleMark(r.ctx, 0, 0, 16, angleMark(profile(RISING_FLOOR, 0x20))!, OPTS);
-    // Per stroke pass: move,line (bar) + move,line (barb).
-    const pass = r.ops.slice(0, r.ops.indexOf('stroke') + 1);
-    expect(pass).toEqual(['begin', 'move', 'line', 'move', 'line', 'stroke']);
+    const [barCasing, stemCasing, barCore, stemCore] = r.strokes;
+    expect(stemCore.width).toBeCloseTo(OPTS.coreWidth * ARROW_WIDTH_SCALE, 10);
+    expect(stemCasing.width).toBeCloseTo(OPTS.casingWidth * ARROW_WIDTH_SCALE, 10);
+    expect(stemCore.width).toBeGreaterThan(barCore.width);
+    expect(stemCasing.width).toBeGreaterThan(barCasing.width);
+    // Length: the stem reaches further from the shared anchor than either half
+    // of the bar does. Under the mark this replaced it reached LESS far (the
+    // barb was 4 against a half-bar of 4.5), which is the inversion.
+    expect(NORMAL_LEN).toBeGreaterThan(BAR_HALF);
+    // ...and the quiet element is not thinned to fake the contrast: the bar
+    // keeps exactly the widths the caller passed.
+    expect(barCore.width).toBe(OPTS.coreWidth);
+    expect(barCasing.width).toBe(OPTS.casingWidth);
+  });
+
+  it('draws a bar AND a stem at the detail tier — two subpaths, not one line', () => {
+    const r = recorder();
+    drawAngleMark(r.ctx, 0, 0, 16, angleMark(profile(RISING_FLOOR, 0x20))!, OPTS);
+    // Bar and stem are separate paths now (they carry different widths).
+    expect(r.ops).toEqual([
+      'begin', 'move', 'line', 'stroke', // bar casing
+      'begin', 'move', 'line', 'stroke', // stem casing
+      'begin', 'move', 'line', 'stroke', // bar core
+      'begin', 'move', 'line', 'stroke', // stem core
+    ]);
   });
 
   it('scales cell-local geometry into the caller box, and offsets by (x, y)', () => {
@@ -288,30 +334,185 @@ describe('drawAngleMark — casing under core, and the geometry that reaches can
     const big = recorder();
     drawAngleMark(big.ctx, 100, 200, 32, mark, OPTS);
     const s = 32 / 16;
-    // Derived from the mark, not from the drawing: anchor + tangent*BAR_HALF.
+    // Derived from the mark, not from the drawing: anchor +/- tangent*BAR_HALF.
     const ax = 100 + mark.ax * s, ay = 200 + mark.ay * s;
     expect(big.pts[0].x).toBeCloseTo(ax - mark.tx * BAR_HALF * s, 10);
     expect(big.pts[1].x).toBeCloseTo(ax + mark.tx * BAR_HALF * s, 10);
-    // The barb root is the anchor; its tip is one BARB_LEN along the normal.
+    // The stem's root is the anchor; its tip is one NORMAL_LEN along the normal.
     expect(big.pts[2].x).toBeCloseTo(ax, 10);
     expect(big.pts[2].y).toBeCloseTo(ay, 10);
-    expect(big.pts[3].y).toBeCloseTo(ay + mark.ny * BARB_LEN * s, 10);
+    expect(big.pts[3].y).toBeCloseTo(ay + mark.ny * NORMAL_LEN * s, 10);
   });
 
-  it('the barb tip leaves the solid — it is on the open side of the surface', () => {
+  it('the stem tip leaves the solid — it is on the open side of the surface', () => {
     const mark = angleMark(profile(FLAT_FLOOR, 0))!;
-    const tipY = mark.ay + mark.ny * BARB_LEN;
+    const tipY = mark.ay + mark.ny * NORMAL_LEN;
     expect(tipY).toBeLessThan(mark.ay); // flat floor: the tip is ABOVE the surface
+  });
+
+  // THE OWNER'S SECOND SENTENCE, AS AN ASSERTION. "Why are the 0 degree ones
+  // not pointing straight up" — at angle 0 the dominant stroke must be the
+  // vertical one, and it must be the stem.
+  it('⭐ at angle 0 the DOMINANT stroke is vertical and points UP', () => {
+    const r = recorder();
+    const mark = angleMark(profile(FLAT_FLOOR, 0))!;
+    drawAngleMark(r.ctx, 0, 0, 16, mark, OPTS);
+    // Stem core is the last pass: pts[6] root, pts[7] tip.
+    const root = r.pts[6], tip = r.pts[7];
+    expect(tip.x - root.x).toBeCloseTo(0, 10);   // exactly vertical
+    expect(tip.y - root.y).toBeLessThan(0);      // upward (y DOWN)
+    // ...and it is the WIDE one. The tangent at angle 0 is exactly horizontal,
+    // so a build that swapped the two would put the width on the horizontal
+    // stroke — which is what the owner was looking at.
+    const stemCore = r.strokes[3], barCore = r.strokes[2];
+    expect(stemCore.width).toBeGreaterThan(barCore.width);
+    const barDx = r.pts[5].x - r.pts[4].x, barDy = r.pts[5].y - r.pts[4].y;
+    expect(barDy).toBeCloseTo(0, 10);
+    expect(Math.abs(barDx)).toBeGreaterThan(0);
+  });
+
+  // 45° IS THE MIRROR TRAP. A transposed or mirrored mark still looks plausible
+  // at 45° because both elements are diagonal; only the SIGNS separate them.
+  it('⭐ at 45° the stem and the bar are distinguishable and correctly signed', () => {
+    const r = recorder();
+    const mark = angleMark(profile(RISING_FLOOR, 0x20))!;
+    drawAngleMark(r.ctx, 0, 0, 16, mark, OPTS);
+    const barDx = r.pts[5].x - r.pts[4].x, barDy = r.pts[5].y - r.pts[4].y;
+    const stemDx = r.pts[7].x - r.pts[6].x, stemDy = r.pts[7].y - r.pts[6].y;
+    // Bar along (cos, +sin) at $20: down-right in screen space.
+    expect(barDx).toBeGreaterThan(0);
+    expect(barDy).toBeGreaterThan(0);
+    // Stem is the perpendicular on the OPEN side of a floor: up-right.
+    expect(stemDx).toBeGreaterThan(0);
+    expect(stemDy).toBeLessThan(0);
+    // They are genuinely perpendicular, so neither is a copy of the other.
+    expect(barDx * stemDx + barDy * stemDy).toBeCloseTo(0, 8);
+    // And the stem is longer, which a transposition would reverse.
+    expect(Math.hypot(stemDx, stemDy)).toBeGreaterThan(Math.hypot(barDx, barDy) / 2);
+  });
+
+  it('the compact tier draws the stem ALONE — two strokes, no bar', () => {
+    const r = recorder();
+    drawAngleMark(r.ctx, 0, 0, 16, angleMark(profile(RISING_FLOOR, 0x20))!, OPTS_COMPACT);
+    expect(r.ops).toEqual(['begin', 'move', 'line', 'stroke', 'begin', 'move', 'line', 'stroke']);
+    // THE STEM KEEPS ITS WEIGHT HERE TOO. At this tier it is the whole mark, so
+    // dropping the scale-up would make the picker thumbnail — the surface the
+    // owner was looking at — the FAINTEST place the mark appears. Measured on
+    // the first cut: 7 angle-coloured pixels in a 38px canvas, against 15 for
+    // the mark it replaced.
+    expect(r.strokes).toEqual([
+      { style: '#000', width: 3 * ARROW_WIDTH_SCALE },
+      { style: '#f00', width: 1 * ARROW_WIDTH_SCALE },
+    ]);
+    // ...and what it drew is the NORMAL, not the tangent. At $20 both are
+    // diagonal, so the discriminating fact is the SIGN of y.
+    expect(r.pts[1].y - r.pts[0].y).toBeLessThan(0);
+  });
+
+  it('below MIN_CELL_PX_FOR_MARK it draws nothing at all', () => {
+    const r = recorder();
+    const tier = drawAngleMark(r.ctx, 0, 0, 16, angleMark(profile(RISING_FLOOR, 0x20))!,
+      { ...OPTS, cellScreenPx: MIN_CELL_PX_FOR_MARK - 0.001 });
+    expect(tier).toBe('off');
+    expect(r.ops).toEqual([]);
+    expect(r.strokes).toEqual([]);
+  });
+
+  // THE WALL STAYS HONEST. Nothing in a full cell says which side is open, so
+  // the mark must not present one. A double-ended stem says "one of these two".
+  it('⭐ a wall draws a DOUBLE-ENDED stem — it does not pick a side', () => {
+    const wall = profile(new Array(16).fill(16), 0x40);
+    const mark = angleMark(wall)!;
+    expect(mark.normalKnown).toBe(false);
+    const r = recorder();
+    drawAngleMark(r.ctx, 0, 0, 16, mark, OPTS_COMPACT);
+    const [a, b] = r.pts;
+    // The two ends are symmetric about the anchor — the mark asserts nothing.
+    expect((a.x + b.x) / 2).toBeCloseTo(mark.ax, 10);
+    expect((a.y + b.y) / 2).toBeCloseTo(mark.ay, 10);
+    expect(Math.hypot(b.x - a.x, b.y - a.y)).toBeCloseTo(2 * NORMAL_LEN, 10);
+  });
+
+  it('...and a cell whose side IS known draws a single-ended stem rooted on the surface', () => {
+    const mark = angleMark(profile(FLAT_FLOOR, 0))!;
+    expect(mark.normalKnown).toBe(true);
+    const r = recorder();
+    drawAngleMark(r.ctx, 0, 0, 16, mark, OPTS_COMPACT);
+    const [a, b] = r.pts;
+    expect(a.x).toBeCloseTo(mark.ax, 10);
+    expect(a.y).toBeCloseTo(mark.ay, 10);
+    expect(Math.hypot(b.x - a.x, b.y - a.y)).toBeCloseTo(NORMAL_LEN, 10);
   });
 });
 
-describe('MIN_CELL_PX_FOR_MARK — the low-zoom density decision is a constant', () => {
-  it('is a screen-pixel threshold callers gate on', () => {
+describe('the size rule lives here, not at the call sites', () => {
+  it('MIN_CELL_PX_FOR_MARK is a screen-pixel threshold callers gate on', () => {
     expect(MIN_CELL_PX_FOR_MARK).toBeGreaterThan(8);
     expect(MIN_CELL_PX_FOR_MARK).toBeLessThanOrEqual(16);
   });
-  it('the bar fits inside a cell at any zoom (cell-local sizing)', () => {
+
+  it('the bar and the stem both fit inside a cell (cell-local sizing)', () => {
     expect(BAR_HALF * 2).toBeLessThan(16);
-    expect(BARB_LEN).toBeLessThan(16);
+    expect(NORMAL_LEN).toBeLessThan(16);
+  });
+
+  // THE THRESHOLD IS DERIVED, AND THE DERIVATION IS THE TEST. The bar earns its
+  // ink only where its endpoint can move a whole screen pixel across the band
+  // the silhouette cannot express. Re-derived here from BAR_HALF and the
+  // 16-column height model — no transcribed constant.
+  it('DETAIL_CELL_PX is the size at which the bar can resolve the silhouette-blind band', () => {
+    expect(SILHOUETTE_BLIND_RAD).toBeCloseTo(Math.atan(1 / 16), 12);
+    const needed = 16 / (BAR_HALF * Math.sin(SILHOUETTE_BLIND_RAD));
+    expect(DETAIL_CELL_PX).toBe(Math.ceil(needed));
+    // At the threshold the half-bar's endpoint moves >= 1 screen px; one step
+    // under it, less than one.
+    const swing = (cellPx: number) => BAR_HALF * (cellPx / 16) * Math.sin(SILHOUETTE_BLIND_RAD);
+    expect(swing(DETAIL_CELL_PX)).toBeGreaterThanOrEqual(1);
+    expect(swing(DETAIL_CELL_PX - 1)).toBeLessThan(1);
+  });
+
+  it('markTier: off below the gate, compact between, detail at DETAIL_CELL_PX', () => {
+    expect(markTier(MIN_CELL_PX_FOR_MARK - 0.001)).toBe('off');
+    expect(markTier(MIN_CELL_PX_FOR_MARK)).toBe('compact');
+    expect(markTier(DETAIL_CELL_PX - 0.001)).toBe('compact');
+    expect(markTier(DETAIL_CELL_PX)).toBe('detail');
+    // The band is not empty — otherwise the whole rule is dead code.
+    expect(DETAIL_CELL_PX).toBeGreaterThan(MIN_CELL_PX_FOR_MARK);
+  });
+
+  // The picker's two surfaces, by the numbers they actually pass. A 22px
+  // thumbnail is far under the threshold (its bar moves 0.3px across the whole
+  // blind band); the big preview is over it.
+  it('a picker thumbnail is compact and the big preview is detail', () => {
+    expect(markTier(fitCellSizeToBox(22 + 8 * 2))).toBe('compact');
+    expect(markTier(fitCellSizeToBox(120))).toBe('detail');
+  });
+
+  // FIT AND PAD ARE ONE RULE. A fixed-box caller must not clip the stem, and
+  // the numbers come from NORMAL_LEN rather than from anyone's eye.
+  it('fitCellSizeToBox leaves room for the stem on both sides', () => {
+    expect(MARK_BOX_MARGIN).toBeCloseTo(NORMAL_LEN / 16, 12);
+    for (const box of [32, 38, 64, 120, 240]) {
+      const size = fitCellSizeToBox(box);
+      const reach = NORMAL_LEN * (size / 16);   // screen px the stem sticks out
+      const pad = (box - size) / 2;
+      expect(pad).toBeGreaterThanOrEqual(reach);
+      expect(size).toBeGreaterThan(0);
+    }
+  });
+
+  it('markPadPx is the same margin stated the other way round', () => {
+    for (const size of [16, 20, 22, 66, 120]) {
+      expect(markPadPx(size)).toBeGreaterThanOrEqual(NORMAL_LEN * (size / 16));
+    }
+  });
+
+  // THE OLD PAD WAS NEVER ENOUGH, WHICH IS WHY THIS IS A ROW AND NOT A NOTE.
+  // The picker used a flat 5px around a shape drawn at its full size; at the
+  // 120px preview the barb needed 30px and got 5.
+  it('a flat 5px pad clips the mark at the sizes the picker actually uses', () => {
+    for (const size of [22, 120]) {
+      expect(NORMAL_LEN * (size / 16)).toBeGreaterThan(5);
+    }
   });
 });

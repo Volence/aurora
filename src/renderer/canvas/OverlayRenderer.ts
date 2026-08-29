@@ -13,7 +13,7 @@ import { fitLabelInContext, labelBudget } from './label-fit';
 import { drawSectionPriority } from './priority-lens';
 import type { CollisionProfileSet, Solidity } from '../../core/collision/collision-model';
 import { columnSolidRun } from '../../core/collision/collision-render';
-import { angleMark, drawAngleMark, MIN_CELL_PX_FOR_MARK, BAR_HALF, BARB_LEN } from '../../core/collision/collision-angle-mark';
+import { angleMark, drawAngleMark, markTier, MIN_CELL_PX_FOR_MARK, BAR_HALF, NORMAL_LEN } from '../../core/collision/collision-angle-mark';
 import type { MarkDrawCtx } from '../../core/collision/collision-angle-mark';
 import { resolveCell, resolvePlaneWords, SECTION_PLANE_WORDS } from '../../core/collision/collision-cell-resolve';
 import { publishCollisionMarkReport, ROW_CAP } from './collision-mark-report';
@@ -139,6 +139,7 @@ export class OverlayRenderer {
       suppressed: anyCollision && options.showCollisionAngles && 16 * zoom < MIN_CELL_PX_FOR_MARK,
       zoom,
       cellScreenPx: 16 * zoom,
+      tier: markTier(16 * zoom),
       drawn: this.markDrawn,
       rows: this.markRows,
     });
@@ -314,11 +315,14 @@ export class OverlayRenderer {
             if (showAngles && cellScreenPx >= MIN_CELL_PX_FOR_MARK) {
               const mark = angleMark(p);
               if (mark) {
-                drawAngleMark(ctx as unknown as MarkDrawCtx, cx, cy, 16, mark, {
+                // The TIER comes back from the draw, not from a second copy of
+                // markTier here — the publish must report what was painted.
+                const tier = drawAngleMark(ctx as unknown as MarkDrawCtx, cx, cy, 16, mark, {
                   color: COLLISION_ANGLE_TICK,
                   casing: COLLISION_ANGLE_CASING,
                   coreWidth: 1.25 / zoom,
                   casingWidth: 3 / zoom,
+                  cellScreenPx,
                 });
                 // Publish out of the SAME values just handed to the draw, in
                 // world px. Recomputing these anywhere else is the thing
@@ -330,8 +334,10 @@ export class OverlayRenderer {
                     ax, ay,
                     bar1x: ax - mark.tx * BAR_HALF, bar1y: ay - mark.ty * BAR_HALF,
                     bar2x: ax + mark.tx * BAR_HALF, bar2y: ay + mark.ty * BAR_HALF,
-                    tipx: ax + mark.nx * BARB_LEN, tipy: ay + mark.ny * BARB_LEN,
+                    tipx: ax + mark.nx * NORMAL_LEN, tipy: ay + mark.ny * NORMAL_LEN,
                     angle: p.angle,
+                    tangentDrawn: tier === 'detail',
+                    normalKnown: mark.normalKnown,
                   });
                 }
               }

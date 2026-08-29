@@ -13,6 +13,7 @@ import type { ObjectSprite } from '../../../state/classicObjectArtStore';
 import type { LevelDoc } from '../../../../core/level-classic/model';
 import { monoMeasureText } from '../../../../test/mono-measure';
 import { COLLISION_ANGLE_TICK } from '../../../canvas/canvas-colors';
+import { DETAIL_CELL_PX } from '../../../../core/collision/collision-angle-mark';
 
 /** A recording 2D-context stand-in: captures drawImage/fillRect call counts. */
 function mockCtx() {
@@ -145,12 +146,16 @@ function collisionDoc(xf: boolean, yf: boolean): LevelDoc {
 }
 
 describe('drawCollision angle mark', () => {
-  // The mark's core pass is: moveTo/lineTo for the tangent bar, then
-  // moveTo/lineTo for the outward barb. Four points, in that order.
-  const BAR_A = 0, BAR_B = 1, BARB_ROOT = 2, BARB_TIP = 3;
+  // The mark's core pass at the DETAIL tier is: moveTo/lineTo for the tangent
+  // bar, then moveTo/lineTo for the outward stem. Four points, in that order.
+  const BAR_A = 0, BAR_B = 1, STEM_ROOT = 2, STEM_TIP = 3;
+  // Scale that puts a 16px cell over DETAIL_CELL_PX (57) so the fine tangent
+  // bar is drawn beside the stem. DERIVED from the constant, so the fixture
+  // follows the rule if the rule ever moves. `+ 1` clears the boundary itself.
+  const DETAIL_SCALE = (DETAIL_CELL_PX + 1) / 16;
 
   it('draws the bar along angleNeedle, not its vertical mirror', () => {
-    const { ctx, pts } = needleCtx();
+    const { ctx, pts } = needleCtx(DETAIL_SCALE);
     drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true);
     const core = corePts(pts);
     expect(core.length).toBe(4);
@@ -159,7 +164,7 @@ describe('drawCollision angle mark', () => {
   });
 
   it('honours the chunk cell flips the heights already honour', () => {
-    const { ctx, pts } = needleCtx();
+    const { ctx, pts } = needleCtx(DETAIL_SCALE);
     drawCollision(ctx, collisionDoc(true, false), 0, 0, 1, true);
     const core = corePts(pts);
     expect(core.length).toBe(4);
@@ -169,20 +174,27 @@ describe('drawCollision angle mark', () => {
 
   // THE ASYMMETRY, ON CLASSIC'S SURFACE. The old bar was symmetric and so could
   // not say which side of the surface was solid; this row is the one that fails
-  // if the barb is ever dropped back to a plain segment.
-  it('the barb leaves the surface on the open side — up, for a floor', () => {
-    const { ctx, pts } = needleCtx();
+  // if the stem is ever dropped back to a plain segment.
+  it('the stem leaves the surface on the open side — up, for a floor', () => {
+    const { ctx, pts } = needleCtx(DETAIL_SCALE);
     drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true);
     const core = corePts(pts);
-    // The barb is rooted at the bar's midpoint...
-    expect(core[BARB_ROOT].x).toBeCloseTo((core[BAR_A].x + core[BAR_B].x) / 2, 10);
-    expect(core[BARB_ROOT].y).toBeCloseTo((core[BAR_A].y + core[BAR_B].y) / 2, 10);
+    // The stem is rooted at the bar's midpoint...
+    expect(core[STEM_ROOT].x).toBeCloseTo((core[BAR_A].x + core[BAR_B].x) / 2, 10);
+    expect(core[STEM_ROOT].y).toBeCloseTo((core[BAR_A].y + core[BAR_B].y) / 2, 10);
     // ...and points AWAY from the solid, which for a floor is upward (-y).
-    expect(core[BARB_TIP].y).toBeLessThan(core[BARB_ROOT].y);
+    expect(core[STEM_TIP].y).toBeLessThan(core[STEM_ROOT].y);
+    // ...and it is the DOMINANT element: longer than either half of the bar.
+    // Classic draws the same mark as aeon, so the hierarchy has to hold here
+    // too — a call site that forgot to pass its cell size would fall to the
+    // compact tier and this row would find only two points above.
+    const stemLen = Math.hypot(core[STEM_TIP].x - core[STEM_ROOT].x, core[STEM_TIP].y - core[STEM_ROOT].y);
+    const halfBar = Math.hypot(core[BAR_B].x - core[BAR_A].x, core[BAR_B].y - core[BAR_A].y) / 2;
+    expect(stemLen).toBeGreaterThan(halfBar);
   });
 
   it('the mark sits on the surface, not at the cell centre', () => {
-    const { ctx, pts } = needleCtx();
+    const { ctx, pts } = needleCtx(DETAIL_SCALE);
     drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true);
     const core = corePts(pts);
     // Heights are all 8 -> columnSolidRun(8) = { y: 8, h: 8 } -> surface y 8.
@@ -190,7 +202,24 @@ describe('drawCollision angle mark', () => {
     // the cell centre HERE only because the fixture floor is exactly half
     // height; the discriminating row for the anchor is in
     // collision-angle-mark.test.ts, which uses a shallow slope.
-    expect(core[BARB_ROOT].y).toBeCloseTo(8, 10);
+    expect(core[STEM_ROOT].y).toBeCloseTo(8, 10);
+  });
+
+  // THE SIZE RULE REACHES CLASSIC TOO. Between the density gate and
+  // DETAIL_CELL_PX the tangent bar is demoted away and the stem is drawn alone
+  // — two core points, not four, and the one that survives is the NORMAL.
+  it('at a cell size under DETAIL_CELL_PX the stem is drawn ALONE', () => {
+    const { ctx, pts } = needleCtx(1); // 16 screen px per cell: over the gate, under detail
+    drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true);
+    const core = corePts(pts);
+    expect(core.length).toBe(2);
+    // Rooted on the surface (y 8) and pointing out of the solid, i.e. up.
+    expect(core[0].y).toBeCloseTo(8, 10);
+    expect(core[1].y).toBeLessThan(core[0].y);
+    // Anti-vacuous: it is the normal that survived, not the tangent. $E0's
+    // tangent ASCENDS to the right, its outward normal points up-LEFT, so the
+    // x sign separates the two.
+    expect(core[1].x).toBeLessThan(core[0].x);
   });
 
   // The density gate: below MIN_CELL_PX_FOR_MARK screen px per 16px cell the
