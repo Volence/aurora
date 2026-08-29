@@ -324,6 +324,21 @@ async function aimAtTile(c, col, row, origin) {
     throw new Error(`AIM REFUSED: meant tile (${col},${row}), integer (${x},${y}) lands in `
       + `(${backCol},${backRow}). vp=${JSON.stringify(vp)} rect=${JSON.stringify(rect)}`);
   }
+  // ⚠ AND IT MUST BE ON THE CANVAS. Landing in the right CELL is not enough:
+  // a cell scrolled past the right edge still inverts to the cell you meant,
+  // because the transform is affine and does not know where the canvas stops.
+  // CDP happily dispatches a mouse event at a coordinate outside the element,
+  // nothing handles it, and the whole thing presents as "the drag did not
+  // paint" — a red feature row about a parking mistake. Measured: the drag
+  // phase's far cell was 49 px past the right edge on the first run and all
+  // three of its rows went red.
+  const inRect = x >= rect.left && x < rect.left + rect.width
+              && y >= rect.top && y < rect.top + rect.height;
+  if (!inRect) {
+    throw new Error(`AIM REFUSED: tile (${col},${row}) is OFF THE CANVAS at integer (${x},${y}); `
+      + `rect is (${rect.left},${rect.top}) ${rect.width}x${rect.height}. Park the viewport so the `
+      + 'whole gesture fits before aiming — this is a harness bug, not a feature failure.');
+  }
   return { x, y, vp, rect };
 }
 
@@ -600,6 +615,72 @@ async function main() {
     check('u1', '⚠ ONE undo restores BOTH planes exactly — a both-planes stroke is one step',
       undoA.every((w) => w === bA.want) && undoB.every((w) => w === bB.want),
       `A ${undoA.map(hex).join(' ')} want ${hex(bA.want)} · B ${undoB.map(hex).join(' ')} want ${hex(bB.want)}`);
+
+    // ═══ [d] THE DRAG — handleMouseMove, the OTHER caller of the same function ═
+    //
+    // The claim "press and drag share one function, so one fix covers both" is a
+    // READING of MapViewport until a drag is actually driven. It was measured
+    // for the SHAPE brush by the collision-preservation harness; the A+B mode
+    // and the crossover brush are new state that the drag path reads through its
+    // own latched refs (`paintBothPlanes`, `paintCrossover`), so it is a
+    // different claim and gets its own rows.
+    console.log('\n=== [d] a REAL drag: the far cell gets both planes and both values ===');
+    await undoAll('before the drag phase');
+    await c.json("window.__dbg.aeon.armCollisionBrush({ plane: 'a', shape: 1, solidity: 'all', "
+      + "xFlip: true, yFlip: false, brush: 1, bothPlanes: true, crossover: 'hand-off' })");
+    const D_FROM = { col: 30, row: 12 };
+    const D_TO = { col: 34, row: 12 };
+    const dFromA = await seed(D_FROM.col, D_FROM.row, 'a', SEED_OWNED, X.V.NONE);
+    await seed(D_FROM.col, D_FROM.row, 'b', SEED_OWNED, X.V.NONE);
+    const dToA = await seed(D_TO.col, D_TO.row, 'a', SEED_OWNED, X.V.NONE);
+    const dToB = await seed(D_TO.col, D_TO.row, 'b', SEED_OWNED, X.V.NONE);
+    check('d0', 'the drag DESTINATION carries no crossover and the seed shape before the drag',
+      dToA.back.every((w) => xoverOf(w) === 'none' && (w & F.OWNED) === (dToA.want & F.OWNED)),
+      `${describe(dToA.back[0])}`);
+
+    // WORLD px, and at zoom 4 the canvas spans only ~219 of them — so the margin
+    // has to leave room for the whole drag, not just its start. `aimAtTile`
+    // refuses loudly if it does not.
+    await setView(c, Math.max(0, origin.x + D_FROM.col * 2 * TILE_PX - 40),
+      Math.max(0, origin.y + D_FROM.row * 2 * TILE_PX - 40), ZOOM);
+    await sleep(150);
+    const aimFrom = await aimAtTile(c, D_FROM.col * 2, D_FROM.row * 2, origin);
+    const aimTo = await aimAtTile(c, D_TO.col * 2, D_TO.row * 2, origin);
+    note('aim', `drag cell (${D_FROM.col},${D_FROM.row}) to (${D_TO.col},${D_TO.row}) = integer client `
+      + `(${aimFrom.x},${aimFrom.y}) to (${aimTo.x},${aimTo.y})`);
+    await mouse(c, 'mousePressed', aimFrom.x, aimFrom.y);
+    // Intermediate moves, so the drag really traverses rather than teleporting.
+    for (let k = 1; k <= 6; k++) {
+      const t = k / 6;
+      await mouse(c, 'mouseMoved',
+        Math.round(aimFrom.x + (aimTo.x - aimFrom.x) * t),
+        Math.round(aimFrom.y + (aimTo.y - aimFrom.y) * t), 1);
+      await sleep(30);
+    }
+    await mouse(c, 'mouseReleased', aimTo.x, aimTo.y);
+    await sleep(300);
+    const dAfterA = []; for (const i of dToA.idx) dAfterA.push(await collAt(c, SEC, 'a', i));
+    const dAfterB = []; for (const i of dToB.idx) dAfterB.push(await collAt(c, SEC, 'b', i));
+    note('words', `far cell A ${dAfterA.map(describe).join('\n                     ')}`);
+    note('words', `far cell B ${dAfterB.map(describe).join('\n                     ')}`);
+    check('d1', 'CONTROL: the DRAG reached the far cell at all (its shape changed)',
+      dAfterA.every((w) => (w & F.OWNED) !== (dToA.want & F.OWNED)),
+      `${dAfterA.map((w) => hex(w & F.OWNED)).join(' ')} vs seed ${hex(dToA.want & F.OWNED)}`);
+    check('d2', 'the DRAG wrote BOTH planes at the far cell — the A+B mode survives the move path',
+      dAfterA.every((w) => (w & F.OWNED) === (armedB.word & F.OWNED))
+      && dAfterB.every((w) => (w & F.OWNED) === (armedB.word & F.OWNED)),
+      `A ${dAfterA.map((w) => hex(w & F.OWNED)).join(' ')} · B ${dAfterB.map((w) => hex(w & F.OWNED)).join(' ')}`);
+    check('d3', "the DRAG wrote each plane's OWN crossover value at the far cell",
+      dAfterA.every((w) => xoverOf(w) === 'to-b') && dAfterB.every((w) => xoverOf(w) === 'to-a'),
+      `A ${dAfterA.map(xoverOf).join(' ')} · B ${dAfterB.map(xoverOf).join(' ')}`);
+    await key(c, 'z', 'KeyZ', 90, 2);
+    await sleep(250);
+    const dBackFar = await collAt(c, SEC, 'a', dToA.idx[0]);
+    const dBackNear = await collAt(c, SEC, 'a', dFromA.idx[0]);
+    check('d4', 'the WHOLE drag is still ONE undo step — both ends revert together',
+      dBackFar === dToA.want && dBackNear === dFromA.want,
+      `far ${hex(dBackFar)} want ${hex(dToA.want)} · near ${hex(dBackNear)} want ${hex(dFromA.want)}`);
+    await shot(c, 'd-drag-both-planes');
 
     // ── [l] the both-planes LENS actually drew ───────────────────────────
     //
