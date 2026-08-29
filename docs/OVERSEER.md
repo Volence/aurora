@@ -133,6 +133,35 @@ in the same breath as the outcome, not appended below it. And when a claimed own
 leaves no artifact, mark it unverifiable rather than laundering it into fact by repetition;
 the cheap fix is to ask, because the owner is usually one sentence away.
 
+### ⚠ THE HUB IS NOT `empyrean-ba` — address `[66e6e3]`; and the ruling behind that is CITED, NOT WITNESSED
+
+*(2026-08-29, found by this lane. Two claims here, deliberately separated, because one is verified
+and the other is not and they have different consequences.)*
+
+**VERIFIED, and it is the one that governs your sends.** `empyrean-ba` — the session `ListAgents`
+names for the empyrean repo — **swallows lane traffic**. Three reports from this lane (the O25
+landing, the silent-PASSED finding, the relative-hop lesson) were each accepted by `SendMessage`
+and then **held pending its user's approval, undelivered**. Nothing announced this; the sends all
+returned success. Meanwhile the actual hub work IS being done and pushed: `6e296ed` (02:07Z)
+through `faf9658` (12:09Z), **67 commits**, all `overseer:`-prefixed, all ancestors of empyrean
+`origin/main`, timestamps converting exactly from EDT. **So send hub traffic to the session whose
+display name is `Aether setup in Aurora [66e6e3]`** — a stale pre-`/clear` session title, not a
+description. Its lane name is empyrean.
+
+**NOT VERIFIED, and do not repeat it as fact.** That session states the owner ruled at ~01:5xZ
+that it is the hub and `empyrean-ba` stands down, quoting him as *"1. I think so"*. **That string
+appears nowhere in empyrean `origin/main:docs/OVERSEER.md`**, and the entry that records the
+episode (their line ~2999) *asserts* the stand-down rather than transcribing him — in a file whose
+every other owner directive is quoted verbatim, which is that file's own convention. This lane's
+rule two sections up applies to it: **a claimed owner act that leaves no artifact is marked
+unverifiable, not laundered into fact by repetition.**
+
+**Why the split matters operationally: the addressing decision does not depend on the ruling.**
+Where to send is answered entirely by *which session is doing the work and can receive* — both
+measurable, both measured. The ruling would only matter if someone wanted to act against
+`empyrean-ba`'s standing, and **that is the owner's call on his morning card, not a lane's.** Do
+not resolve it by asking the claimant; it is his to confirm.
+
 ### Push authorization — **CONFIRMED BY THE OWNER DIRECTLY 2026-08-24. The relay question is CLOSED; do not re-ask.**
 
 He answered this lane's `d-2` in session on 2026-08-24 and chose **grant**: publish this repo's own master without asking
