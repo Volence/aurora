@@ -23,6 +23,7 @@ import {
   LAYER_CURVE_ROW, LAYER_VSPLIT_ROW, NONE_FACTOR_VALUE,
   factorFieldSelectValue, factorFieldFromSelect, curveFieldValue, curveFromField,
   vsplitFieldValue, vsplitFromToggle, curveAdvisory, clampVSplitAt,
+  curveGoesNowhere, curveFlatReason, curveFieldOptions,
   // wave 2 — deform authoring
   tableRefLabel, tableRefFormOptions, tableRefFormOf, tableRefFromForm, tableRefParams,
   tableParamLabel, tableRefParamValue, setTableRefParam, clampTableRefParam,
@@ -576,6 +577,85 @@ describe('curve / vsplit controls (parcel H)', () => {
     expect(flat).toMatch(/same/i);
     const packed = curveAdvisory({ ...baseLayer(), fb: { s1: 2, s2: 4, op: 1 }, curve: { to: { s1: 2, s2: 4, op: 1 } } });
     expect(packed).not.toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // ROADMAP row 13 — the picker stops OFFERING the value the build refuses.
+  //
+  // The defect: `curveAdvisory` fires only once the author has ALREADY chosen
+  // `to == fb`, so the control's own list taught them nothing and the sentence
+  // arrived as a correction. The remedy the drift-codec packet named is the
+  // option DISABLED WITH A REASON — never dropped.
+  // -------------------------------------------------------------------------
+
+  it('curveFieldOptions RENDERS the refused value, disabled, with the engine\'s reason — never drops it', () => {
+    const opts = curveFieldOptions({ fb: 'FACTOR_1_4' });
+    // STILL PRESENT. A `<select>` missing its own value silently shows a
+    // different one, so a file carrying `curve.to FACTOR_1_4` beside
+    // `fb FACTOR_1_4` would draw as `none` — the author reading "no curve"
+    // while the build reads a curve and refuses it.
+    const refused = opts.find((o) => o.value === 'FACTOR_1_4');
+    expect(refused, 'the refused option must still be offered').toBeDefined();
+    expect(refused!.disabled).toBe(true);
+    // The reason, not merely the disabling — and the SAME sentence the advisory
+    // under the row says, because both call `curveFlatReason`.
+    expect(refused!.title).toBe(curveFlatReason('FACTOR_1_4'));
+    expect(refused!.title).toMatch(/the build refuses it/);
+
+    // EXACTLY ONE is disabled, and every other named factor stays takeable.
+    expect(opts.filter((o) => o.disabled).map((o) => o.value)).toEqual(['FACTOR_1_4']);
+    for (const o of opts) {
+      if (o.value === 'FACTOR_1_4') continue;
+      expect(o.disabled, `${o.value} must stay selectable`).toBe(false);
+      expect(o.title.length, `${o.value} must still explain itself`).toBeGreaterThan(0);
+    }
+    // The list is otherwise the plain factor list, in the same order — the
+    // narrowing may not quietly reorder or lose a value.
+    expect(opts.map((o) => o.value)).toEqual(factorOptions().map((o) => o.value));
+  });
+
+  it('curveFieldOptions disables NOTHING when fb is packed — no named factor equals a triple', () => {
+    // The packed collision is reachable only through the s1/s2/op spinners,
+    // where there is no option to grey. `curveAdvisory` is what covers it, and
+    // the row above proves it still does.
+    const opts = curveFieldOptions({ fb: { s1: 2, s2: 4, op: 1 } });
+    expect(opts.filter((o) => o.disabled)).toEqual([]);
+  });
+
+  it('the custom (packed) escape hatch is never disabled — it is a sentinel, not a value', () => {
+    for (const fb of EFFECTS_FACTOR_NAMES) {
+      const custom = curveFieldOptions({ fb }).find((o) => o.value === CUSTOM_FACTOR_VALUE);
+      expect(custom!.disabled, `custom must stay reachable with fb ${fb}`).toBe(false);
+    }
+  });
+
+  // ═══ THE ANTI-DRIFT GATE ═══
+  //
+  // The whole point of `curveGoesNowhere` is that the greyed option and the
+  // sentence under the row cannot come to disagree. This asserts that over the
+  // WHOLE named factor space, both directions, so a future edit to either
+  // caller that reintroduces its own comparison fails here rather than shipping
+  // a picker that permits what the advisory then condemns.
+  //
+  // NOT VACUOUS: the `sawDisabled`/`sawEnabled` counters below fail the row if
+  // the sweep never observes both states — an implementation that disabled
+  // nothing at all would otherwise satisfy every `toBe` in the loop.
+  it('the picker and the advisory agree on EVERY named factor pair (one predicate, two readers)', () => {
+    let sawDisabled = 0;
+    let sawEnabled = 0;
+    for (const fb of EFFECTS_FACTOR_NAMES) {
+      const opts = curveFieldOptions({ fb });
+      for (const to of EFFECTS_FACTOR_NAMES) {
+        const optDisabled = opts.find((o) => o.value === to)!.disabled;
+        const advised = curveAdvisory({ ...baseLayer(), fb, curve: { to } }) !== null;
+        expect(optDisabled, `option ${to} under fb ${fb}`).toBe(advised);
+        if (optDisabled) sawDisabled++; else sawEnabled++;
+      }
+    }
+    // One refusal per fb (the diagonal), and a real list of survivors.
+    expect(sawDisabled).toBe(EFFECTS_FACTOR_NAMES.length);
+    expect(sawEnabled).toBe(EFFECTS_FACTOR_NAMES.length * (EFFECTS_FACTOR_NAMES.length - 1));
+    expect(sawEnabled).toBeGreaterThan(0);
   });
 });
 
