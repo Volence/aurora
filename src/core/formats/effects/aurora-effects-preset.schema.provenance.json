@@ -1,0 +1,36 @@
+{
+  "$what": "Provenance of aurora-effects-preset.schema.json — empyrean's CONTRACT schema for the wave-2 RASTER PRESET document (bands), vendored into Aurora beside the codec that validates against it. preset.ts imports the .json directly; this sidecar records where those bytes came from, and test/formats/effects-preset-schema-drift.test.ts reads `empyrean.blob` from here as its pin of record.",
+  "$why_a_sidecar_and_not_a_test_constant": "The scene schema's pin lived as a const in one test AND as prose in two other files, and the prose copies went three re-pins stale without anything going red, because nothing hashes a comment. That lesson was applied when the scene pin moved here on 2026-08-29; this file is born with it. The hash lives HERE, once, and the test reads it.",
+  "$why_vendored": "Aurora's core must validate from a lone clone, inside a git worktree (where ../../empyrean is not where it is from master), and in a packaged Electron build that ships no sibling repo. A path-probe design would degrade to 'schema not found -> skip validation', which is the loud-on-unmeasurable failure this suite is not allowed to have. The cost of vendoring is staleness; the drift gate is the payment.",
+  "$this_document_is_not_a_scene": "A BAND IS NOT A SCENE FIELD. A scene is a parallax_config; the raster program is a channel of an EffectsPreset, bound per SECTION. A `bands` key on a scene file is refused by the scene loader's closed-schema path, deliberately. These are two schemas and two directories, and conflating them is the failure this whole sidecar pair exists to make impossible.",
+  "empyrean": {
+    "repo": "git@github.com:Volence/empyrean.git",
+    "path": "contract/schema/aurora-effects-preset.schema.json",
+    "revision": "6664b616f42bf3fb7f0eaf4ef3ee3c9b9859583d",
+    "revision_subject": "effects contract: specify the wave-2 preset document (bands) as contract/schema/aurora-effects-preset.schema.json, shape-only, against aeon EFFECTS_CONSUMER_CONTRACT.md section 2.4 at c03b9812; AURORA_EFFECTS_SCHEMA.md 7.1",
+    "blob": "29c1c5ee619717ac1694fd4e152f7e3ed6c771d8",
+    "resolved_by": "git -C ../empyrean show 6664b61:contract/schema/aurora-effects-preset.schema.json — read through git OBJECTS, never through the sibling working tree. Redirected straight into this directory; never retyped, never reformatted.",
+    "revision_published": "6664b61 is an ancestor of empyrean origin/main, checked with `git merge-base --is-ancestor` at vendoring time, and origin/main:contract/schema/aurora-effects-preset.schema.json resolves to the SAME blob 29c1c5ee — so this pin was current at tip, not merely correctly cited.",
+    "branch_that_answers_currency": "origin/main"
+  },
+  "vendored": {
+    "path": "src/core/formats/effects/aurora-effects-preset.schema.json",
+    "bytes": 7726,
+    "git_blob": "29c1c5ee619717ac1694fd4e152f7e3ed6c771d8",
+    "identical_to_source": "byte-for-byte; the git blob id above is the SAME object empyrean stores, which is what effects-preset-schema-drift.test.ts recomputes from these bytes on every run"
+  },
+  "the_worked_example_is_not_an_authority": {
+    "page": "aeon docs/EDITOR_RASTER_PRESETS.md, blob 94db6b3a52c33d4e59011ba7043b8b9827fab38b at aeon origin/master (abc14be1)",
+    "its_own_words": "'This page is NOT an authority on the format.' It names two authorities: aeon tools/EFFECTS_CONSUMER_CONTRACT.md section 2.4 (consumer side) and this schema (writer side). Where the page and the schema disagree, the schema and effects_gen.py win.",
+    "compared_at_this_landing": "Field by field, all seven rows of the page's machine-checked section B against this schema's required/properties. NO DISAGREEMENT was found — key names, arms, arm fields, types, the id pattern, schema const 1, and bands minItems 1 all agree. Recorded in docs/reviews/2026-08-29-band-preset-panel.md.",
+    "what_protects_the_page": "aeon tools/test_effects_gen.py::TestEditorRasterPresetsDoc reads the key list out of that page and compares it to effects_gen.py's PRESET_KEYS / BAND_KEYS / BAND_ON_ARMS on every build, so a wrong field NAME there fails aeon's build. The page's PROSE is not machine-checked and can rot."
+  },
+  "aurora_edits_this_vendoring_forced": {
+    "json_schema_subset": "This schema is the first committed contract schema to put `unevaluatedProperties: false` beside an in-place applicator — at $defs.band.properties.on, where `oneOf: [{required:[cram]},{required:[pal_region]}]` spells the exactly-one-arm rule. json-schema-subset.ts refused that combination outright. The refusal was a FALSE POSITIVE here (a `required`-only branch contributes no property annotations, so the additionalProperties equivalence holds exactly), and it was narrowed to a PROVER, `contributesPropertyAnnotations`, that clears a branch only when every keyword in it is on a whitelist of provably-inert ones. $ref/$dynamicRef stay an unconditional refusal because their value is a string this evaluator does not follow.",
+    "why_a_whitelist": "The failure this evaluator exists to prevent is silently ACCEPTING what the real schema rejects. A blacklist is wrong by default on every keyword nobody thought of; a whitelist is right by default and merely inconvenient when the schema grows."
+  },
+  "pin_history_current_last": [
+    "29c1c5ee — 6664b61, landing (the schema's first revision; byte-identical at origin/main)"
+  ],
+  "re_vendor": "git -C <empyrean> fetch origin && git -C <empyrean> show origin/main:contract/schema/aurora-effects-preset.schema.json > src/core/formats/effects/aurora-effects-preset.schema.json — then update `empyrean.revision`, `empyrean.blob`, `vendored.bytes`, `vendored.git_blob` and `pin_history_current_last` here, and re-run the full suite: the keyword-coverage gate and the derived-constant reads in preset.ts are what tell you which Aurora edits the amendment forces."
+}

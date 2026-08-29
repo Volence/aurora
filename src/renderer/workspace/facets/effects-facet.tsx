@@ -35,6 +35,7 @@ import React from 'react';
 import AeonPropertiesPanel from '../../components/AeonPropertiesPanel';
 import EffectsScenePanel from '../../components/effects/EffectsScenePanel';
 import BgAnimBandPanel from '../../components/effects/BgAnimBandPanel';
+import BandPresetPanel from '../../components/effects/BandPresetPanel';
 import RasterTimelineStrip from '../../components/effects/RasterTimelineStrip';
 import EffectsToolOptions from '../../components/effects/EffectsToolOptions';
 import { Panel, CollapsibleSection } from '../../components/ui';
@@ -68,6 +69,21 @@ function EffectsPanels() {
           what has to be said is per band, which is a list, and a badge painted
           over the map would be chrome every aeon author pays for. */}
       <BgAnimBandPanel />
+      {/* THE RASTER BAND PRESETS, IN THIS COLUMN AND NOT A FACET OF THEIR OWN,
+          on the reason the BgAnim band editor's note above gives: a preset's
+          raster program is the palette half of the same parallax lens, authored
+          against the act in the canvas beside it.
+
+          A DIFFERENT DOCUMENT FROM THE SCENE PANEL AT THE TOP, though, and the
+          panel says so: a scene is a `parallax_config`, a preset is an
+          `EffectsPreset` whose raster program is one channel. A `bands` key on a
+          scene file is refused. They share a column, never a file.
+
+          IT ARRIVES COLLAPSED AND CARRIES ITS OWN LIMITS. Nothing in the suite
+          has ever looked at one of these bands on screen, and saving a preset
+          does not install it — the panel states both in full, unhidden, because
+          the failure mode this surface has is a promise, not a bug. */}
+      <BandPresetPanel />
       {/* Subscriptions live in the AeonPropertiesPanel leaf, not this column —
           the reason its own docblock gives. */}
       <CollapsibleSection id="aeon.props" title="Properties" defaultCollapsed>

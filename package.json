@@ -24,7 +24,8 @@
     "check:harness-guards": "node scratchpad/check-harness-guards.mjs",
     "harness:guard-proof": "node scratchpad/harness-guard-proof.mjs",
     "harness:loop-paint": "node scratchpad/loop-paint-harness.mjs",
-    "harness:curve-option-disabled": "node scratchpad/curve-option-disabled-harness.mjs"
+    "harness:curve-option-disabled": "node scratchpad/curve-option-disabled-harness.mjs",
+    "harness:band-preset": "node scratchpad/band-preset-harness.mjs"
   },
   "keywords": [],
   "author": "",

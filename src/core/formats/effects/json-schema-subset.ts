@@ -25,12 +25,11 @@
 //     test/formats/effects-schema-drift.test.ts.
 //
 // unevaluatedProperties: implemented as additionalProperties. That is EXACT for
-// this schema, not an approximation: every object carrying
-// `unevaluatedProperties` in the committed file carries it beside
-// {type, properties, required} only, with no in-place applicator sibling
-// ($ref/oneOf/allOf/anyOf/if) that could contribute annotations from elsewhere.
-// assertSupported() re-checks that precondition on every schema object it
-// meets, so the equivalence cannot silently stop holding.
+// the committed schemas, not an approximation, and the precondition is checked
+// per node rather than asserted once — see assertSupported() and
+// `contributesPropertyAnnotations` below. The equivalence needs the in-place
+// applicators beside it to contribute no PROPERTY annotations; when one does,
+// or when this file cannot prove it does not, validation is refused.
 
 /** A schema node. Deliberately loose — the committed file is the authority. */
 export type JsonSchema = Record<string, unknown>;
@@ -69,6 +68,68 @@ const IN_PLACE_APPLICATORS = [
   'dependentSchemas',
 ];
 
+/**
+ * Keywords a subschema may carry and still be PROVABLY unable to contribute a
+ * property annotation — the annotations `unevaluatedProperties` is defined in
+ * terms of. Every one of these is a pure assertion over the instance: it either
+ * holds or it does not, and none of them names a property as "evaluated".
+ *
+ * `properties`, `patternProperties`, `additionalProperties` and
+ * `unevaluatedProperties` are DELIBERATELY ABSENT, and so is `$ref` (whose
+ * target could carry any of them). Anything not on this list is treated as
+ * "might annotate", which is the safe side.
+ */
+const NON_ANNOTATING_KEYWORDS: ReadonlySet<string> = new Set<string>([
+  ...ANNOTATION_KEYWORDS,
+  'type', 'const', 'enum', 'pattern', 'minimum', 'maximum',
+  'required', 'minItems', 'maxItems',
+]);
+
+/**
+ * Can this in-place subschema contribute a PROPERTY annotation?
+ *
+ * ═══ WHY THIS EXISTS (the preset schema, empyrean 6664b61) ═══
+ *
+ * The scene schema never put `unevaluatedProperties` beside an in-place
+ * applicator, so assertSupported() could refuse the combination outright. The
+ * PRESET schema does, at `$defs.band.properties.on`:
+ *
+ *     "properties": { "cram": {…}, "pal_region": {…} },
+ *     "oneOf": [ {"required": ["cram"]}, {"required": ["pal_region"]} ],
+ *     "unevaluatedProperties": false
+ *
+ * That is the natural spelling of "exactly one arm, and no other key", and it is
+ * the shape aeon's generator enforces (`render_band_on`). The blanket refusal
+ * was a FALSE POSITIVE on it: `{"required": [...]}` asserts a key is PRESENT and
+ * annotates nothing, so `unevaluatedProperties` still sees exactly the
+ * annotations `properties` produced, and the additionalProperties equivalence
+ * holds exactly.
+ *
+ * ═══ WHY A WHITELIST AND NOT A BLACKLIST ═══
+ *
+ * The failure this evaluator is built against is silently ACCEPTING what the
+ * real schema rejects. A blacklist of annotating keywords is wrong by default on
+ * every keyword nobody thought of; a whitelist of provably-inert ones is right by
+ * default and merely inconvenient when the schema grows. So an unrecognised
+ * keyword inside a branch makes this return `true` and the caller refuse — the
+ * same posture assertSupported() takes for the keyword set itself.
+ *
+ * Recursive, because `not` and nested `oneOf` are themselves in-place: a branch
+ * that merely wraps another applicator is only inert if that one is too.
+ */
+function contributesPropertyAnnotations(node: unknown): boolean {
+  if (Array.isArray(node)) return node.some(contributesPropertyAnnotations);
+  if (typeof node !== 'object' || node === null) return false;
+  for (const [key, val] of Object.entries(node as Record<string, unknown>)) {
+    if (!NON_ANNOTATING_KEYWORDS.has(key)) return true;
+    // `required`/`enum`/`const` hold DATA, not schemas; do not descend into them.
+    if (key === 'required' || key === 'enum' || key === 'const' ||
+        key === 'default' || key === 'examples' || key === '$defs') continue;
+    if (contributesPropertyAnnotations(val)) return true;
+  }
+  return false;
+}
+
 /** Thrown when the schema uses something this evaluator does not implement. */
 export class UnsupportedSchemaError extends Error {
   constructor(message: string) {
@@ -93,12 +154,25 @@ function assertSupported(schema: JsonSchema, where: string): void {
         `unevaluatedProperties at ${where || '<root>'} is only implemented for the value false.`,
       );
     }
-    const applicator = IN_PLACE_APPLICATORS.find(k => schema[k] !== undefined);
+    // A `$ref`/`$dynamicRef` value is a STRING, not a schema, so the prover
+    // below cannot look through it — and its target could declare anything.
+    // Both stay an unconditional refusal, which is also what the $ref-sibling
+    // rule further down would say if it ran first.
+    const opaque = (['$ref', '$dynamicRef'] as const).find(k => schema[k] !== undefined);
+    if (opaque) {
+      throw new UnsupportedSchemaError(
+        `unevaluatedProperties at ${where || '<root>'} sits beside "${opaque}", whose target this ` +
+        'evaluator does not follow when proving the additionalProperties equivalence. Refusing.',
+      );
+    }
+    const applicator = IN_PLACE_APPLICATORS
+      .filter(k => schema[k] !== undefined)
+      .find(k => contributesPropertyAnnotations(schema[k]));
     if (applicator) {
       throw new UnsupportedSchemaError(
         `unevaluatedProperties at ${where || '<root>'} sits beside the in-place applicator ` +
-        `"${applicator}"; this evaluator implements it as additionalProperties, which is only ` +
-        'equivalent when no in-place applicator can contribute annotations. Refusing.',
+        `"${applicator}", whose subschemas can contribute property annotations; this evaluator ` +
+        'implements it as additionalProperties, which is only equivalent when they cannot. Refusing.',
       );
     }
   }

@@ -1,6 +1,7 @@
 // Type-only (erased at compile), so the effects codec's own reach back into
 // project/adapter cannot make this a runtime import cycle. See S4Project.
 import type { EffectsSceneLibrary } from '../formats/effects/scene';
+import type { EffectsPresetLibrary } from '../formats/effects/preset';
 import type { BgOverrideState } from '../formats/bg-override/bg-override-io';
 
 export const SECTION_TILES_WIDE = 256;
@@ -337,6 +338,21 @@ export interface S4Project {
    * though scene.ts reaches back to project/adapter for `FileAccess`.
    */
   effectsScenes: EffectsSceneLibrary;
+  /**
+   * The RASTER PRESET library — `{dataRoot}editor/effects/presets/<id>.json`,
+   * one document per raster program.
+   *
+   * A DIFFERENT DOCUMENT FROM A SCENE, not a sub-shape of one. A scene is a
+   * `parallax_config`; a preset's raster program is a channel of an
+   * `EffectsPreset` bound per SECTION. A `bands` key on a scene file is refused
+   * by the scene loader, so these cannot be merged even if the directories
+   * suggest it.
+   *
+   * REQUIRED, on exactly the rule `effectsScenes` states above: an optional
+   * field reads downstream as "this project has no presets", which is a
+   * different fact from "this project was loaded without looking".
+   */
+  effectsPresets: EffectsPresetLibrary;
   /**
    * The BG override document — `{dataRoot}editor_bg_override.json`, ONE PER
    * GAME rather than per zone or per act (aeon EFFECTS_CONSUMER_CONTRACT.md

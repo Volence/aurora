@@ -17,6 +17,7 @@ import type { LoadedS4Config } from '../config/s4-config';
 import type { S4Project } from '../model/s4-types';
 import type { CollisionProfileSet } from '../collision/collision-model';
 import type { EffectsSceneLibrary } from '../formats/effects/scene';
+import type { EffectsPresetLibrary } from '../formats/effects/preset';
 import type { BgOverrideState } from '../formats/bg-override/bg-override-io';
 
 /**
@@ -210,6 +211,16 @@ export interface AeonProjectData {
    * the directory does not exist in the aeon tree at all.
    */
   scenes: EffectsSceneLibrary;
+  /**
+   * The raster preset library. THE SAME VALUE as `project.effectsPresets`, not
+   * a copy — the aliasing rule `scenes` states, for the same reason: two names
+   * for one object cannot disagree, and two copies eventually will.
+   *
+   * Hazard 2 named "nothing in `AeonProjectData` names a scene, preset, band or
+   * budget". `scenes` closed the first and `bgOverride` the third; this closes
+   * the second.
+   */
+  presets: EffectsPresetLibrary;
   /**
    * The BG override document + its file facts (aeon EFFECTS_CONSUMER_CONTRACT.md
    * §1.1), which is where this project's BgAnim BANDS live — the third of the
