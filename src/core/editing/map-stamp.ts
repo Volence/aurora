@@ -1,6 +1,7 @@
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../model/s4-types';
-import type { ChunkDef, Section } from '../model/s4-types';
+import type { ChunkDef, ChunkPlacementLink, Section } from '../model/s4-types';
 import { cellTileIndices } from '../collision/collision-cell';
+import { allocatePlacementId, buildStampLinkChild } from './chunk-links';
 import type { AnyCommand, BatchCommand, SetTilesCommand, SetCollisionEditCommand } from './commands';
 
 /** Structural shape shared by ChunkDef (stamp source) and MapClipboard (paste
@@ -12,6 +13,31 @@ export interface RegionSource {
   nametable: Uint16Array;
   collisionA: Uint16Array;
   collisionB: Uint16Array;
+}
+
+/**
+ * Whether a region write at this base can carry collision at all — the two
+ * refusals spelled out in `buildRegionWriteCommand`'s body comment, hoisted so
+ * the stamp's identity record can ask the SAME question the write asks.
+ *
+ * It is a predicate rather than a re-derivation at each site because
+ * `ChunkPlacementLink.collision` decides whether a later propagation replays
+ * collision, and a placement that disagreed with the write that made it would
+ * grow collision the author never stamped. Inferring it from the emitted
+ * children instead would read `false` for a stamp whose collision happened to
+ * match what was already there — correct today, wrong the moment the chunk's
+ * collision is edited.
+ */
+export function regionCollisionWritable(
+  source: Pick<RegionSource, 'widthTiles' | 'heightTiles' | 'collisionA' | 'collisionB'>,
+  baseCol: number,
+  baseRow: number,
+): boolean {
+  const cellsW = source.widthTiles >> 1;
+  const cellsH = source.heightTiles >> 1;
+  return (baseCol % 2) === 0 && (baseRow % 2) === 0
+    && source.collisionA.length === cellsW * cellsH
+    && source.collisionB.length === cellsW * cellsH;
 }
 
 /** Build the atomic region-write command shared by stamp (chunk -> section)
@@ -76,9 +102,7 @@ export function buildRegionWriteCommand(args: {
   // forgets both from being a data-loss bug instead of a no-op.
   const cellsW = source.widthTiles >> 1;
   const cellsH = source.heightTiles >> 1;
-  const collisionWritable = (baseCol % 2) === 0 && (baseRow % 2) === 0
-    && source.collisionA.length === cellsW * cellsH
-    && source.collisionB.length === cellsW * cellsH;
+  const collisionWritable = regionCollisionWritable(source, baseCol, baseRow);
 
   if (writeCollision && collisionWritable) {
     const baseCellCol = baseCol >> 1;
@@ -127,14 +151,55 @@ export function buildRegionWriteCommand(args: {
  *  footprint: air words/tiles clear the destination. artOnly=true skips the
  *  collision children. Returns null when nothing changes. Requires the
  *  section's collisionEdit planes to be seeded (caller seeds like
- *  paintCollisionCell does). */
+ *  paintCollisionCell does).
+ *
+ *  CHUNK IDENTITY (owner ruling d-18c). The stamp REMEMBERS its chunk by
+ *  default: the batch carries a third child recording, per tile of the
+ *  footprint, that these tiles came from `chunk`. `detached: true` is the
+ *  checkbox — the art and collision are written identically and no link is
+ *  recorded.
+ *
+ *  ⚠ A DETACHED STAMP IS NOT THE SAME AS NO LINK CHILD. Stamping detached over
+ *  a footprint that was already linked CLEARS those links: the tiles genuinely
+ *  no longer come from the old chunk, and leaving the old links would have the
+ *  next propagation overwrite this stamp. So `detached` emits a clearing child,
+ *  never nothing.
+ *
+ *  ⚠ AND THE BATCH CAN NOW BE NON-NULL WHILE NOTHING VISIBLE CHANGED. Stamping
+ *  a chunk over an area that already holds identical art produces zero art
+ *  entries — but it is still a new placement, and recording it is the whole
+ *  point of the ruling. The old "returns null when nothing changes" contract
+ *  holds for the ART; it does not gate identity. */
 export function buildStampCommand(args: {
   chunk: ChunkDef; section: Section; sectionIndex: number;
   baseCol: number; baseRow: number; artOnly: boolean; description: string;
+  detached?: boolean;
 }): BatchCommand | null {
-  const { chunk, section, sectionIndex, baseCol, baseRow, artOnly, description } = args;
-  return buildRegionWriteCommand({
+  const { chunk, section, sectionIndex, baseCol, baseRow, artOnly, description, detached } = args;
+  const region = buildRegionWriteCommand({
     source: chunk, section, sectionIndex, baseCol, baseRow,
     writeArt: true, writeCollision: !artOnly, description,
   });
+
+  const placement: ChunkPlacementLink | null = detached ? null : {
+    id: allocatePlacementId(section.chunkLinks),
+    chunkId: chunk.id,
+    baseCol,
+    baseRow,
+    // What the stamp ACTUALLY did, not what was asked: `artOnly` is the
+    // request, and buildRegionWriteCommand independently refuses collision on
+    // an odd base or an unsized source. Recording the request would let
+    // propagation grow collision a stamp never wrote.
+    collision: !artOnly && regionCollisionWritable(chunk, baseCol, baseRow),
+  };
+
+  const linkChild = buildStampLinkChild({
+    section, sectionIndex, baseCol, baseRow,
+    widthTiles: chunk.widthTiles, heightTiles: chunk.heightTiles,
+    placement, description,
+  });
+
+  if (!linkChild) return region;
+  if (!region) return { type: 'batch', description, sectionIndex, commands: [linkChild] };
+  return { ...region, commands: [...region.commands, linkChild] };
 }

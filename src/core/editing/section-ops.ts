@@ -1,5 +1,6 @@
 import type { Section } from '../model/s4-types';
 import { createSection, MAX_ACT_SECTIONS } from '../model/s4-types';
+import { cloneSectionChunkLinks } from './chunk-links';
 
 export interface GridState {
   gridWidth: number;
@@ -12,7 +13,20 @@ export interface GridOpResult extends GridState {
   focusIndex: number;
 }
 
-/** Deep-clone a section (independent typed arrays + object/ring copies). */
+/**
+ * Deep-clone a section (independent typed arrays + object/ring copies).
+ *
+ * ⚠ HAND-ENUMERATED, and the key-set guard in test/editing/section-ops.test.ts
+ * CANNOT see the gap. That guard compares `Object.keys(clone)` against a
+ * section built by `createSection`, so it only covers fields `createSection`
+ * sets — every OPTIONAL field the loader populates later
+ * (`engineCollision*`, `collisionEdit*`, `unreadable`, `chunkLinks`) is absent
+ * from its reference object and therefore invisible to it. Those four remain
+ * DROPPED here, unchanged by this parcel; `chunkLinks` is deliberately CARRIED,
+ * and carried on purpose because copy/paste of a section must keep chunk
+ * identity (owner ruling d-18c names copy-paste explicitly). The decision is
+ * pinned by its own named row in that file, not by the key-set guard.
+ */
 export function cloneSection(sec: Section, index: number, name?: string): Section {
   return {
     index,
@@ -22,6 +36,14 @@ export function cloneSection(sec: Section, index: number, name?: string): Sectio
       height: sec.tileGrid.height,
       nametable: new Uint16Array(sec.tileGrid.nametable),
     },
+    // Deep, never a shared reference: the plane is mutable and two sections
+    // sharing one would have a stamp in the copy retarget the original.
+    //
+    // CONDITIONAL SPREAD, not `chunkLinks: sec.chunkLinks ? … : undefined`: an
+    // own key holding `undefined` still shows up in `Object.keys`, which would
+    // make the clone's key set differ from `createSection`'s and fail the
+    // key-set guard for a field that is legitimately absent.
+    ...(sec.chunkLinks ? { chunkLinks: cloneSectionChunkLinks(sec.chunkLinks) } : {}),
     objects: sec.objects.map((o) => ({ ...o })),
     rings: sec.rings.map((r) => ({ ...r })),
     tiles: sec.tiles ? sec.tiles.map((t) => ({ pixels: new Uint8Array(t.pixels) })) : null,

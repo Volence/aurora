@@ -180,14 +180,37 @@ describe('buildStampCommand', () => {
     }
   });
 
-  it('(f) stamping a chunk identical to what is already there returns null', () => {
+  /**
+   * ⚠ THIS ROW'S EXPECTATION CHANGED WITH OWNER RULING d-18c, ON PURPOSE.
+   *
+   * It used to assert `cmd === null` — "a stamp that writes no different word
+   * is not an edit". That was true while a stamp was a pure copy of tiles. It
+   * is FALSE now that a stamp also records WHERE THE TILES CAME FROM: stamping
+   * chunk `c1` over an area that already happens to hold identical art is still
+   * a placement of `c1`, and returning null would leave it unrecorded and
+   * un-propagatable. Which chunk a region came from is not derivable from the
+   * words, which is the entire reason the ruling went the way it did.
+   *
+   * The half of the original property that still holds is asserted directly:
+   * the batch carries NO art and NO collision child. Only identity changed.
+   */
+  it('(f) an identical stamp writes no art and no collision — but IS still a recorded placement', () => {
     const section = seededSection();
     const chunk = createChunkDef('c1', 'Chunk', 4, 4); // all-zero nametable + all-air planes, matches fresh section
 
     const cmd = buildStampCommand({
       chunk, section, sectionIndex: 0, baseCol: 16, baseRow: 16, artOnly: false, description: 'stamp noop',
     });
-    expect(cmd).toBeNull();
+    expect(cmd).not.toBeNull();
+    expect(cmd!.commands.map(c => c.type)).toEqual(['set-chunk-links']);
+
+    // ...and the detached form of the same stamp really is a no-op, which is
+    // what pins the difference to IDENTITY rather than to some new art write.
+    const detached = buildStampCommand({
+      chunk, section, sectionIndex: 0, baseCol: 16, baseRow: 16, artOnly: false,
+      description: 'stamp noop detached', detached: true,
+    });
+    expect(detached).toBeNull();
   });
 
   it('(g) unseeded section planes: collision children are silently omitted, the art child still builds', () => {
@@ -209,8 +232,12 @@ describe('buildStampCommand', () => {
     });
 
     expect(cmd).not.toBeNull();
-    expect(cmd!.commands).toHaveLength(1);
-    expect(cmd!.commands[0].type).toBe('set-tiles');
+    // Art child + the identity child d-18c adds; NO collision children, which
+    // is what this row is about. Asserted by TYPE rather than by length so the
+    // row keeps measuring "collision was omitted" rather than "the batch has n
+    // children", which is a different quantity that any later child changes.
+    expect(cmd!.commands.map(c => c.type)).toEqual(['set-tiles', 'set-chunk-links']);
+    expect(cmd!.commands.some(c => c.type === 'set-collision-edit')).toBe(false);
 
     expect(() => history.execute(cmd!, level)).not.toThrow();
     expect(section.tileGrid.nametable[baseRow * SECTION_TILES_WIDE + baseCol]).toBe(0x2222);

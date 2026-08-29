@@ -62,6 +62,52 @@ export function unpackNametableWord(word: number): NametableEntry {
   };
 }
 
+/**
+ * ONE remembered stamp of a library chunk into an aeon section (owner ruling
+ * d-18c). The tiles it still owns are named by `SectionChunkLinks.plane`, NOT by
+ * this record's footprint — which is the whole point: paint over half a stamp by
+ * hand and only the painted tiles stop tracking.
+ *
+ * `chunkId` is `ChunkDef.id` (a string, project-level). Nothing here copies the
+ * chunk's SIZE: a placement resolves against the live `ChunkDef`, so a chunk
+ * that was resized cannot leave a stale width behind here to disagree with it.
+ */
+export interface ChunkPlacementLink {
+  /** Stable within its section, `>= 1`. 0 is reserved by the plane for "no
+   *  link", so an id is never an array index and never shifts when a sibling
+   *  placement is detached. */
+  id: number;
+  /** `ChunkDef.id` of the library chunk this placement came from. */
+  chunkId: string;
+  /** Top-left TILE coords of the stamp inside the section. Offsets into the
+   *  chunk are `(col - baseCol, row - baseRow)`. */
+  baseCol: number;
+  baseRow: number;
+  /** True when the stamp that created this placement also wrote the two
+   *  collision planes (`artOnly: false`). Propagation replays exactly what the
+   *  stamp did: an art-only stamp must not grow collision later. */
+  collision: boolean;
+}
+
+/**
+ * A section's chunk-identity layer. `plane` is parallel to
+ * `SectionTileGrid.nametable` — one entry per 8px TILE, `0` = unlinked, else the
+ * `id` of a placement in `placements`.
+ *
+ * TILE granularity, not 16px cell, because the art brush writes one nametable
+ * word at a time: a cell-indexed plane would have to either break three
+ * innocent tiles' links or leave three stale ones on any single-tile edit.
+ *
+ * Every non-zero plane value MUST name a placement present in `placements` —
+ * `core/editing/chunk-links.ts` `danglingPlaneRefs` is the check, and the
+ * `.chunklinks.json` parser refuses a document that violates it rather than
+ * loading a half-valid layer.
+ */
+export interface SectionChunkLinks {
+  placements: ChunkPlacementLink[];
+  plane: Uint32Array;
+}
+
 export interface ObjectPlacement {
   /** Section-LOCAL pixel coordinates, 0..$7FF (SECTION_PIXEL_SIZE - 1). The
    *  exporter hard-fails outside that range (core/export/entity-data.ts). */
@@ -108,6 +154,24 @@ export interface Section {
   /** Editable path-B collision plane (the alternate/loop layer), mirror of
    *  collisionEdit. Seeded from engineCollisionB or a saved .collattrb.bin. */
   collisionEditB?: Uint16Array | null;
+  /**
+   * CHUNK IDENTITY (owner ruling d-18c, 2026-08-29): which library chunk each
+   * stamped tile still comes from. `null`/absent = this section has no linked
+   * stamp, which is what every section saved before this field existed reads as.
+   *
+   * The classic half of the editor keeps chunk identity by storing a GRID OF
+   * CHUNK IDS as the level itself (level-classic/model.ts `LayoutGrid.cells`) —
+   * the "never flatten" document. Aeon cannot copy that shape: an aeon section's
+   * `tileGrid.nametable` IS the exported artifact and a chunk is a
+   * variable-size footprint, not one layout cell. So identity rides BESIDE the
+   * nametable, at the same per-tile granularity the paint brush writes at, which
+   * is what lets one hand-painted tile stop tracking while the rest of the
+   * placement keeps propagating.
+   *
+   * See core/editing/chunk-links.ts for every operation on this and
+   * core/formats/section-chunk-links.ts for the `.chunklinks.json` sidecar.
+   */
+  chunkLinks?: SectionChunkLinks | null;
   objects: ObjectPlacement[];
   rings: RingPlacement[];
   /**

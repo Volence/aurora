@@ -5,6 +5,7 @@ import { applyWithBand, applyWithoutBand } from '../formats/bg-override/bg-anim-
 import {
   writeBgOverrideLayoutWord, writeBgOverrideTile, writeBgOverridePhaseBank,
 } from '../formats/bg-override/bg-override-view';
+import { ensureChunkLinks } from './chunk-links';
 
 const MAX_HISTORY = 200;
 
@@ -238,6 +239,26 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
     case 'set-section-scene':
       section.sceneRef = cmd.newRef;
       break;
+    case 'set-chunk-links': {
+      // ensure-then-write: a section that never had an identity layer gets one
+      // sized to its OWN nametable here rather than at load, so every section
+      // saved before chunk identity existed stays free of the plane until it is
+      // first stamped.
+      const links = ensureChunkLinks(section);
+      for (const e of cmd.entries) links.plane[e.index] = e.newRef;
+      if (cmd.removedPlacements?.length) {
+        const gone = new Set(cmd.removedPlacements.map(p => p.id));
+        links.placements = links.placements.filter(p => !gone.has(p.id));
+      }
+      // COPY, never the command's own record: the command must keep an
+      // untouched description of both states, and a later edit to a placement
+      // in the section would otherwise rewrite this command's undo data — the
+      // same rule `set-object` states above.
+      if (cmd.addedPlacements?.length) {
+        for (const p of cmd.addedPlacements) links.placements.push({ ...p });
+      }
+      break;
+    }
     case 'set-collision-edit': {
       const arr = cmd.plane === 'b' ? section.collisionEditB : section.collisionEdit;
       if (arr) for (const e of cmd.entries) arr[e.index] = e.newColl;
@@ -414,6 +435,21 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
     case 'set-section-scene':
       section.sceneRef = cmd.oldRef;
       break;
+    case 'set-chunk-links': {
+      const links = ensureChunkLinks(section);
+      for (const e of cmd.entries) links.plane[e.index] = e.oldRef;
+      // Exactly the mirror of apply: what apply added is dropped, what apply
+      // removed comes back. Ids are stable, so this restores the same records
+      // under the same ids the plane's `oldRef`s name.
+      if (cmd.addedPlacements?.length) {
+        const gone = new Set(cmd.addedPlacements.map(p => p.id));
+        links.placements = links.placements.filter(p => !gone.has(p.id));
+      }
+      if (cmd.removedPlacements?.length) {
+        for (const p of cmd.removedPlacements) links.placements.push({ ...p });
+      }
+      break;
+    }
     case 'set-collision-edit': {
       const arr = cmd.plane === 'b' ? section.collisionEditB : section.collisionEdit;
       if (arr) for (const e of cmd.entries) arr[e.index] = e.oldColl;
