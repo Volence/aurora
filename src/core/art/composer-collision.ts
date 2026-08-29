@@ -1,10 +1,18 @@
 import type { ComposerDoc } from './composer-buffer';
 import type { MapClipboard } from '../editing/map-clipboard';
 import { copyFromSection } from '../editing/map-clipboard';
+import { collisionPaintWord } from '../editing/collision-word';
 import type { Section } from '../model/s4-types';
 
 /** Write one packed cell word into a composer doc plane at 8px-tile coords
- *  (tx,ty) — mapped to the 16px cell (tx>>1, ty>>1). Returns true if changed. */
+ *  (tx,ty) — mapped to the 16px cell (tx>>1, ty>>1). Returns true if changed.
+ *
+ *  The Art facet's chunk collision brush and the map's collision tool are TWO
+ *  DIFFERENT WRITERS of the same word, which is why the fix had to be swept for
+ *  rather than read off the map path: an enumeration by TOOL finds one of them.
+ *  Both now go through `collisionPaintWord`, so the brush writes the fields it
+ *  owns and the doc cell keeps the rest — a doc seeded from a section
+ *  (`seedDocCollisionFromSection`) carries whatever that section's cells had. */
 export function paintDocCollision(
   doc: ComposerDoc, plane: 'a' | 'b', tx: number, ty: number, word: number,
 ): boolean {
@@ -14,8 +22,9 @@ export function paintDocCollision(
   // Odd-dimension docs floor their cell count (chunkCellCount); painting the
   // odd trailing edge has no backing cell — no-op, not a phantom dirty write.
   if (idx >= arr.length) return false;
-  if (arr[idx] === word) return false;
-  arr[idx] = word;
+  const merged = collisionPaintWord(word, arr[idx]);
+  if (arr[idx] === merged) return false;
+  arr[idx] = merged;
   return true;
 }
 

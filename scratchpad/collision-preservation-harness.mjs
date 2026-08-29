@@ -299,7 +299,17 @@ async function main() {
   console.log(`  SECTION_TILES_WIDE = ${STW}`);
   console.log('  peer grounding: git -C ../aeon show b76576ea:tools/collision_pipeline.py');
 
-  if (!(await portFree())) throw new Error(`port ${PORT} already serving a CDP target — kill it first`);
+  // WAIT for the port rather than failing on it. The gate says to run the final
+  // number MORE THAN TWICE, and a previous run's Electron can still be tearing
+  // down seconds after this process exits — so a bare "already serving" abort
+  // makes back-to-back runs flake, and a flaky repeat is how a result ends up
+  // being read from a single run after all. Still a hard failure if something
+  // is genuinely camped on the port.
+  for (let i = 0; i < 60 && !(await portFree()); i++) {
+    if (i === 0) note('port', `${PORT} still serving — waiting for the previous run to exit`);
+    await sleep(1000);
+  }
+  if (!(await portFree())) throw new Error(`port ${PORT} still serving a CDP target after 60s — kill it first`);
 
   const child = spawn('/usr/bin/xvfb-run', [
     '-a', '--server-args=-screen 0 1600x1000x24',
@@ -308,6 +318,13 @@ async function main() {
     cwd: ROOT,
     env: { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1', ELECTRON_DISABLE_SECURITY_WARNINGS: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
+    // DETACHED so the whole tree can be signalled as a PROCESS GROUP below.
+    // `xvfb-run` execs a shell that starts Electron as a CHILD, so killing the
+    // spawned pid reaps the wrapper and leaves Electron holding the debug port.
+    // That orphan is what made the second consecutive run abort with "port
+    // already serving" — i.e. it turned "run the final number more than twice"
+    // into "read it from one run", which is the trap this gate names.
+    detached: true,
   });
   child.stdout.on('data', (d) => process.env.VERBOSE && process.stdout.write(`[app] ${d}`));
   child.stderr.on('data', (d) => process.env.VERBOSE && process.stderr.write(`[app!] ${d}`));
@@ -578,9 +595,16 @@ async function main() {
     note('disk', 'no save was issued; the app has no autosave (shell/close-guard.ts)');
   } finally {
     try { c?.close(); } catch { /* already gone */ }
-    child.kill('SIGTERM');
+    // Negative pid = the whole process GROUP (see `detached` above), so
+    // Electron goes down with its xvfb-run wrapper instead of outliving it.
+    const killGroup = (sig) => { try { process.kill(-child.pid, sig); } catch { /* already gone */ } };
+    killGroup('SIGTERM');
     await sleep(500);
-    child.kill('SIGKILL');
+    killGroup('SIGKILL');
+    // And CONFIRM it: a teardown that silently failed is how the next run
+    // aborts on a port this one was supposed to have released.
+    for (let i = 0; i < 30 && !(await portFree()); i++) await sleep(500);
+    if (!(await portFree())) console.log(`WARN       port ${PORT} still held after teardown`);
   }
 
   const passed = results.filter((r) => r.ok).length;
