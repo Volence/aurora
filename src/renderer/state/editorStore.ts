@@ -274,6 +274,17 @@ interface EditorState {
   selectedEffectsSceneId: string | null;
 
   /**
+   * Which RASTER PRESET the band panel is editing, by id.
+   *
+   * The id and not the document, on `selectedEffectsSceneId`'s own reasoning:
+   * storing the resolved preset would put a slice of the project inside the
+   * editor store and oblige it to keep step with every undo. Resolution is
+   * `resolveSelectedPreset` (providers/effects-preset), which every reader
+   * calls.
+   */
+  selectedEffectsPresetId: string | null;
+
+  /**
    * The promotion candidate the band panel's "From existing tiles" form holds —
    * the geometry and the static base a Promote would use.
    *
@@ -441,6 +452,7 @@ interface EditorState {
   setCollisionCrossoverBrush: (brush: CrossoverBrush) => void;
   setCollisionBrushSize: (size: number) => void;
   setSelectedEffectsSceneId: (id: string | null) => void;
+  setSelectedEffectsPresetId: (id: string | null) => void;
   /**
    * Move the promotion candidate, and point the lens AT it.
    *
@@ -589,6 +601,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   collisionCrossoverBrush: 'keep',
   collisionBrushSize: 1,
   selectedEffectsSceneId: null,
+  selectedEffectsPresetId: null,
   // 1x1 at slot 0: the smallest legal band, and a base the panel re-seeds to
   // `firstPromotableSlot` as soon as a document is open. `bandLensTarget: null`
   // is what keeps this from lighting anything before the author marks.
@@ -689,6 +702,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   setCollisionBrushSize: (size) => set({ collisionBrushSize: Math.max(1, Math.min(31, size | 0)) }),
   setSelectedEffectsSceneId: (id) => set({ selectedEffectsSceneId: id }),
+  setSelectedEffectsPresetId: (id) => set({ selectedEffectsPresetId: id }),
   setBandCandidate: (patch) => set((s) => ({
     bandCandidate: { ...s.bandCandidate, ...patch },
     bandLensTarget: { kind: 'candidate' },

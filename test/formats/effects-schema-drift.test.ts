@@ -219,32 +219,89 @@ describe('effects scene schema — vendored copy drift gate', () => {
 
   /**
    * The evaluator implements `unevaluatedProperties: false` as
-   * `additionalProperties: false`. That is exact only while no in-place
-   * applicator sits beside it (an applicator can contribute the "evaluated"
-   * annotations the keyword is defined against). The evaluator asserts the
-   * precondition at every schema object it meets; this proves the assertion
-   * fires rather than being decorative.
+   * `additionalProperties: false`. That is exact only while the in-place
+   * applicators beside it contribute no PROPERTY annotations — the annotations
+   * the keyword is defined against.
+   *
+   * ═══ THIS GATE WAS NARROWED ON 2026-08-29, AND THE NARROWING IS THE POINT ═══
+   *
+   * It used to assert a BLANKET refusal: `unevaluatedProperties` beside ANY
+   * in-place applicator threw. The preset schema (empyrean 6664b61) is the first
+   * committed contract schema to put the two together, at
+   * `$defs.band.properties.on`:
+   *
+   *     "properties": { "cram": {…}, "pal_region": {…} },
+   *     "oneOf": [ {"required":["cram"]}, {"required":["pal_region"]} ],
+   *     "unevaluatedProperties": false
+   *
+   * — the natural spelling of "exactly one arm, and no other key". The blanket
+   * refusal was a FALSE POSITIVE on it: a `required`-only branch annotates
+   * nothing, so the equivalence holds exactly. The guard is now a PROVER
+   * (`contributesPropertyAnnotations`) over a whitelist of provably-inert
+   * keywords.
+   *
+   * So this row asserts BOTH SIDES of the new boundary, because a narrowed guard
+   * that only ever gets tested on its accepting side is a guard that has been
+   * deleted. The refusing cases below are what stop that.
    */
-  it('refuses unevaluatedProperties beside an in-place applicator', () => {
-    const bad: JsonSchema = {
+  it('refuses unevaluatedProperties only beside an applicator that can annotate', () => {
+    // REFUSES: an unimplemented keyword inside the branch. The unknown-keyword
+    // guard fires first — either way it REFUSES, which is the property.
+    const unimplemented: JsonSchema = {
       type: 'object',
       allOf: [{ type: 'object' }],
       properties: { a: { type: 'string' } },
       unevaluatedProperties: false,
     };
-    // `allOf` is itself unimplemented, so the unknown-keyword guard is what
-    // fires first — either way it REFUSES, which is the property under test.
-    expect(() => validateAgainstSchema({ a: 'x' }, bad)).toThrow(UnsupportedSchemaError);
+    expect(() => validateAgainstSchema({ a: 'x' }, unimplemented)).toThrow(UnsupportedSchemaError);
 
-    const withRef: JsonSchema = {
-      $defs: { base: { type: 'object' } },
+    // REFUSES: the branch declares `properties`, which really does contribute
+    // the annotations `unevaluatedProperties` is defined against. This is the
+    // case the whole guard exists for, and it must still throw.
+    const annotatingBranch: JsonSchema = {
       type: 'object',
-      oneOf: [{ type: 'object' }],
+      oneOf: [{ properties: { b: { type: 'string' } } }, { required: ['a'] }],
       properties: { a: { type: 'string' } },
       unevaluatedProperties: false,
     };
+    expect(() => validateAgainstSchema({ a: 'x', b: 'y' }, annotatingBranch))
+      .toThrow(/in-place applicator "oneOf", whose subschemas can contribute property annotations/);
+
+    // REFUSES: a `$ref` sibling. Its value is a STRING this evaluator does not
+    // follow, so the target could declare anything and the prover cannot clear it.
+    const withRef: JsonSchema = {
+      $defs: { base: { type: 'object', properties: { z: { type: 'string' } } } },
+      $ref: '#/$defs/base',
+      unevaluatedProperties: false,
+    };
     expect(() => validateAgainstSchema({ a: 'x' }, withRef))
-      .toThrow(/in-place applicator "oneOf"/);
+      .toThrow(/sits beside "\$ref", whose target this evaluator does not follow/);
+
+    // REFUSES: an applicator nested one level down inside an otherwise-inert
+    // branch. The prover recurses, so wrapping does not launder an annotator.
+    const nested: JsonSchema = {
+      type: 'object',
+      not: { oneOf: [{ properties: { c: { type: 'string' } } }] },
+      properties: { a: { type: 'string' } },
+      unevaluatedProperties: false,
+    };
+    expect(() => validateAgainstSchema({ a: 'x' }, nested)).toThrow(UnsupportedSchemaError);
+
+    // ACCEPTS: the preset schema's own shape — a `required`-only oneOf beside
+    // `properties`. `required` asserts presence and annotates nothing, so
+    // `unevaluatedProperties` still sees exactly what `properties` produced.
+    const armRule: JsonSchema = {
+      type: 'object',
+      properties: { cram: { type: 'object' }, pal_region: { type: 'object' } },
+      oneOf: [{ required: ['cram'] }, { required: ['pal_region'] }],
+      unevaluatedProperties: false,
+    };
+    expect(() => validateAgainstSchema({ cram: {} }, armRule)).not.toThrow();
+    // ...and it still ENFORCES both halves it is there to enforce, so the
+    // acceptance above is not acceptance of a no-op.
+    expect(validateAgainstSchema({ cram: {}, pal_region: {} }, armRule)).not.toEqual([]);
+    expect(validateAgainstSchema({ cram: {}, other: 1 }, armRule)
+      .some(i => /unknown property "other"/.test(i.message))).toBe(true);
   });
 
   it('refuses a keyword it does not implement rather than ignoring it', () => {

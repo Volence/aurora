@@ -1,5 +1,6 @@
 import type { ObjectPlacement, RingPlacement, Section, Tileset, Palette, Color, Tile, ChunkDef, Act, BgLibraryEntry } from '../model/s4-types';
 import type { EffectsScene, EffectsSceneLibrary } from '../formats/effects/scene';
+import type { EffectsPreset, EffectsPresetLibrary } from '../formats/effects/preset';
 import type { BgOverrideBand, BgOverrideDocument } from '../formats/bg-override/bg-override';
 import type { BandSlotPlan } from '../formats/bg-override/bg-anim-band';
 
@@ -14,6 +15,10 @@ export interface S4Level {
    *  value, not just its `scenes` array, because a scene id can collide with an
    *  `unreadable` entry and the command has to be able to see that. */
   effectsScenes?: EffectsSceneLibrary;
+  /** project-level; present when set-effects-preset is used. The whole library
+   *  value for the reason above: a preset id can collide with an `unreadable`
+   *  entry and the command has to be able to see that. */
+  effectsPresets?: EffectsPresetLibrary;
   /** project-level (one per GAME, not per act); present when band commands are used. */
   bgOverride?: BgOverrideDocument;
 }
@@ -269,6 +274,29 @@ export interface SetEffectsSceneCommand extends EditCommand {
  * assignments an author makes at different times, and folding them together would
  * make changing a background undo a scene assignment made three steps earlier.
  */
+/**
+ * Replace one RASTER PRESET document wholesale — `presets/<id>.json`.
+ *
+ * THE SAME SHAPE AS `set-effects-scene`, ON THE SAME REASONING, and deliberately
+ * not folded into it. A preset is a different document in a different directory
+ * against a different schema; sharing a command type would mean one `apply` that
+ * has to ask which library it is looking at, and the first time that question is
+ * answered wrong an author's scene is overwritten by a preset.
+ *
+ * Both halves are DEEP COPIES the caller owns, never aliases of the library's
+ * live object: a command holding the same object it is meant to restore restores
+ * nothing. A null/null pair is a create (old null) or a delete (new null).
+ *
+ * `sectionIndex` is -1 — act-ambient, like `set-effects-scene`. Presets are
+ * project-level and there is no project-level history to record on.
+ */
+export interface SetEffectsPresetCommand extends EditCommand {
+  type: 'set-effects-preset';
+  presetId: string;
+  oldPreset: EffectsPreset | null;
+  newPreset: EffectsPreset | null;
+}
+
 export interface SetSectionSceneCommand extends EditCommand {
   type: 'set-section-scene';
   oldRef: string | null;
@@ -385,6 +413,7 @@ export type AnyCommand =
   | SetBgOverrideLayoutCommand
   | SetSectionBgCommand
   | SetEffectsSceneCommand
+  | SetEffectsPresetCommand
   | SetSectionSceneCommand
   | SetBgOverrideBandCommand
   | SetBgOverrideTilesCommand

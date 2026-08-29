@@ -140,6 +140,8 @@ export function getActiveLevel(state: ProjectState): S4Level | null {
     // Same rule as the two above: `set-effects-scene` THROWS on a level without
     // it rather than silently consuming an undo slot, so it is always included.
     effectsScenes: state.project?.effectsScenes,
+    // Same rule again — `set-effects-preset` throws on a level without it.
+    effectsPresets: state.project?.effectsPresets,
     act,
   };
 

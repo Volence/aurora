@@ -30,6 +30,7 @@ import { parseBgTiles, normalizeBgLayout, BG_TILE_BASE_SLOT, BG_WIDTH } from '..
 import { bgLibIndexPath, bgLibLayoutPath, bgLibTilesPath, parseBgLibraryIndex } from '../../formats/bg-library';
 import { parseSectionMeta } from '../../formats/section-meta';
 import { loadEffectsSceneLibrary } from '../../formats/effects/scene';
+import { loadEffectsPresetLibrary } from '../../formats/effects/preset';
 import { loadBgOverride } from '../../formats/bg-override/bg-override-io';
 import { buildPalette } from '../../formats/palette';
 import { parseNametable } from '../../formats/s4-nametable';
@@ -149,6 +150,8 @@ export async function loadAeonProject(fa: FileAccess, dir: string): Promise<Aeon
   return {
     config, project, collisionProfiles, notices, legacyAtlasMerged,
     scenes: project.effectsScenes,
+    // Same aliasing rule, same object — see AeonProjectData.presets.
+    presets: project.effectsPresets,
     // Same aliasing rule, same object — see AeonProjectData.bgOverride. Hazard 2
     // named "nothing in `AeonProjectData` names a scene, preset, band or budget";
     // `scenes` closed the first, this closes the third.
@@ -566,6 +569,16 @@ async function loadFullProject(
   const effectsScenes = await loadEffectsSceneLibrary(fa, projectDataRoot(config.raw));
   notices.push(...effectsScenes.notices);
 
+  // The RASTER PRESET library, `{dataRoot}editor/effects/presets/`, on exactly
+  // the same terms: absent is the ordinary "no authored presets yet" and is
+  // silent, a file that will not parse is loud and is never written back over.
+  //
+  // A SUBDIRECTORY of the scene directory, which is safe in both directions:
+  // the scene loader skips any entry that does not end in `.json`, so the
+  // `presets` directory entry is never mistaken for a scene.
+  const effectsPresets = await loadEffectsPresetLibrary(fa, projectDataRoot(config.raw));
+  notices.push(...effectsPresets.notices);
+
   // The BG override document (aeon EFFECTS_CONSUMER_CONTRACT.md §1.1), loaded
   // on exactly the same terms and for the same reason: it depends on nothing
   // above it, an absent file is the ordinary "this game has no BG override"
@@ -584,6 +597,7 @@ async function loadFullProject(
       bgLibrary,
       basePath,
       effectsScenes,
+      effectsPresets,
       bgOverride,
     },
     legacyAtlasMerged,

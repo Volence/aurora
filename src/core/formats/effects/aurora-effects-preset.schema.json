@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://empyrean/contract/aurora-effects-preset.schema.json",
+  "title": "Aurora Effects — Raster Preset Document (wave 2, bands)",
+  "description": "Wire shape for one raster preset document, games/sonic4/data/editor/effects/presets/<preset_id>.json (aeon repo, editor-owned tree). A BAND IS NOT A SCENE FIELD: a scene is a parallax_config; the raster program is a channel of an EffectsPreset bound per SECTION (aeon docs/superpowers/specs/2026-08-28-raster-band-ownership-design.md section 16.1), so bands live here, in the directory docs/AURORA_EFFECTS_SCHEMA.md section 7 reserved for them. NORMATIVE for SHAPE only: which keys exist, their JSON types, and the exactly-one arm rule. NUMERIC BOUNDS ARE DELIBERATELY NOT RESTATED HERE (screen-line range, CRAM address range, burst ceilings, band count, height minimum, the palette-line-0 rule): the engine's own ensures in engine/effects/raster_dsl.emp fire at build time with the measurement behind each rule, and aeon's generator forwards values verbatim so the author reads that sentence (aeon tools/EFFECTS_CONSUMER_CONTRACT.md section 2.4 at c03b9812, the consumer half this schema pairs with). Closed: any key not listed is refused; adding one is a contract change. Reserved and refused by name (still wave-2 open): fires, variants, cycles. Known limits with NO enforcing assertion, stated so a silence is not read as coverage: nothing checks that an authored preset is BOUND to a section (an unbound preset costs ROM and shows nothing; binding is a hand-authored preset() call, BAND-FIRST-CONSUMER territory); nothing checks the total ROM cost of the preset set; the runtime variant-to-pal_line binding behind a pal_region band cannot be checked at build time; nothing checks that a band is VISIBLE.",
+  "type": "object",
+  "required": [
+    "schema",
+    "id",
+    "bands"
+  ],
+  "properties": {
+    "schema": {
+      "const": 1,
+      "description": "Document format version. Absent: refused (aeon effects_gen.py load_preset)."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,31}$",
+      "description": "Must equal the file's stem. Becomes the .emp label component EditorRaster_<ACT>_<id> (aeon effects_gen.py load_preset, SCENE_ID_RE). The equality with the filename is a rule of the loader, not expressible here."
+    },
+    "name": {
+      "description": "Writer-owned display label, any JSON value. Read by nothing; dropped on lowering (aeon PRESET_IGNORED_KEYS)."
+    },
+    "bands": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The bands of this program, lowered to one compose([...]). Absent or empty: refused (aeon load_preset; engine backstop raster_dsl.emp compose). The engine's program-buffer ceiling, not this schema, caps the count (three one-colour bands measured at 55 words).",
+      "items": {
+        "$ref": "#/$defs/band"
+      }
+    }
+  },
+  "unevaluatedProperties": false,
+  "$defs": {
+    "band": {
+      "type": "object",
+      "required": [
+        "top",
+        "bot",
+        "sh",
+        "on"
+      ],
+      "properties": {
+        "top": {
+          "type": "integer",
+          "description": "Screen line the effect turns ON; the band's writes land on this line. Required, no default. 0 is not off, it is line 0, which the engine refuses (lines 0-2 belong to the priming records). Value rules: raster_dsl.emp fire (screen-line range), band (top < bot, height vs fire_cost_cycles)."
+        },
+        "bot": {
+          "type": "integer",
+          "description": "Screen line the effect turns OFF: the derived pal_restore's line. The band covers top..bot-1 inclusive; bot - top is the height the engine charges. Required, no default. Value rules: raster_dsl.emp fire, band (top < bot; height; the S/H height rule when sh is set)."
+        },
+        "sh": {
+          "description": "Shadow/Highlight on for the band. Required, no default, deliberately (whether an effect changes a mode register is stated at the call site). false/0 = two-fire band; true/1 = the three-fire S/H shape. aeon _render_bool_int; raster_dsl.emp band (sh must be 0 or 1).",
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "integer",
+              "enum": [
+                0,
+                1
+              ]
+            }
+          ]
+        },
+        "on": {
+          "type": "object",
+          "description": "The ON op the band turns on; the restore is derived from it. Exactly one of cram / pal_region: zero arms, two arms or an unknown arm are refused (aeon render_band_on). vsram is deliberately not an arm: a band's restore is derived from the ON op's CRAM span and VSRAM has none.",
+          "properties": {
+            "cram": {
+              "$ref": "#/$defs/cram"
+            },
+            "pal_region": {
+              "$ref": "#/$defs/pal_region"
+            }
+          },
+          "oneOf": [
+            {
+              "required": [
+                "cram"
+              ]
+            },
+            {
+              "required": [
+                "pal_region"
+              ]
+            }
+          ],
+          "unevaluatedProperties": false
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "cram": {
+      "type": "object",
+      "required": [
+        "addr",
+        "colours"
+      ],
+      "properties": {
+        "addr": {
+          "type": "integer",
+          "description": "CRAM BYTE address the colours are written to. 0 is a real address (palette line 0, the character's line), which stream_cram and the derived pal_restore both refuse. Value rules: raster_dsl.emp stream_cram (range, even, line != 0, span within the line) and pal_restore."
+        },
+        "colours": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "The CRAM colour words in order from addr. Its LENGTH is also the derived restore's word count. Empty: refused by the engine, not here. Value rules: raster_dsl.emp stream_cram (burst ceiling), pal_restore (DEEP-class ceiling on the derived restore), fire (per-fire stream words)."
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "pal_region": {
+      "type": "object",
+      "required": [
+        "addr",
+        "slot",
+        "pal_line",
+        "entry",
+        "count"
+      ],
+      "properties": {
+        "addr": {
+          "type": "integer",
+          "description": "CRAM byte address the staged variant colours land at. raster_dsl.emp stream_pal_region (range, even, agreement with pal_line/entry), pal_restore on the derived restore."
+        },
+        "slot": {
+          "type": "integer",
+          "description": "Which Pal_Variant_Stage slot the colours are streamed FROM; not the CRAM destination. raster_dsl.emp stream_pal_region (slot range)."
+        },
+        "pal_line": {
+          "type": "integer",
+          "description": "The staging source's palette line; must agree with addr's line (addr >> 5 == pal_line). raster_dsl.emp stream_pal_region."
+        },
+        "entry": {
+          "type": "integer",
+          "description": "The staging source's first entry; must agree with addr's entry ((addr >> 1) & 15 == entry). raster_dsl.emp stream_pal_region."
+        },
+        "count": {
+          "type": "integer",
+          "description": "How many colours are swapped; also the derived restore's word count. raster_dsl.emp stream_pal_region (burst ceiling, entry + count within the line), pal_restore, fire. The runtime binding of the variant to pal_line is NOT checkable at build time."
+        }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

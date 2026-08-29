@@ -618,6 +618,20 @@ interface AeonProbeApi {
   selectedScene(): string | null;
   selectScene(id: string | null): void;
   /**
+   * The RASTER PRESET library as the MODEL holds it — READ-ONLY, and the only
+   * way a harness can see what the band panel's controls actually did.
+   *
+   * `presetsJson()` returns the whole documents, as a JSON STRING for
+   * `scenesJson()`'s reason: CDP's returnByValue flattens a `oneOf` union oddly
+   * across versions, and the ON arm IS a oneOf — the one thing a band harness
+   * most needs to read back exactly.
+   */
+  presets(): { id: string; name: string | null; bands: number }[];
+  presetsJson(): string;
+  unreadablePresets(): { path: string; reason: string }[];
+  selectedPreset(): string | null;
+  selectPreset(id: string | null): void;
+  /**
    * THE PARALLAX GUIDES AS THE LAST REPAINT DREW THEM.
    *
    * The only honest way to check a line on a canvas short of sampling pixels.
@@ -1055,6 +1069,18 @@ function installAeonProbe(): AeonProbeApi {
     sceneRef: (sectionIndex) => section(sectionIndex)?.sceneRef ?? null,
     selectedScene: () => useEditorStore.getState().selectedEffectsSceneId,
     selectScene: (id) => useEditorStore.getState().setSelectedEffectsSceneId(id),
+    presets: () => (useProjectStore.getState().project?.effectsPresets.presets ?? []).map((p) => ({
+      id: p.id,
+      name: typeof p.name === 'string' ? p.name : null,
+      bands: p.bands.length,
+    })),
+    presetsJson: () =>
+      JSON.stringify(useProjectStore.getState().project?.effectsPresets.presets ?? []),
+    unreadablePresets: () =>
+      (useProjectStore.getState().project?.effectsPresets.unreadable ?? [])
+        .map((u) => ({ path: u.path, reason: u.reason })),
+    selectedPreset: () => useEditorStore.getState().selectedEffectsPresetId,
+    selectPreset: (id) => useEditorStore.getState().setSelectedEffectsPresetId(id),
     guides: () => lastGuideReport(),
     collisionMarks: () => lastCollisionMarkReport(),
     screenFrame: () => lastScreenFrameReport(),

@@ -32,6 +32,7 @@ import { serializeBgTiles } from '../../formats/bg-tiles';
 import { bgLibIndexPath, bgLibLayoutPath, bgLibTilesPath, serializeBgLibraryIndex } from '../../formats/bg-library';
 import { serializeSectionMeta } from '../../formats/section-meta';
 import { effectsScenePath, serializeEffectsScene } from '../../formats/effects/scene';
+import { effectsPresetPath, serializeEffectsPreset } from '../../formats/effects/preset';
 import { saveFileFor } from '../../formats/bg-override/bg-override-io';
 import { serializeNametable } from '../../formats/s4-nametable';
 import { serializeCollAttr } from '../../formats/s4-collattr';
@@ -294,6 +295,23 @@ export async function buildAeonSavePlan(
       );
     }
     files.push({ path, bytes: new TextEncoder().encode(serializeEffectsScene(scene)) });
+  }
+
+  // The RASTER PRESET documents, on the identical rule and for the identical
+  // reason: an unreadable file at the path a preset would be written to is a
+  // THROW, not a skip, because skipping is the worst of both — the author's
+  // preset silently never saved AND their broken file still on disk.
+  const unreadablePresetPaths = new Set(project.effectsPresets.unreadable.map(u => u.path));
+  for (const preset of project.effectsPresets.presets) {
+    const path = effectsPresetPath(dataRoot, preset.id);
+    if (unreadablePresetPaths.has(path)) {
+      throw new Error(
+        `refusing to save preset "${preset.id}": ${path} exists and could not be read as a ` +
+        'raster preset, so writing there would destroy it. Fix or remove that file by hand, ' +
+        'or rename the preset.',
+      );
+    }
+    files.push({ path, bytes: new TextEncoder().encode(serializeEffectsPreset(preset)) });
   }
 
   // The BG override document. `saveFileFor` owns all three "write nothing"

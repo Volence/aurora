@@ -1,5 +1,6 @@
 import type { AnyCommand, S4Level } from './commands';
 import type { EffectsScene, EffectsSceneLibrary } from '../formats/effects/scene';
+import type { EffectsPreset, EffectsPresetLibrary } from '../formats/effects/preset';
 import { applyWithBand, applyWithoutBand } from '../formats/bg-override/bg-anim-band';
 import {
   writeBgOverrideLayoutWord, writeBgOverrideTile, writeBgOverridePhaseBank,
@@ -95,6 +96,28 @@ function placeEffectsScene(
   else library.scenes.push(copy);
 }
 
+/**
+ * Place, replace or remove one RASTER PRESET in the library, in place.
+ *
+ * The rule `placeEffectsScene` states, unchanged and for the same reason: an
+ * existing id is REPLACED where it sits and a new one appends, so undoing an
+ * edit never silently reorders the author's preset list. The stored value is a
+ * deep copy — the command has to keep an untouched record of both states however
+ * the caller mutates the library afterwards.
+ */
+function placeEffectsPreset(
+  library: EffectsPresetLibrary, presetId: string, preset: EffectsPreset | null,
+): void {
+  const at = library.presets.findIndex((p) => p.id === presetId);
+  if (preset === null) {
+    if (at >= 0) library.presets.splice(at, 1);
+    return;
+  }
+  const copy = structuredClone(preset);
+  if (at >= 0) library.presets[at] = copy;
+  else library.presets.push(copy);
+}
+
 function applyCommand(cmd: AnyCommand, level: S4Level): void {
   if (cmd.type === 'batch') {
     for (const c of cmd.commands) applyCommand(c, level);
@@ -152,6 +175,14 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
     // leave the author's scene edit unrecorded and therefore unsaved.
     if (!level.effectsScenes) throw new Error('set-effects-scene requires level.effectsScenes');
     placeEffectsScene(level.effectsScenes, cmd.sceneId, cmd.newScene);
+    return;
+  }
+  if (cmd.type === 'set-effects-preset') {
+    // Throw rather than skip, the rule set-palette-line states above: a silent
+    // no-op consumes an undo slot without doing anything, and here it would also
+    // leave the author's band edit unrecorded and therefore unsaved.
+    if (!level.effectsPresets) throw new Error('set-effects-preset requires level.effectsPresets');
+    placeEffectsPreset(level.effectsPresets, cmd.presetId, cmd.newPreset);
     return;
   }
   if (cmd.type === 'set-bg-override-band') {
@@ -332,6 +363,11 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
   if (cmd.type === 'set-effects-scene') {
     if (!level.effectsScenes) throw new Error('set-effects-scene requires level.effectsScenes');
     placeEffectsScene(level.effectsScenes, cmd.sceneId, cmd.oldScene);
+    return;
+  }
+  if (cmd.type === 'set-effects-preset') {
+    if (!level.effectsPresets) throw new Error('set-effects-preset requires level.effectsPresets');
+    placeEffectsPreset(level.effectsPresets, cmd.presetId, cmd.oldPreset);
     return;
   }
   if (cmd.type === 'set-bg-override-band') {
