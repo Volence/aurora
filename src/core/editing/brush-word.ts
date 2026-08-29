@@ -67,6 +67,33 @@
 // the higher priority and such?"): `on` and `off` AUTHOR the bit, which is also
 // what keeps `keep` honest — an editor that could only preserve priority would
 // be one where a wrong bit is permanent.
+//
+// ═══ THE SECOND ROAD: THE AGENT (ROADMAP O12, 2026-08-29) ═══
+//
+// The human brush was not the only writer. `agent-handler.ts`'s `paint_region`
+// built its own word — `packNametableWord(spec.tile, spec.pal, !!spec.pri, …)` —
+// from a `NametableEntrySpec` whose `pri` is OPTIONAL. `!!undefined` is `false`,
+// so an agent bulk-painting a region over authored art CLEARED every priority
+// bit it covered, with the destination word already read into `oldNt` on the
+// line above and thrown away.
+//
+// That is the same defect on a second road, and it is fixed the same way rather
+// than a second way: the agent's optional `pri` is a `BrushPriority` written in
+// the protocol's own idiom, and `brushPriorityFromOptional` is the ONE place
+// that translation is spelled. A copy of the rule inside the agent handler
+// would be the fifth open-coded copy this file exists to prevent.
+//
+// The FLIPS stay as they were on the agent road and that is deliberate, not an
+// oversight: `hf`/`vf` defaulting to false is the rule above, not a violation of
+// it. A flip is which picture the cell shows, and a request that names a tile
+// without naming a flip has named an unflipped picture. Only priority — the
+// field NOTHING depicts — gets a third state.
+//
+// `save_chunk` shares that spec type and is NOT changed by this: it is a
+// CREATOR. It packs a freshly allocated chunk that has no destination, so it
+// passes `undefined` as `oldWord` and `keep` collapses to "no priority" — the
+// same sixteen bits it always wrote. See the call site for why that is stated
+// as `undefined` rather than read out of the fresh array.
 
 import { packNametableWord, unpackNametableWord } from '../model/s4-types';
 
@@ -79,6 +106,24 @@ import { packNametableWord, unpackNametableWord } from '../model/s4-types';
  * to assert something about depth, which is the defect this replaces.
  */
 export type BrushPriority = 'keep' | 'on' | 'off';
+
+/**
+ * The `BrushPriority` an OPTIONAL boolean means.
+ *
+ * A wire field an agent may simply not send has three states already — present
+ * and true, present and false, absent — and this names the third one honestly
+ * instead of collapsing it. `!!spec.pri` was the collapse: it answered "no
+ * opinion" with "definitely off", which is the whole defect.
+ *
+ * It lives HERE rather than in the agent handler because it *is* the rule, said
+ * in the protocol's idiom. Put it next to the call site and the two roads get
+ * two copies of one decision, free to drift — which is exactly how four
+ * open-coded paint words happened.
+ */
+export function brushPriorityFromOptional(pri: boolean | undefined): BrushPriority {
+  if (pri === undefined) return 'keep';
+  return pri ? 'on' : 'off';
+}
 
 /** Everything a paint stroke carries besides the tile index itself. */
 export interface BrushAttributes {

@@ -42,12 +42,41 @@ const BG_ROWS_LEGACY = BG_LAYOUT_WORDS_LEGACY / BG_WIDTH;
  * as `{ kind, ...params }`. The Aether method name is `editor/<name>`; the MCP
  * tool name is `<name>` — same role-based names, never brand-named (protocol D3).
  */
+/**
+ * One nametable entry — SHARED by `paint_region` and `save_chunk`, which are
+ * different kinds of writer, and the descriptions below are the only place an
+ * agent can learn that.
+ *
+ * `paint_region` is a DECIDER: it writes into cells an author already made, so
+ * an omitted `pri` means "no opinion about depth" and the destination's bit
+ * stands (core/editing/brush-word.ts — the same rule the human brush follows).
+ * `save_chunk` is a CREATOR: its cells are freshly allocated and have no
+ * priority to keep, so an omitted `pri` is simply "no priority" there.
+ *
+ * That is ONE sentence — "omit to keep what the destination has" — which is
+ * true for both, and it is written that way on purpose. A per-tool override
+ * would let the two descriptions drift; a description that said only "VDP
+ * priority bit" (what this said until ROADMAP O12) told an agent nothing about
+ * the one thing omitting the field actually decides, and an agent cannot read
+ * the source to find out.
+ *
+ * `hf`/`vf` are deliberately NOT tri-state and the wording says so. A flip is
+ * part of WHICH PICTURE the entry names, not a property of the cell, so an
+ * entry that names a tile and no flip has named an unflipped picture. Only the
+ * field nothing in any picker depicts gets a third state.
+ */
 export const entrySchema = z.object({
   tile: z.number().int().describe('tileset tile index'),
   pal: z.number().int().min(0).max(3).describe('palette line 0-3'),
-  pri: z.boolean().optional().describe('VDP priority bit'),
-  hf: z.boolean().optional().describe('horizontal flip'),
-  vf: z.boolean().optional().describe('vertical flip'),
+  pri: z.boolean().optional().describe(
+    'VDP priority bit (this cell draws in front of sprites). OMIT to KEEP the destination cell\'s '
+    + 'existing priority — paint_region preserves what is already there, and a save_chunk cell is '
+    + 'newly created so it has none. Pass true to set it, false to CLEAR one that is already set.'),
+  hf: z.boolean().optional().describe(
+    'horizontal flip; part of which picture the entry names, so omitting it means UNFLIPPED '
+    + '(unlike pri, it does not preserve the destination\'s flip)'),
+  vf: z.boolean().optional().describe(
+    'vertical flip; omitting it means UNFLIPPED (see hf)'),
 });
 
 // ---- Classic (Sonic 1) schemas ----
@@ -100,7 +129,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'Append or overwrite tileset tiles. Each tile is 64 pixel values 0-15 (index 0 = transparent). Omit "at" to append. One undo step. Reply flags tiles that duplicate an existing tile or its flip (reuse that index instead).' },
   { name: 'paint_region', kind: 'paint-region', result: 'json',
     params: { section: z.number().int().min(0), x: z.number().int().min(0), y: z.number().int().min(0), w: z.number().int().min(1), h: z.number().int().min(1), entries: z.array(entrySchema) },
-    description: 'Paint a w*h tile rectangle of a section with nametable entries (row-major). One undo step. Reply includes updated VRAM budget.' },
+    description: 'Paint a w*h tile rectangle of a section with nametable entries (row-major). Each entry names a PICTURE: tile, palette and flips come from the entry, and an omitted "pri" leaves that cell\'s existing priority bit alone (pass pri:false to clear it). One undo step. Reply includes updated VRAM budget.' },
   { name: 'paint_collision', kind: 'paint-collision', result: 'json',
     params: {
       section: z.number().int().min(0),
@@ -117,7 +146,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
       collisionA: z.array(z.number().int().min(0).max(0xFFFF)).optional().describe('packed collision cell words for plane A, row-major, (w/2)*(h/2) entries; omit for an all-air plane'),
       collisionB: z.array(z.number().int().min(0).max(0xFFFF)).optional().describe('same as collisionA, for plane B'),
     },
-    description: 'Save a reusable w*h pattern into the chunk library (row-major entries), optionally with collisionA/collisionB cell-word planes ((w/2)*(h/2) words each; omitted planes default to air). Returns the chunk id.' },
+    description: 'Save a reusable w*h pattern into the chunk library (row-major entries; the chunk is created fresh, so an omitted "pri" means no priority), optionally with collisionA/collisionB cell-word planes ((w/2)*(h/2) words each; omitted planes default to air). Returns the chunk id.' },
   { name: 'stamp_chunk', kind: 'stamp-chunk', result: 'json',
     params: { chunkId: z.string(), section: z.number().int().min(0), x: z.number().int().min(0), y: z.number().int().min(0) },
     description: 'Stamp a library chunk (art + collision) onto a section at tile coordinates. x/y must be even (collision cells are 16px/2-tile aligned). One undo step.' },

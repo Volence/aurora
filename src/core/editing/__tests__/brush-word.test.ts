@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  brushNametableWord, brushAuthorsPriority, DEFAULT_BRUSH_ATTRIBUTES,
+  brushNametableWord, brushAuthorsPriority, brushPriorityFromOptional, DEFAULT_BRUSH_ATTRIBUTES,
   type BrushAttributes,
 } from '../brush-word';
 import { packNametableWord, unpackNametableWord } from '../../model/s4-types';
@@ -138,5 +138,63 @@ describe('brushAuthorsPriority — the lens-surfacing condition', () => {
   it('the shipped default does not author priority', () => {
     expect(DEFAULT_BRUSH_ATTRIBUTES.priority).toBe('keep');
     expect(brushAuthorsPriority(DEFAULT_BRUSH_ATTRIBUTES)).toBe(false);
+  });
+});
+
+// ── the agent road (ROADMAP O12) ───────────────────────────────────────────
+//
+// `NametableEntrySpec.pri` is OPTIONAL on the wire, so it carries three states
+// already — present-true, present-false, ABSENT — and `!!spec.pri` collapsed the
+// third into the second. These rows pin the translation that un-collapses it.
+describe('brushPriorityFromOptional — the agent\'s optional field is the tri-state', () => {
+  it('an OMITTED pri is "keep" — the defect this closes', () => {
+    expect(brushPriorityFromOptional(undefined)).toBe('keep');
+  });
+
+  it('an EXPLICIT true/false authors the bit', () => {
+    expect(brushPriorityFromOptional(true)).toBe('on');
+    expect(brushPriorityFromOptional(false)).toBe('off');
+  });
+
+  it('omitted is NOT the same as false — the whole point', () => {
+    expect(brushPriorityFromOptional(undefined)).not.toBe(brushPriorityFromOptional(false));
+  });
+
+  it('it agrees with the human brush\'s default, so the two roads cannot drift', () => {
+    expect(brushPriorityFromOptional(undefined)).toBe(DEFAULT_BRUSH_ATTRIBUTES.priority);
+  });
+
+  it('composed with brushNametableWord: an omitted pri preserves a SET bit', () => {
+    const out = brushNametableWord(0x055, LOADED, brush({
+      hFlip: false, vFlip: false, priority: brushPriorityFromOptional(undefined),
+    }));
+    expect(unpackNametableWord(out).priority).toBe(true);
+    expect(unpackNametableWord(out).tileIndex).toBe(0x055);
+  });
+
+  it('composed: pri:false still CLEARS a set bit (an agent can author "off")', () => {
+    const out = brushNametableWord(0x055, LOADED, brush({
+      priority: brushPriorityFromOptional(false),
+    }));
+    expect(unpackNametableWord(out).priority).toBe(false);
+  });
+
+  it('composed: a CREATOR (no destination) gets "no priority" from an omitted pri', () => {
+    const out = brushNametableWord(0x055, undefined, brush({
+      priority: brushPriorityFromOptional(undefined),
+    }));
+    expect(unpackNametableWord(out).priority).toBe(false);
+  });
+
+  it('the FLIPS stay two-state on this road, and that is the rule, not an oversight', () => {
+    // A spec naming a tile and no flip names an UNFLIPPED picture. The
+    // destination's flips must not survive it — that is what makes paint
+    // WYSIWYG. This row is the one that reddens if someone "fixes" the flips
+    // to match priority.
+    const out = brushNametableWord(0x055, LOADED, brush({ hFlip: false, vFlip: false }));
+    expect(unpackNametableWord(LOADED).hFlip).toBe(true);
+    expect(unpackNametableWord(LOADED).vFlip).toBe(true);
+    expect(unpackNametableWord(out).hFlip).toBe(false);
+    expect(unpackNametableWord(out).vFlip).toBe(false);
   });
 });

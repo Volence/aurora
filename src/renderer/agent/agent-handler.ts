@@ -6,8 +6,13 @@ import { useViewStore } from '../state/viewStore';
 import type { S4Level, SetTilesCommand } from '../../core/editing/commands';
 import {
   SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE,
-  packNametableWord, unpackNametableWord, createChunkDef,
+  unpackNametableWord, createChunkDef,
 } from '../../core/model/s4-types';
+// THE ONE DECIDER for what sixteen bits a paint writes — the human brush's and
+// the agent's, deliberately the same one. `packNametableWord` is deliberately
+// NOT imported here any more: a hand-built word on this road is how `pri`'s
+// omitted state got answered with "off". See core/editing/brush-word.ts.
+import { brushNametableWord, brushPriorityFromOptional } from '../../core/editing/brush-word';
 import type { Tile, Zone, Act } from '../../core/model/s4-types';
 import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateEntries, validateChunkCollisionPlane, validatePaintCollisionRect } from '../../core/agent/validation';
 import { computeActBudget, canonicalTileHash } from '../../core/agent/budget';
@@ -388,10 +393,20 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
           const spec = req.entries[r * req.w + c];
           const idx = (req.y + r) * SECTION_TILES_WIDE + (req.x + c);
           const oldNt = section.tileGrid.nametable[idx];
+          // A DECIDER: the request means something NARROWER than the cell.
+          // `pri` is optional on the wire, so omitting it is "no opinion about
+          // depth" and the destination's bit 15 stands — the same rule the
+          // human brush follows. The flips are NOT optional in that sense: a
+          // request naming a tile and no flip has named an unflipped picture.
           entries.push({
             index: idx,
             oldNt,
-            newNt: packNametableWord(spec.tile, spec.pal, !!spec.pri, !!spec.vf, !!spec.hf),
+            newNt: brushNametableWord(spec.tile, oldNt, {
+              paletteLine: spec.pal,
+              hFlip: !!spec.hf,
+              vFlip: !!spec.vf,
+              priority: brushPriorityFromOptional(spec.pri),
+            }),
           });
         }
       }
@@ -454,7 +469,21 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       const id = `agent-${Date.now()}-${state.project!.chunkLibrary.length}`;
       const chunk = createChunkDef(id, req.name, req.w, req.h);
       req.entries.forEach((spec, i) => {
-        chunk.nametable[i] = packNametableWord(spec.tile, spec.pal, !!spec.pri, !!spec.vf, !!spec.hf);
+        // A CREATOR, not a decider: `createChunkDef` hands back a freshly
+        // allocated nametable, so there is provably nothing to preserve and
+        // `keep` means "no priority" — byte for byte what this always wrote.
+        //
+        // `undefined` rather than `chunk.nametable[i]` ON PURPOSE. Reading the
+        // fresh array would give the same answer today and would silently turn
+        // this into a merge the day `createChunkDef` starts seeding anything;
+        // `undefined` states the classification in code, and brushNametableWord
+        // documents that a caller with no destination gets "no priority".
+        chunk.nametable[i] = brushNametableWord(spec.tile, undefined, {
+          paletteLine: spec.pal,
+          hFlip: !!spec.hf,
+          vFlip: !!spec.vf,
+          priority: brushPriorityFromOptional(spec.pri),
+        });
       });
       // Collision planes default to air (createChunkDef); an explicit payload
       // overrides either plane independently.
