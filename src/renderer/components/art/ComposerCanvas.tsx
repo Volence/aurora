@@ -349,7 +349,14 @@ export default function ComposerCanvas() {
         pal: s.paletteLine,
         hf: flipRef.current.hf,
         vf: flipRef.current.vf,
-        pri: false,
+        // KEEP, not false. This was a hard `false`, and the composer's docs are
+        // seeded from real chunks and real section regions (docFromChunk /
+        // docFromSectionRegion both carry `pri: e.priority`), so a stamp threw
+        // away depth an author had put there — with nothing on this surface to
+        // show it happened, and with the doc's OTHER cells keeping theirs.
+        // This facet has no priority control yet; until it does, `keep` is the
+        // only state a stamp can honestly claim. See core/editing/brush-word.ts.
+        pri: 'keep',
       });
     } else if (t === 'palette-apply') {
       // Re-line an already-placed cell: same palette-line source as tile

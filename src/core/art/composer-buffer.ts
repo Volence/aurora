@@ -1,6 +1,11 @@
 import type { Tile, ChunkDef, Section } from '../model/s4-types';
 import { unpackNametableWord, packNametableWord, chunkCellCount, SECTION_TILES_WIDE } from '../model/s4-types';
 import { canonicalizeTile } from '../export/tile-dedup';
+// The composer stamp is the THIRD paint decider (ROADMAP O12's sweep). It uses
+// the SAME tri-state and the SAME resolver the map brush and the agent do —
+// three roads, one rule, so "keep" cannot come to mean different things.
+import type { BrushPriority } from '../editing/brush-word';
+import { resolveBrushPriority } from '../editing/brush-word';
 import { flipTile } from '../import/tile-dedup';
 import type { PixelBuffer } from './pixel-ops';
 import { createBuffer } from './pixel-ops';
@@ -242,14 +247,28 @@ export function bufferToWrites(
   return out;
 }
 
-export interface StampSpec { tile: number; pal: number; hf: boolean; vf: boolean; pri: boolean; }
+/**
+ * A composer tile stamp.
+ *
+ * `pri` is a `BrushPriority`, not a boolean, for the reason stated in full in
+ * core/editing/brush-word.ts: a stamp names a PICTURE, and depth is a property
+ * of the CELL that nothing in the tile picker depicts. This used to be a bare
+ * boolean and `ComposerCanvas` passed a hard-coded `false`, so stamping over a
+ * cell captured from a priority section silently dropped it behind Sonic — the
+ * map's defect on the Art facet, one commit later.
+ *
+ * `hf`/`vf` stay booleans deliberately: a flip IS part of which picture the
+ * stamp puts down, and the composer already arms them.
+ */
+export interface StampSpec { tile: number; pal: number; hf: boolean; vf: boolean; pri: BrushPriority; }
 
 export function stampTile(doc: ComposerDoc, cx: number, cy: number, spec: StampSpec): void {
   const old = doc.cells[cy * doc.widthTiles + cx];
   if (old.localId !== null) doc.localPixels.delete(old.localId);
   doc.cells[cy * doc.widthTiles + cx] = {
     atlasTile: spec.tile, localId: null,
-    pal: spec.pal, hf: spec.hf, vf: spec.vf, pri: spec.pri,
+    pal: spec.pal, hf: spec.hf, vf: spec.vf,
+    pri: resolveBrushPriority(spec.pri, old.pri),
   };
 }
 

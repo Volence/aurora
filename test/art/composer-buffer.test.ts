@@ -4,7 +4,7 @@ import {
   sliceForSave, cellAt, docToBuffer, bufferToWrites, adoptPaletteLineForEmptyCells,
   docLineMap,
 } from '../../src/core/art/composer-buffer';
-import { packNametableWord, createChunkDef, createSection, SECTION_TILES_WIDE } from '../../src/core/model/s4-types';
+import { packNametableWord, unpackNametableWord, createChunkDef, createSection, SECTION_TILES_WIDE } from '../../src/core/model/s4-types';
 import type { Tile } from '../../src/core/model/s4-types';
 
 const atlas: Tile[] = [
@@ -93,11 +93,62 @@ describe('docLineMap', () => {
 describe('stampTile', () => {
   it('writes a cell reference with flips', () => {
     const doc = createDoc(2, 2);
-    stampTile(doc, 1, 0, { tile: 1, pal: 3, hf: true, vf: false, pri: true });
+    stampTile(doc, 1, 0, { tile: 1, pal: 3, hf: true, vf: false, pri: 'on' });
     const cell = cellAt(doc, 1, 0);
     expect(cell.atlasTile).toBe(1);
     expect(cell.pal).toBe(3);
     expect(cell.hf).toBe(true);
+  });
+
+  // ── ROADMAP O12: the composer stamp is the THIRD paint decider ─────────
+  //
+  // `ComposerCanvas.applyTileCell` passed a hard-coded `pri: false` here, and
+  // the composer's docs are seeded from REAL chunks and REAL section regions
+  // (docFromChunk / docFromSectionRegion both carry `pri: e.priority`). So a
+  // stamp destroyed depth an author had put there, while every UNTOUCHED cell
+  // in the same doc kept its own — an inconsistency inside one surface.
+  //
+  // ANTI-VACUOUS: each row below stamps onto a destination whose `pri` is
+  // already the value the claim is about, and asserts that first.
+  it('"keep" PRESERVES a destination cell\'s priority while changing the tile', () => {
+    const doc = createDoc(2, 2);
+    doc.cells[0] = { atlasTile: 1, localId: null, pal: 2, hf: false, vf: false, pri: true };
+    expect(cellAt(doc, 0, 0).pri).toBe(true);
+    stampTile(doc, 0, 0, { tile: 2, pal: 1, hf: false, vf: false, pri: 'keep' });
+    expect(cellAt(doc, 0, 0).atlasTile).toBe(2);   // the stamp really happened
+    expect(cellAt(doc, 0, 0).pri).toBe(true);      // …and the depth survived it
+  });
+
+  it('"keep" does not INVENT priority on a cell that had none', () => {
+    const doc = createDoc(2, 2);
+    doc.cells[0] = { atlasTile: 1, localId: null, pal: 2, hf: false, vf: false, pri: false };
+    stampTile(doc, 0, 0, { tile: 2, pal: 1, hf: false, vf: false, pri: 'keep' });
+    expect(cellAt(doc, 0, 0).pri).toBe(false);
+  });
+
+  it('"off" CLEARS a set bit and "on" sets a clear one — keep stays honest', () => {
+    const doc = createDoc(2, 2);
+    doc.cells[0] = { atlasTile: 1, localId: null, pal: 2, hf: false, vf: false, pri: true };
+    stampTile(doc, 0, 0, { tile: 2, pal: 1, hf: false, vf: false, pri: 'off' });
+    expect(cellAt(doc, 0, 0).pri).toBe(false);
+    stampTile(doc, 0, 0, { tile: 3, pal: 1, hf: false, vf: false, pri: 'on' });
+    expect(cellAt(doc, 0, 0).pri).toBe(true);
+  });
+
+  it('a captured section region round-trips its priority through a stamp and back to a word', () => {
+    // The end-to-end shape of the loss: capture real cells, stamp one, save.
+    const section = createSection(0, 's');
+    section.tileGrid.nametable[0] = packNametableWord(3, 2, true, false, false);
+    section.tileGrid.nametable[1] = packNametableWord(4, 2, true, false, false);
+    const doc = docFromSectionRegion(section, 0, 0, 2, 1);
+    expect(cellAt(doc, 0, 0).pri).toBe(true);
+    expect(cellAt(doc, 1, 0).pri).toBe(true);
+
+    stampTile(doc, 0, 0, { tile: 1, pal: 2, hf: false, vf: false, pri: 'keep' });
+    const out = sliceForSave(doc, atlas);
+    expect(unpackNametableWord(out.nametable[0]).tileIndex).toBe(1);
+    expect(unpackNametableWord(out.nametable[0]).priority).toBe(true);  // stamped
+    expect(unpackNametableWord(out.nametable[1]).priority).toBe(true);  // untouched
   });
 
   it('cleans up orphaned local when overwriting a local cell', () => {
@@ -105,7 +156,7 @@ describe('stampTile', () => {
     setPixels(doc, atlas, [{ x: 0, y: 0, value: 9 }]); // creates localId=1
     const oldId = doc.cells[0].localId!;
     expect(doc.localPixels.has(oldId)).toBe(true);
-    stampTile(doc, 0, 0, { tile: 1, pal: 0, hf: false, vf: false, pri: false });
+    stampTile(doc, 0, 0, { tile: 1, pal: 0, hf: false, vf: false, pri: 'keep' });
     expect(doc.localPixels.has(oldId)).toBe(false); // orphan must be deleted
   });
 });
@@ -131,7 +182,7 @@ describe('sliceForSave', () => {
     // cell 0: hand-painted copy of atlas tile 1 -> should dedup, no append
     setPixels(doc, atlas, Array.from({ length: 64 }, (_, i) => ({ x: i % 8, y: Math.floor(i / 8), value: 7 })));
     // cell 1: brand-new art
-    stampTile(doc, 1, 0, { tile: 0, pal: 1, hf: false, vf: false, pri: false });
+    stampTile(doc, 1, 0, { tile: 0, pal: 1, hf: false, vf: false, pri: 'keep' });
     setPixels(doc, atlas, [{ x: 8, y: 0, value: 9 }]); // doc x=8 -> cell 1
     const result = sliceForSave(doc, atlas);
     expect(result.newTiles.length).toBe(1);            // only the genuinely new one

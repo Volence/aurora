@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  brushNametableWord, brushAuthorsPriority, brushPriorityFromOptional, DEFAULT_BRUSH_ATTRIBUTES,
+  brushNametableWord, brushAuthorsPriority, brushPriorityFromOptional, resolveBrushPriority,
+  DEFAULT_BRUSH_ATTRIBUTES,
   type BrushAttributes,
 } from '../brush-word';
 import { packNametableWord, unpackNametableWord } from '../../model/s4-types';
@@ -196,5 +197,36 @@ describe('brushPriorityFromOptional — the agent\'s optional field is the tri-s
     expect(unpackNametableWord(LOADED).vFlip).toBe(true);
     expect(unpackNametableWord(out).hFlip).toBe(false);
     expect(unpackNametableWord(out).vFlip).toBe(false);
+  });
+});
+
+// ── the shared resolver (O12's third decider) ──────────────────────────────
+//
+// The Art composer's tile stamp replaces a whole `ComposerCell` and never packs
+// a word, so it cannot call `brushNametableWord`. It calls this instead. These
+// rows exist so the two roads cannot come to disagree about what "keep" means.
+describe('resolveBrushPriority — what "keep" means, said once for every road', () => {
+  it('"keep" returns the destination, in both directions', () => {
+    expect(resolveBrushPriority('keep', true)).toBe(true);
+    expect(resolveBrushPriority('keep', false)).toBe(false);
+  });
+
+  it('"on"/"off" ignore the destination', () => {
+    for (const dest of [true, false]) {
+      expect(resolveBrushPriority('on', dest)).toBe(true);
+      expect(resolveBrushPriority('off', dest)).toBe(false);
+    }
+  });
+
+  it('brushNametableWord agrees with it for every state and destination', () => {
+    // The two roads, compared directly. If brushNametableWord ever stops
+    // routing through the resolver, this is what says so.
+    for (const priority of ['keep', 'on', 'off'] as const) {
+      for (const dest of [LOADED, BARE]) {
+        const out = brushNametableWord(0x11, dest, brush({ priority }));
+        expect(unpackNametableWord(out).priority)
+          .toBe(resolveBrushPriority(priority, unpackNametableWord(dest).priority));
+      }
+    }
   });
 });

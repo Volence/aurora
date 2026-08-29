@@ -159,10 +159,26 @@ export function brushNametableWord(
   oldWord: number | undefined,
   brush: BrushAttributes,
 ): number {
-  const priority = brush.priority === 'keep'
-    ? unpackNametableWord(oldWord ?? 0).priority
-    : brush.priority === 'on';
+  const priority = resolveBrushPriority(brush.priority, unpackNametableWord(oldWord ?? 0).priority);
   return packNametableWord(tileIndex, brush.paletteLine, priority, brush.vFlip, brush.hFlip);
+}
+
+/**
+ * The tri-state, resolved against what the destination already carries.
+ *
+ * Split out of `brushNametableWord` because a THIRD decider turned up in the
+ * O12 sweep that does not build a word at all: the Art composer's tile-stamp
+ * (`composer-buffer.ts` `stampTile`) replaces a whole `ComposerCell`, whose
+ * `pri` is a boolean field rather than bit 15 of anything. It was hard-coded
+ * `false` at the call site, so stamping a tile in the composer over a cell
+ * captured from a priority section DESTROYED the bit — the same defect, on a
+ * surface a `packNametableWord` grep cannot see.
+ *
+ * Two roads that both mean `keep` must not each spell out what `keep` means.
+ * This is what they share; the word-packing is not.
+ */
+export function resolveBrushPriority(brush: BrushPriority, destinationPriority: boolean): boolean {
+  return brush === 'keep' ? destinationPriority : brush === 'on';
 }
 
 /**
