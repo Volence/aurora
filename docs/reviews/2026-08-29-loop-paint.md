@@ -1,7 +1,7 @@
 # Painting a loop: the crossover, and "solid on both paths"
 
 **Branch** `lp2-loop-paint` · **Project** LOOPS-P · item **LP-2**
-**Commits** `d1ac8c7` (the implementation) · `00685db` (50 node rows) · `b4f1bf6` + `<drag>` (45 CDP rows)
+**Commits** `d1ac8c7` (the implementation) · `00685db` (50 node rows) · `b4f1bf6` + `05feab0` (45 CDP rows)
 **Instrument** `scratchpad/loop-paint-harness.mjs` — `npm run harness:loop-paint`
 **Seam module** `src/core/collision/layer-transition.ts` — the ONE place a bit number lives
 **Anchor** `git -C ../aeon show aa2a9f29:docs/LOOP_CROSSOVER_ENCODING.md`
