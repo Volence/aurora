@@ -42,7 +42,7 @@
 
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
 import { siblingRoot } from './peer-repo';
 
@@ -141,6 +141,47 @@ export function skipUnlessPresent(
  * looks exactly like a total that was always that size. Call this beside every
  * dynamic `it.each` whose list comes off a fixture tree.
  */
+/**
+ * A `describe` whose BODY must not run when the fixture is absent.
+ *
+ * ⚠ THE TRAP THIS EXISTS FOR. `describe(name, { skip: true }, fn)` STILL RUNS
+ * `fn`. The option marks the collected tests skipped; it does not stop
+ * collection from executing the callback. So a `readFileSync` in a describe body
+ * throws on a machine without the tree — and a throw during collection does not
+ * fail one test, it takes the WHOLE FILE and every test in it:
+ *
+ *     FAIL  src/core/anim/__tests__/sonic-animate.test.ts [ …test.ts ]
+ *     Error: ENOENT: … '/home/volence/sonic_hacks/s1disasm/_anim/Sonic.asm'
+ *
+ * Three files did this (29 tests), measured 2026-08-29.
+ *
+ * WHEN TO USE WHICH. Where the body only reads a value or two, prefer
+ * `let x!: T; beforeAll(() => { x = read(); })` — `beforeAll` does not run
+ * inside a skipped describe either, and it keeps every individual row visible
+ * as its own reasoned skip, which is a better report. Reach for THIS when the
+ * body derives a lot from the fixture and deferring all of it would mean
+ * rewriting the block: it trades the individual row names for one announced,
+ * reasoned skip, which is still honest and never dies.
+ */
+export function describeRequiringFixture(
+  name: string,
+  path: string | null,
+  what: string,
+  fn: () => void,
+): void {
+  if (path !== null && existsSync(path)) {
+    describe(name, fn);
+    return;
+  }
+  describe(name, () => {
+    it(
+      'BLOCK NOT COLLECTED — its body reads the fixture, so it was not executed at all',
+      { skip: true, meta: { skipReason: unmeasurable(path, what) } },
+      () => {},
+    );
+  });
+}
+
 export function declareUnenumerated(count: number, path: string | null, what: string): void {
   if (count > 0) return;
   it(

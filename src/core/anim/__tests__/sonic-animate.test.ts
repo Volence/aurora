@@ -15,7 +15,7 @@
 // A duration byte N holds N+1 ticks (subq/bpl), and an anim change advances
 // immediately on the next Animate step — both study-confirmed.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { parseSonicAnimTable, sonicSpecialScripts } from '../../import/sonic-anim-import';
 import type { SonicSpecialScripts } from '../sonic-animate';
@@ -41,6 +41,24 @@ const guarded = (name: string, fn: () => void): void => {
   }, fn);
 };
 
+/**
+ * ⚠ CALL THIS ONLY FROM `beforeAll` OR A TEST BODY — never from a `describe`
+ * body, even a skipped one.
+ *
+ * `describe(name, { skip: true }, fn)` STILL RUNS `fn`: the option marks the
+ * collected tests skipped, it does not stop collection from executing the
+ * callback. So a read in a describe body runs on a machine with no s1disasm and
+ * throws during collection, which does not fail one test — it takes the WHOLE
+ * FILE, and its 15 tests with it, reported as
+ *
+ *     FAIL  src/core/anim/__tests__/sonic-animate.test.ts [ …test.ts ]
+ *     Error: ENOENT: … open '/home/volence/sonic_hacks/s1disasm/_anim/Sonic.asm'
+ *      ❯ realScripts src/core/anim/__tests__/sonic-animate.test.ts:45:37
+ *
+ * measured 2026-08-29 (docs/reviews/2026-08-29-fixture-absent-honesty.md).
+ * `beforeAll` does NOT run inside a skipped describe, which is why the callers
+ * below assign through one.
+ */
 function realScripts(): SonicSpecialScripts {
   const parse = parseSonicAnimTable(readFileSync(SONIC_ASM, 'utf8'));
   const s = sonicSpecialScripts(parse);
@@ -90,7 +108,8 @@ guarded('sonicHoldReload — the confirmed duration formulas at many inertia poi
 });
 
 guarded('variant selection — the $600 boundary (study-confirmed at exactly $600)', () => {
-  const scripts = realScripts();
+  let scripts!: SonicSpecialScripts;
+  beforeAll(() => { scripts = realScripts(); });
   it('walkrun: $5FF walks, $600 runs (boundary sample took run in the capture)', () => {
     let st = initialSonicAnimState();
     st = stepSonicAnimate(st, { mode: 'walkrun', inertia: 0x5ff, angle: 0, xflip: false }, scripts);
@@ -112,7 +131,8 @@ guarded('variant selection — the $600 boundary (study-confirmed at exactly $60
 });
 
 guarded('rotation fan-out — octant formula and ×6/×4 offsets', () => {
-  const scripts = realScripts();
+  let scripts!: SonicSpecialScripts;
+  beforeAll(() => { scripts = realScripts(); });
   it('sonicOctant matches the formula at both facings across the detent angles', () => {
     for (let a = 0; a < 0x100; a += 0x20) {
       expect(sonicOctant(a, false)).toBe(oct(a, false));
@@ -157,7 +177,8 @@ guarded('rotation fan-out — octant formula and ×6/×4 offsets', () => {
 });
 
 guarded('golden sequences — N-tick traces cycle the 6 script frames + offset', () => {
-  const scripts = realScripts();
+  let scripts!: SonicSpecialScripts;
+  beforeAll(() => { scripts = realScripts(); });
 
   it('walk at inertia $300, angle 0: frames cycle walk[0..5] holding (reload+1) ticks each', () => {
     const reload = holdWalkRun(0x300); // 5 → each frame held 6 ticks

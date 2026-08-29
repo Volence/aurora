@@ -15,7 +15,8 @@
 //      the 2026-08-21 live study).
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync, existsSync, mkdtempSync, writeFileSync, rmSync } from 'fs';
+import { readFileSync, mkdtempSync, writeFileSync, rmSync } from 'fs';
+import { describeRequiringFixture } from '../../../../test/support/fixture-tree';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
@@ -24,17 +25,20 @@ import {
 } from '../sonic-anim-import';
 
 const SONIC_ASM = '/home/volence/sonic_hacks/s1disasm/_anim/Sonic.asm';
-const treePresent = existsSync(SONIC_ASM);
 /**
  * `describe`, but a skip here says WHY — read by scripts/skip-report-reporter.mjs.
- * The bare `treePresent ? describe : describe.skip` this replaces produced rows
+ * The bare `treePresent ? describe : describe.skip` this replaced produced rows
  * indistinguishable from passes in a suite total.
+ *
+ * It is NOT `describe(name, { skip }, fn)`, because that form still EXECUTES
+ * `fn` at collection: the block below reads SONIC_ASM in its body and derives a
+ * whole independent reference resolver from the text, so on a machine without
+ * s1disasm the read threw during collection and took this entire file with it —
+ * 7 tests, reported as a file-level FAIL rather than as any kind of skip.
+ * Measured 2026-08-29, docs/reviews/2026-08-29-fixture-absent-honesty.md.
  */
 const guarded = (name: string, fn: () => void): void => {
-  describe(name, {
-    skip: !treePresent,
-    meta: { skipReason: `${SONIC_ASM} is absent — no s1disasm checkout on this machine` },
-  }, fn);
+  describeRequiringFixture(name, SONIC_ASM, 'the real _anim/Sonic.asm sonani table', fn);
 };
 
 guarded('parseSonicAnimTable — round-trip against the real file', () => {
