@@ -732,8 +732,27 @@ window) rather than adopting their reading — the standing practice in this fil
   `config.override.unwrap_or(SERVER_BUILD_ID)` keeps the name inside an ALLOWED file, keeps the const
   compile-time, and emits a valid non-empty string: **all three tests green.** Reported to them; the fix
   is one line per value (`assert_eq!(id, SERVER_BUILD_ID)`), and both constants are already imported in
-  that test file. **Until it lands, treat (2) as barred-by-construction with an unasserted join, not as
-  proven.** Their anti-vacuity guards are present and correct, which is why this needed reading ACROSS
+  that test file. ✅ **CLOSED 2026-08-29 at oracle `843b99a`** (verified here: real commit, ancestor of their
+  `origin/main`, and the three `assert_eq!`s read at that revision — wire `id`/`source`/`dirty` each
+  pinned to their compile-time constant). **They demonstrated the gap before fixing it rather than
+  accepting the argument: emitting a forged id naming no commit in existence left all 5 tests in that
+  file and all 413 in the crate GREEN.** So the seam was not merely unasserted, it was undetectable —
+  which is the stronger claim and neither of us had stated it. **Condition (2) is now MET.**
+  ⚠ **A CORRECTION TO THIS LANE, THEIRS, AND IT IS RIGHT.** I proposed REPLACING the `implementation`
+  string literal with the constant. That would have silently dropped a different claim: the literal
+  pins the **registry value** (§2.1's registry has one legal spelling), the constant pins the **join**.
+  They kept both. **When a check looks redundant, ask what each of the two claims is before collapsing
+  them** — I was one edit from removing a pin while believing I was strengthening it.
+  And they marked their own new `implementation` join row **not currently load-bearing** — the schema
+  enum in `common/schema.rs` refuses a divergent value before the assertion is reached (measured by
+  them, poison fails at `schema.rs:485`) — kept for when the registry gains a second value, with an
+  explicit "do not cite it as a caught defect". That is this file's own say-which-rows-do-not-
+  discriminate bar, applied to themselves, unprompted.
+  **The generalisation worth keeping, theirs:** *a test per component and none across the seam is how
+  a chain of individually sound links holds nothing* — **and a seam has no author**, which is why it
+  took a reader who wrote none of the three. That is the mechanism behind this file's bar 18b, stated
+  better than bar 18b states it.
+  **Superseded holding position:** treat (2) as barred-by-construction with an unasserted join. Their anti-vacuity guards are present and correct, which is why this needed reading ACROSS
   the tests to find.
 - **Superseded reading, kept as the record of what was believed before the source was read — condition
   (2): STRONGLY CORROBORATED, NOT PROVEN FROM OUTSIDE.** `source:"vcs"`
