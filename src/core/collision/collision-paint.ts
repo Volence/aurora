@@ -1,6 +1,7 @@
 import { findMatchingBlockCells } from './collision-block';
 import { cellTileIndices } from './collision-cell';
-import { collisionPaintWord } from '../editing/collision-word';
+import { buildPlaneEntries, buildBothPlanesEntries, type BothPlanesEntries } from './both-planes-paint';
+import type { CrossoverBrush, CollisionPlaneId } from './layer-transition';
 
 export interface CellRC { cellCol: number; cellRow: number; }
 
@@ -52,18 +53,53 @@ export function paintCollisionRectEntries(args: {
   plane: Uint16Array; tileWidth: number;
 }): CollisionEditEntry[] {
   const { x, y, w, h, word, plane, tileWidth } = args;
-  const entries: CollisionEditEntry[] = [];
+  // Same rule as the interactive stroke, and deliberately the same function:
+  // the agent surface writing a whole word where the brush owns only fourteen
+  // bits would be the identical defect on a second road.
+  return buildPlaneEntries(plane, collisionRectIndices(x, y, w, h, tileWidth), word);
+}
+
+/** Every 8px sub-tile index a w*h CELL rectangle covers, row-major. Split out of
+ *  `paintCollisionRectEntries` because the "solid on both planes" road needs the
+ *  SAME index set for two planes, and a second loop would be a second chance to
+ *  disagree about what a rectangle covers. */
+export function collisionRectIndices(
+  x: number, y: number, w: number, h: number, tileWidth: number,
+): number[] {
+  const indices: number[] = [];
   for (let r = 0; r < h; r++) {
     for (let c = 0; c < w; c++) {
-      for (const index of cellTileIndices(x + c, y + r, tileWidth)) {
-        const oldColl = plane[index]!;
-        // Same rule as the interactive stroke, and deliberately the same
-        // function: the agent surface writing a whole word where the brush owns
-        // only fourteen bits would be the identical defect on a second road.
-        const newColl = collisionPaintWord(word, oldColl);
-        if (oldColl !== newColl) entries.push({ index, oldColl, newColl });
-      }
+      for (const index of cellTileIndices(x + c, y + r, tileWidth)) indices.push(index);
     }
   }
-  return entries;
+  return indices;
+}
+
+/**
+ * The agent's `paint_collision` when it names `plane: "both"` — the same
+ * gesture the "A+B" chip drives on the human road, through the same builder.
+ *
+ * TWO ROADS, ONE RULE. The whole point of routing this through
+ * `buildBothPlanesEntries` rather than calling `paintCollisionRectEntries`
+ * twice is that the merge must happen against EACH plane's own destination
+ * cell; two calls would be correct only by accident of both being written the
+ * same way, and the agent road has already been the place where a second copy
+ * of a paint rule drifted (docs/reviews/2026-08-29-agent-paint-priority.md).
+ */
+export function paintCollisionRectBothPlanes(args: {
+  x: number; y: number; w: number; h: number; word: number;
+  aimedPlane: Uint16Array; otherPlane: Uint16Array | null | undefined;
+  tileWidth: number; bothPlanes: boolean;
+  aimedPlaneId?: CollisionPlaneId;
+  crossover?: CrossoverBrush;
+}): BothPlanesEntries {
+  return buildBothPlanesEntries({
+    aimedPlaneWords: args.aimedPlane,
+    otherPlaneWords: args.otherPlane,
+    indices: collisionRectIndices(args.x, args.y, args.w, args.h, args.tileWidth),
+    brushWord: args.word,
+    bothPlanes: args.bothPlanes,
+    aimedPlaneId: args.aimedPlaneId,
+    crossover: args.crossover,
+  });
 }

@@ -14,6 +14,7 @@ import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
 import type { ShapeDrawOpts, ShapeDrawCtx } from '../../core/collision/collision-shape-draw';
 import { fitCellSizeToBox } from '../../core/collision/collision-angle-mark';
 import { clearCollisionEntries, resetToEngineEntries } from '../../core/editing/collision-word';
+import { auditCrossovers, crossoverAuditMessage, crossoverAuditSeverity } from '../../core/collision/crossover-audit';
 import { useToastStore } from '../state/toastStore';
 import { claimCollisionOverlay } from './collision-overlay-scope';
 import { T } from './ui';
@@ -123,6 +124,12 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
   const entryFlipX = useEditorStore((s) => s.selectedCollisionEntryFlipX);
   const pick = useEditorStore((s) => s.pickCollisionShape);
   const plane = useEditorStore((s) => s.collisionPaintPlane);
+  const bothPlanes = useEditorStore((s) => s.collisionPaintBothPlanes);
+  const setBothPlanes = useEditorStore((s) => s.setCollisionPaintBothPlanes);
+  const crossover = useEditorStore((s) => s.collisionCrossoverBrush);
+  const setCrossover = useEditorStore((s) => s.setCollisionCrossoverBrush);
+  // Re-read on every live edit so the audit follows the strokes, not the mount.
+  const liveEdit = useEditorStore((s) => s.liveEditVersion);
   const brush = useEditorStore((s) => s.collisionBrushSize);
   const setBrush = useEditorStore((s) => s.setCollisionBrushSize);
   const activeSection = useEditorStore((s) => s.activeSectionIndex);
@@ -258,6 +265,21 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
     return s;
   }, [allEntries]);
 
+  // THE PAINT-TIME LOOP AUDIT (anchor §8.2: "Aurora checks the loop").
+  //
+  // Recomputed on every live edit rather than on a timer, and deliberately
+  // NOT memoised on the plane arrays: they are mutated in place by the paint
+  // path, so a reference-identity memo would show the audit from before the
+  // stroke. `liveEditNonce` is the app's own "something changed" signal.
+  const auditSection = useProjectStore((s) => getActiveLevel(s)?.sections[activeSection] ?? null);
+  const audit = useMemo(
+    () => (auditSection ? auditCrossovers(auditSection.collisionEdit, auditSection.collisionEditB) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [auditSection, liveEdit],
+  );
+  const auditNote = audit ? crossoverAuditMessage(audit) : null;
+  const auditSeverity = audit ? crossoverAuditSeverity(audit) : 'ok';
+
   if (!profiles) return <div style={styles.note}>Collision tables not found — open a project with collision data.</div>;
 
   const selProfile = selected > 0 && selected < profiles.solidCount ? profiles.profiles[selected] : null;
@@ -273,6 +295,32 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
         <span style={styles.planeLabel}>Plane</span>
         <button onClick={() => pickPlane('a')} style={{ ...styles.planeBtn, ...(plane === 'a' ? styles.planeSel : {}) }}>A</button>
         <button onClick={() => pickPlane('b')} style={{ ...styles.planeBtn, ...(plane === 'b' ? styles.planeSel : {}) }}>B</button>
+        {/*
+          A MODE ON TOP OF THE PLANE PICK, not a third plane. The stroke still
+          has an aimed plane (which is what the overlay follows and what Reset
+          and Clear act on); this makes it write the other one too, in the same
+          undo step. Modelling it as a third value of `collisionPaintPlane`
+          would have made every reader of that field — the overlay claim, the
+          two destructive buttons, the Art variant — answer a question they have
+          no answer to.
+        */}
+        {/*
+          MAP ONLY, and it is a refusal rather than an oversight. The Art
+          facet's chunk collision brush is a DIFFERENT WRITER (composer-
+          collision.ts `paintDocCollision`) that this parcel does not extend, so
+          a chip here in the Art variant would be a control that silently did
+          nothing — the exact defect class this repo keeps finding. When the
+          composer grows the mode, this gate is what has to be deleted, and its
+          absence is discoverable rather than a lie.
+        */}
+        {variant === 'map' && (
+          <button onClick={() => setBothPlanes(!bothPlanes)}
+            title={'Solid on BOTH paths: one stroke writes path A and path B together, as one undo step. '
+              + 'Shared ground (ordinary floors and walls) belongs on both — painting it twice by hand is '
+              + 'what leaves a half-finished second plane. Turns on the "Solid on both paths" lens so you '
+              + 'can see the plane you are not looking at.'}
+            style={{ ...styles.planeBtn, ...(bothPlanes ? styles.planeSel : {}) }}>A+B</button>
+        )}
       </div>
       <div style={styles.planes}>
         <span style={styles.planeLabel}>Brush</span>
@@ -302,6 +350,43 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
             style={styles.subtleBtn}>Reset</button>
           <button onClick={clearSection} title={`Erase ALL collision in section ${activeSection} (this plane) — undoable`}
             style={styles.subtleBtn}>Clear</button>
+        </div>
+      )}
+      {/*
+        THE CROSSOVER BRUSH — three states, and the middle one does not exist.
+        There is no "to path A" / "to path B" pair here on purpose: per plane
+        the field has only TWO legal values, because a plane-A cell saying "go
+        to A" is a no-op that aeon's bake hard-errors on (rule R2). "Hand off"
+        is whichever value leaves the plane you are painting, so the illegal
+        state is unreachable rather than guarded, and ONE armed brush paints
+        both halves of a two-way loop.
+
+        MAP ONLY, like the A+B chip and for the same reason: the Art facet's
+        chunk brush is a different writer this parcel does not extend.
+      */}
+      {variant === 'map' && (
+        <div style={styles.planes}>
+          <span style={styles.planeLabel}>Loop</span>
+          {([
+            ['keep', 'Keep', 'Leave each cell\u2019s crossover exactly as it is (the default). An ordinary shape stroke says nothing about which path the player is on.'],
+            ['hand-off', plane === 'a' ? 'Hand \u2192 B' : 'Hand \u2192 A', `Mark each painted cell so that a player standing on it while on path ${plane.toUpperCase()} is handed to path ${plane === 'a' ? 'B' : 'A'}. Paint the SAME cells on the other plane to make the crossover two-way \u2014 with "A+B" on, one stroke does both.`],
+            ['clear', 'None', 'Erase the crossover from each painted cell (write "no handoff").'],
+          ] as const).map(([value, label, title]) => (
+            <button key={value} onClick={() => setCrossover(value)} title={title}
+              style={{ ...styles.planeBtn, ...(crossover === value ? styles.planeSel : {}) }}>{label}</button>
+          ))}
+        </div>
+      )}
+      {variant === 'map' && auditNote && (
+        <div style={{ ...styles.hint, color: auditSeverity === 'error' ? T.error : T.warning }}>
+          {auditNote}
+        </div>
+      )}
+      {variant === 'map' && bothPlanes && (
+        <div style={styles.hint}>
+          Painting <strong>both paths</strong>: every stroke writes plane {plane.toUpperCase()} and
+          plane {plane === 'a' ? 'B' : 'A'} together, one undo step. The teal veil marks what is
+          already solid on both.
         </div>
       )}
       <div style={styles.hint}>{variant === 'map'

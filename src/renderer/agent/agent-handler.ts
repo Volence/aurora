@@ -39,7 +39,10 @@ import { regenerateShiftCommand } from '../providers/bg-anim-art';
 import { makeSetBgOverrideTilesCommand } from '../../core/editing/bg-override-art';
 import { buildStampCommand } from '../../core/editing/map-stamp';
 import { ensureCollisionPlanes } from '../../core/collision/collision-cell-resolve';
-import { paintCollisionRectEntries } from '../../core/collision/collision-paint';
+import { paintCollisionRectBothPlanes } from '../../core/collision/collision-paint';
+import {
+  auditCrossovers, crossoverAuditSeverity, crossoverAuditMessage,
+} from '../../core/collision/crossover-audit';
 import type { AgentRequest, AgentRequestEnvelope } from '../../shared/agent-protocol';
 import { useClassicProjectStore } from '../state/classicProjectStore';
 import {
@@ -429,21 +432,56 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       const section = ctx.act.sections[req.section];
       if (!section) throw new Error(`section ${req.section} is empty`);
       ensureCollisionPlanes(section);
-      const plane = req.plane === 'b' ? section.collisionEditB! : section.collisionEdit!;
-      const entries = paintCollisionRectEntries({
+      // "both" is a MODE, not a third plane — the aimed plane stays A so the
+      // command, its description and its undo all name a real plane. See
+      // core/collision/both-planes-paint.ts for why "solid on both planes"
+      // needs no new cell field and is therefore not blocked on aeon's
+      // encoding anchor the way a layer transition is.
+      const bothPlanes = req.plane === 'both';
+      const aimedId: 'a' | 'b' = req.plane === 'both' ? 'a' : req.plane;
+      const aimed = aimedId === 'b' ? section.collisionEditB! : section.collisionEdit!;
+      const other = aimedId === 'b' ? section.collisionEdit! : section.collisionEditB!;
+      // Absent means `keep`, never `clear` — see the protocol comment.
+      const crossover = req.crossover ?? 'keep';
+      const { aimed: entries, other: otherPlaneEntries } = paintCollisionRectBothPlanes({
         x: req.x, y: req.y, w: req.w, h: req.h, word: req.word,
-        plane, tileWidth: SECTION_TILES_WIDE,
+        aimedPlane: aimed, otherPlane: other, tileWidth: SECTION_TILES_WIDE, bothPlanes,
+        aimedPlaneId: aimedId, crossover,
       });
-      if (entries.length > 0) {
+      if (entries.length > 0 || otherPlaneEntries.length > 0) {
         executeAmbientCommand({
           type: 'set-collision-edit',
-          plane: req.plane,
-          description: `agent: paint collision ${req.plane.toUpperCase()} ${req.w}x${req.h} at (${req.x},${req.y})`,
+          plane: aimedId,
+          description: `agent: paint collision ${bothPlanes ? 'A+B (both planes)' : aimedId.toUpperCase()} `
+            + `${req.w}x${req.h} at (${req.x},${req.y})`,
           sectionIndex: req.section,
           entries,
+          ...(otherPlaneEntries.length ? { otherPlaneEntries } : {}),
         }, ctx.level);
       }
-      return { painted: entries.length };
+      // `painted` stays the AIMED plane's count so an existing caller's number
+      // does not change meaning; `paintedOther` is the new half, reported
+      // separately rather than folded in. A single summed number would make
+      // "wrote 8 sub-tiles on one plane" and "wrote 4 on each of two"
+      // indistinguishable, and this parcel's whole risk is the second plane
+      // quietly not being written.
+      // The audit rides back on the reply rather than waiting to be asked for.
+      // An agent painting a loop is the caller LEAST able to notice that it
+      // marked only one plane — it has no lens — and aeon's build does not
+      // check it either (anchor §8.2 assigns the loop-shaped check to Aurora).
+      // So the number that says "this loop works in one direction" is returned
+      // beside the paint that could have caused it.
+      const audit = auditCrossovers(section.collisionEdit, section.collisionEditB);
+      return {
+        painted: entries.length, paintedOther: otherPlaneEntries.length, bothPlanes,
+        crossover,
+        crossoverAudit: {
+          marksA: audit.marksA, marksB: audit.marksB, pairs: audit.pairs,
+          oneWay: audit.oneWay, selfMarks: audit.selfMarks, reserved: audit.reserved,
+          severity: crossoverAuditSeverity(audit),
+          note: crossoverAuditMessage(audit),
+        },
+      };
     }
 
     case 'save-chunk': {

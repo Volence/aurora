@@ -26,7 +26,16 @@ export type AgentRequest =
   | { kind: 'set-palette'; line: number; colors: number[] }   // 16 Genesis CRAM words
   | { kind: 'write-tiles'; tiles: number[][]; at?: number }   // each tile: 64 values 0-15
   | { kind: 'paint-region'; section: number; x: number; y: number; w: number; h: number; entries: NametableEntrySpec[] }
-  | { kind: 'paint-collision'; section: number; plane: 'a' | 'b'; x: number; y: number; w: number; h: number; word: number }
+  // `plane: 'both'` is a MODE, not a third plane — it writes A and B in ONE
+  // undo step, each cell merged against its own plane's word. See
+  // core/collision/both-planes-paint.ts.
+  | { kind: 'paint-collision'; section: number; plane: 'a' | 'b' | 'both'; x: number; y: number; w: number; h: number; word: number;
+      // The LOOP CROSSOVER tri-state, OPTIONAL — and absent means `keep`, not
+      // "none". A request that names a shape without naming a crossover has
+      // said nothing about layer handoff, and answering "definitely none" for
+      // it is the exact collapse `brushPriorityFromOptional` exists to prevent
+      // on the nametable road (docs/reviews/2026-08-29-agent-paint-priority.md).
+      crossover?: 'keep' | 'clear' | 'hand-off' }
   | { kind: 'save-chunk'; name: string; w: number; h: number; entries: NametableEntrySpec[]; collisionA?: number[]; collisionB?: number[] }
   | { kind: 'stamp-chunk'; chunkId: string; section: number; x: number; y: number }
   | { kind: 'goto'; section: number; x?: number; y?: number; zoom?: number }

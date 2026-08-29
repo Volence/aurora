@@ -133,13 +133,50 @@ export const EDITOR_METHODS: EditorMethod[] = [
   { name: 'paint_collision', kind: 'paint-collision', result: 'json',
     params: {
       section: z.number().int().min(0),
-      plane: z.enum(['a', 'b']),
+      // "both" is a MODE, not a third plane: it writes A and B in ONE undo
+      // step, each cell merged against its OWN plane's existing word. It is
+      // named on this enum rather than as a separate boolean because an agent
+      // reading the schema learns the whole choice in one place, and because a
+      // boolean beside a plane would let a caller send the contradictory
+      // `plane: "b", both: true` and expect something the tool cannot mean.
+      plane: z.enum(['a', 'b', 'both'])
+        .describe('collision plane to write: "a", "b", or "both" — one stroke over BOTH planes, '
+          + 'as one undo step, for shared ground (ordinary floors and walls that stop the player '
+          + 'whichever path he is on). Prefer "both" for ordinary geometry: painting each plane '
+          + 'separately is what leaves a second plane half-finished.'),
       x: z.number().int().min(0).max(127).describe('cell col (16px units, 0-127)'),
       y: z.number().int().min(0).max(127).describe('cell row (16px units, 0-127)'),
       w: z.number().int().min(1).max(128), h: z.number().int().min(1).max(128),
       word: z.number().int().min(0).max(0xFFFF).describe('packed collision cell word (shape 9:0, xflip 10, yflip 11, solidity 13:12); 0 = air'),
+      // OPTIONAL, and ABSENT MEANS "keep" — not "none". A request that names a
+      // shape has said nothing about layer handoff, and collapsing "no opinion"
+      // into "definitely no crossover" is how the nametable road silently
+      // cleared every priority bit it painted over
+      // (docs/reviews/2026-08-29-agent-paint-priority.md).
+      //
+      // There is no "to path A" / "to path B" here on purpose: per plane the
+      // field has only two legal values, because a plane-A cell saying "go to
+      // A" is a provable no-op that aeon's bake REFUSES with a hard error
+      // (LOOP_CROSSOVER_ENCODING.md rule R2). "hand-off" is whichever value
+      // leaves the plane being written, so an agent cannot author an illegal
+      // one, and with plane:"both" one call writes both halves of a two-way
+      // loop crossover correctly.
+      crossover: z.enum(['keep', 'clear', 'hand-off']).optional()
+        .describe('what to do with each cell\'s LOOP CROSSOVER (the field that hands the player '
+          + 'to the other collision path, for a loop): "keep" (default, and what omitting it means) '
+          + 'leaves it alone; "hand-off" marks each cell so a player on the plane being painted is '
+          + 'moved to the other one; "clear" erases it. With plane:"both" this writes the correct '
+          + 'opposite value on each plane, which is a complete TWO-WAY crossover — the pair a loop '
+          + 'needs to be traversable in both directions.'),
     },
-    description: 'Fill a w*h CELL rectangle (16px units) of one collision plane with a packed cell word. One undo step. Reply\'s "painted" counts 8px sub-tile entries actually changed, up to 4 per cell.' },
+    description: 'Fill a w*h CELL rectangle (16px units) of one or both collision planes with a packed cell word. '
+      + 'One undo step whichever it is. Reply\'s "painted" counts 8px sub-tile entries actually changed on the '
+      + 'aimed plane (up to 4 per cell) and "paintedOther" counts them on the second plane when plane is "both" — '
+      + 'reported separately, never summed, so "wrote one plane" and "wrote two" cannot look alike. '
+      + 'The reply also carries "crossoverAudit" for the whole section — marksA/marksB/pairs/oneWay plus a '
+      + 'severity and a note. CHECK "oneWay": a loop crossover marked on one plane only is legal, is '
+      + 'invisible, and plays correctly in exactly one direction. Aeon\'s build does NOT check this; '
+      + 'this reply is where it is checked.' },
   { name: 'save_chunk', kind: 'save-chunk', result: 'json',
     params: {
       name: z.string().min(1), w: z.number().int().min(1).max(64), h: z.number().int().min(1).max(64), entries: z.array(entrySchema),
