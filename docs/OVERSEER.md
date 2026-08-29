@@ -148,19 +148,35 @@ through `faf9658` (12:09Z), **67 commits**, all `overseer:`-prefixed, all ancest
 display name is `Aether setup in Aurora [66e6e3]`** — a stale pre-`/clear` session title, not a
 description. Its lane name is empyrean.
 
-**NOT VERIFIED, and do not repeat it as fact.** That session states the owner ruled at ~01:5xZ
-that it is the hub and `empyrean-ba` stands down, quoting him as *"1. I think so"*. **That string
-appears nowhere in empyrean `origin/main:docs/OVERSEER.md`**, and the entry that records the
-episode (their line ~2999) *asserts* the stand-down rather than transcribing him — in a file whose
-every other owner directive is quoted verbatim, which is that file's own convention. This lane's
-rule two sections up applies to it: **a claimed owner act that leaves no artifact is marked
-unverifiable, not laundered into fact by repetition.**
+**THE RULING — was cited-only for about an hour, IS NOW TRANSCRIBED. Read this whole
+paragraph; the first half is stale on purpose.** When this entry was first written, the quoted
+words *"1. I think so"* appeared **nowhere** in empyrean `origin/main:docs/OVERSEER.md`, and the
+entry recording the episode asserted the stand-down rather than transcribing him. Raised with the
+hub; **they had the words and had never written them down, and they landed a late transcription
+the same hour** (empyrean `origin/main`, entry dated 12:12:45Z, verified here).
 
-**Why the split matters operationally: the addressing decision does not depend on the ruling.**
-Where to send is answered entirely by *which session is doing the work and can receive* — both
-measurable, both measured. The ruling would only matter if someone wanted to act against
-`empyrean-ba`'s standing, and **that is the owner's call on his morning card, not a lane's.** Do
-not resolve it by asking the claimant; it is his to confirm.
+**What he actually said, verbatim, and it is worth reading rather than summarising:** asked
+*"The duplicate hub. `empyrean-ba` (the 7h-old dock) is still up and busy; this one is a fresh fork
+Dominion started a minute ago. Which one do you want, or should I message it to stand down?"*, he
+answered *"1. I think so, I haven't beeen working on something for 7 hours. 2. I don't know what
+these are, can you tell me and what the 'ruling' was?"*
+
+**So it is a real answer with his own reason attached, and it is HEDGED.** Note what part 2 shows:
+he answered the duplicate-hub question — which he plainly understood, a session he had not touched
+in seven hours — while saying outright that he did not know what the *other* items were. **Whether
+"I think so" is a ruling or an inclination is his to confirm on waking**, and the exact time was
+never captured (between 01:34Z and 02:07Z).
+
+**The durable lesson, which outlives whichever way he settles it:** the gap was real, and the split
+was right. In a file where every other owner directive is quoted verbatim, the one establishing who
+directs six lanes was paraphrased — and nothing about it looked wrong. Sibling of the hub's Q-39:
+**an assertion and a transcription are indistinguishable once both are prose.** The remedy that
+worked was not doubting anyone; it was asking for the quote.
+
+**And the reason to keep the two halves apart even now: the addressing decision never depended on
+the ruling.** Which session does the work and which can receive are both measurable, and both were
+measured. The ruling would only matter to someone acting **against** `empyrean-ba`'s standing —
+his call, not a lane's.
 
 ### Push authorization — **CONFIRMED BY THE OWNER DIRECTLY 2026-08-24. The relay question is CLOSED; do not re-ask.**
 
