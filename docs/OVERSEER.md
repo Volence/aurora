@@ -219,6 +219,19 @@ Each has caught a real defect here.
      `Player_1` resolvable, so the catch the row was named after was **never entered**; it
      was measuring a different gate. **Planting a violation cannot reveal this**, because the
      row never touches the subject.
+     **THE REMEDY, added 2026-08-29 from a second instance** *(found by the collision-read
+     agent in its OWN harness and reported against my brief rather than quietly fixed —
+     banked in its name)*: **a row must PRINT the artifact it judges, or its aim cannot be
+     checked by anyone, ever.** `[a1b]` asserted "this ascii window is not all air" over a
+     window that WAS entirely air: it stripped row labels with `.slice(1)` +
+     `replace(/^\s*\d+ /)`, which leaves the **ones-ruler** intact, and the ruler's own
+     digits satisfied *"some character is not `.`"*. It was caught by a human reading the
+     printed grid and seeing it empty. The repair is the shape to copy — assert the shape by
+     POSITION (the last `h` lines), count the content off the JSON not the picture, and
+     cross-check that the two agree: **three rows where there was one, because "the picture is
+     right" and "the picture is about the right thing" are different claims.** Corollary: a
+     fixture window is **found by scanning**, never assumed — section 0's corner is genuinely
+     empty, which is why this survived review.
    **The tell that separates (i) from (ii), which is the pair that gets confused:** ask
    whether the observable is unique to the rule. If it is, the assertion is too loose — (i).
    If it is not — if something else in the system can produce it — the assertion may be
