@@ -17,6 +17,12 @@ import { useProjectStore, getCurrentAct } from './state/projectStore';
 import { useEditorStore, focusedHistory } from './state/editorStore';
 import { isBlockAligned, effectiveGranularity } from '../core/editing/map-clipboard';
 import { lastPasteGhostReport, type PasteGhostReport } from './canvas/region-preview';
+import { useSessionStore } from './state/sessionStore';
+import { useWorkspaceStore } from './workspace/workspaceStore';
+import { switchFacet } from './workspace/facet-tools';
+import type { FacetCapability } from '../core/project/adapter';
+import { ensureCollisionPlanes } from '../core/collision/collision-cell-resolve';
+import { selectedCollisionWord } from '../core/collision/collision-cell-word';
 import { openAeonProject } from './state/aeon-open';
 import { bandBudget, bandRows } from './providers/bg-anim-aeon';
 import { serializeBgOverride } from '../core/formats/bg-override/bg-override';
@@ -453,6 +459,46 @@ interface AeonProbeApi {
    * unless the collision overlay happens to be on.
    */
   collisionAAt(sectionIndex: number, index: number): number | null;
+  /**
+   * One tile index's authored collision word on EITHER plane. `collisionAAt`
+   * answers only for A, and the paint tool can be armed to B.
+   */
+  collisionAt(sectionIndex: number, plane: 'a' | 'b', index: number): number | null;
+  /**
+   * ⚠ FIXTURE AUTHORING, harness-only. Seed one plane cell to an exact word,
+   * bypassing the command system.
+   *
+   * It exists because of the vacuity trap this whole area sits in: every cell in
+   * every shipped act holds ZERO in the collision word's unowned bits, so a
+   * harness row that paints over REAL content emits the same artifact whether
+   * preservation works or not. There is no real cell to find, the way
+   * `ntRect` finds real priority cells for the nametable rows — so the
+   * destination has to be AUTHORED, and this is the only way to author it.
+   *
+   * Seeds both planes' arrays first (the same lazy seed a paint would do), so a
+   * harness can poke before any gesture has touched the section. Returns the
+   * word actually stored, or null when the section/index is out of range —
+   * never a silent no-op, because a fixture that did not land would make every
+   * row that depends on it vacuous.
+   */
+  collisionPoke(sectionIndex: number, plane: 'a' | 'b', index: number, word: number): number | null;
+  /**
+   * Switch the active tab's facet, through the app's own `switchFacet` action.
+   *
+   * A harness needs this because tool HOTKEYS are facet-scoped: `toolForKey`
+   * only arms a tool the current facet offers, so pressing 'c' on the Layout
+   * facet silently arms nothing and every gesture row afterwards measures a
+   * stroke that never happened. Returns the facet and the tool actually armed,
+   * so a harness can assert it rather than assume it.
+   */
+  setFacet(facet: string): { facet: string; tool: string } | null;
+  /** Arm the collision palette exactly as a click on it would. Returns the word
+   *  `selectedCollisionWord` now yields, so a harness asserts on the app's own
+   *  encoding rather than recomputing it. */
+  armCollisionBrush(sel: {
+    plane?: 'a' | 'b'; shape?: number; solidity?: 'none' | 'top' | 'sides-bottom' | 'all';
+    xFlip?: boolean; yFlip?: boolean; brush?: number;
+  }): { plane: 'a' | 'b'; word: number };
   /** The armed stamp source (editorStore.selectedChunkId). Read-only. */
   selectedChunk(): string | null;
   /** Every chunk-library id, in library order. Read-only. */
@@ -857,6 +903,45 @@ function installAeonProbe(): AeonProbeApi {
       const plane = section?.collisionEdit;
       if (!plane || index < 0 || index >= plane.length) return null;
       return plane[index];
+    },
+    collisionAt: (sectionIndex, planeId, index) => {
+      const section = getCurrentAct(useProjectStore.getState())?.sections[sectionIndex];
+      const plane = planeId === 'b' ? section?.collisionEditB : section?.collisionEdit;
+      if (!plane || index < 0 || index >= plane.length) return null;
+      return plane[index] ?? null;
+    },
+    collisionPoke: (sectionIndex, planeId, index, word) => {
+      const section = getCurrentAct(useProjectStore.getState())?.sections[sectionIndex];
+      if (!section) return null;
+      ensureCollisionPlanes(section);
+      const plane = planeId === 'b' ? section.collisionEditB : section.collisionEdit;
+      if (!plane || index < 0 || index >= plane.length) return null;
+      plane[index] = word & 0xFFFF;
+      return plane[index] ?? null;
+    },
+    setFacet: (facet) => {
+      const tabId = useSessionStore.getState().activeId || null;
+      if (!tabId) return null;
+      switchFacet(tabId, facet as FacetCapability);
+      return { facet: useWorkspaceStore.getState().facetFor(tabId), tool: useEditorStore.getState().tool };
+    },
+    armCollisionBrush: (sel) => {
+      const e = useEditorStore.getState();
+      if (sel.plane !== undefined) e.setCollisionPaintPlane(sel.plane);
+      if (sel.shape !== undefined) e.pickCollisionShape(sel.shape, false);
+      if (sel.solidity !== undefined) e.setSelectedCollisionSolidity(sel.solidity);
+      if (sel.xFlip !== undefined) e.setSelectedCollisionXFlip(sel.xFlip);
+      if (sel.yFlip !== undefined) e.setSelectedCollisionYFlip(sel.yFlip);
+      if (sel.brush !== undefined) e.setCollisionBrushSize(sel.brush);
+      const s = useEditorStore.getState();
+      return {
+        plane: s.collisionPaintPlane,
+        word: selectedCollisionWord({
+          shape: s.selectedCollisionProfile, entryFlipX: s.selectedCollisionEntryFlipX,
+          userXFlip: s.selectedCollisionXFlip, yFlip: s.selectedCollisionYFlip,
+          solidity: s.selectedCollisionSolidity,
+        }),
+      };
     },
     selectedChunk: () => useEditorStore.getState().selectedChunkId,
     chunkIds: () => (useProjectStore.getState().project?.chunkLibrary ?? []).map((c) => c.id),

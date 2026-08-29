@@ -85,6 +85,7 @@ import { angleDegrees, isAir, isKnownProfile } from '../../core/collision/collis
 import { cellTileIndices } from '../../core/collision/collision-cell';
 import { collisionPaintTargets } from '../../core/collision/collision-paint';
 import { unpackCollisionCell, selectedCollisionWord } from '../../core/collision/collision-cell-word';
+import { collisionPaintWord } from '../../core/editing/collision-word';
 import { resolveCell, resolvePlaneWords, ensureCollisionPlanes, SECTION_PLANE_WORDS } from '../../core/collision/collision-cell-resolve';
 import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
 import type { ShapeDrawCtx, ShapeDrawOpts } from '../../core/collision/collision-shape-draw';
@@ -2409,7 +2410,7 @@ export default function MapViewport() {
     // touched — return before collisionPaintTargets does the per-section scan.
     if (brush === 1 && propagate) {
       const clicked = cellTileIndices(cellCol, cellRow, SECTION_TILES_WIDE);
-      if (clicked.every((i) => ce[i] === word)) return;
+      if (clicked.every((i) => ce[i] === collisionPaintWord(word, ce[i]))) return;
     }
 
     // Same target set the hover preview shows (collisionPaintTargets) — paint and
@@ -2421,8 +2422,12 @@ export default function MapViewport() {
     const entries: Array<{ index: number; oldColl: number; newColl: number }> = [];
     for (const t of targets) {
       for (const index of cellTileIndices(t.cellCol, t.cellRow, SECTION_TILES_WIDE)) {
-        const oldColl = ce[index];
-        if (oldColl !== word) entries.push({ index, oldColl, newColl: word });
+        const oldColl = ce[index]!;
+        // The brush owns its fields; the cell keeps the rest. Never `newColl:
+        // word` — that replaced the whole 16-bit cell and zeroed everything the
+        // palette word did not carry. See core/editing/collision-word.ts.
+        const newColl = collisionPaintWord(word, oldColl);
+        if (oldColl !== newColl) entries.push({ index, oldColl, newColl });
       }
     }
     if (entries.length === 0) return;

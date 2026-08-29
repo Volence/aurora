@@ -1,5 +1,6 @@
 import { findMatchingBlockCells } from './collision-block';
 import { cellTileIndices } from './collision-cell';
+import { collisionPaintWord } from '../editing/collision-word';
 
 export interface CellRC { cellCol: number; cellRow: number; }
 
@@ -55,8 +56,12 @@ export function paintCollisionRectEntries(args: {
   for (let r = 0; r < h; r++) {
     for (let c = 0; c < w; c++) {
       for (const index of cellTileIndices(x + c, y + r, tileWidth)) {
-        const oldColl = plane[index];
-        if (oldColl !== word) entries.push({ index, oldColl, newColl: word });
+        const oldColl = plane[index]!;
+        // Same rule as the interactive stroke, and deliberately the same
+        // function: the agent surface writing a whole word where the brush owns
+        // only fourteen bits would be the identical defect on a second road.
+        const newColl = collisionPaintWord(word, oldColl);
+        if (oldColl !== newColl) entries.push({ index, oldColl, newColl });
       }
     }
   }

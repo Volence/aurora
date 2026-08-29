@@ -12,6 +12,8 @@ import { classifyProfile, COLLISION_KINDS } from '../../core/collision/collision
 import type { CollisionKind } from '../../core/collision/collision-classify';
 import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
 import type { ShapeDrawOpts, ShapeDrawCtx } from '../../core/collision/collision-shape-draw';
+import { clearCollisionEntries, resetToEngineEntries } from '../../core/editing/collision-word';
+import { useToastStore } from '../state/toastStore';
 import { claimCollisionOverlay } from './collision-overlay-scope';
 import { T } from './ui';
 import {
@@ -128,8 +130,10 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
     }
     const ce = p === 'b' ? section.collisionEditB : section.collisionEdit;
     if (!ce) return;
-    const entries: Array<{ index: number; oldColl: number; newColl: number }> = [];
-    for (let i = 0; i < ce.length; i++) if (ce[i] !== 0) entries.push({ index: i, oldColl: ce[i], newColl: 0 });
+    // DECIDED, not inherited: Clear is the ONE writer that may wipe bits the
+    // collision fields do not own, because it is the one gesture whose stated
+    // intent is the whole cell. clearCollisionEntries carries the argument.
+    const entries = clearCollisionEntries(ce);
     if (!entries.length) return;
     executeCommand({
       type: 'set-collision-edit', plane: p,
@@ -162,12 +166,27 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
     }
     const ce = p === 'b' ? section.collisionEditB : section.collisionEdit;
     if (!ce) return;
-    const entries: Array<{ index: number; oldColl: number; newColl: number }> = [];
-    for (let i = 0; i < ce.length; i++) if (ce[i] !== engineWords[i]) entries.push({ index: i, oldColl: ce[i], newColl: engineWords[i] });
+    // The baked baseline is a per-cell BYTE — aeon's bake_plane_cell interns on
+    // (heights, angle, solidity) and nothing else — so a revert CANNOT carry
+    // bits the collision fields do not own. There is nothing to revert them TO,
+    // and discarding them here is unavoidable. Being SILENT about it is not:
+    // the count goes in the command description, which is the text the undo
+    // stack shows, so the discard is named where it is recorded and is undoable
+    // from that same list.
+    const { entries, discardedUnownedCells } = resetToEngineEntries(ce, engineWords);
     if (!entries.length) return;
+    const discardNote = discardedUnownedCells > 0
+      ? ` — discards reserved bits on ${discardedUnownedCells} cell${discardedUnownedCells === 1 ? '' : 's'}`
+      : '';
+    if (discardedUnownedCells > 0) {
+      useToastStore.getState().addToast(
+        `Reset collision ${p.toUpperCase()}: the engine baseline cannot carry the reserved bits on `
+        + `${discardedUnownedCells} cell${discardedUnownedCells === 1 ? '' : 's'}, so they were discarded. Undo restores them.`,
+        'info');
+    }
     executeCommand({
       type: 'set-collision-edit', plane: p,
-      description: `Reset collision ${p.toUpperCase()} to engine (section ${ed.activeSectionIndex})`,
+      description: `Reset collision ${p.toUpperCase()} to engine (section ${ed.activeSectionIndex})${discardNote}`,
       sectionIndex: ed.activeSectionIndex, entries,
     }, level);
   }
