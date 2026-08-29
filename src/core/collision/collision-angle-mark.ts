@@ -129,7 +129,8 @@ export const BAR_HALF = 4.5;
 export const NORMAL_LEN = 6.5;
 
 /**
- * How much thicker the stem is drawn than the tangent bar, at the DETAIL tier.
+ * How much thicker the stem is drawn than the caller's stated width — which is
+ * the tangent bar's width, so this is also the ratio between the two elements.
  *
  * Emphasis is applied by making the dominant element bolder, never by thinning
  * the quiet one: the tangent keeps exactly the widths the previous parcel
@@ -137,9 +138,14 @@ export const NORMAL_LEN = 6.5;
  * is 0.875 screen px per side — already sub-pixel; anything thinner stops
  * rendering as a cased stroke at all).
  *
- * At the COMPACT tier the bar is not drawn, so there is nothing to out-weigh
- * and the stem uses the caller's plain widths — a scale-up there would only
- * fatten a mark that is already most of a small cell.
+ * ⚠ IT APPLIES AT EVERY TIER, AND THE COMPACT TIER IS WHY. The first cut of
+ * this scaled the stem only where a bar was there to out-weigh, on the argument
+ * that a lone mark has no competition. Rendered, the picker thumbnail came out
+ * a 1px hair — measured, seven angle-coloured pixels in a 38px canvas against
+ * the fifteen of the mark it replaced. It read as fainter than what the owner
+ * had already called useless, which is a worse answer than the one it fixed.
+ * At the compact tier the stem is not the loud half of a mark, it IS the mark;
+ * it carries the whole message alone and needs the weight to do it.
  */
 export const ARROW_WIDTH_SCALE = 1.6;
 
@@ -477,8 +483,6 @@ export function drawAngleMark(
   const bx = mark.tx * BAR_HALF * s, by = mark.ty * BAR_HALF * s;
   const nx = mark.nx * NORMAL_LEN * s, ny = mark.ny * NORMAL_LEN * s;
   const withBar = tier === 'detail';
-  // Emphasis only where there is something to out-weigh; see ARROW_WIDTH_SCALE.
-  const stemScale = withBar ? ARROW_WIDTH_SCALE : 1;
 
   const barPath = () => {
     ctx.beginPath();
@@ -497,12 +501,12 @@ export function drawAngleMark(
 
   ctx.strokeStyle = opts.casing;
   if (withBar) { ctx.lineWidth = opts.casingWidth; barPath(); }
-  ctx.lineWidth = opts.casingWidth * stemScale;
+  ctx.lineWidth = opts.casingWidth * ARROW_WIDTH_SCALE;
   stemPath();
 
   ctx.strokeStyle = opts.color;
   if (withBar) { ctx.lineWidth = opts.coreWidth; barPath(); }
-  ctx.lineWidth = opts.coreWidth * stemScale;
+  ctx.lineWidth = opts.coreWidth * ARROW_WIDTH_SCALE;
   stemPath();
 
   return tier;

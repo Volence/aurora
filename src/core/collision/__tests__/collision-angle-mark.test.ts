@@ -395,8 +395,15 @@ describe('drawAngleMark — casing under core, and the geometry that reaches can
     const r = recorder();
     drawAngleMark(r.ctx, 0, 0, 16, angleMark(profile(RISING_FLOOR, 0x20))!, OPTS_COMPACT);
     expect(r.ops).toEqual(['begin', 'move', 'line', 'stroke', 'begin', 'move', 'line', 'stroke']);
-    // No bar to out-weigh, so no scale-up: the stem uses the caller's widths.
-    expect(r.strokes).toEqual([{ style: '#000', width: 3 }, { style: '#f00', width: 1 }]);
+    // THE STEM KEEPS ITS WEIGHT HERE TOO. At this tier it is the whole mark, so
+    // dropping the scale-up would make the picker thumbnail — the surface the
+    // owner was looking at — the FAINTEST place the mark appears. Measured on
+    // the first cut: 7 angle-coloured pixels in a 38px canvas, against 15 for
+    // the mark it replaced.
+    expect(r.strokes).toEqual([
+      { style: '#000', width: 3 * ARROW_WIDTH_SCALE },
+      { style: '#f00', width: 1 * ARROW_WIDTH_SCALE },
+    ]);
     // ...and what it drew is the NORMAL, not the tangent. At $20 both are
     // diagonal, so the discriminating fact is the SIGN of y.
     expect(r.pts[1].y - r.pts[0].y).toBeLessThan(0);
