@@ -99,6 +99,55 @@ export function validatePaintCollisionRect(
   return null;
 }
 
+/**
+ * Which form of `paint_collision` a request is asking for, or the refusal.
+ *
+ * The tool takes EITHER a single `word` (fill the rectangle) OR a `words` array
+ * (one per cell, row-major). Exactly one, never both and never neither — a
+ * request that named both would have two answers and this layer would be
+ * picking one silently. zod cannot state that here (`EditorMethod.params` is a
+ * raw shape, not a refinable object), so it is stated once, in the same module
+ * as the tool's other checks, and tested on both roads.
+ *
+ * A null in `words` is LEGAL and means "leave this cell alone". That is the
+ * form `get_collision_region` hands back for a cell whose four 8px sub-tiles
+ * disagree, so accepting it is what makes read → write total: every cell the
+ * write half can express round-trips, and the ones it cannot are skipped and
+ * counted rather than guessed at.
+ */
+export function validateCollisionWrite(
+  word: unknown, words: unknown, w: number, h: number,
+): string | null {
+  const hasWord = word !== undefined && word !== null;
+  const hasWords = words !== undefined && words !== null;
+  if (hasWord && hasWords) {
+    return 'pass EITHER "word" (fill the rectangle with one cell word) OR "words" '
+      + '(one per cell, row-major) — not both';
+  }
+  if (!hasWord && !hasWords) {
+    return 'pass EITHER "word" (fill the rectangle with one cell word) OR "words" '
+      + '(one per cell, row-major) — neither was given';
+  }
+  if (hasWord) {
+    if (!Number.isInteger(word) || (word as number) < 0 || (word as number) > 0xFFFF) {
+      return `word must be an integer 0-65535, got ${JSON.stringify(word)}`;
+    }
+    return null;
+  }
+  if (!Array.isArray(words)) return `words must be an array, got ${typeof words}`;
+  if (words.length !== w * h) {
+    return `words length ${words.length} != region size ${w}x${h} = ${w * h} cells`;
+  }
+  for (let i = 0; i < words.length; i++) {
+    const v = words[i];
+    if (v === null) continue; // "leave this cell alone" — see the docblock
+    if (!Number.isInteger(v) || v < 0 || v > 0xFFFF) {
+      return `words[${i}] must be an integer 0-65535 or null, got ${JSON.stringify(v)}`;
+    }
+  }
+  return null;
+}
+
 export function validatePaintRegion(
   section: number,
   x: number, y: number, w: number, h: number,

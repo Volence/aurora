@@ -14,7 +14,7 @@ import {
 // omitted state got answered with "off". See core/editing/brush-word.ts.
 import { brushNametableWord, brushPriorityFromOptional } from '../../core/editing/brush-word';
 import type { Tile, Zone, Act } from '../../core/model/s4-types';
-import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateEntries, validateChunkCollisionPlane, validatePaintCollisionRect } from '../../core/agent/validation';
+import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateEntries, validateChunkCollisionPlane, validatePaintCollisionRect, validateCollisionWrite } from '../../core/agent/validation';
 import { computeActBudget, canonicalTileHash } from '../../core/agent/budget';
 import { decodeGenesisColor, encodeGenesisColor } from '../../core/formats/palette';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
@@ -39,7 +39,10 @@ import { regenerateShiftCommand } from '../providers/bg-anim-art';
 import { makeSetBgOverrideTilesCommand } from '../../core/editing/bg-override-art';
 import { buildStampCommand } from '../../core/editing/map-stamp';
 import { ensureCollisionPlanes } from '../../core/collision/collision-cell-resolve';
-import { paintCollisionRectEntries } from '../../core/collision/collision-paint';
+import { paintCollisionRectEntries, paintCollisionCellEntries } from '../../core/collision/collision-paint';
+import {
+  readCollisionRegion, SECTION_CELLS_WIDE, SECTION_CELLS_HIGH, COLLISION_REGION_MAX_CELLS,
+} from '../../core/collision/collision-region-read';
 import type { AgentRequest, AgentRequestEnvelope } from '../../shared/agent-protocol';
 import { useClassicProjectStore } from '../state/classicProjectStore';
 import {
@@ -428,12 +431,28 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       if (err) throw new Error(err);
       const section = ctx.act.sections[req.section];
       if (!section) throw new Error(`section ${req.section} is empty`);
+      // EITHER a single fill `word` OR a per-cell `words` array. The check is
+      // here rather than in zod because `EditorMethod.params` is a raw shape
+      // with nowhere to hang a refinement; see validateCollisionWrite.
+      const formErr = validateCollisionWrite(req.word, req.words, req.w, req.h);
+      if (formErr) throw new Error(formErr);
       ensureCollisionPlanes(section);
       const plane = req.plane === 'b' ? section.collisionEditB! : section.collisionEdit!;
-      const entries = paintCollisionRectEntries({
-        x: req.x, y: req.y, w: req.w, h: req.h, word: req.word,
-        plane, tileWidth: SECTION_TILES_WIDE,
-      });
+      // Both forms are DECIDERS and both go through `collisionPaintWord` inside
+      // collision-paint.ts — two forms of one tool must not be two rules.
+      const plan = req.words !== undefined && req.words !== null
+        ? paintCollisionCellEntries({
+          x: req.x, y: req.y, w: req.w, h: req.h, words: req.words,
+          plane, tileWidth: SECTION_TILES_WIDE,
+        })
+        : {
+          entries: paintCollisionRectEntries({
+            x: req.x, y: req.y, w: req.w, h: req.h, word: req.word!,
+            plane, tileWidth: SECTION_TILES_WIDE,
+          }),
+          skipped: 0,
+        };
+      const entries = plan.entries;
       if (entries.length > 0) {
         executeAmbientCommand({
           type: 'set-collision-edit',
@@ -443,7 +462,43 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
           entries,
         }, ctx.level);
       }
-      return { painted: entries.length };
+      return { painted: entries.length, skipped: plan.skipped };
+    }
+
+    case 'get-collision-region': {
+      const ctx = requireProject();
+      // THE SAME VALIDATOR THE WRITE USES, on purpose: read and write must not
+      // drift on what a legal cell rectangle is, and its cellsW/cellsH come
+      // from the derived section cell extent rather than a second /2 here.
+      const err = validatePaintCollisionRect(req.section, req.x, req.y, req.w, req.h, {
+        sectionCount: ctx.act.sections.length,
+        cellsW: SECTION_CELLS_WIDE, cellsH: SECTION_CELLS_HIGH,
+      });
+      if (err) throw new Error(err);
+      if (req.w * req.h > COLLISION_REGION_MAX_CELLS) {
+        throw new Error(
+          `region ${req.w}x${req.h} = ${req.w * req.h} cells exceeds the `
+          + `${COLLISION_REGION_MAX_CELLS}-cell per-call limit; read it in tiles `
+          + `(a whole ${SECTION_CELLS_WIDE}x${SECTION_CELLS_HIGH}-cell section is `
+          + `${Math.ceil((SECTION_CELLS_WIDE * SECTION_CELLS_HIGH) / COLLISION_REGION_MAX_CELLS)} calls)`,
+        );
+      }
+      const section = ctx.act.sections[req.section];
+      if (!section) throw new Error(`section ${req.section} is empty`);
+      // Seed exactly as a paint would. A section nobody has painted yet has NO
+      // authored plane, and reading it as all-air would report "no collision"
+      // for a section whose engine baseline is full of it — the read would be
+      // confidently wrong about the very thing it exists to check.
+      ensureCollisionPlanes(section);
+      const planeWords = req.plane === 'b' ? section.collisionEditB! : section.collisionEdit!;
+      return readCollisionRegion({
+        plane: req.plane,
+        planeWords,
+        tileWidth: SECTION_TILES_WIDE,
+        x: req.x, y: req.y, w: req.w, h: req.h,
+        profiles: useProjectStore.getState().collisionProfiles,
+        ascii: req.ascii === true,
+      });
     }
 
     case 'save-chunk': {
