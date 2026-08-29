@@ -73,6 +73,30 @@ const POISONS = [
     to: '  if (cmd) void cmd;\n  useEditorStore.getState().setLinkHover(null);\n}\n\nfunction runDetachAll',
     expectRed: ['5'], expectGreen: ['3', '4'],
   },
+  {
+    id: 'F', file: 'src/renderer/workspace/facets/art-facet.tsx',
+    what: 'the chunk editor stops calling buildActPropagationCommand',
+    from: '    executeCommand(propagation\n      ? {',
+    to: '    executeCommand(false\n      ? {',
+    // ⚠ ROW 10 IS EXPECTED TO STAY GREEN HERE AND THAT IS THE POINT, not a
+    // pass: with nothing propagating at all, "it did not touch the hand-painted
+    // tiles" is VACUOUSLY true. Row 10 can only fail to an OVER-EAGER
+    // propagation, which is what poison G plants. Naming that here is the
+    // difference between a row that discriminates and one that just agrees.
+    expectRed: ['9'], expectGreen: ['3', '5', '6', '7', '8', '10'],
+  },
+  {
+    id: 'G', file: 'src/core/editing/chunk-links.ts',
+    what: 'propagation stops honouring the plane — every tile in the footprint window is rewritten',
+    from: '    const p = byId.get(links.plane[index]);\n    if (!p) continue;',
+    to: '    const p = byId.get(links.plane[index]) ?? placements[0];\n    if (!p) continue;',
+    // The discriminating poison for row 10: hand-painted tiles INSIDE the
+    // footprint get overwritten. The detached copy at target2 is outside the
+    // placement's dx/dy window and is still refused, so this reddens row 10 by
+    // its first half only — stated because a reader would otherwise assume the
+    // row proved both halves red.
+    expectRed: ['10'], expectGreen: ['9'],
+  },
 ];
 
 const want = process.argv.slice(2);

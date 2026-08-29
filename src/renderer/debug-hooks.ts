@@ -587,6 +587,23 @@ interface AeonProbeApi {
   stampDetached(): boolean;
   /** The latched "placement under the cursor" the Chunk links panel reads. */
   linkHover(): { sectionIndex: number; placementId: number; chunkId: string } | null;
+  /**
+   * THE ART COMPOSER'S OPEN CHUNK DOCUMENT — read-only, the chunk counterpart
+   * to `bgArtOpen()` (which returns null for anything that is not a BG-override
+   * doc, so it cannot serve here).
+   *
+   * A propagation harness needs three things that exist nowhere on screen in a
+   * readable form: WHICH chunk the composer opened (the canvas looks the same
+   * for any of them), whether the doc is DIRTY (the anti-vacuous control — a
+   * "Save propagated it" row means nothing if the tile stamp never landed), and
+   * the armed `brushTile`, which is drawn into a canvas HUD chip and is
+   * therefore invisible to the DOM. No setters: arming the tool and the tile are
+   * real clicks on the real rail and the real tileset panel.
+   */
+  artChunkOpen(): {
+    chunkId: string | null; name: string; widthTiles: number; heightTiles: number;
+    dirty: boolean; tool: string; brushTile: number;
+  } | null;
   /** Every chunk-library id, in library order. Read-only. */
   chunkIds(): string[];
   /** One library chunk's shape + how much of it is actually art (nonzero
@@ -1092,6 +1109,20 @@ function installAeonProbe(): AeonProbeApi {
       (section(sectionIndex)?.chunkLinks?.placements ?? []).map((p) => ({ ...p })),
     hasChunkLinks: (sectionIndex) => !!section(sectionIndex)?.chunkLinks,
     stampDetached: () => useEditorStore.getState().stampDetached,
+    artChunkOpen: () => {
+      const a = useArtStore.getState();
+      const o = a.open;
+      if (!o || o.bgOverride) return null;
+      return {
+        chunkId: o.chunkId,
+        name: o.name,
+        widthTiles: o.doc.widthTiles,
+        heightTiles: o.doc.heightTiles,
+        dirty: o.dirty,
+        tool: a.tool,
+        brushTile: a.brushTile,
+      };
+    },
     linkHover: () => {
       const h = useEditorStore.getState().linkHover;
       return h ? { ...h } : null;

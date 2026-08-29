@@ -495,9 +495,9 @@ async function main() {
       if (el && el.checked) el.click();
     })()`);
 
-    // ── Row 9: PROPAGATION (see propagation section, appended below) ────────
-    await runPropagationRow(c, {
-      chunkId, info, target, W, H, id2, toScreen, linkAt, planeRow,
+    // ── Rows 9/10: PROPAGATION ──────────────────────────────────────────────
+    await runPropagationRows(c, {
+      chunkId, info, label, target, target2, W, H, id2, linkAt,
     });
 
     if (c.exceptions.length) {
@@ -516,12 +516,176 @@ async function main() {
   process.exit(fails.length ? 1 : 0);
 }
 
-// Filled in by the propagation commit; a placeholder here would be a row that
-// can only pass, which is worse than no row (OVERSEER bar 2e).
-async function runPropagationRow(c, ctx) {
-  skip('9', 'a chunk edit propagates into linked tiles and not into hand-painted ones',
-    'not implemented in this build of the harness');
-  void c; void ctx;
+/**
+ * PROPAGATION, END TO END, THROUGH THE REAL COMPOSER.
+ *
+ * Row 9 is the payoff and row 10 is the safety property, and they are read out
+ * of ONE observation of the document — never two runs stitched together.
+ *
+ *   9   a chunk edited and saved in the Art facet rewrites the section tiles
+ *       that still remember it.
+ *  10   ...and does NOT touch (a) the tiles painted by hand in rows 6/7, nor
+ *       (b) the DETACHED copy stamped in row 8. Those are two different reasons
+ *       a tile is not the chunk's any more, and both must hold.
+ *
+ * The whole path is real gestures: the Art facet pill, a double click on the
+ * chunk's own thumbnail, the Tile stamp button on the tool rail, a click in the
+ * tileset panel to arm a tile, a click on the composer canvas, and the Save
+ * button. `artChunkOpen()` is read-only and is what makes the row anti-vacuous
+ * — it names the chunk that was opened and reports the doc going dirty, so a
+ * gesture that silently missed cannot be mistaken for a propagation that
+ * refused.
+ */
+async function runPropagationRows(c, ctx) {
+  const { chunkId, label, target, target2, W, H, id2, linkAt } = ctx;
+
+  // Open the Art facet and the chunk (double click = `activate` on ChunkCell).
+  const artPill = await c.evalExpr(clickByText('[aria-label="Facets"] button', 'Art'));
+  await sleep(1000);
+  const opened = await c.evalExpr(`(() => {
+    const cells = [...document.querySelectorAll('button')].filter((e) => e.querySelector('canvas'));
+    const b = cells.find((e) => e.lastElementChild
+      && e.lastElementChild.textContent.trim().toUpperCase() === ${JSON.stringify(label)});
+    if (!b) return 'no-thumb';
+    b.scrollIntoView();
+    b.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    return 'dblclicked';
+  })()`);
+  await sleep(1200);
+  const open1 = await c.json('window.__dbg.aeon.artChunkOpen()');
+  if (!open1 || open1.chunkId !== chunkId) {
+    skip('9', 'propagation',
+      `the composer did not open ${chunkId} (pill=${artPill} dbl=${opened} open=${JSON.stringify(open1)})`);
+    return;
+  }
+
+  // Arm the Tile stamp tool — the only art tool that writes a CELL'S TILE
+  // REFERENCE; every other one edits pixels and would leave the nametable
+  // identical, which propagation correctly treats as nothing to do.
+  const armTool = await c.evalExpr(`(() => {
+    const b = document.querySelector('button[aria-label="Tile stamp"]');
+    if (!b) return 'no-tool'; b.click(); return 'clicked';
+  })()`);
+  await sleep(300);
+
+  // THE CELL TO EDIT, chosen against TWO constraints and neither assumed:
+  //   (a) the section tile it owns must still be LINKED after rows 6/7, which
+  //       painted over parts of this same footprint;
+  //   (b) the composer cell must be ON SCREEN. At zoom 8 a 16x16 chunk is
+  //       1024px tall inside a scroller, so the bottom-right cells are off the
+  //       viewport — an aim at one of those is delivered to whatever is there
+  //       instead, the stamp never lands, and the row reads like a propagation
+  //       failure. `elementFromPoint` is the app's own hit test and is the only
+  //       honest way to ask.
+  const geo = await c.json(`(() => {
+    const cv = [...document.querySelectorAll('canvas')].find((k) =>
+      k.parentElement && k.parentElement.style.margin === 'auto'
+      && k.parentElement.style.padding === '24px' && k.offsetParent !== null);
+    if (!cv) return { ok: false };
+    const r = cv.getBoundingClientRect();
+    return { ok: true, left: r.left, top: r.top, w: cv.width, h: cv.height };
+  })()`);
+  if (!geo.ok) { skip('9', 'propagation', 'composer canvas not found'); return; }
+  const zoom = geo.w / (open1.widthTiles * 8);
+  const cellPoint = (cx, cy) => ({
+    x: Math.round(geo.left + (cx * 8 + 4) * zoom),
+    y: Math.round(geo.top + (cy * 8 + 4) * zoom),
+  });
+  let cell = null, px = 0, py = 0;
+  for (let cy = 0; cy < H && !cell; cy++) {
+    for (let cx = 0; cx < W && !cell; cx++) {
+      const pt = cellPoint(cx, cy);
+      const onCanvas = await c.evalExpr(`(() => {
+        const cv = [...document.querySelectorAll('canvas')].find((k) =>
+          k.parentElement && k.parentElement.style.margin === 'auto'
+          && k.parentElement.style.padding === '24px' && k.offsetParent !== null);
+        return document.elementFromPoint(${pt.x}, ${pt.y}) === cv;
+      })()`);
+      if (!onCanvas) continue;
+      const p = await c.json(linkAt(target.col + cx, target.row + cy));
+      if (p && p.id === id2) { cell = { cx, cy }; px = pt.x; py = pt.y; }
+    }
+  }
+  if (!cell) {
+    skip('9', 'propagation', 'no still-linked footprint cell whose composer cell is on screen');
+    return;
+  }
+  const before = await c.json(
+    `window.__dbg.aeon.ntRect(0, ${target.col + cell.cx}, ${target.row + cell.cy}, 1, 1)`);
+  const oldTile = before[0] & 0x7ff;
+
+  // Arm a tile in the REAL tileset panel. Its geometry is stride 18 / itemSize
+  // 16 (TilesetPanel), and the index is derived from the click point rather
+  // than assumed: whatever lands, `artChunkOpen().brushTile` reports it and
+  // every expectation below is derived from THAT.
+  const armTile = await c.json(`(() => {
+    const wrap = [...document.querySelectorAll('div')].find((d) =>
+      d.style.position === 'relative' && d.style.overflow === 'hidden'
+      && d.querySelectorAll('canvas').length === 2);
+    if (!wrap) return { ok: false, why: 'no tileset wrap' };
+    const base = wrap.querySelector('canvas');
+    const r = base.getBoundingClientRect();
+    return { ok: true, left: r.left, top: r.top, width: r.width, height: r.height };
+  })()`);
+  if (!armTile.ok) { skip('9', 'propagation', armTile.why); return; }
+  const stride = 18, half = 8;
+  const cols = Math.max(1, Math.floor(armTile.width / stride));
+  // Walk cells until the armed tile DIFFERS from the one already in the chunk
+  // cell — stamping the same index would produce an identical nametable and
+  // propagation would (correctly) have nothing to write, making the row
+  // unfalsifiable.
+  let armed = null;
+  for (let n = 1; n < Math.min(24, cols * 3) && armed === null; n++) {
+    const x = Math.round(armTile.left + (n % cols) * stride + half);
+    const y = Math.round(armTile.top + Math.floor(n / cols) * stride + half);
+    if (y > armTile.top + armTile.height - 2) break;
+    await click(c, x, y);
+    await sleep(150);
+    const st = await c.json('window.__dbg.aeon.artChunkOpen()');
+    if (st && st.brushTile !== oldTile && st.brushTile > 0) armed = st.brushTile;
+  }
+  if (armed === null) { skip('9', 'propagation', 'could not arm a tileset tile different from the cell'); return; }
+
+  // Stamp the cell on the REAL composer canvas.
+  await click(c, px, py);
+  await sleep(400);
+  const open2 = await c.json('window.__dbg.aeon.artChunkOpen()');
+  if (!open2 || open2.dirty !== true) {
+    skip('9', 'propagation',
+      `the tile stamp did not land (tool=${armTool} open=${JSON.stringify(open2)} zoom=${zoom} at ${px},${py})`);
+    return;
+  }
+
+  // Save — the only surface that dispatches `set-chunk`.
+  const saveClicked = await c.evalExpr(`(() => {
+    const b = document.querySelector('button[title^="Save changes back to this chunk"]');
+    if (!b) return 'no-save'; if (b.disabled) return 'disabled'; b.click(); return 'clicked';
+  })()`);
+  await sleep(900);
+
+  // ONE observation of the document; both rows are read out of it.
+  const linkedAfter = await c.json(
+    `window.__dbg.aeon.ntRect(0, ${target.col + cell.cx}, ${target.row + cell.cy}, 1, 1)`);
+  const paintedAfter = await c.json(
+    `window.__dbg.aeon.ntRect(0, ${target.col}, ${target.row}, 3, 1)`);
+  const detachedAfter = await c.json(
+    `window.__dbg.aeon.ntRect(0, ${target2.col + cell.cx}, ${target2.row + cell.cy}, 1, 1)`);
+  const stillLinked = await c.json(linkAt(target.col + cell.cx, target.row + cell.cy));
+
+  check('9', 'a chunk edited and SAVED in the real Art facet rewrites the section tiles that still remember it',
+    saveClicked === 'clicked' && stillLinked !== null && stillLinked.id === id2
+    && (linkedAfter[0] & 0x7ff) === armed && oldTile !== armed,
+    `save=${saveClicked} composerCell=(${cell.cx},${cell.cy}) armedTile=${armed} previousTile=${oldTile}\n`
+    + `        section word before=${before[0]} after=${linkedAfter[0]} (tileIndex ${linkedAfter[0] & 0x7ff})\n`
+    + `        that tile's link=${JSON.stringify(stillLinked)}`);
+
+  check('10', 'and it REFUSES the hand-painted tiles (rows 6/7) and the DETACHED copy (row 8) — two different reasons, both held',
+    paintedAfter.every((w) => (w & 0x7ff) === 3)
+    && (detachedAfter[0] & 0x7ff) !== armed,
+    `hand-painted words at (${target.col},${target.row})x3 = ${JSON.stringify(paintedAfter)} `
+    + `(must all still be the armed-3 stroke, NOT ${armed})\n`
+    + `        detached copy word at (${target2.col + cell.cx},${target2.row + cell.cy}) = `
+    + `${detachedAfter[0]} (tileIndex ${detachedAfter[0] & 0x7ff}, must not be ${armed})`);
 }
 
 main().catch((e) => { console.error('HARNESS ERROR:', e.message); process.exit(2); });
