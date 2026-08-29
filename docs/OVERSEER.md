@@ -702,6 +702,37 @@ served methods are identical under `CARGO_PKG_VERSION`; **(2)** it must be
 impostor could not also claim, so a value read from a config file would reproduce the exact
 defect the parcel exists to fix.
 
+✅ **BOTH SHIPPED AND MEASURED FIRSTHAND HERE 2026-08-29 — the parcel is CLOSED, and the wire now
+answers what `serverName` never could.** Relayed by the oracle lane, then **verified from this
+session against its OWN privately-spawned `oracle-aether`** (mkdtemp socket, never the owner's
+window) rather than adopting their reading — the standing practice in this file. Probe:
+`scratchpad/init-probe.mjs`.
+- **Condition (1) is MET, by two SEPARATE fields that fail independently, which is the whole ask.**
+  `implementation` = `"oracle-rs"` (WHICH SERVER) and `serverBuild` = `{id, source, dirty}` (WHICH
+  BUILD), where `id` is `<commit SHA>+profile=release+target=x86_64-unknown-linux-gnu+features=`.
+  The motivating defect is now impossible: two binaries from different commits can no longer be
+  identical on the wire. **`serverName` is still `"oracle-next"` and `serverVersion` still `0.0.0`** —
+  both unchanged, both still proving nothing; read `implementation`, never `serverName`.
+- **Condition (2): STRONGLY CORROBORATED, NOT PROVEN FROM OUTSIDE — say it that way.** `source:"vcs"`
+  and `dirty:false` are build-time captures, and the id's SHA is a **real commit, reachable from
+  oracle `origin/main`** (checked here). That is good evidence it is VCS-derived rather than
+  config-supplied. It is **not proof**: nothing observable on the wire can rule out a config
+  override, which would need their build source read. Do not upgrade this to "proven" without
+  doing that.
+- ⚠ **`serverBuild.id` IS A TREE IDENTITY, NOT A CODE IDENTITY — and this bites in the obvious
+  direction.** Found here while class-checking the SHA per bar 9: the id measured on the shipped
+  binary resolves to a **docs-only commit** (`docs/lane-status.json`, 10 insertions / 18 deletions),
+  because a build identity names *whatever HEAD was at build time*. That is CORRECT for its job and
+  is exactly what staleness needs. But it means **the id changes for reasons that have nothing to do
+  with the code**, so two binaries with byte-identical behaviour can report different ids. **Use it
+  for "is this the same binary I measured before" (staleness). NEVER for "does this build contain
+  feature X"** — that question is `capabilities` and `methods`, which exist for it. Reading a code
+  guarantee off a build id is the method-count failure wearing a better costume, and it is the
+  sharper form of this file's own *a provenance record is several claims that do not share a clock*.
+- **The old discriminator can be retired.** This file's 2026-08-24 trick — inferring the Rust core
+  from a **relative** `romPath` in argv — was a clever read of an accident. `implementation` answers
+  it directly now; keep the old note only as history.
+
 - **Aether client** (`src/main/aether/`). The socket path is SELECTED by env-var presence, not
   searched: `resolveSocketPath` (`socket-path.ts:35-50`) takes the first set-and-non-empty of
   `$ORACLE_SOCKET`, `$EXODUS_SOCKET`, `$XDG_RUNTIME_DIR/oracle.sock`, else `/tmp/oracle.sock`, and
