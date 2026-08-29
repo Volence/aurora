@@ -45,7 +45,8 @@
 // defect as a guard that asserts nothing: it goes green over the case it could
 // not see.
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync, lstatSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join, relative } from 'node:path';
 
 const DIR = new URL('.', import.meta.url).pathname.replace(/\/$/, '');
@@ -121,10 +122,27 @@ const looksLikeAurora = (t) =>
   && (/xvfb-run/.test(t) || /dist\/main\/index\.mjs/.test(t) || /\bELECTRON\b/.test(t)
       || /electron/i.test(t));
 
+/** Entries this walk could not classify. NEVER silently dropped: an unreadable
+ *  path is UNMEASURABLE, and a gate that cannot see a file must say so rather
+ *  than report a clean count over the subset it managed to stat. Found the hard
+ *  way -- scratchpad/fixtures/aeon-build-pin/aeon-current is a self-referential
+ *  symlink (an untracked fixture, absent from a fresh worktree), and statSync
+ *  threw ELOOP, so the gate CRASHED in the main tree while passing in every
+ *  worktree it was developed in. */
+export const unreadable = [];
+
 function listMjs(dir, acc = []) {
   for (const name of readdirSync(dir).sort()) {
     const p = join(dir, name);
-    if (statSync(p).isDirectory()) { if (name !== 'node_modules') listMjs(p, acc); continue; }
+    let st;
+    // lstat, not stat: a symlink is classified by the LINK, so a loop or a
+    // dangling target is a fact about this entry rather than an exception.
+    try { st = lstatSync(p); } catch (e) { unreadable.push(`${p} (${e.code})`); continue; }
+    if (st.isSymbolicLink()) {
+      // Follow it only far enough to know if it is a directory; a loop is not.
+      try { if (statSync(p).isDirectory()) { if (name !== 'node_modules') listMjs(p, acc); continue; } }
+      catch (e) { unreadable.push(`${p} (${e.code})`); continue; }
+    } else if (st.isDirectory()) { if (name !== 'node_modules') listMjs(p, acc); continue; }
     if (name.endsWith('.mjs')) acc.push(p);
   }
   return acc;
@@ -259,11 +277,50 @@ if (unmeasurable.length) {
   console.log(`\nUNMEASURABLE (${unmeasurable.length}) — a file this check could not classify is NOT a pass:`);
   for (const u of unmeasurable) console.log(`  ${u}`);
 }
-if (fails.length) {
-  console.log(`\nFAILING (${fails.length}):`);
-  for (const f of fails) console.log(`  ${f}`);
+// ── tracked vs untracked ───────────────────────────────────────────────────
+//
+// An UNTRACKED launcher is exactly as dangerous as a tracked one -- it is a real
+// file someone can really run -- so it is never hidden. But the repo cannot FIX
+// a file it does not carry, and a gate that is permanently red is a gate people
+// learn to ignore. So: tracked failures fail the build; untracked ones are
+// reported loudly and do not, with the note that committing one makes it fatal.
+//
+// Found at landing, not in development: all four of these exist only in the
+// owner's working tree (leftover scratch from earlier sessions), so every
+// worktree this gate was built in was blind to them. Worktree isolation is what
+// makes an agent safe AND what makes it unable to see the tree it protects.
+let trackedFails = fails;
+let untrackedFails = [];
+try {
+  const tracked = new Set(
+    execFileSync('git', ['ls-files', 'scratchpad'], { encoding: 'utf8' })
+      .split('\n').filter(Boolean).map((f) => f.replace(/^scratchpad\//, '')));
+  untrackedFails = fails.filter((f) => !tracked.has(String(f).replace(/^\s*G\d+ /, '').split(':')[0]));
+  trackedFails = fails.filter((f) => !untrackedFails.includes(f));
+} catch (e) {
+  // Cannot ask git -> cannot split -> treat every failure as fatal. Never the
+  // other way: an unanswerable question does not become a pass.
+  unmeasurable.push(`git ls-files failed (${e.message}); every failure treated as tracked`);
 }
 
-const bad = fails.length + unmeasurable.length;
-console.log(`\n════ ${rows.length - bad} clean / ${rows.length} classified · ${fails.length} failure(s) · ${unmeasurable.length} unmeasurable ════`);
+if (untrackedFails.length) {
+  console.log(`\nUNGUARDED BUT UNTRACKED (${untrackedFails.length}) — present in THIS working tree only.`);
+  console.log('  Just as able to hijack another Aurora; not fatal because the repo does not carry them.');
+  console.log('  Committing one makes it a hard failure.');
+  for (const f of untrackedFails) console.log(`  ${f}`);
+}
+
+if (trackedFails.length) {
+  console.log(`\nFAILING (${trackedFails.length}):`);
+  for (const f of trackedFails) console.log(`  ${f}`);
+}
+
+const bad = trackedFails.length + unmeasurable.length;
+const clean = rows.length - trackedFails.length - untrackedFails.length - unmeasurable.length;
+// `clean` subtracts the untracked ones too. They are NOT clean -- they are
+// unguarded and merely not fatal -- and a headline that counted them as clean
+// would be the gate telling the exact lie it exists to catch.
+console.log(`\n════ ${clean} clean / ${rows.length} classified · ${trackedFails.length} failure(s)`
+  + `${untrackedFails.length ? ` · ${untrackedFails.length} unguarded-untracked` : ''}`
+  + ` · ${unmeasurable.length} unmeasurable ════`);
 process.exit(bad ? 1 : 0);
