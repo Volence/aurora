@@ -12,6 +12,8 @@ function makeAct(): Act {
     startPosition: { secX: 0, secY: 0, localX: 0, localY: 0 },
     bgLayout: null,
     bgTiles: null,
+    sceneRef: null,
+    stripPath: null,
   };
 }
 

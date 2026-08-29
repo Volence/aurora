@@ -5,7 +5,11 @@ import type { S4Level } from '../../src/core/editing/commands';
 
 function level(): S4Level {
   const s = createSection(0, 'S0');
-  s.collisionEdit = new Uint8Array(256 * 256);
+  // Uint16Array, not Uint8Array: `Section.collisionEdit` is a plane of 16-bit
+  // engine attribute words. This file used to build a Uint8Array — the writes
+  // it exercises happen to fit in a byte, so the suite stayed green while
+  // testing an array width production never hands the command.
+  s.collisionEdit = new Uint16Array(256 * 256);
   return { sections: [s] };
 }
 
@@ -13,7 +17,7 @@ describe('set-collision-edit', () => {
   it('applies and undoes attr writes on the chosen plane', () => {
     const h = new EditHistory();
     const lv = level();
-    lv.sections[0]!.collisionEditB = new Uint8Array(256 * 256);
+    lv.sections[0]!.collisionEditB = new Uint16Array(256 * 256);
     h.execute({ type: 'set-collision-edit', plane: 'a', description: 'paint', sectionIndex: 0,
       entries: [{ index: 5, oldColl: 0, newColl: 40 }] }, lv);
     h.execute({ type: 'set-collision-edit', plane: 'b', description: 'paint', sectionIndex: 0,

@@ -73,8 +73,8 @@ describe('s4-config', () => {
           gridWidth: 4,
           gridHeight: 3,
           dataPath: 'data/levels/ojz/act1/',
-          bgLayout: null,
-          bgTiles: null,
+          bgLayout: 'data/bg/ojz_bg.bin',
+          bgTiles: 'data/bg/ojz_bg_tiles.bin',
           sceneRef: null,
           startPosition: { secX: 0, secY: 0, localX: 256, localY: 256 },
         }],
@@ -84,8 +84,11 @@ describe('s4-config', () => {
     };
     const config = loadS4Config(json, '/project');
 
-    // Attach a hypothetical future field that the current schema does not know about
-    (config.raw as Record<string, unknown>).futureField = { keep: true };
+    // Attach a hypothetical future field that the current schema does not know
+    // about. The double cast is the POINT of the test: `S4ProjectConfig` has no
+    // index signature precisely because unknown keys are not part of the modelled
+    // contract, and this asserts they survive `raw` anyway.
+    (config.raw as unknown as Record<string, unknown>).futureField = { keep: true };
 
     // Simulate what saveProject does: mutate the tileset and re-stringify
     config.raw.zones[0].tileset = 'data/editor/ojz_tiles.bin';

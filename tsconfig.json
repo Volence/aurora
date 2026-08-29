@@ -12,6 +12,27 @@
     "jsx": "react-jsx",
     "outDir": "dist"
   },
-  "include": ["src/**/*"],
+  // EVERY hand-written TypeScript file in the repo, deliberately — one program,
+  // one set of compilerOptions, no second config that can drift.
+  //
+  // `test/**/*` was ABSENT until 2026-08-29, and its absence is why "tsc clean"
+  // was a green wider than it was: `npx tsc --noEmit` checked ~290 colocated
+  // `src/**/__tests__` files and skipped all 127 files under `test/`. It cost a
+  // real defect — a `StampSpec.pri` widening from `boolean` to a union left
+  // three call sites in test/art/composer-buffer.test.ts mistyped, tsc reported
+  // clean, and a human found them by reading the file.
+  //
+  // ONE config rather than a `tsconfig.test.json`: the test files need nothing
+  // the src build does not already give them. They import `describe`/`it`/
+  // `expect` from 'vitest' explicitly (all 127 do — vitest's `globals: true` is
+  // belt-and-braces, not load-bearing), they use no path aliases, and they need
+  // no extra `lib`/`types`. So a second config would buy looseness nobody asked
+  // for and one more thing to keep in sync. If a test subtree ever DOES need a
+  // weaker option, split it out then — never weaken this one to reach green.
+  //
+  // The root `*.ts` entry picks up vitest.config.ts and electron.vite.config.ts,
+  // which nothing checked either. `scripts/` and `scratchpad/` are .mjs and stay
+  // out: checking them needs `allowJs`, which is a separate decision.
+  "include": ["src/**/*", "test/**/*", "*.ts"],
   "exclude": ["node_modules", "dist"]
 }

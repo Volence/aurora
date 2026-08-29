@@ -278,7 +278,11 @@ describe('the ownership boundary (sole writer of record)', () => {
 
     // The same content, assembled by a writer that inserted differently — at
     // top level, inside the band, and inside the unknown key.
-    const second: BgOverrideDocument = { some_future_key: { aa: 2, zz: 1 } } as BgOverrideDocument;
+    // Built key-by-key in a DIFFERENT insertion order, so `layout`/`tiles` are
+    // assigned below rather than in the literal — the double cast carries the
+    // partially-built document across those lines and is what makes the
+    // ordering, not the shape, the thing under test.
+    const second: BgOverrideDocument = { some_future_key: { aa: 2, zz: 1 } } as unknown as BgOverrideDocument;
     second.tiles = first.tiles;
     second.palette = [1, 2, 3];
     second.anims = [{ zeta_extra: 7 } as unknown as BgOverrideBand];

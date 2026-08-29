@@ -50,6 +50,7 @@ describe('applyClipboardCollisionToDoc', () => {
       nametable: new Uint16Array(16),
       collisionA: new Uint16Array([0x1001, 0x1002, 0x1003, 0x1004]),
       collisionB: new Uint16Array([0x2001, 0x2002, 0x2003, 0x2004]),
+      artOnly: false,     // block-aligned capture, so it carries both planes
     };
   }
 
@@ -76,6 +77,7 @@ describe('applyClipboardCollisionToDoc', () => {
       nametable: new Uint16Array(64),
       collisionA: new Uint16Array(16).fill(0x1234),
       collisionB: new Uint16Array(16).fill(0x5678),
+      artOnly: false,     // block-aligned capture, so it carries both planes
     };
     const changed = applyClipboardCollisionToDoc(doc, clip);
     expect(changed).toBe(true);

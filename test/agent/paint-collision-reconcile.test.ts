@@ -32,7 +32,7 @@ import {
 } from '../../src/core/editing/collision-word';
 import {
   readCrossover, withCrossover, handOffFrom, isSelfMark, otherPlaneId,
-  CROSSOVER_BITS, type CollisionPlaneId,
+  CROSSOVER_BITS, type CollisionPlaneId, type Crossover, type CrossoverRead,
 } from '../../src/core/collision/layer-transition';
 import { readCollisionRegion } from '../../src/core/collision/collision-region-read';
 import { EDITOR_METHODS } from '../../src/main/editor-methods';
@@ -51,6 +51,25 @@ function cellWord(plane: Uint16Array, cc: number, cr: number): number {
 }
 function apply(plane: Uint16Array, entries: { index: number; newColl: number }[]): void {
   for (const e of entries) plane[e.index] = e.newColl;
+}
+
+/**
+ * A read crossover narrowed to a LEGAL one.
+ *
+ * `readCrossover` returns `CrossoverRead` — `Crossover` plus the illegal
+ * reserved value 3 — while the legality helpers (`isSelfMark`,
+ * `crossoverTarget`) are defined over `Crossover` only, deliberately: 3 is
+ * reserved so its presence is a defect somebody must SEE, not a case the rules
+ * quietly answer `false` for. Widening `isSelfMark` to swallow it would erase
+ * exactly that. So this narrows at the test's edge and THROWS on the reserved
+ * value, which is what "the paint never writes a 3" should look like when it
+ * fails, rather than a silent pass through a self-mark check that cannot fire.
+ */
+function legalCrossover(c: CrossoverRead): Crossover {
+  if (c === 'reserved') {
+    throw new Error('read the RESERVED crossover value 3 — the paint wrote an illegal word');
+  }
+  return c;
 }
 
 /** A one-line dump of a 2x2-cell region of both planes: the artifact a row
@@ -253,8 +272,8 @@ describe('[m3] words + both + hand-off — one call, both halves of a two-way lo
       expect(ca).toBe(handOffFrom('a'));
       expect(cb).toBe(handOffFrom(otherPlaneId('a')));
       expect(ca).not.toBe(cb);                       // it is a PAIR, not a copy
-      expect(isSelfMark('a', ca)).toBe(false);
-      expect(isSelfMark('b', cb)).toBe(false);
+      expect(isSelfMark('a', legalCrossover(ca))).toBe(false);
+      expect(isSelfMark('b', legalCrossover(cb))).toBe(false);
     }
     // The skipped cell got NO mark on either plane.
     expect(readCrossover(cellWord(a, 1, 0))).toBe('none');
