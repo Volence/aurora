@@ -15,8 +15,7 @@ import { useAetherStore } from '../state/aetherStore';
 import { warpTargetFor } from '../../core/aether/warp-math';
 import { openDocumentGuarded } from './art/open-document';
 import { resolveEscape } from './map-escape';
-import { flipAxisForKey, resolveFlip } from './map-flip';
-import { flipClipboard, flipSectionRegion, flipDescription } from '../../core/editing/region-flip';
+import { flipAxisForKey, performMapFlip, setFlipGhostRepaint } from './map-flip';
 import { shouldMarkBand } from './map-band-mark';
 import { beginBandStamp, moveBandStamp, endBandStamp, type BandStampGesture } from './map-band-stamp';
 import { docFromTile, docFromSectionRegion } from '../../core/art/composer-buffer';
@@ -1352,6 +1351,16 @@ export default function MapViewport() {
     drawCollisionPreview();
   }, [drawCollisionPreview, syncBandPreview]);
 
+  // THE PASTE GHOST'S REPAINT, HANDED TO EVERY FLIP PATH. This canvas is ours
+  // and the panel's flip buttons cannot reach it, so `map-flip` holds the
+  // callback and calls it whichever surface asked for the mirror. Without this
+  // a button press would mirror the clipboard and leave the OLD art under the
+  // cursor — see setFlipGhostRepaint's docblock.
+  useEffect(() => {
+    setFlipGhostRepaint(drawCollisionPreview);
+    return () => setFlipGhostRepaint(null);
+  }, [drawCollisionPreview]);
+
   // Re-render when anything visual changes
   useEffect(() => {
     redraw();
@@ -1742,54 +1751,13 @@ export default function MapViewport() {
       // its docblock defends the two letters against everything already spent.
       const flipAxis = flipAxisForKey(e.key);
       if (flipAxis) {
-        const ed = useEditorStore.getState();
-        const target = resolveFlip(ed);
-        if (target === 'clipboard' && ed.mapClipboard) {
-          ed.setMapClipboard(flipClipboard(ed.mapClipboard, flipAxis));
-          // THIS IS THE REPAINT. `mapClipboard` is not a redraw dependency, and
-          // the ghost is drawn on the preview overlay, so nothing else would
-          // put the mirrored art under the cursor. (The ghost's raster cache is
-          // keyed on the clipboard's object identity — `flipClipboard` returns
-          // a new object, which is what invalidates it.)
-          drawCollisionPreview();
-          e.preventDefault();
-          return;
-        }
-        if (target === 'selection' && ed.marquee && level) {
-          const m = ed.marquee;
-          const section = act?.sections[m.sectionIndex];
-          if (section) {
-            ensureCollisionPlanes(section);
-            const label = selectionSizeLabel(m.col, m.row, m.w, m.h);
-            const cmd = flipSectionRegion({
-              section, sectionIndex: m.sectionIndex,
-              col: m.col, row: m.row, w: m.w, h: m.h, axis: flipAxis,
-              description: flipDescription(flipAxis, label),
-            });
-            if (cmd) {
-              // ONE batch command, so ONE undo entry — and the invalidation
-              // listener walks batches (see it above), so the canvas repaints
-              // with the model rather than keeping the old picture.
-              executeCommand(cmd, level);
-              useEditorStore.getState().setActiveSectionIndex(m.sectionIndex);
-              // SAY WHAT WAS FLIPPED, and — for a non-block-aligned selection —
-              // that collision was NOT, at the moment the author would
-              // otherwise assume it came along. Same rule and same sentence as
-              // the Ctrl+C toast above: art-only is a normal outcome of a
-              // tile-granular selection, and what it must never be is silent.
-              const reason = artOnlyReason(m.col, m.row, m.w, m.h);
-              useToastStore.getState().addToast(
-                reason ? `${flipDescription(flipAxis, label)} — art only. ${reason}`
-                  : flipDescription(flipAxis, label),
-                reason ? 'info' : 'success');
-            } else {
-              // A rectangle that is already its own mirror. An empty undo step
-              // would be worse than a sentence.
-              useToastStore.getState().addToast(
-                `Nothing to flip — this selection already reads the same ${
-                  flipAxis === 'h' ? 'left to right' : 'top to bottom'}.`, 'info');
-            }
-          }
+        // ONE PATH, and the panel's buttons take it too. Everything this used
+        // to do inline — resolve the target, apply the transform, batch the
+        // undo entry, say what happened, repaint the ghost — moved into
+        // `performMapFlip` when the owner asked for a button as well as a key
+        // ("I think a button on the right panel would be nice too", 2026-08-28).
+        // A second copy here is exactly the drift map-flip.ts exists to prevent.
+        if (performMapFlip(flipAxis).kind !== 'none') {
           e.preventDefault();
           return;
         }

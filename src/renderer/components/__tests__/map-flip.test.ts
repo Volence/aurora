@@ -92,3 +92,178 @@ describe('resolveFlip', () => {
       .toBe('clipboard');
   });
 });
+
+// ═══════════════════════ THE ACTION, AND THE TWO SURFACES ═══════════════════
+//
+// Row 84's follow-on: the owner asked for BUTTONS as well as the keys — *"I
+// think a button on the right panel would be nice too"*. Two surfaces asking
+// for one gesture is the drift risk `map-flip.ts` was created to close, so
+// `performMapFlip` is the whole action (resolve, transform, batch the undo
+// entry, say what happened, repaint the ghost) and neither surface holds a
+// copy of any of it.
+//
+// ⚠ WHAT THESE ROWS CANNOT SEE, AND WHERE IT IS PROVEN INSTEAD. The selection
+// branch writes through `executeCommand` into a live project, and the ghost is
+// a canvas. Both are driven for real by
+// `scratchpad/marquee-flip-button-harness.mjs`, which CLICKS THE DOM BUTTON.
+// These rows own the parts a node suite can actually hold: the target verdict,
+// the clipboard transform, and the fact that the ghost repaint is not silently
+// skipped.
+
+import { performMapFlip, setFlipGhostRepaint } from '../map-flip';
+import { flipClipboard } from '../../../core/editing/region-flip';
+import { useEditorStore } from '../../state/editorStore';
+import type { MapClipboard } from '../../../core/editing/map-clipboard';
+import { readFileSync } from 'node:fs';
+
+/** A 2x2-tile clipboard that is asymmetric in BOTH axes, so a no-op transform
+ *  and a wrong-axis transform are both visible. The values are arbitrary word
+ *  bits; every row compares against `flipClipboard`'s own output, which
+ *  region-flip.test.ts pins against the two word codecs. */
+function clip(): MapClipboard {
+  return {
+    widthTiles: 2, heightTiles: 2,
+    nametable: new Uint16Array([1, 2, 3, 4]),
+    collisionA: new Uint16Array([9]),
+    collisionB: new Uint16Array([0]),
+    artOnly: false,
+  };
+}
+
+function resetEditor(): void {
+  const ed = useEditorStore.getState();
+  ed.setMapClipboard(null);
+  ed.setMarquee(null);
+  ed.setPasting(false);
+  setFlipGhostRepaint(null);
+}
+
+describe('performMapFlip — one action, both surfaces', () => {
+  // THE BUTTON'S DISABLED RULE IS THE KEY'S NO-OP RULE. The panel disables on
+  // `resolveFlip(...) === null`; if the action did anything in a state
+  // `resolveFlip` calls ineligible, the panel would be teaching a rule the map
+  // does not keep. Asserted as an equivalence over a state matrix rather than
+  // as two separate claims about two functions.
+  it('does nothing in exactly the states resolveFlip calls ineligible', () => {
+    const cases = [
+      { pasting: false, mapClipboard: null, tool: 'marquee', marquee: null },
+      { pasting: false, mapClipboard: CLIP, tool: 'paint-tile', marquee: MARQUEE },
+      { pasting: true, mapClipboard: null, tool: 'marquee', marquee: MARQUEE },
+    ];
+    for (const c of cases) {
+      expect(resolveFlip(c as never)).toBe(null);
+      resetEditor();
+      const ed = useEditorStore.getState();
+      ed.setPasting(c.pasting);
+      ed.setMapClipboard(c.mapClipboard as MapClipboard | null);
+      ed.setMarquee(c.marquee as never);
+      const before = useEditorStore.getState().mapClipboard;
+      const out = performMapFlip('h');
+      expect(out.kind).toBe('none');
+      // ...and it is inert, not merely quiet.
+      expect(useEditorStore.getState().mapClipboard).toBe(before);
+    }
+    resetEditor();
+  });
+
+  it('mirrors the PENDING PASTE through region-flip, as a new object', () => {
+    resetEditor();
+    const c0 = clip();
+    const ed = useEditorStore.getState();
+    ed.setMapClipboard(c0);
+    ed.setPasting(true);
+
+    const out = performMapFlip('h');
+    expect(out.kind).toBe('clipboard');
+    const after = useEditorStore.getState().mapClipboard!;
+    // Expectation DERIVED from the shared transform, not transcribed: whatever
+    // region-flip does, this path must do exactly that and nothing else.
+    expect([...after.nametable]).toEqual([...flipClipboard(c0, 'h').nametable]);
+    // A NEW object — the ghost's raster cache is keyed on identity, so an
+    // in-place mutation would mirror the model and leave the picture.
+    expect(after).not.toBe(c0);
+    // ...and the row is not vacuous: this fixture is genuinely asymmetric.
+    expect([...after.nametable]).not.toEqual([...c0.nametable]);
+    resetEditor();
+  });
+
+  it('mirrors on the AXIS asked for — h and v are different transforms here', () => {
+    resetEditor();
+    const c0 = clip();
+    const ed = useEditorStore.getState();
+    ed.setPasting(true);
+
+    ed.setMapClipboard(c0);
+    performMapFlip('h');
+    const h = [...useEditorStore.getState().mapClipboard!.nametable];
+    ed.setMapClipboard(c0);
+    performMapFlip('v');
+    const v = [...useEditorStore.getState().mapClipboard!.nametable];
+    expect(h).not.toEqual(v);
+    expect(h).toEqual([...flipClipboard(c0, 'h').nametable]);
+    expect(v).toEqual([...flipClipboard(c0, 'v').nametable]);
+    resetEditor();
+  });
+
+  // ⚠ THE GHOST. `mapClipboard` is not a redraw dependency and the ghost lives
+  // on MapViewport's preview overlay, so a flip that skips this repaint mirrors
+  // the model and leaves the OLD art under the cursor — which then pastes. The
+  // KEY path always had the repaint inline; the BUTTON cannot reach that
+  // canvas, which is why the callback is registered rather than passed.
+  it('repaints the paste ghost, and REPORTS it when there is nothing to repaint with', () => {
+    resetEditor();
+    const ed = useEditorStore.getState();
+    ed.setMapClipboard(clip());
+    ed.setPasting(true);
+
+    let calls = 0;
+    setFlipGhostRepaint(() => { calls++; });
+    const withGhost = performMapFlip('h');
+    expect(calls).toBe(1);
+    expect(withGhost.kind === 'clipboard' && withGhost.ghostRepainted).toBe(true);
+
+    // Unregistered (MapViewport unmounted): the flip still happens, and the
+    // absence is an ANSWER rather than a silence.
+    setFlipGhostRepaint(null);
+    const noGhost = performMapFlip('h');
+    expect(calls).toBe(1);
+    expect(noGhost.kind === 'clipboard' && noGhost.ghostRepainted).toBe(false);
+    resetEditor();
+  });
+
+  // A selection flip with no project loaded must not throw its way out of a
+  // click handler — the panel can be mounted before an act is open.
+  it('is inert when the marquee names a section no open project has', () => {
+    resetEditor();
+    const ed = useEditorStore.getState();
+    ed.setTool('marquee');
+    ed.setMarquee({ sectionIndex: 0, col: 0, row: 0, w: 2, h: 2 } as never);
+    expect(resolveFlip(useEditorStore.getState() as never)).toBe('selection');
+    expect(performMapFlip('h').kind).toBe('none');
+    resetEditor();
+  });
+});
+
+// ═══ ONE PATH, ENFORCED ON THE SOURCE ═══
+//
+// The rows above prove `performMapFlip` is correct. They cannot prove a CALL
+// SITE uses it — a button that reached for `flipClipboard` directly would leave
+// every row above green while shipping a second source of truth, which is the
+// exact thing this module exists to prevent. So the two surfaces are read as
+// text. Weak evidence standing alone, which is why the harness clicks the real
+// button and compares the real pixels; this row is the cheap tripwire beside it.
+describe('the flip has ONE implementation, and both surfaces take it', () => {
+  const SURFACES = [
+    'src/renderer/components/MapViewport.tsx',
+    'src/renderer/components/MarqueePasteOptions.tsx',
+  ];
+  it('neither the map nor the panel reaches for the transform itself', () => {
+    for (const f of SURFACES) {
+      const src = readFileSync(f, 'utf8');
+      expect(src, `${f} must call the shared action`).toContain('performMapFlip');
+      for (const forbidden of ['flipClipboard', 'flipSectionRegion']) {
+        expect(src.includes(forbidden), `${f} must not call ${forbidden} directly`).toBe(false);
+      }
+    }
+  });
+});
