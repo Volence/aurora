@@ -61,6 +61,16 @@ export interface ShapeDrawOpts {
   markCoreWidth: number;
   /** Angle-mark casing stroke width, in the caller's units. Must exceed core. */
   markCasingWidth: number;
+  /**
+   * How many SCREEN px this caller's 16px collision cell occupies — the picker
+   * passes its box size, the paint ghost passes `16 * zoom`.
+   *
+   * The call site states its BUDGET; `collision-angle-mark.markTier` decides
+   * what that budget can carry. A thumbnail and a 120px preview are genuinely
+   * different pictures of the same mark, and the difference is one rule in one
+   * module rather than an `if (size < …)` at each surface.
+   */
+  cellScreenPx: number;
   showSolidEdges?: boolean;
   showNeedle?: boolean;
 }
@@ -82,8 +92,9 @@ export interface ShapeDrawCtx {
  *  - the solid silhouette (one filled rect per 16px-cell column, via columnSolidRun),
  *  - a surface line tracing the column tops,
  *  - the solid-side edges (per solidEdges) when showSolidEdges,
- *  - the angle mark (surface-anchored bar + outward barb, cased) when the
- *    profile hasAngle && showNeedle — see collision-angle-mark.ts.
+ *  - the angle mark (a dominant outward stem from the surface, plus a fine
+ *    tangent bar at the detail tier, cased) when the profile hasAngle &&
+ *    showNeedle — see collision-angle-mark.ts.
  *  GUI-verified, not unit-tested. */
 export function drawCollisionShape(
   ctx: ShapeDrawCtx,
@@ -147,7 +158,8 @@ export function drawCollisionShape(
     }
   }
 
-  // 4) The angle mark — a tangent bar ON the surface with an outward barb.
+  // 4) The angle mark — a dominant outward stem rooted ON the surface, with a
+  //    fine tangent bar beside it wherever the size can carry one.
   //
   // This used to be a centred, symmetric needle sized at `size * 0.32` and
   // routed through `angleDegrees` (which rounds to whole degrees). All three of
@@ -155,7 +167,7 @@ export function drawCollisionShape(
   //   • CENTRED     — it floated at the box middle instead of the edge it
   //                   describes. `angleMark` anchors on the surface.
   //   • SYMMETRIC   — it could not distinguish a floor from the ceiling at the
-  //                   same angle. The barb can.
+  //                   same angle. The outward stem can.
   //   • ROUNDED     — whole degrees drifted the thumbnail off the map's own
   //                   direction by up to half a degree. `angleMark` works in
   //                   angle BYTES.
@@ -168,6 +180,7 @@ export function drawCollisionShape(
         casing: opts.needleCasing,
         coreWidth: opts.markCoreWidth,
         casingWidth: opts.markCasingWidth,
+        cellScreenPx: opts.cellScreenPx,
       });
     }
   }

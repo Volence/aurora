@@ -12,6 +12,7 @@ import { classifyProfile, COLLISION_KINDS } from '../../core/collision/collision
 import type { CollisionKind } from '../../core/collision/collision-classify';
 import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
 import type { ShapeDrawOpts, ShapeDrawCtx } from '../../core/collision/collision-shape-draw';
+import { fitCellSizeToBox } from '../../core/collision/collision-angle-mark';
 import { clearCollisionEntries, resetToEngineEntries } from '../../core/editing/collision-word';
 import { useToastStore } from '../state/toastStore';
 import { claimCollisionOverlay } from './collision-overlay-scope';
@@ -53,42 +54,62 @@ function shapeOpts(size: number): ShapeDrawOpts {
     solidEdgeWidth: Math.max(1, (size / 16) * 1.5),
     markCoreWidth: Math.max(1, (size / 16) * 1.25),
     markCasingWidth: Math.max(2.5, (size / 16) * 3),
+    // An unscaled canvas: one unit IS one screen pixel, so the box the cell
+    // occupies is the cell's screen size. This is what tells the mark module
+    // that a thumbnail and the big preview are different budgets.
+    cellScreenPx: size,
     showSolidEdges: true,
     showNeedle: true,
   };
 }
 
 /**
- * Room around the shape box for the angle mark's outward barb.
+ * How much bigger than the shape the thumbnail CANVAS is, so the mark's outward
+ * stem is not clipped.
  *
- * The barb points OUT of the solid, so on a full-height cell — surface at y=0 —
- * it leaves the box entirely. ON THE MAP that is correct and wanted: the barb
- * reaches into the air cell above, which is exactly what "the open side is up
- * there" looks like. In a THUMBNAIL the box edge is a hard clip, and the first
- * render of this showed every full-height shape with its barb sliced off at the
- * border, which reads as a rendering fault rather than as a direction.
+ * The stem points OUT of the solid, so on a full-height cell — surface at y=0 —
+ * it leaves the box entirely. ON THE MAP that is correct and wanted: it reaches
+ * into the air cell above, which is exactly what "the open side is up there"
+ * looks like. In a THUMBNAIL the box edge is a hard clip, and a clipped stem
+ * loses its far end — the end that carries the direction, and the only thing
+ * the owner was looking for.
  *
- * So the canvas is bigger than the shape and the shape is drawn inset. The
- * geometry is untouched — this is padding, not a clamp. Clamping the anchor to
- * keep the barb inside would have moved the mark OFF the surface, which is the
- * defect this whole parcel is about.
+ * ⚠ THE PREVIOUS VALUE (5) WAS NEVER ENOUGH, AND THE BIG PREVIEW WAS WORSE.
+ * The reach is proportional to the cell, so a 120px preview needed ~30px of
+ * room and had 5: it has been drawing a barb sliced at the border this whole
+ * time. Nobody noticed because the barb was the quiet element — the same reason
+ * this parcel exists. So the SHAPE now sizes itself to the canvas
+ * (`fitCellSizeToBox`) instead of the canvas guessing a fixed pad, and both
+ * surfaces get an uncut mark.
+ *
+ * Padding, not a clamp: clamping the anchor to keep the stem inside would move
+ * the mark OFF the surface, which is the defect the first parcel removed.
  */
-const MARK_PAD = 5;
+const MARK_PAD = 8;
 
-/** Paint a single profile into a square canvas via drawCollisionShape. */
-function ShapeCanvas({ profile, size }: { profile: CollisionProfile; size: number }) {
+/**
+ * Paint a single profile into a square `box`-px canvas via drawCollisionShape,
+ * with the cell sized so the whole mark fits inside the canvas.
+ *
+ * `box` is fixed by the layout; the CELL is whatever is left after the mark's
+ * outward reach, which is `collision-angle-mark`'s rule and not this file's.
+ */
+function ShapeCanvas({ profile, box, bleed = 0 }: {
+  profile: CollisionProfile; box: number; bleed?: number;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const box = size + MARK_PAD * 2;
+  const size = fitCellSizeToBox(box);
+  const off = (box - size) / 2;
   useEffect(() => {
     const ctx = ref.current?.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, box, box);
     // CanvasRenderingContext2D structurally satisfies ShapeDrawCtx; its fillStyle/
     // strokeStyle are a wider union, so narrow via the minimal shape we draw with.
-    drawCollisionShape(ctx as unknown as ShapeDrawCtx, MARK_PAD, MARK_PAD, size, profile, shapeOpts(size));
-  }, [profile, size, box]);
+    drawCollisionShape(ctx as unknown as ShapeDrawCtx, off, off, size, profile, shapeOpts(size));
+  }, [profile, box, size, off]);
   return <canvas ref={ref} width={box} height={box}
-    style={{ display: 'block', margin: -MARK_PAD }} />;
+    style={{ display: 'block', margin: -bleed }} />;
 }
 
 export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' | 'art' }) {
@@ -303,7 +324,7 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
           </div>
         ) : (
           <div style={styles.previewBox}>
-            <ShapeCanvas profile={previewProfile} size={PREVIEW} />
+            <ShapeCanvas profile={previewProfile} box={PREVIEW} />
           </div>
         )}
         <div style={styles.previewText}>
@@ -325,7 +346,7 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
             <button key={`${e.shape}:${e.mirrorX ? 'm' : ''}`}
               title={`#${e.shape}${e.mirrorX ? ' (mirrored to face left)' : ''} · ${classifyProfile(e.profile)} · ${e.profile.solidity}`}
               onClick={() => pick(e.shape, e.mirrorX)} style={{ ...styles.cellWrap, ...(isSel ? styles.sel : {}) }}>
-              <ShapeCanvas profile={e.profile} size={PX} />
+              <ShapeCanvas profile={e.profile} box={PX + MARK_PAD * 2} bleed={MARK_PAD} />
               <span style={styles.degLabel}>{deg === null ? '—' : `${deg}°`}</span>
             </button>
           );
@@ -346,7 +367,11 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   previewText: { fontSize: T.t2xs, color: T.textBase, fontFamily: T.fontMono, textAlign: 'center' },
-  grid: { display: 'flex', flexWrap: 'wrap', gap: 4, padding: `0 ${T.s2} ${T.s2}` },
+  // GAP >= MARK_PAD, on purpose. Each thumbnail's canvas bleeds MARK_PAD px
+  // past its layout box so the outward stem is not clipped; a gap narrower than
+  // the bleed lets one tile's mark paint over the tile beside it, which in a
+  // PICKER reads as the neighbour having a direction it does not have.
+  grid: { display: 'flex', flexWrap: 'wrap', gap: MARK_PAD + 2, padding: `0 ${T.s2} ${T.s2}` },
   cellWrap: {
     width: PX + 6, padding: 2, background: T.overlay,
     border: `1px solid ${T.border}`, borderRadius: T.rSm, cursor: 'pointer',

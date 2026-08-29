@@ -142,6 +142,7 @@ export function drawCollision(
           casing: COLLISION_ANGLE_CASING,
           coreWidth: 1.25 / zoomScale,
           casingWidth: 3 / zoomScale,
+          cellScreenPx: zoomScale * 16,
         });
       }
     }

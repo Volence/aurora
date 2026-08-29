@@ -124,6 +124,10 @@ function collisionPreviewOpts(zoom: number): ShapeDrawOpts {
     solidEdgeWidth: 3 / zoom,
     markCoreWidth: 1.25 / zoom,
     markCasingWidth: 3 / zoom,
+    // The ghost draws at size 16 into a context already scaled by zoom, so its
+    // CELL is 16*zoom screen px even though its `size` is 16 — the same number
+    // the map overlay in the cell beside it passes, which is the point.
+    cellScreenPx: 16 * zoom,
     showSolidEdges: true,
     showNeedle: true,
   };

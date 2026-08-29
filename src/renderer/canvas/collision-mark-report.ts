@@ -27,16 +27,24 @@ export interface CollisionMarkRow {
   /** The anchor: bar midpoint and barb root, on the collidable surface. */
   ax: number;
   ay: number;
-  /** The tangent bar's two endpoints. */
+  /** The tangent bar's two endpoints — GEOMETRIC, published whether or not the
+   *  bar was drawn. `tangentDrawn` says which; a harness needs the coordinates
+   *  in both cases, because at the compact tier it must prove there is NO ink
+   *  there, and it cannot prove that without knowing where "there" is. */
   bar1x: number;
   bar1y: number;
   bar2x: number;
   bar2y: number;
-  /** The barb's tip — the end that is NOT on the surface. */
+  /** The outward stem's tip — the end that is NOT on the surface. */
   tipx: number;
   tipy: number;
   /** The profile's angle byte, so a row can tie a mark back to the data. */
   angle: number;
+  /** Whether the tangent bar was actually stroked (the DETAIL tier). */
+  tangentDrawn: boolean;
+  /** False for a wall cell, whose open side the geometry cannot decide — the
+   *  stem is drawn double-ended there and asserts nothing. */
+  normalKnown: boolean;
 }
 
 export interface CollisionMarkReport {
@@ -47,6 +55,11 @@ export interface CollisionMarkReport {
   zoom: number;
   /** Screen px per 16px collision cell — the quantity the gate is stated in. */
   cellScreenPx: number;
+  /** What `markTier` said this pass's cells could carry: 'off' | 'compact' |
+   *  'detail'. Published so "the tangent is missing" and "the tangent is
+   *  correctly demoted at this zoom" are different answers a row can fail on,
+   *  the same way `suppressed` separates the gate from a dead overlay. */
+  tier: string;
   /** Total marks drawn this pass (may exceed `rows.length`; see ROW_CAP). */
   drawn: number;
   rows: CollisionMarkRow[];
@@ -64,7 +77,7 @@ export interface CollisionMarkReport {
 export const ROW_CAP = 400;
 
 const EMPTY: CollisionMarkReport = {
-  active: false, suppressed: false, zoom: 1, cellScreenPx: 16, drawn: 0, rows: [], paints: 0,
+  active: false, suppressed: false, zoom: 1, cellScreenPx: 16, tier: 'off', drawn: 0, rows: [], paints: 0,
 };
 
 let lastReport: CollisionMarkReport = EMPTY;

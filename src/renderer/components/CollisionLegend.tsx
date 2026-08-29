@@ -30,6 +30,17 @@ const LEGEND_PROFILE: CollisionProfile = {
 };
 
 /**
+ * The swatch's own drawing box, screen px.
+ *
+ * NOT the tier input. The swatch is told the MAP's `16 * zoom`, so the key
+ * shows the same tier the map is currently drawing — a legend that shows a
+ * tangent bar the map has demoted away is a legend that has drifted from the
+ * overlay, which is the drift this component was routed through the real
+ * drawing code to prevent.
+ */
+const SWATCH = 18;
+
+/**
  * The legend's angle swatch DRAWS THE REAL MARK with the real drawing code.
  *
  * It used to be a CSS `borderTop` — a flat horizontal rule, which is to say a
@@ -39,7 +50,7 @@ const LEGEND_PROFILE: CollisionProfile = {
  * one angle byte two ways). Routing it through `drawAngleMark` means the key
  * cannot disagree with the map: there is one function and it is this one.
  */
-function AngleSwatch() {
+function AngleSwatch({ cellScreenPx }: { cellScreenPx: number }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     const cv = ref.current;
@@ -58,12 +69,11 @@ function AngleSwatch() {
       casing: COLLISION_ANGLE_CASING,
       coreWidth: 1.25,
       casingWidth: 3,
+      cellScreenPx,
     });
-  }, []);
+  }, [cellScreenPx]);
   return <canvas ref={ref} style={{ width: SWATCH, height: SWATCH, flex: '0 0 auto' }} />;
 }
-
-const SWATCH = 16;
 
 /** On-map key for the collision overlay colors. Shown only while a collision
  *  plane is on; adds the angle + A/B-diff rows only when those are active. */
@@ -77,7 +87,8 @@ export default function CollisionLegend() {
   // trap: an author switches "Collision angles" on while zoomed out, nothing
   // appears, and the honest conclusion is that the toggle is broken. The legend
   // is the only surface that can say "it is on, and it is waiting for zoom".
-  const marksHidden = 16 * zoom < MIN_CELL_PX_FOR_MARK;
+  const cellScreenPx = 16 * zoom;
+  const marksHidden = cellScreenPx < MIN_CELL_PX_FOR_MARK;
 
   const rows: Row[] = [
     { kind: 'fill', color: COLLISION_FILL_ALL, label: 'Solid (all sides)' },
@@ -88,7 +99,11 @@ export default function CollisionLegend() {
   if (o.showCollisionAngles) {
     rows.push({
       kind: 'mark',
-      label: marksHidden ? 'Angle — zoom in to show' : 'Angle · barb = open side',
+      // The wording follows the mark. It used to say "barb", which named the
+      // element the mark no longer leads with; the arrow IS the open side now,
+      // and a key that describes a mark the overlay stopped drawing is exactly
+      // the drift routing this swatch through the real code was meant to end.
+      label: marksHidden ? 'Angle — zoom in to show' : 'Angle · arrow points to the open side',
     });
   }
   if (o.showCollision && o.showCollisionPathB) rows.push({ kind: 'outline', color: COLLISION_DIFF, label: 'Path A / B differ' });
@@ -98,7 +113,7 @@ export default function CollisionLegend() {
       <div style={styles.title}>Collision</div>
       {rows.map((r) => (
         <div key={r.label} style={styles.row}>
-          {r.kind === 'mark' ? <AngleSwatch /> : <span style={swatch(r)} />}
+          {r.kind === 'mark' ? <AngleSwatch cellScreenPx={cellScreenPx} /> : <span style={swatch(r)} />}
           <span style={r.kind === 'mark' && marksHidden ? styles.dim : undefined}>{r.label}</span>
         </div>
       ))}
