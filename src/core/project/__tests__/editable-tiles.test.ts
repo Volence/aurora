@@ -62,6 +62,8 @@ describe('tileLockReason', () => {
 // ---------------------------------------------------------------------------
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const S1_PRESENT = fs.existsSync(S1DIR);
 
 function realFs(root: string): FileAccess {
@@ -73,7 +75,7 @@ function realFs(root: string): FileAccess {
 }
 
 describe('editable tiles, real Green Hill act 1', () => {
-  it.skipIf(!S1_PRESENT)('leaves the low tile pool editable and locks only the overlays/gap', async () => {
+  it('leaves the low tile pool editable and locks only the overlays/gap', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, async () => {
     const handle = await s1Adapter.open(realFs(S1DIR));
     const ghz1 = handle.levels!.list().find((r) => r.zone === 'ghz' && r.act === 1)!;
     const doc = await handle.levels!.read(ghz1);

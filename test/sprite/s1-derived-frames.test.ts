@@ -35,6 +35,8 @@ import type { SpriteFrame } from '../../src/core/model/sprite-types';
 import type { Tile } from '../../src/core/model/s4-types';
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const maps = (rel: string) => parseAsmMappings(fs.readFileSync(path.join(S1DIR, '_maps', rel), 'utf8'));
 
 /**
@@ -68,7 +70,7 @@ function renderAlone(frame: SpriteFrame, tiles: Tile[]) {
   };
 }
 
-describe.skipIf(!fs.existsSync(S1DIR))('S1 sideways spring — derivation vs parser+composer', () => {
+describe('S1 sideways spring — derivation vs parser+composer', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
   // HAND-TRANSCRIBED from _maps/Springs.asm (argument order per
   // _MapMacros.asm): the full six-frame table.
   //   0 .spg_Up:       (-$10,-8, 4x1, tile 0) (-$10,0, 4x1, tile 4)
@@ -146,7 +148,7 @@ describe.skipIf(!fs.existsSync(S1DIR))('S1 sideways spring — derivation vs par
   });
 });
 
-describe.skipIf(!fs.existsSync(S1DIR))('flip/negative-offset sweep — other objects, hand-derived', () => {
+describe('flip/negative-offset sweep — other objects, hand-derived', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
   it('GHZ Ball .check2 (frame 2): h+v-flipped quadrants place tiles AND pixels mirrored', () => {
     // HAND-TRANSCRIBED from _maps/GHZ Ball.asm .check2:
     //   (-$18,-$18, 3x3, tile $12)  (0,-$18, 3x3, tile $1B)

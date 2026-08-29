@@ -15,6 +15,8 @@ import { performGuardedWrite } from '../../src/main/guarded-write';
 // ---------------------------------------------------------------------------
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const S1_PRESENT = fs.existsSync(S1DIR);
 
 let tmp: string;
@@ -90,8 +92,9 @@ const ALL_DIRTY = {
 } as const;
 
 describe('classic save integration (temp copy of real s1disasm)', () => {
-  it.skipIf(!S1_PRESENT)(
+  it(
     'read → guarded write → refresh mtimes → external touch → second write conflicts, writes nothing',
+    { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } },
     async () => {
       const act = s1Profile.zones[0].acts[0]; // GHZ1
       const paths = realPaths(act);
@@ -151,8 +154,9 @@ describe('classic save integration (temp copy of real s1disasm)', () => {
     },
   );
 
-  it.skipIf(!S1_PRESENT)(
+  it(
     'adapter write() exposes fileMtimes; updateMtimes refreshes the baseline for the next save',
+    { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } },
     async () => {
       const act = s1Profile.zones[0].acts[0]; // GHZ1
       const zoneId = s1Profile.zones[0].id;

@@ -27,6 +27,8 @@ import { s1Adapter } from '../../project/s1';
 import type { FileAccess } from '../../project/adapter';
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const S1_PRESENT = fs.existsSync(S1DIR);
 
 describe('occlusionWinner truth table', () => {
@@ -55,7 +57,7 @@ function realFs(root: string): FileAccess {
   } as FileAccess;
 }
 
-describe.skipIf(!S1_PRESENT)('decision inputs derived from GHZ act 1 (monitor behind leaves)', () => {
+describe('decision inputs derived from GHZ act 1 (monitor behind leaves)', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, () => {
   it('finds a monitor with occluded AND free pixels, and the rule splits them', async () => {
     const handle = await s1Adapter.open(realFs(S1DIR));
     expect(handle.levels).not.toBeNull();

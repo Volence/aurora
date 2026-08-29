@@ -64,7 +64,13 @@ class CountingCtx {
 }
 
 describe('bench', () => {
-  it.skipIf(!process.env.AURORA_BENCH)('composition throughput', () => {
+  it('composition throughput', {
+    skip: !process.env.AURORA_BENCH,
+    meta: {
+      skipReason: 'AURORA_BENCH is not set — this row is an opt-in measurement harness that '
+        + 'PRINTS rather than asserts, so it is off by default; see the file header to run it',
+    },
+  }, () => {
     const tiles = makeTiles(TILE_COUNT);
     const palettes = makePalettes();
     const nametables = Array.from({ length: SECTIONS }, (_, i) => makeNametable(0x1000 + i));

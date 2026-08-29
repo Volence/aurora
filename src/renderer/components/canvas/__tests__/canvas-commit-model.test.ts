@@ -161,7 +161,9 @@ describe('reportLines and the colind overhang', () => {
 // (s1-io.ts's own stride). Gated like the compression goldens: the fixture
 // tree is absent on CI.
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
-describe.skipIf(!fs.existsSync(S1DIR))('reportLines over GHZ, the zone whose commits all overhang', () => {
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
+describe('reportLines over GHZ, the zone whose commits all overhang', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
   it('states GHZ\'s whole overhang when a commit mints every id past the table', () => {
     const colindLength = fs.statSync(`${S1DIR}/collide/GHZ.bin`).size;
     const blockCount = Math.floor(

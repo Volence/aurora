@@ -23,6 +23,8 @@ import { planSurfaceEdit, type SurfaceWrite } from '../../art/classic-surface-pl
 // ---------------------------------------------------------------------------
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const S1_PRESENT = fs.existsSync(S1DIR);
 
 function realFs(root: string): FileAccess {
@@ -68,8 +70,9 @@ function sixSharedTileDivergences(
 }
 
 describe('object-aware tile claimability, real s1disasm', () => {
-  it.skipIf(!S1_PRESENT)(
+  it(
     'GHZ act 1: reservedTiles covers the platform run and stays out of a six-divergence isolate plan',
+    { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } },
     async () => {
       const handle = await s1Adapter.open(realFs(S1DIR));
       const ghz1 = handle.levels!.list().find((r) => r.zone === 'ghz' && r.act === 1)!;
@@ -159,8 +162,9 @@ describe('object-aware tile claimability, real s1disasm', () => {
   //
   // Reported per the task brief rather than adjusting the assertion to pass:
   // this pins the ACTUAL behavior today, not the design's prediction.
-  it.skipIf(!S1_PRESENT)(
+  it(
     'LZ act 1 and SBZ act 3: the shared-file door reservation is clamped away by both acts’ 454-tile pool, not present',
+    { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } },
     async () => {
       const handle = await s1Adapter.open(realFs(S1DIR));
 
@@ -186,8 +190,9 @@ describe('object-aware tile claimability, real s1disasm', () => {
    * quietly-short set defeats it: the allocator then hands out tiles an object
    * sprite is still drawing through.
    */
-  it.skipIf(!S1_PRESENT)(
+  it(
     'a present-but-unreadable mappings .asm reports NOT KNOWN, not an empty reservation',
+    { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } },
     async () => {
       const real = realFs(S1DIR);
       let refusedOne = false;

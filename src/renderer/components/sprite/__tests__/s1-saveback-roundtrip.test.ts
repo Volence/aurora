@@ -23,6 +23,8 @@ import { useToastStore } from '../../../state/toastStore';
 import type { SpriteFrame } from '../../../../core/model/sprite-types';
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const SONIC_FILES = ['_maps/Sonic.asm', '_maps/Sonic - Dynamic Gfx Script.asm', 'artunc/Sonic.unc'];
 const RING_FILES = ['_maps/Giant Ring.asm', 'artunc/Giant Ring.unc'];
 
@@ -173,7 +175,7 @@ function findEditSpot(
   throw new Error('unmeasurable: no single-coverage edit spot found');
 }
 
-describe.skipIf(!fs.existsSync(S1DIR))('S1 save-back round trip — Sonic (uncompressed + DPLC)', () => {
+describe('S1 save-back round trip — Sonic (uncompressed + DPLC)', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
   it('zero-edit save writes a BYTE-IDENTICAL art file and touches nothing else', async () => {
     const ok = await openDiscoveredSet(tempDir, SONIC_SET, 'uncompressed');
     expect(ok).toBe(true);
@@ -227,7 +229,7 @@ describe.skipIf(!fs.existsSync(S1DIR))('S1 save-back round trip — Sonic (uncom
   });
 });
 
-describe.skipIf(!fs.existsSync(S1DIR))('S1 save-back round trip — Giant Ring (uncompressed flat)', () => {
+describe('S1 save-back round trip — Giant Ring (uncompressed flat)', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
   it('zero-edit save is byte-identical; an edit changes only the derived tile records', async () => {
     const ok = await openDiscoveredSet(tempDir, RING_SET, 'uncompressed');
     expect(ok).toBe(true);

@@ -11,6 +11,8 @@ import type { SpriteFrame } from '../../../model/sprite-types';
 import { buildEditedTiles, encodeS1ArtWriteBack, type EditedFrame } from '../s1-art-write';
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const hasS1 = fs.existsSync(S1DIR);
 
 /** A tile whose 64 pixels are a deterministic function of the tile index. */
@@ -118,7 +120,7 @@ describe('s1 object art save-back (Nemesis)', () => {
     expect(nemesisDecompress(res.bytes).length).toBe(6 * 32);
   });
 
-  it.skipIf(!hasS1)('real artnem file re-encodes decode-identical (codec round-trip)', () => {
+  it('real artnem file re-encodes decode-identical (codec round-trip)', { skip: !hasS1, meta: { skipReason: S1_ABSENT } }, () => {
     const raw = new Uint8Array(fs.readFileSync(`${S1DIR}/artnem/Enemy Jaws.nem`));
     const decoded = nemesisDecompress(raw);
     const back = nemesisDecompress(nemesisCompress(decoded));
@@ -131,7 +133,7 @@ describe('s1 object art save-back (Nemesis)', () => {
   // yflipped — decode the real art + parse the real _maps mappings, render each
   // frame forward through the actual open path, then prove a zero-edit inversion
   // reproduces the whole 32-tile pool byte-for-byte.
-  it.skipIf(!hasS1)('real-shape zero-edit inversion reproduces the tile pool (2-piece + yflip)', () => {
+  it('real-shape zero-edit inversion reproduces the tile pool (2-piece + yflip)', { skip: !hasS1, meta: { skipReason: S1_ABSENT } }, () => {
     const artBytes = new Uint8Array(fs.readFileSync(`${S1DIR}/artnem/Enemy Jaws.nem`));
     const mappings = parseAsmMappings(fs.readFileSync(`${S1DIR}/_maps/Jaws.asm`, 'utf8'));
     expect(mappings.length).toBe(4);

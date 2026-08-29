@@ -300,6 +300,8 @@ describe('s1Adapter.open overrides', () => {
 // ---------------------------------------------------------------------------
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const S1_PRESENT = fs.existsSync(S1DIR);
 
 function realFs(root: string): FileAccess {
@@ -317,7 +319,7 @@ function realFs(root: string): FileAccess {
 }
 
 describe('s1Adapter golden (real s1disasm)', () => {
-  it.skipIf(!S1_PRESENT)('detects and resolves 100% of profile entries; all acts available', async () => {
+  it('detects and resolves 100% of profile entries; all acts available', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, async () => {
     const fa = realFs(S1DIR);
     expect(await s1Adapter.detect(fa)).toEqual({ type: 's1', label: LABEL });
 
@@ -365,7 +367,7 @@ describe('s1Adapter levels.readPalettes', () => {
     expect([...palettes[3]]).toEqual(Array.from({ length: 16 }, (_, i) => 0x0b20 + i));
   });
 
-  it.skipIf(!S1_PRESENT)('golden: equals the full read()\'s LevelDoc.palettes on real s1disasm (GHZ 1)', async () => {
+  it('golden: equals the full read()\'s LevelDoc.palettes on real s1disasm (GHZ 1)', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, async () => {
     const handle = await s1Adapter.open(realFs(S1DIR));
     const ref = handle.levels!.list().find((r) => r.zone === 'ghz' && r.act === 1)!;
     const doc = await handle.levels!.read(ref);

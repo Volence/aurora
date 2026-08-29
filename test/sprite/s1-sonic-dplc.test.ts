@@ -27,9 +27,11 @@ import { parseAsmMappings, parseAsmDPLC } from '../../src/core/import/asm-mappin
 import { reconstructFromFrames } from '../../src/core/import/sprite-import';
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const read = (rel: string) => fs.readFileSync(path.join(S1DIR, rel));
 
-describe.skipIf(!fs.existsSync(S1DIR))('S1 Sonic DPLC — real-file parse, hand-derived entries', () => {
+describe('S1 Sonic DPLC — real-file parse, hand-derived entries', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
   const dplc = () => parseAsmDPLC(read('_maps/Sonic - Dynamic Gfx Script.asm').toString('utf8'));
   const maps = () => parseAsmMappings(read('_maps/Sonic.asm').toString('utf8'));
 

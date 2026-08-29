@@ -11,6 +11,8 @@ import {
 import { resolveObjectArt } from '../s1-object-art';
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 
 describe('object-subtype-rules', () => {
   describe('objectHasSubtypeRule / objectArtKey', () => {
@@ -287,7 +289,7 @@ describe('object-subtype-rules', () => {
     });
   });
 
-  describe.skipIf(!fs.existsSync(S1DIR))('composed frame against real s1disasm', () => {
+  describe('composed frame against real s1disasm', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
     it('a subtype-$0C bridge composes a non-empty ~192px-wide frame', async () => {
       const { composeObjectFramesFromFiles } = await import('../../../level-classic/object-sprite');
       const set = resolveObjectPieces(0x11, 'ghz', 0x0c)!;

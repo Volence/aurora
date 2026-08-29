@@ -8,6 +8,8 @@ import { decodeS1ColInd, encodeS1ColInd } from '../s1-colind';
 import { decodeS1CollisionArray, decodeS1AngleMap, decodeS1CollisionShapes } from '../s1-collision-shapes';
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
+const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 
 function bytes(...v: number[]): Uint8Array {
   return new Uint8Array(v);
@@ -198,7 +200,7 @@ function topLevelBins(dir: string): string[] {
 // (mz3bg/syz1/syz3 carry one trailing byte; ending.bin is truncated short.)
 const IRREGULAR_LAYOUTS = new Set(['mz3bg.bin', 'syz1.bin', 'syz3.bin', 'ending.bin']);
 
-describe.skipIf(!fs.existsSync(S1DIR))('s1 binary goldens over real s1disasm data', () => {
+describe('s1 binary goldens over real s1disasm data', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
   it('levels/*.bin decode, consume the whole file, and re-encode byte-identically', () => {
     const dir = `${S1DIR}/levels`;
     const files = topLevelBins(dir);

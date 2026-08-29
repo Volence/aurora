@@ -25,7 +25,17 @@ import {
 
 const SONIC_ASM = '/home/volence/sonic_hacks/s1disasm/_anim/Sonic.asm';
 const treePresent = existsSync(SONIC_ASM);
-const guarded = treePresent ? describe : describe.skip;
+/**
+ * `describe`, but a skip here says WHY — read by scripts/skip-report-reporter.mjs.
+ * The bare `treePresent ? describe : describe.skip` this replaces produced rows
+ * indistinguishable from passes in a suite total.
+ */
+const guarded = (name: string, fn: () => void): void => {
+  describe(name, {
+    skip: !treePresent,
+    meta: { skipReason: `${SONIC_ASM} is absent — no s1disasm checkout on this machine` },
+  }, fn);
+};
 
 guarded('parseSonicAnimTable — round-trip against the real file', () => {
   const text = readFileSync(SONIC_ASM, 'utf8');
