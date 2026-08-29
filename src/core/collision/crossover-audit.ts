@@ -66,10 +66,18 @@ export interface CrossoverAudit {
   pairs: number;
   /** Marked on exactly one plane. Legal; see the WARN tier above. */
   oneWay: number;
-  /** ILLEGAL: a plane's word telling you to go to the plane you are on. Aeon's
-   *  bake refuses these (rule R2). */
+  /** ILLEGAL: a plane's word telling you to go to the plane you are on.
+   *  Rule R2 SPECIFIES that aeon's bake refuse these. ⚠ AS OF 2026-08-29 IT
+   *  DOES NOT — `bake_plane_cell` never reads bits 15:14 at all (measured:
+   *  docs/reviews/2026-08-29-crossover-paint-loop.md), so R2 is unimplemented
+   *  and this count is the only place a self-mark is noticed anywhere. */
   selfMarks: number;
-  /** ILLEGAL: a cell holding the reserved value 3. The bake hard-errors (R1). */
+  /** ILLEGAL: a cell holding the reserved value 3. Rule R1 SPECIFIES a bake
+   *  hard error. ⚠ AS OF 2026-08-29 THE BAKE DOES NOT READ THE FIELD, so an act
+   *  painted entirely with value 3 bakes clean and emits a byte-identical ROM.
+   *  Note what this count is and is NOT: it REPORTS, it does not refuse — and
+   *  Aurora cannot author a 3 in the first place (`crossoverFor` derives the
+   *  value from the brush and the plane; the brush has no such value). */
   reserved: number;
   /** Solid on exactly one plane. Context, never judged. */
   divergent: number;

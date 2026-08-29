@@ -158,8 +158,13 @@ export function collisionPaintWord(
    * complement instead of as "preserve bits 15:14".
    *
    * `plane` is required whenever the brush authors, because the legal value
-   * depends on which plane the word belongs to and a self-mark is a hard build
-   * error in aeon's bake. There is no way to call this that produces one.
+   * depends on which plane the word belongs to. There is no way to call this
+   * that produces a self-mark — the value is DERIVED from (brush, plane) and
+   * never supplied, which is also why value 3 is unreachable from here.
+   * ⚠ Rule R2 says a self-mark is a hard build error in aeon's bake. As of
+   * 2026-08-29 that is SPECIFIED AND NOT IMPLEMENTED: the bake does not read
+   * bits 15:14. Keep this derivation honest on its own merits, not because
+   * something downstream is expected to catch a mistake — nothing is.
    */
   crossover: CrossoverBrush = 'keep',
   plane?: CollisionPlaneId,

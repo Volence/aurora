@@ -234,7 +234,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + '{word:null, mixed:true, sub:[tl,tr,bl,br]} with NO shape/flip/solidity, never by sampling one of the '
       + 'four, and "mixedCells" counts them (a null in "words" is what paint_collision skips). "word" is all '
       + '16 raw bits, including bits 15:14 — the LOOP CROSSOVER, reported by name as "crossover" per cell '
-      + '("none" / "to-a" / "to-b", or "reserved" for the illegal value 3 that aeon\'s bake hard-errors on, '
+      + '("none" / "to-a" / "to-b", or "reserved" for the illegal value 3 (rule R1 specifies a bake hard error; as of 2026-08-29 the bake does not read this field, so NOTHING downstream refuses it), '
       + 'which is reported rather than normalised away). "crossoverCells" counts the cells carrying one and '
       + '"cellsWithUnownedBits" counts the cells with any bit outside the four picture fields — the same '
       + 'bits, counted from the encoder\'s own mask rather than from the crossover\'s. '
