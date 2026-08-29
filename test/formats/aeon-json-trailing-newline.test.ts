@@ -16,8 +16,10 @@
 // and Aurora's writer did not.
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
+import { referenceFile, skipUnlessPresent } from '../support/fixture-tree';
 
 import type { FileAccess } from '../../src/core/project/adapter';
 import { loadAeonProject } from '../../src/core/project/aeon/load';
@@ -230,26 +232,25 @@ describe('every JSON writer aimed at aeon\'s tree ends in exactly one newline', 
 // ── (3) F2 itself: a no-edit save of aeon's real sidecar is a no-op ──────────
 
 describe('F2: parse → serialize of aeon\'s on-disk files', () => {
-  const AEON = resolve(__dirname, '../../../../../../aeon');
-  const META = resolve(AEON, 'games/sonic4/data/editor/ojz/act1/section_4.meta.json');
-  const OVERRIDE = resolve(AEON, 'games/sonic4/data/editor_bg_override.json');
+  // DERIVED, not a fixed hop. Until 2026-08-29 this read
+  // `resolve(__dirname, '../../../../../../aeon')`, which is six levels up —
+  // correct from a linked worktree under `.claude/worktrees/<id>/`, and
+  // `/aeon` from the main checkout. So on the checkout these tests are
+  // normally run from, both rows below took the absent branch and reported
+  // PASSED while measuring nothing. Nothing could have made them red.
+  const META = referenceFile('aeon', 'games/sonic4/data/editor/ojz/act1/section_4.meta.json');
+  const OVERRIDE = referenceFile('aeon', 'games/sonic4/data/editor_bg_override.json');
 
-  it('section_4.meta.json round-trips byte-identically', () => {
-    if (!existsSync(META)) {
-      console.warn(`skipped: sibling aeon checkout not found at ${META}`);
-      return;
-    }
-    const text = readFileSync(META, 'utf8');
+  it('section_4.meta.json round-trips byte-identically', (ctx) => {
+    if (skipUnlessPresent(ctx, META, "aeon's on-disk section_4.meta.json")) return;
+    const text = readFileSync(META!, 'utf8');
     expect(text.endsWith('\n'), 'the ruling was made on this file carrying the byte').toBe(true);
     expect(serializeSectionMeta(parseSectionMeta(text))).toBe(text);
   });
 
-  it('editor_bg_override.json round-trips up to the ruled trailer — and reports the on-disk state', () => {
-    if (!existsSync(OVERRIDE)) {
-      console.warn(`skipped: sibling aeon checkout not found at ${OVERRIDE}`);
-      return;
-    }
-    const text = readFileSync(OVERRIDE, 'utf8');
+  it('editor_bg_override.json round-trips up to the ruled trailer — and reports the on-disk state', (ctx) => {
+    if (skipUnlessPresent(ctx, OVERRIDE, "aeon's on-disk editor_bg_override.json")) return;
+    const text = readFileSync(OVERRIDE!, 'utf8');
     const out = serializeBgOverride(parseBgOverride(text).doc);
     // The ruling says aeon changes nothing. If the shipped file does not yet
     // carry the newline, the first Aurora save adds exactly that one byte and

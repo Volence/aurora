@@ -106,15 +106,18 @@ describe('collision-word: the owned mask is derived, and matches the engine', ()
    */
   const AEON_REV = 'b76576ea';
   const PIPELINE = 'tools/collision_pipeline.py';
-  it('agrees with aeon collision_pipeline.py field constants at a committed revision', () => {
+  // `ctx.skip(reason)`, never `console.warn(…); return` — a `return` from a test
+  // body is recorded as a PASS, so this row was permanently green on any machine
+  // without an aeon checkout. See docs/reviews/2026-08-29-fixture-absent-honesty.md.
+  it('agrees with aeon collision_pipeline.py field constants at a committed revision', (ctx) => {
     const repo = peerRepo('aeon');
     if (repo === null) {
-      console.warn(`SKIP (UNMEASURABLE): peer repo 'aeon' not present — cannot cross-check ${PIPELINE}`);
+      ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AURORA_AEON_REPO) — cannot cross-check ${PIPELINE} at ${AEON_REV}`);
       return;
     }
     const blob = readAtRev(repo, AEON_REV, PIPELINE);
     if (!blob.ok && /does not resolve/.test(blob.why)) {
-      console.warn(`SKIP (UNMEASURABLE): ${blob.why}`);
+      ctx.skip(`SKIPPED, NOT PASSED: ${blob.why}`);
       return;
     }
     expect(blob.ok, blob.ok ? '' : blob.why).toBe(true);

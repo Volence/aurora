@@ -192,15 +192,20 @@ describe('collisionPaintWord carries the crossover through the ONE decider', () 
 });
 
 describe('CURRENCY — the constants agree with aeon\'s committed anchor', () => {
-  it(`parses ${ANCHOR} at ${AEON_REV} and matches every value`, () => {
+  // `ctx.skip(reason)`, never `console.warn(…); return`. A `return` from a test
+  // body is recorded as a PASS: the word "SKIP" in a console line reaches no
+  // reporter, no total and no gate, so this row sat in the green column on every
+  // machine without an aeon checkout and there was no input that could turn it
+  // red. Measured 2026-08-29, docs/reviews/2026-08-29-fixture-absent-honesty.md.
+  it(`parses ${ANCHOR} at ${AEON_REV} and matches every value`, (ctx) => {
     const repo = peerRepo('aeon');
     if (repo === null) {
-      console.warn(`SKIP (UNMEASURABLE): peer repo 'aeon' not present — cannot cross-check ${ANCHOR}`);
+      ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AURORA_AEON_REPO) — cannot cross-check ${ANCHOR} at ${AEON_REV}`);
       return;
     }
     const blob = readAtRev(repo, AEON_REV, ANCHOR);
     if (!blob.ok && /does not resolve/.test(blob.why)) {
-      console.warn(`SKIP (UNMEASURABLE): ${blob.why}`);
+      ctx.skip(`SKIPPED, NOT PASSED: ${blob.why}`);
       return;
     }
     // An ABSENT anchor at a pinned revision is a FAILURE, not a skip: it means
@@ -233,16 +238,19 @@ describe('CURRENCY — the constants agree with aeon\'s committed anchor', () =>
     expect(/[Ss]elf-marks are illegal/.test(src), `${ANCHOR} no longer states the self-mark rule`).toBe(true);
   });
 
-  it('⚠ the SAME bit number means path-B SOLIDITY in aeon\'s OTHER baker', () => {
+  it('⚠ the SAME bit number means path-B SOLIDITY in aeon\'s OTHER baker', (ctx) => {
     // Not decoration. `bake_cell`'s donor chunk-entry word puts path-B solidity
     // at shift 14, and writing a crossover there would silently make ordinary
     // ground solid on a path nobody painted. This row exists so the collision
     // between the two word spaces is a measured fact in this repo rather than a
     // sentence in a document, and so it turns red if aeon ever moves either.
     const repo = peerRepo('aeon');
-    if (repo === null) { console.warn("SKIP (UNMEASURABLE): peer repo 'aeon' not present"); return; }
+    if (repo === null) {
+      ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AURORA_AEON_REPO) — cannot cross-check ${PIPELINE} at ${AEON_REV}`);
+      return;
+    }
     const blob = readAtRev(repo, AEON_REV, PIPELINE);
-    if (!blob.ok && /does not resolve/.test(blob.why)) { console.warn(`SKIP (UNMEASURABLE): ${blob.why}`); return; }
+    if (!blob.ok && /does not resolve/.test(blob.why)) { ctx.skip(`SKIPPED, NOT PASSED: ${blob.why}`); return; }
     expect(blob.ok, blob.ok ? '' : blob.why).toBe(true);
     const src = (blob as { ok: true; text: string }).text;
     const m = /^PATH_B_SOL_SHIFT\s*=\s*(\d+)/m.exec(src);
