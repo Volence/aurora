@@ -27,7 +27,9 @@
 
 import type { JsonSchema } from './json-schema-subset';
 import { EFFECTS_SCENE_SCHEMA, EFFECTS_SCENE_ID_PATTERN } from './scene';
-import type { EffectsScene, EffectsFactor, EffectsFactorName, EffectsSceneLibrary } from './scene';
+import type {
+  EffectsScene, EffectsFactor, EffectsFactorName, EffectsLayer, EffectsSceneLibrary,
+} from './scene';
 
 /**
  * Walk the committed schema, throwing with the path when it is not there.
@@ -636,4 +638,182 @@ export function newEffectsLayer(
  */
 export function cloneEffectsScene(scene: EffectsScene): EffectsScene {
   return structuredClone(scene);
+}
+
+// ---------------------------------------------------------------------------
+// §2.2 — `drift`, and the ONE place the 1/256 factor is spelled
+// ---------------------------------------------------------------------------
+//
+// `drift` arrived at empyrean 988638f. It is a per-layer, camera-independent
+// horizontal rate: the band scrolls by itself, every frame (S1 GHZ clouds, S2
+// WFZ/HTZ, S3K AIZ1). Engine design: aeon
+// docs/superpowers/specs/2026-08-29-band-drift-design.md §7 at aeon e0ce6011.
+//
+// NOTHING BELOW IS A CONTROL, AND THAT IS THE POINT. aeon's
+// `tools/effects_gen.py` REFUSES the key until their `CAP_BAND_DRIFT` emission
+// parcel lands, so a scene carrying `drift` does not build today. An editor
+// affordance for it would originate a value the build rejects for EVERY input —
+// ROADMAP row O13's open defect (the curve dropdown still offers a ramp the
+// build refuses), in a strictly worse form, since the curve case refuses only an
+// illegal PAIR. These are the constants and the conversion a control will need
+// when the emission parcel lands, tested now so the control cannot get the
+// factor wrong or apply it twice. See docs/reviews/2026-08-29-drift-codec.md.
+
+/** The `oneOf` branch of `drift` that carries a rate, as a path `at()` can walk. */
+const DRIFT_RATE_PATH: (string | number)[] = [
+  ...oneOfBranchWith(['$defs', 'layer', 'properties', 'drift'], 'rate'),
+  'properties', 'rate',
+];
+
+/**
+ * `rate`'s bounds ON THE WIRE, in 1/256 px per frame — NOT px/frame.
+ *
+ * The schema calls ±4096 (= ∓16 px/frame) a TASTE bound, not a correctness one:
+ * nothing breaks at 100 px/frame, it just looks absurd. Aurora still holds it,
+ * because the party that refuses a build is aeon and a scene Aurora wrote
+ * outside the contract's range would be a build failure with Aurora's name on it.
+ */
+export const EFFECTS_DRIFT_RATE_BOUNDS = boundsAt(...DRIFT_RATE_PATH);
+
+/**
+ * The one rate the schema refuses INSIDE its own range, read out of the `not`.
+ *
+ * DERIVED RATHER THAN TYPED AS `0`, on the `EFFECTS_V_FACTOR_LOCK` precedent:
+ * the reason `0` is refused is that `Rate(0)` and `None` are indistinguishable
+ * in ROM (aeon design §7 row 1), which is a fact about the ENCODING and could in
+ * principle be spelled with a different sentinel by a future amendment.
+ */
+export const EFFECTS_DRIFT_RATE_REFUSED: number = (() => {
+  const excluded = at(...DRIFT_RATE_PATH).not;
+  const value = (excluded as Record<string, unknown> | null)?.const;
+  if (typeof value !== 'number' || !Number.isInteger(value)) {
+    throw new Error(
+      `effects scene schema ${DRIFT_RATE_PATH.join('.')} no longer excludes an integer constant ` +
+      'via `not` — the rate the contract refuses was derived from it; re-derive it against the ' +
+      'amended schema.',
+    );
+  }
+  return value;
+})();
+
+/**
+ * How many wire units make one pixel per frame. **256.**
+ *
+ * THIS IS THE ONLY PLACE THE FACTOR IS SPELLED IN AURORA, and it is not spelled
+ * as a literal even here: it is read out of the schema's own description, which
+ * is where the contract chose to put it ("1 px/frame = 256"). A number typed
+ * beside the schema is the exact defect this module exists to prevent, and a
+ * 256× unit error is the top authoring hazard the engine design names (§7.1) —
+ * an author writing 1 meaning 1 px/frame gets 1/256 px/frame, which no assertion
+ * anywhere can catch, because 1 is itself a legal rate.
+ *
+ * DERIVED TWICE, from two independent sentences of that description, exactly as
+ * `EFFECTS_V_FACTOR_LOCK` is: once from the worked conversion, and once from the
+ * bound gloss ("+/-4096 (16 px/frame)") checked against the bound this module
+ * already read out of `maximum`. A schema that moved the unit and updated both
+ * still works; one that decoupled them fails this module's import — which takes
+ * the whole suite with it — instead of silently rescaling every drift Aurora
+ * shows.
+ */
+export const EFFECTS_DRIFT_UNITS_PER_PIXEL: number = (() => {
+  const path = ['$defs', 'layer', 'properties', 'drift'];
+  const description = at(...path).description;
+  if (typeof description !== 'string') {
+    throw new Error(`effects scene schema ${path.join('.')} has no string description`);
+  }
+  const stale =
+    `effects scene schema ${path.join('.')}'s description no longer states its unit in the shape ` +
+    'EFFECTS_DRIFT_UNITS_PER_PIXEL derives it from. The 1/256 factor is READ from the contract, ' +
+    'never typed beside it; re-derive it against the amended schema rather than hardcoding a number.';
+
+  // Sentence 1: the worked conversion the contract gives an author.
+  const worked = /\b1 px\/frame = (\d+)\b/.exec(description);
+  if (!worked) throw new Error(`${stale} (no "1 px/frame = <n>")`);
+  const factor = Number(worked[1]);
+
+  // Sentence 2: the bound gloss — an INDEPENDENT statement of the same ratio.
+  const gloss = /\+\/-(\d+) \((\d+) px\/frame\)/.exec(description);
+  if (!gloss) throw new Error(`${stale} (no "+/-<units> (<px> px/frame)")`);
+  const [glossUnits, glossPx] = [Number(gloss[1]), Number(gloss[2])];
+
+  if (glossUnits !== EFFECTS_DRIFT_RATE_BOUNDS.max) {
+    throw new Error(
+      `${stale} — the description glosses the bound as ${glossUnits} but \`maximum\` is ` +
+      `${EFFECTS_DRIFT_RATE_BOUNDS.max}.`,
+    );
+  }
+  if (glossPx === 0 || glossUnits / glossPx !== factor) {
+    throw new Error(
+      `${stale} — the worked conversion says ${factor} units per px/frame, the bound gloss says ` +
+      `${glossUnits}/${glossPx} = ${glossUnits / glossPx}.`,
+    );
+  }
+  return factor;
+})();
+
+/**
+ * A wire rate as px/frame, for display. Exact for every legal rate: the factor
+ * is a power of two, so the quotient is representable.
+ */
+export function driftRateToPxPerFrame(rate: number): number {
+  return rate / EFFECTS_DRIFT_UNITS_PER_PIXEL;
+}
+
+/**
+ * px/frame as a wire rate — the multiply the schema's SHOULD asks for, in the
+ * one place it happens.
+ *
+ * ROUNDS, because the wire is an integer and px/frame is what a human types.
+ *
+ * HALF-AWAY-FROM-ZERO, not `Math.round`. `Math.round` breaks ties toward +∞, so
+ * it is not symmetric about zero: it sends +0.5 to 1 and −0.5 to −0. On a SIGNED
+ * quantity that means the same typed magnitude survives in one direction and
+ * vanishes in the other, which is a difference an author would see and could not
+ * explain. Rounding the magnitude and reapplying the sign makes the two
+ * directions mirror images, which is what "the same speed, leftward" should mean.
+ *
+ * `-0` is normalised to `0` so a rounded-to-nothing negative cannot present as a
+ * value distinct from zero; `0` is a REFUSED rate either way
+ * (`driftRateRefusal`), and that refusal is deliberately NOT folded in here — a
+ * conversion that sometimes returns a number and sometimes an error is a
+ * conversion nobody can compose.
+ */
+export function driftPxPerFrameToRate(pxPerFrame: number): number {
+  const units = pxPerFrame * EFFECTS_DRIFT_UNITS_PER_PIXEL;
+  const rate = Math.sign(units) * Math.round(Math.abs(units));
+  return rate === 0 ? 0 : rate;
+}
+
+/**
+ * Why `rate` is not a legal wire rate, or null when it is — every clause read
+ * out of the schema above, so this cannot approximate the contract.
+ *
+ * ADVISORY, in scene.ts's sense: nothing in the read or write path calls it.
+ * `validateAgainstSchema` is what actually refuses a document, and it refuses
+ * the same three cases from the same schema node. This exists so a future
+ * control can say WHY before it writes, in a sentence, rather than handing an
+ * author a validator dump.
+ */
+export function driftRateRefusal(rate: number): string | null {
+  if (!Number.isInteger(rate)) {
+    return `a drift rate is a whole number of 1/256 px per frame; ${rate} is not an integer.`;
+  }
+  if (rate === EFFECTS_DRIFT_RATE_REFUSED) {
+    return `${rate} is not a drift rate — it is indistinguishable from no drift at all in ROM, ` +
+      'and aeon refuses it at build time. A layer that should not drift spells "none".';
+  }
+  const { min, max } = EFFECTS_DRIFT_RATE_BOUNDS;
+  if (rate < min || rate > max) {
+    return `${rate} (${driftRateToPxPerFrame(rate)} px/frame) is outside the contract's ` +
+      `${min}..${max} (${driftRateToPxPerFrame(min)}..${driftRateToPxPerFrame(max)} px/frame). ` +
+      'That is a TASTE bound, not a correctness one — raise it in the contract rather than ' +
+      'working around it.';
+  }
+  return null;
+}
+
+/** The rate a layer's `drift` carries, or null for `"none"` / absent. */
+export function driftRateOf(drift: EffectsLayer['drift']): number | null {
+  if (drift === undefined || drift === 'none') return null;
+  return drift.rate;
 }

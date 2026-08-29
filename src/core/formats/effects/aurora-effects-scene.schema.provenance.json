@@ -1,0 +1,37 @@
+{
+  "$what": "Provenance of aurora-effects-scene.schema.json — empyrean's CONTRACT schema, vendored into Aurora beside the codec that validates against it. scene.ts imports the .json directly; this sidecar records where those bytes came from, and test/formats/effects-schema-drift.test.ts reads `empyrean.blob` from here as its pin of record.",
+  "$why_a_sidecar_and_not_only_a_test_constant": "Until 2026-08-29 the pinned blob hash lived as a `const PINNED_BLOB` in effects-schema-drift.test.ts and as prose in scene.ts's header and in effects-scene-golden.test.ts's header. Three copies, one of which (scene.ts) had already gone THREE re-pins stale without anything going red, because nothing hashes a comment. The hash now lives HERE, once, and the test reads it. The prose citations remain prose and say so.",
+  "$why_vendored": "Aurora's core must validate from a lone clone, inside a git worktree (where ../../empyrean is not where it is from master), and in a packaged Electron build that ships no sibling repo. A path-probe design would degrade to 'schema not found -> skip validation', which is the loud-on-unmeasurable failure this suite is not allowed to have. The cost of vendoring is staleness; the drift gate and the currency check below are the payment. See docs/reviews/2026-08-28-golden-live-tree.md for the defect that made reading a peer's LIVE WORKING TREE unacceptable — this file is never read from ../empyrean at runtime or at test time by path, only through git objects at a named revision.",
+  "$why_not_under_test_fixtures": "This is a SOURCE file the app imports, not a test fixture, so it lives beside its consumer. It is also deliberately outside test/fixtures/ because the published-revision sweep in test/formats/aeon-fixture-currency.test.ts walks that tree and reads every 40-hex on a `revision*` key as an AEON revision; an empyrean SHA sitting there would be checked for reachability from aeon's master and fail for a reason that has nothing to do with it.",
+  "empyrean": {
+    "repo": "git@github.com:Volence/empyrean.git",
+    "path": "contract/schema/aurora-effects-scene.schema.json",
+    "revision": "988638f1c27c9a254d32593de9e61e69b10e266d",
+    "revision_subject": "effects schema: add layer.drift (none | {rate: int, 1/256 px/frame, +/-4096, 0 refused}) per aeon band-drift design e0ce6011 section 7; authorable only when CAP_BAND_DRIFT lands",
+    "blob": "4adfbb40d20d0f0b3fea27fe933601ec14fc442e",
+    "resolved_by": "git -C ../empyrean show 988638f:contract/schema/aurora-effects-scene.schema.json — read through git OBJECTS, never through the sibling working tree. Redirected straight into this directory; never retyped, never reformatted.",
+    "revision_published": "988638f is an ancestor of empyrean origin/main, checked with `git merge-base --is-ancestor` at vendoring time, and origin/main:contract/schema/... resolves to the SAME blob 4adfbb40 — so this pin was current at tip, not merely correctly cited.",
+    "branch_that_answers_currency": "origin/main"
+  },
+  "vendored": {
+    "path": "src/core/formats/effects/aurora-effects-scene.schema.json",
+    "bytes": 16467,
+    "git_blob": "4adfbb40d20d0f0b3fea27fe933601ec14fc442e",
+    "identical_to_source": "byte-for-byte; the git blob id above is the SAME object empyrean stores, which is what effects-schema-drift.test.ts recomputes from these bytes on every run"
+  },
+  "what_changed_at_this_pin": {
+    "semantic": "EXACTLY ONE addition: $defs.layer.properties.drift — oneOf(\"none\" | {rate: integer, minimum -4096, maximum 4096, not {const 0}}), default \"none\", unevaluatedProperties false on the object form. Same oneOf shape as curve and vsplit.",
+    "cosmetic": "The SAME commit reflowed the entire file to one key per line, so the byte diff is 365 insertions / 81 deletions for a one-field change. That is a re-pin hazard: a huge diff invites 'looks like a reformat, ship it' and hides a real change inside it.",
+    "how_the_two_were_separated": "A recursive diff of the two PARSED documents (988638f~1 vs 988638f), key by key at every depth, reported exactly one difference: the added drift node. Neither document was retyped; both were extracted with `git show`. Recorded in docs/reviews/2026-08-29-drift-codec.md.",
+    "aurora_edits_this_pin_forced": "(1) json-schema-subset.ts had to IMPLEMENT `not` — the coverage gate in effects-schema-drift.test.ts went red naming it, which is that gate working as designed rather than an evaluator quietly ignoring a keyword. (2) The shape-coverage golden test/fixtures/effects/canopy_dusk.json had to gain a `drift`, because effects-scene-golden.test.ts derives 'every declared layer key is exercised' from the schema and went red naming `drift`."
+  },
+  "pin_history_current_last": [
+    "2d7a9fee — landing (byte-identical empyrean 1326ceb through c2c81e2)",
+    "cab3ca58 — a32bcb03, CR-1: v_factor / v_factor_fg retyped from a $ref to $defs/factor into plain integers 0..15",
+    "d4345af5 — 5c930d6, v_center and v_offset bounded (v_offset SIGNED)",
+    "0f661b70 — 277bc15, layers maxItems 8 -> 16",
+    "dd972cf0 — 0bd4753, `precision` RETIRED (a delete, not a reservation: aeon deleted the storage)",
+    "4adfbb40 — 988638f, `drift` ADDED"
+  ],
+  "re_vendor": "git -C <empyrean> fetch origin && git -C <empyrean> show origin/main:contract/schema/aurora-effects-scene.schema.json > src/core/formats/effects/aurora-effects-scene.schema.json — then update `empyrean.revision`, `empyrean.blob`, `vendored.bytes`, `vendored.git_blob` and `pin_history_current_last` here, and re-run the full suite: the coverage gate and the golden's derived key sweeps are what tell you which Aurora edits the amendment forces."
+}

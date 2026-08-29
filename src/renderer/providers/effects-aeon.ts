@@ -42,7 +42,7 @@ import {
   type TableRefParam,
   EFFECTS_TRANSITION_VALUES,
   cloneEffectsScene, factorLabel, isNamedFactor, newEffectsLayer, newEffectsScene,
-  sceneIdRefusal,
+  sceneIdRefusal, driftRateOf, driftRateToPxPerFrame,
 } from '../../core/formats/effects/scene-ui';
 import { BG_LAYOUT_WORDS, TILE_WIDTH_PX } from '../../core/formats/bg-override/bg-override';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
@@ -2248,9 +2248,24 @@ export function setSceneFieldCommand<K extends SceneFormKey>(
 // guard's other half, which is now surfaced beside the deform row as advice
 // rather than only printed here.
 
+// `drift` JOINED IT AT empyrean 988638f, and it is the purest case the line has
+// had. The other four keys have no control because nobody has built one; `drift`
+// has no control ON PURPOSE — aeon's `tools/effects_gen.py` REFUSES the key
+// until their `CAP_BAND_DRIFT` emission parcel lands, so a spinner would
+// originate a value the build rejects for every input (ROADMAP row O13's open
+// defect, in a worse form). Read-only is the whole of what Aurora may offer
+// today, and it is what stops the banner's own failure recurring: a file could
+// otherwise carry a drift and the card show nothing at all about it.
+//
+// PRINTED IN px/frame, never in wire units. The schema asks the editor to
+// present px/frame (its own UNIT HAZARD note), Aurora took that SHOULD, and this
+// line is the one place the decision is currently VISIBLE. The conversion is
+// `driftRateToPxPerFrame`; the factor is spelled once, in scene-ui.ts, derived
+// from the schema's description. See docs/reviews/2026-08-29-drift-codec.md.
+
 export interface LayerExtra {
   /** The §2.2 key the descriptor is about. */
-  key: 'dsa' | 'dsb' | 'phase' | 'enabled';
+  key: 'dsa' | 'dsb' | 'phase' | 'enabled' | 'drift';
   /** The descriptor as the card prints it. */
   text: string;
 }
@@ -2283,6 +2298,11 @@ export function layerExtras(layer: EffectsLayer): LayerExtra[] {
     if (v !== undefined && v !== EFFECTS_LAYER_DEFAULTS[key]) out.push({ key, text: `${key} ${v}` });
   }
   if (layer.enabled === false) out.push({ key: 'enabled', text: 'disabled' });
+  const rate = driftRateOf(layer.drift);
+  // `"none"` and absent both yield null, so a layer that does not drift gets no
+  // descriptor — the section banner's rule, and the reason a plain layer draws
+  // no line at all.
+  if (rate !== null) out.push({ key: 'drift', text: `drift ${driftRateToPxPerFrame(rate)} px/frame` });
   return out;
 }
 
