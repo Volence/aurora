@@ -26,6 +26,7 @@ import {
 } from '../core/formats/bg-override/bg-override';
 import { BG_WIDTH } from '../core/formats/bg-tiles';
 import { BG_SECTION_BINDING_LIMIT } from '../core/formats/bg-binding';
+import { RASTER_SECTION_BINDING_LIMIT } from '../core/formats/raster-binding';
 // The layer bound an agent is TOLD about, read from the same vendored schema
 // the validator enforces. It was the literal `1..8` until empyrean `277bc15`
 // raised the ceiling to 16 — a description is the only place an agent can learn
@@ -356,12 +357,13 @@ export const EDITOR_METHODS: EditorMethod[] = [
   //     `bands` key in a scene file is refused outright, so an agent that tried
   //     to author bands through set_effects_scene would write a file nothing
   //     loads;
-  //   • saving a preset does not install it. `SectionMeta` now carries the
-  //     preset binding — `rasterRef` (schema §3.1, adjudicated 2026-08-30, NOT
-  //     `effectsRef`) — but Aurora only preserves it round-trip: nothing here
-  //     authors one and aeon's generator does not yet read one, so there is
-  //     still deliberately NO assign_section_preset and a programmer wires the
-  //     preset up by hand. ROADMAP row 93.
+  //   • saving a preset does not install it, and NEITHER DOES BINDING ONE.
+  //     `SectionMeta` carries the preset binding — `rasterRef` (schema §3.1,
+  //     adjudicated 2026-08-30, NOT `effectsRef`) — and `assign_section_preset`
+  //     below writes it. What no aeon consumer does is READ it, so a programmer
+  //     still wires the preset up by hand; the descriptions say so from the one
+  //     constant that owns the sentence (core/formats/raster-binding.ts), never
+  //     a second copy of it. ROADMAP row 93's remaining half is the UI select.
   //
   // THE LIST TOOL IS PLURAL — `list_effects_presets`, matching
   // `list_effects_scenes`. The ratified spec writes the trio in factored
@@ -373,8 +375,8 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + 'config under data/editor/effects/, a preset is the raster band program in the presets/ '
       + 'subdirectory, and a "bands" key in a scene file is refused. Also reports preset files that '
       + 'exist but could NOT be read — those ids are unusable and Aurora will not overwrite them. '
-      + 'There is no per-section assignment: nothing binds a preset to a section yet, which the reply '
-      + 'says in the reply itself.' },
+      + 'Reports the per-section rasterRef column too, and the sentence that says where such a '
+      + 'binding stops.' },
   { name: 'get_effects_preset', kind: 'get-effects-preset', result: 'json',
     params: { id: z.string().min(1).describe('preset id') },
     description: 'Read one raster preset as its WHOLE document, exactly as it is on disk — including any '
@@ -400,8 +402,35 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + 'at least one band, each band being {top, bot, sh, on} with EXACTLY ONE ON arm (cram or pal_region) '
       + '— two arms would be two writes and therefore two restores, which is two bands. No numeric value is '
       + 'range-checked or clamped on this side, on purpose: the engine refuses out-of-budget bands with the '
-      + 'measurement behind the rule. ⚠ Saving does NOT install the preset — nothing binds a preset to a '
-      + 'section, so a programmer wires it up by hand in aeon\'s .emp.' },
+      + 'measurement behind the rule. ⚠ Saving does NOT install the preset: binding it to a section is a '
+      + 'separate call (assign_section_preset), and even that installs nothing yet — '
+      + RASTER_SECTION_BINDING_LIMIT },
+
+  // THE FOURTH TOOL, and it was absent on purpose until 2026-08-30: there was no
+  // field to write. `rasterRef` landed (empyrean docs/AURORA_EFFECTS_SCHEMA.md
+  // §3.1) and this is `assign_section_scene`'s mirror over it.
+  //
+  // ⚠ IT WRITES `rasterRef`, NEVER `effectsRef` — the latter stays reserved and
+  // unspent for a TOTAL binding, because a preset document supplies only the
+  // raster channel of aeon's eight-channel EffectsPreset.
+  //
+  // ⚠ AND THE DESCRIPTION CARRIES THE LIMIT, from the same constant the reply
+  // does. An agent picks a tool from its description and may never read a reply
+  // closely; `assign_section_bg` states the rule this follows — a tool that
+  // reports success for a binding nothing bakes misleads its caller — and this
+  // binding is observed by even less than that one, since nothing composites it
+  // and there is no preview of a raster band anywhere in the suite.
+  { name: 'assign_section_preset', kind: 'assign-section-preset', result: 'json',
+    params: {
+      section: z.number().int().min(0),
+      presetId: z.string().nullable()
+        .describe('raster preset id, or null to UNBIND (absent and explicit null are the same state '
+          + 'for this key, exactly as for sceneRef)'),
+    },
+    description: 'Assign which raster band PRESET a section uses (rasterRef in its meta sidecar): a '
+      + 'preset id from list_effects_presets, or null to unbind. One undo step. Refuses an id that is '
+      + 'not a READABLE preset — a ref the build cannot resolve is worse than no ref. ⚠ '
+      + RASTER_SECTION_BINDING_LIMIT },
 
   // ---- Wave-1 surface 4: BgAnim bands -------------------------------------
   // Same registry, same rule as the scene block above: one entry lights the

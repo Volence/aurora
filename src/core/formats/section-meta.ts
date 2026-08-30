@@ -30,17 +30,52 @@
 // tools/EFFECTS_CONSUMER_CONTRACT.md §2.2). Add a ref here and to save.ts
 // together, or don't add it.
 //
-// NOTHING IN AURORA AUTHORS `rasterRef` — no command, no panel, no agent tool.
-// That does NOT make the field dead the way the deleted `parallaxRef` was: it is
-// READ from disk by load.ts and WRITTEN BACK by save.ts, which is the whole job.
-// A ref this editor cannot author is exactly the ref a partial extension erases.
+// AURORA AUTHORS `rasterRef` THROUGH EXACTLY ONE DOOR: the
+// `assign_section_preset` agent tool, over `sectionPresetCommand`
+// (renderer/providers/effects-preset.ts) and the `set-section-raster` command.
+// There is still no per-section select in the band-preset panel — ROADMAP row
+// 93's remaining half — and a control that wants one must call that same
+// provider function rather than assign the field, so the agent path and the
+// human path cannot diverge on what a no-op is or which ids are valid.
+//
+// NOTHING READS IT ANYWHERE. Not aeon's generator, not the viewport, not a
+// preview — so this file's preserve-it-across-a-round-trip job is still the
+// whole job, exactly as it was when nothing wrote the key either. The tool says
+// so in its own reply rather than letting `changed: true` imply otherwise; the
+// sentence and its expiry live in core/formats/raster-binding.ts.
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// A METHOD BAR, EARNED BY THE PARCEL THAT ADDED `rasterRef` TO THE LIST ABOVE
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// "FOLLOW THE SIBLING KEY" FINDS EVERY SITE THAT HANDLES THE REF SET AND MISSES
+// EVERY SITE THAT DESCRIBES IT IN PROSE. Grepping `sceneRef` is how the four
+// handling sites in this file, plus save.ts's, get found — they all name the
+// sibling key a line or two away. What that grep cannot see is a paragraph that
+// enumerates the set in English, and there were SEVEN of them when `rasterRef`
+// was added: the four "there is deliberately no assign_section_preset" notes
+// (shared/agent-protocol.ts, renderer/agent/agent-handler.ts,
+// main/editor-methods.ts, and the effects-preset agent test's header),
+// `PRESET_LIMITS.unbound` in renderer/providers/effects-preset.ts, docs/MCP.md,
+// and ROADMAP row 93. Left unedited, every one of them tells an author or an
+// agent that the key you just landed does not exist.
+//
+// ⚠ AND ONE OF THE SEVEN WAS UNREACHABLE BY THAT GREP AT ANY GRANULARITY.
+// `PRESET_LIMITS.unbound` is AUTHOR-FACING — it renders as visible text at the
+// top of the band-preset panel — and its file contained ZERO occurrences of
+// `sceneRef`. It named `effectsRef`, the RESERVED key, so it was reachable only
+// by grepping for a key that must never be written. (`main/editor-methods.ts`'s
+// note is the near miss: no `sceneRef` in the site itself, only elsewhere in the
+// file.) The lesson is the enumeration, not the number: when you add a ref,
+// search for what the prose CLAIMS — the reserved names, "no such tool", the
+// literal brace-list — and not only for the key beside yours.
 //
 // KEY ORDER is not this file's to choose. Contract §2.2 names the sidecar as a
 // document of the contract, so §5 binds it: keys sorted alphabetically, scalar
 // document pretty-printed at indent 2 — `canonicalJsonPretty`. The emit
 // literal below stays a literal (so the emitted SET is the interface's, type
 // checked), but its ORDER is a non-fact: the canonical writer sorts it. Add a
-// fourth ref wherever reads best; the bytes come out sorted regardless, and
+// FIFTH ref wherever reads best; the bytes come out sorted regardless, and
 // test/formats/section-meta.test.ts asserts they do.
 
 import { canonicalJsonPretty } from './canonical-json';
