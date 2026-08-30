@@ -453,6 +453,80 @@
  * stale later, and left for its own parcel.
  *
  * ═══════════════════════════════════════════════════════════════════════════
+ * 2026-08-30, O62: THE BOUND SET IS UNDER TEST TOO — AN EIGHTH FACT, NOT A RETIREMENT
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Every block above is about how far ONE binding travels. This one is about
+ * the TREE a binding or an unbind leaves behind, and it ADDS a clause rather
+ * than retiring one: nothing kept above expired, so `Verified at aeon
+ * e6405428` stays where it is (provenance, per the `1cbb6660` ruling) and the
+ * new clause carries its own anchor — `read at aeon 027ec162` — because that
+ * is the revision its claims were read at. Two SHAs in one sentence, each
+ * dated to what it vouches for, rather than one SHA restamped over claims it
+ * did not establish.
+ *
+ * Read at aeon `origin/master` = `027ec162` (four commits past `e6405428`,
+ * all d-34 ceiling-band work; `git diff --stat e6405428 027ec162` over
+ * `tools/`, `build.sh`, the editor and effects data and the captures touches
+ * ONE file, `tools/test_slope_symmetry.py` — none of the three tests below,
+ * not `build.sh`, not a sidecar or a document. Measured, and the first draft
+ * of this line said "nothing under tools/" before the diffstat was run),
+ * through `git -C ../aeon show origin/master:<path>`, never their working
+ * tree:
+ *
+ *   • `tools/test_effects_seam_gate.py::TestRasterSeamAgainstTheRealTree`:
+ *     `test_the_bound_sections_are_exactly_the_threaded_ones` (`:331`) —
+ *     `assertTrue(bound, "no sidecar carries a rasterRef — step 6's band is
+ *     gone")`, then `set(bound) <= threaded` with *"sections [...] bind a
+ *     rasterRef that no preset threads"*; and
+ *     `test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document`
+ *     (`:358`) — `assertEqual(sorted(bound), [5], "the bound sections are
+ *     {…}, not [5]")` plus `assertIn(bound[5], presets)`. Its docstring says
+ *     the `[5]` is a CONTENT assertion kept separate so a content change
+ *     cannot look like a mechanism failure — which is exactly why the
+ *     sentence names the literal.
+ *   • `tools/test_raster_cycle_table_lint.py::test_every_preset_document_is_
+ *     REACHABLE` (`:228`) — every document under
+ *     `games/sonic4/data/editor/effects/presets/` must be named by a
+ *     `.raster_table` row OR bound by a sidecar; *"reachable by NOTHING:
+ *     {orphans}"*. Two documents exist there: `authored_probe` (row 1 of
+ *     `ojz_scroll_test.emp`'s `.raster_table`, `:1733`) and
+ *     `ojz_sec5_showcase` (sidecar only). So unbinding section 5 — or
+ *     re-pointing it at `authored_probe` — orphans `ojz_sec5_showcase`.
+ *   • `build.sh` — the pytest sweep (`:493-499`, `python3 -m pytest
+ *     "${TOOLS}"`) sits inside `if [[ "${NO_LINT:-0}" == "0" ]]`
+ *     (`:447-519`), and `FAST=1` sets `NO_LINT=1` at `:235` ("One switch for
+ *     the whole source-gate block below"); the banner at `:223` lists
+ *     `pytest tools` among the skipped lanes. ⚠ The dispatch described this
+ *     as an `if [[ "$FAST" == "0" ]]` block; the mechanism is one level
+ *     removed, and the sentence says the mechanism, because `NO_LINT=1` alone
+ *     (or `--no-lint`) skips it too and an author reading "FAST=0" would not
+ *     know that.
+ *   • `docs/research/reference_captures/2026-08-30-sec5-band/README.md`,
+ *     *"The canonical build REFUSES the control tree, by design"* — their
+ *     control (sidecar `rasterRef: null`) exited 1 in the pytest lane with
+ *     three failures and was built with `FAST=1 DEBUG=1`. ⚠ That README's
+ *     bullet list attributes the two seam-gate messages to each other's test
+ *     (`:39-40`); the sentence quotes the SOURCE's pairing, not the README's.
+ *   • WHICH TREES FAIL WHICH: unbind section 5 → all three (empty set fails
+ *     `:331`'s assertTrue and `:358`'s `[5]`; the orphan fails `:228`);
+ *     delete the document too → `:228` passes, the other two still refuse
+ *     (the aeon lane's "the first test alone decides" is one test short);
+ *     bind another section beside 5 → `:331` (unthreaded) and `:358`
+ *     (`[5, N]`); move the binding to another section → the same two, and
+ *     `:228` passes because the document is still bound.
+ *
+ * ⚠ THE STANDING REFUSAL BELOW IS UNCHANGED AND THIS IS ITS FIRST REAL TEST.
+ * Aeon's content tests are a snapshot of one act's layout — the very thing the
+ * refusal says this editor must not turn into a gate. So: the empty option is
+ * not disabled, there is no confirm dialog, and the write always lands. The
+ * instrument is the sentence, on the reply and in the block above the select.
+ *
+ * ⚠ THIS CLAUSE'S OWN EXPIRY is inside the sentence (four falsifiers, owner
+ * aeon's lane, three files to re-read). It is narrower than the sentence's
+ * main EXPIRES list on purpose: a second threaded section would fire both.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
  * IF AEON EVER PUBLISHES THE WIRED SET: WHAT THIS EDITOR MAY AND MAY NOT DO
  * ═══════════════════════════════════════════════════════════════════════════
  *
@@ -505,7 +579,32 @@ export const RASTER_SECTION_BINDING_LIMIT =
   + 'raster: a literal, so the key is written, aeon\'s witness counts it, and no program follows it. '
   + 'That case is no longer SILENT — aeon\'s tools/effects_seam_gate.py refuses a full build for it '
   + 'and names the section and the id — but the refusal is aeon\'s alone: nothing here warns, and '
-  + 'FAST=1 skips that gate. Wiring a second section is a preset split plus one call-site line in '
+  + 'FAST=1 skips that gate. AND THE BOUND SET ITSELF IS PINNED BY AEON\'S FULL BUILD, WHICH THIS '
+  + 'EDITOR CAN MOVE: read at aeon 027ec162 (2026-08-30), section 5 bound to ojz_sec5_showcase is '
+  + 'the ONLY state aeon\'s canonical build accepts — three content tests in build.sh\'s pytest '
+  + 'lane refuse every other tree: tools/test_effects_seam_gate.py::TestRasterSeamAgainstTheRealTree'
+  + '::test_the_bound_sections_are_exactly_the_threaded_ones, its sibling '
+  + 'test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document, and '
+  + 'tools/test_raster_cycle_table_lint.py::test_every_preset_document_is_REACHABLE. UNBINDING '
+  + 'SECTION 5 — null from this tool, or the select\'s Hand-authored raster option — leaves the '
+  + 'bound set empty and the document ojz_sec5_showcase.json orphaned, and all three refuse that by '
+  + 'name: "no sidecar carries a rasterRef — step 6\'s band is gone", "the bound sections are [], '
+  + 'not [5]", and "reachable by NOTHING: [\'ojz_sec5_showcase\']" (delete the document too and '
+  + 'the lint passes; the first two still refuse). BINDING ANY OTHER SECTION, beside 5 or instead '
+  + 'of it, fails the exact-[5] assertion (sorted(bound) must equal [5]) and the threaded-set one, '
+  + 'on top of the seam gate above; re-pointing section 5 at any other document orphans '
+  + 'ojz_sec5_showcase. That refusal runs only in the canonical FAST=0 build: FAST=1 sets '
+  + 'NO_LINT=1, the pytest lane sits under NO_LINT, and FAST=1 builds the tree — which is how aeon '
+  + 'built its own control ROM (docs/research/reference_captures/2026-08-30-sec5-band/README.md, '
+  + '"The canonical build REFUSES the control tree, by design"). NOTHING HERE PREVENTS THE WRITE: '
+  + 'the sidecar takes whichever state you choose, and you meet the refusal at aeon\'s next FAST=0 '
+  + 'build or not at all. THAT CLAUSE EXPIRES when the [5] literal in '
+  + 'test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document changes, when those tests '
+  + 'are renamed or the pytest lane leaves the NO_LINT block that FAST=1 switches off, when '
+  + 'test_every_preset_document_is_REACHABLE drops its sidecar arm, or when a second binding ships '
+  + '— owner: aeon\'s lane; before quoting it, re-read tools/test_effects_seam_gate.py, '
+  + 'tools/test_raster_cycle_table_lint.py and build.sh. '
+  + 'Wiring a second section is a preset split plus one call-site line in '
   + 'aeon, not authoring the effect: sections 6-8 share one record, and a section-keyed chooser '
   + 'threaded into a shared record is itself a seam-gate refusal. Nor is there anything to look at '
   + 'here, for section 5 as much as for any other: the band-preset panel now carries a per-section '
