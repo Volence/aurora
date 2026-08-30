@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import type { ComposerDoc } from '../../core/art/composer-buffer';
 import type { DitherPattern, MirrorMode } from '../../core/art/pixel-ops';
+import { DEFAULT_BRUSH_ATTRIBUTES, type BrushPriority } from '../../core/editing/brush-word';
+import { surfacePriorityLens } from './priority-lens-surface';
 
 /** An art surface whose zoom is remembered separately. See ART_TIER_DEFAULT_ZOOM. */
 export type ArtZoomTier = 'composer' | 'tile' | 'block' | 'chunk';
@@ -61,6 +63,25 @@ interface ArtState {
   pendingAction: string | null;
   /** Atlas tile index used by the tile-stamp brush. */
   brushTile: number;
+  /**
+   * What the tile-stamp does to the destination cell's VDP priority bit.
+   *
+   * THE COMPOSER IS A NAMETABLE EDITOR, which is the whole reason this field
+   * exists (ROADMAP O17). A `ComposerCell` carries `pal`, `hf`, `vf` and `pri`,
+   * and `sliceForSave` packs all four into the chunk's nametable word — so
+   * priority is not a stranger to this surface, it was the one nametable field
+   * with no control. The stamp could therefore only ever say `keep`, hard-coded
+   * at the call site, and an author who captured a chunk out of a priority
+   * region had no way to add depth to it or take depth away.
+   *
+   * SEPARATE FROM THE MAP BRUSH's `editorStore.selectedTilePriority`, and
+   * deliberately: they are different brushes on different facets with different
+   * tiles and different flips, and arming one from the other would be a spooky
+   * action the author never asked for. What they SHARE is the rule — both go
+   * through `surfacePriorityLens`, so neither can author the bit while it is
+   * invisible. See core/editing/brush-word.ts for why `keep` is the default.
+   */
+  stampPriority: BrushPriority;
 
   setTool: (t: ArtTool) => void;
   setBrushSpace: (b: BrushSpace) => void;
@@ -81,6 +102,9 @@ interface ArtState {
   requestAction: (a: string) => void;
   clearAction: () => void;
   setBrushTile: (t: number) => void;
+  /** Arm the stamp's priority. Leaving `keep` SURFACES THE PRIORITY LENS, for
+   *  the reason state/priority-lens-surface.ts gives in full. */
+  setStampPriority: (p: BrushPriority) => void;
 }
 
 /**
@@ -109,6 +133,7 @@ export const useArtStore = create<ArtState>((set) => ({
   artTier: 'tile', zoomByTier: { ...ART_TIER_DEFAULT_ZOOM },
   paletteVersion: 0,
   pendingAction: null, brushTile: 0,
+  stampPriority: DEFAULT_BRUSH_ATTRIBUTES.priority,
 
   // Selecting a tool implies its brush space (tile-stamp/collision/palette-apply
   // are tile-space, everything else paints pixels) so the px/tile tab always
@@ -137,4 +162,8 @@ export const useArtStore = create<ArtState>((set) => ({
   requestAction: (pendingAction) => set({ pendingAction }),
   clearAction: () => set({ pendingAction: null }),
   setBrushTile: (brushTile) => set({ brushTile }),
+  setStampPriority: (stampPriority) => {
+    set({ stampPriority });
+    surfacePriorityLens(stampPriority);
+  },
 }));
