@@ -162,6 +162,65 @@ const PLANTS = [
     mustStayGreen: ['THE PRODUCT DOES NOT COLLIDE WITH ITSELF', 'IS ONE UNDO STEP',
       'cuts at the requested line'],
   },
+  // ═══ O49 — four rules whose green had never been tested by poison ═══
+  //
+  // Each of these rows passed the first time it ran and no plant had ever
+  // reddened it. A row nothing has reddened is indistinguishable from a row
+  // that measures nothing; these four plants are the measurement, in the RULE
+  // (never the test), of a defect that would ship wrong output.
+  {
+    // The pal_region arm sized ONE byte per word. "Two bytes per word" is the
+    // rule both arms share (the schema: count "is also the derived restore's
+    // word count"); a span half as wide lets two bands over the SAME CRAM
+    // bytes pass the overlap advisory.
+    id: 'P11',
+    what: 'bandCramSpan\'s pal_region arm — one byte per word instead of two',
+    file: PROVIDER,
+    find: '    return { start: r.addr, end: r.addr + 2 * r.count };',
+    with: '    return { start: r.addr, end: r.addr + r.count };',
+    tests: [PROVIDER_TEST],
+    mustRed: ['a pal_region band spans two bytes per `count`'],
+    mustStayGreen: ['a cram band spans two bytes per colour',
+      'carries the ON op and `sh` to BOTH halves'],
+  },
+  {
+    // The gap between two bands answers with the UPPER neighbour: a
+    // double-click on the clear line would split the band above it at a line
+    // OUTSIDE that band's interval.
+    id: 'P12',
+    what: 'presetBandAt\'s gap case — a line between two bands hits the neighbour above',
+    file: CANVAS,
+    find: '    if (y >= r.y && y <= r.y + r.h) return r.index;',
+    with: '    if (y >= r.y) return r.index;',
+    tests: [CANVAS_TEST],
+    mustRed: ['hits a band\'s interior for the split gesture, and nothing outside it'],
+    mustStayGreen: ['THE ROW THAT KEEPS THE LAYER COLUMN READ-ONLY',
+      'grabs an edge within the published tolerance'],
+  },
+  {
+    // The seed band two lines tall. `bandSplitMinHeight()` is 3, so the band
+    // an author gets from "New" could not be split — a default nobody can use.
+    id: 'P13',
+    what: 'the panel\'s seed band refuses to split — newBand() is 2 lines tall',
+    file: PROVIDER,
+    find: '  return { top: 112, bot: 128, sh: false, on: { cram: { addr: 74, colours: [0] } } };',
+    with: '  return { top: 112, bot: 114, sh: false, on: { cram: { addr: 74, colours: [0] } } };',
+    tests: [PROVIDER_TEST],
+    mustRed: ['the panel\'s own seed band is splittable'],
+    mustStayGreen: ['REFUSES a band with no line to give', 'ONE CLEAR LINE IS ENOUGH'],
+  },
+  {
+    // A cycle figure copied into an exported sentence — the pin the engine's
+    // cost-keyed minimum would silently outdate.
+    id: 'P14',
+    what: 'BAND_SPLIT_LAW gains a cycle figure (op_work_cyc 64) — a copied engine number',
+    file: PROVIDER,
+    find: "  + 'line shows the base palette, and a band needs at least three lines to have one to give.';",
+    with: "  + 'line shows the base palette (op_work_cyc 64), and a band needs at least three lines to have one to give.';",
+    tests: [PROVIDER_TEST],
+    mustRed: ['no cycle figure, no scanline budget, no band count reaches an exported sentence'],
+    mustStayGreen: ['REFUSES a band with no line to give', 'IS ONE UNDO STEP'],
+  },
 ];
 
 /**
