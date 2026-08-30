@@ -14,6 +14,7 @@ import { detectProject, openProject, type FileAccess } from '../../../core/proje
 import { isRelPathSafe } from '../../../shared/rel-path';
 import * as nodeFsMod from 'node:fs';
 import * as nodePath from 'node:path';
+import { referencePath } from '../../../../test/support/fixture-tree';
 
 // ---------------------------------------------------------------------------
 // Fake handle + bridge
@@ -258,7 +259,7 @@ describe('createIpcFileAccess rel-path safety', () => {
 // primitives differ). Skipped when the disasm tree is absent.
 // ---------------------------------------------------------------------------
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
 const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const S1_PRESENT = nodeFsMod.existsSync(S1DIR);

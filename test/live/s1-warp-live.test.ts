@@ -38,11 +38,11 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import net from 'node:net';
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { AetherClient } from '../../src/main/aether/client';
 import { s1WarpTo, S1_SETTLE_FRAMES } from '../../src/main/aether/s1-warp';
 import { parseS1ObjectOffsets } from '../../src/core/aether/s1-object-offsets';
+import { referencePath } from '../support/fixture-tree';
 
 /**
  * `id_Level`, derived from the disassembly rather than typed.
@@ -60,22 +60,27 @@ function levelGameMode(s1: string): number | null {
   return i < 0 ? null : i * 4;
 }
 
-/** Walk up for a sibling checkout, as `core/model/__tests__/screen.test.ts` does. */
-function findSibling(name: string, within: string): string | null {
-  let dir = dirname(fileURLToPath(import.meta.url));
-  for (let i = 0; i < 12; i++) {
-    const candidate = join(dir, name, within);
-    if (existsSync(candidate)) return join(dir, name);
-    const parent = resolve(dir, '..');
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return null;
+/**
+ * A sibling checkout that actually contains the artefact this row needs.
+ *
+ * The twelve-level WALK UP this replaces resolved correctly on this machine, so
+ * it was never a false green — but it was one of only two routes into a peer
+ * tree in the whole suite that `AURORA_<NAME>_REPO` / `AURORA_PEER_ROOT` could
+ * not redirect, measured by fs-level trace on 2026-08-30
+ * (`docs/reviews/2026-08-30-s1disasm-test-coupling.md`). `referencePath` is the
+ * one derivation the rest of the suite uses, and it honours those overrides, so
+ * this row can now be pointed at a build that lives somewhere else. The
+ * REQUIREMENT is unchanged: the named artefact must be present, or the row
+ * skips saying which one was not.
+ */
+function sibling(name: string, within: string): string | null {
+  const root = referencePath(name);
+  return existsSync(join(root, within)) ? root : null;
 }
 
 const OPTED_IN = process.env.AURORA_LIVE_S1_WARP === '1';
-const S1 = findSibling('s1disasm', 's1built.bin');
-const ORACLE = findSibling('oracle', 'target/release/oracle-aether');
+const S1 = sibling('s1disasm', 's1built.bin');
+const ORACLE = sibling('oracle', 'target/release/oracle-aether');
 
 const missing: string[] = [];
 if (!OPTED_IN) missing.push('AURORA_LIVE_S1_WARP=1 not set');

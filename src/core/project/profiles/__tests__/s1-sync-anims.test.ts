@@ -18,8 +18,9 @@ import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { S1_OBJECT_ANIMS, resolveObjectAnims } from '../s1-object-anims';
 import type { SyncAnimEntry } from '../s1-object-anims';
+import { referencePath } from '../../../../../test/support/fixture-tree';
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 const treePresent = existsSync(join(S1DIR, 'sonic.asm'));
 /**
  * `it`, but a skip here says WHY — read by scripts/skip-report-reporter.mjs.

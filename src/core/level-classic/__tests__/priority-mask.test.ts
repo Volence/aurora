@@ -28,8 +28,9 @@ import * as path from 'node:path';
 import { enigmaDecompress } from '../../formats/classic/enigma';
 import { unpackBlockCell, unpackChunkCell, type BlockDef, type ChunkCell, type LevelDoc } from '../model';
 import { blockPriorityQuad, chunkPriorityMask, CHUNK_TILES } from '../priority-mask';
+import { referencePath } from '../../../../test/support/fixture-tree';
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
 const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const S1_PRESENT = fs.existsSync(S1DIR);

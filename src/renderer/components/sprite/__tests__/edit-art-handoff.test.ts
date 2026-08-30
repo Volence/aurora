@@ -24,7 +24,7 @@ import { decodeGenesisColor } from '../../../../core/formats/palette';
 import { resolveObjectAnims } from '../../../../core/project/profiles/s1-object-anims';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
-import { referenceFile, skipUnlessPresent } from '../../../../../test/support/fixture-tree';
+import { referenceFile, skipUnlessPresent, referencePath } from '../../../../../test/support/fixture-tree';
 import type { DiscoveredSpriteSet } from '../../../../core/import/sprite-discovery';
 import type { CompressionKind } from '../../../../core/compress';
 import { useClassicProjectStore } from '../../../state/classicProjectStore';
@@ -260,7 +260,7 @@ describe('editObjectArtCheckout', () => {
     expect(useSpriteStore.getState().currentIndex).toBe(1);
   });
 
-  const S1TREE = '/home/volence/sonic_hacks/s1disasm';
+  const S1TREE = referencePath('s1disasm');
   it(
     'Sonic ($01): the sonani-dialect timeline opens — every table anim listed, specials DYNAMIC', {
       skip: !existsSync(join(S1TREE, '_anim/Sonic.asm')),
@@ -480,7 +480,7 @@ describe('editObjectArtCheckout', () => {
 // the timeline/picker. The reader seam feeds REAL s1disasm text from fs (the
 // tree is read-only), so these are integration-grade without window.api.
 describe('editObjectArtCheckout — animation auto-load', () => {
-  const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+  const S1DIR = referencePath('s1disasm');
   const realReader = async (_base: string, rel: string) => readFileSync(join(S1DIR, rel), 'utf8');
   const treePresent = existsSync(join(S1DIR, '_anim'));
   /** Why the two rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */

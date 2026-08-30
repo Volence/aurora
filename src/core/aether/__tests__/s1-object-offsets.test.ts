@@ -11,11 +11,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   parseAsmEquate, parseS1ObjectOffsets, S1_OFFSET_SOURCE,
 } from '../s1-object-offsets';
+import { referencePath } from '../../../../test/support/fixture-tree';
 
 describe('parseAsmEquate', () => {
   it('reads a decimal equate', () => {
@@ -75,20 +74,23 @@ describe('parseS1ObjectOffsets', () => {
   });
 });
 
-/** Walk up for a sibling `s1disasm/` checkout, as screen.test.ts walks for aeon. */
-function findS1Constants(): string | null {
-  let dir = dirname(fileURLToPath(import.meta.url));
-  for (let i = 0; i < 12; i++) {
-    const candidate = join(dir, 's1disasm', S1_OFFSET_SOURCE.file);
-    if (existsSync(candidate)) return candidate;
-    const parent = resolve(dir, '..');
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return null;
-}
-
-const constantsPath = findS1Constants();
+/**
+ * The sibling `s1disasm/` checkout's `_Constants.asm`, or null when absent.
+ *
+ * This used to WALK UP twelve directories looking for a directory that held a
+ * `s1disasm/`. That found the tree on this machine, so it was honest about
+ * absence — but it was the one route into the disassembly that
+ * `AURORA_S1DISASM_REPO` / `AURORA_PEER_ROOT` could not redirect, and it was
+ * measured to be exactly that on 2026-08-30: with the override pointed at an
+ * absent directory, an fs-level trace caught this file still opening the REAL
+ * `_Constants.asm` (one of only two such leaks in the suite; see
+ * `docs/reviews/2026-08-30-s1disasm-test-coupling.md`). A single derivation is
+ * the point — a second one is a hole in whatever the first one promises.
+ */
+const constantsPath = ((): string | null => {
+  const p = referencePath('s1disasm', S1_OFFSET_SOURCE.file);
+  return existsSync(p) ? p : null;
+})();
 const row = constantsPath ? it : it.skip;
 const why = constantsPath
   ? ''

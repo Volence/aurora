@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { parseCharacterAnims } from '../../src/core/import/anim-import';
+import { referencePath } from '../support/fixture-tree';
 
 // ParsedAnim.frames carries per-frame flip flags since the S1 anim work; these
 // dialects have none, so every frame is {index, xFlip:false, yFlip:false}.
@@ -46,7 +47,7 @@ describe('parseCharacterAnims', () => {
 // 2026-08-28 (docs/reviews/2026-08-28-golden-live-tree.md) and made to name what
 // it could not measure. It is left in place rather than deleted because the
 // decision — re-point at aeon, or drop it — belongs to the sprite lane.
-const FILE = '/home/volence/sonic_hacks/s4_engine/data/animations/sonic_anims.asm';
+const FILE = referencePath('s4_engine', 'data/animations/sonic_anims.asm');
 describe('real sonic_anims.asm', () => {
   it('parses all 11 named animations with sane frame indices', (ctx) => {
     if (!existsSync(FILE)) {

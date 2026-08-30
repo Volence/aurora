@@ -25,8 +25,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { parseAsmMappings, parseAsmDPLC } from '../../src/core/import/asm-mappings';
 import { reconstructFromFrames } from '../../src/core/import/sprite-import';
+import { referencePath } from '../support/fixture-tree';
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
 const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const read = (rel: string) => fs.readFileSync(path.join(S1DIR, rel));

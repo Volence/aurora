@@ -19,8 +19,9 @@ import { parseAsmMappings, parseAsmDPLC } from '../../../import/asm-mappings';
 import { reconstructFromFrames } from '../../../import/sprite-import';
 import { parseTiles } from '../../../formats/tiles';
 import type { SpriteFrame } from '../../../model/sprite-types';
+import { referencePath } from '../../../../../test/support/fixture-tree';
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
 const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const read = (rel: string) => new Uint8Array(fs.readFileSync(path.join(S1DIR, rel)));

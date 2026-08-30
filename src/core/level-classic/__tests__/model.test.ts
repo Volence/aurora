@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
-import { declareUnenumerated } from '../../../../test/support/fixture-tree';
+import { declareUnenumerated, referencePath } from '../../../../test/support/fixture-tree';
 import {
   packBlockCell,
   unpackBlockCell,
@@ -15,7 +15,7 @@ import {
   type LevelDoc,
 } from '../model';
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 
 // ---------------------------------------------------------------------------
 // Builders for a minimal, valid LevelDoc — every test starts from `validDoc()`

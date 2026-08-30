@@ -7,6 +7,7 @@ import type { CommitReport, CommitRefusal } from '../../../../core/art/classic-c
 import { withCollision } from '../../../../core/art/commit-collision';
 import type { CanvasCommitPlan } from '../../../../core/art/classic-commit-plan';
 import { enigmaDecompress } from '../../../../core/formats/classic/enigma';
+import { referencePath } from '../../../../../test/support/fixture-tree';
 
 describe('canvasChunkCapacity', () => {
   it('counts whole chunks only, and reports the remainder rather than rounding', () => {
@@ -160,7 +161,7 @@ describe('reportLines and the colind overhang', () => {
 // the block count is the Enigma-decoded map16/GHZ.eni at 8 bytes per block
 // (s1-io.ts's own stride). Gated like the compression goldens: the fixture
 // tree is absent on CI.
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
 const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 describe('reportLines over GHZ, the zone whose commits all overhang', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {

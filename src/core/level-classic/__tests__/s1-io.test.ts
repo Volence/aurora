@@ -12,6 +12,7 @@ import { decodeS1Objpos } from '../../formats/classic/s1-objpos';
 import { nemesisCompress, nemesisDecompress } from '../../compress/nemesis';
 import { enigmaCompress, enigmaDecompress } from '../../formats/classic/enigma';
 import { kosinskiCompress, kosinskiDecompress } from '../../formats/kosinski';
+import { referencePath } from '../../../../test/support/fixture-tree';
 
 // ---------------------------------------------------------------------------
 // Fakes / helpers
@@ -44,7 +45,7 @@ function memFsWithMtime(files: Record<string, Uint8Array>, mtimes: Record<string
   };
 }
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
 const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const S1_PRESENT = fs.existsSync(S1DIR);

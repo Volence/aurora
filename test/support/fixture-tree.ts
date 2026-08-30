@@ -49,9 +49,15 @@ import { siblingRoot } from './peer-repo';
 /**
  * A reference checkout beside this repo, or null when it is not there.
  *
- * DERIVED, NEVER TYPED. The literal `/home/volence/sonic_hacks/<name>` appears
- * in 37 places in this tree, and that literal is wrong from any checkout but one
- * — a test pinned to it can only ever skip on someone else's machine. Worse, a
+ * DERIVED, NEVER TYPED. The literal `/home/volence/sonic_hacks/<name>` used to
+ * appear in 34 executable places in this tree (36 lines, two of them comments),
+ * and that literal is wrong from any checkout but one — a test pinned to it can
+ * only ever skip on someone else's machine. All 34 were converted to
+ * `referencePath` on 2026-08-30
+ * (`docs/reviews/2026-08-30-s1disasm-test-coupling.md`); what remains matching
+ * that string anywhere under `src/` or `test/` is three COMMENT lines quoting a
+ * historical error message or this very sentence, which are records and must
+ * not be "fixed". Worse than merely wrong, a
  * RELATIVE hop of a fixed depth (`resolve(__dirname, '../../../../../../aeon')`)
  * is wrong in a way that hides: it happened to be right from a linked worktree,
  * six levels down, and resolved to `/aeon` from the main checkout — so the two
@@ -82,6 +88,46 @@ export function referenceFile(name: string, ...rel: string[]): string | null {
   if (root === null) return null;
   return rel.length === 0 ? root : resolve(root, ...rel);
 }
+
+/**
+ * The root a caller would have written as `'/home/volence/sonic_hacks/<name>'`,
+ * with the same TYPE that literal had.
+ *
+ * WHY THIS EXISTS BESIDE `referenceFile`. Thirty-four sites in this tree opened
+ * with `const S1DIR = '/home/volence/sonic_hacks/s1disasm';` and then used
+ * `S1DIR` as a plain `string` — `join(S1DIR, rel)`, `existsSync(join(...))`,
+ * template literals in skip reasons. `referenceFile` answers `string | null`, so
+ * converting those sites through it turns one mechanical substitution into
+ * thirty-four hand edits of the null case, each an opportunity to write a
+ * different guard. This keeps the substitution mechanical and the guards
+ * unchanged: every downstream `existsSync` still decides, exactly as before.
+ *
+ * WHAT THE NULL CASE BECOMES, and why that is honest. `referenceFile` answers
+ * null only when no sibling root can be derived at all (not a git checkout, or
+ * `AURORA_PEER_ROOT` names somewhere that does not exist). That case maps here
+ * to a path under `UNRESOLVED_ROOT`, which is not a directory and is not
+ * creatable by accident, so every `existsSync` downstream answers false and the
+ * rows skip — the same outcome as an absent tree, and the path printed in the
+ * skip reason says which root failed to resolve rather than pretending a
+ * plausible one. It never silently reads something else.
+ *
+ * DEFAULT PRESERVED. With no environment set this resolves to the sibling
+ * checkout beside this repo, which on the machine those literals were written on
+ * is the very path they named — so the conversion changes no behaviour here, and
+ * makes the rows runnable on a machine that sets `AURORA_S1DISASM_REPO` or
+ * `AURORA_PEER_ROOT`.
+ */
+export function referencePath(name: string, ...rel: string[]): string {
+  return referenceFile(name, ...rel) ?? resolve(UNRESOLVED_ROOT, name, ...rel);
+}
+
+/**
+ * Stand-in root for "no sibling root could be derived at all".
+ *
+ * Under `/nonexistent`, which is conventionally absent and, unlike a plausible
+ * relative guess, cannot resolve onto real files if a caller forgets to guard.
+ */
+export const UNRESOLVED_ROOT = '/nonexistent/aurora-unresolved-peer-root';
 
 /**
  * The reason line for a skip. NAMES THE MISSING THING — the point of routing

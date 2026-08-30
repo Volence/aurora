@@ -5,6 +5,7 @@ import { decomposeFrame, assembleSprite } from '../../src/core/art/sprite-decomp
 import { serializeSpriteMappings } from '../../src/core/export/sprite-mappings-export';
 import { serializeTiles } from '../../src/core/export/tile-dedup';
 import type { SpritePiece } from '../../src/core/model/sprite-types';
+import { referencePath } from '../support/fixture-tree';
 
 function paint(fill: (set: (gx: number, gy: number, c: number) => void) => void, w = 16, h = 16): Uint8Array {
   const px = new Uint8Array(w * h);
@@ -104,7 +105,7 @@ describe('reconstructDPLCSprite', () => {
 // 2026-08-28 (docs/reviews/2026-08-28-golden-live-tree.md) and made to name what
 // it could not measure. Left in place rather than deleted because the decision —
 // re-point at aeon, or drop it — belongs to the sprite lane.
-const ENGINE = '/home/volence/sonic_hacks/s4_engine';
+const ENGINE = referencePath('s4_engine');
 const haveSonic = existsSync(`${ENGINE}/data/mappings/sonic.bin`);
 describe('real Sonic data (s4_engine)', () => {
   it('parses 224 frames and reconstructs sane, non-empty character bitmaps', (ctx) => {

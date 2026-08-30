@@ -21,8 +21,9 @@ import { openDiscoveredSet, saveSpriteArt } from '../export-sprite';
 import { useSpriteStore } from '../../../state/spriteStore';
 import { useToastStore } from '../../../state/toastStore';
 import type { SpriteFrame } from '../../../../core/model/sprite-types';
+import { referencePath } from '../../../../../test/support/fixture-tree';
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
 const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const SONIC_FILES = ['_maps/Sonic.asm', '_maps/Sonic - Dynamic Gfx Script.asm', 'artunc/Sonic.unc'];

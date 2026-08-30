@@ -6,8 +6,9 @@ import { decodeS1Objpos, encodeS1Objpos, type S1ObjectEntry } from '../s1-objpos
 import { decodeS1StartPos, encodeS1StartPos } from '../s1-startpos';
 import { decodeS1ColInd, encodeS1ColInd } from '../s1-colind';
 import { decodeS1CollisionArray, decodeS1AngleMap, decodeS1CollisionShapes } from '../s1-collision-shapes';
+import { referencePath } from '../../../../../test/support/fixture-tree';
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
 const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 

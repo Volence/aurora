@@ -23,8 +23,9 @@ import {
 import { parseAsmMappings } from '../../import/asm-mappings';
 import type { SpriteFrame } from '../../model/sprite-types';
 import type { Tile } from '../../model/s4-types';
+import { referencePath } from '../../../../test/support/fixture-tree';
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
 const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const S1_PRESENT = fs.existsSync(S1DIR);

@@ -8,13 +8,14 @@ import { s1Profile, type LevelAct } from '../../src/core/project/profiles/s1';
 import { readS1Level, writeS1Level, type ResolvedLevelPaths } from '../../src/core/level-classic/s1-io';
 import { s1Adapter } from '../../src/core/project/s1/index';
 import { performGuardedWrite } from '../../src/main/guarded-write';
+import { referencePath } from '../support/fixture-tree';
 
 // ---------------------------------------------------------------------------
 // End-to-end guarded-save cycle over a TEMP COPY of real s1disasm files (never
 // mutates the real disasm). Skips when the reference tree is absent.
 // ---------------------------------------------------------------------------
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
 const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 const S1_PRESENT = fs.existsSync(S1DIR);

@@ -24,8 +24,9 @@ import { useSpriteStore } from '../../../state/spriteStore';
 import { useToastStore } from '../../../state/toastStore';
 import { parseTiles } from '../../../../core/formats/tiles';
 import { compressionFor } from '../../../../core/compress';
+import { referencePath } from '../../../../../test/support/fixture-tree';
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
 const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
 
