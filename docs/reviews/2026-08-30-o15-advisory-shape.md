@@ -151,15 +151,26 @@ exception below. The after is at `scratchpad/shots-o15/after-1920x1080-panel.png
 gitignored** — it is regenerable from `SCREEN=1920x1080 npm run harness:vsplit-advisory` plus
 the crop line above.
 
-**⚠ Committed with `-f` against this repo's own ignore rule, deliberately, and the
-exception is narrow.** `.gitignore` ignores screenshots by class under the standing rule
+**⚠ BOTH HALVES committed with `-f` against this repo's own ignore rule, deliberately, and
+the exception is narrow.** `.gitignore` ignores screenshots by class under the standing rule
 *"instruments committed (a review that cites a harness must be able to point at it),
 output not"* — and that rule is right, because a shot is normally regenerable by re-running
 the named command. **A BEFORE shot is not.** Once the fix lands, the command regenerates
 the *after* and the before can never be produced again by any means; it is the same class
 as `scratchpad/2026-08-29-branches-before-sweep.txt`, the record kept precisely because
-nothing could remake it. The AFTER shot is ordinary output and stays ignored — the pair
-lives on in this packet's prose plus the one irreplaceable half.
+nothing could remake it.
+
+**The AFTER is committed too, which reverses this packet's first ruling, and the reason is
+worth more than the file.** I wrote that the after was ordinary regenerable output and
+would stay ignored. Regenerating it took a re-derived crop and a `dpr` normalisation
+(above) — and more to the point, **a pair parked for the owner that ships only one half is
+not a pair.** Leaving the after ignored would put a tracked packet citing an untracked
+image in front of him: a reference on disk here and dangling on any clean clone, which is
+**exactly the defect O31 books** (`ojz_bg_*.bin` bodies ignored while the ref is tracked).
+Writing that shape into the packet that exists to show him something would have been
+funny in the wrong way. The standing rule — *instruments committed, output not* — is
+unchanged and right; **a decision's evidence is not output**, and two 170 KB PNGs are the
+cheapest durable form this decision has.
 
 
 ## 7. §4's vacuity, closed — and it was real, measured under a plant
