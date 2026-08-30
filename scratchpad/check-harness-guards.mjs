@@ -39,6 +39,20 @@
 //       Without this the whole check is vacuous the day someone renames an
 //       export: every file would "import the guard" and none would be guarded.
 //
+//   G5  (O66) A file that can `process.exit()` must not DROP a `killTree(...)`
+//       promise. `killTree` SIGTERMs the app before its first `await` and then
+//       waits a bounded grace for it to be GONE before the X server's group is
+//       signalled — that order is the O65 ruling, and it is what stops
+//       Electron's X connection breaking mid-shutdown (a Chromium CHECK, a
+//       SIGTRAP core under systemd-coredump on every run that needed the
+//       SIGKILL net; 17 of 17 correlated). A bare `killTree(child);` followed
+//       by `process.exit(...)` skips the whole grace: the exit net reaps by
+//       SIGKILL from the capture killTree left in `inFlight`, which is exactly
+//       the shape that produced the cores. Three harnesses had it on the day
+//       this rule was written (section-raster-select, bg-wrap, chunk-links) —
+//       red-first. A captured promise (`await`, `return`, `=`, `=>`, an
+//       argument) is fine; only the dropped one is the hazard.
+//
 // AND FOR SHELL SCRIPTS (O23) — five rules that are NOT G1 in a hat. See the
 // long note above the shell pass for why widening the file set alone would
 // have produced a check that scans `.sh` files and can only return green.
@@ -277,6 +291,42 @@ for (const path of listFiles(DIR, ['.mjs'])) {
       + "agent's harness run (observed killing one three times, 2026-08-16), or a "
       + "production launch from the main tree -- while MISSING this run's own orphan, "
       + "whose worktree path does not match. Backwards in both directions.");
+  }
+
+  // ── G5 (O66): a dropped killTree promise in a file that can process.exit ──
+  //
+  // Derived from the call shape, not a list. Every `killTree(` (the async
+  // helper — `killTreeSync(` is a different identifier and does not match) is
+  // read with what precedes it: `await`, `return`, `=`, `=>`, or an opening
+  // `(`/`,`/`:`/`?` means the promise is captured by SOMETHING and may settle
+  // before an exit; anything else is a dropped promise. A dropped promise is
+  // only a hazard when the file can exit before it settles, so the rule fires
+  // only in files that call `process.exit(` — a file that sets
+  // `process.exitCode` and returns drains its event loop over the grace and is
+  // NOT flagged (bg-dangling-ref, effects-bob measured doing exactly that,
+  // ORDERED line and all). This is a CALL-SHAPE scan, so it runs over the
+  // source with comments AND string bodies stripped: the first cut kept the
+  // strings and flagged harness-guard-proof.mjs for the words
+  // "`killTree(child.pid)` spelling" inside a check LABEL. (The cost: a call
+  // written inside a template literal's `${}` is blanked with the string and
+  // not seen — no harness does that, and a launcher's teardown never should.)
+  const shape = stripInert(raw, { keepStrings: false });
+  if (!isGuardModule && !isThisChecker && /\bprocess\.exit\s*\(/.test(shape)) {
+    const dropped = [];
+    const kt = /(?<![\w.$])killTree\s*\(/g;
+    let k;
+    while ((k = kt.exec(shape))) {
+      const before = shape.slice(0, k.index).replace(/\s+$/, '');
+      if (!/(\bawait|\breturn|=>|[=(,:?])$/.test(before)) {
+        dropped.push(shape.slice(k.index, k.index + 48).split('\n')[0].trim());
+      }
+    }
+    if (dropped.length) {
+      fails.push(`G5 ${rel}: ${dropped.length} dropped killTree promise(s) in a file that calls process.exit() — `
+        + `${dropped.map((d) => `\`${d}\``).join(', ')}. The app gets NO grace: process.exit runs before the `
+        + 'ordered SIGTERM/wait/then-X-server teardown, the exit net SIGKILLs the app, and that is the '
+        + 'shape that left a Chromium SIGTRAP core on every SIGKILL-net run (O65). Spell it `await killTree(child)`.');
+    }
   }
 
   // ── G3 ───────────────────────────────────────────────────────────────────

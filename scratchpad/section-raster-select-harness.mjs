@@ -68,6 +68,13 @@
 //   VITE_AURORA_DEBUG=1 npx electron-vite build
 //   AEON_DIR=<writable copy> npm run harness:section-raster-select
 //
+//   ⚠ FRESH COPY PER RUN (O66). The Ctrl+S in section 5 rewrites the whole
+//   project and section 6 plants a ghost rasterRef in section 0's sidecar, so
+//   the copy is CONSUMED. A second run on the same copy is refused before the
+//   app is launched — exit 2, `HARNESS ABORTED: LEFTOVER FROM A PRIOR RUN: …`
+//   naming the sidecar and the value — never a silent 21/23. Re-materialise:
+//     git -C <aeon> archive <committed rev> | tar -x -C <fresh dir>
+//
 //   PLANT=rot-select   … rot the select finder so it matches nothing; [2b] must
 //                        catch it and the run must ABORT before section 3
 //   PLANT=no-model     … read the binding back off the WIDGET instead of the
@@ -263,6 +270,36 @@ async function main() {
   for (const n of [SEC_A, SEC_B]) {
     console.log(`    section ${n} sidecar: ${existsSync(metaPath(n))
       ? JSON.stringify(readFileSync(metaPath(n), 'utf8')) : 'ABSENT'}`);
+  }
+
+  // O66: FRESH COPY PER RUN, ENFORCED — before anything is launched.
+  //
+  // The Ctrl+S in section 5 rewrites the WHOLE project: 25 files measured on
+  // aeon 6e2495a5 (every section's objects/rings json, the sidecars, the
+  // effects scene, editor_bg_override.json, ojz_bglib.json, chunks.json — the
+  // save plan's serialisation, not a set this harness chooses), and the last
+  // thing section 6 does is plant `rasterRef: "ghost_preset"` into section
+  // SEC_A's sidecar. Nothing here can honestly put those bytes back (a restore
+  // in `finally` never runs on Ctrl+C either), so a second run on the same
+  // copy used to open on a section that was ALREADY bound and print 21/23 with
+  // [1c] red for a reason that was this harness's own doing. The one leftover
+  // that changes a verdict is a rasterRef on a section this run binds; it is
+  // read straight off the disk, and the run REFUSES (exit 2, via the abort
+  // path below) naming the file and the value.
+  for (const n of [SEC_A, SEC_B]) {
+    if (!existsSync(metaPath(n))) continue;
+    let parsed = null;
+    try { parsed = JSON.parse(readFileSync(metaPath(n), 'utf8')); } catch (e) {
+      throw new Error(`LEFTOVER CHECK CANNOT READ ${metaPath(n)}: ${e.message} — `
+        + 'refusing to launch over a sidecar it cannot classify');
+    }
+    if (parsed && parsed.rasterRef !== undefined && parsed.rasterRef !== null) {
+      throw new Error(`LEFTOVER FROM A PRIOR RUN: ${metaPath(n)} already carries `
+        + `rasterRef=${JSON.stringify(parsed.rasterRef)}. This harness binds section ${n} and its `
+        + 'anti-vacuous floor [1c] needs it UNBOUND at open; a previous run\'s Ctrl+S (or its ghost plant) '
+        + 'left this, and that Ctrl+S rewrote the whole project, so nothing here can restore it. '
+        + 'Re-materialise AEON_DIR from a committed aeon revision — FRESH COPY PER RUN.');
+    }
   }
 
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
@@ -633,7 +670,13 @@ async function main() {
     console.log(`\n    screenshot  : ${SHOTS}/section-raster-select.png`);
   } finally {
     try { c && c.close(); } catch { /* closing a dead socket is not a result */ }
-    killTree(child.pid);
+    // O66: AWAITED, and the ChildProcess rather than its pid. `process.exit()`
+    // follows the summary below; the dropped promise meant the app never got
+    // the ordered SIGTERM grace and the exit net SIGKILLed it (measured: no
+    // `cleanup: ORDERED` line, exit 261 ms after the summary — the shape that
+    // left Chromium SIGTRAP cores, O65). Rule G5 in check-harness-guards.mjs
+    // holds this line.
+    await killTree(child);
   }
 
   const pass = results.filter((r) => r.ok).length;
