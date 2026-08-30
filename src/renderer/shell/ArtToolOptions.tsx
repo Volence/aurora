@@ -2,7 +2,9 @@ import React from 'react';
 import { useArtStore, selectArtZoom } from '../state/artStore';
 import { useProjectStore, getCurrentZone } from '../state/projectStore';
 import { useHistoryVersion } from '../hooks/useHistoryVersion';
+import { useViewStore } from '../state/viewStore';
 import { OptionBar, Chip, Divider, T } from '../components/ui';
+import PriorityChips from '../components/shared/PriorityChips';
 import {
   GlyphButton, TransformGrid, DitherConfig, MirrorButton, ZoomControl,
 } from '../components/art-shared/ToolColumnParts';
@@ -139,11 +141,26 @@ export interface ArtOptionCaps {
   readonly transforms: false | 'doc' | 'fixed-square';
   /** The zoom in/out readout (via `artStore.zoom`). */
   readonly zoom: boolean;
+  /**
+   * The tile-stamp's priority tri-state and the priority-lens toggle beside it
+   * (ROADMAP O17) — a claim that the host's canvas both WRITES `pri` onto the
+   * cells it stamps and DRAWS the violet veil over the ones that carry it.
+   *
+   * Aeon's ComposerCanvas is the only host that does either. Classic's tiers are
+   * NOT a gap here and must not be switched on to "match": classic's Block tab
+   * already authors the bit per cell, with its own `Priority` chip beside that
+   * cell's flips (components/classic/BlockTab.tsx), which is the right place for
+   * it because a classic block IS the four-cell nametable unit. Turning this on
+   * for those hosts would put two controls on one field — the exact reason
+   * `repeatPreview` stays off for them.
+   */
+  readonly stampPriority: boolean;
 }
 
 /** Everything — aeon's Art facet, whose canvas reads every field. */
 export const FULL_CAPS: ArtOptionCaps = {
   brushSpace: true, repeatPreview: true, paletteLine: true, transforms: 'doc', zoom: true,
+  stampPriority: true,
 };
 
 /**
@@ -160,6 +177,7 @@ export const FULL_CAPS: ArtOptionCaps = {
  */
 export const CLASSIC_TILE_CAPS: ArtOptionCaps = {
   brushSpace: false, repeatPreview: false, paletteLine: false, transforms: 'fixed-square', zoom: true,
+  stampPriority: false,
 };
 
 /**
@@ -209,6 +227,21 @@ export default function ArtToolOptions({ before, caps = FULL_CAPS }: { before?: 
   const setDither = useArtStore((s) => s.setDither);
   const pixelPerfect = useArtStore((s) => s.pixelPerfect);
   const setPixelPerfect = useArtStore((s) => s.setPixelPerfect);
+  const stampPriority = useArtStore((s) => s.stampPriority);
+  const setStampPriority = useArtStore((s) => s.setStampPriority);
+  // THE LENS TOGGLE'S STATE IS THE VIEW MENU'S OWN KEY, not a second one. The
+  // map's checkbox and this chip switch the SAME `showPriority` overlay, so an
+  // author who turned the veil on over the map finds it already on when they
+  // open the chunk — and `surfacePriorityLens`, which both brushes call, reaches
+  // both surfaces through one write.
+  //
+  // The chip exists at all because the Art facet has NO VIEW MENU: facet-chrome
+  // gates it on `mapOverlays`, and the composer paints exactly ONE of aeon's
+  // thirteen overlay keys, so the menu there would be twelve dead checkboxes
+  // (that file's own rule). Without a chip the auto-surface would raise a veil
+  // this facet could not lower.
+  const showPriority = useViewStore((s) => s.overlays.showPriority);
+  const setOverlay = useViewStore((s) => s.setOverlay);
 
   return (
     <OptionBar>
@@ -237,8 +270,31 @@ export default function ArtToolOptions({ before, caps = FULL_CAPS }: { before?: 
       {/* Palette-line picker: which zone line palette-apply paints onto. */}
       {caps.paletteLine && tool === 'palette-apply' && <PaletteLinePicker />}
 
+      {/* The stamp's VDP priority, and the lens that makes it visible (O17).
+          Tool-gated exactly like the palette-line picker above: the tri-state
+          arms the tile-stamp and nothing else consumes it. The LENS chip is not
+          tool-gated — depth is worth seeing while pixel-painting a cliff edge
+          too, and it is the only way off this facet's veil. */}
+      {caps.stampPriority && tool === 'tile-stamp' && (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: T.tXs, color: T.textLo }}>Priority</span>
+          <PriorityChips value={stampPriority} onChange={setStampPriority} />
+        </span>
+      )}
+
       {/* Collision config lives in the side panel (CollisionPalette — shape/flip/
           solidity/plane), same as Map mode's paint-collision tool. */}
+
+      {caps.stampPriority && (
+        <>
+          <Chip
+            active={showPriority}
+            onClick={() => setOverlay('showPriority', !showPriority)}
+            title="Priority lens — veil the cells that draw IN FRONT of the player (View ▸ Priority on the map)"
+          >Priority lens</Chip>
+          <Divider />
+        </>
+      )}
 
       {/* Mirror cycle + repeat preview */}
       <MirrorButton mirror={mirror} onChange={setMirror} />
