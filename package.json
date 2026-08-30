@@ -38,6 +38,7 @@
     "test": "node scripts/check-test-collection.mjs && node scripts/check-pseudo-skip.mjs && node scripts/check-peer-path-literals.mjs && node scripts/check-object-stringify.mjs && node scratchpad/check-harness-guards.mjs && npm run typecheck && vitest run",
     "test:watch": "vitest",
     "gen:theme": "node scripts/gen-theme.mjs",
+    "harness:effects-bob": "node scratchpad/effects-bob-harness.mjs",
     "harness:tile-attributes": "node scratchpad/tile-attribute-harness.mjs",
     "harness:raster-timeline": "node scratchpad/raster-timeline-harness.mjs",
     "harness:vsplit-advisory": "node scratchpad/vsplit-advisory-harness.mjs",

@@ -9,8 +9,10 @@
 //     (golden protocol) — read at empyrean 069cf59, an ancestor of c2c81e2.
 //   • empyrean contract/schema/aurora-effects-scene.schema.json — the
 //     machine-readable half, vendored beside this file. Its git blob hash is
-//     4adfbb40d20d0f0b3fea27fe933601ec14fc442e and the vendored copy is pinned
-//     against that hash by test/formats/effects-schema-drift.test.ts. The BLOB
+//     c73d5b4282ddc845dcff49ecda21d499a9cd3c43 and the vendored copy is pinned
+//     against that hash by test/formats/effects-schema-drift.test.ts, which
+//     reads it from aurora-effects-scene.schema.provenance.json — THE SIDECAR IS
+//     THE ONE MACHINE-READABLE COPY and this line is prose beside it. The BLOB
 //     hash, not a commit citation, is the load-bearing invariant: the schema
 //     doc has moved twice (2f3b6fd, 069cf59) with the schema JSON byte-identical
 //     underneath, so a commit pin would read as drift that is not there.
@@ -33,7 +35,14 @@
 //     entirely cosmetic: the same commit reflowed the whole file one key per
 //     line. Structural equality was CHECKED, not assumed — a recursive diff of
 //     the two parsed documents reports exactly one difference, the added
-//     `drift` node. docs/reviews/2026-08-29-drift-codec.md).
+//     `drift` node. docs/reviews/2026-08-29-drift-codec.md) →
+//     c73d5b42 (bc639a10, `bob_shift` / `bob_period` ADDED at the ROOT — the
+//     scene-level vertical bob, aeon's DoD item 7 at `8c75722b`. Purely
+//     additive: 16 inserted lines, 0 deleted, and a recursive diff of the two
+//     parsed documents reports exactly two differences, the two added nodes.
+//     `bob_shift`'s `anyOf` is the first in either committed schema and forced
+//     json-schema-subset.ts to implement the keyword — the coverage gate named
+//     it. See the `bob_shift` field note below for the three traps).
 //   • aeon tools/EFFECTS_CONSUMER_CONTRACT.md §2.1/§2.3 at aeon 00607dd5 — the
 //     consumer's read set, and the drift rule that governs both directions.
 //
@@ -180,6 +189,37 @@ export interface EffectsScene {
   v_offset?: number;
   /** Plane-A counterpart of `v_factor`, same shift encoding. RESERVED in v1. */
   v_factor_fg?: number;
+  /**
+   * The scene-level vertical bob's AMPLITUDE, as a right-shift of the
+   * 256-amplitude sine table: peak excursion `256 >> bob_shift` px, so **1 is
+   * 128 px and 8 is 1 px** — bigger number, smaller motion.
+   *
+   * ⚠ THE DOMAIN IS DISCONTINUOUS: exactly **15**, or **1..8**. 0 and 9..14 are
+   * refused by aeon's `scene()` (`engine/level/scene_dsl.emp` at aeon
+   * `8c75722b`), and the schema spells that as `anyOf: [{const: 15}, {1..8}]` —
+   * the first `anyOf` in either committed contract schema.
+   *
+   * ⚠⚠ AND THE SENTINEL INVERTS AT THE LOWERING, which is why this field gets a
+   * paragraph instead of a line. **15 is NO BOB** — the same 15 that means no
+   * deform on `pcfg_anchor_dsa/dsb` — and it is the default. But the WIRE byte
+   * `pcfg_bob` is **0** for no bob and `(bob_shift << 4) | bob_period`
+   * otherwise, so `scene_bob_packed()` folds the authored 15 into the packed 0
+   * that all twenty shipped records already emit. Document-off and wire-off are
+   * OPPOSITE ENDS OF THE RANGE. A control clamped 0..15 authors 15 meaning
+   * MAXIMUM while the engine reads NO BOB; a control treating 0 as off authors
+   * the NARROWEST LEGAL SWAY, shift 0 being illegal precisely because it would
+   * pack to the no-bob byte. Never clamp toward 0. See scene-ui.ts §2.5, which
+   * derives every one of these numbers from the schema rather than restating
+   * them, and [[top-of-range-is-a-sentinel]].
+   */
+  bob_shift?: number;
+  /**
+   * The bob's PERIOD, as a right-shift of the logic tick: one full sway is
+   * `256 << bob_period` ticks, so **0 is the FASTEST** (~4.3 s at 60 Hz) and 8
+   * the slowest (~18 min). Also an inverse shift, and also 0-is-not-off:
+   * **IGNORED ENTIRELY when `bob_shift` is 15.**
+   */
+  bob_period?: number;
   deform_fg?: EffectsSceneDeform;
   deform_bg?: EffectsSceneDeform;
   v_deform?: EffectsVDeform;

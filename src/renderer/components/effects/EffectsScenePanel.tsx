@@ -88,6 +88,9 @@ import {
   layerCurveDeformAdvisory,
   LEFT_COLUMN_MASK_ROW, leftColumnMaskOptions, leftColumnMaskValue,
   leftColumnMaskRowVisible, leftColumnMaskCommand, vDeformToggleCommand,
+  BOB_ROW, BOB_AMPLITUDE_OPTIONS, BOB_PERIOD_OPTIONS,
+  bobEnabled, bobShiftValue, bobPeriodValue, bobLine,
+  bobToggleCommand, setBobShiftCommand, setBobPeriodCommand,
   clampLayerDeformField, clampAmpShift, clampDeformSpeed,
   EFFECTS_LAYER_DEFORM_BOUNDS, EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS,
 } from '../../providers/effects-aeon';
@@ -577,6 +580,69 @@ export default function EffectsScenePanel(): React.ReactElement {
               onChange={(n) => run(setSceneFieldCommand(
                 library, selected.id, 'v_offset', clampVOffset(n)))} />
           </Field>
+          {/*
+            THE VERTICAL BOB (ROADMAP row 99's first split; empyrean bc639a10,
+            aeon 8c75722b). Three rows, and every one of them is shaped by the
+            encoding rather than by taste — the argument is in effects-aeon's
+            §2.5 block, and the short version is: both wire fields are INVERSE
+            shifts, the amplitude's domain has a six-value hole in it, and its
+            off value (15) is the TOP of the range while the wire byte's off (0)
+            is the bottom.
+
+            SO: OFF IS A STATE, NOT A LADDER POSITION, and the two ladders are
+            `<select>`s over enumerated legal values shown in PIXELS and SECONDS.
+            Not NumberFields — this panel's own `V center` comment says why a
+            bounded spinner would not have helped ("min/max only bind the
+            spinner; a typed value goes through unclamped"), and here an
+            unclamped 0 is not merely out of range, it is the one value that
+            packs to silence. A list has no state that can express it.
+          */}
+          {(() => {
+            const on = bobEnabled(selected);
+            return (
+              <>
+                <Field label={BOB_ROW.label} title={BOB_ROW.title}>
+                  {/* TWO KEYS, ONE COMMAND, ONE UNDO STEP: turning the sway off
+                      takes `bob_period` with it, because the engine ignores a
+                      period at bob_shift 15 and a key nothing reads is a key
+                      that will one day be read as meaning something. */}
+                  <Select title={BOB_ROW.title} value={on ? 'on' : 'none'}
+                    onChange={(v) => run(bobToggleCommand(library, selected.id, v === 'on'))}
+                    style={{ width: 88 }}>
+                    <option value="none">{BOB_ROW.off}</option>
+                    <option value="on">{BOB_ROW.on}</option>
+                  </Select>
+                </Field>
+                {!on && <Hint under>{BOB_ROW.hint}</Hint>}
+                {on && (
+                  <>
+                    <Field label={BOB_ROW.amplitudeLabel}>
+                      <Select title={BOB_ROW.amplitudeTitle} value={String(bobShiftValue(selected))}
+                        onChange={(v) => run(setBobShiftCommand(library, selected.id, Number(v)))}
+                        style={{ flex: 1, minWidth: 0 }}>
+                        {BOB_AMPLITUDE_OPTIONS.map((o) => (
+                          <option key={o.shift} value={o.shift}>{o.label}</option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <Field label={BOB_ROW.periodLabel}>
+                      <Select title={BOB_ROW.periodTitle} value={String(bobPeriodValue(selected))}
+                        onChange={(v) => run(setBobPeriodCommand(library, selected.id, Number(v)))}
+                        style={{ flex: 1, minWidth: 0 }}>
+                        {BOB_PERIOD_OPTIONS.map((o) => (
+                          <option key={o.period} value={o.period}>{o.label}</option>
+                        ))}
+                      </Select>
+                    </Field>
+                    {/* WHAT IT DOES, said in the author's units on the row —
+                        the same posture as vFactorHint. Neither ladder shows a
+                        shift exponent anywhere on screen, deliberately. */}
+                    <Hint under>{bobLine(selected)}</Hint>
+                  </>
+                )}
+              </>
+            );
+          })()}
           {/*
             `Precision` LIVED HERE, and it was a control for a field the engine
             had already deleted (ROADMAP row 59, owner ruling d-16). aeon retired
