@@ -1,5 +1,25 @@
 // THE RASTER TIMELINE STRIP — the panel half of `canvas/raster-timeline.ts`.
 //
+// READ-ONLY — AND ⚠ THE RULING BELOW IS DISCHARGED; THIS IS NOW AN OMISSION,
+// NOT A RULING. Read this paragraph before the next one.
+//
+// The original ruling deferred editing until aeon's N-bands design landed.
+// **It landed on 2026-08-28** — that design's own status banner records parcels
+// P1, P2a and `parcel/band-first-consumer` all shipped, N bands exercised by
+// `OJZ_BandDemo` in both canonical shapes on every build, cap three from the
+// program buffer; only P2b/P3 remain design-only. So the stated ground is
+// satisfied and editing is UNBLOCKED. See ROADMAP §5.1 row 94 for the parcel
+// (split/edge drag) and row 95 for the clock, which is separately gated on
+// aeon's item 4 and is NOT unblocked by the above.
+//
+// This correction is banked here rather than only in the roadmap because the
+// paragraph below outlived the fact it rested on for a full day and was still
+// reading as a live ruling: a stale ruling inside a comment outlives every doc
+// that recorded its revision, since nothing re-reads a comment to check whether
+// the rule it cites still holds. Found 2026-08-29, only because the parcel it
+// forbade was proposed.
+//
+// ── the original ruling, kept as the record of what was believed ────────────
 // READ-ONLY, AND THAT IS A RULING RATHER THAN AN OMISSION. Aeon's N-bands design
 // (`docs/superpowers/specs/2026-08-28-raster-band-ownership-design.md`, aeon
 // `0bee83c61e9c53ade6899f7389f666720215caf7`) decides band ownership and edge
