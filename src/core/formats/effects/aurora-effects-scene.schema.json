@@ -424,6 +424,22 @@
       "maximum": 15,
       "default": 0
     },
+    "bob_shift": {
+      "description": "The scene-level vertical bob's AMPLITUDE, as a right-shift of the 256-amplitude sine table: peak excursion 256 >> bob_shift px (1 = 128 px, 8 = 1 px). 15 is the NO-BOB SENTINEL and the default (the same 15 that means no deform on pcfg_anchor_dsa/dsb); 0 and 9..14 are refused by scene() (engine/level/scene_dsl.emp), so this schema admits exactly 15 or 1..8. HAZARD: the wire byte pcfg_bob is 0 for no bob and (bob_shift << 4) | bob_period otherwise, so document-off (15) and wire-off (0) are opposite ends of the range; never clamp toward 0 or write 0 for off. Added 2026-08-30 with aeon 8c75722b (DoD item 7); docs/AURORA_EFFECTS_SCHEMA.md section 2.5.",
+      "type": "integer",
+      "anyOf": [
+        { "const": 15 },
+        { "minimum": 1, "maximum": 8 }
+      ],
+      "default": 15
+    },
+    "bob_period": {
+      "description": "The vertical bob's PERIOD, as a right-shift of the logic tick: sine index (Logic_Tick.low >> bob_period) & $FF, so one full sway is 256 << bob_period ticks (256 at 0, about 4.3 s at 60 Hz; 65,536 at 8). 8 is the ceiling: the 256-entry cycle still closes inside the 16-bit counter, one shift further and the background jumps by the full amplitude once per wrap. Ignored when bob_shift is 15. Added 2026-08-30 with aeon 8c75722b; docs/AURORA_EFFECTS_SCHEMA.md section 2.5.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8,
+      "default": 0
+    },
     "deform_fg": {
       "$ref": "#/$defs/sceneDeform",
       "default": "none"

@@ -28,7 +28,12 @@ import { peerRepo, resolveRev, readAtRev, isAncestor } from '../support/peer-rep
  * this file is the payment.
  *
  * WHAT THE PIN IS. The load-bearing invariant is the schema file's GIT BLOB
- * HASH — d4345af54ad61c841a7f1797cfddaf4dc0167f98 — not a commit citation. An
+ * HASH — not a commit citation, and NOT A NUMBER SPELLED HERE. It lives once, in
+ * `aurora-effects-scene.schema.provenance.json`, which this file reads below;
+ * the value that used to sit on this line was ITSELF THREE RE-PINS STALE
+ * (d4345af5, the third pin, still quoted after the fourth, fifth and sixth had
+ * landed), in the very paragraph explaining why nothing hashes a comment. The
+ * pin history below is prose and says so; the sidecar is the record. An
  * earlier pin, 2d7a9fee37d85334103ca1a3e03e1a40466d6d9c, was byte-identical
  * from empyrean 1326ceb (the merge landing the contract) through c2c81e2, while
  * the schema DOC moved twice underneath it (2f3b6fd, 069cf59) with no §2 change.
@@ -126,6 +131,40 @@ import { peerRepo, resolveRev, readAtRev, isAncestor } from '../support/peer-rep
  * keyword — refusing to validate rather than ignoring it, exactly as designed),
  * and the shape-coverage golden went red naming `drift` (effects-scene-golden
  * derives "every declared layer key is exercised" from the schema).
+ *
+ * WHY IT MOVED A SIXTH TIME (4adfbb40 -> c73d5b42). empyrean bc639a10 added the
+ * scene-level vertical bob's two root keys, `bob_shift` and `bob_period`, per
+ * aeon's DoD item 7 at aeon 8c75722b. PURELY ADDITIVE and small enough to read:
+ * 16 lines inserted, 0 deleted. Structural equality was nevertheless MEASURED
+ * rather than eyeballed, on the drift re-pin's precedent -- a recursive diff of
+ * the two PARSED documents (bc639a10~1 vs bc639a10) reports exactly two
+ * differences, `/properties/bob_shift` and `/properties/bob_period`. Both
+ * documents were extracted with `git show`; neither was retyped. Currency was
+ * checked AT TIP as well as at the named commit: bc639a10 is an ancestor of
+ * origin/main (601e408b) and `origin/main:contract/schema/...` is the same blob
+ * c73d5b42, so this pin is current rather than merely correctly cited.
+ *
+ * AURORA NEEDED TWO EDITS, and THIS SUITE NAMED BOTH. The coverage gate below
+ * went red on `anyOf` -- `bob_shift`'s domain is DISCONTINUOUS (exactly 15, or
+ * 1..8: 0 and 9..14 are refused by aeon's `scene()`), which the contract spells
+ * `anyOf: [{const: 15}, {minimum: 1, maximum: 8}]`, the first `anyOf` in either
+ * committed contract schema. And the golden's derived top-level key sweep went
+ * red naming both keys. Neither was noticed by a human reading a diff.
+ *
+ * `anyOf` IS NOT IMPLEMENTED AS `oneOf`, though `oneOf` was already here and
+ * would accept every value this schema means to accept. The two differ only on
+ * OVERLAP, and an amendment that widened the range arm to include 15 would then
+ * have exactly one legal value silently refused for matching twice -- which is
+ * this evaluator's own failure mode wearing the other sign. Its row is below,
+ * asserted on the committed schema's own node.
+ *
+ * AND THE FIELD ITSELF CARRIES A HAZARD THE PIN HISTORY SHOULD RECORD, because
+ * it is the third instance in this suite of a sentinel at the top of a range:
+ * the DOCUMENT's off is `bob_shift` 15, the WIRE byte `pcfg_bob`'s off is 0
+ * (aeon's `scene_bob_packed()` folds an authored 15 into the packed 0), so
+ * document-off and wire-off are OPPOSITE ENDS. A control clamped 0..15 authors
+ * 15 meaning MAXIMUM while the engine reads NO BOB. See the sidecar's
+ * `the_hazard_this_pin_carries` and ROADMAP row 99.
  *
  * WHAT THIS GATE CANNOT DO, said plainly: it proves the vendored copy is
  * byte-identical to the blob Aurora pinned. It cannot, on its own, notice that
@@ -337,6 +376,74 @@ describe('effects scene schema — vendored copy drift gate', () => {
     // ...and a neighbouring value is not, so this is a hole and not a wall.
     expect(validateAgainstSchema(1, rate, EFFECTS_SCENE_SCHEMA)).toEqual([]);
     expect(validateAgainstSchema(-1, rate, EFFECTS_SCENE_SCHEMA)).toEqual([]);
+  });
+
+  /**
+   * `anyOf` — implemented at empyrean bc639a10's re-pin, because `bob_shift`'s
+   * legal domain is DISCONTINUOUS in a way no other keyword in this subset can
+   * express: exactly the no-bob sentinel 15, or the amplitude ladder 1..8. The
+   * hole is 0 AND 9..14 — two runs, six values — so `not: {const: n}` cannot
+   * spell it and a plain `minimum`/`maximum` cannot either.
+   *
+   * ASSERTED ON THE COMMITTED SCHEMA'S OWN NODE, on the `not` row's precedent
+   * directly above: a hand-built `{anyOf: [...]}` would prove the evaluator can
+   * do something, not that it does it to the field that needs it.
+   *
+   * AND THE EXPECTATIONS ARE DERIVED FROM THE NODE, never copied as literals.
+   * The refused values are computed as "everything from 0 to the sentinel that
+   * is neither the sentinel nor on the ladder", so a schema that moved either
+   * arm moves this row's subject with it rather than leaving it asserting the
+   * old shape.
+   */
+  it('implements `anyOf` as a discontinuous domain, on the committed bob_shift node', () => {
+    const bobShift = (EFFECTS_SCENE_SCHEMA.properties as Record<string, JsonSchema>).bob_shift;
+    const arms = bobShift.anyOf as JsonSchema[];
+    // Anti-vacuous: the field really exists and really is spelled with `anyOf`.
+    expect(arms, 'properties.bob_shift declares no `anyOf`').toBeDefined();
+    expect(arms).toHaveLength(2);
+
+    const sentinel = arms.find(a => typeof a.const === 'number')!.const as number;
+    const ladder = arms.find(a => typeof a.minimum === 'number')!;
+    const [lo, hi] = [ladder.minimum as number, ladder.maximum as number];
+    // The sentinel is OUTSIDE the ladder — the property that makes this a
+    // discontinuous domain rather than a range with a funny name.
+    expect(sentinel < lo || sentinel > hi).toBe(true);
+
+    const legal = [sentinel, ...Array.from({ length: hi - lo + 1 }, (_, i) => lo + i)];
+    for (const value of legal) {
+      expect(validateAgainstSchema(value, bobShift, EFFECTS_SCENE_SCHEMA), `${value} is legal`)
+        .toEqual([]);
+    }
+
+    // Everything in the span the two arms straddle that neither arm admits.
+    const holes = Array.from({ length: Math.max(...legal) + 1 }, (_, i) => i)
+      .filter(v => !legal.includes(v));
+    // Anti-vacuous: the domain really does have a hole in it, in two runs.
+    expect(holes.length).toBeGreaterThan(1);
+    expect(holes).toContain(0);
+    for (const value of holes) {
+      const issues = validateAgainstSchema(value, bobShift, EFFECTS_SCENE_SCHEMA);
+      expect(issues, `${value} must be refused`).toHaveLength(1);
+      expect(issues[0].message).toMatch(/matches none of the 2 allowed forms/);
+    }
+  });
+
+  /**
+   * ...and the distinction from `oneOf` is asserted, because implementing a
+   * keyword as its near neighbour is invisible until the day it is not. On a
+   * value matching BOTH arms, `anyOf` accepts and `oneOf` refuses. The committed
+   * schema has no such value today; that is exactly why nothing else would catch
+   * the substitution.
+   */
+  it('accepts a value matching two arms, where `oneOf` would refuse it', () => {
+    const overlapping: JsonSchema = {
+      type: 'integer',
+      anyOf: [{ minimum: 0, maximum: 10 }, { minimum: 5, maximum: 15 }],
+    };
+    expect(validateAgainstSchema(7, overlapping)).toEqual([]);
+    const asOneOf: JsonSchema = { type: 'integer', oneOf: overlapping.anyOf as JsonSchema[] };
+    expect(validateAgainstSchema(7, asOneOf)[0].message)
+      .toMatch(/matches 2 of the 2 allowed forms; the schema requires exactly one/);
   });
 });
 
