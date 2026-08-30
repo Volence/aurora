@@ -31,6 +31,10 @@ import { sceneIdRefusal } from '../../core/formats/effects/scene-ui';
 import {
   deleteSceneCommand, replaceSceneCommand, sectionSceneCommand,
 } from '../providers/effects-aeon';
+import { parseEffectsPreset } from '../../core/formats/effects/preset';
+import {
+  deletePresetCommand, presetIdRefusal, replacePresetCommand, PRESET_LIMITS,
+} from '../providers/effects-preset';
 import {
   addBandCommand, bandBudget, bandRows, demoteBandCommand,
   promoteBandCommand, removeBandCommand,
@@ -878,6 +882,107 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       if (!command) return { section: req.section, sceneId: req.sceneId, changed: false };
       executeAmbientCommand(command, ctx.level);
       return { section: req.section, sceneId: req.sceneId, changed: true };
+    }
+
+    // ---- Wave 2: raster PRESETS (DoD item 12) ------------------------------
+    //
+    // The three above, mirrored onto the OTHER effects document — and they are a
+    // different document, not a different view of the same one. A scene is a
+    // `parallax_config` under data/editor/effects/; a preset is the raster band
+    // program under data/editor/effects/presets/, and the scene loader refuses a
+    // `bands` key outright, so the two can never be confused into one file.
+    //
+    // Same design rule as the scene block: these go through the SAME provider
+    // functions the band-preset panel's controls do (providers/effects-preset),
+    // so the agent path and the human path cannot diverge on what a no-op is or
+    // which ids are creatable. Same refusal convention too — THROWN, not
+    // returned as `{ok:false}`.
+    //
+    // ⚠ THERE IS NO FOURTH TOOL HERE. `assign_section_preset` would be the
+    // mirror of `assign-section-scene`, and it cannot be written: `SectionMeta`
+    // is `{bgLayoutRef, paletteRef, sceneRef}` (core/formats/section-meta.ts)
+    // and carries no preset field, so there is no ref to write. That is ROADMAP
+    // row 93, gated on aeon landing `effectsRef` in the sidecar — and it is why
+    // `PRESET_LIMITS`' first limit says saving a preset does not install it.
+
+    case 'list-effects-presets': {
+      requireProject();
+      const library = useProjectStore.getState().project!.effectsPresets;
+      return {
+        // `presetListEntries` is the PANEL's row shape (id/label/bands) and is
+        // deliberately not reused: `label` collapses a missing name onto the id,
+        // which is right for a list a human reads and wrong for an agent, which
+        // must be able to tell "named after itself" from "unnamed". So this
+        // reports `name` raw, exactly as `list_effects_scenes` does.
+        presets: library.presets.map(p => ({
+          id: p.id,
+          name: typeof p.name === 'string' ? p.name : null,
+          bands: p.bands.length,
+        })),
+        // NOT silently omitted, on list_effects_scenes' rule: a file that would
+        // not parse is a preset id an agent must not take and a file it must not
+        // expect to be rewritten.
+        unreadable: library.unreadable.map(u => ({ path: u.path, reason: u.reason })),
+        // WHERE `list_effects_scenes` HAS A `sections` COLUMN, THIS HAS A
+        // SENTENCE — and the difference is a fact about the repo, not a gap in
+        // the tool. A per-section column here would be all-nulls forever and
+        // would read as "assigned to nothing" rather than "there is no
+        // assignment to make", which is the wrong thing for an agent to
+        // conclude: it would go looking for the assign tool. Said once, in the
+        // panel's own words (`PRESET_LIMITS.unbound`), so the agent and the
+        // author are told the same thing.
+        sectionBinding: PRESET_LIMITS.find(l => l.key === 'unbound')!.body,
+      };
+    }
+
+    case 'get-effects-preset': {
+      requireProject();
+      const library = useProjectStore.getState().project!.effectsPresets;
+      const preset = library.presets.find(p => p.id === req.id);
+      if (!preset) {
+        const broken = library.unreadable.find(u => u.path.endsWith(`/${req.id}.json`));
+        throw new Error(broken
+          ? `preset "${req.id}" exists at ${broken.path} but could not be read (${broken.reason})`
+          : `preset "${req.id}" not found (use list_effects_presets)`);
+      }
+      // The whole document, unfiltered — the point of the tool.
+      return { preset };
+    }
+
+    case 'set-effects-preset': {
+      const ctx = requireProject();
+      const library = useProjectStore.getState().project!.effectsPresets;
+
+      if (req.preset === null) {
+        const command = deletePresetCommand(library, req.id);
+        if (!command) return { id: req.id, deleted: false, reason: 'no such preset' };
+        executeAmbientCommand(command, ctx.level);
+        return { id: req.id, deleted: true };
+      }
+
+      // VALIDATED BY THE CODEC, not by a shape restated on this boundary — the
+      // rule set-effects-scene states. Going through parseEffectsPreset rather
+      // than validateAgainstSchema buys the three rules that are not in the JSON
+      // schema at all: the filename-stem identity check, the reserved wave-2
+      // vocabulary refused BY NAME (fires / variants / cycles), and the
+      // exactly-one-ON-arm sentence that explains why two writes cannot share a
+      // band. It also buys what the codec deliberately does NOT do: no numeric
+      // bound is checked and nothing is clamped, so the engine's own `ensure`
+      // still fires with the measurement behind the rule (aeon §E.4).
+      const preset = parseEffectsPreset(JSON.stringify(req.preset), req.id);
+
+      const existing = library.presets.find(p => p.id === req.id) ?? null;
+      if (!existing) {
+        // A CREATE has to answer an id question a replace does not: the id may
+        // already be taken by a file that did not parse, which is invisible to
+        // list_effects_presets and which the save path refuses to write over.
+        const refusal = presetIdRefusal(req.id, library);
+        if (refusal) throw new Error(refusal);
+      }
+      const command = replacePresetCommand(library, req.id, preset);
+      if (!command) return { id: req.id, changed: false };
+      executeAmbientCommand(command, ctx.level);
+      return { id: req.id, changed: true, created: existing === null };
     }
 
     // ---- Wave-1 surface 4: BgAnim bands ------------------------------------

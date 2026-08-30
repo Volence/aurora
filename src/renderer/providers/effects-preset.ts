@@ -383,6 +383,36 @@ export function deletePresetCommand(
 }
 
 /**
+ * Put a WHOLE preset document at `id`, creating or replacing.
+ *
+ * THE AGENT SURFACE'S SHAPE rather than the panel's, and the one operation this
+ * file did not already carry. Every function above takes a mutator over the
+ * preset that is already in the library, because a control only ever changes a
+ * field of a document the author is looking at; `set_effects_preset` hands over a
+ * COMPLETE document instead, for the reason `editPresetCommand` gives about
+ * itself — a field-patch API would need the field enumeration this format is
+ * deliberately handled without.
+ *
+ * Null when the document is identical to what is already there, so a re-send is
+ * not an undo step. That is the same JSON comparison `editPresetCommand` makes,
+ * and for the same reason: it is honest about what "changed" means (any key at
+ * any depth, including ones no control shows).
+ *
+ * It does NOT check the id rules — `replaceSceneCommand`'s reason, unchanged: a
+ * REPLACE must not be refused for an id that is obviously already in use, and a
+ * CREATE's extra question (is this id taken by an UNREADABLE file?) belongs to
+ * the caller, which is the only party that knows which of the two it is doing.
+ * `presetIdRefusal` is that question, and the caller asks it.
+ */
+export function replacePresetCommand(
+  library: EffectsPresetLibrary, id: string, preset: EffectsPreset,
+): SetEffectsPresetCommand | null {
+  const existing = library.presets.find((p) => p.id === id) ?? null;
+  if (existing && JSON.stringify(existing) === JSON.stringify(preset)) return null;
+  return presetCommand(id, existing ? `Replace preset ${id}` : `New preset ${id}`, existing, preset);
+}
+
+/**
  * THE ONE EDIT PATH. Every control on this surface goes through it: clone the
  * preset, let `mutate` change whatever it likes, emit a whole-document swap — or
  * null when nothing actually moved.

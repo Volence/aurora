@@ -330,6 +330,60 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + 'null to fall back to the act default. One undo step. Refuses an id that is not a readable scene — '
       + 'a ref the build cannot resolve is worse than no ref.' },
 
+  // ---- Wave 2: raster PRESETS --------------------------------------------
+  // The scene trio, mirrored onto the OTHER effects document. Same registry
+  // rule as above: one entry lights the capability up on BOTH MCP and Aether.
+  //
+  // THE DESCRIPTIONS CARRY TWO FACTS AN AGENT CANNOT GUESS and would otherwise
+  // get backwards:
+  //   • a preset is NOT a scene — different directory, different schema, and a
+  //     `bands` key in a scene file is refused outright, so an agent that tried
+  //     to author bands through set_effects_scene would write a file nothing
+  //     loads;
+  //   • saving a preset does not install it. Nothing binds one to a section, so
+  //     there is deliberately NO assign_section_preset (SectionMeta has no
+  //     preset field) and a programmer wires the preset up by hand.
+  //
+  // THE LIST TOOL IS PLURAL — `list_effects_presets`, matching
+  // `list_effects_scenes`. The ratified spec writes the trio in factored
+  // shorthand as `list/get/set_effects_preset`; in-app mirror consistency is
+  // what an MCP client actually reads, so the plural wins here.
+  { name: 'list_effects_presets', kind: 'list-effects-presets', result: 'json', params: {},
+    description: 'List the project\'s raster band PRESETS (documents under data/editor/effects/presets/): '
+      + 'each preset\'s id, name and band count. A preset is NOT a scene — a scene is the parallax '
+      + 'config under data/editor/effects/, a preset is the raster band program in the presets/ '
+      + 'subdirectory, and a "bands" key in a scene file is refused. Also reports preset files that '
+      + 'exist but could NOT be read — those ids are unusable and Aurora will not overwrite them. '
+      + 'There is no per-section assignment: nothing binds a preset to a section yet, which the reply '
+      + 'says in the reply itself.' },
+  { name: 'get_effects_preset', kind: 'get-effects-preset', result: 'json',
+    params: { id: z.string().min(1).describe('preset id') },
+    description: 'Read one raster preset as its WHOLE document, exactly as it is on disk — including any '
+      + 'field this editor does not itself expose. Feed the result straight back to set_effects_preset.' },
+  { name: 'set_effects_preset', kind: 'set-effects-preset', result: 'json',
+    params: {
+      // THE ID PATTERN IS NOT RESTATED HERE, for set_effects_scene's reason: it
+      // lives in the contract schema (`^[a-z][a-z0-9_]{0,31}$`), the reader
+      // enforces it along with the filename-stem identity rule, and a second
+      // copy on this boundary could only drift from it.
+      id: z.string().min(1)
+        .describe('preset id — lowercase letters, digits and underscores, starting with a letter, max 32. '
+          + 'It becomes part of the generated .emp label EditorRaster_<ACT>_<id>, so hyphens are NOT legal '
+          + '(unlike a background id).'),
+      preset: z.unknown().nullable()
+        .describe('the whole raster preset document (schema 1), or null to delete the preset. Its "id" '
+          + 'must equal the id parameter. Validated against the contract schema; an invalid document is '
+          + 'refused with the specific issues and nothing is written.'),
+    },
+    description: 'Create, replace or delete one raster band preset. Takes the WHOLE document, not a field '
+      + 'patch: read the current one with get_effects_preset, change what you want, send it back. Fields '
+      + 'this editor does not expose survive because nothing enumerates them. One undo step. A document is '
+      + 'at least one band, each band being {top, bot, sh, on} with EXACTLY ONE ON arm (cram or pal_region) '
+      + '— two arms would be two writes and therefore two restores, which is two bands. No numeric value is '
+      + 'range-checked or clamped on this side, on purpose: the engine refuses out-of-budget bands with the '
+      + 'measurement behind the rule. ⚠ Saving does NOT install the preset — nothing binds a preset to a '
+      + 'section, so a programmer wires it up by hand in aeon\'s .emp.' },
+
   // ---- Wave-1 surface 4: BgAnim bands -------------------------------------
   // Same registry, same rule as the scene block above: one entry lights the
   // capability up on BOTH MCP and Aether, so agent parity is a property of
