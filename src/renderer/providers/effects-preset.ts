@@ -26,10 +26,14 @@
 // fails if the panel stops reading it. A limit an author has to hover to find is
 // a limit the panel does not really carry.
 //
-// ⚠ AND NOBODY HAS EVER LOOKED AT ONE OF THESE BANDS ON SCREEN. No emulator run,
-// no capture, anywhere in the suite. Nothing in this file's wording may imply
-// otherwise, and `NO_PREVIEW` says so in as many words rather than leaving the
-// absence of a preview to be read as "preview coming soon".
+// ⚠ AND NOTHING IN THIS EDITOR HAS EVER DRAWN ONE OF THESE BANDS. Until aeon
+// `4a4d3474` (2026-08-30) nobody in the suite had looked at one on screen at
+// all; that commit's `docs/research/reference_captures/2026-08-30-sec5-band/`
+// is the first and only measured frame — section 5, one camera position, in
+// aeon's emulator, in aeon's tree. Nothing in this file's wording may imply a
+// band is visible HERE, and `NO_PREVIEW` says so in as many words — citing
+// that one frame, and saying no preview is built against it — rather than
+// leaving the absence of a preview to be read as "preview coming soon".
 
 import type {
   EffectsPreset, EffectsPresetBand, EffectsPresetLibrary, EffectsPresetBandOn,
@@ -123,9 +127,11 @@ export const PRESET_LIMITS: readonly PresetLimit[] = Object.freeze([
     // their `e6405428`. The sentence cites that capture, says where it lives,
     // and says nothing of it is visible here. What the seventh did NOT change:
     // this viewport still composites nothing, and `NO_PREVIEW` below still
-    // says a band has never been looked at in this suite — which is now
-    // NO_PREVIEW's own expiry to retire, not this limit's, and is TAGGED in
+    // said a band had never been looked at in this suite — which was
+    // NO_PREVIEW's own expiry to retire, not this limit's, and was TAGGED in
     // `core/formats/raster-binding.ts`'s header rather than reworded here.
+    // (Retired 2026-08-30, O64: `NO_PREVIEW` now cites the same capture as
+    // the ONE frame a preview could be checked against, and still draws none.)
     //
     // ⚠ AN EIGHTH FACT WAS ADDED 2026-08-30 (O62), NOT A CORRECTION: the seven
     // above are about how far one binding travels; this one is about the TREE
@@ -196,15 +202,49 @@ export const PRESET_LIMITS: readonly PresetLimit[] = Object.freeze([
  * Why there is no preview here, said out loud.
  *
  * An empty space where a preview would be reads as "not built yet". The truth is
- * stronger and worth stating: nobody in the suite has seen one of these bands
- * render, so there is no ground truth to preview AGAINST. A preview drawn from a
- * model nobody has checked against hardware would be the most confident wrong
- * thing on the screen.
+ * stronger and worth stating. When this was written nobody in the suite had seen
+ * one of these bands render, so there was no ground truth to preview AGAINST at
+ * all. Since aeon `4a4d3474` (2026-08-30) there is exactly ONE: the README in
+ * their `docs/research/reference_captures/2026-08-30-sec5-band/` records
+ * "VERDICT: BAND SEEN" — CRAM line 2 entry 8 `$0EA4` at screen lines 40/56/72
+ * and `$0000` at 8/20/96/150 in one frame, two private headless `oracle-aether`
+ * instances byte-identical, `$0000` everywhere on a control ROM with the
+ * sidecar's `rasterRef` null — and lists what it does NOT establish: the exact
+ * transition lines, other CRAM entries, other camera positions, a walked
+ * crossing, motion, hardware. One section, one camera position, one frame,
+ * measured in aeon's emulator and committed to aeon's tree.
+ *
+ * What that does not change: this editor draws no band (the viewport composites
+ * no `rasterRef`; nothing in Aurora has sampled CRAM), so a preview here would
+ * still be a guess about a frame this editor has never produced — it could at
+ * most be CHECKED against that one frame, and it is not built. A preview drawn
+ * from a model checked against nothing would be the most confident wrong thing
+ * on the screen; one checked against a single frame would be nearly as
+ * confident and wrong everywhere that frame does not reach.
+ *
+ * ⚠ THIS IS NOT `RASTER_SECTION_BINDING_LIMIT`, and the two must not converge.
+ * That sentence owns where a BINDING stops (and cites the same capture for
+ * that); this one owns why there is nothing to preview AGAINST. It is kept
+ * shorter than that limit, and a test row measures it.
+ *
+ * EXPIRES (2026-08-30, in the sentence itself): the captures directory leaving
+ * aeon's tree or its README no longer saying what is quoted here, or a second
+ * measured section or camera position — owner aeon's lane; this editor drawing
+ * a band — owner Aurora. Evaluate, do not obey: re-read that README at a
+ * revision (`git show origin/master:docs/research/reference_captures/
+ * 2026-08-30-sec5-band/README.md`), never by path into their working tree.
  */
 export const NO_PREVIEW =
-  'No preview. A raster band has never been looked at on screen anywhere in this suite, ' +
-  'so there is nothing to draw a faithful preview from — and an unfaithful one would be ' +
-  'worse than none.';
+  'No preview. This editor draws no band: the viewport composites no rasterRef, and ' +
+  'nothing in Aurora has sampled CRAM, so there is nothing to draw a faithful preview ' +
+  'from — and an unfaithful one would be worse than none. There is now ONE measured ' +
+  'frame, in aeon\'s tree and not in this one: aeon 4a4d3474 (2026-08-30), ' +
+  'docs/research/reference_captures/2026-08-30-sec5-band/, section 5 at one camera ' +
+  'position in aeon\'s emulator, CRAM line 2 entry 8 reading $0EA4 inside the band and ' +
+  '$0000 outside it and on the control. A preview here could at most be checked against ' +
+  'that one frame; none is built. Expires (2026-08-30): when that directory leaves ' +
+  'aeon\'s tree or its README stops saying so, or a second section or camera position is ' +
+  'measured — aeon\'s lane; or when this editor draws a band — Aurora\'s.';
 
 // ---------------------------------------------------------------------------
 // Field wording, read out of the schema rather than retyped beside it
