@@ -33,7 +33,9 @@
     "harness:aether-method-gate": "node scratchpad/aether-method-gate-proof.mjs",
     "harness:window-icon": "node scratchpad/window-icon-probe.mjs",
     "harness:bg-wrap": "node scratchpad/bg-wrap-harness.mjs",
-    "harness:composer-priority": "node scratchpad/composer-priority-harness.mjs"
+    "harness:composer-priority": "node scratchpad/composer-priority-harness.mjs",
+    "harness:timeline-edit": "node scratchpad/timeline-edit-harness.mjs",
+    "poisons:timeline-edit": "node scratchpad/timeline-edit-poisons.mjs"
   },
   "keywords": [],
   "author": "",
