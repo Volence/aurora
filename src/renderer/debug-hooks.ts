@@ -350,6 +350,8 @@ interface AeonProbeApi {
   open(dir: string): Promise<void>;
   state(): {
     open: boolean; zone: string | null; act: string | null; sections: number;
+    /** The act's section grid — its world extent is this times SECTION_PIXEL_SIZE. */
+    gridWidth: number | null; gridHeight: number | null;
     tool: string; dirty: boolean; dirtyActs: string[];
   };
   /** Can the focused document's stack undo? Drives the "one gesture, one step" count. */
@@ -947,6 +949,14 @@ function installAeonProbe(): AeonProbeApi {
         open: p.project !== null,
         zone: p.currentZoneId, act: p.currentActId,
         sections: act()?.sections.filter(Boolean).length ?? 0,
+        // THE GRID, NOT JUST THE POPULATED COUNT. `sections` counts sections
+        // that EXIST; the act's extent in world pixels is `grid * 2048` whether
+        // or not every slot is filled, and every statement about where a
+        // background repeats is measured against that extent. A harness that had
+        // to infer the grid from `sections` would be wrong on any act with a
+        // hole in it — OJZ act 1 is 3x3 with two sidecars on disk.
+        gridWidth: act()?.gridWidth ?? null,
+        gridHeight: act()?.gridHeight ?? null,
         tool: e.tool, dirty: e.dirty, dirtyActs: Object.keys(e.dirtyActs),
       };
     },

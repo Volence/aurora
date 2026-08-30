@@ -61,6 +61,7 @@ import type { FactorOption, FactorFieldOption } from '../../providers/effects-ae
 // of §2.2's two-sources guard, written and then never wired. The layer card is
 // its reader: see the deform row.
 import { advisoryLayerDeformConflicts } from '../../../core/formats/effects/scene';
+import { actReach, bandReach, bandReachClause, verticalWrapAdvisory } from '../../canvas/bg-wrap';
 import {
   factorOptions, clampPackedField,
   factorFieldSelectValue, factorFieldFromSelect, NONE_FACTOR_VALUE,
@@ -372,6 +373,12 @@ export default function EffectsScenePanel(): React.ReactElement {
     ? getActiveLevel(state)?.act ?? null
     : null;
   const section = act?.sections[activeSectionIndex] ?? null;
+  // HOW FAR THE CAMERA TRAVELS ACROSS THIS ACT, which is the only thing that
+  // turns a parallax factor into "the background starts over HERE" (ROADMAP
+  // O21). `null` with no act open: the period a factor implies is act-
+  // independent, but every statement about WHERE a repeat lands needs an act,
+  // and inventing one would be worse than saying nothing.
+  const reach = act ? actReach(act) : null;
 
   const create = () => {
     const result = createSceneCommand(library, newId.trim());
@@ -498,6 +505,31 @@ export default function EffectsScenePanel(): React.ReactElement {
             are screen lines or world Ys, and both shipped scenes carry it.
           */}
           <Hint under>{vFactorHint()}</Hint>
+          {/*
+            THE BACKGROUND RUNS OUT OF PICTURE BEFORE THE ACT RUNS OUT OF CAMERA
+            (ROADMAP O21). Plane B is 512 px tall and is blitted once at level
+            load; an unlocked plane divides the camera by `2^v_factor`, so it
+            covers `512 << v_factor` px of travel and then starts over. aeon
+            measured that seam on the running ROM (d-31) and nothing in either
+            repo checks for it.
+
+            ⚠ IT IS SILENT ON EVERY SCENE THAT EXISTS, AND THAT IS THE DESIGN.
+            Both of Aurora's scenes are `v_factor 15`, as are 18 of aeon's 20,
+            and a locked plane cannot wrap. It is also silent on any unlocked
+            scene whose shift has room for its act. What it catches is the one
+            gesture with no feedback at all: dropping this spinner off the lock
+            on a tall act, which is free to do here and silently tears the
+            background in the ROM. A check that fired on every act would be
+            strictly worse than the silence it replaced — the horizontal axis
+            repeats on nearly every band BY DESIGN and gets a tooltip, not this.
+
+            Advisory, never prevention (row 58): the spinner still offers every
+            shift and the document still saves.
+          */}
+          {(() => {
+            const wrap = reach === null ? null : verticalWrapAdvisory(selected, reach.travelY);
+            return wrap === null ? null : <Hint under tone="warning">{wrap}</Hint>;
+          })()}
           {/*
             THE TWO-WRITER RULING, ON THE FIELD THAT CAUSES IT (ROADMAP row 80).
             Moving `v_factor` off the lock while any layer carries a split makes
@@ -793,8 +825,21 @@ export default function EffectsScenePanel(): React.ReactElement {
                 <FactorField title={`Layer ${i} ${PLANE_FACTOR_ROWS.fa.title}`} value={layer.fa}
                   onChange={(f) => run(setLayerFieldCommand(library, selected.id, i, 'fa', f))} />
               </Field>
+              {/* WHERE THIS BAND'S PICTURE STARTS OVER, IN THE TOOLTIP AND NOT
+                  ON THE ROW (ROADMAP O21). Plane B is 512 px wide and wraps, so
+                  a band with any live factor repeats across an act — that is the
+                  design (the survey's row 19: "every background layer must be
+                  periodic at 512 px horizontally"), not a fault, and a visible
+                  line saying so on every layer of every scene would add height
+                  to this panel to report the normal case. What an author cannot
+                  currently get anywhere is the NUMBER: how much camera one pass
+                  costs, and how many passes this act buys. It sits on the
+                  control that decides it. */}
               <Field label={PLANE_FACTOR_ROWS.fb.label} title={PLANE_FACTOR_ROWS.fb.title}>
-                <FactorField title={`Layer ${i} ${PLANE_FACTOR_ROWS.fb.title}`} value={layer.fb}
+                <FactorField title={`Layer ${i} ${PLANE_FACTOR_ROWS.fb.title}`
+                    + (reach === null ? ''
+                      : ` — ${bandReachClause(bandReach(layer, i, reach.travelX), reach.travelX)}`)}
+                  value={layer.fb}
                   onChange={(f) => run(setLayerFieldCommand(library, selected.id, i, 'fb', f))} />
               </Field>
               <Hint under style={{ marginBottom: 0 }}>{PLANE_FACTOR_HINT}</Hint>
