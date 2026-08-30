@@ -57,6 +57,7 @@
 // does the same. This module produces TEXT; it performs no I/O.
 
 import contractJson from './bganim-consumer-contract.json';
+import type { Notice } from '../../project/notice';
 import { canonicalJsonMinified, canonicalKeyOrder } from '../canonical-json';
 
 /** The vendored contract, as data. Loose on purpose — the JSON is the authority. */
@@ -571,7 +572,7 @@ export interface BgOverrideParseResult {
    * is exactly one: the legacy `anim` upgrade, which CHANGES the document on
    * disk the next time it is saved.
    */
-  notices: string[];
+  notices: Notice[];
 }
 
 /**
@@ -601,7 +602,7 @@ export function parseBgOverride(text: string): BgOverrideParseResult {
     throw new BgOverrideError(`${BG_OVERRIDE_CONSUMER_PATH} must contain a JSON object`);
   }
   const doc = parsed as BgOverrideDocument;
-  const notices: string[] = [];
+  const notices: Notice[] = [];
 
   if (LEGACY_ANIM_KEY in doc) {
     // THE CARVE-OUT, and it is TWO different accidents, so it gets two messages.
@@ -637,11 +638,18 @@ export function parseBgOverride(text: string): BgOverrideParseResult {
     }
     delete doc[LEGACY_ANIM_KEY];
     doc.anims = [legacy as BgOverrideBand];
-    notices.push(
-      `${BG_OVERRIDE_CONSUMER_PATH} used the legacy single-band "${LEGACY_ANIM_KEY}" key. It has been ` +
-      'read as "anims": [ … ]; the band is unchanged, but saving this document will rewrite the key, ' +
-      'because writers must not emit the legacy spelling.',
-    );
+    // 'warning', not 'success' and not 'error'. Nothing FAILED — the document
+    // opened and the band survived intact — but the file on disk is not what it
+    // looks like and the next save CHANGES it, which is a fact to be acted on,
+    // and the 2.2s success dwell is not long enough to read one. Exactly the
+    // bargain toastStore's dwellMs describes for the warning channel.
+    notices.push({
+      severity: 'warning',
+      message:
+        `${BG_OVERRIDE_CONSUMER_PATH} used the legacy single-band "${LEGACY_ANIM_KEY}" key. It has been ` +
+        'read as "anims": [ … ]; the band is unchanged, but saving this document will rewrite the key, ' +
+        'because writers must not emit the legacy spelling.',
+    });
   }
 
   // An `anims` key that is present but empty is UNAUTHORED, not invalid. The
@@ -659,11 +667,16 @@ export function parseBgOverride(text: string): BgOverrideParseResult {
   // guess.)
   if (Array.isArray(doc.anims) && doc.anims.length === 0) {
     delete doc.anims;
-    notices.push(
-      `${BG_OVERRIDE_CONSUMER_PATH} carried an empty "anims" key. An empty array is neither absent ` +
-      'nor authored — the no-bands document has no "anims" key at all — so it has been read as a ' +
-      'document with no bands, and saving will drop the key. No band was lost: there was none.',
-    );
+    // 'warning' for the same reason as the legacy-key upgrade above: no failure,
+    // but the document changes shape on the next save and the author should know
+    // which key went and why.
+    notices.push({
+      severity: 'warning',
+      message:
+        `${BG_OVERRIDE_CONSUMER_PATH} carried an empty "anims" key. An empty array is neither absent ` +
+        'nor authored — the no-bands document has no "anims" key at all — so it has been read as a ' +
+        'document with no bands, and saving will drop the key. No band was lost: there was none.',
+    });
   }
 
   const issues = validateBgOverride(doc);

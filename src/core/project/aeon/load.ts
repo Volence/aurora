@@ -13,6 +13,7 @@
 //     flag becomes a returned field. Store writes are the renderer glue's job.
 
 import type { FileAccess, AeonProjectData } from '../adapter';
+import type { Notice } from '../notice';
 import type { CollisionProfileSet } from '../../collision/collision-model';
 import { s4CollisionAdapter } from '../../collision/adapters/s4-collision-adapter';
 import { findFullBlockShapeId } from '../../collision/full-block-shape';
@@ -144,7 +145,7 @@ export async function loadAeonProject(fa: FileAccess, dir: string): Promise<Aeon
     if (collisionProfiles) break;
   }
 
-  const notices: string[] = [];
+  const notices: Notice[] = [];
   const { project, legacyAtlasMerged } = await loadFullProject(fa, config, collisionProfiles, notices);
 
   // `scenes` is the SAME object as `project.effectsScenes`, deliberately — see
@@ -186,24 +187,31 @@ async function markUnreadable(
   path: string,
   suffix: string,
   error: unknown,
-  notices: string[],
+  notices: Notice[],
 ): Promise<void> {
   let present = false;
   try { present = await fa.exists(path); } catch { present = false; }
   if (!present) return; // simply not there — the ordinary case
 
   (section.unreadable ??= []).push(suffix);
-  notices.push(
-    `${path} exists but could not be read (${error instanceof Error ? error.message : String(error)}). ` +
-    'Aurora is showing empty data for it and will NOT overwrite the file — fix it by hand and reopen.',
-  );
+  // 'error', not 'success'. A read FAILED, the section is showing empty data
+  // that is not what is on disk, and the fix is a hand repair — toastStore's
+  // description of the error channel word for word. This message spent a long
+  // time arriving green on the 2.2s success dwell, which read as confirmation
+  // that something worked.
+  notices.push({
+    severity: 'error',
+    message:
+      `${path} exists but could not be read (${error instanceof Error ? error.message : String(error)}). ` +
+      'Aurora is showing empty data for it and will NOT overwrite the file — fix it by hand and reopen.',
+  });
 }
 
 async function loadFullProject(
   fa: FileAccess,
   config: LoadedS4Config,
   collisionProfiles: CollisionProfileSet | null,
-  notices: string[],
+  notices: Notice[],
 ): Promise<{ project: S4Project; legacyAtlasMerged: boolean }> {
   // Tracks whether migrateChunkTilesIntoTileset ran successfully during this
   // load call (returned so the save glue can gate the legacy-atlas truncation).
@@ -586,9 +594,13 @@ async function loadFullProject(
       // "checked" not "remapped": the count includes identity rewrites (on
       // projects where chunkTiles already equals the zone tileset, every
       // entry maps to itself).
-      notices.push(
-        `Tile atlases unified — ${result.appended} tiles merged, ${result.remapped} entries checked`,
-      );
+      // The ONE genuine success on this channel, and it stays green: painting
+      // it a warning would be the same defect wearing the other colour, and a
+      // channel where everything is amber is a channel nobody reads.
+      notices.push({
+        severity: 'success',
+        message: `Tile atlases unified — ${result.appended} tiles merged, ${result.remapped} entries checked`,
+      });
       // Mark that migration ran successfully this load — the save glue uses this
       // to gate truncation of the legacy atlas (belt-and-braces with the alias
       // guard: BOTH must pass before we zero chunks_tiles.bin).

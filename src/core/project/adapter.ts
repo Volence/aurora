@@ -11,6 +11,7 @@
 // interface. Task 5 registers a concrete S1 adapter against it; Task 17 migrates
 // aeon behind it. Keep it minimal — no exports beyond what those tasks need.
 
+import type { Notice } from './notice';
 import type { ResolutionReport } from './report';
 import type { SidecarState } from './mapping';
 import type { LoadedS4Config } from '../config/s4-config';
@@ -189,8 +190,15 @@ export interface AeonProjectData {
   config: LoadedS4Config;
   project: S4Project;
   collisionProfiles: CollisionProfileSet | null;
-  /** Human notices produced during load (e.g. atlas unification), for toasts. */
-  notices: string[];
+  /**
+   * Human notices produced during load (e.g. atlas unification), for toasts.
+   *
+   * EACH ONE CARRIES ITS OWN SEVERITY (`Notice`, ./notice.ts). It used to be a
+   * bare `string[]`, which the toast site had no choice but to paint uniformly
+   * green — including the failures. See the type's header for why the severity
+   * lives at the producer and not here.
+   */
+  notices: Notice[];
   /** True when the legacy chunk-tiles atlas was merged THIS load — gates the
    *  save-time truncation of chunks_tiles.bin (see buildAeonSavePlan). */
   legacyAtlasMerged: boolean;
