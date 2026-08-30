@@ -68,13 +68,29 @@
 //     mark their level tree stale. The collateral row hashes the entire
 //     extracted tree before and after and names every path that moved.
 //
-// ⚠ THIS FILE IS EXPECTED TO GO RED WHEN THE HANDOVER LANDS, AND THAT IS THE
-// POINT. `the floor` asserts that neither document exists in aeon's tree yet —
-// because a run where they already do is not this parcel authoring them, it is
-// this parcel re-authoring over a peer's committed work and reporting green for
-// it. When aeon commits the two files, this row fails and says exactly which
-// one arrived; whoever sees that should retire this file (its job is done) or
-// re-point it, not relax the assertion.
+// ⚠ THIS FILE WAS EXPECTED TO GO RED WHEN THE HANDOVER LANDED, AND IT DID.
+// `the floor` asserts that neither document exists in aeon's tree at the
+// revision it runs against — because a run where they already do is not this
+// parcel authoring them, it is this parcel re-authoring over a peer's committed
+// work and reporting green for it. The option it offered was "retire or
+// re-point, not relax", and it was RE-POINTED:
+//
+//   • aeon `c9a462be` (2026-08-30, "step 6: section 5 carries an authored
+//     band", an ancestor of their origin/master) committed BOTH files, and its
+//     message records them byte-identical to what this writer produced. Against
+//     origin/master this file's floor then went red on exactly the rows it said
+//     it would (`ojz_sec5_showcase` already in the library; `added` empty).
+//   • `REV` below therefore defaults to `1cbb6660` — the revision the handover
+//     was authored against and the last one where the floor holds — resolved
+//     from aeon's OBJECT STORE by the archive step, so this stays a regression
+//     test of the WRITER: the same two author actions against the same tree
+//     must keep producing the same bytes aeon committed. `AURORA_AEON_REV` still
+//     overrides it, and against any revision carrying the files the floor
+//     refuses rather than reporting a re-authoring as green.
+//   • What this file does NOT prove, and never did: that the committed files
+//     render. `RASTER_SECTION_BINDING_LIMIT` (core/formats/raster-binding.ts)
+//     owns that sentence and, since `c9a462be`, cites aeon's own "nothing has
+//     been seen on screen" rather than asserting anything of its own.
 //
 // ⚠ NO EMULATOR, AND NO CLAIM THAT THIS RENDERS. Nothing in this repo has ever
 // looked at a raster band on screen. This file proves the two documents are
@@ -272,7 +288,14 @@ const EXPECTED_META = `{
 // ---------------------------------------------------------------------------
 
 const AEON = referenceFile('aeon');
-const REV = process.env.AURORA_AEON_REV ?? 'origin/master';
+/**
+ * The revision the handover was authored against — the parent of aeon
+ * `c9a462be`, which committed the two files. Pinned (see the header) because
+ * this file's floor requires a tree WITHOUT them; at origin/master it correctly
+ * refuses. Full SHA so the archive step cannot resolve it against a moving ref.
+ */
+const HANDOVER_BASE = '1cbb66603c0ffecab6b41a9a6e517dc17674f6a8';
+const REV = process.env.AURORA_AEON_REV ?? HANDOVER_BASE;
 
 /** `window.api`, backed by node fs — the same surface main/ipc-handlers.ts
  *  serves over IPC (file-io.ts is readFile/writeFile underneath), so this

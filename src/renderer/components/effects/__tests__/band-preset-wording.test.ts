@@ -189,6 +189,26 @@ describe('the three limits say the words that carry them', () => {
     // would send an author to an edit the build rejects.
     expect(l.body).toMatch(/a preset split plus one call-site line/i);
     expect(l.body).toMatch(/costs ROM/i);
+    // ⚠ SIXTH CORRECTION, 2026-08-30, AND THE ROWS BELOW WENT RED FIRST. The
+    // expiry's first clause fired: aeon `c9a462be` commits section 5's sidecar
+    // carrying `ojz_sec5_showcase` (the two files this repo's own handover test
+    // authored), so case 1 is now a section that IS bound, not one that could
+    // be. The sentence says so — and says, in the same breath, exactly how far
+    // "bound" got: to aeon's generator and build (`EditorRaster_OJZ_Act1_
+    // Bindings = 1`), and NOT to a frame. Both halves pinned, because a limit
+    // that gained the first and lost the second is the promise this file exists
+    // to stop.
+    expect(l.body).toMatch(/SECTION 5 IS BOUND: aeon's c9a462be commits section_5\.meta\.json/);
+    expect(l.body).toMatch(/EditorRaster_OJZ_Act1_Bindings is 1/);
+    // ...and the has-anyone-seen-it clause is attributed, not asserted: aeon's
+    // own commit message is the only committed artifact that speaks to it, and
+    // it says "not seen". Aurora's half is its own measurement (no CRAM sampled
+    // HERE). A rewrite that drops either attribution — or that promotes
+    // 6e2495a5's left-edge-strip measurement into "the band was seen" — fails
+    // here.
+    expect(l.body).toMatch(/aeon's c9a462be says in its own words that nothing has been seen on screen/);
+    expect(l.body).toMatch(/no CRAM was sampled here/);
+    expect(l.body).not.toMatch(/band (?:was|has been) (?:seen|measured|observed)/i);
   });
 
   /**
@@ -209,29 +229,42 @@ describe('the three limits say the words that carry them', () => {
     // LIMIT 2 as well, once its own reachability clause gained the same
     // revision — so this row would have been satisfiable by a DIFFERENT rule's
     // wording. The verb is what makes the anchor this limit's own, and it is
-    // kept for the same reason now that the revision has moved to `9cdf32d8`
-    // while LIMIT 2 still names `4aa2abc0`.
-    expect(l.body).toMatch(/Verified at aeon 9cdf32d8/);
-    // ⚠ THE EXPIRY IS NOW THREE-WAY, because the claim is a case split and each
-    // case fails differently. A second threaded section falsifies "only section
-    // 5"; `sec: 5` moving falsifies the NUMBER (which is why the number is
-    // written down); a sidecar carrying the key ends the vacuity of aeon's
-    // seam-gate arm and turns case 1 into something exercised rather than
-    // reasoned about. One expiry naming only the first would leave the other two
-    // to go wrong silently.
-    expect(l.body).toMatch(/EXPIRES when a sidecar in aeon's tree actually carries a rasterRef/);
-    expect(l.body).toMatch(/when a second section is threaded/i);
+    // kept for the same reason now that the revision has moved — to `9cdf32d8`
+    // when the call site landed, and to `6e2495a5` (aeon's origin/master the
+    // evening `c9a462be` landed the sidecar) when the vacuity clauses expired —
+    // while LIMIT 2 still names `4aa2abc0`. This row was RED at `/Verified at
+    // aeon 9cdf32d8/` before it moved, which is the expiry mechanism working.
+    expect(l.body).toMatch(/Verified at aeon 6e2495a5/);
+    expect(l.body).not.toMatch(/Verified at aeon 9cdf32d8/);
+    // ⚠ THE EXPIRY IS SIX-WAY NOW, because the sentence makes six falsifiable
+    // claims and each fails differently. The clause that used to lead — "a
+    // sidecar in aeon's tree actually carries a rasterRef" — is SPENT (it fired
+    // at `c9a462be`) and must not reappear: an expiry naming an event that has
+    // already happened is one nobody will ever see fire again.
+    expect(l.body).not.toMatch(/EXPIRES when a sidecar in aeon's tree actually carries a rasterRef/);
+    expect(l.body).toMatch(/EXPIRES when a second section is threaded/i);
     expect(l.body).toMatch(/when sec: 5 becomes another index/i);
-    expect(l.body).toMatch(/owner: aeon's lane/i);
-    // The VACUITY is part of the sentence, not of the comment around it: a guard
-    // with no live subject is not the same assurance as one that has fired, and
-    // an author quoting the constant elsewhere must get that with it.
-    expect(l.body).toMatch(/the seam gate's section arm is vacuous and prints that it is/i);
-    expect(l.body).toMatch(/no section number here has been exercised end to end/i);
+    expect(l.body).toMatch(/when section 5's sidecar stops naming ojz_sec5_showcase/i);
+    expect(l.body).toMatch(/stops refusing the unthreaded case or build\.sh runs it under FAST=1/i);
+    expect(l.body).toMatch(/when a committed aeon artifact records the section-5 band measured on screen/i);
+    expect(l.body).toMatch(/when this viewport learns to composite a rasterRef/i);
+    expect(l.body).toMatch(/owner: aeon's lane for all but the last, which is Aurora's/i);
+    // The arm's LIVE SUBJECT is part of the sentence, not of the comment around
+    // it — it used to say the arm was vacuous and printed that it was, and an
+    // author quoting the constant elsewhere must get the new state with it: one
+    // sidecar, checked against the threaded set. The retired phrasing is
+    // asserted ABSENT so a revert cannot pass on the kept clauses alone.
+    expect(l.body).toMatch(/exactly one sidecar carries the key \(section 5's\)/i);
+    expect(l.body).toMatch(/the seam gate's section arm is no longer vacuous/i);
+    expect(l.body).toMatch(/counts 1 sidecar rasterRef and checks it against the threaded set/i);
+    expect(l.body).not.toMatch(/arm is vacuous and prints that it is/i);
+    expect(l.body).not.toMatch(/no section number here has been exercised end to end/i);
     // The files to re-read are named IN the sentence, not left to the reader —
-    // and the seam gate is one of them now, because "no longer silent" is itself
-    // a falsifiable claim about a file that can change.
+    // the seam gate because "no longer silent" is a falsifiable claim about a
+    // file that can change, and the SIDECAR DIRECTORY now, because "which
+    // sidecars carry the key" stopped being a vacuity and became a live answer.
     expect(l.body).toMatch(/re-read games\/sonic4\/data\/effects\/ojz_effects\.emp/i);
+    expect(l.body).toMatch(/re-read games\/sonic4\/data\/editor\/ojz\/act1\/ for which sidecars carry rasterRef/i);
     expect(l.body).toMatch(/re-read tools\/effects_seam_gate\.py/i);
     expect(l.body).toMatch(/tools\/effects_gen\.py/i);
   });
@@ -259,8 +292,10 @@ describe('the three limits say the words that carry them', () => {
       /nothing here warns, and FAST=1 skips that gate/i,
       /a preset split plus one call-site line/i,
       /for section 5 as much as for any other/i,
-      /Verified at aeon 9cdf32d8/,
-      /the seam gate's section arm is vacuous and prints that it is/i,
+      /Verified at aeon 6e2495a5/,
+      /the seam gate's section arm is no longer vacuous/i,
+      /SECTION 5 IS BOUND: aeon's c9a462be commits section_5\.meta\.json/,
+      /aeon's c9a462be says in its own words that nothing has been seen on screen/,
     ];
     const unbound = PRESET_LIMITS.find((x) => x.key === 'unbound')!.body;
     const others = [
