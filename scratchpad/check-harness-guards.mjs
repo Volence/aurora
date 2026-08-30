@@ -39,6 +39,19 @@
 //       Without this the whole check is vacuous the day someone renames an
 //       export: every file would "import the guard" and none would be guarded.
 //
+// AND FOR SHELL SCRIPTS (O23) — five rules that are NOT G1 in a hat. See the
+// long note above the shell pass for why widening the file set alone would
+// have produced a check that scans `.sh` files and can only return green.
+//
+//   S1  A `.sh` must not start xvfb-run / Xvfb / electron itself, unless it
+//       traps EXIT **and** INT **and** TERM.
+//   S2  Every `.mjs` a `.sh` dispatches must be one this check classifies as
+//       guarded. A shell script is a launcher by proxy. THIS IS THE RULE WITH
+//       TEETH — it fires today.
+//   S3  No `pkill` (G2, in shell).
+//   S4  No hand-read of `mcp.json` (G3, in shell).
+//   S5  A `.sh` that backgrounds a child must trap EXIT+INT+TERM.
+//
 // LOUD ON UNMEASURABLE. A file this cannot classify — unreadable, or a spawn
 // whose arguments it cannot bracket — is reported UNMEASURABLE and FAILS the
 // run. A checker that silently skips what it cannot understand is the same
@@ -58,6 +71,10 @@ const REQUIRED_EXPORTS = [
   'spawnGuarded', 'killTree', 'killTreeSync', 'descendants', 'isDescendantOf',
   'snapshotDiscovery', 'restoreDiscovery', 'restoreDiscoveryNow', 'readDiscoveryNow', 'setDiscoveryBaseline',
   'resolveOwnedDiscovery', 'ownedRoots', 'DISCOVERY_FILES',
+  // O20's reap. Listed here for the same reason as the rest: rename one of
+  // these and killTree's `reap` branch becomes dead code, every launcher still
+  // "imports the guard", and the X displays start leaking again silently.
+  'displayArtifacts', 'reapDisplays', 'XVFB_TMPDIR_RE',
 ];
 
 // ── source scanning ────────────────────────────────────────────────────────
@@ -131,7 +148,7 @@ const looksLikeAurora = (t) =>
  *  worktree it was developed in. */
 export const unreadable = [];
 
-function listMjs(dir, acc = []) {
+function listFiles(dir, exts, acc = []) {
   for (const name of readdirSync(dir).sort()) {
     const p = join(dir, name);
     let st;
@@ -140,10 +157,10 @@ function listMjs(dir, acc = []) {
     try { st = lstatSync(p); } catch (e) { unreadable.push(`${p} (${e.code})`); continue; }
     if (st.isSymbolicLink()) {
       // Follow it only far enough to know if it is a directory; a loop is not.
-      try { if (statSync(p).isDirectory()) { if (name !== 'node_modules') listMjs(p, acc); continue; } }
+      try { if (statSync(p).isDirectory()) { if (name !== 'node_modules') listFiles(p, exts, acc); continue; } }
       catch (e) { unreadable.push(`${p} (${e.code})`); continue; }
-    } else if (st.isDirectory()) { if (name !== 'node_modules') listMjs(p, acc); continue; }
-    if (name.endsWith('.mjs')) acc.push(p);
+    } else if (st.isDirectory()) { if (name !== 'node_modules') listFiles(p, exts, acc); continue; }
+    if (exts.some((e) => name.endsWith(e))) acc.push(p);
   }
   return acc;
 }
@@ -167,7 +184,10 @@ if (guardSrc) {
     + `${missing.length ? ` — MISSING ${missing.join(', ')}` : ''}`);
 }
 
-for (const path of listMjs(DIR)) {
+/** basename -> kind, filled by the .mjs pass and read by the .sh pass (S2). */
+const mjsKind = new Map();
+
+for (const path of listFiles(DIR, ['.mjs'])) {
   const rel = relative(DIR, path);
   if (rel.startsWith('_o16')) continue;            // this parcel's own scaffolding
   const isGuardModule = path === GUARD_ABS;
@@ -254,6 +274,159 @@ for (const path of listMjs(DIR)) {
     : otherSpawns ? 'spawns something else (oracle emulator or a tool)'
     : 'no launch — not applicable';
   rows.push({ rel, kind, launches: launches.length, otherSpawns });
+  // Keyed by basename because a shell script names its target however it likes
+  // (`scratchpad/x.mjs`, `"$ROOT/scratchpad/x.mjs"`, `"$HERE/handover/x.mjs"`).
+  // A basename collision across subdirectories would make this ambiguous, so
+  // that case is recorded and reported UNMEASURABLE rather than resolved by
+  // guesswork.
+  const base = rel.split('/').pop();
+  if (mjsKind.has(base)) mjsKind.set(base, { kind: 'AMBIGUOUS', rel: `${mjsKind.get(base).rel} and ${rel}` });
+  else mjsKind.set(base, { kind, rel });
+}
+
+// ══ THE SHELL PASS ═════════════════════════════════════════════════════════
+//
+// O23. Everything above reads `.mjs` and nothing else, so the shell scripts
+// sitting in the same directory were invisible to it — `listFiles(DIR,
+// ['.mjs'])`, one line, and a whole file class outside the gate.
+//
+// ⚠ WIDENING THE FILE SET IS NOT THE SAME AS WIDENING THE CHECK, AND DOING
+// ONLY THE FIRST IS HOW YOU GET A GATE THAT SCANS MORE AND ASSERTS LESS.
+// G1 asks "does this call spawnGuarded?". A shell script has no spawnGuarded
+// and never will — the ownership machinery is a Node module — so running G1
+// over `.sh` files would classify every one of them "no launch" and return
+// green forever. That is the trap, and the answer is not to stretch G1 but to
+// ask what a shell script in THIS directory can actually get wrong.
+//
+// It can get two things wrong, and they are different questions:
+//
+//   S1  It can start an X server or an Electron ITSELF. Nothing in shell can
+//       guard that here: `xvfb-run` has no trap of its own (that is hazard 4),
+//       and the descent-based ownership rule lives in Node. So a shell script
+//       must delegate the launch and not perform one — unless it installs a
+//       trap covering INT, TERM and EXIT, which is the minimum that makes a
+//       shell cleanup fire on more than the success path.
+//
+//   S2  It can DISPATCH TO AN UNGUARDED HARNESS. This is the one with teeth,
+//       and it is the actual link between the two halves of this parcel: the
+//       four unguarded launchers O20 blames for the leak are `.mjs` files, and
+//       two of them are reached only through shell scripts that the gate could
+//       not see. A `.sh` is a launcher by proxy, and the right quantity to
+//       watch for it is WHICH LAUNCHER IT NAMES — not whether it contains a
+//       call it structurally cannot contain.
+//
+// S3/S4 are the direct analogues of G2/G3 and belong here because shell is
+// where `pkill` and a hand-rolled `cat ~/.aurora/mcp.json` are natural to
+// write. S5 is the hazard-4 shape itself, stated as a rule.
+//
+// WHICH OF THESE CAN FIRE TODAY, stated plainly so nobody reads a prohibition
+// as a measurement: S2 fires now, on two untracked shell scripts in the
+// owner's working tree. S1, S3, S4 and S5 are prohibitions that currently
+// hold — every one was verified by planting a violation and watching it go
+// red, which is the only reason to believe a green from any of them.
+
+/** Strip `#` comments from shell. Quoting is respected so a `#` inside a
+ *  string survives; without that, `grep '#foo'` would truncate the line. */
+function stripShComments(src) {
+  const out = [];
+  for (const line of src.split('\n')) {
+    let q = null; let cut = -1;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (q) { if (c === '\\' && q === '"') i++; else if (c === q) q = null; continue; }
+      if (c === '"' || c === "'") { q = c; continue; }
+      if (c === '#' && (i === 0 || /\s/.test(line[i - 1]))) { cut = i; break; }
+    }
+    out.push(cut >= 0 ? line.slice(0, cut) : line);
+  }
+  return out.join('\n');
+}
+
+const shRows = [];
+for (const path of listFiles(DIR, ['.sh'])) {
+  const rel = relative(DIR, path);
+  // scratchpad/fixtures/ holds whole checked-out copies of OTHER repos, pinned
+  // as test data. Their build scripts are not this repo's launchers and this
+  // gate has no standing over them.
+  if (rel.startsWith('fixtures/')) continue;
+
+  let raw;
+  try { raw = readFileSync(path, 'utf8'); }
+  catch (e) { unmeasurable.push(`${rel}: unreadable (${e.message})`); continue; }
+  const src = stripShComments(raw);
+
+  // ── S1: does it start an X server or an Electron itself? ─────────────────
+  //
+  // Matched as a COMMAND WORD — start of line, or after a pipe/`&&`/`;`/`(`,
+  // or after an env-var prefix. `echo "run xvfb-run yourself"` is prose about
+  // a launch, not a launch, and a rule that cannot tell them apart is a rule
+  // people route around.
+  const CMD = String.raw`(?:^|[\n;&|(]|\$\()\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*`;
+  const directLaunch = [];
+  for (const [what, re] of [
+    ['xvfb-run', new RegExp(`${CMD}(?:\\S*/)?xvfb-run\\b`)],
+    ['Xvfb', new RegExp(`${CMD}(?:\\S*/)?Xvfb\\b`)],
+    ['electron', new RegExp(`${CMD}(?:\\S*/)?electron\\b`)],
+  ]) if (re.test(src)) directLaunch.push(what);
+  // A trap is only a guard if it covers the signals. `trap ... EXIT` alone does
+  // NOT fire on SIGINT or SIGTERM in POSIX sh, which is the vacuous-guard shape
+  // this repo keeps meeting -- and is exactly what /usr/bin/xvfb-run does not
+  // even have.
+  const trapSigs = new Set();
+  for (const m of src.matchAll(/\btrap\s+(?:'[^']*'|"[^"]*"|\S+)\s+([A-Z0-9 ]+)/g)) {
+    for (const s of m[1].trim().split(/\s+/)) trapSigs.add(s.replace(/^SIG/, ''));
+  }
+  const fullTrap = ['EXIT', 'INT', 'TERM'].every((s) => trapSigs.has(s));
+  if (directLaunch.length && !fullTrap) {
+    fails.push(`S1 ${rel}: starts ${directLaunch.join('/')} itself with no trap covering EXIT+INT+TERM `
+      + `(has: ${[...trapSigs].join(' ') || 'no trap at all'}). Shell has no spawnGuarded, and xvfb-run's own `
+      + 'cleanup is on its success path only (/usr/bin/xvfb-run:184-192) — so an interrupted run leaks the '
+      + 'display lock, the socket and the wrapper tempdir. Delegate the launch to a guarded .mjs.');
+  }
+
+  // ── S2: every .mjs it dispatches must itself be guarded ──────────────────
+  const targets = new Set();
+  for (const m of src.matchAll(/[\w$${}/.\\-]*?([A-Za-z0-9_.-]+\.mjs)\b/g)) targets.add(m[1]);
+  const dispatched = [];
+  for (const t of targets) {
+    const k = mjsKind.get(t);
+    if (!k) { unmeasurable.push(`${rel}: dispatches ${t}, which is not a file under scratchpad/ — cannot classify it`); continue; }
+    if (k.kind === 'AMBIGUOUS') { unmeasurable.push(`${rel}: dispatches ${t}, and that basename exists twice (${k.rel})`); continue; }
+    dispatched.push({ t, ...k });
+  }
+  const bad = dispatched.filter((d) => /UNGUARDED/.test(d.kind));
+  if (bad.length) {
+    fails.push(`S2 ${rel}: dispatches ${bad.length} UNGUARDED launcher(s) — ${bad.map((d) => d.rel).join(', ')}. `
+      + 'A shell script is a launcher by proxy: it leaves the same orphaned Electron and the same leaked X '
+      + 'display as if it had spawned them, and it is how two of those launchers are reached at all.');
+  }
+
+  // ── S3 / S4: the shell forms of G2 and G3 ────────────────────────────────
+  if (/\bpkill\b/.test(src)) {
+    fails.push(`S3 ${rel}: calls pkill. Same reason as G2 — a pattern match on a command line matches the `
+      + "OWNER'S Aurora and misses this run's own orphan from a worktree.");
+  }
+  if (/mcp\.json/.test(src)) {
+    fails.push(`S4 ${rel}: names mcp.json. Reading the shared discovery file from shell cannot apply the `
+      + 'descent test at all, so it can only find "an app" — very possibly his.');
+  }
+
+  // ── S5: hazard 4's own shape, stated as a rule ───────────────────────────
+  const backgrounds = /(?:^|[\n;&|(])\s*(?:nohup|setsid)\b/.test(src) || /&\s*$/m.test(src.replace(/&&/g, ''));
+  if (backgrounds && !fullTrap) {
+    fails.push(`S5 ${rel}: backgrounds a child (& / nohup / setsid) with no trap covering EXIT+INT+TERM `
+      + `(has: ${[...trapSigs].join(' ') || 'no trap at all'}). This is hazard 4 exactly: /usr/bin/xvfb-run `
+      + 'puts its cleanup after the command instead of in a trap, and that is why every interrupted harness '
+      + 'run leaves a display behind.');
+  }
+
+  shRows.push({
+    rel,
+    kind: directLaunch.length ? `LAUNCHES ${directLaunch.join('/')} DIRECTLY${fullTrap ? ' (trapped)' : ' (UNTRAPPED)'}`
+      : bad.length ? 'DISPATCHES AN UNGUARDED LAUNCHER'
+      : dispatched.length ? `dispatches ${dispatched.length} guarded harness(es)`
+      : 'no launch, no dispatch — not applicable',
+  });
 }
 
 // ── report ─────────────────────────────────────────────────────────────────
@@ -264,9 +437,15 @@ for (const r of rows) byKind.set(r.kind, (byKind.get(r.kind) ?? 0) + 1);
 console.log(`\n=== ${rows.length} .mjs file(s) under scratchpad/ ===`);
 for (const [k, v] of [...byKind].sort((a, b) => b[1] - a[1])) console.log(`  ${String(v).padStart(3)}  ${k}`);
 
+const shByKind = new Map();
+for (const r of shRows) shByKind.set(r.kind, (shByKind.get(r.kind) ?? 0) + 1);
+console.log(`\n=== ${shRows.length} .sh file(s) under scratchpad/ (fixtures/ excluded: other repos' build scripts) ===`);
+for (const [k, v] of [...shByKind].sort((a, b) => b[1] - a[1])) console.log(`  ${String(v).padStart(3)}  ${k}`);
+
 if (process.env.VERBOSE) {
   console.log('\n--- per file ---');
   for (const r of rows) console.log(`  ${r.rel.padEnd(50)} ${r.kind}`);
+  for (const r of shRows) console.log(`  ${r.rel.padEnd(50)} ${r.kind}`);
 }
 
 if (exemptions.length) {
@@ -295,7 +474,10 @@ try {
   const tracked = new Set(
     execFileSync('git', ['ls-files', 'scratchpad'], { encoding: 'utf8' })
       .split('\n').filter(Boolean).map((f) => f.replace(/^scratchpad\//, '')));
-  untrackedFails = fails.filter((f) => !tracked.has(String(f).replace(/^\s*G\d+ /, '').split(':')[0]));
+  // `[GS]` — the shell rules use S-codes, and leaving this as `G\d+` would have
+  // filed every shell failure under "tracked" by accident (the rule id would
+  // stay in the key and never match a path), making an untracked .sh fatal.
+  untrackedFails = fails.filter((f) => !tracked.has(String(f).replace(/^\s*[GS]\d+ /, '').split(':')[0]));
   trackedFails = fails.filter((f) => !untrackedFails.includes(f));
 } catch (e) {
   // Cannot ask git -> cannot split -> treat every failure as fatal. Never the
@@ -316,11 +498,12 @@ if (trackedFails.length) {
 }
 
 const bad = trackedFails.length + unmeasurable.length;
-const clean = rows.length - trackedFails.length - untrackedFails.length - unmeasurable.length;
+const classified = rows.length + shRows.length;
+const clean = classified - trackedFails.length - untrackedFails.length - unmeasurable.length;
 // `clean` subtracts the untracked ones too. They are NOT clean -- they are
 // unguarded and merely not fatal -- and a headline that counted them as clean
 // would be the gate telling the exact lie it exists to catch.
-console.log(`\n════ ${clean} clean / ${rows.length} classified · ${trackedFails.length} failure(s)`
+console.log(`\n════ ${clean} clean / ${classified} classified (${rows.length} .mjs + ${shRows.length} .sh) · ${trackedFails.length} failure(s)`
   + `${untrackedFails.length ? ` · ${untrackedFails.length} unguarded-untracked` : ''}`
   + ` · ${unmeasurable.length} unmeasurable ════`);
 process.exit(bad ? 1 : 0);
