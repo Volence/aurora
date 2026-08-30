@@ -117,8 +117,17 @@ Other scripts (all of `package.json`'s):
 ```bash
 npm run build      # production build into dist/ (electron-vite)
 npm run preview    # build, then launch the production build in Electron
-npm test           # vitest, single run
-npm run test:watch # vitest in watch mode
+npm test           # the full gate: the check:* scripts, then `tsc --noEmit`,
+                   #   then vitest once. Typecheck is IN the chain and runs
+                   #   BEFORE the suite — vitest strips types without checking
+                   #   them, so until 2026-08-30 a plant the compiler catches
+                   #   read as "no test noticed" (deleting SectionMeta's
+                   #   `rasterRef` key left vitest at 6041 passed, zero red,
+                   #   while tsc reported 23 errors). Measured cost of the
+                   #   addition: ~13.6s -> ~18.0s wall. See the "//test" note
+                   #   in package.json.
+npm run typecheck  # just `tsc --noEmit`, for a fast types-only pass
+npm run test:watch # vitest in watch mode — NO typecheck; it is not the gate
 npm run gen:theme  # regenerate src/renderer/styles/theme.css
 ```
 
