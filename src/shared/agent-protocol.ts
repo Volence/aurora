@@ -95,6 +95,22 @@ export type AgentRequest =
   | { kind: 'get-effects-scene'; id: string }
   | { kind: 'set-effects-scene'; id: string; scene: unknown | null }
   | { kind: 'assign-section-scene'; section: number; sceneId: string | null }  // null = act default
+  // ---- Wave-2: raster PRESETS (empyrean AURORA_EFFECTS_SCHEMA.md §7 / the
+  // effects definition of done, item 12) ----
+  // A PRESET IS NOT A SCENE and shares no file with one: a scene is the
+  // `parallax_config` at `data/editor/effects/<id>.json`, a preset is the raster
+  // band program at `data/editor/effects/presets/<id>.json`. `preset` is
+  // deliberately untyped on the wire for the same reason `scene` is — the whole
+  // document, validated by the codec (parseEffectsPreset), never by a shape
+  // restated here. null deletes the preset.
+  //
+  // THERE IS NO `assign-section-preset`, and its absence is a fact rather than an
+  // omission: `SectionMeta` is `{bgLayoutRef, paletteRef, sceneRef}` and carries
+  // no preset binding, so there is nothing to write. ROADMAP row 93 tracks it and
+  // waits on aeon landing `effectsRef` in the sidecar.
+  | { kind: 'list-effects-presets' }
+  | { kind: 'get-effects-preset'; id: string }
+  | { kind: 'set-effects-preset'; id: string; preset: unknown | null }
   // ---- Wave-1 surface 4: BgAnim bands (aeon EFFECTS_CONSUMER_CONTRACT §1.1/§1.2) ----
   //
   // PROMOTE IS THE PRIMARY OPERATION, not add. A band's slots are a PREFIX of
