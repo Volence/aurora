@@ -29,7 +29,9 @@ import {
   type LoadedS4Config,
 } from '../../config/s4-config';
 import { serializeBgTiles } from '../../formats/bg-tiles';
-import { bgLibIndexPath, bgLibLayoutPath, bgLibTilesPath, serializeBgLibraryIndex } from '../../formats/bg-library';
+import {
+  bgLibIndexPath, bgLibLayoutPath, bgLibTilesPath, mergeBgLibraryIndex, serializeBgLibraryIndex,
+} from '../../formats/bg-library';
 import { serializeSectionMeta } from '../../formats/section-meta';
 import { clearedChunkLinksText, serializeSectionChunkLinks } from '../../formats/section-chunk-links';
 import { effectsScenePath, serializeEffectsScene } from '../../formats/effects/scene';
@@ -260,8 +262,22 @@ export async function buildAeonSavePlan(
   // round-trip guarantee as the act BG above). Single-zone assumption:
   // like the chunk library, the data model has ONE library per project,
   // keyed here under the current zone's id.
-  if (project.bgLibrary.length > 0) {
-    const indexBytes = new TextEncoder().encode(serializeBgLibraryIndex(project.bgLibrary));
+  //
+  // THE INDEX IS NOT `project.bgLibrary`. It is the library PLUS the manifest
+  // entries this checkout could not open (`bgLibraryUnresolved` — see the field
+  // on S4Project). Writing only what loaded is how a checkout that resolved
+  // none of aeon's seventeen tracked names would replace them, on the next
+  // save, with the one background the author had just made. The bodies below
+  // are still written only for entries we HAVE bytes for: an unresolved entry
+  // keeps its name in the manifest and its (untracked, absent here) binaries
+  // are left exactly as they are rather than overwritten with a placeholder.
+  //
+  // The unresolved entries alone are enough to write the file — a checkout with
+  // an empty library and a full manifest must still emit that manifest, which
+  // the old `bgLibrary.length > 0` gate would have skipped only by accident.
+  const bgIndex = mergeBgLibraryIndex(project.bgLibrary, project.bgLibraryUnresolved);
+  if (bgIndex.length > 0) {
+    const indexBytes = new TextEncoder().encode(serializeBgLibraryIndex(bgIndex));
     files.push({ path: bgLibIndexPath(dataRoot, zone.id), bytes: indexBytes });
     for (const entry of project.bgLibrary) {
       const layoutBytes = serializeNametable(entry.layout);

@@ -285,7 +285,16 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + 'attribute table at $B800). Without "name" replaces the act-default BG (one undo step); with '
       + '"name" saves to the project BG library (additive). Tile indices are local to the BG blob.' },
   { name: 'list_bgs', kind: 'list-bgs', result: 'json', params: {},
-    description: "List available backgrounds: the act default, every BG library entry (id, name, tile count), and each section's current assignment (bgId null = act default). "
+    // The "could not be opened" clause is the same promise `list_effects_scenes`
+    // makes below, and for a sharper reason: aeon TRACKS the BG manifest and
+    // NONE of the per-entry binaries, so on a clean clone `entries` is empty
+    // while `unresolved` names every background the zone has. Without the
+    // second column an agent reads the first and concludes the zone has none.
+    description: "List available backgrounds: the act default, every BG library entry (id, name, tile count), "
+      + "and each section's current assignment (bgId null = act default; dangling true = that id is in NO "
+      + "library entry, so the section is showing the act default). Also reports entries the zone's bglib "
+      + 'manifest NAMES but whose layout/tile binaries are not in this checkout — those ids cannot be '
+      + 'assigned or displayed until the files arrive, and Aurora keeps their names when it saves. '
       + BG_SECTION_BINDING_LIMIT },
   { name: 'assign_section_bg', kind: 'assign-section-bg', result: 'json',
     params: { section: z.number().int().min(0), bgId: z.string().nullable().describe('BG library entry id, or null for the act default') },

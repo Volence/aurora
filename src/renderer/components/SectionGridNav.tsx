@@ -6,6 +6,7 @@ import { useProjectStore, getCurrentAct, getActiveLevel } from '../state/project
 import { SECTION_PIXEL_SIZE, MAX_ACT_SECTIONS } from '../../core/model/s4-types';
 import type { Section } from '../../core/model/s4-types';
 import * as ops from '../../core/editing/section-ops';
+import { danglingBgRef } from '../../core/formats/bg-library';
 import { T, Z } from './ui';
 
 // Module-level clipboard: a deep-cloned section survives re-renders and lets
@@ -154,6 +155,15 @@ export default function SectionGridNav() {
           const isNull = sec === null;
           // Corner dot marks sections assigned a BG-library background
           // (bgLayoutRef != null); tooltip names it.
+          //
+          // O31 — AND WHEN THE LIBRARY HAS NO SUCH ENTRY. The `?? sec.bgLayoutRef`
+          // fallback below is why this surface used to read as working on a
+          // checkout with no library binaries: it printed the raw id, which
+          // looks exactly like a name, under a green dot that means "assigned".
+          // The viewport meanwhile paints the ACT DEFAULT. The dot and the
+          // tooltip are the only per-section signal in the grid, so they say
+          // which of the two states this is.
+          const bgDangling = sec ? danglingBgRef(sec.bgLayoutRef, project?.bgLibrary ?? []) : null;
           const bgName = sec?.bgLayoutRef
             ? project?.bgLibrary.find(b => b.id === sec.bgLayoutRef)?.name ?? sec.bgLayoutRef
             : null;
@@ -169,9 +179,11 @@ export default function SectionGridNav() {
               }}
               title={isNull
                 ? 'Empty slot — click to add a section here · right-click to paste'
-                : bgName
-                  ? `BG: ${bgName} · double-click to jump · drag to move · right-click for menu`
-                  : 'Double-click to jump · drag to move · right-click for menu'}
+                : bgDangling
+                  ? `BG: ${bgDangling} — MISSING from the library, showing the act default · double-click to jump · drag to move · right-click for menu`
+                  : bgName
+                    ? `BG: ${bgName} · double-click to jump · drag to move · right-click for menu`
+                    : 'Double-click to jump · drag to move · right-click for menu'}
               onClick={() => (isNull ? createSectionAt(i) : selectSection(i))}
               onDoubleClick={() => { if (!isNull) jumpToSection(i); }}
               onContextMenu={(e) => openMenu(i, sec, e)}
@@ -181,7 +193,7 @@ export default function SectionGridNav() {
               onDragEnd={onCellDragEnd}
             >
               {sec ? i : '+'}
-              {bgName && <span style={styles.bgDot} />}
+              {bgName && <span style={bgDangling ? styles.bgDotDangling : styles.bgDot} />}
             </button>
           );
         })}
@@ -256,6 +268,17 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'absolute', top: 1, right: 1,
     width: 5, height: 5, borderRadius: '50%',
     background: T.success,
+  },
+  // Same dot, warning-toned and hollow. It stays a dot rather than becoming a
+  // glyph because the two states must be comparable at a glance across a grid
+  // of 48 cells — "assigned" and "assigned to something that is not here" are
+  // neighbours, not different kinds of thing — and hollow reads as absence in a
+  // way a second solid colour does not.
+  bgDotDangling: {
+    position: 'absolute', top: 1, right: 1,
+    width: 5, height: 5, borderRadius: '50%',
+    background: 'transparent', border: `1px solid ${T.warning}`,
+    boxSizing: 'border-box',
   },
   active: { background: T.accent, color: T.surface, border: `1px solid ${T.accent}` },
   null: { background: T.void, color: T.textLo, cursor: 'pointer' },

@@ -95,6 +95,32 @@ export async function openAeonProject(dir: string): Promise<boolean> {
     }
     useViewStore.getState().setPosition(0, 0);
     for (const n of aeon.notices) useToastStore.getState().addToast(n, 'success');
+    // THE ONE THING A CLEAN CHECKOUT MUST BE TOLD AT OPEN, and a `'warning'`
+    // rather than one of the greens above, on toastStore's own bargain: nothing
+    // FAILED — the project opened, every section is editable, the act default
+    // paints — but this is a sentence to be ACTED on, and the 2.2s success
+    // dwell is not long enough to read one.
+    //
+    // Not part of `notices`. That channel is toasted uniformly as 'success'
+    // (including, wrongly, markUnreadable's "fix it by hand" — a separate
+    // defect, left alone here rather than fixed under a BG parcel), so a
+    // warning routed through it would arrive green.
+    //
+    // Names entries, not just a count: "3 backgrounds could not be opened" sends
+    // the reader looking, where the ids are what they would have to find anyway.
+    // Capped, because the real number here is seventeen and a toast is not a
+    // list.
+    const unresolved = aeon.project.bgLibraryUnresolved;
+    if (unresolved.length > 0) {
+      const shown = unresolved.slice(0, 3).map((e) => e.name).join(', ');
+      const rest = unresolved.length - Math.min(3, unresolved.length);
+      useToastStore.getState().addToast(
+        `${unresolved.length} background${unresolved.length === 1 ? '' : 's'} named by this ` +
+        `zone's library could not be opened — ${shown}${rest > 0 ? `, +${rest} more` : ''}. ` +
+        'Their layout/tile files are not in this checkout; sections that reference them show ' +
+        'the act default. Editing still works, and saving will not drop their names.',
+        'warning');
+    }
     useToastStore.getState().addToast(`Opened ${aeon.config.name}`, 'success');
     return true;
   } catch (err) {

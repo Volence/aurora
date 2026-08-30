@@ -3,6 +3,7 @@
 import type { EffectsSceneLibrary } from '../formats/effects/scene';
 import type { EffectsPresetLibrary } from '../formats/effects/preset';
 import type { BgOverrideState } from '../formats/bg-override/bg-override-io';
+import type { BgLibraryUnresolvedEntry } from '../formats/bg-library';
 
 export const SECTION_TILES_WIDE = 256;
 export const SECTION_TILES_HIGH = 256;
@@ -378,6 +379,30 @@ export interface S4Project {
   objectLibrary: ObjectDef[];
   chunkLibrary: ChunkDef[];
   bgLibrary: BgLibraryEntry[];
+  /**
+   * The BG-library entries the zone's MANIFEST names and this checkout cannot
+   * open — `{zone}_bglib.json` listed them, one or both of their binaries was
+   * unreadable or absent.
+   *
+   * NOT AN ERROR LIST. It is the difference between "this project has N
+   * backgrounds" and "this project was opened without seeing N of them", and
+   * those two used to be one array. `load` dropped a bodyless entry with a
+   * `console.warn` and produced a shorter `bgLibrary`; downstream, a section
+   * whose `bgLayoutRef` names a dropped entry falls back to the act default,
+   * `list_bgs` reports a library that does not contain the id its own section
+   * column prints, and `save` rewrites the manifest from the survivors. Every
+   * one of those is a correct reading of a `bgLibrary` that never carried the
+   * fact.
+   *
+   * REQUIRED, on the same rule `effectsScenes` states below: an optional field
+   * reads downstream as "nothing was missing", which is a different claim from
+   * "nobody looked".
+   *
+   * ORDINARILY EMPTY, and empty is not a special case — it is what an authoring
+   * checkout with every body present looks like, and every consumer must treat
+   * the empty array as "the library is whole" without a second flag.
+   */
+  bgLibraryUnresolved: BgLibraryUnresolvedEntry[];
   basePath: string;
   /**
    * The editor effects-scene library — `{dataRoot}editor/effects/<id>.json`,

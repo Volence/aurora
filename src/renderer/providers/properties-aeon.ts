@@ -14,6 +14,7 @@ import type { PropertiesPort, PropertySection, PropertyRow } from '../components
 import type { Act, BgLibraryEntry, Section, Zone } from '../../core/model/s4-types';
 import type { SetSectionBgCommand } from '../../core/editing/commands';
 import type { ToolId } from '../../core/project/adapter';
+import { danglingBgRef } from '../../core/formats/bg-library';
 import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel } from '../state/projectStore';
 import { useViewStore } from '../state/viewStore';
 import { useEditorStore, executeCommand, type Selection } from '../state/editorStore';
@@ -159,6 +160,28 @@ export function aeonPropertySections(input: AeonPropertiesInput): PropertySectio
   } else {
     sectionRows.push(row('Status', '(empty)'));
   }
+  // THE DANGLING REF IS THE ONE STATE THIS SELECT COULD NOT SHOW.
+  //
+  // `value` is the section's ref and the options are the library. When the ref
+  // names an entry the library does not carry — every entry, on a checkout of
+  // aeon that has the tracked `{zone}_bglib.json` and none of its untracked
+  // `{zone}_bg_*.bin` bodies — a `<select>` whose value matches no `<option>`
+  // renders with selectedIndex -1: a BLANK box, sitting under the label
+  // "Background", on a section whose sidecar on disk says it has one. That is
+  // the silent fallback wearing the UI's own clothes, and it is worse than the
+  // viewport's, because here the author is LOOKING at the control that is
+  // supposed to answer this exact question.
+  //
+  // So the missing entry gets an option of its own, carrying its id and saying
+  // what is actually on screen instead. It stays SELECTABLE rather than
+  // disabled: re-picking it is the no-op the section is already in, and a
+  // disabled option would make the control's current state unreachable from
+  // its own list. Picking a real entry, or "Act default", still works — nothing
+  // here blocks the author, which is the point. When the library is whole this
+  // branch produces exactly the old option list.
+  const dangling = input.section
+    ? danglingBgRef(input.section.bgLayoutRef, input.bgLibrary)
+    : null;
   out.push({
     title: 'Active Section',
     rows: sectionRows,
@@ -170,6 +193,17 @@ export function aeonPropertySections(input: AeonPropertiesInput): PropertySectio
         value: input.section.bgLayoutRef ?? '',
         options: [
           { value: '', label: 'Act default' },
+          // THE WORD "missing" LEADS, and that is a measured decision, not a
+          // preference. `PropertiesPanel`'s select is capped at 120px, so a
+          // driven run of this screen showed the id-first version rendering as
+          // "ingame-forest-v15-1" — the id, truncated, with the entire point
+          // of the label off the end and nothing to distinguish it from a
+          // background that is present and simply named that. Whatever the box
+          // is wide enough for has to be the part that matters. The id follows
+          // in full, for the hover title and the open dropdown.
+          ...(dangling !== null
+            ? [{ value: dangling, label: `missing — showing act default (${dangling})` }]
+            : []),
           ...input.bgLibrary.map((b) => ({ value: b.id, label: b.name })),
         ],
         onChange: input.onBackgroundChange,

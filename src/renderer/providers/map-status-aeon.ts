@@ -9,7 +9,8 @@ import React from 'react';
 import type { MapStatusPort } from '../components/shared/map-status-model';
 import { useEditorStore } from '../state/editorStore';
 import { useViewStore } from '../state/viewStore';
-import { useProjectStore, getCurrentZone } from '../state/projectStore';
+import { useProjectStore, getCurrentAct, getCurrentZone } from '../state/projectStore';
+import { danglingBgRef } from '../../core/formats/bg-library';
 import AetherStatus from '../components/AetherStatus';
 
 /** Aeon's trailing status content. An element, not a component, because it takes
@@ -28,6 +29,32 @@ export function stampContext(chunkCount: number, selectedChunkId: string | null)
   if (chunkCount === 0) return 'No chunks loaded — import chunks first';
   if (!selectedChunkId) return 'Select a chunk from the library panel';
   return `Chunk: ${selectedChunkId} — Alt: art only`;
+}
+
+/**
+ * The scope line for the active section — and the one place the MAP itself
+ * admits it is not showing the background the section names (O31).
+ *
+ * The author looking at the viewport has no other signal. The plane is drawn,
+ * it is a plausible background, and it is the ACT DEFAULT standing in for an
+ * entry the library does not carry — which on a checkout of aeon holding the
+ * tracked `{zone}_bglib.json` and none of its untracked `{zone}_bg_*.bin`
+ * bodies is every entry there is. This matters most under the BG paint layer,
+ * where the stroke lands on the act default while the panel names something
+ * else, so the fallback is not merely displayed, it is edited.
+ *
+ * A pure function taking the ref and the library rather than reading the store:
+ * that is what makes the sentence testable at all.
+ */
+export function sectionScope(
+  activeSectionIndex: number,
+  bgRef: string | null,
+  bgLibrary: readonly { readonly id: string }[],
+): string {
+  const dangling = danglingBgRef(bgRef, bgLibrary);
+  return dangling === null
+    ? `Section ${activeSectionIndex}`
+    : `Section ${activeSectionIndex} · BG ${dangling} missing — showing act default`;
 }
 
 export function useAeonMapStatusPort(): MapStatusPort {
@@ -51,18 +78,29 @@ export function useAeonMapStatusPort(): MapStatusPort {
   );
   const chunkCount = project?.chunkLibrary.length ?? 0;
   const contextInfo = tool === 'stamp-chunk' ? stampContext(chunkCount, selectedChunkId) : '';
+  // Read off getState() like `zoneName` above, and re-derived whenever the
+  // project identity or the active section moves — an in-place ref edit lands
+  // through the same `project` subscription every other read here uses.
+  const scopeInfo = React.useMemo(() => {
+    const act = getCurrentAct(useProjectStore.getState());
+    return sectionScope(
+      activeSectionIndex,
+      act?.sections[activeSectionIndex]?.bgLayoutRef ?? null,
+      project?.bgLibrary ?? [],
+    );
+  }, [project, currentZoneId, activeSectionIndex]);
 
   return React.useMemo((): MapStatusPort => ({
     tool,
     pasting,
     layer: editingLayer,
     zoneName,
-    scopeInfo: `Section ${activeSectionIndex}`,
+    scopeInfo,
     contextInfo,
     zoom,
     // setZoom takes optional focus coordinates the bar never supplies; the
     // narrower port signature is a subtype, so it passes straight through.
     onZoom: setZoom,
     right: AETHER,
-  }), [tool, pasting, editingLayer, zoneName, activeSectionIndex, contextInfo, zoom, setZoom]);
+  }), [tool, pasting, editingLayer, zoneName, scopeInfo, contextInfo, zoom, setZoom]);
 }
