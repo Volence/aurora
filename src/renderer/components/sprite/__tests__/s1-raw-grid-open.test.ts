@@ -22,11 +22,22 @@ import type { DiscoveredSpriteSet } from '../../../../core/import/sprite-discove
 import { useSpriteStore } from '../../../state/spriteStore';
 import { useToastStore } from '../../../state/toastStore';
 import { parseTiles } from '../../../../core/formats/tiles';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../../test/support/fixture-tree';
+import { referencePath } from '../../../../../test/support/fixture-tree';
+import { whenS1Files } from '../../../../../test/support/s1-checkout';
 
 const S1DIR = referencePath('s1disasm');
-/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
+
+/**
+ * The three raw grids this file opens. Named here so the guard can name them:
+ * the old gate was `referenceCheckout`, which a checkout with the markers and no
+ * `artunc/` satisfies, and the read-only row then reported
+ * `TypeError: .toMatch() expects to receive a string, but got object` — the
+ * refusal object it got because the open had read nothing
+ * (docs/reviews/2026-08-30-incomplete-checkout-rows.md).
+ */
+const HUD_NUMBERS = 'artunc/HUD Numbers.unc';
+const LIVES_NUMBERS = 'artunc/Lives Counter Numbers.unc';
+const LEVEL_SELECT_TEXT = 'artunc/Level Select & Debug Text.unc';
 
 // window.api over fs (read-only: s1disasm must never be written by a test).
 function stubWindowApi(): () => void {
@@ -87,9 +98,9 @@ function derivedCells(bytes: Uint8Array, widthCells: number, heightCells: number
   });
 }
 
-describe('openDiscoveredSet — raw tile grids (Parcel C)', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
+describe('openDiscoveredSet — raw tile grids (Parcel C)', whenS1Files('the raw tile-grid opens', [HUD_NUMBERS, LIVES_NUMBERS, LEVEL_SELECT_TEXT]), () => {
   it('HUD Numbers: size÷64 frames of 8×16, each cell equal to its two consecutive tiles', async () => {
-    const rel = 'artunc/HUD Numbers.unc';
+    const rel = HUD_NUMBERS;
     const bytes = fs.readFileSync(path.join(S1DIR, rel));
     // Derivation: 8×16 digits are 2 tiles ($40 bytes) apiece — the engine
     // indexes Art_Hud by digit*$40 (_inc/HUD Update.asm:336 `lsl.w #6`).
@@ -113,7 +124,7 @@ describe('openDiscoveredSet — raw tile grids (Parcel C)', { skip: !referenceCh
   });
 
   it('HUD Digits: read-only by design — a SPECIFIC refusal is recorded, and save surfaces it', async () => {
-    await openDiscoveredSet(S1DIR, gridSet('HUD Digits', 'artunc/HUD Numbers.unc', 1, 2), 'uncompressed');
+    await openDiscoveredSet(S1DIR, gridSet('HUD Digits', HUD_NUMBERS, 1, 2), 'uncompressed');
     const s = useSpriteStore.getState();
     expect(s.s1ArtSource).toBeNull();
     expect(s.saveBackRefusal).toMatch(/raw tile grid/);
@@ -124,7 +135,7 @@ describe('openDiscoveredSet — raw tile grids (Parcel C)', { skip: !referenceCh
   });
 
   it('Lives Counter Numbers: size÷32 frames of 8×8, one tile per digit', async () => {
-    const rel = 'artunc/Lives Counter Numbers.unc';
+    const rel = LIVES_NUMBERS;
     const bytes = fs.readFileSync(path.join(S1DIR, rel));
     // Derivation: 8×8 digits are 1 tile — Art_LivesNums indexed by digit*$20
     // (_inc/HUD Update.asm:579 `lsl.w #5`).
@@ -143,7 +154,7 @@ describe('openDiscoveredSet — raw tile grids (Parcel C)', { skip: !referenceCh
   });
 
   it('Level Select & Debug Text: size÷32 glyph frames of 8×8', async () => {
-    const rel = 'artunc/Level Select & Debug Text.unc';
+    const rel = LEVEL_SELECT_TEXT;
     const bytes = fs.readFileSync(path.join(S1DIR, rel));
     // Derivation: the title screen streams the WHOLE file as words
     // (`(Art_Text_end-Art_Text)/2-1`, sonic.asm:1963) into consecutive font

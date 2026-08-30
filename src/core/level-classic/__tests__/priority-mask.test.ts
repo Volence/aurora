@@ -28,12 +28,25 @@ import * as path from 'node:path';
 import { enigmaDecompress } from '../../formats/classic/enigma';
 import { unpackBlockCell, unpackChunkCell, type BlockDef, type ChunkCell, type LevelDoc } from '../model';
 import { blockPriorityQuad, chunkPriorityMask, CHUNK_TILES } from '../priority-mask';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
+import { referencePath } from '../../../../test/support/fixture-tree';
+import { whenS1Files, missingS1Files } from '../../../../test/support/s1-checkout';
 
 const S1DIR = referencePath('s1disasm');
-/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
-const S1_PRESENT = referenceCheckout('s1disasm');
+
+/**
+ * THE ONE FILE THIS SUITE READS, and why the guard names it rather than the tree.
+ *
+ * The gate here used to be `referenceCheckout('s1disasm')` — top-level markers
+ * only. On a checkout with the markers and no `map16/`, that gate said PRESENT,
+ * `loadSbzBlocks()` ran in the describe BODY, and the ENOENT it threw was a
+ * COLLECTION failure: vitest reported `1 failed | no tests`, and all ten rows of
+ * this file vanished from the totals — INCLUDING the four in the two synthetic
+ * describes below, which read nothing at all. Measured 2026-08-30
+ * (`docs/reviews/2026-08-30-incomplete-checkout-rows.md`). A guard on the actual
+ * file keeps those four running and turns the other six into one named skip.
+ */
+const SBZ_MAP16 = 'map16/SBZ.eni';
+const SBZ_PRESENT = missingS1Files([SBZ_MAP16]).length === 0;
 
 /** Decode SBZ's real map16 into BlockDefs via the same unpacker s1-io uses. */
 function loadSbzBlocks(): BlockDef[] {
@@ -64,8 +77,8 @@ const SBZ_B6_WORDS = [0xd91a, 0x4915, 0xc8f6, 0xc917];
 
 const quad = (tl: number, tr: number, bl: number, br: number) => [!!tl, !!tr, !!bl, !!br];
 
-describe('priority bits of real SBZ blocks (hand-derived)', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, () => {
-  const blocks = S1_PRESENT ? loadSbzBlocks() : [];
+describe('priority bits of real SBZ blocks (hand-derived)', whenS1Files('the real SBZ block table', [SBZ_MAP16]), () => {
+  const blocks = SBZ_PRESENT ? loadSbzBlocks() : [];
 
   it('block $11 decodes to the hand-derived words and pri [0,0,1,1]', () => {
     // 0x4016: bit 15 clear → low. 0xC005: bit 15 set → high.

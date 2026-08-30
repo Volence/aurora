@@ -7,6 +7,7 @@ import { decodeS1StartPos, encodeS1StartPos } from '../s1-startpos';
 import { decodeS1ColInd, encodeS1ColInd } from '../s1-colind';
 import { decodeS1CollisionArray, decodeS1AngleMap, decodeS1CollisionShapes } from '../s1-collision-shapes';
 import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../../test/support/fixture-tree';
+import { whenS1Glob } from '../../../../../test/support/s1-checkout';
 
 const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
@@ -202,10 +203,19 @@ function topLevelBins(dir: string): string[] {
 const IRREGULAR_LAYOUTS = new Set(['mz3bg.bin', 'syz1.bin', 'syz3.bin', 'ending.bin']);
 
 describe('s1 binary goldens over real s1disasm data', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
-  it('levels/*.bin decode, consume the whole file, and re-encode byte-identically', () => {
+  // Hoisted so each row can gate on ITS OWN directory. `expect(files.length)
+  // .toBeGreaterThan(0)` inside the body reported an empty `objpos/` as
+  // `AssertionError: expected 0 to be greater than 0` — a decoder complaint for
+  // a missing directory (docs/reviews/2026-08-30-incomplete-checkout-rows.md).
+  // `topLevelBins` already answers [] for an absent dir, so this is safe to
+  // evaluate in a describe body that a skipped describe still executes.
+  const levelBins = topLevelBins(`${S1DIR}/levels`);
+  const objposBins = topLevelBins(`${S1DIR}/objpos`);   // top-level only; skips objpos/platforms
+  const startposBins = topLevelBins(`${S1DIR}/startpos`); // skips Credits Demos / Special Stages
+
+  it('levels/*.bin decode, consume the whole file, and re-encode byte-identically', whenS1Glob('levels', 'levels/*.bin', levelBins), () => {
     const dir = `${S1DIR}/levels`;
-    const files = topLevelBins(dir);
-    expect(files.length).toBeGreaterThan(0);
+    const files = levelBins;
     for (const file of files) {
       const raw = new Uint8Array(fs.readFileSync(path.join(dir, file)));
       const l = decodeS1Layout(raw);
@@ -220,10 +230,9 @@ describe('s1 binary goldens over real s1disasm data', { skip: !referenceCheckout
     }
   });
 
-  it('objpos/*.bin (top level only) decode, respect the terminator, and re-encode byte-identically', () => {
+  it('objpos/*.bin (top level only) decode, respect the terminator, and re-encode byte-identically', whenS1Glob('objpos', 'objpos/*.bin (top level only)', objposBins), () => {
     const dir = `${S1DIR}/objpos`;
-    const files = topLevelBins(dir); // top-level only; skips objpos/platforms
-    expect(files.length).toBeGreaterThan(0);
+    const files = objposBins;
     for (const file of files) {
       const raw = new Uint8Array(fs.readFileSync(path.join(dir, file)));
       const e = decodeS1Objpos(raw);
@@ -233,10 +242,9 @@ describe('s1 binary goldens over real s1disasm data', { skip: !referenceCheckout
     }
   });
 
-  it('startpos/*.bin (top level only) decode and re-encode byte-identically', () => {
+  it('startpos/*.bin (top level only) decode and re-encode byte-identically', whenS1Glob('startpos', 'startpos/*.bin (top level only)', startposBins), () => {
     const dir = `${S1DIR}/startpos`;
-    const files = topLevelBins(dir); // skips Credits Demos / Special Stages subdirs
-    expect(files.length).toBeGreaterThan(0);
+    const files = startposBins;
     for (const file of files) {
       const raw = new Uint8Array(fs.readFileSync(path.join(dir, file)));
       const p = decodeS1StartPos(raw);
