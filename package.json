@@ -32,7 +32,8 @@
     "harness:discovery-exit-net": "node scratchpad/discovery-exit-net-proof.mjs",
     "harness:aether-method-gate": "node scratchpad/aether-method-gate-proof.mjs",
     "harness:window-icon": "node scratchpad/window-icon-probe.mjs",
-    "harness:bg-wrap": "node scratchpad/bg-wrap-harness.mjs"
+    "harness:bg-wrap": "node scratchpad/bg-wrap-harness.mjs",
+    "harness:composer-priority": "node scratchpad/composer-priority-harness.mjs"
   },
   "keywords": [],
   "author": "",

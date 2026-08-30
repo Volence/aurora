@@ -34,6 +34,9 @@ import type { CollisionMarkReport } from './canvas/collision-mark-report';
 import type { GuideReport } from './canvas/effects-guides';
 import { lastScreenFrameReport, type ScreenFrameReport } from './canvas/screen-frame';
 import { lastPriorityLensReport, type PriorityLensReport } from './canvas/priority-lens';
+import {
+  lastComposerPriorityLensReport, type ComposerPriorityLensReport,
+} from './canvas/composer-priority-lens';
 import { lastBothPlanesLensReport, type BothPlanesLensReport } from './canvas/both-planes-lens';
 import { lastCrossoverLensReport, type CrossoverLensReport } from './canvas/crossover-lens';
 import {
@@ -605,6 +608,11 @@ interface AeonProbeApi {
   artChunkOpen(): {
     chunkId: string | null; name: string; widthTiles: number; heightTiles: number;
     dirty: boolean; tool: string; brushTile: number;
+    /** `artStore.stampPriority` — the stamp's armed tri-state (O17). Like
+     *  `brushTile` it is drawn into a canvas HUD chip and so is invisible to the
+     *  DOM; unlike the chips that set it, which ARE real DOM buttons a harness
+     *  must click rather than poke. No setter here, for that reason. */
+    stampPriority: string;
   } | null;
   /** Every chunk-library id, in library order. Read-only. */
   chunkIds(): string[];
@@ -722,6 +730,21 @@ interface AeonProbeApi {
    * scratchpad/priority-lens-harness.mjs.
    */
   priorityLens(): PriorityLensReport;
+  /**
+   * THE PRIORITY LENS ON THE ART COMPOSER, as the last repaint drew it (O17).
+   *
+   * A SECOND REPORT rather than a `surface` field on the first, because the two
+   * are published by two canvases that are never mounted together and a shared
+   * slot would make "the composer's lens ran" and "the map's lens ran" the same
+   * assertion. Same publish-not-recompute contract as `priorityLens()`, with one
+   * addition: `priorityCells` is the MODEL's own count, so a harness can tell a
+   * document with nothing to mark from a lens that drew nothing — the
+   * anti-vacuous control a veil count alone cannot supply.
+   *
+   * `reason: 'live-tile'` is not "off": a single atlas tile has no placement, so
+   * it has no priority bit to show. See canvas/composer-priority-lens.ts.
+   */
+  composerPriorityLens(): ComposerPriorityLensReport;
   /**
    * What the last repaint's in-frame camera composite actually planned and drew.
    *
@@ -1131,6 +1154,7 @@ function installAeonProbe(): AeonProbeApi {
         dirty: o.dirty,
         tool: a.tool,
         brushTile: a.brushTile,
+        stampPriority: a.stampPriority,
       };
     },
     linkHover: () => {
@@ -1173,6 +1197,7 @@ function installAeonProbe(): AeonProbeApi {
     collisionMarks: () => lastCollisionMarkReport(),
     screenFrame: () => lastScreenFrameReport(),
     priorityLens: () => lastPriorityLensReport(),
+    composerPriorityLens: () => lastComposerPriorityLensReport(),
     bothPlanesLens: () => lastBothPlanesLensReport(),
     crossoverLens: () => lastCrossoverLensReport(),
     crossoverEncoding: () => ({

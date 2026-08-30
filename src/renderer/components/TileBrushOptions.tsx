@@ -46,25 +46,10 @@
 import React from 'react';
 import { useEditorStore } from '../state/editorStore';
 import { Chip, SectionBody, T } from './ui';
-import type { BrushPriority } from '../../core/editing/brush-word';
-
-/** `title` is the control's identity here, not decoration: it carries the
- *  three-way state into the accessibility tree and is what the CDP harness
- *  addresses each chip by. Keep them stable. */
-const PRIORITY_CHIPS: { value: BrushPriority; label: string; title: string }[] = [
-  {
-    value: 'keep', label: 'Keep',
-    title: 'Priority: keep — leave each cell\'s existing priority bit alone (default)',
-  },
-  {
-    value: 'on', label: 'On',
-    title: 'Priority: on — painted tiles draw IN FRONT of the player',
-  },
-  {
-    value: 'off', label: 'Off',
-    title: 'Priority: off — painted tiles draw BEHIND the player',
-  },
-];
+// The three chips' labels, titles and explainer sentence are SHARED with the Art
+// composer's stamp (ArtToolOptions), which arms the same tri-state on its own
+// brush. See shared/PriorityChips.tsx for why the words may not be typed twice.
+import PriorityChips, { priorityBrushExplainer } from './shared/PriorityChips';
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -99,17 +84,10 @@ export default function TileBrushOptions() {
           >Y flip</Chip>
         </Row>
         <Row label="Priority">
-          {PRIORITY_CHIPS.map((c) => (
-            <Chip key={c.value} active={priority === c.value} onClick={() => setP(c.value)} title={c.title}>
-              {c.label}
-            </Chip>
-          ))}
+          <PriorityChips value={priority} onChange={setP} />
         </Row>
         <p style={{ margin: 0, fontSize: T.tXs, color: T.textLo, lineHeight: 1.4 }}>
-          {priority === 'keep'
-            ? 'Painting leaves each cell\'s priority as it found it. Pick On or Off to author it — '
-              + 'the priority lens comes on so you can see what you are changing.'
-            : `Painting sets priority ${priority === 'on' ? 'ON' : 'OFF'} on every cell it touches.`}
+          {priorityBrushExplainer(priority, 'Painting')}
         </p>
       </div>
     </SectionBody>

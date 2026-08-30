@@ -8,7 +8,7 @@ import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import { chunkIdsAffectedByCommand } from '../../core/editing/chunk-invalidation';
 import type { MapClipboard, PasteLayers, MarqueeGranularity } from '../../core/editing/map-clipboard';
 import {
-  DEFAULT_BRUSH_ATTRIBUTES, brushAuthorsPriority,
+  DEFAULT_BRUSH_ATTRIBUTES,
   type BrushPriority, type BrushAttributes,
 } from '../../core/editing/brush-word';
 import { crossoverBrushAuthors, type CrossoverBrush } from '../../core/collision/layer-transition';
@@ -17,10 +17,12 @@ import { useArtStore } from './artStore';
 import { BoundEditHistory } from '../../core/editing/bound-edit-history';
 import { documentHistoryHub } from './history-hub';
 import { useProjectStore } from './projectStore';
-// Both are LEAF stores (they import nothing from here), so the priority-lens
-// side effect in `setSelectedTilePriority` cannot create a cycle.
+// Both are LEAF stores (they import nothing from here), so the lens-surfacing
+// side effects here cannot create a cycle. `priority-lens-surface` is a leaf for
+// the same reason — it imports exactly these two.
 import { useViewStore } from './viewStore';
 import { useToastStore } from './toastStore';
+import { surfacePriorityLens } from './priority-lens-surface';
 import { BAND_DEFAULTS } from '../../core/formats/bg-override/bg-override';
 import { useSessionStore } from './sessionStore';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
@@ -671,18 +673,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSelectedTileVFlip: (on) => set({ selectedTileVFlip: !!on }),
   setSelectedTilePriority: (priority) => {
     set({ selectedTilePriority: priority });
-    // THE FEEDBACK LOOP, wired to the rule rather than to the chip: the
-    // condition is `brushAuthorsPriority`, the same predicate brush-word.ts
-    // states the rule in, so the two cannot drift into disagreeing about when
-    // a stroke starts writing an invisible field.
-    if (!brushAuthorsPriority({ ...DEFAULT_BRUSH_ATTRIBUTES, priority })) return;
-    if (useViewStore.getState().overlays.showPriority) return;
-    useViewStore.getState().setOverlay('showPriority', true);
-    useToastStore.getState().addToast(
-      'Priority lens on — the violet veil marks the tiles that draw in front of the player, '
-      + 'so you can see the field this brush is now writing. Turn it off in View.',
-      'info',
-    );
+    // THE FEEDBACK LOOP, wired to the rule rather than to the chip — and now
+    // shared with the Art composer's stamp, which gained the same tri-state
+    // under O17. See state/priority-lens-surface.ts for why the decision moved
+    // out of this setter rather than being written a second time next to it.
+    surfacePriorityLens(priority);
   },
   tileBrush: () => {
     const s = get();

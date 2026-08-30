@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { useArtStore, selectArtZoom } from '../../state/artStore';
+import { useViewStore } from '../../state/viewStore';
 import { isTypingTarget } from '../../shell/typing-target';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useAeonHistoryVersion } from '../../hooks/useHistoryVersion';
@@ -38,6 +39,9 @@ import {
   PIXEL_GRID, PIXEL_GRID_TILE, PIXEL_GRID_BLOCK,
   HUD_CHIP_BG, HUD_CELL_BG, HUD_COLL_ZERO, HUD_COLL_NONZERO,
 } from '../../canvas/canvas-colors';
+import {
+  drawComposerPriority, countPriorityCells, publishComposerPriorityLensReport,
+} from '../../canvas/composer-priority-lens';
 
 interface Write { x: number; y: number; value: number; }
 interface SelRect { x: number; y: number; w: number; h: number; }
@@ -110,6 +114,11 @@ export default function ComposerCanvas() {
   const historyVersion = useAeonHistoryVersion();
   // paletteVersion ticks on every live preview step (kept off the history clock).
   const paletteVersion = useArtStore((s) => s.paletteVersion);
+  // Subscribed so toggling the lens repaints. `drawOverlay` re-reads both fresh
+  // via getState() — these two exist to make the component RENDER, which is what
+  // PixelViewport's (deliberately dependency-free) draw effect keys off.
+  const stampPriority = useArtStore((s) => s.stampPriority);
+  const showPriority = useViewStore((s) => s.overlays.showPriority);
 
   /** Pending H/V flips for the tile-stamp brush (X/Y keys toggle, HUD shows). */
   const flipRef = useRef<{ hf: boolean; vf: boolean }>({ hf: false, vf: false });
@@ -349,14 +358,19 @@ export default function ComposerCanvas() {
         pal: s.paletteLine,
         hf: flipRef.current.hf,
         vf: flipRef.current.vf,
-        // KEEP, not false. This was a hard `false`, and the composer's docs are
-        // seeded from real chunks and real section regions (docFromChunk /
+        // THE ARMED TRI-STATE (ROADMAP O17), no longer a hard-coded `keep`.
+        //
+        // It was a hard `false` until O12 — the composer's docs are seeded from
+        // real chunks and real section regions (docFromChunk /
         // docFromSectionRegion both carry `pri: e.priority`), so a stamp threw
-        // away depth an author had put there — with nothing on this surface to
-        // show it happened, and with the doc's OTHER cells keeping theirs.
-        // This facet has no priority control yet; until it does, `keep` is the
-        // only state a stamp can honestly claim. See core/editing/brush-word.ts.
-        pri: 'keep',
+        // away depth an author had put there. O12 made it `keep`, which stopped
+        // the destruction but left this facet unable to AUTHOR the field at all:
+        // the one nametable attribute a `ComposerCell` carries and no control
+        // could reach, while `pal`, `hf` and `vf` all had one.
+        //
+        // The store field is the composer's OWN brush, not the map's — see
+        // artStore.stampPriority for why they are separate and what they share.
+        pri: s.stampPriority,
       });
     } else if (t === 'palette-apply') {
       // Re-line an already-placed cell: same palette-line source as tile
@@ -510,8 +524,43 @@ export default function ComposerCanvas() {
   /** Tile-space HUD: per-cell collision values + a corner status chip. */
   const drawOverlay = useCallback((ctx: CanvasRenderingContext2D, z: number) => {
     const doc = getDoc();
-    if (!doc) return;
     const s = useArtStore.getState();
+
+    // ── THE PRIORITY LENS (ROADMAP O17) ─────────────────────────────────────
+    //
+    // BEFORE the tool gate below, and deliberately: depth is a property of the
+    // document, not of the armed tool, and an author retouching a cliff edge
+    // with the pencil needs to see which cells sit in front of the player just
+    // as much as one stamping tiles. The tool-gated HUD underneath is a
+    // different thing — it describes the BRUSH.
+    //
+    // Every path publishes, including the refusals, so `paints` advancing is
+    // proof a repaint happened and `reason` tells "nothing to mark" apart from
+    // "never ran". See canvas/composer-priority-lens.ts.
+    const liveTile = useArtStore.getState().open?.liveTileIndex ?? null;
+    if (!doc) {
+      publishComposerPriorityLensReport({
+        active: false, reason: 'no-doc', cells: 0, priorityCells: 0, veils: 0, segments: 0,
+      });
+    } else if (liveTile !== null) {
+      publishComposerPriorityLensReport({
+        active: false, reason: 'live-tile', cells: doc.cells.length,
+        priorityCells: countPriorityCells(doc), veils: 0, segments: 0,
+      });
+    } else if (!useViewStore.getState().overlays.showPriority) {
+      publishComposerPriorityLensReport({
+        active: false, reason: 'off', cells: doc.cells.length,
+        priorityCells: countPriorityCells(doc), veils: 0, segments: 0,
+      });
+    } else {
+      const drawn = drawComposerPriority(ctx, doc, z);
+      publishComposerPriorityLensReport({
+        active: true, reason: null, cells: doc.cells.length,
+        priorityCells: countPriorityCells(doc), veils: drawn.veils, segments: drawn.segments,
+      });
+    }
+
+    if (!doc) return;
     if (!(s.tool === 'tile-stamp' || s.tool === 'collision' || s.tool === 'palette-apply')) return;
     const pxW = doc.widthTiles * 8, pxH = doc.heightTiles * 8;
 
@@ -545,7 +594,11 @@ export default function ComposerCanvas() {
     ctx.translate(-originX, -originY);
     const est = useEditorStore.getState();
     const hud = s.tool === 'tile-stamp'
+      // `pri:` is on the chip because the chips are in the OPTION BAR at the top
+      // of the frame and the artist's eyes are on the canvas. The flips are here
+      // for the same reason and have no other home at all (X/Y keys, a ref).
       ? `stamp #${s.brushTile}  flip[X]:${flipRef.current.hf ? 'H' : '–'} [Y]:${flipRef.current.vf ? 'V' : '–'}`
+        + `  pri:${s.stampPriority}`
       : s.tool === 'palette-apply'
       ? `palette line ${s.paletteLine} → cells`
       : `collision[${est.collisionPaintPlane.toUpperCase()}]: ${
