@@ -105,7 +105,15 @@ the engine field itself is real, `engine/structs.emp:119`). The background that
 DOES reach a ROM is the ACT-WIDE one, through `{dataRoot}editor_bg_override.json`
 and aeon's `tools/inject_editor_bg.py` (run by `tools/regenerate-level.sh:94`).
 So `assign_section_bg` is an editor/preview binding until a per-section consumer
-is built — unlike `assign_section_scene` below, which is baked.
+is built — unlike `assign_section_scene` below, which is baked. **Both tools say
+so in their own replies** (`assign_section_bg` → `binding`, `list_bgs` →
+`sectionBinding`) and in their published descriptions, from one constant
+(`src/core/formats/bg-binding.ts`). The reply used to be a bare `changed: true`,
+from which an agent reasonably concluded the background was in the game — the
+same shape `list_effects_presets` answers with `sectionBinding` rather than an
+all-nulls column. The difference here is that the assignment IS real and IS
+stored, so the sentence says where it stops and `list_bgs` keeps its per-section
+column; the sentence travels beside it, never instead of it.
 
 ## Effects scenes (parallax/raster)
 

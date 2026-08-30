@@ -40,6 +40,7 @@ import {
   promoteBandCommand, removeBandCommand,
 } from '../providers/bg-anim-aeon';
 import { regenerateShiftCommand } from '../providers/bg-anim-art';
+import { BG_SECTION_BINDING_LIMIT } from '../../core/formats/bg-binding';
 import { makeSetBgOverrideTilesCommand } from '../../core/editing/bg-override-art';
 import { buildStampCommand } from '../../core/editing/map-stamp';
 import { withLinkBreaks } from '../../core/editing/chunk-links';
@@ -771,7 +772,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       if (section.bgLayoutRef === req.bgId) {
         // No-op guard: a same-ref command would consume an undo slot without
         // changing anything.
-        return { section: req.section, bgId: req.bgId, changed: false };
+        return { section: req.section, bgId: req.bgId, changed: false, binding: BG_SECTION_BINDING_LIMIT };
       }
       executeAmbientCommand({
         type: 'set-section-bg',
@@ -780,7 +781,16 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         oldRef: section.bgLayoutRef,
         newRef: req.bgId,
       }, ctx.level);
-      return { section: req.section, bgId: req.bgId, changed: true };
+      // A SUCCESS REPLY THAT SAYS WHERE THE SUCCESS STOPS. `changed: true` is
+      // true — the ref is written, the sidecar persists it, the viewport
+      // composites it — and an agent reading only that reasonably concludes the
+      // background is in the game. Nothing bakes it. `list_effects_presets`
+      // answers the same shape with `sectionBinding` rather than an all-nulls
+      // column, and this is that answer for the tool that DOES write something.
+      return {
+        section: req.section, bgId: req.bgId, changed: true,
+        binding: BG_SECTION_BINDING_LIMIT,
+      };
     }
 
     case 'list-bgs': {
@@ -791,7 +801,13 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
           ? { width: BG_WIDTH, height: Math.floor(ctx.act.bgLayout.length / BG_WIDTH), tiles: ctx.act.bgTiles.length }
           : null,
         entries: library.map(b => ({ id: b.id, name: b.name, tiles: b.tiles.length })),
+        // The per-section column IS meaningful here (unlike the preset tool's,
+        // which would be all-nulls forever) — the refs are real and the editor
+        // uses them. What it cannot say on its own is that none of them reaches
+        // a ROM, so the sentence travels beside the column rather than instead
+        // of it. Same words as assign_section_bg's reply, from one constant.
         sections: ctx.act.sections.map((s, i) => s ? { index: i, bgId: s.bgLayoutRef } : null),
+        sectionBinding: BG_SECTION_BINDING_LIMIT,
       };
     }
 
