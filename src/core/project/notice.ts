@@ -39,6 +39,36 @@
 // There is deliberately no `info`: nothing a load produces is neutral. Adding a
 // fourth level would only give a future producer somewhere noncommittal to put a
 // failure.
+//
+// WHAT THE WIDENING DID NOT CATCH, AND THE BAR THAT CAME OUT OF IT
+// ---------------------------------------------------------------
+// Turning `string` into this object was supposed to make `tsc` refuse every call
+// site that had not caught up. It refused most and MISSED the one that mattered:
+// `r.notices.join(' ')` kept typechecking, because `Array.prototype.join` is
+// `join(separator?: string): string` for EVERY element type. Nine sites failed
+// at runtime, printing `[object Object]`, rather than at compile time.
+//
+// The asymmetry is general and worth carrying to the next widening: the type
+// system covers sinks that need the primitive's SHAPE, and does not cover sinks
+// that accept anything and call `toString()`. Measured on TypeScript 6 with
+// `tsc --noEmit` clean, `n: Notice` / `ns: Notice[]`:
+//
+//   REFUSED    n.trim() · ns.includes('a') · ns.indexOf('a') ·
+//              ns.some((x) => x.includes('a')) · const s: string = n
+//   ALLOWED    ns.join(' ') · `${n}` · `${ns}` · String(n) · n.toString() ·
+//              ns.toString() · n + '' · ns + '' · [...ns].sort() ·
+//              ns.map(…).join() · ns.filter(…).join() · [...new Set(ns)].join() ·
+//              ns.flat().join() · console.log(n)
+//
+// `n + ''` being allowed is the one to stare at — `+` with a string operand
+// accepts an object on the other side, so even hand-rolled concatenation is not
+// a compile error.
+//
+// THE BAR: when you widen a primitive to an object, add the new type to
+// `GUARDED` in `scripts/check-object-stringify.mjs`. That gate (wired into
+// `npm test`) is type-aware and watches exactly the sinks listed as ALLOWED
+// above. It is deliberately a NAMED LIST rather than a repo-wide rule; the
+// header there records why, and what was measured before that call was made.
 
 /** @see Notice — the producer picks one, and tsc will not let it abstain. */
 export type NoticeSeverity = 'success' | 'warning' | 'error';
