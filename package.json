@@ -35,6 +35,7 @@
     "harness:bg-wrap": "node scratchpad/bg-wrap-harness.mjs",
     "harness:composer-priority": "node scratchpad/composer-priority-harness.mjs",
     "harness:timeline-edit": "node scratchpad/timeline-edit-harness.mjs",
+    "harness:toast-overflow": "node scratchpad/toast-overflow-harness.mjs",
     "poisons:timeline-edit": "node scratchpad/timeline-edit-poisons.mjs"
   },
   "keywords": [],
