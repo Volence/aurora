@@ -3,6 +3,8 @@ import type { FileAccess } from '../../adapter';
 import { loadAeonProject } from '../load';
 import { buildAeonSavePlan } from '../save';
 import { serializeNametable } from '../../../formats/s4-nametable';
+import { serializeBgLibraryIndex, parseBgLibraryIndex } from '../../../formats/bg-library';
+import { serializeBgTiles, BG_WIDTH } from '../../../formats/bg-tiles';
 import { serializeTiles } from '../../../export/tile-dedup';
 import { serializeSectionMeta, parseSectionMeta } from '../../../formats/section-meta';
 import { serializeCollAttr } from '../../../formats/s4-collattr';
@@ -589,5 +591,115 @@ describe('buildAeonSavePlan — editable collision planes', () => {
     expect(a!.bytes.length).toBe(PLANE_CELLS * 2);
     expect(b!.bytes.length).toBe(PLANE_CELLS * 2);
     expect(a!.bytes).not.toEqual(b!.bytes);   // the two planes really are distinct
+  });
+});
+
+// ── O31: a manifest that names more backgrounds than the checkout holds ─────
+//
+// Measured in aeon 2026-08-30: `games/sonic4/data/editor/ojz_bglib.json` is
+// TRACKED and names 17 entries; every one of the 34 body files it implies
+// (`ojz_bg_<id>.bin` + `..._tiles.bin`) is UNTRACKED, swept up by a `.gitignore`
+// rule whose comment aims at "dead timestamped bg experiments". A clean clone
+// therefore reads the manifest and opens none of it, while the authoring
+// machine resolves all 17 — the failure is invisible to the one person who
+// could fix it. These rows run the real load and the real save plan over that
+// exact shape, at two entries rather than seventeen.
+describe('a bglib manifest naming entries whose bodies are absent', () => {
+  const IDX = 'data/editor/ojz_bglib.json';
+  const PRESENT = 'here-1781210552117';
+  const ABSENT = 'ingame-forest-v15-1786630615596';   // the id aeon's tracked sidecar points at
+
+  /** A layout body one row tall — the smallest the loader accepts. */
+  const bgLayoutBytes = (): Uint8Array => serializeNametable(new Uint16Array(BG_WIDTH));
+
+  function bgFixture(): Map<string, Uint8Array> {
+    const files = fixtureFiles();
+    files.set(IDX, new TextEncoder().encode(serializeBgLibraryIndex([
+      { id: PRESENT, name: 'Here' },
+      { id: ABSENT, name: 'In-game forest (engine v15)' },
+    ])));
+    // ONLY the first entry's bodies. The second is the clean-clone case.
+    files.set(`data/editor/ojz_bg_${PRESENT}.bin`, bgLayoutBytes());
+    files.set(`data/editor/ojz_bg_${PRESENT}_tiles.bin`, serializeBgTiles([tile(3)]));
+    return files;
+  }
+
+  it('load separates what it opened from what the manifest merely named', async () => {
+    const r = await loadAeonProject(memFa(bgFixture()), '/proj');
+    // ANTI-VACUOUS: the resolvable entry really did load, with its bytes — a
+    // loader that had failed on both would satisfy the second assertion alone.
+    expect(r.project.bgLibrary.map((b) => b.id)).toEqual([PRESENT]);
+    expect(r.project.bgLibrary[0].tiles.length).toBe(1);
+    expect(r.project.bgLibraryUnresolved)
+      .toEqual([{ id: ABSENT, name: 'In-game forest (engine v15)' }]);
+  });
+
+  it('a whole checkout reports NOTHING unresolved — empty is the ordinary answer', async () => {
+    const files = bgFixture();
+    files.set(`data/editor/ojz_bg_${ABSENT}.bin`, bgLayoutBytes());
+    files.set(`data/editor/ojz_bg_${ABSENT}_tiles.bin`, serializeBgTiles([tile(4)]));
+    const r = await loadAeonProject(memFa(files), '/proj');
+    expect(r.project.bgLibrary.map((b) => b.id)).toEqual([PRESENT, ABSENT]);
+    expect(r.project.bgLibraryUnresolved).toEqual([]);
+  });
+
+  it('a body PRESENT but too short to hold a row is unresolved, not silently dropped', async () => {
+    const files = bgFixture();
+    // Half a row. `Math.floor(len / (BG_WIDTH*2))` is 0, which the loader used
+    // to `continue` past — indistinguishable downstream from an absent file,
+    // and that is the point: it takes the same road.
+    files.set(`data/editor/ojz_bg_${ABSENT}.bin`, new Uint8Array(BG_WIDTH));
+    files.set(`data/editor/ojz_bg_${ABSENT}_tiles.bin`, serializeBgTiles([tile(4)]));
+    const r = await loadAeonProject(memFa(files), '/proj');
+    expect(r.project.bgLibrary.map((b) => b.id)).toEqual([PRESENT]);
+    expect(r.project.bgLibraryUnresolved.map((e) => e.id)).toEqual([ABSENT]);
+  });
+
+  /**
+   * THE ERASURE THIS EXISTS TO STOP. The save plan used to write the index from
+   * `project.bgLibrary` — the entries that RESOLVED — so a checkout that opened
+   * one of two would replace a two-name manifest with one name, and on aeon's
+   * real tree that is sixteen tracked names gone, their untracked bodies left as
+   * orphans nothing points at. Same shape as the section-meta sidecars: a
+   * reader that could not understand a file must not become a writer that
+   * replaces it.
+   */
+  it('save keeps the names it could not open, and writes bodies only for the ones it has', async () => {
+    const fa = memFa(bgFixture());
+    const r = await loadAeonProject(fa, '/proj');
+    const plan = await buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
+      { legacyAtlasMerged: r.legacyAtlasMerged });
+
+    const idx = plan.files.find((f) => f.path === IDX);
+    expect(idx, 'the manifest was not written at all').toBeDefined();
+    expect(parseBgLibraryIndex(new TextDecoder().decode(idx!.bytes))).toEqual([
+      { id: ABSENT, name: 'In-game forest (engine v15)' },
+      { id: PRESENT, name: 'Here' },
+    ]);
+
+    // The absent entry keeps its NAME and gets no bytes: overwriting its
+    // binaries with a placeholder would be the same erasure one layer down.
+    const paths = plan.files.map((f) => f.path);
+    expect(paths).toContain(`data/editor/ojz_bg_${PRESENT}.bin`);
+    expect(paths).not.toContain(`data/editor/ojz_bg_${ABSENT}.bin`);
+    expect(paths).not.toContain(`data/editor/ojz_bg_${ABSENT}_tiles.bin`);
+  });
+
+  it('a manifest whose entries ALL failed is still re-emitted whole', async () => {
+    const files = fixtureFiles();
+    files.set(IDX, new TextEncoder().encode(serializeBgLibraryIndex([
+      { id: ABSENT, name: 'In-game forest (engine v15)' },
+    ])));
+    const fa = memFa(files);
+    const r = await loadAeonProject(fa, '/proj');
+    // This is aeon's actual situation, at one entry: nothing loaded, so the old
+    // `bgLibrary.length > 0` gate skipped the write — which LOOKED safe and was,
+    // right up until the author added one background and the gate opened.
+    expect(r.project.bgLibrary).toEqual([]);
+    const plan = await buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
+      { legacyAtlasMerged: r.legacyAtlasMerged });
+    const idx = plan.files.find((f) => f.path === IDX);
+    expect(parseBgLibraryIndex(new TextDecoder().decode(idx!.bytes)))
+      .toEqual([{ id: ABSENT, name: 'In-game forest (engine v15)' }]);
   });
 });

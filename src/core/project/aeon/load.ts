@@ -27,7 +27,10 @@ import {
 } from '../../config/s4-config';
 import { parseTiles } from '../../formats/tiles';
 import { parseBgTiles, normalizeBgLayout, BG_TILE_BASE_SLOT, BG_WIDTH } from '../../formats/bg-tiles';
-import { bgLibIndexPath, bgLibLayoutPath, bgLibTilesPath, parseBgLibraryIndex } from '../../formats/bg-library';
+import {
+  bgLibIndexPath, bgLibLayoutPath, bgLibTilesPath, parseBgLibraryIndex,
+  type BgLibraryUnresolvedEntry,
+} from '../../formats/bg-library';
 import { parseSectionMeta } from '../../formats/section-meta';
 import { loadEffectsSceneLibrary } from '../../formats/effects/scene';
 import { loadEffectsPresetLibrary } from '../../formats/effects/preset';
@@ -209,6 +212,10 @@ async function loadFullProject(
   const basePath = config.basePath;
   const zones: Zone[] = [];
   const bgLibrary: BgLibraryEntry[] = [];
+  // The manifest entries whose bodies this checkout does not have. See
+  // S4Project.bgLibraryUnresolved — it is carried, not logged, because both the
+  // save path and every ref-resolving surface need it.
+  const bgLibraryUnresolved: BgLibraryUnresolvedEntry[] = [];
 
   for (const zoneConfig of config.zones) {
     // Load tileset
@@ -463,7 +470,13 @@ async function loadFullProject(
           const layoutRaw = await fa.read(bgLibLayoutPath(dataRoot, zoneConfig.id, meta.id));
           const tilesRaw = await fa.read(bgLibTilesPath(dataRoot, zoneConfig.id, meta.id));
           const height = Math.floor(layoutRaw.length / (BG_WIDTH * 2));
-          if (height < 1) continue;
+          // A layout too short to hold one row is a body that is present and
+          // says nothing — indistinguishable downstream from one that is
+          // absent, so it takes the same road rather than a bare `continue`.
+          if (height < 1) {
+            bgLibraryUnresolved.push({ id: meta.id, name: meta.name });
+            continue;
+          }
           bgLibrary.push({
             id: meta.id,
             name: meta.name,
@@ -471,6 +484,15 @@ async function loadFullProject(
             tiles: parseBgTiles(tilesRaw),
           });
         } catch (entryErr) {
+          // NOT a `console.warn` and nothing else. The manifest is TRACKED in
+          // aeon and the two binaries per entry are NOT (a `.gitignore` rule
+          // aimed at "dead timestamped bg experiments" catches all of them), so
+          // on a clean clone this branch runs for EVERY entry — the library
+          // reads as empty, sections referencing it silently show the act
+          // default, and the console line is seen by nobody. The fact is
+          // carried on the project instead, and the toast on open is its human
+          // half (renderer/state/aeon-open).
+          bgLibraryUnresolved.push({ id: meta.id, name: meta.name });
           console.warn(`[load] BG library entry ${meta.id} failed to load:`, entryErr);
         }
       }
@@ -617,6 +639,7 @@ async function loadFullProject(
       objectLibrary,
       chunkLibrary,
       bgLibrary,
+      bgLibraryUnresolved,
       basePath,
       effectsScenes,
       effectsPresets,
