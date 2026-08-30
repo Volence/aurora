@@ -1,7 +1,7 @@
 # O20 + O23 — the leak's cause was in `/usr/bin/xvfb-run`, and the gate could not see a shell script
 
 **Branch** `fix/xvfb-display-guards` · **2026-08-30** · aurora
-**Commits** `1016fd73` (guard + proof), `b6860658` (checker + runner)
+**Commits** `1016fd73` (guard + proof), `b6860658` (checker + runner), `341fd9ea` (docs), `18e7fbfa` (**fail-closed + gate-isolating rows — read §9 first**)
 
 Two queue rows, one defect family: a cleanup discipline that exists for `.mjs`
 harnesses and does not reach shell. Both are closed, and both rows were wrong
@@ -86,9 +86,11 @@ Artifacts are captured **before the first signal**, for the same reason the tree
 is: an orphaned Xvfb cannot be attributed to us afterwards, and unattributable
 must never become safe-to-delete.
 
-Four gates before any removal, each refusal returned in words: never `:0`; never
-while the recorded Xvfb still runs; never while `/proc/net/unix` shows the
-socket still **bound**; never a directory outside the pattern.
+Five gates before any removal, each refusal returned in words: **gate 0** —
+refuse everything if the socket table could not be read (§9); **gate 1** — never
+`:0`; **gate 2** — never while the recorded Xvfb still runs; **gate 3** — never
+while `/proc/net/unix` shows the socket still **bound**; **gate 4** — never a
+directory outside the pattern.
 
 ### `stillRunningAs()` — three-valued where `alive()` is two
 
@@ -105,7 +107,7 @@ a path in `/proc/net/unix` is a live binding by construction.
 
 ---
 
-## 4. Evidence — `npm run harness:xvfb-reap`, **16/16**
+## 4. Evidence — `npm run harness:xvfb-reap`, **20/20**
 
 No build and no Aurora: `/bin/sleep` under `xvfb-run` isolates the X leak from
 the app, so this cannot collide with the owner's editor.
@@ -121,16 +123,21 @@ PASS [g3] GREEN (abrupt) — killTreeSync SIGKILLs and still leaves nothing behi
 PASS [s1] SIGINT mid-run — the harness never reached a `finally`, and the display is still cleaned up
         during: /tmp/.X187-lock /tmp/.X11-unix/X187 /tmp/xvfb-run.K0qf54 → after: nothing
 PASS [s2] SIGTERM mid-run — …
-PASS [o1] display :0 — the owner's session — is REFUSED, and its socket is still there
-PASS [o2] a display whose recorded process is LIVE is REFUSED (:4242)
-PASS [o3] a directory that is not an xvfb-run tempdir is REFUSED — /tmp and $HOME are untouched
+PASS [o1] GATE 1 — display :0, the owner's session, is refused BY THE NEVER-REAP LIST, and its socket is still there
+PASS [o2] GATE 2 — a display whose recorded process is LIVE is refused BY THE LIVENESS CHECK (:4242)
+PASS [o6] GATE 3 — a LIVE X server is refused BY THE BOUND-SOCKET CHECK even when gates 1 and 2 both pass
+PASS [o3] GATE 4 — a directory outside XVFB_TMPDIR_RE is refused BY THE PATTERN CHECK — /tmp and $HOME are untouched
 PASS [o5] an Xvfb it could not attribute a display to is reported UNMEASURABLE
+PASS [b1] an unreadable socket table returns the NULL sentinel, distinguishable from a readable empty one
+PASS [b2] BLIND — with the socket table unreadable the reap refuses EVERYTHING, and the live server keeps its socket
+PASS [b3] and it refuses in the blindness's own words, not by accidentally matching another gate
 ```
 
 `[n1]` exists because `[g1]` alone is the vacuous shape — it passes just as
 green over a launch that never started an X server. `[o*]` exist because a
 cleanup that only ever says yes is the `pkill` hazard wearing a new name; each
-checks the path is **still on disk** afterwards rather than trusting the refusal.
+checks the path is **still on disk** afterwards rather than trusting the refusal,
+and each names **which gate** refused — see §9 for why that is not pedantry.
 
 Six `xvfb-run` launches, display **`:187` reused every time** (nothing leaked
 between phases, or the number would have climbed), box residue **90/73/1504
@@ -292,3 +299,88 @@ Machine uptime at measurement: **4 days 13:58**. No emulator was touched.
    create. That is foreground process work.
 3. **The 2026-08-29 re-measure discrepancy** (§1, last row) is recorded and not
    resolved.
+
+---
+
+## 9. The coordinator planted the poison this proof had not — two defects
+
+Both found by emptying `NEVER_REAP_DISPLAYS` (deleting gate 1 outright) and
+watching `[o1]` stay **GREEN** at 16/16.
+
+### 9a. The rows did not say WHICH gate refused
+
+Bar 2d cause **(ii)**: two independent code paths, one observable. With gate 1
+gone, **gate 3** refused `:0` anyway, because the owner's live Xwayland binds
+`/tmp/.X11-unix/X0`. `[o1]` asserted only *that* it refused —
+`if (r.removed.length === 0 && sock0)` — while `r.refused` already carried the
+reason the row was throwing away.
+
+Fixed for **all four gates, not just the one that was planted in**. The
+structural reason `[o1]` could rest on a neighbour is that **nothing tested gate
+3 on its own**, so `[o6]` is new: a real running Xvfb, a recorded pid that is a
+genuinely dead `/bin/true` (gate 2 passes) at a display that is not 0 (gate 1
+passes), leaving the socket binding as the only thing between the guard and a
+live server. `[o2]` additionally shows no neighbour *could* have covered —
+`:4242` is not in the never-reap list and has no socket on disk.
+
+**Verified by deleting each of the four in turn, not reasoned about:**
+
+| Plant | Result |
+|---|---|
+| gate 1 emptied | `[o1]` **RED**, and the message names the neighbour: `refused=:0 — /tmp/.X11-unix/X0 is still BOUND by a live process` |
+| gate 2 removed | `[o2]` **RED** — `refused=` empty |
+| gate 3 removed | `[o6]` **RED**, having really deleted a **live** server's lock and socket: `removed=/tmp/.X205-lock /tmp/.X11-unix/X205` — the damage the gate exists to prevent |
+| gate 4 widened | `[o3]` **and** `[o4]` **RED** — `removed=/tmp/xvfb-run-not-really/` |
+
+⚠ Gate 4's plant was widened **only** to the `-not-really` fixture, never to
+anything `/tmp` or `$HOME` could match — a plant that deletes `$HOME` to prove a
+point is not a proof. And it **ate its own fixture**: the second run of the same
+plant was already green on `[o3]`, because the first run had removed the
+directory. *Read the first run, never the second.*
+
+### 9b. `boundSocketPaths()` failed OPEN, against its own docstring
+
+This is the one that matters. Its catch returned an **empty `Set`** while the
+comment beside it promised the caller would treat "unknown" as "do not touch".
+The caller did not: `bound.has(sock)` over an empty Set is `false`, and `false`
+is the value that means **proceed to delete**. An unreadable `/proc/net/unix`
+silently **inverted gate 3 from a refusal into a permission** — leaving
+`NEVER_REAP_DISPLAYS`, the guard nothing tested, as the only thing between the
+reaper and the owner's desktop socket.
+
+**Latent, not live.** `/proc/net/unix` is readable in practice, and
+`displayArtifacts` only lists displays from an `Xvfb` inside our own tree, so
+`:0` does not realistically reach the gate at all — `[o1]` gets there with a
+synthetic list. That is precisely why gate 1 is defence-in-depth for the case
+where attribution goes wrong, and why leaving it resting on a neighbour was the
+wrong call.
+
+Fixed the right way round rather than by correcting the comment: it returns
+`null` for unknown, and `reapDisplays` reads that as **gate 0 — refuse
+everything, loudly**, tempdirs included. Half a reap is a policy nobody can
+reason about, and "I cannot tell live from dead" is a reason to stop, not a
+reason to stop partly. Refusing costs a leaked file — visible, recoverable;
+acting blind costs somebody's desktop.
+
+### The general form, which is the better teaching instance
+
+> **The failure state and the success state emitted the same artifact.**
+
+"I could not look" and "I looked and nothing is bound" were both an empty `Set`
+— indistinguishable to any caller, however carefully written. That is the sigil
+lane's general form of the vacuous check, and it was firing **inside the guard
+written to close a vacuous-guard incident**. It now sits at the top of
+`harness-guard.mjs`'s hazard-4 header, above the `xvfb-run` story, because it
+teaches more than the bug it was found next to.
+
+`G4` also guards `boundSocketPaths` and `NEVER_REAP_DISPLAYS` now (18/18): the
+null-means-unknown contract is what gate 0 reads, and a row has to be able to
+show that no other gate covered for it.
+
+**Re-run after the fix:** `harness:xvfb-reap` **20/20**; `harness:guard-proof`
+**12/12** against a real Electron; `npm test` **426 files passed / 2 skipped,
+5817 passed / 7 skipped, 0 failed**; `check:harness-guards` `152 clean / 152
+classified · 0 failure(s)`. Box residue **108/91/1522 before and after** every
+run. (The box moved from 91/74/1505 to 108/91/1522 between rounds — `+17` in
+each class, another lane's abrupt teardowns, not this parcel's: every run here
+is measured either side and nets zero.)
