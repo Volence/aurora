@@ -19,6 +19,7 @@ import { describe, it, expect } from 'vitest';
 import {
   rasterTimelineView, rasterTimelineSpaceNotice, rasterTimelineAbsences,
   splitRefusal, lineToStripY, drawRasterTimeline, RASTER_TIMELINE_GRAMMAR,
+  RASTER_TIMELINE_GESTURES,
   RASTER_TIMELINE_LINES, RASTER_TIMELINE_ORIGIN_Y, RASTER_TIMELINE_SCALE,
   RASTER_TIMELINE_STRIP_X, RASTER_TIMELINE_STRIP_W, RASTER_TIMELINE_W,
   publishRasterTimelineReport, lastRasterTimelineReport, inactiveRasterTimelineReport,
@@ -291,6 +292,21 @@ describe('what the strip refuses to claim', () => {
     expect(RASTER_TIMELINE_GRAMMAR).toContain('ONE edge');
     expect(RASTER_TIMELINE_GRAMMAR).toContain('INTERVAL with two edges');
     expect(RASTER_TIMELINE_GRAMMAR).toContain('no paired restore');
+  });
+
+  it('the gesture line names the three gestures the strip wires: a drag, a double-click/Alt-click split, one undo step', () => {
+    // ⚠ CONTENT ONLY, AND SAID SO. This row cannot see the `.tsx` that paints
+    // the sentence; whether it REACHES the render is `timeline-edit-harness.mjs`
+    // rows 3c/3e/3f, whose expected text is parsed from the very export this
+    // row imports. A render site that forks or drops the sentence leaves this
+    // row green BY DESIGN — that is what makes the harness the row that
+    // catches it (O49 plant H1). The three claims are the three handlers the
+    // strip wires: pointer down/move/up (a drag), `onDoubleClick` (a split),
+    // and one `executeCommand` per gesture (one undo step).
+    expect(RASTER_TIMELINE_GESTURES).toMatch(/drag a band edge/i);
+    expect(RASTER_TIMELINE_GESTURES).toMatch(/double-click \(or alt-click\)/i);
+    expect(RASTER_TIMELINE_GESTURES).toMatch(/one undo step/i);
+    expect(RASTER_TIMELINE_GESTURES).not.toBe(RASTER_TIMELINE_GRAMMAR);
   });
 
   it('the drawn absence line FITS the strip — it is never ellipsised', () => {

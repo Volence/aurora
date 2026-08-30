@@ -42,20 +42,63 @@
 //    the run moves to (72, 120) is likewise off-tick and distinct from every
 //    other number in the run.
 //
+// 6. A HINT THAT IS DEFINED AND NEVER PAINTED (O49). `RASTER_TIMELINE_GESTURES`
+//    and `BAND_SPLIT_LAW` are the only place an author learns that the handles
+//    ARE handles and why the cut line goes clear. The node suite pins their
+//    CONTENT and cannot see a `.tsx`; a render site that drops or forks either
+//    string leaves every node row green. Rows 3c/3d read each sentence out of
+//    the DOM's own leaf text, INSIDE the strip's open unit (the canvas's parent),
+//    visible and hit-testable at its integer centre; the expected text is PARSED
+//    OUT OF THE SOURCE that exports it (`exportedString`), never typed here and
+//    never read off the app. Rows 3e/3f are the LIVE half (the O46 shape): a
+//    real header click collapses the section and BOTH sentences must LEAVE the
+//    document with the canvas; a second click brings both back. A stale copy of
+//    the text anywhere else in the page cannot pass 3e.
+//
+// ═══ RED-FIRST — the plants, each applied ALONE and shown red before landing ═══
+//
+//   H1  `RasterTimelineStrip.tsx`: the `<Hint>` under the canvas renders the
+//       literal 'Drag a band edge to move it.' instead of RASTER_TIMELINE_GESTURES.
+//       The constant is untouched, so the node identity row in
+//       `raster-timeline.test.ts` ("the gesture line names the three gestures")
+//       stays GREEN — only this file catches it. Expected: 3c and 3f red.
+//   H2  `RasterTimelineStrip.tsx`: the `<Hint>` carrying BAND_SPLIT_LAW is
+//       deleted. The constant is untouched (`effects-preset-timeline.test.ts`'s
+//       rows on it stay GREEN). Expected: 3d and 3f red.
+//   (The original 34 rows were proven red-first in `timeline-edit-poisons.mjs`
+//   and against the running app on 2026-08-30 — ROADMAP row 94.)
+//
+// ═══ ROWS THAT DO NOT DISCRIMINATE, said here rather than left to be assumed ═══
+//
+//   3e (collapse -> both sentences gone) is GREEN under H1 and under H2: an
+//   absent sentence is absent either way. It earns its place only as the
+//   control for 3f. Every other row below is unaffected by H1/H2 and is
+//   therefore not evidence about the hints; 3c, 3d and 3f are.
+//
 // ═══ HOW TO RUN ═══
 //
 //   VITE_AURORA_DEBUG=1 npx electron-vite build   # __dbg exists ONLY here
 //   node scratchpad/timeline-edit-harness.mjs     # or: npm run harness:timeline-edit
 //
+// From an agent worktree: ELECTRON_BIN=<main tree>/node_modules/.bin/electron,
+// AEON_DIR=<a `git archive` of a COMMITTED aeon revision>, and DISPLAY_NUM /
+// PORT set to values no other harness in scratchpad/ defaults to (the defaults
+// below are unique in this directory as of 2026-08-30: :95 and 9439).
+//
 // Screenshots land in scratchpad/shots-timeline-edit/.
 
-import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import * as http from 'node:http';
-import { spawnGuarded } from './lib/harness-guard.mjs';
+import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
-const PORT = Number(process.env.PORT ?? 9412);
+const PORT = Number(process.env.PORT ?? 9439);
+// A FIXED display number, not `xvfb-run -a`: another harness on this box is
+// launched the same way, and `-a` picks whatever is free at the instant it
+// asks — two harnesses can pick the same number a few ms apart. 96..98 are
+// taken by other files here; a live server on this number is refused below.
+const DISPLAY_NUM = Number(process.env.DISPLAY_NUM ?? 95);
 const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
@@ -135,6 +178,7 @@ function cdp(wsUrl) {
 const results = [];
 const fails = [];
 const misses = [];
+let dprSeen = null;
 function check(id, name, ok, detail) {
   console.log(`${ok ? 'PASS' : 'FAIL'}  [${id}] ${name}${detail !== undefined ? `\n        ${detail}` : ''}`);
   results.push({ id, name, ok });
@@ -205,6 +249,69 @@ const expandSection = (title) => String.raw`
 
 const byTitle = (tag, prefix) =>
   `[...document.querySelectorAll(${JSON.stringify(tag)})].find(e => (e.title||'').startsWith(${JSON.stringify(prefix)}))`;
+
+// ── the hint sentences, from the SOURCE that exports them ──────────────────
+/**
+ * The value of `export const NAME = '...' + '...';` in a source file, or null.
+ *
+ * ⚠ PARSED, NOT TYPED, AND NOT ASKED OF THE APP. A sentence typed into this
+ * file would pass against a render site that shows the typed copy and drift
+ * from the real one; a sentence read off `window.__dbg` would be the component
+ * under test grading itself. The literal is the same bytes the node identity
+ * rows import, so H1/H2 (a fork or a deletion AT THE RENDER SITE) are the only
+ * thing that separates this file's verdict from theirs. Only string literals
+ * joined by `+` are accepted — anything else is refused loudly as null.
+ */
+function exportedString(file, name) {
+  const src = readFileSync(`${ROOT}/${file}`, 'utf8');
+  const m = src.match(new RegExp(`export const ${name} =\\s*([\\s\\S]*?);\\n`));
+  if (!m) return null;
+  const expr = m[1].trim();
+  const literalsOnly = /^(?:\s*\+?\s*(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"))+\s*$/;
+  if (!literalsOnly.test(expr)) return null;
+  return new Function(`return (${expr});`)();
+}
+const GESTURES_SRC = 'src/renderer/canvas/raster-timeline.ts';
+const SPLIT_LAW_SRC = 'src/renderer/providers/effects-preset.ts';
+
+/**
+ * Is this exact sentence PAINTED inside the strip's own unit?
+ *
+ * The unit is the canvas's parent (`SectionBody`): the hints are rendered as
+ * its children beside the canvas, so a copy of the sentence anywhere else in
+ * the page — a tooltip, a docs panel, another section — does not count. The
+ * leaf is scrolled into view and hit-tested at its INTEGER centre, the O15
+ * rule: `textContent` survives `display:none`, `elementFromPoint` does not.
+ */
+const HINT_IN_UNIT = (text) => String.raw`
+(() => {
+  const cv = document.getElementById('effects-raster-timeline');
+  const want = ${JSON.stringify(text)};
+  const leaves = [...document.querySelectorAll('div, span, p')]
+    .filter((e) => e.children.length === 0 && (e.textContent || '') === want);
+  const unit = cv ? cv.parentElement : null;
+  const inUnit = unit === null ? [] : leaves.filter((e) => unit.contains(e));
+  const el = inUnit[0] ?? null;
+  if (el === null) return { canvas: cv !== null, leaves: leaves.length, inUnit: 0 };
+  el.scrollIntoView({ block: 'center' });
+  const r = el.getBoundingClientRect();
+  const px = Math.round(r.x + r.width / 2);
+  const py = Math.round(r.y + r.height / 2);
+  const hit = document.elementFromPoint(px, py);
+  return {
+    canvas: true, leaves: leaves.length, inUnit: inUnit.length,
+    visible: typeof el.checkVisibility === 'function' ? el.checkVisibility() : null,
+    rects: el.getClientRects().length,
+    afterCanvas: (cv.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+    hitIsLeaf: hit === el, hitTag: hit ? (hit.id || hit.tagName) : null,
+    rect: { x: r.x, y: r.y, w: r.width, h: r.height }, px, py,
+    dpr: window.devicePixelRatio,
+  };
+})()`;
+/** How many leaves anywhere in the document carry this exact sentence. */
+const HINT_COUNT = (text) => String.raw`
+[...document.querySelectorAll('div, span, p')]
+  .filter((e) => e.children.length === 0 && (e.textContent || '') === ${JSON.stringify(text)}).length`;
 
 // ── the strip's own pixels ─────────────────────────────────────────────────
 const STRIP_ROW = (y, x, len) => String.raw`
@@ -296,10 +403,15 @@ async function mouse(c, type, x, y, extra = {}) {
 
 async function main() {
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
+  if (existsSync(`/tmp/.X${DISPLAY_NUM}-lock`) || existsSync(`/tmp/.X11-unix/X${DISPLAY_NUM}`)) {
+    throw new Error(`UNMEASURABLE: display :${DISPLAY_NUM} is already active on this box — `
+      + 'it is not ours to touch; run with another DISPLAY_NUM.');
+  }
+  console.log(`env: PORT ${PORT}  DISPLAY :${DISPLAY_NUM}  ELECTRON ${ELECTRON}\n     AEON_DIR ${AEONDIR}`);
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
   const child = spawnGuarded('/usr/bin/xvfb-run',
-    ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`],
+    ['-n', String(DISPLAY_NUM), '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`],
     { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   child.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[main] ${d}`); });
   child.stderr.on('data', (d) => { if (process.env.VERBOSE) process.stderr.write(`[err] ${d}`); });
@@ -398,6 +510,61 @@ async function main() {
     check('3b', 'and the panel selected it, so the strip column has a preset to draw',
       (await c.evalExpr('window.__dbg.aeon.selectedPreset()')) === PRESET_ID);
 
+    // ---- 3c-3f. THE TWO HINT SENTENCES REACH THE RENDER (O49) --------------
+    //
+    // Both are rendered only while a preset is selected (3b). ⚠ `resolveSelectedPreset`
+    // falls back to the FIRST preset in the tree, and this aeon tree ships
+    // presets, so "no preset selected" is not a state this run can reach; the
+    // live flip is the section's own header, which unmounts its children.
+    const gesturesText = exportedString(GESTURES_SRC, 'RASTER_TIMELINE_GESTURES');
+    const splitLawText = exportedString(SPLIT_LAW_SRC, 'BAND_SPLIT_LAW');
+    check('3y', 'ANTI-VACUOUS: both sentences were PARSED out of their source, and they '
+      + 'name the gestures this run performs (drag, double-click, undo) and the clear line',
+      typeof gesturesText === 'string' && /drag/i.test(gesturesText)
+      && /double-click/i.test(gesturesText) && /undo/i.test(gesturesText)
+      && typeof splitLawText === 'string' && /CLEAR/.test(splitLawText)
+      && gesturesText !== splitLawText,
+      `gestures=${JSON.stringify(gesturesText)}\n        splitLaw=${JSON.stringify(splitLawText)}`);
+    if (typeof gesturesText !== 'string' || typeof splitLawText !== 'string') {
+      throw new Error('UNMEASURABLE: a hint constant could not be parsed from its source');
+    }
+    const paintedRow = (id, label, r) => check(id, label,
+      r !== null && r.inUnit >= 1 && r.visible !== false && r.rects > 0
+      && r.afterCanvas === true && r.hitIsLeaf === true,
+      `inUnit=${r?.inUnit} leaves-anywhere=${r?.leaves} visible=${r?.visible} rects=${r?.rects} `
+      + `afterCanvas=${r?.afterCanvas} hit=${r?.hitTag} hitIsLeaf=${r?.hitIsLeaf}`
+      + (r && r.rect ? `\n        dpr=${r.dpr} rect=${JSON.stringify(r.rect)} centre=(${r.px}, ${r.py})` : ''));
+    paintedRow('3c', 'RASTER_TIMELINE_GESTURES is PAINTED: the exact sentence is a visible leaf '
+      + 'INSIDE the strip\'s unit, after the canvas, and hit-tests to itself',
+      watchMiss('3c gestures leaf', await c.json(HINT_IN_UNIT(gesturesText))));
+    paintedRow('3d', 'BAND_SPLIT_LAW is PAINTED: the exact sentence is a visible leaf '
+      + 'INSIDE the strip\'s unit, after the canvas, and hit-tests to itself',
+      watchMiss('3d split-law leaf', await c.json(HINT_IN_UNIT(splitLawText))));
+    // THE LIVE HALF. A header click is what an author does; a stale copy of the
+    // sentence would survive it, the real render does not.
+    watchMiss('3e collapse timeline', await c.evalExpr(expandSection('Raster timeline')));
+    await sleep(500);
+    const gone = {
+      canvas: await c.evalExpr('document.getElementById("effects-raster-timeline") !== null'),
+      gestures: await c.evalExpr(HINT_COUNT(gesturesText)),
+      splitLaw: await c.evalExpr(HINT_COUNT(splitLawText)),
+    };
+    check('3e', 'LIVE, half one: collapsing the Raster timeline section takes the canvas AND '
+      + 'both sentences OUT of the document (0 leaves anywhere) — the text is this render\'s',
+      gone.canvas === false && gone.gestures === 0 && gone.splitLaw === 0, JSON.stringify(gone));
+    watchMiss('3f expand timeline', await c.evalExpr(expandSection('Raster timeline')));
+    await sleep(600);
+    const back = {
+      gestures: await c.json(HINT_IN_UNIT(gesturesText)),
+      splitLaw: await c.json(HINT_IN_UNIT(splitLawText)),
+    };
+    check('3f', 'LIVE, half two: expanding it again paints BOTH sentences back inside the unit',
+      back.gestures !== null && back.gestures.inUnit >= 1 && back.gestures.hitIsLeaf === true
+      && back.splitLaw !== null && back.splitLaw.inUnit >= 1 && back.splitLaw.hitIsLeaf === true,
+      `gestures inUnit=${back.gestures?.inUnit} hitIsLeaf=${back.gestures?.hitIsLeaf}; `
+      + `splitLaw inUnit=${back.splitLaw?.inUnit} hitIsLeaf=${back.splitLaw?.hitIsLeaf}; `
+      + `dpr=${back.gestures?.dpr}`);
+
     // THE BAND EDITOR IS A SECOND COLLAPSED SECTION, titled for the preset it
     // belongs to. Its children are not mounted until it is opened, so the
     // spinners below do not exist yet.
@@ -426,6 +593,7 @@ async function main() {
     await sleep(300);
     let rep = await c.json('window.__dbg.aeon.rasterTimeline()');
     const dpr = await c.evalExpr('window.devicePixelRatio');
+    dprSeen = dpr;
     check('5a', 'the strip is ACTIVE and reports the preset column it is drawing',
       rep.active === true && rep.presetId === PRESET_ID && rep.paints > 0,
       `active=${rep.active} presetId=${rep.presetId} paints=${rep.paints}`);
@@ -482,7 +650,7 @@ async function main() {
     const used = [TOP0, TOP1, CUT, BOT0, BOT_ASK];
     check('5d', 'THE AIM SURVIVES THE ROUND TRIP for every line this run touches',
       used.every((l) => lineOfAim(aim(l)) === l),
-      `${221 - roundTrip.length}/221 lines round-trip exactly; `
+      `dpr=${dpr}; ${221 - roundTrip.length}/221 lines round-trip exactly; `
       + `lines this run uses: ${used.map((l) => `${l}->${lineOfAim(aim(l))}`).join(' ')}`
       + (roundTrip.length ? `\n        ⚠ lines that do NOT round-trip: ${roundTrip.join(',')} `
         + '— read any off-by-one at those as an AIM result, not a feature result.' : ''));
@@ -493,7 +661,7 @@ async function main() {
     check('5e', 'and the aim lands INSIDE the window it is dispatched into',
       aimTop.x >= 0 && aimTop.y >= 0
       && aimTop.x < vis0.viewport[0] && aimTop.y < vis0.viewport[1],
-      `aim (${aimTop.x}, ${aimTop.y}) in viewport ${JSON.stringify(vis0.viewport)}`);
+      `dpr=${dpr}; aim (${aimTop.x}, ${aimTop.y}) in viewport ${JSON.stringify(vis0.viewport)}`);
 
     // ---- 6. PIXELS: the band is on the canvas, not only in the model ------
     const PX = rep.presetX + 8;
@@ -674,12 +842,18 @@ async function main() {
     note(`scenes after cleanup: ${JSON.stringify((await c.json('window.__dbg.aeon.scenes()')).map((s) => s.id))}`);
   } finally {
     try { c?.close(); } catch { /* already gone */ }
-    try { process.kill(-child.pid, 'SIGTERM'); } catch { /* already gone */ }
+    // THE ORDERED TEARDOWN (O65, master 0868c1a8): the ChildProcess, awaited.
+    // A bare `process.kill(-child.pid)` raced Xvfb against the Electron and
+    // crashed the browser process when Xvfb won; a bare pid to killTree used
+    // to be a silent no-op. Never `process.exit` over this await.
+    await killTree(child);
   }
 
   const passed = results.filter((r) => r.ok).length;
-  console.log(`\n${passed}/${results.length} rows passed`);
-  if (fails.length) { console.log('FAILED:\n  ' + fails.join('\n  ')); process.exit(1); }
+  console.log(`\n${passed}/${results.length} rows passed  (dpr ${dprSeen ?? 'unmeasured'}, display :${DISPLAY_NUM}, port ${PORT})`);
+  const tSummary = Date.now();
+  process.on('exit', () => console.log(`exit ${Date.now() - tSummary} ms after the summary line`));
+  if (fails.length) { console.log('FAILED:\n  ' + fails.join('\n  ')); process.exitCode = 1; }
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => { console.error(e); process.exitCode = 1; });
