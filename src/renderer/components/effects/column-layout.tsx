@@ -131,6 +131,86 @@ export function Hint({ children, under = false, tone, style }: {
 }
 
 /**
+ * The label on the disclosure. One string, so the harness and the app cannot
+ * drift, and so nobody re-words it per surface.
+ */
+export const WHY_THIS_HAPPENS = 'Why this happens';
+
+/**
+ * AN ADVISORY THAT DOES NOT BURY THE FORM UNDER IT — ROADMAP O15.
+ *
+ * ⚠ THE SPLIT IS SEMANTIC, NEVER POSITIONAL, AND THAT IS THE WHOLE DESIGN.
+ * `diagnosis` (what is wrong, and which layers) and `remedies` (what to do) are
+ * ALWAYS on screen; only `mechanism` (why) is behind the disclosure, collapsed
+ * by default. The remedies are LAST in the composed sentence, so a "show more"
+ * that cut at a character count would hide exactly the part an author acts on —
+ * which is why this component takes three fields and never one string to slice.
+ * The provider returns them separately (`vsplitLockAdvisoryParts`); nothing here
+ * decides where a sentence ends.
+ *
+ * Measured: the v_factor row's advisory was 21 wrapped lines / ~460px of a
+ * ~1010px panel and pushed five controls below the fold
+ * (`docs/reviews/2026-08-30-o15-advisory-shape.md`, capture
+ * `scratchpad/shots-o15/before-1920x1080-panel.png`).
+ *
+ * ⚠ THE MECHANISM IS IN THE DOM WHILE COLLAPSED, hidden with `display: none`
+ * rather than unmounted. That is deliberate — find-in-page still reaches it and
+ * `aria-expanded` says what the button does — but it means `textContent` CANNOT
+ * tell a working disclosure from a permanently hidden one. Every check on this
+ * must measure `checkVisibility()` + `elementFromPoint`, never text;
+ * `scratchpad/vsplit-advisory-harness.mjs` rows `[5e] [5f] [5g] [5h] [5i] [9e]`
+ * are that check, and the packet's §4 is why they exist.
+ *
+ * ⚠ SCOPE, NAMED RATHER THAN SILENTLY WIDENED. The `Deform bg` hint is the next
+ * longest block in the same panel and is clipped at the fold in the same
+ * capture. It has the same shape problem and is NOT converted here — it is a
+ * different sentence with a different owner, and O15's scope says so out loud.
+ */
+export function Advisory({ diagnosis, mechanism, remedies, under = false }: {
+  diagnosis: string; mechanism: string; remedies: string; under?: boolean;
+}) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <Hint under={under} tone="warning">
+      <div>{diagnosis}</div>
+      <button
+        type="button"
+        aria-expanded={open}
+        title={`${WHY_THIS_HAPPENS} — the mechanism behind this refusal`}
+        onClick={() => setOpen((v) => !v)}
+        style={WHY_BUTTON}
+      >{open ? '▾' : '▸'} {WHY_THIS_HAPPENS}</button>
+      {/*
+        `display: none`, not `{open && …}` — see the docblock. The style is on
+        the element that RENDERS the mechanism, so `checkVisibility()` on the
+        node a text search finds is the answer, with no wrapper in between.
+      */}
+      <div style={{ display: open ? 'block' : 'none', marginBottom: T.s2 }}>{mechanism}</div>
+      <div>{remedies}</div>
+    </Hint>
+  );
+}
+
+/**
+ * A text button, not a chip: it toggles a paragraph inside a hint, so it must
+ * read as part of the hint's own tier rather than as a control in the form. The
+ * colour is the warning tone it sits in, underlined so it is legibly a target.
+ */
+const WHY_BUTTON: React.CSSProperties = {
+  display: 'inline-block',
+  margin: `${T.s1} 0`,
+  padding: 0,
+  border: 'none',
+  background: 'none',
+  font: 'inherit',
+  fontSize: T.tXs,
+  color: T.warning,
+  textDecoration: 'underline',
+  textUnderlineOffset: 2,
+  cursor: 'pointer',
+};
+
+/**
  * The one sub-level a section is allowed: a named group of fields inside it.
  *
  * NOT heading type. `panel-headings.test.ts` forbids a panel inside a titled

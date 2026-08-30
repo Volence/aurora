@@ -47,7 +47,7 @@
 
 import React from 'react';
 import { T, Panel, SectionBody, CollapsibleSection, Select, NumberField, Chip, IconButton } from '../ui';
-import { Field, Hint, Card } from './column-layout';
+import { Field, Hint, Card, Advisory } from './column-layout';
 import { useProjectStore, getActiveLevel } from '../../state/projectStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
@@ -69,7 +69,7 @@ import {
   LAYER_CURVE_ROW, LAYER_VSPLIT_ROW, EFFECTS_VSPLIT_AT_BOUNDS,
   clampVFactor, clampVCenter, clampVOffset,
   layerTopBounds, clampLayerTop, planeLineOf, fireLineAdvisory, vsplitOrderAdvisory,
-  vsplitLockAdvisory, sceneVsplitLockAdvisory,
+  vsplitLockAdvisoryParts, sceneVsplitLockAdvisoryParts,
   layerCountLine, vFactorHint,
   sceneListEntries, resolveSelectedScene, sceneRefOptions, unassignableSceneRef,
   sectionSceneCommand, createSceneCommand, deleteSceneCommand,
@@ -508,9 +508,20 @@ export default function EffectsScenePanel(): React.ReactElement {
             clauses. Advisory, never prevention: the spinner still offers every
             shift the schema allows and the document still saves (row 58).
           */}
+          {/*
+            AND IT IS THREE PARTS, NOT ONE PARAGRAPH (ROADMAP O15). Whole and
+            correct, this sentence was 21 wrapped lines — ~46% of the panel's
+            visible height — and pushed `V center`, `V offset`, `Transition`,
+            `Deform fg` and `Deform bg` below the fold. `Advisory` keeps the
+            DIAGNOSIS (which names the guilty layers, the fact only this surface
+            can state) and the REMEDIES on screen, and puts only the MECHANISM
+            behind a collapsed "Why this happens". Semantic, never positional:
+            the remedies are last in the sentence, so a length truncation would
+            hide exactly the half an author acts on.
+          */}
           {(() => {
-            const lock = sceneVsplitLockAdvisory(selected);
-            return lock === null ? null : <Hint under tone="warning">{lock}</Hint>;
+            const lock = sceneVsplitLockAdvisoryParts(selected);
+            return lock === null ? null : <Advisory under {...lock} />;
           })()}
           <Field label="V center">
             {/*
@@ -849,9 +860,13 @@ export default function EffectsScenePanel(): React.ReactElement {
                   scene — which is every scene that ships, so this hint is
                   invisible in the common case and the tests carry a locked
                   control precisely because a broken build looks identical. */}
+              {/* THREE PARTS HERE TOO (ROADMAP O15) — and this is the surface
+                  that renders the sentence ONCE PER SPLIT LAYER, so its height
+                  multiplies. Each card owns its own disclosure state; opening
+                  one card's "Why this happens" does not open the others'. */}
               {(() => {
-                const lock = vsplitLockAdvisory(selected, layer);
-                return lock === null ? null : <Hint under tone="warning">{lock}</Hint>;
+                const lock = vsplitLockAdvisoryParts(selected, layer);
+                return lock === null ? null : <Advisory under {...lock} />;
               })()}
               {/* THE STRIP'S OWN DEFORM (wave 2). `own` overrides the scene's
                   plane-shared table for this strip alone, and it carries the
