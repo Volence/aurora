@@ -7,7 +7,7 @@
  * answer moved on 2026-08-30, so read the history before editing the words.
  *
  * ═══════════════════════════════════════════════════════════════════════════
- * FIVE CORRECTIONS, THREE OF THEM DATED CLAIMS THAT EXPIRED ON SCHEDULE
+ * SIX CORRECTIONS, FOUR OF THEM DATED CLAIMS THAT EXPIRED ON SCHEDULE
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * 1. The key did not exist in either repo. False once empyrean adjudicated
@@ -39,8 +39,18 @@
  *    files this lane authored through its own writer and handed over. Retired
  *    2026-08-30, the same day, on the schedule clause (c) of the previous
  *    expiry set; the block at the end of this header records the re-read.
+ * 6. Nothing had been seen on screen — aeon's `c9a462be` said so in its own
+ *    words, and the sentence cited it rather than asserting either way.
+ *    **False since aeon `4a4d3474`** ("step 6 measured: the section-5 authored
+ *    band IS SEEN on screen - picture, control, A/B CRAM tables", an ancestor
+ *    of their `origin/master`), which commits
+ *    `docs/research/reference_captures/2026-08-30-sec5-band/` — README, two
+ *    bound runs, one control, CRAM tables and frames. Retired 2026-08-30, the
+ *    same day again, on the fifth clause of the previous expiry set; the last
+ *    dated block of this header records what the artifact says and what it
+ *    says it does not.
  *
- * All three retirements were SCHEDULED, not discovered late, and for one
+ * All four retirements were SCHEDULED, not discovered late, and for one
  * reason: the sentence named the aeon files that would falsify it and carried a
  * date. The new sentence carries one too (below), and it still names a SECTION
  * NUMBER.
@@ -137,7 +147,11 @@
  * against". THIS sentence owns the narrower, binding-specific fact: the VIEWPORT
  * does not composite a `rasterRef`, which is the contrast with
  * `assign_section_bg` (whose ref it does). Two limits saying the same thing is
- * how an author learns to skip both.
+ * how an author learns to skip both. (2026-08-30, later: `NO_PREVIEW`'s own
+ * premise expired at aeon `4a4d3474` — a band HAS now been looked at on screen
+ * in this suite, in aeon's tree, see the last dated block. That is
+ * `NO_PREVIEW`'s sentence to retire, with its own rows and harness; this
+ * sentence cites the capture and still does not preview anything.)
  *
  * ⚠ SAID ONCE, HERE. It is read by the agent replies (`agent-handler.ts`,
  * renderer), the published tool descriptions (`editor-methods.ts`, main) and
@@ -239,7 +253,9 @@
  * silently the first time someone binds section 6, and section 6 is exactly the
  * case aeon's seam gate was measured refusing.
  *
- * ⚠ THE BINDING BEING CARRIED IS STILL NOT THE BAND BEING SEEN. Running aeon's
+ * ⚠ THE BINDING BEING CARRIED IS STILL NOT THE BAND BEING SEEN (superseded at
+ * aeon `4a4d3474` — see the last dated block of this header; what follows was
+ * true of THIS lane's scratch run and still is). Running aeon's
  * own `tools/effects_gen.py emit` over a scratch copy carrying both documents
  * emits `EditorRaster_OJZ_Act1_ojz_sec5_showcase`, moves
  * `EditorRaster_OJZ_Act1_Bindings` to 1 and puts
@@ -326,15 +342,115 @@
  *   So: aeon's own words say not seen; Aurora's own measurement is "no CRAM was
  *   sampled here"; and the sentence says both, each attributed. When aeon
  *   commits a measurement, that clause expires — it is in the EXPIRES list.
+ *   • RESOLVED, 2026-08-30, LATER: aeon committed the measurement. `4a4d3474`
+ *     ("step 6 measured: the section-5 authored band IS SEEN on screen") adds
+ *     `docs/research/reference_captures/2026-08-30-sec5-band/`, and the
+ *     sentence now cites THAT — the README's own values, its control, and its
+ *     own list of what it does not establish — in place of `c9a462be`'s "not
+ *     seen". The Aurora half is unchanged and still true: no CRAM was sampled
+ *     here, and this viewport draws none of it. The block after next records
+ *     the re-read.
  *
  * THE NEW EXPIRY, dated 2026-08-30, owner aeon's lane (Aurora's for the last):
  * a second section threaded; `sec: 5` moving; section 5's sidecar no longer
  * naming `ojz_sec5_showcase`; the seam gate's case-3 arm removed or `build.sh`
  * running it under `FAST=1`; a committed aeon artifact recording the section-5
- * band as MEASURED on screen; or this viewport compositing a `rasterRef`.
+ * band as MEASURED on screen (⚠ FIRED at aeon `4a4d3474`, the same afternoon —
+ * the expiry IN FORCE is the one in the last dated block of this header); or
+ * this viewport compositing a `rasterRef`.
  * EVALUATE, DO NOT OBEY — and the re-read list gained the sidecar directory,
  * because "which sidecars carry the key" is now a live question rather than a
  * vacuity.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 2026-08-30, LATER AGAIN: THE FIFTH CLAUSE FIRED AT AEON `4a4d3474` — RETIRED
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Read at aeon `origin/master` = `e6405428` (three commits past `6e2495a5`
+ * that touch the captures: `4a4d3474` adds the directory, `778c0f67` and
+ * `e6405428` amend one README paragraph — the aurora-SHA one — and nothing
+ * else; every `.cram.txt`/`.json`/`.png` blob is byte-identical between
+ * `4a4d3474` and `e6405428`). `4a4d3474` is an ancestor of `origin/master`
+ * and `c9a462be` is an ancestor of it. Read through `git -C ../aeon show
+ * e6405428:<path>`, never their working tree.
+ *
+ * WHAT THE ARTIFACT SAYS, IN ITS OWN WORDS (README.md at `e6405428`):
+ *   • *"VERDICT: BAND SEEN. On the bound ROM, warped into section 5, CRAM line
+ *     2 entry 8 reads `$0EA4` at screen lines 40, 56 and 72 and `$0000` at 8,
+ *     20, 96 and 150 — all seven within one frame (259) — on two independent
+ *     private emulator instances whose tables and frames are byte-identical.
+ *     On the control ROM (same tree, `rasterRef: null`) the same entry reads
+ *     `$0000` on every line and `Raster_Program` is 0. The vacuity check
+ *     (in-band == out-of-band) did not fire."*
+ *   • `bound-A-sec5.cram.txt` is seven lines: `8 out $0000`, `20 out $0000`,
+ *     `40 in $0EA4`, `56 in $0EA4`, `72 in $0EA4`, `96 out $0000`,
+ *     `150 out $0000`; `bound-B` is the same blob. `control-sec5.cram.txt` is
+ *     `$0000` on all seven, the in-band rows marked `wb`.
+ *   • `bound-A-sec5.json`: `raster_program` `$013ACE` =
+ *     `EditorRaster_OJZ_Act1_ojz_sec5_showcase`, `sidecar_rasterRef`
+ *     `ojz_sec5_showcase`, `flat_section` 5, every sample `ok: true` in frame
+ *     259, `vacuity: "1 distinct in-band value(s) vs base $0000 — not
+ *     vacuous"`; `control-sec5.json`: `raster_program` `$000000`,
+ *     `sidecar_rasterRef` null.
+ *   • Bound ROM: aeon `6e2495a5`, `DEBUG=1 ./build.sh` canonical, crc32
+ *     `476e220f`. Control: aeon `7c7c5981` (sidecar `rasterRef: null`,
+ *     reverted at `2ebcd76a`), `FAST=1 DEBUG=1` because the canonical build
+ *     REFUSES the control tree on three content tests; the two ROMs differ in
+ *     exactly 5 bytes (checksum + `OJZ_Preset_Sec5`'s `ep_raster`).
+ *   • WHERE: *"Oracle's Rust core (`oracle-aether`, private headless instance
+ *     per run), not a console; there is no console to settle it on."*
+ *   • WHAT IT SAYS IT DOES NOT ESTABLISH: the exact transition lines (32/80
+ *     are pinned by the build-time decode, not here); any CRAM entry but `$50`;
+ *     any camera position but one; a walked crossing; motion; hardware.
+ *   The dispatch's description of the measurement matched the artifact on
+ *   every value; the artifact is what the sentence quotes.
+ *
+ * THE KEPT CLAUSES, RE-READ AT `e6405428` (line numbers moved; facts did not):
+ *   • `ojz_effects.emp` — still exactly one `raster:` argument calling the
+ *     chooser, `:1079`, `sec: 5`. (a) and (b) have not fired.
+ *   • `games/sonic4/data/editor/ojz/act1/` — still only `section_0`,
+ *     `section_4`, `section_5` sidecars; only section 5's carries `rasterRef`.
+ *   • `effects_scenes.emp:163` `EditorRaster_OJZ_Act1_Bindings = 1`, `:213` the
+ *     arm. `effects_seam_gate.py:133` `raster_seam_faults`, `:207` `exit(1)`,
+ *     `:384` the VACUOUS notice only on an empty set. `build.sh:667` `FAST ==
+ *     "0"`, `:692-693` `sonic4` + the gate; banner `:224`. `effects_gen.py`
+ *     `:1118`/`:1203`/`:1268` unchanged.
+ *
+ * WHAT WAS RETIRED, EXACTLY: *"and no further: aeon's c9a462be says in its own
+ * words that nothing has been seen on screen"* — replaced by *"and once past
+ * them in aeon's tree: aeon's 4a4d3474 (…) records the section-5 band MEASURED
+ * on screen in aeon's emulator capture"* with the README's values, its control
+ * and its instrument named; the fired expiry clause is spent and gone; every
+ * `Verified at`/`At` anchor moved `6e2495a5` → `e6405428` because a claim
+ * expired (the same event as O56, not the `1cbb6660` non-firing). `c9a462be`
+ * stays where it is provenance (the sidecar commit).
+ *
+ * WHAT WAS KEPT, ON PURPOSE: *"no CRAM was sampled here"* — still true, nothing
+ * in Aurora sampled anything — and it now sits beside *"nothing of that frame
+ * is visible in this editor"*, so the sentence says WHERE the band was seen
+ * (aeon's capture, in aeon's tree) one sentence away from the viewport clause
+ * (*"for section 5 as much as for any other … the viewport does not composite
+ * a rasterRef"*), which is unchanged word for word. The hazard this retirement
+ * exists to guard: "aeon measured the band on screen" drifting into "you can
+ * see it here". Both halves are pinned separately. The case split, the FAST=1
+ * qualifier, the ROM-cost clause and both `assign_section_*` contrasts are
+ * untouched.
+ *
+ * THE NEW EXPIRY, dated 2026-08-30, owner aeon's lane (Aurora's for the last):
+ * the four carried clauses; PLUS `docs/research/reference_captures/
+ * 2026-08-30-sec5-band/` leaving aeon's tree or its README no longer saying
+ * what the sentence quotes; PLUS a later aeon measurement of section 5
+ * recording something else; or this viewport compositing a `rasterRef`. The
+ * re-read list gained the captures README, for what was measured and what it
+ * says was not. EVALUATE, DO NOT OBEY.
+ *
+ * ⚠ TAGGED, NOT DONE HERE: `providers/effects-preset.ts`'s `NO_PREVIEW` ("A
+ * raster band has never been looked at on screen anywhere in this suite") and
+ * the comments around it are now false at `4a4d3474`, and so is
+ * `band-preset-wording.test.ts`'s rationale for its NO_PREVIEW row. That is a
+ * different sentence with a different subject (ground truth to preview
+ * against) and its own harness rows; it is named here so it is not found
+ * stale later, and left for its own parcel.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * IF AEON EVER PUBLISHES THE WIRED SET: WHAT THIS EDITOR MAY AND MAY NOT DO
@@ -372,13 +488,13 @@
 export const RASTER_SECTION_BINDING_LIMIT =
   'Saving a preset does not install it, and binding one no longer stops at the sidecar — but it '
   + 'still does not finish. The per-section key is rasterRef: assign_section_preset writes it into '
-  + 'that section\'s .meta.json sidecar, and aeon\'s build NOW READS IT. Verified at aeon 6e2495a5 '
+  + 'that section\'s .meta.json sidecar, and aeon\'s build NOW READS IT. Verified at aeon e6405428 '
   + '(2026-08-30): tools/effects_gen.py resolves rasterRef against the preset documents and emits '
   + 'that section\'s raster program together with the chooser that selects it, refusing an id that '
   + 'names no preset document BY NAME with the known ids listed — and refusing a numeric rasterRef, '
   + 'which matters because this editor\'s own sidecar parser nulls a non-string silently, so the '
   + 'build is the last reader that can still see that mistake. WHICH SECTION YOU BIND NOW DECIDES '
-  + 'WHAT HAPPENS, AND ONLY SECTION 5 IS WIRED. At 6e2495a5 exactly one preset() in aeon\'s '
+  + 'WHAT HAPPENS, AND ONLY SECTION 5 IS WIRED. At e6405428 exactly one preset() in aeon\'s '
   + 'games/sonic4/data/effects/ojz_effects.emp passes the chooser to its raster: channel — '
   + 'OJZ_Preset_Sec5, as raster: ojz_act1_sec_raster(sec: 5, hand: Raster_Program_None) — and '
   + 'SECTION 5 IS BOUND: aeon\'s c9a462be commits section_5.meta.json carrying rasterRef '
@@ -396,16 +512,26 @@ export const RASTER_SECTION_BINDING_LIMIT =
   + 'raster select, but binding one draws nothing — the viewport does not composite a rasterRef, so '
   + 'unlike assign_section_bg — whose ref the viewport does composite — this assignment changes '
   + 'nothing on screen. A preset document costs ROM whether or not any section binds it, since aeon '
-  + 'emits one program per document. Unlike assign_section_scene, which is baked. At 6e2495a5 '
+  + 'emits one program per document. Unlike assign_section_scene, which is baked. At e6405428 '
   + 'exactly one sidecar carries the key (section 5\'s), so the seam gate\'s section arm is no '
   + 'longer vacuous: it counts 1 sidecar rasterRef and checks it against the threaded set. Section '
-  + '5 has been exercised from this editor\'s writer to aeon\'s generator and build, and no '
-  + 'further: aeon\'s c9a462be says in its own words that nothing has been seen on screen, and no '
-  + 'CRAM was sampled here. EXPIRES when a second section is threaded, when sec: 5 becomes another '
+  + '5 has been exercised from this editor\'s writer to aeon\'s generator and build, and once past '
+  + 'them in aeon\'s tree: aeon\'s 4a4d3474 (2026-08-30, docs/research/reference_captures/'
+  + '2026-08-30-sec5-band/) records the section-5 band MEASURED on screen in aeon\'s emulator '
+  + 'capture — its README reads CRAM line 2 entry 8 as $0EA4 at screen lines 40, 56 and 72 and '
+  + '$0000 at lines 8, 20, 96 and 150, all in one frame, on two bound runs that agree byte for '
+  + 'byte, and as $0000 on every one of those lines on the control ROM built with the sidecar\'s '
+  + 'rasterRef null — taken on their headless oracle-aether instance, not hardware. That is aeon\'s '
+  + 'measurement of aeon\'s build: no CRAM was sampled here, and nothing of that frame is visible '
+  + 'in this editor. EXPIRES when a second section is threaded, when sec: 5 becomes another '
   + 'index, when section 5\'s sidecar stops naming ojz_sec5_showcase, when '
   + 'tools/effects_seam_gate.py stops refusing the unthreaded case or build.sh runs it under '
-  + 'FAST=1, when a committed aeon artifact records the section-5 band measured on screen, or when '
-  + 'this viewport learns to composite a rasterRef — owner: aeon\'s lane for all but the last, which '
-  + 'is Aurora\'s. Before quoting this, re-read games/sonic4/data/effects/ojz_effects.emp for which '
-  + 'sec: indices its raster: arguments pass, re-read games/sonic4/data/editor/ojz/act1/ for which '
-  + 'sidecars carry rasterRef, and re-read tools/effects_seam_gate.py and tools/effects_gen.py.';
+  + 'FAST=1, when docs/research/reference_captures/2026-08-30-sec5-band/ leaves aeon\'s tree or its '
+  + 'README stops saying what is quoted here, when a later aeon measurement of section 5 records '
+  + 'something else, or when this viewport learns to composite a rasterRef — owner: aeon\'s lane '
+  + 'for all but the last, which is Aurora\'s. Before quoting this, re-read '
+  + 'games/sonic4/data/effects/ojz_effects.emp for which sec: indices its raster: arguments pass, '
+  + 're-read games/sonic4/data/editor/ojz/act1/ for which sidecars carry rasterRef, re-read '
+  + 'tools/effects_seam_gate.py and tools/effects_gen.py, and re-read '
+  + 'docs/research/reference_captures/2026-08-30-sec5-band/README.md for what was measured and '
+  + 'what it says was not.';
