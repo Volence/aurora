@@ -74,6 +74,12 @@ function unmeasurable(id, name, why) {
   fails.push(`[${id}] ${name} (UNMEASURABLE: ${why})`);
 }
 const note = (t, d) => console.log(`  · ${t}: ${d}`);
+/** k9's own liveness read — alive and not a zombie — deliberately NOT the
+ *  helper's `running`, so the observer shares nothing with the thing observed. */
+const runningPid = (pid) => {
+  if (!alive(pid)) return false;
+  try { return !/^State:\s*Z/m.test(readFileSync(`/proc/${pid}/status`, 'utf8')); } catch { return false; }
+};
 
 /** Launch the real app the way every harness does. Not through spawnGuarded in
  *  the phases that must show the UNGUARDED behaviour — that is the point. */
@@ -360,6 +366,63 @@ async function main() {
           + `(killTree had captured ${before.length}); survivors: ${survivors.length ? survivors.join(',') : 'none'}`);
         await bg;                                                   // let the background half finish; nothing outlives the proof
         if (!dirGone) { try { rmSync(dir, { recursive: true, force: true }); } catch { /* */ } }
+      }
+    }
+
+    // ---- k9: the teardown is ORDERED, seen from OUTSIDE the helper (O65 ruling)
+    //
+    // One SIGTERM to the wrapper's group hit Xvfb and the Electron at the same
+    // instant; when Xvfb won, the Electron's X connection broke mid-shutdown
+    // and Chromium fataled (SIGTRAP core, Timestamp == the SIGTERM instant; 6
+    // of 17 band-preset runs on 2026-08-30). The race is not on demand, and a
+    // raw Aurora is gone ~20 ms after SIGTERM (its main exits outright — see
+    // src/main/discovery-file.ts), so an observer cannot see the order on the
+    // real app. The property under test is the HELPER's order, so the subject
+    // is a stand-in under a real xvfb-run whose exit is a bounded 300 ms after
+    // SIGTERM. Old order: Xvfb dies within ms while the app is held — a sample
+    // with the X server dead and the app alive is guaranteed. New order: the
+    // group is not signalled until the app is gone, so no such sample can
+    // exist. Liveness is read from /proc by this process every 10 ms, using
+    // nothing killTree reports about itself. No Electron, so this row never
+    // produces a core of its own.
+    {
+      const t = spawn('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 320x240x8', '/bin/sh', '-c',
+        'trap "sleep 0.3; exit 0" TERM; while :; do sleep 0.1; done'], { stdio: 'ignore', detached: true });
+      // xvfb-run `sleep 3`s for its X server BEFORE running the command, so a
+      // tree captured on "Xvfb is up" holds the wrapper's own sleep and no app
+      // at all — measured, and it made this row vacuous. Wait for the stand-in —
+      // by ITS argv, not the root's, whose argv also carries the script text.
+      let art = null, appUp = false;
+      for (let i = 0; i < 60 && !(appUp && art && art.displays.length); i++) {
+        await sleep(200); art = displayArtifacts(t.pid);
+        appUp = [...descendants(t.pid)].some((p) => p !== t.pid && /^\/bin\/sh -c trap "sleep 0\.3/.test(cmdlineOf(p)));
+      }
+      if (!art || !art.displays.length || !appUp) {
+        unmeasurable('k9', 'ordered teardown seen from outside', `xvfb-run never started an X server AND the stand-in under ${t.pid}: X ${JSON.stringify(art)}, app up ${appUp}`);
+        await killTree(t, { graceMs: 500, quiet: true });
+      } else {
+        const tree = [...descendants(t.pid)];
+        const xv = tree.filter((p) => /(^|\/)Xvfb( |$)/.test(cmdlineOf(p)));
+        const app = tree.filter((p) => p !== t.pid && !xv.includes(p));
+        const t0 = Date.now();
+        const bg = killTree(t, { graceMs: 4000, quiet: true });
+        const samples = [];
+        for (let i = 0; i < 600; i++) {
+          const smp = { t: Date.now() - t0, app: app.filter(runningPid).length, x: xv.filter(runningPid).length };
+          samples.push(smp);
+          if (!smp.app && !smp.x) break;
+          await sleep(10);
+        }
+        const out = await bg;
+        const violation = samples.find((smp) => smp.x === 0 && smp.app > 0);
+        const held = samples.find((smp) => smp.t >= 100 && smp.app > 0 && smp.x > 0);
+        const last = samples[samples.length - 1];
+        check('k9', 'ORDERED teardown, seen from outside: with the app held 300 ms past SIGTERM, no 10 ms sample has the X server dead while the app is alive',
+          xv.length > 0 && app.length > 0 && !!held && !violation,
+          `app pids [${app.join(' ')}], Xvfb [${xv.join(' ')}] on :${art.displays[0].n}; ${samples.length} samples over ${last.t} ms; `
+          + `hold observed: ${held ? `yes (+${held.t} ms, app and X both up)` : 'NO — the instrument did not see the app being held'}; `
+          + (violation ? `VIOLATION at +${violation.t} ms: X server dead, ${violation.app} app pid(s) alive` : 'no violation')
+          + `; helper's own account: ${JSON.stringify(out.order ?? null)}`);
       }
     }
   } finally {

@@ -616,21 +616,90 @@ export async function killTree(arg, { graceMs = 4000, quiet = false, reap = true
   // net walking from a dead wrapper pid, and this is the only copy of what
   // was under it.
   inFlight.set(child, { tree, art });
+  // O65 RULING: ORDERED. The app first, the X server last. A single SIGTERM to
+  // the wrapper's group reached Xvfb and the Electron at the same instant;
+  // when Xvfb won that race the Electron's X11 connection broke mid-shutdown
+  // and Chromium fataled — `Signal: 5 (TRAP) si_code: SI_KERNEL` in the
+  // BROWSER process, core Timestamp equal to the SIGTERM instant, one core in
+  // every run whose log said `SIGKILLed 5` and none in any that said
+  // `SIGKILLed 0` (6 of 17 band-preset runs on 2026-08-30). So: SIGTERM the
+  // app pids from the captured descent, wait a bounded grace for them to
+  // actually be gone (not zombies), and only THEN signal the wrapper's group
+  // so the X server goes down under nothing. Scope is unchanged — every pid
+  // here came out of `tree`, the /proc walk from the pid this process spawned.
+  const roles = classifyTree(child.pid, tree);
+  const t0 = Date.now();
+  for (const p of roles.app) { try { process.kill(p, 'SIGTERM'); } catch { /* gone */ } }
+  if (graceMs > 0 && roles.app.length) {
+    while (Date.now() - t0 < graceMs && roles.app.some(running)) await sleep(50);
+  }
+  const appMs = Date.now() - t0;
+  const appLeft = roles.app.filter(running);
+  const xvfbUpAtGroupSignal = roles.xvfb.filter(running);
+  // When the app exited on its own, xvfb-run's own `kill $XVFBPID` / `rm -r`
+  // (the cleanup a SIGTERMed wrapper never reaches) has usually run by now and
+  // the wrapper itself is gone: the display is RELEASED, not lost. An X server
+  // down while the wrapper is still up is the other thing — the race this
+  // order exists to prevent — and is said out loud.
+  const wrapperUpAtGroupSignal = running(child.pid);
+  const t1 = Date.now();
   try { process.kill(-child.pid, 'SIGTERM'); } catch { /* not a group leader */ }
   try { child.kill('SIGTERM'); } catch { /* gone */ }
-  if (graceMs > 0) await sleep(graceMs);
+  if (graceMs > 0) {
+    const xGrace = Math.min(graceMs, X_GRACE_MS);
+    while (Date.now() - t1 < xGrace && tree.some(running)) await sleep(50);
+  }
+  const xMs = Date.now() - t1;
   const killed = killPids(tree);
   await sleep(300);
   const survivors = tree.filter(alive);
   registered.delete(child);
   inFlight.delete(child);
+  const order = { app: roles.app, xvfb: roles.xvfb, appMs, appLeft, xvfbUpAtGroupSignal, wrapperUpAtGroupSignal, xMs, graceMs };
   if (!quiet) {
     console.log(`cleanup: tree under pid ${child.pid} (${tree.length} process(es)):`);
     for (const s of seen) console.log(`           ${s}`);
+    console.log(`cleanup: ORDERED — app ${roles.app.length} pid(s) SIGTERMed first, `
+      + (appLeft.length ? `${appLeft.length} STILL RUNNING at the ${graceMs} ms grace` : `gone in ${appMs} ms`)
+      + `; then the wrapper group with the X server ${roles.xvfb.length
+        ? (xvfbUpAtGroupSignal.length ? 'still up'
+          : wrapperUpAtGroupSignal ? 'DOWN WHILE THE WRAPPER STILL RAN — the race this order exists to prevent'
+            : 'already released by xvfb-run\'s own cleanup')
+        : 'absent'}`
+      + `, tree gone in ${xMs} ms; teardown ${appMs + xMs + 300} ms of a ${graceMs} ms grace`);
     console.log(`cleanup: SIGKILLed ${killed}; survivors after kill: ${survivors.length ? survivors.join(',') : 'none'}`);
   }
   const reaped = art ? reapDisplays(art, { quiet }) : null;
-  return { tree, seen, killed, survivors, artifacts: art, reaped };
+  return { tree, seen, killed, survivors, artifacts: art, reaped, order };
+}
+
+/** How long the X server's group gets after the app is gone before SIGKILL.
+ *  Bounded by `graceMs` as well; Xvfb exits within ms of SIGTERM. */
+const X_GRACE_MS = 1500;
+
+/** Alive AND not a zombie. `alive()` says yes to a zombie (signal 0 succeeds
+ *  on one), and the ordered teardown must not wait a whole grace on a corpse
+ *  its parent has not collected yet. */
+export function running(pid) {
+  if (!alive(pid)) return false;
+  try { return !/^State:\s*Z/m.test(readFileSync(`/proc/${pid}/status`, 'utf8')); } catch { return false; }
+}
+
+/**
+ * Who is who in a captured tree, by argv. The root (the xvfb-run shell, or
+ * whatever was spawned) is nobody's — it is signalled as the group. Chromium
+ * children (`--type=`) follow their browser and are not signalled separately.
+ */
+export function classifyTree(rootPid, tree) {
+  const app = [], xvfb = [], followers = [];
+  for (const pid of tree) {
+    if (pid === rootPid || pid === process.pid) continue;
+    const argv = cmdlineOf(pid);
+    if (/(^|\/)Xvfb( |$)/.test(argv)) xvfb.push(pid);
+    else if (/(^|\/)xvfb-run( |$)/.test(argv) || /\s--type=/.test(argv)) followers.push(pid);
+    else app.push(pid);
+  }
+  return { app, xvfb, followers };
 }
 
 /** Synchronous last-resort variant for process-exit handlers, which cannot
