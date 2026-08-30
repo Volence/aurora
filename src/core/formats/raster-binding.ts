@@ -7,7 +7,7 @@
  * answer moved on 2026-08-30, so read the history before editing the words.
  *
  * ═══════════════════════════════════════════════════════════════════════════
- * FOUR CORRECTIONS, TWO OF THEM DATED CLAIMS THAT EXPIRED ON SCHEDULE
+ * FIVE CORRECTIONS, THREE OF THEM DATED CLAIMS THAT EXPIRED ON SCHEDULE
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * 1. The key did not exist in either repo. False once empyrean adjudicated
@@ -30,10 +30,20 @@
  *    section refusal landed inside step 5's own gate", an ancestor of their
  *    `origin/master`), where `ojz_effects.emp:1072` threads
  *    `ojz_act1_sec_raster(sec: 5, hand: Raster_Program_None)`.
+ * 5. No sidecar in aeon's tree carried the key, so the seam gate's section arm
+ *    was vacuous and no section had been exercised end to end. **False since
+ *    aeon `c9a462be`** ("step 6: section 5 carries an authored band", an
+ *    ancestor of their `origin/master`), which commits
+ *    `games/sonic4/data/editor/ojz/act1/section_5.meta.json` with
+ *    `"rasterRef": "ojz_sec5_showcase"` beside the preset document — the two
+ *    files this lane authored through its own writer and handed over. Retired
+ *    2026-08-30, the same day, on the schedule clause (c) of the previous
+ *    expiry set; the block at the end of this header records the re-read.
  *
- * Both retirements were SCHEDULED, not discovered late, and for one reason: the
- * sentence named the aeon files that would falsify it and carried a date. The
- * new sentence carries one too (below), and it now names a SECTION NUMBER.
+ * All three retirements were SCHEDULED, not discovered late, and for one
+ * reason: the sentence named the aeon files that would falsify it and carried a
+ * date. The new sentence carries one too (below), and it still names a SECTION
+ * NUMBER.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * WHAT AEON ACTUALLY DOES AT `9cdf32d8`, READ AT THAT REVISION
@@ -170,6 +180,11 @@
  * 2026-08-30, LATER THE SAME DAY: THE EXPIRY IS ARMED AND HAS NOT FIRED
  * ═══════════════════════════════════════════════════════════════════════════
  *
+ * ⚠ SUPERSEDED THE SAME EVENING — clause (c) fired at aeon `c9a462be`; see
+ * the block AFTER this one. This block is kept as written because it is the
+ * record of what a NON-firing looked like when the trigger was already in
+ * someone's hands, and the next reader in that position will want it.
+ *
  * This lane AUTHORED the two documents clause (c) is waiting for and handed
  * them to aeon's lane. That is not the same event as clause (c), and mistaking
  * the two would retire a sentence that is still true — which the four
@@ -232,6 +247,93 @@
  * band has been looked at.
  *
  * ═══════════════════════════════════════════════════════════════════════════
+ * 2026-08-30, LATER STILL: CLAUSE (c) FIRED AT AEON `c9a462be` — RETIRED HERE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Read at aeon `origin/master` = `6e2495a5` (two commits past `1cbb6660`:
+ * `c9a462be` step 6, then `6e2495a5` a DEFERRED_WORK booking), through
+ * `git -C ../aeon show 6e2495a5:<path>` and `git show c9a462be`, never their
+ * working tree. What each file says, with the line it says it at:
+ *
+ *   • `games/sonic4/data/effects/ojz_effects.emp` — STILL exactly one `raster:`
+ *     argument calling the chooser: `OJZ_Preset_Sec5` (declared `:1078`) with
+ *     `raster: ojz_act1_sec_raster(sec: 5, hand: Raster_Program_None)` at
+ *     `:1079`. `:1033-1036` and `:1049` hand `raster:` a literal; `:1030`
+ *     (`Sec0`) binds `patched:`. So (a) and (b) have NOT fired.
+ *   • `games/sonic4/data/editor/ojz/act1/section_5.meta.json` — EXISTS, with
+ *     `"rasterRef": "ojz_sec5_showcase"` and the other three refs null;
+ *     `games/sonic4/data/editor/effects/presets/ojz_sec5_showcase.json` beside
+ *     it. Only `section_0`, `section_4` and `section_5` have sidecars. (c) HAS
+ *     FIRED, and its own commit says the bytes are what this writer produced.
+ *   • `games/sonic4/data/generated/ojz/act1/effects_scenes.emp` — committed and
+ *     re-emitted: `pub equ EditorRaster_OJZ_Act1_Bindings = 1` (`:163`),
+ *     `EditorRaster_OJZ_Act1_ojz_sec5_showcase` (`:145`), and the chooser's arm
+ *     `if sec == 5 { out = EditorRaster_OJZ_Act1_ojz_sec5_showcase }` (`:213`).
+ *   • `tools/effects_seam_gate.py` — `raster_seam_faults` (`:133`) still carries
+ *     the case-3 arm (`:195-202`, *"section N's sidecar names rasterRef '<id>',
+ *     but no preset threads <fn>(sec: N)"*) and `fail()` still `sys.exit(1)`s
+ *     (`:205-207`). Its OK line (`:381-385`) prints *"N sidecar rasterRef(s)"*
+ *     and appends *"the sidecar arm is VACUOUS today and says so"* ONLY when the
+ *     set is empty — so at `6e2495a5` it prints `1 sidecar rasterRef(s)` and no
+ *     vacuity notice. `tools/test_effects_seam_gate.py` swapped its "NO sidecar
+ *     carries a rasterRef" precondition for `test_the_bound_sections_are_exactly
+ *     _the_threaded_ones` (derived from the call sites) plus a separate
+ *     content row pinning `[5]` — `c9a462be`'s own deliberate change.
+ *   • `build.sh` — the gate runs inside `if [[ "$FAST" == "0" ]]` (`:658`) and
+ *     `if [[ "${GAME}" == "sonic4" ]]` (`:683`), at `:684`; the FAST banner
+ *     (`:224`) still names `effects_seam_gate` among the skipped lanes. So the
+ *     `FAST=1` qualifier is still earned, and Aurora still has no such gate
+ *     (the STANDING REFUSAL below is unchanged).
+ *   • `tools/effects_gen.py` — `ACT_RASTER_REF_KEY` (`:1118`),
+ *     `load_section_raster_refs` (`:1203`), the equ name at `:1268`; unchanged.
+ *
+ * WHAT WAS RETIRED, EXACTLY: `Verified at aeon 9cdf32d8` and `At 9cdf32d8
+ * exactly one preset()` moved to `6e2495a5` — the anchor moves because a claim
+ * expired, which is a different event from the `1cbb6660` re-read above where
+ * nothing had and the anchor was deliberately left; `At 9cdf32d8 no sidecar
+ * carries the key, so the seam gate's section arm is vacuous and prints that
+ * it is, and no section number here has been exercised end to end` is gone,
+ * replaced by the one-sidecar, non-vacuous, exercised-to-the-build wording; and
+ * the expiry's first clause (a sidecar carrying the key) is spent. Section 5's
+ * "the first choice ... that aeon's build CAN carry" became "carries".
+ *
+ * WHAT WAS KEPT, ON PURPOSE: the case split keyed on the NUMBER 5 (all three
+ * cases; case 2 is still reachable by unbinding); `ONLY SECTION 5 IS WIRED`;
+ * the case-3 refusal with both its qualifiers (`nothing here warns, and FAST=1
+ * skips that gate`); the split-plus-a-line clause; the ROM-cost clause; the
+ * `assign_section_scene` and `assign_section_bg` contrasts; and the viewport
+ * clause word for word (`for section 5 as much as for any other`), because a
+ * sidecar in aeon's tree changes NOTHING about what this viewport draws.
+ *
+ * ⚠ "HAS ANYONE SEEN THE BAND": RULED NARROW, FROM COMMITTED ARTIFACTS ONLY.
+ *   • `c9a462be`'s message: *"NOT VERIFIED: nothing has been seen on screen. No
+ *     emulator was run for this commit. That the band RENDERS is the next
+ *     measurement and it is not proven by any of the above."* — a committed
+ *     statement, and it is the one the sentence now cites.
+ *   • `6e2495a5` (DEFERRED_WORK.md, "OWNER SIGHTING, MEASURED BUT NOT
+ *     EXPLAINED") records the owner looking at master's build — romBytes
+ *     736391, which IS the post-step-6 debug ROM — but what was measured is the
+ *     per-column change rate of the LEFT-EDGE STRIP in effects-lab scene 14
+ *     (13.4% vs a 10.6% body). Neither the azure band, section 5, nor CRAM line
+ *     2 entry 8 is mentioned. That is a build carrying the band being looked
+ *     at; it is not a record of the band rendering, and it is not cited as one.
+ *   • `docs/lane-log.jsonl` 2026-08-30T01:32:50Z ("the colour bands do reach
+ *     the screen") predates step 6 by eleven hours and is about aeon's three
+ *     hand-authored test bands (1.64% of the screen), not this document.
+ *   So: aeon's own words say not seen; Aurora's own measurement is "no CRAM was
+ *   sampled here"; and the sentence says both, each attributed. When aeon
+ *   commits a measurement, that clause expires — it is in the EXPIRES list.
+ *
+ * THE NEW EXPIRY, dated 2026-08-30, owner aeon's lane (Aurora's for the last):
+ * a second section threaded; `sec: 5` moving; section 5's sidecar no longer
+ * naming `ojz_sec5_showcase`; the seam gate's case-3 arm removed or `build.sh`
+ * running it under `FAST=1`; a committed aeon artifact recording the section-5
+ * band as MEASURED on screen; or this viewport compositing a `rasterRef`.
+ * EVALUATE, DO NOT OBEY — and the re-read list gained the sidecar directory,
+ * because "which sidecars carry the key" is now a live question rather than a
+ * vacuity.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
  * IF AEON EVER PUBLISHES THE WIRED SET: WHAT THIS EDITOR MAY AND MAY NOT DO
  * ═══════════════════════════════════════════════════════════════════════════
  *
@@ -267,33 +369,40 @@
 export const RASTER_SECTION_BINDING_LIMIT =
   'Saving a preset does not install it, and binding one no longer stops at the sidecar — but it '
   + 'still does not finish. The per-section key is rasterRef: assign_section_preset writes it into '
-  + 'that section\'s .meta.json sidecar, and aeon\'s build NOW READS IT. Verified at aeon 9cdf32d8 '
+  + 'that section\'s .meta.json sidecar, and aeon\'s build NOW READS IT. Verified at aeon 6e2495a5 '
   + '(2026-08-30): tools/effects_gen.py resolves rasterRef against the preset documents and emits '
   + 'that section\'s raster program together with the chooser that selects it, refusing an id that '
   + 'names no preset document BY NAME with the known ids listed — and refusing a numeric rasterRef, '
   + 'which matters because this editor\'s own sidecar parser nulls a non-string silently, so the '
   + 'build is the last reader that can still see that mistake. WHICH SECTION YOU BIND NOW DECIDES '
-  + 'WHAT HAPPENS, AND ONLY SECTION 5 IS WIRED. At 9cdf32d8 exactly one preset() in aeon\'s '
+  + 'WHAT HAPPENS, AND ONLY SECTION 5 IS WIRED. At 6e2495a5 exactly one preset() in aeon\'s '
   + 'games/sonic4/data/effects/ojz_effects.emp passes the chooser to its raster: channel — '
-  + 'OJZ_Preset_Sec5, as raster: ojz_act1_sec_raster(sec: 5, hand: Raster_Program_None) — so binding '
-  + 'a preset to SECTION 5 is the first choice made in this editor that aeon\'s build can carry to a '
-  + 'raster channel, and leaving section 5 unbound resolves to that hand: label and changes nothing. '
-  + 'BINDING ANY OTHER SECTION STILL REACHES NOTHING: those presets hand raster: a literal, so the '
-  + 'key is written, aeon\'s witness counts it, and no program follows it. That case is no longer '
-  + 'SILENT — aeon\'s tools/effects_seam_gate.py refuses a full build for it and names the section '
-  + 'and the id — but the refusal is aeon\'s alone: nothing here warns, and FAST=1 skips that gate. '
-  + 'Wiring a second section is a preset split plus one call-site line in aeon, not authoring the '
-  + 'effect: sections 6-8 share one record, and a section-keyed chooser threaded into a shared '
-  + 'record is itself a seam-gate refusal. Nor is there anything to look at here, for section 5 as '
-  + 'much as for any other: the band-preset panel now carries a per-section raster select, but '
-  + 'binding one draws nothing — the viewport does not composite a rasterRef, so unlike '
-  + 'assign_section_bg — whose ref the '
-  + 'viewport does composite — this assignment changes nothing on screen. A preset document costs ROM '
-  + 'whether or not any section binds it, since aeon emits one program per document. Unlike '
-  + 'assign_section_scene, which is baked. EXPIRES when a sidecar in aeon\'s tree actually carries a '
-  + 'rasterRef (their step 6), or when a second section is threaded, or when sec: 5 becomes another '
-  + 'index — owner: aeon\'s lane. At 9cdf32d8 no sidecar carries the key, so the seam gate\'s '
-  + 'section arm is vacuous and prints that it is, and no section number here has been exercised end '
-  + 'to end. Before quoting this, re-read games/sonic4/data/effects/ojz_effects.emp for which sec: '
-  + 'indices its raster: arguments pass, and re-read tools/effects_seam_gate.py and '
-  + 'tools/effects_gen.py.';
+  + 'OJZ_Preset_Sec5, as raster: ojz_act1_sec_raster(sec: 5, hand: Raster_Program_None) — and '
+  + 'SECTION 5 IS BOUND: aeon\'s c9a462be commits section_5.meta.json carrying rasterRef '
+  + 'ojz_sec5_showcase (authored here, through this writer), so EditorRaster_OJZ_Act1_Bindings is 1 '
+  + 'and the chooser resolves sec 5 to that program — the first choice made in this editor that '
+  + 'aeon\'s build carries to a raster channel. Leaving section 5 unbound resolves to that hand: '
+  + 'label and changes nothing. BINDING ANY OTHER SECTION STILL REACHES NOTHING: those presets hand '
+  + 'raster: a literal, so the key is written, aeon\'s witness counts it, and no program follows it. '
+  + 'That case is no longer SILENT — aeon\'s tools/effects_seam_gate.py refuses a full build for it '
+  + 'and names the section and the id — but the refusal is aeon\'s alone: nothing here warns, and '
+  + 'FAST=1 skips that gate. Wiring a second section is a preset split plus one call-site line in '
+  + 'aeon, not authoring the effect: sections 6-8 share one record, and a section-keyed chooser '
+  + 'threaded into a shared record is itself a seam-gate refusal. Nor is there anything to look at '
+  + 'here, for section 5 as much as for any other: the band-preset panel now carries a per-section '
+  + 'raster select, but binding one draws nothing — the viewport does not composite a rasterRef, so '
+  + 'unlike assign_section_bg — whose ref the viewport does composite — this assignment changes '
+  + 'nothing on screen. A preset document costs ROM whether or not any section binds it, since aeon '
+  + 'emits one program per document. Unlike assign_section_scene, which is baked. At 6e2495a5 '
+  + 'exactly one sidecar carries the key (section 5\'s), so the seam gate\'s section arm is no '
+  + 'longer vacuous: it counts 1 sidecar rasterRef and checks it against the threaded set. Section '
+  + '5 has been exercised from this editor\'s writer to aeon\'s generator and build, and no '
+  + 'further: aeon\'s c9a462be says in its own words that nothing has been seen on screen, and no '
+  + 'CRAM was sampled here. EXPIRES when a second section is threaded, when sec: 5 becomes another '
+  + 'index, when section 5\'s sidecar stops naming ojz_sec5_showcase, when '
+  + 'tools/effects_seam_gate.py stops refusing the unthreaded case or build.sh runs it under '
+  + 'FAST=1, when a committed aeon artifact records the section-5 band measured on screen, or when '
+  + 'this viewport learns to composite a rasterRef — owner: aeon\'s lane for all but the last, which '
+  + 'is Aurora\'s. Before quoting this, re-read games/sonic4/data/effects/ojz_effects.emp for which '
+  + 'sec: indices its raster: arguments pass, re-read games/sonic4/data/editor/ojz/act1/ for which '
+  + 'sidecars carry rasterRef, and re-read tools/effects_seam_gate.py and tools/effects_gen.py.';
