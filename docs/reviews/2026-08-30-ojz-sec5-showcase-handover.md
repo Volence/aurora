@@ -146,3 +146,5 @@ run, no CRAM was sampled. Whether the band is visible on screen is aeon's to mea
   checked, and exactly what fires it are recorded in `src/core/formats/raster-binding.ts`'s
   header rather than in a lane board, because a position that lives only in a gitignored file
   does not survive a session boundary.
+
+*2026-08-30, later: the expiry FIRED at aeon `c9a462be` ("step 6: section 5 carries an authored band", ancestor of their `origin/master` `6e2495a5`), which committed both files byte-identical to the writer's output; `RASTER_SECTION_BINDING_LIMIT` was retired against `6e2495a5` on branch `parcel/o56-binding-limit-expiry` (constant at aurora `3ffee5a3`), and `test/handover/ojz-sec5-showcase.test.ts` was re-pointed at `1cbb6660`. The packet above is left as written.*
