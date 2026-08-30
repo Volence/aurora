@@ -112,6 +112,34 @@
 // a pattern, never touches :0, and refuses any display whose socket is still
 // bound by a live process.
 //
+// ── THE LESSON THIS FILE ACTUALLY TEACHES, WHICH IS NOT HAZARD 4 ───────────
+//
+// `boundSocketPaths()` — the strong instrument written to close hazard 4 —
+// FAILED OPEN against its own docstring. Its catch returned an empty `Set`
+// while the comment beside it promised the caller would treat "unknown" as
+// "do not touch". `bound.has(sock)` over an empty Set is `false`, and `false`
+// is the value that means PROCEED TO DELETE. So an unreadable /proc/net/unix
+// silently inverted a refusal into a permission, and NEVER_REAP_DISPLAYS
+// became the only thing standing between the reaper and the owner's desktop
+// socket.
+//
+// The general form, and it is worth more than the `xvfb-run` story above:
+// **THE FAILURE STATE AND THE SUCCESS STATE EMITTED THE SAME ARTIFACT.**
+// "I could not look" and "I looked and nothing is bound" were both an empty
+// Set. No caller could have distinguished them, however carefully written. An
+// instrument that cannot report its own blindness is the vacuous shape this
+// header is about — and it was firing inside the guard written to close a
+// vacuous-guard incident. It now returns `null` for unknown, and `reapDisplays`
+// treats that as GATE 0: refuse everything, loudly.
+//
+// It was latent, never live (/proc/net/unix is readable in practice, and
+// attribution keeps :0 out of the list), and it was found the only way things
+// like this are found: by planting the poison — emptying NEVER_REAP_DISPLAYS —
+// and noticing the proof stayed GREEN because a neighbouring gate covered for
+// the one that had been deleted. Bar 2d cause (ii). Every gate in
+// `reapDisplays` now has a row in xvfb-reap-proof.mjs that asserts WHICH gate
+// refused, and all four were verified by deleting them one at a time.
+//
 // ── HOW A HARNESS USES THIS ────────────────────────────────────────────────
 //
 //     import { spawnGuarded, killTree, resolveOwnedDiscovery }
@@ -256,7 +284,7 @@ export const XVFB_TMPDIR_RE = /^\/tmp\/xvfb-run\.[A-Za-z0-9]{6}$/;
 /** Display numbers that are never reaped whatever the evidence says. `:0` is
  *  the owner's real session (Xwayland, pid 969 on this box) and deleting its
  *  socket would take his desktop down. */
-const NEVER_REAP_DISPLAYS = new Set([0]);
+export const NEVER_REAP_DISPLAYS = new Set([0]);
 
 /** Block without a timer, so the exit-handler path (which cannot await) can
  *  still give a SIGKILLed process the moment it needs to release its socket. */
@@ -285,22 +313,51 @@ function stillRunningAs(pid, argv) {
   return cmdlineOf(pid) === argv;                             // not recycled onto something else
 }
 
-/** Unix-socket paths currently BOUND by a live process, from /proc/net/unix.
+/**
+ * Unix-socket paths currently BOUND by a live process, from /proc/net/unix.
+ * Returns `null` — NOT an empty Set — when the table cannot be read.
  *
- *  This is the strong instrument, and it exists because the weak one has
- *  already misled a session here: a *lock file* names a pid, and a pid can be
- *  RECYCLED onto an unrelated process, so "that pid is in use" is not "that X
- *  server runs" (2026-08-29, display :151 held back by a Vivaldi renderer
- *  thread that had inherited the recorded pid). A path in /proc/net/unix is a
- *  live binding by construction: no binding, no row. */
-function boundSocketPaths() {
+ * This is the strong instrument, and it exists because the weak one has
+ * already misled a session here: a *lock file* names a pid, and a pid can be
+ * RECYCLED onto an unrelated process, so "that pid is in use" is not "that X
+ * server runs" (2026-08-29, display :151 held back by a Vivaldi renderer
+ * thread that had inherited the recorded pid). A path in /proc/net/unix is a
+ * live binding by construction: no binding, no row.
+ *
+ * ⚠ THIS FUNCTION FAILED OPEN, AGAINST ITS OWN DOCSTRING, AND THAT IS THE
+ * SHARPEST LESSON IN THIS FILE — SHARPER THAN THE `xvfb-run` ONE IT WAS
+ * WRITTEN TO FIX. The catch returned an empty `Set` while the comment said
+ * *"caller treats 'unknown' as 'do not touch'"*. The caller did no such thing:
+ * `bound.has(sock)` over an empty set is `false`, and `false` is the value that
+ * means **not bound, proceed to delete**. So an unreadable /proc/net/unix
+ * silently INVERTED gate 3 from a refusal into a permission.
+ *
+ * The general form, and it is the whole point: **the failure state and the
+ * success state emitted the same artifact.** "I could not look" and "I looked
+ * and found nothing bound" were the same empty Set, so no caller could
+ * possibly distinguish them — and an instrument that cannot report its own
+ * blindness is exactly the vacuous shape this file's header is about, firing
+ * inside the guard written to close a vacuous-guard incident.
+ *
+ * Latent, never live: /proc/net/unix is readable in practice, and
+ * `displayArtifacts` only lists displays from an Xvfb inside our own tree, so
+ * `:0` does not realistically reach the gate at all. That is precisely why
+ * NEVER_REAP_DISPLAYS is defence-in-depth for the case where attribution goes
+ * wrong — and why leaving it resting on a neighbour was the wrong call.
+ *
+ * Found by the coordinator, by planting the poison this file's own proof did
+ * not: emptying NEVER_REAP_DISPLAYS left `[o1]` GREEN, because gate 3 refused
+ * `:0` anyway. Bar 2d cause (ii) — two code paths, one observable.
+ */
+export function boundSocketPaths(path = '/proc/net/unix') {
+  let text;
+  try { text = readFileSync(path, 'utf8'); }
+  catch { return null; }                    // UNKNOWN. Never an empty Set.
   const out = new Set();
-  try {
-    for (const line of readFileSync('/proc/net/unix', 'utf8').split('\n')) {
-      const p = line.trim().split(/\s+/)[7];
-      if (p) out.add(p.replace(/^@/, ''));
-    }
-  } catch { /* no /proc/net/unix — caller treats "unknown" as "do not touch" */ }
+  for (const line of text.split('\n')) {
+    const p = line.trim().split(/\s+/)[7];
+    if (p) out.add(p.replace(/^@/, ''));
+  }
   return out;
 }
 
@@ -356,10 +413,28 @@ export function displayArtifacts(rootPid) {
  *      i.e. some live server answers on it, ours or not;
  *   4. never a tempdir outside XVFB_TMPDIR_RE.
  */
-export function reapDisplays(art, { quiet = false } = {}) {
+export function reapDisplays(art, { quiet = false, bound = boundSocketPaths() } = {}) {
   const removed = [];
   const refused = [];
-  const bound = boundSocketPaths();
+  // GATE 0 — BLIND. `bound === null` means the socket table could not be read,
+  // and this function's whole licence to delete rests on being able to tell a
+  // live server from a corpse. Refuse EVERYTHING and say why: the cost of
+  // refusing is a leaked file, visible and recoverable; the cost of acting
+  // blind is somebody's desktop. An unanswerable question does not become a
+  // pass, here as everywhere else in this repo.
+  if (bound === null) {
+    for (const d of art?.displays ?? []) {
+      refused.push(`:${d.n} — BLIND: /proc/net/unix unreadable, so "is a live server bound to `
+        + 'this display?" has no answer and nothing is removed');
+    }
+    for (const dir of art?.tmpdirs ?? []) refused.push(`${dir} — BLIND: see above; the whole reap is refused, not half of it`);
+    for (const u of art?.unknown ?? []) refused.push(`UNMEASURABLE: ${u}`);
+    if (!quiet) {
+      console.log('cleanup: X reap REFUSED ENTIRELY — /proc/net/unix unreadable, so liveness is unknown');
+      for (const r of refused) console.log(`cleanup: X artifact REFUSED — ${r}`);
+    }
+    return { removed, refused, blind: true };
+  }
   for (const d of art?.displays ?? []) {
     const sock = `/tmp/.X11-unix/X${d.n}`;
     if (NEVER_REAP_DISPLAYS.has(d.n)) { refused.push(`:${d.n} is never reaped (the owner's session)`); continue; }

@@ -75,6 +75,11 @@ const REQUIRED_EXPORTS = [
   // these and killTree's `reap` branch becomes dead code, every launcher still
   // "imports the guard", and the X displays start leaking again silently.
   'displayArtifacts', 'reapDisplays', 'XVFB_TMPDIR_RE',
+  // The two the reap's own gates are made of. `boundSocketPaths` must stay
+  // exported because its NULL-means-unknown contract is what gate 0 reads, and
+  // the proof asserts that contract directly; `NEVER_REAP_DISPLAYS` because a
+  // row has to be able to show that no OTHER gate could have covered for it.
+  'boundSocketPaths', 'NEVER_REAP_DISPLAYS',
 ];
 
 // ── source scanning ────────────────────────────────────────────────────────

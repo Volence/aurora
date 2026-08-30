@@ -28,7 +28,11 @@
 //                 leftovers were guaranteed, not merely likely.
 //   [o*]  OWNERSHIP — the reap REFUSES a display it does not own, refuses :0,
 //                 and refuses a directory that is not an xvfb-run tempdir. A
-//                 cleanup that cannot refuse is the pkill hazard again.
+//                 cleanup that cannot refuse is the pkill hazard again. FOUR
+//                 gates, four rows, and each row asserts WHICH gate refused —
+//                 see the note above them for why that is not pedantry.
+//   [b*]  BLINDNESS — the socket-table reader reporting that it could not
+//                 look, and the reap refusing everything when it does.
 //
 // NOTHING HERE IS A PATTERN MATCH AND NOTHING TOUCHES A PID IT DID NOT SPAWN.
 // It never launches Aurora — `/bin/sleep` under `xvfb-run` isolates the X leak
@@ -45,7 +49,8 @@
 import { spawn } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import {
-  spawnGuarded, killTree, killTreeSync, displayArtifacts, reapDisplays, cmdlineOf, XVFB_TMPDIR_RE,
+  spawnGuarded, killTree, killTreeSync, displayArtifacts, reapDisplays, cmdlineOf,
+  boundSocketPaths, NEVER_REAP_DISPLAYS, XVFB_TMPDIR_RE,
 } from './lib/harness-guard.mjs';
 
 const CHILD = process.argv[2] === '--child';
@@ -238,43 +243,104 @@ async function signalPhase(id, sig) {
 await signalPhase('s1', 'SIGINT');
 await signalPhase('s2', 'SIGTERM');
 
-// ── OWNERSHIP: what the reap REFUSES ───────────────────────────────────────
+// ── OWNERSHIP: what the reap REFUSES, AND WHICH GATE DID THE REFUSING ──────
 //
 // A cleanup that only ever says yes is the pkill hazard wearing a new name.
 // These rows construct artifacts the guard must decline, and then check the
 // paths are STILL THERE — the refusal is verified on disk, not taken on trust.
+//
+// ⚠ EVERY ROW HERE ASSERTS **WHICH GATE** FIRED, AND THE FIRST VERSION DID NOT.
+// The coordinator planted the poison this proof had not: emptying
+// NEVER_REAP_DISPLAYS — deleting gate 1 outright — left [o1] GREEN and the run
+// at 16/16, because the owner's live Xwayland binds /tmp/.X11-unix/X0 and GATE
+// 3 refused :0 anyway. Bar 2d cause (ii): two independent code paths, one
+// observable, and a row that reads only the observable cannot tell them apart.
+//
+// So each row now matches the refusal REASON, which the guard already returned
+// and the row was throwing away. That makes deleting any single gate turn its
+// own row red — verified by deleting each of the four in turn, not reasoned
+// about. There are four gates and there are now four isolating rows: the reason
+// [o1] could rest on a neighbour is that NOTHING tested gate 3 on its own.
+
+/** Did the guard refuse for THIS reason — and did it refuse at all? */
+const refusedBecause = (r, re) => r.removed.length === 0 && r.refused.some((x) => re.test(x));
 
 {
+  // GATE 1 — the never-reap list. :0 is the owner's desktop.
   const r = reapDisplays({ displays: [{ n: 0, xvfbPid: 1, argv: 'Xwayland :0' }], tmpdirs: [], unknown: [] }, { quiet: true });
   const sock0 = existsSync('/tmp/.X11-unix/X0');
-  if (r.removed.length === 0 && sock0) ok('o1', "display :0 — the owner's session — is REFUSED, and its socket is still there", r.refused.join('; '));
-  else no('o1', 'the guard did not refuse :0', `removed=${r.removed.join(' ')} socketStillThere=${sock0}`);
+  if (refusedBecause(r, /never reaped/) && sock0) {
+    ok('o1', "GATE 1 — display :0, the owner's session, is refused BY THE NEVER-REAP LIST, and its socket is still there",
+      r.refused.join('; '));
+  } else {
+    no('o1', 'gate 1 did not refuse :0 in its own words (gate 3 catching it instead is NOT a pass)',
+      `removed=${r.removed.join(' ')} refused=${r.refused.join('; ')} socketStillThere=${sock0}`);
+  }
 }
 
 {
-  // A display whose Xvfb is ALIVE and is not ours: use this node process as the
-  // stand-in owner. Real, live, and foreign to the tree — the same construction
-  // the ownership rule's proof uses, for the same reason.
+  // GATE 2 — the recorded process is still running. Use this node process as
+  // the stand-in owner: real, live, and foreign to the tree, the same
+  // construction the ownership rule's proof uses, for the same reason. Display
+  // 4242 has no socket on disk, so gate 3 cannot fire here and gate 2 is
+  // genuinely the only thing that can refuse.
+  //
   // argv comes from cmdlineOf, the same reader displayArtifacts records with —
   // the FIRST version built it from process.argv.join(' '), which does not
   // reproduce /proc's spelling, so the identity check said "recycled", the
   // guard reaped, and the row failed. The gate was right; the fixture was not.
   const n = 4242;
   const r = reapDisplays({ displays: [{ n, xvfbPid: process.pid, argv: cmdlineOf(process.pid) }], tmpdirs: [], unknown: [] }, { quiet: true });
-  if (r.removed.length === 0 && /still RUNNING/.test(r.refused.join(''))) {
-    ok('o2', `a display whose recorded process is LIVE is REFUSED (:${n})`, r.refused.join('; '));
+  const noNeighbour = !existsSync(`/tmp/.X11-unix/X${n}`) && !NEVER_REAP_DISPLAYS.has(n);
+  if (refusedBecause(r, /still RUNNING/) && noNeighbour) {
+    ok('o2', `GATE 2 — a display whose recorded process is LIVE is refused BY THE LIVENESS CHECK (:${n})`,
+      `${r.refused.join('; ')} · and no other gate could have: :${n} is not in the never-reap list and has no socket on disk`);
   } else {
-    no('o2', 'the guard reaped a display whose process is still running', `removed=${r.removed.join(' ')} refused=${r.refused.join('; ')}`);
+    no('o2', 'gate 2 did not refuse in its own words, or a neighbouring gate could have covered for it',
+      `removed=${r.removed.join(' ')} refused=${r.refused.join('; ')} noNeighbour=${noNeighbour}`);
   }
 }
 
 {
+  // GATE 3 — a live server is bound to the socket. NOTHING TESTED THIS ON ITS
+  // OWN before, which is the structural reason [o1] could rest on it.
+  //
+  // Constructed, not simulated: launch a real Xvfb, then hand the guard a
+  // recorded pid that is genuinely DEAD (a /bin/true that has already exited,
+  // so gate 2 passes) for a display number that is not 0 (so gate 1 passes).
+  // The only thing left standing between the guard and a LIVE X server is the
+  // /proc/net/unix binding.
+  const { child, art } = await launchAndWait('gate3');
+  const n = art.displays[0].n;
+  const corpse = spawn('/bin/true', [], { stdio: 'ignore' });
+  await new Promise((res) => corpse.on('exit', res));
+  const r = reapDisplays({ displays: [{ n, xvfbPid: corpse.pid, argv: '/bin/true' }], tmpdirs: [], unknown: [] }, { quiet: true });
+  const survived = present(paths(n));
+  if (refusedBecause(r, /is still BOUND/) && survived.length === 2) {
+    ok('o6', 'GATE 3 — a LIVE X server is refused BY THE BOUND-SOCKET CHECK even when gates 1 and 2 both pass',
+      `${r.refused.join('; ')} · recorded pid ${corpse.pid} is a dead /bin/true, :${n} is not in the never-reap list, `
+      + `and the artifacts are still on disk: ${survived.join(' ')}`);
+  } else {
+    no('o6', 'gate 3 did not refuse a live server on its own', `removed=${r.removed.join(' ')} refused=${r.refused.join('; ')} survived=${survived.join(' ')}`);
+  }
+  await killTree(child, { graceMs: 1000, quiet: true });
+}
+
+{
+  // GATE 4 — the tempdir pattern. The two paths that carry this row are `/tmp`
+  // and `$HOME`: they EXIST, so a widened pattern would really remove them and
+  // the row would really go red. (`/tmp/xvfb-run-not-really` normally does not
+  // exist, so it tests the pattern and not the removal — and when this gate was
+  // plant-verified by creating it for real, the plant DELETED it, so the second
+  // run of the same plant was already green on this row. A plant that eats its
+  // own fixture is only red once; read the first run, never the second.)
   const r = reapDisplays({ displays: [], tmpdirs: ['/tmp', '/home/volence', '/tmp/xvfb-run-not-really'], unknown: [] }, { quiet: true });
   const survived = existsSync('/tmp') && existsSync('/home/volence');
-  if (r.removed.length === 0 && survived) {
-    ok('o3', 'a directory that is not an xvfb-run tempdir is REFUSED — /tmp and $HOME are untouched', r.refused.join('; '));
+  if (refusedBecause(r, /not an xvfb-run tempdir/) && survived) {
+    ok('o3', 'GATE 4 — a directory outside XVFB_TMPDIR_RE is refused BY THE PATTERN CHECK — /tmp and $HOME are untouched',
+      r.refused.join('; '));
   } else {
-    no('o3', 'the guard removed a directory outside XVFB_TMPDIR_RE', `removed=${r.removed.join(' ')}`);
+    no('o3', 'gate 4 did not refuse in its own words', `removed=${r.removed.join(' ')} refused=${r.refused.join('; ')}`);
   }
   if (!XVFB_TMPDIR_RE.test('/tmp/xvfb-run-not-really') && XVFB_TMPDIR_RE.test('/tmp/xvfb-run.aB3xZ9')) {
     ok('o4', 'XVFB_TMPDIR_RE matches the real shape and nothing near it',
@@ -291,6 +357,63 @@ await signalPhase('s2', 'SIGTERM');
   } else {
     no('o5', 'unmeasurable input was silently dropped', r.refused.join('; '));
   }
+}
+
+// ── BLINDNESS: the instrument reporting that it cannot see ─────────────────
+//
+// boundSocketPaths() FAILED OPEN against its own docstring. The catch returned
+// an empty Set while the comment promised the caller would treat "unknown" as
+// "do not touch" — but `bound.has(sock)` over an empty Set is `false`, and
+// `false` is the value that means PROCEED TO DELETE. An unreadable
+// /proc/net/unix silently inverted gate 3 from a refusal into a permission,
+// leaving NEVER_REAP_DISPLAYS as the only thing between the reaper and the
+// owner's desktop socket — the guard the coordinator's poison showed nothing
+// was testing.
+//
+// The general form is the lesson: THE FAILURE STATE AND THE SUCCESS STATE
+// EMITTED THE SAME ARTIFACT. "I could not look" and "I looked and nothing is
+// bound" were both an empty Set, so no caller could distinguish them.
+
+{
+  const good = boundSocketPaths();
+  const blind = boundSocketPaths('/nonexistent/proc/net/unix');
+  if (blind === null && good instanceof Set && good.size > 0) {
+    ok('b1', 'an unreadable socket table returns the NULL sentinel, distinguishable from a readable empty one',
+      `unreadable -> ${blind} · readable -> Set(${good.size}) · an empty Set would have been indistinguishable from "nothing is bound"`);
+  } else {
+    no('b1', 'boundSocketPaths cannot report its own blindness', `unreadable -> ${blind} · readable -> ${good && good.size}`);
+  }
+}
+
+{
+  // The live artifacts of a REAL running server, handed to the guard while it
+  // is blind. Gate 1 passes (n is not 0) and gate 2 passes (the recorded pid is
+  // a dead /bin/true), so before the fix gate 3 would have inverted and DELETED
+  // the socket of a running X server.
+  const { child, art } = await launchAndWait('blind');
+  const n = art.displays[0].n;
+  const dir = art.tmpdirs[0];
+  const corpse = spawn('/bin/true', [], { stdio: 'ignore' });
+  await new Promise((res) => corpse.on('exit', res));
+  const r = reapDisplays(
+    { displays: [{ n, xvfbPid: corpse.pid, argv: '/bin/true' }], tmpdirs: [dir], unknown: [] },
+    { quiet: true, bound: null });
+  const survived = [...present(paths(n)), ...(existsSync(dir) ? [dir] : [])];
+  if (r.removed.length === 0 && r.blind === true && survived.length === 3) {
+    ok('b2', 'BLIND — with the socket table unreadable the reap refuses EVERYTHING, and the live server keeps its socket',
+      `${r.refused.join(' · ')} · still on disk: ${survived.join(' ')}`);
+  } else {
+    no('b2', 'a blind reap still removed things', `removed=${r.removed.join(' ')} blind=${r.blind} survived=${survived.join(' ')}`);
+  }
+  if (r.refused.every((x) => /BLIND|UNMEASURABLE/.test(x))) {
+    ok('b3', 'and it refuses in the blindness\'s own words, not by accidentally matching another gate', r.refused.join(' · '));
+  } else {
+    no('b3', 'a blind refusal was attributed to the wrong gate', r.refused.join(' · '));
+  }
+  // The tempdir half is refused too, deliberately: half a reap is a policy
+  // nobody can reason about, and "I cannot tell live from dead" is a reason to
+  // stop, not a reason to stop partly.
+  await killTree(child, { graceMs: 1000, quiet: true });
 }
 
 console.log(`\n════ ${pass} pass / ${fail} fail ════`);
