@@ -43,6 +43,7 @@ import { openEngine } from './open-project';
 import { useSessionStore } from './sessionStore';
 import { useSpriteStore, saveableDirtySpriteDocIds } from './spriteStore';
 import { useCanvasStore, saveableDirtyCanvasDocIds } from './canvasStore';
+import { collectSaveOutcomes, reportSaveOutcomes, type SaveReport } from './save-outcome-report';
 import { useArtStore } from './artStore';
 import { useToastStore } from './toastStore';
 import { saveClassicProject } from './classic-save';
@@ -60,10 +61,19 @@ export { documentHistoryHub };
 
 // -- Injectable savers (test seam, mirroring the retired save router's convention) --
 type SaveFn = () => Promise<unknown> | unknown;
-type SaveDocFn = (docId: string) => Promise<unknown> | unknown;
+// `report` is optional and the single-document callers omit it: a save that
+// paints its own outcome is right for Ctrl+S. The Save-ALL loops pass a
+// collector so N documents cost a bounded number of toasts — see
+// state/save-outcome-report.ts.
+type SaveDocFn = (docId: string, report?: SaveReport) => Promise<unknown> | unknown;
 let spriteArtImpl: SaveFn = saveAllSpriteArt;
 let spriteDocImpl: SaveDocFn = saveSpriteDocArt;
-let canvasDocImpl: SaveDocFn = saveCanvasDocument;
+// `saveCanvasDocument`'s second parameter is its guarded-write api (the IO seam
+// its own suite drives), so it cannot bind to SaveDocFn directly — the report
+// goes third. Adapted rather than reordered: the api parameter predates this and
+// is passed positionally at a dozen call sites.
+const canvasDocDefault: SaveDocFn = (docId, report) => saveCanvasDocument(docId, undefined, report);
+let canvasDocImpl: SaveDocFn = canvasDocDefault;
 let classicImpl: SaveFn = saveClassicProject;
 let aeonImpl: SaveFn = saveAeonProject;
 
@@ -82,7 +92,7 @@ export function __setRuntimeSaversForTest(
 export function __resetRuntimeSaversForTest(): void {
   spriteArtImpl = saveAllSpriteArt;
   spriteDocImpl = saveSpriteDocArt;
-  canvasDocImpl = saveCanvasDocument;
+  canvasDocImpl = canvasDocDefault;
   classicImpl = saveClassicProject;
   aeonImpl = saveAeonProject;
 }
@@ -129,7 +139,19 @@ export function ensureSaversRegistered(): void {
     // it is not done here because the two savers must change together — a Save
     // All where one surface stops on the first error and its neighbour does not
     // is a worse thing to reason about than either policy applied consistently.
-    save: async () => { for (const id of saveableDirtyCanvasDocIds()) await canvasDocImpl(id); },
+    // COALESCED, like saveAllSpriteArt. `saveCanvasDocument` has two paths that
+    // report WITHOUT throwing — mid-save edits, and the sidecar it could not
+    // write — so the loop walks past them to the next document and used to emit
+    // one toast per canvas. The sidecar case is the bad one: four sentences on
+    // the ten-second error dwell, and `sidecarRejected` survives a successful
+    // save on purpose, so a project with several broken sidecars flooded on
+    // EVERY save rather than once. The throwing paths are unaffected — they
+    // abort the loop, so they were never the unbounded ones.
+    save: async () => {
+      const { outcomes, reportFor } = collectSaveOutcomes();
+      for (const id of saveableDirtyCanvasDocIds()) await canvasDocImpl(id, reportFor(id));
+      reportSaveOutcomes(outcomes, 'canvas');
+    },
     // Ctrl+S in a canvas tab writes THAT canvas and no other. A dirty canvas
     // with no destination is not savable work, so Save stays inert for it
     // rather than failing — same rule the sprite scope above applies.

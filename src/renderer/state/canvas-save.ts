@@ -24,6 +24,7 @@
 import { canvasDocState, useCanvasStore } from './canvasStore';
 import { saveCanvasFile, type GuardedWriteApi } from './canvas-file';
 import { useToastStore } from './toastStore';
+import type { SaveReport } from './save-outcome-report';
 
 /**
  * Write a canvas document back to the pair it was loaded from.
@@ -45,7 +46,15 @@ import { useToastStore } from './toastStore';
  * offers, threaded through so a routing test can drive the REAL save path
  * without standing up a global `window`.
  */
-export async function saveCanvasDocument(docId: string, api?: GuardedWriteApi): Promise<void> {
+export async function saveCanvasDocument(
+  docId: string, api?: GuardedWriteApi, report?: SaveReport,
+): Promise<void> {
+  // `report` exists so the Save-All loop in project-runtime.ts can COLLECT the
+  // two non-throwing outcomes below instead of painting one per document — see
+  // state/save-outcome-report.ts. Defaulted to the toast, so Ctrl+S on a single
+  // canvas is unchanged. (The THROWING paths are untouched: they abort the loop,
+  // so they were never the unbounded ones.)
+  const say: SaveReport = report ?? useToastStore.getState().addToast;
   const doc = canvasDocState(docId);
   const source = useCanvasStore.getState().sourceOf(docId);
   if (!doc || !source) return; // nothing to write; not an error
@@ -114,7 +123,7 @@ export async function saveCanvasDocument(docId: string, api?: GuardedWriteApi): 
   // so what is on disk is already behind what is on screen. Saying nothing here
   // is the silent case: the dot would have cleared over unsaved pixels.
   if (!cleared) {
-    useToastStore.getState().addToast(
+    say(
       `Saved "${doc.name}", but edits made during the save are still unsaved — save again`,
       'info',
     );
@@ -127,7 +136,7 @@ export async function saveCanvasDocument(docId: string, api?: GuardedWriteApi): 
   // on the next save either, so the user has to be told every time, and told
   // what to DO about it rather than merely that something was skipped.
   if (!res.sidecarWritten) {
-    useToastStore.getState().addToast(
+    say(
       `Saved the pixels of "${doc.name}", but not its settings: ${source.sidecarPath} could not be read ` +
       'when this canvas was opened, so Aurora left it alone instead of overwriting it. ' +
       'The constraint profile and grid origin were NOT written. ' +

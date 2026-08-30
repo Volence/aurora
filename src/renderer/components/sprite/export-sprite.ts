@@ -4,6 +4,9 @@ import { useSpriteStore, spriteDocState, patchSpriteDoc, saveableDirtySpriteDocI
 import type { AnimStepUI, CharacterAnimUI } from '../../state/spriteStore';
 import type { PixelBuffer } from '../../../core/art/pixel-ops';
 import { useToastStore } from '../../state/toastStore';
+import {
+  collectSaveOutcomes, reportSaveOutcomes, type SaveReport,
+} from '../../state/save-outcome-report';
 import { buildSpriteExport, buildDPLCData } from '../../../core/export/sprite-export';
 import type { SpriteManifest } from '../../../core/export/sprite-export';
 import { assembleSprite } from '../../../core/art/sprite-decompose';
@@ -286,8 +289,11 @@ function framesEqual(a: PixelBuffer[], b: PixelBuffer[]): boolean {
  * would discard it without a prompt. (Palette/timeline edits are a separate,
  * pre-existing over-clear: this path writes art bytes only.)
  */
-export async function saveSpriteArt(docId?: string): Promise<void> {
-  const toast = useToastStore.getState().addToast;
+export async function saveSpriteArt(docId?: string, report?: SaveReport): Promise<void> {
+  // `report` exists so saveAllSpriteArt can COLLECT the per-document outcome
+  // instead of putting it on screen — see that function for why. Defaulted to
+  // the toast, so the single-document Ctrl+S below is unchanged.
+  const toast: SaveReport = report ?? useToastStore.getState().addToast;
   const targetId = docId ?? useSpriteStore.getState().activeDocId;
   const doc = spriteDocState(targetId);
   if (!doc) return; // not open — nothing to save, and nothing to say about it
@@ -374,8 +380,8 @@ export async function saveSpriteArt(docId?: string): Promise<void> {
  * checkout — kept as the name the save coordinator and tab-close path call.
  * A no-op for a document that isn't open.
  */
-export async function saveSpriteDocArt(docId: string): Promise<void> {
-  await saveSpriteArt(docId);
+export async function saveSpriteDocArt(docId: string, report?: SaveReport): Promise<void> {
+  await saveSpriteArt(docId, report);
 }
 
 /**
@@ -385,7 +391,16 @@ export async function saveSpriteDocArt(docId: string): Promise<void> {
  * otherwise survive a save the user reasonably believed covered it.
  */
 export async function saveAllSpriteArt(): Promise<void> {
-  for (const docId of saveableDirtySpriteDocIds()) await saveSpriteDocArt(docId);
+  // COALESCED, not one toast per document. `saveSpriteArt` says exactly one
+  // thing on every path it can leave by, which is right for the Ctrl+S that
+  // saves ONE document — but `saveableDirtySpriteDocIds()` is as long as the
+  // artist has dirty sprite tabs, so Save All used to put that many toasts on
+  // screen. See state/save-outcome-report.ts for the shape and why.
+  const { outcomes, reportFor } = collectSaveOutcomes();
+  for (const docId of saveableDirtySpriteDocIds()) {
+    await saveSpriteDocArt(docId, reportFor(docId));
+  }
+  reportSaveOutcomes(outcomes, 'sprite document');
 }
 
 /** Frames from a mapping file: macro call-sites if present, else assemble raw dc.b/.w. */
