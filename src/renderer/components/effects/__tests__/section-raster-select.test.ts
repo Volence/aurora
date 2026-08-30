@@ -163,6 +163,21 @@ describe('what the select offers', () => {
       .toEqual([{ value: '', label: RASTER_REF_ROW.unbound }]);
   });
 
+  /**
+   * ⚠ THIS ROW EXISTS BECAUSE A PLANT SLIPPED PAST THE WHOLE NODE SUITE.
+   * Swapping the option's `value` for its `label` — `value={o.label}` — left
+   * 57 rows green and `tsc` clean, and turned nine harness rows red in the real
+   * app: the select then offered "Authored probe (red / blue)" as a VALUE, so
+   * no pick could ever match a preset id and nothing could be bound at all.
+   *
+   * The row closes that instance. The CLASS — what React actually put on the
+   * element — stays the harness's, which is why the harness is not optional
+   * here.
+   */
+  it('the option VALUE is the preset id, not the display label', () => {
+    expect(code).toMatch(/<option key=\{o\.value\} value=\{o\.value\}>\{o\.label\}<\/option>/);
+  });
+
   /** No document, no control. A section index past the end of the act must not
    *  render a select over `undefined`. */
   it('the panel guards on the section existing before drawing the select', () => {

@@ -374,6 +374,16 @@ interface AeonProbeApi {
   bgTileAt(slot: number): number[] | null;
   /** Which section the last gesture claimed. */
   activeSection(): number;
+  /**
+   * SETUP, `setSelectedBand`'s reason and its bound. The per-section raster
+   * select and the scene assignment row both draw `activeSectionIndex`, and the
+   * only UI routes to that value are the LAYOUT facet's section grid and a click
+   * on the map canvas — neither of which is on screen beside the control under
+   * test. A harness pinning "the select follows the active section" needs to
+   * move it without leaving the facet; a harness pinning the GESTURE that moves
+   * it is a different instrument and must still use the grid or the canvas.
+   */
+  setActiveSection(index: number): void;
   /** Live toast messages, same as the canvas probe's. */
   toasts(): { message: string; type: string }[];
   /** SETUP, like the classic probe's setSelectedChunk: which plane the next
@@ -834,6 +844,16 @@ interface AeonProbeApi {
   /** One section's `sceneRef` — what the assignment dropdown writes. */
   sceneRef(sectionIndex: number): string | null;
   /**
+   * One section's `rasterRef` — what the per-section raster select writes.
+   *
+   * READ-ONLY, and it exists for the defect the DOM cannot show. A `<select>`
+   * whose `onChange` did nothing at all still renders the option the browser
+   * put on screen, so reading the control back tells you what the BROWSER did
+   * and not what the model holds. The two are the same only when the binding
+   * really landed, which is the thing under test.
+   */
+  rasterRef(sectionIndex: number): string | null;
+  /**
    * The BgAnim bands as the MODEL holds them — READ-ONLY, and the only way a
    * harness can see what the band panel's controls actually did.
    *
@@ -1035,6 +1055,7 @@ function installAeonProbe(): AeonProbeApi {
     /** Which section the last gesture claimed — a paint lands wherever the
      *  cursor was, and the grid is 3x3 here. */
     activeSection: () => useEditorStore.getState().activeSectionIndex,
+    setActiveSection: (index) => useEditorStore.getState().setActiveSectionIndex(index),
     toasts: () => useToastStore.getState().toasts.map((t) => ({ message: t.message, type: t.type })),
     setLayer: (layer) => useEditorStore.getState().setEditingLayer(layer),
     setSelectedTile: (index, paletteLine) => {
@@ -1179,6 +1200,7 @@ function installAeonProbe(): AeonProbeApi {
       (useProjectStore.getState().project?.effectsScenes.unreadable ?? [])
         .map((u) => ({ path: u.path, reason: u.reason })),
     sceneRef: (sectionIndex) => section(sectionIndex)?.sceneRef ?? null,
+    rasterRef: (sectionIndex) => section(sectionIndex)?.rasterRef ?? null,
     selectedScene: () => useEditorStore.getState().selectedEffectsSceneId,
     selectScene: (id) => useEditorStore.getState().setSelectedEffectsSceneId(id),
     presets: () => (useProjectStore.getState().project?.effectsPresets.presets ?? []).map((p) => ({

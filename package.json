@@ -53,6 +53,7 @@
     "harness:loop-paint": "node scratchpad/loop-paint-harness.mjs",
     "harness:curve-option-disabled": "node scratchpad/curve-option-disabled-harness.mjs",
     "harness:band-preset": "node scratchpad/band-preset-harness.mjs",
+    "harness:section-raster-select": "node scratchpad/section-raster-select-harness.mjs",
     "harness:discovery-exit-net": "node scratchpad/discovery-exit-net-proof.mjs",
     "harness:aether-method-gate": "node scratchpad/aether-method-gate-proof.mjs",
     "harness:window-icon": "node scratchpad/window-icon-probe.mjs",
