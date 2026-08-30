@@ -2,9 +2,10 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { FileAccess } from '../adapter';
-import { s1Adapter, enumerateProfileEntries } from '../s1/index';
+import { s1Adapter, enumerateProfileEntries, S1_FINGERPRINT } from '../s1/index';
 import { s1Profile } from '../profiles/s1';
 import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
+import { whenS1Act } from '../../../../test/support/s1-checkout';
 
 // ---------------------------------------------------------------------------
 // In-memory FileAccess fake (same pattern as adapter.test.ts).
@@ -320,21 +321,52 @@ function realFs(root: string): FileAccess {
 }
 
 describe('s1Adapter golden (real s1disasm)', () => {
+  // ⚠ THIS ROW IS THE LOUD ANCHOR, AND IT DELIBERATELY DOES NOT SKIP ON AN
+  // INCOMPLETE CHECKOUT. Its subject IS the checkout's completeness — "every
+  // profile entry resolves, every act is available" — so "a file is missing" is
+  // the proposition under test, not a reason to stop measuring. Rows that
+  // measure Aurora AGAINST the data now skip when the data is absent
+  // (docs/reviews/2026-08-30-incomplete-checkout-rows.md); if this one skipped
+  // too, an incomplete checkout would go entirely green. What it lacked was not
+  // loudness but ADDRESS: `expected null to deeply equal { type: 's1', … }` said
+  // nothing about which tree or which part of the fingerprint.
   it('detects and resolves 100% of profile entries; all acts available', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, async () => {
     const fa = realFs(S1DIR);
-    expect(await s1Adapter.detect(fa)).toEqual({ type: 's1', label: LABEL });
+    // The fingerprint's own list, so this cannot drift from what detect() checks.
+    const fingerprintMisses = [
+      ...(fs.existsSync(path.join(S1DIR, S1_FINGERPRINT.file)) ? [] : [S1_FINGERPRINT.file]),
+      ...S1_FINGERPRINT.dirsWithEntries.filter(
+        (d) => !fs.existsSync(path.join(S1DIR, d)) || fs.readdirSync(path.join(S1DIR, d)).length === 0,
+      ),
+    ];
+    expect(
+      await s1Adapter.detect(fa),
+      `s1Adapter.detect() refused ${S1DIR}. Its fingerprint wants ${S1_FINGERPRINT.file} plus `
+      + `non-empty ${S1_FINGERPRINT.dirsWithEntries.join(', ')}; absent or empty here: `
+      + `${fingerprintMisses.length > 0 ? fingerprintMisses.join(', ') : '(none — so this is an Aurora defect, not a checkout one)'}`,
+    ).toEqual({ type: 's1', label: LABEL });
 
     const handle = await s1Adapter.open(fa);
     const misses = handle.report.entries
       .filter((e) => e.status !== 'resolved')
       .map((e) => `${e.key} -> ${e.path}`);
-    expect(misses, `unresolved profile entries:\n${misses.join('\n')}`).toEqual([]);
-    expect(handle.report.resolved).toBe(handle.report.total);
+    expect(
+      misses,
+      `${misses.length} profile entr(y/ies) did not resolve under ${S1DIR} — an INCOMPLETE `
+      + `s1disasm checkout looks exactly like this:\n${misses.join('\n')}`,
+    ).toEqual([]);
+    expect(
+      handle.report.resolved,
+      `${handle.report.total - handle.report.resolved} of ${handle.report.total} profile entries `
+      + `are unresolved under ${S1DIR}`,
+    ).toBe(handle.report.total);
 
     const unavailable = handle.levels!.list().filter((r) => !r.available);
     expect(
       unavailable.map((r) => `${r.zone}${r.act}: ${r.reason}`),
-      `unavailable acts:\n${unavailable.map((r) => `${r.zone}${r.act}: ${r.reason}`).join('\n')}`,
+      `${unavailable.length} act(s) are unavailable under ${S1DIR} — the reasons name profile `
+      + `KEYS, so cross-reference them against that tree:\n`
+      + `${unavailable.map((r) => `${r.zone}${r.act}: ${r.reason}`).join('\n')}`,
     ).toEqual([]);
   });
 });
@@ -368,7 +400,7 @@ describe('s1Adapter levels.readPalettes', () => {
     expect([...palettes[3]]).toEqual(Array.from({ length: 16 }, (_, i) => 0x0b20 + i));
   });
 
-  it('golden: equals the full read()\'s LevelDoc.palettes on real s1disasm (GHZ 1)', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, async () => {
+  it('golden: equals the full read()\'s LevelDoc.palettes on real s1disasm (GHZ 1)', whenS1Act('ghz', 1), async () => {
     const handle = await s1Adapter.open(realFs(S1DIR));
     const ref = handle.levels!.list().find((r) => r.zone === 'ghz' && r.act === 1)!;
     const doc = await handle.levels!.read(ref);

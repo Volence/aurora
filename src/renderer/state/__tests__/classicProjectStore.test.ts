@@ -306,9 +306,19 @@ describe('classicProjectStore integration (real s1disasm)', { skip: !S1_PRESENT,
   });
   afterEach(() => __resetClassicBridgeForTest());
 
+  // ⚠ ANCHOR ROW — does NOT skip on an incomplete checkout, by design. Like
+  // s1-adapter's 100% golden, its subject IS the completeness of the tree, so a
+  // missing file is the proposition and not an excuse to stop. The 2026-08-30
+  // audit found it saying `expected 'error' to be 'opened'` and
+  // `expected 195 to be 231` — a store bug and an arithmetic complaint, for a
+  // checkout with no `artnem/`. It stays red; it now says where.
   it('opens s1disasm → report 100%, 18 acts, all available', async () => {
     const outcome = await useClassicProjectStore.getState().openDirectory(S1DIR);
-    expect(outcome).toBe('opened');
+    expect(
+      outcome,
+      `openDirectory(${S1DIR}) answered '${outcome}': `
+      + `${useClassicProjectStore.getState().error ?? '(no error recorded)'}`,
+    ).toBe('opened');
 
     const s = useClassicProjectStore.getState();
     expect(s.status).toBe('open');
@@ -316,10 +326,20 @@ describe('classicProjectStore integration (real s1disasm)', { skip: !S1_PRESENT,
     // Label captured for recent-projects (adapter's detect label).
     expect(s.label).toBe('Sonic 1 Disassembly (GitHub)');
     // 100% resolution.
-    expect(s.report!.resolved).toBe(s.report!.total);
+    const unresolved = s.report!.entries.filter((e) => e.status !== 'resolved');
+    expect(
+      s.report!.resolved,
+      `${unresolved.length} of ${s.report!.total} profile entries did not resolve under `
+      + `${S1DIR} — that is an INCOMPLETE s1disasm checkout, not a store defect:\n`
+      + `${unresolved.map((e) => `${e.key} -> ${e.path}`).join('\n')}`,
+    ).toBe(s.report!.total);
     // 6 zones x 3 acts, every one available.
     expect(s.zoneTree).toHaveLength(18);
-    expect(s.zoneTree.every((r) => r.available)).toBe(true);
+    const unavailable = s.zoneTree.filter((r) => !r.available);
+    expect(
+      unavailable.map((r) => `${r.zone}${r.act}: ${r.reason}`),
+      `${unavailable.length} act(s) unavailable under ${S1DIR}`,
+    ).toEqual([]);
     // zoneTree carries the expected zone ids.
     expect([...new Set(s.zoneTree.map((r) => r.zone))].sort()).toEqual(
       ['ghz', 'lz', 'mz', 'sbz', 'slz', 'syz'],

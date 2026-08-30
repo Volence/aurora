@@ -163,7 +163,16 @@ describe('s1-object-art linkage table', () => {
           if (!fs.existsSync(path.join(S1DIR, rel))) missing.push(`${where}:$${id.toString(16)} → ${rel}`);
         }
       }
-      expect(missing, `missing files:\n${missing.join('\n')}`).toEqual([]);
+      // ⚠ ANCHOR ROW — this one does not skip on an incomplete checkout either:
+      // "every linked file exists on disk" is precisely the proposition, so a
+      // missing `artnem/` is a real red. Before 2026-08-30 the message listed
+      // REPO-RELATIVE paths and no root, so it never said which tree was short.
+      expect(
+        missing,
+        `${missing.length} linked art/mappings file(s) are absent under ${S1DIR}. If this whole `
+        + 'list is one directory, that is an INCOMPLETE s1disasm checkout rather than a broken '
+        + `link table:\n${missing.join('\n')}`,
+      ).toEqual([]);
     });
   });
 });
