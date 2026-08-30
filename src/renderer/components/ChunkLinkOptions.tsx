@@ -26,12 +26,23 @@
 // return real commands and go through `executeCommand`, so Ctrl+Z puts the
 // links back. They do NOT touch the nametable — detaching turns a link into a
 // copy, and the copy is already sitting in the section.
+//
+// THE EXPLANATORY SENTENCE IS NOT WRITTEN HERE. It is a claim about
+// `buildActPropagationCommand`'s scope, so it lives beside that mechanism as
+// `CHUNK_LINK_LINKED_BLURB` / `CHUNK_LINK_DETACHED_BLURB` in
+// core/editing/chunk-links.ts, where a node test can read the exact words. It
+// used to be an inline literal here promising "every copy", while propagation
+// reached one ACT and the chunk library is project-wide — so a stamp in a
+// second act kept its link and diverged in silence. Do not re-inline it.
 
 import React from 'react';
 import { useEditorStore, executeCommand } from '../state/editorStore';
 import { useProjectStore, getCurrentAct, getActiveLevel } from '../state/projectStore';
 import { useAeonHistoryVersion } from '../hooks/useHistoryVersion';
-import { buildDetachCommand, buildDetachAllCommand, findPlacement } from '../../core/editing/chunk-links';
+import {
+  buildDetachCommand, buildDetachAllCommand, findPlacement,
+  CHUNK_LINK_LINKED_BLURB, CHUNK_LINK_DETACHED_BLURB,
+} from '../../core/editing/chunk-links';
 import { SectionBody, Chip, T } from './ui';
 import type { Section } from '../../core/model/s4-types';
 
@@ -110,11 +121,11 @@ export default function ChunkLinkOptions(): React.ReactElement {
           />
           <span>Detach on stamp</span>
         </label>
-        <p style={{ margin: 0, fontSize: T.tXs, color: T.textLo, lineHeight: 1.4 }}>
-          {detached
-            ? 'Stamps drop plain tiles. Editing the chunk later will NOT change them.'
-            : 'Stamps remember their chunk: editing the chunk later updates every copy '
-              + 'you have not painted over by hand.'}
+        <p
+          data-testid="chunk-link-scope"
+          style={{ margin: 0, fontSize: T.tXs, color: T.textLo, lineHeight: 1.4 }}
+        >
+          {detached ? CHUNK_LINK_DETACHED_BLURB : CHUNK_LINK_LINKED_BLURB}
         </p>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: T.s2, flexWrap: 'wrap' }}>

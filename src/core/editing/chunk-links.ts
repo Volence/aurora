@@ -45,7 +45,7 @@
 // partial write cannot desynchronise them.
 
 import { SECTION_TILES_WIDE } from '../model/s4-types';
-import type { ChunkDef, ChunkPlacementLink, Section, SectionChunkLinks } from '../model/s4-types';
+import type { Act, ChunkDef, ChunkPlacementLink, Section, SectionChunkLinks, Zone } from '../model/s4-types';
 import { cellTileIndices } from '../collision/collision-cell';
 import type { AnyCommand, BatchCommand, SetChunkLinksCommand, SetCollisionEditCommand, SetTilesCommand } from './commands';
 
@@ -486,3 +486,157 @@ export function withLinkBreaks(section: Section, cmd: AnyCommand): AnyCommand {
   }
   return { type: 'batch', description: cmd.description, sectionIndex: cmd.sectionIndex, commands: [cmd, child] };
 }
+
+// ── The out-of-act copies: reported, never silently rewritten ───────────────
+//
+// THE FACT THIS SECTION EXISTS FOR. The chunk library is PROJECT-WIDE — one
+// `chunkLibrary` array on the project, loaded from one `chunkLibrary` path in
+// project.json (core/config/s4-config.ts). Sections are per-ACT. So the same
+// library chunk can be stamped, and remembered, in acts and zones the author
+// does not have open, and `buildActPropagationCommand` above reaches exactly
+// one act's slot array.
+//
+// WHY THE ANSWER IS "REPORT", NOT "PROPAGATE EVERYWHERE".
+//
+//   1. A command cannot ADDRESS another act. `AnyCommand.sectionIndex` is a
+//      flat index into `S4Level.sections`, and `applyCommand` resolves it as
+//      `level.sections[cmd.sectionIndex]` against the level built from the
+//      CURRENTLY FOCUSED act (projectStore.getActiveLevel). A batch child
+//      meant for act 2 slot 3 would, on undo from act 1's tab, be applied to
+//      act 1 slot 3 — silently writing the wrong sections. Undo stacks are
+//      per-document too (`documentHistoryHub.historyFor`), so there is no one
+//      stack a cross-act step could even live on.
+//
+//   2. Across ZONES it would be data corruption rather than propagation. A
+//      `ChunkDef.nametable` word carries a tile index into the ZONE's tileset
+//      (`sliceForSave(doc, zone.tileset.tiles)` mints the indices). Writing
+//      zone A's freshly-sliced indices into a zone B section points zone B's
+//      tiles at whatever happens to sit at those indices in ITS atlas.
+//
+//   3. Even where 1 and 2 did not bite, an edit in one act rewriting level
+//      data in an act the author cannot see, on an undo step they cannot
+//      reach, is action at a distance.
+//
+// So propagation stays act-scoped and the out-of-act copies are NAMED. The
+// author keeps the capability the UI sentence implied — they are told exactly
+// where the un-updated copies are — without any of the three problems above.
+
+/** One act that still holds linked placements of a chunk, outside the act the
+ *  propagation ran in. `sections` counts the act slots involved, `placements`
+ *  the individual stamps. */
+export interface ChunkCopyLocation {
+  zoneId: string;
+  zoneName: string;
+  actId: string;
+  /** False when this act belongs to a DIFFERENT zone than the propagating act,
+   *  which is the case where the chunk's tile indices do not even mean the same
+   *  thing (reason 2 above). */
+  sameZone: boolean;
+  sections: number;
+  placements: number;
+}
+
+export interface OutOfActChunkCopies {
+  /** Acts holding at least one placement, in zone-then-act declaration order. */
+  locations: ChunkCopyLocation[];
+  /** Placements summed over `locations`. */
+  placements: number;
+  /** Placements of this chunk INSIDE the propagating act — i.e. what the
+   *  propagation did reach. Present so a caller (or a guard) can tell "no
+   *  copies elsewhere" from "no copies anywhere". */
+  inActPlacements: number;
+}
+
+/**
+ * Every linked placement of `chunkId` that lives OUTSIDE `currentAct`.
+ *
+ * `currentAct` is matched by OBJECT IDENTITY, not by `act.id`: act ids repeat
+ * across zones in real aeon projects ("act1" in every zone), so an id compare
+ * would silently drop a whole act's copies from the report.
+ */
+export function findOutOfActChunkCopies(args: {
+  chunkId: string;
+  zones: Zone[];
+  currentAct: Act | null;
+}): OutOfActChunkCopies {
+  const { chunkId, zones, currentAct } = args;
+  const locations: ChunkCopyLocation[] = [];
+  let placements = 0;
+  let inActPlacements = 0;
+
+  const currentZone = currentAct
+    ? zones.find((z) => z.acts.some((a) => a === currentAct)) ?? null
+    : null;
+
+  for (const zone of zones) {
+    for (const act of zone.acts) {
+      let actPlacements = 0;
+      let actSections = 0;
+      for (const section of act.sections) {
+        if (!section) continue;
+        const n = placementsOfChunk(section.chunkLinks, chunkId).length;
+        if (n === 0) continue;
+        actPlacements += n;
+        actSections += 1;
+      }
+      if (act === currentAct) { inActPlacements += actPlacements; continue; }
+      if (actPlacements === 0) continue;
+      placements += actPlacements;
+      locations.push({
+        zoneId: zone.id,
+        zoneName: zone.name,
+        actId: act.id,
+        sameZone: currentZone !== null && zone === currentZone,
+        sections: actSections,
+        placements: actPlacements,
+      });
+    }
+  }
+
+  return { locations, placements, inActPlacements };
+}
+
+/**
+ * The sentence shown after a chunk edit when copies survive outside the act, or
+ * null when there are none.
+ *
+ * Lives here rather than at the toast call site so a node test can read the
+ * exact words a rendered surface will show — the toast itself is React and the
+ * suite cannot see it.
+ */
+export function describeOutOfActChunkCopies(copies: OutOfActChunkCopies): string | null {
+  if (copies.locations.length === 0) return null;
+  const where = copies.locations
+    .map((l) => `${l.zoneName} ${l.actId} (${l.placements})`)
+    .join(', ');
+  const n = copies.placements;
+  const crossZone = copies.locations.some((l) => !l.sameZone);
+  return `${n} linked ${n === 1 ? 'copy' : 'copies'} outside this act ${n === 1 ? 'was' : 'were'} `
+    + `NOT updated: ${where}. Open the act and save the chunk there to update `
+    + `${n === 1 ? 'it' : 'them'}`
+    + (crossZone ? ' — copies in another zone resolve tiles against that zone\'s own tileset' : '')
+    + '.';
+}
+
+/**
+ * THE PANEL'S PROMISE, AND THE SCOPE IT IS ALLOWED TO CLAIM.
+ *
+ * Held here, beside the mechanism, because the sentence IS a claim about
+ * `buildActPropagationCommand` and nothing else re-checks a sentence when the
+ * mechanism under it changes. Before 2026-08-30 the panel said "updates every
+ * copy you have not painted over by hand" while propagation reached one act:
+ * a stamp of the same library chunk in a second act kept its link, was never
+ * re-stamped, and diverged in silence.
+ *
+ * ChunkLinkOptions imports these rather than inlining the words;
+ * `chunk-links-cross-act.test.ts` asserts both halves — that the linked text
+ * names the ACT scope, and that the panel still reads it from here rather than
+ * having grown a fresh literal beside it.
+ */
+export const CHUNK_LINK_LINKED_BLURB
+  = 'Stamps remember their chunk: editing the chunk later updates every copy '
+  + 'IN THIS ACT that you have not painted over by hand. Copies in other acts '
+  + 'keep their link and are reported after the edit, not changed.';
+
+export const CHUNK_LINK_DETACHED_BLURB
+  = 'Stamps drop plain tiles. Editing the chunk later will NOT change them.';
