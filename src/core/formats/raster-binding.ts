@@ -167,6 +167,71 @@
  *     lie instead; do not keep it because a guard was once announced.
  *
  * ═══════════════════════════════════════════════════════════════════════════
+ * 2026-08-30, LATER THE SAME DAY: THE EXPIRY IS ARMED AND HAS NOT FIRED
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * This lane AUTHORED the two documents clause (c) is waiting for and handed
+ * them to aeon's lane. That is not the same event as clause (c), and mistaking
+ * the two would retire a sentence that is still true — which the four
+ * corrections above record as nearly happening three times, each time in a
+ * hurry, each time by a reader who had the trigger in front of them.
+ *
+ * THE RE-READ, AT AEON `1cbb6660` (their `origin/master` that day, EIGHT
+ * commits past `9cdf32d8`) — done because the block above says `9cdf32d8` is a
+ * revision and not "now", and read through `git -C ../aeon show <rev>:<path>`,
+ * never their working tree:
+ *
+ *   • `games/sonic4/data/effects/ojz_effects.emp` — still EXACTLY ONE `raster:`
+ *     argument calling the chooser, still `OJZ_Preset_Sec5` at `sec: 5`. Every
+ *     other section's `raster:` is still a hand-authored label, sections 6-8
+ *     still share `OJZ_Preset_Plain`, section 0 still binds `patched:`. So (a)
+ *     has not fired and (b) has not fired.
+ *   • `tools/effects_gen.py` — `ACT_RASTER_REF_KEY = "rasterRef"`,
+ *     `load_section_raster_refs`, the names-no-document refusal and the
+ *     non-string refusal are all still there.
+ *   • `tools/effects_seam_gate.py` — `raster_seam_faults` still carries the
+ *     case-3 arm and still names the section and the id. So the "no longer
+ *     SILENT" clause is still earned.
+ *   • `games/sonic4/data/editor/ojz/act1/` — still only `section_0.meta.json`
+ *     and `section_4.meta.json`, and NEITHER carries `rasterRef`. So (c) HAS
+ *     NOT FIRED, the seam gate's section arm is still vacuous, and the
+ *     sentence's last clause is still true word for word.
+ *
+ * THE RULING: a file in this lane's scratch handover is not a file in aeon's
+ * tree. `_load_section_refs` reads `<aeon repo>/<dataPath>/section_N.meta.json`
+ * — their checkout — and until the commit lands, `EditorRaster_OJZ_Act1_Bindings`
+ * is still 0 and nothing has been exercised end to end IN THEIR TREE. Retiring
+ * now would buy a sentence that is false today in exchange for one that would
+ * have become true later, which is the trade this whole header exists to refuse.
+ *
+ * ⚠ AND THE STRING'S REVISION WAS DELIBERATELY LEFT AT `9cdf32d8`. Re-pinning it
+ * to `1cbb6660` was considered and declined: every `9cdf32d8` in the sentence
+ * names the commit that ESTABLISHED a fact (the call site landed there), which
+ * is provenance, and provenance does not get fresher by being restamped. The
+ * freshness question — "and is it still so?" — is what this block answers, and
+ * it answers it with a revision, a date and a list of what was opened.
+ *
+ * WHAT FIRES IT, EXACTLY, so the next reader does not have to re-derive it:
+ * `games/sonic4/data/editor/ojz/act1/section_5.meta.json` appearing in aeon's
+ * tree with `"rasterRef": "ojz_sec5_showcase"`, alongside
+ * `games/sonic4/data/editor/effects/presets/ojz_sec5_showcase.json`. When it
+ * does, the LAST clause is the one that goes false first (the vacuity and the
+ * never-exercised claim), and the case split must stay a case split keyed on
+ * the SECTION NUMBER — "a bound section plays" is the wording that goes wrong
+ * silently the first time someone binds section 6, and section 6 is exactly the
+ * case aeon's seam gate was measured refusing.
+ *
+ * ⚠ THE BINDING BEING CARRIED IS STILL NOT THE BAND BEING SEEN. Running aeon's
+ * own `tools/effects_gen.py emit` over a scratch copy carrying both documents
+ * emits `EditorRaster_OJZ_Act1_ojz_sec5_showcase`, moves
+ * `EditorRaster_OJZ_Act1_Bindings` to 1 and puts
+ * `if sec == 5 { out = EditorRaster_OJZ_Act1_ojz_sec5_showcase }` in the
+ * chooser — measured, not assumed. That closes the GENERATOR seam and closes
+ * nothing else: no ROM was built, no emulator was run, and no CRAM was sampled,
+ * so `NO_PREVIEW`'s subject is untouched and nothing here may start implying a
+ * band has been looked at.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
  * IF AEON EVER PUBLISHES THE WIRED SET: WHAT THIS EDITOR MAY AND MAY NOT DO
  * ═══════════════════════════════════════════════════════════════════════════
  *
