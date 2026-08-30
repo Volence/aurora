@@ -246,19 +246,37 @@ wave-2 names (`fires`, `variants`, `cycles`) are refused BY NAME rather than as
 typos, and an invalid document is refused with the specific issues and consumes
 no undo step.
 
-**Saving a preset does not install it, and there is no `assign_section_preset`.**
-Nothing binds a preset to a section. `SectionMeta` carries `bgLayoutRef`,
-`paletteRef`, `rasterRef` and `sceneRef`, and `rasterRef` **is** the per-section
-preset binding (empyrean `docs/AURORA_EFFECTS_SCHEMA.md` §3.1, adjudicated
-2026-08-30 — **not** `effectsRef`, which stays reserved and unspent for a *total*
-binding). But Aurora only **preserves** it: no tool here writes a `rasterRef`, and
-aeon's generator does not read one yet. A programmer
-binds a preset by hand in aeon's `.emp`. `list_effects_presets` says this in its
-own reply (`sectionBinding`) rather than shipping an all-nulls section column
-that would read as "assigned to nothing". Nor has anyone in the suite ever
-looked at one of these bands on screen, so nothing anywhere checks that a band
-is VISIBLE — a legal band over an unused palette entry builds green and shows
-nothing.
+**`assign_section_preset`** assigns which raster preset a section uses — `rasterRef` in that section's
+`.meta.json` sidecar. A preset id, or `null` to unbind; absent and explicit-null
+are the same state for this key, exactly as for `sceneRef`. One undo step, and a
+re-send of the ref already there is not one. An id that is not a **readable**
+preset is refused, an unreadable file's id included: a ref the build cannot
+resolve is worse than no ref.
+
+`SectionMeta` carries `bgLayoutRef`, `paletteRef`, `rasterRef` and `sceneRef`,
+and `rasterRef` **is** the per-section preset binding (empyrean
+`docs/AURORA_EFFECTS_SCHEMA.md` §3.1, adjudicated 2026-08-30 — **not**
+`effectsRef`, which stays reserved and unspent for a *total* binding, since a
+preset document supplies only the raster channel of aeon's eight-channel
+`EffectsPreset`).
+
+**Saving a preset does not install it, and neither does binding one.** No aeon
+consumer reads a `rasterRef` yet — the key appears zero times in aeon's
+`tools/EFFECTS_CONSUMER_CONTRACT.md` and `tools/effects_gen.py` resolves
+`sceneRef` only — so nothing bakes the binding into a ROM and a programmer still
+installs the preset by hand in aeon's `.emp`. This tool therefore reports that
+limit **on its success reply**, not only on a refusal, for the reason
+`assign_section_bg` states: a tool that reports success for a binding nothing
+bakes misleads its caller. It is one sentence
+(`src/core/formats/raster-binding.ts`) shared by the reply, the published tool
+descriptions and the band-preset panel's own author-facing limit, so the three
+cannot describe it differently. `list_effects_presets` reports it too, beside a
+per-section `sections` column that reads the same key back.
+
+There is still **no per-section raster select in the UI** — ROADMAP row 93's
+remaining half — and nobody in the suite has ever looked at one of these bands on
+screen, so nothing anywhere checks that a band is VISIBLE: a legal band over an
+unused palette entry builds green and shows nothing.
 
 ## Classic project tools
 
