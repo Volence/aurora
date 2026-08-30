@@ -947,11 +947,16 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
     // returned as `{ok:false}`.
     //
     // ⚠ THERE IS NO FOURTH TOOL HERE. `assign_section_preset` would be the
-    // mirror of `assign-section-scene`, and it cannot be written: `SectionMeta`
-    // is `{bgLayoutRef, paletteRef, sceneRef}` (core/formats/section-meta.ts)
-    // and carries no preset field, so there is no ref to write. That is ROADMAP
-    // row 93, gated on aeon landing `effectsRef` in the sidecar — and it is why
+    // mirror of `assign-section-scene`, and it is not written. `SectionMeta` is
+    // `{bgLayoutRef, paletteRef, rasterRef, sceneRef}`
+    // (core/formats/section-meta.ts) and the preset field now EXISTS —
+    // `rasterRef`, empyrean docs/AURORA_EFFECTS_SCHEMA.md §3.1, adjudicated
+    // 2026-08-30 — but Aurora only PRESERVES it round-trip; nothing here
+    // authors one, and aeon's generator does not yet read one. So the gap moved
+    // rather than closed, and it is still ROADMAP row 93 — and still why
     // `PRESET_LIMITS`' first limit says saving a preset does not install it.
+    //
+    // ⚠ NOT `effectsRef`: that reservation stays unspent for a TOTAL binding.
 
     case 'list-effects-presets': {
       requireProject();

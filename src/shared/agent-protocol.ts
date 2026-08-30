@@ -105,9 +105,16 @@ export type AgentRequest =
   // restated here. null deletes the preset.
   //
   // THERE IS NO `assign-section-preset`, and its absence is a fact rather than an
-  // omission: `SectionMeta` is `{bgLayoutRef, paletteRef, sceneRef}` and carries
-  // no preset binding, so there is nothing to write. ROADMAP row 93 tracks it and
-  // waits on aeon landing `effectsRef` in the sidecar.
+  // omission. `SectionMeta` is `{bgLayoutRef, paletteRef, rasterRef, sceneRef}`
+  // and DOES now carry the preset binding — `rasterRef`, adjudicated 2026-08-30
+  // (empyrean docs/AURORA_EFFECTS_SCHEMA.md §3.1), which Aurora's sidecar
+  // preserves round-trip. What is still missing is the other half: nothing in
+  // Aurora AUTHORS a `rasterRef`, and aeon's generator does not yet read one.
+  // ROADMAP row 93 tracks the authoring tool.
+  //
+  // ⚠ The key is NOT `effectsRef` — that reservation is deliberately unspent,
+  // because a preset document supplies only the raster channel of aeon's
+  // eight-channel EffectsPreset while `effectsRef` promises a TOTAL binding.
   | { kind: 'list-effects-presets' }
   | { kind: 'get-effects-preset'; id: string }
   | { kind: 'set-effects-preset'; id: string; preset: unknown | null }

@@ -74,7 +74,7 @@ function fixtureFiles(): Map<string, Uint8Array> {
 // Meta-sidecar fixture, as in aeon-load.test.ts: the well-formed text comes from
 // the serializer so it is the exact shape a previous save would have left.
 const META_PATH = 'data/ojz/act1/section_0.meta.json';
-const META_REFS = { bgLayoutRef: 'bg-cave', paletteRef: 'pal-dusk', sceneRef: null };
+const META_REFS = { bgLayoutRef: 'bg-cave', paletteRef: 'pal-dusk', rasterRef: null, sceneRef: null };
 const WELL_FORMED_META = serializeSectionMeta(META_REFS)!;
 // Truncated hand-edit: two bytes, not one — the well-formed text ends in the
 // canonical `}\n` (§8), and dropping only the newline leaves valid JSON.
@@ -90,9 +90,25 @@ const SCENE_META_ON_DISK = [
   '{',
   '  "bgLayoutRef": "bg-cave",',
   '  "paletteRef": "pal-dusk",',
+  '  "rasterRef": null,',
   '  "sceneRef": "canopy_dusk"',
   '}',
   '',   // aeon's shipped section_4.meta.json ends in exactly one newline (§8)
+].join('\n');
+
+// The same document with the raster-preset binding SET — schema §3.1's own
+// example body, adjudicated 2026-08-30 at empyrean `da91abce`. Hand-written for
+// the same reason as the one above: a serializer that dropped `rasterRef` would
+// drop it from a serializer-built fixture too, and the byte comparison would
+// pass while the key was being erased.
+const RASTER_META_ON_DISK = [
+  '{',
+  '  "bgLayoutRef": "bg-cave",',
+  '  "paletteRef": null,',
+  '  "rasterRef": "canopy_tint",',
+  '  "sceneRef": "canopy_dusk"',
+  '}',
+  '',
 ].join('\n');
 
 // ── Editable collision-plane fixture, as in aeon-load.test.ts ───────────────
@@ -307,7 +323,8 @@ describe('buildAeonSavePlan', () => {
       { legacyAtlasMerged: false });
     const written = plan.files.find((f) => f.path === META_PATH);
     expect(written).toBeDefined();
-    expect(parseSectionMeta(text(written!.bytes)!)).toEqual({ bgLayoutRef: null, paletteRef: null, sceneRef: null });
+    expect(parseSectionMeta(text(written!.bytes)!))
+      .toEqual({ bgLayoutRef: null, paletteRef: null, rasterRef: null, sceneRef: null });
   });
 
   // ---- sceneRef: the effects-arc assignment ref ----------------------------
@@ -364,7 +381,7 @@ describe('buildAeonSavePlan', () => {
     const written = plan.files.find((f) => f.path === META_PATH);
     expect(written).toBeDefined();
     expect(JSON.parse(text(written!.bytes)!)).toEqual({
-      bgLayoutRef: null, paletteRef: null, sceneRef: 'canopy_dusk',
+      bgLayoutRef: null, paletteRef: null, rasterRef: null, sceneRef: 'canopy_dusk',
     });
   });
 
@@ -389,7 +406,99 @@ describe('buildAeonSavePlan', () => {
     expect(written).toBeDefined();
     expect(text(written!.bytes)).toContain('"sceneRef"');
     expect(JSON.parse(text(written!.bytes)!)).toEqual({
-      bgLayoutRef: null, paletteRef: null, sceneRef: null,
+      bgLayoutRef: null, paletteRef: null, rasterRef: null, sceneRef: null,
+    });
+  });
+
+  // ---- rasterRef: the per-section raster-preset binding (schema §3.1) -------
+  // The same three properties as sceneRef above, and they need their OWN rows
+  // rather than a widened fixture: NOTHING IN AURORA AUTHORS `rasterRef`, so
+  // every guard on it has to construct the value itself. That is exactly the
+  // condition under which a ref gets dropped and no one notices — the hazard
+  // §6 item 1 names, and the reason aeon's lane is blocked on this landing.
+
+  /**
+   * THE contract property for the new key, measured on bytes on disk: a sidecar
+   * carrying `rasterRef` survives load -> save unchanged, alongside `sceneRef`
+   * and `bgLayoutRef` (empyrean docs/AURORA_EFFECTS_SCHEMA.md §3.1 at
+   * `da91abce`; the aeon half of the §8 amend is NOT landed yet — `rasterRef`
+   * appears zero times in tools/EFFECTS_CONSUMER_CONTRACT.md at aeon
+   * origin/master `8f670d5f`, which is the sequencing precondition working).
+   */
+  it('round-trips a rasterRef sidecar byte-for-byte through load -> save', async () => {
+    const files = fixtureFiles();
+    files.set(META_PATH, new TextEncoder().encode(RASTER_META_ON_DISK));
+    // Anti-vacuous on disk: the subject really is present, and really non-null.
+    expect(text(files.get(META_PATH))).toContain('"rasterRef": "canopy_tint"');
+
+    const fa = memFa(files);
+    const r = await loadAeonProject(fa, '/proj');
+    const section = r.project.zones[0].acts[0].sections[0]!;
+    // Anti-vacuous in memory: the load understood the file AND carries the ref,
+    // so the save below preserves a value rather than re-emitting a null.
+    expect(section.unreadable).toBeUndefined();
+    expect(section.rasterRef).toBe('canopy_tint');
+    expect(section.sceneRef).toBe('canopy_dusk');   // and did not eat its sibling
+
+    const plan = await buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
+      { legacyAtlasMerged: false });
+    const written = plan.files.find((f) => f.path === META_PATH);
+    expect(written).toBeDefined();
+    expect(text(written!.bytes)).toBe(RASTER_META_ON_DISK);
+  });
+
+  /**
+   * THE WIDENED WRITE CONDITION (§3.1): a section whose ONLY non-null ref is
+   * `rasterRef` MUST get a file. The four-ref document above stays byte-stable
+   * even with the write-condition site unaware of `rasterRef`, because the
+   * other refs keep it non-empty; this one does not — the sidecar simply stops
+   * being written, and aeon's binding vanishes with no error on any path.
+   */
+  it('writes a sidecar for a section whose only ref is rasterRef', async () => {
+    const files = fixtureFiles();
+    expect(files.has(META_PATH)).toBe(false);       // no sidecar to start from
+    const fa = memFa(files);
+    const r = await loadAeonProject(fa, '/proj');
+    const section = r.project.zones[0].acts[0].sections[0]!;
+    expect(section.bgLayoutRef).toBeNull();         // genuinely all-default...
+    expect(section.paletteRef).toBeNull();
+    expect(section.sceneRef).toBeNull();
+    section.rasterRef = 'canopy_tint';              // ...but for this one ref
+
+    const plan = await buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
+      { legacyAtlasMerged: false });
+    const written = plan.files.find((f) => f.path === META_PATH);
+    expect(written).toBeDefined();
+    expect(JSON.parse(text(written!.bytes)!)).toEqual({
+      bgLayoutRef: null, paletteRef: null, rasterRef: 'canopy_tint', sceneRef: null,
+    });
+  });
+
+  /**
+   * THE EXPLICIT-NULL CLEAR (§3.1). The cleared-overwrite body is its own
+   * hardcoded literal, separate from the serializer, and a ref missing from it
+   * resurrects on the next load — so an author who cleared a `rasterRef` would
+   * find it back.
+   */
+  it('names rasterRef in the cleared-overwrite body', async () => {
+    const files = fixtureFiles();
+    files.set(META_PATH, new TextEncoder().encode(RASTER_META_ON_DISK));
+    const fa = memFa(files);
+    const r = await loadAeonProject(fa, '/proj');
+    const section = r.project.zones[0].acts[0].sections[0]!;
+    expect(section.rasterRef).toBe('canopy_tint');  // there was something to clear
+    section.bgLayoutRef = null;
+    section.paletteRef = null;
+    section.sceneRef = null;
+    section.rasterRef = null;
+
+    const plan = await buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
+      { legacyAtlasMerged: false });
+    const written = plan.files.find((f) => f.path === META_PATH);
+    expect(written).toBeDefined();
+    expect(text(written!.bytes)).toContain('"rasterRef"');
+    expect(JSON.parse(text(written!.bytes)!)).toEqual({
+      bgLayoutRef: null, paletteRef: null, rasterRef: null, sceneRef: null,
     });
   });
 

@@ -124,7 +124,12 @@ export async function buildAeonSavePlan(
     }
 
     // Write meta sidecar (.meta.json) — scalar refs (bgLayoutRef,
-    // paletteRef, sceneRef). Written only when at least one ref is non-null; when
+    // paletteRef, rasterRef, sceneRef). A section whose ONLY non-null ref is
+    // `rasterRef` must get a file: the write condition widened with the key
+    // (empyrean docs/AURORA_EFFECTS_SCHEMA.md §3.1), and a widening missed here
+    // is how aeon's binding gets dropped on the floor rather than erased —
+    // same outcome, quieter.
+    // Written only when at least one ref is non-null; when
     // all refs are null we still OVERWRITE an existing sidecar (with
     // nulls) so a previously-saved ref that was cleared in-session cannot
     // resurrect on the next load. An exists probe gates that overwrite so
@@ -139,6 +144,7 @@ export async function buildAeonSavePlan(
       const metaJson = serializeSectionMeta({
         bgLayoutRef: section.bgLayoutRef,
         paletteRef: section.paletteRef,
+        rasterRef: section.rasterRef,
         sceneRef: section.sceneRef,
       });
       const metaPath = `${prefix}.meta.json`;
@@ -150,7 +156,8 @@ export async function buildAeonSavePlan(
         // this branch happened to know about when it was written: a ref missing
         // from the cleared body is a ref that resurrects on the next load.
         const clearedBytes = new TextEncoder().encode(
-          jsonFileText(JSON.stringify({ bgLayoutRef: null, paletteRef: null, sceneRef: null }, null, 2)));
+          jsonFileText(JSON.stringify(
+            { bgLayoutRef: null, paletteRef: null, rasterRef: null, sceneRef: null }, null, 2)));
         files.push({ path: metaPath, bytes: clearedBytes });
       }
     }

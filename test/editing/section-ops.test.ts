@@ -76,6 +76,11 @@ describe('cloneSection', () => {
     src.paletteRef = 'pal-dusk';
     src.bgLayoutRef = 'bg-cave';
     src.sceneRef = 'canopy_dusk';
+    // `rasterRef` is the one ref NOTHING in Aurora authors — no command, no
+    // panel, no agent tool — so the key-set guard below is the only other thing
+    // watching it, and that guard cannot see a `rasterRef: null` hardcoded into
+    // the clone. This row can.
+    src.rasterRef = 'canopy_tint';
     src.flags = 3;
     src.music = 7;
 
@@ -83,6 +88,7 @@ describe('cloneSection', () => {
     expect(clone.paletteRef).toBe('pal-dusk');
     expect(clone.bgLayoutRef).toBe('bg-cave');
     expect(clone.sceneRef).toBe('canopy_dusk');
+    expect(clone.rasterRef).toBe('canopy_tint');
     expect(clone.flags).toBe(3);
     expect(clone.music).toBe(7);
   });
@@ -103,6 +109,7 @@ describe('cloneSection', () => {
     // as a near-empty object the key-set comparison below is vacuously true.
     expect(Object.keys(src).length).toBeGreaterThanOrEqual(9);
     expect(Object.keys(src)).toContain('sceneRef');
+    expect(Object.keys(src)).toContain('rasterRef');
 
     const clone = cloneSection(src, 5, 'Renamed');
     expect(Object.keys(clone).sort()).toEqual(Object.keys(src).sort());
@@ -118,6 +125,7 @@ describe('cloneSection', () => {
     expect(clone.paletteRef).toBeNull();
     expect(clone.bgLayoutRef).toBeNull();
     expect(clone.sceneRef).toBeNull();
+    expect(clone.rasterRef).toBeNull();
   });
 
   /**

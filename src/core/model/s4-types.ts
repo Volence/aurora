@@ -208,6 +208,29 @@ export interface Section {
    * be named. Deleted with the act-level re-point.
    */
   sceneRef: string | null;
+  /**
+   * Raster-preset binding for this section: null = "this section keeps its
+   * hand-authored raster channel", else a preset-document id (empyrean
+   * docs/AURORA_EFFECTS_SCHEMA.md §3.1, adjudicated 2026-08-30). Persisted
+   * through the meta sidecar's `rasterRef`
+   * (src/core/formats/section-meta.ts), which aeon's effects generator will
+   * read; absent and explicit-null are the same state, exactly as for
+   * `sceneRef`.
+   *
+   * ⚠ NOT `effectsRef`, which stays RESERVED and UNSPENT: a preset document
+   * can only supply the raster channel of aeon's eight-channel EffectsPreset,
+   * so `effectsRef`'s promise of a TOTAL binding is deliberately kept for the
+   * day the document is total.
+   *
+   * ⚠ NOTHING IN AURORA WRITES THIS, and that is not the `parallaxRef` trap
+   * described above. `parallaxRef` was dead because it was written by the
+   * constructors and persisted by NOTHING; this one is loaded from the sidecar
+   * and written back to it, which is the entire reason it exists — aeon
+   * authors the binding, and Aurora's job is to not erase it. There is no
+   * per-section raster select in the UI and no `assign_section_preset` agent
+   * tool; ROADMAP row 93 tracks the authoring half.
+   */
+  rasterRef: string | null;
   flags: number;
   music: number;
 }
@@ -223,6 +246,7 @@ export function createSection(index: number, name: string): Section {
     paletteRef: null,
     bgLayoutRef: null,
     sceneRef: null,
+    rasterRef: null,
     flags: 0,
     music: 0,
   };
