@@ -823,6 +823,73 @@ export function setPresetNameCommand(
 //      is a refused program, not a tight one. A split therefore leaves ONE
 //      CLEAR LINE between the halves, and that line shows the base palette.
 //
+//      ═══ AND THAT SENTENCE IS A DATED CLAIM, NOT AN ENGINE LAW ═══
+//
+//      OVERLAP IS DESIGNED, NOT IMPOSSIBLE — aeon's own words, at the head of
+//      `check_intervals`, and the reason this paragraph carries an expiry
+//      instead of reading as physics. It shipped with ROADMAP row 94 stated as
+//      a law in five places; this is the ONE statement of it in this repo, and
+//      every other site quotes that sentence and points here rather than
+//      re-deriving the rule. What a prohibition with no date costs is not
+//      hypothetical: it is re-read by people who cannot tell "true today" from
+//      "true always", and nothing ever goes red when the world moves.
+//
+//        • WRITTEN 2026-08-30, verified against aeon `2e976223` — their
+//          `origin/master` at that moment, read with `git -C ../aeon show
+//          <rev>:<path>` and never out of anyone's working tree.
+//        • OWNER: aeon's lane. This is their engine rule and their design.
+//          This editor does not own it, does not vote on it, and must not
+//          pre-empt it.
+//        • WHAT WOULD END IT: their **effects tail Part A** — "runtime
+//          patchable-overlap resolution", BANKED 2026-08-17 by owner ruling
+//          (demand-pull), design COMPLETE and three-times swept
+//          (`docs/superpowers/specs/2026-08-17-effects-tail-design-v3.md`,
+//          r3.1, zero open mechanisms). Its stated revival condition is
+//          a real program that needs overlapping patchable bands — the
+//          expected one being an Aurora-authored multi-band showcase, which
+//          is to say: possibly a document written on THIS surface.
+//        • ⚠ AND PART A LANDING WOULD NOT, BY ITSELF, LET THESE BANDS ABUT.
+//          Two qualifications, both read at `2e976223`, and a reader who skips
+//          them will sit waiting for the wrong event:
+//            (a) Part A deletes `check_intervals`' disjointness wall for
+//                PATCHABLE-vs-PATCHABLE pairs ONLY — DEFERRED_WORK.md's own
+//                words are that statics stay sacrosanct via a symmetric
+//                comptime scan. A preset document emits `band()` calls
+//                (`tools/effects_gen.py`'s `render_band`), and `band()`'s
+//                header says it is Static by construction — BOTH fires, and
+//                not handable to `patchable`. So a route from a preset
+//                document to a patchable fire would have to exist too, and at
+//                this revision none does.
+//            (b) The ensure an abutting PAIR actually reaches is not
+//                `check_intervals`: `compose` merges the upper band's restore
+//                and the lower band's ON onto line L as ONE record, and it is
+//                `raster_program`'s restore-alone ensure (spec §4.2a, claim
+//                D-B — quoted above) that refuses it. Part A does not name
+//                that guard, and it is cost-founded rather than
+//                bookkeeping-founded.
+//        • RE-READ, at aeon's then-current master and NOT at `2e976223`, which
+//          is a revision and not "now": `docs/DEFERRED_WORK.md` ("Effects tail
+//          Part A" — whether it is still BANKED), `engine/effects/
+//          raster_dsl.emp` (`check_intervals`' GUARD 2 block, `band()`'s
+//          header, and `raster_program`'s restore-alone ensure) and
+//          `tools/effects_gen.py` (`render_band` — whether a preset document
+//          still lowers to a static `band()`).
+//        • EVALUATE, DO NOT OBEY. If Part A ships AND a preset band can become
+//          patchable, this paragraph is the lie it exists to prevent and the
+//          advisory below is over-strict — fix it then, against the artifact.
+//          If it is still banked, the paragraph is still true and nothing here
+//          moves. Do not re-bank the prohibition without re-reading; do not
+//          relax it because a design exists.
+//
+//      ⚠ AND THE ONE THING THIS IS NOT A LICENCE FOR. aeon's guard says it in
+//      as many words: do not relax it ad hoc, because every naive relaxation
+//      was proven unsound — three adjudications, 38 accepted defects, two of
+//      them latent regressions a green suite would not have caught. So nothing
+//      in this editor loosens on the strength of a banked design.
+//      `bandCollisionAdvisory` stays exactly as strict as it is, and a session
+//      that wants overlapping bands goes to aeon's design — never to this
+//      file's comparisons.
+//
 //   4. THE OWNERSHIP RULE — `check_band_ownership`, the per-CRAM-entry
 //      timeline, refuses two bands live on one entry at once:
 //        "Two bands may share colours only if they do not overlap vertically"
@@ -908,7 +975,17 @@ export const BAND_EDGE_LAW =
 export const BAND_ORDER_LAW =
   'a band covers top..bot-1, so top must stay above bot — the engine refuses top >= bot';
 
-/** Rule 3, as a sentence. The one a split is shaped by. */
+/**
+ * Rule 3, as a sentence. The one a split is shaped by.
+ *
+ * ⚠ THE SENTENCE IS UNCHANGED AND SO IS THE REFUSAL — but the rule it describes
+ * is DATED, not physics: see the GAP RULE block above (written 2026-08-30,
+ * owner aeon's lane, ends if their banked effects-tail Part A revives AND a
+ * preset band can become patchable). It is left as a flat present-tense
+ * statement on purpose: it is read by an AUTHOR mid-drag, who needs to know
+ * what today's build does, not who is going to change it. The provenance is
+ * owed to whoever edits this file, and it is one screen up.
+ */
 export const BAND_GAP_LAW =
   'two bands cannot fire on one screen line: compose merges same-line fires into ONE record, and '
   + "the restore's fire carries the restore ALONE — a second stream op cannot be placed in the same "
@@ -1030,7 +1107,10 @@ export function bandCollisionAdvisory(preset: EffectsPreset, index: number): str
 /**
  * What a split IS, said once, for the strip's hint and for the refusal.
  *
- * The one-clear-line half is not a policy choice — see rule 3 above.
+ * The one-clear-line half is not a policy choice — see rule 3 above, INCLUDING
+ * its dated-claim block: the clear line is what aeon's build requires as of
+ * 2026-08-30, not a law of the hardware, and the sentence an author reads stays
+ * present-tense for the reason `BAND_GAP_LAW`'s docblock gives.
  */
 export const BAND_SPLIT_LAW =
   'A split cuts one band into two over the same ON op, and leaves the cut line CLEAR: the upper '
@@ -1043,6 +1123,12 @@ export const BAND_SPLIT_LAW =
  * COMPUTED FROM THE TWO INEQUALITIES rather than written as 3, so it moves if
  * either of them does: the upper half needs `top < cut` and the lower half needs
  * `cut + 1 < bot`, so a legal cut exists exactly when `bot - top >= 1 + 2`.
+ *
+ * ⚠ THE `+ 1` IN `cut + 1` IS THE GAP RULE, AND THE GAP RULE IS DATED. It is
+ * the one term here that comes from aeon rather than from arithmetic — see the
+ * GAP RULE block above for its date, its owner and what would retire it. If
+ * that rule ever goes, this function is where the 3 stops being 3, which is
+ * exactly why the 3 was never written down.
  */
 export function bandSplitMinHeight(): number {
   const shortestHead = 1;      // cut - top, at its minimum (top < cut)
@@ -1074,7 +1160,8 @@ export function bandSplitLine(band: EffectsPresetBand, requested: number): numbe
  * `compose` emits by SCREEN LINE (`for line in 3..224`), so the ownership walk
  * reads the two halves in line order whatever order they sit in `bands`. Array
  * order would decide that walk only for two fires ON ONE LINE — which rule 3
- * refuses anyway. Adjacency here is for the author reading the panel's list.
+ * refuses anyway, at the revision the GAP RULE block above names. Adjacency
+ * here is for the author reading the panel's list.
  *
  * THE BAND ID CANNOT COLLIDE, structurally: aeon derives it as
  * `band_id = top * 128 + sa`, the halves share `sa` (they share the ON op) and

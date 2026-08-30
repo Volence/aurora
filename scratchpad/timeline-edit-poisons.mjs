@@ -57,8 +57,19 @@ const PLANTS = [
     mustStayGreen: ['ABUTTING BANDS ARE REFUSED', 'the floor is the PROVIDER'],
   },
   {
+    // ⚠ WHAT THIS PLANT IS AND IS NOT TESTING. It proves the editor still cuts
+    // at L and starts the lower half at L+1 — i.e. that the rows watching the
+    // gap rule are alive. It does NOT prove the gap rule itself, which is
+    // aeon's and is DATED: abutting bands do not build at aeon `2e976223`, but
+    // OVERLAP IS DESIGNED, NOT IMPOSSIBLE (their `check_intervals` comment; a
+    // swept runtime-resolution design is banked, owner aeon's lane). The claim
+    // is stated once, with date/owner/expiry/re-read list, in the GAP RULE block
+    // of `src/renderer/providers/effects-preset.ts`. If it ever retires, this
+    // plant does not become wrong — it becomes a plant about a choice rather
+    // than about a constraint, and its `what` below should say so then.
     id: 'P2',
-    what: 'THE GAP RULE — a split leaves its halves ABUTTING, which does not build',
+    what: 'THE GAP RULE (aeon 2e976223, dated) — a split leaves its halves ABUTTING, '
+      + 'which does not build today',
     file: PROVIDER,
     find: "      top: cut + 1, bot: b.bot, sh: b.sh, on: structuredClone(b.on),",
     with: "      top: cut, bot: b.bot, sh: b.sh, on: structuredClone(b.on),",

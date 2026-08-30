@@ -24,6 +24,8 @@
 // fails on a single null.
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   bandCramSpan, bandFireLines, bandEdgeBounds, clampBandEdge, bandEdgeNotice,
   bandCollisionAdvisory, bandSplitRefusal, bandSplitLine, bandSplitMinHeight,
@@ -174,6 +176,16 @@ describe('what one band collides with in the rest of the preset', () => {
     // The rule that decides what a split is. `compose` merges same-line fires
     // into ONE record and `raster_program` refuses it: "the restore's fire
     // carries the restore ONLY".
+    //
+    // ⚠ "REFUSED" IS THE ADVISORY'S VERB, AND THE ENGINE'S IS DATED. This row
+    // asserts what `bandCollisionAdvisory` SAYS, which is a fact about this
+    // editor and does not expire. What it says ABOUT is aeon's rule at
+    // `2e976223`, and that one does: OVERLAP IS DESIGNED, NOT IMPOSSIBLE (their
+    // `check_intervals` comment — a swept runtime-resolution design is banked,
+    // owner aeon's lane). Date, expiry and re-read list live in the GAP RULE
+    // block of `effects-preset.ts`. If it retires, this row does not silently
+    // become wrong — it becomes a row about an over-strict advisory, which is
+    // the failure mode worth being able to see.
     const p = preset([band(40, 80), band(80, 120)]);
     expect(bandCollisionAdvisory(p, 0)).toContain('both fire on screen line 80');
     expect(bandCollisionAdvisory(p, 0)).toContain(BAND_GAP_LAW);
@@ -345,5 +357,138 @@ describe('the numbers this module refuses to copy out of the engine', () => {
     // The two numbers it MAY name are the two that live in shipped engine code,
     // and it names them by importing them.
     expect(BAND_EDGE_LAW).toContain(`${MIN}..${MAX}`);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THE GAP RULE IS A DATED CLAIM, AND THE SITES THAT STATE IT ARE ENUMERATED
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠ WHY THESE ROWS EXIST AT ALL. "Abutting bands do not build" landed with this
+// parcel as an ENGINE LAW — in a comment, in the roadmap row, in the lane log,
+// in the poison list and in the CDP harness's own message. It is true today and
+// it is an INTERIM POSITION: aeon banked a complete, three-times-swept runtime
+// overlap-resolution design on 2026-08-17 (DEFERRED_WORK.md, "Effects tail Part
+// A"), and their own `check_intervals` comment opens "OVERLAP IS DESIGNED, NOT
+// IMPOSSIBLE". A prohibition with no date, no owner and no expiry is the exact
+// shape this repo has been burned by twice: nothing re-reads it to ask whether
+// it still holds, so it survives its own defect.
+//
+// So the claim is stated ONCE, in `effects-preset.ts`'s GAP RULE block, with a
+// date, an owner, a revival condition, a re-read list and an evaluate-do-not-
+// obey line. Every OTHER site quotes aeon's sentence and points at that block
+// rather than re-deriving the law, and the rows below are what make that
+// checkable instead of quotable.
+//
+// ⚠ THE MATCHER TRAP, WHICH THIS SURFACE HAS ALREADY HIT ONCE TODAY. A phrase
+// loose enough to match a NEIGHBOURING rule's wording reports coverage forever
+// without having any (`band-preset-wording.test.ts`'s "LIMIT 1's anchors match
+// LIMIT 1 and nothing else"). Rules 1, 2 and 4 sit in the same comment and say
+// "band", "fire", "line" and "refuses" too — so every anchor below is asserted
+// to appear EXACTLY ONCE in the whole file, and the anti-vacuous half runs
+// first so an anchor that fell out of the source fails as absent rather than
+// passing the uniqueness half trivially.
+
+const REPO_ROOT = join(__dirname, '..', '..', '..', '..');
+
+/** A file's text with `//` comment markers and line wrapping flattened away. */
+function flatten(rel: string): string {
+  return readFileSync(join(REPO_ROOT, rel), 'utf8')
+    .split('\n')
+    // Both comment markers, because the sites span `//` files, `/** */` blocks,
+    // a markdown table cell and a JSONL record — and a claim that wraps mid-
+    // sentence must still be findable as one sentence.
+    .map((l) => l.replace(/^\s*(\/\/|\*)\s?/, ''))
+    .join(' ')
+    .replace(/\s+/g, ' ');
+}
+
+/**
+ * EVERY SITE IN THIS REPO THAT STATES THE PROHIBITION. Enumerated, so the count
+ * is checkable rather than quotable — following one PHRASE finds every site that
+ * spells it that way and misses every site that says it differently
+ * (`core/formats/section-meta.ts`'s method bar).
+ *
+ * The merge commit's own message says it too and is NOT on this list: a commit
+ * message cannot be rewritten without rewriting history, and this branch does
+ * not. That is recorded here rather than left as a gap someone re-finds.
+ */
+const CLAIM_SITES = [
+  'src/renderer/providers/effects-preset.ts',
+  'src/renderer/canvas/raster-timeline.ts',
+  'src/renderer/providers/__tests__/effects-preset-timeline.test.ts',
+  'src/renderer/canvas/__tests__/raster-timeline.test.ts',
+  'scratchpad/timeline-edit-poisons.mjs',
+  'scratchpad/timeline-edit-harness.mjs',
+  'docs/ROADMAP.md',
+  'docs/lane-log.jsonl',
+] as const;
+
+const PROVIDER = 'src/renderer/providers/effects-preset.ts';
+
+describe('the gap rule is banked with an expiry, not asserted as an engine law', () => {
+  it('the canonical block carries the date, the owner, the expiry and the re-read list', () => {
+    const t = flatten(PROVIDER);
+    // The claim is still MADE — this is not a licence to delete it.
+    expect(t).toMatch(/SO ABUTTING BANDS DO NOT BUILD/);
+    // ...and it is dated, owned, and given an end condition.
+    expect(t).toMatch(/WRITTEN 2026-08-30, verified against aeon `2e976223`/);
+    expect(t).toMatch(/OWNER: aeon's lane/);
+    expect(t).toMatch(/effects tail Part A/);
+    expect(t).toMatch(/BANKED 2026-08-17 by owner ruling/);
+    expect(t).toMatch(/a real program that needs overlapping patchable bands/);
+    // The two qualifications that stop a reader waiting for the wrong event.
+    expect(t).toMatch(/PATCHABLE-vs-PATCHABLE pairs ONLY/);
+    expect(t).toMatch(/statics stay sacrosanct/);
+    expect(t).toMatch(/Static by construction/);
+    // Re-read at their THEN-CURRENT master, never at the pinned revision.
+    expect(t).toMatch(/at aeon's then-current master and NOT at `2e976223`/);
+    expect(t).toMatch(/docs\/DEFERRED_WORK\.md/);
+    expect(t).toMatch(/engine\/effects\/raster_dsl\.emp/);
+    expect(t).toMatch(/tools\/effects_gen\.py/);
+    expect(t).toMatch(/EVALUATE, DO NOT OBEY/);
+  });
+
+  it('and it forbids the relaxation it could be misread as licensing', () => {
+    const t = flatten(PROVIDER);
+    // aeon's own instruction, carried verbatim rather than paraphrased: a
+    // paraphrase is how "a design exists" becomes "so we can loosen ours".
+    expect(t).toMatch(/every naive relaxation was proven unsound/);
+    expect(t).toMatch(/stays exactly as strict as it is/);
+  });
+
+  it('the canonical anchors are the GAP RULE block\'s alone — appearing exactly once', () => {
+    const raw = flatten(PROVIDER);
+    const anchors = [
+      /WRITTEN 2026-08-30, verified against aeon `2e976223`/g,
+      /BANKED 2026-08-17 by owner ruling/g,
+      /PATCHABLE-vs-PATCHABLE pairs ONLY/g,
+      /at aeon's then-current master and NOT at `2e976223`/g,
+      /EVALUATE, DO NOT OBEY/g,
+      /every naive relaxation was proven unsound/g,
+    ];
+    for (const re of anchors) {
+      const n = (raw.match(re) ?? []).length;
+      // ANTI-VACUOUS FIRST: absent reads as absent, not as unique.
+      expect(n, `${re.source} appears ${n} times, not once`).toBe(1);
+    }
+  });
+
+  it('every enumerated site carries aeon\'s sentence and points at the canonical block', () => {
+    // THE COUNT IS THE DELIVERABLE. A site added or dropped without this number
+    // moving is the failure this row exists for.
+    expect(CLAIM_SITES.length).toBe(8);
+    for (const rel of CLAIM_SITES) {
+      const t = flatten(rel);
+      // ANTI-VACUOUS: a file that no longer states the claim does not belong on
+      // the list, and must fail here rather than pass by saying nothing.
+      expect(t, `${rel} no longer states the claim — take it off CLAIM_SITES`)
+        .toMatch(/abutting/i);
+      expect(t, `${rel} states the prohibition without aeon's own qualification`)
+        .toMatch(/OVERLAP IS DESIGNED, NOT IMPOSSIBLE/i);
+      if (rel === PROVIDER) continue;
+      expect(t, `${rel} re-derives the law instead of pointing at the one statement`)
+        .toMatch(/effects-preset\.ts/);
+    }
   });
 });

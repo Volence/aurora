@@ -415,6 +415,15 @@ export const RASTER_TIMELINE_GRAMMAR =
  * founding defect one turn later. `BAND_SPLIT_LAW` carries WHY the cut line goes
  * clear; this carries WHAT to do, and the two are separate sentences because one
  * is about the hardware and one is about the mouse.
+ *
+ * ⚠ AND "ABOUT THE HARDWARE" OVERSTATES IT. The cut line goes clear because
+ * ABUTTING BANDS DO NOT BUILD at aeon `2e976223` — a dated claim about their
+ * current guards, not a property of the VDP. OVERLAP IS DESIGNED, NOT
+ * IMPOSSIBLE (their `check_intervals` comment); a swept runtime-resolution
+ * design is banked. Stated ONCE, with its date, owner, expiry and re-read list,
+ * in the GAP RULE block of `providers/effects-preset.ts` — go there before
+ * writing anything new about it here, and do not relax anything on the strength
+ * of the banked design.
  */
 export const RASTER_TIMELINE_GESTURES =
   'Drag a band edge in the left column to move it. Double-click (or Alt-click) inside a band '

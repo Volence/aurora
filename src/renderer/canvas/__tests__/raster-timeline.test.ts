@@ -454,7 +454,16 @@ function pband(top: number, bot: number, addr = 74, words = 1): EffectsPresetBan
 function pset(bands: EffectsPresetBand[]): EffectsPreset {
   return { schema: 1, id: 'strip_preset', bands };
 }
-/** Two bands, distinct and non-trivial, one clear line apart — a legal program. */
+/**
+ * Two bands, distinct and non-trivial, one clear line apart — a legal program.
+ *
+ * ⚠ "LEGAL" IS DATED. ABUTTING BANDS DO NOT BUILD at aeon `2e976223`, which is
+ * why this fixture leaves a gap — but OVERLAP IS DESIGNED, NOT IMPOSSIBLE (their
+ * `check_intervals` comment: a swept runtime-resolution design is banked). The
+ * claim is stated once, with its date, owner and expiry, in the GAP RULE block
+ * of `providers/effects-preset.ts`. If it retires, this fixture stops being the
+ * only legal shape — it does NOT become wrong, so nothing here has to move.
+ */
 function twoBands(): EffectsPreset {
   return pset([pband(40, 90), pband(120, 176)]);
 }
