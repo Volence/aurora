@@ -15,7 +15,9 @@ import { useAeonHistoryVersion } from '../../hooks/useHistoryVersion';
 import { useToastStore } from '../../state/toastStore';
 import type { ChunkDef } from '../../../core/model/s4-types';
 import type { AnyCommand } from '../../../core/editing/commands';
-import { buildActPropagationCommand } from '../../../core/editing/chunk-links';
+import {
+  buildActPropagationCommand, findOutOfActChunkCopies, describeOutOfActChunkCopies,
+} from '../../../core/editing/chunk-links';
 import { Panel, CollapsibleSection, T } from '../../components/ui';
 import ArtToolDock from '../../shell/ArtToolDock';
 import ArtToolOptions from '../../shell/ArtToolOptions';
@@ -115,6 +117,10 @@ function handleSave() {
   }
 
   let saved: ChunkDef | undefined;
+  /** Set on the EDIT path only: the sentence naming the linked copies this
+   *  act-scoped propagation did not reach, or null when there are none. A NEW
+   *  chunk has no copies anywhere yet, so the add path leaves it null. */
+  let outOfActNote: string | null = null;
   if (o.chunkId !== null) {
     const chunk = existingChunk!;
     const setChunk: AnyCommand = {
@@ -162,6 +168,19 @@ function handleSave() {
     // keep their links and are not updated here. `buildActPropagationCommand`
     // is indexed by flat act slot and one command belongs to one act's undo
     // stack; a cross-act step would be undoable from a tab it did not belong to.
+    //
+    // ...AND THE LIMIT IS NOW REPORTED RATHER THAN SILENT. `outOfAct` below
+    // names every act that still links this chunk and was not reached, and the
+    // save toast says so. The panel's sentence (CHUNK_LINK_LINKED_BLURB) states
+    // the same scope. Before 2026-08-30 the panel promised "every copy" and
+    // nothing here contradicted it, so a second act's stamps diverged unseen.
+    // The reasoning behind reporting rather than propagating is written out at
+    // the top of chunk-links.ts's out-of-act section.
+    const outOfAct = findOutOfActChunkCopies({
+      chunkId: chunk.id,
+      zones: pstate.project.zones,
+      currentAct: level.act ?? null,
+    });
     const propagation = buildActPropagationCommand({
       chunk: {
         ...chunk,
@@ -180,6 +199,7 @@ function handleSave() {
         commands: [setChunk, propagation],
       }
       : setChunk, level);
+    outOfActNote = describeOutOfActChunkCopies(outOfAct);
     saved = chunk;
   } else {
     saved = {
@@ -207,11 +227,16 @@ function handleSave() {
     name: saved.name,
     dirty: false,
   });
+  // A WARNING, not a success, when copies survived outside the act: nothing
+  // FAILED, but "your other act still shows the old art" is a sentence that has
+  // to be ACTED on, and toastStore's 2.2s success dwell is not enough time to
+  // read one (see toastStore.dwellMs — the warning tier exists for exactly this
+  // shape). With no out-of-act copies the toast is byte-for-byte the old one.
   useToastStore.getState().addToast(
     o.chunkId !== null
-      ? `Saved chunk "${saved.name}"`
+      ? (outOfActNote ? `Saved chunk "${saved.name}" — ${outOfActNote}` : `Saved chunk "${saved.name}"`)
       : `Added "${saved.name}" to chunk library — Save project to keep`,
-    'success');
+    outOfActNote ? 'warning' : 'success');
 }
 
 function ArtCanvas() {

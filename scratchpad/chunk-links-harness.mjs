@@ -15,6 +15,12 @@
 //   2   the checkbox exists, is UNCHECKED, and the store agrees. The ruling's
 //       default is REMEMBER, and a checkbox defaulted the other way would look
 //       identical in a screenshot.
+//   2b  the panel's explanatory sentence PAINTS the ACT-scoped promise, and is
+//       the live paragraph — it changes when the checkbox is really clicked and
+//       changes back. It used to promise "every copy" while propagation reached
+//       one act; the words themselves are asserted in node
+//       (core/editing/__tests__/chunk-links-cross-act.test.ts), this row is
+//       only "and they reach the screen".
 //   3   a real stamp click records a placement over the WHOLE footprint, with
 //       the armed chunk's id. Prints the plane readout it judges.
 //   4   hovering the stamped region makes the panel NAME it — both the store
@@ -224,6 +230,40 @@ async function main() {
     check('2', "the stamp-time checkbox exists, is UNCHECKED, and the store agrees — d-18c's default is REMEMBER",
       boxState.found === true && boxState.checked === false && storeDetached === false,
       `checkbox=${JSON.stringify(boxState)} store.stampDetached=${storeDetached}`);
+
+    // ── Row 2b: THE PANEL'S SENTENCE SAYS WHAT THE MECHANISM DOES ───────────
+    //
+    // The panel used to promise "editing the chunk later updates every copy"
+    // while `buildActPropagationCommand` reaches ONE ACT and the chunk library
+    // is project-wide — so a stamp of the same chunk in a second act kept its
+    // link, was never re-stamped, and diverged in silence. The words are
+    // asserted for real in node (chunk-links-cross-act.test.ts, on the exported
+    // constants); what node cannot see is whether they PAINT, which is this row.
+    //
+    // ANTI-VACUOUS BY TOGGLE, not by a substring alone: the checkbox is really
+    // clicked and the paragraph must CHANGE to the detached wording and back.
+    // A static string baked anywhere else in the DOM, or a stale render, fails
+    // that even though it would satisfy a bare "contains IN THIS ACT".
+    const scopeText = () => c.evalExpr(
+      '(document.querySelector(\'[data-testid="chunk-link-scope"]\') || {}).textContent || ""');
+    const blurbLinked = await scopeText();
+    await c.evalExpr(
+      'document.querySelector(\'input[aria-label="Detach on stamp"]\').click()');
+    await sleep(300);
+    const blurbDetached = await scopeText();
+    await c.evalExpr(
+      'document.querySelector(\'input[aria-label="Detach on stamp"]\').click()');
+    await sleep(300);
+    const blurbBack = await scopeText();
+    check('2b', 'the panel PAINTS the act-scoped promise, and it is the live paragraph (it changes when the checkbox is toggled and changes back)',
+      blurbLinked.includes('IN THIS ACT')
+      && blurbLinked.includes('other acts')
+      && !/updates every copy (that )?you have not/i.test(blurbLinked)
+      && blurbDetached.includes('will NOT change them')
+      && blurbDetached !== blurbLinked
+      && blurbBack === blurbLinked,
+      `linked=${JSON.stringify(blurbLinked)}\n        detached=${JSON.stringify(blurbDetached)}\n`
+      + `        back=${JSON.stringify(blurbBack)}`);
 
     // Deterministic camera; section 0 sits at world (0,0) whatever the grid is.
     await c.evalExpr('window.__dbg.setView(0, 0, 1)');
