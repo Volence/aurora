@@ -22,10 +22,11 @@ import { parseTiles } from '../../src/core/formats/tiles';
 import { S1_NAMED_ART_DOCS } from '../../src/core/project/profiles/s1-object-art';
 import type { ObjectArtLink } from '../../src/core/project/profiles/s1-object-art';
 import type { Tile } from '../../src/core/model/s4-types';
+import { referenceCheckout, referenceCheckoutReason, referencePath } from '../support/fixture-tree';
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
+const S1_ABSENT = referenceCheckoutReason('s1disasm');
 const read = (rel: string) => new Uint8Array(fs.readFileSync(path.join(S1DIR, rel)));
 const readText = (rel: string) => fs.readFileSync(path.join(S1DIR, rel), 'utf8');
 const decode = (rel: string, comp: 'nemesis' | 'uncompressed') =>
@@ -114,7 +115,7 @@ function expectedFrameCount(key: string, link: ObjectArtLink): number {
   return FRAME_COUNTS[key];
 }
 
-describe('S1 non-level families — every row: real files, real render', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
+describe('S1 non-level families — every row: real files, real render', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
   it('covers exactly the transcribed family set (a new row must bring its pins)', () => {
     expect([...Object.keys(FRAME_COUNTS), ...Object.keys(GRID_GEOMETRY)].sort())
       .toEqual(FAMILIES.map(([k]) => k).sort());
@@ -202,7 +203,7 @@ describe('S1 non-level families — every row: real files, real render', { skip:
   });
 });
 
-describe('family-specific pins (hand-transcribed from the disasm)', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
+describe('family-specific pins (hand-transcribed from the disasm)', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
   it('shield: stars frames 4-7 index Nem_Stars frame-local — tile $23 max, beyond Shield.nem\'s 27 tiles', () => {
     // _maps/Shield and Invincibility.asm .stars3/.stars4 reference tiles up to
     // $1B+9-1; Shield.nem decodes to 27 tiles ($1B) so WITHOUT the per-frame

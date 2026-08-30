@@ -25,11 +25,12 @@ import { resolveEffectiveObjectArt } from '../../project/profiles/object-subtype
 import { layoutCellAt } from '../../../renderer/components/classic/viewport-math';
 import { s1Adapter } from '../../project/s1';
 import type { FileAccess } from '../../project/adapter';
+import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
-const S1_PRESENT = fs.existsSync(S1DIR);
+const S1_ABSENT = referenceCheckoutReason('s1disasm');
+const S1_PRESENT = referenceCheckout('s1disasm');
 
 describe('occlusionWinner truth table', () => {
   it('high plane tile + opaque map pixel occludes a LOW sprite pixel', () => {

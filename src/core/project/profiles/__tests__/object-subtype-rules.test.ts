@@ -9,10 +9,11 @@ import {
   ruleObjectIdsAnyZone,
 } from '../object-subtype-rules';
 import { resolveObjectArt } from '../s1-object-art';
+import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../../test/support/fixture-tree';
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
+const S1_ABSENT = referenceCheckoutReason('s1disasm');
 
 describe('object-subtype-rules', () => {
   describe('objectHasSubtypeRule / objectArtKey', () => {
@@ -289,7 +290,7 @@ describe('object-subtype-rules', () => {
     });
   });
 
-  describe('composed frame against real s1disasm', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
+  describe('composed frame against real s1disasm', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
     it('a subtype-$0C bridge composes a non-empty ~192px-wide frame', async () => {
       const { composeObjectFramesFromFiles } = await import('../../../level-classic/object-sprite');
       const set = resolveObjectPieces(0x11, 'ghz', 0x0c)!;

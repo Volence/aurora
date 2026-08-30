@@ -17,10 +17,11 @@ import type { FileAccess } from '../../project/adapter';
 import type { LevelDoc } from '../model';
 import type { SpriteFrame } from '../../model/sprite-types';
 import type { Tile } from '../../model/s4-types';
+import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
+const S1_ABSENT = referenceCheckoutReason('s1disasm');
 
 function realFs(root: string): FileAccess {
   return {
@@ -179,7 +180,7 @@ describe('object-sprite pure helpers', () => {
     });
   });
 
-  describe('B6 golden: LevelArt + offset-art against real s1disasm', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
+  describe('B6 golden: LevelArt + offset-art against real s1disasm', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
     let ghz1: LevelDoc;
     beforeAll(async () => {
       const handle = await s1Adapter.open(realFs(S1DIR));
@@ -245,7 +246,7 @@ describe('object-sprite pure helpers', () => {
     });
   });
 
-  describe('golden render against real s1disasm', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
+  describe('golden render against real s1disasm', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
     function render(id: number, zone: string) {
       const link = resolveObjectArt(id, zone);
       if (!link) throw new Error(`no link for $${id.toString(16)}`);

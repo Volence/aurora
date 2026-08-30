@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import { renderChunk, renderTile } from '../render';
 import { s1Adapter } from '../../project/s1';
+import { referencePath } from '../../../../test/support/fixture-tree';
 import type {
   LevelDoc,
   BlockDef,
@@ -279,7 +280,7 @@ describe('renderChunk', () => {
 // tree stays green.
 // ---------------------------------------------------------------------------
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 
 function realFs(root: string) {
   return {

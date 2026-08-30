@@ -7,6 +7,7 @@ import { tileLockReason } from '../editable-tiles';
 import { buildUsageIndex } from '../../level-classic/usage-index';
 import { buildChunkSurface } from '../../art/classic-surface-buffer';
 import { planSurfaceEdit, type SurfaceWrite } from '../../art/classic-surface-plan';
+import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
 
 // ---------------------------------------------------------------------------
 // Task 5c, T5 — the regression test that would have caught the bug this whole
@@ -22,10 +23,10 @@ import { planSurfaceEdit, type SurfaceWrite } from '../../art/classic-surface-pl
 // editable-tiles.test.ts's S1_PRESENT gate.
 // ---------------------------------------------------------------------------
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
-const S1_PRESENT = fs.existsSync(S1DIR);
+const S1_ABSENT = referenceCheckoutReason('s1disasm');
+const S1_PRESENT = referenceCheckout('s1disasm');
 
 function realFs(root: string): FileAccess {
   return {

@@ -16,7 +16,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync, mkdtempSync, writeFileSync, rmSync } from 'fs';
-import { describeRequiringFixture } from '../../../../test/support/fixture-tree';
+import { describeRequiringFixture, referencePath } from '../../../../test/support/fixture-tree';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
@@ -24,7 +24,7 @@ import {
   sonicSpecialScripts,
 } from '../sonic-anim-import';
 
-const SONIC_ASM = '/home/volence/sonic_hacks/s1disasm/_anim/Sonic.asm';
+const SONIC_ASM = referencePath('s1disasm', '_anim/Sonic.asm');
 /**
  * `describe`, but a skip here says WHY — read by scripts/skip-report-reporter.mjs.
  * The bare `treePresent ? describe : describe.skip` this replaced produced rows
