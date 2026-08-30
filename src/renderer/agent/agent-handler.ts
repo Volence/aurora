@@ -1105,7 +1105,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       // one did. There, `changed: true` at least buys a repaint: the viewport
       // composites the assigned background and only the ROM half is missing.
       // Here the ref reaches aeon's GENERATOR and then goes exactly as far as
-      // the SECTION allows: at aeon `9cdf32d8` section 5's `preset()` threads
+      // the SECTION allows: at aeon `6e2495a5` section 5's `preset()` threads
       // the chooser and no other section's does, and NOTHING on this side can
       // tell the caller which of those they just did — `req.section` is a number
       // this handler does not interpret. Nor is there an observable consequence

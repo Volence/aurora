@@ -243,7 +243,12 @@ export interface Section {
    * hand-authored label, so a `rasterRef` on section 6 is written, counted by
    * aeon's witness, and consumed by nothing (aeon's own
    * `tools/effects_seam_gate.py` refuses a full build for that, naming the
-   * section — but that is aeon's build, not this field).
+   * section — but that is aeon's build, not this field). And since aeon
+   * `c9a462be` section 5's sidecar in THEIR tree carries
+   * `"rasterRef": "ojz_sec5_showcase"` (`EditorRaster_OJZ_Act1_Bindings = 1`
+   * in their generated module), so this field has been carried end to end from
+   * this editor's writer to aeon's build for one section — and, per that
+   * commit's own message, no further than the build.
    *
    * On THIS side nothing observes the key for ANY section: the viewport
    * composites no `rasterRef` and there is no preview. So a written `rasterRef`
