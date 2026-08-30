@@ -628,8 +628,16 @@ async function main() {
       after.length === 2 && after[0].top === TOP0 && after[0].bot === wantCut
       && after[1].top === wantCut + 1 && after[1].bot === BOT0,
       `bands=${JSON.stringify(after.map((b) => [b.top, b.bot]))}`);
+    // ⚠ THE ROW BELOW MEASURES THE EDITOR, AND NAMES A DATED ENGINE CLAIM. That
+    // abutting halves do not build is true at aeon `2e976223` and is THEIR rule,
+    // not this harness's finding — OVERLAP IS DESIGNED, NOT IMPOSSIBLE (their
+    // `check_intervals` comment; a swept runtime-resolution design is banked,
+    // owner aeon's lane). Stated once, with its date, owner, expiry and re-read
+    // list, in the GAP RULE block of `src/renderer/providers/effects-preset.ts`.
+    // What this row PROVES either way is the gap the editor leaves; if aeon's
+    // rule retires, the assertion still holds and only the sentence changes.
     check('11b', `⚠ THE CUT LINE IS CLEAR: the upper half ends AT ${wantCut} and the lower `
-      + `starts at ${wantCut + 1} — abutting halves would not build`,
+      + `starts at ${wantCut + 1} — abutting halves would not build at aeon 2e976223`,
       after.length === 2 && after[1].top - after[0].bot === 1,
       `gap = ${after.length === 2 ? after[1].top - after[0].bot : 'n/a'} line(s)`);
     check('11c', 'and both halves carry the SAME ON op — a split is one effect over two intervals',
