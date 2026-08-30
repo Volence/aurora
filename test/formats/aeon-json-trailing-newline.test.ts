@@ -156,7 +156,8 @@ describe('canonical-json is where the rule lives', () => {
 
 describe('every JSON writer aimed at aeon\'s tree ends in exactly one newline', () => {
   it('serializeSectionMeta', () => {
-    const text = serializeSectionMeta({ bgLayoutRef: null, paletteRef: null, sceneRef: 'ojz_act1_depth' })!;
+    const text = serializeSectionMeta(
+      { bgLayoutRef: null, paletteRef: null, rasterRef: null, sceneRef: 'ojz_act1_depth' })!;
     expect(text.endsWith('}\n')).toBe(true);
     expect(endsInExactlyOneNewline(text)).toBe(true);
   });
@@ -209,14 +210,15 @@ describe('every JSON writer aimed at aeon\'s tree ends in exactly one newline', 
   });
 
   it('buildAeonSavePlan: the explicit-null sidecar CLEAR (the bypass writer in save.ts)', async () => {
-    const onDisk = serializeSectionMeta({ bgLayoutRef: 'bg-cave', paletteRef: null, sceneRef: null })!;
+    const onDisk = serializeSectionMeta(
+      { bgLayoutRef: 'bg-cave', paletteRef: null, rasterRef: null, sceneRef: null })!;
     const plan = await planFor(fixtureFiles({ metaOnDisk: onDisk }), (r) => {
       r.project.zones[0].acts[0].sections[0]!.bgLayoutRef = null;
     });
     const meta = plan.files.find(f => f.path === 'games/sonic4/data/editor/ojz/act1/section_0.meta.json');
     expect(meta, 'a cleared sidecar is overwritten with nulls, not left to resurrect').toBeDefined();
     const text = dec(meta!.bytes);
-    expect(JSON.parse(text)).toEqual({ bgLayoutRef: null, paletteRef: null, sceneRef: null });
+    expect(JSON.parse(text)).toEqual({ bgLayoutRef: null, paletteRef: null, rasterRef: null, sceneRef: null });
     expect(text.endsWith('}\n')).toBe(true);
     expect(endsInExactlyOneNewline(text)).toBe(true);
   });
@@ -241,11 +243,55 @@ describe('F2: parse → serialize of aeon\'s on-disk files', () => {
   const META = referenceFile('aeon', 'games/sonic4/data/editor/ojz/act1/section_4.meta.json');
   const OVERRIDE = referenceFile('aeon', 'games/sonic4/data/editor_bg_override.json');
 
-  it('section_4.meta.json round-trips byte-identically', (ctx) => {
+  /**
+   * F2's property is that a no-edit save does not flip a byte GRATUITOUSLY —
+   * it was written when the last byte was the newline. It is NOT a promise that
+   * the sidecar's key set can never grow: a contracted ref landing legitimately
+   * adds an explicit `null` to every sidecar written before it, and this is the
+   * SECOND time it has happened (`sceneRef`, 2026-08-22; `rasterRef`, schema
+   * §3.1 at empyrean `da91abce`, 2026-08-30). So the row asserts the property
+   * F2 owns and DERIVES the permitted delta rather than pinning bytes:
+   *
+   *   • every key already on disk survives with its value UNCHANGED — that is
+   *     the erasure hazard, and it is the half that must never soften;
+   *   • any key added is one the parser contributes, and it is `null` — a
+   *     non-null addition would be Aurora inventing an assignment;
+   *   • removing exactly those added keys returns the file byte-for-byte,
+   *     newline included, which is F2 itself.
+   *
+   * The delta is REPORTED, not repaired — the same shape as the override row
+   * below, and for the same reason: the discrepancy is aeon's tree to update on
+   * its own next save, not this test's to hide.
+   */
+  it('section_4.meta.json round-trips with no byte lost — only contracted nulls added', (ctx) => {
     if (skipUnlessPresent(ctx, META, "aeon's on-disk section_4.meta.json")) return;
     const text = readFileSync(META!, 'utf8');
     expect(text.endsWith('\n'), 'the ruling was made on this file carrying the byte').toBe(true);
-    expect(serializeSectionMeta(parseSectionMeta(text))).toBe(text);
+
+    const out = serializeSectionMeta(parseSectionMeta(text))!;
+    const onDisk = JSON.parse(text) as Record<string, unknown>;
+    const written = JSON.parse(out) as Record<string, unknown>;
+    // Anti-vacuous: the on-disk file really carries refs to lose.
+    expect(Object.keys(onDisk).length).toBeGreaterThan(0);
+
+    // Nothing on disk is dropped or altered.
+    for (const k of Object.keys(onDisk)) {
+      expect(written, `${k} must survive the round trip`).toHaveProperty(k);
+      expect(written[k], `${k} must survive UNCHANGED`).toEqual(onDisk[k]);
+    }
+    // Anything added is a contracted ref, explicitly null.
+    const added = Object.keys(written).filter((k) => !(k in onDisk));
+    for (const k of added) expect(written[k], `${k} was added, so it must be null`).toBeNull();
+    if (added.length > 0) {
+      console.warn(
+        `DISCREPANCY: ${META} predates ${added.join(', ')}; Aurora's next write adds `
+        + `exactly ${added.length} explicit null(s) and changes nothing else`);
+    }
+    // ...and F2 proper: for the key set the file actually has, Aurora's own §5
+    // chokepoint reproduces those bytes exactly — trailing newline, key order
+    // and indent included. Derived through `canonicalJsonPretty`, the writer's
+    // own path, rather than compared against a typed string.
+    expect(canonicalJsonPretty(onDisk)).toBe(text);
   });
 
   it('editor_bg_override.json round-trips up to the ruled trailer — and reports the on-disk state', (ctx) => {

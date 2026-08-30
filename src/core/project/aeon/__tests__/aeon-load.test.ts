@@ -69,7 +69,7 @@ function fixtureFiles(): Map<string, Uint8Array> {
 // Meta-sidecar fixture. The well-formed text comes from the serializer rather
 // than being spelled out, so it stays the exact shape a save would have left.
 const META_PATH = 'data/ojz/act1/section_0.meta.json';
-const META_REFS = { bgLayoutRef: 'bg-cave', paletteRef: 'pal-dusk', sceneRef: null };
+const META_REFS = { bgLayoutRef: 'bg-cave', paletteRef: 'pal-dusk', rasterRef: null, sceneRef: null };
 const WELL_FORMED_META = serializeSectionMeta(META_REFS)!;
 // Truncated hand-edit: two bytes, not one — the well-formed text ends in the
 // canonical `}\n` (§8), and dropping only the newline leaves valid JSON.
@@ -83,6 +83,17 @@ const SCENE_META_ON_DISK = [
   '{',
   '  "bgLayoutRef": "bg-cave",',
   '  "paletteRef": "pal-dusk",',
+  '  "sceneRef": "canopy_dusk"',
+  '}',
+].join('\n');
+
+// The raster-preset binding (schema §3.1 at empyrean `da91abce`), as aeon's
+// generator will leave it. Hand-written for the same reason.
+const RASTER_META_ON_DISK = [
+  '{',
+  '  "bgLayoutRef": "bg-cave",',
+  '  "paletteRef": null,',
+  '  "rasterRef": "canopy_tint",',
   '  "sceneRef": "canopy_dusk"',
   '}',
 ].join('\n');
@@ -229,9 +240,40 @@ describe('loadAeonProject', () => {
     expect(r.notices).toEqual([]);
   });
 
+  /**
+   * The raster-preset binding (empyrean docs/AURORA_EFFECTS_SCHEMA.md §3.1 at
+   * `da91abce`): a preset-document id string or null, loaded exactly like its
+   * siblings — and NOT `effectsRef`, which stays reserved and unspent.
+   *
+   * The load arm needs its own row because nothing else in Aurora ever puts a
+   * `rasterRef` on a Section: no command, no panel, no agent tool. A load that
+   * silently dropped the key would leave every other test green.
+   */
+  it('loads rasterRef from the sidecar alongside the other refs', async () => {
+    const files = fixtureFiles();
+    files.set(META_PATH, new TextEncoder().encode(RASTER_META_ON_DISK));
+    expect(RASTER_META_ON_DISK).toContain('"rasterRef": "canopy_tint"'); // anti-vacuous
+    const r = await loadAeonProject(memFa(files), '/proj');
+    const section = r.project.zones[0].acts[0].sections[0]!;
+    expect(section.rasterRef).toBe('canopy_tint');
+    expect(section.sceneRef).toBe('canopy_dusk');  // siblings unaffected
+    expect(section.bgLayoutRef).toBe('bg-cave');
+    expect(section.paletteRef).toBeNull();
+    expect(section.unreadable).toBeUndefined();
+    expect(r.notices).toEqual([]);
+  });
+
+  it('leaves rasterRef null for a section with no sidecar', async () => {
+    const files = fixtureFiles();
+    expect(files.has(META_PATH)).toBe(false);
+    const r = await loadAeonProject(memFa(files), '/proj');
+    expect(r.project.zones[0].acts[0].sections[0]!.rasterRef).toBeNull();
+  });
+
   it('loads a sidecar whose only ref is sceneRef', async () => {
     const files = fixtureFiles();
-    const onlyScene = serializeSectionMeta({ bgLayoutRef: null, paletteRef: null, sceneRef: 'canopy_dusk' })!;
+    const onlyScene = serializeSectionMeta(
+      { bgLayoutRef: null, paletteRef: null, rasterRef: null, sceneRef: 'canopy_dusk' })!;
     expect(onlyScene).toContain('canopy_dusk');   // anti-vacuous: really written
     files.set(META_PATH, new TextEncoder().encode(onlyScene));
     const r = await loadAeonProject(memFa(files), '/proj');
