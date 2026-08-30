@@ -22,8 +22,10 @@
 //      commit's `docs/research/reference_captures/2026-08-30-sec5-band/` is
 //      the first one, in aeon's emulator, in aeon's tree. LIMIT 1 may cite it,
 //      attributed — and the rows pin that it says WHERE, and that nothing of
-//      it is visible in this editor. Copy implying an author can see a band on
-//      THIS surface is still the one thing worse than no preview.
+//      it is visible in this editor. `NO_PREVIEW` cites it too, as the ONE
+//      frame a preview could be checked against (O64, 2026-08-30), and its
+//      rows pin separately that none is built. Copy implying an author can
+//      see a band on THIS surface is still the one thing worse than no preview.
 //
 // ⚠ THE NODE SUITE CANNOT SEE REACT. These rows read the panel SOURCE and the
 // provider's exported strings. That bounds what they can prove: they prove the
@@ -488,22 +490,102 @@ describe('the three limits say the words that carry them', () => {
 
   /**
    * ⚠ NOBODY HAD EVER LOOKED AT ONE OF THESE BANDS ON SCREEN when this was
-   * written. No emulator run, no capture, anywhere in the suite. The absence of
-   * a preview must be EXPLAINED, because an empty space reads as "coming soon"
-   * rather than "there is no ground truth".
+   * written, and `NO_PREVIEW` said so. The absence of a preview must be
+   * EXPLAINED, because an empty space reads as "coming soon" rather than
+   * "there is no ground truth".
    *
-   * ⚠ TAGGED 2026-08-30, NOT MOVED HERE: aeon `4a4d3474` committed exactly such
-   * a capture (`docs/research/reference_captures/2026-08-30-sec5-band/`, in
-   * their tree, on their emulator), so `NO_PREVIEW`'s "never been looked at on
-   * screen anywhere in this suite" is now false. That sentence has a different
-   * subject from LIMIT 1 (ground truth to preview AGAINST, not where a binding
-   * stops), its own harness rows and its own owner; this row still pins the
-   * CURRENT wording so its retirement goes red-first like every other on this
-   * surface, rather than being reworded in passing by a parcel about LIMIT 1.
+   * ⚠ RETIRED 2026-08-30 (O64), AND THE OLD ROW WENT RED FIRST. aeon
+   * `4a4d3474` committed exactly such a capture
+   * (`docs/research/reference_captures/2026-08-30-sec5-band/`: README
+   * "VERDICT: BAND SEEN", CRAM line 2 entry 8 `$0EA4` at lines 40/56/72 and
+   * `$0000` at 8/20/96/150 in one frame, two headless `oracle-aether`
+   * instances byte-identical, `$0000` everywhere on the control), so "never
+   * been looked at on screen anywhere in this suite" became false. The row
+   * that pinned that phrase was red on the constant-only edit before any line
+   * here moved. What replaced it is FOUR rows, not one, because the sentence
+   * now carries four things that rot independently — and the whole hazard of
+   * citing a measurement is that "aeon measured a frame" drifts into "you can
+   * preview it here":
+   *   • the ANCHOR — the captures commit, its directory, and WHERE (aeon's
+   *     emulator) — which a citation-dropping rewrite loses;
+   *   • the SCOPE — ONE frame, section 5, one camera position, not in this
+   *     tree — which a "the band has been verified" rewrite loses;
+   *   • the KEPT HALF — this editor draws no band, nothing sampled CRAM here,
+   *     nothing to draw a faithful preview from, none is built — which a
+   *     "preview coming soon" rewrite loses;
+   *   • the EXPIRES list, dated, with an owner per half.
+   * Plus a per-sentence DRIFT loop, because a positive pin on the kept half
+   * stays green when a fifth sentence is appended after it.
    */
-  it('NO_PREVIEW says there is nothing to draw a faithful preview from', () => {
-    expect(NO_PREVIEW).toMatch(/never been looked at on screen/i);
-    expect(NO_PREVIEW).toMatch(/nothing to draw a faithful preview from/i);
+  describe('NO_PREVIEW, after the not-seen premise expired at aeon 4a4d3474', () => {
+    it('cites the one measured frame: the captures commit, its directory, and aeon\'s emulator', () => {
+      expect(NO_PREVIEW).toMatch(/aeon 4a4d3474 \(2026-08-30\), docs\/research\/reference_captures\/2026-08-30-sec5-band\//);
+      expect(NO_PREVIEW).toMatch(/in aeon's emulator/);
+      // The VALUES are the README's own, and the control is what made it a
+      // measurement rather than a picture.
+      expect(NO_PREVIEW).toMatch(/CRAM line 2 entry 8 reading \$0EA4 inside the band and \$0000 outside it and on the control/);
+      // The retired phrase is asserted ABSENT so a revert cannot pass on the
+      // kept clauses, and so the sentence cannot carry both "never" and "one".
+      expect(NO_PREVIEW).not.toMatch(/never been looked at/i);
+      expect(NO_PREVIEW).not.toMatch(/anywhere in this suite/i);
+    });
+
+    it('scopes it to ONE frame of section 5 at one camera position, in aeon\'s tree and not this one', () => {
+      expect(NO_PREVIEW).toMatch(/ONE measured frame, in aeon's tree and not in this one/);
+      expect(NO_PREVIEW).toMatch(/section 5 at one camera position/);
+      // Not "sections", not "every camera position", not "verified".
+      expect(NO_PREVIEW).not.toMatch(/\bverified\b|\bworks\b|\bplays\b|every camera/i);
+    });
+
+    it('keeps the half that is still true here: draws no band, nothing to preview from, none built', () => {
+      expect(NO_PREVIEW).toMatch(/^No preview\. This editor draws no band: the viewport composites no rasterRef, and nothing in Aurora has sampled CRAM/);
+      expect(NO_PREVIEW).toMatch(/nothing to draw a faithful preview from/i);
+      expect(NO_PREVIEW).toMatch(/an unfaithful one would be worse than none/);
+      expect(NO_PREVIEW).toMatch(/A preview here could at most be checked against that one frame; none is built\./);
+    });
+
+    it('carries a dated EXPIRES list with an owner per half', () => {
+      expect(NO_PREVIEW).toMatch(/Expires \(2026-08-30\):/);
+      expect(NO_PREVIEW).toMatch(/when that directory leaves aeon's tree or its README stops saying so/);
+      expect(NO_PREVIEW).toMatch(/a second section or camera position is measured — aeon's lane/);
+      // Content, not position: the drift loop below owns "nothing after it".
+      expect(NO_PREVIEW).toMatch(/when this editor draws a band — Aurora's\./);
+    });
+
+    /**
+     * THE DRIFT LOOP. Every positive pin above is satisfied by a sentence that
+     * ALSO says "You can preview it here." somewhere after them. So each
+     * sentence is checked on its own: none may address the reader with "you
+     * can", and any sentence that speaks of HERE or THIS EDITOR must be one of
+     * the negatives (draws no band / could at most / none is built / not in
+     * this one) or the expiry list — a sentence that names the editor and
+     * promises something is the drift, and it fails naming its text.
+     */
+    it('no sentence of it says a band can be previewed or seen HERE', () => {
+      const sentences = NO_PREVIEW.split(/(?<=[.!?])\s+/);
+      expect(sentences.length, 'NO_PREVIEW has collapsed to fewer than four sentences').toBeGreaterThanOrEqual(4);
+      for (const s of sentences) {
+        expect(s, s).not.toMatch(/\byou can\b|\bas you\b|\byou will\b/i);
+        if (/\bhere\b|this editor|this one\b/i.test(s)) {
+          const isNegative = /draws no band|could at most|none is built|not in this one/i.test(s);
+          const isExpiry = /^Expires \(/.test(s);
+          expect(isNegative || isExpiry, `a sentence names this editor and promises something: ${s}`).toBe(true);
+        }
+      }
+    });
+
+    /**
+     * A DIFFERENT SENTENCE FROM LIMIT 1, kept that way. LIMIT 1 owns where a
+     * binding stops; this owns why there is nothing to preview against. The
+     * anchor-uniqueness row above already proves none of LIMIT 1's anchors
+     * match this string; this row proves it is the SHORTER of the two and not
+     * the same string, so the two cannot quietly merge.
+     */
+    it('is shorter than RASTER_SECTION_BINDING_LIMIT and is not it', () => {
+      expect(NO_PREVIEW.length, 'NO_PREVIEW is too short to be carrying its clauses').toBeGreaterThan(300);
+      expect(NO_PREVIEW.length).toBeLessThan(RASTER_SECTION_BINDING_LIMIT.length);
+      expect(NO_PREVIEW).not.toBe(RASTER_SECTION_BINDING_LIMIT);
+    });
   });
 
   it('no string on this surface claims anyone has seen a band render', () => {
