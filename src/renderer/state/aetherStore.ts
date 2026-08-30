@@ -35,11 +35,21 @@ interface AetherState {
    */
   paletteKind?: 'aeon' | 'classic';
   /**
+   * WHICH IMPLEMENTATION ANSWERED — protocol.md §2.1's registry value
+   * (`oracle-rs` | `oracle-cpp`). ⚠ NOT `serverName` above, which §2.1 makes a
+   * deployment label and forbids discriminating on; the Rust core still reports
+   * `oracle-next` there. Undefined until a handshake has completed.
+   */
+  implementation?: string;
+  /** Rendered §2.1 build identity. Provenance for a bug report; never compared. */
+  serverBuild?: string;
+  /** The identity check's non-fatal complaint, if it had one. */
+  identityWarning?: string;
+  /**
    * HOW MANY METHODS THE CONNECTED SERVER SERVES, straight from `initialize`.
-   * Two implementations answer the same socket and serve different subsets, so
-   * "connected" alone does not say what is on the other end — and an installed
-   * binary can advertise a different count from the source tree it was built
-   * from. Undefined until a handshake has completed.
+   * A different question from `implementation`: an installed binary can
+   * advertise a different count from the source tree it was built from.
+   * Undefined until a handshake has completed.
    */
   methodCount?: number;
   /** The advertised list itself, for anything that wants to check a specific one. */
@@ -114,6 +124,9 @@ export const useAetherStore = create<AetherState>((set, get) => ({
       error: s.error,
       palette: s.palette ?? false,
       paletteKind: s.paletteKind,
+      implementation: s.implementation,
+      serverBuild: s.serverBuild,
+      identityWarning: s.identityWarning,
       methodCount: s.methodCount,
       servedMethods: s.servedMethods,
       paletteUnservedMethod: s.paletteUnservedMethod,

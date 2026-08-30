@@ -126,11 +126,23 @@ export interface AetherStatusPayload {
    */
   paletteKind?: 'aeon' | 'classic';
   /**
-   * WHAT ANSWERED THE HANDSHAKE. The legacy C++ server and the Rust core resolve
-   * the SAME socket chain, so `status: 'connected'` says nothing about which one
-   * is on the other end. `serverName` differs today (`oracle` vs `oracle-next`)
-   * but names get aligned; the served-method count is the durable signal, and it
-   * is what an installed binary and its source tree can disagree about.
+   * WHICH IMPLEMENTATION ANSWERED — protocol.md §2.1's registry value
+   * (`oracle-rs` | `oracle-cpp`), straight off the handshake.
+   *
+   * ⚠ NOT `serverName`, which is above and is a *deployment* label §2.1 forbids
+   * discriminating on; the Rust core still reports `oracle-next` there. The
+   * socket chain selects a path and not a server, so this is the only field
+   * that answers "which emulator am I talking to".
+   */
+  implementation?: string;
+  /** Provenance only — §2.1 build identity, rendered. NEVER compared for equality. */
+  serverBuild?: string;
+  /** Non-fatal complaint from the identity check (unknown lineage, missing build). */
+  identityWarning?: string;
+  /**
+   * HOW MANY METHODS. A different question from `implementation`: an installed
+   * binary can advertise a different count from the source tree it was built
+   * from. Recorded, never pinned.
    */
   methodCount?: number;
   /** The advertised list itself, exactly as it arrived. */

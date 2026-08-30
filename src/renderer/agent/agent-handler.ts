@@ -1451,12 +1451,24 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       const s = useAetherStore.getState();
       return {
         status: s.status,
+        // ⚠ A DEPLOYMENT LABEL, NOT AN IDENTITY. protocol.md §2.1 makes
+        // `serverName` config-settable and says it MUST NOT be used to
+        // discriminate implementations; the Rust core reports `oracle-next`
+        // here. Kept because it is what a person named their process.
         server: s.serverName ?? null,
-        // WHAT ANSWERED. The legacy C++ server and the Rust core resolve the
-        // same socket chain and serve different subsets, so an agent measuring
-        // capability against `status` alone is measuring nothing. The count is
-        // the durable signal; the name (`oracle` vs `oracle-next`) can be
-        // aligned between them at any time.
+        // WHAT ANSWERED, for real. The legacy C++ server and the Rust core
+        // resolve the same socket chain and serve different subsets, so an
+        // agent measuring capability against `status` alone is measuring
+        // nothing. `implementation` is §2.1's registry lineage — the field that
+        // discriminates. Aurora refuses to connect at all to a superseded or
+        // unidentified one, so a non-null value here has been checked.
+        implementation: s.implementation ?? null,
+        // Provenance for a bug report. §2.1 calls it opaque: never compare it,
+        // and never gate on it — it moves on a documentation commit.
+        serverBuild: s.serverBuild ?? null,
+        // The count is a separate signal: an installed binary can advertise a
+        // different count from the source tree it was built from. Read it,
+        // never pin it.
         methodCount: s.methodCount ?? null,
         // A palette symbol family resolved — i.e. a push can actually land…
         palettePushAvailable: s.palette,
