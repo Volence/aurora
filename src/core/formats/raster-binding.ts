@@ -14,7 +14,13 @@
  *    `rasterRef` (§3.1) and Aurora's sidecar began round-tripping it.
  * 2. Nothing WROTE a binding. False once `assign_section_preset` landed
  *    (aurora `f98824ac`) — a writer exists; it is an agent tool, not a panel
- *    control.
+ *    control. And the "not a panel control" half went too: ROADMAP row 93's
+ *    remaining half landed the per-section raster select in `BandPresetPanel`,
+ *    over the same `sectionPresetCommand`. So THE PANEL WRITES ONE NOW, and
+ *    every clause below that used to say otherwise is gone. What did NOT change
+ *    is the half that clause shared a sentence with: the viewport still
+ *    composites nothing, so binding from the select is as unobservable as
+ *    binding from the tool.
  * 3. Nothing READ a binding. **False since aeon `4aa2abc0`** (a merge on aeon's
  *    `origin/master`, "item 1's zero-byte arm — rasterRef binds a section's
  *    raster channel"), which is what this edit retires.
@@ -66,10 +72,10 @@
  * ⚠ THIS SENTENCE IS NOT `NO_PREVIEW`, AND MUST NOT GROW INTO IT.
  * `providers/effects-preset.ts`'s `NO_PREVIEW` owns "no band has ever been
  * looked at on screen in this suite, so there is no ground truth to preview
- * against". THIS sentence owns the narrower, binding-specific fact: no control
- * writes a `rasterRef` and the VIEWPORT does not composite one, which is the
- * contrast with `assign_section_bg` (whose ref it does). Two limits saying the
- * same thing is how an author learns to skip both.
+ * against". THIS sentence owns the narrower, binding-specific fact: the VIEWPORT
+ * does not composite a `rasterRef`, which is the contrast with
+ * `assign_section_bg` (whose ref it does). Two limits saying the same thing is
+ * how an author learns to skip both.
  *
  * ⚠ SAID ONCE, HERE. It is read by the agent replies (`agent-handler.ts`,
  * renderer), the published tool descriptions (`editor-methods.ts`, main) and
@@ -103,8 +109,9 @@ export const RASTER_SECTION_BINDING_LIMIT =
   + 'SITE: no preset() in aeon\'s games/sonic4/data/effects/ojz_effects.emp passes that chooser to '
   + 'its raster: channel, so a bound section keeps running its hand-authored raster program and the '
   + 'band does not play. The hand-work left is one line per section at that call site, not authoring '
-  + 'the effect. Nor is there anything to look at here: no control in the band-preset panel writes a '
-  + 'rasterRef and the viewport does not composite one, so unlike assign_section_bg — whose ref the '
+  + 'the effect. Nor is there anything to look at here: the band-preset panel now carries a '
+  + 'per-section raster select, but binding one draws nothing — the viewport does not composite a '
+  + 'rasterRef, so unlike assign_section_bg — whose ref the '
   + 'viewport does composite — this assignment changes nothing on screen. A preset document costs ROM '
   + 'whether or not any section binds it, since aeon emits one program per document. Unlike '
   + 'assign_section_scene, which is baked. EXPIRES when aeon threads the chooser into ojz_effects.emp '

@@ -288,10 +288,13 @@ descriptions and the band-preset panel's own author-facing limit, so the three
 cannot describe it differently. `list_effects_presets` reports it too, beside a
 per-section `sections` column that reads the same key back.
 
-There is still **no per-section raster select in the UI** — ROADMAP row 93's
-remaining half — and nobody in the suite has ever looked at one of these bands on
-screen, so nothing anywhere checks that a band is VISIBLE: a legal band over an
-unused palette entry builds green and shows nothing.
+The **per-section raster select** in the band-preset panel writes the same key
+through the same `sectionPresetCommand` (ROADMAP row 93's remaining half,
+landed), so an agent and an author cannot disagree about what a binding or an
+unbind is — its empty option and this tool's explicit `null` are one state. What
+the select does not add is a picture: nobody in the suite has ever looked at one
+of these bands on screen, and nothing anywhere checks that a band is VISIBLE — a
+legal band over an unused palette entry builds green and shows nothing.
 
 ## Classic project tools
 

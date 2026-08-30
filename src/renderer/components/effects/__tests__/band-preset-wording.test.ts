@@ -130,7 +130,18 @@ describe('the three limits say the words that carry them', () => {
     // The author's questions: what writes it, what reads it, where the read
     // stops, and what that leaves them to do by hand.
     expect(l.body).toMatch(/assign_section_preset/);
-    expect(l.body).toMatch(/no control in the band-preset panel writes a rasterRef/i);
+    // ⚠ REVERSED ON PURPOSE, 2026-08-30, AND IT WAS RED BEFORE IT WAS EDITED.
+    // This line read `/no control in the band-preset panel writes a rasterRef/i`
+    // until ROADMAP row 93's remaining half landed the per-section raster
+    // select. That is the fourth of this limit's claims to expire, and the same
+    // mechanism as the other three: the gate went red, someone read why, and
+    // the sentence moved. What must NOT drift is the half it shared a clause
+    // with — a control now writes the key and the viewport STILL composites
+    // nothing — so both are pinned, and the second is what stops "the panel has
+    // a select" from being read as "you can see it".
+    expect(l.body).toMatch(/the band-preset panel now carries a per-section raster select/i);
+    expect(l.body).toMatch(/the viewport does not composite a rasterRef/i);
+    expect(l.body).toMatch(/this assignment changes nothing on screen/i);
     // THE READER EXISTS. Pinned to the file that resolves the key rather than to
     // a loose "reads it", which limit 2's "aeon steps a band-demo table" prose
     // could drift into satisfying.

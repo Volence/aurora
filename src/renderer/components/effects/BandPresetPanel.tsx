@@ -41,6 +41,7 @@ import {
   BAND_FIELD_TITLES, armFieldTitle, armOptions, armLabel,
   bandArm, bandArmAdvisory,
   presetListEntries, resolveSelectedPreset, presetIdRefusal,
+  RASTER_REF_ROW, presetRefOptions, unassignablePresetRef, sectionPresetCommand,
   createPresetCommand, deletePresetCommand,
   addBandCommand, removeBandCommand, lastBandRefusal,
   setBandFieldCommand, setBandArmCommand, setArmFieldCommand,
@@ -95,6 +96,15 @@ export default function BandPresetPanel(): React.ReactElement | null {
   const selectedId = useEditorStore((s) => s.selectedEffectsPresetId);
   const setSelectedId = useEditorStore((s) => s.setSelectedEffectsPresetId);
   const selected = resolveSelectedPreset(library, selectedId);
+  // THE SAME STORE VALUE THE SCENE PANEL'S ASSIGNMENT ROW READS, and that is
+  // what makes two per-section controls in two panels safe: `activeSectionIndex`
+  // is one number in the editor store, not a second notion of "the section being
+  // looked at". A panel-local copy is the two-sources-of-truth defect this
+  // column has already met once (EffectsScenePanel's selected-scene id, ROADMAP
+  // item 43).
+  const activeSectionIndex = useEditorStore((s) => s.activeSectionIndex);
+  const act = getActiveLevel(useProjectStore.getState())?.act ?? null;
+  const section = act?.sections[activeSectionIndex] ?? null;
 
   const [newId, setNewId] = React.useState('');
   const [refusal, setRefusal] = React.useState<string | null>(null);
@@ -186,6 +196,75 @@ export default function BandPresetPanel(): React.ReactElement | null {
             const why = presetIdRefusal(newId.trim(), library);
             return why === null ? null : <Hint under>{why}</Hint>;
           })()}
+
+          {/* ═══ THE PER-SECTION BINDING (ROADMAP row 93's remaining half) ═══
+
+              IN THIS SECTION, NOT A SECTION OF ITS OWN, AND NOT IN THE SCENE
+              PANEL — and the reason is `LimitBlock`, eight rows up. What binding
+              a preset does and does not do is one sentence, it renders at the
+              top of THIS section, and a CollapsibleSection renders no children
+              while it is shut: an author cannot reach this select without the
+              limit already on screen above it. A second titled section could be
+              opened on its own, and the scene panel's own "Section assignment"
+              is four sections away in a different document's editor — either
+              placement hands an author the control with the disclosure out of
+              view, which is the failure the whole panel is shaped around.
+
+              It also belongs beside the library it lists. The options ARE the
+              preset documents in the picker above; drawn under the scene editor
+              they would name files that surface never mentions, and an author
+              who has just typed a new preset id would have to cross a document
+              boundary the panel's own header is at pains to draw.
+
+              ⚠ THE COST, NAMED: the two per-section refs now live in two
+              panels, so "what does section N use" is answered in two places.
+              They cannot disagree about WHICH section — both read
+              `activeSectionIndex` from the one store — and both close with the
+              same "saved to section_N.meta.json as <key>" line, so the split is
+              by document rather than arbitrary.
+
+              NO SENTENCE OF ITS OWN. The row's label and title come from
+              `RASTER_REF_ROW`; the limit is `LimitBlock`'s and is not repeated.
+              The only prose here is WHERE THE VALUE IS WRITTEN, which is the
+              one thing no control can tell you — the scene panel's row settled
+              that trade after measuring the two-sentence version at three
+              lines. */}
+          {!section ? (
+            <Hint style={{ marginTop: T.s3, marginBottom: 0 }}>
+              Section {activeSectionIndex} is empty — nothing to assign a preset to.
+            </Hint>
+          ) : (
+            <>
+              <Field label={`Section ${activeSectionIndex}`} title={RASTER_REF_ROW.title}
+                style={{ marginTop: T.s3, marginBottom: 0 }}>
+                {/* THROUGH `sectionPresetCommand`, NEVER `rasterRef = v`. That
+                    function owns the `''` sentinel, so this select's empty
+                    option and `assign_section_preset`'s explicit null are the
+                    SAME unbind; it owns the no-op rule, so re-picking the
+                    current value burns no undo slot; and it emits the one
+                    `set-section-raster` command both arms of history know. A
+                    control that assigned the field would let this panel and the
+                    agent tool disagree about what an unbind even is. */}
+                <Select title={RASTER_REF_ROW.title}
+                  value={section.rasterRef ?? ''} style={{ flex: 1, minWidth: 0 }}
+                  onChange={(v) => run(sectionPresetCommand(
+                    activeSectionIndex, section.rasterRef, v))}>
+                  {presetRefOptions(library).map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </Select>
+              </Field>
+              {unassignablePresetRef(library, section.rasterRef) && (
+                <Hint under tone="warning">
+                  {unassignablePresetRef(library, section.rasterRef)}
+                </Hint>
+              )}
+              <Hint under style={{ marginBottom: 0 }}>
+                Saved to <code>section_{activeSectionIndex}.meta.json</code> as
+                {' '}<code>rasterRef</code>.
+              </Hint>
+            </>
+          )}
         </SectionBody>
       </CollapsibleSection>
 

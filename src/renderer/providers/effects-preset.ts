@@ -48,6 +48,11 @@ import { RASTER_SECTION_BINDING_LIMIT } from '../../core/formats/raster-binding'
 // are the same engine `ensure` — see the timeline block at the foot of this
 // file — so the constant is imported from the one place that declares it.
 import { EFFECTS_FIRE_LINE_MIN, EFFECTS_FIRE_LINE_MAX } from './effects-aeon';
+// THE OPTION SHAPE IS THE SCENE SELECT'S, not a second one. `presetRefOptions`
+// below is `sceneRefOptions`' mirror and feeds the same `<Select>`; giving it a
+// private `{value,label}` twin would let the two per-section pickers drift in
+// shape as well as in wording.
+import type { FactorOption } from './effects-aeon';
 
 // ---------------------------------------------------------------------------
 // THE THREE LIMITS — one source, read by the panel and by the wording gate
@@ -92,14 +97,17 @@ export const PRESET_LIMITS: readonly PresetLimit[] = Object.freeze([
     // back to naming `effectsRef` — an author who went looking for that key
     // would find nothing.
     //
-    // AND THE STATUS HAS CHANGED THREE TIMES NOW. First the key appeared in the
+    // AND THE STATUS HAS CHANGED FOUR TIMES NOW. First the key appeared in the
     // sidecar and Aurora began round-tripping it, so "not implemented in either
     // repo" became a lie. Then `assign_section_preset` landed, so "nothing binds
     // a preset to a section" became one too — a WRITER exists, it is an agent
-    // tool, and this panel still has no control for it (ROADMAP row 93's other
-    // half). Then aeon `4aa2abc0` landed the READER, so "no aeon consumer reads
+    // tool. Then aeon `4aa2abc0` landed the READER, so "no aeon consumer reads
     // a rasterRef" became the third lie — retired on the schedule the sentence's
-    // own dated expiry set.
+    // own dated expiry set. Then ROADMAP row 93's remaining half landed the
+    // per-section raster select in the section BELOW this block, so "no control
+    // in the band-preset panel writes a rasterRef" became the fourth — and this
+    // limit is now read by an author standing directly above the control it is
+    // about, which is the placement the block was built for.
     //
     // What survives all three is narrower and still load-bearing: the reader
     // stops one seam short. `effects_gen.py` resolves the key and emits the
@@ -456,6 +464,85 @@ export function replacePresetCommand(
   return presetCommand(id, existing ? `Replace preset ${id}` : `New preset ${id}`, existing, preset);
 }
 
+// ---------------------------------------------------------------------------
+// The per-section raster binding — the select's options, label and advisory
+// ---------------------------------------------------------------------------
+
+/**
+ * The row's label and its control title.
+ *
+ * IN THE PROVIDER, NOT THE PANEL, on this file's own rule — but note what is
+ * NOT here. `title` defines the two kinds of value the control offers; it does
+ * NOT restate where the binding stops. That sentence is
+ * `RASTER_SECTION_BINDING_LIMIT`, rendered in full by `LimitBlock` at the top of
+ * the very section this control sits in, and a second near-identical wording
+ * beside the select is precisely the drift core/formats/raster-binding.ts exists
+ * to prevent (bg-binding.ts learned it the expensive way). If this control ever
+ * seems to need something the constant does not say, that is a change to the
+ * constant, not a new sentence here.
+ *
+ * `unbound` is the empty option's label. `sceneRef`'s empty option reads "Act
+ * default" because a section with no scene falls back to the act's own; a
+ * section with no `rasterRef` falls back to nothing of Aurora's — aeon's
+ * `preset()` keeps the `raster:` label a programmer typed, which is what
+ * core/model/s4-types.ts calls "this section keeps its hand-authored raster
+ * channel". The label names that state rather than calling it "none", because
+ * "none" would read as "no raster program at all", which is a different and
+ * false thing.
+ */
+export const RASTER_REF_ROW = Object.freeze({
+  unbound: 'Hand-authored raster',
+  title: 'Which raster band preset this section uses (rasterRef). '
+    + "Hand-authored raster means the section keeps the raster: label aeon's effects source "
+    + 'already names for it.',
+});
+
+/**
+ * The `rasterRef` dropdown for one section: the unbound option plus every
+ * LOADED preset.
+ *
+ * `sceneRefOptions`' EXACT MIRROR (providers/effects-aeon.ts), including the
+ * omission: unreadable preset files are deliberately absent, because binding a
+ * section to a file Aurora could not read writes a ref aeon's generator then
+ * refuses BY NAME at build time. They are not silent — the load already raised a
+ * notice per file, the panel counts them, and `unassignablePresetRef` below
+ * reports a section already pointing at one.
+ */
+export function presetRefOptions(library: EffectsPresetLibrary): FactorOption[] {
+  return [
+    { value: '', label: RASTER_REF_ROW.unbound },
+    ...presetListEntries(library).map((e) => ({ value: e.id, label: e.label })),
+  ];
+}
+
+/**
+ * A warning for a section whose `rasterRef` names nothing this project can
+ * offer, or null.
+ *
+ * REACHABLE WITHOUT ANY BUG, and `unassignableSceneRef`'s reasons hold here
+ * unchanged: the sidecar is hand-editable, and a preset can be deleted, renamed,
+ * or left sitting in `unreadable` while a section still names it. A plain
+ * `<select>` shows an unknown value by falling back to its first option, so
+ * saying nothing would draw this section as "Hand-authored raster" — a quiet lie
+ * about what is in the file.
+ *
+ * ⚠ AND HERE IT IS A LIE WITH A BUILD ATTACHED, which is the one thing this
+ * differs from the scene case in. aeon's `tools/effects_gen.py` refuses an id
+ * naming no preset document BY NAME and lists the ids it does know
+ * (core/formats/raster-binding.ts, verified at aeon `4aa2abc0`), so the author
+ * who is not told here meets it as a build failure instead.
+ */
+export function unassignablePresetRef(
+  library: EffectsPresetLibrary, rasterRef: string | null,
+): string | null {
+  if (rasterRef === null) return null;
+  if (library.presets.some((p) => p.id === rasterRef)) return null;
+  if (library.unreadable.some((u) => u.path.endsWith(`/${rasterRef}.json`))) {
+    return `Assigned to "${rasterRef}", whose file exists but could not be read.`;
+  }
+  return `Assigned to "${rasterRef}", which is not a raster preset in this project.`;
+}
+
 /**
  * Assign which raster PRESET a section uses — `Section.rasterRef`.
  *
@@ -482,10 +569,13 @@ export function replacePresetCommand(
  * in their `ojz_effects.emp` passes that chooser to a `preset()` yet — which is
  * `PRESET_LIMITS.unbound`'s subject and this function's too.
  *
- * NO CONTROL CALLS THIS YET. The per-section raster select is the other half of
- * ROADMAP row 93 and is not built; the agent tool is the only caller today. That
- * is a gap and not a ruling — this is the function such a control must use, on
- * this file's own "the panel holds no logic" rule.
+ * TWO CALLERS NOW, AND THAT IS THE POINT OF THE FUNCTION. `assign_section_preset`
+ * (renderer/agent/agent-handler.ts) and the per-section raster select in
+ * `BandPresetPanel` — ROADMAP row 93's remaining half, landed. The select MUST
+ * come through here and MUST NOT assign `rasterRef`: this function owns the `''`
+ * sentinel, so a select's empty option and an agent's explicit `null` are the
+ * same unbind, and it owns the no-op rule, so neither door can disagree about
+ * what counts as a change worth an undo step.
  */
 export function sectionPresetCommand(
   sectionIndex: number, currentRef: string | null, value: string,
