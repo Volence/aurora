@@ -1114,6 +1114,17 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       // a bare `changed: true` would assert an effect this reply cannot know
       // reached anything. Carried on the no-op reply too, so the same conclusion
       // is available whichever way the call lands.
+      //
+      // ⚠ AND THE SAME CONSTANT, ON THIS SAME LINE, IS WHAT TELLS THE CALLER
+      // THAT AEON'S FULL BUILD WILL REFUSE THE TREE THEY JUST MADE (O62). A
+      // `null` here on section 5, or a bind on any other section, is a write
+      // this handler performs and aeon's FAST=0 pytest lane then refuses by
+      // name (core/formats/raster-binding.ts, the O62 block). There is
+      // deliberately NO branch on `req.presetId === null` and NO branch on the
+      // section number to pick a different sentence: the STANDING REFUSAL
+      // forbids interpreting the number, and a second sentence for the unbind
+      // path is the trimmed-copy defect the assign-section-preset test's
+      // unbind row exists to catch. One constant, both paths, both replies.
       return {
         section: req.section, presetId: req.presetId, changed: true,
         binding: RASTER_SECTION_BINDING_LIMIT,

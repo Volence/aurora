@@ -127,6 +127,20 @@ export const PRESET_LIMITS: readonly PresetLimit[] = Object.freeze([
     // NO_PREVIEW's own expiry to retire, not this limit's, and is TAGGED in
     // `core/formats/raster-binding.ts`'s header rather than reworded here.
     //
+    // ⚠ AN EIGHTH FACT WAS ADDED 2026-08-30 (O62), NOT A CORRECTION: the seven
+    // above are about how far one binding travels; this one is about the TREE
+    // the select leaves behind. At aeon `027ec162` three content tests in
+    // their FAST=0 build accept exactly one bound set — section 5 →
+    // `ojz_sec5_showcase` — so the empty option on section 5 (the very
+    // control this block renders above) produces a tree aeon's canonical
+    // build refuses by name, and so does a pick on any other section. The
+    // sentence says so, says FAST=1 builds it, and says nothing here prevents
+    // the write. The option is NOT disabled and there is NO confirm: the
+    // STANDING REFUSAL in raster-binding.ts — a gate built from one act's
+    // content snapshot would be wrong for the next act and read as authority.
+    // This block is the instrument, which is why it renders whether or not
+    // the active section is bound (band-preset-wording pins that structure).
+    //
     // ⚠ AND THE FIFTH IS A DIFFERENT SHAPE FROM THE OTHER FOUR. Each of those
     // replaced one universal claim with another. This one cannot: aeon's step 5
     // MANUFACTURED a non-uniformity that did not exist before it — section 5's
