@@ -22,6 +22,9 @@ import {
   RASTER_TIMELINE_LINES, RASTER_TIMELINE_ORIGIN_Y, RASTER_TIMELINE_SCALE,
   RASTER_TIMELINE_STRIP_X, RASTER_TIMELINE_STRIP_W, RASTER_TIMELINE_W,
   publishRasterTimelineReport, lastRasterTimelineReport, inactiveRasterTimelineReport,
+  stripYToLine, presetEdgeAt, presetBandAt, presetDragFor,
+  publishRasterTimelinePointer,
+  RASTER_TIMELINE_PRESET_X, RASTER_TIMELINE_PRESET_W, BAND_EDGE_GRAB_PX,
 } from '../raster-timeline';
 import { cameraPreviewPlan } from '../camera-preview';
 import {
@@ -30,6 +33,7 @@ import {
 } from '../../providers/effects-aeon';
 import { SCREEN_HEIGHT } from '../../../core/model/screen';
 import type { EffectsScene, EffectsLayer, EffectsFactor } from '../../../core/formats/effects/scene';
+import type { EffectsPreset, EffectsPresetBand } from '../../../core/formats/effects/preset';
 
 const LOCK = 15;
 
@@ -431,5 +435,194 @@ describe('the payload is a Plane-B row, and the strip never treats it as a line'
     const s = scene([layer(0, 'FACTOR_LOCKED'), layer(64, 'FACTOR_1_4', { vsplit: { at: 0 } })]);
     expect(viewOf(s).splits).toHaveLength(1);
     expect(viewOf(s).splits[0].at).toBe(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THE EDITABLE COLUMN — geometry and hit-testing (ROADMAP §5.1 row 94)
+//
+// ⚠ WHAT THESE ROWS CANNOT SEE, AGAIN AND MORE SO. There is no pointer here.
+// Everything below tests the ARITHMETIC a pointer handler feeds; whether an
+// event reaches it, whether the canvas is covered, and whether a client pixel
+// maps to the strip pixel it should are `scratchpad/timeline-edit-harness.mjs`'s
+// rows, and they drive the real app.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function pband(top: number, bot: number, addr = 74, words = 1): EffectsPresetBand {
+  return { top, bot, sh: false, on: { cram: { addr, colours: Array.from({ length: words }, () => 0) } } };
+}
+function pset(bands: EffectsPresetBand[]): EffectsPreset {
+  return { schema: 1, id: 'strip_preset', bands };
+}
+/** Two bands, distinct and non-trivial, one clear line apart — a legal program. */
+function twoBands(): EffectsPreset {
+  return pset([pband(40, 90), pband(120, 176)]);
+}
+const presetViewOf = (p: EffectsPreset | null, drag = null as null) =>
+  rasterTimelineView(twoSplits(), planOf(twoSplits()), p, drag);
+
+describe('the ruler runs both ways', () => {
+  it('stripYToLine INVERTS lineToStripY exactly, on every line of the frame', () => {
+    // The drag's whole coordinate story is this pair. A half-pixel of drift here
+    // is a band that jumps one line when the pointer comes up.
+    for (let line = 0; line < RASTER_TIMELINE_LINES; line++) {
+      expect(stripYToLine(lineToStripY(line))).toBe(line);
+    }
+  });
+
+  it('and it does NOT round — a pointer between two lines asks for a fraction', () => {
+    // Rounding here would make `bandEdgeNotice` speak about a value the pointer
+    // is not actually at; `clampBandEdge` is the one that rounds, once.
+    expect(stripYToLine(lineToStripY(66) + 0.6)).toBeCloseTo(66.6, 6);
+  });
+});
+
+describe('the preset column is the editable one, and it is the ONLY editable one', () => {
+  it('draws one row per band, at the document\'s own screen lines', () => {
+    const v = presetViewOf(twoBands());
+    expect(v.presetId).toBe('strip_preset');
+    expect(v.presetBands.map((b) => [b.top, b.bot])).toEqual([[40, 90], [120, 176]]);
+    expect(v.presetBands[0].y).toBe(lineToStripY(40));
+    expect(v.presetBands[0].h).toBe((90 - 40) * RASTER_TIMELINE_SCALE);
+  });
+
+  it('grabs an edge within the published tolerance and NOT one pixel past it', () => {
+    const rows = presetViewOf(twoBands()).presetBands;
+    const x = RASTER_TIMELINE_PRESET_X + RASTER_TIMELINE_PRESET_W / 2;
+    const topY = lineToStripY(40);
+    expect(presetEdgeAt(rows, x, topY)).toEqual({ index: 0, edge: 'top' });
+    expect(presetEdgeAt(rows, x, topY + BAND_EDGE_GRAB_PX)).toEqual({ index: 0, edge: 'top' });
+    expect(presetEdgeAt(rows, x, topY + BAND_EDGE_GRAB_PX + 1)).toBeNull();
+  });
+
+  it('grabs the BOT edge at `bot`, where the restore actually fires', () => {
+    const rows = presetViewOf(twoBands()).presetBands;
+    const x = RASTER_TIMELINE_PRESET_X + 1;
+    expect(presetEdgeAt(rows, x, lineToStripY(90))).toEqual({ index: 0, edge: 'bot' });
+    expect(presetEdgeAt(rows, x, lineToStripY(176))).toEqual({ index: 1, edge: 'bot' });
+  });
+
+  it('THE ROW THAT KEEPS THE LAYER COLUMN READ-ONLY: no edge is grabbable over it', () => {
+    // ⚠ A layer top is an ACT coordinate that only has a screen line under the
+    // lock. A hit test that answered over the layer column would let an author
+    // drag, in screen space, a number that does not live there — the "two rulers,
+    // one picture" failure the whole strip is shaped to avoid.
+    const rows = presetViewOf(twoBands()).presetBands;
+    for (let x = RASTER_TIMELINE_STRIP_X; x <= RASTER_TIMELINE_STRIP_X + RASTER_TIMELINE_STRIP_W; x++) {
+      expect(presetEdgeAt(rows, x, lineToStripY(40))).toBeNull();
+      expect(presetBandAt(rows, x, lineToStripY(60))).toBeNull();
+    }
+  });
+
+  it('hits a band\'s interior for the split gesture, and nothing outside it', () => {
+    const rows = presetViewOf(twoBands()).presetBands;
+    const x = RASTER_TIMELINE_PRESET_X + 2;
+    expect(presetBandAt(rows, x, lineToStripY(60))).toBe(0);
+    expect(presetBandAt(rows, x, lineToStripY(150))).toBe(1);
+    // Line 100 sits in the clear gap between the two bands.
+    expect(presetBandAt(rows, x, lineToStripY(100))).toBeNull();
+  });
+
+  it('with no preset there is no column, and the honesty line says palette bands are absent', () => {
+    const v = presetViewOf(null);
+    expect(v.presetId).toBeNull();
+    expect(v.presetBands).toEqual([]);
+    expect(v.absent).toContain('palette bands');
+    // ...and WITH one it stops saying it, because then it would be false.
+    expect(presetViewOf(twoBands()).absent).not.toContain('palette bands');
+    expect(presetViewOf(twoBands()).absent).toContain('per-line deform');
+  });
+
+  it('a colliding pair reaches the strip\'s notices, with nobody asking', () => {
+    // Document state, not gesture state — the `v_offset` hole's lesson.
+    const v = presetViewOf(pset([pband(40, 90), pband(90, 140)]));
+    expect(v.notices.some((n) => n.includes('both fire on screen line 90'))).toBe(true);
+    // De-duplicated: a colliding PAIR must not say one fact twice in two voices.
+    expect(v.notices.filter((n) => n.includes('screen line 90'))).toHaveLength(1);
+  });
+});
+
+describe('the gesture\'s value is computed in exactly one place', () => {
+  it('presetDragFor holds the request at the bound and reports the RAW ask beside it', () => {
+    const p = twoBands();
+    const d = presetDragFor(p, 0, 'top', lineToStripY(200));
+    // Held at `bot - 1` = 89 by the order rule; the raw ask survives so the
+    // advisory can speak about what the pointer wanted.
+    expect(d).toEqual({ index: 0, edge: 'top', line: 89, requested: 200 });
+  });
+
+  it('and the PREVIEW draws that same held value — not the raw pointer', () => {
+    // ⚠ THE TWO-COPIES DEFECT THIS ROW EXISTS FOR: if the preview drew the raw
+    // request and the commit wrote the clamped one, the band would jump on
+    // release, at the bound, where an author is already confused.
+    const p = twoBands();
+    const d = presetDragFor(p, 0, 'top', lineToStripY(200))!;
+    const v = rasterTimelineView(twoSplits(), planOf(twoSplits()), p, d);
+    expect(v.presetBands[0].top).toBe(d.line);
+    expect(v.presetBands[0].dragging).toBe(true);
+    expect(v.presetBands[1].dragging).toBe(false);
+  });
+
+  it('returns null for a band that is not there, rather than a drag on nothing', () => {
+    expect(presetDragFor(twoBands(), 9, 'top', 100)).toBeNull();
+    expect(presetDragFor(null, 0, 'top', 100)).toBeNull();
+  });
+});
+
+describe('drawRasterTimeline — the preset column', () => {
+  it('fills one rectangle per band and strokes TWO handles for each: it is an INTERVAL', () => {
+    // ⚠ THE GRAMMAR, COUNTED. A split gets one rule and no closing edge because
+    // the mechanism has none; a palette band gets two, because it has a paired
+    // restore. A build that drew one edge per band would pass every model row in
+    // this file and misstate the hardware on screen.
+    const v = presetViewOf(twoBands());
+    const counts = drawRasterTimeline(stubCtx(), v);
+    expect(counts.presetFills).toBe(2);
+    expect(counts.presetHandles).toBe(4);
+    expect(counts.markers).toBe(2);   // the splits are still drawn as ONE edge each
+  });
+
+  it('draws nothing in the column when there is no preset, and still draws the rest', () => {
+    const counts = drawRasterTimeline(stubCtx(), presetViewOf(null));
+    expect(counts.presetFills).toBe(0);
+    expect(counts.presetHandles).toBe(0);
+    expect(counts.fills).toBe(4);
+  });
+
+  it('puts the handles on the band\'s own two lines and on no line between them', () => {
+    const ctx = stubCtx();
+    drawRasterTimeline(ctx, presetViewOf(twoBands()));
+    const ys = ctx.calls.filter((c) => c.startsWith('moveTo('))
+      .filter((c) => c.startsWith(`moveTo(${RASTER_TIMELINE_PRESET_X},`))
+      .map((c) => Number(c.split(',')[1].replace(')', '')));
+    expect(ys).toContain(lineToStripY(40) + 0.5);
+    expect(ys).toContain(lineToStripY(90) + 0.5);
+    expect(ys).not.toContain(lineToStripY(65) + 0.5);
+  });
+});
+
+describe('the report carries the editable column too', () => {
+  it('publishes the preset column\'s geometry and its grab tolerance', () => {
+    const inactive = inactiveRasterTimelineReport();
+    expect(inactive.presetX).toBe(RASTER_TIMELINE_PRESET_X);
+    expect(inactive.presetW).toBe(RASTER_TIMELINE_PRESET_W);
+    expect(inactive.grabPx).toBe(BAND_EDGE_GRAB_PX);
+  });
+
+  it('THE POINTER READING SURVIVES THE REPAINT IT CAUSES', () => {
+    // ⚠ A pointer event is followed by a re-render and therefore by a publish.
+    // If the publish carried `pointer` the instrument would report null for
+    // every gesture it exists to measure — the harness would be measuring its
+    // own erasure.
+    publishRasterTimelinePointer({ clientX: 10, clientY: 20, x: 3, y: 4, line: 5, hit: 'edge 0.top' });
+    publishRasterTimelineReport(inactiveRasterTimelineReport());
+    expect(lastRasterTimelineReport().pointer).toEqual(
+      { clientX: 10, clientY: 20, x: 3, y: 4, line: 5, hit: 'edge 0.top' });
+  });
+
+  it('and a pointer reading does NOT advance `paints` — a mouse move is not a draw', () => {
+    const before = lastRasterTimelineReport().paints;
+    publishRasterTimelinePointer(null);
+    expect(lastRasterTimelineReport().paints).toBe(before);
   });
 });

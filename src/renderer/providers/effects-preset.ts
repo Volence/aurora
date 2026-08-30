@@ -39,6 +39,10 @@ import {
   presetArmIssue, presetOnArms, presetArmFields, effectsPresetPath,
 } from '../../core/formats/effects/preset';
 import type { SetEffectsPresetCommand } from '../../core/editing/commands';
+// THE FIRE BOUND IS NOT RE-TYPED HERE. A band's two edges and a vsplit's fire
+// are the same engine `ensure` — see the timeline block at the foot of this
+// file — so the constant is imported from the one place that declares it.
+import { EFFECTS_FIRE_LINE_MIN, EFFECTS_FIRE_LINE_MAX } from './effects-aeon';
 
 // ---------------------------------------------------------------------------
 // THE THREE LIMITS — one source, read by the panel and by the wording gate
@@ -584,5 +588,320 @@ export function setPresetNameCommand(
   return editPresetCommand(library, id, `Preset ${id} name`, (p) => {
     if (name === '') delete p.name;
     else p.name = name;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THE TIMELINE'S EDITING HALF — WHAT A SPLIT IS, AND WHAT BOUNDS AN EDGE
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ROADMAP §5.1 row 94. Everything below is DERIVED from aeon's shipped
+// `engine/effects/raster_dsl.emp`, cited by the TEXT of the ensure rather than
+// by a line number, because these are the rules a drag has to obey and a number
+// copied out of a moving file is this repo's most-paid-for defect. Four rules,
+// and they are not the same KIND of rule:
+//
+//   1. THE FIRE BOUND — `fire()` opens with
+//        "fire: screen line {line} outside 3..223 (lines 0-2 belong to the
+//         priming records)"
+//      and BOTH of a band's edges go through `fire()`: `band()` returns
+//      `[fire(top, ...), fire(bot, ...)]`. So `top` and `bot` are each bounded
+//      3..223 — the SAME bound `EFFECTS_FIRE_LINE_MIN/MAX` already carries for
+//      a vsplit's fire, imported here rather than re-typed.
+//
+//   2. THE ORDER RULE — `band()`'s own
+//        ensure(top < bot, "band: top {top} must be above bot {bot}")
+//      and the vendored schema says it twice more, on `top` and on `bot`.
+//
+//   3. THE GAP RULE — TWO BANDS MAY NOT SHARE A FIRE LINE, and this is the one
+//      that decides what a SPLIT is. `compose` merges every fire on one screen
+//      line into ONE record (`for line in 3..224 { ... }`, gathering across all
+//      programs), and `raster_program` then refuses that record by name:
+//        "the fire at line {n} carries the restore plus {n} other op(s) — the
+//         restore's fire carries the restore ONLY ... a second stream op cannot
+//         be placed in the same blanking window at all"
+//      `check_intervals` says the same thing one level up ("Records must occupy
+//      STRICTLY ASCENDING, DISJOINT fire-line intervals"), and names the
+//      consequence: the arm gap is stored as the low byte of an $8Axx word, so
+//      two records on one line make it -1, whose byte is $FF — RASTER_ARM_PARK,
+//      which kills every remaining fire in the frame silently.
+//
+//      ⚠ SO ABUTTING BANDS DO NOT BUILD. `{top, bot: L}` beside `{top: L, bot}`
+//      is a refused program, not a tight one. A split therefore leaves ONE
+//      CLEAR LINE between the halves, and that line shows the base palette.
+//
+//   4. THE OWNERSHIP RULE — `check_band_ownership`, the per-CRAM-entry
+//      timeline, refuses two bands live on one entry at once:
+//        "Two bands may share colours only if they do not overlap vertically"
+//      Bands whose CRAM spans are DISJOINT are not constrained by it at all —
+//      nesting them is legal, which is why this is an advisory and not a wall.
+//
+// ⚠ WHAT IS DELIBERATELY NOT HERE. The HEIGHT MINIMUM is not transcribed. It is
+// `fire_cost_cycles(f_on) <= (bot - top) * RASTER_SCANLINE_CYC` — cost-keyed on
+// purpose ("they re-price themselves the day the model does"), so any number
+// Aurora wrote down would be a copied pin that goes stale silently. Neither is
+// the S/H minimum, nor the band count. The engine's own `ensure` carries the
+// measurement behind each ("the ON fire costs 624 cyc against 488 available"),
+// which is aeon's §E.4 instruction to a writer and the whole reason this codec
+// clamps nothing.
+//
+// ═══ CLAMP OR ADVISE — THE TWO RULINGS, AND THEIR JOIN ═══
+//
+// `effects-aeon.ts` rules that "the control that OWNS a value refuses to
+// originate an illegal one and says why; every other route surfaces it rather
+// than silently rewriting or blocking" — that is `clampLayerTop` plus
+// `guideBoundNotice`, and a timeline drag is the same kind of gesture.
+// `armOptions` above rules the other half: "DISABLE ONLY WHEN NO DOCUMENT
+// CONTENT CAN MAKE THE VALUE LEGAL; when the precondition is another control's
+// value, ADVISE instead of disabling."
+//
+// Their join, and it is exactly the 1/2 versus 3/4 line above:
+//   • rules 1 and 2 are true whatever else the document says, so the DRAG
+//     CLAMPS to them and says why it stopped (`bandEdgeNotice`, tone 'held').
+//   • rules 3 and 4 depend on ANOTHER BAND's values, so they ADVISE
+//     (`bandCollisionAdvisory`) and the drag lets the author make the mess and
+//     read it named. Walling them would refuse legal programs — a nested band
+//     over a disjoint CRAM span builds fine.
+//
+// And a SPINNER still writes what the author typed, unclamped, because §E.4 is
+// about values FORWARDED to the generator and a typed number is the author's.
+// A drag has no typed number: its value is where the pointer is.
+
+/** A band's two authored edges. Both are fire lines; neither is a payload. */
+export type BandEdge = 'top' | 'bot';
+
+/**
+ * The CRAM BYTE range a band's ON op writes, or null when the band carries no
+ * arm this codec recognises.
+ *
+ * BOTH ARMS SIZE THEIR SPAN FROM A COUNT THE AUTHOR EDITS: `cram` from the
+ * LENGTH of `colours`, `pal_region` from `count` — the schema says of each that
+ * it "is also the derived restore's word count". Two bytes per word.
+ */
+export function bandCramSpan(band: EffectsPresetBand): { start: number; end: number } | null {
+  if ('cram' in band.on) {
+    const colours = band.on.cram.colours;
+    if (!Array.isArray(colours)) return null;
+    return { start: band.on.cram.addr, end: band.on.cram.addr + 2 * colours.length };
+  }
+  if ('pal_region' in band.on) {
+    const r = band.on.pal_region;
+    return { start: r.addr, end: r.addr + 2 * r.count };
+  }
+  return null;
+}
+
+/**
+ * Every SCREEN LINE this band puts a raster fire on.
+ *
+ * TWO for a plain band (`[fire(top, ...), fire(bot, ...)]`) and THREE when `sh`
+ * is set, because the S/H shape adds the de-mix fire: aeon's `band()` returns
+ * `[f_on_sh, fire(bot - 1, [reg_sh_off()]), fire(bot, ...)]`. The extra line is
+ * INSIDE the band's own interval, so it never widens the band's footprint — it
+ * only matters to rule 3, where a neighbour could land on it.
+ */
+export function bandFireLines(band: EffectsPresetBand): number[] {
+  const sh = band.sh === true || band.sh === 1;
+  if (!sh) return [band.top, band.bot];
+  return band.bot - 1 === band.top ? [band.top, band.bot] : [band.top, band.bot - 1, band.bot];
+}
+
+/** Rule 1, as a sentence, in the engine's own numbers. */
+export const BAND_EDGE_LAW =
+  `both of a band's edges are raster fires, and a fire must land on ${EFFECTS_FIRE_LINE_MIN}..`
+  + `${EFFECTS_FIRE_LINE_MAX} (lines 0-${EFFECTS_FIRE_LINE_MIN - 1} belong to the priming records)`;
+
+/** Rule 2, as a sentence. */
+export const BAND_ORDER_LAW =
+  'a band covers top..bot-1, so top must stay above bot — the engine refuses top >= bot';
+
+/** Rule 3, as a sentence. The one a split is shaped by. */
+export const BAND_GAP_LAW =
+  'two bands cannot fire on one screen line: compose merges same-line fires into ONE record, and '
+  + "the restore's fire carries the restore ALONE — a second stream op cannot be placed in the same "
+  + 'blanking window. Two records on one fire line also store an arm gap of -1, whose byte is the '
+  + 'PARK word, which kills every later fire in the frame silently';
+
+/** Rule 4, as a sentence. */
+export const BAND_OVERLAP_LAW =
+  'two bands may share CRAM colours only if they do not overlap vertically — whichever restore '
+  + "comes first writes this frame's BASE palette over the whole span, so the outer band's tint "
+  + "ends at the inner band's bottom edge";
+
+/**
+ * What a DRAG of this edge may reach — rules 1 and 2 only.
+ *
+ * ⚠ THE NEIGHBOURS ARE NOT IN HERE, ON PURPOSE. See the "clamp or advise" block
+ * above: a neighbouring band's position is another control's value, and walling
+ * an edge off with it would refuse programs the engine builds (two bands over
+ * disjoint CRAM spans may nest). Rules 3 and 4 are `bandCollisionAdvisory`.
+ */
+export function bandEdgeBounds(
+  band: EffectsPresetBand, edge: BandEdge,
+): { min: number; max: number } {
+  if (edge === 'top') {
+    return { min: EFFECTS_FIRE_LINE_MIN, max: Math.min(EFFECTS_FIRE_LINE_MAX, band.bot - 1) };
+  }
+  return { min: Math.max(EFFECTS_FIRE_LINE_MIN, band.top + 1), max: EFFECTS_FIRE_LINE_MAX };
+}
+
+/** The value a drag of this edge actually writes. Rounded, then held at the bound. */
+export function clampBandEdge(band: EffectsPresetBand, edge: BandEdge, value: number): number {
+  const b = bandEdgeBounds(band, edge);
+  return Math.max(b.min, Math.min(b.max, Math.round(value)));
+}
+
+/** `GuideBoundNotice`'s shape, for the same job on this surface. */
+export interface BandEdgeNotice {
+  tone: 'held';
+  edge: 'min' | 'max';
+  /** Which rule did the narrowing — the fire bound, or the band's other edge. */
+  rule: 'fire' | 'order';
+  limit: number;
+  text: string;
+}
+
+/**
+ * Why the edge being dragged stopped, or null when it did not.
+ *
+ * `requested` is the raw line the pointer is asking for. It must NOT speak when
+ * nothing is wrong — `guideBoundNotice`'s requirement, and for its reason: an
+ * advisory that is always on screen is read as decoration within a day and is
+ * then not read at the one moment it matters.
+ */
+export function bandEdgeNotice(
+  band: EffectsPresetBand, edge: BandEdge, requested: number,
+): BandEdgeNotice | null {
+  if (!Number.isFinite(requested)) return null;
+  const want = Math.round(requested);
+  const b = bandEdgeBounds(band, edge);
+  if (want >= b.min && want <= b.max) return null;
+  const which = want < b.min ? 'min' : 'max';
+  const limit = which === 'min' ? b.min : b.max;
+  // WHICH rule narrowed it, asked of the bounds rather than assumed from the
+  // edge: `top`'s ceiling is the fire ceiling on a band whose `bot` is off the
+  // bottom, and the ORDER rule's ceiling otherwise. Saying "order" there would
+  // send the author to move the wrong number.
+  const byFire = limit === (which === 'min' ? EFFECTS_FIRE_LINE_MIN : EFFECTS_FIRE_LINE_MAX);
+  const text = byFire
+    ? `held at ${limit}. ${BAND_EDGE_LAW}. The build refuses a fire outside it.`
+    : `held at ${limit}. ${BAND_ORDER_LAW}. Move the other edge first to make room.`;
+  return { tone: 'held', edge: which, rule: byFire ? 'fire' : 'order', limit, text };
+}
+
+/**
+ * What this band collides with in the rest of the preset, or null.
+ *
+ * ⚠ THE 'ILLEGAL' TONE OF THE PAIR — it speaks about a DOCUMENT STATE, not about
+ * a gesture, so it is true whether or not anything is being dragged. That is the
+ * `v_offset` hole's lesson on the guide surface: the route that CREATES an
+ * illegal state is often not the control that owns it, so the state itself has
+ * to be visible with nobody asking.
+ */
+export function bandCollisionAdvisory(preset: EffectsPreset, index: number): string | null {
+  const band = preset.bands[index];
+  if (!band) return null;
+  const mine = bandFireLines(band);
+  const mySpan = bandCramSpan(band);
+  for (let j = 0; j < preset.bands.length; j++) {
+    if (j === index) continue;
+    const other = preset.bands[j];
+    if (!other) continue;
+    // ⚠ THE PAIR IS NAMED IN INDEX ORDER, NOT IN ASKING ORDER, and that is not
+    // tidiness: a collision is a fact about a PAIR, and both members are asked
+    // about it. Phrased from the asker's side the two answers would be two
+    // different strings saying one thing, which the strip's notice list cannot
+    // de-duplicate — and an author would read one defect as two.
+    const [lo, hi] = index < j ? [index, j] : [j, index];
+    const shared = bandFireLines(other).find((l) => mine.includes(l));
+    if (shared !== undefined) {
+      return `band ${lo} and band ${hi} both fire on screen line ${shared}. ${BAND_GAP_LAW}. `
+        + 'The build refuses the program.';
+    }
+    const theirSpan = bandCramSpan(other);
+    if (mySpan === null || theirSpan === null) continue;
+    const spansMeet = mySpan.start < theirSpan.end && theirSpan.start < mySpan.end;
+    const linesMeet = band.top < other.bot && other.top < band.bot;
+    if (spansMeet && linesMeet) {
+      const first = preset.bands[lo];
+      const second = preset.bands[hi];
+      return `band ${lo} (lines ${first.top}..${first.bot}) and band ${hi} (lines ${second.top}..`
+        + `${second.bot}) overlap vertically AND share CRAM bytes `
+        + `${Math.max(mySpan.start, theirSpan.start)}..${Math.min(mySpan.end, theirSpan.end) - 1}. `
+        + `${BAND_OVERLAP_LAW}. The build refuses the program.`;
+    }
+  }
+  return null;
+}
+
+/**
+ * What a split IS, said once, for the strip's hint and for the refusal.
+ *
+ * The one-clear-line half is not a policy choice — see rule 3 above.
+ */
+export const BAND_SPLIT_LAW =
+  'A split cuts one band into two over the same ON op, and leaves the cut line CLEAR: the upper '
+  + "half's restore fires on it, and the lower half's ON op cannot share that fire. So the cut "
+  + 'line shows the base palette, and a band needs at least three lines to have one to give.';
+
+/**
+ * The smallest height a band can be split at all.
+ *
+ * COMPUTED FROM THE TWO INEQUALITIES rather than written as 3, so it moves if
+ * either of them does: the upper half needs `top < cut` and the lower half needs
+ * `cut + 1 < bot`, so a legal cut exists exactly when `bot - top >= 1 + 2`.
+ */
+export function bandSplitMinHeight(): number {
+  const shortestHead = 1;      // cut - top, at its minimum (top < cut)
+  const shortestTail = 2;      // bot - cut, at its minimum (cut + 1 < bot)
+  return shortestHead + shortestTail;
+}
+
+/** Why this band cannot be split, or null. */
+export function bandSplitRefusal(band: EffectsPresetBand): string | null {
+  const need = bandSplitMinHeight();
+  if (band.bot - band.top >= need) return null;
+  return `lines ${band.top}..${band.bot} is ${band.bot - band.top} line(s) tall and a split needs `
+    + `${need}. ${BAND_SPLIT_LAW}`;
+}
+
+/** The line a split actually cuts on, held inside the band's legal cut range. */
+export function bandSplitLine(band: EffectsPresetBand, requested: number): number {
+  return Math.max(band.top + 1, Math.min(band.bot - 2, Math.round(requested)));
+}
+
+/**
+ * Split one band in two at `requestedLine`. ONE undo step.
+ *
+ * THE LOWER HALF IS INSERTED IMMEDIATELY AFTER THE UPPER, and its ON op is a
+ * structural clone of the original's — the two halves are the SAME effect over
+ * two intervals, which is the only reading of "split" this format has.
+ *
+ * ⚠ THE ARRAY ORDER IS AUTHORING, NOT SEMANTICS, and it is worth saying which.
+ * `compose` emits by SCREEN LINE (`for line in 3..224`), so the ownership walk
+ * reads the two halves in line order whatever order they sit in `bands`. Array
+ * order would decide that walk only for two fires ON ONE LINE — which rule 3
+ * refuses anyway. Adjacency here is for the author reading the panel's list.
+ *
+ * THE BAND ID CANNOT COLLIDE, structurally: aeon derives it as
+ * `band_id = top * 128 + sa`, the halves share `sa` (they share the ON op) and
+ * differ in `top` by at least one, so the packed pair differs.
+ */
+export function splitBandCommand(
+  library: EffectsPresetLibrary, id: string, index: number, requestedLine: number,
+): SetEffectsPresetCommand | null {
+  const existing = library.presets.find((p) => p.id === id);
+  const band = existing?.bands[index];
+  if (!existing || !band) return null;
+  if (bandSplitRefusal(band) !== null) return null;
+  const cut = bandSplitLine(band, requestedLine);
+  return editPresetCommand(library, id, `Split band ${index} of ${id} at line ${cut}`, (p) => {
+    const b = p.bands[index];
+    if (!b) return;
+    const lower: EffectsPresetBand = {
+      top: cut + 1, bot: b.bot, sh: b.sh, on: structuredClone(b.on),
+    };
+    b.bot = cut;
+    p.bands.splice(index + 1, 0, lower);
   });
 }

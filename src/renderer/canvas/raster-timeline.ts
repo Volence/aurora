@@ -1,6 +1,6 @@
-// THE RASTER TIMELINE — a READ-ONLY lens on where this scene's bands and splits
-// land down the 224-line frame (ROADMAP §4.6, "224-line strip, split markers,
-// palette stops").
+// THE RASTER TIMELINE — where this scene's layer bands and splits, and the
+// selected PRESET's palette bands, land down the 224-line frame (ROADMAP §4.6,
+// "224-line strip, split markers, palette stops").
 //
 // THE DEFECT IT CLOSES. An author sets `vsplit.at` in a spinner and **nothing on
 // screen changes**. It is the same shape as the two defects closed earlier on
@@ -8,22 +8,46 @@
 // authorable and invisible — and it is closed the same way: by drawing the
 // value, not by describing it.
 //
-// ═══ THE BOUNDARY THIS FILE IS ON THE VIEW SIDE OF ═══
+// ═══ TWO COLUMNS, TWO DOCUMENTS, AND ONLY ONE OF THEM IS EDITABLE HERE ═══
 //
-// Aeon is designing N-bands (`docs/superpowers/specs/2026-08-28-raster-band-
-// ownership-design.md` at aeon `0bee83c61e9c53ade6899f7389f666720215caf7`,
-// reachable from their `origin/master`). That design decides band OWNERSHIP and
-// EDGE semantics. So this module DRAWS and does not EDIT: no marker is
-// draggable, no split is created or deleted here, and there is **no persisted
-// timeline document and no exported type that commits to how splits are owned
-// or ordered**. Everything below is a projection of `CameraPreviewPlan`,
-// recomputed per repaint and thrown away — the same object the camera preview
-// already draws, seen down the frame instead of across it.
+// The PRESET column (left, against the ruler) draws `EffectsPreset.bands` —
+// intervals with two edges, from `presets/<id>.json`. It is the editable one:
+// drag an edge, double-click (or Alt-click) inside a band to split it. Every
+// rule those gestures obey is declared in `providers/effects-preset.ts`'s
+// timeline block and derived there from aeon's shipped `raster_dsl.emp`; NOTHING
+// in this file spells a bound of its own.
 //
-// ⚠ NO BAND COUNT, NO BAND HEIGHT MINIMUM, NO WIRE SIZE is transcribed from that
-// design. It carries five open questions and its height minimum rests on
-// `op_work_cyc == 64`, which their §12 still marks UNVERIFIED. A number copied
-// out of a moving spec is the copied-pin defect this repo keeps paying for.
+// The LAYER column (right) draws the scene's `CameraPreviewPlan` bands, and the
+// split rules across the strip draw `vsplit` fires. Both are READ-ONLY here and
+// stay so: a layer top is authored on the MAP, in the map's world axis, by a
+// guide this strip must not become a second, disagreeing ruler for.
+//
+// ═══ THE RULING THIS FILE USED TO CARRY — DISCHARGED 2026-08-28, ACTED ON HERE
+//
+// It said: "Aeon is designing N-bands (`docs/superpowers/specs/2026-08-28-raster
+// -band-ownership-design.md` at aeon `0bee83c61e9c53ade6899f7389f666720215caf7`
+// ...). That design decides band OWNERSHIP and EDGE semantics. So this module
+// DRAWS and does not EDIT: no marker is draggable, no split is created or
+// deleted here." **The design landed on 2026-08-28** — P1, P2a and
+// `parcel/band-first-consumer` all shipped, N bands exercised by `OJZ_BandDemo`
+// on every build; only P2b/P3 remain design-only. The ownership and edge
+// semantics it was waiting on are now shipped CODE, in `band()`,
+// `check_intervals` and `check_band_ownership`, and that code is what the
+// editing half reads. Kept as the record of what was believed, for the reason
+// the panel's own header states at length: nothing re-reads a comment to check
+// whether the rule it cites still holds.
+//
+// ⚠ WHAT IS STILL NOT TRANSCRIBED, and this half of the ruling is UNCHANGED. NO
+// BAND COUNT, NO BAND HEIGHT MINIMUM, NO WIRE SIZE is copied out of that design.
+// Its height minimum is cost-keyed in the engine on purpose; a number copied out
+// of it is the copied-pin defect this repo keeps paying for. The two bounds the
+// editing half does name are the two that live in shipped engine code, and it
+// names them by importing them.
+//
+// ⚠ AND NOT THE CLOCK. Nothing here moves a band over time. That is ROADMAP §5.1
+// row 95 and it is genuinely gated on aeon's DoD item 4 (P2b plus the
+// time-driven anchor mover, still design-only). Camera bands preview
+// clocklessly; only timer-driven bands would need one.
 //
 // ═══ THE COORDINATE-SPACE FINDING — READ THIS BEFORE ADDING A ROW ═══
 //
@@ -92,9 +116,11 @@
 //     write. Drawn here as a rule with a downward flag.
 //   • A PALETTE BAND is an **interval with TWO edges** — an ON op and a paired
 //     `pal_restore`, which is the whole subject of aeon's N-bands design. Drawn
-//     here: NOT AT ALL, and `rasterTimelineAbsences` says so on the strip. An
-//     interval drawn as a boundary, or a boundary drawn as an interval, is the
-//     picture that looks authoritative and misstates the mechanism.
+//     here as a RECTANGLE with two grabbable edges, in its own column, and never
+//     as a rule. An interval drawn as a boundary, or a boundary drawn as an
+//     interval, is the picture that looks authoritative and misstates the
+//     mechanism. `rasterTimelineAbsences` still says "palette bands" when there
+//     is no preset to draw, because then they really are not drawn.
 //
 // ═══ NO CLOCK ═══
 //
@@ -104,6 +130,8 @@
 // because this is not MapViewport.
 
 import type { EffectsScene, EffectsLayer } from '../../core/formats/effects/scene';
+import type { EffectsPreset, EffectsPresetBand } from '../../core/formats/effects/preset';
+import { bandArm, bandCollisionAdvisory, clampBandEdge } from '../providers/effects-preset';
 import { factorLabel } from '../../core/formats/effects/scene-ui';
 import type { CameraPreviewPlan, CameraPreviewBand } from './camera-preview';
 import {
@@ -140,10 +168,24 @@ export const RASTER_TIMELINE_LINES = SCREEN_HEIGHT;
 
 /** 1 strip pixel per screen line — the ruler is 1:1 so no aim needs a scale. */
 export const RASTER_TIMELINE_SCALE = 1;
-/** Canvas-local Y of screen line 0. Room above for the header line. */
-export const RASTER_TIMELINE_ORIGIN_Y = 16;
-/** The band column: left edge and width, in strip px. */
-export const RASTER_TIMELINE_STRIP_X = 34;
+/**
+ * Canvas-local Y of screen line 0. Room above for the header line AND for the
+ * two column captions — two columns that are not named are two columns an author
+ * has to guess between, and only one of them is editable.
+ */
+export const RASTER_TIMELINE_ORIGIN_Y = 26;
+/**
+ * The PRESET band column — the editable one, and it gets the ruler.
+ *
+ * ⚠ AGAINST THE TICKS ON PURPOSE. This is the column an author drags, and the
+ * numbers they are dragging TO are the ruler's. The layer column, which nothing
+ * here edits, moved right to make room; its own constants are still what the
+ * report publishes, so no aim anywhere is typed.
+ */
+export const RASTER_TIMELINE_PRESET_X = 34;
+export const RASTER_TIMELINE_PRESET_W = 26;
+/** The scene LAYER band column: left edge and width, in strip px. */
+export const RASTER_TIMELINE_STRIP_X = 66;
 export const RASTER_TIMELINE_STRIP_W = 26;
 /** Where a split's rule starts and how far it runs. */
 export const RASTER_TIMELINE_RULE_X = RASTER_TIMELINE_STRIP_X - 6;
@@ -152,9 +194,29 @@ export const RASTER_TIMELINE_W = 258;
 export const RASTER_TIMELINE_H =
   RASTER_TIMELINE_ORIGIN_Y + RASTER_TIMELINE_LINES * RASTER_TIMELINE_SCALE + 30;
 
+/**
+ * How near an edge a pointer must be to grab it, in strip px.
+ *
+ * `GUIDE_GRAB_PX`'s value and its reason, on the surface that already settled
+ * this question for a horizontal line the author aims at with a mouse.
+ */
+export const BAND_EDGE_GRAB_PX = 5;
+
 /** Canvas-local Y of a screen line. The one transform, and it is exact. */
 export function lineToStripY(line: number): number {
   return RASTER_TIMELINE_ORIGIN_Y + line * RASTER_TIMELINE_SCALE;
+}
+
+/**
+ * The screen line at a canvas-local Y — `lineToStripY` inverted, EXACTLY.
+ *
+ * ⚠ NOT ROUNDED HERE. A gesture's raw request is fractional and the raw request
+ * is what an advisory has to speak about: `bandEdgeNotice` rounds it once, and a
+ * second rounding on the way in would make a pointer at 66.6 ask for a bound it
+ * is not actually against. `clampBandEdge` is the one that rounds to write.
+ */
+export function stripYToLine(y: number): number {
+  return (y - RASTER_TIMELINE_ORIGIN_Y) / RASTER_TIMELINE_SCALE;
 }
 
 // ---------------------------------------------------------------------------
@@ -208,16 +270,62 @@ export interface RasterTimelineSplitRow {
   refusal: string | null;
 }
 
+/**
+ * One PRESET palette band on the strip — an interval with two grabbable edges.
+ *
+ * ⚠ `top` AND `bot` ARE THE DOCUMENT'S OWN NUMBERS, not a projection of a plan.
+ * That is the difference from `RasterTimelineBandRow` above and it is the whole
+ * reason this column is editable and that one is not: a preset band's edges ARE
+ * screen lines, authored as screen lines, so a drag writes back exactly what the
+ * ruler shows. A layer's top is an ACT coordinate that only has a screen line
+ * under the lock, and a strip that let an author drag it would be authoring in a
+ * space the value does not live in.
+ */
+export interface RasterTimelinePresetBandRow {
+  index: number;
+  top: number;
+  bot: number;
+  /** Canvas-local Y of `top`, and the height in strip px. Clipped to the ruler. */
+  y: number;
+  h: number;
+  /** True while this row is the one a gesture is moving. */
+  dragging: boolean;
+  sh: boolean;
+  /** Which ON arm, for the column's label. Null when the band carries none. */
+  arm: string | null;
+  /** What this band collides with in the rest of the preset, or null. */
+  collision: string | null;
+}
+
 /** What the strip is showing, in one throwaway bundle. */
 export interface RasterTimelineView {
   sceneId: string;
   space: LayerTopSpace;
   bands: RasterTimelineBandRow[];
   splits: RasterTimelineSplitRow[];
+  /** The preset whose bands the left column is drawing, or null. */
+  presetId: string | null;
+  presetBands: RasterTimelinePresetBandRow[];
   /** Sentences the strip must say for this scene. Empty is the common case. */
   notices: string[];
   /** Mechanisms this strip does not draw. Never empty. */
   absent: string[];
+}
+
+/**
+ * What a gesture is asking of one preset band, while it is asking.
+ *
+ * PER-GESTURE AND THROWN AWAY, exactly like the view it feeds: the document is
+ * not touched until the pointer comes up, so a drag that is abandoned leaves no
+ * command and no undo entry. `MapViewport`'s guide drag is the idiom.
+ */
+export interface RasterTimelinePresetDrag {
+  index: number;
+  edge: 'top' | 'bot';
+  /** The value that WOULD be written — already held at the bound. */
+  line: number;
+  /** The raw line the pointer is asking for, pre-clamp. Drives the notice. */
+  requested: number;
 }
 
 /**
@@ -279,8 +387,12 @@ export function splitRefusal(
  * below says WHY the two mechanisms are not interchangeable, in prose beside the
  * strip where a sentence has room to be a sentence.
  */
-export function rasterTimelineAbsences(): string[] {
-  return ['palette bands', 'per-line deform'];
+export function rasterTimelineAbsences(hasPreset = false): string[] {
+  // ⚠ THE FLAG IS NOT A COSMETIC. "palette bands" was true of every build until
+  // row 94 and is now true only when there is no preset to draw — and an honesty
+  // line that keeps naming something the strip IS showing teaches an author to
+  // stop reading it, which costs the two entries that are still true.
+  return hasPreset ? ['per-line deform'] : ['palette bands', 'per-line deform'];
 }
 
 /**
@@ -291,9 +403,22 @@ export function rasterTimelineAbsences(): string[] {
  * hardware, and that is a worse outcome than not drawing them at all.
  */
 export const RASTER_TIMELINE_GRAMMAR =
-  'Read-only. A split is ONE edge: from its line to the bottom of the frame, until the next '
-  + 'split supersedes it — there is no paired restore and no end line. A palette band is an '
-  + 'INTERVAL with two edges, and those are not drawn yet.';
+  'A split is ONE edge: from its line to the bottom of the frame, until the next split '
+  + 'supersedes it — there is no paired restore and no end line, and nothing here edits one. '
+  + 'A palette band is an INTERVAL with two edges, and those two edges are the ones you drag.';
+
+/**
+ * How to work the editable column, in the app's own voice.
+ *
+ * ⚠ NAMED GESTURES, BESIDE THE THING THEY WORK ON. A drag handle nobody knows is
+ * a handle is the same defect as a value nobody can see — this strip's own
+ * founding defect one turn later. `BAND_SPLIT_LAW` carries WHY the cut line goes
+ * clear; this carries WHAT to do, and the two are separate sentences because one
+ * is about the hardware and one is about the mouse.
+ */
+export const RASTER_TIMELINE_GESTURES =
+  'Drag a band edge in the left column to move it. Double-click (or Alt-click) inside a band '
+  + 'to split it there. Each gesture is one undo step.';
 
 /**
  * The whole view, derived from the plan the camera preview draws from.
@@ -309,8 +434,106 @@ export const RASTER_TIMELINE_GRAMMAR =
  * place, and a split the engine REFUSES has no band to hang off. Drawing only
  * the ones the preview placed would hide exactly the ones that break the build.
  */
+/**
+ * The PRESET column's rows, with one band's edge optionally moved by a gesture.
+ *
+ * ⚠ THE DRAG IS APPLIED HERE AND NOWHERE ELSE. The document is not touched until
+ * the pointer comes up, so the preview and the committed value must be the SAME
+ * arithmetic or the band jumps on release — the class of defect a preview drawn
+ * from a second copy of the rule always eventually has. `clampBandEdge` is that
+ * arithmetic, imported, and the commit calls it too.
+ */
+export function rasterTimelinePresetRows(
+  preset: EffectsPreset | null, drag: RasterTimelinePresetDrag | null,
+): RasterTimelinePresetBandRow[] {
+  if (preset === null) return [];
+  return preset.bands.map((band, index) => {
+    const held = drag !== null && drag.index === index
+      ? { ...band, [drag.edge]: drag.line } as EffectsPresetBand
+      : band;
+    // CLIPPED TO THE RULER, not dropped: a band whose edges sit outside 3..223
+    // is a document the loader keeps and the build refuses, and a row that
+    // vanished would hide exactly the band the author has to fix.
+    const topY = lineToStripY(Math.max(0, Math.min(RASTER_TIMELINE_LINES, held.top)));
+    const botY = lineToStripY(Math.max(0, Math.min(RASTER_TIMELINE_LINES, held.bot)));
+    return {
+      index,
+      top: held.top,
+      bot: held.bot,
+      y: topY,
+      h: Math.max(0, botY - topY),
+      dragging: drag !== null && drag.index === index,
+      sh: held.sh === true || held.sh === 1,
+      arm: bandArm(held),
+      collision: bandCollisionAdvisory(preset, index),
+    };
+  });
+}
+
+/**
+ * Which preset band edge is under this canvas-local point, or null.
+ *
+ * NEAREST WINS, and a tie goes to the LATER band — `guideAtCanvasY`'s rule, for
+ * its reason: the later row is the one drawn on top, so it is the one the author
+ * believes they are pointing at.
+ */
+export function presetEdgeAt(
+  rows: RasterTimelinePresetBandRow[], x: number, y: number,
+): { index: number; edge: 'top' | 'bot' } | null {
+  if (x < RASTER_TIMELINE_PRESET_X - 2
+    || x > RASTER_TIMELINE_PRESET_X + RASTER_TIMELINE_PRESET_W + 2) return null;
+  let best: { index: number; edge: 'top' | 'bot' } | null = null;
+  let bestD = BAND_EDGE_GRAB_PX + 1;
+  for (const r of rows) {
+    for (const edge of ['top', 'bot'] as const) {
+      const d = Math.abs(y - (edge === 'top' ? r.y : r.y + r.h));
+      if (d <= BAND_EDGE_GRAB_PX && d <= bestD) { bestD = d; best = { index: r.index, edge }; }
+    }
+  }
+  return best;
+}
+
+/**
+ * Which preset band's INTERIOR is under this point, or null.
+ *
+ * The split gesture's hit test, and it is deliberately NOT the edge test's
+ * complement: a band tall enough to split is at least three lines, so its
+ * interior always survives the two grab zones being taken out of it.
+ */
+export function presetBandAt(
+  rows: RasterTimelinePresetBandRow[], x: number, y: number,
+): number | null {
+  if (x < RASTER_TIMELINE_PRESET_X
+    || x > RASTER_TIMELINE_PRESET_X + RASTER_TIMELINE_PRESET_W) return null;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const r = rows[i];
+    if (y >= r.y && y <= r.y + r.h) return r.index;
+  }
+  return null;
+}
+
+/**
+ * What a pointer at `canvasY` is asking of this edge — the ONE place a gesture's
+ * value is computed.
+ *
+ * ⚠ THE PREVIEW AND THE COMMIT MUST NOT BE TWO COPIES OF THIS. The strip draws
+ * `drag.line` and the release WRITES `drag.line`; if the component recomputed
+ * the value from the pointer at commit time, a rounding difference of half a
+ * pixel would make the band jump on release, which is the defect every
+ * two-copies preview eventually has.
+ */
+export function presetDragFor(
+  preset: EffectsPreset | null, index: number, edge: 'top' | 'bot', canvasY: number,
+): RasterTimelinePresetDrag | null {
+  const band = preset?.bands[index];
+  if (!band) return null;
+  const requested = stripYToLine(canvasY);
+  return { index, edge, line: clampBandEdge(band, edge, requested), requested };
+}
+
 export function rasterTimelineView(
   scene: EffectsScene, plan: CameraPreviewPlan,
+  preset: EffectsPreset | null = null, drag: RasterTimelinePresetDrag | null = null,
 ): RasterTimelineView {
   const space = layerTopSpace(scene);
   const certain = space === 'screen';
@@ -342,11 +565,25 @@ export function rasterTimelineView(
     splits.push({ layer: i, line, at, y: onStrip ? lineToStripY(line) : null, refusal });
   }
 
+  const presetBands = rasterTimelinePresetRows(preset, drag);
+
   const notices: string[] = [];
   const spaceNote = rasterTimelineSpaceNotice(scene);
   if (spaceNote !== null) notices.push(spaceNote);
+  // ⚠ THE COLLISIONS SPEAK WITH NOBODY ASKING. They are a property of the
+  // DOCUMENT, not of a gesture, and the route that creates one is usually not
+  // the control that owns it — the `v_offset` hole's lesson, one surface over.
+  // De-duplicated because a colliding PAIR would otherwise say the same fact
+  // twice in two subjects.
+  for (const sentence of new Set(presetBands.map((b) => b.collision).filter((s): s is string => s !== null))) {
+    notices.push(sentence);
+  }
 
-  return { sceneId: scene.id, space, bands, splits, notices, absent: rasterTimelineAbsences() };
+  return {
+    sceneId: scene.id, space, bands, splits,
+    presetId: preset?.id ?? null, presetBands,
+    notices, absent: rasterTimelineAbsences(preset !== null),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -364,6 +601,24 @@ const BAND_FILLS = [
 ];
 const SPLIT_LINE = 'rgba(255, 170, 60, 0.95)';
 const SPLIT_TEXT = 'rgba(255, 220, 160, 0.98)';
+/**
+ * The PRESET column, in a hue no other mark on this strip uses.
+ *
+ * ⚠ NOT A SHADE OF THE LAYER COLUMN'S CYAN. The two columns are two DOCUMENTS,
+ * and a palette band and a layer band are not two grades of one thing — an
+ * author who reads them as one has the wrong model of which file they are
+ * editing. It is also chosen clear of the split marker's own sampled window
+ * (r>=200, 130<=g<=190, b<=90): composited over the strip's background the fill
+ * is (82,53,108) and the edge is (210,153,243), so neither can answer for a
+ * split rule in a pixel probe.
+ */
+const PRESET_FILLS = [
+  'rgba(200, 120, 255, 0.38)',
+  'rgba(200, 120, 255, 0.20)',
+];
+const PRESET_EDGE = 'rgba(220, 160, 255, 0.95)';
+/** The edge under a live gesture. A different VALUE, not a different hue. */
+const PRESET_EDGE_HOT = 'rgba(255, 255, 255, 0.98)';
 
 /** Where every ruler tick goes. 32 is the shipped scenes' own spacing (0/32/80/112/160). */
 const RULER_STEP = 32;
@@ -378,12 +633,18 @@ const LABEL_MID_MIN_H = 20;
  * ACTUALLY stroked, so a strip that planned everything and drew nothing reports
  * zeroes. See `RasterTimelineReport`.
  */
-export interface RasterTimelineDrawCounts { fills: number; markers: number }
+export interface RasterTimelineDrawCounts {
+  fills: number;
+  markers: number;
+  /** Preset band rectangles actually filled, and edge handles actually stroked. */
+  presetFills: number;
+  presetHandles: number;
+}
 
 export function drawRasterTimeline(
   ctx: CanvasRenderingContext2D, view: RasterTimelineView,
 ): RasterTimelineDrawCounts {
-  const counts: RasterTimelineDrawCounts = { fills: 0, markers: 0 };
+  const counts: RasterTimelineDrawCounts = { fills: 0, markers: 0, presetFills: 0, presetHandles: 0 };
   const x = RASTER_TIMELINE_STRIP_X;
   const w = RASTER_TIMELINE_STRIP_W;
   const top = RASTER_TIMELINE_ORIGIN_Y;
@@ -396,16 +657,23 @@ export function drawRasterTimeline(
   ctx.font = '9px system-ui, sans-serif';
   ctx.textBaseline = 'middle';
 
-  // ── the ruler ───────────────────────────────────────────────────────────
+  // ── the ruler, and the two columns named ────────────────────────────────
   ctx.fillStyle = RULER_TEXT;
   ctx.fillText(`screen lines 0..${RASTER_TIMELINE_LINES - 1}`, 2, 7);
+  ctx.fillStyle = view.presetId === null ? RULER_TICK : PRESET_EDGE;
+  ctx.fillText(view.presetId === null ? 'no preset' : 'bands', RASTER_TIMELINE_PRESET_X, 18);
+  ctx.fillStyle = RULER_TEXT;
+  ctx.fillText('layers', x, 18);
   for (let line = 0; line <= RASTER_TIMELINE_LINES; line += RULER_STEP) {
     const y = Math.round(lineToStripY(Math.min(line, RASTER_TIMELINE_LINES - 1))) + 0.5;
     ctx.strokeStyle = RULER_TICK;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(x - 3, y);
-    ctx.lineTo(x, y);
+    // ⚠ AGAINST THE LEFTMOST COLUMN, which is now the PRESET one. A tick that
+    // stopped short of the column an author drags would leave the editable
+    // numbers the furthest thing on the strip from their own ruler.
+    ctx.moveTo(RASTER_TIMELINE_PRESET_X - 3, y);
+    ctx.lineTo(RASTER_TIMELINE_PRESET_X, y);
     ctx.stroke();
     ctx.fillStyle = RULER_TEXT;
     ctx.fillText(String(Math.min(line, RASTER_TIMELINE_LINES - 1)), 2, y);
@@ -467,10 +735,59 @@ export function drawRasterTimeline(
     ctx.fillText(text, x + w + 7, ty);
   }
 
+  // ── the PRESET palette bands: INTERVALS, with two grabbable edges ───────
+  //
+  // ⚠ DRAWN AS A RECTANGLE AND NEVER AS A RULE. That is the two-grammars block
+  // at the top of this file, spent: a split is one edge and gets a rule with a
+  // downward flag; a palette band is an interval and gets a body with a closing
+  // edge, because it HAS one — the paired `pal_restore` this whole column is
+  // about. The handles are drawn at both edges of every band, always, and not
+  // only under the pointer: a handle that appears on hover is a handle nobody
+  // discovers, which is this strip's own founding defect wearing a new hat.
+  const px = RASTER_TIMELINE_PRESET_X;
+  const pw = RASTER_TIMELINE_PRESET_W;
+  for (const b of view.presetBands) {
+    const by = Math.round(b.y);
+    const bh = Math.round(b.h);
+    if (bh > 0) {
+      ctx.fillStyle = b.collision !== null
+        ? EFFECTS_GUIDE_REFUSED_BG
+        : PRESET_FILLS[b.index % PRESET_FILLS.length];
+      ctx.fillRect(px, by, pw, bh);
+      counts.presetFills++;
+    }
+    // The two edges. `bot` is the RESTORE's line — the band covers top..bot-1 —
+    // so the closing handle is drawn ON that line rather than a pixel above it:
+    // it is where the author's pointer must land to grab it, and where the
+    // engine's second fire actually goes.
+    for (const edge of ['top', 'bot'] as const) {
+      const ey = Math.round(edge === 'top' ? b.y : b.y + b.h) + 0.5;
+      ctx.strokeStyle = b.dragging ? PRESET_EDGE_HOT
+        : (b.collision !== null ? EFFECTS_GUIDE_REFUSED : PRESET_EDGE);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(px, ey);
+      ctx.lineTo(px + pw, ey);
+      ctx.stroke();
+      counts.presetHandles++;
+    }
+    // The band's index, inside its own column, so the strip and the panel's
+    // list below it are talking about the same band.
+    if (bh >= 11) {
+      ctx.fillStyle = EFFECTS_GUIDE_LABEL_TEXT;
+      ctx.fillText(`${b.index}${b.sh ? ' sh' : ''}`, px + 3, Math.round(by + bh / 2));
+    }
+  }
+
   // ── the priming rows ────────────────────────────────────────────────────
   // Lines 0..2 are the raster program's priming records; no fire may land
   // there. Marked so a split near the top reads as near a WALL.
+  //
+  // ⚠ ACROSS BOTH COLUMNS. The bound is `fire()`'s and a preset band's two edges
+  // are fires too — a wall drawn over only one of the two columns it applies to
+  // reads as a property of that column.
   ctx.fillStyle = PRIMING_FILL;
+  ctx.fillRect(px, top, pw, EFFECTS_FIRE_LINE_MIN * RASTER_TIMELINE_SCALE);
   ctx.fillRect(x, top, w, EFFECTS_FIRE_LINE_MIN * RASTER_TIMELINE_SCALE);
 
   // ── the splits: ONE EDGE EACH ───────────────────────────────────────────
@@ -544,32 +861,93 @@ export interface RasterTimelineReport {
   originY: number;
   stripX: number;
   stripW: number;
+  /** The EDITABLE column's geometry and its grab tolerance, published too. */
+  presetX: number;
+  presetW: number;
+  grabPx: number;
   bands: RasterTimelineBandRow[];
   splits: RasterTimelineSplitRow[];
+  presetId: string | null;
+  presetBands: RasterTimelinePresetBandRow[];
   notices: string[];
   absent: string[];
   /** Band rectangles actually filled, and split rules actually stroked. */
   fills: number;
   markers: number;
+  presetFills: number;
+  presetHandles: number;
+  /**
+   * The canvas's LAST MEASURED client rect, and the strip-px-per-client-px scale
+   * that follows from it.
+   *
+   * ⚠ THIS IS WHAT LETS A HARNESS AIM AT AN INTEGER CLIENT PIXEL AND DERIVE THE
+   * LINE THE APP WILL COMPUTE, through the app's own contract rather than
+   * through a number read off a screenshot. The backing store is fixed, so
+   * `scaleX/scaleY` are 1 whenever the column is wide enough — and when they are
+   * not, they are the factor a harness must apply, published rather than
+   * guessed. `null` before the first paint.
+   */
+  client: { x: number; y: number; w: number; h: number; scaleX: number; scaleY: number } | null;
+  /**
+   * What the last pointer event resolved to IN STRIP SPACE, and what it hit.
+   *
+   * A pure measurement of the app's own client -> strip conversion: a harness
+   * that aims at a client pixel can read back the line the app decided that
+   * pixel was, which is the difference between proving the FEATURE wrong and
+   * proving the AIM wrong.
+   */
+  pointer: { clientX: number; clientY: number; x: number; y: number; line: number;
+             hit: string } | null;
+  /** The gesture in flight, or null. */
+  drag: RasterTimelinePresetDrag | null;
+  /** Why the edge being dragged has stopped, or null. */
+  heldText: string | null;
   /** Advanced on every publish, so a harness can prove a repaint HAPPENED. */
   paints: number;
 }
 
-const INACTIVE: Omit<RasterTimelineReport, 'paints'> = {
+/**
+ * What a publish must carry.
+ *
+ * ⚠ `pointer` IS NOT IN IT, and that is load-bearing rather than tidy. A pointer
+ * event is followed by a re-render and therefore by a repaint, so a publish that
+ * carried `pointer` would erase the reading the event just took — the instrument
+ * would report `null` for every gesture it was built to measure. It is carried
+ * FORWARD instead, and only `publishRasterTimelinePointer` writes it.
+ */
+export type RasterTimelinePublish = Omit<RasterTimelineReport, 'paints' | 'pointer'>;
+
+const INACTIVE: RasterTimelinePublish = {
   active: false, sceneId: null, space: null,
   lines: RASTER_TIMELINE_LINES, scale: RASTER_TIMELINE_SCALE,
   originY: RASTER_TIMELINE_ORIGIN_Y, stripX: RASTER_TIMELINE_STRIP_X, stripW: RASTER_TIMELINE_STRIP_W,
-  bands: [], splits: [], notices: [], absent: [], fills: 0, markers: 0,
+  presetX: RASTER_TIMELINE_PRESET_X, presetW: RASTER_TIMELINE_PRESET_W, grabPx: BAND_EDGE_GRAB_PX,
+  bands: [], splits: [], presetId: null, presetBands: [], notices: [], absent: [],
+  fills: 0, markers: 0, presetFills: 0, presetHandles: 0,
+  client: null, drag: null, heldText: null,
 };
 
-let lastReport: RasterTimelineReport = { ...INACTIVE, paints: 0 };
+let lastReport: RasterTimelineReport = { ...INACTIVE, pointer: null, paints: 0 };
 
-export function publishRasterTimelineReport(r: Omit<RasterTimelineReport, 'paints'>): void {
-  lastReport = { ...r, paints: lastReport.paints + 1 };
+export function publishRasterTimelineReport(r: RasterTimelinePublish): void {
+  lastReport = { ...r, pointer: lastReport.pointer, paints: lastReport.paints + 1 };
+}
+
+/**
+ * Record where the last pointer event landed, WITHOUT advancing `paints`.
+ *
+ * ⚠ THE SEPARATION IS THE POINT. `paints` is the witness that the strip
+ * REPAINTED, and a pointer that moved over a canvas is not a repaint. Folding
+ * this into `publishRasterTimelineReport` would make every mouse move look like
+ * a draw, and would retire the one counter that can tell a live strip from a
+ * stale one.
+ */
+export function publishRasterTimelinePointer(p: RasterTimelineReport['pointer']): void {
+  lastReport = { ...lastReport, pointer: p };
 }
 
 /** The inactive publish — what a facet with no scene selected reports. */
-export function inactiveRasterTimelineReport(): Omit<RasterTimelineReport, 'paints'> {
+export function inactiveRasterTimelineReport(): RasterTimelinePublish {
   return { ...INACTIVE };
 }
 
