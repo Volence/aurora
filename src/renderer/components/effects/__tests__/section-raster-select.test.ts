@@ -227,9 +227,16 @@ describe('the control adds no second wording of the limit', () => {
    * a FORK would be paraphrased, not pasted.
    */
   it('no distinctive phrase of the shared limit is retyped in the panel', () => {
+    // ⚠ 'one line per section' WAS HERE UNTIL 2026-08-30 and this row went RED
+    // when the constant's universal call-site clause was retired (aeon
+    // `9cdf32d8` threads the chooser for section 5, and wiring a second section
+    // is a preset SPLIT plus a line, not one line). The anti-vacuous loop below
+    // is what caught it: a phrase that leaves the constant stops being a sample
+    // of it and would otherwise assert nothing about the panel forever.
     const phrases = [
       'does not install it', 'assign_section_preset writes it',
-      'changes nothing on screen', 'costs ROM', 'one line per section',
+      'changes nothing on screen', 'costs ROM',
+      'a preset split plus one call-site line',
     ];
     // ANTI-VACUOUS: these really are the constant's phrases, so a green here is
     // about the panel and not about five strings nobody wrote.

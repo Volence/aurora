@@ -357,12 +357,24 @@ async function main() {
     // demanded the RESERVED key be on screen, which the unit gate now forbids outright,
     // so the two instruments had come to contradict each other. Re-pointed at phrases
     // LIMIT 1 alone owns today. `costs ROM` survives both rewrites and is kept.
-    check('3a', 'LIMIT 1 is visible: the build reads it, the call site is missing',
-      /rasterRef/.test(panelText) && /the band does not play/i.test(panelText)
-      && /one line per section/i.test(panelText) && /costs ROM/i.test(panelText),
+    // ⚠ RE-PHRASED 2026-08-30, and the OLD phrases are why this row is checked
+    // by hand every time the limit moves. It read `/the band does not play/i`
+    // and `/one line per section/i` — the constant's UNIVERSAL call-site clause
+    // — until aeon `9cdf32d8` threaded the chooser for section 5 and the clause
+    // became a case split. Both phrases left the constant, so both `.test()`s
+    // would have gone false and this row would have reddened on a wording change
+    // rather than on a painting failure. It now anchors on the case split's two
+    // halves, which is the pair an author must SEE together: bind section 5 and
+    // aeon can carry it, bind any other and nothing consumes the key.
+    check('3a', 'LIMIT 1 is visible: section 5 is wired and no other section is',
+      /rasterRef/.test(panelText) && /ONLY SECTION 5 IS WIRED/.test(panelText)
+      && /BINDING ANY OTHER SECTION STILL REACHES NOTHING/.test(panelText)
+      && /a preset split plus one call-site line/i.test(panelText)
+      && /costs ROM/i.test(panelText),
       `rasterRef=${/rasterRef/.test(panelText)} `
-      + `doesNotPlay=${/the band does not play/i.test(panelText)} `
-      + `oneLine=${/one line per section/i.test(panelText)} `
+      + `sec5Wired=${/ONLY SECTION 5 IS WIRED/.test(panelText)} `
+      + `othersReachNothing=${/BINDING ANY OTHER SECTION STILL REACHES NOTHING/.test(panelText)} `
+      + `splitPlusLine=${/a preset split plus one call-site line/i.test(panelText)} `
       + `costsROM=${/costs ROM/i.test(panelText)}`);
     check('3b', 'LIMIT 2 is visible: seeing it is a debug chord over a hand-typed table',
       /START/.test(panelText) && /hand-typed dc\.l list/.test(panelText)

@@ -308,10 +308,23 @@ describe('the reply says where the binding stops', () => {
     expect(RASTER_SECTION_BINDING_LIMIT).not.toMatch(/effectsRef/);
     // The reader that now exists, pinned to the file and the revision.
     expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/effects_gen\.py/);
-    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/Verified at aeon 4aa2abc0/);
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/Verified at aeon 9cdf32d8/);
     // ...and the seam it stops at, which is what an agent must not read past.
     expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/ojz_effects\.emp/);
-    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/the band does not play/i);
+    // ⚠ (3) CHANGED ON 2026-08-30 TOO, AND THIS ROW WENT RED FIRST. It asserted
+    // `/the band does not play/i` — a UNIVERSAL claim, true only while every
+    // section was uniformly unwired. aeon `9cdf32d8` threaded the chooser for
+    // ONE section, which MANUFACTURED the non-uniformity rather than revealing
+    // it, so the universal sentence became the lie and the replacement is a case
+    // split. An agent gets both halves or it misleads its caller in one of two
+    // directions: "nothing works" when the caller bound section 5, or "it works"
+    // when they bound section 6.
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/ONLY SECTION 5 IS WIRED/);
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/BINDING ANY OTHER SECTION STILL REACHES NOTHING/);
+    // And the case-3 refusal, because "your build will fail and say which
+    // section" is a materially different answer from silence — verified at
+    // `9cdf32d8` in `tools/effects_seam_gate.py`, not taken on report.
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/effects_seam_gate\.py refuses a full build/i);
   });
 });
 

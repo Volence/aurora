@@ -232,15 +232,23 @@ export interface Section {
    * the same unbind, and it owns the no-op rule that decides what earns an undo
    * step.
    *
-   * ⚠ AEON READS IT NOW, AND STILL NOTHING OBSERVES IT. The "nothing reads it"
-   * note that stood here was retired on 2026-08-30 by aeon `4aa2abc0`:
-   * `tools/effects_gen.py` resolves `rasterRef` (`ACT_RASTER_REF_KEY`) against
-   * the preset documents and emits the section's raster program plus a chooser.
-   * What it does NOT do is reach the engine — at that revision no `preset()` in
-   * `games/sonic4/data/effects/ojz_effects.emp` passes the chooser to its
-   * `raster:` channel — and on this side the viewport composites nothing and
-   * there is no preview. So a written `rasterRef` still has no observable
-   * consequence, which is why the agent tool answers with
+   * ⚠ AEON READS IT NOW, AND WHAT HAPPENS NEXT DEPENDS ON THE SECTION NUMBER.
+   * The "nothing reads it" note that stood here was retired on 2026-08-30 by
+   * aeon `4aa2abc0`: `tools/effects_gen.py` resolves `rasterRef`
+   * (`ACT_RASTER_REF_KEY`) against the preset documents and emits the section's
+   * raster program plus a chooser. The "nothing CALLS the chooser" note that
+   * replaced it was retired the same day by aeon `9cdf32d8` — but only for
+   * SECTION 5, whose `preset()` threads `ojz_act1_sec_raster(sec: 5, hand:
+   * Raster_Program_None)`. Every other section's `raster:` is still a
+   * hand-authored label, so a `rasterRef` on section 6 is written, counted by
+   * aeon's witness, and consumed by nothing (aeon's own
+   * `tools/effects_seam_gate.py` refuses a full build for that, naming the
+   * section — but that is aeon's build, not this field).
+   *
+   * On THIS side nothing observes the key for ANY section: the viewport
+   * composites no `rasterRef` and there is no preview. So a written `rasterRef`
+   * still has no observable consequence here, which is why the agent tool
+   * answers with
    * `RASTER_SECTION_BINDING_LIMIT` on success as well as on the no-op
    * (`core/formats/raster-binding.ts`, which carries the full sentence and its
    * dated expiry) instead of a bare `changed: true`. Preserving the field across
