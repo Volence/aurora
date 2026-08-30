@@ -94,17 +94,24 @@ export async function openAeonProject(dir: string): Promise<boolean> {
       useArtStore.getState().closeDocument();
     }
     useViewStore.getState().setPosition(0, 0);
-    for (const n of aeon.notices) useToastStore.getState().addToast(n, 'success');
+    // Each notice on ITS OWN channel. This loop used to hardcode `'success'`
+    // for the whole array, which was fine for the atlas-unified line and wrong
+    // for every failure beside it — markUnreadable's "exists but could not be
+    // read … fix it by hand and reopen" arrived green, on the 2.2s success
+    // dwell, reading as confirmation that something worked. The severity now
+    // rides on the notice (core/project/notice.ts) and is assigned by the
+    // producer, which is the only place that knows whether a read succeeded.
+    for (const n of aeon.notices) useToastStore.getState().addToast(n.message, n.severity);
     // THE ONE THING A CLEAN CHECKOUT MUST BE TOLD AT OPEN, and a `'warning'`
-    // rather than one of the greens above, on toastStore's own bargain: nothing
-    // FAILED — the project opened, every section is editable, the act default
-    // paints — but this is a sentence to be ACTED on, and the 2.2s success
-    // dwell is not long enough to read one.
+    // rather than a green, on toastStore's own bargain: nothing FAILED — the
+    // project opened, every section is editable, the act default paints — but
+    // this is a sentence to be ACTED on, and the 2.2s success dwell is not long
+    // enough to read one.
     //
-    // Not part of `notices`. That channel is toasted uniformly as 'success'
-    // (including, wrongly, markUnreadable's "fix it by hand" — a separate
-    // defect, left alone here rather than fixed under a BG parcel), so a
-    // warning routed through it would arrive green.
+    // Still not part of `notices`, though it could now be routed through it
+    // without arriving green. It is a fact about `project.bgLibraryUnresolved`
+    // rather than about a file the loader touched, and the loader has no
+    // producer site to hang it on.
     //
     // Names entries, not just a count: "3 backgrounds could not be opened" sends
     // the reader looking, where the ids are what they would have to find anyway.

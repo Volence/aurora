@@ -45,6 +45,7 @@
 // says so in its own `description`.
 
 import type { FileAccess } from '../../project/adapter';
+import type { Notice } from '../../project/notice';
 import type { JsonSchema } from './json-schema-subset';
 import { validateAgainstSchema, canonicalizeBySchema } from './json-schema-subset';
 import schemaJson from './aurora-effects-preset.schema.json';
@@ -451,7 +452,7 @@ export interface EffectsPresetLibrary {
    * a caller that later writes the library must skip these paths.
    */
   unreadable: UnreadablePreset[];
-  notices: string[];
+  notices: Notice[];
 }
 
 /**
@@ -470,7 +471,7 @@ export async function loadEffectsPresetLibrary(
   const dir = effectsPresetDir(dataRoot);
   const presets: EffectsPreset[] = [];
   const unreadable: UnreadablePreset[] = [];
-  const notices: string[] = [];
+  const notices: Notice[] = [];
 
   let present = false;
   try { present = await fa.exists(dir); } catch { present = false; }
@@ -486,10 +487,14 @@ export async function loadEffectsPresetLibrary(
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);
       unreadable.push({ path, reason });
-      notices.push(
-        `${path} exists but could not be read as a raster preset (${reason}). ` +
-        'Aurora is ignoring it and will NOT overwrite the file — fix it by hand and reopen.',
-      );
+      // 'error', on the same terms as the scene loader one file over: the read
+      // FAILED and the preset is not in the library.
+      notices.push({
+        severity: 'error',
+        message:
+          `${path} exists but could not be read as a raster preset (${reason}). ` +
+          'Aurora is ignoring it and will NOT overwrite the file — fix it by hand and reopen.',
+      });
     }
   }
 

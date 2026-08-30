@@ -146,7 +146,7 @@ describe('the BG override document through loadAeonProject', () => {
 
     expect(r.project.bgOverride.doc).toBeNull();
     expect(r.project.bgOverride.unreadable?.path).toBe(OVERRIDE_PATH);
-    expect(r.notices.some((n) => n.includes(OVERRIDE_PATH) && n.includes('will NOT overwrite')))
+    expect(r.notices.some((n) => n.message.includes(OVERRIDE_PATH) && n.message.includes('will NOT overwrite')))
       .toBe(true);
 
     const plan = await savePlan(fa, r);

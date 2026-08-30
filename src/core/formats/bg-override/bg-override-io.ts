@@ -33,6 +33,7 @@
 // be missed by a write path that forgets to set it, and the content cannot.
 
 import type { FileAccess } from '../../project/adapter';
+import type { Notice } from '../../project/notice';
 import {
   BgOverrideError,
   bgOverridePath,
@@ -75,7 +76,7 @@ export interface BgOverrideState {
    * against a re-serialization would hide exactly that.
    */
   loadedText: string | null;
-  notices: string[];
+  notices: Notice[];
 }
 
 /**
@@ -99,10 +100,13 @@ export async function loadBgOverride(fa: FileAccess, dataRoot: string): Promise<
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);
     state.unreadable = { path, reason };
-    state.notices.push(
-      `${path} exists but could not be read (${reason}). Aurora is ignoring it and will NOT ` +
-      'overwrite the file — fix it by hand and reopen.',
-    );
+    // 'error': the read FAILED. Nothing about this is a confirmation.
+    state.notices.push({
+      severity: 'error',
+      message:
+        `${path} exists but could not be read (${reason}). Aurora is ignoring it and will NOT ` +
+        'overwrite the file — fix it by hand and reopen.',
+    });
     return state;
   }
 
@@ -114,10 +118,16 @@ export async function loadBgOverride(fa: FileAccess, dataRoot: string): Promise<
   } catch (e) {
     const reason = e instanceof BgOverrideError || e instanceof Error ? e.message : String(e);
     state.unreadable = { path, reason };
-    state.notices.push(
-      `${path} exists but could not be read as a BG override document (${reason}). Aurora is ` +
-      'ignoring it and will NOT overwrite the file — fix it by hand and reopen.',
-    );
+    // 'error', same as the read failure above — a parse that threw is a failure
+    // whatever threw it, and the parser's own advisory notices (the legacy-key
+    // upgrade and the empty-`anims` drop) carry their own 'warning' severity
+    // through the spread on the success path.
+    state.notices.push({
+      severity: 'error',
+      message:
+        `${path} exists but could not be read as a BG override document (${reason}). Aurora is ` +
+        'ignoring it and will NOT overwrite the file — fix it by hand and reopen.',
+    });
   }
   return state;
 }

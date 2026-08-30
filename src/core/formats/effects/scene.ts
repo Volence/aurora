@@ -55,6 +55,7 @@
 // nothing in the read or write path calls it.
 
 import type { FileAccess } from '../../project/adapter';
+import type { Notice } from '../../project/notice';
 import type { JsonSchema } from './json-schema-subset';
 import {
   validateAgainstSchema,
@@ -442,7 +443,7 @@ export interface EffectsSceneLibrary {
    * paths, exactly as buildAeonSavePlan skips a section's `unreadable` files.
    */
   unreadable: UnreadableScene[];
-  notices: string[];
+  notices: Notice[];
 }
 
 /**
@@ -462,7 +463,7 @@ export async function loadEffectsSceneLibrary(
   const dir = effectsSceneDir(dataRoot);
   const scenes: EffectsScene[] = [];
   const unreadable: UnreadableScene[] = [];
-  const notices: string[] = [];
+  const notices: Notice[] = [];
 
   let present = false;
   try { present = await fa.exists(dir); } catch { present = false; }
@@ -478,10 +479,15 @@ export async function loadEffectsSceneLibrary(
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);
       unreadable.push({ path, reason });
-      notices.push(
-        `${path} exists but could not be read as an effects scene (${reason}). ` +
-        'Aurora is ignoring it and will NOT overwrite the file — fix it by hand and reopen.',
-      );
+      // 'error': the read FAILED and the scene is not in the library. See
+      // core/project/notice.ts — severity is the producer's to assign, and this
+      // producer knows it is not reporting a success.
+      notices.push({
+        severity: 'error',
+        message:
+          `${path} exists but could not be read as an effects scene (${reason}). ` +
+          'Aurora is ignoring it and will NOT overwrite the file — fix it by hand and reopen.',
+      });
     }
   }
 
