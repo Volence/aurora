@@ -61,6 +61,8 @@
 //   - `.git` and `node_modules` — never sources, and walking node_modules is
 //     expensive. (node_modules is also git-ignored, so the filter below would
 //     drop it anyway; this is purely for speed.)
+//   - any directory that is itself a git tree (holds a `.git` entry) — see
+//     NESTED GIT TREES under EXCLUSIONS; every such skip is printed.
 //   - anything git-ignored, asked of git itself (`git check-ignore`) rather
 //     than re-derived here. That covers dist/ and out/, and it covers the
 //     hard-linked fixture trees under scratchpad/fixtures/ that .gitignore
@@ -77,6 +79,31 @@
 // `.spec.` segment, so they are not test-shaped and were never candidates.
 // If a future exception is ever added here it needs its reason written beside
 // it — an unexplained exception is how a gate stops covering what it claims.
+//
+// NESTED GIT TREES (added 2026-08-30). The walk does not descend into any
+// directory below the root that contains a `.git` entry (file or directory):
+// a nested repository or worktree is never this tree's source, and its test
+// files are that tree's business. Every skip is printed on one line
+// (`skipped N nested git tree(s): ...`) so the narrowing is visible; a gate
+// that quietly shrinks its own scope is the vacuous-gate class again.
+//   Measured reason: on 2026-08-30 the main tree held 27 finished agent
+// worktrees under .claude/worktrees/agent-*/ and this gate reported 11853
+// uncollected files even though `.git/info/exclude` ignores `.claude/`.
+// `git check-ignore` was NOT the failure: rerun by hand on one nested file it
+// answered `.git/info/exclude:18:.claude/` correctly, with and without
+// --no-index, from a worktree (whose `.git` is a file pointing at the main
+// repo — the common dir's info/exclude is consulted). What failed was the
+// spawn: 27 worktrees x 450 test files x ~80 bytes of path is ~1.1 MB of
+// check-ignore stdout, over Node's default 1 MiB spawnSync maxBuffer, so
+// spawnSync returned ENOBUFS, dropIgnored() took its "git unavailable" branch
+// (the note line above the FAIL was the tell) and kept every candidate. The
+// cliff sits at 26 worktrees of that name length; 27 short-named probes
+// (~972 KB) pass. Skipping nested trees in the walk keeps that volume from
+// ever reaching git. The cliff itself is also raised in dropIgnored()
+// (maxBuffer 64 MiB, and the note now names the error): 40 plain ignored
+// copies of the test set (~1.4 MB, no `.git`, the scratchpad/fixtures shape
+// this header already promises not to drown in) failed the same way with the
+// walk skip alone.
 //
 // EXIT CODES
 //   0  agree — every test-shaped file is collected
@@ -111,6 +138,9 @@ function fail(code, lines) {
 
 // ---------------------------------------------------------------- A. on disk
 
+/** Repo-relative paths of nested git trees the walk refused to enter. */
+const nestedTrees = [];
+
 function walk(dir, out) {
   let entries;
   try {
@@ -122,6 +152,13 @@ function walk(dir, out) {
       '  The on-disk enumeration is incomplete, so a "no problems" result would',
       '  be a claim this run cannot support.',
     ]);
+  }
+  // A directory below the root holding a `.git` entry (file for a worktree,
+  // directory for a clone) is another tree, not this one. Recorded, never
+  // silently dropped — the skip line is printed after the walk.
+  if (dir !== ROOT && entries.some((e) => e.name === '.git')) {
+    nestedTrees.push(rel(dir));
+    return out;
   }
   for (const entry of entries) {
     const abs = path.join(dir, entry.name);
@@ -146,12 +183,18 @@ function dropIgnored(candidates) {
     cwd: ROOT,
     input: candidates.join('\n') + '\n',
     encoding: 'utf8',
+    // git echoes every ignored path; Node's default 1 MiB maxBuffer overflowed
+    // at ~12k paths on 2026-08-30 (ENOBUFS) and read as "git unavailable".
+    maxBuffer: 64 * 1024 * 1024,
   });
   // exit 0 = some ignored, 1 = none ignored, 128 = not a repo / git error.
   if (res.error || (res.status !== 0 && res.status !== 1)) {
+    const why = res.error
+      ? `${res.error.code ?? ''} ${res.error.message}`.trim()
+      : `exit ${res.status}: ${(res.stderr || '').trim()}`;
     console.error(
-      'check-test-collection: note — `git check-ignore` unavailable; git-ignored ' +
-        'paths (if any) are being kept as candidates.',
+      'check-test-collection: note — `git check-ignore` unavailable ' +
+        `(${why}); git-ignored paths (if any) are being kept as candidates.`,
     );
     return candidates;
   }
@@ -161,7 +204,14 @@ function dropIgnored(candidates) {
   return candidates.filter((p) => !ignored.has(p));
 }
 
-const onDisk = new Set(dropIgnored(walk(ROOT, [])).sort());
+const walked = walk(ROOT, []);
+if (nestedTrees.length > 0) {
+  console.log(
+    `check-test-collection: skipped ${nestedTrees.length} nested git tree(s): ` +
+      nestedTrees.sort().join(', '),
+  );
+}
+const onDisk = new Set(dropIgnored(walked).sort());
 
 // ------------------------------------------------------------- B. collected
 
