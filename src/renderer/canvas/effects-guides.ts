@@ -188,7 +188,7 @@ export function guideAtCanvasY(
 }
 
 /** A layer is enabled unless the document says otherwise (schema default true). */
-export function layerIsEnabled(layer: EffectsLayer): boolean {
+export function layerIsEnabled(layer: Pick<EffectsLayer, 'enabled'>): boolean {
   return layer.enabled !== false;
 }
 
