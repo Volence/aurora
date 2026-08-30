@@ -247,9 +247,12 @@ typos, and an invalid document is refused with the specific issues and consumes
 no undo step.
 
 **Saving a preset does not install it, and there is no `assign_section_preset`.**
-Nothing binds a preset to a section: `SectionMeta` carries `bgLayoutRef`,
-`paletteRef` and `sceneRef` and no preset field, and the per-section key that
-would carry one (`effectsRef`) is not implemented in either repo. A programmer
+Nothing binds a preset to a section. `SectionMeta` carries `bgLayoutRef`,
+`paletteRef`, `rasterRef` and `sceneRef`, and `rasterRef` **is** the per-section
+preset binding (empyrean `docs/AURORA_EFFECTS_SCHEMA.md` §3.1, adjudicated
+2026-08-30 — **not** `effectsRef`, which stays reserved and unspent for a *total*
+binding). But Aurora only **preserves** it: no tool here writes a `rasterRef`, and
+aeon's generator does not read one yet. A programmer
 binds a preset by hand in aeon's `.emp`. `list_effects_presets` says this in its
 own reply (`sectionBinding`) rather than shipping an all-nulls section column
 that would read as "assigned to nothing". Nor has anyone in the suite ever

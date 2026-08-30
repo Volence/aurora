@@ -78,14 +78,29 @@ describe('the three limits say the words that carry them', () => {
   });
 
   /**
-   * Limit 1. The load-bearing half is "not implemented in EITHER repo" — an
-   * author who reads only "a programmer binds it" may reasonably assume the key
-   * exists and someone just has to set it.
+   * Limit 1. The load-bearing half used to be "not implemented in EITHER repo",
+   * because an author who reads only "a programmer binds it" may reasonably
+   * assume the key exists and someone just has to set it.
+   *
+   * ⚠ THAT HALF CHANGED, AND THE ROW CHANGED WITH IT. Since empyrean
+   * docs/AURORA_EFFECTS_SCHEMA.md §3.1 (adjudicated 2026-08-30) the key DOES
+   * exist, is called `rasterRef`, and Aurora's sidecar round-trips it — so the
+   * old sentence would now be a lie in the direction that matters, telling an
+   * author to stop looking for something that is there. What survives is the
+   * accurate remainder: nothing HERE writes one and aeon does not READ one yet.
+   *
+   * The negative assertion is the point of this row now: `effectsRef` is
+   * reserved and unspent (§7), and naming it here would send an author to a key
+   * no writer produces.
    */
-  it('LIMIT 1 says nothing binds a preset to a section, and names effectsRef', () => {
+  it('LIMIT 1 says nothing binds a preset to a section, and names rasterRef', () => {
     const l = PRESET_LIMITS.find((x) => x.key === 'unbound')!;
-    expect(l.body).toMatch(/effectsRef/);
-    expect(l.body).toMatch(/not implemented in either repo/i);
+    expect(l.body).toMatch(/rasterRef/);
+    expect(l.body).not.toMatch(/effectsRef/);
+    // Both halves of what is still true, not one: this editor does not write
+    // the key, and the consumer does not read it.
+    expect(l.body).toMatch(/no control here writes one/i);
+    expect(l.body).toMatch(/does not read one yet/i);
     expect(l.body).toMatch(/costs ROM/i);
   });
 

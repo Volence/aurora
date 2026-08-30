@@ -22,8 +22,12 @@
 //     the codec deliberately does not normalise. The fixture carries all three,
 //     and every survival check is asserted on them rather than on `top`.
 //   • There is deliberately NO fourth tool. `assign_section_preset` would mirror
-//     `assign-section-scene` and cannot be written — `SectionMeta` is
-//     `{bgLayoutRef, paletteRef, sceneRef}` and has no preset field (ROADMAP row
+//     `assign-section-scene` and is not written. `SectionMeta` is
+//     `{bgLayoutRef, paletteRef, rasterRef, sceneRef}` and the preset field now
+//     EXISTS — `rasterRef`, empyrean docs/AURORA_EFFECTS_SCHEMA.md §3.1,
+//     adjudicated 2026-08-30, NOT `effectsRef` — but Aurora only PRESERVES it:
+//     nothing here authors one and aeon's generator does not read one yet, so
+//     the gap moved rather than closed (still ROADMAP row
 //     93). `list_effects_presets` says so in its reply instead of shipping an
 //     all-nulls `sections` column, and a row below asserts that sentence is the
 //     PANEL'S OWN, not a second wording.

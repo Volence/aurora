@@ -79,10 +79,23 @@ export const PRESET_LIMITS: readonly PresetLimit[] = Object.freeze([
   Object.freeze({
     key: 'unbound' as const,
     title: 'Saving does not install the band',
+    // ⚠ THE KEY WAS RENAMED BY RULING, not by preference: empyrean
+    // docs/AURORA_EFFECTS_SCHEMA.md §3.1 (adjudicated 2026-08-30) adopted
+    // `rasterRef` for the per-section preset binding and left `effectsRef`
+    // reserved and unspent, because a preset document supplies only the raster
+    // channel of aeon's eight-channel EffectsPreset. This limit must not go
+    // back to naming `effectsRef` — an author who went looking for that key
+    // would find nothing.
+    //
+    // AND THE STATUS CHANGED WITH IT. The key now EXISTS in the sidecar and
+    // Aurora round-trips it, so "not implemented in either repo" would be a
+    // lie. What is still true — and is the whole point of the limit — is that
+    // no control here WRITES one and aeon's generator does not yet READ one.
     body:
-      'Nothing binds a preset to a section. The per-section key that would carry it ' +
-      '(effectsRef) is not implemented in either repo, so a programmer binds this preset ' +
-      'by hand in aeon\'s ojz_effects.emp. Until then the document costs ROM whether or ' +
+      'Nothing binds a preset to a section. The per-section key that carries it is ' +
+      'rasterRef, and this editor only preserves it: no control here writes one, and ' +
+      'aeon\'s generator does not read one yet — so a programmer binds this preset by ' +
+      'hand in aeon\'s ojz_effects.emp. Until then the document costs ROM whether or ' +
       'not anything installs it.',
   }),
   Object.freeze({

@@ -356,9 +356,12 @@ export const EDITOR_METHODS: EditorMethod[] = [
   //     `bands` key in a scene file is refused outright, so an agent that tried
   //     to author bands through set_effects_scene would write a file nothing
   //     loads;
-  //   • saving a preset does not install it. Nothing binds one to a section, so
-  //     there is deliberately NO assign_section_preset (SectionMeta has no
-  //     preset field) and a programmer wires the preset up by hand.
+  //   • saving a preset does not install it. `SectionMeta` now carries the
+  //     preset binding — `rasterRef` (schema §3.1, adjudicated 2026-08-30, NOT
+  //     `effectsRef`) — but Aurora only preserves it round-trip: nothing here
+  //     authors one and aeon's generator does not yet read one, so there is
+  //     still deliberately NO assign_section_preset and a programmer wires the
+  //     preset up by hand. ROADMAP row 93.
   //
   // THE LIST TOOL IS PLURAL — `list_effects_presets`, matching
   // `list_effects_scenes`. The ratified spec writes the trio in factored
