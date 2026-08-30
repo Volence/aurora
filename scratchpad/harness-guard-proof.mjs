@@ -47,11 +47,11 @@
 // fail this file without it.
 
 import { spawn } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import {
-  spawnGuarded, killTree, descendants, alive, cmdlineOf,
+  spawnGuarded, killTree, killTreeSync, descendants, alive, cmdlineOf,
   snapshotDiscovery, restoreDiscovery, describeDiscovery, readDiscoveryNow,
   resolveOwnedDiscovery, DISCOVERY_FILES, setDiscoveryBaseline,
   displayArtifacts, reapDisplays,
@@ -74,6 +74,12 @@ function unmeasurable(id, name, why) {
   fails.push(`[${id}] ${name} (UNMEASURABLE: ${why})`);
 }
 const note = (t, d) => console.log(`  · ${t}: ${d}`);
+/** k9's own liveness read — alive and not a zombie — deliberately NOT the
+ *  helper's `running`, so the observer shares nothing with the thing observed. */
+const runningPid = (pid) => {
+  if (!alive(pid)) return false;
+  try { return !/^State:\s*Z/m.test(readFileSync(`/proc/${pid}/status`, 'utf8')); } catch { return false; }
+};
 
 /** Launch the real app the way every harness does. Not through spawnGuarded in
  *  the phases that must show the UNGUARDED behaviour — that is the point. */
@@ -293,6 +299,131 @@ async function main() {
       check('k5', 'and it killed MORE than the wrapper — the Electron itself was in the tree it signalled',
         treeBefore.length > 1,
         `tree under the wrapper ${greenK.pid}:\n        ${(out.seen ?? []).join('\n        ')}`);
+    }
+
+    // ---- k6/k7: the BARE-PID spelling (O65) ----------------------------------
+    //
+    // Three harnesses wrote `killTree(child.pid)` — the pid, not the
+    // ChildProcess. The helper read `.pid` off a number, got undefined, and
+    // returned a silent no-op; the whole tree survived the harness's own
+    // teardown and the harness hung on its pipes to it. These two rows hand the
+    // helpers exactly that argument. No Electron is needed for the property:
+    // a two-process shell tree is a tree. Cheap on purpose, so the row cannot
+    // be UNMEASURABLE for an app-side reason.
+    for (const [id, fn, label] of [['k6', killTree, 'killTree'], ['k7', killTreeSync, 'killTreeSync']]) {
+      const t = spawn('/bin/sh', ['-c', 'sleep 300 & exec sleep 300'], { stdio: 'ignore', detached: true });
+      await sleep(300);
+      const before = [...descendants(t.pid)];
+      const out = await fn(t.pid, { graceMs: 500, quiet: true, reap: false });   // the pid, not `t`
+      await sleep(300);
+      const survivors = before.filter(alive);
+      if (survivors.length) { for (const p of survivors) { try { process.kill(p, 'SIGKILL'); } catch { /* */ } } }
+      check(id, `${label} given a BARE PID (the \`killTree(child.pid)\` spelling) kills the whole tree`,
+        // `out.tree` is the no-op detector: the silent version returned [] without
+        // looking. `killed` is NOT asserted — `sleep` honours SIGTERM inside the
+        // grace period, so a correct run has nothing left to SIGKILL and reports 0.
+        before.length >= 2 && survivors.length === 0 && out.tree.length === before.length,
+        `tree before: ${before.length} [${before.join(' ')}]; helper saw ${out.tree.length}; result ${JSON.stringify({ killed: out.killed, note: out.note })}; `
+        + `survivors: ${survivors.length ? survivors.join(',') : 'none'}${survivors.length ? ' (SIGKILLed by the proof itself)' : ''}`);
+    }
+
+    // ---- k8: killTree STARTED but not awaited, then the exit net (O65) -------
+    //
+    // Three harnesses call `killTree(child)` WITHOUT await and then
+    // `process.exit()`. killTree SIGTERMs before its first `await`, the
+    // xvfb-run wrapper dies at once, everything under it is reparented away,
+    // and the exit net's `killTreeSync` then walks /proc from a dead pid and
+    // finds nothing to reap. The tempdir leaks — measured 23 -> 24 on
+    // section-raster-select-harness.mjs. This row does exactly that sequence
+    // against a real xvfb-run (its tempdir is the artifact only the wrapper's
+    // own `rm -r`, or our reap, ever removes) with `sleep` standing in for the
+    // app. The lock is NOT the discriminator — a SIGTERMed Xvfb removes its own
+    // — the tempdir is, and the check runs INSIDE the un-awaited grace, before
+    // the background half could reap it for us.
+    {
+      const t = spawn('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 320x240x8', '/bin/sleep', '300'],
+        { stdio: 'ignore', detached: true });
+      let art = null;
+      for (let i = 0; i < 50 && !(art && art.displays.length && art.tmpdirs.length); i++) {
+        await sleep(200); art = displayArtifacts(t.pid);
+      }
+      if (!art || !art.displays.length || !art.tmpdirs.length) {
+        unmeasurable('k8', 'un-awaited killTree + exit net still reaps',
+          `xvfb-run never produced a display and tempdir under ${t.pid}: ${JSON.stringify(art)}`);
+        await killTree(t, { graceMs: 500, quiet: true });
+      } else {
+        const dir = art.tmpdirs[0];
+        const before = [...descendants(t.pid)];
+        const bg = killTree(t, { graceMs: 3000, quiet: true });   // NOT awaited — the shape under test
+        await sleep(50);                                            // the harness printed its summary here
+        const net = killTreeSync(t);                                // what process.exit's handler does
+        await sleep(300);
+        const dirGone = !existsSync(dir);
+        const survivors = before.filter(alive);
+        check('k8', 'killTree started but NOT awaited, then the exit net — the net still reaps the tempdir and the pids captured before the first signal',
+          dirGone && survivors.length === 0 && net.tree.length === before.length,
+          `display :${art.displays[0].n}, tempdir ${dir}: gone=${dirGone} at +350 ms; net saw ${net.tree.length} pid(s) `
+          + `(killTree had captured ${before.length}); survivors: ${survivors.length ? survivors.join(',') : 'none'}`);
+        await bg;                                                   // let the background half finish; nothing outlives the proof
+        if (!dirGone) { try { rmSync(dir, { recursive: true, force: true }); } catch { /* */ } }
+      }
+    }
+
+    // ---- k9: the teardown is ORDERED, seen from OUTSIDE the helper (O65 ruling)
+    //
+    // One SIGTERM to the wrapper's group hit Xvfb and the Electron at the same
+    // instant; when Xvfb won, the Electron's X connection broke mid-shutdown
+    // and Chromium fataled (SIGTRAP core, Timestamp == the SIGTERM instant; 6
+    // of 17 band-preset runs on 2026-08-30). The race is not on demand, and a
+    // raw Aurora is gone ~20 ms after SIGTERM (its main exits outright — see
+    // src/main/discovery-file.ts), so an observer cannot see the order on the
+    // real app. The property under test is the HELPER's order, so the subject
+    // is a stand-in under a real xvfb-run whose exit is a bounded 300 ms after
+    // SIGTERM. Old order: Xvfb dies within ms while the app is held — a sample
+    // with the X server dead and the app alive is guaranteed. New order: the
+    // group is not signalled until the app is gone, so no such sample can
+    // exist. Liveness is read from /proc by this process every 10 ms, using
+    // nothing killTree reports about itself. No Electron, so this row never
+    // produces a core of its own.
+    {
+      const t = spawn('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 320x240x8', '/bin/sh', '-c',
+        'trap "sleep 0.3; exit 0" TERM; while :; do sleep 0.1; done'], { stdio: 'ignore', detached: true });
+      // xvfb-run `sleep 3`s for its X server BEFORE running the command, so a
+      // tree captured on "Xvfb is up" holds the wrapper's own sleep and no app
+      // at all — measured, and it made this row vacuous. Wait for the stand-in —
+      // by ITS argv, not the root's, whose argv also carries the script text.
+      let art = null, appUp = false;
+      for (let i = 0; i < 60 && !(appUp && art && art.displays.length); i++) {
+        await sleep(200); art = displayArtifacts(t.pid);
+        appUp = [...descendants(t.pid)].some((p) => p !== t.pid && /^\/bin\/sh -c trap "sleep 0\.3/.test(cmdlineOf(p)));
+      }
+      if (!art || !art.displays.length || !appUp) {
+        unmeasurable('k9', 'ordered teardown seen from outside', `xvfb-run never started an X server AND the stand-in under ${t.pid}: X ${JSON.stringify(art)}, app up ${appUp}`);
+        await killTree(t, { graceMs: 500, quiet: true });
+      } else {
+        const tree = [...descendants(t.pid)];
+        const xv = tree.filter((p) => /(^|\/)Xvfb( |$)/.test(cmdlineOf(p)));
+        const app = tree.filter((p) => p !== t.pid && !xv.includes(p));
+        const t0 = Date.now();
+        const bg = killTree(t, { graceMs: 4000, quiet: true });
+        const samples = [];
+        for (let i = 0; i < 600; i++) {
+          const smp = { t: Date.now() - t0, app: app.filter(runningPid).length, x: xv.filter(runningPid).length };
+          samples.push(smp);
+          if (!smp.app && !smp.x) break;
+          await sleep(10);
+        }
+        const out = await bg;
+        const violation = samples.find((smp) => smp.x === 0 && smp.app > 0);
+        const held = samples.find((smp) => smp.t >= 100 && smp.app > 0 && smp.x > 0);
+        const last = samples[samples.length - 1];
+        check('k9', 'ORDERED teardown, seen from outside: with the app held 300 ms past SIGTERM, no 10 ms sample has the X server dead while the app is alive',
+          xv.length > 0 && app.length > 0 && !!held && !violation,
+          `app pids [${app.join(' ')}], Xvfb [${xv.join(' ')}] on :${art.displays[0].n}; ${samples.length} samples over ${last.t} ms; `
+          + `hold observed: ${held ? `yes (+${held.t} ms, app and X both up)` : 'NO — the instrument did not see the app being held'}; `
+          + (violation ? `VIOLATION at +${violation.t} ms: X server dead, ${violation.app} app pid(s) alive` : 'no violation')
+          + `; helper's own account: ${JSON.stringify(out.order ?? null)}`);
+      }
     }
   } finally {
     // ── unconditional meta-restore ─────────────────────────────────────────
