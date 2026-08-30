@@ -29,3 +29,45 @@ scratchpad/fixtures/aeon-bg-picker-writable/
 # made because the owner is building in ../aeon live and this must not open it.
 # Rebuilt by the rsync line in scratchpad/build-console-overlap-harness.mjs.
 scratchpad/fixtures/aeon-console-fix/
+
+# ── Scratch OUTPUT, by class (added 2026-08-30) ─────────────────────────────
+# The policy this repo already follows above, stated once as classes so the
+# next probe does not need a new line here: INSTRUMENTS are committed (the
+# harnesses named in docs/reviews/* are tracked on purpose, and a review that
+# cites one must be able to point at it), OUTPUT is not. Output is anything a
+# tracked instrument can make again — run logs, emitted trees, pinned fixtures,
+# captured ROM bytes and screenshots.
+#
+# This exists because Dominion's card counts uncommitted files, and 45 pieces
+# of scratch output made that counter unable to say whether a real edit was
+# unbanked. Nothing is deleted by these lines; the files stay on disk.
+scratchpad/*.log
+scratchpad/*.bin
+scratchpad/*.png
+scratchpad/*-emit/
+scratchpad/band-lens/
+scratchpad/fixtures/aeon-build-pin/
+scratchpad/bus-probe-methods.json
+scratchpad/curve-vsplit-emitted.json
+scratchpad/s1-vplayer-spike.json
+
+# One-off probes and drive scripts from work that has since closed. Kept on
+# disk because they document how a measurement was taken, untracked because
+# every session that wrote one chose not to commit it — the same judgement
+# twenty times over, recorded here rather than re-made each boot.
+scratchpad/attr-shape.mjs
+scratchpad/aurora-linked.sh
+scratchpad/band-direction-probe.py
+scratchpad/band-trunk-watch.mjs
+scratchpad/effects-foreground-harness.mjs
+scratchpad/effects-foreground-2-harness.mjs
+scratchpad/effects-foreground-timed.sh
+scratchpad/fg2-save-diff.sh
+scratchpad/fg2-sequence.sh
+scratchpad/load-debug-rom.mjs
+scratchpad/priority-zoom-probe.mjs
+scratchpad/short-viewport-harness.mjs
+scratchpad/short-viewport-reach.mjs
+scratchpad/timed-run.sh
+scratchpad/verify-handover.ts
+scratchpad/verify-running.mjs
