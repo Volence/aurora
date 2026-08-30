@@ -222,13 +222,21 @@ export interface Section {
    * so `effectsRef`'s promise of a TOTAL binding is deliberately kept for the
    * day the document is total.
    *
-   * ⚠ NOTHING IN AURORA WRITES THIS, and that is not the `parallaxRef` trap
-   * described above. `parallaxRef` was dead because it was written by the
-   * constructors and persisted by NOTHING; this one is loaded from the sidecar
-   * and written back to it, which is the entire reason it exists — aeon
-   * authors the binding, and Aurora's job is to not erase it. There is no
-   * per-section raster select in the UI and no `assign_section_preset` agent
-   * tool; ROADMAP row 93 tracks the authoring half.
+   * AURORA AUTHORS THIS NOW, through one door: the `assign_section_preset`
+   * agent tool (`renderer/agent/agent-handler.ts`) over `sectionPresetCommand`
+   * (`renderer/providers/effects-preset.ts`). There is still no per-section
+   * raster select in the UI — ROADMAP row 93's remaining half — so a control
+   * that wants to bind one must go through that same provider function rather
+   * than assign the field.
+   *
+   * ⚠ AND NOTHING READS IT. Not aeon's effects generator (`rasterRef` appears
+   * zero times in `tools/EFFECTS_CONSUMER_CONTRACT.md`; `effects_gen.py`
+   * resolves `sceneRef` only), not the viewport, not any preview. So a written
+   * `rasterRef` has no observable consequence anywhere yet, which is why the
+   * agent tool answers with `RASTER_SECTION_BINDING_LIMIT` on success as well
+   * as on the no-op (`core/formats/raster-binding.ts`) instead of a bare
+   * `changed: true`. Preserving the field across a save round-trip is STILL the
+   * load-bearing job here, exactly as when nothing wrote it.
    */
   rasterRef: string | null;
   flags: number;

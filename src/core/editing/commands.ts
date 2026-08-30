@@ -326,6 +326,36 @@ export interface SetSectionSceneCommand extends EditCommand {
 }
 
 /**
+ * Assign which RASTER PRESET a section uses — `Section.rasterRef`, the fourth
+ * key of the meta sidecar (empyrean AURORA_EFFECTS_SCHEMA.md §3.1, adjudicated
+ * 2026-08-30; the sidecar half landed at 7b1d15a0). null = "this section keeps
+ * its hand-authored raster channel".
+ *
+ * NAMED AFTER THE FIELD, like both its siblings — `bgLayoutRef` has
+ * `set-section-bg` and `sceneRef` has `set-section-scene`, so `rasterRef` gets
+ * `set-section-raster`. It assigns a PRESET DOCUMENT ID and is not a band edit:
+ * editing the bands inside a preset is `set-effects-preset`, which is scoped to
+ * the project's preset library and not to any section at all.
+ *
+ * ⚠ THE FIELD IS `rasterRef`, NEVER `effectsRef`. A preset document supplies
+ * only the RASTER channel of aeon's eight-channel EffectsPreset, so the narrow
+ * binding carries the narrow name and `effectsRef` stays reserved and unspent
+ * for the day the document is total (core/formats/section-meta.ts states the
+ * ruling). A command that wrote `effectsRef` would spend that reservation
+ * silently.
+ *
+ * A SEPARATE COMMAND from `set-section-scene`, on the reason that command
+ * states about `set-section-bg`: three independent assignments over one sidecar,
+ * made at different times, and folding any two together would make changing one
+ * undo the other.
+ */
+export interface SetSectionRasterCommand extends EditCommand {
+  type: 'set-section-raster';
+  oldRef: string | null;
+  newRef: string | null;
+}
+
+/**
  * Add or remove ONE BgAnim band in `editor_bg_override.json` — and, in the same
  * undo step, the tile renumbering and layout rewrite that go with it.
  *
@@ -438,6 +468,7 @@ export type AnyCommand =
   | SetEffectsSceneCommand
   | SetEffectsPresetCommand
   | SetSectionSceneCommand
+  | SetSectionRasterCommand
   | SetBgOverrideBandCommand
   | SetBgOverrideTilesCommand
   | SetBgOverridePhasesCommand

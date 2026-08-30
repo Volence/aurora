@@ -104,20 +104,26 @@ export type AgentRequest =
   // document, validated by the codec (parseEffectsPreset), never by a shape
   // restated here. null deletes the preset.
   //
-  // THERE IS NO `assign-section-preset`, and its absence is a fact rather than an
-  // omission. `SectionMeta` is `{bgLayoutRef, paletteRef, rasterRef, sceneRef}`
-  // and DOES now carry the preset binding — `rasterRef`, adjudicated 2026-08-30
-  // (empyrean docs/AURORA_EFFECTS_SCHEMA.md §3.1), which Aurora's sidecar
-  // preserves round-trip. What is still missing is the other half: nothing in
-  // Aurora AUTHORS a `rasterRef`, and aeon's generator does not yet read one.
-  // ROADMAP row 93 tracks the authoring tool.
+  // `assign-section-preset` IS THE FOURTH, and it is `assign-section-scene`'s
+  // mirror onto the other document. `SectionMeta` is
+  // `{bgLayoutRef, paletteRef, rasterRef, sceneRef}` and the binding it writes is
+  // `rasterRef` — adjudicated 2026-08-30, empyrean
+  // docs/AURORA_EFFECTS_SCHEMA.md §3.1. `presetId: null` UNBINDS: absent and
+  // explicit-null are one state for this key, exactly as for `sceneRef`.
   //
   // ⚠ The key is NOT `effectsRef` — that reservation is deliberately unspent,
   // because a preset document supplies only the raster channel of aeon's
   // eight-channel EffectsPreset while `effectsRef` promises a TOTAL binding.
+  //
+  // ⚠ AND THE BINDING REACHES NOTHING YET. No aeon consumer reads a `rasterRef`,
+  // so the reply carries `RASTER_SECTION_BINDING_LIMIT` on success as well as on
+  // the no-op — `assign-section-bg`'s rule, which exists because a tool that
+  // reports success for a binding nothing bakes misleads its caller. ROADMAP row
+  // 93's remaining half is the per-section select in the UI.
   | { kind: 'list-effects-presets' }
   | { kind: 'get-effects-preset'; id: string }
   | { kind: 'set-effects-preset'; id: string; preset: unknown | null }
+  | { kind: 'assign-section-preset'; section: number; presetId: string | null }  // null = unbind
   // ---- Wave-1 surface 4: BgAnim bands (aeon EFFECTS_CONSUMER_CONTRACT §1.1/§1.2) ----
   //
   // PROMOTE IS THE PRIMARY OPERATION, not add. A band's slots are a PREFIX of

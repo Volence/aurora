@@ -239,6 +239,9 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
     case 'set-section-scene':
       section.sceneRef = cmd.newRef;
       break;
+    case 'set-section-raster':
+      section.rasterRef = cmd.newRef;
+      break;
     case 'set-chunk-links': {
       // ensure-then-write: a section that never had an identity layer gets one
       // sized to its OWN nametable here rather than at load, so every section
@@ -434,6 +437,9 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
       break;
     case 'set-section-scene':
       section.sceneRef = cmd.oldRef;
+      break;
+    case 'set-section-raster':
+      section.rasterRef = cmd.oldRef;
       break;
     case 'set-chunk-links': {
       const links = ensureChunkLinks(section);

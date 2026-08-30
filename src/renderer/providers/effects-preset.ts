@@ -38,7 +38,12 @@ import {
   EFFECTS_PRESET_ID_PATTERN, EFFECTS_PRESET_ON_ARMS, EFFECTS_PRESET_SCHEMA,
   presetArmIssue, presetOnArms, presetArmFields, effectsPresetPath,
 } from '../../core/formats/effects/preset';
-import type { SetEffectsPresetCommand } from '../../core/editing/commands';
+import type { SetEffectsPresetCommand, SetSectionRasterCommand } from '../../core/editing/commands';
+// THE BINDING LIMIT IS NOT RE-TYPED HERE. `PRESET_LIMITS.unbound` below is the
+// AUTHOR-FACING copy of a sentence the agent replies and the published tool
+// descriptions also carry, and main/ cannot import renderer/ — so the words live
+// in core/ and every audience quotes them. See raster-binding.ts's own header.
+import { RASTER_SECTION_BINDING_LIMIT } from '../../core/formats/raster-binding';
 // THE FIRE BOUND IS NOT RE-TYPED HERE. A band's two edges and a vsplit's fire
 // are the same engine `ensure` — see the timeline block at the foot of this
 // file — so the constant is imported from the one place that declares it.
@@ -87,16 +92,23 @@ export const PRESET_LIMITS: readonly PresetLimit[] = Object.freeze([
     // back to naming `effectsRef` — an author who went looking for that key
     // would find nothing.
     //
-    // AND THE STATUS CHANGED WITH IT. The key now EXISTS in the sidecar and
-    // Aurora round-trips it, so "not implemented in either repo" would be a
-    // lie. What is still true — and is the whole point of the limit — is that
-    // no control here WRITES one and aeon's generator does not yet READ one.
-    body:
-      'Nothing binds a preset to a section. The per-section key that carries it is ' +
-      'rasterRef, and this editor only preserves it: no control here writes one, and ' +
-      'aeon\'s generator does not read one yet — so a programmer binds this preset by ' +
-      'hand in aeon\'s ojz_effects.emp. Until then the document costs ROM whether or ' +
-      'not anything installs it.',
+    // AND THE STATUS HAS CHANGED TWICE NOW. First the key appeared in the
+    // sidecar and Aurora began round-tripping it, so "not implemented in either
+    // repo" became a lie. Then `assign_section_preset` landed, so "nothing binds
+    // a preset to a section" became one too — a WRITER exists, it is an agent
+    // tool, and this panel still has no control for it (ROADMAP row 93's other
+    // half). What survives both corrections is the load-bearing half: no
+    // CONSUMER reads a rasterRef, so binding one still installs nothing.
+    //
+    // ⚠ NO LONGER THIS FILE'S OWN WORDS, and that is the fix rather than a
+    // regression. The same sentence is now owed to three audiences — this
+    // panel, `assign_section_preset`'s reply, and the published tool
+    // descriptions in main/ — and `bg-binding.ts` learned the hard way that two
+    // hand-written near-identical sentences is how a limit ends up stated two
+    // different ways. It lives in core/formats/raster-binding.ts because main
+    // must not import the renderer; the author still reads it here, in full, in
+    // the block that never truncates.
+    body: RASTER_SECTION_BINDING_LIMIT,
   }),
   Object.freeze({
     key: 'debug_chord' as const,
@@ -427,6 +439,49 @@ export function replacePresetCommand(
   const existing = library.presets.find((p) => p.id === id) ?? null;
   if (existing && JSON.stringify(existing) === JSON.stringify(preset)) return null;
   return presetCommand(id, existing ? `Replace preset ${id}` : `New preset ${id}`, existing, preset);
+}
+
+/**
+ * Assign which raster PRESET a section uses — `Section.rasterRef`.
+ *
+ * `sectionSceneCommand`'s EXACT MIRROR (providers/effects-aeon.ts), deliberately
+ * down to the `''` sentinel: a `<select>`'s empty option and an agent's explicit
+ * `null` are the SAME STATE for this key, exactly as for `sceneRef`, so both
+ * arrive here as "no binding" and neither can produce a `rasterRef: ""` the
+ * sidecar would then read back as null and erase. Unbinding is expressible, and
+ * it is expressible the same way from both doors.
+ *
+ * Null when the ref is already what the caller asked for, so a re-send burns no
+ * undo slot — the no-op rule the whole surface shares.
+ *
+ * IT DOES NOT VALIDATE THE ID, and that is the same division of labour
+ * `replacePresetCommand` states: the caller knows the library and asks
+ * `presetIdRefusal`-shaped questions itself. `assign_section_preset` refuses an
+ * id that is not a READABLE preset before it gets here, because a ref the build
+ * cannot resolve is worse than no ref.
+ *
+ * ⚠ THIS WRITES `rasterRef`, NEVER `effectsRef` — see the command type's
+ * docblock and core/formats/section-meta.ts for the ruling. And see
+ * `RASTER_SECTION_BINDING_LIMIT` for where the binding stops: nothing reads it
+ * yet, which is `PRESET_LIMITS.unbound`'s subject and this function's too.
+ *
+ * NO CONTROL CALLS THIS YET. The per-section raster select is the other half of
+ * ROADMAP row 93 and is not built; the agent tool is the only caller today. That
+ * is a gap and not a ruling — this is the function such a control must use, on
+ * this file's own "the panel holds no logic" rule.
+ */
+export function sectionPresetCommand(
+  sectionIndex: number, currentRef: string | null, value: string,
+): SetSectionRasterCommand | null {
+  const newRef = value === '' ? null : value;
+  if (newRef === currentRef) return null;
+  return {
+    type: 'set-section-raster',
+    description: `Section ${sectionIndex} raster preset`,
+    sectionIndex,
+    oldRef: currentRef,
+    newRef,
+  };
 }
 
 /**

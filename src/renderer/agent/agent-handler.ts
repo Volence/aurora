@@ -33,7 +33,8 @@ import {
 } from '../providers/effects-aeon';
 import { parseEffectsPreset } from '../../core/formats/effects/preset';
 import {
-  deletePresetCommand, presetIdRefusal, replacePresetCommand, PRESET_LIMITS,
+  deletePresetCommand, presetIdRefusal, replacePresetCommand, sectionPresetCommand,
+  PRESET_LIMITS,
 } from '../providers/effects-preset';
 import {
   addBandCommand, bandBudget, bandRows, demoteBandCommand,
@@ -41,6 +42,7 @@ import {
 } from '../providers/bg-anim-aeon';
 import { regenerateShiftCommand } from '../providers/bg-anim-art';
 import { BG_SECTION_BINDING_LIMIT } from '../../core/formats/bg-binding';
+import { RASTER_SECTION_BINDING_LIMIT } from '../../core/formats/raster-binding';
 import { makeSetBgOverrideTilesCommand } from '../../core/editing/bg-override-art';
 import { buildStampCommand } from '../../core/editing/map-stamp';
 import { withLinkBreaks } from '../../core/editing/chunk-links';
@@ -946,20 +948,23 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
     // which ids are creatable. Same refusal convention too — THROWN, not
     // returned as `{ok:false}`.
     //
-    // ⚠ THERE IS NO FOURTH TOOL HERE. `assign_section_preset` would be the
-    // mirror of `assign-section-scene`, and it is not written. `SectionMeta` is
+    // THERE IS A FOURTH TOOL NOW — `assign-section-preset`, below, the mirror of
+    // `assign-section-scene`. `SectionMeta` is
     // `{bgLayoutRef, paletteRef, rasterRef, sceneRef}`
-    // (core/formats/section-meta.ts) and the preset field now EXISTS —
-    // `rasterRef`, empyrean docs/AURORA_EFFECTS_SCHEMA.md §3.1, adjudicated
-    // 2026-08-30 — but Aurora only PRESERVES it round-trip; nothing here
-    // authors one, and aeon's generator does not yet read one. So the gap moved
-    // rather than closed, and it is still ROADMAP row 93 — and still why
-    // `PRESET_LIMITS`' first limit says saving a preset does not install it.
+    // (core/formats/section-meta.ts) and the field it writes is `rasterRef`
+    // (empyrean docs/AURORA_EFFECTS_SCHEMA.md §3.1, adjudicated 2026-08-30).
     //
     // ⚠ NOT `effectsRef`: that reservation stays unspent for a TOTAL binding.
+    //
+    // ⚠ WHAT IS STILL MISSING IS THE READER, and it is why the assign tool's
+    // reply carries a limit sentence rather than a bare `changed: true`. No aeon
+    // consumer reads a `rasterRef` — see core/formats/raster-binding.ts — which
+    // is also why `PRESET_LIMITS`' first limit still says saving a preset does
+    // not install it, in the very same words. ROADMAP row 93's remaining half is
+    // the per-section select in the band-preset panel.
 
     case 'list-effects-presets': {
-      requireProject();
+      const ctx = requireProject();
       const library = useProjectStore.getState().project!.effectsPresets;
       return {
         // `presetListEntries` is the PANEL's row shape (id/label/bands) and is
@@ -976,14 +981,25 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         // not parse is a preset id an agent must not take and a file it must not
         // expect to be rewritten.
         unreadable: library.unreadable.map(u => ({ path: u.path, reason: u.reason })),
-        // WHERE `list_effects_scenes` HAS A `sections` COLUMN, THIS HAS A
-        // SENTENCE — and the difference is a fact about the repo, not a gap in
-        // the tool. A per-section column here would be all-nulls forever and
-        // would read as "assigned to nothing" rather than "there is no
-        // assignment to make", which is the wrong thing for an agent to
-        // conclude: it would go looking for the assign tool. Said once, in the
-        // panel's own words (`PRESET_LIMITS.unbound`), so the agent and the
-        // author are told the same thing.
+        // THE COLUMN THIS TOOL DELIBERATELY DID NOT HAVE, ADDED BY THE PARCEL
+        // THAT MADE IT MEAN SOMETHING. It used to be omitted on the ground that
+        // it would be "all-nulls forever" and would read as "assigned to
+        // nothing" rather than "there is no assignment to make" — which was the
+        // right call while `assign_section_preset` did not exist. It does now,
+        // so the column is `list_bgs`'s case exactly: the refs are real, an
+        // agent that just wrote one must be able to read it back, and the
+        // SENTENCE travels BESIDE the column instead of standing in for it.
+        //
+        // (`rasterRef` could already be non-null before this parcel — aeon
+        // authors the key and load.ts reads it — so "all-nulls forever" was
+        // strictly an under-statement of what the omission was hiding.)
+        sections: ctx.act.sections.map((s, i) => s ? { index: i, presetId: s.rasterRef } : null),
+        // Said once, in core/formats/raster-binding.ts, and quoted by all three
+        // audiences that owe it: this reply, `assign_section_preset`'s reply,
+        // and the band-preset panel's own author-facing limit. Reached through
+        // `PRESET_LIMITS.unbound` rather than imported directly, so this row
+        // keeps witnessing that the agent and the author read ONE wording — if
+        // the panel ever forks its own sentence again, this stops matching.
         sectionBinding: PRESET_LIMITS.find(l => l.key === 'unbound')!.body,
       };
     }
@@ -1036,6 +1052,56 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       if (!command) return { id: req.id, changed: false };
       executeAmbientCommand(command, ctx.level);
       return { id: req.id, changed: true, created: existing === null };
+    }
+
+    case 'assign-section-preset': {
+      // `assign-section-scene`'s MIRROR, line for line, and the differences are
+      // only the ones the other document forces: a preset library instead of a
+      // scene library, `rasterRef` instead of `sceneRef`, and the binding limit
+      // on the reply. Everything else is deliberately the same — the range
+      // check, the empty-slot check, the readable-id refusal, the THROWN
+      // refusals, the no-op that burns no undo slot.
+      const ctx = requireProject();
+      if (!Number.isInteger(req.section) || req.section < 0 || req.section >= ctx.act.sections.length) {
+        throw new Error(`section ${req.section} out of range (0-${ctx.act.sections.length - 1})`);
+      }
+      const section = ctx.act.sections[req.section];
+      if (!section) throw new Error(`section ${req.section} is empty`);
+      const library = useProjectStore.getState().project!.effectsPresets;
+      if (req.presetId !== null && !library.presets.some(p => p.id === req.presetId)) {
+        // Deliberately refuses an UNREADABLE id too — it is not in `presets`.
+        // `assign-section-scene`'s reason, unchanged: writing a ref the build
+        // cannot resolve is worse than writing none. `list_effects_presets`
+        // reports those ids in its own `unreadable` column, which is where an
+        // agent that hits this refusal will find out why.
+        throw new Error(`preset "${req.presetId}" is not a readable preset in this project (use list_effects_presets)`);
+      }
+      // `''` IS THE UNBIND, and `null` arrives here as `''` for that reason: the
+      // provider owns the mapping so an agent's explicit null and a `<select>`'s
+      // empty option cannot become two different states for one key. Absent and
+      // explicit-null are the same state for `rasterRef`, exactly as for
+      // `sceneRef` (core/formats/section-meta.ts).
+      const command = sectionPresetCommand(req.section, section.rasterRef, req.presetId ?? '');
+      if (!command) {
+        return {
+          section: req.section, presetId: req.presetId, changed: false,
+          binding: RASTER_SECTION_BINDING_LIMIT,
+        };
+      }
+      executeAmbientCommand(command, ctx.level);
+      // A SUCCESS REPLY THAT SAYS WHERE THE SUCCESS STOPS — `assign_section_bg`'s
+      // rule (core/formats/bg-binding.ts), and this tool needs it MORE than that
+      // one did. There, `changed: true` at least buys a repaint: the viewport
+      // composites the assigned background and only the ROM half is missing.
+      // Here nothing reads the ref at all — no aeon consumer, no preview, no
+      // panel — so a bare `changed: true` would be the reply asserting an effect
+      // it cannot know reached anything, with not one observable consequence
+      // behind it. Carried on the no-op reply too, so the same conclusion is
+      // available whichever way the call lands.
+      return {
+        section: req.section, presetId: req.presetId, changed: true,
+        binding: RASTER_SECTION_BINDING_LIMIT,
+      };
     }
 
     // ---- Wave-1 surface 4: BgAnim bands ------------------------------------
