@@ -133,7 +133,10 @@ describe('aeonPropertySections — the background select', () => {
       { value: '', label: 'Act default' },
       {
         value: 'ingame-forest-v15-1786630615596',
-        label: 'ingame-forest-v15-1786630615596 — missing, showing act default',
+        // "missing" FIRST: the panel's select is 120px wide, so a driven run
+        // showed an id-first label truncating to "ingame-forest-v15-1" — the
+        // whole signal off the end of the box.
+        label: 'missing — showing act default (ingame-forest-v15-1786630615596)',
       },
       { value: 'bg-city', label: 'City' },
       { value: 'bg-sky', label: 'Sky' },

@@ -193,8 +193,16 @@ export function aeonPropertySections(input: AeonPropertiesInput): PropertySectio
         value: input.section.bgLayoutRef ?? '',
         options: [
           { value: '', label: 'Act default' },
+          // THE WORD "missing" LEADS, and that is a measured decision, not a
+          // preference. `PropertiesPanel`'s select is capped at 120px, so a
+          // driven run of this screen showed the id-first version rendering as
+          // "ingame-forest-v15-1" — the id, truncated, with the entire point
+          // of the label off the end and nothing to distinguish it from a
+          // background that is present and simply named that. Whatever the box
+          // is wide enough for has to be the part that matters. The id follows
+          // in full, for the hover title and the open dropdown.
           ...(dangling !== null
-            ? [{ value: dangling, label: `${dangling} — missing, showing act default` }]
+            ? [{ value: dangling, label: `missing — showing act default (${dangling})` }]
             : []),
           ...input.bgLibrary.map((b) => ({ value: b.id, label: b.name })),
         ],

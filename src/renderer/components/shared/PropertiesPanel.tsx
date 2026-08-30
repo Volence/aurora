@@ -54,13 +54,21 @@ function Select({ select }: { select: PropertySelect }): React.ReactElement {
   return (
     <div style={styles.property}>
       <span style={styles.propLabel}>{select.label}</span>
+      {/* THE BOX IS 120px AND THE LABELS ARE NOT. `styles.select` caps the
+          width, so anything longer than about eighteen characters is cut off
+          mid-word with no ellipsis and no way to read the rest — a background
+          named "Deep Forest v15 (marching colonnade)" shows as "Deep Forest
+          v15 (". The title is the whole selected label, so hovering answers
+          it. Derived from the option list rather than passed in, because the
+          port's `value` is an id and the thing worth reading is the LABEL. */}
       <select
         style={styles.select}
+        title={select.options.find((o) => o.value === select.value)?.label}
         value={select.value}
         onChange={(e) => select.onChange(e.target.value)}
       >
         {select.options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
+          <option key={o.value} value={o.value} title={o.label}>{o.label}</option>
         ))}
       </select>
     </div>
