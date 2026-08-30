@@ -748,7 +748,11 @@ const registered = new Set();
  * `/tmp/xvfb-run.*` leaked per run (23 -> 24), with the OLD helper reaping it
  * (23 -> 23) only because its silent no-op had left the tree fully alive for
  * the net to see. The doctrine is "capture before the first signal"; this is
- * that capture, kept where the abort path can reach it.
+ * that capture, kept where the abort path can reach it. (O66: the three
+ * harnesses with that shape now `await killTree(child)`, and rule G5 in
+ * check-harness-guards.mjs refuses a dropped killTree promise in any file that
+ * can process.exit — this record stays because the net is still the only
+ * thing that reaps a run interrupted inside the grace.)
  */
 const inFlight = new Map();
 

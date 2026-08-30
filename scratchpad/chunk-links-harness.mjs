@@ -69,7 +69,7 @@ function findElectron(from) {
   throw new Error('no electron binary found walking up from ' + from);
 }
 const ELECTRON = findElectron(ROOT);
-const AEON_DIR = '/home/volence/sonic_hacks/aeon';               // OPEN ONLY — never written
+const AEON_DIR = process.env.AEON_DIR ?? '/home/volence/sonic_hacks/aeon';   // OPEN ONLY — never written; O66: a copy may be named
 const SHOTS = join(ROOT, 'scratchpad/shots-chunk-links');
 mkdirSync(SHOTS, { recursive: true });
 
@@ -546,7 +546,12 @@ async function main() {
     }
   } finally {
     try { c?.close(); } catch { /* closing */ }
-    killTree(app);
+    // O66: AWAITED. `process.exit()` follows the summary below; a dropped
+    // promise here meant the app never got the ordered SIGTERM grace and the
+    // exit net SIGKILLed it (measured: no `cleanup: ORDERED` line, exit 261 ms
+    // after the summary — the shape that left Chromium SIGTRAP cores, O65).
+    // Rule G5 in check-harness-guards.mjs holds this line.
+    await killTree(app);
   }
 
   const passed = results.length - fails.length;

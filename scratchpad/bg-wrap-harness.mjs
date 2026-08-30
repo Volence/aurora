@@ -417,7 +417,12 @@ async function main() {
       + 'unless the app was told to save, and this run never asks it to.');
   } finally {
     try { c && c.close(); } catch { /* closing a dead socket */ }
-    killTree(child);
+    // O66: AWAITED. A dropped promise here reached the ordered grace only on
+    // the green path (nothing exits, the event loop drains over it); on the red
+    // path `process.exit(1)` below ran first and the exit net SIGKILLed the app
+    // — the shape that left Chromium SIGTRAP cores (O65). Rule G5 in
+    // check-harness-guards.mjs holds this line.
+    await killTree(child);
   }
 
   const pass = results.filter((r) => r.ok).length;

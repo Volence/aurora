@@ -329,8 +329,11 @@ async function main() {
 
     // ---- k8: killTree STARTED but not awaited, then the exit net (O65) -------
     //
-    // Three harnesses call `killTree(child)` WITHOUT await and then
-    // `process.exit()`. killTree SIGTERMs before its first `await`, the
+    // Three harnesses CALLED `killTree(child)` WITHOUT await and then
+    // `process.exit()` (all three await it since O66, and rule G5 in
+    // check-harness-guards.mjs refuses the shape; the net still has to hold
+    // for a harness that exits inside the grace — Ctrl+C, a throw on the way
+    // out). killTree SIGTERMs before its first `await`, the
     // xvfb-run wrapper dies at once, everything under it is reparented away,
     // and the exit net's `killTreeSync` then walks /proc from a dead pid and
     // finds nothing to reap. The tempdir leaks — measured 23 -> 24 on
