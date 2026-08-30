@@ -59,6 +59,87 @@
 // Descent from a pid this process spawned is the only ownership test that is
 // actually about ownership. Nothing here ever signals a pid outside that set.
 //
+// ── HAZARD 4: the X server's LEFTOVERS, which hazard 2's fix creates ───────
+//
+// O20. `/usr/bin/xvfb-run` is a shell script with NO TRAP. Its entire cleanup
+//
+//     kill $XVFBPID
+//     xauth remove ":$SERVERNUM"
+//     rm -r "$XVFB_RUN_TMPDIR"
+//
+// sits at /usr/bin/xvfb-run:184-192, AFTER the line that runs the command
+// (:180) and with no `trap` anywhere in the file.
+//
+// Signal the wrapper and none of it runs — which is
+// precisely what `killTree` does on every single teardown. So the guard that
+// fixed hazard 2 is the thing that guarantees hazard 4. This is the same
+// vacuous-guard shape this repo keeps meeting, and here it lives inside a
+// distro script: cleanup written after a command that need not return is
+// cleanup that does not exist.
+//
+// THERE ARE TWO LEAK RATES, NOT ONE, AND THE BIG ONE HAD NEVER BEEN COUNTED.
+// Measured here rather than reasoned about, and the first measurement got it
+// wrong — the RED row of xvfb-reap-proof.mjs refused to reproduce:
+//
+//   /tmp/xvfb-run.XXXXXX/    the wrapper's tempdir (pidfile + Xauthority).
+//                            LEAKS ON EVERY TEARDOWN, graceful ones included:
+//                            only the wrapper's own `rm -r` ever removes it,
+//                            and the wrapper is what we kill. 1504 of these on
+//                            this box on 2026-08-30, back to 25 Aug.
+//
+//   /tmp/.X<N>-lock          the lock file, and
+//   /tmp/.X11-unix/X<N>      the listening socket.
+//                            These leak only on an ABRUPT teardown. Xvfb
+//                            removes both itself when it is SIGTERMed, so
+//                            `killTree`'s graceful path is already clean —
+//                            but `killTreeSync` (Ctrl-C, uncaught throw,
+//                            process exit) is SIGKILL, and a crash is a
+//                            SIGKILL by another name. 89 of these on the box.
+//
+// The 17:1 ratio between the two counts is the shape of that difference, and
+// it is why counting only locks and sockets said the leak was under control.
+//
+// It is not cosmetic. `xvfb-run -a` picks its display with
+// `find_free_servernum` (/usr/bin/xvfb-run:88-99), which walks UP from 99
+// while `/tmp/.X$i-lock` exists — so every leaked lock permanently burns a
+// display number and every later run pays a longer scan. Display numbers had
+// climbed to :1030 before the 2026-08-29 sweep.
+//
+// `reapDisplays()` closes it, and it is scoped exactly the way hazard 3 says
+// it must be: it removes a lock/socket ONLY for a display number read out of
+// an Xvfb process that was inside a tree THIS harness launched, and a tempdir
+// ONLY when an owned process named it in its own XAUTHORITY. It never matches
+// a pattern, never touches :0, and refuses any display whose socket is still
+// bound by a live process.
+//
+// ── THE LESSON THIS FILE ACTUALLY TEACHES, WHICH IS NOT HAZARD 4 ───────────
+//
+// `boundSocketPaths()` — the strong instrument written to close hazard 4 —
+// FAILED OPEN against its own docstring. Its catch returned an empty `Set`
+// while the comment beside it promised the caller would treat "unknown" as
+// "do not touch". `bound.has(sock)` over an empty Set is `false`, and `false`
+// is the value that means PROCEED TO DELETE. So an unreadable /proc/net/unix
+// silently inverted a refusal into a permission, and NEVER_REAP_DISPLAYS
+// became the only thing standing between the reaper and the owner's desktop
+// socket.
+//
+// The general form, and it is worth more than the `xvfb-run` story above:
+// **THE FAILURE STATE AND THE SUCCESS STATE EMITTED THE SAME ARTIFACT.**
+// "I could not look" and "I looked and nothing is bound" were both an empty
+// Set. No caller could have distinguished them, however carefully written. An
+// instrument that cannot report its own blindness is the vacuous shape this
+// header is about — and it was firing inside the guard written to close a
+// vacuous-guard incident. It now returns `null` for unknown, and `reapDisplays`
+// treats that as GATE 0: refuse everything, loudly.
+//
+// It was latent, never live (/proc/net/unix is readable in practice, and
+// attribution keeps :0 out of the list), and it was found the only way things
+// like this are found: by planting the poison — emptying NEVER_REAP_DISPLAYS —
+// and noticing the proof stayed GREEN because a neighbouring gate covered for
+// the one that had been deleted. Bar 2d cause (ii). Every gate in
+// `reapDisplays` now has a row in xvfb-reap-proof.mjs that asserts WHICH gate
+// refused, and all four were verified by deleting them one at a time.
+//
 // ── HOW A HARNESS USES THIS ────────────────────────────────────────────────
 //
 //     import { spawnGuarded, killTree, resolveOwnedDiscovery }
@@ -76,7 +157,7 @@
 // where the exit-handler net has to be synchronous and blunt.
 
 import { spawn } from 'node:child_process';
-import { readdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -194,6 +275,197 @@ function killPids(pids) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// ── HAZARD 4: the X server's leftovers ─────────────────────────────────────
+
+/** The only tempdir shape `xvfb-run` makes (`mktemp -d -t xvfb-run.XXXXXX`).
+ *  Anything else is somebody else's directory and is never removed. */
+export const XVFB_TMPDIR_RE = /^\/tmp\/xvfb-run\.[A-Za-z0-9]{6}$/;
+
+/** Display numbers that are never reaped whatever the evidence says. `:0` is
+ *  the owner's real session (Xwayland, pid 969 on this box) and deleting its
+ *  socket would take his desktop down. */
+export const NEVER_REAP_DISPLAYS = new Set([0]);
+
+/** Block without a timer, so the exit-handler path (which cannot await) can
+ *  still give a SIGKILLed process the moment it needs to release its socket. */
+function sleepSync(ms) {
+  try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch { /* best effort */ }
+}
+
+/**
+ * Is this pid STILL THE PROCESS WE RECORDED, and still running?
+ *
+ * Three-valued where `alive()` is two-valued, and each distinction has already
+ * cost somebody a wrong answer:
+ *   - a ZOMBIE answers signal 0 and is not running. On the Ctrl-C path the
+ *     Xvfb we just SIGKILLed is briefly a zombie, and treating that as "still
+ *     alive" would refuse to reap on the one path where nothing else ever will.
+ *   - a RECYCLED pid answers signal 0 and is somebody else. That is exactly how
+ *     display :151 was held back on 2026-08-29 by a Vivaldi renderer thread.
+ *     If the argv no longer matches, our process is gone.
+ */
+function stillRunningAs(pid, argv) {
+  if (!alive(pid)) return false;
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+    if (/\)\s+Z\s/.test(stat)) return false;                 // zombie: dead, not yet reaped
+  } catch { return false; }                                   // gone between the two reads
+  return cmdlineOf(pid) === argv;                             // not recycled onto something else
+}
+
+/**
+ * Unix-socket paths currently BOUND by a live process, from /proc/net/unix.
+ * Returns `null` — NOT an empty Set — when the table cannot be read.
+ *
+ * This is the strong instrument, and it exists because the weak one has
+ * already misled a session here: a *lock file* names a pid, and a pid can be
+ * RECYCLED onto an unrelated process, so "that pid is in use" is not "that X
+ * server runs" (2026-08-29, display :151 held back by a Vivaldi renderer
+ * thread that had inherited the recorded pid). A path in /proc/net/unix is a
+ * live binding by construction: no binding, no row.
+ *
+ * ⚠ THIS FUNCTION FAILED OPEN, AGAINST ITS OWN DOCSTRING, AND THAT IS THE
+ * SHARPEST LESSON IN THIS FILE — SHARPER THAN THE `xvfb-run` ONE IT WAS
+ * WRITTEN TO FIX. The catch returned an empty `Set` while the comment said
+ * *"caller treats 'unknown' as 'do not touch'"*. The caller did no such thing:
+ * `bound.has(sock)` over an empty set is `false`, and `false` is the value that
+ * means **not bound, proceed to delete**. So an unreadable /proc/net/unix
+ * silently INVERTED gate 3 from a refusal into a permission.
+ *
+ * The general form, and it is the whole point: **the failure state and the
+ * success state emitted the same artifact.** "I could not look" and "I looked
+ * and found nothing bound" were the same empty Set, so no caller could
+ * possibly distinguish them — and an instrument that cannot report its own
+ * blindness is exactly the vacuous shape this file's header is about, firing
+ * inside the guard written to close a vacuous-guard incident.
+ *
+ * Latent, never live: /proc/net/unix is readable in practice, and
+ * `displayArtifacts` only lists displays from an Xvfb inside our own tree, so
+ * `:0` does not realistically reach the gate at all. That is precisely why
+ * NEVER_REAP_DISPLAYS is defence-in-depth for the case where attribution goes
+ * wrong — and why leaving it resting on a neighbour was the wrong call.
+ *
+ * Found by the coordinator, by planting the poison this file's own proof did
+ * not: emptying NEVER_REAP_DISPLAYS left `[o1]` GREEN, because gate 3 refused
+ * `:0` anyway. Bar 2d cause (ii) — two code paths, one observable.
+ */
+export function boundSocketPaths(path = '/proc/net/unix') {
+  let text;
+  try { text = readFileSync(path, 'utf8'); }
+  catch { return null; }                    // UNKNOWN. Never an empty Set.
+  const out = new Set();
+  for (const line of text.split('\n')) {
+    const p = line.trim().split(/\s+/)[7];
+    if (p) out.add(p.replace(/^@/, ''));
+  }
+  return out;
+}
+
+/**
+ * What X artifacts does the tree under `rootPid` own?
+ *
+ * MUST BE CALLED BEFORE THE FIRST SIGNAL, for the same reason the tree is:
+ * once the wrapper dies its children reparent to init, and an orphaned Xvfb
+ * can no longer be attributed to us. After that point the only honest answer
+ * is "unknown", and unknown must never become "safe to delete".
+ *
+ * Ownership, both fields:
+ *   - a display number comes from the argv of an **Xvfb process inside our own
+ *     tree** (`Xvfb :123 -screen ...`) — never from a DISPLAY environment
+ *     variable, which our own process may have inherited from the desktop and
+ *     which would therefore name `:0`;
+ *   - a tempdir comes from the XAUTHORITY of a process inside our own tree,
+ *     and only if it matches XVFB_TMPDIR_RE.
+ */
+export function displayArtifacts(rootPid) {
+  const displays = [];
+  const tmpdirs = new Set();
+  const unknown = [];
+  if (!Number.isInteger(rootPid)) return { displays, tmpdirs: [], unknown: ['no root pid'] };
+  for (const pid of descendants(rootPid)) {
+    if (pid === process.pid) continue;
+    const argv = cmdlineOf(pid);
+    if (/(^|\/)Xvfb( |$)/.test(argv)) {
+      const m = /(?:^|\s):(\d+)(?:\s|$)/.exec(argv);
+      if (m) displays.push({ n: Number(m[1]), xvfbPid: pid, argv });
+      else unknown.push(`pid ${pid} is an Xvfb but its argv carries no :N — ${argv.slice(0, 90)}`);
+    }
+    try {
+      const env = readFileSync(`/proc/${pid}/environ`, 'utf8');
+      const xa = /(?:^|\0)XAUTHORITY=([^\0]*)/.exec(env);
+      if (xa) {
+        const dir = xa[1].replace(/\/[^/]*$/, '');
+        if (XVFB_TMPDIR_RE.test(dir)) tmpdirs.add(dir);
+      }
+    } catch { /* raced with exit, or not readable — not fatal, just less to reap */ }
+  }
+  return { displays, tmpdirs: [...tmpdirs], unknown };
+}
+
+/**
+ * Remove the artifacts named by `displayArtifacts`, and nothing else.
+ *
+ * Call AFTER the tree is dead. Every removal is gated four ways and each
+ * refusal is returned in words:
+ *   1. never a display in NEVER_REAP_DISPLAYS;
+ *   2. never while the Xvfb we recorded is still alive;
+ *   3. never while /proc/net/unix shows the display's socket still BOUND —
+ *      i.e. some live server answers on it, ours or not;
+ *   4. never a tempdir outside XVFB_TMPDIR_RE.
+ */
+export function reapDisplays(art, { quiet = false, bound = boundSocketPaths() } = {}) {
+  const removed = [];
+  const refused = [];
+  // GATE 0 — BLIND. `bound === null` means the socket table could not be read,
+  // and this function's whole licence to delete rests on being able to tell a
+  // live server from a corpse. Refuse EVERYTHING and say why: the cost of
+  // refusing is a leaked file, visible and recoverable; the cost of acting
+  // blind is somebody's desktop. An unanswerable question does not become a
+  // pass, here as everywhere else in this repo.
+  if (bound === null) {
+    for (const d of art?.displays ?? []) {
+      refused.push(`:${d.n} — BLIND: /proc/net/unix unreadable, so "is a live server bound to `
+        + 'this display?" has no answer and nothing is removed');
+    }
+    for (const dir of art?.tmpdirs ?? []) refused.push(`${dir} — BLIND: see above; the whole reap is refused, not half of it`);
+    for (const u of art?.unknown ?? []) refused.push(`UNMEASURABLE: ${u}`);
+    if (!quiet) {
+      console.log('cleanup: X reap REFUSED ENTIRELY — /proc/net/unix unreadable, so liveness is unknown');
+      for (const r of refused) console.log(`cleanup: X artifact REFUSED — ${r}`);
+    }
+    return { removed, refused, blind: true };
+  }
+  for (const d of art?.displays ?? []) {
+    const sock = `/tmp/.X11-unix/X${d.n}`;
+    if (NEVER_REAP_DISPLAYS.has(d.n)) { refused.push(`:${d.n} is never reaped (the owner's session)`); continue; }
+    if (stillRunningAs(d.xvfbPid, d.argv)) { refused.push(`:${d.n} — its Xvfb (pid ${d.xvfbPid}) is still RUNNING`); continue; }
+    if (bound.has(sock)) { refused.push(`:${d.n} — ${sock} is still BOUND by a live process`); continue; }
+    for (const p of [`/tmp/.X${d.n}-lock`, sock]) {
+      // `removed` lists what was ACTUALLY THERE. `rm -f` over a path that never
+      // existed succeeds, and a cleanup report padded with those is a count of
+      // nothing — the same lie as a check that goes green over what it could
+      // not see.
+      if (!existsSync(p)) continue;
+      try { rmSync(p, { force: true }); removed.push(p); }
+      catch (e) { refused.push(`${p} — ${e.message}`); }
+    }
+  }
+  for (const dir of art?.tmpdirs ?? []) {
+    if (!XVFB_TMPDIR_RE.test(dir)) { refused.push(`${dir} — not an xvfb-run tempdir`); continue; }
+    if (!existsSync(dir)) continue;
+    try { rmSync(dir, { recursive: true, force: true }); removed.push(`${dir}/`); }
+    catch (e) { refused.push(`${dir} — ${e.message}`); }
+  }
+  // LOUD ON UNMEASURABLE: an Xvfb we could not attribute a display to is said
+  // out loud rather than folded into a clean count.
+  for (const u of art?.unknown ?? []) refused.push(`UNMEASURABLE: ${u}`);
+  if (!quiet && (removed.length || refused.length)) {
+    console.log(`cleanup: X artifacts reaped (${removed.length}): ${removed.join(' ') || 'none'}`);
+    for (const r of refused) console.log(`cleanup: X artifact REFUSED — ${r}`);
+  }
+  return { removed, refused };
+}
+
 /**
  * SIGTERM the tree, give it a grace period to flush, then SIGKILL what is
  * left. Returns what it saw and what it killed, so a caller can PRINT it.
@@ -203,12 +475,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * and a straight SIGKILL loses the last few seconds of writes, which has
  * already caused one harness to report a false failure.
  */
-export async function killTree(child, { graceMs = 4000, quiet = false } = {}) {
+export async function killTree(child, { graceMs = 4000, quiet = false, reap = true } = {}) {
   if (!child || !Number.isInteger(child.pid)) {
     return { tree: [], killed: 0, note: 'no child to kill' };
   }
   const tree = [...descendants(child.pid)];
   const seen = tree.map((p) => `${p} ${cmdlineOf(p).slice(0, 90)}`);
+  // BEFORE the first signal, for the same reason the tree is: an orphaned Xvfb
+  // cannot be attributed to us afterwards, and unattributable is not reapable.
+  const art = reap ? displayArtifacts(child.pid) : null;
   try { process.kill(-child.pid, 'SIGTERM'); } catch { /* not a group leader */ }
   try { child.kill('SIGTERM'); } catch { /* gone */ }
   if (graceMs > 0) await sleep(graceMs);
@@ -221,17 +496,30 @@ export async function killTree(child, { graceMs = 4000, quiet = false } = {}) {
     for (const s of seen) console.log(`           ${s}`);
     console.log(`cleanup: SIGKILLed ${killed}; survivors after kill: ${survivors.length ? survivors.join(',') : 'none'}`);
   }
-  return { tree, seen, killed, survivors };
+  const reaped = art ? reapDisplays(art, { quiet }) : null;
+  return { tree, seen, killed, survivors, artifacts: art, reaped };
 }
 
 /** Synchronous last-resort variant for process-exit handlers, which cannot
  *  await. Blunt on purpose: at exit there is nothing left to flush for. */
-export function killTreeSync(child) {
+export function killTreeSync(child, { reap = true } = {}) {
   if (!child || !Number.isInteger(child.pid)) return { tree: [], killed: 0 };
   const tree = [...descendants(child.pid)];
+  // Read the artifacts before signalling — this is the Ctrl-C path, and it is
+  // the ONE path where the X leftovers used to be guaranteed: an interrupted
+  // harness never reaches its `finally`, so nothing else was ever going to
+  // remove them. SIGKILL is immediate, so no grace loop is needed before the
+  // reap; `reapDisplays` re-checks liveness per display anyway.
+  const art = reap ? displayArtifacts(child.pid) : null;
   try { process.kill(-child.pid, 'SIGKILL'); } catch { /* not a group leader */ }
   const killed = killPids(tree);
-  return { tree, killed };
+  // A SIGKILLed process releases its sockets when the kernel tears it down,
+  // not at the instant the signal is sent. Without this pause the bound-socket
+  // gate reads the corpse as live and refuses — a leak on the exact path this
+  // exists for. 250ms, blocking, because an exit handler cannot await.
+  if (art?.displays.length) sleepSync(250);
+  const reaped = art ? reapDisplays(art, { quiet: true }) : null;
+  return { tree, killed, artifacts: art, reaped };
 }
 
 // ── HAZARD 1b: the ownership rule for readers ──────────────────────────────

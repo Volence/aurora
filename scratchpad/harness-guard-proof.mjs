@@ -54,6 +54,7 @@ import {
   spawnGuarded, killTree, descendants, alive, cmdlineOf,
   snapshotDiscovery, restoreDiscovery, describeDiscovery, readDiscoveryNow,
   resolveOwnedDiscovery, DISCOVERY_FILES, setDiscoveryBaseline,
+  displayArtifacts, reapDisplays,
 } from './lib/harness-guard.mjs';
 
 const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
@@ -241,6 +242,13 @@ async function main() {
     } else {
       const treeBefore = [...descendants(redK.pid)];
       note('tree before kill', treeBefore.map((p) => `${p} ${cmdlineOf(p).slice(0, 70)}`).join('\n                        '));
+      // The X display this run owns, captured for the same reason the tree is —
+      // this is the ONE teardown in this file that does not go through killTree,
+      // so it is the one place the O20 reap has to be written out by hand.
+      // Measured before it was: this phase leaked a lock, a socket and an
+      // xvfb-run tempdir on EVERY run of the proof, which made the instrument
+      // that polices the leak a contributor to it.
+      const redKArt = displayArtifacts(redK.pid);
       redK.kill();                      // ← THE DEFECT: signals the WRAPPER only
       await sleep(2500);
       const survivors = treeBefore.filter((p) => p !== redK.pid && alive(p));
@@ -263,6 +271,9 @@ async function main() {
       check('k3', 'the RED orphans are gone before the GREEN phase starts',
         survivors.every((p) => !alive(p)),
         survivors.map((p) => `${p} alive=${alive(p)}`).join(' · ') || 'none');
+      const redKReap = reapDisplays(redKArt, { quiet: true });
+      note('red cleanup', `X artifacts from the RED display: ${redKReap.removed.join(' ') || 'none'}`
+        + `${redKReap.refused.length ? ` · refused: ${redKReap.refused.join('; ')}` : ''}`);
     }
 
     // ---- GREEN: the same launch, torn down with killTree ---------------------

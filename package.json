@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "check:test-collection": "node scripts/check-test-collection.mjs",
     "check:pseudo-skip": "node scripts/check-pseudo-skip.mjs",
-    "test": "node scripts/check-test-collection.mjs && node scripts/check-pseudo-skip.mjs && vitest run",
+    "test": "node scripts/check-test-collection.mjs && node scripts/check-pseudo-skip.mjs && node scratchpad/check-harness-guards.mjs && vitest run",
     "test:watch": "vitest",
     "gen:theme": "node scripts/gen-theme.mjs",
     "harness:tile-attributes": "node scratchpad/tile-attribute-harness.mjs",
@@ -23,6 +23,7 @@
     "harness:collision-read": "node scratchpad/collision-read-harness.mjs",
     "check:harness-guards": "node scratchpad/check-harness-guards.mjs",
     "harness:guard-proof": "node scratchpad/harness-guard-proof.mjs",
+    "harness:xvfb-reap": "node scratchpad/xvfb-reap-proof.mjs",
     "harness:loop-paint": "node scratchpad/loop-paint-harness.mjs",
     "harness:curve-option-disabled": "node scratchpad/curve-option-disabled-harness.mjs",
     "harness:band-preset": "node scratchpad/band-preset-harness.mjs"
