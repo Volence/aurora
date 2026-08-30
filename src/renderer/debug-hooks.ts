@@ -1616,13 +1616,23 @@ interface DebugApi {
    * deterministic seam under a flood, on exactly the rationale `spritePaint` has
    * under the canvas.
    *
-   * WHY A HOOK RATHER THAN A REAL FLOOD. `MAX_VISIBLE_TOASTS` exists for the
-   * floods that have no single producer to fix (`saveAllDirty` toasts once per
-   * failed document; ~98 addToast sites), and the one producer that DID flood —
-   * the aeon loader's 63 unreadable-section-file notices — now coalesces to one
-   * on purpose. So there is no longer any project on disk that puts twelve
-   * toasts on screen, and the only honest way to drive the overflow row in the
-   * running app is to add them the way the app itself does.
+   * WHY A HOOK RATHER THAN A REAL FLOOD. `MAX_VISIBLE_TOASTS` is the LAST line,
+   * not the only one: it bounds what is PAINTED, while each producer is
+   * responsible for how many toast objects it builds. Every loop-shaped producer
+   * found by an AST containment scan over `src` has since been bounded —
+   *   • the aeon loader's 63 unreadable-section-file notices → one (load.ts);
+   *   • the two effects library loaders, whose count was a directory listing's
+   *     length → one each (core/formats/effects/{scene,preset}.ts);
+   *   • `saveAllSpriteArt` and the canvas Save-All loop, one toast per dirty
+   *     document → one summary per channel (state/save-outcome-report.ts).
+   * `saveAllDirty` is often miscounted as a flood: it toasts once per failed
+   * SAVER, and there are exactly four, registered by fixed id.
+   *
+   * So no project on disk puts twelve toasts on screen any more, and the only
+   * honest way to drive the overflow row in the running app is to add them the
+   * way the app itself does. This hook is that instrument — deliberately the one
+   * unbounded `addToast` loop left in the tree, because its whole job is to
+   * exceed the cap on demand.
    */
   pushToasts(items: { message: string; type: ToastType }[]): void;
 }

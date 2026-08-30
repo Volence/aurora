@@ -214,6 +214,20 @@ export async function saveClassicProject(
   if (dirtyLevels.length === 0) return { kind: 'nothing' };
 
   let saved = 0;
+  // BOUNDED BY ITS PRODUCER, NOT BY THIS LOOP. Every toast below is followed by
+  // a `return`, so the switch's failure arms cost one toast however long
+  // `dirtyLevels` is — but `notifyMidSaveEdits` in the 'saved' arm is NOT: that
+  // arm `break`s and the loop continues, so it is one toast per level. What
+  // makes that safe today is `collectDirtyLevels`, the only production `collect`,
+  // which returns AT MOST ONE element (the classic level store holds a single
+  // open act).
+  //
+  // So if Tasks 12/13 land the store-backed collector this signature was written
+  // for and it returns N levels, the 'saved' arm becomes a flood and must
+  // coalesce — collect the withheld domains here and fold them after the loop,
+  // the way saveAllSpriteArt does (state/save-outcome-report.ts). Not done now
+  // because a fold over a loop that runs once is machinery guarding nothing, and
+  // it would go stale unread.
   for (const dl of dirtyLevels) {
     const result = await levels.write(dl.ref, dl.doc, dl.dirty);
     const outcome = await saveClassicWriteResult(dir, result, api);
