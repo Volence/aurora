@@ -130,6 +130,74 @@ export function referencePath(name: string, ...rel: string[]): string {
 export const UNRESOLVED_ROOT = '/nonexistent/aurora-unresolved-peer-root';
 
 /**
+ * Entries that must be present for a directory to BE a checkout of `name`,
+ * rather than a directory that merely has the right name.
+ *
+ * Chosen to be universal to the tree, not exhaustive over what the tests read —
+ * see the honesty note on `referenceCheckout`.
+ */
+const REFERENCE_MARKERS: Record<string, readonly string[]> = {
+  s1disasm: ['sonic.asm', '_maps', 'levels'],
+};
+
+/**
+ * Is `name` a REAL checkout — not just a directory that exists?
+ *
+ * WHY THE DIRECTORY WAS NEVER THE RIGHT QUESTION. Twenty-seven files guarded on
+ * `existsSync(S1DIR)`. A directory that exists but holds none of the data
+ * defeats every one of them: the guard says present, the rows run, and they fail
+ * on whatever they happen to touch first. Measured 2026-08-30 by pointing
+ * `AURORA_S1DISASM_REPO` at an EMPTY directory — 135 failures, and 43 of them in
+ * messages that never mention s1disasm at all:
+ *
+ *     TypeError: The "path" argument must be of type string. Received undefined
+ *     AssertionError: expected 0 to be greater than 0
+ *     AssertionError: expected 'error' to be 'opened'
+ *
+ * A failure that misdirects is its own defect class, distinct from a silent
+ * pass. It is URGENT and SELF-LIMITING — it hurts, so it gets fixed — where a
+ * silent pass is IMPORTANT and PERMANENT, since nothing ever prompts the fix.
+ * Neither ranks above the other; they need different scheduling, not a priority
+ * order.
+ *
+ * ⚠ WHAT THIS DOES AND DOES NOT CLOSE, stated so a pass is not read as more than
+ * it is. It closes "the directory is not a checkout at all" — empty, wrong,
+ * half-cloned before any content landed. It does NOT close "a real checkout
+ * missing some of what a given row reads": a tree with `sonic.asm`, `_maps` and
+ * `levels` but no `artnem/` still satisfies this and still fails downstream in
+ * that row's own vocabulary. Closing THAT means each row naming the file it
+ * reads, which is 27 different decisions rather than one, and is booked in
+ * `docs/reviews/2026-08-30-s1disasm-test-coupling.md`.
+ */
+export function referenceCheckout(name: string): boolean {
+  const root = referenceFile(name);
+  if (root === null || !existsSync(root)) return false;
+  return (REFERENCE_MARKERS[name] ?? []).every((m) => existsSync(resolve(root, m)));
+}
+
+/**
+ * The skip reason to pair with `referenceCheckout`, distinguishing the two ways
+ * it can answer false — because "absent" and "present but not a checkout" send a
+ * reader to two different places, and the second one used to be reported with
+ * the words of the first.
+ */
+export function referenceCheckoutReason(name: string): string {
+  const root = referenceFile(name);
+  if (root === null) {
+    return `SKIPPED, NOT PASSED: no sibling checkout root could be derived for ${name} `
+      + '(see AURORA_PEER_ROOT), so these rows measure nothing';
+  }
+  if (!existsSync(root)) {
+    return `SKIPPED, NOT PASSED: ${root} is absent — this machine has no ${name} checkout, `
+      + 'so these rows measure nothing';
+  }
+  const missing = (REFERENCE_MARKERS[name] ?? []).filter((m) => !existsSync(resolve(root, m)));
+  return `SKIPPED, NOT PASSED: ${root} EXISTS but is not a ${name} checkout — it is missing `
+    + `${missing.join(', ')}. These rows measure nothing, and had they run they would have `
+    + 'failed in their own vocabulary rather than naming this directory';
+}
+
+/**
  * The reason line for a skip. NAMES THE MISSING THING — the point of routing
  * these through one helper is consistency of FORM, never anonymity: a reader of
  * the run output must be able to see which file was wanted and go get it. A

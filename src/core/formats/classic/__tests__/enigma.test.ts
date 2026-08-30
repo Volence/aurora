@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import { enigmaCompress, enigmaDecompress } from '../enigma';
-import { referencePath } from '../../../../../test/support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../../test/support/fixture-tree';
 
 const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
+const S1_ABSENT = referenceCheckoutReason('s1disasm');
 
 /** Deterministic PRNG (mulberry32) so the round-trip property is reproducible. */
 function mulberry32(seed: number): () => number {
@@ -120,7 +120,7 @@ describe('enigma decoder byte vectors (CI-safe, no fixtures)', () => {
   });
 });
 
-describe('enigma against s1disasm goldens', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
+describe('enigma against s1disasm goldens', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
   const map16Dir = `${S1DIR}/map16`;
   const eniFiles = fs.existsSync(map16Dir)
     ? fs.readdirSync(map16Dir).filter((f) => f.toLowerCase().endsWith('.eni'))

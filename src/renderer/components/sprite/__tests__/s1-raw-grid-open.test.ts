@@ -22,11 +22,11 @@ import type { DiscoveredSpriteSet } from '../../../../core/import/sprite-discove
 import { useSpriteStore } from '../../../state/spriteStore';
 import { useToastStore } from '../../../state/toastStore';
 import { parseTiles } from '../../../../core/formats/tiles';
-import { referencePath } from '../../../../../test/support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../../test/support/fixture-tree';
 
 const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
+const S1_ABSENT = referenceCheckoutReason('s1disasm');
 
 // window.api over fs (read-only: s1disasm must never be written by a test).
 function stubWindowApi(): () => void {
@@ -87,7 +87,7 @@ function derivedCells(bytes: Uint8Array, widthCells: number, heightCells: number
   });
 }
 
-describe('openDiscoveredSet — raw tile grids (Parcel C)', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
+describe('openDiscoveredSet — raw tile grids (Parcel C)', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
   it('HUD Numbers: size÷64 frames of 8×16, each cell equal to its two consecutive tiles', async () => {
     const rel = 'artunc/HUD Numbers.unc';
     const bytes = fs.readFileSync(path.join(S1DIR, rel));

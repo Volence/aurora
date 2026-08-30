@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import type { FileAccess } from '../adapter';
 import { s1Adapter, enumerateProfileEntries } from '../s1/index';
 import { s1Profile } from '../profiles/s1';
-import { referencePath } from '../../../../test/support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
 
 // ---------------------------------------------------------------------------
 // In-memory FileAccess fake (same pattern as adapter.test.ts).
@@ -302,8 +302,8 @@ describe('s1Adapter.open overrides', () => {
 
 const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
-const S1_PRESENT = fs.existsSync(S1DIR);
+const S1_ABSENT = referenceCheckoutReason('s1disasm');
+const S1_PRESENT = referenceCheckout('s1disasm');
 
 function realFs(root: string): FileAccess {
   return {

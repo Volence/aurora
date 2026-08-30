@@ -19,11 +19,11 @@ import { parseAsmMappings, parseAsmDPLC } from '../../../import/asm-mappings';
 import { reconstructFromFrames } from '../../../import/sprite-import';
 import { parseTiles } from '../../../formats/tiles';
 import type { SpriteFrame } from '../../../model/sprite-types';
-import { referencePath } from '../../../../../test/support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../../test/support/fixture-tree';
 
 const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
+const S1_ABSENT = referenceCheckoutReason('s1disasm');
 const read = (rel: string) => new Uint8Array(fs.readFileSync(path.join(S1DIR, rel)));
 const readText = (rel: string) => fs.readFileSync(path.join(S1DIR, rel), 'utf8');
 
@@ -118,7 +118,7 @@ function load(mapRel: string, artRel: string, dplcRel?: string): Loaded {
   };
 }
 
-const HAVE = fs.existsSync(S1DIR);
+const HAVE = referenceCheckout('s1disasm');
 
 describe('delta writer — uncompressed flat mapping (Giant Ring)', { skip: !HAVE, meta: { skipReason: S1_ABSENT } }, () => {
   const L = () => load('_maps/Giant Ring.asm', 'artunc/Giant Ring.unc');

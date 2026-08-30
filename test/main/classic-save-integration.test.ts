@@ -8,7 +8,7 @@ import { s1Profile, type LevelAct } from '../../src/core/project/profiles/s1';
 import { readS1Level, writeS1Level, type ResolvedLevelPaths } from '../../src/core/level-classic/s1-io';
 import { s1Adapter } from '../../src/core/project/s1/index';
 import { performGuardedWrite } from '../../src/main/guarded-write';
-import { referencePath } from '../support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath } from '../support/fixture-tree';
 
 // ---------------------------------------------------------------------------
 // End-to-end guarded-save cycle over a TEMP COPY of real s1disasm files (never
@@ -17,8 +17,8 @@ import { referencePath } from '../support/fixture-tree';
 
 const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
-const S1_PRESENT = fs.existsSync(S1DIR);
+const S1_ABSENT = referenceCheckoutReason('s1disasm');
+const S1_PRESENT = referenceCheckout('s1disasm');
 
 let tmp: string;
 beforeEach(() => {
@@ -37,9 +37,27 @@ function resolveVariant(v: { path: string; rev00Path?: string }): string {
 function resolveSingle(p: string): string | undefined {
   return fs.existsSync(path.join(S1DIR, p)) ? p : undefined;
 }
+/**
+ * The REQUIRED files, failing in this file's own words rather than four frames
+ * down inside `path.join`. `resolveSingle(t)!` asserted a fact the guard above
+ * does not establish, and on an INCOMPLETE checkout it produced
+ * `TypeError: The "path" argument must be of type string. Received undefined` —
+ * a message naming no file, no directory and no checkout (measured 2026-08-30).
+ */
+function requireSingle(p: string): string {
+  const r = resolveSingle(p);
+  if (r === undefined) {
+    throw new Error(
+      `${path.join(S1DIR, p)} is missing — this checkout has the top-level markers but not `
+      + 'this file, so the row below cannot measure anything. It is an INCOMPLETE s1disasm '
+      + 'checkout, not an Aurora defect.',
+    );
+  }
+  return r;
+}
 function realPaths(act: LevelAct): ResolvedLevelPaths {
   return {
-    tiles: act.tiles.map((t) => resolveSingle(t)!),
+    tiles: act.tiles.map((t) => requireSingle(t)),
     blocks: resolveVariant(act.blocks),
     chunks: resolveVariant(act.chunks),
     colind: resolveVariant(act.colind),
@@ -47,7 +65,7 @@ function realPaths(act: LevelAct): ResolvedLevelPaths {
     bg: resolveVariant(act.bgLayout),
     objpos: resolveVariant(act.objpos),
     startpos: resolveVariant(act.startpos),
-    palette: act.palette.map((c) => resolveSingle(c.file)!),
+    palette: act.palette.map((c) => requireSingle(c.file)),
     animatedArt: act.animatedArt.map((a) => resolveSingle(a.file)),
     collisionNormal: s1Profile.collision.normal,
     collisionAngleMap: s1Profile.collision.angleMap,

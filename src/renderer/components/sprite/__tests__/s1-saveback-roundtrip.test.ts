@@ -21,17 +21,17 @@ import { openDiscoveredSet, saveSpriteArt } from '../export-sprite';
 import { useSpriteStore } from '../../../state/spriteStore';
 import { useToastStore } from '../../../state/toastStore';
 import type { SpriteFrame } from '../../../../core/model/sprite-types';
-import { referencePath } from '../../../../../test/support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../../test/support/fixture-tree';
 
 const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
+const S1_ABSENT = referenceCheckoutReason('s1disasm');
 const SONIC_FILES = ['_maps/Sonic.asm', '_maps/Sonic - Dynamic Gfx Script.asm', 'artunc/Sonic.unc'];
 const RING_FILES = ['_maps/Giant Ring.asm', 'artunc/Giant Ring.unc'];
 
-let tempDir: string;
+let tempDir = '';
 let writtenPaths: string[];
-let restoreApi: () => void;
+let restoreApi: (() => void) | undefined;
 
 function stubWindowApi(): () => void {
   const g = globalThis as unknown as { window?: unknown };
@@ -81,9 +81,24 @@ beforeEach(() => {
   useToastStore.setState({ toasts: [] });
 });
 afterEach(() => {
-  restoreApi();
-  useSpriteStore.getState().closeAll();
-  fs.rmSync(tempDir, { recursive: true, force: true });
+  // THE REMOVAL GOES IN `finally`, and it is not tidiness.
+  //
+  // `beforeEach` mkdtemps into `process.cwd()` — the REPO ROOT — and then copies
+  // the fixture files in. On an incomplete s1disasm checkout the copy throws
+  // AFTER the directory exists and BEFORE `restoreApi` is assigned, so this hook
+  // used to die on `restoreApi()` and never reach the `rmSync`. Nine
+  // `.tmp-s1-saveback-*` directories were left in the repo root by one such run
+  // (measured 2026-08-30); they are untracked and not gitignored, so the next
+  // `git add -A` in this tree would have committed a copy of somebody else's
+  // disassembly.
+  try {
+    restoreApi?.();
+    useSpriteStore.getState().closeAll();
+  } finally {
+    if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true });
+    tempDir = '';
+    restoreApi = undefined;
+  }
 });
 
 const lastToast = () => useToastStore.getState().toasts.at(-1)?.message ?? '';
@@ -176,7 +191,7 @@ function findEditSpot(
   throw new Error('unmeasurable: no single-coverage edit spot found');
 }
 
-describe('S1 save-back round trip — Sonic (uncompressed + DPLC)', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
+describe('S1 save-back round trip — Sonic (uncompressed + DPLC)', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
   it('zero-edit save writes a BYTE-IDENTICAL art file and touches nothing else', async () => {
     const ok = await openDiscoveredSet(tempDir, SONIC_SET, 'uncompressed');
     expect(ok).toBe(true);
@@ -230,7 +245,7 @@ describe('S1 save-back round trip — Sonic (uncompressed + DPLC)', { skip: !fs.
   });
 });
 
-describe('S1 save-back round trip — Giant Ring (uncompressed flat)', { skip: !fs.existsSync(S1DIR), meta: { skipReason: S1_ABSENT } }, () => {
+describe('S1 save-back round trip — Giant Ring (uncompressed flat)', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
   it('zero-edit save is byte-identical; an edit changes only the derived tile records', async () => {
     const ok = await openDiscoveredSet(tempDir, RING_SET, 'uncompressed');
     expect(ok).toBe(true);

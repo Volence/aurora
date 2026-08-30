@@ -5,7 +5,7 @@ import { tileLockReason, isTileEditable } from '../editable-tiles';
 import { firstEditableNonBlankTile } from '../../level-classic/tile-pick';
 import { s1Adapter } from '../s1';
 import type { EditableTileRange, FileAccess } from '../adapter';
-import { referencePath } from '../../../../test/support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
 
 // The composer's 🔒 rule and the command's refusal are ONE predicate now (they
 // used to be two hand-copied ones, and only the command's copy was testable —
@@ -64,8 +64,8 @@ describe('tileLockReason', () => {
 
 const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
-const S1_PRESENT = fs.existsSync(S1DIR);
+const S1_ABSENT = referenceCheckoutReason('s1disasm');
+const S1_PRESENT = referenceCheckout('s1disasm');
 
 function realFs(root: string): FileAccess {
   return {

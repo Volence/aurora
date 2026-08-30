@@ -12,7 +12,7 @@ import { decodeS1Objpos } from '../../formats/classic/s1-objpos';
 import { nemesisCompress, nemesisDecompress } from '../../compress/nemesis';
 import { enigmaCompress, enigmaDecompress } from '../../formats/classic/enigma';
 import { kosinskiCompress, kosinskiDecompress } from '../../formats/kosinski';
-import { referencePath } from '../../../../test/support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
 
 // ---------------------------------------------------------------------------
 // Fakes / helpers
@@ -47,8 +47,8 @@ function memFsWithMtime(files: Record<string, Uint8Array>, mtimes: Record<string
 
 const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = `${S1DIR} is absent — this machine has no s1disasm checkout, so these rows measure nothing`;
-const S1_PRESENT = fs.existsSync(S1DIR);
+const S1_ABSENT = referenceCheckoutReason('s1disasm');
+const S1_PRESENT = referenceCheckout('s1disasm');
 
 function realFs(root: string): FileAccess {
   return {
@@ -74,9 +74,35 @@ function resolveSingle(p: string): string | undefined {
   return fs.existsSync(path.join(S1DIR, p)) ? p : undefined;
 }
 
+/**
+ * `resolveSingle` for the REQUIRED files, failing in this file's own words.
+ *
+ * The `resolveSingle(t)!` this replaces handed `undefined` to `path.join`, and
+ * the whole block died with
+ *
+ *     TypeError: The "path" argument must be of type string. Received undefined
+ *
+ * which names no file, no directory and no checkout — 21 rows of it, measured
+ * 2026-08-30 against a checkout holding `sonic.asm`/`_maps`/`levels` and none of
+ * the level data. A reader of that trace has no reason to suspect their tree;
+ * they go looking for a path bug in Aurora. The `!` was the defect: it asserted
+ * a fact the guard above does not establish.
+ */
+function requireSingle(p: string): string {
+  const r = resolveSingle(p);
+  if (r === undefined) {
+    throw new Error(
+      `${path.join(S1DIR, p)} is missing — this checkout has the top-level markers but not `
+      + 'this file, so the row below cannot measure anything. It is an INCOMPLETE s1disasm '
+      + 'checkout, not an Aurora defect.',
+    );
+  }
+  return r;
+}
+
 function realPaths(act: LevelAct): ResolvedLevelPaths {
   return {
-    tiles: act.tiles.map((t) => resolveSingle(t)!),
+    tiles: act.tiles.map((t) => requireSingle(t)),
     blocks: resolveVariant(act.blocks),
     chunks: resolveVariant(act.chunks),
     colind: resolveVariant(act.colind),
@@ -84,7 +110,7 @@ function realPaths(act: LevelAct): ResolvedLevelPaths {
     bg: resolveVariant(act.bgLayout),
     objpos: resolveVariant(act.objpos),
     startpos: resolveVariant(act.startpos),
-    palette: act.palette.map((c) => resolveSingle(c.file)!),
+    palette: act.palette.map((c) => requireSingle(c.file)),
     animatedArt: act.animatedArt.map((a) => resolveSingle(a.file)),
     collisionNormal: s1Profile.collision.normal,
     collisionAngleMap: s1Profile.collision.angleMap,
