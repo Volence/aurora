@@ -89,13 +89,26 @@ Per-section backgrounds: every section displays the act default unless
 composites the background of the ACTIVE section, so `goto` a section to see
 its assigned BG. Assignments are one undo step each and persist in per-section
 `.meta.json` sidecars; library entries persist under `data/editor/` on save.
-Export emits `{zone}_BG_{id}` labels in the act descriptor's section table —
-the engine build must BINCLUDE the referenced binaries.
+
+**A per-section BG assignment stops at the editor's own files.** There is no
+export step and no `{zone}_BG_{id}` labels: `exportAct` and its
+`{dataPath}export/` dump (`act_descriptor.asm`, …) were deleted from the aeon
+save on 2026-08-19 and nothing in aeon ever read that directory
+(`src/core/project/aeon/save.ts:11-23`). No aeon generator reads
+`{zone}_bglib.json` or a sidecar's `bgLayoutRef` — the effects generator
+explicitly does not (aeon `tools/EFFECTS_CONSUMER_CONTRACT.md:178`) — and every
+section of the shipped act still carries `sec_bg_layout: default`, i.e. "use the
+act-wide BG" (aeon `games/sonic4/data/levels/ojz/act1/act_descriptor.emp:207`;
+the engine field itself is real, `engine/structs.emp:119`). The background that
+DOES reach a ROM is the ACT-WIDE one, through `{dataRoot}editor_bg_override.json`
+and aeon's `tools/inject_editor_bg.py` (run by `tools/regenerate-level.sh:94`).
+So `assign_section_bg` is an editor/preview binding until a per-section consumer
+is built — unlike `assign_section_scene` below, which is baked.
 
 ## Effects scenes (parallax/raster)
 
 A **scene** is one JSON document under `data/editor/effects/<scene_id>.json`
-describing how the two planes scroll: a list of 1–8 layers (`world_y` plus a
+describing how the two planes scroll: a list of 1–16 layers (`world_y` plus a
 Plane A and Plane B scroll factor each) and scene-level vertical parameters.
 The wire shape is the suite contract, `empyrean/docs/AURORA_EFFECTS_SCHEMA.md`
 §2; Aurora vendors the machine-readable schema and validates against it.
@@ -125,10 +138,36 @@ scene, including one whose file exists but did not parse: a ref the build cannot
 resolve is worse than no ref. Scene files Aurora could not read are reported by
 `list_effects_scenes` and are never overwritten.
 
-**Nothing authored here reaches a ROM yet.** aeon's `tools/effects_gen.py` — the
-generator that bakes these documents into the engine — is booked and not built,
-so scenes persist to disk and stop there. That is the accepted sequencing, not
-an oversight.
+**An authored scene DOES reach a ROM.** aeon's `tools/effects_gen.py` — the
+generator that bakes these documents into the engine — shipped and was wired on
+2026-08-22 (aeon `tools/EFFECTS_CONSUMER_CONTRACT.md:24`, beside
+`tools/test_effects_gen.py`). It reads each scene JSON plus each section
+sidecar's `sceneRef`, lowers them through the engine's real `scene()`/`layer()`
+constructors — so an authored value that violates an engine `ensure` fails the
+BUILD, not this tool — and emits
+`games/sonic4/data/generated/ojz/act1/effects_scenes.emp`, whose two binding
+functions `act_descriptor.emp` calls. That module's own header reports the live
+bake ("2 editor scene(s) reached by an assignment, 2 binding(s), 9 act
+sections").
+
+Which build you run decides what happens, and neither outcome is silent:
+
+- **`build_and_run` bakes.** It sends `FAST=1` by default
+  (`src/core/aether/build-plan.ts:174-179`); aeon's `build.sh` sees the editor
+  tree is newer than the generated one (`build.sh:394-407` via
+  `tools/level_staleness.py`, whose "newer" side is all of `data/editor/**`) and
+  re-runs `tools/regenerate-level.sh`, which calls `effects_gen.py emit`
+  (`regenerate-level.sh:206`). Save → build → reload carries a scene edit into
+  the ROM.
+- **A canonical (non-FAST) `./build.sh` refuses.** The generated module is a
+  COMMITTED artifact, so `build.sh:534` runs `effects_gen.py check` and exits
+  naming `tools/regenerate-level.sh`. A stale bake fails the build rather than
+  building green and dropping the edit.
+
+Two manual steps remain, and they are aeon-side: the regenerated tree is
+committed by hand, and an act is only wired at all once its `act_descriptor.emp`
+calls the generator's binding functions (OJZ act 1 does; a new act is a
+one-time programmer edit).
 
 ## Effects presets (raster bands)
 
