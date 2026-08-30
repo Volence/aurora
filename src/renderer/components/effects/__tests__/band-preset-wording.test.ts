@@ -336,6 +336,50 @@ describe('the three limits say the words that carry them', () => {
   });
 
   /**
+   * ⚠ EIGHTH FACT, 2026-08-30 (O62), AND THIS ROW WAS RED BEFORE THE SENTENCE
+   * MOVED. The seven corrections above are all about how far ONE binding
+   * travels. This one is about the TREE an author leaves behind: at aeon
+   * `origin/master` `027ec162` three CONTENT tests in `build.sh`'s pytest lane
+   * accept exactly one bound set — section 5 → `ojz_sec5_showcase` — and refuse
+   * every other by name. The select's empty option on section 5 produces the
+   * tree aeon's own README says could only be built with `FAST=1`; a pick on
+   * any other section fails the exact-`[5]` assertion. The control is NOT
+   * gated and NOT confirmed (the STANDING REFUSAL in raster-binding.ts): the
+   * author reads it here, in the block that renders above the select.
+   *
+   * Pinned on the PANEL's sentence (`PRESET_LIMITS.unbound`), not the constant,
+   * so a panel that stopped reading the constant fails here on the words an
+   * author would miss. The matchers are the claims an author acts on: which
+   * state is accepted, which tests refuse, what their messages say, when the
+   * refusal runs and when it does not, that nothing here prevents the write,
+   * and the expiry. The negatives catch the two wrong rewrites — a gate on
+   * this side, or the refusal attributed to the FAST=1 build.
+   */
+  it('LIMIT 1 discloses that aeon\'s full build refuses any tree but section 5 → ojz_sec5_showcase', () => {
+    const l = PRESET_LIMITS.find((x) => x.key === 'unbound')!;
+    expect(l.body).toMatch(/AND THE BOUND SET ITSELF IS PINNED BY AEON'S FULL BUILD/);
+    expect(l.body).toMatch(/read at aeon 027ec162 \(2026-08-30\)/);
+    expect(l.body).toMatch(/section 5 bound to ojz_sec5_showcase is the ONLY state aeon's canonical build accepts/);
+    expect(l.body).toMatch(/tools\/test_effects_seam_gate\.py::TestRasterSeamAgainstTheRealTree::test_the_bound_sections_are_exactly_the_threaded_ones/);
+    expect(l.body).toMatch(/test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document/);
+    expect(l.body).toMatch(/tools\/test_raster_cycle_table_lint\.py::test_every_preset_document_is_REACHABLE/);
+    // The unbind, in the author's terms — the select's own option is named.
+    expect(l.body).toMatch(/UNBINDING SECTION 5 — null from this tool, or the select's Hand-authored raster option/);
+    expect(l.body).toMatch(/leaves the bound set empty and the document ojz_sec5_showcase\.json orphaned/);
+    expect(l.body).toMatch(/"no sidecar carries a rasterRef — step 6's band is gone"/);
+    expect(l.body).toMatch(/"the bound sections are \[\], not \[5\]"/);
+    expect(l.body).toMatch(/reachable by NOTHING: \['ojz_sec5_showcase'\]/);
+    expect(l.body).toMatch(/BINDING ANY OTHER SECTION, beside 5 or instead of it, fails the exact-\[5\] assertion/);
+    expect(l.body).toMatch(/runs only in the canonical FAST=0 build: FAST=1 sets NO_LINT=1, the pytest lane sits under NO_LINT, and FAST=1 builds the tree/);
+    expect(l.body).toMatch(/NOTHING HERE PREVENTS THE WRITE/);
+    expect(l.body).toMatch(/THAT CLAUSE EXPIRES when the \[5\] literal in test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document changes/);
+    expect(l.body).toMatch(/or when a second binding ships — owner: aeon's lane/);
+    expect(l.body).not.toMatch(/(?:this editor|Aurora|the panel|this tool|the select) (?:refuses|prevents|blocks|greys out|disables)/i);
+    expect(l.body).not.toMatch(/FAST=1 (?:also )?(?:refuses|rejects)/i);
+    expect(l.body).not.toMatch(/FAST=0 builds (?:it|the tree)/i);
+  });
+
+  /**
    * ⚠ THE MATCHER TRAP, GATED RATHER THAN REMEMBERED. It has been hit twice on
    * this surface: a bare `/aeon 4aa2abc0/` turned out to match LIMIT 2 as well,
    * so a row meant to pin LIMIT 1's expiry was satisfiable by a DIFFERENT rule's
@@ -363,6 +407,14 @@ describe('the three limits say the words that carry them', () => {
       /SECTION 5 IS BOUND: aeon's c9a462be commits section_5\.meta\.json/,
       /aeon's 4a4d3474 \(2026-08-30, docs\/research\/reference_captures\/2026-08-30-sec5-band\/\) records the section-5 band MEASURED on screen/,
       /nothing of that frame is visible in this editor/,
+      // O62's disclosure anchors. LIMIT 2 also says "aeon's build fails
+      // loudly" about reachability, so these are the phrases LIMIT 2 must not
+      // grow into.
+      /AND THE BOUND SET ITSELF IS PINNED BY AEON'S FULL BUILD/,
+      /read at aeon 027ec162/,
+      /UNBINDING SECTION 5/,
+      /test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document/,
+      /NOTHING HERE PREVENTS THE WRITE/,
     ];
     const unbound = PRESET_LIMITS.find((x) => x.key === 'unbound')!.body;
     const others = [
@@ -485,6 +537,43 @@ describe('the panel renders the limits, unconditionally, in the body', () => {
     expect(code).toMatch(/\{NO_PREVIEW\}/);
     // The bodies must reach the render, not just the titles.
     expect(code).toMatch(/\{l\.body\}/);
+  });
+
+  /**
+   * ⚠ THE PLACEMENT ROW FOR O62's DISCLOSURE, AND IT IS STRONGER THAN THE ONE
+   * ABOVE ON PURPOSE. "No guard on the `<LimitBlock />` line" is satisfied by a
+   * guard on the line BEFORE it —
+   *
+   *     {!section?.rasterRef && (
+   *       <LimitBlock />
+   *     )}
+   *
+   * — which is exactly the shape a well-meant edit takes when it decides an
+   * author on a BOUND section has already read the block. That is the case the
+   * disclosure exists for: the author about to unbind section 5 is the one
+   * standing on a bound section. So this row asserts the STRUCTURE — the block
+   * is the first thing inside the section body, with no expression between,
+   * and `LimitBlock` takes no props and renders whole bodies — rather than the
+   * text of one line.
+   */
+  it('the disclosure reaches the render whether or not the active section is bound', () => {
+    const body = code.indexOf('<SectionBody>');
+    const block = code.indexOf('<LimitBlock');
+    expect(body, 'no <SectionBody> in the stripped source').toBeGreaterThan(0);
+    expect(block, 'no <LimitBlock in the stripped source').toBeGreaterThan(body);
+    // Nothing but whitespace between the body's opening tag and the block:
+    // no `{`, no `&&`, no `?`, nothing that reads `section` or `rasterRef`.
+    const between = code.slice(body + '<SectionBody>'.length, block);
+    expect(between.trim(), `something sits between <SectionBody> and <LimitBlock>: ${between.trim()}`).toBe('');
+    // The block takes no props — a `bound`/`section` prop is the same guard
+    // moved one level down — and renders each body whole, keyed on nothing.
+    expect(code).toMatch(/function LimitBlock\(\): React\.ReactElement/);
+    const fnStart = code.indexOf('function LimitBlock');
+    const fnEnd = code.indexOf('export default function BandPresetPanel');
+    expect(fnEnd).toBeGreaterThan(fnStart);
+    const fn = code.slice(fnStart, fnEnd);
+    expect(fn).toMatch(/\{l\.body\}/);
+    expect(fn).not.toMatch(/rasterRef|section|bound|\.slice\(|\.replace\(|\.split\(|indexOf\(/);
   });
 
   it('the limits are BODY TEXT, not a title= attribute', () => {

@@ -436,3 +436,145 @@ describe('the agent path and the human path share one function', () => {
     expect(body).not.toMatch(/effectsRef/);
   });
 });
+
+/**
+ * ═══ THE RESULTING TREE, NOT ONLY THE BINDING (O62, 2026-08-30) ═══
+ *
+ * Everything above says how far ONE binding travels. This block is about the
+ * TREE the call leaves behind, because aeon's canonical build has an opinion
+ * about that too and it is not the seam gate's: at aeon `origin/master`
+ * `027ec162`, three CONTENT tests in `build.sh`'s pytest lane accept exactly
+ * one bound set — `{5: 'ojz_sec5_showcase'}` — and refuse every other by name.
+ * Unbinding section 5 (this tool's `null`, the select's empty option) leaves
+ * the set empty and the preset document orphaned; binding any other section
+ * fails the exact-`[5]` assertion. Aeon's own README says their control ROM
+ * could only be built with `FAST=1`. Nothing here refuses the write — the
+ * STANDING REFUSAL in core/formats/raster-binding.ts — so the reply has to say
+ * it, on the two calls that produce such a tree.
+ *
+ * ⚠ THE ROWS READ THE REPLY, NOT THE CONSTANT, for the discriminating half: a
+ * handler that carried the constant on bind and a trimmed copy on unbind would
+ * pass every identity row above (none of them exercises `null` on a bound
+ * section). The clause is located IN the constant first, loudly, and then
+ * asserted to arrive verbatim on each reply — derived, not pasted.
+ */
+const DISCLOSURE_HEAD = 'AND THE BOUND SET ITSELF IS PINNED BY AEON\'S FULL BUILD';
+const DISCLOSURE_TAIL = 'Wiring a second section is a preset split';
+
+/** The disclosure clause as the constant carries it — located, not retyped. */
+function disclosureClause(): string {
+  const start = RASTER_SECTION_BINDING_LIMIT.indexOf(DISCLOSURE_HEAD);
+  expect(start, 'the constant carries no build-refusal disclosure at all').toBeGreaterThan(0);
+  const end = RASTER_SECTION_BINDING_LIMIT.indexOf(DISCLOSURE_TAIL, start);
+  expect(end, 'the disclosure clause has no end — the split clause moved').toBeGreaterThan(start);
+  const clause = RASTER_SECTION_BINDING_LIMIT.slice(start, end);
+  expect(clause.length, 'the disclosure clause is too short to say what it must').toBeGreaterThan(600);
+  return clause;
+}
+
+/**
+ * What the disclosure has to SAY, asserted on whatever text is handed in — a
+ * reply's `binding` or the constant — so a rewrite that keeps the clause and
+ * drops a fact fails on the fact, not on absence. Each matcher is a claim an
+ * author or an agent would act on differently if it were missing.
+ */
+function expectDisclosure(text: string): void {
+  // The only accepted state, by number and by id, anchored and dated.
+  expect(text).toMatch(/read at aeon 027ec162 \(2026-08-30\)/);
+  expect(text).toMatch(/section 5 bound to ojz_sec5_showcase is the ONLY state aeon's canonical build accepts/);
+  // The three tests, by path and name, so an author can go and read them.
+  expect(text).toMatch(/tools\/test_effects_seam_gate\.py::TestRasterSeamAgainstTheRealTree::test_the_bound_sections_are_exactly_the_threaded_ones/);
+  expect(text).toMatch(/test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document/);
+  expect(text).toMatch(/tools\/test_raster_cycle_table_lint\.py::test_every_preset_document_is_REACHABLE/);
+  // UNBIND: empty set + orphaned document, and the three messages as the
+  // source spells them (all three refuse the unbind; the README's own list
+  // attributes two of them crosswise, which is why the source is quoted).
+  expect(text).toMatch(/UNBINDING SECTION 5/);
+  expect(text).toMatch(/leaves the bound set empty and the document ojz_sec5_showcase\.json orphaned/);
+  expect(text).toMatch(/"no sidecar carries a rasterRef — step 6's band is gone"/);
+  expect(text).toMatch(/"the bound sections are \[\], not \[5\]"/);
+  expect(text).toMatch(/reachable by NOTHING: \['ojz_sec5_showcase'\]/);
+  // BIND-OTHER: the exact-[5] assertion, beside 5 or instead of it.
+  expect(text).toMatch(/BINDING ANY OTHER SECTION, beside 5 or instead of it, fails the exact-\[5\] assertion/);
+  // WHEN it runs — and the mechanism, because "FAST=0" alone is a flag name:
+  // FAST=1 sets NO_LINT=1 and the pytest lane sits under NO_LINT.
+  expect(text).toMatch(/runs only in the canonical FAST=0 build: FAST=1 sets NO_LINT=1, the pytest lane sits under NO_LINT, and FAST=1 builds the tree/);
+  expect(text).toMatch(/The canonical build REFUSES the control tree, by design/);
+  // Nothing here gates — the standing refusal, said in the sentence.
+  expect(text).toMatch(/NOTHING HERE PREVENTS THE WRITE/);
+  // Its own expiry, with the four falsifiers and an owner.
+  expect(text).toMatch(/THAT CLAUSE EXPIRES when the \[5\] literal in test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document changes/);
+  expect(text).toMatch(/when those tests are renamed or the pytest lane leaves the NO_LINT block that FAST=1 switches off/);
+  expect(text).toMatch(/when test_every_preset_document_is_REACHABLE drops its sidecar arm/);
+  expect(text).toMatch(/or when a second binding ships — owner: aeon's lane/);
+  expect(text).toMatch(/re-read tools\/test_effects_seam_gate\.py, tools\/test_raster_cycle_table_lint\.py and build\.sh/);
+  // ⚠ WRONG REWRITES, named: the refusal is aeon's and it is the FAST=0 build's.
+  // A sentence that put the gate on this side, or on the FAST=1 build, would
+  // send an author to the wrong place — and would pass every positive above.
+  expect(text).not.toMatch(/(?:this editor|Aurora|the panel|this tool|the select) (?:refuses|prevents|blocks|greys out|disables)/i);
+  expect(text).not.toMatch(/FAST=1 (?:also )?(?:refuses|rejects)/i);
+  expect(text).not.toMatch(/FAST=0 builds (?:it|the tree)/i);
+}
+
+describe('the reply discloses that aeon\'s full build will refuse the resulting tree', () => {
+  beforeEach(() => open());
+
+  /**
+   * ONLY WITNESS FOR: the UNBIND reply. The identity rows above never unbind a
+   * bound section, so this is the one call whose reply could carry a trimmed
+   * sentence unnoticed. Bind first so the `null` really is a change and really
+   * produces the empty-set tree the disclosure is about.
+   */
+  it('the unbind reply (null on a bound section) carries the disclosure verbatim', async () => {
+    await ask({ kind: 'assign-section-preset', section: 0, presetId: 'glare' });
+    const r = await ask({ kind: 'assign-section-preset', section: 0, presetId: null }) as Record<string, unknown>;
+    expect(r.changed, 'the unbind was a no-op — the row measured nothing').toBe(true);
+    expect(sections()[0].rasterRef).toBeNull();
+    const clause = disclosureClause();
+    expect(String(r.binding)).toContain(clause);
+    expectDisclosure(String(r.binding));
+  });
+
+  /**
+   * ONLY WITNESS FOR: the BIND reply carrying the same clause. The handler does
+   * not interpret the section number (nor may it: the STANDING REFUSAL), so
+   * "any other section" is every bind — this row binds a section that is not 5
+   * and reads the disclosure off the success reply.
+   */
+  it('a bind reply on a section other than 5 carries the disclosure verbatim', async () => {
+    const r = await ask({ kind: 'assign-section-preset', section: 1, presetId: 'dusk' }) as Record<string, unknown>;
+    expect(r.changed).toBe(true);
+    const clause = disclosureClause();
+    expect(String(r.binding)).toContain(clause);
+    expectDisclosure(String(r.binding));
+  });
+
+  /**
+   * THE PUBLISHED TOOL DESCRIPTION SAYS IT BY REFERENCE. main/ cannot import
+   * the renderer, which is why the constant lives in core/ — and a description
+   * that pasted the sentence would be the fork bg-binding.ts warns about, one
+   * that no identity row on the reply can see. So this reads the registry
+   * source: the `assign_section_preset` entry's description ends in the
+   * constant, and retypes none of the disclosure's distinctive phrases.
+   */
+  it('editor-methods.ts carries the disclosure by reference to the constant, not as a copy', () => {
+    const src = readFileSync(join(__dirname, '..', '..', '..', 'main', 'editor-methods.ts'), 'utf8');
+    const start = src.indexOf("name: 'assign_section_preset'");
+    expect(start, 'no assign_section_preset registry entry found — this guard is blind').toBeGreaterThan(0);
+    const end = src.indexOf('{ name:', start + 1);
+    const entry = src.slice(start, end > start ? end : undefined);
+    expect(entry.length, 'read an empty registry entry').toBeGreaterThan(200);
+    expect(entry).toMatch(/\+ RASTER_SECTION_BINDING_LIMIT \}/);
+    // The clause exists (loud if not) and none of its distinctive phrases is
+    // retyped in the entry — a fork would be paraphrased, so sample several.
+    const clause = disclosureClause();
+    for (const p of [
+      'UNBINDING SECTION 5', 'NOTHING HERE PREVENTS THE WRITE',
+      'test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document',
+      'FAST=1 sets NO_LINT=1', 'THAT CLAUSE EXPIRES',
+    ]) {
+      expect(clause, `sample phrase left the constant: ${p}`).toContain(p);
+      expect(entry, `editor-methods.ts retypes the disclosure: ${p}`).not.toContain(p);
+    }
+  });
+});

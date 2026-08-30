@@ -326,6 +326,27 @@ citing `c9a462be`'s "nothing has been seen on screen". That was the fifth
 clause; it fired at `4a4d3474` the same afternoon and was retired here the
 same way — against the committed artifact, never a description of it.)*
 
+**And the bound set itself is under test in aeon — so `null` has a build
+consequence, and so does binding any section but 5.** At aeon `origin/master`
+**`027ec162`** (2026-08-30) three content tests in `build.sh`'s pytest lane
+accept exactly one bound set, section 5 → `ojz_sec5_showcase`, and refuse every
+other tree by name: unbinding section 5 empties the set and orphans the preset
+document, which all three refuse (`tools/test_effects_seam_gate.py` `:331` and
+`:358`, `tools/test_raster_cycle_table_lint.py` `:228`); binding any other
+section, beside 5 or instead of it, fails the exact-`[5]` assertion. That lane
+runs only in the canonical build — `FAST=1` sets `NO_LINT=1` and the lane sits
+under `NO_LINT` — so `FAST=1` builds the tree, which is how aeon built its own
+control ROM. **Nothing in Aurora prevents the write**, on purpose (the standing
+refusal in `src/core/formats/raster-binding.ts`: a gate built from one act's
+content snapshot would be wrong for the next act and read as authority). The
+reply carries this as a clause of the same constant, on the unbind reply and on
+every bind reply alike; the tool description below refers to that constant
+rather than copying it, and the band-preset panel renders it above the select
+whether or not the active section is bound. The clause carries its own expiry
+(the `[5]` literal, the tests renamed or the lane leaving the `NO_LINT` block,
+the lint dropping its sidecar arm, a second binding shipping — owner aeon's
+lane) and names the three files to re-read before quoting it.
+
 Wiring a second section is a preset **split** plus one call-site line — sections
 6-8 share one `EffectsPreset` record, and threading a section-keyed chooser into
 a shared record is itself a seam-gate refusal.

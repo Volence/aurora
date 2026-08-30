@@ -430,6 +430,14 @@ export const EDITOR_METHODS: EditorMethod[] = [
   // `c9a462be` — which is the case split the constant now carries along
   // with its dated expiry. An agent that read only "aeon threads the chooser"
   // would bind section 6 and report a band it will never get.
+  //
+  // ⚠ AND SINCE O62 (2026-08-30) THE SAME CONSTANT SAYS WHAT `null` DOES TO
+  // AEON'S BUILD: unbinding section 5, or binding any other section, leaves a
+  // tree aeon's FAST=0 pytest lane refuses by name, and FAST=1 builds. The
+  // description carries that BY REFERENCE — the `+ RASTER_SECTION_BINDING_LIMIT`
+  // below — and must not paste it: the assign-section-preset test reads this
+  // entry and fails on any of the disclosure's distinctive phrases appearing
+  // here as text, because a pasted copy is the fork that drifts.
   { name: 'assign_section_preset', kind: 'assign-section-preset', result: 'json',
     params: {
       section: z.number().int().min(0),
