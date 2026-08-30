@@ -112,7 +112,8 @@
  *   • WHERE IT LOOKS: `_load_section_refs` reads `<repo>/<dataPath>/
  *     section_N.meta.json` — sidecars in aeon's own checkout, which is where
  *     this editor writes them.
- *   • ⚠ IT IS VACUOUS TODAY, AND SAYS SO. At `9cdf32d8` only
+ *   • ⚠ IT WAS VACUOUS AT THAT REVISION, AND SAID SO (superseded at aeon
+ *     `c9a462be` — see the last dated block of this header). At `9cdf32d8` only
  *     `section_0.meta.json` and `section_4.meta.json` exist and neither carries
  *     `rasterRef`, so the loop body never runs; the gate prints *"the sidecar
  *     arm is VACUOUS today and says so rather than reading green"*. The arm is
@@ -153,7 +154,9 @@
  * all and goes wrong SILENTLY the first time someone binds section 6. Write the
  * number.
  *
- *   • WRITTEN: 2026-08-30, against aeon `9cdf32d8`.
+ *   • WRITTEN: 2026-08-30, against aeon `9cdf32d8`. ⚠ CLAUSE (c) BELOW FIRED
+ *     at aeon `c9a462be` the same evening; the expiry IN FORCE is the one in
+ *     the last dated block of this header, into which (a) and (b) carry over.
  *   • OWNER: aeon's lane — their **step 6**, which needs a sidecar actually
  *     carrying a `rasterRef`.
  *   • WHAT ENDS IT: any of three, and each points the sentence a different way.
