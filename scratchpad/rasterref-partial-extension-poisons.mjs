@@ -118,10 +118,16 @@ const PLANTS = [
     why: 'a cleared rasterRef resurrects on the next load',
   },
   {
-    site: 'effects-preset.ts — PRESET_LIMITS.unbound names the ruled key',
-    file: 'src/renderer/providers/effects-preset.ts',
-    find: "'rasterRef, and this editor only preserves it: no control here writes one, and ' +",
-    replace: "'effectsRef, and it is not implemented in either repo: nothing binds it, and ' +",
+    // ⚠ RE-ANCHORED 2026-08-30. This plant used to edit effects-preset.ts, where the
+    // sentence was spelled. It is no longer spelled there: PRESET_LIMITS.unbound now
+    // QUOTES `RASTER_SECTION_BINDING_LIMIT` from core/formats/raster-binding.ts, so the
+    // old anchor stopped existing and the plant reported NOT PLANTED — loud, and still
+    // a plant that had stopped testing anything. The subject is unchanged: the
+    // author-facing sentence must not regress to the reserved key.
+    site: 'raster-binding.ts — the author-facing limit names the ruled key',
+    file: 'src/core/formats/raster-binding.ts',
+    find: "'still does not finish. The per-section key is rasterRef: assign_section_preset writes it into '",
+    replace: "'still does not finish. The per-section key is effectsRef: assign_section_preset writes it into '",
     why: 'the author-facing sentence regresses to the key the CR ruled against',
   },
 ];

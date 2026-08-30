@@ -351,11 +351,18 @@ async function main() {
     // innerText excludes `title=` attribute text and any `display:none`
     // subtree, so a limit buried in a tooltip reads as ABSENT here. That is
     // exactly the failure the brief forbids ("do not bury this in a tooltip").
-    check('3a', 'LIMIT 1 is visible: nothing binds a preset to a section',
-      /effectsRef/.test(panelText) && /not implemented in either repo/i.test(panelText)
-      && /costs ROM/i.test(panelText),
-      `effectsRef=${/effectsRef/.test(panelText)} `
-      + `eitherRepo=${/not implemented in either repo/i.test(panelText)} `
+    // ⚠ RE-CUT 2026-08-30, TWICE-STALE. This row asserted /effectsRef/ and
+    // /not implemented in either repo/ — wording retired when the limit was rewritten
+    // for a key that exists and a build that reads it. Worse than merely stale: it
+    // demanded the RESERVED key be on screen, which the unit gate now forbids outright,
+    // so the two instruments had come to contradict each other. Re-pointed at phrases
+    // LIMIT 1 alone owns today. `costs ROM` survives both rewrites and is kept.
+    check('3a', 'LIMIT 1 is visible: the build reads it, the call site is missing',
+      /rasterRef/.test(panelText) && /the band does not play/i.test(panelText)
+      && /one line per section/i.test(panelText) && /costs ROM/i.test(panelText),
+      `rasterRef=${/rasterRef/.test(panelText)} `
+      + `doesNotPlay=${/the band does not play/i.test(panelText)} `
+      + `oneLine=${/one line per section/i.test(panelText)} `
       + `costsROM=${/costs ROM/i.test(panelText)}`);
     check('3b', 'LIMIT 2 is visible: seeing it is a debug chord over a hand-typed table',
       /START/.test(panelText) && /hand-typed dc\.l list/.test(panelText)
