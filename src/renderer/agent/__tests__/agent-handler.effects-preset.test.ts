@@ -21,16 +21,14 @@
 //     panel only ever writes a string, and `sh` accepts the integers 0/1 which
 //     the codec deliberately does not normalise. The fixture carries all three,
 //     and every survival check is asserted on them rather than on `top`.
-//   • There is deliberately NO fourth tool. `assign_section_preset` would mirror
-//     `assign-section-scene` and is not written. `SectionMeta` is
-//     `{bgLayoutRef, paletteRef, rasterRef, sceneRef}` and the preset field now
-//     EXISTS — `rasterRef`, empyrean docs/AURORA_EFFECTS_SCHEMA.md §3.1,
-//     adjudicated 2026-08-30, NOT `effectsRef` — but Aurora only PRESERVES it:
-//     nothing here authors one and aeon's generator does not read one yet, so
-//     the gap moved rather than closed (still ROADMAP row
-//     93). `list_effects_presets` says so in its reply instead of shipping an
-//     all-nulls `sections` column, and a row below asserts that sentence is the
-//     PANEL'S OWN, not a second wording.
+//   • THERE IS A FOURTH TOOL NOW, and it has its own file:
+//     `assign_section_preset` (agent-handler.assign-section-preset.test.ts)
+//     writes `SectionMeta`'s `rasterRef` — empyrean
+//     docs/AURORA_EFFECTS_SCHEMA.md §3.1, adjudicated 2026-08-30, and NOT
+//     `effectsRef`, which stays reserved for a TOTAL binding. What this file
+//     keeps is the consequence for the LIST tool: it grew the per-section
+//     column it used to omit, and it still reports the binding-limit sentence,
+//     which a row below asserts is the PANEL'S OWN and not a second wording.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { handleAgentRequest } from '../agent-handler';
@@ -49,8 +47,17 @@ import { PRESET_LIMITS } from '../../providers/effects-preset';
 const black = (): Color => ({ r: 0, g: 0, b: 0, a: 255 });
 const line = () => ({ colors: Array.from({ length: 16 }, black) });
 
-/** A section object with just the fields these tools touch. */
-const section = () => ({ sceneRef: null, objects: [], rings: [] });
+/**
+ * A section object with just the fields these tools touch.
+ *
+ * `rasterRef` JOINED THE FIXTURE WITH THE COLUMN, and its absence was not
+ * harmless: the list reply reads the field straight off the section (as
+ * `list_effects_scenes` does with `sceneRef`, deliberately without a `?? null`
+ * that would launder a model bug), so a fixture missing the key reports
+ * `presetId: undefined` — which JSON drops entirely, turning "unbound" into "no
+ * such section" on the wire.
+ */
+const section = () => ({ rasterRef: null, sceneRef: null, objects: [], rings: [] });
 
 const emptySceneLibrary = () => ({ scenes: [], unreadable: [], notices: [] });
 
@@ -157,13 +164,23 @@ describe('list_effects_presets', () => {
     expect(r.presets[0].name).toBe('Glare');
   });
 
-  it('answers the missing per-section column with the PANEL\'S OWN sentence', async () => {
+  it('reports the per-section column AND the PANEL\'S OWN sentence beside it', async () => {
     open({ presets: [glare()], unreadable: [], notices: [] });
     const r = await ask({ kind: 'list-effects-presets' }) as Record<string, unknown>;
 
-    // There is no `sections` key, on purpose: nothing binds a preset to a
-    // section, so an all-nulls column would read as "assigned to nothing".
-    expect(Object.keys(r)).not.toContain('sections');
+    // ⚠ THIS ROW USED TO ASSERT THE OPPOSITE, and the reversal is deliberate.
+    // The column was omitted while nothing could bind a preset, because an
+    // all-nulls column reads as "assigned to nothing" rather than "there is no
+    // assignment to make". `assign_section_preset` exists now, so the refs are
+    // real and an agent that writes one must be able to read it back — which is
+    // `list_bgs`'s case exactly, sentence travelling BESIDE the column rather
+    // than standing in for it. The round trip itself is asserted in
+    // agent-handler.assign-section-preset.test.ts; what this row owns is that
+    // the column is present and reports the key's actual state.
+    expect(r.sections).toEqual([
+      { index: 0, presetId: null },
+      { index: 1, presetId: null },
+    ]);
 
     // DERIVED from PRESET_LIMITS, not transcribed: the author's block and the
     // agent's reply must not be able to describe this limit differently.

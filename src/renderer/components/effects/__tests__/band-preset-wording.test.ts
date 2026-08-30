@@ -35,6 +35,7 @@ import {
   PRESET_HEADLINE, PRESET_LIMITS, NO_PREVIEW, lastBandRefusal, armOptions,
   presetIdRefusal, newPreset,
 } from '../../../providers/effects-preset';
+import { RASTER_SECTION_BINDING_LIMIT } from '../../../../core/formats/raster-binding';
 
 const PANEL_PATH = join(__dirname, '..', 'BandPresetPanel.tsx');
 const panel = readFileSync(PANEL_PATH, 'utf8');
@@ -86,22 +87,51 @@ describe('the three limits say the words that carry them', () => {
    * docs/AURORA_EFFECTS_SCHEMA.md §3.1 (adjudicated 2026-08-30) the key DOES
    * exist, is called `rasterRef`, and Aurora's sidecar round-trips it — so the
    * old sentence would now be a lie in the direction that matters, telling an
-   * author to stop looking for something that is there. What survives is the
-   * accurate remainder: nothing HERE writes one and aeon does not READ one yet.
+   * author to stop looking for something that is there.
    *
-   * The negative assertion is the point of this row now: `effectsRef` is
-   * reserved and unspent (§7), and naming it here would send an author to a key
-   * no writer produces.
+   * ⚠ AND IT CHANGED AGAIN when `assign_section_preset` landed: a WRITER now
+   * exists. "Nothing binds a preset to a section" became false, and this row
+   * used to assert exactly that phrase. What survives both corrections is the
+   * only half that was ever load-bearing for an author — no CONSUMER reads the
+   * key, so binding one still installs nothing — and one new half: the writer
+   * that DOES exist is an agent tool, not a control in this panel, which is
+   * what an author reading this block needs to know to go find it.
+   *
+   * The negative assertion is still the point: `effectsRef` is reserved and
+   * unspent (§7), and naming it here would send an author to a key no writer
+   * produces.
+   *
+   * THE BODY IS NO LONGER THIS FILE'S TO SPELL. It is
+   * `RASTER_SECTION_BINDING_LIMIT` (core/formats/raster-binding.ts), quoted
+   * verbatim by the panel, by `assign_section_preset`'s reply and by the
+   * published tool descriptions — so this row asserts the WORDS the author
+   * needs and a second row asserts the identity, rather than pinning a copy.
    */
-  it('LIMIT 1 says nothing binds a preset to a section, and names rasterRef', () => {
+  it('LIMIT 1 names rasterRef, names the tool that writes it, and says nothing reads it', () => {
     const l = PRESET_LIMITS.find((x) => x.key === 'unbound')!;
     expect(l.body).toMatch(/rasterRef/);
     expect(l.body).not.toMatch(/effectsRef/);
-    // Both halves of what is still true, not one: this editor does not write
-    // the key, and the consumer does not read it.
-    expect(l.body).toMatch(/no control here writes one/i);
-    expect(l.body).toMatch(/does not read one yet/i);
+    // The author's three questions: what writes it, what reads it, and what
+    // that leaves them to do by hand.
+    expect(l.body).toMatch(/assign_section_preset/);
+    expect(l.body).toMatch(/no control in the band-preset panel writes a rasterRef/i);
+    expect(l.body).toMatch(/no aeon consumer reads a rasterRef yet/i);
+    expect(l.body).toMatch(/by hand in aeon's ojz_effects\.emp/i);
     expect(l.body).toMatch(/costs ROM/i);
+  });
+
+  /**
+   * ONE SENTENCE, NOT A COPY OF ONE. The panel, the agent reply and the
+   * published tool descriptions all owe this limit, and two hand-written
+   * near-identical sentences is how a limit ends up stated two different ways
+   * (core/formats/bg-binding.ts says so in as many words). The constant lives
+   * in core/ because main/ must not import the renderer.
+   */
+  it('LIMIT 1 IS the shared constant, not a second wording of it', () => {
+    const l = PRESET_LIMITS.find((x) => x.key === 'unbound')!;
+    expect(RASTER_SECTION_BINDING_LIMIT.length,
+      'the shared constant is empty — this row would assert nothing').toBeGreaterThan(200);
+    expect(l.body).toBe(RASTER_SECTION_BINDING_LIMIT);
   });
 
   /**
