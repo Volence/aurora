@@ -213,9 +213,9 @@ export interface Section {
    * hand-authored raster channel", else a preset-document id (empyrean
    * docs/AURORA_EFFECTS_SCHEMA.md §3.1, adjudicated 2026-08-30). Persisted
    * through the meta sidecar's `rasterRef`
-   * (src/core/formats/section-meta.ts), which aeon's effects generator will
-   * read; absent and explicit-null are the same state, exactly as for
-   * `sceneRef`.
+   * (src/core/formats/section-meta.ts), which aeon's effects generator READS as
+   * of aeon `4aa2abc0`; absent and explicit-null are the same state, exactly as
+   * for `sceneRef`.
    *
    * ⚠ NOT `effectsRef`, which stays RESERVED and UNSPENT: a preset document
    * can only supply the raster channel of aeon's eight-channel EffectsPreset,
@@ -229,14 +229,20 @@ export interface Section {
    * that wants to bind one must go through that same provider function rather
    * than assign the field.
    *
-   * ⚠ AND NOTHING READS IT. Not aeon's effects generator (`rasterRef` appears
-   * zero times in `tools/EFFECTS_CONSUMER_CONTRACT.md`; `effects_gen.py`
-   * resolves `sceneRef` only), not the viewport, not any preview. So a written
-   * `rasterRef` has no observable consequence anywhere yet, which is why the
-   * agent tool answers with `RASTER_SECTION_BINDING_LIMIT` on success as well
-   * as on the no-op (`core/formats/raster-binding.ts`) instead of a bare
-   * `changed: true`. Preserving the field across a save round-trip is STILL the
-   * load-bearing job here, exactly as when nothing wrote it.
+   * ⚠ AEON READS IT NOW, AND STILL NOTHING OBSERVES IT. The "nothing reads it"
+   * note that stood here was retired on 2026-08-30 by aeon `4aa2abc0`:
+   * `tools/effects_gen.py` resolves `rasterRef` (`ACT_RASTER_REF_KEY`) against
+   * the preset documents and emits the section's raster program plus a chooser.
+   * What it does NOT do is reach the engine — at that revision no `preset()` in
+   * `games/sonic4/data/effects/ojz_effects.emp` passes the chooser to its
+   * `raster:` channel — and on this side the viewport composites nothing and
+   * there is no preview. So a written `rasterRef` still has no observable
+   * consequence, which is why the agent tool answers with
+   * `RASTER_SECTION_BINDING_LIMIT` on success as well as on the no-op
+   * (`core/formats/raster-binding.ts`, which carries the full sentence and its
+   * dated expiry) instead of a bare `changed: true`. Preserving the field across
+   * a save round-trip is STILL the load-bearing job here — MORE so now that a
+   * consumer exists to be starved by dropping it.
    */
   rasterRef: string | null;
   flags: number;

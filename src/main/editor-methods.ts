@@ -360,8 +360,10 @@ export const EDITOR_METHODS: EditorMethod[] = [
   //   • saving a preset does not install it, and NEITHER DOES BINDING ONE.
   //     `SectionMeta` carries the preset binding — `rasterRef` (schema §3.1,
   //     adjudicated 2026-08-30, NOT `effectsRef`) — and `assign_section_preset`
-  //     below writes it. What no aeon consumer does is READ it, so a programmer
-  //     still wires the preset up by hand; the descriptions say so from the one
+  //     below writes it. aeon's generator READS it as of aeon `4aa2abc0`, but
+  //     nothing in their `ojz_effects.emp` passes the emitted chooser to a
+  //     section's `preset()`, so the band still does not play and a programmer
+  //     still owes one call-site line; the descriptions say so from the one
   //     constant that owns the sentence (core/formats/raster-binding.ts), never
   //     a second copy of it. ROADMAP row 93's remaining half is the UI select.
   //
@@ -419,7 +421,9 @@ export const EDITOR_METHODS: EditorMethod[] = [
   // closely; `assign_section_bg` states the rule this follows — a tool that
   // reports success for a binding nothing bakes misleads its caller — and this
   // binding is observed by even less than that one, since nothing composites it
-  // and there is no preview of a raster band anywhere in the suite.
+  // and there is no preview of a raster band anywhere in the suite. The reader
+  // half landed at aeon `4aa2abc0` and the call-site half did not, which is the
+  // distinction the constant now carries along with its dated expiry.
   { name: 'assign_section_preset', kind: 'assign-section-preset', result: 'json',
     params: {
       section: z.number().int().min(0),

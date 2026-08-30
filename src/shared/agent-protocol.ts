@@ -115,11 +115,15 @@ export type AgentRequest =
   // because a preset document supplies only the raster channel of aeon's
   // eight-channel EffectsPreset while `effectsRef` promises a TOTAL binding.
   //
-  // ⚠ AND THE BINDING REACHES NOTHING YET. No aeon consumer reads a `rasterRef`,
-  // so the reply carries `RASTER_SECTION_BINDING_LIMIT` on success as well as on
-  // the no-op — `assign-section-bg`'s rule, which exists because a tool that
-  // reports success for a binding nothing bakes misleads its caller. ROADMAP row
-  // 93's remaining half is the per-section select in the UI.
+  // ⚠ AND THE BINDING STILL DOES NOT REACH THE ENGINE. aeon's generator READS
+  // `rasterRef` as of aeon `4aa2abc0` and emits the section's chooser, but no
+  // `preset()` in their `games/sonic4/data/effects/ojz_effects.emp` passes that
+  // chooser to its `raster:` channel yet, so a bound section keeps its
+  // hand-authored program. The reply therefore still carries
+  // `RASTER_SECTION_BINDING_LIMIT` on success as well as on the no-op —
+  // `assign-section-bg`'s rule, which exists because a tool that reports success
+  // for a binding nothing bakes misleads its caller. ROADMAP row 93's remaining
+  // half is the per-section select in the UI.
   | { kind: 'list-effects-presets' }
   | { kind: 'get-effects-preset'; id: string }
   | { kind: 'set-effects-preset'; id: string; preset: unknown | null }

@@ -956,12 +956,15 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
     //
     // ⚠ NOT `effectsRef`: that reservation stays unspent for a TOTAL binding.
     //
-    // ⚠ WHAT IS STILL MISSING IS THE READER, and it is why the assign tool's
-    // reply carries a limit sentence rather than a bare `changed: true`. No aeon
-    // consumer reads a `rasterRef` — see core/formats/raster-binding.ts — which
-    // is also why `PRESET_LIMITS`' first limit still says saving a preset does
-    // not install it, in the very same words. ROADMAP row 93's remaining half is
-    // the per-section select in the band-preset panel.
+    // ⚠ WHAT IS STILL MISSING IS THE CALL SITE, and it is why the assign tool's
+    // reply carries a limit sentence rather than a bare `changed: true`. The
+    // READER landed at aeon `4aa2abc0` — `effects_gen.py` resolves `rasterRef`
+    // and emits the section's chooser — but nothing in aeon's `ojz_effects.emp`
+    // passes that chooser to a `preset()`'s `raster:` channel, so a bound
+    // section's band does not play. See core/formats/raster-binding.ts, which
+    // owns the sentence and its dated expiry; `PRESET_LIMITS`' first limit says
+    // it in the very same words. ROADMAP row 93's remaining half is the
+    // per-section select in the band-preset panel.
 
     case 'list-effects-presets': {
       const ctx = requireProject();
@@ -1093,11 +1096,12 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       // rule (core/formats/bg-binding.ts), and this tool needs it MORE than that
       // one did. There, `changed: true` at least buys a repaint: the viewport
       // composites the assigned background and only the ROM half is missing.
-      // Here nothing reads the ref at all — no aeon consumer, no preview, no
-      // panel — so a bare `changed: true` would be the reply asserting an effect
-      // it cannot know reached anything, with not one observable consequence
-      // behind it. Carried on the no-op reply too, so the same conclusion is
-      // available whichever way the call lands.
+      // Here the ref reaches aeon's GENERATOR (aeon `4aa2abc0`) and stops there:
+      // no call site installs the emitted program, no preview draws it, no panel
+      // shows it — so a bare `changed: true` would be the reply asserting an
+      // effect it cannot know reached anything, with not one observable
+      // consequence behind it. Carried on the no-op reply too, so the same
+      // conclusion is available whichever way the call lands.
       return {
         section: req.section, presetId: req.presetId, changed: true,
         binding: RASTER_SECTION_BINDING_LIMIT,
