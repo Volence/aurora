@@ -187,7 +187,7 @@ describe('loadAeonProject', () => {
     const section = r.project.zones[0].acts[0].sections[0]!;
     expect(section.objects).toEqual([]);                    // nothing to show
     expect(section.unreadable).toContain('objects.json');   // but not "nothing there"
-    expect(r.notices.join(' ')).toMatch(/objects\.json exists but could not be read/);
+    expect(r.notices.map((x) => x.message).join(' ')).toMatch(/objects\.json exists but could not be read/);
   });
 
   it('says nothing about a section file that is simply absent', async () => {
@@ -269,7 +269,7 @@ describe('loadAeonProject', () => {
     expect(section.bgLayoutRef).toBeNull();               // nothing to show
     expect(section.paletteRef).toBeNull();
     expect(section.unreadable).toContain('meta.json');    // but not "nothing there"
-    expect(r.notices.join(' ')).toMatch(/meta\.json exists but could not be read/);
+    expect(r.notices.map((x) => x.message).join(' ')).toMatch(/meta\.json exists but could not be read/);
   });
 
   it('says nothing about a section with no meta sidecar', async () => {
@@ -291,7 +291,7 @@ describe('loadAeonProject', () => {
     const section = r.project.zones[0].acts[0].sections[0];
     // No strips in this fixture, so the section is dropped — but the notice is
     // the point: the file is there and Aurora did not understand it.
-    expect(r.notices.join(' ')).toMatch(/tiles\.bin exists but could not be read/);
+    expect(r.notices.map((x) => x.message).join(' ')).toMatch(/tiles\.bin exists but could not be read/);
     if (section) expect(section.unreadable).toContain('tiles.bin');
   });
 
@@ -363,7 +363,7 @@ describe('loadAeonProject — editable collision planes', () => {
     expect(section.unreadable).toContain('collattr.bin');
     expect(section.unreadable).not.toContain('collattrb.bin');  // the twin was fine
     expect(section.collisionEditB!).toEqual(AUTHORED_B);        // ... and still loaded
-    expect(r.notices.join(' ')).toMatch(/section_0\.collattr\.bin exists but could not be read/);
+    expect(r.notices.map((x) => x.message).join(' ')).toMatch(/section_0\.collattr\.bin exists but could not be read/);
     // The editor still needs something to draw.
     expect(section.collisionEdit!.length).toBe(PLANE_CELLS);
   });
@@ -377,7 +377,7 @@ describe('loadAeonProject — editable collision planes', () => {
     expect(section.unreadable).toContain('collattrb.bin');
     expect(section.unreadable).not.toContain('collattr.bin');
     expect(section.collisionEdit!).toEqual(AUTHORED_A);
-    expect(r.notices.join(' ')).toMatch(/section_0\.collattrb\.bin exists but could not be read/);
+    expect(r.notices.map((x) => x.message).join(' ')).toMatch(/section_0\.collattrb\.bin exists but could not be read/);
     expect(section.collisionEditB!.length).toBe(PLANE_CELLS);
   });
 
@@ -393,7 +393,7 @@ describe('loadAeonProject — editable collision planes', () => {
     expect(section.unreadable).toContain('collattr.bin');
     expect(section.unreadable).not.toContain('collattrb.bin');
     expect(section.collisionEditB!).toEqual(AUTHORED_B);
-    expect(r.notices.join(' ')).toMatch(/section_0\.collattr\.bin exists but could not be read/);
+    expect(r.notices.map((x) => x.message).join(' ')).toMatch(/section_0\.collattr\.bin exists but could not be read/);
     // Never a short plane in memory: a short plane is what the save writes back.
     expect(section.collisionEdit!.length).toBe(PLANE_CELLS);
   });
@@ -410,7 +410,7 @@ describe('loadAeonProject — editable collision planes', () => {
     expect(section.unreadable).toContain('collattrb.bin');
     expect(section.unreadable).not.toContain('collattr.bin');
     expect(section.collisionEdit!).toEqual(AUTHORED_A);
-    expect(r.notices.join(' ')).toMatch(/section_0\.collattrb\.bin exists but could not be read/);
+    expect(r.notices.map((x) => x.message).join(' ')).toMatch(/section_0\.collattrb\.bin exists but could not be read/);
     expect(section.collisionEditB!.length).toBe(PLANE_CELLS);
   });
 
@@ -422,7 +422,7 @@ describe('loadAeonProject — editable collision planes', () => {
 
     const { r, section } = await loadSection(memFa(files));
     expect(section.unreadable).toContain('collattr.bin');
-    expect(r.notices.join(' ')).toMatch(/section_0\.collattr\.bin exists but could not be read/);
+    expect(r.notices.map((x) => x.message).join(' ')).toMatch(/section_0\.collattr\.bin exists but could not be read/);
     expect(section.collisionEdit!.length).toBe(PLANE_CELLS);
   });
 
@@ -435,7 +435,7 @@ describe('loadAeonProject — editable collision planes', () => {
 
     const { r, section } = await loadSection(memFa(files));
     expect(section.unreadable).toContain('collattr.bin');
-    expect(r.notices.join(' ')).toMatch(/section_0\.collattr\.bin exists but could not be read/);
+    expect(r.notices.map((x) => x.message).join(' ')).toMatch(/section_0\.collattr\.bin exists but could not be read/);
     expect(section.collisionEdit!.length).toBe(PLANE_CELLS);
   });
 });

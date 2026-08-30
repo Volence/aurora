@@ -164,7 +164,7 @@ describe('loadAeonProject — the effects-scene library', () => {
     // Silent, not merely non-fatal: §2 makes an absent directory the ordinary
     // "this project has no editor scenes yet", so a toast about it would be noise
     // on every single aeon open the tree can currently produce.
-    expect(r.notices.filter((n) => n.includes('effects'))).toEqual([]);
+    expect(r.notices.filter((n) => n.message.includes('effects'))).toEqual([]);
     expect(r.project.effectsScenes.scenes).toEqual([]);
   });
 
@@ -196,7 +196,7 @@ describe('loadAeonProject — the effects-scene library', () => {
 
     expect(r.scenes.scenes.map((s) => s.id)).toEqual(['canopy_dusk']);
     expect(r.scenes.unreadable.map((u) => u.path)).toEqual([`${EFFECTS_DIR}broken.json`]);
-    expect(r.notices.some((n) => n.includes(`${EFFECTS_DIR}broken.json`))).toBe(true);
+    expect(r.notices.some((n) => n.message.includes(`${EFFECTS_DIR}broken.json`))).toBe(true);
   });
 
   it('names handle.scenes and project.effectsScenes as ONE object, not two copies', async () => {

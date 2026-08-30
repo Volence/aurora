@@ -203,7 +203,7 @@ describe('chunk identity survives close-and-reopen', () => {
 
     // Refused (the runs cover 3 tiles, not the section's) — and SAID SO.
     expect(section.unreadable).toContain('chunklinks.json');
-    expect(r.notices.some(n => n.includes('chunklinks.json'))).toBe(true);
+    expect(r.notices.some(n => n.message.includes('chunklinks.json'))).toBe(true);
     expect(section.chunkLinks ?? null).toBeNull();
 
     const plan = await buildAeonSavePlan(
@@ -222,7 +222,7 @@ describe('chunk identity survives close-and-reopen', () => {
     const r = await loadAeonProject(fa, '/proj');
     const section = r.project.zones[0].acts[0].sections[0]!;
     expect(section.unreadable ?? []).not.toContain('chunklinks.json');
-    expect(r.notices.some(n => n.includes('chunklinks'))).toBe(false);
+    expect(r.notices.some(n => n.message.includes('chunklinks'))).toBe(false);
   });
 
   it('the saved bytes end in exactly one newline, like every other JSON Aurora writes', async () => {

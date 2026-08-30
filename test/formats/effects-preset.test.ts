@@ -325,7 +325,10 @@ describe('the preset library', () => {
     expect(lib.presets.map((p) => p.id)).toEqual(['minimal']);
     expect(lib.unreadable.map((u) => u.path)).toEqual([`${DIR}broken.json`]);
     expect(lib.notices).toHaveLength(1);
-    expect(lib.notices[0]).toMatch(/will NOT overwrite the file/);
+    expect(lib.notices[0].message).toMatch(/will NOT overwrite the file/);
+    // "Loud" means the toast site can tell this from a confirmation. The whole
+    // notice channel used to be painted green at the consumer, so it could not.
+    expect(lib.notices[0].severity).toBe('error');
   });
 
   it('a preset whose id disagrees with its filename lands in unreadable, not presets', async () => {

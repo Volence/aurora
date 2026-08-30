@@ -349,8 +349,12 @@ describe('the legacy singular `anim` key', () => {
     expect(LEGACY_ANIM_KEY in parsed).toBe(false);
     expect(parsed.anims).toHaveLength(1);
     expect(parsed.anims![0].cols).toBe(2);
-    expect(notices.join('\n')).toMatch(/legacy single-band/);
-    expect(notices.join('\n')).toMatch(/saving this document will rewrite the key/);
+    expect(notices.map((n) => n.message).join('\n')).toMatch(/legacy single-band/);
+    expect(notices.map((n) => n.message).join('\n')).toMatch(/saving this document will rewrite the key/);
+    // A WARNING, not a success: the band survived and nothing failed, but the
+    // file on disk is not what it looks like and the next save rewrites it.
+    // Not an error either — that would say the read failed, and it did not.
+    expect(notices.map((n) => n.severity)).toEqual(['warning']);
 
     const out = JSON.parse(serializeBgOverride(parsed));
     expect(LEGACY_ANIM_KEY in out).toBe(false);
@@ -428,11 +432,15 @@ describe('an empty `anims` key is unauthored, not invalid', () => {
   it('says so in a notice rather than doing it silently', () => {
     const { notices } = parseBgOverride(JSON.stringify({ ...minimal(), anims: [] }));
     expect(notices).toHaveLength(1);
-    expect(notices[0]).toMatch(/carried an empty "anims" key/);
-    expect(notices[0]).toMatch(/neither absent nor authored/);
-    expect(notices[0]).toMatch(/saving will drop the key/);
+    expect(notices[0].message).toMatch(/carried an empty "anims" key/);
+    expect(notices[0].message).toMatch(/neither absent nor authored/);
+    expect(notices[0].message).toMatch(/saving will drop the key/);
     // Not alarming about a loss that did not happen.
-    expect(notices[0]).toMatch(/No band was lost: there was none/);
+    expect(notices[0].message).toMatch(/No band was lost: there was none/);
+    // ...and NOT on the success channel, where it would arrive green on a 2.2s
+    // dwell. Nothing failed, but the document changes shape on the next save,
+    // which is the warning channel's whole reason to exist (toastStore.dwellMs).
+    expect(notices[0].severity).toBe('warning');
   });
 
   it('CONTROL: a document with no `anims` key at all is silent', () => {

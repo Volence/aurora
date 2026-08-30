@@ -490,7 +490,7 @@ describe('effects scene library', () => {
     }), ROOT);
     expect(lib.scenes.map(s => s.id)).toEqual(['good']);
     expect(lib.unreadable.map(u => u.path)).toEqual([`${DIR}broken.json`]);
-    expect(lib.notices.join('\n')).toMatch(/will NOT overwrite the file/);
+    expect(lib.notices.map((n) => n.message).join('\n')).toMatch(/will NOT overwrite the file/);
   });
 
   it('treats an id/filename mismatch as unreadable rather than silently renaming', async () => {
