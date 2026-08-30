@@ -675,12 +675,20 @@ async function main() {
       `v_factor=${sc.v_factor} (lock is ${LOCK}) L0.vsplit=${JSON.stringify(sc.layers[0].vsplit)} `
       + '— without this, every row below would be asking about a scene that is fine');
 
+    // ⚠ 5a AND 5b ARE TEXT-PRESENCE ROWS AND THEIR OLD NAMES SAID "ON SCREEN".
+    // Measured by the overseer at landing, not argued: with the disclosure WELDED
+    // SHUT (`display:'none'` unconditionally) this harness runs 43/45 and 5a, 5b
+    // and 9d all PASS — the mechanism paints nothing and these rows cannot tell.
+    // FIND_TEXT walks the DOM; `display:none` text is still there. The rows are
+    // kept because presence is a real question a DELETED feature fails, but their
+    // names now say what they assert. Paint is 5e/5g's job; the remedies' paint is
+    // 5c/5d's, which is why a POSITIONAL cut is caught there and not here.
     hits = await c.json(FIND_TEXT(MECHANISM));
-    check('5a', '⚠ DISCRIMINATING: the MECHANISM is now ON SCREEN, read from the DOM',
+    check('5a', '⚠ DISCRIMINATING for PRESENCE, and it CANNOT see paint: the MECHANISM is in the rendered DOM (5e/5g own "is it painted")',
       hits.length >= 1,
       `${hits.length} element(s) render it. Paired with 4b (same session, same scene, `
       + 'one field changed), this is the pair a deleted feature cannot pass.');
-    check('5b', '⚠ BOTH REMEDIES are on screen — the engine offers two and they are different products',
+    check('5b', '⚠ BOTH REMEDIES are in the rendered DOM — the engine offers two and they are different products (5c/5d own "are they painted")',
       (await c.json(FIND_TEXT(REMEDY_LOCK))).length >= 1
       && (await c.json(FIND_TEXT(REMEDY_HORIZ))).length >= 1,
       `lock=${(await c.json(FIND_TEXT(REMEDY_LOCK))).length} horiz=${(await c.json(FIND_TEXT(REMEDY_HORIZ))).length}. `

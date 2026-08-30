@@ -42,6 +42,28 @@ lines, ~460px tall in a ~275px text column**, inside a panel whose visible heigh
 own hint clipped at the bottom edge. Per row `[7c]` the layer cards carry the same
 sentence **twice more** when two layers split.
 
+⚠ **CORRECTION TO THE PARAGRAPH ABOVE, mine, made at landing — and it is this packet's own
+§1 defect committed one section later.** Those absolute figures are **device pixels at
+`dpr` 1.35**, not CSS pixels: the capture is 1890×1177, which is this harness's ordinary
+**1400×872 window** scaled by a `devicePixelRatio` that varies run to run on this host.
+In CSS pixels the block is roughly **340 × 204**, and `getBoundingClientRect` in the live
+app puts it at **388px** (§6). So the numbers were quoted in a unit the sentence never
+named, against a **window** size rather than the **screen** size the heading advertises —
+`SCREEN=1920x1080` sets the Xvfb *screen*, and the app window inside it is neither that
+size nor his.
+
+**What survives, and it is the finding: the ~46% RATIO, because it is scale-invariant.**
+Two independent methods agree on it (§6: 459→238 off the pixels, 388→186 off the rects,
+0.48 both times). **What does not survive is any absolute-pixel claim in this packet**, and
+the heading *"what is actually on screen (1920x1080, his primary)"* over-claims — it is
+what is on screen in a 1400×872 window under an Xvfb screen of that size.
+
+*Kept rather than silently rewritten, because §1 above criticises the previous packet for
+quoting a harness default as the owner's resolution, and this is the same class of error
+by the same author in the same document: a real measurement, honestly transcribed, in a
+frame the prose misdescribes. The ratio was always the load-bearing number; the pixel
+counts were decoration that read as precision.*
+
 **So the row's own words hold and are, if anything, understated: content right, shape
 wrong, and it buries the fields under it.**
 
