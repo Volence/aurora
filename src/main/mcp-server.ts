@@ -5,8 +5,10 @@ import { app as electronApp } from 'electron';
 import type { BrowserWindow } from 'electron';
 import { createServer } from 'http';
 import type { Server } from 'http';
-import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
+import {
+  writeDiscoveryFiles, removeDiscoveryFiles, installDiscoveryExitNet,
+} from './discovery-file';
 import { requestAgent } from './agent-bridge';
 import type { AgentRequest } from '../shared/agent-protocol';
 import { EDITOR_METHODS } from './editor-methods';
@@ -49,6 +51,8 @@ function buildServer(getWindow: () => BrowserWindow | null): McpServer {
 
 let httpServer: Server | null = null;
 let discoveryPaths: string[] = [];
+/** Uninstaller for the abrupt-exit net, so a restart does not stack handlers. */
+let uninstallExitNet: (() => void) | null = null;
 
 /**
  * The port actually bound. Read at REQUEST time rather than captured, because
@@ -72,12 +76,9 @@ function allowedOrigins(): string[] {
   ]);
 }
 
-// Aurora's discovery file moved from ~/.sonic-level-editor/ to ~/.aurora/ with the
-// rename. We write BOTH during the transition window so existing bus/MCP clients
-// pointing at the legacy path keep finding us; remove the legacy write once every
-// client resolves ~/.aurora/mcp.json.
-const DISCOVERY_DIR = '.aurora';
-const LEGACY_DISCOVERY_DIR = '.sonic-level-editor';
+// The paths, the write, the removal and the abrupt-exit net all live in
+// `discovery-file.ts` — read its header for why removal on `will-quit` alone
+// left a file naming a dead pid after every SIGTERM.
 
 /**
  * Every route this process serves, wired onto a fresh express app.
@@ -185,25 +186,24 @@ export async function startMcpServer(getWindow: () => BrowserWindow | null): Pro
     aetherEvents: `${base}/aether/events`,
     protocolVersion: 1,
   }, null, 2);
-  discoveryPaths = [];
-  for (const sub of [DISCOVERY_DIR, LEGACY_DISCOVERY_DIR]) {
-    const dir = join(home, sub);
-    try {
-      mkdirSync(dir, { recursive: true });
-      const p = join(dir, 'mcp.json');
-      writeFileSync(p, contents);
-      discoveryPaths.push(p);
-    } catch (err) {
-      console.error(`[mcp] could not write discovery file in ${dir}:`, err);
-    }
-  }
+  discoveryPaths = writeDiscoveryFiles(home, contents);
+  // THE FILE MUST NOT OUTLIVE THIS PROCESS. `will-quit` below covers the
+  // graceful quit and nothing else; this covers `exit` and the signals that
+  // otherwise terminate node without running anything — which is how every
+  // harness run (and every session-manager shutdown) used to leave a file
+  // naming a dead pid. SIGKILL remains uncoverable, by anyone.
+  uninstallExitNet?.();
+  uninstallExitNet = installDiscoveryExitNet(() => {
+    removeDiscoveryFiles(discoveryPaths);
+    discoveryPaths = [];
+  });
   console.log(`[mcp] listening on http://127.0.0.1:${port}/mcp`);
 }
 
 export function stopMcpServer(): void {
   if (httpServer) { httpServer.close(); httpServer = null; }
-  for (const p of discoveryPaths) {
-    try { rmSync(p); } catch { /* already gone */ }
-  }
+  removeDiscoveryFiles(discoveryPaths);
   discoveryPaths = [];
+  uninstallExitNet?.();
+  uninstallExitNet = null;
 }

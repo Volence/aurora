@@ -164,7 +164,10 @@ Every route is loopback-only (loopback bind plus a Host/Origin check). The activ
 port is written to `~/.aurora/mcp.json` — default `38473`, falling back to an
 ephemeral port if taken — alongside the `aether` and `aetherEvents` URLs; the
 legacy `~/.sonic-level-editor/mcp.json` is also written during the rename
-transition. Connect with:
+transition. It is removed on exit, including on `SIGINT`/`SIGTERM`/`SIGHUP` —
+but **its presence is never proof the editor is running**: `SIGKILL` and a crash
+leave it behind naming a dead process, so check the `pid` field before trusting
+the port (`docs/MCP.md` § Discovery file). Connect with:
 
 ```bash
 claude mcp add --transport http aurora http://127.0.0.1:38473/mcp

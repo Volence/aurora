@@ -80,6 +80,12 @@ const REQUIRED_EXPORTS = [
   // the proof asserts that contract directly; `NEVER_REAP_DISPLAYS` because a
   // row has to be able to show that no OTHER gate could have covered for it.
   'boundSocketPaths', 'NEVER_REAP_DISPLAYS',
+  // O28. The discovery file outlives the process it names, so every printed
+  // line carries a liveness verdict. Rename this and `describeDiscovery`
+  // quietly goes back to printing a dead pid that reads as a live app —
+  // the exact artifact-asserts-liveness defect, in the module written to
+  // stop it.
+  'livenessOf',
 ];
 
 // ── source scanning ────────────────────────────────────────────────────────

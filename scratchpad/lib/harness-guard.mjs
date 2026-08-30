@@ -211,11 +211,36 @@ export function restoreDiscovery(snap) {
   return done;
 }
 
-/** Printable form of a snapshot — a row that judges the restore must PRINT
- *  the artifact it judged, not assert about it. */
+/**
+ * Printable form of a snapshot — a row that judges the restore must PRINT the
+ * artifact it judged, not assert about it.
+ *
+ * ⚠ EVERY LINE CARRIES A LIVENESS VERDICT, and that is not decoration. This
+ * file's PRESENCE has never meant an app is up: the writer could only remove it
+ * on a graceful quit, so every SIGTERMed run left one naming a dead pid (found
+ * on this box 2026-08-31 naming pid 1383435, `/proc/1383435` absent). Printing
+ * `1383435` on its own reads as "Aurora is on port 38473" to every human who
+ * has ever looked at one of these lines. It is the `[ -S socket ]`-says-server
+ * defect wearing a JSON file: the failure state and the success state emitted
+ * the SAME artifact.
+ *
+ * `alive()` is signal 0, so a recycled pid answers yes — this says "a process
+ * with that pid exists", which is strictly weaker than "Aurora is up" and is
+ * why `resolveOwnedDiscovery` tests DESCENT and not this.
+ */
 export function describeDiscovery(snap) {
   return (snap ?? []).map(({ f, content }) =>
-    `${f} ${content === null ? '(absent)' : `${content.length}B ${JSON.stringify(content).slice(0, 120)}`}`).join('\n        ');
+    `${f} ${content === null ? '(absent)' : `${content.length}B ${livenessOf(content)} `
+      + JSON.stringify(content).slice(0, 120)}`).join('\n        ');
+}
+
+/** `pid N ALIVE|DEAD`, or why the question could not be asked. Never blank —
+ *  an unannotated line is one a reader takes for a live app. */
+export function livenessOf(content) {
+  let j;
+  try { j = JSON.parse(content); } catch { return '[unparseable — no pid to check]'; }
+  if (!Number.isInteger(j.pid)) return `[no pid field (${JSON.stringify(j.pid)}) — LIVENESS UNKNOWABLE]`;
+  return alive(j.pid) ? `[pid ${j.pid} ALIVE]` : `[pid ${j.pid} DEAD — STALE FILE]`;
 }
 
 /** What is on disk RIGHT NOW, in the same printable shape. */
@@ -567,8 +592,20 @@ export async function resolveOwnedDiscovery({ roots = null, timeoutMs = 15000, p
         rejected.push(`${f}: port ${j.port} but pid field is ${JSON.stringify(j.pid)} — cannot establish ownership`);
         continue;
       }
+      // LIVENESS FIRST, THEN OWNERSHIP — two different refusals, and saying
+      // which one fired is the difference between "clean up your stale file"
+      // and "you are looking at somebody else's editor". Descent is the
+      // stronger test and would have refused a dead pid anyway (a corpse is in
+      // nobody's /proc tree), but it would have refused it in the WRONG WORDS,
+      // and a refusal that misnames its reason sends the reader somewhere else.
+      if (!alive(j.pid)) {
+        rejected.push(`${f}: port ${j.port} names pid ${j.pid}, which is DEAD — a STALE discovery `
+          + 'file, not a running app. Presence of this file has never meant an app is up.');
+        continue;
+      }
       if (!ours.has(j.pid)) {
-        rejected.push(`${f}: port ${j.port} pid ${j.pid} is NOT a descendant of ${rootPids.join(',')} — refused`);
+        rejected.push(`${f}: port ${j.port} pid ${j.pid} is ALIVE but is NOT a descendant of `
+          + `${rootPids.join(',')} — somebody else's app (very likely the owner's) — refused`);
         continue;
       }
       return { ok: true, port: j.port, pid: j.pid, from: f, raw, roots: rootPids, rejected };

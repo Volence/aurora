@@ -14,7 +14,9 @@ Every route is loopback-only.
 
 1. Launch the editor (`npm run dev`).
 2. Check the port in `~/.aurora/mcp.json` (default 38473; falls back
-   to an ephemeral port if 38473 is in use — always use the file).
+   to an ephemeral port if 38473 is in use — always use the file). ⚠ The
+   file's *presence* is not evidence the editor is up: check that the `pid`
+   it names is alive before trusting the port (see **Discovery file** below).
 3. `claude mcp add --transport http aurora http://127.0.0.1:38473/mcp`
    (substitute the port from the file if it differs).
 
@@ -309,12 +311,29 @@ is a later workstream; today Aurora only serves the bus.)
 
 ## Discovery file
 
-`~/.aurora/mcp.json` is written on startup and removed on clean quit (the legacy
+`~/.aurora/mcp.json` is written on startup and removed on exit (the legacy
 `~/.sonic-level-editor/mcp.json` is also written during the rename transition).
 It contains `{ "url": "...", "port": <n>, "pid": <n>, "aether": "...",
-"aetherEvents": "...", "protocolVersion": 1 }`. Use the `pid` field to detect
-stale files from crashes: if the process is not running, the file is stale and
-the editor is not active.
+"aetherEvents": "...", "protocolVersion": 1 }`.
+
+**Removal covers the graceful quit AND the abrupt one.** Until 2026-08-31 it hung
+off Electron's `will-quit` alone, so a `SIGTERM` — how every CDP harness ends a
+run, and how a session manager ends an app — terminated the process with the file
+still on disk naming a pid that no longer existed, on every run. `startMcpServer`
+now installs an exit net (`src/main/discovery-file.ts`) covering `exit`, `SIGINT`,
+`SIGTERM` and `SIGHUP`, each signal re-raised after cleanup so the app stays as
+killable as it was.
+
+**⚠ PRESENCE IS STILL NOT LIVENESS, AND NEVER CAN BE.** `SIGKILL`, a segfault and
+a power cut are not coverable by any writer. So a reader must check the `pid`
+field before trusting the port: if that process is not running, the file is stale
+and the editor is not active. This is the same defect as `[ -S socket ]` reporting
+a corpse as a server — the failure state and the success state leave the same
+artifact on disk. In-repo readers go through `scratchpad/lib/harness-guard.mjs`,
+where `resolveOwnedDiscovery()` additionally requires the pid to be a descendant
+of a process the harness itself launched, and `livenessOf()` annotates every
+printed line `ALIVE` / `DEAD — STALE FILE`. Proof:
+`npm run harness:discovery-exit-net`.
 
 ## Troubleshooting
 
