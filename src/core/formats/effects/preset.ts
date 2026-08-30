@@ -45,7 +45,7 @@
 // says so in its own `description`.
 
 import type { FileAccess } from '../../project/adapter';
-import type { Notice } from '../../project/notice';
+import { nameSome, type Notice } from '../../project/notice';
 import type { JsonSchema } from './json-schema-subset';
 import { validateAgainstSchema, canonicalizeBySchema } from './json-schema-subset';
 import schemaJson from './aurora-effects-preset.schema.json';
@@ -487,15 +487,31 @@ export async function loadEffectsPresetLibrary(
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);
       unreadable.push({ path, reason });
-      // 'error', on the same terms as the scene loader one file over: the read
-      // FAILED and the preset is not in the library.
-      notices.push({
-        severity: 'error',
-        message:
-          `${path} exists but could not be read as a raster preset (${reason}). ` +
-          'Aurora is ignoring it and will NOT overwrite the file — fix it by hand and reopen.',
-      });
+      // The per-file reason, unabridged — see the scene loader one file over.
+      console.warn(`[effects] ${path} could not be read as a raster preset: ${reason}`);
     }
+  }
+
+  // ONE notice for the whole directory, coalesced on exactly the same terms as
+  // the scene loader: 'error' either way, and a single failure keeps the message
+  // it always had.
+  if (unreadable.length === 1) {
+    const only = unreadable[0];
+    notices.push({
+      severity: 'error',
+      message:
+        `${only.path} exists but could not be read as a raster preset (${only.reason}). ` +
+        'Aurora is ignoring it and will NOT overwrite the file — fix it by hand and reopen.',
+    });
+  } else if (unreadable.length > 1) {
+    notices.push({
+      severity: 'error',
+      message:
+        `${unreadable.length} files in ${dir} exist but could not be read as raster presets — ` +
+        `${nameSome(unreadable.map((u) => u.path))}. ` +
+        'Aurora is ignoring them and will NOT overwrite them — fix them by hand and reopen. ' +
+        'Each file and its own reason is in the developer console.',
+    });
   }
 
   return { presets, unreadable, notices };

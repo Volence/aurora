@@ -58,7 +58,7 @@ import { useViewStore } from './state/viewStore';
 import { useArtStore } from './state/artStore';
 import { useCanvasStore } from './state/canvasStore';
 import { useSpriteStore } from './state/spriteStore';
-import { useToastStore } from './state/toastStore';
+import { useToastStore, type ToastType } from './state/toastStore';
 import { useSonicPreviewStore } from './state/sonicPreviewStore';
 import { confirmProjectOpen } from './shell/project-open-guard';
 import { activateLevelTarget } from './shell/tab-activation';
@@ -1589,6 +1589,20 @@ interface DebugApi {
   sonicScrub(v: { inertia?: number; angle?: number; xflip?: boolean }): void;
   /** Currently-visible toast messages (they expire — poll while waiting). */
   toasts(): { message: string; type: string }[];
+  /**
+   * Push toasts through the SAME `addToast` every producer calls — the
+   * deterministic seam under a flood, on exactly the rationale `spritePaint` has
+   * under the canvas.
+   *
+   * WHY A HOOK RATHER THAN A REAL FLOOD. `MAX_VISIBLE_TOASTS` exists for the
+   * floods that have no single producer to fix (`saveAllDirty` toasts once per
+   * failed document; ~98 addToast sites), and the one producer that DID flood —
+   * the aeon loader's 63 unreadable-section-file notices — now coalesces to one
+   * on purpose. So there is no longer any project on disk that puts twelve
+   * toasts on screen, and the only honest way to drive the overflow row in the
+   * running app is to add them the way the app itself does.
+   */
+  pushToasts(items: { message: string; type: ToastType }[]): void;
 }
 
 /** The file's fnv1a as 8 hex digits — the frameHashes encoding. Mirrored in
@@ -1732,6 +1746,9 @@ export function installDebugHooks(): void {
       if (v.xflip !== undefined) s.setXflip(v.xflip);
     },
     toasts: () => useToastStore.getState().toasts.map((t) => ({ message: t.message, type: t.type })),
+    pushToasts: (items) => {
+      for (const it of items) useToastStore.getState().addToast(it.message, it.type);
+    },
   };
   (window as unknown as { __dbg: DebugApi }).__dbg = dbg;
 }

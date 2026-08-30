@@ -13,7 +13,7 @@
 //     flag becomes a returned field. Store writes are the renderer glue's job.
 
 import type { FileAccess, AeonProjectData } from '../adapter';
-import type { Notice } from '../notice';
+import { nameSome, type Notice, type UnreadableItem } from '../notice';
 import type { CollisionProfileSet } from '../../collision/collision-model';
 import { s4CollisionAdapter } from '../../collision/adapters/s4-collision-adapter';
 import { findFullBlockShapeId } from '../../collision/full-block-shape';
@@ -180,6 +180,16 @@ export async function loadAeonProject(fa: FileAccess, dir: string): Promise<Aeon
  *
  * Existence is asked of the file adapter rather than sniffed out of the error
  * message, because the message is whatever the host's fs layer chose to say.
+ *
+ * IT COLLECTS, IT DOES NOT TOAST. This used to push one 'error' notice per call,
+ * and it is called for SEVEN files per section — tiles.bin, collattr.bin,
+ * collattrb.bin, objects.json, rings.json, meta.json, chunklinks.json — so a
+ * 3x3 act (OJZ act 1) whose sections are all corrupt produced 63 notices, each
+ * of which became a ten-second toast in an uncapped stack. The failures are all
+ * the same fact wearing different filenames, so they are gathered here and
+ * folded into ONE notice by `summarizeUnreadable` after the load; the individual
+ * reason still reaches the console at the moment it happens, which is where it
+ * has to be anyway when a summary names only the first few.
  */
 async function markUnreadable(
   fa: FileAccess,
@@ -187,24 +197,51 @@ async function markUnreadable(
   path: string,
   suffix: string,
   error: unknown,
-  notices: Notice[],
+  unreadable: UnreadableItem[],
 ): Promise<void> {
   let present = false;
   try { present = await fa.exists(path); } catch { present = false; }
   if (!present) return; // simply not there — the ordinary case
 
   (section.unreadable ??= []).push(suffix);
-  // 'error', not 'success'. A read FAILED, the section is showing empty data
-  // that is not what is on disk, and the fix is a hand repair — toastStore's
-  // description of the error channel word for word. This message spent a long
-  // time arriving green on the 2.2s success dwell, which read as confirmation
-  // that something worked.
-  notices.push({
+  const reason = error instanceof Error ? error.message : String(error);
+  unreadable.push({ path, reason });
+  // The per-file reason, unabridged and in load order. A coalesced summary names
+  // three; this is where the other sixty live, and it is written as the failure
+  // happens rather than reconstructed later.
+  console.warn(`[load] ${path} exists but could not be read: ${reason}`);
+}
+
+/**
+ * Fold the load's unreadable-file collection into notices. Nothing → nothing;
+ * exactly one → the message it always had, word for word (the common case is a
+ * single hand-edit gone wrong, and that message is already the right one); more
+ * than one → ONE notice that COUNTS them and names the first few.
+ *
+ * 'error' in both shapes, on markUnreadable's own terms: a read FAILED, Aurora
+ * is showing empty data that is not what is on disk, and the fix is a hand
+ * repair. Coalescing changes how many toasts that costs, never what channel it
+ * arrives on.
+ */
+function summarizeUnreadable(unreadable: readonly UnreadableItem[]): Notice[] {
+  if (unreadable.length === 0) return [];
+  if (unreadable.length === 1) {
+    const only = unreadable[0];
+    return [{
+      severity: 'error',
+      message:
+        `${only.path} exists but could not be read (${only.reason}). ` +
+        'Aurora is showing empty data for it and will NOT overwrite the file — fix it by hand and reopen.',
+    }];
+  }
+  return [{
     severity: 'error',
     message:
-      `${path} exists but could not be read (${error instanceof Error ? error.message : String(error)}). ` +
-      'Aurora is showing empty data for it and will NOT overwrite the file — fix it by hand and reopen.',
-  });
+      `${unreadable.length} section files exist but could not be read — ` +
+      `${nameSome(unreadable.map((u) => u.path))}. ` +
+      'Aurora is showing empty data for them and will NOT overwrite them — fix them by hand and reopen. ' +
+      'Each file and its own reason is in the developer console.',
+  }];
 }
 
 async function loadFullProject(
@@ -224,6 +261,10 @@ async function loadFullProject(
   // S4Project.bgLibraryUnresolved — it is carried, not logged, because both the
   // save path and every ref-resolving surface need it.
   const bgLibraryUnresolved: BgLibraryUnresolvedEntry[] = [];
+  // Every section file that exists and would not read, across every zone and
+  // act, in load order. Collected rather than toasted one at a time — see
+  // markUnreadable — and folded by summarizeUnreadable below.
+  const unreadableFiles: UnreadableItem[] = [];
 
   for (const zoneConfig of config.zones) {
     // Load tileset
@@ -271,7 +312,7 @@ async function loadFullProject(
             // THERE and unreadable is not that: reseeding from the baked strips
             // silently replaces the artist's layout, and the next save writes
             // the reseed over it.
-            await markUnreadable(fa, section, `${prefix}.tiles.bin`, 'tiles.bin', e, notices);
+            await markUnreadable(fa, section, `${prefix}.tiles.bin`, 'tiles.bin', e, unreadableFiles);
           }
 
           // The engine's real per-cell collision attr indices come from the baked
@@ -331,7 +372,7 @@ async function loadFullProject(
                   }
                   return parseCollAttr(raw);
                 } catch (e) {
-                  await markUnreadable(fa, section, path, suffix, e, notices);
+                  await markUnreadable(fa, section, path, suffix, e, unreadableFiles);
                   return resolvePlaneWords(null, baseline, baseline.length);
                 }
               };
@@ -356,7 +397,7 @@ async function loadFullProject(
             section.objects = JSON.parse(objText) as ObjectPlacement[];
           } catch (e) {
             section.objects = [];
-            await markUnreadable(fa, section, `${prefix}.objects.json`, 'objects.json', e, notices);
+            await markUnreadable(fa, section, `${prefix}.objects.json`, 'objects.json', e, unreadableFiles);
           }
 
           // Load rings
@@ -366,7 +407,7 @@ async function loadFullProject(
             section.rings = JSON.parse(ringText) as RingPlacement[];
           } catch (e) {
             section.rings = [];
-            await markUnreadable(fa, section, `${prefix}.rings.json`, 'rings.json', e, notices);
+            await markUnreadable(fa, section, `${prefix}.rings.json`, 'rings.json', e, unreadableFiles);
           }
 
           // Load meta sidecar (bgLayoutRef/paletteRef/sceneRef) — optional, only
@@ -381,7 +422,7 @@ async function loadFullProject(
             section.paletteRef = meta.paletteRef;
             section.sceneRef = meta.sceneRef;
           } catch (e) {
-            await markUnreadable(fa, section, `${prefix}.meta.json`, 'meta.json', e, notices);
+            await markUnreadable(fa, section, `${prefix}.meta.json`, 'meta.json', e, unreadableFiles);
           }
 
           // Load the chunk-identity sidecar (owner ruling d-18c). ABSENT is the
@@ -402,7 +443,7 @@ async function loadFullProject(
               section.tileGrid.nametable.length,
             );
           } catch (e) {
-            await markUnreadable(fa, section, `${prefix}.chunklinks.json`, 'chunklinks.json', e, notices);
+            await markUnreadable(fa, section, `${prefix}.chunklinks.json`, 'chunklinks.json', e, unreadableFiles);
           }
 
           sections.push(section);
@@ -613,6 +654,12 @@ async function loadFullProject(
       );
     }
   }
+
+  // The section-file failures, folded. Emitted HERE rather than at each
+  // markUnreadable call so the fold sees every zone and act — a per-act summary
+  // would still be one toast per act, which is the same defect at a smaller
+  // scale.
+  notices.push(...summarizeUnreadable(unreadableFiles));
 
   // The effects-scene library (empyrean AURORA_EFFECTS_SCHEMA.md §2). Loaded
   // LAST and unconditionally: it depends on nothing above it, and an absent
