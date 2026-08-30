@@ -360,12 +360,15 @@ export const EDITOR_METHODS: EditorMethod[] = [
   //   • saving a preset does not install it, and NEITHER DOES BINDING ONE.
   //     `SectionMeta` carries the preset binding — `rasterRef` (schema §3.1,
   //     adjudicated 2026-08-30, NOT `effectsRef`) — and `assign_section_preset`
-  //     below writes it. aeon's generator READS it as of aeon `4aa2abc0`, but
-  //     nothing in their `ojz_effects.emp` passes the emitted chooser to a
-  //     section's `preset()`, so the band still does not play and a programmer
-  //     still owes one call-site line; the descriptions say so from the one
-  //     constant that owns the sentence (core/formats/raster-binding.ts), never
-  //     a second copy of it. ROADMAP row 93's remaining half is the UI select.
+  //     below writes it. aeon's generator READS it as of aeon `4aa2abc0`, and
+  //     as of aeon `9cdf32d8` ONE section's `preset()` passes the emitted
+  //     chooser to its `raster:` channel — section 5's. Bind section 5 and the
+  //     ref resolves; bind any other section and the key is written and nothing
+  //     consumes it. The descriptions say that from the one constant that owns
+  //     the sentence (core/formats/raster-binding.ts), never a second copy —
+  //     which matters more here than anywhere, because a published description
+  //     that dropped the case split would be an agent's whole picture of the
+  //     tool.
   //
   // THE LIST TOOL IS PLURAL — `list_effects_presets`, matching
   // `list_effects_scenes`. The ratified spec writes the trio in factored
@@ -422,8 +425,10 @@ export const EDITOR_METHODS: EditorMethod[] = [
   // reports success for a binding nothing bakes misleads its caller — and this
   // binding is observed by even less than that one, since nothing composites it
   // and there is no preview of a raster band anywhere in the suite. The reader
-  // half landed at aeon `4aa2abc0` and the call-site half did not, which is the
-  // distinction the constant now carries along with its dated expiry.
+  // half landed at aeon `4aa2abc0`; the call-site half landed at aeon `9cdf32d8`
+  // FOR SECTION 5 ONLY, which is the case split the constant now carries along
+  // with its dated expiry. An agent that read only "aeon threads the chooser"
+  // would bind section 6 and report a band it will never get.
   { name: 'assign_section_preset', kind: 'assign-section-preset', result: 'json',
     params: {
       section: z.number().int().min(0),

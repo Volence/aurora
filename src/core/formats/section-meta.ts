@@ -31,23 +31,28 @@
 // tools/EFFECTS_CONSUMER_CONTRACT.md §2.2). Add a ref here and to save.ts
 // together, or don't add it.
 //
-// AURORA AUTHORS `rasterRef` THROUGH EXACTLY ONE DOOR: the
-// `assign_section_preset` agent tool, over `sectionPresetCommand`
+// AURORA AUTHORS `rasterRef` THROUGH TWO DOORS AND ONE FUNCTION: the
+// `assign_section_preset` agent tool and the per-section raster select in
+// `components/effects/BandPresetPanel.tsx` (ROADMAP row 93's remaining half,
+// landed 2026-08-30 — this comment said "there is still no per-section select"
+// until then), both over `sectionPresetCommand`
 // (renderer/providers/effects-preset.ts) and the `set-section-raster` command.
-// There is still no per-section select in the band-preset panel — ROADMAP row
-// 93's remaining half — and a control that wants one must call that same
-// provider function rather than assign the field, so the agent path and the
-// human path cannot diverge on what a no-op is or which ids are valid.
+// A third door must call that same provider function rather than assign the
+// field, so the agent path and the human path cannot diverge on what a no-op is
+// or which ids are valid.
 //
 // AEON'S GENERATOR READS IT AS OF aeon 4aa2abc0 (2026-08-30) — the "NOTHING
 // READS IT ANYWHERE" note that stood here was retired on the schedule its own
 // dated expiry set. `tools/effects_gen.py` resolves the key and emits the
-// section's raster program plus a chooser; what it does not do is reach the
-// engine, because no `preset()` in their `ojz_effects.emp` passes that chooser
-// to its `raster:` channel at that revision. Nothing on THIS side observes the
-// key either — not the viewport, not a preview — so the tool still says where
-// the binding stops rather than letting `changed: true` imply otherwise, and
-// the sentence and its new expiry live in core/formats/raster-binding.ts.
+// section's raster program plus a chooser. The "and no `preset()` calls that
+// chooser" note that replaced it was retired the SAME DAY by aeon 9cdf32d8, and
+// only in part: `OJZ_Preset_Sec5` threads `ojz_act1_sec_raster(sec: 5, …)` and
+// no other `preset()` in their `ojz_effects.emp` threads anything, so the key
+// reaches the engine for SECTION 5 and for no other section. Nothing on THIS
+// side observes it for any section — not the viewport, not a preview — so the
+// tool still says where the binding stops rather than letting `changed: true`
+// imply otherwise, and the sentence, its case split and its expiry live in
+// core/formats/raster-binding.ts.
 //
 // ⚠ THE PRESERVE-IT-ACROSS-A-ROUND-TRIP JOB IS NOW STRICTLY MORE LOAD-BEARING,
 // not less. While nothing read the key, dropping it in parse->serialize lost an

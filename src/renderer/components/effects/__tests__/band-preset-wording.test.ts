@@ -142,17 +142,52 @@ describe('the three limits say the words that carry them', () => {
     expect(l.body).toMatch(/the band-preset panel now carries a per-section raster select/i);
     expect(l.body).toMatch(/the viewport does not composite a rasterRef/i);
     expect(l.body).toMatch(/this assignment changes nothing on screen/i);
+    // ⚠ AND IT COVERS SECTION 5 TOO, ASSERTED SEPARATELY. Once one section is
+    // wired in aeon, "the viewport composites nothing" is the exact clause that
+    // would erode first — "aeon threads section 5" reading as "so you can see it
+    // here". Nobody in this suite has ever seen a raster band render, and this
+    // limit must not be the first surface to imply otherwise.
+    expect(l.body).toMatch(/for section 5 as much as for any other/i);
     // THE READER EXISTS. Pinned to the file that resolves the key rather than to
     // a loose "reads it", which limit 2's "aeon steps a band-demo table" prose
     // could drift into satisfying.
     expect(l.body).toMatch(/tools\/effects_gen\.py resolves rasterRef/i);
-    // ...AND THE CALL SITE DOES NOT. The half that keeps this from reading as
-    // "it works now": the chooser is emitted and nothing passes it to preset().
-    expect(l.body).toMatch(/no preset\(\) in aeon's games\/sonic4\/data\/effects\/ojz_effects\.emp/i);
-    expect(l.body).toMatch(/the band does not play/i);
-    // The hand-work is now a CALL-SITE edit, not authoring the effect — the
-    // difference an author acts on.
-    expect(l.body).toMatch(/one line per section at that call site/i);
+    // ⚠ FIFTH CORRECTION, 2026-08-30, AND THE ROW WENT RED FIRST. This asserted
+    // `/no preset\(\) in aeon's …ojz_effects\.emp/i` and `/the band does not
+    // play/i` — the UNIVERSAL call-site clause — until aeon `9cdf32d8` threaded
+    // the chooser for ONE section. Step 5 MANUFACTURED that non-uniformity: the
+    // universal sentence was true right up until it became the lie, so what
+    // replaces it is a CASE SPLIT, and the rows below pin each case separately
+    // because collapsing them is how "section 5 is wired" would drift into "a
+    // bound section plays".
+    //
+    // CASE 1 — section 5 is wired, and the NUMBER is asserted. aeon's drafting
+    // rule, adopted: a sentence naming the number has an obvious expiry that
+    // fires when the number moves; "a bound section plays" has none and goes
+    // wrong silently the first time someone binds section 6.
+    expect(l.body).toMatch(/ONLY SECTION 5 IS WIRED/);
+    expect(l.body).toMatch(/ojz_act1_sec_raster\(sec: 5, hand: Raster_Program_None\)/);
+    // CASE 2 — section 5 unbound is the `hand:` label and is a no-op.
+    expect(l.body).toMatch(/leaving section 5 unbound resolves to that hand: label/i);
+    // CASE 3 — THE REASON THIS SENTENCE EXISTS. Binding any OTHER section writes
+    // a key nothing consumes. Kept, and made section-specific rather than
+    // deleted.
+    expect(l.body).toMatch(/BINDING ANY OTHER SECTION STILL REACHES NOTHING/);
+    // ...and case 3 is no longer SILENT, which is a different author experience
+    // and must not be understated either. Verified at aeon `9cdf32d8`, not taken
+    // on report: `tools/effects_seam_gate.py`'s `raster_seam_faults` appends a
+    // fault naming the section for every sidecar `rasterRef` no `preset()`
+    // threads, and `fail()` exits 1. The two qualifiers ride with it, because a
+    // refusal an author never sees is worse than one they are warned about: the
+    // gate is aeon's (nothing here warns) and `FAST=1 ./build.sh` skips it.
+    expect(l.body).toMatch(/tools\/effects_seam_gate\.py refuses a full build/i);
+    expect(l.body).toMatch(/names the section and the id/i);
+    expect(l.body).toMatch(/nothing here warns, and FAST=1 skips that gate/i);
+    // The hand-work is a SPLIT plus a line, not "one line per section": sections
+    // 6-8 share one `EffectsPreset` record and threading a section-keyed chooser
+    // into a shared record is itself a seam-gate refusal, so the old phrasing
+    // would send an author to an edit the build rejects.
+    expect(l.body).toMatch(/a preset split plus one call-site line/i);
     expect(l.body).toMatch(/costs ROM/i);
   });
 
@@ -173,12 +208,73 @@ describe('the three limits say the words that carry them', () => {
     // ⚠ RE-POINTED AFTER A MATCHER-TRAP CHECK. A bare /aeon 4aa2abc0/ matched
     // LIMIT 2 as well, once its own reachability clause gained the same
     // revision — so this row would have been satisfiable by a DIFFERENT rule's
-    // wording. The verb is what makes the anchor this limit's own.
-    expect(l.body).toMatch(/Verified at aeon 4aa2abc0/);
-    expect(l.body).toMatch(/EXPIRES when aeon threads the chooser into ojz_effects\.emp/);
-    // The two files to re-read are named IN the sentence, not left to the reader.
+    // wording. The verb is what makes the anchor this limit's own, and it is
+    // kept for the same reason now that the revision has moved to `9cdf32d8`
+    // while LIMIT 2 still names `4aa2abc0`.
+    expect(l.body).toMatch(/Verified at aeon 9cdf32d8/);
+    // ⚠ THE EXPIRY IS NOW THREE-WAY, because the claim is a case split and each
+    // case fails differently. A second threaded section falsifies "only section
+    // 5"; `sec: 5` moving falsifies the NUMBER (which is why the number is
+    // written down); a sidecar carrying the key ends the vacuity of aeon's
+    // seam-gate arm and turns case 1 into something exercised rather than
+    // reasoned about. One expiry naming only the first would leave the other two
+    // to go wrong silently.
+    expect(l.body).toMatch(/EXPIRES when a sidecar in aeon's tree actually carries a rasterRef/);
+    expect(l.body).toMatch(/when a second section is threaded/i);
+    expect(l.body).toMatch(/when sec: 5 becomes another index/i);
+    expect(l.body).toMatch(/owner: aeon's lane/i);
+    // The VACUITY is part of the sentence, not of the comment around it: a guard
+    // with no live subject is not the same assurance as one that has fired, and
+    // an author quoting the constant elsewhere must get that with it.
+    expect(l.body).toMatch(/the seam gate's section arm is vacuous and prints that it is/i);
+    expect(l.body).toMatch(/no section number here has been exercised end to end/i);
+    // The files to re-read are named IN the sentence, not left to the reader —
+    // and the seam gate is one of them now, because "no longer silent" is itself
+    // a falsifiable claim about a file that can change.
     expect(l.body).toMatch(/re-read games\/sonic4\/data\/effects\/ojz_effects\.emp/i);
-    expect(l.body).toMatch(/re-read tools\/effects_gen\.py/i);
+    expect(l.body).toMatch(/re-read tools\/effects_seam_gate\.py/i);
+    expect(l.body).toMatch(/tools\/effects_gen\.py/i);
+  });
+
+  /**
+   * ⚠ THE MATCHER TRAP, GATED RATHER THAN REMEMBERED. It has been hit twice on
+   * this surface: a bare `/aeon 4aa2abc0/` turned out to match LIMIT 2 as well,
+   * so a row meant to pin LIMIT 1's expiry was satisfiable by a DIFFERENT rule's
+   * wording — coverage that reports forever without having any. The case split
+   * makes that worse, not better: LIMIT 1 now says "section", "band", "aeon" and
+   * "build" in more places, and every one of those is a phrase LIMIT 2 could
+   * grow.
+   *
+   * So the anchors the rows above stand on are asserted to be LIMIT 1's ALONE.
+   * A phrase that leaks into another limit fails HERE, naming the limit it
+   * leaked into, instead of quietly making one of those rows vacuous.
+   */
+  it('LIMIT 1\'s case-split anchors match LIMIT 1 and nothing else on this surface', () => {
+    const anchors = [
+      /ONLY SECTION 5 IS WIRED/,
+      /ojz_act1_sec_raster\(sec: 5, hand: Raster_Program_None\)/,
+      /leaving section 5 unbound resolves to that hand: label/i,
+      /BINDING ANY OTHER SECTION STILL REACHES NOTHING/,
+      /tools\/effects_seam_gate\.py refuses a full build/i,
+      /nothing here warns, and FAST=1 skips that gate/i,
+      /a preset split plus one call-site line/i,
+      /for section 5 as much as for any other/i,
+      /Verified at aeon 9cdf32d8/,
+      /the seam gate's section arm is vacuous and prints that it is/i,
+    ];
+    const unbound = PRESET_LIMITS.find((x) => x.key === 'unbound')!.body;
+    const others = [
+      PRESET_HEADLINE, NO_PREVIEW,
+      ...PRESET_LIMITS.filter((x) => x.key !== 'unbound').flatMap((x) => [x.title, x.body]),
+    ];
+    for (const re of anchors) {
+      // ANTI-VACUOUS FIRST: an anchor that has fallen out of the constant would
+      // otherwise pass the uniqueness half trivially.
+      expect(re.test(unbound), `${re} no longer appears in LIMIT 1 at all`).toBe(true);
+      for (const s of others) {
+        expect(re.test(s), `${re} ALSO matches: ${s.slice(0, 70)}`).toBe(false);
+      }
+    }
   });
 
   /**

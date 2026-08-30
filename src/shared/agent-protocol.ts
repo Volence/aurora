@@ -115,15 +115,17 @@ export type AgentRequest =
   // because a preset document supplies only the raster channel of aeon's
   // eight-channel EffectsPreset while `effectsRef` promises a TOTAL binding.
   //
-  // ⚠ AND THE BINDING STILL DOES NOT REACH THE ENGINE. aeon's generator READS
-  // `rasterRef` as of aeon `4aa2abc0` and emits the section's chooser, but no
-  // `preset()` in their `games/sonic4/data/effects/ojz_effects.emp` passes that
-  // chooser to its `raster:` channel yet, so a bound section keeps its
-  // hand-authored program. The reply therefore still carries
-  // `RASTER_SECTION_BINDING_LIMIT` on success as well as on the no-op —
-  // `assign-section-bg`'s rule, which exists because a tool that reports success
-  // for a binding nothing bakes misleads its caller. ROADMAP row 93's remaining
-  // half is the per-section select in the UI.
+  // ⚠ AND WHETHER THE BINDING REACHES THE ENGINE DEPENDS ON `section`. aeon's
+  // generator READS `rasterRef` as of aeon `4aa2abc0` and emits the section's
+  // chooser; as of aeon `9cdf32d8` exactly one `preset()` in their
+  // `games/sonic4/data/effects/ojz_effects.emp` passes that chooser to its
+  // `raster:` channel — `OJZ_Preset_Sec5`, on `sec: 5`. So section 5 resolves,
+  // and every other section keeps its hand-authored program while the key sits
+  // there unread. This request carries no hint of which case it is in, and must
+  // not grow one: the reply carries `RASTER_SECTION_BINDING_LIMIT` on success as
+  // well as on the no-op, and that constant is where the case split (and the
+  // number 5) is stated once — `assign-section-bg`'s rule, which exists because
+  // a tool that reports success for a binding nothing bakes misleads its caller.
   | { kind: 'list-effects-presets' }
   | { kind: 'get-effects-preset'; id: string }
   | { kind: 'set-effects-preset'; id: string; preset: unknown | null }

@@ -956,15 +956,23 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
     //
     // ⚠ NOT `effectsRef`: that reservation stays unspent for a TOTAL binding.
     //
-    // ⚠ WHAT IS STILL MISSING IS THE CALL SITE, and it is why the assign tool's
-    // reply carries a limit sentence rather than a bare `changed: true`. The
-    // READER landed at aeon `4aa2abc0` — `effects_gen.py` resolves `rasterRef`
-    // and emits the section's chooser — but nothing in aeon's `ojz_effects.emp`
-    // passes that chooser to a `preset()`'s `raster:` channel, so a bound
-    // section's band does not play. See core/formats/raster-binding.ts, which
-    // owns the sentence and its dated expiry; `PRESET_LIMITS`' first limit says
-    // it in the very same words. ROADMAP row 93's remaining half is the
-    // per-section select in the band-preset panel.
+    // ⚠ WHICH SECTION IS BOUND NOW DECIDES WHAT THE BINDING BUYS, and that is
+    // why the assign tool's reply carries a limit sentence rather than a bare
+    // `changed: true`. The READER landed at aeon `4aa2abc0` (`effects_gen.py`
+    // resolves `rasterRef` and emits the section's chooser); the CALL SITE
+    // landed at aeon `9cdf32d8` — but for ONE section only. `OJZ_Preset_Sec5`
+    // threads `ojz_act1_sec_raster(sec: 5, hand: Raster_Program_None)` and no
+    // other `preset()` in `ojz_effects.emp` threads anything, so a ref on
+    // section 5 is resolved and a ref on any other section is written, counted,
+    // and consumed by nothing.
+    //
+    // ⚠ SO THIS TOOL MUST NOT REPLY WITH A UNIVERSAL SENTENCE IN EITHER
+    // DIRECTION. "The band does not play" is now wrong for section 5, and "a
+    // bound section plays" is wrong for the other eight — and the second failure
+    // is silent, which is why the shared constant names the NUMBER. See
+    // core/formats/raster-binding.ts, which owns the sentence, its case split
+    // and its dated expiry; `PRESET_LIMITS`' first limit says it in the very
+    // same words.
 
     case 'list-effects-presets': {
       const ctx = requireProject();
@@ -1096,12 +1104,16 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       // rule (core/formats/bg-binding.ts), and this tool needs it MORE than that
       // one did. There, `changed: true` at least buys a repaint: the viewport
       // composites the assigned background and only the ROM half is missing.
-      // Here the ref reaches aeon's GENERATOR (aeon `4aa2abc0`) and stops there:
-      // no call site installs the emitted program, no preview draws it, no panel
-      // shows it — so a bare `changed: true` would be the reply asserting an
-      // effect it cannot know reached anything, with not one observable
-      // consequence behind it. Carried on the no-op reply too, so the same
-      // conclusion is available whichever way the call lands.
+      // Here the ref reaches aeon's GENERATOR and then goes exactly as far as
+      // the SECTION allows: at aeon `9cdf32d8` section 5's `preset()` threads
+      // the chooser and no other section's does, and NOTHING on this side can
+      // tell the caller which of those they just did — `req.section` is a number
+      // this handler does not interpret. Nor is there an observable consequence
+      // either way: no preview draws it, no panel shows it, and the viewport
+      // composites no `rasterRef` for section 5 any more than for section 6. So
+      // a bare `changed: true` would assert an effect this reply cannot know
+      // reached anything. Carried on the no-op reply too, so the same conclusion
+      // is available whichever way the call lands.
       return {
         section: req.section, presetId: req.presetId, changed: true,
         binding: RASTER_SECTION_BINDING_LIMIT,

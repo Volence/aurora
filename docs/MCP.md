@@ -273,13 +273,38 @@ and emits the section's raster program plus an always-present chooser.
 carried a dated expiry naming the two files above; they moved, and it was
 retired here rather than found stale later.)*
 
-**What is still missing is the call site.** At `4aa2abc0` no `preset()` in aeon's
+**The call site now exists — for one section.** At aeon **`9cdf32d8`**
+(2026-08-30) exactly one `preset()` in
 `games/sonic4/data/effects/ojz_effects.emp` passes the emitted chooser to its
-`raster:` channel — every `raster:` argument there is a hand-authored label and
-the generated witness reads `EditorRaster_OJZ_Act1_Bindings = 0` — so a bound
-section keeps running its hand-authored program and the band does not play. The
-hand-work left is **one line per section at that call site**, not authoring the
-effect. This tool therefore reports that limit **on its success reply**, not only
+`raster:` channel: `OJZ_Preset_Sec5`, as `raster: ojz_act1_sec_raster(sec: 5,
+hand: Raster_Program_None)`. So there are **three cases, not one**:
+
+| you bind | what happens |
+|---|---|
+| **section 5** | the chooser resolves the ref — the first choice made in this editor that aeon's build can carry to a raster channel |
+| **section 5, unbound** | the chooser returns `hand:` (`Raster_Program_None`); nothing changes |
+| **any other section** | the key is written, aeon's witness counts it, **and nothing consumes it** |
+
+*(This paragraph previously said no `preset()` anywhere passed the chooser, and
+that the hand-work left was "one line per section". aeon's step 5 did not reveal
+a non-uniformity — it **manufactured** one, so the universal sentence became the
+lie the day it landed. It is a case split now, and it names the number 5 on
+aeon's drafting rule: a sentence naming the number expires visibly when the
+number moves, while "a bound section plays" would go wrong silently the first
+time someone binds section 6.)*
+
+**The third case is no longer silent, and it is not silent in aeon.**
+`tools/effects_seam_gate.py` fails a full build when a section's sidecar names a
+`rasterRef` that no `preset()` threads, naming the section and the id. Two
+qualifiers ride with that: nothing in Aurora refuses or warns (the panel offers
+every section and this tool accepts every section), and `FAST=1 ./build.sh`
+skips the gate. At `9cdf32d8` no sidecar in aeon's tree carries the key at all,
+so that arm is **vacuous today and prints that it is** rather than reading green.
+Wiring a second section is a preset **split** plus one call-site line — sections
+6-8 share one `EffectsPreset` record, and threading a section-keyed chooser into
+a shared record is itself a seam-gate refusal.
+
+This tool therefore reports that limit **on its success reply**, not only
 on a refusal, for the reason
 `assign_section_bg` states: a tool that reports success for a binding nothing
 bakes misleads its caller. It is one sentence
