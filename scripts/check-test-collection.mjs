@@ -99,7 +99,11 @@
 // (the note line above the FAIL was the tell) and kept every candidate. The
 // cliff sits at 26 worktrees of that name length; 27 short-named probes
 // (~972 KB) pass. Skipping nested trees in the walk keeps that volume from
-// ever reaching git.
+// ever reaching git. The cliff itself is also raised in dropIgnored()
+// (maxBuffer 64 MiB, and the note now names the error): 40 plain ignored
+// copies of the test set (~1.4 MB, no `.git`, the scratchpad/fixtures shape
+// this header already promises not to drown in) failed the same way with the
+// walk skip alone.
 //
 // EXIT CODES
 //   0  agree — every test-shaped file is collected
@@ -179,12 +183,18 @@ function dropIgnored(candidates) {
     cwd: ROOT,
     input: candidates.join('\n') + '\n',
     encoding: 'utf8',
+    // git echoes every ignored path; Node's default 1 MiB maxBuffer overflowed
+    // at ~12k paths on 2026-08-30 (ENOBUFS) and read as "git unavailable".
+    maxBuffer: 64 * 1024 * 1024,
   });
   // exit 0 = some ignored, 1 = none ignored, 128 = not a repo / git error.
   if (res.error || (res.status !== 0 && res.status !== 1)) {
+    const why = res.error
+      ? `${res.error.code ?? ''} ${res.error.message}`.trim()
+      : `exit ${res.status}: ${(res.stderr || '').trim()}`;
     console.error(
-      'check-test-collection: note — `git check-ignore` unavailable; git-ignored ' +
-        'paths (if any) are being kept as candidates.',
+      'check-test-collection: note — `git check-ignore` unavailable ' +
+        `(${why}); git-ignored paths (if any) are being kept as candidates.`,
     );
     return candidates;
   }
