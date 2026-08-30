@@ -20,8 +20,8 @@ Every route is loopback-only.
 
 ## Tools
 
-Query: `get_project_info`, `get_palette`, `get_tiles`, `get_nametable_region`, `check_budget`, `get_bg`, `list_bgs`, `list_effects_scenes`, `get_effects_scene`
-Mutate (one undo step each): `set_palette`, `write_tiles`, `paint_region`, `paint_collision`, `save_chunk`*, `stamp_chunk`, `set_bg`*, `assign_section_bg`, `set_effects_scene`, `assign_section_scene`
+Query: `get_project_info`, `get_palette`, `get_tiles`, `get_nametable_region`, `check_budget`, `get_bg`, `list_bgs`, `list_effects_scenes`, `get_effects_scene`, `list_effects_presets`, `get_effects_preset`
+Mutate (one undo step each): `set_palette`, `write_tiles`, `paint_region`, `paint_collision`, `save_chunk`*, `stamp_chunk`, `set_bg`*, `assign_section_bg`, `set_effects_scene`, `assign_section_scene`, `set_effects_preset`
 View: `goto`, `screenshot`
 
 The tools above operate on an **aeon** project. The classic (Sonic 1 disassembly)
@@ -129,6 +129,59 @@ resolve is worse than no ref. Scene files Aurora could not read are reported by
 generator that bakes these documents into the engine — is booked and not built,
 so scenes persist to disk and stop there. That is the accepted sequencing, not
 an oversight.
+
+## Effects presets (raster bands)
+
+A **preset** is a different document from a scene, in a different directory:
+`data/editor/effects/presets/<preset_id>.json`. A scene is a `parallax_config`
+— how the two planes scroll. A preset is a **raster band program**: a list of
+bands, each one turning a CRAM write on at a screen line and off at another.
+The scene loader refuses a `bands` key outright, so bands authored into a scene
+file would produce a document nothing loads.
+
+Each band is `{top, bot, sh, on}`. `top`/`bot` are screen lines (the band covers
+`top..bot-1`), `sh` is Shadow/Highlight for the band (`false`/`0` = a two-fire
+band, `true`/`1` = the three-fire S/H shape — required, no default), and `on` is
+the write, carrying **exactly one arm**:
+
+- `cram` — `{addr, colours}`, raw CRAM words written from a CRAM *byte* address.
+  The length of `colours` is also the derived restore's word count, so adding a
+  colour changes what the band costs.
+- `pal_region` — `{addr, slot, pal_line, entry, count}`, colours streamed from a
+  `Pal_Variant_Stage` slot. `slot` is the SOURCE, not the CRAM destination.
+
+Two arms would be two writes and therefore two restores, which is two bands —
+author the second one as a second band. `vsram` is deliberately not an arm: a
+band's restore is derived from the ON op's CRAM span, and a VSRAM op has none.
+
+`list_effects_presets` gives you the inventory (id, name, band count) plus any
+preset file that exists and could NOT be read — those ids are unusable and
+Aurora will never overwrite them. `get_effects_preset` returns ONE WHOLE
+DOCUMENT and `set_effects_preset` takes one back, deliberately not a field
+patch: read, change, send. Pass `preset: null` to delete. Every write is one
+undo step; a re-send of an identical document is not.
+
+**No numeric value is range-checked or clamped on this side, on purpose.** The
+schema is silent on screen-line ranges, CRAM address ranges, burst ceilings,
+band counts and height minimums, and Aurora forwards what you wrote verbatim, so
+the engine's own `ensure` fires at build time with the measurement behind the
+rule (`the ON fire costs 624 cyc against 488 available`). A bound invented on
+this side would replace that sentence with silence. What IS validated is shape
+and identity: the document's `id` must equal the `id` argument, the reserved
+wave-2 names (`fires`, `variants`, `cycles`) are refused BY NAME rather than as
+typos, and an invalid document is refused with the specific issues and consumes
+no undo step.
+
+**Saving a preset does not install it, and there is no `assign_section_preset`.**
+Nothing binds a preset to a section: `SectionMeta` carries `bgLayoutRef`,
+`paletteRef` and `sceneRef` and no preset field, and the per-section key that
+would carry one (`effectsRef`) is not implemented in either repo. A programmer
+binds a preset by hand in aeon's `.emp`. `list_effects_presets` says this in its
+own reply (`sectionBinding`) rather than shipping an all-nulls section column
+that would read as "assigned to nothing". Nor has anyone in the suite ever
+looked at one of these bands on screen, so nothing anywhere checks that a band
+is VISIBLE — a legal band over an unused palette entry builds green and shows
+nothing.
 
 ## Classic project tools
 
