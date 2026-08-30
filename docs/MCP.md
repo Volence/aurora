@@ -274,14 +274,14 @@ carried a dated expiry naming the two files above; they moved, and it was
 retired here rather than found stale later.)*
 
 **The call site now exists — for one section.** At aeon **`9cdf32d8`**
-(2026-08-30) exactly one `preset()` in
+(2026-08-30; still the only one at **`6e2495a5`**) exactly one `preset()` in
 `games/sonic4/data/effects/ojz_effects.emp` passes the emitted chooser to its
 `raster:` channel: `OJZ_Preset_Sec5`, as `raster: ojz_act1_sec_raster(sec: 5,
 hand: Raster_Program_None)`. So there are **three cases, not one**:
 
 | you bind | what happens |
 |---|---|
-| **section 5** | the chooser resolves the ref — the first choice made in this editor that aeon's build can carry to a raster channel |
+| **section 5** | the chooser resolves the ref — the first choice made in this editor that aeon's build carries to a raster channel, and it is bound in aeon's tree since **`c9a462be`** |
 | **section 5, unbound** | the chooser returns `hand:` (`Raster_Program_None`); nothing changes |
 | **any other section** | the key is written, aeon's witness counts it, **and nothing consumes it** |
 
@@ -298,8 +298,20 @@ time someone binds section 6.)*
 `rasterRef` that no `preset()` threads, naming the section and the id. Two
 qualifiers ride with that: nothing in Aurora refuses or warns (the panel offers
 every section and this tool accepts every section), and `FAST=1 ./build.sh`
-skips the gate. At `9cdf32d8` no sidecar in aeon's tree carries the key at all,
-so that arm is **vacuous today and prints that it is** rather than reading green.
+skips the gate. At `9cdf32d8` no sidecar in aeon's tree carried the key, so
+that arm was vacuous and printed that it was; since aeon **`c9a462be`**
+(2026-08-30) `games/sonic4/data/editor/ojz/act1/section_5.meta.json` carries
+`"rasterRef": "ojz_sec5_showcase"` — the two files Aurora's own writer authored
+and handed over — so at `6e2495a5` the arm has **one live subject** (`1 sidecar
+rasterRef(s)`, checked against the threaded set) and the generated module says
+`EditorRaster_OJZ_Act1_Bindings = 1`. Section 5 has therefore been exercised
+from this editor to aeon's build **and no further**: `c9a462be`'s own message
+says nothing has been seen on screen, and no CRAM was sampled here.
+
+*(This paragraph previously said the arm was vacuous today. That was the
+expiry's first clause; it fired the same day and was retired here rather than
+found stale later.)*
+
 Wiring a second section is a preset **split** plus one call-site line — sections
 6-8 share one `EffectsPreset` record, and threading a section-keyed chooser into
 a shared record is itself a seam-gate refusal.

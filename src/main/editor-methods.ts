@@ -361,7 +361,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
   //     `SectionMeta` carries the preset binding — `rasterRef` (schema §3.1,
   //     adjudicated 2026-08-30, NOT `effectsRef`) — and `assign_section_preset`
   //     below writes it. aeon's generator READS it as of aeon `4aa2abc0`, and
-  //     as of aeon `9cdf32d8` ONE section's `preset()` passes the emitted
+  //     as of aeon `6e2495a5` ONE section's `preset()` passes the emitted
   //     chooser to its `raster:` channel — section 5's. Bind section 5 and the
   //     ref resolves; bind any other section and the key is written and nothing
   //     consumes it. The descriptions say that from the one constant that owns
@@ -426,7 +426,8 @@ export const EDITOR_METHODS: EditorMethod[] = [
   // binding is observed by even less than that one, since nothing composites it
   // and there is no preview of a raster band anywhere in the suite. The reader
   // half landed at aeon `4aa2abc0`; the call-site half landed at aeon `9cdf32d8`
-  // FOR SECTION 5 ONLY, which is the case split the constant now carries along
+  // FOR SECTION 5 ONLY, and section 5's sidecar landed in their tree at aeon
+  // `c9a462be` — which is the case split the constant now carries along
   // with its dated expiry. An agent that read only "aeon threads the chooser"
   // would bind section 6 and report a band it will never get.
   { name: 'assign_section_preset', kind: 'assign-section-preset', result: 'json',

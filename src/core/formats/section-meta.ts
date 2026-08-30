@@ -48,7 +48,10 @@
 // chooser" note that replaced it was retired the SAME DAY by aeon 9cdf32d8, and
 // only in part: `OJZ_Preset_Sec5` threads `ojz_act1_sec_raster(sec: 5, …)` and
 // no other `preset()` in their `ojz_effects.emp` threads anything, so the key
-// reaches the engine for SECTION 5 and for no other section. Nothing on THIS
+// reaches the engine for SECTION 5 and for no other section — and since aeon
+// c9a462be section 5's sidecar in their tree really carries one
+// (`ojz_sec5_showcase`, the document this repo's handover test authored), so
+// the round trip below has been exercised on a committed file. Nothing on THIS
 // side observes it for any section — not the viewport, not a preview — so the
 // tool still says where the binding stops rather than letting `changed: true`
 // imply otherwise, and the sentence, its case split and its expiry live in

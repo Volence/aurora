@@ -97,7 +97,7 @@ export const PRESET_LIMITS: readonly PresetLimit[] = Object.freeze([
     // back to naming `effectsRef` — an author who went looking for that key
     // would find nothing.
     //
-    // AND THE STATUS HAS CHANGED FIVE TIMES NOW. First the key appeared in the
+    // AND THE STATUS HAS CHANGED SIX TIMES NOW. First the key appeared in the
     // sidecar and Aurora began round-tripping it, so "not implemented in either
     // repo" became a lie. Then `assign_section_preset` landed, so "nothing binds
     // a preset to a section" became one too — a WRITER exists, it is an agent
@@ -109,7 +109,13 @@ export const PRESET_LIMITS: readonly PresetLimit[] = Object.freeze([
     // limit is now read by an author standing directly above the control it is
     // about, which is the placement the block was built for. Then aeon
     // `9cdf32d8` threaded the chooser FOR ONE SECTION, so "nothing calls it"
-    // became the fifth lie.
+    // became the fifth lie. Then aeon `c9a462be` committed section 5's sidecar
+    // carrying `ojz_sec5_showcase` — the two files this repo's own handover
+    // test authored through the writer below — so "no sidecar carries the key,
+    // the seam gate's arm is vacuous, no section has been exercised end to end"
+    // became the sixth, retired against their `6e2495a5`. What that sixth did
+    // NOT change: the band has not been recorded as seen (aeon's own commit
+    // says so), and this viewport still composites nothing.
     //
     // ⚠ AND THE FIFTH IS A DIFFERENT SHAPE FROM THE OTHER FOUR. Each of those
     // replaced one universal claim with another. This one cannot: aeon's step 5
@@ -539,13 +545,14 @@ export function presetRefOptions(library: EffectsPresetLibrary): FactorOption[] 
  * ⚠ AND HERE IT IS A LIE WITH A BUILD ATTACHED, which is the one thing this
  * differs from the scene case in. aeon's `tools/effects_gen.py` refuses an id
  * naming no preset document BY NAME and lists the ids it does know
- * (core/formats/raster-binding.ts, verified at aeon `9cdf32d8`), so the author
+ * (core/formats/raster-binding.ts, verified at aeon `6e2495a5`), so the author
  * who is not told here meets it as a build failure instead. There is a SECOND
  * build failure behind this one now, and it is the reason the advisory is not
  * the only safety net: `tools/effects_seam_gate.py` refuses a build where a
  * section's `rasterRef` names a perfectly good preset but that section's
- * `preset()` does not thread the chooser — which at `9cdf32d8` is every section
- * except 5.
+ * `preset()` does not thread the chooser — which at `6e2495a5` is every section
+ * except 5 (and section 5 IS bound there, since aeon `c9a462be`, so the arm has
+ * a live subject it passes rather than an empty set it prints).
  */
 export function unassignablePresetRef(
   library: EffectsPresetLibrary, rasterRef: string | null,
@@ -581,8 +588,9 @@ export function unassignablePresetRef(
  * docblock and core/formats/section-meta.ts for the ruling. And see
  * `RASTER_SECTION_BINDING_LIMIT` for where the binding stops, which is now a
  * question of WHICH SECTION: aeon's generator reads the key and emits the
- * chooser, and at `9cdf32d8` exactly one `preset()` in their `ojz_effects.emp`
- * threads it — `OJZ_Preset_Sec5`, on `sec: 5`. This function does not know or
+ * chooser, and at `6e2495a5` exactly one `preset()` in their `ojz_effects.emp`
+ * threads it — `OJZ_Preset_Sec5`, on `sec: 5`, whose sidecar carries
+ * `ojz_sec5_showcase` since their `c9a462be`. This function does not know or
  * care which section it is writing (nor should it: the limit is the surface
  * that carries that, said once), but a caller reading its result as "bound"
  * should read the limit for what "bound" buys on the section they picked.

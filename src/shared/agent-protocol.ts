@@ -117,9 +117,10 @@ export type AgentRequest =
   //
   // ⚠ AND WHETHER THE BINDING REACHES THE ENGINE DEPENDS ON `section`. aeon's
   // generator READS `rasterRef` as of aeon `4aa2abc0` and emits the section's
-  // chooser; as of aeon `9cdf32d8` exactly one `preset()` in their
+  // chooser; as of aeon `6e2495a5` exactly one `preset()` in their
   // `games/sonic4/data/effects/ojz_effects.emp` passes that chooser to its
-  // `raster:` channel — `OJZ_Preset_Sec5`, on `sec: 5`. So section 5 resolves,
+  // `raster:` channel — `OJZ_Preset_Sec5`, on `sec: 5` (bound in their tree
+  // since `c9a462be`). So section 5 resolves,
   // and every other section keeps its hand-authored program while the key sits
   // there unread. This request carries no hint of which case it is in, and must
   // not grow one: the reply carries `RASTER_SECTION_BINDING_LIMIT` on success as

@@ -308,7 +308,13 @@ describe('the reply says where the binding stops', () => {
     expect(RASTER_SECTION_BINDING_LIMIT).not.toMatch(/effectsRef/);
     // The reader that now exists, pinned to the file and the revision.
     expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/effects_gen\.py/);
-    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/Verified at aeon 9cdf32d8/);
+    // ⚠ MOVED TWICE, RED FIRST BOTH TIMES: to `9cdf32d8` when the call site
+    // landed, and to `6e2495a5` (aeon's origin/master the evening `c9a462be`
+    // committed section 5's sidecar) when the sentence's "no sidecar carries
+    // the key" clauses expired. The OLD anchor is asserted absent so a revert
+    // of the constant cannot pass this row on the kept phrases below.
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/Verified at aeon 6e2495a5/);
+    expect(RASTER_SECTION_BINDING_LIMIT).not.toMatch(/Verified at aeon 9cdf32d8/);
     // ...and the seam it stops at, which is what an agent must not read past.
     expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/ojz_effects\.emp/);
     // ⚠ (3) CHANGED ON 2026-08-30 TOO, AND THIS ROW WENT RED FIRST. It asserted
@@ -325,6 +331,12 @@ describe('the reply says where the binding stops', () => {
     // section" is a materially different answer from silence — verified at
     // `9cdf32d8` in `tools/effects_seam_gate.py`, not taken on report.
     expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/effects_seam_gate\.py refuses a full build/i);
+    // And the half an agent reading a SUCCESS reply most needs since aeon
+    // `c9a462be`: section 5 is bound and that binding reached aeon's build —
+    // and stopped there. "Bound" without "and no further" is the reply that
+    // would let an agent report a band it has no evidence for.
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/SECTION 5 IS BOUND/);
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/to aeon's generator and build, and no further/i);
   });
 });
 
