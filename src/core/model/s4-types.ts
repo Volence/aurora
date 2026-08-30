@@ -222,12 +222,15 @@ export interface Section {
    * so `effectsRef`'s promise of a TOTAL binding is deliberately kept for the
    * day the document is total.
    *
-   * AURORA AUTHORS THIS NOW, through one door: the `assign_section_preset`
-   * agent tool (`renderer/agent/agent-handler.ts`) over `sectionPresetCommand`
-   * (`renderer/providers/effects-preset.ts`). There is still no per-section
-   * raster select in the UI — ROADMAP row 93's remaining half — so a control
-   * that wants to bind one must go through that same provider function rather
-   * than assign the field.
+   * AURORA AUTHORS THIS THROUGH TWO DOORS AND ONE FUNCTION: the
+   * `assign_section_preset` agent tool (`renderer/agent/agent-handler.ts`) and
+   * the per-section raster select in `components/effects/BandPresetPanel.tsx`
+   * (ROADMAP row 93's remaining half, landed) — both over `sectionPresetCommand`
+   * (`renderer/providers/effects-preset.ts`). Any further door must go through
+   * that same provider function rather than assign the field: it owns the `''`
+   * sentinel that makes a select's empty option and an agent's explicit `null`
+   * the same unbind, and it owns the no-op rule that decides what earns an undo
+   * step.
    *
    * ⚠ AEON READS IT NOW, AND STILL NOTHING OBSERVES IT. The "nothing reads it"
    * note that stood here was retired on 2026-08-30 by aeon `4aa2abc0`:
