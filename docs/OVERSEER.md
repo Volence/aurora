@@ -1125,3 +1125,53 @@ enumeration ran in, and whether the thing being priced has consumers outside it.
 has as many consumers as it has vendored copies. This is the enumerate-across-instances
 lesson (bar 2e's sigil corollary) firing across repos instead of across lanes — the hub could
 not see this from inside empyrean, and I could not have seen their half from inside aurora.
+
+## Decision closures made before rule 8d — CLOSED OUT OF SHAPE, DO NOT REPAIR
+
+*(Added 2026-08-30T01:59Z. Contract: `empyrean origin/main df8939b`, `contract/DECISIONS.md`
+rule 8d, read at that revision — verified reachable from here before this list was written,
+not taken from the relay that announced it. Dominion's reader parses the field at dominion
+`7a8a9b3`. **In force from 2026-08-30T01:58:05Z**; every id below was appended before that
+instant, so none of them is a violation of anything.)*
+
+Rule 8d asks each lane to list its pre-rule closures **once**, and says in its own words:
+*"Ledgers are NOT rewritten to fit this … History that shows the drift is worth more than
+history edited to look compliant. Nothing in 8d is an instruction to touch an existing
+line."* So this is a **register, not a backlog**. Do not add `answered` to any of them.
+
+**The twelve closures in `docs/decisions.jsonl` that predate the field** — each closes a
+question the 8c way (an appended entry with `supersedes` set) and records its resolution in
+prose rather than in `answered`:
+
+`d-4` · `d-5` · `d-7` · `d-8` · `d-10` · `d-12` · `d-14` · `d-15-answered` ·
+`d-16-hub-ruled` · `d-18c-chunk-identity-ANSWERED` · `d-19-stale-mcp-discovery-CLOSED` ·
+`d-20-live-objects-scope-ANSWERED`
+
+By 8d's `by` vocabulary, had it existed: nine `owner` (`d-4`, `d-5`, `d-7`, `d-8`, `d-10`,
+`d-12`, `d-14`, `d-18c`, `d-20`), two `hub` under a standing delegation and explicitly
+marked as not witnessed here (`d-15-answered`, `d-16-hub-ruled`), one `lane` executing an
+owner-authorized cleanup (`d-19`).
+
+⚠ **Two entries look like closures in a listing and are NOT — do not count them, and do not
+"fix" them either.** Both carry `supersedes` and answer-flavoured wording, which is exactly
+what a name-based scan picks up (this file's own *name, presence and behaviour are three
+different claims*):
+
+- **`d-6`** reads as an answer and is a **re-ask**: it records a ruling that arrived
+  *relayed* and asks him to confirm in one word. `d-7` is the closure, and its whole point
+  is that it was witnessed firsthand rather than relayed.
+- **`d-18b-chunk-identity-which-default`** settles the *shape* he answered with, then asks a
+  genuinely new question (which of the two behaviours is the default). `d-18c` is the
+  closure.
+
+**Classified by reading each entry's `question` and `detail`, not by its id.** Five of the
+twelve have an id ending in `answered`/`ANSWERED`/`CLOSED`/`hub-ruled` and seven do not
+(`d-4`, `d-5`, `d-7`, `d-8`, `d-10`, `d-12`, `d-14`), so an id-suffix scan would have found
+five of twelve and missed the majority — while `d-6` and `d-18b` would have to be excluded
+on their text no matter which scan found them.
+
+**From here on, closures carry `answered`** (`at` from `date -u`, `by`, `chose` validated
+against the entry's own options or `null` for a freehand answer, `said` quoted verbatim and
+never linted, `did` one sentence of lane prose and linted). The field supplies the
+**content** of a resolution and never the **fact** of one: the card leaves the owner's board
+when this lane drops the blocker, not when the field is written.
