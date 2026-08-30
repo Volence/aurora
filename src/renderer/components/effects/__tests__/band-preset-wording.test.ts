@@ -17,9 +17,13 @@
 //   2. The panel READS them and renders them UNCONDITIONALLY. A limit behind a
 //      `title=` or a collapsed detail is a limit the panel does not carry — the
 //      brief's words, and the whole reason `LimitBlock` is not a tooltip.
-//   3. NOTHING here claims anyone has SEEN one. No band in this suite has ever
-//      been looked at on screen; copy implying otherwise is the one thing worse
-//      than no preview.
+//   3. NOTHING here claims anyone has SEEN one HERE. Until aeon `4a4d3474`
+//      (2026-08-30) no band in this suite had been looked at on screen; that
+//      commit's `docs/research/reference_captures/2026-08-30-sec5-band/` is
+//      the first one, in aeon's emulator, in aeon's tree. LIMIT 1 may cite it,
+//      attributed — and the rows pin that it says WHERE, and that nothing of
+//      it is visible in this editor. Copy implying an author can see a band on
+//      THIS surface is still the one thing worse than no preview.
 //
 // ⚠ THE NODE SUITE CANNOT SEE REACT. These rows read the panel SOURCE and the
 // provider's exported strings. That bounds what they can prove: they prove the
@@ -145,8 +149,10 @@ describe('the three limits say the words that carry them', () => {
     // ⚠ AND IT COVERS SECTION 5 TOO, ASSERTED SEPARATELY. Once one section is
     // wired in aeon, "the viewport composites nothing" is the exact clause that
     // would erode first — "aeon threads section 5" reading as "so you can see it
-    // here". Nobody in this suite has ever seen a raster band render, and this
-    // limit must not be the first surface to imply otherwise.
+    // here". When this was written nobody in this suite had seen a raster band
+    // render; since aeon `4a4d3474` one HAS been, in aeon's emulator, and that
+    // makes this clause MORE load-bearing, not less — it is the sentence that
+    // keeps "aeon measured it" from reading as "you can see it in this editor".
     expect(l.body).toMatch(/for section 5 as much as for any other/i);
     // THE READER EXISTS. Pinned to the file that resolves the key rather than to
     // a loose "reads it", which limit 2's "aeon steps a band-demo table" prose
@@ -200,15 +206,62 @@ describe('the three limits say the words that carry them', () => {
     // to stop.
     expect(l.body).toMatch(/SECTION 5 IS BOUND: aeon's c9a462be commits section_5\.meta\.json/);
     expect(l.body).toMatch(/EditorRaster_OJZ_Act1_Bindings is 1/);
-    // ...and the has-anyone-seen-it clause is attributed, not asserted: aeon's
-    // own commit message is the only committed artifact that speaks to it, and
-    // it says "not seen". Aurora's half is its own measurement (no CRAM sampled
-    // HERE). A rewrite that drops either attribution — or that promotes
-    // 6e2495a5's left-edge-strip measurement into "the band was seen" — fails
-    // here.
-    expect(l.body).toMatch(/aeon's c9a462be says in its own words that nothing has been seen on screen/);
+    // ⚠ SEVENTH CORRECTION, 2026-08-30, AND THIS ROW WENT RED FIRST. The
+    // has-anyone-seen-it clause was attributed to aeon's `c9a462be` commit
+    // message ("nothing has been seen on screen") because that was the only
+    // committed artifact that spoke to it. aeon `4a4d3474` then committed the
+    // measurement it asked for — `docs/research/reference_captures/
+    // 2026-08-30-sec5-band/`, README + CRAM tables + frames + a control — and
+    // the row that pinned the "not seen" phrase was red before this line moved.
+    //
+    // What replaces it is STILL an attribution, and the rows below pin four
+    // separate things because each can rot on its own:
+    //   • the anchor is the CAPTURES commit, with its directory, and the verb
+    //     is MEASURED — not "works", not "plays";
+    //   • the VALUES are the artifact's own (README.md and bound-A-sec5.cram.txt
+    //     at aeon e6405428): $0EA4 at 40/56/72, $0000 at 8/20/96/150, and the
+    //     CONTROL reading $0000 — a rewrite that keeps the verdict and drops
+    //     the control has dropped the half that made it a measurement;
+    //   • WHERE: aeon's headless oracle-aether instance, not hardware, which
+    //     the README says in as many words;
+    //   • and the Aurora half, unchanged and still true: no CRAM was sampled
+    //     here, and nothing of that frame is visible in this editor.
+    expect(l.body).toMatch(/aeon's 4a4d3474 \(2026-08-30, docs\/research\/reference_captures\/2026-08-30-sec5-band\/\) records the section-5 band MEASURED on screen in aeon's emulator capture/);
+    expect(l.body).toMatch(/CRAM line 2 entry 8 as \$0EA4 at screen lines 40, 56 and 72 and \$0000 at lines 8, 20, 96 and 150/);
+    expect(l.body).toMatch(/two bound runs that agree byte for byte/);
+    expect(l.body).toMatch(/\$0000 on every one of those lines on the control ROM built with the sidecar's rasterRef null/);
+    expect(l.body).toMatch(/headless oracle-aether instance, not hardware/);
     expect(l.body).toMatch(/no CRAM was sampled here/);
-    expect(l.body).not.toMatch(/band (?:was|has been) (?:seen|measured|observed)/i);
+    expect(l.body).toMatch(/nothing of that frame is visible in this editor/);
+    // The retired phrase is asserted ABSENT so a revert cannot pass on the
+    // kept clauses alone — and so the sentence cannot carry BOTH "not seen"
+    // and "measured", which would be two attributions contradicting each other.
+    expect(l.body).not.toMatch(/nothing has been seen on screen/);
+    expect(l.body).not.toMatch(/and no further/);
+    // ⚠ RE-CUT: this used to be `not.toMatch(/band (?:was|has been) (?:seen|
+    // measured|observed)/i)`, written against promoting 6e2495a5's left-edge
+    // strip into "the band was seen". It stayed GREEN across the retirement
+    // above without pinning anything about the new state — a negative that
+    // the new wording sidesteps is not a guard. What it must catch now is the
+    // DRIFT: every "on screen" in this sentence is either the viewport clause
+    // ("changes nothing on screen") or sits inside the clause anchored on the
+    // captures commit. A third "on screen" — "you can see it on screen",
+    // "visible on screen here" — has no anchor and fails, naming its text.
+    const anchorAt = l.body.indexOf("aeon's 4a4d3474");
+    expect(anchorAt, 'the captures anchor fell out of LIMIT 1').toBeGreaterThan(0);
+    const onScreen = [...l.body.matchAll(/on screen/gi)];
+    expect(onScreen.length, 'no "on screen" left to check').toBeGreaterThanOrEqual(2);
+    for (const m of onScreen) {
+      const tail = l.body.slice(Math.max(0, m.index! - 40), m.index! + 9);
+      const isViewportClause = /changes nothing on screen/i.test(tail);
+      const isInCaptureClause = m.index! > anchorAt && m.index! - anchorAt < 200;
+      expect(isViewportClause || isInCaptureClause,
+        `an "on screen" with no attribution: …${tail}`).toBe(true);
+    }
+    // ...and no clause says the band is seen, shown or drawn HERE. "sampled
+    // here" is the one Aurora measurement, and it is a negative.
+    expect(l.body).not.toMatch(/band is (?:seen|visible|shown|drawn) (?:here|in this editor)/i);
+    expect(l.body).not.toMatch(/(?:seen|measured|observed|rendered) (?:here|in this editor)\b/i);
   });
 
   /**
@@ -230,23 +283,33 @@ describe('the three limits say the words that carry them', () => {
     // revision — so this row would have been satisfiable by a DIFFERENT rule's
     // wording. The verb is what makes the anchor this limit's own, and it is
     // kept for the same reason now that the revision has moved — to `9cdf32d8`
-    // when the call site landed, and to `6e2495a5` (aeon's origin/master the
-    // evening `c9a462be` landed the sidecar) when the vacuity clauses expired —
-    // while LIMIT 2 still names `4aa2abc0`. This row was RED at `/Verified at
-    // aeon 9cdf32d8/` before it moved, which is the expiry mechanism working.
-    expect(l.body).toMatch(/Verified at aeon 6e2495a5/);
+    // when the call site landed, to `6e2495a5` (aeon's origin/master the
+    // evening `c9a462be` landed the sidecar) when the vacuity clauses expired,
+    // and to `e6405428` (their origin/master carrying the captures) when the
+    // not-seen clause expired — while LIMIT 2 still names `4aa2abc0`. This row
+    // was RED at `/Verified at aeon 9cdf32d8/` and again at `/Verified at aeon
+    // 6e2495a5/` before it moved, which is the expiry mechanism working. Both
+    // old anchors are asserted absent so a revert cannot pass on kept phrases.
+    expect(l.body).toMatch(/Verified at aeon e6405428/);
+    expect(l.body).not.toMatch(/Verified at aeon 6e2495a5/);
     expect(l.body).not.toMatch(/Verified at aeon 9cdf32d8/);
-    // ⚠ THE EXPIRY IS SIX-WAY NOW, because the sentence makes six falsifiable
-    // claims and each fails differently. The clause that used to lead — "a
-    // sidecar in aeon's tree actually carries a rasterRef" — is SPENT (it fired
-    // at `c9a462be`) and must not reappear: an expiry naming an event that has
-    // already happened is one nobody will ever see fire again.
+    // ⚠ THE EXPIRY IS SEVEN-WAY NOW, because the sentence makes seven
+    // falsifiable claims and each fails differently. TWO clauses are SPENT and
+    // must not reappear — "a sidecar in aeon's tree actually carries a
+    // rasterRef" (fired at `c9a462be`) and "a committed aeon artifact records
+    // the section-5 band measured on screen" (fired at `4a4d3474`): an expiry
+    // naming an event that has already happened is one nobody will ever see
+    // fire again. What replaced the second is what would falsify the CITATION:
+    // the captures leaving aeon's tree or their README changing its story, or
+    // a later measurement of section 5 saying something else.
     expect(l.body).not.toMatch(/EXPIRES when a sidecar in aeon's tree actually carries a rasterRef/);
+    expect(l.body).not.toMatch(/when a committed aeon artifact records the section-5 band measured on screen/i);
     expect(l.body).toMatch(/EXPIRES when a second section is threaded/i);
     expect(l.body).toMatch(/when sec: 5 becomes another index/i);
     expect(l.body).toMatch(/when section 5's sidecar stops naming ojz_sec5_showcase/i);
     expect(l.body).toMatch(/stops refusing the unthreaded case or build\.sh runs it under FAST=1/i);
-    expect(l.body).toMatch(/when a committed aeon artifact records the section-5 band measured on screen/i);
+    expect(l.body).toMatch(/when docs\/research\/reference_captures\/2026-08-30-sec5-band\/ leaves aeon's tree or its README stops saying what is quoted here/i);
+    expect(l.body).toMatch(/when a later aeon measurement of section 5 records something else/i);
     expect(l.body).toMatch(/when this viewport learns to composite a rasterRef/i);
     expect(l.body).toMatch(/owner: aeon's lane for all but the last, which is Aurora's/i);
     // The arm's LIVE SUBJECT is part of the sentence, not of the comment around
@@ -267,6 +330,9 @@ describe('the three limits say the words that carry them', () => {
     expect(l.body).toMatch(/re-read games\/sonic4\/data\/editor\/ojz\/act1\/ for which sidecars carry rasterRef/i);
     expect(l.body).toMatch(/re-read tools\/effects_seam_gate\.py/i);
     expect(l.body).toMatch(/tools\/effects_gen\.py/i);
+    // ...and the CAPTURES README now, because the sentence quotes it and a
+    // quote of a file that can change is a claim with a re-read.
+    expect(l.body).toMatch(/re-read docs\/research\/reference_captures\/2026-08-30-sec5-band\/README\.md for what was measured and what it says was not/i);
   });
 
   /**
@@ -292,10 +358,11 @@ describe('the three limits say the words that carry them', () => {
       /nothing here warns, and FAST=1 skips that gate/i,
       /a preset split plus one call-site line/i,
       /for section 5 as much as for any other/i,
-      /Verified at aeon 6e2495a5/,
+      /Verified at aeon e6405428/,
       /the seam gate's section arm is no longer vacuous/i,
       /SECTION 5 IS BOUND: aeon's c9a462be commits section_5\.meta\.json/,
-      /aeon's c9a462be says in its own words that nothing has been seen on screen/,
+      /aeon's 4a4d3474 \(2026-08-30, docs\/research\/reference_captures\/2026-08-30-sec5-band\/\) records the section-5 band MEASURED on screen/,
+      /nothing of that frame is visible in this editor/,
     ];
     const unbound = PRESET_LIMITS.find((x) => x.key === 'unbound')!.body;
     const others = [
@@ -368,10 +435,19 @@ describe('the three limits say the words that carry them', () => {
   });
 
   /**
-   * ⚠ NOBODY HAS EVER LOOKED AT ONE OF THESE BANDS ON SCREEN. No emulator run,
-   * no capture, anywhere in the suite. Nothing on this surface may imply
-   * otherwise — and the absence of a preview must be EXPLAINED, because an empty
-   * space reads as "coming soon" rather than "there is no ground truth".
+   * ⚠ NOBODY HAD EVER LOOKED AT ONE OF THESE BANDS ON SCREEN when this was
+   * written. No emulator run, no capture, anywhere in the suite. The absence of
+   * a preview must be EXPLAINED, because an empty space reads as "coming soon"
+   * rather than "there is no ground truth".
+   *
+   * ⚠ TAGGED 2026-08-30, NOT MOVED HERE: aeon `4a4d3474` committed exactly such
+   * a capture (`docs/research/reference_captures/2026-08-30-sec5-band/`, in
+   * their tree, on their emulator), so `NO_PREVIEW`'s "never been looked at on
+   * screen anywhere in this suite" is now false. That sentence has a different
+   * subject from LIMIT 1 (ground truth to preview AGAINST, not where a binding
+   * stops), its own harness rows and its own owner; this row still pins the
+   * CURRENT wording so its retirement goes red-first like every other on this
+   * surface, rather than being reworded in passing by a parcel about LIMIT 1.
    */
   it('NO_PREVIEW says there is nothing to draw a faithful preview from', () => {
     expect(NO_PREVIEW).toMatch(/never been looked at on screen/i);

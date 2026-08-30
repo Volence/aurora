@@ -308,12 +308,15 @@ describe('the reply says where the binding stops', () => {
     expect(RASTER_SECTION_BINDING_LIMIT).not.toMatch(/effectsRef/);
     // The reader that now exists, pinned to the file and the revision.
     expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/effects_gen\.py/);
-    // ⚠ MOVED TWICE, RED FIRST BOTH TIMES: to `9cdf32d8` when the call site
-    // landed, and to `6e2495a5` (aeon's origin/master the evening `c9a462be`
+    // ⚠ MOVED THREE TIMES, RED FIRST EACH TIME: to `9cdf32d8` when the call
+    // site landed, to `6e2495a5` (aeon's origin/master the evening `c9a462be`
     // committed section 5's sidecar) when the sentence's "no sidecar carries
-    // the key" clauses expired. The OLD anchor is asserted absent so a revert
-    // of the constant cannot pass this row on the kept phrases below.
-    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/Verified at aeon 6e2495a5/);
+    // the key" clauses expired, and to `e6405428` (their origin/master carrying
+    // `4a4d3474`'s captures) when "nothing has been seen on screen" expired.
+    // The OLD anchors are asserted absent so a revert of the constant cannot
+    // pass this row on the kept phrases below.
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/Verified at aeon e6405428/);
+    expect(RASTER_SECTION_BINDING_LIMIT).not.toMatch(/Verified at aeon 6e2495a5/);
     expect(RASTER_SECTION_BINDING_LIMIT).not.toMatch(/Verified at aeon 9cdf32d8/);
     // ...and the seam it stops at, which is what an agent must not read past.
     expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/ojz_effects\.emp/);
@@ -332,11 +335,20 @@ describe('the reply says where the binding stops', () => {
     // `9cdf32d8` in `tools/effects_seam_gate.py`, not taken on report.
     expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/effects_seam_gate\.py refuses a full build/i);
     // And the half an agent reading a SUCCESS reply most needs since aeon
-    // `c9a462be`: section 5 is bound and that binding reached aeon's build —
-    // and stopped there. "Bound" without "and no further" is the reply that
-    // would let an agent report a band it has no evidence for.
+    // `c9a462be`: section 5 is bound and that binding reached aeon's build.
+    // ⚠ THIS USED TO END "— and no further", AND THAT MATCHER WAS RED FIRST:
+    // aeon `4a4d3474` committed the section-5 band measured on screen, so the
+    // reply now says so — attributed to the captures commit, with the values
+    // and the control — and says in the same breath that nothing of it is
+    // visible in this editor. An agent that relays "bound" without the second
+    // half would let its caller believe the band can be seen HERE, which is the
+    // drift this row now exists to catch; the first half without the citation
+    // would let it report a band it has no evidence for, which is the old one.
     expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/SECTION 5 IS BOUND/);
-    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/to aeon's generator and build, and no further/i);
+    expect(RASTER_SECTION_BINDING_LIMIT).not.toMatch(/and no further/);
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/aeon's 4a4d3474 \(2026-08-30, docs\/research\/reference_captures\/2026-08-30-sec5-band\/\) records the section-5 band MEASURED on screen/);
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/\$0000 on every one of those lines on the control ROM/);
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/no CRAM was sampled here, and nothing of that frame is visible in this editor/);
   });
 });
 
