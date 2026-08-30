@@ -6,24 +6,25 @@
   "empyrean": {
     "repo": "git@github.com:Volence/empyrean.git",
     "path": "contract/schema/aurora-effects-scene.schema.json",
-    "revision": "988638f1c27c9a254d32593de9e61e69b10e266d",
-    "revision_subject": "effects schema: add layer.drift (none | {rate: int, 1/256 px/frame, +/-4096, 0 refused}) per aeon band-drift design e0ce6011 section 7; authorable only when CAP_BAND_DRIFT lands",
-    "blob": "4adfbb40d20d0f0b3fea27fe933601ec14fc442e",
-    "resolved_by": "git -C ../empyrean show 988638f:contract/schema/aurora-effects-scene.schema.json — read through git OBJECTS, never through the sibling working tree. Redirected straight into this directory; never retyped, never reformatted.",
-    "revision_published": "988638f is an ancestor of empyrean origin/main, checked with `git merge-base --is-ancestor` at vendoring time, and origin/main:contract/schema/... resolves to the SAME blob 4adfbb40 — so this pin was current at tip, not merely correctly cited.",
+    "revision": "bc639a10708b94dabd87dfa6d652dfcfae33389f",
+    "revision_subject": "effects schema \u00a72.5: bob_shift / bob_period (DoD item 7, aeon 8c75722b); scene schema gains both keys, root stays closed; document-off 15 vs wire-off 0 written into the contract; correction against the hub (aurora)",
+    "blob": "c73d5b4282ddc845dcff49ecda21d499a9cd3c43",
+    "resolved_by": "git -C <empyrean> show bc639a10708b94dabd87dfa6d652dfcfae33389f:contract/schema/aurora-effects-scene.schema.json — read through git OBJECTS, never through the sibling working tree. Redirected straight into this directory; never retyped, never reformatted, and the extracted bytes were re-hashed with `git hash-object` before anything was believed about them.",
+    "revision_published": "bc639a10 is an ancestor of empyrean origin/main (601e408b), checked with `git merge-base --is-ancestor` at vendoring time, and origin/main:contract/schema/... resolves to the SAME blob c73d5b42 — so this pin was current at tip, not merely correctly cited.",
     "branch_that_answers_currency": "origin/main"
   },
   "vendored": {
     "path": "src/core/formats/effects/aurora-effects-scene.schema.json",
-    "bytes": 16467,
-    "git_blob": "4adfbb40d20d0f0b3fea27fe933601ec14fc442e",
+    "bytes": 17913,
+    "git_blob": "c73d5b4282ddc845dcff49ecda21d499a9cd3c43",
     "identical_to_source": "byte-for-byte; the git blob id above is the SAME object empyrean stores, which is what effects-schema-drift.test.ts recomputes from these bytes on every run"
   },
   "what_changed_at_this_pin": {
-    "semantic": "EXACTLY ONE addition: $defs.layer.properties.drift — oneOf(\"none\" | {rate: integer, minimum -4096, maximum 4096, not {const 0}}), default \"none\", unevaluatedProperties false on the object form. Same oneOf shape as curve and vsplit.",
-    "cosmetic": "The SAME commit reflowed the entire file to one key per line, so the byte diff is 365 insertions / 81 deletions for a one-field change. That is a re-pin hazard: a huge diff invites 'looks like a reformat, ship it' and hides a real change inside it.",
-    "how_the_two_were_separated": "A recursive diff of the two PARSED documents (988638f~1 vs 988638f), key by key at every depth, reported exactly one difference: the added drift node. Neither document was retyped; both were extracted with `git show`. Recorded in docs/reviews/2026-08-29-drift-codec.md.",
-    "aurora_edits_this_pin_forced": "(1) json-schema-subset.ts had to IMPLEMENT `not` — the coverage gate in effects-schema-drift.test.ts went red naming it, which is that gate working as designed rather than an evaluator quietly ignoring a keyword. (2) The shape-coverage golden test/fixtures/effects/canopy_dusk.json had to gain a `drift`, because effects-scene-golden.test.ts derives 'every declared layer key is exercised' from the schema and went red naming `drift`."
+    "semantic": "EXACTLY TWO additions, both at the ROOT `properties`: `bob_shift` (integer, anyOf [{const 15}, {minimum 1, maximum 8}], default 15) and `bob_period` (integer, 0..8, default 0) — the scene-level vertical bob, aeon EFFECTS-W1 DoD item 7 at aeon 8c75722b. The root stays CLOSED (unevaluatedProperties false); nothing else in the file moved.",
+    "cosmetic": "None. 16 lines inserted, 0 deleted — the diff is exactly the two new nodes, unlike the drift re-pin below.",
+    "how_the_two_were_separated": "A recursive diff of the two PARSED documents (bc639a10~1 vs bc639a10), key by key at every depth, reported exactly two differences: /properties/bob_shift and /properties/bob_period. Neither document was retyped; both were extracted with `git show`.",
+    "the_hazard_this_pin_carries": "THE SENTINEL INVERTS AT THE LOWERING. The DOCUMENT key's off is bob_shift 15 (the house sentinel, the same 15 that means no deform on pcfg_anchor_dsa/dsb); the WIRE byte pcfg_bob's off is 0, because aeon's scene_bob_packed() folds an authored 15 into the packed byte 0 and otherwise emits (bob_shift << 4) | bob_period. Document-off and wire-off are OPPOSITE ENDS OF THE RANGE. A control clamped 0..15 authors 15 meaning MAXIMUM while the engine reads NO BOB; a control treating 0 as off authors the NARROWEST LEGAL SWAY, shift 0 being illegal precisely because it would pack to the no-bob byte. Both fields are also INVERSE shifts (bob_shift 1 = 128 px, 8 = 1 px; bob_period 0 = fastest, 8 = slowest), and bob_shift's domain is DISCONTINUOUS — 0 and 9..14 are refused by aeon's scene(). Aurora's control presents pixels and seconds over closed ladders with off as a separate state, so none of the three is reachable through the UI. ROADMAP row 99.",
+    "aurora_edits_this_pin_forced": "(1) json-schema-subset.ts had to IMPLEMENT `anyOf` — the first in either committed contract schema, and the coverage gate in effects-schema-drift.test.ts went red naming it, which is that gate working as designed rather than an evaluator quietly ignoring a keyword. It is implemented as `anyOf` and NOT as its already-present neighbour `oneOf`, which would accept every value this schema means to accept today and silently refuse one if a future amendment let the arms overlap. (2) The shape-coverage golden test/fixtures/effects/canopy_dusk.json had to gain both keys, because effects-scene-golden.test.ts derives 'every declared top-level key is exercised' from the schema and went red naming them."
   },
   "pin_history_current_last": [
     "2d7a9fee — landing (byte-identical empyrean 1326ceb through c2c81e2)",
@@ -31,7 +32,8 @@
     "d4345af5 — 5c930d6, v_center and v_offset bounded (v_offset SIGNED)",
     "0f661b70 — 277bc15, layers maxItems 8 -> 16",
     "dd972cf0 — 0bd4753, `precision` RETIRED (a delete, not a reservation: aeon deleted the storage)",
-    "4adfbb40 — 988638f, `drift` ADDED"
+    "4adfbb40 — 988638f, `drift` ADDED",
+    "c73d5b42 — bc639a10, `bob_shift` + `bob_period` ADDED (the vertical bob; first `anyOf` in a committed contract schema, and the document-off/wire-off inversion described above)"
   ],
   "re_vendor": "git -C <empyrean> fetch origin && git -C <empyrean> show origin/main:contract/schema/aurora-effects-scene.schema.json > src/core/formats/effects/aurora-effects-scene.schema.json — then update `empyrean.revision`, `empyrean.blob`, `vendored.bytes`, `vendored.git_blob` and `pin_history_current_last` here, and re-run the full suite: the coverage gate and the golden's derived key sweeps are what tell you which Aurora edits the amendment forces."
 }

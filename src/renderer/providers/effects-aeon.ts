@@ -41,6 +41,9 @@ import {
   EFFECTS_SCENE_KEY_DEFAULTS, EFFECTS_LAYER_KEY_DEFAULTS,
   type TableRefParam,
   EFFECTS_TRANSITION_VALUES,
+  EFFECTS_BOB_SHIFT_LADDER, EFFECTS_BOB_SHIFT_NONE, EFFECTS_BOB_PERIOD_BOUNDS,
+  EFFECTS_BOB_PERIOD_DEFAULT,
+  bobPeakPixels, bobPeriodSeconds, bobShiftOf, bobShiftRefusal,
   cloneEffectsScene, factorLabel, isNamedFactor, newEffectsLayer, newEffectsScene,
   sceneIdRefusal, driftRateOf, driftRateToPxPerFrame,
 } from '../../core/formats/effects/scene-ui';
@@ -2093,6 +2096,268 @@ export function clampVOffset(value: number): number {
 }
 
 // ---------------------------------------------------------------------------
+// The vertical bob (§2.5) — a ladder in PIXELS, a period in SECONDS, and off as
+// a STATE
+// ---------------------------------------------------------------------------
+//
+// ═══ WHY THIS IS NOT TWO SPINNERS ═══
+//
+// `bob_shift` and `bob_period` are a correct data model and a hostile control.
+// Both are INVERSE shifts (bigger number, less motion / slower sway), the
+// amplitude's domain has a SIX-VALUE HOLE in it (0 and 9..14 are refused), and
+// its off value is 15 — the TOP of the range, while the wire byte's off is 0 at
+// the bottom. A spinner over either raw field is wrong in all three ways at once:
+// it drags the wrong direction, it drags THROUGH the hole, and its natural
+// "minimum" is the one value the engine refuses because it would pack to
+// silence. Three decisions follow, and each is answering one of those.
+//
+// 1. AMPLITUDE IS A CLOSED LADDER SHOWN IN PIXELS, not a number field over the
+//    shift. Eight options — 128, 64, 32, 16, 8, 4, 2, 1 px of peak excursion —
+//    each carrying the shift it means. The author reads the quantity they are
+//    choosing (how far the background moves) instead of an exponent that means
+//    the reciprocal of it, and the LIST IS THE GUARD: a `<select>` built from
+//    eight enumerated options has no state that can express 0 or 9..14, so the
+//    discontinuity is unreachable by dragging, by typing, or by holding a
+//    spinner's arrow. This repo's own note on `NumberField` says the same thing
+//    from the other side — "`min`/`max` only style the spinner and never stop a
+//    typed value" — so a bounded spinner would NOT have made 0 unreachable, only
+//    unusual.
+//
+//    ORDERED SMALLEST SWAY FIRST, which is the shift order REVERSED. A list of
+//    magnitudes reads small-to-large in every control an author has ever used,
+//    and hiding the inversion is the entire job; ordering by the underlying
+//    shift would leak it back into the one place it was being hidden.
+//
+// 2. PERIOD IS A LADDER SHOWN IN SECONDS, same argument, and it carries the
+//    schema's own second hazard: 0 is the FASTEST, not "none". Nine options,
+//    ~4.3 s up to ~18 min. Showing 18 minutes in words is also the honest way to
+//    say that the top of this ladder is nearly a static background.
+//
+// 3. OFF IS A SEPARATE STATE, not a ladder position. It has to be: 15 is not at
+//    either end of 1..8, it is OUTSIDE it, and folding it in as a ninth entry
+//    would rebuild the exact trap — a list whose off position sits next to its
+//    loudest setting. A toggle also maps one-to-one onto the thing the document
+//    must do, which is OMIT BOTH KEYS: every scene in both trees omits them
+//    today, the schema's default IS the sentinel, and a control that wrote
+//    `bob_shift: 15` on save would touch every scene file in the tree to say
+//    exactly what their silence already said.
+//
+// Nothing below clamps toward 0, and nothing below can produce 0.
+
+/** The bob rows' labels and titles, in one place so the panel decides only layout. */
+export const BOB_ROW = Object.freeze({
+  label: 'Bob',
+  amplitudeLabel: 'Sway',
+  periodLabel: 'Period',
+  title: 'bob_shift / bob_period — a scene-level vertical sway of the background plane',
+  off: 'none',
+  on: 'sway',
+  amplitudeTitle: 'bob_shift — peak excursion of the sway, in pixels. The wire field is an '
+    + `INVERSE right-shift (${EFFECTS_BOB_SHIFT_LADDER.min} = ${bobPeakPixels(EFFECTS_BOB_SHIFT_LADDER.min)} px, `
+    + `${EFFECTS_BOB_SHIFT_LADDER.max} = ${bobPeakPixels(EFFECTS_BOB_SHIFT_LADDER.max)} px); `
+    + 'this list shows the pixels.',
+  periodTitle: 'bob_period — how long one full sway takes. Also an inverse shift: '
+    + `${EFFECTS_BOB_PERIOD_BOUNDS.min} is the FASTEST, ${EFFECTS_BOB_PERIOD_BOUNDS.max} the slowest.`,
+  hint: `off writes no key at all (the contract's default is the no-bob sentinel `
+    + `${EFFECTS_BOB_SHIFT_NONE}, never 0)`,
+});
+
+/** One entry on the amplitude ladder: the wire shift, and what it means on screen. */
+export interface BobAmplitudeOption { shift: number; px: number; label: string }
+
+/**
+ * The eight amplitudes a scene may bob by, SMALLEST SWAY FIRST.
+ *
+ * Built from the ladder's own bounds, so it is exactly the legal set — never a
+ * range the UI then has to police. `bobShiftRefusal` is asserted over every
+ * entry in the tests, which is what makes "the discontinuity is unreachable" a
+ * measured claim about this list rather than a claim about the component.
+ */
+export const BOB_AMPLITUDE_OPTIONS: readonly BobAmplitudeOption[] = Object.freeze((() => {
+  const { min, max } = EFFECTS_BOB_SHIFT_LADDER;
+  const out: BobAmplitudeOption[] = [];
+  // Descending shift == ascending pixels, because the shift is an inverse.
+  for (let shift = max; shift >= min; shift -= 1) {
+    const px = bobPeakPixels(shift);
+    out.push(Object.freeze({ shift, px, label: `${px} px` }));
+  }
+  return out;
+})());
+
+/** One entry on the period ladder. */
+export interface BobPeriodOption { period: number; seconds: number; label: string }
+
+/**
+ * How long one sway takes, as words. Under a minute reads as seconds with one
+ * decimal (the contract's own gloss shape, "about 4.3 s"); past that, minutes,
+ * because "1092.3 s" is a number nobody converts in their head and the top of
+ * this ladder really is eighteen minutes.
+ */
+export function bobPeriodLabel(period: number): string {
+  const seconds = bobPeriodSeconds(period);
+  if (seconds < 60) return `${Math.round(seconds * 10) / 10} s`;
+  const whole = Math.round(seconds);
+  return `${Math.floor(whole / 60)}m ${whole % 60}s`;
+}
+
+/** The nine sway durations, fastest first — which is also period order. */
+export const BOB_PERIOD_OPTIONS: readonly BobPeriodOption[] = Object.freeze((() => {
+  const { min, max } = EFFECTS_BOB_PERIOD_BOUNDS;
+  const out: BobPeriodOption[] = [];
+  for (let period = min; period <= max; period += 1) {
+    out.push(Object.freeze({ period, seconds: bobPeriodSeconds(period), label: bobPeriodLabel(period) }));
+  }
+  return out;
+})());
+
+/**
+ * The amplitude a freshly-enabled bob takes: THE LADDER'S MIDPOINT, derived.
+ *
+ * NOT AN END, and both ends are wrong for the same reason from opposite
+ * directions. The loudest rung is half the Plane-B span and reads on screen as a
+ * fault rather than a setting; the quietest is one pixel, and a toggle whose ON
+ * state produces no visible change is indistinguishable from a toggle that does
+ * not work. The midpoint is the only choice that is defensible without knowing
+ * the scene, and it is computed from the bounds so a widened ladder re-centres
+ * instead of quietly drifting toward an end.
+ */
+export const BOB_SHIFT_SEED: number = (() => {
+  const { min, max } = EFFECTS_BOB_SHIFT_LADDER;
+  return Math.round((min + max) / 2);
+})();
+
+/** Does this scene sway? Absent and the sentinel both read as no. */
+export function bobEnabled(scene: Pick<EffectsScene, 'bob_shift'>): boolean {
+  return bobShiftOf(scene) !== null;
+}
+
+/** The amplitude the form shows — the seed when the scene does not bob. */
+export function bobShiftValue(scene: Pick<EffectsScene, 'bob_shift'>): number {
+  return bobShiftOf(scene) ?? BOB_SHIFT_SEED;
+}
+
+/**
+ * The period the form shows. Falls to the schema's default when absent, which is
+ * the FASTEST sway — the field's own inversion, surfaced rather than smoothed.
+ */
+export function bobPeriodValue(scene: Pick<EffectsScene, 'bob_period'>): number {
+  const period = scene.bob_period;
+  return typeof period === 'number' ? period : EFFECTS_BOB_PERIOD_DEFAULT;
+}
+
+/**
+ * Turn the bob on or off — TWO KEYS, ONE GESTURE, ONE UNDO STEP, on
+ * `vDeformToggleCommand`'s precedent.
+ *
+ * OFF DELETES BOTH KEYS rather than writing the sentinel. Three reasons, and the
+ * first is the one that decides it: `bob_period` is IGNORED when `bob_shift` is
+ * 15, so leaving a period behind on a scene that does not sway leaves a key
+ * nothing reads. Second, the schema's default IS the sentinel, so an absent key
+ * and `bob_shift: 15` are the same document and the shorter one is the one every
+ * scene in both trees already holds — writing 15 on save would put a diff in
+ * every scene file to restate their silence. Third, it is scene.ts's model rule
+ * ("serialize never writes out a default that was not on disk") as an editing
+ * affordance.
+ *
+ * A FILE THAT SPELLS THE DEFAULT KEEPS ITS SPELLING, exactly as
+ * `setSceneFieldCommand` and `vDeformToggleCommand` do: a hand-authored
+ * `"bob_shift": 15` is left alone, because deleting it would be Aurora
+ * rewriting a line the author chose and did not ask about.
+ *
+ * ON SEEDS THE AMPLITUDE AND NOT THE PERIOD. The amplitude has no usable default
+ * (the schema's is "off"), so one must be chosen — see BOB_SHIFT_SEED. The
+ * period's default is a real period, so absent already means something correct,
+ * and seeding it would write a key to say what its absence says.
+ */
+export function bobToggleCommand(
+  library: EffectsSceneLibrary, id: string, on: boolean,
+): SetEffectsSceneCommand | null {
+  return editSceneCommand(library, id, `Scene ${id} bob`, (scene) => {
+    if (on) {
+      scene.bob_shift = BOB_SHIFT_SEED;
+      return;
+    }
+    if (!(EFFECTS_SCENE_KEY_DEFAULTS.get('bob_shift') === scene.bob_shift)) delete scene.bob_shift;
+    // The period goes with it: the engine ignores it once the amplitude is off.
+    if (!(EFFECTS_SCENE_KEY_DEFAULTS.get('bob_period') === scene.bob_period)) delete scene.bob_period;
+  });
+}
+
+/**
+ * Set the sway amplitude.
+ *
+ * THROWS ON AN ILLEGAL SHIFT rather than clamping it, and the throw is the
+ * point. Clamping is what authors the trap: `Math.min(max, Math.max(min, v))`
+ * over 0..15 lands 0 on 1 (the NARROWEST legal sway, for a caller that meant
+ * "none") and 15 on 8, and a clamp toward 0 on the raw field is the exact
+ * mistake the contract's HAZARD note names. There is no value this function
+ * could substitute that is not a guess about intent.
+ *
+ * IT IS ALSO UNREACHABLE FROM THE FORM — the ladder `<select>` cannot produce an
+ * argument that reaches it — so this exists for the caller that does not go
+ * through `BOB_AMPLITUDE_OPTIONS`: a port, a paste, a future gesture. Turning
+ * the bob off is `bobToggleCommand`, not a shift.
+ */
+export function setBobShiftCommand(
+  library: EffectsSceneLibrary, id: string, shift: number,
+): SetEffectsSceneCommand | null {
+  const refusal = bobShiftRefusal(shift);
+  if (refusal !== null) {
+    throw new Error(
+      `setBobShiftCommand: refusing to author bob_shift ${shift} — ${refusal} `
+      + 'Aurora does not clamp this field: the contract\'s off value is '
+      + `${EFFECTS_BOB_SHIFT_NONE} and the wire byte's is 0, so a clamp would silently author `
+      + 'one end meaning the other. Use bobToggleCommand to turn the bob off.',
+    );
+  }
+  if (shift === EFFECTS_BOB_SHIFT_NONE) return bobToggleCommand(library, id, false);
+  return editSceneCommand(library, id, `Scene ${id} bob_shift`, (scene) => {
+    scene.bob_shift = shift;
+  });
+}
+
+/**
+ * Set the sway period.
+ *
+ * WRITES NOTHING WHEN THE SCENE DOES NOT SWAY. The engine ignores `bob_period`
+ * at `bob_shift` 15, so a period on a still scene is a key with no reader — and
+ * the period row is not on screen in that state anyway, so reaching here means a
+ * caller went round the form.
+ *
+ * The schema's default is DELETED rather than written, on the same rule as the
+ * toggle: absent already means the fastest sway.
+ */
+export function setBobPeriodCommand(
+  library: EffectsSceneLibrary, id: string, period: number,
+): SetEffectsSceneCommand | null {
+  const { min, max } = EFFECTS_BOB_PERIOD_BOUNDS;
+  if (!Number.isInteger(period) || period < min || period > max) {
+    throw new Error(
+      `setBobPeriodCommand: refusing to author bob_period ${period} — the contract admits `
+      + `${min}..${max}, where ${min} is the FASTEST sway and ${max} the slowest.`,
+    );
+  }
+  const existing = library.scenes.find((s) => s.id === id);
+  if (existing === undefined || !bobEnabled(existing)) return null;
+  return editSceneCommand(library, id, `Scene ${id} bob_period`, (scene) => {
+    if (period === EFFECTS_BOB_PERIOD_DEFAULT) {
+      if (!(EFFECTS_SCENE_KEY_DEFAULTS.get('bob_period') === scene.bob_period)) {
+        delete scene.bob_period;
+      }
+      return;
+    }
+    scene.bob_period = period;
+  });
+}
+
+/** The bob's one-line readout for a scene: what it does, in pixels and seconds. */
+export function bobLine(scene: Pick<EffectsScene, 'bob_shift' | 'bob_period'>): string | null {
+  const shift = bobShiftOf(scene);
+  if (shift === null) return null;
+  return `${bobPeakPixels(shift)} px peak, one sway every ${bobPeriodLabel(bobPeriodValue(scene))}`;
+}
+
+// ---------------------------------------------------------------------------
 // Scene list
 // ---------------------------------------------------------------------------
 
@@ -2498,6 +2763,8 @@ export {
   factorLabel, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_WORLD_Y_BOUNDS,
   EFFECTS_V_FACTOR_BOUNDS, EFFECTS_V_CENTER_BOUNDS, EFFECTS_V_OFFSET_BOUNDS,
   EFFECTS_VSPLIT_AT_BOUNDS,
+  EFFECTS_BOB_SHIFT_LADDER, EFFECTS_BOB_SHIFT_NONE, EFFECTS_BOB_PERIOD_BOUNDS,
+  bobPeakPixels, bobPeriodSeconds, bobShiftRefusal,
   EFFECTS_LAYER_DEFORM_BOUNDS, EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS,
   EFFECTS_DEFORM_TABLE_BYTES, EFFECTS_TABLE_REF_FORMS,
 };

@@ -6,6 +6,8 @@
       "dsb": 7
     }
   },
+  "bob_period": 2,
+  "bob_shift": 5,
   "budget_class": "ojz_heavy",
   "deform_bg": {
     "shared": {

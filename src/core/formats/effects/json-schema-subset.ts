@@ -49,7 +49,7 @@ const ANNOTATION_KEYWORDS = [
 const ASSERTION_KEYWORDS = [
   '$ref', 'type', 'const', 'enum', 'pattern', 'minimum', 'maximum',
   'properties', 'required', 'unevaluatedProperties',
-  'items', 'minItems', 'maxItems', 'oneOf', 'not',
+  'items', 'minItems', 'maxItems', 'oneOf', 'anyOf', 'not',
 ] as const;
 
 export const SUPPORTED_KEYWORDS: ReadonlySet<string> = new Set<string>([
@@ -341,6 +341,43 @@ function validateNode(
     }
   }
 
+  // `anyOf` — AT LEAST ONE branch must hold.
+  //
+  // ARRIVED WITH `bob_shift` (empyrean bc639a10): the scene bob's amplitude is a
+  // right-shift whose legal domain is DISCONTINUOUS — exactly the no-bob
+  // sentinel 15, or the ladder 1..8 — spelled `anyOf: [{const: 15}, {minimum: 1,
+  // maximum: 8}]`. A hole in a range that `not` cannot express, because the hole
+  // here is 0 and 9..14 (six values in two runs) rather than one constant.
+  //
+  // WHY NOT REUSE `oneOf`, which is already implemented and would ACCEPT every
+  // value this schema means to accept: because the two keywords differ on
+  // OVERLAP, and a future amendment that widened the range branch to include 15
+  // would then have exactly one legal value silently refused for matching twice.
+  // A keyword implemented as its near neighbour is the "silently accepts what the
+  // real schema rejects" failure this file is built against, wearing the other
+  // sign.
+  //
+  // NO ANNOTATION QUESTION ARISES HERE EITHER — `anyOf` stays in
+  // IN_PLACE_APPLICATORS above, so `unevaluatedProperties` beside an `anyOf`
+  // whose branches can annotate is still refused, unchanged.
+  if (Array.isArray(schema.anyOf)) {
+    const branches = schema.anyOf as JsonSchema[];
+    const perBranch = branches.map(branch => {
+      const sub: SchemaIssue[] = [];
+      validateNode(value, branch, path, root, sub);
+      return sub;
+    });
+    if (!perBranch.some(b => b.length === 0)) {
+      const detail = perBranch
+        .map((b, i) => `  form ${i + 1}: ${b.map(x => `${x.path || '<here>'}: ${x.message}`).join('; ')}`)
+        .join('\n');
+      issues.push({
+        path,
+        message: `matches none of the ${branches.length} allowed forms:\n${detail}`,
+      });
+    }
+  }
+
   if (Array.isArray(schema.oneOf)) {
     const branches = schema.oneOf as JsonSchema[];
     const perBranch = branches.map(branch => {
@@ -402,6 +439,23 @@ export function canonicalizeBySchema(value: unknown, schema: JsonSchema, root?: 
 
   if (typeof schema.$ref === 'string') {
     return canonicalizeBySchema(value, resolveRef(schema.$ref, rootSchema), rootSchema);
+  }
+
+  // `anyOf` OVER AN OBJECT IS REFUSED HERE, and the asymmetry with `oneOf` is
+  // deliberate. `oneOf` can pick a branch because exactly one holds; `anyOf`
+  // cannot, and there is no correct branch to canonicalize an object against —
+  // silently returning it would skip the undeclared-key refusal below, which is
+  // the one thing this function still exists for. The committed schema's only
+  // `anyOf` is `properties.bob_shift`, an INTEGER, which falls through to the
+  // `return value` at the bottom untouched; this arm is for the amendment that
+  // makes it an object shape, and it refuses instead of quietly weakening.
+  if (Array.isArray(schema.anyOf)
+      && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    throw new UnsupportedSchemaError(
+      'canonicalizeBySchema: `anyOf` over an object value is not implemented — unlike `oneOf` ' +
+      'there is no single branch to canonicalize against, and returning the object unchanged ' +
+      'would skip the undeclared-key refusal. Implement it before the schema ships that shape.',
+    );
   }
 
   if (Array.isArray(schema.oneOf)) {

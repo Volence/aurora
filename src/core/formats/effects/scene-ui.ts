@@ -517,6 +517,292 @@ export const EFFECTS_V_FACTOR_LOCK: number = EFFECTS_V_FACTOR_BOUNDS.max;
 })();
 
 // ---------------------------------------------------------------------------
+// §2.5 — the scene-level vertical bob (empyrean bc639a10, aeon 8c75722b)
+// ---------------------------------------------------------------------------
+//
+// ⚠ THREE SEPARATE TRAPS IN ONE ENCODING, and every constant below exists to
+// keep one of them out of the control:
+//
+//   1. `bob_shift` IS AN INVERSE AMPLITUDE. Peak excursion is 256 >> bob_shift
+//      px, so 1 is 128 px and 8 is 1 px: the bigger number is the SMALLER
+//      motion. A spinner over the raw shift reads backwards to every author.
+//   2. ITS DOMAIN IS DISCONTINUOUS — exactly 15, or 1..8. 0 and 9..14 are
+//      refused by aeon's `scene()`. A range control cannot express that, so
+//      nothing below hands the UI a range.
+//   3. THE SENTINEL INVERTS AT THE LOWERING. The DOCUMENT's off is 15; the WIRE
+//      byte's off is 0, because `scene_bob_packed()` folds an authored 15 into
+//      the packed byte 0 and otherwise emits `(shift << 4) | period`. So a
+//      slider clamped 0..15 authors 15 meaning MAXIMUM while the engine reads NO
+//      BOB, and a control that treats 0 as "off" authors the NARROWEST LEGAL
+//      SWAY — shift 0 being illegal precisely because it would pack to the
+//      no-bob byte. NEVER CLAMP TOWARD 0. Off is 15, or the keys are absent.
+//      This is the third time in this suite that the top of a range has been the
+//      sentinel (`v_factor` 15, layer deform shift 15, now this).
+//
+// EVERYTHING HERE IS READ OUT OF THE SCHEMA, on the `EFFECTS_DRIFT_UNITS_PER_PIXEL`
+// precedent: the numbers that convert a shift into pixels and a period into
+// seconds are the contract's, and a number typed beside the contract is the
+// defect this module exists to prevent. Each is derived TWICE where the schema
+// says it twice, so an amendment that moves one half fails this module's import
+// — which takes the whole suite with it — instead of silently rescaling what
+// Aurora shows an author.
+
+/** `properties.bob_shift`'s two `anyOf` arms, as a pair of branch schemas. */
+const BOB_SHIFT_ARMS: readonly Record<string, unknown>[] = (() => {
+  const arms = at('properties', 'bob_shift').anyOf;
+  if (!Array.isArray(arms) || arms.length !== 2) {
+    throw new Error(
+      'effects scene schema properties.bob_shift no longer has exactly two `anyOf` arms — the '
+      + 'no-bob sentinel and the amplitude ladder were derived from them separately; re-derive '
+      + 'them against the amended schema.',
+    );
+  }
+  return Object.freeze(arms as Record<string, unknown>[]);
+})();
+
+/**
+ * The amplitude ladder's ends, 1..8 — the CONTINUOUS arm of the discontinuous
+ * domain, and the only shifts a control may offer.
+ *
+ * Found by SEARCHING the arms for the one with numeric bounds rather than by
+ * index, because an amendment that swapped the two arms would otherwise turn
+ * this silently into the sentinel's arm.
+ */
+export const EFFECTS_BOB_SHIFT_LADDER: { min: number; max: number } = (() => {
+  const arm = BOB_SHIFT_ARMS.find(a => typeof a.minimum === 'number' && typeof a.maximum === 'number');
+  if (arm === undefined) {
+    throw new Error(
+      'effects scene schema properties.bob_shift has no `anyOf` arm with numeric '
+      + 'minimum/maximum — the amplitude ladder was derived from it.',
+    );
+  }
+  return Object.freeze({ min: arm.minimum as number, max: arm.maximum as number });
+})();
+
+/**
+ * The NO-BOB SENTINEL — the document's off. **15**, and never 0.
+ *
+ * DERIVED THREE WAYS, because getting this one wrong inverts the control: from
+ * the `anyOf`'s constant arm, from the field's `default`, and from the
+ * description's own words. A schema that moved the sentinel and said so still
+ * works; one that decoupled any two of the three fails the import.
+ */
+export const EFFECTS_BOB_SHIFT_NONE: number = (() => {
+  const arm = BOB_SHIFT_ARMS.find(a => typeof a.const === 'number');
+  if (arm === undefined) {
+    throw new Error(
+      'effects scene schema properties.bob_shift has no `anyOf` arm pinning a constant — the '
+      + 'no-bob sentinel was derived from it.',
+    );
+  }
+  const sentinel = arm.const as number;
+  const node = at('properties', 'bob_shift');
+  if (node.default !== sentinel) {
+    throw new Error(
+      `effects scene schema properties.bob_shift's default (${JSON.stringify(node.default)}) is no `
+      + `longer its no-bob sentinel (${sentinel}) — omitting the key stops meaning "no bob", which `
+      + 'is what lets a scene without a bob round-trip byte-identically. Re-derive.',
+    );
+  }
+  const description = node.description;
+  if (typeof description !== 'string'
+      || !new RegExp(`\\b${sentinel}\\b[^.]*NO-BOB SENTINEL`).test(description)) {
+    throw new Error(
+      `effects scene schema properties.bob_shift no longer names ${sentinel} as its NO-BOB `
+      + 'SENTINEL — EFFECTS_BOB_SHIFT_NONE derives the off value from the `anyOf` constant, and '
+      + 'that coupling has just been broken. Re-derive it against the amended schema.',
+    );
+  }
+  return sentinel;
+})();
+
+/**
+ * THE DISCONTINUITY, ASSERTED AT MODULE LOAD. The sentinel must sit OUTSIDE the
+ * ladder, because every affordance below rests on "off is not a position on the
+ * amplitude control". A schema that widened the ladder to swallow 15 would make
+ * the toggle and the ladder mean overlapping things, and this is where that
+ * stops rather than three files downstream.
+ */
+(function assertBobSentinelIsOutsideTheLadder(): void {
+  const { min, max } = EFFECTS_BOB_SHIFT_LADDER;
+  if (EFFECTS_BOB_SHIFT_NONE >= min && EFFECTS_BOB_SHIFT_NONE <= max) {
+    throw new Error(
+      `effects scene schema properties.bob_shift now admits its no-bob sentinel `
+      + `${EFFECTS_BOB_SHIFT_NONE} inside its amplitude ladder ${min}..${max}. Aurora's control `
+      + 'presents off as a state and amplitude as a ladder precisely because the two were '
+      + 'disjoint; re-design the control against the amended schema.',
+    );
+  }
+})();
+
+/**
+ * The sine table's amplitude, **256** — the numerator of `256 >> bob_shift`.
+ *
+ * DERIVED TWICE from two independent sentences of the field's description: the
+ * formula, and the two worked ends the contract gives an author ("1 = 128 px,
+ * 8 = 1 px"). Both worked ends are checked AGAINST THE LADDER this module
+ * already read out of `minimum`/`maximum`, so the description and the bounds
+ * cannot drift apart either.
+ */
+export const EFFECTS_BOB_AMPLITUDE_BASE: number = (() => {
+  const description = at('properties', 'bob_shift').description;
+  const stale =
+    "effects scene schema properties.bob_shift's description no longer states its amplitude in "
+    + 'the shape EFFECTS_BOB_AMPLITUDE_BASE derives it from. The table amplitude is READ from the '
+    + 'contract, never typed beside it; re-derive it against the amended schema rather than '
+    + 'hardcoding it. (This sentence does not name the number either — a bare literal here would '
+    + "be caught by effects-drift's own sweep, and rightly.)";
+  if (typeof description !== 'string') throw new Error(`${stale} (no description at all)`);
+
+  // Sentence 1: the formula.
+  const formula = /peak excursion (\d+) >> bob_shift px/.exec(description);
+  if (!formula) throw new Error(`${stale} (no "peak excursion <n> >> bob_shift px")`);
+  const base = Number(formula[1]);
+
+  // Sentence 2: the two worked ends — an INDEPENDENT statement of the same map.
+  const worked = /\((\d+) = (\d+) px, (\d+) = (\d+) px\)/.exec(description);
+  if (!worked) throw new Error(`${stale} (no "(<a> = <n> px, <b> = <n> px)")`);
+  const [loShift, loPx, hiShift, hiPx] = worked.slice(1, 5).map(Number);
+
+  const { min, max } = EFFECTS_BOB_SHIFT_LADDER;
+  if (loShift !== min || hiShift !== max) {
+    throw new Error(
+      `${stale} — the worked ends are shifts ${loShift} and ${hiShift} but the ladder is `
+      + `${min}..${max}.`,
+    );
+  }
+  if ((base >> loShift) !== loPx || (base >> hiShift) !== hiPx) {
+    throw new Error(
+      `${stale} — the formula says ${base} >> ${loShift} = ${base >> loShift} and `
+      + `${base} >> ${hiShift} = ${base >> hiShift}, the worked ends say ${loPx} and ${hiPx}.`,
+    );
+  }
+  return base;
+})();
+
+/** `bob_period`'s bounds, 0..8. Unlike the amplitude this arm is CONTINUOUS. */
+export const EFFECTS_BOB_PERIOD_BOUNDS = boundsAt('properties', 'bob_period');
+
+/** `bob_period`'s schema default — the FASTEST sway, not the slowest. */
+export const EFFECTS_BOB_PERIOD_DEFAULT = integerDefaultAt('properties', 'bob_period');
+
+/**
+ * One full sway's length in logic ticks at period 0, **256**, and the tick rate,
+ * **60 Hz** — the two numbers that turn a period shift into a duration an author
+ * can judge.
+ *
+ * DERIVED TOGETHER from the description's parenthetical, and CROSS-CHECKED three
+ * ways: the tick base against the formula sentence beside it, the two glossed
+ * periods against `minimum`/`maximum`, and the glossed seconds against the
+ * quotient the rate implies. The seconds check is what actually pins the Hz: 256
+ * ticks and "about 4.3 s" only agree at 60.
+ */
+const BOB_PERIOD_SCALE: { baseTicks: number; hz: number } = (() => {
+  const description = at('properties', 'bob_period').description;
+  const stale =
+    "effects scene schema properties.bob_period's description no longer states its timing in the "
+    + 'shape Aurora derives it from. Both the base cycle length and the tick rate are READ from '
+    + 'the contract, never typed beside it; re-derive them against the amended schema.';
+  if (typeof description !== 'string') throw new Error(`${stale} (no description at all)`);
+
+  // Sentence 1: the formula.
+  const formula = /one full sway is (\d+) << bob_period ticks/.exec(description);
+  if (!formula) throw new Error(`${stale} (no "one full sway is <n> << bob_period ticks")`);
+  const baseTicks = Number(formula[1]);
+
+  // Sentence 2: the parenthetical, glossing BOTH ends and the wall-clock rate.
+  const gloss = /\(([\d,]+) at (\d+), about ([\d.]+) s at (\d+) Hz; ([\d,]+) at (\d+)\)/
+    .exec(description);
+  if (!gloss) throw new Error(`${stale} (no "(<t> at <p>, about <s> s at <n> Hz; <t> at <p>)")`);
+  const num = (s: string) => Number(s.replace(/,/g, ''));
+  const [loTicks, loPeriod, seconds, hz, hiTicks, hiPeriod] =
+    [num(gloss[1]), num(gloss[2]), Number(gloss[3]), num(gloss[4]), num(gloss[5]), num(gloss[6])];
+
+  const { min, max } = EFFECTS_BOB_PERIOD_BOUNDS;
+  if (loPeriod !== min || hiPeriod !== max) {
+    throw new Error(`${stale} — the gloss covers periods ${loPeriod} and ${hiPeriod}, the bounds are ${min}..${max}.`);
+  }
+  if (loTicks !== baseTicks << loPeriod || hiTicks !== baseTicks << hiPeriod) {
+    throw new Error(
+      `${stale} — the formula gives ${baseTicks << loPeriod} and ${baseTicks << hiPeriod} ticks, `
+      + `the gloss says ${loTicks} and ${hiTicks}.`,
+    );
+  }
+  if (hz === 0 || Math.round((loTicks / hz) * 10) / 10 !== seconds) {
+    throw new Error(
+      `${stale} — ${loTicks} ticks at ${hz} Hz is ${loTicks / hz} s, the gloss says ${seconds} s.`,
+    );
+  }
+  return Object.freeze({ baseTicks, hz });
+})();
+
+export const EFFECTS_BOB_PERIOD_BASE_TICKS = BOB_PERIOD_SCALE.baseTicks;
+export const EFFECTS_BOB_TICKS_PER_SECOND = BOB_PERIOD_SCALE.hz;
+
+/**
+ * A bob amplitude shift as its PEAK EXCURSION IN PIXELS — the quantity an author
+ * is actually choosing, and the one the schema itself suggests presenting.
+ *
+ * MONOTONE DECREASING in its argument. That inversion is the whole reason this
+ * function exists rather than a control over the raw shift.
+ */
+export function bobPeakPixels(shift: number): number {
+  return EFFECTS_BOB_AMPLITUDE_BASE >> shift;
+}
+
+/** A bob period shift as the length of one full sway, in logic ticks. */
+export function bobPeriodTicks(period: number): number {
+  return EFFECTS_BOB_PERIOD_BASE_TICKS << period;
+}
+
+/** A bob period shift as the length of one full sway, in seconds of wall clock. */
+export function bobPeriodSeconds(period: number): number {
+  return bobPeriodTicks(period) / EFFECTS_BOB_TICKS_PER_SECOND;
+}
+
+/**
+ * Why `shift` is not a legal `bob_shift`, or null when it is — every clause read
+ * out of the schema above, so this cannot approximate the contract.
+ *
+ * ADVISORY in scene.ts's sense: nothing in the read or write path calls it.
+ * `validateAgainstSchema` is what refuses a document. This exists so the control
+ * can refuse to ORIGINATE the discontinuity and say why in a sentence, and so a
+ * test can name the illegal values without restating them as literals.
+ */
+export function bobShiftRefusal(shift: number): string | null {
+  if (!Number.isInteger(shift)) {
+    return `a bob amplitude is a whole right-shift count; ${shift} is not an integer.`;
+  }
+  if (shift === EFFECTS_BOB_SHIFT_NONE) return null;
+  const { min, max } = EFFECTS_BOB_SHIFT_LADDER;
+  if (shift < min || shift > max) {
+    return `${shift} is not a bob amplitude: the contract admits ${min}..${max} `
+      + `(${bobPeakPixels(min)} px down to ${bobPeakPixels(max)} px of peak excursion) or the `
+      + `no-bob sentinel ${EFFECTS_BOB_SHIFT_NONE}. `
+      + (shift < min
+        ? 'Below the ladder is NOT "less motion" — the wire byte spells no bob as 0, so shift 0 '
+          + 'would pack to silence and aeon refuses it. Off is '
+          + `${EFFECTS_BOB_SHIFT_NONE}, never 0.`
+        : `Above the ladder annihilates the ${EFFECTS_BOB_AMPLITUDE_BASE}-amplitude table, `
+          + 'leaving a sub-pixel droop and no motion at all.');
+  }
+  return null;
+}
+
+/**
+ * The `bob_shift` a scene carries, or null when it does not bob.
+ *
+ * ABSENT AND THE SENTINEL BOTH READ AS NULL, which is the point: the schema's
+ * default IS the sentinel, so "no key" and "key set to 15" are the same
+ * document, and no caller should have to know which spelling a file used.
+ */
+export function bobShiftOf(scene: Pick<EffectsScene, 'bob_shift'>): number | null {
+  const shift = scene.bob_shift;
+  if (typeof shift !== 'number' || shift === EFFECTS_BOB_SHIFT_NONE) return null;
+  return shift;
+}
+
+// ---------------------------------------------------------------------------
 // Identity
 // ---------------------------------------------------------------------------
 
