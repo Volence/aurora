@@ -7,7 +7,8 @@ import { tileLockReason } from '../editable-tiles';
 import { buildUsageIndex } from '../../level-classic/usage-index';
 import { buildChunkSurface } from '../../art/classic-surface-buffer';
 import { planSurfaceEdit, type SurfaceWrite } from '../../art/classic-surface-plan';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
+import { referencePath } from '../../../../test/support/fixture-tree';
+import { whenS1Act, whenS1Acts } from '../../../../test/support/s1-checkout';
 
 // ---------------------------------------------------------------------------
 // Task 5c, T5 — the regression test that would have caught the bug this whole
@@ -19,14 +20,17 @@ import { referenceCheckout, referenceCheckoutReason, referencePath } from '../..
 // end-to-end — reservedTiles() through planSurfaceEdit() — against real GHZ
 // data, so a regression here means the bug is back.
 //
-// Skipped (not failed) when the disasm tree is absent, same convention as
-// editable-tiles.test.ts's S1_PRESENT gate.
+// Skipped (not failed) when the disasm tree is absent — and, since 2026-08-30,
+// when it is PRESENT BUT INCOMPLETE. The old `referenceCheckout` gate asked only
+// whether the top-level markers were there; on a checkout with the markers and
+// no `artnem/` (say) all three rows ran and died inside the adapter with
+// `act ghz/1 unavailable: missing 2 required file(s): ghz.act1.tiles.0, …` —
+// logical keys, no path, no tree, no mention that the CHECKOUT is what is wrong.
+// `whenS1Act` derives each act's gating files from the same profile the adapter
+// enumerates and names the absent ones.
 // ---------------------------------------------------------------------------
 
 const S1DIR = referencePath('s1disasm');
-/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
-const S1_PRESENT = referenceCheckout('s1disasm');
 
 function realFs(root: string): FileAccess {
   return {
@@ -73,7 +77,7 @@ function sixSharedTileDivergences(
 describe('object-aware tile claimability, real s1disasm', () => {
   it(
     'GHZ act 1: reservedTiles covers the platform run and stays out of a six-divergence isolate plan',
-    { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } },
+    whenS1Act('ghz', 1),
     async () => {
       const handle = await s1Adapter.open(realFs(S1DIR));
       const ghz1 = handle.levels!.list().find((r) => r.zone === 'ghz' && r.act === 1)!;
@@ -165,7 +169,7 @@ describe('object-aware tile claimability, real s1disasm', () => {
   // this pins the ACTUAL behavior today, not the design's prediction.
   it(
     'LZ act 1 and SBZ act 3: the shared-file door reservation is clamped away by both acts’ 454-tile pool, not present',
-    { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } },
+    whenS1Acts(['lz', 1], ['sbz', 3]),
     async () => {
       const handle = await s1Adapter.open(realFs(S1DIR));
 
@@ -193,7 +197,7 @@ describe('object-aware tile claimability, real s1disasm', () => {
    */
   it(
     'a present-but-unreadable mappings .asm reports NOT KNOWN, not an empty reservation',
-    { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } },
+    whenS1Act('ghz', 1),
     async () => {
       const real = realFs(S1DIR);
       let refusedOne = false;

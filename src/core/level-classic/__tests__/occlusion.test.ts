@@ -25,12 +25,10 @@ import { resolveEffectiveObjectArt } from '../../project/profiles/object-subtype
 import { layoutCellAt } from '../../../renderer/components/classic/viewport-math';
 import { s1Adapter } from '../../project/s1';
 import type { FileAccess } from '../../project/adapter';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
+import { referencePath } from '../../../../test/support/fixture-tree';
+import { whenS1Act } from '../../../../test/support/s1-checkout';
 
 const S1DIR = referencePath('s1disasm');
-/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
-const S1_PRESENT = referenceCheckout('s1disasm');
 
 describe('occlusionWinner truth table', () => {
   it('high plane tile + opaque map pixel occludes a LOW sprite pixel', () => {
@@ -58,7 +56,7 @@ function realFs(root: string): FileAccess {
   } as FileAccess;
 }
 
-describe('decision inputs derived from GHZ act 1 (monitor behind leaves)', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, () => {
+describe('decision inputs derived from GHZ act 1 (monitor behind leaves)', whenS1Act('ghz', 1), () => {
   it('finds a monitor with occluded AND free pixels, and the rule splits them', async () => {
     const handle = await s1Adapter.open(realFs(S1DIR));
     expect(handle.levels).not.toBeNull();

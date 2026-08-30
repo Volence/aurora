@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import { renderChunk, renderTile } from '../render';
 import { s1Adapter } from '../../project/s1';
 import { referencePath } from '../../../../test/support/fixture-tree';
+import { whenS1Act } from '../../../../test/support/s1-checkout';
 import type {
   LevelDoc,
   BlockDef,
@@ -295,7 +296,7 @@ const anyOpaque = (buf: Uint8ClampedArray): boolean => {
   return false;
 };
 
-describe('renderChunk golden (real GHZ1)', { skip: !fs.existsSync(`${S1DIR}/levels/ghz1.bin`), meta: { skipReason: `${S1DIR}/levels/ghz1.bin is absent — this machine has no s1disasm checkout` } }, () => {
+describe('renderChunk golden (real GHZ1)', whenS1Act('ghz', 1), () => {
   it('cell (0,0) is air (id 0) → transparent, and a ground cell renders opaque', async () => {
     const fa = realFs(S1DIR);
     const handle = await s1Adapter.open(fa);

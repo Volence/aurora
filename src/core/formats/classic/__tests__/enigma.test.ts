@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import { enigmaCompress, enigmaDecompress } from '../enigma';
 import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../../test/support/fixture-tree';
+import { whenS1Glob } from '../../../../../test/support/s1-checkout';
 
 const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
@@ -132,8 +133,11 @@ describe('enigma against s1disasm goldens', { skip: !referenceCheckout('s1disasm
     expect(decoded.length % 8).toBe(0);
   });
 
-  it('re-encodes every map16 golden to an equivalent stream', () => {
-    expect(eniFiles.length).toBeGreaterThan(0);
+  // Gated on its own glob, matching the GHZ.eni row above: `expect(eniFiles
+  // .length).toBeGreaterThan(0)` reported a missing `map16/` as
+  // `AssertionError: expected 0 to be greater than 0`, which names neither the
+  // directory nor the checkout (2026-08-30 incomplete-checkout audit).
+  it('re-encodes every map16 golden to an equivalent stream', whenS1Glob('map16', 'map16/*.eni', eniFiles), () => {
     for (const file of eniFiles) {
       const decoded = enigmaDecompress(new Uint8Array(fs.readFileSync(`${map16Dir}/${file}`)));
       const reDecoded = enigmaDecompress(enigmaCompress(decoded));

@@ -1,14 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import { kosinskiCompress, kosinskiDecompress } from '../../kosinski';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../../test/support/fixture-tree';
+import { referencePath } from '../../../../../test/support/fixture-tree';
+import { whenS1Glob } from '../../../../../test/support/s1-checkout';
 import {
   nemesisCompress, nemesisDecompress, nemesisCompressPlainForTest,
 } from '../../../compress/nemesis';
 
 const S1DIR = referencePath('s1disasm');
-/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
 
 /** Deterministic PRNG (mulberry32) so the round-trip vectors are reproducible. */
 function mulberry32(seed: number): () => number {
@@ -157,7 +156,22 @@ describe('nemesis round-trip vectors (CI-safe, no fixtures)', () => {
  * them, prove they survive real Sonic 1 data: every map256 chunk table and every
  * 8x8 art bank decodes to a sanely-sized buffer and round-trips byte-for-byte.
  */
-describe('kosinski/nemesis goldens over real s1disasm data', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
+/**
+ * ⚠ THE DESCRIBE GATE IS DELIBERATELY NOT THE ROW GATE.
+ *
+ * `referenceCheckout` asks only whether this is a checkout at all. On a checkout
+ * that HAS the markers and no `artnem/`, the three rows below ran and asserted
+ * `expect(nemFiles.length).toBeGreaterThan(0)` — which a reader receives as
+ * `AssertionError: expected 0 to be greater than 0`, a message naming neither
+ * the directory, the pattern, nor the tree, and pointing squarely at the codec.
+ * Each row now gates on ITS OWN glob, so the skip says which directory was empty
+ * (`docs/reviews/2026-08-30-incomplete-checkout-rows.md`).
+ *
+ * The filter is this file's own `endsWith`, with no Aurora code between the
+ * directory and the count, so gating on it cannot hide an Aurora regression —
+ * the round-trip assertions inside each row are untouched.
+ */
+describe('kosinski/nemesis goldens over real s1disasm data', () => {
   const map256Dir = `${S1DIR}/map256`;
   const kosFiles = fs.existsSync(map256Dir)
     ? fs.readdirSync(map256Dir).filter((f) => f.toLowerCase().endsWith('.kos'))
@@ -168,8 +182,7 @@ describe('kosinski/nemesis goldens over real s1disasm data', { skip: !referenceC
     ? fs.readdirSync(artnemDir).filter((f) => f.toLowerCase().startsWith('8x8 - ') && f.toLowerCase().endsWith('.nem'))
     : [];
 
-  it('map256/*.kos decompresses, is chunk-aligned, and round-trips', () => {
-    expect(kosFiles.length).toBeGreaterThan(0);
+  it('map256/*.kos decompresses, is chunk-aligned, and round-trips', whenS1Glob('map256', 'map256/*.kos', kosFiles), () => {
     for (const file of kosFiles) {
       const compressed = new Uint8Array(fs.readFileSync(`${map256Dir}/${file}`));
       const decoded = kosinskiDecompress(compressed);
@@ -181,8 +194,7 @@ describe('kosinski/nemesis goldens over real s1disasm data', { skip: !referenceC
     }
   });
 
-  it('artnem/8x8 - *.nem decompresses, is tile-aligned, and round-trips', () => {
-    expect(nemFiles.length).toBeGreaterThan(0);
+  it('artnem/8x8 - *.nem decompresses, is tile-aligned, and round-trips', whenS1Glob('artnem', 'artnem/8x8 - *.nem', nemFiles), () => {
     for (const file of nemFiles) {
       const compressed = new Uint8Array(fs.readFileSync(`${artnemDir}/${file}`));
       const decoded = nemesisDecompress(compressed);
@@ -208,8 +220,7 @@ describe('kosinski/nemesis goldens over real s1disasm data', { skip: !referenceC
   // regression. Before this work they came in at 2.1x-3.0x — and an earlier
   // draft of this very test used 1.35, which a 2.16x regression still failed
   // but a subtler one would have sailed through.
-  it('artnem/8x8 - *.nem re-encodes without inflating the file', () => {
-    expect(nemFiles.length).toBeGreaterThan(0);
+  it('artnem/8x8 - *.nem re-encodes without inflating the file', whenS1Glob('artnem', 'artnem/8x8 - *.nem', nemFiles), () => {
     for (const file of nemFiles) {
       const compressed = new Uint8Array(fs.readFileSync(`${artnemDir}/${file}`));
       const decoded = nemesisDecompress(compressed);

@@ -8,7 +8,8 @@ import { s1Profile, type LevelAct } from '../../src/core/project/profiles/s1';
 import { readS1Level, writeS1Level, type ResolvedLevelPaths } from '../../src/core/level-classic/s1-io';
 import { s1Adapter } from '../../src/core/project/s1/index';
 import { performGuardedWrite } from '../../src/main/guarded-write';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../support/fixture-tree';
+import { referencePath } from '../support/fixture-tree';
+import { whenS1Act } from '../support/s1-checkout';
 
 // ---------------------------------------------------------------------------
 // End-to-end guarded-save cycle over a TEMP COPY of real s1disasm files (never
@@ -16,9 +17,6 @@ import { referenceCheckout, referenceCheckoutReason, referencePath } from '../su
 // ---------------------------------------------------------------------------
 
 const S1DIR = referencePath('s1disasm');
-/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
-const S1_PRESENT = referenceCheckout('s1disasm');
 
 let tmp: string;
 beforeEach(() => {
@@ -28,11 +26,30 @@ afterEach(() => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
-/** Resolve one act's paths against the real disasm (REV/exists fallback). */
+/**
+ * Resolve one act's paths against the real disasm (REV/exists fallback).
+ *
+ * THE LAST LINE USED TO BE `return v.path` — a path known not to exist, handed
+ * onward as if it did. `copyInto` then skipped the absent source silently and
+ * `readS1Level` died as
+ * `ENOENT: no such file or directory, open '/tmp/aurora-classic-save-XXXX/map256/GHZ.kos'`,
+ * pointing a reader at a TEMP DIRECTORY that `afterEach` had already deleted,
+ * for a file that was missing in s1disasm all along (measured 2026-08-30,
+ * docs/reviews/2026-08-30-incomplete-checkout-rows.md). The `whenS1Act` guard on
+ * both rows below should reach every gating entry first; this is the backstop
+ * that makes a hole in it audible instead of misdirecting.
+ */
 function resolveVariant(v: { path: string; rev00Path?: string }): string {
   if (fs.existsSync(path.join(S1DIR, v.path))) return v.path;
   if (v.rev00Path && fs.existsSync(path.join(S1DIR, v.rev00Path))) return v.rev00Path;
-  return v.path;
+  const tried = [v.path, ...(v.rev00Path ? [v.rev00Path] : [])]
+    .map((p) => path.join(S1DIR, p))
+    .join(' nor ');
+  throw new Error(
+    `${tried} is missing — this checkout has the top-level markers but not this file, so the `
+    + 'row below cannot measure anything. It is an INCOMPLETE s1disasm checkout, not an Aurora '
+    + 'defect.',
+  );
 }
 function resolveSingle(p: string): string | undefined {
   return fs.existsSync(path.join(S1DIR, p)) ? p : undefined;
@@ -113,7 +130,7 @@ const ALL_DIRTY = {
 describe('classic save integration (temp copy of real s1disasm)', () => {
   it(
     'read → guarded write → refresh mtimes → external touch → second write conflicts, writes nothing',
-    { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } },
+    whenS1Act('ghz', 1),
     async () => {
       const act = s1Profile.zones[0].acts[0]; // GHZ1
       const paths = realPaths(act);
@@ -175,7 +192,7 @@ describe('classic save integration (temp copy of real s1disasm)', () => {
 
   it(
     'adapter write() exposes fileMtimes; updateMtimes refreshes the baseline for the next save',
-    { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } },
+    whenS1Act('ghz', 1),
     async () => {
       const act = s1Profile.zones[0].acts[0]; // GHZ1
       const zoneId = s1Profile.zones[0].id;

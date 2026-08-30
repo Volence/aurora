@@ -5,7 +5,8 @@ import { tileLockReason, isTileEditable } from '../editable-tiles';
 import { firstEditableNonBlankTile } from '../../level-classic/tile-pick';
 import { s1Adapter } from '../s1';
 import type { EditableTileRange, FileAccess } from '../adapter';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
+import { referencePath } from '../../../../test/support/fixture-tree';
+import { whenS1Act } from '../../../../test/support/s1-checkout';
 
 // The composer's 🔒 rule and the command's refusal are ONE predicate now (they
 // used to be two hand-copied ones, and only the command's copy was testable —
@@ -63,9 +64,6 @@ describe('tileLockReason', () => {
 // ---------------------------------------------------------------------------
 
 const S1DIR = referencePath('s1disasm');
-/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
-const S1_PRESENT = referenceCheckout('s1disasm');
 
 function realFs(root: string): FileAccess {
   return {
@@ -76,7 +74,7 @@ function realFs(root: string): FileAccess {
 }
 
 describe('editable tiles, real Green Hill act 1', () => {
-  it('leaves the low tile pool editable and locks only the overlays/gap', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, async () => {
+  it('leaves the low tile pool editable and locks only the overlays/gap', whenS1Act('ghz', 1), async () => {
     const handle = await s1Adapter.open(realFs(S1DIR));
     const ghz1 = handle.levels!.list().find((r) => r.zone === 'ghz' && r.act === 1)!;
     const doc = await handle.levels!.read(ghz1);

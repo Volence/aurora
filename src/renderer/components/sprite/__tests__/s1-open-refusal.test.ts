@@ -24,11 +24,20 @@ import { useSpriteStore } from '../../../state/spriteStore';
 import { useToastStore } from '../../../state/toastStore';
 import { parseTiles } from '../../../../core/formats/tiles';
 import { compressionFor } from '../../../../core/compress';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../../test/support/fixture-tree';
+import { referencePath } from '../../../../../test/support/fixture-tree';
+import { spriteSetFiles, whenS1Files } from '../../../../../test/support/s1-checkout';
 
 const S1DIR = referencePath('s1disasm');
-/** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
+
+// Each describe gates on the FILES ITS OWN SET NAMES, not on the tree's markers.
+// The marker gate (`referenceCheckout`) is satisfied by a checkout with no
+// `artnem/` or no `artunc/`, and these rows then failed as
+// `expected false to be true` / `expected null not to be null` — the open
+// returning false because a file was absent, reported as a refusal-logic bug
+// (docs/reviews/2026-08-30-incomplete-checkout-rows.md). One row in the first
+// block was worse than misdirected: 'animations stay ABSENT' asserts an EMPTY
+// timeline, which an open that read nothing satisfies vacuously, so it PASSED on
+// a checkout it could not read. It is inside the same guard now.
 
 // window.api over fs (read-only: s1disasm must never be written by a test).
 function stubWindowApi(): () => void {
@@ -68,13 +77,17 @@ const SONIC_SET: DiscoveredSpriteSet = {
   mappings: '_maps/Sonic.asm', art: 'artunc/Sonic.unc',
   dplc: '_maps/Sonic - Dynamic Gfx Script.asm',
 };
+const SIGNPOST_SET: DiscoveredSpriteSet = {
+  name: 'Signpost', game: 's1',
+  mappings: '_maps/Signpost.asm', art: 'artnem/Signpost.nem',
+};
 const SPRING_SET: DiscoveredSpriteSet = {
   name: 'Spring', game: 's1',
   mappings: '_maps/Springs.asm', art: 'artnem/Spring Horizontal.nem',
   frameSources: [{ firstFrame: 3, lastFrame: 5, art: 'artnem/Spring Vertical.nem', compression: 'nemesis' }],
 };
 
-describe('openDiscoveredSet — Sonic DPLC open captures a save-back target', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
+describe('openDiscoveredSet — Sonic DPLC open captures a save-back target', whenS1Files('the Sonic DPLC open', spriteSetFiles(SONIC_SET)), () => {
   it('opens 88 frames and captures an in-place target carrying compression + DPLC lists', async () => {
     const ok = await openDiscoveredSet(S1DIR, SONIC_SET, 'uncompressed');
     expect(ok).toBe(true);
@@ -111,7 +124,7 @@ describe('openDiscoveredSet — Sonic DPLC open captures a save-back target', { 
   });
 });
 
-describe('openDiscoveredSet — Spring per-frame art swap', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
+describe('openDiscoveredSet — Spring per-frame art swap', whenS1Files('the Spring per-frame art swap', spriteSetFiles(SPRING_SET)), () => {
   it('frames 3-5 draw Nem_VSpring (hand-derived pixels); frames 0-2 keep Nem_HSpring; save refuses honestly', async () => {
     // Control open: the OLD single-pool behavior (no frameSources).
     await openDiscoveredSet(S1DIR, { ...SPRING_SET, frameSources: undefined }, 'nemesis');
@@ -173,11 +186,9 @@ describe('openDiscoveredSet — Spring per-frame art swap', { skip: !referenceCh
   });
 });
 
-describe('openDiscoveredSet — positive control: the capture guard is not over-tightened', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
+describe('openDiscoveredSet — positive control: the capture guard is not over-tightened', whenS1Files('the Signpost positive control', spriteSetFiles(SIGNPOST_SET)), () => {
   it('Signpost (plain non-DPLC Nemesis) still captures an in-place target, no refusal recorded', async () => {
-    const ok = await openDiscoveredSet(S1DIR, {
-      name: 'Signpost', game: 's1', mappings: '_maps/Signpost.asm', art: 'artnem/Signpost.nem',
-    }, 'nemesis');
+    const ok = await openDiscoveredSet(S1DIR, SIGNPOST_SET, 'nemesis');
     expect(ok).toBe(true);
     const s = useSpriteStore.getState();
     expect(s.s1ArtSource).not.toBeNull();

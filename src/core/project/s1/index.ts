@@ -81,6 +81,22 @@ const SIDECAR = '.aurora/project.json';
  *    Assign mode.
  *  - `rings` is ABSENT: S1 rings are objects in objpos, not a separate layer.
  */
+/**
+ * THE detect() FINGERPRINT — the top-level source file plus the three data dirs
+ * the profile relies on. Disjoint from aeon's fingerprint by design.
+ *
+ * Exported because `detect` answers `null` for all four cases alike, and a test
+ * that only sees the null can say no more than
+ * `expected null to deeply equal { type: 's1', … }`. A caller that wants to
+ * report WHICH part of the fingerprint failed has to check the same four things,
+ * and a second hand-written copy of this list would drift from the one that
+ * decides. (s1-adapter.test.ts's real-checkout golden reads it.)
+ */
+export const S1_FINGERPRINT = {
+  file: 'sonic.asm',
+  dirsWithEntries: ['artnem', 'map256', 'levels'],
+} as const;
+
 export const S1_FACETS = ['layout', 'objects', 'collision', 'palette', 'art'] as const satisfies readonly FacetCapability[];
 
 // ---------------------------------------------------------------------------
@@ -281,12 +297,10 @@ export const s1Adapter: ProjectAdapter = {
   type: 's1',
 
   async detect(fa: FileAccess): Promise<ProjectMatch | null> {
-    // Fingerprint: the top-level source file plus the three data dirs the profile
-    // relies on. Disjoint from aeon's fingerprint by design.
-    if (!(await fa.exists('sonic.asm'))) return null;
-    if (!(await dirHasEntries(fa, 'artnem'))) return null;
-    if (!(await dirHasEntries(fa, 'map256'))) return null;
-    if (!(await dirHasEntries(fa, 'levels'))) return null;
+    if (!(await fa.exists(S1_FINGERPRINT.file))) return null;
+    for (const dir of S1_FINGERPRINT.dirsWithEntries) {
+      if (!(await dirHasEntries(fa, dir))) return null;
+    }
     return { type: 's1', label: LABEL };
   },
 
