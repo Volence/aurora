@@ -142,16 +142,19 @@
  * effect", and still not "nothing left to do".
  *
  * ⚠ THIS SENTENCE IS NOT `NO_PREVIEW`, AND MUST NOT GROW INTO IT.
- * `providers/effects-preset.ts`'s `NO_PREVIEW` owns "no band has ever been
- * looked at on screen in this suite, so there is no ground truth to preview
- * against". THIS sentence owns the narrower, binding-specific fact: the VIEWPORT
+ * `providers/effects-preset.ts`'s `NO_PREVIEW` owns "there is no ground truth
+ * to preview against here" (it said "no band has ever been looked at on screen
+ * in this suite" until 2026-08-30, and since O64 says there is ONE measured
+ * frame, in aeon's tree, that a preview is not built against). THIS sentence
+ * owns the narrower, binding-specific fact: the VIEWPORT
  * does not composite a `rasterRef`, which is the contrast with
  * `assign_section_bg` (whose ref it does). Two limits saying the same thing is
  * how an author learns to skip both. (2026-08-30, later: `NO_PREVIEW`'s own
  * premise expired at aeon `4a4d3474` — a band HAS now been looked at on screen
  * in this suite, in aeon's tree, see the last dated block. That is
  * `NO_PREVIEW`'s sentence to retire, with its own rows and harness; this
- * sentence cites the capture and still does not preview anything.)
+ * sentence cites the capture and still does not preview anything. Retired
+ * there 2026-08-30, O64.)
  *
  * ⚠ SAID ONCE, HERE. It is read by the agent replies (`agent-handler.ts`,
  * renderer), the published tool descriptions (`editor-methods.ts`, main) and
@@ -450,7 +453,10 @@
  * `band-preset-wording.test.ts`'s rationale for its NO_PREVIEW row. That is a
  * different sentence with a different subject (ground truth to preview
  * against) and its own harness rows; it is named here so it is not found
- * stale later, and left for its own parcel.
+ * stale later, and left for its own parcel. (Done 2026-08-30, O64, branch
+ * `parcel/o64-no-preview-expiry`: `NO_PREVIEW` cites the same capture as the
+ * one frame a preview could be checked against, says none is built, and
+ * carries its own dated EXPIRES list. This limit was not touched by it.)
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * 2026-08-30, O62: THE BOUND SET IS UNDER TEST TOO — AN EIGHTH FACT, NOT A RETIREMENT

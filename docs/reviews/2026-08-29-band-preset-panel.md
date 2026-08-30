@@ -141,6 +141,17 @@ And, because an empty space where a preview would be reads as "coming soon" rath
 > there is nothing to draw a faithful preview from — and an unfaithful one would be worse
 > than none.
 
+*2026-08-30, later: that premise expired at aeon `4a4d3474` ("step 6 measured: the section-5
+authored band IS SEEN on screen", ancestor of their `origin/master` `0b6eaf6f`), which committed
+`docs/research/reference_captures/2026-08-30-sec5-band/` — README "VERDICT: BAND SEEN", CRAM
+line 2 entry 8 `$0EA4` at lines 40/56/72 and `$0000` at 8/20/96/150 in one frame, two headless
+`oracle-aether` instances byte-identical, `$0000` everywhere on a control with `rasterRef` null.
+`NO_PREVIEW` was rewritten on branch `parcel/o64-no-preview-expiry` (O64): it now cites that ONE
+frame — section 5, one camera position, aeon's emulator, aeon's tree — as the only thing a
+preview here could be checked against, says none is built, keeps "this editor draws no band",
+and carries a dated EXPIRES list. The quote above is left as written; `band-preset-harness.mjs`
+row 3e's matcher moved with it.*
+
 A wording row asserts that **no string on this surface** claims anyone has seen a band, and
 that the word "preview" appears only in the sentence saying there is not one.
 

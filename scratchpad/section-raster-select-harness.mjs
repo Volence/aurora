@@ -54,10 +54,11 @@
 // been observed at both 1 and 1.35 hours apart.
 //
 // ⚠ NO EMULATOR, EVER. Nothing here runs a ROM. The band a bound preset names
-// has never been looked at on screen anywhere in this suite and this harness
-// does not change that: it photographs the AUTHORING surface. What a bound band
-// LOOKS like stays unmeasured, which is `RASTER_SECTION_BINDING_LIMIT`'s own
-// subject.
+// has been looked at on screen once in this suite — aeon `4a4d3474`
+// (2026-08-30), in aeon's emulator, in aeon's tree; until then never — and this
+// harness does not add to that: it photographs the AUTHORING surface. What a
+// bound band LOOKS like in THIS editor stays unmeasured, which is
+// `RASTER_SECTION_BINDING_LIMIT`'s own subject.
 //
 // CLEANUP IS BY PID, ALWAYS — `spawnGuarded` + `killTree`. No `pkill` on a
 // pattern: from a worktree that kills the owner's editor and spares this run's

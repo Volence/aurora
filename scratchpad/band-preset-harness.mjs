@@ -45,10 +45,12 @@
 // an INTEGER derived from the rect printed beside it.
 //
 // ⚠ NO EMULATOR, EVER. Nothing here runs a ROM or calls an emulator tool. The
-// band this panel authors has never been looked at on screen anywhere in this
-// suite, and this harness does not change that — it photographs the AUTHORING
-// SURFACE, which is all that is in scope. Any claim about what a band LOOKS
-// like remains unmeasured and is tagged as such in the packet.
+// band this panel authors has been looked at on screen exactly once in this
+// suite — aeon `4a4d3474` (2026-08-30), `docs/research/reference_captures/
+// 2026-08-30-sec5-band/`, in aeon's emulator, in aeon's tree — and this
+// harness does not add to that: it photographs the AUTHORING SURFACE, which
+// is all that is in scope. What a band LOOKS like in THIS editor remains
+// unmeasured (it draws none), and row 3e pins that the panel says so.
 //
 // CLEANUP IS BY PID, ALWAYS. `killTree` walks /proc for descendants of the pid
 // THIS process spawned. No `pkill` on a pattern: from a worktree that kills the
@@ -390,8 +392,19 @@ async function main() {
       && /programmer wires it up in one line/.test(panelText)
       // The sentence aeon's page exists to prevent must not appear anywhere.
       && !/no longer needs a programmer/i.test(panelText));
+    // ⚠ MATCHER MOVED 2026-08-30 (O64): it pinned "never been looked at on
+    // screen", which aeon `4a4d3474` made false; NO_PREVIEW now cites that
+    // one frame and says none is built against it. Both halves are pinned
+    // here so "aeon measured it" cannot paint as "you can preview it".
     check('3e', 'and it says there is no preview, rather than leaving a silence',
-      /never been looked at on screen/i.test(panelText));
+      /No preview\. This editor draws no band/.test(panelText)
+      && /could at most be checked against that one frame; none is built/i.test(panelText)
+      && /aeon 4a4d3474 \(2026-08-30\)/.test(panelText)
+      && !/never been looked at on screen/i.test(panelText),
+      `drawsNone=${/This editor draws no band/.test(panelText)} `
+      + `noneBuilt=${/none is built/i.test(panelText)} `
+      + `anchor=${/aeon 4a4d3474 \(2026-08-30\)/.test(panelText)} `
+      + `retiredPhraseGone=${!/never been looked at on screen/i.test(panelText)}`);
 
     // IS IT ACTUALLY PAINTED? A rect is real even when the scrolling section
     // has clipped it away — the way a sibling harness's first capture came back
