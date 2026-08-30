@@ -17,6 +17,7 @@ import {
   layerTopSpace, layerTopBounds, clampLayerTop, planeLineOf, PLANE_LINE_SPAN,
   fireLineAdvisory, layerEmitsFire, fireScreenLineOf, vsplitOrderAdvisory,
   vsplitLockAdvisory, sceneVsplitLockAdvisory, VSPLIT_LOCK_CLAUSES, clampVFactor,
+  vsplitLockAdvisoryParts, sceneVsplitLockAdvisoryParts, joinAdvisory,
   guideBoundNotice,
   EFFECTS_FIRE_LINE_MIN, EFFECTS_FIRE_LINE_MAX,
   layerCountLine, vFactorHint,
@@ -1097,6 +1098,84 @@ describe('sceneVsplitLockAdvisory — the same rule with the SCENE as its subjec
     // ...and they are still two different EVENTS, not one string printed twice
     // (the `guideBoundNotice` two-tones precedent).
     expect(scn).not.toBe(lyr);
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // ROADMAP O15 — THE SPLIT IS SEMANTIC, AND THESE ROWS ARE WHAT KEEPS IT SO.
+  //
+  // The panel now hides only the MECHANISM behind a disclosure. The failure
+  // mode this guards is not "the disclosure broke" — the CDP harness owns that,
+  // because nothing here can see a DOM. It is the one a reader cannot spot:
+  // somebody re-cutting the parts by LENGTH. The remedies are last in the
+  // composed sentence, so a positional cut hides exactly the half an author
+  // acts on, and the composed string would still read correctly in every test
+  // above. So: the actionable halves must never be inside the hidden half, and
+  // the composed sentence must still be byte-identical to what row 80 shipped.
+  // ═════════════════════════════════════════════════════════════════════════
+  it('⚠ O15: the three parts join back to the SAME sentence, byte for byte', () => {
+    // ⚠ PINNED AGAINST AN INDEPENDENT RECOMPOSITION, NOT AGAINST THE FUNCTION.
+    // The first draft of this row asserted `joinAdvisory(parts) === advisory()`
+    // and was VACUOUS by construction: `advisory()` IS that join, so it passed
+    // under a plant that emptied `remedies` into `mechanism`. What is actually
+    // at stake is that the SENTENCE row 80 shipped is unchanged, so the pin is
+    // the clauses plus the connective words, spelled out here — the only part
+    // of the sentence that lives nowhere else.
+    const s = sceneWith(4, [plain(0), split(80)]);
+    const scnParts = sceneVsplitLockAdvisoryParts(s);
+    const lyrParts = vsplitLockAdvisoryParts(s, s.layers[1]);
+    expect(scnParts).not.toBeNull();
+    expect(lyrParts).not.toBeNull();
+    expect(joinAdvisory(scnParts!)).toBe(
+      `${VSPLIT_LOCK_CLAUSES.sceneIs(4)}, and layer 1 authors a Plane B split `
+      + `— the build refuses this scene. ${VSPLIT_LOCK_CLAUSES.mechanism} `
+      + VSPLIT_LOCK_CLAUSES.remedies);
+    expect(joinAdvisory(lyrParts!)).toBe(
+      `this layer authors a Plane B split while ${VSPLIT_LOCK_CLAUSES.sceneIs(4)} — `
+      + 'the build refuses the WHOLE SCENE, not just this layer. '
+      + `${VSPLIT_LOCK_CLAUSES.mechanism} ${VSPLIT_LOCK_CLAUSES.remedies}`);
+    // And no part is joined into a doubled space or a ragged edge — the seam a
+    // three-part composition is the only thing that can produce.
+    for (const p of [scnParts!, lyrParts!]) {
+      expect(joinAdvisory(p)).not.toMatch(/\s{2,}|^\s|\s$/);
+    }
+  });
+
+  it('⚠ O15: the ACTIONABLE halves are never inside the hidden half', () => {
+    const s = sceneWith(4, [plain(0), split(80)]);
+    for (const [where, p] of [
+      ['scene', sceneVsplitLockAdvisoryParts(s)!],
+      ['layer', vsplitLockAdvisoryParts(s, s.layers[1])!],
+    ] as const) {
+      // WHAT TO DO NEXT is in `remedies`, whole, both of them...
+      expect(p.remedies, where).toContain(VSPLIT_LOCK_CLAUSES.remedyLock);
+      expect(p.remedies, where).toContain(VSPLIT_LOCK_CLAUSES.remedyHorizontal);
+      // ...and NOT in the part a surface is allowed to collapse. A positional
+      // cut at any character count puts at least one of them here.
+      expect(p.mechanism, where).not.toContain(VSPLIT_LOCK_CLAUSES.remedyLock);
+      expect(p.mechanism, where).not.toContain(VSPLIT_LOCK_CLAUSES.remedyHorizontal);
+      // WHAT IS WRONG is in `diagnosis`, with the author's own value...
+      expect(p.diagnosis, where).toContain(VSPLIT_LOCK_CLAUSES.sceneIs(4));
+      // ...and the WHY is only in `mechanism` — the diagnosis must not have
+      // absorbed it, or collapsing the mechanism would save nothing.
+      expect(p.mechanism, where).toBe(VSPLIT_LOCK_CLAUSES.mechanism);
+      expect(p.diagnosis, where).not.toContain(VSPLIT_LOCK_CLAUSES.mechanism);
+      expect(p.remedies, where).not.toContain(VSPLIT_LOCK_CLAUSES.mechanism);
+      // ANTI-VACUOUS: none of the three is empty, and the mechanism really is
+      // the bulk — if it were not, the ruling would be hiding the wrong part.
+      expect(p.diagnosis.length, where).toBeGreaterThan(40);
+      expect(p.remedies.length, where).toBeGreaterThan(40);
+      expect(p.mechanism.length, where).toBeGreaterThan(p.diagnosis.length + p.remedies.length);
+    }
+  });
+
+  it('⚠ O15: WHICH LAYERS is in the diagnosis — the half that can never be hidden', () => {
+    // The scene surface is the only one that can name the guilty layers, and it
+    // is the fact the v_factor route destroys. A refactor that moved it into
+    // the mechanism would put the one irreplaceable fact behind a click.
+    const p = sceneVsplitLockAdvisoryParts(
+      sceneWith(4, [split(0), plain(40), split(80)]))!;
+    expect(p.diagnosis).toContain('layers 0, 2 author Plane B splits');
+    expect(p.mechanism).not.toContain('layers 0, 2');
   });
 
   it('is an ADVISORY: nothing here narrows a control or rewrites a value (ROADMAP rows 37/58)', () => {

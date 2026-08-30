@@ -1896,8 +1896,57 @@ export const VSPLIT_LOCK_CLAUSES = Object.freeze({
   remedies: VSPLIT_LOCK_REMEDIES,
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// THE SHAPE OF THAT RULING — ROADMAP O15 (2026-08-30)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Row 80 put the right words on screen and made them 21 wrapped lines, ~460px
+// of a ~1010px panel, which pushed `V center`, `V offset`, `Transition`,
+// `Deform fg` and `Deform bg` below the fold — measured off
+// `scratchpad/shots-o15/before-1920x1080-panel.png` and ruled in
+// `docs/reviews/2026-08-30-o15-advisory-shape.md`. The content is not in
+// question; the shape is.
+//
+// ⚠ THE SPLIT IS SEMANTIC AND MUST STAY THAT WAY. The three parts do three
+// different jobs — DIAGNOSIS ("what is wrong, and on the scene surface WHICH
+// layers"), MECHANISM ("why"), REMEDIES ("what to do next") — and the remedies
+// are LAST in the composed sentence. So any length-based truncation, any "show
+// more" that slices at a character count, hides precisely the part an author
+// acts on and keeps the part they can skip. That is why the parts are returned
+// SEPARATELY ADDRESSABLE from here rather than a finished sentence being cut up
+// by whoever renders it: a downstream `slice()` cannot be told which half is
+// actionable, and would be re-derived (wrongly) at every call site.
+//
+// The composed strings below are UNCHANGED, byte for byte — `joinAdvisory` is
+// the three parts joined by single spaces, which is exactly what the two
+// functions used to build inline. Every existing consumer (the tests, and
+// `canvas/raster-timeline.ts` through `VSPLIT_LOCK_CLAUSES`) keeps reading the
+// same words.
+
 /**
- * The advisory for THIS LAYER's split on a camera-tracked scene, or null.
+ * The two-writer advisory, in the three parts that are doing three jobs.
+ *
+ * ⚠ `diagnosis` and `remedies` are the halves an author ACTS on and must be on
+ * screen without a click. `mechanism` is the explanation and is the bulk of the
+ * height; a surface may put it behind a disclosure. A surface that hides
+ * `remedies` has inverted the ruling.
+ */
+export interface VsplitLockAdvisoryParts {
+  /** What is wrong — and, on the scene surface, which layers. Never hidden. */
+  diagnosis: string;
+  /** Why, in the engine's own terms. The part a disclosure may hold. */
+  mechanism: string;
+  /** What to do next, both remedies. Never hidden. */
+  remedies: string;
+}
+
+/** The three parts as one sentence — the pre-O15 wording, unchanged. */
+export function joinAdvisory(parts: VsplitLockAdvisoryParts): string {
+  return `${parts.diagnosis} ${parts.mechanism} ${parts.remedies}`;
+}
+
+/**
+ * The advisory for THIS LAYER's split on a camera-tracked scene, in parts, or null.
  *
  * The subject is the LAYER, because this is what the layer card renders and the
  * author reached it by turning THIS split on. Null for every layer without a
@@ -1909,33 +1958,48 @@ export const VSPLIT_LOCK_CLAUSES = Object.freeze({
  * is the majority case AND is exactly what a completely broken implementation
  * produces. Nothing here can be believed without a locked control beside it.
  */
+export function vsplitLockAdvisoryParts(
+  scene: Pick<EffectsScene, 'v_factor'>,
+  layer: Pick<EffectsLayer, 'vsplit'>,
+): VsplitLockAdvisoryParts | null {
+  if (!layerEmitsFire(layer)) return null;
+  if (layerTopSpace(scene) === 'screen') return null;
+  return {
+    diagnosis: `this layer authors a Plane B split while ${VSPLIT_LOCK_SCENE_IS(scene.v_factor)} — `
+      + 'the build refuses the WHOLE SCENE, not just this layer.',
+    mechanism: VSPLIT_LOCK_MECHANISM,
+    remedies: VSPLIT_LOCK_REMEDIES,
+  };
+}
+
+/** The layer advisory as one sentence — for surfaces that cannot hold three parts. */
 export function vsplitLockAdvisory(
   scene: Pick<EffectsScene, 'v_factor'>,
   layer: Pick<EffectsLayer, 'vsplit'>,
 ): string | null {
-  if (!layerEmitsFire(layer)) return null;
-  if (layerTopSpace(scene) === 'screen') return null;
-  return `this layer authors a Plane B split while ${VSPLIT_LOCK_SCENE_IS(scene.v_factor)} — `
-    + `the build refuses the WHOLE SCENE, not just this layer. ${VSPLIT_LOCK_MECHANISM} `
-    + VSPLIT_LOCK_REMEDIES;
+  const parts = vsplitLockAdvisoryParts(scene, layer);
+  return parts === null ? null : joinAdvisory(parts);
 }
 
 /**
- * The same rule with the SCENE as its subject, for the `v_factor` row, or null.
+ * The same rule with the SCENE as its subject, for the `v_factor` row, in parts,
+ * or null.
  *
  * ⚠ A DIFFERENT EVENT, NOT A SECOND DRESSING — the `guideBoundNotice` precedent.
  * The layer-card sentence answers "what did turning this split on do?"; this one
  * answers "what did moving v_factor off the lock do?", and the author who took
  * that route never touched a layer. It is also the only surface that can name
- * WHICH layers are now illegal, which is the fact that route destroys.
+ * WHICH layers are now illegal, which is the fact that route destroys — and that
+ * naming lives in `diagnosis`, which is why `diagnosis` is the half that can
+ * never be the one behind the disclosure.
  *
  * Null on a locked scene, and null on an unlocked scene carrying no split —
  * unlocked-with-no-split is a perfectly legal scene and the majority of what the
  * engine's parallax exists for.
  */
-export function sceneVsplitLockAdvisory(
+export function sceneVsplitLockAdvisoryParts(
   scene: Pick<EffectsScene, 'v_factor' | 'layers'>,
-): string | null {
+): VsplitLockAdvisoryParts | null {
   if (layerTopSpace(scene) === 'screen') return null;
   const guilty = scene.layers.reduce<number[]>(
     (acc, l, i) => (layerEmitsFire(l) ? [...acc, i] : acc), []);
@@ -1943,8 +2007,20 @@ export function sceneVsplitLockAdvisory(
   const which = guilty.length === 1
     ? `layer ${guilty[0]} authors a Plane B split`
     : `layers ${guilty.join(', ')} author Plane B splits`;
-  return `${VSPLIT_LOCK_SCENE_IS(scene.v_factor)}, and ${which} — the build refuses this scene. `
-    + `${VSPLIT_LOCK_MECHANISM} ${VSPLIT_LOCK_REMEDIES}`;
+  return {
+    diagnosis: `${VSPLIT_LOCK_SCENE_IS(scene.v_factor)}, and ${which} `
+      + '— the build refuses this scene.',
+    mechanism: VSPLIT_LOCK_MECHANISM,
+    remedies: VSPLIT_LOCK_REMEDIES,
+  };
+}
+
+/** The scene advisory as one sentence — for surfaces that cannot hold three parts. */
+export function sceneVsplitLockAdvisory(
+  scene: Pick<EffectsScene, 'v_factor' | 'layers'>,
+): string | null {
+  const parts = sceneVsplitLockAdvisoryParts(scene);
+  return parts === null ? null : joinAdvisory(parts);
 }
 
 /**

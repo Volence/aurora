@@ -55,6 +55,19 @@
 //    review). Section 8 reads the document back and requires it to still HOLD
 //    the illegal combination, unrewritten.
 //
+// 7. ⚠ A DISCLOSURE WELDED SHUT — ROADMAP O15, and it is a trap this file
+//    CREATED. O15 put the MECHANISM behind a collapsed "Why this happens" so
+//    the advisory stopped being 21 lines and burying five controls. The
+//    mechanism is hidden, NOT unmounted, so `textContent` still contains it:
+//    rows [5a] [5b] [9d] now go green over a mechanism that can never be shown
+//    — success and failure emitting the same artifact, this repo's dominant
+//    defect class arriving because of a fix. Rows [5e] [5f] [5f2] [5g] [5g2]
+//    [5h] [5i] [9e] are the keepers and NOT ONE OF THEM READS TEXT: they use
+//    `checkVisibility()`, `getClientRects().length` and `elementFromPoint`, on
+//    BOTH surfaces, collapsed and expanded, in one session through one click.
+//    [5c]/[5d]/[5b2] were RE-POINTED at clauses that are never hidden — see the
+//    comments at each. Packet: docs/reviews/2026-08-30-o15-advisory-shape.md §4.
+//
 // ═══ AIM AT INTEGERS ═══
 //
 // `devicePixelRatio` is whatever Electron infers under Xvfb and has been seen at
@@ -101,6 +114,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // this parcel.
 const PROVIDER_SRC = `${ROOT}/src/renderer/providers/effects-aeon.ts`;
 const SRC = readFileSync(PROVIDER_SRC, 'utf8');
+// The disclosure's label lives with the component that draws it, not with the
+// clauses, and it is parsed for the SAME reason: a harness that typed "Why this
+// happens" would keep clicking a button the app had renamed.
+const LAYOUT_SRC = `${ROOT}/src/renderer/components/effects/column-layout.tsx`;
+const LAYOUT = readFileSync(LAYOUT_SRC, 'utf8');
 
 /**
  * The lock sentinel, DERIVED THE WAY THE APP DERIVES IT.
@@ -128,26 +146,32 @@ function parseLock() {
 const LOCK = parseLock();
 
 /**
- * Pull one `const NAME = <string concatenation>;` out of the provider and
+ * Pull one `const NAME = <string concatenation>;` out of a source file and
  * evaluate the literal pieces — single-quoted AND template.
  *
  * ⚠ IT REFUSES TO GUESS. A clause it cannot recover throws, loudly, before a
  * single row runs; so does an interpolation it does not know how to resolve. A
  * harness that silently fell back to a typed string would be asserting against
  * itself, which is the class of defect this whole parcel is about.
+ *
+ * `subs` names the interpolations THIS CALL is allowed to resolve, and it is a
+ * whitelist rather than a fallback: `${EFFECTS_V_FACTOR_LOCK}` is always
+ * resolvable from the schema-derived constant, and a caller that knows what a
+ * clause's parameter is bound to on screen (`${vf}` = the value the fixture
+ * typed) may add it. Anything left over still stops the run.
  */
-function parseClause(name) {
-  const m = SRC.match(new RegExp(`const ${name} =\\s*([\\s\\S]*?);\\n`));
-  if (!m) throw new Error(`CANNOT MEASURE: ${name} not found in ${PROVIDER_SRC}`);
+function parseClauseFrom(src, where, name, subs = {}) {
+  const m = src.match(new RegExp(`const ${name} =\\s*([\\s\\S]*?);\\n`));
+  if (!m) throw new Error(`CANNOT MEASURE: ${name} not found in ${where}`);
   const pieces = m[1].match(/'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g);
-  if (!pieces) throw new Error(`CANNOT MEASURE: ${name} has no string literals in ${PROVIDER_SRC}`);
+  if (!pieces) throw new Error(`CANNOT MEASURE: ${name} has no string literals in ${where}`);
+  const all = { EFFECTS_V_FACTOR_LOCK: LOCK, ...subs };
   return pieces.map((p) => {
     if (p.startsWith('`')) {
-      // The only interpolation these clauses use is the lock sentinel, and it is
-      // resolved from the constant above rather than typed. Anything else stops
-      // the run: an unresolved `${…}` in an expected string would make the
-      // on-screen comparison fail for a reason that is not the feature.
-      const body = p.slice(1, -1).replace(/\$\{EFFECTS_V_FACTOR_LOCK\}/g, String(LOCK));
+      let body = p.slice(1, -1);
+      for (const [k, v] of Object.entries(all)) {
+        body = body.split(`\${${k}}`).join(String(v));
+      }
       if (body.includes('${')) {
         throw new Error(`CANNOT MEASURE: ${name} interpolates something this harness `
           + `cannot resolve: ${body}`);
@@ -158,6 +182,7 @@ function parseClause(name) {
     return eval(p);
   }).join('');
 }
+const parseClause = (name, subs) => parseClauseFrom(SRC, PROVIDER_SRC, name, subs);
 
 const MECHANISM = parseClause('VSPLIT_LOCK_MECHANISM');
 const REMEDY_LOCK = parseClause('VSPLIT_LOCK_REMEDY_LOCK');
@@ -167,6 +192,15 @@ const REMEDY_HORIZ = parseClause('VSPLIT_LOCK_REMEDY_HORIZONTAL');
 // interpolates the value, so a wrong-value bug must be visible. 3 is neither an
 // edge nor the lock.
 const UNLOCKED_VF = 3;
+// ── O15: THE DIAGNOSIS HALF, AND THE DISCLOSURE'S LABEL ────────────────────
+//
+// The advisory is now THREE PARTS and only the mechanism is behind a
+// disclosure, so the rows that used to ask "is the whole paragraph painted?"
+// through the mechanism leaf have to ask it through a clause that is never
+// hidden. `VSPLIT_LOCK_SCENE_IS` is the head of the DIAGNOSIS and is the clause
+// that carries the author's own `v_factor` value — the fact `[5b2]` is about.
+const SCENE_IS_UNLOCKED = parseClause('VSPLIT_LOCK_SCENE_IS', { vf: UNLOCKED_VF });
+const WHY = parseClauseFrom(LAYOUT, LAYOUT_SRC, 'WHY_THIS_HAPPENS');
 // Two layers, so the multi-layer plural in the scene sentence is exercised and
 // so there is a layer WITHOUT a split in the same scene as a control.
 const TOP_A = 0;
@@ -341,6 +375,161 @@ const HIT_AT = (phrase) => String.raw`
   };
 })()`;
 
+/**
+ * ⚠ THE O15 VACUITY CLOSURE — read the packet's §4 before touching this.
+ *
+ * The mechanism is now behind a collapsed disclosure, and it is HIDDEN, NOT
+ * UNMOUNTED. So `textContent` contains it whether the disclosure works or has
+ * been broken into a permanently shut box: `[5a]`/`[5b]`/`[9d]` would go green
+ * on both, which is a check whose failure state and success state emit the same
+ * artifact. THIS PROBE NEVER READS TEXT AS EVIDENCE. It reports, per mechanism
+ * element:
+ *
+ *   • `visible`  — `checkVisibility()`, the browser's own answer;
+ *   • `rects`    — `getClientRects().length`; a `display:none` node has ZERO
+ *                  boxes, which is the strongest DOM statement of "does not
+ *                  paint" available and is not a rounded rectangle;
+ *   • `blockHitIsMechanism` — `document.elementFromPoint` at the CENTRE OF THE
+ *                  ADVISORY BLOCK the mechanism belongs to. Aiming at the
+ *                  mechanism's own centre is meaningless when it has no box, so
+ *                  the aim is the box it would be inside; a hidden mechanism
+ *                  must not be what is under that point, and a shown one at its
+ *                  own centre must be (`[5g]`).
+ *
+ * Containment is STRICT (`el === hit || el.contains(hit)`). `hit.contains(el)`
+ * — which `HIT_AT` allows — is true for any ANCESTOR of the mechanism, and the
+ * advisory block IS an ancestor, so the loose test would report "the mechanism
+ * is under the pointer" for a mechanism that is `display:none`.
+ *
+ * ⚠ THERE ARE THREE SURFACES, NOT TWO, AND THIS ROW LEARNED IT THE HARD WAY.
+ * The first run of the O15 rows asserted "exactly 2 mechanism elements" and
+ * found THREE: `canvas/raster-timeline.ts`'s `splitRefusal` composes the same
+ * clauses on the raster strip, in a different collapsible section, as ONE
+ * un-split paragraph. That surface is OUTSIDE O15's scope (the ruling names the
+ * v_factor row and the layer cards) and is deliberately untouched. So the
+ * classification here is STRUCTURAL, not a count and not a hard-coded index:
+ * `hasDisclosure` is true when the mechanism's own block also holds a
+ * "Why this happens" control, which is precisely what makes it one of the two
+ * advisories O15 converted. `[5j]` asserts the third is still there and still
+ * whole, so "scope held" is measured rather than asserted in prose.
+ */
+const MECH_STATE = String.raw`
+(() => {
+  const want = ${JSON.stringify(MECHANISM)};
+  const out = [];
+  for (const el of document.querySelectorAll('*')) {
+    const t = el.textContent || '';
+    if (!t.includes(want)) continue;
+    if ([...el.children].some((k) => (k.textContent || '').includes(want))) continue;
+    const block = el.parentElement;
+    let blockHit = null; let blockH = null;
+    if (block) {
+      block.scrollIntoView({ block: 'center' });
+      const b = block.getBoundingClientRect();
+      blockH = b.height;
+      if (b.width > 0 && b.height > 0) {
+        const h = document.elementFromPoint(
+          Math.round(b.left + b.width / 2), Math.round(b.top + b.height / 2));
+        blockHit = h === null ? null
+          : (el === h || el.contains(h)) ? 'MECHANISM' : (h.textContent || '').slice(0, 48);
+      }
+    }
+    const r = el.getBoundingClientRect();
+    out.push({
+      // The block holds a disclosure => this is one of the two advisories O15
+      // converted. No disclosure => the raster strip's own sentence, out of scope.
+      hasDisclosure: !!block && [...block.querySelectorAll('button')]
+        .some((b) => (b.textContent || '').includes(${JSON.stringify(WHY)})),
+      visible: el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }),
+      rects: el.getClientRects().length,
+      h: Math.round(r.height), w: Math.round(r.width),
+      blockH: blockH === null ? null : Math.round(blockH),
+      blockHitIsMechanism: blockHit === 'MECHANISM',
+      blockHitText: blockHit,
+      inText: t.includes(want),
+    });
+  }
+  return out;
+})()`;
+
+/** Every "Why this happens" disclosure on screen, with its state and its box. */
+const TOGGLES = String.raw`
+(() => [...document.querySelectorAll('button')]
+  .filter((b) => (b.textContent || '').includes(${JSON.stringify(WHY)}))
+  .map((b, i) => {
+    const r = b.getBoundingClientRect();
+    return {
+      i, expanded: b.getAttribute('aria-expanded'), text: (b.textContent || '').trim(),
+      visible: b.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }),
+      w: Math.round(r.width), h: Math.round(r.height),
+    };
+  }))()`;
+
+/** Scroll disclosure `i` into view, hit-test its own centre, and click it. */
+const CLICK_TOGGLE = (i) => String.raw`
+(() => {
+  const bs = [...document.querySelectorAll('button')]
+    .filter((b) => (b.textContent || '').includes(${JSON.stringify(WHY)}));
+  const b = bs[${i}];
+  if (!b) return { ok: false, why: 'no such disclosure', count: bs.length };
+  b.scrollIntoView({ block: 'center' });
+  const r = b.getBoundingClientRect();
+  const x = Math.round(r.left + r.width / 2);
+  const y = Math.round(r.top + r.height / 2);
+  const h = document.elementFromPoint(x, y);
+  const hit = h !== null && (h === b || b.contains(h));
+  b.click();
+  return { ok: true, count: bs.length, x, y, hit, hitTag: h ? h.tagName : null,
+           hitText: h ? (h.textContent || '').slice(0, 48) : null };
+})()`;
+
+/**
+ * Strict `elementFromPoint` at a phrase's own centre — `[5g]`'s aim.
+ *
+ * Deliberately NOT `HIT_AT`: this one refuses `hit.contains(leaf)`, so an
+ * ancestor under the pointer is not counted as the leaf being painted.
+ */
+const HIT_STRICT = (phrase, nth = 0) => String.raw`
+(() => {
+  const want = ${JSON.stringify(phrase)};
+  const leaves = [...document.querySelectorAll('*')].filter((el) =>
+    (el.textContent || '').includes(want)
+    && ![...el.children].some((k) => (k.textContent || '').includes(want)));
+  const leaf = leaves[${nth}];
+  if (!leaf) return { found: false, leaves: leaves.length };
+  leaf.scrollIntoView({ block: 'center' });
+  const r = leaf.getBoundingClientRect();
+  const x = Math.round(r.left + r.width / 2);
+  const y = Math.round(r.top + r.height / 2);
+  const hit = document.elementFromPoint(x, y);
+  return {
+    found: true, leaves: leaves.length, x, y, dpr: window.devicePixelRatio,
+    rect: { width: Math.round(r.width), height: Math.round(r.height) },
+    inside: hit !== null && (hit === leaf || leaf.contains(hit)),
+    hitTag: hit ? hit.tagName : null,
+    hitText: hit ? (hit.textContent || '').slice(0, 48) : null,
+  };
+})()`;
+
+/**
+ * The WHOLE advisory block a phrase belongs to — its container's text.
+ *
+ * O15 split one element into four siblings (diagnosis, disclosure, mechanism,
+ * remedies), so a leaf that used to carry the whole sentence now carries a
+ * third of it. This walks ONE step up from the leaf, structurally, rather than
+ * asking the app for a `data-` hook it could get wrong: the parts are siblings
+ * by construction, so their parent is the block.
+ */
+const BLOCK_TEXT = (phrase) => String.raw`
+(() => {
+  const want = ${JSON.stringify(phrase)};
+  const leaf = [...document.querySelectorAll('*')].find((el) =>
+    (el.textContent || '').includes(want)
+    && ![...el.children].some((k) => (k.textContent || '').includes(want)));
+  if (!leaf || !leaf.parentElement) return { found: false };
+  return { found: true, text: leaf.parentElement.textContent || '' };
+})()`;
+
 function sceneOf(doc) { return doc.find((s) => s.id === SCENE_ID) ?? null; }
 
 async function main() {
@@ -496,21 +685,142 @@ async function main() {
       && (await c.json(FIND_TEXT(REMEDY_HORIZ))).length >= 1,
       `lock=${(await c.json(FIND_TEXT(REMEDY_LOCK))).length} horiz=${(await c.json(FIND_TEXT(REMEDY_HORIZ))).length}. `
       + 'The one sentence Aurora had before row 80 offered only the lock.');
+    // ⚠ RE-POINTED BY O15, and the reason is the whole of the packet's §4.
+    // This row asks whether the author's OWN v_factor value reaches him. That
+    // value lives in the DIAGNOSIS clause, and until O15 the mechanism leaf's
+    // `textContent` happened to contain the diagnosis too, because the whole
+    // advisory was ONE element. It is not any more — the mechanism leaf now
+    // carries only the mechanism — so reading the value off the mechanism would
+    // be reading it off the wrong half. `SCENE_IS_UNLOCKED` is parsed from the
+    // provider with `${vf}` bound to what the fixture typed, so this is still
+    // not a sentence typed in this file.
+    const diag = await c.json(FIND_TEXT(SCENE_IS_UNLOCKED));
     check('5b2', 'the author\'s OWN v_factor value is in the sentence, not a generic prohibition',
-      hits.some((h) => h.text.includes(`v_factor ${UNLOCKED_VF}`)),
-      `looking for "v_factor ${UNLOCKED_VF}" in: ${JSON.stringify(hits.map((h) => h.text.slice(0, 90)))}`);
+      diag.length >= 1,
+      `${diag.length} element(s) render "${SCENE_IS_UNLOCKED}". `
+      + `(mechanism leaves seen: ${JSON.stringify(hits.map((h) => h.text.slice(0, 60)))})`);
 
-    const hit = await c.json(HIT_AT(MECHANISM));
+    // ⚠ RE-POINTED BY O15. [5c]/[5d] are the "published but never painted" rows,
+    // and after O15 the mechanism is DELIBERATELY not painted until asked for —
+    // so aimed at the mechanism they would now be asserting the opposite of the
+    // ruling. They are re-aimed at REMEDY_HORIZ: the LAST clause of the whole
+    // advisory, the one a naive length-truncation would eat first, and one of
+    // the two halves the ruling says must never need a click.
+    const remedyHits = await c.json(FIND_TEXT(REMEDY_HORIZ));
+    const hit = await c.json(HIT_AT(REMEDY_HORIZ));
     note(`AIM: dpr=${hit.dpr} rect=${JSON.stringify(hit.rect)} aim=(${hit.x},${hit.y}) `
       + `hit=<${hit.hitTag}>`);
-    check('5c', '⚠ RENDERED AND NOT HIDDEN: elementFromPoint at the hint\'s own centre lands INSIDE it',
+    check('5c', '⚠ RENDERED AND NOT HIDDEN: elementFromPoint at the REMEDIES\' own centre lands INSIDE them',
       hit.found === true && hit.inside === true && hit.rect.width > 0 && hit.rect.height > 0,
       `inside=${hit.inside} hitTag=${hit.hitTag} hitText="${hit.hitText}". `
-      + 'A display:none hint still has a textContent; this is what separates the two.');
-    check('5d', 'and the browser agrees it is visible (checkVisibility, opacity + CSS)',
-      hits.every((h) => h.visible !== false),
-      JSON.stringify(hits.map((h) => ({ tag: h.tag, visible: h.visible }))));
+      + 'A display:none hint still has a textContent; this is what separates the two. '
+      + 'Aimed at the LAST clause on purpose — it is what a positional truncation hides.');
+    check('5d', 'and the browser agrees the remedies are visible (checkVisibility, opacity + CSS)',
+      remedyHits.length >= 1 && remedyHits.every((h) => h.visible !== false),
+      JSON.stringify(remedyHits.map((h) => ({ tag: h.tag, visible: h.visible }))));
     await shot(c, '5-unlocked-by-v_factor');
+
+    // =====================================================================
+    // 5e-5i. ⚠ THE O15 DISCLOSURE, AND THE VACUITY IT CREATES.
+    //
+    // Collapsing the mechanism makes every `textContent` row above go green
+    // whether the mechanism can EVER be shown or not — [5a] and [5b] would pass
+    // over a disclosure welded shut. These five rows are the ones that cannot,
+    // and not one of them reads text as evidence. Each is a PAIR with another:
+    //   [5e] hidden collapsed   × [5g] shown expanded  — an always-shown build
+    //        fails 5e, an always-hidden build fails 5g, and NEITHER can pass both
+    //        in one session through one click.
+    //   [5g] shown after click  × [5h] hidden after a second click — a one-way
+    //        toggle passes 5g and fails 5h.
+    //   [5i] is the row the whole parcel is about: the block must actually be
+    //        SHORTER collapsed. A disclosure that hides the text with `opacity`
+    //        or `visibility` passes 5e's checkVisibility and fails this.
+    // =====================================================================
+    let mech = await c.json(MECH_STATE);
+    const panelOf = (ms) => ms.filter((m) => m.hasDisclosure);
+    const stripOf = (ms) => ms.filter((m) => !m.hasDisclosure);
+    note('MECHANISM ELEMENTS, COLLAPSED (the artifact [5e] and [5j] judge):',
+      JSON.stringify(mech));
+    check('5e', '⚠ VACUITY CLOSED: collapsed, the panel\'s mechanism is in the DOM and PAINTS NOTHING',
+      panelOf(mech).length === 2
+      && panelOf(mech).every((m) => m.inText === true && m.visible === false && m.rects === 0
+        && m.h === 0 && m.blockHitIsMechanism === false),
+      `${panelOf(mech).length} mechanism element(s) inside a disclosure block `
+      + '(want 2: the v_factor row and layer 0\'s card): '
+      + `${JSON.stringify(panelOf(mech).map((m) => ({ visible: m.visible, rects: m.rects, h: m.h, hit: m.blockHitText })))}. `
+      + 'inText proves textContent still carries it — which is exactly why no row here '
+      + 'may use textContent. visible/rects/blockHit are the measurement.');
+    check('5j', 'SCOPE HELD: the raster strip\'s own sentence is NOT converted and is still whole',
+      stripOf(mech).length >= 1
+      && stripOf(mech).every((m) => m.visible === true && m.rects >= 1 && m.h > 0),
+      `${stripOf(mech).length} mechanism element(s) with no disclosure: `
+      + `${JSON.stringify(stripOf(mech).map((m) => ({ visible: m.visible, h: m.h })))}. `
+      + 'That is `canvas/raster-timeline.ts`\'s `splitRefusal`, in a different collapsible '
+      + 'section — O15\'s scope names the v_factor row and the layer cards, and this row '
+      + 'is what makes "scope held" a measurement instead of a sentence in a packet.');
+
+    const toggles = await c.json(TOGGLES);
+    note('DISCLOSURES ON SCREEN:', JSON.stringify(toggles));
+    check('5f', 'one "' + WHY + '" disclosure per converted advisory, visible, aria-expanded=false',
+      toggles.length === panelOf(mech).length && toggles.length === 2
+      && toggles.every((t) => t.visible === true && t.expanded === 'false'
+        && t.w > 0 && t.h > 0),
+      `${toggles.length} disclosure(s) vs ${panelOf(mech).length} converted mechanism element(s). `
+      + 'A mechanism with no control to open it is a deleted feature with a textContent.');
+
+    const clicked = await c.json(CLICK_TOGGLE(0));
+    note('CLICK on disclosure 0 (the v_factor row\'s):', JSON.stringify(clicked));
+    check('5f2', 'ANTI-VACUOUS: the disclosure was hit-testable at its own centre and was clicked',
+      clicked.ok === true && clicked.hit === true,
+      `hit=${clicked.hit} hitTag=${clicked.hitTag} hitText="${clicked.hitText}" `
+      + '— a button under something else is not a control an author can reach');
+    await sleep(400);
+
+    mech = await c.json(MECH_STATE);
+    const openHit = await c.json(HIT_STRICT(MECHANISM, 0));
+    note('MECHANISM ELEMENTS, DISCLOSURE 0 EXPANDED (the artifact [5g] judges):',
+      `${JSON.stringify(mech)}\n        AIM (strict): ${JSON.stringify(openHit)}`);
+    check('5g', '⚠ VACUITY CLOSED: expanded, the mechanism PAINTS and elementFromPoint lands INSIDE it',
+      mech[0]?.hasDisclosure === true
+      && mech[0].visible === true && mech[0].rects >= 1 && mech[0].h > 0
+      && openHit.found === true && openHit.inside === true,
+      `mech[0]={hasDisclosure:${mech[0]?.hasDisclosure}, visible:${mech[0]?.visible}, `
+      + `rects:${mech[0]?.rects}, h:${mech[0]?.h}} `
+      + `strict-hit inside=${openHit.inside} on <${openHit.hitTag}> "${openHit.hitText}". `
+      + 'Paired with [5e], one session, one click apart — a build that always hides or '
+      + 'always shows the mechanism cannot pass both.');
+    check('5g2', 'and it is ONE disclosure, not all of them: layer 0\'s card stayed collapsed',
+      mech[1]?.hasDisclosure === true && mech[1].visible === false && mech[1].rects === 0,
+      `mech[1]={hasDisclosure:${mech[1]?.hasDisclosure}, visible:${mech[1]?.visible}, `
+      + `rects:${mech[1]?.rects}}. `
+      + 'Every advisory owning its own state is what stops one click reflowing the panel.');
+
+    // [5i] — THE SHAPE, MEASURED, which is the row this whole parcel exists for.
+    const openBlockH = mech[0].blockH;
+    note('ADVISORY BLOCK HEIGHTS (px, off getBoundingClientRect):',
+      `v_factor row, EXPANDED = ${openBlockH}px; layer 0's card, still collapsed in the `
+      + `same frame = ${mech[1].blockH}px (a different sentence, printed for context only — `
+      + '[5i] compares ONE block against ITSELF in two states)');
+    await shot(c, '5g-mechanism-expanded');
+    const reclosed = await c.json(CLICK_TOGGLE(0));
+    await sleep(400);
+    mech = await c.json(MECH_STATE);
+    check('5h', '⚠ THE TOGGLE GOES BOTH WAYS: a second click hides the mechanism again',
+      reclosed.ok === true
+      && panelOf(mech).length === 2
+      && panelOf(mech).every((m) => m.visible === false && m.rects === 0),
+      'after re-click: '
+      + `${JSON.stringify(panelOf(mech).map((m) => ({ visible: m.visible, rects: m.rects })))}. `
+      + 'A one-way disclosure passes [5g] and fails here.');
+    const shutBlockH = mech[0].blockH;
+    check('5i', '⚠ THE SHAPE: the advisory block is materially SHORTER collapsed than expanded',
+      typeof openBlockH === 'number' && typeof shutBlockH === 'number'
+      && openBlockH > 0 && shutBlockH > 0 && shutBlockH <= openBlockH * 0.6,
+      `collapsed=${shutBlockH}px expanded=${openBlockH}px `
+      + `(ratio ${(shutBlockH / openBlockH).toFixed(2)}, want <= 0.60). `
+      + 'This is the row O15 is about. Measured under a planted `visibility: hidden` '
+      + '(instead of `display: none`) it read 388/388 — the text was invisible and the '
+      + 'form was still buried, which is the ruling defeated by a fix that looks right.');
 
     // =====================================================================
     // 6. THE SCENE SENTENCE NAMES WHICH LAYERS — the fact route A destroys.
@@ -543,6 +853,19 @@ async function main() {
     check('7c', 'ANTI-VACUOUS: there are TWO layer sentences, one per split layer',
       layerHits.length === 2,
       `${layerHits.length} element(s). Both layers carry a split now, so both cards speak.`);
+    // ⚠ SCROLL THE SUBJECT INTO VIEW BEFORE THE SHOT, EXPLICITLY.
+    //
+    // This is the frame O15's before/after pair is cropped from, and until now
+    // WHERE the effects column happened to be scrolled was a side effect of
+    // whichever probe had last called `scrollIntoView` — [5c]'s aim, before O15;
+    // [5i]'s block walk, after it. That silently re-aimed the capture at the
+    // raster strip and would have made the two halves of the pair pictures of
+    // different things. The v_factor spinner is the anchor: it is the control
+    // the advisory hangs off and it is at the top of the crop in the committed
+    // before shot (`scratchpad/shots-o15/before-1920x1080-panel.png`).
+    await c.evalExpr(String.raw`
+      (() => { const e = ${vfField}; if (e) e.scrollIntoView({ block: 'center' }); return 'ok'; })()`);
+    await sleep(300);
     await shot(c, '7-two-sentences');
 
     // =====================================================================
@@ -588,10 +911,39 @@ async function main() {
       hits.length === 1,
       `${hits.length} sentence(s); expected exactly one, on layer 1's card. `
       + 'Routes A and B are different gestures and this is the one the layer card owns.');
+    // ⚠ RE-POINTED BY O15. This used to read the leaf's own text, which worked
+    // only because the whole advisory was ONE element. It is four siblings now,
+    // so the leaf carrying LAYER_SUBJECT is the diagnosis alone. The subject of
+    // the row is unchanged — "the layer card states one rule, not a shorter one"
+    // — and it is asked of the BLOCK. It stays a textContent row on purpose:
+    // "the words are all in this block" is a text question. Whether the author
+    // can SEE them is [9e]'s, and that one never touches text.
+    const block = await c.json(BLOCK_TEXT(LAYER_SUBJECT));
     check('9d', 'and it carries the mechanism and BOTH remedies, same as route A — one rule, not two',
-      hits.length === 1 && hits[0].text.includes(MECHANISM)
-      && hits[0].text.includes(REMEDY_LOCK) && hits[0].text.includes(REMEDY_HORIZ),
-      `text="${hits[0]?.text?.slice(0, 120)}…"`);
+      hits.length === 1 && block.found === true && block.text.includes(MECHANISM)
+      && block.text.includes(REMEDY_LOCK) && block.text.includes(REMEDY_HORIZ),
+      `block text="${block.text?.slice(0, 140)}…"`);
+    // ⚠ AND [9d] IS EXACTLY THE ROW THE PACKET'S §4 WARNS ABOUT — it would pass
+    // over a mechanism welded shut. [9e] is its keeper, on the second surface:
+    // section 5 proved the disclosure on the v_factor row, this proves the LAYER
+    // CARD got the same treatment rather than one of the two being converted.
+    const mech9 = await c.json(MECH_STATE);
+    const rem9 = await c.json(HIT_STRICT(REMEDY_HORIZ, 1));
+    const tog9 = await c.json(TOGGLES);
+    note('LAYER CARD, ROUTE B (the artifact [9e] judges):',
+      `mechanisms=${JSON.stringify(mech9)}\n        disclosures=${JSON.stringify(tog9)}`
+      + `\n        remedies strict-hit=${JSON.stringify(rem9)}`);
+    check('9e', '⚠ VACUITY CLOSED on the SECOND surface: the layer card hides the mechanism '
+      + 'and paints the remedies',
+      mech9.filter((m) => m.hasDisclosure).length === 2
+      && mech9[1]?.hasDisclosure === true
+      && mech9[1].visible === false && mech9[1].rects === 0
+      && tog9.length === 2 && tog9[1].visible === true && tog9[1].expanded === 'false'
+      && rem9.found === true && rem9.inside === true,
+      `layer-card mechanism={visible:${mech9[1]?.visible}, rects:${mech9[1]?.rects}} `
+      + `disclosure={visible:${tog9[1]?.visible}, expanded:${tog9[1]?.expanded}} `
+      + `remedies strict-hit inside=${rem9.inside} on <${rem9.hitTag}>. `
+      + 'Text cannot tell these two states apart, which is why none of this reads text.');
     await shot(c, '9-route-b-layer-card');
 
     // ---- 10. Leave the tree as found. ------------------------------------
@@ -624,21 +976,32 @@ async function main() {
   if (fails.length) { console.log('FAILED:'); for (const f of fails) console.log(`  ${f}`); }
   console.log(
     '\nROWS THAT DO NOT DISCRIMINATE, named so nobody counts them twice:\n'
-    + '  [0y] [0a] [1a] [2a] [3a0] [3a1] [3a2] [3b] [4a0] [4a] [5a0] [5a1] [6b0] [9a0] [9b0]\n'
-    + '  [9b1] [9b2] [9c0] [10a] — setup and anti-vacuous rows. They prove the instrument\n'
+    + '  [0y] [0a] [1a] [2a] [3a0] [3a1] [3a2] [3b] [4a0] [4a] [5a0] [5a1] [5f2] [6b0] [9a0]\n'
+    + '  [9b0] [9b1] [9b2] [9c0] [10a] — setup and anti-vacuous rows. They prove the instrument\n'
     + '      built and saw its subject; none can fail for the ADVISORY being wrong.\n'
     + '  [8b] — reads a spinner back. It would go red only if something clamped v_factor,\n'
     + '      which this parcel is forbidden from doing; it guards a non-goal.\n'
-    + 'THE DISCRIMINATING ROWS: [4b] [5a] [5b] [5b2] [5c] [5d] [6a] [6b] [7a] [7b] [7c]\n'
-    + '  [8a] [9a] [9b] [9c] [9d].\n'
+    + 'THE DISCRIMINATING ROWS: [4b] [5a] [5b] [5b2] [5c] [5d] [5e] [5f] [5g] [5g2] [5h] [5i]\n'
+    + '  [5j] [6a] [6b] [7a] [7b] [7c] [8a] [9a] [9b] [9c] [9d] [9e].\n'
     + '  [4b]+[5a] are the PAIR: one scene, one field changed, silent then speaking. Neither\n'
     + '      alone discriminates — [4b] alone is what a DELETED feature returns, [5a] alone is\n'
     + '      what an ALWAYS-ON hint returns.\n'
     + '  [9a]+[9b] are the two silences a broken build cannot both produce: re-locking with a\n'
     + '      split, and unlocking without one.\n'
-    + '  [5c] is the one a published-but-unpainted sentence cannot survive.\n'
+    + '  [5c] is the one a published-but-unpainted sentence cannot survive — and since O15\n'
+    + '      it is aimed at the LAST clause, so a positional truncation cannot survive it\n'
+    + '      either.\n'
     + '  [5b] is the one an advisory offering a single remedy cannot survive.\n'
     + '  [7a]/[7b] are the ones a single sentence rendered in one place cannot survive.\n'
+    + '  [5e]+[5g] are the O15 PAIR — collapsed hides the mechanism, one click shows it,\n'
+    + '      one session. An always-hidden build fails [5g]; an always-shown one fails\n'
+    + '      [5e]; a one-way toggle fails [5h]; a hide-by-opacity fails [5i]; converting\n'
+    + '      only the v_factor row and not the layer card fails [9e]. NONE of them reads\n'
+    + '      textContent, because textContent cannot tell those states apart at all.\n'
+    + '  [5i] is the row the O15 ruling is FOR: the block must actually be shorter.\n'
+    + '  [5j] is the SCOPE row: the raster strip composes the same clauses and O15 does not\n'
+    + '      touch it, so it must still be there, whole, and WITHOUT a disclosure. It is\n'
+    + '      also the row that keeps the alternative-green-path note below honest.\n'
     + '\n'
     + '⚠ THE ALTERNATIVE GREEN PATH, RULED OUT AND NAMED — measured, not reasoned.\n'
     + '  The 5-series asks "is the sentence ON SCREEN", and there are THREE surfaces that\n'
