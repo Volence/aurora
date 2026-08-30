@@ -47,3 +47,44 @@ export interface Notice {
   severity: NoticeSeverity;
   message: string;
 }
+
+/** One file a loader found, could not read, and refuses to overwrite. */
+export interface UnreadableItem {
+  /** Project-relative path, as the loader asked for it. */
+  path: string;
+  /** Whatever the read or the parser said. Kept per item — it is the repair hint. */
+  reason: string;
+}
+
+/** How many items a coalesced summary NAMES before it starts counting. */
+export const NAMED_IN_SUMMARY = 3;
+
+/**
+ * The shared tail of every coalesced failure summary: name a few, count the
+ * rest — "a, b, c, +12 more".
+ *
+ * WHY THIS EXISTS. A producer that pushes one notice per failed file is a
+ * producer that can put an unbounded wall of TEN-SECOND error toasts on screen
+ * (toastStore.dwellMs). `markUnreadable` alone reaches 63 on a 3x3 act whose
+ * every section file is corrupt — seven suffixes (tiles.bin, collattr.bin,
+ * collattrb.bin, objects.json, rings.json, meta.json, chunklinks.json) times
+ * nine sections; coalesced-notices.test.ts DERIVES that figure from a load
+ * rather than asserting a literal. That pressure is what makes someone turn the
+ * error channel off, which would undo the whole point of moving failures onto
+ * it.
+ *
+ * The shape is not invented here: `bgLibraryUnresolved` already ships it
+ * (renderer/state/aeon-open.ts), which is why seventeen missing background
+ * bodies on a clean clone are ONE pleasant warning and not seventeen.
+ *
+ * THE COUNT IS THE HONEST PART. `+K more` is derived from the array length, so
+ * it can never render "I could not tell" as zero — an empty list produces no
+ * summary at all rather than a summary claiming nothing happened. And the items
+ * that are not NAMED are still reachable: every producer that coalesces also
+ * `console.warn`s each failure, with its own reason, at the moment it happens.
+ */
+export function nameSome(paths: readonly string[], limit: number = NAMED_IN_SUMMARY): string {
+  const shown = paths.slice(0, limit).join(', ');
+  const rest = paths.length - Math.min(limit, paths.length);
+  return rest > 0 ? `${shown}, +${rest} more` : shown;
+}

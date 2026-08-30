@@ -55,7 +55,7 @@
 // nothing in the read or write path calls it.
 
 import type { FileAccess } from '../../project/adapter';
-import type { Notice } from '../../project/notice';
+import { nameSome, type Notice } from '../../project/notice';
 import type { JsonSchema } from './json-schema-subset';
 import {
   validateAgainstSchema,
@@ -479,16 +479,36 @@ export async function loadEffectsSceneLibrary(
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);
       unreadable.push({ path, reason });
-      // 'error': the read FAILED and the scene is not in the library. See
-      // core/project/notice.ts — severity is the producer's to assign, and this
-      // producer knows it is not reporting a success.
-      notices.push({
-        severity: 'error',
-        message:
-          `${path} exists but could not be read as an effects scene (${reason}). ` +
-          'Aurora is ignoring it and will NOT overwrite the file — fix it by hand and reopen.',
-      });
+      // The per-file reason, unabridged. The notice below names only the first
+      // few, and this directory is a LISTING — its length is whatever the tree
+      // holds, so the notice cannot be per file.
+      console.warn(`[effects] ${path} could not be read as an effects scene: ${reason}`);
     }
+  }
+
+  // ONE notice for the whole directory, on the shape bgLibraryUnresolved already
+  // ships. 'error' either way — the read FAILED and the scene is not in the
+  // library; see core/project/notice.ts, severity is the producer's to assign,
+  // and coalescing changes the count, never the channel. A single failure keeps
+  // the message it always had, because one broken scene is the common case and
+  // naming it outright is already right.
+  if (unreadable.length === 1) {
+    const only = unreadable[0];
+    notices.push({
+      severity: 'error',
+      message:
+        `${only.path} exists but could not be read as an effects scene (${only.reason}). ` +
+        'Aurora is ignoring it and will NOT overwrite the file — fix it by hand and reopen.',
+    });
+  } else if (unreadable.length > 1) {
+    notices.push({
+      severity: 'error',
+      message:
+        `${unreadable.length} files in ${dir} exist but could not be read as effects scenes — ` +
+        `${nameSome(unreadable.map((u) => u.path))}. ` +
+        'Aurora is ignoring them and will NOT overwrite them — fix them by hand and reopen. ' +
+        'Each file and its own reason is in the developer console.',
+    });
   }
 
   return { scenes, unreadable, notices };
