@@ -165,6 +165,38 @@
  *     the lie it exists to prevent — pointed the other way, again. And if the
  *     seam gate stops refusing case 3, the "no longer silent" clause becomes the
  *     lie instead; do not keep it because a guard was once announced.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * IF AEON EVER PUBLISHES THE WIRED SET: WHAT THIS EDITOR MAY AND MAY NOT DO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Ruled by this lane 2026-08-30 and written HERE rather than in the lane board,
+ * because the board is gitignored by contract — a position that lives only there
+ * does not survive a session boundary, and this one was reached by argument that
+ * would have to be had again from scratch.
+ *
+ * ⚠ THE STANDING REFUSAL: Aurora does NOT gate the per-section select, and does
+ * not decide which sections can accept a binding. Being wired is a property of a
+ * hand-authored `preset()` in aeon's `ojz_effects.emp`, which this repo does not
+ * parse and must not start parsing. Any gate written from what we can see today
+ * would hardcode ONE act's current content layout into the editor, be silently
+ * wrong for the next act, and read to an author as authoritative. That is a copy
+ * of a snapshot wearing a check's clothes. The DISCLOSURE is the instrument; a
+ * gate is not.
+ *
+ * Aeon has booked publishing the wired set as generated output (their
+ * `5fc778c4`), which would be re-derived per act on every build and so could not
+ * describe a layout that had moved. IF that lands, the refusal may be revisited
+ * — against the ARTIFACT, read at a committed revision, never against the
+ * promise of one, and never by caching the set into this tree as a literal.
+ *
+ * ⚠ AND THE PART THAT IS EASY TO GET BACKWARDS. If such a statement exists but
+ * is ABSENT OR UNREADABLE at the moment we look, the control stays **ENABLED**
+ * with the disclosure — never disabled. A control greyed out because we could
+ * not read a file is indistinguishable, to the author looking at it, from one
+ * greyed out because the thing is impossible; the second is a claim we would not
+ * have earned. Fail toward the honest sentence, not toward the confident-looking
+ * lock.
  */
 
 export const RASTER_SECTION_BINDING_LIMIT =
