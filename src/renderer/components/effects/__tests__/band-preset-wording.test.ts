@@ -91,15 +91,31 @@ describe('the three limits say the words that carry them', () => {
    *
    * ⚠ AND IT CHANGED AGAIN when `assign_section_preset` landed: a WRITER now
    * exists. "Nothing binds a preset to a section" became false, and this row
-   * used to assert exactly that phrase. What survives both corrections is the
-   * only half that was ever load-bearing for an author — no CONSUMER reads the
+   * used to assert exactly that phrase. What survived that correction was the
+   * only half that was then load-bearing for an author — no CONSUMER reads the
    * key, so binding one still installs nothing — and one new half: the writer
    * that DOES exist is an agent tool, not a control in this panel, which is
    * what an author reading this block needs to know to go find it.
    *
+   * ⚠ THIRD CORRECTION, 2026-08-30, AND IT RETIRED A DATED CLAIM ON SCHEDULE.
+   * The consumer half is now false too: aeon `4aa2abc0` landed the reader.
+   * `tools/effects_gen.py` resolves `rasterRef` against the preset documents
+   * and emits the section's program plus the chooser. This row asserted
+   * `/no aeon consumer reads a rasterRef yet/` and `/by hand in aeon's
+   * ojz_effects\.emp/` — BOTH WENT RED, which is the rows working: the old
+   * sentence's expiry named the two aeon files, and they moved.
+   *
+   * What replaced it is NOT "it works now", and the row asserts the difference
+   * on purpose. At `4aa2abc0` nothing CALLS the chooser: every `raster:`
+   * argument in `games/sonic4/data/effects/ojz_effects.emp` is a hand-authored
+   * label and `EditorRaster_OJZ_Act1_Bindings = 0`. So the rows below assert
+   * three separate author-facing claims — the reader EXISTS, the CALL SITE does
+   * not, and the sentence names a revision and an expiry — because a limit that
+   * loses any one of them misleads in a different direction.
+   *
    * The negative assertion is still the point: `effectsRef` is reserved and
    * unspent (§7), and naming it here would send an author to a key no writer
-   * produces.
+   * produces. NOTHING in this parcel spends that reservation.
    *
    * THE BODY IS NO LONGER THIS FILE'S TO SPELL. It is
    * `RASTER_SECTION_BINDING_LIMIT` (core/formats/raster-binding.ts), quoted
@@ -107,17 +123,51 @@ describe('the three limits say the words that carry them', () => {
    * published tool descriptions — so this row asserts the WORDS the author
    * needs and a second row asserts the identity, rather than pinning a copy.
    */
-  it('LIMIT 1 names rasterRef, names the tool that writes it, and says nothing reads it', () => {
+  it('LIMIT 1 names rasterRef, names the tool that writes it, and says where the read stops', () => {
     const l = PRESET_LIMITS.find((x) => x.key === 'unbound')!;
     expect(l.body).toMatch(/rasterRef/);
     expect(l.body).not.toMatch(/effectsRef/);
-    // The author's three questions: what writes it, what reads it, and what
-    // that leaves them to do by hand.
+    // The author's questions: what writes it, what reads it, where the read
+    // stops, and what that leaves them to do by hand.
     expect(l.body).toMatch(/assign_section_preset/);
     expect(l.body).toMatch(/no control in the band-preset panel writes a rasterRef/i);
-    expect(l.body).toMatch(/no aeon consumer reads a rasterRef yet/i);
-    expect(l.body).toMatch(/by hand in aeon's ojz_effects\.emp/i);
+    // THE READER EXISTS. Pinned to the file that resolves the key rather than to
+    // a loose "reads it", which limit 2's "aeon steps a band-demo table" prose
+    // could drift into satisfying.
+    expect(l.body).toMatch(/tools\/effects_gen\.py resolves rasterRef/i);
+    // ...AND THE CALL SITE DOES NOT. The half that keeps this from reading as
+    // "it works now": the chooser is emitted and nothing passes it to preset().
+    expect(l.body).toMatch(/no preset\(\) in aeon's games\/sonic4\/data\/effects\/ojz_effects\.emp/i);
+    expect(l.body).toMatch(/the band does not play/i);
+    // The hand-work is now a CALL-SITE edit, not authoring the effect — the
+    // difference an author acts on.
+    expect(l.body).toMatch(/one line per section at that call site/i);
     expect(l.body).toMatch(/costs ROM/i);
+  });
+
+  /**
+   * ⚠ THE EXPIRY IS PART OF THE SENTENCE, NOT OF THE COMMENT AROUND IT.
+   *
+   * The sentence this replaced named a date and two aeon files, and that is the
+   * only reason its retirement was scheduled rather than discovered years late
+   * (the files moved; the rows above went red; someone read the expiry). The
+   * replacement makes a claim of exactly the same kind — "no call site yet" —
+   * so it owes the same treatment, and an author or an agent quoting the
+   * constant somewhere this comment does not reach must get the expiry WITH it.
+   *
+   * Pinned to a revision the reader can check out, not to "recently".
+   */
+  it('LIMIT 1 carries its own expiry: a revision, what ends it, and what to re-read', () => {
+    const l = PRESET_LIMITS.find((x) => x.key === 'unbound')!;
+    // ⚠ RE-POINTED AFTER A MATCHER-TRAP CHECK. A bare /aeon 4aa2abc0/ matched
+    // LIMIT 2 as well, once its own reachability clause gained the same
+    // revision — so this row would have been satisfiable by a DIFFERENT rule's
+    // wording. The verb is what makes the anchor this limit's own.
+    expect(l.body).toMatch(/Verified at aeon 4aa2abc0/);
+    expect(l.body).toMatch(/EXPIRES when aeon threads the chooser into ojz_effects\.emp/);
+    // The two files to re-read are named IN the sentence, not left to the reader.
+    expect(l.body).toMatch(/re-read games\/sonic4\/data\/effects\/ojz_effects\.emp/i);
+    expect(l.body).toMatch(/re-read tools\/effects_gen\.py/i);
   });
 
   /**
@@ -140,6 +190,14 @@ describe('the three limits say the words that carry them', () => {
    * one that surprises people, and it comes with its own consolation (the build
    * fails loudly rather than silently), which must survive too — without it the
    * limit reads as "and it might silently not work", which is worse than true.
+   *
+   * ⚠ THE CONSOLATION WAS NARROWED AT aeon `4aa2abc0` AND THE ROW NOW GATES IT.
+   * aeon's reachability check used to fire when a preset had no table ROW; a
+   * section binding is a second installer now, so it fires only when a document
+   * has NEITHER. Ungated, that clause could quietly drift back to the stronger
+   * claim and send an author who bound a preset off to add a row they do not
+   * need — a real action taken on a wrong sentence, which is what these rows
+   * exist to stop.
    */
   it('LIMIT 2 says seeing it is a debug chord AND the table is hand-typed', () => {
     const l = PRESET_LIMITS.find((x) => x.key === 'debug_chord')!;
@@ -147,6 +205,7 @@ describe('the three limits say the words that carry them', () => {
     expect(l.body).toMatch(/hand-typed dc\.l list/);
     expect(l.body).toMatch(/does not add itself/i);
     expect(l.body).toMatch(/fails loudly/i);
+    expect(l.body).toMatch(/neither a table row nor a section binding/i);
   });
 
   /** Limit 3. "Builds green and shows nothing" is the sentence that lands. */

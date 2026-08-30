@@ -25,8 +25,9 @@
 // it enumerates, so a ref missed at any one of them is erased on the next save
 // round-trip with no error on any path. Preserving every ref across
 // parse->serialize is a cross-tool contract requirement, not local hygiene —
-// aeon's generator writes sceneRef into these same files, and rasterRef next
-// (empyrean docs/AURORA_EFFECTS_SCHEMA.md §3/§3.1/§6/§8; aeon
+// aeon's generator writes sceneRef into these same files and READS rasterRef
+// back out of them as of aeon 4aa2abc0 (empyrean
+// docs/AURORA_EFFECTS_SCHEMA.md §3/§3.1/§6/§8; aeon
 // tools/EFFECTS_CONSUMER_CONTRACT.md §2.2). Add a ref here and to save.ts
 // together, or don't add it.
 //
@@ -38,11 +39,20 @@
 // provider function rather than assign the field, so the agent path and the
 // human path cannot diverge on what a no-op is or which ids are valid.
 //
-// NOTHING READS IT ANYWHERE. Not aeon's generator, not the viewport, not a
-// preview — so this file's preserve-it-across-a-round-trip job is still the
-// whole job, exactly as it was when nothing wrote the key either. The tool says
-// so in its own reply rather than letting `changed: true` imply otherwise; the
-// sentence and its expiry live in core/formats/raster-binding.ts.
+// AEON'S GENERATOR READS IT AS OF aeon 4aa2abc0 (2026-08-30) — the "NOTHING
+// READS IT ANYWHERE" note that stood here was retired on the schedule its own
+// dated expiry set. `tools/effects_gen.py` resolves the key and emits the
+// section's raster program plus a chooser; what it does not do is reach the
+// engine, because no `preset()` in their `ojz_effects.emp` passes that chooser
+// to its `raster:` channel at that revision. Nothing on THIS side observes the
+// key either — not the viewport, not a preview — so the tool still says where
+// the binding stops rather than letting `changed: true` imply otherwise, and
+// the sentence and its new expiry live in core/formats/raster-binding.ts.
+//
+// ⚠ THE PRESERVE-IT-ACROSS-A-ROUND-TRIP JOB IS NOW STRICTLY MORE LOAD-BEARING,
+// not less. While nothing read the key, dropping it in parse->serialize lost an
+// author's intent; now it silently un-installs a program from a consumer that
+// would otherwise have emitted it.
 //
 // ═══════════════════════════════════════════════════════════════════════════
 // A METHOD BAR, EARNED BY THE PARCEL THAT ADDED `rasterRef` TO THE LIST ABOVE

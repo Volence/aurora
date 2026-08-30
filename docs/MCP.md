@@ -260,12 +260,27 @@ and `rasterRef` **is** the per-section preset binding (empyrean
 preset document supplies only the raster channel of aeon's eight-channel
 `EffectsPreset`).
 
-**Saving a preset does not install it, and neither does binding one.** No aeon
-consumer reads a `rasterRef` yet — the key appears zero times in aeon's
-`tools/EFFECTS_CONSUMER_CONTRACT.md` and `tools/effects_gen.py` resolves
-`sceneRef` only — so nothing bakes the binding into a ROM and a programmer still
-installs the preset by hand in aeon's `.emp`. This tool therefore reports that
-limit **on its success reply**, not only on a refusal, for the reason
+**Saving a preset does not install it, and binding one no longer stops at the
+sidecar — but it still does not finish.** aeon's build **reads** `rasterRef` as
+of aeon **`4aa2abc0`** (2026-08-30): `tools/effects_gen.py` resolves the key
+against the preset documents, refuses an id naming no document *by name with the
+known ids listed*, refuses a numeric `rasterRef` (Aurora's own parser nulls a
+non-string silently, so the build is the last reader that can see that mistake),
+and emits the section's raster program plus an always-present chooser.
+`tools/EFFECTS_CONSUMER_CONTRACT.md` §2.2 carries the key's normative shape.
+
+*(This paragraph previously said no aeon consumer read the key. That claim
+carried a dated expiry naming the two files above; they moved, and it was
+retired here rather than found stale later.)*
+
+**What is still missing is the call site.** At `4aa2abc0` no `preset()` in aeon's
+`games/sonic4/data/effects/ojz_effects.emp` passes the emitted chooser to its
+`raster:` channel — every `raster:` argument there is a hand-authored label and
+the generated witness reads `EditorRaster_OJZ_Act1_Bindings = 0` — so a bound
+section keeps running its hand-authored program and the band does not play. The
+hand-work left is **one line per section at that call site**, not authoring the
+effect. This tool therefore reports that limit **on its success reply**, not only
+on a refusal, for the reason
 `assign_section_bg` states: a tool that reports success for a binding nothing
 bakes misleads its caller. It is one sentence
 (`src/core/formats/raster-binding.ts`) shared by the reply, the published tool

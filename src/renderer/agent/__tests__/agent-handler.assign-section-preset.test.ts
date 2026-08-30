@@ -21,9 +21,13 @@
 //     (core/formats/bg-binding.ts): a tool that reports success for a binding
 //     NOTHING BAKES misleads its caller. This binding is observed by strictly
 //     less than that one — the background at least gets composited in the
-//     viewport, while nothing anywhere reads a `rasterRef` and no preview of a
-//     raster band exists in the suite at all — so the disclosure is on the
-//     SUCCESS reply, not only the refusal.
+//     viewport, while a `rasterRef` reaches aeon's GENERATOR (aeon `4aa2abc0`)
+//     and stops one seam short of the engine, with no preview of a raster band
+//     anywhere in the suite — so the disclosure is on the SUCCESS reply, not
+//     only the refusal. ⚠ The "nothing anywhere reads a rasterRef" wording that
+//     stood here was retired on 2026-08-30 when aeon landed the reader; what is
+//     still missing is the CALL SITE, and the constant carries that distinction
+//     plus its new dated expiry.
 //
 //   • `list_effects_presets` GREW THE `sections` COLUMN it deliberately did not
 //     have. The omission was right while nothing could bind: an all-nulls column
@@ -287,18 +291,27 @@ describe('the reply says where the binding stops', () => {
    * ANTI-VACUOUS, and the row that asks the SECOND question: does the sentence
    * measure the quantity the property is about? Every `toBe` above would pass on
    * an empty string. What the disclosure has to say is (1) which key is written,
-   * (2) that no consumer reads it, naming the two aeon files that would have to
-   * change, and (3) what an author must therefore still do by hand — plus the
-   * negative that keeps it off the reserved key.
+   * (2) how far it travels, and (3) what an author must therefore still do by
+   * hand — plus the negative that keeps it off the reserved key.
+   *
+   * ⚠ (2) CHANGED ON 2026-08-30 AND THIS ROW CHANGED WITH IT. It used to assert
+   * that NO consumer reads the key, naming the two aeon files that would have to
+   * move. They moved: aeon `4aa2abc0` landed the reader, so
+   * `/EFFECTS_CONSUMER_CONTRACT\.md/` and `/nothing bakes this binding/` went
+   * red — the expiry firing, not a regression. The replacement asserts the
+   * narrowed truth, which is a DIFFERENT claim and not a softer one: the
+   * generator reads it, and nothing installs what it emits.
    */
   it('actually says the load-bearing things, and never names the reserved key', () => {
     expect(RASTER_SECTION_BINDING_LIMIT.length).toBeGreaterThan(200);
     expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/rasterRef/);
     expect(RASTER_SECTION_BINDING_LIMIT).not.toMatch(/effectsRef/);
-    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/EFFECTS_CONSUMER_CONTRACT\.md/);
+    // The reader that now exists, pinned to the file and the revision.
     expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/effects_gen\.py/);
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/Verified at aeon 4aa2abc0/);
+    // ...and the seam it stops at, which is what an agent must not read past.
     expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/ojz_effects\.emp/);
-    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/nothing bakes this binding/i);
+    expect(RASTER_SECTION_BINDING_LIMIT).toMatch(/the band does not play/i);
   });
 });
 

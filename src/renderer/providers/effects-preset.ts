@@ -92,13 +92,21 @@ export const PRESET_LIMITS: readonly PresetLimit[] = Object.freeze([
     // back to naming `effectsRef` — an author who went looking for that key
     // would find nothing.
     //
-    // AND THE STATUS HAS CHANGED TWICE NOW. First the key appeared in the
+    // AND THE STATUS HAS CHANGED THREE TIMES NOW. First the key appeared in the
     // sidecar and Aurora began round-tripping it, so "not implemented in either
     // repo" became a lie. Then `assign_section_preset` landed, so "nothing binds
     // a preset to a section" became one too — a WRITER exists, it is an agent
     // tool, and this panel still has no control for it (ROADMAP row 93's other
-    // half). What survives both corrections is the load-bearing half: no
-    // CONSUMER reads a rasterRef, so binding one still installs nothing.
+    // half). Then aeon `4aa2abc0` landed the READER, so "no aeon consumer reads
+    // a rasterRef" became the third lie — retired on the schedule the sentence's
+    // own dated expiry set.
+    //
+    // What survives all three is narrower and still load-bearing: the reader
+    // stops one seam short. `effects_gen.py` resolves the key and emits the
+    // chooser, but at `4aa2abc0` nothing in aeon's `ojz_effects.emp` PASSES that
+    // chooser to a section's `preset()`, so the band still does not play. The
+    // hand-work left is a one-line call-site edit, not authoring the effect —
+    // and that difference is what an author acts on.
     //
     // ⚠ NO LONGER THIS FILE'S OWN WORDS, and that is the fix rather than a
     // regression. The same sentence is now owed to three audiences — this
@@ -113,11 +121,18 @@ export const PRESET_LIMITS: readonly PresetLimit[] = Object.freeze([
   Object.freeze({
     key: 'debug_chord' as const,
     title: 'Seeing it is a debug chord',
+    // ⚠ THE REACHABILITY HALF WAS NARROWED AT aeon `4aa2abc0`, and the old
+    // wording ("fails loudly when a preset has NO ROW") is now too strong: a
+    // section binding counts as a second installer, so the check fires only when
+    // a document has neither. Corrected here rather than left, because an author
+    // who binds a preset and is then told their build will fail for a missing
+    // row would go add one they do not need.
     body:
       'aeon steps a band-demo table with START held + UP to install the next program and ' +
       'START + DOWN to remove it. That table is a hand-typed dc.l list — this document ' +
-      'does not add itself to it. aeon\'s build fails loudly when a preset has no row, so ' +
-      'the omission is not silent, but the fix is a programmer\'s edit.',
+      'does not add itself to it. aeon\'s build fails loudly when a preset document is ' +
+      'reached by neither a table row nor a section binding (aeon 4aa2abc0), so the ' +
+      'omission is not silent, but adding the row is a programmer\'s edit.',
   }),
   Object.freeze({
     key: 'unchecked_visibility' as const,
@@ -462,8 +477,10 @@ export function replacePresetCommand(
  *
  * ⚠ THIS WRITES `rasterRef`, NEVER `effectsRef` — see the command type's
  * docblock and core/formats/section-meta.ts for the ruling. And see
- * `RASTER_SECTION_BINDING_LIMIT` for where the binding stops: nothing reads it
- * yet, which is `PRESET_LIMITS.unbound`'s subject and this function's too.
+ * `RASTER_SECTION_BINDING_LIMIT` for where the binding stops: aeon's generator
+ * READS the key as of `4aa2abc0` and emits the section's chooser, but nothing
+ * in their `ojz_effects.emp` passes that chooser to a `preset()` yet — which is
+ * `PRESET_LIMITS.unbound`'s subject and this function's too.
  *
  * NO CONTROL CALLS THIS YET. The per-section raster select is the other half of
  * ROADMAP row 93 and is not built; the agent tool is the only caller today. That
