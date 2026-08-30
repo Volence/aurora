@@ -115,6 +115,31 @@ all-nulls column. The difference here is that the assignment IS real and IS
 stored, so the sentence says where it stops and `list_bgs` keeps its per-section
 column; the sentence travels beside it, never instead of it.
 
+**A LIBRARY ENTRY CAN BE NAMED AND ABSENT, AND ON A CLEAN CLONE ALL OF THEM
+ARE.** The library is one manifest (`{dataRoot}editor/{zone}_bglib.json`, id and
+name only) plus TWO binaries per entry beside it. Measured in aeon on
+2026-08-30: the manifest is TRACKED and names **17** entries, and **none** of
+the 34 bodies is tracked — `.gitignore`'s blanket `*.bin` catches them and no
+un-ignore rule brings them back, under a comment aimed at "dead timestamped bg
+experiments". The tracked sidecar `ojz/act1/section_0.meta.json` carries
+`bgLayoutRef: "ingame-forest-v15-1786630615596"`, one of the seventeen. So the
+same sidecar holds two refs with opposite fates: `sceneRef` resolves (effects
+scenes are tracked JSON and genuinely bake), `bgLayoutRef` does not, and nothing
+in the file says which is which.
+
+What that costs is the EDITOR, not the ROM — the paragraph above is why: no
+per-section BG reaches a ROM either way, so a clean clone is not building the
+wrong game, it is authoring against a picture that is not the one it names.
+`list_bgs` therefore reports **`unresolved`** — the manifest entries this
+checkout cannot open, without which an empty `entries` reads as "this zone has
+no backgrounds" — and a per-section **`dangling`** flag. `assign_section_bg`
+refuses such an id with a message naming the missing BINARIES rather than the
+generic "not found in the library", which would be false about an id `list_bgs`
+just printed. Saving never narrows the manifest to what it could read. On the
+human side the missing entry is named in the Properties select, the section
+grid's tooltip and dot, the map status line, and a warning toast at open.
+Nothing blocks: a missing body stays fully editable.
+
 ## Effects scenes (parallax/raster)
 
 A **scene** is one JSON document under `data/editor/effects/<scene_id>.json`
