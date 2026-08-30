@@ -79,10 +79,12 @@ function EffectsPanels() {
           `EffectsPreset` whose raster program is one channel. A `bands` key on a
           scene file is refused. They share a column, never a file.
 
-          IT ARRIVES COLLAPSED AND CARRIES ITS OWN LIMITS. Nothing in the suite
-          has ever looked at one of these bands on screen, and saving a preset
-          does not install it — the panel states both in full, unhidden, because
-          the failure mode this surface has is a promise, not a bug. */}
+          IT ARRIVES COLLAPSED AND CARRIES ITS OWN LIMITS. Nothing in THIS
+          editor draws one of these bands (one frame of one has been looked at,
+          once, in aeon's emulator — aeon `4a4d3474`, 2026-08-30 — and no
+          preview here is built against it), and saving a preset does not
+          install it — the panel states both in full, unhidden, because the
+          failure mode this surface has is a promise, not a bug. */}
       <BandPresetPanel />
       {/* Subscriptions live in the AeonPropertiesPanel leaf, not this column —
           the reason its own docblock gives. */}

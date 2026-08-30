@@ -364,9 +364,17 @@ The **per-section raster select** in the band-preset panel writes the same key
 through the same `sectionPresetCommand` (ROADMAP row 93's remaining half,
 landed), so an agent and an author cannot disagree about what a binding or an
 unbind is — its empty option and this tool's explicit `null` are one state. What
-the select does not add is a picture: nobody in the suite has ever looked at one
-of these bands on screen, and nothing anywhere checks that a band is VISIBLE — a
-legal band over an unused palette entry builds green and shows nothing.
+the select does not add is a picture: this editor draws no band, and the one
+frame of one anybody has looked at — aeon **`4a4d3474`** (2026-08-30),
+`docs/research/reference_captures/2026-08-30-sec5-band/`, section 5 at one
+camera position in aeon's emulator, in aeon's tree — is the only thing a preview
+here could be checked against, and none is built (the panel's `NO_PREVIEW` says
+so, with its own dated expiry). Nothing anywhere checks that a band is VISIBLE —
+a legal band over an unused palette entry builds green and shows nothing.
+
+*(This paragraph previously said nobody in the suite had ever looked at one of
+these bands on screen. That was true until `4a4d3474` landed the same day and
+was retired here against the committed README, not a description of it.)*
 
 ## Classic project tools
 
