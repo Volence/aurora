@@ -305,12 +305,26 @@ that arm was vacuous and printed that it was; since aeon **`c9a462be`**
 and handed over — so at `6e2495a5` the arm has **one live subject** (`1 sidecar
 rasterRef(s)`, checked against the threaded set) and the generated module says
 `EditorRaster_OJZ_Act1_Bindings = 1`. Section 5 has therefore been exercised
-from this editor to aeon's build **and no further**: `c9a462be`'s own message
-says nothing has been seen on screen, and no CRAM was sampled here.
+from this editor to aeon's build, **and once past it, in aeon's tree**: aeon
+**`4a4d3474`** (2026-08-30, "step 6 measured: the section-5 authored band IS
+SEEN on screen", an ancestor of their `origin/master` `e6405428`) commits
+`docs/research/reference_captures/2026-08-30-sec5-band/`, whose README records
+CRAM line 2 entry 8 reading `$0EA4` at screen lines 40, 56 and 72 and `$0000`
+at 8, 20, 96 and 150, all in one frame, on two bound runs that are
+byte-identical — and `$0000` on every one of those lines on a control ROM
+built with the sidecar's `rasterRef` null, `Raster_Program` 0. That was taken
+on aeon's headless `oracle-aether` instance, not hardware, and the README lists
+what it does not establish (exact transition lines, other CRAM entries, other
+camera positions, a walked crossing, motion). **It is aeon's measurement of
+aeon's build.** No CRAM was sampled in Aurora, and nothing of that frame is
+visible in this editor — the viewport still composites no `rasterRef`.
 
 *(This paragraph previously said the arm was vacuous today. That was the
 expiry's first clause; it fired the same day and was retired here rather than
-found stale later.)*
+found stale later. It then said section 5 had been exercised "and no further",
+citing `c9a462be`'s "nothing has been seen on screen". That was the fifth
+clause; it fired at `4a4d3474` the same afternoon and was retired here the
+same way — against the committed artifact, never a description of it.)*
 
 Wiring a second section is a preset **split** plus one call-site line — sections
 6-8 share one `EffectsPreset` record, and threading a section-keyed chooser into

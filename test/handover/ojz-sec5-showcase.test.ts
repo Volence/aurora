@@ -89,14 +89,20 @@
 //     refuses rather than reporting a re-authoring as green.
 //   • What this file does NOT prove, and never did: that the committed files
 //     render. `RASTER_SECTION_BINDING_LIMIT` (core/formats/raster-binding.ts)
-//     owns that sentence and, since `c9a462be`, cites aeon's own "nothing has
-//     been seen on screen" rather than asserting anything of its own.
+//     owns that sentence. From `c9a462be` it cited aeon's own "nothing has
+//     been seen on screen"; since aeon `4a4d3474` (2026-08-30, the same day)
+//     it cites their committed measurement instead —
+//     `docs/research/reference_captures/2026-08-30-sec5-band/`, CRAM line 2
+//     entry 8 `$0EA4` in-band and `$0000` outside and on the control — and
+//     still asserts nothing of its own. Nothing in this file changed for that;
+//     it never pinned either wording.
 //
-// ⚠ NO EMULATOR, AND NO CLAIM THAT THIS RENDERS. Nothing in this repo has ever
-// looked at a raster band on screen. This file proves the two documents are
-// what Aurora's writer produces and that they round-trip; whether the band is
-// visible in the running game is aeon's to measure with CRAM samples, and
-// `RASTER_SECTION_BINDING_LIMIT` owns that sentence.
+// ⚠ NO EMULATOR, AND NO CLAIM THAT THIS RENDERS. Nothing in THIS REPO has ever
+// looked at a raster band on screen (aeon has, in theirs, see above). This
+// file proves the two documents are what Aurora's writer produces and that
+// they round-trip; whether the band is visible in the running game was aeon's
+// to measure with CRAM samples, they did, and `RASTER_SECTION_BINDING_LIMIT`
+// owns the sentence that cites it.
 
 import { it, expect, beforeAll, afterAll } from 'vitest';
 import { execFileSync } from 'node:child_process';

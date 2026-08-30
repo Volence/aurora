@@ -114,8 +114,18 @@ export const PRESET_LIMITS: readonly PresetLimit[] = Object.freeze([
     // test authored through the writer below — so "no sidecar carries the key,
     // the seam gate's arm is vacuous, no section has been exercised end to end"
     // became the sixth, retired against their `6e2495a5`. What that sixth did
-    // NOT change: the band has not been recorded as seen (aeon's own commit
-    // says so), and this viewport still composites nothing.
+    // NOT change at the time: the band had not been recorded as seen (aeon's
+    // own commit said so), and this viewport still composites nothing. Then
+    // aeon `4a4d3474` committed the measurement — `docs/research/
+    // reference_captures/2026-08-30-sec5-band/`, CRAM line 2 entry 8 `$0EA4`
+    // in-band, `$0000` outside and on the control, on their emulator — so
+    // "nothing has been seen on screen" became the SEVENTH, retired against
+    // their `e6405428`. The sentence cites that capture, says where it lives,
+    // and says nothing of it is visible here. What the seventh did NOT change:
+    // this viewport still composites nothing, and `NO_PREVIEW` below still
+    // says a band has never been looked at in this suite — which is now
+    // NO_PREVIEW's own expiry to retire, not this limit's, and is TAGGED in
+    // `core/formats/raster-binding.ts`'s header rather than reworded here.
     //
     // ⚠ AND THE FIFTH IS A DIFFERENT SHAPE FROM THE OTHER FOUR. Each of those
     // replaced one universal claim with another. This one cannot: aeon's step 5
