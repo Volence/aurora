@@ -113,6 +113,49 @@ describe('aeonPropertySections — the background select', () => {
     expect(section(i, 'Active Section').select?.value).toBe('bg-sky');
   });
 
+  // ── O31: the ref the library cannot answer ────────────────────────────────
+  //
+  // A `<select>` whose `value` matches no `<option>` renders at selectedIndex
+  // -1: a BLANK box under the label "Background", on a section whose sidecar on
+  // disk names one. That is what a checkout of aeon carrying the tracked
+  // `ojz_bglib.json` and none of its untracked `ojz_bg_*.bin` bodies produced —
+  // seventeen names in the manifest, zero entries in `bgLibrary`, and
+  // `section_0.meta.json` pointing into the gap.
+  const DANGLING = { objects: [], rings: [], bgLayoutRef: 'ingame-forest-v15-1786630615596' };
+
+  it('gives the missing entry an option of its own, so the control is not blank', () => {
+    const sel = section(input({ bgLibrary: LIB, section: DANGLING }), 'Active Section').select;
+    // The value is unchanged — the section really does carry that ref, and a
+    // fix that quietly rewrote it to '' would be the silent fallback again,
+    // this time in the model.
+    expect(sel?.value).toBe('ingame-forest-v15-1786630615596');
+    expect(sel?.options).toEqual([
+      { value: '', label: 'Act default' },
+      {
+        value: 'ingame-forest-v15-1786630615596',
+        label: 'ingame-forest-v15-1786630615596 — missing, showing act default',
+      },
+      { value: 'bg-city', label: 'City' },
+      { value: 'bg-sky', label: 'Sky' },
+    ]);
+  });
+
+  it('the extra option appears ONLY for a ref nothing answers', () => {
+    // ANTI-VACUOUS: a resolvable ref and the act default must both produce the
+    // untouched list, or the row above would pass over an option added always.
+    const resolvable = input({ bgLibrary: LIB, section: { objects: [], rings: [], bgLayoutRef: 'bg-sky' } });
+    expect(section(resolvable, 'Active Section').select?.options).toHaveLength(3);
+    expect(section(input({ bgLibrary: LIB }), 'Active Section').select?.options).toHaveLength(3);
+  });
+
+  it('a missing entry does not block the author — every real option still works', () => {
+    const onBackgroundChange = vi.fn();
+    const sel = section(
+      input({ bgLibrary: LIB, section: DANGLING, onBackgroundChange }), 'Active Section').select;
+    sel?.onChange('bg-city');
+    expect(onBackgroundChange).toHaveBeenCalledWith('bg-city');
+  });
+
   it('forwards the raw select value — the null-for-empty rule is aeonBackgroundCommand’s', () => {
     // The panel must not decide what '' MEANS. Only the aeon port knows that the
     // empty option is `bgLayoutRef: null`, and only it may issue the command.

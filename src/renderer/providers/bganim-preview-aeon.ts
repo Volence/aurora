@@ -25,6 +25,7 @@ import { actBindsBgOverride } from '../../core/formats/bg-override/bg-override-b
 import { bgOverrideDisplay } from '../../core/formats/bg-override/bg-override-view';
 import type { BgOverrideState } from '../../core/formats/bg-override/bg-override-io';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
+import { danglingBgRef } from '../../core/formats/bg-library';
 import { useProjectStore, getCurrentAct, getCurrentZone } from '../state/projectStore';
 import { useEditorStore } from '../state/editorStore';
 import type { Act, BgLibraryEntry, Tile } from '../../core/model/s4-types';
@@ -112,6 +113,20 @@ export function resolveDisplayedBg(
       return { source: 'library', layout: entry.layout, tiles: entry.tiles, libraryId: entry.id };
     }
   }
+  // ── THE SILENT FALLBACK (O31) ──────────────────────────────────────────────
+  //
+  // A non-null `ref` that found no entry lands HERE, and comes out as
+  // `source: 'act'` — the same value a section that asked for nothing produces.
+  // That is deliberate and stays: an author on a checkout without the library's
+  // binaries must keep editing, and the act default is the right thing to
+  // paint. What must not stay silent is the DIFFERENCE, and this return value
+  // is the wrong carrier for it — the readers that need it ask about sections
+  // this function never resolves (the whole grid) or about the manifest rather
+  // than the picture. `core/formats/bg-library.ts danglingBgRef` is the one
+  // predicate, and it is read by the Properties select (providers/
+  // properties-aeon), the section grid's dot and tooltip (SectionGridNav), the
+  // map status line (providers/map-status-aeon) and `list_bgs` (agent-handler).
+  // A fifth reader belongs there too, not in a field here that nothing reads.
   if (act.bgLayout && act.bgTiles) {
     return { source: 'act', layout: act.bgLayout, tiles: act.bgTiles, libraryId: null };
   }

@@ -25,7 +25,7 @@ import {
   BG_LAYOUT_WORDS, BG_LAYOUT_WORDS_LEGACY, BG_TILE_CAPACITY,
   LAYOUT_TILE_INDEX_MASK, LAYOUT_WORD_MAX,
 } from '../../core/formats/bg-override/bg-override';
-import { makeBgId } from '../../core/formats/bg-library';
+import { danglingBgRef, makeBgId } from '../../core/formats/bg-library';
 import { parseEffectsScene } from '../../core/formats/effects/scene';
 import { sceneIdRefusal } from '../../core/formats/effects/scene-ui';
 import {
@@ -764,8 +764,23 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       const section = ctx.act.sections[req.section];
       if (!section) throw new Error(`section ${req.section} is empty`);
       if (req.bgId !== null) {
-        const library = useProjectStore.getState().project!.bgLibrary;
-        if (!library.some(b => b.id === req.bgId)) {
+        const proj = useProjectStore.getState().project!;
+        if (!proj.bgLibrary.some(b => b.id === req.bgId)) {
+          // TWO DIFFERENT REFUSALS, because they need two different actions.
+          // "Not in the library" is right for an id nobody ever made. But an id
+          // the zone's MANIFEST names, whose binaries this checkout does not
+          // have, is a refusal the agent cannot act on with that wording — it
+          // reads the id in `list_bgs`'s own `unresolved` column and is told it
+          // does not exist. The bytes are the missing thing, and only the
+          // person with the authoring checkout can supply them.
+          const named = proj.bgLibraryUnresolved.find(e => e.id === req.bgId);
+          if (named) {
+            throw new Error(
+              `bg "${req.bgId}" (${named.name}) is named by the zone's bglib manifest but its ` +
+              'layout/tile binaries are not in this checkout, so there is nothing to display. ' +
+              'Aeon tracks the manifest and not the bodies — the files have to come from the ' +
+              'authoring machine before this ref can resolve.');
+          }
           throw new Error(`bg "${req.bgId}" not found in the library (use list-bgs)`);
         }
       }
@@ -795,18 +810,35 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
 
     case 'list-bgs': {
       const ctx = requireProject();
-      const library = useProjectStore.getState().project!.bgLibrary;
+      const proj = useProjectStore.getState().project!;
+      const library = proj.bgLibrary;
       return {
         actDefault: ctx.act.bgLayout && ctx.act.bgTiles
           ? { width: BG_WIDTH, height: Math.floor(ctx.act.bgLayout.length / BG_WIDTH), tiles: ctx.act.bgTiles.length }
           : null,
         entries: library.map(b => ({ id: b.id, name: b.name, tiles: b.tiles.length })),
+        // NAMED BY THE MANIFEST, NOT OPENABLE HERE. Without this column an
+        // agent on a clean clone of aeon sees `entries: []` and concludes the
+        // zone has no backgrounds, when the tracked `{zone}_bglib.json` names
+        // seventeen and only their untracked binaries are missing. Empty is the
+        // ordinary answer; a non-empty one is a fact about the CHECKOUT, not
+        // about the project, and no amount of editing here will change it.
+        unresolved: proj.bgLibraryUnresolved.map(e => ({ id: e.id, name: e.name })),
         // The per-section column IS meaningful here (unlike the preset tool's,
         // which would be all-nulls forever) — the refs are real and the editor
         // uses them. What it cannot say on its own is that none of them reaches
         // a ROM, so the sentence travels beside the column rather than instead
         // of it. Same words as assign_section_bg's reply, from one constant.
-        sections: ctx.act.sections.map((s, i) => s ? { index: i, bgId: s.bgLayoutRef } : null),
+        //
+        // `dangling` is the second thing the bare `bgId` could not say. A
+        // section printing an id that appears in neither `entries` nor
+        // `unresolved` is showing the ACT DEFAULT on screen while this column
+        // reads as an assignment that works, and the reader has to cross-check
+        // two arrays to notice. The flag is computed from the same library the
+        // viewport resolves against, so it cannot drift from what is painted.
+        sections: ctx.act.sections.map((s, i) => s
+          ? { index: i, bgId: s.bgLayoutRef, dangling: danglingBgRef(s.bgLayoutRef, library) !== null }
+          : null),
         sectionBinding: BG_SECTION_BINDING_LIMIT,
       };
     }

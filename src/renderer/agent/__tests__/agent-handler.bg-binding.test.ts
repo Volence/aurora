@@ -39,7 +39,17 @@ const bgEntry = (id: string, name: string) => ({
   tiles: [{ pixels: new Uint8Array(64) }],
 });
 
-function fakeProject(): never {
+/**
+ * `unresolved` and `refs` are the O31 half: a checkout where the zone's bglib
+ * MANIFEST names entries whose binaries are absent, and a section sidecar that
+ * points at one of them. Both default to the whole-library case, so every O33
+ * row below is unchanged by their existence.
+ */
+function fakeProject(opts: {
+  unresolved?: { id: string; name: string }[];
+  refs?: (string | null)[];
+} = {}): never {
+  const refs = opts.refs ?? [null, null];
   return {
     zones: [{
       id: 'ojz', name: 'OJZ',
@@ -47,11 +57,12 @@ function fakeProject(): never {
       palette: { lines: [line(), line(), line(), line()] },
       acts: [{
         id: 'act1', name: 'act1', gridWidth: 2, gridHeight: 1,
-        sections: [section(), section()],
+        sections: refs.map((r) => ({ ...section(), bgLayoutRef: r })),
       }],
     }],
     chunkLibrary: [],
     bgLibrary: [bgEntry('sky', 'Sky'), bgEntry('caves', 'Caves')],
+    bgLibraryUnresolved: opts.unresolved ?? [],
     effectsScenes: { scenes: [], unreadable: [], notices: [] },
     effectsPresets: { presets: [], unreadable: [], notices: [] },
   } as never;
@@ -64,11 +75,11 @@ const sections = () => useProjectStore.getState().project!.zones[0].acts[0].sect
   .map((s) => s as { bgLayoutRef: string | null });
 const actHistory = () => documentHistoryHub.historyFor('level:ojz:act1');
 
-function open(): void {
+function open(opts: Parameters<typeof fakeProject>[0] = {}): void {
   documentHistoryHub.clearAll();
   useProjectStore.getState().reset();
   useWorkspaceStore.getState().reset();
-  useProjectStore.setState({ project: fakeProject() });
+  useProjectStore.setState({ project: fakeProject(opts) });
   useProjectStore.getState().setCurrentAct('ojz', 'act1');
   useSessionStore.setState({ activeId: 'tool:project-setup' });
 }
@@ -155,9 +166,13 @@ describe('the reply says where the success stops', () => {
   it('list_bgs keeps its per-section column AND gains the sentence', async () => {
     await ask({ kind: 'assign-section-bg', section: 1, bgId: 'caves' });
     const r = await ask({ kind: 'list-bgs' }) as Record<string, unknown>;
+    // `dangling` joined the row for O31 (last block). It is asserted here too,
+    // rather than loosened to a partial match, because this row's whole job is
+    // that the column KEEPS what it had — a `toMatchObject` would go on passing
+    // if a later change dropped `bgId` for a differently-named field.
     expect(r.sections).toEqual([
-      { index: 0, bgId: null },
-      { index: 1, bgId: 'caves' },
+      { index: 0, bgId: null, dangling: false },
+      { index: 1, bgId: 'caves', dangling: false },
     ]);
     expect(r.sectionBinding).toBe(BG_SECTION_BINDING_LIMIT);
     // and the library is still reported as it was
@@ -185,5 +200,81 @@ describe('the reply says where the success stops', () => {
     expect(BG_SECTION_BINDING_LIMIT).toMatch(/sec_bg_layout: default/);
     expect(BG_SECTION_BINDING_LIMIT).toMatch(/inject_editor_bg/);
     expect(BG_SECTION_BINDING_LIMIT).toMatch(/assign_section_scene/);
+  });
+});
+
+// O31 — A LIBRARY THAT PROMISES SEVENTEEN ENTRIES AND SHIPS NONE OF THEM.
+//
+// Measured in aeon 2026-08-30: `games/sonic4/data/editor/ojz_bglib.json` is
+// TRACKED and names 17 entries; all 34 body files (`ojz_bg_<id>.bin` and
+// `..._tiles.bin`) are untracked, caught by a `.gitignore` rule whose own
+// comment aims at "dead timestamped bg experiments"; and the TRACKED sidecar
+// `ojz/act1/section_0.meta.json` carries `bgLayoutRef:
+// "ingame-forest-v15-1786630615596"` — one of the seventeen.
+//
+// So a clean clone reads a manifest of seventeen names, opens none of them, and
+// paints a section whose sidecar asks for one of them with the act default. The
+// authoring machine resolves everything, which is why the failure is invisible
+// to exactly the person who could fix it.
+//
+// WHAT THESE ROWS ASSERT IS THE HONESTY, NOT A REFUSAL. A missing body must stay
+// workable — the author on a clean clone is told, never stopped — so the first
+// row here is the control that says the tool still writes.
+describe('a ref the library cannot answer is reported, not swallowed', () => {
+  it('CONTROL: a dangling ref does not stop the tool from working', async () => {
+    open({ unresolved: [{ id: 'ghost', name: 'Ghost Forest' }], refs: ['ghost', null] });
+    // The section carrying the dangling ref can still be re-pointed at a real
+    // entry, in one undo step, exactly as if nothing were missing. A change that
+    // made a dangling ref an error would pass every wording row below.
+    const r = await ask({ kind: 'assign-section-bg', section: 0, bgId: 'sky' }) as Record<string, unknown>;
+    expect(r.changed).toBe(true);
+    expect(sections()[0].bgLayoutRef).toBe('sky');
+  });
+
+  it('list_bgs names the manifest entries this checkout could not open', async () => {
+    open({ unresolved: [{ id: 'ghost', name: 'Ghost Forest' }] });
+    const l = await ask({ kind: 'list-bgs' }) as Record<string, unknown>;
+    // ANTI-VACUOUS: the loaded entries are still there and are a DIFFERENT set,
+    // so a reply that merged the two columns would fail here rather than pass
+    // by accident.
+    expect((l.entries as { id: string }[]).map((e) => e.id)).toEqual(['sky', 'caves']);
+    expect(l.unresolved).toEqual([{ id: 'ghost', name: 'Ghost Forest' }]);
+  });
+
+  it('the unresolved column is EMPTY on a whole checkout, not merely present', async () => {
+    open();
+    const l = await ask({ kind: 'list-bgs' }) as Record<string, unknown>;
+    expect(l.unresolved).toEqual([]);
+  });
+
+  it('list_bgs flags the section whose ref nothing answers, and only that one', async () => {
+    open({ unresolved: [{ id: 'ghost', name: 'Ghost Forest' }], refs: ['ghost', 'sky'] });
+    const l = await ask({ kind: 'list-bgs' }) as Record<string, unknown>;
+    const rows = l.sections as { index: number; bgId: string | null; dangling: boolean }[];
+    // The whole point: both rows print an id, and without the flag they read
+    // the same. Section 1 resolves and section 0 does not.
+    expect(rows[0]).toEqual({ index: 0, bgId: 'ghost', dangling: true });
+    expect(rows[1]).toEqual({ index: 1, bgId: 'sky', dangling: false });
+  });
+
+  it('a section on the act default is NOT dangling — unbound and broken are different', async () => {
+    open({ refs: [null, null] });
+    const rows = (await ask({ kind: 'list-bgs' }) as Record<string, unknown>)
+      .sections as { dangling: boolean }[];
+    expect(rows.map((r) => r.dangling)).toEqual([false, false]);
+  });
+
+  it('assigning a manifest-named id says the BYTES are missing, not that the id is unknown', async () => {
+    open({ unresolved: [{ id: 'ghost', name: 'Ghost Forest' }] });
+    // The refusal an agent can act on. "not found in the library" is the wrong
+    // sentence for an id `list_bgs` just printed in its own `unresolved`
+    // column, and it is what this used to say.
+    await expect(ask({ kind: 'assign-section-bg', section: 0, bgId: 'ghost' }))
+      .rejects.toThrow(/binaries are not in this checkout/);
+    await expect(ask({ kind: 'assign-section-bg', section: 0, bgId: 'ghost' }))
+      .rejects.toThrow(/Ghost Forest/);
+    // ...and the OTHER refusal still exists, unchanged, for an id nobody made.
+    await expect(ask({ kind: 'assign-section-bg', section: 0, bgId: 'nope' }))
+      .rejects.toThrow(/not found in the library/);
   });
 });
