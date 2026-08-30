@@ -25,6 +25,7 @@ import {
   LAYOUT_WORD_MAX, TILE_PIXELS, TILE_PIXEL_MAX,
 } from '../core/formats/bg-override/bg-override';
 import { BG_WIDTH } from '../core/formats/bg-tiles';
+import { BG_SECTION_BINDING_LIMIT } from '../core/formats/bg-binding';
 // The layer bound an agent is TOLD about, read from the same vendored schema
 // the validator enforces. It was the literal `1..8` until empyrean `277bc15`
 // raised the ceiling to 16 — a description is the only place an agent can learn
@@ -284,10 +285,16 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + 'attribute table at $B800). Without "name" replaces the act-default BG (one undo step); with '
       + '"name" saves to the project BG library (additive). Tile indices are local to the BG blob.' },
   { name: 'list_bgs', kind: 'list-bgs', result: 'json', params: {},
-    description: "List available backgrounds: the act default, every BG library entry (id, name, tile count), and each section's current assignment (bgId null = act default)." },
+    description: "List available backgrounds: the act default, every BG library entry (id, name, tile count), and each section's current assignment (bgId null = act default). "
+      + BG_SECTION_BINDING_LIMIT },
   { name: 'assign_section_bg', kind: 'assign-section-bg', result: 'json',
     params: { section: z.number().int().min(0), bgId: z.string().nullable().describe('BG library entry id, or null for the act default') },
-    description: 'Assign which background a section displays: a BG library id, or null to revert to the act default. The viewport composites the assigned BG while that section is active. One undo step.' },
+    // THE SENTENCE IS IMPORTED, NOT RESTATED. An agent reads the description
+    // before it ever sees a reply, and a description that promised a ROM effect
+    // this tool does not have would send it down the same wrong path the reply
+    // used to. One constant, `core/formats/bg-binding.ts`.
+    description: 'Assign which background a section displays: a BG library id, or null to revert to the act default. The viewport composites the assigned BG while that section is active. One undo step. '
+      + BG_SECTION_BINDING_LIMIT },
   // ---- The effects arc, wave 1 -------------------------------------------
   // One registry entry lights a capability up on BOTH MCP and Aether, so agent
   // parity is a property of adding it here (this file's header, and ROADMAP §6's

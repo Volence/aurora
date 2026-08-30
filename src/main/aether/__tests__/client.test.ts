@@ -31,6 +31,12 @@ const INIT_RESULT = {
   serverVersion: '0.1.0',
   protocolVersion: 1,
   running: false,
+  // REQUIRED by protocol.md §2.1 (registered 2026-08-26), and the client now
+  // refuses a handshake that omits `implementation` — a fixture without these
+  // described a server nobody ships, for the same reason the `methods` note
+  // below gives. Shapes measured off a live `oracle-aether` on 2026-08-31.
+  implementation: 'oracle-rs',
+  serverBuild: { id: 'fb72abe+profile=release', source: 'vcs', dirty: false },
   // Everything these rows actually call. `emulator/registers` is here because
   // the framing rows call it: a fixture that advertised `status` but not
   // `registers` describes a server nobody ships, and the client now refuses an

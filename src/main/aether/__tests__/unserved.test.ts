@@ -41,6 +41,11 @@ const FIXTURE = {
   serverName: 'oracle-next',
   serverVersion: '0.4.1',
   protocolVersion: 1,
+  // REQUIRED by protocol.md §2.1, and the client now refuses a handshake
+  // without it — a reply that omitted these described a server nobody ships.
+  // Shapes measured off a live `oracle-aether` on 2026-08-31, not invented.
+  implementation: 'oracle-rs',
+  serverBuild: { id: 'fb72abe+profile=release', source: 'vcs', dirty: false },
   methods: ['emulator/status', 'emulator/pause', 'emulator/lookup_symbol', 'emulator/run_to'],
   capabilities: { events: ['emulator/stopped'] },
 };
@@ -175,10 +180,15 @@ describe('the handshake records WHAT ANSWERED, not just that something did', () 
     const { client } = await connected(other);
     expect(client.handshake!.methodCount).toBe(other.methods.length);
     expect(client.handshake!.methodCount).not.toBe(FIXTURE.methods.length);
-    // And the OTHER discriminator the two implementations actually differ on
-    // today: the legacy C++ server calls itself `oracle`, the Rust core calls
-    // itself `oracle-next`.
+    // ⚠ THIS ROW USED TO ASSERT `serverName === 'oracle'` AND CALL IT "the
+    // other discriminator the two implementations differ on". It is not one.
+    // protocol.md §2.1 makes `serverName` a DEPLOYMENT label a config may set
+    // and forbids discriminating on it — this very fixture proves the point,
+    // renaming the deployment while the lineage is unchanged. The identity has
+    // to survive that rename, and it does.
     expect(client.handshake!.serverName).toBe('oracle');
+    expect(client.handshake!.identity.implementation).toBe('oracle-rs');
+    expect(client.handshake!.identity.verdict).toBe('supported');
   });
 
   it('logs the handshake once, naming the server and the count', async () => {

@@ -17,6 +17,7 @@ import { IPC_CHANNELS, type AetherStatusPayload, type AetherWarpResult, type Aet
 import { AetherClient } from './client';
 import { resolveSocketPath } from './socket-path';
 import { unservedMethodOf } from './unserved';
+import { describeBuild } from './server-identity';
 import { pushPaletteWords } from './push-palette';
 import { warpTo, WarpGateReason } from './warp';
 import { s1WarpTo } from './s1-warp';
@@ -281,8 +282,13 @@ function statusPayload(socketPath?: string): AetherStatusPayload {
     paletteKind: paletteKind ?? undefined,
     // WHICH SERVER ANSWERED. Two implementations resolve the same socket and
     // serve different subsets, so "connected" alone does not say what Aurora is
-    // talking to. The count travels with the name because the name is the thing
-    // most likely to be aligned between them, and the count is not.
+    // talking to — and `serverName` above cannot say either (protocol.md §2.1
+    // makes it a deployment label). `implementation` is the discriminator; the
+    // build is provenance, rendered and never compared.
+    implementation: client?.handshake?.identity.implementation ?? undefined,
+    serverBuild: client?.handshake?.identity.serverBuild
+      ? describeBuild(client.handshake.identity.serverBuild) : undefined,
+    identityWarning: client?.handshake?.identity.warning ?? undefined,
     methodCount: client?.handshake?.methodCount,
     servedMethods: client?.handshake?.methods,
     paletteUnservedMethod,

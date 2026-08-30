@@ -15,6 +15,7 @@
 
 import { ERR, PROTOCOL_VERSION, type JsonRpcResponse } from './protocol';
 import { MethodNotServedError } from './unserved';
+import { identifyServer, describeBuild, type ServerIdentity } from './server-identity';
 
 /** The slice of a socket this client needs. `net.Socket` satisfies it. */
 export interface AetherSocket {
@@ -49,6 +50,10 @@ interface InitializeResult {
   protocolVersion?: number;
   methods?: string[];
   capabilities?: Record<string, unknown>;
+  /** §2.1's lineage field. Read through `identifyServer`, never compared here. */
+  implementation?: unknown;
+  /** §2.1's build identity. Recorded as provenance; never compared. */
+  serverBuild?: unknown;
 }
 
 /**
@@ -57,19 +62,31 @@ interface InitializeResult {
  * the same path, so Aurora can be swapped between them with nothing in this
  * codebase changing.
  *
- * `serverName` IS a real discriminator today and not an invented one — the
- * legacy server reports `oracle` (ControlSocket.cpp `kServerName`) and the Rust
- * core reports `oracle-next` (oracle-aether engine.rs `server_name`) — but it is
- * a name, and names get aligned. `methodCount` is the load-bearing field: an
- * installed `oracle-aether` binary can banner a different count from the source
- * tree it was built from, and a consumer measuring against the binary gets the
- * older answer with nothing announcing it. Record the count that ACTUALLY
- * arrived rather than any number written down elsewhere.
+ * ⚠ `serverName` IS NOT A DISCRIMINATOR, and the comment that used to stand
+ * here said it was — "a real discriminator today and not an invented one". It
+ * reports `oracle-next` from the Rust core to this day; protocol.md §2.1 makes
+ * it a *deployment* label a config may set and says it "MUST NOT be used to
+ * discriminate implementations". The field that answers "which core" is
+ * `implementation` (§2.1's closed registry), classified in `server-identity.ts`
+ * — that module carries the whole argument.
+ *
+ * `methodCount` remains load-bearing for a different question: an installed
+ * `oracle-aether` binary can banner a different count from the source tree it
+ * was built from, and a consumer measuring against the binary gets the older
+ * answer with nothing announcing it. Record the count that ACTUALLY arrived
+ * rather than any number written down elsewhere — and never PIN it, which is
+ * the defect `docs/reviews/2026-08-31-liveness-assertions.md` opens with.
  */
 export interface AetherHandshake {
   serverName?: string;
   serverVersion?: string;
   protocolVersion?: number;
+  /**
+   * WHICH IMPLEMENTATION ANSWERED, and which build of it — the verdict, the
+   * raw values, and any non-fatal complaint. Never null after a successful
+   * handshake: a connection that could not be identified does not complete.
+   */
+  identity: ServerIdentity;
   /** Exactly what `initialize` advertised, in the order it advertised it. */
   methods: string[];
   /** `methods.length` — the number the banner claims, measured at the wire. */
@@ -145,6 +162,16 @@ export class AetherClient {
         );
       }
 
+      // WHICH IMPLEMENTATION ANSWERED — BEFORE anything is recorded as usable.
+      // The socket chain selects a path, never a server (`socket-path.ts`), so
+      // this is the only moment Aurora can learn what it is driving, and until
+      // this call existed it never asked. `identifyServer` reads §2.1's
+      // `implementation` and NOT `serverName`; see `server-identity.ts` for why
+      // the refusal is a denylist and why an unknown lineage is not fatal.
+      const identity = identifyServer(init);
+      const log = this.opts.log ?? ((m: string) => console.log(m));
+      if (identity.refusal) throw new Error(identity.refusal);
+
       const methods = init.methods ?? [];
       this.methods = new Set(methods);
       this.server = { name: init.serverName, version: init.serverVersion };
@@ -152,20 +179,26 @@ export class AetherClient {
         serverName: init.serverName,
         serverVersion: init.serverVersion,
         protocolVersion: init.protocolVersion,
+        identity,
         methods: [...methods],
         methodCount: methods.length,
         capabilities: init.capabilities,
         at: Date.now(),
       };
       // ONCE, AT THE HANDSHAKE, because this is the only moment the answer is
-      // free. Two different servers answer this socket; the count is how a swap
-      // becomes visible in a log rather than as a feature that stopped working.
-      (this.opts.log ?? ((m: string) => console.log(m)))(
-        `[aether] handshake: ${init.serverName ?? 'unnamed server'}` +
+      // free. Two different servers answer this socket; the implementation is
+      // WHICH one, and the count is how a swap becomes visible in a log rather
+      // than as a feature that stopped working. The build id is provenance —
+      // printed so a bug report carries it, compared against nothing.
+      log(
+        `[aether] handshake: ${identity.implementation ?? 'UNIDENTIFIED'}` +
+        ` (deployment name ${init.serverName ?? 'unset'})` +
         ` ${init.serverVersion ?? '(no version)'}` +
         ` protocol ${init.protocolVersion ?? '(unstated)'}` +
-        ` — ${methods.length} methods served`,
+        ` — ${methods.length} methods served` +
+        ` — build ${describeBuild(identity.serverBuild)}`,
       );
+      if (identity.warning) log(`[aether] WARNING: ${identity.warning}`);
 
       // STEP TWO, AND IT IS NOT OPTIONAL. The server registers this connection
       // for events when `initialized` arrives, never on `initialize`
