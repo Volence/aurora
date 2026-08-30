@@ -1,0 +1,5 @@
+{
+  "name": "ozone-probe-app",
+  "private": true,
+  "main": "main.js"
+}

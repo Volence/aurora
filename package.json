@@ -24,6 +24,7 @@
     "harness:collision-read": "node scratchpad/collision-read-harness.mjs",
     "check:harness-guards": "node scratchpad/check-harness-guards.mjs",
     "harness:guard-proof": "node scratchpad/harness-guard-proof.mjs",
+    "harness:ozone-x11": "node scratchpad/ozone-x11-proof.mjs",
     "harness:xvfb-reap": "node scratchpad/xvfb-reap-proof.mjs",
     "harness:loop-paint": "node scratchpad/loop-paint-harness.mjs",
     "harness:curve-option-disabled": "node scratchpad/curve-option-disabled-harness.mjs",
