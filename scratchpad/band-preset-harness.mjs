@@ -688,7 +688,16 @@ async function main() {
     // BY PID ONLY. killTree walks /proc for descendants of the pid THIS
     // process spawned; nothing here signals a pid outside that set, and there
     // is no `pkill` on a pattern anywhere in this file.
-    await killTree(child.pid);
+    //
+    // O65: this line used to read `killTree(child.pid)`. The helper took the
+    // ChildProcess and read `.pid` off it, so a bare number was a SILENT no-op:
+    // all 12 processes of the tree outlived this `finally`, the stdout/stderr
+    // pipes to them kept this process's event loop alive, and the summary line
+    // below was followed by a hang that only a `timeout` wrapper ended
+    // (measured 2026-08-30, 30 s after the summary: same 12 pids, `cleanup:`
+    // never printed). The helper now accepts a pid too and shouts on anything
+    // else; this passes the ChildProcess, the shape the helper was written for.
+    await killTree(child);
   }
 
   console.log(`\n=== ${results.length} rows, ${fails.length} failed, ${((Date.now() - t0) / 1000).toFixed(1)}s ===`);

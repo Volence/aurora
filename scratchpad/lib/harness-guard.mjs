@@ -567,8 +567,43 @@ export function reapDisplays(art, { quiet = false, bound = boundSocketPaths() } 
  * and a straight SIGKILL loses the last few seconds of writes, which has
  * already caused one harness to report a false failure.
  */
-export async function killTree(child, { graceMs = 4000, quiet = false, reap = true } = {}) {
-  if (!child || !Number.isInteger(child.pid)) {
+/**
+ * O65. What `killTree`/`killTreeSync` were HANDED, resolved to something with a
+ * `.pid` — or null, LOUDLY.
+ *
+ * ⚠ THIS EXISTS BECAUSE THE SILENT VERSION HUNG THREE HARNESSES. The helpers
+ * took the ChildProcess and read `child.pid` off it; three launchers wrote
+ * `killTree(child.pid)` instead — a bare number, whose `.pid` is undefined —
+ * and the old first line returned `{ note: 'no child to kill' }` without
+ * printing a word. Every process in the tree survived the harness's own
+ * teardown; the harness's stdout/stderr pipes to that tree stayed open, so its
+ * event loop never drained and the summary line was followed by a process that
+ * would not exit until a `timeout` wrapper SIGTERMed it. Measured 2026-08-30:
+ * 12 processes alive at the summary line, the same 12 alive 30 s later,
+ * `cleanup:` never printed. A guard that asserts nothing, in the guard module.
+ *
+ * So: a bare pid is now an ACCEPTED spelling (resolved to the registered child
+ * when one has that pid, so `registered` bookkeeping still works), and anything
+ * else is refused ON STDERR rather than as a note nobody reads. The return
+ * stays a no-op — a `finally` must not throw over the error it is cleaning up
+ * after — but the no-op is no longer silent.
+ */
+function asChild(arg, fn) {
+  if (Number.isInteger(arg)) {
+    for (const c of registered) if (c.pid === arg) return c;
+    return { pid: arg, kill(sig = 'SIGTERM') { try { process.kill(arg, sig); } catch { /* gone */ } } };
+  }
+  if (arg && Number.isInteger(arg.pid)) return arg;
+  const got = arg === undefined ? 'undefined' : arg === null ? 'null'
+    : typeof arg === 'object' ? `object with pid=${String(arg.pid)}` : `${typeof arg} ${String(arg)}`;
+  console.error(`${fn}: NOTHING KILLED — expected the ChildProcess from spawnGuarded (or its pid), got ${got}. `
+    + 'The tree this harness launched is still running.');
+  return null;
+}
+
+export async function killTree(arg, { graceMs = 4000, quiet = false, reap = true } = {}) {
+  const child = asChild(arg, 'killTree');
+  if (!child) {
     return { tree: [], killed: 0, note: 'no child to kill' };
   }
   const tree = [...descendants(child.pid)];
@@ -576,6 +611,11 @@ export async function killTree(child, { graceMs = 4000, quiet = false, reap = tr
   // BEFORE the first signal, for the same reason the tree is: an orphaned Xvfb
   // cannot be attributed to us afterwards, and unattributable is not reapable.
   const art = reap ? displayArtifacts(child.pid) : null;
+  // O65: the capture goes on record BEFORE the signal, for the exit net. See
+  // `inFlight` — an un-awaited killTree followed by process.exit leaves the
+  // net walking from a dead wrapper pid, and this is the only copy of what
+  // was under it.
+  inFlight.set(child, { tree, art });
   try { process.kill(-child.pid, 'SIGTERM'); } catch { /* not a group leader */ }
   try { child.kill('SIGTERM'); } catch { /* gone */ }
   if (graceMs > 0) await sleep(graceMs);
@@ -583,6 +623,7 @@ export async function killTree(child, { graceMs = 4000, quiet = false, reap = tr
   await sleep(300);
   const survivors = tree.filter(alive);
   registered.delete(child);
+  inFlight.delete(child);
   if (!quiet) {
     console.log(`cleanup: tree under pid ${child.pid} (${tree.length} process(es)):`);
     for (const s of seen) console.log(`           ${s}`);
@@ -594,15 +635,23 @@ export async function killTree(child, { graceMs = 4000, quiet = false, reap = tr
 
 /** Synchronous last-resort variant for process-exit handlers, which cannot
  *  await. Blunt on purpose: at exit there is nothing left to flush for. */
-export function killTreeSync(child, { reap = true } = {}) {
-  if (!child || !Number.isInteger(child.pid)) return { tree: [], killed: 0 };
-  const tree = [...descendants(child.pid)];
+export function killTreeSync(arg, { reap = true } = {}) {
+  const child = asChild(arg, 'killTreeSync');
+  if (!child) return { tree: [], killed: 0, note: 'no child to kill' };
+  // O65: if an async killTree already SIGTERMed this tree and never got to
+  // finish (the harness exited inside the grace period), the wrapper is dead
+  // and a fresh /proc walk from its pid sees NOTHING — the Electron has been
+  // reparented away and the Xvfb's tempdir is unattributable. The capture
+  // killTree made before its first signal is the only record; merge it in.
+  const prior = inFlight.get(child);
+  const tree = [...new Set([...(prior?.tree ?? []), ...descendants(child.pid)])];
   // Read the artifacts before signalling — this is the Ctrl-C path, and it is
   // the ONE path where the X leftovers used to be guaranteed: an interrupted
   // harness never reaches its `finally`, so nothing else was ever going to
   // remove them. SIGKILL is immediate, so no grace loop is needed before the
   // reap; `reapDisplays` re-checks liveness per display anyway.
-  const art = reap ? displayArtifacts(child.pid) : null;
+  const art = reap ? mergeArtifacts(prior?.art, displayArtifacts(child.pid)) : null;
+  inFlight.delete(child);
   try { process.kill(-child.pid, 'SIGKILL'); } catch { /* not a group leader */ }
   const killed = killPids(tree);
   // A SIGKILLed process releases its sockets when the kernel tears it down,
@@ -617,6 +666,36 @@ export function killTreeSync(child, { reap = true } = {}) {
 // ── HAZARD 1b: the ownership rule for readers ──────────────────────────────
 
 const registered = new Set();
+
+/**
+ * O65. Teardowns `killTree` has STARTED but not finished: child -> what it
+ * captured before its first signal. Measured 2026-08-30 on
+ * section-raster-select-harness.mjs, which calls `killTree(child)` without
+ * `await` and then `process.exit()`s: killTree SIGTERMs synchronously (before
+ * its first `await`), the xvfb-run wrapper dies at once, the Electron under it
+ * is reparented out of the tree, and 13 ms later the exit net's `killTreeSync`
+ * walks /proc from the dead wrapper pid and finds only the corpse — no
+ * Electron to SIGKILL, no XAUTHORITY to derive the tempdir from. One
+ * `/tmp/xvfb-run.*` leaked per run (23 -> 24), with the OLD helper reaping it
+ * (23 -> 23) only because its silent no-op had left the tree fully alive for
+ * the net to see. The doctrine is "capture before the first signal"; this is
+ * that capture, kept where the abort path can reach it.
+ */
+const inFlight = new Map();
+
+/** Union of two `displayArtifacts` results; entries from `a` win on a display
+ *  number because they were read while the Xvfb was alive. */
+function mergeArtifacts(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  const displays = [...a.displays];
+  for (const d of b.displays) if (!displays.some((x) => x.n === d.n)) displays.push(d);
+  return {
+    displays,
+    tmpdirs: [...new Set([...a.tmpdirs, ...b.tmpdirs])],
+    unknown: [...a.unknown, ...b.unknown],
+  };
+}
 
 /** The pids this harness spawned through `spawnGuarded`. */
 export function ownedRoots() {

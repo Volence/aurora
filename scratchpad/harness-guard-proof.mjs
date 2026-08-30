@@ -47,11 +47,11 @@
 // fail this file without it.
 
 import { spawn } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import {
-  spawnGuarded, killTree, descendants, alive, cmdlineOf,
+  spawnGuarded, killTree, killTreeSync, descendants, alive, cmdlineOf,
   snapshotDiscovery, restoreDiscovery, describeDiscovery, readDiscoveryNow,
   resolveOwnedDiscovery, DISCOVERY_FILES, setDiscoveryBaseline,
   displayArtifacts, reapDisplays,
@@ -293,6 +293,74 @@ async function main() {
       check('k5', 'and it killed MORE than the wrapper — the Electron itself was in the tree it signalled',
         treeBefore.length > 1,
         `tree under the wrapper ${greenK.pid}:\n        ${(out.seen ?? []).join('\n        ')}`);
+    }
+
+    // ---- k6/k7: the BARE-PID spelling (O65) ----------------------------------
+    //
+    // Three harnesses wrote `killTree(child.pid)` — the pid, not the
+    // ChildProcess. The helper read `.pid` off a number, got undefined, and
+    // returned a silent no-op; the whole tree survived the harness's own
+    // teardown and the harness hung on its pipes to it. These two rows hand the
+    // helpers exactly that argument. No Electron is needed for the property:
+    // a two-process shell tree is a tree. Cheap on purpose, so the row cannot
+    // be UNMEASURABLE for an app-side reason.
+    for (const [id, fn, label] of [['k6', killTree, 'killTree'], ['k7', killTreeSync, 'killTreeSync']]) {
+      const t = spawn('/bin/sh', ['-c', 'sleep 300 & exec sleep 300'], { stdio: 'ignore', detached: true });
+      await sleep(300);
+      const before = [...descendants(t.pid)];
+      const out = await fn(t.pid, { graceMs: 500, quiet: true, reap: false });   // the pid, not `t`
+      await sleep(300);
+      const survivors = before.filter(alive);
+      if (survivors.length) { for (const p of survivors) { try { process.kill(p, 'SIGKILL'); } catch { /* */ } } }
+      check(id, `${label} given a BARE PID (the \`killTree(child.pid)\` spelling) kills the whole tree`,
+        // `out.tree` is the no-op detector: the silent version returned [] without
+        // looking. `killed` is NOT asserted — `sleep` honours SIGTERM inside the
+        // grace period, so a correct run has nothing left to SIGKILL and reports 0.
+        before.length >= 2 && survivors.length === 0 && out.tree.length === before.length,
+        `tree before: ${before.length} [${before.join(' ')}]; helper saw ${out.tree.length}; result ${JSON.stringify({ killed: out.killed, note: out.note })}; `
+        + `survivors: ${survivors.length ? survivors.join(',') : 'none'}${survivors.length ? ' (SIGKILLed by the proof itself)' : ''}`);
+    }
+
+    // ---- k8: killTree STARTED but not awaited, then the exit net (O65) -------
+    //
+    // Three harnesses call `killTree(child)` WITHOUT await and then
+    // `process.exit()`. killTree SIGTERMs before its first `await`, the
+    // xvfb-run wrapper dies at once, everything under it is reparented away,
+    // and the exit net's `killTreeSync` then walks /proc from a dead pid and
+    // finds nothing to reap. The tempdir leaks — measured 23 -> 24 on
+    // section-raster-select-harness.mjs. This row does exactly that sequence
+    // against a real xvfb-run (its tempdir is the artifact only the wrapper's
+    // own `rm -r`, or our reap, ever removes) with `sleep` standing in for the
+    // app. The lock is NOT the discriminator — a SIGTERMed Xvfb removes its own
+    // — the tempdir is, and the check runs INSIDE the un-awaited grace, before
+    // the background half could reap it for us.
+    {
+      const t = spawn('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 320x240x8', '/bin/sleep', '300'],
+        { stdio: 'ignore', detached: true });
+      let art = null;
+      for (let i = 0; i < 50 && !(art && art.displays.length && art.tmpdirs.length); i++) {
+        await sleep(200); art = displayArtifacts(t.pid);
+      }
+      if (!art || !art.displays.length || !art.tmpdirs.length) {
+        unmeasurable('k8', 'un-awaited killTree + exit net still reaps',
+          `xvfb-run never produced a display and tempdir under ${t.pid}: ${JSON.stringify(art)}`);
+        await killTree(t, { graceMs: 500, quiet: true });
+      } else {
+        const dir = art.tmpdirs[0];
+        const before = [...descendants(t.pid)];
+        const bg = killTree(t, { graceMs: 3000, quiet: true });   // NOT awaited — the shape under test
+        await sleep(50);                                            // the harness printed its summary here
+        const net = killTreeSync(t);                                // what process.exit's handler does
+        await sleep(300);
+        const dirGone = !existsSync(dir);
+        const survivors = before.filter(alive);
+        check('k8', 'killTree started but NOT awaited, then the exit net — the net still reaps the tempdir and the pids captured before the first signal',
+          dirGone && survivors.length === 0 && net.tree.length === before.length,
+          `display :${art.displays[0].n}, tempdir ${dir}: gone=${dirGone} at +350 ms; net saw ${net.tree.length} pid(s) `
+          + `(killTree had captured ${before.length}); survivors: ${survivors.length ? survivors.join(',') : 'none'}`);
+        await bg;                                                   // let the background half finish; nothing outlives the proof
+        if (!dirGone) { try { rmSync(dir, { recursive: true, force: true }); } catch { /* */ } }
+      }
     }
   } finally {
     // ── unconditional meta-restore ─────────────────────────────────────────
