@@ -44,7 +44,9 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it } from 'vitest';
 
-import { siblingRoot } from './peer-repo';
+import { siblingPath, siblingPathOrUnresolved, UNRESOLVED_ROOT } from './sibling-root.mjs';
+
+export { UNRESOLVED_ROOT };
 
 /**
  * A reference checkout beside this repo, or null when it is not there.
@@ -80,13 +82,7 @@ export function referenceTree(name: string): string | null {
  * `unmeasurable` has separate wording for that.
  */
 export function referenceFile(name: string, ...rel: string[]): string | null {
-  const override = process.env[`AURORA_${name.toUpperCase()}_REPO`];
-  const root = override ?? (() => {
-    const r = siblingRoot();
-    return r === null ? null : resolve(r, name);
-  })();
-  if (root === null) return null;
-  return rel.length === 0 ? root : resolve(root, ...rel);
+  return siblingPath(name, ...rel);
 }
 
 /**
@@ -118,16 +114,8 @@ export function referenceFile(name: string, ...rel: string[]): string | null {
  * `AURORA_PEER_ROOT`.
  */
 export function referencePath(name: string, ...rel: string[]): string {
-  return referenceFile(name, ...rel) ?? resolve(UNRESOLVED_ROOT, name, ...rel);
+  return siblingPathOrUnresolved(name, ...rel);
 }
-
-/**
- * Stand-in root for "no sibling root could be derived at all".
- *
- * Under `/nonexistent`, which is conventionally absent and, unlike a plausible
- * relative guess, cannot resolve onto real files if a caller forgets to guard.
- */
-export const UNRESOLVED_ROOT = '/nonexistent/aurora-unresolved-peer-root';
 
 /**
  * Entries that must be present for a directory to BE a checkout of `name`,

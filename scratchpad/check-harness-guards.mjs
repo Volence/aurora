@@ -86,6 +86,13 @@ const REQUIRED_EXPORTS = [
   // the exact artifact-asserts-liveness defect, in the module written to
   // stop it.
   'livenessOf',
+  // O36 / HAZARD 5. `spawnGuarded` injects `--ozone-platform=x11` through
+  // `pinOzoneToX11`, because deleting DISPLAY does NOT detach an Electron from
+  // the owner's Wayland session and every harness believed it did. Listed here
+  // for the same reason as the rest: rename either name and the injection
+  // becomes dead code while every launcher still "imports the guard" and every
+  // harness silently goes back to measuring the owner's desktop.
+  'pinOzoneToX11', 'OZONE_X11_FLAG',
 ];
 
 // ── source scanning ────────────────────────────────────────────────────────

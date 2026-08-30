@@ -21,9 +21,12 @@ import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '..');
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+// DERIVED, NEVER TYPED — see test/support/sibling-root.mjs.
+const S1DIR = siblingPathOrUnresolved('s1disasm');
 
 async function loadCore() {
   const entry = `

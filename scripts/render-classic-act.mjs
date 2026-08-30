@@ -27,9 +27,14 @@ import * as zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '..');
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+// DERIVED, NEVER TYPED — see test/support/sibling-root.mjs. Honours
+// AURORA_PEER_ROOT / AURORA_S1DISASM_REPO, and resolves to the same directory
+// the literal named on the machine it was written on.
+const S1DIR = siblingPathOrUnresolved('s1disasm');
 const CHUNK_PX = 256;
 
 // ---------------------------------------------------------------------------

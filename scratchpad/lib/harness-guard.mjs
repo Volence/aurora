@@ -140,6 +140,73 @@
 // `reapDisplays` now has a row in xvfb-reap-proof.mjs that asserts WHICH gate
 // refused, and all four were verified by deleting them one at a time.
 //
+// ── HAZARD 5: THE XVFB THAT WAS NEVER USED ─────────────────────────────────
+//
+// O36. Every launcher in scratchpad/ opens with the same two lines:
+//
+//     const env = { ...process.env, ... };
+//     delete env.DISPLAY;          // never the owner's X session
+//
+// and then runs the app under `xvfb-run`. The comment says what the author
+// intended. It is not what happens. MEASURED 2026-08-30, not reasoned about:
+// a window-less Electron (no BrowserWindow at all, so nothing can appear on
+// anyone's screen) launched through EXACTLY that shape, under an Xvfb given
+// the deliberately distinctive geometry 1001x777, was asked what displays it
+// could see. It answered
+//
+//     2844x1600 @1.35 , 1920x1080 @1
+//
+// — the owner's two real monitors. Not 1001x777. The Xvfb was started, was
+// paid for, and was never connected to.
+//
+// WHY. `delete env.DISPLAY` is an X11 gesture, and the attachment is not
+// happening over X11. The owner's session exports
+//
+//     ELECTRON_OZONE_PLATFORM_HINT=auto
+//     WAYLAND_DISPLAY=wayland-0
+//     XDG_RUNTIME_DIR=/run/user/1000
+//
+// and `{ ...process.env }` copies all three into every harness. `auto` tells
+// Chromium's Ozone layer to prefer Wayland when a compositor is reachable, and
+// one always is. DISPLAY is irrelevant to that decision, so deleting it
+// removes the fallback and leaves the preference.
+//
+// ⚠ THE OBVIOUS FIX DOES NOT WORK, AND THAT IS THE PART WORTH READING. Also
+// deleting WAYLAND_DISPLAY — the treatment window-icon-probe.mjs applies, and
+// the one anybody would reach for — STILL reported the owner's monitors.
+// libwayland's `wl_display_connect(NULL)` falls back to the literal name
+// "wayland-0" under $XDG_RUNTIME_DIR when WAYLAND_DISPLAY is unset, so hiding
+// the variable hides nothing. Confirmed from the other side: with
+// XDG_RUNTIME_DIR removed as well, Electron did not fall back to X11 — it
+// printed "Failed to connect to Wayland display" and SEGFAULTED (exit 139),
+// proving it had been trying Wayland the whole time.
+//
+// Setting ELECTRON_OZONE_PLATFORM_HINT=x11 does not work either (measured, on
+// Electron v41.2.1), and neither does the `--ozone-platform-hint=x11` command
+// line. The ONE thing that works is the explicit platform flag:
+//
+//     --ozone-platform=x11        ->  1001x777, our Xvfb, every time
+//
+// So that flag is injected here, into the argv of every Electron this module
+// spawns, rather than left to ninety harnesses to remember. `delete
+// env.DISPLAY` is kept by the harnesses and is now merely redundant: xvfb-run
+// sets DISPLAY for its child itself.
+//
+// WHAT IT COST WHILE IT WAS LIVE. Every screenshot, every element rect and
+// every devicePixelRatio any harness ever measured was taken on the owner's
+// desktop at dpr 1.35, not on the Xvfb the harness asked for. That is the
+// already-recorded "dpr varies run-to-run here" anomaly — it varies because it
+// depends on which of his two monitors Chromium called primary, a quantity no
+// harness controls or should ever have been able to see.
+//
+// ⚠ AND IT IS A SAFETY PROPERTY, NOT AN ACCURACY ONE. These harnesses DO
+// create BrowserWindows. A window-less probe was used deliberately so that
+// measuring this could not put anything on a screen the owner is using, so
+// what a *windowed* run does is INFERRED here and not measured: an Electron
+// attached to his compositor is one `show` away from his desktop. Nothing in
+// this file should be read as having tested that, and nobody should test it
+// while he is logged in.
+//
 // ── HOW A HARNESS USES THIS ────────────────────────────────────────────────
 //
 //     import { spawnGuarded, killTree, resolveOwnedDiscovery }
@@ -684,10 +751,46 @@ export function spawnGuarded(cmd, args, opts = {}) {
     console.log(`guard: discovery snapshot taken before launch:\n        ${describeDiscovery(snapshot)}`);
   }
   installNet();
-  const child = spawn(cmd, args, { detached: true, ...opts });
+  const pinned = pinOzoneToX11(cmd, args);
+  if (pinned !== args) console.log(`guard: pinned Ozone to x11 (${OZONE_X11_FLAG}) — see HAZARD 5`);
+  const child = spawn(cmd, pinned, { detached: true, ...opts });
   registered.add(child);
   child.on('exit', () => { /* keep it registered: the tree may outlive the wrapper */ });
   return child;
+}
+
+// ── HAZARD 5: pin the Ozone platform ───────────────────────────────────────
+
+/** The ONE thing measured to work. `--ozone-platform-hint=x11` and
+ *  `ELECTRON_OZONE_PLATFORM_HINT=x11` were both measured NOT to. */
+export const OZONE_X11_FLAG = '--ozone-platform=x11';
+
+/** Is this argument the Electron binary itself? */
+const isElectronBin = (a) =>
+  typeof a === 'string' && /(^|\/)electron$/.test(a.split('?')[0]);
+
+/**
+ * Insert `--ozone-platform=x11` immediately after the Electron binary.
+ *
+ * POSITION MATTERS AND IS THE WHOLE REASON THIS IS A FUNCTION. The command is
+ * usually `xvfb-run -a -s '-screen 0 WxH' <electron> <app.mjs> …`, so the flag
+ * cannot go at the front (xvfb-run would eat it) or at the back (it would be
+ * an argument to the app, not to Chromium). It goes directly after the binary,
+ * which is where Chromium parses its own switches.
+ *
+ * Returns `args` UNCHANGED — by identity, so the caller can tell — when no
+ * Electron binary can be found in the command. A harness spawning something
+ * else (the oracle emulator, a build tool) is not our business, and guessing
+ * at it would be worse than leaving it alone.
+ */
+export function pinOzoneToX11(cmd, args) {
+  const a = [...args];
+  if (a.includes(OZONE_X11_FLAG)) return args;      // already pinned; do not double it
+  if (isElectronBin(cmd)) return [OZONE_X11_FLAG, ...a];
+  const i = a.findIndex(isElectronBin);
+  if (i === -1) return args;                        // not an Electron launch
+  a.splice(i + 1, 0, OZONE_X11_FLAG);
+  return a;
 }
 
 /** Restore the files now and report what was put back. Safe to call twice;

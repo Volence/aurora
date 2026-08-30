@@ -34,14 +34,28 @@
  * cite where a measurement was taken. Those are RECORDS; rewriting them destroys
  * provenance and buys nothing, because a comment opens no file.
  *
- * ⚠ WHAT THIS DOES NOT COVER — stated here so a pass is never read as more than
- * it is. It scans `src/` and `test/` only. `scripts/*.mjs` still holds three
- * hand-typed `s1disasm` paths (`probe-sonic-dplc-sharing`, `verify-s1-roundtrip`,
- * `render-classic-act`). Those are hand-run instruments in no runner, so they
- * cannot report a false green, and converting them would need a SECOND copy of
- * the sibling-root derivation in JS — one derivation is the whole point of
- * `referencePath`, and a second one is a hole in whatever the first promises.
- * The count of roots actually scanned is printed on every run.
+ * WHAT THIS COVERS — `src/`, `test/` AND `scripts/`, as of 2026-08-30. The count
+ * of roots actually scanned is printed on every run; read that line rather than
+ * this prose.
+ *
+ * ⚠ THIS FILE USED TO EXCLUDE `scripts/`, AND USED TO CARRY ITS OWN COPY OF THE
+ * SIBLING-ROOT DERIVATION. Those two facts were the same fact. The exclusion was
+ * argued from the cost of a second derivation — "converting them would need a
+ * SECOND copy of the sibling-root derivation in JS" — while this file WAS that
+ * second copy, sitting a hundred lines below the sentence, and it had already
+ * drifted: `peer-repo.ts` honours `AURORA_PEER_ROOT` and the copy here never
+ * read it. Measured before the fix:
+ *
+ *     $ AURORA_PEER_ROOT=/nonexistent/relocated node scripts/check-peer-path-literals.mjs
+ *     … scanned 918 file(s) … for literals naming /home/volence/sonic_hacks
+ *
+ * Under that override the tests resolve their fixtures somewhere else entirely,
+ * so the gate was forbidding a string no test could use and permitting the one
+ * they all did — the check aimed at the wrong target while printing a confident
+ * pass. The derivation now lives once, in `test/support/sibling-root.mjs`, which
+ * `node` imports directly and `tsc` reads through a signature-only `.d.mts`; so
+ * the scripts could be converted, and with nothing left to exclude the exclusion
+ * went with them.
  *
  * ANTI-VACUOUS — TWO GUARDS, both checked rather than printed
  * ----------------------------------------------------------
@@ -54,43 +68,37 @@
  *   2. Zero files found, or a sibling root that cannot be derived, is exit 2 and
  *      says so. "Could not measure" must never render as "no problems found".
  *
+ * KNOWN PROPERTY OF THE MATCH, found while verifying the override and recorded
+ * rather than left for someone to rediscover: the test is a plain SUBSTRING of
+ * the sibling root, so a very SHORT root produces false positives.
+ * `AURORA_PEER_ROOT=/tmp` flags 18 lines, almost all of them legitimate
+ * `'/tmp/test.sock'` fixtures. A real peer root (`/home/<user>/<dir>`) is
+ * specific enough that this cannot happen, and the failure direction is the
+ * safe one — it goes RED and prints every line it judged, so nobody is misled
+ * into thinking the tree is clean. It is a usability wart under a degenerate
+ * configuration, not a hole.
+ *
  * EXIT CODES
  *   0  no executable line names a sibling checkout by absolute path
  *   1  at least one does
  *   2  could not measure
  */
 
-import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { siblingRoot } from '../test/support/sibling-root.mjs';
+
 const PREFIX = 'check-peer-path-literals';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-/** Deliberately NOT `scripts` — see "WHAT THIS DOES NOT COVER" above. */
-const ROOTS = ['src', 'test'];
-const EXTS = ['.ts', '.tsx'];
+const ROOTS = ['src', 'test', 'scripts'];
+/** `.mjs` is here so `scripts/` is actually examined and not merely listed. */
+const EXTS = ['.ts', '.tsx', '.mjs', '.mts'];
 
 function die(msg) {
   console.error(`${PREFIX}: COULD NOT MEASURE — ${msg}`);
   process.exit(2);
-}
-
-/**
- * The directory holding this repo and its siblings, derived the way
- * `test/support/peer-repo.ts` derives it: `--git-common-dir` is the MAIN
- * checkout's `.git` even from a linked worktree, so two `dirname`s up is the
- * sibling root from a plain clone and from an agent worktree alike.
- */
-function siblingRoot() {
-  try {
-    const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
-      cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
-    return common ? dirname(dirname(common)) : null;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -157,9 +165,14 @@ if (canary.length !== 1 || canary[0].line !== 3) {
 const SIBLING = siblingRoot();
 if (!SIBLING) {
   die(
-    'the sibling root could not be derived (`git rev-parse --git-common-dir` failed).\n' +
-    '  Without it there is no path to forbid, so this run is NOT evidence that no test\n' +
-    '  hardcodes one.',
+    'the sibling root could not be derived — either `git rev-parse --git-common-dir` failed,\n' +
+    `  or AURORA_PEER_ROOT (${process.env.AURORA_PEER_ROOT ?? 'unset'}) names a directory that is\n` +
+    '  not there. Without it there is no path to forbid, so this run is NOT evidence that no\n' +
+    '  test hardcodes one.\n' +
+    '\n' +
+    '  ⚠ This used to be a confident PASS. The gate carried its own copy of the derivation\n' +
+    '  which ignored AURORA_PEER_ROOT, so under an override it went on forbidding the DEFAULT\n' +
+    '  sibling root — the one string no test could then be using — and printed OK.',
   );
 }
 
@@ -193,8 +206,8 @@ for (const f of files.sort()) {
 }
 
 console.log(
-  `${PREFIX}: scanned ${files.length} file(s) under ${ROOTS.join(', ')} for literals naming ` +
-  `${SIBLING} (canary OK; scripts/ deliberately NOT scanned).`,
+  `${PREFIX}: scanned ${files.length} ${EXTS.join('/')} file(s) under ${ROOTS.join(', ')} ` +
+  `for literals naming ${SIBLING} (canary OK; nothing excluded).`,
 );
 
 if (violations.length === 0) {
@@ -209,11 +222,17 @@ console.error(
   '  That literal is one machine\'s home directory. Every row behind it can only\n' +
   '  ever SKIP on another checkout — unrunnable by construction, and silently so.\n' +
   '\n' +
-  '  Derive it instead:\n' +
+  '  Derive it instead. From TypeScript under src/ or test/:\n' +
   '\n' +
   "      import { referencePath } from '<...>/test/support/fixture-tree';\n" +
   "      const S1DIR = referencePath('s1disasm');            // whole tree\n" +
   "      const FILE  = referencePath('s1disasm', '_anim/Sonic.asm');\n" +
+  '\n' +
+  '  From a plain-Node script under scripts/, which cannot import a .ts —\n' +
+  '  the SAME derivation, one module lower down:\n' +
+  '\n' +
+  "      import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';\n" +
+  "      const S1DIR = siblingPathOrUnresolved('s1disasm');\n" +
   '\n' +
   '  Guard it exactly as before — `referencePath` resolves to the same directory\n' +
   '  on this machine, so no existsSync/skip needs to change — and the row becomes\n' +

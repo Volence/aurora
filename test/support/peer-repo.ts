@@ -27,11 +27,20 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-/** This repository's own root (the worktree we are running in). */
-export const AURORA_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+import { AURORA_ROOT, siblingRoot, siblingPath } from './sibling-root.mjs';
+
+/**
+ * THE SIBLING-ROOT DERIVATION IS NOT DEFINED HERE ANY MORE, and that is the
+ * point rather than tidiness. It used to live in this file, where only tsc-
+ * compiled code could reach it — so `scripts/check-peer-path-literals.mjs`,
+ * the gate that FORBIDS hand-typed peer paths, carried its own private copy,
+ * and that copy silently ignored `AURORA_PEER_ROOT` while its docblock claimed
+ * to derive the root "exactly as `peer-repo.ts` derives it". One definition now
+ * lives in `sibling-root.mjs`, which node and tsc can both read; re-exported
+ * here so this module's existing importers are unaffected.
+ */
+export { AURORA_ROOT, siblingRoot };
 
 function git(cwd: string, args: string[]): string | null {
   try {
@@ -42,28 +51,11 @@ function git(cwd: string, args: string[]): string | null {
 }
 
 /**
- * The directory that holds this repo and its siblings.
- *
- * Derived, not typed: `--git-common-dir` is the MAIN checkout's `.git` even when
- * we are running inside a linked worktree (where `--show-toplevel` would answer
- * with the worktree, several levels down), so `dirname(dirname(...))` is the
- * sibling root in both cases.
- */
-export function siblingRoot(): string | null {
-  const override = process.env.AURORA_PEER_ROOT;
-  if (override) return existsSync(override) ? override : null;
-  const common = git(AURORA_ROOT, ['rev-parse', '--path-format=absolute', '--git-common-dir'])?.trim();
-  if (!common) return null;
-  return dirname(dirname(common));
-}
-
-/**
  * Path to a peer repo's checkout, or null. Only ever handed to `git -C`; nothing
  * in this module opens a file underneath it.
  */
 export function peerRepo(name: string): string | null {
-  const override = process.env[`AURORA_${name.toUpperCase()}_REPO`];
-  const dir = override ?? (() => { const r = siblingRoot(); return r === null ? null : resolve(r, name); })();
+  const dir = siblingPath(name);
   if (dir === null || !existsSync(dir)) return null;
   return git(dir, ['rev-parse', '--is-inside-work-tree']) === null ? null : dir;
 }
