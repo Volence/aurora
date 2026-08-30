@@ -1,5 +1,33 @@
 // Folding a Save-All's per-document outcomes into a BOUNDED number of toasts.
 //
+// ⚠ WHAT IS PROVEN ABOUT THIS, AND WHAT IS NOT — read before citing it as
+// verified. Ruled 2026-08-30 after the fix landed, deliberately recorded here
+// rather than left for a reader to assume, because "we fixed the toast flood"
+// is the kind of sentence that gets quoted as end-to-end when it is not.
+//
+//   • PROVEN, producer side: the unit rows beside this file assert the COUNT,
+//     with each expectation derived from its fixture's own `ids.length` so it
+//     moves with N rather than pinning a literal. Poisons: gutting this fold
+//     reddens rows on both surfaces; removing only the reason-preservation
+//     reddens only the reason row, so the two halves are independently guarded.
+//   • PROVEN, painting side, BY AN EXISTING INSTRUMENT AND NOT BY THIS PARCEL:
+//     `scratchpad/toast-overflow-harness.mjs` drives the real app under CDP and
+//     shows the screen paints fewer than the store holds, that this is a CAP AND
+//     NOT A DROP (two numbers from two places), that the overflow row's count is
+//     rebuilt from store and screen rather than compared to a literal, and that
+//     the state is escapable. So a flood cannot reach the screen even if a
+//     producer regresses.
+//   • NOT PROVEN: that a real Save-All GESTURE over several dirty documents
+//     yields one toast end to end. That spans gesture → coordinator → saver →
+//     this fold, and no instrument crosses it. The node suite cannot see a
+//     running app at all.
+//
+// A harness for that last gap was CONSIDERED AND DECLINED, with the reason, so
+// nobody rebuilds the argument: the painting side is already covered above, the
+// production side is covered by the rows, and what remains is wiring this parcel
+// did not change. If a future change moves WHERE the fold is called from, that
+// judgement expires with it — the gap would then be over code that had moved.
+//
 // THE PROPERTY, and it is a PRODUCTION bound rather than a painting one. The
 // toast container caps what is DRAWN; it does not stop a producer from building
 // a hundred toast objects, and it is the producer that decides how many distinct
