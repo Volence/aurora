@@ -9,8 +9,16 @@
 // (or off the disk) by the observer.
 //
 // Rows:
-//   0  the emulator is the post-parser-drop binary (35 methods) — fewer means
-//      the STALE binary launched and nothing below means anything
+//   0  the emulator serves EVERY Aether method this run needs — derived from
+//      source (this file's own `observer.call` sites plus the literals in
+//      `src/main/aether/*.ts`, which is every method the app under test can
+//      issue) and checked against the list `initialize` actually advertised.
+//      ⚠ THIS ROW USED TO PIN `methods === '35'` AND THREW OTHERWISE. The
+//      count went 35 -> 52 -> 53 -> 55 while the fix was being written, so
+//      the pin threw on every CORRECT binary and passed only on a stale one
+//      — inverted against its own stated purpose. A count is not a
+//      capability; the advertised list is. Proof, against a live server:
+//      `npm run harness:aether-method-gate`.
 //   1  sonic.lst loads (accepted unverified) and v_palette_line_1..4 resolve
 //      as four lines exactly $20 apart (geometry transcribed from
 //      _Variables.asm:318-321, not hardcoded addresses)
@@ -50,6 +58,7 @@ import net from 'node:net';
 import * as http from 'node:http';
 import * as esbuild from 'esbuild';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { requiredAetherMethods, methodGap } from './lib/aether-methods.mjs';
 
 const PORT = Number(process.env.PORT ?? 9382);
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));   // this worktree
@@ -125,6 +134,12 @@ async function key(c, k, code, vk) {
   await c.send('Input.dispatchKeyEvent', { type: 'keyUp', ...base });
 }
 
+// WHAT THIS RUN NEEDS FROM THE SERVER — derived, so it cannot rot.
+// The derivation, and the whole argument for why the old `methods === '35'`
+// pin threw on every correct binary, live in `lib/aether-methods.mjs`.
+const HARNESS_SRC = fileURLToPath(import.meta.url);
+const CLIENT_SRC_DIR = join(ROOT, 'src/main/aether');
+
 // Words the sentinel pushes use — valid Genesis CRAM (0000BBB0GGG0RRR0, even
 // channels), distinct per row so a shifted mapping cannot alias.
 const SENT_A = Array.from({ length: 16 }, (_, i) => ((i * 0x0222) & 0x0eee));
@@ -166,13 +181,41 @@ async function main() {
     emu.stdout.on('data', (d) => { elog += d; if (process.env.VERBOSE) process.stdout.write(`[emu] ${d}`); });
     emu.stderr.on('data', (d) => { elog += d; if (process.env.VERBOSE) process.stderr.write(`[emu!] ${d}`); });
     for (let i = 0; i < 60 && !elog.includes('listening on'); i++) await sleep(200);
-    const methods = /(\d+) methods advertised/.exec(elog)?.[1] ?? '0';
-    check('0', 'the emulator serves and advertises 35 methods (post-parser-drop binary)',
-      elog.includes('listening on') && methods === '35', `methods=${methods} sock=${SOCK}`);
-    if (methods !== '35') throw new Error('stale oracle-aether binary — aborting; nothing below would mean anything');
+    const bannerCount = /(\d+) methods advertised/.exec(elog)?.[1] ?? null;
+    if (!elog.includes('listening on')) {
+      check('0', 'the emulator came up on the socket', false, `banner=${JSON.stringify(elog.slice(-400))}`);
+      throw new Error('oracle-aether never announced a socket — nothing below would mean anything');
+    }
 
+    // The observer's own handshake is the measurement. `initialize` carries the
+    // advertised list, `implementation` (§2.1's registry lineage) and
+    // `serverBuild`; the connect refuses outright if the lineage is superseded
+    // or absent, so reaching this line has already established WHICH core.
     observer = new AetherClient({ connect: () => net.connect(SOCK), socketPath: SOCK });
     await observer.connect();
+    const hs = observer.handshake;
+
+    // WHAT THIS RUN NEEDS, DERIVED — never a number written down anywhere.
+    const need = requiredAetherMethods(readFileSync(HARNESS_SRC, 'utf8'), CLIENT_SRC_DIR);
+    const gap = methodGap(need, hs.methods);
+    check('0', 'every Aether method this run needs is in the list `initialize` advertised',
+      gap.missing.length === 0, gap.summary);
+    if (gap.missing.length) {
+      throw new Error(`the emulator does not serve ${gap.missing.join(', ')} — aborting; `
+        + 'rows below would fail for the wrong reason');
+    }
+
+    // PROVENANCE, RECORDED AND COMPARED AGAINST NOTHING. §2.1 calls
+    // `serverBuild.id` opaque and it carries profile/target/features, so it
+    // moves on a documentation commit; an equality check here would be the
+    // pin this row just removed, one level up. The banner count is printed
+    // beside the wire count for the same reason — to be READ, not matched.
+    console.log(`        [server] implementation=${hs.identity.implementation}`
+      + ` build=${hs.identity.serverBuild ? hs.identity.serverBuild.id : '(none)'}`
+      + `${hs.identity.serverBuild?.dirty ? ' DIRTY' : ''}`
+      + ` deployment-name=${hs.serverName} protocol=${hs.protocolVersion}`
+      + ` methods=${hs.methodCount} (banner said ${bannerCount ?? 'nothing'})`);
+    if (hs.identity.warning) console.log(`        [server] WARNING: ${hs.identity.warning}`);
 
     // --- Row 1: symbols + geometry ------------------------------------------
     let lsErr = null, ls = null;
