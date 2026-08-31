@@ -132,7 +132,7 @@ npm run gen:theme  # regenerate src/renderer/styles/theme.css
 ```
 
 `gen:theme` reads the Empyrean design tokens from `$EMPYREAN_TOKENS`, else the
-sibling `../megaforge/design/tokens.json`. Its output is checked in, so only
+sibling `../empyrean/design/tokens.json`. Its output is checked in, so only
 regeneration needs the contract repo present.
 
 ### Environment variables
