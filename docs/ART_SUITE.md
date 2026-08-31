@@ -298,7 +298,8 @@ file, mtime-guarded.
 ### Agent surface
 
 Agents reach the same commands through the shared editor-method registry
-(36 tools, exposed identically over MCP and Aether), including `edit_chunk`,
+(`EDITOR_METHODS` in `src/main/editor-methods.ts` — 57 methods as of 2026-08-30, re-derive from
+the array rather than trusting this number; exposed identically over MCP and Aether), including `edit_chunk`,
 `edit_block`, `set_block_collision`, `commit_canvas` and `import_art_sheet`.
 See `docs/MCP.md` → *Classic project tools*.
 
