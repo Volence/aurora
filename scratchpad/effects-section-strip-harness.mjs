@@ -417,9 +417,13 @@ async function main() {
       && truth.own.includes(5) && truth.threaded.includes(5),
       JSON.stringify(c5.rows.map((r) => `${r.mark} ${r.label} ${r.detail}`)));
 
+    // ⚠ INDEXES GUARDED. A poison that DELETES a condition row must make this
+    // row FAIL, not throw: a throw aborts the run and the rows below it are
+    // never taken, which reads as a truncation rather than as a verdict.
     check('3e', 'each condition row carries its own contract on `title` — stated, not just marked',
-      c5.rows.every((r) => r.titleLen > 250)
-      && /^CONDITION 1 of 2/.test(c0.rows[0].title) && /^CONDITION 2 of 2/.test(c0.rows[1].title),
+      c5.rows.length === 2 && c5.rows.every((r) => r.titleLen > 250)
+      && /^CONDITION 1 of 2/.test(c0.rows[0]?.title ?? '')
+      && /^CONDITION 2 of 2/.test(c0.rows[1]?.title ?? ''),
       JSON.stringify(c5.rows.map((r) => ({ n: r.n, titleLen: r.titleLen, head: r.title.slice(0, 40) }))));
 
     // ---- 4. IT ADVISES; IT DOES NOT GATE. --------------------------------
