@@ -2,11 +2,14 @@
  * check-peer-path-literals — fail the run when a file reaches a peer checkout by
  * any route but the resolver.
  *
- * THREE RULES, all listed on every run's own output line. Rule 1 is what this
+ * FOUR RULES, all listed on every run's own output line. Rule 1 is what this
  * file was built for; rules 2 and 3 were added by O69 (2026-09-02) after the
  * SUITE-PATHS landing left two residues rule 1 is STRUCTURALLY UNABLE TO SEE,
  * because neither contains a home-directory literal — the gate scanned both and
- * printed a confident OK.
+ * printed a confident OK. Rule 4 came the same way one day later, O72: 114
+ * instruments asked "which checkout am I" — often via `AURORA_DIR`, the right
+ * name imported the right way from the right module — when they meant "which
+ * built tree do I run against", and rules 1-3 are all blind to that.
  *
  *   1. `sibling-literal`  — an executable line naming the sibling root.
  *   2. `session-scratchpad` — an executable line naming an agent session's
@@ -22,9 +25,17 @@
  *      transitional aliases, the two-spellings-disagree refusal and the
  *      set-but-wrong error, and two then hand-rolled the sibling derivation by
  *      string-surgery on the worktree path.
+ *   4. `checkout-as-build-tree` — an executable line composing a path to a BUILD
+ *      ARTIFACT (`node_modules/…`, `dist/…`) out of `AURORA_DIR` or a local
+ *      alias of it. 114 instruments did, and every one of them RAN, because in
+ *      the main checkout "the tree I live in" and "the tree with a build in it"
+ *      are the same directory. In a linked worktree they are not — a worktree
+ *      has neither artifact — so each composed a path to a file that is not
+ *      there. See the block above `CHECKOUT_IDENT` for the whole argument.
  *
  * Rule 3 does NOT cover `.sh` — see `ENV_RULE_EXEMPT_EXTS`, which says why and
- * what that leaves uncovered.
+ * what that leaves uncovered. Rule 4 is `.ts/.tsx/.mjs/.mts` only and is the one
+ * FILE-SCOPED rule here; see its own block for both reasons.
  *
  * WHY RULE 1 EXISTS
  * -----------------
@@ -364,6 +375,141 @@ const RESOLVER_FILES = ['test/support/sibling-root.mjs', 'scratchpad/lib/suite_p
  */
 const ENV_RULE_EXEMPT_EXTS = ['.sh'];
 
+// ---------------------------------------------------------------------------
+// RULE 4 — `checkout-as-build-tree`, added by O72 (2026-09-02).
+//
+// WHAT IT CATCHES, and why the first three rules cannot. `AURORA_DIR` answers
+// "which checkout am I", observed from the resolver's own file location. The
+// BUILT TREE — the directory carrying `node_modules/.bin/electron` and
+// `dist/main/index.mjs` — is a different question, and `AURORA_BUILT_TREE` /
+// `scratchpad/lib/run-root.mjs` is its answer (the O70 split). In the main
+// checkout the two are the same directory, which is why 103 `scratchpad/*.mjs`
+// instruments composed a build path out of the checkout name and nobody saw it:
+// they ran. In a LINKED WORKTREE they are not the same directory — a worktree
+// has no `node_modules/` and no `dist/` — so every one of those composed a path
+// to a file that is not there, and the failure surfaced as an ENOENT inside
+// `xvfb-run` reading like "the CDP target never appeared".
+//
+// Rules 1-3 are structurally blind to it: there is no home-directory literal, no
+// session scratchpad, and no `process.env` read. `AURORA_DIR` is the CORRECT
+// name for a checkout, imported the correct way, from the correct module. What
+// is wrong is the QUESTION it is being asked.
+//
+// ⚠ IT IS FILE-SCOPED, WHICH NO OTHER RULE IS, and that is forced rather than
+// chosen. The composition is almost never spelled on `AURORA_DIR` itself — it
+// goes through a local alias — 119 files bind `const ROOT = AURORA_DIR;` — so a
+// line-local grep for `AURORA_DIR.*node_modules` returns ZERO and reads as an
+// empty world. A too-narrow query and an absent population produce the same
+// output. So `scan` computes the file's alias set first and the rule matches
+// against it.
+//
+// C DIALECT ONLY, stated rather than left to be discovered: the alias shape
+// below is `const X = AURORA_DIR`, which is JavaScript. The Python instruments
+// under `scratchpad/` resolve through `scratchpad/lib/suite_paths.py` and none
+// of them spawns the built app, so there is nothing there for this to see today;
+// if one ever does, this rule will not catch it and `check-python-resolver.mjs`
+// is where the row belongs.
+// ---------------------------------------------------------------------------
+
+/** The identifier the resolver exports for this repo's own checkout. */
+const CHECKOUT_IDENT = 'AURORA_DIR';
+
+/**
+ * The build artifacts a run needs, as they appear in a composed path.
+ *
+ * `dist` carries a trailing "not a letter or digit" guard because `distance`,
+ * `distinct` and `distM` are all real words in these files — four of them
+ * matched a naive `dist` and none was a path.
+ */
+const ARTIFACT = '(?:node_modules|dist(?![A-Za-z0-9_]))';
+
+/**
+ * Every local name in one file that is the CHECKOUT's answer.
+ *
+ * THREE SEEDS, and the third one is the finding rather than the design.
+ *
+ *   · `AURORA_DIR` itself.
+ *   · anything bound to a seed, transitively (`const ROOT = AURORA_DIR;` then
+ *     `const R = ROOT;`) — a FIXPOINT, because one pass misses the second hop
+ *     and reports a clean file.
+ *   · anything bound to an expression over `import.meta.url`. That is
+ *     `AURORA_DIR` hand-rolled: "the checkout is where my own file lives", the
+ *     same derivation the resolver makes, spelled locally. SEVEN instruments
+ *     used it, and a rule seeded only from the imported name would have printed
+ *     a confident OK over every one of them — they never mention `AURORA_DIR`,
+ *     so they were not even in the survey population O72 started from. It is
+ *     the same lesson the header records for rules 2 and 3, one layer down: a
+ *     failing predicate and an absent population produce the same output.
+ *
+ * Passing such a name INTO `runTarget(HERE)` is not a violation and is not
+ * matched here — only composing an artifact path out of one is.
+ *
+ * A FOURTH SEED, narrower and by SPELLING: a binding IMPORTED under the local
+ * name `ROOT`. Three probes import `ROOT` from `canvas-cdp-harness.mjs` and one
+ * of them read `join(ROOT, 'dist', 'renderer', 'assets')` — a real build path,
+ * off a checkout, and invisible to the three seeds above because the binding is
+ * not created in that file at all. This seed is a convention rather than a
+ * derivation, and it is the one place here that could produce a FALSE positive:
+ * a module that exported a RUN-TARGET under the name `ROOT` would be flagged
+ * wrongly. Nothing does — the house name for that is `RUN.root` — and the
+ * failure direction is loud, so it is worth the coverage.
+ */
+const IMPORTED_CHECKOUT_NAMES = ['ROOT'];
+
+function checkoutAliases(code) {
+  const names = new Set([CHECKOUT_IDENT]);
+  for (const m of code.matchAll(/\bimport\s*\{([^}]*)\}\s*from\s*['"][^'"]+['"]/g)) {
+    for (const spec of m[1].split(',')) {
+      const local = spec.trim().split(/\s+as\s+/).pop()?.trim();
+      if (local && IMPORTED_CHECKOUT_NAMES.includes(local)) names.add(local);
+    }
+  }
+  for (const m of code.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([^;\n]*import\.meta\.url[^;\n]*);/g)) {
+    names.add(m[1]);
+  }
+  for (let pass = 0; pass < 8; pass++) {
+    const before = names.size;
+    for (const m of code.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*[;,]/g)) {
+      if (names.has(m[2])) names.add(m[1]);
+    }
+    for (const m of code.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*dirname\(\s*([A-Za-z_$][\w$]*)\s*\)\s*;/g)) {
+      if (names.has(m[2])) names.add(m[1]);
+    }
+    if (names.size === before) break;
+  }
+  return names;
+}
+
+/**
+ * The alias this line composes a build path out of, or null.
+ *
+ * Three shapes, because these files use all three: a template interpolation
+ * (`` `${ROOT}/dist/main/index.mjs` ``), a path-join argument (`join(ROOT,
+ * 'node_modules/.bin/electron')`, and `resolve(...)` by the same shape), and
+ * plain concatenation (`ROOT + '/dist'`).
+ */
+function composesBuildPath(line, aliases) {
+  for (const a of aliases) {
+    const re = new RegExp(
+      `\\$\\{\\s*${a}\\s*\\}/${ARTIFACT}`
+      + `|\\b${a}\\s*,\\s*['"\`]\\.?/?${ARTIFACT}`
+      + `|\\b${a}\\s*\\+\\s*['"\`]/?${ARTIFACT}`,
+    );
+    if (re.test(line)) return a;
+  }
+  return null;
+}
+
+/**
+ * Files allowed to compose a build path off the checkout name.
+ *
+ * EMPTY, and that is the point — this list exists so that adding to it is a
+ * visible act. `scratchpad/mapviewport-baseline-harness.mjs` reads like a
+ * candidate and is NOT one: its `ROOT` is bound to `resolveRunRoot(...).root`,
+ * the run target, so no alias of the checkout reaches an artifact there.
+ */
+const BUILD_RULE_EXEMPT = [];
+
 /** The rules, built once the sibling root is known. */
 function makeRules(sibling) {
   return [
@@ -385,17 +531,32 @@ function makeRules(sibling) {
       exempt: (rel) => RESOLVER_FILES.includes(rel)
         || ENV_RULE_EXEMPT_EXTS.some((x) => rel.endsWith(x)),
     },
+    {
+      id: 'checkout-as-build-tree',
+      what: 'an executable line composing a build path (node_modules/… or dist/…) out of '
+        + `${CHECKOUT_IDENT} or a local alias of it, which answers "which checkout am I" and `
+        + 'not "which built tree do I run against"',
+      // The only rule that needs the whole file: the composition goes through a
+      // local alias, so the line alone cannot say what it is composing off.
+      match: (line, ctx) => ctx !== undefined && ctx.kind === 'c'
+        && composesBuildPath(line, ctx.checkoutAliases) !== null,
+      exempt: (rel) => BUILD_RULE_EXEMPT.includes(rel),
+    },
   ];
 }
 
 /** Every violating line of one source, as {rule, line, text}. */
 function scan(src, rules, kind = 'c', rel = '') {
   const code = stripComments(src, kind);
+  // FILE SCOPE, computed once and handed to every matcher. Rule 4 needs it:
+  // the build path is composed off a LOCAL ALIAS of the checkout name, so a
+  // line read on its own cannot tell that alias from any other variable.
+  const ctx = { kind, rel, checkoutAliases: kind === 'c' ? checkoutAliases(code) : new Set() };
   const hits = [];
   code.split('\n').forEach((line, n) => {
     for (const r of rules) {
       if (r.exempt?.(rel)) continue;
-      if (r.match(line)) hits.push({ rule: r.id, line: n + 1, text: line.trim().slice(0, 140) });
+      if (r.match(line, ctx)) hits.push({ rule: r.id, line: n + 1, text: line.trim().slice(0, 140) });
     }
   });
   return hits;
@@ -424,6 +585,25 @@ const CANARY_SESSION = join(tmpdir(), 'claude-4242', '-canary', 'deadbeef', 'scr
 const CANARY_ENV = checkoutEnv(SUITE_PEERS[0]);
 
 /**
+ * The identifier rule 4 owns, taken from the constant the rule itself reads, so
+ * the canary cannot go on passing against a name the rule no longer polices.
+ */
+const CANARY_CHECKOUT = CHECKOUT_IDENT;
+
+/**
+ * The two artifact paths rule 4's canary composes, INTERPOLATED rather than
+ * typed into the canary lines.
+ *
+ * Same trick rules 2 and 3 already use (`${CANARY_SESSION}`, `${CANARY_ENV}`),
+ * and for the same reason: this file's own source is one of the 1,170 files the
+ * run scans, so a canary line carrying the violating text verbatim makes the
+ * gate fail on itself. Exempting this file instead would have been the wrong
+ * fix — it would switch rule 4 off for the whole gate, including the parts of it
+ * that legitimately bind `const ROOT = AURORA_DIR;`.
+ */
+const CANARY_ART = ['node_modules/.bin/electron', 'dist/main/index.mjs'];
+
+/**
  * THE CANARIES, one per dialect, each carrying all three rules.
  *
  * `at` is now a list of `[line, ruleId]`, in the order `scan` yields them
@@ -441,8 +621,43 @@ const CANARIES = [
       `const SHOTS = '${CANARY_SESSION}';`,
       `const AEON = process.env.${CANARY_ENV};`,
       `const ALSO = process.env['${CANARY_ENV}'];`,
+      // ── rule 4, and the two ways it goes wrong in opposite directions ──
+      // Lines 8-9 are the violation in its two spellings, THROUGH A LOCAL ALIAS
+      // (line 7) — which is the whole reason the rule is file-scoped, and the
+      // reason a line-local grep for the checkout name beside an artifact
+      // returns zero and reads as an empty world.
+      `const ROOT = ${CANARY_CHECKOUT};`,
+      `const ELECTRON = \`\${ROOT}/${CANARY_ART[0]}\`;`,
+      `const MAIN = join(ROOT, '${CANARY_ART[1]}');`,
+      // Line 10 must NOT fire: the checkout name is the RIGHT answer for output
+      // a human reads, and a rule that flagged it would be un-clearable.
+      "const SHOTS = join(ROOT, 'scratchpad/shots-canary');",
+      // Line 11 must NOT fire either: `dist` is the start of several ordinary
+      // words in these files (`distance`, `distinct`, `distM`), and a naive
+      // substring matched four lines that were not paths at all.
+      "const TABLE = ROOT + '/distance-table.json';",
+      // Lines 12-13: the SECOND HOP. One alias pass would miss this and report
+      // the file clean, which is the failure the fixpoint exists to prevent.
+      'const R2 = ROOT;',
+      `const E2 = \`\${R2}/${CANARY_ART[0]}\`;`,
+      // Lines 14-15: AURORA_DIR HAND-ROLLED. Seven instruments derived the
+      // checkout from their own file location and never named the resolver at
+      // all, so a rule seeded only from the imported identifier reported every
+      // one of them clean. This is the seed that found them.
+      "const OWN = fileURLToPath(new URL('..', import.meta.url));",
+      `const E3 = \`\${OWN}/${CANARY_ART[0]}\`;`,
+      // Lines 16-17: the alias IMPORTED from a sibling harness, and the SEGMENT
+      // spelling of the join. One probe read the built renderer assets exactly
+      // this way; no seed above can see a binding the file never creates.
+      "import { session, ROOT as ROOT } from './canvas-cdp-harness.mjs';",
+      `const A = join(ROOT, '${CANARY_ART[1].split('/')[0]}', 'renderer', 'assets');`,
     ].join('\n'),
-    at: [[3, 'sibling-literal'], [4, 'session-scratchpad'], [5, 'unratified-env'], [6, 'unratified-env']],
+    at: [
+      [3, 'sibling-literal'], [4, 'session-scratchpad'], [5, 'unratified-env'], [6, 'unratified-env'],
+      [8, 'checkout-as-build-tree'], [9, 'checkout-as-build-tree'],
+      [13, 'checkout-as-build-tree'], [15, 'checkout-as-build-tree'],
+      [17, 'checkout-as-build-tree'],
+    ],
   },
   {
     kind: 'hash',
@@ -511,7 +726,7 @@ for (const r of CANARY_RULES) {
 // AND EVERY EXEMPTION MUST NAME A FILE THAT EXISTS. An exemption for a renamed
 // or deleted file exempts nothing while looking like it exempts something, and
 // the file it was written for is then policed by a rule it must violate.
-for (const rel of RESOLVER_FILES) {
+for (const rel of [...RESOLVER_FILES, ...BUILD_RULE_EXEMPT]) {
   try {
     if (!statSync(join(ROOT, rel)).isFile()) throw new Error('not a file');
   } catch (e) {
@@ -627,7 +842,8 @@ console.log(
 
 if (violations.length === 0) {
   console.log(`${PREFIX}: OK — no executable line names a sibling checkout by absolute path, `
-    + 'names a session scratchpad, or reads a suite path variable outside the resolver.');
+    + 'names a session scratchpad, reads a suite path variable outside the resolver, or '
+    + `composes a build path out of ${CHECKOUT_IDENT}.`);
   process.exit(0);
 }
 
@@ -655,6 +871,30 @@ console.error(
   '  when the variable is set but names nothing. Go through the resolver —\n' +
   '  `siblingPathOrUnresolved(name)` to resolve, `checkoutOverride(name)` when an\n' +
   '  override is REQUIRED, `AURORA_DIR` for this repo\'s own tree.\n' +
+  '\n' +
+  '  [checkout-as-build-tree] AURORA_DIR answers "which checkout am I" — observed\n' +
+  '  from the resolver\'s own file location. The tree carrying node_modules/.bin/\n' +
+  '  electron and dist/main/index.mjs is a DIFFERENT question, and in a linked git\n' +
+  '  worktree it is a different directory: a worktree has neither, so a path\n' +
+  '  composed off the checkout name points at a file that is not there and the run\n' +
+  '  dies with an ENOENT inside xvfb-run that reads like "the CDP target never\n' +
+  '  appeared". From a scratchpad/ instrument:\n' +
+  '\n' +
+  "      import { runTarget, announceRunRoot } from './lib/run-root.mjs';\n" +
+  '      const ROOT = AURORA_DIR;                        // question 1: where I live\n' +
+  '      const RUN = announceRunRoot(runTarget(ROOT));   // question 2: what I run\n' +
+  '      const ELECTRON = RUN.electron;                  // honours ELECTRON_BIN\n' +
+  '      const MAIN = RUN.main;\n' +
+  '\n' +
+  '  `runTarget` walks up for a tree carrying BOTH artifacts, honours\n' +
+  '  AURORA_BUILT_TREE when an operator pins one, and `announceRunRoot` prints the\n' +
+  '  tree it chose and marks it BORROWED when that is not the tree the script lives\n' +
+  '  in — the announcement the artifacts carve-out owes (empyrean\n' +
+  '  contract/SUITE_PATHS.md @ c9bc05f).\n' +
+  '\n' +
+  '  AURORA_DIR stays right for everything that is NOT a build artifact: reading\n' +
+  '  src/, writing scratchpad/shots-*, opening test/fixtures/. Those are the tree\n' +
+  '  you edited, and they are not what this rule flags.\n' +
   '\n' +
   '  [sibling-literal] That literal is one machine\'s home directory. Every row\n' +
   '  behind it can only ever SKIP on another checkout — unrunnable by\n' +

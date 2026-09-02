@@ -52,10 +52,17 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const ROOT = AURORA_DIR;
-const ELECTRON = process.env.ELECTRON_BIN ?? join(ROOT, 'node_modules/.bin/electron');
-const MAIN = join(ROOT, 'dist/main/index.mjs');
+// WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
+// question 1. A linked worktree has no node_modules/ and no dist/, so the tree
+// carrying the build can be a different directory from the one this file lives
+// in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
+// it is not this one. See scratchpad/lib/run-root.mjs.
+const RUN = announceRunRoot(runTarget(ROOT));
+const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
+const MAIN = RUN.main;
 const INSPECT_PORT = Number(process.env.INSPECT_PORT ?? 9333);
 // The SAME expression `main/index.ts` uses, evaluated against the BUILT bundle.
 const ICON = join(dirname(MAIN), '../../build/icon.png');

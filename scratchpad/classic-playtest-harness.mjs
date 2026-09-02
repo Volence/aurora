@@ -59,11 +59,19 @@ import net from 'node:net';
 import * as http from 'node:http';
 import * as esbuild from 'esbuild';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 import { requiredAetherMethods, methodGap } from './lib/aether-methods.mjs';
 
 const PORT = Number(process.env.PORT ?? 9382);
 const ROOT = AURORA_DIR;   // this worktree
-const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
+// WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
+// question 1. A linked worktree has no node_modules/ and no dist/, so the tree
+// carrying the build can be a different directory from the one this file lives
+// in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
+// it is not this one. See scratchpad/lib/run-root.mjs.
+const RUN = announceRunRoot(runTarget(ROOT));
+const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
+const MAIN = RUN.main;
 const SERVER = siblingPathOrUnresolved('oracle', 'target/release/oracle-aether');
 const S1DIR = siblingPathOrUnresolved('s1disasm');
 const ROM = join(S1DIR, 's1built.bin');
@@ -152,7 +160,7 @@ async function main() {
   // A STALE dist/ MAKES EVERY ROW VACUOUS: this harness once passed 19/19
   // against a planted source defect because the bundle predated the plant.
   // Refuse to run when any source file is newer than the built main bundle.
-  const distM = statSync(join(ROOT, 'dist/main/index.mjs')).mtimeMs;
+  const distM = statSync(MAIN).mtimeMs;
   const newest = execSync(
     `find ${JSON.stringify(join(ROOT, 'src'))} -name '*.ts' -o -name '*.tsx' | xargs stat -c %Y | sort -n | tail -1`,
     { shell: '/bin/bash' }).toString().trim();
@@ -256,7 +264,7 @@ async function main() {
     // --- Row 2: the app opens s1disasm; palette honestly absent pre-connect --
     const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1', ORACLE_SOCKET: SOCK };
     delete env.DISPLAY;
-    app = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`], {
+    app = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, MAIN], {
       cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
     });
     app.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[app] ${d}`); });

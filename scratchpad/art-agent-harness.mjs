@@ -36,7 +36,7 @@
 //
 //   VITE_AURORA_DEBUG=1 npm run build && node scratchpad/art-agent-harness.mjs
 
-import { session, openProjectAndAct, S1DIR, CANVAS_DIR, ROOT, sleep, resolveOwnedDiscovery } from './canvas-cdp-harness.mjs';
+import { session, openProjectAndAct, S1DIR, CANVAS_DIR, ROOT, MAIN, sleep, resolveOwnedDiscovery } from './canvas-cdp-harness.mjs';
 import { deflateSync } from 'node:zlib';
 import { writeFileSync, rmSync, existsSync, readdirSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -179,7 +179,7 @@ const main = async () => {
     console.log(`\n[prov] discovery file ${found.from} said:\n       ${found.raw.trim()}`);
     console.log(`[prov] pid ${found.pid} IS a descendant of ${found.roots.join(',')} — accepted`);
     console.log(`[wire] POST http://127.0.0.1:${PORT}/aether`);
-    console.log(`[app ] ${ROOT}/dist/main/index.mjs against ${S1DIR}\n`);
+    console.log(`[app ] ${MAIN} against ${S1DIR}\n`);
 
     // TWO INDEPENDENT READERS, on purpose. `poolSizes()` comes off the live store
     // through the CDP probe; `get_classic_level` comes back over the same wire

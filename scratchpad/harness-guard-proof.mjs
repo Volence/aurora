@@ -47,6 +47,7 @@
 // fail this file without it.
 
 import { AURORA_DIR } from '../test/support/sibling-root.mjs';
+import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -59,7 +60,14 @@ import {
 } from './lib/harness-guard.mjs';
 
 const ROOT = AURORA_DIR;
-const ELECTRON = process.env.ELECTRON_BIN ?? `${ROOT}/node_modules/.bin/electron`;
+// WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
+// question 1. A linked worktree has no node_modules/ and no dist/, so the tree
+// carrying the build can be a different directory from the one this file lives
+// in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
+// it is not this one. See scratchpad/lib/run-root.mjs.
+const RUN = announceRunRoot(runTarget(ROOT));
+const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
+const MAIN = RUN.main;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const results = [];
@@ -87,7 +95,7 @@ const runningPid = (pid) => {
 function launchRaw(port) {
   const env = { ...process.env, AURORA_DEBUG_PORT: String(port), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
-  return spawn('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 800x600x24', ELECTRON, `${ROOT}/dist/main/index.mjs`],
+  return spawn('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 800x600x24', ELECTRON, MAIN],
     { cwd: ROOT, env, stdio: ['ignore', 'ignore', 'ignore'], detached: true });
 }
 
@@ -109,8 +117,8 @@ async function waitForOurDiscovery(root, ms = 40000) {
 }
 
 async function main() {
-  if (!existsSync(`${ROOT}/dist/main/index.mjs`)) {
-    console.error(`no build at ${ROOT}/dist/main/index.mjs — run npm run build first`);
+  if (!existsSync(MAIN)) {
+    console.error(`no build at ${MAIN} — run npm run build first`);
     process.exit(2);
   }
 
@@ -170,7 +178,7 @@ async function main() {
     const genv = { ...process.env, AURORA_DEBUG_PORT: '9481', AURORA_NO_GPU: '1' };
     delete genv.DISPLAY;
     const guarded = spawnGuarded('/usr/bin/xvfb-run',
-      ['-a', '-s', '-screen 0 800x600x24', ELECTRON, `${ROOT}/dist/main/index.mjs`],
+      ['-a', '-s', '-screen 0 800x600x24', ELECTRON, MAIN],
       { cwd: ROOT, env: genv, stdio: ['ignore', 'ignore', 'ignore'] });
     const o2 = await resolveOwnedDiscovery({ timeoutMs: 45000 });
     for (const r of o2.rejected ?? []) note('refused', r);

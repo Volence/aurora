@@ -23,6 +23,7 @@ import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-roo
 import { spawn } from 'node:child_process';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9343);
 const S1DIR = siblingPathOrUnresolved('s1disasm');
@@ -31,8 +32,14 @@ const ROOT = AURORA_DIR;
 // The worktree's node_modules has no electron binary (partial install); the
 // main tree's is the same version from the same package.json, and the app code
 // still comes from the WORKTREE's dist, which is what is under test.
-const ELECTRON = process.env.ELECTRON_BIN
-  ?? siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron');
+// WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
+// question 1. A linked worktree has no node_modules/ and no dist/, so the tree
+// carrying the build can be a different directory from the one this file lives
+// in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
+// it is not this one. See scratchpad/lib/run-root.mjs.
+const RUN = announceRunRoot(runTarget(ROOT));
+const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
+const MAIN = RUN.main;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -203,7 +210,7 @@ async function key(c, k, opts = {}) {
 }
 
 function launch() {
-  const electron = spawnGuarded(ELECTRON, [`${ROOT}/dist/main/index.mjs`], {
+  const electron = spawnGuarded(ELECTRON, [MAIN], {
     cwd: ROOT,
     env: { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],

@@ -41,15 +41,23 @@
 // pixel and prints dpr + rect so the environment is visible in the output.
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
-import { mkdirSync, existsSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9397);
 const ROOT = AURORA_DIR;
-const ELECTRON = process.env.ELECTRON_BIN ?? `${ROOT}/node_modules/.bin/electron`;
+// WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
+// question 1. A linked worktree has no node_modules/ and no dist/, so the tree
+// carrying the build can be a different directory from the one this file lives
+// in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
+// it is not this one. See scratchpad/lib/run-root.mjs.
+const RUN = announceRunRoot(runTarget(ROOT));
+const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
+const MAIN = RUN.main;
 const AEONDIR = siblingPathOrUnresolved('aeon');
 const SHOTS = `${ROOT}/scratchpad/shots-screen-frame`;
 mkdirSync(SHOTS, { recursive: true });
@@ -98,7 +106,6 @@ function cdp(wsUrl) {
   const json = async (expr) => JSON.parse(await evalExpr(`JSON.stringify(${expr})`));
   return { ready, send, evalExpr, json, close: () => ws.close() };
 }
-
 
 /** Drive the REAL View menu, because there is no __dbg overlay setter — which
  *  also makes the menu item itself part of what this confirms. The menu's items
@@ -161,7 +168,7 @@ async function main() {
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
   const child = spawnGuarded('/usr/bin/xvfb-run',
-    ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`],
+    ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, MAIN],
     { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   child.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[main] ${d}`); });
   child.stderr.on('data', (d) => { if (process.env.VERBOSE) process.stderr.write(`[err] ${d}`); });
@@ -183,7 +190,7 @@ async function main() {
 
     // ---- 0. PROVENANCE ----------------------------------------------------
     const haveProbe = await c.evalExpr('typeof window.__dbg.aeon.screenFrame === "function"');
-    check('0a', 'the build under test contains the screen-frame probe', haveProbe === true, `${ROOT}/dist`);
+    check('0a', 'the build under test contains the screen-frame probe', haveProbe === true, `${RUN.root}/dist`);
     if (!haveProbe) throw new Error('wrong build');
 
     await c.evalExpr('localStorage.clear()');

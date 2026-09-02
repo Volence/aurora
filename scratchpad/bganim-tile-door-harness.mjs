@@ -91,6 +91,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9418);
 const ROOT = AURORA_DIR;
@@ -98,10 +99,14 @@ const ROOT = AURORA_DIR;
 // `node_modules/.bin/electron` does not exist in a git worktree, and the
 // failure presents as `CDP target never appeared` — a message that says nothing
 // about the real cause. Every harness here carries it.
-const ELECTRON = process.env.ELECTRON_BIN
-  ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
-    ? `${ROOT}/node_modules/.bin/electron`
-    : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
+// WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
+// question 1. A linked worktree has no node_modules/ and no dist/, so the tree
+// carrying the build can be a different directory from the one this file lives
+// in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
+// it is not this one. See scratchpad/lib/run-root.mjs.
+const RUN = announceRunRoot(runTarget(ROOT));
+const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
+const MAIN = RUN.main;
 const LIVE_AEON = siblingPathOrUnresolved('aeon');
 const WORKTREE = `${ROOT}/scratchpad/fixtures/aeon-tile-door`;
 if (WORKTREE.replace(/\/$/, '') === LIVE_AEON.replace(/\/$/, '')) {
@@ -311,7 +316,7 @@ async function main() {
   const child = spawnGuarded('/usr/bin/xvfb-run',
     ['-a', '-s', `-screen 0 ${SCREEN}x24`, ELECTRON,
       ...(process.env.SCALE ? [`--force-device-scale-factor=${process.env.SCALE}`] : []),
-      `${ROOT}/dist/main/index.mjs`],
+      MAIN],
     { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   child.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[main] ${d}`); });
   child.stderr.on('data', (d) => { if (process.env.VERBOSE) process.stderr.write(`[err] ${d}`); });
@@ -337,7 +342,7 @@ async function main() {
     // none of row 57 in it.
     const haveProbe = await c.evalExpr('typeof window.__dbg.aeon.stripOpen === "function"');
     check('0a', 'the build under test contains row 57\'s strip-open probe (this branch, not master)',
-      haveProbe === true, `${ROOT}/dist`);
+      haveProbe === true, `${RUN.root}/dist`);
     if (!haveProbe) throw new Error('wrong build — VITE_AURORA_DEBUG=1 npm run build');
 
     await c.evalExpr('localStorage.clear()');

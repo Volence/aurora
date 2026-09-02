@@ -43,15 +43,68 @@
  * legitimate thing, and it can only ever test the configuration in which the
  * misassignment is invisible.
  *
- * WHAT IS NOT YET CONVERTED, counted rather than estimated (2026-09-02):
- * 105 of the 123 `scratchpad/*.mjs` instruments that import `AURORA_DIR` use it
- * to reach `node_modules/` or `dist/` — question 2 wearing question 1's answer.
- * They are not wrong today: they run against the tree they live in, which is
- * what they want from the main checkout, and `ELECTRON_BIN` is their existing
- * escape hatch for the binary half. They are the migration surface, and they are
- * the reason the refusal in `sibling-root.mjs` names `AURORA_BUILT_TREE` as the
- * variable for "run against the tree over there" rather than promising that
- * every instrument already reads it.
+ * THE SURFACE IS NOW CONVERTED — O72, 2026-09-02, and the count is re-derived
+ * here rather than carried over, because the previous figure in this block was
+ * wrong in both directions.
+ *
+ *     163  scratchpad/*.mjs (depth 1; scratchpad/lib and scratchpad/handover
+ *          are not in that glob) — TRACKED files, `git ls-files`
+ *
+ * ⚠ SAY WHICH 163, because two people counted this and got 163 and 173 and
+ * NEITHER WAS WRONG. 163 is what git tracks at depth 1; 173 was a filesystem
+ * walk, which also sees the instruments `.gitignore` names — NINE of them at
+ * that depth on the owner's machine, 172 present against 163 tracked — plus
+ * subdirectories. An agent worktree is a fresh checkout and carries none of the
+ * nine, so the same command answers differently there, and a count that does not
+ * say which set it counted cannot be reconciled with another one. The ignored
+ * nine are deliberately outside this repo's contract and are NOT part of any
+ * figure below; `test/support/run-root.test.ts` enumerates from git for exactly
+ * that reason, after a `readdirSync` version of it went green in a worktree and
+ * red on the merged tree naming four of them.
+ *     122    …importing AURORA_DIR
+ *     104      …and composing a build path out of it, IN CODE
+ *       1        …already converted before O72 (mapviewport-baseline-harness)
+ *     103        …converted by O72
+ *      18      …not composing one: 14 mention neither artifact at all, and 4
+ *               matched a loose `dist` grep only in prose (`distance`,
+ *               `distinct`, `distM`). All 18 are question 1 and correct as they
+ *               are.
+ *
+ * …AND ELEVEN MORE THAT NO LINE ABOVE COUNTS, because the survey's own
+ * predicate could not reach them. Every one was found by rule 4 of
+ * `scripts/check-peer-path-literals.mjs` AFTER the conversion, not by any
+ * search — which is the finding, not a footnote: a search that returns nothing
+ * and a world with nothing in it print the same output.
+ *
+ *      +1  scratchpad/handover/handover-band-harness.mjs — one directory below
+ *          the `*.mjs` glob every count above was taken over.
+ *      +7  instruments deriving the checkout from their OWN `import.meta.url`
+ *          (animated-art, canvas-cdp, priority-lens, paint-through,
+ *          s1-layout-anim, s1-priority-occlusion, ozone-x11-proof). That is
+ *          `AURORA_DIR` hand-rolled; they never name the resolver, so a
+ *          population defined as "mentions AURORA_DIR" excluded them by
+ *          construction.
+ *      +3  probes IMPORTING `ROOT` from `canvas-cdp-harness` (art-agent,
+ *          collision-agent, collision-gesture) — the binding is not created in
+ *          those files at all. Two printed a provenance line naming the wrong
+ *          tree; one read `join(ROOT, 'dist', 'renderer', 'assets')` for real.
+ *
+ * So 114 instruments changed: 111 import this module directly (112 with
+ * mapviewport, which was already here), and the 3 canvas-cdp probes take `MAIN`
+ * and `RUN` re-exported from the harness they already depend on. Of the 112,
+ * 110 call `runTarget`; this one and mapviewport call `resolveRunRoot` for
+ * reasons each states.
+ *
+ * The converted ones were never WRONG from the main checkout — they ran against
+ * the tree they lived in, which is the same directory there — and `ELECTRON_BIN`
+ * remains the escape hatch for the binary half, now read in one place
+ * (`electronBin`) instead of sixty-one.
+ *
+ * ⚠ WHAT KEEPS THIS FROM COMING BACK is not this paragraph. It is rule 4,
+ * `checkout-as-build-tree`, in `scripts/check-peer-path-literals.mjs`, which is
+ * in the `npm test` chain: a new instrument that composes `${AURORA_DIR}/dist/…`
+ * fails the suite naming the line. Prose describing a completed migration is
+ * exactly the artifact that goes stale silently.
  */
 
 import { existsSync } from 'node:fs';
@@ -63,12 +116,97 @@ import { auroraBuiltTree, AURORA_BUILT_TREE_ENV } from '../../test/support/sibli
 const MAX_LEVELS = 8;
 
 /**
+ * THE TWO ARTIFACT PATHS, SPELLED ONCE.
+ *
+ * Every consumer below composes from these, and so does `isRunnableTree` — the
+ * predicate that decides a tree is runnable and the paths a harness then spawns
+ * MUST be the same two strings, or the walk can approve a tree and the spawn can
+ * miss in it. They were 114 independent pairs of spellings before O72.
+ */
+const ELECTRON_REL = 'node_modules/.bin/electron';
+const DIST_MAIN_REL = 'dist/main/index.mjs';
+
+/**
  * A tree that can actually run the app: BOTH halves, because either alone is a
  * tree that fails halfway through a spawn with ENOENT rather than up front.
  */
 export function isRunnableTree(dir) {
-  return existsSync(join(dir, 'node_modules/.bin/electron'))
-    && existsSync(join(dir, 'dist/main/index.mjs'));
+  return existsSync(join(dir, ELECTRON_REL))
+    && existsSync(join(dir, DIST_MAIN_REL));
+}
+
+/**
+ * THE OVERRIDE FOR THE BINARY HALF, and the reason it is separate from
+ * `AURORA_BUILT_TREE` rather than folded into it.
+ *
+ * `ELECTRON_BIN` names ONE FILE, not a tree. It predates the O70 split, 61
+ * instruments took it before O72 and `docs/OVERSEER.md` documents it as the
+ * override an agent worktree uses, so it keeps working exactly as it did. It is
+ * NOT in the resolver's `OWNED_ENV`, deliberately: `OWNED_ENV` is the set of
+ * SUITE PATH variables that rule 3 of `scripts/check-peer-path-literals.mjs`
+ * forbids anyone but the resolver from reading, and this names an executable on
+ * this machine, not a checkout of a suite repo. Reading it HERE rather than in
+ * 61 files is the point of the helper: one reader, one spelling.
+ */
+export const ELECTRON_BIN_ENV = 'ELECTRON_BIN';
+
+/**
+ * The electron binary to spawn, given the tree the run is against.
+ *
+ * ⚠ `root` IS `resolveRunRoot(...).root` AND NOT `AURORA_DIR`. That is the whole
+ * of O72: 114 instruments composed this path out of the answer to "which
+ * checkout am I", which is a different question and a different directory the
+ * moment the caller lives in a linked worktree — a worktree has no
+ * `node_modules/`, so the composed path named a file that is not there and the
+ * spawn died with ENOENT after the harness had already printed a banner.
+ *
+ * The pre-O72 idiom fell back to `siblingPathOrUnresolved('aurora', …)` when the
+ * binary was missing in-tree — "go find the aurora checkout". `resolveRunRoot`
+ * supersedes that and is strictly better: it requires BOTH artifacts before it
+ * calls a tree runnable, so it cannot hand back a checkout with a stale or
+ * absent `dist/` and let the failure surface one step later.
+ */
+export function electronBin(root) {
+  return process.env[ELECTRON_BIN_ENV] ?? join(root, ELECTRON_REL);
+}
+
+/** The built main bundle to hand electron, given the tree the run is against. */
+export function distMain(root) {
+  return join(root, DIST_MAIN_REL);
+}
+
+/**
+ * EVERYTHING A HARNESS NEEDS TO RUN THE BUILT APP, from its own location.
+ *
+ * One call so the three answers cannot drift apart in a caller: a harness that
+ * resolved the run root and then composed its electron path off `AURORA_DIR`
+ * anyway is the exact defect O72 migrated away, and it is invisible from the
+ * main checkout where the two directories are the same one.
+ *
+ * `{ root, here, borrowed, source, electron, main }`.
+ */
+export function runTarget(here) {
+  const run = resolveRunRoot(here);
+  return { ...run, electron: electronBin(run.root), main: distMain(run.root) };
+}
+
+/**
+ * PRINT the announcement the contract owes, and return the value unchanged so
+ * it composes: `const RUN = announceRunRoot(runTarget(HERE));`
+ *
+ * TO STDERR, and that is not a detail. These instruments print measurements on
+ * stdout and several are read by eye or by another script; a provenance line is
+ * not a measurement. It goes out on every call rather than once per process —
+ * the module's own header rules out a memoised nag as the PROOF artifact, and
+ * this is the caller saying which tree it chose, which is the thing the walk's
+ * carve-out owes ("a derivation that legitimately differs and SAYS SO is
+ * conformant; one that differs silently is the defect").
+ *
+ * `write` is injectable so a row can capture the line instead of the terminal.
+ */
+export function announceRunRoot(run, write = (s) => process.stderr.write(s)) {
+  write(`${describeRunRoot(run)}\n`);
+  return run;
 }
 
 /**
