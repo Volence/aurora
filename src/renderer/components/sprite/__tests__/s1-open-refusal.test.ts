@@ -24,10 +24,10 @@ import { useSpriteStore } from '../../../state/spriteStore';
 import { useToastStore } from '../../../state/toastStore';
 import { parseTiles } from '../../../../core/formats/tiles';
 import { compressionFor } from '../../../../core/compress';
-import { referencePath } from '../../../../../test/support/fixture-tree';
+import { referencePath, S1_PINNED } from '../../../../../test/support/fixture-tree';
 import { spriteSetFiles, whenS1Files } from '../../../../../test/support/s1-checkout';
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 
 // Each describe gates on the FILES ITS OWN SET NAMES, not on the tree's markers.
 // The marker gate (`referenceCheckout`) is satisfied by a checkout with no

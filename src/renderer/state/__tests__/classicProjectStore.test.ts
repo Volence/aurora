@@ -14,7 +14,7 @@ import { detectProject, openProject, type FileAccess } from '../../../core/proje
 import { isRelPathSafe } from '../../../shared/rel-path';
 import * as nodeFsMod from 'node:fs';
 import * as nodePath from 'node:path';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath, S1_PINNED } from '../../../../test/support/fixture-tree';
 
 // ---------------------------------------------------------------------------
 // Fake handle + bridge
@@ -259,10 +259,10 @@ describe('createIpcFileAccess rel-path safety', () => {
 // primitives differ). Skipped when the disasm tree is absent.
 // ---------------------------------------------------------------------------
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
-const S1_PRESENT = referenceCheckout('s1disasm');
+const S1_ABSENT = referenceCheckoutReason(S1_PINNED);
+const S1_PRESENT = referenceCheckout(S1_PINNED);
 
 function nodeFileAccess(root: string): FileAccess {
   return {

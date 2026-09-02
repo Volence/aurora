@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import type { FileAccess } from '../adapter';
 import { s1Adapter, enumerateProfileEntries, S1_FINGERPRINT } from '../s1/index';
 import { s1Profile } from '../profiles/s1';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath, S1_PINNED } from '../../../../test/support/fixture-tree';
 import { whenS1Act } from '../../../../test/support/s1-checkout';
 
 // ---------------------------------------------------------------------------
@@ -301,10 +301,10 @@ describe('s1Adapter.open overrides', () => {
 // Golden — real s1disasm (skipped when the disasm tree is absent).
 // ---------------------------------------------------------------------------
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
-const S1_PRESENT = referenceCheckout('s1disasm');
+const S1_ABSENT = referenceCheckoutReason(S1_PINNED);
+const S1_PRESENT = referenceCheckout(S1_PINNED);
 
 function realFs(root: string): FileAccess {
   return {

@@ -21,7 +21,7 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath, S1_PINNED } from '../../../../test/support/fixture-tree';
 import {
   S1_ANIM_FAMILIES,
   animStateKey,
@@ -35,10 +35,10 @@ import {
   stripFrameAt,
 } from '../s1-anim-art';
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
-const S1_PRESENT = referenceCheckout('s1disasm');
+const S1_ABSENT = referenceCheckoutReason(S1_PINNED);
+const S1_PRESENT = referenceCheckout(S1_PINNED);
 
 function fam(id: string) {
   const f = S1_ANIM_FAMILIES.find((x) => x.id === id);

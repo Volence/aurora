@@ -25,14 +25,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { parseAsmMappings, parseAsmDPLC } from '../../src/core/import/asm-mappings';
 import { reconstructFromFrames } from '../../src/core/import/sprite-import';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath, S1_PINNED } from '../support/fixture-tree';
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
+const S1_ABSENT = referenceCheckoutReason(S1_PINNED);
 const read = (rel: string) => fs.readFileSync(path.join(S1DIR, rel));
 
-describe('S1 Sonic DPLC — real-file parse, hand-derived entries', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
+describe('S1 Sonic DPLC — real-file parse, hand-derived entries', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
   const dplc = () => parseAsmDPLC(read('_maps/Sonic - Dynamic Gfx Script.asm').toString('utf8'));
   const maps = () => parseAsmMappings(read('_maps/Sonic.asm').toString('utf8'));
 

@@ -12,7 +12,7 @@ import { decodeS1Objpos } from '../../formats/classic/s1-objpos';
 import { nemesisCompress, nemesisDecompress } from '../../compress/nemesis';
 import { enigmaCompress, enigmaDecompress } from '../../formats/classic/enigma';
 import { kosinskiCompress, kosinskiDecompress } from '../../formats/kosinski';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath, S1_PINNED } from '../../../../test/support/fixture-tree';
 
 // ---------------------------------------------------------------------------
 // Fakes / helpers
@@ -45,10 +45,10 @@ function memFsWithMtime(files: Record<string, Uint8Array>, mtimes: Record<string
   };
 }
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
-const S1_PRESENT = referenceCheckout('s1disasm');
+const S1_ABSENT = referenceCheckoutReason(S1_PINNED);
+const S1_PRESENT = referenceCheckout(S1_PINNED);
 
 function realFs(root: string): FileAccess {
   return {

@@ -7,7 +7,7 @@ import { tileLockReason } from '../editable-tiles';
 import { buildUsageIndex } from '../../level-classic/usage-index';
 import { buildChunkSurface } from '../../art/classic-surface-buffer';
 import { planSurfaceEdit, type SurfaceWrite } from '../../art/classic-surface-plan';
-import { referencePath } from '../../../../test/support/fixture-tree';
+import { referencePath, S1_PINNED } from '../../../../test/support/fixture-tree';
 import { whenS1Act, whenS1ActReservations, whenS1Acts } from '../../../../test/support/s1-checkout';
 
 // ---------------------------------------------------------------------------
@@ -30,7 +30,7 @@ import { whenS1Act, whenS1ActReservations, whenS1Acts } from '../../../../test/s
 // enumerates and names the absent ones.
 // ---------------------------------------------------------------------------
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 
 function realFs(root: string): FileAccess {
   return {

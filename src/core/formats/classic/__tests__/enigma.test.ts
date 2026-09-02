@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import { enigmaCompress, enigmaDecompress } from '../enigma';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../../test/support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath, S1_PINNED } from '../../../../../test/support/fixture-tree';
 import { whenS1Glob } from '../../../../../test/support/s1-checkout';
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
+const S1_ABSENT = referenceCheckoutReason(S1_PINNED);
 
 /** Deterministic PRNG (mulberry32) so the round-trip property is reproducible. */
 function mulberry32(seed: number): () => number {
@@ -121,7 +121,7 @@ describe('enigma decoder byte vectors (CI-safe, no fixtures)', () => {
   });
 });
 
-describe('enigma against s1disasm goldens', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
+describe('enigma against s1disasm goldens', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
   const map16Dir = `${S1DIR}/map16`;
   const eniFiles = fs.existsSync(map16Dir)
     ? fs.readdirSync(map16Dir).filter((f) => f.toLowerCase().endsWith('.eni'))

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join } from 'path';
-import { referenceFile, whenPresent, declareUnenumerated } from '../support/fixture-tree';
+import { referenceFile, whenPresent, declareUnenumerated, S1_PINNED } from '../support/fixture-tree';
 import { parseS1DisasmAnimScript } from '../../src/core/import/anim-import';
 import { parseSonicAnimTable } from '../../src/core/import/sonic-anim-import';
 import type { AnimFrame } from '../../src/core/import/anim-import';
@@ -32,7 +32,7 @@ import { S1_OBJECT_ANIMS } from '../../src/core/project/profiles/s1-object-anims
 // that registers NOTHING — no pass, no fail, no skip, just a smaller total that
 // looks like it was always that size. `declareUnenumerated` announces it.
 
-const ANIM_DIR = referenceFile('s1disasm', '_anim');
+const ANIM_DIR = referenceFile(S1_PINNED, '_anim');
 
 /**
  * INDEPENDENT expected-animation-count: count the file's own `dc.w` offset-table
@@ -199,7 +199,7 @@ describe('S1_OBJECT_ANIMS links resolve against the real tree', () => {
       expect(link.sync?.length, `id ${id}: neither animAsm nor sync`).toBeGreaterThanOrEqual(1);
       return;
     }
-    const path = join(referenceFile('s1disasm')!, link.animAsm);
+    const path = join(referenceFile(S1_PINNED)!, link.animAsm);
     expect(existsSync(path), `${link.animAsm} missing on disk`).toBe(true);
     if (link.dialect === 'sonic') {
       // Sonic's row parses with the DEDICATED sonani parser (the general one

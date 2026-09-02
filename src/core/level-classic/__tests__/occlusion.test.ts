@@ -25,10 +25,10 @@ import { resolveEffectiveObjectArt } from '../../project/profiles/object-subtype
 import { layoutCellAt } from '../../../renderer/components/classic/viewport-math';
 import { s1Adapter } from '../../project/s1';
 import type { FileAccess } from '../../project/adapter';
-import { referencePath } from '../../../../test/support/fixture-tree';
+import { referencePath, S1_PINNED } from '../../../../test/support/fixture-tree';
 import { whenS1Act } from '../../../../test/support/s1-checkout';
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 
 describe('occlusionWinner truth table', () => {
   it('high plane tile + opaque map pixel occludes a LOW sprite pixel', () => {

@@ -8,7 +8,7 @@ import { s1Profile, type LevelAct } from '../../src/core/project/profiles/s1';
 import { readS1Level, writeS1Level, type ResolvedLevelPaths } from '../../src/core/level-classic/s1-io';
 import { s1Adapter } from '../../src/core/project/s1/index';
 import { performGuardedWrite } from '../../src/main/guarded-write';
-import { referencePath } from '../support/fixture-tree';
+import { referencePath, S1_PINNED } from '../support/fixture-tree';
 import { whenS1Act } from '../support/s1-checkout';
 
 // ---------------------------------------------------------------------------
@@ -16,7 +16,7 @@ import { whenS1Act } from '../support/s1-checkout';
 // mutates the real disasm). Skips when the reference tree is absent.
 // ---------------------------------------------------------------------------
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 
 let tmp: string;
 beforeEach(() => {

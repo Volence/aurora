@@ -24,7 +24,7 @@ import { decodeGenesisColor } from '../../../../core/formats/palette';
 import { resolveObjectAnims } from '../../../../core/project/profiles/s1-object-anims';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
-import { referenceFile, skipUnlessPresent, referencePath } from '../../../../../test/support/fixture-tree';
+import { referenceFile, skipUnlessPresent, referencePath, S1_PINNED } from '../../../../../test/support/fixture-tree';
 import type { DiscoveredSpriteSet } from '../../../../core/import/sprite-discovery';
 import type { CompressionKind } from '../../../../core/compress';
 import { useClassicProjectStore } from '../../../state/classicProjectStore';
@@ -260,7 +260,7 @@ describe('editObjectArtCheckout', () => {
     expect(useSpriteStore.getState().currentIndex).toBe(1);
   });
 
-  const S1TREE = referencePath('s1disasm');
+  const S1TREE = referencePath(S1_PINNED);
   it(
     'Sonic ($01): the sonani-dialect timeline opens — every table anim listed, specials DYNAMIC', {
       skip: !existsSync(join(S1TREE, '_anim/Sonic.asm')),
@@ -424,7 +424,7 @@ describe('editObjectArtCheckout', () => {
     // not a skip — so with no s1disasm checkout this row reported green while
     // touching none of its subject. And it delegated its own honesty to a
     // DIFFERENT file's skip, which says nothing about this row's total.
-    const PAL = referenceFile('s1disasm', 'palette/Title Screen.bin');
+    const PAL = referenceFile(S1_PINNED, 'palette/Title Screen.bin');
     if (skipUnlessPresent(ctx, PAL, "s1disasm's palette/Title Screen.bin")) return;
     useClassicLevelStore.setState({ ref: null, doc: null });
     __setSpriteSetOpenerForTest(stubOpener([], 8));
@@ -480,7 +480,7 @@ describe('editObjectArtCheckout', () => {
 // the timeline/picker. The reader seam feeds REAL s1disasm text from fs (the
 // tree is read-only), so these are integration-grade without window.api.
 describe('editObjectArtCheckout — animation auto-load', () => {
-  const S1DIR = referencePath('s1disasm');
+  const S1DIR = referencePath(S1_PINNED);
   const realReader = async (_base: string, rel: string) => readFileSync(join(S1DIR, rel), 'utf8');
   const treePresent = existsSync(join(S1DIR, '_anim'));
   /** Why the two rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */

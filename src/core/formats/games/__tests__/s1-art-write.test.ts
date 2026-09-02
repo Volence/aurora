@@ -9,12 +9,12 @@ import { reconstructFromFrames } from '../../../import/sprite-import';
 import type { Tile } from '../../../model/s4-types';
 import type { SpriteFrame } from '../../../model/sprite-types';
 import { buildEditedTiles, encodeS1ArtWriteBack, type EditedFrame } from '../s1-art-write';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../../test/support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath, S1_PINNED } from '../../../../../test/support/fixture-tree';
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
-const hasS1 = referenceCheckout('s1disasm');
+const S1_ABSENT = referenceCheckoutReason(S1_PINNED);
+const hasS1 = referenceCheckout(S1_PINNED);
 
 /** A tile whose 64 pixels are a deterministic function of the tile index. */
 function synthTile(idx: number): Tile {

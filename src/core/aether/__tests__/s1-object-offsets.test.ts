@@ -14,7 +14,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import {
   parseAsmEquate, parseS1ObjectOffsets, S1_OFFSET_SOURCE,
 } from '../s1-object-offsets';
-import { referencePath } from '../../../../test/support/fixture-tree';
+import { referencePath, S1_PINNED } from '../../../../test/support/fixture-tree';
 
 describe('parseAsmEquate', () => {
   it('reads a decimal equate', () => {
@@ -91,7 +91,7 @@ describe('parseS1ObjectOffsets', () => {
  * the point — a second one is a hole in whatever the first one promises.
  */
 const constantsPath = ((): string | null => {
-  const p = referencePath('s1disasm', S1_OFFSET_SOURCE.file);
+  const p = referencePath(S1_PINNED, S1_OFFSET_SOURCE.file);
   return existsSync(p) ? p : null;
 })();
 const row = constantsPath ? it : it.skip;

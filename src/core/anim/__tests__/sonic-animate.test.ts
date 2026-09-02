@@ -19,7 +19,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { parseSonicAnimTable, sonicSpecialScripts } from '../../import/sonic-anim-import';
 import type { SonicSpecialScripts } from '../sonic-animate';
-import { referencePath } from '../../../../test/support/fixture-tree';
+import { referencePath, S1_PINNED } from '../../../../test/support/fixture-tree';
 import {
   initialSonicAnimState,
   stepSonicAnimate,
@@ -28,7 +28,7 @@ import {
   sonicOctant,
 } from '../sonic-animate';
 
-const SONIC_ASM = referencePath('s1disasm', '_anim/Sonic.asm');
+const SONIC_ASM = referencePath(S1_PINNED, '_anim/Sonic.asm');
 const treePresent = existsSync(SONIC_ASM);
 /**
  * `describe`, but a skip here says WHY — read by scripts/skip-report-reporter.mjs.
