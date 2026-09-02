@@ -48,7 +48,19 @@
  * wrong in both directions.
  *
  *     163  scratchpad/*.mjs (depth 1; scratchpad/lib and scratchpad/handover
- *          are not in that glob)
+ *          are not in that glob) — TRACKED files, `git ls-files`
+ *
+ * ⚠ SAY WHICH 163, because two people counted this and got 163 and 173 and
+ * NEITHER WAS WRONG. 163 is what git tracks at depth 1; 173 was a filesystem
+ * walk, which also sees the instruments `.gitignore` names — NINE of them at
+ * that depth on the owner's machine, 172 present against 163 tracked — plus
+ * subdirectories. An agent worktree is a fresh checkout and carries none of the
+ * nine, so the same command answers differently there, and a count that does not
+ * say which set it counted cannot be reconciled with another one. The ignored
+ * nine are deliberately outside this repo's contract and are NOT part of any
+ * figure below; `test/support/run-root.test.ts` enumerates from git for exactly
+ * that reason, after a `readdirSync` version of it went green in a worktree and
+ * red on the merged tree naming four of them.
  *     122    …importing AURORA_DIR
  *     104      …and composing a build path out of it, IN CODE
  *       1        …already converted before O72 (mapviewport-baseline-harness)

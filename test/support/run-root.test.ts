@@ -39,7 +39,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 
@@ -456,6 +456,45 @@ describe('run-root: the two halves of the O70 split, POINTED APART', () => {
    * way `check-harness-guards.mjs` reads it: the file names an `ELECTRON`
    * binding, or one of the two artifact paths, in code.
    *
+   * ⚠⚠ THE POPULATION COMES FROM GIT, NOT FROM A DIRECTORY READ, AND THAT IS THE
+   * WHOLE CORRECTNESS OF THIS ROW. It was a `readdirSync` walk when O72 landed,
+   * it was GREEN in the worktree it was written in, and it went RED on the
+   * merged tree naming four files: `effects-foreground-harness.mjs`,
+   * `effects-foreground-2-harness.mjs`, `priority-zoom-probe.mjs`,
+   * `short-viewport-harness.mjs`. All four are named INDIVIDUALLY in
+   * `.gitignore` — nine such instruments sit at `scratchpad/` depth 1 on the
+   * owner's machine, 172 present against 163 tracked — and an agent worktree is
+   * a fresh checkout that carries none of them.
+   *
+   * Two things were wrong with that, and only the second is about this repo:
+   *
+   *   · A filesystem walk lets **whatever debris a given machine happens to
+   *     carry** decide the colour. Green meant "this checkout has no stray
+   *     instruments", never "the repo is correct", and it was red FOREVER on the
+   *     owner's machine until someone edited files git does not track. Pass and
+   *     fail both decided outside the repo — bar 19's family.
+   *   · A gitignored instrument is DELIBERATELY outside the repo's contract.
+   *     This repo cannot police what it does not carry, and a gate demanding
+   *     edits to untracked local files asks for a change nobody can review or
+   *     revert.
+   *
+   * WHY `ls-files` TWICE AND NOT ONCE, which is a deviation from the fix as
+   * literally specified and is argued here rather than done quietly. Tracked-only
+   * would fix the defect above and open one the gate that polices this same area
+   * explicitly refuses to open: a brand-new instrument written the old way is
+   * UNTRACKED at the exact moment its author runs `npm test`, which is the
+   * moment this row exists to speak. `scripts/check-peer-path-literals.mjs`
+   * enumerates the filesystem and then drops **only** what `git check-ignore`
+   * names, and says why in as many words — *"UNTRACKED-BUT-NOT-IGNORED FILES ARE
+   * STILL SCANNED, deliberately … Filtering on 'tracked' instead of 'ignored'
+   * would open that hole in the ordinary write-test-commit path."* That is
+   * exactly the population below, spelled in git rather than in `readdirSync`:
+   * tracked, plus untracked-and-not-ignored. Two checks policing one population
+   * must agree about what that population IS, or they drift — and them
+   * disagreeing about these four files, in the other direction, is precisely the
+   * failure being fixed. Dropping the second call is a one-line change if the
+   * tracked-only reading is preferred.
+   *
    * ⚠ THE PREDICATE THAT DOES NOT WORK, recorded because it was the first one
    * written here and it went red for a reason worth keeping: "names an artifact
    * path in code" collapses to 11 files AFTER the migration, because a migrated
@@ -463,11 +502,11 @@ describe('run-root: the two halves of the O70 split, POINTED APART', () => {
    * survey predicate that the fix itself invalidates measures the fix, not the
    * property.
    *
-   * A hardcoded floor would rot, so the anti-vacuous half is only "the walk
-   * found a population at all". The real recurrence guard is rule 4 of
-   * `scripts/check-peer-path-literals.mjs`, which polices the composition rather
-   * than the import; this row is its structural companion and catches the other
-   * shape — a harness that resolves correctly but by its own private copy.
+   * A hardcoded floor would rot, so the anti-vacuous half is only "the
+   * enumeration found a population at all". The real recurrence guard is rule 4
+   * of `check-peer-path-literals.mjs`, which polices the composition rather than
+   * the import; this row is its structural companion and catches the other shape
+   * — a harness that resolves correctly but by its own private copy.
    *
    * EXCLUDED, each for a stated reason: `lib/run-root.mjs` IS the module;
    * `check-harness-guards.mjs` and `lib/harness-guard.mjs` read those strings to
@@ -476,32 +515,39 @@ describe('run-root: the two halves of the O70 split, POINTED APART', () => {
    * only — it takes `electronBin` and is asserted separately below.
    */
   it('every scratchpad instrument that launches the app resolves it through this module', () => {
-    const dir = resolve(__dirname, '../../scratchpad');
-    const files: string[] = [];
-    const walk = (d: string): void => {
-      for (const e of readdirSync(d, { withFileTypes: true })) {
-        if (e.name === 'node_modules' || e.name === 'fixtures' || e.name === 'shots') continue;
-        const p = resolve(d, e.name);
-        if (e.isDirectory()) walk(p);
-        else if (e.name.endsWith('.mjs')) files.push(p);
+    const repo = resolve(__dirname, '../..');
+    /**
+     * LOUD ON UNMEASURABLE. If git cannot answer, this row must say so rather
+     * than fall through to an empty list, which would render as a clean tree.
+     */
+    const gitList = (args: string[]): string[] => {
+      const out = spawnSync('git', ['-C', repo, 'ls-files', ...args, '--', 'scratchpad'],
+        { encoding: 'utf8' });
+      if (out.status !== 0) {
+        throw new Error(`could not enumerate the population: git ls-files ${args.join(' ')} `
+          + `exited ${out.status}: ${out.stderr}`);
       }
+      return (out.stdout ?? '').split('\n').filter(Boolean);
     };
-    walk(dir);
+    const files = [...new Set([
+      ...gitList([]),                              // tracked
+      ...gitList(['--others', '--exclude-standard']), // new, and not ignored
+    ])].filter((p) => p.endsWith('.mjs')).sort();
+
     const EXCLUDE = [
       'lib/run-root.mjs', 'lib/harness-guard.mjs', 'check-harness-guards.mjs', 'ozone-x11-proof.mjs',
     ];
     const launchers: string[] = [];
     const missing: string[] = [];
-    for (const f of files) {
-      const rel = f.slice(dir.length + 1);
+    for (const rel of files) {
       if (EXCLUDE.some((x) => rel.endsWith(x))) continue;
-      const code = stripComments(readFileSync(f, 'utf8'));
+      const code = stripComments(readFileSync(resolve(repo, rel), 'utf8'));
       if (!/(?:^|[^.\w$])ELECTRON\b|node_modules\/\.bin\/electron|dist\/main\/index\.mjs/.test(code)) continue;
       launchers.push(rel);
       if (!/from '\.{1,2}\/(?:\.\.\/)*lib\/run-root\.mjs'/.test(code)) missing.push(rel);
     }
-    // ANTI-VACUOUS: if the walk found nothing, this row proved nothing.
-    expect(launchers.length, 'no instrument launches the app — the walk found nothing')
+    // ANTI-VACUOUS: an enumeration that found nothing proves nothing.
+    expect(launchers.length, 'no instrument launches the app — the enumeration found nothing')
       .toBeGreaterThan(50);
     expect(missing, `these launch the built app without the run-target module:\n${missing.join('\n')}`)
       .toEqual([]);
