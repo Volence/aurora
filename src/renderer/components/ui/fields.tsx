@@ -96,8 +96,20 @@ function numberFieldText(value: number): string {
  * value commits has changed), and the box resyncs to whatever the document
  * really holds on blur.
  */
-export function NumberField({ value, onChange, min, max, title, width = 48, refuse, onRefusal }: {
+export function NumberField({ value, onChange, min, max, step, title, width = 48, refuse, onRefusal }: {
   value: number; onChange: (v: number) => void; min?: number; max?: number; title?: string; width?: number;
+  /**
+   * The spinner arrows' increment. `<input type="number">` defaults it to `1`
+   * and — because a browser SNAPS to a multiple of the step — one press on a
+   * fractional value jumps to a whole number: `0.125` becomes `1`. Every field
+   * in this app was an integer until the drift row, which is authored in
+   * px/frame over a ⅛..6 corpus, so it passes its own.
+   *
+   * LIKE `min`/`max`, THIS IS NOT A REFUSAL. It governs the arrows and
+   * `:invalid`; a typed value that is not a multiple of it still fires
+   * `onChange`. `refuse` is the only thing that withholds a commit.
+   */
+  step?: number;
   /**
    * WHY THIS VALUE CANNOT BE WRITTEN, or null when it can — the REAL refusal.
    *
@@ -130,7 +142,7 @@ export function NumberField({ value, onChange, min, max, title, width = 48, refu
   }, [value, editing]);
 
   return (
-    <input type="number" title={title} value={text} min={min} max={max}
+    <input type="number" title={title} value={text} min={min} max={max} step={step}
       onFocus={(e) => {
         setEditing(true);
         // SELECT ON FOCUS. Clicking a box holding `112` and typing `40` used to

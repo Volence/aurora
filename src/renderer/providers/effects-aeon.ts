@@ -26,7 +26,7 @@ import type {
 import {
   EFFECTS_LAYER_DEFAULTS,
   type EffectsScene, type EffectsSceneLibrary, type EffectsFactor, type EffectsLayer,
-  type EffectsTableRef, type EffectsCurve, type EffectsVSplit,
+  type EffectsTableRef, type EffectsCurve, type EffectsVSplit, type EffectsDrift,
   type EffectsSceneDeform, type EffectsVDeform, type EffectsLayerDeform,
 } from '../../core/formats/effects/scene';
 import {
@@ -45,7 +45,9 @@ import {
   EFFECTS_BOB_PERIOD_DEFAULT,
   bobPeakPixels, bobPeriodSeconds, bobShiftOf, bobShiftRefusal,
   cloneEffectsScene, factorLabel, isNamedFactor, newEffectsLayer, newEffectsScene,
-  sceneIdRefusal, driftRateOf, driftRateToPxPerFrame,
+  sceneIdRefusal, driftRateOf, driftRateToPxPerFrame, driftPxPerFrameToRate,
+  driftRateRefusal, driftPxPerFrameRefusal,
+  EFFECTS_DRIFT_UNITS_PER_PIXEL, EFFECTS_DRIFT_PX_BOUNDS, EFFECTS_DRIFT_RATE_BOUNDS,
 } from '../../core/formats/effects/scene-ui';
 import { BG_LAYOUT_WORDS, TILE_WIDTH_PX } from '../../core/formats/bg-override/bg-override';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
@@ -180,6 +182,110 @@ export function vsplitFieldValue(layer: Pick<EffectsLayer, 'vsplit'>): number | 
  */
 export function vsplitFromToggle(on: boolean, layer: Pick<EffectsLayer, 'world_y'>): EffectsVSplit | undefined {
   return on ? { at: clampVSplitAt(layer.world_y) } : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// drift — EW-DRIFT-CTL
+// ---------------------------------------------------------------------------
+//
+// A constant horizontal rate added to this strip's scroll EVERY FRAME,
+// independent of the camera: S1 GHZ's clouds, S3K AIZ1's. It is the one thing on
+// this card that moves with the camera standing still, which is why the row's
+// hint says exactly that and nothing else — the neighbouring rows are all
+// camera-relative and an author reads "drift" as parallax otherwise.
+//
+// THE UNIT IS THE WHOLE PARCEL. The wire is 1/256 px per FRAME; the card is
+// px/frame. aeon's generator does NOT convert (`render_drift`'s docstring: the
+// multiply "happens in AURORA'S UI, on export, above the wire — so a multiply
+// here would apply it twice and every authored rate would come out 256x too
+// fast"), so the ×256 exists in exactly ONE place in this repo,
+// `driftPxPerFrameToRate`, and this row is its only caller on the write path.
+// Nothing here re-derives it; a 256× error is invisible to every one-directional
+// test because every wrong value is itself a legal rate.
+//
+// A LAYER KEY, NOT A BAND KEY, and there is deliberately no group control. The
+// four OJZ canopy strips carry ONE rate on purpose — that art is a single visual
+// plane cut into four records and per-strip rates would shear it at a boundary —
+// but that is an author typing the same number four times, not a reason to hide
+// the per-layer nature behind an "apply to all".
+
+/**
+ * The rate a new drift starts at: ⅛ px/frame, which is S3K AIZ1's clouds — the
+ * schema's own worked corpus value, and the slowest rate in it.
+ *
+ * DERIVED FROM THE FACTOR, not typed as `32`, and CHECKED at import: a contract
+ * that moved the unit or narrowed the range so ⅛ px/frame stopped being legal
+ * fails this module's load instead of seeding every new drift with a value the
+ * build refuses.
+ */
+export const EFFECTS_DRIFT_SEED_RATE: number = (() => {
+  const rate = EFFECTS_DRIFT_UNITS_PER_PIXEL / 8;
+  const why = driftRateRefusal(rate);
+  if (why !== null) {
+    throw new Error(
+      `the drift row's seed (1/8 px/frame = ${rate}) is no longer a legal rate: ${why} `
+      + 'Re-derive the seed against the amended contract.',
+    );
+  }
+  return rate;
+})();
+
+/**
+ * The spinner's arrow step, in px/frame — the seed's own magnitude.
+ *
+ * NOT 1, which is what `<input type="number">` defaults to. The corpus runs from
+ * ⅛ to 6 px/frame, so a step of 1 makes the arrows useless at the slow end and
+ * (because a browser snaps to a multiple of the step) turns one press on `0.125`
+ * into `1`. Stepping by the slowest corpus rate makes the arrows walk the range
+ * an author actually authors in.
+ */
+export const EFFECTS_DRIFT_PX_STEP = driftRateToPxPerFrame(EFFECTS_DRIFT_SEED_RATE);
+
+/** The drift row: label, title (with the schema's bound, in px/frame), hint, and its two states. */
+export const LAYER_DRIFT_ROW = Object.freeze({
+  key: 'drift' as const,
+  label: 'Drift',
+  title: 'drift.rate — a constant horizontal speed added every frame, with or without the camera; '
+    + `${EFFECTS_DRIFT_PX_BOUNDS.min}..${EFFECTS_DRIFT_PX_BOUNDS.max} px/frame, negative = leftward`,
+  hint: 'moves on its own, camera or no camera — clouds; set it to none for a strip that should not',
+  none: 'none',
+  on: 'px/frame',
+  /** The box's own title: the unit, said where the number is typed. */
+  rateTitle: `drift.rate in PIXELS PER FRAME (the file stores 1/256ths: `
+    + `1 px/frame = ${EFFECTS_DRIFT_UNITS_PER_PIXEL}). S3K AIZ1's clouds are `
+    + `${driftRateToPxPerFrame(EFFECTS_DRIFT_SEED_RATE)}; the fastest in the corpus is 6`,
+});
+
+/** The drift spinner's value in px/frame, or null when the layer does not drift. */
+export function driftPxFieldValue(layer: Pick<EffectsLayer, 'drift'>): number | null {
+  const rate = driftRateOf(layer.drift);
+  return rate === null ? null : driftRateToPxPerFrame(rate);
+}
+
+/**
+ * Turning drift on or off. Off clears the key — `"none"` and absent mean the
+ * same thing and an absent key is the spelling that puts no diff on a file that
+ * never carried it (`setLayerFieldCommand`'s rule). On seeds the corpus's
+ * slowest rate rather than zero, because ZERO IS REFUSED: it is
+ * indistinguishable from no drift at all in ROM, so a control that seeded it
+ * would land every new drift in the refused state.
+ */
+export function driftFromToggle(on: boolean): EffectsDrift | undefined {
+  return on ? { rate: EFFECTS_DRIFT_SEED_RATE } : undefined;
+}
+
+/**
+ * What a typed px/frame value writes. The ×256 lives in `driftPxPerFrameToRate`
+ * and this is the only place on the write path that calls it.
+ *
+ * ⚠ ONLY EVER REACHED THROUGH `driftPxPerFrameRefusal` — `NumberField`'s
+ * `refuse` withholds the commit, so an out-of-range or rounds-to-zero value
+ * never arrives here. This function does NOT clamp, deliberately: a clamp would
+ * substitute a number the author did not type, which is the defect the whole
+ * refusal path exists to avoid.
+ */
+export function driftFromPxPerFrame(pxPerFrame: number): EffectsDrift {
+  return { rate: driftPxPerFrameToRate(pxPerFrame) };
 }
 
 /**
@@ -2578,10 +2684,13 @@ export function removeLayerCommand(
   });
 }
 
-/** The layer keys the card has a control for. `curve`/`vsplit` are parcel H, `deform` is wave 2. */
-export type LayerCardKey = 'world_y' | 'fa' | 'fb' | 'curve' | 'vsplit' | 'deform';
+/**
+ * The layer keys the card has a control for. `curve`/`vsplit` are parcel H,
+ * `deform` is wave 2, `drift` is EW-DRIFT-CTL.
+ */
+export type LayerCardKey = 'world_y' | 'fa' | 'fb' | 'curve' | 'vsplit' | 'deform' | 'drift';
 /** The optional ones, where the control has a "none" state that CLEARS the key. */
-export type LayerCardOptionalKey = 'curve' | 'vsplit' | 'deform';
+export type LayerCardOptionalKey = 'curve' | 'vsplit' | 'deform' | 'drift';
 
 /**
  * Set one field of one layer.
@@ -2690,24 +2799,24 @@ export function setSceneFieldCommand<K extends SceneFormKey>(
 // guard's other half, which is now surfaced beside the deform row as advice
 // rather than only printed here.
 
-// `drift` JOINED IT AT empyrean 988638f, and it is the purest case the line has
-// had. The other four keys have no control because nobody has built one; `drift`
-// has no control ON PURPOSE — aeon's `tools/effects_gen.py` REFUSES the key
-// until their `CAP_BAND_DRIFT` emission parcel lands, so a spinner would
-// originate a value the build rejects for every input (ROADMAP row O13's open
-// defect, in a worse form). Read-only is the whole of what Aurora may offer
-// today, and it is what stops the banner's own failure recurring: a file could
-// otherwise carry a drift and the card show nothing at all about it.
+// `drift` JOINED IT AT empyrean 988638f and LEFT IT AT EW-DRIFT-CTL, on the same
+// rule and the same precedent: it joined because aeon's generator refused the key
+// and a spinner would have originated a value the build rejected for every input;
+// it left the moment aeon's emission parcel landed (aeon `ce4dbb7c`) and the card
+// grew a real row for it (`LAYER_DRIFT_ROW`). A value the card edits is not
+// repeated here.
 //
-// PRINTED IN px/frame, never in wire units. The schema asks the editor to
-// present px/frame (its own UNIT HAZARD note), Aurora took that SHOULD, and this
-// line is the one place the decision is currently VISIBLE. The conversion is
-// `driftRateToPxPerFrame`; the factor is spelled once, in scene-ui.ts, derived
-// from the schema's description. See docs/reviews/2026-08-29-drift-codec.md.
+// What is left is exactly the set with no control anywhere on the card: `dsa`,
+// `dsb`, `phase` and `enabled`.
+//
+// THE px/frame RULING OUTLIVED THIS LINE. It used to be the one place the
+// decision was visible; it is now the row's own spinner, its title and its
+// refusals. See docs/reviews/2026-08-29-drift-codec.md (the codec) and
+// docs/reviews/2026-09-02-effects-drift-control.md (the control).
 
 export interface LayerExtra {
   /** The §2.2 key the descriptor is about. */
-  key: 'dsa' | 'dsb' | 'phase' | 'enabled' | 'drift';
+  key: 'dsa' | 'dsb' | 'phase' | 'enabled';
   /** The descriptor as the card prints it. */
   text: string;
 }
@@ -2740,11 +2849,6 @@ export function layerExtras(layer: EffectsLayer): LayerExtra[] {
     if (v !== undefined && v !== EFFECTS_LAYER_DEFAULTS[key]) out.push({ key, text: `${key} ${v}` });
   }
   if (layer.enabled === false) out.push({ key: 'enabled', text: 'disabled' });
-  const rate = driftRateOf(layer.drift);
-  // `"none"` and absent both yield null, so a layer that does not drift gets no
-  // descriptor — the section banner's rule, and the reason a plain layer draws
-  // no line at all.
-  if (rate !== null) out.push({ key: 'drift', text: `drift ${driftRateToPxPerFrame(rate)} px/frame` });
   return out;
 }
 
@@ -2767,4 +2871,9 @@ export {
   bobPeakPixels, bobPeriodSeconds, bobShiftRefusal,
   EFFECTS_LAYER_DEFORM_BOUNDS, EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS,
   EFFECTS_DEFORM_TABLE_BYTES, EFFECTS_TABLE_REF_FORMS,
+  // The drift row's contract half. `driftPxPerFrameRefusal` is what the card
+  // hands `NumberField`'s `refuse`, and it is re-exported rather than reimplemented
+  // here so the ONE source of the rules stays scene-ui's.
+  EFFECTS_DRIFT_RATE_BOUNDS, EFFECTS_DRIFT_PX_BOUNDS, EFFECTS_DRIFT_UNITS_PER_PIXEL,
+  driftPxPerFrameRefusal, driftRateToPxPerFrame, driftPxPerFrameToRate, driftRateOf,
 };

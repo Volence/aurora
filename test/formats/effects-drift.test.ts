@@ -17,11 +17,17 @@ import {
   driftRateToPxPerFrame,
   driftPxPerFrameToRate,
   driftRateRefusal,
+  driftPxPerFrameRefusal,
+  EFFECTS_DRIFT_PX_BOUNDS,
   driftRateOf,
   cloneEffectsScene,
 } from '../../src/core/formats/effects/scene-ui';
 import { validateAgainstSchema } from '../../src/core/formats/effects/json-schema-subset';
-import { layerExtras, layerExtrasLine } from '../../src/renderer/providers/effects-aeon';
+import {
+  layerExtras, layerExtrasLine,
+  EFFECTS_DRIFT_SEED_RATE, EFFECTS_DRIFT_PX_STEP,
+  driftPxFieldValue, driftFromToggle, driftFromPxPerFrame,
+} from '../../src/renderer/providers/effects-aeon';
 
 /**
  * `layer.drift` — the codec, the round trip, and the unit conversion.
@@ -47,11 +53,16 @@ import { layerExtras, layerExtrasLine } from '../../src/renderer/providers/effec
  * honest: an actually-undeclared key must STILL be refused, so these round trips
  * cannot be passing because the schema went open.
  *
- * NO CONTROL IS BUILT, DELIBERATELY. aeon's `tools/effects_gen.py` refuses the
- * key until their `CAP_BAND_DRIFT` emission parcel lands, so a scene carrying
- * `drift` DOES NOT REACH A ROM today, by design and not by omission. A spinner
- * for it would originate a value the build rejects for every input — ROADMAP row
- * O13's open defect in a worse form. See docs/reviews/2026-08-29-drift-codec.md.
+ * THE CONTROL EXISTS NOW (EW-DRIFT-CTL). When this file was written aeon's
+ * `tools/effects_gen.py` REFUSED the key, so a spinner would have originated a
+ * value the build rejected for every input and none was built. aeon's emission
+ * parcel landed at aeon `ce4dbb7c` ("chain 205 — drift becomes authorable in the
+ * editor"): `LAYER_KEYS` carries `drift` and `render_drift` lowers it to
+ * `SceneDrift.Rate(n)`. The layer card grew the row, `layerExtras` gave the key
+ * up (a value the card edits is not printed read-only beside it), and the
+ * round-trip block at the bottom of this file is the gate on the ×256.
+ * See docs/reviews/2026-08-29-drift-codec.md and
+ * docs/reviews/2026-09-02-effects-drift-control.md.
  */
 
 const GOLDEN_PATH = resolve(__dirname, '../fixtures/effects/canopy_dusk.json');
@@ -388,8 +399,16 @@ describe('px/frame <-> wire rate: the 256x hazard', () => {
    */
   it('no second copy of the factor exists in the effects source', () => {
     const files = [
-      'scene.ts', 'scene-ui.ts', 'json-schema-subset.ts', 'factor-decode.ts',
-    ].map(f => resolve(__dirname, '../../src/core/formats/effects', f));
+      ...['scene.ts', 'scene-ui.ts', 'json-schema-subset.ts', 'factor-decode.ts']
+        .map(f => resolve(__dirname, '../../src/core/formats/effects', f)),
+      // EXTENDED AT EW-DRIFT-CTL to the two files the control lives in. Before
+      // the row existed these were not plausible homes for a stray 256; now they
+      // are the FIRST place a second copy would appear — someone converting "one
+      // more time" in the provider or inline in the panel is exactly the
+      // double-multiply aeon's generator docstring warns about.
+      resolve(__dirname, '../../src/renderer/providers/effects-aeon.ts'),
+      resolve(__dirname, '../../src/renderer/components/effects/EffectsScenePanel.tsx'),
+    ];
     const offenders: string[] = [];
     for (const file of files) {
       readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
@@ -409,41 +428,244 @@ describe('px/frame <-> wire rate: the 256x hazard', () => {
 });
 
 // ---------------------------------------------------------------------------
-// The card SHOWS it, and shows it in px/frame. It does not offer to change it.
+// The card EDITS it now, so the read-only line gave the key up (EW-DRIFT-CTL)
 // ---------------------------------------------------------------------------
+//
+// `layerExtras` is "what the file sets that the card cannot". `curve` and
+// `vsplit` left it in parcel H and `deform` in wave 2, each when it got a
+// control; drift leaves it here, for the same rule. A value said twice, in two
+// units, by two surfaces that can disagree is the defect that rule exists to
+// stop — and the extras line printed px/frame while the file held 1/256ths, so
+// a stale copy of it would have been the 256× hazard wearing a descriptor.
 
-describe('a drifting layer is visible on the card, read-only, in px/frame', () => {
-  it('prints a descriptor for a rate and nothing for "none" or absent', () => {
+describe('the extras line no longer speaks for drift', () => {
+  it('prints nothing for a drifting layer that carries no other extra', () => {
     const scene = parseEffectsScene(GOLDEN, 'canopy_dusk');
-    const lines = scene.layers.map((l, i) => `${i}: ${layerExtrasLine(l) ?? '(no line)'}`);
+    const lines = scene.layers.map((l, i) =>
+      `${i}: drift=${JSON.stringify(l.drift ?? null)} extras=${layerExtrasLine(l) ?? '(no line)'}`);
     console.log('--- layerExtrasLine per layer ---\n' + lines.join('\n'));
 
-    // Layer 2 carries {rate: 32}; layer 3 carries "none"; layer 0 has neither.
-    expect(layerExtras(scene.layers[2]).find(e => e.key === 'drift')?.text)
-      .toBe('drift 0.125 px/frame');
-    expect(layerExtras(scene.layers[3]).some(e => e.key === 'drift')).toBe(false);
-    expect(layerExtras(scene.layers[0]).some(e => e.key === 'drift')).toBe(false);
+    // Layer 2 carries {rate: 32} and nothing else the line reports.
+    expect(driftRateOf(scene.layers[2].drift)).toBe(32);
+    expect(layerExtrasLine(scene.layers[2])).toBeNull();
+    for (const layer of scene.layers) {
+      expect(layerExtras(layer).map(e => e.key as string)).not.toContain('drift');
+    }
   });
 
-  /**
-   * THE UNIT IS THE POINT OF THIS ROW. A descriptor printing the WIRE value
-   * would read "drift 32", which an author would take for 32 px/frame — the
-   * 256× hazard the schema names, arriving through the one surface that
-   * currently mentions drift at all.
-   */
-  it('never prints the wire value where a px/frame value belongs', () => {
-    const text = layerExtras({ world_y: 0, fa: 'FACTOR_1', fb: 'FACTOR_1', drift: { rate: 1536 } })
-      .find(e => e.key === 'drift')!.text;
-    expect(text).toBe('drift 6 px/frame');       // the schema's corpus max
-    expect(text).not.toContain('1536');
-  });
-
-  it('shows a drift beside the other extras rather than replacing them', () => {
+  it('leaves the other extras exactly as they were', () => {
     const line = layerExtrasLine({
       world_y: 0, fa: 'FACTOR_1', fb: 'FACTOR_1',
       phase: 64, enabled: false, drift: { rate: -256 },
     });
     console.log('--- combined extras line ---\n' + line);
-    expect(line).toBe('phase 64 · disabled · drift -1 px/frame');
+    expect(line).toBe('phase 64 · disabled');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE CONTROL — the ×256, once, and the refusals the build would otherwise give
+// ---------------------------------------------------------------------------
+//
+// aeon FORWARDS `Rate(0)` and `Rate(9000)` as shape-legal (`render_drift`'s own
+// docstring) and leaves them to its build-time `ensure`, so this control is the
+// only place an author learns the bound before a red build.
+
+describe('the drift row seeds, converts and refuses', () => {
+  it('seeds a legal, non-zero rate — the corpus\'s slowest', () => {
+    console.log(`--- seed --- rate=${EFFECTS_DRIFT_SEED_RATE} `
+      + `px=${driftRateToPxPerFrame(EFFECTS_DRIFT_SEED_RATE)} step=${EFFECTS_DRIFT_PX_STEP}`);
+    // ⅛ px/frame, which the SCHEMA'S OWN DESCRIPTION names as S3K AIZ1's clouds.
+    // Read out of the contract here rather than typed, so a re-vendor that moved
+    // the corpus value fails this row instead of the seed silently disagreeing
+    // with the sentence the row's title tells the author.
+    const description = String(
+      ((EFFECTS_SCENE_SCHEMA.$defs as Record<string, Record<string, Record<string, Record<string, unknown>>>>)
+        .layer.properties.drift).description);
+    const aiz = /S3K AIZ1's clouds = (\d+)/.exec(description);
+    expect(aiz, 'the schema no longer names the AIZ1 corpus rate').not.toBeNull();
+    expect(EFFECTS_DRIFT_SEED_RATE).toBe(Number(aiz![1]));
+
+    expect(driftRateRefusal(EFFECTS_DRIFT_SEED_RATE)).toBeNull();
+    expect(EFFECTS_DRIFT_SEED_RATE).not.toBe(EFFECTS_DRIFT_RATE_REFUSED);
+    expect(driftFromToggle(true)).toEqual({ rate: EFFECTS_DRIFT_SEED_RATE });
+    // Off CLEARS the key rather than writing "none" — setLayerFieldCommand's rule.
+    expect(driftFromToggle(false)).toBeUndefined();
+  });
+
+  it('shows the file\'s wire rate as px/frame and nothing when there is no drift', () => {
+    const rows = [
+      { drift: { rate: 32 } as const, expect: 0.125 },
+      { drift: { rate: 1536 } as const, expect: 6 },
+      { drift: { rate: -256 } as const, expect: -1 },
+      { drift: 'none' as const, expect: null },
+      { drift: undefined, expect: null },
+    ];
+    console.log('--- driftPxFieldValue ---\n' + rows.map(r =>
+      `${JSON.stringify(r.drift ?? null)} -> ${driftPxFieldValue({ drift: r.drift })}`).join('\n'));
+    for (const r of rows) expect(driftPxFieldValue({ drift: r.drift })).toBe(r.expect);
+  });
+
+  /**
+   * THE ×256, AND THAT IT HAPPENS EXACTLY ONCE.
+   *
+   * A doubled multiply is invisible to a one-directional check because every
+   * wrong value is itself a legal rate: 1 px/frame written twice is 65536, which
+   * only the BOUND catches, and 0.001 px/frame written twice is 65, which
+   * nothing catches. So this walks the whole path the author walks — type
+   * px/frame, write the document, SERIALIZE, PARSE BACK, read the box — and
+   * asserts the box shows what was typed.
+   */
+  it('round-trips a typed px/frame value through a real document, unchanged', () => {
+    const typed = [0.125, 1, -1, 6, -6, 0.5, 2.25, 16, -16];
+    const scene = parseEffectsScene(GOLDEN, 'canopy_dusk');
+
+    const table: string[] = [];
+    for (const px of typed) {
+      expect(driftPxPerFrameRefusal(px), `${px} px/frame must be authorable`).toBeNull();
+
+      const authored = cloneEffectsScene(scene);
+      authored.layers[0].drift = driftFromPxPerFrame(px);
+      const wire = authored.layers[0].drift as { rate: number };
+
+      const text = serializeEffectsScene(authored);
+      const back = parseEffectsScene(text, 'canopy_dusk');
+      const shown = driftPxFieldValue(back.layers[0]);
+
+      table.push(`typed ${px} px/frame -> wire ${wire.rate} -> on disk `
+        + `${/"rate": (-?\d+)/.exec(text.slice(text.indexOf('"drift"')))?.[1]} -> box shows ${shown}`);
+
+      expect(shown, `${px} px/frame did not survive the round trip`).toBe(px);
+      // The multiply happened, and it happened ONCE: the file holds the px value
+      // scaled by the factor exactly one time. A doubled multiply lands on
+      // px*F*F, a missing one on px.
+      expect(wire.rate).toBe(px * EFFECTS_DRIFT_UNITS_PER_PIXEL);
+    }
+    console.log('--- px/frame round trip through serialize + parse ---\n' + table.join('\n'));
+  });
+
+  /**
+   * THE REFUSALS, in the author's units. Every clause is `driftRateRefusal`'s,
+   * reached by converting first — asserted here by running BOTH over the same
+   * values and requiring they never disagree on the verdict.
+   */
+  it('refuses zero, everything that rounds to zero, and everything out of range', () => {
+    const { min, max } = EFFECTS_DRIFT_PX_BOUNDS;
+    const rows: { px: number; refused: boolean; why: string }[] = [
+      { px: 0, refused: true, why: 'zero — indistinguishable from none in ROM' },
+      { px: 0.001, refused: true, why: 'rounds to zero on the wire' },
+      { px: -0.001, refused: true, why: 'rounds to zero, leftward' },
+      { px: 1 / EFFECTS_DRIFT_UNITS_PER_PIXEL, refused: false, why: 'one wire unit — the slowest legal' },
+      { px: min, refused: false, why: 'the bound itself' },
+      { px: max, refused: false, why: 'the bound itself' },
+      { px: min - 0.01, refused: true, why: 'past the bound, leftward' },
+      { px: max + 0.01, refused: true, why: 'past the bound' },
+      { px: 9000 / EFFECTS_DRIFT_UNITS_PER_PIXEL, refused: true, why: 'the generator forwards Rate(9000)' },
+      { px: Number.NaN, refused: true, why: 'not a number' },
+      { px: 0.125, refused: false, why: 'AIZ1 clouds' },
+      { px: 6, refused: false, why: 'the corpus maximum' },
+    ];
+    const printed: string[] = [];
+    for (const r of rows) {
+      const px = driftPxPerFrameRefusal(r.px);
+      // The wire-side rule, run independently on the same value.
+      const wire = Number.isFinite(r.px) ? driftRateRefusal(driftPxPerFrameToRate(r.px)) : 'not finite';
+      printed.push(`${String(r.px).padEnd(22)} ${px === null ? 'ACCEPTED' : 'REFUSED '} `
+        + `(${r.why})\n    ${px ?? ''}`);
+      expect(px === null, `${r.px} px/frame: expected refused=${r.refused}`).toBe(!r.refused);
+      // Never disagree with the wire-side rule this delegates to.
+      expect(px === null).toBe(wire === null);
+    }
+    console.log('--- driftPxPerFrameRefusal ---\n' + printed.join('\n'));
+
+    // Both verdicts really do vary across the sample — a refusal that always
+    // says yes, or always no, would pass a same-verdict check vacuously.
+    expect(rows.some(r => r.refused)).toBe(true);
+    expect(rows.some(r => !r.refused)).toBe(true);
+  });
+
+  /**
+   * THE SENTENCE NAMES THE WIRE VALUE. The 256× hazard is invisible by
+   * construction, and a refusal is the one moment an author can be shown the
+   * conversion at no cost.
+   */
+  it('says the wire value and the factor exactly when the conversion changed it', () => {
+    const tiny = driftPxPerFrameRefusal(0.001)!;
+    const zero = driftPxPerFrameRefusal(0)!;
+    const over = driftPxPerFrameRefusal(EFFECTS_DRIFT_PX_BOUNDS.max + 1)!;
+    console.log('--- refusal sentences ---\n'
+      + `0.001: ${tiny}\n0: ${zero}\n${EFFECTS_DRIFT_PX_BOUNDS.max + 1}: ${over}`);
+
+    // ROUNDING LOST SOMETHING → the gloss, which is the one place the ×256 is
+    // ever visible: the sentence is about `0` while the box holds `0.001`.
+    expect(tiny).toContain('0.001 px/frame is 0 in wire units');
+    expect(tiny).toContain(`1 px/frame = ${EFFECTS_DRIFT_UNITS_PER_PIXEL}`);
+
+    // THE CONVERSION WAS EXACT → no gloss. Not brevity for its own sake: the
+    // out-of-range sentence is already in the author's own units, and the
+    // paragraph is painted in a 129px-tall list scroller (measured,
+    // effects-drift-harness [5e]) where restating it costs the bottom edge.
+    expect(over).not.toContain('in wire units');
+    expect(zero).not.toContain('in wire units');
+
+    // The REASON survives in every case — this is the sentence the owner could
+    // not get out of the build without reverting.
+    for (const s of [tiny, zero]) {
+      expect(s).toContain('indistinguishable from no drift at all in ROM');
+      expect(s).toContain('"none"');
+    }
+    expect(over).toContain(String(EFFECTS_DRIFT_RATE_BOUNDS.max));
+    expect(over).toContain('TASTE bound');
+    // And the out-of-range sentence still names BOTH units without the gloss.
+    expect(over).toContain(String((EFFECTS_DRIFT_PX_BOUNDS.max + 1) * EFFECTS_DRIFT_UNITS_PER_PIXEL));
+    expect(over).toContain(`${EFFECTS_DRIFT_PX_BOUNDS.max + 1} px/frame`);
+  });
+
+  /**
+   * THE WIRING, READ OUT OF THE PANEL SOURCE — and ⚠ THIS IS NOT THE GATE.
+   *
+   * It says the drift box is handed `refuse` and `driftFromPxPerFrame` rather
+   * than writing a typed number straight into `drift.rate`. What it CANNOT say
+   * is that either one reaches a browser: `refuse` withholding a commit, and the
+   * ×256 happening on the real write path, are facts about the running app, and
+   * `scratchpad/effects-drift-harness.mjs` rows [4a] and [5a]–[5e] are what
+   * measure them by typing into the real box. A source assertion about
+   * validation is the shape of the bug this control exists to fix (`min`/`max`
+   * look identical in source and stop nothing), so this row exists to catch a
+   * REWIRE in a suite run, never to stand in for the harness.
+   */
+  it('the panel hands the box the refusal and the conversion (SOURCE ONLY — see the harness)', () => {
+    const panel = readFileSync(resolve(
+      __dirname, '../../src/renderer/components/effects/EffectsScenePanel.tsx'), 'utf8');
+    // Comments stripped: this file's own prose names both functions.
+    const code = panel.replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(code.length).toBeGreaterThan(5000);
+
+    const box = /<NumberField title=\{`Layer \$\{i\} \$\{LAYER_DRIFT_ROW\.rateTitle\}`\}[\s\S]*?\/>/
+      .exec(code)?.[0];
+    console.log('--- the drift NumberField, comments stripped ---\n' + (box ?? '(NOT FOUND)'));
+    expect(box, 'the drift box is no longer identifiable by its title').toBeDefined();
+    expect(box).toContain('refuse={(n) => driftPxPerFrameRefusal(n)}');
+    expect(box).toContain('driftFromPxPerFrame(n)');
+    // The typed number must NOT reach `rate` directly — that is the missing
+    // multiply, and it produces a legal document that drifts 256x too slow.
+    expect(box).not.toMatch(/rate:\s*n\b/);
+  });
+
+  /**
+   * A DOCUMENT THE CONTROL WROTE IS A DOCUMENT THE CONTRACT ACCEPTS. The refusal
+   * and the validator are two implementations of one rule; this is the row that
+   * would catch them parting.
+   */
+  it('writes only documents the schema validates', () => {
+    const scene = parseEffectsScene(GOLDEN, 'canopy_dusk');
+    for (const px of [0.125, 6, -16, 1 / EFFECTS_DRIFT_UNITS_PER_PIXEL]) {
+      const authored = cloneEffectsScene(scene);
+      authored.layers[0].drift = driftFromPxPerFrame(px);
+      const errors = validateAgainstSchema(authored, EFFECTS_SCENE_SCHEMA);
+      expect(errors, `${px} px/frame produced ${JSON.stringify(authored.layers[0].drift)}`)
+        .toEqual([]);
+    }
   });
 });

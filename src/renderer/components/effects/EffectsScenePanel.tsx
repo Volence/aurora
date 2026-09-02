@@ -93,6 +93,8 @@ import {
   bobToggleCommand, setBobShiftCommand, setBobPeriodCommand,
   clampLayerDeformField, clampAmpShift, clampDeformSpeed,
   EFFECTS_LAYER_DEFORM_BOUNDS, EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS,
+  LAYER_DRIFT_ROW, EFFECTS_DRIFT_PX_BOUNDS, EFFECTS_DRIFT_PX_STEP,
+  driftPxFieldValue, driftFromToggle, driftFromPxPerFrame, driftPxPerFrameRefusal,
 } from '../../providers/effects-aeon';
 
 const EMPTY_LIBRARY: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [] };
@@ -361,10 +363,22 @@ export default function EffectsScenePanel(): React.ReactElement {
   const setSelectedId = useEditorStore((s) => s.setSelectedEffectsSceneId);
   const [newId, setNewId] = React.useState('');
   const [refusal, setRefusal] = React.useState<string | null>(null);
+  // THE DRIFT BOX'S REFUSAL, PER LAYER — keyed by index because the cards are
+  // mapped inline in this component and a single string would paint layer 3's
+  // refusal under layer 0's box. `NumberField` clears it on focus and on any
+  // value that commits, so a stale sentence cannot outlive the number beside it.
+  const [driftRefusal, setDriftRefusal] = React.useState<Record<number, string | null>>({});
 
   // Keep the selection on something that exists: undoing a create, or opening a
   // different project, leaves a stale id behind.
   const selected = resolveSelectedScene(library, selectedId);
+
+  // A refusal is about ONE box on ONE scene's layer, and the map above keys it by
+  // index alone — so switching scenes would otherwise paint the old scene's
+  // sentence under the new scene's layer of the same number. Cleared on the
+  // change rather than keyed by `${id}:${i}`, because a refusal is a transient
+  // fact about what the author just typed and nothing should carry it across.
+  React.useEffect(() => { setDriftRefusal({}); }, [selected?.id]);
 
   // ONCE PER SCENE, NOT ONCE PER CARD. The advisory walks every layer and
   // returns `/layers/N` paths, so calling it inside the map would be N scans of
@@ -1060,12 +1074,80 @@ export default function EffectsScenePanel(): React.ReactElement {
                   </>
                 );
               })()}
+              {/* DRIFT (EW-DRIFT-CTL). The one row on this card that moves the
+                  strip with the camera STANDING STILL, which is why it sits
+                  last: everything above it is camera-relative.
+
+                  ═══ THE UNIT, WHICH IS THE WHOLE ROW ═══
+
+                  The box is px/frame; the FILE is in 1/256ths of one. aeon's
+                  generator does NOT convert — its own docstring says the
+                  multiply "happens in AURORA'S UI, on export" and that doing
+                  it there too "would apply it twice and every authored rate
+                  would come out 256x too fast" — so `driftFromPxPerFrame` is
+                  the single write-path caller of the single
+                  `EFFECTS_DRIFT_UNITS_PER_PIXEL` multiply in this repo, and
+                  nothing here re-derives that factor. (Nor does this comment
+                  write it as a bare literal: `effects-drift.test.ts` greps
+                  these files for one, which is the check that would catch a
+                  second copy.) A unit error of that size is invisible to any
+                  test that checks one direction, because every wrong value is
+                  itself a legal rate; the gate is the ROUND TRIP — author,
+                  export, import, and the box shows what was typed.
+
+                  ═══ REFUSED AT THE CONTROL, AT TYPING TIME ═══
+
+                  aeon FORWARDS `Rate(0)` and `Rate(9000)` as shape-legal and
+                  lets its build `ensure` refuse them, so this box is the only
+                  place an author learns the bound before a red build — the
+                  owner's own complaint (EFFECTS-W1 defect 5), where the only
+                  escape from an unbuildable document was to revert. `refuse`
+                  withholds the commit; `min`/`max`/`step` below bind the
+                  spinner and stop NO typed value.
+
+                  NO GROUP CONTROL, deliberately. The four OJZ canopy strips
+                  carry one rate because that art is a single plane cut into
+                  four records and per-strip rates would shear it at a boundary
+                  — an author typing one number four times, not an "apply to
+                  all" that would hide that drift is per-layer. */}
+              {(() => {
+                const px = driftPxFieldValue(layer);
+                const why = driftRefusal[i] ?? null;
+                return (
+                  <>
+                    <Field label={LAYER_DRIFT_ROW.label} title={LAYER_DRIFT_ROW.title}>
+                      <Select title={`Layer ${i} ${LAYER_DRIFT_ROW.title}`}
+                        value={px === null ? 'none' : 'rate'}
+                        onChange={(v) => {
+                          setDriftRefusal((s) => ({ ...s, [i]: null }));
+                          run(setLayerFieldCommand(
+                            library, selected.id, i, 'drift', driftFromToggle(v === 'rate')));
+                        }}
+                        style={{ width: 88 }}>
+                        <option value="none">{LAYER_DRIFT_ROW.none}</option>
+                        <option value="rate">{LAYER_DRIFT_ROW.on}</option>
+                      </Select>
+                      {px !== null && (
+                        <NumberField title={`Layer ${i} ${LAYER_DRIFT_ROW.rateTitle}`}
+                          min={EFFECTS_DRIFT_PX_BOUNDS.min} max={EFFECTS_DRIFT_PX_BOUNDS.max}
+                          step={EFFECTS_DRIFT_PX_STEP} width={72} value={px}
+                          refuse={(n) => driftPxPerFrameRefusal(n)}
+                          onRefusal={(r) => setDriftRefusal((s) => ({ ...s, [i]: r }))}
+                          onChange={(n) => run(setLayerFieldCommand(
+                            library, selected.id, i, 'drift', driftFromPxPerFrame(n)))} />
+                      )}
+                    </Field>
+                    <Hint under style={{ marginBottom: 0 }}>{LAYER_DRIFT_ROW.hint}</Hint>
+                    {why !== null && <Hint under tone="warning">{why}</Hint>}
+                  </>
+                );
+              })()}
               {/* WHAT THE FILE SETS THAT THE CARD STILL CANNOT: disabled, and
                   dsa/dsb/phase. Read-only, mono, at the hint tier so it cannot
                   be mistaken for a control. curve and vsplit left this line
                   when they got controls above (parcel H); deform left it in
-                  wave 2, for the same reason. Absent entirely for a plain
-                  layer: no empty line. */}
+                  wave 2 and drift at EW-DRIFT-CTL, for the same reason. Absent
+                  entirely for a plain layer: no empty line. */}
               {(() => {
                 const line = layerExtrasLine(layer);
                 return line === null ? null : (

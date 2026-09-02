@@ -76,6 +76,40 @@ only thing in Aurora that shows what a scene's layers do.
 
 > The `LAYERS` list is a very short scrolling window inside an already-scrolling panel. If you can only see one layer, scroll **inside** the list.
 
+### Clouds that move on their own (`Drift`)
+
+Everything above needs the camera. **`Drift`** does not: it is a constant sideways
+speed added to one layer **every frame**, whether the camera moves or not. That is
+what clouds are — Green Hill's, Angel Island's.
+
+1. On the layer you want moving, set **`Drift`** to `px/frame`.
+2. A number box appears, already holding `0.125`. That is Angel Island's clouds —
+   the slowest speed anyone has shipped, and a good place to start.
+3. Type a speed. **Negative moves left.** `1` is a pixel a frame, which is fast;
+   `6` is the fastest in any of the games this engine copies.
+
+**The box is pixels per frame. The file is in 256ths of one.** You never type the
+file's number — Aurora multiplies on the way out and divides on the way back in.
+If you open the scene file and see `"rate": 32` where you typed `0.125`, that is
+correct.
+
+Two things it will not let you write, and it says so under the box:
+
+- **`0`.** In the ROM a zero drift and no drift at all are the same bytes, so the
+  build refuses it. Set the row back to `none` — that is how you say "this layer
+  does not drift". Anything that *rounds* to zero (`0.001`) is refused for the
+  same reason.
+- **More than ±16 px/frame.** Nothing breaks up there; it just looks absurd, and
+  the build refuses it anyway.
+
+> Four layers of one picture want the **same** number typed four times — a single
+> plane cut into four strips will tear at a boundary if the strips drift at
+> different speeds. There is deliberately no "apply to all": drift is per-layer,
+> and hiding that would hide the tearing.
+
+⚠ `Parallax preview` does **not** animate drift. Nothing in Aurora shows a layer
+actually drifting; you see that in the game.
+
 ---
 
 ## 3. Make a raster band (a coloured stripe)
@@ -297,8 +331,9 @@ anything on this list's top half.
 
 | I want to… | go to |
 |---|---|
-| make the background drift | `LAYERS` → `Add` → set `Plane B (bg)` |
-| see the drift | `Parallax preview` on the Effects toolbar |
+| make the background move as the camera does | `LAYERS` → `Add` → set `Plane B (bg)` |
+| see that | `Parallax preview` on the Effects toolbar |
+| make a layer move on its own (clouds) | that layer's `Drift` row → `px/frame` |
 | make a coloured stripe | `RASTER BAND PRESETS` → `Preset id` → `New` |
 | make colours shimmer | `PRESET — <id> — CYCLES, VARIANTS` → `cycles: authored script` |
 | delete a preset a section binds | unbind that section first — Aurora refuses the delete and says which |
@@ -314,6 +349,7 @@ anything on this list's top half.
 - `Top` at or below `Bot` on the same raster band.
 - Lighting `L0` in a `variants` line mask.
 - A `colours` list that is empty or holds a non-integer.
+- A `Drift` of `0`, or anything that rounds to it, or one past ±16 px/frame.
 
 ### Things the build can still refuse
 
