@@ -365,7 +365,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
       <CollapsibleSection
         id="aeon.bganim.bands"
         defaultCollapsed
-        title={`BG animation bands (${budget.bands}/${budget.maxBands})`}>
+        title={`Tile animations (${budget.bands}/${budget.maxBands})`}>
        <SectionBody>
         {state === null && (
           <Hint style={{ marginBottom: 0 }}>No aeon project is open.</Hint>
@@ -430,11 +430,11 @@ export default function BgAnimBandPanel(): React.ReactElement {
           // is what makes the readout a block rather than four ragged lines.
           <Card key={b.index} raised selected={lit} domId={bandCardDomId(b.index)}
             title={lit
-              ? 'The map is tinting every background cell this band paints. Click a card or a '
+              ? 'The map is tinting every background cell this tile animation paints. Click a card or a '
                 + 'cell to move the lens.'
-              : 'Show this band on the map — every background cell its slots paint.'}
+              : 'Show this tile animation on the map — every background cell its slots paint.'}
             onClick={() => setLensTarget({ kind: 'band', index: b.index })}>
-            <Field label={`Band ${b.index}`}>
+            <Field label={`Tile animation ${b.index}`}>
               <span style={{ fontSize: T.tSm, color: T.textHi }}>{b.geometry}</span>
             </Field>
             <Hint under>
@@ -445,7 +445,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
               {b.patternPx}px pattern · {b.columnBytes}B/col · {b.phaseBanks} banks
             </Hint>
             <Hint under>
-              <span title="The scalar source. The band shifts HORIZONTALLY whichever driver it uses.">
+              <span title="The scalar source. A tile animation shifts HORIZONTALLY whichever driver it uses.">
                 driver <strong>{b.driver}</strong>
                 {b.driverIsExplicit ? '' : ' (default — the key is absent)'}
               </span>
@@ -485,10 +485,10 @@ export default function BgAnimBandPanel(): React.ReactElement {
             )}
             <Row style={{ marginLeft: CONTROL_INSET }}>
               <IconButton icon={<span>Demote</span>}
-                label={`Demote band ${b.index} to static tiles`}
+                label={`Demote tile animation ${b.index} to static tiles`}
                 onClick={() => { setPendingRemoval(null); apply(demoteBandCommand(doc, b.index)); }} />
               <IconButton icon={<span>Remove</span>}
-                label={`Remove band ${b.index}`}
+                label={`Remove tile animation ${b.index}`}
                 onClick={() => {
                   // First press asks the COMMAND, which refuses when cells draw
                   // the band and says how many. That refusal IS the prompt —
@@ -544,7 +544,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
             {/* `animatedSlots` is a COUNT: the animated prefix is 0..count-1,
                 and an empty document says so in words rather than `0..-1`. */}
             {budget.animatedSlots} animated ({slotSpanPhrase(0, budget.animatedSlots)}) ·{' '}
-            {budget.bandsRemaining} band slot{budget.bandsRemaining === 1 ? '' : 's'} left
+            {budget.bandsRemaining} tile-animation slot{budget.bandsRemaining === 1 ? '' : 's'} left
           </Hint>
         )}
         {refusalText && (
@@ -555,7 +555,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
 
       {/* DEFAULT-COLLAPSED — a creation form, and the tallest box in the column.
           See the file docblock; the four CDP harnesses that drive it open it. */}
-      <CollapsibleSection id="aeon.bganim.new" title="New band" defaultCollapsed>
+      <CollapsibleSection id="aeon.bganim.new" title="New tile animation" defaultCollapsed>
        <SectionBody>
         {/* ONE GEOMETRY, TWO SOURCES. Cols, rows and driver describe the band
             itself and mean the same thing whichever way its art arrives, so
@@ -589,7 +589,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
 
         <Field label="Driver" title="The SCALAR the step is read from. Never an axis.">
           <Select
-            title="Which scalar drives this band's step. Every band shifts HORIZONTALLY whichever
+            title="Which scalar drives this tile animation's step. Every one shifts HORIZONTALLY whichever
                    driver it uses — camera_y does NOT mean vertical motion."
             value={explicitDriver ? driver : ''}
             onChange={(v) => setCandidate({ driver: v === '' ? undefined : v })}
@@ -629,7 +629,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
             style={{ flex: 1, minWidth: 0 }}>
             {/* Same contract as the driver's empty option: this LEAVES THE KEY OUT. */}
             <option value=""
-              title="Omit rate_shift. The band moves at whatever aeon's own default is, today and
+              title="Omit rate_shift. The tile animation moves at whatever aeon's own default is, today and
                      after any change to it.">
               (default — {DEFAULT_RATE_SHIFT})
             </option>
@@ -670,13 +670,13 @@ export default function BgAnimBandPanel(): React.ReactElement {
 
         {/* ── Source 1: art the document already carries ────────────────── */}
         <Group label="From existing tiles" note="costs no tiles — the range moves, it is not copied">
-          <Field label="From tile" title="First tile of the static range this band takes over">
+          <Field label="From tile" title="First tile of the static range this tile animation takes over">
             <NumberField
               // Both halves through `slotSpanPhrase`: FIRST..LAST, never one
               // past the end. The second sentence is the same fact the bound
               // below states, and it named the first FREE slot as taken.
               title={`static base — the range is ${slotSpanPhrase(staticBase, tileCount)}. `
-                + `Bands already own ${slotSpanPhrase(0, budget.animatedSlots)}.`}
+                + `Tile animations already own ${slotSpanPhrase(0, budget.animatedSlots)}.`}
               // THE CLAMP IS THE BOUND, and it reads the SAME expression `min`
               // does (ROADMAP item 40). Was `Math.max(0, Math.round(n) || 0)`,
               // which enforced a floor of 0 under a spinner advertising the
@@ -724,9 +724,9 @@ export default function BgAnimBandPanel(): React.ReactElement {
         <Group label="From new art"
           note={<>costs {tileCount} slot{tileCount === 1 ? '' : 's'} ·{' '}
             <strong>{budget.tileSlotsRemaining}</strong> free</>}>
-          <Field label="Blank band">
+          <Field label="Blank tile animation">
             <Chip disabled={insertOff !== null}
-              title={insertOff ?? `Add a blank ${cols}x${bandRowCount} band (${tileCount} tiles)`}
+              title={insertOff ?? `Add a blank ${cols}x${bandRowCount} tile animation (${tileCount} tiles)`}
               onClick={() => apply(verbs.add.run())}>
               Add band
             </Chip>

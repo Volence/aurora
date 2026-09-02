@@ -308,7 +308,7 @@ export default function BandPresetPanel(): React.ReactElement | null {
                 setColoursRefusal={(r) => setColoursRefusal((s) => ({ ...s, [i]: r }))} />
             ))}
 
-            <Chip onClick={() => run(addBandCommand(library, selected.id))}>Add band</Chip>
+            <Chip onClick={() => run(addBandCommand(library, selected.id))}>Add raster band</Chip>
           </SectionBody>
         </CollapsibleSection>
       )}
@@ -542,11 +542,11 @@ function BandCard({
 
   return (
     <Card>
-      <Field label={`Band ${index}`}>
+      <Field label={`Raster band ${index}`}>
         {/* DISABLED WITH A REASON, NOT HIDDEN. `lastBandRefusal` is the same
             predicate `removeBandCommand` returns null on, read from one place,
             so the greyed button and the sentence under it cannot disagree. */}
-        <IconButton icon={<span>Remove</span>} label={`Remove band ${index}`}
+        <IconButton icon={<span>Remove</span>} label={`Remove raster band ${index}`}
           disabled={lastRefusal !== null}
           onClick={() => run(removeBandCommand(library, presetId, index))} />
       </Field>

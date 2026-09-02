@@ -54,7 +54,7 @@ describe('bandVerbs — the fixture document', () => {
 
   it('labels name the tile and the blankness', () => {
     expect(v.promote.label).toBe(`Promote from tile ${base}`);
-    expect(v.add.label).toBe('Add blank band');
+    expect(v.add.label).toBe('Add blank tile animation');
   });
   it('the label follows the candidate\'s base — it is derived, not fixed', () => {
     expect(bandVerbs(d, { ...candidate, staticBase: base + 5 }).promote.label)

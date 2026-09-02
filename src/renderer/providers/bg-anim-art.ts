@@ -43,13 +43,13 @@ import type { TilePickerLayer, TilePickerOrigin } from './tile-picker-source';
 export const SHIFT_BUTTON_LABEL = 'Shift';
 export const SHIFT_BUTTON_TITLE =
   'Regenerate banks 1–7 from phase 0: bank k becomes phase 0 scrolled k px within the '
-  + 'band’s pattern width (the same fill as "pre-shifted (moves)"). Run it again after '
+  + 'tile animation’s pattern width (the same fill as "pre-shifted (moves)"). Run it again after '
   + 'every phase-0 edit; banks you drew by hand are replaced. One undo step.';
 export const BANK_STRIP_HINT = 'banks 0–7 · click one to draw it';
 export const BANK_THUMB_TITLE = (bank: number): string =>
   bank === 0
-    ? 'Phase 0 — the picture at rest. Drawing it also writes the band’s static slots.'
-    : `Bank ${bank} — the band at step ${bank}. Draw it by hand, or Shift to derive it from phase 0.`;
+    ? 'Phase 0 — the picture at rest. Drawing it also writes the tile animation’s static slots.'
+    : `Bank ${bank} — the tile animation at step ${bank}. Draw it by hand, or Shift to derive it from phase 0.`;
 
 // ---------------------------------------------------------------------------
 // Which palette line the override's art renders through
@@ -349,7 +349,7 @@ export function openBandBankDocument(
   if (!d) return null;
   return {
     doc: d, liveTileIndex: null, chunkId: null, bgOverride: target,
-    name: `band ${bandIndex} bank ${bank}`, dirty: false,
+    name: `tile animation ${bandIndex} bank ${bank}`, dirty: false,
   };
 }
 

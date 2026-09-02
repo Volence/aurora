@@ -73,7 +73,7 @@ export function bandVerbs(
       run: () => promoteBandCommand(doc, c.staticBase, spec),
     },
     add: {
-      label: 'Add blank band',
+      label: 'Add blank tile animation',
       reason: insertUnavailableReason(doc, c.cols, c.rows),
       run: () => addBandCommand(doc, spec),
     },
