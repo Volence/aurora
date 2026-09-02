@@ -811,12 +811,36 @@ window) rather than adopting their reading — the standing practice in this fil
   exposure while there is no breakpoint consumer, and the session that starts one must confirm the
   server-side fix landed BEFORE trusting a green run of its own.** Recorded as a not-currently-reachable
   finding, not as an all-clear.
-  **Question handed back and not yet answered:** whether `run_to`'s reply shares `resume`'s thread
-  split. If it does, our boot restore would proceed against a still-running machine — **loudly, not
-  silently**, because `write_memory` is in `require_paused` and refuses by name, so it is not a
-  corruption risk. But it would present as an unexplained boot-restore failure whose cause is across
-  the fence. Attribute a `require_paused` refusal after a *successful* `run_to` to that before
-  debugging this side.
+  ✅ **THE `run_to` QUESTION IS ANSWERED — NO, IT DOES NOT SHARE THE SPLIT, and the answer came back
+  with a caveat that INVERTS the worry.** *(Oracle, 2026-09-02, banked their side at `7ba2faf`;
+  every claim below **read firsthand here** at that revision, confirmed an ancestor of their
+  `origin/main` before it was written down.)*
+  **Why `bootRestore` is safe, and it is a stronger property than ordering.** `engine_loop`
+  (`server.rs`) handles one call at a time — `engine.dispatch(...)` and THEN `reply.send(...)`. `run_to`
+  blocks *inside* dispatch: it `require_paused`es, sets `running = true`, calls `advance_until(...)`
+  which does not return until the target, the frame bound, a breakpoint or a `stopAfter` watch ends the
+  run, sets `running = false`, emits `stopped`, and only then builds its result. **The reply is PRODUCED
+  BY the halt rather than merely correlated with it**, so having the reply means the machine is parked.
+  `resume` is the opposite and is the whole race: its entire body flips a flag and returns
+  (`Ok(json!({"wasRunning": self.set_free_run(true)}))`), and the halt lands later on a subsequent
+  free-run step whose broadcast fires after the reply was already sent.
+  ⚠ **THE INVERTED HAZARD, WHICH IS THE PART TO CARRY INTO A BREAKPOINT CONSUMER.** `run_to` calls
+  `emit_stopped` **BEFORE** it builds its reply — verified here in the body's own order — so **on the
+  wire the `stopped` event PRECEDES the `run_to` reply.** Our read-through-to-the-reply pattern is
+  correct and unaffected (it discards the event and takes the reply). But **a client that consumed the
+  reply and THEN waited for the halt event would block forever.** That is F-RESUME-STOP-RACE with the
+  halves swapped, and it is exactly the loop someone reaches for when writing a first breakpoint
+  consumer. **Ping the oracle lane before writing that wait loop** — their standing offer, and they will
+  say whether the server-side fix has landed.
+  **Also confirmed here and load-bearing for our gate:** `run_to`'s result carries
+  `"reached": run.predicate_fired` — *the predicate's own verdict, never the sink's* — because a
+  `stopAfter` watch can end the run too. `bootRestore` gating on `reached !== true` is therefore
+  reading the right field: a watch-induced halt cannot masquerade as the target being reached.
+  **SCOPE, theirs, stated rather than widened:** all of the above is the **socket / free-run driver**,
+  which is the path this repo reaches. The **hosted** path — their player window through `Host::pump` —
+  is a different driver and stays registered as their `F-STOPPREC-HOSTED-HALT`, where the halt is
+  *inferred* from sharing one function with the measured path rather than measured. **Nothing here
+  upgrades that**, and a claim about the hosted window may not cite this row.
 
 - **`require_paused`** — **the full list, re-derived from **oracle's RUST source** at `e484ace`
   2026-08-22 (**server fact** — not known to hold on the legacy C++ server), because this row was missing four for months**: `run_frames`, `run_to`,
