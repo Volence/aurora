@@ -93,6 +93,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9439);
 // A FIXED display number, not `xvfb-run -a`: another harness on this box is
@@ -101,10 +102,14 @@ const PORT = Number(process.env.PORT ?? 9439);
 // taken by other files here; a live server on this number is refused below.
 const DISPLAY_NUM = Number(process.env.DISPLAY_NUM ?? 95);
 const ROOT = AURORA_DIR;
-const ELECTRON = process.env.ELECTRON_BIN
-  ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
-    ? `${ROOT}/node_modules/.bin/electron`
-    : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
+// WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
+// question 1. A linked worktree has no node_modules/ and no dist/, so the tree
+// carrying the build can be a different directory from the one this file lives
+// in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
+// it is not this one. See scratchpad/lib/run-root.mjs.
+const RUN = announceRunRoot(runTarget(ROOT));
+const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
+const MAIN = RUN.main;
 const AEONDIR = siblingPathOrUnresolved('aeon');
 const SHOTS = `${ROOT}/scratchpad/shots-timeline-edit`;
 mkdirSync(SHOTS, { recursive: true });
@@ -412,7 +417,7 @@ async function main() {
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
   const child = spawnGuarded('/usr/bin/xvfb-run',
-    ['-n', String(DISPLAY_NUM), '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`],
+    ['-n', String(DISPLAY_NUM), '-s', '-screen 0 1680x1050x24', ELECTRON, MAIN],
     { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   child.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[main] ${d}`); });
   child.stderr.on('data', (d) => { if (process.env.VERBOSE) process.stderr.write(`[err] ${d}`); });
@@ -436,7 +441,7 @@ async function main() {
     const haveProbe = await c.evalExpr(
       'typeof window.__dbg.aeon.rasterTimeline === "function" && '
       + 'typeof window.__dbg.aeon.presetsJson === "function"');
-    check('0a', 'the build under test has BOTH probes this run reads', haveProbe === true, `${ROOT}/dist`);
+    check('0a', 'the build under test has BOTH probes this run reads', haveProbe === true, `${RUN.root}/dist`);
     if (!haveProbe) throw new Error('wrong build — VITE_AURORA_DEBUG=1 npx electron-vite build');
 
     await c.evalExpr('localStorage.clear()');

@@ -102,20 +102,25 @@
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npm run build
 // Run:                     node scratchpad/writer-originated-scene-harness.mjs
 
-import { AURORA_DIR, checkoutOverride, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, checkoutOverride } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9394);
 const ROOT = AURORA_DIR;
-const ELECTRON = process.env.ELECTRON_BIN
-  ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
-    ? `${ROOT}/node_modules/.bin/electron`
-    : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
+// WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
+// question 1. A linked worktree has no node_modules/ and no dist/, so the tree
+// carrying the build can be a different directory from the one this file lives
+// in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
+// it is not this one. See scratchpad/lib/run-root.mjs.
+const RUN = announceRunRoot(runTarget(ROOT));
+const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
+const MAIN = RUN.main;
 // A WRITABLE COPY of the aeon project. Never aeon's own tree.
 const AEONDIR = checkoutOverride('aeon')?.value;
 if (!AEONDIR) throw new Error('AEON_DIR must point at a WRITABLE COPY of an aeon project');
@@ -309,7 +314,7 @@ async function main() {
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
   const child = spawnGuarded('/usr/bin/xvfb-run',
-    ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`],
+    ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, MAIN],
     { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   child.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[main] ${d}`); });
   child.stderr.on('data', (d) => { if (process.env.VERBOSE) process.stderr.write(`[err] ${d}`); });

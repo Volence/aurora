@@ -95,21 +95,26 @@
 // could match a preset id and nothing could be bound at all. Restored; a source
 // row now covers that instance, and the class stays this harness's.
 
-import { AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import * as http from 'node:http';
 import * as os from 'node:os';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9438);
 const DISPLAY_NUM = Number(process.env.DISPLAY_NUM ?? 98);
 const ROOT = AURORA_DIR;
-const ELECTRON = process.env.ELECTRON_BIN
-  ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
-    ? `${ROOT}/node_modules/.bin/electron`
-    : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
+// WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
+// question 1. A linked worktree has no node_modules/ and no dist/, so the tree
+// carrying the build can be a different directory from the one this file lives
+// in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
+// it is not this one. See scratchpad/lib/run-root.mjs.
+const RUN = announceRunRoot(runTarget(ROOT));
+const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
+const MAIN = RUN.main;
 const AEONDIR = checkoutOverride('aeon')?.value;
 if (!AEONDIR) throw new Error('AEON_DIR must point at a WRITABLE COPY of an aeon project');
 if (AEONDIR.startsWith(siblingDefaultPathOrUnresolved('aeon'))) {
@@ -307,7 +312,7 @@ async function main() {
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
   const child = spawnGuarded('/usr/bin/xvfb-run',
-    ['-n', String(DISPLAY_NUM), '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`],
+    ['-n', String(DISPLAY_NUM), '-s', '-screen 0 1680x1050x24', ELECTRON, MAIN],
     { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   child.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[main] ${d}`); });
   child.stderr.on('data', (d) => { if (process.env.VERBOSE) process.stderr.write(`[err] ${d}`); });

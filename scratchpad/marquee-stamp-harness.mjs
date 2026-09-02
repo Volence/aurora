@@ -40,15 +40,23 @@
 
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
-import { writeFileSync, existsSync, statSync, mkdirSync } from 'node:fs';
+import { writeFileSync, statSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9388);
 const ROOT = AURORA_DIR;   // this worktree
-const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
+// WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
+// question 1. A linked worktree has no node_modules/ and no dist/, so the tree
+// carrying the build can be a different directory from the one this file lives
+// in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
+// it is not this one. See scratchpad/lib/run-root.mjs.
+const RUN = announceRunRoot(runTarget(ROOT));
+const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
+const MAIN = RUN.main;
 const AEON_DIR = siblingPathOrUnresolved('aeon');               // OPEN ONLY — never written
 const SHOTS = join(ROOT, 'scratchpad/shots-marquee-stamp');
 mkdirSync(SHOTS, { recursive: true });
@@ -136,7 +144,7 @@ async function main() {
   // A STALE dist/ MAKES EVERY ROW VACUOUS (lesson inherited from
   // classic-playtest-harness.mjs): refuse to run when any source file is newer
   // than the built main bundle.
-  const distM = statSync(join(ROOT, 'dist/main/index.mjs')).mtimeMs;
+  const distM = statSync(MAIN).mtimeMs;
   const newest = execSync(
     `find ${JSON.stringify(join(ROOT, 'src'))} -name '*.ts' -o -name '*.tsx' | xargs stat -c %Y | sort -n | tail -1`,
     { shell: '/bin/bash' }).toString().trim();
@@ -148,7 +156,7 @@ async function main() {
   try {
     const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
     delete env.DISPLAY;
-    app = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`], {
+    app = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, MAIN], {
       cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
     });
     app.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[app] ${d}`); });
