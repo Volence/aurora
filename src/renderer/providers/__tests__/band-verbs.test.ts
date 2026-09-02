@@ -16,7 +16,7 @@ import {
   DEFAULT_PHASE_FILL, addBandCommand, bandBudget, insertUnavailableReason,
   promoteBandCommand, promoteUnavailableReason,
 } from '../bg-anim-aeon';
-import { bandSpecOf, bandVerbs } from '../band-verbs';
+import { bandSpecOf, bandVerbs, seededStaticBase, type BandCandidate } from '../band-verbs';
 
 const FIXTURE = 'test/fixtures/bg-override/editor_bg_override.b0e5a661.json';
 const doc = (): BgOverrideDocument => parseBgOverride(readFileSync(FIXTURE, 'utf8')).doc;
@@ -81,5 +81,44 @@ describe('bandVerbs — the fixture document', () => {
     expect(w.add.reason).not.toBeNull();
     // Promote is a different predicate and does not read cols — still open.
     expect(w.promote.reason).toBe(promoteUnavailableReason(d));
+  });
+});
+
+describe('the seed follows the document — EFFECTS-W1 defect 12', () => {
+  // THE DEFECT, IN ONE SENTENCE: adding a tile animation grew the animated
+  // prefix and the panel's seed followed it (32 -> 33); UNDO shrank the prefix
+  // back and the seed did NOT, so the toolbar went on offering
+  // `Promote from tile 33` in a world where 33 no longer existed. A control
+  // advertising an operation from the world the author had just left is the
+  // same shape as the owner's "some seem like they're just a repeat of things".
+  //
+  // ⚠ THE RULE IS TESTED HERE AND NOT IN THE PANEL because the node suite
+  // cannot see React: it lived inside a `useEffect`, which is why it was wrong
+  // for as long as nobody could run it.
+  const base = (staticBase: number, authored?: boolean): BandCandidate => ({
+    staticBase, cols: 1, rows: 1,
+    ...(authored === undefined ? {} : { staticBaseAuthored: authored }),
+  });
+
+  it('an UNAUTHORED seed follows the prefix DOWN as well as up — the defect', () => {
+    expect(seededStaticBase(base(32), 33)).toBe(33);
+    // The half that was missing. Without it the toolbar keeps offering 33.
+    expect(seededStaticBase(base(33), 32)).toBe(32);
+    expect(seededStaticBase(base(33), 33)).toBe(33);
+  });
+
+  it('an AUTHORED base is only ever RAISED, and only once it has gone illegal', () => {
+    // Following an author's own choice DOWN would rewrite a deliberate value
+    // every time a band came or went — what the original one-directional clamp
+    // was right to avoid, and what this flag preserves.
+    expect(seededStaticBase(base(80, true), 32)).toBe(80);
+    expect(seededStaticBase(base(80, true), 96)).toBe(96);
+    expect(seededStaticBase(base(80, true), 80)).toBe(80);
+  });
+
+  it('ABSENT means unauthored — every candidate written before the flag existed', () => {
+    const c = { staticBase: 33, cols: 1, rows: 1 };
+    expect('staticBaseAuthored' in c).toBe(false);
+    expect(seededStaticBase(c, 32)).toBe(32);
   });
 });

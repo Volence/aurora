@@ -2412,7 +2412,10 @@ export default function MapViewport() {
       return;
     }
     if (decided.kind === 'candidate') {
-      ed.setBandCandidate({ staticBase: decided.staticBase });
+      // `staticBaseAuthored`: a mark on the map is the AUTHOR choosing this
+      // base, so the panel's seed must stop following the document for it
+      // (band-verbs.ts, EFFECTS-W1 defect 12).
+      ed.setBandCandidate({ staticBase: decided.staticBase, staticBaseAuthored: true });
       publishBandMark({ kind: 'candidate', cell: mark.cell, slot: decided.slot, value: decided.staticBase });
       return;
     }

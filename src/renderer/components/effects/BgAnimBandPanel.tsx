@@ -214,7 +214,7 @@ import {
 // shared with the Effects facet's tool-options bar (parcel B). This panel no
 // longer calls `promoteBandCommand` / `addBandCommand` itself, so the two
 // surfaces cannot run different specs or disagree about why a chip is off.
-import { bandVerbs } from '../../providers/band-verbs';
+import { bandVerbs, seededStaticBase } from '../../providers/band-verbs';
 import { runBandVerb, bandCardDomId } from '../../providers/band-follow';
 // Parcel I: the bank strip and its two verbs (open bank k in the Art facet;
 // Shift = regenerate banks 1..7 from phase 0), decided in one provider.
@@ -297,7 +297,15 @@ export default function BgAnimBandPanel(): React.ReactElement {
   const { cols, rows: bandRowCount, staticBase } = candidate;
   const setCols = (n: number): void => setCandidate({ cols: n });
   const setBandRowCount = (n: number): void => setCandidate({ rows: n });
-  const setStaticBase = (n: number): void => setCandidate({ staticBase: n });
+  // THE AUTHOR'S OWN WRITE, MARKED AS SUCH (defect 12). There are THREE doors a
+  // person can set this base through — this box, a mark on the map
+  // (MapViewport) and a dragged range in the tile strip (ArtBrowser) — and all
+  // three set the flag. They are named here because a door that forgot it
+  // would have the effect below quietly overwrite the author's choice on the
+  // next undo, which is the defect this flag exists to end, wearing its own
+  // costume.
+  const setStaticBase = (n: number): void =>
+    setCandidate({ staticBase: n, staticBaseAuthored: true });
   // WHAT THE MAP IS LIGHTING, resolved through the SAME function the canvas
   // calls (`resolveBandLens`) so the sentence in this column and the tint on the
   // map cannot describe different sets of cells.
@@ -331,11 +339,21 @@ export default function BgAnimBandPanel(): React.ReactElement {
   // candidate — that is right for an author's keystroke and wrong for a
   // document that moved on its own, which would make an undo of somebody else's
   // promote silently take over the map. So this writes the field directly.
+  //
+  // ⚠ AND IT FOLLOWS THE DOCUMENT DOWN AS WELL AS UP, WHEN THE NUMBER IS THE
+  // PANEL'S OWN (EFFECTS-W1 defect 12). This only raised, so adding a tile
+  // animation moved the seed 32 -> 33 and UNDO left it at 33 — the toolbar went
+  // on offering `Promote from tile 33` in a world where 33 no longer existed.
+  // The missing fact is who last wrote the number: `staticBaseAuthored` says
+  // so, and it is the only thing that lets "follow the document" and "never
+  // rewrite the author's choice" both be true. An author's own base is still
+  // only ever RAISED, and only when it has gone illegal.
   const firstPromotableSlot = budget.firstPromotableSlot;
   React.useEffect(() => {
     const b = useEditorStore.getState().bandCandidate;
-    if (b.staticBase < firstPromotableSlot) {
-      useEditorStore.setState({ bandCandidate: { ...b, staticBase: firstPromotableSlot } });
+    const want = seededStaticBase(b, firstPromotableSlot);
+    if (b.staticBase !== want) {
+      useEditorStore.setState({ bandCandidate: { ...b, staticBase: want } });
     }
   }, [firstPromotableSlot]);
 

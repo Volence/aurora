@@ -31,6 +31,31 @@ import {
 /** The promotion form's state, as `editorStore.bandCandidate` holds it. */
 export interface BandCandidate {
   staticBase: number;
+  /**
+   * True once the AUTHOR set `staticBase` themselves — typed it, or dragged a
+   * range on the strip. Absent/false means the number is the panel's own seed,
+   * following the document's animated prefix.
+   *
+   * ═══ WHY A PROVENANCE FLAG AND NOT A COMPARISON ═══
+   *
+   * EFFECTS-W1 defect 12. Adding a tile animation grows the animated prefix, so
+   * the panel's seed follows it — `Promote from tile 32` becomes `33`. UNDO
+   * shrinks the prefix back to 32, and the toolbar went on saying 33: a control
+   * advertising an operation from a world the author had just left, which is
+   * the same shape as the owner's "some seem like they're just a repeat of
+   * things".
+   *
+   * The fix cannot be "always follow the document", because that would rewrite
+   * a base the author deliberately chose every time a band came or went. It
+   * cannot be "never follow" either — that is the bug. The missing fact is WHO
+   * last wrote the number, and nothing in the document can answer it, so the
+   * candidate carries it.
+   *
+   * ⚠ IT IS NOT PERSISTED AND MUST NOT BE. It describes this session's editing,
+   * not the project; a stored `true` would freeze a seed forever on a document
+   * that had moved underneath it.
+   */
+  staticBaseAuthored?: boolean;
   cols: number;
   rows: number;
   /** Absent = the panel's default fill (`DEFAULT_PHASE_FILL`). */
@@ -39,6 +64,34 @@ export interface BandCandidate {
   driver?: BandSpec['driver'];
   /** Absent = the key is left out of the document. */
   rateShift?: number;
+}
+
+/**
+ * What `staticBase` should be once the DOCUMENT has moved under it — the whole
+ * of EFFECTS-W1 defect 12, as one comparison a test can run.
+ *
+ * IT LIVES HERE AND NOT IN THE PANEL'S `useEffect` for this file's own reason
+ * and `BgAnimBandPanel`'s: the node suite cannot see React, so a rule spelled
+ * inside a hook is a rule nothing in `vitest run` can check — and this rule was
+ * WRONG in the shipped panel for exactly as long as nobody could check it.
+ *
+ * THE TWO CASES, AND WHY THEY DIFFER:
+ *
+ *   NOT AUTHORED — the number is the panel's own seed, so it tracks the
+ *     animated prefix in BOTH directions. Adding a tile animation moved it
+ *     32 -> 33; undoing that add must move it back, or the toolbar goes on
+ *     offering `Promote from tile 33` in a world where 33 does not exist.
+ *
+ *   AUTHORED — the author typed it, marked it on the map, or dragged it in the
+ *     strip. It is only ever RAISED, and only when the prefix has grown past it
+ *     and made it illegal. Following it DOWN would rewrite a deliberate choice
+ *     every time a band came or went, which is what the original one-directional
+ *     clamp was right to avoid.
+ */
+export function seededStaticBase(c: BandCandidate, firstPromotableSlot: number): number {
+  return c.staticBaseAuthored
+    ? Math.max(c.staticBase, firstPromotableSlot)
+    : firstPromotableSlot;
 }
 
 /** The candidate as the command layer wants it. Absent keys STAY absent. */
