@@ -13,6 +13,7 @@
     "check:peer-path-literals": "node scripts/check-peer-path-literals.mjs",
     "check:object-stringify": "node scripts/check-object-stringify.mjs",
     "check:ledger-timestamps": "node scripts/check-ledger-timestamps.mjs",
+    "check:python-resolver": "node scripts/check-python-resolver.mjs",
     "//test": [
       "`npm run typecheck` is IN this chain, and must stay in it. vitest strips types",
       "without checking them, so before 2026-08-30 a plant the compiler catches read as",
@@ -34,9 +35,16 @@
       "that booked this assumed tsc was SLOWER than the suite and would need its own script;",
       "it is under half, so the naive add is also the correct one.",
       "It composes `npm run typecheck` rather than spelling `tsc --noEmit` a second time, so",
-      "there is one definition of how this repo typechecks."
+      "there is one definition of how this repo typechecks.",
+      "`check-python-resolver.mjs` is in this chain because vitest CANNOT execute the Python",
+      "half of the peer-path resolver, `scratchpad/lib/suite_paths.py`, which six instruments",
+      "import and which had no test file in any language at any path until 2026-09-02. A test",
+      "nothing runs is the empty population that whole parcel exists to end, so the rows run",
+      "here, where everything else in this repo runs. It needs no Python package: the rows are",
+      "stdlib `unittest`, and `python3` is already required by check-ledger-timestamps in this",
+      "same chain."
     ],
-    "test": "node scripts/check-test-collection.mjs && node scripts/check-pseudo-skip.mjs && node scripts/check-peer-path-literals.mjs && node scripts/check-object-stringify.mjs && node scripts/check-ledger-timestamps.mjs && node scratchpad/check-harness-guards.mjs && npm run typecheck && vitest run",
+    "test": "node scripts/check-test-collection.mjs && node scripts/check-pseudo-skip.mjs && node scripts/check-peer-path-literals.mjs && node scripts/check-object-stringify.mjs && node scripts/check-ledger-timestamps.mjs && node scripts/check-python-resolver.mjs && node scratchpad/check-harness-guards.mjs && npm run typecheck && vitest run",
     "test:watch": "vitest",
     "gen:theme": "node scripts/gen-theme.mjs",
     "harness:effects-bob": "node scratchpad/effects-bob-harness.mjs",
