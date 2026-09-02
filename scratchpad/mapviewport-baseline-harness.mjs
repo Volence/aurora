@@ -193,7 +193,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
-import { resolveRunRoot } from './lib/run-root.mjs';
+import { resolveRunRoot, describeRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9427);
 
@@ -219,9 +219,8 @@ const PORT = Number(process.env.PORT ?? 9427);
 // the O70 split is invisible while they both name the same directory, which is
 // every run until someone sets the override. This file needs a built app to run
 // at all, so a property proved only here is proved nowhere.
-const { root: ROOT, here: HERE, borrowed: BORROWED } = resolveRunRoot(
-  dirname(dirname(fileURLToPath(import.meta.url))),
-);
+const RUN_ROOT = resolveRunRoot(dirname(dirname(fileURLToPath(import.meta.url))));
+const { root: ROOT, here: HERE, borrowed: BORROWED } = RUN_ROOT;
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
 const AEON_DIR = siblingPathOrUnresolved('aeon');               // OPEN ONLY — never saved
 const SHOTS = join(HERE, 'scratchpad/shots-mapviewport-baseline');
@@ -819,7 +818,11 @@ function assertCell(cell) {
 
 // -------------------------------------------------------------------- the run
 async function main() {
-  console.log(`root: ${ROOT}${BORROWED ? `  (script lives in ${HERE}; that tree has no built app, so the app under test is ${ROOT}'s build)` : ''}`);
+  // Rendered by `describeRunRoot` rather than composed here: this function
+  // cannot run without a built dist/, so a line composed inline is a line no row
+  // can check, and "differs silently" is the defect the announcement exists to
+  // prevent (empyrean contract/SUITE_PATHS.md @ c9bc05f, the artifacts carve-out).
+  console.log(describeRunRoot(RUN_ROOT));
   if (BORROWED) {
     note('root', 'The measured binary is NOT built from the tree this script sits in. That is only safe while the '
       + 'two trees share their src/ — check `git diff` between them before trusting a number, or build in place.');
