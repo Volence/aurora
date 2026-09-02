@@ -6,8 +6,8 @@
 // levels.read/write + the main-process performGuardedWrite) lands in a rebuilt ROM
 // exactly where the layout lives, and nowhere else but the checksum.
 //
-// SAFETY: never touches the real disasm. It copies /home/volence/sonic_hacks/
-// s1disasm into the scratchpad and operates only on that copy. Two builds of the
+// SAFETY: never touches the real disasm. It copies the resolved s1disasm tree
+// into a scratch directory and operates only on that copy. Two builds of the
 // SAME copy control for any build nondeterminism: build once unedited (baseline
 // ROM), apply the edit, rebuild (edited ROM), diff.
 //
@@ -19,6 +19,7 @@
 //   Exit 0 = PASS, 1 = FAIL (or an honest build/toolchain failure, reported).
 
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -30,8 +31,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = AURORA_DIR;
 // DERIVED, NEVER TYPED — see test/support/sibling-root.mjs.
 const S1DIR = siblingPathOrUnresolved('s1disasm');
-const SCRATCH =
-  '/tmp/claude-1000/-home-volence-sonic-hacks-aurora/f87d5d2e-4db0-467e-8e74-11d9672d1a09/scratchpad';
+// DERIVED, never a session path, and never inside S1DIR. This was hard-wired to
+// a 2026-08 session's scratchpad under /tmp/claude-1000/… with no override at
+// all; that directory is long gone, and since `mkdirSync(…, {recursive:true})`
+// below would happily re-create it, the harness's whole working copy, both ROMs
+// and the artifact paths it PRINTS at the end pointed at a tree nobody could
+// find. It holds a full copy of s1disasm plus two ROMs, so it goes in the OS
+// temp directory unless the operator names one — never under `${REPO}`, which
+// would put a disasm copy inside a git checkout.
+const SCRATCH = process.env.SCRATCH
+  ?? fs.mkdtempSync(path.join(os.tmpdir(), 'aurora-s1-roundtrip-'));
 const WORK = path.join(SCRATCH, 's1disasm-verify');
 const BASELINE_ROM = path.join(SCRATCH, 's1-baseline.bin');
 const EDITED_ROM = path.join(SCRATCH, 's1-edited.bin');

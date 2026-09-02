@@ -34,8 +34,13 @@ const AEONDIR = siblingPathOrUnresolved('aeon') + '/';
 const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN
   ?? siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron');
-const SHOTS = process.env.SHOTS
-  ?? '/tmp/claude-1000/-home-volence-sonic-hacks-aurora/58a10310-a36d-4824-82a6-10ea1b59001b/scratchpad/shots';
+// DERIVED, never a session path. This defaulted to a 2026-08 session's
+// scratchpad under /tmp/claude-1000/…, which stopped existing when that session
+// ended; `mkdirSync(…, {recursive:true})` then RE-CREATED it, so the harness
+// wrote its screenshots into a directory nobody would ever look in and reported
+// success. Every other harness here writes `${ROOT}/scratchpad/shots-<name>`;
+// this one now does too, and SHOTS still overrides it.
+const SHOTS = process.env.SHOTS ?? `${ROOT}/scratchpad/shots-capture`;
 
 mkdirSync(SHOTS, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
