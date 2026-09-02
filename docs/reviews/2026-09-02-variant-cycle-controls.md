@@ -57,6 +57,14 @@ name, at build time.
 
 ## 3. The disclosure — verbatim, derived, gated, dated
 
+> ⚠ **SUPERSEDED LATER THE SAME DAY — THIS SECTION IS A HISTORICAL RECORD, NOT THE CURRENT
+> SURFACE.** aeon MERGED DoD item 5 (aeon `445a5856`) on 2026-09-02, the drift row went red
+> exactly as designed, and the sentence below **RETIRED**: `PRESET_KEYS_AWAITING_AEON` is now
+> `[]` and `PresetLagDisclosure` renders nothing. Nothing quoted in this section is on screen
+> any more. MERGED, NOT CERTIFIED — sigil `dd5eaad2` records chain 198 RED with no ROM byte
+> moved. See `docs/reviews/2026-09-02-preset-lag-retired.md` for the retirement, what replaced
+> the deleted row, and the condition that brings the sentence back.
+
 On screen, first in the section body, `tone="warning"`:
 
 > Not consumed by the engine yet. `cycles` and `variants` are authored here and saved to this
