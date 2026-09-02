@@ -210,6 +210,23 @@ const PAINTED_LEAF = (needle, afterSelector) => String.raw`
   };
 })()`;
 
+/**
+ * SHOW ONE OF THE THREE JOBS - d-26b's sub-tabs (EW-SHAPE-TABS).
+ *
+ * The Effects column's panels are re-parented under three sub-tabs, so the
+ * sections this instrument measures are UNMOUNTED (not hidden) until their job
+ * is shown. One click, immediately after the facet mounts; nothing else about
+ * what these rows assert changed. A missing bar returns 'no-sub-tab' rather
+ * than throwing, so the row below reports "not found" instead of a stack.
+ */
+const SUBTAB = (id) => String.raw`
+(() => {
+  const t = document.querySelector('[data-effects-sub-tab="' + ${JSON.stringify(id)} + '"]');
+  if (!t) return 'no-sub-tab';
+  t.click();
+  return 'ok';
+})()`;
+
 async function main() {
   const t0 = Date.now();
   console.log('=== effects-refusal harness ===');
@@ -304,6 +321,8 @@ async function main() {
     check('1c', 'the Effects facet mounts',
       (await c.evalExpr(clickByText('/^Effects$/'))) === true);
     await sleep(1400);
+    await c.evalExpr(SUBTAB('colour'));
+    await sleep(1000);
 
     const PRESET_PROOF = `document.querySelector('input[placeholder="new_preset_id"]')`;
     await c.evalExpr(OPEN_SECTION(String.raw`/^Raster band presets\b/`, PRESET_PROOF));

@@ -111,7 +111,19 @@ function ConditionRow({ n, label, cond, title }: {
   );
 }
 
-export default function SectionPicker(): React.ReactElement | null {
+export default function SectionPicker({ children }: {
+  /**
+   * THE LAST ROW OF THE STICKY BOX — the sub-tab bar, and nothing else today.
+   *
+   * ⚠ IT IS A SLOT AND NOT AN IMPORT so that this component keeps knowing
+   * nothing about the three jobs: the strip is about WHICH SECTION, the bar is
+   * about WHICH JOB, and folding one into the other's module is how a permanent
+   * header starts collecting rows. What it buys is the one thing a sibling
+   * cannot have — permanence — for the reason `EffectsSubTabBar`'s own docblock
+   * gives: two sticky siblings at `top: 0` occupy the same 0.
+   */
+  children?: React.ReactNode;
+} = {}): React.ReactElement | null {
   useHistoryVersion();
   useProjectStore((s) => s.project);
   const activeSectionIndex = useEditorStore((s) => s.activeSectionIndex);
@@ -223,6 +235,11 @@ export default function SectionPicker(): React.ReactElement | null {
               : ' · threaded ?'}
           </div>
         )}
+
+        {/* THE SUB-TAB BAR, LAST IN THE PERMANENT BOX. See the prop's docblock:
+            it is here because permanence has exactly one mechanism in this
+            column and it is the `sticky` above. */}
+        {children}
       </div>
 
       {/* WHAT TO ASK A PROGRAMMER FOR — first in the scrolling flow, directly

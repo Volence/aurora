@@ -251,6 +251,26 @@ const setSelect = (label, value) => String.raw`
 
 const rowFor = (probe, label) => (probe.rows || []).find(r => r.label === label) ?? null;
 
+/**
+ * THE SCENE FORM, OPENED — it arrives COLLAPSED since EW-SHAPE-TABS (d-26b),
+ * which is what gives the layers list above it a real height on the Parallax
+ * sub-tab. Every row below reads controls inside that form, so the arrival
+ * state has to be opened the way an author opens it: one click on the header.
+ * Idempotent — it returns 'already-open' when the form is showing.
+ */
+const OPEN_SCENE_FORM = String.raw`
+(() => {
+  const has = () => [...document.querySelectorAll('input')]
+    .some((e) => (e.title || '').startsWith('v_offset'));
+  if (has()) return 'already-open';
+  const hdr = [...document.querySelectorAll('div')]
+    .filter((d) => d.style && d.style.cursor === 'pointer'
+                && /^SCENE\s*\u2014/i.test((d.innerText || '').trim()))[0];
+  if (!hdr) return 'no-scene-header';
+  hdr.click();
+  return 'clicked';
+})()`;
+
 async function main() {
   console.log('\n=== THE VERTICAL BOB CONTROL, AS RENDERED — ROADMAP row 99 ===');
   console.log(`aeon copy: ${AEONDIR}   plant: ${PLANT || 'none'}`);
@@ -312,6 +332,10 @@ async function main() {
     await sleep(1800);
     check('i2', 'the Effects facet is mounted [instrument]', clicked === true, `click=${clicked}`);
     if (clicked !== true) throw new Error('could not reach the Effects facet');
+    const openedForm = await c.evalExpr(OPEN_SCENE_FORM);
+    await sleep(900);
+    check('i2b', 'the Scene form is open — it arrives collapsed since d-26b\'s sub-tabs [instrument]',
+      openedForm === 'clicked' || openedForm === 'already-open', `open → ${openedForm}`);
 
     // ---- OFF: the arrival state, and the state every saved scene is in -----
     const off = await c.json(FORM_PROBE);

@@ -44,7 +44,7 @@ import type { AnyCommand } from '../../core/editing/commands';
 import { useProjectStore, getActiveLevel } from '../state/projectStore';
 import { executeCommand, useEditorStore } from '../state/editorStore';
 import { useToastStore } from '../state/toastStore';
-import { revealPanel } from '../shell/panel-state';
+import { revealEffectsSection } from './effects-sub-tabs';
 import type { BandCommandResult } from './bg-anim-aeon';
 
 /** The `CollapsibleSection` id the band list lives in — `BgAnimBandPanel`'s. */
@@ -82,7 +82,15 @@ export function followBand(index: number): void {
   // BEFORE the scroll request, and it is an ordering the panel depends on: the
   // section renders no children while collapsed, so the card the scroll wants
   // does not exist in the DOM until this line has run and re-rendered.
-  revealPanel(BANDS_SECTION_ID);
+  //
+  // ⚠ AND SINCE THE SUB-TABS (d-26b) THERE ARE TWO DOORS SHUT, NOT ONE. The
+  // verb that runs this lives on the tool-options bar, which is on screen from
+  // every sub-tab — so the author can be on Parallax when the band lands on
+  // Tile anim. `revealEffectsSection` switches to the owning tab and THEN
+  // reveals; a bare `revealPanel` here would open a section that is not
+  // mounted, which is the owner's "I press add a band bank and idk where it is"
+  // in a second costume.
+  revealEffectsSection(BANDS_SECTION_ID);
   ed.revealBand(index);
   useToastStore.getState().addToast(
     `Tile animation ${index} added — selected below, and lit on the map`, 'info');

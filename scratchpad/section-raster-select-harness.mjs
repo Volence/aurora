@@ -266,6 +266,23 @@ const modelRef = (n) => (PLANT === 'no-model'
   ? String.raw`(() => { const s = ${SELECT}; return s ? (s.value === '' ? null : s.value) : 'NO-SELECT'; })()`
   : `window.__dbg.aeon.rasterRef(${n})`);
 
+/**
+ * SHOW ONE OF THE THREE JOBS - d-26b's sub-tabs (EW-SHAPE-TABS).
+ *
+ * The Effects column's panels are re-parented under three sub-tabs, so the
+ * sections this instrument measures are UNMOUNTED (not hidden) until their job
+ * is shown. One click, immediately after the facet mounts; nothing else about
+ * what these rows assert changed. A missing bar returns 'no-sub-tab' rather
+ * than throwing, so the row below reports "not found" instead of a stack.
+ */
+const SUBTAB = (id) => String.raw`
+(() => {
+  const t = document.querySelector('[data-effects-sub-tab="' + ${JSON.stringify(id)} + '"]');
+  if (!t) return 'no-sub-tab';
+  t.click();
+  return 'ok';
+})()`;
+
 async function main() {
   const t0 = Date.now();
   console.log('=== section-raster-select harness ===');
@@ -379,6 +396,8 @@ async function main() {
     const clicked = await c.evalExpr(clickByText('/^Effects$/'));
     check('1d', 'the Effects facet mounts', clicked === true, `click → ${clicked}`);
     await sleep(1200);
+    await c.evalExpr(SUBTAB('colour'));
+    await sleep(1000);
 
     // ---- 2. THE CONTROL IS ON SCREEN AND REACHABLE. ----------------------
     const PRESET_PROOF = `document.querySelector('input[placeholder="new_preset_id"]')`;
@@ -614,6 +633,8 @@ async function main() {
     await sleep(2000);
     await c.evalExpr(clickByText('/^Effects$/'));
     await sleep(1200);
+    await c.evalExpr(SUBTAB('colour'));
+    await sleep(1000);
     await c.evalExpr(OPEN_SECTION(SECTION_RE, PRESET_PROOF));
     await sleep(900);
     await c.evalExpr(`window.__dbg.aeon.setActiveSection(${SEC_A})`);

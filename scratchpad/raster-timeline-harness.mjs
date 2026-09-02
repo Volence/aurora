@@ -226,6 +226,24 @@ const clickByText = (re, tag = 'button') => String.raw`
 const byTitle = (tag, prefix) =>
   `[...document.querySelectorAll(${JSON.stringify(tag)})].find(e => (e.title||'').startsWith(${JSON.stringify(prefix)}))`;
 
+/**
+ * THE SCENE FORM, OPENED — it arrives COLLAPSED since EW-SHAPE-TABS (d-26b),
+ * which is what gives the layers list above it a real height. `v_offset` lives
+ * in it, so §8 needs it open. Idempotent, and the disclosure persists, so
+ * calling it before every edit costs one DOM query.
+ */
+const OPEN_SCENE_FORM = String.raw`
+(() => {
+  const has = () => !!(${byTitle('input', 'v_offset —')});
+  if (has()) return 'already-open';
+  const hdr = [...document.querySelectorAll('div')]
+    .filter((d) => d.style && d.style.cursor === 'pointer'
+                && /^SCENE\s*\u2014/i.test((d.innerText || '').trim()))[0];
+  if (!hdr) return 'no-scene-header';
+  hdr.click();
+  return 'clicked';
+})()`;
+
 // ── the strip's own pixels ─────────────────────────────────────────────────
 //
 // `getContext('2d')` returns the context the component already drew with, so
@@ -302,6 +320,23 @@ const SCROLL_AND_HIT = String.raw`
            viewport: [document.documentElement.clientWidth, document.documentElement.clientHeight] };
 })()`;
 
+/**
+ * SHOW ONE OF THE THREE JOBS - d-26b's sub-tabs (EW-SHAPE-TABS).
+ *
+ * The Effects column's panels are re-parented under three sub-tabs, so the
+ * sections this instrument measures are UNMOUNTED (not hidden) until their job
+ * is shown. One click, immediately after the facet mounts; nothing else about
+ * what these rows assert changed. A missing bar returns 'no-sub-tab' rather
+ * than throwing, so the row below reports "not found" instead of a stack.
+ */
+const SUBTAB = (id) => String.raw`
+(() => {
+  const t = document.querySelector('[data-effects-sub-tab="' + ${JSON.stringify(id)} + '"]');
+  if (!t) return 'no-sub-tab';
+  t.click();
+  return 'ok';
+})()`;
+
 async function main() {
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
@@ -354,6 +389,8 @@ async function main() {
     check('1b', 'the facet bar offers an Effects pill',
       (await c.evalExpr(clickByText('/^Effects$/'))) === true);
     await sleep(1200);
+    await c.evalExpr(SUBTAB('colour'));
+    await sleep(1000);
 
     // ---- 2. The strip exists BEFORE anything is authored -------------------
     // ⚠ ORDER MATTERS. If this row ran after the fixture it could not tell "the
@@ -367,6 +404,30 @@ async function main() {
       `lines=${rep.lines} scale=${rep.scale} originY=${rep.originY} stripX=${rep.stripX} stripW=${rep.stripW}`);
 
     // ---- 3. Author the fixture through the real form ----------------------
+    // ⚠ THE SCENE FORM IS ON THE PARALLAX JOB, THE STRIP IS ON THE COLOUR ONE
+    // (d-26b's sub-tabs). This instrument spans both: it authors layers and
+    // splits through the scene form, then measures what the timeline drew.
+    // Neither half moved; the run now says which job it is standing in.
+    await c.evalExpr(SUBTAB('parallax'));
+    await sleep(1000);
+    /**
+     * EDIT ON THE PARALLAX JOB, THEN COME BACK TO THE STRIP.
+     *
+     * Every §6-§9 step is one gesture on a layer card or the scene form
+     * followed by a measurement of the timeline canvas, and those two live on
+     * different sub-tabs now. This is that round trip, in one place, so no step
+     * can measure a canvas that is not mounted or type into a card that is not.
+     */
+    const onParallax = async (expr) => {
+      await c.evalExpr(SUBTAB('parallax'));
+      await sleep(600);
+      await c.evalExpr(OPEN_SCENE_FORM);
+      await sleep(300);
+      const r = await c.evalExpr(expr);
+      await c.evalExpr(SUBTAB('colour'));
+      await sleep(800);
+      return r;
+    };
     const scenes0 = await c.json('window.__dbg.aeon.scenes()');
     note(`fixture scenes before this run: ${JSON.stringify(scenes0.map((s) => s.id))}`);
     await c.evalExpr(SET_INPUT(`document.querySelector('input[placeholder="new_scene_id"]')`, SCENE_ID));
@@ -415,6 +476,11 @@ async function main() {
     }
 
     // ---- 5. IS IT ON THE STRIP? -------------------------------------------
+    // Back to the job that draws it. The strip is unmounted while another job
+    // is shown, so a report taken here without this line would be about a
+    // canvas that is not on the screen.
+    await c.evalExpr(SUBTAB('colour'));
+    await sleep(1200);
     rep = await c.json('window.__dbg.aeon.rasterTimeline()');
     const dpr = await c.evalExpr('window.devicePixelRatio');
     const rect = await c.json(`(() => { const cv = document.getElementById('effects-raster-timeline');
@@ -477,7 +543,7 @@ async function main() {
     await shot(c, '01-strip-two-splits');
 
     // ---- 6. THE COORDINATE TRAP, HALF ONE: the TOP moves the marker -------
-    watchMiss('6 top L1', await c.evalExpr(SET_INPUT(byTitle('input', 'Layer 1 Screen line'), TOP_A2)));
+    watchMiss('6 top L1', await onParallax(SET_INPUT(byTitle('input', 'Layer 1 Screen line'), TOP_A2)));
     await sleep(700);
     rep = await c.json('window.__dbg.aeon.rasterTimeline()');
     check('6a', `moving the top ${TOP_A} -> ${TOP_A2} moved the SPLIT's fire line with it`,
@@ -496,7 +562,7 @@ async function main() {
     // marker here. The paints counter is checked in the same breath so that
     // "did not move" cannot be "did not repaint".
     const paintsBefore = rep.paints;
-    watchMiss('7 at L1', await c.evalExpr(SET_INPUT(byTitle('input', 'Layer 1 vsplit.at ('), AT_A2)));
+    watchMiss('7 at L1', await onParallax(SET_INPUT(byTitle('input', 'Layer 1 vsplit.at ('), AT_A2)));
     await sleep(700);
     rep = await c.json('window.__dbg.aeon.rasterTimeline()');
     check('7a', `the document took the new payload (at ${AT_A} -> ${AT_A2}) and the strip REPAINTED`,
@@ -516,7 +582,7 @@ async function main() {
     await shot(c, '02-payload-changed-marker-did-not-move');
 
     // ---- 8. v_offset moves the whole ruler --------------------------------
-    watchMiss('8 v_offset', await c.evalExpr(SET_INPUT(byTitle('input', 'v_offset —'), V_OFFSET)));
+    watchMiss('8 v_offset', await onParallax(SET_INPUT(byTitle('input', 'v_offset —'), V_OFFSET)));
     await sleep(800);
     rep = await c.json('window.__dbg.aeon.rasterTimeline()');
     check('8a', `v_offset ${V_OFFSET} lifted both fire lines by exactly ${V_OFFSET} `
@@ -531,7 +597,7 @@ async function main() {
       `at ${TOP_A2 - V_OFFSET}: ${rowSummary(moved ?? [])}\n        at ${TOP_A2}: ${rowSummary(vacated ?? [])}`);
     await shot(c, '03-v-offset-shifted');
     // Put it back so the closing screenshot is the one worth showing.
-    await c.evalExpr(SET_INPUT(byTitle('input', 'v_offset —'), 0));
+    await onParallax(SET_INPUT(byTitle('input', 'v_offset —'), 0));
     await sleep(700);
 
     // ---- 9. THE CONTROLS, and the blanket miss row ------------------------
@@ -541,7 +607,7 @@ async function main() {
     // to zero markers AND to zero marker pixels: an empty strip is what a broken
     // one looks like, so the run has to show it can produce both states.
     for (const i of [1, 2]) {
-      await c.evalExpr(SET_INPUT(byTitle('select', `Layer ${i} vsplit.at —`), 'none'));
+      await onParallax(SET_INPUT(byTitle('select', `Layer ${i} vsplit.at —`), 'none'));
       await sleep(400);
     }
     rep = await c.json('window.__dbg.aeon.rasterTimeline()');

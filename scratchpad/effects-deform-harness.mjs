@@ -268,10 +268,38 @@ function sceneOf(doc) { return doc.find((s) => s.id === SCENE_ID) ?? null; }
  * subject check is spelled once here and every negative row below carries it:
  * the panel is present AND still drawing the row the warning belongs to.
  */
-const PANEL_ALIVE = /Deform fg[\s\S]*Layer 0/;
+// ⚠ TWO SUBSTRINGS, NOT ONE ORDERED PATTERN. This was
+// `/Deform fg[\s\S]*Layer 0/`, which also asserted that the scene form came
+// BEFORE the layer list in the column — and EW-SHAPE-TABS (d-26b) swapped them,
+// so that the list gets the column's spare height instead of the form. The
+// claim this predicate exists to make is "both halves of the Parallax job are
+// on screen"; the order was never part of it, and asserting it here made eight
+// rows red for a reason that had nothing to do with what any of them measure.
+const PANEL_ALIVE_PARTS = ['Deform fg', 'Layer 0'];
 function panelIsDrawn(text) {
-  return typeof text === 'string' && text !== 'no-panel' && PANEL_ALIVE.test(text);
+  return typeof text === 'string' && text !== 'no-panel'
+    && PANEL_ALIVE_PARTS.every((part) => text.includes(part));
 }
+
+/**
+ * THE SCENE FORM, OPENED — it arrives COLLAPSED since EW-SHAPE-TABS (d-26b),
+ * which is what gives the layers list above it a real height on the Parallax
+ * sub-tab. Every row below reads controls inside that form, so the arrival
+ * state has to be opened the way an author opens it: one click on the header.
+ * Idempotent — it returns 'already-open' when the form is showing.
+ */
+const OPEN_SCENE_FORM = String.raw`
+(() => {
+  const has = () => [...document.querySelectorAll('input')]
+    .some((e) => (e.title || '').startsWith('v_offset'));
+  if (has()) return 'already-open';
+  const hdr = [...document.querySelectorAll('div')]
+    .filter((d) => d.style && d.style.cursor === 'pointer'
+                && /^SCENE\s*\u2014/i.test((d.innerText || '').trim()))[0];
+  if (!hdr) return 'no-scene-header';
+  hdr.click();
+  return 'clicked';
+})()`;
 
 async function main() {
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
@@ -326,6 +354,12 @@ async function main() {
         .filter(t => /^(Scenes|Layers|Section assignment)/.test(t))`);
     check('2b', 'ANTI-VACUOUS: the Effects panel is mounted',
       headings.includes('Scenes'), JSON.stringify(headings));
+    // The scene form arrives collapsed since d-26b's sub-tabs; every deform row
+    // is a control inside it.
+    const openedForm = await c.evalExpr(OPEN_SCENE_FORM);
+    await sleep(900);
+    check('2c', 'the Scene form is open — it arrives collapsed since d-26b [instrument]',
+      openedForm === 'clicked' || openedForm === 'already-open', `open → ${openedForm}`);
 
     // ---- 3. Author a scene through the real form. ------------------------
     const scenes0 = await c.json('window.__dbg.aeon.scenes()');

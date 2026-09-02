@@ -262,6 +262,22 @@ function expectOutcome(anchor, release, rows, firstPromotableSlot, blobTileCount
   return { kind: 'range', base, cols: Math.min(Math.max(1, Math.floor(run / rows)), maxCols), run };
 }
 
+/**
+ * SHOW ONE OF THE THREE JOBS - d-26b's sub-tabs (EW-SHAPE-TABS).
+ *
+ * The Effects column's panels are re-parented under three sub-tabs, so a
+ * section belonging to another job is UNMOUNTED (not hidden) until that job is
+ * shown. Nothing the rows below assert changed; they now say which job they
+ * are standing in.
+ */
+const SUBTAB = (id) => String.raw`
+(() => {
+  const t = document.querySelector('[data-effects-sub-tab="' + ${JSON.stringify(id)} + '"]');
+  if (!t) return 'no-sub-tab';
+  t.click();
+  return 'ok';
+})()`;
+
 async function main() {
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
@@ -448,6 +464,9 @@ async function main() {
     const ROWS = 4;                       // the height both shipped bands use
     await c.evalExpr(clickByText('/^Effects$/'));
     await sleep(1400);
+    // The tile-animation form is the TILE ANIM job's since d-26b.
+    await c.evalExpr(SUBTAB('tileAnim'));
+    await sleep(1000);
     await c.evalExpr(SECTION_STATE('/^New band/', true));
     await sleep(500);
     const setRows = await c.evalExpr(SET_INPUT(
@@ -962,6 +981,8 @@ async function main() {
     // layout words pulled out of the model in this process.
     await c.evalExpr(clickByText('/^Effects$/'));
     await sleep(1600);
+    await c.evalExpr(SUBTAB('tileAnim'));
+    await sleep(1000);
     const candNow = await c.json('window.__dbg.aeon.bandCandidate()');
     const lens = await c.json('window.__dbg.aeon.bandLens()');
     const layout = await c.json(

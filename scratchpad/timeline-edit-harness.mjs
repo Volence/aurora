@@ -407,6 +407,22 @@ async function mouse(c, type, x, y, extra = {}) {
   await sleep(extra.settle ?? 90);
 }
 
+/**
+ * SHOW ONE OF THE THREE JOBS - d-26b's sub-tabs (EW-SHAPE-TABS).
+ *
+ * The Effects column's panels are re-parented under three sub-tabs, so a
+ * section belonging to another job is UNMOUNTED (not hidden) until that job is
+ * shown. Nothing about what the rows below assert changed; they now say which
+ * job they are standing in.
+ */
+const SUBTAB = (id) => String.raw`
+(() => {
+  const t = document.querySelector('[data-effects-sub-tab="' + ${JSON.stringify(id)} + '"]');
+  if (!t) return 'no-sub-tab';
+  t.click();
+  return 'ok';
+})()`;
+
 async function main() {
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
   if (existsSync(`/tmp/.X${DISPLAY_NUM}-lock`) || existsSync(`/tmp/.X11-unix/X${DISPLAY_NUM}`)) {
@@ -476,6 +492,10 @@ async function main() {
       `before=${JSON.stringify(scenes0.map((s) => s.id))}`);
 
     // ---- 3. A PRESET, through the real panel ------------------------------
+    // The preset form is the COLOUR job's; the scene above was authored on
+    // Parallax, which is where the facet arrives.
+    await c.evalExpr(SUBTAB('colour'));
+    await sleep(1000);
     watchMiss('3 expand presets', await c.evalExpr(expandSection('Raster band presets')));
     await sleep(600);
     const presets0 = await c.json('window.__dbg.aeon.presets()');

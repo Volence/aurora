@@ -309,6 +309,23 @@ const EXPAND_LAYERS = String.raw`
   return open() ? 'clicked-open' : 'clicked-shut';
 })()`;
 
+/**
+ * THE SCENE FORM, OPENED - it arrives COLLAPSED since EW-SHAPE-TABS (d-26b),
+ * which is what gives the layers list above it a real height. Idempotent.
+ */
+const OPEN_SCENE_FORM = String.raw`
+(() => {
+  const has = () => [...document.querySelectorAll('input')]
+    .some((e) => (e.title || '').startsWith('v_offset'));
+  if (has()) return 'already-open';
+  const hdr = [...document.querySelectorAll('div')]
+    .filter((d) => d.style && d.style.cursor === 'pointer'
+                && /^SCENE\s*\u2014/i.test((d.innerText || '').trim()))[0];
+  if (!hdr) return 'no-scene-header';
+  hdr.click();
+  return 'clicked';
+})()`;
+
 async function main() {
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
@@ -369,6 +386,13 @@ async function main() {
       headings.some((h) => h === 'Scenes'), JSON.stringify(headings));
 
     // ---- 3. R1/R2: create the scene, name it. ----------------------------
+    // ⚠ The scene form arrives COLLAPSED since d-26b's sub-tabs; `Name` and
+    // every field below it live inside it. Opened once, the way an author does.
+    const openForm = async () => {
+      const r = await c.evalExpr(OPEN_SCENE_FORM);
+      await sleep(800);
+      return r;
+    };
     const typed = await drive(c, 'R1 new_scene_id', SET_INPUT(
       `document.querySelector('input[placeholder="new_scene_id"]')`, SCENE_ID));
     check('3a', 'the new-scene id field accepts a real keystroke', typed === 'ok', `typed=${typed}`);
@@ -392,6 +416,11 @@ async function main() {
 
     // The Name field is the ONE text input on the surface with neither a title
     // nor a placeholder (the Filter box and new_scene_id both have placeholders).
+    // ⚠ OPENED BEFORE THE GESTURE, not after it. The scene form arrives
+    // COLLAPSED since d-26b's sub-tabs, and a collapsed section renders no
+    // children — so the Name field does not exist to be typed into until this
+    // has run.
+    await openForm();
     const named = await drive(c, 'R2 name', SET_INPUT(
       `[...document.querySelectorAll('input')].find(e => e.type === 'text'
          && !e.getAttribute('placeholder') && !e.title)`,
