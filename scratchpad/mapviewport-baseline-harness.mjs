@@ -176,14 +176,17 @@
 //   VITE_AURORA_DEBUG=1 npm run build
 //   node scratchpad/mapviewport-baseline-harness.mjs        (VERBOSE=1 for app logs)
 //                                                          (PORT=... to move off 9427)
-//                                                          (AURORA_ROOT=... to pin the tree)
+//                                                          (AURORA_BUILT_TREE=... to pin the
+//                                                           BUILT tree this runs against —
+//                                                           not AURORA_ROOT, which names the
+//                                                           checkout and no longer moves it)
 //                                                          (PANS=... pans per cell, default 150)
 //                                                          (BATCH=... repaints per batch, default 12)
 // PANS and BATCH are the resolution/runtime dial. Lowering either COARSENS the
 // amortised number; rows c2 and the per-cell resolution line will say so in the
 // output, so a short run cannot quietly masquerade as a precise one.
 
-import { auroraDirOverride, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { auroraBuiltTree, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { writeFileSync, statSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -204,13 +207,20 @@ const PORT = Number(process.env.PORT ?? 9427);
 function resolveRoot() {
   // `here` stays a local derivation because it is the OTHER OPERAND of the
   // comparison this function exists to make: "the tree this script lives in"
-  // against "the tree the run is against". `AURORA_DIR` collapses to `here`
-  // when nothing is set, so asking the resolver for both would make `borrowed`
-  // permanently false. The OVERRIDE is what goes through the resolver, so this
-  // site gets the aliases, the disagreement refusal and the set-but-wrong error.
+  // against "the tree the run is against". `AURORA_DIR` IS `here` — it is now
+  // observed from the resolver's own module location and can never be moved by
+  // an operator (empyrean contract/SUITE_PATHS.md @ fba68d5) — so asking the
+  // resolver for both operands would make `borrowed` permanently false.
+  //
+  // The PIN goes through the resolver, and it is a different variable now.
+  // "Which tree do I run against" is not "which tree am I": the first is
+  // legitimately overridable and the second is a fact. `AURORA_BUILT_TREE` is
+  // that first question; `AURORA_ROOT`, which this header used to document for
+  // the job, is a transitional alias of `AURORA_DIR` and setting it to another
+  // tree now REFUSES, naming this variable.
   const here = dirname(dirname(fileURLToPath(import.meta.url)));
   const runnable = (d) => existsSync(join(d, 'node_modules/.bin/electron')) && existsSync(join(d, 'dist/main/index.mjs'));
-  const override = auroraDirOverride();
+  const override = auroraBuiltTree();
   if (override !== null) return { root: override.value, here, borrowed: override.value !== here };
   let dir = here;
   for (let i = 0; i < 8; i++) {
