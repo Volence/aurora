@@ -935,15 +935,22 @@ export function cloneEffectsScene(scene: EffectsScene): EffectsScene {
 // WFZ/HTZ, S3K AIZ1). Engine design: aeon
 // docs/superpowers/specs/2026-08-29-band-drift-design.md §7 at aeon e0ce6011.
 //
-// NOTHING BELOW IS A CONTROL, AND THAT IS THE POINT. aeon's
-// `tools/effects_gen.py` REFUSES the key until their `CAP_BAND_DRIFT` emission
-// parcel lands, so a scene carrying `drift` does not build today. An editor
-// affordance for it would originate a value the build rejects for EVERY input —
-// ROADMAP row O13's open defect (the curve dropdown still offers a ramp the
-// build refuses), in a strictly worse form, since the curve case refuses only an
-// illegal PAIR. These are the constants and the conversion a control will need
-// when the emission parcel lands, tested now so the control cannot get the
-// factor wrong or apply it twice. See docs/reviews/2026-08-29-drift-codec.md.
+// THERE IS A CONTROL NOW (EW-DRIFT-CTL). When this block was written aeon's
+// `tools/effects_gen.py` REFUSED the key — a control would have originated a
+// value the build rejected for EVERY input — and the codec shipped without one.
+// aeon's emission parcel landed at aeon `ce4dbb7c` ("chain 205 — drift becomes
+// authorable in the editor"): `LAYER_KEYS` there now carries `drift` and
+// `render_drift` lowers it to `SceneDrift.Rate(n)`. The row lives on the layer
+// card (EffectsScenePanel, `LAYER_DRIFT_ROW`); everything below is still the
+// only place the unit is known. See docs/reviews/2026-08-29-drift-codec.md and
+// docs/reviews/2026-09-02-effects-drift-control.md.
+//
+// ⚠ WHAT THE GENERATOR DOES NOT DO, and why the refusals below are load-bearing:
+// `render_drift`'s own docstring says it does NOT convert (the px/frame ↔ 1/256
+// multiply "happens in AURORA'S UI, on export, above the wire — so a multiply
+// here would apply it twice"), and it FORWARDS `Rate(0)` and `Rate(9000)` as
+// shape-legal, leaving them to aeon's build-time `ensure`. So Aurora's control is
+// the only place an author learns the bound before a red build.
 
 /** The `oneOf` branch of `drift` that carries a rate, as a path `at()` can walk. */
 const DRIFT_RATE_PATH: (string | number)[] = [
@@ -1102,4 +1109,48 @@ export function driftRateRefusal(rate: number): string | null {
 export function driftRateOf(drift: EffectsLayer['drift']): number | null {
   if (drift === undefined || drift === 'none') return null;
   return drift.rate;
+}
+
+/**
+ * `rate`'s bounds IN THE UNIT THE AUTHOR TYPES — px/frame — for the control's
+ * title and its spinner.
+ *
+ * DIVIDED, never a second pair of numbers: ±16 written here would be a copy of
+ * ±4096 that a contract amendment could leave behind, which is the whole defect
+ * this module exists to stop.
+ */
+export const EFFECTS_DRIFT_PX_BOUNDS = Object.freeze({
+  min: driftRateToPxPerFrame(EFFECTS_DRIFT_RATE_BOUNDS.min),
+  max: driftRateToPxPerFrame(EFFECTS_DRIFT_RATE_BOUNDS.max),
+});
+
+/**
+ * Why a TYPED px/frame value cannot be written, or null when it can — the
+ * refusal the control passes to `NumberField`'s `refuse`, which withholds the
+ * commit.
+ *
+ * ONE SOURCE OF RULES. Every clause is `driftRateRefusal`'s, reached by
+ * converting first: this function adds no bound, no exclusion and no arithmetic
+ * of its own, it only says the verdict in the units the author is looking at.
+ * A second copy of "±4096, not 0" phrased in px is exactly the drift the
+ * derivation above refuses to allow.
+ *
+ * WHY THE WIRE VALUE IS NAMED IN THE SENTENCE. The 256× hazard is invisible by
+ * construction — every wrong value is itself a legal number — so the one moment
+ * an author can SEE the conversion is when it refuses them. `0.001 px/frame is 0
+ * in wire units` teaches the multiply in the one place it costs nothing to read.
+ *
+ * ROUNDING IS PART OF THE REFUSAL, not a step before it. A typed `0.001` is not
+ * zero, but it LOWERS to zero, and zero is the value aeon refuses; catching it
+ * here is why the control cannot write a layer that says "drifts" and builds red.
+ */
+export function driftPxPerFrameRefusal(pxPerFrame: number): string | null {
+  if (!Number.isFinite(pxPerFrame)) {
+    return `${pxPerFrame} is not a drift rate — type a signed number of pixels per frame.`;
+  }
+  const rate = driftPxPerFrameToRate(pxPerFrame);
+  const why = driftRateRefusal(rate);
+  if (why === null) return null;
+  return `${pxPerFrame} px/frame is ${rate} in wire units `
+    + `(1 px/frame = ${EFFECTS_DRIFT_UNITS_PER_PIXEL}). ${why}`;
 }
