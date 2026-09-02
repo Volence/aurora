@@ -19,7 +19,9 @@ history of how it got there. **Nothing here was rewritten** — these are the ti
 
 ### O45
 
-`size: M` · `state: done` · `blockedBy: None` · `project: None`
+`size: M` · LANDED 2026-09-02, row left the board · `blockedBy: None` · `project: EFFECTS-W1`
+
+⚠ **`done` is NOT in the `state` vocabulary** (`contract/LANE_STATUS.md`: `open` / `next` / `doing` / `blocked`). This line said `state: done` when the row landed; corrected here because three lanes in three days wrote `done` into a live `lane-status.json`, and one bad enum rejects the WHOLE file — the console then serves nothing and the owner's card for that lane goes dark, silently to the lane. A landed row does not get a state, it **leaves the board** and lives in `docs/lane-log.jsonl`. Do not copy a `state:` value out of this archive into the board.
 
 > RESCUED FROM O25 as that row was retired. O25 closed 59 fails / 3 collection deaths / 6 silent PASSes, and left this: a PARTIAL checkout fails 27 files / 135 tests because every guard tests DIRECTORY existence, not a file. ⚠ VERIFY THE OVERLAP BEFORE STARTING — O39 (merge 2b0f610d) closed the misdirection half over 22 rows and its marker check covers 'not a checkout at all' but explicitly NOT 'a real checkout missing what a row reads'. So this may be substantially covered, partly covered, or untouched; re-measure rather than assuming either way. The numbers above predate O39.
 
