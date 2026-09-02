@@ -55,6 +55,7 @@ import { existsSync } from 'node:fs';
 
 import { enumerateProfileEntries, S1_GLOBAL_REQUIRED_KEYS } from '../../src/core/project/s1';
 import { s1Profile } from '../../src/core/project/profiles/s1';
+import { levelArtReservationRequests } from '../../src/core/project/profiles/s1-levelart-reservations';
 
 import { referenceCheckout, referencePath, referencePathSource } from './fixture-tree';
 
@@ -199,6 +200,38 @@ export function whenS1Act(zone: string, act: number): {
     skip: missing.length > 0,
     meta: { skipReason: incompleteCheckoutReason(what, missing) },
   };
+}
+
+/**
+ * The object-mapping `.asm` files an act's RESERVATION walk reads, DERIVED from
+ * `levelArtReservationRequests` — the same function the adapter calls.
+ *
+ * ⚠ THESE ARE NOT PROFILE ENTRIES AT ALL, which is why no act guard could see
+ * them. `readMapText` treats an absent mappings file as *"this request does not
+ * apply"* — deliberately permissive, matching `editableTileRange`'s null
+ * convention — so the reservation set comes back smaller instead of failing.
+ * The row that measures the set then reports the shortfall as arithmetic:
+ * measured 2026-09-02 (O45), removing `_maps/Collapsing Ledge.asm` alone turned
+ * `reserved.size` from 158 into 48 and the row said
+ *
+ *     AssertionError: expected 48 to be greater than or equal to 150
+ *
+ * which names no file, no directory and no tree. A row whose subject IS the
+ * reservation set has to guard on the files the set is built from.
+ */
+export function s1ActReservationMapFiles(zone: string, act: number): string[] {
+  return [...new Set(levelArtReservationRequests(zone, act).map((r) => r.mapAsm))];
+}
+
+/** `whenS1Act`, plus the mapping files that act's reservation set is built from. */
+export function whenS1ActReservations(zone: string, act: number): {
+  skip: boolean;
+  meta: { skipReason: string };
+} {
+  const base = whenS1Act(zone, act);
+  if (base.skip) return base;
+  const what = `${zone.toUpperCase()} act ${act}'s reservation set`;
+  return whenS1Files(what, s1ActReservationMapFiles(zone, act));
 }
 
 /** Options for a row that needs EVERY listed act. */

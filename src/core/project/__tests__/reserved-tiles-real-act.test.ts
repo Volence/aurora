@@ -8,7 +8,7 @@ import { buildUsageIndex } from '../../level-classic/usage-index';
 import { buildChunkSurface } from '../../art/classic-surface-buffer';
 import { planSurfaceEdit, type SurfaceWrite } from '../../art/classic-surface-plan';
 import { referencePath } from '../../../../test/support/fixture-tree';
-import { whenS1Act, whenS1Acts } from '../../../../test/support/s1-checkout';
+import { whenS1Act, whenS1ActReservations, whenS1Acts } from '../../../../test/support/s1-checkout';
 
 // ---------------------------------------------------------------------------
 // Task 5c, T5 — the regression test that would have caught the bug this whole
@@ -77,7 +77,11 @@ function sixSharedTileDivergences(
 describe('object-aware tile claimability, real s1disasm', () => {
   it(
     'GHZ act 1: reservedTiles covers the platform run and stays out of a six-divergence isolate plan',
-    whenS1Act('ghz', 1),
+    // Not `whenS1Act`: this row's subject is the RESERVATION SET, which is built
+    // from `_maps/*.asm` files that are not profile entries at all, so no
+    // act-derived guard can see them and a missing one is tolerated into a
+    // smaller set (O45 — `expected 48 to be greater than or equal to 150`).
+    whenS1ActReservations('ghz', 1),
     async () => {
       const handle = await s1Adapter.open(realFs(S1DIR));
       const ghz1 = handle.levels!.list().find((r) => r.zone === 'ghz' && r.act === 1)!;
