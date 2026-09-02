@@ -2,7 +2,7 @@
 //
 // DERIVED, NOT TYPED. These mirror aeon's own constants:
 //
-//     /home/volence/sonic_hacks/aeon/engine/system/constants.emp
+//     <aeon>/engine/system/constants.emp
 //         pub const SCREEN_WIDTH  = 320
 //         pub const SCREEN_HEIGHT = 224
 //
@@ -14,10 +14,13 @@
 //
 // Aurora never imports aeon at runtime (this is an editor, aeon is a sibling
 // checkout that may be absent). The agreement is enforced instead by
-// `__tests__/screen.test.ts`, which reads that file from the sibling path and
-// asserts equality — and SKIPS WITH A MESSAGE when the checkout is missing,
-// never silently green. `SCREEN_CONSTANT_SOURCE` below is what that test reads,
-// so the citation in this docblock and the thing being checked are one record.
+// `__tests__/screen.test.ts`, which reads that file out of aeon at a COMMITTED
+// revision (`git -C <aeon> show origin/master:…`, the checkout resolved through
+// AEON_DIR / EMPYREAN_SUITE_ROOT) and asserts equality — never through aeon's
+// working tree, which is a peer lane's live edit buffer. It SKIPS WITH A MESSAGE
+// when the checkout is missing, never silently green. `SCREEN_CONSTANT_SOURCE`
+// below is what that test reads, so the citation in this docblock and the thing
+// being checked are one record.
 
 export const SCREEN_WIDTH = 320;
 export const SCREEN_HEIGHT = 224;
