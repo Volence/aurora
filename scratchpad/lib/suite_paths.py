@@ -30,10 +30,12 @@ announced once on stderr, naming the spelling to switch to. That roster is held
 IDENTICAL to the JavaScript twin's by a row in
 `scratchpad/lib/test_suite_paths.py`, which reads both tables live and fails when
 either side gains, loses or reorders a spelling — the two files are two copies of
-one fact, and they had already drifted over `AEON_ROOT` before that row existed. A variable that is SET BUT NAMES SOMETHING ABSENT is a hard error at
-the step that read it, not a null that lets the next step run — the contract's
-rule, and the reason a typo in `AEON_DIR` stops a run instead of quietly
-becoming a reading of the owner's live tree.
+one fact, and they had already drifted over `AEON_ROOT` before that row existed.
+
+A variable that is SET BUT NAMES SOMETHING ABSENT is a hard error at the step
+that read it, not a null that lets the next step run — the contract's rule, and
+the reason a typo in `AEON_DIR` stops a run instead of quietly becoming a
+reading of the owner's live tree.
 
 WHY THIS IS A MODULE AND NOT FIVE COPIES. Five instruments here spelled the
 same home path. Five in-file resolvers would be five things to drift, and the
