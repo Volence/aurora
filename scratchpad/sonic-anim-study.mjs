@@ -6,6 +6,7 @@
 //   (4) roll formula max(0, $400-|inertia|)>>8; push (>>6) if reachable
 // Method: teacher-forced twin of Sonic_Animate (s1disasm _incObj/01 Sonic.asm:2176,
 // FixBugs=0) stepped against per-frame reads of v_player, scripts read FROM ROM.
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { existsSync, rmSync, mkdtempSync } from 'node:fs';
 import net from 'node:net';
@@ -13,9 +14,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import * as esbuild from 'esbuild';
 
-const SERVER = '/home/volence/sonic_hacks/oracle-next/target/release/oracle-aether';
-const ROM = '/home/volence/sonic_hacks/s1disasm/s1built.bin';
-const LST = '/home/volence/sonic_hacks/s1disasm/sonic.lst';
+const SERVER = siblingPathOrUnresolved('oracle', 'target/release/oracle-aether');
+const ROM = siblingPathOrUnresolved('s1disasm', 's1built.bin');
+const LST = siblingPathOrUnresolved('s1disasm', 'sonic.lst');
 const SOCK = '/run/user/1000/aur-sonanim.sock';
 if (existsSync(SOCK)) rmSync(SOCK);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

@@ -1,11 +1,12 @@
 // Measurement probe (not shipped): print the raw block words + unpacked cells
 // for the audit's SBZ mixed-priority spot-check ids, so the unit-test fixture
 // is measured off the real data rather than invented.
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import * as fs from 'node:fs';
 import { enigmaDecompress } from '../src/core/formats/classic/enigma';
 import { unpackBlockCell } from '../src/core/level-classic/model';
 
-const raw = new Uint8Array(fs.readFileSync('/home/volence/sonic_hacks/s1disasm/map16/SBZ.eni'));
+const raw = new Uint8Array(fs.readFileSync(siblingPathOrUnresolved('s1disasm', 'map16/SBZ.eni')));
 const dec = enigmaDecompress(raw);
 console.log('decoded bytes:', dec.length, 'blocks:', dec.length / 8);
 for (const id of [0x11, 0x12, 0x2b, 0x35]) {

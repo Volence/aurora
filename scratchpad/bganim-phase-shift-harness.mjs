@@ -30,6 +30,7 @@
 // Run: node scratchpad/bganim-phase-shift-harness.mjs
 //   env AEON_DIR (default ../aeon), AEON_SHA (default: the roomy provenance
 //   sidecar's pin), BAND=CxR (default 2x1), PORT, VERBOSE, EMIT_DIR
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { writeFileSync, mkdirSync, mkdtempSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -44,7 +45,7 @@ const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.met
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`
-    : '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron');
+    : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
 const AEON = process.env.AEON_DIR ?? join(dirname(ROOT.replace(/\/\.claude\/worktrees\/[^/]+$/, '')), 'aeon');
 const FIXTURES = `${ROOT}/test/fixtures/bg-override`;
 const PROVENANCE = JSON.parse(readFileSync(`${FIXTURES}/editor_bg_override.roomy.provenance.json`, 'utf8'));

@@ -68,6 +68,7 @@
 // Run (fixture):           node scratchpad/bganim-motion-harness.mjs
 // Run (live project):      AEON_LIVE=1 node scratchpad/bganim-motion-harness.mjs
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -86,7 +87,7 @@ const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.met
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`
-    : '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron');
+    : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
 const SHOTS = `${ROOT}/scratchpad/shots-bganim-motion`;
 mkdirSync(SHOTS, { recursive: true });
 

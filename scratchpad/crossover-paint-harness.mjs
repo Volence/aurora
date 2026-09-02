@@ -35,12 +35,13 @@
 //
 //   run:  VITE_AURORA_DEBUG=1 npm run build && node scratchpad/crossover-paint-harness.mjs
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { session, resolveOwnedDiscovery, sleep, ROOT } from './canvas-cdp-harness.mjs';
 
-const WORKTREE = '/home/volence/sonic_hacks/.aurora-crossover-paint';
-const LIVE_AEON = '/home/volence/sonic_hacks/aeon';
+const WORKTREE = siblingPathOrUnresolved('.aurora-crossover-paint');
+const LIVE_AEON = siblingPathOrUnresolved('aeon');
 
 // ═══ The tree under test must not be the peer's live checkout ══════════════
 // aeon's main checkout currently holds unruled owner content (the d-44 scene

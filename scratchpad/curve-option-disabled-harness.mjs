@@ -69,6 +69,7 @@
 //   AEON_DIR=<writable copy> node scratchpad/curve-option-disabled-harness.mjs
 //   PLANT=rot-selector  … the selector rot, to prove row 3a is not vacuous
 
+import { checkoutOverride, siblingDefaultPathOrUnresolved, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
@@ -82,10 +83,10 @@ const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.met
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`
-    : '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron');
-const AEONDIR = process.env.AEON_DIR;
+    : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
+const AEONDIR = checkoutOverride('aeon')?.value;
 if (!AEONDIR) throw new Error('AEON_DIR must point at a WRITABLE COPY of an aeon project');
-if (AEONDIR.startsWith('/home/volence/sonic_hacks/aeon')) {
+if (AEONDIR.startsWith(siblingDefaultPathOrUnresolved('aeon'))) {
   throw new Error('AEON_DIR points at aeon itself — this harness saves, and must never write there');
 }
 const SHOTS = `${ROOT}/scratchpad/shots-curve-option-disabled`;

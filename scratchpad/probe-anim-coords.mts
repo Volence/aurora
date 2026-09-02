@@ -10,6 +10,7 @@
 //    blank resting state (t=0) and a mid-puff state (t=212 → puff-1 state 4).
 //
 // Run: npx tsx scratchpad/probe-anim-coords.mts
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import * as fs from 'node:fs';
 import { enigmaDecompress } from '../src/core/formats/classic/enigma';
 import { kosinskiDecompress } from '../src/core/formats/kosinski';
@@ -23,7 +24,7 @@ import {
 } from '../src/core/level-classic/s1-anim-art';
 import { s1Profile, type VariantPath } from '../src/core/project/profiles/s1';
 
-const S1 = '/home/volence/sonic_hacks/s1disasm';
+const S1 = siblingPathOrUnresolved('s1disasm');
 const read = (p: string) => new Uint8Array(fs.readFileSync(`${S1}/${p}`));
 const rv = (v: VariantPath) =>
   fs.existsSync(`${S1}/${v.path}`) ? v.path : (v.rev00Path ?? v.path);

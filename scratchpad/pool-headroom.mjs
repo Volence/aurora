@@ -2,13 +2,14 @@
 // READ-ONLY: pool sizes vs the S1 format's hard caps, per zone. Auto-forking a
 // shared block on edit (the Aseprite "Auto" contract) SPENDS pool budget, so the
 // headroom is what decides whether that policy is affordable here.
+import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { build } from 'esbuild';
 
-const REPO = process.env.AURORA_REPO ?? '/home/volence/sonic_hacks/aurora/.claude/worktrees/ux-plan6';
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const REPO = process.env.AURORA_REPO ?? AURORA_ROOT;
+const S1DIR = siblingPathOrUnresolved('s1disasm');
 
 const MAX_BLOCKS = 0x400;       // model.ts MAX_BLOCKS — 10-bit block field
 const MAX_CHUNKS_DECL = 256;    // model.ts MAX_CHUNKS — "one byte"

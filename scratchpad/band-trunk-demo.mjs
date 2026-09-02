@@ -25,6 +25,7 @@
 // dpr varies run to run here and a fractional aim lands one row off.
 // ===========================================================================
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -35,7 +36,7 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 const PORT = Number(process.env.PORT ?? 9401);
 const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
 const ELECTRON = process.env.ELECTRON_BIN ?? `${ROOT}/node_modules/.bin/electron`;
-const LIVE_AEON = '/home/volence/sonic_hacks/aeon';
+const LIVE_AEON = siblingPathOrUnresolved('aeon');
 const AEONDIR = process.env.AEON_DIR ?? `${ROOT}/scratchpad/fixtures/aeon-bg-writable`;
 if (AEONDIR.replace(/\/$/, '') === LIVE_AEON) throw new Error('refusing to open the LIVE aeon tree');
 const SHOTS = `${ROOT}/scratchpad/shots-band-trunk`;

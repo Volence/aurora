@@ -40,13 +40,14 @@
 //
 // Run: node scratchpad/bganim-preview-fixture.mjs [--force]
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
-export const AEON = process.env.AEON_DIR ?? '/home/volence/sonic_hacks/aeon';
+export const AEON = siblingPathOrUnresolved('aeon');
 export const FIXTURE = join(ROOT, 'scratchpad/fixtures/aeon-bganim-coherent');
 
 const CONTRACT = JSON.parse(readFileSync(

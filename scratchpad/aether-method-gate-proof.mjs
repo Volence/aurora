@@ -50,6 +50,7 @@
 //
 // Usage: node scratchpad/aether-method-gate-proof.mjs
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -64,8 +65,8 @@ const HARNESS = join(ROOT, 'scratchpad/classic-playtest-harness.mjs');
 const CLIENT_DIR = join(ROOT, 'src/main/aether');
 // `oracle-next` is a symlink to `oracle` (verified: same md5), so this and
 // classic-playtest-harness.mjs's SERVER are the same binary by two names.
-const SERVER = '/home/volence/sonic_hacks/oracle/target/release/oracle-aether';
-const ROM = '/home/volence/sonic_hacks/s1disasm/s1built.bin';
+const SERVER = siblingPathOrUnresolved('oracle', 'target/release/oracle-aether');
+const ROM = siblingPathOrUnresolved('s1disasm', 's1built.bin');
 const SOCK = `/run/user/1000/aur-mg-${process.pid}.sock`;
 
 const results = []; const fails = [];

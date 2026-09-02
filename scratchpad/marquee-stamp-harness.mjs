@@ -38,6 +38,7 @@
 //
 // Usage: node scratchpad/marquee-stamp-harness.mjs   (VERBOSE=1 for app logs)
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { writeFileSync, existsSync, statSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -48,7 +49,7 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 const PORT = Number(process.env.PORT ?? 9388);
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));   // this worktree
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
-const AEON_DIR = '/home/volence/sonic_hacks/aeon';               // OPEN ONLY — never written
+const AEON_DIR = siblingPathOrUnresolved('aeon');               // OPEN ONLY — never written
 const SHOTS = join(ROOT, 'scratchpad/shots-marquee-stamp');
 mkdirSync(SHOTS, { recursive: true });
 

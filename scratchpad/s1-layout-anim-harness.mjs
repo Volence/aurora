@@ -28,6 +28,7 @@
 //   • Cost: the real-clock section reports __auroraObjAnimPerf (per-pass ms of
 //     the object-preview draw) over ~4s of free-running playback.
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { existsSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -44,7 +45,7 @@ const ELECTRON = [
   join(ROOT, '../../..', 'node_modules/.bin/electron'),
 ].find(existsSync);
 if (!ELECTRON) throw new Error('electron binary not found (npm install?)');
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = siblingPathOrUnresolved('s1disasm');
 const SHOTS = `${ROOT}/scratchpad/shots-objanim`;
 mkdirSync(SHOTS, { recursive: true });
 

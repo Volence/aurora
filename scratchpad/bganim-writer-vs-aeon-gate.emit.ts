@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parseBgOverride, serializeBgOverride, cloneBgOverride,
-         bandTileCount } from '../../../../../../home/volence/sonic_hacks/aurora/src/core/formats/bg-override/bg-override';
+         bandTileCount } from '../src/core/formats/bg-override/bg-override';
 
 const FIX = 'test/fixtures/bg-override/editor_bg_override.b0e5a661.json';
 const out = process.argv[2];

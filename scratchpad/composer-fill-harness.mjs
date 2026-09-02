@@ -17,6 +17,7 @@
 // MODE: `node composer-fill-harness.mjs before|after` — writes
 // scratchpad/fill-<mode>.json and scratchpad/shots-fill/<mode>-<tier>.png.
 
+import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import * as http from 'node:http';
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -24,9 +25,10 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const MODE = process.argv[2] === 'after' ? 'after' : 'before';
 const PORT = Number(process.env.PORT ?? 9357);
-const ROOT = '/home/volence/sonic_hacks/aurora/.claude/worktrees/ux-plan6';
-const ELECTRON = '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron';
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const ROOT = AURORA_ROOT;
+const ELECTRON = process.env.ELECTRON_BIN
+  ?? siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron');
+const S1DIR = siblingPathOrUnresolved('s1disasm');
 const SHOTS = `${ROOT}/scratchpad/shots-fill`;
 mkdirSync(SHOTS, { recursive: true });
 

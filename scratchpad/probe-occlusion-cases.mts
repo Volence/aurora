@@ -5,6 +5,7 @@
 //
 // Also scans every linked object's mappings for pieces with the priority bit
 // SET (attrs bit 15 / spritePiece arg 9), to find a hi-pri sprite piece case.
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { s1Adapter } from '../src/core/project/s1/index';
@@ -19,7 +20,7 @@ import { resolveEffectiveObjectArt, objectArtKey } from '../src/core/project/pro
 import { s1ObjectName } from '../src/core/project/profiles/s1-objects';
 import { parseAsmMappings } from '../src/core/import/asm-mappings';
 
-const S1 = '/home/volence/sonic_hacks/s1disasm';
+const S1 = siblingPathOrUnresolved('s1disasm');
 const CHUNK_PX = 256;
 
 function realFs(root: string) {

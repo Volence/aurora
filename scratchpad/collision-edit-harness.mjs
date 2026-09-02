@@ -18,15 +18,16 @@
 // scratchpad/micro-type-harness.mjs, session-clear included: a stored session can
 // park the app on a dead tab, which cost that harness three restarts.
 
+import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9421);
-const ROOT = '/home/volence/sonic_hacks/aurora';
+const ROOT = AURORA_ROOT;
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = siblingPathOrUnresolved('s1disasm');
 const SHOTS = `${ROOT}/scratchpad/shots-edit`;
 mkdirSync(SHOTS, { recursive: true });
 

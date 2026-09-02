@@ -25,6 +25,7 @@
 // (classic-playtest-harness.mjs lesson: a stale bundle once passed 19/19
 // against a planted defect).
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { writeFileSync, mkdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -35,7 +36,7 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 const PORT = Number(process.env.PORT ?? 9402);
 const ROOT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '');
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = siblingPathOrUnresolved('s1disasm');
 const SHOTS = `${ROOT}/scratchpad/shots-priority`;
 mkdirSync(SHOTS, { recursive: true });
 

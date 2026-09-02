@@ -48,6 +48,7 @@
 //
 // Screenshots land in scratchpad/shots-toast-overflow/.
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
@@ -59,7 +60,7 @@ const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.met
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`
-    : '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron');
+    : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
 const SHOTS = `${ROOT}/scratchpad/shots-toast-overflow`;
 mkdirSync(SHOTS, { recursive: true });
 

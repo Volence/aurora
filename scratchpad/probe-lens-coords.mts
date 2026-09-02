@@ -6,13 +6,14 @@
 //    or $11 (pri [0,0,1,1]) in the FG layout, with the chunk-cell flips at that
 //    placement, plus the world px of one HIGH tile and one LOW tile inside it.
 //  - SLZ act 1: a placement of an ALL-HIGH block (SLZ has 58, 0 mixed).
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import * as fs from 'node:fs';
 import { enigmaDecompress } from '../src/core/formats/classic/enigma';
 import { kosinskiDecompress } from '../src/core/formats/kosinski';
 import { decodeS1Layout } from '../src/core/formats/classic/s1-layout';
 import { unpackBlockCell, unpackChunkCell, type BlockDef } from '../src/core/level-classic/model';
 
-const S1 = '/home/volence/sonic_hacks/s1disasm';
+const S1 = siblingPathOrUnresolved('s1disasm');
 const read = (p: string) => new Uint8Array(fs.readFileSync(`${S1}/${p}`));
 
 function loadBlocks(eni: string): BlockDef[] {

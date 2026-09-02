@@ -39,6 +39,7 @@
 // Requires:  VITE_AURORA_DEBUG=1 npx electron-vite build
 // Run:       node scratchpad/guard-surface-harness.mjs
 
+import { siblingDefaultPathOrUnresolved, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -52,13 +53,13 @@ const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.met
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`
-    : '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron');
+    : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
 const AEONDIR = process.env.AEON_DIR
   ?? '/tmp/claude-1000/-home-volence-sonic-hacks-aurora/474f13c9-7e59-4f1b-b1d3-46f806d45cf4/scratchpad/aeonwork/aeon';
 const SHOTS = `${ROOT}/scratchpad/shots-guard-surface`;
 mkdirSync(SHOTS, { recursive: true });
 
-if (AEONDIR === '/home/volence/sonic_hacks/aeon') {
+if (AEONDIR === siblingDefaultPathOrUnresolved('aeon')) {
   throw new Error('refusing to run against the real aeon tree — use the throwaway copy');
 }
 

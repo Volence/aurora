@@ -23,6 +23,7 @@
 // harness's section 6 rather than from this file's DOM search.
 //
 // Until then item 40's typing wrinkle is UNTESTED, which is not the same as absent.
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url'; import { dirname } from 'node:path';
@@ -31,7 +32,7 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 const PORT = Number(process.env.PORT ?? 9399);
 const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
-const AEONDIR = '/home/volence/sonic_hacks/aeon';
+const AEONDIR = siblingPathOrUnresolved('aeon');
 const SHOTS = `${ROOT}/scratchpad/shots-fromtile`; mkdirSync(SHOTS, { recursive: true });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 function getJSON(p, t = 1500) { return new Promise((res, rej) => {

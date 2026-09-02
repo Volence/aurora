@@ -1,11 +1,12 @@
 // Find SBZ mixed-priority blocks whose pattern is asymmetric under x-flip AND
 // y-flip — the fixture the flip-trap test needs (a symmetric pattern like
 // [0,0,1,1] cannot distinguish a correct mask from one that ignores xf).
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import * as fs from 'node:fs';
 import { enigmaDecompress } from '../src/core/formats/classic/enigma';
 import { unpackBlockCell } from '../src/core/level-classic/model';
 
-const raw = new Uint8Array(fs.readFileSync('/home/volence/sonic_hacks/s1disasm/map16/SBZ.eni'));
+const raw = new Uint8Array(fs.readFileSync(siblingPathOrUnresolved('s1disasm', 'map16/SBZ.eni')));
 const dec = enigmaDecompress(raw);
 const nBlocks = dec.length / 8;
 for (let id = 0; id < nBlocks; id++) {

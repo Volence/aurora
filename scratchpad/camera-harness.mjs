@@ -11,13 +11,14 @@
 // Draw counting works by patching CanvasRenderingContext2D.setTransform, which
 // the render effect calls exactly once per compose.
 
+import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = 9338;
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
-const ROOT = '/home/volence/sonic_hacks/aurora';
+const S1DIR = siblingPathOrUnresolved('s1disasm');
+const ROOT = AURORA_ROOT;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

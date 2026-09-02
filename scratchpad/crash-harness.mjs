@@ -5,13 +5,14 @@
 // non-'ready'. Prints artState().sprites each cycle so composed/subtype keying is
 // visibly exercised.
 
+import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = 9337;
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
-const ROOT = '/home/volence/sonic_hacks/aurora';
+const S1DIR = siblingPathOrUnresolved('s1disasm');
+const ROOT = AURORA_ROOT;
 const ACTS = [['ghz', 1], ['ghz', 2], ['ghz', 3], ['mz', 1], ['lz', 1], ['slz', 1], ['sbz', 1], ['syz', 1]];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

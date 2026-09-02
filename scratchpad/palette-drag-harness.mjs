@@ -21,14 +21,16 @@
 // Run with MODE=before against a tree holding the pre-fix PaletteEditor to see
 // the bug; MODE=after (default) against the fixed one.
 
+import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9357);
-const ROOT = '/home/volence/sonic_hacks/aurora/.claude/worktrees/ux-plan6';
-const ELECTRON = '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron';
-const AEONDIR = '/home/volence/sonic_hacks/aeon/';
+const ROOT = AURORA_ROOT;
+const ELECTRON = process.env.ELECTRON_BIN
+  ?? siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron');
+const AEONDIR = siblingPathOrUnresolved('aeon') + '/';
 const MODE = process.env.MODE ?? 'after';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

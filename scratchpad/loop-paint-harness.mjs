@@ -81,6 +81,7 @@
 // O16: the discovery/teardown machinery is SHARED, not pasted. This harness
 // arrived on master carrying its own correct-but-private copies; they are
 // replaced here so a future fix to the guard reaches this file too.
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawnGuarded, killTree, restoreDiscoveryNow, describeDiscovery,
          discoverySnapshot, resolveOwnedDiscovery, descendants } from './lib/harness-guard.mjs';
 import { writeFileSync, readFileSync, mkdirSync, existsSync, rmSync, readdirSync } from 'node:fs';
@@ -94,8 +95,8 @@ const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.met
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`
-    : '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron');
-const AEONDIR = process.env.AEON_DIR ?? '/home/volence/sonic_hacks/aeon';
+    : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
+const AEONDIR = siblingPathOrUnresolved('aeon');
 const SHOTS = `${ROOT}/scratchpad/shots-loop-paint`;
 mkdirSync(SHOTS, { recursive: true });
 

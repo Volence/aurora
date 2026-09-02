@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Probe: what state is the freshly booted s4.debug.bin actually in?
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -9,8 +10,8 @@ import net from 'node:net';
 import * as esbuild from 'esbuild';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const SERVER = '/home/volence/sonic_hacks/oracle-next/target/release/oracle-aether';
-const ROM = '/home/volence/sonic_hacks/aeon/s4.debug.bin';
+const SERVER = siblingPathOrUnresolved('oracle', 'target/release/oracle-aether');
+const ROM = siblingPathOrUnresolved('aeon', 's4.debug.bin');
 const SOCK = `/tmp/bp-${process.pid}.sock`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const hex = (n) => '0x' + (n >>> 0).toString(16).toUpperCase();

@@ -1,7 +1,7 @@
 // Is the import path REACHABLE in the running app? The native file dialog
 // cannot be driven under CDP, so this verifies everything up to it: the command
 // exists for a classic project, the dialog opens, and it says what it needs.
-import { session, openProjectAndAct, INSTALL, sleep, ctrlK, typeText, enter, shot, drain } from '/home/volence/sonic_hacks/aurora/scratchpad/canvas-cdp-harness.mjs';
+import { session, openProjectAndAct, INSTALL, sleep, ctrlK, typeText, enter, shot, drain } from './canvas-cdp-harness.mjs';
 
 const rows = [];
 const check = (id, what, pass, detail='') => {

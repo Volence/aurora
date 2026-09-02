@@ -1,11 +1,13 @@
 // THROWAWAY probe (not committed): can CDP real key events drive a native <select> here?
+import { AURORA_ROOT, checkoutOverride, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 const PORT = 9422;
-const ROOT = '/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-af1d3ca5fa3bf08c5';
-const ELECTRON = '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron';
-const AEONDIR = process.env.AEON_DIR;
+const ROOT = AURORA_ROOT;
+const ELECTRON = process.env.ELECTRON_BIN
+  ?? siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron');
+const AEONDIR = checkoutOverride('aeon')?.value;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(p){return new Promise((res,rej)=>{const q=http.get({host:'127.0.0.1',port:PORT,path:p,timeout:1500},(r)=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>{try{res(JSON.parse(d))}catch(e){rej(e)}})});q.on('timeout',()=>q.destroy(new Error('t')));q.on('error',rej)})}
 async function waitForTarget(){for(let i=0;i<90;i++){try{const l=await getJSON('/json/list');const p=l.find(t=>t.type==='page'&&t.webSocketDebuggerUrl);if(p)return p.webSocketDebuggerUrl}catch{}await sleep(500)}throw new Error('no target')}

@@ -9,6 +9,7 @@
 //   - the difference, which is what screenToWorld feeds the transform
 // plus devicePixelRatio and the visual viewport, since a scaling pipeline is
 // one of the two candidate shapes.
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -19,8 +20,8 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 const PORT = Number(process.env.PORT ?? 9396);
 const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
 const ELECTRON = existsSync(`${ROOT}/node_modules/.bin/electron`)
-  ? `${ROOT}/node_modules/.bin/electron` : '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron';
-const AEONDIR = '/home/volence/sonic_hacks/aeon';
+  ? `${ROOT}/node_modules/.bin/electron` : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron');
+const AEONDIR = siblingPathOrUnresolved('aeon');
 const SCENE_ID = 'aim_probe';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(path) {

@@ -3,14 +3,16 @@
 // Not the deliverable harness — just verifies the hooks resolve real data
 // before the real paint-through harness is built on top of them.
 
+import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9361);
-const ROOT = '/home/volence/sonic_hacks/aurora/.claude/worktrees/ux-plan6';
-const ELECTRON = '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron';
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const ROOT = AURORA_ROOT;
+const ELECTRON = process.env.ELECTRON_BIN
+  ?? siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron');
+const S1DIR = siblingPathOrUnresolved('s1disasm');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function getJSON(path, timeoutMs = 1500) {

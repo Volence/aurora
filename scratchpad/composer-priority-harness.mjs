@@ -88,6 +88,7 @@
 //
 // Usage: node scratchpad/composer-priority-harness.mjs   (VERBOSE=1 for app logs)
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, statSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -106,7 +107,7 @@ function findElectron(from) {
   throw new Error('no electron binary found walking up from ' + from);
 }
 const ELECTRON = findElectron(ROOT);
-const AEON_DIR = process.env.AEON_DIR ?? '/home/volence/sonic_hacks/aeon';  // OPEN ONLY
+const AEON_DIR = siblingPathOrUnresolved('aeon');  // OPEN ONLY
 const SHOTS = join(ROOT, 'scratchpad/shots-composer-priority');
 mkdirSync(SHOTS, { recursive: true });
 

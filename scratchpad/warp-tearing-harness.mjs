@@ -26,6 +26,7 @@
 //
 // Usage: node scratchpad/warp-tearing-harness.mjs   (VERBOSE=1 for server log)
 
+import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -33,10 +34,10 @@ import { join } from 'node:path';
 import net from 'node:net';
 import * as esbuild from 'esbuild';
 
-const ROOT = '/home/volence/sonic_hacks/aurora';
-const SERVER = '/home/volence/sonic_hacks/oracle-next/target/release/oracle-aether';
+const ROOT = AURORA_ROOT;
+const SERVER = siblingPathOrUnresolved('oracle', 'target/release/oracle-aether');
 // The mailbox is DEBUG-shape only — Warp_Req_* are absent from release listings.
-const ROM = '/home/volence/sonic_hacks/aeon/s4.debug.bin';
+const ROM = siblingPathOrUnresolved('aeon', 's4.debug.bin');
 const SOCK = join(tmpdir(), `aur-warp-${process.pid}.sock`);
 const SHOTS = join(ROOT, 'scratchpad/shots-warp-tearing');
 mkdirSync(SHOTS, { recursive: true });

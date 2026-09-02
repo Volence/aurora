@@ -81,6 +81,7 @@
 // Run:                     node scratchpad/bganim-tile-door-harness.mjs
 //                          (xvfb-run is spawned internally)
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import {
   writeFileSync, mkdirSync, existsSync, readFileSync, rmSync,
@@ -100,8 +101,8 @@ const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.met
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`
-    : '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron');
-const LIVE_AEON = process.env.LIVE_AEON ?? '/home/volence/sonic_hacks/aeon';
+    : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
+const LIVE_AEON = siblingPathOrUnresolved('aeon');
 const WORKTREE = `${ROOT}/scratchpad/fixtures/aeon-tile-door`;
 if (WORKTREE.replace(/\/$/, '') === LIVE_AEON.replace(/\/$/, '')) {
   throw new Error('refusing to run against the LIVE aeon tree');
