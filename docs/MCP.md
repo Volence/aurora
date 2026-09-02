@@ -10,6 +10,20 @@ The same registry is served over the Aether bus at `POST /aether` (JSON-RPC 2.0,
 events over SSE at `/aether/events`) for non-AI suite clients — see the README.
 Every route is loopback-only.
 
+⚠ **A bare `aeon <path>:<line>` in this document is a perishable claim.** Two
+paragraphs were re-verified against aeon `origin/master` **`73b07a4f`**
+(2026-09-02): *"A per-section BG assignment stops at the editor's own files"*
+(under **Collision**) and *"An authored scene DOES reach a ROM"* with the two
+build bullets under it (under **Effects scenes**). SIX of the EIGHT aeon line
+citations in them had drifted, by +1 to +35 lines, in the four days since they
+were written. No claim was falsified — every mechanism still holds; only the
+line numbers moved, which is exactly why a bare number is not self-checking.
+Every OTHER aeon citation in this file was NOT re-checked here; those that
+carry a pinned revision inline (`4aa2abc0`, `9cdf32d8`, `6e2495a5`) say so
+themselves. Read any of them with `git -C ../aeon show <rev>:<path>` — never
+through the sibling's working tree, which is another lane's live checkout and
+so means "whatever is on disk mid-edit".
+
 ## Connect (one time)
 
 1. Launch the editor (`npm run dev`).
@@ -98,12 +112,15 @@ export step and no `{zone}_BG_{id}` labels: `exportAct` and its
 save on 2026-08-19 and nothing in aeon ever read that directory
 (`src/core/project/aeon/save.ts:11-23`). No aeon generator reads
 `{zone}_bglib.json` or a sidecar's `bgLayoutRef` — the effects generator
-explicitly does not (aeon `tools/EFFECTS_CONSUMER_CONTRACT.md:178`) — and every
-section of the shipped act still carries `sec_bg_layout: default`, i.e. "use the
-act-wide BG" (aeon `games/sonic4/data/levels/ojz/act1/act_descriptor.emp:207`;
+explicitly does not (aeon `tools/EFFECTS_CONSUMER_CONTRACT.md:195`) — and no
+section of the shipped act CAN carry anything but `sec_bg_layout: default`, i.e.
+"use the act-wide BG": all nine build through the one `ojz_sec` comptime
+constructor, whose signature takes no BG parameter and whose body sets the field
+to `default` (aeon `games/sonic4/data/levels/ojz/act1/act_descriptor.emp:202`
+for the constructor, `:211` for the field, `:229-317` for the nine call sites;
 the engine field itself is real, `engine/structs.emp:119`). The background that
 DOES reach a ROM is the ACT-WIDE one, through `{dataRoot}editor_bg_override.json`
-and aeon's `tools/inject_editor_bg.py` (run by `tools/regenerate-level.sh:94`).
+and aeon's `tools/inject_editor_bg.py` (run by `tools/regenerate-level.sh:95`).
 So `assign_section_bg` is an editor/preview binding until a per-section consumer
 is built — unlike `assign_section_scene` below, which is baked. **Both tools say
 so in their own replies** (`assign_section_bg` → `binding`, `list_bgs` →
@@ -189,13 +206,14 @@ Which build you run decides what happens, and neither outcome is silent:
 
 - **`build_and_run` bakes.** It sends `FAST=1` by default
   (`src/core/aether/build-plan.ts:174-179`); aeon's `build.sh` sees the editor
-  tree is newer than the generated one (`build.sh:394-407` via
-  `tools/level_staleness.py`, whose "newer" side is all of `data/editor/**`) and
+  tree is newer than the generated one (`build.sh:409-426` via
+  `tools/level_staleness.py`, whose "newer" side is all of `data/editor/**`
+  plus `editor_bg_override.json` — `level_staleness.py:36-39`) and
   re-runs `tools/regenerate-level.sh`, which calls `effects_gen.py emit`
-  (`regenerate-level.sh:206`). Save → build → reload carries a scene edit into
+  (`regenerate-level.sh:207`). Save → build → reload carries a scene edit into
   the ROM.
 - **A canonical (non-FAST) `./build.sh` refuses.** The generated module is a
-  COMMITTED artifact, so `build.sh:534` runs `effects_gen.py check` and exits
+  COMMITTED artifact, so `build.sh:569` runs `effects_gen.py check` and exits
   naming `tools/regenerate-level.sh`. A stale bake fails the build rather than
   building green and dropping the edit.
 
