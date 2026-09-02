@@ -589,20 +589,68 @@ describe('the drift row seeds, converts and refuses', () => {
    * construction, and a refusal is the one moment an author can be shown the
    * conversion at no cost.
    */
-  it('says the wire value and the factor in the refusal', () => {
-    const zero = driftPxPerFrameRefusal(0.001)!;
+  it('says the wire value and the factor exactly when the conversion changed it', () => {
+    const tiny = driftPxPerFrameRefusal(0.001)!;
+    const zero = driftPxPerFrameRefusal(0)!;
     const over = driftPxPerFrameRefusal(EFFECTS_DRIFT_PX_BOUNDS.max + 1)!;
-    console.log(`--- refusal sentences ---\n0.001: ${zero}\n${EFFECTS_DRIFT_PX_BOUNDS.max + 1}: ${over}`);
+    console.log('--- refusal sentences ---\n'
+      + `0.001: ${tiny}\n0: ${zero}\n${EFFECTS_DRIFT_PX_BOUNDS.max + 1}: ${over}`);
 
-    expect(zero).toContain('is 0 in wire units');
-    expect(zero).toContain(`1 px/frame = ${EFFECTS_DRIFT_UNITS_PER_PIXEL}`);
-    // The REASON, not just "invalid" — this is the sentence the owner could not
-    // get out of the build without reverting.
-    expect(zero).toContain('indistinguishable from no drift at all in ROM');
-    expect(zero).toContain('"none"');
+    // ROUNDING LOST SOMETHING → the gloss, which is the one place the ×256 is
+    // ever visible: the sentence is about `0` while the box holds `0.001`.
+    expect(tiny).toContain('0.001 px/frame is 0 in wire units');
+    expect(tiny).toContain(`1 px/frame = ${EFFECTS_DRIFT_UNITS_PER_PIXEL}`);
 
+    // THE CONVERSION WAS EXACT → no gloss. Not brevity for its own sake: the
+    // out-of-range sentence is already in the author's own units, and the
+    // paragraph is painted in a 129px-tall list scroller (measured,
+    // effects-drift-harness [5e]) where restating it costs the bottom edge.
+    expect(over).not.toContain('in wire units');
+    expect(zero).not.toContain('in wire units');
+
+    // The REASON survives in every case — this is the sentence the owner could
+    // not get out of the build without reverting.
+    for (const s of [tiny, zero]) {
+      expect(s).toContain('indistinguishable from no drift at all in ROM');
+      expect(s).toContain('"none"');
+    }
     expect(over).toContain(String(EFFECTS_DRIFT_RATE_BOUNDS.max));
     expect(over).toContain('TASTE bound');
+    // And the out-of-range sentence still names BOTH units without the gloss.
+    expect(over).toContain(String((EFFECTS_DRIFT_PX_BOUNDS.max + 1) * EFFECTS_DRIFT_UNITS_PER_PIXEL));
+    expect(over).toContain(`${EFFECTS_DRIFT_PX_BOUNDS.max + 1} px/frame`);
+  });
+
+  /**
+   * THE WIRING, READ OUT OF THE PANEL SOURCE — and ⚠ THIS IS NOT THE GATE.
+   *
+   * It says the drift box is handed `refuse` and `driftFromPxPerFrame` rather
+   * than writing a typed number straight into `drift.rate`. What it CANNOT say
+   * is that either one reaches a browser: `refuse` withholding a commit, and the
+   * ×256 happening on the real write path, are facts about the running app, and
+   * `scratchpad/effects-drift-harness.mjs` rows [4a] and [5a]–[5e] are what
+   * measure them by typing into the real box. A source assertion about
+   * validation is the shape of the bug this control exists to fix (`min`/`max`
+   * look identical in source and stop nothing), so this row exists to catch a
+   * REWIRE in a suite run, never to stand in for the harness.
+   */
+  it('the panel hands the box the refusal and the conversion (SOURCE ONLY — see the harness)', () => {
+    const panel = readFileSync(resolve(
+      __dirname, '../../src/renderer/components/effects/EffectsScenePanel.tsx'), 'utf8');
+    // Comments stripped: this file's own prose names both functions.
+    const code = panel.replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(code.length).toBeGreaterThan(5000);
+
+    const box = /<NumberField title=\{`Layer \$\{i\} \$\{LAYER_DRIFT_ROW\.rateTitle\}`\}[\s\S]*?\/>/
+      .exec(code)?.[0];
+    console.log('--- the drift NumberField, comments stripped ---\n' + (box ?? '(NOT FOUND)'));
+    expect(box, 'the drift box is no longer identifiable by its title').toBeDefined();
+    expect(box).toContain('refuse={(n) => driftPxPerFrameRefusal(n)}');
+    expect(box).toContain('driftFromPxPerFrame(n)');
+    // The typed number must NOT reach `rate` directly — that is the missing
+    // multiply, and it produces a legal document that drifts 256x too slow.
+    expect(box).not.toMatch(/rate:\s*n\b/);
   });
 
   /**

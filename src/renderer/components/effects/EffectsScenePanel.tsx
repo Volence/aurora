@@ -1128,7 +1128,7 @@ export default function EffectsScenePanel(): React.ReactElement {
                         <option value="rate">{LAYER_DRIFT_ROW.on}</option>
                       </Select>
                       {px !== null && (
-                        <NumberField title={LAYER_DRIFT_ROW.rateTitle}
+                        <NumberField title={`Layer ${i} ${LAYER_DRIFT_ROW.rateTitle}`}
                           min={EFFECTS_DRIFT_PX_BOUNDS.min} max={EFFECTS_DRIFT_PX_BOUNDS.max}
                           step={EFFECTS_DRIFT_PX_STEP} width={72} value={px}
                           refuse={(n) => driftPxPerFrameRefusal(n)}

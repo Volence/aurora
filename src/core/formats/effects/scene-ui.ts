@@ -1135,10 +1135,16 @@ export const EFFECTS_DRIFT_PX_BOUNDS = Object.freeze({
  * A second copy of "±4096, not 0" phrased in px is exactly the drift the
  * derivation above refuses to allow.
  *
- * WHY THE WIRE VALUE IS NAMED IN THE SENTENCE. The 256× hazard is invisible by
- * construction — every wrong value is itself a legal number — so the one moment
- * an author can SEE the conversion is when it refuses them. `0.001 px/frame is 0
- * in wire units` teaches the multiply in the one place it costs nothing to read.
+ * THE WIRE GLOSS APPEARS EXACTLY WHEN THE CONVERSION CHANGED THE NUMBER, which
+ * is the one case an author cannot reconstruct. Type `0.001` and the sentence
+ * that comes back is about `0`; without "0.001 px/frame is 0 in wire units" that
+ * reads as a non sequitur, and the ×256 — invisible by construction, since every
+ * wrong value is itself a legal rate — never becomes visible anywhere. Type `20`
+ * and the delegated sentence is ALREADY in the author's own units ("5120 (20
+ * px/frame) is outside…"); a gloss there restates the arithmetic a second time in
+ * one paragraph, and the paragraph is painted in a 129px-tall list scroller
+ * (MEASURED, effects-drift-harness [5e]) where a third line costs the sentence
+ * its bottom edge.
  *
  * ROUNDING IS PART OF THE REFUSAL, not a step before it. A typed `0.001` is not
  * zero, but it LOWERS to zero, and zero is the value aeon refuses; catching it
@@ -1151,6 +1157,7 @@ export function driftPxPerFrameRefusal(pxPerFrame: number): string | null {
   const rate = driftPxPerFrameToRate(pxPerFrame);
   const why = driftRateRefusal(rate);
   if (why === null) return null;
+  if (driftRateToPxPerFrame(rate) === pxPerFrame) return why;
   return `${pxPerFrame} px/frame is ${rate} in wire units `
     + `(1 px/frame = ${EFFECTS_DRIFT_UNITS_PER_PIXEL}). ${why}`;
 }
