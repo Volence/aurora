@@ -716,8 +716,11 @@ describe('the narrowed control carries its reason', () => {
     const one = newPreset('probe');
     expect(one.bands).toHaveLength(1);
     const why = lastBandRefusal(one);
-    expect(why).toMatch(/at least one band/i);
+    expect(why).toMatch(/at least one/i);
     expect(why).toMatch(/zero-band program/i);
+    // EFFECTS-W1 defect 7: the sentence NAMES the preset it is about, so a
+    // reader who meets it in a column of several cards knows which.
+    expect(why).toMatch(/^preset "probe":/);
 
     // ...and with two bands the refusal lifts, so this is a condition and not
     // a permanent wall.

@@ -47,10 +47,19 @@ interface Box {
   /** Re-render from the caller with a new committed value (a controlled parent). */
   setValue(v: number): void;
   renders(): number;
+  /** How many times the component asked the focused element to select itself. */
+  readonly selects: { count: number };
 }
 
 /** Render the real `NumberField` and drive the real `<input>` it returns. */
-function box(props: { value: number; min?: number; max?: number }, sink?: (n: number) => number | void): Box {
+function box(
+  props: {
+    value: number; min?: number; max?: number;
+    refuse?: (v: number) => string | null;
+    onRefusal?: (reason: string | null) => void;
+  },
+  sink?: (n: number) => number | void,
+): Box {
   const commits: number[] = [];
   const h = renderHooked(NumberField, {
     ...props,
@@ -67,10 +76,23 @@ function box(props: { value: number; min?: number; max?: number }, sink?: (n: nu
     expect(el.props.type, 'the field must really be a number input').toBe('number');
     return el.props as Record<string, (e: unknown) => void> & { value: string };
   };
+  const selects = { count: 0 };
   return {
     commits,
     type: (raw) => { input().onChange({ target: { value: raw } } as unknown as ChangeEvent); },
-    focus: () => { input().onFocus({} as unknown as ChangeEvent); },
+    // ⚠ THE FAKE FOCUS EVENT CARRIES A `currentTarget`, and it must. The box
+    // SELECTS its contents on focus (EFFECTS-W1 defect 5 / walkthrough §a14:
+    // clicking a box holding `112` and typing `40` committed `40112`), so an
+    // event without one is not the event the DOM delivers — and a `?.` in the
+    // component to tolerate it would be the component hiding a real breakage.
+    // `selects` counts the calls so a row can assert the behaviour rather than
+    // merely surviving it.
+    focus: () => {
+      input().onFocus({
+        currentTarget: { select: () => { selects.count += 1; } },
+      } as unknown as ChangeEvent);
+    },
+    selects,
     blur: () => { input().onBlur({} as unknown as ChangeEvent); },
     shown: () => input().value,
     setValue: (v) => { h.setProps({ value: v }); },
@@ -287,7 +309,42 @@ describe('fields.tsx wiring', () => {
     const src = strip(RAW());
     expect(src).not.toContain('Number(e.target.value)');
     expect(src).toMatch(/parseNumberFieldText\(raw\)/);
-    expect(src).toMatch(/if \(n !== undefined\) onChange\(n\)/);
+    // ⚠ THE COMMIT MOVED BEHIND A REFUSAL (EFFECTS-W1 defect 5), so the shape
+    // this row pins moved with it: parse, ask `refuse`, then commit only if
+    // nothing objected. The two halves are asserted in ORDER, because a
+    // `refuse` consulted AFTER the commit would be decoration over a value
+    // already in the document.
+    expect(src).toMatch(/if \(n === undefined\) return;/);
+    const askAt = src.indexOf('refuse?.(n)');
+    const commitAt = src.indexOf('if (why === null) onChange(n)');
+    expect(askAt).toBeGreaterThan(-1);
+    expect(commitAt).toBeGreaterThan(askAt);
+  });
+
+  it('the box SELECTS its contents on focus — the cause of `40112`', () => {
+    // Behaviour, not source: the harness counts the `select()` the component
+    // calls on the focused element.
+    const b = box({ value: 112 });
+    expect(b.selects.count).toBe(0);
+    b.focus();
+    expect(b.selects.count).toBe(1);
+  });
+
+  it('a value the caller REFUSES is never committed, and the reason is reported', () => {
+    const seen: (string | null)[] = [];
+    const b = box({
+      value: 112,
+      refuse: (n: number) => (n > 223 ? `${n} is off the screen` : null),
+      onRefusal: (r: string | null) => seen.push(r),
+    });
+    b.type('40112');
+    expect(b.commits, 'a refused value reached the document').toEqual([]);
+    expect(seen).toEqual(['40112 is off the screen']);
+    // ANTI-VACUOUS: the same box still commits a value the caller allows, so
+    // the row above is not passing because nothing works.
+    b.type('40');
+    expect(b.commits).toEqual([40]);
+    expect(seen).toEqual(['40112 is off the screen', null]);
   });
 
   it('strips comments before scanning (the known false green)', () => {

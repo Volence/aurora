@@ -96,8 +96,29 @@ function numberFieldText(value: number): string {
  * value commits has changed), and the box resyncs to whatever the document
  * really holds on blur.
  */
-export function NumberField({ value, onChange, min, max, title, width = 48 }: {
+export function NumberField({ value, onChange, min, max, title, width = 48, refuse, onRefusal }: {
   value: number; onChange: (v: number) => void; min?: number; max?: number; title?: string; width?: number;
+  /**
+   * WHY THIS VALUE CANNOT BE WRITTEN, or null when it can — the REAL refusal.
+   *
+   * ⚠ `min`/`max` ABOVE ARE NOT A REFUSAL AND NEVER WERE. On
+   * `<input type="number">` they govern the spinner arrows and the `:invalid`
+   * pseudo-class and stop NO typed value: `min={3}` lets an author type 40112
+   * and fires `onChange(40112)`. This repo has been bitten by exactly that —
+   * EFFECTS-W1 defect 5, where a screen line of 40112 and a `Top 200 / Bot 100`
+   * were both accepted in silence and became four build errors. So a caller
+   * that means "this cannot be written" passes `refuse`; `min`/`max` stay for
+   * the spinner's step behaviour only.
+   *
+   * When it returns a reason the value is NOT committed — `onChange` does not
+   * fire — and `onRefusal` is called with the sentence so the caller can paint
+   * it AT the control. The box keeps the author's text while they are typing
+   * and resyncs to the document on blur, so the illegal number visibly snaps
+   * back with the reason still on screen beside it.
+   */
+  refuse?: (v: number) => string | null;
+  /** Called with the refusal sentence, or null when a value commits cleanly. */
+  onRefusal?: (reason: string | null) => void;
 }) {
   const [text, setText] = React.useState(() => numberFieldText(value));
   const [editing, setEditing] = React.useState(false);
@@ -110,13 +131,26 @@ export function NumberField({ value, onChange, min, max, title, width = 48 }: {
 
   return (
     <input type="number" title={title} value={text} min={min} max={max}
-      onFocus={() => setEditing(true)}
+      onFocus={(e) => {
+        setEditing(true);
+        // SELECT ON FOCUS. Clicking a box holding `112` and typing `40` used to
+        // commit `40112` — the caret landed where the pointer did and the digits
+        // were INSERTED (walkthrough §a14; it produced Top 40112 / Bot 72128 and
+        // no warning anywhere). Selecting makes the first keystroke replace,
+        // which is what every author expects of a small numeric field and what
+        // makes the refusal below a backstop rather than a daily obstacle.
+        e.currentTarget.select();
+        onRefusal?.(null);
+      }}
       onBlur={() => { setEditing(false); setText(numberFieldText(value)); }}
       onChange={(e) => {
         const raw = e.target.value;
         setText(raw);
         const n = parseNumberFieldText(raw);
-        if (n !== undefined) onChange(n);
+        if (n === undefined) return;
+        const why = refuse?.(n) ?? null;
+        onRefusal?.(why);
+        if (why === null) onChange(n);
       }}
       style={{ ...base, width }} />
   );

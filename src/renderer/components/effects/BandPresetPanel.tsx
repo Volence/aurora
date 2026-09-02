@@ -56,6 +56,7 @@ import {
   VARIANT_SLOT_OPTIONS, variantSlotState, variantSlotIndices, setVariantSlotStateCommand,
   VARIANT_FIELDS, variantFieldTitle, variantFieldSeed, setVariantFieldCommand,
   CRAM_LINES, variantLineOn, toggleVariantLineCommand,
+  bandSubject, bandEdgeRefusal, variantLineRefusal, cycleFieldRefusal,
 } from '../../providers/effects-preset';
 import { PresetLagDisclosure } from './PresetLagDisclosure';
 
@@ -265,9 +266,9 @@ export default function BandPresetPanel(): React.ReactElement | null {
                   ))}
                 </Select>
               </Field>
-              {unassignablePresetRef(library, section.rasterRef) && (
+              {unassignablePresetRef(library, section.rasterRef, activeSectionIndex) && (
                 <Hint under tone="warning">
-                  {unassignablePresetRef(library, section.rasterRef)}
+                  {unassignablePresetRef(library, section.rasterRef, activeSectionIndex)}
                 </Hint>
               )}
               <Hint under style={{ marginBottom: 0 }}>
@@ -393,20 +394,30 @@ function CycleChannelCard({ library, presetId, index, channel, run }: {
 }): React.ReactElement {
   const { required, optional } = presetDefFields('cycle_channel');
   const values = channel as unknown as Record<string, number | undefined>;
+  const [fieldRefusal, setFieldRefusal] = React.useState<Record<string, string | null>>({});
   return (
     <Card>
       <Field label={`Channel ${index}`}>
         <IconButton icon={<span>Remove</span>} label={`Remove cycle channel ${index}`}
           onClick={() => run(removeCycleChannelCommand(library, presetId, index))} />
       </Field>
-      {/* NO min/max ON ANY SPINNER HERE EITHER — the band spinners' rule
-          (aeon E.4), for the same reason: the constructor's ensure names the
-          bound and the measurement; a bound here would replace it. */}
+      {/* STILL NO min/max — the band spinners' rule (aeon E.4), for the same
+          reason: the constructor's ensure names the bound and the measurement,
+          and a bound here would replace it.
+
+          ONE FIELD HAS A RULE THE SCHEMA STATES OUTRIGHT, and it is refused:
+          `line` must not be 0, because line 0 is the character's. Everything
+          else is forwarded verbatim. `cycleFieldRefusal` owns the split. */}
       {required.map((f) => (
-        <Field key={f} label={f} title={cycleFieldTitle(f)}>
-          <NumberField title={cycleFieldTitle(f)} width={72} value={Number(values[f])}
-            onChange={(n) => run(setCycleFieldCommand(library, presetId, index, f, n))} />
-        </Field>
+        <React.Fragment key={f}>
+          <Field label={f} title={cycleFieldTitle(f)}>
+            <NumberField title={cycleFieldTitle(f)} width={72} value={Number(values[f])}
+              refuse={(n) => cycleFieldRefusal(presetId, index, f, n)}
+              onRefusal={(r) => setFieldRefusal((s) => ({ ...s, [f]: r }))}
+              onChange={(n) => run(setCycleFieldCommand(library, presetId, index, f, n))} />
+          </Field>
+          {fieldRefusal[f] != null && <Hint under tone="warning">{fieldRefusal[f]}</Hint>}
+        </React.Fragment>
       ))}
       {/* The optional field(s): present → a spinner and an unset; absent → a
           chip that writes it. An absent `dir` is the constructor's default
@@ -465,6 +476,7 @@ function VariantSlotCard({ library, preset, index, run }: {
   const slot = state === 'authored' ? (preset.variants![index] as EffectsPresetPalVariant) : null;
   const values = (slot ?? {}) as Record<string, number | undefined>;
   const unset = VARIANT_FIELDS.filter((f) => values[f] === undefined);
+  const [lineRefusal, setLineRefusal] = React.useState<string | null>(null);
   return (
     <Card>
       <Field label={`Slot ${index}`} title={VARIANTS_TITLE}>
@@ -481,17 +493,33 @@ function VariantSlotCard({ library, preset, index, run }: {
             /* The friendlier spelling the schema hands to the panel (ruling
                Q4): one chip per CRAM line, bit n ⇔ line n. The WIRE value is
                the integer beside them, and a toggle flips one bit only, so a
-               hand-written mask keeps whatever else it carried. Line 0 is
-               offered because a file can carry it and the constructor's
-               refusal is the constructor's to give. */
+               hand-written mask keeps whatever else it carried.
+
+               ⚠ `L0` USED TO BE A ONE-CLICK RED BUILD (EFFECTS-W1 defect 5 /
+               b1). It was offered on the reasoning that "a file can carry it
+               and the constructor's refusal is the constructor's to give" —
+               while the tooltip ON THIS BUTTON already stated the rule. One
+               click, no feedback, a build failure naming a byte offset. It is
+               now refused when it would SET the bit and still allowed when it
+               would CLEAR one a hand-written file carries, so the reasoning
+               above stays true and the trap is gone. The refusal derivation is
+               `variantLineRefusal`, in the provider, so this chip and the
+               sentence under it cannot disagree. */
             <>
-              {CRAM_LINES.map((line) => (
-                <Chip key={line} active={variantLineOn(Number(values[f]), line)}
-                  title={`CRAM line ${line} — bit ${line} of the mask`}
-                  onClick={() => run(toggleVariantLineCommand(library, preset.id, index, line))}>
-                  L{line}
-                </Chip>
-              ))}
+              {CRAM_LINES.map((line) => {
+                const why = variantLineRefusal(preset.id, index, Number(values[f]), line);
+                return (
+                  <Chip key={line} active={variantLineOn(Number(values[f]), line)}
+                    title={why ?? `CRAM line ${line} — bit ${line} of the mask`}
+                    onClick={() => {
+                      if (why !== null) { setLineRefusal(why); return; }
+                      setLineRefusal(null);
+                      run(toggleVariantLineCommand(library, preset.id, index, line));
+                    }}>
+                    L{line}
+                  </Chip>
+                );
+              })}
               <span style={{ fontSize: T.tXs, color: T.textLo }}>= {Number(values[f])}</span>
             </>
           ) : (
@@ -502,6 +530,11 @@ function VariantSlotCard({ library, preset, index, run }: {
             onClick={() => run(setVariantFieldCommand(library, preset.id, index, f, undefined))} />
         </Field>
       ))}
+      {/* THE REFUSAL, UNDER THE CHIPS THAT PRODUCED IT. It is state and not a
+          derivation because it is about a GESTURE — the document is unchanged,
+          so nothing in it could carry the sentence. `Hint under` puts it in the
+          field column, directly below the `L0 L1 L2 L3` row. */}
+      {lineRefusal !== null && <Hint under tone="warning">{lineRefusal}</Hint>}
       {/* Every field is optional and absent means the constructor's default.
           The absent ones are one row of chips, each of which WRITES the field
           — a seed to type over, not a default Aurora claims to know. */}
@@ -539,6 +572,14 @@ function BandCard({
   const arm = bandArm(band);
   const armAdvice = bandArmAdvisory(band);
   const options = armOptions(arm ?? (Object.keys(band.on)[0] ?? null));
+  // WHY THE REFUSAL OUTLIVES THE BLUR. `NumberField` resyncs its text to the
+  // document when focus leaves, so an illegal number visibly snaps back — and
+  // if the sentence went with it, the author would watch their value vanish
+  // with no explanation, which is worse than the silence this replaces. It is
+  // cleared on the box's next focus (`NumberField`'s `onFocus`), so it is never
+  // stale advice about a value the author has moved on from.
+  const [edgeRefusal, setEdgeRefusal] =
+    React.useState<{ top: string | null; bot: string | null }>({ top: null, bot: null });
 
   return (
     <Card>
@@ -552,20 +593,33 @@ function BandCard({
       </Field>
       {lastRefusal !== null && <Hint under>{lastRefusal}</Hint>}
 
+      {/* ═══ REFUSED AT THE CONTROL, AT TYPING TIME (EFFECTS-W1 defect 5) ═══
+
+          STILL NO `min`/`max`, and that is not the omission it looks like: on
+          `<input type="number">` those govern the SPINNER and `:invalid` and
+          stop no typed value at all. `min={3}` would have let `40112` through
+          exactly as before. The refusal is `refuse`, which withholds the write.
+
+          NOT A CLAMP, so aeon's §E.4 stands: nothing here substitutes a number
+          the author did not type. The value is refused, unwritten, and the
+          engine's own rule is quoted back with the preset and the band named —
+          see `bandEdgeRefusal`'s docblock for why the line is drawn at rules 1
+          and 2 and why the order rule's message ends "move the other edge
+          first". */}
       <Field label="Top" title={BAND_FIELD_TITLES.top}>
         <NumberField title={BAND_FIELD_TITLES.top} width={72} value={band.top}
+          refuse={(n) => bandEdgeRefusal(band, presetId, index, 'top', n)}
+          onRefusal={(r) => setEdgeRefusal({ ...edgeRefusal, top: r })}
           onChange={(n) => run(setBandFieldCommand(library, presetId, index, 'top', n))} />
       </Field>
+      {edgeRefusal.top !== null && <Hint under tone="warning">{edgeRefusal.top}</Hint>}
       <Field label="Bot" title={BAND_FIELD_TITLES.bot}>
         <NumberField title={BAND_FIELD_TITLES.bot} width={72} value={band.bot}
+          refuse={(n) => bandEdgeRefusal(band, presetId, index, 'bot', n)}
+          onRefusal={(r) => setEdgeRefusal({ ...edgeRefusal, bot: r })}
           onChange={(n) => run(setBandFieldCommand(library, presetId, index, 'bot', n))} />
       </Field>
-      {/* NO min/max ON EITHER SPINNER, AND THAT IS THE CONTRACT, not an
-          oversight. aeon's E.4: "Do not validate ranges, and do not clamp.
-          Forward what the author typed" — so the author reads the ENGINE's
-          refusal, which carries the measurement behind the rule ("the ON fire
-          costs 624 cyc against 488 available"). A clamp here replaces that
-          sentence with silence. */}
+      {edgeRefusal.bot !== null && <Hint under tone="warning">{edgeRefusal.bot}</Hint>}
 
       <Field label="S/H" title={BAND_FIELD_TITLES.sh}>
         <Select title={BAND_FIELD_TITLES.sh}
@@ -613,7 +667,8 @@ function BandCard({
               placeholder="14 3584"
               onChange={(e) => {
                 setColoursText(e.target.value);
-                const parsed = parseColours(e.target.value);
+                const parsed = parseColours(
+                  e.target.value, bandSubject(presetId, index, 'colours'));
                 if (!parsed.ok) { setColoursRefusal(parsed.reason); return; }
                 setColoursRefusal(null);
                 run(setColoursCommand(library, presetId, index, parsed.colours));

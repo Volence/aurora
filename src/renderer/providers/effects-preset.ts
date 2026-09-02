@@ -620,14 +620,19 @@ export function presetRefOptions(library: EffectsPresetLibrary): FactorOption[] 
  * a live subject it passes rather than an empty set it prints).
  */
 export function unassignablePresetRef(
-  library: EffectsPresetLibrary, rasterRef: string | null,
+  library: EffectsPresetLibrary, rasterRef: string | null, sectionIndex?: number,
 ): string | null {
   if (rasterRef === null) return null;
   if (library.presets.some((p) => p.id === rasterRef)) return null;
+  // THE SECTION IS NAMED (EFFECTS-W1 defect 7). One control draws every
+  // section in turn, so "Assigned to X" alone left the reader to work out
+  // WHICH section's sidecar carries the dangling id — and the build's own
+  // message for the same fault names the section, so the two now agree.
+  const where = sectionIndex === undefined ? 'This section' : `Section ${sectionIndex}`;
   if (library.unreadable.some((u) => u.path.endsWith(`/${rasterRef}.json`))) {
-    return `Assigned to "${rasterRef}", whose file exists but could not be read.`;
+    return `${where} is assigned to "${rasterRef}", whose file exists but could not be read.`;
   }
-  return `Assigned to "${rasterRef}", which is not a raster preset in this project.`;
+  return `${where} is assigned to "${rasterRef}", which is not a raster preset in this project.`;
 }
 
 /**
@@ -745,9 +750,9 @@ export function removeBandCommand(
  */
 export function lastBandRefusal(preset: EffectsPreset): string | null {
   if (preset.bands.length > 1) return null;
-  return 'A preset must have at least one band — the schema refuses an empty bands list, ' +
-    'because a document that emits a zero-band program is a document that should not exist. ' +
-    'Delete the preset instead.';
+  return `preset "${preset.id}": this is its only raster band, and a preset must have at least `
+    + 'one — the schema refuses an empty bands list, because a document that emits a zero-band '
+    + 'program is a document that should not exist. Delete the preset instead.';
 }
 
 /** Set `top`, `bot` or `sh` on one band. */
@@ -816,21 +821,28 @@ export function setArmFieldCommand(
  * nothing. It does NOT range-check the integers it does parse — that is §E.4's
  * line, and the engine's own refusal carries the burst ceiling behind it.
  */
-export function parseColours(text: string): { ok: true; colours: number[] } | { ok: false; reason: string } {
+export function parseColours(
+  text: string, subject?: string,
+): { ok: true; colours: number[] } | { ok: false; reason: string } {
+  // NAMED, LIKE EVERY OTHER MESSAGE ON THIS SURFACE (defect 7). The caller
+  // passes `bandSubject(presetId, index, 'colours')`; the parameter is optional
+  // only because this function is also reachable from a test and from the agent
+  // path, where there is no card to point at.
+  const where = subject === undefined ? '' : `${subject}: `;
   const tokens = text.split(/[\s,]+/).filter((t) => t.length > 0);
   if (tokens.length === 0) {
     return {
       ok: false,
-      reason: 'Enter at least one colour word. An empty list is refused by the engine — the ' +
-        'ON op would write nothing and the derived restore would have no span.',
+      reason: `${where}enter at least one colour word. An empty list is refused by the engine — `
+        + 'the ON op would write nothing and the derived restore would have no span.',
     };
   }
   const colours: number[] = [];
   for (const t of tokens) {
     const n = /^0[xX][0-9a-fA-F]+$/.test(t) ? Number.parseInt(t, 16) : Number(t);
     if (!Number.isInteger(n)) {
-      return { ok: false, reason: `"${t}" is not an integer. Colours are CRAM words — decimal, ` +
-        'or 0x-prefixed hex.' };
+      return { ok: false, reason: `${where}"${t}" is not an integer. Colours are CRAM words — `
+        + 'decimal, or 0x-prefixed hex.' };
     }
     colours.push(n);
   }
@@ -1298,6 +1310,46 @@ export function toggleVariantLineCommand(
 // about values FORWARDED to the generator and a typed number is the author's.
 // A drag has no typed number: its value is where the pointer is.
 
+// ═══════════════════════════════════════════════════════════════════════════
+// NAMING THE THING — the prefix every message on this surface carries
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// EFFECTS-W1 defect 7. A failure an author met read, in full:
+//
+//     [Error] variant: lines mask 15 selects line 0 (the character's) — use
+//     bits 1-3 @ Span { source: SourceId(8), start: 2800, end: 2906 }
+//
+// and could not be walked back to any control: no preset id, no band index, no
+// field name — a byte offset into a generated file the author has never opened.
+// aeon owns that message. What Aurora owns is every sentence IT produces, and
+// the rule adopted here is that each one opens with the coordinates a person
+// can act on.
+//
+// ⚠ WHICH COORDINATES, AND WHY NOT ALWAYS THREE. The brief asked for "the
+// preset, the section, and the field". A BAND is not section-scoped — a preset
+// document is act-ambient and any number of sections may bind it — so naming a
+// section in a band's refusal would be a guess dressed as a fact. The split is:
+//
+//     a band / cycle / variant message   →  preset · which card · which field
+//     a per-section binding message      →  section · preset
+//
+// so the coordinate named is always one the author can actually go and change.
+
+/** `preset "x" · Raster band 0 · Top` — the coordinates, in the panel's own words. */
+export function bandSubject(presetId: string, index: number, field?: string): string {
+  return `preset "${presetId}" · Raster band ${index}${field === undefined ? '' : ` · ${field}`}`;
+}
+
+/** `preset "x" · Channel 0 · line`. */
+export function cycleSubject(presetId: string, index: number, field?: string): string {
+  return `preset "${presetId}" · Channel ${index}${field === undefined ? '' : ` · ${field}`}`;
+}
+
+/** `preset "x" · Slot 0 · lines`. */
+export function variantSubject(presetId: string, index: number, field?: string): string {
+  return `preset "${presetId}" · Slot ${index}${field === undefined ? '' : ` · ${field}`}`;
+}
+
 /** A band's two authored edges. Both are fire lines; neither is a payload. */
 export type BandEdge = 'top' | 'bot';
 
@@ -1392,6 +1444,120 @@ export function clampBandEdge(band: EffectsPresetBand, edge: BandEdge, value: nu
   return Math.max(b.min, Math.min(b.max, Math.round(value)));
 }
 
+/**
+ * ═══ WHY A TYPED NUMBER IS NOW REFUSED, AFTER A YEAR OF BEING FORWARDED ═══
+ *
+ * The block above ("clamp or advise") settled what a DRAG does and left the
+ * SPINNER forwarding whatever the author typed, on aeon's §E.4: "Do not
+ * validate ranges, and do not clamp. Forward what the author typed", so the
+ * author reads the ENGINE's refusal with its measurement attached.
+ *
+ * ⚠ THAT WAS RIGHT ABOUT CLAMPING AND WRONG ABOUT SILENCE, and the cold
+ * walkthrough measured the cost. `Top 200 / Bot 100` was accepted with no
+ * error, no red and no warning, and became FOUR build errors in three
+ * vocabularies quoting two specs the author cannot open. `Top = 40112` — a
+ * typo the panel itself caused, by not selecting on click — was accepted just
+ * as silently. The author's own report of this surface was that it "kept giving
+ * errors during build time that I would have to stop and revert".
+ *
+ * SO THIS IS NOT A CLAMP AND §E.4 IS NOT BROKEN. Nothing here substitutes a
+ * number: an illegal value is REFUSED, by name, at the control, with the
+ * engine's own rule quoted — the value the author typed is never quietly
+ * replaced by one Aurora invented, which is the thing §E.4 forbids. The
+ * distinction is the whole design:
+ *
+ *     clamp   →  the document silently holds something the author did not type
+ *     refuse  →  the document is unchanged and the author is told why
+ *
+ * ⚠ AND ONLY RULES 1 AND 2 ARE REFUSED — the two that are true whatever else
+ * the document says. Rules 3 and 4 depend on ANOTHER band's values and stay
+ * advisory (`bandCollisionAdvisory`), because walling them would refuse
+ * programs the engine builds. That is the same 1/2-versus-3/4 line the drag
+ * already draws, and it is drawn once, here, in `bandEdgeBounds`.
+ *
+ * ⚠ ORDER-RULE REFUSALS ARE ESCAPABLE, and the sentence says how. Refusing
+ * `top >= bot` means a band cannot be moved DOWN by typing `top` first; the
+ * message therefore ends "Move Bot first to make room", which is the same
+ * escape `bandEdgeNotice` already gives a held drag. Both edges bound each
+ * other, so there is always an order that works.
+ */
+export function bandEdgeRefusal(
+  band: EffectsPresetBand, presetId: string, index: number, edge: BandEdge, value: number,
+): string | null {
+  if (!Number.isInteger(value)) {
+    return `${bandSubject(presetId, index, edge === 'top' ? 'Top' : 'Bot')}: ${value} is not a `
+      + 'whole number. A screen line is an integer.';
+  }
+  const b = bandEdgeBounds(band, edge);
+  if (value >= b.min && value <= b.max) return null;
+  const other = edge === 'top' ? band.bot : band.top;
+  const outsideFire = value < EFFECTS_FIRE_LINE_MIN || value > EFFECTS_FIRE_LINE_MAX;
+  const label = edge === 'top' ? 'Top' : 'Bot';
+  // ⚠ IT NAMES WHAT THE DOCUMENT STILL HOLDS, and the first draft said "Not
+  // written." instead — which is true of the refused number and NOT the whole
+  // truth. `NumberField` commits per keystroke, so typing `40112` over `112`
+  // walks through `4` and `40`, both of which are legal and both of which land;
+  // the box then holds `40112` and the document holds `40`. Measured in the CDP
+  // harness, not reasoned about. A message that says only "not written" leaves
+  // an author looking at `40112` on screen with no idea what is in the file.
+  const holds = `${label} is still ${band[edge]}.`;
+  if (outsideFire) {
+    return `${bandSubject(presetId, index, label)}: ${value} is not a `
+      + `screen line — ${BAND_EDGE_LAW}. Refused; ${holds}`;
+  }
+  return `${bandSubject(presetId, index, label)}: ${value} would put Top `
+    + `at or below Bot (${edge === 'top' ? `Bot is ${other}` : `Top is ${other}`}) — `
+    + `${BAND_ORDER_LAW}. Move the other edge first to make room. Refused; ${holds}`;
+}
+
+/**
+ * Why lighting this line in a `variants` mask is refused, or null.
+ *
+ * THE ONE CLICK THAT COST A RED BUILD. `L0` was offered because "a file can
+ * carry it and the constructor's refusal is the constructor's to give" — and
+ * the tooltip ON THE BUTTON ITSELF already said "Line 0 is the character's and
+ * the mask's bit for it must be clear". One click, zero feedback, a build
+ * failure naming a byte offset. The rule was in the product, at the control,
+ * and did nothing.
+ *
+ * ⚠ IT REFUSES SETTING THE BIT, NEVER CLEARING IT. A hand-written file can
+ * carry bit 0, and a panel that refused the click that FIXES it would trap the
+ * author inside the illegal state with no control that can leave it. So the
+ * asymmetry is deliberate and is what keeps the old "a file can carry it"
+ * reasoning true.
+ */
+export function variantLineRefusal(
+  presetId: string, slotIndex: number, mask: number, line: number,
+): string | null {
+  if (line !== 0) return null;
+  if (variantLineOn(mask, line)) return null;   // turning it OFF is always allowed
+  return `${variantSubject(presetId, slotIndex, 'lines')}: ${VARIANT_LINE_0_LAW} `
+    + `Bits 1-3 are yours. Refused; the mask is still ${mask}.`;
+}
+
+/** The line-0 rule, in the schema's own words, read out of the contract. */
+export const VARIANT_LINE_0_LAW: string =
+  'Line 0 is the character\'s palette line and the mask\'s bit for it must be clear — aeon\'s '
+  + 'build refuses the program with "variant: lines mask N selects line 0 (the character\'s) — '
+  + 'use bits 1-3".';
+
+/**
+ * Why this cycle-channel field cannot hold this value, or null.
+ *
+ * ONLY `line` HAS A RULE HERE, and only the one the schema states outright
+ * ("Never 0: line 0 is the character's"). `first`, `count` and `period` carry
+ * no bound in the contract and none is invented: §E.4's instruction stands
+ * wherever there is a rule to forward rather than a rule to enforce.
+ */
+export function cycleFieldRefusal(
+  presetId: string, index: number, field: string, value: number,
+): string | null {
+  if (field !== 'line') return null;
+  if (value !== 0) return null;
+  return `${cycleSubject(presetId, index, 'line')}: 0 is the character's palette line, and the `
+    + 'schema\'s own rule on this field is "Never 0". Pick 1, 2 or 3. Refused.';
+}
+
 /** `GuideBoundNotice`'s shape, for the same job on this surface. */
 export interface BandEdgeNotice {
   tone: 'held';
@@ -1411,7 +1577,7 @@ export interface BandEdgeNotice {
  * then not read at the one moment it matters.
  */
 export function bandEdgeNotice(
-  band: EffectsPresetBand, edge: BandEdge, requested: number,
+  band: EffectsPresetBand, edge: BandEdge, requested: number, subject?: string,
 ): BandEdgeNotice | null {
   if (!Number.isFinite(requested)) return null;
   const want = Math.round(requested);
@@ -1424,9 +1590,12 @@ export function bandEdgeNotice(
   // bottom, and the ORDER rule's ceiling otherwise. Saying "order" there would
   // send the author to move the wrong number.
   const byFire = limit === (which === 'min' ? EFFECTS_FIRE_LINE_MIN : EFFECTS_FIRE_LINE_MAX);
+  // NAMED WHERE THE CALLER KNOWS THE NAME (defect 7). A drag's notice used to
+  // open "held at 223", which is true of any edge of any band of any preset.
+  const where = subject === undefined ? '' : `${subject}: `;
   const text = byFire
-    ? `held at ${limit}. ${BAND_EDGE_LAW}. The build refuses a fire outside it.`
-    : `held at ${limit}. ${BAND_ORDER_LAW}. Move the other edge first to make room.`;
+    ? `${where}held at ${limit}. ${BAND_EDGE_LAW}. The build refuses a fire outside it.`
+    : `${where}held at ${limit}. ${BAND_ORDER_LAW}. Move the other edge first to make room.`;
   return { tone: 'held', edge: which, rule: byFire ? 'fire' : 'order', limit, text };
 }
 
@@ -1456,8 +1625,8 @@ export function bandCollisionAdvisory(preset: EffectsPreset, index: number): str
     const [lo, hi] = index < j ? [index, j] : [j, index];
     const shared = bandFireLines(other).find((l) => mine.includes(l));
     if (shared !== undefined) {
-      return `band ${lo} and band ${hi} both fire on screen line ${shared}. ${BAND_GAP_LAW}. `
-        + 'The build refuses the program.';
+      return `preset "${preset.id}": Raster band ${lo} and Raster band ${hi} both fire on screen `
+        + `line ${shared}. ${BAND_GAP_LAW}. The build refuses the program.`;
     }
     const theirSpan = bandCramSpan(other);
     if (mySpan === null || theirSpan === null) continue;
@@ -1466,7 +1635,8 @@ export function bandCollisionAdvisory(preset: EffectsPreset, index: number): str
     if (spansMeet && linesMeet) {
       const first = preset.bands[lo];
       const second = preset.bands[hi];
-      return `band ${lo} (lines ${first.top}..${first.bot}) and band ${hi} (lines ${second.top}..`
+      return `preset "${preset.id}": Raster band ${lo} (lines ${first.top}..${first.bot}) and `
+        + `Raster band ${hi} (lines ${second.top}..`
         + `${second.bot}) overlap vertically AND share CRAM bytes `
         + `${Math.max(mySpan.start, theirSpan.start)}..${Math.min(mySpan.end, theirSpan.end) - 1}. `
         + `${BAND_OVERLAP_LAW}. The build refuses the program.`;
