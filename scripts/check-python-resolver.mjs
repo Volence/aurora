@@ -177,26 +177,31 @@ const args = ['-m', 'unittest', 'discover', '-s', ROWS_DIR, '-t', ROWS_DIR, '-p'
 const run = spawnSync('python3', args, { cwd: AURORA_DIR, encoding: 'utf8', env: childEnv });
 if (run.error) die(`could not run python3 (${run.error.message}).`);
 
-// THE PREFIX WAS HONOURED, MEASURED. Python writes each imported module's bytecode under
-// the prefix, so a non-empty tree is the child's own evidence that it compiled there and
-// therefore could reach no cache from any earlier run. An EMPTY one means this run's
-// compilation source is unknown, which is precisely the state that reports green over a
-// mutation, so it is exit 2 rather than a caveat in the verdict line.
-const compiled = countFiles(cacheRoot);
-if (compiled === 0) {
-  die(`nothing was compiled under the per-run bytecode prefix ${cacheRoot}, so this run `
-    + 'cannot show it executed the files on disk rather than a cache some earlier run left '
-    + "behind. Python invalidates its cache on (mtime, size), so a same-size edit with the "
-    + 'mtime restored runs as its old self and reports green. Whatever the rows printed, '
-    + 'they were not shown to be about the current source.');
-}
-
 // unittest reports on stderr; the rows print their measurements on stdout.
 const report = run.stderr ?? '';
 const measurements = run.stdout ?? '';
 
 if (measurements.trim()) console.log(measurements.trimEnd());
 if (report.trim()) console.log(report.trimEnd());
+
+// THE PREFIX WAS HONOURED, MEASURED. Python writes each imported module's bytecode under
+// the prefix, so a non-empty tree is the child's own evidence that it compiled there and
+// therefore could reach no cache from any earlier run. An EMPTY one means this run's
+// compilation source is unknown, which is precisely the state that reports green over a
+// mutation, so it is exit 2 rather than a caveat in the verdict line.
+//
+// AFTER the output above and not before it, deliberately: when this fires, the run has
+// usually just printed a confident `OK`, and the two lines together are the whole lesson.
+// Refusing first hides the green that is the reason to refuse, and reads as a crash.
+const compiled = countFiles(cacheRoot);
+if (compiled === 0) {
+  die(`nothing was compiled under the per-run bytecode prefix ${cacheRoot}, so this run `
+    + 'cannot show it executed the files on disk rather than a cache some earlier run left '
+    + "behind. Python invalidates its cache on (mtime, size), so a same-size edit with the "
+    + 'mtime restored runs as its old self and reports green. Whatever the rows printed '
+    + 'above — including a passing `OK` — they were not shown to be about the current '
+    + 'source.');
+}
 
 // ---- anti-vacuity: the required rows must have appeared ----------------------
 
