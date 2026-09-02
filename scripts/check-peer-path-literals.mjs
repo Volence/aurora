@@ -6,9 +6,10 @@
  * file was built for; rules 2 and 3 were added by O69 (2026-09-02) after the
  * SUITE-PATHS landing left two residues rule 1 is STRUCTURALLY UNABLE TO SEE,
  * because neither contains a home-directory literal — the gate scanned both and
- * printed a confident OK. Rule 4 came the same way one day later, O72: 104
- * instruments asked `AURORA_DIR` — the right name, imported the right way, from
- * the right module — the WRONG QUESTION, and rules 1-3 are all blind to that.
+ * printed a confident OK. Rule 4 came the same way one day later, O72: 114
+ * instruments asked "which checkout am I" — often via `AURORA_DIR`, the right
+ * name imported the right way from the right module — when they meant "which
+ * built tree do I run against", and rules 1-3 are all blind to that.
  *
  *   1. `sibling-literal`  — an executable line naming the sibling root.
  *   2. `session-scratchpad` — an executable line naming an agent session's
@@ -26,7 +27,7 @@
  *      string-surgery on the worktree path.
  *   4. `checkout-as-build-tree` — an executable line composing a path to a BUILD
  *      ARTIFACT (`node_modules/…`, `dist/…`) out of `AURORA_DIR` or a local
- *      alias of it. 104 instruments did, and every one of them RAN, because in
+ *      alias of it. 114 instruments did, and every one of them RAN, because in
  *      the main checkout "the tree I live in" and "the tree with a build in it"
  *      are the same directory. In a linked worktree they are not — a worktree
  *      has neither artifact — so each composed a path to a file that is not
@@ -396,7 +397,7 @@ const ENV_RULE_EXEMPT_EXTS = ['.sh'];
 //
 // ⚠ IT IS FILE-SCOPED, WHICH NO OTHER RULE IS, and that is forced rather than
 // chosen. The composition is almost never spelled on `AURORA_DIR` itself — it
-// goes through a local alias (`const ROOT = AURORA_DIR;` in 107 files), so a
+// goes through a local alias — 119 files bind `const ROOT = AURORA_DIR;` — so a
 // line-local grep for `AURORA_DIR.*node_modules` returns ZERO and reads as an
 // empty world. A too-narrow query and an absent population produce the same
 // output. So `scan` computes the file's alias set first and the rule matches

@@ -362,9 +362,9 @@ export const AURORA_DIR_ENV_ALIASES = ['AURORA_ROOT', 'AURORA_REPO'];
  * own — which is why aurora splits. Do not read this as "split every
  * `<TOOL>_DIR`".
  *
- * WHO READS IT TODAY: `scratchpad/lib/run-root.mjs`, and through it the 104
+ * WHO READS IT TODAY: `scratchpad/lib/run-root.mjs`, and through it the 114
  * instruments O72 converted on 2026-09-02 (its docblock carries the re-derived
- * count and the one file the survey's own glob could not see). Nothing else
+ * count and the eleven files no survey predicate could see). Nothing else
  * reads this variable, by design: an instrument asks `runTarget()` for the tree
  * to run against, and this name is how an operator pins that tree.
  */

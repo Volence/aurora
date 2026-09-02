@@ -57,15 +57,34 @@
  *               matched a loose `dist` grep only in prose (`distance`,
  *               `distinct`, `distM`). All 18 are question 1 and correct as they
  *               are.
- *      +1  scratchpad/handover/handover-band-harness.mjs, which the `*.mjs`
- *          glob DOES NOT REACH and which no count above includes. It was found
- *          by rule 4 of `scripts/check-peer-path-literals.mjs` after the
- *          conversion, not by the survey — the survey's predicate and the
- *          population disagreed, and only the gate could tell which.
  *
- * So 104 instruments in total now resolve their run target here. The ones that
- * were converted were never WRONG from the main checkout — they ran against the
- * tree they lived in, which is the same directory there — and `ELECTRON_BIN`
+ * …AND ELEVEN MORE THAT NO LINE ABOVE COUNTS, because the survey's own
+ * predicate could not reach them. Every one was found by rule 4 of
+ * `scripts/check-peer-path-literals.mjs` AFTER the conversion, not by any
+ * search — which is the finding, not a footnote: a search that returns nothing
+ * and a world with nothing in it print the same output.
+ *
+ *      +1  scratchpad/handover/handover-band-harness.mjs — one directory below
+ *          the `*.mjs` glob every count above was taken over.
+ *      +7  instruments deriving the checkout from their OWN `import.meta.url`
+ *          (animated-art, canvas-cdp, priority-lens, paint-through,
+ *          s1-layout-anim, s1-priority-occlusion, ozone-x11-proof). That is
+ *          `AURORA_DIR` hand-rolled; they never name the resolver, so a
+ *          population defined as "mentions AURORA_DIR" excluded them by
+ *          construction.
+ *      +3  probes IMPORTING `ROOT` from `canvas-cdp-harness` (art-agent,
+ *          collision-agent, collision-gesture) — the binding is not created in
+ *          those files at all. Two printed a provenance line naming the wrong
+ *          tree; one read `join(ROOT, 'dist', 'renderer', 'assets')` for real.
+ *
+ * So 114 instruments changed: 111 import this module directly (112 with
+ * mapviewport, which was already here), and the 3 canvas-cdp probes take `MAIN`
+ * and `RUN` re-exported from the harness they already depend on. Of the 112,
+ * 110 call `runTarget`; this one and mapviewport call `resolveRunRoot` for
+ * reasons each states.
+ *
+ * The converted ones were never WRONG from the main checkout — they ran against
+ * the tree they lived in, which is the same directory there — and `ELECTRON_BIN`
  * remains the escape hatch for the binary half, now read in one place
  * (`electronBin`) instead of sixty-one.
  *
@@ -90,7 +109,7 @@ const MAX_LEVELS = 8;
  * Every consumer below composes from these, and so does `isRunnableTree` — the
  * predicate that decides a tree is runnable and the paths a harness then spawns
  * MUST be the same two strings, or the walk can approve a tree and the spawn can
- * miss in it. They were two independent spellings in 103 instruments before O72.
+ * miss in it. They were 114 independent pairs of spellings before O72.
  */
 const ELECTRON_REL = 'node_modules/.bin/electron';
 const DIST_MAIN_REL = 'dist/main/index.mjs';
@@ -123,7 +142,7 @@ export const ELECTRON_BIN_ENV = 'ELECTRON_BIN';
  * The electron binary to spawn, given the tree the run is against.
  *
  * ⚠ `root` IS `resolveRunRoot(...).root` AND NOT `AURORA_DIR`. That is the whole
- * of O72: 103 instruments composed this path out of the answer to "which
+ * of O72: 114 instruments composed this path out of the answer to "which
  * checkout am I", which is a different question and a different directory the
  * moment the caller lives in a linked worktree — a worktree has no
  * `node_modules/`, so the composed path named a file that is not there and the
