@@ -389,7 +389,8 @@ describe('sibling-root: the names the contract ratified', () => {
     const out = run(
       'process.stdout.write([R.SUITE_ROOT_ENV, R.checkoutEnv("aeon"), R.checkoutEnv("s1disasm"), '
       + 'R.checkoutEnv("oracle"), R.checkoutEnv("empyrean"), R.checkoutEnvAliases("aeon").join(","), '
-      + 'R.checkoutEnvAliases("oracle").join(","), R.SUITE_ROOT_ENV_ALIASES.join(",")].join("\\n"));',
+      + 'R.checkoutEnvAliases("oracle").join(","), R.checkoutEnvAliases("s1disasm").join(","), '
+      + 'R.SUITE_ROOT_ENV_ALIASES.join(",")].join("\\n"));',
     );
     expect(out.stdout.split('\n')).toEqual([
       'EMPYREAN_SUITE_ROOT',
@@ -399,6 +400,7 @@ describe('sibling-root: the names the contract ratified', () => {
       'EMPYREAN_DIR',
       'AURORA_AEON_REPO,LIVE_AEON',
       'AURORA_ORACLE_REPO',
+      'AURORA_S1DISASM_REPO,S1_DIR',
       'AURORA_PEER_ROOT',
     ]);
   });

@@ -12,9 +12,8 @@
  * error and no line anyone reads. `test/support/fixture-tree.ts`'s
  * `referencePath()` derives the same path from this repo's own git common dir
  * and honours the suite's variables — `<NAME>_DIR` then `EMPYREAN_SUITE_ROOT`,
- * with `AURORA_<NAME>_REPO` / `AURORA_PEER_ROOT` as transitional aliases — so the
- * identical row
- * runs on a machine that keeps its peers somewhere else.
+ * with `AURORA_<NAME>_REPO` / `AURORA_PEER_ROOT` as transitional aliases — so
+ * the identical row runs on a machine that keeps its peers somewhere else.
  *
  * Measured before and after (docs/reviews/2026-08-30-s1disasm-test-coupling.md):
  * with `AURORA_S1DISASM_REPO` pointed at an absent directory, an fs-level trace
@@ -105,6 +104,7 @@
  *   2  could not measure
  */
 
+import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -318,6 +318,47 @@ if (files.length === 0) {
   die(`no ${EXTS.join('/')} files under ${ROOTS.join(', ')}. Nothing was examined.`);
 }
 
+/**
+ * Drop the files git IGNORES — and only those.
+ *
+ * `scratchpad/` is where the harnesses write, and some of them materialise a
+ * whole vendored copy of a peer repo (`scratchpad/fixtures/aeon-bganim-coherent/`,
+ * .gitignore line 15) whose own scripts naturally carry that peer's paths.
+ * Judging generated output is not this gate's question: it polices what THIS
+ * repo ships. Running one such harness took the count from 1,163 files to
+ * 11,688 and the violations from 252 to 5,200, none of them a line anybody here
+ * wrote — a gate whose colour depends on whether a harness has been run since
+ * the last clean is a gate people learn to ignore.
+ *
+ * UNTRACKED-BUT-NOT-IGNORED FILES ARE STILL SCANNED, deliberately. A brand-new
+ * instrument is exactly what this exists to catch, and it is untracked at the
+ * moment its author runs `npm test`. Filtering on "tracked" instead of
+ * "ignored" would open that hole in the ordinary write-test-commit path.
+ */
+let ignored = 0;
+try {
+  const listed = execFileSync('git', ['check-ignore', '--stdin'], {
+    cwd: ROOT,
+    input: files.join('\n'),
+    encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'ignore'],
+    // One line per ignored path. A harness that has materialised a vendored
+    // peer copy pushes this well past node's 1 MB default, and the failure is
+    // ENOBUFS — which this file turns into COULD NOT MEASURE rather than a
+    // pass, but there is no reason to hit it.
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  const drop = new Set(listed.split('\n').filter(Boolean).map((p) => resolve(ROOT, p)));
+  ignored = drop.size;
+  for (let i = files.length - 1; i >= 0; i--) if (drop.has(files[i])) files.splice(i, 1);
+} catch (e) {
+  // Exit 1 means "nothing matched", which is the ordinary clean-tree answer.
+  if (e.status !== 1) die(`git check-ignore failed (${e.message}) — cannot tell generated output from source, so this run judges an unknown set of files`);
+}
+if (files.length === 0) {
+  die(`every ${EXTS.join('/')} file under ${ROOTS.join(', ')} is git-ignored. Nothing was examined.`);
+}
+
 const violations = [];
 for (const f of files.sort()) {
   for (const hit of scan(readFileSync(f, 'utf8'), SIBLING, dialect(f))) {
@@ -330,7 +371,8 @@ for (const f of files.sort()) {
 // run that consulted an override from one that derived its own answer.
 console.log(
   `${PREFIX}: scanned ${files.length} ${EXTS.join('/')} file(s) under ${ROOTS.join(', ')} ` +
-  `for literals naming ${SIBLING} (canary OK, both dialects; nothing excluded).\n` +
+  `for literals naming ${SIBLING} (canary OK, both dialects; ` +
+  `${ignored} git-ignored file(s) excluded, nothing else).\n` +
   `${PREFIX}: sibling root ${SIBLING} — ${SIBLING_SOURCE}`,
 );
 

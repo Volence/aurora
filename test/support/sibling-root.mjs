@@ -142,11 +142,13 @@ export function checkoutEnv(name) {
  *
  * `LIVE_AEON` is here because it is what the scratchpad instruments read
  * today; the contract lists it among the aeon spellings "to retire at their
- * owners' pace".
+ * owners' pace". `S1_DIR` is aurora's own older spelling for `S1DISASM_DIR`,
+ * accepted so migrating the instruments that read it drops no override.
  */
 export function checkoutEnvAliases(name) {
   const upper = name.toUpperCase().replace(/[^A-Z0-9]+/g, '_');
-  return name === 'aeon' ? [`AURORA_${upper}_REPO`, 'LIVE_AEON'] : [`AURORA_${upper}_REPO`];
+  const extra = { aeon: ['LIVE_AEON'], s1disasm: ['S1_DIR'] }[name] ?? [];
+  return [`AURORA_${upper}_REPO`, ...extra];
 }
 
 /** Announced at most once per process per variable — a nag, not a log. */
