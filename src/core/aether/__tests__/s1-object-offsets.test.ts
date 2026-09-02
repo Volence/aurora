@@ -81,6 +81,9 @@ describe('parseS1ObjectOffsets', () => {
  * `s1disasm/`. That found the tree on this machine, so it was honest about
  * absence — but it was the one route into the disassembly that
  * `AURORA_S1DISASM_REPO` / `AURORA_PEER_ROOT` could not redirect, and it was
+ * (those two spellings are the ones that were current when this was measured;
+ * the names today are `S1DISASM_DIR` / `EMPYREAN_SUITE_ROOT`, and the old ones
+ * are accepted as transitional aliases — empyrean `contract/SUITE_PATHS.md`)
  * measured to be exactly that on 2026-08-30: with the override pointed at an
  * absent directory, an fs-level trace caught this file still opening the REAL
  * `_Constants.asm` (one of only two such leaks in the suite; see

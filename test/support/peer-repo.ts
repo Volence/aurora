@@ -20,8 +20,10 @@
  *
  * NO ABSOLUTE PEER PATH IS WRITTEN DOWN HERE either: the sibling root is derived
  * from this repo's own git common dir, so it is correct from a plain clone and
- * from a linked worktree alike, and `AURORA_PEER_ROOT` / `AURORA_<NAME>_REPO`
- * override it.
+ * from a linked worktree alike, and the suite's variables override it:
+ * `<NAME>_DIR` (`AEON_DIR`) first, then `EMPYREAN_SUITE_ROOT`, with
+ * `AURORA_<NAME>_REPO` / `AURORA_PEER_ROOT` accepted as transitional aliases
+ * (empyrean `contract/SUITE_PATHS.md` @ 82982b7f).
  */
 
 import { execFileSync } from 'node:child_process';
