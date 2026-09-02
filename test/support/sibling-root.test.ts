@@ -355,103 +355,118 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
       }).trim();
       const viaCommon = dirname(dirname(common));
 
-      // ANTI-VACUOUS (1/2), and the whole reason this row is worth its cost. If
-      // the worktree were not actually LINKED, the two commands would agree, the
-      // "wrong" branch would never be exercised, and the row would go green
-      // having re-measured the main-checkout case. So prove they disagree HERE,
-      // in the environment this row built, before believing anything it says.
-      expect(
-        dirname(toplevel),
-        `the temporary worktree at ${wt.dir} is not behaving as a LINKED worktree: `
-        + `dirname(--show-toplevel) = ${dirname(toplevel)} and dirname(dirname(--git-common-dir)) `
-        + `= ${viaCommon} AGREE, so this row would measure the main-checkout case and prove `
-        + 'nothing about step 3',
-      ).not.toBe(viaCommon);
-
-      // ANTI-VACUOUS (2/2) — "RUNS FROM A LINKED WORKTREE IS NECESSARY, NOT
-      // SUFFICIENT" (sigil's refinement to the same contract bullet, 2026-09-02,
-      // found on its shell-side bed). A linked worktree that happens to sit
-      // BESIDE the suite root lets the WRONG method land on the RIGHT path by
-      // accident — `--show-toplevel` + `../<name>` resolves the sibling anyway —
-      // so the bed passes while proving nothing. The contract's two acceptable
-      // beds are: nest the worktree inside the checkout, or put it somewhere the
-      // sibling walk from `--show-toplevel` DEMONSTRABLY finds nothing.
-      //
-      // This bed takes the second arm, and asserts it rather than relying on it:
-      // the scratch directory is a fresh `mkdtemp` holding only `wt`, so the peer
-      // checkout that DOES exist under the right root is absent under the wrong
-      // one. The name is derived from `--git-common-dir`, never typed, so this
-      // cannot pass by naming a string that is right on one machine.
-      //
-      // (Nesting was considered and declined for this repo: a worktree under
-      // `<repo>/` would be swept by the test globs and by
-      // `scripts/check-peer-path-literals.mjs`, which walks this tree. The temp
-      // dir is the stronger arm here anyway — `/tmp/<mkdtemp>` contains nothing
-      // at all — but "stronger incidentally" is not the bar, which is why it is
-      // asserted below.)
       const mainCheckout = dirname(common);
       const wrongRoot = dirname(toplevel);
-      expect(
-        existsSync(resolve(mainCheckout)),
-        `the main checkout ${mainCheckout} named by --git-common-dir should exist`,
-      ).toBe(true);
-      expect(
-        existsSync(resolve(wrongRoot, basename(mainCheckout))),
-        `this bed does not test anything: the WRONG derivation (dirname(--show-toplevel) = `
-        + `${wrongRoot}) would still find ${basename(mainCheckout)} beside it, so a resolver using `
-        + `--show-toplevel could land on the right peer by accident. Put the worktree somewhere the `
-        + 'sibling walk finds nothing, or nest it inside the checkout '
-        + '(empyrean contract/SUITE_PATHS.md, sigil\'s refinement)',
-      ).toBe(false);
+
+      // THE PAIR THIS ROW EXISTS TO MEASURE, as two absolute paths rather than a
+      // conclusion that they differ. Everything below is about these two lines.
+      const pair = `    WRONG derivation  dirname(--show-toplevel)           = ${wrongRoot}\n`
+        + `    RIGHT derivation  dirname(dirname(--git-common-dir)) = ${viaCommon}`;
+
+      /**
+       * NOT AN ASSERTION FAILURE — A REFUSAL, and the distinction is the point.
+       *
+       * A plain failing `expect` here reads as "the resolver is broken" and sends
+       * the next reader to debug `sibling-root.mjs`. What these checks actually
+       * detect is that THE BED cannot tell the two derivations apart, which sends
+       * them somewhere else entirely: fix the bed. And a bed that silently stops
+       * discriminating — the worktree lands somewhere new, a git version changes
+       * a path shape, the temp root moves under it — would otherwise degrade to
+       * exactly the vacuous green O68 exists to close, arriving through O68's own
+       * fix. So it fails LOUDLY, named, rather than skipping or quietly passing.
+       * (empyrean contract/SUITE_PATHS.md @ f17940b, sigil's stronger form.)
+       */
+      const unmeasurable = (why: string): never => {
+        throw new Error(
+          `UNMEASURABLE — this bed cannot discriminate, so it proves NOTHING about step 3. `
+          + `FIX THE BED, NOT THE RESOLVER.\n${pair}\n    reason: ${why}`,
+        );
+      };
+
+      // (1) The bed must be a LINKED worktree. If it is not, the two derivations
+      // agree, the "wrong" branch is never exercised, and the row would go green
+      // having re-measured the main-checkout case.
+      if (wrongRoot === viaCommon) {
+        unmeasurable(
+          `the worktree at ${wt.dir} is not behaving as a linked worktree — the two derivations `
+          + 'AGREE here, which is the main-checkout case wearing a worktree\'s name',
+        );
+      }
+
+      // (2) "RUNS FROM A LINKED WORKTREE IS NECESSARY, NOT SUFFICIENT" (sigil,
+      // from its shell-side bed). A linked worktree sitting BESIDE the suite root
+      // lets `--show-toplevel` + `../<name>` land on the right peer by ACCIDENT,
+      // so the bed passes while proving nothing. The contract's two arms: nest
+      // the worktree inside the checkout, or put it where the sibling walk from
+      // `--show-toplevel` demonstrably finds nothing.
+      //
+      // THIS BED TAKES THE SECOND ARM AND PROVES IT rather than enjoying it by
+      // luck of the temp path: the scratch dir is a fresh `mkdtemp` holding only
+      // `wt`, so the peer checkout that DOES exist under the right root is absent
+      // under the wrong one. The name comes from `--git-common-dir`, never typed.
+      //
+      // (Nesting was considered and declined here: a worktree under `<repo>/`
+      // gets swept by the test globs and by `scripts/check-peer-path-literals.mjs`,
+      // which walks this tree.)
+      if (!existsSync(mainCheckout)) {
+        unmeasurable(`the main checkout ${mainCheckout} named by --git-common-dir does not exist`);
+      }
+      if (existsSync(resolve(wrongRoot, basename(mainCheckout)))) {
+        unmeasurable(
+          `the WRONG derivation would still find ${basename(mainCheckout)} beside it, at `
+          + `${resolve(wrongRoot, basename(mainCheckout))} — so a resolver using --show-toplevel `
+          + 'could land on the right peer by accident and this row could not tell',
+        );
+      }
 
       // THE WORKTREE'S OWN COPY of the resolver, not the main copy under a
       // different cwd: `sibling-root.mjs` anchors `AURORA_ROOT` to its own module
-      // file (`import.meta.url`) and passes THAT as git's cwd, so merely chdir-ing
-      // into the worktree would measure the main checkout again, green and
-      // meaningless. Proven as its own row below.
+      // file (`import.meta.url`) and passes THAT to git as `cwd`, so a bed that
+      // merely chdir-ed into the worktree is PROVABLY INERT — git would run in
+      // the main checkout and the row would pass under a worktree-shaped name
+      // with nothing in the output to be suspicious of. Proven as its own row
+      // below; `derive()` spawns a fresh process against the subject it is given.
       const [derived, source] = derive(wt.subject);
 
-      // ANTI-VACUOUS (3/3) — PROVE WE WERE ACTUALLY STANDING IN IT. The two
-      // assertions above prove the bed is a place where the wrong method is
-      // wrong; this one proves the resolver ran THERE. `siblingRootSource()`
-      // embeds the cwd it handed git, so the announce line is the receipt:
-      // `step 3: git rev-parse --git-common-dir from <AURORA_ROOT> → <common>`.
-      // If a future edit "simplified" this row to spawn the MAIN copy with cwd
-      // set to the worktree, the row would still go green — the subject pins
-      // `cwd: AURORA_ROOT` and ignores the process cwd entirely (proven as its
-      // own row below) — and would be measuring the main-checkout case wearing a
-      // worktree's name, which is the exact defect O68 exists to close.
+      // (3) PROVE WE WERE ACTUALLY STANDING IN IT. `siblingRootSource()` is a
+      // stdout return value, recomputed per call (nothing in the subject memoises
+      // the RESOLUTION — the only `Set` in it memoises the alias nag), and it
+      // embeds the cwd git was handed:
+      //   `step 3: git rev-parse --git-common-dir from <AURORA_ROOT> → <common>`
+      // A bed whose announce line names the main checkout has measured nothing,
+      // so this is a bed refusal too, not a resolver assertion.
       const announce = /^step 3: git rev-parse --git-common-dir from (.*) → (.*)$/.exec(source ?? '');
-      expect(
-        announce,
-        `the resolver's announce line should name the cwd it used; got ${JSON.stringify(source)}`,
-      ).not.toBeNull();
-      expect(
-        announce![1],
-        `the resolver announced \`${source}\` — it ran from ${announce![1]}, not from the linked `
-        + `worktree ${wt.dir} this row built. The bed must EXECUTE THE WORKTREE'S OWN COPY of `
-        + 'sibling-root.mjs; the subject anchors AURORA_ROOT to its own module file and pins that '
-        + 'as git\'s cwd, so merely chdir-ing into the worktree measures the main checkout again '
-        + '(empyrean contract/SUITE_PATHS.md, third paragraph of the step-3 bullet)',
-      ).toBe(wt.dir);
-      expect(announce![1]).not.toBe(mainCheckout);
-      expect(announce![2]).toBe(common);
+      if (announce === null) {
+        unmeasurable(`the resolver did not announce a step-3 derivation; it said ${JSON.stringify(source)}`);
+      }
+      if (announce![1] !== wt.dir) {
+        unmeasurable(
+          `the resolver announced \`${source}\` — it derived from ${announce![1]}, not from the `
+          + `linked worktree ${wt.dir} this row built, so the measurement is of that tree instead. `
+          + 'The bed must EXECUTE THE WORKTREE\'S OWN COPY of sibling-root.mjs',
+        );
+      }
+      if (announce![2] !== common) {
+        unmeasurable(`the resolver saw --git-common-dir = ${announce![2]}, this row saw ${common}`);
+      }
 
-      // The contract's "say which step answered", in the run's own output.
+      // The contract's "say which step answered", in the run's own output — the
+      // measured PAIR, printed on every green run and not only on failure.
       // eslint-disable-next-line no-console
       console.log(
-        `step 3 measured from a LINKED worktree ${wt.dir}\n`
-        + `  --show-toplevel   → ${toplevel}  (dirname → ${dirname(toplevel)}, the WRONG answer)\n`
-        + `  --git-common-dir  → ${common}  (dirname² → ${viaCommon}, the right one)\n`
-        + `  subject answered  → ${derived}\n  ${source}`,
+        `step 3 measured from a LINKED worktree, built by this row at ${wt.dir}\n${pair}\n`
+        + `    resolver answered → ${derived}\n    ${source}`,
       );
 
+      // ONLY NOW is a failure the RESOLVER's fault: the bed has proved it is
+      // standing somewhere the wrong method is wrong, and that it measured there.
       expect(
         derived,
-        `the resolver, run from the linked worktree ${wt.dir}, should answer the MAIN checkout's `
-        + `parent ${viaCommon} (via --git-common-dir), not ${dirname(toplevel)} (via --show-toplevel)`,
+        `the resolver, run from the linked worktree ${wt.dir}, answered ${derived}. It should be `
+        + `the MAIN checkout's parent (via --git-common-dir), not the worktree's (via `
+        + `--show-toplevel):\n${pair}`,
       ).toBe(viaCommon);
-      expect(derived).not.toBe(dirname(toplevel));
+      expect(derived).not.toBe(wrongRoot);
     } finally {
       removeLinkedWorktree(repo, wt);
     }
@@ -474,22 +489,29 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
    */
   it('pins git\'s cwd to its OWN module location, so the process cwd cannot steer it', () => {
     const elsewhere = mkdtempSync(resolve(tmpdir(), 'aurora-step3-cwd-'));
-    const body = 'process.stdout.write(String(R.siblingRoot()) + "\\n" + R.siblingRootSource() + "\\n" + R.AURORA_ROOT);';
-    const home = run(body).stdout.split('\n');
-    const away = run(body, {}, SUBJECT, elsewhere).stdout.split('\n');
+    try {
+      const body = 'process.stdout.write(String(R.siblingRoot()) + "\\n" + R.siblingRootSource() + "\\n" + R.AURORA_ROOT);';
+      const home = run(body).stdout.split('\n');
+      const away = run(body, {}, SUBJECT, elsewhere).stdout.split('\n');
 
-    expect(away[2], 'AURORA_ROOT is the module\'s own location and must not move with the cwd').toBe(home[2]);
-    expect(away[2]).toBe(resolve(__dirname, '../..'));
-    expect(
-      away[1],
-      `run with cwd=${elsewhere} (outside any repository) the resolver announced \`${away[1]}\`; `
-      + `it should be identical to the announce from its own directory, \`${home[1]}\`, because `
-      + 'step 3 passes AURORA_ROOT as git\'s cwd rather than inheriting the process cwd',
-    ).toBe(home[1]);
-    expect(away[1]).toContain(`from ${resolve(__dirname, '../..')}`);
-    expect(away[0]).toBe(home[0]);
-    expect(away[0]).not.toBe('null');
-    rmSync(elsewhere, { recursive: true, force: true });
+      expect(away[2], 'AURORA_ROOT is the module\'s own location and must not move with the cwd').toBe(home[2]);
+      expect(away[2]).toBe(resolve(__dirname, '../..'));
+      expect(
+        away[1],
+        `run with cwd=${elsewhere} (outside any repository) the resolver announced \`${away[1]}\`; `
+        + `it should be identical to the announce from its own directory, \`${home[1]}\`, because `
+        + 'step 3 passes AURORA_ROOT as git\'s cwd rather than inheriting the process cwd',
+      ).toBe(home[1]);
+      expect(away[1]).toContain(`from ${resolve(__dirname, '../..')}`);
+      expect(away[0]).toBe(home[0]);
+      expect(away[0]).not.toBe('null');
+    } finally {
+      // In a `finally` for the same reason the worktree above is: this row is
+      // planted red on purpose, and the FAILING run is the one that leaks. Found
+      // exactly that way — the plant left `/tmp/aurora-step3-cwd-*` behind
+      // because this `rmSync` used to sit after the assertions.
+      rmSync(elsewhere, { recursive: true, force: true });
+    }
   });
 });
 
