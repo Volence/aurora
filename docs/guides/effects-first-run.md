@@ -167,10 +167,12 @@ named at the top of the panel**:
 - **the raster preset** → the `Section <n>` dropdown at the bottom of
   `RASTER BAND PRESETS`.
 
-The Effects tab has a **section picker** at the very top of the panel. It names
-the section you are editing, prints what that section is bound to (`scene … ·
-raster …`), lets you change which section without leaving the tab, and says in
-one chip whether that section can carry a raster band at all. It is the same
+The Effects tab has a **section strip** pinned to the top of the panel. It stays
+put while the rest of the column scrolls, so it is on screen when you reach
+either binding — including the raster one, which is about 1,600px further down.
+It names the section you are editing, prints what that section is bound to
+(`scene … · raster …`), lets you change which section without leaving the tab,
+and states the two raster-wiring conditions as two rows (below). It is the same
 number the Layout tab's `SECTIONS` grid sets — one section, two tabs.
 
 ### Which section can carry a raster band?
@@ -193,17 +195,25 @@ sections that share and what would happen.
 There is a second, smaller step behind that one, and Aurora keeps the two apart
 because conflating them is how the wrong answer got published twice in one day:
 
-| fact | what it means | today, in `ojz act1` |
+| condition | what it means | today, in `ojz act1` |
 |---|---|---|
-| **own preset** | no other section binds this section's preset record | 0, 1, 2, 3, 4, 5 |
-| **wired** | a preset also *threads the chooser* on this index — one line in aeon | 5 |
+| **1 — own preset** | no other section binds this section's preset record | 0, 1, 2, 3, 4, 5 |
+| **2 — threaded** | some `preset()` also *threads the chooser* on this index — one line in aeon | 5 |
 
-A binding on a section that owns its preset but is not wired writes the key, and
-aeon's canonical build refuses it by name (*"no preset threads
+The strip prints these as **two rows**, each with its own `✓` / `✗` / `?`, because
+which one you fail decides what you do next: condition 1 needs a programmer to
+**split a preset record**; condition 2 needs **one line of aeon**. A single
+verdict cannot tell you which.
+
+A binding on a section that owns its preset but is not threaded writes the key,
+and aeon's canonical build refuses it by name (*"no preset threads
 `ojz_act1_sec_raster(sec: N)`"*) until that line is added.
 
-**Aurora derives both sets from aeon's own files on every load** — the act
-descriptor and the effects library — and prints them in the picker's own chip.
+**Aurora derives both facts from aeon's own files on every load** — the act
+descriptor and the effects library — and prints both sets act-wide on the strip's
+last line. The two are read from different files and degrade independently: if
+only one file is unreadable, that condition reads `?  could not read <file>` and
+the other still answers.
 Nothing here is a list somebody wrote down, so the answer changes on its own when
 aeon changes the level. It does **not** stop you binding: whether a section is
 wired is aeon's fact to change, and a lock built on a snapshot would be wrong the
@@ -293,7 +303,7 @@ anything on this list's top half.
 | make colours shimmer | `PRESET — <id> — CYCLES, VARIANTS` → `cycles: authored script` |
 | delete a preset a section binds | unbind that section first — Aurora refuses the delete and says which |
 | animate background tiles | `NEW TILE ANIMATION` |
-| change which section I am editing | the picker at the top of the Effects panel |
+| change which section I am editing | the section strip pinned to the top of the Effects panel |
 | use a scene on a section | pick the section, then `SECTION ASSIGNMENT` |
 | save | Ctrl+S |
 | open this page | `? Guide` on the Effects toolbar |

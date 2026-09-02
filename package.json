@@ -65,6 +65,7 @@
     "harness:effects-guide": "node scratchpad/effects-guide-harness.mjs",
     "harness:effects-refusal": "node scratchpad/effects-refusal-harness.mjs",
     "harness:effects-section-picker": "node scratchpad/effects-section-picker-harness.mjs",
+    "harness:effects-section-strip": "node scratchpad/effects-section-strip-harness.mjs",
     "harness:band-preset": "node scratchpad/band-preset-harness.mjs",
     "harness:section-raster-select": "node scratchpad/section-raster-select-harness.mjs",
     "harness:variant-cycle": "node scratchpad/variant-cycle-harness.mjs",

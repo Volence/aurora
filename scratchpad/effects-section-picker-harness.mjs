@@ -95,7 +95,8 @@ function independentDerivation() {
   const call = /raster\s*:\s*ojz_act1_sec_raster\s*\(\s*sec\s*:\s*(\d+)/g;
   let m;
   while ((m = call.exec(lib)) !== null) threaded.push(Number(m[1]));
-  return { bind, own, wired: own.filter((s) => threaded.includes(s)).sort((a, b) => a - b) };
+  threaded.sort((a, b) => a - b);
+  return { bind, own, threaded, wired: own.filter((s) => threaded.includes(s)).sort((a, b) => a - b) };
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -189,16 +190,31 @@ const SET_SELECT = (selector, value) => String.raw`
   return 'ok';
 })()`;
 
+/**
+ * THE PICKER AND ITS ADVISORY, AS ONE SUBJECT.
+ *
+ * EW-SHAPE-STRIP made the picker `position: sticky` so it survives a scroll, and
+ * that forced the long advisory paragraph OUT of the sticky box into a sibling
+ * directly below it (a 200px permanent header on a 742px column is its own
+ * defect; the docblock in SectionPicker.tsx carries the measurement). The rows
+ * below are about the SENTENCE, not about which of the two boxes carries it, so
+ * they read the pair. Row [2a]'s `firstInColumn` still pins the strip itself.
+ */
+const PICKER_GROUP = String.raw`
+  [${PICKER}, document.querySelector('[data-effects-section-advisory]')].filter(Boolean)`;
+
 /** The painted leaf inside the picker carrying `needle`, or `{leaf:false}`. */
 const PICKER_LEAF = (needle) => String.raw`
 (() => {
-  const p = ${PICKER};
+  const g = ${PICKER_GROUP};
+  const p = g[0];
   if (!p) return { leaf: false, noPicker: true };
-  const leaves = [...p.querySelectorAll('div')]
+  const leaves = g.flatMap((box) => [...box.querySelectorAll('div')])
     .filter((d) => (d.innerText || '').includes(${JSON.stringify(needle)})
                 && ![...d.children].some((k) => (k.innerText || '').includes(${JSON.stringify(needle)})));
   const leaf = leaves[0] || null;
-  if (!leaf) return { leaf: false, pickerText: (p.innerText || '').replace(/\s+/g, ' ').slice(0, 220) };
+  if (!leaf) return { leaf: false,
+    pickerText: g.map((b) => (b.innerText || '')).join(' ').replace(/\s+/g, ' ').slice(0, 220) };
   leaf.scrollIntoView({ block: 'center' });
   const b = leaf.getBoundingClientRect();
   const hit = document.elementFromPoint(
@@ -221,7 +237,8 @@ async function main() {
   console.log(`    DISPLAY     : :${DISPLAY_NUM}`);
   console.log('    INDEPENDENT DERIVATION (this process, from aeon\'s own files):');
   console.log(`      bindings  : ${JSON.stringify(truth.bind)}`);
-  console.log(`      own preset: [${truth.own.join(',')}]   wired: [${truth.wired.join(',')}]`);
+  console.log(`      own preset: [${truth.own.join(',')}]   threaded: [${truth.threaded.join(',')}]`
+    + `   wired (both): [${truth.wired.join(',')}]`);
 
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
@@ -372,29 +389,39 @@ async function main() {
     await c.evalExpr(SET_SELECT(PICKER_SELECT, 5));
     await sleep(900);
     const wiredView = await c.json(String.raw`(() => {
-      const p = ${PICKER};
-      const t = (p.innerText || '').replace(/\s+/g, ' ');
-      return { text: t.trim(), quiet: !/share the preset record|nothing threads|could not read/.test(t) };
+      const g = ${PICKER_GROUP};
+      const t = g.map((b) => (b.innerText || '')).join(' ').replace(/\s+/g, ' ');
+      return { text: t.trim(), boxes: g.length,
+               quiet: !/share the preset record|nothing threads|could not read/.test(t) };
     })()`);
+    // ⚠ AND THE ADVISORY BOX MUST BE GONE, not merely silent: it renders only
+    // when there is something to say, so `boxes === 1` is the discriminating
+    // half — a union that always found two boxes would make `quiet` cheap.
     check('4c', 'the WIRED section is silent — the same finder that spoke twice above says nothing',
-      wiredView.quiet === true && /raster: wired/.test(wiredView.text)
+      wiredView.quiet === true && wiredView.boxes === 1
+      && /✓ own preset/.test(wiredView.text) && /✓ threaded/.test(wiredView.text)
       && truth.wired.includes(5),
       `${JSON.stringify(wiredView)}\n        independent parse: wired=[${truth.wired.join(',')}]`);
 
     // THE SETS THE PICKER PRINTS, AGAINST THE INDEPENDENT PARSE.
+    // ⚠ THE STRING MOVED WITH EW-SHAPE-STRIP, and the reason is the parcel's
+    // point: it used to print `wired`, which is the CONJUNCTION of the two
+    // conditions, and the strip states the two conditions apart. So the sets it
+    // prints are now the two independent ones — `own preset` and `threaded` —
+    // and `truth.threaded` (every `sec: N` in a chooser call) is a different
+    // derivation from `truth.wired` (own ∩ threaded), asserted separately below.
     const chipText = await c.json(String.raw`(() => {
-      const p = ${PICKER};
-      const el = [...p.querySelectorAll('span')].find((s) => /^act: /.test((s.innerText || '').trim()));
-      if (!el) return { found: false, all: [...p.querySelectorAll('span')].map((s) => s.innerText) };
+      const el = document.querySelector('[data-effects-act-sets]');
+      if (!el) return { found: false };
       return { found: true, text: (el.innerText || '').trim(),
                rects: el.getClientRects().length,
                visible: typeof el.checkVisibility === 'function' ? el.checkVisibility() : null };
     })()`);
-    check('4d', 'the picker PRINTS the derived sets, and they equal this process\'s own parse',
+    const expectSets = `act: own preset ${truth.own.join(',')} · threaded ${truth.threaded.join(',')}`;
+    check('4d', 'the strip PRINTS both derived sets, and they equal this process\'s own parse',
       chipText.found === true && chipText.rects > 0 && chipText.visible !== false
-      && chipText.text === `act: wired ${truth.wired.join(',')} · own preset ${truth.own.join(',')}`,
-      `app: ${JSON.stringify(chipText.text)}\n        independent: `
-      + `"act: wired ${truth.wired.join(',')} · own preset ${truth.own.join(',')}"`);
+      && chipText.text === expectSets,
+      `app: ${JSON.stringify(chipText.text)}\n        independent: ${JSON.stringify(expectSets)}`);
 
     // ---- 5. THE PROSE CUT. -----------------------------------------------
     const limit = await c.json(String.raw`(() => {
