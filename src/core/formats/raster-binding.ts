@@ -556,6 +556,34 @@
  * — against the ARTIFACT, read at a committed revision, never against the
  * promise of one, and never by caching the set into this tree as a literal.
  *
+ * ⚠ REVISITED AND NARROWED 2026-09-02 (overseer ruling, EFFECTS-W1). `src/core/
+ * formats/section-wiring.ts` NOW PARSES aeon's files, per act, on every load.
+ * That contradicts the sentence above and is deliberate; read this before
+ * "restoring" the rule or citing it against that module.
+ * WHAT STANDS, unchanged and load-bearing: **no gate.** The derived sets ADVISE.
+ * An unreadable file yields "could not read", never "not allowed" — the clause
+ * below is the hardest one here and it is honoured.
+ * WHAT CHANGED, and why the three reasons above are met rather than waived: the
+ * objection was to a SNAPSHOT CACHED AS A LITERAL ("a copy of a snapshot wearing
+ * a check's clothes"). A per-act, per-load derivation is not that — it cannot
+ * describe a layout that has moved, which is the exact property the generated
+ * output was wanted for. The owner-visible cost of holding the letter was real:
+ * the picker offered every section while the build refused all but one, and that
+ * cost him a red build he had to revert.
+ * ⚠ THE FACT THAT MADE THIS WORTH THE DEVIATION, and it is why ONE derived set
+ * would have been wrong: **being wired is TWO conditions, not one.**
+ *   (1) NECESSARY — the section binds a preset no other section binds. Shared
+ *       presets (6/7/8 -> OJZ_Preset_Plain) cannot take a per-section chooser,
+ *       since every sharer would get the same band. Today: 0,1,2,3,4,5.
+ *   (2) SUFFICIENT — a `preset()` actually THREADS `ojz_act1_sec_raster(sec: N)`.
+ *       Today: **5 alone** (`ojz_effects.emp:1114`).
+ * Binding section 0 satisfies (1), fails (2), and dies in aeon's canonical build.
+ * Both were published as "the" answer on 2026-09-02 — aurora's own prose said
+ * "only 5" (right about (2)), aeon said "1-5" and then "0-5" (right about (1)) —
+ * and BOTH were half-right, including this overseer, who relayed (1) as the
+ * practical answer and was wrong. `section-wiring.ts` keeps them apart for that
+ * reason; collapsing them back into one set re-creates the error.
+ *
  * ⚠ AND THE PART THAT IS EASY TO GET BACKWARDS. If such a statement exists but
  * is ABSENT OR UNREADABLE at the moment we look, the control stays **ENABLED**
  * with the disclosure — never disabled. A control greyed out because we could
