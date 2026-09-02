@@ -23,9 +23,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, cpSync, rmSync, existsSync, symlinkSync } from 'node:fs';
+import {
+  mkdtempSync, mkdirSync, writeFileSync, cpSync, rmSync, existsSync, symlinkSync, realpathSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, resolve } from 'node:path';
 
 const SUBJECT = resolve(__dirname, 'sibling-root.mjs');
 
@@ -511,6 +513,282 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
       // exactly that way — the plant left `/tmp/aurora-step3-cwd-*` behind
       // because this `rmSync` used to sit after the assertions.
       rmSync(elsewhere, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * ─────────── THE MAIN-CHECKOUT TWIN, AND WHY IT IS A SEPARATE BED ───────────
+   *
+   * The rows above measure step 3 from a LINKED WORKTREE, because that is the
+   * only place `--git-common-dir` and `--show-toplevel` disagree. Those rows are
+   * necessary and they are also a DISJOINT POPULATION from where this suite
+   * normally runs: `git rev-parse --git-common-dir` has THREE output shapes, not
+   * two, and the worktree bed exercises exactly one of them.
+   *
+   *   from a linked worktree            → an ABSOLUTE path, whether asked or not
+   *   from a main checkout's ROOT       → `.git`
+   *   from a main checkout SUBDIRECTORY → `../../.git` (relative, with `..`)
+   *
+   * Measured here on git 2.55.0, by the rows below, on a repository they build.
+   *
+   * Only the first shape is absolute for free. A resolver that consumes the other
+   * two as if they were absolute is WRONG IN THE MAIN CHECKOUT ONLY — and green
+   * on every branch sweep, because agents run in worktrees. A sibling lane in
+   * this suite shipped exactly that observable and its merged tree went red:
+   * *(the mechanism there was resolving git's relative answer against the process
+   * cwd rather than against the directory git ran in; the mutation this file is
+   * planted against — dropping `--path-format=absolute` — is a DIFFERENT
+   * mechanism that produces the same class of observable.)* Empyrean
+   * `contract/SUITE_PATHS.md` (2026-09-02) ruled the shape for every lane: *"the
+   * row exercises the constructed bed for the disagreement AND the real main
+   * checkout for the shape production actually uses … a lane whose step-3 row is
+   * a bed and nothing else has an untested production path invisible in a green
+   * run."*
+   *
+   * WHY THE BED IS A SCRATCH `git init` AND NOT THIS REPOSITORY. "The real main
+   * checkout" is the shape to cover; using the real tree as the BED is not the
+   * way to cover it, for two independent reasons.
+   *
+   *   1. It cannot be reached from here. These rows run in a linked worktree
+   *      about half the time (every agent session), where the real tree is not
+   *      the configuration under test at all.
+   *   2. Fatally, its expected suite root is THE ANSWER A RESOLVER THAT IGNORED
+   *      THE BED ENTIRELY WOULD GIVE. A row whose expectation is satisfied by
+   *      measuring something else is the inert bed this file has been burned by
+   *      twice, and it would pass while proving nothing.
+   *
+   * So the bed is a repository this row creates, at a path no other run has, and
+   * the subject is COPIED INTO IT — because `sibling-root.mjs` anchors
+   * `AURORA_DIR` to its own module file and hands THAT to git as `cwd`, so the
+   * subject's own location IS the bed and a bed that merely chdir-ed would be
+   * provably inert (proven as its own row, above). The expected suite root is
+   * therefore a `mkdtemp` path that ONLY this bed can produce, and the row
+   * asserts it is not the answer the real tree gives — so "the resolver ignored
+   * the bed" is RED here, not green.
+   */
+  interface MainCheckoutBed {
+    /** The `mkdtemp` root, removed in a `finally`. Holds everything below. */
+    scratch: string;
+    /** `<scratch>/suite` — the suite root the derivation must arrive at. */
+    suite: string;
+    /** `<suite>/aurora` — the main checkout, a real `git init`. */
+    repo: string;
+    /** The directory the subject copy makes `AURORA_DIR`, i.e. git's cwd. */
+    anchor: string;
+    /** The copied resolver, at `<anchor>/test/support/sibling-root.mjs`. */
+    subject: string;
+  }
+
+  /**
+   * A main checkout whose `.git` is a real one, with the subject `nest` levels
+   * below its root.
+   *
+   * `nest` is what selects the git output shape: `[]` puts the subject's anchor
+   * AT the repository root (`.git`), and two segments put it two levels down
+   * (`../../.git`) — the shape a resolver anchored in a package or crate
+   * subdirectory sees. No commit is made: `--git-common-dir` answers in an empty
+   * repository, and a commit would need a configured identity.
+   *
+   * `realpathSync` on the `mkdtemp` result because the subject reports the path
+   * Node resolved its module through; on a machine where the temp root is a
+   * symlink an unresolved path would make the announce comparison below refuse a
+   * bed that is actually fine.
+   */
+  function makeMainCheckout(nest: string[]): MainCheckoutBed {
+    const scratch = realpathSync(mkdtempSync(resolve(tmpdir(), 'aurora-step3-main-')));
+    const suite = resolve(scratch, 'suite');
+    const repo = resolve(suite, 'aurora');
+    const anchor = resolve(repo, ...nest);
+    const subject = resolve(anchor, 'test/support/sibling-root.mjs');
+    mkdirSync(dirname(subject), { recursive: true });
+    execFileSync('git', ['init', '-q', repo], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    cpSync(SUBJECT, subject);
+    return { scratch, suite, repo, anchor, subject };
+  }
+
+  /**
+   * The body of both rows below: prove the bed discriminates, prove the resolver
+   * stood in it, then — and only then — assert the derived suite root.
+   *
+   * `expectedRaw` is the git output shape this bed is supposed to produce. It is
+   * checked rather than assumed: a bed that stopped producing it has stopped
+   * being the configuration the row names, and that is a bed failure, not a
+   * resolver failure. The DERIVED EXPECTATION is never `expectedRaw` — it is
+   * `dirname(dirname(<absolute --git-common-dir>))` read out of the bed.
+   */
+  function proveStep3FromMainCheckout(bed: MainCheckoutBed, expectedRaw: string, label: string): void {
+    const git = (args: string[]): string => execFileSync('git', args, {
+      cwd: bed.anchor, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+
+    // What git says when it is not asked for a format — the shape a resolver
+    // that dropped `--path-format=absolute` would be handed.
+    const raw = git(['rev-parse', '--git-common-dir']);
+    // …and when it is. This is the operand the subject's derivation runs on.
+    const common = git(['rev-parse', '--path-format=absolute', '--git-common-dir']);
+
+    // THE EXPECTATION, DERIVED FROM THE BED. `sibling-root.mjs` computes the
+    // suite root as `dirname(dirname(common))` — a purely LEXICAL operation on
+    // whatever string git returned, with no `resolve()` and no join against
+    // `AURORA_DIR` anywhere. So the same two `dirname`s over git's DEFAULT
+    // output is exactly what a flag-less resolver would answer, and both are
+    // computed here rather than typed.
+    const expected = dirname(dirname(common));
+    const withoutTheFlag = dirname(dirname(raw));
+
+    // What a resolver that never left the real tree would say — MEASURED by
+    // running the real subject from its real location, not typed. This is the
+    // control for "could this row pass with the resolver ignoring the bed?".
+    const ignoringTheBed = derive()[0];
+
+    const facts = `    bed anchor, which is git's cwd and the subject's AURORA_DIR = ${bed.anchor}\n`
+      + `    git rev-parse --git-common-dir                              = ${JSON.stringify(raw)}\n`
+      + `    …--path-format=absolute --git-common-dir                    = ${common}\n`
+      + `    RIGHT derivation dirname(dirname(absolute))                 = ${expected}\n`
+      + `    same derivation on git's DEFAULT output                     = ${JSON.stringify(withoutTheFlag)}\n`
+      + `    what the resolver answers from the REAL tree, ignoring this bed = ${ignoringTheBed}`;
+
+    /**
+     * NOT AN ASSERTION FAILURE — A REFUSAL, for the reason spelled out at the
+     * linked-worktree row above: these detect that THE BED cannot discriminate,
+     * which sends the reader to fix the bed rather than the resolver, and a bed
+     * that silently stopped discriminating would otherwise decay into exactly
+     * the vacuous green this whole file exists to close.
+     */
+    const unmeasurable = (why: string): never => {
+      throw new Error(
+        'UNMEASURABLE — this bed cannot discriminate, so it proves NOTHING about step 3 from '
+        + `${label}. FIX THE BED, NOT THE RESOLVER.\n${facts}\n    reason: ${why}`,
+      );
+    };
+
+    // (1) IT MUST BE A MAIN CHECKOUT. From a linked worktree git answers
+    // `--git-common-dir` absolutely whether or not it is asked to, so an
+    // absolute default answer here means this bed is the WORKTREE case wearing a
+    // main checkout's name — already covered above, and blind to precisely the
+    // defect these rows exist for.
+    if (isAbsolute(raw)) {
+      unmeasurable(
+        `git answers ${JSON.stringify(raw)} — already absolute — at ${bed.anchor}, so this bed is `
+        + 'not a main checkout and re-measures the linked-worktree case',
+      );
+    }
+
+    // (2) …AND THE ONE WHOSE SHAPE THIS ROW NAMES. The two rows differ only in
+    // where the subject sits, and that difference is the whole point of there
+    // being two, so a bed that produced the other shape would silently make them
+    // one row run twice.
+    if (raw !== expectedRaw) {
+      unmeasurable(
+        `${label} should make git answer ${JSON.stringify(expectedRaw)}; it answered `
+        + `${JSON.stringify(raw)}, so this bed is not the configuration this row names`,
+      );
+    }
+
+    // (3) THE FLAG MUST MATTER HERE. If both derivations agreed, the row would
+    // go green against a resolver that never asked git for an absolute answer,
+    // and would be blind to the whole failure class.
+    if (withoutTheFlag === expected) {
+      unmeasurable(
+        'the derivation gives the same answer with and without --path-format=absolute at this '
+        + 'bed, so a resolver that never asked for an absolute path would pass here',
+      );
+    }
+
+    // (4) THE EXPECTATION MUST BE UNREACHABLE WITHOUT THE BED. This is the
+    // question in its sharpest form: if the bed's suite root happened to be what
+    // the real tree derives, a resolver that ignored the bed entirely would
+    // satisfy the assertion below and the row would prove nothing.
+    if (expected === ignoringTheBed) {
+      unmeasurable(
+        `the suite root this bed implies (${expected}) is the same one the resolver derives from `
+        + 'the real tree, so a resolver that ignored this bed would pass the assertion below',
+      );
+    }
+
+    // (5) PROVE THE RESOLVER ACTUALLY STOOD HERE. The returned step-source —
+    // recomputed per call, on stdout, embedding the cwd git was handed — is the
+    // only artifact that distinguishes "measured in the bed" from "measured
+    // somewhere else and correct by accident".
+    const [derived, source] = derive(bed.subject);
+    const announce = /^step 3: git rev-parse --git-common-dir from (.*) → (.*)$/.exec(source ?? '');
+    if (announce === null) {
+      unmeasurable(`the resolver did not announce a step-3 derivation; it said ${JSON.stringify(source)}`);
+    }
+    if (announce![1] !== bed.anchor) {
+      unmeasurable(
+        `the resolver announced \`${source}\` — it derived from ${announce![1]}, not from the main `
+        + `checkout ${bed.anchor} this row built, so it measured that tree instead`,
+      );
+    }
+
+    // The contract's "say which step answered", in the run's own output, on
+    // every green run and not only on failure.
+    // eslint-disable-next-line no-console
+    console.log(
+      `step 3 measured from ${label}, built by this row at ${bed.repo}\n${facts}\n`
+      + `    resolver answered → ${derived}\n    ${source}`,
+    );
+
+    // ONLY NOW is a failure the RESOLVER's fault.
+    expect(
+      derived,
+      `the resolver, run from ${label} at ${bed.anchor}, answered ${derived}. It should be the `
+      + `directory holding that checkout, derived from --git-common-dir:\n${facts}`,
+    ).toBe(expected);
+    // The two named ways to be wrong, asserted rather than implied by the line
+    // above, so a failure says WHICH failure it is.
+    expect(
+      derived,
+      'this is the answer a resolver that consumed git\'s default (relative) output would give',
+    ).not.toBe(withoutTheFlag);
+    expect(
+      derived,
+      'this is the answer a resolver that ignored the bed and measured the real tree would give',
+    ).not.toBe(ignoringTheBed);
+  }
+
+  it('derives the suite root from a MAIN CHECKOUT ROOT, where git answers `.git`', (ctx) => {
+    let bed: MainCheckoutBed;
+    try {
+      bed = makeMainCheckout([]);
+    } catch (e) {
+      ctx.skip(
+        'SKIPPED, NOT PASSED: could not build a scratch main checkout to measure from, so the '
+        + 'configuration production actually runs in — a main-checkout root, where '
+        + '`git rev-parse --git-common-dir` answers the relative `.git` — was NOT measured by this '
+        + `run. \`git init\` failed: ${(e as Error).message}`,
+      );
+      return;
+    }
+    try {
+      proveStep3FromMainCheckout(bed, '.git', 'a main-checkout ROOT');
+    } finally {
+      rmSync(bed.scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('derives it from a MAIN-CHECKOUT SUBDIRECTORY, where git answers `../../.git`', (ctx) => {
+    // Two levels down: the shape a resolver anchored in a package or crate
+    // subdirectory is handed, and the one a lexical trim of git's answer walks
+    // up past. Aurora's own anchor is the checkout root, so this is not this
+    // repo's production shape — it is the shape the derivation must survive if
+    // `sibling-root.mjs` ever moves, and the shape that broke a sibling lane.
+    let bed: MainCheckoutBed;
+    try {
+      bed = makeMainCheckout(['packages', 'editor']);
+    } catch (e) {
+      ctx.skip(
+        'SKIPPED, NOT PASSED: could not build a scratch main checkout to measure from, so the '
+        + 'third git output shape — `../../.git`, relative WITH `..`, from a subdirectory of a '
+        + `main checkout — was NOT measured by this run. \`git init\` failed: ${(e as Error).message}`,
+      );
+      return;
+    }
+    try {
+      proveStep3FromMainCheckout(bed, '../../.git', 'a main-checkout SUBDIRECTORY two levels down');
+    } finally {
+      rmSync(bed.scratch, { recursive: true, force: true });
     }
   });
 });
