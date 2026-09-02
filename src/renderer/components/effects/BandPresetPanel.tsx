@@ -322,14 +322,17 @@ export default function BandPresetPanel(): React.ReactElement | null {
           out, the bands section's height does not move, and this one is shut
           until asked for.
 
-          THE DISCLOSURE IS THE FIRST THING IN THE BODY — the same containment
-          that puts LimitBlock first above: a CollapsibleSection renders no
-          children while shut, so nobody reaches a cycles select without the
-          "not consumed by the engine yet" sentence already on screen. And it
-          is a leaf that takes no props, so no `bound`/`section` guard can be
-          slipped in one level down. The sentence itself is derived from the
-          measured premise (core/formats/effects/preset-lag.ts) and renders
-          nothing when that premise is gone. */}
+          THE DISCLOSURE IS THE FIRST THING IN THE BODY, AND IT IS SILENT
+          TODAY. It said "not consumed by the engine yet" above these controls
+          until 2026-09-02, when aeon MERGED EFFECTS-W1 item 5 and its
+          generator began lowering both keys; the sentence is derived from the
+          measured premise (core/formats/effects/preset-lag.ts), that premise is
+          now empty, and the leaf renders nothing. It STAYS MOUNTED, first and
+          unconditional, because that is what makes re-arming it a one-line
+          edit in that file: a CollapsibleSection renders no children while
+          shut, so nobody would reach a cycles select without the sentence
+          again. And it is a leaf that takes no props, so no `bound`/`section`
+          guard can be slipped in one level down. */}
       {selected && (
         <CollapsibleSection
           id="aeon.effects.preset.channels"

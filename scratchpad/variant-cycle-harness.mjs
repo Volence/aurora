@@ -11,11 +11,19 @@
 // walks the leaf's element tree. Neither can make the claim this file is for:
 //
 //        IN THE RUNNING APP, AN AUTHOR OPENS A PRESET'S "cycles, variants"
-//        SECTION, READS "Not consumed by the engine yet." BEFORE ANY CONTROL,
-//        AUTHORS A CYCLE CHANNEL, AUTHORS A VARIANT SLOT, CLEARS THE NEXT SLOT
-//        WITH null, SWITCHES CYCLES OFF, PRESSES Ctrl+S — AND THE BYTES ON
-//        DISK SAY EXACTLY THAT, WHILE THE DOCUMENT AEON SHIPPED, OPENED AND
-//        NEVER TOUCHED, IS BYTE-IDENTICAL.
+//        SECTION, AUTHORS A CYCLE CHANNEL, AUTHORS A VARIANT SLOT, CLEARS THE
+//        NEXT SLOT WITH null, SWITCHES CYCLES OFF, PRESSES Ctrl+S — AND THE
+//        BYTES ON DISK SAY EXACTLY THAT, WHILE THE DOCUMENT AEON SHIPPED,
+//        OPENED AND NEVER TOUCHED, IS BYTE-IDENTICAL.
+//
+//        …and row [2f] checks what the panel SAYS above those controls. Until
+//        2026-09-02 that was "Not consumed by the engine yet.", required
+//        painted and first. aeon MERGED EFFECTS-W1 item 5, the premise in
+//        core/formats/effects/preset-lag.ts emptied, and [2f] now requires the
+//        OPPOSITE: no element on the open section still makes that claim. The
+//        row reads the premise from that file and asks whichever question it
+//        makes true, so re-filling the premise re-arms the original check with
+//        no edit here.
 //
 // ============================================================================
 // WHAT WOULD MAKE THIS GO GREEN WITHOUT THE PROPERTY HOLDING
@@ -39,11 +47,15 @@
 //     and the file rows grep the BYTES for `"cycles": null` and for the absence
 //     of the key in the untouched document.
 //
-//   • THE DISCLOSURE IS RENDERED SOMEWHERE. Row [2c] scopes to the smallest
-//     element carrying the lead sentence, requires it PAINTED (checkVisibility
-//     + a strict elementFromPoint), and requires it to PRECEDE the first
-//     control by document order. The date it carries is read from the file
-//     that owns it (core/formats/effects/preset-lag.ts), not retyped here.
+//   • THE DISCLOSURE IS RENDERED SOMEWHERE — or, since the retirement, IS NOT.
+//     Row [2f] scopes to the smallest element carrying the lead sentence. With
+//     the premise open it requires that element PAINTED (checkVisibility + a
+//     strict elementFromPoint) and PRECEDING the first control by document
+//     order; with the premise empty it requires no such element to exist at
+//     all, which is the only way a retired warning is proven gone rather than
+//     merely unlooked-for. The lead, the date AND the premise are all read from
+//     the file that owns them (core/formats/effects/preset-lag.ts), never
+//     retyped here — so this row cannot be told which answer it wants.
 //
 //   • A BOUND SLIPPED IN. Row [5b] types a `first` of 300 — a value no CRAM
 //     line count reaches — and requires the model to hold 300: the control
@@ -53,11 +65,12 @@
 // ONE session and printed together — `devicePixelRatio` on this machine has
 // been observed at both 1 and 1.35 hours apart.
 //
-// ⚠ NO EMULATOR, EVER. Nothing here runs a ROM, and nothing could show one
-// obeying these keys: aeon's generator refuses both by name at origin/master
-// (the disclosure's premise, measured by the drift test's last row). This
-// harness photographs the AUTHORING surface and the FILE — that is the whole of
-// what this parcel can claim.
+// ⚠ NO EMULATOR, EVER. Nothing here runs a ROM. aeon's generator now lowers
+// both keys (item 5, MERGED on aeon's master 2026-09-02 — merged, not
+// certified: sigil dd5eaad2 records chain 198 RED with no ROM byte moved), but
+// that changes nothing about what this file can claim. It photographs the
+// AUTHORING surface and the FILE, and a ROM obeying these keys is aeon's and
+// sigil's to show, never this harness's.
 //
 // CLEANUP IS BY PID, ALWAYS — `spawnGuarded` + `killTree`. No `pkill` on a
 // pattern: from a worktree that kills the owner's editor and spares this run's
@@ -127,12 +140,19 @@ const SHIPPED = `${AEONDIR}/games/sonic4/data/editor/effects/presets/${SHIPPED_I
 const PRESET_ID = process.env.PRESET_ID ?? 'harness_vc';
 const MINE = `${AEONDIR}/games/sonic4/data/editor/effects/presets/${PRESET_ID}.json`;
 
-/** The disclosure's date and lead, read from the ONE file that owns them. A
- *  retyped copy here would be the second source of truth the parcel forbids. */
+/** The disclosure's date, lead AND PREMISE, read from the ONE file that owns
+ *  them. A retyped copy here would be the second source of truth the parcel
+ *  forbids — and the premise is read for the same reason the date is: row [2f]
+ *  asks the OPPOSITE question depending on it, and must not be told which. */
 const LAG_SRC = readFileSync(`${ROOT}/src/core/formats/effects/preset-lag.ts`, 'utf8');
 const LAG_DATE = (LAG_SRC.match(/PRESET_LAG_MEASURED_ON = '(\d{4}-\d{2}-\d{2})'/) || [])[1];
 const LAG_LEAD = (LAG_SRC.match(/PRESET_LAG_LEAD = '([^']+)'/) || [])[1];
 if (!LAG_DATE || !LAG_LEAD) throw new Error('preset-lag.ts no longer carries the date/lead this harness reads');
+const LAG_PREMISE_M = LAG_SRC.match(/PRESET_KEYS_AWAITING_AEON: readonly string\[\] = Object\.freeze\(\[([^\]]*)\]\)/);
+if (!LAG_PREMISE_M) throw new Error('preset-lag.ts no longer carries the premise list this harness reads');
+const LAG_KEYS = LAG_PREMISE_M[1].split(',').map((s) => s.trim().replace(/^'|'$/g, '')).filter(Boolean);
+/** EMPTY since 2026-09-02: aeon MERGED item 5, so the sentence retired. */
+const PREMISE_OPEN = LAG_KEYS.length > 0;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(path, timeoutMs = 1500) {
@@ -481,17 +501,30 @@ async function main() {
         sameBody: !!(s && leaf.parentElement && leaf.parentElement.contains(s)),
       };
     })()`);
-    check('2f', 'the disclosure is on screen — painted, dated, and BEFORE the first control in the same body',
-      disc.leaf === true && disc.text.startsWith(LAG_LEAD)
-      && disc.text.includes(`Measured ${LAG_DATE}`) && disc.text.includes(`Expires (${LAG_DATE})`)
-      && /refuses both by name at origin\/master/.test(disc.text)
-      && disc.rects > 0 && disc.visible !== false && disc.hitInside === true
-      && disc.beforeCycles === true && disc.sameBody === true,
-      JSON.stringify(disc));
-    if (disc.leaf) {
+    // ROW [2f] ASKS WHICHEVER QUESTION THE PREMISE MAKES TRUE, and it is told
+    // which by preset-lag.ts, not by a constant here. Until 2026-09-02 the
+    // premise was ['cycles','variants'] and this row required the sentence
+    // PAINTED and FIRST. aeon MERGED item 5, the premise emptied, and the row
+    // now requires the opposite: NOTHING on this screen may still tell the
+    // author the engine ignores what they are about to type. Both branches
+    // screenshot, so the retirement is photographed the way the sentence was.
+    check('2f', PREMISE_OPEN
+      ? 'the disclosure is on screen — painted, dated, and BEFORE the first control in the same body'
+      : `the disclosure is RETIRED (premise empty in preset-lag.ts) — NO element on the open `
+        + `section says ${JSON.stringify(LAG_LEAD)}`,
+      PREMISE_OPEN
+        ? (disc.leaf === true && disc.text.startsWith(LAG_LEAD)
+          && disc.text.includes(`Measured ${LAG_DATE}`) && disc.text.includes(`Expires (${LAG_DATE})`)
+          && /refuses (?:it|both) by name at origin\/master/.test(disc.text)
+          && disc.rects > 0 && disc.visible !== false && disc.hitInside === true
+          && disc.beforeCycles === true && disc.sameBody === true)
+        : disc.leaf === false,
+      JSON.stringify({ premise: LAG_KEYS, ...disc }));
+    {
       const shot = await c.send('Page.captureScreenshot', { format: 'png' });
-      writeFileSync(`${SHOTS}/disclosure.png`, Buffer.from(shot.data, 'base64'));
-      console.log(`        screenshot  : ${SHOTS}/disclosure.png`);
+      const name = disc.leaf ? 'disclosure.png' : 'disclosure-retired.png';
+      writeFileSync(`${SHOTS}/${name}`, Buffer.from(shot.data, 'base64'));
+      console.log(`        screenshot  : ${SHOTS}/${name}`);
     }
 
     // ---- 3. TOUCH NOTHING ON THE SHIPPED DOCUMENT. -----------------------
