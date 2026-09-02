@@ -1,5 +1,11 @@
-// ONE-OFF AUTHORING STEP for the on-screen drift proof. Not a test of anything —
-// it is a vitest file only because vitest is the TypeScript runner this repo has.
+// ONE-OFF AUTHORING STEP for the on-screen drift proof. NOT A TEST, and deliberately
+// NOT named `*.test.ts`: it is a vitest file only because vitest is the TypeScript
+// runner this repo has, and vitest's `include` does not reach scratchpad/. A file that
+// LOOKS like a test and is never collected is a silent zero inside a green total —
+// `check-test-collection` caught exactly that on this file and was right.
+// Run it explicitly:
+//   npx vitest run --config <a config whose include names this file> \
+//     DRIFT_SCENE_PATH=... DRIFT_LAYER=2 DRIFT_PX=-1
 //
 // WHY IT GOES THROUGH AURORA'S CODEC INSTEAD OF WRITING JSON BY HAND: the seam
 // under test is Aurora's export -> aeon's generator. Hand-writing the JSON walks
