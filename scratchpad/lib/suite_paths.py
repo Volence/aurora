@@ -24,9 +24,13 @@ JavaScript resolver (`test/support/sibling-root.mjs`). The first Python
 instrument that needs it adds it there-and-here; it must not be spelled
 `AURORA_DIR`.
 
-`AURORA_<NAME>_REPO`, `AURORA_PEER_ROOT`, `LIVE_AEON`, `AURORA_ROOT` and
-`AURORA_REPO` are accepted as transitional aliases and announced once on stderr,
-naming the spelling to switch to. A variable that is SET BUT NAMES SOMETHING ABSENT is a hard error at
+`AURORA_<NAME>_REPO`, `AURORA_PEER_ROOT`, `LIVE_AEON`, `AEON_ROOT`, `S1_DIR`,
+`AURORA_ROOT` and `AURORA_REPO` are accepted as transitional aliases and
+announced once on stderr, naming the spelling to switch to. That roster is held
+IDENTICAL to the JavaScript twin's by a row in
+`scratchpad/lib/test_suite_paths.py`, which reads both tables live and fails when
+either side gains, loses or reorders a spelling — the two files are two copies of
+one fact, and they had already drifted over `AEON_ROOT` before that row existed. A variable that is SET BUT NAMES SOMETHING ABSENT is a hard error at
 the step that read it, not a null that lets the next step run — the contract's
 rule, and the reason a typo in `AEON_DIR` stops a run instead of quietly
 becoming a reading of the owner's live tree.
@@ -100,7 +104,22 @@ def checkout_env(name: str) -> str:
 
 
 def checkout_env_aliases(name: str) -> tuple[str, ...]:
-    extra = {"aeon": ("LIVE_AEON",), "s1disasm": ("S1_DIR",)}.get(name, ())
+    """Transitional aliases for one peer's checkout variable.
+
+    THIS LIST AND `checkoutEnvAliases` IN `test/support/sibling-root.mjs` ARE TWO COPIES
+    OF ONE FACT, and they drifted: `AEON_ROOT` was accepted there and not here, so an
+    operator who exported it got a JavaScript instrument that resolved and a Python one
+    that refused — the same machine, the same environment, two answers. Both twins
+    accept it now. Order is part of the contract, not decoration: the first spelling
+    that answers wins, so a reordering is a different precedence.
+
+    `scratchpad/lib/test_suite_paths.py` compares the two tables live, over the
+    JavaScript twin's own peer roster plus a non-peer name, and fails when either side
+    gains, loses or reorders an alias. Change one twin without the other and that row
+    goes red; that is the point of it, and it is why the lists are not merely made to
+    match by hand.
+    """
+    extra = {"aeon": ("LIVE_AEON", "AEON_ROOT"), "s1disasm": ("S1_DIR",)}.get(name, ())
     upper = "".join(c if c.isalnum() else "_" for c in name.upper())
     return (f"AURORA_{upper}_REPO",) + extra
 

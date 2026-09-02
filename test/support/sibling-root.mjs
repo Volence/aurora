@@ -184,6 +184,15 @@ export function checkoutEnv(name) {
  * `src/core/editing/__tests__/bg-override-art-injector-gate.test.ts`. `S1_DIR`
  * is aurora's own older spelling for `S1DISASM_DIR`, accepted so migrating the
  * instruments that read it drops no override.
+ *
+ * THIS LIST AND `checkout_env_aliases` IN `scratchpad/lib/suite_paths.py` ARE TWO
+ * COPIES OF ONE FACT, and they drifted: `AEON_ROOT` was accepted here and not
+ * there, so an operator who exported it got a JavaScript instrument that
+ * resolved and a Python one that refused. `scratchpad/lib/test_suite_paths.py`
+ * now compares both tables live — over `SUITE_PEERS` plus a non-peer name, in
+ * order, since the first spelling that answers wins — and goes red when either
+ * side gains, loses or reorders an alias. Edit this function and that row is
+ * where it will be noticed.
  */
 export function checkoutEnvAliases(name) {
   const upper = name.toUpperCase().replace(/[^A-Z0-9]+/g, '_');
