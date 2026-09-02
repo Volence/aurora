@@ -166,6 +166,18 @@ function audit(repo, ledger, extra = []) {
 // THE CANARY BED. A real git repository, real commits, committer times set.
 // ---------------------------------------------------------------------------
 
+/**
+ * THE FLAGS, defined once and used by BOTH the canaries and the real ledgers.
+ *
+ * If the canaries ran a different command line from the real run they would stop being
+ * evidence about it — the shape where a check is exercised in one configuration and
+ * trusted in another. `gateArgs` is what every invocation below goes through; the `drop`
+ * argument exists only for K3a, which is precisely a case about a flag being absent.
+ */
+const AUDIT_FLAGS = ['--strict-ahead', '--only-present'];
+const gateArgs = (since, drop = []) =>
+  ['--since', since, ...AUDIT_FLAGS.filter((f) => !drop.includes(f))];
+
 /** A synthetic epoch, far from any real ledger, so no case can accidentally read one. */
 const T = (day, hh, mm, ss = 0) =>
   `2001-01-${String(day).padStart(2, '0')}T${String(hh).padStart(2, '0')}:`
@@ -193,10 +205,13 @@ function bed(commits) {
   const git = (...args) => execFileSync('git', ['-C', dir, ...args], { env, encoding: 'utf8' });
   git('init', '-q', '-b', 'main');
   mkdirSync(join(dir, 'docs'), { recursive: true });
-  let body = '';
+  const body = [];
   for (const c of commits) {
-    body += `${c.lines.join('\n')}\n`;
-    writeFileSync(join(dir, BED_LEDGER), body);
+    // `rewrite: true` drops the LAST line before appending — the shape a correction
+    // takes, and the only way to build the remedy case.
+    if (c.rewrite) body.pop();
+    body.push(...c.lines);
+    writeFileSync(join(dir, BED_LEDGER), `${body.join('\n')}\n`);
     git('add', BED_LEDGER);
     execFileSync('git', ['-C', dir, 'commit', '-q', '-m', `at ${c.at}`], {
       env: { ...env, GIT_AUTHOR_DATE: c.at, GIT_COMMITTER_DATE: c.at },
@@ -235,7 +250,7 @@ const CASES = [
   {
     name: 'K1 old bad entry, committed before the cutoff — GRANDFATHERED, not a failure',
     commits: [OLD_BAD],
-    args: ['--since', CANARY_SINCE, '--strict-ahead'],
+    args: gateArgs(CANARY_SINCE),
     status: 0,
     want: ['0 entries IN SCOPE', '1 GRANDFATHERED'],
     absent: ['OVER THRESHOLD', 'STAMPED AHEAD'],
@@ -244,7 +259,7 @@ const CASES = [
   {
     name: 'K2 an honest entry after the cutoff — judged, and passes',
     commits: [OLD_BAD, NEW_GOOD],
-    args: ['--since', CANARY_SINCE, '--strict-ahead'],
+    args: gateArgs(CANARY_SINCE),
     status: 0,
     want: ['1 entry IN SCOPE', '1 GRANDFATHERED'],
     absent: ['OVER THRESHOLD'],
@@ -253,7 +268,7 @@ const CASES = [
   {
     name: 'K3a an entry 5s AHEAD of its commit, in scope, WITHOUT --strict-ahead — exit 0',
     commits: [OLD_BAD, NEW_AHEAD],
-    args: ['--since', CANARY_SINCE],
+    args: gateArgs(CANARY_SINCE, ['--strict-ahead']),
     status: 0,
     want: ['STAMPED AHEAD OF ITS OWN COMMIT (1)', 'pass --strict-ahead'],
     absent: [],
@@ -262,7 +277,7 @@ const CASES = [
   {
     name: 'K3b the same entry WITH --strict-ahead — exit 1',
     commits: [OLD_BAD, NEW_AHEAD],
-    args: ['--since', CANARY_SINCE, '--strict-ahead'],
+    args: gateArgs(CANARY_SINCE),
     status: 1,
     want: ['ALL OF THESE FAIL THIS RUN', T(4, 9, 0, 5)],
     absent: [],
@@ -271,7 +286,7 @@ const CASES = [
   {
     name: 'K4 a bad entry committed after the cutoff — exit 1, naming it',
     commits: [OLD_BAD, NEW_BAD],
-    args: ['--since', CANARY_SINCE, '--strict-ahead'],
+    args: gateArgs(CANARY_SINCE),
     status: 1,
     want: ['OVER THRESHOLD (1)', T(5, 8, 40), '1 GRANDFATHERED'],
     absent: [],
@@ -280,7 +295,7 @@ const CASES = [
   {
     name: 'K4b an entry BACKFILLED after the cutoff with an old `at` — exit 1, IN SCOPE',
     commits: [OLD_BAD, BACKFILLED],
-    args: ['--since', CANARY_SINCE, '--strict-ahead'],
+    args: gateArgs(CANARY_SINCE),
     status: 1,
     // "1 entry IN SCOPE" and "1 GRANDFATHERED" together are the discriminator: a cutoff
     // placed on `at` would put this entry among the grandfathered and report 0 in scope.
@@ -291,7 +306,7 @@ const CASES = [
   {
     name: 'K5 an unparseable line committed after the cutoff — exit 1, not a silent skip',
     commits: [OLD_BAD, { at: T(3, 9, 0), lines: ['this line is not json'] }],
-    args: ['--since', CANARY_SINCE, '--strict-ahead'],
+    args: gateArgs(CANARY_SINCE),
     status: 1,
     want: ['UNPARSEABLE IN SCOPE (1)'],
     absent: [],
@@ -300,17 +315,48 @@ const CASES = [
   {
     name: 'K6 two NEW entries sharing one stamp — exit 1, the second went unjudged',
     commits: [OLD_BAD, NEW_GOOD, { at: T(4, 9, 0), lines: [line(T(3, 9, 0), 'collides')] }],
-    args: ['--since', CANARY_SINCE, '--strict-ahead'],
+    args: gateArgs(CANARY_SINCE),
     status: 1,
     want: ['BOTH APPEARANCES IN SCOPE'],
     absent: [],
     fires: ['duplicate-in-scope'],
   },
   {
+    // THE REMEDY, and the gate has none without it. Commit 2 rewrites the same entry
+    // with a stamp read at its own commit; commit 1's bad stamp is still in the diff
+    // forever, so without --only-present this repo is red with no move left to make.
+    name: 'K6b a bad entry CORRECTED by a later commit — exit 0, and the correction counted',
+    commits: [
+      OLD_BAD,
+      { at: T(5, 9, 0), lines: [line(T(5, 8, 40), 'to-be-corrected')] },
+      { at: T(6, 9, 0), lines: [line(T(6, 9, 0), 'to-be-corrected')], rewrite: true },
+    ],
+    args: gateArgs(CANARY_SINCE),
+    status: 0,
+    want: ['NO LONGER IN THE FILE', '1 in-scope stamp'],
+    absent: ['OVER THRESHOLD'],
+    fires: ['withdrawn'],
+  },
+  {
+    // …and the correction must not become a way to launder a bad stamp: the REPLACEMENT
+    // is judged at ITS commit, so a correction that is itself remembered still fails.
+    name: 'K6c a correction that is itself remembered — exit 1, judged at its own commit',
+    commits: [
+      OLD_BAD,
+      { at: T(5, 9, 0), lines: [line(T(5, 8, 40), 'to-be-corrected')] },
+      { at: T(6, 9, 0), lines: [line(T(6, 8, 40), 'to-be-corrected')], rewrite: true },
+    ],
+    args: gateArgs(CANARY_SINCE),
+    status: 1,
+    want: ['OVER THRESHOLD (1)', T(6, 8, 40)],
+    absent: [],
+    fires: ['over-threshold'],
+  },
+  {
     name: 'K7 a ledger git does not track — exit 2, which this gate treats as FAILURE',
     commits: [OLD_BAD],
     ledger: 'docs/not-tracked.jsonl',
-    args: ['--since', CANARY_SINCE, '--strict-ahead'],
+    args: gateArgs(CANARY_SINCE),
     status: 2,
     want: ['COULD NOT MEASURE', 'NOT A PASS'],
     absent: [],
@@ -324,6 +370,9 @@ const RULES_EXERCISED = [
   // Not a rule of the audit but a property of the RATCHET, and the only one no other case
   // can see: an entry committed after the cutoff is judged whatever `at` it claims.
   'backfill-in-scope',
+  // The remedy path: a stamp introduced in scope and then corrected away is reported and
+  // not judged. Without it the gate has an unfixable red state.
+  'withdrawn',
 ];
 
 function runCanaries() {
@@ -414,7 +463,7 @@ for (const ledger of LEDGERS) {
     die(`${ledger} is not readable here (${e.message}). This gate names the ledgers it is `
       + 'answerable for; one of them is missing, so the run covers less than it says.');
   }
-  const { status, out } = audit(AURORA_DIR, ledger, ['--since', IN_FORCE, '--strict-ahead']);
+  const { status, out } = audit(AURORA_DIR, ledger, gateArgs(IN_FORCE));
   results.push({ ledger, status, out });
 }
 

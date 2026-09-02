@@ -79,10 +79,21 @@ unparseable line, and a repeated stamp whose FIRST appearance is also in scope (
 entries sharing one second, the second unjudged). A repair commit re-adding a line first
 written before the cutoff is the innocent case above and is reported without failing.
 
+`--only-present` is the REMEDY, and a gate without it has none. First appearance is keyed
+on the stamp, so a bad entry that is CORRECTED in a later commit leaves its old stamp
+findable in the diff forever: the run stays red and no commit anyone can make will clear
+it, short of rewriting history that may already be pushed. Measured while building the
+gate -- a planted bad entry was removed by a follow-up commit and the audit went on
+reporting it. Under `--only-present` only stamps the file STILL CARRIES at HEAD are
+judged, and the ones introduced-then-removed-or-corrected are COUNTED AND PRINTED rather
+than dropped. A stamp no longer in the ledger is no longer a claim the ledger makes.
+
 WITHOUT `--since`, NOTHING ABOVE APPLIES and every verdict this file gave before that date
-is unchanged. `--strict-ahead` is likewise opt-in: it makes any `at` later than its own
-commit a failure at any magnitude, which is what the sign section already says about the
-evidence and what the exit status alone did not say.
+is unchanged. `--strict-ahead` and `--only-present` are likewise opt-in: the first makes
+any `at` later than its own commit a failure at any magnitude, which is what the sign
+section already says about the evidence and what the exit status alone did not say; the
+second is described just above. The bare instrument still reports the whole history,
+which is what an audit of history should do.
 
 USAGE
 -----
@@ -181,7 +192,7 @@ def collect(repo: str, ledger: str) -> tuple[list[dict], list[dict], list[dict]]
             try:
                 entry = json.loads(dline[1:])
             except json.JSONDecodeError:
-                unparsed.append({"sha": sha[:8], "ctime": ctime,
+                unparsed.append({"sha": sha[:8], "ctime": ctime, "raw": dline[1:],
                                  "text": dline[1:][:100]})
                 continue
             if not isinstance(entry, dict) or "at" not in entry:
@@ -190,7 +201,7 @@ def collect(repo: str, ledger: str) -> tuple[list[dict], list[dict], list[dict]]
             at_raw = str(entry["at"])
             at = parse_at(at_raw)
             if at is None:
-                unparsed.append({"sha": sha[:8], "ctime": ctime,
+                unparsed.append({"sha": sha[:8], "ctime": ctime, "raw": dline[1:],
                                  "text": f"unparseable at={at_raw!r}"})
                 continue
 
@@ -248,6 +259,15 @@ def main() -> int:
                          "whose FIRST appearance is also in scope (two new entries sharing "
                          "one second — a repair re-adding an old line is not that, and is "
                          "reported without failing).")
+    ap.add_argument("--only-present", action="store_true",
+                    help="Judge only stamps the ledger STILL CARRIES at HEAD, and report "
+                         "the rest as introduced-then-removed-or-corrected. Without this "
+                         "there is NO REMEDY for a bad entry once it is pushed: the audit "
+                         "keys on first appearance, so correcting the stamp in a later "
+                         "commit leaves the old one findable forever and a gate stays red "
+                         "with nothing anyone can do about it short of rewriting history. "
+                         "A stamp no longer in the file is no longer a claim the ledger "
+                         "makes. The count is printed, never swallowed.")
     ap.add_argument("--strict-ahead", action="store_true",
                     help="Make ANY entry stamped after its own commit a failure, not only "
                          "one past --threshold. This is what the header already says is "
@@ -284,17 +304,47 @@ def main() -> int:
     def in_scope(rec) -> bool:
         return since is None or rec["ctime"] >= since
 
-    judged = [e for e in judged_all if in_scope(e)]
-    grandfathered = len(judged_all) - len(judged)
+    # WHAT THE LEDGER STILL SAYS, when --only-present is on. Keyed on the stamp for
+    # entries and on the whole raw line for the ones that would not parse.
+    present_at: set[str] | None = None
+    present_lines: set[str] | None = None
+    if args.only_present:
+        head = git(args.repo, "show", f"HEAD:{args.ledger}")
+        present_at, present_lines = set(), set()
+        for hline in head.split("\n"):
+            if not hline.strip():
+                continue
+            present_lines.add(hline)
+            try:
+                e = json.loads(hline)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(e, dict) and "at" in e:
+                present_at.add(str(e["at"]))
+
+    def still_there(rec) -> bool:
+        if present_at is None:
+            return True
+        return (rec["raw"] in present_lines) if "raw" in rec else (rec["at"] in present_at)
+
+    scoped = [e for e in judged_all if in_scope(e)]
+    judged = [e for e in scoped if still_there(e)]
+    grandfathered = len(judged_all) - len(scoped)
+    # Introduced in scope and no longer in the file: corrected, or removed. Counted and
+    # printed, because a population that vanishes from a report is how a check that judged
+    # nothing reads as a check that found nothing.
+    withdrawn = len(scoped) - len(judged)
     dup_scope = [d for d in duplicates if in_scope(d)]
     # A repeated stamp is a FAILURE only when BOTH appearances are in scope: that is two
     # new entries sharing one second, and the second went unjudged. A repair commit
     # re-adding a line first written before the cutoff is the innocent case the header
     # describes, and it is reported below without turning the run red.
-    dup_fail = [d for d in dup_scope if since is not None and d["first_ctime"] >= since]
+    dup_fail = [d for d in dup_scope
+                if since is not None and d["first_ctime"] >= since and still_there(d)]
     # Empty when the ratchet is off, so an in-scope unparseable line is a failure only in
     # gate mode and the instrument's own verdicts do not move.
-    unparsed_scope = [u for u in unparsed if in_scope(u)] if since is not None else []
+    unparsed_scope = ([u for u in unparsed if in_scope(u) and still_there(u)]
+                      if since is not None else [])
 
     ahead = [e for e in judged if e["delta"] < 0]
     over = sorted((e for e in judged if abs(e["delta"]) > args.threshold),
@@ -321,7 +371,11 @@ def main() -> int:
               f"NOT held to the rule, because the ledgers are append-only and are not "
               f"rewritten; the cutoff exists so nothing NEW joins them. Of the "
               f"{unjudged} not judged, {len(dup_scope)} repeated stamps and "
-              f"{len(unparsed_scope)} unparseable lines are in scope.")
+              f"{len(unparsed_scope)} unparseable lines are in scope."
+              + (f" {withdrawn} in-scope stamp(s) were introduced and are NO LONGER IN THE "
+                 f"FILE — corrected or removed — so they are not judged (--only-present); "
+                 f"that is the only remedy a pushed bad entry has."
+                 if args.only_present and withdrawn else ""))
 
     if not args.quiet:
         # The distribution is calibration, so it covers EVERY first appearance including
