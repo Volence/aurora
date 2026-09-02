@@ -3,6 +3,7 @@ import { EditHistory } from '../../src/core/editing/history';
 import type { S4Level, SetSectionsCommand } from '../../src/core/editing/commands';
 import type { Act, Section } from '../../src/core/model/s4-types';
 import { createSection } from '../../src/core/model/s4-types';
+import { unknownWiring } from '../../src/core/formats/effects/section-wiring';
 
 function makeLevel(): { level: S4Level; act: Act; original: Section } {
   const original = createSection(0, 'Section 0');
@@ -14,8 +15,7 @@ function makeLevel(): { level: S4Level; act: Act; original: Section } {
     startPosition: { secX: 0, secY: 0, localX: 0, localY: 0 },
     bgLayout: null,
     bgTiles: null,
-    sceneRef: null,
-    stripPath: null,
+    rasterWiring: unknownWiring('(fixture)', '(fixture)', 'a hand-built act reads no aeon files'), sceneRef: null, stripPath: null,
   };
   return { level: { sections: act.sections, act }, act, original };
 }

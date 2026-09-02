@@ -30,7 +30,7 @@
 import React from 'react';
 import { T, SectionBody, CollapsibleSection, Select, NumberField, Chip, IconButton } from '../ui';
 import { Field, Hint, Card } from './column-layout';
-import { useProjectStore, getActiveLevel } from '../../state/projectStore';
+import { useProjectStore, getActiveLevel, getCurrentZone } from '../../state/projectStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import type { AnyCommand } from '../../../core/editing/commands';
@@ -40,7 +40,7 @@ import type {
 } from '../../../core/formats/effects/preset';
 import { EFFECTS_PRESET_BAND_KEYS, presetArmFields, presetDefFields } from '../../../core/formats/effects/preset';
 import {
-  PRESET_HEADLINE, PRESET_LIMITS, NO_PREVIEW,
+  PRESET_HEADLINE, presetLimitsShort, NO_PREVIEW, NO_PREVIEW_SHORT,
   BAND_FIELD_TITLES, armFieldTitle, armOptions, armLabel,
   bandArm, bandArmAdvisory,
   presetListEntries, resolveSelectedPreset, presetIdRefusal,
@@ -58,6 +58,9 @@ import {
   CRAM_LINES, variantLineOn, toggleVariantLineCommand,
   bandSubject, bandEdgeRefusal, variantLineRefusal, cycleFieldRefusal,
 } from '../../providers/effects-preset';
+import { sectionRasterAdvisory, rasterChooserName } from '../../../core/formats/effects/section-wiring';
+import { openGuide } from '../../state/guideStore';
+import { EFFECTS_GUIDE_SLUG, GUIDE_ANCHORS } from '../guide/guides';
 import { PresetLagDisclosure } from './PresetLagDisclosure';
 
 const EMPTY_LIBRARY: EffectsPresetLibrary = { presets: [], unreadable: [], notices: [] };
@@ -90,12 +93,39 @@ function LimitBlock(): React.ReactElement {
       display: 'flex', flexDirection: 'column', gap: T.s2,
     }}>
       <div style={{ fontSize: T.tSm, color: T.textHi }}>{PRESET_HEADLINE}</div>
-      {PRESET_LIMITS.map((l) => (
-        <div key={l.key} style={{ fontSize: T.tXs, color: T.textBase, lineHeight: 1.45 }}>
+      {/* ═══ THE AUTHOR'S LENGTH, WITH THE CONTRACT ONE HOVER AWAY ═══
+
+          This block rendered 8,059 characters before the first control in a
+          285px column (EFFECTS-W1 defect 3, measured) — a design memo standing
+          between an author and a button. Every one of those characters is still
+          reachable: `full` is the contract wording, verbatim, on this element's
+          own `title`, and the guide carries it as prose. What is PAINTED is the
+          two sentences an author has to act on.
+
+          THE ORDER MATTERS AND IS UNCHANGED: what saving does not do, then what
+          looking at it costs, then what "it built" does not prove. */}
+      {presetLimitsShort().map((l) => (
+        <div key={l.key} title={l.full}
+          style={{ fontSize: T.tXs, color: T.textBase, lineHeight: 1.45 }}>
           <span style={{ color: T.textHi }}>{l.title}.</span>{' '}{l.body}
         </div>
       ))}
-      <div style={{ fontSize: T.tXs, color: T.textLo, lineHeight: 1.45 }}>{NO_PREVIEW}</div>
+      <div title={NO_PREVIEW} style={{ fontSize: T.tXs, color: T.textLo, lineHeight: 1.45 }}>
+        {NO_PREVIEW_SHORT}
+      </div>
+      {/* THE REST OF IT, WHERE THE REST OF IT BELONGS. A hover is not a place to
+          read seven minutes of prose; the guide is. This is the deep link the
+          walkthrough asked for on this exact card. */}
+      <button type="button"
+        onClick={() => openGuide(EFFECTS_GUIDE_SLUG, GUIDE_ANCHORS.rasterBand)}
+        title="Open the first-run guide, at the part about raster bands."
+        style={{
+          alignSelf: 'flex-start', font: 'inherit', fontSize: T.tXs, color: T.accent,
+          background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+          textAlign: 'left',
+        }}>
+        ? Read the whole note in the guide
+      </button>
     </div>
   );
 }
@@ -117,6 +147,11 @@ export default function BandPresetPanel(): React.ReactElement | null {
   const activeSectionIndex = useEditorStore((s) => s.activeSectionIndex);
   const act = getActiveLevel(useProjectStore.getState())?.act ?? null;
   const section = act?.sections[activeSectionIndex] ?? null;
+  // The zone id is needed only to name the chooser function in the sentence —
+  // the wiring itself was derived at load time, from aeon's files.
+  const zoneId = getCurrentZone(useProjectStore.getState())?.id ?? '';
+  const wiringAdvisory = act === null ? null : sectionRasterAdvisory(
+    act.rasterWiring, activeSectionIndex, rasterChooserName(zoneId, act.id));
 
   const [newId, setNewId] = React.useState('');
   const [refusal, setRefusal] = React.useState<string | null>(null);
@@ -270,6 +305,27 @@ export default function BandPresetPanel(): React.ReactElement | null {
                 <Hint under tone="warning">
                   {unassignablePresetRef(library, section.rasterRef, activeSectionIndex)}
                 </Hint>
+              )}
+              {/* ═══ WHAT THIS SECTION CAN ACTUALLY CARRY ═══
+
+                  Derived per act from aeon's own act_descriptor.emp and
+                  <zone>_effects.emp, never listed here — the question was
+                  answered wrong three times in one day and every wrong answer
+                  was a snapshot. See core/formats/effects/section-wiring.ts.
+
+                  ⚠ IT ADVISES; IT DOES NOT GATE. The select is not disabled and
+                  there is no confirm: raster-binding.ts's STANDING REFUSAL, and
+                  its hardest clause — if the files cannot be READ the sentence
+                  says so, because a control greyed out because a file was
+                  missing is indistinguishable from one greyed out because the
+                  thing is impossible.
+
+                  IT SPEAKS ABOUT THE LEVEL, NOT ABOUT AURORA: "sections 6, 7
+                  and 8 share one preset, so giving one of them a band would
+                  give all three the same band" tells an author what to ask a
+                  programmer for. "You cannot do that" does not. */}
+              {wiringAdvisory !== null && (
+                <Hint under tone="warning">{wiringAdvisory}</Hint>
               )}
               <Hint under style={{ marginBottom: 0 }}>
                 Saved to <code>section_{activeSectionIndex}.meta.json</code> as

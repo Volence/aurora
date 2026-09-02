@@ -38,6 +38,7 @@ import { EditHistory } from '../history';
 import type { S4Level } from '../commands';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { unknownWiring } from '../../formats/effects/section-wiring';
 
 const black = (): Color => ({ r: 0, g: 0, b: 0, a: 255 });
 const line = () => ({ colors: Array.from({ length: 16 }, black) });
@@ -81,7 +82,7 @@ function act(id: string, sectionCount: number): Act {
     id, gridWidth: sectionCount, gridHeight: 1,
     sections: Array.from({ length: sectionCount }, (_, i) => createSection(i, `${id}-s${i}`)),
     startPosition: { secX: 0, secY: 0, localX: 0, localY: 0 },
-    bgLayout: null, bgTiles: null, sceneRef: null, stripPath: null,
+    bgLayout: null, bgTiles: null, rasterWiring: unknownWiring('(fixture)', '(fixture)', 'a hand-built act reads no aeon files'), sceneRef: null, stripPath: null,
   };
 }
 

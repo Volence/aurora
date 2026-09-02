@@ -199,6 +199,67 @@ export const PRESET_LIMITS: readonly PresetLimit[] = Object.freeze([
   }),
 ]);
 
+// ═══════════════════════════════════════════════════════════════════════════
+// THE SAME THREE LIMITS, AT AUTHOR LENGTH — EFFECTS-W1 defect 3
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// MEASURED: `LimitBlock` rendered 8,059 characters before the first control in
+// a 285px column — roughly seven minutes of reading — of which `unbound` alone
+// was 6,508. It cited `tools/effects_gen.py`, `raster_dsl.emp`, four aeon commit
+// SHAs, three pytest test names and `NO_LINT=1`. Everything in it is true and
+// much of it matters, including the one fact that later cost a red build; it was
+// in the worst possible place. An author looking for a button scrolls past it,
+// and an author who reads it is reading a design memo instead of authoring.
+//
+// ⚠ THE LONG SENTENCES ARE NOT DELETED AND MUST NOT BE. `PRESET_LIMITS` is the
+// contract-level wording, owed to three audiences — this panel, the agent's
+// `assign_section_preset` reply, and the published tool descriptions in main/ —
+// and `raster-binding.ts` exists precisely so those three cannot drift. What
+// changed is WHICH of them the panel PAINTS. The short line is the author's; the
+// long one is still one hover away on the same element, and the guide carries
+// the whole of it in prose a person can read at their own pace.
+//
+// ⚠ AND THE SHORT ONE IS DERIVED FROM THE LONG ONE'S SUBJECT, NOT SUMMARISED
+// FROM MEMORY. Each entry below names the same `key` as its long sibling and
+// `presetLimitsShort()` refuses to build if a key ever disappears — a summary
+// that outlives the thing it summarises is exactly the failure this file's
+// header spends four screens on.
+
+export interface PresetLimitShort {
+  key: PresetLimit['key'];
+  title: string;
+  /** One or two sentences. The author's version. */
+  body: string;
+  /** The full contract wording — the element's `title`, so nothing is lost. */
+  full: string;
+}
+
+const SHORT_BODIES: Record<PresetLimit['key'], string> = {
+  unbound:
+    'Saving writes the document; a section has to BIND it, and aeon has to have wired that '
+    + 'section. The panel says which state the section you are on is in, at the dropdown below.',
+  debug_chord:
+    'A preset also needs a row in aeon\'s band-demo table or a section binding to be reachable '
+    + 'at all. aeon\'s build fails loudly when it has neither, so this is never silent.',
+  unchecked_visibility:
+    'Nothing checks that a band is VISIBLE. A legal band over an unused palette entry, or one '
+    + 'whose colour matches what it repaints, builds green and shows nothing.',
+};
+
+export function presetLimitsShort(): readonly PresetLimitShort[] {
+  return PRESET_LIMITS.map((l) => {
+    const body = SHORT_BODIES[l.key];
+    if (body === undefined) {
+      throw new Error(
+        `PRESET_LIMITS gained the key "${l.key}" with no author-length wording. Add one to `
+        + 'SHORT_BODIES: a limit the panel cannot say in two sentences is a limit the panel '
+        + 'does not really carry.',
+      );
+    }
+    return { key: l.key, title: l.title, body, full: l.body };
+  });
+}
+
 /**
  * Why there is no preview here, said out loud.
  *
@@ -235,6 +296,15 @@ export const PRESET_LIMITS: readonly PresetLimit[] = Object.freeze([
  * revision (`git show origin/master:docs/research/reference_captures/
  * 2026-08-30-sec5-band/README.md`), never by path into their working tree.
  */
+/**
+ * The author's version of NO_PREVIEW — defect 3's cut, same rule as
+ * `SHORT_BODIES`: what an author must know, with the provenance one hover away.
+ * `NO_PREVIEW` itself is unchanged and is what the element's `title` carries.
+ */
+export const NO_PREVIEW_SHORT =
+  'No preview. Aurora draws no raster band — there is nothing here to check one against, and a '
+  + 'wrong preview would be worse than none. You see it when the ROM runs.';
+
 export const NO_PREVIEW =
   'No preview. This editor draws no band: the viewport composites no rasterRef, and ' +
   'nothing in Aurora has sampled CRAM, so there is nothing to draw a faithful preview ' +
