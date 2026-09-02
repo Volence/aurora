@@ -23,9 +23,9 @@
 
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, cpSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, cpSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 
 const SUBJECT = resolve(__dirname, 'sibling-root.mjs');
 
@@ -49,7 +49,7 @@ interface Run {
  * repo's own harnesses export `AEON_DIR`, so inheriting the ambient environment
  * would make several rows measure the developer's shell instead of the subject.
  */
-function run(body: string, env: Record<string, string> = {}, subject = SUBJECT): Run {
+function run(body: string, env: Record<string, string> = {}, subject = SUBJECT, cwd = dirname(subject)): Run {
   const clean = { ...process.env };
   for (const k of Object.keys(clean)) {
     if (/^(EMPYREAN_SUITE_ROOT|AURORA_PEER_ROOT|LIVE_AEON|.*_DIR|AURORA_.*_REPO)$/.test(k)) delete clean[k];
@@ -58,7 +58,7 @@ function run(body: string, env: Record<string, string> = {}, subject = SUBJECT):
   const r = execFileSync(process.execPath, ['--input-type=module', '-e', src], {
     env: { ...clean, ...env },
     encoding: 'utf8',
-    cwd: dirname(subject),
+    cwd,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   return { status: 0, stdout: r, stderr: '' };
@@ -355,8 +355,8 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
       }).trim();
       const viaCommon = dirname(dirname(common));
 
-      // ANTI-VACUOUS, and the whole reason this row is worth its cost. If the
-      // worktree were not actually LINKED, the two commands would agree, the
+      // ANTI-VACUOUS (1/2), and the whole reason this row is worth its cost. If
+      // the worktree were not actually LINKED, the two commands would agree, the
       // "wrong" branch would never be exercised, and the row would go green
       // having re-measured the main-checkout case. So prove they disagree HERE,
       // in the environment this row built, before believing anything it says.
@@ -368,7 +368,75 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
         + 'nothing about step 3',
       ).not.toBe(viaCommon);
 
+      // ANTI-VACUOUS (2/2) — "RUNS FROM A LINKED WORKTREE IS NECESSARY, NOT
+      // SUFFICIENT" (sigil's refinement to the same contract bullet, 2026-09-02,
+      // found on its shell-side bed). A linked worktree that happens to sit
+      // BESIDE the suite root lets the WRONG method land on the RIGHT path by
+      // accident — `--show-toplevel` + `../<name>` resolves the sibling anyway —
+      // so the bed passes while proving nothing. The contract's two acceptable
+      // beds are: nest the worktree inside the checkout, or put it somewhere the
+      // sibling walk from `--show-toplevel` DEMONSTRABLY finds nothing.
+      //
+      // This bed takes the second arm, and asserts it rather than relying on it:
+      // the scratch directory is a fresh `mkdtemp` holding only `wt`, so the peer
+      // checkout that DOES exist under the right root is absent under the wrong
+      // one. The name is derived from `--git-common-dir`, never typed, so this
+      // cannot pass by naming a string that is right on one machine.
+      //
+      // (Nesting was considered and declined for this repo: a worktree under
+      // `<repo>/` would be swept by the test globs and by
+      // `scripts/check-peer-path-literals.mjs`, which walks this tree. The temp
+      // dir is the stronger arm here anyway — `/tmp/<mkdtemp>` contains nothing
+      // at all — but "stronger incidentally" is not the bar, which is why it is
+      // asserted below.)
+      const mainCheckout = dirname(common);
+      const wrongRoot = dirname(toplevel);
+      expect(
+        existsSync(resolve(mainCheckout)),
+        `the main checkout ${mainCheckout} named by --git-common-dir should exist`,
+      ).toBe(true);
+      expect(
+        existsSync(resolve(wrongRoot, basename(mainCheckout))),
+        `this bed does not test anything: the WRONG derivation (dirname(--show-toplevel) = `
+        + `${wrongRoot}) would still find ${basename(mainCheckout)} beside it, so a resolver using `
+        + `--show-toplevel could land on the right peer by accident. Put the worktree somewhere the `
+        + 'sibling walk finds nothing, or nest it inside the checkout '
+        + '(empyrean contract/SUITE_PATHS.md, sigil\'s refinement)',
+      ).toBe(false);
+
+      // THE WORKTREE'S OWN COPY of the resolver, not the main copy under a
+      // different cwd: `sibling-root.mjs` anchors `AURORA_ROOT` to its own module
+      // file (`import.meta.url`) and passes THAT as git's cwd, so merely chdir-ing
+      // into the worktree would measure the main checkout again, green and
+      // meaningless. Proven as its own row below.
       const [derived, source] = derive(wt.subject);
+
+      // ANTI-VACUOUS (3/3) — PROVE WE WERE ACTUALLY STANDING IN IT. The two
+      // assertions above prove the bed is a place where the wrong method is
+      // wrong; this one proves the resolver ran THERE. `siblingRootSource()`
+      // embeds the cwd it handed git, so the announce line is the receipt:
+      // `step 3: git rev-parse --git-common-dir from <AURORA_ROOT> → <common>`.
+      // If a future edit "simplified" this row to spawn the MAIN copy with cwd
+      // set to the worktree, the row would still go green — the subject pins
+      // `cwd: AURORA_ROOT` and ignores the process cwd entirely (proven as its
+      // own row below) — and would be measuring the main-checkout case wearing a
+      // worktree's name, which is the exact defect O68 exists to close.
+      const announce = /^step 3: git rev-parse --git-common-dir from (.*) → (.*)$/.exec(source ?? '');
+      expect(
+        announce,
+        `the resolver's announce line should name the cwd it used; got ${JSON.stringify(source)}`,
+      ).not.toBeNull();
+      expect(
+        announce![1],
+        `the resolver announced \`${source}\` — it ran from ${announce![1]}, not from the linked `
+        + `worktree ${wt.dir} this row built. The bed must EXECUTE THE WORKTREE'S OWN COPY of `
+        + 'sibling-root.mjs; the subject anchors AURORA_ROOT to its own module file and pins that '
+        + 'as git\'s cwd, so merely chdir-ing into the worktree measures the main checkout again '
+        + '(empyrean contract/SUITE_PATHS.md, third paragraph of the step-3 bullet)',
+      ).toBe(wt.dir);
+      expect(announce![1]).not.toBe(mainCheckout);
+      expect(announce![2]).toBe(common);
+
       // The contract's "say which step answered", in the run's own output.
       // eslint-disable-next-line no-console
       console.log(
@@ -387,6 +455,41 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
     } finally {
       removeLinkedWorktree(repo, wt);
     }
+  });
+
+  /**
+   * THE PIN, AS A ROW — why the bed above copies the subject instead of chdir-ing.
+   *
+   * `AURORA_ROOT` is `resolve(dirname(fileURLToPath(import.meta.url)), '../..')`
+   * — the MODULE'S OWN FILE, not the process cwd — and step 3 hands exactly that
+   * to git as `cwd`. So the process cwd is inert: a bed that builds a linked
+   * worktree and only changes directory into it measures the main checkout,
+   * passes, and proves nothing. That claim is load-bearing for the row above and
+   * for the other suite lanes writing the same shape, so it is measured here
+   * rather than asserted in a comment.
+   *
+   * The cwd used is a `mkdtemp` OUTSIDE ANY REPOSITORY: if the subject consulted
+   * the process cwd at all, git would find no repo there and step 3 would fail
+   * over to step 4, so this row would go red loudly rather than subtly.
+   */
+  it('pins git\'s cwd to its OWN module location, so the process cwd cannot steer it', () => {
+    const elsewhere = mkdtempSync(resolve(tmpdir(), 'aurora-step3-cwd-'));
+    const body = 'process.stdout.write(String(R.siblingRoot()) + "\\n" + R.siblingRootSource() + "\\n" + R.AURORA_ROOT);';
+    const home = run(body).stdout.split('\n');
+    const away = run(body, {}, SUBJECT, elsewhere).stdout.split('\n');
+
+    expect(away[2], 'AURORA_ROOT is the module\'s own location and must not move with the cwd').toBe(home[2]);
+    expect(away[2]).toBe(resolve(__dirname, '../..'));
+    expect(
+      away[1],
+      `run with cwd=${elsewhere} (outside any repository) the resolver announced \`${away[1]}\`; `
+      + `it should be identical to the announce from its own directory, \`${home[1]}\`, because `
+      + 'step 3 passes AURORA_ROOT as git\'s cwd rather than inheriting the process cwd',
+    ).toBe(home[1]);
+    expect(away[1]).toContain(`from ${resolve(__dirname, '../..')}`);
+    expect(away[0]).toBe(home[0]);
+    expect(away[0]).not.toBe('null');
+    rmSync(elsewhere, { recursive: true, force: true });
   });
 });
 
