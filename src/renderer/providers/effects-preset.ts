@@ -37,10 +37,11 @@
 
 import type {
   EffectsPreset, EffectsPresetBand, EffectsPresetLibrary, EffectsPresetBandOn,
+  EffectsPresetCycleChannel,
 } from '../../core/formats/effects/preset';
 import {
   EFFECTS_PRESET_ID_PATTERN, EFFECTS_PRESET_ON_ARMS, EFFECTS_PRESET_SCHEMA,
-  presetArmIssue, presetOnArms, presetArmFields, effectsPresetPath,
+  presetArmIssue, presetOnArms, presetArmFields, presetDefFields, effectsPresetPath,
 } from '../../core/formats/effects/preset';
 import type { SetEffectsPresetCommand, SetSectionRasterCommand } from '../../core/editing/commands';
 // THE BINDING LIMIT IS NOT RE-TYPED HERE. `PRESET_LIMITS.unbound` below is the
@@ -853,6 +854,304 @@ export function setPresetNameCommand(
   return editPresetCommand(library, id, `Preset ${id} name`, (p) => {
     if (name === '') delete p.name;
     else p.name = name;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THE OTHER TWO CHANNELS — `cycles` AND `variants` (ROADMAP §5.1 row 97, 2nd half)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Both keys are OPTIONAL at the root and both encode THREE STATES the schema
+// keeps distinct on purpose (§7.2, rulings Q2 and Q5). The controls below author
+// exactly those states and never fold one into another:
+//
+//   cycles    ABSENT  = keep the section's hand-authored cycle (the key is not
+//                       written);  null = cycling OFF;  array = the script.
+//   variants  ABSENT  = every slot keeps its hand value;  present = an array
+//                       whose index IS the slot — a slot the array does not
+//                       reach keeps its hand value, null at an index CLEARS it,
+//                       an object authors it.
+//
+// So `[]` is a real document for both keys and is NEVER rewritten as null or
+// as absence: for `cycles` it is the generator's refusal (the schema says so, and
+// `emptyCyclesAdvisory` quotes it); for `variants` it reaches no slot. A control
+// that "tidied" `[]` into null on first touch would have authored "cycling OFF"
+// on the author's behalf — the exact defect the brief names.
+//
+// NO BOUNDS AND NO CLAMPING, as for the band spinners (aeon §E.4): every value
+// is forwarded verbatim, and `variants[].lines` stays the engine's integer
+// bitmask on the wire (ruling Q4) even where the panel offers checkboxes.
+//
+// NOTHING BELOW IS CONSUMED BY THE ENGINE YET — see core/formats/effects/
+// preset-lag.ts, whose sentence the panel renders above these controls.
+
+export type CyclesState = 'absent' | 'off' | 'authored';
+
+/** Which of the three spellings the document carries for `cycles`. */
+export function cyclesState(preset: EffectsPreset): CyclesState {
+  if (!('cycles' in preset) || preset.cycles === undefined) return 'absent';
+  if (preset.cycles === null) return 'off';
+  return 'authored';
+}
+
+export const CYCLES_TITLE = presetFieldTitle(['properties', 'cycles']);
+export const VARIANTS_TITLE = presetFieldTitle(['properties', 'variants']);
+
+/** One cycle-channel field's title, straight from the schema. */
+export function cycleFieldTitle(field: string): string {
+  return presetFieldTitle(['$defs', 'cycle_channel', 'properties', field]);
+}
+
+/** One variant field's title, straight from the schema. */
+export function variantFieldTitle(field: string): string {
+  return presetFieldTitle(['$defs', 'pal_variant', 'properties', field]);
+}
+
+/**
+ * The three `cycles` options, each labelled with the spelling it WRITES, so an
+ * author reading the picker reads the file. The order is the schema's own.
+ */
+export const CYCLES_STATE_OPTIONS: readonly { value: CyclesState; label: string }[] = Object.freeze([
+  { value: 'absent', label: 'keep the section\'s hand-authored cycle (key absent)' },
+  { value: 'off', label: 'off (null)' },
+  { value: 'authored', label: 'authored script (array of channels)' },
+]);
+
+/**
+ * The seed channel an author starts from when switching `cycles` to a script.
+ *
+ * ONE CHANNEL, NOT ZERO, for the reason `newPreset` seeds one band: an empty
+ * `cycles` array is legal JSON and the generator's refusal, so a script born
+ * empty is born refused for a reason the author had no hand in. The numbers are
+ * a starting point to replace, NOT a validated or "safe" channel — Aurora does
+ * not know what is safe here. `line` seeds 2 because the schema's own sentence
+ * on it is "Never 0: line 0 is the character's"; `period` seeds the schema's
+ * own worked number ("period 8 means a rotation every 8 frames"). `dir` is left
+ * absent because it is the one field the constructor defaults.
+ */
+export function newCycleChannel(): EffectsPresetCycleChannel {
+  return { line: 2, first: 8, count: 4, period: 8 };
+}
+
+/**
+ * Author one of the three `cycles` spellings.
+ *
+ * `absent` DELETES the key — `p.cycles = undefined` would still serialise as
+ * a key on some writers and is a fourth spelling the schema does not have.
+ * Switching to `authored` from either other state seeds ONE channel; an array
+ * already there is kept as it is (so re-picking the current option is a no-op
+ * and burns no undo slot, through `editPresetCommand`'s guard).
+ */
+export function setCyclesStateCommand(
+  library: EffectsPresetLibrary, id: string, state: CyclesState,
+): SetEffectsPresetCommand | null {
+  return editPresetCommand(library, id, `Preset ${id} cycles: ${state}`, (p) => {
+    if (state === 'absent') { delete p.cycles; return; }
+    if (state === 'off') { p.cycles = null; return; }
+    if (!Array.isArray(p.cycles)) p.cycles = [newCycleChannel()];
+  });
+}
+
+export function addCycleChannelCommand(
+  library: EffectsPresetLibrary, id: string,
+): SetEffectsPresetCommand | null {
+  return editPresetCommand(library, id, `Add cycle channel to ${id}`, (p) => {
+    if (!Array.isArray(p.cycles)) return;
+    p.cycles.push(newCycleChannel());
+  });
+}
+
+/**
+ * Remove one channel — DOWN TO AN EMPTY ARRAY, deliberately. The schema accepts
+ * `[]` and names it the generator's refusal; refusing it here would leave a
+ * file that carries `[]` un-editable, and silently writing null instead would
+ * author "cycling OFF". The empty array stays on screen with
+ * `emptyCyclesAdvisory` under it, and the author picks the spelling they mean.
+ */
+export function removeCycleChannelCommand(
+  library: EffectsPresetLibrary, id: string, index: number,
+): SetEffectsPresetCommand | null {
+  return editPresetCommand(library, id, `Remove cycle channel ${index} from ${id}`, (p) => {
+    if (!Array.isArray(p.cycles) || index < 0 || index >= p.cycles.length) return;
+    p.cycles.splice(index, 1);
+  });
+}
+
+/**
+ * Set one channel field. `dir` is the only optional one: `undefined` deletes
+ * it, handing the value back to the constructor's default.
+ */
+export function setCycleFieldCommand(
+  library: EffectsPresetLibrary, id: string, index: number, field: string, value: number | undefined,
+): SetEffectsPresetCommand | null {
+  const { required, optional } = presetDefFields('cycle_channel');
+  if (!required.includes(field) && !optional.includes(field)) return null;
+  if (value === undefined && !optional.includes(field)) return null;
+  return editPresetCommand(library, id, `Cycle channel ${index} ${field}`, (p) => {
+    if (!Array.isArray(p.cycles)) return;
+    const ch = p.cycles[index] as unknown as Record<string, unknown> | undefined;
+    if (!ch) return;
+    if (value === undefined) delete ch[field];
+    else ch[field] = value;
+  });
+}
+
+/**
+ * The sentence under an EMPTY `cycles` array — the SCHEMA's own, read out of
+ * the `cycles` description rather than retyped, and read loudly: if the
+ * contract stops saying it, this throws at module load rather than advising
+ * something the schema no longer holds.
+ */
+export const EMPTY_CYCLES_ADVISORY: string = (() => {
+  const m = /An EMPTY array is legal JSON here[^.]*\.[^.]*\./.exec(CYCLES_TITLE);
+  if (!m) {
+    throw new Error('the schema\'s `cycles` description no longer carries its "An EMPTY array is '
+      + 'legal JSON here" sentence — re-read the contract before advising on an empty script');
+  }
+  return m[0];
+})();
+
+export function emptyCyclesAdvisory(preset: EffectsPreset): string | null {
+  return Array.isArray(preset.cycles) && preset.cycles.length === 0 ? EMPTY_CYCLES_ADVISORY : null;
+}
+
+export type VariantsState = 'absent' | 'present';
+export type VariantSlotState = 'unreached' | 'cleared' | 'authored';
+
+/** Whether the `variants` key is written at all. */
+export function variantsState(preset: EffectsPreset): VariantsState {
+  return !('variants' in preset) || preset.variants === undefined ? 'absent' : 'present';
+}
+
+export const VARIANTS_STATE_OPTIONS: readonly { value: VariantsState; label: string }[] = Object.freeze([
+  { value: 'absent', label: 'every slot keeps its hand-authored value (key absent)' },
+  { value: 'present', label: 'array — slot by slot below' },
+]);
+
+/**
+ * The state of slot `index` as the document spells it. A slot past the end of
+ * the array — and every slot when the key is absent — is `unreached`.
+ */
+export function variantSlotState(preset: EffectsPreset, index: number): VariantSlotState {
+  const v = preset.variants;
+  if (!Array.isArray(v) || index >= v.length) return 'unreached';
+  return v[index] === null ? 'cleared' : 'authored';
+}
+
+/**
+ * The slots the panel draws: every slot the array reaches, PLUS ONE unreached
+ * slot the author can extend into. No slot COUNT is shown or enforced — the
+ * schema carries none (PAL_MAX_VARIANTS is the engine's), and an over-long
+ * array is the generator's refusal, named by it.
+ */
+export function variantSlotIndices(preset: EffectsPreset): number[] {
+  const n = Array.isArray(preset.variants) ? preset.variants.length : 0;
+  return Array.from({ length: n + 1 }, (_, i) => i);
+}
+
+export const VARIANT_SLOT_OPTIONS: readonly { value: VariantSlotState; label: string }[] = Object.freeze([
+  { value: 'unreached', label: 'keep hand-authored value (array ends before this slot)' },
+  { value: 'cleared', label: 'clear (null)' },
+  { value: 'authored', label: 'author (object)' },
+]);
+
+/**
+ * Write the `variants` key or delete it.
+ *
+ * `present` from absent writes `[]` — an array that reaches no slot. That is
+ * semantically what absent means too, and the two are STILL different
+ * documents: the author chose to write the key, and the file says so. Dropping
+ * to `absent` deletes whatever slots were there, in ONE undo step.
+ */
+export function setVariantsStateCommand(
+  library: EffectsPresetLibrary, id: string, state: VariantsState,
+): SetEffectsPresetCommand | null {
+  return editPresetCommand(library, id, `Preset ${id} variants: ${state}`, (p) => {
+    if (state === 'absent') { delete p.variants; return; }
+    if (!Array.isArray(p.variants)) p.variants = [];
+  });
+}
+
+/**
+ * Author one slot's spelling.
+ *
+ *   unreached  — the array ENDS BEFORE this slot: it and every slot after it
+ *                are dropped (the only spelling of "not reached" there is).
+ *   cleared    — null at the index.
+ *   authored   — an object at the index, born EMPTY: every variant field is
+ *                optional with a constructor default, so `{}` is a complete,
+ *                legal, number-free seed. Nothing is invented for it.
+ *
+ * Only the slot just past the end can be extended into (the panel offers no
+ * other), so the array never grows a hole of undefined.
+ */
+export function setVariantSlotStateCommand(
+  library: EffectsPresetLibrary, id: string, index: number, state: VariantSlotState,
+): SetEffectsPresetCommand | null {
+  return editPresetCommand(library, id, `Preset ${id} variant slot ${index}: ${state}`, (p) => {
+    if (!Array.isArray(p.variants) || index < 0 || index > p.variants.length) return;
+    if (state === 'unreached') { p.variants.length = Math.min(index, p.variants.length); return; }
+    const current = p.variants[index];
+    if (state === 'cleared') { p.variants[index] = null; return; }
+    if (current === null || current === undefined) p.variants[index] = {};
+  });
+}
+
+/** The variant fields, in the schema's order — all optional. */
+export const VARIANT_FIELDS: readonly string[] = presetDefFields('pal_variant').optional;
+
+/**
+ * The value a variant field is born with when the author sets it.
+ *
+ * A starting point, NOT a default: the constructor's defaults are aeon's and
+ * are not restated here. 0 for every shift and bias is simply the smallest
+ * integer to type over. `lines` seeds every line the SCHEMA's own rule permits
+ * — bit 0 clear ("Line 0 is the character's and the mask's bit for it must be
+ * clear"), at least one line named — which on a four-line CRAM is lines 1–3,
+ * mask %1110 = 14.
+ */
+export function variantFieldSeed(field: string): number {
+  return field === 'lines' ? 0b1110 : 0;
+}
+
+/**
+ * Set or unset one field on an authored slot. `undefined` deletes the key —
+ * every field is optional, and an absent field is the constructor's default,
+ * which is a different document from an explicit value that happens to equal it.
+ */
+export function setVariantFieldCommand(
+  library: EffectsPresetLibrary, id: string, index: number, field: string, value: number | undefined,
+): SetEffectsPresetCommand | null {
+  if (!VARIANT_FIELDS.includes(field)) return null;
+  return editPresetCommand(library, id, `Variant slot ${index} ${field}`, (p) => {
+    if (!Array.isArray(p.variants)) return;
+    const slot = p.variants[index] as unknown as Record<string, unknown> | null | undefined;
+    if (slot === null || slot === undefined) return;
+    if (value === undefined) delete slot[field];
+    else slot[field] = value;
+  });
+}
+
+/**
+ * The CRAM lines a `lines` mask names, for the checkbox spelling: bit n ⇔ line
+ * n. Four lines, because the Genesis CRAM has four; the wire value is still the
+ * integer, and bits above line 3 — a hand-written file could carry them — are
+ * preserved by `toggleVariantLineCommand`, which flips ONE bit and nothing else.
+ */
+export const CRAM_LINES: readonly number[] = Object.freeze([0, 1, 2, 3]);
+
+export function variantLineOn(mask: number, line: number): boolean {
+  return (mask & (1 << line)) !== 0;
+}
+
+export function toggleVariantLineCommand(
+  library: EffectsPresetLibrary, id: string, index: number, line: number,
+): SetEffectsPresetCommand | null {
+  return editPresetCommand(library, id, `Variant slot ${index} line ${line}`, (p) => {
+    if (!Array.isArray(p.variants)) return;
+    const slot = p.variants[index];
+    if (slot === null || slot === undefined || typeof slot.lines !== 'number') return;
+    slot.lines = slot.lines ^ (1 << line);
   });
 }
 

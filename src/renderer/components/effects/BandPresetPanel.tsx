@@ -34,8 +34,11 @@ import { useProjectStore, getActiveLevel } from '../../state/projectStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import type { AnyCommand } from '../../../core/editing/commands';
-import type { EffectsPresetLibrary, EffectsPresetBand } from '../../../core/formats/effects/preset';
-import { EFFECTS_PRESET_BAND_KEYS, presetArmFields } from '../../../core/formats/effects/preset';
+import type {
+  EffectsPresetLibrary, EffectsPresetBand, EffectsPreset, EffectsPresetCycleChannel,
+  EffectsPresetPalVariant,
+} from '../../../core/formats/effects/preset';
+import { EFFECTS_PRESET_BAND_KEYS, presetArmFields, presetDefFields } from '../../../core/formats/effects/preset';
 import {
   PRESET_HEADLINE, PRESET_LIMITS, NO_PREVIEW,
   BAND_FIELD_TITLES, armFieldTitle, armOptions, armLabel,
@@ -46,7 +49,15 @@ import {
   addBandCommand, removeBandCommand, lastBandRefusal,
   setBandFieldCommand, setBandArmCommand, setArmFieldCommand,
   parseColours, setColoursCommand, setPresetNameCommand,
+  CYCLES_TITLE, CYCLES_STATE_OPTIONS, cyclesState, setCyclesStateCommand,
+  addCycleChannelCommand, removeCycleChannelCommand, setCycleFieldCommand, cycleFieldTitle,
+  emptyCyclesAdvisory,
+  VARIANTS_TITLE, VARIANTS_STATE_OPTIONS, variantsState, setVariantsStateCommand,
+  VARIANT_SLOT_OPTIONS, variantSlotState, variantSlotIndices, setVariantSlotStateCommand,
+  VARIANT_FIELDS, variantFieldTitle, variantFieldSeed, setVariantFieldCommand,
+  CRAM_LINES, variantLineOn, toggleVariantLineCommand,
 } from '../../providers/effects-preset';
+import { PresetLagDisclosure } from './PresetLagDisclosure';
 
 const EMPTY_LIBRARY: EffectsPresetLibrary = { presets: [], unreadable: [], notices: [] };
 
@@ -301,7 +312,209 @@ export default function BandPresetPanel(): React.ReactElement | null {
           </SectionBody>
         </CollapsibleSection>
       )}
+
+      {/* ═══ THE OTHER TWO CHANNELS (ROADMAP row 97, second half) ═══
+
+          A SECTION OF ITS OWN, and the reason is the fold (O15, row 102): the
+          bands section is measured, and cycles + variants at full extent are
+          two cards of five spinners and three of eight. Folded in above, an
+          author scrolling for "Add band" would pass them every time. Split
+          out, the bands section's height does not move, and this one is shut
+          until asked for.
+
+          THE DISCLOSURE IS THE FIRST THING IN THE BODY — the same containment
+          that puts LimitBlock first above: a CollapsibleSection renders no
+          children while shut, so nobody reaches a cycles select without the
+          "not consumed by the engine yet" sentence already on screen. And it
+          is a leaf that takes no props, so no `bound`/`section` guard can be
+          slipped in one level down. The sentence itself is derived from the
+          measured premise (core/formats/effects/preset-lag.ts) and renders
+          nothing when that premise is gone. */}
+      {selected && (
+        <CollapsibleSection
+          id="aeon.effects.preset.channels"
+          title={`Preset — ${selected.id} — cycles, variants`}
+          defaultCollapsed>
+          <SectionBody>
+            <PresetLagDisclosure />
+            <CyclesBlock library={library} preset={selected} run={run} />
+            <VariantsBlock library={library} preset={selected} run={run} />
+            <Hint style={{ marginBottom: 0 }}>
+              Saved to <code>data/editor/effects/presets/{selected.id}.json</code> as
+              {' '}<code>cycles</code> and <code>variants</code>. An absent key is not written.
+            </Hint>
+          </SectionBody>
+        </CollapsibleSection>
+      )}
     </>
+  );
+}
+
+/**
+ * The `cycles` channel: one picker for the three spellings, then the script's
+ * channels when there is one. The picker's options are the provider's, labelled
+ * with what each WRITES, so the author reads the file from the control.
+ */
+function CyclesBlock({ library, preset, run }: {
+  library: EffectsPresetLibrary; preset: EffectsPreset; run: (c: AnyCommand | null) => void;
+}): React.ReactElement {
+  const state = cyclesState(preset);
+  const emptyAdvice = emptyCyclesAdvisory(preset);
+  return (
+    <>
+      <Field label="cycles" title={CYCLES_TITLE}>
+        <Select title={CYCLES_TITLE} value={state} style={{ flex: 1, minWidth: 0 }}
+          onChange={(v) => run(setCyclesStateCommand(library, preset.id, v as typeof state))}>
+          {CYCLES_STATE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </Select>
+      </Field>
+      {/* `[]` stays `[]` and says so. The advisory is the schema's own
+          sentence; the array is not rewritten as null or dropped, because
+          either would author a spelling the author did not pick. */}
+      {emptyAdvice !== null && <Hint under tone="warning">{emptyAdvice}</Hint>}
+      {Array.isArray(preset.cycles) && preset.cycles.map((ch, i) => (
+        <CycleChannelCard key={i} library={library} presetId={preset.id} index={i} channel={ch} run={run} />
+      ))}
+      {Array.isArray(preset.cycles) && (
+        <Chip onClick={() => run(addCycleChannelCommand(library, preset.id))}>Add channel</Chip>
+      )}
+    </>
+  );
+}
+
+function CycleChannelCard({ library, presetId, index, channel, run }: {
+  library: EffectsPresetLibrary; presetId: string; index: number;
+  channel: EffectsPresetCycleChannel; run: (c: AnyCommand | null) => void;
+}): React.ReactElement {
+  const { required, optional } = presetDefFields('cycle_channel');
+  const values = channel as unknown as Record<string, number | undefined>;
+  return (
+    <Card>
+      <Field label={`Channel ${index}`}>
+        <IconButton icon={<span>Remove</span>} label={`Remove cycle channel ${index}`}
+          onClick={() => run(removeCycleChannelCommand(library, presetId, index))} />
+      </Field>
+      {/* NO min/max ON ANY SPINNER HERE EITHER — the band spinners' rule
+          (aeon E.4), for the same reason: the constructor's ensure names the
+          bound and the measurement; a bound here would replace it. */}
+      {required.map((f) => (
+        <Field key={f} label={f} title={cycleFieldTitle(f)}>
+          <NumberField title={cycleFieldTitle(f)} width={72} value={Number(values[f])}
+            onChange={(n) => run(setCycleFieldCommand(library, presetId, index, f, n))} />
+        </Field>
+      ))}
+      {/* The optional field(s): present → a spinner and an unset; absent → a
+          chip that writes it. An absent `dir` is the constructor's default
+          and a different document from an explicit 0. */}
+      {optional.map((f) => (
+        <Field key={f} label={f} title={cycleFieldTitle(f)}>
+          {values[f] !== undefined ? (
+            <>
+              <NumberField title={cycleFieldTitle(f)} width={72} value={Number(values[f])}
+                onChange={(n) => run(setCycleFieldCommand(library, presetId, index, f, n))} />
+              <IconButton icon={<span>Unset</span>} label={`Unset ${f} on cycle channel ${index}`}
+                onClick={() => run(setCycleFieldCommand(library, presetId, index, f, undefined))} />
+            </>
+          ) : (
+            <Chip title={`${f} is absent — the constructor's default. Set it to write a value.`}
+              onClick={() => run(setCycleFieldCommand(library, presetId, index, f, 0))}>
+              absent — set
+            </Chip>
+          )}
+        </Field>
+      ))}
+    </Card>
+  );
+}
+
+/**
+ * The `variants` channel: one picker for key-present-or-absent, then one card
+ * per slot the array reaches PLUS ONE unreached slot to extend into. No slot
+ * count is drawn: the schema carries none, and the generator names its own.
+ */
+function VariantsBlock({ library, preset, run }: {
+  library: EffectsPresetLibrary; preset: EffectsPreset; run: (c: AnyCommand | null) => void;
+}): React.ReactElement {
+  const state = variantsState(preset);
+  return (
+    <>
+      <Field label="variants" title={VARIANTS_TITLE}>
+        <Select title={VARIANTS_TITLE} value={state} style={{ flex: 1, minWidth: 0 }}
+          onChange={(v) => run(setVariantsStateCommand(library, preset.id, v as typeof state))}>
+          {VARIANTS_STATE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </Select>
+      </Field>
+      {state === 'present' && variantSlotIndices(preset).map((i) => (
+        <VariantSlotCard key={i} library={library} preset={preset} index={i} run={run} />
+      ))}
+    </>
+  );
+}
+
+function VariantSlotCard({ library, preset, index, run }: {
+  library: EffectsPresetLibrary; preset: EffectsPreset; index: number; run: (c: AnyCommand | null) => void;
+}): React.ReactElement {
+  const state = variantSlotState(preset, index);
+  const slot = state === 'authored' ? (preset.variants![index] as EffectsPresetPalVariant) : null;
+  const values = (slot ?? {}) as Record<string, number | undefined>;
+  const unset = VARIANT_FIELDS.filter((f) => values[f] === undefined);
+  return (
+    <Card>
+      <Field label={`Slot ${index}`} title={VARIANTS_TITLE}>
+        <Select title={VARIANTS_TITLE} value={state} style={{ flex: 1, minWidth: 0 }}
+          onChange={(v) => run(setVariantSlotStateCommand(library, preset.id, index, v as typeof state))}>
+          {VARIANT_SLOT_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </Select>
+      </Field>
+      {slot !== null && VARIANT_FIELDS.filter((f) => values[f] !== undefined).map((f) => (
+        <Field key={f} label={f} title={variantFieldTitle(f)}>
+          {f === 'lines' ? (
+            /* The friendlier spelling the schema hands to the panel (ruling
+               Q4): one chip per CRAM line, bit n ⇔ line n. The WIRE value is
+               the integer beside them, and a toggle flips one bit only, so a
+               hand-written mask keeps whatever else it carried. Line 0 is
+               offered because a file can carry it and the constructor's
+               refusal is the constructor's to give. */
+            <>
+              {CRAM_LINES.map((line) => (
+                <Chip key={line} active={variantLineOn(Number(values[f]), line)}
+                  title={`CRAM line ${line} — bit ${line} of the mask`}
+                  onClick={() => run(toggleVariantLineCommand(library, preset.id, index, line))}>
+                  L{line}
+                </Chip>
+              ))}
+              <span style={{ fontSize: T.tXs, color: T.textLo }}>= {Number(values[f])}</span>
+            </>
+          ) : (
+            <NumberField title={variantFieldTitle(f)} width={72} value={Number(values[f])}
+              onChange={(n) => run(setVariantFieldCommand(library, preset.id, index, f, n))} />
+          )}
+          <IconButton icon={<span>Unset</span>} label={`Unset ${f} on variant slot ${index}`}
+            onClick={() => run(setVariantFieldCommand(library, preset.id, index, f, undefined))} />
+        </Field>
+      ))}
+      {/* Every field is optional and absent means the constructor's default.
+          The absent ones are one row of chips, each of which WRITES the field
+          — a seed to type over, not a default Aurora claims to know. */}
+      {slot !== null && unset.length > 0 && (
+        <Field label="absent" title="Fields not written — each is the constructor's default until set.">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: T.s1, flex: 1, minWidth: 0 }}>
+            {unset.map((f) => (
+              <Chip key={f} title={variantFieldTitle(f)}
+                onClick={() => run(setVariantFieldCommand(library, preset.id, index, f, variantFieldSeed(f)))}>
+                {f}
+              </Chip>
+            ))}
+          </div>
+        </Field>
+      )}
+    </Card>
   );
 }
 

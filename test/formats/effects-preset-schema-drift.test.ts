@@ -30,6 +30,7 @@ import {
   EFFECTS_PRESET_SCHEMA, EFFECTS_PRESET_BAND_KEYS, EFFECTS_PRESET_ON_ARMS,
   EFFECTS_PRESET_RESERVED_KEYS, EFFECTS_PRESET_ROOT_KEYS, presetArmFields,
 } from '../../src/core/formats/effects/preset';
+import { PRESET_KEYS_AWAITING_AEON } from '../../src/core/formats/effects/preset-lag';
 import { peerRepo, resolveRev, readAtRev, isAncestor } from '../support/peer-repo';
 
 const SCHEMA_PATH = resolve(
@@ -432,15 +433,30 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
    * CURRENCY rows keep — whose job is to go red the day it stops being true.
    * When aeon lands its half of item 5 (effects_gen.py lowering cycles and
    * variants, the page's `preset-refused` row shrinking to `fires`), this row
-   * fails: delete it, and re-read docs/reviews for anything that quoted the lag.
+   * fails: empty `PRESET_KEYS_AWAITING_AEON` (or delete it and this row
+   * together), and re-read docs/reviews for anything that quoted the lag.
+   *
+   * THE PIN LIVES IN src/, NOT HERE. `PRESET_KEYS_AWAITING_AEON`
+   * (core/formats/effects/preset-lag.ts) is the premise of the band-preset
+   * panel's "not consumed by the engine yet" sentence, and this row is its
+   * MEASUREMENT: one fact, hand-typed once, measured here, rendered there.
+   * The row carries no copy of the names, so the sentence cannot say one thing
+   * while the test asserts another. `preset-lag-disclosure.test.ts` checks
+   * from the other side that this row still exists while the premise does.
    */
   it(`the contract-leads-consumer lag at aeon ${page.kind === 'ok' ? page.tip.slice(0, 8) : TIP} is `
-     + 'exactly the item-5 keys, cycles and variants (goes red when aeon catches up)', (ctx) => {
+     + 'exactly PRESET_KEYS_AWAITING_AEON, the panel\'s disclosure premise (goes red when aeon catches up)', (ctx) => {
     onPage(ctx, ({ tip, keys }) => {
+      // Anti-vacuous: a premise with nothing in it has no business being
+      // measured — if aeon has caught up, retire the constant AND this row.
+      expect(PRESET_KEYS_AWAITING_AEON.length, 'PRESET_KEYS_AWAITING_AEON is empty: the disclosure '
+        + 'has retired, so delete this row with it').toBeGreaterThan(0);
       const lag = keys['preset-refused'].filter((k) => !schemaReserved.includes(k)).sort();
       expect(lag, `the lag between ${PROV.empyrean.path} (blob ${PROV.empyrean.blob}) and aeon `
-        + `${PAGE} at ${tip} has MOVED. If it is now empty, aeon has built item 5: delete this row. `
-        + 'If it is something else, that is a split to report.').toEqual(['cycles', 'variants']);
+        + `${PAGE} at ${tip} has MOVED away from PRESET_KEYS_AWAITING_AEON. If it is now empty, `
+        + 'aeon has built item 5: empty the constant (the panel\'s sentence retires with it) and '
+        + 'delete this row. If it is something else, that is a split to report.')
+        .toEqual([...PRESET_KEYS_AWAITING_AEON].sort());
     });
   });
 });
