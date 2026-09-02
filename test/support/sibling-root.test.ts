@@ -791,6 +791,121 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
       rmSync(bed.scratch, { recursive: true, force: true });
     }
   });
+
+  /**
+   * ─────────── AND THE CHECKOUT THIS SUITE ACTUALLY RUNS IN ───────────
+   *
+   * The two rows above prove the derivation in a repository they BUILT. This one
+   * proves it in the repository the code is checked out as, and the difference is
+   * the whole reason the contract asks for both: *"a lane whose step-3 row is a
+   * bed and nothing else has an untested production path invisible in a green
+   * run … a derivation verified where it could be constructed says nothing about
+   * where it runs."* (empyrean `contract/SUITE_PATHS.md`.)
+   *
+   * ⚠ THIS ROW DOES NOT DISCRIMINATE A BED-IGNORING RESOLVER, AND SAYING SO IS
+   * PART OF ITS JOB. Its expectation is the real tree's own suite root, which is
+   * exactly the answer a resolver that ignored every bed would give — so unlike
+   * the two rows above, it cannot tell "measured here" from "measured somewhere
+   * else and right by luck". That is not a defect to fix here and it is not a
+   * reason to delete the row; it is a NARROWER row on an axis the constructed
+   * beds cannot reach. The two properties are covered by different rows on
+   * purpose:
+   *
+   *   bed-ignoring resolver  → caught by the constructed rows above, whose
+   *                            expectation is a `mkdtemp` path no other run has
+   *   the FLAG defect        → caught HERE as well, and here it is the
+   *                            PRODUCTION path: from a main-checkout root
+   *                            without `--path-format=absolute`, the derivation
+   *                            yields `"."` rather than the suite root
+   *
+   * The repo's bar is to say which rows do not discriminate rather than let a
+   * reader assume every green one was earned.
+   *
+   * WHY IT MAY SKIP, AND WHY THAT IS NOT A PASS. Agent sessions run in a linked
+   * worktree, where this configuration does not exist to be measured — which is
+   * precisely the disjoint population this parcel is about, arriving one level
+   * up. There is nothing to assert there, so it says so in the run's own output
+   * and contributes zero, exactly as the contract requires: *"the skip prints its
+   * reason in the run's output, since a green log and an absent run are the same
+   * artifact."* Whether the production configuration was measured is then
+   * readable from the run rather than assumed from its colour.
+   *
+   * THE DETECTOR IS THE SAME ONE THE BED REFUSALS USE — a RELATIVE answer from
+   * `git rev-parse --git-common-dir` means a main checkout, an absolute one means
+   * a linked worktree — deliberately, so there are not two ways of asking the
+   * same question that could drift apart.
+   */
+  it('and THIS checkout, when it is a main one — the configuration production runs in', (ctx) => {
+    // The subject's own anchor, read back from the subject rather than
+    // recomputed here: it is what step 3 hands git as `cwd`, so it is the only
+    // directory whose git output shape says anything about this run.
+    const anchor = run('process.stdout.write(R.AURORA_DIR);').stdout;
+
+    let raw: string;
+    try {
+      raw = execFileSync('git', ['rev-parse', '--git-common-dir'], {
+        cwd: anchor, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+      }).trim();
+    } catch (e) {
+      ctx.skip(
+        'SKIPPED, NOT PASSED: this checkout is not a git repository at all, so step 3 could not be '
+        + `measured in the configuration production runs in. \`git rev-parse\` in ${anchor} failed: `
+        + `${(e as Error).message}`,
+      );
+      return;
+    }
+
+    if (isAbsolute(raw)) {
+      ctx.skip(
+        'SKIPPED, NOT PASSED: step 3 was NOT measured in this repo\'s real MAIN CHECKOUT by this '
+        + `run — the production configuration. This run is standing in a LINKED WORKTREE (${anchor}), `
+        + `where \`git rev-parse --git-common-dir\` answers the absolute ${raw} whether it is asked to `
+        + 'or not, so the relative output shape production consumes does not exist here to be '
+        + 'measured. The two rows above measured that shape on a repository they built; this row is '
+        + 'the one that would have measured it where the code actually lives, and it measured '
+        + 'nothing. Run the suite from the main checkout to close this.',
+      );
+      return;
+    }
+
+    // A main checkout. Everything below is measured LIVE from this tree in this
+    // run — nothing typed, and no path from any developer's machine.
+    const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
+      cwd: anchor, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+    const expected = dirname(dirname(common));
+    // What the same lexical derivation gives on git's DEFAULT output — the
+    // production answer if `--path-format=absolute` were ever dropped.
+    const withoutTheFlag = dirname(dirname(raw));
+
+    const [derived, source] = derive();
+
+    // eslint-disable-next-line no-console
+    console.log(
+      `step 3 measured in THIS repo's REAL MAIN CHECKOUT — the production configuration\n`
+      + `    anchor, which is git's cwd and the subject's AURORA_DIR = ${anchor}\n`
+      + `    git rev-parse --git-common-dir                          = ${JSON.stringify(raw)}\n`
+      + `    …--path-format=absolute --git-common-dir                = ${common}\n`
+      + `    RIGHT derivation dirname(dirname(absolute))             = ${expected}\n`
+      + `    same derivation on git's DEFAULT output                 = ${JSON.stringify(withoutTheFlag)}\n`
+      + `    resolver answered → ${derived}\n    ${source}\n`
+      + '    (this row does NOT discriminate a bed-ignoring resolver — see its header)',
+    );
+
+    expect(
+      derived,
+      `run in this repo's own main checkout at ${anchor}, the resolver answered ${derived}; the `
+      + `directory holding this checkout, derived from --git-common-dir, is ${expected}`,
+    ).toBe(expected);
+    expect(
+      derived,
+      'this is the answer a resolver consuming git\'s default (relative) output would give HERE, in '
+      + 'the configuration production runs in',
+    ).not.toBe(withoutTheFlag);
+    // The step-source names the anchor, so a reader of the log can tell which
+    // tree this row's green is about.
+    expect(source).toContain(`from ${anchor}`);
+  });
 });
 
 describe('sibling-root: step 4 — refuse, naming what was looked for and where', () => {
