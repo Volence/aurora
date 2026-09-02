@@ -91,6 +91,14 @@
  *       audit keys on the stamp, so the second such entry goes unjudged; that is a
  *       harmless miss for a repair commit re-adding an old line (K1's repo proves such a
  *       re-add does NOT fail) and a hole for two new ones.
+ *   K6b a bad entry CORRECTED by a later commit: exit 0, with the old stamp counted and
+ *       printed as no longer in the file. This is the REMEDY, and the gate had none until
+ *       the red-first proof found it: first appearance keys on the stamp, so the bad `at`
+ *       stays in that commit's diff forever and no commit anyone could make would clear
+ *       the run. That is a permanently-red suite — the failure the ratchet exists to
+ *       prevent, reintroduced at a different point.
+ *   K6c a correction that is ITSELF remembered: exit 1. The replacement is judged at its
+ *       own commit, so the remedy cannot launder a stamp, only replace one.
  *   K7  a ledger path git does not track: exit 2, and the gate treats 2 as FAILURE. A
  *       gate that cannot see is not a gate that passed.
  *
@@ -490,6 +498,12 @@ if (bad.length === 0) {
   process.exit(0);
 }
 
+// An audit that could not measure is reported as UNMEASURABLE and exits 2, not 1. Both
+// are red and both stop the `npm test` chain, but they are different facts, and a reader
+// told "an entry failed" when the truth is "nothing was examined" has been handed a
+// verdict attached to a fabricated reason. The header has always documented exit 2 for
+// this; until the exit-2 proof was run, the code did not do it.
+const unmeasurable = bad.filter((r) => r.status === 2);
 console.error(
   `\n${PREFIX}: FAIL — ${bad.length} of ${LEDGERS.length} ledger(s) did not pass:\n`
   + bad.map((r) => `  ${r.ledger}: exit ${r.status}`
@@ -497,12 +511,17 @@ console.error(
       ? ' — COULD NOT MEASURE, which is a FAILURE here and not a pass. A gate that cannot see is not a gate that passed.'
       : ' — see the sections above.')).join('\n')
   + '\n\n'
-  + '  An `at` is required to come from `date -u +%Y-%m-%dT%H:%M:%SZ` read at the moment\n'
-  + '  the entry is written, immediately before committing it. Not from memory, not\n'
-  + '  rounded to the nearest five minutes, not copied from a sibling entry.\n'
-  + '\n'
-  + '  FIX THE NEW ENTRY, DO NOT MOVE THE CUTOFF. These ledgers are append-only and are\n'
-  + '  not rewritten; the entries this gate grandfathers stay exactly as they are, and\n'
-  + '  IN_FORCE exists so that nothing NEW joins them.\n',
+  + (unmeasurable.length < bad.length
+    ? '  An `at` is required to come from `date -u +%Y-%m-%dT%H:%M:%SZ` read at the moment\n'
+      + '  the entry is written, immediately before committing it. Not from memory, not\n'
+      + '  rounded to the nearest five minutes, not copied from a sibling entry.\n'
+      + '\n'
+      + '  FIX THE NEW ENTRY, DO NOT MOVE THE CUTOFF. These ledgers are append-only and are\n'
+      + '  not rewritten; the entries this gate grandfathers stay exactly as they are, and\n'
+      + '  IN_FORCE exists so that nothing NEW joins them. If the bad stamp is already\n'
+      + '  pushed, correct the entry in a follow-up commit — the run then reports the old\n'
+      + '  stamp as no longer in the file and stops judging it.\n'
+    : '  Nothing here says an entry is wrong. It says the audit did not run, which is not\n'
+      + '  the same fact and must not be read as one.\n'),
 );
-process.exit(1);
+process.exit(unmeasurable.length ? 2 : 1);
