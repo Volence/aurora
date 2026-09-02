@@ -90,6 +90,42 @@ export function readAtRev(repo: string, rev: string, path: string): PeerBlob {
   return { ok: true, text, blob };
 }
 
+/**
+ * `git -C <repo> grep -l <pattern> <rev> -- <paths>` — which files AT A REVISION
+ * match, as repo-relative paths.
+ *
+ * The committed-revision answer to a question that is otherwise asked with a
+ * shell `grep -rl` over a peer's working directory, which measures whatever that
+ * lane has typed and not committed — and which, on a machine without the peer,
+ * either throws or answers with the exit status of a failed command.
+ *
+ * ⚠ IT DISTINGUISHES "NO MATCHES" FROM "COULD NOT RUN", because `git grep`
+ * spells both as a non-zero exit. Exit 1 is the honest empty answer (and for a
+ * completeness row, an empty answer is a FAILURE, not a skip); anything else is
+ * a repo or revision problem, which the caller must report as unmeasured.
+ */
+export type PeerGrep =
+  | { ok: true; files: string[] }
+  | { ok: false; why: string };
+
+export function grepAtRev(repo: string, rev: string, pattern: string, paths: string[]): PeerGrep {
+  const sha = resolveRev(repo, rev);
+  if (sha === null) return { ok: false, why: `revision ${rev} does not resolve in ${repo} (unfetched? shallow?)` };
+  try {
+    const out = execFileSync(
+      'git',
+      ['-C', repo, 'grep', '--extended-regexp', '--files-with-matches', pattern, sha, '--', ...paths],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 },
+    );
+    // Each line is `<sha>:<path>`; the revision prefix is noise to the caller.
+    return { ok: true, files: out.split('\n').filter((l) => l.length > 0).map((l) => l.slice(sha.length + 1)) };
+  } catch (e) {
+    const status = (e as { status?: number }).status;
+    if (status === 1) return { ok: true, files: [] };
+    return { ok: false, why: `git grep exited ${status ?? '?'} in ${repo} at ${rev} (${sha})` };
+  }
+}
+
 /** True when `ancestor` is reachable from `descendant` — i.e. the pin is PUBLISHED, not local-only. */
 export function isAncestor(repo: string, ancestor: string, descendant: string): boolean {
   return git(repo, ['merge-base', '--is-ancestor', ancestor, descendant]) !== null;

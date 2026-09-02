@@ -57,15 +57,33 @@ import { enumerateProfileEntries, S1_GLOBAL_REQUIRED_KEYS } from '../../src/core
 import { s1Profile } from '../../src/core/project/profiles/s1';
 import { levelArtReservationRequests } from '../../src/core/project/profiles/s1-levelart-reservations';
 
-import { referenceCheckout, referencePath, referencePathSource } from './fixture-tree';
+import { referenceCheckout, referencePath, referencePathSource, S1_PINNED } from './fixture-tree';
 
-/** Absolute path inside the s1disasm checkout (derived, never typed). */
+/**
+ * ⚠ THESE NOW RESOLVE THE PIN, NOT THE PEER (ROADMAP row 78 phase 2).
+ *
+ * Every guard and path in this module used to point at `../s1disasm`, another
+ * lane's live working tree, so 28 test files had their colour decided by
+ * whatever that lane had typed and not committed — measured in
+ * `docs/reviews/2026-09-02-row78-s1disasm-live-tree.md`. The data those rows
+ * assert on is now vendored into this repo at a named revision, and this is the
+ * one place that changed: no consumer had to learn a new spelling.
+ *
+ * The consequence for the guards below, said out loud because a guard that
+ * cannot fire is the defect class this repo keeps finding: with the tree
+ * committed HERE, `whenS1Files` and friends will not skip on any machine that
+ * has this repo. They are kept because they still name the file a row reads —
+ * which is what makes a failure legible — and because the same helpers are what
+ * a row would use if it ever pointed back at the peer. The live assertion on the
+ * pin's completeness and integrity is `test/formats/s1disasm-pin-currency.test.ts`,
+ * which FAILS; it does not skip.
+ */
 export function s1Path(...rel: string[]): string {
-  return referencePath('s1disasm', ...rel);
+  return referencePath(S1_PINNED, ...rel);
 }
 
-/** The checkout root, for messages. */
-export const S1_ROOT = referencePath('s1disasm');
+/** The pinned tree's root, for messages. */
+export const S1_ROOT = referencePath(S1_PINNED);
 
 /**
  * WHICH VARIABLE PUT US IN THAT TREE — the third thing a refusal owes.
@@ -76,7 +94,7 @@ export const S1_ROOT = referencePath('s1disasm');
  * resolver reads the environment at call time.
  */
 function s1RootSource(): string {
-  return referencePathSource('s1disasm');
+  return referencePathSource(S1_PINNED);
 }
 
 /**
@@ -147,11 +165,12 @@ const REASON_SHOWS = 4;
 export function incompleteCheckoutReason(what: string, missing: readonly string[]): string {
   const shown = missing.slice(0, REASON_SHOWS).join(', ');
   const more = missing.length > REASON_SHOWS ? ` (+${missing.length - REASON_SHOWS} more)` : '';
-  return `SKIPPED, NOT PASSED: cannot measure ${what} — the s1disasm checkout at ${S1_ROOT} `
-    + `is INCOMPLETE: ${missing.length} required file(s) absent: ${shown}${more}. `
-    + 'It has the top-level markers but not this data, so this row measures nothing. '
-    + 'That is an incomplete checkout, not an Aurora defect. '
-    + `(${s1RootSource()} — if that is the wrong tree, that is the thing to change.)`;
+  return `SKIPPED, NOT PASSED: cannot measure ${what} — the VENDORED s1disasm tree at `
+    + `${S1_ROOT} is INCOMPLETE: ${missing.length} required file(s) absent: ${shown}${more}. `
+    + 'It has the top-level markers but not this data. That tree is COMMITTED TO THIS REPO, so '
+    + 'this is an Aurora defect (a deleted or half-merged fixture), not a machine without a '
+    + 'disassembly; rebuild it with `node scripts/vendor-s1-fixtures.mjs`. '
+    + `(${s1RootSource()})`;
 }
 
 /**
@@ -164,12 +183,14 @@ export function whenS1Files(what: string, rels: readonly string[]): {
   skip: boolean;
   meta: { skipReason: string };
 } {
-  if (!referenceCheckout('s1disasm')) {
+  if (!referenceCheckout(S1_PINNED)) {
     return {
       skip: true,
       meta: {
-        skipReason: `SKIPPED, NOT PASSED: cannot measure ${what} — no s1disasm checkout at `
-          + `${S1_ROOT} (see S1DISASM_DIR / EMPYREAN_SUITE_ROOT), so this row measures nothing`,
+        skipReason: `SKIPPED, NOT PASSED: cannot measure ${what} — the VENDORED s1disasm `
+          + `tree at ${S1_ROOT} is not there. It is committed to THIS repo, so this is an Aurora `
+          + 'defect, not a machine without a disassembly; rebuild it with '
+          + '`node scripts/vendor-s1-fixtures.mjs`',
       },
     };
   }
@@ -186,12 +207,14 @@ export function whenS1Act(zone: string, act: number): {
   meta: { skipReason: string };
 } {
   const what = `${zone.toUpperCase()} act ${act} through the real adapter`;
-  if (!referenceCheckout('s1disasm')) {
+  if (!referenceCheckout(S1_PINNED)) {
     return {
       skip: true,
       meta: {
-        skipReason: `SKIPPED, NOT PASSED: cannot measure ${what} — no s1disasm checkout at `
-          + `${S1_ROOT} (see S1DISASM_DIR / EMPYREAN_SUITE_ROOT), so this row measures nothing`,
+        skipReason: `SKIPPED, NOT PASSED: cannot measure ${what} — the VENDORED s1disasm `
+          + `tree at ${S1_ROOT} is not there. It is committed to THIS repo, so this is an Aurora `
+          + 'defect, not a machine without a disassembly; rebuild it with '
+          + '`node scripts/vendor-s1-fixtures.mjs`',
       },
     };
   }
@@ -285,12 +308,13 @@ export function whenS1Glob(dir: string, describeGlob: string, matches: readonly 
   meta: { skipReason: string };
 } {
   const abs = s1Path(dir);
-  if (!referenceCheckout('s1disasm')) {
+  if (!referenceCheckout(S1_PINNED)) {
     return {
       skip: true,
       meta: {
-        skipReason: `SKIPPED, NOT PASSED: cannot measure ${describeGlob} — no s1disasm checkout `
-          + `at ${S1_ROOT} (see S1DISASM_DIR / EMPYREAN_SUITE_ROOT), so this row measures nothing`,
+        skipReason: `SKIPPED, NOT PASSED: cannot measure ${describeGlob} — the VENDORED `
+          + `s1disasm tree at ${S1_ROOT} is not there. It is committed to THIS repo, so this is `
+          + 'an Aurora defect; rebuild it with `node scripts/vendor-s1-fixtures.mjs`',
       },
     };
   }
@@ -306,7 +330,7 @@ export function whenS1Glob(dir: string, describeGlob: string, matches: readonly 
       meta: {
         skipReason: `SKIPPED, NOT PASSED: cannot measure ${describeGlob} — ${abs} EXISTS but `
           + 'holds no file matching that pattern, so this row has nothing to read and measures '
-          + 'nothing. That is an incomplete s1disasm checkout, not an Aurora defect.',
+          + 'nothing. That directory is VENDORED into this repo, so this is an Aurora defect.',
       },
     };
   }
