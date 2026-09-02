@@ -260,6 +260,27 @@ const SET_SELECT = (selector, value) => String.raw`
 })()`;
 const STRIP_SELECT = String.raw`(() => { const p = ${STRIP}; return p ? p.querySelector('select') : null; })()`;
 
+/**
+ * SHOW ONE OF THE THREE JOBS — added by EW-SHAPE-TABS (d-26b), which re-parented
+ * this column's panels under three sub-tabs.
+ *
+ * ⚠ WHY THIS HARNESS NEEDED A LINE AT ALL. Every row below is still about the
+ * STRIP, which is outside the tabs and unchanged. But two of them are taken
+ * somewhere else in the column — at the raster binding, and at the bottom of a
+ * column tall enough for "permanent" to mean anything — and the raster binding
+ * now lives on the COLOUR tab. On Parallax that control is not in the DOM at
+ * all (unmounted, not hidden), and the tab does not scroll on arrival, which is
+ * that parcel's measured result. So the permanence rows moved to the tab that
+ * still has both properties; nothing about what they assert changed.
+ */
+const SUBTAB = (id) => String.raw`
+(() => {
+  const t = document.querySelector('[data-effects-sub-tab="' + ${JSON.stringify(id)} + '"]');
+  if (!t) return 'no-sub-tab';
+  t.click();
+  return 'ok';
+})()`;
+
 /** The per-section raster binding at the bottom of RASTER BAND PRESETS. */
 const RASTER_SELECT = String.raw`
   [...document.querySelectorAll('select')]
@@ -324,6 +345,11 @@ async function main() {
     await sleep(2500);
     check('1b', 'the Effects facet mounts', (await c.evalExpr(clickByText('/^Effects$/'))) === true);
     await sleep(1500);
+    // The COLOUR job: the tab that carries the raster binding this strip
+    // captions, and the one whose column is still taller than the window.
+    check('1c', 'the Colour sub-tab is reachable — the raster binding lives there since d-26b',
+      (await c.evalExpr(SUBTAB('colour'))) === 'ok');
+    await sleep(1100);
 
     // ---- 2. PERMANENCE. --------------------------------------------------
     const top = await c.json(STRIP_PAINT);
@@ -366,9 +392,18 @@ async function main() {
     })()`);
     await sleep(600);
     const atRaster = await c.json(STRIP_PAINT);
+    // ⚠ THE TRAVEL CLAUSE IS DERIVED NOW, NOT A LITERAL 500 (EW-SHAPE-TABS).
+    // It exists so that "the strip is still visible because nothing moved"
+    // fails, and 500 was a proxy for the 1,600px this control used to sit
+    // down the single column. On the Colour sub-tab the same binding is 395px
+    // down, so the literal started refusing a strip that had genuinely
+    // survived the scroll. The property is: the column has moved by MORE THAN
+    // THE STRIP'S OWN HEIGHT, which is exactly the condition under which a
+    // non-sticky strip is entirely above the scrollport (its bottom would be
+    // at colTop - scrollTop + height < colTop).
     check('2c', 'AT THE RASTER BINDING — the control it captions — the strip is still painted',
       rasterAt.found === true && atRaster.insideScroller === true && atRaster.hitIsSelect === true
-      && atRaster.scroll.top > 500,
+      && atRaster.scroll.top > atRaster.rect.height,
       `raster select: ${JSON.stringify(rasterAt)}\n        ${JSON.stringify(atRaster)}`);
 
     // ---- 3. THE TWO CONDITIONS, APART. -----------------------------------
@@ -458,6 +493,8 @@ async function main() {
       await sleep(2500);
       await c.evalExpr(clickByText('/^Effects$/'));
       await sleep(1500);
+      await c.evalExpr(SUBTAB('colour'));
+      await sleep(1000);
       const got = await c.json(String.raw`(() => {
         const conds = ${CONDITIONS};
         const s = ${RASTER_SELECT};
@@ -527,6 +564,8 @@ async function main() {
     await sleep(2500);
     await c.evalExpr(clickByText('/^Effects$/'));
     await sleep(1500);
+    await c.evalExpr(SUBTAB('colour'));
+    await sleep(1000);
     await c.evalExpr(SET_SELECT(STRIP_SELECT, 0));
     await sleep(600);
     // ⚠ SCROLLED, AND THE SCROLL IS READ BACK. The point of the capture is the

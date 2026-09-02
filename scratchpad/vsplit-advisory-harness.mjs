@@ -349,11 +349,17 @@ const DOM_ORDER = (phrase) => String.raw`
   const P = Node.DOCUMENT_POSITION_FOLLOWING;
   return {
     found: true, vf: true, l0: true,
-    // "the hint comes BEFORE the layer-0 split control" == it is up in the
-    // scene section rather than down on a card.
+    // "the hint comes BEFORE the layer-0 split control". ⚠ SINCE d-26b's
+    // sub-tabs the LAYERS list is ABOVE the scene form (a content section never
+    // shrinks, and 478px of scene form was pinning the list to its floor), so
+    // this is now FALSE for the scene sentence and false for the layer one —
+    // it no longer discriminates, and the rows below say so and use
+    // afterVFactor instead, which discriminates in the new order. (No
+    // backticks in this block: it is inside a template literal.)
     beforeLayer0: (leaf.compareDocumentPosition(l0) & P) !== 0,
-    // "the hint comes AFTER the v_factor spinner" — true for both, but taken
-    // with beforeLayer0 it pins the hint between them, which is the scene row.
+    // "the hint comes AFTER the v_factor spinner" — the scene form is now the
+    // LAST section of the Parallax job, so this is TRUE for the scene sentence
+    // (it hangs off the spinner) and FALSE for a layer card's, which is above.
     afterVFactor: (vf.compareDocumentPosition(leaf) & P) !== 0,
   };
 })()`;
@@ -538,6 +544,32 @@ const BLOCK_TEXT = (phrase) => String.raw`
 
 function sceneOf(doc) { return doc.find((s) => s.id === SCENE_ID) ?? null; }
 
+/**
+ * THE SCENE FORM, OPENED - it arrives COLLAPSED since EW-SHAPE-TABS (d-26b),
+ * which is what gives the layers list above it a real height. Idempotent.
+ */
+const OPEN_SCENE_FORM = String.raw`
+(() => {
+  const has = () => [...document.querySelectorAll('input')]
+    .some((e) => (e.title || '').startsWith('v_offset'));
+  if (has()) return 'already-open';
+  const hdr = [...document.querySelectorAll('div')]
+    .filter((d) => d.style && d.style.cursor === 'pointer'
+                && /^SCENE\s*\u2014/i.test((d.innerText || '').trim()))[0];
+  if (!hdr) return 'no-scene-header';
+  hdr.click();
+  return 'clicked';
+})()`;
+
+/** Show one of d-26b's three Effects jobs. See [5j]. */
+const SUBTAB_VS = (id) => String.raw`
+(() => {
+  const t = document.querySelector('[data-effects-sub-tab="' + ${JSON.stringify(id)} + '"]');
+  if (!t) return 'no-sub-tab';
+  t.click();
+  return 'ok';
+})()`;
+
 async function main() {
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
@@ -607,6 +639,13 @@ async function main() {
     await sleep(1200);
 
     // ---- 3. THE FIXTURE, BUILT THROUGH THE REAL CONTROLS. -----------------
+    // ⚠ v_factor and the rest of the scene form arrive COLLAPSED since d-26b's
+    // sub-tabs. Opened here, once, before anything reads a control inside it.
+    const openSceneForm = async () => {
+      const r = await c.evalExpr(OPEN_SCENE_FORM);
+      await sleep(800);
+      return r;
+    };
     const scenes0 = await c.json('window.__dbg.aeon.scenes()');
     note(`fixture scenes before this run: ${JSON.stringify(scenes0.map((s) => s.id))}`);
     await c.evalExpr(SET_INPUT(
@@ -672,6 +711,7 @@ async function main() {
     // 5. ⚠ THE DISCRIMINATING SECTION, ROUTE A: move v_factor off the lock
     //    while a split is already placed. The author never touches a layer.
     // =====================================================================
+    await openSceneForm();
     await setField('5a0', 'the v_factor spinner took a camera-tracking shift', vfField, UNLOCKED_VF);
     await sleep(700);
     doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
@@ -764,11 +804,23 @@ async function main() {
       + `${JSON.stringify(panelOf(mech).map((m) => ({ visible: m.visible, rects: m.rects, h: m.h, hit: m.blockHitText })))}. `
       + 'inText proves textContent still carries it — which is exactly why no row here '
       + 'may use textContent. visible/rects/blockHit are the measurement.');
+    // ⚠ THE RASTER STRIP IS ON A DIFFERENT JOB SINCE d-26b, so its sentence is
+    // UNMOUNTED while Parallax is shown and this row has to go and look at it.
+    // The claim is unchanged — O15 converted the v_factor row and the layer
+    // cards and NOT this — but "it is not converted" and "it is not rendered"
+    // are different facts, and measuring the second while meaning the first is
+    // exactly how a scope row stops discriminating.
+    await c.evalExpr(SUBTAB_VS('colour'));
+    await sleep(1100);
+    const mechStrip = await c.json(MECH_STATE);
+    await c.evalExpr(SUBTAB_VS('parallax'));
+    await sleep(900);
+    await openSceneForm();
     check('5j', 'SCOPE HELD: the raster strip\'s own sentence is NOT converted and is still whole',
-      stripOf(mech).length >= 1
-      && stripOf(mech).every((m) => m.visible === true && m.rects >= 1 && m.h > 0),
-      `${stripOf(mech).length} mechanism element(s) with no disclosure: `
-      + `${JSON.stringify(stripOf(mech).map((m) => ({ visible: m.visible, h: m.h })))}. `
+      stripOf(mechStrip).length >= 1
+      && stripOf(mechStrip).every((m) => m.visible === true && m.rects >= 1 && m.h > 0),
+      `${stripOf(mechStrip).length} mechanism element(s) with no disclosure: `
+      + `${JSON.stringify(stripOf(mechStrip).map((m) => ({ visible: m.visible, h: m.h })))}. `
       + 'That is `canvas/raster-timeline.ts`\'s `splitRefusal`, in a different collapsible '
       + 'section — O15\'s scope names the v_factor row and the layer cards, and this row '
       + 'is what makes "scope held" a measurement instead of a sentence in a packet.');
@@ -856,12 +908,13 @@ async function main() {
     // =====================================================================
     const LAYER_SUBJECT = 'this layer authors a Plane B split while';
     const order = await c.json(DOM_ORDER(NAMES_BOTH));
-    check('7a', 'the SCENE sentence sits between the v_factor spinner and the layer cards',
-      order.found === true && order.afterVFactor === true && order.beforeLayer0 === true,
-      JSON.stringify(order));
+    check('7a', 'the SCENE sentence hangs off the v_factor spinner, inside the scene form',
+      order.found === true && order.afterVFactor === true,
+      `${JSON.stringify(order)}\n        ⚠ beforeLayer0 is FALSE by design since d-26b — the `
+      + 'layers list is above the scene form now, so the pair discriminates on afterVFactor');
     const orderL = await c.json(DOM_ORDER(LAYER_SUBJECT));
-    check('7b', 'the LAYER sentence sits on a layer card, below layer 0\'s split control',
-      orderL.found === true && orderL.beforeLayer0 === false,
+    check('7b', 'the LAYER sentence sits on a layer card — ABOVE the scene form, not in it',
+      orderL.found === true && orderL.beforeLayer0 === false && orderL.afterVFactor === false,
       JSON.stringify(orderL));
     const layerHits = await c.json(FIND_TEXT(LAYER_SUBJECT));
     check('7c', 'ANTI-VACUOUS: there are TWO layer sentences, one per split layer',
