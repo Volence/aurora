@@ -186,13 +186,14 @@
 // amortised number; rows c2 and the per-cell resolution line will say so in the
 // output, so a short run cannot quietly masquerade as a precise one.
 
-import { auroraBuiltTree, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { writeFileSync, statSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { resolveRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9427);
 
@@ -204,34 +205,23 @@ const PORT = Number(process.env.PORT ?? 9427);
  * announce which one was chosen — the run is against THAT tree's build, and a
  * reader has to know whether it was the one they edited.
  */
-function resolveRoot() {
-  // `here` stays a local derivation because it is the OTHER OPERAND of the
-  // comparison this function exists to make: "the tree this script lives in"
-  // against "the tree the run is against". `AURORA_DIR` IS `here` — it is now
-  // observed from the resolver's own module location and can never be moved by
-  // an operator (empyrean contract/SUITE_PATHS.md @ fba68d5) — so asking the
-  // resolver for both operands would make `borrowed` permanently false.
-  //
-  // The PIN goes through the resolver, and it is a different variable now.
-  // "Which tree do I run against" is not "which tree am I": the first is
-  // legitimately overridable and the second is a fact. `AURORA_BUILT_TREE` is
-  // that first question; `AURORA_ROOT`, which this header used to document for
-  // the job, is a transitional alias of `AURORA_DIR` and setting it to another
-  // tree now REFUSES, naming this variable.
-  const here = dirname(dirname(fileURLToPath(import.meta.url)));
-  const runnable = (d) => existsSync(join(d, 'node_modules/.bin/electron')) && existsSync(join(d, 'dist/main/index.mjs'));
-  const override = auroraBuiltTree();
-  if (override !== null) return { root: override.value, here, borrowed: override.value !== here };
-  let dir = here;
-  for (let i = 0; i < 8; i++) {
-    if (runnable(dir)) return { root: dir, here, borrowed: dir !== here };
-    const up = dirname(dir);
-    if (up === dir) break;
-    dir = up;
-  }
-  return { root: here, here, borrowed: false };
-}
-const { root: ROOT, here: HERE, borrowed: BORROWED } = resolveRoot();
+// `here` stays a LOCAL derivation because it is the OTHER OPERAND of the
+// comparison `resolveRunRoot` exists to make: "the tree this script lives in"
+// against "the tree the run is against". `AURORA_DIR` IS `here` — observed from
+// the resolver's own module location, never movable by an operator (empyrean
+// contract/SUITE_PATHS.md @ fba68d5) — so asking for both operands from there
+// would make `borrowed` permanently false. It is passed IN for the same reason
+// the contract's step-3 beds parameterise their anchor: a resolver whose anchor
+// is its own file cannot be stood anywhere else, and then nothing can test it.
+//
+// THE WALK ITSELF MOVED to `lib/run-root.mjs` so it can be executed by a test
+// with the two variables pointed APART — a caller assigned to the wrong half of
+// the O70 split is invisible while they both name the same directory, which is
+// every run until someone sets the override. This file needs a built app to run
+// at all, so a property proved only here is proved nowhere.
+const { root: ROOT, here: HERE, borrowed: BORROWED } = resolveRunRoot(
+  dirname(dirname(fileURLToPath(import.meta.url))),
+);
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
 const AEON_DIR = siblingPathOrUnresolved('aeon');               // OPEN ONLY — never saved
 const SHOTS = join(HERE, 'scratchpad/shots-mapviewport-baseline');

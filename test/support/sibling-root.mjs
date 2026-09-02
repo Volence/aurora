@@ -343,6 +343,20 @@ export const AURORA_DIR_ENV_ALIASES = ['AURORA_ROOT', 'AURORA_REPO'];
  * transitional alias of `AURORA_DIR` read by ~64 instruments for a DIFFERENT
  * fact; making it mean both is the fusion again. An operator who types it at the
  * old job now gets the consistency check's refusal, which names this variable.
+ *
+ * ⚠ NOT A RULE — A CONDITIONAL. The contract (@ 8be3a16, sigil checking the same
+ * fold against its own `AEON_DIR`) says *"the fold is safe precisely while the
+ * build is in-tree AND the artifacts are revision-stamped; it becomes unsafe the
+ * moment either stops holding, and splitting before then adds a variable whose
+ * two halves are provably identical."* Sigil is NOT splitting and is right not
+ * to. Aurora fails the first condition — a linked worktree has no `dist/` of its
+ * own — which is why aurora splits. Do not read this as "split every
+ * `<TOOL>_DIR`".
+ *
+ * WHO READS IT TODAY: `scratchpad/lib/run-root.mjs`, whose docblock carries the
+ * migration surface (105 of 123 `scratchpad/*.mjs` instruments use `AURORA_DIR`
+ * to reach `node_modules/` or `dist/`, counted 2026-09-02 — question 2 wearing
+ * question 1's answer, benign from the main checkout, unconverted).
  */
 export const AURORA_BUILT_TREE_ENV = 'AURORA_BUILT_TREE';
 
