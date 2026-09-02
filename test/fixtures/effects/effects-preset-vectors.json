@@ -1,0 +1,115 @@
+{
+  "$comment": "Document vectors for contract/schema/aurora-effects-preset.schema.json, added 2026-08-30 with the cycles/variants contract change (docs/AURORA_EFFECTS_SCHEMA.md section 7.2, against aeon's demand artifact 8ec2b05d). EVERY CASE IS DERIVED FROM A SECTION 7.2 RULE OR FROM THE ARTIFACT'S SECTION 1 FIELD TABLE, none from a generator's behaviour: the contract leads and aeon's tools/effects_gen.py implements against it, the direction section 8 requires. The FAIL cases exist because a schema that accepts everything certifies without checking; each one perturbs a PASS document in exactly ONE way the cited rule forbids, and each was proven to make this gate RED before being declared a fail-case. WHAT IS DELIBERATELY NOT HERE: value vectors. The schema is normative for SHAPE only (section 7.1), so a legal-shaped document carrying an out-of-range period or a shift of 9 PASSES here and is refused by the engine's own ensure with the measurement behind it. Two refusals this gate therefore cannot express, both the GENERATOR's and both stated in section 7.2: cycles: [] (legal JSON, refused by aeon's load_preset naming the two legal spellings) and a variants array longer than PAL_MAX_VARIANTS.",
+  "cases": [
+    {
+      "name": "bands-only document (the pre-2026-08-30 shape, unchanged)",
+      "expect": "pass",
+      "why": "section 7.1: adding two optional keys must not disturb a document that carries neither. Regression vector for the addition itself.",
+      "doc": {
+        "schema": 1,
+        "id": "ojz_sec1_tint",
+        "name": "OJZ act 1 section 1 - horizon tint",
+        "bands": [
+          {
+            "top": 64,
+            "bot": 96,
+            "sh": false,
+            "on": { "cram": { "addr": 34, "colours": [546, 306] } }
+          }
+        ]
+      }
+    },
+    {
+      "name": "both keys authored: a one-channel cycle and slot 0 with slot 1 cleared",
+      "expect": "pass",
+      "why": "section 7.2, the worked shape: cycles is an array of channel objects (line/first/count/period required, dir optional) and variants is positional with null clearing a slot. Field names transcribed from the artifact section 1.3 (pal_variant) and 1.4 (pal_cycle_channel).",
+      "doc": {
+        "schema": 1,
+        "id": "ojz_sec3_shimmer",
+        "name": "OJZ act 1 section 3 - shimmer band over deep water",
+        "bands": [
+          {
+            "top": 120,
+            "bot": 148,
+            "sh": false,
+            "on": { "pal_region": { "addr": 72, "slot": 0, "pal_line": 2, "entry": 4, "count": 3 } }
+          }
+        ],
+        "cycles": [
+          { "line": 2, "first": 8, "count": 4, "period": 8, "dir": 0 }
+        ],
+        "variants": [
+          { "shift_r": 1, "shift_g": 1 },
+          null
+        ]
+      }
+    },
+    {
+      "name": "cycling OFF plus a one-entry variants array",
+      "expect": "pass",
+      "why": "section 7.2 ruling Q2: cycles: null is the one spelling of OFF (it lowers to Pal_Cycle_None), and ruling Q5: an array shorter than the slot count leaves the missing slot at its hand-authored value. Both states must be expressible in one document.",
+      "doc": {
+        "schema": 1,
+        "id": "ojz_sec5_still",
+        "name": "OJZ act 1 section 5 - no cycling, one authored slot",
+        "bands": [
+          {
+            "top": 100,
+            "bot": 132,
+            "sh": true,
+            "on": { "pal_region": { "addr": 96, "slot": 1, "pal_line": 3, "entry": 0, "count": 4 } }
+          }
+        ],
+        "cycles": null,
+        "variants": [
+          { "shift_g": 1, "bias_b": -2, "lines": 12 }
+        ]
+      }
+    },
+    {
+      "name": "a cycle channel carrying an unknown key",
+      "expect": "fail",
+      "why": "section 7.2: the channel object is CLOSED, the same closure the band object carries. dirn is the misspelling of dir a hand-edited document produces, and an open channel object would accept it and lower a script running the default direction, silently. Proven red first: with expect pass this case reported 'Unevaluated properties are not allowed (dirn was unexpected)'.",
+      "doc": {
+        "schema": 1,
+        "id": "ojz_sec3_shimmer",
+        "bands": [
+          { "top": 120, "bot": 148, "sh": false, "on": { "cram": { "addr": 72, "colours": [546] } } }
+        ],
+        "cycles": [
+          { "line": 2, "first": 8, "count": 4, "period": 8, "dirn": 1 }
+        ]
+      }
+    },
+    {
+      "name": "a variants entry that is a string",
+      "expect": "fail",
+      "why": "section 7.2 ruling Q5: a variants entry is a variant OBJECT or null. A string is the author naming the engine symbol they meant to reproduce; the wire carries the descriptor's fields, never a symbol name, which is the same refusal section 3.1 makes for a non-string rasterRef in the other direction. Proven red first: with expect pass this case reported \"'Variant_Water_Deep' is not valid under any of the given schemas\".",
+      "doc": {
+        "schema": 1,
+        "id": "ojz_sec3_shimmer",
+        "bands": [
+          { "top": 120, "bot": 148, "sh": false, "on": { "cram": { "addr": 72, "colours": [546] } } }
+        ],
+        "variants": [
+          "Variant_Water_Deep"
+        ]
+      }
+    },
+    {
+      "name": "a cycle channel missing period",
+      "expect": "fail",
+      "why": "section 7.2: line, first, count and period are REQUIRED because cycle_channel() defaults none of them (artifact section 1.4, palette_dsl.emp:92-100); only dir has a default. A document missing period gives the generator no value to forward, and the schema is where that is caught rather than in a generator traceback. Proven red first: with expect pass this case reported \"'period' is a required property\".",
+      "doc": {
+        "schema": 1,
+        "id": "ojz_sec3_shimmer",
+        "bands": [
+          { "top": 120, "bot": 148, "sh": false, "on": { "cram": { "addr": 72, "colours": [546] } } }
+        ],
+        "cycles": [
+          { "line": 2, "first": 8, "count": 4, "dir": 1 }
+        ]
+      }
+    }
+  ]
+}

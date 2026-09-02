@@ -1,0 +1,29 @@
+{
+  "$what": "Provenance of effects-preset-vectors.json — empyrean's accept/reject DOCUMENT VECTORS for contract/schema/aurora-effects-preset.schema.json, vendored beside the tests that run them. test/formats/effects-preset-vectors.test.ts reads `empyrean.blob` from here as its pin of record and runs every case through parseEffectsPreset: each `expect: pass` document must parse and survive a save with nothing dropped, each `expect: fail` document must be refused by the SCHEMA (not by the filename/id rule, which the vectors do not exercise).",
+  "$why_a_sidecar": "The same shape as src/core/formats/effects/aurora-effects-preset.schema.provenance.json, for the same reason: a pin recorded as prose in a test header goes stale without anything going red, because nothing hashes a comment. The hash lives HERE, once, and the test reads it.",
+  "$what_the_vectors_are_not": "Value vectors. The schema is normative for SHAPE only (empyrean AURORA_EFFECTS_SCHEMA.md section 7.1), so a legal-shaped document carrying an out-of-range period or a shift of 9 PASSES here and is refused by the engine's own ensure with the measurement behind it. Two generator refusals the vectors' own $comment names as inexpressible here: cycles: [] and a variants array longer than PAL_MAX_VARIANTS.",
+  "empyrean": {
+    "repo": "git@github.com:Volence/empyrean.git",
+    "path": "contract/schema/tests/effects-preset-vectors.json",
+    "revision": "12aecd58825de5c830b4bbe33fe9f80cf01bea83",
+    "revision_subject": "merge: item 5 contract change, cycles and variants in preset documents (schema 7.2, preset JSON schema, G7 vectors, CR record) under the hub's ten rulings",
+    "blob": "cc3f0f96cf572b1731e0a21ad3e9188b2bfd8958",
+    "resolved_by": "git -C ../empyrean show 12aecd5:contract/schema/tests/effects-preset-vectors.json — read through git OBJECTS, never through the sibling working tree. Redirected straight into this directory; never retyped, never reformatted; re-hashed with `git hash-object` before anything believed it.",
+    "revision_published": "12aecd5 is an ancestor of empyrean origin/main (63c85aebec4671fb6cc8dccca89c7a5b5d3ddf1c at vendoring), checked with `git merge-base --is-ancestor`, and origin/main:contract/schema/tests/effects-preset-vectors.json resolves to the SAME blob cc3f0f96 — current at tip, not merely correctly cited.",
+    "branch_that_answers_currency": "origin/main"
+  },
+  "vendored": {
+    "path": "test/fixtures/effects/effects-preset-vectors.json",
+    "bytes": 6035,
+    "git_blob": "cc3f0f96cf572b1731e0a21ad3e9188b2bfd8958",
+    "identical_to_source": "byte-for-byte; the git blob id above is the SAME object empyrean stores, which is what effects-preset-vectors.test.ts recomputes from these bytes on every run"
+  },
+  "schema_these_vectors_belong_to": {
+    "sidecar": "src/core/formats/effects/aurora-effects-preset.schema.provenance.json",
+    "same_revision": "Both were vendored from empyrean 12aecd5 in one parcel (EW-REVENDOR-PRESET). A re-pin of one without the other is a mismatch the vectors test would report as the schema refusing a vector the contract says it accepts, or vice versa."
+  },
+  "pin_history_current_last": [
+    "cc3f0f96 — 12aecd5, landing (the vectors' first revision; byte-identical at origin/main 63c85aeb)"
+  ],
+  "re_vendor": "git -C <empyrean> fetch origin && git -C <empyrean> show origin/main:contract/schema/tests/effects-preset-vectors.json > test/fixtures/effects/effects-preset-vectors.json — then update `empyrean.revision`, `empyrean.blob`, `vendored.bytes`, `vendored.git_blob` and `pin_history_current_last` here, re-vendor the SCHEMA at the same revision, and re-run the full suite."
+}
