@@ -102,6 +102,31 @@ stale one was the more actionable of the pair. Nothing was wrong with either row
 written. The landing step that closes an item is *replace the row*, never *add the outcome
 beside it*.
 
+### This file is bounded, and shrinking it is THREE moves — the first is a MEASUREMENT
+
+*(Suite contract: `OVERSEER-PROTOCOL.md` "The boot read is bounded" and `contract/LANE_STATUS.md`
+rule 7, both at empyrean `f4d6d4b`; the three moves at empyrean `a1dcc7c`, this lane's finding
+adopted back. Read them there, not from this summary.)*
+
+`docs/OVERSEER.md` is the boot read: target ~100 KB. Dated tails and closed narrative go to
+`docs/OVERSEER-LOG.md`, which nothing reads at boot. **A ruling that must survive a rotation is
+written HERE as well as there, never only there.** `docs/lane-status.json`: title ≤240, ≤20 rows,
+≤12 KB — assert the three in the script that writes it, don't read them back afterwards.
+
+**(1)** A bar that COPIED protocol text becomes a pointer — **but only lines a grep finds verbatim
+in `origin/main:docs/OVERSEER-PROTOCOL.md`.** A bar that CITED the protocol and wrote local
+precedent under it is **not** a duplicate, and the two look identical in a listing: same SHA, same
+parenthetical. Measured here 2026-09-02: **3 of 125 lines** under the nine bars this file labels as
+shared-protocol duplicates were verbatim. Pointer-ising the rest would delete the local half and
+report compliance for it. **(2)** Closed history around a live rule moves to the LOG verbatim; the
+rule stays and gets rewritten legibly. **(3)** Rewriting live repo-specific rulings interleaved
+with narrative is **the owner's parcel**, not a lane's tidy-up.
+
+⚠ **Judge by BYTES.** Unwrapping a multi-kilobyte one-line bullet raises the line count while
+cutting bytes — this file went 1,238 → 1,148 lines but 121,317 → 108,607 B — so the line bound can
+move the wrong way under a correct fix. **Standing residual: still ~8.6 KB over, and move (3) is
+where the rest of it lives.**
+
 ## Owner state — never record an approval whose granting act you have not seen
 
 *(Added 2026-08-22, raised by the empyrean lane after two lanes hit it the same day by
