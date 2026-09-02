@@ -420,7 +420,7 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
       }
 
       // THE WORKTREE'S OWN COPY of the resolver, not the main copy under a
-      // different cwd: `sibling-root.mjs` anchors `AURORA_ROOT` to its own module
+      // different cwd: `sibling-root.mjs` anchors `AURORA_DIR` to its own module
       // file (`import.meta.url`) and passes THAT to git as `cwd`, so a bed that
       // merely chdir-ed into the worktree is PROVABLY INERT — git would run in
       // the main checkout and the row would pass under a worktree-shaped name
@@ -432,7 +432,7 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
       // stdout return value, recomputed per call (nothing in the subject memoises
       // the RESOLUTION — the only `Set` in it memoises the alias nag), and it
       // embeds the cwd git was handed:
-      //   `step 3: git rev-parse --git-common-dir from <AURORA_ROOT> → <common>`
+      //   `step 3: git rev-parse --git-common-dir from <AURORA_DIR> → <common>`
       // A bed whose announce line names the main checkout has measured nothing,
       // so this is a bed refusal too, not a resolver assertion.
       const announce = /^step 3: git rev-parse --git-common-dir from (.*) → (.*)$/.exec(source ?? '');
@@ -475,7 +475,7 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
   /**
    * THE PIN, AS A ROW — why the bed above copies the subject instead of chdir-ing.
    *
-   * `AURORA_ROOT` is `resolve(dirname(fileURLToPath(import.meta.url)), '../..')`
+   * `AURORA_DIR` is, with nothing set, `resolve(dirname(fileURLToPath(import.meta.url)), '../..')`
    * — the MODULE'S OWN FILE, not the process cwd — and step 3 hands exactly that
    * to git as `cwd`. So the process cwd is inert: a bed that builds a linked
    * worktree and only changes directory into it measures the main checkout,
@@ -490,17 +490,17 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
   it('pins git\'s cwd to its OWN module location, so the process cwd cannot steer it', () => {
     const elsewhere = mkdtempSync(resolve(tmpdir(), 'aurora-step3-cwd-'));
     try {
-      const body = 'process.stdout.write(String(R.siblingRoot()) + "\\n" + R.siblingRootSource() + "\\n" + R.AURORA_ROOT);';
+      const body = 'process.stdout.write(String(R.siblingRoot()) + "\\n" + R.siblingRootSource() + "\\n" + R.AURORA_DIR);';
       const home = run(body).stdout.split('\n');
       const away = run(body, {}, SUBJECT, elsewhere).stdout.split('\n');
 
-      expect(away[2], 'AURORA_ROOT is the module\'s own location and must not move with the cwd').toBe(home[2]);
+      expect(away[2], 'AURORA_DIR is the module\'s own location and must not move with the cwd').toBe(home[2]);
       expect(away[2]).toBe(resolve(__dirname, '../..'));
       expect(
         away[1],
         `run with cwd=${elsewhere} (outside any repository) the resolver announced \`${away[1]}\`; `
         + `it should be identical to the announce from its own directory, \`${home[1]}\`, because `
-        + 'step 3 passes AURORA_ROOT as git\'s cwd rather than inheriting the process cwd',
+        + 'step 3 passes AURORA_DIR as git\'s cwd rather than inheriting the process cwd',
       ).toBe(home[1]);
       expect(away[1]).toContain(`from ${resolve(__dirname, '../..')}`);
       expect(away[0]).toBe(home[0]);
@@ -519,7 +519,7 @@ describe('sibling-root: step 4 — refuse, naming what was looked for and where'
   /**
    * Forced by COPYING the subject outside any git repository: the derivation is
    * anchored to the module's own location, so a copy at `<tmp>/test/support/`
-   * makes `AURORA_ROOT` a tmpdir, where `git rev-parse` finds nothing.
+   * makes `AURORA_DIR` a tmpdir, where `git rev-parse` finds nothing.
    */
   function subjectOutsideAnyRepo(): string {
     const root = mkdtempSync(resolve(tmpdir(), 'aurora-no-repo-'));
