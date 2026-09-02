@@ -786,6 +786,38 @@ window) rather than adopting their reading — the standing practice in this fil
   then an `initialized` NOTIFICATION; subscription happens on the second, and skipping it
   gives a healthy connection that silently never receives an event. Feature-detect off
   the advertised method list, never a version.
+- **THE RESUME/STOP RACE IS NOT REACHABLE FROM THIS CLIENT — AND THE DAY IT BECOMES REACHABLE IS
+  NAMED** *(2026-09-02, oracle's F-RESUME-STOP-RACE relayed by the hub; answered from source here at
+  master `44f17ca8` and booked at their request, because a stated position must live in a tree rather
+  than in mail — shared protocol bar 20, sending side)*. **Their finding:** the halt broadcast is
+  emitted from the engine thread while the `ok(resume)` reply is written by the connection thread, so
+  a client that resumes and then waits for a stop can miss the stop entirely if its reply-reader
+  discards events arriving before the reply. **It failed at trial 4 of 8 after three clean passes** —
+  the number to remember, because a two- or three-run green on a race is exactly what this lane would
+  otherwise have signed off.
+  **Aurora cannot hit it, and the reason is STRUCTURAL rather than careful: we never adopted the
+  pattern.** `AetherClient.onEvent` has exactly ONE non-test consumer in the tree — `bridge.ts`'s
+  `c.onEvent(() => publish())`, a connection-badge refresh that discards the event's method and params
+  — and **nothing anywhere awaits an event**. The dispatch loop feeds subscribers as messages arrive
+  and is not coupled to the reply path, so the window their race needs does not exist. Every
+  sequencing point reads a REPLY instead: `bootRestore` (`boot-restore.ts`) gates on `run_to`'s own
+  `reached` field, `s1-warp.ts` says in its header it chose `run_frames` over resume-and-sleep on
+  purpose, and every `resume` in `push-palette.ts` / `warp.ts` / `s1-warp.ts` / `build-run.ts` is a
+  terminal `wasRunning` restore inside a `finally` with nothing awaited after it.
+  ⚠ **THE PERISHABLE HALF, which is the whole reason this is written down: BREAKPOINTS MAKE IT LIVE.**
+  A client that sets a breakpoint, resumes, and waits to be told it hit is precisely their shape — and
+  that is the first thing Aurora would build on `breakpoint_add`, which is where oracle says the race
+  still is (`breakpoints.rs` / `watchpoints.rs`, server side, booked by them). **So read this row as: no
+  exposure while there is no breakpoint consumer, and the session that starts one must confirm the
+  server-side fix landed BEFORE trusting a green run of its own.** Recorded as a not-currently-reachable
+  finding, not as an all-clear.
+  **Question handed back and not yet answered:** whether `run_to`'s reply shares `resume`'s thread
+  split. If it does, our boot restore would proceed against a still-running machine — **loudly, not
+  silently**, because `write_memory` is in `require_paused` and refuses by name, so it is not a
+  corruption risk. But it would present as an unexplained boot-restore failure whose cause is across
+  the fence. Attribute a `require_paused` refusal after a *successful* `run_to` to that before
+  debugging this side.
+
 - **`require_paused`** — **the full list, re-derived from **oracle's RUST source** at `e484ace`
   2026-08-22 (**server fact** — not known to hold on the legacy C++ server), because this row was missing four for months**: `run_frames`, `run_to`,
   `step`, `step_over`, `step_out`, `write_memory`, `write_cram`, `press`, `play_input`,
