@@ -28,6 +28,7 @@ import * as http from 'node:http';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { writeFileSync, mkdirSync, existsSync, readFileSync, rmSync, cpSync } from 'node:fs';
 import { spawnGuarded, killTree, restoreDiscoveryNow, readDiscoveryNow, resolveOwnedDiscovery } from './lib/harness-guard.mjs';
+import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9364);
 // SELF-LOCATING, not hardcoded. This file used to name the main checkout
@@ -38,7 +39,14 @@ const PORT = Number(process.env.PORT ?? 9364);
 // deriving it from this file's own location fixes it for every future one.
 // Resolves identically to the old literal when run from the main checkout.
 const ROOT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '');
-const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
+// WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
+// question 1. A linked worktree has no node_modules/ and no dist/, so the tree
+// carrying the build can be a different directory from the one this file lives
+// in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
+// it is not this one. See scratchpad/lib/run-root.mjs.
+const RUN = announceRunRoot(runTarget(ROOT));
+const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
+const MAIN = RUN.main;
 const S1DIR = siblingPathOrUnresolved('s1disasm');
 const CANVAS_DIR = `${S1DIR}/.aurora/canvas`;
 const SHOTS = `${ROOT}/scratchpad/shots-canvas`;
@@ -506,7 +514,7 @@ async function session(label, body) {
   console.log(`\n=== session: ${label} (port ${PORT} verified free) ===`);
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
-  const child = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`], {
+  const child = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, MAIN], {
     cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
   });
   child.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[main] ${d}`); });
@@ -693,6 +701,11 @@ export {
   INSTALL, sleep, mouse, key, enter, escape, ctrlK, typeText, clickEl,
   drawArt, clickArt, focusTab, closeTab, shot, drain,
   ROOT, S1DIR, CANVAS_DIR, SHOTS,
+  // O72: the tree `session()` actually LAUNCHES, which is not `ROOT` when this
+  // file lives in a linked worktree. Three probes print a provenance line
+  // naming the app under test; exporting `MAIN` is what lets them name the
+  // right one instead of composing it out of the checkout.
+  MAIN, RUN,
   // O16. Re-exported so the probes that drive a `session()` app over the Aether
   // wire resolve its port through the OWNERSHIP rule instead of open-coding a
   // read of the shared discovery file. See lib/harness-guard.mjs.

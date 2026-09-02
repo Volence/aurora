@@ -55,6 +55,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9411);
 const ROOT = AURORA_DIR;
@@ -62,14 +63,17 @@ const ROOT = AURORA_DIR;
 // Hardcoding `${ROOT}/node_modules/...` fails instantly here (ENOENT inside
 // xvfb-run) and presents as "CDP target never appeared", which reads like a
 // timing problem and is not one.
-function findElectron(from) {
-  for (let d = from; d !== '/'; d = dirname(d)) {
-    const p = join(d, 'node_modules/.bin/electron');
-    if (existsSync(p)) return p;
-  }
-  throw new Error('no electron binary found walking up from ' + from);
-}
-const ELECTRON = findElectron(ROOT);
+// That walk used to be a private copy here; O72 moved it into the module below,
+// where it also requires a built `dist/` before calling a tree runnable and
+// where a test can execute it.
+// WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
+// question 1. A linked worktree has no node_modules/ and no dist/, so the tree
+// carrying the build can be a different directory from the one this file lives
+// in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
+// it is not this one. See scratchpad/lib/run-root.mjs.
+const RUN = announceRunRoot(runTarget(ROOT));
+const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
+const MAIN = RUN.main;
 const AEON_DIR = siblingPathOrUnresolved('aeon');   // OPEN ONLY — never written; O66: a copy may be named
 const SHOTS = join(ROOT, 'scratchpad/shots-chunk-links');
 mkdirSync(SHOTS, { recursive: true });
@@ -169,7 +173,7 @@ const clickByText = (sel, text) => `(() => {
 })()`;
 
 async function main() {
-  const distM = statSync(join(ROOT, 'dist/main/index.mjs')).mtimeMs;
+  const distM = statSync(MAIN).mtimeMs;
   const newest = execSync(
     `find ${JSON.stringify(join(ROOT, 'src'))} -name '*.ts' -o -name '*.tsx' | xargs stat -c %Y | sort -n | tail -1`,
     { shell: '/bin/bash' }).toString().trim();
@@ -181,7 +185,7 @@ async function main() {
   try {
     const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
     delete env.DISPLAY;
-    app = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`], {
+    app = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, MAIN], {
       cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
     });
     app.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[app] ${d}`); });

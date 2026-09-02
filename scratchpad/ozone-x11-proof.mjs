@@ -57,28 +57,37 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 import { spawnGuarded, killTree, pinOzoneToX11, OZONE_X11_FLAG } from './lib/harness-guard.mjs';
+import { electronBin, resolveRunRoot } from './lib/run-root.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = dirname(HERE);
 const PROBE_APP = join(HERE, 'lib', 'ozone-probe-app');
 
 /**
- * RESOLVED, NOT TYPED. `${ROOT}/node_modules/.bin/electron` — what the other
- * harnesses use — does not exist in an agent worktree, which carries no
- * `node_modules` of its own. Node's own resolver walks up to the main
- * checkout's, and the `electron` package's entry point exports the absolute
- * path of the binary, so this answers correctly from a plain clone and from a
- * worktree alike.
+ * RESOLVED, NOT TYPED — and THE ONE FILE O72 DID NOT MIGRATE WHOLESALE.
+ *
+ * The other 110 instruments take `runTarget(ROOT)`, which walks up for a tree
+ * carrying BOTH `node_modules/.bin/electron` and `dist/main/index.mjs` and hands
+ * back the two paths from it. This proof does not run Aurora at all: it drives
+ * `lib/ozone-probe-app`, a synthetic Electron app checked in beside it. So a
+ * tree with an electron binary and NO `dist/` is perfectly good here and is not
+ * "runnable" by that predicate — insisting on it would make this proof depend on
+ * a build it never loads, and refuse to run on a clone that has not been built.
+ *
+ * What it DOES take is `electronBin`, so the `ELECTRON_BIN` override and the
+ * `node_modules/.bin/electron` spelling live in one place with everyone else's,
+ * and it keeps its own last resort: node's resolver walks up to the main
+ * checkout's `node_modules` and the `electron` package exports the absolute path
+ * of the binary, which answers from a plain clone and from a worktree alike.
  */
 function resolveElectron() {
-  if (process.env.ELECTRON_BIN) return process.env.ELECTRON_BIN;
-  const local = join(ROOT, 'node_modules', '.bin', 'electron');
-  if (existsSync(local)) return local;
+  const bin = electronBin(resolveRunRoot(ROOT).root);
+  if (existsSync(bin)) return bin;
   try {
-    const bin = createRequire(import.meta.url)('electron');
-    if (typeof bin === 'string' && existsSync(bin)) return bin;
+    const found = createRequire(import.meta.url)('electron');
+    if (typeof found === 'string' && existsSync(found)) return found;
   } catch { /* fall through to the honest failure below */ }
-  return local;
+  return bin;
 }
 const ELECTRON = resolveElectron();
 

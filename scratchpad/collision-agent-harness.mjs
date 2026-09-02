@@ -75,7 +75,7 @@
 //
 //   VITE_AURORA_DEBUG=1 npm run build && node scratchpad/collision-agent-harness.mjs
 
-import { session, openProjectAndAct, clickEl, sleep, S1DIR, ROOT, resolveOwnedDiscovery } from './canvas-cdp-harness.mjs';
+import { session, openProjectAndAct, clickEl, sleep, S1DIR, MAIN, resolveOwnedDiscovery } from './canvas-cdp-harness.mjs';
 
 // FLAT/fully-solid, the value editor-methods.ts advertises in the `shape`
 // description (core/art/commit-collision.ts's FLAT_SHAPE = 0xff). Restated as a
@@ -290,7 +290,7 @@ const main = async () => {
     console.log(`\n[prov] discovery file ${found.from} said:\n       ${found.raw.trim()}`);
     console.log(`[prov] pid ${found.pid} IS a descendant of ${found.roots.join(',')} — accepted`);
     console.log(`[wire] POST http://127.0.0.1:${PORT}/aether`);
-    console.log(`[app ] ${ROOT}/dist/main/index.mjs against ${S1DIR}\n`);
+    console.log(`[app ] ${MAIN} against ${S1DIR}\n`);
 
     // --- 1: provenance + discovery ---------------------------------------
     // NOTE: this row is a CAPABILITY check and nothing more. It says the app

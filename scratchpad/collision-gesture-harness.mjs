@@ -89,7 +89,7 @@
 // the gesture. Row 1 aborts the run when it is missing, because every later
 // PASS would be describing code this branch does not contain.
 
-import { session, openProjectAndAct, mouse, clickEl, sleep, S1DIR, ROOT, resolveOwnedDiscovery } from './canvas-cdp-harness.mjs';
+import { session, openProjectAndAct, mouse, clickEl, sleep, S1DIR, MAIN, RUN, resolveOwnedDiscovery } from './canvas-cdp-harness.mjs';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -145,7 +145,7 @@ async function rpc(port, method, params) {
 
 /** Does the built renderer bundle carry this branch's gesture code? */
 function bundleMarkers() {
-  const dir = join(ROOT, 'dist', 'renderer', 'assets');
+  const dir = join(RUN.root, 'dist', 'renderer', 'assets');
   if (!existsSync(dir)) return { files: 0, build: false, hint: false };
   let build = false, hint = false, files = 0;
   for (const f of readdirSync(dir)) {
@@ -656,7 +656,7 @@ const main = async () => {
       return;
     }
     const PORT = found.port;
-    console.log(`\n[app ] ${ROOT}/dist/main/index.mjs against ${S1DIR}`);
+    console.log(`\n[app ] ${MAIN} against ${S1DIR}`);
     console.log(`[prov] discovery file ${found.from} said:\n       ${found.raw.trim()}`);
     console.log(`[prov] pid ${found.pid} IS a descendant of ${found.roots.join(',')} — accepted`);
     console.log(`[wire] POST http://127.0.0.1:${PORT}/aether — SETUP ONLY`);

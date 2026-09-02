@@ -9,10 +9,19 @@ import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-roo
 import { spawn } from 'node:child_process';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = 9337;
 const S1DIR = siblingPathOrUnresolved('s1disasm');
 const ROOT = AURORA_DIR;
+// WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
+// question 1. A linked worktree has no node_modules/ and no dist/, so the tree
+// carrying the build can be a different directory from the one this file lives
+// in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
+// it is not this one. See scratchpad/lib/run-root.mjs.
+const RUN = announceRunRoot(runTarget(ROOT));
+const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
+const MAIN = RUN.main;
 const ACTS = [['ghz', 1], ['ghz', 2], ['ghz', 3], ['mz', 1], ['lz', 1], ['slz', 1], ['sbz', 1], ['syz', 1]];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -60,7 +69,7 @@ function cdp(wsUrl) {
 }
 
 async function main() {
-  const electron = spawnGuarded(`${ROOT}/node_modules/.bin/electron`, [`${ROOT}/dist/main/index.mjs`], {
+  const electron = spawnGuarded(ELECTRON, [MAIN], {
     cwd: ROOT,
     env: { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
