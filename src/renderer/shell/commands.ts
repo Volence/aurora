@@ -8,7 +8,8 @@
 import type { Command } from '../components/CommandPalette';
 import type { TabDescriptor } from '../../core/shell/session';
 import type { RecentProject } from '../../shared/ipc-types';
-import { PROJECT_SETUP_TAB } from './tabs';
+import { PROJECT_SETUP_TAB, guideTab } from './tabs';
+import { GUIDES } from '../components/guide/guides';
 
 export interface CommandSnapshot {
   tabs: TabDescriptor[];
@@ -55,6 +56,20 @@ export function buildCommands(s: CommandSnapshot, a: CommandActions): Command[] 
     { id: 'build-and-run', label: 'Build & Run', hint: 'Ctrl+Shift+B', run: a.buildAndRun },
     { id: 'open-setup', label: 'Project Setup', hint: 'tool', run: () => a.openTab(PROJECT_SETUP_TAB) },
   ];
+
+  // THE GUIDES, IN ⌘K, UNCONDITIONALLY — no project needed, and listed by their
+  // own titles so a search for "parallax", "raster" or "background" finds one.
+  // This is the third door to the same page (Home card, Effects `?`), and it is
+  // the one that works from anywhere: EFFECTS-W1 defect 1's measurement was that
+  // NO route existed at all.
+  for (const g of GUIDES) {
+    cmds.push({
+      id: `open-guide-${g.slug}`,
+      label: `Guide: ${g.title}`,
+      hint: 'help',
+      run: () => a.openTab(guideTab(g.slug, g.title)),
+    });
+  }
 
   // aeon only, and unconditional within it: every other route into the sprite
   // editor needs an object that is ALREADY bound to a saved sprite, and the only

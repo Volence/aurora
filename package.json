@@ -62,6 +62,7 @@
     "harness:xvfb-reap": "node scratchpad/xvfb-reap-proof.mjs",
     "harness:loop-paint": "node scratchpad/loop-paint-harness.mjs",
     "harness:curve-option-disabled": "node scratchpad/curve-option-disabled-harness.mjs",
+    "harness:effects-guide": "node scratchpad/effects-guide-harness.mjs",
     "harness:band-preset": "node scratchpad/band-preset-harness.mjs",
     "harness:section-raster-select": "node scratchpad/section-raster-select-harness.mjs",
     "harness:variant-cycle": "node scratchpad/variant-cycle-harness.mjs",
