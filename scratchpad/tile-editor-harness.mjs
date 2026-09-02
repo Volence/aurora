@@ -16,14 +16,14 @@
 //   - Negative controls run alongside the real checks (`neg(...)`); the run
 //     FAILS if any of them passes.
 
-import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import * as http from 'node:http';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9351);
-const ROOT = AURORA_ROOT;
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN
   ?? siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron');
 const S1DIR = siblingPathOrUnresolved('s1disasm');

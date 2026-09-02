@@ -12,12 +12,13 @@
 // Run: node scratchpad/band-lens-poisons.mjs        (~1 min per poison)
 //      POISON=<id> node scratchpad/band-lens-poisons.mjs   for one
 
+import { AURORA_DIR } from '../test/support/sibling-root.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const F = {
   cov: `${ROOT}/src/renderer/providers/band-coverage.ts`,
   lens: `${ROOT}/src/renderer/canvas/band-lens.ts`,

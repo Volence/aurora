@@ -74,7 +74,7 @@
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npm run build
 // Run:                     node scratchpad/section-header-action-harness.mjs
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -87,7 +87,7 @@ const PORT = Number(process.env.PORT ?? 9433);
 // main clone a pinned path silently serves a worktree's dist/, which makes a
 // "re-verified on master" run a re-verification of the branch. (The effects
 // harness was caught doing exactly that at landing on 2026-08-22.)
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 // A git worktree has no node_modules of its own, so the BINARY and the app ROOT
 // are allowed to come from different trees.
 const ELECTRON = process.env.ELECTRON_BIN

@@ -60,7 +60,7 @@
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npm run build
 // Run:                     node scratchpad/bg-tile-picker-harness.mjs
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -69,7 +69,7 @@ import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9401);
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const AEON = siblingPathOrUnresolved('aeon');
 // node_modules may live above ROOT (a git worktree under the checkout resolves
 // its dependencies from the parent tree), so this WALKS UP rather than assuming.

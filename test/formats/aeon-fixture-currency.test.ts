@@ -38,7 +38,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { peerRepo, resolveRev, readAtRev, isAncestor, gitBlobSha, AURORA_ROOT } from '../support/peer-repo';
+import { peerRepo, resolveRev, readAtRev, isAncestor, gitBlobSha, AURORA_DIR } from '../support/peer-repo';
 
 const FIXTURE = resolve(__dirname, '../fixtures/effects/ojz_act1_depth.json');
 const PROVENANCE = resolve(__dirname, '../fixtures/effects/ojz_act1_depth.provenance.json');
@@ -129,7 +129,7 @@ describe('CURRENCY: is the vendored aeon fixture still what aeon ships?', () => 
     };
     const REVISION_KEY = /"revision[a-z_]*"\s*:\s*"([0-9a-f]{40})"/g;
 
-    const root = resolve(AURORA_ROOT, 'test/fixtures');
+    const root = resolve(AURORA_DIR, 'test/fixtures');
     const sidecars: string[] = [];
     const walk = (dir: string) => {
       for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -147,7 +147,7 @@ describe('CURRENCY: is the vendored aeon fixture still what aeon ships?', () => 
     const orphaned: string[] = [];
     let checked = 0;
     for (const file of sidecars) {
-      const short = file.slice(AURORA_ROOT.length + 1);
+      const short = file.slice(AURORA_DIR.length + 1);
       const text = readFileSync(file, 'utf8');
       const doc = JSON.parse(text) as Record<string, unknown>;
       // Every 40-hex revision the file records, whatever the key is spelled…

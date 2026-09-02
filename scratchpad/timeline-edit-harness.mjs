@@ -87,7 +87,7 @@
 //
 // Screenshots land in scratchpad/shots-timeline-edit/.
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
@@ -100,7 +100,7 @@ const PORT = Number(process.env.PORT ?? 9439);
 // asks — two harnesses can pick the same number a few ms apart. 96..98 are
 // taken by other files here; a live server on this number is refused below.
 const DISPLAY_NUM = Number(process.env.DISPLAY_NUM ?? 95);
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`

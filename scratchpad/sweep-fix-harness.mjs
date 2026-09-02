@@ -18,14 +18,14 @@
 // prompt with Discard, so /home/volence/sonic_hacks/aeon is not written to — the
 // run asserts that at the end by comparing the act data dir's mtimes.
 
-import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import * as http from 'node:http';
 import { readdirSync, statSync } from 'node:fs';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9377);
-const ROOT = AURORA_ROOT;
+const ROOT = AURORA_DIR;
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
 const AEON = siblingPathOrUnresolved('aeon');
 

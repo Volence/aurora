@@ -68,7 +68,7 @@
 // Run (fixture):           node scratchpad/bganim-motion-harness.mjs
 // Run (live project):      AEON_LIVE=1 node scratchpad/bganim-motion-harness.mjs
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -78,7 +78,7 @@ import { AEON, buildFixture, documentFacts } from './bganim-preview-fixture.mjs'
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9397);
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 // A git WORKTREE has no `node_modules` of its own — module resolution walks up
 // to the main checkout — so `${ROOT}/node_modules/.bin/electron` does not exist
 // there and the spawn failed with "CDP target never appeared", which reads like

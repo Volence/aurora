@@ -11,13 +11,13 @@
 //
 // Run: node scratchpad/storage-flush-probe.mjs
 
-import { AURORA_ROOT } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9366);
-const ROOT = AURORA_ROOT;
+const ROOT = AURORA_DIR;
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

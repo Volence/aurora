@@ -22,7 +22,7 @@
 //   - the workspace persists the per-tab facet, so a run that ends on Art starts
 //     the NEXT run on Art. Every phase pins the facet it wants.
 
-import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import * as http from 'node:http';
@@ -31,7 +31,7 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 const PORT = Number(process.env.PORT ?? 9351);
 const S1DIR = siblingPathOrUnresolved('s1disasm');
 const AEONDIR = siblingPathOrUnresolved('aeon') + '/';
-const ROOT = AURORA_ROOT;
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN
   ?? siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron');
 const SHOTS = process.env.SHOTS

@@ -30,7 +30,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 
-import { AURORA_ROOT, siblingRoot, siblingPath } from './sibling-root.mjs';
+import { AURORA_DIR, siblingRoot, siblingPath } from './sibling-root.mjs';
 
 /**
  * THE SIBLING-ROOT DERIVATION IS NOT DEFINED HERE ANY MORE, and that is the
@@ -42,7 +42,7 @@ import { AURORA_ROOT, siblingRoot, siblingPath } from './sibling-root.mjs';
  * lives in `sibling-root.mjs`, which node and tsc can both read; re-exported
  * here so this module's existing importers are unaffected.
  */
-export { AURORA_ROOT, siblingRoot };
+export { AURORA_DIR, siblingRoot };
 
 function git(cwd: string, args: string[]): string | null {
   try {

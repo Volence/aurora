@@ -23,12 +23,13 @@
 //
 // Run: node scratchpad/timeline-edit-poisons.mjs
 
+import { AURORA_DIR } from '../test/support/sibling-root.mjs';
 import { readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const PROVIDER = join(ROOT, 'src/renderer/providers/effects-preset.ts');
 const CANVAS = join(ROOT, 'src/renderer/canvas/raster-timeline.ts');
 

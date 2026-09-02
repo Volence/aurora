@@ -12,12 +12,13 @@
 //
 // Usage: node scratchpad/chunk-links-poisons.mjs [id ...]
 
+import { AURORA_DIR } from '../test/support/sibling-root.mjs';
 import { execSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const f = (p) => join(ROOT, p);
 
 const POISONS = [

@@ -39,6 +39,7 @@
 //
 // Usage: node scratchpad/discovery-exit-net-proof.mjs
 
+import { AURORA_DIR } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, existsSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -47,7 +48,7 @@ import { fileURLToPath } from 'node:url';
 import * as esbuild from 'esbuild';
 import { livenessOf } from './lib/harness-guard.mjs';
 
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const results = []; const fails = [];
 function check(id, name, ok, detail) {
   console.log(`${ok ? 'PASS' : 'FAIL'}  [${id}] ${name}${detail !== undefined ? `\n        ${detail}` : ''}`);

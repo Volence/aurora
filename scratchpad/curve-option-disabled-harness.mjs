@@ -69,7 +69,7 @@
 //   AEON_DIR=<writable copy> node scratchpad/curve-option-disabled-harness.mjs
 //   PLANT=rot-selector  … the selector rot, to prove row 3a is not vacuous
 
-import { checkoutOverride, siblingDefaultPathOrUnresolved, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
@@ -79,7 +79,7 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9423);
 const DISPLAY_NUM = Number(process.env.DISPLAY_NUM ?? 97);
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`

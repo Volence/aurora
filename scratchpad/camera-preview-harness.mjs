@@ -59,7 +59,7 @@
 // Build first:  VITE_AURORA_DEBUG=1 npx electron-vite build
 // Run:          AEON_DIR=<copy> node scratchpad/camera-preview-harness.mjs
 
-import { checkoutOverride, siblingDefaultPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -69,7 +69,7 @@ import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9412);
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN ?? `${ROOT}/node_modules/.bin/electron`;
 const AEONDIR = checkoutOverride('aeon')?.value;
 if (!AEONDIR || !existsSync(AEONDIR)) {

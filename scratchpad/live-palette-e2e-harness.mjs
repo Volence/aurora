@@ -20,7 +20,7 @@
 //
 // Usage: node scratchpad/live-palette-e2e-harness.mjs   (VERBOSE=1 for logs)
 
-import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,7 +31,7 @@ import * as esbuild from 'esbuild';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9375);
-const ROOT = AURORA_ROOT;
+const ROOT = AURORA_DIR;
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
 const SERVER = siblingPathOrUnresolved('oracle', 'target/release/oracle-aether');
 const ROM = siblingPathOrUnresolved('aeon', 's4.bin');

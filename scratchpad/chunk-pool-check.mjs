@@ -1,7 +1,7 @@
-import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import * as fs from 'node:fs'; import * as path from 'node:path'; import * as os from 'node:os';
 import { build } from 'esbuild';
-const REPO=AURORA_ROOT;
+const REPO=AURORA_DIR;
 const entry=`export { s1Adapter } from ${JSON.stringify(path.join(REPO,'src/core/project/s1/index.ts'))};`;
 const outfile=path.join(os.tmpdir(),`chk-${process.pid}.mjs`);
 await build({stdin:{contents:entry,resolveDir:REPO,sourcefile:'e.ts',loader:'ts'},bundle:true,platform:'node',format:'esm',outfile,logLevel:'silent'});

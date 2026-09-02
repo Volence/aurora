@@ -25,7 +25,7 @@
 // dpr varies run to run here and a fractional aim lands one row off.
 // ===========================================================================
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -34,7 +34,7 @@ import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9401);
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN ?? `${ROOT}/node_modules/.bin/electron`;
 const LIVE_AEON = siblingPathOrUnresolved('aeon');
 const AEONDIR = process.env.AEON_DIR ?? `${ROOT}/scratchpad/fixtures/aeon-bg-writable`;

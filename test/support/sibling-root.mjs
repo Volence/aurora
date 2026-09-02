@@ -18,6 +18,8 @@
  *     <NAME>_DIR               | AURORA_<NAME>_REPO
  *     AEON_DIR                 |   … and LIVE_AEON, which most of the
  *                              |     scratchpad instruments read today
+ *     AURORA_DIR               | AURORA_ROOT, which 64 instruments read
+ *                              |     today for THIS repo's own tree
  *
  * PRECEDENCE, THE SAME FOUR STEPS IN EVERY RESOLVER IN THE SUITE
  * -------------------------------------------------------------
@@ -111,8 +113,13 @@ import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** This repository's own root. `test/support/` → two levels up. */
-export const AURORA_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+/**
+ * Where this module's own file sits in a tree — `test/support/` → two levels up.
+ *
+ * The RAW observation, before any override is consulted. It is not exported:
+ * `AURORA_DIR` below is the answer, and there must be exactly one of those.
+ */
+const AURORA_DIR_DERIVED = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 /** Every refusal from this module. Never a null that lets the next step run. */
 export class SuitePathError extends Error {
@@ -218,6 +225,99 @@ function requireDir(pick, step, what) {
   return expand(pick.value);
 }
 
+/**
+ * ────────────────────────────────────────────────────────────────────────────
+ * THIS REPO'S OWN CHECKOUT — `AURORA_DIR`, the same question one step inward.
+ * ────────────────────────────────────────────────────────────────────────────
+ *
+ * "Which aurora tree am I?" was, until O69, answered by hand in 93 files: 64
+ * spelled it `process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(
+ * import.meta.url)))` and 29 more wrote the derivation with no override at all,
+ * so an operator pointing a run at another tree moved 64 of them and silently
+ * failed to move the other 29. `AURORA_ROOT` is also not the contract's name:
+ * the ratified checkout spelling is `<TOOL>_DIR`, so `AURORA_DIR`, with
+ * `AURORA_ROOT` accepted as a transitional alias and announced — exactly the
+ * shape `S1_DIR` already has in `checkoutEnvAliases` below.
+ *
+ * ⚠ STEP 2 IS DELIBERATELY NOT CONSULTED HERE, and this is the one place in the
+ * resolver where a precedence step is skipped rather than ordered. For a PEER,
+ * `EMPYREAN_SUITE_ROOT/<name>` is a reasonable guess. For THIS repo it is not a
+ * guess at all: this module's own file location is a direct observation of the
+ * answer, not a derivation from it. Consulting the suite root first would break
+ * the documented poison recipe on purpose —
+ *
+ *     EMPYREAN_SUITE_ROOT=$(mktemp -d) npm test
+ *
+ * exists to reproduce a machine with no REFERENCE trees. If it also relocated
+ * aurora, every harness would stop finding its own `dist/`, `src/` and schema
+ * files, and a run meant to prove "the peer-dependent half skips honestly"
+ * would instead die of unrelated absence. It would also make a linked worktree
+ * resolve to the MAIN checkout, which is precisely the `--show-toplevel` bug
+ * the contract's step 3 warns about, reintroduced from the other side.
+ *
+ * So: step 1 (explicit variable), then step 3 (own location). Step 4 is
+ * unreachable — this module is in the tree it is being asked about.
+ */
+
+/** The canonical variable naming THIS repo's checkout. THIS is the name. */
+export const AURORA_DIR_ENV = 'AURORA_DIR';
+
+/**
+ * Transitional aliases for it, accepted and announced.
+ *
+ * `AURORA_ROOT` is what 64 instruments read; `AURORA_REPO` is a third spelling
+ * two of them grew for the same fact. Both are here so migrating an instrument
+ * drops no override an operator already has in a shell.
+ */
+export const AURORA_DIR_ENV_ALIASES = ['AURORA_ROOT', 'AURORA_REPO'];
+
+function resolveAuroraDir() {
+  const pick = pickEnv(AURORA_DIR_ENV, AURORA_DIR_ENV_ALIASES);
+  if (pick === null) {
+    return {
+      dir: AURORA_DIR_DERIVED,
+      source: `step 3: this module's own location (${fileURLToPath(import.meta.url)}) → `
+        + `${AURORA_DIR_DERIVED}`,
+    };
+  }
+  const dir = requireDir(pick, 1, 'it is meant to be the aurora checkout');
+  if (pick.name !== AURORA_DIR_ENV) announceAlias(pick.name, AURORA_DIR_ENV);
+  const note = pick.name === AURORA_DIR_ENV ? '' : ` (transitional alias; the name is ${AURORA_DIR_ENV})`;
+  return { dir, source: `step 1: ${pick.name}=${pick.value}${note}` };
+}
+
+/**
+ * This repository's own root — the ONE derivation, override included.
+ *
+ * Eager on purpose: a set-but-wrong `AURORA_DIR` is the contract's hard error,
+ * and the loudest place to raise it is the import that is about to hand the
+ * value to `readFileSync`. Nothing here reads the environment a second time,
+ * so no consumer can disagree with another about which tree it is in.
+ */
+export const AURORA_DIR = resolveAuroraDir().dir;
+
+/** Which precedence step produced `AURORA_DIR`, as prose to print before work. */
+export function auroraDirSource() {
+  return resolveAuroraDir().source;
+}
+
+/**
+ * The explicit override for THIS repo's checkout, as `{ name, value }`, or null.
+ *
+ * `checkoutOverride` for aurora — for the one instrument that must distinguish
+ * "an operator pointed me at another tree" from "I am running where I live"
+ * (`mapviewport-baseline-harness`, which reports the run as BORROWED when they
+ * differ). Without this it hand-rolled `process.env.AURORA_ROOT`, and so missed
+ * the aliases, the disagreement refusal and the set-but-wrong error.
+ */
+export function auroraDirOverride() {
+  const pick = pickEnv(AURORA_DIR_ENV, AURORA_DIR_ENV_ALIASES);
+  if (pick === null) return null;
+  const dir = requireDir(pick, 1, 'it is meant to be the aurora checkout');
+  if (pick.name !== AURORA_DIR_ENV) announceAlias(pick.name, AURORA_DIR_ENV);
+  return { name: pick.name, value: dir };
+}
+
 /** `{ root, source }` for the suite root; `root` is null only at step 4. */
 function resolveSuiteRoot() {
   const pick = pickEnv(SUITE_ROOT_ENV, SUITE_ROOT_ENV_ALIASES);
@@ -230,7 +330,7 @@ function resolveSuiteRoot() {
   let common = '';
   try {
     common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
-      cwd: AURORA_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+      cwd: AURORA_DIR, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
   } catch {
     common = '';
@@ -238,13 +338,13 @@ function resolveSuiteRoot() {
   if (common) {
     return {
       root: dirname(dirname(common)),
-      source: `step 3: git rev-parse --git-common-dir from ${AURORA_ROOT} → ${common}`,
+      source: `step 3: git rev-parse --git-common-dir from ${AURORA_DIR} → ${common}`,
     };
   }
   return {
     root: null,
     source: `step 4: REFUSED — ${SUITE_ROOT_ENV} is unset (aliases: ${SUITE_ROOT_ENV_ALIASES.join(', ')}) `
-      + `and \`git rev-parse --git-common-dir\` in ${AURORA_ROOT} produced nothing, so there is no `
+      + `and \`git rev-parse --git-common-dir\` in ${AURORA_DIR} produced nothing, so there is no `
       + 'directory to call the suite root',
   };
 }
@@ -353,7 +453,7 @@ export function requireSiblingPath(name, ...rel) {
     throw new SuitePathError(
       `cannot resolve the ${name} checkout: looked for ${checkoutEnv(name)} (aliases: `
       + `${checkoutEnvAliases(name).join(', ')}), then ${SUITE_ROOT_ENV} (aliases: `
-      + `${SUITE_ROOT_ENV_ALIASES.join(', ')}), then a derivation from ${AURORA_ROOT}. ${source}. `
+      + `${SUITE_ROOT_ENV_ALIASES.join(', ')}), then a derivation from ${AURORA_DIR}. ${source}. `
       + `Set ${checkoutEnv(name)} or ${SUITE_ROOT_ENV}. (empyrean contract/SUITE_PATHS.md @ 82982b7f)`,
     );
   }
@@ -401,7 +501,8 @@ export function siblingDefaultPathOrUnresolved(name, ...rel) {
 // prompt and for the instruments' own `--where` flags.
 if (import.meta.url === `file://${process.argv[1]}`) {
   const { root, source } = resolveSuiteRoot();
-  process.stdout.write(`aurora ${AURORA_ROOT}\n`);
+  process.stdout.write(`aurora ${AURORA_DIR}\n`);
+  process.stdout.write(`from   ${auroraDirSource()}\n`);
   process.stdout.write(`suite  ${root ?? '(unresolved)'}\n`);
   process.stdout.write(`from   ${source}\n`);
 }

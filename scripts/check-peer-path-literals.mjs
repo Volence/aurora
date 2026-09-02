@@ -403,10 +403,10 @@ console.error(
   '\n' +
   '  Three shapes a scratchpad/ instrument needs and a naive substitution gets wrong:\n' +
   '\n' +
-  '    · THIS repo\'s own root is AURORA_ROOT from the same module — never a\n' +
+  '    · THIS repo\'s own root is AURORA_DIR from the same module — never a\n' +
   '      literal, and never `.claude/worktrees/<name>`, which names a tree that no\n' +
   '      longer exists.\n' +
-  '    · The electron binary is `process.env.ELECTRON_BIN ?? resolve(AURORA_ROOT,\n' +
+  '    · The electron binary is `process.env.ELECTRON_BIN ?? resolve(AURORA_DIR,\n' +
   '      \'node_modules/.bin/electron\')`. An agent worktree has no node_modules, so\n' +
   '      the override is how a harness runs there; a literal is not a default.\n' +
   '    · A guard that REFUSES the live tree compares against `siblingDefaultPath`,\n' +

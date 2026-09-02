@@ -56,7 +56,7 @@
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npm run build
 // Run:                     node scratchpad/bganim-rate-shift-harness.mjs
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -68,8 +68,7 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 const PORT = Number(process.env.PORT ?? 9397);
 // Defaults to the tree this FILE lives in — a pinned path would silently serve
 // another checkout's dist/.
-const ROOT = process.env.AURORA_ROOT
-  ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`

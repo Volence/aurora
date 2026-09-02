@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Probe 2: does a resumed (free-running) headless oracle-aether advance frames?
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import net from 'node:net';
 import * as esbuild from 'esbuild';
 
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const SERVER = siblingPathOrUnresolved('oracle', 'target/release/oracle-aether');
 const ROM = siblingPathOrUnresolved('aeon', 's4.debug.bin');
 const SOCK = `/tmp/bq-${process.pid}.sock`;

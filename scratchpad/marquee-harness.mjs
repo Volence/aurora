@@ -79,7 +79,7 @@
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npx electron-vite build
 // Run:                     node scratchpad/marquee-harness.mjs
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -91,8 +91,7 @@ const PORT = Number(process.env.PORT ?? 9396);
 // SELF-LOCATING, never a pinned path: run from the main clone this must serve
 // the main clone's dist/, or a "re-verified after merge" run silently
 // re-verifies the branch.
-const ROOT = process.env.AURORA_ROOT
-  ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`

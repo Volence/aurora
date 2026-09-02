@@ -10,9 +10,13 @@ ruled 2026-09-02):
      (never `--show-toplevel`, which answers with the worktree);
   4. refuse, naming what was looked for and where.
 
-`AURORA_<NAME>_REPO`, `AURORA_PEER_ROOT` and `LIVE_AEON` are accepted as
-transitional aliases and announced once on stderr, naming the spelling to
-switch to. A variable that is SET BUT NAMES SOMETHING ABSENT is a hard error at
+THIS repo's own checkout is `AURORA_DIR` by the same rule, and is resolved by
+`AURORA_DIR` / `aurora_dir_source()` below (step 1 then step 3 — see the note on
+`_aurora_dir` for why step 2 is skipped for the repo asking the question).
+
+`AURORA_<NAME>_REPO`, `AURORA_PEER_ROOT`, `LIVE_AEON`, `AURORA_ROOT` and
+`AURORA_REPO` are accepted as transitional aliases and announced once on stderr,
+naming the spelling to switch to. A variable that is SET BUT NAMES SOMETHING ABSENT is a hard error at
 the step that read it, not a null that lets the next step run — the contract's
 rule, and the reason a typo in `AEON_DIR` stops a run instead of quietly
 becoming a reading of the owner's live tree.
@@ -45,7 +49,8 @@ import subprocess
 import sys
 
 __all__ = [
-    "SuitePathError", "SUITE_ROOT_ENV", "SUITE_ROOT_ENV_ALIASES", "AURORA_ROOT",
+    "SuitePathError", "SUITE_ROOT_ENV", "SUITE_ROOT_ENV_ALIASES",
+    "AURORA_DIR", "AURORA_DIR_ENV", "AURORA_DIR_ENV_ALIASES", "aurora_dir_source",
     "checkout_env", "checkout_env_aliases",
     "suite_root", "suite_root_source", "sibling_path", "sibling_path_source",
     "sibling_default_path", "checkout_override",
@@ -62,10 +67,19 @@ SUITE_ROOT_ENV = "EMPYREAN_SUITE_ROOT"
 #: Transitional aliases for the suite root, accepted and announced.
 SUITE_ROOT_ENV_ALIASES = ("AURORA_PEER_ROOT",)
 
-#: This checkout — `<aurora>/scratchpad/lib/suite_paths.py`, so parents[2]. In a
-#: linked worktree this is the WORKTREE, which is what an instrument measuring
-#: "this tree" wants.
-AURORA_ROOT = pathlib.Path(__file__).resolve().parents[2]
+#: Where this module's own file sits — `<aurora>/scratchpad/lib/suite_paths.py`,
+#: so parents[2]. In a linked worktree this is the WORKTREE, which is what an
+#: instrument measuring "this tree" wants. The RAW observation; `AURORA_DIR`
+#: below is the answer, and there must be exactly one of those.
+_AURORA_DIR_DERIVED = pathlib.Path(__file__).resolve().parents[2]
+
+#: The canonical variable naming THIS repo's checkout. THIS is the name.
+AURORA_DIR_ENV = "AURORA_DIR"
+
+#: Transitional aliases for it, accepted and announced. ``AURORA_ROOT`` is the
+#: spelling 64 JS instruments read before O69; ``AURORA_REPO`` is a third one
+#: two of them grew for the same fact.
+AURORA_DIR_ENV_ALIASES = ("AURORA_ROOT", "AURORA_REPO")
 
 _ANNOUNCED: set[str] = set()
 
@@ -122,6 +136,40 @@ def _require_dir(name: str, value: str, step: int, what: str) -> pathlib.Path:
     return p.resolve()
 
 
+def _aurora_dir() -> tuple[pathlib.Path, str]:
+    """THIS repo's checkout: step 1 (`AURORA_DIR`), then step 3 (own location).
+
+    Step 2 is deliberately skipped, the one place in this resolver where a step
+    is. For a PEER, `EMPYREAN_SUITE_ROOT/<name>` is a reasonable guess; for THIS
+    repo this file's own location is a direct observation, not a derivation. If
+    the suite root moved aurora too, `EMPYREAN_SUITE_ROOT=$(mktemp -d)` — the
+    documented recipe for "a machine with no REFERENCE trees" — would also stop
+    every instrument finding its own sources, and a linked worktree would
+    resolve to the MAIN checkout, which is the `--show-toplevel` bug from the
+    other side. Step 4 is unreachable: this module is in the tree it names.
+    """
+    pick = _pick(AURORA_DIR_ENV, AURORA_DIR_ENV_ALIASES)
+    if pick is None:
+        return _AURORA_DIR_DERIVED, (
+            f"step 3: this module's own location ({pathlib.Path(__file__).resolve()}) "
+            f"-> {_AURORA_DIR_DERIVED}")
+    name, value = pick
+    p = _require_dir(name, value, 1, "it is meant to be the aurora checkout")
+    if name != AURORA_DIR_ENV:
+        _announce(name, AURORA_DIR_ENV)
+        return p, f"step 1: {name}={value} (transitional alias; the name is {AURORA_DIR_ENV})"
+    return p, f"step 1: {name}={value}"
+
+
+#: This repository's own root — the ONE derivation, override included.
+AURORA_DIR = _aurora_dir()[0]
+
+
+def aurora_dir_source() -> str:
+    """Which precedence step produced `AURORA_DIR`, to print before doing work."""
+    return _aurora_dir()[1]
+
+
 def _suite_root() -> tuple[pathlib.Path | None, str]:
     pick = _pick(SUITE_ROOT_ENV, SUITE_ROOT_ENV_ALIASES)
     if pick is not None:
@@ -134,16 +182,16 @@ def _suite_root() -> tuple[pathlib.Path | None, str]:
     try:
         common = subprocess.run(
             ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
-            cwd=str(AURORA_ROOT), capture_output=True, text=True, check=True).stdout.strip()
+            cwd=str(AURORA_DIR), capture_output=True, text=True, check=True).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         common = ""
     if common:
         return (pathlib.Path(common).parent.parent,
-                f"step 3: git rev-parse --git-common-dir from {AURORA_ROOT} -> {common}")
+                f"step 3: git rev-parse --git-common-dir from {AURORA_DIR} -> {common}")
     return None, (
         f"step 4: REFUSED — {SUITE_ROOT_ENV} is unset (aliases: "
         f"{', '.join(SUITE_ROOT_ENV_ALIASES)}) and `git rev-parse --git-common-dir` in "
-        f"{AURORA_ROOT} produced nothing")
+        f"{AURORA_DIR} produced nothing")
 
 
 def suite_root() -> pathlib.Path:
@@ -175,7 +223,7 @@ def _sibling(name: str, allow_checkout_env: bool = True) -> tuple[pathlib.Path, 
         raise SuitePathError(
             f"cannot resolve the {name} checkout: looked for {checkout_env(name)} (aliases: "
             f"{', '.join(checkout_env_aliases(name))}), then {SUITE_ROOT_ENV} (aliases: "
-            f"{', '.join(SUITE_ROOT_ENV_ALIASES)}), then a derivation from {AURORA_ROOT}. "
+            f"{', '.join(SUITE_ROOT_ENV_ALIASES)}), then a derivation from {AURORA_DIR}. "
             f"{source}. Set {checkout_env(name)} or {SUITE_ROOT_ENV}.")
     return root / name, source
 
@@ -213,7 +261,8 @@ def checkout_override(name: str) -> tuple[str, pathlib.Path] | None:
 
 
 if __name__ == "__main__":   # "where does this think the suite is?"
-    print(f"aurora {AURORA_ROOT}")
+    print(f"aurora {AURORA_DIR}")
+    print(f"from   {aurora_dir_source()}")
     root, source = _suite_root()
     print(f"suite  {root if root else '(unresolved)'}")
     print(f"from   {source}")

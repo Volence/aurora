@@ -8,11 +8,12 @@
 //
 //   node scratchpad/o17-plant.mjs p1 plant   # then run the suite
 //   node scratchpad/o17-plant.mjs p1 restore
+import { AURORA_DIR } from '../test/support/sibling-root.mjs';
 import { readFileSync, writeFileSync, copyFileSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const SPEC = {
   p1: ['src/renderer/components/art/ComposerCanvas.tsx',
     'pri: s.stampPriority,', "pri: 'keep',"],

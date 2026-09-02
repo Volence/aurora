@@ -38,7 +38,7 @@
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npm run build
 // Run:                     node scratchpad/bg-dangling-ref-harness.mjs
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -47,7 +47,7 @@ import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9437);
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const AEON = siblingPathOrUnresolved('aeon');
 const ELECTRON = process.env.ELECTRON_BIN ?? (() => {
   let dir = ROOT;

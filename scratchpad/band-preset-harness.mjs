@@ -64,7 +64,7 @@
 //   PLANT=rot-section    … rot the bands-section header selector with the `\b`
 //                          that really failed here; row 4c must go red
 
-import { checkoutOverride, siblingDefaultPathOrUnresolved, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { writeFileSync, readFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
@@ -74,7 +74,7 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9431);
 const DISPLAY_NUM = Number(process.env.DISPLAY_NUM ?? 96);
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`

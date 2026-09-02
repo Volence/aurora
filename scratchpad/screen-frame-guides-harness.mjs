@@ -60,6 +60,7 @@
 // Build first:  VITE_AURORA_DEBUG=1 npx electron-vite build
 // Run:          AEON_DIR=<copy> node scratchpad/screen-frame-guides-harness.mjs
 
+import { AURORA_DIR } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -69,7 +70,7 @@ import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9401);
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN ?? `${ROOT}/node_modules/.bin/electron`;
 const AEONDIR = process.env.AEON_DIR;
 if (!AEONDIR || !existsSync(AEONDIR)) {

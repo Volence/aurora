@@ -45,7 +45,7 @@
 // Run: node scratchpad/bganim-insert-roomy-harness.mjs
 //   env AEON_DIR (default ../aeon), AEON_SHA (default: the provenance sidecar's),
 //       STATES=roomy,live (default both), BAND=CxR (default derived), EMIT_DIR, PORT, VERBOSE
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { writeFileSync, mkdirSync, mkdtempSync, existsSync, readFileSync, copyFileSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -56,7 +56,7 @@ import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9396);
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`

@@ -85,7 +85,7 @@
 //   quoted beside it. A plant that changes no verdict is not a plant, so it
 //   was removed rather than kept as a decoration.
 
-import { checkoutOverride, siblingDefaultPathOrUnresolved, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
@@ -100,7 +100,7 @@ const DISPLAY_NUM = Number(process.env.DISPLAY_NUM ?? 97);
  *  printed below is stamped with the screen it was read at. */
 const SCREEN = process.env.SCREEN ?? '1680x1050';
 if (!/^\d{3,4}x\d{3,4}$/.test(SCREEN)) throw new Error(`SCREEN must look like 1920x1080, got ${JSON.stringify(SCREEN)}`);
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`
