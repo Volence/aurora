@@ -79,6 +79,12 @@
  *       it a finding, and it is why the gate passes `--strict-ahead`.
  *   K4  an entry stamped 20 minutes before its commit, in scope: exit 1, naming that
  *       entry's stamp. The other direction of the ratchet.
+ *   K4b an entry BACKFILLED — committed after the cutoff, with an `at` claiming a date
+ *       BEFORE it: exit 1, and reported as IN SCOPE rather than grandfathered. This is
+ *       the ONLY case that tells the two possible cutoffs apart; every other case here
+ *       behaves the same whether the cutoff reads the commit or the entry's own `at`, so
+ *       without it the whole canary set would go on printing OK with the cutoff moved
+ *       onto `at` and the gate blind to half of what it exists to catch.
  *   K5  a line that is not JSON, committed in scope: exit 1, "UNPARSEABLE IN SCOPE". A
  *       line the audit cannot read must not read as a line that passed.
  *   K6  two NEW entries sharing one second: exit 1, "BOTH APPEARANCES IN SCOPE". The
@@ -211,6 +217,19 @@ const NEW_GOOD = { at: T(3, 9, 0), lines: [line(T(3, 9, 0), 'new-good')] };
 const NEW_AHEAD = { at: T(4, 9, 0), lines: [line(T(4, 9, 0, 5), 'new-ahead')] };
 /** Committed on day 5, stamped 20 minutes earlier — remembered, in scope. */
 const NEW_BAD = { at: T(5, 9, 0), lines: [line(T(5, 8, 40), 'new-bad')] };
+/**
+ * THE BACKFILL, and the only case that tells the two possible cutoffs apart.
+ *
+ * Committed on day 5 — after the cutoff — with an `at` claiming day 1, before it. Under
+ * the ratchet as built (cutoff on COMMITTER TIME) this entry is in scope and fails. Under
+ * the tempting alternative (cutoff on the entry's own `at`) it would be grandfathered and
+ * pass, and the gate would be blind to exactly half of what it exists to catch.
+ *
+ * ⚠ WITHOUT THIS CASE THE CANARY SET LOOKED COMPLETE AND WAS NOT: every other case here
+ * behaves identically under both cutoffs, so the whole suite would have gone on printing
+ * OK with the cutoff moved onto `at`.
+ */
+const BACKFILLED = { at: T(5, 9, 0), lines: [line(T(1, 10, 0), 'backfilled')] };
 
 const CASES = [
   {
@@ -259,6 +278,17 @@ const CASES = [
     fires: ['over-threshold'],
   },
   {
+    name: 'K4b an entry BACKFILLED after the cutoff with an old `at` — exit 1, IN SCOPE',
+    commits: [OLD_BAD, BACKFILLED],
+    args: ['--since', CANARY_SINCE, '--strict-ahead'],
+    status: 1,
+    // "1 entry IN SCOPE" and "1 GRANDFATHERED" together are the discriminator: a cutoff
+    // placed on `at` would put this entry among the grandfathered and report 0 in scope.
+    want: ['1 entry IN SCOPE', '1 GRANDFATHERED', 'OVER THRESHOLD (1)', T(1, 10, 0)],
+    absent: ['0 entries IN SCOPE', '2 GRANDFATHERED'],
+    fires: ['backfill-in-scope', 'over-threshold'],
+  },
+  {
     name: 'K5 an unparseable line committed after the cutoff — exit 1, not a silent skip',
     commits: [OLD_BAD, { at: T(3, 9, 0), lines: ['this line is not json'] }],
     args: ['--since', CANARY_SINCE, '--strict-ahead'],
@@ -291,6 +321,9 @@ const CASES = [
 /** Every failure rule the gate relies on. Each must fire on some case. */
 const RULES_EXERCISED = [
   'over-threshold', 'strict-ahead', 'unparseable', 'duplicate-in-scope', 'unmeasurable',
+  // Not a rule of the audit but a property of the RATCHET, and the only one no other case
+  // can see: an entry committed after the cutoff is judged whatever `at` it claims.
+  'backfill-in-scope',
 ];
 
 function runCanaries() {
