@@ -38,8 +38,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 
@@ -54,19 +54,56 @@ interface Run { status: number; stdout: string; stderr: string }
 function run(body: string, env: Record<string, string> = {}): Run {
   const clean = { ...process.env };
   for (const k of Object.keys(clean)) {
-    if (/^(EMPYREAN_SUITE_ROOT|AURORA_PEER_ROOT|LIVE_AEON|AURORA_ROOT|AURORA_REPO|AURORA_BUILT_TREE|.*_DIR|AURORA_.*_REPO)$/.test(k)) delete clean[k];
+    // ELECTRON_BIN joined this list with O72: `electronBin()` reads it, so an
+    // ambient one on the developer's shell would make every row below assert
+    // against that operator's binary instead of the tree under test.
+    if (/^(EMPYREAN_SUITE_ROOT|AURORA_PEER_ROOT|LIVE_AEON|AURORA_ROOT|AURORA_REPO|AURORA_BUILT_TREE|ELECTRON_BIN|.*_DIR|AURORA_.*_REPO)$/.test(k)) delete clean[k];
   }
   const src = `import * as S from ${JSON.stringify(SUBJECT)};\n`
     + `import * as R from ${JSON.stringify(RESOLVER)};\n${body}\n`;
-  try {
-    const out = execFileSync(process.execPath, ['--input-type=module', '-e', src], {
-      env: { ...clean, ...env }, encoding: 'utf8', cwd: dirname(SUBJECT), stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    return { status: 0, stdout: out, stderr: '' };
-  } catch (e) {
-    const err = e as { status?: number; stdout?: string; stderr?: string };
-    return { status: err.status ?? -1, stdout: err.stdout ?? '', stderr: err.stderr ?? '' };
+  // spawnSync, not execFileSync: O72 added `announceRunRoot`, whose whole job is
+  // to WRITE, and it writes to stderr. execFileSync surfaces stderr only when
+  // the child fails, so a row asserting the announcement on a SUCCESSFUL run
+  // read an empty string and could never have failed for the right reason.
+  const out = spawnSync(process.execPath, ['--input-type=module', '-e', src], {
+    env: { ...clean, ...env }, encoding: 'utf8', cwd: dirname(SUBJECT), stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  return { status: out.status ?? -1, stdout: out.stdout ?? '', stderr: out.stderr ?? '' };
+}
+
+/**
+ * Blank out comments, keeping strings and every newline.
+ *
+ * ⚠ NOT `replace(/\/\*[\s\S]*?\*\//g, '')`. That was the first version here and
+ * it was WRONG in a way that produced a confident false failure: a `//` line in
+ * `classic-playtest-harness.mjs` mentions `src/main/aether/*.ts`, so the naive
+ * block-comment pass found an opening `/*` inside a LINE comment and deleted
+ * everything down to the next `*​/` — including that file's `run-root` import.
+ * The row then reported the one migrated harness it could not see as the one
+ * harness that had not been migrated. Same character-walk as the gate's.
+ */
+function stripComments(src: string): string {
+  const out = src.split('');
+  let i = 0;
+  while (i < src.length) {
+    const two = src.slice(i, i + 2);
+    if (two === '//') { while (i < src.length && src[i] !== '\n') { out[i] = ' '; i++; } continue; }
+    if (two === '/*') {
+      while (i < src.length && src.slice(i, i + 2) !== '*/') { if (src[i] !== '\n') out[i] = ' '; i++; }
+      out[i] = ' '; out[i + 1] = ' '; i += 2; continue;
+    }
+    if (src[i] === '"' || src[i] === "'" || src[i] === '`') {
+      const q = src[i++];
+      while (i < src.length) {
+        if (src[i] === '\\') { i += 2; continue; }
+        if (src[i] === q) { i++; break; }
+        i++;
+      }
+      continue;
+    }
+    i++;
   }
+  return out.join('');
 }
 
 /** A directory that LOOKS built: both files `isRunnableTree` requires. */
@@ -267,6 +304,223 @@ describe('run-root: the two halves of the O70 split, POINTED APART', () => {
     } finally {
       rmSync(built, { recursive: true, force: true });
     }
+  });
+
+  /**
+   * ───────────── O72: THE TWO ARTIFACT PATHS, AND WHO COMPOSES THEM ─────────────
+   *
+   * `resolveRunRoot` answers with a DIRECTORY. Before O72 each of 104
+   * instruments then composed the two artifact paths off a name of its own —
+   * and 103 of them composed them off `AURORA_DIR`, the CHECKOUT, which is the
+   * misassignment the O70 split exists to end and which is invisible from the
+   * main checkout because both names are one directory there.
+   *
+   * These rows exercise the composition itself, with the caller's tree and the
+   * built tree pointed APART, so a helper that quietly reached for `AURORA_DIR`
+   * instead of its argument cannot pass.
+   */
+  it('electronBin and distMain compose off the tree they are GIVEN, not the checkout', () => {
+    const built = makeBuiltTree('given-tree');
+    try {
+      const out = run(
+        `const e = S.electronBin(${JSON.stringify(built)});\n`
+        + `const m = S.distMain(${JSON.stringify(built)});\n`
+        + 'process.stdout.write(JSON.stringify({ e, m, auroraDir: R.AURORA_DIR }));',
+      );
+      expect(out.status, `stderr:\n${out.stderr}`).toBe(0);
+      const r = JSON.parse(out.stdout) as Record<string, string>;
+      expect(r.e).toBe(`${built}/node_modules/.bin/electron`);
+      expect(r.m).toBe(`${built}/dist/main/index.mjs`);
+      // The anti-vacuous half: the checkout is a DIFFERENT directory here, and
+      // a helper that ignored its argument would have answered with it.
+      expect(r.auroraDir).not.toBe(built);
+      expect(r.e).not.toContain(r.auroraDir);
+      expect(r.m).not.toContain(r.auroraDir);
+    } finally {
+      rmSync(built, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * ELECTRON_BIN STILL WORKS, and it is asserted rather than assumed.
+   *
+   * It predates the split, `docs/OVERSEER.md` documents it as the override an
+   * agent worktree uses, and 61 instruments read it directly before O72. The
+   * migration moved that read into one function; a migration that silently
+   * dropped it would break every agent worktree and no other row here would go
+   * red, because every other row runs with it scrubbed.
+   */
+  it('electronBin still honours ELECTRON_BIN, and it wins over the tree', () => {
+    const built = makeBuiltTree('override-loses');
+    try {
+      const pinned = '/some/other/place/electron';
+      const out = run(
+        `process.stdout.write(JSON.stringify({\n`
+        + `  withOverride: S.electronBin(${JSON.stringify(built)}),\n`
+        + '  saw: process.env.ELECTRON_BIN ?? "(unset)",\n'
+        + '}));',
+        { ELECTRON_BIN: pinned },
+      );
+      expect(out.status, `stderr:\n${out.stderr}`).toBe(0);
+      const r = JSON.parse(out.stdout) as Record<string, string>;
+      expect(r.saw, 'constructed, not ambient').toBe(pinned);
+      expect(r.withOverride).toBe(pinned);
+      // …and it does NOT leak into the other half: ELECTRON_BIN names one FILE,
+      // so `distMain` must be untouched by it.
+      const out2 = run(
+        `process.stdout.write(S.distMain(${JSON.stringify(built)}));`, { ELECTRON_BIN: pinned },
+      );
+      expect(out2.stdout).toBe(`${built}/dist/main/index.mjs`);
+    } finally {
+      rmSync(built, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * THE WHOLE MIGRATION, IN ITS WORKTREE SHAPE — the row the main checkout
+   * cannot produce.
+   *
+   * A linked git worktree is a real checkout with no `node_modules/` and no
+   * `dist/`, sitting under a tree that has both. That is modelled exactly here:
+   * an empty directory nested under a built one. The PRE-MIGRATION composition
+   * (`<checkout>/node_modules/.bin/electron`) names a file that is not there;
+   * `runTarget` answers with the built ancestor's paths and marks the run
+   * borrowed. Both halves are asserted, because the second alone would pass for
+   * a helper that always returned the ancestor.
+   */
+  it('runTarget from a worktree-shaped caller resolves the BUILT tree, where the old form found nothing', () => {
+    const built = makeBuiltTree('worktree-parent');
+    const worktree = resolve(built, '.claude/worktrees/agent-bed');
+    try {
+      mkdirSync(worktree, { recursive: true });
+      const out = run(
+        `import { existsSync } from 'node:fs';\n`
+        + `const here = ${JSON.stringify(worktree)};\n`
+        + 'const t = S.runTarget(here);\n'
+        + 'process.stdout.write(JSON.stringify({\n'
+        + '  electron: t.electron, main: t.main, root: t.root, borrowed: t.borrowed,\n'
+        + '  newFormResolves: existsSync(t.electron) && existsSync(t.main),\n'
+        + '  oldFormResolves: existsSync(`${here}/node_modules/.bin/electron`)\n'
+        + '                    && existsSync(`${here}/dist/main/index.mjs`),\n'
+        + '}));',
+      );
+      expect(out.status, `stderr:\n${out.stderr}`).toBe(0);
+      const r = JSON.parse(out.stdout) as Record<string, string | boolean>;
+      expect(r.oldFormResolves, 'the pre-migration composition names files that are not there')
+        .toBe(false);
+      expect(r.newFormResolves, 'the migrated composition names files that ARE there').toBe(true);
+      expect(r.root).toBe(built);
+      expect(r.electron).toBe(`${built}/node_modules/.bin/electron`);
+      expect(r.main).toBe(`${built}/dist/main/index.mjs`);
+      expect(r.borrowed, 'and the run says whose build it measured').toBe(true);
+    } finally {
+      rmSync(built, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * THE ANNOUNCEMENT ACTUALLY LEAVES THE PROCESS, and on stderr.
+   *
+   * 104 instruments call `announceRunRoot` at module scope. A version that
+   * composed the line and dropped it would leave every one of them silent about
+   * whose build produced their numbers, which is the failure the carve-out
+   * names, and no other row here would notice: they all read the RETURN value.
+   */
+  it('announceRunRoot writes the line to stderr and returns the value unchanged', () => {
+    const built = makeBuiltTree('announce-writes');
+    const worktree = resolve(built, 'nested/unbuilt');
+    try {
+      mkdirSync(worktree, { recursive: true });
+      const out = run(
+        `const t = S.runTarget(${JSON.stringify(worktree)});\n`
+        + 'const back = S.announceRunRoot(t);\n'
+        + 'process.stdout.write(JSON.stringify({ same: back === t, root: back.root }));',
+      );
+      expect(out.status, `stderr:\n${out.stderr}`).toBe(0);
+      expect(JSON.parse(out.stdout)).toEqual({ same: true, root: built });
+      // stdout carries the measurement; provenance goes to stderr so it cannot
+      // corrupt output another script reads.
+      expect(out.stderr, 'the announcement must reach stderr').toContain(built);
+      expect(out.stderr).toContain('BORROWED');
+      expect(out.stdout, 'and must NOT be mixed into stdout').not.toContain('BORROWED');
+    } finally {
+      rmSync(built, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * THE POPULATION IS WIRED — a set difference, not a count.
+   *
+   * Every `scratchpad/**` instrument that LAUNCHES the built app must resolve
+   * what it launches through this module. "Launches" is read off the source the
+   * way `check-harness-guards.mjs` reads it: the file names an `ELECTRON`
+   * binding, or one of the two artifact paths, in code.
+   *
+   * ⚠ THE PREDICATE THAT DOES NOT WORK, recorded because it was the first one
+   * written here and it went red for a reason worth keeping: "names an artifact
+   * path in code" collapses to 11 files AFTER the migration, because a migrated
+   * harness says `RUN.electron` and `MAIN` and never spells either path again. A
+   * survey predicate that the fix itself invalidates measures the fix, not the
+   * property.
+   *
+   * A hardcoded floor would rot, so the anti-vacuous half is only "the walk
+   * found a population at all". The real recurrence guard is rule 4 of
+   * `scripts/check-peer-path-literals.mjs`, which polices the composition rather
+   * than the import; this row is its structural companion and catches the other
+   * shape — a harness that resolves correctly but by its own private copy.
+   *
+   * EXCLUDED, each for a stated reason: `lib/run-root.mjs` IS the module;
+   * `check-harness-guards.mjs` and `lib/harness-guard.mjs` read those strings to
+   * RECOGNISE a launcher and to build a pkill pattern, never to open a file;
+   * `ozone-x11-proof.mjs` drives a synthetic probe app and needs the binary half
+   * only — it takes `electronBin` and is asserted separately below.
+   */
+  it('every scratchpad instrument that launches the app resolves it through this module', () => {
+    const dir = resolve(__dirname, '../../scratchpad');
+    const files: string[] = [];
+    const walk = (d: string): void => {
+      for (const e of readdirSync(d, { withFileTypes: true })) {
+        if (e.name === 'node_modules' || e.name === 'fixtures' || e.name === 'shots') continue;
+        const p = resolve(d, e.name);
+        if (e.isDirectory()) walk(p);
+        else if (e.name.endsWith('.mjs')) files.push(p);
+      }
+    };
+    walk(dir);
+    const EXCLUDE = [
+      'lib/run-root.mjs', 'lib/harness-guard.mjs', 'check-harness-guards.mjs', 'ozone-x11-proof.mjs',
+    ];
+    const launchers: string[] = [];
+    const missing: string[] = [];
+    for (const f of files) {
+      const rel = f.slice(dir.length + 1);
+      if (EXCLUDE.some((x) => rel.endsWith(x))) continue;
+      const code = stripComments(readFileSync(f, 'utf8'));
+      if (!/(?:^|[^.\w$])ELECTRON\b|node_modules\/\.bin\/electron|dist\/main\/index\.mjs/.test(code)) continue;
+      launchers.push(rel);
+      if (!/from '\.{1,2}\/(?:\.\.\/)*lib\/run-root\.mjs'/.test(code)) missing.push(rel);
+    }
+    // ANTI-VACUOUS: if the walk found nothing, this row proved nothing.
+    expect(launchers.length, 'no instrument launches the app — the walk found nothing')
+      .toBeGreaterThan(50);
+    expect(missing, `these launch the built app without the run-target module:\n${missing.join('\n')}`)
+      .toEqual([]);
+  });
+
+  /**
+   * THE ONE EXCEPTION, ASSERTED RATHER THAN LISTED.
+   *
+   * `ozone-x11-proof.mjs` is excluded from the row above because it drives a
+   * synthetic probe app and would refuse to run on an unbuilt clone if it
+   * demanded a `dist/`. An exclusion nobody checks is how a file quietly stops
+   * resolving through the module at all, so what it DOES take is asserted here.
+   */
+  it('the ozone proof still takes the shared electron resolution, by its binary half', () => {
+    const src = readFileSync(resolve(__dirname, '../../scratchpad/ozone-x11-proof.mjs'), 'utf8');
+    expect(src).toContain("from './lib/run-root.mjs'");
+    expect(src).toContain('electronBin(');
+    // …and no longer reads the override itself, which is now `electronBin`'s job.
+    expect(stripComments(src)).not.toContain('process.env.ELECTRON_BIN');
   });
 
   /**
