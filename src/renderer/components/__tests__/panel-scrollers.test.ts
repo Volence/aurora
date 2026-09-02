@@ -161,8 +161,13 @@ describe('a scrolling panel inside a CollapsibleSection cannot grow without boun
     // And the panel that groups its OWN sections, which the facet-walking
     // derivation could not see at all (§5.1 item 18).
     expect(OWNERS.map(panelName)).toContain('effects/EffectsScenePanel.tsx');
+    // ⚠ THE ORDER IS SOURCE ORDER AND IT MOVED (EW-SHAPE-TABS, d-26b): the
+    // LAYERS list is now above the scene form, which arrives collapsed, because
+    // a content section never shrinks and 478px of scene form was pushing the
+    // list onto its 160px floor. The set is what this row is about; the order
+    // is asserted because it is cheap and a silent re-order is worth seeing.
     expect(SECTIONS.filter((s) => s.owner.endsWith('EffectsScenePanel.tsx')).map((s) => s.id))
-      .toEqual(['aeon.effects.scenes', 'aeon.effects.scene', 'aeon.effects.layers', 'aeon.effects.assign']);
+      .toEqual(['aeon.effects.scenes', 'aeon.effects.layers', 'aeon.effects.scene', 'aeon.effects.assign']);
   });
 
   it('finds scrollers at all (a regex drift would pass vacuously)', () => {

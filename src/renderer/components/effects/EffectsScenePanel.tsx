@@ -478,336 +478,6 @@ export default function EffectsScenePanel(): React.ReactElement {
       </CollapsibleSection>
 
       {selected && (
-        <CollapsibleSection id="aeon.effects.scene" title={`Scene — ${selected.id}`}
-          right={<IconButton icon={<span>Delete</span>} label={`Delete scene ${selected.id}`}
-            onClick={() => run(deleteSceneCommand(library, selected.id))} />}>
-         <SectionBody>
-          <Field label="Name">
-            <input value={typeof selected.name === 'string' ? selected.name : ''}
-              onChange={(e) => run(setSceneFieldCommand(
-                library, selected.id, 'name', e.target.value === '' ? undefined : e.target.value))}
-              style={textInput} />
-          </Field>
-          {/*
-            ONE FIELD PER ROW (ROADMAP item 41). `V center` and `V offset` used
-            to share a line, and so did `Precision` and `Transition` (until row
-            59 retired `Precision` outright): the second
-            label in each pair started wherever the first control happened to
-            end, so no label column could reach it. That is the half of "mixed
-            label widths" that was really wrong — every FIRST label already
-            agreed on 72px, measured.
-          */}
-          <Field label="V factor"
-            title="Vertical scroll for the whole background plane, as a right-shift amount">
-            {/*
-              A SPINNER, NOT A FACTOR PICKER (ROADMAP item 35). `v_factor` is a
-              right-shift count the engine feeds to `asr.w`; the FACTOR_* names
-              this row used to offer belong to a different space and folded to a
-              byte no engine reads. Bounds come from the schema so the spinner
-              cannot offer a shift the engine has no room for, and the max is the
-              lock sentinel, which is why it is also the new-scene default.
-            */}
-            <NumberField
-              title={`v_factor — background vertical shift, ${EFFECTS_V_FACTOR_BOUNDS.min}`
-                + `..${EFFECTS_V_FACTOR_BOUNDS.max}; `
-                + `${EFFECTS_V_FACTOR_BOUNDS.max} locks the plane to v_offset`}
-              min={EFFECTS_V_FACTOR_BOUNDS.min} max={EFFECTS_V_FACTOR_BOUNDS.max}
-              value={selected.v_factor}
-              onChange={(n) => run(setSceneFieldCommand(
-                library, selected.id, 'v_factor', clampVFactor(n)))} />
-          </Field>
-          {/*
-            SAID ON THE ROW, NOT ONLY IN THE TOOLTIP (owner feedback 2026-08-26
-            pt 4). The sentinel is what decides whether the layer tops below
-            are screen lines or world Ys, and both shipped scenes carry it.
-          */}
-          <Hint under>{vFactorHint()}</Hint>
-          {/*
-            THE BACKGROUND RUNS OUT OF PICTURE BEFORE THE ACT RUNS OUT OF CAMERA
-            (ROADMAP O21). Plane B is 512 px tall and is blitted once at level
-            load; an unlocked plane divides the camera by `2^v_factor`, so it
-            covers `512 << v_factor` px of travel and then starts over. aeon
-            measured that seam on the running ROM (d-31) and nothing in either
-            repo checks for it.
-
-            ⚠ IT IS SILENT ON EVERY SCENE THAT EXISTS, AND THAT IS THE DESIGN.
-            Both of Aurora's scenes are `v_factor 15`, as are 18 of aeon's 20,
-            and a locked plane cannot wrap. It is also silent on any unlocked
-            scene whose shift has room for its act. What it catches is the one
-            gesture with no feedback at all: dropping this spinner off the lock
-            on a tall act, which is free to do here and silently tears the
-            background in the ROM. A check that fired on every act would be
-            strictly worse than the silence it replaced — the horizontal axis
-            repeats on nearly every band BY DESIGN and gets a tooltip, not this.
-
-            Advisory, never prevention (row 58): the spinner still offers every
-            shift and the document still saves.
-          */}
-          {(() => {
-            const wrap = reach === null ? null : verticalWrapAdvisory(selected, reach.travelY);
-            return wrap === null ? null : <Hint under tone="warning">{wrap}</Hint>;
-          })()}
-          {/*
-            THE TWO-WRITER RULING, ON THE FIELD THAT CAUSES IT (ROADMAP row 80).
-            Moving `v_factor` off the lock while any layer carries a split makes
-            the WHOLE SCENE unbuildable, and until this row nothing on screen
-            said so — `fireLineAdvisory` bowed out on a comment claiming an
-            advisory that did not exist. This is the scene-subject spelling; the
-            layer cards carry the layer-subject one, and both compose the same
-            clauses. Advisory, never prevention: the spinner still offers every
-            shift the schema allows and the document still saves (row 58).
-          */}
-          {/*
-            AND IT IS THREE PARTS, NOT ONE PARAGRAPH (ROADMAP O15). Whole and
-            correct, this sentence was 21 wrapped lines — ~46% of the panel's
-            visible height — and pushed `V center`, `V offset`, `Transition`,
-            `Deform fg` and `Deform bg` below the fold. `Advisory` keeps the
-            DIAGNOSIS (which names the guilty layers, the fact only this surface
-            can state) and the REMEDIES on screen, and puts only the MECHANISM
-            behind a collapsed "Why this happens". Semantic, never positional:
-            the remedies are last in the sentence, so a length truncation would
-            hide exactly the half an author acts on.
-          */}
-          {(() => {
-            const lock = sceneVsplitLockAdvisoryParts(selected);
-            return lock === null ? null : <Advisory under {...lock} />;
-          })()}
-          <Field label="V center">
-            {/*
-              BOUNDED BY THE CLAMP, NOT THE PROPS (ROADMAP item 37). `min`/`max`
-              on a NumberField only bind the spinner; a typed value goes
-              through unclamped. clampVCenter/clampVOffset read the schema's
-              range, which is the range aeon refuses beyond at emit.
-            */}
-            <NumberField title={`v_center — the act-axis row the vertical factor pivots about, `
-                + `${EFFECTS_V_CENTER_BOUNDS.min}..${EFFECTS_V_CENTER_BOUNDS.max}`}
-              min={EFFECTS_V_CENTER_BOUNDS.min} max={EFFECTS_V_CENTER_BOUNDS.max} width={72}
-              value={typeof selected.v_center === 'number' ? selected.v_center : 0}
-              onChange={(n) => run(setSceneFieldCommand(
-                library, selected.id, 'v_center', clampVCenter(n)))} />
-          </Field>
-          <Field label="V offset">
-            <NumberField title={`v_offset — signed pixel offset added after the shift, `
-                + `${EFFECTS_V_OFFSET_BOUNDS.min}..${EFFECTS_V_OFFSET_BOUNDS.max}`}
-              min={EFFECTS_V_OFFSET_BOUNDS.min} max={EFFECTS_V_OFFSET_BOUNDS.max} width={72}
-              value={typeof selected.v_offset === 'number' ? selected.v_offset : 0}
-              onChange={(n) => run(setSceneFieldCommand(
-                library, selected.id, 'v_offset', clampVOffset(n)))} />
-          </Field>
-          {/*
-            THE VERTICAL BOB (ROADMAP row 99's first split; empyrean bc639a10,
-            aeon 8c75722b). Three rows, and every one of them is shaped by the
-            encoding rather than by taste — the argument is in effects-aeon's
-            §2.5 block, and the short version is: both wire fields are INVERSE
-            shifts, the amplitude's domain has a six-value hole in it, and its
-            off value (15) is the TOP of the range while the wire byte's off (0)
-            is the bottom.
-
-            SO: OFF IS A STATE, NOT A LADDER POSITION, and the two ladders are
-            `<select>`s over enumerated legal values shown in PIXELS and SECONDS.
-            Not NumberFields — this panel's own `V center` comment says why a
-            bounded spinner would not have helped ("min/max only bind the
-            spinner; a typed value goes through unclamped"), and here an
-            unclamped 0 is not merely out of range, it is the one value that
-            packs to silence. A list has no state that can express it.
-          */}
-          {(() => {
-            const on = bobEnabled(selected);
-            return (
-              <>
-                <Field label={BOB_ROW.label} title={BOB_ROW.title}>
-                  {/* TWO KEYS, ONE COMMAND, ONE UNDO STEP: turning the sway off
-                      takes `bob_period` with it, because the engine ignores a
-                      period at bob_shift 15 and a key nothing reads is a key
-                      that will one day be read as meaning something. */}
-                  <Select title={BOB_ROW.title} value={on ? 'on' : 'none'}
-                    onChange={(v) => run(bobToggleCommand(library, selected.id, v === 'on'))}
-                    style={{ width: 88 }}>
-                    <option value="none">{BOB_ROW.off}</option>
-                    <option value="on">{BOB_ROW.on}</option>
-                  </Select>
-                </Field>
-                {!on && <Hint under>{BOB_ROW.hint}</Hint>}
-                {on && (
-                  <>
-                    <Field label={BOB_ROW.amplitudeLabel}>
-                      <Select title={BOB_ROW.amplitudeTitle} value={String(bobShiftValue(selected))}
-                        onChange={(v) => run(setBobShiftCommand(library, selected.id, Number(v)))}
-                        style={{ flex: 1, minWidth: 0 }}>
-                        {BOB_AMPLITUDE_OPTIONS.map((o) => (
-                          <option key={o.shift} value={o.shift}>{o.label}</option>
-                        ))}
-                      </Select>
-                    </Field>
-                    <Field label={BOB_ROW.periodLabel}>
-                      <Select title={BOB_ROW.periodTitle} value={String(bobPeriodValue(selected))}
-                        onChange={(v) => run(setBobPeriodCommand(library, selected.id, Number(v)))}
-                        style={{ flex: 1, minWidth: 0 }}>
-                        {BOB_PERIOD_OPTIONS.map((o) => (
-                          <option key={o.period} value={o.period}>{o.label}</option>
-                        ))}
-                      </Select>
-                    </Field>
-                    {/* WHAT IT DOES, said in the author's units on the row —
-                        the same posture as vFactorHint. Neither ladder shows a
-                        shift exponent anywhere on screen, deliberately. */}
-                    <Hint under>{bobLine(selected)}</Hint>
-                  </>
-                )}
-              </>
-            );
-          })()}
-          {/*
-            `Precision` LIVED HERE, and it was a control for a field the engine
-            had already deleted (ROADMAP row 59, owner ruling d-16). aeon retired
-            `Scene.sc_precision` on 2026-08-26 with the per-cell HScroll path;
-            empyrean `0bd4753` then cut the key from the shared schema, so this
-            dropdown was writing a value nothing would ever read. Removed rather
-            than hidden: the schema has no key, the model has no field, and
-            `SCENE_FORM_CHOICES` has no entry, so there is nothing left to
-            re-grow it from by accident. An old scene file that still carries
-            `precision` does NOT quietly lose the key here — it is refused at
-            load, by name, because the contract schema is closed. That refusal is
-            the ruled behaviour and the affected population is empty; see
-            scene.ts's field note and docs/reviews/2026-08-27-retire-precision.md.
-          */}
-          <Field label="Transition">
-            <Select title="transition"
-              value={typeof selected.transition === 'string' ? selected.transition : SCENE_FORM_CHOICES.transition[0]}
-              onChange={(v) => run(setSceneFieldCommand(
-                library, selected.id, 'transition', v as EffectsScene['transition']))}
-              style={{ flex: 1, minWidth: 0 }}>
-              {SCENE_FORM_CHOICES.transition.map((t) => <option key={t} value={t}>{t}</option>)}
-            </Select>
-          </Field>
-          {/*
-            ═══ DEFORM (wave 2) ═══
-
-            The two plane rows are ONE loop over `SCENE_DEFORM_ROWS`, not two
-            hand-written blocks: `deform_fg` and `deform_bg` are the same
-            `$defs/sceneDeform` pointed at two planes, and the pair of them
-            written out twice is exactly the copy that lets one grow a control
-            the other does not have.
-
-            OFF CLEARS THE KEY, it does not write `"none"` — setSceneFieldCommand's
-            rule, and the reason it now has a none-defaulted arm at all.
-          */}
-          {(Object.keys(SCENE_DEFORM_ROWS) as (keyof typeof SCENE_DEFORM_ROWS)[]).map((key) => {
-            const row = SCENE_DEFORM_ROWS[key];
-            const shared = sceneDeformValue(selected, key);
-            const write = (next: { table: EffectsTableRef; speed: number }) => run(
-              setSceneFieldCommand(library, selected.id, key, { shared: next }));
-            return (
-              <React.Fragment key={key}>
-                <Field label={row.label} title={row.title}>
-                  <Select title={`${row.title}`} value={shared === null ? 'none' : 'on'}
-                    onChange={(v) => run(setSceneFieldCommand(
-                      library, selected.id, key, sceneDeformFromToggle(v === 'on')))}
-                    style={{ width: 88 }}>
-                    <option value="none">{SCENE_DEFORM_ROW_SHARED.none}</option>
-                    <option value="on">{SCENE_DEFORM_ROW_SHARED.on}</option>
-                  </Select>
-                </Field>
-                {shared !== null && (
-                  <>
-                    <TableRefField table={shared.table} titlePrefix={key}
-                      onChange={(t) => write({ ...shared, table: t })} />
-                    <Field label={tableParamLabel('speed')}>
-                      <NumberField title={`${key} ${SCENE_DEFORM_ROW_SHARED.speedTitle}`} width={72}
-                        value={shared.speed}
-                        onChange={(n) => write({ ...shared, speed: clampDeformSpeed(n) })} />
-                    </Field>
-                  </>
-                )}
-              </React.Fragment>
-            );
-          })}
-          <Hint under>{SCENE_DEFORM_ROW_SHARED.hint}</Hint>
-          {/* THE PER-COLUMN ONE, kept visually beside the plane rows and said to
-              be a different thing in its own hint: `v_deform` is per-column
-              VERTICAL scroll (VDP reg $0B bit 2), not a third plane table. */}
-          {(() => {
-            const columns = vDeformValue(selected);
-            const write = (next: { table: EffectsTableRef; speed: number; amp_shift: number }) => run(
-              setSceneFieldCommand(library, selected.id, 'v_deform', { columns: next }));
-            return (
-              <>
-                <Field label={V_DEFORM_ROW.label} title={V_DEFORM_ROW.title}>
-                  {/* THE TOGGLE IS NOT setSceneFieldCommand. Turning V deform
-                      OFF must take `left_column_mask` back to undeclared in the
-                      SAME gesture, because the engine refuses a declared policy
-                      on a scene with no per-column V deform — so a toggle that
-                      cleared one key would leave the document build-refused for
-                      having turned a feature off. Two keys, one command, one
-                      undo step. */}
-                  <Select title={V_DEFORM_ROW.title} value={columns === null ? 'none' : 'on'}
-                    onChange={(v) => run(vDeformToggleCommand(library, selected.id, v === 'on'))}
-                    style={{ width: 88 }}>
-                    <option value="none">{V_DEFORM_ROW.none}</option>
-                    <option value="on">{V_DEFORM_ROW.on}</option>
-                  </Select>
-                </Field>
-                {columns !== null && (
-                  <>
-                    <TableRefField table={columns.table} titlePrefix={V_DEFORM_ROW.key}
-                      onChange={(t) => write({ ...columns, table: t })} />
-                    <Field label={tableParamLabel('speed')}>
-                      <NumberField title={`${V_DEFORM_ROW.key} ${SCENE_DEFORM_ROW_SHARED.speedTitle}`}
-                        width={72} value={columns.speed}
-                        onChange={(n) => write({ ...columns, speed: clampDeformSpeed(n) })} />
-                    </Field>
-                    <Field label={tableParamLabel('amp_shift')}>
-                      <NumberField title={V_DEFORM_ROW.ampTitle}
-                        min={EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS.min}
-                        max={EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS.max} width={72}
-                        value={columns.amp_shift}
-                        onChange={(n) => write({ ...columns, amp_shift: clampAmpShift(n) })} />
-                    </Field>
-                  </>
-                )}
-              </>
-            );
-          })()}
-          <Hint under style={{ marginBottom: 0 }}>{V_DEFORM_ROW.hint}</Hint>
-          {/* THE POLICY V DEFORM MAKES MANDATORY.
-              Shown when there is a V deform to adjudicate — and ALSO whenever
-              the document already declares a policy without one, which the
-              build refuses and a hand-edited file can reach: hiding the row
-              there would leave the author reading an advisory with no control
-              to act on, which is the exact trap this row exists to close.
-              `sprite_mask` is rendered DISABLED with the engine's reason: the
-              schema admits the value and the engine refuses it outright, so it
-              must be visible (a file can carry it) and unpickable. */}
-          {leftColumnMaskRowVisible(selected) && (
-            <Field label={LEFT_COLUMN_MASK_ROW.label} title={LEFT_COLUMN_MASK_ROW.title}>
-              <Select title={LEFT_COLUMN_MASK_ROW.title} value={leftColumnMaskValue(selected)}
-                onChange={(v) => run(leftColumnMaskCommand(library, selected.id, v))}
-                style={{ flex: 1, minWidth: 0 }}>
-                {leftColumnMaskOptions(selected).map((o) => (
-                  <option key={o.value} value={o.value} disabled={o.disabled} title={o.title}>
-                    {o.label}{o.disabled ? ' (engine refuses)' : ''}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          )}
-          {leftColumnMaskRowVisible(selected)
-            && <Hint under>{LEFT_COLUMN_MASK_ROW.hint}</Hint>}
-          {/* WHAT THE BUILD WOULD REFUSE, said before the build says it. Four of
-              aeon's five comptime deform guards are CROSS-FIELD — a table with
-              no plane to sample from, a per-column scene colliding with a
-              layer's split, the mandatory left_column_mask policy and its
-              mirror — so no single control can carry them and the shape
-              validator cannot see them either. Advice, never enforcement: sigil
-              stays the rulebook (scene.ts's advisory docblock). */}
-          {sceneDeformAdvisories(selected).map((a) => (
-            <Hint key={a} under tone="warning" style={{ marginBottom: 0 }}>{a}</Hint>
-          ))}
-         </SectionBody>
-        </CollapsibleSection>
-      )}
-
-      {selected && (
         <CollapsibleSection id="aeon.effects.layers" variant="list"
           title={`Layers (${selected.layers.length}/${EFFECTS_LAYER_COUNT.max} per scene)`}
           right={<IconButton icon={<span>Add</span>} label="Add layer"
@@ -1158,6 +828,353 @@ export default function EffectsScenePanel(): React.ReactElement {
                 );
               })()}
             </Card>
+          ))}
+         </SectionBody>
+        </CollapsibleSection>
+      )}
+
+      {/* ⚠ THE SCENE FORM ARRIVES COLLAPSED, AND IT IS THE ONLY WAY THE LAYERS
+          LIST ABOVE GETS A HEIGHT (EW-SHAPE-TABS; the owner's mockup draws this
+          section as `Scene settings (v)`, shut, under the layer list).
+
+          MEASURED, not preferred. The list section takes a share of what the
+          CONTENT sections leave, and content sections never shrink
+          (ui/CollapsibleSection). On the Parallax tab, expanded, this form is
+          478px of a 742px column — so with it open the layers list is pushed
+          onto its 160px floor and draws a 129px window onto a list of ~200px
+          cards, which is where the cold walkthrough (§a9) and the drift parcel
+          both landed. Shut, it is a 25px header and the list gets the rest.
+
+          THE FIELDS DID NOT MOVE AND NOTHING WAS HIDDEN: one click opens it,
+          and the disclosure is persisted per author (shell/panel-state), so
+          this is the ARRIVAL state only. It is `defaultCollapsed`, which the
+          persisted state overrides in both directions. */}
+      {selected && (
+        <CollapsibleSection id="aeon.effects.scene" title={`Scene — ${selected.id}`}
+          defaultCollapsed
+          right={<IconButton icon={<span>Delete</span>} label={`Delete scene ${selected.id}`}
+            onClick={() => run(deleteSceneCommand(library, selected.id))} />}>
+         <SectionBody>
+          <Field label="Name">
+            <input value={typeof selected.name === 'string' ? selected.name : ''}
+              onChange={(e) => run(setSceneFieldCommand(
+                library, selected.id, 'name', e.target.value === '' ? undefined : e.target.value))}
+              style={textInput} />
+          </Field>
+          {/*
+            ONE FIELD PER ROW (ROADMAP item 41). `V center` and `V offset` used
+            to share a line, and so did `Precision` and `Transition` (until row
+            59 retired `Precision` outright): the second
+            label in each pair started wherever the first control happened to
+            end, so no label column could reach it. That is the half of "mixed
+            label widths" that was really wrong — every FIRST label already
+            agreed on 72px, measured.
+          */}
+          <Field label="V factor"
+            title="Vertical scroll for the whole background plane, as a right-shift amount">
+            {/*
+              A SPINNER, NOT A FACTOR PICKER (ROADMAP item 35). `v_factor` is a
+              right-shift count the engine feeds to `asr.w`; the FACTOR_* names
+              this row used to offer belong to a different space and folded to a
+              byte no engine reads. Bounds come from the schema so the spinner
+              cannot offer a shift the engine has no room for, and the max is the
+              lock sentinel, which is why it is also the new-scene default.
+            */}
+            <NumberField
+              title={`v_factor — background vertical shift, ${EFFECTS_V_FACTOR_BOUNDS.min}`
+                + `..${EFFECTS_V_FACTOR_BOUNDS.max}; `
+                + `${EFFECTS_V_FACTOR_BOUNDS.max} locks the plane to v_offset`}
+              min={EFFECTS_V_FACTOR_BOUNDS.min} max={EFFECTS_V_FACTOR_BOUNDS.max}
+              value={selected.v_factor}
+              onChange={(n) => run(setSceneFieldCommand(
+                library, selected.id, 'v_factor', clampVFactor(n)))} />
+          </Field>
+          {/*
+            SAID ON THE ROW, NOT ONLY IN THE TOOLTIP (owner feedback 2026-08-26
+            pt 4). The sentinel is what decides whether the layer tops below
+            are screen lines or world Ys, and both shipped scenes carry it.
+          */}
+          <Hint under>{vFactorHint()}</Hint>
+          {/*
+            THE BACKGROUND RUNS OUT OF PICTURE BEFORE THE ACT RUNS OUT OF CAMERA
+            (ROADMAP O21). Plane B is 512 px tall and is blitted once at level
+            load; an unlocked plane divides the camera by `2^v_factor`, so it
+            covers `512 << v_factor` px of travel and then starts over. aeon
+            measured that seam on the running ROM (d-31) and nothing in either
+            repo checks for it.
+
+            ⚠ IT IS SILENT ON EVERY SCENE THAT EXISTS, AND THAT IS THE DESIGN.
+            Both of Aurora's scenes are `v_factor 15`, as are 18 of aeon's 20,
+            and a locked plane cannot wrap. It is also silent on any unlocked
+            scene whose shift has room for its act. What it catches is the one
+            gesture with no feedback at all: dropping this spinner off the lock
+            on a tall act, which is free to do here and silently tears the
+            background in the ROM. A check that fired on every act would be
+            strictly worse than the silence it replaced — the horizontal axis
+            repeats on nearly every band BY DESIGN and gets a tooltip, not this.
+
+            Advisory, never prevention (row 58): the spinner still offers every
+            shift and the document still saves.
+          */}
+          {(() => {
+            const wrap = reach === null ? null : verticalWrapAdvisory(selected, reach.travelY);
+            return wrap === null ? null : <Hint under tone="warning">{wrap}</Hint>;
+          })()}
+          {/*
+            THE TWO-WRITER RULING, ON THE FIELD THAT CAUSES IT (ROADMAP row 80).
+            Moving `v_factor` off the lock while any layer carries a split makes
+            the WHOLE SCENE unbuildable, and until this row nothing on screen
+            said so — `fireLineAdvisory` bowed out on a comment claiming an
+            advisory that did not exist. This is the scene-subject spelling; the
+            layer cards carry the layer-subject one, and both compose the same
+            clauses. Advisory, never prevention: the spinner still offers every
+            shift the schema allows and the document still saves (row 58).
+          */}
+          {/*
+            AND IT IS THREE PARTS, NOT ONE PARAGRAPH (ROADMAP O15). Whole and
+            correct, this sentence was 21 wrapped lines — ~46% of the panel's
+            visible height — and pushed `V center`, `V offset`, `Transition`,
+            `Deform fg` and `Deform bg` below the fold. `Advisory` keeps the
+            DIAGNOSIS (which names the guilty layers, the fact only this surface
+            can state) and the REMEDIES on screen, and puts only the MECHANISM
+            behind a collapsed "Why this happens". Semantic, never positional:
+            the remedies are last in the sentence, so a length truncation would
+            hide exactly the half an author acts on.
+          */}
+          {(() => {
+            const lock = sceneVsplitLockAdvisoryParts(selected);
+            return lock === null ? null : <Advisory under {...lock} />;
+          })()}
+          <Field label="V center">
+            {/*
+              BOUNDED BY THE CLAMP, NOT THE PROPS (ROADMAP item 37). `min`/`max`
+              on a NumberField only bind the spinner; a typed value goes
+              through unclamped. clampVCenter/clampVOffset read the schema's
+              range, which is the range aeon refuses beyond at emit.
+            */}
+            <NumberField title={`v_center — the act-axis row the vertical factor pivots about, `
+                + `${EFFECTS_V_CENTER_BOUNDS.min}..${EFFECTS_V_CENTER_BOUNDS.max}`}
+              min={EFFECTS_V_CENTER_BOUNDS.min} max={EFFECTS_V_CENTER_BOUNDS.max} width={72}
+              value={typeof selected.v_center === 'number' ? selected.v_center : 0}
+              onChange={(n) => run(setSceneFieldCommand(
+                library, selected.id, 'v_center', clampVCenter(n)))} />
+          </Field>
+          <Field label="V offset">
+            <NumberField title={`v_offset — signed pixel offset added after the shift, `
+                + `${EFFECTS_V_OFFSET_BOUNDS.min}..${EFFECTS_V_OFFSET_BOUNDS.max}`}
+              min={EFFECTS_V_OFFSET_BOUNDS.min} max={EFFECTS_V_OFFSET_BOUNDS.max} width={72}
+              value={typeof selected.v_offset === 'number' ? selected.v_offset : 0}
+              onChange={(n) => run(setSceneFieldCommand(
+                library, selected.id, 'v_offset', clampVOffset(n)))} />
+          </Field>
+          {/*
+            THE VERTICAL BOB (ROADMAP row 99's first split; empyrean bc639a10,
+            aeon 8c75722b). Three rows, and every one of them is shaped by the
+            encoding rather than by taste — the argument is in effects-aeon's
+            §2.5 block, and the short version is: both wire fields are INVERSE
+            shifts, the amplitude's domain has a six-value hole in it, and its
+            off value (15) is the TOP of the range while the wire byte's off (0)
+            is the bottom.
+
+            SO: OFF IS A STATE, NOT A LADDER POSITION, and the two ladders are
+            `<select>`s over enumerated legal values shown in PIXELS and SECONDS.
+            Not NumberFields — this panel's own `V center` comment says why a
+            bounded spinner would not have helped ("min/max only bind the
+            spinner; a typed value goes through unclamped"), and here an
+            unclamped 0 is not merely out of range, it is the one value that
+            packs to silence. A list has no state that can express it.
+          */}
+          {(() => {
+            const on = bobEnabled(selected);
+            return (
+              <>
+                <Field label={BOB_ROW.label} title={BOB_ROW.title}>
+                  {/* TWO KEYS, ONE COMMAND, ONE UNDO STEP: turning the sway off
+                      takes `bob_period` with it, because the engine ignores a
+                      period at bob_shift 15 and a key nothing reads is a key
+                      that will one day be read as meaning something. */}
+                  <Select title={BOB_ROW.title} value={on ? 'on' : 'none'}
+                    onChange={(v) => run(bobToggleCommand(library, selected.id, v === 'on'))}
+                    style={{ width: 88 }}>
+                    <option value="none">{BOB_ROW.off}</option>
+                    <option value="on">{BOB_ROW.on}</option>
+                  </Select>
+                </Field>
+                {!on && <Hint under>{BOB_ROW.hint}</Hint>}
+                {on && (
+                  <>
+                    <Field label={BOB_ROW.amplitudeLabel}>
+                      <Select title={BOB_ROW.amplitudeTitle} value={String(bobShiftValue(selected))}
+                        onChange={(v) => run(setBobShiftCommand(library, selected.id, Number(v)))}
+                        style={{ flex: 1, minWidth: 0 }}>
+                        {BOB_AMPLITUDE_OPTIONS.map((o) => (
+                          <option key={o.shift} value={o.shift}>{o.label}</option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <Field label={BOB_ROW.periodLabel}>
+                      <Select title={BOB_ROW.periodTitle} value={String(bobPeriodValue(selected))}
+                        onChange={(v) => run(setBobPeriodCommand(library, selected.id, Number(v)))}
+                        style={{ flex: 1, minWidth: 0 }}>
+                        {BOB_PERIOD_OPTIONS.map((o) => (
+                          <option key={o.period} value={o.period}>{o.label}</option>
+                        ))}
+                      </Select>
+                    </Field>
+                    {/* WHAT IT DOES, said in the author's units on the row —
+                        the same posture as vFactorHint. Neither ladder shows a
+                        shift exponent anywhere on screen, deliberately. */}
+                    <Hint under>{bobLine(selected)}</Hint>
+                  </>
+                )}
+              </>
+            );
+          })()}
+          {/*
+            `Precision` LIVED HERE, and it was a control for a field the engine
+            had already deleted (ROADMAP row 59, owner ruling d-16). aeon retired
+            `Scene.sc_precision` on 2026-08-26 with the per-cell HScroll path;
+            empyrean `0bd4753` then cut the key from the shared schema, so this
+            dropdown was writing a value nothing would ever read. Removed rather
+            than hidden: the schema has no key, the model has no field, and
+            `SCENE_FORM_CHOICES` has no entry, so there is nothing left to
+            re-grow it from by accident. An old scene file that still carries
+            `precision` does NOT quietly lose the key here — it is refused at
+            load, by name, because the contract schema is closed. That refusal is
+            the ruled behaviour and the affected population is empty; see
+            scene.ts's field note and docs/reviews/2026-08-27-retire-precision.md.
+          */}
+          <Field label="Transition">
+            <Select title="transition"
+              value={typeof selected.transition === 'string' ? selected.transition : SCENE_FORM_CHOICES.transition[0]}
+              onChange={(v) => run(setSceneFieldCommand(
+                library, selected.id, 'transition', v as EffectsScene['transition']))}
+              style={{ flex: 1, minWidth: 0 }}>
+              {SCENE_FORM_CHOICES.transition.map((t) => <option key={t} value={t}>{t}</option>)}
+            </Select>
+          </Field>
+          {/*
+            ═══ DEFORM (wave 2) ═══
+
+            The two plane rows are ONE loop over `SCENE_DEFORM_ROWS`, not two
+            hand-written blocks: `deform_fg` and `deform_bg` are the same
+            `$defs/sceneDeform` pointed at two planes, and the pair of them
+            written out twice is exactly the copy that lets one grow a control
+            the other does not have.
+
+            OFF CLEARS THE KEY, it does not write `"none"` — setSceneFieldCommand's
+            rule, and the reason it now has a none-defaulted arm at all.
+          */}
+          {(Object.keys(SCENE_DEFORM_ROWS) as (keyof typeof SCENE_DEFORM_ROWS)[]).map((key) => {
+            const row = SCENE_DEFORM_ROWS[key];
+            const shared = sceneDeformValue(selected, key);
+            const write = (next: { table: EffectsTableRef; speed: number }) => run(
+              setSceneFieldCommand(library, selected.id, key, { shared: next }));
+            return (
+              <React.Fragment key={key}>
+                <Field label={row.label} title={row.title}>
+                  <Select title={`${row.title}`} value={shared === null ? 'none' : 'on'}
+                    onChange={(v) => run(setSceneFieldCommand(
+                      library, selected.id, key, sceneDeformFromToggle(v === 'on')))}
+                    style={{ width: 88 }}>
+                    <option value="none">{SCENE_DEFORM_ROW_SHARED.none}</option>
+                    <option value="on">{SCENE_DEFORM_ROW_SHARED.on}</option>
+                  </Select>
+                </Field>
+                {shared !== null && (
+                  <>
+                    <TableRefField table={shared.table} titlePrefix={key}
+                      onChange={(t) => write({ ...shared, table: t })} />
+                    <Field label={tableParamLabel('speed')}>
+                      <NumberField title={`${key} ${SCENE_DEFORM_ROW_SHARED.speedTitle}`} width={72}
+                        value={shared.speed}
+                        onChange={(n) => write({ ...shared, speed: clampDeformSpeed(n) })} />
+                    </Field>
+                  </>
+                )}
+              </React.Fragment>
+            );
+          })}
+          <Hint under>{SCENE_DEFORM_ROW_SHARED.hint}</Hint>
+          {/* THE PER-COLUMN ONE, kept visually beside the plane rows and said to
+              be a different thing in its own hint: `v_deform` is per-column
+              VERTICAL scroll (VDP reg $0B bit 2), not a third plane table. */}
+          {(() => {
+            const columns = vDeformValue(selected);
+            const write = (next: { table: EffectsTableRef; speed: number; amp_shift: number }) => run(
+              setSceneFieldCommand(library, selected.id, 'v_deform', { columns: next }));
+            return (
+              <>
+                <Field label={V_DEFORM_ROW.label} title={V_DEFORM_ROW.title}>
+                  {/* THE TOGGLE IS NOT setSceneFieldCommand. Turning V deform
+                      OFF must take `left_column_mask` back to undeclared in the
+                      SAME gesture, because the engine refuses a declared policy
+                      on a scene with no per-column V deform — so a toggle that
+                      cleared one key would leave the document build-refused for
+                      having turned a feature off. Two keys, one command, one
+                      undo step. */}
+                  <Select title={V_DEFORM_ROW.title} value={columns === null ? 'none' : 'on'}
+                    onChange={(v) => run(vDeformToggleCommand(library, selected.id, v === 'on'))}
+                    style={{ width: 88 }}>
+                    <option value="none">{V_DEFORM_ROW.none}</option>
+                    <option value="on">{V_DEFORM_ROW.on}</option>
+                  </Select>
+                </Field>
+                {columns !== null && (
+                  <>
+                    <TableRefField table={columns.table} titlePrefix={V_DEFORM_ROW.key}
+                      onChange={(t) => write({ ...columns, table: t })} />
+                    <Field label={tableParamLabel('speed')}>
+                      <NumberField title={`${V_DEFORM_ROW.key} ${SCENE_DEFORM_ROW_SHARED.speedTitle}`}
+                        width={72} value={columns.speed}
+                        onChange={(n) => write({ ...columns, speed: clampDeformSpeed(n) })} />
+                    </Field>
+                    <Field label={tableParamLabel('amp_shift')}>
+                      <NumberField title={V_DEFORM_ROW.ampTitle}
+                        min={EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS.min}
+                        max={EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS.max} width={72}
+                        value={columns.amp_shift}
+                        onChange={(n) => write({ ...columns, amp_shift: clampAmpShift(n) })} />
+                    </Field>
+                  </>
+                )}
+              </>
+            );
+          })()}
+          <Hint under style={{ marginBottom: 0 }}>{V_DEFORM_ROW.hint}</Hint>
+          {/* THE POLICY V DEFORM MAKES MANDATORY.
+              Shown when there is a V deform to adjudicate — and ALSO whenever
+              the document already declares a policy without one, which the
+              build refuses and a hand-edited file can reach: hiding the row
+              there would leave the author reading an advisory with no control
+              to act on, which is the exact trap this row exists to close.
+              `sprite_mask` is rendered DISABLED with the engine's reason: the
+              schema admits the value and the engine refuses it outright, so it
+              must be visible (a file can carry it) and unpickable. */}
+          {leftColumnMaskRowVisible(selected) && (
+            <Field label={LEFT_COLUMN_MASK_ROW.label} title={LEFT_COLUMN_MASK_ROW.title}>
+              <Select title={LEFT_COLUMN_MASK_ROW.title} value={leftColumnMaskValue(selected)}
+                onChange={(v) => run(leftColumnMaskCommand(library, selected.id, v))}
+                style={{ flex: 1, minWidth: 0 }}>
+                {leftColumnMaskOptions(selected).map((o) => (
+                  <option key={o.value} value={o.value} disabled={o.disabled} title={o.title}>
+                    {o.label}{o.disabled ? ' (engine refuses)' : ''}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+          {leftColumnMaskRowVisible(selected)
+            && <Hint under>{LEFT_COLUMN_MASK_ROW.hint}</Hint>}
+          {/* WHAT THE BUILD WOULD REFUSE, said before the build says it. Four of
+              aeon's five comptime deform guards are CROSS-FIELD — a table with
+              no plane to sample from, a per-column scene colliding with a
+              layer's split, the mandatory left_column_mask policy and its
+              mirror — so no single control can carry them and the shape
+              validator cannot see them either. Advice, never enforcement: sigil
+              stays the rulebook (scene.ts's advisory docblock). */}
+          {sceneDeformAdvisories(selected).map((a) => (
+            <Hint key={a} under tone="warning" style={{ marginBottom: 0 }}>{a}</Hint>
           ))}
          </SectionBody>
         </CollapsibleSection>

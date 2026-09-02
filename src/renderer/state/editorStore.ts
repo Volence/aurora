@@ -4,6 +4,11 @@ import type { ToolId } from '../../core/project/adapter';
 // Type-only: the candidate's shape is owned by the verbs module that turns it
 // into a BandSpec, so the store and the two surfaces cannot disagree on it.
 import type { BandCandidate } from '../providers/band-verbs';
+// Type-only, and that is what keeps the cycle from existing: the sub-tab module
+// reads THIS store (it owns the switch-then-reveal order), so a value import
+// back would close a loop. The table of which tab owns which section belongs
+// with the reveal that uses it, not here.
+import type { EffectsSubTabId } from '../providers/effects-sub-tabs';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import { chunkIdsAffectedByCommand } from '../../core/editing/chunk-invalidation';
 import type { MapClipboard, PasteLayers, MarqueeGranularity } from '../../core/editing/map-clipboard';
@@ -276,6 +281,25 @@ interface EditorState {
   selectedEffectsSceneId: string | null;
 
   /**
+   * WHICH OF THE EFFECTS FACET'S THREE JOBS IS ON SCREEN — the owner's
+   * `three_sub_tabs_plus_section_strip` ruling (d-26b).
+   *
+   * IN THE STORE, NOT `React.useState` IN THE COLUMN, for the reason
+   * `selectedEffectsSceneId` is: a sibling has to be able to write it. A tile
+   * animation is created from the TOOL-OPTIONS BAR, and the follow-up that
+   * points the author at the card it made (providers/band-follow) has to bring
+   * the Tile anim tab forward first — a `revealPanel` into an unmounted tab
+   * opens a section nobody can see. Everything goes through
+   * `revealEffectsSection` (providers/effects-sub-tabs), which owns that order.
+   *
+   * NOT PERSISTED. The section disclosures are a preference (localStorage,
+   * shell/panel-state); which job you are doing is not — arriving on the tab
+   * you last used to author a palette cycle, a week later, is a worse default
+   * than arriving on the one a scene needs.
+   */
+  effectsSubTab: EffectsSubTabId;
+
+  /**
    * Which RASTER PRESET the band panel is editing, by id.
    *
    * The id and not the document, on `selectedEffectsSceneId`'s own reasoning:
@@ -484,6 +508,15 @@ interface EditorState {
   setSelectedEffectsSceneId: (id: string | null) => void;
   setSelectedEffectsPresetId: (id: string | null) => void;
   /**
+   * Show one of the facet's three jobs.
+   *
+   * ⚠ CALL `revealEffectsSection` INSTEAD when the point is to make a SECTION
+   * reachable — this setter alone leaves a `defaultCollapsed` section shut on
+   * the tab it just brought forward, which is the same "the click worked and
+   * nothing changed on screen" the reveal exists to end.
+   */
+  setEffectsSubTab: (tab: EffectsSubTabId) => void;
+  /**
    * Move the promotion candidate, and point the lens AT it.
    *
    * The two happen together because they are one act: an author who changes
@@ -634,6 +667,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   collisionBrushSize: 1,
   selectedEffectsSceneId: null,
   selectedEffectsPresetId: null,
+  // The job a scene needs, and the one the mockup draws first.
+  effectsSubTab: 'parallax',
   // 1x1 at slot 0: the smallest legal band, and a base the panel re-seeds to
   // `firstPromotableSlot` as soon as a document is open. `bandLensTarget: null`
   // is what keeps this from lighting anything before the author marks.
@@ -732,6 +767,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setCollisionBrushSize: (size) => set({ collisionBrushSize: Math.max(1, Math.min(31, size | 0)) }),
   setSelectedEffectsSceneId: (id) => set({ selectedEffectsSceneId: id }),
   setSelectedEffectsPresetId: (id) => set({ selectedEffectsPresetId: id }),
+  setEffectsSubTab: (effectsSubTab) => set({ effectsSubTab }),
   setBandCandidate: (patch) => set((s) => ({
     bandCandidate: { ...s.bandCandidate, ...patch },
     bandLensTarget: { kind: 'candidate' },
