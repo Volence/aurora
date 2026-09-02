@@ -62,6 +62,17 @@
  * stale cache gets there in the first place. An empty per-run prefix makes no stale
  * artifact reachable, whatever anyone did before.
  *
+ * AND THE CLAIM IS MEASURED, NOT ASSERTED. Found by planting the removal of the line
+ * above: with the prefix gone from the child's environment the run went green on a
+ * mutated file AND WENT ON PRINTING "compiled from source", because the sentence was
+ * prose about an intention rather than a reading. A gate that says which hazard it
+ * closed while not closing it is worse than one that says nothing. So after the run this
+ * file counts the `.pyc` files Python actually wrote under the per-run prefix: a
+ * non-empty prefix is proof the child honoured it, an empty one means the run's
+ * compilation source is unknown and that is exit 2. `PYTHONDONTWRITEBYTECODE` is dropped
+ * from the child's environment for the same reason — inherited, it would suppress the
+ * writes this check reads, turning a real measurement into a false alarm.
+ *
  * EXIT CODES
  *   0  every required row ran and the rows passed (skips are reported, not hidden)
  *   1  at least one row failed
@@ -70,7 +81,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 
@@ -137,17 +148,48 @@ if (version.error || version.status !== 0) {
 const cacheRoot = mkdtempSync(resolve(tmpdir(), 'aurora-py-resolver-cache-'));
 process.on('exit', () => rmSync(cacheRoot, { recursive: true, force: true }));
 
+/**
+ * The child's environment: the prefix set, and `PYTHONDONTWRITEBYTECODE` REMOVED.
+ *
+ * Dropping it is not an optimisation. Inherited, it suppresses every bytecode write,
+ * which would leave the prefix empty and make the after-the-run check below — the only
+ * thing that turns "the prefix was set" into "the prefix was honoured" — unable to tell
+ * a suppressed write from an ignored variable.
+ */
+const childEnv = { ...process.env, PYTHONPYCACHEPREFIX: cacheRoot };
+delete childEnv.PYTHONDONTWRITEBYTECODE;
+
+/** Every file under a directory tree, so the count below is of real artifacts. */
+function countFiles(dir) {
+  let n = 0;
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    if (e.isDirectory()) n += countFiles(join(dir, e.name));
+    else n += 1;
+  }
+  return n;
+}
+
 // ---- the run ----------------------------------------------------------------
 
 // `-t` (top-level dir) is the rows' own directory so `import suite_paths` finds the
 // subject beside them, which is the same import path the six instruments use.
 const args = ['-m', 'unittest', 'discover', '-s', ROWS_DIR, '-t', ROWS_DIR, '-p', ROWS_FILE, '-v'];
-const run = spawnSync('python3', args, {
-  cwd: AURORA_DIR,
-  encoding: 'utf8',
-  env: { ...process.env, PYTHONPYCACHEPREFIX: cacheRoot },
-});
+const run = spawnSync('python3', args, { cwd: AURORA_DIR, encoding: 'utf8', env: childEnv });
 if (run.error) die(`could not run python3 (${run.error.message}).`);
+
+// THE PREFIX WAS HONOURED, MEASURED. Python writes each imported module's bytecode under
+// the prefix, so a non-empty tree is the child's own evidence that it compiled there and
+// therefore could reach no cache from any earlier run. An EMPTY one means this run's
+// compilation source is unknown, which is precisely the state that reports green over a
+// mutation, so it is exit 2 rather than a caveat in the verdict line.
+const compiled = countFiles(cacheRoot);
+if (compiled === 0) {
+  die(`nothing was compiled under the per-run bytecode prefix ${cacheRoot}, so this run `
+    + 'cannot show it executed the files on disk rather than a cache some earlier run left '
+    + "behind. Python invalidates its cache on (mtime, size), so a same-size edit with the "
+    + 'mtime restored runs as its old self and reports green. Whatever the rows printed, '
+    + 'they were not shown to be about the current source.');
+}
 
 // unittest reports on stderr; the rows print their measurements on stdout.
 const report = run.stderr ?? '';
@@ -186,9 +228,10 @@ console.log(
   + `scratchpad/lib/suite_paths.py; all ${REQUIRED_ROWS.length} required row(s) present; `
   + `${skipped} skipped (reasons above, each naming what it did NOT measure).`);
 console.log(
-  `${PREFIX}: compiled from source — PYTHONPYCACHEPREFIX was a fresh empty ${cacheRoot}, so `
-  + 'no earlier run\'s bytecode was reachable. A same-size, same-mtime edit is invisible to '
-  + "Python's cache and would otherwise have run as its old self.");
+  `${PREFIX}: compiled from source — ${compiled} bytecode file(s) were written under the `
+  + `fresh, empty per-run prefix ${cacheRoot}, which is the child's own evidence that it `
+  + 'compiled there and could reach no earlier cache. A same-size, same-mtime edit is '
+  + "invisible to Python's cache and would otherwise have run as its old self.");
 
 if (run.status !== 0) {
   console.error(`${PREFIX}: FAILED — see the report above.`);
