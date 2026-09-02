@@ -189,10 +189,10 @@ export function resolveStripDrag(input: StripDragInputs): StripDragOutcome {
   if (!rowChoices().includes(rows)) {
     return {
       kind: 'refused',
-      reason: `rows ${rows} is not a legal band height`,
+      reason: `rows ${rows} is not a legal tile-animation height`,
       hint: `rows is ${rows}, which does not make rows*${TILE_BYTES} an exact power of two — `
         + 'the runtime rotates a whole pattern column by shifting it. Pick a row count from the '
-        + "band form's Rows control before dragging a range.",
+        + "tile-animation form's Rows control before dragging a range.",
     };
   }
 
@@ -203,7 +203,7 @@ export function resolveStripDrag(input: StripDragInputs): StripDragOutcome {
   if (staticBase > runEnd) {
     return {
       kind: 'refused',
-      reason: `slots ${lo}..${runEnd} already belong to bands`,
+      reason: `slots ${lo}..${runEnd} already belong to tile animations`,
       // ⚠ `firstPromotableSlot` is a COUNT, so it is the first FREE slot, not the
       // last owned one — the animated slots are `0 .. firstPromotableSlot - 1`
       // (`bandBudget` sets it from `animatedSlotCount`). Naming the boundary as
@@ -212,7 +212,7 @@ export function resolveStripDrag(input: StripDragInputs): StripDragOutcome {
       // the whole point. Derived here, and pinned by a node row that computes
       // the boundary from `firstPromotableSlot` rather than restating a literal.
       hint: `slots ${lo}..${runEnd} are all inside the animated prefix — slots 0..`
-        + `${firstPromotableSlot - 1} already belong to bands, so there is no static art under `
+        + `${firstPromotableSlot - 1} already belong to tile animations, so there is no static art under `
         + `this drag to promote. Drag a run that reaches slot ${firstPromotableSlot} or past it.`,
     };
   }
@@ -225,7 +225,7 @@ export function resolveStripDrag(input: StripDragInputs): StripDragOutcome {
     return {
       kind: 'refused',
       reason: `no ${rows}-row column fits from slot ${staticBase}`,
-      hint: `a band of ${rows} row(s) needs ${rows} slot(s) from ${staticBase}, but the blob `
+      hint: `a tile animation of ${rows} row(s) needs ${rows} slot(s) from ${staticBase}, but the blob `
         + `ends at ${blobTileCount}. No column fits there, so the candidate is unchanged.`,
     };
   }
@@ -363,7 +363,7 @@ export function stripDragHint(outcome: StripDragOutcome): string {
   const parts = [
     // `rangeSlots` supplies the "slots …" half; a literal "slots" here would
     // render "slots slots 192..199".
-    `band candidate · ${rangeSlots(outcome)} (${outcome.cols}x${outcome.rows})`,
+    `tile-animation candidate · ${rangeSlots(outcome)} (${outcome.cols}x${outcome.rows})`,
     `from a dragged run of ${outcome.runLength} slot${outcome.runLength === 1 ? '' : 's'}`,
   ];
   if (outcome.clampedToPrefix) parts.push('start moved past the animated prefix');

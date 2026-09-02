@@ -204,6 +204,17 @@ describe('a binding that names nothing is SAID, not silently redrawn as unbound'
       .toMatch(/"ghost".*not a raster preset in this project/);
   });
 
+  // EFFECTS-W1 defect 7: the SECTION is named too, when the caller knows it.
+  // One control draws every section in turn, so the sentence has to say which
+  // section's sidecar carries the dangling id — aeon's own build message for
+  // the same fault names the section, and the two now agree.
+  it('names the SECTION when the caller passes one, and stays generic when it does not', () => {
+    expect(unassignablePresetRef(lib(['a']), 'ghost', 4))
+      .toMatch(/^Section 4 is assigned to "ghost"/);
+    expect(unassignablePresetRef(lib(['a']), 'ghost'))
+      .toMatch(/^This section is assigned to "ghost"/);
+  });
+
   /** The two failures are DIFFERENT ACTIONS for the author — create the preset,
    *  versus fix the file that will not parse — so they are different sentences. */
   it('an id whose FILE exists but will not parse says so instead', () => {
@@ -212,7 +223,7 @@ describe('a binding that names nothing is SAID, not silently redrawn as unbound'
   });
 
   it('the panel renders that advisory, in code, at the warning tone', () => {
-    expect(code).toMatch(/unassignablePresetRef\(library, section\.rasterRef\)/);
+    expect(code).toMatch(/unassignablePresetRef\(library, section\.rasterRef, activeSectionIndex\)/);
     expect(code).toMatch(/<Hint under tone="warning">/);
   });
 });

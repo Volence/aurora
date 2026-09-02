@@ -302,8 +302,8 @@ export function bandMotion(
  * above, compressed to one hint line; the per-band sentence is `bandMotion`.
  */
 export const BAND_MECHANISM_HINT =
-  'A band is a cols x rows tile pattern with 8 frames swapped over the same tiles, so it '
-  + 'scrolls inside its own window. Every cell that points at the band moves the same way.';
+  'A tile animation is a cols x rows tile pattern with 8 frames swapped over the same tiles, so '
+  + 'it scrolls inside its own window. Every cell that points at it moves the same way.';
 
 export type BandStatusKind = 'previewing' | 'no-cells' | 'refused' | 'unresolved';
 
@@ -344,7 +344,7 @@ export function bandStatus(
     return {
       kind: 'refused',
       rate,
-      verdict: `Not previewing: ${verdict.refusal}. The band names slots in the BG tile blob, `
+      verdict: `Not previewing: ${verdict.refusal}. The tile animation names slots in the BG tile blob, `
         + 'and the blob on screen is not the one this document describes.',
     };
   }

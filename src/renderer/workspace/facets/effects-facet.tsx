@@ -33,6 +33,7 @@
 
 import React from 'react';
 import AeonPropertiesPanel from '../../components/AeonPropertiesPanel';
+import SectionPicker from '../../components/effects/SectionPicker';
 import EffectsScenePanel from '../../components/effects/EffectsScenePanel';
 import BgAnimBandPanel from '../../components/effects/BgAnimBandPanel';
 import BandPresetPanel from '../../components/effects/BandPresetPanel';
@@ -44,6 +45,15 @@ import { mapFacet, type FacetModule } from '../facet-registry';
 function EffectsPanels() {
   return (
     <Panel width={300} scroll>
+      {/* WHICH SECTION AM I EDITING — FIRST, AND NEVER COLLAPSIBLE.
+          (EFFECTS-W1 defect 4.) This column carries TWO per-section bindings
+          ~4,000px apart, both acting on one store value that was set on a
+          different tab and named nowhere here. A cold reader spent eight
+          minutes editing a scene the section did not use. It is above the scene
+          panel because it is about BOTH bindings, and it is not a
+          CollapsibleSection because a shut one renders no children — an author
+          who collapsed it would be back where they started. */}
+      <SectionPicker />
       <EffectsScenePanel />
       {/* THE RASTER TIMELINE, DIRECTLY UNDER THE SCENE IT IS ABOUT (ROADMAP row
           79). It is the SAME layers the scene panel lists and the map draws

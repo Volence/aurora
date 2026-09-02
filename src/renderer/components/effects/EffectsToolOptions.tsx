@@ -19,10 +19,13 @@ import React from 'react';
 import { T, OptionBar, Chip } from '../ui';
 import { useProjectStore } from '../../state/projectStore';
 import { useEditorStore } from '../../state/editorStore';
+import { useViewStore } from '../../state/viewStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import { bandVerbs, type BandVerb } from '../../providers/band-verbs';
 import { runBandVerb } from '../../providers/band-follow';
 import { TOOL_HINTS } from '../../workspace/tool-meta';
+import { openGuide } from '../../state/guideStore';
+import { EFFECTS_GUIDE_SLUG, GUIDE_ANCHORS } from '../guide/guides';
 
 function VerbChip({ verb, onRefusal }: { verb: BandVerb; onRefusal: (reason: string | null) => void }) {
   return (
@@ -43,6 +46,8 @@ export default function EffectsToolOptions(): React.ReactElement {
   const candidate = useEditorStore((s) => s.bandCandidate);
   const tool = useEditorStore((s) => s.tool);
   const [refusal, setRefusal] = React.useState<string | null>(null);
+  const cameraPreview = useViewStore((s) => s.overlays.showCameraPreview);
+  const toggleOverlay = useViewStore((s) => s.toggleOverlay);
   const doc = project?.bgOverride?.doc ?? null;
   const verbs = bandVerbs(doc, candidate);
   // What the bar SAYS beside the chips: a run-time refusal first (it is the
@@ -53,8 +58,45 @@ export default function EffectsToolOptions(): React.ReactElement {
     ?? TOOL_HINTS[tool];
   return (
     <OptionBar>
+      {/* THE FIRST HELP AFFORDANCE THIS APPLICATION HAS EVER HAD, and it is
+          here because this bar is where the measured confusion starts: the
+          cold reader's first click on this tab was `Add blank band`, which
+          built the wrong feature and dirtied his project (§a5). It sits BEFORE
+          the two verbs for that reason — left of the button that cost him the
+          mistake, not after it.
+
+          A `?` AND A WORD. A bare glyph is a guess; "? Guide" is a promise.
+          The 300px column below has no room for this, which is the other half
+          of why the bar carries it. */}
+      <Chip title="Open the first-run guide: what this tab does, and how to make a background move."
+        onClick={() => openGuide(EFFECTS_GUIDE_SLUG, GUIDE_ANCHORS.whatThisTabDoes)}>
+        ? Guide
+      </Chip>
       <VerbChip verb={verbs.promote} onRefusal={setRefusal} />
       <VerbChip verb={verbs.add} onRefusal={setRefusal} />
+      {/* ═══ THE PREVIEW THIS TAB IS ABOUT, ON THIS TAB (EFFECTS-W1 defect 14) ═══
+
+          The composite background preview EXISTS and is the only thing on
+          screen that shows what a scene's layers do — and it was off by
+          default, in the View menu, unmentioned by the Effects tab. The cold
+          reader found it ten minutes after he needed it, while auditing that
+          menu for something else.
+
+          THE SAME SWITCH, NOT A SECOND ONE. It toggles `showCameraPreview` in
+          the one view store the menu writes, so the checkbox and this chip
+          cannot disagree — the defect `Play bands` already documents about
+          itself in a tooltip. It stays off by default: it is view state, and
+          turning an author's overlays on for them is not this parcel's call. */}
+      <Chip active={cameraPreview}
+        title={cameraPreview
+          ? 'Stop compositing the background in the screen frame. The same switch as '
+            + 'View > Compose the background in the frame (parallax).'
+          : 'Draw the real background per parallax strip, inside the screen frame — the only '
+            + 'thing in Aurora that shows what a scene\'s layers do. The same switch as '
+            + 'View > Compose the background in the frame (parallax).'}
+        onClick={() => toggleOverlay('showCameraPreview')}>
+        Parallax preview
+      </Chip>
       <span style={{ flex: 1 }} />
       <span style={{ color: refusal ? T.warning : T.textFaint }}>{line}</span>
     </OptionBar>

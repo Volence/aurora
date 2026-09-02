@@ -38,7 +38,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  PRESET_HEADLINE, PRESET_LIMITS, NO_PREVIEW, lastBandRefusal, armOptions,
+  PRESET_HEADLINE, PRESET_LIMITS, NO_PREVIEW, NO_PREVIEW_SHORT, presetLimitsShort,
+  lastBandRefusal, armOptions,
   presetIdRefusal, newPreset,
 } from '../../../providers/effects-preset';
 import { RASTER_SECTION_BINDING_LIMIT } from '../../../../core/formats/raster-binding';
@@ -614,11 +615,61 @@ describe('the panel renders the limits, unconditionally, in the body', () => {
   });
 
   it('LimitBlock reads the provider, and does not retype the sentences', () => {
-    expect(code).toMatch(/PRESET_LIMITS\.map/);
+    expect(code).toMatch(/presetLimitsShort\(\)\.map/);
     expect(code).toMatch(/\{PRESET_HEADLINE\}/);
-    expect(code).toMatch(/\{NO_PREVIEW\}/);
+    expect(code).toMatch(/\{NO_PREVIEW_SHORT\}/);
     // The bodies must reach the render, not just the titles.
     expect(code).toMatch(/\{l\.body\}/);
+  });
+
+  /**
+   * ⚠ THE RULING THIS FILE OPENED WITH WAS AMENDED, NOT ABANDONED — EFFECTS-W1
+   * defect 3, and the amendment is worth stating because the old rows read as
+   * an absolute.
+   *
+   * The old rule was "the limits render IN FULL, always visible, never a
+   * tooltip", and its reason still stands: a limit behind a hover is a limit
+   * the panel does not carry. What was measured is that the FULL wording is
+   * 8,059 characters in a 285px column — about seven minutes of reading, citing
+   * four aeon SHAs and three pytest names — standing between an author and the
+   * first control. A limit nobody reaches the bottom of is also a limit the
+   * panel does not carry.
+   *
+   * So the amendment splits AUDIENCE, not visibility: every limit still renders
+   * VISIBLY and unconditionally, at author length; the contract-length wording
+   * (owed to the agent reply and the published tool descriptions, and pinned by
+   * the rows above) is reachable on the same element's `title` and in full in
+   * the guide. The rows below hold that split from BOTH sides — the short text
+   * must be painted, and the long text must still be reachable — so neither
+   * half can quietly become the other.
+   */
+  it('every contract limit has an author-length sibling — none can be dropped', () => {
+    const short = presetLimitsShort();
+    expect(short.map((l) => l.key)).toEqual(PRESET_LIMITS.map((l) => l.key));
+    for (const l of short) {
+      // Two sentences, not two paragraphs, and not empty.
+      expect(l.body.length, `${l.key} is empty`).toBeGreaterThan(40);
+      expect(l.body.length, `${l.key} is not author-length`).toBeLessThan(320);
+      // The contract wording is CARRIED, verbatim, not paraphrased away.
+      expect(l.full).toBe(PRESET_LIMITS.find((x) => x.key === l.key)!.body);
+    }
+  });
+
+  it('the cut is real: the PAINTED block is a fraction of the contract text', () => {
+    const painted = PRESET_HEADLINE.length
+      + presetLimitsShort().reduce((n, l) => n + l.title.length + 2 + l.body.length, 0)
+      + NO_PREVIEW_SHORT.length;
+    const contract = PRESET_HEADLINE.length
+      + PRESET_LIMITS.reduce((n, l) => n + l.title.length + 2 + l.body.length, 0)
+      + NO_PREVIEW.length;
+    // MEASURED BOTH SIDES HERE, not quoted from a report: 8,059 -> ~1,000 at
+    // the landing. The bound is generous so ordinary wording edits do not fail
+    // it, and tight enough that the 6,508-character `unbound` body coming back
+    // into the render does.
+    expect(contract, `the contract text is only ${contract} chars — has it been cut instead `
+      + 'of moved? It is owed to the agent reply and the tool descriptions').toBeGreaterThan(6000);
+    expect(painted, `the painted block is ${painted} chars against a contract ${contract}`)
+      .toBeLessThan(2000);
   });
 
   /**
@@ -659,11 +710,21 @@ describe('the panel renders the limits, unconditionally, in the body', () => {
   });
 
   it('the limits are BODY TEXT, not a title= attribute', () => {
-    // The failure this rules out: `title={l.body}` — technically present,
-    // invisible until hover, which the brief forbids in as many words.
+    // The failure this rules out is unchanged: the thing an author must READ
+    // cannot be hover-only. `l.body` is the SHORT wording now, and it is what
+    // must be painted.
     expect(code).not.toMatch(/title=\{(?:l|limit)\.body\}/);
-    expect(code).not.toMatch(/title=\{NO_PREVIEW\}/);
+    expect(code).not.toMatch(/title=\{NO_PREVIEW_SHORT\}/);
     expect(code).not.toMatch(/title=\{PRESET_HEADLINE\}/);
+  });
+
+  it('and the contract wording is still REACHABLE, on the same elements', () => {
+    // The other half of the split. Deleting these two would turn a move into a
+    // deletion, which is the failure the amendment above is at pains not to be.
+    expect(code).toMatch(/title=\{l\.full\}/);
+    expect(code).toMatch(/title=\{NO_PREVIEW\}/);
+    // ...and the guide carries it as prose, from the card it is about.
+    expect(code).toMatch(/openGuide\(EFFECTS_GUIDE_SLUG, GUIDE_ANCHORS\.rasterBand\)/);
   });
 });
 
@@ -716,8 +777,11 @@ describe('the narrowed control carries its reason', () => {
     const one = newPreset('probe');
     expect(one.bands).toHaveLength(1);
     const why = lastBandRefusal(one);
-    expect(why).toMatch(/at least one band/i);
+    expect(why).toMatch(/at least one/i);
     expect(why).toMatch(/zero-band program/i);
+    // EFFECTS-W1 defect 7: the sentence NAMES the preset it is about, so a
+    // reader who meets it in a column of several cards knows which.
+    expect(why).toMatch(/^preset "probe":/);
 
     // ...and with two bands the refusal lifts, so this is a condition and not
     // a permanent wall.

@@ -309,7 +309,11 @@ export default function ArtBrowser() {
       // footprint of this range the moment the button comes up. NO DOCUMENT
       // WRITE: the only writers in this arc are still promoteBandCommand /
       // addBandCommand.
-      ed.setBandCandidate({ staticBase: outcome.staticBase, cols: outcome.cols });
+      // `staticBaseAuthored`: a dragged range is the AUTHOR choosing this base
+      // — see band-verbs.ts (EFFECTS-W1 defect 12).
+      ed.setBandCandidate({
+        staticBase: outcome.staticBase, cols: outcome.cols, staticBaseAuthored: true,
+      });
     }
     // `range` and `refused` both report on the picker's own hover line — the
     // strip has no other surface, and the candidate they aim lives two panels

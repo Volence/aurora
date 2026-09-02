@@ -79,8 +79,8 @@ export function makeAddBandCommand(
   doc: BgOverrideDocument, band: BgOverrideBand, bandIndex?: number,
 ): SetBgOverrideBandCommand {
   const plan = planBandInsertion(doc, band, bandIndex);
-  refuseIfResultInvalid(insertBand(doc, plan, band), 'add a BgAnim band');
-  return command(true, band, plan, 'Add BG animation band');
+  refuseIfResultInvalid(insertBand(doc, plan, band), 'add a tile animation');
+  return command(true, band, plan, 'Add tile animation');
 }
 
 /**
@@ -96,8 +96,8 @@ export function makeRemoveBandCommand(
 ): SetBgOverrideBandCommand {
   const plan = planBandRemoval(doc, bandIndex, options);
   const band = (doc.anims ?? [])[bandIndex];
-  refuseIfResultInvalid(removeBand(doc, plan), 'remove a BgAnim band');
-  return command(false, band, plan, 'Remove BG animation band');
+  refuseIfResultInvalid(removeBand(doc, plan), 'remove a tile animation');
+  return command(false, band, plan, 'Remove tile animation');
 }
 
 /**
@@ -119,8 +119,8 @@ export function makePromoteBandCommand(
   doc: BgOverrideDocument, band: BgOverrideBand, staticBase: number, bandIndex?: number,
 ): SetBgOverrideBandCommand {
   const plan = planBandPromotion(doc, band, staticBase, bandIndex);
-  refuseIfResultInvalid(promoteBand(doc, plan, band), 'promote static tiles to a BgAnim band');
-  return command(true, band, plan, 'Promote BG tiles to animation band');
+  refuseIfResultInvalid(promoteBand(doc, plan, band), 'promote static tiles to a tile animation');
+  return command(true, band, plan, 'Promote BG tiles to a tile animation');
 }
 
 /**
@@ -139,6 +139,6 @@ export function makeDemoteBandCommand(
 ): SetBgOverrideBandCommand {
   const plan = planBandDemotion(doc, bandIndex, staticBase);
   const band = (doc.anims ?? [])[bandIndex];
-  refuseIfResultInvalid(demoteBand(doc, plan), 'demote a BgAnim band to static tiles');
-  return command(false, band, plan, 'Demote BG animation band to static tiles');
+  refuseIfResultInvalid(demoteBand(doc, plan), 'demote a tile animation to static tiles');
+  return command(false, band, plan, 'Demote tile animation to static tiles');
 }

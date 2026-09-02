@@ -34,6 +34,10 @@ import {
 } from '../../formats/bg-library';
 import { parseSectionMeta } from '../../formats/section-meta';
 import { loadEffectsSceneLibrary } from '../../formats/effects/scene';
+import {
+  wiringPaths, unknownWiring, descriptorEffectsBindings, libraryRasterChooserCalls,
+  rasterChooserName, type SectionRasterWiring,
+} from '../../formats/effects/section-wiring';
 import { loadEffectsPresetLibrary } from '../../formats/effects/preset';
 import { loadBgOverride } from '../../formats/bg-override/bg-override-io';
 import { buildPalette } from '../../formats/palette';
@@ -479,6 +483,61 @@ async function loadFullProject(
         // optional bg data
       }
 
+      // WHICH SECTIONS CAN CARRY A RASTER BAND — DERIVED FROM AEON'S OWN FILES,
+      // per act, on every load. Never a list in this repository: the question
+      // was answered wrong three times in one day, and every wrong answer was
+      // a snapshot. See core/formats/effects/section-wiring.ts for the rule and
+      // for why an unreadable file yields "unknown" and never "no".
+      //
+      // ⚠ IT MUST NOT FAIL A LOAD. These are aeon's source files, not Aurora's
+      // documents: a project without them (a different game, a trimmed
+      // checkout) opens exactly as before and the panel says it could not read
+      // them. That is why every read here is inside its own try.
+      const wiringAt = wiringPaths(actConfig.dataPath, zoneConfig.id);
+      let rasterWiring: SectionRasterWiring;
+      if (wiringAt === null) {
+        rasterWiring = unknownWiring(
+          actConfig.dataPath, actConfig.dataPath,
+          'this act\'s dataPath is not under a data/editor/ directory, so aeon\'s act '
+          + 'descriptor and effects library could not be located from it',
+        );
+      } else {
+        const chooser = rasterChooserName(zoneConfig.id, actConfig.id);
+        rasterWiring = unknownWiring(wiringAt.descriptor, wiringAt.library, 'not read');
+        try {
+          const descText = new TextDecoder().decode(await fa.read(wiringAt.descriptor));
+          const bindings = descriptorEffectsBindings(descText, zoneConfig.id);
+          rasterWiring.bindings = bindings;
+          rasterWiring.descriptor = Object.keys(bindings).length > 0
+            ? { path: wiringAt.descriptor, parsed: true }
+            : {
+                path: wiringAt.descriptor, parsed: false,
+                reason: `no ${zoneConfig.id}_sec(sec: N, … effects: …) records were found in it`,
+              };
+        } catch (e) {
+          rasterWiring.descriptor = {
+            path: wiringAt.descriptor, parsed: false,
+            reason: e instanceof Error ? e.message : 'could not be read',
+          };
+        }
+        try {
+          const libText = new TextDecoder().decode(await fa.read(wiringAt.library));
+          const calls = libraryRasterChooserCalls(libText, chooser);
+          rasterWiring.threadedBy = calls;
+          // ⚠ AN EMPTY CALL MAP IS A REAL ANSWER HERE, unlike an empty binding
+          // map. "No preset threads the chooser" is the state every act starts
+          // in and is exactly what the advisory needs to say; only a file that
+          // could not be READ is unknown. The two are different facts and the
+          // parse flag says which.
+          rasterWiring.library = { path: wiringAt.library, parsed: true };
+        } catch (e) {
+          rasterWiring.library = {
+            path: wiringAt.library, parsed: false,
+            reason: e instanceof Error ? e.message : 'could not be read',
+          };
+        }
+      }
+
       acts.push({
         id: actConfig.id,
         gridWidth: actConfig.gridWidth,
@@ -487,6 +546,7 @@ async function loadFullProject(
         startPosition: actConfig.startPosition,
         bgLayout,
         bgTiles,
+        rasterWiring,
         // Act-level effects scene (AURORA_EFFECTS_SCHEMA.md §4). null and absent
         // are the same fact — "no editor assignment, the engine's hand-authored
         // act_parallax_config stands" — so they collapse to null here rather

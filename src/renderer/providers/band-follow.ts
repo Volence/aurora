@@ -85,7 +85,7 @@ export function followBand(index: number): void {
   revealPanel(BANDS_SECTION_ID);
   ed.revealBand(index);
   useToastStore.getState().addToast(
-    `Band ${index} added — selected below, and lit on the map`, 'info');
+    `Tile animation ${index} added — selected below, and lit on the map`, 'info');
 }
 
 /**

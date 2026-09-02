@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { tileUsageCounts, paletteLineUsageCounts } from '../../src/core/art/usage';
 import { createSection, packNametableWord } from '../../src/core/model/s4-types';
 import type { Act } from '../../src/core/model/s4-types';
+import { unknownWiring } from '../../src/core/formats/effects/section-wiring';
 
 function makeAct(): Act {
   return {
@@ -12,8 +13,7 @@ function makeAct(): Act {
     startPosition: { secX: 0, secY: 0, localX: 0, localY: 0 },
     bgLayout: null,
     bgTiles: null,
-    sceneRef: null,
-    stripPath: null,
+    rasterWiring: unknownWiring('(fixture)', '(fixture)', 'a hand-built act reads no aeon files'), sceneRef: null, stripPath: null,
   };
 }
 

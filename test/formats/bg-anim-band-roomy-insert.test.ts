@@ -180,7 +180,7 @@ describe('INSERTING a brand-new band on the roomy document', () => {
     // The panel's gate, which is a different implementation of the same bound,
     // refuses too, in ITS words, and names the free count it derived.
     const reason = insertUnavailableReason(ROOMY, OVER.cols, OVER.rows);
-    expect(reason).toMatch(`adding a band puts its ${n} tile(s) INTO the blob, and the blob has ${FREE} free slot(s) of ${BG_TILE_CAPACITY}`);
+    expect(reason).toMatch(`adding a tile animation puts its ${n} tile(s) INTO the blob, and the blob has ${FREE} free slot(s) of ${BG_TILE_CAPACITY}`);
   });
 });
 

@@ -2,6 +2,7 @@
 // project/adapter cannot make this a runtime import cycle. See S4Project.
 import type { EffectsSceneLibrary } from '../formats/effects/scene';
 import type { EffectsPresetLibrary } from '../formats/effects/preset';
+import type { SectionRasterWiring } from '../formats/effects/section-wiring';
 import type { BgOverrideState } from '../formats/bg-override/bg-override-io';
 import type { BgLibraryUnresolvedEntry } from '../formats/bg-library';
 
@@ -387,6 +388,21 @@ export interface Act {
    * untouched; there is no act-level assignment UI yet.
    */
   sceneRef: string | null;
+  /**
+   * WHICH SECTIONS OF THIS ACT CAN CARRY AN EDITOR-AUTHORED RASTER BAND, derived
+   * from aeon's own `act_descriptor.emp` and `<zone>_effects.emp` at load time.
+   *
+   * ⚠ NOT A LIST THIS REPOSITORY HOLDS, and that is the whole point — see
+   * core/formats/effects/section-wiring.ts. The question was answered wrong
+   * three times in one day and every wrong answer was a snapshot of one act's
+   * content. Re-derived per act on every load, it cannot go stale silently.
+   *
+   * ⚠ READ-ONLY, AND NEVER SAVED. Aurora does not write aeon's descriptor or
+   * effects library; this is a view of them. A project whose files are missing
+   * or unparseable loads exactly as before and carries an `unknownWiring`, whose
+   * advisories say "could not read", never "not allowed".
+   */
+  rasterWiring: SectionRasterWiring;
   /**
    * The act's GENERATED-DATA directory — project.json's `stripPath`, verbatim
    * and project-root-relative, or null when the act declares none.

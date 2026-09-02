@@ -161,7 +161,13 @@ describe('set-bg-override-band', () => {
     const cmd = makeAddBandCommand(GOLDEN, band(1, 1, 9));
     expect(cmd.type).toBe('set-bg-override-band');
     expect(cmd.sectionIndex).toBe(-1);
-    expect(cmd.description).toMatch(/band/i);
+    // The undo label an author reads back. It says "tile animation", not
+    // "band", since EFFECTS-W1 defect 2: `band` names the RASTER feature and
+    // nothing else, and the two names deliberately share no word. The wire
+    // command type above still spells `set-bg-override-band` — that is a
+    // protocol name, not a word on screen, and it is asserted separately.
+    expect(cmd.description).toMatch(/tile animation/i);
+    expect(cmd.description).not.toMatch(/\bband\b/i);
     expect(cmd.adding).toBe(true);
     expect(makeRemoveBandCommand(GOLDEN, 0, { blankReferencingCells: true }).adding).toBe(false);
   });

@@ -30,7 +30,7 @@
 import React from 'react';
 import { T, SectionBody, CollapsibleSection, Select, NumberField, Chip, IconButton } from '../ui';
 import { Field, Hint, Card } from './column-layout';
-import { useProjectStore, getActiveLevel } from '../../state/projectStore';
+import { useProjectStore, getActiveLevel, getCurrentZone } from '../../state/projectStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import type { AnyCommand } from '../../../core/editing/commands';
@@ -40,13 +40,13 @@ import type {
 } from '../../../core/formats/effects/preset';
 import { EFFECTS_PRESET_BAND_KEYS, presetArmFields, presetDefFields } from '../../../core/formats/effects/preset';
 import {
-  PRESET_HEADLINE, PRESET_LIMITS, NO_PREVIEW,
+  PRESET_HEADLINE, presetLimitsShort, NO_PREVIEW, NO_PREVIEW_SHORT,
   BAND_FIELD_TITLES, armFieldTitle, armOptions, armLabel,
   bandArm, bandArmAdvisory,
   presetListEntries, resolveSelectedPreset, presetIdRefusal,
   RASTER_REF_ROW, presetRefOptions, unassignablePresetRef, sectionPresetCommand,
   createPresetCommand, deletePresetCommand,
-  addBandCommand, removeBandCommand, lastBandRefusal,
+  addBandCommand, removeBandCommand, lastBandRefusal, deletePresetRefusal,
   setBandFieldCommand, setBandArmCommand, setArmFieldCommand,
   parseColours, setColoursCommand, setPresetNameCommand,
   CYCLES_TITLE, CYCLES_STATE_OPTIONS, cyclesState, setCyclesStateCommand,
@@ -56,7 +56,11 @@ import {
   VARIANT_SLOT_OPTIONS, variantSlotState, variantSlotIndices, setVariantSlotStateCommand,
   VARIANT_FIELDS, variantFieldTitle, variantFieldSeed, setVariantFieldCommand,
   CRAM_LINES, variantLineOn, toggleVariantLineCommand,
+  bandSubject, bandEdgeRefusal, variantLineRefusal, cycleFieldRefusal,
 } from '../../providers/effects-preset';
+import { sectionRasterAdvisory, rasterChooserName } from '../../../core/formats/effects/section-wiring';
+import { openGuide } from '../../state/guideStore';
+import { EFFECTS_GUIDE_SLUG, GUIDE_ANCHORS } from '../guide/guides';
 import { PresetLagDisclosure } from './PresetLagDisclosure';
 
 const EMPTY_LIBRARY: EffectsPresetLibrary = { presets: [], unreadable: [], notices: [] };
@@ -89,12 +93,39 @@ function LimitBlock(): React.ReactElement {
       display: 'flex', flexDirection: 'column', gap: T.s2,
     }}>
       <div style={{ fontSize: T.tSm, color: T.textHi }}>{PRESET_HEADLINE}</div>
-      {PRESET_LIMITS.map((l) => (
-        <div key={l.key} style={{ fontSize: T.tXs, color: T.textBase, lineHeight: 1.45 }}>
+      {/* ═══ THE AUTHOR'S LENGTH, WITH THE CONTRACT ONE HOVER AWAY ═══
+
+          This block rendered 8,059 characters before the first control in a
+          285px column (EFFECTS-W1 defect 3, measured) — a design memo standing
+          between an author and a button. Every one of those characters is still
+          reachable: `full` is the contract wording, verbatim, on this element's
+          own `title`, and the guide carries it as prose. What is PAINTED is the
+          two sentences an author has to act on.
+
+          THE ORDER MATTERS AND IS UNCHANGED: what saving does not do, then what
+          looking at it costs, then what "it built" does not prove. */}
+      {presetLimitsShort().map((l) => (
+        <div key={l.key} title={l.full}
+          style={{ fontSize: T.tXs, color: T.textBase, lineHeight: 1.45 }}>
           <span style={{ color: T.textHi }}>{l.title}.</span>{' '}{l.body}
         </div>
       ))}
-      <div style={{ fontSize: T.tXs, color: T.textLo, lineHeight: 1.45 }}>{NO_PREVIEW}</div>
+      <div title={NO_PREVIEW} style={{ fontSize: T.tXs, color: T.textLo, lineHeight: 1.45 }}>
+        {NO_PREVIEW_SHORT}
+      </div>
+      {/* THE REST OF IT, WHERE THE REST OF IT BELONGS. A hover is not a place to
+          read seven minutes of prose; the guide is. This is the deep link the
+          walkthrough asked for on this exact card. */}
+      <button type="button"
+        onClick={() => openGuide(EFFECTS_GUIDE_SLUG, GUIDE_ANCHORS.rasterBand)}
+        title="Open the first-run guide, at the part about raster bands."
+        style={{
+          alignSelf: 'flex-start', font: 'inherit', fontSize: T.tXs, color: T.accent,
+          background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+          textAlign: 'left',
+        }}>
+        ? Read the whole note in the guide
+      </button>
     </div>
   );
 }
@@ -116,6 +147,17 @@ export default function BandPresetPanel(): React.ReactElement | null {
   const activeSectionIndex = useEditorStore((s) => s.activeSectionIndex);
   const act = getActiveLevel(useProjectStore.getState())?.act ?? null;
   const section = act?.sections[activeSectionIndex] ?? null;
+  // The zone id is needed only to name the chooser function in the sentence —
+  // the wiring itself was derived at load time, from aeon's files.
+  const zoneId = getCurrentZone(useProjectStore.getState())?.id ?? '';
+  // The delete guard's subject is the SECTIONS, not the library: a binding lives
+  // in a section's sidecar, so "is anything pointing at this document" can only
+  // be asked of the act.
+  const deleteRefusal = (act === null || selected === null)
+    ? null
+    : deletePresetRefusal(act.sections, selected.id);
+  const wiringAdvisory = act === null ? null : sectionRasterAdvisory(
+    act.rasterWiring, activeSectionIndex, rasterChooserName(zoneId, act.id));
 
   const [newId, setNewId] = React.useState('');
   const [refusal, setRefusal] = React.useState<string | null>(null);
@@ -265,10 +307,31 @@ export default function BandPresetPanel(): React.ReactElement | null {
                   ))}
                 </Select>
               </Field>
-              {unassignablePresetRef(library, section.rasterRef) && (
+              {unassignablePresetRef(library, section.rasterRef, activeSectionIndex) && (
                 <Hint under tone="warning">
-                  {unassignablePresetRef(library, section.rasterRef)}
+                  {unassignablePresetRef(library, section.rasterRef, activeSectionIndex)}
                 </Hint>
+              )}
+              {/* ═══ WHAT THIS SECTION CAN ACTUALLY CARRY ═══
+
+                  Derived per act from aeon's own act_descriptor.emp and
+                  <zone>_effects.emp, never listed here — the question was
+                  answered wrong three times in one day and every wrong answer
+                  was a snapshot. See core/formats/effects/section-wiring.ts.
+
+                  ⚠ IT ADVISES; IT DOES NOT GATE. The select is not disabled and
+                  there is no confirm: raster-binding.ts's STANDING REFUSAL, and
+                  its hardest clause — if the files cannot be READ the sentence
+                  says so, because a control greyed out because a file was
+                  missing is indistinguishable from one greyed out because the
+                  thing is impossible.
+
+                  IT SPEAKS ABOUT THE LEVEL, NOT ABOUT AURORA: "sections 6, 7
+                  and 8 share one preset, so giving one of them a band would
+                  give all three the same band" tells an author what to ask a
+                  programmer for. "You cannot do that" does not. */}
+              {wiringAdvisory !== null && (
+                <Hint under tone="warning">{wiringAdvisory}</Hint>
               )}
               <Hint under style={{ marginBottom: 0 }}>
                 Saved to <code>section_{activeSectionIndex}.meta.json</code> as
@@ -285,10 +348,18 @@ export default function BandPresetPanel(): React.ReactElement | null {
           title={`Preset — ${selected.id}`}
           defaultCollapsed
           right={
+            // GUARDED, WITH THE REASON UNDER IT (EFFECTS-W1 defect 11). This
+            // deleted the document with no confirmation and left every binding
+            // that named it dangling; the author then met aeon's refusal
+            // through the FAST wrapper, which blames missing donor directories.
+            // Same idiom as the band Remove button: `deletePresetRefusal` is the
+            // ONE derivation the disabled state and the sentence both read.
             <IconButton icon={<span>Delete</span>} label={`Delete preset ${selected.id}`}
+              disabled={deleteRefusal !== null}
               onClick={() => run(deletePresetCommand(library, selected.id))} />
           }>
           <SectionBody>
+            {deleteRefusal !== null && <Hint tone="warning">{deleteRefusal}</Hint>}
             <Field label="Name" title="name — the writer's display label. Read by nothing and
               dropped when the generator lowers this document; it exists for you, not the build.">
               <input
@@ -308,7 +379,7 @@ export default function BandPresetPanel(): React.ReactElement | null {
                 setColoursRefusal={(r) => setColoursRefusal((s) => ({ ...s, [i]: r }))} />
             ))}
 
-            <Chip onClick={() => run(addBandCommand(library, selected.id))}>Add band</Chip>
+            <Chip onClick={() => run(addBandCommand(library, selected.id))}>Add raster band</Chip>
           </SectionBody>
         </CollapsibleSection>
       )}
@@ -393,20 +464,30 @@ function CycleChannelCard({ library, presetId, index, channel, run }: {
 }): React.ReactElement {
   const { required, optional } = presetDefFields('cycle_channel');
   const values = channel as unknown as Record<string, number | undefined>;
+  const [fieldRefusal, setFieldRefusal] = React.useState<Record<string, string | null>>({});
   return (
     <Card>
       <Field label={`Channel ${index}`}>
         <IconButton icon={<span>Remove</span>} label={`Remove cycle channel ${index}`}
           onClick={() => run(removeCycleChannelCommand(library, presetId, index))} />
       </Field>
-      {/* NO min/max ON ANY SPINNER HERE EITHER — the band spinners' rule
-          (aeon E.4), for the same reason: the constructor's ensure names the
-          bound and the measurement; a bound here would replace it. */}
+      {/* STILL NO min/max — the band spinners' rule (aeon E.4), for the same
+          reason: the constructor's ensure names the bound and the measurement,
+          and a bound here would replace it.
+
+          ONE FIELD HAS A RULE THE SCHEMA STATES OUTRIGHT, and it is refused:
+          `line` must not be 0, because line 0 is the character's. Everything
+          else is forwarded verbatim. `cycleFieldRefusal` owns the split. */}
       {required.map((f) => (
-        <Field key={f} label={f} title={cycleFieldTitle(f)}>
-          <NumberField title={cycleFieldTitle(f)} width={72} value={Number(values[f])}
-            onChange={(n) => run(setCycleFieldCommand(library, presetId, index, f, n))} />
-        </Field>
+        <React.Fragment key={f}>
+          <Field label={f} title={cycleFieldTitle(f)}>
+            <NumberField title={cycleFieldTitle(f)} width={72} value={Number(values[f])}
+              refuse={(n) => cycleFieldRefusal(presetId, index, f, n)}
+              onRefusal={(r) => setFieldRefusal((s) => ({ ...s, [f]: r }))}
+              onChange={(n) => run(setCycleFieldCommand(library, presetId, index, f, n))} />
+          </Field>
+          {fieldRefusal[f] != null && <Hint under tone="warning">{fieldRefusal[f]}</Hint>}
+        </React.Fragment>
       ))}
       {/* The optional field(s): present → a spinner and an unset; absent → a
           chip that writes it. An absent `dir` is the constructor's default
@@ -465,6 +546,7 @@ function VariantSlotCard({ library, preset, index, run }: {
   const slot = state === 'authored' ? (preset.variants![index] as EffectsPresetPalVariant) : null;
   const values = (slot ?? {}) as Record<string, number | undefined>;
   const unset = VARIANT_FIELDS.filter((f) => values[f] === undefined);
+  const [lineRefusal, setLineRefusal] = React.useState<string | null>(null);
   return (
     <Card>
       <Field label={`Slot ${index}`} title={VARIANTS_TITLE}>
@@ -481,17 +563,33 @@ function VariantSlotCard({ library, preset, index, run }: {
             /* The friendlier spelling the schema hands to the panel (ruling
                Q4): one chip per CRAM line, bit n ⇔ line n. The WIRE value is
                the integer beside them, and a toggle flips one bit only, so a
-               hand-written mask keeps whatever else it carried. Line 0 is
-               offered because a file can carry it and the constructor's
-               refusal is the constructor's to give. */
+               hand-written mask keeps whatever else it carried.
+
+               ⚠ `L0` USED TO BE A ONE-CLICK RED BUILD (EFFECTS-W1 defect 5 /
+               b1). It was offered on the reasoning that "a file can carry it
+               and the constructor's refusal is the constructor's to give" —
+               while the tooltip ON THIS BUTTON already stated the rule. One
+               click, no feedback, a build failure naming a byte offset. It is
+               now refused when it would SET the bit and still allowed when it
+               would CLEAR one a hand-written file carries, so the reasoning
+               above stays true and the trap is gone. The refusal derivation is
+               `variantLineRefusal`, in the provider, so this chip and the
+               sentence under it cannot disagree. */
             <>
-              {CRAM_LINES.map((line) => (
-                <Chip key={line} active={variantLineOn(Number(values[f]), line)}
-                  title={`CRAM line ${line} — bit ${line} of the mask`}
-                  onClick={() => run(toggleVariantLineCommand(library, preset.id, index, line))}>
-                  L{line}
-                </Chip>
-              ))}
+              {CRAM_LINES.map((line) => {
+                const why = variantLineRefusal(preset.id, index, Number(values[f]), line);
+                return (
+                  <Chip key={line} active={variantLineOn(Number(values[f]), line)}
+                    title={why ?? `CRAM line ${line} — bit ${line} of the mask`}
+                    onClick={() => {
+                      if (why !== null) { setLineRefusal(why); return; }
+                      setLineRefusal(null);
+                      run(toggleVariantLineCommand(library, preset.id, index, line));
+                    }}>
+                    L{line}
+                  </Chip>
+                );
+              })}
               <span style={{ fontSize: T.tXs, color: T.textLo }}>= {Number(values[f])}</span>
             </>
           ) : (
@@ -502,6 +600,11 @@ function VariantSlotCard({ library, preset, index, run }: {
             onClick={() => run(setVariantFieldCommand(library, preset.id, index, f, undefined))} />
         </Field>
       ))}
+      {/* THE REFUSAL, UNDER THE CHIPS THAT PRODUCED IT. It is state and not a
+          derivation because it is about a GESTURE — the document is unchanged,
+          so nothing in it could carry the sentence. `Hint under` puts it in the
+          field column, directly below the `L0 L1 L2 L3` row. */}
+      {lineRefusal !== null && <Hint under tone="warning">{lineRefusal}</Hint>}
       {/* Every field is optional and absent means the constructor's default.
           The absent ones are one row of chips, each of which WRITES the field
           — a seed to type over, not a default Aurora claims to know. */}
@@ -539,33 +642,54 @@ function BandCard({
   const arm = bandArm(band);
   const armAdvice = bandArmAdvisory(band);
   const options = armOptions(arm ?? (Object.keys(band.on)[0] ?? null));
+  // WHY THE REFUSAL OUTLIVES THE BLUR. `NumberField` resyncs its text to the
+  // document when focus leaves, so an illegal number visibly snaps back — and
+  // if the sentence went with it, the author would watch their value vanish
+  // with no explanation, which is worse than the silence this replaces. It is
+  // cleared on the box's next focus (`NumberField`'s `onFocus`), so it is never
+  // stale advice about a value the author has moved on from.
+  const [edgeRefusal, setEdgeRefusal] =
+    React.useState<{ top: string | null; bot: string | null }>({ top: null, bot: null });
 
   return (
     <Card>
-      <Field label={`Band ${index}`}>
+      <Field label={`Raster band ${index}`}>
         {/* DISABLED WITH A REASON, NOT HIDDEN. `lastBandRefusal` is the same
             predicate `removeBandCommand` returns null on, read from one place,
             so the greyed button and the sentence under it cannot disagree. */}
-        <IconButton icon={<span>Remove</span>} label={`Remove band ${index}`}
+        <IconButton icon={<span>Remove</span>} label={`Remove raster band ${index}`}
           disabled={lastRefusal !== null}
           onClick={() => run(removeBandCommand(library, presetId, index))} />
       </Field>
       {lastRefusal !== null && <Hint under>{lastRefusal}</Hint>}
 
+      {/* ═══ REFUSED AT THE CONTROL, AT TYPING TIME (EFFECTS-W1 defect 5) ═══
+
+          STILL NO `min`/`max`, and that is not the omission it looks like: on
+          `<input type="number">` those govern the SPINNER and `:invalid` and
+          stop no typed value at all. `min={3}` would have let `40112` through
+          exactly as before. The refusal is `refuse`, which withholds the write.
+
+          NOT A CLAMP, so aeon's §E.4 stands: nothing here substitutes a number
+          the author did not type. The value is refused, unwritten, and the
+          engine's own rule is quoted back with the preset and the band named —
+          see `bandEdgeRefusal`'s docblock for why the line is drawn at rules 1
+          and 2 and why the order rule's message ends "move the other edge
+          first". */}
       <Field label="Top" title={BAND_FIELD_TITLES.top}>
         <NumberField title={BAND_FIELD_TITLES.top} width={72} value={band.top}
+          refuse={(n) => bandEdgeRefusal(band, presetId, index, 'top', n)}
+          onRefusal={(r) => setEdgeRefusal({ ...edgeRefusal, top: r })}
           onChange={(n) => run(setBandFieldCommand(library, presetId, index, 'top', n))} />
       </Field>
+      {edgeRefusal.top !== null && <Hint under tone="warning">{edgeRefusal.top}</Hint>}
       <Field label="Bot" title={BAND_FIELD_TITLES.bot}>
         <NumberField title={BAND_FIELD_TITLES.bot} width={72} value={band.bot}
+          refuse={(n) => bandEdgeRefusal(band, presetId, index, 'bot', n)}
+          onRefusal={(r) => setEdgeRefusal({ ...edgeRefusal, bot: r })}
           onChange={(n) => run(setBandFieldCommand(library, presetId, index, 'bot', n))} />
       </Field>
-      {/* NO min/max ON EITHER SPINNER, AND THAT IS THE CONTRACT, not an
-          oversight. aeon's E.4: "Do not validate ranges, and do not clamp.
-          Forward what the author typed" — so the author reads the ENGINE's
-          refusal, which carries the measurement behind the rule ("the ON fire
-          costs 624 cyc against 488 available"). A clamp here replaces that
-          sentence with silence. */}
+      {edgeRefusal.bot !== null && <Hint under tone="warning">{edgeRefusal.bot}</Hint>}
 
       <Field label="S/H" title={BAND_FIELD_TITLES.sh}>
         <Select title={BAND_FIELD_TITLES.sh}
@@ -613,7 +737,8 @@ function BandCard({
               placeholder="14 3584"
               onChange={(e) => {
                 setColoursText(e.target.value);
-                const parsed = parseColours(e.target.value);
+                const parsed = parseColours(
+                  e.target.value, bandSubject(presetId, index, 'colours'));
                 if (!parsed.ok) { setColoursRefusal(parsed.reason); return; }
                 setColoursRefusal(null);
                 run(setColoursCommand(library, presetId, index, parsed.colours));

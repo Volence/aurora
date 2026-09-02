@@ -224,7 +224,7 @@ describe('the two refusals — loud, and unchanged candidate', () => {
     const fps = 32;
     const r = resolveStripDrag(drag({ anchorSlot: 4, releaseSlot: 20, firstPromotableSlot: fps }));
     expect(r.kind).toBe('refused');
-    expect(r.kind === 'refused' && r.reason).toMatch(/already belong to bands/);
+    expect(r.kind === 'refused' && r.reason).toMatch(/already belong to tile animations/);
     expect(r.kind === 'refused' && r.hint).toMatch(/animated prefix/);
     // THE BOUNDARY IS DERIVED FROM `firstPromotableSlot`, NOT TYPED.
     // `bandBudget` sets it from `animatedSlotCount`, so it is a COUNT: the owned
@@ -260,7 +260,7 @@ describe('the two refusals — loud, and unchanged candidate', () => {
   it('a rows value the runtime cannot shift is refused, in the contract\'s own terms', () => {
     const r = resolveStripDrag(drag({ rows: 3, anchorSlot: 40, releaseSlot: 55 }));
     expect(r.kind).toBe('refused');
-    expect(r.kind === 'refused' && r.reason).toContain('rows 3 is not a legal band height');
+    expect(r.kind === 'refused' && r.reason).toContain('rows 3 is not a legal tile-animation height');
     expect(r.kind === 'refused' && r.hint).toContain(`rows*${TILE_BYTES}`);
   });
 
@@ -367,7 +367,7 @@ describe('the label — the strip\'s only surface', () => {
     expect(line).not.toMatch(/slots/);
     expect(line).not.toMatch(/band/);
     expect(title).toMatch(/slots/);
-    expect(title).toMatch(/band candidate/);
+    expect(title).toMatch(/tile-animation candidate/);
     // ANTI-VACUOUS: they are still talking about the SAME range, so the words
     // moved rather than the line being emptied of its subject.
     const last = lastOwnedSlot(r);
@@ -384,7 +384,7 @@ describe('the label — the strip\'s only surface', () => {
     // module — the label opens "band · " — so this matcher cannot be satisfied
     // by the line above.
     expect(stripDragHint(r))
-      .toContain(`band candidate · slots ${r.staticBase}..${last} (${r.cols}x${r.rows})`);
+      .toContain(`tile-animation candidate · slots ${r.staticBase}..${last} (${r.cols}x${r.rows})`);
     expect(stripDragHint(r)).not.toContain(`..${last + 1}`);
     expect(stripDragHint(r)).not.toMatch(/slots slots/);
   });
@@ -439,7 +439,7 @@ describe('the label — the strip\'s only surface', () => {
     // not. `slotSpanDigits` answers `NO_SLOTS_PHRASE` exactly as
     // `slotSpanPhrase` does, so the short form cannot render `40..39` either.
     expect(stripDragLabel(empty)).toBe(`${NO_SLOTS_PHRASE} · 0x4`);
-    expect(stripDragHint(empty)).toContain(`band candidate · ${NO_SLOTS_PHRASE} (0x4)`);
+    expect(stripDragHint(empty)).toContain(`tile-animation candidate · ${NO_SLOTS_PHRASE} (0x4)`);
     expect(stripDragLabel(empty)).not.toContain('..');
     expect(stripDragHint(empty)).not.toContain('..');
   });
@@ -485,7 +485,7 @@ describe('the label — the strip\'s only surface', () => {
   it('a refusal is stated on the line, never swallowed, with the reasoning on the hint', () => {
     const r = resolveStripDrag(drag({ anchorSlot: 4, releaseSlot: 20 }));
     expect(stripDragLabel(r)).toMatch(/^no range — /);
-    expect(stripDragLabel(r)).toContain('already belong to bands');
+    expect(stripDragLabel(r)).toContain('already belong to tile animations');
     expect(stripDragHint(r)).toContain('animated prefix');
     // The line is a summary of the hint, never the whole of it.
     expect(stripDragHint(r).length).toBeGreaterThan(stripDragLabel(r).length);

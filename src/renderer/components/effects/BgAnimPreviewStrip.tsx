@@ -110,13 +110,13 @@ export default function BgAnimPreviewStrip() {
         <Chip
           active={playing}
           onClick={() => toggleOverlay('playAnimatedArt')}
-          title={'Play the BgAnim bands in the canvas. The same switch as View > Play '
+          title={'Play the tile animations in the canvas. The same switch as View > Play '
             + 'animations — playback is view state, not a property of this panel.'}
         >
-          {playing ? 'Playing' : 'Play bands'}
+          {playing ? 'Playing' : 'Play tile animations'}
         </Chip>
         {playing && snapshot.timerBands === 0 && snapshot.hasDrawable && (
-          <Chip title={'Every previewing band reads the camera, so its phase is a function of '
+          <Chip title={'Every previewing tile animation reads the camera, so its phase is a function of '
             + 'where you are looking. Pan the canvas to move it.'}>
             pan to move
           </Chip>
@@ -140,10 +140,10 @@ export default function BgAnimPreviewStrip() {
           of them, it is the consumer&apos;s own expression.
           {' '}(1) The clock is the editor&apos;s wall clock, not <code>Logic_Tick</code>: a lag
           frame freezes a band in game and never here.
-          {' '}(2) Camera bands read your pan; the engine also clamps its camera to the level, and
+          {' '}(2) Camera-driven tile animations read your pan; the engine also clamps its camera to the level, and
           that clamp is not modelled, so panning past the right or bottom edge shows phases the
           game holds still.
-          {' '}(3) A band&apos;s two DMA pieces can land a frame apart in game, showing a one-frame
+          {' '}(3) A tile animation&apos;s two DMA pieces can land a frame apart in game, showing a one-frame
           seam this never draws.
           {' '}(4) The ROM is the truth channel. This is for judging <i>rate</i>, which is the one
           thing a compile loop is too slow to judge.

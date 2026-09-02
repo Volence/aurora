@@ -295,7 +295,7 @@ describe('coverageSubject — WHAT the highlight is, in the author\'s words', ()
     const s = coverageSubject('band', 2, range);
     // The whole sentence, so this row cannot be satisfied by the candidate
     // sentence or by `coverageSummary` — both of which also print a slot span.
-    expect(s).toBe(`highlighted: the cells band 2 animates (slots ${range.base}..${last})`);
+    expect(s).toBe(`highlighted: the cells tile animation 2 animates (slots ${range.base}..${last})`);
     expect(s).not.toContain(`..${last + 1}`);
   });
 
@@ -303,7 +303,7 @@ describe('coverageSubject — WHAT the highlight is, in the author\'s words', ()
     const range = slotRange(34, 4, 2);
     const last = lastOwnedSlot(range);
     const s = coverageSubject('candidate', null, range);
-    expect(s).toBe(`highlighted: the cells a band at slots ${range.base}..${last} would animate`);
+    expect(s).toBe(`highlighted: the cells a tile animation at slots ${range.base}..${last} would animate`);
     expect(s).not.toContain(`..${last + 1}`);
     expect(s).not.toContain('band null');
   });
@@ -316,7 +316,7 @@ describe('coverageSubject — WHAT the highlight is, in the author\'s words', ()
     const empty: SlotRange = { base: 34, count: 0 };
     expect(rangeCovers(empty, 34)).toBe(false);   // ANTI-VACUOUS: it really owns nothing
     expect(coverageSubject('band', 2, empty))
-      .toBe(`highlighted: nothing — band 2 covers ${NO_SLOTS_PHRASE}`);
+      .toBe(`highlighted: nothing — tile animation 2 covers ${NO_SLOTS_PHRASE}`);
     expect(coverageSubject('candidate', null, empty))
       .toBe(`highlighted: nothing — this candidate covers ${NO_SLOTS_PHRASE}`);
     for (const s of [coverageSubject('band', 2, empty), coverageSubject('candidate', null, empty)]) {

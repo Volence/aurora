@@ -216,7 +216,7 @@ describe('band stamp tool', () => {
     }
   });
   it('has a label, a hint and a letter no other tool answers to', () => {
-    expect(TOOL_LABELS['stamp-band']).toBe('Stamp Band');
+    expect(TOOL_LABELS['stamp-band']).toBe('Stamp tile animation');
     expect(TOOL_KEYS['stamp-band']).toMatch(/^[a-z]$/);
     const others = TOOL_IDS.filter((t) => t !== 'stamp-band').map((t) => TOOL_KEYS[t]);
     expect(others).not.toContain(TOOL_KEYS['stamp-band']);

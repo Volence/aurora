@@ -5,6 +5,9 @@ a person actually asks here on their first day. It is written from a walkthrough
 someone who had never opened this tab (`docs/reviews/2026-09-02-effects-cold-walkthrough.md`);
 every heading below is a question that reader genuinely got stuck on.
 
+You can open this page from inside Aurora at any time: the **? Guide** button on the
+Effects toolbar, the **Guides** card on the Home tab, or `Ctrl+K` → "Guide".
+
 ---
 
 ## 1. What does this tab do?
@@ -17,8 +20,8 @@ Three separate things, which look similar and are not:
 | a horizontal stripe of the screen to change colour (water, heat haze, a tinted sky) | a **raster band**, inside a **preset** | `RASTER BAND PRESETS`, bottom of the panel |
 | the same colours to rotate, so water shimmers | a **palette cycle**, inside the same preset | `PRESET — <id> — CYCLES, VARIANTS` |
 
-There is a fourth thing on this tab, `BG ANIMATION BANDS`, which is **not** any of
-these. See §7 — read it before you click anything called "band".
+There is a fourth thing on this tab, `TILE ANIMATIONS`, which is **not** any of
+these — it animates background *tiles*, not colours. See §7.
 
 The right panel is one long column, roughly eight screens tall, in this fixed order:
 
@@ -28,10 +31,10 @@ SCENE — <id>                 ← settings for the whole scene
 LAYERS (n/16 per scene)      ← the parallax strips        ⟵ §2
 SECTION ASSIGNMENT           ← which scene this section uses  ⟵ §5
 RASTER TIMELINE              ← a picture of bands + layers
-BG ANIMATION BANDS (n/4)     ← NOT raster. §7
-NEW BAND                     ← NOT raster either. §7
+TILE ANIMATIONS (n/4)        ← animated background TILES. §7
+NEW TILE ANIMATION           ← the form that makes one. §7
 RASTER BAND PRESETS          ← raster bands live here     ⟵ §3
-PRESET — <id>                ← the bands in one preset
+PRESET — <id>                ← the raster bands in one preset
 PRESET — <id> — CYCLES…      ← palette cycling            ⟵ §4
 PROPERTIES
 ```
@@ -54,8 +57,7 @@ whose background factor is *lower* than the camera drifts — that is parallax.
 **Read the tooltip on that dropdown after you set it.** It rewrites itself into the
 only sentence in this panel that tells you what will actually happen:
 
-> *at 1/8 of camera speed: its 512px picture starts over every 4096px of camera
-> travel, 1 time across this act's 5824px*
+> at 1/8 of camera speed: its 512px picture starts over every 4096px of camera travel, 1 time across this act's 5824px
 
 Reference points: `FACTOR_1` = moves with the camera (that is the ground);
 `FACTOR_1_2` = half speed, clearly behind; `FACTOR_1_16` = a distant sky;
@@ -64,14 +66,15 @@ Reference points: `FACTOR_1` = moves with the camera (that is the ground);
 `Plane A (fg)` is the level itself. Leave it at `FACTOR_1` unless you know why not.
 
 ### See it
-Nothing draws until you ask. **`View ▾` → tick `Compose the background in the frame
-(parallax)`**, and tick `Screen frame (320x224)` too. The canvas then draws the real
-background per strip with each layer's factor labelled. This is off by default and
-the Effects tab does not mention it; turn it on the first time you open the tab and
-leave it on.
 
-> The `LAYERS` list is a very short scrolling window inside an already-scrolling
-> panel. If you can only see one layer, scroll **inside** the list.
+Nothing draws until you ask. Press **`Parallax preview`** on the Effects toolbar —
+it is the same switch as `View ▾` → `Compose the background in the frame
+(parallax)`. Tick `Screen frame (320x224)` in that menu too. The canvas then draws
+the real background per strip with each layer's factor labelled. It is off by
+default; turn it on the first time you open the tab and leave it on. This is the
+only thing in Aurora that shows what a scene's layers do.
+
+> The `LAYERS` list is a very short scrolling window inside an already-scrolling panel. If you can only see one layer, scroll **inside** the list.
 
 ---
 
@@ -81,10 +84,9 @@ A raster band repaints part of the palette for a range of screen lines. It lives
 inside a **preset** — a document that can hold several bands. There is no control
 called "make a band"; you make a preset, and it comes with one.
 
-1. Scroll to `RASTER BAND PRESETS`. **The card opens with several screens of design
-   notes for programmers. Scroll past them.** (What matters in them is §6 below.)
+1. Scroll to `RASTER BAND PRESETS`.
 2. Type an id in `Preset id` — lower case, underscores, e.g. `ojz_water_tint`.
-3. Press `New`. You now have a preset with `Band 0` in it.
+3. Press `New`. You now have a preset with `Raster band 0` in it.
 4. Open `PRESET — <your id>` and fill the band in:
 
 | field | what it means | sane first value |
@@ -98,12 +100,10 @@ called "make a band"; you make a preset, and it comes with one.
 
 ### Two things that will catch you
 
-**`Top` must be less than `Bot`, and both must be real screen lines (3–223).** Nothing
-in this panel checks that. `Top 200 / Bot 100` is accepted in silence and produces
-four separate build errors.
-
-**Clicking a number field does not select what is in it.** Click `Top`, type `40`,
-and you get `40112`. Select the contents first (⌘/Ctrl-A, or triple-click).
+**`Top` must be less than `Bot`, and both must be real screen lines (3–223).** Aurora
+now refuses a value outside that as you type it and says which rule stopped it, so
+`Top 200 / Bot 100` no longer reaches the build. Clicking a number box also selects
+what is in it, so clicking `Top` and typing `40` gives `40`, not `40112`.
 
 **`colours` is a decimal Genesis CRAM word,** not a hex code and not a swatch. The
 format is `0000 BBB0 GGG0 RRR0`. Useful values:
@@ -116,10 +116,11 @@ format is `0000 BBB0 GGG0 RRR0`. Useful values:
 
 To mix your own: `red + green×16 + blue×256`, each of R/G/B being an even number
 0–14. (`Authored probe (red / blue)`, shipped with the project, uses `14` and `3584`
-— open it if you want a worked example.)
+— open it if you want a worked example.) A `0x`-prefixed hex value is accepted too.
 
-**There is no preview.** Aurora does not draw raster bands. You will not see this
-until the ROM runs.
+**There is no preview of a raster band.** Aurora draws parallax layers (§2) but not
+raster bands — there is nothing here to check one against, and a wrong preview would
+be worse than none. You will not see a band until the ROM runs.
 
 ---
 
@@ -142,19 +143,16 @@ The other two `cycles` settings are wire-format states, not behaviours:
 *keep the section's hand-authored cycle (key absent)* leaves whatever the engine
 already had; *off (null)* actively turns cycling off. Pick "authored script".
 
-### `variants`, and the one click that will break your build
+### `variants`, and the line mask
 
 `variants` is a separate thing that lives in the same card: it stages a whole palette
 line shifted darker or lighter. If you open it, `lines` renders as `L0 L1 L2 L3`
 chips.
 
-**Never light `L0`.** Line 0 is the player's palette and the engine refuses a mask
-that includes it. Aurora will let you click it, will not warn you, and the build
-fails with:
-
-```
-[Error] variant: lines mask 15 selects line 0 (the character's) — use bits 1-3
-```
+**`L0` cannot be lit.** Line 0 is the player's palette and the engine refuses a mask
+that includes it. Aurora used to let you click it and fail the build; it now refuses
+the click and says why. If a hand-written file already carries bit 0, you can still
+click `L0` to clear it.
 
 If you do not need `variants`, leave it on *every slot keeps its hand-authored value*.
 
@@ -162,31 +160,57 @@ If you do not need `variants`, leave it on *every slot keeps its hand-authored v
 
 ## 5. Bind it to a section
 
-Two separate bindings, at opposite ends of the panel, both acting on **the currently
-active section**:
+Two separate bindings, at opposite ends of the panel, both acting on **the section
+named at the top of the panel**:
 
 - **the scene** → `SECTION ASSIGNMENT`, just under `LAYERS`.
 - **the raster preset** → the `Section <n>` dropdown at the bottom of
   `RASTER BAND PRESETS`.
 
-**To bind a different section you must change the active section, and you do that on
-the Layout tab.** Layout → click the number in `SECTIONS` → back to Effects. The
-Effects tab has no section picker.
+The Effects tab has a **section picker** at the very top of the panel. It names
+the section you are editing, prints what that section is bound to (`scene … ·
+raster …`), lets you change which section without leaving the tab, and says in
+one chip whether that section can carry a raster band at all. It is the same
+number the Layout tab's `SECTIONS` grid sets — one section, two tabs.
 
-### Which section can you bind a raster preset to?
+### Which section can carry a raster band?
 
-**Today: section 5, and only section 5.** Binding any other section writes the key,
-and the engine has nothing wired to read it — so the band never appears, and the
-**canonical build refuses the tree**:
+This is a fact about **the level's own data**, not a limit of the editor, and Aurora
+derives it per project rather than shipping a list.
 
-```
-sections [0] bind a rasterRef that no preset threads — the generator emits the
-binding and nothing reads it, which presents to the author as an assignment that
-did nothing
-```
+A section's effects come from a `preset()` record in aeon's effects library, and
+`Sec.sec_effects` is a **pointer** — several sections can point at the same record.
+Giving a section-keyed raster band to a record that two sections share would give the
+band to **both** of them, so aeon's build refuses it.
 
-Wiring a second section is a one-line change in aeon by a programmer, not something
-you can do here. Scenes have no such restriction — bind a scene to any section.
+> A section can carry an editor-authored raster band **only if it binds a preset that no other section binds.**
+
+In `ojz act1` today that is sections **0–5**: each has its own preset. Sections
+**6, 7 and 8 all share `OJZ_Preset_Plain`**, so none of the three can have one until
+a programmer splits that record — and Aurora says so at the control, naming the
+sections that share and what would happen.
+
+There is a second, smaller step behind that one, and Aurora keeps the two apart
+because conflating them is how the wrong answer got published twice in one day:
+
+| fact | what it means | today, in `ojz act1` |
+|---|---|---|
+| **own preset** | no other section binds this section's preset record | 0, 1, 2, 3, 4, 5 |
+| **wired** | a preset also *threads the chooser* on this index — one line in aeon | 5 |
+
+A binding on a section that owns its preset but is not wired writes the key, and
+aeon's canonical build refuses it by name (*"no preset threads
+`ojz_act1_sec_raster(sec: N)`"*) until that line is added.
+
+**Aurora derives both sets from aeon's own files on every load** — the act
+descriptor and the effects library — and prints them in the picker's own chip.
+Nothing here is a list somebody wrote down, so the answer changes on its own when
+aeon changes the level. It does **not** stop you binding: whether a section is
+wired is aeon's fact to change, and a lock built on a snapshot would be wrong the
+day they change it. If Aurora cannot read those files it says so, and still lets
+you bind.
+
+Scenes have no such restriction — bind a scene to any section.
 
 ---
 
@@ -234,25 +258,28 @@ happens when you delete a preset a section still points at.
 
 ---
 
-## 7. "Band" means two different things. Read this before clicking one.
+## 7. Tile animations are not raster bands
+
+Two features on this tab used to share the word "band". They no longer do, and the
+two names now share no word at all:
 
 | control | what it makes |
 |---|---|
-| `Add blank band` (toolbar) | a **BG animation band** — animated *tiles* |
-| `NEW BAND` (panel) | the same BG animation band, with all the options |
-| `BG ANIMATION BANDS (n/4)` | the list of those |
+| `Add blank tile animation` (toolbar) | a **tile animation** — animated background *tiles* |
+| `NEW TILE ANIMATION` (panel) | the same thing, with all the options |
+| `TILE ANIMATIONS (n/4)` | the list of those |
 | `RASTER BAND PRESETS` | **raster bands** — the coloured stripes of §3 |
-| `PRESET — <id>` → `Band 0` | one raster band |
+| `PRESET — <id>` → `Raster band 0` | one raster band |
 | `bands` column of `RASTER TIMELINE` | raster bands, drawn |
 
-A **BG animation band** is a block of background tiles that cycles through eight
+A **tile animation** is a block of background tiles that cycles through eight
 frames, so a waterfall runs or a trunk scrolls. It costs tile slots and has a hard
 ceiling of four per act. It has nothing to do with palettes or screen lines.
 
 A **raster band** repaints colours on a range of screen lines. It costs no tiles.
 
-If you clicked `Add blank band` looking for a raster band — that is the commonest
-first mistake here — press **Undo** immediately, and go to `RASTER BAND PRESETS`.
+If you are looking for a coloured stripe, you want `RASTER BAND PRESETS`, not
+anything on this list's top half.
 
 ---
 
@@ -261,19 +288,33 @@ first mistake here — press **Undo** immediately, and go to `RASTER BAND PRESET
 | I want to… | go to |
 |---|---|
 | make the background drift | `LAYERS` → `Add` → set `Plane B (bg)` |
-| see the drift | `View ▾` → `Compose the background in the frame (parallax)` |
+| see the drift | `Parallax preview` on the Effects toolbar |
 | make a coloured stripe | `RASTER BAND PRESETS` → `Preset id` → `New` |
 | make colours shimmer | `PRESET — <id> — CYCLES, VARIANTS` → `cycles: authored script` |
-| animate background tiles | `NEW BAND` |
-| use a scene on a section | Layout tab → pick the section → Effects → `SECTION ASSIGNMENT` |
+| delete a preset a section binds | unbind that section first — Aurora refuses the delete and says which |
+| animate background tiles | `NEW TILE ANIMATION` |
+| change which section I am editing | the picker at the top of the Effects panel |
+| use a scene on a section | pick the section, then `SECTION ASSIGNMENT` |
 | save | Ctrl+S |
+| open this page | `? Guide` on the Effects toolbar |
 
-### Things Aurora will let you do that the build refuses
+### Things Aurora refuses while you author, so the build does not have to
 
-- `Top ≥ Bot`, or a screen line outside 3–223, on a raster band.
-- `L0` lit in a `variants` line mask.
-- Binding a raster preset to any section other than 5.
-- Deleting a preset a section still binds.
+- A `Top` or `Bot` outside screen lines 3–223.
+- `Top` at or below `Bot` on the same raster band.
+- Lighting `L0` in a `variants` line mask.
+- A `colours` list that is empty or holds a non-integer.
 
-None of these are flagged while you author them. If a build goes red right after you
-touched this tab, check these four first.
+### Things the build can still refuse
+
+- Binding a raster preset to a section aeon has not threaded yet (§5) — Aurora warns
+  at the control and does not block it, because that is aeon's fact to change.
+- A band whose colour is invisible against the palette it repaints. Nothing anywhere
+  catches that — not this panel, not the schema, not the build.
+- Overlapping bands that share CRAM colours, or two bands firing on one screen line.
+  Aurora warns; it does not refuse, because a nested band over a disjoint colour span
+  is legal and walling it would refuse programs the engine builds.
+
+Deleting a preset a section still binds used to be on this list. It is not any more:
+Aurora refuses the delete, names the sections that bind it, and tells you to set them
+back to `Hand-authored raster` first.

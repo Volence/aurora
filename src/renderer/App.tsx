@@ -35,7 +35,10 @@ import { registerAeonFacetModules, registerS1FacetModules } from './workspace/re
 import { useSessionLifecycle, useActTabSync } from './shell/session-lifecycle';
 import { requestOpenTab, requestFocusIndex } from './shell/tab-activation';
 import { buildCommands } from './shell/commands';
-import { classicLevelTab, aeonLevelTab, untitledSpriteTab, PROJECT_SETUP_TAB } from './shell/tabs';
+import { classicLevelTab, aeonLevelTab, untitledSpriteTab, PROJECT_SETUP_TAB, parseGuideTabId } from './shell/tabs';
+import GuideTab from './components/guide/GuideTab';
+import { guideBySlug } from './components/guide/guides';
+import { useGuideStore } from './state/guideStore';
 import { resolveObjectSprite } from './shell/explorer-data';
 import { s1ArtRowGroups, groupIdsHex } from '../core/project/profiles/s1-object-presentation';
 import { editObjectArt } from './components/sprite/export-sprite';
@@ -47,6 +50,23 @@ import type { ObjectDef } from '../core/model/s4-types';
 
 // Referentially-stable fallback — see the matching constant in shell/Explorer.tsx.
 const EMPTY_LIBRARY: ObjectDef[] = [];
+
+/**
+ * The guide pane — a leaf, so the anchor subscription does not re-render App.
+ *
+ * The `nonce` is in the key rather than the props for a reason worth stating:
+ * pressing the SAME `?` twice must scroll the page again, and an `anchor` that
+ * did not change would give React nothing to react to. Re-keying remounts the
+ * reader, which is lossless (it holds no state of its own) and makes "open at
+ * §3" mean the same thing every time it is asked for.
+ */
+function GuidePane({ slug }: { slug: string }): React.ReactElement | null {
+  const anchor = useGuideStore((s) => s.anchor);
+  const nonce = useGuideStore((s) => s.nonce);
+  const guide = guideBySlug(slug);
+  if (!guide) return null;
+  return <GuideTab key={`${slug}:${nonce}`} guide={guide} anchor={anchor} />;
+}
 
 export default function App() {
   const { openProject, openProjectByPath } = useProject();
@@ -238,6 +258,15 @@ export default function App() {
                   <HomeTab onOpenProject={openProject} onOpenRecent={openProjectByPath} />
                 ) : tab.id === PROJECT_SETUP_TAB.id ? (
                   <ProjectSetupTab />
+                ) : parseGuideTabId(tab.id) ? (
+                  /* THE IN-APP GUIDE (EFFECTS-W1 defect 1). It rides the `tool`
+                     kind's keep-alive pane, so its scroll position survives a
+                     trip back to the level and a `?` on another control can
+                     re-aim it without a remount. An unknown slug renders
+                     nothing rather than an empty page — `openGuide` refuses to
+                     open one, so this branch is unreachable in practice and is
+                     written to stay quiet if it ever is not. */
+                  <GuidePane slug={parseGuideTabId(tab.id)!.slug} />
                 ) : null}
               </div>
             ))}

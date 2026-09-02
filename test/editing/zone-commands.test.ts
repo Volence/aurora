@@ -3,6 +3,7 @@ import { EditHistory } from '../../src/core/editing/history';
 import type { S4Level } from '../../src/core/editing/commands';
 import type { Tile, Palette, Act } from '../../src/core/model/s4-types';
 import { createChunkDef, createSection } from '../../src/core/model/s4-types';
+import { unknownWiring } from '../../src/core/formats/effects/section-wiring';
 
 function makeLevel(): S4Level {
   const palette: Palette = {
@@ -146,7 +147,7 @@ describe('set-bg command', () => {
     return {
       id: 'act1', gridWidth: 1, gridHeight: 1, sections: [],
       startPosition: { secX: 0, secY: 0, localX: 0, localY: 0 },
-      bgLayout: null, bgTiles: null, sceneRef: null, stripPath: null,
+      bgLayout: null, bgTiles: null, rasterWiring: unknownWiring('(fixture)', '(fixture)', 'a hand-built act reads no aeon files'), sceneRef: null, stripPath: null,
     };
   }
 

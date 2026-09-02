@@ -24,8 +24,8 @@ export const TOOL_LABELS: Record<ToolId, string> = {
   'paint-collision': 'Paint Collision',
   'place-object': 'Place Object',
   'place-ring': 'Place Ring',
-  'mark-band': 'Mark Band',
-  'stamp-band': 'Stamp Band',
+  'mark-band': 'Mark tile animation',
+  'stamp-band': 'Stamp tile animation',
 };
 
 /**
@@ -48,8 +48,8 @@ export const TOOL_HINTS: Record<ToolId, string> = {
   'paint-collision': 'Click to set the collision type on tiles',
   'place-object': 'Click to place the selected object type',
   'place-ring': 'Click to place the selected ring pattern',
-  'mark-band': 'Click a background cell to mark a band there; drag to pan · Esc hides the lens',
-  'stamp-band': 'Pick a band in the Art panel, then click to lay one pattern or drag a region to tile it',
+  'mark-band': 'Click a background cell to mark a tile animation there; drag to pan · Esc hides the lens',
+  'stamp-band': 'Pick a tile animation in the Art panel, then click to lay one pattern or drag a region to tile it',
 };
 
 /**

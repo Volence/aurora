@@ -13,6 +13,33 @@ export const PROJECT_SETUP_TAB: TabDescriptor = {
   title: 'Project Setup',
 };
 
+// GUIDE TAB IDS — 'tool:guide:<slug>' — host the in-app help page
+// (components/guide/GuideTab.tsx). Kind is `tool`, the kind PROJECT_SETUP_TAB
+// already uses, so the shell's keep-alive pane renders it with no new TabKind:
+// a guide is a read-only page with no document, no dirty state and no undo,
+// which is exactly what `tool` means here.
+//
+// THE SLUG IS THE FILE STEM under docs/guides/, which is what makes the tab id
+// stable across restarts: session restore reopens `tool:guide:effects-first-run`
+// and `guideBySlug` finds the text with no extra mapping. It carries NO anchor —
+// a deep link is where the reader ARRIVED, not what the tab IS, and baking it
+// into the id would open a second tab per `?` button.
+export const GUIDE_TAB_PREFIX = 'tool:guide:';
+
+export function guideTab(slug: string, title: string): TabDescriptor {
+  return { id: `${GUIDE_TAB_PREFIX}${slug}`, kind: 'tool', title };
+}
+
+export function parseGuideTabId(id: string): { slug: string } | null {
+  if (!id.startsWith(GUIDE_TAB_PREFIX)) return null;
+  const slug = id.slice(GUIDE_TAB_PREFIX.length);
+  return /^[a-z0-9][a-z0-9-]*$/.test(slug) ? { slug } : null;
+}
+
+export function isGuideTabId(id: string): boolean {
+  return parseGuideTabId(id) !== null;
+}
+
 /** The act-scoped document id for a zone/act pair — also the level TAB id. */
 export function levelDocId(zone: string, act: string): string {
   return `level:${zone}:${act}`;

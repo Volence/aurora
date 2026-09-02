@@ -279,12 +279,12 @@ export function coverageSubject(
   // only arithmetic could reach. Both kinds get the same honest sentence:
   // nothing is highlighted, and why.
   if (slots === NO_SLOTS_PHRASE) {
-    const subject = kind === 'band' ? `band ${bandIndex}` : 'this candidate';
+    const subject = kind === 'band' ? `tile animation ${bandIndex}` : 'this candidate';
     return `highlighted: nothing — ${subject} covers ${NO_SLOTS_PHRASE}`;
   }
   return kind === 'band'
-    ? `highlighted: the cells band ${bandIndex} animates (${slots})`
-    : `highlighted: the cells a band at ${slots} would animate`;
+    ? `highlighted: the cells tile animation ${bandIndex} animates (${slots})`
+    : `highlighted: the cells a tile animation at ${slots} would animate`;
 }
 
 /**

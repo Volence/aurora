@@ -14,6 +14,39 @@ import { requestOpenTab } from '../../shell/tab-activation';
 import { classicLevelTab, aeonLevelTab, PROJECT_SETUP_TAB } from '../../shell/tabs';
 import type { RecentProject } from '../../../shared/ipc-types';
 import { normalizeProjectPath } from '../../../shared/project-path';
+import { GUIDES } from '../guide/guides';
+import { openGuide } from '../../state/guideStore';
+
+/**
+ * THE GUIDES, ON HOME, IN BOTH STATES.
+ *
+ * It renders on the no-project page as well as the project page, and that is
+ * the point rather than an oversight: the cold walkthrough's very first finding
+ * (§a1) is a reader arriving at Home with nothing open and finding "exactly two
+ * things: Open Project… and a list of recent projects". Someone who has not
+ * opened a project yet is the reader most likely to need this, and gating it on
+ * a project would hide it from them.
+ *
+ * The blurb is the guide's own (`guides.ts`), not a second sentence written
+ * here — the drift this codebase has paid for repeatedly is one fact spelled in
+ * two places.
+ */
+function GuideCards(): React.ReactElement {
+  return (
+    <>
+      <div style={styles.sectionTitle}>Guides</div>
+      <div style={styles.cards}>
+        {GUIDES.map((g) => (
+          <button key={g.slug} onClick={() => openGuide(g.slug)} style={styles.guideCard}
+            title={g.blurb}>
+            <span style={styles.cardLabel}>{g.title}</span>
+            <span style={styles.guideBlurb}>{g.blurb}</span>
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
 
 export interface HomeTabProps {
   onOpenProject: () => void;
@@ -53,6 +86,7 @@ export default function HomeTab({ onOpenProject, onOpenRecent }: HomeTabProps) {
             </div>
           </div>
           <button onClick={onOpenProject} style={styles.primaryButton}>Open Project…</button>
+          <GuideCards />
           {recents.length > 0 && (
             <>
               <div style={styles.sectionTitle}>Recent projects</div>
@@ -138,6 +172,8 @@ export default function HomeTab({ onOpenProject, onOpenRecent }: HomeTabProps) {
           </button>
         </div>
 
+        <GuideCards />
+
         <div style={styles.sectionTitle}>Switch project</div>
         {/* The recents sit IN the card grid, not in a list below it. They were a
             flex column outside it, which on this page — where every other card
@@ -212,6 +248,16 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer', color: T.textBase, textAlign: 'left' as const,
   },
   cardDisabled: { opacity: 0.45, cursor: 'default' },
+  // A card that stacks a title over its blurb — the `card` grid cell, but
+  // column-flowed, because a guide's one line of explanation is what makes it
+  // worth clicking and a `title` attribute is not an affordance.
+  guideCard: {
+    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3,
+    minWidth: 0, padding: '12px 14px', background: T.void,
+    border: `1px solid ${T.border}`, borderRadius: T.rLg,
+    cursor: 'pointer', color: T.textBase, textAlign: 'left' as const,
+  },
+  guideBlurb: { fontSize: T.t2xs, color: T.textLo, lineHeight: 1.45 },
   cardLabel: { flex: 1, minWidth: 0, fontSize: T.tSm, fontWeight: T.wMedium, color: T.textHi },
   cardBadge: { fontSize: T.t2xs, color: T.textLo, fontFamily: T.fontMono, flexShrink: 0 },
 };

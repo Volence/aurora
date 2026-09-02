@@ -34,7 +34,7 @@ import { useProjectStore } from '../state/projectStore';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { resetProjectRuntime } from '../state/project-runtime';
 import { loadStoredSession, saveStoredSession, loadStoredWorkspace, defaultProjectSession, migrateSessionKeys } from './session-storage';
-import { classicLevelTab, aeonLevelTab, parseSpriteDocTabId, parseCanvasDocTabId, PROJECT_SETUP_TAB } from './tabs';
+import { classicLevelTab, aeonLevelTab, parseSpriteDocTabId, parseCanvasDocTabId, isGuideTabId, PROJECT_SETUP_TAB } from './tabs';
 import { canvasNameIsSafe } from '../state/canvas-file';
 import { activateLevelTarget, activateSpriteDocTarget, activateRestoredCanvasDocTarget } from './tab-activation';
 import type { TabDescriptor } from '../../core/shell/session';
@@ -75,6 +75,14 @@ export function restoredTabIsValid(
   ctx: { enumerated: ReadonlySet<string>; classicOpen: boolean; aeonOpen: boolean },
 ): boolean {
   if (ctx.enumerated.has(id)) return true;
+  // A GUIDE TAB SURVIVES A RESTART AND NEEDS NO PROJECT. Unlike every other
+  // predicate here it is gated on nothing: the page is a document in THIS
+  // repository, so it is equally valid with a classic project, an aeon project
+  // or none at all. The slug is checked (parseGuideTabId's own pattern), which
+  // keeps a hand-edited session from restoring a tab whose text does not exist —
+  // `GuidePane` renders null for an unknown slug, and a permanently blank tab
+  // under a helpful title is the failure this line avoids.
+  if (isGuideTabId(id)) return true;
   // CANVAS TABS SURVIVE A RESTART (R17(1), decided in Task 13). Gated on ANY
   // project being open, because unlike a sprite a canvas has no engine: the same
   // canvas is equally valid in a classic or an aeon project, and all it needs is
