@@ -1,6 +1,7 @@
 // Does any zone have a HI-PRI block cell referencing an ANIMATED tile on the
 // FG plane? (If yes, the occlusion overlay would show frame-0 art there while
 // playback runs — a documented limitation to size honestly.)
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { s1Adapter } from '../src/core/project/s1/index';
@@ -8,7 +9,7 @@ import { animatedTilesForZone } from '../src/core/level-classic/s1-anim-art';
 import { layoutCellAt } from '../src/renderer/components/classic/viewport-math';
 import { chunkIndexForId } from '../src/core/level-classic/model';
 
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = siblingPathOrUnresolved('s1disasm');
 const rfs = {
   async exists(r: string) { return fs.existsSync(path.join(S1DIR, r)); },
   async read(r: string) { return new Uint8Array(fs.readFileSync(path.join(S1DIR, r))); },

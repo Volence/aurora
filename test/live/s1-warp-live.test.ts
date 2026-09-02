@@ -66,6 +66,8 @@ function levelGameMode(s1: string): number | null {
  * The twelve-level WALK UP this replaces resolved correctly on this machine, so
  * it was never a false green — but it was one of only two routes into a peer
  * tree in the whole suite that `AURORA_<NAME>_REPO` / `AURORA_PEER_ROOT` could
+ * (the spellings current at that measurement; today `<NAME>_DIR` /
+ * `EMPYREAN_SUITE_ROOT`, with those two accepted as transitional aliases)
  * not redirect, measured by fs-level trace on 2026-08-30
  * (`docs/reviews/2026-08-30-s1disasm-test-coupling.md`). `referencePath` is the
  * one derivation the rest of the suite uses, and it honours those overrides, so

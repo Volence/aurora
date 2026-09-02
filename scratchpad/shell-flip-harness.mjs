@@ -19,18 +19,20 @@
 // (inactive pills/tools are literally `transparent`) rather than off a
 // hardcoded theme colour.
 
+import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9343);
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
-const AEONDIR = '/home/volence/sonic_hacks/aeon/';   // trailing slash: matches the recents entry
-const ROOT = '/home/volence/sonic_hacks/aurora/.claude/worktrees/ux-plan5';
+const S1DIR = siblingPathOrUnresolved('s1disasm');
+const AEONDIR = siblingPathOrUnresolved('aeon') + '/';   // trailing slash: matches the recents entry
+const ROOT = AURORA_ROOT;
 // The worktree's node_modules has no electron binary (partial install); the
 // main tree's is the same version from the same package.json, and the app code
 // still comes from the WORKTREE's dist, which is what is under test.
-const ELECTRON = '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron';
+const ELECTRON = process.env.ELECTRON_BIN
+  ?? siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

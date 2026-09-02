@@ -59,6 +59,7 @@
 // Build first:  VITE_AURORA_DEBUG=1 npx electron-vite build
 // Run:          AEON_DIR=<copy> node scratchpad/camera-preview-harness.mjs
 
+import { checkoutOverride, siblingDefaultPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -70,11 +71,11 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 const PORT = Number(process.env.PORT ?? 9412);
 const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
 const ELECTRON = process.env.ELECTRON_BIN ?? `${ROOT}/node_modules/.bin/electron`;
-const AEONDIR = process.env.AEON_DIR;
+const AEONDIR = checkoutOverride('aeon')?.value;
 if (!AEONDIR || !existsSync(AEONDIR)) {
   throw new Error('AEON_DIR must point at a COPY of an aeon tree — never the live one');
 }
-if (AEONDIR.includes('aeon-build-pin') || AEONDIR === '/home/volence/sonic_hacks/aeon') {
+if (AEONDIR.includes('aeon-build-pin') || AEONDIR === siblingDefaultPathOrUnresolved('aeon')) {
   throw new Error('AEON_DIR names a tree the owner has open — make your own copy');
 }
 const SHOTS = `${ROOT}/scratchpad/shots-camera-preview`;

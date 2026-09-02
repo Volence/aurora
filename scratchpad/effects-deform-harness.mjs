@@ -78,6 +78,7 @@
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npx electron-vite build
 // Run:                     node scratchpad/effects-deform-harness.mjs
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -94,8 +95,8 @@ const ROOT = process.env.AURORA_ROOT
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`
-    : '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron');
-const AEONDIR = process.env.AEON_DIR ?? '/home/volence/sonic_hacks/aeon';
+    : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
+const AEONDIR = siblingPathOrUnresolved('aeon');
 const SHOTS = `${ROOT}/scratchpad/shots-effects-deform`;
 mkdirSync(SHOTS, { recursive: true });
 

@@ -22,6 +22,7 @@
 // each session (setup always runs) — used to re-run one row cheaply while a real
 // bug is temporarily reintroduced into the source for the falsification pass.
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import * as http from 'node:http';
 import { pathToFileURL, fileURLToPath } from 'node:url';
@@ -38,7 +39,7 @@ const PORT = Number(process.env.PORT ?? 9364);
 // Resolves identically to the old literal when run from the main checkout.
 const ROOT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '');
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = siblingPathOrUnresolved('s1disasm');
 const CANVAS_DIR = `${S1DIR}/.aurora/canvas`;
 const SHOTS = `${ROOT}/scratchpad/shots-canvas`;
 mkdirSync(SHOTS, { recursive: true });

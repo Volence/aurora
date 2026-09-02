@@ -26,9 +26,11 @@ ap.add_argument("--plant-slots", type=int, default=None,
                 help="RED-FIRST: pretend the band covers this many slots and expect a refusal")
 args = ap.parse_args()
 
-AEON = pathlib.Path(os.environ.get("AEON_DIR", pathlib.Path(__file__).resolve().parents[2] / "aeon"))
-if not AEON.exists():                       # a git worktree sits two levels deeper
-    AEON = pathlib.Path("/home/volence/sonic_hacks/aeon")
+import pathlib, sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "lib"))
+from suite_paths import sibling_path   # the suite's 4-step precedence, one derivation
+AEON = sibling_path('aeon')   # honours AEON_DIR / LIVE_AEON, then EMPYREAN_SUITE_ROOT;
+                              # the parents[2] guess it replaces was wrong from a worktree
 REV = args.rev or subprocess.run(
     ["git", "-C", str(AEON), "ls-remote", "origin", "refs/heads/master"],
     capture_output=True, check=True, text=True).stdout.split("\t")[0].strip()

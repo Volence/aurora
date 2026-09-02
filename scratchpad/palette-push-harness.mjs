@@ -22,6 +22,7 @@
 //
 // Usage: node scratchpad/palette-push-harness.mjs   (VERBOSE=1 for server log)
 
+import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,9 +30,9 @@ import { join } from 'node:path';
 import net from 'node:net';
 import * as esbuild from 'esbuild';
 
-const ROOT = '/home/volence/sonic_hacks/aurora';
-const SERVER = '/home/volence/sonic_hacks/oracle-next/target/release/oracle-aether';
-const ROM = '/home/volence/sonic_hacks/aeon/s4.bin';
+const ROOT = AURORA_ROOT;
+const SERVER = siblingPathOrUnresolved('oracle', 'target/release/oracle-aether');
+const ROM = siblingPathOrUnresolved('aeon', 's4.bin');
 
 // SHORT PATH ON PURPOSE: a unix socket path must fit sun_path (~104 bytes) and
 // the session scratchpad is far too deep. The server's own failure here is a

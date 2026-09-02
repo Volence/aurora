@@ -70,7 +70,7 @@ export const S1_ROOT = referencePath('s1disasm');
  * Which of `rels` are not on disk, as ABSOLUTE paths.
  *
  * Absolute on purpose: a relative `artnem/Rings.nem` in a failure message does
- * not say WHICH tree, and `AURORA_S1DISASM_REPO` / `AURORA_PEER_ROOT` mean there
+ * not say WHICH tree, and `S1DISASM_DIR` / `EMPYREAN_SUITE_ROOT` mean there
  * is more than one candidate.
  */
 export function missingS1Files(rels: readonly string[]): string[] {
@@ -134,7 +134,7 @@ export function whenS1Files(what: string, rels: readonly string[]): {
       skip: true,
       meta: {
         skipReason: `SKIPPED, NOT PASSED: cannot measure ${what} — no s1disasm checkout at `
-          + `${S1_ROOT} (see AURORA_S1DISASM_REPO / AURORA_PEER_ROOT), so this row measures nothing`,
+          + `${S1_ROOT} (see S1DISASM_DIR / EMPYREAN_SUITE_ROOT), so this row measures nothing`,
       },
     };
   }
@@ -156,7 +156,7 @@ export function whenS1Act(zone: string, act: number): {
       skip: true,
       meta: {
         skipReason: `SKIPPED, NOT PASSED: cannot measure ${what} — no s1disasm checkout at `
-          + `${S1_ROOT} (see AURORA_S1DISASM_REPO / AURORA_PEER_ROOT), so this row measures nothing`,
+          + `${S1_ROOT} (see S1DISASM_DIR / EMPYREAN_SUITE_ROOT), so this row measures nothing`,
       },
     };
   }
@@ -223,7 +223,7 @@ export function whenS1Glob(dir: string, describeGlob: string, matches: readonly 
       skip: true,
       meta: {
         skipReason: `SKIPPED, NOT PASSED: cannot measure ${describeGlob} — no s1disasm checkout `
-          + `at ${S1_ROOT} (see AURORA_S1DISASM_REPO / AURORA_PEER_ROOT), so this row measures nothing`,
+          + `at ${S1_ROOT} (see S1DISASM_DIR / EMPYREAN_SUITE_ROOT), so this row measures nothing`,
       },
     };
   }

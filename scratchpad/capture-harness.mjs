@@ -22,16 +22,18 @@
 //   - the workspace persists the per-tab facet, so a run that ends on Art starts
 //     the NEXT run on Art. Every phase pins the facet it wants.
 
+import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9351);
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
-const AEONDIR = '/home/volence/sonic_hacks/aeon/';
-const ROOT = '/home/volence/sonic_hacks/aurora/.claude/worktrees/ux-plan5';
-const ELECTRON = '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron';
+const S1DIR = siblingPathOrUnresolved('s1disasm');
+const AEONDIR = siblingPathOrUnresolved('aeon') + '/';
+const ROOT = AURORA_ROOT;
+const ELECTRON = process.env.ELECTRON_BIN
+  ?? siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron');
 const SHOTS = process.env.SHOTS
   ?? '/tmp/claude-1000/-home-volence-sonic-hacks-aurora/58a10310-a36d-4824-82a6-10ea1b59001b/scratchpad/shots';
 

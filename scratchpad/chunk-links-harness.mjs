@@ -48,6 +48,7 @@
 //
 // Usage: node scratchpad/chunk-links-harness.mjs   (VERBOSE=1 for app logs)
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { execSync } from 'node:child_process';
 import { writeFileSync, statSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -69,7 +70,7 @@ function findElectron(from) {
   throw new Error('no electron binary found walking up from ' + from);
 }
 const ELECTRON = findElectron(ROOT);
-const AEON_DIR = process.env.AEON_DIR ?? '/home/volence/sonic_hacks/aeon';   // OPEN ONLY — never written; O66: a copy may be named
+const AEON_DIR = siblingPathOrUnresolved('aeon');   // OPEN ONLY — never written; O66: a copy may be named
 const SHOTS = join(ROOT, 'scratchpad/shots-chunk-links');
 mkdirSync(SHOTS, { recursive: true });
 

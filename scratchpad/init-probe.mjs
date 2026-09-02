@@ -1,9 +1,10 @@
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import net from 'node:net'; import fs from 'node:fs';
 import os from 'node:os'; import path from 'node:path';
 
-const BIN = '/home/volence/sonic_hacks/oracle/target/release/oracle-aether';
-const ROM = '/home/volence/sonic_hacks/aeon/s4.debug.bin';
+const BIN = siblingPathOrUnresolved('oracle', 'target/release/oracle-aether');
+const ROM = siblingPathOrUnresolved('aeon', 's4.debug.bin');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aur-init-'));
 const sock = path.join(dir, 'o.sock');
 

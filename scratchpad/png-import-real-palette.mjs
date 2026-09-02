@@ -7,11 +7,12 @@
 //
 // Run: npx tsx scratchpad/png-import-real-palette.mjs
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { readFileSync } from 'node:fs';
 import { importPngAgainstPalette } from '../src/core/art/png-import.ts';
 import { decodeGenesisColor } from '../src/core/formats/palette.ts';
 
-const DISASM = '/home/volence/sonic_hacks/s1disasm';
+const DISASM = siblingPathOrUnresolved('s1disasm');
 
 // GHZ composes as Sonic.bin[0..16) -> entries 0..16, then
 // Green Hill Zone.bin[0..48) -> entries 16..64 (profiles/s1.ts basePalette).

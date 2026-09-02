@@ -37,6 +37,7 @@
 //
 // Usage: node scratchpad/boot-override-harness.mjs    (VERBOSE=1 for logs)
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -46,15 +47,15 @@ import net from 'node:net';
 import * as esbuild from 'esbuild';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url))); // this tree (worktree-safe)
-const SERVER = '/home/volence/sonic_hacks/oracle-next/target/release/oracle-aether';
-const ROM = '/home/volence/sonic_hacks/aeon/s4.debug.bin';
-const AEON = '/home/volence/sonic_hacks/aeon';
+const SERVER = siblingPathOrUnresolved('oracle', 'target/release/oracle-aether');
+const ROM = siblingPathOrUnresolved('aeon', 's4.debug.bin');
+const AEON = siblingPathOrUnresolved('aeon');
 // Short and in /tmp directly — a long unix socket path dies on SUN_LEN.
 const SOCK = `/tmp/bo-${process.pid}.sock`;
 const BUILD_ENV = {
   ...process.env,
-  SIGIL_BUILD: process.env.SIGIL_BUILD ?? '/home/volence/sonic_hacks/sigil/target/release/sigil',
-  SIGIL_EMIT: process.env.SIGIL_EMIT ?? '/home/volence/sonic_hacks/sigil/target/release/emit_sound_blob',
+  SIGIL_BUILD: process.env.SIGIL_BUILD ?? siblingPathOrUnresolved('sigil', 'target/release/sigil'),
+  SIGIL_EMIT: process.env.SIGIL_EMIT ?? siblingPathOrUnresolved('sigil', 'target/release/emit_sound_blob'),
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

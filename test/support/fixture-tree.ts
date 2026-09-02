@@ -65,7 +65,10 @@ export { UNRESOLVED_ROOT };
  * six levels down, and resolved to `/aeon` from the main checkout — so the two
  * tests using it had been passing while measuring nothing, everywhere except
  * inside an agent worktree. `siblingRoot()` answers correctly from both, and
- * honours `AURORA_PEER_ROOT` / `AURORA_<NAME>_REPO`.
+ * honours the suite's variables — `<NAME>_DIR` (`S1DISASM_DIR`, `AEON_DIR`)
+ * then `EMPYREAN_SUITE_ROOT`, with `AURORA_<NAME>_REPO` / `AURORA_PEER_ROOT`
+ * accepted as transitional aliases (empyrean `contract/SUITE_PATHS.md` @
+ * 82982b7f).
  */
 export function referenceTree(name: string): string | null {
   const dir = referenceFile(name);
@@ -99,19 +102,29 @@ export function referenceFile(name: string, ...rel: string[]): string | null {
  * unchanged: every downstream `existsSync` still decides, exactly as before.
  *
  * WHAT THE NULL CASE BECOMES, and why that is honest. `referenceFile` answers
- * null only when no sibling root can be derived at all (not a git checkout, or
- * `AURORA_PEER_ROOT` names somewhere that does not exist). That case maps here
- * to a path under `UNRESOLVED_ROOT`, which is not a directory and is not
- * creatable by accident, so every `existsSync` downstream answers false and the
- * rows skip — the same outcome as an absent tree, and the path printed in the
- * skip reason says which root failed to resolve rather than pretending a
- * plausible one. It never silently reads something else.
+ * null only at the resolver's STEP 4 — nothing set, and no derivation possible
+ * (not a git checkout at all). That case maps here to a path under
+ * `UNRESOLVED_ROOT`, which is not a directory and is not creatable by accident,
+ * so every `existsSync` downstream answers false and the rows skip — the same
+ * outcome as an absent tree, and the path printed in the skip reason says which
+ * root failed to resolve rather than pretending a plausible one. It never
+ * silently reads something else.
+ *
+ * ⚠ A VARIABLE THAT IS SET BUT NAMES SOMETHING ABSENT NO LONGER ARRIVES HERE.
+ * It THROWS at the step that read it (`SuitePathError`, naming the variable,
+ * its value and the step) — the suite contract's "set but wrong is a hard error
+ * at that step, not a null that lets the next step run". So a typo in
+ * `S1DISASM_DIR` used to become 250 reasoned skips that looked exactly like a
+ * machine without the data; now it stops the run and says which variable is
+ * wrong. To reproduce a machine WITHOUT the reference data, point
+ * `EMPYREAN_SUITE_ROOT` at an EMPTY directory (`$(mktemp -d)`), which is what
+ * the 2026-08-29 tmpfs measurement did anyway.
  *
  * DEFAULT PRESERVED. With no environment set this resolves to the sibling
  * checkout beside this repo, which on the machine those literals were written on
  * is the very path they named — so the conversion changes no behaviour here, and
- * makes the rows runnable on a machine that sets `AURORA_S1DISASM_REPO` or
- * `AURORA_PEER_ROOT`.
+ * makes the rows runnable on a machine that sets `S1DISASM_DIR` or
+ * `EMPYREAN_SUITE_ROOT`.
  */
 export function referencePath(name: string, ...rel: string[]): string {
   return siblingPathOrUnresolved(name, ...rel);
@@ -173,7 +186,7 @@ export function referenceCheckoutReason(name: string): string {
   const root = referenceFile(name);
   if (root === null) {
     return `SKIPPED, NOT PASSED: no sibling checkout root could be derived for ${name} `
-      + '(see AURORA_PEER_ROOT), so these rows measure nothing';
+      + '(see S1DISASM_DIR / EMPYREAN_SUITE_ROOT), so these rows measure nothing';
   }
   if (!existsSync(root)) {
     return `SKIPPED, NOT PASSED: ${root} is absent — this machine has no ${name} checkout, `
@@ -193,7 +206,7 @@ export function referenceCheckoutReason(name: string): string {
  * hand-written strings it replaced.
  */
 export function unmeasurable(path: string | null, what: string): string {
-  const where = path ?? '(no sibling checkout found at all — see AURORA_PEER_ROOT)';
+  const where = path ?? '(no sibling checkout found at all — see EMPYREAN_SUITE_ROOT)';
   return `SKIPPED, NOT PASSED: cannot measure ${what} — ${where} is absent on this machine, so this row measures nothing`;
 }
 

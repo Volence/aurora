@@ -101,6 +101,7 @@
 // Run:                     node scratchpad/layer-bound-harness.mjs
 //              or:         ./scratchpad/run-layer-bound.sh   (the named runner)
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -117,8 +118,8 @@ const ROOT = process.env.AURORA_ROOT
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`
-    : '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron');
-const AEONDIR = process.env.AEON_DIR ?? '/home/volence/sonic_hacks/aeon';
+    : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
+const AEONDIR = siblingPathOrUnresolved('aeon');
 const SHOTS = `${ROOT}/scratchpad/shots-layer-bound`;
 mkdirSync(SHOTS, { recursive: true });
 

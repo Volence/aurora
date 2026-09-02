@@ -79,6 +79,7 @@
 // Run:                     node scratchpad/band-art-foreground-harness.mjs
 // ===========================================================================
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -92,8 +93,8 @@ const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.met
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`
-    : '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron');
-const LIVE_AEON = process.env.LIVE_AEON ?? '/home/volence/sonic_hacks/aeon';
+    : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
+const LIVE_AEON = siblingPathOrUnresolved('aeon');
 const WORKTREE = `${ROOT}/scratchpad/fixtures/aeon-band-art-fg`;
 if (WORKTREE.replace(/\/$/, '') === LIVE_AEON.replace(/\/$/, '')) {
   throw new Error('refusing to run against the LIVE aeon tree');

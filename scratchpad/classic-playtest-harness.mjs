@@ -48,6 +48,7 @@
 //
 // Usage: node scratchpad/classic-playtest-harness.mjs   (VERBOSE=1 for logs)
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, statSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -63,8 +64,8 @@ import { requiredAetherMethods, methodGap } from './lib/aether-methods.mjs';
 const PORT = Number(process.env.PORT ?? 9382);
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));   // this worktree
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
-const SERVER = '/home/volence/sonic_hacks/oracle-next/target/release/oracle-aether';
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const SERVER = siblingPathOrUnresolved('oracle', 'target/release/oracle-aether');
+const S1DIR = siblingPathOrUnresolved('s1disasm');
 const ROM = join(S1DIR, 's1built.bin');
 const LST = join(S1DIR, 'sonic.lst');
 const GHZPAL = join(S1DIR, 'palette/Green Hill Zone.bin');

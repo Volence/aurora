@@ -23,6 +23,7 @@
 // is temporarily reintroduced into the source, for the mandatory falsification
 // pass (see the report for what was actually broken and observed failing).
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import * as http from 'node:http';
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -33,8 +34,9 @@ const PORT = Number(process.env.PORT ?? 9362);
 // worktree that no longer exists, so the harness could not run at all. Derived
 // from this file's own location instead, which survives the next move.
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
-const ELECTRON = '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron';
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const ELECTRON = process.env.ELECTRON_BIN
+  ?? siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron');
+const S1DIR = siblingPathOrUnresolved('s1disasm');
 const SHOTS = `${ROOT}/scratchpad/shots-paint`;
 mkdirSync(SHOTS, { recursive: true });
 const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(',').map((s) => s.trim())) : null;

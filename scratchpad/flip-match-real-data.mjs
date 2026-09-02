@@ -7,12 +7,13 @@
 //
 // Run: npx tsx scratchpad/flip-match-real-data.mjs   (from the aurora repo root)
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { readFileSync } from 'node:fs';
 import { nemesisDecompress } from '../src/core/compress/nemesis.ts';
 import { canonicalTile } from '../src/core/art/tile-canon.ts';
 import { poolTileEntries, TILE_BYTES } from '../src/core/art/tile-pool-match.ts';
 
-const DISASM = '/home/volence/sonic_hacks/s1disasm';
+const DISASM = siblingPathOrUnresolved('s1disasm');
 
 // From profiles/s1.ts — GHZ ships two art files, every other zone one.
 const ZONES = {

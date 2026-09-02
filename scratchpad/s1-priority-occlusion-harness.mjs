@@ -46,6 +46,7 @@
 //       exact, expectations computed from animTilePatchesAt + renderChunk, the
 //       same core the app patches with), not frozen frame-0 art.
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { existsSync, writeFileSync, mkdirSync, statSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -64,7 +65,7 @@ const ELECTRON = [
   join(ROOT, '../../..', 'node_modules/.bin/electron'),
 ].find(existsSync);
 if (!ELECTRON) throw new Error('electron binary not found (npm install?)');
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = siblingPathOrUnresolved('s1disasm');
 const SHOTS = `${ROOT}/scratchpad/shots-occlusion`;
 mkdirSync(SHOTS, { recursive: true });
 

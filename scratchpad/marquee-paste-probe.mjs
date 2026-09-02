@@ -11,6 +11,7 @@
 // Also dumps the map canvas itself (toDataURL) so a red row can be looked at
 // without trusting a window screenshot's scale.
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -21,8 +22,8 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 const PORT = Number(process.env.PORT ?? 9397);
 const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
 const ELECTRON = existsSync(`${ROOT}/node_modules/.bin/electron`)
-  ? `${ROOT}/node_modules/.bin/electron` : '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron';
-const AEONDIR = process.env.AEON_DIR ?? '/home/volence/sonic_hacks/aeon';
+  ? `${ROOT}/node_modules/.bin/electron` : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron');
+const AEONDIR = siblingPathOrUnresolved('aeon');
 const OUT = `${ROOT}/scratchpad/shots-marquee`;
 mkdirSync(OUT, { recursive: true });
 

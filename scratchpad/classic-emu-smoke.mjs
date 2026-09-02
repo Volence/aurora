@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Smoke: is the rebuilt headless oracle-aether the post-parser-drop binary
 // (35 methods), and does it accept sonic.lst + resolve v_palette_line_2?
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 import net from 'node:net';
@@ -9,9 +10,9 @@ import * as esbuild from 'esbuild';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
-const SERVER = '/home/volence/sonic_hacks/oracle-next/target/release/oracle-aether';
-const ROM = '/home/volence/sonic_hacks/s1disasm/s1built.bin';
-const LST = '/home/volence/sonic_hacks/s1disasm/sonic.lst';
+const SERVER = siblingPathOrUnresolved('oracle', 'target/release/oracle-aether');
+const ROM = siblingPathOrUnresolved('s1disasm', 's1built.bin');
+const LST = siblingPathOrUnresolved('s1disasm', 'sonic.lst');
 const SOCK = `/run/user/1000/aur-cp-smoke.sock`;
 const ROOT = process.cwd();
 if (existsSync(SOCK)) rmSync(SOCK);   // a stale socket file refuses the bind

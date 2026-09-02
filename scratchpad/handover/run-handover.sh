@@ -17,7 +17,21 @@
 set -e
 cd "$(dirname "$0")/../.."
 ROOT=$(pwd)
-AEON_DIR=${AEON_DIR:-/home/volence/sonic_hacks/aeon}
+# The suite's 4-step precedence, in the two lines a shell can carry: the explicit
+# checkout variable, then EMPYREAN_SUITE_ROOT/aeon, then a derivation from this
+# checkout's own git common dir (never --show-toplevel, which answers with the
+# worktree), then DIE naming what was looked for. No home literal, and no silent
+# fall-back to the live tree. (empyrean contract/SUITE_PATHS.md @ 82982b7f)
+_common=$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
+SUITE_ROOT=${EMPYREAN_SUITE_ROOT:-${AURORA_PEER_ROOT:-$([ -n "$_common" ] && dirname "$(dirname "$_common")")}}
+AEON_DIR=${AEON_DIR:-${LIVE_AEON:-${SUITE_ROOT:+$SUITE_ROOT/aeon}}}
+if [ -z "$AEON_DIR" ] || [ ! -d "$AEON_DIR" ]; then
+  echo "run-handover: cannot resolve the aeon checkout — AEON_DIR (aliases LIVE_AEON," >&2
+  echo "  AURORA_AEON_REPO) is unset or names '$AEON_DIR', which is not a directory; " >&2
+  echo "  EMPYREAN_SUITE_ROOT is '${EMPYREAN_SUITE_ROOT:-unset}'; and no suite root could be" >&2
+  echo "  derived from $ROOT. Set AEON_DIR or EMPYREAN_SUITE_ROOT." >&2
+  exit 2
+fi
 REV=${1:-$(git -C "$AEON_DIR" ls-remote origin refs/heads/master | cut -f1)}
 ART=$ROOT/test/fixtures/bg-override/editor_bg_override.handover-band.json
 EMIT=$ROOT/scratchpad/handover/emit
@@ -81,7 +95,7 @@ MODEL=$ROOT/scratchpad/handover/model-emit
 mkdir -p "$MODEL"
 "$ROOT/node_modules/.bin/esbuild" "$ROOT/scratchpad/bganim-promoted-vs-aeon-injector.emit.ts" \
   --bundle --platform=node --format=cjs --outfile="$MODEL/emit.cjs" >/dev/null 2>&1 \
-  || /home/volence/sonic_hacks/aurora/node_modules/.bin/esbuild \
+  || "$SUITE_ROOT/aurora/node_modules/.bin/esbuild" \
        "$ROOT/scratchpad/bganim-promoted-vs-aeon-injector.emit.ts" \
        --bundle --platform=node --format=cjs --outfile="$MODEL/emit.cjs" >/dev/null 2>&1
 cp "$EMIT/live-before.json" "$MODEL/live-source.json"

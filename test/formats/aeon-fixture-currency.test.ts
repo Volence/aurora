@@ -79,7 +79,7 @@ describe('CURRENCY: is the vendored aeon fixture still what aeon ships?', () => 
 
   it(`matches games/…/ojz_act1_depth.json at aeon ${AEON_TIP}`, (ctx) => {
     if (aeon === null) {
-      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AURORA_AEON_REPO) — '
+      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR) — '
         + `CANNOT MEASURE whether the pin ${prov.aeon.revision} is still current`);
       return;
     }

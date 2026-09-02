@@ -39,6 +39,7 @@
 // both 1 and 1.35), which makes the canvas rect FRACTIONAL and puts a requested
 // coordinate on no device pixel. Every probe below aims at an integer client
 // pixel and prints dpr + rect so the environment is visible in the output.
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { mkdirSync, existsSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -49,7 +50,7 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 const PORT = Number(process.env.PORT ?? 9397);
 const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
 const ELECTRON = process.env.ELECTRON_BIN ?? `${ROOT}/node_modules/.bin/electron`;
-const AEONDIR = process.env.AEON_DIR ?? '/home/volence/sonic_hacks/aeon';
+const AEONDIR = siblingPathOrUnresolved('aeon');
 const SHOTS = `${ROOT}/scratchpad/shots-screen-frame`;
 mkdirSync(SHOTS, { recursive: true });
 

@@ -183,6 +183,7 @@
 // amortised number; rows c2 and the per-cell resolution line will say so in the
 // output, so a short run cannot quietly masquerade as a precise one.
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { writeFileSync, statSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -215,7 +216,7 @@ function resolveRoot() {
 }
 const { root: ROOT, here: HERE, borrowed: BORROWED } = resolveRoot();
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
-const AEON_DIR = '/home/volence/sonic_hacks/aeon';               // OPEN ONLY — never saved
+const AEON_DIR = siblingPathOrUnresolved('aeon');               // OPEN ONLY — never saved
 const SHOTS = join(HERE, 'scratchpad/shots-mapviewport-baseline');
 mkdirSync(SHOTS, { recursive: true });
 

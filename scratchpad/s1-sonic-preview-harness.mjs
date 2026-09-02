@@ -32,6 +32,7 @@
 //
 // Usage: node scratchpad/s1-sonic-preview-harness.mjs   (VERBOSE=1 for app logs)
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, existsSync, statSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -50,7 +51,7 @@ const ELECTRON = (() => {
   }
   throw new Error('electron binary not found above ' + ROOT);
 })();
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = siblingPathOrUnresolved('s1disasm');
 const SHOTS = join(ROOT, 'scratchpad/shots-s1-sonic-preview');
 mkdirSync(SHOTS, { recursive: true });
 

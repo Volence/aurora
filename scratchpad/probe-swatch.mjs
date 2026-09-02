@@ -1,9 +1,11 @@
+import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 const PORT = 9357;
-const ROOT = '/home/volence/sonic_hacks/aurora/.claude/worktrees/ux-plan6';
-const ELECTRON = '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron';
+const ROOT = AURORA_ROOT;
+const ELECTRON = process.env.ELECTRON_BIN
+  ?? siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const getJSON = (p) => new Promise((res, rej) => { const q = http.get({host:'127.0.0.1',port:PORT,path:p,timeout:1500},(r)=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>{try{res(JSON.parse(d))}catch(e){rej(e)}})}); q.on('timeout',()=>q.destroy(new Error('t'))); q.on('error',rej); });
 async function wait(){for(let i=0;i<90;i++){try{const l=await getJSON('/json/list');const p=l.find(t=>t.type==='page'&&t.webSocketDebuggerUrl);if(p)return p.webSocketDebuggerUrl}catch{}await sleep(500)}throw new Error('no target')}
@@ -15,7 +17,7 @@ try{
   const c=cdp(await wait());await c.ready;await c.send('Runtime.enable');
   for(let i=0;i<60;i++){try{if(await c.ev('typeof window.__dbg==="object"'))break}catch{}await sleep(300)}
   await c.ev('localStorage.clear();1');
-  await c.ev(`window.__dbg.openDir("/home/volence/sonic_hacks/s1disasm")`);await sleep(1800);
+  await c.ev(`window.__dbg.openDir(${siblingPathOrUnresolved('s1disasm')})`);await sleep(1800);
   await c.ev('window.__dbg.activate("ghz",1)');await sleep(4000);
   await c.ev(`(()=>{const b=[...document.querySelectorAll('[aria-label="Facets"] button')].find(e=>e.textContent.trim()==='Art');b.click();return 1})()`);await sleep(1000);
   await c.ev(`(()=>{const b=[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='Tile'&&e.parentElement&&e.parentElement.children.length===3);b.click();return 1})()`);await sleep(900);

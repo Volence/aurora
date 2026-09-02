@@ -33,6 +33,7 @@
 //
 // Usage: node scratchpad/sprite-restore-harness.mjs   (VERBOSE=1 for app logs)
 
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -43,7 +44,7 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 const PORT = Number(process.env.PORT ?? 9384);
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));   // this worktree
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
-const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1DIR = siblingPathOrUnresolved('s1disasm');
 const SESSION_KEY = `aurora.session.v1:${S1DIR}`;
 const MOTOBUG_TAB = 'doc:sprite:s1:64';   // $40
 const RING_TAB = 'doc:sprite:s1:37';      // $25
