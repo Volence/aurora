@@ -6,18 +6,23 @@
   "empyrean": {
     "repo": "git@github.com:Volence/empyrean.git",
     "path": "contract/schema/aurora-effects-preset.schema.json",
-    "revision": "6664b616f42bf3fb7f0eaf4ef3ee3c9b9859583d",
-    "revision_subject": "effects contract: specify the wave-2 preset document (bands) as contract/schema/aurora-effects-preset.schema.json, shape-only, against aeon EFFECTS_CONSUMER_CONTRACT.md section 2.4 at c03b9812; AURORA_EFFECTS_SCHEMA.md 7.1",
-    "blob": "29c1c5ee619717ac1694fd4e152f7e3ed6c771d8",
-    "resolved_by": "git -C ../empyrean show 6664b61:contract/schema/aurora-effects-preset.schema.json — read through git OBJECTS, never through the sibling working tree. Redirected straight into this directory; never retyped, never reformatted.",
-    "revision_published": "6664b61 is an ancestor of empyrean origin/main, checked with `git merge-base --is-ancestor` at vendoring time, and origin/main:contract/schema/aurora-effects-preset.schema.json resolves to the SAME blob 29c1c5ee — so this pin was current at tip, not merely correctly cited.",
+    "revision": "12aecd58825de5c830b4bbe33fe9f80cf01bea83",
+    "revision_subject": "merge: item 5 contract change, cycles and variants in preset documents (schema 7.2, preset JSON schema, G7 vectors, CR record) under the hub's ten rulings",
+    "blob": "f85dde134325676a6c701ca1f77e90dbc958bca2",
+    "resolved_by": "git -C ../empyrean show 12aecd5:contract/schema/aurora-effects-preset.schema.json — read through git OBJECTS, never through the sibling working tree. Redirected straight into this directory; never retyped, never reformatted. Re-vendored 2026-09-01 the same way, and the blob re-hashed with `git hash-object` before anything believed it.",
+    "revision_published": "12aecd5 is an ancestor of empyrean origin/main (63c85aebec4671fb6cc8dccca89c7a5b5d3ddf1c at re-vendoring), checked with `git merge-base --is-ancestor`, and origin/main:contract/schema/aurora-effects-preset.schema.json resolves to the SAME blob f85dde13 — so this pin is current at tip, not merely correctly cited. The previous pin 6664b61 (blob 29c1c5ee) was checked the same way at its landing.",
     "branch_that_answers_currency": "origin/main"
   },
   "vendored": {
     "path": "src/core/formats/effects/aurora-effects-preset.schema.json",
-    "bytes": 7726,
-    "git_blob": "29c1c5ee619717ac1694fd4e152f7e3ed6c771d8",
+    "bytes": 15284,
+    "git_blob": "f85dde134325676a6c701ca1f77e90dbc958bca2",
     "identical_to_source": "byte-for-byte; the git blob id above is the SAME object empyrean stores, which is what effects-preset-schema-drift.test.ts recomputes from these bytes on every run"
+  },
+  "contract_vectors": {
+    "path": "test/fixtures/effects/effects-preset-vectors.json",
+    "sidecar": "test/fixtures/effects/effects-preset-vectors.provenance.json",
+    "why": "12aecd5 also published accept/reject document vectors for this schema at contract/schema/tests/effects-preset-vectors.json. They are vendored beside the tests with a sidecar in this same shape, and test/formats/effects-preset-vectors.test.ts runs every one through parseEffectsPreset and hashes the file against its sidecar the way the drift gate hashes this schema."
   },
   "the_worked_example_is_not_an_authority": {
     "page": "aeon docs/EDITOR_RASTER_PRESETS.md, blob 94db6b3a52c33d4e59011ba7043b8b9827fab38b at aeon origin/master (abc14be1)",
@@ -27,10 +32,12 @@
   },
   "aurora_edits_this_vendoring_forced": {
     "json_schema_subset": "This schema is the first committed contract schema to put `unevaluatedProperties: false` beside an in-place applicator — at $defs.band.properties.on, where `oneOf: [{required:[cram]},{required:[pal_region]}]` spells the exactly-one-arm rule. json-schema-subset.ts refused that combination outright. The refusal was a FALSE POSITIVE here (a `required`-only branch contributes no property annotations, so the additionalProperties equivalence holds exactly), and it was narrowed to a PROVER, `contributesPropertyAnnotations`, that clears a branch only when every keyword in it is on a whitelist of provably-inert ones. $ref/$dynamicRef stay an unconditional refusal because their value is a string this evaluator does not follow.",
-    "why_a_whitelist": "The failure this evaluator exists to prevent is silently ACCEPTING what the real schema rejects. A blacklist is wrong by default on every keyword nobody thought of; a whitelist is right by default and merely inconvenient when the schema grows."
+    "why_a_whitelist": "The failure this evaluator exists to prevent is silently ACCEPTING what the real schema rejects. A blacklist is wrong by default on every keyword nobody thought of; a whitelist is right by default and merely inconvenient when the schema grows.",
+    "type_arrays_12aecd5": "The 12aecd5 amendment spelled `cycles` as `\"type\": [\"array\", \"null\"]` — the first type ARRAY in a committed contract schema. json-schema-subset.ts refused type arrays inside validateNode, i.e. only on a node a DOCUMENT reached; `type` was already an implemented keyword NAME, so the keyword-coverage gate stayed GREEN while the first document carrying `cycles` threw UnsupportedSchemaError. Two edits: (1) `type` now accepts a list of implemented type names, meaning any-of, refused by name in assertSupported before any value is seen; (2) a whole-schema walker, `assertSchemaSupported`, runs the per-node check over every node reachable or not, and both drift gates call it — because a keyword NAME can be implemented while a VALUE SHAPE of it is not, and only a walk sees the shape."
   },
   "pin_history_current_last": [
-    "29c1c5ee — 6664b61, landing (the schema's first revision; byte-identical at origin/main)"
+    "29c1c5ee — 6664b61, landing (the schema's first revision; byte-identical at origin/main)",
+    "f85dde13 — 12aecd5, re-vendored 2026-09-01 (item 5: cycles and variants declared, fires alone reserved; byte-identical at origin/main 63c85aeb)"
   ],
   "re_vendor": "git -C <empyrean> fetch origin && git -C <empyrean> show origin/main:contract/schema/aurora-effects-preset.schema.json > src/core/formats/effects/aurora-effects-preset.schema.json — then update `empyrean.revision`, `empyrean.blob`, `vendored.bytes`, `vendored.git_blob` and `pin_history_current_last` here, and re-run the full suite: the keyword-coverage gate and the derived-constant reads in preset.ts are what tell you which Aurora edits the amendment forces."
 }

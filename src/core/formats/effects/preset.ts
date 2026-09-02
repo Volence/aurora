@@ -24,9 +24,12 @@
 //   • aeon `docs/EDITOR_RASTER_PRESETS.md` (read at aeon origin/master, blob
 //     94db6b3a52c33d4e59011ba7043b8b9827fab38b) is a WORKED EXAMPLE and says so
 //     in its own header: "This page is NOT an authority on the format." Where it
-//     and the schema disagree, the schema and `effects_gen.py` win. They were
-//     compared field by field at this landing and DO NOT disagree — see the
-//     packet, docs/reviews/2026-08-29-band-preset-panel.md.
+//     and the schema disagree, the schema and `effects_gen.py` win. They agreed
+//     field for field at the 6664b61 landing (docs/reviews/2026-08-29-band-
+//     preset-panel.md); since the 12aecd5 re-vendor the schema DECLARES `cycles`
+//     and `variants` that aeon's page and generator still refuse by name — the
+//     contract leading its consumer, measured and NAMED by the drift gate's
+//     last row rather than papered over.
 //
 // THE STRUCTURAL IDEA IS SCENE.TS'S, UNCHANGED. Parse hands back what JSON.parse
 // produced; serialize reorders by aeon's §5 canonical order and refuses to drop
@@ -120,12 +123,77 @@ export interface EffectsPresetBand {
   on: EffectsPresetBandOn;
 }
 
+/**
+ * One palette-cycle channel — `$defs.cycle_channel` (empyrean 12aecd5): a
+ * rotating span of CRAM entries, lowered through aeon's `cycle_channel()`.
+ *
+ * FOUR REQUIRED AND ONE OPTIONAL, which is the constructor's own split: only
+ * `dir` has an engine default (forward). `period` is in the AUTHOR's unit
+ * (frames between rotations); the engine's +1 quirk is the generator's to
+ * absorb, never this codec's (ruling Q7) — so no value here is touched.
+ */
+export interface EffectsPresetCycleChannel {
+  /** CRAM line the rotation runs on. Never 0 — the constructor refuses it. */
+  line: number;
+  /** First entry index within the line. */
+  first: number;
+  /** How many consecutive entries rotate. */
+  count: number;
+  /** Frames between rotations, in the author's unit. */
+  period: number;
+  /** Rotation direction; the only field the constructor defaults. */
+  dir?: number;
+}
+
+/**
+ * One palette variant descriptor — `$defs.pal_variant` (empyrean 12aecd5),
+ * lowered through aeon's `variant()`: per channel, `clamp((c >> shift) + bias,
+ * 0, 7)` on the CRAM lines the `lines` bitmask names.
+ *
+ * EVERY FIELD OPTIONAL, because every one has a constructor default — which is
+ * what lets the shipped deep-water variant be `{shift_r: 1, shift_g: 1}`
+ * verbatim. `lines` is the engine's INTEGER BITMASK, 1:1 with the field
+ * (ruling Q4); a friendlier spelling is a panel's job, not the wire's.
+ */
+export interface EffectsPresetPalVariant {
+  shift_r?: number;
+  bias_r?: number;
+  shift_g?: number;
+  bias_g?: number;
+  shift_b?: number;
+  bias_b?: number;
+  /** Which CRAM lines the derive covers, as the bitmask the engine field is. */
+  lines?: number;
+}
+
+/**
+ * The preset document. `bands` is the raster channel; `cycles` and `variants`
+ * (empyrean 12aecd5, AURORA_EFFECTS_SCHEMA.md §7.2) are OTHER CHANNELS OF THE
+ * SAME `EffectsPreset` record, which is why they live beside it and one
+ * `rasterRef` binds the whole document (ruling Q1).
+ *
+ * THREE STATES EACH, AND ABSENT IS ONE OF THEM — so this codec must never
+ * normalise an absent key to null or an empty array, and never drop a null:
+ *
+ *   `cycles`   absent = keep the section's hand-authored cycle (the no-cost
+ *              majority case); `null` = cycling OFF (lowers to the
+ *              Pal_Cycle_None sentinel); array = the authored script. An empty
+ *              array is legal JSON here and the GENERATOR's refusal (§7.2).
+ *   `variants` positional, index = slot: an index the array does not reach
+ *              (including an absent key) keeps that slot's hand-authored value
+ *              — load-bearing, because every shipped preset carries the act's
+ *              water tint; `null` at an index CLEARS that slot; an object
+ *              authors it. There is no key-level null: clearing both slots is
+ *              `[null, null]`.
+ */
 export interface EffectsPreset {
   schema: 1;
   id: string;
   /** Display label. Writer-owned: read by nothing, dropped on lowering. */
   name?: unknown;
   bands: EffectsPresetBand[];
+  cycles?: EffectsPresetCycleChannel[] | null;
+  variants?: (EffectsPresetPalVariant | null)[];
 }
 
 // ---------------------------------------------------------------------------
@@ -165,9 +233,31 @@ export function presetArmFields(arm: string): readonly string[] {
   return Object.freeze([...(schemaNode(['$defs', arm]).required as string[])]);
 }
 
+/** Every root key the schema DECLARES (required, optional and writer-owned alike). */
+export const EFFECTS_PRESET_ROOT_KEYS: readonly string[] =
+  Object.freeze(Object.keys(schemaNode(['properties'])));
+
+/**
+ * A `$defs` object's field names split the way its schema node splits them:
+ * `required` in the schema's own order, `optional` = declared and not required.
+ * Read off the vendored file so the interfaces above can be checked against it
+ * (test/formats/effects-preset.test.ts) rather than trusted.
+ */
+export function presetDefFields(def: string): { required: readonly string[]; optional: readonly string[] } {
+  const node = schemaNode(['$defs', def]);
+  const required = [...((node.required as string[] | undefined) ?? [])];
+  const declared = Object.keys(node.properties as Record<string, unknown>);
+  return Object.freeze({
+    required: Object.freeze(required),
+    optional: Object.freeze(declared.filter(k => !required.includes(k))),
+  });
+}
+
 /**
  * The wave-2 vocabulary the contract has AGREED and this generator has NOT
- * BUILT: `fires`, `variants`, `cycles`.
+ * BUILT. At 6664b61 that was `fires`, `variants`, `cycles`; at 12aecd5 the
+ * schema DECLARES `cycles` and `variants` (§7.2) and only `fires` stays
+ * reserved — which this derivation reads, and does not restate.
  *
  * WHY THEY ARE WORTH SEPARATING from a plain unknown key. They are not typos —
  * they are empyrean `docs/AURORA_EFFECTS_SCHEMA.md` §7's reserved names, so an

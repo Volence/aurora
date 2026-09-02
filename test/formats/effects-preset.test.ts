@@ -1,10 +1,11 @@
 // The raster PRESET codec — `presets/<preset_id>.json`.
 //
 // CONTRACT, both halves, pinned and read through git OBJECTS:
-//   • empyrean contract/schema/aurora-effects-preset.schema.json at 6664b61,
-//     blob 29c1c5ee619717ac1694fd4e152f7e3ed6c771d8 — the NORMATIVE writer-side
-//     half, vendored beside the codec. The pin of record is the provenance
-//     sidecar; effects-preset-schema-drift.test.ts is the gate that hashes it.
+//   • empyrean contract/schema/aurora-effects-preset.schema.json — the
+//     NORMATIVE writer-side half, vendored beside the codec. The pin of record
+//     (revision and blob) is the provenance sidecar, NOT this comment;
+//     effects-preset-schema-drift.test.ts is the gate that hashes it, and
+//     effects-preset-vectors.test.ts runs the contract's own vectors.
 //   • aeon docs/EDITOR_RASTER_PRESETS.md, blob
 //     94db6b3a52c33d4e59011ba7043b8b9827fab38b at aeon origin/master — a WORKED
 //     EXAMPLE that says of itself "This page is NOT an authority on the format".
@@ -23,9 +24,11 @@ import {
   effectsPresetDir, effectsPresetPath, presetIdFromFileName,
   presetArmIssue, presetArmFields,
   EffectsPresetError, EFFECTS_PRESET_BAND_KEYS, EFFECTS_PRESET_ON_ARMS,
-  EFFECTS_PRESET_RESERVED_KEYS, EFFECTS_PRESET_ID_PATTERN,
-  type EffectsPreset,
+  EFFECTS_PRESET_RESERVED_KEYS, EFFECTS_PRESET_ID_PATTERN, EFFECTS_PRESET_ROOT_KEYS,
+  EFFECTS_PRESET_SCHEMA, presetDefFields,
+  type EffectsPreset, type EffectsPresetCycleChannel, type EffectsPresetPalVariant,
 } from '../../src/core/formats/effects/preset';
+import { canonicalJsonPretty } from '../../src/core/formats/canonical-json';
 
 /**
  * aeon's own §D document, `authored_probe.json`, in the canonical form its page
@@ -108,8 +111,57 @@ describe('constants are DERIVED from the schema, not typed beside it', () => {
       .toEqual(['addr', 'count', 'entry', 'pal_line', 'slot']);
   });
 
+  /**
+   * At 6664b61 the sentence named three: cycles, fires, variants. At 12aecd5
+   * the schema DECLARES cycles and variants and the sentence names only fires —
+   * so the derivation is checked against the schema's own `properties`, not a
+   * typed list: a reserved name is never also a declared one, and the declared
+   * set carries exactly the two the amendment moved across.
+   */
   it('derives the reserved wave-2 names from the schema\'s own sentence', () => {
-    expect([...EFFECTS_PRESET_RESERVED_KEYS]).toEqual(['cycles', 'fires', 'variants']);
+    const declared = Object.keys(EFFECTS_PRESET_SCHEMA.properties as Record<string, unknown>);
+    expect(EFFECTS_PRESET_RESERVED_KEYS.length).toBeGreaterThan(0);
+    expect(EFFECTS_PRESET_RESERVED_KEYS.filter((k) => declared.includes(k))).toEqual([]);
+    expect(EFFECTS_PRESET_RESERVED_KEYS).toContain('fires');
+    expect(declared).toEqual(expect.arrayContaining(['cycles', 'variants']));
+    expect(EFFECTS_PRESET_ROOT_KEYS).toEqual(declared);
+  });
+
+  /**
+   * THE INTERFACES ARE TRANSCRIPTIONS OF THE SCHEMA'S $defs, AND THIS IS THE
+   * CHECK THAT THEY STAY ONE. TypeScript cannot enumerate an interface at run
+   * time, so each object literal below is typed as a Record over the
+   * interface's keys (all of them, then only the REQUIRED ones): tsc refuses
+   * the literal if a key is added to or dropped from the interface, and the
+   * assertion refuses it if the literal stops matching the vendored schema. A
+   * field renamed in a future amendment fails here, in words, before any codec
+   * silently carries the old name.
+   */
+  type RequiredKeys<T> = { [K in keyof T]-?: Record<string, never> extends Pick<T, K> ? never : K }[keyof T];
+
+  it('EffectsPresetCycleChannel is the schema\'s $defs.cycle_channel, field for field', () => {
+    const all: Record<keyof EffectsPresetCycleChannel, true> =
+      { line: true, first: true, count: true, period: true, dir: true };
+    const required: Record<RequiredKeys<EffectsPresetCycleChannel>, true> =
+      { line: true, first: true, count: true, period: true };
+    const fields = presetDefFields('cycle_channel');
+    expect(Object.keys(all).sort()).toEqual([...fields.required, ...fields.optional].sort());
+    expect(Object.keys(required).sort()).toEqual([...fields.required].sort());
+    // Anti-vacuous, and the schema's own words: dir is THE ONLY optional field.
+    expect(fields.optional).toEqual(['dir']);
+  });
+
+  it('EffectsPresetPalVariant is the schema\'s $defs.pal_variant, field for field', () => {
+    const all: Record<keyof EffectsPresetPalVariant, true> = {
+      shift_r: true, bias_r: true, shift_g: true, bias_g: true, shift_b: true, bias_b: true, lines: true,
+    };
+    const required: Record<RequiredKeys<EffectsPresetPalVariant>, true> = {};
+    const fields = presetDefFields('pal_variant');
+    expect(Object.keys(all).sort()).toEqual([...fields.optional].sort());
+    // EVERY FIELD IS OPTIONAL — the schema declares no `required` at all.
+    expect(Object.keys(required)).toEqual([]);
+    expect(fields.required).toEqual([]);
+    expect(fields.optional.length).toBe(7);
   });
 
   it('reads the id pattern out of the schema', () => {
@@ -337,5 +389,74 @@ describe('the preset library', () => {
     }), ROOT);
     expect(lib.presets).toEqual([]);
     expect(lib.unreadable[0].reason).toMatch(/filename stem and the id must match/);
+  });
+});
+
+/**
+ * THE ITEM-5 PRECONDITION — `cycles` and `variants` PARSE HERE.
+ *
+ * empyrean's CR (docs/2026-08-30-item5-cycles-variants-cr.md §4.1, schema
+ * 12aecd5) makes Aurora's re-vendor a HARD PRECONDITION on any document carrying
+ * either key: the codec pins the CLOSED root, so before the re-vendor a document
+ * with either key was refused by Aurora's own loader — the exact defect the
+ * vertical bob hit (ROADMAP row 99). These rows were RED against the 6664b61 pin
+ * (refused as "RESERVED wave-2 vocabulary") and are green at 12aecd5.
+ *
+ * Every document below is spelled in aeon's canonical form (`sort_keys=True,
+ * indent=2` + newline) so the round-trip is asserted BYTE-FOR-BYTE, which is
+ * what CR §4.6 asks for: `cycles: null` must survive a save, and a `variants`
+ * array with a `null` entry must keep its index — a codec that drops nulls or
+ * compacts the array changes which slot is which.
+ *
+ * NO CONTROL AND NO UI: that is item 12's gated half. The codec accepts; nothing
+ * here authors.
+ */
+describe('the item-5 precondition: a document carrying cycles / variants parses here', () => {
+  /** MINIMAL's document plus `extra`, in canonical (alphabetical, recursive) form. */
+  function canonicalWith(extra: Record<string, unknown>): string {
+    return canonicalJsonPretty({ ...(JSON.parse(MINIMAL) as Record<string, unknown>), ...extra });
+  }
+
+  it('`cycles: null` — cycling OFF — parses, is NOT read as absent, and survives a save', () => {
+    const text = canonicalWith({ cycles: null });
+    const p = parseEffectsPreset(text, 'minimal');
+    expect('cycles' in p).toBe(true);
+    expect(p.cycles).toBeNull();
+    expect(serializeEffectsPreset(p)).toBe(text);
+  });
+
+  it('a one-slot `variants` array parses and survives a save', () => {
+    const text = canonicalWith({ variants: [{ shift_g: 1, shift_r: 1 }] });
+    const p = parseEffectsPreset(text, 'minimal');
+    expect(p.variants).toEqual([{ shift_r: 1, shift_g: 1 }]);
+    expect(serializeEffectsPreset(p)).toBe(text);
+  });
+
+  it('a one-channel cycle script parses and survives a save', () => {
+    const text = canonicalWith({ cycles: [{ count: 4, first: 8, line: 2, period: 8 }] });
+    const p = parseEffectsPreset(text, 'minimal');
+    expect(p.cycles).toEqual([{ line: 2, first: 8, count: 4, period: 8 }]);
+    expect(serializeEffectsPreset(p)).toBe(text);
+  });
+
+  it('`variants: [null, {...}]` keeps the null AT ITS INDEX through a save (index = slot)', () => {
+    const text = canonicalWith({ variants: [null, { lines: 12, shift_g: 1 }] });
+    const p = parseEffectsPreset(text, 'minimal');
+    expect(p.variants).toHaveLength(2);
+    expect(p.variants?.[0]).toBeNull();
+    expect(serializeEffectsPreset(p)).toBe(text);
+  });
+
+  it('an UNKNOWN root key is still refused — the root stays closed', () => {
+    expect(() => parseEffectsPreset(canonicalWith({ wobble: 3 }), 'minimal'))
+      .toThrow(/unknown property "wobble"/);
+  });
+
+  it('`cycles` and `variants` are no longer RESERVED; `fires` still is', () => {
+    expect(EFFECTS_PRESET_RESERVED_KEYS).not.toContain('cycles');
+    expect(EFFECTS_PRESET_RESERVED_KEYS).not.toContain('variants');
+    expect(EFFECTS_PRESET_RESERVED_KEYS).toContain('fires');
+    expect(() => parseEffectsPreset(canonicalWith({ fires: [] }), 'minimal'))
+      .toThrow(/fires is RESERVED wave-2 vocabulary/);
   });
 });

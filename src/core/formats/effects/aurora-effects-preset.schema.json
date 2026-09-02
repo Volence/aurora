@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://empyrean/contract/aurora-effects-preset.schema.json",
-  "title": "Aurora Effects — Raster Preset Document (wave 2, bands)",
-  "description": "Wire shape for one raster preset document, games/sonic4/data/editor/effects/presets/<preset_id>.json (aeon repo, editor-owned tree). A BAND IS NOT A SCENE FIELD: a scene is a parallax_config; the raster program is a channel of an EffectsPreset bound per SECTION (aeon docs/superpowers/specs/2026-08-28-raster-band-ownership-design.md section 16.1), so bands live here, in the directory docs/AURORA_EFFECTS_SCHEMA.md section 7 reserved for them. NORMATIVE for SHAPE only: which keys exist, their JSON types, and the exactly-one arm rule. NUMERIC BOUNDS ARE DELIBERATELY NOT RESTATED HERE (screen-line range, CRAM address range, burst ceilings, band count, height minimum, the palette-line-0 rule): the engine's own ensures in engine/effects/raster_dsl.emp fire at build time with the measurement behind each rule, and aeon's generator forwards values verbatim so the author reads that sentence (aeon tools/EFFECTS_CONSUMER_CONTRACT.md section 2.4 at c03b9812, the consumer half this schema pairs with). Closed: any key not listed is refused; adding one is a contract change. Reserved and refused by name (still wave-2 open): fires, variants, cycles. Known limits with NO enforcing assertion, stated so a silence is not read as coverage: nothing checks that an authored preset is BOUND to a section (an unbound preset costs ROM and shows nothing; binding is a hand-authored preset() call, BAND-FIRST-CONSUMER territory); nothing checks the total ROM cost of the preset set; the runtime variant-to-pal_line binding behind a pal_region band cannot be checked at build time; nothing checks that a band is VISIBLE.",
+  "title": "Aurora Effects Raster Preset Document (wave 2: bands, cycles, variants)",
+  "description": "Wire shape for one raster preset document, games/sonic4/data/editor/effects/presets/<preset_id>.json (aeon repo, editor-owned tree). A BAND IS NOT A SCENE FIELD: a scene is a parallax_config; the raster program is a channel of an EffectsPreset bound per SECTION (aeon docs/superpowers/specs/2026-08-28-raster-band-ownership-design.md section 16.1), so bands live here, in the directory docs/AURORA_EFFECTS_SCHEMA.md section 7 reserved for them. NORMATIVE for SHAPE only: which keys exist, their JSON types, and the exactly-one arm rule. NUMERIC BOUNDS ARE DELIBERATELY NOT RESTATED HERE (screen-line range, CRAM address range, burst ceilings, band count, height minimum, the palette-line-0 rule): the engine's own ensures in engine/effects/raster_dsl.emp fire at build time with the measurement behind each rule, and aeon's generator forwards values verbatim so the author reads that sentence (aeon tools/EFFECTS_CONSUMER_CONTRACT.md section 2.4 at c03b9812, the consumer half this schema pairs with). Closed: any key not listed is refused; adding one is a contract change. cycles and variants were added 2026-08-30 (docs/AURORA_EFFECTS_SCHEMA.md section 7.2, DoD item 5, against aeon's demand artifact 8ec2b05d): they are OTHER CHANNELS OF THE SAME EffectsPreset record the raster program is a channel of (ep_cycle and ep_variants are fields of that record, aeon engine/effects/preset.emp:56-67), which is why they live in this document beside bands and why one rasterRef binds the whole of it (ruling Q1). Reserved and refused by name (still wave-2 open): fires. Known limits with NO enforcing assertion, stated so a silence is not read as coverage: nothing checks that an authored preset is BOUND to a section (an unbound preset costs ROM and shows nothing; binding is a hand-authored preset() call, BAND-FIRST-CONSUMER territory); nothing checks the total ROM cost of the preset set; the runtime variant-to-pal_line binding behind a pal_region band cannot be checked at build time (a document carrying BOTH bands and variants makes the slot half of that binding visible in one file, but no assertion is added here: ruling Q6 defers it, because an absent variants entry means the section keeps its hand-authored slot and the document is not the whole truth); nothing checks that a band is VISIBLE; nothing here refuses an empty cycles array or a variants array longer than the engine's slot count, both of which are the generator's refusals (section 7.2).",
   "type": "object",
   "required": [
     "schema",
@@ -28,6 +28,30 @@
       "description": "The bands of this program, lowered to one compose([...]). Absent or empty: refused (aeon load_preset; engine backstop raster_dsl.emp compose). The engine's program-buffer ceiling, not this schema, caps the count (three one-colour bands measured at 55 words).",
       "items": {
         "$ref": "#/$defs/band"
+      }
+    },
+    "cycles": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "description": "This section's ONE palette cycle script, spelled as its array of channels: the array IS the script, because ep_cycle is one pointer (aeon preset.emp:63) and a shape must not express what the engine cannot bind. THIS IS PALETTE CYCLING (Palette_DoCycle, palette.emp:439), not the DEBUG hotkey's raster cycle table. THREE STATES, ONE SPELLING EACH (docs/AURORA_EFFECTS_SCHEMA.md section 7.2, ruling Q2): ABSENT = the section keeps its hand-authored cycle, the no-cost majority case; null = cycling OFF, which lowers to the Pal_Cycle_None sentinel and never to 0; a non-empty array = the authored script. An EMPTY array is legal JSON here and refused by aeon's load_preset naming the two legal spellings, the way an empty bands is refused; that refusal is the generator's, not this schema's. The channel COUNT carries no number here (ruling Q3): PAL_CYCLE_MAX_CHANNELS is the engine's, and today only cycle_script1/cycle_script2 exist so the generator refuses more than two by name. The script's header word is derived from the array length by the wrapper and is not a document field.",
+      "items": {
+        "$ref": "#/$defs/cycle_channel"
+      }
+    },
+    "variants": {
+      "type": "array",
+      "description": "The palette variant descriptors this section binds, POSITIONALLY: index = ep_variants[i] = the slot Palette_SetVariant takes = the slot a pal_region band names in this same document (aeon preset.emp:64, palette.emp:298-319). THREE STATES PER INDEX (docs/AURORA_EFFECTS_SCHEMA.md section 7.2, ruling Q5): an index the array does not reach (including an absent variants key) keeps that slot's hand-authored value, which is load-bearing because every shipped preset carries the act's water tint and a silent clear would drop it; null at an index CLEARS that slot (the engine's 'unused slots 0 = clear'); an object at an index authors it. There is deliberately no key-level null: clearing both slots is [null, null]. The slot COUNT carries no number here: PAL_MAX_VARIANTS is the engine's, locked by a power-of-two mask and three ensures, and an over-long array is refused by the generator naming it.",
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/pal_variant"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     }
   },
@@ -143,6 +167,74 @@
         "count": {
           "type": "integer",
           "description": "How many colours are swapped; also the derived restore's word count. raster_dsl.emp stream_pal_region (burst ceiling, entry + count within the line), pal_restore, fire. The runtime binding of the variant to pal_line is NOT checkable at build time."
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "cycle_channel": {
+      "type": "object",
+      "description": "One rotating span of CRAM entries, lowered through aeon's cycle_channel() into a pal_cycle_channel (palette.emp:150-157, palette_dsl.emp:92-100). Four fields required and one optional, which is the constructor's own split: only dir has an engine default. Value rules are the constructor's ensures and are not restated here.",
+      "required": [
+        "line",
+        "first",
+        "count",
+        "period"
+      ],
+      "properties": {
+        "line": {
+          "type": "integer",
+          "description": "CRAM line the rotation runs on, pc_line. Never 0: line 0 is the character's, which the constructor refuses. Required, no default."
+        },
+        "first": {
+          "type": "integer",
+          "description": "First entry index within the line, pc_first. Required, no default."
+        },
+        "count": {
+          "type": "integer",
+          "description": "How many consecutive entries rotate, pc_count. Required, no default. Value rules: cycle_channel (a minimum, and first + count within the line); the runtime treats a too-small count as a no-op."
+        },
+        "period": {
+          "type": "integer",
+          "description": "FRAMES BETWEEN ROTATIONS, in the AUTHOR's unit: period 8 means a rotation every 8 frames. The engine's timer reloads period and rotates at 0, so its runtime cadence is period + 1 frames (palette.emp:454-461), a quirk aeon has booked a fix for; THE GENERATOR ABSORBS IT (it emits period - 1 today, period unchanged after the fix lands) so that no authored document ever moves (ruling Q7). Consequence, stated rather than encoded: the legal document range today is the engine's range shifted by one, and the generator reports it. Required, no default."
+        },
+        "dir": {
+          "type": "integer",
+          "description": "Rotation direction, pc_dir: forward or reverse. THE ONLY OPTIONAL FIELD, because it is the only one cycle_channel() defaults (dir: int = 0, forward). The two legal values are the constructor's ensure, not restated here."
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "pal_variant": {
+      "type": "object",
+      "description": "One palette variant descriptor, lowered through aeon's variant() into a pal_variant (palette.emp:130-136, palette_dsl.emp:32-49). The transform is per colour channel, clamp((c >> shift) + bias, 0, 7) on the Genesis word, applied only to the CRAM lines the mask names. EVERY FIELD IS OPTIONAL because every one has a constructor default, which is what lets the shipped deep-water variant be {shift_r: 1, shift_g: 1} verbatim. Ranges (shift width, bias sign and magnitude, the mask's forbidden bit) are the constructor's ensures and are not restated here. v_pad is not a document field.",
+      "properties": {
+        "shift_r": {
+          "type": "integer",
+          "description": "Right-shift of the red channel before the bias, v_shift_r."
+        },
+        "bias_r": {
+          "type": "integer",
+          "description": "Signed bias added to red after the shift, v_bias_r."
+        },
+        "shift_g": {
+          "type": "integer",
+          "description": "Right-shift of the green channel before the bias, v_shift_g."
+        },
+        "bias_g": {
+          "type": "integer",
+          "description": "Signed bias added to green after the shift, v_bias_g."
+        },
+        "shift_b": {
+          "type": "integer",
+          "description": "Right-shift of the blue channel before the bias, v_shift_b."
+        },
+        "bias_b": {
+          "type": "integer",
+          "description": "Signed bias added to blue after the shift, v_bias_b."
+        },
+        "lines": {
+          "type": "integer",
+          "description": "Which CRAM lines the derive covers, v_lines, as the INTEGER BITMASK the engine field is (ruling Q4): the 1:1 spelling is the one that cannot drift from the engine, and a friendlier form (checkboxes, a list of line numbers) is the editor panel's job, not the wire's. Line 0 is the character's and the mask's bit for it must be clear; that rule, and the requirement that the mask name at least one line, are the constructor's ensures. Uncovered lines are left as they are."
         }
       },
       "unevaluatedProperties": false

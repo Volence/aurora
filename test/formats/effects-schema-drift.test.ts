@@ -5,6 +5,7 @@ import { resolve } from 'path';
 import {
   SUPPORTED_KEYWORDS,
   collectSchemaKeywords,
+  assertSchemaSupported,
   validateAgainstSchema,
   UnsupportedSchemaError,
   type JsonSchema,
@@ -254,6 +255,17 @@ describe('effects scene schema — vendored copy drift gate', () => {
     expect(used.has('unevaluatedProperties')).toBe(true);
     expect(used.has('oneOf')).toBe(true);
     expect([...used].filter(k => !SUPPORTED_KEYWORDS.has(k))).toEqual([]);
+  });
+
+  /**
+   * The census above answers "is every keyword NAME implemented?". This asks
+   * the stronger question — "would the evaluator refuse ANY node?" — which the
+   * preset gate learned to ask at empyrean 12aecd5, when a type ARRAY passed the
+   * census and threw on the first document that reached it. Kept in step here
+   * so the two gates cannot disagree about what "covered" means.
+   */
+  it('every NODE of the committed schema passes the evaluator\'s per-node check', () => {
+    expect(() => assertSchemaSupported(EFFECTS_SCENE_SCHEMA)).not.toThrow();
   });
 
   /**

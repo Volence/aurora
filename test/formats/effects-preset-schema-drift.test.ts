@@ -23,11 +23,12 @@ import { readFileSync } from 'fs';
 import { createHash } from 'crypto';
 import { resolve } from 'path';
 import {
-  SUPPORTED_KEYWORDS, collectSchemaKeywords, validateAgainstSchema, type JsonSchema,
+  SUPPORTED_KEYWORDS, collectSchemaKeywords, assertSchemaSupported, validateAgainstSchema,
+  canonicalizeBySchema, UnsupportedSchemaError, type JsonSchema,
 } from '../../src/core/formats/effects/json-schema-subset';
 import {
   EFFECTS_PRESET_SCHEMA, EFFECTS_PRESET_BAND_KEYS, EFFECTS_PRESET_ON_ARMS,
-  EFFECTS_PRESET_RESERVED_KEYS, presetArmFields,
+  EFFECTS_PRESET_RESERVED_KEYS, EFFECTS_PRESET_ROOT_KEYS, presetArmFields,
 } from '../../src/core/formats/effects/preset';
 import { peerRepo, resolveRev, readAtRev, isAncestor } from '../support/peer-repo';
 
@@ -88,6 +89,101 @@ describe('raster preset schema — vendored copy drift gate', () => {
     expect(used.has('unevaluatedProperties')).toBe(true);
     expect(used.has('oneOf')).toBe(true);
     expect([...used].filter((k) => !SUPPORTED_KEYWORDS.has(k))).toEqual([]);
+  });
+
+  /**
+   * ═══ THE KEYWORD CENSUS ABOVE WAS GREEN ON A SCHEMA THE EVALUATOR REFUSED ═══
+   *
+   * At the 12aecd5 re-vendor, `cycles` arrived spelled `"type": ["array",
+   * "null"]`. `type` is an implemented keyword NAME, so the census passed; the
+   * refusal of a type ARRAY lived inside validateNode and only fired on a node a
+   * DOCUMENT reached. Every bands-only document parsed. The first document with
+   * a `cycles` key threw `UnsupportedSchemaError: type arrays are not implemented
+   * (at /cycles)` — the exact partial-coverage shape the evaluator's header
+   * promises not to have. This row asks the stronger question: run the per-node
+   * check over EVERY node, reachable or not.
+   */
+  it('every NODE of the committed preset schema passes the evaluator\'s per-node check', () => {
+    // Anti-vacuous: the construct that motivated this row really is in the
+    // schema, so a green here is a green on a type array.
+    const cycles = (EFFECTS_PRESET_SCHEMA.properties as Record<string, JsonSchema>).cycles;
+    expect(Array.isArray(cycles.type)).toBe(true);
+    expect(() => assertSchemaSupported(EFFECTS_PRESET_SCHEMA)).not.toThrow();
+    // ...and the walk really refuses, on a schema whose only defect is one the
+    // census cannot see.
+    const censusBlind: JsonSchema = {
+      type: 'object',
+      properties: { a: { type: 'object' }, b: { type: ['array', 'bignum'] } },
+    };
+    expect([...collectSchemaKeywords(censusBlind)].filter((k) => !SUPPORTED_KEYWORDS.has(k)))
+      .toEqual([]);
+    expect(() => assertSchemaSupported(censusBlind))
+      .toThrow(/type "bignum" at \/properties\/b is not implemented/);
+  });
+
+  /**
+   * `type` as an ARRAY — implemented at the 12aecd5 re-vendor, because `cycles`
+   * has THREE states and two of them are JSON types: absent (keep the hand-
+   * authored cycle), null (cycling OFF, the Pal_Cycle_None sentinel), array
+   * (the script). Asserted on the committed schema's own `cycles` node, not a
+   * hand-built fragment, and on BOTH sides: what it must refuse, refused; what
+   * it must accept, accepted.
+   */
+  it('implements a type ARRAY, on the committed schema\'s own cycles node', () => {
+    const cycles = (EFFECTS_PRESET_SCHEMA.properties as Record<string, JsonSchema>).cycles;
+    expect(cycles.type).toEqual(['array', 'null']);
+    const root = EFFECTS_PRESET_SCHEMA;
+
+    // ACCEPTS both spellings the schema names.
+    expect(validateAgainstSchema(null, cycles, root)).toEqual([]);
+    expect(validateAgainstSchema([{ line: 2, first: 8, count: 4, period: 8 }], cycles, root))
+      .toEqual([]);
+
+    // REFUSES every other JSON type, naming both alternatives in one sentence.
+    for (const wrong of [0, 'off', false, {}]) {
+      const issues = validateAgainstSchema(wrong, cycles, root);
+      expect(issues.map((i) => i.message)).toEqual([`expected array or null, got ${
+        wrong === null ? 'null' : Array.isArray(wrong) ? 'array' : typeof wrong}`]);
+    }
+    // ...and a wrong type does NOT cascade into the items check.
+    expect(validateAgainstSchema('off', cycles, root)).toHaveLength(1);
+    // ...and the array branch still validates its items — the type array did
+    // not turn `items` off.
+    expect(validateAgainstSchema([{ line: 2 }], cycles, root).map((i) => i.path))
+      .toEqual(['/0', '/0', '/0']);
+
+    // The canonicalizer carries a null through the type array untouched.
+    expect(canonicalizeBySchema(null, cycles, root)).toBeNull();
+  });
+
+  /**
+   * The one-slot-of-null shape `variants` uses: `items: { oneOf: [ {$ref},
+   * {type: null} ] }`. Nothing new had to be implemented for it — `oneOf`,
+   * `$ref` and `type: null` were all there — but "nothing new" is exactly the
+   * claim that deserves a row, on the committed node.
+   */
+  it('keeps a null slot in `variants` at its index, on the committed schema\'s own node', () => {
+    const variants = (EFFECTS_PRESET_SCHEMA.properties as Record<string, JsonSchema>).variants;
+    const root = EFFECTS_PRESET_SCHEMA;
+    const arms = ((variants.items as JsonSchema).oneOf as JsonSchema[]);
+    expect(arms.map((a) => a.$ref ?? a.type)).toEqual(['#/$defs/pal_variant', 'null']);
+
+    const doc = [null, { shift_r: 1, shift_g: 1 }, null];
+    expect(validateAgainstSchema(doc, variants, root)).toEqual([]);
+    expect(canonicalizeBySchema(doc, variants, root)).toEqual(doc);
+    // A string is neither arm, and the refusal lands on the slot's index.
+    expect(validateAgainstSchema(['Variant_Water_Deep'], variants, root).map((i) => i.path))
+      .toEqual(['/0']);
+    // A variant object with an unknown key is refused THROUGH the $ref arm.
+    expect(validateAgainstSchema([{ shift_q: 1 }], variants, root)
+      .some((i) => /shift_q/.test(i.message))).toBe(true);
+  });
+
+  it('the walker refuses a $ref that does not resolve, and an empty type array', () => {
+    expect(() => assertSchemaSupported({ items: { $ref: '#/$defs/nowhere' } }))
+      .toThrow(UnsupportedSchemaError);
+    expect(() => assertSchemaSupported({ properties: { a: { type: [] } } }))
+      .toThrow(/empty type array at \/properties\/a/);
   });
 
   /**
@@ -196,8 +292,23 @@ describe('CURRENCY: is the vendored preset schema still what empyrean publishes?
  * thing that would notice, and it reads the page's OWN machine-checked block
  * rather than any prose around it.
  *
- * At this landing the two AGREE, field for field. Recorded in
- * docs/reviews/2026-08-29-band-preset-panel.md.
+ * At the 6664b61 landing the two AGREED, field for field (recorded in
+ * docs/reviews/2026-08-29-band-preset-panel.md).
+ *
+ * ═══ AT THE 12aecd5 RE-VENDOR THEY DO NOT, AND THE DIRECTION IS THE CONTRACT'S ═══
+ *
+ * The schema now DECLARES `cycles` and `variants` and reserves only `fires`;
+ * aeon's page and `effects_gen.py` at origin/master 15efabca still REFUSE all
+ * three by name. That is the contract leading its consumer — empyrean's vectors
+ * say so in their own `$comment` ("the contract leads and aeon's
+ * tools/effects_gen.py implements against it, the direction section 8
+ * requires") — and it is a LAG, not a contradiction: nothing aeon lowers is a
+ * name the schema does not declare, and nothing the schema reserves is a name
+ * aeon lowers. So the rows below assert the invariants that hold ACROSS a lag
+ * (same vocabulary on both sides; aeon refuses at least what the schema
+ * reserves; whatever else aeon refuses is a key the schema declares), and the
+ * last row NAMES the lag as it stood, so the day aeon catches up is a red row
+ * here and not a silent green.
  */
 describe('aeon\'s worked example vs the schema (the schema wins; this reports a split)', () => {
   const aeon = peerRepo('aeon');
@@ -217,42 +328,119 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
     return out;
   }
 
-  it(`agrees with ${PAGE} at aeon ${TIP}, row for row`, (ctx) => {
+  /**
+   * The page's key block, or the reason it could not be read. Resolved ONCE at
+   * collection so the lag row's title can name what it found; the rows below
+   * skip loudly on the not-measurable outcomes and fail on the measured ones.
+   */
+  type PageRead =
+    | { kind: 'skip'; why: string }
+    | { kind: 'fail'; why: string }
+    | { kind: 'ok'; tip: string; keys: Record<string, string[]> };
+  function readPage(): PageRead {
     if (aeon === null) {
-      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AURORA_AEON_REPO) — '
-        + 'CANNOT MEASURE whether aeon\'s worked example still agrees with the schema');
-      return;
+      return { kind: 'skip', why: 'SKIPPED, NOT PASSED: no aeon checkout beside this repo (set '
+        + 'AURORA_AEON_REPO) — CANNOT MEASURE whether aeon\'s worked example still agrees with '
+        + 'the schema' };
     }
     const tip = resolveRev(aeon, TIP);
     if (tip === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${aeon} — CANNOT MEASURE `
-        + 'agreement with aeon\'s page');
-      return;
+      return { kind: 'skip', why: `SKIPPED, NOT PASSED: ${TIP} does not resolve in ${aeon} — `
+        + 'CANNOT MEASURE agreement with aeon\'s page' };
     }
     const at = readAtRev(aeon, tip, PAGE);
     // Not a skip: the revision resolved, so this WAS measured, and the page
     // vanishing from aeon's tip is a fact worth failing on.
-    expect(at.ok, at.ok ? '' : `aeon ${tip}: ${at.ok ? '' : at.why}`).toBe(true);
-    if (!at.ok) return;
-
+    if (!at.ok) return { kind: 'fail', why: `aeon ${tip}: ${at.why}` };
     const keys = pageKeys(at.text);
     // Not a skip either: the page is there and its machine-checked block is not.
     // That is exactly the drift this row exists to catch.
-    expect(keys, `${PAGE} at aeon ${tip} no longer carries its `
-      + 'KEYS-CHECKED-AGAINST-effects_gen.py block — the one part of that page that cannot rot '
-      + 'silently has been removed').not.toBeNull();
-    if (keys === null) return;
+    if (keys === null) {
+      return { kind: 'fail', why: `${PAGE} at aeon ${tip} no longer carries its `
+        + 'KEYS-CHECKED-AGAINST-effects_gen.py block — the one part of that page that cannot '
+        + 'rot silently has been removed' };
+    }
+    return { kind: 'ok', tip, keys };
+  }
+  const page = readPage();
 
-    const SPLIT = `A SPLIT BETWEEN aeon ${PAGE} (at ${tip}) AND `
-      + `${PROV.empyrean.path} (blob ${PROV.empyrean.blob}). THE SCHEMA WINS — but report this: `
-      + 'aeon asked to hear about it immediately.';
+  /** Runs `body` on a measured page; skips loudly or fails on the other outcomes. */
+  function onPage(ctx: { skip: (why: string) => void }, body: (p: PageRead & { kind: 'ok' }) => void): void {
+    if (page.kind === 'skip') { ctx.skip(page.why); return; }
+    expect(page.kind, page.kind === 'fail' ? page.why : '').toBe('ok');
+    if (page.kind !== 'ok') return;
+    body(page);
+  }
 
-    expect(keys.preset, SPLIT).toEqual(['bands', 'id', 'schema']);
-    expect(keys.band, SPLIT).toEqual([...EFFECTS_PRESET_BAND_KEYS].sort());
-    expect(keys['on-arms'], SPLIT).toEqual([...EFFECTS_PRESET_ON_ARMS].sort());
-    expect(keys['on.cram'], SPLIT).toEqual([...presetArmFields('cram')].sort());
-    expect(keys['on.pal_region'], SPLIT).toEqual([...presetArmFields('pal_region')].sort());
-    expect(keys['preset-refused'], SPLIT).toEqual([...EFFECTS_PRESET_RESERVED_KEYS]);
-    expect(keys['preset-ignored'], SPLIT).toEqual(['name']);
+  const SPLIT = (tip: string): string => `A SPLIT BETWEEN aeon ${PAGE} (at ${tip}) AND `
+    + `${PROV.empyrean.path} (blob ${PROV.empyrean.blob}). THE SCHEMA WINS — but report this: `
+    + 'aeon asked to hear about it immediately.';
+
+  // The schema's own account of its root, derived: what it requires, what it
+  // declares without constraining (the writer-owned `name`: a property node
+  // carrying no assertion keyword), and what it declares beyond both.
+  const rootProps = EFFECTS_PRESET_SCHEMA.properties as Record<string, JsonSchema>;
+  const schemaRequired = [...(EFFECTS_PRESET_SCHEMA.required as string[])].sort();
+  const schemaIgnored = Object.keys(rootProps)
+    .filter((k) => Object.keys(rootProps[k]).every((kw) => kw === 'description' || kw === 'title'))
+    .sort();
+  const schemaOptional = Object.keys(rootProps)
+    .filter((k) => !schemaRequired.includes(k) && !schemaIgnored.includes(k)).sort();
+  const schemaReserved = [...EFFECTS_PRESET_RESERVED_KEYS];
+
+  it(`agrees with ${PAGE} at aeon ${TIP} on every shape the schema and the page both spell`, (ctx) => {
+    onPage(ctx, ({ tip, keys }) => {
+      // Anti-vacuous: the derivations partitioned the root the way the schema
+      // is known to spell it at this landing — three required, one ignored,
+      // the rest optional — and EFFECTS_PRESET_ROOT_KEYS agrees.
+      expect(schemaRequired).toHaveLength(3);
+      expect(schemaIgnored).toEqual(['name']);
+      expect(schemaOptional.length).toBeGreaterThan(0);
+      expect([...schemaRequired, ...schemaIgnored, ...schemaOptional].sort())
+        .toEqual([...EFFECTS_PRESET_ROOT_KEYS].sort());
+
+      expect(keys.preset, SPLIT(tip)).toEqual(schemaRequired);
+      expect(keys['preset-ignored'], SPLIT(tip)).toEqual(schemaIgnored);
+      expect(keys.band, SPLIT(tip)).toEqual([...EFFECTS_PRESET_BAND_KEYS].sort());
+      expect(keys['on-arms'], SPLIT(tip)).toEqual([...EFFECTS_PRESET_ON_ARMS].sort());
+      expect(keys['on.cram'], SPLIT(tip)).toEqual([...presetArmFields('cram')].sort());
+      expect(keys['on.pal_region'], SPLIT(tip)).toEqual([...presetArmFields('pal_region')].sort());
+    });
+  });
+
+  it('the two sides know the SAME root vocabulary, and aeon refuses at least what the schema reserves', (ctx) => {
+    onPage(ctx, ({ tip, keys }) => {
+      const pageVocabulary = [...keys.preset, ...keys['preset-ignored'], ...keys['preset-refused']].sort();
+      const schemaVocabulary = [...EFFECTS_PRESET_ROOT_KEYS, ...schemaReserved].sort();
+      // A name one side knows and the other does not is a rename or a typo —
+      // a real split, whichever direction the lag runs.
+      expect(pageVocabulary, SPLIT(tip)).toEqual(schemaVocabulary);
+      // A name the schema still RESERVES must not be one aeon claims to lower.
+      for (const reserved of schemaReserved) {
+        expect(keys['preset-refused'], `${SPLIT(tip)} aeon lowers "${reserved}", which the schema `
+          + 'still reserves').toContain(reserved);
+      }
+      // Whatever ELSE aeon refuses is a key the schema declares and aeon has not
+      // built yet — the contract-leads-consumer lag, never an unknown name.
+      const lag = keys['preset-refused'].filter((k) => !schemaReserved.includes(k));
+      expect(lag.filter((k) => !schemaOptional.includes(k)), SPLIT(tip)).toEqual([]);
+    });
+  });
+
+  /**
+   * THE LAG, NAMED. A pinned expectation on purpose — the same kind of pin the
+   * CURRENCY rows keep — whose job is to go red the day it stops being true.
+   * When aeon lands its half of item 5 (effects_gen.py lowering cycles and
+   * variants, the page's `preset-refused` row shrinking to `fires`), this row
+   * fails: delete it, and re-read docs/reviews for anything that quoted the lag.
+   */
+  it(`the contract-leads-consumer lag at aeon ${page.kind === 'ok' ? page.tip.slice(0, 8) : TIP} is `
+     + 'exactly the item-5 keys, cycles and variants (goes red when aeon catches up)', (ctx) => {
+    onPage(ctx, ({ tip, keys }) => {
+      const lag = keys['preset-refused'].filter((k) => !schemaReserved.includes(k)).sort();
+      expect(lag, `the lag between ${PROV.empyrean.path} (blob ${PROV.empyrean.blob}) and aeon `
+        + `${PAGE} at ${tip} has MOVED. If it is now empty, aeon has built item 5: delete this row. `
+        + 'If it is something else, that is a split to report.').toEqual(['cycles', 'variants']);
+    });
   });
 });

@@ -21,8 +21,13 @@
 //     future amendment adding `allOf`/`if`/`patternProperties` fails loudly the
 //     first time anything validates, instead of quietly becoming a no-op.
 //   • collectSchemaKeywords() lets a test walk the committed schema and assert
-//     the whole keyword set is implemented — the coverage gate in
-//     test/formats/effects-schema-drift.test.ts.
+//     the whole keyword set is implemented, and assertSchemaSupported() runs the
+//     per-node check over every node whether or not a document reaches it — the
+//     coverage gates in test/formats/effects-schema-drift.test.ts and
+//     test/formats/effects-preset-schema-drift.test.ts. Both are needed: a
+//     keyword name can be implemented while a VALUE SHAPE of it is not (the
+//     type array `cycles` arrived with, empyrean 12aecd5), and only the walk
+//     sees the shape.
 //
 // unevaluatedProperties: implemented as additionalProperties. That is EXACT for
 // the committed schemas, not an approximation, and the precondition is checked
@@ -138,6 +143,28 @@ export class UnsupportedSchemaError extends Error {
   }
 }
 
+/** The `type` names matchesType() below implements — checked HERE, before any value is seen. */
+const IMPLEMENTED_TYPES: ReadonlySet<string> = new Set<string>([
+  'object', 'array', 'string', 'boolean', 'null', 'number', 'integer',
+]);
+
+/**
+ * The per-node support check: every keyword on this node is implemented, and
+ * every keyword VALUE SHAPE this evaluator distinguishes is one it implements.
+ *
+ * ═══ WHY THE VALUE SHAPE IS CHECKED HERE AND NOT ONLY AT USE (empyrean 12aecd5) ═══
+ *
+ * The preset amendment that added `cycles` spelled it `"type": ["array", "null"]`
+ * — the first type ARRAY in any committed contract schema. `type` was already a
+ * SUPPORTED keyword, so the keyword-coverage gate stayed green; the refusal
+ * lived inside validateNode, which only runs on a node the DOCUMENT reaches.
+ * Every document without a `cycles` key parsed, and the first one with it threw
+ * UnsupportedSchemaError. That is the partial-coverage hole this file's header
+ * promises not to have: a gate that covers most of the schema and is silently
+ * wrong in the corner. So the shape refusal is a property of the SCHEMA NODE,
+ * asserted here, and `assertSchemaSupported` below walks every node so a gate
+ * can ask the question of the whole schema without a document.
+ */
 function assertSupported(schema: JsonSchema, where: string): void {
   for (const key of Object.keys(schema)) {
     if (!SUPPORTED_KEYWORDS.has(key)) {
@@ -146,6 +173,19 @@ function assertSupported(schema: JsonSchema, where: string): void {
         'json-schema-subset.ts. Refusing to validate rather than ignoring it — ' +
         'implement the keyword (and extend SUPPORTED_KEYWORDS) before the schema ships it.',
       );
+    }
+  }
+  if (schema.type !== undefined) {
+    const names = Array.isArray(schema.type) ? schema.type : [schema.type];
+    if (names.length === 0) {
+      throw new UnsupportedSchemaError(`an empty type array at ${where || '<root>'} is not implemented`);
+    }
+    for (const t of names) {
+      if (typeof t !== 'string' || !IMPLEMENTED_TYPES.has(t)) {
+        throw new UnsupportedSchemaError(
+          `type ${JSON.stringify(t)} at ${where || '<root>'} is not implemented by json-schema-subset.ts`,
+        );
+      }
     }
   }
   if (schema.unevaluatedProperties !== undefined) {
@@ -245,12 +285,15 @@ function validateNode(
     return;
   }
 
-  if (typeof schema.type === 'string' && !matchesType(value, schema.type)) {
-    issues.push({ path, message: `expected ${schema.type}, got ${typeName(value)}` });
-    return; // no cascade off a wrong type
-  }
-  if (schema.type !== undefined && typeof schema.type !== 'string') {
-    throw new UnsupportedSchemaError(`type arrays are not implemented (at ${path || '<root>'})`);
+  // `type` — one name, or (since empyrean 12aecd5, `cycles`) an ARRAY of names
+  // meaning "any of these". Both spellings reduce to one list; assertSupported
+  // has already refused a name matchesType() does not know.
+  if (schema.type !== undefined) {
+    const names = (Array.isArray(schema.type) ? schema.type : [schema.type]) as string[];
+    if (!names.some(t => matchesType(value, t))) {
+      issues.push({ path, message: `expected ${names.join(' or ')}, got ${typeName(value)}` });
+      return; // no cascade off a wrong type
+    }
   }
 
   if (schema.const !== undefined && !deepEqual(value, schema.const)) {
@@ -494,6 +537,58 @@ export function canonicalizeBySchema(value: unknown, schema: JsonSchema, root?: 
 }
 
 /**
+ * Which keywords hold SUBSCHEMAS, and how: by name (`properties`, `$defs`), as
+ * one schema (`items`, `not`), or as a list of schemas (`oneOf`, `anyOf`). Every
+ * other keyword's value is data (`required`, `enum`, `const`, `type`, …).
+ *
+ * One table, read by both walkers below, so the coverage gate and the keyword
+ * census cannot disagree about what a subschema is.
+ */
+const NAME_KEYED_SUBSCHEMAS: ReadonlySet<string> = new Set(['properties', '$defs']);
+const SINGLE_SUBSCHEMA: ReadonlySet<string> = new Set(['items', 'not']);
+const LIST_SUBSCHEMAS: ReadonlySet<string> = new Set(['oneOf', 'anyOf']);
+
+/**
+ * Run the per-node support check over EVERY node of `schema`, reachable by a
+ * document or not — the question a document-driven validation cannot ask.
+ *
+ * THIS IS THE COVERAGE GATE'S REAL INSTRUMENT (empyrean 12aecd5). The keyword
+ * census `collectSchemaKeywords` answers "is every keyword NAME implemented?";
+ * this answers "would validateNode refuse ANY node of this schema?" — which is
+ * a strictly stronger question, because assertSupported also refuses value
+ * SHAPES (a type array, `unevaluatedProperties: true`, a `$ref` with an
+ * asserting sibling, a `$ref` that does not resolve) that a keyword name cannot
+ * express. Throws UnsupportedSchemaError naming the node, or returns.
+ */
+export function assertSchemaSupported(schema: JsonSchema, root: JsonSchema = schema): void {
+  const walk = (node: unknown, where: string): void => {
+    if (typeof node !== 'object' || node === null || Array.isArray(node)) {
+      throw new UnsupportedSchemaError(
+        `the subschema at ${where || '<root>'} is not an object; boolean and array schemas are not implemented`,
+      );
+    }
+    const obj = node as JsonSchema;
+    assertSupported(obj, where);
+    if (typeof obj.$ref === 'string') resolveRef(obj.$ref, root); // throws when it does not resolve
+    for (const [key, val] of Object.entries(obj)) {
+      if (NAME_KEYED_SUBSCHEMAS.has(key)) {
+        for (const [name, sub] of Object.entries(val as Record<string, unknown>)) {
+          walk(sub, `${where}/${key}/${name}`);
+        }
+      } else if (SINGLE_SUBSCHEMA.has(key)) {
+        walk(val, `${where}/${key}`);
+      } else if (LIST_SUBSCHEMAS.has(key)) {
+        if (!Array.isArray(val)) {
+          throw new UnsupportedSchemaError(`${key} at ${where || '<root>'} is not an array of schemas`);
+        }
+        val.forEach((sub, i) => walk(sub, `${where}/${key}/${i}`));
+      }
+    }
+  };
+  walk(schema, '');
+}
+
+/**
  * Every keyword appearing anywhere in `schema`. Used by the drift gate to
  * assert the committed contract file stays inside the implemented subset.
  */
@@ -503,11 +598,10 @@ export function collectSchemaKeywords(schema: JsonSchema): Set<string> {
     if (Array.isArray(node)) { node.forEach(walk); return; }
     if (typeof node !== 'object' || node === null) return;
     const obj = node as Record<string, unknown>;
-    // Containers whose KEYS are names, not keywords.
-    const nameKeyed = new Set(['properties', '$defs']);
     for (const [key, val] of Object.entries(obj)) {
       seen.add(key);
-      if (nameKeyed.has(key) && typeof val === 'object' && val !== null) {
+      // Containers whose KEYS are names, not keywords.
+      if (NAME_KEYED_SUBSCHEMAS.has(key) && typeof val === 'object' && val !== null) {
         Object.values(val as Record<string, unknown>).forEach(walk);
       } else if (key === 'enum' || key === 'const' || key === 'default' ||
                  key === 'required' || key === 'examples') {

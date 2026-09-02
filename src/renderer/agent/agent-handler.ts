@@ -1044,7 +1044,9 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       // rule set-effects-scene states. Going through parseEffectsPreset rather
       // than validateAgainstSchema buys the three rules that are not in the JSON
       // schema at all: the filename-stem identity check, the reserved wave-2
-      // vocabulary refused BY NAME (fires / variants / cycles), and the
+      // vocabulary refused BY NAME (whatever the vendored schema's own sentence
+      // still reserves — `fires` since empyrean 12aecd5 declared cycles and
+      // variants; EFFECTS_PRESET_RESERVED_KEYS, never a list here), and the
       // exactly-one-ON-arm sentence that explains why two writes cannot share a
       // band. It also buys what the codec deliberately does NOT do: no numeric
       // bound is checked and nothing is clamped, so the engine's own `ensure`
