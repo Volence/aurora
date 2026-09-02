@@ -28,15 +28,15 @@ import * as path from 'node:path';
 import { enigmaDecompress } from '../../formats/classic/enigma';
 import { unpackBlockCell, unpackChunkCell, type BlockDef, type ChunkCell, type LevelDoc } from '../model';
 import { blockPriorityQuad, chunkPriorityMask, CHUNK_TILES } from '../priority-mask';
-import { referencePath } from '../../../../test/support/fixture-tree';
+import { referencePath, S1_PINNED } from '../../../../test/support/fixture-tree';
 import { whenS1Files, missingS1Files } from '../../../../test/support/s1-checkout';
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 
 /**
  * THE ONE FILE THIS SUITE READS, and why the guard names it rather than the tree.
  *
- * The gate here used to be `referenceCheckout('s1disasm')` — top-level markers
+ * The gate here used to be `referenceCheckout(S1_PINNED)` — top-level markers
  * only. On a checkout with the markers and no `map16/`, that gate said PRESENT,
  * `loadSbzBlocks()` ran in the describe BODY, and the ENOENT it threw was a
  * COLLECTION failure: vitest reported `1 failed | no tests`, and all ten rows of

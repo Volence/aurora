@@ -33,11 +33,11 @@ import { parseAsmMappings } from '../../src/core/import/asm-mappings';
 import { renderFrameToIndices } from '../../src/core/art/sprite-render';
 import type { SpriteFrame } from '../../src/core/model/sprite-types';
 import type { Tile } from '../../src/core/model/s4-types';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath, S1_PINNED } from '../support/fixture-tree';
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
+const S1_ABSENT = referenceCheckoutReason(S1_PINNED);
 const maps = (rel: string) => parseAsmMappings(fs.readFileSync(path.join(S1DIR, '_maps', rel), 'utf8'));
 
 /**
@@ -71,7 +71,7 @@ function renderAlone(frame: SpriteFrame, tiles: Tile[]) {
   };
 }
 
-describe('S1 sideways spring — derivation vs parser+composer', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
+describe('S1 sideways spring — derivation vs parser+composer', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
   // HAND-TRANSCRIBED from _maps/Springs.asm (argument order per
   // _MapMacros.asm): the full six-frame table.
   //   0 .spg_Up:       (-$10,-8, 4x1, tile 0) (-$10,0, 4x1, tile 4)
@@ -149,7 +149,7 @@ describe('S1 sideways spring — derivation vs parser+composer', { skip: !refere
   });
 });
 
-describe('flip/negative-offset sweep — other objects, hand-derived', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
+describe('flip/negative-offset sweep — other objects, hand-derived', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
   it('GHZ Ball .check2 (frame 2): h+v-flipped quadrants place tiles AND pixels mirrored', () => {
     // HAND-TRANSCRIBED from _maps/GHZ Ball.asm .check2:
     //   (-$18,-$18, 3x3, tile $12)  (0,-$18, 3x3, tile $1B)

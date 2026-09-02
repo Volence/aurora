@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import { renderChunk, renderTile } from '../render';
 import { s1Adapter } from '../../project/s1';
-import { referencePath } from '../../../../test/support/fixture-tree';
+import { referencePath, S1_PINNED } from '../../../../test/support/fixture-tree';
 import { whenS1Act } from '../../../../test/support/s1-checkout';
 import type {
   LevelDoc,
@@ -281,7 +281,7 @@ describe('renderChunk', () => {
 // tree stays green.
 // ---------------------------------------------------------------------------
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 
 function realFs(root: string) {
   return {

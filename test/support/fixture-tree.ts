@@ -45,10 +45,52 @@ import { resolve } from 'node:path';
 import { describe, it } from 'vitest';
 
 import {
-  siblingPath, siblingPathOrUnresolved, siblingPathSource, UNRESOLVED_ROOT,
+  AURORA_DIR, siblingPath, siblingPathOrUnresolved, siblingPathSource, UNRESOLVED_ROOT,
 } from './sibling-root.mjs';
 
 export { UNRESOLVED_ROOT };
+
+/**
+ * A REFERENCE TREE THAT IS NOT A PEER — the s1disasm data VENDORED into this
+ * repo at a named revision (`test/fixtures/s1disasm`, ROADMAP row 78 phase 2).
+ *
+ * WHY IT IS A SEPARATE NAME AND NOT A REDEFINITION OF `'s1disasm'`. Those are
+ * two different things and the difference is the whole point of row 78:
+ *
+ *   `'s1disasm'`         — the PEER CHECKOUT beside this repo. Somebody else's
+ *                          live working tree; present or not, current or not,
+ *                          and mid-edit as often as not. The right target for a
+ *                          row whose subject IS a checkout (a built `s1built.bin`,
+ *                          a `sonic.lst` from a local build).
+ *   `S1_PINNED`          — bytes committed HERE, at the revision named in
+ *                          `test/fixtures/s1disasm/.provenance.json`. The right
+ *                          target for a row asking *does OUR code handle this
+ *                          document* — the input must not move, or the row
+ *                          measures two things at once, and it must not need
+ *                          the peer to exist at all.
+ *
+ * Everything in this module works on either: `referencePath(S1_PINNED, 'levels/ghz1.bin')`
+ * reads the pin, `referencePath('s1disasm', …)` still reads the peer. What a row
+ * READS is therefore a one-token, greppable property of that row.
+ *
+ * ⚠ A CURRENCY QUESTION MUST NOT BE ASKED OF THE PIN. A pin equals itself by
+ * construction, so "is the peer's source still shaped the way our table says"
+ * cannot be asked here and gets `test/support/peer-repo.ts` (a COMMITTED peer
+ * revision) instead — see `src/core/project/profiles/__tests__/s1-sync-anims.test.ts`.
+ */
+export const S1_PINNED = 's1disasm-pinned';
+
+/**
+ * Reference trees that live INSIDE this repo. Their absence is an AURORA defect
+ * — a deleted fixture, a bad merge — never "this machine has no disassembly",
+ * and the reasons below say so rather than sending a reader off to clone a peer.
+ */
+const VENDORED_ROOTS: Record<string, { dir: string; remake: string }> = {
+  [S1_PINNED]: {
+    dir: resolve(AURORA_DIR, 'test/fixtures/s1disasm'),
+    remake: 'node scripts/vendor-s1-fixtures.mjs',
+  },
+};
 
 /**
  * WHICH PRECEDENCE STEP — and therefore which VARIABLE — produced this repo's
@@ -61,6 +103,11 @@ export { UNRESOLVED_ROOT };
  * step that answered; this is that string, so a refusal can end with it.
  */
 export function referencePathSource(name: string): string {
+  const vendored = VENDORED_ROOTS[name];
+  if (vendored !== undefined) {
+    return `${name} is VENDORED IN THIS REPO at ${vendored.dir} — no environment variable `
+      + `selects it, and no peer checkout is consulted; rebuild it with \`${vendored.remake}\``;
+  }
   return siblingPathSource(name);
 }
 
@@ -101,6 +148,8 @@ export function referenceTree(name: string): string | null {
  * `unmeasurable` has separate wording for that.
  */
 export function referenceFile(name: string, ...rel: string[]): string | null {
+  const vendored = VENDORED_ROOTS[name];
+  if (vendored !== undefined) return resolve(vendored.dir, ...rel);
   return siblingPath(name, ...rel);
 }
 
@@ -143,6 +192,8 @@ export function referenceFile(name: string, ...rel: string[]): string | null {
  * `EMPYREAN_SUITE_ROOT`.
  */
 export function referencePath(name: string, ...rel: string[]): string {
+  const vendored = VENDORED_ROOTS[name];
+  if (vendored !== undefined) return resolve(vendored.dir, ...rel);
   return siblingPathOrUnresolved(name, ...rel);
 }
 
@@ -155,6 +206,9 @@ export function referencePath(name: string, ...rel: string[]): string {
  */
 const REFERENCE_MARKERS: Record<string, readonly string[]> = {
   s1disasm: ['sonic.asm', '_maps', 'levels'],
+  // The pin carries the same three, so a row converted from the peer to the pin
+  // keeps the identical guard rather than quietly losing one.
+  [S1_PINNED]: ['sonic.asm', '_maps', 'levels'],
 };
 
 /**
@@ -199,6 +253,16 @@ export function referenceCheckout(name: string): boolean {
  * the words of the first.
  */
 export function referenceCheckoutReason(name: string): string {
+  const vendored = VENDORED_ROOTS[name];
+  if (vendored !== undefined) {
+    const missing = (REFERENCE_MARKERS[name] ?? []).filter((m) => !existsSync(resolve(vendored.dir, m)));
+    return `SKIPPED, NOT PASSED: ${vendored.dir} is VENDORED IN THIS REPO and is `
+      + `${existsSync(vendored.dir) ? `incomplete — missing ${missing.join(', ')}` : 'ABSENT'}. `
+      + 'That is an AURORA defect (a deleted or half-merged fixture), NOT a machine without a '
+      + `disassembly: no peer checkout is involved. Rebuild with \`${vendored.remake}\`. `
+      + 'The vendored tree\'s own integrity is asserted by '
+      + 'test/formats/s1disasm-pin-currency.test.ts, which FAILS rather than skipping.';
+  }
   const root = referenceFile(name);
   if (root === null) {
     return `SKIPPED, NOT PASSED: no sibling checkout root could be derived for ${name} `

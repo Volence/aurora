@@ -7,7 +7,7 @@ import type { CommitReport, CommitRefusal } from '../../../../core/art/classic-c
 import { withCollision } from '../../../../core/art/commit-collision';
 import type { CanvasCommitPlan } from '../../../../core/art/classic-commit-plan';
 import { enigmaDecompress } from '../../../../core/formats/classic/enigma';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../../test/support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath, S1_PINNED } from '../../../../../test/support/fixture-tree';
 
 describe('canvasChunkCapacity', () => {
   it('counts whole chunks only, and reports the remainder rather than rounding', () => {
@@ -161,10 +161,10 @@ describe('reportLines and the colind overhang', () => {
 // the block count is the Enigma-decoded map16/GHZ.eni at 8 bytes per block
 // (s1-io.ts's own stride). Gated like the compression goldens: the fixture
 // tree is absent on CI.
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
-describe('reportLines over GHZ, the zone whose commits all overhang', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
+const S1_ABSENT = referenceCheckoutReason(S1_PINNED);
+describe('reportLines over GHZ, the zone whose commits all overhang', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
   it('states GHZ\'s whole overhang when a commit mints every id past the table', () => {
     const colindLength = fs.statSync(`${S1DIR}/collide/GHZ.bin`).size;
     const blockCount = Math.floor(

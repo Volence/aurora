@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import { kosinskiCompress, kosinskiDecompress } from '../../kosinski';
-import { referencePath } from '../../../../../test/support/fixture-tree';
+import { referencePath, S1_PINNED } from '../../../../../test/support/fixture-tree';
 import { whenS1Glob } from '../../../../../test/support/s1-checkout';
 import {
   nemesisCompress, nemesisDecompress, nemesisCompressPlainForTest,
 } from '../../../compress/nemesis';
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 
 /** Deterministic PRNG (mulberry32) so the round-trip vectors are reproducible. */
 function mulberry32(seed: number): () => number {

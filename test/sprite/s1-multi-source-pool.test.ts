@@ -19,11 +19,11 @@ import * as path from 'path';
 import { parseAsmMappings } from '../../src/core/import/asm-mappings';
 import { composeTilePool, reconstructFromTilePool } from '../../src/core/import/sprite-import';
 import { resolveObjectArt } from '../../src/core/project/profiles/s1-object-art';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath, S1_PINNED } from '../support/fixture-tree';
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
+const S1_ABSENT = referenceCheckoutReason(S1_PINNED);
 const nem = (rel: string) => new Uint8Array(fs.readFileSync(path.join(S1DIR, 'artnem', rel)));
 
 describe('the sources row shape', () => {
@@ -67,7 +67,7 @@ describe('composeTilePool', () => {
   });
 });
 
-describe('Eggman tail frames against the real files', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
+describe('Eggman tail frames against the real files', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
   it('.escapeflame1/2 render NONBLANK from the composed pool; .blank stays 0; the ship is untouched', () => {
     const frames = parseAsmMappings(fs.readFileSync(path.join(S1DIR, '_maps/Eggman.asm'), 'utf8'));
     expect(frames.length).toBe(13);

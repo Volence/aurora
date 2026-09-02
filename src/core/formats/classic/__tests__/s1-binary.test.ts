@@ -6,12 +6,12 @@ import { decodeS1Objpos, encodeS1Objpos, type S1ObjectEntry } from '../s1-objpos
 import { decodeS1StartPos, encodeS1StartPos } from '../s1-startpos';
 import { decodeS1ColInd, encodeS1ColInd } from '../s1-colind';
 import { decodeS1CollisionArray, decodeS1AngleMap, decodeS1CollisionShapes } from '../s1-collision-shapes';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../../test/support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath, S1_PINNED } from '../../../../../test/support/fixture-tree';
 import { whenS1Glob } from '../../../../../test/support/s1-checkout';
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
+const S1_ABSENT = referenceCheckoutReason(S1_PINNED);
 
 function bytes(...v: number[]): Uint8Array {
   return new Uint8Array(v);
@@ -202,7 +202,7 @@ function topLevelBins(dir: string): string[] {
 // (mz3bg/syz1/syz3 carry one trailing byte; ending.bin is truncated short.)
 const IRREGULAR_LAYOUTS = new Set(['mz3bg.bin', 'syz1.bin', 'syz3.bin', 'ending.bin']);
 
-describe('s1 binary goldens over real s1disasm data', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
+describe('s1 binary goldens over real s1disasm data', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
   // Hoisted so each row can gate on ITS OWN directory. `expect(files.length)
   // .toBeGreaterThan(0)` inside the body reported an empty `objpos/` as
   // `AssertionError: expected 0 to be greater than 0` — a decoder complaint for

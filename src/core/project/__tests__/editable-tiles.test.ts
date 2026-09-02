@@ -5,7 +5,7 @@ import { tileLockReason, isTileEditable } from '../editable-tiles';
 import { firstEditableNonBlankTile } from '../../level-classic/tile-pick';
 import { s1Adapter } from '../s1';
 import type { EditableTileRange, FileAccess } from '../adapter';
-import { referencePath } from '../../../../test/support/fixture-tree';
+import { referencePath, S1_PINNED } from '../../../../test/support/fixture-tree';
 import { whenS1Act } from '../../../../test/support/s1-checkout';
 
 // The composer's 🔒 rule and the command's refusal are ONE predicate now (they
@@ -63,7 +63,7 @@ describe('tileLockReason', () => {
 // any of that, so a refused pencil there is never the lock rule's doing.
 // ---------------------------------------------------------------------------
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 
 function realFs(root: string): FileAccess {
   return {

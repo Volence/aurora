@@ -23,12 +23,12 @@ import {
 import { parseAsmMappings } from '../../import/asm-mappings';
 import type { SpriteFrame } from '../../model/sprite-types';
 import type { Tile } from '../../model/s4-types';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath, S1_PINNED } from '../../../../test/support/fixture-tree';
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
-const S1_PRESENT = referenceCheckout('s1disasm');
+const S1_ABSENT = referenceCheckoutReason(S1_PINNED);
+const S1_PRESENT = referenceCheckout(S1_PINNED);
 
 /** A synthetic 8x8 tile whose every pixel is `v` (0 = fully transparent). */
 function solidTile(v: number): Tile {

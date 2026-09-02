@@ -17,12 +17,12 @@ import type { FileAccess } from '../../project/adapter';
 import type { LevelDoc } from '../model';
 import type { SpriteFrame } from '../../model/sprite-types';
 import type { Tile } from '../../model/s4-types';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath, S1_PINNED } from '../../../../test/support/fixture-tree';
 import { whenS1Act } from '../../../../test/support/s1-checkout';
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
+const S1_ABSENT = referenceCheckoutReason(S1_PINNED);
 
 function realFs(root: string): FileAccess {
   return {
@@ -254,7 +254,7 @@ describe('object-sprite pure helpers', () => {
     });
   });
 
-  describe('golden render against real s1disasm', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
+  describe('golden render against real s1disasm', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
     function render(id: number, zone: string) {
       const link = resolveObjectArt(id, zone);
       if (!link) throw new Error(`no link for $${id.toString(16)}`);

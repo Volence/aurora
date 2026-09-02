@@ -22,10 +22,10 @@ import type { DiscoveredSpriteSet } from '../../../../core/import/sprite-discove
 import { useSpriteStore } from '../../../state/spriteStore';
 import { useToastStore } from '../../../state/toastStore';
 import { parseTiles } from '../../../../core/formats/tiles';
-import { referencePath } from '../../../../../test/support/fixture-tree';
+import { referencePath, S1_PINNED } from '../../../../../test/support/fixture-tree';
 import { whenS1Files } from '../../../../../test/support/s1-checkout';
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 
 /**
  * The three raw grids this file opens. Named here so the guard can name them:

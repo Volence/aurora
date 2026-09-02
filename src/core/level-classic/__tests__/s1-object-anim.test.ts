@@ -27,12 +27,12 @@ import {
 import { S1_OBJECT_ANIMS, resolveObjectAnims } from '../../project/profiles/s1-object-anims';
 import { parseS1DisasmAnimScript } from '../../import/anim-import';
 import { syncedTimelineAnims } from '../../../renderer/components/sprite/export-sprite';
-import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
+import { referenceCheckout, referenceCheckoutReason, referencePath, S1_PINNED } from '../../../../test/support/fixture-tree';
 
-const S1DIR = referencePath('s1disasm');
+const S1DIR = referencePath(S1_PINNED);
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const S1_ABSENT = referenceCheckoutReason('s1disasm');
-const S1_PRESENT = referenceCheckout('s1disasm');
+const S1_ABSENT = referenceCheckoutReason(S1_PINNED);
+const S1_PRESENT = referenceCheckout(S1_PINNED);
 if (!S1_PRESENT) {
   // eslint-disable-next-line no-console
   console.warn('s1-object-anim.test: s1disasm not found — the real-script derivation rows are SKIPPED');
