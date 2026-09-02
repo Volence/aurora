@@ -133,50 +133,14 @@ in the same breath as the outcome, not appended below it. And when a claimed own
 leaves no artifact, mark it unverifiable rather than laundering it into fact by repetition;
 the cheap fix is to ask, because the owner is usually one sentence away.
 
-### ⚠ THE HUB IS NOT `empyrean-ba` — address `[66e6e3]`; and the ruling behind that is CITED, NOT WITNESSED
+### Addressing the hub
 
-*(2026-08-29, found by this lane. Two claims here, deliberately separated, because one is verified
-and the other is not and they have different consequences.)*
-
-**VERIFIED, and it is the one that governs your sends.** `empyrean-ba` — the session `ListAgents`
-names for the empyrean repo — **swallows lane traffic**. Three reports from this lane (the O25
-landing, the silent-PASSED finding, the relative-hop lesson) were each accepted by `SendMessage`
-and then **held pending its user's approval, undelivered**. Nothing announced this; the sends all
-returned success. Meanwhile the actual hub work IS being done and pushed: `6e296ed` (02:07Z)
-through `faf9658` (12:09Z), **67 commits**, all `overseer:`-prefixed, all ancestors of empyrean
-`origin/main`, timestamps converting exactly from EDT. **So send hub traffic to the session whose
-display name is `Aether setup in Aurora [66e6e3]`** — a stale pre-`/clear` session title, not a
-description. Its lane name is empyrean.
-
-**THE RULING — was cited-only for about an hour, IS NOW TRANSCRIBED. Read this whole
-paragraph; the first half is stale on purpose.** When this entry was first written, the quoted
-words *"1. I think so"* appeared **nowhere** in empyrean `origin/main:docs/OVERSEER.md`, and the
-entry recording the episode asserted the stand-down rather than transcribing him. Raised with the
-hub; **they had the words and had never written them down, and they landed a late transcription
-the same hour** (empyrean `origin/main`, entry dated 12:12:45Z, verified here).
-
-**What he actually said, verbatim, and it is worth reading rather than summarising:** asked
-*"The duplicate hub. `empyrean-ba` (the 7h-old dock) is still up and busy; this one is a fresh fork
-Dominion started a minute ago. Which one do you want, or should I message it to stand down?"*, he
-answered *"1. I think so, I haven't beeen working on something for 7 hours. 2. I don't know what
-these are, can you tell me and what the 'ruling' was?"*
-
-**So it is a real answer with his own reason attached, and it is HEDGED.** Note what part 2 shows:
-he answered the duplicate-hub question — which he plainly understood, a session he had not touched
-in seven hours — while saying outright that he did not know what the *other* items were. **Whether
-"I think so" is a ruling or an inclination is his to confirm on waking**, and the exact time was
-never captured (between 01:34Z and 02:07Z).
-
-**The durable lesson, which outlives whichever way he settles it:** the gap was real, and the split
-was right. In a file where every other owner directive is quoted verbatim, the one establishing who
-directs six lanes was paraphrased — and nothing about it looked wrong. Sibling of the hub's Q-39:
-**an assertion and a transcription are indistinguishable once both are prose.** The remedy that
-worked was not doubting anyone; it was asking for the quote.
-
-**And the reason to keep the two halves apart even now: the addressing decision never depended on
-the ruling.** Which session does the work and which can receive are both measurable, and both were
-measured. The ruling would only matter to someone acting **against** `empyrean-ba`'s standing —
-his call, not a lane's.
+**Send hub traffic to the lane named `empyrean`**, not to a session display name. The 2026-08-29
+episode that established this — a dock session that accepted `SendMessage` and silently held three
+reports undelivered, and the owner's hedged *"1. I think so"* behind it — is in
+`docs/OVERSEER-LOG.md`. **The durable lesson is there too and is worth the click:** in a file where
+every other owner directive is quoted verbatim, the one establishing who directs six lanes was
+paraphrased, and nothing about it looked wrong. Ask for the quote.
 
 ### Push authorization — **CONFIRMED BY THE OWNER DIRECTLY 2026-08-24. The relay question is CLOSED; do not re-ask.**
 
@@ -195,31 +159,9 @@ and it is the worked example this section teaches from.
 
 #### Original entry — RELAYED 2026-08-23, superseded above
 
-**The grant, as received:** standing approval to push **this repo's own master** without
-asking each time. Conditions ride with it and are part of it, not gloss: **verify `origin`
-actually moved** (the push is not the act, the remote moving is); **never rewrite
-already-pushed history**; **never push another lane's repo**; **publication to the public
-wiki site stays a separate explicit ask.**
-
-**Scope, stated because this is the class of grant that gets restated wider:** it authorizes
-**pushing, not the work being pushed.** It does not release the boot stop and it is not
-approval to dispatch, to land a parcel, or to start a queue item. A lane still holding for
-his word on WHAT to do is still holding.
-
-**⚠ EPISTEMIC STATUS, per this section's own rule — read this before citing the grant.**
-The ruling reached Aurora **relayed by the empyrean lane**, banked at empyrean `2bd72a03`
-(verified firsthand here: reachable from their `origin/main`, `docs/OVERSEER.md` +23, and its
-text **names the granting act** — he was asked directly as a consolidated suite-wide question
-and chose this option over "standing for docs, ask for code" and "per-push"). That is
-genuinely better than the usual relay, and it is still **an artifact of the RELAY, not of the
-granting act.** This session did not witness him rule it. **So: verified as far as it goes,
-and marked as relayed rather than laundered into "the owner told Aurora".** The cheap fix is
-this section's own — ask, because he is usually one sentence away — and it was taken: the
-confirmation was put to him in the same turn this was written. **If a later session finds his
-answer recorded nowhere, treat the grant as relayed-only and ask again rather than citing
-this row as the approval.**
-
-
+Moved to `docs/OVERSEER-LOG.md`. It is the record of what was believed before he answered, and the
+worked example of banking a relay with its limit rather than laundering it into "the owner told
+Aurora". The grant above is what governs.
 ## What the overseer implements
 
 Aurora is a TypeScript/Electron app: features, tests and harnesses all go to agents in
@@ -752,15 +694,8 @@ window) rather than adopting their reading — the standing practice in this fil
   a chain of individually sound links holds nothing* — **and a seam has no author**, which is why it
   took a reader who wrote none of the three. That is the mechanism behind this file's bar 18b, stated
   better than bar 18b states it.
-  **Superseded holding position:** treat (2) as barred-by-construction with an unasserted join. Their anti-vacuity guards are present and correct, which is why this needed reading ACROSS
-  the tests to find.
-- **Superseded reading, kept as the record of what was believed before the source was read — condition
-  (2): STRONGLY CORROBORATED, NOT PROVEN FROM OUTSIDE.** `source:"vcs"`
-  and `dirty:false` are build-time captures, and the id's SHA is a **real commit, reachable from
-  oracle `origin/main`** (checked here). That is good evidence it is VCS-derived rather than
-  config-supplied. It is **not proof**: nothing observable on the wire can rule out a config
-  override, which would need their build source read. Do not upgrade this to "proven" without
-  doing that.
+  **Superseded holding position and superseded reading moved to `docs/OVERSEER-LOG.md`** — what was
+  believed about condition (2) before oracle's source was read. Both conditions are MET above.
 - ⚠ **`serverBuild.id` IS A TREE IDENTITY, NOT A CODE IDENTITY — and this bites in the obvious
   direction.** Found here while class-checking the SHA per bar 9: the id measured on the shipped
   binary resolves to a **docs-only commit** (`docs/lane-status.json`, 10 insertions / 18 deletions),
@@ -958,15 +893,9 @@ window) rather than adopting their reading — the standing practice in this fil
   `"no such method: emulator/write_vram"`, with the frame/mclk envelope attached — a gap refuses
   by name and feeds the queue rather than degrading to a plausible answer.
 
-  *Superseded reasoning, kept because it is the worked example of banking a relay with its limit
-  rather than laundering it:* **UPDATE 2026-08-24, RELAYED BY THE ORACLE LANE AND RECORDED WITH
-  THEIR STATED LIMIT — not re-measured here.** They report this specific staleness closed: `target/release/oracle-aether`
-  is dated 2026-08-22 21:52, zero non-docs files changed between their `12cc17e` and their HEAD,
-  and `12cc17e` banks a handshake that read **41 methods over the wire**, committed 21:54, two
-  minutes after that binary was built. **Their own limit, carried rather than dropped: that is
-  mtime plus a docs-only diff plus a previously-banked wire check, and they did NOT re-handshake
-  it.** So the artifact is argued to be the verified one, not observed to be. The bar itself is
-  untouched, and the freshness tell is still the banner read by executing.
+  *Superseded reasoning moved to `docs/OVERSEER-LOG.md`: the 2026-08-24 relay from the oracle lane,
+  recorded with their stated limit. The bar is untouched, and the freshness tell is still the banner
+  read by executing.*
 - **When `write_vram` is eventually built, require `bypassesVdpPort: true` in the reply**
   *(oracle's condition, recorded here because Aurora is the consumer)*. The debug read/write
   path skips the VDP port path, FIFO and DMA entirely. **The flag is what protects an agent;
@@ -1187,52 +1116,9 @@ has as many consumers as it has vendored copies. This is the enumerate-across-in
 lesson (bar 2e's sigil corollary) firing across repos instead of across lanes — the hub could
 not see this from inside empyrean, and I could not have seen their half from inside aurora.
 
-## Decision closures made before rule 8d — CLOSED OUT OF SHAPE, DO NOT REPAIR
+## Decision closures made before rule 8d
 
-*(Added 2026-08-30T01:59Z. Contract: `empyrean origin/main df8939b`, `contract/DECISIONS.md`
-rule 8d, read at that revision — verified reachable from here before this list was written,
-not taken from the relay that announced it. Dominion's reader parses the field at dominion
-`7a8a9b3`. **In force from 2026-08-30T01:58:05Z**; every id below was appended before that
-instant, so none of them is a violation of anything.)*
-
-Rule 8d asks each lane to list its pre-rule closures **once**, and says in its own words:
-*"Ledgers are NOT rewritten to fit this … History that shows the drift is worth more than
-history edited to look compliant. Nothing in 8d is an instruction to touch an existing
-line."* So this is a **register, not a backlog**. Do not add `answered` to any of them.
-
-**The twelve closures in `docs/decisions.jsonl` that predate the field** — each closes a
-question the 8c way (an appended entry with `supersedes` set) and records its resolution in
-prose rather than in `answered`:
-
-`d-4` · `d-5` · `d-7` · `d-8` · `d-10` · `d-12` · `d-14` · `d-15-answered` ·
-`d-16-hub-ruled` · `d-18c-chunk-identity-ANSWERED` · `d-19-stale-mcp-discovery-CLOSED` ·
-`d-20-live-objects-scope-ANSWERED`
-
-By 8d's `by` vocabulary, had it existed: nine `owner` (`d-4`, `d-5`, `d-7`, `d-8`, `d-10`,
-`d-12`, `d-14`, `d-18c`, `d-20`), two `hub` under a standing delegation and explicitly
-marked as not witnessed here (`d-15-answered`, `d-16-hub-ruled`), one `lane` executing an
-owner-authorized cleanup (`d-19`).
-
-⚠ **Two entries look like closures in a listing and are NOT — do not count them, and do not
-"fix" them either.** Both carry `supersedes` and answer-flavoured wording, which is exactly
-what a name-based scan picks up (this file's own *name, presence and behaviour are three
-different claims*):
-
-- **`d-6`** reads as an answer and is a **re-ask**: it records a ruling that arrived
-  *relayed* and asks him to confirm in one word. `d-7` is the closure, and its whole point
-  is that it was witnessed firsthand rather than relayed.
-- **`d-18b-chunk-identity-which-default`** settles the *shape* he answered with, then asks a
-  genuinely new question (which of the two behaviours is the default). `d-18c` is the
-  closure.
-
-**Classified by reading each entry's `question` and `detail`, not by its id.** Five of the
-twelve have an id ending in `answered`/`ANSWERED`/`CLOSED`/`hub-ruled` and seven do not
-(`d-4`, `d-5`, `d-7`, `d-8`, `d-10`, `d-12`, `d-14`), so an id-suffix scan would have found
-five of twelve and missed the majority — while `d-6` and `d-18b` would have to be excluded
-on their text no matter which scan found them.
-
-**From here on, closures carry `answered`** (`at` from `date -u`, `by`, `chose` validated
-against the entry's own options or `null` for a freehand answer, `said` quoted verbatim and
-never linted, `did` one sentence of lane prose and linted). The field supplies the
-**content** of a resolution and never the **fact** of one: the card leaves the owner's board
-when this lane drops the blocker, not when the field is written.
+The twelve pre-rule closures in `docs/decisions.jsonl`, their `by` classification, and the two
+entries that look like closures and are not (`d-6`, `d-18b`) are registered in
+`docs/OVERSEER-LOG.md`. **It is a register, not a backlog: do not add `answered` to any of them, and
+do not "fix" them.** From here on, closures carry `answered`.
