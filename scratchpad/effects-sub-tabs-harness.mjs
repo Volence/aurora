@@ -448,7 +448,16 @@ async function main() {
       report);
     // THE WALKTHROUGH'S §c1, ON SCREEN. The two features called "band" were
     // adjacent sections in one list; they can no longer be looked at together.
-    check('3c', '⚠ THE TWO "BAND" FEATURES ARE NEVER ON SCREEN TOGETHER (walkthrough §c1)',
+    //
+    // ⚠ THIS ROW IS NOT DISCRIMINATING ON ITS OWN, and poison 1 proved it: with
+    // every tab rendering the Parallax panel, NEITHER band feature is on screen
+    // and this row goes GREEN on a build where the tabs are decoration. A pair
+    // that never appears never fails to appear together. It is only meaningful
+    // given [3a], which requires each tab to paint its own sections first, and
+    // it is kept because that conjunction is the claim — not because it can
+    // carry it alone.
+    check('3c', '⚠ THE TWO "BAND" FEATURES ARE NEVER ON SCREEN TOGETHER (walkthrough §c1) — '
+      + 'meaningful only with [3a]; see the comment above',
       TABS.every((t) => !(shows(seen[t.id].heads, 'TILE ANIMATIONS (')
         && shows(seen[t.id].heads, 'RASTER BAND PRESETS'))),
       report);

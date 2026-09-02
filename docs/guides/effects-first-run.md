@@ -16,30 +16,40 @@ Three separate things, which look similar and are not:
 
 | you want | you build | where |
 |---|---|---|
-| the background to slide past at a different speed from the ground | a **scene** with **layers** | `SCENES` → `LAYERS`, top of the right panel |
-| a horizontal stripe of the screen to change colour (water, heat haze, a tinted sky) | a **raster band**, inside a **preset** | `RASTER BAND PRESETS`, bottom of the panel |
-| the same colours to rotate, so water shimmers | a **palette cycle**, inside the same preset | `PRESET — <id> — CYCLES, VARIANTS` |
+| the background to slide past at a different speed from the ground | a **scene** with **layers** | the **Parallax** sub-tab |
+| a horizontal stripe of the screen to change colour (water, heat haze, a tinted sky) | a **raster band**, inside a **preset** | the **Colour** sub-tab |
+| the same colours to rotate, so water shimmers | a **palette cycle**, inside the same preset | the **Colour** sub-tab |
+| background *tiles* to animate in place | a **tile animation** | the **Tile anim** sub-tab |
 
-There is a fourth thing on this tab, `TILE ANIMATIONS`, which is **not** any of
-these — it animates background *tiles*, not colours. See §7.
+The fourth one is **not** a colour effect and shares no mechanism with the second,
+which is why they are on different sub-tabs. See §7.
 
-The right panel is one long column, roughly eight screens tall, in this fixed order:
+**The right panel is three sub-tabs under one permanent strip.** The strip says
+which section you are editing and what it is bound to, and never moves; the three
+buttons under it choose which job you are doing. One job is on screen at a time,
+and the other two are not rendered at all.
 
 ```
-SCENES                       ← pick / create a scene
-SCENE — <id>                 ← settings for the whole scene
-LAYERS (n/16 per scene)      ← the parallax strips        ⟵ §2
-SECTION ASSIGNMENT           ← which scene this section uses  ⟵ §5
-RASTER TIMELINE              ← a picture of bands + layers
-TILE ANIMATIONS (n/4)        ← animated background TILES. §7
-NEW TILE ANIMATION           ← the form that makes one. §7
-RASTER BAND PRESETS          ← raster bands live here     ⟵ §3
-PRESET — <id>                ← the raster bands in one preset
-PRESET — <id> — CYCLES…      ← palette cycling            ⟵ §4
-PROPERTIES
+Editing   [ Section 0            ▾ ]   ← the strip: always there, never scrolls
+scene ojz_act1_start · raster hand-authored
+✓ own preset / ✗ threaded              ← can this section carry a raster band? §5
+[ Parallax ][  Colour  ][ Tile anim ]  ← the three jobs
+
+  Parallax                Colour                    Tile anim
+  ────────                ──────                    ─────────
+  SCENES            §2    RASTER TIMELINE           TILE ANIMATIONS (n/4)  §7
+  LAYERS (n/16)     §2    RASTER BAND PRESETS  §3   NEW TILE ANIMATION     §7
+  SCENE — <id>            PRESET — <id>        §3
+  SECTION ASSIGNMENT §5   PRESET — … CYCLES…   §4
 ```
 
-Scroll to the bottom once, now, so the shape stops surprising you.
+`PROPERTIES` sits below all three — it is a readout of whatever is selected, not
+one of the jobs.
+
+**`SCENE — <id>` arrives shut.** That is deliberate and it is one click: the layer
+list above it is the thing you scroll, and an open scene form takes two thirds of
+the column away from it. Open it when you need `V factor`, `Bob`, `Deform` or
+`V offset`; it stays open after that.
 
 ---
 
@@ -49,9 +59,10 @@ A **scene** is a stack of horizontal **layers**. Each layer starts at a screen l
 and says how fast the foreground and background scroll from that line down. A layer
 whose background factor is *lower* than the camera drifts — that is parallax.
 
-1. In `SCENES`, click a scene, or type an id in `Scene id` and press `New`.
-2. In `LAYERS`, press `Add`. A layer appears at the next screen line.
-3. On the new layer set **`Plane B (bg)`** to a fraction — `FACTOR_1_8` is a good
+1. Press **`Parallax`**, the first of the three sub-tab buttons.
+2. In `SCENES`, click a scene, or type an id in `Scene id` and press `New`.
+3. In `LAYERS`, press `Add`. A layer appears at the next screen line.
+4. On the new layer set **`Plane B (bg)`** to a fraction — `FACTOR_1_8` is a good
    first try.
 
 **Read the tooltip on that dropdown after you set it.** It rewrites itself into the
@@ -74,7 +85,7 @@ the real background per strip with each layer's factor labelled. It is off by
 default; turn it on the first time you open the tab and leave it on. This is the
 only thing in Aurora that shows what a scene's layers do.
 
-> The `LAYERS` list is a very short scrolling window inside an already-scrolling panel. If you can only see one layer, scroll **inside** the list.
+> The `LAYERS` list has its own scrollbar and gets the height the Parallax sub-tab has to spare — measured at 211px of a ~2,400px list, so about a card and a half. Scroll **inside** the list. Opening `SCENE — <id>` under it takes that height away again; shut it when you are done in there.
 
 ### Clouds that move on their own (`Drift`)
 
@@ -118,7 +129,7 @@ A raster band repaints part of the palette for a range of screen lines. It lives
 inside a **preset** — a document that can hold several bands. There is no control
 called "make a band"; you make a preset, and it comes with one.
 
-1. Scroll to `RASTER BAND PRESETS`.
+1. Press **`Colour`**, the middle sub-tab, and open `RASTER BAND PRESETS`.
 2. Type an id in `Preset id` — lower case, underscores, e.g. `ojz_water_tint`.
 3. Press `New`. You now have a preset with `Raster band 0` in it.
 4. Open `PRESET — <your id>` and fill the band in:
@@ -160,7 +171,8 @@ be worse than none. You will not see a band until the ROM runs.
 
 ## 4. Make a palette cycle (shimmer)
 
-Still inside your preset, open `PRESET — <id> — CYCLES, VARIANTS`.
+Still on the **Colour** sub-tab and still inside your preset, open
+`PRESET — <id> — CYCLES, VARIANTS`.
 
 1. Set `cycles` to **`authored script (array of channels)`**. A `Channel 0` appears.
 2. Fill it in:
@@ -194,16 +206,16 @@ If you do not need `variants`, leave it on *every slot keeps its hand-authored v
 
 ## 5. Bind it to a section
 
-Two separate bindings, at opposite ends of the panel, both acting on **the section
-named at the top of the panel**:
+Two separate bindings, now on two different sub-tabs, both acting on **the section
+named in the strip at the top**:
 
-- **the scene** → `SECTION ASSIGNMENT`, just under `LAYERS`.
+- **the scene** → `SECTION ASSIGNMENT`, at the bottom of the **Parallax** sub-tab.
 - **the raster preset** → the `Section <n>` dropdown at the bottom of
-  `RASTER BAND PRESETS`.
+  `RASTER BAND PRESETS`, on the **Colour** sub-tab.
 
-The Effects tab has a **section strip** pinned to the top of the panel. It stays
-put while the rest of the column scrolls, so it is on screen when you reach
-either binding — including the raster one, which is about 1,600px further down.
+The Effects tab has a **section strip** pinned to the top of the panel, above the
+three sub-tab buttons. It stays put while the rest of the column scrolls and while
+you change job, so it is on screen when you reach either binding.
 It names the section you are editing, prints what that section is bound to
 (`scene … · raster …`), lets you change which section without leaving the tab,
 and states the two raster-wiring conditions as two rows (below). It is the same
@@ -304,17 +316,23 @@ happens when you delete a preset a section still points at.
 
 ## 7. Tile animations are not raster bands
 
-Two features on this tab used to share the word "band". They no longer do, and the
-two names now share no word at all:
+Two features on this tab used to share the word "band". They no longer do: the two
+names share no word, **and they are on different sub-tabs**, so they can no longer
+be read as one list.
 
-| control | what it makes |
-|---|---|
-| `Add blank tile animation` (toolbar) | a **tile animation** — animated background *tiles* |
-| `NEW TILE ANIMATION` (panel) | the same thing, with all the options |
-| `TILE ANIMATIONS (n/4)` | the list of those |
-| `RASTER BAND PRESETS` | **raster bands** — the coloured stripes of §3 |
-| `PRESET — <id>` → `Raster band 0` | one raster band |
-| `bands` column of `RASTER TIMELINE` | raster bands, drawn |
+| control | sub-tab | what it makes |
+|---|---|---|
+| `Add blank tile animation` (toolbar) | any — see below | a **tile animation** — animated background *tiles* |
+| `NEW TILE ANIMATION` | Tile anim | the same thing, with all the options |
+| `TILE ANIMATIONS (n/4)` | Tile anim | the list of those |
+| `RASTER BAND PRESETS` | Colour | **raster bands** — the coloured stripes of §3 |
+| `PRESET — <id>` → `Raster band 0` | Colour | one raster band |
+| `bands` column of `RASTER TIMELINE` | Colour | raster bands, drawn |
+
+`Add blank tile animation` is on the toolbar, which is on screen whichever job you
+are doing — so pressing it from `Parallax` brings the **Tile anim** sub-tab
+forward, opens the list and scrolls to the animation it just made. The tab
+changing under you is the click working.
 
 A **tile animation** is a block of background tiles that cycles through eight
 frames, so a waterfall runs or a trunk scrolls. It costs tile slots and has a hard
@@ -322,8 +340,8 @@ ceiling of four per act. It has nothing to do with palettes or screen lines.
 
 A **raster band** repaints colours on a range of screen lines. It costs no tiles.
 
-If you are looking for a coloured stripe, you want `RASTER BAND PRESETS`, not
-anything on this list's top half.
+If you are looking for a coloured stripe, you want the **Colour** sub-tab, not the
+**Tile anim** one.
 
 ---
 
@@ -331,14 +349,16 @@ anything on this list's top half.
 
 | I want to… | go to |
 |---|---|
-| make the background move as the camera does | `LAYERS` → `Add` → set `Plane B (bg)` |
+| make the background move as the camera does | `Parallax` → `LAYERS` → `Add` → set `Plane B (bg)` |
 | see that | `Parallax preview` on the Effects toolbar |
 | make a layer move on its own (clouds) | that layer's `Drift` row → `px/frame` |
-| make a coloured stripe | `RASTER BAND PRESETS` → `Preset id` → `New` |
-| make colours shimmer | `PRESET — <id> — CYCLES, VARIANTS` → `cycles: authored script` |
+| make a coloured stripe | `Colour` → `RASTER BAND PRESETS` → `Preset id` → `New` |
+| make colours shimmer | `Colour` → `PRESET — <id> — CYCLES, VARIANTS` → `cycles: authored script` |
 | delete a preset a section binds | unbind that section first — Aurora refuses the delete and says which |
-| animate background tiles | `NEW TILE ANIMATION` |
+| animate background tiles | `Tile anim` → `NEW TILE ANIMATION` |
 | change which section I am editing | the section strip pinned to the top of the Effects panel |
+| change which job I am doing | the three buttons under the strip: `Parallax` / `Colour` / `Tile anim` |
+| find `V factor`, `Bob`, `Deform`, `V offset` | `Parallax` → open `SCENE — <id>` (it arrives shut) |
 | use a scene on a section | pick the section, then `SECTION ASSIGNMENT` |
 | save | Ctrl+S |
 | open this page | `? Guide` on the Effects toolbar |
