@@ -145,14 +145,31 @@ function canonicalisedByAurora(onDisk: string): string {
   return body.endsWith('\n') ? body : body + '\n';
 }
 
-// The same document with the raster-preset binding SET — schema §3.1's own
-// example body, adjudicated 2026-08-30 at empyrean `da91abce`. Hand-written for
-// the same reason as the one above: a serializer that dropped `rasterRef` would
-// drop it from a serializer-built fixture too, and the byte comparison would
-// pass while the key was being erased.
+// The same document with the raster-preset binding SET — schema §3.1's example
+// body VERBATIM (all four values, adjudicated 2026-08-30 at empyrean
+// `da91abce`), re-sorted into the canonical key order §3.1's own last bullet
+// mandates ("§8: sort_keys=True, indent=2, exactly one trailing \n"); the
+// example in the prose is written sceneRef-before-rasterRef. It said `bg-cave`
+// here until 2026-09-02, which made the "§3.1's own example body" citation
+// false in the same small way the sceneRef fixture's §3 citation was.
+//
+// NOT re-originated from aeon like SCENE_META_ON_DISK above, deliberately.
+// aeon's one real rasterRef body is section_5.meta.json at origin/master
+// d78f9090 — {bgLayoutRef: null, paletteRef: null, rasterRef:
+// "ojz_sec5_showcase", sceneRef: null} — and adopting it would DELETE the
+// sibling assertions below (`section.sceneRef === 'canopy_dusk'`, "did not eat
+// its sibling"), which are the whole reason a rasterRef fixture exists: nothing
+// in Aurora authors this key, so a drop is invisible everywhere else. There is
+// also nothing stale to correct — section_5 is already the four-key canonical
+// form, so unlike the sceneRef fixture this one does not claim a spelling no
+// writer produces.
+//
+// Hand-written for the same reason as the one above: a serializer that dropped
+// `rasterRef` would drop it from a serializer-built fixture too, and the byte
+// comparison would pass while the key was being erased.
 const RASTER_META_ON_DISK = [
   '{',
-  '  "bgLayoutRef": "bg-cave",',
+  '  "bgLayoutRef": "ingame-forest-v15-1786630615596",',
   '  "paletteRef": null,',
   '  "rasterRef": "canopy_tint",',
   '  "sceneRef": "canopy_dusk"',

@@ -79,6 +79,18 @@ const MALFORMED_META = WELL_FORMED_META.slice(0, -2);
 // carrying the effects-arc scene assignment. Hand-written rather than built by
 // serializeSectionMeta: a serializer that dropped sceneRef would drop it from
 // the fixture too, and the test would pass while proving nothing.
+//
+// SYNTHETIC ON PURPOSE, unlike its same-named twin in aeon-save.test.ts, which
+// is the verbatim bytes of aeon's section_0.meta.json at origin/master
+// d78f9090. THREE DISTINCT non-null refs is coverage no real aeon body can
+// give — every committed sidecar has at most one non-null sibling — and a load
+// that transposed two refs is exactly what only distinct values catch. The
+// SHAPE is aeon's, though, and stays so: three keys, no `rasterRef`, no
+// trailing newline, matching section_0 byte-shape for byte-shape. Aeon's writer
+// does not emit `rasterRef` (two of the three sidecars that have ever existed
+// lack it; none carries an explicit null — docs/reviews/
+// 2026-09-02-rasterref-absent-save.md §1), so do not "canonicalise" this
+// fixture by adding the key: that widening is what the save twin had to undo.
 const SCENE_META_ON_DISK = [
   '{',
   '  "bgLayoutRef": "bg-cave",',
@@ -87,11 +99,15 @@ const SCENE_META_ON_DISK = [
   '}',
 ].join('\n');
 
-// The raster-preset binding (schema §3.1 at empyrean `da91abce`), as aeon's
-// generator will leave it. Hand-written for the same reason.
+// The raster-preset binding: schema §3.1's example body VERBATIM (empyrean
+// `da91abce`), re-sorted into the canonical key order §3.1's own last bullet
+// mandates. Hand-written for the same reason. NOT aeon's section_5 body, which
+// is the only real one — its `sceneRef` and `bgLayoutRef` are null, so adopting
+// it would delete the sibling assertions this row exists for (see the same note
+// in aeon-save.test.ts).
 const RASTER_META_ON_DISK = [
   '{',
-  '  "bgLayoutRef": "bg-cave",',
+  '  "bgLayoutRef": "ingame-forest-v15-1786630615596",',
   '  "paletteRef": null,',
   '  "rasterRef": "canopy_tint",',
   '  "sceneRef": "canopy_dusk"',
@@ -257,7 +273,7 @@ describe('loadAeonProject', () => {
     const section = r.project.zones[0].acts[0].sections[0]!;
     expect(section.rasterRef).toBe('canopy_tint');
     expect(section.sceneRef).toBe('canopy_dusk');  // siblings unaffected
-    expect(section.bgLayoutRef).toBe('bg-cave');
+    expect(section.bgLayoutRef).toBe('ingame-forest-v15-1786630615596');
     expect(section.paletteRef).toBeNull();
     expect(section.unreadable).toBeUndefined();
     expect(r.notices).toEqual([]);
