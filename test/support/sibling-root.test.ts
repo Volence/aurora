@@ -23,7 +23,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, cpSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, cpSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 
@@ -259,31 +259,134 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
   // `describeRequiringFixture` header records three files and 29 tests lost
   // that way), so a subject that is broken enough to throw must still be able
   // to report one red row per property.
-  const derive = () => run('process.stdout.write(R.siblingRoot() + "\\n" + R.siblingRootSource());').stdout.split('\n');
+  const derive = (subject = SUBJECT) => run(
+    'process.stdout.write(R.siblingRoot() + "\\n" + R.siblingRootSource());', {}, subject,
+  ).stdout.split('\n');
 
   it('names step 3 and the command it used', () => {
     const [, source] = derive();
     expect(source).toMatch(/^step 3: git rev-parse --git-common-dir/);
   });
 
+  /**
+   * A LINKED WORKTREE, BUILT BY THE ROW THAT NEEDS IT — because the property is
+   * invisible anywhere else.
+   *
+   * `--git-common-dir` answers the MAIN checkout's `.git` from inside a linked
+   * worktree, where `--show-toplevel` answers the worktree's own directory. In
+   * the main checkout the two COINCIDE, so a row asserting the difference there
+   * proves nothing, and a row that skips there is honest but never runs where
+   * `npm test` normally runs: the one property step 3 exists for was measured
+   * essentially nowhere. Empyrean `contract/SUITE_PATHS.md` (2026-09-02, from
+   * this finding) now requires the shape of every resolver in the suite: *"The
+   * step-3 proof runs from a linked worktree, or says in the run's own output
+   * that it did not."*
+   *
+   * `--no-checkout` because the row needs git's PLUMBING (the `.git` file
+   * pointing at the common dir), not aurora's twelve thousand files; the one
+   * file it does need is COPIED IN from the working tree rather than checked out
+   * of HEAD, so the row measures the subject as it is edited RIGHT NOW. A
+   * checked-out HEAD copy would have gone green against the committed subject
+   * while the working tree's was broken — which is precisely how this row was
+   * planted red.
+   *
+   * The scratch directory is the OS temp dir, never `.claude/worktrees/`, which
+   * something else manages.
+   */
+  interface LinkedWorktree { scratch: string; dir: string; subject: string }
+
+  function addLinkedWorktree(repo: string): LinkedWorktree {
+    const scratch = mkdtempSync(resolve(tmpdir(), 'aurora-step3-worktree-'));
+    const dir = resolve(scratch, 'wt');
+    try {
+      execFileSync('git', ['worktree', 'add', '--no-checkout', '--detach', dir, 'HEAD'], {
+        cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (e) {
+      rmSync(scratch, { recursive: true, force: true });
+      throw e;
+    }
+    mkdirSync(resolve(dir, 'test/support'), { recursive: true });
+    const subject = resolve(dir, 'test/support/sibling-root.mjs');
+    cpSync(SUBJECT, subject);
+    return { scratch, dir, subject };
+  }
+
+  /** In a `finally`, always: a failing assertion must not leak a worktree. */
+  function removeLinkedWorktree(repo: string, wt: LinkedWorktree): void {
+    try {
+      execFileSync('git', ['worktree', 'remove', '--force', wt.dir], { cwd: repo, stdio: 'ignore' });
+    } catch {
+      // Fall through to prune: the registration, not the directory, is the leak.
+    }
+    rmSync(wt.scratch, { recursive: true, force: true });
+    try {
+      execFileSync('git', ['worktree', 'prune'], { cwd: repo, stdio: 'ignore' });
+    } catch {
+      // Nothing to prune, or no git — the directory is gone either way.
+    }
+  }
+
   it('answers the MAIN checkout\'s parent, which is what --show-toplevel would get wrong', (ctx) => {
-    const [derived] = derive();
-    const here = resolve(__dirname, '../..');
-    const toplevel = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: here, encoding: 'utf8' }).trim();
-    const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
-      cwd: here, encoding: 'utf8',
-    }).trim();
-    const viaCommon = dirname(dirname(common));
-    if (dirname(toplevel) === viaCommon) {
+    // Parameterised so the skip path below is REACHABLE on demand: point this at
+    // a directory that is not a git checkout and `git worktree add` fails
+    // exactly as it would on a machine without git or on an exported tarball.
+    const repo = process.env.AURORA_STEP3_REPO_FOR_TEST ?? resolve(__dirname, '../..');
+
+    let wt: LinkedWorktree;
+    try {
+      wt = addLinkedWorktree(repo);
+    } catch (e) {
       ctx.skip(
-        'SKIPPED, NOT PASSED: this run is in the MAIN checkout, where --show-toplevel and '
-        + '--git-common-dir agree, so the row cannot tell them apart and measures nothing. '
-        + 'Run it from a linked worktree (.claude/worktrees/<name>) to measure it.',
+        'SKIPPED, NOT PASSED: could not build a linked worktree to measure from, so the '
+        + 'property step 3 exists for — --git-common-dir answering where --show-toplevel '
+        + `answers wrongly — was NOT measured by this run. \`git worktree add\` in ${repo} `
+        + `failed: ${(e as Error).message}`,
       );
       return;
     }
-    expect(derived).toBe(viaCommon);
-    expect(derived).not.toBe(dirname(toplevel));
+
+    try {
+      const toplevel = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+        cwd: wt.dir, encoding: 'utf8',
+      }).trim();
+      const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
+        cwd: wt.dir, encoding: 'utf8',
+      }).trim();
+      const viaCommon = dirname(dirname(common));
+
+      // ANTI-VACUOUS, and the whole reason this row is worth its cost. If the
+      // worktree were not actually LINKED, the two commands would agree, the
+      // "wrong" branch would never be exercised, and the row would go green
+      // having re-measured the main-checkout case. So prove they disagree HERE,
+      // in the environment this row built, before believing anything it says.
+      expect(
+        dirname(toplevel),
+        `the temporary worktree at ${wt.dir} is not behaving as a LINKED worktree: `
+        + `dirname(--show-toplevel) = ${dirname(toplevel)} and dirname(dirname(--git-common-dir)) `
+        + `= ${viaCommon} AGREE, so this row would measure the main-checkout case and prove `
+        + 'nothing about step 3',
+      ).not.toBe(viaCommon);
+
+      const [derived, source] = derive(wt.subject);
+      // The contract's "say which step answered", in the run's own output.
+      // eslint-disable-next-line no-console
+      console.log(
+        `step 3 measured from a LINKED worktree ${wt.dir}\n`
+        + `  --show-toplevel   → ${toplevel}  (dirname → ${dirname(toplevel)}, the WRONG answer)\n`
+        + `  --git-common-dir  → ${common}  (dirname² → ${viaCommon}, the right one)\n`
+        + `  subject answered  → ${derived}\n  ${source}`,
+      );
+
+      expect(
+        derived,
+        `the resolver, run from the linked worktree ${wt.dir}, should answer the MAIN checkout's `
+        + `parent ${viaCommon} (via --git-common-dir), not ${dirname(toplevel)} (via --show-toplevel)`,
+      ).toBe(viaCommon);
+      expect(derived).not.toBe(dirname(toplevel));
+    } finally {
+      removeLinkedWorktree(repo, wt);
+    }
   });
 });
 
