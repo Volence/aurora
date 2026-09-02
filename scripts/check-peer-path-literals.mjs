@@ -149,9 +149,7 @@ import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 
 import {
-  AURORA_DIR, AURORA_DIR_ENV, AURORA_DIR_ENV_ALIASES,
-  checkoutEnv, checkoutEnvAliases, siblingRoot, siblingRootSource,
-  SUITE_PEERS, SUITE_ROOT_ENV, SUITE_ROOT_ENV_ALIASES,
+  AURORA_DIR, checkoutEnv, OWNED_ENV, siblingRoot, siblingRootSource, SUITE_PEERS,
 } from '../test/support/sibling-root.mjs';
 
 const PREFIX = 'check-peer-path-literals';
@@ -274,9 +272,10 @@ function stripCComments(src) {
 //     later on a missing file, reading like a broken harness.
 //
 // EVERY NAME AND PATH BELOW IS DERIVED. Rule 2's prefix comes from `os.tmpdir()`;
-// rule 3's variable list comes from the resolver's own exported constants over
-// its own peer roster, so a variable added or renamed there is policed here
-// without anyone remembering to edit this file. Rule 1's root comes from the
+// rule 3's variable list is the resolver's own `OWNED_ENV` export, imported
+// whole, so a variable added OR renamed there is policed here without anyone
+// remembering to edit this file — which was not true while this file assembled
+// that list itself (see `OWNED_ENV` below). Rule 1's root comes from the
 // resolver as it always did.
 // ---------------------------------------------------------------------------
 
@@ -287,15 +286,21 @@ function reEscape(s) {
 
 /**
  * Every environment variable the resolver owns — canonical names and the
- * transitional aliases it accepts — read out of the resolver rather than
- * repeated here. Reading any of these from the environment directly is what
- * rule 3 forbids.
+ * transitional aliases it accepts — IMPORTED WHOLE rather than reassembled here.
+ *
+ * ⚠ THIS USED TO BE A LOCAL `[SUITE_ROOT_ENV, …AURORA_DIR_ENV_ALIASES, …]`
+ * ASSEMBLY, and the paragraph below claimed of it that "a variable added or
+ * renamed there is policed here without anyone remembering to edit this file".
+ * That was true only for a PEER: a variable added to the resolver under a new
+ * constant — `AURORA_BUILT_TREE`, O70 — appeared in the resolver's exports and
+ * in nothing this file read, so rule 3 would have gone on printing a confident
+ * OK while not policing it at all. The list now lives once, beside the
+ * variables, and this file takes it.
  */
-const OWNED_ENV = [
-  SUITE_ROOT_ENV, ...SUITE_ROOT_ENV_ALIASES,
-  AURORA_DIR_ENV, ...AURORA_DIR_ENV_ALIASES,
-  ...SUITE_PEERS.flatMap((n) => [checkoutEnv(n), ...checkoutEnvAliases(n)]),
-];
+if (!Array.isArray(OWNED_ENV) || OWNED_ENV.length === 0) {
+  die('the resolver exported no OWNED_ENV list, so rule 3 would police nothing while '
+    + 'reporting a clean tree.');
+}
 
 /**
  * The shapes an environment READ takes in the dialects scanned.

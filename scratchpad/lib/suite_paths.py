@@ -10,9 +10,19 @@ ruled 2026-09-02):
      (never `--show-toplevel`, which answers with the worktree);
   4. refuse, naming what was looked for and where.
 
-THIS repo's own checkout is `AURORA_DIR` by the same rule, and is resolved by
-`AURORA_DIR` / `aurora_dir_source()` below (step 1 then step 3 — see the note on
-`_aurora_dir` for why step 2 is skipped for the repo asking the question).
+THOSE FOUR STEPS ARE FOR NAMING ANOTHER TOOL'S CHECKOUT. THIS repo's own
+checkout is not on that ladder: it is OBSERVED from this module's file location,
+its step-source is `own`, and `AURORA_DIR` — if set — is a consistency check that
+raises on disagreement rather than an override (the hub's 2026-09-02 ruling, "A
+resolver's OWN checkout is observed, not resolved", @ fba68d5). See
+`_check_own_checkout_claim` below.
+
+`AURORA_BUILT_TREE`, the OTHER question — which BUILT tree a run executes
+against, a directory of artifacts rather than a checkout — is deliberately not
+here: no Python instrument in this tree runs an app, so it lives only in the
+JavaScript resolver (`test/support/sibling-root.mjs`). The first Python
+instrument that needs it adds it there-and-here; it must not be spelled
+`AURORA_DIR`.
 
 `AURORA_<NAME>_REPO`, `AURORA_PEER_ROOT`, `LIVE_AEON`, `AURORA_ROOT` and
 `AURORA_REPO` are accepted as transitional aliases and announced once on stderr,
@@ -136,38 +146,55 @@ def _require_dir(name: str, value: str, step: int, what: str) -> pathlib.Path:
     return p.resolve()
 
 
-def _aurora_dir() -> tuple[pathlib.Path, str]:
-    """THIS repo's checkout: step 1 (`AURORA_DIR`), then step 3 (own location).
+def _check_own_checkout_claim() -> tuple[str, str] | None:
+    """`AURORA_DIR`, IF SET, IS A CONSISTENCY CHECK — never an override.
 
-    Step 2 is deliberately skipped, the one place in this resolver where a step
-    is. For a PEER, `EMPYREAN_SUITE_ROOT/<name>` is a reasonable guess; for THIS
-    repo this file's own location is a direct observation, not a derivation. If
-    the suite root moved aurora too, `EMPYREAN_SUITE_ROOT=$(mktemp -d)` — the
-    documented recipe for "a machine with no REFERENCE trees" — would also stop
-    every instrument finding its own sources, and a linked worktree would
-    resolve to the MAIN checkout, which is the `--show-toplevel` bug from the
-    other side. Step 4 is unreachable: this module is in the tree it names.
+    The four steps at the top of this file are for naming ANOTHER tool's
+    checkout, which is what the contract's title says. For THIS repo the module's
+    file location is a direct observation and steps 1 and 2 are guesses about a
+    fact already in hand (empyrean `contract/SUITE_PATHS.md` @ fba68d5, "A
+    resolver's OWN checkout is observed, not resolved", ruled from aurora's own
+    O69 question). So set-and-agreeing is fine and set-but-wrong raises, for the
+    same reason a wrong `AEON_DIR` raises: it is evidence of a wrong environment,
+    and the alternative is relocating the repo under test in silence.
+
+    Symlinks are followed for the COMPARISON only — `/tmp` and
+    `.claude/worktrees/` are reached through them on some machines, and an
+    operator who exports the realpath has agreed.
     """
     pick = _pick(AURORA_DIR_ENV, AURORA_DIR_ENV_ALIASES)
     if pick is None:
-        return _AURORA_DIR_DERIVED, (
-            f"step 3: this module's own location ({pathlib.Path(__file__).resolve()}) "
-            f"-> {_AURORA_DIR_DERIVED}")
+        return None
     name, value = pick
-    p = _require_dir(name, value, 1, "it is meant to be the aurora checkout")
     if name != AURORA_DIR_ENV:
         _announce(name, AURORA_DIR_ENV)
-        return p, f"step 1: {name}={value} (transitional alias; the name is {AURORA_DIR_ENV})"
-    return p, f"step 1: {name}={value}"
+    claimed = pathlib.Path(value).expanduser()
+    if claimed != _AURORA_DIR_DERIVED and claimed.resolve() != _AURORA_DIR_DERIVED.resolve():
+        raise SuitePathError(
+            f"{name}={value} does not agree with where this module actually is. "
+            f"{AURORA_DIR_ENV} is a CONSISTENCY CHECK on aurora's own checkout, NOT an override: "
+            f"the own checkout is observed from {pathlib.Path(__file__).resolve()}, which makes it "
+            f"{_AURORA_DIR_DERIVED}. Setting it to something else cannot move this repo; it can "
+            "only relocate the repo under test silently, so it is refused. That row in the "
+            "contract's variable table exists so OTHER tools can name aurora. "
+            "(empyrean contract/SUITE_PATHS.md @ fba68d5)")
+    return name, value
 
 
-#: This repository's own root — the ONE derivation, override included.
-AURORA_DIR = _aurora_dir()[0]
+_OWN_CHECKOUT_CLAIM = _check_own_checkout_claim()
+
+#: This repository's own root — OBSERVED from this module's file location, never
+#: from the environment and never from the cwd.
+AURORA_DIR = _AURORA_DIR_DERIVED
 
 
 def aurora_dir_source() -> str:
-    """Which precedence step produced `AURORA_DIR`, to print before doing work."""
-    return _aurora_dir()[1]
+    """Which step produced `AURORA_DIR` — `own`, always — to print before work."""
+    checked = "" if _OWN_CHECKOUT_CLAIM is None else (
+        f" ({_OWN_CHECKOUT_CLAIM[0]}={_OWN_CHECKOUT_CLAIM[1]} agrees — a consistency check, "
+        "not an override)")
+    return (f"own: this module's own location ({pathlib.Path(__file__).resolve()}) "
+            f"-> {AURORA_DIR}{checked}")
 
 
 def _suite_root() -> tuple[pathlib.Path | None, str]:

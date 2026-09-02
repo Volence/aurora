@@ -176,20 +176,24 @@
 //   VITE_AURORA_DEBUG=1 npm run build
 //   node scratchpad/mapviewport-baseline-harness.mjs        (VERBOSE=1 for app logs)
 //                                                          (PORT=... to move off 9427)
-//                                                          (AURORA_ROOT=... to pin the tree)
+//                                                          (AURORA_BUILT_TREE=... to pin the
+//                                                           BUILT tree this runs against —
+//                                                           not AURORA_ROOT, which names the
+//                                                           checkout and no longer moves it)
 //                                                          (PANS=... pans per cell, default 150)
 //                                                          (BATCH=... repaints per batch, default 12)
 // PANS and BATCH are the resolution/runtime dial. Lowering either COARSENS the
 // amortised number; rows c2 and the per-cell resolution line will say so in the
 // output, so a short run cannot quietly masquerade as a precise one.
 
-import { auroraDirOverride, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { writeFileSync, statSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { resolveRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9427);
 
@@ -201,27 +205,23 @@ const PORT = Number(process.env.PORT ?? 9427);
  * announce which one was chosen — the run is against THAT tree's build, and a
  * reader has to know whether it was the one they edited.
  */
-function resolveRoot() {
-  // `here` stays a local derivation because it is the OTHER OPERAND of the
-  // comparison this function exists to make: "the tree this script lives in"
-  // against "the tree the run is against". `AURORA_DIR` collapses to `here`
-  // when nothing is set, so asking the resolver for both would make `borrowed`
-  // permanently false. The OVERRIDE is what goes through the resolver, so this
-  // site gets the aliases, the disagreement refusal and the set-but-wrong error.
-  const here = dirname(dirname(fileURLToPath(import.meta.url)));
-  const runnable = (d) => existsSync(join(d, 'node_modules/.bin/electron')) && existsSync(join(d, 'dist/main/index.mjs'));
-  const override = auroraDirOverride();
-  if (override !== null) return { root: override.value, here, borrowed: override.value !== here };
-  let dir = here;
-  for (let i = 0; i < 8; i++) {
-    if (runnable(dir)) return { root: dir, here, borrowed: dir !== here };
-    const up = dirname(dir);
-    if (up === dir) break;
-    dir = up;
-  }
-  return { root: here, here, borrowed: false };
-}
-const { root: ROOT, here: HERE, borrowed: BORROWED } = resolveRoot();
+// `here` stays a LOCAL derivation because it is the OTHER OPERAND of the
+// comparison `resolveRunRoot` exists to make: "the tree this script lives in"
+// against "the tree the run is against". `AURORA_DIR` IS `here` — observed from
+// the resolver's own module location, never movable by an operator (empyrean
+// contract/SUITE_PATHS.md @ fba68d5) — so asking for both operands from there
+// would make `borrowed` permanently false. It is passed IN for the same reason
+// the contract's step-3 beds parameterise their anchor: a resolver whose anchor
+// is its own file cannot be stood anywhere else, and then nothing can test it.
+//
+// THE WALK ITSELF MOVED to `lib/run-root.mjs` so it can be executed by a test
+// with the two variables pointed APART — a caller assigned to the wrong half of
+// the O70 split is invisible while they both name the same directory, which is
+// every run until someone sets the override. This file needs a built app to run
+// at all, so a property proved only here is proved nowhere.
+const { root: ROOT, here: HERE, borrowed: BORROWED } = resolveRunRoot(
+  dirname(dirname(fileURLToPath(import.meta.url))),
+);
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
 const AEON_DIR = siblingPathOrUnresolved('aeon');               // OPEN ONLY — never saved
 const SHOTS = join(HERE, 'scratchpad/shots-mapviewport-baseline');

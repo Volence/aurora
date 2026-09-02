@@ -10,7 +10,10 @@
  * decision"), so tsc needs the signature stated rather than inferred.
  */
 
-/** This repository's own checkout — `AURORA_DIR`, then this module's location. */
+/**
+ * This repository's own checkout — OBSERVED from this module's own file
+ * location. Never overridable; `AURORA_DIR` the variable is a consistency check.
+ */
 export declare const AURORA_DIR: string;
 
 /** The canonical variable naming THIS repo's checkout — `AURORA_DIR`. */
@@ -19,8 +22,17 @@ export declare const AURORA_DIR_ENV: string;
 /** Transitional aliases for it (`AURORA_ROOT`), accepted and announced. */
 export declare const AURORA_DIR_ENV_ALIASES: string[];
 
-/** Which precedence step produced `AURORA_DIR`, as printable prose. */
+/** The variable naming the BUILT tree a run executes against. */
+export declare const AURORA_BUILT_TREE_ENV: string;
+
+/** Which step produced `AURORA_DIR` — `own`, always — as printable prose. */
 export declare function auroraDirSource(): string;
+
+/** The BUILT tree this run is aimed at, or null when none was named. */
+export declare function auroraBuiltTree(): { name: string; value: string } | null;
+
+/** Every environment variable this module owns, canonical names and aliases. */
+export declare const OWNED_ENV: string[];
 
 /** Every refusal from the resolver. */
 export declare class SuitePathError extends Error {}
