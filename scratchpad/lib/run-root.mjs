@@ -72,6 +72,51 @@ export function isRunnableTree(dir) {
 }
 
 /**
+ * WHICH OF THE THREE SHAPES THIS SPLIT'S UNSET CASE TAKES — the contract makes
+ * the split declare it (@ c9bc05f), so it is declared here rather than inferred.
+ *
+ * `AURORA_BUILT_TREE` is **no default**: unset, `auroraBuiltTree()` reports none.
+ * The consumer of that none is not a fallback to the old name, though — it is
+ * **an independent second derivation**, the walk below, and it is the sub-case
+ * that is MEANT to differ: it searches for a BUILD (both artifacts present)
+ * rather than for a checkout, and those legitimately come apart, because a
+ * linked worktree is a real checkout and an unrunnable one. That is the
+ * artifacts carve-out, and what it owes is not equality but an ANNOUNCEMENT:
+ *
+ *     "the row asserts what 'say which step answered' already requires of every
+ *      resolver: that the run ANNOUNCES the tree it chose, by name, and marks it
+ *      when that tree is not the one the script lives in. A derivation that
+ *      legitimately differs and says so is conformant; one that differs silently
+ *      is the defect the precedence rules exist to prevent."
+ *
+ * So `source` is returned from every branch (a value, recomputed per call — not
+ * a memoised stderr nag, which the contract forbids as the proof artifact), and
+ * `describeRunRoot` renders the line a person reads FROM that value. The walk
+ * predates the O70 split and was keyed off the CHECKOUT name, which is the
+ * misassignment the split exists to end; O70 rekeyed it, and this is where it
+ * says so.
+ */
+
+/**
+ * The line a harness PRINTS before doing work — rendered from the returned
+ * value, never a second derivation of it.
+ *
+ * It lives here, and not inline in the harness that prints it, for one reason:
+ * the harness spawns Electron against a built `dist/` on import, so an
+ * announcement composed inside it can never be executed by a test, and an
+ * announcement nothing checks is how "differs silently" arrives. Here, a row
+ * drives it against a `mkdtemp` tree layout.
+ */
+export function describeRunRoot({ root, here, borrowed, source }) {
+  return `root: ${root}`
+    + (borrowed
+      ? `  BORROWED — this script lives in ${here}, which has no built app, so the app under `
+        + `test is ${root}'s build`
+      : '')
+    + `\n      ${source}`;
+}
+
+/**
  * `{ root, here, borrowed, source }` for a harness that runs the built app.
  *
  * `here` is the caller's OWN location and is passed IN, not derived here: it is

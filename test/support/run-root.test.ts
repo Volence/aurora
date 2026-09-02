@@ -195,6 +195,81 @@ describe('run-root: the two halves of the O70 split, POINTED APART', () => {
   });
 
   /**
+   * ─────────── THE SECOND ROW: THE UNSET PATH, CONSTRUCTED NOT AMBIENT ───────────
+   *
+   * The apart-rows above prove each consumer follows the right NAME. They never
+   * run the new name's UNSET path, so they are green whatever that path does
+   * (empyrean `contract/SUITE_PATHS.md` @ c9bc05f, "Two rows, not one").
+   *
+   * WHICH OF THE THREE SHAPES THIS SPLIT TAKES, since the contract makes the
+   * split declare it: `AURORA_BUILT_TREE` is **no default** — unset, the
+   * resolver reports none. But the consumer of that none is not a fallback to
+   * the old name; it is **an independent second derivation** (the walk), and the
+   * sub-case that is MEANT to differ, because it searches for a BUILD rather
+   * than a checkout and "a linked worktree is a real checkout and an unrunnable
+   * one". That is the artifacts carve-out, so what these rows assert is not
+   * equality — equality is the WRONG assertion here — but the announcement:
+   * *"that the run ANNOUNCES the tree it chose, by name, and marks it when that
+   * tree is not the one the script lives in."*
+   *
+   * CONSTRUCTED, and the row PROVES it rather than trusting `run`'s scrubber:
+   * the child prints back what it saw in its own environment for both names, so
+   * a row that went green because an ambient `AURORA_BUILT_TREE` happened to be
+   * set — or because the scrub regex stopped matching — is not possible.
+   */
+  it('with BOTH names scrubbed, the announcement names the tree it chose and MARKS it borrowed', () => {
+    const built = makeBuiltTree('announce-ancestor');
+    const child = resolve(built, 'nested/no-build-here');
+    try {
+      mkdirSync(child, { recursive: true });
+      const out = run(
+        `const r = S.resolveRunRoot(${JSON.stringify(child)});\n`
+        + 'process.stdout.write(JSON.stringify({\n'
+        + '  line: S.describeRunRoot(r), borrowed: r.borrowed,\n'
+        + '  sawBuilt: process.env[R.AURORA_BUILT_TREE_ENV] ?? "(unset)",\n'
+        + '  sawDir: process.env[R.AURORA_DIR_ENV] ?? "(unset)",\n'
+        + '}));',
+      );
+      expect(out.status, `stderr:\n${out.stderr}`).toBe(0);
+      const r = JSON.parse(out.stdout) as Record<string, string | boolean>;
+      // The row is CONSTRUCTED: neither name was present in the child at all.
+      expect(r.sawBuilt, 'an ambient override would make this row prove nothing').toBe('(unset)');
+      expect(r.sawDir).toBe('(unset)');
+      // …and with nobody having chosen, the derivation still SAYS what it did.
+      expect(r.borrowed).toBe(true);
+      expect(r.line, 'the announcement must name the tree the run is against').toContain(built);
+      expect(r.line, 'and the tree the script lives in, so the two are readable apart').toContain(child);
+      expect(r.line, 'and MARK it, because those two are not the same tree').toContain('BORROWED');
+      expect(r.line).toContain('walked up');
+    } finally {
+      rmSync(built, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * THE ANTI-VACUOUS HALF of the row above, and it is the one that matters here:
+   * a `describeRunRoot` that printed `BORROWED` unconditionally would satisfy
+   * the contract's letter and tell a reader nothing, which is the same failure
+   * as never printing it. Same shape, one built tree, no borrowing.
+   */
+  it('…and does NOT mark it when the tree it chose IS the one the script lives in', () => {
+    const built = makeBuiltTree('announce-in-tree');
+    try {
+      const out = run(
+        `const r = S.resolveRunRoot(${JSON.stringify(built)});\n`
+        + 'process.stdout.write(JSON.stringify({ line: S.describeRunRoot(r), borrowed: r.borrowed }));',
+      );
+      const r = JSON.parse(out.stdout) as Record<string, string | boolean>;
+      expect(r.borrowed).toBe(false);
+      expect(r.line, 'it still names the tree — that half is owed on every run').toContain(built);
+      expect(r.line, 'nothing was borrowed, so nothing may say so').not.toContain('BORROWED');
+      expect(r.line).toContain('in-tree:');
+    } finally {
+      rmSync(built, { recursive: true, force: true });
+    }
+  });
+
+  /**
    * THE CONSUMER IS ACTUALLY WIRED TO THIS MODULE.
    *
    * Every row above measures `run-root.mjs`. None of them can see the harness
@@ -208,6 +283,9 @@ describe('run-root: the two halves of the O70 split, POINTED APART', () => {
     const src = execFileSync('/bin/cat', [HARNESS], { encoding: 'utf8' });
     expect(src).toContain("from './lib/run-root.mjs'");
     expect(src).toContain('resolveRunRoot(');
+    // …and it prints the announcement through the module too, rather than
+    // composing its own line where no row can reach it.
+    expect(src).toContain('describeRunRoot(RUN_ROOT)');
     // The accessor that conflated the two questions is gone from the consumer.
     expect(src, 'the harness must not resolve its run target from the own-checkout variable')
       .not.toContain('auroraDirOverride');
