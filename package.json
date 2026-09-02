@@ -12,6 +12,7 @@
     "check:pseudo-skip": "node scripts/check-pseudo-skip.mjs",
     "check:peer-path-literals": "node scripts/check-peer-path-literals.mjs",
     "check:object-stringify": "node scripts/check-object-stringify.mjs",
+    "check:ledger-timestamps": "node scripts/check-ledger-timestamps.mjs",
     "//test": [
       "`npm run typecheck` is IN this chain, and must stay in it. vitest strips types",
       "without checking them, so before 2026-08-30 a plant the compiler catches read as",
@@ -35,7 +36,7 @@
       "It composes `npm run typecheck` rather than spelling `tsc --noEmit` a second time, so",
       "there is one definition of how this repo typechecks."
     ],
-    "test": "node scripts/check-test-collection.mjs && node scripts/check-pseudo-skip.mjs && node scripts/check-peer-path-literals.mjs && node scripts/check-object-stringify.mjs && node scratchpad/check-harness-guards.mjs && npm run typecheck && vitest run",
+    "test": "node scripts/check-test-collection.mjs && node scripts/check-pseudo-skip.mjs && node scripts/check-peer-path-literals.mjs && node scripts/check-object-stringify.mjs && node scripts/check-ledger-timestamps.mjs && node scratchpad/check-harness-guards.mjs && npm run typecheck && vitest run",
     "test:watch": "vitest",
     "gen:theme": "node scripts/gen-theme.mjs",
     "harness:effects-bob": "node scratchpad/effects-bob-harness.mjs",
