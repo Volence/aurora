@@ -202,28 +202,36 @@ describe('S1 sync animation table — CURRENCY cross-check (s1disasm at a commit
 
     // Re-derive each channel's rate from its timer-reset constant `#N-1` and
     // its modulus from the andi mask, straight out of the routine text.
+    // Every complaint below is about ANOTHER repository and says so — see the
+    // `cites` block in the next row for why a bare matcher is not enough here.
+    const where = `SynchroAnimate in sonic.asm at ${S1_TIP} (${rev})`;
     const rate = (ch: number): number => {
       const m = body.match(new RegExp(`move\\.b\\t#(\\d+)-1,\\(v_ani${ch}_time\\)`));
-      expect(m, `v_ani${ch}_time reset`).toBeTruthy();
+      expect(m, `${NOT_OURS} ${where} has no v_ani${ch}_time reset`).toBeTruthy();
       return Number(m![1]);
     };
     const mask = (ch: number): number => {
       const m = body.match(new RegExp(`andi\\.b\\t#(\\d+),\\(v_ani${ch}_frame\\)`));
-      expect(m, `v_ani${ch}_frame mask`).toBeTruthy();
+      expect(m, `${NOT_OURS} ${where} has no v_ani${ch}_frame mask`).toBeTruthy();
       return Number(m![1]);
+    };
+    const shape = (pattern: RegExp, what: string): void => {
+      expect(pattern.test(body), `${NOT_OURS} ${where} no longer has ${what} (${pattern.source})`).toBe(true);
     };
     // Channel 0 counts DOWN (subq), channel 1 UP (addq) — direction is what
     // makes the helix frame list descend and the ring list ascend.
-    expect(body).toMatch(/subq\.b\t#1,\(v_ani0_frame\)/);
-    expect(body).toMatch(/addq\.b\t#1,\(v_ani1_frame\)/);
+    shape(/subq\.b\t#1,\(v_ani0_frame\)/, 'channel 0 counting DOWN');
+    shape(/addq\.b\t#1,\(v_ani1_frame\)/, 'channel 1 counting UP');
     // Channel 3 is the accumulator: rol.w #7 + andi.w #3 → (buf >> 9) & 3.
-    expect(body).toMatch(/rol\.w\t#7,d0/);
-    expect(body).toMatch(/andi\.w\t#3,d0/);
+    shape(/rol\.w\t#7,d0/, "channel 3's rol.w #7 accumulator shift");
+    shape(/andi\.w\t#3,d0/, "channel 3's mod-4 mask");
 
     for (const { id, entry } of allSyncRows) {
       if (entry.channel === 3) continue; // accumulator: no fixed rate to read
-      expect(entry.framesPerStep, `obj ${id.toString(16)} rate vs sonic.asm`).toBe(rate(entry.channel));
-      expect(entry.frames.length, `obj ${id.toString(16)} modulus vs sonic.asm`).toBe(mask(entry.channel) + 1);
+      expect(entry.framesPerStep, `${NOT_OURS} obj ${id.toString(16)} rate vs ${where}`)
+        .toBe(rate(entry.channel));
+      expect(entry.frames.length, `${NOT_OURS} obj ${id.toString(16)} modulus vs ${where}`)
+        .toBe(mask(entry.channel) + 1);
     }
   });
 
@@ -240,16 +248,36 @@ describe('S1 sync animation table — CURRENCY cross-check (s1disasm at a commit
     const rings = read('_incObj/25, 37 Rings.asm');
     const giant = read('_incObj/4B, 7C Giant Ring and Flash.asm');
     const helix = read('_incObj/17 GHZ Spiked Pole Helix.asm');
+
+    /**
+     * ⚠ EVERY FAILURE HERE IS ABOUT ANOTHER REPOSITORY, so every failure has to
+     * SAY SO. A bare `expect(giant).toMatch(/…/)` reports "expected '; ====…'
+     * to match /move\.b…/" — an unreadable 16 KB haystack, no file name, no
+     * revision, and nothing telling the reader this is not an Aurora bug.
+     * Measured 2026-09-02 while proving this row red: that is exactly what the
+     * first poisoned run printed.
+     */
+    const cites = (text: string, file: string, pattern: RegExp, what: string): void => {
+      expect(
+        pattern.test(text),
+        `${NOT_OURS}\n`
+        + `  ${file} at ${S1_TIP} (${rev}) no longer contains ${what}\n`
+        + `  looked for:  ${pattern.source}\n`
+        + '  S1_OBJECT_ANIMS cites this instruction as the consumer of its sync channel;\n'
+        + '  if the engine changed, the table and its per-row citations need re-deriving.\n'
+        + `  Re-read with:  git -C ${repo} show ${rev}:'${file}'`,
+      ).toBe(true);
+    };
     // Obj25 + Obj4B copy the shared channel-1 frame straight into obFrame.
-    expect(rings).toMatch(/move\.b\t\(v_ani1_frame\)\.w,obFrame\(a0\)/);
-    expect(giant).toMatch(/move\.b\t\(v_ani1_frame\)\.w,obFrame\(a0\)/);
+    cites(rings, '_incObj/25, 37 Rings.asm', /move\.b\t\(v_ani1_frame\)\.w,obFrame\(a0\)/, 'the channel-1 frame copy');
+    cites(giant, '_incObj/4B, 7C Giant Ring and Flash.asm', /move\.b\t\(v_ani1_frame\)\.w,obFrame\(a0\)/, 'the channel-1 frame copy');
     // Obj37 reads the channel-3 accumulator frame; its timer is seeded 255.
-    expect(rings).toMatch(/move\.b\t\(v_ani3_frame\)\.w,obFrame\(a0\)/);
-    expect(rings).toMatch(/move\.b\t#255,\(v_ani3_time\)\.w/);
+    cites(rings, '_incObj/25, 37 Rings.asm', /move\.b\t\(v_ani3_frame\)\.w,obFrame\(a0\)/, 'the channel-3 frame copy');
+    cites(rings, '_incObj/25, 37 Rings.asm', /move\.b\t#255,\(v_ani3_time\)\.w/, 'the 255-frame loss-timer seed');
     // Obj17 ADDS a per-instance base before masking — the disclosed offset.
-    expect(helix).toMatch(/move\.b\t\(v_ani0_frame\)\.w,d0/);
-    expect(helix).toMatch(/add\.b\thelix_frame\(a0\),d0/);
-    expect(helix).toMatch(/andi\.b\t#7,d0/);
+    cites(helix, '_incObj/17 GHZ Spiked Pole Helix.asm', /move\.b\t\(v_ani0_frame\)\.w,d0/, 'the channel-0 frame read');
+    cites(helix, '_incObj/17 GHZ Spiked Pole Helix.asm', /add\.b\thelix_frame\(a0\),d0/, 'the per-instance helix_frame offset');
+    cites(helix, '_incObj/17 GHZ Spiked Pole Helix.asm', /andi\.b\t#7,d0/, 'the mod-8 mask');
   });
 
   currency('no fifth consumer hides in _incObj (the table is complete)', (rev, repo) => {
