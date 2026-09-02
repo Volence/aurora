@@ -67,11 +67,12 @@ Reference points: `FACTOR_1` = moves with the camera (that is the ground);
 
 ### See it
 
-Nothing draws until you ask. **`View ▾` → tick `Compose the background in the frame
-(parallax)`**, and tick `Screen frame (320x224)` too. The canvas then draws the real
-background per strip with each layer's factor labelled. This is off by default and
-the Effects tab does not mention it; turn it on the first time you open the tab and
-leave it on.
+Nothing draws until you ask. Press **`Parallax preview`** on the Effects toolbar —
+it is the same switch as `View ▾` → `Compose the background in the frame
+(parallax)`. Tick `Screen frame (320x224)` in that menu too. The canvas then draws
+the real background per strip with each layer's factor labelled. It is off by
+default; turn it on the first time you open the tab and leave it on. This is the
+only thing in Aurora that shows what a scene's layers do.
 
 > The `LAYERS` list is a very short scrolling window inside an already-scrolling panel. If you can only see one layer, scroll **inside** the list.
 
@@ -117,8 +118,9 @@ To mix your own: `red + green×16 + blue×256`, each of R/G/B being an even numb
 0–14. (`Authored probe (red / blue)`, shipped with the project, uses `14` and `3584`
 — open it if you want a worked example.) A `0x`-prefixed hex value is accepted too.
 
-**There is no preview.** Aurora does not draw raster bands. You will not see this
-until the ROM runs.
+**There is no preview of a raster band.** Aurora draws parallax layers (§2) but not
+raster bands — there is nothing here to check one against, and a wrong preview would
+be worse than none. You will not see a band until the ROM runs.
 
 ---
 
@@ -286,9 +288,10 @@ anything on this list's top half.
 | I want to… | go to |
 |---|---|
 | make the background drift | `LAYERS` → `Add` → set `Plane B (bg)` |
-| see the drift | `View ▾` → `Compose the background in the frame (parallax)` |
+| see the drift | `Parallax preview` on the Effects toolbar |
 | make a coloured stripe | `RASTER BAND PRESETS` → `Preset id` → `New` |
 | make colours shimmer | `PRESET — <id> — CYCLES, VARIANTS` → `cycles: authored script` |
+| delete a preset a section binds | unbind that section first — Aurora refuses the delete and says which |
 | animate background tiles | `NEW TILE ANIMATION` |
 | change which section I am editing | the picker at the top of the Effects panel |
 | use a scene on a section | pick the section, then `SECTION ASSIGNMENT` |
@@ -306,7 +309,12 @@ anything on this list's top half.
 
 - Binding a raster preset to a section aeon has not threaded yet (§5) — Aurora warns
   at the control and does not block it, because that is aeon's fact to change.
-- Deleting a preset a section still binds. Aurora shows a yellow line naming the
-  dangling id on the section that still points at it.
 - A band whose colour is invisible against the palette it repaints. Nothing anywhere
-  catches that.
+  catches that — not this panel, not the schema, not the build.
+- Overlapping bands that share CRAM colours, or two bands firing on one screen line.
+  Aurora warns; it does not refuse, because a nested band over a disjoint colour span
+  is legal and walling it would refuse programs the engine builds.
+
+Deleting a preset a section still binds used to be on this list. It is not any more:
+Aurora refuses the delete, names the sections that bind it, and tells you to set them
+back to `Hand-authored raster` first.

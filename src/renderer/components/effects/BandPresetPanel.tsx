@@ -46,7 +46,7 @@ import {
   presetListEntries, resolveSelectedPreset, presetIdRefusal,
   RASTER_REF_ROW, presetRefOptions, unassignablePresetRef, sectionPresetCommand,
   createPresetCommand, deletePresetCommand,
-  addBandCommand, removeBandCommand, lastBandRefusal,
+  addBandCommand, removeBandCommand, lastBandRefusal, deletePresetRefusal,
   setBandFieldCommand, setBandArmCommand, setArmFieldCommand,
   parseColours, setColoursCommand, setPresetNameCommand,
   CYCLES_TITLE, CYCLES_STATE_OPTIONS, cyclesState, setCyclesStateCommand,
@@ -150,6 +150,12 @@ export default function BandPresetPanel(): React.ReactElement | null {
   // The zone id is needed only to name the chooser function in the sentence —
   // the wiring itself was derived at load time, from aeon's files.
   const zoneId = getCurrentZone(useProjectStore.getState())?.id ?? '';
+  // The delete guard's subject is the SECTIONS, not the library: a binding lives
+  // in a section's sidecar, so "is anything pointing at this document" can only
+  // be asked of the act.
+  const deleteRefusal = (act === null || selected === null)
+    ? null
+    : deletePresetRefusal(act.sections, selected.id);
   const wiringAdvisory = act === null ? null : sectionRasterAdvisory(
     act.rasterWiring, activeSectionIndex, rasterChooserName(zoneId, act.id));
 
@@ -342,10 +348,18 @@ export default function BandPresetPanel(): React.ReactElement | null {
           title={`Preset — ${selected.id}`}
           defaultCollapsed
           right={
+            // GUARDED, WITH THE REASON UNDER IT (EFFECTS-W1 defect 11). This
+            // deleted the document with no confirmation and left every binding
+            // that named it dangling; the author then met aeon's refusal
+            // through the FAST wrapper, which blames missing donor directories.
+            // Same idiom as the band Remove button: `deletePresetRefusal` is the
+            // ONE derivation the disabled state and the sentence both read.
             <IconButton icon={<span>Delete</span>} label={`Delete preset ${selected.id}`}
+              disabled={deleteRefusal !== null}
               onClick={() => run(deletePresetCommand(library, selected.id))} />
           }>
           <SectionBody>
+            {deleteRefusal !== null && <Hint tone="warning">{deleteRefusal}</Hint>}
             <Field label="Name" title="name — the writer's display label. Read by nothing and
               dropped when the generator lowers this document; it exists for you, not the build.">
               <input

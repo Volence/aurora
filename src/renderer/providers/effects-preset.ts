@@ -585,6 +585,54 @@ export function deletePresetCommand(
   return presetCommand(id, `Delete preset ${id}`, existing, null);
 }
 
+/** Which sections' sidecars name this preset. Empty when none do. */
+export function sectionsBindingPreset(
+  sections: readonly ({ rasterRef: string | null } | null)[], id: string,
+): number[] {
+  const out: number[] = [];
+  sections.forEach((s, i) => { if (s && s.rasterRef === id) out.push(i); });
+  return out;
+}
+
+/**
+ * Why this preset cannot be deleted right now, or null.
+ *
+ * ═══ EFFECTS-W1 DEFECT 11 — THE UNGUARDED DELETE ═══
+ *
+ * `Delete` removed the document with no confirmation and left every binding
+ * that named it DANGLING. aeon's generator then refuses the build BY NAME
+ * ("rasterRef 'x' names no preset document … Known ids: …"), and the walkthrough
+ * met that message through the FAST wrapper, which replaces it with a wrong one
+ * about missing donor directories. One unguarded click, one misattributed build
+ * failure.
+ *
+ * ⚠ IT REFUSES RATHER THAN CLEARING THE BINDINGS FOR YOU, and that is the
+ * choice worth stating. Clearing them would be one click and would silently
+ * change an author's per-section assignments — a second edit they did not ask
+ * for, on files they were not looking at, folded into a delete. Unbinding is one
+ * control away, it is one undo step of its own, and the sentence says exactly
+ * where it is. `lastBandRefusal` is the idiom: disabled, with the reason beside
+ * it, from one derivation both the button and the sentence read.
+ *
+ * ⚠ IT IS NOT A CONFIRM DIALOG EITHER. A confirm asks "are you sure?" about a
+ * consequence the author cannot see; this names the sections, which is the thing
+ * they would have had to go and find out.
+ */
+export function deletePresetRefusal(
+  sections: readonly ({ rasterRef: string | null } | null)[], id: string,
+): string | null {
+  const bound = sectionsBindingPreset(sections, id);
+  if (bound.length === 0) return null;
+  const list = bound.length === 1
+    ? `Section ${bound[0]}`
+    : `Sections ${bound.slice(0, -1).join(', ')} and ${bound[bound.length - 1]}`;
+  return `${list} ${bound.length === 1 ? 'binds' : 'bind'} "${id}". Deleting it would leave `
+    + `${bound.length === 1 ? 'that binding' : 'those bindings'} naming a document that does not `
+    + 'exist, and aeon\'s build refuses that by name. Set the raster binding back to '
+    + `"${RASTER_REF_ROW.unbound}" on ${bound.length === 1 ? 'that section' : 'those sections'} `
+    + 'first — the Section dropdown above.';
+}
+
 /**
  * Put a WHOLE preset document at `id`, creating or replacing.
  *

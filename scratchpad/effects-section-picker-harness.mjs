@@ -423,6 +423,88 @@ async function main() {
       `longest title = ${limit.longestTitle} chars over ${limit.titleCount} element(s); `
       + `guide link present = ${limit.hasGuideLink}`);
 
+    // ---- 6. THE DELETE GUARD (defect 11) AND THE PREVIEW CHIP (defect 14). ----
+    //
+    // aeon's own tree binds section 5 to `ojz_sec5_showcase`, so the guard has a
+    // REAL subject here rather than one this harness authored. The picker is
+    // already on section 5 from row [4c].
+    await c.evalExpr(`window.__dbg.aeon.selectPreset("ojz_sec5_showcase")`);
+    await sleep(900);
+    await c.evalExpr(String.raw`
+      (() => {
+        const hdrs = [...document.querySelectorAll('div')]
+          .filter((d) => d.style && d.style.cursor === 'pointer'
+                      && /^Preset — ojz_sec5_showcase(?!\s—)/.test((d.textContent || '').trim()));
+        if (hdrs.length) hdrs[hdrs.length - 1].click();
+        return 'ok';
+      })()`);
+    await sleep(900);
+    const del = await c.json(String.raw`(() => {
+      const b = [...document.querySelectorAll('button')]
+        .find((e) => /^Delete preset ojz_sec5_showcase$/.test(e.getAttribute('aria-label') || ''));
+      if (!b) return { found: false,
+        labels: [...document.querySelectorAll('button')]
+          .map((e) => e.getAttribute('aria-label')).filter(Boolean).slice(0, 25) };
+      b.scrollIntoView({ block: 'center' });
+      const leaves = [...document.querySelectorAll('div')]
+        .filter((d) => /binds "ojz_sec5_showcase"/.test(d.innerText || '')
+                    && ![...d.children].some((k) => /binds "ojz_sec5_showcase"/.test(k.innerText || '')));
+      const leaf = leaves[0] || null;
+      let paint = null;
+      if (leaf) {
+        leaf.scrollIntoView({ block: 'center' });
+        const lb = leaf.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          Math.round(lb.left + lb.width / 2), Math.round(lb.top + lb.height / 2));
+        paint = {
+          text: (leaf.innerText || '').replace(/\s+/g, ' ').trim(),
+          rects: leaf.getClientRects().length,
+          visible: typeof leaf.checkVisibility === 'function' ? leaf.checkVisibility() : null,
+          hitInside: !!(hit && (hit === leaf || leaf.contains(hit) || hit.contains(leaf))),
+        };
+      }
+      return { found: true, disabled: b.disabled, paint };
+    })()`);
+    check('6a', 'Delete is DISABLED on a preset a section binds, with the reason painted beside it',
+      del.found === true && del.disabled === true && del.paint !== null
+      && del.paint.rects > 0 && del.paint.visible !== false && del.paint.hitInside === true
+      && /^Section 5 binds "ojz_sec5_showcase"\./.test(del.paint.text)
+      && /Hand-authored raster/.test(del.paint.text),
+      JSON.stringify(del));
+
+    // THE PREVIEW CHIP. It must move the ONE view-store flag the View menu
+    // writes — read back off the store, not off the chip.
+    const preview = await c.json(String.raw`(() => {
+      const chip = [...document.querySelectorAll('button')]
+        .find((b) => /^Parallax preview$/.test((b.textContent || '').trim()));
+      if (!chip) return { found: false };
+      chip.scrollIntoView({ block: 'center' });
+      const b = chip.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        Math.round(b.left + b.width / 2), Math.round(b.top + b.height / 2));
+      const before = window.__dbg.overlays().showCameraPreview;
+      chip.click();
+      const after = window.__dbg.overlays().showCameraPreview;
+      chip.click();
+      const back = window.__dbg.overlays().showCameraPreview;
+      return {
+        found: true, before, after, back,
+        // ⚠ NOT sliced to 120: the sentence this row is about is the TAIL of
+        // the tooltip ("The same switch as View > …"), and a 120-char slice cut
+        // it off — one red row paid for the harness's own truncation.
+        title: (chip.title || '').slice(0, 400),
+        rects: chip.getClientRects().length,
+        visible: typeof chip.checkVisibility === 'function' ? chip.checkVisibility() : null,
+        hitIsChip: !!(hit && (hit === chip || chip.contains(hit))),
+      };
+    })()`);
+    check('6b', 'the Parallax preview chip is painted and toggles the SAME view-store flag',
+      preview.found === true && preview.rects > 0 && preview.visible !== false
+      && preview.hitIsChip === true
+      && preview.before === false && preview.after === true && preview.back === false
+      && /View > Compose the background/.test(preview.title),
+      JSON.stringify(preview));
+
     const shot = await c.send('Page.captureScreenshot', { format: 'png' });
     writeFileSync(`${SHOTS}/effects-section-picker.png`, Buffer.from(shot.data, 'base64'));
     console.log(`\n    screenshot  : ${SHOTS}/effects-section-picker.png`);
