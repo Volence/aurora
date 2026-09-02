@@ -23,7 +23,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, cpSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, cpSync, rmSync, existsSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, resolve } from 'node:path';
 
@@ -52,7 +52,7 @@ interface Run {
 function run(body: string, env: Record<string, string> = {}, subject = SUBJECT, cwd = dirname(subject)): Run {
   const clean = { ...process.env };
   for (const k of Object.keys(clean)) {
-    if (/^(EMPYREAN_SUITE_ROOT|AURORA_PEER_ROOT|LIVE_AEON|AURORA_ROOT|AURORA_REPO|.*_DIR|AURORA_.*_REPO)$/.test(k)) delete clean[k];
+    if (/^(EMPYREAN_SUITE_ROOT|AURORA_PEER_ROOT|LIVE_AEON|AURORA_ROOT|AURORA_REPO|AURORA_BUILT_TREE|.*_DIR|AURORA_.*_REPO)$/.test(k)) delete clean[k];
   }
   const src = `import * as R from ${JSON.stringify(subject)};\n${body}\n`;
   const r = execFileSync(process.execPath, ['--input-type=module', '-e', src], {
@@ -87,7 +87,7 @@ function runExpectingFailure(body: string, env: Record<string, string> = {}): Ru
 function runBoth(body: string, env: Record<string, string> = {}): Run {
   const clean = { ...process.env };
   for (const k of Object.keys(clean)) {
-    if (/^(EMPYREAN_SUITE_ROOT|AURORA_PEER_ROOT|LIVE_AEON|AURORA_ROOT|AURORA_REPO|.*_DIR|AURORA_.*_REPO)$/.test(k)) delete clean[k];
+    if (/^(EMPYREAN_SUITE_ROOT|AURORA_PEER_ROOT|LIVE_AEON|AURORA_ROOT|AURORA_REPO|AURORA_BUILT_TREE|.*_DIR|AURORA_.*_REPO)$/.test(k)) delete clean[k];
   }
   const src = `import * as R from ${JSON.stringify(SUBJECT)};\n${body}\n`;
   const scratch = mkdtempSync(resolve(tmpdir(), 'aurora-suite-run-'));
@@ -633,61 +633,188 @@ describe('sibling-root: the names the contract ratified', () => {
     ]);
   });
 
-  it('spells THIS repo\'s own checkout variable and its aliases', () => {
+  it('spells THIS repo\'s own checkout variable, its aliases, and the built-tree name', () => {
     const out = run(
-      'process.stdout.write([R.AURORA_DIR_ENV, R.AURORA_DIR_ENV_ALIASES.join(",")].join("\\n"));',
+      'process.stdout.write([R.AURORA_DIR_ENV, R.AURORA_DIR_ENV_ALIASES.join(","), '
+      + 'R.AURORA_BUILT_TREE_ENV].join("\\n"));',
     );
-    expect(out.stdout.split('\n')).toEqual(['AURORA_DIR', 'AURORA_ROOT,AURORA_REPO']);
+    expect(out.stdout.split('\n')).toEqual(['AURORA_DIR', 'AURORA_ROOT,AURORA_REPO', 'AURORA_BUILT_TREE']);
+  });
+
+  /**
+   * THE GATE'S LIST IS THIS LIST — asserted here because the gate cannot assert it.
+   *
+   * `check-peer-path-literals.mjs` rule 3 imports `OWNED_ENV` whole rather than
+   * reassembling it, precisely so that a variable added to the resolver under a
+   * NEW constant is policed without anyone editing the gate. That property is
+   * only real if `OWNED_ENV` actually contains every name the resolver reads, so
+   * the row checks membership rather than a typed list: the canonical names, the
+   * announced aliases, and the new built-tree name, each taken from the
+   * resolver's own exports so a rename moves both sides together.
+   */
+  it('OWNED_ENV — what the gate polices — holds every name this module reads', () => {
+    const out = run(
+      'const missing = [R.SUITE_ROOT_ENV, ...R.SUITE_ROOT_ENV_ALIASES, R.AURORA_DIR_ENV, '
+      + '...R.AURORA_DIR_ENV_ALIASES, R.AURORA_BUILT_TREE_ENV, '
+      + '...R.SUITE_PEERS.flatMap((n) => [R.checkoutEnv(n), ...R.checkoutEnvAliases(n)])]'
+      + '.filter((n) => !R.OWNED_ENV.includes(n));\n'
+      + 'process.stdout.write(missing.join(",") + "\\n" + R.OWNED_ENV.length);',
+    );
+    const [missing, count] = out.stdout.split('\n');
+    expect(missing, 'names the resolver reads that rule 3 would not police').toBe('');
+    expect(Number(count)).toBeGreaterThan(10);
   });
 });
 
 /**
- * AURORA_DIR — the same question turned inward, and the ONE step that is
- * deliberately not in the chain.
+ * AURORA_DIR — OBSERVED, NOT RESOLVED, and `AURORA_DIR` the VARIABLE is a
+ * consistency check over that observation rather than an override.
  *
  * Before O69 "which aurora tree am I" was answered by hand in 93 files: 64 read
  * `process.env.AURORA_ROOT` (not the contract's spelling) and 29 more wrote the
  * derivation with no override at all, so pointing a run at another tree moved
- * two thirds of them and silently failed to move the rest.
+ * two thirds of them and silently failed to move the rest. O69 gave them one
+ * derivation and gave `AURORA_DIR` a step-1 OVERRIDE, so
+ * `AURORA_DIR=/elsewhere npm test` relocated the repo under test in silence.
+ * The hub ruled that half out (empyrean `contract/SUITE_PATHS.md` @ fba68d5, "A
+ * resolver's OWN checkout is observed, not resolved"), and these rows are that
+ * ruling:
+ *
+ *     "Own checkout = the module's own location … never cwd and never
+ *      `--show-toplevel`. Its step-source says so (`own`) … `<OWN>_DIR`, if set,
+ *      is a consistency check, not an override: set-and-agreeing is fine,
+ *      set-but-wrong throws."
  *
  * Every expectation below is COMPOSED from `SUBJECT` — the path this file
- * already had to know to import the subject — or from a `mkdtemp` directory
- * created moments earlier. Nothing here is a path typed by hand, so no row can
- * pass by naming a string that happens to be right on one machine.
+ * already had to know to import the subject — or read back from the subject's
+ * OWN export, or from a `mkdtemp` directory created moments earlier. Nothing
+ * here is a path typed by hand, so no row can pass by naming a string that
+ * happens to be right on one machine.
  */
-describe('sibling-root: AURORA_DIR — this repo\'s own checkout', () => {
+describe('sibling-root: AURORA_DIR — this repo\'s own checkout, OBSERVED', () => {
   /**
    * The tree the subject lives in, derived from the path used to import it:
    * `<tree>/test/support/sibling-root.mjs` → three levels up from the FILE.
    */
   const SUBJECT_TREE = resolve(SUBJECT, '../../..');
 
-  it('unset → step 3, this module\'s own location, and the source says so', () => {
+  /**
+   * …and the same fact read back out of the SUBJECT'S OWN EXPORT, in a clean
+   * child, for the rows that must hand the subject a value it will AGREE with.
+   *
+   * Typing `SUBJECT_TREE` into those rows would work today and would keep
+   * working if the subject and this file ever became wrong about the tree in the
+   * same way. The check under test is a comparison against exactly this value,
+   * so this is the operand to feed it.
+   */
+  const observed = (): string => run('process.stdout.write(R.AURORA_DIR);').stdout;
+
+  it('unset → the source says `own` and names this module\'s FILE, not a precedence step', () => {
     const out = run('process.stdout.write(R.AURORA_DIR + "\\n" + R.auroraDirSource());');
     const [dir, source] = out.stdout.split('\n');
     expect(dir).toBe(SUBJECT_TREE);
-    expect(source).toContain('step 3');
+    expect(source).toMatch(/^own: this module's own location \(/);
     expect(source).toContain(SUBJECT);
+    // The own checkout is not on the four-step ladder at all — the ladder names
+    // ANOTHER tool's checkout. A source claiming a step number is the O69 shape.
+    expect(source, 'the own checkout has no precedence step').not.toMatch(/step [1-4]/);
   });
 
-  it('AURORA_DIR answers, and the source names step 1', () => {
-    const suite = makeFakeSuite();
-    const out = run(
+  /**
+   * ─────────── THE CONSISTENCY CHECK, BOTH DIRECTIONS ───────────
+   *
+   * These two rows are a pair and neither means anything alone. The first shows
+   * the refusal firing on a real disagreement; the second is the ANTI-VACUOUS
+   * half — a subject that threw on any `AURORA_DIR` at all, or that failed to
+   * start for an unrelated reason, would pass the first and fail the second.
+   *
+   * THE ALTERNATIVE GREEN PATH, RULED OUT: the first row could have gone red for
+   * a reason other than the rule holding — `pickEnv`'s two-spellings-DISAGREE
+   * refusal, which also throws `SuitePathError` and also names a variable. So it
+   * sets exactly ONE spelling, and asserts the consistency check's own sentence
+   * rather than merely a non-zero exit. (`DISAGREE` is the other message's word
+   * and appears in neither of these two.)
+   */
+  it('SET AND DISAGREEING is REFUSED — it is a consistency check, not an override', () => {
+    const elsewhere = mkdtempSync(resolve(tmpdir(), 'aurora-not-this-tree-'));
+    const out = runExpectingFailure(
+      'process.stdout.write(R.AURORA_DIR);', { AURORA_DIR: elsewhere },
+    );
+    expect(out.status, `expected a non-zero exit; got ${out.status} with stdout ${out.stdout}`).not.toBe(0);
+    expect(out.stderr).toContain('SuitePathError');
+    expect(out.stderr).toContain(`AURORA_DIR=${elsewhere}`);
+    expect(out.stderr).toContain('does not agree with where this module actually is');
+    expect(out.stderr).toContain('CONSISTENCY CHECK');
+    expect(out.stderr).toContain('NOT an override');
+    // It names the module file it observed, and the answer it observed, so the
+    // operator can see which of the two is the one they did not expect.
+    expect(out.stderr).toContain(SUBJECT);
+    expect(out.stderr).toContain(SUBJECT_TREE);
+    // …and it names the variable that DOES answer "run against the tree over
+    // there", with the value they typed, because that is usually what they meant.
+    expect(out.stderr).toContain(`AURORA_BUILT_TREE=${elsewhere}`);
+    // A refusal that had already printed the wrong tree would be no refusal.
+    expect(out.stdout).toBe('');
+    // Not the OTHER refusal: only one spelling was set here.
+    expect(out.stderr).not.toContain('DISAGREE');
+  });
+
+  it('SET AND AGREEING is accepted, silent, and moves nothing — the anti-vacuous half', () => {
+    const here = observed();
+    const out = runBoth(
       'process.stdout.write(R.AURORA_DIR + "\\n" + R.auroraDirSource());',
-      { AURORA_DIR: resolve(suite, 'aurora') },
+      { AURORA_DIR: here },
     );
     const [dir, source] = out.stdout.split('\n');
-    expect(dir).toBe(resolve(suite, 'aurora'));
-    expect(source).toContain('step 1: AURORA_DIR=');
+    expect(dir).toBe(here);
+    expect(dir).toBe(SUBJECT_TREE);
+    // Still `own`. The variable agreed with the observation; it did not become it.
+    expect(source).toMatch(/^own: this module's own location \(/);
+    // The source distinguishes "checked and agreed" from "nothing was set", so a
+    // reader of a log can tell which run had the claim made about it.
+    expect(source).toContain(`AURORA_DIR=${here} agrees`);
+    expect(source).toContain('a consistency check, not an override');
+    // THE CANONICAL NAME PRINTS NOTHING — announcing it would train the reader
+    // to ignore the alias line.
+    expect(out.stderr, `stderr was:\n${out.stderr}`).toBe('');
   });
 
-  it('AURORA_ROOT is accepted as an alias and announced ONCE, naming AURORA_DIR', () => {
-    const suite = makeFakeSuite();
+  /**
+   * A SECOND SPELLING OF THE SAME DIRECTORY IS AGREEMENT, not disagreement.
+   *
+   * `/tmp` is a symlink on some machines and `.claude/worktrees/` is reached
+   * through one on this one, so an operator who exports a path that resolves to
+   * the same directory has agreed and must not be refused — a check that
+   * compared strings would fire on a correct environment, which is how a
+   * consistency check turns into a thing people unset.
+   *
+   * THE BED IS BUILT, not hoped for: the row makes its own symlink, so it is
+   * discriminating on any machine rather than only on one where `/tmp` happens
+   * to be linked. It is also red against the OLD subject for a second reason —
+   * an override would have answered with the LINK path, not the real one.
+   */
+  it('a symlinked spelling of the same directory AGREES, and does not become the answer', () => {
+    const here = observed();
+    const scratch = mkdtempSync(resolve(tmpdir(), 'aurora-symlinked-'));
+    const link = resolve(scratch, 'aurora-by-another-name');
+    try {
+      symlinkSync(here, link, 'dir');
+      expect(link).not.toBe(here);
+      const out = runBoth('process.stdout.write(R.AURORA_DIR);', { AURORA_DIR: link });
+      expect(out.stdout, 'the observation is the answer; the variable only agreed with it').toBe(here);
+      expect(out.stderr).toBe('');
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('AURORA_ROOT, the alias, is announced ONCE and CHECKED the same way', () => {
+    const here = observed();
     const out = runBoth(
       'R.auroraDirSource(); R.auroraDirSource(); process.stdout.write(R.AURORA_DIR);',
-      { AURORA_ROOT: resolve(suite, 'aurora') },
+      { AURORA_ROOT: here },
     );
-    expect(out.stdout).toBe(resolve(suite, 'aurora'));
+    expect(out.stdout).toBe(here);
     const lines = out.stderr.trim().split('\n').filter(Boolean);
     expect(lines).toHaveLength(1);
     expect(lines[0]).toBe(
@@ -696,39 +823,34 @@ describe('sibling-root: AURORA_DIR — this repo\'s own checkout', () => {
     );
   });
 
+  it('AURORA_ROOT pointed at ANOTHER tree is refused, not obeyed — the migration is not a loophole', () => {
+    const elsewhere = mkdtempSync(resolve(tmpdir(), 'aurora-not-this-tree-'));
+    const out = runExpectingFailure('process.stdout.write(R.AURORA_DIR);', { AURORA_ROOT: elsewhere });
+    expect(out.status).not.toBe(0);
+    expect(out.stderr).toContain(`AURORA_ROOT=${elsewhere}`);
+    expect(out.stderr).toContain('does not agree with where this module actually is');
+    // The nag still nags: the spelling is still transitional, and an operator
+    // fixing the value should not then be surprised by the rename.
+    expect(out.stderr).toContain('AURORA_ROOT is a transitional alias');
+    expect(out.stdout).toBe('');
+  });
+
   it('AURORA_REPO, the third spelling, is announced the same way', () => {
-    const suite = makeFakeSuite();
-    const out = runBoth('process.stdout.write(R.AURORA_DIR);',
-      { AURORA_REPO: resolve(suite, 'aurora') });
-    expect(out.stdout).toBe(resolve(suite, 'aurora'));
+    const here = observed();
+    const out = runBoth('process.stdout.write(R.AURORA_DIR);', { AURORA_REPO: here });
+    expect(out.stdout).toBe(here);
     expect(out.stderr).toContain('AURORA_REPO is a transitional alias — set AURORA_DIR instead');
   });
 
-  it('THE CANONICAL NAME PRINTS NOTHING — the anti-vacuous half of the two rows above', () => {
-    const suite = makeFakeSuite();
-    const out = runBoth('process.stdout.write(R.AURORA_DIR);',
-      { AURORA_DIR: resolve(suite, 'aurora') });
-    expect(out.stdout).toBe(resolve(suite, 'aurora'));
-    expect(out.stderr).toBe('');
-  });
-
-  it('SET BUT WRONG is a hard error naming the variable, its value and the step', () => {
-    const absent = resolve(makeFakeSuite(), 'no-such-aurora');
-    const out = runExpectingFailure('process.stdout.write(R.AURORA_DIR);', { AURORA_DIR: absent });
-    expect(out.status).not.toBe(0);
-    expect(out.stderr).toContain('SuitePathError');
-    expect(out.stderr).toContain(`AURORA_DIR=${absent}`);
-    expect(out.stderr).toContain('is not a directory');
-    expect(out.stderr).toContain('Precedence step 1 refuses');
-  });
-
-  it('the canonical name and an alias that DISAGREE are refused, naming both', () => {
+  it('the canonical name and an alias that DISAGREE are refused BEFORE either is checked', () => {
     const suite = makeFakeSuite();
     const out = runExpectingFailure('process.stdout.write(R.AURORA_DIR);', {
       AURORA_DIR: resolve(suite, 'aurora'),
       AURORA_ROOT: resolve(suite, 'aeon'),
     });
     expect(out.status).not.toBe(0);
+    // Two answers to one question is a wrong environment, and that is the
+    // complaint the operator needs — not "neither of them is this tree".
     expect(out.stderr).toContain('DISAGREE');
     expect(out.stderr).toContain(`AURORA_DIR=${resolve(suite, 'aurora')}`);
     expect(out.stderr).toContain(`AURORA_ROOT=${resolve(suite, 'aeon')}`);
@@ -738,14 +860,17 @@ describe('sibling-root: AURORA_DIR — this repo\'s own checkout', () => {
    * THE DELIBERATE GAP, asserted rather than described.
    *
    * `EMPYREAN_SUITE_ROOT=$(mktemp -d) npm test` is this repo's documented recipe
-   * for "a machine with no REFERENCE trees". If step 2 also answered for aurora
-   * ITSELF, that recipe would relocate the repo under test and every instrument
-   * would stop finding its own `dist/` and `src/` — a run meant to prove the
-   * peer-dependent half skips honestly would die of unrelated absence instead.
+   * for "a machine with no REFERENCE trees". If the suite root also answered for
+   * aurora ITSELF, that recipe would relocate the repo under test and every
+   * instrument would stop finding its own `dist/` and `src/` — a run meant to
+   * prove the peer-dependent half skips honestly would die of unrelated absence
+   * instead. The contract names this one too: *"`EMPYREAN_SUITE_ROOT` never
+   * relocates the resolver's own checkout."*
    *
    * The second half of this row is what stops it being vacuous: the SAME child
    * process, the SAME variable, moving a PEER. Without it, a subject that
-   * ignored `EMPYREAN_SUITE_ROOT` entirely would pass.
+   * ignored `EMPYREAN_SUITE_ROOT` entirely would pass. (The contract asks for
+   * exactly this shape, and calls it aurora's.)
    */
   it('EMPYREAN_SUITE_ROOT moves a PEER and does NOT move AURORA_DIR', () => {
     const suite = makeFakeSuite();
@@ -758,17 +883,65 @@ describe('sibling-root: AURORA_DIR — this repo\'s own checkout', () => {
     expect(dir).toBe(SUBJECT_TREE);
     expect(dir).not.toBe(resolve(suite, 'aurora'));
   });
+});
 
-  it('auroraDirOverride is null when nothing is set, and names the spelling when set', () => {
-    const suite = makeFakeSuite();
-    expect(run('process.stdout.write(String(R.auroraDirOverride()));').stdout).toBe('null');
-    const out = run(
-      'process.stdout.write(JSON.stringify(R.auroraDirOverride()));',
-      { AURORA_ROOT: resolve(suite, 'aurora') },
+/**
+ * AURORA_BUILT_TREE — the OTHER question, which is why the one above can refuse.
+ *
+ * "Where do I live" and "which built tree do I RUN AGAINST" are different
+ * questions that wore one variable until O70. The second is real: a linked
+ * worktree shares no `node_modules` and no `dist/` with the checkout it was cut
+ * from, so `scratchpad/mapviewport-baseline-harness.mjs` walks up until it finds
+ * a tree that is actually runnable and announces `borrowed` when that is not the
+ * tree the script lives in. Pinning that tree is legitimate; relocating the repo
+ * is not.
+ *
+ * The name follows the contract's existing shape for a variable that names
+ * artifacts rather than a checkout (oracle's `ORACLE_AEON_DIR`), and
+ * deliberately does not end in `_DIR`: `<TOOL>_DIR` is the ratified CHECKOUT
+ * spelling, and one token away from `AURORA_DIR` is where the two questions
+ * fused in the first place.
+ */
+describe('sibling-root: AURORA_BUILT_TREE — which built tree a run executes against', () => {
+  it('is null when nothing is set, so a caller can walk up and find one itself', () => {
+    expect(run('process.stdout.write(String(R.auroraBuiltTree()));').stdout).toBe('null');
+  });
+
+  /**
+   * ONE CHILD, BOTH HALVES — the shape the contract asks of the suite-root row,
+   * applied to the variable this parcel adds.
+   *
+   * Half one: it names the tree, so it is an override and not decoration. Half
+   * two: it does NOT move `AURORA_DIR`, which is the whole reason it exists as a
+   * separate name. Without half two a subject that quietly aliased the two —
+   * the O69 shape, one rename later — would pass.
+   */
+  it('names the built tree AND does not move AURORA_DIR', () => {
+    const built = mkdtempSync(resolve(tmpdir(), 'aurora-built-tree-'));
+    const out = runBoth(
+      'process.stdout.write(JSON.stringify(R.auroraBuiltTree()) + "\\n" + R.AURORA_DIR '
+      + '+ "\\n" + R.auroraDirSource());',
+      { AURORA_BUILT_TREE: built },
     );
-    expect(JSON.parse(out.stdout)).toEqual({
-      name: 'AURORA_ROOT',
-      value: resolve(suite, 'aurora'),
-    });
+    const [json, dir, source] = out.stdout.split('\n');
+    expect(JSON.parse(json)).toEqual({ name: 'AURORA_BUILT_TREE', value: built });
+    expect(dir).toBe(resolve(SUBJECT, '../../..'));
+    expect(dir).not.toBe(built);
+    // It is not a checkout variable, so it does not trip the own-checkout check
+    // and it is not a transitional alias of anything: nothing is announced.
+    expect(source).toContain('own: this module\'s own location');
+    expect(source).not.toContain('agrees');
+    expect(out.stderr, `stderr was:\n${out.stderr}`).toBe('');
+  });
+
+  it('SET BUT WRONG refuses rather than falling back to the tree the instrument lives in', () => {
+    const absent = resolve(mkdtempSync(resolve(tmpdir(), 'aurora-built-tree-')), 'no-such-build');
+    const out = runExpectingFailure('R.auroraBuiltTree();', { AURORA_BUILT_TREE: absent });
+    expect(out.status, `expected a non-zero exit; got ${out.status} with stdout ${out.stdout}`).not.toBe(0);
+    expect(out.stderr).toContain('SuitePathError');
+    expect(out.stderr).toContain(`AURORA_BUILT_TREE=${absent}`);
+    expect(out.stderr).toContain('is not a directory');
+    // The refusal says what it is NOT, because the whole parcel is that split.
+    expect(out.stderr).toContain('is NOT AURORA_DIR');
   });
 });
