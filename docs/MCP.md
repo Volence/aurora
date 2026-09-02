@@ -242,9 +242,21 @@ the engine's own `ensure` fires at build time with the measurement behind the
 rule (`the ON fire costs 624 cyc against 488 available`). A bound invented on
 this side would replace that sentence with silence. What IS validated is shape
 and identity: the document's `id` must equal the `id` argument, the reserved
-wave-2 names (`fires`, `variants`, `cycles`) are refused BY NAME rather than as
-typos, and an invalid document is refused with the specific issues and consumes
-no undo step.
+wave-2 name (`fires`, the one the vendored schema still reserves; `cycles` and
+`variants` became declared channels of the same document at empyrean `12aecd5`,
+schema §7.2, and parse here — with no control authoring them yet, ROADMAP row
+97) is refused BY NAME rather than as a typo, and an invalid document is refused
+with the specific issues and consumes no undo step. The pin of record for that
+schema is `src/core/formats/effects/aurora-effects-preset.schema.provenance.json`,
+never a list in prose.
+
+`cycles` has three states with one spelling each — absent keeps the section's
+hand-authored cycle, `null` is cycling OFF, an array is the script — and
+`variants` is positional (index = slot: an index the array does not reach keeps
+the hand-authored slot, `null` clears it, an object authors it). Send a document
+with `cycles: null` and it comes back with `cycles: null`; this side never
+normalises absent to null or drops a null slot, because each of those is a
+different instruction to the engine.
 
 **`assign_section_preset`** assigns which raster preset a section uses — `rasterRef` in that section's
 `.meta.json` sidecar. A preset id, or `null` to unbind; absent and explicit-null
