@@ -19,9 +19,11 @@ history of how it got there. **Nothing here was rewritten** — these are the ti
 
 ### O45
 
-`size: M` · `state: next` · `blockedBy: None` · `project: None`
+`size: M` · `state: done` · `blockedBy: None` · `project: None`
 
 > RESCUED FROM O25 as that row was retired. O25 closed 59 fails / 3 collection deaths / 6 silent PASSes, and left this: a PARTIAL checkout fails 27 files / 135 tests because every guard tests DIRECTORY existence, not a file. ⚠ VERIFY THE OVERLAP BEFORE STARTING — O39 (merge 2b0f610d) closed the misdirection half over 22 rows and its marker check covers 'not a checkout at all' but explicitly NOT 'a real checkout missing what a row reads'. So this may be substantially covered, partly covered, or untouched; re-measure rather than assuming either way. The numbers above predate O39.
+
+> **CLOSED 2026-09-02**, branch `fix/o45-partial-checkout-file-guards`, packet `docs/reviews/2026-09-02-o45-partial-checkout-file-guards.md`, ROADMAP §5.1 row 112. **The overlap was verified and O39 substantially covered this.** Measured by removing 46 files ONE AT A TIME from a complete s1disasm copy at a committed revision: of 243 new failing rows, 152 already name the missing file and 61 are O39's anchors; **28 misdirect — 9 distinct rows in 7 files**, and **eight of the nine share one cause**: the shared collision tables gate every act's `read()` while being `gating: false` (correctly — they have no OWNING act), so every guard that filters the profile by zone/act answered truthfully about the wrong list and ONE missing file failed 33 rows. Closed by exporting `S1_GLOBAL_REQUIRED_KEYS`, merging it into the act guard, naming the file/tree/variable in every refusal, and giving the guard module its first test — which MEASURES that constant rather than trusting it. MISDIRECT 28 -> 0, 0 rows went failed->passed or failed->gone. **Residual, stated:** 46 of 178 read paths sampled, and the shipped half is three error strings that no test drives through the UI — tagged for foreground confirmation.
 
 ### O48
 

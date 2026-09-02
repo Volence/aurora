@@ -182,6 +182,67 @@ export function enumerateProfileEntries(profile: ClassicProfile): ProfileEntry[]
   return out;
 }
 
+/**
+ * THE GLOBAL ENTRIES `read()` REQUIRES FOR EVERY ACT — a different question
+ * from `gating`, and the gap between the two defeated every act-level guard in
+ * this repository.
+ *
+ * `gating` means *"a miss makes THE OWNING ACT unavailable"*, and these have no
+ * owning act, so they are correctly `gating: false` and the availability report
+ * correctly still says every act is available. `read()` then throws for ALL
+ * eighteen of them. Measured 2026-09-02 (O45): a real s1disasm checkout missing
+ * only `collide/Angle Map.bin` — one file out of 970 — failed **33 rows**, and
+ * the eight of those that O39 had guarded with `whenS1Act(...)` failed straight
+ * THROUGH the guard, because the guard derives an act's inputs by filtering
+ * `enumerateProfileEntries` on `zone`/`act` and a global entry matches no act.
+ *
+ * So this constant is the second proposition — "what `read()` needs whatever
+ * the act is" — exported so `test/support/s1-checkout.ts` can ask it rather
+ * than re-derive a list that would drift, the same reason `S1_FINGERPRINT` is
+ * exported.
+ *
+ * ⚠ IT IS NOT TRUSTED, IT IS MEASURED. `test/support/s1-checkout.test.ts` drops
+ * each global entry from a profile-derived fake tree in turn and records which
+ * ones make `read()` refuse by name; that measured set must equal this one, so
+ * adding a `global(...)` call in `buildPaths` without adding it here goes red.
+ */
+export const S1_GLOBAL_REQUIRED_KEYS: readonly string[] = [
+  'collision.normal',
+  'collision.angleMap',
+];
+
+/**
+ * How this adapter refuses a file the checkout does not have.
+ *
+ * WHY THE PATH AND THE ROOT ARE BOTH IN THE TEXT. Until O45 these refusals
+ * named a profile KEY and nothing else —
+ *
+ *     Error: act ghz/1 unavailable: missing 1 required file(s): ghz.act1.tiles.0
+ *     Error: required collision table 'collision.angleMap' did not resolve
+ *
+ * — which is a name only this module's own enumeration can decode. A reader
+ * (or a failing test row) cannot go and get `ghz.act1.tiles.0`; they can go and
+ * get `artnem/8x8 - GHZ1.nem`. And a machine can have more than one candidate
+ * tree (`S1DISASM_DIR`, `EMPYREAN_SUITE_ROOT`, a folder picked in the app), so
+ * a repo-relative path alone does not say WHICH tree lacks it — hence
+ * `fa.rootDir` when the FileAccess knows it.
+ *
+ * The environment variables are deliberately NOT named here: this is shipped
+ * core, reached from a folder the user picked in a dialog as often as from a
+ * test. Naming the variable is the harness's job and `test/support/` does it.
+ */
+function missingInputMessage(
+  fa: FileAccess,
+  what: string,
+  missing: readonly { key: string; path: string }[],
+): string {
+  const where = fa.rootDir === undefined ? '' : ` under ${fa.rootDir}`;
+  const list = missing.map((m) => `${m.path} (entry '${m.key}')`).join(', ');
+  return `${what}: ${missing.length} required file(s) not in this s1disasm checkout${where}: `
+    + `${list}. This tree opened as an s1disasm project and then did not hold this data, `
+    + 'so it is an INCOMPLETE checkout rather than a defect in what reads it.';
+}
+
 // ---------------------------------------------------------------------------
 // Resolution
 // ---------------------------------------------------------------------------
@@ -312,12 +373,14 @@ export const s1Adapter: ProjectAdapter = {
     const resolved = await Promise.all(entries.map((e) => resolveEntry(fa, e, effective)));
 
     // Bucket gating misses per act so we can flag unavailable acts + reasons.
-    const missesByAct = new Map<string, string[]>();
+    // Keyed by act, carrying the PATH beside the key: a reason that names only
+    // `ghz.act1.tiles.0` cannot be acted on by whoever reads it (O45).
+    const missesByAct = new Map<string, { key: string; path: string }[]>();
     for (const r of resolved) {
       if (r.entry.status === 'missing' && r.source.gating && r.source.zone !== undefined) {
         const k = `${r.source.zone}/${r.source.act}`;
         const list = missesByAct.get(k) ?? [];
-        list.push(r.source.key);
+        list.push({ key: r.source.key, path: r.entry.path });
         missesByAct.set(k, list);
       }
     }
@@ -333,7 +396,7 @@ export const s1Adapter: ProjectAdapter = {
                 act: act.act,
                 label: act.name,
                 available: false,
-                reason: `missing ${misses.length} required file(s): ${misses.join(', ')}`,
+                reason: missingInputMessage(fa, `act ${zone.id}/${act.act} is unavailable`, misses),
               }
             : { zone: zone.id, act: act.act, label: act.name, available: true },
         );
@@ -350,9 +413,22 @@ export const s1Adapter: ProjectAdapter = {
     for (const r of resolved) {
       if (r.entry.status === 'resolved') pathByKey.set(r.entry.key, r.entry.path);
     }
+    // The path an entry WOULD have had, resolved or not — so a refusal can name
+    // the file that is not there. `resolveEntry` reports a miss against the
+    // preferred path for exactly this reason, and before O45 nothing read it.
+    const attemptedPathByKey = new Map<string, string>();
+    for (const r of resolved) attemptedPathByKey.set(r.entry.key, r.entry.path);
+    const attempted = (key: string): string => attemptedPathByKey.get(key) ?? `<no entry '${key}'>`;
+
     const global = (key: string): string => {
       const p = pathByKey.get(key);
-      if (p === undefined) throw new Error(`required collision table '${key}' did not resolve`);
+      if (p === undefined) {
+        throw new Error(missingInputMessage(
+          fa,
+          `the shared collision table '${key}', which EVERY act needs`,
+          [{ key, path: attempted(key) }],
+        ));
+      }
       return p;
     };
 
@@ -367,7 +443,13 @@ export const s1Adapter: ProjectAdapter = {
       const p = (field: string): string => {
         const key = `${zoneId}.act${act.act}.${field}`;
         const path = pathByKey.get(key);
-        if (path === undefined) throw new Error(`entry '${key}' did not resolve`);
+        if (path === undefined) {
+          throw new Error(missingInputMessage(
+            fa,
+            `act ${zoneId}/${act.act} cannot be read`,
+            [{ key, path: attempted(key) }],
+          ));
+        }
         return path;
       };
       return {
@@ -402,7 +484,10 @@ export const s1Adapter: ProjectAdapter = {
       read: async (ref: ZoneActRef): Promise<LevelDoc> => {
         const meta = refs.find((r) => r.zone === ref.zone && r.act === ref.act);
         if (!meta) throw new Error(`unknown act ${ref.zone}/${ref.act}`);
-        if (!meta.available) throw new Error(`act ${ref.zone}/${ref.act} unavailable: ${meta.reason}`);
+        // `reason` already opens with `act <zone>/<act> is unavailable` and now
+        // names every missing file and the tree, so re-prefixing it would only
+        // say the act twice.
+        if (!meta.available) throw new Error(meta.reason ?? `act ${ref.zone}/${ref.act} unavailable`);
         const { zone, act } = findAct(ref);
         const state = await readS1Level(act, buildPaths(zone, act), fa);
         readStates.set(refKey(ref), state.read);

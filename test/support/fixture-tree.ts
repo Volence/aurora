@@ -44,9 +44,25 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it } from 'vitest';
 
-import { siblingPath, siblingPathOrUnresolved, UNRESOLVED_ROOT } from './sibling-root.mjs';
+import {
+  siblingPath, siblingPathOrUnresolved, siblingPathSource, UNRESOLVED_ROOT,
+} from './sibling-root.mjs';
 
 export { UNRESOLVED_ROOT };
+
+/**
+ * WHICH PRECEDENCE STEP — and therefore which VARIABLE — produced this repo's
+ * answer for `name`, as prose for a refusal to carry.
+ *
+ * A skip that says only "…/s1disasm is missing X" leaves the reader to guess
+ * whether that root came from `S1DISASM_DIR`, from `EMPYREAN_SUITE_ROOT`, or
+ * from the derivation off this checkout's own git dir — three different fixes.
+ * The suite contract asks every consumer to print the resolved path AND the
+ * step that answered; this is that string, so a refusal can end with it.
+ */
+export function referencePathSource(name: string): string {
+  return siblingPathSource(name);
+}
 
 /**
  * A reference checkout beside this repo, or null when it is not there.
@@ -199,15 +215,50 @@ export function referenceCheckoutReason(name: string): string {
 }
 
 /**
+ * The nearest ANCESTOR of `path` that does exist, or null when even the root of
+ * the chain is gone.
+ *
+ * WHY A SKIP REASON NEEDS THIS. "…/s1disasm/_anim/Sonic.asm is absent on this
+ * machine" reads as *there is no disassembly here*, and on a machine with a
+ * complete-looking checkout that is simply false — measured 2026-09-02 (O45),
+ * where removing one file printed exactly that line beside a checkout that was
+ * right there. The two states send a reader to two different places (clone the
+ * tree / complete the tree), and the deepest surviving directory tells them
+ * apart from evidence rather than from a caller's claim.
+ */
+function nearestExistingAncestor(path: string): string | null {
+  let dir = resolve(path, '..');
+  for (;;) {
+    if (existsSync(dir)) return dir;
+    const up = resolve(dir, '..');
+    if (up === dir) return null;
+    dir = up;
+  }
+}
+
+/**
  * The reason line for a skip. NAMES THE MISSING THING — the point of routing
  * these through one helper is consistency of FORM, never anonymity: a reader of
  * the run output must be able to see which file was wanted and go get it. A
  * reason that said only "a fixture is absent" would be a worse report than the
  * hand-written strings it replaced.
+ *
+ * ⚠ IT ALSO SAYS WHICH OF THE TWO ABSENCES IT IS. A tree that is not there and
+ * a tree that is there without this file are different defects with different
+ * fixes, and this line used to render both as the first one.
  */
 export function unmeasurable(path: string | null, what: string): string {
-  const where = path ?? '(no sibling checkout found at all — see EMPYREAN_SUITE_ROOT)';
-  return `SKIPPED, NOT PASSED: cannot measure ${what} — ${where} is absent on this machine, so this row measures nothing`;
+  if (path === null) {
+    return `SKIPPED, NOT PASSED: cannot measure ${what} — no sibling checkout could be resolved `
+      + 'at all (see EMPYREAN_SUITE_ROOT / <NAME>_DIR), so this row measures nothing';
+  }
+  const near = nearestExistingAncestor(path);
+  const context = near === null
+    ? ' — and no directory above it exists either'
+    : `; the deepest directory above it that DOES exist is ${near}, so if that is the checkout, `
+      + 'this is an INCOMPLETE checkout rather than an absent one';
+  return `SKIPPED, NOT PASSED: cannot measure ${what} — ${path} is not on this machine${context}. `
+    + 'This row measures nothing';
 }
 
 /** `describe`/`it` options that skip with a reason when `path` is not readable. */
