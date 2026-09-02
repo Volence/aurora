@@ -52,7 +52,7 @@ interface Run {
 function run(body: string, env: Record<string, string> = {}, subject = SUBJECT, cwd = dirname(subject)): Run {
   const clean = { ...process.env };
   for (const k of Object.keys(clean)) {
-    if (/^(EMPYREAN_SUITE_ROOT|AURORA_PEER_ROOT|LIVE_AEON|.*_DIR|AURORA_.*_REPO)$/.test(k)) delete clean[k];
+    if (/^(EMPYREAN_SUITE_ROOT|AURORA_PEER_ROOT|LIVE_AEON|AURORA_ROOT|AURORA_REPO|.*_DIR|AURORA_.*_REPO)$/.test(k)) delete clean[k];
   }
   const src = `import * as R from ${JSON.stringify(subject)};\n${body}\n`;
   const r = execFileSync(process.execPath, ['--input-type=module', '-e', src], {
@@ -87,7 +87,7 @@ function runExpectingFailure(body: string, env: Record<string, string> = {}): Ru
 function runBoth(body: string, env: Record<string, string> = {}): Run {
   const clean = { ...process.env };
   for (const k of Object.keys(clean)) {
-    if (/^(EMPYREAN_SUITE_ROOT|AURORA_PEER_ROOT|LIVE_AEON|.*_DIR|AURORA_.*_REPO)$/.test(k)) delete clean[k];
+    if (/^(EMPYREAN_SUITE_ROOT|AURORA_PEER_ROOT|LIVE_AEON|AURORA_ROOT|AURORA_REPO|.*_DIR|AURORA_.*_REPO)$/.test(k)) delete clean[k];
   }
   const src = `import * as R from ${JSON.stringify(SUBJECT)};\n${body}\n`;
   const scratch = mkdtempSync(resolve(tmpdir(), 'aurora-suite-run-'));
@@ -626,10 +626,149 @@ describe('sibling-root: the names the contract ratified', () => {
       'S1DISASM_DIR',
       'ORACLE_DIR',
       'EMPYREAN_DIR',
-      'AURORA_AEON_REPO,LIVE_AEON',
+      'AURORA_AEON_REPO,LIVE_AEON,AEON_ROOT',
       'AURORA_ORACLE_REPO',
       'AURORA_S1DISASM_REPO,S1_DIR',
       'AURORA_PEER_ROOT',
     ]);
+  });
+
+  it('spells THIS repo\'s own checkout variable and its aliases', () => {
+    const out = run(
+      'process.stdout.write([R.AURORA_DIR_ENV, R.AURORA_DIR_ENV_ALIASES.join(",")].join("\\n"));',
+    );
+    expect(out.stdout.split('\n')).toEqual(['AURORA_DIR', 'AURORA_ROOT,AURORA_REPO']);
+  });
+});
+
+/**
+ * AURORA_DIR — the same question turned inward, and the ONE step that is
+ * deliberately not in the chain.
+ *
+ * Before O69 "which aurora tree am I" was answered by hand in 93 files: 64 read
+ * `process.env.AURORA_ROOT` (not the contract's spelling) and 29 more wrote the
+ * derivation with no override at all, so pointing a run at another tree moved
+ * two thirds of them and silently failed to move the rest.
+ *
+ * Every expectation below is COMPOSED from `SUBJECT` — the path this file
+ * already had to know to import the subject — or from a `mkdtemp` directory
+ * created moments earlier. Nothing here is a path typed by hand, so no row can
+ * pass by naming a string that happens to be right on one machine.
+ */
+describe('sibling-root: AURORA_DIR — this repo\'s own checkout', () => {
+  /**
+   * The tree the subject lives in, derived from the path used to import it:
+   * `<tree>/test/support/sibling-root.mjs` → three levels up from the FILE.
+   */
+  const SUBJECT_TREE = resolve(SUBJECT, '../../..');
+
+  it('unset → step 3, this module\'s own location, and the source says so', () => {
+    const out = run('process.stdout.write(R.AURORA_DIR + "\\n" + R.auroraDirSource());');
+    const [dir, source] = out.stdout.split('\n');
+    expect(dir).toBe(SUBJECT_TREE);
+    expect(source).toContain('step 3');
+    expect(source).toContain(SUBJECT);
+  });
+
+  it('AURORA_DIR answers, and the source names step 1', () => {
+    const suite = makeFakeSuite();
+    const out = run(
+      'process.stdout.write(R.AURORA_DIR + "\\n" + R.auroraDirSource());',
+      { AURORA_DIR: resolve(suite, 'aurora') },
+    );
+    const [dir, source] = out.stdout.split('\n');
+    expect(dir).toBe(resolve(suite, 'aurora'));
+    expect(source).toContain('step 1: AURORA_DIR=');
+  });
+
+  it('AURORA_ROOT is accepted as an alias and announced ONCE, naming AURORA_DIR', () => {
+    const suite = makeFakeSuite();
+    const out = runBoth(
+      'R.auroraDirSource(); R.auroraDirSource(); process.stdout.write(R.AURORA_DIR);',
+      { AURORA_ROOT: resolve(suite, 'aurora') },
+    );
+    expect(out.stdout).toBe(resolve(suite, 'aurora'));
+    const lines = out.stderr.trim().split('\n').filter(Boolean);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toBe(
+      'suite-paths: AURORA_ROOT is a transitional alias — set AURORA_DIR instead '
+      + '(empyrean contract/SUITE_PATHS.md)',
+    );
+  });
+
+  it('AURORA_REPO, the third spelling, is announced the same way', () => {
+    const suite = makeFakeSuite();
+    const out = runBoth('process.stdout.write(R.AURORA_DIR);',
+      { AURORA_REPO: resolve(suite, 'aurora') });
+    expect(out.stdout).toBe(resolve(suite, 'aurora'));
+    expect(out.stderr).toContain('AURORA_REPO is a transitional alias — set AURORA_DIR instead');
+  });
+
+  it('THE CANONICAL NAME PRINTS NOTHING — the anti-vacuous half of the two rows above', () => {
+    const suite = makeFakeSuite();
+    const out = runBoth('process.stdout.write(R.AURORA_DIR);',
+      { AURORA_DIR: resolve(suite, 'aurora') });
+    expect(out.stdout).toBe(resolve(suite, 'aurora'));
+    expect(out.stderr).toBe('');
+  });
+
+  it('SET BUT WRONG is a hard error naming the variable, its value and the step', () => {
+    const absent = resolve(makeFakeSuite(), 'no-such-aurora');
+    const out = runExpectingFailure('process.stdout.write(R.AURORA_DIR);', { AURORA_DIR: absent });
+    expect(out.status).not.toBe(0);
+    expect(out.stderr).toContain('SuitePathError');
+    expect(out.stderr).toContain(`AURORA_DIR=${absent}`);
+    expect(out.stderr).toContain('is not a directory');
+    expect(out.stderr).toContain('Precedence step 1 refuses');
+  });
+
+  it('the canonical name and an alias that DISAGREE are refused, naming both', () => {
+    const suite = makeFakeSuite();
+    const out = runExpectingFailure('process.stdout.write(R.AURORA_DIR);', {
+      AURORA_DIR: resolve(suite, 'aurora'),
+      AURORA_ROOT: resolve(suite, 'aeon'),
+    });
+    expect(out.status).not.toBe(0);
+    expect(out.stderr).toContain('DISAGREE');
+    expect(out.stderr).toContain(`AURORA_DIR=${resolve(suite, 'aurora')}`);
+    expect(out.stderr).toContain(`AURORA_ROOT=${resolve(suite, 'aeon')}`);
+  });
+
+  /**
+   * THE DELIBERATE GAP, asserted rather than described.
+   *
+   * `EMPYREAN_SUITE_ROOT=$(mktemp -d) npm test` is this repo's documented recipe
+   * for "a machine with no REFERENCE trees". If step 2 also answered for aurora
+   * ITSELF, that recipe would relocate the repo under test and every instrument
+   * would stop finding its own `dist/` and `src/` — a run meant to prove the
+   * peer-dependent half skips honestly would die of unrelated absence instead.
+   *
+   * The second half of this row is what stops it being vacuous: the SAME child
+   * process, the SAME variable, moving a PEER. Without it, a subject that
+   * ignored `EMPYREAN_SUITE_ROOT` entirely would pass.
+   */
+  it('EMPYREAN_SUITE_ROOT moves a PEER and does NOT move AURORA_DIR', () => {
+    const suite = makeFakeSuite();
+    const out = run(
+      'process.stdout.write(R.AURORA_DIR + "\\n" + R.siblingPath("aeon"));',
+      { EMPYREAN_SUITE_ROOT: suite },
+    );
+    const [dir, aeon] = out.stdout.split('\n');
+    expect(aeon).toBe(resolve(suite, 'aeon'));
+    expect(dir).toBe(SUBJECT_TREE);
+    expect(dir).not.toBe(resolve(suite, 'aurora'));
+  });
+
+  it('auroraDirOverride is null when nothing is set, and names the spelling when set', () => {
+    const suite = makeFakeSuite();
+    expect(run('process.stdout.write(String(R.auroraDirOverride()));').stdout).toBe('null');
+    const out = run(
+      'process.stdout.write(JSON.stringify(R.auroraDirOverride()));',
+      { AURORA_ROOT: resolve(suite, 'aurora') },
+    );
+    expect(JSON.parse(out.stdout)).toEqual({
+      name: 'AURORA_ROOT',
+      value: resolve(suite, 'aurora'),
+    });
   });
 });

@@ -11,14 +11,14 @@
 // armed-id the click handlers read, so if it says "click selects" while the
 // tool is armed, the branches have desynced.
 
-import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = 9342;
 const S1DIR = siblingPathOrUnresolved('s1disasm');
-const ROOT = AURORA_ROOT;
+const ROOT = AURORA_DIR;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

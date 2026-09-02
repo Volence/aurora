@@ -37,7 +37,7 @@
 //
 // Usage: node scratchpad/boot-override-harness.mjs    (VERBOSE=1 for logs)
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -46,7 +46,7 @@ import { fileURLToPath } from 'node:url';
 import net from 'node:net';
 import * as esbuild from 'esbuild';
 
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url))); // this tree (worktree-safe)
+const ROOT = AURORA_DIR; // this tree (worktree-safe)
 const SERVER = siblingPathOrUnresolved('oracle', 'target/release/oracle-aether');
 const ROM = siblingPathOrUnresolved('aeon', 's4.debug.bin');
 const AEON = siblingPathOrUnresolved('aeon');

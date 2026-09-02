@@ -31,7 +31,7 @@
 //
 // Usage: node scratchpad/s1-library-presentation-harness.mjs   (VERBOSE=1 for app logs)
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -40,7 +40,7 @@ import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9391);
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));   // this worktree
+const ROOT = AURORA_DIR;   // this worktree
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
 const S1DIR = siblingPathOrUnresolved('s1disasm');
 const SHOTS = join(ROOT, 'scratchpad/shots-s1-library');

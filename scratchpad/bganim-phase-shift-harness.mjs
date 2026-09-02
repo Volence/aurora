@@ -30,7 +30,7 @@
 // Run: node scratchpad/bganim-phase-shift-harness.mjs
 //   env AEON_DIR (default ../aeon), AEON_SHA (default: the roomy provenance
 //   sidecar's pin), BAND=CxR (default 2x1), PORT, VERBOSE, EMIT_DIR
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { writeFileSync, mkdirSync, mkdtempSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -41,12 +41,12 @@ import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9397);
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`
     : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
-const AEON = process.env.AEON_DIR ?? join(dirname(ROOT.replace(/\/\.claude\/worktrees\/[^/]+$/, '')), 'aeon');
+const AEON = siblingPathOrUnresolved('aeon');   // honours AEON_DIR at step 1
 const FIXTURES = `${ROOT}/test/fixtures/bg-override`;
 const PROVENANCE = JSON.parse(readFileSync(`${FIXTURES}/editor_bg_override.roomy.provenance.json`, 'utf8'));
 const AEON_SHA = process.env.AEON_SHA ?? PROVENANCE.aeon.revision;

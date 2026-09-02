@@ -255,14 +255,14 @@
 // scratchpad/shots-section-column/.
 // ===========================================================================
 
-import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9381);
-const ROOT = AURORA_ROOT;
+const ROOT = AURORA_DIR;
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
 const S1DIR = siblingPathOrUnresolved('s1disasm');
 const AEONDIR = siblingPathOrUnresolved('aeon');

@@ -81,7 +81,7 @@
 // Run:                     node scratchpad/bganim-tile-door-harness.mjs
 //                          (xvfb-run is spawned internally)
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import {
   writeFileSync, mkdirSync, existsSync, readFileSync, rmSync,
@@ -93,7 +93,7 @@ import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9418);
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 // ⚠ A HARNESS CANNOT LAUNCH FROM A WORKTREE WITHOUT THIS FALLBACK.
 // `node_modules/.bin/electron` does not exist in a git worktree, and the
 // failure presents as `CDP target never appeared` — a message that says nothing

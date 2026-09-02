@@ -1,10 +1,10 @@
 // THROWAWAY probe (not committed): can CDP real key events drive a native <select> here?
-import { AURORA_ROOT, checkoutOverride, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, checkoutOverride, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 const PORT = 9422;
-const ROOT = AURORA_ROOT;
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN
   ?? siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron');
 const AEONDIR = checkoutOverride('aeon')?.value;

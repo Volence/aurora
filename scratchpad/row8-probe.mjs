@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Probe: replay harness rows 7→8 and watch WHO checks the sprite doc out after
 // openAct — poll spriteState + session activeId, no clicks at all.
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +9,7 @@ import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = 9385;
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
 const S1DIR = siblingPathOrUnresolved('s1disasm');
 const SESSION_KEY = `aurora.session.v1:${S1DIR}`;

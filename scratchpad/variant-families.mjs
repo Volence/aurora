@@ -14,7 +14,7 @@
 // Reads a real s1disasm tree through the SAME s1Adapter the app uses. Writes
 // nothing but its own report.
 
-import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO = process.env.AURORA_REPO ?? AURORA_ROOT;
+const REPO = AURORA_DIR;
 const S1DIR = siblingPathOrUnresolved('s1disasm');
 
 async function loadCore() {

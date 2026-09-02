@@ -32,7 +32,7 @@
 //
 // Usage: node scratchpad/s1-sonic-preview-harness.mjs   (VERBOSE=1 for app logs)
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, existsSync, statSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -41,7 +41,7 @@ import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9401);
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));   // this worktree
+const ROOT = AURORA_DIR;   // this worktree
 // Worktrees have no node_modules of their own — walk up (the same resolution
 // npx uses) until the electron binary appears.
 const ELECTRON = (() => {

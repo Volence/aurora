@@ -46,6 +46,7 @@
 // reads this marker, prints it as a declared exemption on every run, and would
 // fail this file without it.
 
+import { AURORA_DIR } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -57,7 +58,7 @@ import {
   displayArtifacts, reapDisplays,
 } from './lib/harness-guard.mjs';
 
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN ?? `${ROOT}/node_modules/.bin/electron`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

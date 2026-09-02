@@ -19,7 +19,7 @@
 //     false. If one of them reports true the probe is blind and the whole run is
 //     worthless, which is reported separately from the failures.
 
-import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import * as http from 'node:http';
@@ -27,7 +27,7 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const ENGINE = process.env.ENGINE ?? 'aeon';
 const PORT = Number(process.env.PORT ?? (ENGINE === 'aeon' ? 9371 : 9372));
-const ROOT = AURORA_ROOT;
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN
   ?? siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron');
 const AEONDIR = siblingPathOrUnresolved('aeon') + '/';

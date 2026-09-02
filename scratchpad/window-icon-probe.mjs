@@ -46,13 +46,14 @@
 // Usage: node scratchpad/window-icon-probe.mjs
 //   ELECTRON_BIN=… to point at an electron a worktree does not have.
 
+import { AURORA_DIR } from '../test/support/sibling-root.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN ?? join(ROOT, 'node_modules/.bin/electron');
 const MAIN = join(ROOT, 'dist/main/index.mjs');
 const INSPECT_PORT = Number(process.env.INSPECT_PORT ?? 9333);

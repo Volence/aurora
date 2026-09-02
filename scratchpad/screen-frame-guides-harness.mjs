@@ -60,6 +60,7 @@
 // Build first:  VITE_AURORA_DEBUG=1 npx electron-vite build
 // Run:          AEON_DIR=<copy> node scratchpad/screen-frame-guides-harness.mjs
 
+import { AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -69,11 +70,20 @@ import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9401);
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN ?? `${ROOT}/node_modules/.bin/electron`;
-const AEONDIR = process.env.AEON_DIR;
-if (!AEONDIR || !existsSync(AEONDIR)) {
+// REQUIRED, never defaulted: this harness writes into the tree it opens. Going
+// through `checkoutOverride` rather than `process.env.AEON_DIR` buys the
+// aliases, the two-spellings-disagree refusal, and the set-but-wrong error —
+// which is the `!existsSync` half of the old check, raised by the resolver at
+// the step that read the variable and naming it.
+const aeonOverride = checkoutOverride('aeon');
+if (aeonOverride === null) {
   throw new Error('AEON_DIR must point at a COPY of an aeon tree — never the live one');
+}
+const AEONDIR = aeonOverride.value;
+if (AEONDIR === siblingDefaultPathOrUnresolved('aeon')) {
+  throw new Error('refusing to run against the real aeon tree — use the throwaway copy');
 }
 const SHOTS = `${ROOT}/scratchpad/shots-screen-frame`;
 mkdirSync(SHOTS, { recursive: true });

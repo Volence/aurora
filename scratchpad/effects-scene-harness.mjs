@@ -65,7 +65,7 @@
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npm run build
 // Run:                     node scratchpad/effects-scene-harness.mjs
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -82,8 +82,7 @@ const PORT = Number(process.env.PORT ?? 9391);
 // the overseer rebuilt the merged tree, ran this, and got the branch's build.)
 // Deriving it from import.meta.url means the harness and the tree it tests
 // cannot come apart.
-const ROOT = process.env.AURORA_ROOT
-  ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 // The electron BINARY and the app ROOT are separate on purpose. A git worktree
 // has no node_modules of its own (node resolution walks up to the main clone's),
 // so a harness run from a worktree has to take the binary from wherever it is

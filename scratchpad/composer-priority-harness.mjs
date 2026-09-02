@@ -88,7 +88,7 @@
 //
 // Usage: node scratchpad/composer-priority-harness.mjs   (VERBOSE=1 for app logs)
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, statSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -97,7 +97,7 @@ import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9414);
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 // A WORKTREE HAS NO node_modules OF ITS OWN — npm resolves up, and so must this.
 function findElectron(from) {
   for (let d = from; d !== '/'; d = dirname(d)) {

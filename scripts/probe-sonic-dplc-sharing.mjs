@@ -21,10 +21,10 @@ import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO = path.resolve(__dirname, '..');
+const REPO = AURORA_DIR;
 // DERIVED, NEVER TYPED — see test/support/sibling-root.mjs.
 const S1DIR = siblingPathOrUnresolved('s1disasm');
 

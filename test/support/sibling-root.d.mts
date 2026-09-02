@@ -10,8 +10,17 @@
  * decision"), so tsc needs the signature stated rather than inferred.
  */
 
-/** This repository's own root. */
-export declare const AURORA_ROOT: string;
+/** This repository's own checkout — `AURORA_DIR`, then this module's location. */
+export declare const AURORA_DIR: string;
+
+/** The canonical variable naming THIS repo's checkout — `AURORA_DIR`. */
+export declare const AURORA_DIR_ENV: string;
+
+/** Transitional aliases for it (`AURORA_ROOT`), accepted and announced. */
+export declare const AURORA_DIR_ENV_ALIASES: string[];
+
+/** Which precedence step produced `AURORA_DIR`, as printable prose. */
+export declare function auroraDirSource(): string;
 
 /** Every refusal from the resolver. */
 export declare class SuitePathError extends Error {}
@@ -21,6 +30,9 @@ export declare const SUITE_ROOT_ENV: string;
 
 /** Transitional aliases for the suite root, accepted and announced. */
 export declare const SUITE_ROOT_ENV_ALIASES: string[];
+
+/** The peer checkouts this repo can name, by directory name. */
+export declare const SUITE_PEERS: string[];
 
 /** The canonical checkout variable for a peer: `aeon` → `AEON_DIR`. */
 export declare function checkoutEnv(name: string): string;

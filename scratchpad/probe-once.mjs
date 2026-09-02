@@ -2,13 +2,13 @@
 // One-shot diagnostic: open the aeon project, paint once, and dump enough state
 // to see WHERE the edit landed. Not a check suite — a microscope.
 
-import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9378);
-const ROOT = AURORA_ROOT;
+const ROOT = AURORA_DIR;
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
 const AEON = siblingPathOrUnresolved('aeon');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

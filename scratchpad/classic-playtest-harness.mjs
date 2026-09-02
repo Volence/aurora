@@ -48,7 +48,7 @@
 //
 // Usage: node scratchpad/classic-playtest-harness.mjs   (VERBOSE=1 for logs)
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, statSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -62,7 +62,7 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { requiredAetherMethods, methodGap } from './lib/aether-methods.mjs';
 
 const PORT = Number(process.env.PORT ?? 9382);
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));   // this worktree
+const ROOT = AURORA_DIR;   // this worktree
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
 const SERVER = siblingPathOrUnresolved('oracle', 'target/release/oracle-aether');
 const S1DIR = siblingPathOrUnresolved('s1disasm');

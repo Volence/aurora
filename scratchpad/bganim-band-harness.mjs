@@ -108,7 +108,7 @@
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npm run build
 // Run:                     node scratchpad/bganim-band-harness.mjs
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -122,8 +122,7 @@ const PORT = Number(process.env.PORT ?? 9394);
 // A pinned worktree path is a landmine: run from the main clone it silently
 // serves the WORKTREE's dist/, so a "re-verified on the merged tree" run is
 // actually re-verifying the branch.
-const ROOT = process.env.AURORA_ROOT
-  ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 // The electron BINARY and the app ROOT are separate on purpose: a git worktree
 // has no node_modules of its own.
 const ELECTRON = process.env.ELECTRON_BIN

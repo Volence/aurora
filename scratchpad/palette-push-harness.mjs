@@ -22,7 +22,7 @@
 //
 // Usage: node scratchpad/palette-push-harness.mjs   (VERBOSE=1 for server log)
 
-import { AURORA_ROOT, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -30,7 +30,7 @@ import { join } from 'node:path';
 import net from 'node:net';
 import * as esbuild from 'esbuild';
 
-const ROOT = AURORA_ROOT;
+const ROOT = AURORA_DIR;
 const SERVER = siblingPathOrUnresolved('oracle', 'target/release/oracle-aether');
 const ROM = siblingPathOrUnresolved('aeon', 's4.bin');
 

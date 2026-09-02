@@ -53,7 +53,7 @@
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npx electron-vite build
 // Run:                     npm run harness:collision-read
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, readFileSync, mkdirSync, existsSync, rmSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -63,7 +63,7 @@ import * as http from 'node:http';
 import { spawnGuarded, killTree, restoreDiscoveryNow, readDiscoveryNow, resolveOwnedDiscovery } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9414);
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`

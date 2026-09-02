@@ -43,7 +43,7 @@
 // Run: node scratchpad/handover/handover-band-harness.mjs
 //   env AEON_DIR, AEON_SHA (default: resolved pushed master), BAND=CxR
 //       (default 8x4), BASE (default 2), PORT, VERBOSE, EMIT_DIR
-import { siblingPathOrUnresolved } from '../../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../../test/support/sibling-root.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { writeFileSync, mkdirSync, mkdtempSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -56,13 +56,16 @@ import { spawnGuarded, killTree } from '../lib/harness-guard.mjs';
 const PORT = Number(process.env.PORT ?? 9398);
 const HERE = dirname(fileURLToPath(import.meta.url));
 // HERE is scratchpad/handover, so the repo root is TWO levels up — not one.
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(HERE));
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`
     : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
-const AEON = process.env.AEON_DIR
-  ?? join(dirname(ROOT.replace(/\/\.claude\/worktrees\/[^/]+$/, '')), 'aeon');
+// READ-ONLY (`git -C AEON show`), so the default location is fine here; the
+// resolver honours AEON_DIR at step 1. This used to hand-roll the sibling by
+// string-surgery on the worktree path, which is the derivation `sibling-root`
+// exists to be the only copy of.
+const AEON = siblingPathOrUnresolved('aeon');
 // THE PIN. Resolved from the remote unless the caller pins it explicitly.
 const AEON_SHA = process.env.AEON_SHA ?? execFileSync(
   'git', ['-C', AEON, 'ls-remote', 'origin', 'refs/heads/master'], { encoding: 'utf8' },

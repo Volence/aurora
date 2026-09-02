@@ -106,7 +106,7 @@
 // Run:                     npm run harness:tile-attributes
 //                     (or) node scratchpad/tile-attribute-harness.mjs
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, readFileSync, mkdirSync, existsSync, rmSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -119,8 +119,7 @@ const PORT = Number(process.env.PORT ?? 9411);
 // SELF-LOCATING, never a pinned path: run from the main clone this must serve
 // the main clone's dist/, or a "re-verified after merge" run silently
 // re-verifies the branch instead.
-const ROOT = process.env.AURORA_ROOT
-  ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`

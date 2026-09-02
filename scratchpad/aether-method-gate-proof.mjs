@@ -50,7 +50,7 @@
 //
 // Usage: node scratchpad/aether-method-gate-proof.mjs
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -60,7 +60,7 @@ import net from 'node:net';
 import * as esbuild from 'esbuild';
 import { requiredAetherMethods, methodGap, INDIRECT_METHODS, methodLiteralsIn } from './lib/aether-methods.mjs';
 
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const HARNESS = join(ROOT, 'scratchpad/classic-playtest-harness.mjs');
 const CLIENT_DIR = join(ROOT, 'src/main/aether');
 // `oracle-next` is a symlink to `oracle` (verified: same md5), so this and

@@ -18,8 +18,10 @@
 // THROWAWAY COPY of aeon as `.json` files, the app opens that copy, and the
 // panel is read on the document the reader loaded.
 //
-// ⛔ THE COPY, NEVER `/home/volence/sonic_hacks/aeon`. AEON_DIR defaults to the
-// scratchpad clone; the real tree is never opened and never written.
+// ⛔ THE COPY, NEVER THE LIVE AEON TREE. AEON_DIR has NO DEFAULT — unset, this
+// harness refuses to start; set to the tree aeon actually lives in, it refuses
+// again, against the RESOLVED default location rather than a literal. See the
+// two-refusal block below.
 //
 // ═══ ANTI-VACUOUS ═══
 //
@@ -39,7 +41,7 @@
 // Requires:  VITE_AURORA_DEBUG=1 npx electron-vite build
 // Run:       node scratchpad/guard-surface-harness.mjs
 
-import { siblingDefaultPathOrUnresolved, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -49,13 +51,51 @@ import { execSync } from 'node:child_process';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9411);
-const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`
     : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
-const AEONDIR = process.env.AEON_DIR
-  ?? '/tmp/claude-1000/-home-volence-sonic-hacks-aurora/474f13c9-7e59-4f1b-b1d3-46f806d45cf4/scratchpad/aeonwork/aeon';
+/**
+ * THE COPY IS REQUIRED, SO THERE IS NO DEFAULT. Two refusals, and they are two
+ * different questions — keep them apart.
+ *
+ * Until O69 this read `process.env.AEON_DIR ?? '<a previous session's scratchpad
+ * under /tmp/claude-1000/…/aeonwork/aeon>'`. That directory has not existed for
+ * weeks; the default was a path to nowhere wearing the shape of a default. It
+ * carries no home-directory literal, so `check-peer-path-literals` never saw it,
+ * and it never fired the guard below either — a dead path is not the live tree,
+ * so the run got past the refusal and died later on a missing file, which reads
+ * like a broken harness rather than a missing variable.
+ *
+ * A default is not available honestly here. A throwaway copy is something an
+ * operator MAKES; this harness cannot invent one, and every candidate default
+ * is either that dead path again or the live tree the guard exists to refuse.
+ * So the harness REFUSES when nothing is set, which is the contract's step 4 in
+ * its loudest form, and `checkoutOverride` is the resolver's own instrument for
+ * exactly this ("for an instrument that REQUIRES one to have been set (a
+ * harness that writes, and must be pointed at a copy)"). Going through it also
+ * buys the aliases, the two-spellings-disagree refusal and the set-but-wrong
+ * error, none of which a hand-rolled `process.env.AEON_DIR` had.
+ *
+ * The SECOND refusal — the one below, comparing against the RESOLVED default
+ * location rather than a literal — is unchanged and must stay that way. It is
+ * what stops `AEON_DIR=<the live tree>` from writing scene files into another
+ * lane's working tree.
+ */
+const aeonOverride = checkoutOverride('aeon');
+if (aeonOverride === null) {
+  throw new Error(
+    'AEON_DIR is unset, and this harness has no honest default: it WRITES scene '
+    + '.json files into the tree it opens, so it must be pointed at a throwaway '
+    + `copy of aeon. Make one (e.g. \`cp -r ${siblingDefaultPathOrUnresolved('aeon')} `
+    + '$(mktemp -d)/aeon`) and set AEON_DIR to it. Refusing rather than guessing: '
+    + 'the guess this replaced was a dead scratchpad path from a 2026-08 session, '
+    + 'which failed later and further away. (empyrean contract/SUITE_PATHS.md, '
+    + 'precedence step 4)',
+  );
+}
+const AEONDIR = aeonOverride.value;
 const SHOTS = `${ROOT}/scratchpad/shots-guard-surface`;
 mkdirSync(SHOTS, { recursive: true });
 

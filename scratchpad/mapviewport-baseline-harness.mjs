@@ -183,7 +183,7 @@
 // amortised number; rows c2 and the per-cell resolution line will say so in the
 // output, so a short run cannot quietly masquerade as a precise one.
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { auroraDirOverride, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { writeFileSync, statSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -202,9 +202,16 @@ const PORT = Number(process.env.PORT ?? 9427);
  * reader has to know whether it was the one they edited.
  */
 function resolveRoot() {
+  // `here` stays a local derivation because it is the OTHER OPERAND of the
+  // comparison this function exists to make: "the tree this script lives in"
+  // against "the tree the run is against". `AURORA_DIR` collapses to `here`
+  // when nothing is set, so asking the resolver for both would make `borrowed`
+  // permanently false. The OVERRIDE is what goes through the resolver, so this
+  // site gets the aliases, the disagreement refusal and the set-but-wrong error.
   const here = dirname(dirname(fileURLToPath(import.meta.url)));
   const runnable = (d) => existsSync(join(d, 'node_modules/.bin/electron')) && existsSync(join(d, 'dist/main/index.mjs'));
-  if (process.env.AURORA_ROOT) return { root: process.env.AURORA_ROOT, here, borrowed: process.env.AURORA_ROOT !== here };
+  const override = auroraDirOverride();
+  if (override !== null) return { root: override.value, here, borrowed: override.value !== here };
   let dir = here;
   for (let i = 0; i < 8; i++) {
     if (runnable(dir)) return { root: dir, here, borrowed: dir !== here };

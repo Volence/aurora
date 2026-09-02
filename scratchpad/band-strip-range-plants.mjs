@@ -19,12 +19,13 @@
 // Run: node scratchpad/band-strip-range-plants.mjs
 // It restores the file on every exit path, including a crash.
 
+import { AURORA_DIR } from '../test/support/sibling-root.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const ROOT = AURORA_DIR;
 const SRC = `${ROOT}/src/renderer/providers/band-strip-range.ts`;
 const TEST = 'src/renderer/providers/__tests__/band-strip-range.test.ts';
 

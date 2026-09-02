@@ -1,9 +1,33 @@
 /**
- * check-peer-path-literals — fail the run when a test types the ABSOLUTE PATH of
- * a sibling checkout instead of deriving it.
+ * check-peer-path-literals — fail the run when a file reaches a peer checkout by
+ * any route but the resolver.
  *
- * WHY THIS EXISTS
- * ---------------
+ * THREE RULES, all listed on every run's own output line. Rule 1 is what this
+ * file was built for; rules 2 and 3 were added by O69 (2026-09-02) after the
+ * SUITE-PATHS landing left two residues rule 1 is STRUCTURALLY UNABLE TO SEE,
+ * because neither contains a home-directory literal — the gate scanned both and
+ * printed a confident OK.
+ *
+ *   1. `sibling-literal`  — an executable line naming the sibling root.
+ *   2. `session-scratchpad` — an executable line naming an agent session's
+ *      scratchpad (`<tmpdir>/claude-<uid>/…`), which is gone when that session
+ *      ends. 3 files defaulted to one; the worst was a harness whose whole
+ *      safety property is "run against a COPY of aeon, never the live tree" —
+ *      the dead default never tripped that guard, because a dead path is not the
+ *      live tree, so an unset variable got PAST the refusal and died later.
+ *   3. `unratified-env`   — an executable line going to `process.env` /
+ *      `os.environ` for a variable the resolver owns. 64 files read
+ *      `process.env.AURORA_ROOT` (not the contract's `AURORA_DIR`) and 8 read
+ *      `process.env.AEON_DIR` / `AEON_ROOT`, so all of them missed the
+ *      transitional aliases, the two-spellings-disagree refusal and the
+ *      set-but-wrong error, and two then hand-rolled the sibling derivation by
+ *      string-surgery on the worktree path.
+ *
+ * Rule 3 does NOT cover `.sh` — see `ENV_RULE_EXEMPT_EXTS`, which says why and
+ * what that leaves uncovered.
+ *
+ * WHY RULE 1 EXISTS
+ * -----------------
  * On 2026-08-30 this tree held 34 executable copies of
  * `'/home/volence/sonic_hacks/s1disasm'`, plus 2 of the same shape for
  * `s4_engine`. That literal is one machine's home directory. On any other
@@ -68,11 +92,12 @@
  * the scripts could be converted, and with nothing left to exclude the exclusion
  * went with them.
  *
- * ANTI-VACUOUS — THREE GUARDS, all checked rather than printed
+ * ANTI-VACUOUS — FIVE GUARDS, all checked rather than printed
  * -----------------------------------------------------------
  *   1. A CANARY PER DIALECT runs through the identical pipeline on every
  *      invocation: a synthetic source holding commented occurrences and one
- *      executable occurrence must yield exactly the violating line(s) named.
+ *      executable occurrence PER RULE must yield exactly the (line, rule) pairs
+ *      named.
  *      If a comment stripper ever eats string literals, or stops stripping, or
  *      lets a quote run past its line, the canary fails and this exits 2 —
  *      because "0 violations" and "I examined nothing" would otherwise be the
@@ -87,6 +112,20 @@
  *      hash". All exit 2.
  *   3. Zero files found, or a sibling root that cannot be derived, is exit 2 and
  *      says so. "Could not measure" must never render as "no problems found".
+ *   4. EVERY RULE MUST HAVE FIRED on a canary. Guard 1 checks that the canaries
+ *      and the rules agree; it cannot see a rule nobody wrote a canary line for,
+ *      which would contribute zero violations for the rest of time and read as
+ *      "that class is clean". Proven by deleting rule 2's two canary lines and
+ *      its `at` entries: "rule session-scratchpad never fired on either canary".
+ *      Exit 2. (Breaking rule 2's PATTERN instead is caught by guard 1 — proven:
+ *      "expected […4:session-scratchpad…], got [3:sibling-literal,
+ *      5:unratified-env, 6:unratified-env]". Exit 2.)
+ *   5. EVERY EXEMPTION MUST NAME A FILE THAT EXISTS. Rule 3 exempts the two
+ *      files that IMPLEMENT the resolver; an exemption for a renamed file
+ *      exempts nothing while looking like it exempts something. Proven by
+ *      renaming one in the list: "the exemption list names
+ *      test/support/sibling-root-RENAMED.mjs, which is not a readable file
+ *      here". Exit 2.
  *
  * KNOWN PROPERTY OF THE MATCH, found while verifying the override and recorded
  * rather than left for someone to rediscover: the test is a plain SUBSTRING of
@@ -99,20 +138,24 @@
  * configuration, not a hole.
  *
  * EXIT CODES
- *   0  no executable line names a sibling checkout by absolute path
+ *   0  no executable line violates any of the three rules
  *   1  at least one does
  *   2  could not measure
  */
 
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
+import { join, relative, resolve } from 'node:path';
 
-import { siblingRoot, siblingRootSource, SUITE_ROOT_ENV, SUITE_ROOT_ENV_ALIASES } from '../test/support/sibling-root.mjs';
+import {
+  AURORA_DIR, AURORA_DIR_ENV, AURORA_DIR_ENV_ALIASES,
+  checkoutEnv, checkoutEnvAliases, siblingRoot, siblingRootSource,
+  SUITE_PEERS, SUITE_ROOT_ENV, SUITE_ROOT_ENV_ALIASES,
+} from '../test/support/sibling-root.mjs';
 
 const PREFIX = 'check-peer-path-literals';
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = AURORA_DIR;
 const ROOTS = ['src', 'test', 'scripts', 'scratchpad'];
 /**
  * `.mjs` is here so `scripts/` and `scratchpad/` are actually examined and not
@@ -209,12 +252,146 @@ function stripCComments(src) {
   return out.join('');
 }
 
-/** Every violating line of one source, as {line, text}. */
-function scan(src, root, kind = 'c') {
+// ---------------------------------------------------------------------------
+// THE RULES. Three classes, one pipeline.
+//
+// Rules 2 and 3 were added by O69 (2026-09-02), which found two residues of the
+// SUITE-PATHS landing that rule 1 is structurally unable to see: NEITHER OF THEM
+// CONTAINS A HOME-DIRECTORY LITERAL, so a gate that greps for the sibling root
+// scanned them and printed OK.
+//
+//   · 64 files read `process.env.AURORA_ROOT` for "which aurora tree", which is
+//     not the contract's spelling (`AURORA_DIR`) and is a second derivation
+//     besides. 8 more read `process.env.AEON_DIR` / `AEON_ROOT` directly, so
+//     they missed the aliases, the two-spellings-disagree refusal and the
+//     set-but-wrong error the resolver raises. Two of those eight then wrote
+//     their own sibling derivation by string-surgery on the worktree path.
+//   · 3 files defaulted to a path under a PREVIOUS SESSION'S scratchpad
+//     (`/tmp/claude-<uid>/…/<session uuid>/scratchpad/…`), long deleted. One of
+//     them was the throwaway-copy path of a harness that must never touch the
+//     live aeon tree: the dead default never tripped that guard (a dead path is
+//     not the live tree), so an unset variable sailed past the refusal and died
+//     later on a missing file, reading like a broken harness.
+//
+// EVERY NAME AND PATH BELOW IS DERIVED. Rule 2's prefix comes from `os.tmpdir()`;
+// rule 3's variable list comes from the resolver's own exported constants over
+// its own peer roster, so a variable added or renamed there is policed here
+// without anyone remembering to edit this file. Rule 1's root comes from the
+// resolver as it always did.
+// ---------------------------------------------------------------------------
+
+/** Escape a literal for use inside a RegExp. */
+function reEscape(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Every environment variable the resolver owns — canonical names and the
+ * transitional aliases it accepts — read out of the resolver rather than
+ * repeated here. Reading any of these from the environment directly is what
+ * rule 3 forbids.
+ */
+const OWNED_ENV = [
+  SUITE_ROOT_ENV, ...SUITE_ROOT_ENV_ALIASES,
+  AURORA_DIR_ENV, ...AURORA_DIR_ENV_ALIASES,
+  ...SUITE_PEERS.flatMap((n) => [checkoutEnv(n), ...checkoutEnvAliases(n)]),
+];
+
+/**
+ * The shapes an environment READ takes in the dialects scanned.
+ *
+ * Deliberately not "the name appears anywhere": `siblingPathOrUnresolved('aeon')
+ * // honours AEON_DIR` is a comment (already stripped) and this gate's own
+ * guidance strings NAME these variables in prose, which is the correct thing for
+ * them to do. What is forbidden is going to `process.env` / `os.environ` for
+ * one, because that is the second reader.
+ *
+ * ⚠ NOT `$AEON_DIR`, and that omission is measured rather than assumed. A shell
+ * `$VAR` shape was tried first and flagged
+ * `band-art-foreground-harness.mjs:932`, where `${LIVE_AEON}` is a template
+ * interpolation of a LOCAL const — the same characters, a different language.
+ * The shell files that really do read these are exempt below anyway, so the
+ * shape bought one false positive and no coverage.
+ */
+const ENV_READ = new RegExp(
+  '(?:process\\.env\\.(?:' + OWNED_ENV.join('|') + ')\\b'
+  + '|(?:process\\.env|import\\.meta\\.env)\\[\\s*[\'"`](?:' + OWNED_ENV.join('|') + ')[\'"`]\\s*\\]'
+  + '|environ(?:\\.get)?\\s*[[(]\\s*[\'"](?:' + OWNED_ENV.join('|') + ')[\'"])',
+);
+
+/**
+ * A path under an agent session's scratchpad — `<tmpdir>/claude-<uid>/…`.
+ *
+ * The tmp root is derived; `claude-` names the family of session directories,
+ * and the uid is left open because a literal left behind by one session need not
+ * carry this machine's. There is no legitimate executable use: a session
+ * scratchpad is by construction gone when that session ends, so a path into one
+ * is either a dead default or a value that should have come from `mkdtemp`.
+ * COMMENTS stay exempt by the same rule as everywhere else — several review
+ * documents record where a measurement was taken, and that is provenance.
+ */
+const SESSION_SCRATCH = new RegExp(reEscape(join(tmpdir(), 'claude-')) + '\\d');
+
+/**
+ * The two files that IMPLEMENT the resolver, which necessarily read the
+ * variables rule 3 forbids everyone else from reading.
+ *
+ * Checked for existence at startup: an exemption naming a file that is not there
+ * silently exempts nothing while looking like it exempts something, and a
+ * renamed resolver would turn this gate red on itself with no explanation.
+ */
+const RESOLVER_FILES = ['test/support/sibling-root.mjs', 'scratchpad/lib/suite_paths.py'];
+
+/**
+ * WHAT RULE 3 DOES NOT COVER, stated rather than left to be discovered.
+ *
+ * `.sh` files are exempt from it. A shell script cannot import either resolver,
+ * so the contract's answer for them — and this gate's own guidance below — is to
+ * spell the four steps in-file, which necessarily means reading the variables:
+ *
+ *     AEON_DIR=${AEON_DIR:-${LIVE_AEON:-${SUITE_ROOT:+$SUITE_ROOT/aeon}}}
+ *
+ * That is `scratchpad/handover/run-handover.sh` doing it RIGHT. There is exactly
+ * one such file in the tree today. So this rule covers .ts/.tsx/.mjs/.mts/.py
+ * and NOT .sh; a shell script that hardcodes a peer path is still caught by rule
+ * 1, and one that reads a variable badly is caught by nothing here. Recorded so
+ * nobody reads this gate's OK as covering the shell.
+ */
+const ENV_RULE_EXEMPT_EXTS = ['.sh'];
+
+/** The rules, built once the sibling root is known. */
+function makeRules(sibling) {
+  return [
+    {
+      id: 'sibling-literal',
+      what: `an executable line naming the sibling root ${sibling} by absolute path`,
+      match: (line) => line.includes(sibling),
+    },
+    {
+      id: 'session-scratchpad',
+      what: `an executable line naming an agent session scratchpad (${join(tmpdir(), 'claude-')}…)`,
+      match: (line) => SESSION_SCRATCH.test(line),
+    },
+    {
+      id: 'unratified-env',
+      what: 'an executable line reading a suite path variable from the environment '
+        + 'instead of through the resolver',
+      match: (line) => ENV_READ.test(line),
+      exempt: (rel) => RESOLVER_FILES.includes(rel)
+        || ENV_RULE_EXEMPT_EXTS.some((x) => rel.endsWith(x)),
+    },
+  ];
+}
+
+/** Every violating line of one source, as {rule, line, text}. */
+function scan(src, rules, kind = 'c', rel = '') {
   const code = stripComments(src, kind);
   const hits = [];
   code.split('\n').forEach((line, n) => {
-    if (line.includes(root)) hits.push({ line: n + 1, text: line.trim().slice(0, 140) });
+    for (const r of rules) {
+      if (r.exempt?.(rel)) continue;
+      if (r.match(line)) hits.push({ rule: r.id, line: n + 1, text: line.trim().slice(0, 140) });
+    }
   });
   return hits;
 }
@@ -224,14 +401,43 @@ function scan(src, root, kind = 'c') {
 // stripper — the half added when scratchpad/ came into scope — ate string
 // literals or matched nothing, and the run would still have printed OK.
 const CANARY_ROOT = '/canary-sibling-root';
+
+/**
+ * A session-scratchpad path shaped like the real ones, built from the SAME
+ * derivation rule 2 uses. Typing `/tmp/claude-1000/…` here would let the rule
+ * and its canary agree while both were wrong about `os.tmpdir()`.
+ */
+const CANARY_SESSION = join(tmpdir(), 'claude-4242', '-canary', 'deadbeef', 'scratchpad', 'x');
+
+/**
+ * A canonical variable name rule 3 owns, taken from the resolver.
+ *
+ * `AEON_DIR` spelled out here would go on passing after someone renamed it in
+ * the resolver — the canary would be testing a name the gate no longer polices,
+ * which is the exact shape of a check that covers nothing while printing OK.
+ */
+const CANARY_ENV = checkoutEnv(SUITE_PEERS[0]);
+
+/**
+ * THE CANARIES, one per dialect, each carrying all three rules.
+ *
+ * `at` is now a list of `[line, ruleId]`, in the order `scan` yields them
+ * (line, then rule order), so a rule that silently stops matching is not merely
+ * a smaller count but a named absence. The two `expected/got` strings below are
+ * compared verbatim.
+ */
 const CANARIES = [
   {
     kind: 'c',
     src: [
       `// a record quoting ${CANARY_ROOT}/peer — a comment opens no file, so this is exempt`,
-      `/* also exempt: ${CANARY_ROOT}/peer */`,
+      `/* also exempt: ${CANARY_ROOT}/peer, ${CANARY_SESSION}, process.env.${CANARY_ENV} */`,
       `const DIR = '${CANARY_ROOT}/peer';`,
+      `const SHOTS = '${CANARY_SESSION}';`,
+      `const AEON = process.env.${CANARY_ENV};`,
+      `const ALSO = process.env['${CANARY_ENV}'];`,
     ].join('\n'),
+    at: [[3, 'sibling-literal'], [4, 'session-scratchpad'], [5, 'unratified-env'], [6, 'unratified-env']],
   },
   {
     kind: 'hash',
@@ -240,16 +446,21 @@ const CANARIES = [
       `AEON="${CANARY_ROOT}/peer"  # trailing record, also ${CANARY_ROOT}/peer, also exempt`,
       "echo don't stop here",
       `# and one more record, ${CANARY_ROOT}/peer, still exempt after that apostrophe`,
+      `SHOTS="${CANARY_SESSION}"`,
+      `aeon = os.environ["${CANARY_ENV}"]`,
+      `aeon = os.environ.get("${CANARY_ENV}")`,
     ].join('\n'),
-    // LINE 2 AND ONLY LINE 2, and each of the other three lines is a different
-    // way for this to break. Line 2 itself: the trailing `#` must not shield
-    // the assignment BEFORE it, and the two occurrences on that line count as
-    // one violating LINE, not two. Line 1 and line 4 must stay exempt, and
-    // line 4 is the interesting one — the apostrophe in line 3's `don't` is a
-    // bare word in shell, so a stripper that lets a quote run to the next quote
-    // (or to EOF) leaves everything after it unstripped, and every `#` record
-    // below turns into a violation nobody can clear.
-    at: [2],
+    // LINE 2 AND ONLY LINE 2 for rule 1, and each of lines 1, 3 and 4 is a
+    // different way for that to break. Line 2 itself: the trailing `#` must not
+    // shield the assignment BEFORE it, and the two occurrences on that line
+    // count as one violating LINE, not two. Line 1 and line 4 must stay exempt,
+    // and line 4 is the interesting one — the apostrophe in line 3's `don't` is
+    // a bare word in shell, so a stripper that lets a quote run to the next
+    // quote (or to EOF) leaves everything after it unstripped, and every `#`
+    // record below turns into a violation nobody can clear. Lines 5-7 carry the
+    // two new rules in this dialect's own spellings — `os.environ[…]` and
+    // `os.environ.get(…)`, neither of which the C canary can reach.
+    at: [[2, 'sibling-literal'], [5, 'session-scratchpad'], [6, 'unratified-env'], [7, 'unratified-env']],
   },
 ];
 
@@ -263,17 +474,45 @@ for (const [file, want] of [['a.py', 'hash'], ['a.sh', 'hash'], ['a.mjs', 'c'], 
   }
 }
 
+const CANARY_RULES = makeRules(CANARY_ROOT);
+const canaryFired = new Set();
 for (const c of CANARIES) {
-  const hits = scan(c.src, CANARY_ROOT, c.kind);
-  const want = c.at ?? [3];
-  const got = hits.map((h) => h.line);
-  if (got.length !== want.length || got.some((l, i) => l !== want[i])) {
+  const hits = scan(c.src, CANARY_RULES, c.kind);
+  const want = c.at.map(([l, r]) => `${l}:${r}`).join(', ');
+  const got = hits.map((h) => `${h.line}:${h.rule}`).join(', ');
+  if (got !== want) {
     die(
-      `the ${c.kind} canary did not behave: expected violations on line(s) ${want.join(',')}, ` +
-      `got ${got.join(',') || 'none'}.\n` +
-      '  The comment stripper or the matcher is broken, so a clean result from this run\n' +
-      '  would be evidence of NOTHING. Fix the gate before trusting its answer.',
+      `the ${c.kind} canary did not behave: expected violations at [${want}], ` +
+      `got [${got || 'none'}].\n` +
+      '  The comment stripper or one of the matchers is broken, so a clean result from this\n' +
+      '  run would be evidence of NOTHING. Fix the gate before trusting its answer.',
     );
+  }
+  for (const h of hits) canaryFired.add(h.rule);
+}
+
+// EVERY RULE MUST HAVE FIRED. A rule whose pattern silently stops matching —
+// a renamed export, an over-escaped regex — would otherwise contribute zero
+// violations for the rest of time and read as "that class is clean". This is the
+// same argument as guard 1 itself, one level up: it is not enough that the
+// canary agrees with the rules, the rules must all have been exercised.
+for (const r of CANARY_RULES) {
+  if (!canaryFired.has(r.id)) {
+    die(`rule "${r.id}" never fired on either canary, so this run says nothing about it: `
+      + `${r.what}. Its pattern matches nothing, and every file would pass it.`);
+  }
+}
+
+// AND EVERY EXEMPTION MUST NAME A FILE THAT EXISTS. An exemption for a renamed
+// or deleted file exempts nothing while looking like it exempts something, and
+// the file it was written for is then policed by a rule it must violate.
+for (const rel of RESOLVER_FILES) {
+  try {
+    if (!statSync(join(ROOT, rel)).isFile()) throw new Error('not a file');
+  } catch (e) {
+    die(`the exemption list names ${rel}, which is not a readable file here (${e.message}). `
+      + 'Either it moved — in which case update RESOLVER_FILES — or this gate is about to '
+      + 'report the resolver as violating the rule the resolver implements.');
   }
 }
 
@@ -359,10 +598,12 @@ if (files.length === 0) {
   die(`every ${EXTS.join('/')} file under ${ROOTS.join(', ')} is git-ignored. Nothing was examined.`);
 }
 
+const RULES = makeRules(SIBLING);
 const violations = [];
 for (const f of files.sort()) {
-  for (const hit of scan(readFileSync(f, 'utf8'), SIBLING, dialect(f))) {
-    violations.push({ file: relative(ROOT, f), ...hit });
+  const rel = relative(ROOT, f);
+  for (const hit of scan(readFileSync(f, 'utf8'), RULES, dialect(f), rel)) {
+    violations.push({ file: rel, ...hit });
   }
 }
 
@@ -371,22 +612,48 @@ for (const f of files.sort()) {
 // run that consulted an override from one that derived its own answer.
 console.log(
   `${PREFIX}: scanned ${files.length} ${EXTS.join('/')} file(s) under ${ROOTS.join(', ')} ` +
-  `for literals naming ${SIBLING} (canary OK, both dialects; ` +
+  `against ${RULES.length} rule(s) — ${RULES.map((r) => r.id).join(', ')} ` +
+  `(all ${RULES.length} fired on the canaries, both dialects; ` +
   `${ignored} git-ignored file(s) excluded, nothing else).\n` +
-  `${PREFIX}: sibling root ${SIBLING} — ${SIBLING_SOURCE}`,
+  `${PREFIX}: sibling root ${SIBLING} — ${SIBLING_SOURCE}\n` +
+  `${PREFIX}: aurora ${AURORA_DIR}; ${OWNED_ENV.length} suite variable(s) policed, ` +
+  `read only by ${RESOLVER_FILES.join(' and ')}`,
 );
 
 if (violations.length === 0) {
-  console.log(`${PREFIX}: OK — no executable line names a sibling checkout by absolute path.`);
+  console.log(`${PREFIX}: OK — no executable line names a sibling checkout by absolute path, `
+    + 'names a session scratchpad, or reads a suite path variable outside the resolver.');
   process.exit(0);
 }
 
+const byRule = new Map(RULES.map((r) => [r.id, []]));
+for (const v of violations) byRule.get(v.rule).push(v);
+
 console.error(
-  `\n${PREFIX}: FAIL — ${violations.length} executable line(s) hardcode ${SIBLING}:\n` +
-  violations.map((v) => `  ${v.file}:${v.line}\n      ${v.text}`).join('\n') +
+  `\n${PREFIX}: FAIL — ${violations.length} executable line(s) across ` +
+  `${[...byRule.values()].filter((v) => v.length).length} rule(s):\n` +
+  RULES.filter((r) => byRule.get(r.id).length).map((r) =>
+    `\n  [${r.id}] ${byRule.get(r.id).length} line(s) — ${r.what}:\n` +
+    byRule.get(r.id).map((v) => `    ${v.file}:${v.line}\n        ${v.text}`).join('\n'),
+  ).join('\n') +
   '\n\n' +
-  '  That literal is one machine\'s home directory. Every row behind it can only\n' +
-  '  ever SKIP on another checkout — unrunnable by construction, and silently so.\n' +
+  '  [session-scratchpad] A path under an agent session\'s scratchpad stops\n' +
+  '  existing when that session ends. As a DEFAULT it is the worst kind: it never\n' +
+  '  trips a guard that compares against the live tree, so the run gets past the\n' +
+  '  refusal and dies later and further away. Use `mkdtemp(os.tmpdir())` for a\n' +
+  '  scratch directory, `${AURORA_DIR}/scratchpad/…` for output a human reads, or\n' +
+  '  REFUSE naming the variable when a copy is something the operator must make.\n' +
+  '\n' +
+  '  [unratified-env] Going to the environment for a <PEER>_DIR yourself reads ONE\n' +
+  '  spelling and nothing else:\n' +
+  '  no transitional aliases, no refusal when two spellings disagree, no error\n' +
+  '  when the variable is set but names nothing. Go through the resolver —\n' +
+  '  `siblingPathOrUnresolved(name)` to resolve, `checkoutOverride(name)` when an\n' +
+  '  override is REQUIRED, `AURORA_DIR` for this repo\'s own tree.\n' +
+  '\n' +
+  '  [sibling-literal] That literal is one machine\'s home directory. Every row\n' +
+  '  behind it can only ever SKIP on another checkout — unrunnable by\n' +
+  '  construction, and silently so.\n' +
   '\n' +
   '  Derive it instead. From TypeScript under src/ or test/:\n' +
   '\n' +
@@ -403,10 +670,10 @@ console.error(
   '\n' +
   '  Three shapes a scratchpad/ instrument needs and a naive substitution gets wrong:\n' +
   '\n' +
-  '    · THIS repo\'s own root is AURORA_ROOT from the same module — never a\n' +
+  '    · THIS repo\'s own root is AURORA_DIR from the same module — never a\n' +
   '      literal, and never `.claude/worktrees/<name>`, which names a tree that no\n' +
   '      longer exists.\n' +
-  '    · The electron binary is `process.env.ELECTRON_BIN ?? resolve(AURORA_ROOT,\n' +
+  '    · The electron binary is `process.env.ELECTRON_BIN ?? resolve(AURORA_DIR,\n' +
   '      \'node_modules/.bin/electron\')`. An agent worktree has no node_modules, so\n' +
   '      the override is how a harness runs there; a literal is not a default.\n' +
   '    · A guard that REFUSES the live tree compares against `siblingDefaultPath`,\n' +
