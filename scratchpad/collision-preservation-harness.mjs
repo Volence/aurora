@@ -94,21 +94,26 @@
 
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
-import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9413);
 // SELF-LOCATING, never a pinned path: run from the main clone this must serve
 // the main clone's dist/, or a "re-verified after merge" run silently
 // re-verifies the branch instead.
 const ROOT = AURORA_DIR;
-const ELECTRON = process.env.ELECTRON_BIN
-  ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
-    ? `${ROOT}/node_modules/.bin/electron`
-    : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
+// WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
+// question 1. A linked worktree has no node_modules/ and no dist/, so the tree
+// carrying the build can be a different directory from the one this file lives
+// in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
+// it is not this one. See scratchpad/lib/run-root.mjs.
+const RUN = announceRunRoot(runTarget(ROOT));
+const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
+const MAIN = RUN.main;
 const AEONDIR = siblingPathOrUnresolved('aeon');
 const SHOTS = `${ROOT}/scratchpad/shots-collision-preservation`;
 mkdirSync(SHOTS, { recursive: true });

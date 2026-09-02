@@ -27,13 +27,20 @@ import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9351);
 const S1DIR = siblingPathOrUnresolved('s1disasm');
 const AEONDIR = siblingPathOrUnresolved('aeon') + '/';
 const ROOT = AURORA_DIR;
-const ELECTRON = process.env.ELECTRON_BIN
-  ?? siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron');
+// WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
+// question 1. A linked worktree has no node_modules/ and no dist/, so the tree
+// carrying the build can be a different directory from the one this file lives
+// in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
+// it is not this one. See scratchpad/lib/run-root.mjs.
+const RUN = announceRunRoot(runTarget(ROOT));
+const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
+const MAIN = RUN.main;
 // DERIVED, never a session path. This defaulted to a 2026-08 session's
 // scratchpad under /tmp/claude-1000/…, which stopped existing when that session
 // ended; `mkdirSync(…, {recursive:true})` then RE-CREATED it, so the harness
@@ -238,7 +245,7 @@ async function ctrlZ(c) {
 }
 
 function launch() {
-  const e = spawnGuarded(ELECTRON, [`${ROOT}/dist/main/index.mjs`], {
+  const e = spawnGuarded(ELECTRON, [MAIN], {
     cwd: ROOT,
     env: { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],

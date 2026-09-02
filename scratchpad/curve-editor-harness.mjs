@@ -91,21 +91,26 @@
 
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
-import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9397);
 // SELF-LOCATING, never a pinned path: run from the main clone this must serve
 // the main clone's dist/, or a "re-verified after merge" run silently
 // re-verifies the branch.
 const ROOT = AURORA_DIR;
-const ELECTRON = process.env.ELECTRON_BIN
-  ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
-    ? `${ROOT}/node_modules/.bin/electron`
-    : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
+// WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
+// question 1. A linked worktree has no node_modules/ and no dist/, so the tree
+// carrying the build can be a different directory from the one this file lives
+// in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
+// it is not this one. See scratchpad/lib/run-root.mjs.
+const RUN = announceRunRoot(runTarget(ROOT));
+const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
+const MAIN = RUN.main;
 const AEONDIR = siblingPathOrUnresolved('aeon');
 const SHOTS = `${ROOT}/scratchpad/shots-curve-editor`;
 mkdirSync(SHOTS, { recursive: true });
@@ -372,7 +377,7 @@ async function main() {
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
   const child = spawnGuarded('/usr/bin/xvfb-run',
-    ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`],
+    ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, MAIN],
     { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   child.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[main] ${d}`); });
   child.stderr.on('data', (d) => { if (process.env.VERBOSE) process.stderr.write(`[err] ${d}`); });
@@ -395,7 +400,7 @@ async function main() {
     // ---- 0. PROVENANCE. ---------------------------------------------------
     const haveProbe = await c.evalExpr('typeof window.__dbg.aeon.cameraPreview === "function"');
     check('0a', 'the build under test has the camera-preview probe at all',
-      haveProbe === true, `${ROOT}/dist`);
+      haveProbe === true, `${RUN.root}/dist`);
     if (!haveProbe) throw new Error('wrong build — VITE_AURORA_DEBUG=1 npx electron-vite build');
 
     await c.evalExpr('localStorage.clear()');
@@ -653,7 +658,6 @@ async function main() {
     const topOn = watchMiss('6 topOn', await sampleRow(TOP));
     const lowOn = watchMiss('6 lowOn', await sampleRow(LOW));
     await shot(c, 'curve-on');
-
 
     // THE CONTROL THAT MAKES 6d MEAN ANYTHING. A row of one flat colour is
     // unchanged by ANY scroll, so "the low row changed" would be unprovable —

@@ -74,18 +74,23 @@
 
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
-import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9401);
 const ROOT = AURORA_DIR;
-const ELECTRON = process.env.ELECTRON_BIN
-  ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
-    ? `${ROOT}/node_modules/.bin/electron`
-    : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
+// WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
+// question 1. A linked worktree has no node_modules/ and no dist/, so the tree
+// carrying the build can be a different directory from the one this file lives
+// in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
+// it is not this one. See scratchpad/lib/run-root.mjs.
+const RUN = announceRunRoot(runTarget(ROOT));
+const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
+const MAIN = RUN.main;
 const AEONDIR = siblingPathOrUnresolved('aeon');
 const SHOTS = `${ROOT}/scratchpad/shots-strip-range`;
 mkdirSync(SHOTS, { recursive: true });
@@ -271,7 +276,7 @@ async function main() {
   const child = spawnGuarded('/usr/bin/xvfb-run',
     ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON,
       ...(process.env.SCALE ? [`--force-device-scale-factor=${process.env.SCALE}`] : []),
-      `${ROOT}/dist/main/index.mjs`],
+      MAIN],
     { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   child.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[main] ${d}`); });
   child.stderr.on('data', (d) => { if (process.env.VERBOSE) process.stderr.write(`[err] ${d}`); });
@@ -297,7 +302,7 @@ async function main() {
     // of wave 2 in it.
     const haveProbe = await c.evalExpr('typeof window.__dbg.aeon.stripDrag === "function"');
     check('0a', 'the build under test contains the strip-drag probe (this branch, not master)',
-      haveProbe === true, `${ROOT}/dist`);
+      haveProbe === true, `${RUN.root}/dist`);
     if (!haveProbe) throw new Error('wrong build — VITE_AURORA_DEBUG=1 npm run build');
 
     await c.evalExpr('localStorage.clear()');
