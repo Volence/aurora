@@ -42,6 +42,26 @@
  * from a linked worktree, which is where agent sessions run — and whether that happened
  * has to be readable from the run rather than inferred from its colour.
  *
+ * EVERY RUN COMPILES FROM SOURCE — AND THIS IS NOT REDUNDANT
+ * ----------------------------------------------------------
+ * Python's bytecode cache is invalidated on the source's (mtime, size). A mutation that
+ * preserves BOTH is invisible to it, and the run then executes a stale `.pyc` while the
+ * changed file sits on disk. That is not theoretical here: this gate's own red-first
+ * plants edit a short tuple in `suite_paths.py`, seconds apart — exactly the shape that
+ * collides — and the coordinator verifying this parcel hit a FALSE GREEN on the first
+ * attempt at one, read it as a defect in the row, and found the real cause only by
+ * clearing the cache. Measured on the shipped gate: same-size alias reorder plus
+ * `os.utime` back to the original mtime → exit 0 with the run printing the OLD alias
+ * order as fact; the identical mutation with the cache discarded → exit 1. A proof
+ * method that can silently pass is the thing this whole parcel exists to end.
+ *
+ * So every run gets `PYTHONPYCACHEPREFIX` pointed at a FRESH temp directory, created and
+ * removed here. NOT `-B` and NOT `PYTHONDONTWRITEBYTECODE`: those stop a cache being
+ * WRITTEN and do nothing about READING one that already exists, so they would leave the
+ * hazard fully armed for anyone who has ever run these rows by hand — which is how the
+ * stale cache gets there in the first place. An empty per-run prefix makes no stale
+ * artifact reachable, whatever anyone did before.
+ *
  * EXIT CODES
  *   0  every required row ran and the rows passed (skips are reported, not hidden)
  *   1  at least one row failed
@@ -50,8 +70,9 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, relative, resolve } from 'node:path';
 
 import { AURORA_DIR } from '../test/support/sibling-root.mjs';
 
@@ -100,12 +121,32 @@ if (version.error || version.status !== 0) {
     + '`check-ledger-timestamps` in this same chain needs python3 too.');
 }
 
+// ---- a bytecode cache no earlier run can have poisoned -----------------------
+
+/**
+ * A FRESH, EMPTY cache root for this run only — see the header for why this is the fix
+ * and `-B` / `PYTHONDONTWRITEBYTECODE` are not. Registered for removal on `exit` rather
+ * than deleted after the run, because `die()` calls `process.exit` and a gate that only
+ * cleans up on its happy path leaves temp directories behind on exactly the runs a
+ * person is already debugging.
+ *
+ * It is passed to the child's environment, so it also governs the processes the rows
+ * themselves spawn — the copies of the subject living in each bed, which is where the
+ * derivation is actually measured.
+ */
+const cacheRoot = mkdtempSync(resolve(tmpdir(), 'aurora-py-resolver-cache-'));
+process.on('exit', () => rmSync(cacheRoot, { recursive: true, force: true }));
+
 // ---- the run ----------------------------------------------------------------
 
 // `-t` (top-level dir) is the rows' own directory so `import suite_paths` finds the
 // subject beside them, which is the same import path the six instruments use.
 const args = ['-m', 'unittest', 'discover', '-s', ROWS_DIR, '-t', ROWS_DIR, '-p', ROWS_FILE, '-v'];
-const run = spawnSync('python3', args, { cwd: AURORA_DIR, encoding: 'utf8' });
+const run = spawnSync('python3', args, {
+  cwd: AURORA_DIR,
+  encoding: 'utf8',
+  env: { ...process.env, PYTHONPYCACHEPREFIX: cacheRoot },
+});
 if (run.error) die(`could not run python3 (${run.error.message}).`);
 
 // unittest reports on stderr; the rows print their measurements on stdout.
@@ -144,6 +185,10 @@ console.log(
   `${PREFIX}: ran ${count} row(s) from ${relative(AURORA_DIR, rowsPath)} against `
   + `scratchpad/lib/suite_paths.py; all ${REQUIRED_ROWS.length} required row(s) present; `
   + `${skipped} skipped (reasons above, each naming what it did NOT measure).`);
+console.log(
+  `${PREFIX}: compiled from source — PYTHONPYCACHEPREFIX was a fresh empty ${cacheRoot}, so `
+  + 'no earlier run\'s bytecode was reachable. A same-size, same-mtime edit is invisible to '
+  + "Python's cache and would otherwise have run as its old self.");
 
 if (run.status !== 0) {
   console.error(`${PREFIX}: FAILED — see the report above.`);
