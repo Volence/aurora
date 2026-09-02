@@ -294,6 +294,150 @@ export function sectionRasterAdvisory(
     + 'That is one line in aeon, not a redesign. The binding is written either way.';
 }
 
+// ---------------------------------------------------------------------------
+// THE TWO CONDITIONS, KEPT APART ON THE SCREEN AS WELL AS IN THE DERIVATION
+// ---------------------------------------------------------------------------
+//
+// `sectionRasterState` above collapses both facts into ONE word, and that word
+// is what the strip used to print: `raster: needs one aeon line`. It is correct
+// and it is a collapse — and collapsing these two is precisely how three
+// different wrong answers got published in one day (the header). An author
+// reading one chip cannot tell WHICH of the two conditions their section fails,
+// which is the only thing that decides what they do next:
+//
+//   condition 1 fails → ask for a preset SPLIT (a data change, several lines)
+//   condition 2 fails → ask for ONE aeon line
+//
+// So the two are ALSO returned apart, verdict by verdict, and the strip prints
+// them as two rows. `unknown` is a THIRD verdict and never folds into `no`: the
+// standing refusal in raster-binding.ts turns on exactly that distinction.
+//
+// ⚠ CONDITION 2 IS EXISTENCE, NOT OWNERSHIP, and that is deliberate. aeon's own
+// gate says "no preset threads <fn>(sec: N)", so the fact an author is told
+// matches the message they will meet. Whether the threading record is the one
+// the section actually binds is a THIRD fact, and it is reported in the detail
+// rather than folded into the verdict — a preset that threads sec 3 while
+// section 3 binds a different record would otherwise read as fully wired here
+// and be refused by the build. `sectionRasterState` stays the stricter
+// conjunction, and `sectionConditionsAgreeWithState` below is the seam.
+
+export type ConditionVerdict = 'yes' | 'no' | 'unknown';
+
+export interface WiringCondition {
+  verdict: ConditionVerdict;
+  /** The preset record this condition is about, when there is one. */
+  record: string | null;
+  /** One short line, painted beside the verdict. Never a prohibition. */
+  detail: string;
+}
+
+export interface SectionWiringConditions {
+  /** Binds a preset record no other section binds. */
+  ownPreset: WiringCondition;
+  /** Some `preset()` threads `<chooser>(sec: N)`. */
+  threaded: WiringCondition;
+}
+
+/**
+ * The two conditions for one section, separately, each with its own verdict.
+ *
+ * Read the block above before changing a verdict: `unknown` is not `no`, and
+ * condition 2 is asked even when condition 1 fails, because "which one do I
+ * fail" is the question the strip exists to answer and a short-circuit would
+ * answer it for only half the sections.
+ */
+export function sectionWiringConditions(
+  w: SectionRasterWiring, sectionIndex: number, chooserFn: string,
+): SectionWiringConditions {
+  const ownPreset: WiringCondition = (() => {
+    if (!w.descriptor.parsed) {
+      return { verdict: 'unknown', record: null, detail: `could not read ${basename(w.descriptor.path)}` };
+    }
+    const record = w.bindings[sectionIndex];
+    if (record === undefined) {
+      return { verdict: 'no', record: null, detail: 'binds no preset record' };
+    }
+    const sharers = sectionSharers(w, sectionIndex).filter((s) => s !== sectionIndex);
+    if (sharers.length > 0) {
+      return { verdict: 'no', record, detail: `${record}, shared with section${sharers.length === 1 ? '' : 's'} ${listOf(sharers)}` };
+    }
+    return { verdict: 'yes', record, detail: record };
+  })();
+
+  const threaded: WiringCondition = (() => {
+    const call = `${chooserFn}(sec: ${sectionIndex})`;
+    if (!w.library.parsed) {
+      return { verdict: 'unknown', record: null, detail: `could not read ${basename(w.library.path)}` };
+    }
+    const by = Object.keys(w.threadedBy).filter((r) => w.threadedBy[r] === sectionIndex);
+    if (by.length === 0) return { verdict: 'no', record: null, detail: `nothing threads ${call}` };
+    const record = by[0];
+    // THE THIRD FACT, in the detail and not in the verdict — see the block above.
+    if (ownPreset.record !== null && record !== ownPreset.record) {
+      return {
+        verdict: 'yes', record,
+        detail: `${record} threads ${call}, but section ${sectionIndex} binds ${ownPreset.record}`,
+      };
+    }
+    return { verdict: 'yes', record, detail: `${record} threads ${call}` };
+  })();
+
+  return { ownPreset, threaded };
+}
+
+/** The tail of a project-relative path — what a person calls the file. */
+function basename(p: string): string {
+  const at = p.lastIndexOf('/');
+  return at < 0 ? p : p.slice(at + 1);
+}
+
+/**
+ * THE SEAM between the collapsed word and the two rows, asserted rather than
+ * assumed: `wired` must mean both conditions hold AND on the same record.
+ *
+ * It exists because the strip prints the two rows and the rest of the column
+ * still reads the one word, and two derivations of one fact that nothing
+ * compares is how they come apart.
+ */
+export function sectionConditionsAgreeWithState(
+  w: SectionRasterWiring, sectionIndex: number, chooserFn: string,
+): boolean {
+  const c = sectionWiringConditions(w, sectionIndex, chooserFn);
+  const bothHold = c.ownPreset.verdict === 'yes' && c.threaded.verdict === 'yes'
+    && c.threaded.record === c.ownPreset.record;
+  return (sectionRasterState(w, sectionIndex) === 'wired') === bothHold;
+}
+
+/**
+ * The sections whose preset record is theirs alone — CONDITION 1 ONLY.
+ *
+ * ⚠ NOT `eligibleSections`, and the difference is a self-contradiction the strip
+ * shipped for one harness run: `eligibleSections` goes through
+ * `sectionRasterState`, which answers `unknown` for EVERY section as soon as the
+ * effects library is unreadable — so with the descriptor read and the library
+ * missing, the strip printed `✓ own preset OJZ_Preset_Sec0` on its condition row
+ * and `own preset none` on its act-wide line, in the same box, at the same time.
+ * The act-wide statement of a condition must be derived from THAT CONDITION, not
+ * from a state that folds in the other one.
+ */
+export function ownPresetSections(w: SectionRasterWiring, sectionCount: number, chooserFn: string)
+: number[] {
+  const out: number[] = [];
+  for (let i = 0; i < sectionCount; i++) {
+    if (sectionWiringConditions(w, i, chooserFn).ownPreset.verdict === 'yes') out.push(i);
+  }
+  return out;
+}
+
+/** The sections some preset threads the chooser on, in order. Derived. */
+export function threadedSections(w: SectionRasterWiring, sectionCount: number): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < sectionCount; i++) {
+    if (Object.values(w.threadedBy).includes(i)) out.push(i);
+  }
+  return out;
+}
+
 /** The sections a binding reaches the screen on today, in order. Derived. */
 export function wiredSections(w: SectionRasterWiring, sectionCount: number): number[] {
   const out: number[] = [];

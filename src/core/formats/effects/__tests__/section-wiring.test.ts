@@ -28,7 +28,8 @@ import { join } from 'node:path';
 import {
   descriptorEffectsBindings, libraryRasterChooserCalls, rasterChooserName, wiringPaths,
   unknownWiring, sectionRasterState, sectionRasterAdvisory, sectionSharers,
-  wiredSections, eligibleSections, type SectionRasterWiring,
+  wiredSections, eligibleSections, sectionWiringConditions, threadedSections,
+  ownPresetSections, sectionConditionsAgreeWithState, type SectionRasterWiring,
 } from '../section-wiring';
 import { siblingPathOrUnresolved } from '../../../../../test/support/sibling-root.mjs';
 
@@ -159,6 +160,115 @@ describe('the four author-facing states', () => {
     expect(eligibleSections(w, 4)).toEqual([0]);
     expect(eligibleSections({ ...w, threadedBy: {} }, 4)).toEqual([0]);
     expect(wiredSections({ ...w, threadedBy: {} }, 4)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE TWO CONDITIONS, STATED APART (EW-SHAPE-STRIP)
+// ---------------------------------------------------------------------------
+//
+// The strip prints two rows where the panel used to print one word. These rows
+// are about the SPLIT, not about the underlying parse — that is covered above —
+// and the one they exist for is the last one: `unknown` must never fold into
+// `no`, on either condition, independently.
+
+describe('the two wiring conditions, stated apart', () => {
+  const w = synthetic();
+  const CH = rasterChooserName('zzz', 'act1');
+
+  it('both hold → two ✓, and the detail names the record and the call', () => {
+    const c = sectionWiringConditions(w, 0, CH);
+    expect(c.ownPreset.verdict).toBe('yes');
+    expect(c.ownPreset.record).toBe('ZZZ_Preset_Sec0');
+    expect(c.threaded.verdict).toBe('yes');
+    expect(c.threaded.detail).toContain('zzz_act1_sec_raster(sec: 0)');
+  });
+
+  it('condition 1 fails and condition 2 IS STILL ASKED — no short-circuit', () => {
+    // Section 1 shares its record with 2, and nothing threads sec 1. An author
+    // whose strip stopped at the first failure could not tell whether fixing
+    // the share would be enough.
+    const c = sectionWiringConditions(w, 1, CH);
+    expect(c.ownPreset.verdict).toBe('no');
+    expect(c.ownPreset.detail).toContain('shared with section 2');
+    expect(c.threaded.verdict).toBe('no');
+    expect(c.threaded.detail).toBe('nothing threads zzz_act1_sec_raster(sec: 1)');
+  });
+
+  it('a section binding nothing fails condition 1 with its own reason', () => {
+    const c = sectionWiringConditions(w, 3, CH);
+    expect(c.ownPreset.verdict).toBe('no');
+    expect(c.ownPreset.record).toBeNull();
+    expect(c.ownPreset.detail).toBe('binds no preset record');
+  });
+
+  it('the THIRD fact — threaded by a record the section does not bind — is in the detail', () => {
+    // SYNTHETIC, and unreachable in ojz/act1 today. A preset that threads sec 2
+    // while section 2 binds a different record satisfies condition 2 as aeon's
+    // gate words it ("no preset threads …") and still would not reach the
+    // screen, so the verdict stays `yes` and the discrepancy is NAMED.
+    const w2: SectionRasterWiring = { ...w, threadedBy: { ...w.threadedBy, ZZZ_Preset_Other: 2 } };
+    const c = sectionWiringConditions(w2, 2, CH);
+    expect(c.threaded.verdict).toBe('yes');
+    expect(c.threaded.detail).toContain('but section 2 binds ZZZ_Preset_Shared');
+    // …and the collapsed word still refuses it, which is the seam below.
+    expect(sectionRasterState(w2, 2)).not.toBe('wired');
+  });
+
+  it('an unreadable file is `unknown` PER CONDITION — and never `no`', () => {
+    const noDesc = unknownWiring('a/act_descriptor.emp', 'b/zzz_effects.emp', 'ENOENT');
+    const c1 = sectionWiringConditions(noDesc, 0, CH);
+    expect(c1.ownPreset.verdict).toBe('unknown');
+    expect(c1.ownPreset.detail).toBe('could not read act_descriptor.emp');
+    expect(c1.threaded.verdict).toBe('unknown');
+
+    // ONE file readable, the other not: the readable condition still answers.
+    const halfRead: SectionRasterWiring = {
+      ...w, library: { path: 'b/zzz_effects.emp', parsed: false, reason: 'ENOENT' },
+    };
+    const c2 = sectionWiringConditions(halfRead, 0, CH);
+    expect(c2.ownPreset.verdict).toBe('yes');
+    expect(c2.threaded.verdict).toBe('unknown');
+    expect(c2.threaded.detail).toBe('could not read zzz_effects.emp');
+  });
+
+  it('THE SEAM: `wired` means both conditions on the SAME record, for every section', () => {
+    // Two derivations of one fact that nothing compares is how they come apart.
+    for (let i = 0; i < 4; i++) expect(sectionConditionsAgreeWithState(w, i, CH)).toBe(true);
+    const w2: SectionRasterWiring = { ...w, threadedBy: { ...w.threadedBy, ZZZ_Preset_Other: 2 } };
+    for (let i = 0; i < 4; i++) expect(sectionConditionsAgreeWithState(w2, i, CH)).toBe(true);
+    const noLib: SectionRasterWiring = {
+      ...w, library: { path: 'b', parsed: false, reason: 'ENOENT' },
+    };
+    for (let i = 0; i < 4; i++) expect(sectionConditionsAgreeWithState(noLib, i, CH)).toBe(true);
+  });
+
+  it('the ACT-WIDE own-preset set cannot contradict the per-section condition row', () => {
+    // THE DEFECT THIS PINS, caught by the strip harness's own output: with the
+    // descriptor read and the LIBRARY missing, `eligibleSections` answers `[]`
+    // — it goes through `sectionRasterState`, which is `unknown` for every
+    // section when either file is unreadable — so the strip printed
+    // `✓ own preset ZZZ_Preset_Sec0` on the condition row and `own preset none`
+    // on the act line, in the same box, at the same time.
+    const noLib: SectionRasterWiring = {
+      ...w, library: { path: 'b/zzz_effects.emp', parsed: false, reason: 'ENOENT' },
+    };
+    expect(eligibleSections(noLib, 4)).toEqual([]);          // the trap
+    expect(ownPresetSections(noLib, 4, CH)).toEqual([0]);     // the fix
+    // And the invariant, over both worlds: the act-wide set is exactly the
+    // sections whose own-preset condition says yes.
+    for (const world of [w, noLib]) {
+      const perSection = [0, 1, 2, 3]
+        .filter((i) => sectionWiringConditions(world, i, CH).ownPreset.verdict === 'yes');
+      expect(ownPresetSections(world, 4, CH)).toEqual(perSection);
+    }
+  });
+
+  it('`threadedSections` is EXISTENCE, and is not the same set as wired', () => {
+    expect(threadedSections(w, 4)).toEqual([0]);
+    const w2: SectionRasterWiring = { ...w, threadedBy: { ...w.threadedBy, ZZZ_Preset_Other: 2 } };
+    expect(threadedSections(w2, 4)).toEqual([0, 2]);
+    expect(wiredSections(w2, 4)).toEqual([0]);
   });
 });
 
