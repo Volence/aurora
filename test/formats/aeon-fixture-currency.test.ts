@@ -126,6 +126,12 @@ describe('CURRENCY: is the vendored aeon fixture still what aeon ships?', () => 
     const KNOWN_REPOS: Record<string, { name: string; defaultTip: string }> = {
       aeon: { name: 'aeon', defaultTip: AEON_TIP },
       empyrean: { name: 'empyrean', defaultTip: 'origin/main' },
+      // The s1disasm pin (test/fixtures/s1disasm/.provenance.json, ROADMAP row
+      // 78). Its published branch is `origin/AS` — that repo's own origin/HEAD;
+      // it has no `master`. The sidecar says so itself in
+      // `branch_that_answers_currency`, which is what this sweep reads; the
+      // default here is the fallback for a sidecar that omits it.
+      s1disasm: { name: 's1disasm', defaultTip: 'origin/AS' },
     };
     const REVISION_KEY = /"revision[a-z_]*"\s*:\s*"([0-9a-f]{40})"/g;
 
