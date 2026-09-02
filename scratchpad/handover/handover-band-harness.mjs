@@ -61,8 +61,11 @@ const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`
     : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
-const AEON = process.env.AEON_DIR
-  ?? join(dirname(ROOT.replace(/\/\.claude\/worktrees\/[^/]+$/, '')), 'aeon');
+// READ-ONLY (`git -C AEON show`), so the default location is fine here; the
+// resolver honours AEON_DIR at step 1. This used to hand-roll the sibling by
+// string-surgery on the worktree path, which is the derivation `sibling-root`
+// exists to be the only copy of.
+const AEON = siblingPathOrUnresolved('aeon');
 // THE PIN. Resolved from the remote unless the caller pins it explicitly.
 const AEON_SHA = process.env.AEON_SHA ?? execFileSync(
   'git', ['-C', AEON, 'ls-remote', 'origin', 'refs/heads/master'], { encoding: 'utf8' },

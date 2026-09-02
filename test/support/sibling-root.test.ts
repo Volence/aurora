@@ -398,7 +398,7 @@ describe('sibling-root: the names the contract ratified', () => {
       'S1DISASM_DIR',
       'ORACLE_DIR',
       'EMPYREAN_DIR',
-      'AURORA_AEON_REPO,LIVE_AEON',
+      'AURORA_AEON_REPO,LIVE_AEON,AEON_ROOT',
       'AURORA_ORACLE_REPO',
       'AURORA_S1DISASM_REPO,S1_DIR',
       'AURORA_PEER_ROOT',

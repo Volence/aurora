@@ -65,7 +65,7 @@
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npx electron-vite build
 // Run:                     node scratchpad/build-console-overlap-harness.mjs
 
-import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, checkoutOverride, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -81,7 +81,10 @@ const ELECTRON = process.env.ELECTRON_BIN
     : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
 // A PRIVATE COPY. The owner is building in ../aeon right now; this harness must
 // not so much as open it.
-const AEONDIR = process.env.AEON_DIR ?? resolve(ROOT, 'scratchpad/fixtures/aeon-console-fix');
+// The default is a fixture inside this repo, never the live tree; the override
+// goes through the resolver so it picks up the aliases and refuses a value that
+// is set but names nothing.
+const AEONDIR = checkoutOverride('aeon')?.value ?? resolve(ROOT, 'scratchpad/fixtures/aeon-console-fix');
 const SCREEN = process.env.SCREEN ?? '1680x1050x24';
 const SHOTS = `${ROOT}/scratchpad/shots-build-console`;
 mkdirSync(SHOTS, { recursive: true });

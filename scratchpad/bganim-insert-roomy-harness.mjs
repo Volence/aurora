@@ -61,7 +61,7 @@ const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
     ? `${ROOT}/node_modules/.bin/electron`
     : siblingPathOrUnresolved('aurora', 'node_modules/.bin/electron'));
-const AEON = process.env.AEON_DIR ?? join(dirname(ROOT.replace(/\/\.claude\/worktrees\/[^/]+$/, '')), 'aeon');
+const AEON = siblingPathOrUnresolved('aeon');   // honours AEON_DIR at step 1
 const FIXTURES = `${ROOT}/test/fixtures/bg-override`;
 const PROVENANCE = JSON.parse(readFileSync(`${FIXTURES}/editor_bg_override.roomy.provenance.json`, 'utf8'));
 const AEON_SHA = process.env.AEON_SHA ?? PROVENANCE.aeon.revision;

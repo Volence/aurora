@@ -31,6 +31,9 @@ export declare const SUITE_ROOT_ENV: string;
 /** Transitional aliases for the suite root, accepted and announced. */
 export declare const SUITE_ROOT_ENV_ALIASES: string[];
 
+/** The peer checkouts this repo can name, by directory name. */
+export declare const SUITE_PEERS: string[];
+
 /** The canonical checkout variable for a peer: `aeon` → `AEON_DIR`. */
 export declare function checkoutEnv(name: string): string;
 

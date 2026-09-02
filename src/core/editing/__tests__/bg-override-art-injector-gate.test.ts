@@ -31,26 +31,28 @@ import {
   type BgOverrideDocument,
 } from '../../formats/bg-override/bg-override';
 import { documentBands, bandSlotBases } from '../../formats/bg-override/bg-anim-band';
+import { referencePath } from '../../../../test/support/fixture-tree';
+import { AURORA_DIR } from '../../../../test/support/sibling-root.mjs';
 
-const REPO = resolve(__dirname, '../../../..');
+const REPO = AURORA_DIR;
 /**
- * The sibling aeon checkout — `../aeon` beside the aurora repo, as item 24's
- * probe resolves it. A git WORKTREE of aurora lives under
- * `aurora/.claude/worktrees/<id>`, so the sibling is found by walking the
- * ancestors for an `aeon/tools/inject_editor_bg.py`; `AEON_ROOT` overrides.
+ * The sibling aeon checkout's injector.
+ *
+ * THIS USED TO BE A PRIVATE RESOLVER: `process.env.AEON_ROOT`, then an
+ * ancestor-walk looking for `aeon/tools/inject_editor_bg.py`, then a guess. Two
+ * problems, and O69's gate now forbids both. `AEON_ROOT` is one of the six
+ * spellings the contract lists for aeon and not the ratified one, so a run with
+ * `AEON_DIR` set — which every other instrument here honours — silently walked
+ * the ancestors instead and could land on a DIFFERENT tree than the rest of the
+ * suite was using. And the walk was a second derivation of the sibling root, of
+ * exactly the kind `sibling-root.mjs` exists to be the only copy of.
+ *
+ * `siblingPath` covers both: `AEON_DIR` (with `AEON_ROOT` and `LIVE_AEON`
+ * accepted as announced aliases) at step 1, `EMPYREAN_SUITE_ROOT` at step 2,
+ * `--git-common-dir` at step 3 — which answers the MAIN checkout's parent from
+ * inside a linked worktree, the case the ancestor-walk was written for.
  */
-function findTool(): string {
-  const rel = join('tools', 'inject_editor_bg.py');
-  if (process.env.AEON_ROOT) return join(process.env.AEON_ROOT, rel);
-  let dir = REPO;
-  for (let i = 0; i < 6; i++) {
-    const candidate = join(dir, '..', 'aeon', rel);
-    if (existsSync(candidate)) return resolve(candidate);
-    dir = dirname(dir);
-  }
-  return resolve(REPO, '..', 'aeon', rel);
-}
-const TOOL = findTool();
+const TOOL = referencePath('aeon', 'tools', 'inject_editor_bg.py');
 const FIXTURE = join(REPO, 'test/fixtures/bg-override/editor_bg_override.b0e5a661.json');
 
 const toolPresent = existsSync(TOOL);

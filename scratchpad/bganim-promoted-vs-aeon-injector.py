@@ -53,6 +53,9 @@ sibling working tree.
 """
 import sys, os, importlib.util, pathlib, tempfile, struct, io, contextlib, shutil, subprocess, json, argparse
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "lib"))   # scratchpad/x.py
+from suite_paths import sibling_path, sibling_path_source
+
 ap = argparse.ArgumentParser()
 ap.add_argument("out", nargs="?", default=".")
 ap.add_argument("--before", default="live-before.json")
@@ -62,7 +65,12 @@ args = ap.parse_args()
 
 AEON_REV = os.environ.get("AEON_REV", "9b3f11f60def3dbad10fe69fff719ea92874d749")
 sp = pathlib.Path(args.out)
-aeon = pathlib.Path(os.environ.get("AEON_DIR", pathlib.Path(__file__).resolve().parents[2] / "aeon"))
+# READ-ONLY, and at a PINNED revision (`git show`), so the default location is
+# right; the resolver honours AEON_DIR at step 1. This used to hand-roll
+# `parents[2] / "aeon"`, which is a second derivation of the sibling root that
+# knew nothing of EMPYREAN_SUITE_ROOT, the aliases, or the set-but-wrong error.
+aeon = sibling_path("aeon")
+print(f"[aeon] checkout {aeon} -- {sibling_path_source('aeon')}", file=sys.stderr)
 for mod in ("tools/vram_map.py", "tools/inject_editor_bg.py"):
     (sp / pathlib.Path(mod).name).write_bytes(subprocess.run(
         ["git", "-C", str(aeon), "show", f"{AEON_REV}:{mod}"], capture_output=True, check=True).stdout)

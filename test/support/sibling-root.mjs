@@ -139,6 +139,24 @@ export const SUITE_ROOT_ENV = 'EMPYREAN_SUITE_ROOT';
  */
 export const SUITE_ROOT_ENV_ALIASES = ['AURORA_PEER_ROOT'];
 
+/**
+ * The peer checkouts this repo can name, by directory name.
+ *
+ * The five suite tools from the contract's own table (`AEON_DIR`, `SIGIL_DIR`,
+ * `EMPYREAN_DIR`, `SERAPH_DIR`, `ORACLE_DIR` — aurora is itself, and has
+ * `AURORA_DIR` above), plus `s1disasm`, the Sonic 1 reference tree aurora opens
+ * as a project and which the contract does not list because no other tool reads
+ * it.
+ *
+ * IT IS HERE SO THE GATE NEED NOT REPEAT IT. `check-peer-path-literals` forbids
+ * reading any variable this module owns from `process.env` directly; the set of
+ * such variables is `checkoutEnv`/`checkoutEnvAliases` over this roster plus the
+ * suite-root and aurora names. A roster typed a second time inside the gate is
+ * how the gate would come to police a different set of names than the resolver
+ * implements — the two-copies defect this file's header already records once.
+ */
+export const SUITE_PEERS = ['aeon', 'sigil', 'empyrean', 'seraph', 'oracle', 's1disasm'];
+
 /** The canonical checkout variable for a peer: `aeon` → `AEON_DIR`. */
 export function checkoutEnv(name) {
   return `${name.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_DIR`;
@@ -149,12 +167,14 @@ export function checkoutEnv(name) {
  *
  * `LIVE_AEON` is here because it is what the scratchpad instruments read
  * today; the contract lists it among the aeon spellings "to retire at their
- * owners' pace". `S1_DIR` is aurora's own older spelling for `S1DISASM_DIR`,
- * accepted so migrating the instruments that read it drops no override.
+ * owners' pace", and `AEON_ROOT` is another from that same list, read by
+ * `src/core/editing/__tests__/bg-override-art-injector-gate.test.ts`. `S1_DIR`
+ * is aurora's own older spelling for `S1DISASM_DIR`, accepted so migrating the
+ * instruments that read it drops no override.
  */
 export function checkoutEnvAliases(name) {
   const upper = name.toUpperCase().replace(/[^A-Z0-9]+/g, '_');
-  const extra = { aeon: ['LIVE_AEON'], s1disasm: ['S1_DIR'] }[name] ?? [];
+  const extra = { aeon: ['LIVE_AEON', 'AEON_ROOT'], s1disasm: ['S1_DIR'] }[name] ?? [];
   return [`AURORA_${upper}_REPO`, ...extra];
 }
 
