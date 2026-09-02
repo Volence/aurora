@@ -413,3 +413,294 @@ measurements, the ten-shim census, the two-derivation corroboration, the relay-c
 
 > - **⚠ THE BULLET BELOW IS TRUE ONLY FOR A SESSION WHOSE SHIM INTERPRETER STARTED AFTER `oracle-old` `07314aa` (2026-08-25 21:09) — AND THIS SESSION'S DID NOT.** *(Raised by the oracle lane 2026-08-26; every claim below verified firsthand here before it was acted on.)* Python reads its source **at process start**, so a shim launched before that commit keeps the OLD behaviour forever: it does **not** spawn a private instance, it dials the default socket chain and **attaches to whatever holds it — which is the owner's on-screen game window.** A step, pause, reset or memory write from such a session lands in the game he is playing. **Measured here:** `/run/user/1000/oracle.sock` is held by `oracle-frontend` pid 1542676 (`--aether --x11`, the owner's player); this session's shim is pid 287509, started **Aug 25 20:29**, i.e. pre-fix, and `pgrep -P` shows it has **NO CHILD** — no private instance exists for it. Post-fix sessions look visibly different in the same `ss -lxp`: theirs carry an `oracle-aether` of their own on a `/tmp/oracle-mcp-*/oracle.sock` mkdtemp path. **The file on disk is correct; the running interpreters are not.** A session RELAUNCH picks the fix up automatically — a `/clear` does not, because the shim is on the process command line. **It already cost something once:** a lane reloaded the owner's window onto a worktree build in good faith at ~18:20Z believing it had a private instance. **So: check the vintage before trusting the bullet below, and when in doubt do not call the tool** — his window is not ours to touch. **Corroborated 2026-08-26 from a different enumeration parameter** *(bar 19's genuine-corroboration shape, flagged as such by the oracle lane)*: this lane derived the `/clear`-does-not-help half from the shim being on the **process command line**; they observed it directly — their session was `/clear`ed and **the shim's start time did not move** (pid 287372, still `Aug 25 20:29:19`). Where the shim is configured versus a before/after on an actual clear: neither derivation could share the other's parameter. They adopted `pgrep -P` as a bar (oracle `cfe3406`) and report it renders across the whole box — **ten shims, eight with no child, two owning a `/tmp/oracle-mcp-*` instance.** **THE JOIN KEY ALREADY SHIPS — do not ask for it, consume it** *(oracle, 2026-08-26, verified by them live against a spawned server on the corpus ROM rather than read off the schema)*. `emulator/pixel_attribution` returns **`cell`**, present iff `winner.layer` is `planeA`/`planeB`/`window`: ⚠ **CORRECTED 2026-08-27 — `cell` is a SIBLING of `winner` at the top level of the result, NOT hanging off it; `winner` carries only `{layer}`.** Measured here against a freshly spawned `oracle-rs` build `d285ecbc6c3a` (`docs/reviews/2026-08-27-band-lens.md`). **This one fails SILENTLY:** a consumer written to the old shape reads `winner.cell?.tile` and gets `undefined` for every pixel without throwing — this lane's own first lens run printed *"27/28 sample points on planeB"* and *"0 sample points on planeB"* in the same output because of it. Every other claim in the relayed finding is corroborated here (VRAM-absolute tiles, `tileAddr == tile*32` on an independent sample `1101 -> 0x89A0`, the rebase direction, and `cell` present for 27/27 plane-B winners). ⚠ **AND THE ATTRIBUTION IS WRONG IF YOU STOP THERE — corrected 2026-08-27 by the oracle lane and verified firsthand here before amending.** Their own bank was RIGHT: oracle `docs/OVERSEER.md` says `pixel_attribution.cell` (top-level) and their source writes `out["cell"]` at the top level (`crates/oracle-aether/src/engine.rs:2821`), with their tests and the empyrean contract schema agreeing. **The nesting was corrupted in the RELAY, between a correct record and this bank** — so a reader who goes looking for a bad record upstream will find a good one and lose the lesson. **The lesson is theirs and it is sharper than the bug:** the shape was machine-enforced in THREE places — their tests, their source, the contract — **and one sentence of prose defeated all three, because assertions do not cover claims ABOUT assertions.** Operational form, adopted: **relay the assertion's LOCATION, or send the JSON — never the shape in prose.** Fields: `{tile, tileAddr, palette, hflip, vflip, priority}` — the nametable word decoded. **`cell.tile` is VRAM-ABSOLUTE** (0..2047, and `tileAddr == tile * 32`: their 1066 -> `0x8540` checks out). **Aurora must rebase by `BG_TILE_BASE_SLOT` (1024, verified here in `bganim-consumer-contract.json`) to reach blob-local** — the same rebase and the same direction the injector applies inbound. That closes the band-lens loop from the other direction: click a dot, rebase, name the band and slot. ⚠ **THE REBASE CAN LAND OUTSIDE THE BLOB, AND THE EDITOR MUST SAY SO RATHER THAN INDEX.** Verified here on their own two samples: 1066 -> 42, inside OJZ's **320**-tile blob; **1456 -> 432, outside it** (and `BG_TILE_CAPACITY` is 448, so even in-capacity is not in-blob). Plane B can be showing engine art, another act's art, or a slot past the blob's end, and `tile < 1024` rebases NEGATIVE. **Any click-to-identify consumer must answer "not part of your background" for those** — an unchecked rebase either throws or, worse, names a slot the author does not own. This is the same two-correct-axes failure that cost an afternoon on the marquee; the space is stated in the field's own description, so there is no excuse for inferring it. ✅ **TAGGED QUESTION CLOSED 2026-08-27 — the band STEPS, proven with a control run.** (`docs/reviews/2026-08-27-band-lens.md`; instruments `scratchpad/band-lens-harness.mjs` + `scratchpad/band-step-proof.mjs`.) The gate is open: a freshly spawned server advertises **46 methods** including `get_layer_states`/`set_layer_enabled`, verified **by executing**, not by grepping their source. **The finding that matters for any future lens work: a SCREENSHOT DIFF CANNOT ANSWER WHETHER A BAND STEPS.** A band DMAs new pixels into fixed slots, so the nametable tile index never moves — 0 of 27 plane-B sample points changed tile id across 90 frames while the screenshots differed on every capture, and the screenshot is the more persuasive of the two. The quantity that answers it is **VRAM tile bytes at the band's own slots, against a control run of blob slots the band does not own**: 6 distinct band contents across 6 captures, control byte-stable throughout, which is what separates stepping from scrolling and from a wholesale art reload. Original text follows for the record. Oracle has `get_layer_states` / `set_layer_enabled` in flight and picked that parcel for exactly this case — hiding plane A to see what a band actually paints underneath. **This lane is the registered first consumer.** They will signal when it is **served and reachable through a REBUILT BINARY**, not when it merges — a distinction that repo already paid for once. Do not attempt the question before a session relaunch gives this lane a private instance. **How to check in one command:** `pgrep -P <shim pid>` — no child means no private instance means you are about to attach to whatever holds the chain.
 
+---
+
+## Moved out of the boot read, second pass — closed history around live rules
+
+Cut from `docs/OVERSEER.md` on 2026-09-02T17:21:13Z under `OVERSEER-PROTOCOL.md` "The boot read is
+bounded", move (2): *closed history around a live rule moves to the log verbatim; the rule stays and
+is rewritten legibly*. **Verbatim, whole blocks, nothing rewritten** — each left a short entry where
+it stood, carrying the durable rule and a pointer here. The move was proved lossless by
+set-difference over every non-blank line of the pre-edit `OVERSEER.md` against head + log.
+
+### The `initialize` build-identity parcel, as it stood
+
+*(was `docs/OVERSEER.md` lines 672-736)*
+
+This is the CLOSED half of the parcel: the firsthand probe, oracle's three-way seam gap and its fix at oracle `843b99a`, and the `implementation`-literal correction they made to this lane. The head keeps four live rules — read `implementation` never `serverName`; `serverBuild.id` is a TREE identity and never a code identity; the retired relative-`romPath` discriminator; and the seam-has-no-author generalisation with its collapse-no-check corollary.
+
+✅ **BOTH SHIPPED AND MEASURED FIRSTHAND HERE 2026-08-29 — the parcel is CLOSED, and the wire now
+answers what `serverName` never could.** Relayed by the oracle lane, then **verified from this
+session against its OWN privately-spawned `oracle-aether`** (mkdtemp socket, never the owner's
+window) rather than adopting their reading — the standing practice in this file. Probe:
+`scratchpad/init-probe.mjs`.
+- **Condition (1) is MET, by two SEPARATE fields that fail independently, which is the whole ask.**
+  `implementation` = `"oracle-rs"` (WHICH SERVER) and `serverBuild` = `{id, source, dirty}` (WHICH
+  BUILD), where `id` is `<commit SHA>+profile=release+target=x86_64-unknown-linux-gnu+features=`.
+  The motivating defect is now impossible: two binaries from different commits can no longer be
+  identical on the wire. **`serverName` is still `"oracle-next"` and `serverVersion` still `0.0.0`** —
+  both unchanged, both still proving nothing; read `implementation`, never `serverName`.
+- ⚠ **CONDITION (2) UPGRADED 2026-08-29 — barred by contract AND by a source-level test, both read
+  firsthand at oracle `fee8f12` (ancestor of their `origin/main`, checked). BUT ONE JOINT IS UNASSERTED
+  AND IT IS THE LOAD-BEARING ONE.** What they built is genuinely strong: `build.rs` computes the values
+  at COMPILE time in two branches, and the no-git fallback emits `no-vcs+pkg=…` which cannot be mistaken
+  for a SHA rather than fabricating one; `dirty` is an `Option` OMITTED under `"declared"`, so **a
+  `dirty:false` on the wire can only have come from a real working-tree measurement** — the exact thing
+  wire-reading could not settle. `_COMPILE_TIME_OR_NOTHING` is stronger than a test: a runtime-read
+  value cannot sit in a `const` initialiser, so that failure is a BUILD error.
+  **The gap, found here by reading their three tests against each other rather than one at a time —
+  this file's own bar 18b, the uncited joint, in someone else's repo.** The property splits three ways
+  and the join is asserted by nobody: (a) `_COMPILE_TIME_OR_NOTHING` proves the CONSTANTS are
+  compile-time; (b) `neither_identity_value_is_reachable_from_configuration` proves the constant NAMES
+  appear only in `build_info.rs` and `engine.rs`; (c) `initialize_names_the_implementation_and_the_build`
+  proves the WIRE `serverBuild.id` is a non-empty string with a valid `source`. **Nothing asserts that
+  the string on the wire IS that constant** — and `engine.rs`, the one file allowed to mention both, is
+  exactly where a divergence would live. An override written there as
+  `config.override.unwrap_or(SERVER_BUILD_ID)` keeps the name inside an ALLOWED file, keeps the const
+  compile-time, and emits a valid non-empty string: **all three tests green.** Reported to them; the fix
+  is one line per value (`assert_eq!(id, SERVER_BUILD_ID)`), and both constants are already imported in
+  that test file. ✅ **CLOSED 2026-08-29 at oracle `843b99a`** (verified here: real commit, ancestor of their
+  `origin/main`, and the three `assert_eq!`s read at that revision — wire `id`/`source`/`dirty` each
+  pinned to their compile-time constant). **They demonstrated the gap before fixing it rather than
+  accepting the argument: emitting a forged id naming no commit in existence left all 5 tests in that
+  file and all 413 in the crate GREEN.** So the seam was not merely unasserted, it was undetectable —
+  which is the stronger claim and neither of us had stated it. **Condition (2) is now MET.**
+  ⚠ **A CORRECTION TO THIS LANE, THEIRS, AND IT IS RIGHT.** I proposed REPLACING the `implementation`
+  string literal with the constant. That would have silently dropped a different claim: the literal
+  pins the **registry value** (§2.1's registry has one legal spelling), the constant pins the **join**.
+  They kept both. **When a check looks redundant, ask what each of the two claims is before collapsing
+  them** — I was one edit from removing a pin while believing I was strengthening it.
+  And they marked their own new `implementation` join row **not currently load-bearing** — the schema
+  enum in `common/schema.rs` refuses a divergent value before the assertion is reached (measured by
+  them, poison fails at `schema.rs:485`) — kept for when the registry gains a second value, with an
+  explicit "do not cite it as a caught defect". That is this file's own say-which-rows-do-not-
+  discriminate bar, applied to themselves, unprompted.
+  **The generalisation worth keeping, theirs:** *a test per component and none across the seam is how
+  a chain of individually sound links holds nothing* — **and a seam has no author**, which is why it
+  took a reader who wrote none of the three. That is the mechanism behind this file's bar 18b, stated
+  better than bar 18b states it.
+  **Superseded holding position and superseded reading moved to `docs/OVERSEER-LOG.md`** — what was
+  believed about condition (2) before oracle's source was read. Both conditions are MET above.
+- ⚠ **`serverBuild.id` IS A TREE IDENTITY, NOT A CODE IDENTITY — and this bites in the obvious
+  direction.** Found here while class-checking the SHA per bar 9: the id measured on the shipped
+  binary resolves to a **docs-only commit** (`docs/lane-status.json`, 10 insertions / 18 deletions),
+  because a build identity names *whatever HEAD was at build time*. That is CORRECT for its job and
+  is exactly what staleness needs. But it means **the id changes for reasons that have nothing to do
+  with the code**, so two binaries with byte-identical behaviour can report different ids. **Use it
+  for "is this the same binary I measured before" (staleness). NEVER for "does this build contain
+  feature X"** — that question is `capabilities` and `methods`, which exist for it. Reading a code
+  guarantee off a build id is the method-count failure wearing a better costume, and it is the
+  sharper form of this file's own *a provenance record is several claims that do not share a clock*.
+- **The old discriminator can be retired.** This file's 2026-08-24 trick — inferring the Rust core
+  from a **relative** `romPath` in argv — was a clever read of an accident. `implementation` answers
+  it directly now; keep the old note only as history.
+
+### The resume/stop race, as it stood
+
+*(was `docs/OVERSEER.md` lines 749-803)*
+
+The closed narrative behind the row: oracle's trial-4-of-8 measurement, the enumeration of every sequencing point in this tree, and the `engine_loop`/`run_to` source trace read firsthand at oracle `7ba2faf`. The head keeps the live rules — no exposure because nothing awaits an event, breakpoints make it live so confirm the server-side fix first, the inverted `run_to` hazard and the ping-before-you-write-that-wait-loop offer, the `reached` field `bootRestore` gates on, and the hosted-path scope limit.
+
+- **THE RESUME/STOP RACE IS NOT REACHABLE FROM THIS CLIENT — AND THE DAY IT BECOMES REACHABLE IS
+  NAMED** *(2026-09-02, oracle's F-RESUME-STOP-RACE relayed by the hub; answered from source here at
+  master `44f17ca8` and booked at their request, because a stated position must live in a tree rather
+  than in mail — shared protocol bar 20, sending side)*. **Their finding:** the halt broadcast is
+  emitted from the engine thread while the `ok(resume)` reply is written by the connection thread, so
+  a client that resumes and then waits for a stop can miss the stop entirely if its reply-reader
+  discards events arriving before the reply. **It failed at trial 4 of 8 after three clean passes** —
+  the number to remember, because a two- or three-run green on a race is exactly what this lane would
+  otherwise have signed off.
+  **Aurora cannot hit it, and the reason is STRUCTURAL rather than careful: we never adopted the
+  pattern.** `AetherClient.onEvent` has exactly ONE non-test consumer in the tree — `bridge.ts`'s
+  `c.onEvent(() => publish())`, a connection-badge refresh that discards the event's method and params
+  — and **nothing anywhere awaits an event**. The dispatch loop feeds subscribers as messages arrive
+  and is not coupled to the reply path, so the window their race needs does not exist. Every
+  sequencing point reads a REPLY instead: `bootRestore` (`boot-restore.ts`) gates on `run_to`'s own
+  `reached` field, `s1-warp.ts` says in its header it chose `run_frames` over resume-and-sleep on
+  purpose, and every `resume` in `push-palette.ts` / `warp.ts` / `s1-warp.ts` / `build-run.ts` is a
+  terminal `wasRunning` restore inside a `finally` with nothing awaited after it.
+  ⚠ **THE PERISHABLE HALF, which is the whole reason this is written down: BREAKPOINTS MAKE IT LIVE.**
+  A client that sets a breakpoint, resumes, and waits to be told it hit is precisely their shape — and
+  that is the first thing Aurora would build on `breakpoint_add`, which is where oracle says the race
+  still is (`breakpoints.rs` / `watchpoints.rs`, server side, booked by them). **So read this row as: no
+  exposure while there is no breakpoint consumer, and the session that starts one must confirm the
+  server-side fix landed BEFORE trusting a green run of its own.** Recorded as a not-currently-reachable
+  finding, not as an all-clear.
+  ✅ **THE `run_to` QUESTION IS ANSWERED — NO, IT DOES NOT SHARE THE SPLIT, and the answer came back
+  with a caveat that INVERTS the worry.** *(Oracle, 2026-09-02, banked their side at `7ba2faf`;
+  every claim below **read firsthand here** at that revision, confirmed an ancestor of their
+  `origin/main` before it was written down.)*
+  **Why `bootRestore` is safe, and it is a stronger property than ordering.** `engine_loop`
+  (`server.rs`) handles one call at a time — `engine.dispatch(...)` and THEN `reply.send(...)`. `run_to`
+  blocks *inside* dispatch: it `require_paused`es, sets `running = true`, calls `advance_until(...)`
+  which does not return until the target, the frame bound, a breakpoint or a `stopAfter` watch ends the
+  run, sets `running = false`, emits `stopped`, and only then builds its result. **The reply is PRODUCED
+  BY the halt rather than merely correlated with it**, so having the reply means the machine is parked.
+  `resume` is the opposite and is the whole race: its entire body flips a flag and returns
+  (`Ok(json!({"wasRunning": self.set_free_run(true)}))`), and the halt lands later on a subsequent
+  free-run step whose broadcast fires after the reply was already sent.
+  ⚠ **THE INVERTED HAZARD, WHICH IS THE PART TO CARRY INTO A BREAKPOINT CONSUMER.** `run_to` calls
+  `emit_stopped` **BEFORE** it builds its reply — verified here in the body's own order — so **on the
+  wire the `stopped` event PRECEDES the `run_to` reply.** Our read-through-to-the-reply pattern is
+  correct and unaffected (it discards the event and takes the reply). But **a client that consumed the
+  reply and THEN waited for the halt event would block forever.** That is F-RESUME-STOP-RACE with the
+  halves swapped, and it is exactly the loop someone reaches for when writing a first breakpoint
+  consumer. **Ping the oracle lane before writing that wait loop** — their standing offer, and they will
+  say whether the server-side fix has landed.
+  **Also confirmed here and load-bearing for our gate:** `run_to`'s result carries
+  `"reached": run.predicate_fired` — *the predicate's own verdict, never the sink's* — because a
+  `stopAfter` watch can end the run too. `bootRestore` gating on `reached !== true` is therefore
+  reading the right field: a watch-induced halt cannot masquerade as the target being reached.
+  **SCOPE, theirs, stated rather than widened:** all of the above is the **socket / free-run driver**,
+  which is the path this repo reaches. The **hosted** path — their player window through `Host::pump` —
+  is a different driver and stays registered as their `F-STOPPREC-HOSTED-HALT`, where the halt is
+  *inferred* from sharing one function with the measured path rather than measured. **Nothing here
+  upgrades that**, and a claim about the hosted window may not cite this row.
+
+### The built-binary enumeration parameter, as it stood
+
+*(was `docs/OVERSEER.md` lines 896-923)*
+
+The 2026-08-24 closure narrative: oracle's fresh handshake at 41 methods, this lane's independent re-verification through the relative-`romPath` discriminator, the `serverName`/`serverVersion` note that the `initialize` parcel later closed, and the loud-failure check on `write_vram`. The head keeps the bar itself — verify by EXECUTING, never by grepping source — and the banner's method count as the freshness tell.
+
+- **A built binary is a third enumeration parameter, and it is the one source greps cannot
+  reach** *(same day)*: `oracle-aether` release bannered **37 methods** while oracle's source
+  served 41 — the binary predated four landed methods. Two lanes had derived the count from
+  source by different methods and agreed; both were blind to the artifact. **A consumer
+  measuring the bus against an installed binary gets the old answer with nothing announcing
+  it**, so a cutover must rebuild and **verify by executing, never by grepping source**.
+  ✅ **CLOSED 2026-08-24 BY EXECUTING, which is what this row demands and what the update below
+  could not supply.** The oracle lane started `oracle-aether` on `/run/user/1000/oracle.sock` and
+  handshook it fresh: **41 methods**, `serverName: oracle-next`, `serverVersion: 0.0.0`,
+  `breakpoints=false`, `z80=false`. **Aurora then verified independently from this session rather
+  than adopting their number**: `emulator/status` returned `romPath: "../aeon/s4.debug.bin"` —
+  the **relative** argv only the Rust binary is given, where the C++ `oracle_gui` carries the
+  absolute path — with `symbolCount: 2674`, `symbolsPath: ../aeon/s4.debug.lst`, paused at frame
+  0 with `pc` at `EntryPoint`. **So the legacy Python shim reaching the Rust core is now confirmed
+  against a SECOND server instance, by this lane's own 2026-08-22 discriminator, re-used to certify
+  the server that discriminator was first derived against.** Note what this is NOT: the shim is the
+  same one in both runs, so this is a re-confirmation, not an independent derivation.
+  ⚠ **`serverName` and `serverVersion` remain unforgeable-by-nothing** — a config default and a
+  literal that has never moved. **Neither can tell you which server answered**, which is exactly
+  the gap Aurora's two conditions on the `initialize` build-identity parcel exist to close. The
+  wire now demonstrates the gap instead of it being argued from source.
+  **Loud-failure verified too, not asserted**: `emulator/write_vram` returns `-32601`,
+  `"no such method: emulator/write_vram"`, with the frame/mclk envelope attached — a gap refuses
+  by name and feeds the queue rather than degrading to a plausible answer.
+
+  *Superseded reasoning moved to `docs/OVERSEER-LOG.md`: the 2026-08-24 relay from the oracle lane,
+  recorded with their stated limit. The bar is untouched, and the freshness tell is still the banner
+  read by executing.*
+
+### The BgAnim driver, as it stood
+
+*(was `docs/OVERSEER.md` lines 931-976)*
+
+The 2026-08-24 closure narrative: the emitted symbols, the correction to aeon's own banked memory, the `jbsr` enumeration over every `.emp`, and the boot-path trace link by link (`game.emp:58-60` -> `GameState_OJZScroll_Update` -> `game_loop.emp:41-42` -> `boot.emp:349`). The head keeps dead-data-is-not-dead-code, build-it-and-watch-it, the not-the-wiring diagnosis, the `test`-in-an-aeon-path signal, and the bg_anim.emp:103 comment warning with its tell-them-if-there-is-a-fourth instruction.
+
+- **The BgAnim DRIVER IS ALIVE, and the only thing that calls it is sonic4's BOOT STATE**
+  *(ENGINE facts — re-derivable against aeon, no server question. Relayed by the hub from the
+  aeon lane 2026-08-24; every claim below re-verified firsthand here at aeon `origin/master`
+  before being written down, and the last one is this lane's own addition.)*
+  **`BgAnim_Init` (`9B30`) and `BgAnim_Update` (`9B3C`) are both emitted** in `s4.debug.lst`.
+  Aeon's OWN banked memory said BgAnim had been silently deleted and BG was dead since
+  2026-07-21; they re-checked and **corrected it**. This lane's memory carried a
+  near-miss of the same error, phrased as *"OJZ BG animation dead in the ROM"* — true of the
+  DATA (`anims` wiped, so `BgAnim_Table: u16 = 0`, the disabled stub) and false of the CODE.
+  **Dead data is not dead code**; keep the two words apart when speaking about this.
+  **Call sites, enumerated over every `.emp`:** the ONLY `jbsr`s are in
+  `games/sonic4/test/ojz_scroll_test.emp` — `BgAnim_Init` at `:515` and `:1159`,
+  `BgAnim_Update` at `:821`. Everything else is a definition, a comment, or generated data.
+  **There is no separate shipping game-loop call site.**
+  **But the scroll test IS the shipping boot path, which is this lane's addition to their
+  finding and it changes the risk:** `games/sonic4/config/game.emp:58-60` binds
+  `const ENTRY_ID = GS_OJZ_SCROLL_TEST` and `proc entry = GameState_OJZScroll_Init`. So a ROM
+  test reaches the driver by **booting** — no special entry, and "test module" understates
+  what it is.
+  ✅ **CLOSED 2026-08-24 — THE DRIVER TICKS EVERY FRAME ON A PLAIN `s4.bin` BOOT.** Traced by
+  aeon, re-traced by the hub, and the two links carrying the actual risk re-verified firsthand
+  here: `game.emp:59-60` binds `entry = GameState_OJZScroll_Init`, and
+  **`GameState_OJZScroll_Update` (`:556`) contains ZERO `rts` between its head and the
+  `jbsr BgAnim_Update` at `:821`** — the only exit is the `rts` at `:822` immediately after it,
+  and no branch guards the call. (Mechanical middle links, taken as traced: `:549` stores
+  `GameState_OJZScroll_Update` into `Game_State`; `game_loop.emp:41-42` does the per-frame
+  `movea.l Game_State, a0` / `jsr (a0)` computed dispatch; `boot.emp:349` seeds it from
+  `Game.entry`.)
+  **So the ROM half arranges nothing — build it and watch it.** No special entry, no test build
+  shape, no harness. **And if a band loads but never steps, it is NOT the wiring** — look at the
+  data or the proc body, and at that point it is plausibly an engine item and therefore aeon's.
+  ⚠ **`test` IN A PATH IS A KNOWN-BAD SIGNAL IN AEON'S TREE, not a description.** The sole caller
+  lives in a module named `test` **and that module is the shipping boot entry**. Both wrong
+  readings this cost the suite — *"the driver is dead"* and *"it needs a harness"* — come from
+  that one word. Aeon's own first draft of the repaired comment said *"there is NO shipping
+  game-loop call site"*: literally true, reads as *dead driver*, and they caught it before
+  committing — i.e. they nearly shipped the INVERSE error into the very comment they were
+  fixing. Treat `test` in an aeon path as unlabelled until checked.
+  ⚠ **`engine/level/bg_anim.emp:103` reads *"call once per frame from the main loop"* — that
+  is the CONTRACT THE PROC WAS WRITTEN TO, not a description of what calls it.** A reader who
+  greps the definition finds a sentence that looks exactly like proof of a call site. This is
+  the third perishable-claim-in-a-code-comment instance in three repos in one day (aeon's
+  `effects_gen.py` SLICE 1 docstring; this repo's stage-4 spec claiming a fix that never
+  landed; and now this). Not a bar yet — the hub is holding it at three and explicitly
+  declined to write one from a single afternoon's instances. **If runtime work here turns up
+  a fourth, tell them.**
+
+### The pinned-checkout / pinned-build bar, as it stood
+
+*(was `docs/OVERSEER.md` lines 1072-1124)*
+
+The episode behind the bar: the clean checkout that built to two different CRCs, my own uncited "the checkout SHIPPED gitignored artifacts" misdiagnosis that the aeon lane built on, the suite-wide `docs/lane-status.json` enumeration that found sigil the only lane where it was untracked-and-unignored, the cause fixed at sigil `e5bd4a4f`, and sigil's deliberate not-relinking during aeon's seven-ROM freeze — the last of which is another lane's live state and is exactly what the row below this one says never to snapshot here. The head keeps the bar, the `revision:`-is-load-bearing / `tree:`-is-stale-by-construction split, the provenance-record general rule, and aeon's always-dirty-tree consequence.
+
+- **⚠ A PINNED AEON CHECKOUT IS NOT A PINNED BUILD — THE TOOLCHAIN IS THE UNPINNED INPUT**
+  *(2026-08-27; `docs/reviews/2026-08-27-fixture-build-drift.md`, corrected at `b1c15d0`.)*
+  A `git clone` of aeon at a fixed SHA, tracked tree clean throughout, built to `4b4f1b5b`
+  and later to `f33b157e` — deterministically, never returning. `build.sh` takes **two
+  binaries from the environment and the checkout pins neither**: `SIGIL_EMIT` (which *writes*
+  `engine/sound/generated/`) and `SIGIL_BUILD` (the assembler). Both live in **sigil's live
+  working tree**, an active lane that relinks them during the day; both moved inside one
+  build window here. **So a cross-session CRC comparison is meaningless unless both sides
+  carry the same assembler revision** — quote `build.sh`'s own `Assembler: sigil <rev>`
+  banner (match on that TEXT, never a line number) beside every CRC recorded or handed out.
+  Adopted by the aeon lane as their landing bar at aeon `fd6ccc8e` (verified: reachable from
+  their `origin/master`, and it is an `OVERSEER.md` bar commit — the right class for a bar).
+  **My first diagnosis of this was wrong and the error is the lesson:** I wrote *"the checkout
+  SHIPPED gitignored artifacts"* into a committed packet **with no line cited**, and the aeon
+  lane accepted it and built a careful, inapplicable `cp -r` explanation on top. A clone
+  cannot carry ignored files; the reflog and `git ls-tree <sha>` each settle it in one
+  command, and neither of us ran either. Bar 2f, by this file's own author, two days after
+  writing it down.
+  ⚠ **AND THE BANNER'S `tree:` FIELD IS VACUOUS TODAY — DO NOT RECORD IT AS A SIGNAL.**
+  *(Caught by the sigil lane before this bar was banked, and verified here against the shared
+  binary.)* `sigil --version` reports `tree: dirty at capture — 0 modified, 1 untracked`, and
+  that **1 untracked is `docs/lane-status.json`** — permanently present, read by no build,
+  incapable of changing a byte. The flag is **stuck on**, so it can only ever return one
+  answer: bar 2e in the very instrument this bar was about to adopt as its defence. Its own
+  `freshness:` line concedes the second half — *"tree state is a build-time snapshot; cargo
+  has no trigger for uncommitted"* — so it is **stale by construction** as well as stuck.
+  **The `revision:` half is load-bearing; the `tree:`/`-dirty` half is not.** Enumerated
+  across the suite from here, which sigil could not see from inside their own repo:
+  `docs/lane-status.json` is **tracked** in aeon, oracle, seraph and empyrean, and
+  **untracked-but-ignored** here — **sigil was the only lane where it was untracked AND not
+  ignored**, which was the whole cause.
+  ✅ **CAUSE FIXED at sigil `e5bd4a4f`** (verified here: reachable from their `origin/master`,
+  a `.gitignore` commit, and their main checkout's `git status --porcelain` is now empty).
+  ⚠ **BUT THE FIELD IS NOW *STALE*, NOT FIXED, AND THE DIFFERENCE IS OPERATIONAL.** `tree:` is
+  a **build-time snapshot** cargo has no trigger to refresh, so the shared binary **still
+  prints `fbf60abd-dirty` today** — the cause was removed, the reported value was not. **The
+  tell that the fix has actually reached the banner is a `revision:` that is NOT `fbf60abd`;
+  it is NOT the dirty flag clearing.** Do not read a stale `dirty` as "sigil never fixed it",
+  and do not start trusting `tree:` until a relinked binary proves it can say `clean`. Sigil
+  is deliberately **not** relinking to make it true while aeon has a seven-ROM freeze pinning
+  the shared binary — which is this bar's own hazard being honoured, and is the right call.
+  ⚠ **THE GENERAL RULE, and it is why "quote the banner" was the wrong operational form of a
+  correct rule: A PROVENANCE RECORD IS NOT ONE CLAIM, IT IS SEVERAL, AND THEY DO NOT SHARE A
+  CLOCK.** `revision:` follows git refs (cargo re-captures on HEAD/refs moves); `tree:` follows
+  a *build* (cargo has no trigger for uncommitted). **Same line of output, two freshnesses, and
+  nothing in the formatting says so.** Adopted by the aeon lane as the headline of their own
+  bar. The question it hands the next person, in place of a fact to memorise: **which
+  components of this record can move, and on whose schedule?** Ask it before quoting any
+  provenance field — version banners, build stamps, `--version` output, embedded SHAs.
+  **Downstream consequence worth knowing** *(aeon's, from this enumeration)*: because aeon
+  **tracks** that file and edits it all session, their main tree is effectively always dirty,
+  which is why their golden freezes must run from a clean worktree. They had been reading that
+  as a property of the freeze tooling; it is a property of the status-file convention.
