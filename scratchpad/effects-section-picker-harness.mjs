@@ -505,6 +505,21 @@ async function main() {
       && /View > Compose the background/.test(preview.title),
       JSON.stringify(preview));
 
+    // ⚠ SCROLLED TO THE TOP FIRST, and the reason is a person, not a row. The
+    // owner ruled the Effects tooling's SHAPE on 2026-09-02 (decision d-26b) by
+    // taking a recommendation's reasoning, and the ruling's own note says he
+    // did NOT evaluate the mockups on look — so the visual detail is
+    // unratified and the built thing has to be captured FOR HIM. A screenshot
+    // parked wherever the last assertion happened to leave the scroller shows
+    // him whatever that was; this one shows him the strip.
+    await c.evalExpr(String.raw`(() => {
+      const p = ${PICKER};
+      let sc = p ? p.parentElement : null;
+      while (sc && !(sc.scrollHeight > sc.clientHeight + 1)) sc = sc.parentElement;
+      if (sc) sc.scrollTop = 0;
+      return 'ok';
+    })()`);
+    await sleep(500);
     const shot = await c.send('Page.captureScreenshot', { format: 'png' });
     writeFileSync(`${SHOTS}/effects-section-picker.png`, Buffer.from(shot.data, 'base64'));
     console.log(`\n    screenshot  : ${SHOTS}/effects-section-picker.png`);

@@ -163,6 +163,45 @@ discriminating power, reported rather than hidden.
 
 ---
 
+## The owner's shape ruling landed MID-PARCEL — what it covers and what it does not
+
+Decision **d-26b** was answered at `2026-09-02T19:41:07Z`, on master, while this
+branch was being built (this branch is cut from `74f205dd`; the ruling is
+`01744138`, two commits later — the merge is clean, neither touches the other's
+files). He chose **`three_sub_tabs_plus_section_strip`**.
+
+**Its centrepiece is what this parcel shipped.** "A strip that always states which
+section you are editing and what it is bound to — the missing fact behind three of
+the fourteen defects" is `SectionPicker`: first in the column, never collapsible,
+naming the section, printing `scene … · raster …`, and carrying the derived wiring.
+A screenshot of the built strip is parked at
+`scratchpad/shots-effects-section-picker/effects-section-picker.png`.
+
+**Two clauses of the ruling this parcel does NOT cover**, and they are follow-on
+work, not omissions:
+
+1. **The three sub-tabs** (Parallax / Colour / Tile anim). This parcel left the
+   single scrolling column and fixed inside it. Everything here survives that
+   re-layout — the picker becomes the strip, the panels become sub-tab contents —
+   but the re-layout itself is its own parcel.
+2. **"The parallax preview … is on by default on the Parallax sub-tab."** There is
+   no Parallax sub-tab yet, and turning `showCameraPreview` on globally would change
+   every author's overlay state on every facet. The chip is shipped and OFF by
+   default; the default flips when the sub-tab that scopes it exists.
+
+⚠ **The ruling's own recommendation text repeats the premise this parcel
+disproved** — *"the picker offers every section while only section 5 is wired"*. Six
+sections own their preset; one is threaded. Whoever builds the sub-tabs should read
+`core/formats/effects/section-wiring.ts` rather than that sentence.
+
+⚠ **And the ruling's own note applies to what is above.** *"He chose the reasoning,
+not the picture… Treat the SHAPE as ruled and the VISUAL DETAIL as unratified:
+capture the built strip and sub-tabs for him rather than assuming the appearance is
+approved."* The screenshot exists for that reason. If the strip looks wrong to him,
+that is that note coming due, not him changing his mind.
+
+---
+
 ## What the instruments cannot see
 
 - **Nothing here ran a ROM.** No emulator, no `mcp__oracle__*`. What a bound band
