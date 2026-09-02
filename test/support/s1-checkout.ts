@@ -53,10 +53,10 @@
 
 import { existsSync } from 'node:fs';
 
-import { enumerateProfileEntries } from '../../src/core/project/s1';
+import { enumerateProfileEntries, S1_GLOBAL_REQUIRED_KEYS } from '../../src/core/project/s1';
 import { s1Profile } from '../../src/core/project/profiles/s1';
 
-import { referenceCheckout, referencePath } from './fixture-tree';
+import { referenceCheckout, referencePath, referencePathSource } from './fixture-tree';
 
 /** Absolute path inside the s1disasm checkout (derived, never typed). */
 export function s1Path(...rel: string[]): string {
@@ -65,6 +65,18 @@ export function s1Path(...rel: string[]): string {
 
 /** The checkout root, for messages. */
 export const S1_ROOT = referencePath('s1disasm');
+
+/**
+ * WHICH VARIABLE PUT US IN THAT TREE — the third thing a refusal owes.
+ *
+ * "which file, in which checkout, and which variable resolved it": the file and
+ * the checkout were already in these messages; the variable was not, and it is
+ * the one a reader can act on. Read at call time, not at import, because the
+ * resolver reads the environment at call time.
+ */
+function s1RootSource(): string {
+  return referencePathSource('s1disasm');
+}
 
 /**
  * Which of `rels` are not on disk, as ABSOLUTE paths.
@@ -78,23 +90,44 @@ export function missingS1Files(rels: readonly string[]): string[] {
 }
 
 /**
- * The gating files one act needs, as repo-relative paths, DERIVED from the
- * profile the adapter itself enumerates — never a hand-listed set, so a profile
- * change cannot leave this behind.
+ * The profile entries reading one act needs — act-scoped AND global.
+ *
+ * ⚠ `gating` IS NOT THE WHOLE ANSWER, AND THE GAP COST 33 ROWS. `gating` means
+ * *"a miss makes THE OWNING ACT unavailable"*, so the shared collision tables
+ * — which have no owning act — are `gating: false` and every filter on
+ * `zone`/`act` misses them. `read()` needs them all the same, for all eighteen
+ * acts. Measured 2026-09-02 (O45): a real checkout missing only
+ * `collide/Angle Map.bin` failed 33 rows, and the eight `whenS1Act(...)` guards
+ * O39 had installed did not fire at all — they answered "this act's files are
+ * all here", truthfully, about the wrong list.
+ *
+ * `S1_GLOBAL_REQUIRED_KEYS` is the adapter's own statement of the second half,
+ * and `test/support/s1-checkout.test.ts` MEASURES it against `read()` rather
+ * than trusting it, so a new `global(...)` call cannot silently reopen the gap.
+ */
+function s1ActRequiredEntries(zone: string, act: number) {
+  const all = enumerateProfileEntries(s1Profile);
+  return [
+    ...all.filter((e) => e.gating && e.zone === zone && e.act === act),
+    ...all.filter((e) => e.zone === undefined && S1_GLOBAL_REQUIRED_KEYS.includes(e.key)),
+  ];
+}
+
+/**
+ * The files one act needs, as repo-relative paths, DERIVED from the profile the
+ * adapter itself enumerates — never a hand-listed set, so a profile change
+ * cannot leave this behind.
  *
  * REV00 fallback honoured the same way `resolveEntry` honours it: an entry
  * counts as present if either of its two candidate paths exists.
  */
 export function s1ActRequiredFiles(zone: string, act: number): string[] {
-  return enumerateProfileEntries(s1Profile)
-    .filter((e) => e.gating && e.zone === zone && e.act === act)
-    .map((e) => e.variant.path);
+  return s1ActRequiredEntries(zone, act).map((e) => e.variant.path);
 }
 
-/** Which of an act's gating files are absent, as absolute paths (REV00-aware). */
+/** Which of an act's required files are absent, as absolute paths (REV00-aware). */
 export function missingS1ActFiles(zone: string, act: number): string[] {
-  return enumerateProfileEntries(s1Profile)
-    .filter((e) => e.gating && e.zone === zone && e.act === act)
+  return s1ActRequiredEntries(zone, act)
     .filter((e) => {
       if (existsSync(s1Path(e.variant.path))) return false;
       return !(e.variant.rev00Path !== undefined && existsSync(s1Path(e.variant.rev00Path)));
@@ -116,7 +149,8 @@ export function incompleteCheckoutReason(what: string, missing: readonly string[
   return `SKIPPED, NOT PASSED: cannot measure ${what} — the s1disasm checkout at ${S1_ROOT} `
     + `is INCOMPLETE: ${missing.length} required file(s) absent: ${shown}${more}. `
     + 'It has the top-level markers but not this data, so this row measures nothing. '
-    + 'That is an incomplete checkout, not an Aurora defect.';
+    + 'That is an incomplete checkout, not an Aurora defect. '
+    + `(${s1RootSource()} — if that is the wrong tree, that is the thing to change.)`;
 }
 
 /**
