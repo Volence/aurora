@@ -80,21 +80,70 @@ const WELL_FORMED_META = serializeSectionMeta(META_REFS)!;
 // canonical `}\n` (§8), and dropping only the newline leaves valid JSON.
 const MALFORMED_META = WELL_FORMED_META.slice(0, -2);
 
-// A sidecar as some OTHER writer leaves it — aeon's generator, or a hand edit —
-// carrying the effects-arc scene assignment. Hand-written rather than built by
-// serializeSectionMeta: a serializer that dropped sceneRef would drop it from
-// the fixture too, and a byte comparison against that fixture would pass while
-// the key was being erased. This text is the contract's example body
-// (empyrean docs/AURORA_EFFECTS_SCHEMA.md §3 at 1326ceb).
+// A sidecar as the OTHER writer really leaves it: the VERBATIM bytes of aeon's
+//   games/sonic4/data/editor/ojz/act1/section_0.meta.json
+// at aeon `origin/master` `d78f9090` (2026-09-02), read through git objects
+// (`git show d78f9090:<path> | cat -A`), never a checkout — 108 bytes,
+// sha256 3b375c4e884e2ea97a0392f26fa5a5833deab2606c98040ecf08b373ee8227b9.
+//
+// THREE keys, and no trailing newline. **aeon's writer does not emit
+// `rasterRef`**: of the only three sidecars that have ever existed on any aeon
+// ref, two (section_0, section_4) LACK the key entirely and one (section_5)
+// carries a string; NONE carries an explicit `"rasterRef": null`
+// (docs/reviews/2026-09-02-rasterref-absent-save.md §1, and the pin in
+// aeon-save.rasterref-absent.test.ts). This fixture used to be a hand-invented
+// body that was widened at `3674d85a` to carry `"rasterRef": null` while still
+// claiming to be "the contract's example body (§3 at 1326ceb)" — it was neither:
+// §3's example body at 1326ceb has three keys and no `rasterRef`, and no other
+// writer emits that spelling. section_0 is the file that body was drawn from
+// (its `bgLayoutRef` is §3's example value, verbatim), so the lineage survives
+// re-origination.
+//
+// Why section_0 and not section_4: both lack `rasterRef` and carry a non-null
+// `sceneRef`, but section_0 is the only real body with a non-null SIBLING ref,
+// so the round-trip below keeps proving that `sceneRef` survives ALONGSIDE
+// another ref rather than as a lone key — and META_PATH below is literally
+// `section_0.meta.json`, so fixture and path now name the same real file. Its
+// price is the second, already-ruled canonicalisation (the §8 trailing newline),
+// which `canonicalisedByAurora` derives rather than types.
+//
+// Still not built by serializeSectionMeta: a fixture the writer under test
+// produces drops whatever that writer drops, and the byte comparison would pass
+// while the key was being erased.
 const SCENE_META_ON_DISK = [
   '{',
-  '  "bgLayoutRef": "bg-cave",',
-  '  "paletteRef": "pal-dusk",',
-  '  "rasterRef": null,',
-  '  "sceneRef": "canopy_dusk"',
+  '  "bgLayoutRef": "ingame-forest-v15-1786630615596",',
+  '  "paletteRef": null,',
+  '  "sceneRef": "ojz_act1_start"',
   '}',
-  '',   // aeon's shipped section_4.meta.json ends in exactly one newline (§8)
 ].join('\n');
+
+/** The anchor the inserted key sorts after, and the line Aurora's writer adds. */
+const PALETTE_NULL_LINE = '  "paletteRef": null,\n';
+const RASTER_NULL_LINE = '  "rasterRef": null,\n';
+
+/**
+ * What the contract rules Aurora's writer may change about an aeon sidecar,
+ * DERIVED from the fixture text — never typed as a second golden, which would
+ * agree with a broken writer the moment someone updated it to match.
+ *
+ * Exactly two canonicalisations, both already adjudicated and measured:
+ *   1. `"rasterRef": null` inserted in sorted position, because the model has no
+ *      "absent" (`section-meta.ts` folds absent -> null on load) and schema §3.1
+ *      rules absent and explicit-null THE SAME STATE. Measured in
+ *      docs/reviews/2026-09-02-rasterref-absent-save.md §2 and pinned in
+ *      aeon-save.rasterref-absent.test.ts.
+ *   2. the §8 canonical trailing newline, if the file lacked it.
+ * Anything else the writer does to these bytes is a defect and goes red here.
+ */
+function canonicalisedByAurora(onDisk: string): string {
+  // Anti-vacuous: the anchor really is there exactly once, and there really is
+  // nothing to canonicalise twice.
+  expect(onDisk.split(PALETTE_NULL_LINE)).toHaveLength(2);
+  expect(onDisk).not.toContain('"rasterRef"');
+  const body = onDisk.replace(PALETTE_NULL_LINE, PALETTE_NULL_LINE + RASTER_NULL_LINE);
+  return body.endsWith('\n') ? body : body + '\n';
+}
 
 // The same document with the raster-preset binding SET — schema §3.1's own
 // example body, adjudicated 2026-08-30 at empyrean `da91abce`. Hand-written for
@@ -201,6 +250,21 @@ async function loadSaveApply(files: Map<string, Uint8Array>): Promise<Map<string
 
 function text(bytes: Uint8Array | undefined): string | undefined {
   return bytes === undefined ? undefined : new TextDecoder().decode(bytes);
+}
+
+/** Put `onDisk` at META_PATH, load, plan a save with NO edit, and return the
+ *  sidecar bytes the plan would write — the exact pair state/aeon-save.ts drives
+ *  for an untouched section. Throws if the plan writes no sidecar at all. */
+async function savedSidecarFrom(onDisk: string): Promise<string> {
+  const files = fixtureFiles();
+  files.set(META_PATH, new TextEncoder().encode(onDisk));
+  const fa = memFa(files);
+  const r = await loadAeonProject(fa, '/proj');
+  const plan = await buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
+    { legacyAtlasMerged: r.legacyAtlasMerged });
+  const written = plan.files.filter((f) => f.path === META_PATH);
+  expect(written).toHaveLength(1);
+  return new TextDecoder().decode(written[0]!.bytes);
 }
 
 describe('buildAeonSavePlan', () => {
@@ -331,19 +395,24 @@ describe('buildAeonSavePlan', () => {
 
   /**
    * THE contract property, measured on bytes on disk: a sidecar carrying
-   * sceneRef survives load -> save unchanged. Named as a requirement rather
-   * than an implementation detail in both halves — empyrean
+   * sceneRef survives load -> save with the ref intact and nothing else touched
+   * but the two ruled canonicalisations. Named as a requirement rather than an
+   * implementation detail in both halves — empyrean
    * docs/AURORA_EFFECTS_SCHEMA.md §3/§6/§8 at 1326ceb ("parse->serialize must
    * preserve `sceneRef`") and aeon tools/EFFECTS_CONSUMER_CONTRACT.md §2.2 at
    * 00607dd5 — because parse builds a fresh object from keys it enumerates and
    * serialize emits only what it enumerates, so a key either side misses is
    * erased on the next save with no error anywhere.
+   *
+   * The expectation is DERIVED from the on-disk bytes by `canonicalisedByAurora`
+   * (one inserted line, plus the §8 tail), so a serializer that dropped
+   * `sceneRef`, dropped `rasterRef`, or added a fourth key all go red here.
    */
-  it('round-trips a sceneRef sidecar byte-for-byte through load -> save', async () => {
+  it('round-trips a sceneRef sidecar through load -> save, changing only the ruled canonicalisation', async () => {
     const files = fixtureFiles();
     files.set(META_PATH, new TextEncoder().encode(SCENE_META_ON_DISK));
     // Anti-vacuous on disk: the subject really is present, and really non-null.
-    expect(text(files.get(META_PATH))).toContain('"sceneRef": "canopy_dusk"');
+    expect(text(files.get(META_PATH))).toContain('"sceneRef": "ojz_act1_start"');
 
     const fa = memFa(files);
     const r = await loadAeonProject(fa, '/proj');
@@ -351,13 +420,30 @@ describe('buildAeonSavePlan', () => {
     // Anti-vacuous in memory: the load understood the file AND carries the ref,
     // so the save below is exercising a preserved value, not a re-emitted null.
     expect(section.unreadable).toBeUndefined();
-    expect(section.sceneRef).toBe('canopy_dusk');
+    expect(section.sceneRef).toBe('ojz_act1_start');
 
     const plan = await buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
       { legacyAtlasMerged: false });
     const written = plan.files.find((f) => f.path === META_PATH);
     expect(written).toBeDefined();
-    expect(text(written!.bytes)).toBe(SCENE_META_ON_DISK);
+    expect(text(written!.bytes)).toBe(canonicalisedByAurora(SCENE_META_ON_DISK));
+  });
+
+  /**
+   * The half that makes "one-time canonicalisation" (§8's own words for the
+   * trailing-newline flip) TRUE rather than a hopeful adjective: saving the
+   * canonical output again is a byte no-op. Without this row a writer that
+   * churned the file on every save — inserting a line, reordering keys, adding
+   * or removing the tail each time — would still satisfy the row above, and
+   * aeon's tree would gain a diff on every no-edit save forever.
+   */
+  it('canonicalises exactly once — re-saving the canonical body is a byte no-op', async () => {
+    const first = await savedSidecarFrom(SCENE_META_ON_DISK);
+    expect(first).toBe(canonicalisedByAurora(SCENE_META_ON_DISK));   // the one-time step
+    expect(first).not.toBe(SCENE_META_ON_DISK);                      // anti-vacuous: it really moved
+    const second = await savedSidecarFrom(first);
+    expect(second).toBe(first);                                      // ...and then stops
+    expect(second).toContain('"sceneRef": "ojz_act1_start"');         // still carrying the subject
   });
 
   /**
@@ -395,7 +481,7 @@ describe('buildAeonSavePlan', () => {
     const fa = memFa(files);
     const r = await loadAeonProject(fa, '/proj');
     const section = r.project.zones[0].acts[0].sections[0]!;
-    expect(section.sceneRef).toBe('canopy_dusk');   // there was something to clear
+    expect(section.sceneRef).toBe('ojz_act1_start');   // there was something to clear
     section.bgLayoutRef = null;
     section.paletteRef = null;
     section.sceneRef = null;
@@ -508,12 +594,14 @@ describe('buildAeonSavePlan', () => {
    * assignment included.
    */
   it('leaves an unreadable sidecar carrying a sceneRef byte-identical', async () => {
-    const malformed = SCENE_META_ON_DISK.slice(0, -2);   // truncated hand-edit (past the `}\n`)
+    // Truncated hand-edit. section_0's real bytes end `"\n}` with no §8 tail, so
+    // dropping the last two characters takes the closing brace with them.
+    const malformed = SCENE_META_ON_DISK.slice(0, -2);
     const files = fixtureFiles();
     files.set(META_PATH, new TextEncoder().encode(malformed));
     // Anti-vacuous: really unparseable, and really carrying the ref it would lose.
     expect(() => JSON.parse(malformed)).toThrow();
-    expect(malformed).toContain('canopy_dusk');
+    expect(malformed).toContain('ojz_act1_start');
 
     const out = await loadSaveApply(files);
     expect(text(out.get(META_PATH))).toBe(malformed);
