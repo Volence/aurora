@@ -1,5 +1,8 @@
 import os, struct, sys
-AEON='/home/volence/sonic_hacks/aeon'
+import pathlib, sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "lib"))
+from suite_paths import sibling_path   # the suite's 4-step precedence, one derivation
+AEON=str(sibling_path('aeon'))
 ED=os.path.join(AEON,'games/sonic4/data/editor/ojz/act1')
 COLL=os.path.join(AEON,'games/sonic4/data/collision/base')
 hm=open(os.path.join(COLL,'heightmaps.bin'),'rb').read()

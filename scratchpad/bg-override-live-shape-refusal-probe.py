@@ -14,7 +14,10 @@ from contextlib import redirect_stdout
 import numpy as np
 from PIL import Image
 
-AEON = "/home/volence/sonic_hacks/aeon"
+import pathlib, sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "lib"))
+from suite_paths import sibling_path   # the suite's 4-step precedence, one derivation
+AEON = str(sibling_path('aeon'))
 LIVE = os.path.join(AEON, "games/sonic4/data/editor_bg_override.json")
 sys.path.insert(0, os.path.join(AEON, "tools"))
 import png_to_bg_override as tool

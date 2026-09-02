@@ -38,7 +38,10 @@ ap.add_argument("--plant-copy", action="store_true",
                 help="RED-FIRST: bake banks 1..7 as copies of bank 0 and expect this probe to fail")
 args = ap.parse_args()
 
-AEON = pathlib.Path(os.environ.get("AEON_DIR", "/home/volence/sonic_hacks/aeon"))
+import pathlib, sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "lib"))
+from suite_paths import sibling_path   # the suite's 4-step precedence, one derivation
+AEON = sibling_path('aeon')   # honours AEON_DIR / LIVE_AEON, then EMPYREAN_SUITE_ROOT
 REV = args.rev or subprocess.run(
     ["git", "-C", str(AEON), "ls-remote", "origin", "refs/heads/master"],
     capture_output=True, check=True, text=True).stdout.split("\t")[0].strip()

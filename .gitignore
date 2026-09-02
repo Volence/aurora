@@ -71,3 +71,7 @@ scratchpad/short-viewport-reach.mjs
 scratchpad/timed-run.sh
 scratchpad/verify-handover.ts
 scratchpad/verify-running.mjs
+
+# `scratchpad/lib/suite_paths.py` is imported by the Python instruments beside it;
+# CPython caches the bytecode next to it.
+scratchpad/lib/__pycache__/
