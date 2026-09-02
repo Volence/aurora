@@ -18,6 +18,7 @@ import type { LevelDoc } from '../model';
 import type { SpriteFrame } from '../../model/sprite-types';
 import type { Tile } from '../../model/s4-types';
 import { referenceCheckout, referenceCheckoutReason, referencePath } from '../../../../test/support/fixture-tree';
+import { whenS1Act } from '../../../../test/support/s1-checkout';
 
 const S1DIR = referencePath('s1disasm');
 /** Why the rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
@@ -180,7 +181,14 @@ describe('object-sprite pure helpers', () => {
     });
   });
 
-  describe('B6 golden: LevelArt + offset-art against real s1disasm', { skip: !referenceCheckout('s1disasm'), meta: { skipReason: S1_ABSENT } }, () => {
+  // THE MARKER GUARD IS THE WRONG QUESTION FOR THIS BLOCK (O45). It opens GHZ
+  // act 1 through the real adapter, so what it needs is that ACT's inputs, not
+  // three top-level markers. On a real checkout missing one of them it used to
+  // die on `act ghz/1 unavailable: missing 1 required file(s): ghz.act1.tiles.0`
+  // — a profile key naming no file and no tree — measured under 11 of 46
+  // single-file removals. Its three siblings (occlusion, editable-tiles,
+  // render) already take `whenS1Act`; this one was simply missed.
+  describe('B6 golden: LevelArt + offset-art against real s1disasm', whenS1Act('ghz', 1), () => {
     let ghz1: LevelDoc;
     beforeAll(async () => {
       const handle = await s1Adapter.open(realFs(S1DIR));
