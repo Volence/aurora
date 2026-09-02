@@ -65,7 +65,7 @@
 //
 // RUN:
 //   VITE_AURORA_DEBUG=1 npx electron-vite build
-//   AEON_DIR=<writable copy> npm run harness:variant-cycle
+//   AEON_DIR=<writable copy> [SCREEN=1920x1080] npm run harness:variant-cycle
 //
 //   ⚠ FRESH COPY PER RUN (O66). The Ctrl+S in section 7 rewrites the whole
 //   project and leaves `harness_vc.json` in presets/. A second run on the same
@@ -94,6 +94,11 @@ import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9439);
 const DISPLAY_NUM = Number(process.env.DISPLAY_NUM ?? 97);
+/** The X screen. ⚠ 1680x1050 is THIS FILE'S default and not a display in this
+ *  workspace (the owner's primary is 1920x1080 — O15's packet, §1); every height
+ *  printed below is stamped with the screen it was read at. */
+const SCREEN = process.env.SCREEN ?? '1680x1050';
+if (!/^\d{3,4}x\d{3,4}$/.test(SCREEN)) throw new Error(`SCREEN must look like 1920x1080, got ${JSON.stringify(SCREEN)}`);
 const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
 const ELECTRON = process.env.ELECTRON_BIN
   ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
@@ -309,7 +314,7 @@ async function main() {
   console.log(`    node        : ${process.version}   PLANT=${PLANT || '(none)'}`);
   console.log(`    loadavg     : ${os.loadavg().map((n) => n.toFixed(2)).join(' ')}`);
   console.log(`    AEON_DIR    : ${AEONDIR}`);
-  console.log(`    DISPLAY     : :${DISPLAY_NUM}`);
+  console.log(`    DISPLAY     : :${DISPLAY_NUM}  screen ${SCREEN} (${process.env.SCREEN ? 'SCREEN env' : 'this file\'s default, NOT a display here'})`);
   console.log(`    disclosure  : lead ${JSON.stringify(LAG_LEAD)}, measured ${LAG_DATE} (from preset-lag.ts)`);
 
   // O66: FRESH COPY PER RUN, ENFORCED — before anything is launched. The
@@ -333,7 +338,7 @@ async function main() {
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
   const child = spawnGuarded('/usr/bin/xvfb-run',
-    ['-n', String(DISPLAY_NUM), '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`],
+    ['-n', String(DISPLAY_NUM), '-s', `-screen 0 ${SCREEN}x24`, ELECTRON, `${ROOT}/dist/main/index.mjs`],
     { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   child.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[main] ${d}`); });
   child.stderr.on('data', (d) => { if (process.env.VERBOSE) process.stderr.write(`[err] ${d}`); });
