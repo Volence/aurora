@@ -2,63 +2,85 @@
  * The contract-leads-consumer lag on the raster preset document, as ONE fact
  * with ONE measurement behind it.
  *
- * ═══ WHAT THIS IS ═══
+ * ═══ THE LAG IS EMPTY. RETIRED 2026-09-02. ═══
  *
- * The vendored schema (aurora-effects-preset.schema.json, empyrean 12aecd5)
- * DECLARES `cycles` and `variants` — DoD item 5's two keys, §7.2 — and Aurora
- * authors, validates, saves and re-reads both. aeon's generator does not read
- * them yet: at aeon origin/master, `tools/effects_gen.py` refuses both keys by
- * name, and `docs/EDITOR_RASTER_PRESETS.md`'s `preset-refused` row says so. So
- * a value an author sets under either key reaches the FILE and nothing further —
- * not the ROM, not an emulator, not a screen. That is the premise of the
- * sentence the band-preset panel shows above its cycle and variant controls
- * (`presetLagDisclosure`), and it is a fact about aeon, which this tree cannot
- * measure at run time.
+ * It was `['cycles', 'variants']` from the 12aecd5 re-vendor until aeon merged
+ * EFFECTS-W1 DoD item 5 (aeon `445a5856`, 2026-09-02). The premise was: the
+ * vendored schema DECLARES both keys (§7.2) and Aurora authors, validates,
+ * saves and re-reads both, while aeon's `tools/effects_gen.py` refused both by
+ * NAME — so a value an author set under either reached the FILE and nothing
+ * further, not the ROM, not an emulator, not a screen. The band-preset panel
+ * said exactly that, above the controls, in a sentence derived from this list.
  *
- * ═══ ONE SOURCE OF TRUTH, MEASURED IN ONE PLACE ═══
+ * At aeon `origin/master` `a5e2b618` (page blob `518492e3`) that is no longer
+ * true, and it is not true on a doc heading: `PRESET_KEYS` in `effects_gen.py`
+ * carries both names, `_check_cycles` / `_check_variants` shape-check them,
+ * `render_cycle_channel` / `render_variant` / `render_preset_cycle` /
+ * `render_preset_variants` lower them through the real constructors, and the
+ * committed generated `.emp` carries the emitted record
+ * (`games/sonic4/data/generated/ojz/act1/effects_scenes.emp`:
+ * `EditorVariant_OJZ_Act1_ojz_sec3_shimmer_0: pal_variant = variant(shift_r: 1,
+ * shift_g: 1)`). So the list below is EMPTY and the sentence does not render.
+ *
+ * ═══ MERGED, NOT CERTIFIED — AND THE CONDITION THAT REVIVES THE SENTENCE ═══
+ *
+ * Item 5 is MERGED on aeon's master. It is NOT a certified chain: sigil
+ * `dd5eaad2` (reachable on sigil `origin/master`) records "chain 198 recorded
+ * RED — 3 failures, no ROM byte moved", and aeon supersedes it with chain 199.
+ * Nothing in this repository has seen a ROM obey these keys, and nothing here
+ * claims one has. What retired is a sentence about what aeon's GENERATOR does
+ * with an authored key, which is a fact this file can and does measure.
+ *
+ * RE-OPEN CONDITION, stated so the retirement cannot become permanent by
+ * accident: IF ANY OF CHAIN 199'S SEVEN GOLDENS DIFFERS FROM CHAIN 198'S, the
+ * ROM did not behave as the retired sentence's absence now implies, and the
+ * sentence COMES BACK — re-fill the list below and re-date it. That check is
+ * aeon's and sigil's to run; Aurora cannot measure it, and no row in this repo
+ * pretends to.
+ *
+ * ═══ THE MACHINERY STAYS. IT IS NOT DEAD CODE — IT IS A RE-ARMABLE DISCLOSURE ═══
  *
  * `PRESET_KEYS_AWAITING_AEON` is the only hand-typed statement of the fact.
  * TWO readers, and only two:
  *
- *   1. `test/formats/effects-preset-schema-drift.test.ts`'s last row MEASURES it:
- *      it reads aeon's page at origin/master through git objects, computes the
- *      lag (the keys aeon refuses that the schema does not reserve), and asserts
- *      that lag equals THIS list. The test carries no copy of the names.
+ *   1. `test/formats/effects-preset-schema-drift.test.ts` MEASURES it: it reads
+ *      aeon's page at origin/master through git objects, computes the lag (the
+ *      keys aeon refuses that the schema does not reserve), and — now that the
+ *      lag is empty — asserts it is EMPTY. That row goes red the day a lag
+ *      re-opens, in either direction: aeon reverting item 5, or the contract
+ *      declaring a key aeon has not built. Its message says to re-fill this
+ *      list. The test carries no copy of the names.
  *   2. `presetLagDisclosure` DERIVES the panel's sentence from it, and returns
- *      null — no sentence — when the list is empty.
+ *      null — no sentence — when the list is empty. It is mounted
+ *      unconditionally and propless in `BandPresetPanel`, so re-filling this
+ *      list is the whole of what it takes to put the sentence back on screen.
  *
  * `src/renderer/components/effects/__tests__/preset-lag-disclosure.test.ts`
- * closes the loop from the other side: while this list is non-empty, the drift
- * test must still assert against it. Delete the measuring row without retiring
- * the premise and that test goes red, so the sentence cannot outlive the
- * measurement that justifies it (memory: a workaround outlives its defect;
- * a hold carries its date).
+ * closes the loop from the other side: it asserts the list is empty AND that the
+ * drift test still measures the refusal list, so a green suite cannot mean
+ * "nobody is looking any more". Its sentence rows drive the derivation with an
+ * EXPLICIT hypothetical list, so the wording is still fully asserted with the
+ * premise retired (memory: a workaround outlives its defect; a hold carries its
+ * date; a suite that passes while asserting nothing is the failure mode).
  *
- * ═══ EXPIRY (2026-09-02) ═══
- *
- * Ends when aeon lowers the keys — DoD item 5, aeon's lane, queued behind
- * aeon's chain 196 — which the drift row reports as `preset-refused` shrinking
- * to `fires`. The row goes red; the fix is to empty this list (or delete both
- * the list and the row together); the sentence retires by construction. Evaluate,
- * do not obey: re-measure with `git -C <aeon> show origin/master:docs/
- * EDITOR_RASTER_PRESETS.md`, never by path into a working tree.
- *
- * Owner of the sentence: Aurora (this file). Owner of the fact: aeon.
+ * Evaluate, do not obey: re-measure with `git -C <aeon> show
+ * origin/master:docs/EDITOR_RASTER_PRESETS.md`, never by path into a working
+ * tree. Owner of the sentence: Aurora (this file). Owner of the fact: aeon.
  */
 
 /**
  * The preset keys the schema declares that aeon's generator does not lower yet,
- * sorted, as the drift row measures them. Empty means "no lag" and retires the
- * disclosure.
+ * sorted, as the drift row measures them. EMPTY since 2026-09-02 — no lag, and
+ * so no disclosure. Re-fill it (and only it) if the drift row reports one again.
  */
-export const PRESET_KEYS_AWAITING_AEON: readonly string[] = Object.freeze(['cycles', 'variants']);
+export const PRESET_KEYS_AWAITING_AEON: readonly string[] = Object.freeze([]);
 
 /** The date the premise above was last measured — printed inside the sentence. */
 export const PRESET_LAG_MEASURED_ON = '2026-09-02';
 
 /** Where the measurement lives, named in the sentence so a reader can re-run it. */
 export const PRESET_LAG_MEASUREMENT =
-  'test/formats/effects-preset-schema-drift.test.ts (last row) against aeon ' +
+  'test/formats/effects-preset-schema-drift.test.ts (the refusal-list row) against aeon ' +
   'docs/EDITOR_RASTER_PRESETS.md at origin/master';
 
 /** The sentence's leading words — a harness finds the block by them. */
@@ -91,5 +113,5 @@ export function presetLagDisclosure(keys: readonly string[] = PRESET_KEYS_AWAITI
     `set below reaches a ROM, and no emulator has shown ${one ? 'it' : 'either'}. ` +
     `Measured ${PRESET_LAG_MEASURED_ON} by ${PRESET_LAG_MEASUREMENT}. ` +
     `Expires (${PRESET_LAG_MEASURED_ON}): the day that row goes red because aeon lowers ` +
-    `${one ? 'the key' : 'the keys'} (DoD item 5, aeon's lane) — this sentence retires with the row.`;
+    `${one ? 'the key' : 'the keys'} — this sentence retires with the row.`;
 }

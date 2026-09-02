@@ -12,10 +12,12 @@
 // ⚠ WHAT THESE ROWS CANNOT SEE. There is no React here: nothing below proves a
 // select on screen reaches these functions. That is
 // `scratchpad/variant-cycle-harness.mjs`'s job, driving the real app. And
-// NOTHING here touches an engine or an emulator — the keys are not consumed by
-// aeon's generator yet (core/formats/effects/preset-lag.ts), so the only
-// artifact a row can honestly assert is the FILE's bytes, which is why the
-// round-trip rows compare `serializeEffectsPreset` text.
+// NOTHING here touches an engine or an emulator, so the only artifact a row can
+// honestly assert is the FILE's bytes, which is why the round-trip rows compare
+// `serializeEffectsPreset` text. (Until 2026-09-02 there was a second reason:
+// aeon's generator refused both keys by name. It no longer does — item 5 is
+// MERGED on aeon's master, not certified, see core/formats/effects/preset-lag.ts
+// — but nothing in THIS file could measure a ROM either way.)
 
 import { describe, it, expect } from 'vitest';
 import {

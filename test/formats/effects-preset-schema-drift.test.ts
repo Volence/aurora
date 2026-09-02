@@ -28,9 +28,8 @@ import {
 } from '../../src/core/formats/effects/json-schema-subset';
 import {
   EFFECTS_PRESET_SCHEMA, EFFECTS_PRESET_BAND_KEYS, EFFECTS_PRESET_ON_ARMS,
-  EFFECTS_PRESET_RESERVED_KEYS, EFFECTS_PRESET_ROOT_KEYS, presetArmFields,
+  EFFECTS_PRESET_RESERVED_KEYS, EFFECTS_PRESET_ROOT_KEYS, presetArmFields, presetDefFields,
 } from '../../src/core/formats/effects/preset';
-import { PRESET_KEYS_AWAITING_AEON } from '../../src/core/formats/effects/preset-lag';
 import { peerRepo, resolveRev, readAtRev, isAncestor } from '../support/peer-repo';
 
 const SCHEMA_PATH = resolve(
@@ -296,20 +295,31 @@ describe('CURRENCY: is the vendored preset schema still what empyrean publishes?
  * At the 6664b61 landing the two AGREED, field for field (recorded in
  * docs/reviews/2026-08-29-band-preset-panel.md).
  *
- * ═══ AT THE 12aecd5 RE-VENDOR THEY DO NOT, AND THE DIRECTION IS THE CONTRACT'S ═══
+ * ═══ THE 12aecd5 LAG OPENED, AND CLOSED AGAIN ON 2026-09-02 ═══
  *
- * The schema now DECLARES `cycles` and `variants` and reserves only `fires`;
- * aeon's page and `effects_gen.py` at origin/master 15efabca still REFUSE all
- * three by name. That is the contract leading its consumer — empyrean's vectors
- * say so in their own `$comment` ("the contract leads and aeon's
+ * At the 12aecd5 re-vendor the schema DECLARED `cycles` and `variants` and
+ * reserved only `fires`, while aeon's page and `effects_gen.py` still REFUSED
+ * all three by name. That was the contract leading its consumer — empyrean's
+ * vectors say so in their own `$comment` ("the contract leads and aeon's
  * tools/effects_gen.py implements against it, the direction section 8
- * requires") — and it is a LAG, not a contradiction: nothing aeon lowers is a
- * name the schema does not declare, and nothing the schema reserves is a name
- * aeon lowers. So the rows below assert the invariants that hold ACROSS a lag
- * (same vocabulary on both sides; aeon refuses at least what the schema
- * reserves; whatever else aeon refuses is a key the schema declares), and the
- * last row NAMES the lag as it stood, so the day aeon catches up is a red row
- * here and not a silent green.
+ * requires") — a LAG, not a contradiction. aeon merged EFFECTS-W1 DoD item 5
+ * (`445a5856`, 2026-09-02) and the lag is now EMPTY: `preset-refused` has
+ * shrunk to `fires` alone, and the page's `preset` row grew the two optional
+ * keys plus the `cycle-channel`, `cycle-channel-optional` and `variant` rows.
+ *
+ * SO THE ROWS BELOW SPLIT THE QUESTION IN TWO, and they must stay split,
+ * because a lag is a legitimate state of this pair and a rename is not:
+ *
+ *   - The first two rows assert the invariants that hold ACROSS a lag — same
+ *     vocabulary on both sides; every REQUIRED key accepted; nothing accepted
+ *     that the schema does not declare; aeon refuses at least what the schema
+ *     reserves. A name one side knows and the other does not is a SPLIT.
+ *   - The last row is the PIN: the lag is EMPTY. It goes red in either
+ *     direction — aeon un-building a key (a regression: item 5 reverted), or
+ *     the contract declaring one aeon has not built (a new lag) — and its
+ *     message says which fix each is. It replaced the row that pinned the
+ *     `['cycles','variants']` lag by name, retired with the disclosure it
+ *     measured (docs/reviews/2026-09-02-preset-lag-retired.md).
  */
 describe('aeon\'s worked example vs the schema (the schema wins; this reports a split)', () => {
   const aeon = peerRepo('aeon');
@@ -400,12 +410,50 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
       expect([...schemaRequired, ...schemaIgnored, ...schemaOptional].sort())
         .toEqual([...EFFECTS_PRESET_ROOT_KEYS].sort());
 
-      expect(keys.preset, SPLIT(tip)).toEqual(schemaRequired);
+      // ═══ `preset` IS AEON'S ACCEPTED SET, NOT THE SCHEMA'S REQUIRED SET ═══
+      //
+      // This row asserted `keys.preset === schemaRequired` until 2026-09-02, and
+      // it was green only by COINCIDENCE: during the lag the two optional keys
+      // were refused, so the accepted set and the required set were the same
+      // three names. Item 5 landed and the row went red on a page that had done
+      // nothing wrong. The lag-tolerant statement is a pair of one-sided ones —
+      // every required key must be accepted, and nothing may be accepted that
+      // the schema does not declare. The gap between them IS the lag, and the
+      // pin row below is the only thing entitled to have an opinion about it.
+      for (const req of schemaRequired) {
+        expect(keys.preset, `${SPLIT(tip)} aeon does not accept "${req}", which the schema `
+          + 'REQUIRES — a document the schema demands would be refused').toContain(req);
+      }
+      expect(
+        keys.preset.filter((k) => !schemaRequired.includes(k) && !schemaOptional.includes(k)),
+        `${SPLIT(tip)} aeon accepts a root key the schema does not declare`,
+      ).toEqual([]);
+
       expect(keys['preset-ignored'], SPLIT(tip)).toEqual(schemaIgnored);
       expect(keys.band, SPLIT(tip)).toEqual([...EFFECTS_PRESET_BAND_KEYS].sort());
       expect(keys['on-arms'], SPLIT(tip)).toEqual([...EFFECTS_PRESET_ON_ARMS].sort());
       expect(keys['on.cram'], SPLIT(tip)).toEqual([...presetArmFields('cram')].sort());
       expect(keys['on.pal_region'], SPLIT(tip)).toEqual([...presetArmFields('pal_region')].sort());
+
+      // ═══ THE SHAPES ITEM 5 ADDED — the same question, one level down ═══
+      //
+      // The page grew `cycle-channel`, `cycle-channel-optional` and `variant`
+      // when aeon built the two keys, and those are field names an Aurora panel
+      // writes into a document. Unchecked, they are exactly what the row above
+      // exists to stop: a spelling the two halves disagree about, breaking
+      // nothing anywhere and inviting the next author to build against the
+      // wrong one. Derived from the schema's own `$defs` nodes, never retyped.
+      const cycleChannel = presetDefFields('cycle_channel');
+      const palVariant = presetDefFields('pal_variant');
+      // Anti-vacuous: the derivations really found split, non-empty field sets.
+      expect(cycleChannel.required.length).toBeGreaterThan(0);
+      expect(cycleChannel.optional.length).toBeGreaterThan(0);
+      expect(palVariant.required).toEqual([]);
+      expect(palVariant.optional.length).toBeGreaterThan(0);
+
+      expect(keys['cycle-channel'], SPLIT(tip)).toEqual([...cycleChannel.required].sort());
+      expect(keys['cycle-channel-optional'], SPLIT(tip)).toEqual([...cycleChannel.optional].sort());
+      expect(keys.variant, SPLIT(tip)).toEqual([...palVariant.optional].sort());
     });
   });
 
@@ -429,34 +477,71 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
   });
 
   /**
-   * THE LAG, NAMED. A pinned expectation on purpose — the same kind of pin the
-   * CURRENCY rows keep — whose job is to go red the day it stops being true.
-   * When aeon lands its half of item 5 (effects_gen.py lowering cycles and
-   * variants, the page's `preset-refused` row shrinking to `fires`), this row
-   * fails: empty `PRESET_KEYS_AWAITING_AEON` (or delete it and this row
-   * together), and re-read docs/reviews for anything that quoted the lag.
+   * THE LAG IS EMPTY — the pin, and the successor of the row that named it.
    *
-   * THE PIN LIVES IN src/, NOT HERE. `PRESET_KEYS_AWAITING_AEON`
-   * (core/formats/effects/preset-lag.ts) is the premise of the band-preset
-   * panel's "not consumed by the engine yet" sentence, and this row is its
-   * MEASUREMENT: one fact, hand-typed once, measured here, rendered there.
-   * The row carries no copy of the names, so the sentence cannot say one thing
-   * while the test asserts another. `preset-lag-disclosure.test.ts` checks
-   * from the other side that this row still exists while the premise does.
+   * ═══ WHAT THIS REPLACED, AND WHY IT IS NOT A QUIETER SUITE ═══
+   *
+   * Until 2026-09-02 this row pinned the lag to `PRESET_KEYS_AWAITING_AEON`
+   * (`src/core/formats/effects/preset-lag.ts`), the premise of the band-preset
+   * panel's "not consumed by the engine yet" sentence, and its job was to go
+   * red the day aeon caught up. aeon caught up (item 5, `445a5856`), it went
+   * red, and its own message said to empty the constant and delete the row.
+   *
+   * Deleting it outright would have left NOTHING watching the refusal list:
+   * aeon reverting item 5 would put `cycles` and `variants` back into
+   * `preset-refused`, the vocabulary row above would stay green (the union is
+   * unchanged — the names merely move between rows), and Aurora would go on
+   * shipping cycle and variant controls with no disclosure above them and no
+   * test with an opinion. So the pin did not go away; it changed value, from
+   * "the lag is exactly these two names" to "the lag is empty", which is the
+   * measured truth and is still a claim that can be wrong.
+   *
+   * IT GOES RED IN BOTH DIRECTIONS, and the message distinguishes them:
+   *   - aeon UN-builds a key (item 5 reverted) → a regression, and the panel
+   *     owes its author the sentence again.
+   *   - the contract DECLARES a key aeon has not built → a new lag, the same
+   *     legitimate state as 12aecd5, and the fix is to re-fill the constant.
+   * Either way the fix is one edit in ONE file, and the sentence follows.
+   *
+   * THE ROW STILL CARRIES NO COPY OF ANY KEY NAME: the left side is read from
+   * aeon's page and the right side is the empty set.
+   * `preset-lag-disclosure.test.ts` checks from the other side that this row is
+   * still here, so the retirement cannot itself rot into an unmeasured claim.
    */
   it(`the contract-leads-consumer lag at aeon ${page.kind === 'ok' ? page.tip.slice(0, 8) : TIP} is `
-     + 'exactly PRESET_KEYS_AWAITING_AEON, the panel\'s disclosure premise (goes red when aeon catches up)', (ctx) => {
+     + 'EMPTY — aeon lowers every key the schema declares (retired 2026-09-02; red if one re-opens)', (ctx) => {
     onPage(ctx, ({ tip, keys }) => {
-      // Anti-vacuous: a premise with nothing in it has no business being
-      // measured — if aeon has caught up, retire the constant AND this row.
-      expect(PRESET_KEYS_AWAITING_AEON.length, 'PRESET_KEYS_AWAITING_AEON is empty: the disclosure '
-        + 'has retired, so delete this row with it').toBeGreaterThan(0);
+      // Anti-vacuous: this row is only meaningful because the schema declares
+      // keys BEYOND the required ones for aeon to have built. If that ever
+      // stopped being so, "the lag is empty" would be true of nothing.
+      expect(schemaOptional.length, 'the schema declares no optional root key, so there is no lag '
+        + 'this row could ever measure').toBeGreaterThan(0);
+      expect(keys['preset-refused'].length, 'aeon refuses nothing at all, so the refusal list this '
+        + 'row filters is not being read').toBeGreaterThan(0);
+
       const lag = keys['preset-refused'].filter((k) => !schemaReserved.includes(k)).sort();
-      expect(lag, `the lag between ${PROV.empyrean.path} (blob ${PROV.empyrean.blob}) and aeon `
-        + `${PAGE} at ${tip} has MOVED away from PRESET_KEYS_AWAITING_AEON. If it is now empty, `
-        + 'aeon has built item 5: empty the constant (the panel\'s sentence retires with it) and '
-        + 'delete this row. If it is something else, that is a split to report.')
-        .toEqual([...PRESET_KEYS_AWAITING_AEON].sort());
+      expect(
+        lag,
+        `A LAG HAS RE-OPENED between ${PROV.empyrean.path} (blob ${PROV.empyrean.blob}) and aeon `
+        + `${PAGE} at ${tip}: aeon refuses ${JSON.stringify(lag)}, which the schema DECLARES. `
+        + 'This is not a split — it is the contract leading its consumer, the state this pair was '
+        + 'in from the 12aecd5 re-vendor until aeon merged item 5 on 2026-09-02 — but Aurora\'s '
+        + 'band-preset panel is now authoring keys that reach the file and nothing further with '
+        + 'NO disclosure above the controls. FIX: put these names back into the premise list in '
+        + 'src/core/formats/effects/preset-lag.ts (the panel\'s sentence is derived from it and '
+        + 'comes back on screen by construction), update its date, and flip this row back to '
+        + 'asserting that list. IF INSTEAD AEON HAS REVERTED EFFECTS-W1 ITEM 5, that is the '
+        + 'regression this row exists to catch: report it to aeon before re-filling anything.',
+      ).toEqual([]);
+
+      // The same fact from the other side, so the row cannot pass on a page that
+      // simply stopped listing its refusals: every key the schema declares is a
+      // key aeon's page says it accepts.
+      expect(
+        schemaOptional.filter((k) => !keys.preset.includes(k)),
+        `${SPLIT(tip)} the schema declares these optional keys and aeon's page neither accepts `
+        + 'nor refuses them — the page has stopped accounting for part of the vocabulary',
+      ).toEqual([]);
     });
   });
 });
