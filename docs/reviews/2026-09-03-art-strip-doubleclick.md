@@ -167,8 +167,9 @@ Environment says. Times are completion times.
 | 7 | fixed | **1280x700** / 1 | **20/20, exit 0** | 10:00:42Z |
 | 8 | fixed | 1680x1050 / 1 | **20/20, exit 0** | 10:01:55Z |
 | 9 | fixed, `SCALE=1.35` | 1680x1050 / **1.35, fractional rect** | **20/20, exit 0** | 10:02:36Z |
+| 10 | fixed — **after the last write**, on the committed tree | 1680x1050 / 1 | **20/20, exit 0** | 10:07:34Z |
 
-Four green runs across three environments, and `devicePixelRatio` is printed by
+Five green runs across three environments, and `devicePixelRatio` is printed by
 the harness on every one (1, 1, 1, **1.35**) — this box has been seen at both,
 hours apart, so the fractional case is forced rather than waited for. Run 9's
 strip rect is `{"left":1005.926…,"top":378.657…,"width":224.444…}`; every aim is
@@ -264,7 +265,9 @@ looking alike.
 Test Files  1 failed | 470 passed | 2 skipped (473)
      Tests  1 failed | 6536 passed | 8 skipped (6545)
 ```
-`npm test` in this worktree, completed 2026-09-03T10:03:06Z, uptime 8d 21:52.
+`npm test` in this worktree, completed 2026-09-03T10:03:06Z, uptime 8d 21:52 —
+and re-run on the committed tree AFTER the last write, completed 10:06:28Z,
+uptime 8d 21:55, with the identical aggregate and the identical single failure.
 
 **Failing:** `test/formats/effects-preset-schema-drift.test.ts > the
 contract-leads-consumer lag at aeon 79f5af7e is EXACTLY the premise list`.
