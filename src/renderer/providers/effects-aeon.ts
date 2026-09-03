@@ -2149,8 +2149,12 @@ export function layerCountLine(scene: Pick<EffectsScene, 'layers'>): string {
 /**
  * The V-factor row's inline hint — the sentinel's meaning said on the row,
  * not only in a tooltip. A hint under the control rather than in the label:
- * the label column is a fixed 72px (`column-layout` LABEL_W) and a sentence
+ * the label column is a fixed width (`column-layout` LABEL_W) and a sentence
  * there would push every control in the section rightward.
+ *
+ * Deliberately no number here: this line read "a fixed 72px" while LABEL_W was
+ * 64, and a comment that restates a constant it already names by symbol can
+ * only ever go stale — nothing re-reads a comment to check it.
  */
 export function vFactorHint(): string {
   return `${EFFECTS_V_FACTOR_LOCK} = locked (no vertical scroll)`;
