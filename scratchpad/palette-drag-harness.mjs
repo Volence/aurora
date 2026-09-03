@@ -20,8 +20,15 @@
 //
 // Run with MODE=before against a tree holding the pre-fix PaletteEditor to see
 // the bug; MODE=after (default) against the fixed one.
+//
+// ⛔ THE COPY, NEVER THE LIVE AEON TREE (O53). AEON_DIR has NO DEFAULT — unset,
+// this harness refuses at import; set to the tree aeon actually lives in, it
+// refuses again, against the RESOLVED default location rather than a literal.
+// See the two-refusal block below.
 
-import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import {
+  AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved,
+} from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
@@ -37,7 +44,55 @@ const ROOT = AURORA_DIR;
 const RUN = announceRunRoot(runTarget(ROOT));
 const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
 const MAIN = RUN.main;
-const AEONDIR = siblingPathOrUnresolved('aeon') + '/';
+/**
+ * THE COPY IS REQUIRED, SO THERE IS NO DEFAULT. Two refusals, two questions.
+ *
+ * Until O53 this read `siblingPathOrUnresolved('aeon') + '/'` — the resolver
+ * used correctly, and therefore invisible to `check-peer-path-literals` (no
+ * sibling literal, no raw `process.env`), pointed straight at the aeon lane's
+ * LIVE checkout. This harness does not merely read it: it opens it as a project
+ * and drives palette drags that COMMIT (rows A5/B1 below assert the commit
+ * happened), so a run could write an edited palette into another lane's
+ * working tree mid-edit. Review bar 19 (`docs/OVERSEER.md`), whose own
+ * corollary (b) is that routing a read through a resolver "removes the literal
+ * while leaving the read pointed at the same live tree".
+ *
+ * No default is available honestly. A throwaway copy is something an operator
+ * MAKES; every candidate default is either a dead path — which never trips the
+ * guard below, so the run dies later and further away (`docs/OVERSEER.md`,
+ * SUITE-PATHS) — or the live tree the guard exists to refuse. So it REFUSES
+ * when nothing is set, the contract's step 4 in its loudest form, through
+ * `checkoutOverride`, which also buys the aliases, the two-spellings-disagree
+ * refusal and the set-but-wrong error a hand-rolled `process.env.AEON_DIR` had
+ * none of.
+ *
+ * NO TRAILING SLASH, and that is a fix rather than a tidy-up. The recent row is
+ * found by `button[title=<AEONDIR>]`, and `addRecentProject` stores the path
+ * through `normalizeProjectPath` (`src/shared/project-path.ts`), which strips
+ * trailing separators. The old `+ '/'` therefore searched for a title the app
+ * could not render.
+ */
+const aeonOverride = checkoutOverride('aeon');
+if (aeonOverride === null) {
+  throw new Error(
+    'AEON_DIR is unset, and this harness has no honest default: it OPENS the tree '
+    + 'it is pointed at as a project and drives palette drags that COMMIT, so it must '
+    + 'be pointed at a throwaway copy of aeon. Make one (e.g. `cp -r '
+    + `${siblingDefaultPathOrUnresolved('aeon')} $(mktemp -d)/aeon\`) and set AEON_DIR `
+    + 'to it. Refusing rather than guessing: the guess this replaced was the aeon '
+    + "lane's LIVE checkout. (empyrean contract/SUITE_PATHS.md, precedence step 4; "
+    + 'aurora docs/OVERSEER.md review bar 19)',
+  );
+}
+const AEONDIR = aeonOverride.value;
+if (AEONDIR === siblingDefaultPathOrUnresolved('aeon')) {
+  throw new Error(
+    `${aeonOverride.name}=${AEONDIR} is the real aeon tree — this harness commits `
+    + 'palette edits into the project it opens and must never write there. Point it at '
+    + `a throwaway copy (e.g. \`cp -r ${siblingDefaultPathOrUnresolved('aeon')} `
+    + '$(mktemp -d)/aeon`). (aurora docs/OVERSEER.md review bar 19)',
+  );
+}
 const MODE = process.env.MODE ?? 'after';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -109,7 +164,15 @@ const HELPERS = String.raw`
   };
   // PaletteEditor's zone swatches carry "line N, index M — $XXXX" as their title,
   // rendered straight from zone.palette. That title IS the model readout.
-  H.swatches = () => [...document.querySelectorAll('div[title]')].filter((d) => /^line \d+, index \d+ — \$/.test(d.title));
+  //
+  // NOTE (O53) — this queried div[title] and matched NOTHING. PaletteGrid.tsx:108
+  // renders each swatch as a <button type="button" title=...>; the title TEXT is
+  // unchanged (src/renderer/providers/palette-aeon.ts:417), only the tag moved.
+  // The rot was invisible while the harness died earlier, at the recent row.
+  // Matched on the TITLE SHAPE rather than a tag name so the next re-tag of the
+  // swatch cannot silently empty this list again.
+  // (No backticks in this comment on purpose: HELPERS is a String.raw literal.)
+  H.swatches = () => [...document.querySelectorAll('[title]')].filter((d) => /^line \d+, index \d+ — \$/.test(d.title));
   H.word = (line, idx) => {
     const d = H.swatches().find((e) => e.title.startsWith('line ' + line + ', index ' + idx + ' '));
     return d ? d.title.split('— ')[1] : null;
@@ -138,9 +201,18 @@ const HELPERS = String.raw`
     s.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
     return 'released';
   };
+  // NOTE (O53) — this looked only at <span> and read opacity, and therefore
+  // answered null for every row since Chip grew a real button: an INTERACTIVE
+  // chip is now a <button disabled> and only a non-interactive readout stays a
+  // span (src/renderer/components/ui/primitives.tsx:147-159). Undo is
+  // interactive, so it was never found, and A4/A6/B2 read "not recorded" when
+  // the truth was "not measured".
+  // null still means COULD NOT MEASURE and is kept apart from false on purpose.
   H.chipEnabled = (label) => {
-    const s = [...document.querySelectorAll('span')].find((e) => e.children.length === 0 && e.textContent.trim() === label);
-    return s ? getComputedStyle(s).opacity === '1' : null;
+    const e = [...document.querySelectorAll('button,span')]
+      .find((n) => n.children.length === 0 && n.textContent.trim() === label);
+    if (!e) return null;
+    return e.tagName === 'BUTTON' ? !e.disabled : getComputedStyle(e).opacity === '1';
   };
   H.sliderCount = () => H.sliders().length;
   window.__h = H;
