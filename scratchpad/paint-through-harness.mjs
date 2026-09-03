@@ -171,11 +171,26 @@ const INSTALL = String.raw`
     const s = getComputedStyle(e);
     return s.backgroundColor === s.borderTopColor;
   };
-  // The header's Undo/Redo chips (LevelWorkspace.tsx) — same span+opacity
-  // pattern as tile-editor-harness's chipEnabled.
+  // The header's Undo/Redo chips (LevelWorkspace.tsx).
+  //
+  // WARNING: THIS LOOKED AT <span> ONLY, AND THAT IS WHY THIS FILE WAS RED.
+  // 598be067 (2026-08-16, "the section 5 accessibility and consistency calls")
+  // made every INTERACTIVE Chip a real <button> -- the primitive's own comment
+  // says so, and names Undo/Redo as the example -- leaving spans for the
+  // readouts. So this returned null for Undo, drain()'s (=== true) loop never
+  // ran, and every "undo everything back to a clean act" between checks became
+  // a NO-OP that reported success. See the cascade in the file header.
+  //
+  // Enabledness now comes off the button's own disabled property rather than an
+  // opacity literal: disabled={!history?.canUndo} is what the component writes;
+  // opacity is a styling consequence of it. Spans keep the opacity rule,
+  // because a non-interactive chip has no disabled property.
   H.chipEnabled = (label) => {
-    const s = [...document.querySelectorAll('span')].find((e) => e.children.length === 0 && e.textContent.trim() === label);
-    return s ? getComputedStyle(s).opacity === '1' : null;
+    const all = [...document.querySelectorAll('button,span')]
+      .filter((x) => x.children.length === 0 && x.textContent.trim() === label);
+    const e = all.find((x) => x.tagName === 'BUTTON') || all[0];
+    if (!e) return null;
+    return e.tagName === 'BUTTON' ? !e.disabled : getComputedStyle(e).opacity === '1';
   };
 
   // TileTab's own 16-swatch row (title 'index N' / 'index 0 — transparent',
@@ -295,11 +310,29 @@ async function shot(c, name) {
   writeFileSync(`${SHOTS}/${name}.png`, Buffer.from(data, 'base64'));
   console.log(`   shot: ${name}.png`);
 }
-/** Ctrl+Z until the Undo chip goes disabled; returns the press count. */
+/**
+ * Ctrl+Z until the Undo chip goes disabled; returns the press count.
+ *
+ * ⚠ REFUSES WHEN THE CHIP CANNOT BE READ, and that refusal is the point. When
+ * `chipEnabled` went `null` (the chip became a button — see its comment), this
+ * loop's `=== true` was simply false, it pressed nothing, and it returned `0`
+ * — "I undid everything" and "I could not see the control" printed the same
+ * number. Every later check then ran on an act the previous check had painted,
+ * which is how check 3 came to pass while its own detail line said the cell
+ * went `439 -> 439`, i.e. never diverged at all.
+ */
 async function drain(c, limit = 30) {
   let n = 0;
-  while (n < limit && (await c.evalExpr('window.__p.chipEnabled("Undo")')) === true) { await ctrlZ(c); await sleep(260); n++; }
-  return n;
+  for (;;) {
+    const enabled = await c.evalExpr('window.__p.chipEnabled("Undo")');
+    if (enabled === null) {
+      throw new Error('the Undo chip could not be found, so "is there anything left to undo" has '
+        + 'NO ANSWER. This is UNMEASURABLE, not "the stack is empty": returning 0 here leaves every '
+        + 'later check running on whatever the previous one painted. Fix __p.chipEnabled.');
+    }
+    if (enabled !== true || n >= limit) return n;
+    await ctrlZ(c); await sleep(260); n++;
+  }
 }
 const chunkCellOrigin = (idx) => ({ x: (idx % 16) * 16, y: Math.floor(idx / 16) * 16 });
 
@@ -550,9 +583,18 @@ async function runChecks(c, cand) {
     await shot(c, '08-chunkB-after-isolate');
 
     if (run('3')) {
+      // ⚠ THE PRECONDITION IS PART OF THE ASSERTION. This row used to check
+      // only `chunkCellA1.block !== shared.blockId` — "the cell is not on the
+      // shared block AFTER" — which is satisfied by a cell that was ALREADY off
+      // it before the paint. It duly went green on a run whose own detail line
+      // read `block 439 -> 439 (started shared at 214)`: nothing diverged, the
+      // cell had been diverged by an earlier check the broken `drain()` never
+      // undid, and the row could not tell. It must have STARTED shared and MOVED.
       check('3', 'Isolate: painting a chunk cell leaves a SIBLING chunk (sharing the same block) visually unchanged',
-        chunkCellA1.block !== shared.blockId && hashB_afterIsolate === hashB_before,
-        `chunk A's cell diverged: block ${chunkCellA0.block} -> ${chunkCellA1.block} (started shared at ${shared.blockId}); `
+        chunkCellA0.block === shared.blockId
+        && chunkCellA1.block !== chunkCellA0.block
+        && hashB_afterIsolate === hashB_before,
+        `chunk A's cell: block ${chunkCellA0.block} -> ${chunkCellA1.block} (must START at the shared ${shared.blockId} and MOVE off it); `
         + `chunk B's rendered canvas hash: ${hashB_before} -> ${hashB_afterIsolate} (unchanged=${hashB_afterIsolate === hashB_before})`);
       neg('3n', 'chunk A did NOT diverge (still shares the original block after an Isolate paint)',
         chunkCellA1.block === shared.blockId, `chunk A's cell block after paint=${chunkCellA1.block}`);
