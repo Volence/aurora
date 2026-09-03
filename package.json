@@ -123,6 +123,7 @@
     "harness:micro-type": "node scratchpad/micro-type-harness.mjs",
     "harness:numberfield-empty": "node scratchpad/numberfield-empty-harness.mjs",
     "harness:o55-new-band-door": "node scratchpad/o55-new-band-door-probe.mjs",
+    "harness:o56-loop-authoring-door": "node scratchpad/o56-loop-authoring-door-probe.mjs",
     "harness:object-label": "node scratchpad/object-label-harness.mjs",
     "harness:ozone-x11": "node scratchpad/ozone-x11-proof.mjs",
     "harness:paint-regression": "node scratchpad/paint-regression-harness.mjs",
