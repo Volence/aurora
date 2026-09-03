@@ -50,6 +50,18 @@ LIMITS, stated rather than left to be discovered
 * Entries are keyed by their `at` value. Two DISTINCT entries sharing one second are read
   as a repeat and the second goes unjudged -- a missed check, never a false alarm. Every
   such collision is printed under DUPLICATE STAMPS so it is visible rather than swallowed.
+* THE ONE LIMIT OF THE COLLISION REMEDY: two BYTE-IDENTICAL appearances. --only-present
+  asks whether a collision's own line survives at HEAD, and two identical lines are one
+  string to a set, so correcting either of them leaves the other answering "still there"
+  and the run stays red with no move left. Stated rather than papered over, because a
+  check that appears to cover a case and does not is worse than one that says it doesn't.
+  It errs RED (a stuck failure, never a silent pass), it cannot arise from the ordinary
+  cause -- two entries written minutes apart differ in their headline -- and the way out
+  is to make the duplicated entry's own text distinct, which is what a genuinely repeated
+  line needs anyway. The alternative mechanism, comparing the NUMBER of occurrences at
+  HEAD against the number of appearances recorded, would cover it and is a new mechanism
+  with its own edges (a line legitimately present twice, a reformat changing the count);
+  measured on the bed and rejected as a bigger change than the hole justifies.
 * A repair commit that alters an entry's `at` is indistinguishable from a new entry. That
   is correct: changing a stamp IS the thing being audited.
 * A squashed or rewritten history moves committer times, so deltas after a rebase describe
@@ -87,6 +99,17 @@ gate -- a planted bad entry was removed by a follow-up commit and the audit went
 reporting it. Under `--only-present` only stamps the file STILL CARRIES at HEAD are
 judged, and the ones introduced-then-removed-or-corrected are COUNTED AND PRINTED rather
 than dropped. A stamp no longer in the ledger is no longer a claim the ledger makes.
+
+A COLLISION IS ASKED THE SAME QUESTION ABOUT ITS OWN LINE, not about its stamp. Keying a
+repeated stamp on the stamp -- which is what it did until 2026-09-03 -- made the remedy
+UNREACHABLE for the one case `--since` calls a hole: when two NEW entries share a second,
+the innocent sibling keeps that second at HEAD forever, so correcting the offending entry
+left the collision failing and only changing BOTH stamps cleared it, which nothing told
+anyone to do. It happened for real in aurora on 2026-09-03 and the fix had to touch both
+entries. Keyed on the line, correcting THE LATER APPEARANCE -- the one that went unjudged
+-- clears the run and is reported as withdrawn. Correcting the FIRST does not clear it and
+must not: the later entry is still in the file and was still never judged. The directions
+are deliberately asymmetric. The limit of this keying is under LIMITS above.
 
 WITHOUT `--since`, NOTHING ABOVE APPLIES and every verdict this file gave before that date
 is unchanged. `--strict-ahead` and `--only-present` are likewise opt-in: the first makes
@@ -208,9 +231,13 @@ def collect(repo: str, ledger: str) -> tuple[list[dict], list[dict], list[dict]]
             # FIRST APPEARANCE ONLY. Everything after is a repair re-adding a correct line.
             if at_raw in seen:
                 first_sha, first_ctime = seen[at_raw]
+                # `raw` is THIS appearance's own line, and it is what --only-present keys
+                # on. Keying a duplicate on its stamp instead would ask "does ANY line at
+                # HEAD still carry this second?", which the innocent sibling answers yes to
+                # forever -- see the REMEDY note under --only-present in the header.
                 duplicates.append({"at": at_raw, "first": first_sha, "again": sha[:8],
                                    "ctime": ctime, "first_ctime": first_ctime,
-                                   "label": label_of(entry)})
+                                   "raw": dline[1:], "label": label_of(entry)})
                 continue
             seen[at_raw] = (sha[:8], ctime)
 
@@ -267,7 +294,12 @@ def main() -> int:
                          "commit leaves the old one findable forever and a gate stays red "
                          "with nothing anyone can do about it short of rewriting history. "
                          "A stamp no longer in the file is no longer a claim the ledger "
-                         "makes. The count is printed, never swallowed.")
+                         "makes. The count is printed, never swallowed. A REPEATED stamp "
+                         "is asked about its OWN LINE, not its stamp — an innocent sibling "
+                         "carries that second at HEAD forever, so keying the collision on "
+                         "the stamp made this remedy unreachable for exactly the case "
+                         "--since exists to catch. Correcting the LATER appearance clears "
+                         "it; correcting the first does not, and must not.")
     ap.add_argument("--strict-ahead", action="store_true",
                     help="Make ANY entry stamped after its own commit a failure, not only "
                          "one past --threshold. This is what the header already says is "
@@ -339,8 +371,18 @@ def main() -> int:
     # new entries sharing one second, and the second went unjudged. A repair commit
     # re-adding a line first written before the cutoff is the innocent case the header
     # describes, and it is reported below without turning the run red.
-    dup_fail = [d for d in dup_scope
-                if since is not None and d["first_ctime"] >= since and still_there(d)]
+    dup_both_in_scope = [d for d in dup_scope
+                         if since is not None and d["first_ctime"] >= since]
+    # …and the REMEDY applies here too: under --only-present a collision stops failing once
+    # THE COLLIDING LINE ITSELF is gone from HEAD -- i.e. once the later appearance, the one
+    # that went unjudged, has been corrected. Correcting the FIRST appearance instead does
+    # NOT clear it, and must not: the second entry is still in the file and was still never
+    # judged. The two directions are not symmetric, and `raw` is what makes them tell apart.
+    dup_fail = [d for d in dup_both_in_scope if still_there(d)]
+    # Withdrawn collisions are COUNTED AND PRINTED, never dropped -- same argument as
+    # `withdrawn` above. A population that leaves the report is how "judged nothing" comes
+    # to read as "found nothing".
+    dup_withdrawn = [d for d in dup_both_in_scope if not still_there(d)]
     # Empty when the ratchet is off, so an in-scope unparseable line is a failure only in
     # gate mode and the instrument's own verdicts do not move.
     unparsed_scope = ([u for u in unparsed if in_scope(u) and still_there(u)]
@@ -375,7 +417,12 @@ def main() -> int:
               + (f" {withdrawn} in-scope stamp(s) were introduced and are NO LONGER IN THE "
                  f"FILE — corrected or removed — so they are not judged (--only-present); "
                  f"that is the only remedy a pushed bad entry has."
-                 if args.only_present and withdrawn else ""))
+                 if args.only_present and withdrawn else "")
+              + (f" {len(dup_withdrawn)} in-scope REPEATED stamp(s) collided and the "
+                 f"colliding line is NO LONGER IN THE FILE — the later appearance was "
+                 f"corrected — so they no longer fail (--only-present); correcting the "
+                 f"FIRST appearance would not have cleared them."
+                 if args.only_present and dup_withdrawn else ""))
 
     if not args.quiet:
         # The distribution is calibration, so it covers EVERY first appearance including
@@ -402,7 +449,12 @@ def main() -> int:
               + (f" {len(shown)} in scope, listed; {hidden} grandfathered, counted only."
                  if since is not None else ""))
         for d in shown:
-            both = " [BOTH APPEARANCES IN SCOPE]" if d in dup_fail else ""
+            if d in dup_fail:
+                both = " [BOTH APPEARANCES IN SCOPE]"
+            elif d in dup_withdrawn:
+                both = " [BOTH APPEARANCES IN SCOPE, COLLIDING LINE WITHDRAWN]"
+            else:
+                both = ""
             print(f"  {d['at']}  first {d['first']}  again {d['again']}  "
                   f"{d['label']}{both}")
 
@@ -439,7 +491,12 @@ def main() -> int:
         print(f"\nTWO IN-SCOPE ENTRIES SHARE ONE STAMP ({len(dup_fail)}) — both appearances "
               f"were introduced after the cutoff, so this is not a repair re-adding an old "
               f"line: it is a NEW entry whose stamp collides with another new one, and the "
-              f"second was never judged. Give it the second the clock actually read.")
+              f"second was never judged. Give it the second the clock actually read.\n"
+              f"  CORRECT THE LATER APPEARANCE — the one listed second below, which is the "
+              f"one that went unjudged. Under --only-present that clears the run, and it is "
+              f"reported as withdrawn rather than dropped. Correcting the FIRST appearance "
+              f"does NOT clear it and should not: the later entry would still be in the "
+              f"file, still carrying a stamp nothing ever judged.")
         for d in dup_fail:
             print(f"  {d['at']}  {d['first']} then {d['again']}  {d['label']}")
 
