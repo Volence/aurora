@@ -154,6 +154,40 @@ function cdp(wsUrl) {
   return { ready, send, evalExpr, json, close: () => ws.close() };
 }
 
+// ⚠ THE FORM IS BEHIND A SUB-TAB AND A DISCLOSURE NOW, AND NEITHER USED TO BE
+// TOUCHED (O50 triage, 2026-09-03). Two 2026-09-02 moves:
+//   • `aeon.bganim.new` is on the `tileAnim` sub-tab
+//     (providers/effects-sub-tabs.ts) and the facet arrives on `parallax`. A
+//     section on an inactive tab is NOT MOUNTED.
+//   • the disclosure is titled `New tile animation` (BgAnimBandPanel.tsx:635,
+//     renamed at 023e0ed9) and arrives COLLAPSED, and a collapsed
+//     CollapsibleSection renders no children at all.
+// So the phase-fill select, the cols/rows/base fields and Promote were all
+// absent from the DOM, and rows 3a/3b/4a/5a reported the CONTROLS as missing —
+// which reads exactly like a deleted feature.
+const SELECT_TILE_ANIM_TAB = String.raw`
+(() => {
+  const t = document.querySelector('[data-effects-sub-tab="tileAnim"]');
+  if (!t) return 'no-tab-bar';
+  t.click();
+  return 'clicked';
+})()`;
+const OPEN_NEW_BAND = String.raw`
+(() => {
+  const isHeader = (el) => {
+    if (el.tagName !== 'DIV') return false;
+    const cs = getComputedStyle(el);
+    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
+      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN';
+  };
+  const hdr = [...document.querySelectorAll('div')].filter(isHeader)
+    .find((h) => (h.firstElementChild.textContent || '').trim() === 'New tile animation');
+  if (!hdr) return 'no-section';
+  if (hdr.parentElement.parentElement.children.length > 1) return 'already-open';
+  hdr.click();
+  return 'clicked';
+})()`;
+
 const results = [];
 const fails = [];
 function check(id, name, ok, detail) {
@@ -294,6 +328,18 @@ async function main() {
     const pill = await c.evalExpr(clickByText('/^Effects$/'));
     check('1b', 'the Effects pill is on the facet bar [instrument]', pill === true);
     await sleep(1500);
+    const tabbed = await c.evalExpr(SELECT_TILE_ANIM_TAB);
+    await sleep(1000);
+    const subTab = await c.evalExpr('window.__dbg.parallaxPreview().subTab');
+    check('1c', 'the Tile anim sub-tab is active, so the creation form is MOUNTED [instrument]',
+      subTab === 'tileAnim',
+      `SELECT_TILE_ANIM_TAB -> ${JSON.stringify(tabbed)}; store subTab=${JSON.stringify(subTab)}`);
+    const openedNew = await c.evalExpr(OPEN_NEW_BAND);
+    await sleep(800);
+    check('1d', 'the New tile animation disclosure is OPEN — it arrives collapsed, and a collapsed '
+      + 'section renders NO children [instrument]',
+      openedNew === 'clicked' || openedNew === 'already-open',
+      `OPEN_NEW_BAND -> ${JSON.stringify(openedNew)}`);
 
     // ── preconditions: THIS document, saturated, bandless ──
     const status = await c.json('window.__dbg.aeon.bgOverrideStatus()');
@@ -319,8 +365,13 @@ async function main() {
     await sleep(400);
     const noteText = await c.evalExpr(BODY_TEXT);
     check('3b', "selecting 'shift' takes, and the panel's note now promises motion",
+      // ⚠ THE NOTE'S OWN WORDS moved at 023e0ed9: the provider writes "so the
+      // TILE ANIMATION MOVES with no further authoring"
+      // (providers/bg-anim-aeon.ts:186-187). "band MOVES" is the retired
+      // spelling — the word the vocabulary split removed for naming two
+      // features. Taken from the provider, not from a passing run.
       pickedFill === 'ok' && /pre-shifted 1 px per bank/.test(noteText)
-        && /band MOVES with no further authoring/.test(noteText),
+        && /tile animation MOVES with no further authoring/.test(noteText),
       pickedFill === 'ok' ? (noteText.match(/banks 1–7 are phase 0[^.]*\./) || ['note not found'])[0] : pickedFill);
 
     // ── geometry + base, then PROMOTE ──

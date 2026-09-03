@@ -3,6 +3,15 @@
 //
 // ═══ THE MEASUREMENT THIS EXISTS FOR ═══
 //
+// ⚠ THE MOTIVATING DEFECT IS CLOSED IN AEON (2026-08-30, `838f3129` and
+// `befbae65`; found by the O50 triage on 2026-09-03 when row M3 came back red).
+// All 34 bodies are TRACKED now. What this file measures is not the census
+// though — it is what the EDITOR does when a section names a background it
+// cannot resolve, and it MANUFACTURES that state from a hardlinked copy rather
+// than relying on the tree to be broken. Every row from M5 down is unaffected.
+// The paragraph below is the state at the time it was written, kept because it
+// is what the app-behaviour rows are about:
+//
 // In aeon on 2026-08-30: `games/sonic4/data/editor/ojz_bglib.json` is TRACKED
 // and names 17 entries. All 34 body files it implies (`ojz_bg_<id>.bin` +
 // `..._tiles.bin`) are UNTRACKED — `.gitignore`'s blanket `*.bin` catches them
@@ -160,8 +169,36 @@ async function main() {
   check('M1', 'the bglib manifest is TRACKED in aeon', manifestTracked,
     `${EDITOR_REL}/${ZONE}_bglib.json`);
   check('M2', 'and it names entries', manifest.length > 0, `${manifest.length} entries`);
-  check('M3', 'and NONE of their bodies is tracked', trackedBodies.length === 0,
-    `tracked ${ZONE}_bg_*.bin files: ${trackedBodies.length}`);
+  // ⚠ WHAT M3 USED TO ASSERT, AND WHY IT NO LONGER CAN (O50 triage, 2026-09-03).
+  // Until 2026-08-30 this row read:
+  //
+  //     check('M3', 'and NONE of their bodies is tracked', trackedBodies.length === 0, …)
+  //
+  // — the census of the hazard: a tracked manifest of 17 names whose 34 bodies
+  // were all caught by `.gitignore`'s blanket `*.bin`, so a clean clone
+  // resolved none of them. AEON CLOSED THAT, at `838f3129` ("fix: track the
+  // background the project actually names") and `befbae65` ("protect: 17
+  // authored backgrounds existed on one disk with no history"), both
+  // 2026-08-30. All 34 bodies are tracked today, so the row was asserting the
+  // ABSENCE OF A FIX and had been red ever since. It is retired, not softened —
+  // the claim was true when written and is false now, and the peer commits are
+  // named so a reader who finds the old line in `git log` knows which.
+  //
+  // The rows below do NOT depend on it: this harness MANUFACTURES the
+  // clean-clone state by unlinking the bodies from a hardlinked copy, so the
+  // app-behaviour half (T/S/R/G/B) measures the same thing it always did. What
+  // the run genuinely needs is that the bodies are THERE to remove — an
+  // already-bodyless tree would make the unlink a no-op and every row below it
+  // a statement about nothing. That is what M3 asserts now.
+  const bodiesOnDisk = readdirSync(join(AEON, EDITOR_REL))
+    .filter((f) => f.startsWith(`${ZONE}_bg_`) && f.endsWith('.bin'));
+  check('M3', 'their bodies are PRESENT in the tree, so unlinking them manufactures a real '
+    + 'absence rather than restating one',
+    bodiesOnDisk.length === manifest.length * 2,
+    `${bodiesOnDisk.length} ${ZONE}_bg_*.bin on disk for ${manifest.length} manifest entries `
+    + `(expected ${manifest.length * 2}: a body and a _tiles body each); `
+    + `${trackedBodies.length} of them are git-TRACKED — the hazard's own census, `
+    + 'recorded and no longer gated (see the block above)');
   check('M4', "section_0's TRACKED sidecar names one of them",
     manifest.some((e) => e.id === sidecar.bgLayoutRef),
     `bgLayoutRef=${JSON.stringify(sidecar.bgLayoutRef)} sceneRef=${JSON.stringify(sidecar.sceneRef)}`);

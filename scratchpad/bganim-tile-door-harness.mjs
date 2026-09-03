@@ -488,6 +488,34 @@ async function main() {
       + 'the door rather than something already on screen',
       openedBefore === null, JSON.stringify(openedBefore));
 
+    const AT_AIM = `(() => {
+      const el = document.elementFromPoint(${aimA.x}, ${aimA.y});
+      if (!el) return null;
+      const path = [];
+      for (let e = el; e && path.length < 5; e = e.parentElement) {
+        path.push(e.tagName + (e.id ? '#' + e.id : ''));
+      }
+      return { path, text: (el.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 90),
+        dpr: window.devicePixelRatio };
+    })()`;
+    const BANDROW = `(() => {
+      const b = document.getElementById('art-browser-bands');
+      const c = document.getElementById('art-browser-canvas');
+      const box = c ? c.closest('div').parentElement : null;
+      const r = (el) => { const q = el && el.getBoundingClientRect();
+        return q ? { top: Math.round(q.top), h: Math.round(q.height) } : null; };
+      return { bandRow: r(b), cards: b ? b.children.length : 0, container: r(box),
+        tool: window.__dbg.aeon.state().tool };
+    })()`;
+    // The state at the aim, taken BEFORE the gesture so the gesture is measured
+    // on a cold panel exactly as it always was. The diagnosis that reads these
+    // is AFTER [4b] — see the block below it — because an ordinary click here
+    // would change the very thing [4b] measures.
+    const under = await c.json(AT_AIM);
+    const rowsBefore = await c.json(BANDROW);
+    const selBefore = await c.json('window.__dbg.aeon.selectedTile()');
+    const geomPreClick = await c.json(STRIP_GEOM);
+
     await doubleClick(aimA);
     const repA = await openRep();
     const openA = await artOpen();
@@ -504,8 +532,94 @@ async function main() {
       && openA.name === TILE_DOC_NAME(SLOT_A) && openA.dirty === false,
       `report=${JSON.stringify(repA)}\n        open=${JSON.stringify(openA)}`
       + `\n        aimed client (${aimA.x},${aimA.y}) → slot ${SLOT_A}; prefix is 0..${FPS - 1}`);
+    // ═══ WHY [4b] IS RED, MEASURED RATHER THAN GUESSED (O50 triage 2026-09-03) ═══
+    //
+    // `stripOpen().gestures === 0` and "the door refused" print the same, and
+    // only one of them is a finding. `publishStripOpen` is the FIRST statement
+    // of `handleDoubleClick` (ArtBrowser.tsx:360), ahead of every branch, so a
+    // zero means the handler NEVER RAN rather than ran and declined.
+    //
+    // These two rows separate the three candidates — a dead aim, a dead
+    // gesture, and a live gesture aimed at a target that MOVED — and they run
+    // AFTER [4b] because 4b1's ordinary click arms `paint-tile`, which is the
+    // very state change 4b2 is about.
     if (!openA || openA.target.kind !== 'tile') {
-      throw new Error(`slot ${SLOT_A} did not open — see [4b]`);
+      // ⚠ NOT ONE EXTRA GESTURE IS PERFORMED TO REACH THESE TWO ROWS. Both read
+      // state that [4b]'S OWN double click produced, compared against the
+      // snapshots taken before it. A diagnostic CLICK here would be worthless
+      // and looks convincing: [4b]'s own first press/release already picked the
+      // slot and armed the tool, so "an ordinary click picks 37" and "the strip
+      // did not move" both come back GREEN off the previous gesture's leavings
+      // — measured, on the plant that found it (bar 2d(iii)).
+      const selAfter = await c.json('window.__dbg.aeon.selectedTile()');
+      const geomPost = await c.json(STRIP_GEOM);
+      const rowsAfter = await c.json(BANDROW);
+      check('4b1', 'ANTI-VACUOUS FOR THE GESTURE: the gesture DID reach the strip — its first '
+        + `press/release picked slot ${SLOT_A}, so [4b] is not a dead aim`,
+        selAfter.bg === SLOT_A,
+        `elementFromPoint(${aimA.x},${aimA.y}) before the gesture = ${JSON.stringify(under)}; `
+        + `selectedTile.bg ${selBefore.bg} -> ${selAfter.bg} (aimed ${SLOT_A})`);
+      // ⚠ THE DISPLACEMENT IS A TRANSIENT, AND THE END STATE HIDES IT. Reading
+      // the geometry before and after the whole gesture says "it did not move"
+      // — measured, twice — because the SECOND half undoes what the FIRST half
+      // did. So this row splits a double click and reads BETWEEN the halves.
+      //
+      // What the two halves do, from the end state and the mid-gesture sample:
+      //   half 1  an ordinary click. `handleClick` picks the slot and arms
+      //           `paint-tile`; `layout-facet.tsx:61-65` then renders the
+      //           "Brush" CollapsibleSection IMMEDIATELY ABOVE the `aeon.art`
+      //           section the strip lives in, and the strip is pushed down.
+      //   half 2  lands on whatever slid into that place — the band row — so it
+      //           hits a BandCard, which arms `stamp-band`, which un-renders the
+      //           Brush section and puts the strip back. `dblclick` never
+      //           reaches the strip container at all (`gestures` stays 0), and
+      //           the author is left holding the BAND STAMP.
+      //
+      // The inter-click gap is printed: this row inserts CDP round trips into
+      // it, and a gap past the platform's double-click threshold would be its
+      // own explanation for a missing `dblclick`.
+      const t0 = Date.now();
+      await press(aimA, 1); await sleep(40); await release(aimA, 1);
+      const midPanel = await c.json(BANDROW);
+      const midGeom = await c.json(STRIP_GEOM);
+      const midAim = await c.json(AT_AIM);
+      const gapMs = Date.now() - t0;
+      await press(aimA, 2); await sleep(40); await release(aimA, 2); await sleep(900);
+      const endPanel = await c.json(BANDROW);
+      const endGeom = await c.json(STRIP_GEOM);
+      check('4b2', 'the strip box does not MOVE part-way through a double click — the second half '
+        + 'has to land where the first half did',
+        !!geomPreClick && !!midGeom && geomPreClick.top === midGeom.top
+        && geomPreClick.left === midGeom.left,
+        `inter-click gap ${gapMs}ms (the plain gesture's is ~100ms)`
+        + `\n        strip BEFORE      =${JSON.stringify(geomPreClick)}`
+        + `\n        strip BETWEEN     =${JSON.stringify(midGeom)}`
+        + `\n        strip AFTER       =${JSON.stringify(endGeom)}   <- back where it started`
+        + `\n        under the aim BEFORE : ${JSON.stringify(under)}`
+        + `\n        under the aim BETWEEN: ${JSON.stringify(midAim)}`
+        + `\n        panel BEFORE : ${JSON.stringify(rowsBefore)}`
+        + `\n        panel BETWEEN: ${JSON.stringify(midPanel)}`
+        + `\n        panel AFTER  : ${JSON.stringify(endPanel)}`
+        + `\n        panel after [4b]'s own gesture: ${JSON.stringify(rowsAfter)}`);
+      // CHARACTERISATION, DELIBERATELY NOT A ROW. A row that PASSED on
+      // `gestures === 0` would pin the defect: it would go red the day somebody
+      // fixed this. So the repeat is printed, not gated. It answers the one
+      // remaining alternative — that [4b] failed because it was the FIRST
+      // gesture of the session and something had not settled yet.
+      const aimAgain = aimIn(endGeom, gridCols)(SLOT_A);
+      if (aimAgain) {
+        await doubleClick(aimAgain);
+        console.log('        CHARACTERISATION — a third identical double click at '
+          + `(${aimAgain.x},${aimAgain.y}): report=${JSON.stringify(await openRep())} `
+          + `open=${JSON.stringify(await artOpen())}. The column is never "settled": the FIRST `
+          + 'half of every double click re-arms paint-tile, so the Brush section is re-inserted '
+          + 'and the strip is displaced again, every time.');
+      } else {
+        console.log(`        CHARACTERISATION — could not repeat: slot ${SLOT_A} has no integer `
+          + `aim inside ${JSON.stringify(endGeom)}.`);
+      }
+      await shot(c, 'tile-door-refused');
+      throw new Error(`slot ${SLOT_A} did not open — see [4b], and [4b1]/[4b2] for why`);
     }
     await shot(c, 'composer-static-slot-a');
 

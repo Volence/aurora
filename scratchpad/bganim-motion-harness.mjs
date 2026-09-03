@@ -215,6 +215,25 @@ async function toggleViewOverlay(c, re) {
   return res;
 }
 
+// ⚠ THE SECTION IS ON THE `tileAnim` SUB-TAB NOW, AND ITS TITLE MOVED.
+// Two master-side changes on 2026-09-02, both of which this expression used to
+// miss silently (it returned 'no-section' and the harness threw):
+//   • providers/effects-sub-tabs.ts put `aeon.bganim.bands` on the Tile anim
+//     tab. A section on an INACTIVE tab is NOT MOUNTED — it is not collapsed,
+//     it does not exist — and `parallax` is the arrival tab.
+//   • 023e0ed9 ("effects: `band` names ONE feature now") renamed the section
+//     from `BG animation bands` to `Tile animations (n/4)`
+//     (components/effects/BgAnimBandPanel.tsx:430).
+// The tab button is a real <button onClick> (components/effects/
+// EffectsSubTabBar.tsx), so a DOM .click() is the gesture it listens for.
+const SELECT_TILE_ANIM_TAB = String.raw`
+(() => {
+  const t = document.querySelector('[data-effects-sub-tab="tileAnim"]');
+  if (!t) return 'no-tab-bar';
+  t.click();
+  return 'clicked';
+})()`;
+
 const OPEN_BAND_LIST = String.raw`
 (() => {
   const isHeader = (el) => {
@@ -224,7 +243,7 @@ const OPEN_BAND_LIST = String.raw`
       && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN';
   };
   const hdr = [...document.querySelectorAll('div')].filter(isHeader)
-    .find((h) => /^BG animation bands/.test((h.firstElementChild.textContent || '').trim()));
+    .find((h) => /^Tile animations\b/.test((h.firstElementChild.textContent || '').trim()));
   if (!hdr) return 'no-section';
   if (hdr.parentElement.parentElement.children.length > 1) return 'already-open';
   hdr.click();
@@ -365,11 +384,34 @@ async function main() {
   };
   // Sample cells for the pan rows must stay ON SCREEN across the largest pan the
   // rows perform, so they are chosen to the RIGHT of it.
+  //
+  // ⚠ THE MARGIN IS NOT COSMETIC, AND A 2-CELL ONE MADE ROW 4c REPORT A DEFECT
+  // THAT DOES NOT EXIST (O50 triage, 2026-09-03). `#map-canvas` carries
+  // SCREEN-SPACE chrome pinned to its left edge — the effects layer-guide label
+  // plates, `ctx.fillRect(4, boxY, w + 8, 13)` at canvas/effects-guides.ts:386.
+  // At a 2-cell margin the leftmost sampled cell sits at canvas x = 16 after the
+  // 256px pan, i.e. UNDER that plate, so the sample read chrome at one pan and
+  // background at the other and 4c called it a phase that failed to wrap. The
+  // control row 4y catches this class generally — it went red on the same run,
+  // over cells NO band owns — and this margin (8 cells = 64px clear of the
+  // plate) is what makes both green. Widen this, never narrow it.
+  const CLEAR_OF_CANVAS_CHROME_CELLS = 8;
   const maxPan = camPeriodPx;
   const camCells = camera
-    ? cellsOf(camera.index, { minCol: Math.ceil(maxPan / CELL_PX) + 2, minRow: 1 }).slice(0, 24)
+    ? cellsOf(camera.index,
+      { minCol: Math.ceil(maxPan / CELL_PX) + CLEAR_OF_CANVAS_CHROME_CELLS, minRow: 1 }).slice(0, 24)
     : [];
   const timerCells = cellsOf(timer.index, { minRow: 1 }).slice(0, 24);
+  // THE CONTROL POPULATION for the pan rows: cells no band owns. They are
+  // STATIC art — no driver, no clock, no bank — so their pixels at a given
+  // WORLD position must be identical at every pan. If they are not, the
+  // world→cell mapping this file samples through has moved and every pan row is
+  // comparing two different pictures rather than two phases (bar 2d(iii)).
+  // Same column window as camCells so the two see the same edge conditions.
+  const staticCells = camera
+    ? cellsOf(-1,
+      { minCol: Math.ceil(maxPan / CELL_PX) + CLEAR_OF_CANVAS_CHROME_CELLS, minRow: 1 }).slice(0, 24)
+    : [];
   console.log(`  sampling ${timerCells.length} timer cells`
     + (camera ? ` and ${camCells.length} camera cells` : ' (no camera band on this target)'));
   if (timerCells.length === 0 || (camera && camCells.length === 0)) {
@@ -435,15 +477,23 @@ async function main() {
     // EVERYTHING THIS HARNESS TOUCHES IN THE COLUMN IS INSIDE IT — the "Play
     // bands" chip, the "why approximate?" disclosure and every band card. A
     // collapsed CollapsibleSection renders no children at all, so without this
-    // click `clickByText('/^Play bands$/')` returns false and TEN rows report a
+    // click `clickByText('/^Play tile animations$/')` returns false and TEN rows report a
     // feature that is working perfectly as broken. Measured: 11/23 before this
     // line, 23/23 after. Opened the way a human opens it.
+    // The Tile anim SUB-TAB first — see SELECT_TILE_ANIM_TAB. Its sections are
+    // unmounted, not collapsed, until this runs, and the store is the witness
+    // rather than the DOM (an absent tab bar would otherwise read as success).
+    const tabbed = await c.evalExpr(SELECT_TILE_ANIM_TAB);
+    await sleep(900);
+    const subTab = await c.evalExpr('window.__dbg.parallaxPreview().subTab');
+    check('0c2', 'the Tile anim sub-tab is active, so its sections are MOUNTED [instrument]',
+      subTab === 'tileAnim', `SELECT_TILE_ANIM_TAB -> ${JSON.stringify(tabbed)}; store subTab=${JSON.stringify(subTab)}`);
     const openedBands = await c.evalExpr(OPEN_BAND_LIST);
-    check('0d', 'the BG animation bands section is open (it arrives collapsed) [instrument]',
+    check('0d', 'the Tile animations section is open (it arrives collapsed) [instrument]',
       openedBands === 'clicked' || openedBands === 'already-open',
       `OPEN_BAND_LIST -> ${JSON.stringify(openedBands)}`);
     if (openedBands === 'no-section') {
-      throw new Error('no "BG animation bands" section on screen — the preview control lives in it');
+      throw new Error('no "Tile animations" section on screen — the preview control lives in it');
     }
     await sleep(700);
     // SETUP, not a measurement: the BG editing layer paints Plane B and nothing
@@ -539,7 +589,7 @@ async function main() {
     const cards = await c.json(String.raw`
 (() => {
   const norm = (el) => (el.textContent || '').replace(/\s+/g, ' ').trim();
-  const RE = /^Band (\d+)$/;
+  const RE = /^Tile animation (\d+)$/;
   return [...document.querySelectorAll('span')]
     .filter((s) => RE.test(norm(s)))
     .map((s) => {
@@ -585,7 +635,7 @@ async function main() {
     console.log(`        idle rAF SCHEDULING baseline: ${idleRafRate.toFixed(1)}/s`);
 
     // ---- 3. PLAYBACK ON: THE TIMER BAND MOVES, AT ITS OWN RATE. ---------
-    const played = await c.evalExpr(clickByText('/^Play bands$/'));
+    const played = await c.evalExpr(clickByText('/^Play tile animations$/'));
     check('3z', 'the Effects column offers the "Play bands" control and it clicks',
       played === true, `clickByText -> ${JSON.stringify(played)}`);
     await sleep(500);
@@ -637,28 +687,73 @@ async function main() {
         'they are all about a camera_x band, and the live document has none. The fixture run '
         + 'measures them; nothing about them is target-specific, so they are not re-derived here.');
     } else {
+    // ⚠ THE SAMPLE'S OWN CENSUS TRAVELS WITH THE HASH (bar 2d(iii): a row must
+    // PRINT the artifact it judges). `sampleCells` SKIPS a cell that has left
+    // the canvas, so two hashes can differ because a different NUMBER of cells
+    // was read rather than because the phase moved — which reads as a phase
+    // defect and is not one. `cellsRead` is printed on every one of these rows
+    // and asserted equal to the population, so an off-screen sample can no
+    // longer masquerade as a finding, in either direction.
     const at = async (dx, dy) => {
       const vp = { x: vp0.x + dx, y: vp0.y + dy, zoom: vp0.zoom };
       await setView(c, vp);
       await sleep(400);
-      return (await sample(c, camCells, vp)).hash;
+      const s = await sample(c, camCells, vp);
+      return { ...s, dx, dy };
     };
-    const h0 = await at(0, 0);
-    const hSub = await at(camUnits - 1, 0);
-    const hStep = await at(camUnits, 0);
-    const hWrap = await at(camPeriodPx, 0);
-    const hVert = await at(0, camUnits * 4);
+    const show = (s) => `hash=${s.hash} cellsRead=${s.cellsRead}/${camCells.length} nonzero=${s.nonzeroBytes}`;
+    const atStatic = async (dx) => {
+      const vp = { x: vp0.x + dx, y: vp0.y, zoom: vp0.zoom };
+      await setView(c, vp);
+      await sleep(400);
+      return await sample(c, staticCells, vp);
+    };
+    const st0 = staticCells.length ? await atStatic(0) : null;
+    const stWrap = staticCells.length ? await atStatic(camPeriodPx) : null;
+    const s0 = await at(0, 0);
+    const sSub = await at(camUnits - 1, 0);
+    const sStep = await at(camUnits, 0);
+    const sWrap = await at(camPeriodPx, 0);
+    const sVert = await at(0, camUnits * 4);
     await setView(c, vp0);
     await sleep(400);
+    const h0 = s0.hash, hSub = sSub.hash, hStep = sStep.hash, hWrap = sWrap.hash, hVert = sVert.hash;
+
+    // The comparability precondition for 4a-4d. Without it, every one of them is
+    // comparing populations rather than phases.
+    const sameCensus = [s0, sSub, sStep, sWrap, sVert].every((s) => s.cellsRead === s0.cellsRead)
+      && s0.cellsRead === camCells.length && s0.nonzeroBytes > 0;
+    check('4z', 'ANTI-VACUOUS: every pan sampled the SAME cell population — all of it, and not '
+      + 'blank — so 4a-4d compare phase and not how many cells stayed on the canvas',
+      sameCensus,
+      [s0, sSub, sStep, sWrap, sVert].map((s) => `d(${s.dx},${s.dy}) ${show(s)}`).join('  ||  '));
+
+    // THE CONTROL. Static (band-less) cells at the same world positions, at the
+    // same two pans 4c compares. They have no driver and no bank, so a
+    // difference here is the world→cell MAPPING moving under the sample, not a
+    // phase — and it would make 4c's verdict meaningless in either direction.
+    if (staticCells.length) {
+      check('4y', 'CONTROL: cells NO band owns are byte-identical at pan 0 and at a whole '
+        + `pattern period (${camPeriodPx}px) — so 4c compares phase, not two different pictures`,
+        st0.hash === stWrap.hash && st0.cellsRead === staticCells.length && st0.nonzeroBytes > 0,
+        `static at 0: hash=${st0.hash} cellsRead=${st0.cellsRead}/${staticCells.length} `
+        + `nonzero=${st0.nonzeroBytes}; at ${camPeriodPx}: hash=${stWrap.hash} `
+        + `cellsRead=${stWrap.cellsRead}/${staticCells.length} nonzero=${stWrap.nonzeroBytes}`);
+    } else {
+      note('4y', 'the static control could not be measured on this target',
+        'the layout in this document assigns every cell in the sampled window to a band, so '
+        + 'there is no band-less population to hold still beside the camera band.');
+    }
 
     check('4a', `panning one full step (${camUnits}px = 1 << rate_shift) changes the camera `
-      + 'band\'s phase', hStep !== h0, `h(0)=${h0} h(${camUnits})=${hStep}`);
+      + 'band\'s phase', hStep !== h0, `at 0: ${show(s0)}; at ${camUnits}: ${show(sStep)}`);
     check('4b', `panning ${camUnits - 1}px — one short of a step — does NOT: the rate IS the shift`,
-      hSub === h0, `h(0)=${h0} h(${camUnits - 1})=${hSub}`);
+      hSub === h0, `at 0: ${show(s0)}; at ${camUnits - 1}: ${show(sSub)}`);
     check('4c', `panning a whole pattern period (${camPeriodPx}px = pattern_px << rate_shift) `
-      + 'returns the SAME phase', hWrap === h0, `h(0)=${h0} h(${camPeriodPx})=${hWrap}`);
+      + 'returns the SAME phase', hWrap === h0,
+      `at 0: ${show(s0)}; at ${camPeriodPx}: ${show(sWrap)}`);
     check('4d', 'panning VERTICALLY does not move a camera_x band — a driver names a scalar '
-      + 'source, not an axis', hVert === h0, `h(0)=${h0} h(vertical)=${hVert}`);
+      + 'source, not an axis', hVert === h0, `at 0: ${show(s0)}; vertical: ${show(sVert)}`);
     }
 
     // ---- 5. THE CLOCK IS REALLY CANCELLED. ------------------------------
@@ -699,7 +794,7 @@ async function main() {
     // Plane B on changes nothing at these cells, the foreground covers all of
     // them and one pixel state is what a CORRECT composite also produces.
     const planeBVisible = withBg !== withoutBg;
-    await c.evalExpr(clickByText('/^Play bands$/'));
+    await c.evalExpr(clickByText('/^Play tile animations$/'));
     await sleep(600);
     const compHashes = new Set();
     for (let i = 0; i < 12; i++) {
@@ -723,7 +818,7 @@ async function main() {
     await sleep(400);
 
     // ---- 6. UNMOUNT. ----------------------------------------------------
-    await c.evalExpr(clickByText('/^Play bands$/'));
+    await c.evalExpr(clickByText('/^Play tile animations$/'));
     await sleep(800);
     const preUnmount = await snap(c);
     const wentArt = await c.evalExpr(clickByText('/^Art$/'));

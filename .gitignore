@@ -51,6 +51,21 @@ scratchpad/bus-probe-methods.json
 scratchpad/curve-vsplit-emitted.json
 scratchpad/s1-vplayer-spike.json
 
+# Four more of the same class, found by the O50 triage on 2026-09-03: each is
+# rebuilt by a TRACKED instrument on every run and each showed up as an
+# untracked entry in `git status` afterwards, which is the counter this block
+# exists to keep honest.
+#   scratchpad/bg-dangling-ref-harness.mjs    -> aeon-bg-dangling/ (cp -al)
+#   scratchpad/bganim-tile-door-harness.mjs   -> aeon-tile-door/   (cp -al)
+#   scratchpad/handover/handover-band-harness.mjs -> handover/emit/
+#     (`scratchpad/*-emit/` above does not reach a subdirectory)
+#   scratchpad/writer-originated-scene-harness.mjs -> the emitted scene, the
+#     same shape as curve-vsplit-emitted.json above.
+scratchpad/fixtures/aeon-bg-dangling/
+scratchpad/fixtures/aeon-tile-door/
+scratchpad/handover/emit/
+scratchpad/writer-originated-emitted.json
+
 # One-off probes and drive scripts from work that has since closed. Kept on
 # disk because they document how a measurement was taken, untracked because
 # every session that wrote one chose not to commit it — the same judgement
