@@ -68,6 +68,39 @@
 // channel delivers the Ctrl+Z that [c8] and [r8] measure, and those pass. If
 // they ever go red, [k1]'s green means nothing.
 //
+// ═══ d-27, 2026-09-03 — THE BUTTONS NOW ACT AND DROP FOCUS ════════════════
+//
+// The owner ruled `blur_after_press`: *"just being a button that acts and then
+// drops focus is how it should work right?"* (empyrean 034ab6c). The two
+// buttons blur unconditionally as they fire, so the Space that used to re-fire
+// a wholesale wipe on the still-focused button no longer reaches either writer.
+//
+// THREE ROWS IN THIS FILE CHANGED MEANING WITH THAT RULING, AND ALL THREE SAY
+// SO WHERE THEY LIVE RATHER THAN HERE ONLY:
+//
+//   [k2] RETIRED — its premise ("the KEYBOARD-fired wipe is as recoverable as
+//        the clicked one") describes an event that can no longer occur. It is
+//        not deleted quietly and it is not re-pointed at something vacuous; the
+//        full accounting, and what replaces it, is at the retirement block.
+//   [k3] [k4] [k5] [k6] [k7] NEW — the positive form of the ruling: neither
+//        button keeps focus after a real click, a bare Space afterwards changes
+//        nothing, a SECOND real click still fires (the anti-cheat row, without
+//        which the others pass on buttons that simply do nothing), and a press
+//        that changes NOTHING drops focus too ([k7], the row that makes
+//        "unconditional" a measurement rather than a comment).
+//   [c8] REWORDED — it used to say "pressed with focus still on the button",
+//        and proved `isTypingTarget`'s <button> exemption in passing. The
+//        Ctrl+Z now arrives from <body>. What it ASSERTS is unchanged (one
+//        undo, plane exact) and it prints the measured activeElement beside it.
+//   [k1] UNCHANGED and still meaningful, but read its green carefully: it
+//        proves there is no GLOBAL key path to the writers, with focus proved
+//        off the buttons first. That is a different mechanism from the focused
+//        button's own activation, which is [k5]'s. Since d-27, Space cannot
+//        reach a writer by either road — so [k1]'s Space is now
+//        over-determined and [k5] is the row that would catch a regression of
+//        the ruling. Neither subsumes the other: a stray window listener would
+//        redden [k1] alone, a lost blur [k5] alone.
+//
 // ⚠ AND ONE ROW HERE WAS ALREADY WRONG ONCE, IN THE OTHER DIRECTION. The first
 // [k1] focused `#map-canvas` and called that "focus is off the buttons". A
 // <canvas> has no tabindex, so `.focus()` is a no-op: focus stayed on the Reset
@@ -549,16 +582,25 @@ async function main() {
       /\ball\b/i.test(clearTitle) && /this plane/i.test(clearTitle) && afterClear.nonzero === 0,
       `title "${clearTitle}"; measured reach = all ${PLANE_WORDS} words of one plane of one section`);
 
-    // ── undo, WITHOUT moving focus off the button ─────────────────────────
+    // ── undo, from WHEREVER THE CLICK LEFT FOCUS ─────────────────────────
     //
     // This is the sequence a person is actually in: they click Clear, see the
-    // section go blank, and hit Ctrl+Z. Focus is on the button, not the canvas,
-    // and the handler is `LevelWorkspace`'s window listener behind
-    // `isTypingTarget` — which exempts <button> deliberately. That exemption is
-    // what this row proves rather than reads.
+    // section go blank, and hit Ctrl+Z without touching anything in between.
+    //
+    // ⚠ WHAT "WHEREVER" MEANS CHANGED WITH d-27, AND THIS COMMENT USED TO SAY
+    // THE OLD THING. Before the ruling it said "focus is on the button, not the
+    // canvas", and the row proved that `LevelWorkspace`'s `isTypingTarget`
+    // exempts <button> so the undo gets through. Since d-27 the button DROPS
+    // focus as it fires, so the Ctrl+Z below is delivered from <body> instead
+    // and this row no longer exercises that <button> exemption — the exemption
+    // is still live and still matters for every other button in the app, it is
+    // simply not what these two hand it any more. The row is unchanged in what
+    // it asserts (one Ctrl+Z, plane exact) and it PRINTS the measured
+    // activeElement beside it, so the day either half moves again it is visible
+    // in the note rather than inferred from a comment.
     const focusAfter = await c.json(String.raw`(() => {
       const a = document.activeElement;
-      return { tag: a ? a.tagName : null, text: a ? (a.textContent || '').trim() : null,
+      return { tag: a ? a.tagName : null, text: a ? (a.textContent || '').trim().slice(0, 32) : null,
                isClear: a === window.__o48b.el('sec1') };
     })()`);
     note('focus after the click', JSON.stringify(focusAfter));
@@ -566,11 +608,14 @@ async function main() {
     await ctrlZ(c);
     await sleep(400);
     const undone = await c.json(`window.__o48b.diff('preClear', ${SEC}, '${PLANE}')`);
-    check('c8', 'ONE Ctrl+Z — pressed with focus still on the button, as a person would — puts the '
-      + 'whole plane back EXACTLY, unowned bits included',
+    check('c8', 'ONE Ctrl+Z — pressed immediately after the click, from wherever the click left '
+      + 'focus, as a person would — puts the whole plane back EXACTLY, unowned bits included',
       undone.changed === 0,
       `cells still differing from the pre-click snapshot = ${undone.changed}`
-      + `${undone.changed ? ` first ${JSON.stringify(undone.first)}` : ''}`);
+      + `${undone.changed ? ` first ${JSON.stringify(undone.first)}` : ''}. `
+      + `activeElement when the Ctrl+Z was sent: ${JSON.stringify(focusAfter)} — since d-27 that is `
+      + 'BODY rather than the Clear button, so the undo path this measures is the window listener '
+      + 'reached from body, not the <button> exemption in isTypingTarget.');
     const restoredFixture = [];
     for (const i of FIXTURE) restoredFixture.push(await collAt(c, SEC, PLANE, i));
     check('c9', 'the undo restores the UNOWNED bits too, not just the shape fields',
@@ -774,60 +819,185 @@ async function main() {
       `${KEYS.length} keystrokes sent one at a time, each measured; keys that changed the plane: `
       + `${culprits.length ? culprits.join(' · ') : 'none'}. POSITIVE CONTROL for this green: the same `
       + 'Input.dispatchKeyEvent channel delivers the Ctrl+Z that [c8] and [r8] measure — if those are '
-      + 'green, keystrokes are arriving and this is a real absence rather than a silent one.');
+      + 'green, keystrokes are arriving and this is a real absence rather than a silent one. '
+      + 'SCOPE (d-27): this is the GLOBAL key path only — focus is deliberately moved off the buttons '
+      + 'first. The focused button\'s own activation is [k5]\'s subject, and a lost blur reddens that '
+      + 'row, not this one.');
 
-    // …but the buttons are ordinary <button>s. Once one has been clicked it
-    // KEEPS keyboard focus, and the platform's own activate-on-Enter/Space
-    // applies to a wholesale destructive writer that asks for no confirmation.
-    // That is measured here rather than assumed, and the row asserts the thing
-    // that actually decides how bad it is: the keyboard-fired wipe is exactly
-    // as recoverable as the clicked one.
-    console.log('\n=== [k2] the button the last click left focused ===');
-    await c.evalExpr(`window.__o48b.snap('preRefire', ${SEC}, '${PLANE}')`);
-    const undoPreRefire = await canUndo(c);
-    await clickHandle(c, CLEAR, 'Clear (for the focus test)');
-    await ctrlZ(c);   // the author takes it back…
-    await sleep(400);
-    const focusStill = await c.json(String.raw`(() => {
+    // ═══ [k2] — PREMISE RETIRED (not tuned green), 2026-09-03, d-27 ════════
+    //
+    // WHAT [k2] MEASURED. The buttons were ordinary <button>s, so once clicked
+    // one KEPT keyboard focus and the platform's own activate-on-Space applied
+    // to a wholesale destructive writer that asks for no confirmation. [k2]
+    // clicked Clear, took it back with Ctrl+Z, then sent bare Enter and bare
+    // Space at the still-focused button and asserted the thing that decided how
+    // bad it was: **the keyboard-fired wipe is exactly as recoverable as the
+    // clicked one** — one Ctrl+Z, plane whole, `canUndo` back where it started.
+    // Space re-fired it; Enter did not, over this input channel, and the two
+    // were sent separately because "a keystroke re-fires it" without naming
+    // which is how a finding gets waved away as unreproducible.
+    //
+    // WHY THE PREMISE IS GONE. The owner ruled d-27 `blur_after_press`
+    // (empyrean 034ab6c): *"just being a button that acts and then drops focus
+    // is how it should work right?"* `CollisionPalette.actAndDropFocus` blurs
+    // the button unconditionally as it fires, so **there is no longer a
+    // keyboard-fired wipe** for [k2] to measure the recoverability of. The row
+    // is not merely inverted — its subject does not occur. Re-authoring it as
+    // "the keyboard-fired wipe is undoable" would assert a property of an event
+    // that cannot happen, which is green by construction and measures nothing;
+    // that is the vacuity this file already paid for once at [c4]. So it is
+    // RETIRED rather than re-pointed, and deliberately not deleted in silence.
+    //
+    // WHAT REPLACES IT. Five positive rows below, which assert the ruling
+    // instead of the old behaviour: [k3]/[k4] the button does not keep focus,
+    // [k5] a bare Space afterwards changes nothing on the plane, [k6] a second
+    // real click still fires (without which [k3]-[k5] could all be satisfied by
+    // simply breaking the buttons), and [k7] a press that changes NOTHING drops
+    // focus too — the row that gates the UNCONDITIONAL half of the design.
+    //
+    // WHAT IS NOT LOST WITH IT. The undo property [k2] asserted still has an
+    // owner: [c8]/[c9] prove one Ctrl+Z restores a CLICKED wipe exactly,
+    // unowned bits included, and [c10]/[r9] pin the one-command-per-press half.
+    // Nothing that only [k2] covered has gone unmeasured.
+
+    console.log('\n=== [k3..k7] d-27 — the button acts and DROPS FOCUS ===');
+    const planeStats = () =>
+      c.json(`window.__o48b.stats(window.__o48b.read(${SEC}, '${PLANE}'), ${M.unowned}, ${M.owned})`);
+    const focusNow = (handle) => c.json(String.raw`(() => {
       const a = document.activeElement;
-      return { tag: a ? a.tagName : null, text: a ? (a.textContent || '').trim() : null,
-               isClear: a === window.__o48b.el('sec1') };
+      return { tag: a ? a.tagName : null, id: a ? (a.id || null) : null,
+               text: a ? (a.textContent || '').trim().slice(0, 32) : null,
+               isTheButton: a === window.__o48b.el(${JSON.stringify(handle)}) };
     })()`);
-    const beforeEnter = await c.json(`window.__o48b.diff('preRefire', ${SEC}, '${PLANE}')`);
-    note('re-fire baseline', `after click+Ctrl+Z the focus is ${JSON.stringify(focusStill)} and the plane `
-      + `is whole again (${beforeEnter.changed} cells differing from before the click)`);
-    // BOTH activation keys, measured separately. Chromium activates a focused
-    // <button> on Enter's keydown and on Space's keyUP, and the two do not
-    // behave alike over CDP — naming "a keystroke re-fires it" without saying
-    // WHICH is how a finding gets waved away as unreproducible.
-    const fired = [];
-    for (const [k, code, vk] of [['Enter', 'Enter', 13], [' ', 'Space', 32]]) {
-      const was = await c.json(`window.__o48b.stats(window.__o48b.read(${SEC}, '${PLANE}'), ${M.unowned}, ${M.owned})`);
-      if (was.nonzero === 0) { // already wiped by the previous key — put it back first
-        for (let i = 0; i < 3 && (await canUndo(c)); i++) { await ctrlZ(c); await sleep(300); }
-      }
-      const pre = await c.json(`window.__o48b.stats(window.__o48b.read(${SEC}, '${PLANE}'), ${M.unowned}, ${M.owned})`);
+
+    // ── [k3] CLEAR gives up focus, and the click still wiped ──────────────
+    //
+    // The "still wiped" half is IN THE CONDITION on purpose. A `disabled`
+    // button, or one React never wired, does not take focus on click either —
+    // so a focus row alone is satisfied by a broken control, which is the
+    // failure mode this whole file was written to refuse.
+    await c.evalExpr(`window.__o48b.snap('preK3Click', ${SEC}, '${PLANE}')`);
+    const preK3 = await planeStats();
+    await clickHandle(c, CLEAR, 'Clear (d-27 focus)');
+    const focusAfterClearBlur = await focusNow(CLEAR);
+    const postK3 = await planeStats();
+    note('after the Clear click', `activeElement = ${JSON.stringify(focusAfterClearBlur)} · `
+      + `non-zero ${preK3.nonzero} → ${postK3.nonzero}`);
+    check('k3', 'd-27: after a REAL CLICK, Clear does not keep keyboard focus — and the same click '
+      + 'still performed the wipe',
+      focusAfterClearBlur.isTheButton === false && preK3.nonzero > 0 && postK3.nonzero === 0,
+      `document.activeElement is <${focusAfterClearBlur.tag}> "${focusAfterClearBlur.text}" `
+      + `(isTheClearButton=${focusAfterClearBlur.isTheButton}); the click took the plane `
+      + `${preK3.nonzero} → ${postK3.nonzero} non-zero cells. Before d-27 this read `
+      + '<BUTTON> "Clear" isTheClearButton=true.');
+
+    // ── [k5] and its VACUITY GUARD ───────────────────────────────────────
+    //
+    // The plane is all zeros right now, and `clearCollisionEntries` on an empty
+    // plane returns no entries — so a Space that DID re-fire Clear would change
+    // nothing and this row would pass having proved the opposite of what it
+    // claims. The Ctrl+Z below is therefore not tidying: it is what gives the
+    // key something to destroy, and `preSpace.nonzero > 0` is asserted IN THE
+    // ROW so the guard cannot silently stop holding.
+    //
+    // That same Ctrl+Z is the POSITIVE CONTROL for the green: it travels the
+    // identical `Input.dispatchKeyEvent` channel as the Space, so a restore of
+    // >0 cells proves keystrokes are arriving and [k5] is a real absence rather
+    // than a silent one.
+    await ctrlZ(c);
+    await sleep(400);
+    const restoredByKey = await c.json(`window.__o48b.diff('preK3Click', ${SEC}, '${PLANE}')`);
+    const preSpace = await planeStats();
+    await c.evalExpr(`window.__o48b.snap('preSpace', ${SEC}, '${PLANE}')`);
+    const focusBeforeSpace = await focusNow(CLEAR);
+    note('before the keys', `plane restored by a Ctrl+Z over the SAME key channel `
+      + `(${preSpace.nonzero} non-zero cells back; ${restoredByKey.changed} still differing from `
+      + `pre-click) · activeElement = ${JSON.stringify(focusBeforeSpace)}`);
+    const stillFired = [];
+    for (const [k, code, vk] of [[' ', 'Space', 32], ['Enter', 'Enter', 13]]) {
       await key(c, k, code, vk);
       await sleep(400);
-      const post = await c.json(`window.__o48b.stats(window.__o48b.read(${SEC}, '${PLANE}'), ${M.unowned}, ${M.owned})`);
-      note(`  bare ${code} on the focused Clear button`,
-        `non-zero ${pre.nonzero} → ${post.nonzero} — ${pre.nonzero > 0 && post.nonzero === 0 ? 'RE-FIRED THE WIPE' : 'no effect'}`);
-      if (pre.nonzero > 0 && post.nonzero === 0) fired.push(code);
+      const d = await c.json(`window.__o48b.diff('preSpace', ${SEC}, '${PLANE}')`);
+      note(`  bare ${code} after the click`, `${d.changed} cells changed`);
+      if (d.changed > 0) {
+        stillFired.push(`${code} → ${d.changed} cells`);
+        for (let i = 0; i < 3 && (await canUndo(c)); i++) { await ctrlZ(c); await sleep(300); }
+        await c.evalExpr(`window.__o48b.snap('preSpace', ${SEC}, '${PLANE}')`);
+      }
     }
-    const refire = await c.json(`window.__o48b.stats(window.__o48b.read(${SEC}, '${PLANE}'), ${M.unowned}, ${M.owned})`);
-    const reFired = fired.length > 0;
-    note('the re-fire path', `keys that re-fired Clear with no confirmation: `
-      + `${reFired ? fired.join(', ') : 'none of Enter, Space'}`);
+    check('k5', 'd-27: a bare SPACE straight after the click reaches no wholesale writer — the plane '
+      + 'is untouched (Enter sent too, and it never fired this even before the ruling)',
+      preSpace.nonzero > 0 && stillFired.length === 0,
+      `keys that changed the plane: ${stillFired.length ? stillFired.join(' · ') : 'none of Space, Enter'}. `
+      + `VACUITY GUARD: the plane held ${preSpace.nonzero} non-zero cells when the keys were sent, so a `
+      + 're-fire of Clear had ~1.8k cells to destroy and would be visible (an EMPTY plane would make '
+      + 'this row pass on a Space that fired). POSITIVE CONTROL: the Ctrl+Z immediately before travelled '
+      + `the same Input.dispatchKeyEvent channel and put ${preSpace.nonzero} cells back. Before d-27, `
+      + 'Space here wiped the plane with no confirmation.');
+
+    // ── [k6] the anti-cheat row: clicking again STILL WORKS ──────────────
+    //
+    // [k3]-[k5] are all satisfiable by a button that does nothing at all. This
+    // is the row that stops that, and it is a SECOND real click through the
+    // same integer-aimed helper, not a synthetic .click().
+    await c.evalExpr(`window.__o48b.snap('preSecondClick', ${SEC}, '${PLANE}')`);
+    const preK6 = await planeStats();
+    await clickHandle(c, CLEAR, 'Clear (second real click)');
+    const postK6 = await planeStats();
+    const focusAfterSecond = await focusNow(CLEAR);
+    check('k6', 'd-27 did not break the control: a SECOND real click on Clear fires the wipe again, '
+      + 'and drops focus again',
+      preK6.nonzero > 0 && postK6.nonzero === 0 && focusAfterSecond.isTheButton === false,
+      `second click took the plane ${preK6.nonzero} → ${postK6.nonzero} non-zero cells; `
+      + `activeElement after it = <${focusAfterSecond.tag}> "${focusAfterSecond.text}" `
+      + `(isTheClearButton=${focusAfterSecond.isTheButton}). Without this row, blurring by simply `
+      + 'removing the handler would pass [k3], [k5] and [k4].');
     for (let i = 0; i < 3 && (await canUndo(c)); i++) { await ctrlZ(c); await sleep(300); }
-    const refireUndone = await c.json(`window.__o48b.diff('preRefire', ${SEC}, '${PLANE}')`);
-    check('k2', 'a wipe fired from the KEYBOARD (Enter/Space on the button the last click left focused) '
-      + 'is as undoable as one fired from the mouse — the plane comes back whole',
-      refireUndone.changed === 0 && (await canUndo(c)) === undoPreRefire,
-      `keys that re-fired the wipe: ${reFired ? fired.join(', ') : 'none'}; `
-      + `cells still differing after rewinding = ${refireUndone.changed}. `
-      + 'The re-fire is platform-default <button> behaviour rather than an app bug, and it is reported '
-      + 'because these two are WHOLESALE writers that ask for no confirmation: one click on Clear, then '
-      + 'a bare SPACE while focus has not moved, fires it again. Enter did NOT, over this input channel.');
+
+    // ── [k4] RESET gives up focus too ────────────────────────────────────
+    //
+    // Same shape as [k3], and it needs its own row rather than an assumption:
+    // the two buttons are two separate JSX dispatch lines, and a fix applied to
+    // one of two near-identical call sites is this repo's dominant way for a
+    // defect to survive a convincing green.
+    await c.evalExpr(`window.__o48b.snap('preResetBlur', ${SEC}, '${PLANE}')`);
+    await clickHandle(c, RESET, 'Reset (d-27 focus)');
+    const focusAfterResetBlur = await focusNow(RESET);
+    const resetBlurDiff = await c.json(`window.__o48b.diff('preResetBlur', ${SEC}, '${PLANE}')`);
+    note('after the Reset click', `activeElement = ${JSON.stringify(focusAfterResetBlur)} · `
+      + `${resetBlurDiff.changed} cells changed`);
+    check('k4', 'd-27: after a REAL CLICK, Reset does not keep keyboard focus either — and the same '
+      + 'click still performed the reset',
+      focusAfterResetBlur.isTheButton === false && resetBlurDiff.changed > 0,
+      `document.activeElement is <${focusAfterResetBlur.tag}> "${focusAfterResetBlur.text}" `
+      + `(isTheResetButton=${focusAfterResetBlur.isTheButton}); the click changed `
+      + `${resetBlurDiff.changed} cells. Reset is a SEPARATE onClick from Clear's — a blur wired to `
+      + 'only one of the two would pass [k3] and fail here.');
+
+    // ── [k7] THE NO-OP PRESS, which is the half a cheaper fix would miss ──
+    //
+    // The plane is now AT the baseline, so this second consecutive Reset takes
+    // `if (!entries.length) return` and writes nothing ([r7] proves that return
+    // is real and pushes no phantom undo step). It is measured HERE because it
+    // is the case d-27's implementation had a choice about: blurring inside the
+    // handler AFTER the early returns would satisfy [k3] and [k4] and leave the
+    // button focused on exactly the press an author is least likely to notice —
+    // and a repeat Space is most pointless precisely when the last press did
+    // nothing. `actAndDropFocus` blurs BEFORE the action for that reason, and
+    // this row is what makes "unconditional" a measurement rather than a claim
+    // in a comment.
+    await c.evalExpr(`window.__o48b.snap('preNoopPress', ${SEC}, '${PLANE}')`);
+    await clickHandle(c, RESET, 'Reset (no-op press — already at the baseline)');
+    const focusAfterNoop = await focusNow(RESET);
+    const noopDiff = await c.json(`window.__o48b.diff('preNoopPress', ${SEC}, '${PLANE}')`);
+    check('k7', 'd-27 is UNCONDITIONAL: a press that changes NOTHING (second consecutive Reset, the '
+      + '`!entries.length` early return) still drops focus',
+      noopDiff.changed === 0 && focusAfterNoop.isTheButton === false,
+      `the press changed ${noopDiff.changed} cells (0 = it really did take the early return, which is `
+      + `what makes this the no-op path) and activeElement after it is <${focusAfterNoop.tag}> `
+      + `"${focusAfterNoop.text}" (isTheResetButton=${focusAfterNoop.isTheButton}). An implementation `
+      + 'that blurred only on the acting path passes [k3] and [k4] and fails HERE.');
+    for (let i = 0; i < 3 && (await canUndo(c)); i++) { await ctrlZ(c); await sleep(300); }
 
     // ── restore the poked fixture cells ──────────────────────────────────
     console.log('\n=== restoring (nothing was ever written to disk) ===');
