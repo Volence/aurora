@@ -376,6 +376,135 @@ const WARNINGS = String.raw`(() => {
   };
 })()`;
 
+/**
+ * CAN THE AUTHOR READ THE CONTROL HE IS ABOUT TO SET? — the [W*] rows.
+ *
+ * ═══ WHY A THIRD WIDTH PROBE EXISTS, AND WHY IT DOES NOT REUSE THE OTHER TWO ═══
+ *
+ * `effects-column-harness`'s `[L2]` asks whether a LABEL fits its column. That
+ * is one of the two ways this column runs out of room, and it is the one that
+ * announces itself: an over-wide label WRAPS, and a wrap is two line boxes you
+ * can count. The other way is silent. The label column and the control share a
+ * fixed-width row, so every pixel `LABEL_W` takes, a `<select style="flex:1">`
+ * loses — and a select that runs out of room does not wrap and does not
+ * overflow. It ELLIPSES, which is the layout absorbing the overflow so
+ * completely that the element's own geometry stops carrying any trace of it.
+ *
+ * ⚠ THIS IS EXACTLY `[r4]`'s DEFECT IN A SECOND PLACE, AND IT IS WORSE HERE.
+ * `[r4]` measured a wrapped label with a DOM Range and got the union of its line
+ * boxes — a number bounded by the column, so a label wanting 84px reported 42.
+ * A `<select>` has the same trap and no escape hatch: `scrollWidth` is clamped
+ * to `clientWidth`, the option text is not a DOM text node a Range can select,
+ * and `checkVisibility()` is `true` on a select showing three words of eight.
+ * EVERY quantity the element will volunteer about itself is post-truncation.
+ *
+ * ═══ THE OBSERVABLE, AND WHY IT CANNOT BE BOUNDED BY THE COLUMN ═══
+ *
+ * The width the select WOULD need to show a given choice in full, measured on a
+ * clone that is not in the layout at all:
+ *
+ *   - clone the live select, so padding, border, font size and the UA's own
+ *     dropdown arrow come along and nothing here has to guess at any of them;
+ *   - DELETE EVERY OPTION BUT ONE, because a `<select>` sized to its whole list
+ *     answers a question about the longest option, and what truncates on screen
+ *     is whichever one is currently chosen;
+ *   - `position: absolute` off-screen with `width: max-content`, `flex: none`
+ *     and `maxWidth: none`, so no flex line, no column and no `minWidth: 0`
+ *     can bound the answer;
+ *   - measure, then remove it in the same synchronous turn.
+ *
+ * ⚠ AND IT IS ASKED OF EVERY OPTION, NOT ONLY THE SELECTED ONE. Every option in
+ * the list becomes the current choice the moment someone picks it, so a gate on
+ * the selected option alone is green on the state the fixture happens to leave
+ * behind and silent about the two an author reaches next. The three-state
+ * pickers here are the case that matters: this run authors a channel, so `Movement`
+ * sits on `sweep` and the row would never measure `no motion — …` at all.
+ *
+ * It is appended INSIDE the live row rather than to `<body>`, so it inherits
+ * the same font-family the real control renders in. A probe measured against
+ * the body's font would answer a question about a different typeface.
+ *
+ * ⚠ AND THE PROBE IS PROVEN ABLE TO SEE BOTH ANSWERS — row `[W0]`. A clone
+ * technique that silently returned the rendered width (an option that failed to
+ * detach, `max-content` unsupported, the style overrides not applying) would
+ * report EVERY control as a perfect fit, forever, and this row would be the
+ * same green whether or not anything fit. So `[W0]` requires the run to have
+ * measured at least one control needing MORE than it has and at least one
+ * needing LESS — a spread, not a verdict — and it prints every number it read.
+ * Only then is `[W1]`'s judgement worth anything.
+ */
+const FIT = String.raw`(() => {
+  const hdr = [...document.querySelectorAll('div')]
+    .filter((d) => d.style && d.style.cursor === 'pointer' && ${ANCHORS_RE}.test((d.textContent || '').trim()))
+    .pop();
+  if (!hdr) return { found: false };
+  const root = hdr.parentElement;
+  const out = [];
+  for (const sel of root.querySelectorAll('select')) {
+    const row = sel.parentElement;
+    const labelEl = row && row.firstElementChild !== sel ? row.firstElementChild : null;
+    const label = labelEl ? (labelEl.textContent || '').replace(/\s+/g, ' ').trim() : '?';
+    const choice = sel.options[sel.selectedIndex]
+      ? sel.options[sel.selectedIndex].textContent.trim() : '';
+    const have = Math.ceil(sel.getBoundingClientRect().width);
+    const widthOf = (value, overrideText) => {
+      try {
+        const probe = sel.cloneNode(true);
+        for (const o of [...probe.options]) if (o.value !== value) o.remove();
+        if (probe.options.length !== 1) return -1;
+        if (overrideText !== undefined) probe.options[0].textContent = overrideText;
+        probe.style.position = 'absolute';
+        probe.style.left = '-99999px';
+        probe.style.top = '0px';
+        probe.style.width = 'max-content';
+        probe.style.minWidth = '0px';
+        probe.style.maxWidth = 'none';
+        probe.style.flex = 'none';
+        row.appendChild(probe);
+        const w = Math.ceil(probe.getBoundingClientRect().width);
+        probe.remove();
+        return w;
+      } catch (e) { return -1; }
+    };
+    const need = widthOf(sel.value);
+    // Every option, because every one of them is one click from being the value
+    // on screen. Reported per option so the gate's own artifact names WHICH
+    // choice does not fit rather than only that one of them does not.
+    const opts = [...sel.options].map((o) => ({
+      text: o.textContent.trim(), w: widthOf(o.value), selected: o.value === sel.value,
+    }));
+    // The LABEL's own fit, on the same terms [L2] uses: the width one
+    // unwrapped line would need, which is NOT what a Range over a label that
+    // has already wrapped reports.
+    let labelNeed = -1; let labelHave = -1;
+    if (labelEl) {
+      labelHave = labelEl.clientWidth;
+      const prev = labelEl.style.whiteSpace;
+      labelEl.style.whiteSpace = 'nowrap';
+      const rg = document.createRange();
+      rg.selectNodeContents(labelEl);
+      labelNeed = Math.ceil(rg.getBoundingClientRect().width);
+      labelEl.style.whiteSpace = prev;
+    }
+    // THE PROBE PROVING ITSELF, ON THIS RUN, IN THIS ROW'S OWN FONT.
+    //
+    // The anti-vacuity problem a fit gate has is that its healthy state is
+    // "everything fits" — so "some control did not fit" cannot be its evidence
+    // of life, or the gate goes vacuous on the very day the defect is fixed.
+    // Instead the SAME widthOf is asked for the selected option's text with a
+    // long run of Ms welded onto it. A clone that were silently reporting the
+    // rendered width, or ignoring max-content, or failing to detach its
+    // options, would hand back the same number for both. This one must come
+    // back strictly wider AND past the room the select actually has.
+    const calText = choice + ' MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM';
+    const calW = widthOf(sel.value, calText);
+    out.push({ label, choice, have, need, labelHave, labelNeed, opts, calW, calText });
+  }
+  const col = ${STRIP} ? ${STRIP}.parentElement : null;
+  return { found: true, columnW: col ? Math.round(col.getBoundingClientRect().width) : -1,
+           controls: out };
+})()`;
+
 // ── THE MAP-REPAINT PROBE ────────────────────────────────────────────────────
 //
 // Installed BY THE HARNESS, around MapViewport. The component is not modified
@@ -790,6 +919,81 @@ async function main() {
       + 'preset that uses the feature says so before anything is opened',
       anchorHead !== null && new RegExp(`\\(1/${MAX_PATCH}\\)`).test(anchorHead),
       `header text: ${JSON.stringify(anchorHead)}`);
+
+    // ── W. THE CONTROLS ARE LEGIBLE, NOT MERELY PRESENT ────────────────────
+    //
+    // Every row above this one asks whether a control is THERE, whether it
+    // offers the schema's rungs, and whether what it writes is what was asked
+    // for. Not one of them asks whether the author can READ it. The owner's
+    // standing complaint about this tooling is "so confusing and convoluted...
+    // I was just lost", and O56 booked the same finding again as controls that
+    // were reachable in one click and "very quietly labelled". A control whose
+    // current value is ellipsed to three words of eight has not shipped, and
+    // twenty-five green rows said nothing about it.
+    await c.evalExpr(OPEN_SECTION(ANCHORS_RE, CHANNEL_SEL));
+    await sleep(500);
+    const fit = await c.json(FIT);
+    if (fit.found !== true) throw new Error('the anchors section was not found for the [W*] rows');
+    // ⚠ THE ARTIFACT IS PRINTED, NOT SUMMARISED. A width gate that says only
+    // "3 controls truncate" cannot be audited for its AIM by anyone who did not
+    // write it. Every option's own number is on screen beside the room it has,
+    // so a reader can check that the quantity being judged is one that can
+    // still be too wide after the layout has absorbed the overflow.
+    const allOpts = fit.controls.flatMap(
+      (r) => r.opts.map((o) => ({ ...o, label: r.label, have: r.have })));
+    const shown = (o) => `"${o.label}" ${o.selected ? '→' : ' ·'} "${o.text}": `
+      + `needs ${o.w}px, has ${o.have}px`;
+    const unmeasured = allOpts.filter((o) => !(o.w > 0));
+    const tooWide = allOpts.filter((o) => o.w > 0 && o.w > o.have);
+    const fits = allOpts.filter((o) => o.w > 0 && o.w <= o.have);
+    // ⚠ [W0] IS WHAT MAKES [W1] MEAN ANYTHING, AND IT CANNOT BE "SOMETHING DID
+    // NOT FIT". A fit gate's healthy state is that everything fits, so evidence
+    // of life drawn from the app's own defects expires the day they are fixed —
+    // which is the day the gate starts mattering. So the probe is proved on
+    // text it MAKES too long: the selected option plus forty Ms, through the
+    // same `widthOf`, in the same row, in the same font. A clone reporting the
+    // rendered width, ignoring `max-content`, or failing to detach its options
+    // returns the same number for both, and this row says so.
+    const cal = fit.controls.map((r) => ({
+      label: r.label, need: r.need, calW: r.calW, have: r.have,
+      grew: r.calW > r.need, past: r.calW > r.have,
+    }));
+    const calBad = cal.filter((x) => !(x.grew && x.past) || !(x.need > 0));
+    check('W0', 'ANTI-VACUOUS: the fit probe is PROVEN able to report a control that does not fit '
+      + '— the same measurement, on each select\'s own choice with 40 Ms welded on, comes back '
+      + 'strictly wider and past the room the select has',
+      calBad.length === 0 && cal.length > 0 && unmeasured.length === 0,
+      `${allOpts.length} options over ${fit.controls.length} selects in a ${fit.columnW}px column `
+      + `(dpr ${await c.evalExpr('window.devicePixelRatio')}); ${tooWide.length} need more room, `
+      + `${fits.length} fit, ${unmeasured.length} UNMEASURABLE\n        `
+      + cal.map((x) => `"${x.label}": real choice ${x.need}px → padded ${x.calW}px in ${x.have}px `
+        + `(grew ${x.grew}, past the box ${x.past})`).join('\n        '));
+    // ⚠ EVERY OPTION, NOT THE SELECTED ONE. See the FIT docblock: an option the
+    // fixture did not happen to select is one click from being what the author
+    // is reading, and a gate that skips it ships a truncated screen.
+    check('W1', 'every choice EVERY select here can show is shown in full — not just the one this '
+      + 'run happens to have selected',
+      tooWide.length === 0 && unmeasured.length === 0,
+      unmeasured.length
+        ? `COULD NOT MEASURE ${unmeasured.length} option(s): `
+          + unmeasured.map((o) => `"${o.label}"/"${o.text}"`).join(', ')
+        : tooWide.length
+          ? tooWide.map((o) => `TRUNCATED by ${o.w - o.have}px — ${shown(o)}`).join('\n        ')
+          : `all ${allOpts.length} options fit; tightest is `
+            + shown(allOpts.reduce((a, o) => (o.have - o.w < a.have - a.w ? o : a), allOpts[0]))
+            + ` (${allOpts.reduce((m, o) => Math.min(m, o.have - o.w), Infinity)}px to spare)`);
+    // The label half, asked in the section [L2] cannot see: [L2] measures the
+    // Parallax column, and this section is on another sub-tab and therefore
+    // UNMOUNTED while that harness runs.
+    const labelBad = fit.controls.filter((r) => r.labelNeed > r.labelHave);
+    check('W2', 'and no label in this section is wider than the shared label column it sits in',
+      labelBad.length === 0,
+      labelBad.length
+        ? labelBad.map(shown).join('\n        ')
+        : `all ${fit.controls.length} labels fit; widest is `
+          + `"${fit.controls.reduce((a, r) => (r.labelNeed > a.labelNeed ? r : a), fit.controls[0]).label}" `
+          + `at ${Math.max(...fit.controls.map((r) => r.labelNeed))}px in `
+          + `${fit.controls[0].labelHave}px`);
 
     // ── 9. THE CAPTURE FOR THE OWNER ───────────────────────────────────────
     // ⚠ THE LOOK IS UNRATIFIED. He ruled the shape of this facet, not this
