@@ -41,11 +41,29 @@ const code = panel
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/^\s*\/\/.*$/gm, '');
 
-/** The `RampCard` function body, so the rows below cannot be satisfied elsewhere. */
+/**
+ * The `RampCard` function body, so the rows below cannot be satisfied elsewhere.
+ *
+ * ⚠ IT IS BOUNDED AT THE NEXT COMPONENT, AND IT WAS NOT UNTIL 2026-09-03. This
+ * read `code.slice(at)` — the rest of the FILE — which was the same thing as
+ * "the ramp card" only because `RampCard` happened to be last. `BaseSwapCard`
+ * (ROADMAP row 131) was written after it and the field-count row immediately
+ * counted seven `<NumberField>`s against the ramp's five keys. The count row is
+ * this file's whole point (it is the only automatic signal in this repo for the
+ * per-line-curve MUST NOT), so a slice that grows with the file would have gone
+ * red for the wrong reason today and, one refactor later, green for the wrong
+ * reason instead.
+ */
 const rampCard = (() => {
   const at = code.indexOf('function RampCard(');
   if (at < 0) throw new Error('RampCard is gone from BandPresetPanel.tsx — this file measures it');
-  return code.slice(at);
+  const rest = code.slice(at);
+  // The function's own closing brace: the first `}` in column 0 after it. Every
+  // brace inside the body is indented, and this does not depend on what happens
+  // to be written next in the file.
+  const end = rest.indexOf('\n}\n');
+  if (end < 0) throw new Error('RampCard has no closing brace in column 0 — the slice is unbounded');
+  return rest.slice(0, end + 3);
 })();
 
 describe('the slice this file measures is bounded', () => {

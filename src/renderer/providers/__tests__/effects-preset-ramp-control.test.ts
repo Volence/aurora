@@ -529,9 +529,25 @@ describe('switching the raster program is ONE undoable command', () => {
           + 'refused by rasterChannelSeedRefusal yet produced a command anyway'}`,
       ).toBe(refusal !== null);
     }
-    // Anti-vacuous: at least one of each kind exists, or the loop proves nothing.
+    // Anti-vacuous: the loop really ran over every declared channel, and at
+    // least one of them is seedable — or it proves nothing.
+    expect(RASTER_CHANNEL_OPTIONS).toHaveLength(EFFECTS_PRESET_RASTER_CHANNELS.length);
     expect(RASTER_CHANNEL_OPTIONS.some((o) => rasterChannelSeedRefusal(o.value) === null)).toBe(true);
-    expect(RASTER_CHANNEL_OPTIONS.some((o) => rasterChannelSeedRefusal(o.value) !== null)).toBe(true);
+    // ⚠ RE-PINNED 2026-09-03 (ROADMAP row 131). This row's second half used to
+    // require an UNSEEDABLE channel to exist, which was `base_swap` — and that
+    // parcel's whole job was to give it a seed, so the row would have gone red
+    // for the success. What it MEANT is that the refusal is a real condition and
+    // not a constant `null`, and that is asserted directly: a channel this
+    // contract does not declare is refused, with a sentence.
+    const notAChannel = 'not_a_raster_channel';
+    expect(EFFECTS_PRESET_RASTER_CHANNELS).not.toContain(notAChannel);
+    expect(rasterChannelSeedRefusal(notAChannel)).not.toBeNull();
+    expect(setRasterChannelCommand(lib(rampPreset()), ID, notAChannel)).toBeNull();
+    // ...and every channel the contract DOES declare can be authored here today,
+    // so no dropdown entry is dead.
+    for (const c of EFFECTS_PRESET_RASTER_CHANNELS) {
+      expect(rasterChannelSeedRefusal(c), `channel "${c}" has no seed`).toBeNull();
+    }
   });
 
   it('the labels are per-channel, not a two-way ternary that mislabels the third', () => {

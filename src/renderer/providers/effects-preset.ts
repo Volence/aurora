@@ -45,7 +45,7 @@
 import type {
   EffectsPreset, EffectsPresetBand, EffectsPresetLibrary, EffectsPresetBandOn,
   EffectsPresetCycleChannel, EffectsPresetAnchorSweep, AnchorAmpRung, AnchorPeriodRung,
-  EffectsPresetRamp,
+  EffectsPresetRamp, EffectsPresetBaseSwap,
 } from '../../core/formats/effects/preset';
 import {
   EFFECTS_PRESET_ID_PATTERN, EFFECTS_PRESET_ON_ARMS, EFFECTS_PRESET_SCHEMA,
@@ -80,6 +80,19 @@ import {
   // returns null off-grid and MUST NOT be made to snap.
   presetFp16FromNumber, presetFp16ToNumber,
   presetRasterChannel, EFFECTS_PRESET_RASTER_CHANNELS,
+  // ═══ THE `base_swap` CHANNEL'S BOUNDS — ALSO ALL THE CODEC'S ═══
+  //
+  // Read off the vendored schema with module-load guards (empyrean 5bd76ba,
+  // §7.5) and imported, never retyped beside a control — the defect this family
+  // has produced twice. The granule is the one to know about:
+  // EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE is `multipleOf` 8192, and an
+  // unaligned target is NOT a range error — VDP reg $02 encodes only the address
+  // bits above the granule and DROPS the rest silently, so the failure is a
+  // different address with nothing else visibly wrong. `isBaseSwapTargetAligned`
+  // REPORTS it; there is deliberately no snap in the codec and none here.
+  EFFECTS_PRESET_BASE_SWAP_KEYS, EFFECTS_PRESET_BASE_SWAP_LINE_RANGE,
+  EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE, EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE,
+  isBaseSwapTargetAligned,
 } from '../../core/formats/effects/preset';
 import type { SetEffectsPresetCommand, SetSectionRasterCommand } from '../../core/editing/commands';
 // THE BINDING LIMIT IS NOT RE-TYPED HERE. `PRESET_LIMITS.unbound` below is the
@@ -543,10 +556,18 @@ export function presetListEntries(library: EffectsPresetLibrary): PresetListEntr
  * as `0 bands` — which reads as a broken or half-authored preset rather than a
  * different kind of one. That is exactly what a `base_swap` preset did before
  * this row learned its name.
+ *
+ * ⚠ THE WORD IS THE CHANNEL'S OWN NOUN, NOT A TEST PER CHANNEL. This was an
+ * `if` per channel with the count as its fallthrough, so the fourth arm would
+ * have gone straight back to reading `0 bands`. Now the only test is the
+ * POSITIVE one — is this the channel that HAS a count? — and every other
+ * channel, present or future, gets the noun `RASTER_CHANNEL_NOUNS` already has
+ * to carry for it (a channel with no noun cannot load this module at all).
  */
 export function presetListSummary(entry: PresetListEntry): string {
-  if (entry.channel === 'ramp') return 'ramp';
-  if (entry.channel === 'base_swap') return 'base swap';
+  if (entry.channel !== null && entry.channel !== 'bands') {
+    return RASTER_CHANNEL_NOUNS[entry.channel] ?? entry.channel;
+  }
   return `${entry.bands} band${entry.bands === 1 ? '' : 's'}`;
 }
 
@@ -3069,7 +3090,407 @@ export function setRampRateCommand(
   });
 }
 
-// ── exactly one raster program, and switching between the two ──────────────
+// ---------------------------------------------------------------------------
+// THE BASE-SWAP RASTER CHANNEL — `base_swap`'s derivations, refusals, commands
+// ---------------------------------------------------------------------------
+//
+// ═══ WHAT THE CONTROL IS ═══
+//
+// TWO NUMBERS AND DELIBERATELY NOTHING ELSE: a screen `line` and a VRAM
+// `target`. At that line, one OP_SET_REG fire re-points Plane A's nametable base
+// register (VDP reg $02) at `target`; from there down, Plane A draws from a
+// different nametable — the "Batman & Robin trick". The document is a CLOSED
+// object of exactly those two required members, so a third control here would be
+// authoring a key the schema refuses.
+//
+// ═══ ⚠ TWO ASYMMETRIES WITH `ramp`, AND A READER WHO JUST READ THAT BLOCK WILL
+//     CARRY BOTH ACROSS WRONGLY ═══
+//
+//   1. NO CAPABILITY GATE. `ramp` renders only where `Game.SCANLINE_CAPS`
+//      declares CAP_DENSE_TIER; `base_swap` has no such bit, OP_SET_REG
+//      dispatches unconditionally in every game, and no ensure is re-emitted at
+//      the generated call site. There is no game in which a base swap silently
+//      no-ops for want of a capability — so nothing on this surface is gated,
+//      and a disabled control built around an assumed gate would be a lie.
+//   2. NOT DEBUG-GATED. The generated emission is unconditional `pub` data that
+//      reaches the RELEASE ROM (aeon measured the section-6 program at $013446
+//      in the release listing, 22 bytes identical to hand-authored
+//      `OJZ_BaseSwap`). Authoring one here is not a debug-only affordance.
+//
+// BOTH ARE THE CONTRACT'S OWN WORDS, PARSED (`BASE_SWAP_ASYMMETRIES`) rather
+// than retyped, and both are PAINTED in the card — an asymmetry stated only in a
+// docblock is an asymmetry the author never learns.
+//
+// ═══ ⚠ THE ADDRESS IS AN ADDRESS ═══
+//
+// `target` is a raw VRAM BYTE ADDRESS and an author meeting `57344` in a bare
+// number box has no way to know that. Every place this surface shows one, it
+// shows the hex beside the decimal (`fmtVramBase`) and NAMES the address when
+// the contract names it (`BASE_SWAP_NAMED_TARGETS`, parsed out of the schema:
+// 57344 = $E000 = VRAM_PLANE_B). It NAMES NOTHING THE CONTRACT DOES NOT —
+// `rampAddrGloss`'s rule, for the same reason: a per-address gloss Aurora made
+// up would be an invention wearing a contract's clothes.
+//
+// ═══ ⚠ AND NOTHING SNAPS ═══
+//
+// `isBaseSwapTargetAligned` reports; `baseSwapTargetNeighbours` COMPUTES the two
+// legal addresses either side of a refused one so the sentence can offer them.
+// Rounding an author's address to the nearest granule draws a DIFFERENT PLANE'S
+// PICTURE without saying so, which is the exact failure the granule exists to
+// make visible. aeon §E.4's no-clamp rule, with hardware behind it.
+
+/** The `base_swap` key's own title — the contract's paragraph, at the point of use. */
+export const BASE_SWAP_TITLE = presetFieldTitle(['properties', 'base_swap']);
+
+/** Every base_swap field's title, straight from the schema. */
+export const BASE_SWAP_FIELD_TITLES = Object.freeze({
+  line: presetFieldTitle(['$defs', 'base_swap', 'properties', 'line']),
+  target: presetFieldTitle(['$defs', 'base_swap', 'properties', 'target']),
+});
+
+/**
+ * THE TWO ASYMMETRIES IN THE CONTRACT'S OWN WORDS — parsed, never retyped.
+ *
+ * Both sentences live in the `base_swap` property's description and this reads
+ * them out. If empyrean ever drops either, this throws at module load rather
+ * than leaving the panel quietly asserting a property of the engine that the
+ * contract no longer states — which is the direction that matters here, because
+ * the whole hazard is a reader ASSUMING ramp's gating by analogy.
+ */
+export const BASE_SWAP_ASYMMETRIES: string = (() => {
+  const m = /(NO capability bit gates it[\s\S]*?own program\)\.)/.exec(BASE_SWAP_TITLE);
+  if (!m || !/CAP_DENSE_TIER/.test(m[1]) || !/DEBUG-gated/.test(m[1])) {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer states base_swap\'s two asymmetries with ramp '
+      + '(no capability gate, not DEBUG-gated) in its `base_swap` property description. Those are '
+      + 'the two properties a reader carries across from ramp and gets wrong, and this panel paints '
+      + 'the contract\'s own statement of them. Re-read the schema — do NOT retype the sentences.',
+    );
+  }
+  return m[1];
+})();
+
+/**
+ * The painted half, at an author's length — `presetLimitsShort()`'s split.
+ *
+ * The contract sentence carries a symbol name and a ROM address, which is owed
+ * to the agent surface and useless in a 285px column; this is what an author has
+ * to act on. Both halves reach the same element, and the wording rows assert
+ * they make the same claim.
+ */
+export const BASE_SWAP_ASYMMETRIES_SHORT =
+  'No capability gate, and not DEBUG-gated: unlike a ramp, this runs in every game and reaches '
+  + 'the release ROM. Nothing here is disabled for want of an engine capability.';
+
+/**
+ * WHAT AN AUTHOR SEES, in the contract's own words — parsed out of the same
+ * description.
+ *
+ * Aurora draws no raster program (`NO_PREVIEW`), so what the swap LOOKS like is
+ * a claim this editor cannot make on its own evidence. It can quote the one who
+ * measured it: aeon's on-screen captures, via the schema.
+ */
+export const BASE_SWAP_WHAT_YOU_SEE: string = (() => {
+  const m = /WHAT AN AUTHOR SEES: ([\s\S]*?)(?:\s*$)/.exec(BASE_SWAP_TITLE);
+  if (!m || !/self-restoring/.test(m[1])) {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer states what an author sees (the swap line down, '
+      + 'the untouched frame top, the self-restore) in its `base_swap` property description. This '
+      + 'panel QUOTES that rather than asserting it, because Aurora draws no raster program and '
+      + 'has not measured one. Re-read the schema — do NOT retype the sentence.',
+    );
+  }
+  return m[1].trim();
+})();
+
+// ── the address, shown as an address ────────────────────────────────────────
+
+/**
+ * How many hex digits a VRAM base address is written with, FROM THE RANGE — so
+ * `$E000` and `$0000` are the same width and a reader can compare two at a
+ * glance. 65535 is four digits; a wider range would widen this rather than
+ * printing a ragged column.
+ */
+const VRAM_BASE_HEX_DIGITS = EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.max.toString(16).length;
+
+/** A VRAM byte address in the notation every `VRAM_*` consumer is written in. */
+export function fmtVramBase(addr: number): string {
+  if (!Number.isInteger(addr) || addr < 0) return String(addr);
+  return `$${addr.toString(16).toUpperCase().padStart(VRAM_BASE_HEX_DIGITS, '0')}`;
+}
+
+/** An address as an author needs to read it: the hex it is, and the decimal the file holds. */
+export function fmtVramBaseBoth(addr: number): string {
+  return `${fmtVramBase(addr)} (${addr})`;
+}
+
+/**
+ * THE ADDRESSES THE CONTRACT NAMES — parsed out of the schema, and NOTHING IS
+ * INVENTED BESIDE THEM.
+ *
+ * The schema names exactly one: the shipped section-6 target, `57344 ($E000,
+ * VRAM_PLANE_B)`. `rampAddrGloss`'s rule applies unchanged — every other legal
+ * address gets a sentence saying the contract admits it and this editor does not
+ * know what is there, rather than a name Aurora would be making up. A wrong name
+ * on a VRAM base is worse than none: it would tell an author they are pointing
+ * at a plane they are not.
+ *
+ * Guarded three ways at module load: the decimal and the hex must agree, the
+ * address must be inside the declared range, and it must be ON the granule —
+ * because the contract's own worked example failing its own constraint would
+ * mean one of the two had moved.
+ */
+export const BASE_SWAP_NAMED_TARGETS: ReadonlyMap<number, string> = (() => {
+  const desc = BASE_SWAP_FIELD_TITLES.target;
+  const m = /targets (\d+) \(\$([0-9A-Fa-f]+), (VRAM_[A-Z0-9_]+)/.exec(desc);
+  if (!m) {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer names a worked VRAM base in '
+      + '$defs.base_swap.properties.target (the shipped "57344 ($E000, VRAM_PLANE_B)"), which is '
+      + 'the ONLY address this editor is allowed to put a name on. Re-read the schema — do NOT '
+      + 'retype the address or invent a second one.',
+    );
+  }
+  const dec = Number(m[1]);
+  const hex = parseInt(m[2], 16);
+  if (dec !== hex) {
+    throw new Error(
+      `the schema's worked base address disagrees with itself: ${dec} decimal is not $${m[2]}. One `
+      + 'of the two was edited by hand; re-read the schema.',
+    );
+  }
+  if (!isBaseSwapTargetAligned(dec)) {
+    throw new Error(
+      `the schema's own worked base address ${dec} is not a legal base_swap target (range `
+      + `${EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.min}..${EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.max}`
+      + `, granule ${EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE}). The worked example and the `
+      + 'constraints have drifted apart; re-read both.',
+    );
+  }
+  return Object.freeze(new Map<number, string>([[dec, m[3]]]));
+})();
+
+/**
+ * WHAT THIS ADDRESS IS, as much of it as the contract establishes — the gloss
+ * that sits beside the number box.
+ *
+ * ⚠ IT INVENTS NOTHING, and that is the whole design. One address is named by
+ * the contract; every other legal one is reported as admitted, on the granule,
+ * and unnamed. An unaligned one says so first, because that is the only thing
+ * about it worth reading.
+ */
+export function baseSwapTargetGloss(target: number): string {
+  const named = BASE_SWAP_NAMED_TARGETS.get(target);
+  if (named !== undefined) return `${fmtVramBase(target)} — ${named}`;
+  if (!isBaseSwapTargetAligned(target)) {
+    return `${fmtVramBase(target)} — NOT on the $${EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE
+      .toString(16).toUpperCase()} granule`;
+  }
+  const only = [...BASE_SWAP_NAMED_TARGETS].map(([a, n]) => `${fmtVramBase(a)} (${n})`).join(', ');
+  return `${fmtVramBase(target)} — on the granule; the contract names only ${only}`;
+}
+
+/**
+ * WHAT THE SWAP DOES, in one sentence of the document's own numbers.
+ *
+ * The `rampDriftSummary` idiom: the arithmetic an author would otherwise do in
+ * their head, from the two values in front of them. It states the mechanism and
+ * the address in BOTH bases, and it names the target only when the contract
+ * does — so this sentence is never the place a made-up plane name gets in.
+ */
+export function baseSwapSummary(bs: EffectsPresetBaseSwap): string {
+  const named = BASE_SWAP_NAMED_TARGETS.get(bs.target);
+  const what = named === undefined
+    ? `the nametable at ${fmtVramBaseBoth(bs.target)}`
+    : `${fmtVramBaseBoth(bs.target)} — ${named}`;
+  return `At screen line ${bs.line}, Plane A's base register (VDP reg $02) is re-pointed at `
+    + `${what}. One fire, one register write; the ${bs.line} line${bs.line === 1 ? '' : 's'} above `
+    + 'it are untouched.';
+}
+
+// ── the seed, from the contract's own worked example ────────────────────────
+
+/**
+ * A BRAND-NEW BASE SWAP — both keys written, because the constructor defaults
+ * NEITHER (`newBand`'s rule, and the schema says so in as many words).
+ *
+ * ⚠ THE TWO NUMBERS ARE THE CONTRACT'S OWN WORKED EXAMPLE, PARSED, NOT CHOSEN.
+ * The schema states that the shipped section-6 preset fires on 160 and targets
+ * $E000 (VRAM_PLANE_B), and those are exactly the two values a fresh swap gets.
+ * The reason is `newRamp`'s and one more:
+ *
+ *   • A SEED MUST NOT BE BORN ILLEGAL — asserted below against the line range
+ *     and the granule, not assumed.
+ *   • A SEED MUST NOT BE BORN INERT. A `target` this editor cannot name is a
+ *     first state whose effect the panel cannot explain; $E000 is the one
+ *     address the contract explains, so a fresh swap is one the author can read
+ *     a sentence about.
+ *
+ * It is NOT a claim that this is the right swap for their section — Aurora does
+ * not know that, and a seed that pretended to would be the clamp aeon's §E.4
+ * forbids wearing a different hat.
+ */
+const BASE_SWAP_SEED_LINE: number = (() => {
+  const m = /shipped section-6 preset fires on (\d+)/.exec(BASE_SWAP_FIELD_TITLES.line);
+  if (!m) {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer states the shipped section-6 fire line in '
+      + '$defs.base_swap.properties.line, which is where a fresh swap\'s seed line is read from. '
+      + 'Re-read the schema — do NOT type a line number here.',
+    );
+  }
+  const line = Number(m[1]);
+  const r = EFFECTS_PRESET_BASE_SWAP_LINE_RANGE;
+  if (!Number.isInteger(line) || line < r.min || line > r.max) {
+    throw new Error(
+      `the schema's own worked fire line ${line} is outside the range it declares (${r.min}..`
+      + `${r.max}). A seed born outside the range would put a fresh document in a state the author `
+      + 'had no hand in; re-read both.',
+    );
+  }
+  return line;
+})();
+
+const BASE_SWAP_SEED_TARGET: number = [...BASE_SWAP_NAMED_TARGETS.keys()][0];
+
+export function newBaseSwap(): EffectsPresetBaseSwap {
+  return { line: BASE_SWAP_SEED_LINE, target: BASE_SWAP_SEED_TARGET };
+}
+
+// ── the refusals ────────────────────────────────────────────────────────────
+
+/** Why this fire line cannot be written, or null. */
+export function baseSwapLineRefusal(
+  bs: EffectsPresetBaseSwap, presetId: string, value: number,
+): string | null {
+  const subject = `preset "${presetId}" base_swap line`;
+  const holds = `line is still ${bs.line}.`;
+  if (!Number.isInteger(value)) {
+    return `${subject}: ${value} is not a whole number. A screen line is an integer. `
+      + `Refused; ${holds}`;
+  }
+  const r = EFFECTS_PRESET_BASE_SWAP_LINE_RANGE;
+  if (value < r.min || value > r.max) {
+    return `${subject}: ${value} is outside ${r.min}..${r.max}, which is the engine's own ensure `
+      + `for a raster fire — lines below ${r.min} belong to the priming records and ${r.max} is the `
+      + 'frame-rewind interlock. ⚠ THIS IS NOT THE RAMP\'S RANGE even though both are screen '
+      + `lines: a ramp's top stops at ${EFFECTS_PRESET_RAMP_TOP_RANGE.max} because a run needs a `
+      + `line after it, and a swap is a single fire that reaches ${r.max}. Refused; ${holds}`;
+  }
+  return null;
+}
+
+/**
+ * THE TWO LEGAL BASES EITHER SIDE OF A VALUE — computed, never typed.
+ *
+ * `rampRateNeighbours`' idiom, and for the same reason: "that address is not
+ * available" is useless without "here is what is". Null on a side means there is
+ * nothing there — below the first granule, or above the last.
+ *
+ * The granule is an ABSOLUTE multiple (`isBaseSwapTargetAligned` asks
+ * `target % granule === 0`), so the legal set is the multiples of the granule
+ * that fall inside the declared range, and both ends are derived from the range
+ * rather than assumed to be its endpoints.
+ */
+export function baseSwapTargetNeighbours(
+  target: number,
+): { below: number | null; above: number | null } {
+  const g = EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE;
+  const r = EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE;
+  const first = Math.ceil(r.min / g) * g;
+  const last = Math.floor(r.max / g) * g;
+  if (!Number.isFinite(target)) return { below: null, above: null };
+  const below = Math.min(Math.floor(target / g) * g, last);
+  const above = Math.max(Math.ceil(target / g) * g, first);
+  return {
+    below: below < first ? null : below,
+    above: above > last ? null : above,
+  };
+}
+
+/**
+ * WHY THIS VRAM BASE CANNOT BE WRITTEN, or null.
+ *
+ * ═══ THE GRANULE IS THE POINT, AND IT IS NOT A ROUNDING CONVENIENCE ═══
+ *
+ * An unaligned target is NOT out of range and fails loudly NOWHERE downstream:
+ * VDP reg $02 encodes only the address bits above the granule and DROPS the rest
+ * SILENTLY, so the VDP fetches from a different address than every `VRAM_*`
+ * consumer reads and writes and nothing else looks wrong. The engine's own
+ * ensure names the granule in its refusal and the schema's `multipleOf` is that
+ * same refusal one step earlier; this is it one step earlier again, at the
+ * control, at typing time.
+ *
+ * NOT A SNAP, and here that rule has hardware behind it rather than taste:
+ * rounding to the nearest granule produces A DIFFERENT PLANE'S PICTURE, without
+ * saying so. So the neighbours are OFFERED and nothing is written.
+ */
+export function baseSwapTargetRefusal(
+  bs: EffectsPresetBaseSwap, presetId: string, value: number,
+): string | null {
+  const subject = `preset "${presetId}" base_swap target`;
+  const holds = `target is still ${fmtVramBaseBoth(bs.target)}.`;
+  const g = EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE;
+  const r = EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE;
+  const n = baseSwapTargetNeighbours(value);
+  const pair = `${n.below === null ? '(nothing lower)' : fmtVramBaseBoth(n.below)} and `
+    + `${n.above === null ? '(nothing higher)' : fmtVramBaseBoth(n.above)}`;
+  if (!Number.isInteger(value)) {
+    return `${subject}: ${value} is not a whole number. A VRAM byte address is an integer, and `
+      + `this one must also be a multiple of ${g} (${fmtVramBase(g)}). The nearest legal bases are `
+      + `${pair}. Refused; ${holds}`;
+  }
+  if (value < r.min || value > r.max) {
+    return `${subject}: ${fmtVramBaseBoth(value)} is outside ${fmtVramBaseBoth(r.min)}..`
+      + `${fmtVramBaseBoth(r.max)}, which is the range vdp_base_reg takes. The nearest legal bases `
+      + `are ${pair}. Refused; ${holds}`;
+  }
+  if (!isBaseSwapTargetAligned(value)) {
+    return `${subject}: ${fmtVramBaseBoth(value)} is not on the ${fmtVramBase(g)} granule. ⚠ THIS `
+      + 'IS NOT A RANGE ERROR AND IT FAILS LOUDLY NOWHERE: Plane A\'s base register (VDP reg $02) '
+      + 'encodes only the address bits ABOVE the granule and DROPS the rest SILENTLY, so an '
+      + 'unaligned base is a DIFFERENT ADDRESS than every VRAM_* consumer reads and writes, with '
+      + `nothing else visibly wrong. The nearest legal bases are ${pair}. Refused, and NOT snapped `
+      + 'to either — snapping would point Plane A at another picture without telling you. '
+      + `${holds}`;
+  }
+  return null;
+}
+
+// ── the commands ────────────────────────────────────────────────────────────
+
+/** Set the screen line the swap fires on. Null when refused or nothing moved. */
+export function setBaseSwapLineCommand(
+  library: EffectsPresetLibrary, id: string, value: number,
+): SetEffectsPresetCommand | null {
+  return editPresetCommand(library, id, `Preset ${id} base_swap line`, (p) => {
+    if (!p.base_swap) return;
+    if (baseSwapLineRefusal(p.base_swap, id, value) !== null) return;
+    p.base_swap.line = value;
+  });
+}
+
+/** Set the VRAM base Plane A is re-pointed at. Null when refused or nothing moved. */
+export function setBaseSwapTargetCommand(
+  library: EffectsPresetLibrary, id: string, value: number,
+): SetEffectsPresetCommand | null {
+  return editPresetCommand(library, id, `Preset ${id} base_swap target`, (p) => {
+    if (!p.base_swap) return;
+    if (baseSwapTargetRefusal(p.base_swap, id, value) !== null) return;
+    p.base_swap.target = value;
+  });
+}
+
+// ── exactly one raster program, and switching between them ─────────────────
+//
+// ⚠ NOTHING IN THIS SECTION MAY COUNT THE CHANNELS. It said "the two" until
+// 2026-09-03, and on the day a third arrived a ternary mislabelled it, an
+// if/else authored the two-key document the schema refuses, and a `!== 'ramp'`
+// test woke the band controls on a document with no bands. All three were
+// invisible while there were two. Every list below is DERIVED from
+// `EFFECTS_PRESET_RASTER_CHANNELS` (the schema's own `oneOf`) or is a MAP keyed
+// by channel with a module-load guard, so a fourth arm is a data change and the
+// places that must learn about it SAY SO OUT LOUD instead of guessing.
 
 /**
  * WHY THE BAND CONTROLS CANNOT WRITE HERE, or null when they can.
@@ -3121,28 +3542,74 @@ const RASTER_CHANNEL_NOUNS: Record<string, string> = {
 };
 
 /**
- * WHICH CHANNELS THIS PANEL CAN SEED, and the sentence for the ones it cannot.
+ * ONE SEED PER CHANNEL THIS PANEL CAN AUTHOR — A MAP, NOT A BRANCH.
  *
  * `setRasterChannelCommand` switches a document by DISCARDING the old channel
  * and seeding a fresh one, so it can only offer a channel it has a seed for.
- * `base_swap` has none: seeding it means choosing a screen line and a VRAM base
- * address, and that is the authoring control this parcel deliberately does not
- * own (its follow-up does). Offering the switch anyway would give an author a
- * dropdown entry that silently does nothing.
+ * Every seed lives here, keyed by the channel it writes, and the command LOOKS
+ * ITS SEED UP rather than choosing between two of them.
  *
- * Derived from the seeds that exist, not from a list typed beside them, and
- * checked against the schema's channel set at module load so a channel cannot be
- * added to the contract and quietly fall out of BOTH lists.
+ * ⚠ THIS WAS AN `if`/`else` AND THE `else` WAS A LIE. `if (channel === 'ramp')
+ * p.ramp = newRamp(); else p.bands = [newBand()]` is correct while there are
+ * exactly two channels and authors the WRONG DOCUMENT for every one after that
+ * — a `base_swap` switch would have seeded bands. A map cannot do that: an
+ * unknown channel has no entry, which is a refusal rather than a wrong guess.
+ *
+ * `RASTER_CHANNEL_SEEDABLE` is the key set, not a second list typed beside it,
+ * so a channel cannot gain a seed and stay "not authorable" in the dropdown.
  */
-const RASTER_CHANNEL_SEEDABLE: readonly string[] = Object.freeze(['bands', 'ramp']);
+const RASTER_CHANNEL_SEEDS: Readonly<Record<string, (p: EffectsPreset) => void>> = Object.freeze({
+  bands: (p: EffectsPreset) => { p.bands = [newBand()]; },
+  ramp: (p: EffectsPreset) => { p.ramp = newRamp(); },
+  base_swap: (p: EffectsPreset) => { p.base_swap = newBaseSwap(); },
+});
 
+const RASTER_CHANNEL_SEEDABLE: readonly string[] = Object.freeze(Object.keys(RASTER_CHANNEL_SEEDS));
+
+/**
+ * WHICH CHANNELS HAVE AN EDITOR ON THIS PANEL — the registry `rasterEditorGap`
+ * reads.
+ *
+ * A card is genuinely per-channel content (two numbers here, five there, a list
+ * of band cards for the third) and cannot be derived. What CAN be derived is
+ * whether one is MISSING: a fourth arm would otherwise open, select correctly in
+ * the Raster row, and render no editor at all, with nothing on screen saying so.
+ */
+const RASTER_CHANNEL_EDITORS: readonly string[] = Object.freeze(['bands', 'ramp', 'base_swap']);
+
+// ═══ THE MODULE-LOAD GUARDS — every per-channel registry, checked against the
+// schema's own channel set, so a channel cannot be added to the contract and
+// quietly fall out of any of them.
 for (const c of EFFECTS_PRESET_RASTER_CHANNELS) {
   if (RASTER_CHANNEL_NOUNS[c] === undefined) {
     throw new Error(
       `raster channel "${c}" is declared by aurora-effects-preset.schema.json's top-level oneOf `
       + 'but has no noun in RASTER_CHANNEL_NOUNS, so every sentence that names what a document '
       + 'carries would say "undefined". Add the noun — and decide whether the panel can seed it '
-      + '(RASTER_CHANNEL_SEEDABLE) rather than letting it default either way.',
+      + '(RASTER_CHANNEL_SEEDS) and whether it has an editor (RASTER_CHANNEL_EDITORS) rather than '
+      + 'letting either default.',
+    );
+  }
+}
+for (const c of RASTER_CHANNEL_SEEDABLE) {
+  if (!EFFECTS_PRESET_RASTER_CHANNELS.includes(c)) {
+    throw new Error(
+      `RASTER_CHANNEL_SEEDS carries a seed for "${c}", which the contract's top-level oneOf does `
+      + 'not declare as a raster channel. A seed for a key the schema refuses would offer the '
+      + 'author a switch that authors an invalid document.',
+    );
+  }
+  // ⚠ AND THE SEED MUST WRITE ITS OWN KEY. A copy-paste that left `ramp`'s seed
+  // under `base_swap`'s key would silently author the wrong channel on every
+  // switch — the exact defect the map replaced an if/else to prevent, sneaking
+  // back in as data. Cheap to prove: run it and ask the codec what it made.
+  const probe: EffectsPreset = { schema: 1, id: 'seed-guard' };
+  RASTER_CHANNEL_SEEDS[c](probe);
+  if (presetRasterChannel(probe) !== c) {
+    throw new Error(
+      `RASTER_CHANNEL_SEEDS["${c}"] does not write the "${c}" key — it produced a `
+      + `${presetRasterChannel(probe) ?? 'channel-less'} document. Every switch into that channel `
+      + 'would author a different raster program than the one the author picked.',
     );
   }
 }
@@ -3158,10 +3625,46 @@ export function rasterChannelSeedRefusal(channel: string): string | null {
   if (!EFFECTS_PRESET_RASTER_CHANNELS.includes(channel)) {
     return `"${channel}" is not a raster channel this contract declares.`;
   }
+  // ⚠ NO CHANNEL'S NAME AND NO CHANNEL'S FIELDS APPEAR IN THIS SENTENCE. It
+  // used to say what a `base_swap` seed would need ("a screen line and a VRAM
+  // base address"), which was true for exactly one channel and would have been
+  // quietly wrong for the next one to arrive without a seed.
   return `a ${RASTER_CHANNEL_NOUNS[channel]} cannot be authored in this panel yet: switching to a `
-    + 'channel means seeding a fresh one, and this one has no seed — it needs a screen line and a '
-    + 'VRAM base address, which is its own control. A document that already carries one opens, '
-    + 'reads and saves correctly; only creating one from here is missing.';
+    + 'channel means seeding a fresh one and this panel has no seed for that channel. A document '
+    + 'that already carries one opens, reads and saves correctly; only creating one from here is '
+    + 'missing.';
+}
+
+/**
+ * WHY THIS DOCUMENT HAS NO EDITOR BELOW, or null when it has one.
+ *
+ * ═══ THE FOURTH ARM'S LANDING PAD ═══
+ *
+ * Every raster channel this contract declares has a card on this panel today, so
+ * this returns null for every real document — which is exactly why it exists.
+ * The day a fifth arm is vendored, the Raster row will offer it and select it
+ * correctly (both are derived from the schema) and the section below it would
+ * render NOTHING, with no sentence saying why: an author looking at a preset
+ * whose editor silently is not there. That is the shape of dead surface this
+ * whole parcel is about, one level up.
+ *
+ * It takes the channel rather than the preset so it can be measured against a
+ * channel that does not exist yet — a row that could only pass a real document
+ * through it would be untestable until the defect it guards against had already
+ * shipped.
+ */
+export function rasterEditorGapFor(channel: string | null, presetId: string): string | null {
+  if (channel === null || RASTER_CHANNEL_EDITORS.includes(channel)) return null;
+  const noun = RASTER_CHANNEL_NOUNS[channel] ?? channel;
+  return `preset "${presetId}" carries a ${noun}, and this panel has no editor for it yet. The `
+    + 'document opens, reads and saves correctly and nothing here has changed it — but its fields '
+    + 'cannot be edited from this panel, so edit the JSON directly until this channel has a card. '
+    + 'Switching the Raster program row above would DISCARD it.';
+}
+
+/** The same question, asked of a document. */
+export function rasterEditorGap(preset: EffectsPreset): string | null {
+  return rasterEditorGapFor(presetRasterChannel(preset), preset.id);
 }
 
 /**
@@ -3223,12 +3726,22 @@ export const RASTER_CHANNEL_OPTIONS: readonly { value: string; label: string }[]
 export function rasterChannelSwapAdvisory(preset: EffectsPreset): string {
   const channel = presetRasterChannel(preset);
   const bands = (preset.bands ?? []).length;
+  // ⚠ WHAT IT DISCARDS IS KNOWN; WHAT IT BECOMES IS NOT. This advisory is
+  // painted UNDER the select and BEFORE the gesture, so it cannot know which
+  // channel the author will pick. It said "seeds a fresh ramp" on a bands
+  // document — true while there were exactly two channels, and a false promise
+  // the moment a third existed: switching bands → base_swap would have promised
+  // a ramp. Only the discarded side is named, because only that side is decided.
+  //
+  // The `bands` arm is a POSITIVE test on the one channel that has a countable
+  // body, not a test against "the other one", so it stays right for every
+  // channel there will ever be.
   const discards = channel === 'bands' || channel === null
     ? `${bands} raster band${bands === 1 ? '' : 's'}`
     : `this ${RASTER_CHANNEL_NOUNS[channel]}`;
-  const becomes = channel === 'bands' || channel === null ? 'a fresh ramp' : 'a fresh one-band list';
-  return `A preset holds exactly one raster program, so switching DISCARDS ${discards} and seeds `
-    + `${becomes}. It is ONE undo step — Ctrl+Z puts back exactly what was here.`;
+  return `A preset holds exactly one raster program, so switching DISCARDS ${discards} and seeds a `
+    + 'fresh one of whichever program you pick. It is ONE undo step — Ctrl+Z puts back exactly '
+    + 'what was here.';
 }
 
 /**
@@ -3260,7 +3773,12 @@ export function setRasterChannelCommand(
     for (const c of EFFECTS_PRESET_RASTER_CHANNELS) {
       if (c !== channel) delete (p as unknown as Record<string, unknown>)[c];
     }
-    if (channel === 'ramp') p.ramp = newRamp();
-    else p.bands = [newBand()];
+    // ⚠ THE SEED IS LOOKED UP, NOT CHOSEN. This was
+    // `if (channel === 'ramp') … else p.bands = [newBand()]`, whose `else` meant
+    // "the only other one" — so the first switch into a third channel would have
+    // seeded BANDS while the dropdown said otherwise. The refusal above
+    // guarantees the entry exists; the module-load guard above that guarantees
+    // it writes its own key.
+    RASTER_CHANNEL_SEEDS[channel](p);
   });
 }

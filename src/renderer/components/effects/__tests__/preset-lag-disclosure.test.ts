@@ -530,16 +530,19 @@ describe('the panel mounts the leaf first in the ANCHORS section too, unconditio
     // component the channels section mounts, so this is both mount sites.
     expect(presetLagDisclosure(PRESET_KEYS_AWAITING_AEON)).toBeNull();
     expect(PresetLagDisclosure()).toBeNull();
-    // ...and it is mounted in exactly THREE places, so "silent" is a statement
+    // ...and it is mounted in exactly FOUR places, so "silent" is a statement
     // about every body and not about a leaf that quietly lost a mount site.
     //
-    // ⚠ THREE, NOT TWO. The `ramp` control card (row 128) grew a third mount
-    // when it landed, and nothing pinned it — so the count is asserted here and
-    // the site itself in the row below. A mount site no row names is a mount
-    // site the next "tidy away the silent leaf" edit removes for free.
+    // ⚠ FOUR, NOT THREE, AND IT WAS TWO BEFORE THAT. The `ramp` control card
+    // (row 128) grew the third when it landed and nothing pinned it; the
+    // `base_swap` card (row 131) is the fourth, pinned in the same breath as it
+    // was written. The count is asserted here and each site in a row of its own.
+    // A mount site no row names is a mount site the next "tidy away the silent
+    // leaf" edit removes for free.
     expect(code.split('<PresetLagDisclosure').length - 1,
-      'the leaf is no longer mounted in exactly three bodies — channels, anchors and the ramp '
-      + 'card. A lost mount site is a re-armed lag that never reaches that surface.').toBe(3);
+      'the leaf is no longer mounted in exactly four bodies — channels, anchors, the ramp card and '
+      + 'the base-swap card. A lost mount site is a re-armed lag that never reaches that surface.',
+    ).toBe(4);
 
     // 2. AND THE WORDING THESE KEYS EARNED IS STILL ASSERTED, driven by the
     //    replay. If the lag re-opens on either one, an author gets a sentence
@@ -604,7 +607,7 @@ describe('the panel mounts the leaf in the RAMP card too, and it stays while sil
     expect(card, 'no ramp control card in the panel').toBeGreaterThan(0);
     // The mount is BEFORE the fields it covers — the same rule as the sections.
     const mounts = [...code.matchAll(/<PresetLagDisclosure\s*\/>/g)].map((m) => m.index!);
-    expect(mounts, 'the leaf is not mounted three times').toHaveLength(3);
+    expect(mounts, 'the leaf is not mounted four times').toHaveLength(4);
     const inRamp = mounts.filter((i) => i < card);
     expect(inRamp.length, 'no PresetLagDisclosure mount precedes the ramp card\'s own controls')
       .toBeGreaterThan(0);
@@ -617,9 +620,18 @@ describe('the panel mounts the leaf in the RAMP card too, and it stays while sil
     expect(between, 'the nearest mount above the ramp controls belongs to a COLLAPSIBLE SECTION, '
       + 'not to the ramp card — the ramp card\'s own mount has been removed')
       .not.toMatch(/<CollapsibleSection|id="aeon\.effects\.preset\./);
-    // ...and it really is the last of the three, so the two section rows above
+    // ...and it really is the THIRD of the four, so the two section rows above
     // and this row are talking about three distinct mounts.
-    expect(nearest).toBe(Math.max(...mounts));
+    //
+    // ⚠ THIS WAS `expect(nearest).toBe(Math.max(...mounts))` AND IT WAS ONLY
+    // TRUE WHILE THE RAMP CARD WAS LAST IN THE FILE. The base-swap card (row
+    // 131) is written after it and carries the fourth mount, so "the last mount
+    // in the file" stopped meaning "the ramp card's". Re-aimed at the thing
+    // actually meant: it is the third of four, and exactly one mount follows it.
+    expect(mounts.indexOf(nearest)).toBe(2);
+    expect(mounts.filter((i) => i > nearest),
+      'the ramp card\'s mount is no longer followed by exactly one more (the base-swap card\'s)',
+    ).toHaveLength(1);
     // Nothing renders between the mount and the first ramp field but markup the
     // card owns — specifically, no guard on the mount line itself.
     const line = code.slice(0, nearest).lastIndexOf('\n');
@@ -663,6 +675,79 @@ describe('the panel mounts the leaf in the RAMP card too, and it stays while sil
   it('the card carries no hand-typed copy of the retired sentence', () => {
     // The disclosure reaches this card THROUGH the leaf. A literal here would
     // be a second copy of the claim that no premise can retire.
+    expect(code).not.toMatch(/Not consumed by the engine yet/);
+    expect(code).not.toMatch(/refuses the WHOLE DOCUMENT/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AND THE FOURTH MOUNT SITE: THE BASE-SWAP CONTROL CARD (ROADMAP row 131)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠ THIS SITE IS SILENT FOR A DIFFERENT REASON THAN THE RAMP CARD'S, and the
+// difference is the reason it is pinned rather than assumed. `ramp` was in the
+// premise and RETIRED out of it when aeon's page learned the key. `base_swap`
+// was NEVER in it: aeon shipped the key AHEAD of the contract declaring it (the
+// opposite direction), so no lag ever opened and the drift row stayed green
+// throughout. A reader who assumes the ramp card's history applies here would
+// conclude the mount is a leftover from a retirement that never happened, and
+// delete it.
+//
+// It stays for the reason all four do: the leaf is ONE component reading ONE
+// premise, so re-arming is a one-line edit in `core/formats/effects/preset-lag.
+// ts` that must reach every surface that authors a preset key.
+describe('the panel mounts the leaf in the BASE-SWAP card too, and it stays while silent', () => {
+  const code = stripComments(readFileSync(PANEL_PATH, 'utf8'));
+
+  it('the base-swap card mounts the leaf, propless and unguarded, before its fields', () => {
+    // Located by a control only this card has, not by a key name.
+    const card = code.indexOf('setBaseSwapLineCommand(');
+    expect(card, 'no base-swap control card in the panel').toBeGreaterThan(0);
+    const mounts = [...code.matchAll(/<PresetLagDisclosure\s*\/>/g)].map((m) => m.index!);
+    expect(mounts, 'the leaf is not mounted four times').toHaveLength(4);
+    const before = mounts.filter((i) => i < card);
+    expect(before.length, 'no PresetLagDisclosure mount precedes the base-swap card\'s controls')
+      .toBeGreaterThan(0);
+    const nearest = Math.max(...before);
+    // ...and it is THIS card's mount, not the ramp card's leaking in from
+    // above: nothing between the mount and the base-swap control opens the ramp
+    // card. Without this clause the row would pass on a panel that deleted the
+    // base-swap mount entirely.
+    expect(code.slice(nearest, card),
+      'the nearest mount above the base-swap controls belongs to another card or section — the '
+      + 'base-swap card\'s own mount has been removed')
+      .not.toMatch(/<CollapsibleSection|setRampSpanCommand\(|id="aeon\.effects\.preset\./);
+    // It is the LAST of the four, which is what makes this row and the ramp
+    // row above talk about two distinct mounts.
+    expect(nearest).toBe(Math.max(...mounts));
+    // No guard on the mount line itself.
+    const line = code.slice(0, nearest).lastIndexOf('\n');
+    const mountLine = code.slice(line + 1, code.indexOf('\n', nearest));
+    expect(mountLine).toMatch(/^\s*<PresetLagDisclosure\s*\/>\s*$/);
+    expect(mountLine).not.toMatch(/&&|\?|selected\.|section/);
+  });
+
+  it('⚠ THE KEY THIS CARD AUTHORS WAS NEVER IN THE PREMISE — and the sentence it WOULD say survives', () => {
+    const authored: readonly string[] = ['base_swap'];
+    for (const k of authored) {
+      expect(
+        PRESET_KEYS_AWAITING_AEON,
+        `${k} is in the premise — a lag has OPENED on the key this card authors, which would be a `
+        + 'first: aeon shipped this key ahead of the contract. Re-aim this row rather than '
+        + 'relaxing it.',
+      ).not.toContain(k);
+      expect(EFFECTS_PRESET_ROOT_KEYS, `${k} is not a root key of the schema`).toContain(k);
+    }
+    expect(presetLagDisclosure(PRESET_KEYS_AWAITING_AEON)).toBeNull();
+    expect(PresetLagDisclosure()).toBeNull();
+    // The sentence this key would earn if a lag ever opened on it.
+    const wouldSay = presetLagDisclosure(authored)!;
+    expect(wouldSay).not.toBeNull();
+    for (const k of authored) expect(wouldSay).toContain(`\`${k}\``);
+    expect(wouldSay).toMatch(/refuses the WHOLE DOCUMENT/);
+  });
+
+  it('the card carries no hand-typed copy of the retired sentence', () => {
     expect(code).not.toMatch(/Not consumed by the engine yet/);
     expect(code).not.toMatch(/refuses the WHOLE DOCUMENT/);
   });
