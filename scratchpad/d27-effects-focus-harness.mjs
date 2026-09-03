@@ -391,11 +391,22 @@ async function main() {
     await sleep(800);
     await c.evalExpr(INSTALL_HANDLES);
 
-    // Grow it to three layers. `Add layer` is an IconButton, so it is found by
-    // aria-label; a `/^Add$/` text match reads "Add Add layer" and finds nothing.
+    // GROW IT TO FOUR LAYERS, AND FOUR IS NOT A ROUND NUMBER — it is what
+    // [esp-c] needs. At three, the second consecutive removal lands ON the
+    // schema floor, which DISABLES the Remove button, and a disabled button
+    // never takes focus: [esp-c]'s "focus is not the button" half then reads
+    // green for a reason that has nothing to do with d-27. That is not a
+    // hypothetical — it was measured. Under plant P9 (the blur removed at this
+    // site) a three-layer fixture left [esp-c] GREEN while [esp-a] and [esp-b]
+    // went red, which is a row satisfied by an accident. From four, the second
+    // removal leaves two, the button stays ENABLED, and [esp-c] asserts that
+    // too so the accident cannot come back silently.
+    //
+    // `Add layer` is an IconButton, so it is found by aria-label; a `/^Add$/`
+    // text match reads "Add Add layer" and finds nothing.
     for (let i = 0; i < 8; i++) {
       const s = await snap(c);
-      if (s.layers >= 3) break;
+      if (s.layers >= 4) break;
       await clickHandle(c, 'addLayer', `Add layer (fixture, at ${s.layers})`);
       await c.evalExpr(INSTALL_HANDLES);
     }
@@ -405,15 +416,15 @@ async function main() {
     await shot(c, 'fixture');
     note('[esp] fixture', `scene "${SCENE_ID}" has ${fixture.layers} layers · remove buttons = `
       + JSON.stringify(buttons0));
-    check('esp-0', `ANTI-VACUOUS fixture: this run's own scene holds >= 3 layers — comfortably above `
-      + `the schema floor of ${LAYERS.min}, so the Remove buttons are ENABLED and two consecutive `
-      + 'clicks are both on the acting path',
-      fixture.layers >= 3 && buttons0.length === fixture.layers
+    check('esp-0', `ANTI-VACUOUS fixture: this run's own scene holds >= 4 layers — two clear of the `
+      + `schema floor of ${LAYERS.min}, so the Remove buttons are ENABLED and BOTH consecutive clicks `
+      + 'land above the floor rather than on it',
+      fixture.layers >= 4 && buttons0.length === fixture.layers
       && buttons0.every((b) => b.disabled === false),
       `layers=${fixture.layers} (was ${before.list.length} scenes before this run created one), `
       + `remove buttons=${JSON.stringify(buttons0)}, schema floor min=${LAYERS.min} max=${LAYERS.max} `
       + `(read from ${SCHEMA_SRC.replace(ROOT + '/', '')})`);
-    if (fixture.layers < 3) throw new Error('could not build a 3-layer fixture — every row below would be vacuous');
+    if (fixture.layers < 4) throw new Error('could not build a 4-layer fixture — every row below would be vacuous');
 
     // ── [esp-a] ───────────────────────────────────────────────────────────
     await c.evalExpr("window.__d27e.latch('removeLayer0')");
@@ -455,7 +466,7 @@ async function main() {
     const espEnter = await snap(c);
     check('esp-b', 'effects/EffectsScenePanel.tsx Remove layer: a bare SPACE straight after the click '
       + 'reaches no writer — the scene library is byte-identical (Enter sent separately too)',
-      espRestored.layers >= 3 && espRestored.scenes === espPre.scenes
+      espRestored.layers >= 4 && espRestored.scenes === espPre.scenes
       && espSpace.scenes === espRestored.scenes && espEnter.scenes === espRestored.scenes,
       `layers after Space = ${espSpace.layers}, after Enter = ${espEnter.layers} (unchanged from `
       + `${espRestored.layers}); scenesJson compared as a RAW STRING. VACUITY GUARD: the scene held `
@@ -470,12 +481,19 @@ async function main() {
     await clickHandle(c, 'removeLayer0', 'Remove layer 0 (second real click, SAME pixel)');
     const espFocusC = await focusNow(c, 'removeLayer0');
     const espC = await snap(c);
+    const buttonsC = await c.evalExpr('window.__d27e.layerButtons()');
+    const slot0EnabledAfter = buttonsC.length > 0 && buttonsC[0].disabled === false;
     check('esp-c', 'effects/EffectsScenePanel.tsx Remove layer: a SECOND real click still removes a '
-      + 'layer and drops focus again',
-      espC.layers === espPreC.layers - 1 && espFocusC.isTheButton === false,
-      `layers ${espPreC.layers} → ${espC.layers}; activeElement after = <${espFocusC.tag}> `
-      + `(isTheButton=${espFocusC.isTheButton}). Without this row, blurring by simply removing the `
-      + 'handler would pass [esp-a] and [esp-b].');
+      + 'layer and drops focus again — WITH THE BUTTON STILL ENABLED, so the focus half cannot be '
+      + 'satisfied by the schema floor greying it out',
+      espC.layers === espPreC.layers - 1 && espFocusC.isTheButton === false && slot0EnabledAfter,
+      `layers ${espPreC.layers} → ${espC.layers}; slot 0's Remove button after the click is `
+      + `disabled=${!slot0EnabledAfter} (buttons now ${JSON.stringify(buttonsC)}); activeElement after `
+      + `= <${espFocusC.tag}> (isTheButton=${espFocusC.isTheButton}). ⚠ THE ENABLED CLAUSE IS NOT `
+      + 'DECORATION: with a three-layer fixture the second removal lands ON the floor, the button '
+      + 'greys out, and a disabled button never takes focus — under plant P9 (the blur removed here) '
+      + 'that made this row GREEN while [esp-a] and [esp-b] went red. Measured, then fixed. Without '
+      + 'this row at all, blurring by simply removing the handler would pass [esp-a] and [esp-b].');
 
     note('[esp-d] NOT MEASURABLE, and that is a finding',
       'this site has NO reachable no-op press. `removeLayerCommand` has three null paths and '
