@@ -305,25 +305,35 @@ close carried it. **The run is 171–173 s, the same as before the fix.**
 
 ### 4.1 The flush check — red-first on the CONSTRUCTED state
 
-**The mutation, quoted from disk** (`scratchpad/canvas-cdp-harness.mjs:843`,
-`git diff --stat` naming that file):
+Taken twice: once during development, and once **against the exact committed
+artifact** (`008ad952`) so the proof is of the thing that ships. The second is
+quoted.
+
+**The mutation, applied on disk and quoted back from it**
+(`scratchpad/canvas-cdp-harness.mjs:853`; `git diff --stat` reported
+`scratchpad/canvas-cdp-harness.mjs | 2 +-`, and nothing else in the tree):
 
 ```
-      /* POISON: window.close() DELETED — the constructed state the flush check exists to catch */
+      /* POISON: window.close() DELETED — the state the flush check exists to catch */
 ```
 
-**The first run of that plant** (never the second — the plant is in the teardown
-and a plant near teardown can leave state that makes its own rerun green):
+**The FIRST run of that plant** — never the second, because the plant is in the
+teardown and a plant near teardown can leave state that makes its own rerun
+green:
 
 ```
-   flush check: this session's last write is on disk: true   [session A]
-   flush check: this session's last write is on disk: false  [session B]
+   flush check: this session's last write is on disk: true   (it was NOT before the close
+        — the close is what carried it)                              [session A]
+   flush check: this session's last write is on disk: false  (it was not before the close
+        either, and the close did not carry it)                      [session B]
 HARNESS ERROR: Error: LOCALSTORAGE NEVER REACHED DISK — session B — restart with a
   canvas active (row 13, first half) is gone and the marker it wrote a moment …
 ```
 
-`rc=2`, the run stopped **at the teardown that lost the data**, not one session
-later in the wording of an app defect. Restored from the committed baseline.
+**`rc=2`**, and the run stopped **at the teardown that lost the data** — not one
+session later in the wording of an app defect. Restored with
+`git show HEAD:scratchpad/canvas-cdp-harness.mjs`; `git status --short` clean
+afterwards.
 
 ⚠ **And note what the same state did to the rest of the instrument**: on the
 diagnostic-only arm of the same mutation, the run still printed **52/52** with
