@@ -467,7 +467,14 @@ async function main() {
     // The tile-animation form is the TILE ANIM job's since d-26b.
     await c.evalExpr(SUBTAB('tileAnim'));
     await sleep(1000);
-    await c.evalExpr(SECTION_STATE('/^New band/', true));
+    // ⚠ THE SECTION'S TITLE MOVED at 023e0ed9 (2026-09-02, "effects: `band` names
+    // ONE feature now — tile animation vs raster band"): `New band` is
+    // `New tile animation` (BgAnimBandPanel.tsx:635). This file had already been
+    // taught the sub-tab (SUBTAB above) and NOT the rename, so the disclosure
+    // stayed shut, the Rows <select> was never in the DOM, `SET_INPUT` returned
+    // `no-element`, and rows stayed 1. Row 5a caught it — and 6c and 8a, which
+    // both divide by rows, failed as consequences of the same one line.
+    const openedNew = await c.evalExpr(SECTION_STATE('/^New tile animation/', true));
     await sleep(500);
     const setRows = await c.evalExpr(SET_INPUT(
       `[...document.querySelectorAll('select')].find(e => /^rows —/.test(e.title || ''))`, ROWS));
@@ -476,7 +483,8 @@ async function main() {
     check('5a', `ANTI-VACUOUS: the panel's own Rows control really set rows=${ROWS} — the strip's `
       + 'column arithmetic divides by it',
       setRows === 'ok' && cand5.rows === ROWS,
-      `setRows=${setRows} candidate=${JSON.stringify(cand5)}`);
+      `SECTION_STATE(New tile animation)=${JSON.stringify(openedNew)} `
+      + `setRows=${setRows} candidate=${JSON.stringify(cand5)}`);
     // Back to the strip, and put the lens OUT so section 6 can prove it lights.
     await c.evalExpr('window.__dbg.aeon.setBandLensTarget(null)');
     await c.evalExpr(clickByText('/^Layout$/'));
@@ -935,7 +943,13 @@ async function main() {
         rep8.gestures === gest8 + 1 && rep8.kind === 'refused'
         && JSON.stringify(cand8) === JSON.stringify(candPre)
         && !!label8 && label8.text.startsWith('no range — ')
-        && /already belong to bands/.test(label8.text)
+        // ⚠ THE REFUSAL'S OWN WORDS, and they moved at 023e0ed9 (2026-09-02).
+        // `providers/band-strip-range.ts:206` says "already belong to TILE
+        // ANIMATIONS"; this read "already belong to bands", which is the word
+        // the vocabulary split retired precisely because it named two features.
+        // Taken from the provider, not from a passing run — the node suite
+        // pins the same literal at band-strip-range.test.ts:227 and :488.
+        && /already belong to tile animations/.test(label8.text)
         && /animated prefix/.test(label8.title),
         `report=${JSON.stringify(rep8)} candidate ${JSON.stringify(candPre)} -> ${JSON.stringify(cand8)} `
         + `readout=${JSON.stringify(label8)}`);
