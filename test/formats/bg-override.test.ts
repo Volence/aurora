@@ -508,7 +508,8 @@ describe('band invariants — each one is a document that would bake CLEANLY', (
     const doc = minimal();
     doc.tiles = tiles(12);
     doc.anims = [band(doc.tiles, 0, 2, 3)]; // 3*32 = 96, not a power of two
-    expect(issuesOf(doc)).toMatch(/column bytes rows\*32 = 3\*32 = 96 is not a power of two/);
+    expect(issuesOf(doc)).toMatch(
+      /a horizontal band rotates by whole columns of rows\*32 = 3\*32 = 96 B/);
     // The neighbouring power of two is fine — the refusal is about the value,
     // not about odd rows or about this fixture.
     doc.anims = [band(doc.tiles, 0, 2, 4)];
@@ -518,7 +519,8 @@ describe('band invariants — each one is a document that would bake CLEANLY', (
   it('refuses pattern_px that is not cols*8', () => {
     const doc = withOneBand();
     doc.anims![0].pattern_px = doc.anims![0].cols * TILE_WIDTH_PX + 1;
-    expect(issuesOf(doc)).toMatch(/pattern_px is 17 but must equal cols\*8 = 16/);
+    expect(issuesOf(doc)).toMatch(
+      /pattern_px is 17 but a horizontal band's pattern period is cols\*8 = 16/);
   });
 
   it('refuses a slot_base that does not equal the running cursor', () => {
@@ -725,7 +727,8 @@ describe('coverage, derived from the vendored contract', () => {
   const BAND_POISONS: Record<string, { poison: (b: BgOverrideBand) => void; match: RegExp }> = {
     cols: { poison: b => { b.cols = 0; }, match: /cols must be an integer >= 1/ },
     rows: { poison: b => { b.rows = 0; }, match: /rows must be an integer >= 1/ },
-    pattern_px: { poison: b => { b.pattern_px = 1; }, match: /pattern_px is 1 but must equal/ },
+    axis: { poison: b => { b.axis = 'diagonal'; }, match: /axis is "diagonal"/ },
+    pattern_px: { poison: b => { b.pattern_px = 1; }, match: /pattern_px is 1 but a horizontal band's pattern period is/ },
     driver: { poison: b => { b.driver = 'nope'; }, match: /driver is "nope"/ },
     rate_shift: { poison: b => { b.rate_shift = -1; }, match: /rate_shift must be an integer >= 0/ },
     slot_base: { poison: b => { b.slot_base = 5; }, match: /slot_base is 5 but the running cursor is 0/ },

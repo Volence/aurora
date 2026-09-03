@@ -75,10 +75,12 @@ describe('the driver picker', () => {
     expect(opts.length).toBeGreaterThan(0);
     expect(opts.map((o) => o.value)).toEqual([...BGANIM_DRIVER_NAMES]);
     // No option offers a direction. `camera_y` is a SOURCE, and it is the one
-    // name a reader mistakes for an instruction.
+    // name a reader mistakes for an instruction — sharper now that the surface
+    // HAS a vertical option, because camera_y is still not it.
     for (const o of opts) {
       expect(o.label).not.toMatch(/vertical|horizontal|up|down/i);
-      expect(o.title).toMatch(/HORIZONTALLY/);
+      expect(o.title).toMatch(/never sets an axis/);
+      expect(o.title).toMatch(/camera_y does NOT mean vertical motion/);
     }
   });
 

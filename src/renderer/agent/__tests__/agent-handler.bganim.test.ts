@@ -103,8 +103,17 @@ describe('list_bg_anim_bands', () => {
     expect(budget.tileCapacity).toBe(BG_TILE_CAPACITY);
     expect(budget.maxBands).toBe(BGANIM_MAX_BANDS);
     expect(budget.tileSlotsRemaining).toBe(BG_TILE_CAPACITY - doc().tiles.length);
-    // The fact that decides which authoring door to reach for, on every reply.
-    expect(String(r.note)).toMatch(/HORIZONTALLY/);
+    // The AXIS, in the same two-part shape the driver has — the effective value
+    // and whether the file spells it. An agent that read only the first would
+    // drop `axis` off a band that claims vertical (writer obligation 3), and
+    // aeon's shimmer guard cannot see a band that no longer claims it.
+    expect(bands.every((b) => b.axis === 'horizontal')).toBe(true);
+    expect(bands.every((b) => b.axisIsExplicit === false)).toBe(true);
+    // The fact that decides which authoring door to reach for, on every reply —
+    // and the correction that a driver is not an axis, which is now sharper
+    // rather than absent: the `axis` key is what says which way a band moves.
+    expect(String(r.note)).toMatch(/NEVER an axis/);
+    expect(String(r.note)).toMatch(/`axis` key/);
   });
 
   it('says so when there is no file, without erroring', async () => {

@@ -45,10 +45,18 @@ import {
   TILE_PIXELS,
   TILE_WIDTH_PX,
   animatedSlotCount,
+  bandAxis,
+  bandCellSlot,
   bandColumnBytes,
+  bandIsHorizontal,
+  bandPatternPx,
+  bandRotationUnitBytes,
+  bandSlotCell,
   bandTileCount,
   cloneBgOverride,
   validateBgOverride,
+  BAND_AXIS_DEFAULT,
+  type BgAnimBandAxis,
   type BgAnimDriver,
   type BgOverrideBand,
   type BgOverrideDocument,
@@ -76,13 +84,22 @@ export interface BgAnimBandView {
   rows: number;
   /** `cols * rows` — the slots this band covers. */
   tileCount: number;
-  /** `cols * TILE_WIDTH_PX`, as the consumer asserts it. */
+  /** Which way the pattern translates, with the consumer's default resolved. */
+  axis: BgAnimBandAxis;
+  /** false = the document leaves `axis` out and the consumer's default applies. */
+  axisIsExplicit: boolean;
+  /** `pattern_px` — the period ALONG THE AXIS: `cols*8` horizontal, `rows*8` vertical. */
   patternPx: number;
-  /** `rows * TILE_BYTES` — the quantity the runtime shifts, so a power of two. */
+  /** `rows * TILE_BYTES`. On a VERTICAL band this is not the rotation unit — see below. */
   columnBytes: number;
   /**
-   * The SCALAR SOURCE the band's step is read from — never an axis. Every band
-   * moves HORIZONTALLY whichever driver it names, `camera_y` included.
+   * The quantity the runtime shifts, so a power of two: `columnBytes` on a
+   * horizontal band, `cols * TILE_BYTES` on a vertical one.
+   */
+  rotationUnitBytes: number;
+  /**
+   * The SCALAR SOURCE the band's step is read from — never an axis. `camera_y`
+   * does NOT mean vertical motion; the `axis` field above is what does.
    */
   driver: BgAnimDriver;
   /** false = the document leaves `driver` out and the consumer's default applies. */
@@ -126,8 +143,11 @@ export function describeBands(doc: BgOverrideDocument): BgAnimBandView[] {
     cols: band.cols,
     rows: band.rows,
     tileCount: bandTileCount(band),
-    patternPx: band.cols * TILE_WIDTH_PX,
+    axis: bandAxis(band),
+    axisIsExplicit: band.axis !== undefined,
+    patternPx: bandPatternPx(band),
     columnBytes: bandColumnBytes(band),
+    rotationUnitBytes: bandRotationUnitBytes(band),
     driver: (band.driver ?? BAND_DEFAULTS.driver) as BgAnimDriver,
     driverIsExplicit: band.driver !== undefined,
     rateShift: (band.rate_shift ?? BAND_DEFAULTS.rate_shift) as number,
@@ -170,12 +190,12 @@ export function tileSlotsRemaining(doc: BgOverrideDocument): number {
  *            makes the picture break on the band's second phase — offered as a
  *            deliberate authoring start, never a default.
  *
- *   'shift'  Bank k is phase 0 scrolled k pixels within the band's own pattern
- *            width — exactly what the contract calls `phases` ("pre-shifted art
- *            1px apart, selected by step & 7"), and what aeon's own generator
- *            emits. The one fill that makes a saved band visibly MOVE with no
- *            further authoring. See `shiftedPhaseBanks` for the direction
- *            derivation.
+ *   'shift'  Bank k is phase 0 scrolled k pixels ALONG THE BAND'S DECLARED AXIS,
+ *            within its own `pattern_px` — exactly what the contract calls
+ *            `phases` ("pre-shifted art 1px apart, selected by step & 7"), and
+ *            what aeon's own generator emits. The one fill that makes a saved
+ *            band visibly MOVE with no further authoring. See
+ *            `shiftedPhaseBanks` for the axis and direction derivation.
  */
 export type BandPhaseFill = 'copy' | 'blank' | 'shift';
 
@@ -198,33 +218,60 @@ export type BandPhaseFill = 'copy' | 'blank' | 'shift';
  *
  * So bank k reads its pixels from phase 0 at `x + k * PHASE_SHIFT_SRC_PX`,
  * wrapping at the band's `pattern_px`. The constant is named so the direction
- * is greppable and single-sited; +1 is "content moves toward -x as the driver
- * scalar grows", which for `camera_x` is the background receding as the camera
- * advances.
+ * is greppable and single-sited; +1 is "content moves toward the DECREASING
+ * coordinate as the driver scalar grows", which for `camera_x` is the
+ * background receding as the camera advances.
+ *
+ * THE SAME CONSTANT SERVES BOTH AXES, and that is derived rather than assumed.
+ * aeon's axis block states the direction as one mechanism: "bank k is phase 0
+ * translated k px toward DECREASING coordinate ... and the coarse rotate
+ * carries the same sign, so an increasing driver scrolls a horizontal band LEFT
+ * and a vertical band UP". Reading at `+k` along the axis is what produces both.
  */
 export const PHASE_SHIFT_SRC_PX = 1;
 
 /**
  * Banks 0..BGANIM_PHASE_BANKS-1 as pre-shifted copies of `phase0`: bank k is
- * phase 0 scrolled k pixels, wrapping within the band's own `pattern_px`.
+ * phase 0 scrolled k pixels ALONG THE BAND'S DECLARED AXIS, wrapping within its
+ * own `pattern_px`.
+ *
+ * THE COLUMN-WISE TWIN (aurora ROADMAP row 55, built 2026-09-03). Until aeon
+ * 3a4712fa there was one arm here and it was horizontal BY CONSTRUCTION: it
+ * rolled x within `cols*8` and read its slots column-major. Running exactly that
+ * over a band declared `axis: "vertical"` is the accident aeon's
+ * `validate_band_phase_axis` exists to refuse — phases that are exact HORIZONTAL
+ * translations under a vertical declaration, which bakes clean and ships a
+ * SHIMMER instead of a scroll. So the axis is not an option on this function; it
+ * is read off the band, and there is no way to ask for the other arm.
+ *
+ * THE PIXEL GEOMETRY IS THE RUNTIME'S, ON BOTH ARMS.
+ *
+ *   • SLOT ORDER (writer obligation 1) comes from `bandCellSlot`/`bandSlotCell`,
+ *     the codec's one pair: column-major `c*rows + r` on a horizontal band ("a
+ *     pattern column's tiles are contiguous in VRAM" — aeon
+ *     engine/level/bg_anim.emp; forest_bg_gen.py builds its banks `for col: for
+ *     vrow:`), ROW-major `r*cols + c` on a vertical one (aeon
+ *     EFFECTS_CONSUMER_CONTRACT.md §1.2). The two produce the same SET of slots,
+ *     so nothing downstream can tell them apart and nothing but the order can be
+ *     asserted about them.
+ *   • THE ROLL runs along the axis: x within `cols*8` horizontal, y within
+ *     `rows*8` vertical — which is `bandPatternPx` on both, because
+ *     `pattern_px` IS the period along the axis.
+ *
+ * Each tile is a flat row-major 8x8 of TILE_PIXELS values (the contract's
+ * TILE_PIXELS entry cites the injector's pack loop), and the band's pixel plane
+ * is `cols*8` x `rows*8` however its slots are ordered.
  *
  * Bank 0 is the k=0 roll, which is phase 0 exactly — the prefix identity
- * (`phases[0] == tiles[slot_base : slot_base+n]`) survives by construction.
- *
- * THE PIXEL GEOMETRY IS THE RUNTIME'S. A band's slots are COLUMN-MAJOR — "a
- * pattern column's tiles are contiguous in VRAM" (aeon engine/level/bg_anim.emp
- * header; forest_bg_gen.py builds its banks `for col: for vrow:`; the injector
- * comments the banks blob "column-major so whole-column rotation is two wrapped
- * DMAs") — so tile index t is column floor(t/rows), row t%rows, and the band's
- * horizontal pixel axis runs across columns 8px (TILE_WIDTH_PX) at a time.
- * Each tile is a flat row-major 8x8 of TILE_PIXELS values (the contract's
- * TILE_PIXELS entry cites the injector's pack loop).
+ * (`phases[0] == tiles[slot_base : slot_base+n]`) survives by construction on
+ * both arms.
  */
 export function shiftedPhaseBanks(
-  spec: Pick<BgOverrideBand, 'cols' | 'rows'>, phase0: readonly number[][],
+  spec: Pick<BgOverrideBand, 'cols' | 'rows' | 'axis'>, phase0: readonly number[][],
 ): number[][][] {
   const n = bandTileCount(spec);
-  const patternPx = spec.cols * TILE_WIDTH_PX;
+  const patternPx = bandPatternPx(spec);
+  const horizontal = bandIsHorizontal(spec);
   if (phase0.length !== n || phase0.some((t) => !Array.isArray(t) || t.length !== TILE_PIXELS)) {
     throw new BgOverrideError(
       `cannot derive shifted phase banks: phase 0 must be ${n} tiles of ${TILE_PIXELS} pixels for ` +
@@ -234,14 +281,23 @@ export function shiftedPhaseBanks(
   }
   return Array.from({ length: BGANIM_PHASE_BANKS }, (_, bank) =>
     Array.from({ length: n }, (_, t) => {
-      const col = Math.floor(t / spec.rows);
-      const row = t % spec.rows;
+      const { col, row } = bandSlotCell(spec, t);
       const out = new Array<number>(TILE_PIXELS);
+      const roll = bank * PHASE_SHIFT_SRC_PX;
       for (let py = 0; py < TILE_WIDTH_PX; py++) {
         for (let px = 0; px < TILE_WIDTH_PX; px++) {
-          const srcX = (col * TILE_WIDTH_PX + px + bank * PHASE_SHIFT_SRC_PX) % patternPx;
-          const srcTile = Math.floor(srcX / TILE_WIDTH_PX) * spec.rows + row;
-          out[py * TILE_WIDTH_PX + px] = phase0[srcTile][py * TILE_WIDTH_PX + (srcX % TILE_WIDTH_PX)];
+          // The source PIXEL on the band's own plane, rolled along the axis.
+          const srcX = horizontal
+            ? (col * TILE_WIDTH_PX + px + roll) % patternPx
+            : col * TILE_WIDTH_PX + px;
+          const srcY = horizontal
+            ? row * TILE_WIDTH_PX + py
+            : (row * TILE_WIDTH_PX + py + roll) % patternPx;
+          const srcTile = bandCellSlot(
+            spec, Math.floor(srcX / TILE_WIDTH_PX), Math.floor(srcY / TILE_WIDTH_PX),
+          );
+          out[py * TILE_WIDTH_PX + px] =
+            phase0[srcTile][(srcY % TILE_WIDTH_PX) * TILE_WIDTH_PX + (srcX % TILE_WIDTH_PX)];
         }
       }
       return out;
@@ -250,7 +306,8 @@ export function shiftedPhaseBanks(
 
 /** Banks 0.. from phase 0 under one fill mode. The single dispatch every door shares. */
 function phaseBanksFrom(
-  spec: Pick<BgOverrideBand, 'cols' | 'rows'>, phase0: readonly number[][], fill: BandPhaseFill,
+  spec: Pick<BgOverrideBand, 'cols' | 'rows' | 'axis'>, phase0: readonly number[][],
+  fill: BandPhaseFill,
 ): number[][][] {
   switch (fill) {
     case 'copy':
@@ -287,6 +344,13 @@ export interface NewBandSpec {
    * TOGETHER with `phases` is refused: `phases` already spells every bank.
    */
   phaseFill?: BandPhaseFill;
+  /**
+   * Which way the band moves. Omit to leave the key out, so the document tracks
+   * the consumer's default (`horizontal`). It is read BEFORE the fill runs: on
+   * `phaseFill: 'shift'` the axis chooses which roll generates banks 1..7, so a
+   * band cannot be born vertical with horizontal phases.
+   */
+  axis?: BgAnimBandAxis;
   /** Omit to leave the key out, so the document tracks the consumer's default. */
   driver?: BgAnimDriver;
   /** Omit to leave the key out. */
@@ -324,9 +388,13 @@ export function createBand(spec: NewBandSpec): BgOverrideBand {
   const band: BgOverrideBand = {
     cols: spec.cols,
     rows: spec.rows,
-    pattern_px: spec.cols * TILE_WIDTH_PX,
+    // The period ALONG THE AXIS, so a vertical band's `pattern_px` is rows*8.
+    // Derived through the codec so the two cannot disagree about which key it
+    // reads; a literal `cols * TILE_WIDTH_PX` here was the horizontal-only shape.
+    pattern_px: bandPatternPx(spec),
     phases,
   };
+  if (spec.axis !== undefined) band.axis = spec.axis;
   if (spec.driver !== undefined) band.driver = spec.driver;
   if (spec.rate_shift !== undefined) band.rate_shift = spec.rate_shift;
 
@@ -703,6 +771,13 @@ export interface PromoteBandSpec {
    * every mode — the fill only ever decides the banks the range does not pin.
    */
   phaseFill?: BandPhaseFill;
+  /**
+   * Which way the promoted band moves. Omit to leave the key out. It reaches
+   * `phaseBanksFrom` with the rest of the spec, so `phaseFill: 'shift'` on a
+   * vertical promotion generates a VERTICAL roll — the pair that would otherwise
+   * bake as a shimmer.
+   */
+  axis?: BgAnimBandAxis;
   /** Omit to leave the key out, so the document tracks the consumer's default. */
   driver?: BgAnimDriver;
   /** Omit to leave the key out. */

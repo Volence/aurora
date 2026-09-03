@@ -271,7 +271,7 @@ export class BgAnimPreviewRenderer {
     const key = bandStepKey(states);
     if (key !== this.drawnKey) {
       const phases: BandOverlayPhase[] = states.map((s) => ({
-        cols: s.cols, rows: s.rows, bank: s.bank, coarseColumns: s.coarseColumns,
+        cols: s.cols, rows: s.rows, axis: s.axis, bank: s.bank, coarseColumns: s.coarseColumns,
       }));
       composeBandOverlay(
         this.scratch.data, pixelW, pixelH, this.widthTiles, this.cells, phases,

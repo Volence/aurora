@@ -37,14 +37,22 @@
 //    spend them, and so a refusal explains itself: capacity is a live quantity
 //    an author manages, in both directions.
 //
-// 2. A DRIVER IS A SCALAR SOURCE, NEVER AN AXIS. Every band moves
-//    HORIZONTALLY whichever driver it names, `camera_y` included — the runtime
-//    is a horizontally-periodic pattern shifted by a step, and the driver only
-//    says where the step's scalar is read from (aeon engine/level/bg_anim.emp;
-//    the vendored contract's `drivers` block says it in as many words). There is
-//    no "vertical band" and no vertical option anywhere on this surface. The
-//    names come from BGANIM_DRIVER_NAMES, which the codec reads out of the
-//    vendored contract, so this file cannot hold a stale driver list.
+// 2. A DRIVER IS A SCALAR SOURCE, NEVER AN AXIS — and since aeon 3a4712fa
+//    (2026-09-02) the axis is a SEPARATE KEY rather than a fixed fact. The
+//    driver says only where the step's scalar is read from (aeon
+//    engine/level/bg_anim.emp; the vendored contract's `drivers` block); `axis`
+//    says which way the pattern translates, `horizontal` (the default, scrolls
+//    LEFT) or `vertical` (scrolls UP). `camera_y` still does NOT mean vertical
+//    motion, and that is now a sharper correction rather than a softer one,
+//    because the surface HAS a vertical option and it is not that one. Both
+//    lists come from the codec, which reads them out of the vendored contract,
+//    so this file cannot hold a stale driver or a stale axis list.
+//
+//    THE GEOMETRY RULE MOVES WITH THE AXIS. The power-of-two constraint is on
+//    the ROTATION UNIT in bytes and keeps its shape on both arms — what changes
+//    is which key carries it: `rows` on a horizontal band, `cols` on a vertical
+//    one. So the picker that offers legal sizes is axis-parameterised
+//    (`rotationUnitChoices`), never a fixed row list.
 //
 // EVERY REFUSAL IS THE CODEC'S OWN WORDS. Nothing here restates a bound or
 // composes a second explanation for one: the builders call the command
@@ -62,7 +70,12 @@ import {
   TILE_WIDTH_PX,
   animatedSlotCount,
   bandColumnBytes,
+  bandPatternPx,
+  bandRotationUnitBytes,
+  BAND_AXIS_DEFAULT,
+  BGANIM_BAND_AXES,
   bandTileCount,
+  type BgAnimBandAxis,
   type BgAnimDriver,
   type BgOverrideDocument,
 } from '../../core/formats/bg-override/bg-override';
@@ -124,8 +137,8 @@ export function driverOptions(): DriverOption[] {
   return BGANIM_DRIVER_NAMES.map((name) => ({
     value: name,
     label: name,
-    title: `${name} — the SCALAR the tile animation's step is read from. It shifts HORIZONTALLY `
-      + 'whichever driver it uses; a driver never sets an axis.',
+    title: `${name} — the SCALAR the tile animation's step is read from. A driver never sets an `
+      + 'axis: camera_y does NOT mean vertical motion. Use the Axis control for that.',
   }));
 }
 
@@ -319,20 +332,71 @@ export function rateShiftNote(rateShift: number): string {
  * cannot work.
  */
 export function rowChoices(): number[] {
+  return rotationUnitChoices(BAND_AXIS_DEFAULT);
+}
+
+/**
+ * Tile counts the band's ROTATION-UNIT key may take, on a given axis.
+ *
+ * ONE PICKER, TWO KEYS. The constraint never changes shape — the runtime rotates
+ * a whole unit by SHIFTING, so `unit_bytes` must be an exact power of two — but
+ * which band key carries it does: `rows` on a horizontal band, `cols` on a
+ * vertical one (aeon `_AXIS_UNIT_TILES`). This evaluates the condition through
+ * the codec's own `bandRotationUnitBytes` on a probe band of the given axis,
+ * rather than restating "must be a power of two" one derivation step away from
+ * the rule as the consumer spells it.
+ *
+ * OFFERING IS NOT ENFORCING. The refusal still comes from `createBand` →
+ * `validateBgOverride`; this only keeps a picker from showing a dead choice.
+ */
+export function rotationUnitChoices(axis: BgAnimBandAxis): number[] {
   const out: number[] = [];
   // A band's slots are a prefix of a blob that can never exceed BG_TILE_CAPACITY,
-  // so no legal band has more rows than that — the ceiling is derived, not a
+  // so no legal band's unit is longer than that — the ceiling is derived, not a
   // round number picked to look generous.
-  for (let rows = 1; rows <= BG_TILE_CAPACITY; rows++) {
-    const bytes = bandColumnBytes({ rows });
-    if (bytes > 0 && (bytes & (bytes - 1)) === 0) out.push(rows);
+  for (let tiles = 1; tiles <= BG_TILE_CAPACITY; tiles++) {
+    const probe = axis === BAND_AXIS_DEFAULT
+      ? { cols: 1, rows: tiles, axis } : { cols: tiles, rows: 1, axis };
+    const bytes = bandRotationUnitBytes(probe);
+    if (bytes > 0 && (bytes & (bytes - 1)) === 0) out.push(tiles);
   }
   return out;
 }
 
-/** `cols * TILE_WIDTH_PX` — what `pattern_px` must equal, as the consumer asserts it. */
-export function patternPxFor(cols: number): number {
-  return cols * TILE_WIDTH_PX;
+/**
+ * `pattern_px` for a geometry — the period ALONG THE AXIS, so `cols*8` on a
+ * horizontal band and `rows*8` on a vertical one. Through the codec, because a
+ * second `cols * TILE_WIDTH_PX` here is exactly the horizontal-only expression
+ * this parcel went looking for.
+ */
+export function patternPxFor(cols: number, rows = 1, axis: BgAnimBandAxis = BAND_AXIS_DEFAULT): number {
+  return bandPatternPx({ cols, rows, axis });
+}
+
+/**
+ * The axis picker's options. Names come from the codec (which reads them out of
+ * the vendored contract), and each carries the two things an author cannot guess
+ * from the word: which way it actually scrolls, and which key the power-of-two
+ * rule lands on once they pick it.
+ */
+export interface AxisOption { value: BgAnimBandAxis; label: string; title: string }
+
+export function axisOptions(): AxisOption[] {
+  return BGANIM_BAND_AXES.map((axis) => {
+    const horizontal = axis === BAND_AXIS_DEFAULT;
+    return {
+      value: axis,
+      label: horizontal ? 'horizontal (scrolls left)' : 'vertical (scrolls up)',
+      title: horizontal
+        ? 'The pattern translates along X. Its period is cols*8 px, and ROWS is the key that must '
+          + 'make rows*32 a power of two. As the driver scalar increases the art scrolls LEFT — '
+          + 'direction is fixed by the mechanism and is not a setting.'
+        : 'The pattern translates along Y. Its period is rows*8 px, and COLS is the key that must '
+          + 'make cols*32 a power of two. As the driver scalar increases the art scrolls UP — '
+          + 'direction is fixed by the mechanism and is not a setting. The pre-shifted fill '
+          + 'becomes a vertical roll, and the slots are ordered row-major.',
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -535,6 +599,13 @@ export interface BandSpec {
    * which is the contract's "pre-shifted art 1px apart", so the band MOVES.
    */
   phaseFill?: BandPhaseFill;
+  /**
+   * Which way the band moves. Omit to leave the key out (the document then
+   * tracks aeon's own default, `horizontal`). It reaches the fill, so a vertical
+   * band asked for `phaseFill: 'shift'` gets a VERTICAL roll — the pairing that
+   * would otherwise bake clean and ship a shimmer.
+   */
+  axis?: BgAnimBandAxis;
   /** Omit to leave the key out, so the document tracks the consumer's default. */
   driver?: BgAnimDriver;
   /** Omit to leave the key out. */
@@ -560,6 +631,7 @@ export function promoteBandCommand(
     const band = bandFromStaticTiles(doc, staticBase, {
       cols: spec.cols, rows: spec.rows,
       ...(spec.phaseFill !== undefined ? { phaseFill: spec.phaseFill } : {}),
+      ...(spec.axis !== undefined ? { axis: spec.axis } : {}),
       ...(spec.driver !== undefined ? { driver: spec.driver } : {}),
       ...(spec.rateShift !== undefined ? { rate_shift: spec.rateShift } : {}),
     });
@@ -602,6 +674,7 @@ export function addBandCommand(
       cols: spec.cols, rows: spec.rows,
       ...(phases !== undefined ? { phases } : {}),
       ...(spec.phaseFill !== undefined ? { phaseFill: spec.phaseFill } : {}),
+      ...(spec.axis !== undefined ? { axis: spec.axis } : {}),
       ...(spec.driver !== undefined ? { driver: spec.driver } : {}),
       ...(spec.rateShift !== undefined ? { rate_shift: spec.rateShift } : {}),
     });
@@ -634,5 +707,6 @@ export function removeBandCommand(
 // Constants the panel renders, re-exported so the component imports one module
 // ---------------------------------------------------------------------------
 
-export { BGANIM_MAX_BANDS, BG_TILE_CAPACITY, TILE_BYTES, TILE_WIDTH_PX };
-export type { BandPhaseFill };
+export { BGANIM_MAX_BANDS, BG_TILE_CAPACITY, TILE_BYTES, TILE_WIDTH_PX, BAND_AXIS_DEFAULT,
+  BGANIM_BAND_AXES };
+export type { BandPhaseFill, BgAnimBandAxis };

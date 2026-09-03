@@ -457,7 +457,8 @@ export const EDITOR_METHODS: EditorMethod[] = [
   //
   // THE DESCRIPTIONS CARRY TWO FACTS AN AGENT CANNOT GUESS, and both of them
   // are ones a plausible-sounding wrong model would get backwards:
-  //   • a driver is a SCALAR SOURCE, not an axis — every band moves horizontally;
+  //   • a driver is a SCALAR SOURCE, not an axis — which way a band moves is its
+  //     own `axis` key (horizontal, the default, or vertical since aeon 3a4712fa);
   //   • promotion does not grow the tile blob and addition does, which is why
   //     promotion is the operation that works on a document at capacity.
   { name: 'list_bg_anim_bands', kind: 'list-bg-anim-bands', result: 'json', params: {},
@@ -468,10 +469,15 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + 'operation will refuse against it.' },
   { name: 'promote_bg_anim_band', kind: 'promote-bg-anim-band', result: 'json',
     params: {
-      cols: z.number().int().min(1).describe('pattern width in tiles; pattern_px becomes cols*8'),
+      cols: z.number().int().min(1)
+        .describe('pattern width in tiles. On a HORIZONTAL band it sets the period '
+          + '(pattern_px = cols*8); on a VERTICAL band it is the rotation unit and cols*32 must be '
+          + 'an exact power of two'),
       rows: z.number().int().min(1)
-        .describe('pattern height in tiles. rows*32 (the bytes in one pattern column) must be an '
-          + 'exact power of two, because the runtime rotates a column by shifting it'),
+        .describe('pattern height in tiles. On a HORIZONTAL band rows*32 (the bytes in one pattern '
+          + 'column) must be an exact power of two, because the runtime rotates a column by '
+          + 'shifting it; on a VERTICAL band that rule moves to cols*32 and rows sets the period '
+          + 'instead (pattern_px = rows*8)'),
       staticBase: z.number().int().min(0)
         .describe('first tile of the existing static range to declare animated. It must lie at or '
           + 'after the end of the current animated prefix (list_bg_anim_bands reports it as '
@@ -479,13 +485,19 @@ export const EDITOR_METHODS: EditorMethod[] = [
       phaseFill: z.enum(['copy', 'blank', 'shift']).optional()
         .describe('how banks 1..7 are derived from phase 0. copy (the default here) leaves the '
           + 'band visually inert until its frames are drawn; blank breaks the picture on the '
-          + 'second phase; shift makes bank k phase 0 scrolled k px within the band\'s own '
-          + 'pattern width — the contract\'s "pre-shifted art 1px apart", so the band MOVES with '
-          + 'no further authoring. Phase 0 is always read from the promoted range itself'),
+          + 'second phase; shift makes bank k phase 0 scrolled k px ALONG THE BAND\'S AXIS within '
+          + 'its own pattern period — the contract\'s "pre-shifted art 1px apart", so the band '
+          + 'MOVES with no further authoring. Phase 0 is always read from the promoted range itself'),
+      axis: z.enum(['horizontal', 'vertical']).optional()
+        .describe('which way the pattern translates. Omit to leave the key out, which bakes as '
+          + 'horizontal. A vertical band scrolls UP as its driver increases, takes its period from '
+          + 'rows (pattern_px = rows*8) and its power-of-two rotation unit from cols. Setting it '
+          + 'also switches phaseFill=shift to a VERTICAL roll and the band\'s slot order to '
+          + 'row-major — aeon refuses a vertical band whose phases are horizontal translations'),
       driver: z.string().optional()
-        .describe('camera_x, camera_y or timer — the SCALAR the band\'s step is read from. Every '
-          + 'band shifts HORIZONTALLY whichever driver it uses; camera_y does NOT mean vertical '
-          + 'motion. Omit to leave the key out so the document tracks the engine default'),
+        .describe('camera_x, camera_y or timer — the SCALAR the band\'s step is read from, never '
+          + 'an axis: camera_y does NOT mean vertical motion, and `axis` is what does. Omit to '
+          + 'leave the key out so the document tracks the engine default'),
       rateShift: z.number().int().optional()
         .describe('right shift applied to the driver scalar. Omit to leave the key out'),
     },
@@ -509,8 +521,12 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + 'there is nothing to blank. One undo step.' },
   { name: 'add_bg_anim_band', kind: 'add-bg-anim-band', result: 'json',
     params: {
-      cols: z.number().int().min(1).describe('pattern width in tiles; pattern_px becomes cols*8'),
-      rows: z.number().int().min(1).describe('pattern height in tiles; rows*32 must be a power of two'),
+      cols: z.number().int().min(1)
+        .describe('pattern width in tiles. Horizontal band: the period (pattern_px = cols*8). '
+          + 'Vertical band: the rotation unit, so cols*32 must be a power of two'),
+      rows: z.number().int().min(1)
+        .describe('pattern height in tiles. Horizontal band: the rotation unit, so rows*32 must be '
+          + 'a power of two. Vertical band: the period (pattern_px = rows*8)'),
       phases: z.array(z.array(z.array(z.number().int().min(0).max(15)).length(64))).optional()
         .describe('the band art: exactly 8 banks, each of cols*rows tiles, each tile 64 pixel '
           + 'values 0-15 row-major. Omit for a blank band'),
@@ -519,6 +535,10 @@ export const EDITOR_METHODS: EditorMethod[] = [
           + 'phase 0 is blank art, so all three agree today; the option is the same one '
           + 'promote_bg_anim_band takes). Refused together with `phases`, which already spells '
           + 'every bank'),
+      axis: z.enum(['horizontal', 'vertical']).optional()
+        .describe('which way the pattern translates; omit to leave the key out (bakes as '
+          + 'horizontal). Vertical scrolls UP, takes its period from rows and its power-of-two '
+          + 'rotation unit from cols, and orders its slots row-major'),
       driver: z.string().optional().describe('camera_x, camera_y or timer — the scalar source, never an axis'),
       rateShift: z.number().int().optional().describe('right shift applied to the driver scalar'),
     },
@@ -554,9 +574,10 @@ export const EDITOR_METHODS: EditorMethod[] = [
   { name: 'regenerate_bg_anim_band_shift', kind: 'regenerate-bg-anim-band-shift', result: 'json',
     params: { band: z.number().int().min(0).describe('index into the band list') },
     description: 'Rebuild banks 1..7 of a BgAnim band from its CURRENT phase 0 as pre-shifted '
-      + 'phases (bank k = phase 0 scrolled k px within the band\'s pattern width — the same fill '
-      + 'as phaseFill=shift). A REGENERATE, to run after each phase-0 edit; hand-drawn banks are '
-      + 'replaced. Phase 0 is untouched. One undo step.' },
+      + 'phases (bank k = phase 0 scrolled k px ALONG THE BAND\'S OWN AXIS, within its pattern '
+      + 'period — the same fill as phaseFill=shift, and vertical for a band that declares it). '
+      + 'A REGENERATE, to run after each phase-0 edit; hand-drawn banks are replaced. Phase 0 is '
+      + 'untouched. One undo step.' },
 
   { name: 'screenshot', kind: 'screenshot', result: 'image',
     params: { region: z.object({ x: z.number().int().min(0), y: z.number().int().min(0), w: z.number().int().min(1), h: z.number().int().min(1) }).optional(), showBg: z.boolean().optional().describe('render the background plane during capture') },

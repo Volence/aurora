@@ -75,7 +75,13 @@ import {
   LAYOUT_WORD_MAX,
   TILE_PIXELS,
   TILE_WIDTH_PX,
+  bandAxis,
+  bandCellSlot,
+  bandIsHorizontal,
+  bandPatternPx,
+  bandSlotCell,
   bandTileCount,
+  type BgAnimBandAxis,
   type BgAnimDriver,
   type BgOverrideBand,
 } from './bg-override';
@@ -204,13 +210,16 @@ export function bandDriverValue(driver: BgAnimDriver, inputs: BandDriverInputs):
   }
 }
 
-/** `pattern_px` for a band — `cols * TILE_WIDTH_PX`, as the consumer asserts it. */
-export function bandPatternPx(band: Pick<BgOverrideBand, 'cols'>): number {
-  return band.cols * TILE_WIDTH_PX;
-}
+/**
+ * `pattern_px` for a band — the period ALONG ITS AXIS, re-exported from the
+ * codec rather than recomputed. It used to be `cols * TILE_WIDTH_PX` here, which
+ * is the horizontal reading; a second copy of that expression is exactly how a
+ * vertical band would have previewed against the wrong ring.
+ */
+export { bandPatternPx };
 
 /** `step_mask` — `pattern_px - 1` (emitter), never a document field. */
-export function bandStepMask(band: Pick<BgOverrideBand, 'cols'>): number {
+export function bandStepMask(band: Pick<BgOverrideBand, 'cols' | 'rows' | 'axis'>): number {
   return bandPatternPx(band) - 1;
 }
 
@@ -239,20 +248,26 @@ export function bandPhase(step: number): BandPhase {
  * Which tile of the selected bank lands in the band's local slot `localSlot`.
  *
  * DERIVED FROM THE TWO DMAs, not from the header prose. `BgAnim_Update` queues:
- *   piece 1  src = bank + coarse*col_bytes, dest = band base, len = n*32 - that
- *   piece 2  src = bank,                    dest = base + len(piece 1)
- * so destination column `j` is fed by art column `(j + coarse) mod cols`, and
- * the row within a column is untouched (the DMA moves whole columns). Slots are
- * COLUMN-MAJOR — "a pattern column's tiles are contiguous in VRAM" — so slot
- * `t` is column `floor(t / rows)`, row `t % rows`.
+ *   piece 1  src = bank + coarse*unit_bytes, dest = band base, len = n*32 - that
+ *   piece 2  src = bank,                     dest = base + len(piece 1)
+ * so destination UNIT `j` is fed by art unit `(j + coarse) mod units`, and the
+ * position within a unit is untouched (the DMA moves whole units).
+ *
+ * THE UNIT IS AXIS-DEPENDENT, and it is the same rotate either way — the engine
+ * shifts by `col_shift` and does not know which axis it is on. On a HORIZONTAL
+ * band the unit is a pattern COLUMN (`rows*32` bytes, slots column-major) and on
+ * a VERTICAL band a pattern ROW (`cols*32` bytes, slots ROW-major). Both are the
+ * `bandCellSlot`/`bandSlotCell` pair, so this function never spells an order of
+ * its own — a second spelling here is how the preview would come to disagree
+ * with the shift fill about which cell a slot draws.
  */
 export function bandSlotSource(
-  localSlot: number, band: Pick<BgOverrideBand, 'cols' | 'rows'>, coarseColumns: number,
+  localSlot: number, band: Pick<BgOverrideBand, 'cols' | 'rows' | 'axis'>, coarseUnits: number,
 ): number {
-  const col = Math.floor(localSlot / band.rows);
-  const row = localSlot % band.rows;
-  const srcCol = (col + coarseColumns) % band.cols;
-  return srcCol * band.rows + row;
+  const { col, row } = bandSlotCell(band, localSlot);
+  return bandIsHorizontal(band)
+    ? bandCellSlot(band, (col + coarseUnits) % band.cols, row)
+    : bandCellSlot(band, col, (row + coarseUnits) % band.rows);
 }
 
 /** A band resolved for preview: everything the blitter needs, nothing it does not. */
@@ -264,6 +279,8 @@ export interface BandPreviewState {
   rateShift: number;
   cols: number;
   rows: number;
+  /** Resolved through `BAND_DEFAULTS`, like `driver` — absent means horizontal. */
+  axis: BgAnimBandAxis;
   /** First BG-blob slot the band owns (derived by walking the list). */
   slotBase: number;
   /** `cols * rows`. */
@@ -294,7 +311,8 @@ export function bandDriver(band: Pick<BgOverrideBand, 'driver'>): BgAnimDriver {
  * pure function of the pan the viewport already repaints on. Only `timer` needs
  * a clock, and a camera band auto-scrolling on one would teach the author that
  * `camera_y` means vertical motion — which it does not; it names a SCALAR
- * SOURCE, and every band moves horizontally.
+ * SOURCE, and which way the band moves is its `axis` key, independently of
+ * every driver.
  */
 export function bandIsTimeVarying(band: Pick<BgOverrideBand, 'driver'>): boolean {
   return bandDriver(band) === 'timer';
@@ -320,7 +338,7 @@ export function bandPreviewStates(
     const step = bandStep(bandDriverValue(driver, inputs), rateShift, bandStepMask(band));
     const { bank, coarseColumns } = bandPhase(step);
     out.push({
-      index, driver, rateShift, cols: band.cols, rows: band.rows,
+      index, driver, rateShift, cols: band.cols, rows: band.rows, axis: bandAxis(band),
       slotBase, tileCount: n, step, bank, coarseColumns,
       timeVarying: driver === 'timer',
     });
