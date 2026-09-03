@@ -216,6 +216,33 @@ which is why the CDP harness above is the proof and this is only the floor.
 
 ## Tagged, not fixed
 
+> ## ⚠ THIS SECTION IS CLOSED — DO NOT ACT ON IT
+>
+> **All nine were fixed on 2026-09-03**, branch `fix/d27-survey-nine`, under the
+> hub's ruling in the owner's place: the same mechanism he had already ruled on,
+> applied to the same shape. The successor packet is
+> **`docs/reviews/2026-09-03-d27-survey-nine.md`** and it supersedes everything
+> below — read it before booking anything from this list.
+>
+> What it carries that this section does not:
+>
+> - `actAndDropFocus` **moved** to `components/ui/act-and-drop-focus.ts`; `Chip`
+>   and `IconButton` now forward the click event, without which five of the nine
+>   could not have been wired at all.
+> - Two harnesses, `harness:d27-sprite-focus` (30/30) and
+>   `harness:d27-effects-focus` (19/19), plus **eleven plants** — one per site,
+>   each reddening only its own site's rows, and a P8 that kills the `[k7]` row
+>   alone under the cheaper blur-on-the-acting-path design.
+> - **`[k7]` exists at five of the nine and cannot exist at the other four**, and
+>   the four are named with the reason. That was not visible from the survey.
+> - **Four of the six "unmount themselves" exclusions below are DISPUTED** — the
+>   two effects Delete buttons unmount only when deleting the LAST document
+>   (`resolveSelected*` falls back to element 0), and BOTH `BgAnimBandPanel`
+>   controls stay mounted, including `:567` on its refusing press. Disputed with
+>   evidence and **not acted on**; the successor packet says why.
+> - `newSprite`'s recoverability is **d-29** (master `204825c3`), the owner's,
+>   and this parcel did not touch `newSprite`.
+
 **The same `<button>`-keeps-focus shape elsewhere.** d-27 surveyed these two
 controls and ruled on these two, and the owner is mid-project on something else,
 so nothing outside `CollisionPalette.tsx` was touched. A read-only survey of
