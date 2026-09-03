@@ -98,6 +98,7 @@
     "harness:collision-needle": "node scratchpad/collision-needle-harness.mjs",
     "harness:collision-preservation": "node scratchpad/collision-preservation-harness.mjs",
     "harness:collision-read": "node scratchpad/collision-read-harness.mjs",
+    "harness:collision-say-both": "node scratchpad/collision-say-both-harness.mjs",
     "harness:commit-cdp": "node scratchpad/commit-cdp-harness.mjs",
     "harness:commit-collision": "node scratchpad/commit-collision-harness.mjs",
     "harness:composer-collision-gesture": "node scratchpad/composer-collision-gesture-harness.mjs",
