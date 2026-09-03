@@ -308,13 +308,18 @@ describe('against aeon\'s real ojz/act1 — the numbers as they stand today', ()
       .toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
     // Named, so a rename in aeon is visible here rather than silently shifting
     // the eligible set.
+    //
+    // ⚠ RE-PINNED 2026-09-03: section 6 was `OJZ_Preset_Plain` (one of the three
+    // sharers) until aeon landed item 11a's base_swap and gave 6 a preset of its
+    // own. CONFIRMED INTENDED with aeon; not a regression, and not a rename —
+    // section 6 LEFT the shared record, which is why the row below moved too.
     expect(b[0]).toBe('OJZ_Preset_Sec0');
-    expect(b[6]).toBe('OJZ_Preset_Plain');
+    expect(b[6]).toBe('OJZ_Preset_Sec6');
     expect(b[7]).toBe('OJZ_Preset_Plain');
     expect(b[8]).toBe('OJZ_Preset_Plain');
   });
 
-  it('SIX sections own their preset; 6, 7 and 8 share one', (ctx) => {
+  it('SEVEN sections own their preset; 7 and 8 share one', (ctx) => {
     if (!need(ctx)) return;
     const w: SectionRasterWiring = {
       bindings: descriptorEffectsBindings(desc, 'ojz'),
@@ -322,27 +327,37 @@ describe('against aeon\'s real ojz/act1 — the numbers as they stand today', ()
       descriptor: { path: DESC, parsed: true },
       library: { path: LIB, parsed: true },
     };
-    expect(eligibleSections(w, 9)).toEqual([0, 1, 2, 3, 4, 5]);
-    for (const s of [6, 7, 8]) expect(sectionRasterState(w, s)).toBe('shared');
-    expect(sectionSharers(w, 7)).toEqual([6, 7, 8]);
+    // ⚠ RE-PINNED 2026-09-03 with the row above, and it is ONE aeon landing seen
+    // twice: section 6 acquired its own preset record for item 11a's base_swap,
+    // so it joined the eligible set and left the sharer set. 0-5 -> 0-6, and the
+    // sharers 6,7,8 -> 7,8. CONFIRMED INTENDED with aeon.
+    expect(eligibleSections(w, 9)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    for (const s of [7, 8]) expect(sectionRasterState(w, s)).toBe('shared');
+    expect(sectionSharers(w, 7)).toEqual([7, 8]);
   });
 
-  it('exactly ONE section is threaded today — and it is not the same fact as eligible', (ctx) => {
+  it('exactly TWO sections are threaded today — and it is not the same fact as eligible', (ctx) => {
     if (!need(ctx)) return;
     // ⚠ THE TWO FACTS ARE DIFFERENT AND BOTH MATTER. "Section 0 may have a
     // band" (its preset is its own) and "section 0 has one wired" (a preset
     // threads the chooser on index 0) are different claims, and conflating them
     // is how "only section 5" and "sections 0-5" were BOTH published as the
-    // answer on the same day. They are 5 and 0-5 respectively.
+    // answer on the same day. They are {5,6} and 0-6 respectively.
+    //
+    // ⚠ RE-PINNED 2026-09-03, the third face of the SAME aeon landing: item 11a
+    // threaded section 6's base_swap program through the chooser as well as
+    // giving 6 its own preset record. The two facts moved TOGETHER this time and
+    // still are not the same fact — eligible is 0-6, threaded is {5,6} — which
+    // is precisely why the row keeps asserting both. CONFIRMED INTENDED.
     const calls = libraryRasterChooserCalls(lib, rasterChooserName('ojz', 'act1'));
-    expect(calls).toEqual({ OJZ_Preset_Sec5: 5 });
+    expect(calls).toEqual({ OJZ_Preset_Sec5: 5, OJZ_Preset_Sec6: 6 });
     const w: SectionRasterWiring = {
       bindings: descriptorEffectsBindings(desc, 'ojz'),
       threadedBy: calls,
       descriptor: { path: DESC, parsed: true },
       library: { path: LIB, parsed: true },
     };
-    expect(wiredSections(w, 9)).toEqual([5]);
+    expect(wiredSections(w, 9)).toEqual([5, 6]);
     expect(eligibleSections(w, 9)).not.toEqual(wiredSections(w, 9));
   });
 });

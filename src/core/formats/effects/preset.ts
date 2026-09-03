@@ -322,6 +322,67 @@ export interface EffectsPresetRamp {
 }
 
 /**
+ * The mid-frame nametable-base SWAP — `$defs.base_swap`, the document face of
+ * `raster_program([fire(line, [reg_set($8200 | vdp_base_reg(VdpBase.PlaneA,
+ * target))])])`. Both members are required; the object is CLOSED. The "Batman &
+ * Robin trick": from `line` down, Plane A draws from a different nametable.
+ *
+ * ═══ TWO ASYMMETRIES WITH `ramp`. DO NOT ASSUME SYMMETRY BY ANALOGY. ═══
+ *
+ * A reader arriving here straight from `EffectsPresetRamp` will carry two of its
+ * properties across, and BOTH ARE WRONG for this key. They are stated here
+ * because the schema states them, and because an assumed capability gate is the
+ * kind of thing a control parcel silently builds a disabled button around.
+ *
+ *   1. NO CAPABILITY GATE. `ramp` renders only in a game whose
+ *      `Game.SCANLINE_CAPS` declares `CAP_DENSE_TIER`, and aeon's generator must
+ *      re-emit that ensure at every generated call site. `base_swap` has NO such
+ *      bit: `OP_SET_REG` dispatches unconditionally in every game, so nothing is
+ *      gated and no ensure is re-emitted. There is no game in which authoring a
+ *      base_swap silently no-ops for want of a capability.
+ *   2. NOT DEBUG-GATED. The generated section-6 emission is unconditional `pub`
+ *      data reaching `s4.bin` — aeon measured `EditorRaster_OJZ_Act1_ojz_sec6_
+ *      baseswap` at $013446 in the RELEASE listing, its 22 bytes identical to the
+ *      hand-authored `OJZ_BaseSwap` program.
+ *
+ * ═══ ONE RASTER PROGRAM PER DOCUMENT ═══
+ *
+ * `base_swap`, `ramp` and `bands` all lower into the SAME `EffectsPreset.ep_raster`
+ * channel and no combinator exists, so exactly one per document — the schema's
+ * top-level `oneOf`, which grew its THIRD arm for this key. See
+ * `EFFECTS_PRESET_RASTER_CHANNELS`, which is read off that `oneOf` and not
+ * restated.
+ */
+export interface EffectsPresetBaseSwap {
+  /**
+   * The screen line the swap fires on, 3..223 — `fire()`'s own ensure (lines 0-2
+   * belong to the priming records; 223 is the frame-rewind interlock). Read the
+   * range from `EFFECTS_PRESET_BASE_SWAP_LINE_RANGE`, never retyped.
+   *
+   * ⚠ NOT the ramp's `top` range. A ramp's `top` maxes at 222 because a run needs
+   * at least one line after it; a swap is a single fire and reaches 223.
+   */
+  line: number;
+  /**
+   * The raw VRAM BYTE ADDRESS Plane A's base register (VDP reg $02) is
+   * re-pointed at — 0..65535, and a MULTIPLE OF 8192.
+   *
+   * ⚠ THIS IS AN ADDRESS, NOT AN INDEX OR A FLAG. The shipped section-6 preset
+   * targets **57344 = $E000 = VRAM_PLANE_B**, i.e. from line 160 down, Plane A
+   * draws Plane B's picture. A reader meeting `57344` with no comment has no way
+   * to know that, and a control that offered it as a bare number would be asking
+   * an author for a hexadecimal VRAM constant in decimal.
+   *
+   * THE GRANULE IS WHY `multipleOf` IS HERE AND WHY IT IS NOT A ROUNDING
+   * CONVENIENCE: reg $02 encodes only the address bits ABOVE $2000 and DROPS the
+   * rest SILENTLY. An unaligned target is not out of range — it is a DIFFERENT
+   * address than every `VRAM_*` consumer reads and writes, with nothing else
+   * visibly wrong. See `EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE`.
+   */
+  target: number;
+}
+
+/**
  * The preset document. `bands` is the raster channel; `cycles` and `variants`
  * (empyrean 12aecd5, AURORA_EFFECTS_SCHEMA.md §7.2) and `patch_world_ys` /
  * `patch_motion` (empyrean d36d704, §7.3) are OTHER CHANNELS OF THE SAME
@@ -379,6 +440,12 @@ export interface EffectsPreset {
    * per-line-curve MUST NOT.
    */
   ramp?: EffectsPresetRamp;
+  /**
+   * The BASE-SWAP raster channel (empyrean 5bd76ba, §7.5). Mutually exclusive
+   * with `bands` and `ramp` — the same `raster:` slot. Unlike `ramp` it is
+   * neither capability-gated nor DEBUG-gated; see `EffectsPresetBaseSwap`.
+   */
+  base_swap?: EffectsPresetBaseSwap;
   cycles?: EffectsPresetCycleChannel[] | null;
   variants?: (EffectsPresetPalVariant | null)[];
   /**
@@ -630,13 +697,19 @@ function schemaRange(path: string[]): Readonly<{ min: number; max: number }> {
 const RAMP = ['$defs', 'ramp'] as const;
 
 /**
- * The two raster channels, read off the schema's TOP-LEVEL `oneOf` rather than
+ * The raster channels, read off the schema's TOP-LEVEL `oneOf` rather than
  * restated: exactly one of these keys per document.
  *
  * Read from the `oneOf` and not from `properties`, because it is the `oneOf`
- * that carries the exclusivity. If a third channel is ever added, or the
- * exclusivity is ever relaxed, this list changes with it and the gate that
- * asserts its contents goes red.
+ * that carries the exclusivity. When a channel is added, or the exclusivity is
+ * ever relaxed, this list changes with it and the gate that asserts its contents
+ * goes red.
+ *
+ * ⚠ IT WAS TWO AND IS NOW THREE (`base_swap`, empyrean 5bd76ba). Nothing here
+ * needed editing for that, which is the point of deriving it — but the sentence
+ * "the two raster channels" was in this docblock and would have gone quietly
+ * wrong, so treat the COUNT as a thing that moves and the DERIVATION as the
+ * thing that does not.
  */
 export const EFFECTS_PRESET_RASTER_CHANNELS: readonly string[] = (() => {
   const branches = (EFFECTS_PRESET_SCHEMA as Record<string, unknown>).oneOf;
@@ -669,7 +742,10 @@ export const EFFECTS_PRESET_RASTER_CHANNELS: readonly string[] = (() => {
  * document HAS; it is not the refusal — the schema's `oneOf` is, on parse and on
  * serialize alike, and it is what refuses a document carrying both.
  */
-export function presetRasterChannel(preset: Partial<EffectsPreset>): 'bands' | 'ramp' | null {
+export function presetRasterChannel(
+  preset: Partial<EffectsPreset>,
+): 'bands' | 'ramp' | 'base_swap' | null {
+  if (preset.base_swap !== undefined) return 'base_swap';
   if (preset.ramp !== undefined) return 'ramp';
   if (preset.bands !== undefined) return 'bands';
   return null;
@@ -909,6 +985,104 @@ export function anchorSnapCycleSeconds(seconds: number): AnchorPeriodRung {
   const target = Math.log2(Math.max(seconds, Number.MIN_VALUE));
   return ANCHOR_PERIOD_RUNGS.reduce((best, r) =>
     Math.abs(Math.log2(r.seconds) - target) < Math.abs(Math.log2(best.seconds) - target) ? r : best);
+}
+
+// ---------------------------------------------------------------------------
+// The base_swap key (empyrean 5bd76ba, §7.5) — the line range, the address
+// range, and the $2000 GRANULE. Every number below is READ OUT of the vendored
+// schema; none is typed beside it, and each read throws at module load when the
+// schema's wording moves rather than yielding a plausible-looking wrong value.
+//
+// ⚠ THE TWO ASYMMETRIES WITH `ramp`, restated here where a constants reader will
+// see them: base_swap has NO capability gate (no CAP_DENSE_TIER analogue —
+// OP_SET_REG dispatches unconditionally) and its generated emission is NOT
+// DEBUG-gated (it is unconditional pub data in the release ROM). Do not carry
+// ramp's gating across by analogy; see `EffectsPresetBaseSwap`.
+// ---------------------------------------------------------------------------
+
+const BASE_SWAP = ['$defs', 'base_swap'] as const;
+
+/** `base_swap`'s required member names, in the schema's own `required` order. */
+export const EFFECTS_PRESET_BASE_SWAP_KEYS: readonly string[] =
+  Object.freeze([...(schemaNode([...BASE_SWAP]).required as string[])]);
+
+/**
+ * `line`'s inclusive range, 3..223 in the vendored schema — `fire()`'s ensure.
+ *
+ * ⚠ NOT the same as the ramp's `top` range even though both are screen lines:
+ * `top` maxes at 222 because a run occupies at least one line after its start,
+ * and a swap is one fire that reaches the last line before the rewind interlock.
+ */
+export const EFFECTS_PRESET_BASE_SWAP_LINE_RANGE =
+  schemaRange([...BASE_SWAP, 'properties', 'line']);
+
+/**
+ * `target`'s inclusive range, 0..65535 — `vdp_base_reg`'s parameter range. A
+ * raw VRAM BYTE ADDRESS; see `EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE` for why
+ * the range alone is not the contract.
+ */
+export const EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE =
+  schemaRange([...BASE_SWAP, 'properties', 'target']);
+
+/**
+ * THE $2000 GRANULE — `multipleOf`, read off the schema keyword itself.
+ *
+ * Plane A's nametable base register (VDP reg $02) encodes only the address bits
+ * ABOVE this granule and DROPS the rest SILENTLY. So an unaligned `target` is
+ * NOT a range error and does not fail loudly anywhere downstream: the VDP simply
+ * fetches from a different address than every `VRAM_*` consumer reads and writes,
+ * and nothing else looks wrong. That is why the granule is a first-class constant
+ * and not an implementation detail of a rounding helper — a control that snaps
+ * silently would hide exactly the misalignment this refuses.
+ *
+ * WORKED VALUE, because the key is meaningless without one: the shipped
+ * section-6 document targets **57344 = $E000 = VRAM_PLANE_B** — 7 granules up —
+ * so Plane A draws Plane B's picture from line 160 down.
+ *
+ * Derived LOUDLY: a granule of 0 or 1, or a non-integer, would make every target
+ * "aligned" and the constraint indistinguishable from absent, so this throws at
+ * module load rather than shipping a vacuous granule.
+ */
+export const EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE: number = (() => {
+  const node = schemaNode([...BASE_SWAP, 'properties', 'target']);
+  const granule = node.multipleOf;
+  if (typeof granule !== 'number' || !Number.isInteger(granule) || granule < 2) {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer bounds $defs.base_swap.properties.target with ' +
+      `an integer multipleOf >= 2 (read: ${JSON.stringify(granule)}), which is where the Plane A ` +
+      'base-register granule is read from. A granule of 0 or 1 would make every address "aligned" ' +
+      'and is indistinguishable from no constraint at all, so this refuses rather than shipping ' +
+      'it. Re-read the schema — do NOT hardcode $2000.',
+    );
+  }
+  // The range and the granule are two schema facts that must agree: the address
+  // space has to be a whole number of granules, or the top granule is a partial
+  // one and the last legal base address is not what either number says.
+  const span = EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.max
+    - EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.min + 1;
+  if (span % granule !== 0) {
+    throw new Error(
+      `the base_swap target range ${EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.min}..` +
+      `${EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.max} is not a whole number of ${granule}-byte ` +
+      'granules. One of those two schema facts has moved; re-read both.',
+    );
+  }
+  return granule;
+})();
+
+/**
+ * Is `target` a legal Plane A base address — in range AND on the granule?
+ *
+ * The predicate exists so no caller re-spells `% 8192`. It reports; it does not
+ * snap. There is deliberately no `snapBaseSwapTarget` here: rounding an author's
+ * address to the nearest granule produces a DIFFERENT plane's picture without
+ * saying so, which is the failure the granule exists to make visible.
+ */
+export function isBaseSwapTargetAligned(target: number): boolean {
+  return Number.isInteger(target)
+    && target >= EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.min
+    && target <= EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.max
+    && target % EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE === 0;
 }
 
 /**

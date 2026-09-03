@@ -52,7 +52,7 @@ const ANNOTATION_KEYWORDS = [
 
 /** Keywords this evaluator actually asserts. */
 const ASSERTION_KEYWORDS = [
-  '$ref', 'type', 'const', 'enum', 'pattern', 'minimum', 'maximum',
+  '$ref', 'type', 'const', 'enum', 'pattern', 'minimum', 'maximum', 'multipleOf',
   'properties', 'required', 'unevaluatedProperties',
   'items', 'minItems', 'maxItems', 'oneOf', 'anyOf', 'not',
 ] as const;
@@ -86,7 +86,7 @@ const IN_PLACE_APPLICATORS = [
  */
 const NON_ANNOTATING_KEYWORDS: ReadonlySet<string> = new Set<string>([
   ...ANNOTATION_KEYWORDS,
-  'type', 'const', 'enum', 'pattern', 'minimum', 'maximum',
+  'type', 'const', 'enum', 'pattern', 'minimum', 'maximum', 'multipleOf',
   'required', 'minItems', 'maxItems',
 ]);
 
@@ -316,6 +316,24 @@ function validateNode(
     }
     if (typeof schema.maximum === 'number' && value > schema.maximum) {
       issues.push({ path, message: `${value} is above the maximum ${schema.maximum}` });
+    }
+    // `multipleOf` arrived with `base_swap.target` (empyrean 5bd76ba), the first
+    // GRANULE in a committed contract schema: Plane A's nametable base register
+    // encodes only the address bits above $2000 and drops the rest SILENTLY, so
+    // an unaligned value is not a range error — it is a different address with
+    // nothing else visibly wrong.
+    //
+    // Division, not `%`: JSON Schema 2020-12 defines the keyword as "division by
+    // this keyword's value results in an integer", and `%` on IEEE doubles is
+    // exact only while both operands are. Every committed use is integral so the
+    // two agree today; the spec's spelling is the one that keeps agreeing if a
+    // fractional granule is ever published. A non-finite quotient (multipleOf 0)
+    // is not an integer, so it refuses rather than dividing by zero silently.
+    if (typeof schema.multipleOf === 'number') {
+      const q = value / schema.multipleOf;
+      if (!Number.isInteger(q)) {
+        issues.push({ path, message: `${value} is not a multiple of ${schema.multipleOf}` });
+      }
     }
   }
 

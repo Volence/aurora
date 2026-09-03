@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://empyrean/contract/aurora-effects-preset.schema.json",
-  "title": "Aurora Effects Raster Preset Document (wave 2: bands, cycles, variants, patch anchors, ramp)",
+  "title": "Aurora Effects Raster Preset Document (wave 2: bands, cycles, variants, patch anchors, ramp, base_swap)",
   "description": "Wire shape for one raster preset document, games/sonic4/data/editor/effects/presets/<preset_id>.json (aeon repo, editor-owned tree). A BAND IS NOT A SCENE FIELD: a scene is a parallax_config; the raster program is a channel of an EffectsPreset bound per SECTION (aeon docs/superpowers/specs/2026-08-28-raster-band-ownership-design.md section 16.1), so bands live here, in the directory docs/AURORA_EFFECTS_SCHEMA.md section 7 reserved for them. NORMATIVE for SHAPE only: which keys exist, their JSON types, and the exactly-one arm rule. NUMERIC BOUNDS ARE DELIBERATELY NOT RESTATED HERE (screen-line range, CRAM address range, burst ceilings, band count, height minimum, the palette-line-0 rule): the engine's own ensures in engine/effects/raster_dsl.emp fire at build time with the measurement behind each rule, and aeon's generator forwards values verbatim so the author reads that sentence (aeon tools/EFFECTS_CONSUMER_CONTRACT.md section 2.4 at c03b9812, the consumer half this schema pairs with). Closed: any key not listed is refused; adding one is a contract change. cycles and variants were added 2026-08-30 (docs/AURORA_EFFECTS_SCHEMA.md section 7.2, DoD item 5, against aeon's demand artifact 8ec2b05d): they are OTHER CHANNELS OF THE SAME EffectsPreset record the raster program is a channel of (ep_cycle and ep_variants are fields of that record, aeon engine/effects/preset.emp:56-67), which is why they live in this document beside bands and why one rasterRef binds the whole of it (ruling Q1). Reserved and refused by name (still wave-2 open): fires. Known limits with NO enforcing assertion, stated so a silence is not read as coverage: nothing checks that an authored preset is BOUND to a section (an unbound preset costs ROM and shows nothing; binding is a hand-authored preset() call, BAND-FIRST-CONSUMER territory); nothing checks the total ROM cost of the preset set; the runtime variant-to-pal_line binding behind a pal_region band cannot be checked at build time (a document carrying BOTH bands and variants makes the slot half of that binding visible in one file, but no assertion is added here: ruling Q6 defers it, because an absent variants entry means the section keeps its hand-authored slot and the document is not the whole truth); nothing checks that a band is VISIBLE; nothing here refuses an empty cycles array or a variants array longer than the engine's slot count, both of which are the generator's refusals (section 7.2).",
   "type": "object",
   "required": [
@@ -17,6 +17,11 @@
     {
       "required": [
         "ramp"
+      ]
+    },
+    {
+      "required": [
+        "base_swap"
       ]
     }
   ],
@@ -103,10 +108,38 @@
     "ramp": {
       "$ref": "#/$defs/ramp",
       "description": "The dense-tier RAMP: one linear per-scanline vertical-scroll run, RasterRampProgram (aeon engine/effects/raster.emp:582-593), built by raster_ramp_program(top, lines, cmd, start, step) (raster.emp:629-678). Added 2026-09-03 (docs/AURORA_EFFECTS_SCHEMA.md section 7.4, DoD item 6, against aeon's key-shape artifact docs/superpowers/specs/2026-09-03-item6-dense-perline-vscroll-key-shape.md at aeon 9e85baf0, authored at item 6's landing cf3dfb1a). ONE OBJECT, never an array: a preset has exactly one raster: channel (EffectsPreset.ep_raster, preset.emp:62/141), so there is one ramp per document. EXACTLY ONE OF bands OR ramp per document, asserted by this file's top-level oneOf: both lower into the SAME raster: slot and the engine has no combinator that mixes a sparse fire list with a dense run (artifact sections 1.5, 2, 8: no ensure refuses the pair because no code accepts it), so the contract refuses the pair here, the strict side, and WIDENS to allow both only when aeon ships a combinator and its own refusal; a schema can widen later and cannot narrow (protocol.md section 11.18's rule, applied to this file). ABSENT ramp on a bands document means what absent bands meant before: nothing (the document is the other kind); a section with no rasterRef keeps its hand-authored raster channel (effects_gen.py:1972). THE MUST NOT: a ramp authors exactly ONE linear rate (step) and ONE starting offset (start) over a top/lines span. NO per-line curve, NO independent per-line values: RasterRampProgram has one rrp_step and one rrp_start and no field that could receive a table (raster.emp:590-591; artifact section 6). A control offering per-line values would write what the engine cannot honour. WHAT AN AUTHOR SEES: a VSRAM target's value j displays on screen line top + j + 1 (the N+1 VSRAM latency, raster.emp:602-609, measured in aeon docs/benchmarks/effects-p3/RAMP-EVIDENCE.md), and the constructor does NOT compensate; an editor preview that draws value j on line top + j is one line high. GATING: the run renders only in a game whose Game.SCANLINE_CAPS declares CAP_DENSE_TIER ($0200, scene_dsl.emp:289; sonic4 yes, demo no). The ensure lives at the CALL SITE, not in the constructor (ojz_effects.emp:1048-1049; a comptime fn's free names resolve where it is called), so the generator MUST re-emit that ensure beside every raster_ramp_program() it emits, or an ungated game builds a program the interpreter silently no-ops (artifact section 1.4, 3.3). COST, information only: 304 of the 488 cycles per scanline (RASTER_DENSE_LINE_RAMP_CYC, raster_dsl.emp:1897, measured from a two-point fixture across three boots), a build-wide ensure keeps it under the window (:1908-1909); 34 bytes of ROM per emitted program. GENERATOR OBLIGATIONS (aeon, step 4): accept a document with ramp and no bands (bands is no longer required here); lower cmd as vdp_comm(VSRAM, WRITE, target.vsram.addr), never accept a raw command word from the document; lower start and step ONLY through fp16(whole, frac256), never as a raw integer, because raster_ramp_program's start/step carry NO ensure of their own and fp16's two ensures (raster.emp:685-686) are the entire authored-range contract (artifact section 7); route the program through the same per-section chooser bands uses (effects_gen.py:2693-2694) so two raster-channel writers never race for one field; keep the ep_raster/ep_patched exclusivity (preset.emp:153-154), so a section bound to a patched: template refuses a ramp document exactly as it refuses a bands document."
+    },
+    "base_swap": {
+      "$ref": "#/$defs/base_swap",
+      "description": "The mid-frame nametable-base SWAP: one OP_SET_REG raster fire on one screen line re-pointing Plane A's base register (VDP reg $02) at a VRAM address, the Batman & Robin trick, item 11a. Added 2026-09-03 (docs/AURORA_EFFECTS_SCHEMA.md section 7.5, DoD item 11, against aeon's shape note docs/superpowers/specs/2026-09-03-item11a-base-swap-key-shape.md at the landing aeon 850d4c60, which SHIPPED the key ahead of this CR by its own booking's call, with a real section bound: presets/ojz_sec6_baseswap.json {line: 160, target: 57344} via section_6.meta.json rasterRef). ONE CLOSED OBJECT, never an array: one raster: channel per preset. EXACTLY ONE OF bands, ramp OR base_swap per document (this file's top-level oneOf): all three lower into the same EffectsPreset.ep_raster channel (preset.emp:62/141) and no combinator exists; the contract refuses the pair on the strict side and widens only when aeon ships one (the ramp rule, section 7.4). ABSENT: no swap; the section's raster channel is whatever bands or ramp says, or Raster_Program_None if nothing is bound. LOWERING (aeon effects_gen.py at 850d4c60): raster_program([fire(line, [reg_set($8200 | vdp_base_reg(VdpBase.PlaneA, target))])]), the SAME three calls the hand-authored OJZ_BaseSwap makes; the generator forwards both values VERBATIM and restates no range, the engine constructs own them. NO capability bit gates it, unlike ramp's CAP_DENSE_TIER: OP_SET_REG dispatches unconditionally in every game, so no ensure is re-emitted at the generated call site; a real asymmetry with ramp, stated so nobody assumes one by analogy. NOT DEBUG-gated on the generated path: the section-6 emission is unconditional pub data reaching s4.bin (aeon measured EditorRaster_OJZ_Act1_ojz_sec6_baseswap at $013446 in the release listing, its 22 bytes identical to OJZ_BaseSwap's own program). WHAT AN AUTHOR SEES: from the swap line down, Plane A draws from the target nametable; the top of the frame is untouched, and the swap is self-restoring at the frame top (aeon item 11a on-screen captures, aeon 587873d9)."
     }
   },
   "unevaluatedProperties": false,
   "$defs": {
+    "base_swap": {
+      "type": "object",
+      "description": "One mid-frame base swap, the document face of raster_program([fire(line, [reg_set($8200 | vdp_base_reg(VdpBase.PlaneA, target))])]). Both members REQUIRED (the fire and the register op default nothing); the object is CLOSED. Ranges restate the two engine ensures the value meets next (fire's line range, vdp_base_reg's granule) so the editor is the first refusal, never a silently wrong register byte.",
+      "required": [
+        "line",
+        "target"
+      ],
+      "properties": {
+        "line": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 223,
+          "description": "The screen line the swap fires on, one OP_SET_REG fire. Authored range is fire()'s own ensure, 3..223 (aeon engine/effects/raster_dsl.emp:360-361: lines 0-2 belong to the priming records, 223 is the frame-rewind interlock), restated here so an author meets the refusal in the editor; the generator forwards it verbatim. Required, no default. The shipped section-6 preset fires on 160."
+        },
+        "target": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535,
+          "multipleOf": 8192,
+          "description": "The raw VRAM byte address Plane A's base register is re-pointed at, 0..65535 (vdp_base_reg's parameter range, aeon engine/vdp.emp:114) and a MULTIPLE OF 8192 ($2000, Plane A's register granule, vdp.emp:116-117): reg $02 encodes only the address bits above the granule and DROPS the rest silently, so an unaligned target would make the VDP fetch from a different address than every VRAM_* consumer reads and writes, with nothing else visibly wrong; the engine's ensure names the granule in its refusal, and the multipleOf here is the same refusal one step earlier. Required, no default. The shipped section-6 preset targets 57344 ($E000, VRAM_PLANE_B, so Plane A draws Plane B's picture from the swap line down). No storage-width note is owed: the value is a plain comptime int on this path, never packed into a narrower field."
+        }
+      },
+      "unevaluatedProperties": false
+    },
     "ramp": {
       "type": "object",
       "description": "One dense-tier ramp, the document face of raster_ramp_program(top, lines, cmd, start, step). All five inputs are REQUIRED because the constructor defaults none of them (raster.emp:629-678); cmd is spelled as target (an arm plus a byte address) and lowered by the generator. The span bounds restate the engine's ensures so an author meets the refusal in the editor rather than at somebody else's build: top >= 3 (raster.emp:631), lines >= 1 (:632), top + lines <= 223 (:640-641, the frame-rewind interlock, not the raw 224-line screen); the sum cannot be written in this schema and is the generator's and the engine's to refuse, so the per-field maxima here (top <= 222, lines <= 220) are only the loosest values the sum admits, not the contract for the pair.",
