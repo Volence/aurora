@@ -7,12 +7,15 @@
 // (`docs/reviews/2026-09-03-d27-blur-after-press.md`, "Tagged, not fixed"):
 //
 //   [esp] effects/EffectsScenePanel.tsx   Remove layer   (removeLayerCommand)
+//   [bnd] effects/BandPresetPanel.tsx     Remove raster band  (removeBandCommand)
+//   [cyc] effects/BandPresetPanel.tsx     Remove cycle channel
+//                                              (removeCycleChannelCommand)
 //
-// ⚠ TWO MORE SITES ARE STILL OUTSTANDING and are deliberately NOT here yet:
-// `effects/BandPresetPanel.tsx`'s Remove raster band and Remove cycle channel.
-// That file is contended by another lane at the time of writing and this parcel
-// takes it last, in its own commit. When those land they belong in THIS file,
-// beside [esp], because they share this file's boot and its handle discipline.
+// All three are the `key={i}` LIST-REMOVAL family, and [cyc] is the purest
+// instance of the d-27 shape anywhere in the survey: no `disabled` predicate,
+// no refusal, no confirmation, and a schema that accepts an empty `cycles`
+// list — so before the ruling nothing at all stopped a held Space walking the
+// whole channel list away, one keystroke per channel.
 //
 // ═══ THE ROW SHAPE, AND THE ONE ROW THIS SITE CANNOT HAVE ═════════════════
 //
@@ -83,6 +86,7 @@ const SHOTS = join(ROOT, 'scratchpad/shots-d27-effects-focus');
 mkdirSync(SHOTS, { recursive: true });
 
 const SCENE_ID = 'd27_focus_probe';
+const PRESET_ID = 'd27_focus_preset';
 
 // ── the layer floor and ceiling, READ OUT OF THE SCHEMA, never pinned ───────
 //
@@ -262,6 +266,72 @@ async function snap(c) {
   return { scenes, canUndo, list, layers: mine ? mine.layers : -1 };
 }
 
+/**
+ * The PRESET library, as the RAW STRING `presetsJson()` returns, plus the two
+ * counts the band/channel rows compare.
+ *
+ * ⚠ RAW STRING for the same reason as `snap()`: a band's ON arm is a schema
+ * `oneOf`, and CDP's `returnByValue` flattens those inconsistently, so a
+ * parse-and-re-stringify would compare the flattening rather than the document.
+ */
+async function psnap(c, presetId) {
+  const presets = await c.evalExpr('window.__dbg.aeon.presetsJson()');
+  const canUndo = await c.evalExpr('window.__dbg.aeon.canUndo()');
+  const list = JSON.parse(presets);
+  const mine = list.find((p) => p.id === presetId) ?? null;
+  return {
+    presets, canUndo, ids: list.map((p) => p.id),
+    bands: mine ? mine.bands.length : -1,
+    cycles: mine && Array.isArray(mine.cycles) ? mine.cycles.length : -1,
+  };
+}
+
+/** React-controlled <select>: the native setter plus the change React listens for. */
+const SET_SELECT = (selector, value) => String.raw`
+(() => {
+  const el = ${selector};
+  if (!el) return 'no-element';
+  Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set
+    .call(el, ${JSON.stringify(String(value))});
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  return el.value;
+})()`;
+
+/** The effects sub-tab bar writes `data-effects-sub-tab` — a real hook, not a guess. */
+const SUBTAB = (id) => String.raw`
+(() => {
+  const t = document.querySelector('[data-effects-sub-tab="' + ${JSON.stringify(id)} + '"]');
+  if (!t) return 'no-sub-tab';
+  t.click();
+  return 'ok';
+})()`;
+
+/**
+ * Open a CollapsibleSection by its header text, and REPORT WHAT HAPPENED
+ * rather than returning a bare boolean — when this misses, the reason is
+ * always "which headers were actually on screen", so it says so.
+ *
+ * `.pop()` takes the LAST matching header, which is why every caller's regex
+ * has to exclude its siblings: this panel renders three sections whose titles
+ * all begin `Preset — <id>`.
+ */
+const OPEN_SECTION = (re, proofSelector) => String.raw`
+(() => {
+  const open = () => !!(${proofSelector});
+  if (open()) return 'already-open';
+  const hdr = [...document.querySelectorAll('div')]
+    .filter((d) => d.style && d.style.cursor === 'pointer' && ${re}.test((d.textContent || '').trim()))
+    .pop();
+  if (!hdr) {
+    const seen = [...document.querySelectorAll('div')]
+      .filter((d) => d.style && d.style.cursor === 'pointer')
+      .map((d) => (d.textContent || '').trim().slice(0, 56));
+    return 'no-header; headers on screen: ' + JSON.stringify(seen);
+  }
+  hdr.click();
+  return 'clicked';
+})()`;
+
 /** React-controlled input: the native setter plus the events React listens for. */
 const SET_INPUT = (selector, value) => String.raw`
 (() => {
@@ -296,16 +366,39 @@ const CLICK_BY_TEXT = (re, tag = 'button') => String.raw`
 const INSTALL_HANDLES = String.raw`
 (() => {
   const byAria = (a) => document.querySelector('button[aria-label="' + a + '"]');
+  const byText = (t) => [...document.querySelectorAll('button')]
+    .find((b) => (b.textContent || '').trim() === t) || null;
   window.__d27e = {
     el(h) {
-      const m = /^removeLayer(\d+)$/.exec(h);
-      if (m) return byAria('Remove layer ' + m[1]);
+      const m = /^remove(Layer|Band|Channel)(\d+)$/.exec(h);
+      if (m) {
+        const word = { Layer: 'Remove layer ', Band: 'Remove raster band ',
+                       Channel: 'Remove cycle channel ' }[m[1]];
+        return byAria(word + m[2]);
+      }
       if (h === 'addLayer') return byAria('Add layer');
+      // The two Add controls on the band-preset panel are Chips, not
+      // IconButtons, so they carry no aria-label and ARE matched by text --
+      // the opposite of the Remove buttons above, and the reason each is
+      // resolved by the mechanism its own component actually uses.
+      if (h === 'addBand') return byText('Add raster band');
+      if (h === 'addChannel') return byText('Add channel');
       return null;
     },
+    removeButtons: (kind) => [...document.querySelectorAll('button[aria-label]')]
+      .filter((b) => new RegExp('^' + kind + ' \\d+$').test(b.getAttribute('aria-label')))
+      .map((b) => ({ aria: b.getAttribute('aria-label'), disabled: !!b.disabled })),
     layerButtons: () => [...document.querySelectorAll('button[aria-label]')]
       .filter((b) => /^Remove layer \d+$/.test(b.getAttribute('aria-label')))
       .map((b) => ({ aria: b.getAttribute('aria-label'), disabled: !!b.disabled })),
+    // The cycles picker, found by its OPTION VALUES rather than by position or
+    // by a title string: the provider owns 'absent' / 'off' / 'authored', and
+    // an option set is the one thing about this control that cannot drift
+    // without the fixture below becoming wrong anyway.
+    cyclesSelect: () => [...document.querySelectorAll('select')].find((sel) => {
+      const vals = [...sel.options].map((o) => o.value).join(',');
+      return vals === 'absent,off,authored';
+    }) || null,
     // THE NODE-IDENTITY LATCH. latch(h) remembers the actual DOM element a
     // handle resolves to right now; isSameNode(h) says whether the handle
     // still resolves to that same element -- a triple-equals on the node, not
@@ -503,6 +596,232 @@ async function main() {
       + 'button fires no onClick. A [k7] row here would be green by construction. The unconditional '
       + 'half is carried by the shared helper (it blurs BEFORE act()) and measured by plant P8 in the '
       + 'review packet, at the one site that HAS a reachable no-op press.');
+
+    // ═══════════════════════════════════════════════════════════════════
+    // [bnd] effects/BandPresetPanel.tsx — Remove raster band
+    // [cyc] effects/BandPresetPanel.tsx — Remove cycle channel
+    //
+    // The last two of the survey's nine. They live in the colour sub-tab, on a
+    // preset this run creates, and they get the same rows as [esp] — with the
+    // same "still ENABLED after the click" clause on -c, because the raster
+    // band button carries a disabled predicate of its own (lastBandRefusal,
+    // the schema's one-band floor) and would otherwise be able to pass its
+    // focus half by greying out.
+    // ═══════════════════════════════════════════════════════════════════
+    console.log('\n=== [bnd] / [cyc] BandPresetPanel (effects/BandPresetPanel.tsx) ===');
+    await c.evalExpr(SUBTAB('colour'));
+    await sleep(1200);
+    const presetsBefore = await psnap(c, PRESET_ID);
+    const openList = await c.evalExpr(OPEN_SECTION(
+      String.raw`/^Raster band presets\b/`,
+      `document.querySelector('input[placeholder="new_preset_id"]')`));
+    await sleep(900);
+    note('preset list section', `OPEN_SECTION → ${openList}`);
+    await c.evalExpr(SET_INPUT(`document.querySelector('input[placeholder="new_preset_id"]')`, PRESET_ID));
+    await sleep(400);
+    await c.evalExpr(CLICK_BY_TEXT('/^New$/'));
+    await sleep(1200);
+    await c.evalExpr(`window.__dbg.aeon.selectPreset(${JSON.stringify(PRESET_ID)})`);
+    await sleep(800);
+    // ⚠ THE REGEX EXCLUDES ITS OWN SIBLINGS. Three sections on this panel are
+    // titled "Preset — <id>…" and OPEN_SECTION takes the LAST match, so a bare
+    // prefix would open "cycles, variants" and the band rows would find no
+    // buttons at all.
+    const bandsOpen = await c.evalExpr(OPEN_SECTION(
+      String.raw`/^Preset — ` + PRESET_ID + String.raw`(?![-a-z0-9_ ])/`,
+      `document.querySelector('button[aria-label^="Remove raster band"]')`));
+    await sleep(900);
+    await c.evalExpr(INSTALL_HANDLES);
+    note('bands section', `OPEN_SECTION → ${bandsOpen}`);
+    for (let i = 0; i < 8; i++) {
+      const st2 = await psnap(c, PRESET_ID);
+      if (st2.bands >= 4) break;
+      await clickHandle(c, 'addBand', `Add raster band (fixture, at ${st2.bands})`);
+      await c.evalExpr(INSTALL_HANDLES);
+    }
+    await c.evalExpr(INSTALL_HANDLES);
+    const bndFixture = await psnap(c, PRESET_ID);
+    const bndButtons0 = await c.evalExpr("window.__d27e.removeButtons('Remove raster band')");
+    await shot(c, 'bands-fixture');
+    check('bnd-0', "ANTI-VACUOUS fixture: this run's own preset holds >= 4 raster bands — clear of the "
+      + 'schema floor of one band, so the Remove buttons are ENABLED and BOTH consecutive clicks land '
+      + 'above the floor',
+      bndFixture.bands >= 4 && bndButtons0.length === bndFixture.bands
+      && bndButtons0.every((b) => b.disabled === false),
+      `preset "${PRESET_ID}" bands=${bndFixture.bands}, remove buttons=${JSON.stringify(bndButtons0)}. `
+      + "The floor is lastBandRefusal's `bands.length <= 1`, which is the SAME predicate "
+      + 'removeBandCommand returns null on — one derivation, so the greyed button and the sentence '
+      + 'under it cannot disagree.');
+    if (bndFixture.bands < 4) throw new Error('could not build a 4-band fixture — the [bnd] rows would be vacuous');
+
+    await c.evalExpr("window.__d27e.latch('removeBand0')");
+    const bndPre = await psnap(c, PRESET_ID);
+    await clickHandle(c, 'removeBand0', 'Remove raster band 0');
+    const bndFocusA = await focusNow(c, 'removeBand0');
+    const bndA = await psnap(c, PRESET_ID);
+    check('bnd-a', 'effects/BandPresetPanel.tsx Remove raster band: after a REAL CLICK the button does '
+      + 'not keep keyboard focus — AND the same click still removed a band',
+      bndFocusA.isTheButton === false && bndA.bands === bndPre.bands - 1,
+      `activeElement = <${bndFocusA.tag}> "${bndFocusA.text}" aria=${JSON.stringify(bndFocusA.aria)} `
+      + `(isTheRemoveButton=${bndFocusA.isTheButton}); bands ${bndPre.bands} → ${bndA.bands}.`);
+
+    const bndSame = await c.evalExpr('window.__d27e.isSameNode("removeBand0")');
+    const bndInDom = await c.evalExpr('window.__d27e.latchedStillInDom()');
+    check('bnd-e', 'the key={i} RETARGET at Remove raster band: the button that removed band 0 is the '
+      + 'SAME DOM NODE afterwards — it stayed and now addresses the band that slid into slot 0',
+      bndSame === true && bndInDom === true && bndA.bands === bndPre.bands - 1,
+      `=== identity across the click: ${bndSame}; still in the document: ${bndInDom}; bands `
+      + `${bndPre.bands} → ${bndA.bands}. Node identity rather than band CONTENT, for the same reason `
+      + 'as [esp-e]: Add raster band produces identical bands, so a content comparison could not tell '
+      + '"removed the neighbour" from "removed the same one again".');
+
+    await ctrlZ(c); await sleep(600);
+    const bndRestored = await psnap(c, PRESET_ID);
+    note('[bnd] before the keys', `Ctrl+Z over the SAME key channel restored bands `
+      + `${bndA.bands} → ${bndRestored.bands}`);
+    await space(c); await sleep(500);
+    const bndSpace = await psnap(c, PRESET_ID);
+    await enter(c); await sleep(500);
+    const bndEnter = await psnap(c, PRESET_ID);
+    check('bnd-b', 'effects/BandPresetPanel.tsx Remove raster band: a bare SPACE straight after the '
+      + 'click reaches no writer — the preset library is byte-identical (Enter sent separately too)',
+      bndRestored.bands >= 4 && bndRestored.presets === bndPre.presets
+      && bndSpace.presets === bndRestored.presets && bndEnter.presets === bndRestored.presets,
+      `bands after Space = ${bndSpace.bands}, after Enter = ${bndEnter.bands} (unchanged from `
+      + `${bndRestored.bands}); presetsJson compared as a RAW STRING. VACUITY GUARD: the preset held `
+      + `${bndRestored.bands} bands when the keys were sent — clear of the floor, so the button was `
+      + 'ENABLED and a Space that reached it had a band to destroy. POSITIVE CONTROL: the Ctrl+Z '
+      + 'immediately before travelled the same Input.dispatchKeyEvent channel and put the band back.');
+
+    const bndPreC = await psnap(c, PRESET_ID);
+    await clickHandle(c, 'removeBand0', 'Remove raster band 0 (second real click, SAME pixel)');
+    const bndFocusC = await focusNow(c, 'removeBand0');
+    const bndC = await psnap(c, PRESET_ID);
+    const bndButtonsC = await c.evalExpr("window.__d27e.removeButtons('Remove raster band')");
+    const bndSlot0Enabled = bndButtonsC.length > 0 && bndButtonsC[0].disabled === false;
+    check('bnd-c', 'effects/BandPresetPanel.tsx Remove raster band: a SECOND real click still removes a '
+      + 'band and drops focus again — WITH THE BUTTON STILL ENABLED, so the focus half cannot be '
+      + 'satisfied by the one-band floor greying it out',
+      bndC.bands === bndPreC.bands - 1 && bndFocusC.isTheButton === false && bndSlot0Enabled,
+      `bands ${bndPreC.bands} → ${bndC.bands}; slot 0's Remove button after the click is `
+      + `disabled=${!bndSlot0Enabled} (buttons now ${JSON.stringify(bndButtonsC)}); activeElement after `
+      + `= <${bndFocusC.tag}> (isTheButton=${bndFocusC.isTheButton}). The enabled clause is the same one `
+      + '[esp-c] needed after a three-layer fixture let the floor answer for d-27.');
+    note('[bnd-d] NOT MEASURABLE, and that is a finding',
+      'no reachable no-op press. removeBandCommand returns null when the preset is missing, the index '
+      + 'is out of range, or bands.length <= 1 — and that last one is EXACTLY the predicate '
+      + 'lastBandRefusal uses to DISABLE the button, so an author cannot press it there. A [k7] row '
+      + 'would be green by construction; plant P8 measures the unconditional half at the one site '
+      + 'where a no-op press IS reachable.');
+    for (let i = 0; i < 4 && (await c.evalExpr('window.__dbg.aeon.canUndo()')); i++) {
+      const st3 = await psnap(c, PRESET_ID);
+      if (st3.bands >= 4) break;
+      await ctrlZ(c); await sleep(300);
+    }
+
+    // ── [cyc] the cycle-channel card ─────────────────────────────────────
+    //
+    // A fresh preset carries NO cycles key at all (newPreset writes only
+    // schema/id/bands), so cyclesState is 'absent' and neither the Add chip nor
+    // any card renders. The picker has to be driven to 'authored' first, which
+    // is what seeds the array — done through the select's own change event
+    // rather than by poking the store, so the fixture is built by the same path
+    // an author would use.
+    const cycOpen = await c.evalExpr(OPEN_SECTION(
+      String.raw`/^Preset — ` + PRESET_ID + String.raw` — cycles/`,
+      'window.__d27e.cyclesSelect()'));
+    await sleep(900);
+    await c.evalExpr(INSTALL_HANDLES);
+    const cycSel = await c.evalExpr(SET_SELECT('window.__d27e.cyclesSelect()', 'authored'));
+    await sleep(900);
+    await c.evalExpr(INSTALL_HANDLES);
+    note('cycles section', `OPEN_SECTION → ${cycOpen} · cycles picker set to → ${JSON.stringify(cycSel)}`);
+    for (let i = 0; i < 8; i++) {
+      const st4 = await psnap(c, PRESET_ID);
+      if (st4.cycles >= 3) break;
+      await clickHandle(c, 'addChannel', `Add channel (fixture, at ${st4.cycles})`);
+      await c.evalExpr(INSTALL_HANDLES);
+    }
+    await c.evalExpr(INSTALL_HANDLES);
+    const cycFixture = await psnap(c, PRESET_ID);
+    const cycButtons0 = await c.evalExpr("window.__d27e.removeButtons('Remove cycle channel')");
+    await shot(c, 'cycles-fixture');
+    check('cyc-0', "ANTI-VACUOUS fixture: the preset's cycles list is AUTHORED and holds >= 3 channels, "
+      + 'so both consecutive clicks have a channel to remove',
+      cycFixture.cycles >= 3 && cycButtons0.length === cycFixture.cycles
+      && cycButtons0.every((b) => b.disabled === false),
+      `cycles=${cycFixture.cycles}, remove buttons=${JSON.stringify(cycButtons0)}. This control has NO `
+      + 'disabled predicate at all — no floor, no refusal, no confirmation — which is what makes it the '
+      + 'purest instance of the d-27 shape on this panel.');
+    if (cycFixture.cycles < 3) throw new Error('could not build a cycles fixture — the [cyc] rows would be vacuous');
+
+    await c.evalExpr("window.__d27e.latch('removeChannel0')");
+    const cycPre = await psnap(c, PRESET_ID);
+    await clickHandle(c, 'removeChannel0', 'Remove cycle channel 0');
+    const cycFocusA = await focusNow(c, 'removeChannel0');
+    const cycA = await psnap(c, PRESET_ID);
+    check('cyc-a', 'effects/BandPresetPanel.tsx Remove cycle channel: after a REAL CLICK the button does '
+      + 'not keep keyboard focus — AND the same click still removed a channel',
+      cycFocusA.isTheButton === false && cycA.cycles === cycPre.cycles - 1,
+      `activeElement = <${cycFocusA.tag}> "${cycFocusA.text}" aria=${JSON.stringify(cycFocusA.aria)} `
+      + `(isTheRemoveButton=${cycFocusA.isTheButton}); cycles ${cycPre.cycles} → ${cycA.cycles}.`);
+
+    const cycSame = await c.evalExpr('window.__d27e.isSameNode("removeChannel0")');
+    const cycInDom = await c.evalExpr('window.__d27e.latchedStillInDom()');
+    check('cyc-e', 'the key={i} RETARGET at Remove cycle channel: the button that removed channel 0 is '
+      + 'the SAME DOM NODE afterwards — it stayed and now addresses the channel that slid into slot 0',
+      cycSame === true && cycInDom === true && cycA.cycles === cycPre.cycles - 1,
+      `=== identity across the click: ${cycSame}; still in the document: ${cycInDom}; cycles `
+      + `${cycPre.cycles} → ${cycA.cycles}. Worst case of the family: NOTHING disables this button at `
+      + 'any count — the schema accepts an empty cycles list by design — so before d-27 a held Space '
+      + 'walked the whole list away one keystroke at a time.');
+
+    await ctrlZ(c); await sleep(600);
+    const cycRestored = await psnap(c, PRESET_ID);
+    note('[cyc] before the keys', `Ctrl+Z over the SAME key channel restored cycles `
+      + `${cycA.cycles} → ${cycRestored.cycles}`);
+    await space(c); await sleep(500);
+    const cycSpace = await psnap(c, PRESET_ID);
+    await enter(c); await sleep(500);
+    const cycEnter = await psnap(c, PRESET_ID);
+    check('cyc-b', 'effects/BandPresetPanel.tsx Remove cycle channel: a bare SPACE straight after the '
+      + 'click reaches no writer — the preset library is byte-identical (Enter sent separately too)',
+      cycRestored.cycles >= 3 && cycRestored.presets === cycPre.presets
+      && cycSpace.presets === cycRestored.presets && cycEnter.presets === cycRestored.presets,
+      `cycles after Space = ${cycSpace.cycles}, after Enter = ${cycEnter.cycles} (unchanged from `
+      + `${cycRestored.cycles}). VACUITY GUARD: the list held ${cycRestored.cycles} channels when the `
+      + 'keys were sent, so a re-fire had one to destroy. POSITIVE CONTROL: the Ctrl+Z immediately '
+      + 'before travelled the same Input.dispatchKeyEvent channel and put the channel back.');
+
+    const cycPreC = await psnap(c, PRESET_ID);
+    await clickHandle(c, 'removeChannel0', 'Remove cycle channel 0 (second real click, SAME pixel)');
+    const cycFocusC = await focusNow(c, 'removeChannel0');
+    const cycC = await psnap(c, PRESET_ID);
+    const cycButtonsC = await c.evalExpr("window.__d27e.removeButtons('Remove cycle channel')");
+    check('cyc-c', 'effects/BandPresetPanel.tsx Remove cycle channel: a SECOND real click still removes '
+      + 'a channel and drops focus again',
+      cycC.cycles === cycPreC.cycles - 1 && cycFocusC.isTheButton === false,
+      `cycles ${cycPreC.cycles} → ${cycC.cycles}; buttons now ${JSON.stringify(cycButtonsC)}; `
+      + `activeElement after = <${cycFocusC.tag}> (isTheButton=${cycFocusC.isTheButton}). Without this `
+      + 'row, blurring by simply removing the handler would pass [cyc-a] and [cyc-b].');
+    note('[cyc-d] NOT MEASURABLE, and that is a finding',
+      'removeCycleChannelCommand no-ops only when cycles is not an array or the index is out of range '
+      + '— and a card cannot render in either case, so no author can perform that press. As everywhere '
+      + 'else in this family, the unconditional half comes from the shared helper and is measured by '
+      + 'plant P8.');
+
+    // ── put the preset library back ──────────────────────────────────────
+    for (let i = 0; i < 25 && (await c.evalExpr('window.__dbg.aeon.canUndo()')); i++) {
+      await ctrlZ(c); await sleep(200);
+      const st5 = await psnap(c, PRESET_ID);
+      if (st5.ids.length === presetsBefore.ids.length) break;
+    }
+    const presetsEnd = await psnap(c, PRESET_ID);
+    check('z2', 'the preset library is back where this run found it — the probe preset was created IN '
+      + "MEMORY by the panel's own New button and taken back through the app's history",
+      presetsEnd.ids.length === presetsBefore.ids.length,
+      `presets before this run = ${JSON.stringify(presetsBefore.ids)}, after the undos = `
+      + `${JSON.stringify(presetsEnd.ids)}`);
 
     // ── put the scene back the way this run found it ──────────────────────
     for (let i = 0; i < 12 && (await c.evalExpr('window.__dbg.aeon.canUndo()')); i++) {

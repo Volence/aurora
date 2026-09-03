@@ -77,6 +77,15 @@ const SITES: Array<{ rel: string; importFrom: string; writer: string; calls: str
     writer: 'removeLayerCommand — key={i} list removal, same retarget shape',
     calls: ['actAndDropFocus(e, () => run(removeLayerCommand(library, selected.id, i)))'],
   },
+  {
+    rel: 'components/effects/BandPresetPanel.tsx', importFrom: '../ui/act-and-drop-focus',
+    writer: 'removeBandCommand / removeCycleChannelCommand — the purest instance of the shape: the '
+      + 'channel Remove has no disabled predicate, no refusal and no confirmation at any count',
+    calls: [
+      'actAndDropFocus(e, () => run(removeBandCommand(library, presetId, index)))',
+      'actAndDropFocus(e, () => run(removeCycleChannelCommand(library, presetId, index)))',
+    ],
+  },
 ];
 
 describe('d-27: every surveyed control that stays mounted goes through actAndDropFocus', () => {
