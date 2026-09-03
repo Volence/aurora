@@ -158,6 +158,17 @@ in the same breath as the outcome, not appended below it. And when a claimed own
 leaves no artifact, mark it unverifiable rather than laundering it into fact by repetition;
 the cheap fix is to ask, because the owner is usually one sentence away.
 
+### ⚠ CUT THE CEREMONY — OWNER, 2026-09-02T18:20:19Z. It OUTRANKS every process bar in this file while EFFECTS-W1 is open
+
+**Read it at the artifact, not from this line** — it is the bullet beginning `2026-09-02T18:20:19Z — CUT THE CEREMONY` in empyrean's `docs/OVERSEER.md`, carried by empyrean `90554f2` (verified here an ancestor of `origin/main`, and read at that revision before this line was written):
+
+```sh
+git -C ../empyrean fetch -q origin && \
+git -C ../empyrean show origin/main:docs/OVERSEER.md | grep -n -A2 "18:20:19Z"
+```
+
+Deliberately a pointer and not a summary: clause 2 of the ruling is a moratorium on boot-doc growth, so restating it here would be the first thing it forbids. The two clauses this lane trips over most are (2) no new process bars and no boot-doc growth, and (3) DoD items and the bug tier only — no instrument work, no cross-lane audits, no re-measuring a peer's numbers, **unless it blocks a DoD item or ships wrong output**. Banked 2026-09-03 at the hub's ask; four other lanes hold the same pointer.
+
 ### Addressing the hub
 
 ⚠ **REPORT TO THE HUB EVERY TIME YOU FINISH A PIECE OF WORK OR STOP — OWNER, 2026-09-03T05:21:01Z**,
