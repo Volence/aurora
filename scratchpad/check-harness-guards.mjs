@@ -209,6 +209,25 @@ const unmeasurable = [];
 const rows = [];
 const exemptions = [];
 
+/**
+ * Failures that are ALWAYS fatal, whatever `git ls-files` says about the path
+ * they name.
+ *
+ * ⚠ FOUND BY PLANTING, AND IT MADE G6's EXEMPTION AUDIT VACUOUS. The
+ * tracked/untracked split at the bottom of this file is right for a rule about
+ * a FILE — the repo cannot fix a launcher it does not carry, so an untracked
+ * one is reported and not fatal. It is exactly wrong for a rule about this
+ * repo's OWN CONFIGURATION. G6's STALE EXEMPTION fires precisely when the path
+ * in `RETIRED_UNREGISTERED` is NOT tracked, so the split filed every stale
+ * exemption as "untracked, not fatal": the check that exists to stop the
+ * exemption list rotting went GREEN (exit 0) over a planted rotten entry.
+ * The failure was printed, and printed is not gated.
+ *
+ * Anything added here is a claim about package.json or about this file's own
+ * lists, not about a file the repo may or may not carry.
+ */
+const alwaysFatal = new Set();
+
 // G4 first: if the module is wrong, everything below is meaningless.
 let guardSrc = null;
 try { guardSrc = readFileSync(GUARD_ABS, 'utf8'); }
@@ -768,20 +787,23 @@ const RETIRED_UNREGISTERED = {
     const inPopulation = new Set(population);
     for (const [f, why] of Object.entries(RETIRED_UNREGISTERED)) {
       if (!inPopulation.has(f)) {
-        // Keyed by the raw path on purpose: it is not in `git ls-files`, which
-        // is the finding, and the untracked bucket is where a path git does not
-        // carry belongs. It still fails the run — every unmeasurable and every
-        // stale claim here is loud.
-        fails.push(`G6 ${relOf(f)}: STALE EXEMPTION — RETIRED_UNREGISTERED excuses \`${f}\` and it is not `
+        // ALWAYS FATAL. This is a claim about THIS FILE'S OWN LIST, not about a
+        // file the repo carries — and it fires exactly when the path is not
+        // tracked, which is the one condition the untracked split would use to
+        // make it non-fatal. Planted and measured: without `alwaysFatal` the
+        // whole exemption audit exits 0 over a rotten entry.
+        const msg = `G6 ${relOf(f)}: STALE EXEMPTION — RETIRED_UNREGISTERED excuses \`${f}\` and it is not `
           + 'a tracked harness-like file (renamed? deleted?). Delete the entry, or fix the path — an '
-          + 'exemption that no longer names anything is a workaround outliving its defect.');
+          + 'exemption that no longer names anything is a workaround outliving its defect.';
+        fails.push(msg); alwaysFatal.add(msg);
         continue;
       }
       const by = reachedBy(f);
       if (by) {
-        fails.push(`G6 ${relOf(f)}: DEAD EXEMPTION — RETIRED_UNREGISTERED excuses this path, but \`${by}\` `
+        const msg = `G6 ${relOf(f)}: DEAD EXEMPTION — RETIRED_UNREGISTERED excuses this path, but \`${by}\` `
           + 'already reaches it. One of the two is wrong: either the script should go, or the '
-          + 'exemption should. Reason on file: ' + why.slice(0, 80) + '…');
+          + 'exemption should. Reason on file: ' + why.slice(0, 80) + '…';
+        fails.push(msg); alwaysFatal.add(msg);
       }
     }
 
@@ -843,7 +865,14 @@ try {
   // `[GS]` — the shell rules use S-codes, and leaving this as `G\d+` would have
   // filed every shell failure under "tracked" by accident (the rule id would
   // stay in the key and never match a path), making an untracked .sh fatal.
-  untrackedFails = fails.filter((f) => !tracked.has(String(f).replace(/^\s*[GS]\d+ /, '').split(':')[0]));
+  // `alwaysFatal` is excluded FIRST. Those failures are claims about this
+  // repo's own configuration (package.json, this file's exemption list), not
+  // about a file the repo may not carry, and G6's STALE EXEMPTION fires exactly
+  // when the path it names is untracked — so without this line the split makes
+  // that rule non-fatal in precisely the case it exists to catch. Measured, not
+  // reasoned: a planted rotten exemption exited 0 before this was here.
+  untrackedFails = fails.filter((f) => !alwaysFatal.has(f)
+    && !tracked.has(String(f).replace(/^\s*[GS]\d+ /, '').split(':')[0]));
   trackedFails = fails.filter((f) => !untrackedFails.includes(f));
 } catch (e) {
   // Cannot ask git -> cannot split -> treat every failure as fatal. Never the
