@@ -623,18 +623,56 @@ async function main() {
       + `        composite vscroll=${JSON.stringify(camD.bands.map((b) => b.vscroll))}\n`
       + `        expected         =${JSON.stringify(expectVscroll)}`);
 
-    check('6b', 'the composite SAYS it does not draw the curve ramps this scene carries — '
-      + 'the boundary of the claim, on the canvas',
-      camD.absent.some((a) => /curve/.test(a)) && camD.absent.some((a) => /foreground/.test(a)),
-      JSON.stringify(camD.absent));
+    // ⚠ THIS PAIR ASSERTED A RULE THE APP HAS SINCE OVERTURNED — repaired in the
+    // O50 triage, 2026-09-03, and the direction is now the opposite one.
+    //
+    // [6b] used to require the composite's `absent` caption to SAY it does not
+    // draw curve ramps. It does not say that any more, on purpose:
+    // `cameraPreviewAbsences` (canvas/camera-preview.ts) carries a comment
+    // reading "⚠ NO `curve` LINE HERE ANY MORE, and its removal is the parcel.
+    // Ramps are composed per line by `curveRampRuns` … A stale absence is worse
+    // than none". So the row was red because the feature SHIPPED, and holding it
+    // would have been asking the app to lie about itself.
+    //
+    // ⚠ AND THE OLD [6c] CANNOT SIMPLY BE KEPT. "the flat scene reports NO curve
+    // absence" is now true of EVERY scene — no scene reports one — so its
+    // success state and its failure state emit the same artifact and it could
+    // only ever return green (docs/OVERSEER.md bar 2e). It is re-pointed at the
+    // same quantity as [6b] so the two still form an anti-vacuous pair.
+    //
+    // THE QUANTITY IS THE RAMP ITSELF, which is what the parcel added:
+    // `CameraPreviewBand.ramp` is `CurveRun[] | null`, composed by
+    // `curveRampRuns`, and a real ramp is a band whose scroll CHANGES down its
+    // own rows — a single-valued "ramp" is a flat band with an array around it.
+    const rampsOf = (cam) => cam.bands
+      .map((b, i) => ({ i, layer: b.layer, runs: Array.isArray(b.ramp) ? b.ramp.length : 0,
+                        xs: Array.isArray(b.ramp) ? [...new Set(b.ramp.map((r) => r.scrollX))].length : 0 }))
+      .filter((r) => r.runs > 0);
+    const deepRamps = rampsOf(camD);
+    const deepCurves = deep.layers.filter((l) => l.curve !== undefined && l.curve !== 'none').length;
+    check('6b', 'the composite DRAWS the curve ramps this scene carries — at least one band '
+      + 'is composed as a ramp whose scroll really varies down its own rows, and the caption '
+      + 'no longer claims curves are missing',
+      deepCurves > 0
+      && deepRamps.length > 0 && deepRamps.some((r) => r.xs > 1)
+      && camD.absent.every((a) => !/curve/.test(a))
+      && camD.absent.some((a) => /foreground/.test(a)),
+      `${deepCurves} curved layer(s) in the document · ramped bands=${JSON.stringify(deepRamps)}`
+      + `\n        absent=${JSON.stringify(camD.absent)}`);
 
     await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_FLAT)})`);
     await sleep(700);
     let camBack = await c.json('window.__dbg.aeon.cameraPreview()');
-    check('6c', '[anti-vacuous] the flat scene reports NO curve absence — so 6b is about '
-      + 'this scene\'s content and not a constant string',
-      camBack.absent.every((a) => !/curve/.test(a)) && camBack.absent.length > 0,
-      JSON.stringify(camBack.absent));
+    const flatScene = sceneOf(doc, SCENE_FLAT);
+    const flatRamps = rampsOf(camBack);
+    const flatCurves = flatScene.layers
+      .filter((l) => l.curve !== undefined && l.curve !== 'none').length;
+    check('6c', '[anti-vacuous] the CURVELESS scene composes NO ramp at all — so 6b is about '
+      + 'this scene\'s content and not something every scene gets',
+      flatCurves === 0 && flatRamps.length === 0 && camBack.bands.length > 0
+      && camBack.absent.length > 0,
+      `${flatCurves} curved layer(s) in the document · ramped bands=${JSON.stringify(flatRamps)} `
+      + `of ${camBack.bands.length} · absent=${JSON.stringify(camBack.absent)}`);
 
     // ---- 7. THE TOGGLE OFF ----------------------------------------------
     const menuBoxes2 = await openViewMenu(c);
