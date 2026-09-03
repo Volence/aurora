@@ -268,6 +268,19 @@ const CLICK_VIEW_ITEM = (re) => String.raw`
   box.click();
   return { before, after: box.checked };
 })()`;
+/** The same finder, READING ONLY — for `setViewOverlay` below. */
+const READ_VIEW_ITEM = (re) => String.raw`
+(() => {
+  const label = [...document.querySelectorAll('label')]
+    .find((e) => ${re}.test((e.textContent || '').trim()));
+  if (!label) {
+    return { error: 'no-label', saw: [...document.querySelectorAll('label')]
+      .map((e) => (e.textContent || '').trim()) };
+  }
+  const box = label.querySelector('input[type=checkbox]');
+  if (!box) return { error: 'no-checkbox' };
+  return { checked: box.checked };
+})()`;
 async function toggleViewOverlay(c, re) {
   const opened = await c.evalExpr(OPEN_VIEW_MENU);
   if (opened !== true) return { error: opened };
@@ -277,6 +290,32 @@ async function toggleViewOverlay(c, re) {
   await c.evalExpr(OPEN_VIEW_MENU).catch(() => {});   // close
   await sleep(300);
   return r;
+}
+
+/**
+ * PUT an overlay into a state, rather than flipping it.
+ *
+ * ⚠ ADDED FOR EW-SHAPE-PREVIEW, AND ONLY §3 USES IT. The composite is now ON by
+ * default on the Parallax sub-tab, which is the sub-tab this whole harness
+ * works on — so §3's opening `toggleViewOverlay` would have turned the thing it
+ * needs OFF and inverted every parity below it. Every OTHER call in this file
+ * is one half of a BALANCED PAIR (on→off→on around a measurement) and is
+ * correct as a flip whatever the starting state is; converting those would have
+ * been a rewrite, not a repair.
+ */
+async function setViewOverlay(c, re, want) {
+  const opened = await c.evalExpr(OPEN_VIEW_MENU);
+  if (opened !== true) return { error: opened };
+  await sleep(400);
+  const seen = await c.json(READ_VIEW_ITEM(re));
+  let r = { ...seen, clicked: false };
+  if (seen.error === undefined && seen.checked !== want) {
+    r = { ...(await c.json(CLICK_VIEW_ITEM(re))), clicked: true };
+  }
+  await sleep(300);
+  await c.evalExpr(OPEN_VIEW_MENU).catch(() => {});   // close
+  await sleep(300);
+  return { ...r, after: r.clicked ? r.after : seen.checked };
 }
 
 /** A real key event on the window — the camera keys' own listener. */
@@ -457,9 +496,13 @@ async function main() {
     await sleep(500);
     const frameOn = await toggleViewOverlay(c, '/^Screen frame/');
     note(`Screen frame checkbox: ${JSON.stringify(frameOn)}`);
-    const composeOn = watchMiss('3a compose', await toggleViewOverlay(
-      c, '/^Compose the background in the frame/'));
-    check('3a', "the real View menu OFFERS the composite's checkbox, and it turned ON",
+    // PUT, not flip — see `setViewOverlay`. Since EW-SHAPE-PREVIEW the
+    // composite is already on when this harness arrives, and a flip here would
+    // have turned it off.
+    const composeOn = watchMiss('3a compose', await setViewOverlay(
+      c, '/^Compose the background in the frame/', true));
+    check('3a', "the real View menu OFFERS the composite's checkbox, and it is ON "
+      + '(on by default now; this row asks for the state, not for a click)',
       !!composeOn && composeOn.error === undefined && composeOn.after === true,
       JSON.stringify(composeOn));
 
