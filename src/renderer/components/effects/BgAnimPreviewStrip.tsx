@@ -139,7 +139,7 @@ export default function BgAnimPreviewStrip() {
           <b>The preview is approximate</b>, in four named ways — the phase arithmetic is not one
           of them, it is the consumer&apos;s own expression.
           {' '}(1) The clock is the editor&apos;s wall clock, not <code>Logic_Tick</code>: a lag
-          frame freezes a band in game and never here.
+          frame freezes a tile animation in game and never here.
           {' '}(2) Camera-driven tile animations read your pan; the engine also clamps its camera to the level, and
           that clamp is not modelled, so panning past the right or bottom edge shows phases the
           game holds still.
@@ -152,14 +152,14 @@ export default function BgAnimPreviewStrip() {
 
       {!snapshot.backgroundPresent && (
         <Hint tone="warning">
-          The active section resolves to no background, so there is nothing for a band to
-          animate on screen.
+          The active section resolves to no background, so there is nothing for a tile animation
+          to animate on screen.
         </Hint>
       )}
 
       {playing && !bgOnScreen && (
         <Hint tone="warning">
-          Plane B is hidden, so the bands are drawing where you cannot see them. Turn on
+          Plane B is hidden, so the tile animations are drawing where you cannot see them. Turn on
           View &gt; Show Bg Plane, or switch to the BG layer.
         </Hint>
       )}
