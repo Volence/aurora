@@ -31,7 +31,15 @@ import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9351);
 const S1DIR = siblingPathOrUnresolved('s1disasm');
-const AEONDIR = siblingPathOrUnresolved('aeon') + '/';
+// NO TRAILING SLASH, and that is a fix rather than a tidy-up (O53 §5 named this
+// as the third site; O54 landed it). L464 seeds a recent row with this string
+// and L473 then finds it by `button[title=<AEONDIR>]` — but `addRecentProject`
+// stores through `normalizeProjectPath` (`src/shared/project-path.ts:29`), which
+// strips trailing separators, and the row renders `title={r.path}`. So the old
+// `+ '/'` searched for a title the app could never render, and the aeon half of
+// this capture died at "aeon unreachable" reporting the Explorer's collapse
+// toggle instead.
+const AEONDIR = siblingPathOrUnresolved('aeon');
 const ROOT = AURORA_DIR;
 // WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
 // question 1. A linked worktree has no node_modules/ and no dist/, so the tree
