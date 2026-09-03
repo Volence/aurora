@@ -590,7 +590,16 @@ async function main() {
       // short body, so before O77 it was the one conjunct that stayed true while
       // the row was measuring the wrong string. Scoped to this element and
       // carried through to its object.
-      /a row in aeon's band-demo table or a section binding/.test(debugChord.text)
+      // ⚠ `\x27`, NOT A BARE `'`, AND IT IS NOT STYLE. `check-harness-guards.mjs`
+      // (in `npm test`) strips comments before hunting for `pkill`, and its
+      // `stripInert` has no regex-literal case: a bare apostrophe inside `/…/`
+      // opens a string to it, the scanner desynchronises, and a COMMENT further
+      // down this file — the one saying there is no `pkill` here — survives
+      // stripping and trips G2. Measured: the same file with `aeon's` in these
+      // two regexes fails `check:harness-guards`; with `\x27` it is clean. The
+      // character matched is identical. The checker's fragility is filed in the
+      // O77 packet; this spelling is the local fix, not the general one.
+      /a row in aeon\x27s band-demo table or a section binding/.test(debugChord.text)
       && /fails loudly when it has neither/.test(debugChord.text)
       // HOVERED — the chord itself, and the fact the table is hand-typed. These
       // are what a programmer needs and an author does not, which is why the cut
@@ -601,7 +610,7 @@ async function main() {
       && /aeon 4aa2abc0/.test(debugChord.title),
       debugChord.missing ? 'NO ELEMENT LED "Seeing it is a debug chord." — the limit is gone'
         : `painted(${debugChord.text.length}B): `
-        + `rowOrBinding=${/a row in aeon's band-demo table or a section binding/.test(debugChord.text)} `
+        + `rowOrBinding=${/a row in aeon\x27s band-demo table or a section binding/.test(debugChord.text)} `
         + `loudWhenNeither=${/fails loudly when it has neither/.test(debugChord.text)}; `
         + `hover(${debugChord.title.length}B): chord=${/START/.test(debugChord.title)} `
         + `handTyped=${/hand-typed dc\.l list/.test(debugChord.title)} `
