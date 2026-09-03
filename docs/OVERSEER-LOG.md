@@ -77,6 +77,16 @@ history of how it got there. **Nothing here was rewritten** — these are the ti
 
 > Controls for aeon DoD items 7-11 (vertical bob, BgAnim vertical motion, Hydrocity row remap, the three plane tricks, nametable-base swaps incl. Plane Z) — each lands as its engine item lands; priced as an aggregate L, to be split when the first one arrives. Absorbs the old row 55.
 
+**THE REELS HALF (item 10a) IS BLOCKED ON AN ENGINE MECHANISM THAT DOES NOT EXIST YET — hub relay 2026-09-03, NOT read by me at an aeon revision.** Aeon's own key-shape artifact (aeon `c866b8ed`, `docs/superpowers/specs/2026-09-03-item10a-reels-key-shape.md`) finds that **10a is one fixed DEBUG demo**: no per-scene mechanism, no constructor, no engine hook. **A document key would therefore lower to nothing for a real section.** So the hub is deliberately **NOT filing a reels CR yet**; aeon builds the authorable engine half first (per-scene rates, checks travelling with the construct, a stated magnitude bound), then a short shape note, then the CR.
+
+⚠ **DO NOT BUILD A CONTROL AGAINST THE SPELLING BELOW.** It is **pre-declared, not contract** — there is no CR and no schema key. It is recorded only so both sides converge, and so that a future session does not re-derive it differently. **The artifact the CR eventually publishes is what to vendor and derive from**, exactly as the `ramp` key was.
+
+- Pre-declared spelling: a **SCENE-level** key `reel_rates` — a bare array of **exactly 5 signed integers**, index = band **left to right**, index 0 owning screen columns 0-3. **Absent = no reels.**
+- ⚠ **AND THE MUST NOT, which is the part that constrains OUR surface: reels are NEVER an arm of `v_deform`.** That mechanism is **one shared phase** and cannot express independent per-band rates. **A control that offers reels under `v_deform` would author something the engine cannot honour** — the same class as the per-line curve trap that `ramp` was named to avoid, and the same class as the reels trap aeon cited when ruling on item 6. Whatever this control eventually is, it is its own thing.
+- Item **11**'s field is *likely* the same shape; the hub has asked aeon to confirm in one line. **Likely is not a design input** — treat 11 as unspecified until that line exists.
+
+**What IS actionable today: item 6's `ramp`.** That CR has landed and is being vendored (see the EW-PERLINE entry above).
+
 ### A12
 
 `size: L` · `state: open` · `blockedBy: aeon's DEBUG override block` · `project: LIVE-OBJECTS`
