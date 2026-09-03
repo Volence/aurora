@@ -143,7 +143,8 @@ function toWord(v: number): number {
  *
  * ═══ THIS NEEDED NO CLOCK, AND THE BOOKING THAT SAID IT DID WAS WRONG ═══
  *
- * `viewStore.showCameraPreview` said "no curve ramps, no deform (both need a
+ * `viewStore.showCameraPreview` (now `viewStore.parallaxPreview`) said "no
+ * curve ramps, no deform (both need a
  * clock this pass does not have)". Deform does: its line loops index a table by
  * `Parallax_Deform_Phase_FG`/`_BG`, which `Parallax_Update` advances by
  * `speed` every frame. A CURVE READS NO SUCH THING. Every input to the hoist is

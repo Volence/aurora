@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { OpenEngine } from './open-project';
+import { loadPreviewChoice, savePreviewChoice, type PreviewChoice } from '../shell/preview-pref';
 
 export interface OverlayOptions {
   showObjects: boolean;
@@ -61,32 +62,32 @@ export interface OverlayOptions {
    *  comes from core/model/screen.ts (mirrors aeon's SCREEN_WIDTH/HEIGHT).
    *  A reference the author asks for, so OFF by default like the lenses. */
   showScreenFrame: boolean;
-  /** Inside the screen frame, compose Plane B the way the ROM would for a
-   *  camera at the frame's anchor: each band at its own factor's offset, with
-   *  the vsplits selecting the vertical region from their line down.
-   *
-   *  The owner: "I just want it to appear how it would in game." ONE CANVAS —
-   *  he rejected a second view himself ("too cumbersome with wanting to do
-   *  edits and having to go back and forth"), so this repaints the frame's
-   *  interior inside the map's own pass and the foreground still composites
-   *  over it.
-   *
-   *  ⚠ IT IS NOT THE WHOLE PICTURE and the composite says so on the canvas:
-   *  no deform (that one really does need a clock — its line loops index a
-   *  table by a phase `Parallax_Update` advances every frame), no foreground
-   *  factors, no sprites, no priority. See canvas/camera-preview.ts's absence
-   *  list, which is the live answer; this comment is prose beside it.
-   *
-   *  ⚠ CURVE RAMPS ARE DRAWN, and this line used to say they were not — "no
-   *  curve ramps, no deform (both need a clock this pass does not have)". The
-   *  parenthesis was true of deform and FALSE of curves, and lumping them cost
-   *  the feature a pass: a ramp is a function of the LINE, not of a frame
-   *  counter, so nothing about the map's clockless repaint was ever in its way.
-   *  See `curveRampRuns` for the measurement.
-   *
-   *  A lens, so OFF by default. */
-  showCameraPreview: boolean;
 }
+
+// ═══ WHERE THE PARALLAX COMPOSITE WENT, AND WHY IT IS NOT AN OVERLAY KEY ═══
+//
+// `showCameraPreview` used to be the eleventh key of `OverlayOptions`: one
+// global boolean, listed in every aeon facet's View menu, off by default. It is
+// now `ViewState.parallaxPreview` — a TRI-STATE owned by the Effects facet's
+// Parallax sub-tab (`providers/parallax-preview.ts` derives what draws).
+//
+// It could not stay here, and the reason is not tidiness:
+//
+//   1. AN `OverlayOptions` VALUE IS A BOOLEAN, and "on by default until the
+//      author says otherwise" needs three states, not two (shell/preview-pref).
+//   2. A BOOLEAN NAMED `showCameraPreview` THAT READS FALSE WHILE THE PREVIEW
+//      IS ON SCREEN is a label that outlives its meaning — and everything in
+//      this repo that reads the overlay record (`__dbg.overlays()`, the View
+//      menu's uniform checkbox, four test literals) would have believed it.
+//   3. THE DEFAULT MUST NOT LEAK INTO THE OTHER FACETS. Every key in this
+//      record is offered by the View menu in Layout, Objects, Collision and
+//      Art. Flipping this one's default to `true` would have shown all four a
+//      ticked box for a preview nobody asked for and nothing draws there. The
+//      View menu now carries the parallax composite ONLY in the Effects facet,
+//      because that is the only place it means anything.
+//
+// The canvas, the keyboard camera-step and both switches read one derivation,
+// and nothing in this file can turn the preview on.
 
 /**
  * Which overlays each engine actually renders.
@@ -130,9 +131,10 @@ export const OVERLAY_KEYS_BY_ENGINE: Record<OpenEngine, readonly (keyof OverlayO
     // The screen frame (row G). Aeon only for now: classic's viewport is a
     // separate draw path (classic-surface) that does not read this key yet.
     'showScreenFrame',
-    // The in-frame camera composite. Aeon only, and effects-only in practice —
-    // it needs a scene, so it is inert in every other aeon facet.
-    'showCameraPreview',
+    // ⚠ `showCameraPreview` WAS HERE and is deliberately gone — see the block
+    // above `ViewState`. The View menu still offers the parallax composite, but
+    // from `ViewMenu`'s own effects-facet row rather than from this list, so it
+    // cannot appear in Layout / Objects / Collision / Art.
   ],
 };
 
@@ -145,6 +147,20 @@ interface ViewState {
    *  toggles: it is a reference the author placed, not document state, so it
    *  does not enter the undo stack or the project file. */
   screenFrame: { x: number; y: number };
+  /**
+   * THE PARALLAX COMPOSITE — the author's CHOICE, not what is drawn.
+   *
+   * `null` while he has never operated the switch, which is when the default
+   * gets to speak. What actually draws is
+   * `providers/parallax-preview.ts#parallaxPreviewOn()`, and nothing should
+   * read this field except that module and the two switches: reading it raw is
+   * how "the flag is false" and "the preview is off" come apart.
+   *
+   * Seeded from the author's stored choice, so an explicit OFF survives a
+   * restart — shell/preview-pref.ts says why this one overlay is remembered
+   * when none of the others is.
+   */
+  parallaxPreview: PreviewChoice;
 
   pan: (dx: number, dy: number) => void;
   setZoom: (zoom: number, centerX?: number, centerY?: number) => void;
@@ -156,6 +172,16 @@ interface ViewState {
   setOverlay: (key: keyof OverlayOptions, value: boolean) => void;
   /** Pin the screen frame at a world point (clamped to the origin, whole px). */
   setScreenFrame: (x: number, y: number) => void;
+  /**
+   * Record the author's choice about the parallax composite, and remember it.
+   *
+   * There is no `toggleParallaxPreview`, on purpose: a toggle would have to
+   * flip the STORED value, and the stored value is `null` exactly when the
+   * thing on screen disagrees with it — so `!null` would turn the preview ON
+   * while it was already on. The callers flip the EFFECTIVE value and set the
+   * result.
+   */
+  setParallaxPreview: (v: PreviewChoice) => void;
 }
 
 export const useViewStore = create<ViewState>((set) => ({
@@ -191,10 +217,9 @@ export const useViewStore = create<ViewState>((set) => ({
     playAnimatedArt: false,
     // A reference, asked for: OFF like the lenses.
     showScreenFrame: false,
-    // A lens: OFF until asked for.
-    showCameraPreview: false,
   },
   screenFrame: { x: 0, y: 0 },
+  parallaxPreview: loadPreviewChoice(),
 
   pan: (dx, dy) => set((state) => ({
     vpX: Math.max(0, state.vpX - dx / state.zoom),
@@ -234,4 +259,9 @@ export const useViewStore = create<ViewState>((set) => ({
   setScreenFrame: (x, y) => set({
     screenFrame: { x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)) },
   }),
+
+  setParallaxPreview: (v) => {
+    savePreviewChoice(v);
+    set({ parallaxPreview: v });
+  },
 }));

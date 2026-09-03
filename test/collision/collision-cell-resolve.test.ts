@@ -116,7 +116,7 @@ const BOTH_PLANES: OverlayOptions = {
   showCollisionPathB: true, showBgPlane: false, showStart: false, showPriority: false,
   occludeSprites: false, playAnimatedArt: false,
   showSolidBothPlanes: false, showCrossover: false,
-  showScreenFrame: false, showCameraPreview: false,
+  showScreenFrame: false,
 };
 
 /** A viewport that covers one whole section at 1:1 — every cell is in range. */

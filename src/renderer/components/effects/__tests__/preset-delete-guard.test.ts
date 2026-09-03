@@ -77,9 +77,13 @@ describe('the parallax preview is reachable from the tab it is about (defect 14)
     // The preview existed, was off by default, lived in the View menu and was
     // never mentioned by this tab; the cold reader found it ten minutes after
     // he needed it. A second, private flag would be worse than the burial —
-    // this reads and writes `showCameraPreview` in the one store the menu uses.
-    expect(bar).toMatch(/useViewStore\(\(s\) => s\.overlays\.showCameraPreview\)/);
-    expect(bar).toMatch(/toggleOverlay\('showCameraPreview'\)/);
+    // this reads and writes the ONE derivation the View menu's own row uses
+    // (providers/parallax-preview). It was `overlays.showCameraPreview` until
+    // EW-SHAPE-PREVIEW made the switch tab-scoped and the flag a tri-state; the
+    // claim this row makes — one switch, not two — is unchanged.
+    expect(bar).toMatch(/useParallaxPreviewOn\(\)/);
+    expect(bar).toMatch(/onClick=\{\(\) => toggleParallaxPreview\(\)\}/);
+    expect(bar).not.toMatch(/overlays\.showCameraPreview/);
     expect(bar).toMatch(/Parallax preview/);
     // It reflects the current state rather than pretending to be a button.
     expect(bar).toMatch(/<Chip active=\{cameraPreview\}/);

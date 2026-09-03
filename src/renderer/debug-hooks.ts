@@ -55,6 +55,7 @@ import { lastStripOpenReport } from './providers/bg-anim-art';
 import type { StripOpenReport } from './providers/bg-anim-art';
 import { useAetherStore } from './state/aetherStore';
 import { useViewStore } from './state/viewStore';
+import { parallaxPreviewOn } from './providers/parallax-preview';
 import { useArtStore } from './state/artStore';
 import { useCanvasStore } from './state/canvasStore';
 import { useSpriteStore } from './state/spriteStore';
@@ -1424,6 +1425,19 @@ interface DebugApi {
    */
   setOverlay(key: string, value: boolean): void;
   /**
+   * THE PARALLAX COMPOSITE, AND ITS THREE INPUTS SEPARATELY.
+   *
+   * It is NOT in `overlays()` — it stopped being an overlay key when it became
+   * tab-scoped (EW-SHAPE-PREVIEW), and it could not stay one: `on` is true for
+   * an author whose stored `choice` is `null`, which no boolean record can say.
+   *
+   * A harness gets all four because the interesting failures are the ones where
+   * they disagree — a preview drawn in the wrong facet, a default speaking over
+   * a recorded choice, a choice recorded by a click that should have been a
+   * no-op. `on` is the app's own derivation, not a second one computed here.
+   */
+  parallaxPreview(): { on: boolean; choice: boolean | null; facet: string; subTab: string };
+  /**
    * Open an act the way the UI does — through the tab activation guard, which is
    * what carries the per-tab viewport snapshot/restore. `openAct` above goes
    * straight to the store and bypasses all of it, so a harness testing restore
@@ -1697,6 +1711,12 @@ export function installDebugHooks(): void {
     overlays: () => ({ ...useViewStore.getState().overlays }) as unknown as Record<string, boolean>,
     setOverlay: (k, v) => useViewStore.getState()
       .setOverlay(k as keyof ReturnType<typeof useViewStore.getState>['overlays'], v),
+    parallaxPreview: () => ({
+      on: parallaxPreviewOn(),
+      choice: useViewStore.getState().parallaxPreview,
+      facet: useWorkspaceStore.getState().facetFor(useSessionStore.getState().activeId),
+      subTab: useEditorStore.getState().effectsSubTab,
+    }),
     activate: (zone, act) => activateLevelTarget(levelDocId(zone, String(act))),
     resetLevel: () => useClassicLevelStore.getState().reset(),
     // setState rather than setCurrentAct: the store action takes an act id, and
