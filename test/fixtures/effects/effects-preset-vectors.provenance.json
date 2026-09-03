@@ -5,11 +5,11 @@
   "empyrean": {
     "repo": "git@github.com:Volence/empyrean.git",
     "path": "contract/schema/tests/effects-preset-vectors.json",
-    "revision": "12aecd58825de5c830b4bbe33fe9f80cf01bea83",
-    "revision_subject": "merge: item 5 contract change, cycles and variants in preset documents (schema 7.2, preset JSON schema, G7 vectors, CR record) under the hub's ten rulings",
+    "revision": "d36d70417b580e5b5134f772bc85a6fc3474d295",
+    "revision_subject": "effects schema: the preset document gains patch_world_ys and patch_motion (DoD item 4 authoring key, per aeon key-shape artifact 81b2a719; AURORA_EFFECTS_SCHEMA.md 7.3)",
     "blob": "cc3f0f96cf572b1731e0a21ad3e9188b2bfd8958",
-    "resolved_by": "git -C ../empyrean show 12aecd5:contract/schema/tests/effects-preset-vectors.json — read through git OBJECTS, never through the sibling working tree. Redirected straight into this directory; never retyped, never reformatted; re-hashed with `git hash-object` before anything believed it.",
-    "revision_published": "12aecd5 is an ancestor of empyrean origin/main (63c85aebec4671fb6cc8dccca89c7a5b5d3ddf1c at vendoring), checked with `git merge-base --is-ancestor`, and origin/main:contract/schema/tests/effects-preset-vectors.json resolves to the SAME blob cc3f0f96 — current at tip, not merely correctly cited.",
+    "resolved_by": "git -C ../empyrean show d36d704:contract/schema/tests/effects-preset-vectors.json — read through git OBJECTS, never through the sibling working tree. THE BYTES DID NOT MOVE: this file is blob cc3f0f96 at 12aecd5 and at d36d704 alike, so nothing was re-extracted on 2026-09-03 and the vendored copy is untouched. Only the revision this sidecar CITES advanced, so that it and the schema's sidecar name one revision.",
+    "revision_published": "d36d704 is an ancestor of empyrean origin/main (4dcd520e1d3989e19bfdd3c3f3a38181e6e6910b at re-pinning, after `git fetch origin`), checked with `git merge-base --is-ancestor`, and origin/main:contract/schema/tests/effects-preset-vectors.json resolves to the SAME blob cc3f0f96 — current at tip, not merely correctly cited.",
     "branch_that_answers_currency": "origin/main"
   },
   "vendored": {
@@ -20,10 +20,12 @@
   },
   "schema_these_vectors_belong_to": {
     "sidecar": "src/core/formats/effects/aurora-effects-preset.schema.provenance.json",
-    "same_revision": "Both were vendored from empyrean 12aecd5 in one parcel (EW-REVENDOR-PRESET). A re-pin of one without the other is a mismatch the vectors test would report as the schema refusing a vector the contract says it accepts, or vice versa."
+    "same_revision": "Both sidecars cite ONE empyrean revision, and they are re-pinned together. 12aecd5 (EW-REVENDOR-PRESET) vendored both files; d36d704 (EW-CHANNELS-WRITER) moved the SCHEMA's bytes and left these alone, so this sidecar's revision advanced with the schema's while its blob stayed cc3f0f96. A re-pin of one without the other is a mismatch the vectors test would report as the schema refusing a vector the contract says it accepts, or vice versa.",
+    "no_published_vectors_for_the_2026_09_03_keys": "d36d704 published no vector rows for patch_world_ys / patch_motion — empyrean's §7.3 records a sixteen-vector probe it ran in its OWN repo but did not commit into contract/schema/tests/. So the accept/reject rows for the two new keys in Aurora are AURORA'S OWN, written from the schema and §7.3, and live in test/formats/effects-preset.test.ts rather than here. If empyrean later publishes them, they arrive through this file's re_vendor command and supersede nothing: Aurora's rows and the contract's would then both run."
   },
   "pin_history_current_last": [
-    "cc3f0f96 — 12aecd5, landing (the vectors' first revision; byte-identical at origin/main 63c85aeb)"
+    "cc3f0f96 — 12aecd5, landing (the vectors' first revision; byte-identical at origin/main 63c85aeb)",
+    "cc3f0f96 — d36d704, revision advanced 2026-09-03 with the schema's re-vendor; the BLOB DID NOT CHANGE (no vectors were published for patch_world_ys / patch_motion), byte-identical at origin/main 4dcd520e"
   ],
   "re_vendor": "git -C <empyrean> fetch origin && git -C <empyrean> show origin/main:contract/schema/tests/effects-preset-vectors.json > test/fixtures/effects/effects-preset-vectors.json — then update `empyrean.revision`, `empyrean.blob`, `vendored.bytes`, `vendored.git_blob` and `pin_history_current_last` here, re-vendor the SCHEMA at the same revision, and re-run the full suite."
 }

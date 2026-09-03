@@ -53,10 +53,87 @@
           }
         ]
       }
+    },
+    "patch_world_ys": {
+      "type": "array",
+      "maxItems": 4,
+      "description": "The anchor SEED per patch channel, POSITIONALLY: index = patch channel, ep_patch_world_ys[i] (aeon preset.emp:66), lowered through preset(patch_world_ys:) (preset.emp:141-148). Added 2026-09-03 (docs/AURORA_EFFECTS_SCHEMA.md section 7.3, DoD item 4, against aeon's key-shape artifact 81b2a719). THREE STATES PER INDEX, the variants rule: an index the array does not reach (including an absent key) KEEPS the section's hand-authored value; null at an index is the engine sentinel PATCH_ANCHOR_NONE ($7FFF, channel unused), NEVER 0; an integer authors it. UNIT: WHOLE PIXELS, absolute level space, u16, and NEITHER SIDE CONVERTS, 1:1. This is NOT item 3's unit: drift.rate is 1/256 px per frame with the editor multiplying by 256 on export; a world Y exported x256 lands 256 times down the level and the band silently never appears (aeon raster_dsl.emp:2095-2103: the screen line is anchor - Camera_Y). 0 is a real world Y, above the screen top, the most invasive state a channel can have; spell 'unused' as null. The two bounds encoded here, the u16 range and the refusal of 32767, are enforced NOWHERE ELSE today (aeon's artifact section 3, two rows marked NOTHING TODAY), which is why this schema departs from its shape-only posture for them: a closed writer-side schema is the one refusal an author meets. The array's max length is RASTER_MAX_PATCH = 4 (raster_dsl.emp:2089), encoded for the same reason (preset.emp:161/167 ensure length 4 at the call site, but the generator pads a short array, so an over-long one has no other refusal before the engine's). A seed without a motion is legal and stationary; a motion without a seed on a channel the section leaves unused is seeded to the sentinel and never shows, so an author wanting movement authors BOTH keys at that index.",
+      "items": {
+        "oneOf": [
+          {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535,
+            "not": {
+              "const": 32767
+            }
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "patch_motion": {
+      "type": "array",
+      "maxItems": 4,
+      "description": "The anchor MOTION per patch channel, POSITIONALLY, the same index space as patch_world_ys: ep_patch_motion[i] (aeon preset.emp:86), lowered through preset(patch_motion:) to anchor_sweep(amp_shift:, period_shift:, phase:) (raster_dsl.emp:2232-2238). Added 2026-09-03 (section 7.3, DoD item 4, aeon 81b2a719). THREE STATES PER INDEX: unreached index or absent key KEEPS the hand-authored value; null is ANCHOR_MOTION_NONE (0, no motion); an object authors it. EXACTLY ONE ARM, sweep, the single-arm form item 3's drift uses. There is deliberately NO approach arm and none is reserved: APPROACH has no preset seed field (preset.emp:81-87 scopes it out; its handle is the runtime call Effects_SetTargetY), so a reserved arm would be a key with nothing behind it. A motion is only READ in a game whose SCANLINE_CAPS raises CAP_ANCHOR_MOTION ($0100; sonic4 yes, demo no): the seed is installed unconditionally (34 bytes, preset.emp:333-340) while the latch loop that reads it is gated (raster.emp:1930), so in an ungated game an authored sweep is a silent no-op, not a refusal (aeon artifact section 4b; a generator refusal is step 4's). A sweep whose peak-to-peak travel leaves the channel's patchable(lo, hi) band is NOT clamped: Raster_BuildSchedule drops the record for that frame and the band VANISHES until the next zero crossing (section 4a), and no comptime scope holds both numbers; aeon's tools/test_anchor_sweep_band.py is that scope and today reads only the hand-authored module, which is why extending it to the generated module is a hard prerequisite of step 4.",
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/patch_motion_entry"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
     }
   },
   "unevaluatedProperties": false,
   "$defs": {
+    "patch_motion_entry": {
+      "type": "object",
+      "description": "One authored motion: exactly one arm. Only sweep exists; zero arms, two arms or an unknown arm are refused here and by the generator's shape check (aeon effects_gen.py, step 4).",
+      "required": [
+        "sweep"
+      ],
+      "properties": {
+        "sweep": {
+          "$ref": "#/$defs/anchor_sweep"
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "anchor_sweep": {
+      "type": "object",
+      "description": "A sinusoidal sweep of the anchor about its seed, anchor_sweep() (aeon raster_dsl.emp:2232-2238), packing amp_shift, period_shift and phase into one motion word. THE LADDERS ARE QUANTIZED and the two shifts are BASE-2 LOGARITHMS, not physical units: peak excursion is 256 >> amp_shift px (7 rungs, 64 px down to 1 px), one cycle is 256 << period_shift logic ticks (9 rungs, 4.27 s to 1092 s at 60 Hz). Aurora converts DOWN on export (amp_shift = log2(256 / peak_px), period_shift = log2(cycle_seconds * 60 / 256)) and a slider must SNAP to a rung: rounding a shift instead of snapping silently doubles or halves the amplitude or the period, invisibly at author time. phase is the only continuous field. The shipped hand-authored precedent is OJZ_Preset_Sec0, anchor_sweep(amp_shift: 4, period_shift: 1): 32 px peak-to-peak over 8.53 s. Ranges are the engine's ensures (raster_dsl.emp:2232/2234/2236) and are restated here only as the rungs the UI must offer; the engine's message is the field's documentation.",
+      "required": [
+        "amp_shift",
+        "period_shift"
+      ],
+      "properties": {
+        "amp_shift": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 8,
+          "description": "Amplitude rung: peak excursion 256 >> amp_shift px, so 2 = 64 px and 8 = 1 px, powers of two only. Required, no default. Engine ensure raster_dsl.emp:2232."
+        },
+        "period_shift": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8,
+          "description": "Period rung: one cycle is 256 << period_shift logic ticks, so 0 = 256 ticks (4.27 s at 60 Hz) and 8 = 65536 ticks. 8 is the ceiling because the tick counter is 16 bits (ANCHOR_TICK_BITS). Required, no default. Engine ensure raster_dsl.emp:2234."
+        },
+        "phase": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255,
+          "description": "Starting point in the 256-entry sine table: 0..255 is one full cycle, phase = round(fraction_of_cycle * 256). The only optional field, because it is the only one anchor_sweep() defaults (0). Engine ensure raster_dsl.emp:2236."
+        }
+      },
+      "unevaluatedProperties": false
+    },
     "band": {
       "type": "object",
       "required": [
