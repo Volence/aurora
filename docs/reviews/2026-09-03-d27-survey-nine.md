@@ -240,6 +240,28 @@ reports the helper ABSENT while it is sitting right there.
 
 ## The six the survey excluded — two confirmed, four DISPUTED and NOT acted on
 
+> ## ⚠ THIS SECTION IS SUPERSEDED BY A MEASUREMENT — 2026-09-03
+>
+> Everything below is a **second code read**, and it says so itself at the end
+> ("the honest next step is a harness row on each, not an edit made on a code
+> read"). That harness now exists:
+> **`docs/reviews/2026-09-03-d27-disputed-six.md`**, instrument
+> `npm run harness:d27-disputed-six` — all six clicked with real mouse input,
+> 31 rows 31/31, seven plants each reddening only its own site.
+>
+> **The dispute below is UPHELD on all four**, and with two facts the read could
+> not reach: all four **keep keyboard focus**, and the two Delete buttons keep it
+> **retargeted at a different document**. `Demote` needs a successor band before
+> the question is even meaningful (with one band it unmounts, which is the
+> agreed arm); `Remove`'s press *after* the refusal refuses again and destroys
+> nothing, and the confirmation chip does not take focus.
+>
+> ⚠ **A finding neither pass looked for: `AeonChunkActions.tsx`'s `Clear` wipes
+> 71 chunks and ONE Ctrl+Z DOES NOT BRING THEM BACK** (`clearChunks` is a bare
+> zustand `set`, not `executeCommand`). Its exclusion from d-27 is correct; it is
+> the d-29 class, and it is the owner's call.
+
+
 The survey excluded six controls because their handler unmounts them, so the
 defect cannot fire. **None of them was changed here.** Reading the code for this
 parcel, two of those exclusions hold and **four do not**, and they are written

@@ -260,10 +260,27 @@ So of the controls carrying the shape:
   `:67`, `sprite/FrameGrid.tsx:53`, `sprite/SpritePaletteHeader.tsx:81` and
   `:88`, `effects/EffectsScenePanel.tsx:506`, `effects/BandPresetPanel.tsx:1016`
   and `:719`, `sprite/Timeline.tsx:182`.
-- **6 unmount themselves and do NOT** — `AeonChunkActions.tsx:34`,
-  `SectionGridNav.tsx:238`, `effects/EffectsScenePanel.tsx:855`,
-  `effects/BandPresetPanel.tsx:382`, `effects/BgAnimBandPanel.tsx:564` and `:567`.
-  Listed so nobody re-finds them and books work that has nothing to fix.
+- **6 were CLAIMED to unmount themselves and therefore not to reproduce it** —
+  `AeonChunkActions.tsx:34`, `SectionGridNav.tsx:238`,
+  `effects/EffectsScenePanel.tsx:855`, `effects/BandPresetPanel.tsx:382`,
+  `effects/BgAnimBandPanel.tsx:564` and `:567`.
+
+  > ## ⚠ FOUR OF THESE SIX ARE WRONG — MEASURED 2026-09-03
+  >
+  > **`docs/reviews/2026-09-03-d27-disputed-six.md`** clicked all six in the app
+  > and read `document.activeElement` and DOM-node identity back
+  > (`npm run harness:d27-disputed-six`, 31/31, seven plants). **This list was a
+  > code read, and it is the reason that packet exists — do not book anything off
+  > the paragraph below without reading it.**
+  >
+  > - `AeonChunkActions.tsx` and `SectionGridNav.tsx` **do** unmount — confirmed.
+  > - **`EffectsScenePanel`'s Delete scene, `BandPresetPanel`'s Delete preset,
+  >   `BgAnimBandPanel`'s `Demote` and its `Remove` all SURVIVE their own press
+  >   and KEEP KEYBOARD FOCUS.** The two Delete buttons survive **retargeted at a
+  >   different document**.
+  > - ⚠ **And `AeonChunkActions.tsx`'s `Clear` is NOT one Ctrl+Z away** — 71
+  >   chunks to 0, and the undo does not bring them back. That is the d-29 class
+  >   and it is the owner's.
 
 **List-item buttons keyed by index are the worst case** — the button stays
 mounted *and now points at the next item*, so a repeat Space does not repeat the

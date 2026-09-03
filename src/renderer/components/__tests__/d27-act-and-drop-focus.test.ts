@@ -33,12 +33,21 @@ const HELPER_REL = 'components/ui/act-and-drop-focus.ts';
  * that file uses to reach the helper; `call` is a fragment of the wired
  * `onClick` that must contain the helper's name.
  *
- * ⚠ The six the survey EXCLUDED (they unmount themselves, so the defect cannot
- * fire) are deliberately absent and must stay absent: `AeonChunkActions.tsx`,
- * `SectionGridNav.tsx`, `BgAnimBandPanel.tsx`, and the two Delete-document
- * buttons in the effects panels. Adding one here would book work with nothing
- * to fix. See `docs/reviews/2026-09-03-d27-survey-nine.md` for the two of those
- * whose classification this parcel disputes — disputed, and NOT acted on.
+ * ⚠ THE SIX THE SURVEY EXCLUDED ARE ABSENT BECAUSE THEY ARE NOT FIXED, NOT
+ * BECAUSE THEY ARE SAFE. The survey excluded them on the grounds that they
+ * unmount themselves; `docs/reviews/2026-09-03-d27-disputed-six.md` CLICKED all
+ * six (`npm run harness:d27-disputed-six`) and found that claim holds for only
+ * two: `AeonChunkActions.tsx`'s Clear and `SectionGridNav.tsx`'s Remove really
+ * do unmount. **`EffectsScenePanel`'s Delete scene, `BandPresetPanel`'s Delete
+ * preset, and BOTH `BgAnimBandPanel` controls survive their own press and KEEP
+ * KEYBOARD FOCUS** — the two Deletes retargeted at a different document. They
+ * are absent from `SITES` because nothing has been wired at them yet, and the
+ * day one is, it belongs here. Adding a row for an UNWIRED site would redden
+ * this file, which is the correct direction and not the point of the list.
+ *
+ * ⚠ `AeonChunkActions.tsx`'s Clear is separately in the d-29 class: it wipes the
+ * chunk library and one Ctrl+Z does not bring it back. That is recoverability,
+ * not focus, and it is not this file's subject.
  */
 const SITES: Array<{ rel: string; importFrom: string; writer: string; calls: string[] }> = [
   {
