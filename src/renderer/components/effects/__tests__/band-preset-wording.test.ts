@@ -793,7 +793,7 @@ describe('the narrowed control carries its reason', () => {
 
     // ...and with two bands the refusal lifts, so this is a condition and not
     // a permanent wall.
-    one.bands.push(one.bands[0]);
+    one.bands!.push(one.bands![0]);
     expect(lastBandRefusal(one)).toBeNull();
   });
 

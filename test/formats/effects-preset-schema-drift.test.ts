@@ -30,7 +30,17 @@ import {
   EFFECTS_PRESET_SCHEMA, EFFECTS_PRESET_BAND_KEYS, EFFECTS_PRESET_ON_ARMS,
   EFFECTS_PRESET_RESERVED_KEYS, EFFECTS_PRESET_ROOT_KEYS, presetArmFields, presetDefFields,
 } from '../../src/core/formats/effects/preset';
+import { PRESET_KEYS_AWAITING_AEON } from '../../src/core/formats/effects/preset-lag';
 import { peerRepo, resolveRev, readAtRev, isAncestor } from '../support/peer-repo';
+
+/**
+ * The hand-typed premise the panel's lag disclosure is derived from, sorted the
+ * way this file's rows measure. Imported rather than restated: the rows below
+ * are the ONLY thing that keeps it honest against aeon's page at TIP, so a
+ * second copy here would be the unmeasured claim the whole apparatus exists to
+ * prevent.
+ */
+const LAGGING = [...PRESET_KEYS_AWAITING_AEON].sort();
 
 const SCHEMA_PATH = resolve(
   __dirname, '../../src/core/formats/effects/aurora-effects-preset.schema.json',
@@ -480,9 +490,30 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
   it(`agrees with ${PAGE} at aeon ${TIP} on every shape the schema and the page both spell`, (ctx) => {
     onPage(ctx, ({ tip, keys }) => {
       // Anti-vacuous: the derivations partitioned the root the way the schema
-      // is known to spell it at this landing — three required, one ignored,
-      // the rest optional — and EFFECTS_PRESET_ROOT_KEYS agrees.
-      expect(schemaRequired).toHaveLength(3);
+      // is known to spell it at this landing — TWO required, one ignored, the
+      // rest optional — and EFFECTS_PRESET_ROOT_KEYS agrees.
+      //
+      // ⚠ THIS WAS THREE UNTIL empyrean 9233883, AND THE THIRD DID NOT VANISH.
+      // `bands` LEFT the top-level `required` list when `ramp` arrived, because
+      // a ramp-only document is legal; the document still carries exactly one
+      // raster program, and that rule moved into a top-level `oneOf` over
+      // `required: [bands]` / `required: [ramp]`. So the count going 3 -> 2 is
+      // NOT a loosening, and reading it as one is the misreading this comment
+      // exists to prevent — the row below asserts the `oneOf` is what took over,
+      // so the pair cannot both be quietly dropped.
+      expect(schemaRequired).toHaveLength(2);
+      // The `oneOf` that took over, asserted STRUCTURALLY and without naming the
+      // lagging key: two branches, each a single `required` over a root key the
+      // schema declares, one of which is the sparse channel. Naming the other
+      // here would put a second copy of a premise-list name in this file, which
+      // preset-lag-disclosure.test.ts forbids for exactly the reason it forbids
+      // the rest: a key name lives in the premise list and nowhere else.
+      const oneOfNames = (EFFECTS_PRESET_SCHEMA.oneOf as { required: string[] }[])
+        .map((b) => b.required[0]).sort();
+      expect(oneOfNames, 'the exactly-one-raster-program rule left `required` and no top-level '
+        + 'oneOf took it over').toHaveLength(2);
+      for (const n of oneOfNames) expect(EFFECTS_PRESET_ROOT_KEYS).toContain(n);
+      expect(oneOfNames).toContain('bands');
       expect(schemaIgnored).toEqual(['name']);
       expect(schemaOptional.length).toBeGreaterThan(0);
       expect([...schemaRequired, ...schemaIgnored, ...schemaOptional].sort())
@@ -584,7 +615,7 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
         `${SPLIT(tip)} aeon's page knows a root key the schema neither declares nor reserves`,
       ).toEqual([]);
       expect(
-        schemaVocabulary.filter((k) => !pageVocabulary.includes(k)),
+        schemaVocabulary.filter((k) => !pageVocabulary.includes(k) && !LAGGING.includes(k)),
         `${SPLIT(tip)} the schema knows these root keys and aeon's page does not mention them at `
         + 'all. If aeon has RENAMED one, this is the split. If instead the contract has DECLARED '
         + 'a key aeon has not built, that is the contract leading its consumer — a lag, the state '
@@ -646,8 +677,8 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
    * rot into an unmeasured claim.
    */
   it(`the contract-leads-consumer lag at aeon ${page.kind === 'ok' ? page.tip.slice(0, 8) : TIP} is `
-     + 'EMPTY — aeon accepts every key the schema declares (retired 2026-09-03; red in both '
-     + 'directions)', (ctx) => {
+     + `exactly ${JSON.stringify(LAGGING)} — the premise the panel's disclosure is derived from `
+     + '(re-armed 2026-09-03 for `ramp`; red in both directions)', (ctx) => {
     onPage(ctx, ({ tip, keys }) => {
       // Anti-vacuous: this row is only meaningful because the schema declares
       // keys BEYOND the required ones for aeon to have built, and because
@@ -667,6 +698,17 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
       // premise constant always MEANT: every root key the schema declares that
       // aeon's page does not ACCEPT, whichever way aeon declines it.
       const lag = schemaOptional.filter((k) => !keys.preset.includes(k)).sort();
+      // ═══ WHILE A LAG IS OPEN THIS ROW NAMES THE PREMISE CONSTANT ═══
+      //
+      // The retired shape compared the measured lag to the EMPTY SET and
+      // deliberately did not mention `PRESET_KEYS_AWAITING_AEON`, because
+      // "the measured lag equals <a constant known to be empty>" is one claim
+      // spelled through an indirection. That reasoning INVERTS while the lag is
+      // open: the constant is now a non-empty hand-typed premise that a panel
+      // renders a warning from, and the only thing that can keep it honest is a
+      // row asserting it against aeon's page AT TIP. So the comparison is
+      // two-directional — a key that stops lagging fails here (empty the list),
+      // and a key that starts lagging fails here too (fill it in).
       expect(
         lag,
         `A LAG HAS RE-OPENED between ${PROV.empyrean.path} (blob ${PROV.empyrean.blob}) and aeon `
@@ -684,15 +726,20 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
         + '  • AEON HAS UN-BUILT A KEY IT USED TO LOWER — that is a REGRESSION, not a lag, and it '
         + 'is what this row exists to catch: the vocabulary row above stays green through it, '
         + 'because the name merely moves from the page\'s `preset:` row to `preset-refused:`. '
-        + 'Report it to aeon BEFORE re-filling anything here.',
-      ).toEqual([]);
+        + 'Report it to aeon BEFORE re-filling anything here.\n'
+        + `  • OR THE LAG CLOSED: aeon now accepts a key ${JSON.stringify(LAGGING)} claims it does `
+        + 'not. Empty PRESET_KEYS_AWAITING_AEON, re-date it, and the panel\'s sentence retires '
+        + 'with this row — do NOT empty it on a merge announcement, this row reads TIP.',
+      ).toEqual(LAGGING);
 
       // The same fact from the other side, so the row cannot pass on a page that
       // simply stopped listing its refusals: every name aeon REFUSES is one the
-      // schema still reserves. (While a lag is open this clause gains the
-      // premise list as a second allowed source — see the 2026-09-03 shape.)
+      // schema still reserves, or one the premise list says is lagging. `ramp`
+      // is in NEITHER of aeon's lists today — that is what makes this lag the
+      // sharper flavour — but a future aeon that moves it to `preset-refused:`
+      // while still not lowering it must not fail this clause as a SPLIT.
       expect(
-        keys['preset-refused'].filter((k) => !schemaReserved.includes(k)),
+        keys['preset-refused'].filter((k) => !schemaReserved.includes(k) && !LAGGING.includes(k)),
         `${SPLIT(tip)} aeon refuses a root key the schema does not reserve. If the schema DECLARES `
         + 'it, that is a lag and the row above owns it; if the schema does not know the name at '
         + 'all, that is a split.',

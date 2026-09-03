@@ -2,7 +2,36 @@
  * The contract-leads-consumer lag on the raster preset document, as ONE fact
  * with ONE measurement behind it.
  *
- * ═══ THE LAG IS EMPTY. RETIRED (AGAIN) 2026-09-03 — STEP 4 HAS RUN. ═══
+ * ═══ THE LAG IS OPEN AGAIN: `ramp`, RE-ARMED 2026-09-03 (ITEM 6, STEP 3) ═══
+ *
+ * THE FOURTH ARMING. empyrean `9233883` (AURORA_EFFECTS_SCHEMA.md §7.4) declared
+ * EFFECTS-W1 DoD item 6's authoring key, `ramp`, and Aurora has vendored it and
+ * written the codec (step 3). AEON'S STEP 4 HAS NOT RUN. Measured firsthand
+ * through git objects at aeon `origin/master` `dd17f7c9`, page blob `62ca6426`:
+ *
+ *   - `docs/EDITOR_RASTER_PRESETS.md`'s machine-checked block reads
+ *     `preset: bands, cycles, id, patch_motion, patch_world_ys, schema, variants`
+ *     — no `ramp` — and `preset-refused:` is `fires` alone.
+ *   - `tools/effects_gen.py` contains the string `ramp` ZERO TIMES, in any case.
+ *     `PRESET_KEYS` (`:285`) does not carry it and no `_check_ramp` exists.
+ *
+ * SO THIS IS THE SHARPER FLAVOUR, the same one item 4 had: `ramp` is not in
+ * aeon's vocabulary at all, so it takes `_check_keys`'s generic unknown-key path
+ * and `_refuse` RAISES. A preset document carrying `ramp` does not lower
+ * partially — IT FAILS AEON'S BUILD ENTIRELY. `presetLagDisclosure` below says
+ * exactly that, and it is the wording this flavour needs.
+ *
+ * The ENGINE half of item 6 shipped long ago (`RasterRampProgram` since
+ * 2026-08-14, gated and budgeted at aeon `cf3dfb1a`); it is the GENERATOR that
+ * has not been taught the key. That distinction matters to an author: the
+ * mechanism exists and is not reachable from a document.
+ *
+ * RE-RETIRE CONDITION: the day the drift row goes red because aeon's page
+ * ACCEPTS `ramp` — empty this list and re-date it, and the sentence retires with
+ * the row. Do not empty it on a merge announcement; the row reads aeon's page at
+ * TIP on every run and is the only thing entitled to an opinion here.
+ *
+ * ═══ THE PREVIOUS RETIREMENT (ITEM 4), KEPT FOR ITS REASONING ═══
  *
  * The four-step cross-repo chain for EFFECTS-W1 DoD item 4 has closed. aeon
  * named the key shape, the hub filed the schema CR (empyrean `d36d704`,
@@ -150,11 +179,12 @@
  * `['cycles','variants']` from 2026-08-30; EMPTY on 2026-09-02 when aeon merged
  * item 5; `['patch_motion','patch_world_ys']` on 2026-09-03 when empyrean
  * d36d704 declared item 4's authoring keys and aeon's step 4 had not run; EMPTY
- * again LATER THE SAME DAY, when it did. Re-fill it (and only it) the day the
- * drift row reports a lag again — the sentence comes back on screen in both
- * mount sites by construction.
+ * again LATER THE SAME DAY, when it did; `['ramp']` on 2026-09-03 when empyrean
+ * 9233883 declared item 6's authoring key and aeon's step 4 had not run. Empty
+ * it (and only it) the day the drift row reports the lag closed — the sentence
+ * leaves the screen in both mount sites by construction.
  */
-export const PRESET_KEYS_AWAITING_AEON: readonly string[] = Object.freeze([]);
+export const PRESET_KEYS_AWAITING_AEON: readonly string[] = Object.freeze(['ramp']);
 
 /** The date the premise above was last measured — printed inside the sentence. */
 export const PRESET_LAG_MEASURED_ON = '2026-09-03';

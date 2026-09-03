@@ -137,7 +137,7 @@ describe('every ACCEPT vector survives a band edit in the renderer with its item
       const cmd = addBandCommand(library, c.doc.id);
       expect(cmd, 'the edit path refused a contract-accepted document').not.toBeNull();
       const after = cmd!.newPreset!;
-      expect(after.bands.length).toBe(c.doc.bands.length + 1);
+      expect(after.bands!.length).toBe(c.doc.bands!.length + 1);
       for (const k of ITEM5) {
         expect(k in after, `${k} was present before the edit and absent after`).toBe(k in c.doc);
         expect(after[k]).toEqual(c.doc[k]);

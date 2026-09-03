@@ -1288,7 +1288,7 @@ function installAeonProbe(): AeonProbeApi {
     presets: () => (useProjectStore.getState().project?.effectsPresets.presets ?? []).map((p) => ({
       id: p.id,
       name: typeof p.name === 'string' ? p.name : null,
-      bands: p.bands.length,
+      bands: (p.bands ?? []).length,
     })),
     presetsJson: () =>
       JSON.stringify(useProjectStore.getState().project?.effectsPresets.presets ?? []),

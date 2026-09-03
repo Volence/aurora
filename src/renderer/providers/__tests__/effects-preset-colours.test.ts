@@ -52,7 +52,7 @@ function library(p: EffectsPreset): EffectsPresetLibrary {
 /** A preset whose one band writes `colours` at `addr`. */
 function cramPreset(addr: number, colours: number[]): EffectsPreset {
   const p = newPreset(ID);
-  p.bands[0].on = { cram: { addr, colours: colours.slice() } };
+  p.bands![0].on = { cram: { addr, colours: colours.slice() } };
   return p;
 }
 
@@ -167,13 +167,13 @@ describe('setColourCommand writes ONE entry and leaves the document otherwise id
   it('changes the entry it was given and no other', () => {
     const before = cramPreset(74, [14, 3584, 0, 7]);
     const next = after(setColourCommand(library(before), ID, 0, 2, 0x0e0));
-    const cram = (next.bands[0].on as { cram: { colours: number[] } }).cram;
+    const cram = (next.bands![0].on as { cram: { colours: number[] } }).cram;
     expect(cram.colours).toEqual([14, 3584, 0x0e0, 7]);
     // …and the rest of the DOCUMENT, byte for byte. A row that only checked the
     // array would miss a command that also rewrote `top` or dropped `sh`.
     const strip = (p: EffectsPreset): string => {
       const c = JSON.parse(JSON.stringify(p)) as EffectsPreset;
-      (c.bands[0].on as { cram: { colours: number[] } }).cram.colours = [];
+      (c.bands![0].on as { cram: { colours: number[] } }).cram.colours = [];
       return serializeEffectsPreset(c);
     };
     expect(strip(next)).toBe(strip(before));
@@ -181,7 +181,7 @@ describe('setColourCommand writes ONE entry and leaves the document otherwise id
 
   it('writes a plain decimal integer — the wire format does not move', () => {
     const next = after(setColourCommand(library(cramPreset(74, [0])), ID, 0, 0, 3584));
-    const written = (next.bands[0].on as { cram: { colours: number[] } }).cram.colours[0];
+    const written = (next.bands![0].on as { cram: { colours: number[] } }).cram.colours[0];
     expect(typeof written).toBe('number');
     expect(Number.isInteger(written)).toBe(true);
     // The serialized bytes hold the integer, not a `$0E00` string or an object.
@@ -209,7 +209,7 @@ describe('setColourCommand writes ONE entry and leaves the document otherwise id
 
   it('does nothing to a band whose arm is not cram', () => {
     const p = newPreset(ID);
-    p.bands[0].on = { pal_region: { addr: 74, slot: 0, pal_line: 2, entry: 5, count: 1 } };
+    p.bands![0].on = { pal_region: { addr: 74, slot: 0, pal_line: 2, entry: 5, count: 1 } };
     expect(setColourCommand(library(p), ID, 0, 0, 14)).toBeNull();
   });
 
@@ -233,7 +233,7 @@ describe('setColourCommand writes ONE entry and leaves the document otherwise id
     expect(parseColours('14 3584')).toEqual({ ok: true, colours: [14, 3584] });
     expect(parseColours('0x0e 0xe00')).toEqual({ ok: true, colours: [14, 3584] });
     const next = after(setColoursCommand(library(cramPreset(74, [0])), ID, 0, [14, 3584]));
-    expect((next.bands[0].on as { cram: { colours: number[] } }).cram.colours)
+    expect((next.bands![0].on as { cram: { colours: number[] } }).cram.colours)
       .toEqual([14, 3584]);
   });
 });
@@ -248,9 +248,9 @@ describe('cramSpanAdvisory: a span that runs off the end of its line says so', (
     // enough to fill it, must be silent; one more colour must not be.
     const at = CRAM_LINE_ENTRIES * CRAM_WORD_BYTES; // line 1, entry 0
     const fits = cramPreset(at, new Array(CRAM_LINE_ENTRIES).fill(0));
-    expect(cramSpanAdvisory(fits.bands[0], ID, 0)).toBeNull();
+    expect(cramSpanAdvisory(fits.bands![0], ID, 0)).toBeNull();
     const over = cramPreset(at, new Array(CRAM_LINE_ENTRIES + 1).fill(0));
-    expect(cramSpanAdvisory(over.bands[0], ID, 0)).not.toBeNull();
+    expect(cramSpanAdvisory(over.bands![0], ID, 0)).not.toBeNull();
   });
 
   it('names the preset and the band, like every other message on this surface', () => {
@@ -258,7 +258,7 @@ describe('cramSpanAdvisory: a span that runs off the end of its line says so', (
     // is the one subject-line derivation; this row asserts the advisory uses it
     // rather than composing its own.
     const over = cramPreset(74, new Array(CRAM_LINE_ENTRIES).fill(0));
-    const why = cramSpanAdvisory(over.bands[0], ID, 0)!;
+    const why = cramSpanAdvisory(over.bands![0], ID, 0)!;
     expect(why).toContain(bandSubject(ID, 0));
     // and it says which two things to move — an advisory that only diagnoses
     // leaves the author where the walkthrough was.
@@ -267,7 +267,7 @@ describe('cramSpanAdvisory: a span that runs off the end of its line says so', (
 
   it('quotes the engine rule it is about, and only that rule', () => {
     const over = cramPreset(74, new Array(CRAM_LINE_ENTRIES).fill(0));
-    const why = cramSpanAdvisory(over.bands[0], ID, 0)!;
+    const why = cramSpanAdvisory(over.bands![0], ID, 0)!;
     // Wording only THIS rule uses. `stream_cram` appears in several schema
     // descriptions; "span to stay within the line" is this refusal's alone.
     expect(why).toMatch(/span to stay within the line/);
@@ -276,10 +276,10 @@ describe('cramSpanAdvisory: a span that runs off the end of its line says so', (
 
   it('says nothing about an arm it does not apply to, or an empty list', () => {
     const p = newPreset(ID);
-    p.bands[0].on = { pal_region: { addr: 74, slot: 0, pal_line: 2, entry: 5, count: 99 } };
-    expect(cramSpanAdvisory(p.bands[0], ID, 0)).toBeNull();
-    expect(cramSpanAdvisory(cramPreset(74, []).bands[0], ID, 0)).toBeNull();
-    expect(cramSpanAdvisory(cramPreset(-4, [0, 0]).bands[0], ID, 0)).toBeNull();
+    p.bands![0].on = { pal_region: { addr: 74, slot: 0, pal_line: 2, entry: 5, count: 99 } };
+    expect(cramSpanAdvisory(p.bands![0], ID, 0)).toBeNull();
+    expect(cramSpanAdvisory(cramPreset(74, []).bands![0], ID, 0)).toBeNull();
+    expect(cramSpanAdvisory(cramPreset(-4, [0, 0]).bands![0], ID, 0)).toBeNull();
   });
 
   it('ADVISES — it does not refuse the value, which is aeon E.4\'s line', () => {
@@ -289,9 +289,9 @@ describe('cramSpanAdvisory: a span that runs off the end of its line says so', (
     // that produced the state is not withheld.
     const lib = library(cramPreset(74, [0]));
     const grown = after(setColoursCommand(lib, ID, 0, new Array(CRAM_LINE_ENTRIES).fill(0)));
-    expect((grown.bands[0].on as { cram: { colours: number[] } }).cram.colours.length)
+    expect((grown.bands![0].on as { cram: { colours: number[] } }).cram.colours.length)
       .toBe(CRAM_LINE_ENTRIES);
-    expect(cramSpanAdvisory(grown.bands[0], ID, 0)).not.toBeNull();
+    expect(cramSpanAdvisory(grown.bands![0], ID, 0)).not.toBeNull();
   });
 });
 

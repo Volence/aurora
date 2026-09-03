@@ -425,7 +425,7 @@ export default function BandPresetPanel(): React.ReactElement | null {
                 style={textInput} />
             </Field>
 
-            {selected.bands.map((band, i) => (
+            {(selected.bands ?? []).map((band, i) => (
               <BandCard key={i} library={library} presetId={selected.id} index={i} band={band}
                 run={run}
                 lastRefusal={lastBandRefusal(selected)}
