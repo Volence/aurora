@@ -57,6 +57,20 @@ history of how it got there. **Nothing here was rewritten** — these are the ti
 
 > Per-line scroll authoring as a NEW field via schema CR — supersedes the A7 row's booking. Never a widened `curve` (re-verified: unevaluatedProperties:false on the object arm). Waits on aeon DoD item 6 (dense VSRAM run op under CAP_DENSE_TIER) then a CR.
 
+**THE CONTROL SHAPE, from aeon's item 6 parcel — RELAYED BY THE HUB 2026-09-03, NOT READ BY ME AT AN AEON REVISION.** Marked as relay on purpose: the parcel was unlanded and merging when this arrived, so every figure below is the hub's transcription of aeon's shape and none of it is a measurement of mine. **Re-derive it from the committed artifact when the CR lands** — the CR is what fixes the preset key name, its lowering, and the schema file it goes in, and until then there is nothing to write.
+
+- **The mechanism ALREADY SHIPPED (2026-08-14); item 6 GATES it rather than inventing it.** So this was never blocked on the engine being able to do it.
+- **`step` (rate) and a sibling `start` (initial VSRAM offset)**, both signed fixed point authored as `fp16(whole, frac256)`. **Units: pixels of vertical scroll PER SCANLINE.**
+- **Span is `top`/`lines`**, with `ensure(top >= 3)`, `ensure(lines >= 1)`, `ensure(top + lines <= 223)`.
+- **Every bound is a comptime `ensure` — a loud build failure, never a clamp.** That matters for the authoring surface: Aurora must refuse out-of-range input at author time with the same numbers, because the alternative is an author discovering a bound at somebody else's build. And a clamping producer here would be the [[top-of-range-is-a-sentinel]] failure again.
+- Gated on `Game.SCANLINE_CAPS` declaring `CAP_DENSE_TIER`. Budget measured by aeon at **304 of 488 cycles per line**, which is why the dense-tier stream register stays off the owner's list.
+
+⚠ **AEON'S ONE MUST NOT, AND IT IS THE WHOLE DESIGN CONSTRAINT: a per-line CURVE is NOT authorable.** Only a constant linear rate over the span. A control implying arbitrary per-line values would write what the engine cannot honour — aeon names this the same class as the reels trap. **So the surface is: a signed rate + a signed start, over a `top`/`lines` span. It is not a curve editor and must not look like one.** This agrees with the row above it, which already refused a widened `curve`.
+
+⚠ **TWO THINGS TO SETTLE AT THE CR, RAISED BY ME AND NOT BY AEON — do not let them pass unasked:**
+1. **The stated width and the stated range disagree.** The relay says *signed 16.16* while giving `whole` as **-512..511** (10 bits) and `frac256` as 0..255 (8 bits). Those are not the same claim. A spinner built on 16.16 offers an author roughly sixty times the range the `ensure` will accept, and they find out at aeon's build. **Ask which is the type and which is the bound, and derive Aurora's control from the artifact, never from this paragraph.**
+2. **The NAME is a trap in the making.** "Per-line scroll" describes what the hardware does and invites exactly the mental model aeon just forbade — an author who reads *per-line* reasonably expects to set values per line. The key is being named right now, at the CR, which is the one moment it is cheap to fix. Something naming the RATE (a constant slope over a span) rather than the granularity would make the forbidden thing unthinkable instead of merely refused. **This is a suggestion to aeon, not a demand; the key name is theirs.**
+
 ### EW-7-11
 
 `size: L` · `state: open` · `blockedBy: FILE: each of aeon's items 7-11 in turn` · `project: EFFECTS-W1`
