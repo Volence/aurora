@@ -53,6 +53,11 @@
 //       red-first. A captured promise (`await`, `return`, `=`, `=>`, an
 //       argument) is fine; only the dropped one is the hazard.
 //
+//   G6  (O49) A TRACKED harness-like file that NO `package.json` script can
+//       reach fails, naming the file and the exact script line to add. See the
+//       long note above the G6 pass for the population, the reachability rule,
+//       and why the exemption is a written list rather than a filename pattern.
+//
 // AND FOR SHELL SCRIPTS (O23) — five rules that are NOT G1 in a hat. See the
 // long note above the shell pass for why widening the file set alone would
 // have produced a check that scans `.sh` files and can only return green.
@@ -203,6 +208,25 @@ const fails = [];
 const unmeasurable = [];
 const rows = [];
 const exemptions = [];
+
+/**
+ * Failures that are ALWAYS fatal, whatever `git ls-files` says about the path
+ * they name.
+ *
+ * ⚠ FOUND BY PLANTING, AND IT MADE G6's EXEMPTION AUDIT VACUOUS. The
+ * tracked/untracked split at the bottom of this file is right for a rule about
+ * a FILE — the repo cannot fix a launcher it does not carry, so an untracked
+ * one is reported and not fatal. It is exactly wrong for a rule about this
+ * repo's OWN CONFIGURATION. G6's STALE EXEMPTION fires precisely when the path
+ * in `RETIRED_UNREGISTERED` is NOT tracked, so the split filed every stale
+ * exemption as "untracked, not fatal": the check that exists to stop the
+ * exemption list rotting went GREEN (exit 0) over a planted rotten entry.
+ * The failure was printed, and printed is not gated.
+ *
+ * Anything added here is a claim about package.json or about this file's own
+ * lists, not about a file the repo may or may not carry.
+ */
+const alwaysFatal = new Set();
 
 // G4 first: if the module is wrong, everything below is meaningless.
 let guardSrc = null;
@@ -497,6 +521,302 @@ for (const path of listFiles(DIR, ['.sh'])) {
   });
 }
 
+// ══ G6 (O49) — A HARNESS NOBODY CAN RUN BY NAME ════════════════════════════
+//
+// Every rule above asks whether a harness is SAFE TO RUN. None asks whether it
+// can be run at all, and that is the gap that cost this repo twice in one
+// night. On 2026-09-03 there were 145 tracked harness-like files under
+// scratchpad/ and 44 of them were reachable by a `package.json` script. The
+// other 101 could not be run by name by anyone.
+//
+// THE PRICE, both recorded in docs/lane-log.jsonl:
+//
+//   · `vsplit-advisory-harness` sat RED FOR SIX DAYS at 30/31, holding a rule
+//     that had been overturned at 7ba5a638. The repair had dropped a parameter
+//     so stale call sites would fail to compile — which works for TypeScript
+//     and does not reach a .mjs harness. The stated reason nobody saw it:
+//     "THE HARNESS WAS NOT IN package.json so nobody could run it."
+//   · Registering nine collision-family harnesses (O48c) immediately surfaced a
+//     tenth finding: `crossover-paint` had NEVER been runnable on a clean
+//     checkout, and its own anti-vacuous row was what said so. Unregistered,
+//     nothing swept it, so nothing asked.
+//
+// A one-time registration pass rots the same way O16's one-time guard pass
+// would have. So this is DERIVED: the population comes from `git ls-files`, the
+// reachability from the ACTUAL script table in package.json, and adding a
+// harness adds a row here whether or not anybody remembers this rule exists.
+//
+// THE POPULATION is a filename shape — `*-harness.mjs`, `*-probe.mjs`,
+// `*-proof.mjs` — and that is deliberate, because it is the shape that decides
+// what a person calls a harness when they write one. It is NOT how the
+// exemption works; see below.
+//
+// REACHABLE means some `package.json` script command names the file: directly,
+// or through a `.sh` under scratchpad/ that a script dispatches (a shell script
+// a script runs is a door with a name on it, exactly like a `node` line). The
+// path is matched at a filename boundary, so `marquee-harness.mjs` is not
+// satisfied by a script that runs `marquee-flip-harness.mjs`.
+//
+// ⚠ THE EXEMPTION IS A WRITTEN LIST WITH A REASON PER ENTRY, NOT A PATTERN.
+// A pattern (`*-probe.mjs`, say) would be the cheaper spelling and it is the
+// wrong one twice over: it makes the exemption INVISIBLE — nobody reading the
+// gate learns which files are excused or why — and it silently swallows the
+// next real instrument that happens to be named `-probe`. Four of the files
+// below ARE named `-harness` and eleven of the excused ones are named `-probe`,
+// so no pattern could have drawn this line anyway. Every entry is printed on
+// every run, for the same reason G1's single exemption is.
+//
+// WHAT EARNS AN EXEMPTION: the file does not GATE. A registered script is a
+// name you can run and get a verdict from; these exit 0 whatever they measured
+// (or non-zero only when the measurement could not be TAKEN — no socket, no
+// app), so registering one would add a script that can never go red. That is
+// the vacuous-instrument shape this repo keeps paying for, and a green from it
+// would be worse than its absence. The classification, with the evidence for
+// every one of the 145, is docs/reviews/2026-09-03-harness-registration.md.
+//
+// THE LIST ITSELF IS CHECKED, because an exemption nobody re-derives is a
+// workaround outliving its defect: an entry naming a file that is no longer
+// tracked FAILS (stale), and an entry naming a file that IS reachable FAILS
+// (dead — it is excusing something that already has a name).
+//
+// LOUD ON UNMEASURABLE. If `git ls-files` cannot answer, or package.json cannot
+// be read or parsed, this rule reports UNMEASURABLE and fails. It never renders
+// "I could not enumerate" as "zero unregistered harnesses" — the whole defect
+// class here is a check that goes green over what it could not see.
+
+/** The filename shape people reach for when they write a harness. */
+const HARNESS_LIKE = /-(harness|probe|proof)\.mjs$/;
+
+/**
+ * Tracked harness-like files deliberately left unregistered, with the reason.
+ * Repo-relative paths. Every entry is printed on every run.
+ *
+ * Adding an entry here is a claim that the file does not gate — that it exits 0
+ * whatever it measured. If you are tempted to add one for a file that DOES
+ * gate, register it instead; that is the entire point of the rule.
+ */
+const RETIRED_UNREGISTERED = {
+  // ── report-only, and an in-repo record says what closed the investigation ──
+  'scratchpad/_select-key-probe.mjs':
+    'Report-only (exit 0 always). Settled the three real-input facts in '
+    + 'docs/reviews/2026-08-27-curve-vsplit-reachable.md §5, which quotes its output verbatim; '
+    + 'the standing instrument for that row is harness:curve-vsplit-reachable.',
+  'scratchpad/band-lens-harness.mjs':
+    'Report-only (exit 0 at the end; exit 1 only when the socket never appears). One half of the '
+    + 'band-lens investigation CLOSED 2026-08-27 — docs/OVERSEER-LOG.md names this file and '
+    + 'band-step-proof.mjs as its two instruments and marks the tagged question answered.',
+  'scratchpad/band-step-proof.mjs':
+    'Report-only — prints VERDICT and exits 0 on all three of STEPS / UNDETERMINED / did NOT step. '
+    + 'Same closure as band-lens-harness.mjs: docs/OVERSEER-LOG.md, "TAGGED QUESTION CLOSED '
+    + '2026-08-27 — the band STEPS, proven with a control run".',
+  'scratchpad/band-rate-shift-probe.mjs':
+    'Report-only — writes rate-shift.json and exits 0; its non-zero exits are all BLOCKED/no-socket. '
+    + 'Answered ROADMAP row 43\'s untested rate_shift tail; packet '
+    + 'docs/reviews/2026-08-27-rate-shift-watched.md.',
+  'scratchpad/bganim-marquee-resolution-probe.mjs':
+    'Report-only on its subject — its exit 3 gates the DECODE being proven, not the marquee '
+    + 'percentages it reports. The measurement that gated the gesture; packet '
+    + 'docs/reviews/2026-08-26-bganim-marquee-resolution.md.',
+  'scratchpad/block-fanout-probe.mjs':
+    'Report-only — prints a JSON census, no exit code at all. '
+    + 'docs/reviews/2026-08-19-handoff-after-collision.md: "A block fan-out census decided one '
+    + 'design question outright."',
+  'scratchpad/bus-probe.mjs':
+    'Report-only (exit 0) — prints the Aether method list. Superseded as a standing check by '
+    + 'harness:aether-method-gate, which derives the method SET the run needs instead of printing '
+    + 'a count (O26: "A COUNT IS NOT A CAPABILITY").',
+  'scratchpad/effects-strip-delta-probe.mjs':
+    'Self-declared in its own header: "This is a MEASUREMENT, not a gate." Step 1 of EW-SHAPE-STRIP; '
+    + 'the shipped surface is gated by harness:effects-section-strip, packet '
+    + 'docs/reviews/2026-09-02-effects-section-strip.md.',
+  'scratchpad/effects-subtabs-geometry-probe.mjs':
+    'Self-declared: "A MEASUREMENT. It asserts nothing, so it can be run against master\'s build '
+    + 'and against this branch\'s and the two numbers compared." Shipped surface gated by '
+    + 'harness:effects-sub-tabs, packet docs/reviews/2026-09-02-effects-sub-tabs.md.',
+  'scratchpad/fromtile-typing-probe.mjs':
+    'Report-only — prints "VERDICT: NO SNAP / SNAPS" and exits 0 either way. Answered ROADMAP '
+    + 'item 40\'s tagged typing wrinkle; that row is DELIVERED 2026-08-27.',
+  'scratchpad/guide-aim-probe.mjs':
+    'Self-declared in its first line: "DIAGNOSTIC, NOT A GATE." Its only non-zero exit is a '
+    + 'PROBE ERROR. Aimed at ROADMAP row 43\'s layer-guide drag.',
+  'scratchpad/init-probe.mjs':
+    'Report-only (exit 0) — prints the initialize reply\'s keys. docs/OVERSEER-LOG.md: "the parcel '
+    + 'is CLOSED ... Probe: `scratchpad/init-probe.mjs`."',
+  'scratchpad/label-measure-probe.mjs':
+    'Self-declared: "MEASUREMENT PROBE for ROADMAP §5.1 item 17 — no assertions, just numbers." '
+    + 'Item 17 is DELIVERED and its standing instrument is harness:object-label.',
+  'scratchpad/loop-cell-probe.mjs':
+    'Report-only — its only non-zero exit is UNMEASURABLE. '
+    + 'docs/reviews/2026-08-19-handoff-after-collision.md: "a layout census showed a shipped '
+    + 'warning was unreachable in stock data — which is why a harness row now authors the '
+    + 'condition itself."',
+  'scratchpad/marquee-paste-probe.mjs':
+    'Report-only — diffs the whole canvas and prints a bounding box; non-zero only on PROBE ERROR. '
+    + 'Written to diagnose marquee-harness rows 5b/6a; ROADMAP item 74 DELIVERED 2026-08-28 and '
+    + 'harness:marquee is the standing instrument.',
+  'scratchpad/row8-probe.mjs':
+    'Report-only — "no clicks at all", non-zero only on PROBE ERROR. Diagnosed sprite-restore-'
+    + 'harness rows 7→8, which exist and assert today (rows 7, 8a, 8b) under harness:sprite-restore.',
+  'scratchpad/s1-vplayer-spike-probe.mjs':
+    'Report-only on the spike itself — writes s1-vplayer-spike.json and exits 0; its non-zero exits '
+    + 'are BLOCKED / UNDETERMINED, i.e. the measurement could not be taken. Item 48\'s gate spike; '
+    + 'packet docs/reviews/2026-08-27-s1-vplayer-spike.md.',
+  'scratchpad/skipped-cells-probe.mjs':
+    'Report-only — prints "[VERDICT] field-on-wire=…" and never gates on it; non-zero only when '
+    + 'the discovery file cannot be owned. `skippedCells` shipped at 8efda9d '
+    + '(docs/reviews/2026-08-19-handoff-after-collision.md).',
+  'scratchpad/storage-flush-probe.mjs':
+    'Report-only — no exit code at all. Its own header: "A 40-line control for ONE question the '
+    + 'canvas harness could not answer about itself"; cited by '
+    + 'docs/superpowers/plans/2026-08-15-canvas-cdp-report.md.',
+  'scratchpad/zone-blocks-probe.mjs':
+    'Report-only — and note it LOOKS like a gate: it builds a `fails` array (line 90) and never '
+    + 'reads it, so a red row exits 0. Its question was answered by '
+    + 'docs/superpowers/plans/2026-08-17-classic-collision-editing.md §3 ("Refuse the table '
+    + 'growth"). The dead accumulator is recorded in the O49 packet, NOT fixed here.',
+
+  // ── report-only, and NO in-repo record says what closed it (UNCLASSIFIABLE) ──
+  // These are excused for the same measured reason as the rest — none of them
+  // gates, so a script entry could never go red — but their status is genuinely
+  // open, not decided. They are listed separately so nobody reads the section
+  // above as covering them. See the O49 packet §4.
+  'scratchpad/artmode-repro-harness.mjs':
+    'UNCLASSIFIABLE. Report-only: no exit code at all, self-declared "Diagnostic only — it changes '
+    + 'nothing and saves nothing." Reproduces two reported Art-mode defects (Chunk>Assign renders '
+    + 'black; Paint opens at 24x and ctrl+scroll will not zoom out) and NO doc in this repo records '
+    + 'either being fixed. Excused because it cannot go red, not because it is finished.',
+  'scratchpad/assign-black-harness.mjs':
+    'UNCLASSIFIABLE. Report-only: prints "REPRODUCED: assign went black" or "not reproduced" and '
+    + 'exits 0 either way. First hypothesis for the Assign-renders-black report; no recorded closure.',
+  'scratchpad/assign-toggle-harness.mjs':
+    'UNCLASSIFIABLE. Report-only, and it LOOKS like a gate: it has PASS/FAIL rows and computes '
+    + '`bad` on its last line, then never uses it — a failing row exits 0. Second hypothesis for the '
+    + 'same report; no recorded closure. The dead tally is recorded in the O49 packet, NOT fixed here.',
+  'scratchpad/bo-probe.mjs':
+    'UNCLASSIFIABLE. Report-only: "Probe: what state is the freshly booted s4.debug.bin actually '
+    + 'in?", non-zero only on a thrown error. No packet, ROADMAP row or lane-log entry names its '
+    + 'investigation or its closure; the only doc citing it is the O16 mass-edit table.',
+};
+
+{
+  // Population: TRACKED files only. An untracked harness cannot be registered
+  // by this repo (the same reasoning the tracked/untracked split below uses),
+  // so it is out of scope here rather than quietly counted.
+  let population = null;
+  try {
+    population = execFileSync('git', ['ls-files', 'scratchpad'], { encoding: 'utf8' })
+      .split('\n').filter(Boolean).filter((f) => HARNESS_LIKE.test(f));
+  } catch (e) {
+    unmeasurable.push(`G6: \`git ls-files scratchpad\` failed (${e.message}) — the population cannot be `
+      + 'enumerated at all, so this run makes NO claim about which harnesses are registered. '
+      + 'This is not zero violations.');
+  }
+
+  let scripts = null;
+  const PKG = join(DIR, '..', 'package.json');
+  try {
+    const pkg = JSON.parse(readFileSync(PKG, 'utf8'));
+    if (pkg.scripts && typeof pkg.scripts === 'object') scripts = pkg.scripts;
+    else unmeasurable.push('G6: package.json parsed but has no "scripts" object — cannot ask what is '
+      + 'reachable, so this run makes NO claim about registration.');
+  } catch (e) {
+    unmeasurable.push(`G6: package.json unreadable or unparseable (${e.message}) — cannot ask what is `
+      + 'reachable, so this run makes NO claim about registration. This is not zero violations.');
+  }
+
+  if (population && scripts) {
+    // The script COMMANDS, as text. A `//comment` key holds an array of prose
+    // and is not a runnable script; it must not make a file look reachable.
+    const commands = Object.entries(scripts)
+      .filter(([, v]) => typeof v === 'string')
+      .map(([k, v]) => ({ name: k, cmd: v }));
+
+    // Match a path at a filename boundary, so `marquee-harness.mjs` is NOT
+    // satisfied by a command that runs `marquee-flip-button-harness.mjs`.
+    const namesPath = (cmd, p) =>
+      new RegExp(`(?<![\\w./-])${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w./-])`).test(cmd);
+
+    // One hop: a `.sh` under scratchpad/ that a script dispatches is a door with
+    // a name on it. Read each such script once and remember what it names.
+    const shReach = new Map();     // basename -> the script name that reaches it
+    for (const { name, cmd } of commands) {
+      for (const m of cmd.matchAll(/[\w$/.\\-]*scratchpad\/[\w$/.\\-]*\.sh\b/g)) {
+        let sh;
+        try { sh = readFileSync(join(DIR, '..', m[0]), 'utf8'); }
+        catch { continue; }        // a script naming a missing .sh is S-pass business, not G6's
+        for (const t of sh.matchAll(/[\w$/.\\-]*?([A-Za-z0-9_.-]+\.mjs)\b/g)) {
+          if (!shReach.has(t[1])) shReach.set(t[1], `${name} → ${m[0]}`);
+        }
+      }
+    }
+
+    const reachedBy = (f) => {
+      const direct = commands.find((c) => namesPath(c.cmd, f));
+      if (direct) return direct.name;
+      const viaSh = shReach.get(f.split('/').pop());
+      return viaSh ?? null;
+    };
+
+    const unreachable = [];
+    let reachedCount = 0;
+    let viaShCount = 0;
+    for (const f of population) {
+      const by = reachedBy(f);
+      if (by) { reachedCount++; if (by.includes('→')) viaShCount++; continue; }
+      if (Object.hasOwn(RETIRED_UNREGISTERED, f)) continue;
+      unreachable.push(f);
+    }
+
+    // Every G6 message is keyed by the SCRATCHPAD-RELATIVE path, the same shape
+    // the other rules use, so the tracked/untracked split below can find it in
+    // `git ls-files`. Spelling these `scratchpad/…` would file every one of them
+    // as UNTRACKED and quietly make the rule non-fatal.
+    const relOf = (f) => f.replace(/^scratchpad\//, '');
+
+    for (const f of unreachable) {
+      const slug = f.split('/').pop().replace(HARNESS_LIKE, '');
+      fails.push(`G6 ${relOf(f)}: tracked, harness-like, and NO package.json script `
+        + 'can reach it — nobody can run it by name, so nothing sweeps it and a red row in it is '
+        + `invisible. Add:  "harness:${slug}": "node ${f}"  to package.json (keep the block sorted). `
+        + 'If it is report-only — it exits 0 whatever it measured — add it to RETIRED_UNREGISTERED in '
+        + 'this file WITH THE REASON instead; a script that can never go red is worse than no script.');
+    }
+
+    // The exemption list is itself checked, so it cannot rot into a workaround
+    // that outlives its defect.
+    const inPopulation = new Set(population);
+    for (const [f, why] of Object.entries(RETIRED_UNREGISTERED)) {
+      if (!inPopulation.has(f)) {
+        // ALWAYS FATAL. This is a claim about THIS FILE'S OWN LIST, not about a
+        // file the repo carries — and it fires exactly when the path is not
+        // tracked, which is the one condition the untracked split would use to
+        // make it non-fatal. Planted and measured: without `alwaysFatal` the
+        // whole exemption audit exits 0 over a rotten entry.
+        const msg = `G6 ${relOf(f)}: STALE EXEMPTION — RETIRED_UNREGISTERED excuses \`${f}\` and it is not `
+          + 'a tracked harness-like file (renamed? deleted?). Delete the entry, or fix the path — an '
+          + 'exemption that no longer names anything is a workaround outliving its defect.';
+        fails.push(msg); alwaysFatal.add(msg);
+        continue;
+      }
+      const by = reachedBy(f);
+      if (by) {
+        const msg = `G6 ${relOf(f)}: DEAD EXEMPTION — RETIRED_UNREGISTERED excuses this path, but \`${by}\` `
+          + 'already reaches it. One of the two is wrong: either the script should go, or the '
+          + 'exemption should. Reason on file: ' + why.slice(0, 80) + '…';
+        fails.push(msg); alwaysFatal.add(msg);
+      }
+    }
+
+    console.log(`\nG6  ${reachedCount}/${population.length} tracked harness-like file(s) reachable by a `
+      + `package.json script (${viaShCount} via a dispatched .sh) · `
+      + `${Object.keys(RETIRED_UNREGISTERED).length} declared report-only · ${unreachable.length} UNREACHABLE`);
+    console.log('    DECLARED REPORT-ONLY, printed every run because an exemption nobody sees is a hole:');
+    for (const [f, why] of Object.entries(RETIRED_UNREGISTERED)) {
+      console.log(`      ${f}\n        ${why.replace(/\s+/g, ' ')}`);
+    }
+  }
+}
+
 // ── report ─────────────────────────────────────────────────────────────────
 
 const byKind = new Map();
@@ -545,7 +865,14 @@ try {
   // `[GS]` — the shell rules use S-codes, and leaving this as `G\d+` would have
   // filed every shell failure under "tracked" by accident (the rule id would
   // stay in the key and never match a path), making an untracked .sh fatal.
-  untrackedFails = fails.filter((f) => !tracked.has(String(f).replace(/^\s*[GS]\d+ /, '').split(':')[0]));
+  // `alwaysFatal` is excluded FIRST. Those failures are claims about this
+  // repo's own configuration (package.json, this file's exemption list), not
+  // about a file the repo may not carry, and G6's STALE EXEMPTION fires exactly
+  // when the path it names is untracked — so without this line the split makes
+  // that rule non-fatal in precisely the case it exists to catch. Measured, not
+  // reasoned: a planted rotten exemption exited 0 before this was here.
+  untrackedFails = fails.filter((f) => !alwaysFatal.has(f)
+    && !tracked.has(String(f).replace(/^\s*[GS]\d+ /, '').split(':')[0]));
   trackedFails = fails.filter((f) => !untrackedFails.includes(f));
 } catch (e) {
   // Cannot ask git -> cannot split -> treat every failure as fatal. Never the
