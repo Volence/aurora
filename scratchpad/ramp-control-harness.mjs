@@ -733,10 +733,19 @@ async function main() {
     await typeInto(c, 'start', '0', 'Start (positive, so only `step` is named)');
     await typeInto(c, 'step', '-1.5', 'Step (a representable NEGATIVE)');
     const negDoc = await doc(c);
+    // ⚠ THE SEARCH NEEDLE IS FROM THE BODY, NOT THE LEAD, AND THAT IS LOAD-
+    // BEARING. `paintedRect` takes the LAST `div,span` whose innerText contains
+    // the needle — the innermost one. The leaf paints its lead in its own
+    // `<span>` for emphasis and the rest as a sibling TEXT NODE, so searching by
+    // the lead lands on that 46-character span and every body needle reports
+    // false against a sentence that is fully on screen. Measured on the first
+    // run of this row. Searching by a phrase that appears ONLY in the body
+    // resolves to the containing Hint, whose innerText is the whole sentence —
+    // lead included, which is why the lead stays in the needle list.
     const NS_NEG_NEEDLES = [NS_LEAD, '`step` (px per scanline) is negative',
       'raster_ramp_program', 'u32', 'A POSITIVE value in the same field builds and runs today',
       'this is about the sign, not about `ramp`'];
-    const negSentence = await c.json(`window.__rp.paintedRect(${JSON.stringify(NS_LEAD)}, `
+    const negSentence = await c.json('window.__rp.paintedRect(\'raster_ramp_program\', '
       + `${JSON.stringify(NS_NEG_NEEDLES)})`);
     await shot(c, 'ns-negative');
     check('ns-b', '⚠ A REPRESENTABLE NEGATIVE LANDS IN THE DOCUMENT AND THE PANEL DISCLOSES IT. '
@@ -752,8 +761,8 @@ async function main() {
     // ── [ns-c] `start` is the same u32 and the same raw forward ──────────
     await typeInto(c, 'start', '-2', 'Start (also NEGATIVE)');
     const bothDoc = await doc(c);
-    const NS_BOTH_NEEDLES = ['`start` (px) and `step` (px per scanline) are negative'];
-    const bothSentence = await c.json(`window.__rp.paintedRect(${JSON.stringify(NS_LEAD)}, `
+    const NS_BOTH_NEEDLES = [NS_LEAD, '`start` (px) and `step` (px per scanline) are negative'];
+    const bothSentence = await c.json('window.__rp.paintedRect(\'raster_ramp_program\', '
       + `${JSON.stringify(NS_BOTH_NEEDLES)})`);
     await shot(c, 'ns-both');
     check('ns-c', '`start` is disclosed too, and the sentence names BOTH — `rrp_start` is the same '
@@ -768,7 +777,13 @@ async function main() {
     await typeInto(c, 'start', '0', 'Start (back to a positive document)');
     await typeInto(c, 'step', '1.5', 'Step (POSITIVE — this one builds)');
     const posDoc = await doc(c);
+    // BOTH ENDS OF THE SENTENCE, because the lead lives in its own span and the
+    // body in a sibling text node — a check on one alone could go null while the
+    // other was still painted. Neither phrase appears anywhere else on the
+    // surface (the rate refusal's caveat shares the MECHANISM words, not these).
     const stillThere = await c.json(`window.__rp.paintedRect(${JSON.stringify(NS_LEAD)})`);
+    const stillBody = await c.json('window.__rp.paintedRect('
+      + `${JSON.stringify('A POSITIVE value in the same field builds and runs today')})`);
     await shot(c, 'ns-positive');
     check('ns-d', '⚠ AND ON A POSITIVE DOCUMENT THE SENTENCE IS GONE. This is the direction the '
       + 'parcel exists for: "ramp does not reach the game" RETIRED earlier the same day, and a '
@@ -778,9 +793,10 @@ async function main() {
       + 'negative word',
       !!posDoc.ramp.step && posDoc.ramp.step.whole === 1 && posDoc.ramp.step.frac256 === 128
       && !!posDoc.ramp.start && posDoc.ramp.start.whole === 0 && posDoc.ramp.start.frac256 === 0
-      && stillThere === null,
+      && stillThere === null && stillBody === null,
       `start = ${JSON.stringify(posDoc.ramp.start)}, step = ${JSON.stringify(posDoc.ramp.step)}; `
-      + `paintedRect(lead) = ${JSON.stringify(stillThere)} (must be null)`);
+      + `paintedRect(lead) = ${JSON.stringify(stillThere)}, paintedRect(body) = `
+      + `${JSON.stringify(stillBody)} (both must be null)`);
 
     // ══════════════════════════════════════════════════════════════════════
     // [ds] THE DISPLAY READOUT
