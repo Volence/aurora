@@ -62,12 +62,13 @@ import { mapFacet, type FacetModule } from '../facet-registry';
  * THE RESIDUE, stated rather than implied: `aeon.sections` above is a `list`
  * section (`flex: 1 1 0`, floor `SECTION_LIST_MIN_HEIGHT`). In a column with
  * between 0 and one Brush-height of slack it can still SHRINK when an options
- * section mounts, which would move Art up. Measured on this app's column it does
- * not — the nav sits at its natural height with surplus below, and at 1280x700
- * it sits on its floor, and neither regime moves (both runs are in
- * docs/reviews/2026-09-03-art-strip-doubleclick.md §D). Nothing here can rule
- * out the narrow band in between; only reserving the space could, and that costs
- * the chunk grid its column.
+ * section mounts, which would move Art up. MEASURED, not argued: the strip's top
+ * is 381 before the gesture and 381 between the halves at BOTH 1680x1050 and
+ * 1280x700 (the runs are in docs/reviews/2026-09-03-art-strip-doubleclick.md
+ * §D), so neither of the two configurations exercised is in that regime. What is
+ * NOT measured is a column height that puts the nav strictly between its natural
+ * height and its floor with less than a Brush of slack; only reserving the space
+ * could rule that out, and reserving it costs the chunk grid its column.
  */
 function LayoutPanels() {
   const tool = useEditorStore((s) => s.tool);
