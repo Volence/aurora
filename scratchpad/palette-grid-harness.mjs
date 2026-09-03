@@ -18,8 +18,15 @@
 //   - every block carries NEGATIVE CONTROLS (`neg`) — conditions known to be
 //     false. If one of them reports true the probe is blind and the whole run is
 //     worthless, which is reported separately from the failures.
+//
+// ⛔ ENGINE=aeon TAKES A COPY, NEVER THE LIVE AEON TREE (O53). AEON_DIR has NO
+// default — unset, an ENGINE=aeon run refuses at import; set to the tree aeon
+// actually lives in, it refuses again, against the RESOLVED default location
+// rather than a literal. See the two-refusal block below.
 
-import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import {
+  AURORA_DIR, checkoutOverride, siblingPathOrUnresolved, siblingDefaultPathOrUnresolved,
+} from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import * as http from 'node:http';
@@ -37,7 +44,69 @@ const ROOT = AURORA_DIR;
 const RUN = announceRunRoot(runTarget(ROOT));
 const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
 const MAIN = RUN.main;
-const AEONDIR = siblingPathOrUnresolved('aeon') + '/';
+/**
+ * THE COPY IS REQUIRED, SO THERE IS NO DEFAULT. Two refusals, two questions.
+ *
+ * Until O53 this read `siblingPathOrUnresolved('aeon') + '/'` — the resolver
+ * used correctly, and therefore invisible to `check-peer-path-literals` (no
+ * sibling literal, no raw `process.env`), pointed straight at the aeon lane's
+ * LIVE checkout. This harness does not merely read it: it opens it as a project
+ * and drives palette drags that COMMIT (row 11 below asserts the commit landed
+ * on the undo stack), so a run could write an edited palette into another
+ * lane's working tree mid-edit. Review bar 19 (`docs/OVERSEER.md`), whose own
+ * corollary (b) is that routing a read through a resolver "removes the literal
+ * while leaving the read pointed at the same live tree".
+ *
+ * No default is available honestly. A throwaway copy is something an operator
+ * MAKES; every candidate default is either a dead path — which never trips the
+ * guard below, so the run dies later and further away (`docs/OVERSEER.md`,
+ * SUITE-PATHS) — or the live tree the guard exists to refuse. So it REFUSES
+ * when nothing is set, the contract's step 4 in its loudest form, through
+ * `checkoutOverride`, which also buys the aliases, the two-spellings-disagree
+ * refusal and the set-but-wrong error a hand-rolled `process.env.AEON_DIR` had
+ * none of.
+ *
+ * ⚠ GATED ON `ENGINE`, DELIBERATELY. `ENGINE=classic` never names the aeon tree
+ * (it opens `S1DIR` below instead), so refusing an aeon variable there would
+ * demand an environment that run has no use for. The refusal is still at MODULE
+ * LOAD for the runs that can touch aeon, because `ENGINE` is read above.
+ *
+ * NO TRAILING SLASH, and that is a fix rather than a tidy-up. The recent row is
+ * found by `button[title=<AEONDIR>]`, and `addRecentProject` stores the path
+ * through `normalizeProjectPath` (`src/shared/project-path.ts`), which strips
+ * trailing separators. The old `+ '/'` therefore searched for a title the app
+ * could not render.
+ *
+ * ⚠ `S1DIR` BELOW IS THE SAME SHAPE, LEFT LEGIBLE RATHER THAN FIXED. Bar 19's
+ * own carve-out ("this parcel left `s1disasm`'s 37 sites alone for exactly this
+ * reason") covers it, and O53 was scoped to the two aeon-writing harnesses.
+ * `ENGINE=classic` still opens the live s1disasm checkout; see the O53 packet
+ * `docs/reviews/2026-09-03-o53-palette-harness-live-tree.md` for the survey.
+ */
+const AEONDIR = (() => {
+  if (ENGINE !== 'aeon') return null;
+  const override = checkoutOverride('aeon');
+  if (override === null) {
+    throw new Error(
+      'AEON_DIR is unset, and this harness has no honest default: ENGINE=aeon OPENS '
+      + 'the tree it is pointed at as a project and drives palette drags that COMMIT, '
+      + 'so it must be pointed at a throwaway copy of aeon. Make one (e.g. `cp -r '
+      + `${siblingDefaultPathOrUnresolved('aeon')} $(mktemp -d)/aeon\`) and set AEON_DIR `
+      + 'to it. Refusing rather than guessing: the guess this replaced was the aeon '
+      + "lane's LIVE checkout. (empyrean contract/SUITE_PATHS.md, precedence step 4; "
+      + 'aurora docs/OVERSEER.md review bar 19)',
+    );
+  }
+  if (override.value === siblingDefaultPathOrUnresolved('aeon')) {
+    throw new Error(
+      `${override.name}=${override.value} is the real aeon tree — this harness commits `
+      + 'palette edits into the project it opens and must never write there. Point it at '
+      + `a throwaway copy (e.g. \`cp -r ${siblingDefaultPathOrUnresolved('aeon')} `
+      + '$(mktemp -d)/aeon`). (aurora docs/OVERSEER.md review bar 19)',
+    );
+  }
+  return override.value;
+})();
 const S1DIR = siblingPathOrUnresolved('s1disasm');
 const SHOTS = `${ROOT}/scratchpad/shots6`;
 mkdirSync(SHOTS, { recursive: true });
@@ -226,9 +295,18 @@ const HELPERS = String.raw`
     return 'released';
   };
   H.sliderValue = (which) => { const s = H.sliders()[which]; return s ? s.value : null; };
+  // NOTE (O53) — this looked only at <span> and read opacity, and therefore
+  // answered null for every row since Chip grew a real button: an INTERACTIVE
+  // chip is now a <button disabled> and only a non-interactive readout stays a
+  // span (src/renderer/components/ui/primitives.tsx:147-159). Undo is
+  // interactive, so it was never found, and every "and it is undoable" row read
+  // "not recorded" when the truth was "not measured".
+  // null still means COULD NOT MEASURE and is kept apart from false on purpose.
   H.chipEnabled = (label) => {
-    const s = [...document.querySelectorAll('span')].find((e) => e.children.length === 0 && e.textContent.trim() === label);
-    return s ? getComputedStyle(s).opacity === '1' : null;
+    const e = [...document.querySelectorAll('button,span')]
+      .find((n) => n.children.length === 0 && n.textContent.trim() === label);
+    if (!e) return null;
+    return e.tagName === 'BUTTON' ? !e.disabled : getComputedStyle(e).opacity === '1';
   };
   window.__h = H;
   return Object.keys(H).length;
