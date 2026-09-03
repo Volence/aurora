@@ -1994,11 +1994,20 @@ export const ANCHOR_AMP_OPTIONS: readonly { value: number; label: string }[] = O
  * ticks is what the engine counts. Both come off the rung, so the two can never
  * disagree. Two decimals because the first rung is 4.27 s and rounding it to 4
  * would put a number on screen that is not the one the file means.
+ *
+ * ⚠ NO LEADING "every", AND IT WAS NOT A STYLE CHOICE. `every 1092.27 s (65536
+ * ticks)` — the ladder's TOP RUNG — needed 192px in the 190px select and was
+ * truncated on screen. This is a GENERATED label, so no one reading the source
+ * would ever see the string that overflowed, and it is the one an author
+ * reaches by picking the slowest sweep. The word was pure redundancy: the row's
+ * own label is `Cycle`, so it read "Cycle: every 8.53 s". Found by
+ * `anchor-authoring-harness` `[W1]`, which measures EVERY option rather than
+ * whichever one the fixture happened to select.
  */
 export const ANCHOR_PERIOD_OPTIONS: readonly { value: number; label: string }[] = Object.freeze(
   ANCHOR_PERIOD_RUNGS.map((r) => Object.freeze({
     value: r.period_shift,
-    label: `every ${r.seconds.toFixed(2)} s (${r.ticks} ticks)`,
+    label: `${r.seconds.toFixed(2)} s (${r.ticks} ticks)`,
   })),
 );
 
@@ -2083,20 +2092,63 @@ export function anchorChannelIndices(preset: EffectsPreset): number[] {
  * key carries is that 0 is a real — and the most invasive — world Y; a picker
  * saying "none" beside a number field is one an author can reasonably read as
  * "zero". The option says the spelling the file gets.
+ *
+ * ═══ THESE ARE SHORT BECAUSE THE BOX IS 190px, AND THAT IS NOT NEGOTIABLE ═══
+ *
+ * These labels sit in a `<select>` that gets **190px** — the effects column is
+ * 300px, the shared label column takes 64 of it, and the rest is padding and
+ * gaps (`anchor-authoring-harness` `[W0]`, measured). The first spelling of
+ * this table needed **347px** and was ellipsed to `keep the section's hand-auth…`
+ * on screen, so the one word that distinguishes the three states — *keep* —
+ * survived only by luck of being first.
+ *
+ * ⚠ AND NO LABEL-COLUMN WIDTH CAN FIX THAT. Even at `LABEL_W = 0` the select
+ * would reach about 254px, still short of 347. A `<select>` does not wrap and
+ * does not overflow; it truncates, silently, and `scrollWidth` is clamped so
+ * the element itself will not admit it. The words had to come down.
+ *
+ * WHAT WAS TRADED, said plainly rather than quietly:
+ *   - `the section's` → gone. "hand-authored" already means "already in the
+ *     file, not written by this editor", which is the distinction that matters
+ *     at the control. The full sentence survives in the select's `title`, which
+ *     is the schema's own description.
+ *   - `(array ends here)` → gone from the option. It is the FILE SPELLING, and
+ *     it is still said in full by `anchorExtendRefusal` at the moment it
+ *     constrains anybody ("anything but ... will do") and by the title.
+ *   - `(whole pixels)` → gone. The unit is on the World Y row itself
+ *     (`px, level space`), and `anchorSeedRefusal` names the whole-pixel rule
+ *     in a sentence at the moment a fraction is typed, which is the only moment
+ *     it is actionable.
+ *   - `about the seed` → gone from `sweep`. The section's own opening
+ *     paragraph already says a sweep "makes that point drift up and down on a
+ *     timer", and the seed's row sits immediately above this one.
+ *   - `(object)` → gone from `sweep`, and it is the one asymmetry here.
+ *     `(null)` stays on both spellings that write one, because null-versus-a-
+ *     number is the documented hazard this whole key carries. `(object)` is a
+ *     JSON type name that helps only somebody reading the file, and the object
+ *     itself becomes visible the instant `sweep` is picked — Travel, Cycle and
+ *     Start at are its three keys, drawn directly below.
+ * Nothing that distinguishes one state from another was traded.
+ *
+ * ⚠ MEASURED, NOT ESTIMATED, AND THE FIRST ATTEMPT AT THIS WAS WRONG. Guessing
+ * a character budget from a couple of samples put two of these labels 4px and
+ * 10px over — an em-dash between spaces is dearer than the letters around it.
+ * Every string here is sized by `[W1]` against the rendered box; when one is
+ * reworded, re-run `npm run harness:anchor-authoring` rather than counting.
  */
 export const ANCHOR_SEED_OPTIONS: readonly { value: AnchorSeedState; label: string }[] =
   Object.freeze([
-    { value: 'unreached', label: 'keep the section\'s hand-authored anchor (array ends here)' },
+    { value: 'unreached', label: 'keep hand-authored anchor' },
     { value: 'unused', label: 'channel unused (null)' },
-    { value: 'authored', label: 'follow a world Y (whole pixels)' },
+    { value: 'authored', label: 'follow a world Y' },
   ]);
 
-/** The three motion spellings, on the same terms. */
+/** The three motion spellings, on the same terms — and the same 190px. */
 export const ANCHOR_MOTION_OPTIONS: readonly { value: AnchorMotionState; label: string }[] =
   Object.freeze([
-    { value: 'unreached', label: 'keep the section\'s hand-authored motion (array ends here)' },
-    { value: 'still', label: 'no motion — the anchor stays on its seed (null)' },
-    { value: 'sweep', label: 'sweep — up and down about the seed (object)' },
+    { value: 'unreached', label: 'keep hand-authored motion' },
+    { value: 'still', label: 'no motion (null)' },
+    { value: 'sweep', label: 'sweep up and down' },
   ]);
 
 /**
