@@ -94,6 +94,7 @@
     "harness:curve-editor": "node scratchpad/curve-editor-harness.mjs",
     "harness:curve-option-disabled": "node scratchpad/curve-option-disabled-harness.mjs",
     "harness:curve-vsplit-reachable": "node scratchpad/curve-vsplit-reachable-harness.mjs",
+    "harness:d27-sprite-focus": "node scratchpad/d27-sprite-focus-harness.mjs",
     "harness:discovery-exit-net": "node scratchpad/discovery-exit-net-proof.mjs",
     "harness:effects-bob": "node scratchpad/effects-bob-harness.mjs",
     "harness:effects-column": "node scratchpad/effects-column-harness.mjs",
