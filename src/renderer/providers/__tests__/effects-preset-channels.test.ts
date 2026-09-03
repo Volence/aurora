@@ -380,4 +380,47 @@ describe('round trip: what the panel does not touch, it does not change', () => 
     expect(slotTexts[1]).toContain('"variants": [\n    null\n  ]');
     expect(slotTexts[2]).toContain('"variants": [\n    {}\n  ]');
   });
+
+  /**
+   * ═══ THE ITEM-4 KEYS THROUGH THE PROVIDER'S OWN PATHS ═══
+   *
+   * empyrean d36d704 / §7.3. There is no CONTROL for `patch_world_ys` or
+   * `patch_motion` — the sliders are EW-TIMELINE-CLOCK's row, not this parcel's
+   * — but the provider is where an `EffectsPreset` is CONSTRUCTED (`newPreset`)
+   * and CLONED (`clonePreset`, through every command factory), and the lesson
+   * this repo paid 13-ref-sites for is that a field dropped by a copier outside
+   * the codec frame survives a suite the codec's own round-trip passes. So the
+   * two paths a preset takes through this module are asserted directly.
+   */
+  it('newPreset authors NEITHER item-4 key — absent is a state, not a gap to fill', () => {
+    const fresh = newPreset(ID);
+    expect('patch_world_ys' in fresh).toBe(false);
+    expect('patch_motion' in fresh).toBe(false);
+    // An index the array does not reach keeps the section's hand-authored
+    // channel. A new document has nothing to say about a channel nobody touched,
+    // and a padded `[null, null, null, null]` would say "all four unused".
+    expect(serializeEffectsPreset(fresh)).not.toMatch(/patch_/);
+  });
+
+  it('both item-4 keys survive every command factory\'s clone, in all three states', () => {
+    const seeded: EffectsPreset = {
+      ...newPreset(ID),
+      patch_world_ys: [224, null],
+      patch_motion: [{ sweep: { amp_shift: 4, period_shift: 1 } }, null],
+    };
+    const before = serializeEffectsPreset(seeded);
+    // A command factory that touches an unrelated channel: the item-4 keys ride
+    // through `clonePreset` untouched, at their own lengths, nulls in place.
+    const lib = library(seeded);
+    const cmd = setCyclesStateCommand(lib, ID, 'off')!;
+    expect(cmd.newPreset!.patch_world_ys).toEqual([224, null]);
+    expect(cmd.newPreset!.patch_motion).toEqual([{ sweep: { amp_shift: 4, period_shift: 1 } }, null]);
+    // ...and the OLD side of the undo record carries them too, so an undo
+    // restores the channels rather than dropping them.
+    expect(serializeEffectsPreset(cmd.oldPreset!)).toBe(before);
+    // The written bytes differ only by the `cycles` key the gesture set.
+    const after = serializeEffectsPreset(cmd.newPreset!);
+    expect(after).toContain('"cycles": null');
+    expect(after.replace(/ {2}"cycles": null,\n/, '')).toBe(before);
+  });
 });

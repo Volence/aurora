@@ -2,7 +2,34 @@
  * The contract-leads-consumer lag on the raster preset document, as ONE fact
  * with ONE measurement behind it.
  *
- * ═══ THE LAG IS EMPTY. RETIRED 2026-09-02. ═══
+ * ═══ RE-ARMED 2026-09-03. THE LAG IS `patch_world_ys` AND `patch_motion`. ═══
+ *
+ * The retirement below happened, and then the exact event its RE-OPEN paragraph
+ * described happened too — from the other direction. empyrean `d36d704`
+ * (AURORA_EFFECTS_SCHEMA.md §7.3) declared two new optional preset keys for
+ * EFFECTS-W1 DoD item 4, Aurora vendored them (step 3 of a four-step chain), and
+ * aeon's `tools/effects_gen.py` reads neither: step 4 is theirs and has not run.
+ * Measured at aeon `origin/master` `81b2a719` through git objects:
+ * `PRESET_KEYS` (`effects_gen.py:280`) is `{schema, id, bands, cycles,
+ * variants}` and `docs/EDITOR_RASTER_PRESETS.md`'s machine-checked block lists
+ * the same five. aeon's master moved to `63fa3f8c` during the same session (three
+ * DMA-reserve measurement commits) and the block is UNCHANGED there — re-read,
+ * not assumed. The drift row reads TIP on every run, so it is that row and not
+ * this comment that answers the question today.
+ *
+ * ═══ THIS LAG IS SHARPER THAN THE LAST ONE, AND THE SENTENCE SAYS SO ═══
+ *
+ * At 12aecd5 the two lagging keys were in aeon's `preset-refused` list — refused
+ * BY NAME, with a reason. These two are not in aeon's vocabulary at all, so they
+ * take `_check_keys`'s generic unknown-key path (`effects_gen.py:444-453`), and
+ * `_refuse` RAISES: a preset document carrying either key does not "lower
+ * partially", it FAILS AEON'S BUILD ENTIRELY until step 4 lands. An author who
+ * sets one has not merely authored something inert — they have made that preset
+ * un-generatable. The disclosure below is written to say that, because the
+ * softer 12aecd5 wording ("saved to this file, and that is as far as it goes")
+ * would understate it.
+ *
+ * ═══ THE 2026-09-02 RETIREMENT, KEPT FOR ITS REASONING ═══
  *
  * It was `['cycles', 'variants']` from the 12aecd5 re-vendor until aeon merged
  * EFFECTS-W1 DoD item 5 (aeon `445a5856`, 2026-09-02). The premise was: the
@@ -44,24 +71,37 @@
  * TWO readers, and only two:
  *
  *   1. `test/formats/effects-preset-schema-drift.test.ts` MEASURES it: it reads
- *      aeon's page at origin/master through git objects, computes the lag (the
- *      keys aeon refuses that the schema does not reserve), and — now that the
- *      lag is empty — asserts it is EMPTY. That row goes red the day a lag
- *      re-opens, in either direction: aeon reverting item 5, or the contract
- *      declaring a key aeon has not built. Its message says to re-fill this
- *      list. The test carries no copy of the names.
+ *      aeon's page at origin/master through git objects, computes the lag and
+ *      asserts it equals this list exactly. It goes red in BOTH directions —
+ *      aeon builds one of these (empty the list) or the contract declares a key
+ *      aeon has not built (add it). The test carries no copy of the names.
+ *
+ *      ⚠ THE MEASUREMENT WIDENED ON 2026-09-03, AND IT HAD TO. Until then the
+ *      lag was computed from aeon's `preset-refused` list alone, which sees only
+ *      the refused-BY-NAME flavour; a key aeon's page does not mention at all
+ *      was invisible to it. That is precisely the flavour d36d704 produced, and
+ *      the row stayed green on the half that mattered. The lag is now computed
+ *      as "every root key the schema declares that aeon's page does not
+ *      ACCEPT", which covers both flavours and is the definition this constant
+ *      always meant.
  *   2. `presetLagDisclosure` DERIVES the panel's sentence from it, and returns
  *      null — no sentence — when the list is empty. It is mounted
  *      unconditionally and propless in `BandPresetPanel`, so re-filling this
  *      list is the whole of what it takes to put the sentence back on screen.
  *
  * `src/renderer/components/effects/__tests__/preset-lag-disclosure.test.ts`
- * closes the loop from the other side: it asserts the list is empty AND that the
- * drift test still measures the refusal list, so a green suite cannot mean
- * "nobody is looking any more". Its sentence rows drive the derivation with an
- * EXPLICIT hypothetical list, so the wording is still fully asserted with the
- * premise retired (memory: a workaround outlives its defect; a hold carries its
- * date; a suite that passes while asserting nothing is the failure mode).
+ * closes the loop from the other side. It has been re-aimed with the premise
+ * twice and keeps the shape both states need: while the lag is OPEN it asserts
+ * every name here is an OPTIONAL root key the schema really declares (a premise
+ * naming something the contract never opened would disclose fiction), asserts
+ * the whole sentence against the derivation rather than a text match, drives the
+ * EMPTY case too so the retirement path cannot rot while unused, and pins that
+ * the drift test still names this constant and still computes the WIDE lag. Its
+ * poison stubs this list EMPTY and requires silence — the direction that proves
+ * the sentence is not hard-wired, which is the one that matters while a
+ * disclosure is on screen (memory: a workaround outlives its defect; a hold
+ * carries its date; a suite that passes while asserting nothing is the failure
+ * mode).
  *
  * Evaluate, do not obey: re-measure with `git -C <aeon> show
  * origin/master:docs/EDITOR_RASTER_PRESETS.md`, never by path into a working
@@ -70,17 +110,22 @@
 
 /**
  * The preset keys the schema declares that aeon's generator does not lower yet,
- * sorted, as the drift row measures them. EMPTY since 2026-09-02 — no lag, and
- * so no disclosure. Re-fill it (and only it) if the drift row reports one again.
+ * sorted, as the drift row measures them.
+ *
+ * `['cycles','variants']` from 2026-08-30; EMPTY on 2026-09-02 when aeon merged
+ * item 5; re-filled 2026-09-03 with item 4's authoring key, whose step 4 is
+ * aeon's and has not run. Empty it (and only it) the day the drift row says the
+ * lag has closed.
  */
-export const PRESET_KEYS_AWAITING_AEON: readonly string[] = Object.freeze([]);
+export const PRESET_KEYS_AWAITING_AEON: readonly string[] =
+  Object.freeze(['patch_motion', 'patch_world_ys']);
 
 /** The date the premise above was last measured — printed inside the sentence. */
-export const PRESET_LAG_MEASURED_ON = '2026-09-02';
+export const PRESET_LAG_MEASURED_ON = '2026-09-03';
 
 /** Where the measurement lives, named in the sentence so a reader can re-run it. */
 export const PRESET_LAG_MEASUREMENT =
-  'test/formats/effects-preset-schema-drift.test.ts (the refusal-list row) against aeon ' +
+  'test/formats/effects-preset-schema-drift.test.ts (the lag row) against aeon ' +
   'docs/EDITOR_RASTER_PRESETS.md at origin/master';
 
 /** The sentence's leading words — a harness finds the block by them. */
@@ -109,8 +154,10 @@ export function presetLagDisclosure(keys: readonly string[] = PRESET_KEYS_AWAITI
   const list = one ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
   return `${PRESET_LAG_LEAD} ${list} ${one ? 'is' : 'are'} authored here and saved to this ` +
     `preset file, and that is as far as ${one ? 'it goes' : 'they go'}: aeon's generator ` +
-    `(tools/effects_gen.py) refuses ${one ? 'it' : 'both'} by name at origin/master, so nothing ` +
-    `set below reaches a ROM, and no emulator has shown ${one ? 'it' : 'either'}. ` +
+    `(tools/effects_gen.py) does not accept ${one ? 'it' : 'them'} at origin/master and refuses ` +
+    'the WHOLE DOCUMENT, so a preset carrying ' +
+    `${one ? 'the key' : 'either key'} will not build, nothing set below reaches a ROM, and no ` +
+    `emulator has shown ${one ? 'it' : 'either'}. ` +
     `Measured ${PRESET_LAG_MEASURED_ON} by ${PRESET_LAG_MEASUREMENT}. ` +
     `Expires (${PRESET_LAG_MEASURED_ON}): the day that row goes red because aeon lowers ` +
     `${one ? 'the key' : 'the keys'} — this sentence retires with the row.`;
