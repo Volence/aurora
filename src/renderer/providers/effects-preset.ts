@@ -118,6 +118,21 @@ import type { FactorOption } from './effects-aeon';
 import {
   cramLocation, fmtGenesisWord, CRAM_LINE_ENTRIES, CRAM_LINE_COUNT, CRAM_WORD_BYTES,
 } from '../../core/formats/palette';
+// THE NEGATIVE-VALUE CAVEAT LIVES IN core/, NOT HERE, for `preset-lag.ts`'s
+// reason: it is a self-retiring disclosure whose premise is measured against a
+// peer repo at a committed revision, and a copy of it in a renderer provider
+// would be a second statement of the fact that nothing measures. This module
+// APPENDS it; it does not decide it.
+//
+// ⚠ THE PREMISE IS PASSED EXPLICITLY, NOT LEFT TO THE DEFAULT PARAMETER. A
+// default argument is evaluated in the DECLARING module's scope, so a caller
+// that omits it reads the real constant even when a test has stubbed the module
+// — the poison would go green while the caveat stayed hard-wired on. Reading
+// the constant here, through the import, is what makes both directions of the
+// premise reach this sentence.
+import {
+  rampSignRateCaveat, RAMP_SIGN_FIELDS_AWAITING_AEON,
+} from '../../core/formats/effects/ramp-sign-lag';
 
 // ---------------------------------------------------------------------------
 // THE THREE LIMITS — one source, read by the panel and by the wording gate
@@ -2834,6 +2849,15 @@ export function rampRateUnits(field: RampRateField): string {
  * commits per keystroke, so an author typing `-0.5` walks through values that DO
  * land, and the field they are looking at is not necessarily the value in the
  * file.
+ *
+ * ⚠ AND EVERY BRANCH THAT NAMES A NEGATIVE ALTERNATIVE CARRIES A CAVEAT.
+ * `rampSignRateCaveat` (core/formats/effects/ramp-sign-lag.ts) is appended when
+ * the value this sentence just OFFERED is below zero, because aeon's
+ * `raster_ramp_program` cannot encode a negative 16.16 today and the offer would
+ * otherwise read as a fix. THE ARITHMETIC IS UNTOUCHED — `-1` and `0` really are
+ * the nearest spellable values, and falsifying that to route around a build
+ * limitation would put a lie in the panel to hide a defect in a peer. The caveat
+ * rides beside the truth, and retires with the drift row.
  */
 export function rampRateRefusal(
   ramp: EffectsPresetRamp, presetId: string, field: RampRateField, px: number,
@@ -2846,12 +2870,16 @@ export function rampRateRefusal(
   const n = rampRateNeighbours(px);
   const pair = `${n.below === null ? '(nothing lower)' : fmtRampPx(n.below)} and `
     + `${n.above === null ? '(nothing higher)' : fmtRampPx(n.above)}`;
+  // The values this sentence is about to OFFER, per branch — the caveat's input,
+  // so it can never fire about a number that is not on screen.
+  const caveat = (named: readonly (number | null)[]): string =>
+    rampSignRateCaveat(field, named, RAMP_SIGN_FIELDS_AWAITING_AEON) ?? '';
   if (problem === 'sign-hole') {
     return `${subject}: ${px} ${units} HAS NO SPELLING in this encoding. frac256 is a MAGNITUDE `
       + 'and the sign lives on whole alone, so a negative value needs a negative whole and there is '
       + 'none between -1 and 0 — {whole: 0, frac256: 128} is +0.5, not -0.5. The whole interval '
       + `between -1 and 0 is unreachable. The nearest rates you CAN have are ${pair}. Refused, and `
-      + `not rounded to either — ${holds}`;
+      + `not rounded to either — ${holds}${caveat([n.below, n.above])}`;
   }
   if (problem === 'above-range' || problem === 'below-range') {
     const end = problem === 'above-range'
@@ -2862,11 +2890,12 @@ export function rampRateRefusal(
       + `fraction 0..${EFFECTS_PRESET_FP16_FRAC_RANGE.max}/${RAMP_RATE_UNITS_PER_PX}, so ${end}. `
       + 'The engine\'s STORAGE is wider — signed 16.16, about 64 times this — and a control built '
       + 'on the storage width would offer you values the build refuses. '
-      + `Refused; ${holds}`;
+      + `Refused; ${holds}`
+      + caveat([problem === 'above-range' ? RAMP_RATE_MAX : RAMP_RATE_MIN]);
   }
   return `${subject}: ${px} ${units} is not a whole number of 1/${RAMP_RATE_UNITS_PER_PX} px, `
     + `which is the finest rate fp16(whole, frac256) can spell. The nearest it has are ${pair}. `
-    + `Refused, and not rounded to either — ${holds}`;
+    + `Refused, and not rounded to either — ${holds}${caveat([n.below, n.above])}`;
 }
 
 // ── the span, and the pair the per-field maxima do not describe ─────────────
