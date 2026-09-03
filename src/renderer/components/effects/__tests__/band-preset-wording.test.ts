@@ -14,9 +14,17 @@
 //
 //   1. The three limits EXIST and say the load-bearing words. A limit that
 //      loses "not implemented in either repo" has become a shrug.
-//   2. The panel READS them and renders them UNCONDITIONALLY. A limit behind a
-//      `title=` or a collapsed detail is a limit the panel does not carry — the
-//      brief's words, and the whole reason `LimitBlock` is not a tooltip.
+//   2. The panel READS them and renders them UNCONDITIONALLY, AT BOTH LENGTHS.
+//      ⚠ AMENDED at `b8d16256` (EFFECTS-W1 defect 3) and the amendment has two
+//      halves: the AUTHOR-LENGTH sentence (`presetLimitsShort()`) must be
+//      PAINTED — a limit that is only reachable behind a `title=` or a
+//      collapsed detail is a limit the panel does not carry — AND the
+//      CONTRACT-length wording (`PRESET_LIMITS[k].body`) must still be
+//      REACHABLE on the same element's `title`, or the move became a deletion.
+//      The rows near the foot of this file hold both directions; neither half
+//      alone is the rule. Do not read the pre-amendment phrasing ("LimitBlock
+//      is not a tooltip") as forbidding the hovers — see BandPresetPanel.tsx's
+//      header, which was itself left stale by that commit and repaired in O79.
 //   3. NOTHING here claims anyone has SEEN one HERE. Until aeon `4a4d3474`
 //      (2026-08-30) no band in this suite had been looked at on screen; that
 //      commit's `docs/research/reference_captures/2026-08-30-sec5-band/` is
