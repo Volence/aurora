@@ -219,16 +219,28 @@ which is why the CDP harness above is the proof and this is only the floor.
 **The same `<button>`-keeps-focus shape elsewhere.** d-27 surveyed these two
 controls and ruled on these two, and the owner is mid-project on something else,
 so nothing outside `CollisionPalette.tsx` was touched. A read-only survey of
-`src/renderer/` found **18 more controls** with the shape (destructive, no
-confirm, natively focusable, no blur). It is recorded here for the overseer to
-book or decline, not acted on.
+`src/renderer/` looked for the same four properties (destructive, no confirm,
+natively focusable, no blur). It is recorded here for the overseer to book or
+decline, not acted on.
 
-The survey tracked one axis worth keeping: **does the button survive its own
-click?** A control whose handler unmounts it (the list empties, the selection
-clears) loses focus to `<body>` anyway and the defect does not reproduce. The
-ones that stay mounted are the real matches, and **list-item buttons keyed by
-index are the worst case** — the button stays mounted *and now points at the next
-item*, so a repeat Space does not repeat the action, it **retargets** it.
+**The count needs its axis, or it is not a count.** The survey tracked one thing
+I did not expect to matter: **does the button survive its own click?** A control
+whose handler unmounts it — the list empties, the selection clears — loses focus
+to `<body>` on its own, and **the d-27 defect does not reproduce there at all**.
+So of the controls carrying the shape:
+
+- **9 stay mounted and DO reproduce it** — `shell/SpriteToolOptions.tsx:56` and
+  `:67`, `sprite/FrameGrid.tsx:53`, `sprite/SpritePaletteHeader.tsx:81` and
+  `:88`, `effects/EffectsScenePanel.tsx:506`, `effects/BandPresetPanel.tsx:1016`
+  and `:719`, `sprite/Timeline.tsx:182`.
+- **6 unmount themselves and do NOT** — `AeonChunkActions.tsx:34`,
+  `SectionGridNav.tsx:238`, `effects/EffectsScenePanel.tsx:855`,
+  `effects/BandPresetPanel.tsx:382`, `effects/BgAnimBandPanel.tsx:564` and `:567`.
+  Listed so nobody re-finds them and books work that has nothing to fix.
+
+**List-item buttons keyed by index are the worst case** — the button stays
+mounted *and now points at the next item*, so a repeat Space does not repeat the
+action, it **retargets** it at the neighbour.
 
 The two families worth looking at first:
 
@@ -242,6 +254,9 @@ The two families worth looking at first:
   layer), `BandPresetPanel.tsx:1016` (remove raster band) and `:719` (remove
   cycle channel), `sprite/Timeline.tsx:182` (remove step). All undoable, all
   cheap to fix the same way, and all with the retarget-on-repeat property above.
+
+⚠ **These line numbers are a snapshot of a tree that is moving.** Re-grep before
+acting on any of them; the survey is a map, not a work order.
 
 Also found, and worth copying rather than fixing: **`BgAnimBandPanel.tsx:567`**
 already does the right thing without a dialog — the first press *refuses* if map
