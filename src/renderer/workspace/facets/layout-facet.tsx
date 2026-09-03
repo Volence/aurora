@@ -15,12 +15,70 @@ import { Panel, CollapsibleSection } from '../../components/ui';
 import { useEditorStore } from '../../state/editorStore';
 import { mapFacet, type FacetModule } from '../facet-registry';
 
+/**
+ * THE COLUMN'S ORDER IS LOAD-BEARING: EVERY TOOL-CONDITIONAL SECTION SITS BELOW
+ * THE ART SECTION, AND THAT IS A BUG FIX, NOT A PREFERENCE.
+ *
+ * The Art section hosts a DOUBLE CLICK (ArtBrowser's strip opens a background
+ * slot in the composer — ROADMAP row 57) and a DRAG (the range that aims a band
+ * promotion). A double click is two hit tests a moment apart, so it only works
+ * while the thing it is aimed at STAYS WHERE IT WAS between them.
+ *
+ * It did not. The first press/release of a double click is an ordinary click:
+ * `ArtBrowser.handleClick` picks the slot and arms `paint-tile`, which used to
+ * MOUNT the "Brush" section IMMEDIATELY ABOVE this one — 144.56px of it,
+ * measured — so the strip slid down out from under the cursor and the second
+ * click landed on the band-card row that had taken its place. That armed
+ * `stamp-band`, which un-mounted Brush and put the strip back, so a before/after
+ * reading says nothing moved. `dblclick` never reached the strip's container at
+ * all: the composer was unreachable from the human gesture, and the author was
+ * left holding a stamp they never asked for.
+ *
+ * THE RULE THAT REPLACES IT, stated so a future section knows where to go:
+ *
+ *   A section whose PRESENCE depends on the tool must not precede a section
+ *   that hosts a multi-step pointer gesture, when a gesture in that section can
+ *   change the tool.
+ *
+ * Both halves are true here and only here in this app: `ArtBrowser` is the one
+ * panel that calls `setTool` from a pointer handler, and this is the one facet
+ * column with tool-conditional section membership. The rule is held by
+ * `workspace/__tests__/panel-gesture-order.test.ts`, which derives both halves
+ * from source rather than from this comment, and the gesture itself by
+ * `scratchpad/bganim-tile-door-harness.mjs`, which drives the real double click
+ * under CDP and asserts the strip's box does not move between the two halves —
+ * the two facts that were false. Neither a reorder here nor a new `setTool` in a
+ * panel can put the defect back quietly.
+ *
+ * THREE FIXES WERE REJECTED and the reasons matter more than the choice:
+ *   * reserving the slot's space always — the arms have different heights
+ *     (a 144px Brush, a flex chunk grid), so arming still reflowed;
+ *   * moving the open gesture off `dblclick`, or capturing the pointer — the
+ *     panel would still move under the cursor, and the next gesture added to
+ *     this column would find the same fault waiting;
+ *   * any "wait and see whether a second click arrives" before arming the tool —
+ *     a timer over a live fault, which treats the symptom and keeps the cause.
+ *
+ * THE RESIDUE, stated rather than implied: `aeon.sections` above is a `list`
+ * section (`flex: 1 1 0`, floor `SECTION_LIST_MIN_HEIGHT`). In a column with
+ * between 0 and one Brush-height of slack it can still SHRINK when an options
+ * section mounts, which would move Art up. Measured on this app's column it does
+ * not — the nav sits at its natural height with surplus below, and at 1280x700
+ * it sits on its floor, and neither regime moves (both runs are in
+ * docs/reviews/2026-09-03-art-strip-doubleclick.md §D). Nothing here can rule
+ * out the narrow band in between; only reserving the space could, and that costs
+ * the chunk grid its column.
+ */
 function LayoutPanels() {
   const tool = useEditorStore((s) => s.tool);
   const pasting = useEditorStore((s) => s.pasting);
   return (
     <Panel width={240} scroll>
       <CollapsibleSection id="aeon.sections" title="Sections" variant="list"><SectionGridNav /></CollapsibleSection>
+      {/* THE GESTURE HOST, AND IT GOES ABOVE THE TOOL-CONDITIONAL SLOT — see
+          this component's docblock. Its only neighbour above is unconditional,
+          so arming a tool from the strip cannot move the strip. */}
+      <CollapsibleSection id="aeon.art" title="Art"><ArtBrowser /></CollapsibleSection>
       {/* Same paste-suppression rule as the old map branch (see the original
           LegacyWorkspace comment): pasting overrides every tool's options panel. */}
       {/* ONE id for these two, and that reuse IS deliberate: they are mutually
@@ -63,7 +121,6 @@ function LayoutPanels() {
           <TileBrushOptions />
         </CollapsibleSection>
       )}
-      <CollapsibleSection id="aeon.art" title="Art"><ArtBrowser /></CollapsibleSection>
       {/* The object readout is on HERE and nowhere else: Layout offers the
           `select` tool, and this panel is the only thing in the facet that shows
           what you picked. The Objects facet has the real editor instead.
