@@ -56,6 +56,31 @@
 // value is the lowest set bit of the complement, so the fixture follows the rule
 // instead of restating it. Both are printed.
 //
+// ═══ WHICH ROWS DISCRIMINATE — MEASURED, NOT ASSERTED ═══
+//
+// Three plants were applied to a real build, the bundle grepped to prove each
+// reached `dist/` (a rebuild is not a plant until the artifact carries it), the
+// harness re-run, and the file restored with `git checkout` from the committed
+// baseline. Runner: `npm run harness:composer-collision-gesture`.
+//
+//   P1  `composer-collision.ts`: `collisionPaintWord(word, arr[idx])` → `word &
+//       0xFFFF`, the pre-fix wholesale write. Built as `const merged = word &
+//       65535`. → [p2] [d2] [b1] RED, 10/13. [p1] and [d1] stay green: they are
+//       CONTROLS on the owned half, which a wholesale write still gets right.
+//   P2  `ComposerCanvas.tsx`: the move path gated to `t !== 'collision'`, so a
+//       drag writes nothing. → [d1] RED ALONE, 12/13.
+//   P3  `ComposerCanvas.tsx`: `est.collisionPaintPlane` → a hard `'a'`, so the
+//       palette's plane pick is ignored. → [b1] RED alone, 12/13; its detail
+//       printed `plane B 0x5402 → 0x5402; plane A 0x0000 → 0x3001`.
+//
+// ⚠ ONE ROW PASSES VACUOUSLY, UNDER P2, AND IT IS DISCLOSED RATHER THAN HIDDEN.
+// [d2] asks whether the far cell's unowned bits survived the drag. Under P2 the
+// drag never reaches that cell, so the fixture sits there untouched and the row
+// is satisfied by a stroke that did not happen. [d2] therefore CANNOT CARRY THE
+// PRESERVATION CLAIM ALONE — [d1] beside it is what says the drag arrived, and
+// the log shows it too: under P2 [d2]'s own detail prints `whole word 0x5402`,
+// the fixture, where a real drag prints `0x7001`. Read the pair, never [d2].
+//
 // ═══ THE dpr TRAP ═══
 //
 // `devicePixelRatio` varies run to run under Xvfb here. [aim] prints it beside
