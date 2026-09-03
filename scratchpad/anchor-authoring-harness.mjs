@@ -795,10 +795,20 @@ async function main() {
     // ⚠ THE LOOK IS UNRATIFIED. He ruled the shape of this facet, not this
     // section's appearance; the packet parks these and names what I would
     // change.
+    //
+    // ⚠ THE COLUMN IS SCROLLED TO THE SECTION FIRST. The first version of this
+    // capture shot the arrival scroll position and the section it is about was
+    // 764px below the frame — a screenshot of the wrong screen, handed to the
+    // owner as "the look". The scroll offset is printed with the file.
+    await c.evalExpr(OPEN_SECTION(ANCHORS_RE, CHANNEL_SEL));
+    await sleep(500);
+    const shotScroll = await c.evalExpr(SCROLL_TO(PREVIEW));
+    await sleep(600);
     const shot = await c.send('Page.captureScreenshot', { format: 'png' });
     writeFileSync(`${SHOTS}/anchors-section-open.png`, Buffer.from(shot.data, 'base64'));
     console.log(`    screenshot  : ${SHOTS}/anchors-section-open.png`);
-    note('9a', 'the shot above is the section OPEN with one channel authored and a sweep running.');
+    note('9a', 'the shot above is the section OPEN with one channel authored and a sweep running, '
+      + `with the column scrolled ${shotScroll}px to put the card in frame.`);
   } finally {
     try { c && c.close(); } catch { /* closing a dead socket is not a result */ }
     await killTree(child);
