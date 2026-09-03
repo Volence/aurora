@@ -1,5 +1,17 @@
 # LP-3 — a painted loop crossover reaches the FILE, and stops there
 
+> **⚠ POINTER, 2026-09-03 (O47) — the second arrow no longer fails. This packet's
+> findings are LEFT INTACT because it is the record of the broken state; read
+> `docs/reviews/2026-09-03-o47-crossover-rom-arrow.md` for the re-measurement.**
+> At aeon `e190297caa303935bd3545b6a83f2b065aa19eac`, `bake_plane_cell` reads bits
+> 15:14, the mark rides in the interned attr byte's identity and is emitted as a
+> fifth 256-byte table `crossover.bin` / `CrossoverTable`. The same paint that
+> moved zero ROM bytes here moves 945 there, five of them the mark, against a
+> control whose self-diff is zero. **In particular the standing consequence
+> below — "A CRC delta is not available as evidence for this feature, in either
+> direction" — is retired at that revision.** What is NOT retired: a marked cell
+> in a built ROM is still not a working loop; see that packet's §7.
+
 **2026-08-29.** Instrument: `scratchpad/crossover-paint-harness.mjs`.
 Throwaway aeon worktree `/home/volence/sonic_hacks/.aurora-crossover-paint`
 (branch `parcel/ojz-crossover-paint`, cut from aeon `4d86f5db`), reset to clean
