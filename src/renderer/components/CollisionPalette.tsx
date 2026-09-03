@@ -208,8 +208,13 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
       : '';
     if (discardedUnownedCells > 0) {
       useToastStore.getState().addToast(
-        `Reset collision ${p.toUpperCase()}: the engine baseline cannot carry the reserved bits on `
-        + `${discardedUnownedCells} cell${discardedUnownedCells === 1 ? '' : 's'}, so they were discarded. Undo restores them.`,
+        // NAME THE FIELD THE AUTHOR AUTHORED, not the bits. "reserved bits" is
+        // this file's internal word for the same thing the Loop row above writes,
+        // so an author who painted loop crossovers read a sentence about something
+        // they had never heard of losing something they had (O48b).
+        `Reset collision ${p.toUpperCase()}: the engine baseline cannot carry the loop crossover on `
+        + `${discardedUnownedCells} cell${discardedUnownedCells === 1 ? '' : 's'}, so it was discarded `
+        + `along with the reserved bits. Undo restores them.`,
         'info');
     }
     executeCommand({
@@ -346,9 +351,13 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
       {variant === 'map' && (
         <div style={styles.planes}>
           <span style={styles.planeLabel}>Sec {activeSection}</span>
-          <button onClick={resetToEngine} title={`Reset section ${activeSection} collision (this plane) to the engine baseline — undoable`}
+          {/* Both titles name the LOOP CROSSOVER explicitly. It is written by the
+              Loop row in this same palette and it is destroyed by both buttons,
+              and until O48b neither string said so — the reach was correct and the
+              wording understated it, which is the half a reader acts on. */}
+          <button onClick={resetToEngine} title={`Reset section ${activeSection} collision (this plane) to the engine baseline, including any loop crossover — undoable`}
             style={styles.subtleBtn}>Reset</button>
-          <button onClick={clearSection} title={`Erase ALL collision in section ${activeSection} (this plane) — undoable`}
+          <button onClick={clearSection} title={`Erase ALL collision in section ${activeSection} (this plane), including any loop crossover — undoable`}
             style={styles.subtleBtn}>Clear</button>
         </div>
       )}
