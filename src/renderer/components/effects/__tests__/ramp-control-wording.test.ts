@@ -189,6 +189,59 @@ describe('the panel spells no ramp rule of its own', () => {
   });
 });
 
+describe('the scroll-mode sentence is mounted, split, and derived nowhere here', () => {
+  /**
+   * THE SAME SPLIT AS THE MUST NOT, and the same reason: what an author must act
+   * on is painted, the measured aeon chain and the capability conjunct ride on
+   * the element's own `title`. A sentence about whether this ramp is a
+   * full-screen scroll or a 16-pixel sliver cannot be hover-only.
+   */
+  it('the painted half is the short one and the contract half is on the same element', () => {
+    expect(rampCard).toMatch(/title=\{scroll\.full\}>\{scroll\.short\}</);
+  });
+
+  /**
+   * ⚠ THE DERIVATION IS THE PROVIDER'S. This panel holds no rules, and this rule
+   * in particular reaches across THREE documents (preset, sidecar, scene) — a
+   * comparison spelled here would be one the provider's sentence could disagree
+   * with. The card is handed an answer; it does not compute one.
+   */
+  it('the card computes nothing about scenes, sections or the mode bit', () => {
+    for (const forbidden of ['v_deform', 'vDeformValue', 'sceneRef', 'rasterRef', '$0B']) {
+      expect(rampCard, `RampCard spells "${forbidden}" itself`).not.toContain(forbidden);
+    }
+    // and the panel asks the provider exactly once, outside the card
+    expect(code).toContain('rampScrollModeAdvisory(');
+    expect(rampCard).not.toContain('rampScrollModeAdvisory(');
+  });
+
+  /**
+   * ⚠ IT DOES NOT GATE. Both arms are legitimate authoring choices, so the
+   * sentence must not disable a control or refuse a value — the panel would then
+   * be enforcing a preference dressed as a rule.
+   */
+  it('nothing in the card is disabled by, or refused because of, the mode', () => {
+    expect(rampCard).not.toMatch(/disabled=\{[^}]*scroll/);
+    expect(rampCard).not.toMatch(/refuse=\{[^}]*scroll/);
+  });
+
+  /**
+   * ⚠ INDEPENDENT OF THE CONTESTED READOUT. A real ROM rendered 5..223 where the
+   * card derives 4..223 (2026-09-03, two different tops, the same +1), so the
+   * display lag is an open contract question. This sentence is about the
+   * HORIZONTAL extent and must not be wired to the vertical one, or settling that
+   * question would silently move this one.
+   */
+  it('the scroll sentence is not derived from the display span or the lag', () => {
+    const at = rampCard.indexOf('scroll.short');
+    expect(at).toBeGreaterThan(0);
+    // the mount site names neither the readout nor the constant
+    const mount = rampCard.slice(Math.max(0, at - 300), at + 300);
+    expect(mount).not.toContain('rampDisplaySpan');
+    expect(mount).not.toContain('DISPLAY_LAG');
+  });
+});
+
 describe('the dead band control carries its reason', () => {
   /**
    * ⚠ ONE DERIVATION, READ TWICE. The chip's `disabled` and the sentence beside
