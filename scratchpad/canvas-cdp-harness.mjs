@@ -188,14 +188,30 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /**
  * HOW LONG THE TEARDOWN WILL WAIT FOR CHROMIUM TO COMMIT THE AREA.
  *
- * Not a guess about how long a shutdown takes — the barrier normally returns in
- * a few seconds and this is only the point at which "it never happened" becomes
- * the honest answer. Chromium's commit delay is ~5 s at rest and grows with the
- * page's write volume, so this is an order of magnitude above the resting delay
- * and still bounded. `FLUSH_BARRIER_MS=0` forces the refusal, which is how the
- * red-first proof of this gate is taken (see the packet).
+ * ⚠ THIS IS NOT A GUESS ABOUT HOW LONG A SHUTDOWN TAKES — it is the point at
+ * which "it never happened" becomes the honest answer, and the barrier returns
+ * the moment the bytes land rather than sleeping to it.
+ *
+ * AND THE REAL DELAY IS FAR BIGGER THAN ANYONE ASSUMED, WHICH IS THE HEADLINE
+ * MEASUREMENT OF THIS PARCEL. Printed per session, twice, 2026-09-03:
+ *
+ *     session A (light)   1.7 s / 1.9 s
+ *     session B           54.0 s / 54.2 s
+ *     session C           48.3 s / 48.3 s
+ *     session D           43.8 s / 43.8 s
+ *
+ * Every busy session waits THREE QUARTERS OF A MINUTE for its own writes to
+ * reach disk, and the two runs agree to within 25 ms — a reproducibility that
+ * rules load out and points at Chromium's per-area commit RATE LIMITER (a
+ * budget of commits per hour, so the delay is a function of how many batches
+ * the session generated, which in a scripted harness is fixed). The old
+ * teardown gave that ~4 s of a dead process. It is not surprising it lost the
+ * area in 4 runs of 9; it is surprising it ever kept it.
+ *
+ * 180 s is three-and-a-bit times the worst observed wait. `FLUSH_BARRIER_MS=0`
+ * forces the refusal, which is how the red-first proof of this gate is taken.
  */
-const FLUSH_BARRIER_MS = Number(process.env.FLUSH_BARRIER_MS ?? 60000);
+const FLUSH_BARRIER_MS = Number(process.env.FLUSH_BARRIER_MS ?? 180000);
 /** How many markers the barrier will spend before giving up on a session store
  *  that keeps moving under it. See `flushBarrier`. */
 const FLUSH_BARRIER_ATTEMPTS = Number(process.env.FLUSH_BARRIER_ATTEMPTS ?? 3);
@@ -818,6 +834,17 @@ async function session(label, body) {
  * after it. The app is idle here (the body has returned, no input is pending),
  * but idle is an argument and this is a measurement: the stored session is read
  * before and after and a change is reported rather than assumed away.
+ *
+ * ⚠ ONE FORCING STEP WAS TRIED AND DID NOTHING — recorded here, the way O50
+ * recorded its two, so it is not re-tried. `Page.navigate` to `about:blank`
+ * after the marker, on the theory that dropping the renderer's binding to the
+ * area makes the browser commit it immediately instead of on its timer. One
+ * full run each arm, 2026-09-03: 1908/54229/48294/43791 ms with the navigate
+ * against 1713/53980/48316/43797 ms without — identical to within 25 ms on
+ * three of the four sessions, and the run time was 320 s both ways. The delay is
+ * not something the client can shorten from outside; it is a budget the page
+ * already spent. The barrier waits it out, and the run is ~2.5 min longer than
+ * it was for that reason — which is the price of the number being true.
  */
 async function flushBarrier(c, child, label) {
   const pids = descendants(child.pid);
@@ -831,15 +858,22 @@ async function flushBarrier(c, child, label) {
   for (let attempt = 1; attempt <= FLUSH_BARRIER_ATTEMPTS; attempt++) {
     const before = await readSession();
     const mark = flushMarker(`${label.slice(0, 1)}${attempt}`);
+    let after = before;
     const r = await awaitFlushed({
       mark,
-      write: (m) => c.evalExpr(`localStorage.setItem(${JSON.stringify(FLUSH_MARKER_KEY)}, ${JSON.stringify(m)}); 1`),
+      write: async (m) => {
+        await c.evalExpr(`localStorage.setItem(${JSON.stringify(FLUSH_MARKER_KEY)}, ${JSON.stringify(m)}); 1`);
+        // THE ORDERING CHECK, TAKEN HERE AND NOT AFTER THE WAIT. What has to be
+        // true is that the app wrote nothing AFTER the marker, and that is
+        // settled the moment the marker is in; reading it later would also mean
+        // holding the page open for the whole wait for no further reason.
+        after = await readSession();
+      },
       present: () => bytesOnDisk(dir, mark),
       maxMs: FLUSH_BARRIER_MS,
       sleep,
     });
     if (!r.flushed) return { ok: false, message: flushRefusal({ waitedMs: r.waitedMs, dir, how, label }) };
-    const after = await readSession();
     if (before !== after) {
       // The app wrote again AFTER the marker, so the marker's batch does not
       // cover that write and this attempt proved nothing about it. Go round
@@ -897,11 +931,21 @@ async function waitRestored(c, maxMs = 45000) {
   //
   // A SECOND CAUSE, FOUND BY THIS GUARD RATHER THAN REASONED ABOUT, and the
   // reason the message below names two: it tripped SPONTANEOUSLY at session C
-  // on 2026-09-03 — 1 of 3 runs, load ~3, no other instrument running and no
-  // poison applied. So the teardown's `window.close()` + FIXED 4 s does not
-  // reliably get the area to disk either. That flake is NOT fixed here; it is
-  // reported. What is fixed is that it can no longer be mistaken for the app
-  // losing a canvas tab.
+  // on 2026-09-03 — 4 of 9 runs, load ~3, no other instrument running and no
+  // poison applied. The teardown's `window.close()` + FIXED 4 s did not get the
+  // area to disk, and could not have: the app is gone ~50 ms after the close,
+  // and Chromium's commit for a busy session here is FORTY-FOUR TO FIFTY-FOUR
+  // SECONDS out.
+  //
+  // ⚠ THAT CAUSE IS FIXED AS OF O79 — the teardown now waits for the bytes in
+  // the profile's leveldb before it closes the window, and REFUSES if they
+  // never arrive (`flushBarrier` above; `scratchpad/lib/storage-flush.mjs`).
+  // The message below still names it, because a refusal must describe the
+  // world and not the fix: if the barrier is disabled, bypassed, or the
+  // teardown is edited so it runs after the close, this is the symptom that
+  // comes back. But on a current tree the barrier fails FIRST and by name, so
+  // a trip HERE now points at cause (a) — another instrument on the shared
+  // profile — rather than at (b).
   //
   // So: REFUSE, and name both mechanisms rather than the one that was looked
   // for first. An environment condition must never be reported as an app
@@ -920,10 +964,13 @@ async function waitRestored(c, maxMs = 45000) {
       + `        call localStorage.clear(). Run this harness with no other Aurora-launching\n`
       + `        instrument running concurrently.\n`
       + `    (b) THE PREVIOUS SESSION'S FLUSH NEVER REACHED DISK. Chromium commits a\n`
-      + `        localStorage area on a throttled timer; the teardown above gives it\n`
-      + `        window.close() plus a FIXED 4 s, which is not a guarantee. Observed\n`
-      + `        spontaneously on 2026-09-03 — 1 of 3 runs, at load ~3, with nothing else\n`
-      + `        running — so this is a live flake in the teardown, not a hypothetical.\n`
+      + `        localStorage area on a rate-limited timer — MEASURED at 44-54 s for this\n`
+      + `        harness's busy sessions — while the app is gone ~50 ms after window.close().\n`
+      + `        That was 4 trips in 9 runs before O79. It is FIXED: the teardown now waits\n`
+      + `        for the bytes in the profile's leveldb and refuses if they never arrive, so\n`
+      + `        on a current tree that failure announces itself THERE, one session earlier,\n`
+      + `        and never reaches this guard. If you are reading this message on a current\n`
+      + `        tree, (b) is the unlikely half — check (a) first.\n`
       + `  EITHER WAY IT IS NOT AN APP DEFECT. Do NOT record the restart rows as failures on\n`
       + `  the strength of this run; re-run it, and if it trips repeatedly investigate (b).`);
   }
