@@ -76,7 +76,7 @@ function overlays(over: Partial<OverlayOptions> = {}): OverlayOptions {
     showCollisionPathB: false, showBgPlane: false, showStart: false,
     showPriority: false, showSolidBothPlanes: false, showCrossover: false,
     occludeSprites: false, playAnimatedArt: false,
-    showScreenFrame: false, showCameraPreview: false,
+    showScreenFrame: false,
     ...over,
   } as OverlayOptions;
 }

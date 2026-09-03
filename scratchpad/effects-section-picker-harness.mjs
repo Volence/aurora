@@ -518,8 +518,24 @@ async function main() {
       && /Hand-authored raster/.test(del.paint.text),
       JSON.stringify(del));
 
-    // THE PREVIEW CHIP. It must move the ONE view-store flag the View menu
-    // writes — read back off the store, not off the chip.
+    // THE PREVIEW CHIP. It must move the ONE view-store answer the View menu's
+    // own row writes — read back off the store, not off the chip.
+    //
+    // ⚠ REPAIRED FOR EW-SHAPE-PREVIEW, NOT RETUNED. The flag left
+    // `overlays.showCameraPreview` (a boolean, in every facet's View menu) and
+    // became `__dbg.parallaxPreview()` (facet + sub-tab + a tri-state choice),
+    // so the reader moved. The round trip is still the claim, and the row now
+    // states the `choice` at each step as well as the effective value — a
+    // toggle written as `!stored` would flip the effective value the wrong way
+    // on the FIRST click (`!null` is `true`), which no on/off pair can see.
+    //
+    // ⚠ AND THIS HARNESS IS STANDING ON THE COLOUR SUB-TAB HERE (it is looking
+    // at the raster section select), so `before` is OFF and UNDECIDED — the
+    // default is scoped to Parallax. The first version of this repair asserted
+    // `before.on === true` because the parcel's own harness arrives on
+    // Parallax, and it went red on this file for exactly the right reason.
+    // The sub-tab is asserted below so a future re-parenting cannot silently
+    // change what this row is measuring.
     const preview = await c.json(String.raw`(() => {
       const chip = [...document.querySelectorAll('button')]
         .find((b) => /^Parallax preview$/.test((b.textContent || '').trim()));
@@ -528,11 +544,11 @@ async function main() {
       const b = chip.getBoundingClientRect();
       const hit = document.elementFromPoint(
         Math.round(b.left + b.width / 2), Math.round(b.top + b.height / 2));
-      const before = window.__dbg.overlays().showCameraPreview;
+      const before = window.__dbg.parallaxPreview();
       chip.click();
-      const after = window.__dbg.overlays().showCameraPreview;
+      const after = window.__dbg.parallaxPreview();
       chip.click();
-      const back = window.__dbg.overlays().showCameraPreview;
+      const back = window.__dbg.parallaxPreview();
       return {
         found: true, before, after, back,
         // ⚠ NOT sliced to 120: the sentence this row is about is the TAIL of
@@ -544,10 +560,14 @@ async function main() {
         hitIsChip: !!(hit && (hit === chip || chip.contains(hit))),
       };
     })()`);
-    check('6b', 'the Parallax preview chip is painted and toggles the SAME view-store flag',
+    check('6b', 'the Parallax preview chip is painted and toggles the SAME view-store answer — '
+      + 'off (undecided, on the COLOUR job) to on and back, recording a real choice each time',
       preview.found === true && preview.rects > 0 && preview.visible !== false
       && preview.hitIsChip === true
-      && preview.before === false && preview.after === true && preview.back === false
+      && preview.before.subTab === 'colour'
+      && preview.before.on === false && preview.before.choice === null
+      && preview.after.on === true && preview.after.choice === true
+      && preview.back.on === false && preview.back.choice === false
       && /View > Compose the background/.test(preview.title),
       JSON.stringify(preview));
 

@@ -19,7 +19,7 @@ import React from 'react';
 import { T, OptionBar, Chip } from '../ui';
 import { useProjectStore } from '../../state/projectStore';
 import { useEditorStore } from '../../state/editorStore';
-import { useViewStore } from '../../state/viewStore';
+import { useParallaxPreviewOn, toggleParallaxPreview } from '../../providers/parallax-preview';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import { bandVerbs, type BandVerb } from '../../providers/band-verbs';
 import { runBandVerb } from '../../providers/band-follow';
@@ -46,8 +46,7 @@ export default function EffectsToolOptions(): React.ReactElement {
   const candidate = useEditorStore((s) => s.bandCandidate);
   const tool = useEditorStore((s) => s.tool);
   const [refusal, setRefusal] = React.useState<string | null>(null);
-  const cameraPreview = useViewStore((s) => s.overlays.showCameraPreview);
-  const toggleOverlay = useViewStore((s) => s.toggleOverlay);
+  const cameraPreview = useParallaxPreviewOn();
   const doc = project?.bgOverride?.doc ?? null;
   const verbs = bandVerbs(doc, candidate);
   // What the bar SAYS beside the chips: a run-time refusal first (it is the
@@ -82,19 +81,33 @@ export default function EffectsToolOptions(): React.ReactElement {
           reader found it ten minutes after he needed it, while auditing that
           menu for something else.
 
-          THE SAME SWITCH, NOT A SECOND ONE. It toggles `showCameraPreview` in
-          the one view store the menu writes, so the checkbox and this chip
-          cannot disagree — the defect `Play bands` already documents about
-          itself in a tooltip. It stays off by default: it is view state, and
-          turning an author's overlays on for them is not this parcel's call. */}
+          ═══ AND SINCE EW-SHAPE-PREVIEW IT ARRIVES ON ═══
+
+          Wave 1 fixed the finding-it half and left the default alone, because
+          `showCameraPreview` was one global overlay key and flipping it would
+          have shown the preview to Layout, Objects, Collision and Art as well.
+          It is scoped now (providers/parallax-preview), so d-26b's third clause
+          is met: ON by default on the Parallax sub-tab, because an author who
+          has never seen the preview does not know to ask for it.
+
+          ⚠ AND AN AUTHOR WHO TURNS IT OFF IS OBEYED, for good — the chip writes
+          a CHOICE, and a recorded choice silences the default permanently
+          (shell/preview-pref). A default that came back every time he returned
+          to the tab would be a new defect wearing this one's clothes.
+
+          THE SAME SWITCH, NOT A SECOND ONE. `toggleParallaxPreview` is what
+          the View menu's own row calls, so the checkbox and this chip cannot
+          disagree — the defect `Play bands` already documents about itself in a
+          tooltip. */}
       <Chip active={cameraPreview}
         title={cameraPreview
           ? 'Stop compositing the background in the screen frame. The same switch as '
-            + 'View > Compose the background in the frame (parallax).'
+            + 'View > Compose the background in the frame (parallax). Aurora remembers that '
+            + 'you turned it off.'
           : 'Draw the real background per parallax strip, inside the screen frame — the only '
             + 'thing in Aurora that shows what a scene\'s layers do. The same switch as '
             + 'View > Compose the background in the frame (parallax).'}
-        onClick={() => toggleOverlay('showCameraPreview')}>
+        onClick={() => toggleParallaxPreview()}>
         Parallax preview
       </Chip>
       <span style={{ flex: 1 }} />

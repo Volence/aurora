@@ -78,12 +78,29 @@ Reference points: `FACTOR_1` = moves with the camera (that is the ground);
 
 ### See it
 
-Nothing draws until you ask. Press **`Parallax preview`** on the Effects toolbar —
-it is the same switch as `View ▾` → `Compose the background in the frame
-(parallax)`. Tick `Screen frame (320x224)` in that menu too. The canvas then draws
-the real background per strip with each layer's factor labelled. It is off by
-default; turn it on the first time you open the tab and leave it on. This is the
-only thing in Aurora that shows what a scene's layers do.
+**It is already on.** Arriving on the **Parallax** sub-tab draws the real background
+per strip inside the screen frame, with each layer's factor labelled — the only
+thing in Aurora that shows what a scene's layers do. You do not have to find a
+switch first, which is what everybody had to do before.
+
+The switch is **`Parallax preview`** on the Effects toolbar, and the same switch is
+`View ▾` → `Compose the background in the frame (parallax)`. Three things about it
+that are worth knowing:
+
+- **Turn it off and it stays off.** Aurora writes your answer down, and from then on
+  it is your answer — on this tab, on the other two, and the next time you open the
+  application. The "on by default" only ever speaks to somebody who has never
+  touched the switch.
+- **It follows you across the three jobs once you have decided.** Until you do, it
+  is on for `Parallax` and off for `Colour` and `Tile anim`. If you want the
+  background under your raster band, press the chip on the Colour tab — that is a
+  decision, and it sticks.
+- **It exists only on this tab.** No other tab draws it and no other tab's `View ▾`
+  offers it.
+
+While it is on, the **arrow keys move the camera** (1px, or 16 with Shift) instead
+of panning the map — that is how you judge slow parallax, which a mouse drag jumps
+straight past. Dragging with the mouse, space-panning and the wheel still pan.
 
 > The `LAYERS` list has its own scrollbar and gets the height the Parallax sub-tab has to spare — measured at 211px of a ~2,400px list, so about a card and a half. Scroll **inside** the list. Opening `SCENE — <id>` under it takes that height away again; shut it when you are done in there.
 

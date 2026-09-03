@@ -70,6 +70,11 @@ import {
   resolveSelectedScene, setLayerFieldCommand, clampLayerTop, layerTopSpace,
   setSceneFieldCommand, clampVOffset, guideBoundNotice,
 } from '../providers/effects-aeon';
+// The facet gate and the parallax composite's ONE derivation. Both used to be
+// spelled here; the composite's inputs are now the facet, the sub-tab and the
+// author's choice, and a second copy of the predicate in this file is how the
+// canvas and the two switches would come to disagree about what is on screen.
+import { EFFECTS_FACET, inEffectsFacet, parallaxPreviewOn } from '../providers/parallax-preview';
 import { EFFECTS_V_OFFSET_DEFAULT } from '../../core/formats/effects/scene-ui';
 import type { EffectsScene } from '../../core/formats/effects/scene';
 import type { FacetCapability } from '../../core/project/adapter';
@@ -138,11 +143,11 @@ function collisionPreviewOpts(zoom: number): ShapeDrawOpts {
 }
 const overlayRenderer = new OverlayRenderer();
 
-/**
- * The facet the parallax guides belong to. `FACET_CAPABILITIES`' key for the
- * effects lens (workspace/facets/effects-facet.tsx mounts `mapFacet('parallax')`).
- */
-const EFFECTS_FACET: FacetCapability = 'parallax';
+// `EFFECTS_FACET` — the facet the parallax guides belong to, `FACET_CAPABILITIES`'
+// key for the effects lens (workspace/facets/effects-facet.tsx mounts
+// `mapFacet('parallax')`) — is imported from providers/parallax-preview above,
+// together with `inEffectsFacet`. It was declared here until EW-SHAPE-PREVIEW
+// needed the same two facts outside this file.
 
 /**
  * The scene whose layers draw as world-Y guides, or null for "no guides".
@@ -210,12 +215,6 @@ function screenFrameShown(): boolean {
   if (useViewStore.getState().overlays.showScreenFrame) return true;
   const scene = activeGuideScene();
   return scene !== null && layerTopSpace(scene) === 'screen';
-}
-
-/** True while the author is standing in the effects lens. The gate both effects overlays share. */
-function inEffectsFacet(): boolean {
-  const tabId = useSessionStore.getState().activeId;
-  return useWorkspaceStore.getState().facetFor(tabId) === EFFECTS_FACET;
 }
 
 /**
@@ -522,6 +521,17 @@ export default function MapViewport() {
   const activeTabId = useSessionStore((s) => s.activeId);
   const activeFacet = useWorkspaceStore((s) => s.facetFor(activeTabId));
   const selectedEffectsSceneId = useEditorStore((s) => s.selectedEffectsSceneId);
+
+  // ---- The parallax composite (EW-SHAPE-PREVIEW) ---------------------------
+  // Its two OTHER inputs, subscribed for exactly the reason above: it stopped
+  // being an overlay key, so `overlays` in the deps below no longer carries its
+  // repaint. `effectsSubTab` is in the list because the DEFAULT is scoped to
+  // the Parallax sub-tab — a switch from Colour back to Parallax turns the
+  // composite on for an author who has never decided, and without this
+  // subscription the canvas would not find out until something else repainted
+  // it. The facet, the third input, is `activeFacet` above.
+  const parallaxPreviewChoice = useViewStore((s) => s.parallaxPreview);
+  const effectsSubTab = useEditorStore((s) => s.effectsSubTab);
 
   // ---- The band lens (ROADMAP item 43 part 2) ------------------------------
   // Subscribed for the same reason the two above are: `redraw` is dependency-
@@ -1109,6 +1119,14 @@ export default function MapViewport() {
     const fd = frameDrag.current;
     const frameAnchor = fd ? fd.anchor : frameAnchorFor(guideScene, view.screenFrame);
 
+    // IS THE PARALLAX COMPOSITE ON? Not an overlay key any more — it is the
+    // facet, the sub-tab and the author's choice, and `parallaxPreviewOn`
+    // (providers/parallax-preview) is the only place those three are combined.
+    // Read here, once, for the same reason `guideScene` is: two resolutions in
+    // one pass is how the draw and the hoisted `cameraPreviewActive` end up
+    // disagreeing about who clears the background.
+    const previewOn = parallaxPreviewOn();
+
     // The band overlay goes over Plane B and UNDER the foreground, because that
     // is where the art it replaces lives. Drawing it after the FG composite
     // would put background tiles on top of the level.
@@ -1141,7 +1159,7 @@ export default function MapViewport() {
     // AFTER `drawBands()` ON PURPOSE: `bandPreview.overlayCanvas()` is only
     // current once `draw` has run for this frame (its own docblock says so).
     const drawCamera = () => {
-      if (!guideScene || !overlayOpts.showCameraPreview) {
+      if (!guideScene || !previewOn) {
         publishCameraPreviewReport({
           active: false, sceneId: null, camX: null, camY: null, vscrollBase: null,
           vLocked: null, bands: [], absent: [], blits: 0,
@@ -1174,7 +1192,7 @@ export default function MapViewport() {
     // decides who clears the background — see the note at that branch's `else`.
     // Kept as one expression rather than as a flag `drawCamera` sets, because
     // the decision is needed before the call, not after it.
-    const cameraPreviewActive = !!guideScene && overlayOpts.showCameraPreview
+    const cameraPreviewActive = !!guideScene && previewOn
       && sectionRenderer.bgPlaneCanvas() !== null;
 
     if (ed.editingLayer === 'bg') {
@@ -1430,6 +1448,9 @@ export default function MapViewport() {
     // highlight. Each is a discrete state change — a pill click, a list click,
     // the cursor crossing a line — never a tick.
     activeFacet, selectedEffectsSceneId, guideHover,
+    // The parallax composite's other two inputs. It left `overlays` when it
+    // became tab-scoped, so these two carry the repaint that key used to.
+    parallaxPreviewChoice, effectsSubTab,
     // The band lens (item 43 part 2): the mark and the candidate geometry.
     // ⚠ `bandCandidate` is BELT-AND-BRACES and measured to be so: dropping it
     // alone turns no harness row red, because `setBandCandidate` also writes a
@@ -1848,11 +1869,20 @@ export default function MapViewport() {
       //
       // ⚠ THIS TAKES A BINDING THAT ALREADY EXISTED — arrows pan the map by 64.
       // The old behaviour is kept everywhere the composite is not on, which is
-      // every facet but this one plus this one with the toggle off; the toggle
-      // is the switch and it is in the View menu. Mouse pan, space-pan and the
-      // wheel are untouched in both cases, so panning is never unreachable.
-      const cameraKeys = inEffectsFacet() && useViewStore.getState().overlays.showCameraPreview
-        ? activeGuideScene() : null;
+      // every facet but this one plus this one with the switch off. Mouse pan,
+      // space-pan and the wheel are untouched in both cases, so panning is
+      // never unreachable.
+      //
+      // ⚠ AND SINCE EW-SHAPE-PREVIEW THAT IS THE ARRIVAL STATE, not an opt-in:
+      // the composite is on by default on the Parallax sub-tab, so the arrows
+      // step the camera the moment an author reaches that tab. Kept coupled to
+      // ONE predicate deliberately — a composite that is on screen while the
+      // arrows still pan the map would be a preview with no way to move the
+      // camera it is a preview OF, which is the gesture the owner asked for by
+      // name. Reversible in one line: make this read
+      // `useViewStore.getState().parallaxPreview === true` and the keys go back
+      // to needing an explicit yes while the picture still arrives drawn.
+      const cameraKeys = parallaxPreviewOn() ? activeGuideScene() : null;
       if (cameraKeys && (e.key === 'ArrowLeft' || e.key === 'ArrowRight'
         || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
         const d = e.shiftKey ? CAMERA_KEY_STEP_COARSE : CAMERA_KEY_STEP_FINE;
