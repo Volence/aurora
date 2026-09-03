@@ -15,6 +15,7 @@ import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
 import type { ShapeDrawOpts, ShapeDrawCtx } from '../../core/collision/collision-shape-draw';
 import { fitCellSizeToBox } from '../../core/collision/collision-angle-mark';
 import { clearCollisionEntries, resetToEngineEntries } from '../../core/editing/collision-word';
+import { otherPlane } from '../../core/collision/both-planes-paint';
 import { auditCrossovers, crossoverAuditMessage, crossoverAuditSeverity } from '../../core/collision/crossover-audit';
 import { useToastStore } from '../state/toastStore';
 import { claimCollisionOverlay } from './collision-overlay-scope';
@@ -26,6 +27,12 @@ import {
 
 const PX = 22;        // thumbnail size
 const PREVIEW = 120;  // big preview canvas size
+
+/** The "solid on both planes" chip's label — ONE constant, because the hint
+ *  below points at it BY NAME. Two copies would let a rename leave a sentence
+ *  telling the author to press a control that no longer exists, which is the
+ *  discoverability defect this hint exists to close, inverted. */
+const BOTH_PLANES_LABEL = 'A+B';
 
 /** Floor-type picker → the cell's solidity (which sensor directions it stops). */
 const FLOOR_TYPES: ReadonlyArray<{ value: Solidity; label: string; title: string }> = [
@@ -334,7 +341,7 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
               + 'Shared ground (ordinary floors and walls) belongs on both — painting it twice by hand is '
               + 'what leaves a half-finished second plane. Turns on the "Solid on both paths" lens so you '
               + 'can see the plane you are not looking at.'}
-            style={{ ...styles.planeBtn, ...(bothPlanes ? styles.planeSel : {}) }}>A+B</button>
+            style={{ ...styles.planeBtn, ...(bothPlanes ? styles.planeSel : {}) }}>{BOTH_PLANES_LABEL}</button>
         )}
       </div>
       <div style={styles.planes}>
@@ -404,13 +411,45 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
           {auditNote}
         </div>
       )}
-      {variant === 'map' && bothPlanes && (
+      {/*
+        THE CAPABILITY SAYS ITS OWN NAME, ARMED OR NOT (O77 / §5.1 item 134).
+        ────────────────────────────────────────────────────────────────────
+        "Solid on both planes" shipped 2026-08-29 and every word describing it
+        was HOVER-ONLY (the A+B chip's `title`) or ARMED-ONLY (the sentence
+        below, which rendered only once the mode was already on). An author who
+        did not already know the mode existed saw three letters and no reason to
+        hover — and two lanes then spent an evening costing out spare cell-word
+        bits for a third cell state that had shipped five days earlier. The gap
+        was never in the code; it was that nothing an author could SEE said so.
+
+        So the OFF branch is not a duplicate of the ON one: it is the only text
+        in this panel that reaches a reader who has not armed the mode. They are
+        one conditional, not two, so both inherit the SAME `variant === 'map'`
+        gate the A+B chip has — the Art facet's chunk brush is a different
+        writer that does not honour this mode, and a hint there would be an
+        invitation to a control that is not present.
+
+        ⚠ BOTH SENTENCES SAY "STROKE", AND THAT IS THE HONEST SCOPE, NOT PROSE.
+        `collisionPaintBothPlanes` is read by exactly two writers: the map
+        brush's `paintCollisionCell` (all brush sizes and Alt-propagate, latched
+        at mousedown) and the agent's `paint_collision` with `plane: "both"`.
+        Reset and Clear above act on the AIMED plane alone whatever this mode
+        says — which is why the armed sentence names that, where an author who
+        just armed the mode might reach for them.
+      */}
+      {variant === 'map' && (bothPlanes ? (
         <div style={styles.hint}>
           Painting <strong>both paths</strong>: every stroke writes plane {plane.toUpperCase()} and
-          plane {plane === 'a' ? 'B' : 'A'} together, one undo step. The teal veil marks what is
-          already solid on both.
+          plane {otherPlane(plane).toUpperCase()} together, one undo step. The teal veil marks what is
+          already solid on both. Reset and Clear still act on plane {plane.toUpperCase()} alone.
         </div>
-      )}
+      ) : (
+        <div style={styles.hint}>
+          Ordinary ground — floors and walls the player meets on either path — belongs on
+          both planes. <strong>{BOTH_PLANES_LABEL}</strong> above paints plane A and plane B with one stroke,
+          so shared ground is drawn once instead of twice.
+        </div>
+      ))}
       <div style={styles.hint}>{variant === 'map'
         ? (brush > 1
           ? `Pick a shape, then paint on the map. Paints the ${brush}×${brush} block area under the cursor.`
