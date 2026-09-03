@@ -73,6 +73,77 @@ export function fmtGenesisWord(word: number): string {
   return '$' + word.toString(16).toUpperCase().padStart(4, '0');
 }
 
+// ---------------------------------------------------------------------------
+// CRAM GEOMETRY — where a BYTE address lands
+// ---------------------------------------------------------------------------
+//
+// ═══ WHY THESE THREE NUMBERS ARE CONSTANTS AND NOT LITERALS ═══
+//
+// `16` and `2` were already spelled inline four times in this file alone
+// (`parsePaletteLine`'s `i * 2`, `buildPalette`'s `destIdx / 16`, `destIdx % 16`,
+// `lineIdx >= 4`) and once more, as its own exported constant, in
+// components/art-shared/palette-grid-model (`LINE_LENGTH`). The effects panel now
+// needs the same arithmetic to say what `addr = 74` MEANS, and a sixth copy of a
+// `/ 32` is how two surfaces come to disagree about which line an address is on.
+//
+// ⚠ THE UNIT IS BYTES AND THAT IS THE WHOLE TRAP. `addr` in an effects preset is
+// a CRAM **byte** address (`$defs.cram.properties.addr`, "CRAM BYTE address the
+// colours are written to"); an entry is one WORD. So the divisor between an
+// address and a line is `CRAM_LINE_ENTRIES * CRAM_WORD_BYTES` = 32, not 16 — and
+// an author reading "16 colours per line" off a palette editor and dividing by 16
+// lands two lines out. The contract states the same geometry as shifts, in
+// `$defs.pal_region`'s own descriptions (`addr >> 5 == pal_line`,
+// `(addr >> 1) & 15 == entry`), and `cram-geometry.test.ts` asserts THIS
+// derivation against THOSE two formulas parsed out of the vendored schema text —
+// two independent statements of one fact, cross-checked, rather than a number
+// copied from a neighbouring pin.
+
+/** Colours in one CRAM line. Fixed by the VDP, not by any engine or file format. */
+export const CRAM_LINE_ENTRIES = 16;
+
+/** Bytes per CRAM entry — one 16-bit word. */
+export const CRAM_WORD_BYTES = 2;
+
+/** Lines the Genesis CRAM holds. `buildPalette` below builds exactly this many. */
+export const CRAM_LINE_COUNT = 4;
+
+/** Where a CRAM byte address lands. */
+export interface CramLocation {
+  /** Palette line, 0-based. May be >= CRAM_LINE_COUNT for an address past CRAM. */
+  readonly line: number;
+  /** Entry within the line, 0..CRAM_LINE_ENTRIES-1. */
+  readonly entry: number;
+  /**
+   * False when the address is not on a word boundary. The engine's `stream_cram`
+   * requires an even address; an odd one still HAS a line and an entry (it
+   * straddles the entry below it), and reporting the location silently would
+   * hide the one thing wrong with it.
+   */
+  readonly aligned: boolean;
+  /** False when the line is past the CRAM's own `CRAM_LINE_COUNT` lines. */
+  readonly inCram: boolean;
+}
+
+/**
+ * The line and entry a CRAM BYTE address names, or `null` when the address is
+ * negative — which is not a location at all, and must not be rendered as one.
+ *
+ * Out-of-CRAM but non-negative addresses DO get a location, flagged `inCram:
+ * false`: an author who typed 200 needs to be told it is line 6 and that there
+ * is no line 6, which is more useful than a blank.
+ */
+export function cramLocation(addr: number): CramLocation | null {
+  if (!Number.isFinite(addr) || addr < 0) return null;
+  const entryIndex = Math.floor(addr / CRAM_WORD_BYTES);
+  const line = Math.floor(entryIndex / CRAM_LINE_ENTRIES);
+  return {
+    line,
+    entry: entryIndex % CRAM_LINE_ENTRIES,
+    aligned: addr % CRAM_WORD_BYTES === 0,
+    inCram: line < CRAM_LINE_COUNT,
+  };
+}
+
 /**
  * Parse raw Genesis palette data into a PaletteLine (16 colors).
  * Each color is a big-endian 16-bit word.

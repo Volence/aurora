@@ -29,7 +29,13 @@
 
 import React from 'react';
 import { T, SectionBody, CollapsibleSection, Select, NumberField, Chip, IconButton } from '../ui';
-import { Field, Hint, Card } from './column-layout';
+import { Field, Hint, Card, CONTROL_INSET } from './column-layout';
+// THE APP'S OWN SWATCH AND THE APP'S OWN PICKER. `GenesisColorSliders` is the
+// R/G/B control both palette panels mount, and `swatchCss` is the one CRAM-word
+// → CSS conversion in this tree. Neither is re-derived here: a second `>> 9 & 7`
+// is how the palette panels drifted the first time (palette-grid-model's header).
+import GenesisColorSliders from '../art-shared/GenesisColorSliders';
+import { swatchCss } from '../art-shared/palette-grid-model';
 import { useProjectStore, getActiveLevel, getCurrentZone } from '../../state/projectStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
@@ -52,6 +58,10 @@ import {
   addBandCommand, removeBandCommand, lastBandRefusal, deletePresetRefusal,
   setBandFieldCommand, setBandArmCommand, setArmFieldCommand,
   parseColours, setColoursCommand, setPresetNameCommand,
+  // EW-COLOUR-PICKER — defect 13's colour half. Every one of these is a
+  // derivation or a sentence, and every one of them is the PROVIDER's: the
+  // component below draws swatches and does not know what a CRAM line is.
+  addrGloss, colourSwatchTitle, setColourCommand, cramSpanAdvisory,
   CYCLES_TITLE, CYCLES_STATE_OPTIONS, cyclesState, setCyclesStateCommand,
   addCycleChannelCommand, removeCycleChannelCommand, setCycleFieldCommand, cycleFieldTitle,
   emptyCyclesAdvisory,
@@ -176,7 +186,7 @@ export default function BandPresetPanel(): React.ReactElement | null {
 
   const [newId, setNewId] = React.useState('');
   const [refusal, setRefusal] = React.useState<string | null>(null);
-  const [coloursText, setColoursText] = React.useState<Record<number, string>>({});
+  const [coloursText, setColoursText] = React.useState<Record<number, string | undefined>>({});
   const [coloursRefusal, setColoursRefusal] = React.useState<Record<number, string | null>>({});
 
   function run(command: AnyCommand | null): void {
@@ -862,6 +872,107 @@ function VariantSlotCard({ library, preset, index, run }: {
   );
 }
 
+/**
+ * THE COLOUR HALF OF DEFECT 13 — a swatch per entry, and a picker that is not
+ * "know the packing and convert to base 10".
+ *
+ * ═══ WHAT THE WALKTHROUGH ACTUALLY MEASURED ═══
+ *
+ * a12: "To find out what a colour looks like I opened the shipped `Authored
+ * probe (red / blue)` preset and read its numbers: `14` and `3584`. Those are
+ * Genesis CRAM words in decimal. An author must know the BBB GGG RRR packing AND
+ * convert it to base 10, by hand, in an application that has a full palette
+ * editor one tab away. Nothing offers a swatch."
+ *
+ * ═══ THE FOUR DESIGN CALLS, AND WHY ═══
+ *
+ * 1. THE SWATCH IS THE APP'S EXISTING SWATCH, not a new one. 16x16, 1px border
+ *    at `T.border`, `borderRadius: 2`, colour through `swatchCss` — the exact
+ *    values `art-shared/PaletteGrid` draws, read off it rather than re-picked, so
+ *    a colour looks the same in the panel that authors it and the editor that
+ *    owns the palette. What is deliberately NOT copied is `flex: 1 1 0`: the grid
+ *    divides a fixed 16 columns across its width, and this list has a length the
+ *    AUTHOR chose, so a fixed 16px that wraps keeps one colour one size whether
+ *    the band writes one word or twelve.
+ *
+ * 2. INLINE, NOT A POPOVER. The picker is `GenesisColorSliders` — the same
+ *    control both palette panels use — mounted UNDER the strip, which is what
+ *    `PaletteGrid` does with the same component. This column is a 300px
+ *    scroller: a popover in it has to be portalled, positioned against a moving
+ *    scroll offset, and dismissed, and every one of those is a way for a control
+ *    to end up painted outside its scroller (measured on this surface's
+ *    neighbours more than once). An inline panel cannot be anywhere but where its
+ *    row is.
+ *
+ * 3. IT IS A SECOND WAY IN, NEVER A REPLACEMENT. The text field above is
+ *    untouched and still holds the decimal list. That is the ROADMAP row 97
+ *    precedent — one toggle flips one bit, the readout prints the integer — and
+ *    it is also the only way the LIST'S LENGTH stays authorable: the length is a
+ *    second authored quantity (it is the derived restore's word count), the text
+ *    field is where it is authored, and a swatch strip that had to grow and shrink
+ *    would have quietly become the length control too.
+ *
+ * 4. NO CHECKER ON INDEX 0. `PaletteGrid` draws entry 0 as a checker because the
+ *    VDP treats it as the backdrop; here the list index is a POSITION IN THE
+ *    BAND'S WRITE, not a palette entry, so index 0 of `colours` is an ordinary
+ *    colour. Which entry it lands on is in the swatch's title, from the address.
+ *
+ * ⚠ ONE GESTURE, ONE UNDO STEP. `onChange` (per slider tick) writes NOTHING —
+ * it moves a local draft, so a drag is not a hundred history entries. `onCommit`
+ * (pointerup, keyup, blur) runs one `setColourCommand`. The commit fires twice
+ * per drag by design, and the second is a no-op because `editPresetCommand`
+ * returns null for a document that did not change.
+ */
+function ColourSwatches({ library, presetId, index, addr, colours, run, onEdited }: {
+  library: EffectsPresetLibrary; presetId: string; index: number;
+  addr: number; colours: readonly number[];
+  run: (c: AnyCommand | null) => void;
+  /** The list changed from HERE — drop the text field's draft so it re-reads. */
+  onEdited: () => void;
+}): React.ReactElement | null {
+  const [sel, setSel] = React.useState<number | null>(null);
+  const [draft, setDraft] = React.useState<number | null>(null);
+  const committed = sel === null ? 0 : (colours[sel] ?? 0);
+  // Resync on a selection change or on an external write — undo/redo, an agent
+  // edit, the command the release just ran — so the sliders never show a stale
+  // draft over a document that has moved. PaletteGrid's own rule, same deps.
+  React.useEffect(() => { setDraft(null); }, [sel, committed]);
+  if (colours.length === 0) return null;
+  const open = sel !== null && sel < colours.length;
+  return (
+    <div style={{ marginLeft: CONTROL_INSET, marginBottom: T.s2 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+        {colours.map((word, i) => (
+          <button key={i} type="button"
+            title={colourSwatchTitle(addr, i, word)}
+            aria-label={`Colour ${i} of raster band ${index}`}
+            data-band-colour={i}
+            onClick={() => setSel((cur) => (cur === i ? null : i))}
+            style={{
+              width: 16, height: 16, padding: 0, boxSizing: 'border-box',
+              background: swatchCss(sel === i && draft !== null ? draft : word),
+              borderWidth: sel === i ? 2 : 1, borderStyle: 'solid',
+              borderColor: sel === i ? T.textHi : T.border,
+              borderRadius: 2, cursor: 'pointer',
+            }} />
+        ))}
+      </div>
+      {open && (
+        <div style={{ marginTop: T.s2 }}>
+          <GenesisColorSliders
+            word={draft ?? committed}
+            heading={`Colour ${sel}`}
+            onChange={(w) => setDraft(w)}
+            onCommit={(w) => {
+              run(setColourCommand(library, presetId, index, sel!, w));
+              onEdited();
+            }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BandCard({
   library, presetId, index, band, run, lastRefusal,
   coloursText, coloursRefusal, setColoursText, setColoursRefusal,
@@ -874,7 +985,14 @@ function BandCard({
   lastRefusal: string | null;
   coloursText: string | undefined;
   coloursRefusal: string | null;
-  setColoursText: (t: string) => void;
+  /**
+   * `undefined` DROPS the draft and lets the box read the document again — which
+   * is what a swatch edit needs. Without it an author who typed in the list and
+   * then picked a colour would watch the swatch change under a text box still
+   * showing what they typed: one field's draft outliving an edit to the other,
+   * which is the two-sources-of-truth defect this panel has met before.
+   */
+  setColoursText: (t: string | undefined) => void;
   setColoursRefusal: (r: string | null) => void;
 }): React.ReactElement {
   const arm = bandArm(band);
@@ -957,6 +1075,31 @@ function BandCard({
       </Field>
       {armAdvice !== null && <Hint under tone="warning">{armAdvice}</Hint>}
 
+      {/* ═══ `addr` GETS A HUMAN RENDERING BESIDE THE NUMBER (a13) ═══
+
+          The cold reader met `addr = 74` with a three-letter label and nothing
+          else: "There is no 'palette line 2, entry 5' rendering of it anywhere,
+          though the panel elsewhere is happy to render a line mask as L0 L1 L2
+          L3 chips." That is the precedent this follows, and it follows it the
+          same way ROADMAP row 97 did — THE INTEGER STAYS. The spinner is
+          untouched, still carries no min/max (aeon §E.4, harness row 4e), and
+          the gloss is a `<span>` after it, exactly where `World Y` puts "px,
+          level space" and `Start at` puts "/256 of a cycle".
+
+          ⚠ IT SITS IN THE CONTROL COLUMN AND COSTS THE LABEL COLUMN NOTHING.
+          The label is still the schema's key at LABEL_W; the gloss is the third
+          item in a row that already had two, and `line 2 · entry 5` is the
+          longest ordinary case. Widening the label column was NOT an option —
+          it is zero-sum against every select in this panel, measured
+          (column-layout.tsx's docblock, and docs/reviews/2026-09-03-effects-
+          label-widths.md).
+
+          BOTH ARMS, because both carry `addr` and the schema calls both a CRAM
+          byte address. On `pal_region` it is worth more, not less: that arm ALSO
+          carries `pal_line` and `entry` as their own keys which "must AGREE with
+          addr", so an author can now see the disagreement the engine would
+          refuse. `addrGloss` reads the ADDRESS and never those keys — see its
+          docblock for why printing the file's own claim would be a lie. */}
       {arm !== null && presetArmFields(arm)
         .filter((f) => f !== 'colours')
         .map((f) => (
@@ -964,6 +1107,12 @@ function BandCard({
             <NumberField title={armFieldTitle(arm, f)} width={72}
               value={Number((band.on as unknown as Record<string, Record<string, number>>)[arm][f])}
               onChange={(n) => run(setArmFieldCommand(library, presetId, index, f, n))} />
+            {f === 'addr' && (
+              <span style={{ fontSize: T.tXs, color: T.textLo, minWidth: 0 }}>
+                {addrGloss(Number(
+                  (band.on as unknown as Record<string, Record<string, number>>)[arm][f]))}
+              </span>
+            )}
           </Field>
         ))}
 
@@ -984,6 +1133,10 @@ function BandCard({
               style={textInput} />
           </Field>
           {coloursRefusal !== null && <Hint under tone="warning">{coloursRefusal}</Hint>}
+          {/* ═══ THE SWATCHES (a12) ═══ */}
+          <ColourSwatches library={library} presetId={presetId} index={index}
+            addr={band.on.cram.addr} colours={band.on.cram.colours} run={run}
+            onEdited={() => setColoursText(undefined)} />
           {/* The second authored quantity, said where it is authored: the list's
               LENGTH is also the derived restore's word count, so adding a colour
               changes what the band costs and not only how it looks. */}
@@ -991,6 +1144,13 @@ function BandCard({
             {band.on.cram.colours.length} colour
             {band.on.cram.colours.length === 1 ? '' : 's'} — also the derived restore's word count.
           </Hint>
+          {/* THE TWO CONTROLS ARE JOINTLY REFUSABLE, so the sentence is under
+              both of them. The length is authored above, the address below, and
+              each can be reasonable while the pair is not. An ADVISORY, not a
+              refusal — see `cramSpanAdvisory`. */}
+          {cramSpanAdvisory(band, presetId, index) !== null && (
+            <Hint under tone="warning">{cramSpanAdvisory(band, presetId, index)}</Hint>
+          )}
         </>
       )}
 
