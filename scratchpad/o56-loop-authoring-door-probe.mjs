@@ -354,8 +354,16 @@ async function main() {
     console.log(`\n        LENS REPORTS AFTER ARMING:`);
     console.log(`          bothPlanesLens: ${JSON.stringify(lensB)}`);
     console.log(`          crossoverLens:  ${JSON.stringify(lensX)}`);
+    // ⚠ `.active`, NOT `!!report`. The first shape of this row asserted the two
+    // reports were non-null and PASSED under the red-first mutation while
+    // bothPlanesLens answered {"active":false,"reason":"off"} — a lens that
+    // never ran still publishes a report saying so, which is the whole point of
+    // `reason`. A row that cannot tell "drew nothing" from "never armed" is
+    // asserting nothing.
     check('5d', 'arming the two chips surfaced BOTH lenses (they are not silent modes)',
-      !!lensB && !!lensX, `bothPlanes=${!!lensB} crossover=${!!lensX}`);
+      lensB?.active === true && lensX?.active === true,
+      `bothPlanes.active=${lensB?.active} (reason=${lensB?.reason}) `
+      + `crossover.active=${lensX?.active} (reason=${lensX?.reason})`);
 
     // ═══ 6. THE DISCOVERABILITY CENSUS, ON THE FACET ═══════════════════
     const facetWords = await c.json(LOOP_WORDS);
