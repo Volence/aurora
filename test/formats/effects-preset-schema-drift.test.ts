@@ -30,6 +30,7 @@ import {
   EFFECTS_PRESET_SCHEMA, EFFECTS_PRESET_BAND_KEYS, EFFECTS_PRESET_ON_ARMS,
   EFFECTS_PRESET_RESERVED_KEYS, EFFECTS_PRESET_ROOT_KEYS, presetArmFields, presetDefFields,
 } from '../../src/core/formats/effects/preset';
+import { PRESET_KEYS_AWAITING_AEON } from '../../src/core/formats/effects/preset-lag';
 import { peerRepo, resolveRev, readAtRev, isAncestor } from '../support/peer-repo';
 
 const SCHEMA_PATH = resolve(
@@ -177,6 +178,76 @@ describe('raster preset schema — vendored copy drift gate', () => {
     // A variant object with an unknown key is refused THROUGH the $ref arm.
     expect(validateAgainstSchema([{ shift_q: 1 }], variants, root)
       .some((i) => /shift_q/.test(i.message))).toBe(true);
+  });
+
+  /**
+   * ═══ THE d36d704 AMENDMENT FORCED NO EVALUATOR EDIT — MEASURED, NOT ASSUMED ═══
+   *
+   * The 12aecd5 re-vendor's lesson was that a keyword NAME can be implemented
+   * while a VALUE SHAPE of it is not, and that only the walk sees the shape. So
+   * "nothing new was needed for `patch_world_ys` / `patch_motion`" is a claim
+   * that has to be made on the committed nodes themselves, with the constructs
+   * the amendment actually uses named, or it is a claim about a schema nobody
+   * ran. The two rows below do that on both new root nodes.
+   */
+  it('keeps a null slot in `patch_world_ys`, and refuses the sentinel written as an integer', () => {
+    const seeds = (EFFECTS_PRESET_SCHEMA.properties as Record<string, JsonSchema>).patch_world_ys;
+    const root = EFFECTS_PRESET_SCHEMA;
+    const arms = ((seeds.items as JsonSchema).oneOf as JsonSchema[]);
+    // Anti-vacuous: this really is the integer-or-null shape with a hole in it.
+    expect(arms.map((a) => a.type)).toEqual(['integer', 'null']);
+    expect((arms[0].not as JsonSchema).const).toBe(32767);
+    expect(seeds.maxItems).toBe(4);
+
+    // aeon §2.2's own example, and the nulls stay at their index.
+    const doc = [224, 314, null, null];
+    expect(validateAgainstSchema(doc, seeds, root)).toEqual([]);
+    expect(canonicalizeBySchema(doc, seeds, root)).toEqual(doc);
+    // A SHORT array is legal — an index the array does not reach keeps the
+    // section's hand-authored channel, so the writer must never pad to 4.
+    expect(validateAgainstSchema([224], seeds, root)).toEqual([]);
+    // The three refusals the schema owns, each on its own value.
+    expect(validateAgainstSchema([32767], seeds, root).map((i) => i.path)).toEqual(['/0']);
+    expect(validateAgainstSchema([65536], seeds, root).map((i) => i.path)).toEqual(['/0']);
+    expect(validateAgainstSchema([0, 1, 2, 3, 4], seeds, root)
+      .some((i) => /has 5 items, maximum 4/.test(i.message))).toBe(true);
+    // 32766 is not the sentinel and 0 is a real world Y: the `not` is a HOLE in
+    // a range, not a floor.
+    expect(validateAgainstSchema([0, 32766, 65535], seeds, root)).toEqual([]);
+  });
+
+  it('validates `patch_motion` through its $ref arms, and the sweep node the amendment added', () => {
+    const motion = (EFFECTS_PRESET_SCHEMA.properties as Record<string, JsonSchema>).patch_motion;
+    const defs = EFFECTS_PRESET_SCHEMA.$defs as Record<string, JsonSchema>;
+    const root = EFFECTS_PRESET_SCHEMA;
+    // Anti-vacuous: the $ref-inside-oneOf shape and the two closed $defs nodes
+    // the amendment introduced really are what is being exercised.
+    expect(((motion.items as JsonSchema).oneOf as JsonSchema[]).map((a) => a.$ref ?? a.type))
+      .toEqual(['#/$defs/patch_motion_entry', 'null']);
+    expect(defs.patch_motion_entry.unevaluatedProperties).toBe(false);
+    expect(defs.anchor_sweep.unevaluatedProperties).toBe(false);
+    // ...and NEITHER sits beside an in-place applicator, so the
+    // additionalProperties equivalence holds without the prover being consulted
+    // — a different situation from `$defs.band.properties.on`, where it is.
+    for (const node of [defs.patch_motion_entry, defs.anchor_sweep]) {
+      expect(Object.keys(node).filter((k) => ['oneOf', 'anyOf', 'allOf', 'not', '$ref'].includes(k)))
+        .toEqual([]);
+    }
+
+    const doc = [{ sweep: { amp_shift: 4, period_shift: 1, phase: 0 } }, null];
+    expect(validateAgainstSchema(doc, motion, root)).toEqual([]);
+    expect(canonicalizeBySchema(doc, motion, root)).toEqual(doc);
+    // `phase` is the only optional field, and the split is read off the schema.
+    expect(presetDefFields('anchor_sweep')).toEqual({
+      required: ['amp_shift', 'period_shift'], optional: ['phase'],
+    });
+    expect(presetDefFields('patch_motion_entry')).toEqual({ required: ['sweep'], optional: [] });
+    // An unknown arm is refused THROUGH the $ref, and the message names it.
+    expect(validateAgainstSchema([{ approach: {} }], motion, root)
+      .some((i) => /unknown property "approach"/.test(i.message))).toBe(true);
+    // A shift off the end of its ladder is refused with the bound.
+    expect(validateAgainstSchema([{ sweep: { amp_shift: 1, period_shift: 0 } }], motion, root)
+      .some((i) => /1 is below the minimum 2/.test(i.message))).toBe(true);
   });
 
   it('the walker refuses a $ref that does not resolve, and an empty type array', () => {
@@ -461,9 +532,35 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
     onPage(ctx, ({ tip, keys }) => {
       const pageVocabulary = [...keys.preset, ...keys['preset-ignored'], ...keys['preset-refused']].sort();
       const schemaVocabulary = [...EFFECTS_PRESET_ROOT_KEYS, ...schemaReserved].sort();
-      // A name one side knows and the other does not is a rename or a typo —
-      // a real split, whichever direction the lag runs.
-      expect(pageVocabulary, SPLIT(tip)).toEqual(schemaVocabulary);
+
+      // ═══ TWO ONE-SIDED CLAIMS, NOT ONE EQUALITY (widened 2026-09-03) ═══
+      //
+      // A plain `toEqual` was right while every lagging key sat in aeon's
+      // `preset-refused` row — a key the contract had declared and aeon had not
+      // built was still a name aeon's page KNEW. empyrean d36d704 produced the
+      // other flavour: `patch_world_ys` and `patch_motion` are not in aeon's
+      // vocabulary at all (their step 4 has not run), so the equality went red
+      // on a page that had done nothing wrong, exactly as the `preset` row did
+      // on 2026-09-02. The lag-tolerant statement is again a PAIR:
+      //
+      //   ← aeon knows no name the schema does not. A rename or a typo on
+      //     aeon's side, or a key aeon invented, still fails here.
+      //   → every name the schema knows that aeon does not is a DECLARED LAG,
+      //     named in PRESET_KEYS_AWAITING_AEON — never a silent difference.
+      //
+      // The gap between them IS the lag, and the pin row below owns it.
+      expect(
+        pageVocabulary.filter((k) => !schemaVocabulary.includes(k)),
+        `${SPLIT(tip)} aeon's page knows a root key the schema neither declares nor reserves`,
+      ).toEqual([]);
+      expect(
+        schemaVocabulary.filter((k) => !pageVocabulary.includes(k)),
+        `${SPLIT(tip)} the schema knows these root keys and aeon's page does not mention them at `
+        + 'all — if that is the contract leading its consumer, they belong in '
+        + 'PRESET_KEYS_AWAITING_AEON (src/core/formats/effects/preset-lag.ts) so the panel '
+        + 'discloses them; if aeon has RENAMED one, this is the split.',
+      ).toEqual(PRESET_KEYS_AWAITING_AEON.filter((k) => !pageVocabulary.includes(k)));
+
       // A name the schema still RESERVES must not be one aeon claims to lower.
       for (const reserved of schemaReserved) {
         expect(keys['preset-refused'], `${SPLIT(tip)} aeon lowers "${reserved}", which the schema `
@@ -509,38 +606,52 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
    * still here, so the retirement cannot itself rot into an unmeasured claim.
    */
   it(`the contract-leads-consumer lag at aeon ${page.kind === 'ok' ? page.tip.slice(0, 8) : TIP} is `
-     + 'EMPTY — aeon lowers every key the schema declares (retired 2026-09-02; red if one re-opens)', (ctx) => {
+     + 'EXACTLY the premise list — red in both directions (re-armed 2026-09-03)', (ctx) => {
     onPage(ctx, ({ tip, keys }) => {
       // Anti-vacuous: this row is only meaningful because the schema declares
-      // keys BEYOND the required ones for aeon to have built. If that ever
-      // stopped being so, "the lag is empty" would be true of nothing.
+      // keys BEYOND the required ones for aeon to have built, and because
+      // aeon's page really lists what it accepts.
       expect(schemaOptional.length, 'the schema declares no optional root key, so there is no lag '
         + 'this row could ever measure').toBeGreaterThan(0);
-      expect(keys['preset-refused'].length, 'aeon refuses nothing at all, so the refusal list this '
-        + 'row filters is not being read').toBeGreaterThan(0);
+      expect(keys.preset.length, 'aeon accepts nothing at all, so the accepted list this row '
+        + 'subtracts from is not being read').toBeGreaterThan(0);
 
-      const lag = keys['preset-refused'].filter((k) => !schemaReserved.includes(k)).sort();
+      // ═══ THE MEASUREMENT WIDENED, AND THE OLD ONE HAD A HOLE ═══
+      //
+      // Until 2026-09-03 the lag was `keys['preset-refused'] minus the reserved
+      // names` — which sees a key aeon refuses BY NAME and is blind to a key
+      // aeon's page does not mention at all. empyrean d36d704 produced exactly
+      // the blind flavour, and that clause stayed GREEN through it; only the
+      // one-sided check underneath it went red. So the lag is now what the
+      // premise constant always MEANT: every root key the schema declares that
+      // aeon's page does not ACCEPT, whichever way aeon declines it.
+      const lag = schemaOptional.filter((k) => !keys.preset.includes(k)).sort();
       expect(
         lag,
-        `A LAG HAS RE-OPENED between ${PROV.empyrean.path} (blob ${PROV.empyrean.blob}) and aeon `
-        + `${PAGE} at ${tip}: aeon refuses ${JSON.stringify(lag)}, which the schema DECLARES. `
-        + 'This is not a split — it is the contract leading its consumer, the state this pair was '
-        + 'in from the 12aecd5 re-vendor until aeon merged item 5 on 2026-09-02 — but Aurora\'s '
-        + 'band-preset panel is now authoring keys that reach the file and nothing further with '
-        + 'NO disclosure above the controls. FIX: put these names back into the premise list in '
-        + 'src/core/formats/effects/preset-lag.ts (the panel\'s sentence is derived from it and '
-        + 'comes back on screen by construction), update its date, and flip this row back to '
-        + 'asserting that list. IF INSTEAD AEON HAS REVERTED EFFECTS-W1 ITEM 5, that is the '
-        + 'regression this row exists to catch: report it to aeon before re-filling anything.',
-      ).toEqual([]);
+        `THE LAG BETWEEN ${PROV.empyrean.path} (blob ${PROV.empyrean.blob}) and aeon ${PAGE} at `
+        + `${tip} is ${JSON.stringify(lag)}, and PRESET_KEYS_AWAITING_AEON says `
+        + `${JSON.stringify([...PRESET_KEYS_AWAITING_AEON])}. This row is red in BOTH directions `
+        + 'and the fix differs:\n'
+        + '  • THE MEASURED LAG GREW — the contract declares a key aeon has not built. Not a '
+        + 'split: it is the contract leading its consumer, the state this pair was in from the '
+        + '12aecd5 re-vendor to 2026-09-02 and again from the d36d704 one. Aurora is authoring a '
+        + 'key that reaches the file and nothing further, so put the name into the premise list '
+        + 'in src/core/formats/effects/preset-lag.ts (the panel\'s sentence is derived from it '
+        + 'and comes back on screen by construction) and re-date it.\n'
+        + '  • THE MEASURED LAG SHRANK — aeon has BUILT one of these. Remove that name from the '
+        + 'premise list and re-date it; the sentence retires by construction. If instead aeon has '
+        + 'UN-built a key it used to lower, that is a regression: report it to aeon before '
+        + 'touching anything here.',
+      ).toEqual([...PRESET_KEYS_AWAITING_AEON].sort());
 
       // The same fact from the other side, so the row cannot pass on a page that
-      // simply stopped listing its refusals: every key the schema declares is a
-      // key aeon's page says it accepts.
+      // simply stopped listing its refusals: every name aeon REFUSES is either
+      // one the schema reserves, or a declared lag.
       expect(
-        schemaOptional.filter((k) => !keys.preset.includes(k)),
-        `${SPLIT(tip)} the schema declares these optional keys and aeon's page neither accepts `
-        + 'nor refuses them — the page has stopped accounting for part of the vocabulary',
+        keys['preset-refused'].filter(
+          (k) => !schemaReserved.includes(k) && !PRESET_KEYS_AWAITING_AEON.includes(k)),
+        `${SPLIT(tip)} aeon refuses a root key the schema neither reserves nor has a declared lag `
+        + 'for',
       ).toEqual([]);
     });
   });

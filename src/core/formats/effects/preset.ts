@@ -26,10 +26,13 @@
 //     in its own header: "This page is NOT an authority on the format." Where it
 //     and the schema disagree, the schema and `effects_gen.py` win. They agreed
 //     field for field at the 6664b61 landing (docs/reviews/2026-08-29-band-
-//     preset-panel.md); since the 12aecd5 re-vendor the schema DECLARES `cycles`
-//     and `variants` that aeon's page and generator still refuse by name — the
-//     contract leading its consumer, measured and NAMED by the drift gate's
-//     last row rather than papered over.
+//     preset-panel.md); the 12aecd5 re-vendor opened a LAG (the schema declared
+//     `cycles` and `variants` before aeon lowered them) which aeon closed on
+//     2026-09-02, and the d36d704 re-vendor has opened another one with
+//     `patch_world_ys` and `patch_motion` — step 4 of that key's four-step chain
+//     is aeon's and has not run. The contract leading its consumer, measured and
+//     NAMED by the drift gate's lag row and disclosed on screen by
+//     `preset-lag.ts`, rather than papered over.
 //
 // THE STRUCTURAL IDEA IS SCENE.TS'S, UNCHANGED. Parse hands back what JSON.parse
 // produced; serialize reorders by aeon's §5 canonical order and refuses to drop
@@ -167,10 +170,54 @@ export interface EffectsPresetPalVariant {
 }
 
 /**
+ * One authored anchor MOTION — `$defs.anchor_sweep` (empyrean d36d704), lowered
+ * through aeon's `anchor_sweep()` (`raster_dsl.emp:2232-2238`), which packs all
+ * three fields into one motion word.
+ *
+ * ═══ BOTH SHIFTS ARE BASE-2 LOGARITHMS, NOT PHYSICAL UNITS ═══
+ *
+ * Peak excursion is `256 >> amp_shift` px and one cycle is `256 << period_shift`
+ * logic ticks — so the legal domain is SEVEN amplitude rungs and NINE period
+ * rungs and nothing between them. A control that takes a continuous pixel or
+ * seconds value and ROUNDS it into a shift silently doubles or halves what the
+ * author asked for, with no error anywhere. `ANCHOR_AMP_RUNGS` and
+ * `ANCHOR_PERIOD_RUNGS` below are the ladders themselves, derived from this
+ * schema, so a panel offers the rungs instead of re-deriving them.
+ *
+ * `phase` is the only continuous field, and the only one `anchor_sweep()`
+ * defaults (to 0) — which is why it is the only optional one here.
+ */
+export interface EffectsPresetAnchorSweep {
+  /** Amplitude rung: peak excursion `256 >> amp_shift` px. 2..8, no default. */
+  amp_shift: number;
+  /** Period rung: one cycle is `256 << period_shift` logic ticks. 0..8, no default. */
+  period_shift: number;
+  /** Starting point in the 256-entry sine table, 0..255. The only optional field. */
+  phase?: number;
+}
+
+/**
+ * One patch channel's motion — `$defs.patch_motion_entry`. EXACTLY ONE ARM, and
+ * `sweep` is the only arm there is.
+ *
+ * NO `approach` ARM EXISTS AND NONE IS RESERVED, ruled at d36d704 on aeon's own
+ * request rather than merely accepted: APPROACH has no preset seed field
+ * (`preset.emp:81-87` scopes it out; its handle is the runtime call
+ * `Effects_SetTargetY`), so a reserved arm would be a key with nothing behind
+ * it. Adding one later is its own contract change — which is why this is a plain
+ * interface and not a union with one member: a union would advertise a second
+ * arm's arrival as a shape this codec was already shaped for, and it is not.
+ */
+export interface EffectsPresetPatchMotion {
+  sweep: EffectsPresetAnchorSweep;
+}
+
+/**
  * The preset document. `bands` is the raster channel; `cycles` and `variants`
- * (empyrean 12aecd5, AURORA_EFFECTS_SCHEMA.md §7.2) are OTHER CHANNELS OF THE
- * SAME `EffectsPreset` record, which is why they live beside it and one
- * `rasterRef` binds the whole document (ruling Q1).
+ * (empyrean 12aecd5, AURORA_EFFECTS_SCHEMA.md §7.2) and `patch_world_ys` /
+ * `patch_motion` (empyrean d36d704, §7.3) are OTHER CHANNELS OF THE SAME
+ * `EffectsPreset` record, which is why they live beside it and one `rasterRef`
+ * binds the whole document (ruling Q1).
  *
  * THREE STATES EACH, AND ABSENT IS ONE OF THEM — so this codec must never
  * normalise an absent key to null or an empty array, and never drop a null:
@@ -185,6 +232,16 @@ export interface EffectsPresetPalVariant {
  *              water tint; `null` at an index CLEARS that slot; an object
  *              authors it. There is no key-level null: clearing both slots is
  *              `[null, null]`.
+ *
+ *   `patch_world_ys` / `patch_motion` — positional, index = PATCH CHANNEL, at
+ *              most `EFFECTS_PRESET_MAX_PATCH`. Same three states as `variants`,
+ *              and the sentinel spelling matters more here than anywhere else in
+ *              this file: `null` is `PATCH_ANCHOR_NONE` ($7FFF) and **`0` is a
+ *              real world Y, above the screen top** — the most invasive state a
+ *              channel can have. Never write 0 to mean absent. A SHORT ARRAY IS
+ *              LEGAL AND THIS WRITER MUST NOT PAD IT: padding turns "the section
+ *              keeps its hand-authored channel" into "the editor authored
+ *              something here", which is a different document.
  */
 export interface EffectsPreset {
   schema: 1;
@@ -194,6 +251,13 @@ export interface EffectsPreset {
   bands: EffectsPresetBand[];
   cycles?: EffectsPresetCycleChannel[] | null;
   variants?: (EffectsPresetPalVariant | null)[];
+  /**
+   * The anchor SEED per patch channel, in WHOLE PIXELS of absolute level space.
+   * NEITHER SIDE CONVERTS — see `EFFECTS_PRESET_PATCH_SEED_UNITS_PER_PIXEL`.
+   */
+  patch_world_ys?: (number | null)[];
+  /** The anchor MOTION per patch channel, in the SAME index space as the seed. */
+  patch_motion?: (EffectsPresetPatchMotion | null)[];
 }
 
 // ---------------------------------------------------------------------------
@@ -253,11 +317,214 @@ export function presetDefFields(def: string): { required: readonly string[]; opt
   });
 }
 
+// ---------------------------------------------------------------------------
+// The anchor keys (empyrean d36d704, §7.3) — bounds and LADDERS, derived
+// ---------------------------------------------------------------------------
+
+/**
+ * Pull one number out of a schema `description`, or throw naming the sentence.
+ *
+ * ═══ WHY A SENTENCE AND NOT A LITERAL BESIDE IT ═══
+ *
+ * The three constants below (256, 256, 60) are the ones the two shift LADDERS
+ * are computed from, and the schema states each of them in prose because JSON
+ * Schema has no keyword for "this integer is a base-2 logarithm of a physical
+ * quantity". Retyping them here would put a second copy of an engine constant in
+ * this repo with nothing measuring it — the failure `EFFECTS_PRESET_RESERVED_KEYS`
+ * below was built against, one level down. So they are READ, and read LOUDLY:
+ * a sentence that stops matching throws at module load rather than silently
+ * yielding a plausible-looking wrong ladder.
+ */
+function schemaNumberFromProse(path: string[], re: RegExp, what: string): number {
+  const description = String(schemaNode(path).description ?? '');
+  const m = re.exec(description);
+  if (!m) {
+    throw new Error(
+      `aurora-effects-preset.schema.json no longer states ${what} at ${path.join('.')} in the ` +
+      `shape ${re} that this module reads it from. Re-read the schema and update the derivation ` +
+      '— do NOT hardcode the number: it is an engine constant, and a second unmeasured copy of ' +
+      'one is exactly what this reader exists to avoid.',
+    );
+  }
+  return Number(m[1]);
+}
+
+/** `RASTER_MAX_PATCH` — how many patch channels either array may reach. */
+export const EFFECTS_PRESET_MAX_PATCH: number =
+  schemaNode(['properties', 'patch_world_ys']).maxItems as number;
+
+/** The seed's integer branch: `{type, minimum, maximum, not:{const}}`. */
+const SEED_INT = schemaNode(['properties', 'patch_world_ys', 'items', 'oneOf', '0']);
+
+/** The seed's inclusive range on the wire — the engine field is a `u16`. */
+export const EFFECTS_PRESET_WORLD_Y_RANGE: Readonly<{ min: number; max: number }> =
+  Object.freeze({ min: SEED_INT.minimum as number, max: SEED_INT.maximum as number });
+
+/**
+ * `PATCH_ANCHOR_NONE` — the one seed value the schema REFUSES, read off its own
+ * `not`. "Channel unused" is spelled `null`; writing the sentinel as an integer
+ * is refused so the two spellings cannot both mean it.
+ */
+export const EFFECTS_PRESET_PATCH_ANCHOR_NONE: number =
+  (SEED_INT.not as Record<string, unknown>).const as number;
+
+/**
+ * HOW MANY WIRE UNITS MAKE ONE PIXEL FOR A PATCH SEED. **One.**
+ *
+ * ═══ THE ONE NUMBER THIS PARCEL SHIPS A SILENT BUG WITHOUT ═══
+ *
+ * `drift.rate` — the OTHER effects key an author sets in pixels — is 1/256 px
+ * per frame, and Aurora multiplies by 256 on export in exactly one place
+ * (`scene-ui.ts`'s `EFFECTS_DRIFT_UNITS_PER_PIXEL`). A world Y carried through
+ * that habit lands 256 times down the level, `anchor - Camera_Y` is enormous,
+ * and THE BAND SILENTLY NEVER APPEARS. The schema cannot catch it: 224 × 256 =
+ * 57344 is inside the u16 range and validates clean. empyrean's §7.3 says so in
+ * its own verification note.
+ *
+ * So the ratio is stated HERE, as a constant a test can be written against, and
+ * it is READ FROM THE CONTRACT rather than typed: the schema's own unit sentence
+ * ends "NEITHER SIDE CONVERTS, 1:1". If a future amendment ever gives this field
+ * a scale, this line changes with the contract instead of disagreeing with it.
+ */
+export const EFFECTS_PRESET_PATCH_SEED_UNITS_PER_PIXEL: number = (() => {
+  const description = String(schemaNode(['properties', 'patch_world_ys']).description ?? '');
+  const m = /NEITHER SIDE CONVERTS, (\d+):(\d+)\./.exec(description);
+  if (!m) {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer carries the "NEITHER SIDE CONVERTS, 1:1" ' +
+      'sentence that EFFECTS_PRESET_PATCH_SEED_UNITS_PER_PIXEL is derived from. Re-read the ' +
+      'unit paragraph before writing another world Y: if the contract has given this field a ' +
+      'scale, every seed Aurora has written is wrong by that factor.',
+    );
+  }
+  const [wire, px] = [Number(m[1]), Number(m[2])];
+  if (px === 0) throw new Error('the seed unit sentence parsed to a zero denominator');
+  return wire / px;
+})();
+
+/** One rung of the amplitude ladder. */
+export interface AnchorAmpRung {
+  amp_shift: number;
+  /** Peak excursion from the seed, in pixels: `base >> amp_shift`. */
+  peak_px: number;
+  /** Total travel — twice the peak. What an author actually sees move. */
+  peak_to_peak_px: number;
+}
+
+/** One rung of the period ladder. */
+export interface AnchorPeriodRung {
+  period_shift: number;
+  /** One full cycle, in logic ticks: `base << period_shift`. */
+  ticks: number;
+  /** The same cycle in seconds at the engine's tick rate. */
+  seconds: number;
+}
+
+const SWEEP = ['$defs', 'anchor_sweep'] as const;
+const AMP = [...SWEEP, 'properties', 'amp_shift'];
+const PERIOD = [...SWEEP, 'properties', 'period_shift'];
+const PHASE = [...SWEEP, 'properties', 'phase'];
+
+/** `ANCHOR_SINE_AMP` — peak excursion is this many pixels shifted RIGHT. */
+const ANCHOR_AMP_BASE_PX =
+  schemaNumberFromProse(AMP, /peak excursion (\d+) >> amp_shift px/, 'the amplitude base');
+/** One cycle at `period_shift` 0, in logic ticks; higher rungs shift it LEFT. */
+const ANCHOR_PERIOD_BASE_TICKS =
+  schemaNumberFromProse(PERIOD, /one cycle is (\d+) << period_shift logic ticks/, 'the period base');
+/** The tick rate the schema quotes its seconds at. */
+const ANCHOR_TICKS_PER_SECOND =
+  schemaNumberFromProse([...SWEEP], /at (\d+) Hz/, 'the tick rate');
+
+function inclusiveRange(path: string[]): number[] {
+  const node = schemaNode(path);
+  const lo = node.minimum as number;
+  const hi = node.maximum as number;
+  if (!Number.isInteger(lo) || !Number.isInteger(hi) || hi < lo) {
+    throw new Error(`${path.join('.')} does not declare an integer minimum..maximum`);
+  }
+  return Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
+}
+
+/**
+ * THE AMPLITUDE LADDER — every peak a sweep can have, and nothing between.
+ *
+ * Seven rungs, computed from the schema's own `minimum`/`maximum` and the base
+ * it states in prose. A panel that offers this array cannot offer an illegal
+ * amplitude, and cannot round one into the wrong rung.
+ */
+export const ANCHOR_AMP_RUNGS: readonly AnchorAmpRung[] = Object.freeze(
+  inclusiveRange(AMP).map((amp_shift) => Object.freeze({
+    amp_shift,
+    peak_px: ANCHOR_AMP_BASE_PX >> amp_shift,
+    peak_to_peak_px: (ANCHOR_AMP_BASE_PX >> amp_shift) * 2,
+  })),
+);
+
+/** THE PERIOD LADDER — nine rungs, on the same terms as the amplitude ladder. */
+export const ANCHOR_PERIOD_RUNGS: readonly AnchorPeriodRung[] = Object.freeze(
+  inclusiveRange(PERIOD).map((period_shift) => Object.freeze({
+    period_shift,
+    ticks: ANCHOR_PERIOD_BASE_TICKS * (2 ** period_shift),
+    seconds: (ANCHOR_PERIOD_BASE_TICKS * (2 ** period_shift)) / ANCHOR_TICKS_PER_SECOND,
+  })),
+);
+
+/** `phase`'s inclusive range — the sweep's one CONTINUOUS field. */
+export const ANCHOR_PHASE_RANGE: Readonly<{ min: number; max: number }> = Object.freeze({
+  min: schemaNode(PHASE).minimum as number,
+  max: schemaNode(PHASE).maximum as number,
+});
+
+/**
+ * The rung with EXACTLY this peak, or null.
+ *
+ * NULL RATHER THAN THE NEAREST RUNG, deliberately. `amp_shift = log2(256 /
+ * peak_px)` is only defined on the ladder, and a converter that quietly rounded
+ * would be the doubling/halving §7.3 names — a caller that means to snap must
+ * say so by calling `anchorSnapPeakPx`, and then it has the snapped rung in hand
+ * to show the author what the value actually became.
+ */
+export function anchorAmpRungForPeakPx(peakPx: number): AnchorAmpRung | null {
+  return ANCHOR_AMP_RUNGS.find((r) => r.peak_px === peakPx) ?? null;
+}
+
+/** The rung with EXACTLY this cycle length in ticks, or null. Same rule. */
+export function anchorPeriodRungForTicks(ticks: number): AnchorPeriodRung | null {
+  return ANCHOR_PERIOD_RUNGS.find((r) => r.ticks === ticks) ?? null;
+}
+
+/**
+ * The nearest amplitude rung to a requested peak — SNAP, not round.
+ *
+ * Nearest in the LOG domain, which is where the ladder is uniform: in pixels the
+ * gap from 32 to 64 is 32 and the gap from 1 to 2 is 1, so a linear nearest
+ * would bias every request toward the small end. A request outside the ladder
+ * clamps to its nearest END rung, which is a real rung and therefore a value the
+ * author can see and correct.
+ */
+export function anchorSnapPeakPx(peakPx: number): AnchorAmpRung {
+  const target = Math.log2(Math.max(peakPx, Number.MIN_VALUE));
+  return ANCHOR_AMP_RUNGS.reduce((best, r) =>
+    Math.abs(Math.log2(r.peak_px) - target) < Math.abs(Math.log2(best.peak_px) - target) ? r : best);
+}
+
+/** The nearest period rung to a requested cycle in SECONDS. Same rule. */
+export function anchorSnapCycleSeconds(seconds: number): AnchorPeriodRung {
+  const target = Math.log2(Math.max(seconds, Number.MIN_VALUE));
+  return ANCHOR_PERIOD_RUNGS.reduce((best, r) =>
+    Math.abs(Math.log2(r.seconds) - target) < Math.abs(Math.log2(best.seconds) - target) ? r : best);
+}
+
 /**
  * The wave-2 vocabulary the contract has AGREED and this generator has NOT
  * BUILT. At 6664b61 that was `fires`, `variants`, `cycles`; at 12aecd5 the
  * schema DECLARES `cycles` and `variants` (§7.2) and only `fires` stays
- * reserved — which this derivation reads, and does not restate.
+ * reserved — which this derivation reads, and does not restate. THE d36d704
+ * AMENDMENT DID NOT MOVE THIS SENTENCE: `patch_world_ys` and `patch_motion`
+ * arrived DECLARED, not reserved, so the list is still `fires` alone. That is a
+ * measured reading of the new bytes, not an assumption — the derivation below
+ * would have thrown at module load if the sentence had moved, and the drift
+ * gate asserts what it yields.
  *
  * WHY THEY ARE WORTH SEPARATING from a plain unknown key. They are not typos —
  * they are empyrean `docs/AURORA_EFFECTS_SCHEMA.md` §7's reserved names, so an

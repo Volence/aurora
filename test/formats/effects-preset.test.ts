@@ -26,8 +26,13 @@ import {
   EffectsPresetError, EFFECTS_PRESET_BAND_KEYS, EFFECTS_PRESET_ON_ARMS,
   EFFECTS_PRESET_RESERVED_KEYS, EFFECTS_PRESET_ID_PATTERN, EFFECTS_PRESET_ROOT_KEYS,
   EFFECTS_PRESET_SCHEMA, presetDefFields,
+  EFFECTS_PRESET_MAX_PATCH, EFFECTS_PRESET_WORLD_Y_RANGE, EFFECTS_PRESET_PATCH_ANCHOR_NONE,
+  EFFECTS_PRESET_PATCH_SEED_UNITS_PER_PIXEL,
+  ANCHOR_AMP_RUNGS, ANCHOR_PERIOD_RUNGS, ANCHOR_PHASE_RANGE,
+  anchorAmpRungForPeakPx, anchorPeriodRungForTicks, anchorSnapPeakPx, anchorSnapCycleSeconds,
   type EffectsPreset, type EffectsPresetCycleChannel, type EffectsPresetPalVariant,
 } from '../../src/core/formats/effects/preset';
+import { validateAgainstSchema, type JsonSchema } from '../../src/core/formats/effects/json-schema-subset';
 import { canonicalJsonPretty } from '../../src/core/formats/canonical-json';
 
 /**
@@ -458,5 +463,302 @@ describe('the item-5 precondition: a document carrying cycles / variants parses 
     expect(EFFECTS_PRESET_RESERVED_KEYS).toContain('fires');
     expect(() => parseEffectsPreset(canonicalWith({ fires: [] }), 'minimal'))
       .toThrow(/fires is RESERVED wave-2 vocabulary/);
+  });
+});
+
+/**
+ * ═══ THE ITEM-4 AUTHORING KEY — `patch_world_ys` AND `patch_motion` ═══
+ *
+ * empyrean d36d704 / AURORA_EFFECTS_SCHEMA.md §7.3, against aeon's key-shape
+ * artifact `81b2a719`. Step 3 of a four-step chain: aeon named the shape, the
+ * hub filed the CR, THIS is Aurora accepting and writing it, and aeon's
+ * generator reads it in step 4.
+ *
+ * THE REFUSAL THIS REPLACES WAS REAL, and the first row below reproduces it from
+ * the current bytes rather than asserting it from memory. aeon's own artifact
+ * records the correction: their item-4 design said an older Aurora "erases it on
+ * the next save round-trip", and that is wrong about this codec — the root is
+ * CLOSED (`unevaluatedProperties: false`), so a document carrying either key was
+ * refused AT PARSE and no author on a tree carrying one could open the preset at
+ * all. Acceptance, not preservation, is what this parcel had to deliver.
+ *
+ * NO CONTROL AND NO UI. The sliders and the timeline control are EW-TIMELINE-
+ * CLOCK's, a different row. The codec accepts, round-trips and writes; nothing
+ * here authors.
+ */
+describe('the item-4 authoring key: patch_world_ys / patch_motion', () => {
+  function canonicalWith(extra: Record<string, unknown>): string {
+    return canonicalJsonPretty({ ...(JSON.parse(MINIMAL) as Record<string, unknown>), ...extra });
+  }
+
+  /** aeon §2.2/§2.3's own example values, so the fixtures are not invented. */
+  const SEEDS = [224, 314, null, null];
+  const SWEEP = { amp_shift: 4, period_shift: 1, phase: 0 };
+
+  /**
+   * THE CONTROL FOR EVERY ROW BELOW: the pre-d36d704 refusal, reproduced.
+   *
+   * Built by DELETING the two new properties from the vendored schema — one
+   * difference from the real thing, the same evaluator, the same document — so
+   * "it parses now" is a measured change and not a claim about a schema nobody
+   * ran. Without this row every acceptance below could be green on a codec that
+   * never refused anything.
+   */
+  it('WAS refused before this re-vendor, and the refusal named the closed root', () => {
+    const closedWithoutThem = JSON.parse(
+      JSON.stringify(EFFECTS_PRESET_SCHEMA),
+    ) as { properties: Record<string, unknown> };
+    // Anti-vacuous: the properties really are there to delete.
+    expect(Object.keys(closedWithoutThem.properties)).toEqual(
+      expect.arrayContaining(['patch_world_ys', 'patch_motion']),
+    );
+    delete closedWithoutThem.properties.patch_world_ys;
+    delete closedWithoutThem.properties.patch_motion;
+
+    const doc = JSON.parse(canonicalWith({ patch_world_ys: SEEDS })) as unknown;
+    const before = validateAgainstSchema(doc, closedWithoutThem as unknown as JsonSchema)
+      .map((i) => i.message);
+    expect(before).toEqual(['unknown property "patch_world_ys" (the schema is closed)']);
+    // ...and the SAME document against the real vendored schema: nothing wrong.
+    expect(validateAgainstSchema(doc, EFFECTS_PRESET_SCHEMA)).toEqual([]);
+  });
+
+  it('both keys are DECLARED at the root, and neither is reserved', () => {
+    expect(EFFECTS_PRESET_ROOT_KEYS).toContain('patch_world_ys');
+    expect(EFFECTS_PRESET_ROOT_KEYS).toContain('patch_motion');
+    expect(EFFECTS_PRESET_RESERVED_KEYS).not.toContain('patch_world_ys');
+    expect(EFFECTS_PRESET_RESERVED_KEYS).not.toContain('patch_motion');
+  });
+
+  it('a seed array parses, keeps its nulls AT THEIR INDEX, and survives a save', () => {
+    const text = canonicalWith({ patch_world_ys: SEEDS });
+    const p = parseEffectsPreset(text, 'minimal');
+    expect(p.patch_world_ys).toEqual([224, 314, null, null]);
+    expect(serializeEffectsPreset(p)).toBe(text);
+  });
+
+  it('a motion array parses, keeps its nulls AT THEIR INDEX, and survives a save', () => {
+    const text = canonicalWith({ patch_motion: [{ sweep: SWEEP }, null, null, null] });
+    const p = parseEffectsPreset(text, 'minimal');
+    expect(p.patch_motion?.[0]).toEqual({ sweep: SWEEP });
+    expect(p.patch_motion?.[1]).toBeNull();
+    expect(serializeEffectsPreset(p)).toBe(text);
+  });
+
+  /**
+   * THE THREE STATES, ALL AT ONCE, BYTE-FOR-BYTE — the `variants` rule applied
+   * to both keys in one document: index 0 authored, index 1 `null`, indices 2
+   * and 3 UNREACHED (the array ends). A codec that padded a short array, dropped
+   * a null, or compacted one would change which channel is which, and the byte
+   * comparison is what notices.
+   */
+  it('unreached / null / authored all survive one round trip, byte-for-byte', () => {
+    const text = canonicalWith({
+      patch_world_ys: [224, null],
+      patch_motion: [{ sweep: { amp_shift: 3, period_shift: 2 } }, null],
+    });
+    const p = parseEffectsPreset(text, 'minimal');
+    expect(p.patch_world_ys).toHaveLength(2);
+    expect(p.patch_motion).toHaveLength(2);
+    expect(serializeEffectsPreset(p)).toBe(text);
+    // A SHORT ARRAY IS NOT PADDED. If the writer had filled the tail out to
+    // `EFFECTS_PRESET_MAX_PATCH`, channels 2 and 3 would stop KEEPING their
+    // hand-authored value and start being AUTHORED as unused — a different
+    // document that this schema accepts, so only a length can say it.
+    expect(EFFECTS_PRESET_MAX_PATCH).toBeGreaterThan(2);
+    const written = JSON.parse(serializeEffectsPreset(p)) as EffectsPreset;
+    expect(written.patch_world_ys).toHaveLength(2);
+    expect(written.patch_motion).toHaveLength(2);
+  });
+
+  it('an ABSENT key stays absent through a round trip — absent is a state, not a default', () => {
+    const text = MINIMAL;
+    const p = parseEffectsPreset(text, 'minimal');
+    expect('patch_world_ys' in p).toBe(false);
+    expect('patch_motion' in p).toBe(false);
+    expect(serializeEffectsPreset(p)).toBe(text);
+    expect(serializeEffectsPreset(p)).not.toContain('patch_');
+  });
+
+  it('`phase` is optional and an omitted one is NOT written back as 0', () => {
+    const text = canonicalWith({ patch_motion: [{ sweep: { amp_shift: 4, period_shift: 1 } }] });
+    const p = parseEffectsPreset(text, 'minimal');
+    expect(p.patch_motion?.[0]).toEqual({ sweep: { amp_shift: 4, period_shift: 1 } });
+    expect(serializeEffectsPreset(p)).toBe(text);
+    expect(serializeEffectsPreset(p)).not.toContain('phase');
+  });
+
+  // ── The refusals the schema owns, each with the wording that names it ──
+
+  it('refuses the SENTINEL written as an integer — "unused" is spelled null', () => {
+    expect(EFFECTS_PRESET_PATCH_ANCHOR_NONE).toBe(32767);
+    expect(() => parseEffectsPreset(
+      canonicalWith({ patch_world_ys: [EFFECTS_PRESET_PATCH_ANCHOR_NONE] }), 'minimal',
+    )).toThrow(new RegExp(`forbids the constant ${EFFECTS_PRESET_PATCH_ANCHOR_NONE}`));
+    // ...and the value one below it, which is NOT the sentinel, is accepted.
+    expect(() => parseEffectsPreset(
+      canonicalWith({ patch_world_ys: [EFFECTS_PRESET_PATCH_ANCHOR_NONE - 1] }), 'minimal',
+    )).not.toThrow();
+  });
+
+  it('refuses a seed outside the u16 range, at both ends, naming the bound', () => {
+    const { min, max } = EFFECTS_PRESET_WORLD_Y_RANGE;
+    expect(() => parseEffectsPreset(canonicalWith({ patch_world_ys: [max + 1] }), 'minimal'))
+      .toThrow(new RegExp(`${max + 1} is above the maximum ${max}`));
+    expect(() => parseEffectsPreset(canonicalWith({ patch_world_ys: [min - 1] }), 'minimal'))
+      .toThrow(new RegExp(`${min - 1} is below the minimum ${min}`));
+    // Both ends of the legal range are accepted, so the row is not green on a
+    // schema that refuses everything.
+    expect(() => parseEffectsPreset(canonicalWith({ patch_world_ys: [min, max] }), 'minimal'))
+      .not.toThrow();
+  });
+
+  it('refuses a fifth channel on either key, naming the cap', () => {
+    const over = Array.from({ length: EFFECTS_PRESET_MAX_PATCH + 1 }, () => null);
+    for (const key of ['patch_world_ys', 'patch_motion']) {
+      expect(() => parseEffectsPreset(canonicalWith({ [key]: over }), 'minimal'), key)
+        .toThrow(new RegExp(
+          `has ${over.length} items, maximum ${EFFECTS_PRESET_MAX_PATCH}`));
+    }
+    // The cap itself is legal.
+    expect(() => parseEffectsPreset(
+      canonicalWith({ patch_world_ys: over.slice(1) }), 'minimal')).not.toThrow();
+  });
+
+  it('refuses an `approach` arm — none exists and none is reserved', () => {
+    let message = '';
+    try {
+      parseEffectsPreset(
+        canonicalWith({ patch_motion: [{ approach: { target: 1, rate: 1 } }] }), 'minimal');
+    } catch (e) { message = (e as Error).message; }
+    expect(message).toMatch(/patch_motion\/0/);
+    expect(message).toMatch(/unknown property "approach"/);
+    expect(message).toMatch(/missing required property "sweep"/);
+  });
+
+  it('refuses zero arms and two arms, and an unknown sweep field', () => {
+    const bad: Record<string, unknown>[] = [
+      { patch_motion: [{}] },
+      { patch_motion: [{ sweep: { amp_shift: 4, period_shift: 1 }, wobble: {} }] },
+      { patch_motion: [{ sweep: { amp_shift: 4, period_shift: 1, tempo: 3 } }] },
+    ];
+    for (const extra of bad) {
+      expect(() => parseEffectsPreset(canonicalWith(extra), 'minimal'), JSON.stringify(extra))
+        .toThrow(EffectsPresetError);
+    }
+  });
+
+  it('refuses a shift off the end of its ladder, naming the rung bound', () => {
+    const amp = ANCHOR_AMP_RUNGS[0].amp_shift;
+    const period = ANCHOR_PERIOD_RUNGS[ANCHOR_PERIOD_RUNGS.length - 1].period_shift;
+    expect(() => parseEffectsPreset(
+      canonicalWith({ patch_motion: [{ sweep: { amp_shift: amp - 1, period_shift: 1 } }] }),
+      'minimal',
+    )).toThrow(new RegExp(`${amp - 1} is below the minimum ${amp}`));
+    expect(() => parseEffectsPreset(
+      canonicalWith({ patch_motion: [{ sweep: { amp_shift: 4, period_shift: period + 1 } }] }),
+      'minimal',
+    )).toThrow(new RegExp(`${period + 1} is above the maximum ${period}`));
+    expect(() => parseEffectsPreset(
+      canonicalWith({ patch_motion: [{ sweep: { amp_shift: 4, period_shift: 1, phase: 256 } }] }),
+      'minimal',
+    )).toThrow(/256 is above the maximum 255/);
+  });
+
+  /**
+   * ═══ THE UNIT. THE ONE ROW THIS PARCEL SHIPS A SILENT BUG WITHOUT ═══
+   *
+   * `drift.rate` is 1/256 px per frame and Aurora multiplies by 256 on export.
+   * `patch_world_ys` is WHOLE PIXELS and neither side converts. A seed carried
+   * through the drift habit lands 256 times down the level, `anchor - Camera_Y`
+   * is enormous, and the band SILENTLY NEVER APPEARS — and the schema cannot
+   * catch it, because 224 × 256 = 57344 is inside the u16 range and validates
+   * clean. empyrean's §7.3 says exactly that.
+   *
+   * So the row asserts the value AS TYPED reaches the bytes, and it asserts the
+   * scaled value would be a DIFFERENT document — which is what makes it go red
+   * if anything ever routes this key through a ×256. It is not a range check:
+   * 57344 is legal and stays legal (this codec clamps nothing, §E.4), it is just
+   * not what the author wrote.
+   */
+  it('carries a world Y 1:1 — a ×256 anywhere on this path would go red here', () => {
+    expect(EFFECTS_PRESET_PATCH_SEED_UNITS_PER_PIXEL).toBe(1);
+    const px = 224;
+    const text = canonicalWith({ patch_world_ys: [px] });
+    const p = parseEffectsPreset(text, 'minimal');
+    expect(p.patch_world_ys).toEqual([px]);
+    const out = serializeEffectsPreset(p);
+    expect(out).toBe(text);
+    expect(JSON.parse(out).patch_world_ys).toEqual([px]);
+    // The drift habit's number, spelled out: it is a legal document and a
+    // DIFFERENT one, so a writer that applied it could not produce these bytes.
+    const scaled = px * 256;
+    expect(scaled).toBeLessThanOrEqual(EFFECTS_PRESET_WORLD_Y_RANGE.max);
+    expect(() => parseEffectsPreset(canonicalWith({ patch_world_ys: [scaled] }), 'minimal'))
+      .not.toThrow();
+    expect(out).not.toContain(String(scaled));
+    expect(out).toContain(String(px));
+  });
+
+  /**
+   * THE LADDERS, checked against aeon §2.4's own table — the numbers a UI slider
+   * must snap to. They are DERIVED from the schema (its `minimum`/`maximum` and
+   * the bases it states in prose), so this row is the check that the derivation
+   * produces aeon's table and not a plausible-looking neighbour.
+   */
+  it('derives aeon §2.4\'s ladders: 7 amplitude rungs, 9 period rungs', () => {
+    expect(ANCHOR_AMP_RUNGS.map((r) => [r.amp_shift, r.peak_px, r.peak_to_peak_px])).toEqual([
+      [2, 64, 128], [3, 32, 64], [4, 16, 32], [5, 8, 16], [6, 4, 8], [7, 2, 4], [8, 1, 2],
+    ]);
+    expect(ANCHOR_PERIOD_RUNGS.map((r) => [r.period_shift, r.ticks])).toEqual([
+      [0, 256], [1, 512], [2, 1024], [3, 2048], [4, 4096],
+      [5, 8192], [6, 16384], [7, 32768], [8, 65536],
+    ]);
+    expect(ANCHOR_PERIOD_RUNGS.map((r) => +r.seconds.toFixed(2))).toEqual([
+      4.27, 8.53, 17.07, 34.13, 68.27, 136.53, 273.07, 546.13, 1092.27,
+    ]);
+    expect(ANCHOR_PHASE_RANGE).toEqual({ min: 0, max: 255 });
+    // The shipped hand-authored precedent, OJZ_Preset_Sec0: amp_shift 4 /
+    // period_shift 1 = 32 px peak-to-peak over 8.53 s.
+    expect(anchorAmpRungForPeakPx(16)?.peak_to_peak_px).toBe(32);
+    expect(+anchorPeriodRungForTicks(512)!.seconds.toFixed(2)).toBe(8.53);
+  });
+
+  it('an off-ladder request is REFUSED by the exact converters and SNAPPED by the snappers', () => {
+    // Exact: null, never the neighbour. A converter that rounded would be the
+    // silent doubling §7.3 names.
+    expect(anchorAmpRungForPeakPx(20)).toBeNull();
+    expect(anchorAmpRungForPeakPx(0)).toBeNull();
+    expect(anchorPeriodRungForTicks(700)).toBeNull();
+    // Snap: a rung, chosen in the LOG domain, so 20 px goes to 16 (a ratio of
+    // 1.25) rather than to 32 (a ratio of 1.6) — a linear nearest would say 16
+    // too, but 24 px is the case that separates them.
+    expect(anchorSnapPeakPx(20).peak_px).toBe(16);
+    expect(anchorSnapPeakPx(23).peak_px).toBe(32);   // log-nearest; a LINEAR nearest says 16
+    expect(anchorSnapPeakPx(1000).peak_px).toBe(ANCHOR_AMP_RUNGS[0].peak_px);
+    expect(anchorSnapPeakPx(0).peak_px)
+      .toBe(ANCHOR_AMP_RUNGS[ANCHOR_AMP_RUNGS.length - 1].peak_px);
+    expect(anchorSnapCycleSeconds(9).period_shift).toBe(1);
+    expect(anchorSnapCycleSeconds(0.1).period_shift).toBe(0);
+  });
+
+  /**
+   * EVERY WRITER PATH, not just the codec's own. The lesson this repo paid for:
+   * a field dropped by a COPIER outside the codec frame survives a 3,909-test
+   * suite, because the codec's own round-trip never runs through the copier.
+   * `structuredClone` is the only cloner an `EffectsPreset` has (the command
+   * path's `clonePreset`), asserted here so a hand-enumerating copy added later
+   * has something to break. The one literal CONSTRUCTOR, `newPreset`, lives in
+   * the renderer provider and is checked from there
+   * (src/renderer/providers/__tests__/effects-preset-channels.test.ts).
+   */
+  it('survives the whole-object clone the command path uses', () => {
+    const p = parseEffectsPreset(canonicalWith({
+      patch_world_ys: [224, null], patch_motion: [{ sweep: SWEEP }],
+    }), 'minimal');
+    const cloned = structuredClone(p);
+    expect(cloned.patch_world_ys).toEqual([224, null]);
+    expect(cloned.patch_motion).toEqual([{ sweep: SWEEP }]);
+    expect(serializeEffectsPreset(cloned)).toBe(serializeEffectsPreset(p));
   });
 });
