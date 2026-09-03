@@ -311,6 +311,12 @@ describe('an off-granule target is refused, offered neighbours, and NOT snapped'
     const n = baseSwapTargetNeighbours(off);
     expect(why).toContain(fmtVramBaseBoth(n.below!));
     expect(why).toContain(fmtVramBaseBoth(n.above!));
+    // ⚠ AND THEY ARE TWO DIFFERENT ADDRESSES. A pair that collapsed to one value
+    // would still satisfy both `toContain`s above — the sentence would read "the
+    // nearest legal bases are $C000 (49152) and $C000 (49152)", which offers the
+    // author one way out while looking like two.
+    expect(n.below).not.toBe(n.above);
+    expect(why).toContain(`are ${fmtVramBaseBoth(n.below!)} and ${fmtVramBaseBoth(n.above!)}`);
     expect(why).toMatch(/NOT snapped/);
     expect(why).toContain(`target is still ${fmtVramBaseBoth(bs.target)}`);
   });
