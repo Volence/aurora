@@ -42,10 +42,21 @@ import { serializeCollAttr } from '../../formats/s4-collattr';
 import { jsonFileText } from '../../formats/canonical-json';
 import { serializeTiles } from '../../export/tile-dedup';
 import type { S4Project } from '../../model/s4-types';
+import type { SaveCompare } from './save-skip';
+
+/** One planned write. `compare` tells the save glue how to decide whether the
+ *  file on disk already SAYS this (save-skip.ts); omitted means byte identity,
+ *  which is the conservative default — a push site that forgets it writes more,
+ *  never less. */
+export interface AeonSaveFile {
+  path: string;
+  bytes: Uint8Array;
+  compare?: SaveCompare;
+}
 
 export interface AeonSavePlan {
   /** Every write, in order, keyed by project-relative path. */
-  files: { path: string; bytes: Uint8Array }[];
+  files: AeonSaveFile[];
   /** True when project.json was retargeted (it is then also present in files). */
   configChanged: boolean;
 }
@@ -58,7 +69,7 @@ export async function buildAeonSavePlan(
   actId: string,
   opts: { legacyAtlasMerged: boolean },
 ): Promise<AeonSavePlan> {
-  const files: { path: string; bytes: Uint8Array }[] = [];
+  const files: AeonSaveFile[] = [];
 
   const zone = project.zones.find(z => z.id === zoneId);
   const act = zone?.acts.find(a => a.id === actId);
@@ -113,14 +124,14 @@ export async function buildAeonSavePlan(
       // see canonical-json.ts jsonFileText. Same for every JSON write below.
       const objectsJson = jsonFileText(JSON.stringify(section.objects, null, 2));
       const objectsBytes = new TextEncoder().encode(objectsJson);
-      files.push({ path: `${prefix}.objects.json`, bytes: objectsBytes });
+      files.push({ path: `${prefix}.objects.json`, bytes: objectsBytes, compare: 'json' });
     }
 
     // Write rings (.rings.json)
     if (understood('rings.json')) {
       const ringsJson = jsonFileText(JSON.stringify(section.rings, null, 2));
       const ringsBytes = new TextEncoder().encode(ringsJson);
-      files.push({ path: `${prefix}.rings.json`, bytes: ringsBytes });
+      files.push({ path: `${prefix}.rings.json`, bytes: ringsBytes, compare: 'json' });
     }
 
     // Write meta sidecar (.meta.json) — scalar refs (bgLayoutRef,
@@ -150,7 +161,7 @@ export async function buildAeonSavePlan(
       const metaPath = `${prefix}.meta.json`;
       if (metaJson !== null) {
         const metaBytes = new TextEncoder().encode(metaJson);
-        files.push({ path: metaPath, bytes: metaBytes });
+        files.push({ path: metaPath, bytes: metaBytes, compare: 'section-meta' });
       } else if (await fa.exists(metaPath)) {
         // Every ref the sidecar can hold must be named here, not just the ones
         // this branch happened to know about when it was written: a ref missing
@@ -158,7 +169,7 @@ export async function buildAeonSavePlan(
         const clearedBytes = new TextEncoder().encode(
           jsonFileText(JSON.stringify(
             { bgLayoutRef: null, paletteRef: null, rasterRef: null, sceneRef: null }, null, 2)));
-        files.push({ path: metaPath, bytes: clearedBytes });
+        files.push({ path: metaPath, bytes: clearedBytes, compare: 'section-meta' });
       }
     }
 
@@ -177,9 +188,9 @@ export async function buildAeonSavePlan(
       const linksText = serializeSectionChunkLinks(section.chunkLinks);
       const linksPath = `${prefix}.chunklinks.json`;
       if (linksText !== null) {
-        files.push({ path: linksPath, bytes: new TextEncoder().encode(jsonFileText(linksText)) });
+        files.push({ path: linksPath, bytes: new TextEncoder().encode(jsonFileText(linksText)), compare: 'json' });
       } else if (await fa.exists(linksPath)) {
-        files.push({ path: linksPath, bytes: new TextEncoder().encode(jsonFileText(clearedChunkLinksText())) });
+        files.push({ path: linksPath, bytes: new TextEncoder().encode(jsonFileText(clearedChunkLinksText())), compare: 'json' });
       }
     }
   }
@@ -197,7 +208,7 @@ export async function buildAeonSavePlan(
     }));
     const chunksJson = jsonFileText(JSON.stringify(serializedChunks));
     const chunksBytes = new TextEncoder().encode(chunksJson);
-    files.push({ path: config.chunkLibraryPath, bytes: chunksBytes });
+    files.push({ path: config.chunkLibraryPath, bytes: chunksBytes, compare: 'json' });
   }
 
   // Persist each zone's tileset to an editor-owned path.
@@ -285,7 +296,7 @@ export async function buildAeonSavePlan(
   const bgIndex = mergeBgLibraryIndex(project.bgLibrary, project.bgLibraryUnresolved);
   if (bgIndex.length > 0) {
     const indexBytes = new TextEncoder().encode(serializeBgLibraryIndex(bgIndex));
-    files.push({ path: bgLibIndexPath(dataRoot, zone.id), bytes: indexBytes });
+    files.push({ path: bgLibIndexPath(dataRoot, zone.id), bytes: indexBytes, compare: 'json' });
     for (const entry of project.bgLibrary) {
       const layoutBytes = serializeNametable(entry.layout);
       files.push({ path: bgLibLayoutPath(dataRoot, zone.id, entry.id), bytes: layoutBytes });
@@ -339,13 +350,19 @@ export async function buildAeonSavePlan(
         'or rename the scene.',
       );
     }
-    files.push({ path, bytes: new TextEncoder().encode(serializeEffectsScene(scene)) });
+    files.push({ path, bytes: new TextEncoder().encode(serializeEffectsScene(scene)), compare: 'json' });
   }
 
   // The RASTER PRESET documents, on the identical rule and for the identical
   // reason: an unreadable file at the path a preset would be written to is a
   // THROW, not a skip, because skipping is the worst of both — the author's
   // preset silently never saved AND their broken file still on disk.
+  //
+  // `compare: 'json'` and NOT the sidecar's 'section-meta': `cycles` and
+  // `variants` have THREE states each in this document and absent lowers
+  // differently from null (formats/effects/preset.ts). Plain JSON-value
+  // equality is what keeps those distinct — a missing key and a null key are
+  // different values, so a save that changes one into the other still writes.
   const unreadablePresetPaths = new Set(project.effectsPresets.unreadable.map(u => u.path));
   for (const preset of project.effectsPresets.presets) {
     const path = effectsPresetPath(dataRoot, preset.id);
@@ -356,7 +373,7 @@ export async function buildAeonSavePlan(
         'or rename the preset.',
       );
     }
-    files.push({ path, bytes: new TextEncoder().encode(serializeEffectsPreset(preset)) });
+    files.push({ path, bytes: new TextEncoder().encode(serializeEffectsPreset(preset)), compare: 'json' });
   }
 
   // The BG override document. `saveFileFor` owns all three "write nothing"
@@ -373,7 +390,7 @@ export async function buildAeonSavePlan(
   // the rule landed writes the document once with exactly that byte added,
   // and every save after it is the no-op again. Aeon changes nothing.
   const bgOverrideFile = saveFileFor(project.bgOverride);
-  if (bgOverrideFile) files.push(bgOverrideFile);
+  if (bgOverrideFile) files.push({ ...bgOverrideFile, compare: 'json' });
 
   if (configChanged) {
     // A pointer rewrite should read as a pointer rewrite in review, nothing
@@ -385,7 +402,7 @@ export async function buildAeonSavePlan(
     // ends in exactly one newline, this one included — so a source without
     // the byte gains it on its first pointer rewrite, once.
     const projectJsonBytes = new TextEncoder().encode(jsonFileText(JSON.stringify(config.raw, null, 2)));
-    files.push({ path: 'project.json', bytes: projectJsonBytes });
+    files.push({ path: 'project.json', bytes: projectJsonBytes, compare: 'json' });
   }
 
   // RE-ENTRY HAZARD closure: the load-time atlas migration re-runs any

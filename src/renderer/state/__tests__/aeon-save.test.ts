@@ -179,6 +179,93 @@ describe('saveAeonProject', () => {
     expect(written).toContain('data/ojz/act1/section_0.tiles.bin');
   });
 
+  // ═════════════════════════════════════════════════════════════════════════
+  // EW-SAVE-NOISE — the skip compares MEANING, not bytes, END TO END.
+  //
+  // The unit rows live in core/project/aeon/__tests__/save-skip.test.ts. These
+  // drive the real `saveAeonProject` so the plan's `compare` tags are exercised
+  // too: a tag on the wrong push site is invisible to a unit test of the
+  // predicate, and it is exactly the mistake that would silently stop writing a
+  // file. Each pair is a SKIP row and the WRITE row that would catch it if the
+  // skip went too far.
+  // ═════════════════════════════════════════════════════════════════════════
+
+  const diskText = (rel: string) => new TextDecoder().decode(files.get(rel)!);
+  const putText = (rel: string, text: string) => files.set(rel, new TextEncoder().encode(text));
+  const OBJECTS = 'data/ojz/act1/section_0.objects.json';
+  const META = 'data/ojz/act1/section_0.meta.json';
+
+  it('does not rewrite a JSON file whose disk bytes differ only by the trailing newline', async () => {
+    // aeon's committed documents are `json.dumps` output and carry no trailing
+    // newline; Aurora's §8 canonical form adds one. Before this, EVERY save
+    // rewrote all 22 of them, and rewrote them again after every revert.
+    await saveAeonProject();
+    const withNewline = diskText(OBJECTS);
+    expect(withNewline.endsWith('\n')).toBe(true);
+    putText(OBJECTS, withNewline.replace(/\n+$/, ''));   // aeon's spelling
+    written.length = 0;
+
+    expect((await saveAeonProject()).kind).toBe('saved');
+    expect(written).not.toContain(OBJECTS);
+    // ...and the author's bytes are still theirs: the skip did not write.
+    expect(diskText(OBJECTS).endsWith('\n')).toBe(false);
+  });
+
+  it('DOES write objects.json when an object was actually added', async () => {
+    await saveAeonProject();
+    written.length = 0;
+    const section = useProjectStore.getState().project!.zones[0].acts[0].sections[0]!;
+    section.objects.push({ id: 1, x: 32, y: 48, subtype: 0 } as never);
+    dirtyAct('ojz', 'act1');
+
+    expect((await saveAeonProject()).kind).toBe('saved');
+    expect(written).toContain(OBJECTS);
+    expect(JSON.parse(diskText(OBJECTS))).toHaveLength(1);
+  });
+
+  /**
+   * The sidecar half. `"rasterRef": null` is the key the cold reader never
+   * authored; absent and explicit-null are the same state (empyrean §3.1,
+   * aeon's `meta.get` in tools/effects_gen.py, Aurora's parseSectionMeta), so
+   * the file must not be touched to add it.
+   */
+  it('does not rewrite a sidecar to add an absent rasterRef', async () => {
+    const section = useProjectStore.getState().project!.zones[0].acts[0].sections[0]!;
+    section.sceneRef = 'ojz_act1_depth';
+    dirtyAct('ojz', 'act1');
+    await saveAeonProject();
+    expect(JSON.parse(diskText(META)).rasterRef).toBeNull();
+
+    // Rewind the file to aeon's older spelling: the key simply absent.
+    const older = JSON.parse(diskText(META)) as Record<string, unknown>;
+    delete older.rasterRef;
+    putText(META, JSON.stringify(older, null, 2));       // no trailing newline either
+    written.length = 0;
+
+    expect((await saveAeonProject()).kind).toBe('saved');
+    expect(written).not.toContain(META);
+    expect(Object.keys(JSON.parse(diskText(META)))).not.toContain('rasterRef');
+  });
+
+  it('DOES write a sidecar when a ref is bound, and again when it is CLEARED', async () => {
+    const section = useProjectStore.getState().project!.zones[0].acts[0].sections[0]!;
+    section.sceneRef = 'ojz_act1_depth';
+    dirtyAct('ojz', 'act1');
+    await saveAeonProject();
+    expect(written).toContain(META);
+    expect(JSON.parse(diskText(META)).sceneRef).toBe('ojz_act1_depth');
+
+    // The clear. It goes down the OTHER branch in the plan (the all-null
+    // cleared-overwrite), and a skip that ate it would resurrect the binding on
+    // the next load — the exact failure the branch exists to prevent.
+    section.sceneRef = null;
+    dirtyAct('ojz', 'act1');
+    written.length = 0;
+    expect((await saveAeonProject()).kind).toBe('saved');
+    expect(written).toContain(META);
+    expect(JSON.parse(diskText(META)).sceneRef).toBeNull();
+  });
+
   /**
    * R8's toast is GONE, with the step it reported on: the export half of the
    * save was retired 2026-08-19 (ROADMAP §4.2), so "Project saved" can no

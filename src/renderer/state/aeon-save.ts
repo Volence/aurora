@@ -13,6 +13,7 @@
 // fix rather than a note to remember later.
 
 import { buildAeonSavePlan } from '../../core/project/aeon/save';
+import { planFileNeedsWrite } from '../../core/project/aeon/save-skip';
 import { createIpcFileAccess } from './classic-file-access';
 import { useProjectStore } from './projectStore';
 import { useEditorStore } from './editorStore';
@@ -69,21 +70,23 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
       // Degrades to writing everything if the batch read is unavailable or
       // throws: skipping an unchanged write is an optimisation, and a save must
       // never fail because an optimisation could not run.
+      //
+      // ⚠ THE COMPARISON IS BY MEANING, NOT BY BYTES, and the difference is the
+      // whole of EW-SAVE-NOISE: a byte test let 23 files through on one Ctrl+S
+      // whose parsed value had not moved — 22 gaining only the §8 trailing
+      // newline aeon's Python writers omit, 2 gaining only `"rasterRef": null`.
+      // `planFileNeedsWrite` owns every rule and every refusal to relax one;
+      // read the header of save-skip.ts before widening anything there.
       let existing: Array<{ bytes: Uint8Array | null }> = [];
       try {
         existing = await window.api.readManyFiles?.(
           config.basePath, plan.files.map((f) => f.path),
         ) ?? [];
       } catch { existing = []; }
-      const same = (a: Uint8Array, b: Uint8Array | null): boolean => {
-        if (!b || a.length !== b.length) return false;
-        for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-        return true;
-      };
       for (let i = 0; i < plan.files.length; i++) {
         const f = plan.files[i];
         const old = existing[i]?.bytes ?? null;
-        if (same(f.bytes, old)) continue;
+        if (!planFileNeedsWrite(f.compare, old, f.bytes)) continue;
         await window.api.writeBinaryFile(config.basePath, f.path,
           f.bytes.buffer.slice(f.bytes.byteOffset, f.bytes.byteOffset + f.bytes.byteLength) as ArrayBuffer);
       }
