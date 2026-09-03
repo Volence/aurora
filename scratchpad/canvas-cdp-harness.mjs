@@ -831,6 +831,16 @@ async function session(label, body) {
     // ⚠ IT IS NOT "ALWAYS PASS": deleting the `window.close()` line below makes
     // it answer false for three of four sessions. That is the constructed state,
     // and the check catches it.
+    //
+    // ⚠ AND THE FLAKE ITSELF IS NOT CLAIMED FIXED — O50's 4-in-9 DID NOT
+    // REPRODUCE. Nine runs of the untouched master instrument on 2026-09-03
+    // tripped zero times, which at 44% happens about 0.9% of the time, so the
+    // rate today is simply not the rate O50 measured and I do not know why. What
+    // this parcel establishes is that cause (b) does not occur under the shipping
+    // teardown (36 sessions of the old teardown, 36 more of the new) and that
+    // when it DOES occur it is now named HERE rather than one session later as a
+    // product failure. A future red run is still to be investigated, not
+    // dismissed on the strength of this comment.
     let flushCheck = null;
     if (c && !bodyThrew) {
       flushCheck = await armFlushCheck(c, child, label);
