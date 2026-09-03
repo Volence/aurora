@@ -792,12 +792,83 @@ async function main() {
            .filter(t => t.startsWith(${JSON.stringify(`${prefix} `)}))
            .map(t => t.slice(${prefix.length + 1}).split(/[ (]/)[0])`);
       const got = {};
+      const seeds = {};
       for (const key of params) {
+        seeds[key] = await c.evalExpr(`(() => { const e = ${NUM_BY_TITLE(`/^${prefix} ${key}\\b/`)};
+          return e ? Number(e.value) : null; })()`);
         got[key] = await driveInt(`R14 ${prefix} ${key}`, `/^${prefix} ${key}\\b/`, key);
       }
-      return { form: opts[k].value, params: got, formOptions: opts.map((o) => o.value) };
+      // ⚠ A TABLE PARAMETER IS NOT ALWAYS A SPINNER ANY MORE, AND THE SCAN ABOVE
+      // CANNOT SEE THE OTHER KIND (O50 triage, 2026-09-03). ROADMAP row 63 moved
+      // `period` from a NumberField to a <Select> of the legal divisors —
+      // "a picker where the engine admits a SET, a spinner where it admits a
+      // RANGE" (EffectsScenePanel.tsx:289-315). `input[type=number]` stopped
+      // matching it, so `period` was silently NEITHER DRIVEN NOR COUNTED: the
+      // document kept the seed, `params.period` was `undefined`, and rows 8b and
+      // 8f failed against a control this file could no longer see. Every
+      // non-number table control the sub-form renders is driven here, by the
+      // same one-value-per-key discipline, and the OLD value is kept as the seed
+      // so the escape test compares against what the toggle really left.
+      const picks = await c.json(
+        `[...document.querySelectorAll('select')]
+           .map(e => e.title || '')
+           .filter(t => t.startsWith(${JSON.stringify(`${prefix} `)}))
+           .map(t => t.slice(${prefix.length + 1}).split(/[ (]/)[0])
+           // A KEY, not a dash. The attachment's own on/off toggle is titled
+           // \`${prefix} — …\`, so a bare split would collect \`—\` as a
+           // parameter, issue a gesture for it and inflate row 8a's target by
+           // one per attachment. Schema keys are snake_case identifiers.
+           .filter(k => k !== 'table' && /^[a-z_][a-z0-9_]*$/.test(k))`);
+      const pickTitles = {};
+      for (const key of picks) {
+        const re = `/^${prefix} ${key}\\b/`;
+        const cur = await c.evalExpr(`(() => { const s = ${SEL_BY_TITLE(re)};
+          return s ? s.value : null; })()`);
+        pickTitles[key] = await c.evalExpr(`(() => { const s = ${SEL_BY_TITLE(re)};
+          return s ? (s.title || '') : null; })()`);
+        const os = await optionsOf(re);
+        // The LAST enabled option that is not the value already there. "Not the
+        // one already there" is what makes the gesture observable at all; a
+        // disabled option is one the engine refuses (8c's rule, same reason).
+        const usable = (os ?? []).filter((o) => !o.disabled && o.value !== String(cur));
+        if (usable.length === 0) {
+          seeds[key] = cur === null ? null : Number(cur);
+          got[key] = seeds[key];
+          console.log(`        R14 ${prefix} ${key}: the picker offers no enabled value other `
+            + `than the one already set (${cur}) — NOT DRIVEN, and said so.`);
+          continue;
+        }
+        seeds[key] = cur === null ? null : Number(cur);
+        const chosen = usable[usable.length - 1].value;
+        await drive(c, `R14 ${prefix} ${key}`, SET_INPUT(SEL_BY_TITLE(re), chosen));
+        await sleep(160);
+        got[key] = Number(chosen);
+      }
+      return { form: opts[k].value, params: got, seeds, pickTitles, pickedKeys: picks,
+        formOptions: opts.map((o) => o.value) };
     };
 
+    // ⚠ THE SEED IS NOT A CONSTANT, AND TYPING IT AS ONE COST TWO ROWS.
+    // `seedTableRefParam` (providers/effects-aeon.ts:503-506) seeds `period`
+    // with the parameter's own MAX — "one whole cycle over the table", where the
+    // table length is derived from the schema's prose
+    // (`EFFECTS_DEFORM_TABLE_BYTES`, core/formats/effects/scene-ui.ts:261) —
+    // and every other parameter with its MIN. Row 8b typed `256` for the seed
+    // period and `1` for the seed amplitude; both are now read off the control
+    // that advertises them, in the same session that drives them.
+    //
+    // It is captured HERE, while the sub-form is on screen. Row 8f used to
+    // re-read it AFTER the save and got `{found:false}` -> `Number(undefined)`
+    // -> `NaN`, and `NaN > 0` is false, so 8f failed on a control that had
+    // simply gone off screen rather than on anything about the file.
+    let PERIOD_TABLE_BYTES = null;
+    const SEED = {
+      period: null, amplitude: null,
+      // A LITERAL, and it is one in the source too: `sceneDeformFromToggle`
+      // (effects-aeon.ts:812) writes `speed: 0` outright — it is not a table
+      // parameter and no control advertises it.
+      speed: 0,
+    };
     const attach = {};
     for (const [k, key] of ['deform_fg', 'deform_bg', 'v_deform'].entries()) {
       const toggle = await optionsOf(`/^${key}\\b/`);
@@ -805,6 +876,31 @@ async function main() {
       await drive(c, `R12 ${key} on`, SET_INPUT(SEL_BY_TITLE(`/^${key}\\b/`), LAST(toggle)));
       await sleep(500);
       attach[key] = { toggleValue: LAST(toggle), ...(await driveTable(key, k)) };
+      if (key === 'deform_fg') {
+        // Both read from the SAME session that drove them: `period` is a picker
+        // now, so its seed is the value the toggle left in it, captured before
+        // the pick; `amplitude` is still a spinner, and its seed is the min the
+        // control advertises (`seedTableRefParam`, effects-aeon.ts:503-506).
+        const ab = await boundsOf(`/^${key} amplitude\\b/`);
+        SEED.period = attach[key].seeds.period ?? null;
+        SEED.amplitude = ab.found && ab.min !== '' ? Number(ab.min) : null;
+        // "the table length the control itself advertises" — off the picker's
+        // own title (`… must divide the N-byte table …`,
+        // EffectsScenePanel.tsx:303-304), which is where the number lives now
+        // that there is no spinner `max` to read it from.
+        const pt = attach[key].pickTitles?.period ?? '';
+        const m = /divide the (\d+)-byte table/.exec(pt);
+        PERIOD_TABLE_BYTES = m ? Number(m[1]) : null;
+        console.log(`        SEED read off the live controls: period=${SEED.period} `
+          + `(the value the toggle left in the period PICKER — row 63 made it a `
+          + `<select>, not a spinner), `
+          + `amplitude=${SEED.amplitude} (its min), speed=${SEED.speed} (a literal in `
+          + `sceneDeformFromToggle). Layers N=${N}. `
+          + `Driven: ${JSON.stringify(attach[key].params)}; seeds: `
+          + `${JSON.stringify(attach[key].seeds)}; picker keys: `
+          + `${JSON.stringify(attach[key].pickedKeys)}; table length off the picker's own `
+          + `title: ${PERIOD_TABLE_BYTES}.`);
+      }
     }
     // `amp_shift` is the one v_deform field the sub-form does not title with the
     // attachment's prefix (its title starts with the key itself), so it is driven
@@ -855,10 +951,16 @@ async function main() {
     // harness has now had. So this row asserts the R13/R14 VALUES, and asserts
     // separately that each one is NOT the seed the toggle would have left.
     const fg = S.deform_fg?.shared, bg = S.deform_bg?.shared, vd = S.v_deform?.columns;
+    // SEED.period / SEED.amplitude are READ OFF THE CONTROLS above, not typed.
+    // `SEED.period === null` means the control was not on screen when it should
+    // have been — LOUD, never a green pass through an unmeasurable seed.
     const seedEscape = fg && bg && vd
-      && fg.table.amplitude !== 1 && fg.table.period !== 256 && fg.speed !== 0
-      && bg.table.amplitude !== 1 && bg.table.period !== 256 && bg.speed !== 0
-      && vd.speed !== 0 && vd.amp_shift !== 0;
+      && SEED.period !== null && SEED.amplitude !== null
+      && fg.table.amplitude !== SEED.amplitude && fg.table.period !== SEED.period
+      && fg.speed !== SEED.speed
+      && bg.table.amplitude !== SEED.amplitude && bg.table.period !== SEED.period
+      && bg.speed !== SEED.speed
+      && vd.speed !== SEED.speed && vd.amp_shift !== 0;
     check('8b', 'the three scene deform attachments reached the DOCUMENT at the '
       + 'rule\'s values, and not one of them is the seed its toggle would have left',
       fg?.table?.generator === attach.deform_fg.form
@@ -874,7 +976,7 @@ async function main() {
       && vd.amp_shift === attach.v_deform.params.amp_shift
       && seedEscape,
       JSON.stringify({ deform_fg: S.deform_fg, deform_bg: S.deform_bg, v_deform: S.v_deform,
-        forms: attach.deform_fg.formOptions, seedEscape }));
+        forms: attach.deform_fg.formOptions, seed: SEED, seedEscape }));
     // ROW 8c — R15's rule checked against the option's OWN disabled flag. The
     // engine refuses `sprite_mask` outright and the panel renders it DISABLED, so
     // a "last option" rule that landed on it would author a scene the build
@@ -997,7 +1099,13 @@ async function main() {
     // period does not divide the table length, and the table length is what the
     // period spinner's `max` is. R14's max/N exists precisely to satisfy this, so
     // this row is what says the exception earned its place.
-    const periodMax = (await boundsOf('/^deform_fg period\\b/')).max;
+    // ⚠ CAPTURED WHILE THE SUB-FORM WAS ON SCREEN (see SEED above), not re-read
+    // here. This line used to re-read the control after the save, when it is no
+    // longer mounted, so `.max` was `undefined`, `Number(undefined)` was `NaN`,
+    // and `NaN > 0` failed the row over a control that had gone off screen. The
+    // live re-read is still PRINTED beside it, so the two can be compared.
+    const periodMax = PERIOD_TABLE_BYTES;
+    const periodMaxNow = (await boundsOf('/^deform_fg period\\b/'));
     const fileFg = parsed.deform_fg?.shared;
     check('8f', 'every deform key reached the emitted FILE, and its generator '
       + 'periods divide the table length the control itself advertises',
@@ -1007,7 +1115,7 @@ async function main() {
       && Number(periodMax) > 0
       && Number(periodMax) % fileFg.table.period === 0
       && Number(periodMax) % parsed.deform_bg.shared.table.period === 0,
-      JSON.stringify({ keys: Object.keys(parsed), periodMax,
+      JSON.stringify({ keys: Object.keys(parsed), periodMax, periodMaxNow,
         fg: fileFg?.table, bg: parsed.deform_bg?.shared?.table,
         lastLayer: parsed.layers[N - 1].deform }));
     check('7e', 'the emitted v_factor is an integer in the control\'s own range',
