@@ -22,12 +22,59 @@
  * `effects_gen.py` is a claim about a DIFFERENT artifact than the one this file
  * measures, and the two must not be traded for one another in a report.
  *
- * ⚠ MERGED, NOT CERTIFIED. NOTHING IN THIS REPOSITORY HAS SEEN A ROM OBEY
- * `ramp`, and no row here claims one has. What retired is a sentence about what
- * aeon's page ACCEPTS. The ENGINE half of item 6 shipped long ago
- * (`RasterRampProgram` since 2026-08-14, gated and budgeted at aeon `cf3dfb1a`),
- * and the GENERATOR has now been taught the key — but "accepted at the door" and
- * "obeyed by a ROM" are different facts and only the first is measured here.
+ * ⚠ MERGED, AND NOW WITNESSED ON A PEER'S BRANCH — STILL NOT CERTIFIED, AND
+ * STILL NOT BY AURORA (updated 2026-09-03). No row in THIS repository has
+ * measured a ROM obeying `ramp`, and none claims to; what retired above is a
+ * sentence about what aeon's page ACCEPTS. The ENGINE half of item 6 shipped
+ * long ago (`RasterRampProgram` since 2026-08-14, gated and budgeted at aeon
+ * `cf3dfb1a`), and the GENERATOR has now been taught the key. Since the wording
+ * above was written, aeon has ALSO driven a running machine on this editor's own
+ * `ramp` document — so "nothing has seen a ROM obey `ramp`" is no longer the
+ * whole truth, and leaving it would have been technically true and misleading.
+ * What is actually true today, measured here through git objects rather than
+ * relayed:
+ *
+ *   ⚠ IT IS ON A BRANCH, NOT ON THEIR MASTER. aeon
+ *   `origin/parcel/aurora-ramp-witness` `a1a76741`; `git merge-base
+ *   --is-ancestor` says it is NOT an ancestor of aeon `origin/master`
+ *   `ddaab282`. On aeon's MASTER none of what follows has happened yet, and a
+ *   merge announcement is not a merge — check the ancestry, not the report.
+ *
+ *   - THE SIGN RULE IS CLOSED THERE, and it was closed BY this editor's
+ *     document. `raster_ramp_program` never two's-complement encoded a NEGATIVE
+ *     `start`/`step` into its `u32` image fields, so no ROM could hold a
+ *     downward ramp at all — sigil refused the EMISSION (`[emit.out-of-range]
+ *     -98304 does not fit u32`). Fixed at aeon `7a5d237d` with a two-directional
+ *     zero-byte pin. `ramp-sign-lag.ts` measures aeon's MASTER and is therefore
+ *     still correctly ARMED; it must not be retired on this branch's existence.
+ *   - A MACHINE OBEYED THE DOCUMENT. `tools/ramp_authored_witness.py`, subject
+ *     `aurora_local_rampctl_probe` (copied byte-for-byte from Aurora
+ *     `b7e95791`): the 34-byte record decoded out of `s4.debug.bin` matches the
+ *     document in every field, `rrp_step` = `$FFFE8000` = -98304 = the authored
+ *     -1.5 px/line; and the picture differs from that same record with `rrp_step`
+ *     ZEROED, which is a four-byte control. So the chain from a keystroke in this
+ *     panel to a VSRAM write has been walked once, end to end.
+ *   - WHAT THAT DOES *NOT* SAY: the on-screen SLOPE was never matched
+ *     line-by-line against -1.5. The span arm deliberately uses step-0 twins, so
+ *     it measures which lines the run REACHES, not the rate it applies to them.
+ *   - IT IS EMULATION, NOT SILICON. oracle is Exodus-derived.
+ *
+ * ⚠ AND THE SPAN IS CONTESTED BY EXACTLY ONE LINE — do not read the above as a
+ * clean success; a comment that reported only the good half would be this same
+ * defect pointing the other way. Aurora derives first-displayed-line `top + 1`
+ * (`EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG` in `preset.ts`, parsed from the
+ * contract schema's own sentence). aeon's arm 4 MEASURED `top + 2`, on two
+ * documents with different tops: `top 3` first rendered on line 5, and a control
+ * at `top 128` first rendered on line 130 — two tops, the same one-line
+ * disagreement. AURORA HAS NOT CORRECTED ITS CONSTANT AND MUST NOT: it is parsed
+ * from the contract on purpose, and aeon has likewise marked its own three
+ * statements of the rule CONTESTED rather than silently fixing them, pending a
+ * third `top` and a different (CRAM) target. Their reasoning is at aeon
+ * `docs/DEFERRED_WORK.md` § "RAMP BOUNDARY" and
+ * `docs/benchmarks/effects-p3/RAMP-EVIDENCE.md`, both on that same branch.
+ *
+ * "Accepted at the door", "obeyed by a machine on a peer's unmerged branch" and
+ * "certified" are THREE different facts, and only the first two exist today.
  * Certification is aeon's pytest lane and sigil's attest chain, not this
  * landing, and no row in this repo stands in for either.
  *
@@ -36,11 +83,10 @@
  * writes under `ramp` — a unit, a bound, a fixed-point spelling or a capability
  * Aurora does not know about — then "aeon reads this key" is true of the
  * vocabulary and false of the documents this editor produces, and the disclosure
- * comes back with wording that says so. RELAYED, NOT MEASURED HERE: aeon's
- * generator half reportedly routes `start`/`step` only through `fp16()` and
- * carries a `-1.5` witness beside it — the sign rule this lane caught earlier
- * today, now guarded on both sides. That is a report about aeon's source, not a
- * reading this file took, and it is written down as such.
+ * comes back with wording that says so. (That condition FIRED once already, in
+ * the smallest possible way: the negative-step emission failure above is exactly
+ * "a fixed-point spelling Aurora does not know about", it was found by an Aurora
+ * document, and `ramp-sign-lag.ts` is the narrower sentence it produced.)
  *
  * ═══ THE PREVIOUS RETIREMENT (ITEM 4), KEPT FOR ITS REASONING ═══
  *
@@ -79,9 +125,20 @@
  * wording stays fully asserted with nothing on screen.
  *
  * ⚠ MERGED, NOT CERTIFIED. Nothing in this repository has seen a ROM obey
- * `patch_world_ys` or `patch_motion`, and nothing here claims one has. What
- * retired is a sentence about what aeon's GENERATOR does with an authored key,
- * which is a fact this file can and does measure. aeon's own page records that
+ * `patch_world_ys` or `patch_motion`, and nothing here claims one has.
+ *
+ * ⚠ RE-CHECKED 2026-09-03 AND DELIBERATELY LEFT AS IT STANDS — this is NOT the
+ * `ramp` block above with two key names swapped in, and the difference is the
+ * whole point of re-reading it. `ramp` now has a branch witness; these two have
+ * NO witness anywhere this lane can see. Checked rather than assumed: aeon
+ * `origin/master` `ddaab282` carries none, and `origin/parcel/anchor-motion-key`
+ * and `origin/parcel/anchor-mover` — the two branches whose names could plausibly
+ * hold one — are both fully merged and carry zero commits of their own
+ * (`git log origin/master..<branch>` is empty for each). So the flat "nothing has
+ * seen a ROM obey these" is not stale here; it is the current state.
+ *
+ * What retired is a sentence about what aeon's GENERATOR does with an authored
+ * key, which is a fact this file can and does measure. aeon's own page records that
  * `preset()` ensures the ARRAY LENGTH and not the values, and that a game
  * without `CAP_ANCHOR_MOTION` refuses an authored sweep — both are aeon's
  * checks, run in aeon's build, and no row here stands in for them.
@@ -131,6 +188,28 @@
  * sentence COMES BACK — re-fill the list below and re-date it. That check is
  * aeon's and sigil's to run; Aurora cannot measure it, and no row in this repo
  * pretends to.
+ *
+ * ⚠ THE CONDITION HAS NOW BEEN DECIDED, AND IT DID NOT FIRE (read 2026-09-03,
+ * firsthand, through git objects — the paragraph above was written while chain
+ * 199 was still outstanding, and a reader who stopped there would go looking for
+ * an answer that already exists). sigil `1eef8681` ("freeze: chain 199,
+ * item5-cross-seam-composition; 198 abandoned"), reachable on sigil
+ * `origin/master`: *"FIXPOINT PASSED — the regenerated goldens are byte-identical
+ * to 198's, so all seven are unchanged and this chain moves no ROM byte."* Four
+ * canonical shapes rebuilt from a fresh clean worktree with the ROMs deleted
+ * first, all four matching. So the seven goldens do NOT differ, the sentence does
+ * NOT come back, and this list stays empty on this account.
+ *
+ * ⚠ AND THE HEADLINE ABOVE STILL STANDS, WHICH IS WHY THIS IS AN APPENDIX AND NOT
+ * A REWRITE. Chain 199's attest run is itself recorded RED — sigil `1da03b9e`,
+ * 4231 passed / 1 failed, the one failure being
+ * `no_landing_path_invokes_the_drift_job`, sigil's OWN guard that its drift job
+ * stays reachable only from its timer, tripped by sigil's own drift fix and
+ * carried in on a master merge. Unrelated to item 5, and recorded rather than
+ * tidied away. More to the point: "all seven goldens byte-identical" means NO ROM
+ * BYTE MOVED, so the chain proves the composition did not regress — it is not,
+ * and could not be, a ROM seen obeying `cycles` or `variants`. Item 5 remains
+ * MERGED, NOT CERTIFIED.
  *
  * ═══ THE MACHINERY STAYS. IT IS NOT DEAD CODE — IT IS A RE-ARMABLE DISCLOSURE ═══
  *
