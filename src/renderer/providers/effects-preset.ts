@@ -21,10 +21,17 @@
 // pedantry — it is the difference between a panel an author trusts and a panel
 // that quietly promises the engine cannot deliver.
 //
-// So the limits below are NOT tooltips. `PRESET_LIMITS` renders as a visible
-// block at the top of the section, always, and `effects-preset-wording.test.ts`
-// fails if the panel stops reading it. A limit an author has to hover to find is
-// a limit the panel does not really carry.
+// So the limits below are never hover-ONLY. Each one exists at TWO lengths:
+// `PRESET_LIMITS[k].body` is the contract wording, and `presetLimitsShort()`
+// derives the author-length sentences from it via `SHORT_BODIES`. The panel
+// paints the SHORT half in a visible block at the top of the section, always,
+// and puts the contract half on the same element's `title` (plus the guide) —
+// a limit an author has to hover to find is a limit the panel does not really
+// carry, and a limit that is only ever painted is a contract sentence deleted.
+// `band-preset-wording.test.ts` (components/effects/__tests__) fails if either
+// half stops reaching the panel; there is no `effects-preset-wording.test.ts`
+// and never has been. See BandPresetPanel.tsx's own header for the split and
+// for the rows that hold it.
 //
 // ⚠ AND NOTHING IN THIS EDITOR HAS EVER DRAWN ONE OF THESE BANDS. Until aeon
 // `4a4d3474` (2026-08-30) nobody in the suite had looked at one on screen at
@@ -93,7 +100,13 @@ export interface PresetLimit {
   key: 'unbound' | 'debug_chord' | 'unchecked_visibility';
   /** The short label the block leads with. */
   title: string;
-  /** The limit itself. Shown in full — never truncated, never a tooltip. */
+  /**
+   * The limit itself, at CONTRACT length — the wording owed to the agent reply
+   * and the published tool descriptions, never paraphrased away. This is the
+   * field `presetLimitsShort()` carries through as `full` and the panel puts on
+   * the element's `title`; what the panel PAINTS is `SHORT_BODIES[key]`. Both
+   * must reach the render — see this file's header.
+   */
   body: string;
 }
 

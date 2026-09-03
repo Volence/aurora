@@ -13,14 +13,36 @@
 // here, it belongs there — a rule spelled in a component is a rule the advisory
 // beside it can disagree with.
 //
-// ═══ THE LIMIT BLOCK IS NOT DECORATION AND IS NOT A TOOLTIP ═══
+// ═══ THE LIMIT BLOCK IS NOT DECORATION, AND IT HAS TWO HALVES ═══
 //
-// `PRESET_LIMITS` renders in full, at the top of the section, always visible,
-// before any control. That placement is the parcel's whole point: aeon wrote
-// their page to stop one sentence ("authoring effects no longer needs a
-// programmer"), and a panel that buries the correction in a hover is a panel
-// that repeats it. effects-preset-wording.test.ts fails if these strings stop
-// reaching the render.
+// `LimitBlock` paints `presetLimitsShort()` — the AUTHOR-LENGTH wording — at the
+// top of the section, unconditionally, before any control, and carries the
+// CONTRACT wording (`PRESET_LIMITS`, verbatim) on the SAME elements' `title`,
+// plus a deep link into the guide. That split is the shape, and both halves are
+// load-bearing: aeon wrote their page to stop one sentence ("authoring effects
+// no longer needs a programmer"), so the correction an author must ACT ON is
+// painted and cannot be hover-only, while the full contract text — owed to the
+// agent reply and the published tool descriptions — must stay reachable rather
+// than be deleted.
+//
+// ⚠ DO NOT "FIX" THE HOVERS BY PAINTING THE CONTRACT TEXT. This block once
+// rendered 8,059 characters before the first control in a 285px column; cutting
+// the painted half to ~875 while keeping every character on the `title` IS
+// EFFECTS-W1 defect 3's fix (`b8d16256`, 2026-09-02), not a regression against
+// the earlier "renders in full" ruling, which that commit amended. An earlier
+// version of THIS COMMENT still asserted the un-amended ruling and would have
+// talked a reader into undoing it (O79).
+//
+// THE GATE IS band-preset-wording.test.ts, in this directory's __tests__ — NOT
+// `effects-preset-wording.test.ts`, which has never existed. It holds both
+// halves from both sides: 'the limits are BODY TEXT, not a title= attribute',
+// 'and the contract wording is still REACHABLE, on the same elements', 'every
+// contract limit has an author-length sibling — none can be dropped', and 'the
+// cut is real: the PAINTED block is a fraction of the contract text'. That file
+// reads SOURCE, so it cannot see a pixel; the rendered halves are held per
+// element by rows [2c] and [3a]-[3e] of scratchpad/band-preset-harness.mjs
+// (`npm run harness:band-preset`), which read `innerText` and `title`
+// separately for exactly this reason.
 //
 // It is also deliberately NOT scolding. The three limits are stated as facts
 // with named owners, the headline says what an author CAN do, and every control
