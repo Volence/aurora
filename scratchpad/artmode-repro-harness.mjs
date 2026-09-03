@@ -39,7 +39,7 @@ const PROBE = String.raw`
     }
     return { ink, n, fraction: +(ink / n).toFixed(3) };
   };
-  // EVERY PIXEL FIGURE BELOW IS REPORTED BESIDE THIS. `devicePixelRatio` under
+  // EVERY PIXEL FIGURE BELOW IS REPORTED BESIDE THIS. devicePixelRatio under
   // Xvfb has been observed at both 1 and 1.35 in the same session on this
   // machine, which makes canvas client rects fractional and turns a correct
   // off-by-one into something that reads like a feature defect. A run that does
@@ -47,7 +47,7 @@ const PROBE = String.raw`
   P.dpr = () => ({
     dpr: devicePixelRatio,
     inner: [innerWidth, innerHeight],
-    // The main canvas' raw (unrounded) client rect — `canvasInfo` rounds, and
+    // The main canvas' raw (unrounded) client rect — canvasInfo rounds, and
     // the rounding is exactly what hides a fractional dpr.
     rawRect: (() => {
       const c = P.main(); if (!c) return null;
