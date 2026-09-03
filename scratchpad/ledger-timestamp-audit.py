@@ -58,10 +58,20 @@ LIMITS, stated rather than left to be discovered
   It errs RED (a stuck failure, never a silent pass), it cannot arise from the ordinary
   cause -- two entries written minutes apart differ in their headline -- and the way out
   is to make the duplicated entry's own text distinct, which is what a genuinely repeated
-  line needs anyway. The alternative mechanism, comparing the NUMBER of occurrences at
-  HEAD against the number of appearances recorded, would cover it and is a new mechanism
-  with its own edges (a line legitimately present twice, a reformat changing the count);
-  measured on the bed and rejected as a bigger change than the hole justifies.
+  line needs anyway.
+
+  THE ALTERNATIVE WAS BUILT AND MEASURED, not argued away. Comparing the NUMBER of
+  occurrences of that line at HEAD against the number of times it was ever added does
+  cover the twins -- and it goes SILENTLY GREEN on a collision nobody corrected, whenever
+  the colliding line was REMOVED AND LATER RE-ADDED VERBATIM: two additions, one line at
+  HEAD, read as "withdrawn" while the unjudged stamp sits in the file. That is not an
+  exotic shape; it is the dominant innocent commit pattern this very header opens with
+  (`9c2974e0` re-added two entries). Both mechanisms were run over the same beds: they
+  agree on correcting-the-second, correcting-the-first and a pure reorder; they differ on
+  the twins (set-keying errs RED) and on remove-then-restore (counting errs GREEN). A
+  stuck red announces itself and a silent green does not, so the set keying is kept and
+  the twins limit is the price. Both discriminating cases are canaries in the gate
+  (K6h, K6i), so a later swap to counting cannot pass unnoticed.
 * A repair commit that alters an entry's `at` is indistinguishable from a new entry. That
   is correct: changing a stamp IS the thing being audited.
 * A squashed or rewritten history moves committer times, so deltas after a rebase describe

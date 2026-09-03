@@ -117,10 +117,17 @@
  *       K6's comment credited this to K1's repo, which has one commit and performs no
  *       re-add, so the innocent direction of `dup_fail`'s `first_ctime >= since` clause
  *       was asserted and never measured.
- *   K6h THE LIMIT, pinned: two BYTE-IDENTICAL appearances, the second corrected — still
+ *   K6h the colliding line REMOVED then RESTORED verbatim, nothing corrected: still
+ *       exit 1. Keyed on the line it is still at HEAD, which is right — the stamp is
+ *       still an unjudged claim. The rejected alternative (COUNT the occurrences at HEAD
+ *       against the times the line was added) goes SILENTLY GREEN here, on the dominant
+ *       innocent commit pattern the audit's header opens with. Measured on both.
+ *   K6i THE LIMIT, pinned: two BYTE-IDENTICAL appearances, the second corrected — still
  *       exit 1. `--only-present` asks whether a collision's own line survives at HEAD, and
- *       two identical lines are one string to a set. It errs RED, never green. Written up
- *       under LIMITS in the audit; asserted here so K6d is not read as covering it.
+ *       two identical lines are one string to a set. It errs RED, never green. Counting
+ *       WOULD cover this one; K6h is the price of counting, and a stuck red announces
+ *       itself where a silent green does not. Written up under LIMITS in the audit;
+ *       asserted here so K6d is not read as covering it.
  *   K7  a ledger path git does not track: exit 2, and the gate treats 2 as FAILURE. A
  *       gate that cannot see is not a gate that passed.
  *
@@ -470,13 +477,35 @@ const CASES = [
     fires: [],
   },
   {
+    // THE OTHER HALF OF THE MECHANISM CHOICE. Nothing here is corrected: the colliding
+    // line is removed and later RE-ADDED VERBATIM, which is the dominant innocent commit
+    // pattern the audit's header opens with. Keyed on the line it is still at HEAD, so
+    // this stays red — right, because the stamp is still an unjudged claim the ledger
+    // makes. The rejected count-of-occurrences mechanism reads two additions against one
+    // line at HEAD and calls it withdrawn, going SILENTLY GREEN here; measured, not
+    // assumed. This case and K6i are what stop a later swap to counting passing unnoticed.
+    //
+    // The count is (2), and it is derived rather than copied from K6e: the re-add is a
+    // second addition of that line, so `collect()` books a SECOND duplicate record
+    // against the same stamp. Both are in scope and both are still at HEAD.
+    name: 'K6h the colliding line REMOVED then RESTORED verbatim, uncorrected — still exit 1',
+    commits: [...COLLIDE,
+      { at: T(5, 9, 0), body: [OLD_BAD_LINE, PAIR_A] },
+      { at: T(6, 9, 0), body: [OLD_BAD_LINE, PAIR_A, PAIR_B] }],
+    args: gateArgs(CANARY_SINCE),
+    status: 1,
+    want: ['TWO IN-SCOPE ENTRIES SHARE ONE STAMP (2)', 'CORRECT THE LATER APPEARANCE'],
+    absent: ['COLLIDING LINE WITHDRAWN'],
+    fires: ['duplicate-in-scope'],
+  },
+  {
     // THE LIMIT, PINNED RATHER THAN LEFT TO BE DISCOVERED. --only-present asks whether a
     // collision's own line survives at HEAD, and two BYTE-IDENTICAL lines are one string
     // to a set: correcting either leaves the other answering "still there", so this run
     // stays red with no move left. It errs RED, never green, and the way out is to make
     // the entry's own text distinct. Written down in the audit's LIMITS section; asserted
     // here so nobody reads K6d as covering a case it does not.
-    name: 'K6h the LIMIT — two BYTE-IDENTICAL appearances, the second corrected — still exit 1',
+    name: 'K6i the LIMIT — two BYTE-IDENTICAL appearances, the second corrected — still exit 1',
     commits: [
       OLD_BAD,
       { at: T(3, 9, 0), lines: [TWIN] },
