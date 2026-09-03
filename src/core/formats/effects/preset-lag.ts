@@ -2,34 +2,45 @@
  * The contract-leads-consumer lag on the raster preset document, as ONE fact
  * with ONE measurement behind it.
  *
- * ═══ THE LAG IS OPEN AGAIN: `ramp`, RE-ARMED 2026-09-03 (ITEM 6, STEP 3) ═══
+ * ═══ THE LAG IS EMPTY. RETIRED (AGAIN) 2026-09-03 — ITEM 6'S STEP 4 HAS RUN. ═══
  *
- * THE FOURTH ARMING. empyrean `9233883` (AURORA_EFFECTS_SCHEMA.md §7.4) declared
- * EFFECTS-W1 DoD item 6's authoring key, `ramp`, and Aurora has vendored it and
- * written the codec (step 3). AEON'S STEP 4 HAS NOT RUN. Measured firsthand
- * through git objects at aeon `origin/master` `dd17f7c9`, page blob `62ca6426`:
+ * THE FOURTH ARMING HAS RETIRED. empyrean `9233883` (AURORA_EFFECTS_SCHEMA.md
+ * §7.4) declared EFFECTS-W1 DoD item 6's authoring key, `ramp`; Aurora vendored
+ * it and wrote the codec (step 3, merge `3d76791d`); and AEON'S STEP 4 HAS NOW
+ * RUN. Measured firsthand through git objects at aeon `origin/master`
+ * `c7ee7075` ("lane-log: the plane swap and the ramp generator both land"), page
+ * blob `5514719913f550b309f33e7d1ae22f08270a4b1b`:
  *
- *   - `docs/EDITOR_RASTER_PRESETS.md`'s machine-checked block reads
- *     `preset: bands, cycles, id, patch_motion, patch_world_ys, schema, variants`
- *     — no `ramp` — and `preset-refused:` is `fires` alone.
- *   - `tools/effects_gen.py` contains the string `ramp` ZERO TIMES, in any case.
- *     `PRESET_KEYS` (`:285`) does not carry it and no `_check_ramp` exists.
+ *   - `docs/EDITOR_RASTER_PRESETS.md`'s machine-checked block now reads
+ *     `preset: bands, cycles, id, patch_motion, patch_world_ys, ramp, schema,
+ *     variants` — `ramp` IS THERE — and `preset-refused:` is `fires` alone.
  *
- * SO THIS IS THE SHARPER FLAVOUR, the same one item 4 had: `ramp` is not in
- * aeon's vocabulary at all, so it takes `_check_keys`'s generic unknown-key path
- * and `_refuse` RAISES. A preset document carrying `ramp` does not lower
- * partially — IT FAILS AEON'S BUILD ENTIRELY. `presetLagDisclosure` below says
- * exactly that, and it is the wording this flavour needs.
+ * ⚠ THE PAGE IS THE ARTIFACT, NOT THE GENERATOR SOURCE. `PRESET_LAG_MEASUREMENT`
+ * below names `docs/EDITOR_RASTER_PRESETS.md` at `origin/master`, and that is
+ * what the drift row actually consults — the page's machine-checked block, which
+ * aeon's own test compares against `tools/effects_gen.py`. A claim about
+ * `effects_gen.py` is a claim about a DIFFERENT artifact than the one this file
+ * measures, and the two must not be traded for one another in a report.
  *
- * The ENGINE half of item 6 shipped long ago (`RasterRampProgram` since
- * 2026-08-14, gated and budgeted at aeon `cf3dfb1a`); it is the GENERATOR that
- * has not been taught the key. That distinction matters to an author: the
- * mechanism exists and is not reachable from a document.
+ * ⚠ MERGED, NOT CERTIFIED. NOTHING IN THIS REPOSITORY HAS SEEN A ROM OBEY
+ * `ramp`, and no row here claims one has. What retired is a sentence about what
+ * aeon's page ACCEPTS. The ENGINE half of item 6 shipped long ago
+ * (`RasterRampProgram` since 2026-08-14, gated and budgeted at aeon `cf3dfb1a`),
+ * and the GENERATOR has now been taught the key — but "accepted at the door" and
+ * "obeyed by a ROM" are different facts and only the first is measured here.
+ * Certification is aeon's pytest lane and sigil's attest chain, not this
+ * landing, and no row in this repo stands in for either.
  *
- * RE-RETIRE CONDITION: the day the drift row goes red because aeon's page
- * ACCEPTS `ramp` — empty this list and re-date it, and the sentence retires with
- * the row. Do not empty it on a merge announcement; the row reads aeon's page at
- * TIP on every run and is the only thing entitled to an opinion here.
+ * RE-OPEN CONDITION FOR ITEM 6, stated so this retirement cannot become
+ * permanent by accident: if aeon's build REFUSES a document Aurora actually
+ * writes under `ramp` — a unit, a bound, a fixed-point spelling or a capability
+ * Aurora does not know about — then "aeon reads this key" is true of the
+ * vocabulary and false of the documents this editor produces, and the disclosure
+ * comes back with wording that says so. RELAYED, NOT MEASURED HERE: aeon's
+ * generator half reportedly routes `start`/`step` only through `fp16()` and
+ * carries a `-1.5` witness beside it — the sign rule this lane caught earlier
+ * today, now guarded on both sides. That is a report about aeon's source, not a
+ * reading this file took, and it is written down as such.
  *
  * ═══ THE PREVIOUS RETIREMENT (ITEM 4), KEPT FOR ITS REASONING ═══
  *
@@ -156,7 +167,8 @@
  *
  * `src/renderer/components/effects/__tests__/preset-lag-disclosure.test.ts`
  * closes the loop from the other side. It has now been re-aimed with the premise
- * THREE times (armed → retired → armed → retired) and keeps the shape both
+ * FIVE times (armed → retired → armed → retired → armed → retired) and keeps
+ * the shape both
  * states need. With the lag CLOSED it asserts the retirement rather than assuming
  * it (the list is empty, and the leaf is silent BECAUSE of that and not for some
  * other reason); it keeps the WORDING fully asserted by driving the derivation
@@ -180,11 +192,13 @@
  * item 5; `['patch_motion','patch_world_ys']` on 2026-09-03 when empyrean
  * d36d704 declared item 4's authoring keys and aeon's step 4 had not run; EMPTY
  * again LATER THE SAME DAY, when it did; `['ramp']` on 2026-09-03 when empyrean
- * 9233883 declared item 6's authoring key and aeon's step 4 had not run. Empty
- * it (and only it) the day the drift row reports the lag closed — the sentence
- * leaves the screen in both mount sites by construction.
+ * 9233883 declared item 6's authoring key and aeon's step 4 had not run; EMPTY
+ * again LATER THE SAME DAY AGAIN, when aeon's page grew `ramp` into its accepted
+ * `preset:` row at `c7ee7075`. Re-fill it (and only it) the day the drift row
+ * reports a lag again — the sentence comes back on screen in both mount sites by
+ * construction.
  */
-export const PRESET_KEYS_AWAITING_AEON: readonly string[] = Object.freeze(['ramp']);
+export const PRESET_KEYS_AWAITING_AEON: readonly string[] = Object.freeze([]);
 
 /** The date the premise above was last measured — printed inside the sentence. */
 export const PRESET_LAG_MEASURED_ON = '2026-09-03';

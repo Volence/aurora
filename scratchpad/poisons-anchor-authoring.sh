@@ -200,8 +200,10 @@ restore src/renderer/providers/effects-sub-tabs.ts
 
 echo
 echo "════ P8 — the NO-BUILD disclosure is dropped from the anchors section ════"
-echo "     (the leaf is SILENT since 2026-09-03 — aeon merged item 4's step 4 and the"
-echo "      premise emptied — but it stays MOUNTED, first and unconditional, because"
+echo "     (the leaf is SILENT — the premise emptied when aeon merged item 4's step 4"
+echo "      on 2026-09-03, re-filled for \`ramp\`, and emptied again the same day when"
+echo "      aeon merged item 6's step 4 — but it stays MOUNTED, first and unconditional,"
+echo "      because"
 echo "      that is what makes re-arming it a one-line edit in preset-lag.ts. Drop the"
 echo "      mount and a re-opened lag reaches an author with no warning at all, above"
 echo "      controls whose output would fail aeon's build outright)"
