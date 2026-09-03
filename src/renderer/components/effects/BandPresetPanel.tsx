@@ -1444,7 +1444,17 @@ function RampCard({ library, presetId, ramp, run, scroll }: {
           `null` IS the retired state, and re-arming stays a one-line edit in
           `core/formats/effects/preset-lag.ts` that reaches all three sites at
           once. Unmounting it here is how the next lag misses this card.
-          ⚠ MERGED, NOT CERTIFIED: nothing here has seen a ROM obey `ramp`. */}
+          ⚠ MERGED, AND WITNESSED ON A PEER'S BRANCH — NOT CERTIFIED, AND NOT
+          BY AURORA (updated 2026-09-03). aeon drove a running machine on THIS
+          EDITOR'S OWN ramp document: the authored -1.5 px/line is in the ROM
+          record and moves the picture against a four-byte control. But it is on
+          `origin/parcel/aurora-ramp-witness`, which is NOT an ancestor of aeon's
+          master; it is emulation, not silicon; and the first-displayed-line rule
+          this card's own span readout applies is CONTESTED BY ONE LINE by that
+          same run — we derive `top + 1`, they measured `top + 2` on two
+          different tops. Nothing in Aurora has measured a ROM. The full record,
+          including what the witness does NOT say, is in
+          `core/formats/effects/preset-lag.ts`. */}
       <PresetLagDisclosure />
 
       {/* THE SIGN DISCLOSURE — A NARROWER FACT ONE LAYER FURTHER DOWN, AND IT
@@ -1654,8 +1664,25 @@ function BaseSwapCard({ library, presetId, baseSwap, run }: {
           IT STAYS MOUNTED ANYWAY, `RampCard`'s reason: a mounted leaf returning
           null IS the retired state, and re-arming is a one-line edit in
           `core/formats/effects/preset-lag.ts` that must reach every card.
-          ⚠ MERGED, NOT CERTIFIED HERE: aeon measured a generated section-6
-          program in the release listing; nothing in Aurora has seen a ROM. */}
+          ⚠ CERTIFIED BY AEON, ON A BRANCH, WITH TWO STATED LIMITS — AND STILL
+          NOT BY AURORA (updated 2026-09-03; the previous wording said only that
+          aeon had measured the generated program in the RELEASE LISTING, which
+          is now an understatement). A running machine obeys the GENERATED
+          section-6 program, separated from the hand-written `OJZ_BaseSwap` demo
+          three independent ways: by ADDRESS (`Raster_Program` after the crossing
+          is the generated symbol, not the demo), by PATH (reached through the
+          engine's own boundary crossing, not a poke), and BY CONSTRUCTION in the
+          release shape (`OJZ_BaseSwap` emits zero bytes there). Footprint lines
+          161..223 contiguous, 0..160 byte-identical, in BOTH shapes; and the
+          boundary was DERIVED, not fitted — moving the document's line 160 to
+          100 moved the measured boundary to 101, and the unmutated tree went
+          cleanly red on the same ROM.
+          ⚠ THE TWO LIMITS ARE LOAD-BEARING AND MUST TRAVEL WITH THE CLAIM: the
+          RELEASE-shape binding is proved STATICALLY, NOT WALKED (the warp
+          mailbox is DEBUG-only, so the crossing itself is witnessed only in
+          DEBUG), and this is EMULATION, NOT SILICON. It is also on aeon
+          `origin/parcel/sec6-baseswap-certify` `7b11f929`, which is NOT an
+          ancestor of aeon's master. Nothing in Aurora has measured a ROM. */}
       <PresetLagDisclosure />
 
       <Field label="Line" title={BASE_SWAP_FIELD_TITLES.line}>

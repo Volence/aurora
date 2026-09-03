@@ -64,10 +64,18 @@
 // ⚠ MERGED, NOT CERTIFIED. NOTHING HERE SAYS A ROM OBEYS `ramp` OR ANY OF THESE
 // KEYS. No emulator, no build, no attest chain ran from this lane. What retired
 // is a claim about what aeon's PAGE ACCEPTS. Certification is aeon's pytest lane
-// and sigil's attest chain. RELAYED, NOT MEASURED HERE: aeon's generator half
-// reportedly routes `start`/`step` only through `fp16()` and carries a `-1.5`
-// witness beside it — the sign rule this lane caught earlier today, guarded on
-// both sides. That is a report about aeon's source, not a reading taken here.
+// and sigil's attest chain.
+//
+// ⚠ WAS A RELAY, IS NOW A READING (2026-09-03). The `-1.5` witness this header
+// used to carry as hearsay has been read firsthand through git objects: aeon
+// `origin/parcel/aurora-ramp-witness` `a1a76741` fixes the constructor's missing
+// two's-complement encode (`7a5d237d`) and drives a running machine on THIS
+// editor's own document. ⚠ THAT BRANCH IS NOT AN ANCESTOR OF AEON'S MASTER, the
+// witness is emulation rather than silicon, and the first-displayed-line rule is
+// CONTESTED BY ONE LINE by that same run. None of that changes a single row in
+// this file, which measures aeon's PAGE at `origin/master` and nothing else —
+// it is written down so the next reader does not mistake the branch for the
+// tip. The whole record is in `core/formats/effects/preset-lag.ts`.
 //
 // ⚠ WHAT THESE ROWS CANNOT SEE. No React DOM here. The leaf is called as a
 // plain function and its element tree walked (the object-inspector-field-bounds

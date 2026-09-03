@@ -80,9 +80,20 @@
  * own failure text is the precedent and says so in as many words. A message
  * saying "the encode landed" is a claim about a conversation; the row above is a
  * claim about a blob at a resolved revision, and only the second can retire a
- * sentence. (Aeon's fix is reported to live on their branch
- * `parcel/aurora-ramp-witness` — RELAYED, not measured here, and unmerged at the
- * revision above.)
+ * sentence.
+ *
+ * ⚠ THE FIX EXISTS, AND IT IS STILL NOT ON THEIR MASTER — WAS A RELAY, NOW
+ * MEASURED (2026-09-03). aeon `7a5d237d` ("fix(raster): raster_ramp_program
+ * never encoded a NEGATIVE step, so no ROM could hold one") adds the
+ * two's-complement encode with a two-directional zero-byte pin, on branch
+ * `parcel/aurora-ramp-witness` (tip `a1a76741`). Read here firsthand through git
+ * objects, and `git merge-base --is-ancestor` says that branch is NOT an
+ * ancestor of aeon `origin/master` `ddaab282`. SO THE LIST BELOW STAYS FILLED:
+ * the row measures TIP, the constructor at TIP still forwards the bare
+ * parameter, and an author ramping downward today still cannot build. This
+ * paragraph exists so the next reader who hears "the sign fix landed" checks the
+ * ancestry instead of emptying the list — the row will redden by itself on the
+ * merge, which is the whole design.
  *
  * ⚠ AND THE RE-MEASURE MUST READ THE ENGINE SOURCE, NOT A PAGE. This lane came
  * within one step of retiring a different disclosure off a message about a
