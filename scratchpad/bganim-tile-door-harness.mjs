@@ -544,33 +544,80 @@ async function main() {
     // AFTER [4b] because 4b1's ordinary click arms `paint-tile`, which is the
     // very state change 4b2 is about.
     if (!openA || openA.target.kind !== 'tile') {
-      const geomPre2 = await c.json(STRIP_GEOM);
-      await press(aimA, 1); await sleep(40); await release(aimA, 1); await sleep(600);
-      const selAfterClick = await c.json('window.__dbg.aeon.selectedTile()');
-      const geomPostClick = await c.json(STRIP_GEOM);
-      check('4b1', 'ANTI-VACUOUS FOR THE GESTURE: an ORDINARY click at the very same point reaches '
-        + `the strip and picks slot ${SLOT_A} — so [4b] is not a dead aim`,
-        selAfterClick.bg === SLOT_A,
-        `elementFromPoint(${aimA.x},${aimA.y}) = ${JSON.stringify(under)}; `
-        + `selectedTile.bg ${selBefore.bg} -> ${selAfterClick.bg} (aimed ${SLOT_A})`);
-      // ⚠ THE FIRST HALF OF A DOUBLE CLICK IS AN ORDINARY CLICK. It picks the
-      // tile and arms `paint-tile` — and `layout-facet.tsx:61-65` renders the
-      // "Brush" CollapsibleSection (`TileBrushOptions`) for exactly that tool,
-      // IMMEDIATELY ABOVE the `aeon.art` section the strip lives in. So the
-      // strip is pushed down by the height of a section that did not exist when
-      // the pointer was placed, and the second half of the same double click
-      // lands on whatever slid into its place.
-      check('4b2', 'the strip box does not MOVE when a click picks a tile — the second half of a '
-        + 'double click has to land where the first half did',
-        !!geomPre2 && !!geomPostClick
-        && geomPre2.left === geomPostClick.left && geomPre2.top === geomPostClick.top
-        && geomPre2.cw === geomPostClick.cw && geomPre2.height === geomPostClick.height,
-        `strip before the pick=${JSON.stringify(geomPre2)}`
-        + `\n        strip after  the pick=${JSON.stringify(geomPostClick)}`
-        + `\n        under the aim BEFORE the gesture: ${JSON.stringify(under)}`
-        + `\n        under the aim AFTER  the pick   : ${JSON.stringify(await c.json(AT_AIM))}`
-        + `\n        panel BEFORE: ${JSON.stringify(rowsBefore)}`
-        + `\n        panel AFTER : ${JSON.stringify(await c.json(BANDROW))}`);
+      // ⚠ NOT ONE EXTRA GESTURE IS PERFORMED TO REACH THESE TWO ROWS. Both read
+      // state that [4b]'S OWN double click produced, compared against the
+      // snapshots taken before it. A diagnostic CLICK here would be worthless
+      // and looks convincing: [4b]'s own first press/release already picked the
+      // slot and armed the tool, so "an ordinary click picks 37" and "the strip
+      // did not move" both come back GREEN off the previous gesture's leavings
+      // — measured, on the plant that found it (bar 2d(iii)).
+      const selAfter = await c.json('window.__dbg.aeon.selectedTile()');
+      const geomPost = await c.json(STRIP_GEOM);
+      const rowsAfter = await c.json(BANDROW);
+      check('4b1', 'ANTI-VACUOUS FOR THE GESTURE: the gesture DID reach the strip — its first '
+        + `press/release picked slot ${SLOT_A}, so [4b] is not a dead aim`,
+        selAfter.bg === SLOT_A,
+        `elementFromPoint(${aimA.x},${aimA.y}) before the gesture = ${JSON.stringify(under)}; `
+        + `selectedTile.bg ${selBefore.bg} -> ${selAfter.bg} (aimed ${SLOT_A})`);
+      // ⚠ THE DISPLACEMENT IS A TRANSIENT, AND THE END STATE HIDES IT. Reading
+      // the geometry before and after the whole gesture says "it did not move"
+      // — measured, twice — because the SECOND half undoes what the FIRST half
+      // did. So this row splits a double click and reads BETWEEN the halves.
+      //
+      // What the two halves do, from the end state and the mid-gesture sample:
+      //   half 1  an ordinary click. `handleClick` picks the slot and arms
+      //           `paint-tile`; `layout-facet.tsx:61-65` then renders the
+      //           "Brush" CollapsibleSection IMMEDIATELY ABOVE the `aeon.art`
+      //           section the strip lives in, and the strip is pushed down.
+      //   half 2  lands on whatever slid into that place — the band row — so it
+      //           hits a BandCard, which arms `stamp-band`, which un-renders the
+      //           Brush section and puts the strip back. `dblclick` never
+      //           reaches the strip container at all (`gestures` stays 0), and
+      //           the author is left holding the BAND STAMP.
+      //
+      // The inter-click gap is printed: this row inserts CDP round trips into
+      // it, and a gap past the platform's double-click threshold would be its
+      // own explanation for a missing `dblclick`.
+      const t0 = Date.now();
+      await press(aimA, 1); await sleep(40); await release(aimA, 1);
+      const midPanel = await c.json(BANDROW);
+      const midGeom = await c.json(STRIP_GEOM);
+      const midAim = await c.json(AT_AIM);
+      const gapMs = Date.now() - t0;
+      await press(aimA, 2); await sleep(40); await release(aimA, 2); await sleep(900);
+      const endPanel = await c.json(BANDROW);
+      const endGeom = await c.json(STRIP_GEOM);
+      check('4b2', 'the strip box does not MOVE part-way through a double click — the second half '
+        + 'has to land where the first half did',
+        !!geomPreClick && !!midGeom && geomPreClick.top === midGeom.top
+        && geomPreClick.left === midGeom.left,
+        `inter-click gap ${gapMs}ms (the plain gesture's is ~100ms)`
+        + `\n        strip BEFORE      =${JSON.stringify(geomPreClick)}`
+        + `\n        strip BETWEEN     =${JSON.stringify(midGeom)}`
+        + `\n        strip AFTER       =${JSON.stringify(endGeom)}   <- back where it started`
+        + `\n        under the aim BEFORE : ${JSON.stringify(under)}`
+        + `\n        under the aim BETWEEN: ${JSON.stringify(midAim)}`
+        + `\n        panel BEFORE : ${JSON.stringify(rowsBefore)}`
+        + `\n        panel BETWEEN: ${JSON.stringify(midPanel)}`
+        + `\n        panel AFTER  : ${JSON.stringify(endPanel)}`
+        + `\n        panel after [4b]'s own gesture: ${JSON.stringify(rowsAfter)}`);
+      // CHARACTERISATION, DELIBERATELY NOT A ROW. A row that PASSED on
+      // `gestures === 0` would pin the defect: it would go red the day somebody
+      // fixed this. So the repeat is printed, not gated. It answers the one
+      // remaining alternative — that [4b] failed because it was the FIRST
+      // gesture of the session and something had not settled yet.
+      const aimAgain = aimIn(endGeom, gridCols)(SLOT_A);
+      if (aimAgain) {
+        await doubleClick(aimAgain);
+        console.log('        CHARACTERISATION — a third identical double click at '
+          + `(${aimAgain.x},${aimAgain.y}): report=${JSON.stringify(await openRep())} `
+          + `open=${JSON.stringify(await artOpen())}. The column is never "settled": the FIRST `
+          + 'half of every double click re-arms paint-tile, so the Brush section is re-inserted '
+          + 'and the strip is displaced again, every time.');
+      } else {
+        console.log(`        CHARACTERISATION — could not repeat: slot ${SLOT_A} has no integer `
+          + `aim inside ${JSON.stringify(endGeom)}.`);
+      }
       await shot(c, 'tile-door-refused');
       throw new Error(`slot ${SLOT_A} did not open — see [4b], and [4b1]/[4b2] for why`);
     }
