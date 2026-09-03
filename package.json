@@ -154,6 +154,7 @@
     "harness:paste-pan": "node scratchpad/paste-pan-harness.mjs",
     "harness:priority-lens": "node scratchpad/priority-lens-harness.mjs",
     "harness:ramp-control": "node scratchpad/ramp-control-harness.mjs",
+    "harness:ramp-scroll-mode": "node scratchpad/ramp-scroll-mode-harness.mjs",
     "harness:raster-timeline": "node scratchpad/raster-timeline-harness.mjs",
     "harness:restore": "node scratchpad/restore-harness.mjs",
     "harness:s1-anim": "node scratchpad/s1-anim-harness.mjs",

@@ -318,6 +318,13 @@ describe('CASE: the bound sections disagree — and the panel says so', () => {
     // the majority arm is NOT presented as the answer
     expect(short).not.toContain(RAMP_SCROLL_LEAD.full);
     expect(short).not.toContain(RAMP_SCROLL_LEAD.column);
+
+    // ⚠ AND IT READS AS ENGLISH IN BOTH NUMBERS. A generated clause that says
+    // "Section 1 scroll the full width" reads as a bug in the panel and costs
+    // the sentence the authority it needs; the first run of the CDP harness
+    // caught exactly that.
+    expect(short).toContain('Sections 0 and 1 scroll the full width');
+    expect(short).toContain('Section 3 scrolls one');
   });
 
   it('a THIRD group — determined and undetermined together — is also reported', () => {

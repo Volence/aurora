@@ -325,11 +325,13 @@ export function rampScrollModeSentence(
   } else if (groups > 1) {
     const parts: string[] = [];
     if (full.length > 0) {
-      parts.push(`${sectionList(full.map((b) => b.section))} scroll the full width `
+      parts.push(`${sectionList(full.map((b) => b.section))} `
+        + `${full.length === 1 ? 'scrolls' : 'scroll'} the full width `
         + `(${sceneList(full)}${full.length === 1 ? ' has' : ' have'} no \`v_deform\`)`);
     }
     if (column.length > 0) {
-      parts.push(`${sectionList(column.map((b) => b.section))} scroll one `
+      parts.push(`${sectionList(column.map((b) => b.section))} `
+        + `${column.length === 1 ? 'scrolls' : 'scroll'} one `
         + `${RAMP_SCROLL_COLUMN_WIDTH_PX}-pixel column (${sceneList(column)}`
         + `${column.length === 1 ? ' has' : ' have'} a \`v_deform\`)`);
     }
