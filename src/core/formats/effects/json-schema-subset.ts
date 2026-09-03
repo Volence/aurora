@@ -501,6 +501,35 @@ export function canonicalizeBySchema(value: unknown, schema: JsonSchema, root?: 
     );
   }
 
+  // `oneOf` — pick the one branch that holds, and then decide WHOSE properties
+  // describe this value.
+  //
+  // ═══ THE HOLE THIS ARM HAD, FOUND AT empyrean 9233883 ═══
+  //
+  // It used to recurse into the winning branch and RETURN. That is right when
+  // the branch is a whole alternative SHAPE (the scene schema's factor arms,
+  // each with its own `properties`) — and silently wrong when the branch is a
+  // bare `{"required": [...]}` arm rule sitting BESIDE this node's own
+  // `properties`, because such a branch declares no properties at all: the
+  // recursion fell straight through to `return value` at the bottom, skipping
+  // the undeclared-key refusal that is the only reason this function still
+  // exists.
+  //
+  // The shape has been in the committed preset schema since 6664b61 at
+  // `$defs.band.properties.on`, where it was invisible because validation
+  // refuses such a document first. 9233883 HOISTED IT TO THE DOCUMENT ROOT
+  // (`oneOf: [{required:[bands]},{required:[ramp]}]` beside `properties`), where
+  // it covered every key of every preset, which is what made it worth finding.
+  //
+  // The test is the one `assertSupported` already asks of this exact shape:
+  // `contributesPropertyAnnotations`. A branch that provably cannot contribute
+  // property annotations cannot be the thing that describes this value's
+  // properties either — so canonicalization continues with THIS node's own
+  // keywords, minus the `oneOf` it has already satisfied. A branch that CAN
+  // annotate is a real alternative shape and still wins, exactly as before.
+  //
+  // Dropping `oneOf` from the recursed-into schema is what terminates the
+  // recursion, and the branch selection above has already been paid for.
   if (Array.isArray(schema.oneOf)) {
     const branches = schema.oneOf as JsonSchema[];
     const hits = branches.filter(b => validateAgainstSchema(value, b, rootSchema).length === 0);
@@ -509,7 +538,11 @@ export function canonicalizeBySchema(value: unknown, schema: JsonSchema, root?: 
         `canonicalizeBySchema: value matches ${hits.length} schema forms, expected exactly 1 — validate before serializing`,
       );
     }
-    return canonicalizeBySchema(value, hits[0], rootSchema);
+    if (contributesPropertyAnnotations(hits[0])) {
+      return canonicalizeBySchema(value, hits[0], rootSchema);
+    }
+    const { oneOf: _satisfied, ...rest } = schema;
+    return canonicalizeBySchema(value, rest as JsonSchema, rootSchema);
   }
 
   if (Array.isArray(value) && schema.items !== undefined) {
