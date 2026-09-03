@@ -226,8 +226,37 @@ restore "$PROV"
 echo
 echo "════ H2 — THE CLOCK SPENDS THE MAP'S IDLE PROPERTY ════"
 echo "     (the mistake row 95 names by name: a clock that repaints the map on a"
-echo "      timer. The loop is pointed at #map-canvas — one line, still compiles,"
-echo "      and the preview still animates, which is what makes it dangerous)"
+echo "      timer. The loop nudges the CAMERA every frame — which is what an"
+echo "      implementation that wanted to draw the moving band ON THE MAP would"
+echo "      do — through the app's own view store. It still compiles and the"
+echo "      preview still animates, which is what makes it dangerous)"
+python3 - <<'PY'
+p='src/renderer/components/effects/AnchorSweepPreview.tsx'
+s=open(p).read()
+s=s.replace("""import React from 'react';""",
+"""import React from 'react';
+import { useViewStore } from '../../state/viewStore';""", 1)
+s=s.replace("""      cv.__anchorFrames = (cv.__anchorFrames ?? 0) + 1;
+      if (!stopped) raf = requestAnimationFrame(draw);""",
+"""      cv.__anchorFrames = (cv.__anchorFrames ?? 0) + 1;
+      const v = useViewStore.getState();
+      v.setViewport(v.vpX, v.vpY, v.zoom === 1 ? 1.0001 : 1);
+      if (!stopped) raf = requestAnimationFrame(draw);""")
+open(p,'w').write(s)
+PY
+show "$PREV" "setViewport"
+harness_run
+restore "$PREV"
+
+echo
+echo "════ H2b — the clock CLOBBERS the map canvas without MapViewport redrawing ════"
+echo "     (⚠ THIS ONE COMES BACK GREEN, AND IT IS REPORTED RATHER THAN TUNED AWAY."
+echo "      The probe records a repaint only when 2D ops FOLLOW the width write, so"
+echo "      what it measures is 'MapViewport ran a draw' — not 'something touched"
+echo "      the map canvas'. [6c] therefore cannot see a clock that blanks the map"
+echo "      without the component redrawing. That is a real blind spot in the"
+echo "      instrument, it is named in the packet, and H2 above is the leg that"
+echo "      DOES discriminate on the map-repaint clause.)"
 python3 - <<'PY'
 p='src/renderer/components/effects/AnchorSweepPreview.tsx'
 s=open(p).read()
