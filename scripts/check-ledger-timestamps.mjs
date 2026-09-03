@@ -89,8 +89,11 @@
  *       line the audit cannot read must not read as a line that passed.
  *   K6  two NEW entries sharing one second: exit 1, "BOTH APPEARANCES IN SCOPE". The
  *       audit keys on the stamp, so the second such entry goes unjudged; that is a
- *       harmless miss for a repair commit re-adding an old line (K1's repo proves such a
- *       re-add does NOT fail) and a hole for two new ones.
+ *       harmless miss for a repair commit re-adding an old line and a hole for two new
+ *       ones. (This line used to credit the innocent half to "K1's repo". K1's repo has
+ *       ONE commit and performs no re-add, so nothing measured it until K6g below — an
+ *       assertion standing in for a case, in the file whose whole argument is that those
+ *       are not the same thing.)
  *   K6b a bad entry CORRECTED by a later commit: exit 0, with the old stamp counted and
  *       printed as no longer in the file. This is the REMEDY, and the gate had none until
  *       the red-first proof found it: first appearance keys on the stamp, so the bad `at`
