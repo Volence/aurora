@@ -47,7 +47,7 @@
 import { describe, it, expect } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve, join, dirname } from 'node:path';
+import { resolve, join } from 'node:path';
 
 import {
   AEON_PRESET_DIR_REL,
@@ -185,7 +185,7 @@ describe('§2 all five harnesses reach the id through the module, not through a 
     expect(code).toMatch(/readAeonShippedPreset\(/);
   });
 
-  it.each(HARNESSES)('%s carries no bare `%s` literal in code', (rel) => {
+  it.each(HARNESSES)(`%s carries no bare \`${ID}\` literal in code`, (rel) => {
     const offenders = codeLines(rel).filter((l) => l.includes(ID));
     expect(offenders, `${rel} still types the peer's id in code: ${JSON.stringify(offenders)}`)
       .toEqual([]);
