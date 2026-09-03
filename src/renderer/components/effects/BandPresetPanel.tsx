@@ -67,6 +67,7 @@ import type {
   EffectsPresetLibrary, EffectsPresetBand, EffectsPreset, EffectsPresetCycleChannel,
   EffectsPresetPalVariant, EffectsPresetRamp, EffectsPresetBaseSwap,
 } from '../../../core/formats/effects/preset';
+import type { EffectsSceneLibrary } from '../../../core/formats/effects/scene';
 import {
   EFFECTS_PRESET_BAND_KEYS, EFFECTS_PRESET_BASE_SWAP_KEYS, presetArmFields, presetDefFields,
   EFFECTS_PRESET_MAX_PATCH, ANCHOR_PHASE_RANGE,
@@ -101,6 +102,17 @@ import {
   rampSpanRefusal, rampAddrRefusal, rampAddrGloss, rampRateRefusal, rampRateUnits,
   rampDisplayGloss, rampDriftSummary,
   setRampSpanCommand, setRampAddrCommand, setRampRateCommand,
+  // ═══ WHICH OF TWO EFFECTS THIS RAMP PRODUCES (EW-RAMP-SCROLL-MODE) ═══
+  //
+  // A VSRAM ramp is a FULL-SCREEN scroll or a SINGLE 16-PIXEL COLUMN, and the
+  // document is identical either way: VDP $0B bit 2 is raised by the SCENE
+  // bound to the SECTION bound to this preset. So the answer is per-section, it
+  // is derived from three documents this panel does not own, and when the bound
+  // sections disagree the sentence says so and names them rather than picking
+  // one. Everything about the rule — the measured aeon chain, the capability
+  // conjunct, the relayed column span — is in core/formats/effects/
+  // ramp-scroll-mode.ts. Nothing here restates it.
+  rampScrollModeAdvisory,
   // ═══ THE BASE-SWAP CHANNEL (EW-BASE-SWAP-CONTROL, ROADMAP row 131) ═══
   //
   // TWO NUMBERS, ONE OF WHICH IS A VRAM BASE ADDRESS. Every bound, every gloss
@@ -158,6 +170,11 @@ import { PresetLagDisclosure } from './PresetLagDisclosure';
 import { RampSignLagDisclosure } from './RampSignLagDisclosure';
 
 const EMPTY_LIBRARY: EffectsPresetLibrary = { presets: [], unreadable: [], notices: [] };
+// THE SCENE LIBRARY, FOR ONE QUESTION ONLY: does the scene bound to the section
+// bound to this preset carry a `v_deform`? That bit decides whether a VSRAM
+// `ramp` is a full-screen scroll or a 16-pixel sliver, and it lives in a
+// DIFFERENT DOCUMENT — see `rampScrollModeAdvisory`. This panel writes no scene.
+const EMPTY_SCENES: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [] };
 
 const textInput: React.CSSProperties = {
   flex: 1, minWidth: 0, background: T.raised, color: T.textHi,
@@ -252,6 +269,16 @@ export default function BandPresetPanel(): React.ReactElement | null {
     : deletePresetRefusal(act.sections, selected.id);
   const wiringAdvisory = act === null ? null : sectionRasterAdvisory(
     act.rasterWiring, activeSectionIndex, rasterChooserName(zoneId, act.id));
+  // ⚠ THE SUBJECT IS THE WHOLE ACT, NOT `activeSectionIndex`. Every other
+  // per-section reading on this surface is about the section the author is
+  // looking at; this one is about every section that BINDS the document they are
+  // looking at, which is a different set and is usually not the active one. A
+  // sentence scoped to the active section would answer "what does this ramp do"
+  // with a fact about a section that may not bind it at all.
+  const scenes = project?.effectsScenes ?? EMPTY_SCENES;
+  const rampScroll = (act === null || selected === null || selected.ramp === undefined)
+    ? null
+    : rampScrollModeAdvisory(act.sections, act.sceneRef, scenes, selected.id);
 
   const [newId, setNewId] = React.useState('');
   const [refusal, setRefusal] = React.useState<string | null>(null);
@@ -545,7 +572,8 @@ export default function BandPresetPanel(): React.ReactElement | null {
                 saying its fields are not editable here instead of rendering an
                 empty section under a Raster row that names it correctly. */}
             {selected.ramp !== undefined && (
-              <RampCard library={library} presetId={selected.id} ramp={selected.ramp} run={run} />
+              <RampCard library={library} presetId={selected.id} ramp={selected.ramp} run={run}
+                scroll={rampScroll} />
             )}
             {selected.base_swap !== undefined && (
               <BaseSwapCard library={library} presetId={selected.id}
@@ -1377,11 +1405,16 @@ function BandCard({
  * ever drawn a raster program, `NO_PREVIEW` says so at the top of the panel, and
  * a drawn ramp is exactly where the display lag would be most dangerous.
  */
-function RampCard({ library, presetId, ramp, run }: {
+function RampCard({ library, presetId, ramp, run, scroll }: {
   library: EffectsPresetLibrary;
   presetId: string;
   ramp: EffectsPresetRamp;
   run: (c: AnyCommand | null) => void;
+  /**
+   * Which of the two effects this ramp will actually produce, derived from the
+   * BINDINGS by the provider. Null only when there is no act to ask.
+   */
+  scroll: { short: string; full: string } | null;
 }): React.ReactElement {
   // WHY THE REFUSAL OUTLIVES THE BLUR — `BandCard`'s reason, unchanged:
   // `NumberField` resyncs its text to the document when focus leaves, so an
@@ -1425,6 +1458,39 @@ function RampCard({ library, presetId, ramp, run }: {
           and the retirement condition. */}
       <RampSignLagDisclosure
         start={presetFp16ToNumber(ramp.start)} step={presetFp16ToNumber(ramp.step)} />
+
+      {/* ═══ WHICH OF TWO COMPLETELY DIFFERENT EFFECTS THIS DOCUMENT MAKES ═══
+
+          ABOVE THE CONTROLS, NOT BELOW THEM, and that is the whole placement
+          argument: this sentence changes what every number under it MEANS. The
+          same `top`/`lines`/`start`/`step` are a full-screen vertical scroll
+          when the bound section's scene has no `v_deform` and a single 16-pixel
+          sliver when it has one — so an author who meets it only after scrolling
+          past five spinners has already authored the numbers under a guess. The
+          `rampDriftSummary` at the foot is the other half of "what does this
+          do" and stays there; it is arithmetic about the document, and this is a
+          fact about three documents.
+
+          NEUTRAL TONE, DELIBERATELY. Both arms are features — a one-column VSRAM
+          ramp is a thing an author may want — so this is not a warning, nothing
+          is disabled by it and no value is refused because of it. It is the
+          legibility this card was missing, not a new rule.
+
+          THE SPLIT IS `presetLimitsShort()`'s, for its reason: what an author
+          must know is painted, and the measured aeon chain, the
+          `CAP_PER_COL_VSRAM` conjunct and the relayed column span ride on this
+          element's own `title`.
+
+          ⚠ IT READS NO LINE NUMBERS. The card's display-span readout is
+          CONTESTED (a real ROM rendered 5..223 where we derive 4..223, at two
+          different tops); this sentence is about the HORIZONTAL extent and
+          touches neither `rampDisplaySpan` nor the lag constant, so it does not
+          move when that question is settled. */}
+      {scroll !== null && (
+        <Hint under>
+          <span title={scroll.full}>{scroll.short}</span>
+        </Hint>
+      )}
 
       <Field label="Top" title={RAMP_FIELD_TITLES.top}>
         <NumberField title={RAMP_FIELD_TITLES.top} width={72} value={ramp.top}

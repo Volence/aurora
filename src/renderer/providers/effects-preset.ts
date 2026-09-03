@@ -133,6 +133,24 @@ import {
 import {
   rampSignRateCaveat, RAMP_SIGN_FIELDS_AWAITING_AEON,
 } from '../../core/formats/effects/ramp-sign-lag';
+// WHICH OF TWO EFFECTS A VSRAM RAMP PRODUCES — the sentences and the measured
+// aeon chain live in core/, this file only RESOLVES the bindings. Same split as
+// the caveat above and for the same reason: the fact is a peer repo's, measured
+// at a revision, and a renderer provider is not where a cross-tool measurement
+// should be restated.
+import {
+  rampScrollModeSentence,
+} from '../../core/formats/effects/ramp-scroll-mode';
+import type {
+  RampScrollBinding, RampScrollUnknownReason,
+} from '../../core/formats/effects/ramp-scroll-mode';
+// THE ONE DERIVATION OF "DOES THIS SCENE ATTACH A PER-COLUMN TABLE".
+// `vDeformValue` is what the scene panel's own V-deform row reads; testing
+// `=== 'none'` a second time here is how this sentence and that control would
+// come to disagree about what an off state is (and `undefined` is a third
+// spelling of off that a bare comparison misses).
+import { vDeformValue } from './effects-aeon';
+import type { EffectsSceneLibrary } from '../../core/formats/effects/scene';
 
 // ---------------------------------------------------------------------------
 // THE THREE LIMITS — one source, read by the panel and by the wording gate
@@ -3073,6 +3091,97 @@ export function rampDriftSummary(ramp: EffectsPresetRamp): string {
   return `One rate over ${ramp.lines} line${ramp.lines === 1 ? '' : 's'}: the accumulator starts `
     + `at ${fmtRampPx(start)} px and ends at ${fmtRampPx(end)} px, a total of `
     + `${fmtRampPx(end - start)} px. The engine writes the whole part of it every line.`;
+}
+
+// ── which effect this ramp actually produces: the bindings, resolved ────────
+
+/**
+ * WHOSE SCENE DECIDES THIS SECTION'S VSRAM MODE — one binding per section that
+ * names this preset, resolved through the SAME fallback chain the model
+ * declares.
+ *
+ * ═══ A PRESET IS NOT A SCENE, AND THEY MEET ONLY AT A SECTION ═══
+ *
+ * The ramp is authored in a preset document; `v_deform` lives on a scene
+ * document; `section_N.meta.json` carries `rasterRef` AND `sceneRef`, so the
+ * section is the only place the two can be joined. That makes the honest answer
+ * PER SECTION, and this function refuses to collapse it: it returns one row per
+ * binding and lets `rampScrollModeSentence` say so when the rows disagree.
+ *
+ * ⚠ `sceneRef: null` IS THE ACT DEFAULT, NOT "NO SCENE". `Section.sceneRef`'s
+ * own docblock: null falls back to `Act.sceneRef`, and only below THAT to the
+ * engine's hand-authored config. Treating null as absent would report every
+ * section that never touched the scene dropdown as unanswerable while the act
+ * was in fact naming a scene for all of them.
+ *
+ * ⚠ AND THE BOTTOM OF THE CHAIN IS NOT AN ARM — IT IS `unknown`. When the act
+ * names no scene either, the config is aeon's `act_parallax_config` in
+ * `act_descriptor.emp`, a file this editor has never opened. That is the common
+ * case in aeon's tree today (their `project.json` has `sceneRef: null` and there
+ * is no `data/editor/effects/` at all), which is exactly why it must not be
+ * quietly folded into "full-screen": it would be a confident sentence about a
+ * document nobody here has read.
+ *
+ * A DANGLING REF IS ALSO `unknown`, and it is reachable with no bug: the sidecar
+ * is hand-editable, aeon's generator writes it too, and a scene can be deleted,
+ * renamed, or sitting in `unreadable`. `unassignableSceneRef`'s own reason,
+ * applied one layer further out — and the `unreadable` test is spelled the same
+ * way it is there, so the two cannot disagree about which failure it was.
+ */
+export function rampScrollBindings(
+  sections: readonly ({ rasterRef: string | null; sceneRef: string | null } | null)[],
+  actSceneRef: string | null,
+  scenes: EffectsSceneLibrary,
+  presetId: string,
+): RampScrollBinding[] {
+  const out: RampScrollBinding[] = [];
+  sections.forEach((s, index) => {
+    if (!s || s.rasterRef !== presetId) return;
+    const via: 'section' | 'act' = s.sceneRef !== null ? 'section' : 'act';
+    const ref = s.sceneRef !== null ? s.sceneRef : actSceneRef;
+    if (ref === null) {
+      out.push({ section: index, mode: 'unknown', sceneId: null, via: null, reason: 'act-unset' });
+      return;
+    }
+    const scene = scenes.scenes.find((sc) => sc.id === ref);
+    if (scene !== undefined) {
+      out.push({
+        section: index,
+        mode: vDeformValue(scene) === null ? 'full' : 'column',
+        sceneId: ref,
+        via,
+        reason: null,
+      });
+      return;
+    }
+    const unreadable = scenes.unreadable.some((u) => u.path.endsWith(`/${ref}.json`));
+    const reason: RampScrollUnknownReason = via === 'section'
+      ? (unreadable ? 'section-unreadable' : 'section-dangling')
+      : (unreadable ? 'act-unreadable' : 'act-dangling');
+    out.push({ section: index, mode: 'unknown', sceneId: ref, via, reason });
+  });
+  return out;
+}
+
+/**
+ * The ramp card's scroll-mode sentence: the painted half and the contract half.
+ *
+ * ONE CALL FOR THE PANEL, because the panel holds no rules — it has the act and
+ * the two libraries and asks this one question, exactly as it asks
+ * `deletePresetRefusal` and `sectionRasterAdvisory`.
+ *
+ * ⚠ IT ADVISES; IT DOES NOT GATE. Both arms are features. Nothing is disabled by
+ * this sentence and no document is refused because of it — `raster-binding.ts`'s
+ * standing refusal, and the reason it applies here is stronger than usual: an
+ * author who WANTS a 16-pixel sliver is not making a mistake.
+ */
+export function rampScrollModeAdvisory(
+  sections: readonly ({ rasterRef: string | null; sceneRef: string | null } | null)[],
+  actSceneRef: string | null,
+  scenes: EffectsSceneLibrary,
+  presetId: string,
+): { short: string; full: string } {
+  return rampScrollModeSentence(rampScrollBindings(sections, actSceneRef, scenes, presetId));
 }
 
 // ── commands ───────────────────────────────────────────────────────────────
