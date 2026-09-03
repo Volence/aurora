@@ -478,6 +478,53 @@ export const XVFB_TMPDIR_RE = /^\/tmp\/xvfb-run\.[A-Za-z0-9]{6}$/;
  *  socket would take his desktop down. */
 export const NEVER_REAP_DISPLAYS = new Set([0]);
 
+/**
+ * O78. The xvfb-run tempdirs this process INHERITED — a wrapper we are running
+ * UNDER, never one we started.
+ *
+ * ⚠ THIS IS THE `DISPLAY` TRAP ONE FIELD OVER, AND IT COST A GREEN HARNESS ITS
+ * EXIT CODE. `displayArtifacts` is careful never to take a display number from
+ * an environment variable, because our own process may have inherited `:0` from
+ * the desktop — and then it read `XAUTHORITY` out of a descendant's environ and
+ * called the directory ours. Under an OUTER `xvfb-run` (`xvfb-run -a npm run
+ * harness:…`, the shape a sweep uses), that variable names the OUTER wrapper's
+ * `/tmp/xvfb-run.XXXXXX/`. Every child we spawn inherits it — harnesses delete
+ * `DISPLAY` from the child env, not `XAUTHORITY` — so it appears in our own
+ * tree's environs and matches XVFB_TMPDIR_RE exactly. The reap then deleted the
+ * outer wrapper's Xauthority file while its Xvfb was still up. Measured
+ * 2026-09-03: the harness exited 0 with 44 rows and 0 failed, and the outer
+ * `xvfb-run` then ran `xauth remove ":287"` at :188 against a file that was no
+ * longer there, got `xauth: error in locking authority file`, and `set -e`
+ * (armed at :26, re-armed at :182) aborted it BEFORE `exit $RETVAL` at :197.
+ * Exit 1. Nothing signalled the harness; its own exit code was never wrong.
+ *
+ * Both our own env and every ancestor's are read: our children get ours, and
+ * ours came from an ancestor, so one hop is enough in practice — the walk is a
+ * few file reads and costs nothing.
+ */
+export function inheritedXauthDirs() {
+  const dirs = new Set();
+  const add = (v) => {
+    if (!v) return;
+    const dir = v.replace(/\/[^/]*$/, '');
+    if (XVFB_TMPDIR_RE.test(dir)) dirs.add(dir);
+  };
+  add(process.env.XAUTHORITY);
+  let pid = process.pid;
+  for (let hop = 0; hop < 32 && pid > 1; hop++) {
+    let ppid = 0;
+    try {
+      const st = readFileSync(`/proc/${pid}/status`, 'utf8');
+      ppid = Number(/^PPid:\s*(\d+)$/m.exec(st)?.[1] ?? 0);
+    } catch { break; }
+    if (!ppid) break;
+    try { add(/(?:^|\0)XAUTHORITY=([^\0]*)/.exec(readFileSync(`/proc/${ppid}/environ`, 'utf8'))?.[1]); }
+    catch { /* not readable — one fewer exclusion, never a licence to delete */ }
+    pid = ppid;
+  }
+  return dirs;
+}
+
 /** Block without a timer, so the exit-handler path (which cannot await) can
  *  still give a SIGKILLed process the moment it needs to release its socket. */
 function sleepSync(ms) {
@@ -567,13 +614,17 @@ export function boundSocketPaths(path = '/proc/net/unix') {
  *     variable, which our own process may have inherited from the desktop and
  *     which would therefore name `:0`;
  *   - a tempdir comes from the XAUTHORITY of a process inside our own tree,
- *     and only if it matches XVFB_TMPDIR_RE.
+ *     and only if it matches XVFB_TMPDIR_RE **and we did not inherit it
+ *     ourselves** (O78 — see `inheritedXauthDirs`; a variable a child got from
+ *     us is evidence about our ancestors, not about what we started).
  */
 export function displayArtifacts(rootPid) {
   const displays = [];
   const tmpdirs = new Set();
   const unknown = [];
-  if (!Number.isInteger(rootPid)) return { displays, tmpdirs: [], unknown: ['no root pid'] };
+  const inherited = new Set();
+  const ours = inheritedXauthDirs();
+  if (!Number.isInteger(rootPid)) return { displays, tmpdirs: [], unknown: ['no root pid'], inherited: [] };
   for (const pid of descendants(rootPid)) {
     if (pid === process.pid) continue;
     const argv = cmdlineOf(pid);
@@ -587,11 +638,11 @@ export function displayArtifacts(rootPid) {
       const xa = /(?:^|\0)XAUTHORITY=([^\0]*)/.exec(env);
       if (xa) {
         const dir = xa[1].replace(/\/[^/]*$/, '');
-        if (XVFB_TMPDIR_RE.test(dir)) tmpdirs.add(dir);
+        if (XVFB_TMPDIR_RE.test(dir)) { if (ours.has(dir)) inherited.add(dir); else tmpdirs.add(dir); }
       }
     } catch { /* raced with exit, or not readable — not fatal, just less to reap */ }
   }
-  return { displays, tmpdirs: [...tmpdirs], unknown };
+  return { displays, tmpdirs: [...tmpdirs], unknown, inherited: [...inherited] };
 }
 
 /**
@@ -603,11 +654,17 @@ export function displayArtifacts(rootPid) {
  *   2. never while the Xvfb we recorded is still alive;
  *   3. never while /proc/net/unix shows the display's socket still BOUND —
  *      i.e. some live server answers on it, ours or not;
- *   4. never a tempdir outside XVFB_TMPDIR_RE.
+ *   4. never a tempdir outside XVFB_TMPDIR_RE;
+ *   5. never a tempdir this process INHERITED (O78) — a wrapper we run under,
+ *      whose Xauthority we would be deleting out from under a live Xvfb. The
+ *      gate is here as well as in `displayArtifacts` because a caller may hand
+ *      this function a set it built by hand, and "somebody else assembled the
+ *      list" has never been a licence to delete in this file.
  */
 export function reapDisplays(art, { quiet = false, bound = boundSocketPaths() } = {}) {
   const removed = [];
   const refused = [];
+  const inheritedDirs = inheritedXauthDirs();
   // GATE 0 — BLIND. `bound === null` means the socket table could not be read,
   // and this function's whole licence to delete rests on being able to tell a
   // live server from a corpse. Refuse EVERYTHING and say why: the cost of
@@ -620,6 +677,7 @@ export function reapDisplays(art, { quiet = false, bound = boundSocketPaths() } 
         + 'this display?" has no answer and nothing is removed');
     }
     for (const dir of art?.tmpdirs ?? []) refused.push(`${dir} — BLIND: see above; the whole reap is refused, not half of it`);
+    for (const d of art?.inherited ?? []) refused.push(`${d} — INHERITED (not claimed): an outer xvfb-run's tempdir`);
     for (const u of art?.unknown ?? []) refused.push(`UNMEASURABLE: ${u}`);
     if (!quiet) {
       console.log('cleanup: X reap REFUSED ENTIRELY — /proc/net/unix unreadable, so liveness is unknown');
@@ -644,6 +702,11 @@ export function reapDisplays(art, { quiet = false, bound = boundSocketPaths() } 
   }
   for (const dir of art?.tmpdirs ?? []) {
     if (!XVFB_TMPDIR_RE.test(dir)) { refused.push(`${dir} — not an xvfb-run tempdir`); continue; }
+    if (inheritedDirs.has(dir)) {
+      refused.push(`${dir} — INHERITED: it is named by our own XAUTHORITY, so it belongs to an `
+        + 'xvfb-run we are running UNDER, not to anything we started');
+      continue;
+    }
     if (!existsSync(dir)) continue;
     try { rmSync(dir, { recursive: true, force: true }); removed.push(`${dir}/`); }
     catch (e) { refused.push(`${dir} — ${e.message}`); }
@@ -651,6 +714,12 @@ export function reapDisplays(art, { quiet = false, bound = boundSocketPaths() } 
   // LOUD ON UNMEASURABLE: an Xvfb we could not attribute a display to is said
   // out loud rather than folded into a clean count.
   for (const u of art?.unknown ?? []) refused.push(`UNMEASURABLE: ${u}`);
+  // ...and loud on what GATE 5 removed from the claim set upstream, so a run
+  // under an outer wrapper says so instead of silently reaping one fewer dir.
+  for (const d of art?.inherited ?? []) {
+    refused.push(`${d} — INHERITED (not claimed): our own XAUTHORITY names it, so it is an outer `
+      + "xvfb-run's tempdir and its Xvfb is still up");
+  }
   if (!quiet && (removed.length || refused.length)) {
     console.log(`cleanup: X artifacts reaped (${removed.length}): ${removed.join(' ') || 'none'}`);
     for (const r of refused) console.log(`cleanup: X artifact REFUSED — ${r}`);
@@ -867,6 +936,7 @@ function mergeArtifacts(a, b) {
     displays,
     tmpdirs: [...new Set([...a.tmpdirs, ...b.tmpdirs])],
     unknown: [...a.unknown, ...b.unknown],
+    inherited: [...new Set([...(a.inherited ?? []), ...(b.inherited ?? [])])],
   };
 }
 
