@@ -273,6 +273,20 @@ const clickByText = (re, tag = 'button') => String.raw`
  * every band harness in this repo has to open these two sections before
  * touching anything in them. Copied from bganim-motion-harness's OPEN_BAND_LIST.
  */
+// ⚠ THE TILE-ANIM SUB-TAB (2026-09-02, `three_sub_tabs_plus_section_strip`;
+// providers/effects-sub-tabs.ts). `aeon.bganim.bands` and `aeon.bganim.new` are
+// on the `tileAnim` tab and the facet arrives on `parallax`. A section on an
+// inactive tab is NOT MOUNTED — not collapsed, absent — so both SECTION_STATE
+// calls below answered 'no-section' and thirteen rows failed at once. The tab
+// button is a real <button onClick> (EffectsSubTabBar.tsx).
+const SELECT_TILE_ANIM_TAB = String.raw`
+(() => {
+  const t = document.querySelector('[data-effects-sub-tab="tileAnim"]');
+  if (!t) return 'no-tab-bar';
+  t.click();
+  return 'clicked';
+})()`;
+
 const SECTION_STATE = (re, click) => String.raw`
 (() => {
   const isHeader = (el) => {
@@ -403,11 +417,17 @@ async function main() {
     const pill = await c.evalExpr(clickByText('/^Effects$/'));
     check('2a', 'the facet bar offers an Effects pill', pill === true);
     await sleep(1500);
+    const tabbed = await c.evalExpr(SELECT_TILE_ANIM_TAB);
+    await sleep(1000);
+    const subTab = await c.evalExpr('window.__dbg.parallaxPreview().subTab');
+    check('2a2', 'the Tile anim sub-tab is active, so its sections are MOUNTED [instrument]',
+      subTab === 'tileAnim',
+      `SELECT_TILE_ANIM_TAB -> ${JSON.stringify(tabbed)}; store subTab=${JSON.stringify(subTab)}`);
     const headings = await c.json(
       `[...document.querySelectorAll('span')].map(e => (e.textContent||'').trim())
-        .filter(t => /^(Scenes|Layers|BG animation bands|New band)/.test(t))`);
+        .filter(t => /^(Scenes|Layers|Tile animations|New tile animation)/.test(t))`);
     check('2b', 'ANTI-VACUOUS: the Effects panel is mounted with the band sections',
-      headings.some((t) => t.startsWith('BG animation bands')), JSON.stringify(headings));
+      headings.some((t) => t.startsWith('Tile animations')), JSON.stringify(headings));
 
     // THE SUBJECT ASSERTION. A run on a project with no override document, no
     // bands, or a viewport painting the ACT DEFAULT would light nothing and
@@ -458,8 +478,8 @@ async function main() {
     // THE COLLAPSED-SECTION CALL, asserted rather than assumed. Both band
     // sections arrive shut (ROADMAP item 45), and everything in sections 4-6
     // runs with them shut.
-    const sBands = await c.evalExpr(SECTION_STATE('/^BG animation bands/', false));
-    const sNew = await c.evalExpr(SECTION_STATE('/^New band/', false));
+    const sBands = await c.evalExpr(SECTION_STATE('/^Tile animations\\b/', false));
+    const sNew = await c.evalExpr(SECTION_STATE('/^New tile animation/', false));
     // A collapsed CollapsibleSection renders NO CHILDREN, so the form controls
     // are not merely hidden — they are absent from the DOM. That absence is the
     // assertion: it is what makes "the lens works with the panel shut" a claim
@@ -708,8 +728,8 @@ async function main() {
 
     // ---- 7. THE STORE LIFT: the form moves the map ------------------------
     // Open both sections (they arrive shut) and drive the real controls.
-    const openBands = await c.evalExpr(SECTION_STATE('/^BG animation bands/', true));
-    const openNew = await c.evalExpr(SECTION_STATE('/^New band/', true));
+    const openBands = await c.evalExpr(SECTION_STATE('/^Tile animations\\b/', true));
+    const openNew = await c.evalExpr(SECTION_STATE('/^New tile animation/', true));
     await sleep(700);
     check('7z', '[instrument] both band sections opened the way a human opens them',
       (openBands === 'clicked' || openBands === 'already-open')
@@ -887,13 +907,17 @@ async function main() {
     // and the card's own footprint line must be as neutral as the candidate's.
     const cardClicked = await c.evalExpr(String.raw`
       (() => {
+        // ⚠ THE CARD'S TITLE MOVED at 023e0ed9: the Field label is
+        // \`Tile animation N\` now (BgAnimBandPanel.tsx:500), not \`Band N\`.
+        // The old anchor matched nothing and this returned 'no-card' — a
+        // string that reads like a missing feature and was a missing word.
         const t = [...document.querySelectorAll('*')].find((e) => e.children.length === 0
-          && /^Band 0$/.test((e.textContent || '').trim()));
+          && /^Tile animation 0$/.test((e.textContent || '').trim()));
         if (!t) return 'no-card';
         let card = t;
         for (let i = 0; i < 6 && card; i++) {
           card = card.parentElement;
-          if (card && /^Band 0/.test((card.textContent || '').trim())
+          if (card && /^Tile animation 0/.test((card.textContent || '').trim())
               && card.textContent.includes('Demote')) { card.click(); return 'clicked'; }
         }
         return 'no-card';
