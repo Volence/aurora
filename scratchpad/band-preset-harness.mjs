@@ -13,6 +13,23 @@
 //        LIMITS AS BODY TEXT BEFORE ANY CONTROL, AND THE PANEL ROUND-TRIPS A
 //        PRESET DOCUMENT AURORA DID NOT AUTHOR.
 //
+// ⚠ THE FIRST HALF OF THAT CLAIM WAS AMENDED, NOT DROPPED — `b8d16256`
+// (2026-09-02, EFFECTS-W1 defect 3), and section 3 was a day late following it.
+// The block painted 8,059 characters of design memo before the first control in
+// a 285px column; it now paints 875 and carries the contract-length wording on
+// the SAME elements' `title`. "Render the limits in full, never a tooltip" was
+// right that a hover-only limit is a limit the panel does not carry — and a
+// limit nobody reaches the bottom of is also one — so the split is BY AUDIENCE
+// and the claim now has two halves:
+//
+//        EVERY LIMIT RENDERS VISIBLY AND UNCONDITIONALLY AT AUTHOR LENGTH,
+//        AND THE CONTRACT WORDING IS ONE HOVER AWAY ON THE SAME ELEMENT.
+//
+// Rows 3a-3e assert BOTH, per element. A row that checked only the painted half
+// would go green on a build that dropped every hover, which is the re-point this
+// repo names as its dominant defect class; one that checked only the hover is
+// what section 3 accidentally became for a day, and it could not go green at all.
+//
 // Two claims. The second is what makes the first worth anything: a panel that
 // only warns is not a feature, and a panel that only works is the lie aeon's
 // page was written to prevent.
@@ -27,10 +44,18 @@
 //     substring off it, and PLANT=rot-selector reproduces the end-anchored rot
 //     that has bitten this repo five times.
 //   • THE LIMITS ARE PRESENT BUT INVISIBLE — in a `title=`, in a collapsed
-//     detail, or below the section's scroll edge. Rows 3a..3c read
-//     `innerText` (which excludes attribute text and `display:none` subtrees),
-//     not `textContent`, and row 3e asserts the block is inside the painted box
-//     of its own scroller.
+//     detail, or below the section's scroll edge. Rows 3a..3e read the author's
+//     half out of `innerText` (which excludes attribute text and `display:none`
+//     subtrees) and never out of `textContent`, so a limit that slid entirely
+//     into its own hover reads as ABSENT from the painted half; row 3f asserts
+//     the block is inside the painted box of its own scroller.
+//   • THE CONTRACT WORDING QUIETLY LEAVES THE HOVER once the author-length
+//     sentence is what the row reads. That is the mirror failure the O77 repair
+//     created the room for, and each row's SECOND half is what closes it: the
+//     `title` is asserted on the same element, by phrases only that limit's
+//     contract wording carries. Row 2c is the floor under both — four titled
+//     prose parts, three distinct leads, every part with a painted body AND a
+//     hover — asserted before any row reads a substring off one.
 //   • THE PANEL RENDERS THE LIMITS AND NOTHING ELSE WORKS. Section 4 drives a
 //     real edit and reads the DOCUMENT back through `__dbg.aeon.presetsJson()`,
 //     so "the warning is there" cannot substitute for "the feature is there".
@@ -429,6 +454,90 @@ async function main() {
       throw new Error('limit block not found — section 3 cannot be measured');
     }
 
+    // ═════════════════════════════════════════════════════════════════════
+    // 2c. THE TWO HALVES OF EACH LIMIT, PULLED APART — O77
+    // ═════════════════════════════════════════════════════════════════════
+    //
+    // ⚠ WHY THIS EXISTS AT ALL, AND WHAT IT REPLACES. Until O77 every row in
+    // section 3 matched its phrases against ONE string: `panelText`, the block's
+    // `innerText`. That was right while the block painted the contract-length
+    // wording. `b8d16256` (2026-09-02, EFFECTS-W1 defect 3) amended the ruling
+    // it was written to: the panel now paints the AUTHOR-length sentence and
+    // carries the contract-length one on the SAME element's `title`. innerText
+    // excludes attribute text BY DESIGN — that is the whole reason this harness
+    // reads it — so from that commit rows 3a, 3b and 3e were matching the
+    // contract wording against a string it had deliberately left, and were
+    // INCAPABLE OF GREEN. They carried no information for a day, and the reason
+    // was invisible to a grep: every phrase they asserted is still in the
+    // provider, just no longer painted. MEASURED here 2026-09-03: the block's
+    // innerText is 875 chars (it was 8,059) and the four `title`s hold
+    // 6474 + 384 + 230 + 797.
+    //
+    // THE AMENDMENT IS NOT A RETIREMENT, so neither is the repair. The ruling
+    // now has TWO halves — "every limit renders visibly at author length" AND
+    // "the contract wording is one hover away on the same element" — and a row
+    // that checked only the painted half would be the re-point this repo calls
+    // its dominant defect: it would go green on a build that dropped the hover
+    // entirely. Each row below asserts BOTH halves of ONE element, so neither
+    // can quietly become the other, and both are scoped to that element rather
+    // than to the whole block — which also ends the uniqueness problem that bit
+    // row 3b (`fails loudly` occurs 3× in effects-preset.ts, and the SHORT body
+    // is one of them: the pre-O77 row printed `loud=true` while every one of its
+    // other conjuncts was false).
+    //
+    // KEYED BY THE PAINTED LEAD-IN, NOT BY INDEX. `LimitBlock` renders each
+    // limit as `<span>{title}.</span> {body}` under a `title={full}`, and
+    // NO_PREVIEW as the same div with no lead span — so the lead is a structural
+    // key the panel already draws, and a reorder is caught by row 2c rather than
+    // silently re-attributing one limit's wording to another.
+    const LIMIT_PARTS = String.raw`
+      (() => {
+        const box = ${LIMIT_BLOCK};
+        if (!box) return [];
+        return [...box.children]
+          .filter((el) => el.tagName === 'DIV' && el.hasAttribute('title'))
+          .map((el) => ({
+            text: el.innerText,
+            title: el.getAttribute('title') || '',
+            lead: (el.firstElementChild && el.firstElementChild.tagName === 'SPAN')
+              ? (el.firstElementChild.textContent || '').trim() : '',
+          }));
+      })()`;
+    const parts = await c.json(LIMIT_PARTS);
+    /** The lead-ins `PRESET_LIMITS` supplies, in the order the panel renders them. */
+    const LEADS = [
+      'Saving does not install the band.',
+      'Seeing it is a debug chord.',
+      'Nothing checks that a band is visible.',
+    ];
+    // NOT `?? {}`. A part that is not there must make its row say so, not make
+    // it pass over an empty string — an absent limit and a silent one read the
+    // same otherwise. The sentinel is impossible to match, and it PRINTS.
+    const MISSING = Object.freeze({ text: '', title: '', missing: true });
+    const partByLead = (lead) => parts.find((p) => p.lead === lead) ?? MISSING;
+    const noPreviewParts = parts.filter((p) => p.lead === '');
+    const noPreview = noPreviewParts.length === 1 ? noPreviewParts[0] : MISSING;
+    // ANTI-VACUOUS FLOOR FOR EVERYTHING BELOW, asserted before any row reads a
+    // substring off a part. Four titled prose divs, the three leads present and
+    // distinct, exactly one unled (the no-preview line), and every part carrying
+    // BOTH a painted body and a hover. A build that dropped every `title` would
+    // stop here rather than at three separate rows naming three sentences.
+    check('2c', 'each limit is ONE element carrying a painted body AND the contract wording on its hover',
+      parts.length === 4
+      && LEADS.every((l) => parts.filter((p) => p.lead === l).length === 1)
+      && noPreviewParts.length === 1
+      && parts.every((p) => p.text.length > 80 && p.title.length > 100),
+      `${parts.length} titled prose parts: `
+      + JSON.stringify(parts.map((p) => ({
+        lead: p.lead || '(no lead — the no-preview line)',
+        painted: p.text.length, hover: p.title.length,
+      }))));
+    const unbound = partByLead(LEADS[0]);
+    const debugChord = partByLead(LEADS[1]);
+    const unchecked = partByLead(LEADS[2]);
+    /** Every word the block can put in front of an author, painted or hovered. */
+    const allProse = [panelText, ...parts.map((p) => p.title)].join('\n');
+
     // ---- 3. THE CLAIM: all three limits, as VISIBLE BODY TEXT. -----------
     //
     // `innerText`, NOT `textContent`, and that is the whole point of the row:
@@ -450,43 +559,131 @@ async function main() {
     // rather than on a painting failure. It now anchors on the case split's two
     // halves, which is the pair an author must SEE together: bind section 5 and
     // aeon can carry it, bind any other and nothing consumes the key.
-    check('3a', 'LIMIT 1 is visible: section 5 is wired and no other section is',
-      /rasterRef/.test(panelText) && /ONLY SECTION 5 IS WIRED/.test(panelText)
-      && /BINDING ANY OTHER SECTION STILL REACHES NOTHING/.test(panelText)
-      && /a preset split plus one call-site line/i.test(panelText)
-      && /costs ROM/i.test(panelText),
-      `rasterRef=${/rasterRef/.test(panelText)} `
-      + `sec5Wired=${/ONLY SECTION 5 IS WIRED/.test(panelText)} `
-      + `othersReachNothing=${/BINDING ANY OTHER SECTION STILL REACHES NOTHING/.test(panelText)} `
-      + `splitPlusLine=${/a preset split plus one call-site line/i.test(panelText)} `
-      + `costsROM=${/costs ROM/i.test(panelText)}`);
-    check('3b', 'LIMIT 2 is visible: seeing it is a debug chord over a hand-typed table',
-      /START/.test(panelText) && /hand-typed dc\.l list/.test(panelText)
-      && /does not add itself/i.test(panelText) && /fails loudly/i.test(panelText),
-      `chord=${/START/.test(panelText)} handTyped=${/hand-typed dc\.l list/.test(panelText)} `
-      + `notSelfAdding=${/does not add itself/i.test(panelText)} `
-      + `loud=${/fails loudly/i.test(panelText)}`);
-    check('3c', 'LIMIT 3 is visible: nothing checks that a band is visible',
-      /builds green and shows nothing/i.test(panelText)
-      && /unused palette entry/i.test(panelText));
+    check('3a', 'LIMIT 1: the author-length sentence is PAINTED and the contract wording is on its hover',
+      // PAINTED — the author's half. `SHORT_BODIES.unbound`, and the two clauses
+      // an author has to act on: that a SECTION must bind the document, and that
+      // the control which does it is the one below this block.
+      /a section has to BIND it/.test(unbound.text)
+      && /aeon has to have wired that section/.test(unbound.text)
+      && /at the dropdown below/.test(unbound.text)
+      // HOVERED — the contract half, `RASTER_SECTION_BINDING_LIMIT`, the sentence
+      // this panel, `assign_section_preset`'s reply and the published tool
+      // descriptions all quote. Same five phrases the pre-O77 row asserted; the
+      // string they are asserted against is the one that carries them.
+      && /rasterRef/.test(unbound.title)
+      && /ONLY SECTION 5 IS WIRED/.test(unbound.title)
+      && /BINDING ANY OTHER SECTION STILL REACHES NOTHING/.test(unbound.title)
+      && /a preset split plus one call-site line/i.test(unbound.title)
+      && /costs ROM/i.test(unbound.title),
+      unbound.missing ? 'NO ELEMENT LED "Saving does not install the band." — the limit is gone'
+        : `painted(${unbound.text.length}B): mustBind=${/a section has to BIND it/.test(unbound.text)} `
+        + `aeonWired=${/aeon has to have wired that section/.test(unbound.text)} `
+        + `namesTheControl=${/at the dropdown below/.test(unbound.text)}; `
+        + `hover(${unbound.title.length}B): rasterRef=${/rasterRef/.test(unbound.title)} `
+        + `sec5Wired=${/ONLY SECTION 5 IS WIRED/.test(unbound.title)} `
+        + `othersReachNothing=${/BINDING ANY OTHER SECTION STILL REACHES NOTHING/.test(unbound.title)} `
+        + `splitPlusLine=${/a preset split plus one call-site line/i.test(unbound.title)} `
+        + `costsROM=${/costs ROM/i.test(unbound.title)}`);
+    check('3b', 'LIMIT 2: the author-length sentence is PAINTED and the debug chord is on its hover',
+      // PAINTED. ⚠ `fails loudly` ALONE IS NOT THIS ROW'S PHRASE and never was:
+      // it occurs three times in effects-preset.ts and one of them is this very
+      // short body, so before O77 it was the one conjunct that stayed true while
+      // the row was measuring the wrong string. Scoped to this element and
+      // carried through to its object.
+      // ⚠ `\x27`, NOT A BARE `'`, AND IT IS NOT STYLE. `check-harness-guards.mjs`
+      // (in `npm test`) strips comments before hunting for `pkill`, and its
+      // `stripInert` has no regex-literal case: a bare apostrophe inside `/…/`
+      // opens a string to it, the scanner desynchronises, and a COMMENT further
+      // down this file — the one saying there is no `pkill` here — survives
+      // stripping and trips G2. Measured: the same file with `aeon's` in these
+      // two regexes fails `check:harness-guards`; with `\x27` it is clean. The
+      // character matched is identical. The checker's fragility is filed in the
+      // O77 packet; this spelling is the local fix, not the general one.
+      /a row in aeon\x27s band-demo table or a section binding/.test(debugChord.text)
+      && /fails loudly when it has neither/.test(debugChord.text)
+      // HOVERED — the chord itself, and the fact the table is hand-typed. These
+      // are what a programmer needs and an author does not, which is why the cut
+      // put them here rather than deleting them.
+      && /START/.test(debugChord.title)
+      && /hand-typed dc\.l list/.test(debugChord.title)
+      && /does not add itself/i.test(debugChord.title)
+      && /aeon 4aa2abc0/.test(debugChord.title),
+      debugChord.missing ? 'NO ELEMENT LED "Seeing it is a debug chord." — the limit is gone'
+        : `painted(${debugChord.text.length}B): `
+        + `rowOrBinding=${/a row in aeon\x27s band-demo table or a section binding/.test(debugChord.text)} `
+        + `loudWhenNeither=${/fails loudly when it has neither/.test(debugChord.text)}; `
+        + `hover(${debugChord.title.length}B): chord=${/START/.test(debugChord.title)} `
+        + `handTyped=${/hand-typed dc\.l list/.test(debugChord.title)} `
+        + `notSelfAdding=${/does not add itself/i.test(debugChord.title)} `
+        + `anchor=${/aeon 4aa2abc0/.test(debugChord.title)}`);
+    // ⚠ THIS ROW WAS GREEN THROUGH THE WHOLE O77 OUTAGE, AND THAT IS THE FINDING
+    // rather than a reprieve. `SHORT_BODIES.unchecked_visibility` happens to keep
+    // both phrases the long body used, so the row went on passing while its two
+    // neighbours could not go green — same instrument, same drift, one accident
+    // of wording apart. It was measuring the painted half only and claiming the
+    // contract wording; it now says which half it reads, like the other three.
+    check('3c', 'LIMIT 3: the author-length sentence is PAINTED and the full wording is on its hover',
+      /builds green and shows nothing/i.test(unchecked.text)
+      && /unused palette entry/i.test(unchecked.text)
+      && /Nothing checks that a band is VISIBLE/.test(unchecked.text)
+      && /No check anywhere in the pipeline catches that/.test(unchecked.title)
+      && /not this panel, not the schema, not the build/.test(unchecked.title),
+      unchecked.missing ? 'NO ELEMENT LED "Nothing checks that a band is visible." — the limit is gone'
+        : `painted(${unchecked.text.length}B): `
+        + `buildsGreen=${/builds green and shows nothing/i.test(unchecked.text)} `
+        + `unusedEntry=${/unused palette entry/i.test(unchecked.text)}; `
+        + `hover(${unchecked.title.length}B): `
+        + `nothingCatches=${/No check anywhere in the pipeline catches that/.test(unchecked.title)} `
+        + `namesAllThree=${/not this panel, not the schema, not the build/.test(unchecked.title)}`);
     check('3d', "the ACCURATE headline is visible, not the inaccurate one",
       /An author can author a raster band/.test(panelText)
       && /programmer wires it up in one line/.test(panelText)
-      // The sentence aeon's page exists to prevent must not appear anywhere.
-      && !/no longer needs a programmer/i.test(panelText));
+      // ⚠ THE NEGATIVE IS TAKEN OVER `allProse`, NOT `panelText` — O77. The
+      // sentence aeon's page exists to prevent must not appear ANYWHERE the
+      // panel can put it in front of an author, and after `b8d16256` most of
+      // this block's prose is in a `title`, which `panelText` does not see. A
+      // negative asserted over the string that lost 88% of the words is a
+      // negative that mostly stopped looking.
+      && !/no longer needs a programmer/i.test(allProse),
+      `headline=${/An author can author a raster band/.test(panelText)} `
+      + `wiresItUp=${/programmer wires it up in one line/.test(panelText)} `
+      + `forbiddenSentenceAbsent=${!/no longer needs a programmer/i.test(allProse)} `
+      + `(searched ${allProse.length}B: ${panelText.length}B painted + ${allProse.length - panelText.length - 4}B hovered)`);
     // ⚠ MATCHER MOVED 2026-08-30 (O64): it pinned "never been looked at on
     // screen", which aeon `4a4d3474` made false; NO_PREVIEW now cites that
     // one frame and says none is built against it. Both halves are pinned
     // here so "aeon measured it" cannot paint as "you can preview it".
-    check('3e', 'and it says there is no preview, rather than leaving a silence',
-      /No preview\. This editor draws no band/.test(panelText)
-      && /could at most be checked against that one frame; none is built/i.test(panelText)
-      && /aeon 4a4d3474 \(2026-08-30\)/.test(panelText)
-      && !/never been looked at on screen/i.test(panelText),
-      `drawsNone=${/This editor draws no band/.test(panelText)} `
-      + `noneBuilt=${/none is built/i.test(panelText)} `
-      + `anchor=${/aeon 4a4d3474 \(2026-08-30\)/.test(panelText)} `
-      + `retiredPhraseGone=${!/never been looked at on screen/i.test(panelText)}`);
+    check('3e', 'and it says there is no preview — PAINTED, with the provenance on its hover',
+      // PAINTED — `NO_PREVIEW_SHORT`. The absence of a preview is the one thing
+      // in this block an author must not have to hover to find: an empty space
+      // where a preview would be reads as "not built yet", and a hover-only
+      // disclosure is a silence to everyone who does not hover.
+      /No preview\. Aurora draws no raster band/.test(noPreview.text)
+      && /a wrong preview would be worse than none/.test(noPreview.text)
+      && /You see it when the ROM runs/.test(noPreview.text)
+      // HOVERED — `NO_PREVIEW`, with the one measured frame it cites. Both halves
+      // of the O64 matcher are kept, on the string that carries them.
+      && /No preview\. This editor draws no band/.test(noPreview.title)
+      && /could at most be checked against that one frame; none is built/i.test(noPreview.title)
+      && /aeon 4a4d3474 \(2026-08-30\)/.test(noPreview.title)
+      // ⚠ AND THE RETIRED PHRASE IS HUNTED ACROSS BOTH HALVES — O77. Before the
+      // prose cut this negative was asserted over the string that held the
+      // provenance; after it, that string holds none of it, so a `NO_PREVIEW`
+      // that regressed to "never been looked at on screen" would have sat in the
+      // hover unseen while the row reported the phrase gone.
+      && !/never been looked at on screen/i.test(noPreview.text)
+      && !/never been looked at on screen/i.test(noPreview.title),
+      noPreview.missing ? 'NO UNLED TITLED DIV IN THE BLOCK — the no-preview line is gone'
+        : `painted(${noPreview.text.length}B): `
+        + `auroraDrawsNone=${/No preview\. Aurora draws no raster band/.test(noPreview.text)} `
+        + `worseThanNone=${/a wrong preview would be worse than none/.test(noPreview.text)} `
+        + `whenTheROMRuns=${/You see it when the ROM runs/.test(noPreview.text)}; `
+        + `hover(${noPreview.title.length}B): `
+        + `drawsNone=${/No preview\. This editor draws no band/.test(noPreview.title)} `
+        + `noneBuilt=${/none is built/i.test(noPreview.title)} `
+        + `anchor=${/aeon 4a4d3474 \(2026-08-30\)/.test(noPreview.title)}; `
+        + `retiredPhraseGoneFromBOTH=`
+        + `${!/never been looked at on screen/i.test(noPreview.text + noPreview.title)}`);
 
     // IS IT ACTUALLY PAINTED? A rect is real even when the scrolling section
     // has clipped it away — the way a sibling harness's first capture came back
