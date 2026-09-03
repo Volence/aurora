@@ -524,12 +524,18 @@ async function main() {
     // ⚠ REPAIRED FOR EW-SHAPE-PREVIEW, NOT RETUNED. The flag left
     // `overlays.showCameraPreview` (a boolean, in every facet's View menu) and
     // became `__dbg.parallaxPreview()` (facet + sub-tab + a tri-state choice),
-    // so the reader moved. Two consequences the row now states rather than
-    // assumes: the composite is ON when this harness reaches it, so `before` is
-    // TRUE and the first click turns it OFF; and the first click records
-    // `choice === false`, which is the value a naive `!stored` toggle would
-    // have got wrong (`!null` is `true`). `back` returns to on, and the round
-    // trip is still the claim.
+    // so the reader moved. The round trip is still the claim, and the row now
+    // states the `choice` at each step as well as the effective value — a
+    // toggle written as `!stored` would flip the effective value the wrong way
+    // on the FIRST click (`!null` is `true`), which no on/off pair can see.
+    //
+    // ⚠ AND THIS HARNESS IS STANDING ON THE COLOUR SUB-TAB HERE (it is looking
+    // at the raster section select), so `before` is OFF and UNDECIDED — the
+    // default is scoped to Parallax. The first version of this repair asserted
+    // `before.on === true` because the parcel's own harness arrives on
+    // Parallax, and it went red on this file for exactly the right reason.
+    // The sub-tab is asserted below so a future re-parenting cannot silently
+    // change what this row is measuring.
     const preview = await c.json(String.raw`(() => {
       const chip = [...document.querySelectorAll('button')]
         .find((b) => /^Parallax preview$/.test((b.textContent || '').trim()));
@@ -555,12 +561,13 @@ async function main() {
       };
     })()`);
     check('6b', 'the Parallax preview chip is painted and toggles the SAME view-store answer — '
-      + 'from ON (the Parallax sub-tab\'s default) to off and back, recording a real choice',
+      + 'off (undecided, on the COLOUR job) to on and back, recording a real choice each time',
       preview.found === true && preview.rects > 0 && preview.visible !== false
       && preview.hitIsChip === true
-      && preview.before.on === true && preview.before.choice === null
-      && preview.after.on === false && preview.after.choice === false
-      && preview.back.on === true && preview.back.choice === true
+      && preview.before.subTab === 'colour'
+      && preview.before.on === false && preview.before.choice === null
+      && preview.after.on === true && preview.after.choice === true
+      && preview.back.on === false && preview.back.choice === false
       && /View > Compose the background/.test(preview.title),
       JSON.stringify(preview));
 
