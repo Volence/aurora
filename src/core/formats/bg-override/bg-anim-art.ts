@@ -38,7 +38,7 @@ import {
 } from './bg-override';
 import { bandSlotBases, documentBands, shiftedPhaseBanks } from './bg-anim-band';
 
-/** Which band a prefix slot belongs to, and where inside its column-major pattern. */
+/** Which band a prefix slot belongs to, and where inside its pattern (see `bandSlotCell`). */
 export interface SlotOwner {
   bandIndex: number;
   band: BgOverrideBand;

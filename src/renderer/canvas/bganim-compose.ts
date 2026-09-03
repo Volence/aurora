@@ -20,6 +20,7 @@
 
 import { blitTile8 } from './compose-nametable';
 import { bandSlotSource } from '../../core/formats/bg-override/bganim-preview';
+import type { BgAnimBandAxis } from '../../core/formats/bg-override/bg-override';
 
 /** One background cell that draws a band slot, resolved once at prepare time. */
 export interface BandOverlayCell {
@@ -39,9 +40,16 @@ export interface BandOverlayCell {
 export interface BandOverlayPhase {
   cols: number;
   rows: number;
+  /**
+   * Which way the band moves. CARRIED, not defaulted here: `bandSlotSource`
+   * rotates whole COLUMNS on a horizontal band and whole ROWS on a vertical one,
+   * and it reads the axis off this object — a phase that dropped the key would
+   * preview a vertical band as a horizontal one, silently and every frame.
+   */
+  axis?: BgAnimBandAxis;
   /** Index into `phases` — the fine half of the step. */
   bank: number;
-  /** Whole pattern columns of rotation — the coarse half. */
+  /** Whole pattern units of rotation — the coarse half. Columns horizontal, ROWS vertical. */
   coarseColumns: number;
 }
 

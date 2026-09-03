@@ -60,6 +60,14 @@ export interface BandCandidate {
   rows: number;
   /** Absent = the panel's default fill (`DEFAULT_PHASE_FILL`). */
   phaseFill?: BandPhaseFill;
+  /**
+   * Absent = the key is left out of the document, which bakes as horizontal.
+   * On the candidate rather than in the panel's React state for this file's own
+   * reason: the Effects bar's chips build their spec from here too, and an axis
+   * the bar could not read would make the chip and the panel author different
+   * bands from the same form.
+   */
+  axis?: BandSpec['axis'];
   /** Absent = the key is left out of the document. */
   driver?: BandSpec['driver'];
   /** Absent = the key is left out of the document. */
@@ -100,6 +108,7 @@ export function bandSpecOf(c: BandCandidate): BandSpec {
     cols: c.cols,
     rows: c.rows,
     phaseFill: c.phaseFill ?? DEFAULT_PHASE_FILL,
+    ...(c.axis !== undefined ? { axis: c.axis } : {}),
     ...(c.driver !== undefined ? { driver: c.driver } : {}),
     ...(c.rateShift !== undefined ? { rateShift: c.rateShift } : {}),
   };

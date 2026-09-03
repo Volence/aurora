@@ -147,15 +147,71 @@ export const BGANIM_DRIVERS: Readonly<Record<string, number>> = Object.freeze(
 /**
  * Legal `driver` values, in contract order.
  *
- * EVERY BAND MOVES HORIZONTALLY, whichever driver it names. `camera_y` means
- * "driven by vertical camera movement", producing horizontal pattern motion —
- * a band editor that presents it as vertical motion is wrong, and it is the
- * natural misreading (aeon engine/level/bg_anim.emp: "Each band is a
- * horizontally-periodic pattern").
+ * A DRIVER IS NOT AN AXIS, and that is the whole of what this name settles: it
+ * picks the SCALAR the step is read from, never which way the band moves.
+ * `camera_y` means "driven by vertical camera movement" and says nothing about
+ * the direction of the motion it produces — it is the natural misreading, and
+ * the answer to it is now the `axis` key rather than "every band moves
+ * horizontally", which was true until aeon 3a4712fa (2026-09-02) and is retired.
  */
 export const BGANIM_DRIVER_NAMES = Object.freeze(Object.keys(BGANIM_DRIVERS));
 
 export type BgAnimDriver = string;
+
+// ---------------------------------------------------------------------------
+// The motion axis — aeon 3a4712fa (EFFECTS-W1 DoD item 8), 2026-09-02
+//
+// THE ENGINE IS AXIS-AGNOSTIC AND ALWAYS WAS. `col_shift` is log2 of the
+// rotation UNIT in bytes and `step_mask` is the pattern period in px minus 1;
+// both are UNITS, not axes, so the vertical arm reuses the same whole-unit DMA
+// rotate with NO ENGINE BYTE CHANGED. What forbade vertical until 2026-09-02
+// was two asserts that spelled the horizontal reading of those two fields as if
+// it were the only one.
+//
+// So the axis is a declaration about ART, and three of the four things that
+// have to be true for it are the WRITER'S — this codec's, and its callers'.
+// aeon's consumer says outright that it cannot check them; they are recorded as
+// `invariants.slotOrder` / `.phaseAxis` / `.axisRoundTrip` in the vendored file:
+//
+//   1  SLOT ORDER.  Band cell (c, r) is slot `base + c*rows + r` on a
+//      horizontal band and `base + r*cols + c` on a vertical one. Same SET of
+//      slots either way — so a check over the set, the count or a checksum of
+//      them is vacuous by construction. Only the ORDER discriminates.
+//   2  PHASES ALONG THE AXIS.  aeon refuses exactly one case: a vertical band
+//      whose eight phases are exact HORIZONTAL translations of phase 0 and are
+//      not also vertical ones. That is precisely what a horizontal-only
+//      shift-fill run over a vertical band produces.
+//   3  ROUND TRIP.  `axis` survives load / edit-something-else / save. Dropping
+//      it reverts the band to horizontal and blinds obligation 2's guard.
+//
+// DIRECTION IS FIXED AND IS NOT A KEY: bank k is phase 0 moved k px toward
+// DECREASING coordinate and the coarse rotate carries the same sign, so an
+// increasing driver scrolls a horizontal band LEFT and a vertical band UP.
+// ---------------------------------------------------------------------------
+
+/** `['horizontal', 'vertical']` — refused by name, in contract order. */
+export const BGANIM_BAND_AXES = Object.freeze(
+  at(['bandKeys', 'axis', 'values']) as string[],
+);
+
+export type BgAnimBandAxis = string;
+
+/** `'horizontal'` — what an absent `axis` bakes as. */
+export const BAND_AXIS_DEFAULT = at(['bandKeys', 'axis', 'default']) as BgAnimBandAxis;
+
+/**
+ * Which band key supplies the ROTATION UNIT on each axis, and which supplies the
+ * PERIOD. Read from the contract, which holds aeon's `_AXIS_UNIT_TILES` /
+ * `_AXIS_PERIOD_TILES` tables verbatim — so a refusal can name the key an author
+ * must change instead of saying "column bytes" to someone editing a vertical
+ * band, which is the shape of message that sends a reader to the wrong field.
+ */
+export const BAND_AXIS_UNIT_KEY = Object.freeze(
+  at(['bandKeys', 'axis', 'unitKey']) as Record<string, 'cols' | 'rows'>,
+);
+export const BAND_AXIS_PERIOD_KEY = Object.freeze(
+  at(['bandKeys', 'axis', 'periodKey']) as Record<string, 'cols' | 'rows'>,
+);
 
 /**
  * The top-level keys the contract declares, in its §1.1 table order.
@@ -197,6 +253,7 @@ export const LEGACY_ANIM_KEY = ((): string => {
 export const BAND_DEFAULTS = Object.freeze({
   driver: at(['bandKeys', 'driver', 'default']) as string,
   rate_shift: at(['bandKeys', 'rate_shift', 'default']) as number,
+  axis: at(['bandKeys', 'axis', 'default']) as BgAnimBandAxis,
 });
 
 /**
@@ -247,6 +304,12 @@ export interface BgOverrideBand {
   cols: number;
   rows: number;
   pattern_px: number;
+  /**
+   * Which way the pattern translates. Optional in the TYPE as well as on disk:
+   * an absent key means `BAND_AXIS_DEFAULT`, and this codec never writes a
+   * default it was not given.
+   */
+  axis?: BgAnimBandAxis;
   driver?: BgAnimDriver;
   rate_shift?: number;
   slot_base?: number;
@@ -296,6 +359,78 @@ export function bandTileCount(band: Pick<BgOverrideBand, 'cols' | 'rows'>): numb
  */
 export function bandColumnBytes(band: Pick<BgOverrideBand, 'rows'>): number {
   return band.rows * TILE_BYTES;
+}
+
+/** Bytes in one pattern ROW, `cols * TILE_BYTES` — a vertical band's rotation unit. */
+export function bandRowBytes(band: Pick<BgOverrideBand, 'cols'>): number {
+  return band.cols * TILE_BYTES;
+}
+
+/** `axis` with the consumer's default applied — the ONE resolution site. */
+export function bandAxis(band: Pick<BgOverrideBand, 'axis'>): BgAnimBandAxis {
+  return (band.axis ?? BAND_AXIS_DEFAULT) as BgAnimBandAxis;
+}
+
+/** True when the band declares the default axis, whether or not it spells it. */
+export function bandIsHorizontal(band: Pick<BgOverrideBand, 'axis'>): boolean {
+  return bandAxis(band) === BAND_AXIS_DEFAULT;
+}
+
+/**
+ * Bytes the runtime rotates by, per whole-tile step of motion: `rows*TILE_BYTES`
+ * on a horizontal band (one pattern column), `cols*TILE_BYTES` on a vertical one
+ * (one pattern row).
+ *
+ * THE POWER-OF-TWO RULE IS ON THIS QUANTITY, and it keeps its SHAPE across both
+ * axes — the consumer computes `unit_shift = unit_bytes.bit_length() - 1` and
+ * asserts `(1 << unit_shift) == unit_bytes`, because the runtime rotates a whole
+ * unit by SHIFTING rather than dividing. What the axis changes is only WHICH
+ * BAND KEY the rule lands on (aeon `_AXIS_UNIT_TILES`), which is why the
+ * refusals below name the key rather than restating the rule.
+ */
+export function bandRotationUnitBytes(
+  band: Pick<BgOverrideBand, 'cols' | 'rows' | 'axis'>,
+): number {
+  return BAND_AXIS_UNIT_KEY[bandAxis(band)] === 'rows'
+    ? bandColumnBytes(band) : bandRowBytes(band);
+}
+
+/**
+ * `pattern_px` — the period ALONG THE AXIS: `cols*TILE_WIDTH_PX` horizontal,
+ * `rows*TILE_WIDTH_PX` vertical (aeon `band_axis_geometry` returns
+ * `period_tiles * 8`, and `main()` asserts `pattern_px == period_px`).
+ */
+export function bandPatternPx(
+  band: Pick<BgOverrideBand, 'cols' | 'rows' | 'axis'>,
+): number {
+  return band[BAND_AXIS_PERIOD_KEY[bandAxis(band)]] * TILE_WIDTH_PX;
+}
+
+/**
+ * Band cell `(c, r)` -> the band-local slot index that draws it.
+ *
+ * OBLIGATION 1, IN ONE PLACE. Column-major on a horizontal band (`c*rows + r`),
+ * ROW-major on a vertical one (`r*cols + c`) — aeon EFFECTS_CONSUMER_CONTRACT.md
+ * §1.2. The two orders produce the SAME SET of slots and differ only in which
+ * cell gets which, so nothing downstream — not the consumer, not a count, not a
+ * checksum — can tell a right one from a wrong one. Every Aurora surface that
+ * turns a band into a grid (the shift fill, the preview's DMA model, the art
+ * composer's atlas) goes through here so there is one order per axis rather than
+ * one per reader.
+ */
+export function bandCellSlot(
+  band: Pick<BgOverrideBand, 'cols' | 'rows' | 'axis'>, col: number, row: number,
+): number {
+  return bandIsHorizontal(band) ? col * band.rows + row : row * band.cols + col;
+}
+
+/** The inverse of `bandCellSlot`: which band cell a local slot index draws. */
+export function bandSlotCell(
+  band: Pick<BgOverrideBand, 'cols' | 'rows' | 'axis'>, localSlot: number,
+): { col: number; row: number } {
+  return bandIsHorizontal(band)
+    ? { col: Math.floor(localSlot / band.rows), row: localSlot % band.rows }
+    : { col: localSlot % band.cols, row: Math.floor(localSlot / band.cols) };
 }
 
 /** Total animated slots = Σ(cols*rows). A PREFIX of `tiles`, never an addition. */
@@ -390,8 +525,25 @@ function validateBand(
     issues.push(
       `anims[${i}].driver is ${JSON.stringify(b.driver)}; the consumer indexes DRIVERS by this ` +
       `name and raises on anything else. Legal: ${BGANIM_DRIVER_NAMES.join(' / ')} ` +
-      `(default ${JSON.stringify(BAND_DEFAULTS.driver)}). A driver names the SCALAR SOURCE, ` +
-      `not an axis — every band moves horizontally.`,
+      `(default ${JSON.stringify(BAND_DEFAULTS.driver)}). A driver names the SCALAR SOURCE the ` +
+      'step is read from and never an axis — which way the band moves is the `axis` key ' +
+      `(${BGANIM_BAND_AXES.join(' / ')}, default ${JSON.stringify(BAND_AXIS_DEFAULT)}).`,
+    );
+  }
+  // THE AXIS, validated before anything that reads it. A bad value here would
+  // otherwise index the unit/period tables with an unknown key and derive
+  // `undefined * 32` for the geometry below, so the geometry checks are skipped
+  // when it is wrong rather than reported against a nonsense unit.
+  const axisSpelled = b.axis !== undefined;
+  const axisLegal = !axisSpelled
+    || (typeof b.axis === 'string' && BGANIM_BAND_AXES.includes(b.axis));
+  if (!axisLegal) {
+    issues.push(
+      `anims[${i}].axis is ${JSON.stringify(b.axis)}; the consumer refuses anything but ` +
+      `${BGANIM_BAND_AXES.map(a => JSON.stringify(a)).join(' / ')} BY NAME (aeon ` +
+      `band_axis_geometry). Absent means ${JSON.stringify(BAND_AXIS_DEFAULT)}. The axis names ` +
+      'which way the band\'s pattern TRANSLATES; it is NOT the `driver`, which names the scalar ' +
+      'the step is read from.',
     );
   }
   if (b.rate_shift !== undefined && (!isInt(b.rate_shift) || b.rate_shift < 0)) {
@@ -399,20 +551,33 @@ function validateBand(
   }
 
   if (!isInt(cols) || !isInt(rows) || cols < 1 || rows < 1) return cursor; // nothing below is derivable
+  // An illegal `axis` was reported above; the geometry below is a function of it,
+  // so deriving it from a value the consumer would refuse would only add noise.
+  if (!axisLegal) return cursor;
 
   const n = bandTileCount({ cols, rows });
-  const colBytes = bandColumnBytes({ rows });
-  if (!isPowerOfTwo(colBytes)) {
+  const geom = { cols, rows, ...(axisSpelled ? { axis: b.axis as BgAnimBandAxis } : {}) };
+  const axis = bandAxis(geom);
+  const unitKey = BAND_AXIS_UNIT_KEY[axis];
+  const periodKey = BAND_AXIS_PERIOD_KEY[axis];
+  const unitBytes = bandRotationUnitBytes(geom);
+  if (!isPowerOfTwo(unitBytes)) {
     issues.push(
-      `anims[${i}]: column bytes rows*${TILE_BYTES} = ${rows}*${TILE_BYTES} = ${colBytes} is not a ` +
-      'power of two. The runtime rotates a whole column by SHIFTING (col_shift = log2 of it), so ' +
-      'the consumer asserts `(1 << col_shift) == col_bytes`. Equivalently: rows must be a power of two.',
+      `anims[${i}]: a ${axis} band rotates by whole ` +
+      `${axis === BAND_AXIS_DEFAULT ? 'columns' : 'rows'} of ${unitKey}*${TILE_BYTES} = ` +
+      `${geom[unitKey]}*${TILE_BYTES} = ${unitBytes} B, and the runtime shifts by that distance ` +
+      '(`col_shift` = log2 of it, and the consumer asserts `(1 << col_shift) == unit_bytes`), so ' +
+      `it must be a power of two — ${unitKey}=${geom[unitKey]} is not. The power-of-two key is ` +
+      `\`${BAND_AXIS_UNIT_KEY[BAND_AXIS_DEFAULT]}\` on a ${BAND_AXIS_DEFAULT} band and ` +
+      `\`${BAND_AXIS_UNIT_KEY.vertical}\` on a vertical one; this band is ${axis}.`,
     );
   }
-  if (b.pattern_px !== undefined && b.pattern_px !== cols * TILE_WIDTH_PX) {
+  const periodPx = bandPatternPx(geom);
+  if (b.pattern_px !== undefined && b.pattern_px !== periodPx) {
     issues.push(
-      `anims[${i}].pattern_px is ${JSON.stringify(b.pattern_px)} but must equal cols*${TILE_WIDTH_PX} = ` +
-      `${cols * TILE_WIDTH_PX}. The consumer derives step_mask = pattern_px - 1 from it.`,
+      `anims[${i}].pattern_px is ${JSON.stringify(b.pattern_px)} but a ${axis} band's pattern ` +
+      `period is ${periodKey}*${TILE_WIDTH_PX} = ${periodPx}. \`pattern_px\` is the period ALONG ` +
+      'THE AXIS, and the consumer derives step_mask = pattern_px - 1 from it.',
     );
   }
 

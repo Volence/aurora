@@ -41,13 +41,27 @@
 // is actively managing, so the number belongs next to the control that spends
 // it, in both directions.
 //
-// ═══ THERE IS NO VERTICAL BAND, AND THE PANEL SAYS SO ═══
+// ═══ THERE IS A VERTICAL BAND NOW, AND IT IS ITS OWN CONTROL ═══
 //
-// Every band shifts HORIZONTALLY. The driver picks the SCALAR SOURCE the step is
-// read from (`camera_x` / `camera_y` / `timer`) and never an axis; `camera_y` is
-// the name that reads like a vertical instruction and is not one. The dropdown's
-// options come from BGANIM_DRIVER_NAMES (read out of the vendored consumer
-// contract) and every one of them carries that correction in its title.
+// This block used to read "THERE IS NO VERTICAL BAND, AND THE PANEL SAYS SO".
+// aeon 3a4712fa (2026-09-02) added the `axis` key, so the panel has an Axis
+// picker — horizontal (the default, scrolls LEFT) or vertical (scrolls UP) —
+// and the old sentence is retired rather than softened, here and in the driver
+// tooltips that carried it.
+//
+// THE DRIVER IS STILL NOT AN AXIS, and the correction is now sharper rather than
+// weaker: the surface HAS a vertical option and `camera_y` is not it. The
+// dropdown's options come from BGANIM_DRIVER_NAMES and the axis picker's from
+// BGANIM_BAND_AXES, both read out of the vendored consumer contract, so neither
+// list can go stale here.
+//
+// AND THE GEOMETRY FORM RESHAPES WITH THE AXIS, which is the part a reader does
+// not expect. The power-of-two constraint is on the ROTATION UNIT in bytes and
+// keeps its shape — what moves is which key carries it: `rows` on a horizontal
+// band, `cols` on a vertical one. So the constrained key is the `<select>` over
+// legal counts and the free key is the number box, and they SWAP when the axis
+// does. A form that left `rows` constrained on a vertical band would offer an
+// author a picker over the wrong key and a free box over an illegal one.
 //
 // ═══ THE PREVIEW LIVES IN THIS SECTION NOW (ROADMAP item 45) ═══
 //
@@ -204,11 +218,11 @@ function LensSwatch(): React.ReactElement {
 }
 import type { AnyCommand } from '../../../core/editing/commands';
 import {
-  DEFAULT_DRIVER, DEFAULT_PHASE_FILL, DEFAULT_RATE_SHIFT, bandBudget,
-  bandRows, clampRateShift, clampStaticBase, demoteBandCommand, driverOptions,
+  DEFAULT_DRIVER, DEFAULT_PHASE_FILL, DEFAULT_RATE_SHIFT, BAND_AXIS_DEFAULT, bandBudget,
+  bandRows, clampRateShift, clampStaticBase, demoteBandCommand, driverOptions, axisOptions,
   patternPxFor, phaseFillOptions,
-  rateShiftNote, removeBandCommand, rowChoices, slotSpanPhrase,
-  type BandCommandResult, type BandPhaseFill,
+  rateShiftNote, removeBandCommand, rotationUnitChoices, slotSpanPhrase,
+  type BandCommandResult, type BandPhaseFill, type BgAnimBandAxis,
 } from '../../providers/bg-anim-aeon';
 // The two creation verbs — label, disabled reason, command — derived ONCE and
 // shared with the Effects facet's tool-options bar (parcel B). This panel no
@@ -319,6 +333,36 @@ export default function BgAnimBandPanel(): React.ReactElement {
   // `(default)` options below write `undefined` rather than today's number.
   const driver = candidate.driver ?? DEFAULT_DRIVER;
   const explicitDriver = candidate.driver !== undefined;
+  // THE AXIS, in the same two-part shape the driver and the rate have: absent
+  // means the key is left out and the file tracks aeon's own default.
+  const axis: BgAnimBandAxis = candidate.axis ?? BAND_AXIS_DEFAULT;
+  const explicitAxis = candidate.axis !== undefined;
+  const horizontalAxis = axis === BAND_AXIS_DEFAULT;
+  // Which key the power-of-two rule lands on, and therefore which control is the
+  // picker. Derived from the provider, never spelled here.
+  const unitChoices = rotationUnitChoices(axis);
+  /**
+   * Set the axis, and repair the geometry ONLY if the swap made it illegal.
+   *
+   * SWAPPING THE AXIS SWAPS WHICH KEY MUST BE A POWER OF TWO, so a 3x4 band that
+   * is legal horizontally has an illegal `cols` the moment it goes vertical. The
+   * picker for the newly-constrained key would then have no option matching the
+   * current value, and a `<select>` with no matching option does not report a
+   * problem — it just reads back as whatever the browser settled on. So the
+   * value is snapped DOWN to the largest legal count that does not exceed it
+   * (never below 1), and only when it is actually illegal: a geometry that
+   * survives the swap is left exactly as the author left it.
+   */
+  const setAxis = (next: BgAnimBandAxis | undefined): void => {
+    const resolved = next ?? BAND_AXIS_DEFAULT;
+    const legal = rotationUnitChoices(resolved);
+    const key = resolved === BAND_AXIS_DEFAULT ? 'rows' : 'cols';
+    const current = key === 'rows' ? candidate.rows : candidate.cols;
+    const repair = legal.includes(current)
+      ? {}
+      : { [key]: legal.filter((n) => n <= current).pop() ?? legal[0] };
+    setCandidate({ axis: next, ...repair });
+  };
   // The rate, in the same two-part shape the driver has and for the same reason:
   // "default" is a STATE OF THE DOCUMENT (the key is absent and the file tracks
   // the consumer), not a number to pre-fill the box with. The seed the box takes
@@ -412,7 +456,8 @@ export default function BgAnimBandPanel(): React.ReactElement {
           <Hint>
             No bands yet. A band declares a contiguous range of the background&apos;s tile blob
             animated: its slots become a prefix of <code>tiles</code> and the runtime shifts them
-            horizontally. Promote a static range below.
+            along the band&apos;s own axis — left, or up if it is vertical. Promote a static range
+            below.
           </Hint>
         )}
 
@@ -460,12 +505,26 @@ export default function BgAnimBandPanel(): React.ReactElement {
                   `slotSpanPhrase`, so the range and the tile count beside it
                   cannot disagree about how many slots this band owns. */}
               {b.slotRange} · {b.tileCount} tile{b.tileCount === 1 ? '' : 's'} ·{' '}
-              {b.patternPx}px pattern · {b.columnBytes}B/col · {b.phaseBanks} banks
+              {b.patternPx}px pattern ·{' '}
+              {/* THE ROTATION UNIT, not "B/col" — on a vertical band the unit is
+                  a whole pattern ROW (cols*32) and calling it a column would name
+                  the wrong key next to the number that constrains it. */}
+              {b.rotationUnitBytes}B/{b.axis === 'vertical' ? 'row' : 'col'} ·{' '}
+              {b.phaseBanks} banks
             </Hint>
             <Hint under>
-              <span title="The scalar source. A tile animation shifts HORIZONTALLY whichever driver it uses.">
+              <span title="The scalar source the step is read from — never an axis. camera_y does
+                            NOT mean vertical motion; the axis beside it is what says which way this
+                            tile animation moves.">
                 driver <strong>{b.driver}</strong>
                 {b.driverIsExplicit ? '' : ' (default — the key is absent)'}
+              </span>
+              {' · '}
+              <span title="Which way this tile animation's pattern translates. horizontal scrolls
+                           LEFT and takes its period from cols; vertical scrolls UP and takes it
+                           from rows. Direction is fixed by the mechanism, not a setting.">
+                axis <strong>{b.axis}</strong>
+                {b.axisIsExplicit ? '' : ' (default — the key is absent)'}
               </span>
               {' · '}
               rate_shift <strong>{b.rateShift}</strong>
@@ -580,35 +639,86 @@ export default function BgAnimBandPanel(): React.ReactElement {
             they are asked once, above both actions. Duplicating them into two
             sections would have been the shape that quietly says one of the two
             is the real one. */}
-        <Field label="Cols" title="Pattern width in tiles">
-          {/* `|| 1` USED TO BE THE EMPTY-BOX ARM, and it was the wrong shape
-              of fix: emptying the box handed this a `Number('')` of 0, which
-              this quietly turned into a 1 the author never typed. The field
-              now commits nothing at all for a box with no number in it, so an
-              empty "Cols" leaves the candidate's width alone. What is left
-              here is the floor, for a 0 or a negative somebody really typed. */}
-          <NumberField title={`cols — pattern_px will be ${patternPxFor(cols)}`}
-            min={1} width={56} value={cols}
-            onChange={(n) => setCols(Math.max(1, Math.round(n) || 1))} />
-        </Field>
-        <Field label="Rows"
-          title="Rows must make rows*32 a power of two — the runtime shifts a whole column">
-          <Select title="rows — constrained so that rows * 32 bytes per column is an exact power of two,
-                         because the runtime rotates a column by shifting it"
-            value={String(bandRowCount)}
-            onChange={(v) => setBandRowCount(Number(v))}
-            style={{ width: 80 }}>
-            {rowChoices().map((r) => <option key={r} value={String(r)}>{r}</option>)}
+        {/* THE AXIS, ABOVE THE GEOMETRY IT RESHAPES. It is asked first because
+            it decides which of the two fields below is the constrained one —
+            reading the form top to bottom is then the same order as deciding
+            it. Same `(default)` contract as the driver and rate pickers: the
+            empty option LEAVES THE KEY OUT, so the document tracks whatever
+            aeon's default is rather than freezing today's into the file. */}
+        <Field label="Axis" title="Which way the pattern translates. NOT the driver.">
+          <Select
+            title="axis — which way this tile animation's pattern moves. horizontal scrolls LEFT
+                   and takes its period from cols; vertical scrolls UP and takes it from rows.
+                   Direction is fixed by the mechanism and is not a setting. Picking vertical also
+                   makes the pre-shifted fill a VERTICAL roll and orders the slots row-major."
+            value={explicitAxis ? axis : ''}
+            onChange={(v) => setAxis(v === '' ? undefined : (v as BgAnimBandAxis))}
+            style={{ flex: 1, minWidth: 0 }}>
+            <option value="">(default — {BAND_AXIS_DEFAULT})</option>
+            {axisOptions().map((o) => (
+              <option key={o.value} value={o.value} title={o.title}>{o.label}</option>
+            ))}
           </Select>
         </Field>
+
+        {/* COLS AND ROWS SWAP SHAPE WITH THE AXIS. Exactly one of them carries
+            the power-of-two rule — `rows` horizontal, `cols` vertical — and that
+            one is the picker over legal counts while the other is a free box.
+            Both branches read their options from `unitChoices`, which the
+            provider derives through the codec, so neither can hold a stale list. */}
+        <Field label="Cols"
+          title={horizontalAxis
+            ? 'Pattern width in tiles — the PERIOD when the axis is horizontal (pattern_px = cols*8)'
+            : 'Pattern width in tiles — the ROTATION UNIT when the axis is vertical, so cols*32 '
+              + 'must be a power of two'}>
+          {horizontalAxis ? (
+            /* `|| 1` USED TO BE THE EMPTY-BOX ARM, and it was the wrong shape
+               of fix: emptying the box handed this a `Number('')` of 0, which
+               this quietly turned into a 1 the author never typed. The field
+               now commits nothing at all for a box with no number in it, so an
+               empty "Cols" leaves the candidate's width alone. What is left
+               here is the floor, for a 0 or a negative somebody really typed. */
+            <NumberField title={`cols — pattern_px will be ${patternPxFor(cols, bandRowCount, axis)}`}
+              min={1} width={56} value={cols}
+              onChange={(n) => setCols(Math.max(1, Math.round(n) || 1))} />
+          ) : (
+            <Select title="cols — constrained so that cols * 32 bytes per pattern ROW is an exact
+                           power of two, because a vertical band rotates a whole row by shifting it"
+              value={String(cols)}
+              onChange={(v) => setCols(Number(v))}
+              style={{ width: 80 }}>
+              {unitChoices.map((c) => <option key={c} value={String(c)}>{c}</option>)}
+            </Select>
+          )}
+        </Field>
+        <Field label="Rows"
+          title={horizontalAxis
+            ? 'Rows must make rows*32 a power of two — the runtime shifts a whole column'
+            : 'Pattern height in tiles — the PERIOD when the axis is vertical (pattern_px = rows*8)'}>
+          {horizontalAxis ? (
+            <Select title="rows — constrained so that rows * 32 bytes per column is an exact power of two,
+                           because the runtime rotates a column by shifting it"
+              value={String(bandRowCount)}
+              onChange={(v) => setBandRowCount(Number(v))}
+              style={{ width: 80 }}>
+              {unitChoices.map((r) => <option key={r} value={String(r)}>{r}</option>)}
+            </Select>
+          ) : (
+            <NumberField title={`rows — pattern_px will be ${patternPxFor(cols, bandRowCount, axis)}`}
+              min={1} width={56} value={bandRowCount}
+              onChange={(n) => setBandRowCount(Math.max(1, Math.round(n) || 1))} />
+          )}
+        </Field>
         <Hint under>
-          {tileCount} slot{tileCount === 1 ? '' : 's'} · {patternPxFor(cols)}px pattern
+          {tileCount} slot{tileCount === 1 ? '' : 's'} ·{' '}
+          {patternPxFor(cols, bandRowCount, axis)}px pattern ·{' '}
+          {horizontalAxis ? 'scrolls left' : 'scrolls up'}
         </Hint>
 
         <Field label="Driver" title="The SCALAR the step is read from. Never an axis.">
           <Select
-            title="Which scalar drives this tile animation's step. Every one shifts HORIZONTALLY whichever
-                   driver it uses — camera_y does NOT mean vertical motion."
+            title="Which scalar drives this tile animation's step. A driver never sets an axis —
+                   camera_y does NOT mean vertical motion. The Axis field above is what does."
             value={explicitDriver ? driver : ''}
             onChange={(v) => setCandidate({ driver: v === '' ? undefined : v })}
             style={{ flex: 1, minWidth: 0 }}>

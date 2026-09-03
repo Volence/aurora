@@ -1161,6 +1161,13 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         bands: bandRows(state.doc).map(b => ({
           index: b.index, cols: b.cols, rows: b.rows, tileCount: b.tileCount,
           patternPx: b.patternPx, columnBytes: b.columnBytes,
+          rotationUnitBytes: b.rotationUnitBytes,
+          // Same shape as `driver` below: the EFFECTIVE axis plus whether the
+          // document spells it, so an agent editing a band cannot write today's
+          // default into a file that was tracking the contract's — and cannot
+          // drop the key off a band that DOES claim vertical, which is writer
+          // obligation 3 and the one aeon's guard cannot see through.
+          axis: b.axis, axisIsExplicit: b.axisIsExplicit,
           // `driver` is the EFFECTIVE value and `driverIsExplicit` says whether
           // the document spells it. An agent that read only the first would
           // write today's default into a file that was tracking the contract's.
@@ -1170,9 +1177,10 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         })),
         // Stated on every reply because it is the fact that decides which of the
         // two authoring doors an agent should reach for.
-        note: 'Every band shifts HORIZONTALLY; `driver` names the scalar source '
-          + '(camera_x/camera_y/timer), never an axis. Adding a band grows the tile blob; '
-          + 'promoting an existing static range does not.',
+        note: '`driver` names the scalar source (camera_x/camera_y/timer) and NEVER an axis; '
+          + 'which way a band moves is its own `axis` key — horizontal (the default, scrolls '
+          + 'LEFT) or vertical (scrolls UP). Adding a band grows the tile blob; promoting an '
+          + 'existing static range does not.',
         actSections: ctx.act.sections.length,
       };
     }
@@ -1183,6 +1191,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       const result = promoteBandCommand(doc, req.staticBase, {
         cols: req.cols, rows: req.rows,
         ...(req.phaseFill !== undefined ? { phaseFill: req.phaseFill } : {}),
+        ...(req.axis !== undefined ? { axis: req.axis } : {}),
         ...(req.driver !== undefined ? { driver: req.driver } : {}),
         ...(req.rateShift !== undefined ? { rateShift: req.rateShift } : {}),
       });
@@ -1204,6 +1213,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       const result = addBandCommand(currentBgOverride(), {
         cols: req.cols, rows: req.rows,
         ...(req.phaseFill !== undefined ? { phaseFill: req.phaseFill } : {}),
+        ...(req.axis !== undefined ? { axis: req.axis } : {}),
         ...(req.driver !== undefined ? { driver: req.driver } : {}),
         ...(req.rateShift !== undefined ? { rateShift: req.rateShift } : {}),
       }, req.phases);

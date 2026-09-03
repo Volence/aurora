@@ -16,6 +16,10 @@ import {
   TILE_PIXEL_MAX,
   TILE_WIDTH_PX,
   BGANIM_DRIVERS,
+  BGANIM_BAND_AXES,
+  BAND_AXIS_DEFAULT,
+  BAND_AXIS_UNIT_KEY,
+  BAND_AXIS_PERIOD_KEY,
   TOP_LEVEL_KEYS,
   BAND_KEYS,
   OWNED_KEYS,
@@ -59,13 +63,25 @@ import { BG_TILE_BASE_SLOT as LOADER_BG_TILE_BASE_SLOT } from '../../src/core/fo
  * 5cef80aaac156a7627ab119c06d6d846f450ca40, verified with `git -C ../aeon show`),
  * and no other value in the file moved. tools/regenerate-level.sh joined
  * `source.documents` because it is what makes that path project-root-relative.
+ *
+ * AMENDED 2026-09-03 with the MOTION AXIS, re-derived at aeon
+ * 3a4712faa920100653669c1ec3fc26c2da71ef68 (reachable from their origin/master)
+ * from tools/inject_editor_bg.py's `BAND_AXES` / `_AXIS_UNIT_TILES` /
+ * `_AXIS_PERIOD_TILES` / `band_axis_geometry` / `validate_band_phase_axis` and
+ * §1.2 of the contract doc. THIS FILE IS A DERIVATION, NOT A BYTE COPY of any
+ * aeon blob — there is no aeon blob whose hash could pin it, which is why the
+ * pin below is over OUR text and why `amendments` records the revision each
+ * value was read at. A partial re-derivation is legitimate and must SAY SO:
+ * `amendments[0].notALL` and `outputDir.note` carry the two values this one did
+ * NOT re-vendor, one of which (the act binding) has moved in SHAPE at that
+ * revision without moving in VALUE. Asserted below rather than left to prose.
  */
 
 const CONTRACT_PATH = resolve(
   __dirname, '../../src/core/formats/bg-override/bganim-consumer-contract.json',
 );
 const CONTRACT_TEXT = readFileSync(CONTRACT_PATH, 'utf8');
-const CONTRACT_SHA256 = '280221247fcd7d6c7211ef671226a69cd8115ab69b041df9580447b2b38b5bbf';
+const CONTRACT_SHA256 = 'a8e385e2e70f464d9869f7ecca6cb459308f5bee591ce045d0b5574e9a3d77d7';
 
 describe('the vendored contract is the one we pinned', () => {
   it('matches the pinned content hash', () => {
@@ -191,9 +207,17 @@ describe('the contract declares a complete, well-formed key model', () => {
   it('names every invariant the codec and the band command enforce, prefix identity included', () => {
     const invariants = at(['invariants']) as Record<string, string>;
     expect(Object.keys(invariants).sort()).toEqual([
-      'bandCeiling', 'capacity', 'columnBytesPowerOfTwo', 'contiguousPacking',
-      'insideTheBlob', 'layoutTileIndex', 'patternWidth', 'prefixIdentity',
+      'axisRoundTrip', 'bandCeiling', 'capacity', 'contiguousPacking',
+      'insideTheBlob', 'layoutTileIndex', 'patternPeriod', 'phaseAxis',
+      'prefixIdentity', 'rotationUnitPowerOfTwo', 'slotOrder',
     ]);
+    // THE TWO RENAMES ARE PART OF THE AXIS AMENDMENT, not cosmetic: both rules
+    // now read off a DIFFERENT band key per axis, so a name that says "column"
+    // or "width" states the horizontal reading as if it were the only one — the
+    // exact shape of stale rule this parcel went looking for. Asserted as
+    // ABSENT so the old names cannot quietly come back beside the new ones.
+    expect(invariants.columnBytesPowerOfTwo).toBeUndefined();
+    expect(invariants.patternWidth).toBeUndefined();
     expect(invariants.prefixIdentity).toContain('phases[0] == tiles[slot_base');
     expect(invariants.capacity).toContain('PREFIX');
     // The layout-word rule the band command renumbers through. Both halves are
@@ -206,6 +230,73 @@ describe('the contract declares a complete, well-formed key model', () => {
   it('records the driver table as a scalar-source map, not an axis list', () => {
     expect(BGANIM_DRIVERS).toEqual({ camera_x: 0, camera_y: 1, timer: 2 });
     expect(at(['drivers', '$comment'])).toMatch(/does NOT mean vertical motion/);
+    // THE RETIRED RULE. "every band moves HORIZONTALLY" was true of this
+    // comment until aeon 3a4712fa and is now false; a surface that still says it
+    // teaches a limit the product no longer has. The sentence is asserted GONE
+    // rather than merely replaced, because the failure mode is an old sentence
+    // surviving beside a new one.
+    expect(at(['drivers', '$comment'])).not.toMatch(/every band moves HORIZONTALLY/i);
+    expect(at(['drivers', '$comment'])).toMatch(/`axis` key/);
+  });
+
+  /**
+   * THE AXIS, and the three writer obligations that come with it.
+   *
+   * WHAT A GREEN HERE RULES OUT: a vendored file that gained `axis` without the
+   * two tables the codec's refusals index (`unitKey` / `periodKey` — a missing
+   * one makes `bandRotationUnitBytes` derive `undefined * 32` = NaN and the
+   * power-of-two check pass silently on every band), and one that recorded the
+   * key without recording that the consumer CANNOT CHECK the three things
+   * Aurora now owes. It does NOT rule out anything about aeon; nothing here can
+   * observe them, and `amendments` is what a reader re-derives from.
+   */
+  it('records the motion axis, its two key tables, and the aeon revision it was read at', () => {
+    expect(BGANIM_BAND_AXES).toEqual(['horizontal', 'vertical']);
+    expect(BAND_AXIS_DEFAULT).toBe('horizontal');
+    expect(BGANIM_BAND_AXES).toContain(BAND_AXIS_DEFAULT);
+    expect(BAND_KEYS).toContain('axis');
+    expect(at(['bandKeys', 'axis', 'required'])).toBe(false);
+    // The unit/period split is the whole of the geometry change, and the two
+    // tables must be EXACT COMPLEMENTS over cols/rows on both axes — a table
+    // that named the same key twice would make a band its own period and its
+    // own rotation unit, which passes every shape check and bakes.
+    for (const axis of BGANIM_BAND_AXES) {
+      expect(['cols', 'rows']).toContain(BAND_AXIS_UNIT_KEY[axis]);
+      expect(['cols', 'rows']).toContain(BAND_AXIS_PERIOD_KEY[axis]);
+      expect(BAND_AXIS_UNIT_KEY[axis]).not.toBe(BAND_AXIS_PERIOD_KEY[axis]);
+    }
+    // ...and they must SWAP between the axes, which is the fact aeon's
+    // `_AXIS_UNIT_TILES` / `_AXIS_PERIOD_TILES` encode. Two axes agreeing would
+    // make `axis` a no-op that every other assertion here would still pass.
+    expect(BAND_AXIS_UNIT_KEY.horizontal).not.toBe(BAND_AXIS_UNIT_KEY.vertical);
+    expect(BAND_AXIS_PERIOD_KEY.horizontal).not.toBe(BAND_AXIS_PERIOD_KEY.vertical);
+
+    const amendment = (at(['amendments']) as Record<string, unknown>[])
+      .find((a) => a.id === 'axis');
+    expect(amendment).toBeDefined();
+    expect(amendment!.commit).toMatch(/^[0-9a-f]{40}$/);
+    expect((amendment!.documents as string[]).join('\n'))
+      .toContain('tools/inject_editor_bg.py');
+    // A PARTIAL re-derivation must say which values it did NOT re-read. This is
+    // the assertion that keeps "amended at revision X" from being read as
+    // "every value in this file is current at X".
+    expect(String(amendment!.notALL)).toMatch(/outputDir\.note/);
+    expect(at(['outputDir', 'note'])).toMatch(/DRIFT DISCLOSED, NOT RE-VENDORED/);
+  });
+
+  it('names all three writer obligations, and says the consumer cannot check them', () => {
+    // These are the parcel. They are recorded HERE rather than only in prose
+    // because the codec's own comments cite them by key name, and a reader who
+    // finds one in the source must be able to find it in the contract.
+    const inv = at(['invariants']) as Record<string, string>;
+    expect(inv.slotOrder).toContain('c*rows + r');
+    expect(inv.slotOrder).toContain('r*cols + c');
+    expect(inv.slotOrder).toMatch(/CANNOT CHECK IT/);
+    // The trap this parcel's own tests had to be aimed around, written into the
+    // contract so the next author meets it before writing a vacuous assertion.
+    expect(inv.slotOrder).toMatch(/vacuous/);
+    expect(inv.phaseAxis).toMatch(/validate_band_phase_axis/);
+    expect(inv.axisRoundTrip).toMatch(/survive a load/);
   });
 
   it('records the consumer-hardcoded path', () => {

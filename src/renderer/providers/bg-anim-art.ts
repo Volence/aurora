@@ -23,7 +23,7 @@ import {
   makeRegenerateShiftCommand, makeSetBgOverridePhaseBankCommand, makeSetBgOverrideTilesCommand,
 } from '../../core/editing/bg-override-art';
 import {
-  BGANIM_PHASE_BANKS, TILE_WIDTH_PX, bandTileCount,
+  BGANIM_PHASE_BANKS, TILE_WIDTH_PX, bandCellSlot, bandSlotCell, bandTileCount,
   type BgOverrideBand, type BgOverrideDocument,
 } from '../../core/formats/bg-override/bg-override';
 import { documentBands, bandSlotBases } from '../../core/formats/bg-override/bg-anim-band';
@@ -78,7 +78,7 @@ export function bgArtAtlas(doc: BgOverrideDocument, target: BgArtTarget): Tile[]
   return bgOverrideDisplay(doc).tiles;
 }
 
-/** Atlas index of doc cell `cellIndex` under `target` — column-major for a bank. */
+/** Atlas index of doc cell `cellIndex` under `target` — the band's own slot order. */
 export function bgArtCellAtlasIndex(
   doc: BgOverrideDocument, target: BgArtTarget, cellIndex: number,
 ): number | null {
@@ -88,7 +88,7 @@ export function bgArtCellAtlasIndex(
   if (!band) return null;
   const c = cellIndex % band.cols, r = Math.floor(cellIndex / band.cols);
   if (r >= band.rows) return null;
-  const slot = c * band.rows + r;
+  const slot = bandCellSlot(band, c, r);
   return target.bank === 0 ? bandSlotBases(bands)[target.bandIndex] + slot : slot;
 }
 
@@ -421,7 +421,7 @@ export function regenerateShiftCommand(
   }
 }
 
-/** Rasterize bank `bank` of `band` as RGBA, `cols*8 x rows*8`, column-major slots. */
+/** Rasterize bank `bank` of `band` as RGBA, `cols*8 x rows*8`, in the band's slot order. */
 export function bankThumbnail(band: BgOverrideBand, bank: number, lut: PaletteLut): {
   width: number; height: number; rgba: Uint8ClampedArray;
 } {
@@ -430,7 +430,7 @@ export function bankThumbnail(band: BgOverrideBand, bank: number, lut: PaletteLu
   const tiles = band.phases[bank] ?? [];
   const n = bandTileCount(band);
   for (let t = 0; t < n && t < tiles.length; t++) {
-    const col = Math.floor(t / band.rows), row = t % band.rows;
+    const { col, row } = bandSlotCell(band, t);
     drawTileInto(rgba, width, col * TILE_WIDTH_PX, row * TILE_WIDTH_PX, tiles[t], lut, false, false);
   }
   return { width, height, rgba };

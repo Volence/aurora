@@ -147,13 +147,14 @@ export type AgentRequest =
   | { kind: 'list-bg-anim-bands' }
   | {
       kind: 'promote-bg-anim-band'; cols: number; rows: number; staticBase: number;
-      phaseFill?: 'copy' | 'blank' | 'shift'; driver?: string; rateShift?: number;
+      phaseFill?: 'copy' | 'blank' | 'shift'; axis?: 'horizontal' | 'vertical';
+      driver?: string; rateShift?: number;
     }
   | { kind: 'demote-bg-anim-band'; band: number; staticBase?: number }
   | {
       kind: 'add-bg-anim-band'; cols: number; rows: number;
       phases?: number[][][]; phaseFill?: 'copy' | 'blank' | 'shift';
-      driver?: string; rateShift?: number;
+      axis?: 'horizontal' | 'vertical'; driver?: string; rateShift?: number;
     }
   | { kind: 'remove-bg-anim-band'; band: number; blankReferencingCells?: boolean }
   // ---- Band ART (parcel I). Pixels of `tiles[i]`; a prefix slot's write lands

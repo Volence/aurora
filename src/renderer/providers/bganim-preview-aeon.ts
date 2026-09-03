@@ -12,7 +12,7 @@
 // calling this from a render AND from an rAF costs one map lookup on all but the
 // frames where something actually moved.
 
-import { BAND_DEFAULTS } from '../../core/formats/bg-override/bg-override';
+import { BAND_DEFAULTS, BAND_AXIS_DEFAULT } from '../../core/formats/bg-override/bg-override';
 import { BgAnimPreviewRenderer, type BandPreviewVerdict } from '../canvas/BgAnimPreviewRenderer';
 import {
   documentBands, bandSlotBases, describeBands,
@@ -249,16 +249,36 @@ const SLOWEST_PRINTABLE_PX_PER_SEC = 0.01;
 // advances it 1 px per `2^rate_shift` units (schema §5). Every cell whose
 // layout word names a band slot shows the same motion.
 //
-// ═══ THE DIRECTION WORD IS FOREGROUND-GATED ═══
+// ═══ THE DIRECTION WORD IS FOREGROUND-GATED, AND THERE ARE TWO OF THEM ═══
 //
 // The memory bank records bank k at x as phase 0 at x+k, i.e. the art moves
 // LEFT as the driver increases — but that is a reading of the fill, not a
 // watching of the ROM, and a caption that stated the wrong direction would be
-// worse than one that states none. So the sentence ships as `scrolls · …`, and
-// the overseer flips ONE constant after watching the built ROM. The tests pin
-// the flipped shape (`scrolls left · …`) so the flip is one edit.
+// worse than one that states none. So the sentence shipped as `scrolls · …`
+// until the overseer flipped ONE constant after watching the built ROM.
+//
+// THE VERTICAL WORD IS NOT YET WATCHED. aeon's axis block states it from the
+// mechanism — "bank k is phase 0 translated k px toward DECREASING coordinate …
+// so an increasing driver scrolls a horizontal band LEFT and a vertical band
+// UP" — and the LEFT half of that same sentence is the one already confirmed on
+// the ROM, which is why `up` ships rather than an empty word: the two halves are
+// one mechanism with one sign, and confirming one confirmed the sign. It is
+// recorded here as DERIVED-FROM-A-CONFIRMED-MECHANISM, not as watched, so that a
+// foreground run that contradicts it edits one constant and not a paragraph.
 
-/** The direction word the motion sentence carries. CONFIRMED on the built ROM 2026-08-26 (see bganim-band-status.test.ts). */
+/**
+ * The direction word each axis's motion sentence carries.
+ *
+ *   horizontal  CONFIRMED on the built ROM 2026-08-26 (bganim-band-status.test.ts).
+ *   vertical    DERIVED from the same sign, aeon 3a4712fa; not yet watched.
+ *
+ * `''` on either arm drops the word, which is the shape the horizontal one
+ * shipped in before it was confirmed.
+ */
+export const BAND_SCROLL_DIRECTIONS: Readonly<Record<string, '' | 'left' | 'right' | 'up' | 'down'>> =
+  Object.freeze({ horizontal: 'left', vertical: 'up' });
+
+/** The horizontal word, kept as its own name because callers pin it. */
 export const BAND_SCROLL_DIRECTION: '' | 'left' | 'right' = 'left';
 
 /**
@@ -272,7 +292,7 @@ export const BAND_SCROLL_DIRECTION: '' | 'left' | 'right' = 'left';
  * none, and printing one would invent a speed the engine does not have.
  */
 export function bandMotion(
-  band: { driver: string; rateShift: number }, kind: 'band' | 'candidate',
+  band: { driver: string; rateShift: number; axis?: string }, kind: 'band' | 'candidate',
 ): string {
   // `2 **`, not `1 <<`: `rate_shift` has no upper bound in the contract
   // (`clampRateShift`'s docblock says why), and a shift of 32 wraps to 1 under
@@ -281,7 +301,11 @@ export function bandMotion(
   const units = 2 ** band.rateShift;
   const per = Number.isFinite(units) ? units.toLocaleString('en-US') : `2^${band.rateShift}`;
   const verb = kind === 'band' ? 'scrolls' : 'would scroll';
-  const dir = BAND_SCROLL_DIRECTION === '' ? '' : ` ${BAND_SCROLL_DIRECTION}`;
+  // The direction is a property of the AXIS, not of the driver: an increasing
+  // driver scrolls a horizontal band left and a vertical band up, and the same
+  // rate sentence follows either word.
+  const word = BAND_SCROLL_DIRECTIONS[band.axis ?? BAND_AXIS_DEFAULT] ?? '';
+  const dir = word === '' ? '' : ` ${word}`;
   if (band.driver !== 'timer') {
     // A camera band's phase is a function of the pan, so it has no speed. This
     // is `bandIsTimeVarying`'s question asked of an already-resolved driver.
@@ -303,7 +327,8 @@ export function bandMotion(
  */
 export const BAND_MECHANISM_HINT =
   'A tile animation is a cols x rows tile pattern with 8 frames swapped over the same tiles, so '
-  + 'it scrolls inside its own window. Every cell that points at it moves the same way.';
+  + 'it scrolls inside its own window — left, or up if its axis is vertical. Every cell that '
+  + 'points at it moves the same way.';
 
 export type BandStatusKind = 'previewing' | 'no-cells' | 'refused' | 'unresolved';
 
@@ -330,7 +355,7 @@ export interface BandStatus {
  * the preview's own, or `undefined` when the snapshot has none for this band.
  */
 export function bandStatus(
-  band: { driver: string; rateShift: number },
+  band: { driver: string; rateShift: number; axis?: string },
   verdict: { cells: number; refusal: string | null } | undefined,
 ): BandStatus {
   // THE SAME SENTENCE THE LENS CAPTION PRINTS (`bandLensCaptionLines`), by
@@ -469,7 +494,11 @@ export function resolveBandLens(): BandLensResolution {
     range = slotRange(c.staticBase, c.cols, c.rows);
     // Absent driver/rate mean "leave the key out" (parcel B), so the caption
     // resolves the contract default the way the document would.
-    motion = bandMotion({ driver: c.driver ?? BAND_DEFAULTS.driver, rateShift: c.rateShift ?? BAND_DEFAULTS.rate_shift }, 'candidate');
+    motion = bandMotion({
+      driver: c.driver ?? BAND_DEFAULTS.driver,
+      rateShift: c.rateShift ?? BAND_DEFAULTS.rate_shift,
+      axis: c.axis ?? BAND_DEFAULTS.axis,
+    }, 'candidate');
   }
 
   const resolved = resolveDisplayedBg(
