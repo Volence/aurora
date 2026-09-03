@@ -16,6 +16,7 @@ import { useClassicObjectArtStore } from './state/classicObjectArtStore';
 import { useProjectStore, getCurrentAct } from './state/projectStore';
 import { useEditorStore, focusedHistory } from './state/editorStore';
 import { isBlockAligned, effectiveGranularity } from '../core/editing/map-clipboard';
+import { COLLISION_CELL_OWNED_MASK, COLLISION_CELL_UNOWNED_MASK } from '../core/editing/collision-word';
 import { lastPasteGhostReport, type PasteGhostReport } from './canvas/region-preview';
 import { useSessionStore } from './state/sessionStore';
 import { useWorkspaceStore } from './workspace/workspaceStore';
@@ -625,6 +626,50 @@ interface AeonProbeApi {
      *  must click rather than poke. No setter here, for that reason. */
     stampPriority: string;
   } | null;
+  /**
+   * ONE CELL OF THE OPEN COMPOSER DOCUMENT'S COLLISION PLANE — read-only, at
+   * 16px CELL resolution (`doc.collisionA` / `doc.collisionB` are stored that
+   * way, unlike a section's tile-resolution planes, so `collisionRect`'s shape
+   * does not transfer).
+   *
+   * `artChunkOpen()` reports the doc's identity and dirtiness and nothing about
+   * what it holds, and `collisionAt` answers for a SECTION — the composer's doc
+   * is a copy taken at open (`docFromChunk`) that no section hook can see. So a
+   * gesture row against the Art facet's chunk collision brush has no other way
+   * to read its own destination.
+   *
+   * Null when nothing is open, when the open doc is a BG-override doc, or when
+   * the index is out of range — never a silent 0, which is a legal word.
+   */
+  artDocCollisionAt(plane: 'a' | 'b', index: number): number | null;
+  /**
+   * THE COLLISION WORD'S OWNERSHIP RULE, as the app itself computes it —
+   * `COLLISION_CELL_OWNED_MASK` and its 16-bit complement.
+   *
+   * A harness asserting "the brush wrote its fields and the cell kept the rest"
+   * has to say WHICH bits are which, and a typed `0x3fff` in a harness is a pin
+   * that survives the day `packCollisionCell` grows a field — the exact failure
+   * `collision-word.ts` states the rule as a mask complement to avoid. So the
+   * masks come from the module, and a harness builds its fixture out of them.
+   */
+  collisionWordMasks(): { owned: number; unowned: number };
+  /**
+   * ⚠ FIXTURE AUTHORING, harness-only — the composer counterpart to
+   * `collisionPoke`, and it exists for exactly the same reason.
+   *
+   * Bits outside `COLLISION_CELL_OWNED_MASK` are ZERO in every shipped chunk,
+   * so a row that paints over a real doc cell emits the same artifact whether
+   * the brush merges or replaces. The destination has to be AUTHORED, and the
+   * composer offers no gesture that can author it (that is the point: the
+   * unowned bits are the half no control writes).
+   *
+   * Returns the word actually stored, or null when nothing is open / the index
+   * is out of range — never a silent no-op, because a fixture that did not land
+   * makes every row after it vacuous. Does NOT mark the doc dirty: dirtiness is
+   * what the CONTROL rows measure, and a fixture that pre-dirtied the doc would
+   * hand them a pass they did not earn.
+   */
+  artDocCollisionPoke(plane: 'a' | 'b', index: number, word: number): number | null;
   /** Every chunk-library id, in library order. Read-only. */
   chunkIds(): string[];
   /** One library chunk's shape + how much of it is actually art (nonzero
@@ -1183,6 +1228,24 @@ function installAeonProbe(): AeonProbeApi {
       const h = useEditorStore.getState().linkHover;
       return h ? { ...h } : null;
     },
+    artDocCollisionAt: (planeId, index) => {
+      const o = useArtStore.getState().open;
+      if (!o || o.bgOverride) return null;
+      const arr = planeId === 'b' ? o.doc.collisionB : o.doc.collisionA;
+      if (!Number.isInteger(index) || index < 0 || index >= arr.length) return null;
+      return arr[index];
+    },
+    artDocCollisionPoke: (planeId, index, word) => {
+      const o = useArtStore.getState().open;
+      if (!o || o.bgOverride) return null;
+      const arr = planeId === 'b' ? o.doc.collisionB : o.doc.collisionA;
+      if (!Number.isInteger(index) || index < 0 || index >= arr.length) return null;
+      arr[index] = word & 0xFFFF;
+      return arr[index];
+    },
+    collisionWordMasks: () => ({
+      owned: COLLISION_CELL_OWNED_MASK, unowned: COLLISION_CELL_UNOWNED_MASK,
+    }),
     chunkIds: () => (useProjectStore.getState().project?.chunkLibrary ?? []).map((c) => c.id),
     chunkInfo: (id) => {
       const c = useProjectStore.getState().project?.chunkLibrary.find((k) => k.id === id);
