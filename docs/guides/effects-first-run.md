@@ -104,6 +104,46 @@ straight past. Dragging with the mouse, space-panning and the wheel still pan.
 
 > The `LAYERS` list has its own scrollbar and gets the height the Parallax sub-tab has to spare — measured at 211px of a ~2,400px list, so about a card and a half. Scroll **inside** the list. Opening `SCENE — <id>` under it takes that height away again; shut it when you are done in there.
 
+### Drag the line instead of typing the number
+
+Every layer in the scene is drawn on the map as a horizontal line labelled
+`L0 y=0`, `L1 y=32`, and so on. **Those lines are the `Screen line` spinner, in the
+other spelling — grab one and drag it.** Put the cursor within about six pixels of a
+line and it turns into an up-down resize cursor; that is the line telling you it is
+grabbable. Press, drag, release.
+
+- **The map does not pan while you are on a line.** The line takes the press, so the
+  drag moves the layer and nothing else. Anywhere off a line, the same press pans
+  the map exactly as before. The wheel still zooms, space still pans, and the arrow
+  keys still move the camera — none of them are on the mouse button the line uses.
+- **You can drag past the top or the bottom of the window.** The gesture follows
+  your cursor off the canvas, so a layer can be put somewhere the map is not
+  currently showing.
+- **It is one undo.** However far you drag and however long you take, `Ctrl+Z` once
+  puts the layer back where it started. A drag you release where you began writes
+  nothing at all.
+- **The number is the same number.** The drag runs through the spinner's own limits,
+  so it cannot put a layer somewhere you could not have typed.
+
+**When a line turns red, read the sentence beside it.** That is the layer telling
+you the build will refuse it — the message says which rule and what to do, and it
+appears while you are still holding the button, not after you let go.
+
+### One layer dragged past another
+
+Nothing stops you, and nothing quietly re-sorts your layers behind your back. Drag
+`L1` above `L0` and it stays where you put it.
+
+For most layers that is simply legal: a layer with `Plane B split at` set to `none`
+has no rule about what order it comes in.
+
+**Where it is not legal, the line goes red and says so.** If *both* layers carry a
+`Plane B split`, the splits have to go down the screen — two of them on one row
+would be two whole-plane scroll values for one line, and the build refuses it. You
+get the message the moment you drag one past the other, and it names both layers.
+There are two ways out and Aurora will not choose for you: give the two layers
+different screen lines, or drop one of the splits.
+
 ### Clouds that move on their own (`Drift`)
 
 Everything above needs the camera. **`Drift`** does not: it is a constant sideways

@@ -68,7 +68,7 @@ import { publishBothPlanesLensReport } from '../canvas/both-planes-lens';
 import { publishCrossoverLensReport } from '../canvas/crossover-lens';
 import {
   resolveSelectedScene, setLayerFieldCommand, clampLayerTop, layerTopSpace,
-  setSceneFieldCommand, clampVOffset, guideBoundNotice,
+  setSceneFieldCommand, clampVOffset, guideBoundNotice, vsplitOrderAdvisory,
 } from '../providers/effects-aeon';
 // The facet gate and the parallax composite's ONE derivation. Both used to be
 // spelled here; the composite's inputs are now the facet, the sub-tab and the
@@ -1401,11 +1401,49 @@ export default function MapViewport() {
       // Cheap by construction: a handful of layers, pure arithmetic, inside the
       // draw pass that already runs. No clock, nothing scheduled — MapViewport's
       // measured zero-idle-repaint property (37/37) is untouched.
+      // ---- WHAT HAPPENS WHEN ONE GUIDE IS DRAGGED PAST ANOTHER (2026-09-02) -
+      //
+      // THE DRAG DOES NOT REFUSE AND DOES NOT REORDER. `clampLayerTop` bounds a
+      // top against the PLANE and the fire rule and nothing else, so a guide
+      // crosses its neighbour freely — and that is correct for the majority of
+      // layers, because for a layer that authors no vsplit there is NO engine
+      // rule about order at all. Refusing the crossing would invent a bound the
+      // bake does not have; reordering would rewrite a placement the author did
+      // not ask about (`vsplitOrderAdvisory`'s own note: the violation is a fact
+      // about TWO layers with two legal resolutions, so a control that picked
+      // one would be choosing for the author).
+      //
+      // ⚠ SO THE ONE THING IT MUST NOT DO IS BE SILENT, and until now it was.
+      // When BOTH layers author a vsplit the crossing IS an engine violation
+      // (`scene_vsplit_fires` ensures `line > prev`) and the build dies. That
+      // sentence already existed — in the PANEL, on a row that is 300px away and
+      // routinely scrolled out of its own 129px window. The canvas, where the
+      // gesture happens, said nothing. It says it here now, in the same plate
+      // and the same red the other refusals use.
+      //
+      // ASKED OF THE LAYERS AS THE GESTURE HAS THEM, not as the document does:
+      // during a drag the document still holds the pre-drag top, so asking the
+      // stored array would report the crossing one gesture late — visible only
+      // after release, which is exactly when it is no longer actionable.
+      //
+      // THE BOUND NOTICE WINS WHERE BOTH APPLY. "This top cannot exist" is about
+      // the layer the author has hold of; "these two tops collide" is about a
+      // pair. A layer that is both illegal on its own AND out of order has a
+      // first problem, and reading the second one first sends the author to
+      // change the wrong layer.
+      const shown = dragHere
+        ? guideScene.layers.map((l, i) => (i === dragHere.index ? { ...l, world_y: dragHere.worldY } : l))
+        : guideScene.layers;
       const notices = new Map<number, { tone: 'held' | 'illegal'; text: string }>();
       for (let i = 0; i < guideScene.layers.length; i++) {
         const n = guideBoundNotice(guideScene, guideScene.layers[i],
           dragHere && dragHere.index === i ? dragHere.requested : undefined);
-        if (n !== null) notices.set(i, { tone: n.tone, text: n.text });
+        if (n !== null) { notices.set(i, { tone: n.tone, text: n.text }); continue; }
+        // 'illegal', not 'held': nothing was refused to a gesture — the pair is
+        // in a state the BUILD rejects, which is `guideBoundNotice`'s own reading
+        // of that tone.
+        const order = vsplitOrderAdvisory(guideScene, shown, i);
+        if (order !== null) notices.set(i, { tone: 'illegal', text: order });
       }
       const opts = {
         dragIndex: dragHere ? dragHere.index : null,
