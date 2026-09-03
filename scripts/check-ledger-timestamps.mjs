@@ -89,8 +89,11 @@
  *       line the audit cannot read must not read as a line that passed.
  *   K6  two NEW entries sharing one second: exit 1, "BOTH APPEARANCES IN SCOPE". The
  *       audit keys on the stamp, so the second such entry goes unjudged; that is a
- *       harmless miss for a repair commit re-adding an old line (K1's repo proves such a
- *       re-add does NOT fail) and a hole for two new ones.
+ *       harmless miss for a repair commit re-adding an old line and a hole for two new
+ *       ones. (This line used to credit the innocent half to "K1's repo". K1's repo has
+ *       ONE commit and performs no re-add, so nothing measured it until K6g below — an
+ *       assertion standing in for a case, in the file whose whole argument is that those
+ *       are not the same thing.)
  *   K6b a bad entry CORRECTED by a later commit: exit 0, with the old stamp counted and
  *       printed as no longer in the file. This is the REMEDY, and the gate had none until
  *       the red-first proof found it: first appearance keys on the stamp, so the bad `at`
@@ -99,6 +102,35 @@
  *       prevent, reintroduced at a different point.
  *   K6c a correction that is ITSELF remembered: exit 1. The replacement is judged at its
  *       own commit, so the remedy cannot launder a stamp, only replace one.
+ *   K6d two NEW entries sharing one stamp, THE SECOND corrected: exit 0, with the
+ *       withdrawn collision counted and printed. This is the remedy above, applied to the
+ *       one failure it could not reach. A collision used to be keyed on its STAMP, and
+ *       the innocent sibling carries that stamp at HEAD forever, so correcting the
+ *       offending entry cleared nothing and only changing BOTH stamps did — which the
+ *       failure text never said. That is a permanently-red suite for the one case K6
+ *       itself calls a hole, and it happened here for real (`9f51a2ff`).
+ *   K6e the same collision with THE FIRST corrected instead: still exit 1. THE TWO
+ *       DIRECTIONS ARE NOT SYMMETRIC and a fix that cleared both would have reopened K6's
+ *       hole while looking like a remedy — the later appearance is the one that went
+ *       unjudged, and it is still in the file.
+ *   K6f the collision remedy ITSELF remembered: exit 1 as OVER THRESHOLD, judged at its
+ *       own commit. K6c's property on the collision path — the remedy replaces a stamp,
+ *       it never launders one.
+ *   K6g a repair commit re-adding a GRANDFATHERED line: exit 0, reported and not failed.
+ *       K6's comment credited this to K1's repo, which has one commit and performs no
+ *       re-add, so the innocent direction of `dup_fail`'s `first_ctime >= since` clause
+ *       was asserted and never measured.
+ *   K6h the colliding line REMOVED then RESTORED verbatim, nothing corrected: still
+ *       exit 1. Keyed on the line it is still at HEAD, which is right — the stamp is
+ *       still an unjudged claim. The rejected alternative (COUNT the occurrences at HEAD
+ *       against the times the line was added) goes SILENTLY GREEN here, on the dominant
+ *       innocent commit pattern the audit's header opens with. Measured on both.
+ *   K6i THE LIMIT, pinned: two BYTE-IDENTICAL appearances, the second corrected — still
+ *       exit 1. `--only-present` asks whether a collision's own line survives at HEAD, and
+ *       two identical lines are one string to a set. It errs RED, never green. Counting
+ *       WOULD cover this one; K6h is the price of counting, and a stuck red announces
+ *       itself where a silent green does not. Written up under LIMITS in the audit;
+ *       asserted here so K6d is not read as covering it.
  *   K7  a ledger path git does not track: exit 2, and the gate treats 2 as FAILURE. A
  *       gate that cannot see is not a gate that passed.
  *
@@ -202,6 +234,12 @@ const BED_LEDGER = 'docs/lane-log.jsonl';
  * author dates are pinned so a case's expectation is arithmetic, never the wall clock,
  * and identity comes from the environment rather than the machine's git config so the bed
  * builds on a box that has none.
+ *
+ * A commit may instead give `body`, the WHOLE file as it should stand after it. `rewrite`
+ * can only correct the LAST line, and the duplicate cases below need to correct the FIRST
+ * of two colliding entries as well — the direction that must NOT clear the run. Stating
+ * the file outright is the only way to build that, and it keeps the two directions built
+ * by one mechanism so neither is an artifact of how its bed was assembled.
  */
 function bed(commits) {
   const dir = mkdtempSync(join(tmpdir(), 'aurora-ledger-canary-'));
@@ -213,12 +251,16 @@ function bed(commits) {
   const git = (...args) => execFileSync('git', ['-C', dir, ...args], { env, encoding: 'utf8' });
   git('init', '-q', '-b', 'main');
   mkdirSync(join(dir, 'docs'), { recursive: true });
-  const body = [];
+  let body = [];
   for (const c of commits) {
-    // `rewrite: true` drops the LAST line before appending — the shape a correction
-    // takes, and the only way to build the remedy case.
-    if (c.rewrite) body.pop();
-    body.push(...c.lines);
+    if (c.body) {
+      body = [...c.body];
+    } else {
+      // `rewrite: true` drops the LAST line before appending — the shape a correction
+      // takes, and the only way to build the remedy case.
+      if (c.rewrite) body.pop();
+      body.push(...c.lines);
+    }
     writeFileSync(join(dir, BED_LEDGER), `${body.join('\n')}\n`);
     git('add', BED_LEDGER);
     execFileSync('git', ['-C', dir, 'commit', '-q', '-m', `at ${c.at}`], {
@@ -253,6 +295,25 @@ const NEW_BAD = { at: T(5, 9, 0), lines: [line(T(5, 8, 40), 'new-bad')] };
  * OK with the cutoff moved onto `at`.
  */
 const BACKFILLED = { at: T(5, 9, 0), lines: [line(T(1, 10, 0), 'backfilled')] };
+
+/**
+ * THE COLLISION — two NEW in-scope entries sharing one stamp, which is K6's hole and the
+ * one failure the gate's advertised remedy could not reach until 2026-09-03.
+ *
+ * The remedy is "correct the entry in a follow-up commit". A collision was keyed on its
+ * STAMP, and the innocent sibling goes on carrying that stamp at HEAD forever, so no
+ * correction of the offending entry cleared it — only changing BOTH stamps did, which the
+ * gate never said. It happened for real in this repo (`9f51a2ff`, "clear the shared
+ * stamp"): the fix had to touch both entries. K6d–K6h below pin all four directions.
+ */
+const SHARED_AT = T(3, 9, 0);
+const OLD_BAD_LINE = OLD_BAD.lines[0];
+const PAIR_A = line(SHARED_AT, 'first-of-pair');
+const PAIR_B = line(SHARED_AT, 'second-of-pair');
+/** Both entries committed after the cutoff — so both appearances are in scope. */
+const COLLIDE = [OLD_BAD, { at: T(3, 9, 0), lines: [PAIR_A] }, { at: T(4, 9, 0), lines: [PAIR_B] }];
+/** Two appearances that are BYTE-IDENTICAL — the documented limit of the fix. */
+const TWIN = line(SHARED_AT, 'twin');
 
 const CASES = [
   {
@@ -361,6 +422,106 @@ const CASES = [
     fires: ['over-threshold'],
   },
   {
+    // THE REMEDY, REACHED, for the one failure it could not reach. Correcting the LATER
+    // appearance — the entry that actually went unjudged — clears the run, because the
+    // collision is now asked about its OWN LINE and that line is gone from HEAD.
+    name: 'K6d two NEW entries share a stamp, THE SECOND corrected — exit 0, and counted',
+    commits: [...COLLIDE,
+      { at: T(5, 9, 0), body: [OLD_BAD_LINE, PAIR_A, line(T(5, 9, 0), 'second-of-pair')] }],
+    args: gateArgs(CANARY_SINCE),
+    status: 0,
+    // The withdrawn collision must be COUNTED AND PRINTED, not dropped. A population that
+    // leaves the report is the defect class this whole file exists to avoid, so the
+    // RATCHET line's count and the listing's marker are both asserted, not just the exit.
+    want: ['1 in-scope REPEATED stamp', 'COLLIDING LINE WITHDRAWN', 'DUPLICATE STAMPS (1)'],
+    absent: ['TWO IN-SCOPE ENTRIES SHARE ONE STAMP', 'OVER THRESHOLD'],
+    fires: ['duplicate-withdrawn'],
+  },
+  {
+    // …and the OTHER direction, which must NOT clear. The directions are not symmetric:
+    // the later appearance is the one that went unjudged, so correcting the FIRST leaves
+    // an entry in the file carrying a stamp nothing ever checked. A fix that made this
+    // case pass too would have reopened K6's hole while looking like a remedy.
+    name: 'K6e the same collision, THE FIRST corrected instead — still exit 1',
+    commits: [...COLLIDE,
+      { at: T(5, 9, 0), body: [OLD_BAD_LINE, line(T(5, 9, 0), 'first-of-pair'), PAIR_B] }],
+    args: gateArgs(CANARY_SINCE),
+    status: 1,
+    want: ['TWO IN-SCOPE ENTRIES SHARE ONE STAMP (1)', 'CORRECT THE LATER APPEARANCE'],
+    absent: ['COLLIDING LINE WITHDRAWN', 'OVER THRESHOLD'],
+    fires: ['duplicate-in-scope'],
+  },
+  {
+    // K6c's property on the duplicate path: the collision remedy cannot LAUNDER either.
+    // The replacement line is a first appearance judged at ITS OWN commit, so a correction
+    // that is itself remembered still fails — as an over-threshold entry, which is the
+    // honest reason, rather than going on failing as a collision it no longer is.
+    name: 'K6f the collision remedy is itself remembered — exit 1, judged at its own commit',
+    commits: [...COLLIDE,
+      { at: T(5, 9, 0), body: [OLD_BAD_LINE, PAIR_A, line(T(5, 8, 40), 'second-of-pair')] }],
+    args: gateArgs(CANARY_SINCE),
+    status: 1,
+    want: ['OVER THRESHOLD (1)', T(5, 8, 40), 'COLLIDING LINE WITHDRAWN'],
+    absent: ['TWO IN-SCOPE ENTRIES SHARE ONE STAMP'],
+    fires: ['over-threshold', 'duplicate-withdrawn'],
+  },
+  {
+    // THE INNOCENT CASE STAYS INNOCENT. K1's property with the re-add actually performed:
+    // a repair commit AFTER the cutoff re-adding a line first written BEFORE it is a
+    // duplicate in scope whose FIRST appearance is grandfathered, so `dup_fail`'s
+    // `first_ctime >= since` clause spares it. K1's repo alone never exercised this — it
+    // has one commit and no re-add — so the claim was asserted and not measured.
+    name: 'K6g a repair commit re-adding a GRANDFATHERED line — exit 0, reported not failed',
+    commits: [OLD_BAD, { at: T(3, 9, 0), lines: [OLD_BAD_LINE] }],
+    args: gateArgs(CANARY_SINCE),
+    status: 0,
+    want: ['0 entries IN SCOPE', '1 GRANDFATHERED', 'DUPLICATE STAMPS (1)', '1 in scope, listed'],
+    absent: ['BOTH APPEARANCES IN SCOPE', 'TWO IN-SCOPE ENTRIES SHARE ONE STAMP', 'OVER THRESHOLD'],
+    fires: [],
+  },
+  {
+    // THE OTHER HALF OF THE MECHANISM CHOICE. Nothing here is corrected: the colliding
+    // line is removed and later RE-ADDED VERBATIM, which is the dominant innocent commit
+    // pattern the audit's header opens with. Keyed on the line it is still at HEAD, so
+    // this stays red — right, because the stamp is still an unjudged claim the ledger
+    // makes. The rejected count-of-occurrences mechanism reads two additions against one
+    // line at HEAD and calls it withdrawn, going SILENTLY GREEN here; measured, not
+    // assumed. This case and K6i are what stop a later swap to counting passing unnoticed.
+    //
+    // The count is (2), and it is derived rather than copied from K6e: the re-add is a
+    // second addition of that line, so `collect()` books a SECOND duplicate record
+    // against the same stamp. Both are in scope and both are still at HEAD.
+    name: 'K6h the colliding line REMOVED then RESTORED verbatim, uncorrected — still exit 1',
+    commits: [...COLLIDE,
+      { at: T(5, 9, 0), body: [OLD_BAD_LINE, PAIR_A] },
+      { at: T(6, 9, 0), body: [OLD_BAD_LINE, PAIR_A, PAIR_B] }],
+    args: gateArgs(CANARY_SINCE),
+    status: 1,
+    want: ['TWO IN-SCOPE ENTRIES SHARE ONE STAMP (2)', 'CORRECT THE LATER APPEARANCE'],
+    absent: ['COLLIDING LINE WITHDRAWN'],
+    fires: ['duplicate-in-scope'],
+  },
+  {
+    // THE LIMIT, PINNED RATHER THAN LEFT TO BE DISCOVERED. --only-present asks whether a
+    // collision's own line survives at HEAD, and two BYTE-IDENTICAL lines are one string
+    // to a set: correcting either leaves the other answering "still there", so this run
+    // stays red with no move left. It errs RED, never green, and the way out is to make
+    // the entry's own text distinct. Written down in the audit's LIMITS section; asserted
+    // here so nobody reads K6d as covering a case it does not.
+    name: 'K6i the LIMIT — two BYTE-IDENTICAL appearances, the second corrected — still exit 1',
+    commits: [
+      OLD_BAD,
+      { at: T(3, 9, 0), lines: [TWIN] },
+      { at: T(4, 9, 0), lines: [TWIN] },
+      { at: T(5, 9, 0), body: [OLD_BAD_LINE, TWIN, line(T(5, 9, 0), 'twin')] },
+    ],
+    args: gateArgs(CANARY_SINCE),
+    status: 1,
+    want: ['TWO IN-SCOPE ENTRIES SHARE ONE STAMP (1)'],
+    absent: ['COLLIDING LINE WITHDRAWN'],
+    fires: ['duplicate-in-scope'],
+  },
+  {
     name: 'K7 a ledger git does not track — exit 2, which this gate treats as FAILURE',
     commits: [OLD_BAD],
     ledger: 'docs/not-tracked.jsonl',
@@ -381,6 +542,10 @@ const RULES_EXERCISED = [
   // The remedy path: a stamp introduced in scope and then corrected away is reported and
   // not judged. Without it the gate has an unfixable red state.
   'withdrawn',
+  // The same remedy on the COLLISION path, which is a different code path and was
+  // unreachable until 2026-09-03: a repeated stamp whose own line has been corrected away
+  // stops failing, and is counted and printed rather than dropped.
+  'duplicate-withdrawn',
 ];
 
 function runCanaries() {
@@ -521,6 +686,14 @@ console.error(
       + '  IN_FORCE exists so that nothing NEW joins them. If the bad stamp is already\n'
       + '  pushed, correct the entry in a follow-up commit — the run then reports the old\n'
       + '  stamp as no longer in the file and stops judging it.\n'
+      + '\n'
+      + '  IF THE FAILURE IS "TWO IN-SCOPE ENTRIES SHARE ONE STAMP", correct THE LATER\n'
+      + '  APPEARANCE — the second one listed, which is the entry that went unjudged.\n'
+      + '  Correcting the FIRST does not clear it and must not: the later entry would\n'
+      + '  still be in the file, still carrying a stamp nothing ever checked. You do NOT\n'
+      + '  need to change both. (Until 2026-09-03 you did, because the collision was keyed\n'
+      + '  on the stamp and the innocent sibling kept it at HEAD; that made the remedy\n'
+      + '  above unreachable for exactly the case the ratchet calls a hole.)\n'
     : '  Nothing here says an entry is wrong. It says the audit did not run, which is not\n'
       + '  the same fact and must not be read as one.\n'),
 );
