@@ -515,10 +515,15 @@ export interface PresetListEntry {
    * it as an empty band list — which reads as a broken or half-authored preset
    * rather than a different kind of one. `presetRasterChannel` is the codec's
    * narrowing helper and the one spelling of the question; `null` is a document
-   * that carries neither, which the schema refuses and which therefore only
-   * exists mid-edit.
+   * that carries no raster program, which the schema refuses and which therefore
+   * only exists mid-edit.
+   *
+   * ⚠ DERIVED FROM THE HELPER'S RETURN TYPE, not restated. It was spelled out as
+   * `'bands' | 'ramp' | null` until `base_swap` arrived (empyrean 5bd76ba) and
+   * the restatement was the ONLY thing that had to be edited for a third raster
+   * channel. Deriving it means the next channel is a codec change alone.
    */
-  channel: 'bands' | 'ramp' | null;
+  channel: ReturnType<typeof presetRasterChannel>;
 }
 
 export function presetListEntries(library: EffectsPresetLibrary): PresetListEntry[] {
@@ -530,9 +535,18 @@ export function presetListEntries(library: EffectsPresetLibrary): PresetListEntr
   }));
 }
 
-/** What one list row says on its right — `3 bands`, or `ramp`. */
+/**
+ * What one list row says on its right — `3 bands`, `ramp`, or `base swap`.
+ *
+ * EVERY NON-BANDS CHANNEL NEEDS A WORD HERE. A document whose channel is not
+ * `bands` has no `bands` key at all, so falling through to the count renders it
+ * as `0 bands` — which reads as a broken or half-authored preset rather than a
+ * different kind of one. That is exactly what a `base_swap` preset did before
+ * this row learned its name.
+ */
 export function presetListSummary(entry: PresetListEntry): string {
   if (entry.channel === 'ramp') return 'ramp';
+  if (entry.channel === 'base_swap') return 'base swap';
   return `${entry.bands} band${entry.bands === 1 ? '' : 's'}`;
 }
 
@@ -3076,20 +3090,115 @@ export function setRampRateCommand(
  * so the greyed button and the sentence cannot disagree.
  */
 export function bandControlsRefusal(preset: EffectsPreset): string | null {
-  if (presetRasterChannel(preset) !== 'ramp') return null;
-  return `preset "${preset.id}" carries a ramp, not bands. A preset holds EXACTLY ONE raster `
-    + 'program: bands and ramp lower into the same raster: slot and the engine has no combinator '
-    + 'that mixes a sparse fire list with a dense run, so the schema refuses a document carrying '
-    + 'both — which means the band controls cannot write here at all. Set the Raster program row '
-    + 'above back to bands to author bands; that discards the ramp, and it is one undo step.';
+  const channel = presetRasterChannel(preset);
+  // ⚠ ASKED AS "IS IT bands?", NOT AS "IS IT ramp?". It was the latter until
+  // `base_swap` arrived (empyrean 5bd76ba) and a THIRD channel appeared — at
+  // which point `!== 'ramp'` returned null on a base_swap document, the band
+  // controls came back to life on a preset with no `bands` key, and every one of
+  // them was a silent no-op with no sentence beside it. A negative test against
+  // one sibling is wrong the moment there are two; the positive test against the
+  // channel these controls DO write is right for every channel there will be.
+  if (channel === null || channel === 'bands') return null;
+  return `preset "${preset.id}" carries a ${RASTER_CHANNEL_NOUNS[channel]}, not bands. A preset `
+    + 'holds EXACTLY ONE raster program: every raster key lowers into the same raster: slot and '
+    + 'the engine has no combinator that mixes them, so the schema refuses a document carrying '
+    + 'two — which means the band controls cannot write here at all. Set the Raster program row '
+    + `above back to bands to author bands; that discards the ${RASTER_CHANNEL_NOUNS[channel]}, `
+    + 'and it is one undo step.';
 }
 
-/** The two raster programs, off the schema's own top-level `oneOf`. */
+/**
+ * ONE NOUN PER RASTER CHANNEL, so a sentence can name what a document carries.
+ *
+ * Keyed by the codec's channel names and checked against the schema's own
+ * `oneOf` at module load: a channel with no noun here would otherwise reach a
+ * sentence as `undefined`, which is the shape of "a preset carries a undefined".
+ */
+const RASTER_CHANNEL_NOUNS: Record<string, string> = {
+  bands: 'band list',
+  ramp: 'ramp',
+  base_swap: 'base swap',
+};
+
+/**
+ * WHICH CHANNELS THIS PANEL CAN SEED, and the sentence for the ones it cannot.
+ *
+ * `setRasterChannelCommand` switches a document by DISCARDING the old channel
+ * and seeding a fresh one, so it can only offer a channel it has a seed for.
+ * `base_swap` has none: seeding it means choosing a screen line and a VRAM base
+ * address, and that is the authoring control this parcel deliberately does not
+ * own (its follow-up does). Offering the switch anyway would give an author a
+ * dropdown entry that silently does nothing.
+ *
+ * Derived from the seeds that exist, not from a list typed beside them, and
+ * checked against the schema's channel set at module load so a channel cannot be
+ * added to the contract and quietly fall out of BOTH lists.
+ */
+const RASTER_CHANNEL_SEEDABLE: readonly string[] = Object.freeze(['bands', 'ramp']);
+
+for (const c of EFFECTS_PRESET_RASTER_CHANNELS) {
+  if (RASTER_CHANNEL_NOUNS[c] === undefined) {
+    throw new Error(
+      `raster channel "${c}" is declared by aurora-effects-preset.schema.json's top-level oneOf `
+      + 'but has no noun in RASTER_CHANNEL_NOUNS, so every sentence that names what a document '
+      + 'carries would say "undefined". Add the noun — and decide whether the panel can seed it '
+      + '(RASTER_CHANNEL_SEEDABLE) rather than letting it default either way.',
+    );
+  }
+}
+
+/**
+ * Why the panel cannot switch a preset INTO this channel, or null when it can.
+ *
+ * Read by the option label AND by `setRasterChannelCommand`'s refusal, so the
+ * dropdown entry and the reason cannot disagree — `lastBandRefusal`'s idiom.
+ */
+export function rasterChannelSeedRefusal(channel: string): string | null {
+  if (RASTER_CHANNEL_SEEDABLE.includes(channel)) return null;
+  if (!EFFECTS_PRESET_RASTER_CHANNELS.includes(channel)) {
+    return `"${channel}" is not a raster channel this contract declares.`;
+  }
+  return `a ${RASTER_CHANNEL_NOUNS[channel]} cannot be authored in this panel yet: switching to a `
+    + 'channel means seeding a fresh one, and this one has no seed — it needs a screen line and a '
+    + 'VRAM base address, which is its own control. A document that already carries one opens, '
+    + 'reads and saves correctly; only creating one from here is missing.';
+}
+
+/**
+ * The raster programs, off the schema's own top-level `oneOf`.
+ *
+ * ⚠ EVERY CHANNEL IS LISTED, INCLUDING THE ONES THE PANEL CANNOT SEED, because
+ * this list is also what the `Select` renders the CURRENT channel from: leave
+ * `base_swap` out and a base_swap document's Raster row shows the wrong program's
+ * name. A channel that cannot be seeded says so IN ITS OWN LABEL, from
+ * `rasterChannelSeedRefusal`, and `setRasterChannelCommand` refuses it — so the
+ * entry is honest rather than silently dead.
+ *
+ * ⚠ AND THE LABELS ARE A MAP, NOT A TERNARY. This was
+ * `c === 'ramp' ? ... : 'bands — a sparse fire list'`, which is correct while
+ * there are exactly two channels and silently mislabels every one after that:
+ * the day `base_swap` arrived it rendered as "bands — a sparse fire list".
+ */
+const RASTER_CHANNEL_LABELS: Record<string, string> = {
+  bands: 'bands — a sparse fire list',
+  ramp: 'ramp — one dense per-line run',
+  base_swap: 'base swap — one mid-frame plane A base change',
+};
+
 export const RASTER_CHANNEL_OPTIONS: readonly { value: string; label: string }[] =
-  Object.freeze(EFFECTS_PRESET_RASTER_CHANNELS.map((c) => Object.freeze({
-    value: c,
-    label: c === 'ramp' ? 'ramp — one dense per-line run' : 'bands — a sparse fire list',
-  })));
+  Object.freeze(EFFECTS_PRESET_RASTER_CHANNELS.map((c) => {
+    const label = RASTER_CHANNEL_LABELS[c];
+    if (label === undefined) {
+      throw new Error(
+        `raster channel "${c}" is declared by the contract's top-level oneOf but has no label in `
+        + 'RASTER_CHANNEL_LABELS, so the Raster dropdown would render an empty row. Add the label.',
+      );
+    }
+    return Object.freeze({
+      value: c,
+      label: rasterChannelSeedRefusal(c) === null ? label : `${label} (not authorable here yet)`,
+    });
+  }));
 
 /**
  * WHAT SWITCHING THE RASTER PROGRAM WILL DISCARD — said BEFORE the switch, not
@@ -3114,10 +3223,10 @@ export const RASTER_CHANNEL_OPTIONS: readonly { value: string; label: string }[]
 export function rasterChannelSwapAdvisory(preset: EffectsPreset): string {
   const channel = presetRasterChannel(preset);
   const bands = (preset.bands ?? []).length;
-  const discards = channel === 'ramp'
-    ? 'this ramp'
-    : `${bands} raster band${bands === 1 ? '' : 's'}`;
-  const becomes = channel === 'ramp' ? 'a fresh one-band list' : 'a fresh ramp';
+  const discards = channel === 'bands' || channel === null
+    ? `${bands} raster band${bands === 1 ? '' : 's'}`
+    : `this ${RASTER_CHANNEL_NOUNS[channel]}`;
+  const becomes = channel === 'bands' || channel === null ? 'a fresh ramp' : 'a fresh one-band list';
   return `A preset holds exactly one raster program, so switching DISCARDS ${discards} and seeds `
     + `${becomes}. It is ONE undo step — Ctrl+Z puts back exactly what was here.`;
 }
@@ -3140,15 +3249,18 @@ export function rasterChannelSwapAdvisory(preset: EffectsPreset): string {
 export function setRasterChannelCommand(
   library: EffectsPresetLibrary, id: string, channel: string,
 ): SetEffectsPresetCommand | null {
-  if (!EFFECTS_PRESET_RASTER_CHANNELS.includes(channel)) return null;
+  if (rasterChannelSeedRefusal(channel) !== null) return null;
   return editPresetCommand(library, id, `Preset ${id} raster program: ${channel}`, (p) => {
     if (presetRasterChannel(p) === channel) return;
-    if (channel === 'ramp') {
-      delete p.bands;
-      p.ramp = newRamp();
-    } else {
-      delete p.ramp;
-      p.bands = [newBand()];
+    // ⚠ EVERY OTHER CHANNEL IS DELETED, NOT JUST THE ONE SIBLING. This was an
+    // if/else over two keys; with three channels an if/else would leave the
+    // third in place and author the two-key document the `oneOf` refuses — which
+    // serialize would catch, but only after the panel had shown an editor that
+    // appeared to support both.
+    for (const c of EFFECTS_PRESET_RASTER_CHANNELS) {
+      if (c !== channel) delete (p as unknown as Record<string, unknown>)[c];
     }
+    if (channel === 'ramp') p.ramp = newRamp();
+    else p.bands = [newBand()];
   });
 }

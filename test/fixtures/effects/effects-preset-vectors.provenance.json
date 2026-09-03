@@ -5,28 +5,29 @@
   "empyrean": {
     "repo": "git@github.com:Volence/empyrean.git",
     "path": "contract/schema/tests/effects-preset-vectors.json",
-    "revision": "9233883735deba44b1b547a25e491c690b136f0f",
-    "revision_subject": "effects schema: the preset document gains `ramp` (DoD item 6 authoring key, per aeon key-shape artifact 9e85baf0 at cf3dfb1a; AURORA_EFFECTS_SCHEMA.md 7.4): one closed object (top, lines, target.vsram.addr, start, step), start/step as fp16 objects so the authored range is fp16's own ensures and the generator emits fp16() verbatim; exactly one of bands|ramp per document by a top-level oneOf (bands leaves required); vsram arm only, no cram arm reserved; the per-line-curve MUST NOT encoded by closure",
-    "blob": "d8a5f3589d29f8a9cb8443b88c74371448c880b8",
-    "resolved_by": "git -C ../empyrean show 9233883:contract/schema/tests/effects-preset-vectors.json \u2014 read through git OBJECTS, never through the sibling working tree. THE BYTES DID MOVE THIS TIME: blob cc3f0f96 at 12aecd5 and d36d704, blob d8a5f358 at 9233883. Re-extracted 2026-09-03 by `git cat-file blob d8a5f358...` redirected into this file, and re-hashed with `git hash-object` on the vendored bytes before anything believed it.",
-    "revision_published": "9233883 is an ancestor of empyrean origin/main (f9fdfbe108800688a657fc6d93e809724f83381a at re-vendoring, after `git fetch origin`), checked with `git merge-base --is-ancestor`, and origin/main:contract/schema/tests/effects-preset-vectors.json resolves to the SAME blob d8a5f358 \u2014 current at tip, not merely correctly cited.",
+    "revision": "5bd76ba8e6a45a7104d1ffceacdf46794312b9cf",
+    "revision_subject": "effects schema: the preset document gains `base_swap` (DoD item 11a authoring key, per aeon shape note at 850d4c60, which shipped the key and a bound section-6 preset ahead of this CR; AURORA_EFFECTS_SCHEMA.md 7.5): one closed object {line 3..223, target 0..65535 multipleOf 8192}, exactly one of bands|ramp|base_swap per document (third oneOf arm); ranges restate fire()'s line ensure and vdp_base_reg's $2000-granule ensure; no capability gate, not DEBUG-gated",
+    "blob": "af5b5ceeb857945789033980bbd6ff764bde58cf",
+    "resolved_by": "git -C ../empyrean show 5bd76ba:contract/schema/tests/effects-preset-vectors.json \u2014 read through git OBJECTS, never through the sibling working tree. THE BYTES DID MOVE AGAIN: blob cc3f0f96 at 12aecd5 and d36d704, d8a5f358 at 9233883, af5b5cee at 5bd76ba. Re-extracted 2026-09-03 by `git cat-file blob af5b5cee...` redirected into this file, and re-hashed with `git hash-object` on the vendored bytes before anything believed it. The hub relayed the same id independently and the two derivations agree.",
+    "revision_published": "5bd76ba is an ancestor of empyrean origin/main (6da51293182bf61fbf5d7a07804b80e2348440b6 at re-vendoring, after `git fetch origin`), checked with `git merge-base --is-ancestor`, and origin/main:contract/schema/tests/effects-preset-vectors.json resolves to the SAME blob af5b5cee \u2014 current at tip, not merely correctly cited.",
     "branch_that_answers_currency": "origin/main"
   },
   "vendored": {
     "path": "test/fixtures/effects/effects-preset-vectors.json",
-    "bytes": 10748,
-    "git_blob": "d8a5f3589d29f8a9cb8443b88c74371448c880b8",
+    "bytes": 13327,
+    "git_blob": "af5b5ceeb857945789033980bbd6ff764bde58cf",
     "identical_to_source": "byte-for-byte; the git blob id above is the SAME object empyrean stores, which is what effects-preset-vectors.test.ts recomputes from these bytes on every run"
   },
   "schema_these_vectors_belong_to": {
     "sidecar": "src/core/formats/effects/aurora-effects-preset.schema.provenance.json",
     "same_revision": "Both sidecars cite ONE empyrean revision, and they are re-pinned together. 12aecd5 (EW-REVENDOR-PRESET) vendored both files; d36d704 (EW-CHANNELS-WRITER) moved the SCHEMA's bytes and left these alone, so this sidecar's revision advanced with the schema's while its blob stayed cc3f0f96. A re-pin of one without the other is a mismatch the vectors test would report as the schema refusing a vector the contract says it accepts, or vice versa.",
-    "no_published_vectors_for_the_2026_09_03_keys": "TRUE OF d36d704, NOT OF 9233883, and the difference is the point. d36d704 published no vector rows for patch_world_ys / patch_motion, so Aurora wrote its own in test/formats/effects-preset.test.ts. 9233883 DID publish rows for `ramp`: ELEVEN of them (6 cases -> 17, none removed, none changed) \u2014 a ramp-only document PASSES, and bands+ramp together, neither, whole 512, frac256 256, a raw-integer step, top 2, addr 80, a cram arm, a `curve` key and a missing `step` are each REFUSED. They run here through parseEffectsPreset like every other vector, so the MUST NOT (no per-line curve) is gated by the contract's own row and not only by Aurora's prose."
+    "no_published_vectors_for_the_2026_09_03_keys": "TRUE OF d36d704, NOT OF 9233883 OR 5bd76ba, and the difference is the point. d36d704 published no vector rows for patch_world_ys / patch_motion, so Aurora wrote its own in test/formats/effects-preset.test.ts. 9233883 published ELEVEN for `ramp` (6 cases -> 17) and 5bd76ba published SEVEN for `base_swap` (17 -> 24). THE SET IS NOW 24 CASES, 5 EXPECTED-PASS AND 19 EXPECTED-FAIL, counted here from the vendored bytes and agreeing with both the hub's description and the overseer's independent count. The one new PASS is THE DOCUMENT AEON ACTUALLY SHIPS: {schema 1, id ojz_sec6_baseswap, base_swap {line 160, target 57344}}, bound by section_6.meta.json's rasterRef \u2014 so the row that proves an author can open section 6 is the contract's own, not Aurora's. The six new refusals are base_swap+ramp, target 57345 (off the $2000 granule), target 65536, line 2, a missing target, and a `plane` key. They run here through parseEffectsPreset like every other vector."
   },
   "pin_history_current_last": [
     "cc3f0f96 \u2014 12aecd5, landing (the vectors' first revision; byte-identical at origin/main 63c85aeb)",
     "cc3f0f96 \u2014 d36d704, revision advanced 2026-09-03 with the schema's re-vendor; the BLOB DID NOT CHANGE (no vectors were published for patch_world_ys / patch_motion), byte-identical at origin/main 4dcd520e",
-    "d8a5f358 \u2014 9233883, re-vendored 2026-09-03; THE BLOB CHANGED (11 rows added for `ramp`, 6 cases -> 17). A parsed diff found 142 added leaves, 0 removed and 0 changed in place, so no pre-existing vector moved. Byte-identical at origin/main f9fdfbe1."
+    "d8a5f358 \u2014 9233883, re-vendored 2026-09-03; THE BLOB CHANGED (11 rows added for `ramp`, 6 cases -> 17). A parsed diff found 142 added leaves, 0 removed and 0 changed in place, so no pre-existing vector moved. Byte-identical at origin/main f9fdfbe1.",
+    "af5b5cee \u2014 5bd76ba, re-vendored 2026-09-03; THE BLOB CHANGED AGAIN (7 rows added for `base_swap`, 17 cases -> 24). A parsed leaf diff found 62 added leaves, 0 removed and 0 CHANGED IN PLACE, and the additions are all at cases/17..23 \u2014 so the existing 17 rows are UNTOUCHED and this is an append, which is the fact that makes it a re-vendor rather than a migration. Verified here, not taken on the hub's word. Byte-identical at origin/main 6da51293."
   ],
   "re_vendor": "git -C <empyrean> fetch origin && git -C <empyrean> show origin/main:contract/schema/tests/effects-preset-vectors.json > test/fixtures/effects/effects-preset-vectors.json \u2014 then update `empyrean.revision`, `empyrean.blob`, `vendored.bytes`, `vendored.git_blob` and `pin_history_current_last` here, re-vendor the SCHEMA at the same revision, and re-run the full suite."
 }

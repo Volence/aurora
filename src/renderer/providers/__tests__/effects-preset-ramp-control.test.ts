@@ -39,6 +39,7 @@ import {
   presetFp16FromNumber,
   presetFp16ToNumber,
   presetRasterChannel,
+  EFFECTS_PRESET_RASTER_CHANNELS,
   parseEffectsPreset,
   serializeEffectsPreset,
   type EffectsPreset,
@@ -53,6 +54,7 @@ import {
   rampDisplaySpan, rampDisplayGloss, rampDriftSummary,
   setRampSpanCommand, setRampAddrCommand, setRampRateCommand,
   setRasterChannelCommand, rasterChannelSwapAdvisory, RASTER_CHANNEL_OPTIONS,
+  rasterChannelSeedRefusal,
   bandControlsRefusal, lastBandRefusal, addBandCommand, removeBandCommand,
   presetListEntries, presetListSummary,
 } from '../effects-preset';
@@ -498,8 +500,62 @@ describe('the band controls on a ramp document are refused WITH A REASON', () =>
 // ---------------------------------------------------------------------------
 
 describe('switching the raster program is ONE undoable command', () => {
-  it('offers exactly the schema\'s two channels', () => {
-    expect(RASTER_CHANNEL_OPTIONS.map((o) => o.value).sort()).toEqual(['bands', 'ramp']);
+  it('offers exactly the schema\'s channels, and says which cannot be seeded here', () => {
+    // ⚠ RE-PINNED 2026-09-03 (empyrean 5bd76ba): two channels became three. The
+    // list is EVERY channel the contract declares, not every channel this panel
+    // can author, because the same list is what the Select renders the CURRENT
+    // channel from — omitting one would show a base_swap document the wrong
+    // program's name.
+    expect(RASTER_CHANNEL_OPTIONS.map((o) => o.value).sort())
+      .toEqual([...EFFECTS_PRESET_RASTER_CHANNELS].sort());
+    expect(RASTER_CHANNEL_OPTIONS.map((o) => o.value).sort())
+      .toEqual(['bands', 'base_swap', 'ramp']);
+    // No option is silently dead: one that cannot be seeded says so in its own
+    // label AND is refused by the command, from the one predicate.
+    //
+    // The probe document is a RAMP for every option and a BANDS document for
+    // `ramp` itself, because switching to the channel a document already carries
+    // is a legitimate no-op and would otherwise be indistinguishable from a
+    // refusal — the exact confusion this row is here to prevent.
+    for (const o of RASTER_CHANNEL_OPTIONS) {
+      const refusal = rasterChannelSeedRefusal(o.value);
+      expect(o.label).not.toBe('');
+      expect(o.label.includes('not authorable here yet')).toBe(refusal !== null);
+      const probe = o.value === 'ramp' ? newPreset(ID, 'n') : rampPreset();
+      expect(presetRasterChannel(probe)).not.toBe(o.value);
+      expect(
+        setRasterChannelCommand(lib(probe), ID, o.value) === null,
+        `option "${o.value}" ${refusal === null ? 'is offered but produces no command' : 'is '
+          + 'refused by rasterChannelSeedRefusal yet produced a command anyway'}`,
+      ).toBe(refusal !== null);
+    }
+    // Anti-vacuous: at least one of each kind exists, or the loop proves nothing.
+    expect(RASTER_CHANNEL_OPTIONS.some((o) => rasterChannelSeedRefusal(o.value) === null)).toBe(true);
+    expect(RASTER_CHANNEL_OPTIONS.some((o) => rasterChannelSeedRefusal(o.value) !== null)).toBe(true);
+  });
+
+  it('the labels are per-channel, not a two-way ternary that mislabels the third', () => {
+    // The defect this row exists for: the labels were
+    // `c === 'ramp' ? ramp-label : bands-label`, so base_swap rendered as
+    // "bands — a sparse fire list" the moment the contract declared it.
+    const labels = RASTER_CHANNEL_OPTIONS.map((o) => o.label);
+    expect(new Set(labels).size).toBe(labels.length);
+    for (const o of RASTER_CHANNEL_OPTIONS) expect(o.label).toContain(o.value.replace('_', ' '));
+  });
+
+  it('a base_swap document keeps its band controls DEAD, and says why', () => {
+    // The third channel reopened this: `bandControlsRefusal` asked "is it ramp?"
+    // and so returned null on a base_swap document — band controls alive on a
+    // preset with no `bands` key, every click a silent no-op.
+    const p = { schema: 1 as const, id: ID, base_swap: { line: 160, target: 57344 } };
+    const refusal = bandControlsRefusal(p);
+    expect(refusal, 'the band controls came back to life on a base_swap document').not.toBeNull();
+    expect(refusal).toContain('base swap');
+    expect(refusal).not.toContain('undefined');
+    // Control: a bands document is not refused.
+    expect(bandControlsRefusal(newPreset(ID, 'n'))).toBeNull();
+    // And the controls really are no-ops there, not merely labelled as such.
+    expect(addBandCommand(lib(p as never), ID)).toBeNull();
   });
 
   /**

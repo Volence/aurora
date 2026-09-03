@@ -86,7 +86,12 @@ describe('the top-level oneOf: exactly one raster program per document', () => {
     // rows below would never reach.
     expect(EFFECTS_PRESET_SCHEMA.required as string[]).not.toContain('bands');
     expect(Array.isArray(EFFECTS_PRESET_SCHEMA.oneOf)).toBe(true);
-    expect(EFFECTS_PRESET_RASTER_CHANNELS).toEqual(['bands', 'ramp']);
+    // ⚠ RE-PINNED 2 -> 3 at empyrean 5bd76ba: `base_swap` is the third arm. It
+    // is asserted here (rather than loosened to a length check) because this row
+    // is the premise of the four below, and a channel silently VANISHING from the
+    // oneOf is the failure that would make them vacuous. The exhaustive matrix
+    // over three arms lives in test/formats/effects-preset-base-swap.test.ts.
+    expect(EFFECTS_PRESET_RASTER_CHANNELS).toEqual(['bands', 'base_swap', 'ramp']);
     // ...and the channels are DERIVED from that `oneOf`, not restated: every one
     // of them is a declared root property.
     const props = Object.keys(EFFECTS_PRESET_SCHEMA.properties as Record<string, unknown>);
@@ -111,14 +116,14 @@ describe('the top-level oneOf: exactly one raster program per document', () => {
     ).not.toEqual([]);
     // The refusal is the exactly-one rule's, not a coincidence from some other
     // keyword: the evaluator says it matched TWO forms.
-    expect(issues.map((i) => i.message).join(' ')).toMatch(/matches 2 of the 2 allowed forms/);
+    expect(issues.map((i) => i.message).join(' ')).toMatch(/matches 2 of the 3 allowed forms/);
     expect(issues.map((i) => i.path)).toContain('');
   });
 
   it('NEITHER is REFUSED — a preset document must carry one raster program', () => {
     const issues = validateAgainstSchema({ ...base }, S);
     expect(issues, 'a document carrying NO raster program was accepted').not.toEqual([]);
-    expect(issues.map((i) => i.message).join(' ')).toMatch(/matches none of the 2 allowed forms/);
+    expect(issues.map((i) => i.message).join(' ')).toMatch(/matches none of the 3 allowed forms/);
   });
 
   it('...and the codec refuses both-and-neither too, not only the raw validator', () => {

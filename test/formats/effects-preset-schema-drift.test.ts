@@ -501,17 +501,29 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
       // NOT a loosening, and reading it as one is the misreading this comment
       // exists to prevent — the row below asserts the `oneOf` is what took over,
       // so the pair cannot both be quietly dropped.
+      //
+      // `required` has stayed at TWO across every raster key since: a new raster
+      // channel arrives as another `oneOf` ARM, never as another required key,
+      // because requiring it would make every existing document illegal. The two
+      // counts move independently and only the arm count grows.
       expect(schemaRequired).toHaveLength(2);
       // The `oneOf` that took over, asserted STRUCTURALLY and without naming the
-      // lagging key: two branches, each a single `required` over a root key the
-      // schema declares, one of which is the sparse channel. Naming the other
-      // here would put a second copy of a premise-list name in this file, which
-      // preset-lag-disclosure.test.ts forbids for exactly the reason it forbids
-      // the rest: a key name lives in the premise list and nowhere else.
+      // lagging key: one branch per raster channel, each a single `required` over
+      // a root key the schema declares, one of which is the sparse channel.
+      // Naming the others here would put a second copy of a premise-list name in
+      // this file, which preset-lag-disclosure.test.ts forbids for exactly the
+      // reason it forbids the rest: a key name lives in the premise list and
+      // nowhere else.
+      //
+      // ⚠ RE-PINNED 2 -> 3 at empyrean 5bd76ba (the base_swap CR). The count is
+      // the number of MUTUALLY EXCLUSIVE raster channels the contract declares,
+      // so it rises by one per raster-key CR and is expected to keep rising; it
+      // must never FALL, which would mean an arm was dropped and a document that
+      // used to be legal is not.
       const oneOfNames = (EFFECTS_PRESET_SCHEMA.oneOf as { required: string[] }[])
         .map((b) => b.required[0]).sort();
       expect(oneOfNames, 'the exactly-one-raster-program rule left `required` and no top-level '
-        + 'oneOf took it over').toHaveLength(2);
+        + 'oneOf took it over').toHaveLength(3);
       for (const n of oneOfNames) expect(EFFECTS_PRESET_ROOT_KEYS).toContain(n);
       expect(oneOfNames).toContain('bands');
       expect(schemaIgnored).toEqual(['name']);
