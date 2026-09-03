@@ -125,14 +125,31 @@ not is a DECLARED lag), the same repair the `preset` row got on 2026-09-02.
 
 ## 5. Verification
 
-**Full suite: `6498 passed / 0 failed / 8 skipped` (471 files), `tsc --noEmit` clean, all seven
-`check:*` scripts green** (`harness-guards` 188/188, `ledger-timestamps`, `object-stringify`,
-`peer-path-literals` 1220 files / 4 rules, `pseudo-skip` 5904 bodies, `python-resolver` 7 rows,
-`test-collection` 471/471). All 8 skips are pre-existing and each names its reason; none is mine.
+**BOTH SIDES MEASURED IN THIS SESSION**, not one side taken from a roadmap row (memory:
+before/after numbers launder). The baseline was run by detaching to master `62750403` on a clean
+tree and running the same command.
 
-**+21 rows**, counted per file on both sides through git objects:
+| | Test files | Tests |
+|---|---|---|
+| master `62750403` | 1 failed / 468 passed / 2 skipped (471) | **1 failed / 6476 passed / 8 skipped (6485)** |
+| `feat/ew-channels-writer` `b2d227d3` | 469 passed / 2 skipped (471) | **0 failed / 6498 passed / 8 skipped (6506)** |
+
+**MASTER WAS ALREADY RED, WITH EXACTLY THE ROW THAT MOTIVATED THIS PARCEL**:
+`CURRENCY: is the vendored preset schema still what empyrean publishes? > matches
+contract/schema/aurora-effects-preset.schema.json at empyrean origin/main` —
+`NOT AN AURORA REGRESSION — the vendored preset contract schema is stale.` That is the drift gate
+doing its job, and this branch is its fix. The arithmetic closes with nothing unaccounted:
+total tests 6485 → 6506 = **+21**, and passed 6476 → 6498 = **+22** because the 21 new rows landed
+AND the stale-pin row turned green.
+
+**+21 rows**, independently counted per file on both sides through git objects:
 `effects-preset.test.ts` 41→58, `effects-preset-schema-drift.test.ts` 14→16,
 `effects-preset-channels.test.ts` 30→32; `preset-lag-disclosure.test.ts` 12→12 (re-aimed, not grown).
+
+`tsc --noEmit` clean; all seven `check:*` scripts green (`harness-guards` 188/188,
+`ledger-timestamps`, `object-stringify`, `peer-path-literals` 1220 files / 4 rules,
+`pseudo-skip` 5904 bodies, `python-resolver` 7 rows, `test-collection` 471/471). All 8 skips are
+pre-existing, identical on both sides, and each names its reason; none is mine.
 
 **The round trip, byte-for-byte.** A document carrying both keys in all three states — index 0
 authored, index 1 `null`, indices 2–3 unreached — comes back byte-identical through
