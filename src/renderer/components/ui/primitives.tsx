@@ -100,7 +100,16 @@ export function ToolButton({ icon, label, active, onClick }: {
 }
 
 export function IconButton({ icon, label, onClick, disabled }: {
-  icon: React.ReactNode; label: string; onClick: () => void; disabled?: boolean;
+  icon: React.ReactNode; label: string;
+  /** The event is FORWARDED (d-27). React always handed it to this handler —
+   *  `onClick` goes straight onto the `<button>` — but the type said `() =>
+   *  void`, and TypeScript will not accept a one-parameter callback where a
+   *  zero-parameter one is declared. So a destructive caller could not reach
+   *  `e.currentTarget` to blur the button it just pressed without either
+   *  widening this or blurring `document.activeElement` on faith. Widening is
+   *  purely additive: every existing `() => …` caller still fits. See
+   *  `ui/act-and-drop-focus.ts`. */
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void; disabled?: boolean;
 }) {
   return (
     <button title={label} aria-label={label} disabled={disabled} onClick={onClick} style={{
@@ -113,7 +122,13 @@ export function IconButton({ icon, label, onClick, disabled }: {
 }
 
 export function Chip({ children, active, onClick, disabled, title, tone }: {
-  children: React.ReactNode; active?: boolean; onClick?: () => void; disabled?: boolean; title?: string;
+  children: React.ReactNode; active?: boolean;
+  /** The event is FORWARDED — same reason as `IconButton`'s, see the note
+   *  there and `ui/act-and-drop-focus.ts` (d-27). Widening only; every
+   *  `() => …` caller still fits. NOTE the `if (!onClick)` branch below: a chip
+   *  with no handler is a `<span>`, so this widening reaches only the chips
+   *  that are already real `<button>`s. */
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void; disabled?: boolean; title?: string;
   /** Colours the chip's border and text WITHOUT making it look active. A chip
    *  that is switched off while reporting a problem — the canvas's Clashes chip
    *  with the tint hidden — has to say so without claiming the tint is on. A
