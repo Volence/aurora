@@ -68,6 +68,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import * as http from 'node:http';
 import * as os from 'node:os';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { readAeonShippedPreset, reQuote } from './lib/aeon-shipped-preset.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9454);
@@ -84,8 +85,23 @@ if (AEONDIR.startsWith(siblingDefaultPathOrUnresolved('aeon'))) {
 const SHOTS = `${ROOT}/scratchpad/shots-effects-refusal`;
 mkdirSync(SHOTS, { recursive: true });
 const PLANT = process.env.PLANT ?? '';
-/** aeon's own shipped preset — a document this repo did not author. */
-const PRESET_ID = process.env.PRESET_ID ?? 'authored_probe';
+/** aeon's own shipped preset — a document this repo did not author, and the one
+ *  this run types into (in the MODEL only; no save is issued and the band it
+ *  edits is a real one, not one Aurora invented for itself).
+ *
+ *  ⚠ READ BY PATH, AT IMPORT, AND NOT LOOKED UP THROUGH THE APP. This id
+ *  belongs to aeon and aeon has BOOKED a rename of it (their
+ *  docs/DEFERRED_WORK.md, "PRESET-ID NAMESPACE COLLISION", 2026-09-03). This
+ *  file used to carry the string `authored_probe` twice — once here and once
+ *  INSIDE ROW [3c]'S REGEX — and would have discovered a rename as "the preset
+ *  is absent" at row [1b], or worse as a refusal sentence that did not match a
+ *  pattern nobody would think to blame. Now the run refuses BEFORE the app
+ *  launches, naming the absolute path and the booking, and [3c]'s pattern is
+ *  built from the id that was read. See scratchpad/lib/aeon-shipped-preset.mjs. */
+const SHIPPED = process.env.PRESET_ID ? null : readAeonShippedPreset(AEONDIR);
+const PRESET_ID = process.env.PRESET_ID ?? SHIPPED.id;
+if (SHIPPED) console.log(`    SHIPPED     : ${SHIPPED.path} (${SHIPPED.text.length}B, id ${SHIPPED.id}, ${SHIPPED.bands} band(s))`);
+else console.log(`    SHIPPED     : OVERRIDDEN by PRESET_ID=${PRESET_ID} — the by-path identity check is SKIPPED`);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(path, timeoutMs = 1500) {
@@ -426,7 +442,8 @@ async function main() {
     check('3c', 'a PAINTED refusal sits under the box and names preset, band and field',
       refusal.leaf === true && refusal.rects > 0 && refusal.visible !== false
       && refusal.hitInside === true && refusal.afterControl === true
-      && /^preset "authored_probe" · Raster band 0 · Top: 40112 is not a screen line/.test(refusal.text)
+      && new RegExp(`^preset "${reQuote(PRESET_ID)}" · Raster band 0 · Top: 40112 is not a screen line`)
+        .test(refusal.text)
       && new RegExp(`Refused; Top is still ${held}\\.$`).test(refusal.text),
       JSON.stringify(refusal));
 

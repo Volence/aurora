@@ -60,9 +60,10 @@
 //     real edit and reads the DOCUMENT back through `__dbg.aeon.presetsJson()`,
 //     so "the warning is there" cannot substitute for "the feature is there".
 //   • THE DOCUMENT IS AURORA'S OWN, so a round-trip proves nothing. Section 5
-//     reads aeon's SHIPPED `authored_probe.json` — a file this repo did not
-//     write — and compares the bytes on disk before and after an unrelated
-//     edit elsewhere in the library.
+//     reads aeon's SHIPPED preset document — a file this repo did not write,
+//     read BY PATH at import (scratchpad/lib/aeon-shipped-preset.mjs) rather
+//     than hunted through the app — and compares the bytes on disk before and
+//     after an unrelated edit elsewhere in the library.
 //
 // ⚠ NOTHING HERE IS STITCHED FROM TWO RUNS. `dpr`, the rects and the clip are
 // read in ONE session and printed together, because `devicePixelRatio` on this
@@ -98,6 +99,7 @@ import { dirname } from 'node:path';
 import * as http from 'node:http';
 import * as os from 'node:os';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { readAeonShippedPreset } from './lib/aeon-shipped-preset.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9431);
@@ -120,9 +122,33 @@ const SHOTS = `${ROOT}/scratchpad/shots-band-preset`;
 mkdirSync(SHOTS, { recursive: true });
 
 const PLANT = process.env.PLANT ?? '';
-const PRESET_ID = process.env.PRESET_ID ?? 'harness_band';
-/** aeon's own shipped document — the round-trip subject this repo did not write. */
-const SHIPPED = `${AEONDIR}/games/sonic4/data/editor/effects/presets/authored_probe.json`;
+/** THIS run's preset — created through the panel's own `New`, authored here.
+ *  ⚠ `aurora_local_` IS NOT DECORATION. `New` writes into the same id namespace
+ *  aeon commits into, and a collision there does not fail: it silently selects
+ *  the existing document. `ramp_probe` was a sibling harness's id until aeon
+ *  landed a real `ramp_probe.json` and eighteen rows were handed their file.
+ *  Do not shorten. Row [1c2] is the partner guard. */
+const PRESET_ID = process.env.PRESET_ID ?? 'aurora_local_bandpreset_probe';
+/** aeon's own shipped document — the round-trip subject this repo did not write.
+ *
+ *  ⚠ READ BY PATH, AT IMPORT, AND ITS id AND BAND COUNT TAKEN FROM THE FILE.
+ *  This id belongs to aeon and aeon has BOOKED a rename of it (their
+ *  docs/DEFERRED_WORK.md, "PRESET-ID NAMESPACE COLLISION", 2026-09-03). The
+ *  path was already spelled here, but its absence surfaced only at row [5b] —
+ *  the LAST row of a twelve-hundred-line run — while row [1b] hunted the string
+ *  `authored_probe` through the app's model and pinned `bands === 2` as a
+ *  number typed in on 2026-08-29. Both now come from the file, and the run
+ *  refuses before launch if it is gone. See scratchpad/lib/aeon-shipped-preset.mjs. */
+const SHIPPED_DOC = readAeonShippedPreset(AEONDIR);
+const SHIPPED_ID = SHIPPED_DOC.id;
+const SHIPPED = SHIPPED_DOC.path;
+/** The band count read OFF AEON'S FILE, not typed here — so row [1b] measures
+ *  the loader against their document rather than against a memory of it. */
+const SHIPPED_BANDS = SHIPPED_DOC.bands;
+if (SHIPPED_BANDS < 1) {
+  throw new Error(`${SHIPPED} carries ${SHIPPED_BANDS} bands — row [1b] would be vacuous. `
+    + 'Re-materialise AEON_DIR from a committed aeon revision.');
+}
 /** Where THIS harness's own preset lands. Deleted before every run — see below. */
 const MINE = `${AEONDIR}/games/sonic4/data/editor/effects/presets/${PRESET_ID}.json`;
 
@@ -343,8 +369,9 @@ async function main() {
   console.log(`    DISPLAY     : :${DISPLAY_NUM}`);
 
   // ⚠ THE HARNESS SAVES, SO THE HARNESS POLLUTES ITS OWN FIXTURE — and this
-  // caught it red-handed rather than in review. Run 2 wrote `harness_band.json`
-  // into the copy; run 3 then OPENED it, so the preset already existed before
+  // caught it red-handed rather than in review. Run 2 wrote this run's preset
+  // file (then `harness_band.json`) into the copy; run 3 then OPENED it, so the
+  // preset already existed before
   // any click, `presetIdRefusal` refused the id as taken, `create` returned
   // early — and the row "clicking New created the preset in the MODEL" WENT
   // GREEN on a document the click had nothing to do with. Two paths, one
@@ -411,9 +438,11 @@ async function main() {
     // row about round-tripping it would be about a document that does not
     // exist, and "unchanged on disk" would be trivially true.
     const loaded = await c.json('window.__dbg.aeon.presets()');
-    check('1b', "aeon's own authored_probe.json was LOADED into the model",
-      loaded.some((p) => p.id === 'authored_probe' && p.bands === 2),
-      `${loaded.length} presets: ${JSON.stringify(loaded)}`);
+    check('1b', `aeon's own ${SHIPPED_ID}.json was LOADED into the model, with the `
+      + `${SHIPPED_BANDS} band(s) THEIR FILE ON DISK CARRIES`,
+      loaded.some((p) => p.id === SHIPPED_ID && p.bands === SHIPPED_BANDS),
+      `${loaded.length} presets: ${JSON.stringify(loaded)}; expected ${SHIPPED_ID} with `
+      + `${SHIPPED_BANDS} band(s), read from ${SHIPPED}`);
     const unreadable = await c.json('window.__dbg.aeon.unreadablePresets()');
     check('1c', 'no preset file in the project was unreadable',
       unreadable.length === 0, JSON.stringify(unreadable));
@@ -802,7 +831,7 @@ async function main() {
     // instrument, two builds — rather than from a number typed into a packet.
     // NEITHER \b NOR (?!\w) HERE, and BOTH cost a run. The header's textContent
     // runs straight into the `right` slot's own label — "Preset —
-    // harness_bandDelete" — so there is no word boundary between "d" and "D",
+    // <id>Delete" — so there is no word boundary between "e" and "D",
     // and "D" is itself a word character. The bound that is actually correct
     // comes from the ID'S OWN CHARSET (^[a-z][a-z0-9_]{0,31}$ in the schema): no
     // legal id character can follow, so a longer id cannot be matched by
@@ -812,9 +841,9 @@ async function main() {
     // and it is a THIRD rot of this same selector. `(?![a-z0-9_])` was correct
     // when one section carried this prefix. There are now THREE:
     //
-    //     Preset — harness_bandDelete                     <- the bands editor
-    //     Preset — harness_band — cycles, variants        <- ROADMAP row 97
-    //     Preset — harness_band — moving anchors          <- ROADMAP row 95
+    //     Preset — <id>Delete                     <- the bands editor
+    //     Preset — <id> — cycles, variants        <- ROADMAP row 97
+    //     Preset — <id> — moving anchors          <- ROADMAP row 95
     //
     // …and `OPEN_SECTION` takes `.pop()`, the LAST match. So this harness had
     // been clicking the MOVING ANCHORS header open and then looking for the band
@@ -1141,7 +1170,7 @@ async function main() {
     check('5a', 'a REAL Ctrl+S ran and cleared the dirty flag',
       dirtyBefore === true && dirtyAfter === false,
       `dirty ${dirtyBefore} -> ${dirtyAfter}`);
-    check('5b', "aeon's shipped authored_probe.json is BYTE-IDENTICAL after a save",
+    check('5b', `aeon's shipped ${SHIPPED_ID}.json is BYTE-IDENTICAL after a save`,
       shippedBefore !== null && shippedAfter === shippedBefore,
       shippedBefore === null ? 'the shipped file was ABSENT — nothing was round-tripped'
         : `${shippedBefore.length}B before, ${shippedAfter === null ? 'ABSENT' : `${shippedAfter.length}B`} after`);

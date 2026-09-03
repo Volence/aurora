@@ -102,6 +102,7 @@ import { dirname } from 'node:path';
 import * as http from 'node:http';
 import * as os from 'node:os';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { readAeonShippedPreset } from './lib/aeon-shipped-preset.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9438);
@@ -126,8 +127,21 @@ mkdirSync(SHOTS, { recursive: true });
 const PLANT = process.env.PLANT ?? '';
 /** aeon's own shipped preset document — the id this harness binds TO. It is
  *  deliberately a document this repo did not author, so a green here is not
- *  Aurora agreeing with itself. */
-const PRESET_ID = process.env.PRESET_ID ?? 'authored_probe';
+ *  Aurora agreeing with itself.
+ *
+ *  ⚠ READ BY PATH, AT IMPORT, AND NOT LOOKED UP THROUGH THE APP. This id
+ *  belongs to aeon and aeon has BOOKED a rename of it (their
+ *  docs/DEFERRED_WORK.md, "PRESET-ID NAMESPACE COLLISION", 2026-09-03). This
+ *  file used to carry the string `authored_probe` and discover its absence at
+ *  row [2b] — "the select does not offer aeon's preset" — deep inside an
+ *  Electron run, in a repo with an empty diff, pointing at Aurora's code
+ *  instead of at their rename. Now the run refuses BEFORE the app launches,
+ *  naming the absolute path and the booking. See
+ *  scratchpad/lib/aeon-shipped-preset.mjs. */
+const SHIPPED = process.env.PRESET_ID ? null : readAeonShippedPreset(AEONDIR);
+const PRESET_ID = process.env.PRESET_ID ?? SHIPPED.id;
+if (SHIPPED) console.log(`    SHIPPED     : ${SHIPPED.path} (${SHIPPED.text.length}B, id ${SHIPPED.id}, ${SHIPPED.bands} band(s))`);
+else console.log(`    SHIPPED     : OVERRIDDEN by PRESET_ID=${PRESET_ID} — the by-path identity check is SKIPPED`);
 /** The section under test. 0 has a sidecar in aeon's tree; 1 is the SECOND
  *  section, used to prove the select follows `activeSectionIndex` rather than
  *  drawing section 0 forever. */
@@ -684,9 +698,21 @@ async function main() {
     check('6b', 'the select falls back to the unbind option — which is why silence would LIE',
       ghostView.found === true && ghostView.widget === '' && ghostView.offersGhost === false,
       `widget = ${JSON.stringify(ghostView.widget)}, offers ghost_preset = ${ghostView.offersGhost}`);
-    check('6c', 'a warning naming the id sits UNDER the select — and it is painted, not merely present',
+    // ⚠ THE SENTENCE NAMES THE SECTION, and this row did not know it until
+    // 2026-09-03. `unassignablePresetRef` grew a `${where}` prefix in 9c387987
+    // ("the panel refuses at typing time what the build refuses at build time",
+    // EFFECTS-W1 defect 7) precisely so the reader is not left working out
+    // WHICH section's sidecar carries the dangling id — one control draws every
+    // section in turn. Nobody re-ran this harness, so the row sat red on master
+    // for an app change that made the panel BETTER. Found by the shared-preset-
+    // namespace parcel, which had to run this file and could not read its tally.
+    // The section number is derived from SEC_A, not typed, so moving the planted
+    // section moves the expectation with it.
+    check('6c', `a warning naming BOTH section ${SEC_A} and the dangling id sits UNDER the select `
+      + '— and it is painted, not merely present',
       ghostView.leaf === true
-      && /^Assigned to "ghost_preset", which is not a raster preset in this project\.$/.test(ghostView.text)
+      && new RegExp(`^Section ${SEC_A} is assigned to "ghost_preset", which is not a raster `
+        + 'preset in this project\\.$').test(ghostView.text)
       && ghostView.rects > 0 && ghostView.visible !== false
       && ghostView.hitInside === true && ghostView.afterSelect === true,
       JSON.stringify(ghostView));

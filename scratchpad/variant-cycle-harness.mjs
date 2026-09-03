@@ -81,7 +81,7 @@
 //   AEON_DIR=<writable copy> [SCREEN=1920x1080] npm run harness:variant-cycle
 //
 //   ⚠ FRESH COPY PER RUN (O66). The Ctrl+S in section 7 rewrites the whole
-//   project and leaves `harness_vc.json` in presets/. A second run on the same
+//   project and leaves `aurora_local_vc_probe.json` in presets/. A second run on the same
 //   copy is refused before the app is launched — exit 2, `HARNESS ABORTED:
 //   LEFTOVER FROM A PRIOR RUN: …` — never a silent partial pass. Re-materialise:
 //     git -C <aeon> archive <committed rev> | tar -x -C <fresh dir>
@@ -105,6 +105,7 @@ import { dirname } from 'node:path';
 import * as http from 'node:http';
 import * as os from 'node:os';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { readAeonShippedPreset } from './lib/aeon-shipped-preset.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9439);
@@ -133,11 +134,23 @@ mkdirSync(SHOTS, { recursive: true });
 
 const PLANT = process.env.PLANT ?? '';
 /** aeon's own shipped document — opened, never touched, and required to come
- *  back byte-identical from a save that re-serialises the whole library. */
-const SHIPPED_ID = 'authored_probe';
-const SHIPPED = `${AEONDIR}/games/sonic4/data/editor/effects/presets/${SHIPPED_ID}.json`;
-/** THIS run's preset — created through the UI, authored through the UI. */
-const PRESET_ID = process.env.PRESET_ID ?? 'harness_vc';
+ *  back byte-identical from a save that re-serialises the whole library.
+ *
+ *  ⚠ READ BY PATH, AT IMPORT. This id belongs to aeon, and aeon has BOOKED a
+ *  rename of it (their docs/DEFERRED_WORK.md, "PRESET-ID NAMESPACE COLLISION",
+ *  2026-09-03). This file already refused a missing file by path further down,
+ *  which is why its exposure was the mildest of the five; what it did NOT do
+ *  was prove the document's `id` matches its filename, so a half-landed rename
+ *  would have been read as a preset. See scratchpad/lib/aeon-shipped-preset.mjs. */
+const SHIPPED_DOC = readAeonShippedPreset(AEONDIR);
+const SHIPPED_ID = SHIPPED_DOC.id;
+const SHIPPED = SHIPPED_DOC.path;
+/** THIS run's preset — created through the UI, authored through the UI.
+ *  ⚠ `aurora_local_` IS NOT DECORATION. The panel's `New` writes into the same
+ *  id namespace aeon commits into, and a collision there does not fail: it
+ *  silently hands back the existing document. `ramp_probe` was a sibling
+ *  harness's id until aeon landed a real `ramp_probe.json`. Do not shorten. */
+const PRESET_ID = process.env.PRESET_ID ?? 'aurora_local_vc_probe';
 const MINE = `${AEONDIR}/games/sonic4/data/editor/effects/presets/${PRESET_ID}.json`;
 
 /** The disclosure's date, lead AND PREMISE, read from the ONE file that owns
@@ -376,7 +389,10 @@ async function main() {
     throw new Error(`LEFTOVER FROM A PRIOR RUN: ${MINE} exists. Row [4a] needs ${PRESET_ID} ABSENT at open, `
       + 'and the Ctrl+S that wrote it rewrote the whole project. Re-materialise AEON_DIR — FRESH COPY PER RUN.');
   }
-  if (!existsSync(SHIPPED)) throw new Error(`${SHIPPED} is ABSENT — nothing to round-trip`);
+  // Existence, JSON-ness and the id/filename agreement were all proved at
+  // import by `readAeonShippedPreset` — that is the seam aeon's rename crosses.
+  // Re-read here because the bytes row [7d] compares against must be the ones
+  // on disk at the moment the app is launched, not at module load.
   const shippedBefore = readFileSync(SHIPPED, 'utf8');
   const shippedParsed = JSON.parse(shippedBefore);
   if ('cycles' in shippedParsed || 'variants' in shippedParsed) {
@@ -724,17 +740,36 @@ async function main() {
         && (x.firstElementChild.textContent || '').trim() === 'lines');
       return row ? (row.innerText || '').replace(/\s+/g, ' ').trim() : null;
     })()`);
-    check('6d', 'lines is the INTEGER BITMASK on the wire: chip seeds 14 (0b1110), L0 → 15, L2 → 11, readout shows the integer',
-      chipLines === true && linesSeed === 14 && l0 === true && linesL0 === 15 && l2 === true && d.variants[0].lines === 11
-      && typeof d.variants[0].lines === 'number' && /= 11\b/.test(readout || ''),
-      `seed ${linesSeed} → L0 ${linesL0} → L2 ${JSON.stringify(d.variants[0].lines)}; row reads ${JSON.stringify(readout)}`);
+    // ⚠ L0 IS REFUSED NOW, AND THE ROW ASKED FOR THE REFUSED GESTURE. This row
+    // was written on 2026-09-02 expecting `L0 → 15`. EFFECTS-W1 defect 5 / b1
+    // then landed `variantLineRefusal` (providers/effects-preset.ts): line 0 is
+    // the character's palette line, so SETTING bit 0 is refused while CLEARING
+    // one a hand-written file carries is still allowed — because L0 used to be a
+    // one-click red build with no feedback. Nobody re-ran this harness, so the
+    // row sat red on master asking the panel to reintroduce the trap. Found by
+    // the shared-preset-namespace parcel, which had to run this file.
+    //
+    // The claim is UNCHANGED and still whole: one toggle flips ONE bit. The seed
+    // 14 = 0b1110 already has bit 0 clear, so L0 is the refused direction — and
+    // `l0 === true` is what keeps that half honest, because a REFUSED click and
+    // a MISSING button leave the model identically unmoved. L2 then clears bit 2
+    // only: 14 → 10, bits 1 and 3 untouched.
+    check('6d', 'lines is the INTEGER BITMASK on the wire: chip seeds 14 (0b1110); L0 is REFUSED '
+      + '(line 0 is the character\'s) and the mask does not move; L2 clears bit 2 → 10, '
+      + 'bits 1 and 3 intact; the readout shows the integer',
+      chipLines === true && linesSeed === 14
+      && l0 === true && linesL0 === 14
+      && l2 === true && d.variants[0].lines === 10
+      && typeof d.variants[0].lines === 'number' && /= 10\b/.test(readout || ''),
+      `seed ${linesSeed} → L0 (clicked=${JSON.stringify(l0)}) ${linesL0} → L2 `
+      + `${JSON.stringify(d.variants[0].lines)}; row reads ${JSON.stringify(readout)}`);
 
     const clear1 = await c.evalExpr(SET_SELECT(SLOT_SEL(1), 'cleared'));
     await sleep(600);
     d = await docOf(c, PRESET_ID);
     check('6e', 'slot 1 → "clear" writes null at index 1 — the array now reaches it, and slot 0 is untouched',
       clear1 === 'ok' && Array.isArray(d.variants) && d.variants.length === 2 && d.variants[1] === null
-      && d.variants[0] !== null && d.variants[0].shift_r === 3 && d.variants[0].lines === 11
+      && d.variants[0] !== null && d.variants[0].shift_r === 3 && d.variants[0].lines === 10
       && (await c.evalExpr(String.raw`((${SLOT_SEL(2)}) || {}).value`)) === 'unreached',
       `variants = ${JSON.stringify(d.variants)}`);
 
@@ -760,9 +795,9 @@ async function main() {
 
     const wrote = existsSync(MINE) ? readFileSync(MINE, 'utf8') : null;
     const parsed = wrote === null ? null : JSON.parse(wrote);
-    check('7b', `${PRESET_ID}.json ON DISK: cycles is null, variants is [{lines: 11, shift_r: 3}, null]`,
+    check('7b', `${PRESET_ID}.json ON DISK: cycles is null, variants is [{lines: 10, shift_r: 3}, null]`,
       parsed !== null && 'cycles' in parsed && parsed.cycles === null
-      && JSON.stringify(parsed.variants) === JSON.stringify([{ lines: 11, shift_r: 3 }, null]),
+      && JSON.stringify(parsed.variants) === JSON.stringify([{ lines: 10, shift_r: 3 }, null]),
       wrote === null ? `NOT WRITTEN at ${MINE}` : `${wrote.length}B: ${wrote.replace(/\s+/g, ' ')}`);
     // aeon's normative form, reproduced independently of the codec so this row
     // measures the BYTES rather than agreeing with the writer.
