@@ -2,34 +2,61 @@
  * The contract-leads-consumer lag on the raster preset document, as ONE fact
  * with ONE measurement behind it.
  *
- * ═══ RE-ARMED 2026-09-03. THE LAG IS `patch_world_ys` AND `patch_motion`. ═══
+ * ═══ THE LAG IS EMPTY. RETIRED (AGAIN) 2026-09-03 — STEP 4 HAS RUN. ═══
  *
- * The retirement below happened, and then the exact event its RE-OPEN paragraph
- * described happened too — from the other direction. empyrean `d36d704`
- * (AURORA_EFFECTS_SCHEMA.md §7.3) declared two new optional preset keys for
- * EFFECTS-W1 DoD item 4, Aurora vendored them (step 3 of a four-step chain), and
- * aeon's `tools/effects_gen.py` reads neither: step 4 is theirs and has not run.
- * Measured at aeon `origin/master` `81b2a719` through git objects:
- * `PRESET_KEYS` (`effects_gen.py:280`) is `{schema, id, bands, cycles,
- * variants}` and `docs/EDITOR_RASTER_PRESETS.md`'s machine-checked block lists
- * the same five. aeon's master moved to `63fa3f8c` during the same session (three
- * DMA-reserve measurement commits) and the block is UNCHANGED there — re-read,
- * not assumed. The drift row reads TIP on every run, so it is that row and not
- * this comment that answers the question today.
+ * The four-step cross-repo chain for EFFECTS-W1 DoD item 4 has closed. aeon
+ * named the key shape, the hub filed the schema CR (empyrean `d36d704`,
+ * AURORA_EFFECTS_SCHEMA.md §7.3), Aurora vendored and wrote the keys (step 3,
+ * merge `b5c5284b`), and aeon's generator now READS them. Measured firsthand
+ * through git objects at aeon `origin/master` `b7f4bdeb`, page blob `22a42064`
+ * — a revision LATER than the `81b2a719`/`63fa3f8c` the re-arm below was written
+ * against, because aeon's master moves fast and the drift row reads TIP on every
+ * run, so it and not this comment answers the question today:
  *
- * ═══ THIS LAG IS SHARPER THAN THE LAST ONE, AND THE SENTENCE SAYS SO ═══
+ *   - `PRESET_KEYS` (`tools/effects_gen.py:285-286`) is now `{schema, id, bands,
+ *     cycles, variants, patch_world_ys, patch_motion}`, with a comment above it
+ *     dating the join to 2026-09-03 and naming §7.3 as the authority.
+ *   - `_check_patch_world_ys` and `_check_patch_motion` shape-check them
+ *     (positional, `<= 4`, the `PATCH_ANCHOR_NONE` sentinel refused as an
+ *     integer, `PATCH_WORLD_Y_MAX` = `0xFFFF`), plus the cross-key refusal for a
+ *     motion on a null seed and the `CAP_ANCHOR_MOTION` capability check.
+ *   - `render_patch_motion` and the `fn_sec_patch_world_y` / `fn_sec_patch_motion`
+ *     emitters lower them as VALUES into `ep_patch_world_ys` / `ep_patch_motion`.
+ *   - `docs/EDITOR_RASTER_PRESETS.md`'s machine-checked block lists both under
+ *     `preset:`, and grew `sweep:` / `sweep-optional:` rows for the shape.
  *
- * At 12aecd5 the two lagging keys were in aeon's `preset-refused` list — refused
- * BY NAME, with a reason. These two are not in aeon's vocabulary at all, so they
- * take `_check_keys`'s generic unknown-key path (`effects_gen.py:444-453`), and
- * `_refuse` RAISES: a preset document carrying either key does not "lower
- * partially", it FAILS AEON'S BUILD ENTIRELY until step 4 lands. An author who
- * sets one has not merely authored something inert — they have made that preset
- * un-generatable. The disclosure below is written to say that, because the
- * softer 12aecd5 wording ("saved to this file, and that is as far as it goes")
- * would understate it.
+ * `preset-refused` is back to `fires` alone.
  *
- * ═══ THE 2026-09-02 RETIREMENT, KEPT FOR ITS REASONING ═══
+ * ═══ THE LAG THAT RETIRED WAS THE SHARPER FLAVOUR, AND THAT IS KEPT ═══
+ *
+ * At 12aecd5 the lagging keys were in aeon's `preset-refused` list — refused BY
+ * NAME, with a reason. These two were not in aeon's vocabulary at all, so they
+ * took `_check_keys`'s generic unknown-key path and `_refuse` RAISED: a preset
+ * document carrying either key did not "lower partially", it FAILED AEON'S
+ * BUILD ENTIRELY. `presetLagDisclosure` below still says exactly that, because
+ * the softer 12aecd5 wording would understate a re-opened lag of this flavour —
+ * and `preset-lag-disclosure.test.ts` replays that premise explicitly so the
+ * wording stays fully asserted with nothing on screen.
+ *
+ * ⚠ MERGED, NOT CERTIFIED. Nothing in this repository has seen a ROM obey
+ * `patch_world_ys` or `patch_motion`, and nothing here claims one has. What
+ * retired is a sentence about what aeon's GENERATOR does with an authored key,
+ * which is a fact this file can and does measure. aeon's own page records that
+ * `preset()` ensures the ARRAY LENGTH and not the values, and that a game
+ * without `CAP_ANCHOR_MOTION` refuses an authored sweep — both are aeon's
+ * checks, run in aeon's build, and no row here stands in for them.
+ *
+ * RE-OPEN CONDITION FOR ITEM 4, stated so this retirement cannot become
+ * permanent by accident: if aeon's build REFUSES a document Aurora writes under
+ * either key — a length, a sentinel, a unit or a capability Aurora does not know
+ * about — then "aeon reads these keys" is true of the vocabulary and false of
+ * the documents this editor actually produces, and the disclosure comes back
+ * with wording that says so. Aurora cannot measure that: it is aeon's pytest
+ * lane and sigil's attest chain, and no row in this repo pretends otherwise.
+ * What Aurora CAN measure is the vocabulary, and the drift row does, on every
+ * run, at TIP.
+ *
+ * ═══ THE 2026-09-02 RETIREMENT (ITEM 5), KEPT FOR ITS REASONING ═══
  *
  * It was `['cycles', 'variants']` from the 12aecd5 re-vendor until aeon merged
  * EFFECTS-W1 DoD item 5 (aeon `445a5856`, 2026-09-02). The premise was: the
@@ -49,7 +76,7 @@
  * `EditorVariant_OJZ_Act1_ojz_sec3_shimmer_0: pal_variant = variant(shift_r: 1,
  * shift_g: 1)`). So the list below is EMPTY and the sentence does not render.
  *
- * ═══ MERGED, NOT CERTIFIED — AND THE CONDITION THAT REVIVES THE SENTENCE ═══
+ * ═══ ITEM 5 WAS MERGED, NOT CERTIFIED — AND ITS OWN REVIVAL CONDITION ═══
  *
  * Item 5 is MERGED on aeon's master. It is NOT a certified chain: sigil
  * `dd5eaad2` (reachable on sigil `origin/master`) records "chain 198 recorded
@@ -71,37 +98,45 @@
  * TWO readers, and only two:
  *
  *   1. `test/formats/effects-preset-schema-drift.test.ts` MEASURES it: it reads
- *      aeon's page at origin/master through git objects, computes the lag and
- *      asserts it equals this list exactly. It goes red in BOTH directions —
- *      aeon builds one of these (empty the list) or the contract declares a key
- *      aeon has not built (add it). The test carries no copy of the names.
+ *      aeon's page at origin/master through git objects, computes the lag, and —
+ *      now that the lag is empty — asserts it is EMPTY. That row goes red the
+ *      day a lag re-opens, in either direction: aeon un-building a key, or the
+ *      contract declaring a key aeon has not built. Its message says which fix
+ *      each is. The row carries no copy of any key name, and — as on 2026-09-02
+ *      — it no longer names THIS constant either, because a row asserting "the
+ *      measured lag equals <an empty list>" would be the same claim spelled
+ *      through an indirection nobody can read.
  *
- *      ⚠ THE MEASUREMENT WIDENED ON 2026-09-03, AND IT HAD TO. Until then the
- *      lag was computed from aeon's `preset-refused` list alone, which sees only
- *      the refused-BY-NAME flavour; a key aeon's page does not mention at all
- *      was invisible to it. That is precisely the flavour d36d704 produced, and
- *      the row stayed green on the half that mattered. The lag is now computed
- *      as "every root key the schema declares that aeon's page does not
- *      ACCEPT", which covers both flavours and is the definition this constant
- *      always meant.
+ *      ⚠ THE MEASUREMENT WIDENED ON 2026-09-03 AND MUST STAY WIDE. Until then
+ *      the lag was computed from aeon's `preset-refused` list alone, which sees
+ *      only the refused-BY-NAME flavour; a key aeon's page does not mention at
+ *      all was invisible to it. That is precisely the flavour d36d704 produced,
+ *      and the row stayed green through it. The lag is computed as "every root
+ *      key the schema declares that aeon's page does not ACCEPT", which covers
+ *      both flavours and is the definition this constant always meant.
+ *      Narrowing it back is how this whole apparatus goes green while blind, so
+ *      `preset-lag-disclosure.test.ts` pins the WIDE form on the drift test's
+ *      own source.
  *   2. `presetLagDisclosure` DERIVES the panel's sentence from it, and returns
  *      null — no sentence — when the list is empty. It is mounted
- *      unconditionally and propless in `BandPresetPanel`, so re-filling this
- *      list is the whole of what it takes to put the sentence back on screen.
+ *      unconditionally and propless in `BandPresetPanel`, in BOTH the channels
+ *      section and the anchors section, so re-filling this list is the whole of
+ *      what it takes to put the sentence back on screen in both places. The
+ *      leaves STAY MOUNTED while silent: that is what keeps re-arming a one-line
+ *      edit in this file.
  *
  * `src/renderer/components/effects/__tests__/preset-lag-disclosure.test.ts`
- * closes the loop from the other side. It has been re-aimed with the premise
- * twice and keeps the shape both states need: while the lag is OPEN it asserts
- * every name here is an OPTIONAL root key the schema really declares (a premise
- * naming something the contract never opened would disclose fiction), asserts
- * the whole sentence against the derivation rather than a text match, drives the
- * EMPTY case too so the retirement path cannot rot while unused, and pins that
- * the drift test still names this constant and still computes the WIDE lag. Its
- * poison stubs this list EMPTY and requires silence — the direction that proves
- * the sentence is not hard-wired, which is the one that matters while a
- * disclosure is on screen (memory: a workaround outlives its defect; a hold
- * carries its date; a suite that passes while asserting nothing is the failure
- * mode).
+ * closes the loop from the other side. It has now been re-aimed with the premise
+ * THREE times (armed → retired → armed → retired) and keeps the shape both
+ * states need. With the lag CLOSED it asserts the retirement rather than assuming
+ * it (the list is empty, and the leaf is silent BECAUSE of that and not for some
+ * other reason); it keeps the WORDING fully asserted by driving the derivation
+ * with an EXPLICIT replay of the retired premise, checked against the schema so
+ * the replay is real vocabulary and not fiction; and its poison flips to the
+ * load-bearing direction — stub this list back NON-empty and the leaf must speak
+ * the whole sentence again, which a leaf hard-wired to `return null` would fail
+ * (memory: a workaround outlives its defect; a hold carries its date; a suite
+ * that passes while asserting nothing is the failure mode).
  *
  * Evaluate, do not obey: re-measure with `git -C <aeon> show
  * origin/master:docs/EDITOR_RASTER_PRESETS.md`, never by path into a working
@@ -113,12 +148,13 @@
  * sorted, as the drift row measures them.
  *
  * `['cycles','variants']` from 2026-08-30; EMPTY on 2026-09-02 when aeon merged
- * item 5; re-filled 2026-09-03 with item 4's authoring key, whose step 4 is
- * aeon's and has not run. Empty it (and only it) the day the drift row says the
- * lag has closed.
+ * item 5; `['patch_motion','patch_world_ys']` on 2026-09-03 when empyrean
+ * d36d704 declared item 4's authoring keys and aeon's step 4 had not run; EMPTY
+ * again LATER THE SAME DAY, when it did. Re-fill it (and only it) the day the
+ * drift row reports a lag again — the sentence comes back on screen in both
+ * mount sites by construction.
  */
-export const PRESET_KEYS_AWAITING_AEON: readonly string[] =
-  Object.freeze(['patch_motion', 'patch_world_ys']);
+export const PRESET_KEYS_AWAITING_AEON: readonly string[] = Object.freeze([]);
 
 /** The date the premise above was last measured — printed inside the sentence. */
 export const PRESET_LAG_MEASURED_ON = '2026-09-03';
