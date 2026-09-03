@@ -92,7 +92,23 @@ const AEONDIR = siblingPathOrUnresolved('aeon');
 const SHOTS = join(ROOT, 'scratchpad/shots-ramp-control');
 mkdirSync(SHOTS, { recursive: true });
 
-const PRESET_ID = 'ramp_probe';
+// ⚠ THIS ID MUST NOT COLLIDE WITH A PRESET AEON SHIPS, and it did.
+//
+// This harness opens aeon's LIVE checkout read-only and creates its fixture
+// THROUGH THE PANEL, so its probe id shares a namespace with every preset aeon
+// commits. `ramp_probe` was this file's id from 2026-09-03 — and hours later
+// aeon landed a REAL `ramp_probe.json` (their `15c15340`, item 6 step 4, tracked
+// in their git). From then on `New` did not make a fresh document: the panel
+// selected AEON'S ramp preset, and the fixture that promises "a fresh BANDS
+// preset" handed every row below a ramp.
+//
+// Caught by `[f0]`, which asserts the fixture IS a bands document with an
+// ENABLED chip before any row reads anything — the anti-vacuous row refusing to
+// let 18 rows measure somebody else's file. Without it this harness would have
+// edited aeon's committed preset in the model and reported confidently on it.
+//
+// The prefix is the fix: an id no other repo would author. Do not shorten it.
+const PRESET_ID = 'aurora_local_rampctl_probe';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = [];
@@ -693,6 +709,45 @@ async function main() {
       })()`)) === true,
       'the readout\'s own `title` carries RAMP_DISPLAY_LAG_NOTE, which states the latency and that '
       + 'no stage of the engine path compensates.');
+
+    // ══════════════════════════════════════════════════════════════════════
+    // WITNESS MODE — `RAMP_WITNESS_OUT=<path>` authors the document aeon's
+    // end-to-end proof runs against, THROUGH THE PANEL, and writes it out.
+    //
+    // WHY THIS LIVES HERE rather than in a throwaway script: the whole value of
+    // the witness is that the document was AUTHORED, not hand-written — a
+    // hand-written fixture proves the generator, a panel-authored one proves
+    // the product. That claim is only as good as its reproducibility, so the
+    // authoring path is committed and anyone can regenerate the file.
+    //
+    // THE SPAN IS DERIVED, NOT CHOSEN: `{top: 3, lines: 220}` is the longest
+    // legal run that also ends EXACTLY on the span bound — `lines` at its
+    // maximum and `top + lines === EFFECTS_PRESET_RAMP_SPAN_MAX`. It displays
+    // on 4..223, and 223 is the last line of a 224-line screen, so a display-lag
+    // error falls off the end instead of shifting subtly. `step` is -1.5, the
+    // schema's own worked example, so the ROM proves the SIGN RULE end to end
+    // and not merely the plumbing; `addr` 2 is plane B full-width, measured by
+    // the engine lane (VSCR 0 at the probe point) rather than chosen.
+    // ══════════════════════════════════════════════════════════════════════
+    if (process.env.RAMP_WITNESS_OUT) {
+      console.log('\n=== WITNESS MODE: authoring aeon\'s subject through the panel ===');
+      const TYPED = [['top', '3'], ['lines', '220'], ['addr', '2'],
+                     ['start', '0'], ['step', '-1.5']];
+      for (const [h, v] of TYPED) await typeInto(c, h, v, `${h} (witness)`);
+      const w = await doc(c);
+      if (!w || !w.ramp) throw new Error('witness: no ramp document to write');
+      writeFileSync(process.env.RAMP_WITNESS_OUT, JSON.stringify(w, null, 2) + '\n');
+      console.log('WITNESS WRITTEN → ' + process.env.RAMP_WITNESS_OUT);
+      console.log('  TYPED BY HAND, in the panel: '
+        + TYPED.map(([h, v]) => `${h}=${v}`).join(', '));
+      console.log('  DERIVED BY THE CODEC, not typed: '
+        + `start=${JSON.stringify(w.ramp.start)} step=${JSON.stringify(w.ramp.step)} `
+        + `target=${JSON.stringify(w.ramp.target)}`);
+      console.log('  write span (ENGINE lines, what the file says): '
+        + `${w.ramp.top}..${w.ramp.top + w.ramp.lines - 1}`);
+      console.log('  display span (SCREEN lines, one VSRAM latency later): '
+        + `${w.ramp.top + 1}..${w.ramp.top + w.ramp.lines}`);
+    }
 
     // ══════════════════════════════════════════════════════════════════════
     // Leave the app as we found it — the probe preset was never saved, but the
