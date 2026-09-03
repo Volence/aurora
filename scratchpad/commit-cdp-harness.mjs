@@ -1,4 +1,13 @@
 #!/usr/bin/env node
+// ⚠ IT DELETES INSIDE THE OPENED PROJECT'S `.aurora/canvas`, so `S1DISASM_DIR`
+// must name a WRITABLE COPY of a populated s1disasm. There is no default: the
+// guard lives in scratchpad/canvas-cdp-harness.mjs (this file's `CANVAS_DIR`
+// comes from there) and refuses at import when the variable is unset or points
+// at the live checkout. See docs/reviews/2026-09-03-canvas-harness-live-tree-delete.md.
+//
+//     cp -r <sibling>/s1disasm /tmp/s1disasm-copy
+//     S1DISASM_DIR=/tmp/s1disasm-copy npm run harness:commit-cdp
+//
 // Phase 2C verification: is COMMIT real in the running Electron app?
 //
 // The node suite renders no React, so every claim the commit panel makes is

@@ -17,14 +17,27 @@
 // read back out of the store through `window.__dbg.canvas.*`, which is
 // strictly read-only: every mutation in this file goes through the real UI.
 //
+// ⚠ HOW TO RUN IT, AND IT NO LONGER HAS A DEFAULT. This harness DELETES
+// `<s1disasm>/.aurora/canvas` twice as setup, so `S1DISASM_DIR` must name a
+// WRITABLE COPY of a populated s1disasm — it opens the project and loads GHZ
+// act 1, so an empty directory will not do — and it refuses if that variable is
+// unset or points at the live checkout. See the guard below `RUN` for why, and
+// for the four sibling harnesses covered by the same guard.
+//
+//     cp -r <sibling>/s1disasm /tmp/s1disasm-copy
+//     S1DISASM_DIR=/tmp/s1disasm-copy npm run harness:canvas-cdp
+//
 // The 14 rows are the plan's own Task 14 table. `ONLY=10,11 node
 // scratchpad/canvas-cdp-harness.mjs` restricts which numbered rows run inside
 // each session (setup always runs) — used to re-run one row cheaply while a real
 // bug is temporarily reintroduced into the source for the falsification pass.
 
-import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import {
+  siblingPathOrUnresolved, siblingDefaultPathOrUnresolved, checkoutOverride, UNRESOLVED_ROOT,
+} from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
 import * as http from 'node:http';
+import { basename, resolve as resolvePath } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { writeFileSync, mkdirSync, existsSync, readFileSync, rmSync, cpSync } from 'node:fs';
 import { spawnGuarded, killTree, restoreDiscoveryNow, readDiscoveryNow, resolveOwnedDiscovery } from './lib/harness-guard.mjs';
@@ -76,8 +89,92 @@ function newCanvasDefaults() {
 const RUN = announceRunRoot(runTarget(ROOT));
 const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
 const MAIN = RUN.main;
-const S1DIR = siblingPathOrUnresolved('s1disasm');
-const CANVAS_DIR = `${S1DIR}/.aurora/canvas`;
+// ===========================================================================
+// WHERE THIS HARNESS IS ALLOWED TO WRITE — and DELETING is the most extreme
+// write there is (d-28, `COPY ONLY WHERE IT CAN WRITE`).
+// ===========================================================================
+// THE DEFECT THIS REPLACES. `const S1DIR = siblingPathOrUnresolved('s1disasm')`
+// falls back to the LIVE SIBLING CHECKOUT when nothing is set, and `main()`
+// opened with `rmSync(CANVAS_DIR, { recursive: true, force: true })` as SETUP.
+// On 2026-09-03 `/home/volence/sonic_hacks/s1disasm/.aurora/canvas` held 20 real
+// files of the owner's canvas artwork. `npm run harness:canvas-cdp` with no
+// environment set therefore deleted all of them, silently, before the first
+// session launched. It had not happened only because the agents who ran it had
+// happened to point at throwaway copies.
+//
+// THE SHAPE OF THE FIX is `scratchpad/band-preset-harness.mjs`'s, and BOTH
+// clauses matter:
+//   1. NO DEFAULT AT ALL, so an unset variable stops the run at import, naming
+//      the variable — before any `rmSync` can run.
+//   2. A REFUSAL when the variable is pointed at the live tree anyway. A
+//      default that is a dead path is the worst of all worlds: it never trips
+//      clause 2, so the run gets past the refusal and dies later and further
+//      away.
+//
+// WHY IT IS SCOPED TO AN ENTRY-POINT LIST RATHER THAN APPLIED AT IMPORT.
+// This file is TWO things. It is the harness `harness:canvas-cdp` runs, which
+// writes and deletes; and it is the shared library 17 other instruments import
+// for `session()` / `openProjectAndAct()`, which only OPEN a peer tree. d-28
+// fixes the write-capable half and explicitly DEFERS the read-only half, so an
+// unconditional top-level throw would convert 12 read-only sites this ruling
+// leaves alone. The five entry points below are the ones that reach the write
+// surface — this file plus the four that import `CANVAS_DIR` and delete inside
+// it — derived by the sweep in
+// docs/reviews/2026-09-03-canvas-harness-live-tree-delete.md §4, and policed by
+// `scripts/check-peer-path-literals.mjs` rule 5 `peer-tree-write`.
+//
+// FORGETTING TO ADD A NEW WRITER TO THIS LIST IS LOUD AND HARMLESS, which is
+// the property that makes the list safe to maintain: unarmed, `CANVAS_DIR` is
+// not the live tree, it is a path under `UNRESOLVED_ROOT` that cannot exist and
+// is not creatable by accident, so the write fails with an ENOENT naming
+// `/nonexistent/…` instead of deleting somebody's art.
+const CANVAS_WRITERS = new Set([
+  'canvas-cdp-harness.mjs',        // this file: two recursive rmSync of the whole directory
+  'art-agent-harness.mjs',         // mkdirSync + writeFileSync + rmSync of `stage5-*`
+  'commit-cdp-harness.mjs',        // rmSync of EVERY file in the directory
+  'commit-collision-harness.mjs',  // rmSync of `stage4-*`
+  'constraints-cdp-harness.mjs',   // rmSync of EVERY file in the directory
+]);
+const ENTRY = basename(process.argv[1] ?? '');
+const WRITES_CANVAS = CANVAS_WRITERS.has(ENTRY);
+/** The WRITABLE COPY, or null when this entry point does not write. */
+let S1_COPY = null;
+if (WRITES_CANVAS) {
+  const ovr = checkoutOverride('s1disasm')?.value;
+  if (!ovr) {
+    throw new Error(
+      `S1DISASM_DIR must point at a WRITABLE COPY of an s1disasm checkout — ${ENTRY} DELETES\n`
+      + '  inside <that checkout>/.aurora/canvas as setup, and must never do that to the live tree.\n'
+      + '  There is deliberately NO DEFAULT: the default used to be the live sibling checkout, and\n'
+      + '  running with nothing set recursively deleted the canvas artwork stored there.\n'
+      + '\n'
+      + '  THE COPY MUST BE A POPULATED s1disasm — this harness opens it as a project and loads GHZ\n'
+      + '  act 1, so an empty directory will not do. Make one and point at it:\n'
+      + `      cp -r ${siblingDefaultPathOrUnresolved('s1disasm')} /tmp/s1disasm-copy\n`
+      + '      S1DISASM_DIR=/tmp/s1disasm-copy npm run harness:canvas-cdp\n'
+      + '  (EMPYREAN_SUITE_ROOT does NOT satisfy this: it resolves the live checkout, which is the\n'
+      + '  thing being refused. It has to be the copy, by name.)',
+    );
+  }
+  if (ovr.startsWith(siblingDefaultPathOrUnresolved('s1disasm'))) {
+    throw new Error(
+      `S1DISASM_DIR points at s1disasm itself (${ovr}) — ${ENTRY} DELETES inside\n`
+      + '  <that checkout>/.aurora/canvas, and must never write there. Copy it first:\n'
+      + `      cp -r ${siblingDefaultPathOrUnresolved('s1disasm')} /tmp/s1disasm-copy\n`
+      + '      S1DISASM_DIR=/tmp/s1disasm-copy npm run harness:canvas-cdp',
+    );
+  }
+  S1_COPY = ovr;
+}
+// THE READ-ONLY HALF, UNCHANGED. `openProjectAndAct()` opens this, and 12
+// importers reach it that way; d-28 leaves those recorded and untouched. When
+// this entry point DOES write, it is the copy, so the project the app opens and
+// the directory this file deletes are the same tree — pointing them apart would
+// make every row read the wrong disk.
+const S1DIR = S1_COPY ?? siblingPathOrUnresolved('s1disasm');
+const CANVAS_DIR = S1_COPY
+  ? `${S1_COPY}/.aurora/canvas`
+  : resolvePath(UNRESOLVED_ROOT, 's1disasm-canvas-NOT-ARMED');
 const SHOTS = `${ROOT}/scratchpad/shots-canvas`;
 mkdirSync(SHOTS, { recursive: true });
 const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(',').map((s) => s.trim())) : null;

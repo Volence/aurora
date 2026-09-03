@@ -510,6 +510,212 @@ function composesBuildPath(line, aliases) {
  */
 const BUILD_RULE_EXEMPT = [];
 
+// ---------------------------------------------------------------------------
+// RULE 5 — `peer-tree-write`, added 2026-09-03 (O80, the canvas-harness delete).
+//
+// WHAT IT CATCHES. A file-system WRITE — and deleting is the most extreme write
+// there is — whose destination derives from a resolver DEFAULT rather than from
+// an explicit checkout override. The default is another lane's LIVE WORKING
+// TREE, so such a line does not risk corrupting shared state, it does it every
+// run, as designed. `scratchpad/canvas-cdp-harness.mjs` opened `main()` with a
+// recursive `rmSync` of `<s1disasm>/.aurora/canvas`; on the day it was found
+// that directory held 20 files of the owner's canvas artwork, and four sibling
+// harnesses inherited the same destination through its export.
+//
+// THE POLICY IT ENFORCES is d-28 `COPY ONLY WHERE IT CAN WRITE`
+// (docs/decisions.jsonl, id `d-28-peer-tree-open-policy-answered`): a harness
+// that can write to a peer tree must be pointed at a COPY, by name, with no
+// default; one that merely READS may keep using the resolver's answer. So this
+// rule is deliberately keyed on the VERB and not on the path — which is also
+// why rules 1-4 are structurally blind to it. All four ask how a path was
+// SPELLED, and here the spelling is entirely correct: the right resolver, the
+// right peer name, imported the right way. What is wrong is what the code then
+// DOES with the answer.
+//
+// WHY IT IS NOT the repo-wide outage `docs/reviews/2026-09-03-o53-…md` §5.3
+// argued against. That section rejected a verb-aware rule that would fire on the
+// ~82 files which merely OPEN a peer tree. This one does not look at opens at
+// all — only at `node:fs` writes — and the whole population of those was 13
+// sites in 5 files, every one of them fixed on this branch, so it lands green
+// with an EMPTY exemption list.
+//
+// ⚠ WHAT IT DOES NOT COVER, said rather than left to be discovered.
+//   · An import. The four sibling harnesses reach the same directory through
+//     `import { CANVAS_DIR } from './canvas-cdp-harness.mjs'`, and no seed here
+//     creates that binding, exactly as rule 4 found with `ROOT`. Seeding on the
+//     SPELLING `CANVAS_DIR` would fire on those four files, which are now safe
+//     because the value they import is armed from an override or else points at
+//     `UNRESOLVED_ROOT`. Their protection is that fallback, not this rule.
+//   · A write the app performs on the harness's behalf — a dispatched Ctrl+S —
+//     which is `node:fs` in the MAIN process and invisible here. That is the
+//     `bganim-ui-authored-composition-harness.mjs` shape, O54's parcel.
+//   · The `hash` dialect. Python's writes are spelled `open(...,'w')`, and no
+//     Python instrument under `scratchpad/` writes to a peer path today; if one
+//     ever does, `check-python-resolver.mjs` is where the row belongs.
+// ---------------------------------------------------------------------------
+
+/**
+ * The resolver exports that answer with a DEFAULT — the peer's live checkout
+ * when nothing is set.
+ *
+ * An ARRAY joined into the regex rather than a typed-out alternation, so this
+ * file's own source never contains the text `siblingPath` immediately followed
+ * by an open paren. It is one of the files the run scans, and a constant that
+ * matched its own seed would make every write line below it a violation.
+ */
+const PEER_DEFAULT_RESOLVERS = [
+  'siblingPathOrUnresolved', 'siblingDefaultPathOrUnresolved',
+  'siblingPath', 'siblingDefaultPath', 'requireSiblingPath',
+];
+
+/** The resolver export that answers ONLY from an explicit `<NAME>_DIR`. */
+const PEER_OVERRIDE_RESOLVER = 'checkoutOverride';
+
+/**
+ * The `node:fs` calls that change a directory's contents, split by WHERE the
+ * destination sits — and that split is load-bearing, not tidiness.
+ *
+ * `cpSync(S1DIR, WORK, { recursive: true })` in `scripts/verify-s1-roundtrip.mjs`
+ * is the CORRECT pattern: it reads the peer tree and copies it into a local
+ * scratch directory, which is exactly what d-28 asks a write-capable instrument
+ * to do. A rule that matched the peer name anywhere in the argument list flagged
+ * that line — i.e. it reported the remedy as the defect. The peer path in
+ * argument ONE of a two-place verb is the SOURCE.
+ *
+ * `mkdirSync` is a write because materialising a directory inside somebody
+ * else's checkout is one, and because it is the line that PRECEDES the write in
+ * every one of the sites this rule was derived from.
+ */
+const WRITE_VERBS_DEST_FIRST = [
+  'rmSync', 'rmdirSync', 'unlinkSync', 'writeFileSync', 'appendFileSync',
+  'mkdirSync', 'truncateSync', 'createWriteStream', 'writeSync',
+];
+const WRITE_VERBS_DEST_SECOND = ['cpSync', 'copyFileSync', 'renameSync', 'linkSync', 'symlinkSync'];
+const WRITE_VERBS = [...WRITE_VERBS_DEST_FIRST, ...WRITE_VERBS_DEST_SECOND];
+
+/**
+ * The two call regexes for ONE file — canonical names PLUS whatever that file
+ * imported them AS.
+ *
+ * ⚠ FOUND BY THE SECOND RED-FIRST PLANT, NOT BY READING. A plant spelled
+ * `import { siblingPathOrUnresolved as _sp }` and then `rmSync` on a path built
+ * from `_sp('s1disasm')` left the gate at exit 0 — the call site never carries
+ * the canonical text, so a regex over it sees an empty world, and a rule that
+ * can be escaped by renaming an import polices only the people who did not.
+ * This is rule 4's `IMPORTED_CHECKOUT_NAMES` lesson arriving one rule later,
+ * except that here the local name is DERIVABLE rather than a convention: the
+ * import statement says exactly which export it renamed.
+ */
+function resolverCalls(code) {
+  const def = new Set(PEER_DEFAULT_RESOLVERS);
+  const ovr = new Set([PEER_OVERRIDE_RESOLVER]);
+  for (const m of code.matchAll(/\bimport\s*\{([^}]*)\}\s*from\s*['"][^'"]+['"]/g)) {
+    for (const spec of m[1].split(',')) {
+      const [imported, renamed] = spec.trim().split(/\s+as\s+/).map((s) => s.trim());
+      const local = renamed || imported;
+      if (!imported || !local) continue;
+      if (PEER_DEFAULT_RESOLVERS.includes(imported)) def.add(local);
+      if (imported === PEER_OVERRIDE_RESOLVER) ovr.add(local);
+    }
+  }
+  return {
+    isDefault: new RegExp(`(?<![.\\w$])(?:${[...def].join('|')})\\s*\\(`),
+    isOverride: new RegExp(`(?<![.\\w$])(?:${[...ovr].join('|')})\\s*\\(`),
+  };
+}
+
+/** Every `const|let|var NAME = EXPR` in one file, EXPR possibly spanning lines. */
+function* bindings(code) {
+  // Two passes over the same shape. The line-bounded one is what rule 4 uses and
+  // is exact for the common case; the `;`-bounded one is what reaches a ternary
+  // written across three lines, which is precisely how the fixed harness spells
+  // its armed-or-poisoned destination. Neither alone sees both.
+  for (const m of code.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([^;\n]*)/g)) yield [m[1], m[2]];
+  for (const m of code.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([\s\S]*?);/g)) yield [m[1], m[2]];
+}
+
+/**
+ * Does EXPR build a PATH out of NAME — as opposed to merely mentioning it?
+ *
+ * ⚠ THIS DISTINCTION IS THE RULE'S ACCURACY, and the first draft did not have
+ * it. Propagating taint on any mention made `const mapText =
+ * readFileSync(join(S1DIR, '_maps/Sonic.asm'), 'utf8')` a "peer path", and from
+ * there the whole dataflow of a rendering script — `doc`, `grid`, `img` — so
+ * `writeFileSync(args.out, encodePng(img))` came back as a write into somebody's
+ * checkout. Nine such lines, in four scripts, none of them a violation. CONTENT
+ * READ OUT OF A PEER TREE IS NOT A PEER PATH.
+ *
+ * The four shapes below are the ones a path is actually composed with, and they
+ * are the same three rule 4 matches plus a bare re-binding.
+ */
+function composesPathOver(expr, name) {
+  const n = `(?<![.\\w$])${name}\\b`;
+  return new RegExp(
+    `(?:^|[^\\w$.])(?:join|resolve)\\s*\\(\\s*${n}`          // join(X, …) / resolve(X, …)
+    + `|\\$\\{\\s*${name}\\s*\\}`                              // `${X}/…`
+    + `|${n}\\s*\\+\\s*['"\`]`                                 // X + '/…'
+    + `|^\\s*${n}\\s*$`,                                       // const Y = X;
+  ).test(expr);
+}
+
+/**
+ * Every local name in one file that is a peer path the resolver DEFAULTED.
+ *
+ * A FIXPOINT for the same reason rule 4 needs one — `S1DIR` then `CANVAS_DIR`
+ * then `PNG` is three hops, and one pass reports the file clean.
+ *
+ * A RESOLVER DEFAULT ANYWHERE IN THE EXPRESSION TAINTS, even beside an override.
+ * `const S1DIR = S1_COPY ?? siblingPath…('s1disasm')` still CAN be the live tree
+ * — that is what the `??` means — so letting the override half clear it would
+ * open a hole the shape of the defect. What the override half does is stop taint
+ * SPREADING: a name composed purely over a `checkoutOverride` answer is a path
+ * the caller was forced to name, which is what d-28 asks for, and that is how
+ * `const CANVAS_DIR = S1_COPY ? … : …` stops being a violation without an
+ * exemption entry.
+ */
+function peerDefaultAliases(code) {
+  const call = resolverCalls(code);
+  const def = new Set(), ovr = new Set();
+  for (let pass = 0; pass < 8; pass++) {
+    const before = def.size + ovr.size;
+    for (const [name, expr] of bindings(code)) {
+      if (call.isDefault.test(expr) || [...def].some((d) => composesPathOver(expr, d))) { def.add(name); continue; }
+      if (call.isOverride.test(expr) || [...ovr].some((o) => composesPathOver(expr, o))) ovr.add(name);
+    }
+    if (def.size + ovr.size === before) break;
+  }
+  return def;
+}
+
+/**
+ * The alias this line writes THROUGH, or null.
+ *
+ * The second-argument form skips one argument with `[^,)]*,`, which is an
+ * approximation — it would be wrong for `cpSync(join(a, b), DEST)`, where the
+ * first argument carries its own comma. It errs toward NOT matching, i.e.
+ * toward a missed violation rather than a false one, and no site in this repo
+ * spells it that way today.
+ */
+function writesPeerDefault(line, aliases) {
+  if (!aliases.size) return null;
+  for (const a of aliases) {
+    const n = `(?<![.\\w$])${a}\\b`;
+    const first = new RegExp(`\\b(?:${WRITE_VERBS_DEST_FIRST.join('|')})\\s*\\(\\s*[^)]*?${n}`);
+    const second = new RegExp(`\\b(?:${WRITE_VERBS_DEST_SECOND.join('|')})\\s*\\(\\s*[^,)]*,\\s*[^)]*?${n}`);
+    if (first.test(line) || second.test(line)) return a;
+  }
+  return null;
+}
+
+/**
+ * Files allowed to write to a resolver-defaulted peer path.
+ *
+ * EMPTY, and — like `BUILD_RULE_EXEMPT` — that is the point. An entry here says
+ * "this instrument may delete inside another lane's working tree", which is a
+ * claim that should have to be written down and reviewed.
+ */
+const WRITE_RULE_EXEMPT = [];
+
 /** The rules, built once the sibling root is known. */
 function makeRules(sibling) {
   return [
@@ -542,6 +748,19 @@ function makeRules(sibling) {
         && composesBuildPath(line, ctx.checkoutAliases) !== null,
       exempt: (rel) => BUILD_RULE_EXEMPT.includes(rel),
     },
+    {
+      id: 'peer-tree-write',
+      what: `an executable line writing (${WRITE_VERBS.join('/')}) to a path a resolver `
+        + 'DEFAULTED to a peer checkout, i.e. another lane\'s LIVE working tree. d-28 says '
+        + `COPY ONLY WHERE IT CAN WRITE: take the destination from ${PEER_OVERRIDE_RESOLVER}(), `
+        + 'which has no default, and refuse when it names the live tree',
+      // File-scoped for rule 4's reason and one more: the destination is almost
+      // never spelled on the resolver call — it is three hops away through
+      // `S1DIR` then `CANVAS_DIR` then `PNG`.
+      match: (line, ctx) => ctx !== undefined && ctx.kind === 'c'
+        && writesPeerDefault(line, ctx.peerDefaultAliases) !== null,
+      exempt: (rel) => WRITE_RULE_EXEMPT.includes(rel),
+    },
   ];
 }
 
@@ -551,7 +770,12 @@ function scan(src, rules, kind = 'c', rel = '') {
   // FILE SCOPE, computed once and handed to every matcher. Rule 4 needs it:
   // the build path is composed off a LOCAL ALIAS of the checkout name, so a
   // line read on its own cannot tell that alias from any other variable.
-  const ctx = { kind, rel, checkoutAliases: kind === 'c' ? checkoutAliases(code) : new Set() };
+  const ctx = {
+    kind,
+    rel,
+    checkoutAliases: kind === 'c' ? checkoutAliases(code) : new Set(),
+    peerDefaultAliases: kind === 'c' ? peerDefaultAliases(code) : new Set(),
+  };
   const hits = [];
   code.split('\n').forEach((line, n) => {
     for (const r of rules) {
@@ -604,6 +828,49 @@ const CANARY_CHECKOUT = CHECKOUT_IDENT;
 const CANARY_ART = ['node_modules/.bin/electron', 'dist/main/index.mjs'];
 
 /**
+ * The three names rule 5 owns, taken from the rule's OWN constants and
+ * INTERPOLATED, for both of the reasons the block above gives.
+ *
+ * Taken from the constants so a rename in the rule cannot leave the canary
+ * exercising a name the rule no longer polices — the shape that makes a check
+ * cover nothing while printing OK. Interpolated because this file is scanned:
+ * typing the resolver name beside an open paren here would seed rule 5's own
+ * alias set against this file and turn every write line below into a violation.
+ *
+ * The peer NAME is arbitrary on purpose — rule 5 keys on the resolver call and
+ * the verb, never on which peer is being written to, and taking it from
+ * `SUITE_PEERS` says so while keeping it a name the resolver would accept.
+ */
+const CANARY_DEFAULT_RESOLVER = PEER_DEFAULT_RESOLVERS[0];
+const CANARY_OVERRIDE_RESOLVER = PEER_OVERRIDE_RESOLVER;
+const CANARY_PEER = SUITE_PEERS[SUITE_PEERS.length - 1];
+/**
+ * Three write verbs taken FROM the rule's own lists, one of them from the
+ * two-place half so the source/destination split is actually exercised.
+ *
+ * The `find` keeps the canary semantically readable while still failing loudly
+ * if the list it is drawn from ever loses the member — a canary that hard-typed
+ * `writeFileSync` would go on passing after the rule stopped policing it.
+ */
+const CANARY_WRITE_DIR = WRITE_VERBS_DEST_FIRST[0];
+const CANARY_WRITE_FILE = WRITE_VERBS_DEST_FIRST.find((v) => v === 'writeFileSync')
+  ?? WRITE_VERBS_DEST_FIRST[WRITE_VERBS_DEST_FIRST.length - 1];
+const CANARY_COPY = WRITE_VERBS_DEST_SECOND[0];
+for (const [what, v] of [['CANARY_WRITE_DIR', CANARY_WRITE_DIR], ['CANARY_WRITE_FILE', CANARY_WRITE_FILE],
+  ['CANARY_COPY', CANARY_COPY]]) {
+  if (typeof v !== 'string' || v.length === 0) {
+    die(`${what} came out empty, so rule 5's canary would carry no write verb at all and would `
+      + 'prove nothing about the rule while still printing OK.');
+  }
+}
+// The read used as rule 5's negative control must NOT be a write verb, or the
+// "reads are the deferred half" line below would be asserting nothing.
+if (WRITE_VERBS.includes('readFileSync')) {
+  die('readFileSync is in WRITE_VERBS, so rule 5\'s read-only negative control is a second '
+    + 'positive and the canary would prove the opposite of what it claims.');
+}
+
+/**
  * THE CANARIES, one per dialect, each carrying all three rules.
  *
  * `at` is now a list of `[line, ruleId]`, in the order `scan` yields them
@@ -651,12 +918,68 @@ const CANARIES = [
       // this way; no seed above can see a binding the file never creates.
       "import { session, ROOT as ROOT } from './canvas-cdp-harness.mjs';",
       `const A = join(ROOT, '${CANARY_ART[1].split('/')[0]}', 'renderer', 'assets');`,
+      // ── rule 5, and the three ways it goes wrong ───────────────────────────
+      // Lines 18-19 build the destination the way the defect did: a resolver
+      // DEFAULT, then a subdirectory of it. Neither line writes, so neither
+      // fires — the rule is about the verb.
+      `const S1 = ${CANARY_DEFAULT_RESOLVER}('${CANARY_PEER}');`,
+      'const CANVASD = `${S1}/.aurora/canvas`;',
+      // Line 20 IS the defect, verbatim in shape: a recursive delete of another
+      // lane's live working tree, as harness setup.
+      `${CANARY_WRITE_DIR}(CANVASD, { recursive: true, force: true });`,
+      // Lines 21-22: the THIRD HOP. `S1` → `CANVASD` → `PNGP` is one hop deeper
+      // than rule 4's canary goes, and it is the depth the real file used
+      // (`S1DIR` → `CANVAS_DIR` → `PNG`). A fixpoint that stopped at two passes
+      // would report line 22 clean, which is the failure this pair prevents.
+      "const PNGP = join(CANVASD, 'ghz-cliffs.png');",
+      `${CANARY_WRITE_FILE}(PNGP, buf);`,
+      // Line 23 must NOT fire. READING a peer tree from the resolver's default
+      // is the half d-28 explicitly DEFERRED, and a rule that flagged it would
+      // go red on ~82 files the ruling leaves alone — the outage
+      // docs/reviews/2026-09-03-o53-…md §5.3 argued against.
+      'const bytes = readFileSync(PNGP);',
+      // Line 24 must NOT fire, and it is the one that cost nine false positives
+      // in four scripts before the rule distinguished a PATH from CONTENT. What
+      // came out of a peer file is bytes; writing them somewhere is not writing
+      // to the peer, and taint that spreads on a bare mention says it is.
+      `${CANARY_WRITE_FILE}(bytes, buf);`,
+      // Lines 25-27 must NOT fire, and this is the trio that makes the rule
+      // clearable at all: a destination taken from the OVERRIDE resolver has no
+      // default, so the caller was forced to name a copy. Without this, the fix
+      // for a violation would be an exemption entry rather than a fix.
+      `const OVR = ${CANARY_OVERRIDE_RESOLVER}('${CANARY_PEER}')?.value;`,
+      'const SAFE = `${OVR}/.aurora/canvas`;',
+      `${CANARY_WRITE_DIR}(SAFE, { recursive: true, force: true });`,
+      // Line 28 must NOT fire: a write to this repo's own output directory is
+      // most of what these instruments do, and flagging it would be un-clearable.
+      `${CANARY_WRITE_FILE}(join(ROOT, 'scratchpad/shots-canary/x.png'), buf);`,
+      // Lines 29-31: SOURCE vs DESTINATION, the pair that decides whether the
+      // rule reports the remedy as the defect. Copying a peer tree INTO a local
+      // scratch directory (line 30) is precisely what d-28 asks a write-capable
+      // instrument to do and must stay clean; copying anything INTO the peer
+      // (line 31) is the violation. A rule matching the alias anywhere in the
+      // argument list flags both, which is how `scripts/verify-s1-roundtrip.mjs`
+      // came back red for doing the right thing.
+      "const LOCALWORK = join(ROOT, 'scratchpad/work-canary');",
+      `${CANARY_COPY}(CANVASD, LOCALWORK, { recursive: true });`,
+      `${CANARY_COPY}(LOCALWORK, CANVASD, { recursive: true });`,
+      // Lines 32-34: THE RESOLVER IMPORTED UNDER ANOTHER NAME. The second
+      // red-first plant escaped the rule entirely by writing
+      // `import { … as _sp }`, because the call site then carries none of the
+      // canonical text and a regex over it reports an empty world. The local
+      // name is not a convention here — the import statement names it — so this
+      // canary line is what keeps that seed alive.
+      `import { ${CANARY_DEFAULT_RESOLVER} as _cr } from './sibling-root.mjs';`,
+      `const S2 = _cr('${CANARY_PEER}');`,
+      `${CANARY_WRITE_DIR}(S2, { recursive: true, force: true });`,
     ].join('\n'),
     at: [
       [3, 'sibling-literal'], [4, 'session-scratchpad'], [5, 'unratified-env'], [6, 'unratified-env'],
       [8, 'checkout-as-build-tree'], [9, 'checkout-as-build-tree'],
       [13, 'checkout-as-build-tree'], [15, 'checkout-as-build-tree'],
       [17, 'checkout-as-build-tree'],
+      [20, 'peer-tree-write'], [22, 'peer-tree-write'], [31, 'peer-tree-write'],
+      [34, 'peer-tree-write'],
     ],
   },
   {
@@ -726,7 +1049,7 @@ for (const r of CANARY_RULES) {
 // AND EVERY EXEMPTION MUST NAME A FILE THAT EXISTS. An exemption for a renamed
 // or deleted file exempts nothing while looking like it exempts something, and
 // the file it was written for is then policed by a rule it must violate.
-for (const rel of [...RESOLVER_FILES, ...BUILD_RULE_EXEMPT]) {
+for (const rel of [...RESOLVER_FILES, ...BUILD_RULE_EXEMPT, ...WRITE_RULE_EXEMPT]) {
   try {
     if (!statSync(join(ROOT, rel)).isFile()) throw new Error('not a file');
   } catch (e) {
@@ -842,8 +1165,9 @@ console.log(
 
 if (violations.length === 0) {
   console.log(`${PREFIX}: OK — no executable line names a sibling checkout by absolute path, `
-    + 'names a session scratchpad, reads a suite path variable outside the resolver, or '
-    + `composes a build path out of ${CHECKOUT_IDENT}.`);
+    + 'names a session scratchpad, reads a suite path variable outside the resolver, '
+    + `composes a build path out of ${CHECKOUT_IDENT}, or writes to a peer path the `
+    + 'resolver defaulted.');
   process.exit(0);
 }
 
