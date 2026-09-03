@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { peerRepo, resolveRev, isAncestor } from '../support/peer-repo';
@@ -16,8 +16,10 @@ import { serializeBgOverride } from '../../src/core/formats/bg-override/bg-overr
  *
  * Every other row in this parcel is Aurora asserting about Aurora. This one
  * hands bytes that Aurora's promote door actually produced to
- * `tools/inject_editor_bg.py`'s `band_axis_geometry` and
- * `validate_band_phase_axis`, executed, at a committed aeon revision.
+ * `tools/inject_editor_bg.py` — its `band_axis_geometry`, its
+ * `validate_band_phase_axis`, AND its `main()`, which is the real emitter that
+ * writes the 44-byte band record the engine reads — executed, at a committed
+ * aeon revision.
  *
  * ═══ HOW IT REACHES AEON, AND THE TWO RULES IT KEEPS ═══
  *
@@ -56,8 +58,16 @@ const AXIS_REV = '3a4712faa920100653669c1ec3fc26c2da71ef68';
 /** The branch whose tip answers "is the pin still in aeon's history?". */
 const AEON_TIP = 'origin/master';
 
-/** Paths the guard needs: the tools themselves and the project.json they read act ids from. */
-const ARCHIVE_PATHS = ['tools', 'project.json'];
+/**
+  * What the emitter needs, and nothing more: the tools, the project.json they
+  * read act ids from, and the two per-game TOMLs `vram_map`/`bganim_room` read
+  * the tile capacity and the section ceiling out of. The act's own `data/`
+  * directory is NOT extracted — this test supplies the override document
+  * itself, which is the whole point.
+  */
+const ARCHIVE_PATHS = [
+  'tools', 'project.json', 'games/sonic4/vram.toml', 'games/sonic4/map.toml',
+];
 
 const aeon = peerRepo('aeon');
 let work: string | null = null;
@@ -85,6 +95,9 @@ beforeAll(() => {
     rmSync(dir, { recursive: true, force: true });
     return;
   }
+  // The emitter writes its four outputs into the act's generated directory and
+  // does not create it. Ours, inside the work dir — aeon's tree is never touched.
+  mkdirSync(join(dir, 'games', 'sonic4', 'data', 'generated', 'ojz', 'act1'), { recursive: true });
   if (!existsSync(join(dir, 'tools', 'inject_editor_bg.py'))) {
     setupWhy = `aeon ${AXIS_REV} has no tools/inject_editor_bg.py`;
     rmSync(dir, { recursive: true, force: true });
@@ -97,11 +110,13 @@ afterAll(() => { if (work !== null) rmSync(work, { recursive: true, force: true 
 
 /** The one probe script. Written into the work dir so nothing is executed from aeon's tree. */
 const PROBE = `
-import json, os, sys
+import json, os, shutil, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tools'))
 import inject_editor_bg as ib
-anims = json.load(open(sys.argv[1]))['anims']
-out = {'axes': list(ib.BAND_AXES), 'geometry': [], 'guard': 'admitted', 'why': ''}
+doc_path = sys.argv[1]
+anims = json.load(open(doc_path))['anims']
+out = {'axes': list(ib.BAND_AXES), 'geometry': [], 'guard': 'admitted', 'why': '',
+       'emitted': None, 'emp': '', 'banks_bytes': 0}
 try:
     for i, a in enumerate(anims):
         axis, unit_bytes, unit_shift, period_px = ib.band_axis_geometry(a, where='band %d' % i)
@@ -112,6 +127,19 @@ try:
             'band %d: pattern_px %d is not the period along %s (%d)'
             % (i, a['pattern_px'], axis, period_px))
     ib.validate_band_phase_axis(anims)
+    # THE EMITTER ITSELF, not a re-implementation of it. main() reads the
+    # override at its own hardcoded path and writes the four generated files;
+    # the 44-byte record it emits is what the engine reads at runtime.
+    shutil.copyfile(doc_path, ib.OVERRIDE)
+    ib.main()
+    emp = open(os.path.join(ib.OUT_DIR, 'bg_anim.emp')).read()
+    out['emp'] = emp
+    out['banks_bytes'] = os.path.getsize(os.path.join(ib.OUT_DIR, 'bg_anim_banks.bin'))
+    for line in emp.splitlines():
+        if line.startswith('data _BgAnim_Band0_hdr'):
+            fields = line.split('=', 1)[1].strip().strip('[]').split(',')
+            keys = ['driver', 'rate_shift', 'step_mask', 'col_shift', 'tile_count', 'vram_dest']
+            out['emitted'] = dict(zip(keys, [f.strip() for f in fields]))
 except AssertionError as e:
     out['guard'] = 'refused'
     out['why'] = str(e)
@@ -124,6 +152,10 @@ interface Probe {
                     period_px: number; pattern_px: number }>;
   guard: 'admitted' | 'refused';
   why: string;
+  /** The 44-byte record's six header fields, as the emitter spelled them. */
+  emitted: Record<string, string> | null;
+  emp: string;
+  banks_bytes: number;
 }
 
 function runAeonGuard(doc: unknown): Probe {
@@ -243,6 +275,37 @@ describe('AEON\'S OWN GUARD, run against bytes Aurora wrote', () => {
     expect(probe.why).toMatch(/exact HORIZONTAL/);
   });
 
+  /**
+   * THE BAKE, one step past the guard: aeon's own `main()` turns our document
+   * into the four generated files, and the 44-byte record it writes is what
+   * `BgAnim_Update` reads. Two of its six fields are the axis — `step_mask` is
+   * the period along it and `col_shift` is log2 of the rotation unit — so this
+   * is where the axis stops being a JSON key and becomes bytes.
+   */
+  it('EMITS a record whose step_mask and col_shift are the VERTICAL readings', (ctx) => {
+    if (skipUnlessReady(ctx)) return;
+    const doc = verticalBandDocument();
+    const band = documentBands(doc)[0];
+    const probe = runAeonGuard(doc);
+    expect(probe.emitted, `aeon emitted no band record:\n${probe.emp}`).not.toBeNull();
+    const rec = probe.emitted!;
+    // Every expectation DERIVED from the band Aurora authored, never copied out
+    // of the emitter's output.
+    expect(Number(rec.step_mask)).toBe(band.rows * 8 - 1);
+    expect(1 << Number(rec.col_shift)).toBe(band.cols * 32);
+    expect(Number(rec.tile_count)).toBe(band.cols * band.rows);
+    // The horizontal readings of the SAME geometry, asserted as NOT emitted.
+    // Without this pair a 4x4 band would satisfy both and prove nothing.
+    expect(Number(rec.step_mask)).not.toBe(band.cols * 8 - 1);
+    expect(1 << Number(rec.col_shift)).not.toBe(band.rows * 32);
+    // The banks blob is the real art: 8 banks x n slots x 32 bytes.
+    expect(probe.banks_bytes).toBe(8 * band.cols * band.rows * 32);
+    // The record cannot carry the axis — `col_shift` and `step_mask` are units —
+    // so the emitter names it in the comment, which is the only place a reader
+    // of the generated module can find it.
+    expect(probe.emp).toMatch(/vertical \(scrolls up\)/);
+  });
+
   it('leaves a HORIZONTAL band with the same art alone', (ctx) => {
     if (skipUnlessReady(ctx)) return;
     // The other control: the guard must be narrow. A band that claims horizontal
@@ -257,5 +320,11 @@ describe('AEON\'S OWN GUARD, run against bytes Aurora wrote', () => {
     expect(probe.guard, probe.why).toBe('admitted');
     expect(probe.geometry[0].axis).toBe('horizontal');
     expect(probe.geometry[0].unit_bytes).toBe(band.rows * 32);
+    // ...and the SAME emitter, on the SAME art, writes the OTHER two numbers.
+    // This is the pair that makes the record's two axis fields observable: one
+    // band, one geometry, two records, differing exactly where the axis says.
+    expect(Number(probe.emitted!.step_mask)).toBe(band.cols * 8 - 1);
+    expect(1 << Number(probe.emitted!.col_shift)).toBe(band.rows * 32);
+    expect(probe.emp).toMatch(/horizontal \(scrolls left\)/);
   });
 });
