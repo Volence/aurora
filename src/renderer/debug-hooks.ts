@@ -509,6 +509,18 @@ interface AeonProbeApi {
    */
   collisionPoke(sectionIndex: number, plane: 'a' | 'b', index: number, word: number): number | null;
   /**
+   * Whether the section carries an ENGINE BASELINE for a plane, and its length.
+   *
+   * READ-ONLY, and it exists because CollisionPalette's Reset opens with
+   * `if (!engine) return` — a silent early return that is invisible from
+   * outside the app. "Already at the baseline" and "there is no baseline to
+   * reset to" both present to a harness (and to an author) as a click that
+   * changed nothing, and only one of those is the button working. Null when the
+   * section itself is missing, so absence of a section never reads as absence
+   * of a baseline.
+   */
+  collisionBaseline(sectionIndex: number, plane: 'a' | 'b'): { present: boolean; length: number } | null;
+  /**
    * Switch the active tab's facet, through the app's own `switchFacet` action.
    *
    * A harness needs this because tool HOTKEYS are facet-scoped: `toolForKey`
@@ -1165,6 +1177,12 @@ function installAeonProbe(): AeonProbeApi {
       if (!plane || index < 0 || index >= plane.length) return null;
       plane[index] = word & 0xFFFF;
       return plane[index] ?? null;
+    },
+    collisionBaseline: (sectionIndex, planeId) => {
+      const section = getCurrentAct(useProjectStore.getState())?.sections[sectionIndex];
+      if (!section) return null;
+      const engine = planeId === 'b' ? section.engineCollisionB : section.engineCollision;
+      return { present: !!engine, length: engine ? engine.length : 0 };
     },
     setFacet: (facet) => {
       const tabId = useSessionStore.getState().activeId || null;
