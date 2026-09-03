@@ -131,6 +131,26 @@ async function main() {
     })()`);
     await sleep(2000);
 
+    // ⚠ THE TILE-ANIM SUB-TAB, AND IT IS NOT OPTIONAL (2026-09-02, the
+    // `three_sub_tabs_plus_section_strip` ruling — providers/effects-sub-tabs.ts).
+    // The Effects column is three sub-tabs now and `parallax` is the arrival one.
+    // A section on an INACTIVE tab is NOT MOUNTED, so every band control this file
+    // reads is absent from the DOM until the tab is switched — which is what row 2a
+    // caught when it went red at "0 strings" with the panel showing the Parallax
+    // job. The tab button is a real <button onClick>, so a DOM .click() is the
+    // gesture it listens for (this is NOT the mousedown-activated facet tab case).
+    const tabbed = await c.json(`(() => {
+      const t = document.querySelector('[data-effects-sub-tab="tileAnim"]');
+      if (!t) return { found: false };
+      t.click();
+      return { found: true };
+    })()`);
+    await sleep(1200);
+    const subTab = await c.evalExpr('window.__dbg.parallaxPreview().subTab');
+    console.log(`  sub-tab: requested tileAnim, button ${tabbed.found ? 'found' : 'ABSENT'}, store says ${JSON.stringify(subTab)}`);
+    check('1b', 'ANTI-VACUOUS: the Tile anim sub-tab is the active one, so its sections are MOUNTED',
+      subTab === 'tileAnim', `store effectsSubTab=${JSON.stringify(subTab)}, button found=${tabbed.found}`);
+
     // The band section is COLLAPSED by default — a harness that skips this reads
     // an empty panel and reports the defect's literal as absent, which is exactly
     // the vacuous pass row 2a exists to catch. Expand every disclosure that names
@@ -140,10 +160,14 @@ async function main() {
     // the span (or on ancestors chosen by a child-count heuristic) leaves the
     // section exactly as collapsed as before while REPORTING a click. Integer
     // client pixels, per this repo's dpr bar.
+    // ⚠ The section's TITLE moved with the vocabulary split at 023e0ed9
+    // ("effects: \`band\` names ONE feature now — tile animation vs raster band"):
+    // `BG animation bands` is now `Tile animations (n/4)`
+    // (components/effects/BgAnimBandPanel.tsx:430). The old literal matched nothing.
     const hdr = await c.json(`(() => {
       const el = [...document.querySelectorAll('*')].filter(e => {
         const t = (e.textContent || '').trim();
-        return /^BG animation bands/i.test(t);
+        return /^Tile animations\\b/i.test(t);
       }).pop();
       if (!el) return null;
       const r = el.getBoundingClientRect();
