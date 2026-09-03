@@ -47,10 +47,10 @@
 // claiming cover it did not need, in the one list that exists to be short.
 
 import { spawn } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import {
   spawnGuarded, killTree, killTreeSync, displayArtifacts, reapDisplays, cmdlineOf,
-  boundSocketPaths, NEVER_REAP_DISPLAYS, XVFB_TMPDIR_RE,
+  boundSocketPaths, NEVER_REAP_DISPLAYS, XVFB_TMPDIR_RE, inheritedXauthDirs,
 } from './lib/harness-guard.mjs';
 
 const CHILD = process.argv[2] === '--child';
@@ -356,6 +356,116 @@ const refusedBecause = (r, re) => r.removed.length === 0 && r.refused.some((x) =
     ok('o5', 'an Xvfb it could not attribute a display to is reported UNMEASURABLE, not folded into a clean count', r.refused.join('; '));
   } else {
     no('o5', 'unmeasurable input was silently dropped', r.refused.join('; '));
+  }
+}
+
+// ── GATE 5: the tempdir we INHERITED (O78) ─────────────────────────────────
+//
+// The defect these two rows exist for did not leave an X server running and did
+// not orphan a process. It made a GREEN harness report RED — and to the only
+// reader that matters, a sweep reading an exit code, that is indistinguishable
+// from a real failure.
+//
+// The shape: run any harness under an OUTER `xvfb-run` (`xvfb-run -a npm run
+// harness:…`). The outer wrapper exports XAUTHORITY naming ITS OWN
+// /tmp/xvfb-run.XXXXXX/. The harness inherits it, passes it into the child env
+// (harnesses delete DISPLAY from that env, never XAUTHORITY), and so every
+// process in the harness's OWN tree carries it. `displayArtifacts` read it out
+// of /proc/<pid>/environ, matched XVFB_TMPDIR_RE, and called the directory
+// ours; the reap deleted it. The harness then exited 0 — measured, 44 rows and
+// 0 failed — and the outer wrapper's own cleanup ran `xauth remove` at
+// /usr/bin/xvfb-run:188 against a file that was gone, failed, and `set -e`
+// aborted it before `exit $RETVAL` at :197. The wrapper exited 1.
+//
+// It is the DISPLAY trap the docstring above `displayArtifacts` already warns
+// about, one field over: an environment variable is evidence about our
+// ANCESTORS, never about what we started.
+//
+// Two rows because there are two halves and each can be broken alone:
+//   [o7] `reapDisplays` REFUSES such a directory even when handed it directly,
+//        and the directory is verified still on disk afterwards;
+//   [o8] `displayArtifacts` does not CLAIM it in the first place — with a
+//        control tempdir in the same tree that it MUST still claim, so "claims
+//        nothing" cannot pass as "claims the right thing".
+
+/** A directory with exactly the shape xvfb-run mints, created fresh so no plant
+ *  can eat the fixture: a run with gate 5 deleted really removes THIS one, and
+ *  the next run gets a new one and is red again. */
+function makeTempdirLikeXvfbRun(tag) {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let dir;
+  do {
+    let s = '';
+    for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+    dir = `/tmp/xvfb-run.${s}`;
+  } while (existsSync(dir));
+  if (!XVFB_TMPDIR_RE.test(dir)) throw new Error(`fixture ${dir} does not match the real shape — the row would be vacuous`);
+  mkdirSync(dir);
+  writeFileSync(`${dir}/Xauthority.${tag}`, 'not a real cookie');
+  return dir;
+}
+
+{
+  const outerDir = makeTempdirLikeXvfbRun('o7');
+  const savedXauth = process.env.XAUTHORITY;
+  // Being under an outer wrapper IS having this variable. Setting it is not a
+  // simulation of the condition — it is the condition, read the same way.
+  process.env.XAUTHORITY = `${outerDir}/Xauthority.o7`;
+  try {
+    const seen = inheritedXauthDirs();
+    const r = reapDisplays({ displays: [], tmpdirs: [outerDir], unknown: [] }, { quiet: true });
+    const survived = existsSync(outerDir);
+    if (seen.has(outerDir) && refusedBecause(r, /INHERITED/) && survived) {
+      ok('o7', 'GATE 5 — a tempdir named by our OWN XAUTHORITY is refused BY THE INHERITANCE CHECK, and it is still on disk',
+        `${r.refused.join('; ')} · fixture ${outerDir} matches XVFB_TMPDIR_RE, so gate 4 could not have covered for this, `
+        + 'and it exists, so a widened gate would really have deleted it');
+    } else {
+      no('o7', 'gate 5 did not refuse an inherited tempdir in its own words',
+        `inheritedXauthDirs saw it: ${seen.has(outerDir)} · removed=${r.removed.join(' ')} `
+        + `refused=${r.refused.join('; ')} stillOnDisk=${survived}`);
+    }
+  } finally {
+    if (savedXauth === undefined) delete process.env.XAUTHORITY; else process.env.XAUTHORITY = savedXauth;
+    rmSync(outerDir, { recursive: true, force: true });
+  }
+}
+
+{
+  // [o8] ATTRIBUTION, on a real process tree. One `/bin/sh` with two children:
+  // one carrying the XAUTHORITY we "inherited" (must NOT be claimed), one
+  // carrying a foreign wrapper's (must STILL be claimed). Without the second
+  // half a fix that claims nothing at all would pass this row.
+  const outerDir = makeTempdirLikeXvfbRun('o8-outer');
+  const oursDir = makeTempdirLikeXvfbRun('o8-ours');
+  const savedXauth = process.env.XAUTHORITY;
+  process.env.XAUTHORITY = `${outerDir}/Xauthority.o8-outer`;
+  let sh;
+  try {
+    sh = spawn('/bin/sh', ['-c',
+      `XAUTHORITY=${outerDir}/Xauthority.o8-outer /bin/sleep 8 & `
+      + `XAUTHORITY=${oursDir}/Xauthority.o8-ours /bin/sleep 8 & wait`],
+    { stdio: 'ignore', detached: true, env: { ...process.env } });
+    await new Promise((res) => setTimeout(res, 700));
+    const art = displayArtifacts(sh.pid);
+    const claimedOuter = art.tmpdirs.includes(outerDir);
+    const claimedOurs = art.tmpdirs.includes(oursDir);
+    const saidInherited = (art.inherited ?? []).includes(outerDir);
+    if (!claimedOuter && claimedOurs && saidInherited) {
+      ok('o8', 'ATTRIBUTION — the inherited tempdir is not claimed (and is reported as inherited, not dropped silently), '
+        + 'while a foreign wrapper\'s tempdir in the SAME tree still is',
+        `tree under pid ${sh.pid}: tmpdirs=${JSON.stringify(art.tmpdirs)} inherited=${JSON.stringify(art.inherited)} · `
+        + `ours=${oursDir} claimed, outer=${outerDir} refused`);
+    } else {
+      no('o8', 'attribution is wrong in one direction or the other',
+        `claimedOuter=${claimedOuter} (must be false) claimedOurs=${claimedOurs} (must be true) `
+        + `reportedInherited=${saidInherited} (must be true) · tmpdirs=${JSON.stringify(art.tmpdirs)} `
+        + `inherited=${JSON.stringify(art.inherited ?? null)}`);
+    }
+  } finally {
+    if (savedXauth === undefined) delete process.env.XAUTHORITY; else process.env.XAUTHORITY = savedXauth;
+    if (sh?.pid) { try { process.kill(-sh.pid, 'SIGKILL'); } catch { /* gone */ } }
+    rmSync(outerDir, { recursive: true, force: true });
+    rmSync(oursDir, { recursive: true, force: true });
   }
 }
 
