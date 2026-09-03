@@ -137,19 +137,35 @@ export const PLANE_FACTOR_HINT =
 // Both were read-only on the card (parcel E) and are controls now; the extras
 // line no longer lists them, so a value is said once.
 
-/** The curve row: label, title, the one hint, and the word for its none state. */
+/**
+ * The curve row: label, title, the one hint, and the word for its none state.
+ *
+ * ⚠ THE LABEL IS `B curve to` AND THE DROPPED WORD IS DELIBERATE. It read
+ * `Plane B curve to`, which needs 84px of the shared 64px label column and
+ * wrapped onto two lines on every layer card of the shipped scene — measured
+ * under CDP, `effects-column-harness` `[r4]`. The column is not widened for it:
+ * it is 300px total and every pixel the label takes is one a `flex: 1` control
+ * loses, and the controls in this column are the part carrying sentences. The
+ * plane is not lost — the row DIRECTLY above this one is `Plane B (bg)`, and
+ * the title below spells `curve.to` out in full. See `column-layout.tsx`.
+ */
 export const LAYER_CURVE_ROW = Object.freeze({
   key: 'curve' as const,
-  label: 'Plane B curve to',
+  label: 'B curve to',
   title: 'curve.to — the Plane B factor at this strip\'s bottom; none keeps fb the whole way down',
   hint: "Plane B speed ramps from fb at this strip's top to this value at its bottom",
   none: 'none',
 });
 
-/** The vsplit row: label, title (with the schema's bound), hint, and its two states. */
+/**
+ * The vsplit row: label, title (with the schema's bound), hint, and its two states.
+ *
+ * ⚠ `B split at`, not `Plane B split at`, for the reason on `LAYER_CURVE_ROW`:
+ * the full spelling needs 77px of a 64px column and wrapped.
+ */
 export const LAYER_VSPLIT_ROW = Object.freeze({
   key: 'vsplit' as const,
-  label: 'Plane B split at',
+  label: 'B split at',
   title: `vsplit.at — the Plane B row scrolled to from this strip down `
     + `(${EFFECTS_VSPLIT_AT_BOUNDS.min}..${EFFECTS_VSPLIT_AT_BOUNDS.max}); none leaves the plane alone`,
   hint: 'from this strip down, Plane B scrolls vertically as a whole',

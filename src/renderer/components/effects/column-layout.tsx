@@ -32,6 +32,66 @@
 // sized by the one label this pass removed: `#0 world_y` at 57px, which folded
 // a layer INDEX into a field name. The index now titles the layer card.
 //
+// ═══ ⚠ AND THAT POPULATION WENT STALE — RE-MEASURED 2026-09-03 ═══
+//
+// THE LIST ABOVE IS FIFTEEN LABELS AND THE COLUMN HAD TWENTY-FOUR. A later
+// parcel added `Plane B curve to` (84px) and `Plane B split at` (77px) to the
+// layer card and did not re-run the measurement, so ten rows of the shipped
+// scene wrapped onto two lines while this block still said "9px of headroom".
+// The CONSTANT was never wrong; the POPULATION it was derived from stopped
+// being the population on screen. That is the failure mode this section exists
+// to make visible, and the annotation above — "nothing here needed
+// re-measuring" — is exactly the reasoning that let it through a second time.
+//
+// ⚠ AND THE INSTRUMENT COULD NOT HAVE CAUGHT IT EITHER. `[r4]` measured a
+// Range over the label, but a Range over an ALREADY-WRAPPED label returns the
+// union of its line boxes, which is bounded by the column: `Plane B curve to`
+// reported 42px while wanting 84. A re-derivation from that list would have
+// confirmed the very width causing the wrap, with a clean-looking number, for
+// ever. `[r4]` now reports the unwrapped width beside it and `[L2]` gates on
+// LINE-BOX COUNT, so a wrap is counted rather than inferred from a width the
+// wrap itself truncated (O50 triage, merge `ce23e3bf`).
+//
+// The full re-measured population, 1680x1050, dpr 1, every section OPEN so the
+// collapsed ones are in it too (`effects-column-harness` `[r4]`/`[r7]`, run on
+// the built tree; `[L2b]` gates all 52 rows):
+//
+//     Bob 21 · Drift 24 · Name 32 · Editing 37 · Layer 0-4 38 · Deform 40
+//     V factor 40 · V offset 40 · Scene id 43 · V center 43 · B split at 45
+//     Section 0 47 · V deform 48 · B curve to 52 · Transition 52 · Deform fg 53
+//     Deform bg 56 · Screen line 57 · Plane A (fg) 59 · Plane B (bg) 62
+//
+// `Background` (69px) is measured but NOT in that list and does not size this
+// column: it belongs to the Properties section, which draws its OWN 148px label
+// column and is excluded by the harness's `FOREIGN_SECTIONS`. It is recorded
+// here so the next reader does not "discover" it and widen the column for a
+// label that was never in it.
+//
+// ═══ WHY 64 SURVIVED THE RE-DERIVATION — THE COLUMN IS ZERO-SUM ═══
+//
+// The widest label is now `Plane B (bg)` at 62px, so 64 leaves 2px. The two
+// offenders were SHORTENED instead (`B curve to` / `B split at`,
+// `providers/effects-aeon.ts`) and the constant did not move. That was a
+// measured choice, not a conservative one:
+//
+//   THE COLUMN IS 300px AND EVERY PIXEL IS ZERO-SUM. A `<select style="flex:1">`
+//   in one of these rows gets 190px. Whatever LABEL_W takes, it takes from
+//   there — and unlike a label, a select does NOT wrap and does NOT overflow.
+//   It ellipses, and `scrollWidth` is clamped, so nothing about the element
+//   afterwards admits that anything was cut.
+//
+// The triage that found the wrap proposed `LABEL_W` 64 → 100 and measured it
+// green on `effects-column-harness` 25/25. Run against the OTHER facet that
+// shares this primitive, it breaks three controls the same day: at 100 the
+// select falls to 154px, and `±16 px (32 px of travel)` (157px) and
+// `8.53 s (512 ticks)` (159px) — both GENERATED ladder rungs — stop fitting,
+// while `follow a world Y` goes from tight to hopeless. A width measured green
+// on the harness that owns the constant, and red on the panel next door.
+// `anchor-authoring-harness` `[W0]`/`[W1]`/`[W2]` is that second measurement
+// and it did not exist until this parcel; the two must both be run before this
+// number moves. Shortening two redundant labels cost nothing and taxed nobody:
+// the row above them already reads `Plane B (bg)`.
+//
 // IT IS A FIXED WIDTH THAT WRAPS, NOT A FLOOR. It was a `minWidth` floor for
 // one pass, on the argument that a label outgrowing the column would push its
 // control right and trip the harness's [L1] row. That guard is FOREGROUND, and
@@ -62,7 +122,27 @@
 import React from 'react';
 import { T } from '../ui';
 
-/** The label column, in px. See the docblock — it is measured, and it is a floor. */
+/**
+ * The label column, in px. See the docblock — it is measured, and it is a FIXED
+ * WIDTH THAT WRAPS, not a floor. (It read "it is a floor" here for three
+ * parcels after it stopped being one; the docblock forty lines up spent a
+ * paragraph on why a floor was wrong.)
+ *
+ * ⚠ ADDING A LABEL TO THIS COLUMN IS A MEASUREMENT, NOT A JUDGEMENT CALL, and
+ * the last two that were added by eye both wrapped. Neither the node suite nor
+ * a screenshot can settle it — ~6,535 vitest rows were green while ten rows of
+ * the shipped scene drew on two lines, because the node bars are CHARACTER
+ * counts (`effects-wording.test.ts` against the longest existing label,
+ * `label-column-align.test.ts` against its longest TOKEN) and neither knows
+ * what a pixel is. Before adding or rewording anything here, run BOTH:
+ *
+ *     npm run harness:effects-column      # [L2]/[L2b] the labels, [r4] the widths
+ *     npm run harness:anchor-authoring    # [W1] the controls the labels pay for
+ *
+ * and paste the new `[r4]` line into the population above rather than
+ * amending it from memory. Deleting a row from that list is forbidden; see the
+ * `Precision` note.
+ */
 export const LABEL_W = 64;
 
 /**
