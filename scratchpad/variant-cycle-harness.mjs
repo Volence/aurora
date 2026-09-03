@@ -81,7 +81,7 @@
 //   AEON_DIR=<writable copy> [SCREEN=1920x1080] npm run harness:variant-cycle
 //
 //   ⚠ FRESH COPY PER RUN (O66). The Ctrl+S in section 7 rewrites the whole
-//   project and leaves `harness_vc.json` in presets/. A second run on the same
+//   project and leaves `aurora_local_vc_probe.json` in presets/. A second run on the same
 //   copy is refused before the app is launched — exit 2, `HARNESS ABORTED:
 //   LEFTOVER FROM A PRIOR RUN: …` — never a silent partial pass. Re-materialise:
 //     git -C <aeon> archive <committed rev> | tar -x -C <fresh dir>
@@ -105,6 +105,7 @@ import { dirname } from 'node:path';
 import * as http from 'node:http';
 import * as os from 'node:os';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { readAeonShippedPreset } from './lib/aeon-shipped-preset.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9439);
@@ -133,11 +134,23 @@ mkdirSync(SHOTS, { recursive: true });
 
 const PLANT = process.env.PLANT ?? '';
 /** aeon's own shipped document — opened, never touched, and required to come
- *  back byte-identical from a save that re-serialises the whole library. */
-const SHIPPED_ID = 'authored_probe';
-const SHIPPED = `${AEONDIR}/games/sonic4/data/editor/effects/presets/${SHIPPED_ID}.json`;
-/** THIS run's preset — created through the UI, authored through the UI. */
-const PRESET_ID = process.env.PRESET_ID ?? 'harness_vc';
+ *  back byte-identical from a save that re-serialises the whole library.
+ *
+ *  ⚠ READ BY PATH, AT IMPORT. This id belongs to aeon, and aeon has BOOKED a
+ *  rename of it (their docs/DEFERRED_WORK.md, "PRESET-ID NAMESPACE COLLISION",
+ *  2026-09-03). This file already refused a missing file by path further down,
+ *  which is why its exposure was the mildest of the five; what it did NOT do
+ *  was prove the document's `id` matches its filename, so a half-landed rename
+ *  would have been read as a preset. See scratchpad/lib/aeon-shipped-preset.mjs. */
+const SHIPPED_DOC = readAeonShippedPreset(AEONDIR);
+const SHIPPED_ID = SHIPPED_DOC.id;
+const SHIPPED = SHIPPED_DOC.path;
+/** THIS run's preset — created through the UI, authored through the UI.
+ *  ⚠ `aurora_local_` IS NOT DECORATION. The panel's `New` writes into the same
+ *  id namespace aeon commits into, and a collision there does not fail: it
+ *  silently hands back the existing document. `ramp_probe` was a sibling
+ *  harness's id until aeon landed a real `ramp_probe.json`. Do not shorten. */
+const PRESET_ID = process.env.PRESET_ID ?? 'aurora_local_vc_probe';
 const MINE = `${AEONDIR}/games/sonic4/data/editor/effects/presets/${PRESET_ID}.json`;
 
 /** The disclosure's date, lead AND PREMISE, read from the ONE file that owns
@@ -376,7 +389,10 @@ async function main() {
     throw new Error(`LEFTOVER FROM A PRIOR RUN: ${MINE} exists. Row [4a] needs ${PRESET_ID} ABSENT at open, `
       + 'and the Ctrl+S that wrote it rewrote the whole project. Re-materialise AEON_DIR — FRESH COPY PER RUN.');
   }
-  if (!existsSync(SHIPPED)) throw new Error(`${SHIPPED} is ABSENT — nothing to round-trip`);
+  // Existence, JSON-ness and the id/filename agreement were all proved at
+  // import by `readAeonShippedPreset` — that is the seam aeon's rename crosses.
+  // Re-read here because the bytes row [7d] compares against must be the ones
+  // on disk at the moment the app is launched, not at module load.
   const shippedBefore = readFileSync(SHIPPED, 'utf8');
   const shippedParsed = JSON.parse(shippedBefore);
   if ('cycles' in shippedParsed || 'variants' in shippedParsed) {

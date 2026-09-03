@@ -77,6 +77,7 @@ import { join, relative } from 'node:path';
 import * as http from 'node:http';
 import * as os from 'node:os';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { readAeonShippedPreset } from './lib/aeon-shipped-preset.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9471);
@@ -98,8 +99,20 @@ mkdirSync(SHOTS, { recursive: true });
 
 const PLANT = process.env.PLANT ?? '';
 /** aeon's own shipped preset document — a document this repo did not author, so
- *  binding it is not Aurora agreeing with itself. */
-const PRESET_ID = process.env.PRESET_ID ?? 'authored_probe';
+ *  binding it is not Aurora agreeing with itself.
+ *
+ *  ⚠ READ BY PATH, AT IMPORT, AND NOT LOOKED UP THROUGH THE APP. This id
+ *  belongs to aeon and aeon has BOOKED a rename of it (their
+ *  docs/DEFERRED_WORK.md, "PRESET-ID NAMESPACE COLLISION", 2026-09-03). This
+ *  file used to carry the string `authored_probe` and discover its absence at
+ *  row [3a] — "the select does not offer the option", four hundred lines into
+ *  an Electron run, in a repo with an empty diff. Now the run refuses BEFORE
+ *  the app launches, naming the absolute path and the booking, so their rename
+ *  fails at the seam it crossed. See scratchpad/lib/aeon-shipped-preset.mjs. */
+const SHIPPED = process.env.PRESET_ID ? null : readAeonShippedPreset(AEONDIR);
+const PRESET_ID = process.env.PRESET_ID ?? SHIPPED.id;
+if (SHIPPED) console.log(`    SHIPPED     : ${SHIPPED.path} (${SHIPPED.text.length}B, id ${SHIPPED.id}, ${SHIPPED.bands} band(s))`);
+else console.log(`    SHIPPED     : OVERRIDDEN by PRESET_ID=${PRESET_ID} — the by-path identity check is SKIPPED`);
 /** The section the ONE edit binds. Section 0 has a sidecar in aeon's tree
  *  ALREADY (and it is one of the two the walkthrough saw gain `rasterRef`), so
  *  the §4 write is a CHANGE to a tracked file rather than a new one — which is
