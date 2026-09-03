@@ -647,6 +647,33 @@ async function main() {
     note(`Bg Plane checkbox: ${JSON.stringify(bgPlaneOn)}`);
     await sleep(700);
 
+    // ⚠ OPEN THE SCENE FORM BEFORE SWEEPING v_offset. Since d-26b (2026-09-02,
+    // docs/reviews/2026-09-02-effects-sub-tabs.md §3) `aeon.effects.scene` is
+    // `defaultCollapsed`, and a collapsed section is UNMOUNTED rather than
+    // hidden, so the v_offset spinner is not in the DOM on arrival. That is
+    // what [7d] was reporting: `6 v_offset: "no-element"`, eight times, one per
+    // sweep candidate. Nothing else went red, because the sweep's FIRST
+    // candidate is 0 and the scene already sat at 0 — [6a] found its rows and
+    // passed on a field that had never been written. The blanket row is the only
+    // thing between that and a green run measuring an unset fixture, which is
+    // exactly the job it was written for; it is worth saying so out loud.
+    const sceneForm = await c.evalExpr(String.raw`
+      (() => {
+        const has = () => [...document.querySelectorAll('input')]
+          .some((e) => (e.title || '').startsWith('v_offset —'));
+        if (has()) return 'already-open';
+        const hdr = [...document.querySelectorAll('div')]
+          .filter((d) => d.style && d.style.cursor === 'pointer'
+                      && /^SCENE\s*—/i.test((d.innerText || '').trim()))[0];
+        if (!hdr) return 'no-scene-header';
+        hdr.click();
+        return 'clicked';
+      })()`);
+    await sleep(900);
+    check('6a0', 'INSTRUMENT: the Scene form is open, so the v_offset sweep below writes a real '
+      + 'field — it arrives collapsed since d-26b',
+      sceneForm === 'clicked' || sceneForm === 'already-open', `open -> ${sceneForm}`);
+
     let owned = [];
     let vOff = 0;
     for (const cand of [0, 128, 256, 384, 64, 192, 320, 448]) {

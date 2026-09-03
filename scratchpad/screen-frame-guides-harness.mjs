@@ -62,7 +62,7 @@
 
 import { AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import * as os from 'node:os';
@@ -422,13 +422,65 @@ async function main() {
     await sleep(600);
     const frame2 = await c.json('window.__dbg.aeon.screenFrame()');
     const guides2 = await c.json('window.__dbg.aeon.guides()');
+    const doc3g = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
+    const scene3g = doc3g.find((x) => x.id === guides2.sceneId) ?? null;
     const frameDelta = frame2.anchor.y - fBefore;
-    check('3g', 'the frame\'s EDGE is grabbable while it is forced on, and dragging it moves '
-      + 'the guides by exactly the same world delta',
-      frameDelta > 0 && (guides2.rows[0].canvasY - gBefore) === frameDelta * view.zoom,
+    // ⚠ THIS ROW HELD A RULE THE APP OVERTURNED, AND HELD IT IN THE DIRECTION
+    // THE APP NAMES AS THE OLD WRONG ANSWER — repaired in the O50 triage,
+    // 2026-09-03.
+    //
+    // It required the guides to move by the frame's own delta. `effects-guides.ts`
+    // lists exactly that under STILL REJECTED:
+    //
+    //     - the SCREEN FRAME's top edge — row 65's answer. It makes the guides
+    //       move when the camera moves, which is precisely what a LOCKED plane
+    //       does not do.
+    //
+    // `guideOriginWorldY` returns 0 in both spaces, so a guide's world row IS the
+    // layer's own `world_y` and no v_offset enters it; the canvas even says so in
+    // its caption — "plane rows — fixed on the background, not on the frame".
+    // The guide correctly did not move, and the row read that as a broken drag.
+    //
+    // ⚠ AND NOTE HOW IT SURVIVED. The overturn (2026-08-27, `7ba5a638`) DROPPED A
+    // PARAMETER so that every stale call site would fail to compile — which works
+    // for TypeScript and does not reach a `.mjs` harness, which passes no
+    // arguments and asserts behaviour. `effects-guides-harness` was caught by the
+    // 2026-09-03 lane-log sweep; this sibling, holding the same overturned rule
+    // in a different file, was not.
+    //
+    // THE COUPLING THAT DOES EXIST is asserted instead, and it is stronger than
+    // the old one because it names both halves at once:
+    //   • the drag is LIVE — the frame's anchor really moved, and
+    //   • it reached the DOCUMENT — a locked scene's frame Y *is* `v_offset`
+    //     (`frameAnchorFor` / `commitVOffset`), so the drag is a document edit;
+    //   • the guide's PLANE ROW is INVARIANT across it — the lock's whole
+    //     content; and
+    //   • the GAP between the frame top and the guide is the layer's SCREEN
+    //     LINE, `world_y - v_offset`, which is what moving v_offset actually
+    //     changes. At the v_offset of 0 this file starts from, that gap equals
+    //     `world_y`, which is why row [3b] reads as it does — [3b] is this same
+    //     property sampled at the one offset where the two coincide.
+    const worldBefore = guides.rows[0].worldY;
+    const worldAfter = guides2.rows[0].worldY;
+    const vOffsetAfter = scene3g?.v_offset ?? 0;
+    const screenLine = worldAfter - vOffsetAfter;
+    const frameTopCanvasY = frame2.rect.y;
+    const gap = guides2.rows[0].canvasY - frameTopCanvasY;
+    check('3g', 'the frame\'s EDGE is grabbable while it is forced on; the drag reaches the '
+      + 'DOCUMENT as v_offset; the guide\'s PLANE ROW does not move with it (a locked plane is '
+      + 'not on the frame); and the gap between them is the layer\'s SCREEN LINE, world_y - v_offset',
+      frameDelta > 0
+      && vOffsetAfter === frame2.anchor.y
+      && worldAfter === worldBefore
+      && guides2.space === 'screen'
+      && gap === screenLine * view.zoom,
       `frame anchor ${fBefore} -> ${frame2.anchor.y} (delta ${frameDelta}); `
-      + `guide canvasY ${gBefore} -> ${guides2.rows[0].canvasY} `
-      + `(delta ${guides2.rows[0].canvasY - gBefore}, expected ${frameDelta * view.zoom})`);
+      + `document v_offset=${vOffsetAfter} (scene ${guides2.sceneId}, space ${guides2.space})\n`
+      + `        guide worldY ${worldBefore} -> ${worldAfter} (a plane row: MUST NOT move), `
+      + `canvasY ${gBefore} -> ${guides2.rows[0].canvasY}\n`
+      + `        frame top canvasY=${frameTopCanvasY}, gap=${gap}, `
+      + `screen line = world_y ${worldAfter} - v_offset ${vOffsetAfter} = ${screenLine} `
+      + `(x zoom ${view.zoom} = ${screenLine * view.zoom})`);
     // Put the frame back so the sections below start from a known anchor.
     await mouseA('mouseMoved', edgeX, edgeY + FRAME_DRAG_PX, { buttons: 0 });
     await sleep(200);
@@ -615,9 +667,26 @@ async function main() {
     check('7b', '[anti-vacuous] before the click there is no such card in the DOM',
       cardBefore === false, `#${cardId} present=${cardBefore} lens=${JSON.stringify(lensBefore)}`);
 
-    const clicked = await c.evalExpr(clickByText('/^Add blank band$/'));
-    check('7c', '[anti-vacuous] the tool bar offers the Add blank band chip and it was clicked',
-      clicked === true);
+    // ⚠ THE CHIP IS CALLED `Add blank tile animation` NOW — repaired in the O50
+    // triage, 2026-09-03. Wave 1 renamed it, in `bandVerbs`
+    // (renderer/providers/band-verbs.ts), because "band" named two unrelated
+    // features across six controls. The label is READ from that provider rather
+    // than typed here, so the next rename fails the read instead of silently
+    // clicking nothing: this row is the anti-vacuous for the four below it, and
+    // a `clickByText` that matches no element returns false — which it did, and
+    // then [7d]..[7h] measured a band that had never been added.
+    const ADD_CHIP = (() => {
+      const src = readFileSync(`${ROOT}/src/renderer/providers/band-verbs.ts`, 'utf8');
+      const m = src.match(/label: '(Add blank [^']+)'/);
+      if (!m) {
+        throw new Error('band-verbs.ts no longer declares an `Add blank …` label — this harness '
+          + 'reads the chip name from the provider and refuses to guess one');
+      }
+      return m[1];
+    })();
+    const clicked = await c.evalExpr(clickByText(`/^${ADD_CHIP}$/`));
+    check('7c', `[anti-vacuous] the tool bar offers the "${ADD_CHIP}" chip (read from `
+      + 'providers/band-verbs.ts) and it was clicked', clicked === true, `clicked=${clicked}`);
     await sleep(1200);
 
     // 7d. ★ THE CATCHER ★
@@ -653,9 +722,24 @@ async function main() {
       inView !== null && inView.visible === true, JSON.stringify(inView));
 
     // 7f. A toast said so, once.
+    // ⚠ THE TOAST IS WORDED `Tile animation N added — …` NOW (O50 triage,
+    // 2026-09-03). Same wave-1 rename as the chip: the word "band" named two
+    // unrelated features, and this one is the tile-animation half. The pattern
+    // is BUILT FROM the provider's own template rather than typed, so a further
+    // rewording fails the read instead of silently matching nothing and
+    // reporting "no toast" about a toast that is right there.
     const toasts = await c.json('window.__dbg.aeon.toasts()');
-    check('7f', 'exactly one toast names the band that was added',
-      toasts.filter((t) => /Band \d+ added/.test(t.message)).length === 1,
+    const TOAST_RE = (() => {
+      const src = readFileSync(`${ROOT}/src/renderer/providers/band-follow.ts`, 'utf8');
+      const m = src.match(/`([A-Za-z ]+)\$\{index\} (added[^`]*)`/);
+      if (!m) {
+        throw new Error('band-follow.ts no longer declares an `… ${index} added …` toast — this '
+          + 'harness reads the wording from the provider and refuses to guess it');
+      }
+      return new RegExp(`^${m[1]}\\d+ added\\b`);
+    })();
+    check('7f', `exactly one toast names the tile animation that was added (${TOAST_RE})`,
+      toasts.filter((t) => TOAST_RE.test(t.message)).length === 1,
       JSON.stringify(toasts));
 
     // 7g. ★ ONE undo step. The selection, the reveal and the scroll must not
@@ -685,17 +769,46 @@ async function main() {
     // The header is a `<div onClick>` and BOTH the section wrapper and the
     // header row have the same textContent while the section is shut, so the
     // FIRST match is the wrapper — which has no handler. Take the innermost.
+    // ⚠ THREE THINGS MOVED UNDER THIS ROW, and all three are wave-1/d-26b
+    // renames rather than defects (O50 triage, 2026-09-03):
+    //   • the section is titled `New tile animation`, not `New band`;
+    //   • it lives on the **Tile anim** SUB-TAB, which is not the default, and a
+    //     section on an inactive tab is UNMOUNTED, not hidden — so the header
+    //     genuinely is not in the DOM until the tab is selected. (The run gets
+    //     there anyway, because 7c's chip drives `revealEffectsSection`, which
+    //     switches the tab first; the click is made explicit here so the row
+    //     does not depend on a side effect of an earlier row.)
+    //   • the chip reads `Add`, under a `Blank tile animation` field label — the
+    //     JSX-text case O55 booked (docs/reviews/2026-09-03-o55-new-band-red.md).
+    //     `/^Add$/` alone is far too generic to aim a row at, so the chip is
+    //     found by its own TITLE, which the panel composes as
+    //     `Add a blank <cols>x<rows> tile animation (<n> tiles)`.
+    const subtab2 = await c.evalExpr(String.raw`
+      (() => {
+        const b = [...document.querySelectorAll('[role="tab"]')]
+          .find((e) => /^Tile anim$/.test((e.textContent || '').trim()));
+        if (!b) return 'no-tab-bar';
+        if (b.getAttribute('aria-selected') === 'true') return 'already-tileAnim';
+        b.click(); return 'clicked';
+      })()`);
+    await sleep(700);
     const opened = await c.evalExpr(String.raw`
       (() => {
         const hits = [...document.querySelectorAll('div')]
-          .filter((d) => (d.textContent || '').trim() === 'New band');
+          .filter((d) => (d.textContent || '').trim() === 'New tile animation');
         if (!hits.length) return 'no-header';
         hits[hits.length - 1].click();
         return 'clicked ' + hits.length;
       })()`);
     await sleep(600);
-    const clicked2 = await c.evalExpr(clickByText('/^Add band$/'));
-    note('7h', `New band section header clicked=${opened}`);
+    const clicked2 = await c.evalExpr(String.raw`
+      (() => {
+        const chip = [...document.querySelectorAll('button')]
+          .find((b) => /^Add a blank .* tile animation \(/.test(b.title || ''));
+        if (!chip || chip.disabled) return false;
+        chip.click(); return true;
+      })()`);
+    note('7h', `sub-tab=${subtab2} · New tile animation header clicked=${opened}`);
     await sleep(1200);
     const lens2 = await c.json('window.__dbg.aeon.bandLensTarget()');
     const card2 = await c.evalExpr(`!!document.getElementById("aeon-band-card-${idx2}")`);

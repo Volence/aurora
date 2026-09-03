@@ -432,11 +432,48 @@ async function main() {
     const paramTitles = (rs, prefix) => rs
       .filter((r) => r.tag === 'INPUT')
       .map((r) => r.title.slice(prefix.length).trim().split(' ')[0]);
-    check('4b', 'the table sub-form RENDERS one spinner per schema parameter of the seeded form, '
-      + 'plus a speed spinner',
-      paramTitles(rows, 'deform_fg').join(',') === [...paramsOf(FIRST_FORM), 'speed'].join(','),
-      `rendered=${JSON.stringify(paramTitles(rows, 'deform_fg'))} `
-      + `schema ${FIRST_FORM} requires ${JSON.stringify(paramsOf(FIRST_FORM))} (+ speed)`);
+    // ⚠ "ONE SPINNER PER PARAMETER" IS NOT THE RULE ANY MORE — repaired in the
+    // O50 triage, 2026-09-03. This row filtered `tag === 'INPUT'` and so counted
+    // only NumberFields. ROADMAP row 63 moved `period` to a `<Select>`, on the
+    // stated principle "A PICKER WHERE THE ENGINE ADMITS A SET, A SPINNER WHERE
+    // IT ADMITS A RANGE": period must DIVIDE the table length, which no
+    // min/max or clamp can express, and the spinner "advertised 247 values the
+    // build refuses". So the row read `["amplitude","speed"]` against a schema
+    // asking for `["amplitude","period"]` and went red because the app got
+    // BETTER at the thing the row is about.
+    //
+    // The property the row exists for is "the author can see and change every
+    // schema parameter", and that is unchanged — it is the CONTROL COUNT, not
+    // the control's tag. So: one control per schema parameter plus speed, in
+    // schema order, over inputs AND selects (the `table` picker itself is not a
+    // parameter and is excluded by name, and asserted separately by [4c]).
+    //
+    // AND THE KIND IS STILL CHECKED, just not by pinning it: any parameter
+    // rendered as a picker must SAY WHY on its own title — the divisor rule —
+    // so a picker can never quietly replace a spinner without carrying the
+    // engine constraint that justifies it. Both halves print their artifact.
+    // The two non-parameter controls that share the prefix and are excluded BY
+    // NAME rather than by position: the attachment's own on/off select (its
+    // title continues straight into an em dash, so its "key" is not a word at
+    // all) and the `table` form picker, which [4c] asserts separately. `bin` is
+    // a path, not a numeric parameter, and belongs to one branch only.
+    const paramControls = (rs, prefix) => rs
+      .map((r) => ({ tag: r.tag, key: r.title.slice(prefix.length).trim().split(' ')[0],
+                     title: r.title }))
+      .filter((r) => /^[a-z][a-z0-9_]*$/.test(r.key) && r.key !== 'table' && r.key !== 'bin');
+    const fgParams = paramControls(rows, 'deform_fg');
+    const pickerJustified = fgParams
+      .filter((r) => r.tag === 'SELECT')
+      .every((r) => /must divide the \d+-byte table/.test(r.title));
+    check('4b', 'the table sub-form RENDERS one CONTROL per schema parameter of the seeded form, '
+      + 'plus speed — and any parameter offered as a PICKER rather than a spinner carries the '
+      + 'engine rule that justifies it (row 63: a set, not a range)',
+      fgParams.map((r) => r.key).join(',') === [...paramsOf(FIRST_FORM), 'speed'].join(',')
+      && pickerJustified,
+      `rendered=${JSON.stringify(fgParams.map((r) => `${r.key}:${r.tag}`))} `
+      + `schema ${FIRST_FORM} requires ${JSON.stringify(paramsOf(FIRST_FORM))} (+ speed)`
+      + `\n        picker titles=${JSON.stringify(fgParams.filter((r) => r.tag === 'SELECT')
+        .map((r) => r.title))}`);
 
     // THE FORM PICKER OFFERS THE WHOLE CONTRACT. Six branches, not two.
     const formSelect = rows.find((r) => r.tag === 'SELECT' && / table — /.test(r.title));

@@ -132,6 +132,26 @@ const PROBE = String.raw`
   };
 })()`;
 
+/**
+ * THE GRID'S CELLS AND HOW MANY THE APP HAS MARKED SELECTED.
+ *
+ * `ChunkGrid`'s Cell is `<button>` wrapping a `<canvas>`, and a selected one
+ * takes `styles.cellSel` — `outline: 2px solid <accent>` (components/shared/
+ * ChunkGrid.tsx). The outline is the app's OWN rendering of "this is selected",
+ * read off the computed style, so it cannot be satisfied by the harness merely
+ * having called something.
+ */
+const CELL_STATE = String.raw`
+(() => {
+  const cells = [...document.querySelectorAll('button')].filter((b) => b.querySelector('canvas'));
+  const outlined = cells.filter((b) => {
+    const s = getComputedStyle(b);
+    return s.outlineStyle === 'solid' && parseFloat(s.outlineWidth) >= 2;
+  });
+  return { cells: cells.length, selected: outlined.length,
+           titles: outlined.map((b) => (b.title || '').slice(0, 30)) };
+})()`;
+
 async function shot(c, name) {
   const { data } = await c.send('Page.captureScreenshot', { format: 'png' });
   writeFileSync(`${SHOTS}/${name}.png`, Buffer.from(data, 'base64'));
@@ -244,11 +264,72 @@ async function main() {
       // (maxWidth 120) and the hint grows to the two-clause sentence, all while
       // the S/M/L control still holds the row's right end. On the old shared
       // row this is the state whose leftover could collapse toward zero.
-      const picked = await c.evalExpr(`(() => { const cells = [...document.querySelectorAll('[title]')]
-        .filter((e) => /chunk/i.test(e.getAttribute('title') || ''));
-        if (!cells.length) return false; cells[cells.length - 1].click(); return true; })()`);
-      check('6t', 't: a chunk is selected, so the badge is a name and the hint is the long one', picked === true, `picked=${picked}`);
+      //
+      // ⚠ HOW A CELL IS FOUND, AND WHY IT IS NOT BY TITLE TEXT (O50 triage,
+      // 2026-09-03). This used to take every `[title]` in the document whose
+      // title matched `/chunk/i` and click the LAST one. Two things are wrong
+      // with that and together they made [7t] red for three weeks while [6t]
+      // reported success:
+      //
+      //   • an aeon cell's title is the chunk's NAME and nothing else
+      //     (`aeonChunkTitle`, providers/chunk-grid-aeon.ts) — the word "chunk"
+      //     appears in it only for a BLANK chunk's warning suffix. So the
+      //     population was mostly other controls that happen to say "chunk"
+      //     (the Stamp Chunk tool among them), and the last one in document
+      //     order is whichever of those the layout put last.
+      //   • [6t] asserted the CLICK CALL, not the SELECTION. `picked === true`
+      //     means only "an element matched and .click() was invoked" — it is
+      //     true when the click lands on nothing at all, so the anti-vacuous
+      //     row could never have failed for the reason [7t] fails.
+      //     docs/OVERSEER.md bar 2d(iii) and the O51 ".click() is not a click"
+      //     entry.
+      //
+      // A cell is now found STRUCTURALLY — a `<button>` containing a `<canvas>`,
+      // which is what `ChunkGrid`'s Cell renders — and clicked through the
+      // browser's own hit testing at its centre. [6t] then asserts the app's own
+      // SELECTED styling (`styles.cellSel` = a 2px solid outline) is on exactly
+      // one cell, having been on none before, and PRINTS both counts.
+      // ⚠ AND THE CELL HAS TO BE SCROLLED TO BEFORE IT CAN BE CLICKED. The
+      // repaired finder above aimed correctly at the last cell — and measured it
+      // at y=3617 in a 1050px-high window, because 71 cells do not fit. A real
+      // hit-tested click there lands on nothing, which is the SECOND reason [7t]
+      // was red and would have been mistaken for the first. `scrollIntoView`
+      // first, then RE-MEASURE, and refuse to click a point that is still
+      // outside the window rather than dispatching into space: a rect with
+      // non-zero width says nothing about whether it is on screen, and neither
+      // does `checkVisibility()` (docs/OVERSEER.md, the paint-trio entry).
+      const cellsBefore = await c.json(CELL_STATE);
+      const aim = await c.json(`(() => {
+        const cells = [...document.querySelectorAll('button')].filter((b) => b.querySelector('canvas'));
+        if (!cells.length) return { ok: false, n: 0 };
+        const b = cells[cells.length - 1];
+        b.scrollIntoView({ block: 'center', inline: 'center' });
+        const r = b.getBoundingClientRect();
+        const onScreen = r.width > 0 && r.height > 0
+          && r.top >= 0 && r.left >= 0
+          && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
+        return { ok: onScreen, n: cells.length,
+                 title: (b.title || '').slice(0, 40),
+                 rect: { top: Math.round(r.top), bottom: Math.round(r.bottom) },
+                 win: { h: window.innerHeight, w: window.innerWidth },
+                 x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+      })()`);
+      await sleep(400);
+      if (aim.ok) {
+        const base = { x: aim.x, y: aim.y, button: 'left', clickCount: 1, buttons: 1 };
+        await c.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...base, buttons: 0 });
+        await c.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...base });
+        await c.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...base, buttons: 0 });
+      }
       await sleep(1200);
+      const cellsAfter = await c.json(CELL_STATE);
+      check('6t', 't: a chunk is REALLY selected — the app put its selected outline on exactly '
+        + 'one cell, and on none before the click',
+        aim.ok === true && cellsBefore.selected === 0 && cellsAfter.selected === 1,
+        `${aim.n} cells, aimed at "${aim.title}" @${aim.x},${aim.y} `
+        + `(rect ${JSON.stringify(aim.rect)} in a ${aim.win ? aim.win.h : '?'}px window, `
+        + `on screen: ${aim.ok}) · outlined cells ${cellsBefore.selected} -> ${cellsAfter.selected} `
+        + `(of ${cellsBefore.cells} -> ${cellsAfter.cells}, now ${JSON.stringify(cellsAfter.titles)})`);
       const sel = await c.json(PROBE);
       check('7t', 't: the selected-state hint is the two-clause sentence',
         sel.found === true && /^Click map to stamp/.test(sel.text), `"${sel.found ? sel.text : '(not found)'}"`);

@@ -414,6 +414,34 @@ async function main() {
     // LAYER 0 BECOMES A FIRE. `layerEmitsFire` is the VARIANT test — a `vsplit`
     // attachment present, `at: 0` included — so this select is the whole switch.
     await setField('3a3', 'the layer card offers a Plane B split control on layer 0', vsplitSel(0), 'at');
+    // ⚠ THE SCENE FORM ARRIVES COLLAPSED SINCE d-26b (2026-09-02,
+    // docs/reviews/2026-09-02-effects-sub-tabs.md, §3): `aeon.effects.scene` —
+    // the section holding v_center/v_offset — is `defaultCollapsed`, and a
+    // collapsed section renders no body, so its spinners are UNMOUNTED rather
+    // than hidden. `voField` therefore missed and every row downstream of
+    // v_offset (18 of them) was measuring a scene whose v_offset had never been
+    // set. The layer cards are in `aeon.effects.layers`, which is still open on
+    // arrival, which is why [3a1]/[3a2] passed and only this one did not.
+    //
+    // IDEMPOTENT, and it reports which door it had to open. The Layers and Scene
+    // sections are both on the Parallax sub-tab, which is the default, so no tab
+    // switch is needed here — [3a3b] would say so if that ever changed.
+    const sceneForm = await c.evalExpr(String.raw`
+      (() => {
+        const has = () => [...document.querySelectorAll('input')]
+          .some((e) => /^v_offset — /.test(e.title || ''));
+        if (has()) return 'already-open';
+        const hdr = [...document.querySelectorAll('div')]
+          .filter((d) => d.style && d.style.cursor === 'pointer'
+                      && /^SCENE\s*—/i.test((d.innerText || '').trim()))[0];
+        if (!hdr) return 'no-scene-header';
+        hdr.click();
+        return 'clicked';
+      })()`);
+    await sleep(900);
+    check('3a3b', 'INSTRUMENT: the Scene form is open — it arrives collapsed since d-26b, and '
+      + 'a collapsed section is UNMOUNTED, not hidden',
+      sceneForm === 'clicked' || sceneForm === 'already-open', `open -> ${sceneForm}`);
     await setField('3a4', 'ANTI-VACUOUS: the scene\'s v_offset field exists and took the owner\'s value',
       voField, VO_A);
     await c.evalExpr('window.__dbg.setView(0, 0, 1)');

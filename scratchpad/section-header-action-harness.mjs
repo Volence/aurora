@@ -65,18 +65,30 @@
 //        heading "Layers (8/8)" over 0 cards, 0 body nodes, body 0px
 //   FAIL [5c]   Delete did not write aeon.effects.scene into persisted panel state
 //
-// (verified 2026-08-24). Row 4b is the ORIGINAL defect report reproduced
-// verbatim. Note what click 2 does in that run: it PASSES, because the second
-// stray toggle cancels the first. That is why section 3 asserts after every
-// click instead of at the end — a run that only looked at the final state would
-// have been green for even counts and this bug shipped once already.
+// (verified 2026-08-24, when the ceiling was 8 and the heading had no suffix —
+// the quoted strings above are that run's, not today's; see LAYER_MAX below).
+// Row 4b is the ORIGINAL defect report reproduced verbatim. Note what click 2
+// does in that run: it PASSES, because the second stray toggle cancels the
+// first. That is why section 3 asserts after every click instead of at the end —
+// a run that only looked at the final state would have been green for even
+// counts and this bug shipped once already.
+//
+// ⚠ O50 TRIAGE, 2026-09-03 — THIS FILE WAS RED FOR THREE INSTRUMENT REASONS AT
+// ONCE, AND ONLY THE FIRST WAS VISIBLE. The heading finder was dead (see
+// LAYER_MAX's block), which aborted the run at [1a] and hid the other two:
+// the growth loop's ceiling literal (8, now 16) and the CARD COUNTER, which had
+// been returning 0 for every card the app drew because it keyed on a spinner
+// title that only exists on an UNLOCKED scene (see LAYER_CARDS's block). The
+// app was never at fault: 31/31 after the three repairs, with the card counter
+// re-proven red-first by renaming the Remove button's label (8 rows red, all
+// and only the card-dependent ones).
 //
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npm run build
 // Run:                     node scratchpad/section-header-action-harness.mjs
 
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import * as http from 'node:http';
@@ -110,6 +122,48 @@ const SCENE_ID = 'hdr_action_probe';
 const PANEL_KEY = 'aurora.shell.panels';
 const LAYERS_ID = 'aeon.effects.layers';
 const SCENE_SECTION_ID = 'aeon.effects.scene';
+
+/**
+ * ⚠ THE LAYERS HEADING AND ITS CEILING ARE BOTH READ, NEVER PINNED — O50
+ * triage, 2026-09-03, and this file was RED for both at once.
+ *
+ * It matched `/^Layers \(\d+\/\d+\)$/` and required the ceiling state to read
+ * exactly `Layers (8/8)`. Two independent things had moved under it:
+ *
+ *   • the heading has read `Layers (n/MAX per scene)` since wave 1 — the panel
+ *     composes it as `Layers (${n}/${EFFECTS_LAYER_COUNT.max} per scene)`
+ *     (components/effects/EffectsScenePanel.tsx), so the `$`-anchored pattern
+ *     found NOTHING and every row of this file was unreachable behind [1a];
+ *   • `maxItems` went 8 -> 16 at empyrean `277bc15`
+ *     (core/formats/effects/aurora-effects-scene.schema.provenance.json), so
+ *     even a repaired pattern would have stalled the growth loop at a ceiling
+ *     the app no longer has.
+ *
+ * A literal here would be a SECOND authority for a number the schema already
+ * owns — `scene-ui.ts` says so in as many words — so the maximum is read out of
+ * the schema file the app itself compiles, and the heading pattern is built
+ * from it. `LAYER_MAX` is printed in the banner so a run says which ceiling it
+ * measured against.
+ */
+const LAYER_MAX = (() => {
+  const schema = JSON.parse(readFileSync(
+    `${ROOT}/src/core/formats/effects/aurora-effects-scene.schema.json`, 'utf8'));
+  const n = schema?.properties?.layers?.maxItems;
+  if (typeof n !== 'number') {
+    throw new Error('effects scene schema properties.layers has no numeric maxItems — '
+      + 'this harness reads the ceiling from the schema and refuses to guess one');
+  }
+  return n;
+})();
+/**
+ * The heading the Layers section actually paints, as a source-derived regex
+ * LITERAL — every consumer below interpolates this into a CDP expression where
+ * a `/…/` literal is what is wanted, so the escaping is done once, here.
+ */
+const LAYERS_RE = String.raw`/^Layers \(\d+\/${LAYER_MAX} per scene\)$/`;
+/** The same at the ceiling, for the row that reproduces the original report. */
+const LAYERS_AT_MAX = new RegExp(
+  String.raw`^Layers \(${LAYER_MAX}\/${LAYER_MAX} per scene\)$`);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(path, timeoutMs = 1500) {
@@ -280,30 +334,66 @@ const SECTION_PROBE = (titleRe) => String.raw`
   };
 })()`;
 
-/** How many layer CARDS are rendered — the children the user came for. */
+/**
+ * How many layer CARDS are rendered — the children the user came for.
+ *
+ * ⚠ WHAT IDENTIFIES A CARD, AND WHY IT IS NOT THE TOP SPINNER'S TITLE ANY MORE
+ * (O50 triage, 2026-09-03). This counter had been reporting 0 for every card
+ * the app actually drew, hidden behind a `[1a]` no run could get past.
+ *
+ * It keyed on `/^Layer \d+ world_y/` over the top spinner's `title`. The panel
+ * composes that title as ``Layer ${i} ${top.label} (…)``, and `top.label` is
+ * `world_y` ONLY ON AN UNLOCKED SCENE: `layerTopBounds`
+ * (renderer/providers/effects-aeon.ts) returns `label: 'Screen line'` whenever
+ * `layerTopSpace(scene) === 'screen'`, which is what the scene this file
+ * creates through the real New button is. So the FIELD never moved — the
+ * SCENE'S SPACE decides the word, and a counter keyed on one arm of that branch
+ * reads 0 on the other. The comment that used to sit here reasoned "the
+ * spinner's title is the field's own name, so it moves only if the field does";
+ * that is exactly the trap. The title carries a VALUE, not just a name.
+ *
+ * The identity no scene state can rewrite is the card's own Remove control:
+ * `IconButton` with `label={'Remove layer ' + i}` renders a real
+ * `<button aria-label="Remove layer N">` (components/ui/primitives.tsx), one per
+ * card, present in every state (merely disabled at the layer floor).
+ *
+ * AND IT RETURNS THE ARTIFACT, NOT JUST THE COUNT — a bare 0 cannot distinguish
+ * "the app drew no cards" (a defect) from "the finder moved" (an instrument
+ * fault), which is precisely the confusion that cost this triage a run. The
+ * caller prints the spinner titles it saw. docs/OVERSEER.md bar 2d(iii).
+ */
 const LAYER_CARDS = String.raw`
 (() => {
   const hdrSpan = [...document.querySelectorAll('span')]
-    .find(e => /^Layers \(\d+\/\d+\)$/.test((e.textContent || '').trim()));
+    .find(e => ${LAYERS_RE}.test((e.textContent || '').trim()));
   if (!hdrSpan) return -1;
   let header = hdrSpan;
   while (header && !(header.tagName === 'DIV'
          && parseFloat(getComputedStyle(header).paddingLeft) > 0)) header = header.parentElement;
   const section = header.parentElement.parentElement;
   // The bordered box, not a row inside it — the effects harness learned that a
-  // naive text query counts both and reports 4 cards for 2.
-  //
-  // MATCHED ON THE world_y SPINNER'S TITLE, not on a label's text (ROADMAP item
-  // 41). This used to key on a "#N world_y" label, which the item-41 layout pass
-  // renamed to "world_y" under a "Layer N" card title — and a card counter that
-  // depends on a LABEL is one a layout parcel can silently zero. The spinner's
-  // "title" is the field's own name and is what the panel binds the model
-  // through, so it moves only if the field does.
-  return [...section.querySelectorAll('div')].filter((d) =>
-    parseFloat(getComputedStyle(d).borderTopWidth) >= 1
-    && [...d.querySelectorAll('input[type=number]')]
-         .some((e) => /^Layer \d+ world_y/.test(e.title || ''))).length;
+  // naive text query counts both and reports 4 cards for 2. Cards are counted
+  // by their own Remove button, NOT by the top spinner's title; the docblock
+  // above says why, and why the title reads 0 on a locked scene.
+  const bordered = [...section.querySelectorAll('div')].filter((d) =>
+    parseFloat(getComputedStyle(d).borderTopWidth) >= 1);
+  const numTitles = [...section.querySelectorAll('input[type=number]')]
+    .map((e) => e.title || '');
+  const n = bordered.filter((d) =>
+    [...d.querySelectorAll('button[aria-label]')]
+      .some((e) => /^Remove layer \d+$/.test(e.getAttribute('aria-label') || ''))).length;
+  return { n, bordered: bordered.length, numbers: numTitles.length,
+           sample: numTitles.slice(0, 3) };
 })()`;
+
+/** `{n, …}` from `LAYER_CARDS`, or a `{n:-1}` shaped value when the heading is gone. */
+async function layerCards(c) {
+  const v = await c.json(LAYER_CARDS);
+  return (v === -1 || v === null) ? { n: -1, bordered: 0, numbers: 0, sample: [] } : v;
+}
+/** The one-line artifact a row prints beside its count. */
+const cardsNote = (v) => `${v.n} cards (${v.bordered} bordered boxes, ${v.numbers} number `
+  + `spinners; e.g. ${JSON.stringify(v.sample)})`;
 
 const panelState = (c) => c.evalExpr(`localStorage.getItem(${JSON.stringify(PANEL_KEY)})`);
 
@@ -354,6 +444,12 @@ async function main() {
     await sleep(4000);
     await waitDbg();
 
+    // PRINT THE CEILING THIS RUN MEASURED AGAINST. It is read from the schema
+    // and it has moved once already (8 -> 16); a run that does not say which
+    // number it used cannot be reconciled with an older one that used the other.
+    console.log(`        schema ceiling: layers maxItems = ${LAYER_MAX}`);
+    console.log(`        heading finder: ${LAYERS_RE}`);
+
     // ---- 0. Get to a real section with a real header action. --------------
     await c.evalExpr(`window.__dbg.aeon.open(${JSON.stringify(AEONDIR)})`)
       .catch((e) => console.log('        aeon open threw:', e.message));
@@ -396,15 +492,16 @@ async function main() {
     await sleep(700);
 
     // ---- 1. ANTI-VACUOUS: the instrument can see its subject. -------------
-    let p = await c.json(SECTION_PROBE('/^Layers \\(\\d+\\/\\d+\\)$/'));
+    let p = await c.json(SECTION_PROBE(LAYERS_RE));
     if (!p.found) {
       unmeasurable('1a', 'the Layers section is on screen', p.why);
       throw new Error(`no subject: ${p.why}`);
     }
-    let cards = await c.evalExpr(LAYER_CARDS);
+    let cards = await layerCards(c);
     check('1a', 'the Layers section is on screen, EXPANDED, with visible children',
-      p.bodyKids > 0 && p.bodyH > 0 && cards > 0,
-      `"${p.title}" header ${p.headerH}px, body ${p.bodyH}px, ${p.bodyKids} body nodes, ${cards} layer cards`);
+      p.bodyKids > 0 && p.bodyH > 0 && cards.n > 0,
+      `"${p.title}" header ${p.headerH}px, body ${p.bodyH}px, ${p.bodyKids} body nodes, `
+      + cardsNote(cards));
     check('1b', 'its header carries a real ACTION control, and it is enabled',
       p.hasAction === true && p.actionDisabled === false && /Add layer/i.test(p.actionLabel || ''),
       `action=${JSON.stringify(p.actionLabel)} disabled=${p.actionDisabled}`);
@@ -434,9 +531,9 @@ async function main() {
     const before2 = await panelState(c);
     await clickAt(c, p.titlePt);
     let after2 = await panelState(c);
-    let q = await c.json(SECTION_PROBE('/^Layers \\(\\d+\\/\\d+\\)$/'));
+    let q = await c.json(SECTION_PROBE(LAYERS_RE));
     check('2a', 'clicking the TITLE collapses the section (children leave the DOM)',
-      q.found && q.bodyKids === 0 && q.bodyH === 0 && (await c.evalExpr(LAYER_CARDS)) === 0,
+      q.found && q.bodyKids === 0 && q.bodyH === 0 && (await layerCards(c)).n === 0,
       `body ${q.bodyH}px, ${q.bodyKids} body nodes`);
     // This is also the row that validates PANEL_KEY: a wrong key reads null and
     // fails here instead of making every "unchanged" row below trivially true.
@@ -446,26 +543,26 @@ async function main() {
     await clickAt(c, p.titlePt);
     // A collapsed header sits where it did, but re-measure anyway rather than
     // reusing stale coordinates across a relayout.
-    p = await c.json(SECTION_PROBE('/^Layers \\(\\d+\\/\\d+\\)$/'));
-    cards = await c.evalExpr(LAYER_CARDS);
+    p = await c.json(SECTION_PROBE(LAYERS_RE));
+    cards = await layerCards(c);
     const after2b = await panelState(c);
     check('2c', 'clicking the TITLE again re-expands it, in the DOM and in storage',
-      p.found && p.bodyKids > 0 && cards > 0 && JSON.parse(after2b)[LAYERS_ID] === false,
-      `body ${p.bodyH}px, ${cards} cards, state=${after2b}`);
+      p.found && p.bodyKids > 0 && cards.n > 0 && JSON.parse(after2b)[LAYERS_ID] === false,
+      `body ${p.bodyH}px, ${cardsNote(cards)}, state=${after2b}`);
 
     // Requirement 2's other half: DEAD SPACE in the header row still toggles.
     // A fix that narrowed the hit target to the title alone would pass 2a–2c
     // and fail here.
     await clickAt(c, p.deadPt);
-    let q3 = await c.json(SECTION_PROBE('/^Layers \\(\\d+\\/\\d+\\)$/'));
+    let q3 = await c.json(SECTION_PROBE(LAYERS_RE));
     const afterDead = await panelState(c);
     check('2d', 'clicking DEAD SPACE in the header row still toggles (the hit target is the row)',
       q3.found && q3.bodyKids === 0 && JSON.parse(afterDead)[LAYERS_ID] === true,
       `body ${q3.bodyH}px, ${q3.bodyKids} body nodes, state=${afterDead}`);
     await clickAt(c, p.deadPt);
-    p = await c.json(SECTION_PROBE('/^Layers \\(\\d+\\/\\d+\\)$/'));
+    p = await c.json(SECTION_PROBE(LAYERS_RE));
     check('2e', 'and dead space brings it back',
-      p.found && p.bodyKids > 0 && (await c.evalExpr(LAYER_CARDS)) > 0,
+      p.found && p.bodyKids > 0 && (await layerCards(c)).n > 0,
       `body ${p.bodyH}px, state=${await panelState(c)}`);
 
     // The CHEVRON is the one part of the header that looks like a control, and
@@ -475,15 +572,15 @@ async function main() {
       unmeasurable('2f', 'the chevron toggles the section', 'no chevron rect in the header');
     } else {
       await clickAt(c, p.chevronPt);
-      const q4 = await c.json(SECTION_PROBE('/^Layers \\(\\d+\\/\\d+\\)$/'));
+      const q4 = await c.json(SECTION_PROBE(LAYERS_RE));
       const afterChev = await panelState(c);
       check('2f', 'clicking the CHEVRON still toggles',
         q4.found && q4.bodyKids === 0 && JSON.parse(afterChev)[LAYERS_ID] === true,
         `body ${q4.bodyH}px, ${q4.bodyKids} body nodes, state=${afterChev}`);
       await clickAt(c, q4.chevronPt ?? p.chevronPt);
-      p = await c.json(SECTION_PROBE('/^Layers \\(\\d+\\/\\d+\\)$/'));
+      p = await c.json(SECTION_PROBE(LAYERS_RE));
       check('2g', 'and the chevron brings it back, so the section is expanded for the subject rows',
-        p.found && p.bodyKids > 0 && (await c.evalExpr(LAYER_CARDS)) > 0,
+        p.found && p.bodyKids > 0 && (await layerCards(c)).n > 0,
         `body ${p.bodyH}px, state=${await panelState(c)}`);
     }
 
@@ -495,7 +592,7 @@ async function main() {
     const stateBefore3 = await panelState(c);
     for (let n = 1; n <= 3; n++) {
       const layersBefore = sceneOf(await c.json('window.__dbg.aeon.scenes()')).layers;
-      const shot0 = await c.json(SECTION_PROBE('/^Layers \\(\\d+\\/\\d+\\)$/'));
+      const shot0 = await c.json(SECTION_PROBE(LAYERS_RE));
       if (!shot0.found || !shot0.actionPt) {
         unmeasurable(`3a.${n}`, `click ${n}: the Add layer control is on screen`,
           shot0.why ?? 'no action control in the header');
@@ -503,8 +600,8 @@ async function main() {
       }
       await clickAt(c, shot0.actionPt);
       const layersAfter = sceneOf(await c.json('window.__dbg.aeon.scenes()')).layers;
-      const after = await c.json(SECTION_PROBE('/^Layers \\(\\d+\\/\\d+\\)$/'));
-      const cardsAfter = await c.evalExpr(LAYER_CARDS);
+      const after = await c.json(SECTION_PROBE(LAYERS_RE));
+      const cardsAfter = await layerCards(c);
       const stateAfter = await panelState(c);
       // ANTI-VACUOUS, and the alternative green-path this row exists to close:
       // a click that never reached the button also never toggles anything, so
@@ -512,9 +609,9 @@ async function main() {
       check(`3a.${n}`, `click ${n}: the Add layer click really reached the button (layers ${layersBefore}→${layersAfter})`,
         layersAfter === layersBefore + 1, `model layers ${layersBefore} → ${layersAfter}`);
       check(`3b.${n}`, `click ${n}: the section is STILL EXPANDED after the action`,
-        after.found && after.bodyKids > 0 && after.bodyH > 0 && cardsAfter === layersAfter,
+        after.found && after.bodyKids > 0 && after.bodyH > 0 && cardsAfter.n === layersAfter,
         `"${after.title}" body ${after.bodyH}px, ${after.bodyKids} body nodes, `
-        + `${cardsAfter} cards for ${layersAfter} layers`);
+        + `${cardsNote(cardsAfter)} for ${layersAfter} layers`);
       // THE LOAD-BEARING ROW. A re-render can put children back; nothing puts
       // an unwanted localStorage write back.
       check(`3c.${n}`, `click ${n}: persisted panel state was NOT written for ${LAYERS_ID}`,
@@ -530,28 +627,28 @@ async function main() {
     // one — and the last click is the 7th, the odd one that did it.
     let scene = sceneOf(await c.json('window.__dbg.aeon.scenes()'));
     let guardTrips = 0;
-    while (scene.layers < 8 && guardTrips < 12) {
-      const s = await c.json(SECTION_PROBE('/^Layers \\(\\d+\\/\\d+\\)$/'));
+    while (scene.layers < LAYER_MAX && guardTrips < LAYER_MAX + 4) {
+      const s = await c.json(SECTION_PROBE(LAYERS_RE));
       if (!s.found || !s.actionPt || s.actionDisabled) break;
       await clickAt(c, s.actionPt);
       scene = sceneOf(await c.json('window.__dbg.aeon.scenes()'));
       guardTrips++;
     }
-    const atMax = await c.json(SECTION_PROBE('/^Layers \\(\\d+\\/\\d+\\)$/'));
-    const cardsAtMax = await c.evalExpr(LAYER_CARDS);
+    const atMax = await c.json(SECTION_PROBE(LAYERS_RE));
+    const cardsAtMax = await layerCards(c);
     const stateAtMax = await panelState(c);
     check('4a', 'the stack really did grow to the schema maximum through the real control',
-      scene.layers === 8 && /^Layers \(8\/8\)$/.test(atMax.title || ''),
+      scene.layers === LAYER_MAX && LAYERS_AT_MAX.test(atMax.title || ''),
       `model layers=${scene.layers}, heading="${atMax.title}"`);
     // The literal defect report: the heading says 8/8 and there is nothing
     // under it.
-    check('4b', 'at 8/8 the panel is NOT empty — the heading and the body agree',
-      cardsAtMax === 8 && atMax.bodyKids > 0,
-      `heading "${atMax.title}" over ${cardsAtMax} cards, ${atMax.bodyKids} body nodes, `
+    check('4b', `at ${LAYER_MAX}/${LAYER_MAX} the panel is NOT empty — the heading and the body agree`,
+      cardsAtMax.n === LAYER_MAX && atMax.bodyKids > 0,
+      `heading "${atMax.title}" over ${cardsNote(cardsAtMax)}, ${atMax.bodyKids} body nodes, `
       + `body ${atMax.bodyH}px`);
     check('4c', 'seven Add-layer clicks left persisted panel state untouched',
       stateAtMax === stateBefore3, `before=${stateBefore3}\n        after =${stateAtMax}`);
-    await shot(c, '3-layers-8-of-8');
+    await shot(c, `3-layers-${LAYER_MAX}-of-${LAYER_MAX}`);
 
     // ---- 5. THE OTHER INTERACTIVE CALL SITE: Delete scene. ----------------
     //

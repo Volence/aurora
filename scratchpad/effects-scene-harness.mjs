@@ -65,9 +65,12 @@
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npm run build
 // Run:                     node scratchpad/effects-scene-harness.mjs
 
-import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved }
+  from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync, existsSync, renameSync, readdirSync }
+  from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import * as http from 'node:http';
@@ -96,14 +99,92 @@ const ROOT = AURORA_DIR;
 const RUN = announceRunRoot(runTarget(ROOT));
 const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
 const MAIN = RUN.main;
-const AEONDIR = siblingPathOrUnresolved('aeon');
+/**
+ * WARNING: THE FIXTURE PREMISE EXPIRED, AND THIS FILE NOW MATERIALISES IT
+ * ITSELF (O50 triage, 2026-09-03).
+ *
+ * The docblock above said, and verified on 2026-08-22, that the aeon tree's
+ * `games/sonic4/data/editor/effects/` DOES NOT EXIST. Aeon has since committed
+ * two scenes into it (`ojz_act1_depth`, `ojz_act1_start`), so [1b] "an absent
+ * editor/effects/ loads as ZERO scenes" measured a directory that is now there,
+ * and [3c] / [9a], which count the library against 0 and 1, went with it. That
+ * is not a defect in either tree - it is a harness standing on somebody else's
+ * repository contents, which is a premise that can only decay.
+ *
+ * So the empty-library case is CREATED rather than assumed: the effects
+ * directory is moved aside for the run and moved back in `finally`. That is a
+ * WRITE, which is why `AEON_DIR` must now be a COPY and is refused when it is
+ * the live sibling tree - the suite rule is "copy only where a harness can
+ * WRITE" (hub ruling 2026-09-03, card d-28), and this file has crossed into
+ * that half. Its old "IT WRITES NOTHING TO DISK" claim is retired below.
+ *
+ * A LEFTOVER FROM A KILLED RUN IS REFUSED UP FRONT rather than silently reused,
+ * which is `section-raster-select`'s precedent (O66): a fixture a previous run
+ * half-built is not the fixture this one claims to have created.
+ */
+const AEON_OVERRIDE = checkoutOverride('aeon');
+const AEONDIR = AEON_OVERRIDE?.value;
+if (!AEONDIR || !existsSync(AEONDIR)) {
+  throw new Error("AEON_DIR must name a COPY of an aeon tree: this harness moves that tree's "
+    + 'data/editor/effects/ aside for the run (and back afterwards) so it can measure the '
+    + "empty-library case, which aeon's own tree no longer presents.");
+}
+if (AEONDIR === siblingDefaultPathOrUnresolved('aeon')) {
+  throw new Error(`AEON_DIR is the live aeon checkout (${AEONDIR}). This harness WRITES to the `
+    + 'tree it is given (it moves data/editor/effects/ aside and back). Point it at a copy.');
+}
+
+/** `<tree>/games/<game>/data/editor/effects` for every game in the copy. */
+function effectsDirs(root) {
+  const games = join(root, 'games');
+  let entries;
+  try { entries = readdirSync(games, { withFileTypes: true }); } catch { return []; }
+  return entries.filter((e) => e.isDirectory())
+    .map((e) => join(games, e.name, 'data', 'editor', 'effects'))
+    .filter((d) => existsSync(d));
+}
+const ASIDE = '.o50-aside';
+const staged = [];
+for (const dir of effectsDirs(AEONDIR)) {
+  if (existsSync(dir + ASIDE)) {
+    throw new Error(`HARNESS ABORTED: LEFTOVER FROM A PRIOR RUN: ${dir}${ASIDE} already exists, so `
+      + 'this tree is not in a state this run can claim to have created. Move it back onto '
+      + `${dir} by hand, or re-materialise the copy.`);
+  }
+  renameSync(dir, dir + ASIDE);
+  staged.push(dir);
+}
+function restoreEffectsDirs() {
+  for (const dir of staged) {
+    try { if (existsSync(dir + ASIDE)) renameSync(dir + ASIDE, dir); }
+    catch (e) { console.error(`  COULD NOT RESTORE ${dir}: ${e.message}`); }
+  }
+}
+process.on('exit', restoreEffectsDirs);
+console.log(`  fixture: moved ${staged.length} effects director`
+  + `${staged.length === 1 ? 'y' : 'ies'} aside in ${AEONDIR} for the empty-library case`
+  + `${staged.length ? `\n           ${staged.join('\n           ')}` : ''}`);
 const SHOTS = `${ROOT}/scratchpad/shots-effects-scene`;
 mkdirSync(SHOTS, { recursive: true });
 
 const SCENE_ID = 'harness_probe';
 // Schema §2's layer ceiling, mirrored here so section 11d can grow the stack to
 // it. Row 4b already proves the app's own copy of the schema is intact.
-const EFFECTS_MAX_LAYERS = 8;
+const EFFECTS_MAX_LAYERS = (() => {
+  // READ, NEVER PINNED. The literal here was 8; `maxItems` went 8 -> 16 at
+  // empyrean 277bc15 (the schema's own provenance file records it), so section
+  // 11d was growing the stack to a ceiling the app no longer has and [11d]
+  // could not be satisfied. `scene-ui.ts` states that the schema is the single
+  // authority for this number; a literal here was a second one.
+  const schema = JSON.parse(readFileSync(
+    `${ROOT}/src/core/formats/effects/aurora-effects-scene.schema.json`, 'utf8'));
+  const n = schema?.properties?.layers?.maxItems;
+  if (typeof n !== 'number') {
+    throw new Error('effects scene schema properties.layers has no numeric maxItems - this '
+      + 'harness reads the ceiling from the schema and refuses to guess one');
+  }
+  return n;
+})();
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(path, timeoutMs = 1500) {
@@ -319,7 +400,15 @@ async function main() {
     const factorSel = await c.json(String.raw`
       (() => {
         const sels = [...document.querySelectorAll('select')]
-          .filter(e => /^Layer \d+ f[ab]$/.test(e.title || ''));
+          // NOT DOLLAR-ANCHORED (O50 triage, 2026-09-03). The two pickers'
+          // titles read 'Layer N fa - how far Plane A ...' / 'fb - ...':
+          // PLANE_FACTOR_ROWS (providers/effects-aeon.ts) gives each row a
+          // sentence after the key and the panel composes the title as
+          // 'Layer N ' + row.title, so a dollar-anchor after the key matched
+          // nothing and [4a] reported the pickers absent while on screen.
+          // Anchored on the key ITSELF plus its separator, which keeps the row
+          // aimed at the field rather than at prose a wording pass can rewrite.
+          .filter(e => /^Layer \d+ f[ab] — /.test(e.title || ''));
         return sels.map(s => ({
           title: s.title,
           options: [...s.options].map(o => o.value),
@@ -348,12 +437,56 @@ async function main() {
       && anyFactor.options.includes('FACTOR_LOCKED')
       && anyFactor.options.includes('__packed__'),
       anyFactor ? `${anyFactor.options.length} options: ${JSON.stringify(anyFactor.options)}` : 'no picker');
-    // Wave 1 exposes cell precision only; "line" is a reserved engine tier.
+    // THE PRECISION PICKER IS GONE ON PURPOSE, so this row is INVERTED rather
+    // than deleted (O50 triage, 2026-09-03). It used to require the picker to
+    // offer "cell" and not the reserved "line" tier. ROADMAP row 59 (owner
+    // ruling d-16) removed the control outright: aeon retired
+    // `Scene.sc_precision` on 2026-08-26 with the per-cell HScroll path and
+    // empyrean `0bd4753` cut the key from the shared schema, so the dropdown
+    // was writing a value nothing would ever read
+    // (docs/reviews/2026-08-27-retire-precision.md; the removal comment is
+    // still in EffectsScenePanel.tsx where the control stood).
+    //
+    // Deleting the row would leave nothing watching a control that was removed
+    // "rather than hidden" and that the parcel took care to make un-regrowable.
+    // So it now asserts the ABSENCE, which is the shipped behaviour, and names
+    // the ruling — a re-grown picker fails here instead of passing quietly.
+    // ⚠ AND THE ABSENCE HAS TO BE MEASURED WHERE THE CONTROL WOULD BE. The
+    // retired picker stood in `aeon.effects.scene`, which arrives
+    // `defaultCollapsed` since d-26b and is therefore UNMOUNTED. Asserting
+    // "no precision picker" against a shut section is a check whose success
+    // state and failure state emit the same artifact — it could only ever
+    // return green (docs/OVERSEER.md bar 2e). FOUND BY PLANTING ONE: a
+    // re-grown `<Select title="precision">` in that section left this row at
+    // 40/40. The form is opened FIRST now, with its own instrument row, so the
+    // null means the control is not there rather than that nothing is.
+    const sceneFormFor4c = await c.evalExpr(String.raw`
+      (() => {
+        const has = () => [...document.querySelectorAll('input')]
+          .some((e) => (e.title || '').startsWith('v_factor'));
+        if (has()) return 'already-open';
+        const hdr = [...document.querySelectorAll('div')]
+          .filter((d) => d.style && d.style.cursor === 'pointer'
+                      && /^SCENE\s*\u2014/i.test((d.innerText || '').trim()))[0];
+        if (!hdr) return 'no-scene-header';
+        hdr.click();
+        return 'clicked';
+      })()`);
+    await sleep(900);
+    check('4c0', 'INSTRUMENT: the Scene form is OPEN, so the absence [4c] asserts is an absence '
+      + 'from a mounted section rather than from a collapsed one',
+      sceneFormFor4c === 'clicked' || sceneFormFor4c === 'already-open',
+      `open -> ${sceneFormFor4c}`);
+    const vFactorPresent = await c.evalExpr(
+      `[...document.querySelectorAll('input[type=number]')].some(e => /^v_factor\\b/.test(e.title || ''))`);
+    check('4c1', 'ANTI-VACUOUS for [4c]: a control that DOES live in that form is on screen, so '
+      + 'the section is genuinely mounted and a null below means "retired", not "shut"',
+      vFactorPresent === true, `v_factor spinner present=${vFactorPresent}`);
     const precision = await c.json(
       `(() => { const s = ${SELECT_BY_TITLE('/precision/')}; return s ? [...s.options].map(o => o.value) : null; })()`);
-    check('4c', 'the precision picker offers "cell" and NOT the reserved "line" tier',
-      Array.isArray(precision) && precision.length === 1 && precision[0] === 'cell',
-      JSON.stringify(precision));
+    check('4c', 'there is NO precision picker — the control was RETIRED with the engine field '
+      + '(ROADMAP row 59 / owner ruling d-16), removed rather than hidden, and must not re-grow',
+      precision === null, `precision picker options: ${JSON.stringify(precision)}`);
 
     // ---- 5. Editing a layer reaches the document. -------------------------
     const beforeEdit = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
@@ -398,6 +531,15 @@ async function main() {
     await shot(c, '2-scene-two-layers');
 
     // ---- 7. Section assignment. -------------------------------------------
+    // WHAT THE UNDO WILL HAVE TO RESTORE, CAPTURED RATHER THAN ASSUMED TO BE
+    // `null` (O50 triage, 2026-09-03). Row [7c] below required `null` after one
+    // undo, which held only while aeon's section 0 carried no `sceneRef` of its
+    // own. It carries `ojz_act1_start` now, so a CORRECT single undo restored
+    // that and the row read a working undo as a no-op command eating a step.
+    // The property is "ONE undo reverses the assignment"; the value it reverses
+    // TO belongs to the fixture and is read from it.
+    const section0 = await c.evalExpr('window.__dbg.aeon.activeSection()');
+    const refBefore = await c.evalExpr(`window.__dbg.aeon.sceneRef(${section0})`);
     const assigned = await c.evalExpr(SET_INPUT(SELECT_BY_TITLE('/sceneRef/'), SCENE_ID));
     check('7a', 'the section assignment dropdown took a real change event', assigned === 'ok',
       `assigned=${assigned}`);
@@ -425,10 +567,11 @@ async function main() {
     // — which is exactly how this row passed on the harness's own first (broken)
     // run, when the Effects pill had never been clicked. The pre-state is part
     // of the assertion.
-    check('7c', 'ONE Ctrl+Z clears the assignment — the two re-picks issued nothing',
-      ref === SCENE_ID && refAfterUndo === null,
-      `assigned=${JSON.stringify(ref)} -> after one undo sceneRef=${JSON.stringify(refAfterUndo)}`
-      + ' (non-null after means a no-op command consumed a step)');
+    check('7c', 'ONE Ctrl+Z reverses the assignment — the two re-picks issued nothing',
+      ref === SCENE_ID && refBefore !== SCENE_ID && refAfterUndo === refBefore,
+      `before=${JSON.stringify(refBefore)} assigned=${JSON.stringify(ref)} -> after ONE undo `
+      + `sceneRef=${JSON.stringify(refAfterUndo)} (anything but the "before" value means a `
+      + 'no-op command consumed a step)');
 
     // ---- 8. NO CLOCK WAS ADDED. -------------------------------------------
     // The MapViewport measurement (37/37) left aeon's viewport with zero idle
@@ -500,7 +643,12 @@ async function main() {
     const openAllPackedForms = async () => {
       const titles = await c.json(String.raw`
         [...document.querySelectorAll('select')].map(e => e.title || '')
-          .filter(t => /^Layer \d+ f[ab]$/.test(t))`);
+          // NOT DOLLAR-ANCHORED - the same repair as row [4a]. The pickers'
+          // titles carry PLANE_FACTOR_ROWS' sentence after the key, so this
+          // returned [] and every form stayed shut while [11b]/[11d] reported
+          // "0 packed spinners" as though the app had drawn none.
+          // (O50 triage, 2026-09-03.)
+          .filter(t => /^Layer \d+ f[ab] — /.test(t))`);
       for (const t of titles) {
         await c.evalExpr(SET_INPUT(
           `[...document.querySelectorAll('select')].find(e => e.title === ${JSON.stringify(t)})`,
@@ -513,6 +661,31 @@ async function main() {
     const packedOpened = await openAllPackedForms();
 
     // ---- 10a/10b. THE RIGHT PADDING, derived rather than eyeballed. --------
+    //
+    // FIRST, OPEN THE SCENE FORM. Two of the four controls this section flags -
+    // `Name` and `V factor` - live in `aeon.effects.scene`, which arrives
+    // `defaultCollapsed` since d-26b (2026-09-02,
+    // docs/reviews/2026-09-02-effects-sub-tabs.md section 3). A collapsed
+    // section is UNMOUNTED, not hidden, so both read MISSING and [10a] failed on
+    // an inset it could not measure. Idempotent, and it says which door it
+    // opened. (O50 triage, 2026-09-03.)
+    const sceneFormOpen = await c.evalExpr(String.raw`
+      (() => {
+        const has = () => [...document.querySelectorAll('input')]
+          .some((e) => (e.title || '').startsWith('v_factor'));
+        if (has()) return 'already-open';
+        const hdr = [...document.querySelectorAll('div')]
+          .filter((d) => d.style && d.style.cursor === 'pointer'
+                      && /^SCENE\s*\u2014/i.test((d.innerText || '').trim()))[0];
+        if (!hdr) return 'no-scene-header';
+        hdr.click();
+        return 'clicked';
+      })()`);
+    await sleep(900);
+    check('10a0', 'INSTRUMENT: the Scene form is open, so Name and V factor are mounted - it '
+      + 'arrives collapsed since d-26b, and a collapsed section is UNMOUNTED',
+      sceneFormOpen === 'clicked' || sceneFormOpen === 'already-open', `open -> ${sceneFormOpen}`);
+
     //
     // The number this row compares against is NOT typed here. It is read off the
     // live computed style of the section header the controls sit under, which
@@ -550,7 +723,15 @@ async function main() {
         const named = [
           ['new_scene_id', document.querySelector('input[placeholder="new_scene_id"]')],
           ['Name', rowInput('Name')],
-          ['V factor', document.querySelector('select[title="Scene v_factor"]')],
+          // A SPINNER, NOT A SELECT, AND ITS TITLE IS A SENTENCE. ROADMAP item
+          // 35 replaced the FACTOR_* picker with a NumberField, because
+          // v_factor is a right-shift count the engine feeds to asr.w and the
+          // FACTOR_* names belong to a different space. So
+          // select[title="Scene v_factor"] could never match again, on either
+          // count. Found by the field's own key at the head of its title.
+          // (O50 triage, 2026-09-03.)
+          ['V factor', [...document.querySelectorAll('input[type=number]')]
+            .find(e => /^v_factor\b/.test(e.title || '')) || null],
           ['Section select', [...document.querySelectorAll('select')]
             .find(e => /sceneRef/.test(e.title || '')) || null],
         ];
@@ -607,7 +788,13 @@ async function main() {
     const DENSITY_PROBE = String.raw`
       (() => {
         const hdrSpan = [...document.querySelectorAll('span')]
-          .find(e => /^Layers \(\d+\/\d+\)$/.test((e.textContent || '').trim()));
+          // The heading reads 'Layers (n/MAX per scene)' since wave 1 - the
+          // panel composes it from EFFECTS_LAYER_COUNT.max, and MAX is 16 since
+          // empyrean 277bc15. The old dollar-anchored pattern matched nothing,
+          // so every row of section 11 reported the section absent while it was
+          // on screen. Matched on the prefix, which is the part that names the
+          // section rather than the part that counts it. (O50 triage.)
+          .find(e => /^Layers \(\d+\/\d+ /.test((e.textContent || '').trim()));
         if (!hdrSpan) return { error: 'no Layers heading on screen' };
         let header = hdrSpan;
         while (header && !(header.tagName === 'DIV'
@@ -627,15 +814,33 @@ async function main() {
         // cards for two layers and reported [154,24,154,24] — the 24s were the
         // rows inside the 154s. The border is what distinguishes them.
         //
-        // MATCHED ON THE world_y SPINNER'S TITLE, not on a label's text (ROADMAP
-        // item 41): the label used to read "#N world_y" and now reads "world_y"
-        // under a "Layer N" card title. A card counter keyed on a LABEL is one a
-        // layout parcel can silently zero; the spinner's title is the field's own
-        // name, which moves only if the field does.
+        // MATCHED ON THE CARD'S OWN REMOVE BUTTON, and not on the top spinner's
+        // title (O50 triage, 2026-09-03 - this counter was returning 0 for every
+        // card the app drew, which is what took rows 11a-11e down once the
+        // heading finder above was repaired).
+        //
+        // It keyed on /^Layer \d+ world_y/. That spinner's title is composed as
+        // 'Layer i ' + top.label, and top.label is 'world_y' only on an UNLOCKED
+        // scene: layerTopBounds (providers/effects-aeon.ts) returns
+        // 'Screen line' whenever layerTopSpace(scene) is 'screen', which is what
+        // the scene this file AUTHORS is - the new-scene default v_factor is the
+        // lock sentinel, as EffectsScenePanel says where the spinner is defined.
+        // The old comment argued the title "moves only if the field does"; the
+        // title carries a VALUE, not just a name, and the scene's own space
+        // decides the word.
+        //
+        // A card's Remove control is the identity no scene state rewrites:
+        // IconButton renders a real <button aria-label="Remove layer N">
+        // (components/ui/primitives.tsx), exactly one per card, present in every
+        // state (merely disabled at the layer floor). The rejected spinner
+        // titles are reported below so a 0 can never again be ambiguous between
+        // "no cards drawn" and "the finder moved" - docs/OVERSEER.md bar 2d(iii).
         const cards = [...section.querySelectorAll('div')].filter((d) =>
           parseFloat(getComputedStyle(d).borderTopWidth) >= 1
-          && [...d.querySelectorAll('input[type=number]')]
-               .some((e) => /^Layer \d+ world_y/.test(e.title || '')));
+          && [...d.querySelectorAll('button[aria-label]')]
+               .some((e) => /^Remove layer \d+$/.test(e.getAttribute('aria-label') || '')));
+        const topTitles = [...section.querySelectorAll('input[type=number]')]
+          .map((e) => e.title || '').filter((t) => /^Layer \d+ /.test(t)).slice(0, 3);
         const spinners = [...section.querySelectorAll('input[type=number]')]
           .filter((e) => /^s[12] —/.test(e.title || ''));
         const pr = panel.getBoundingClientRect();
@@ -660,6 +865,8 @@ async function main() {
         return {
           title: hdrSpan.textContent.trim(),
           cards: cards.length, spinners: spinners.length,
+          // THE ARTIFACT THIS ROW JUDGES, printed beside its count.
+          topTitles,
           headerHeight: Math.round(hr.height),
           sectionHeight: Math.round(sr.height),
           bodyHeight: Math.round(sr.height - hr.height),

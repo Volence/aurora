@@ -90,6 +90,40 @@ try {
   check('0c', 'ANTI-VACUOUS: a scene is selected, so the model reads below are real',
     !!(scenePick && scenePick.ok), JSON.stringify(scenePick));
 
+  // ⚠ SINCE d-26b (2026-09-02, `docs/reviews/2026-09-02-effects-sub-tabs.md`) THE
+  // v_center/v_offset BOXES ARE TWO DOORS AWAY, NOT ONE. The Effects tab is three
+  // sub-tabs; the boxes live in `aeon.effects.scene` on **Parallax**, and that
+  // section now arrives `defaultCollapsed`. Sections are UNMOUNTED, never
+  // `display: none` — so before this the run reached a screen with no
+  // `input[type=number]` carrying a `v_center` title at all and `0b` was red for a
+  // shape change, not a defect. Both steps are IDEMPOTENT and both print what they
+  // did, so the run says which door it had to open. (O50 triage, 2026-09-03.)
+  const subtab = await c.ev(`(() => {
+    const b = [...document.querySelectorAll('[role="tab"]')]
+      .find(e => /^Parallax$/.test((e.textContent||'').trim()));
+    if (!b) return 'no-tab-bar';
+    if (b.getAttribute('aria-selected') === 'true') return 'already-parallax';
+    b.click(); return 'clicked';
+  })()`);
+  await sleep(700);
+  console.log(`  sub-tab -> ${subtab}`);
+  check('0c2', 'INSTRUMENT: the Parallax sub-tab is the one on screen (d-26b sub-tabs)',
+    subtab === 'clicked' || subtab === 'already-parallax', String(subtab));
+  const sceneForm = await c.ev(`(() => {
+    const has = () => [...document.querySelectorAll('input')]
+      .some(e => (e.title || '').startsWith('v_offset'));
+    if (has()) return 'already-open';
+    const hdr = [...document.querySelectorAll('div')]
+      .filter(d => d.style && d.style.cursor === 'pointer'
+                && /^SCENE\\s*\\u2014/i.test((d.innerText || '').trim()))[0];
+    if (!hdr) return 'no-scene-header';
+    hdr.click(); return 'clicked';
+  })()`);
+  await sleep(900);
+  console.log(`  scene form -> ${sceneForm}`);
+  check('0c3', 'INSTRUMENT: the Scene form is open — it arrives collapsed since d-26b',
+    sceneForm === 'clicked' || sceneForm === 'already-open', String(sceneForm));
+
   const inputs = async () => c.json(`(() => [...document.querySelectorAll('input[type=number]')].map((i,ix) => {
     const r = i.getBoundingClientRect();
     return { ix, min:i.getAttribute('min'), max:i.getAttribute('max'), value:i.value,

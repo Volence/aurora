@@ -299,8 +299,45 @@ const SUBJECT_SCENE = 'ojz_act1_start';
 // AFTER phase 2 opens every section, so this list changing cannot make either
 // of them vacuous: [D1b] still fails if it finds nothing to count, and [D2]
 // still fails if the four caveats are absent after the click.
-const EXPECTED_OPEN = ['Scenes', 'Scene', 'Layers', 'Section assignment'];
-const EXPECTED_CLOSED = ['BG animation bands', 'New band', 'Properties'];
+/**
+ * ⚠ THE COLUMN IS THREE COLUMNS NOW, and these two lists are the PARALLAX one's
+ * arrival state (O50 triage, 2026-09-03).
+ *
+ * d-26b (2026-09-02, docs/reviews/2026-09-02-effects-sub-tabs.md) split the
+ * Effects column into three sub-tabs. The tile-animation sections
+ * (`aeon.bganim.bands`, `aeon.bganim.new`) moved to **Tile anim** and, crucially,
+ * a section on an inactive tab is UNMOUNTED, not `display: none` — the packet
+ * says so in as many words, because hiding "would have kept every text finder in
+ * this repo green while the control was unreachable". So they are genuinely not
+ * in the Parallax column and [A1] listing them here made it unsatisfiable.
+ *
+ * `Scene` also left this list: the same parcel made `aeon.effects.scene`
+ * `defaultCollapsed`, which is the half that gives the layers list a real
+ * height (§3 of the packet). It is in EXPECTED_CLOSED now.
+ *
+ * The rows that are ABOUT the tile-animation list ([D1], [D1b], [D2]) do not
+ * lose their subject — they take an explicit excursion to the Tile anim tab and
+ * say so, rather than looking for it here and reporting an absence.
+ */
+const EXPECTED_OPEN = ['Scenes', 'Layers', 'Section assignment'];
+const EXPECTED_CLOSED = ['Scene', 'Properties'];
+
+/** The tile-animation sections, on their own tab, with the titles wave 1 gave them. */
+const TILE_ANIM_TAB = 'Tile anim';
+const TILE_ANIM_SECTION = /^Tile animations \(/;
+
+/**
+ * Select an Effects sub-tab and say what happened. Idempotent; the bar is a
+ * real `<button role="tab">` with an `onClick`, so a click is a click here.
+ */
+const SUBTAB = (label) => `(() => {
+  const b = [...document.querySelectorAll('[role="tab"]')]
+    .find((e) => (e.textContent || '').trim() === ${JSON.stringify(label)});
+  if (!b) return 'no-tab-bar';
+  if (b.getAttribute('aria-selected') === 'true') return 'already-' + ${JSON.stringify(label)};
+  b.click();
+  return 'clicked';
+})()`;
 
 /**
  * THE ONE SECTION IN THIS COLUMN THIS PARCEL DOES NOT OWN, named rather than
@@ -596,10 +633,33 @@ const COLUMN_PROBE = String.raw`
     // cannot answer "is the column wide enough" — this can, and it is what the
     // label-column width is derived FROM rather than guessed at.
     let naturalW = 0;
+    // ⚠ AND HOW MANY LINE BOXES THE TEXT ACTUALLY OCCUPIES — the direct
+    // measurement of "did it wrap", and NOT the label element's height.
+    // (O50 triage, 2026-09-03. See the [L2] block for what the height arm was
+    // really reading.) A Range over the contents yields one client rect per
+    // line box, so 1 is a single line whatever the box around it is doing.
+    let lineBoxes = -1;
+    let nowrapW = -1;
     try {
       const rg = document.createRange();
       rg.selectNodeContents(first);
       naturalW = Math.ceil(rg.getBoundingClientRect().width);
+      // DISTINCT TOPS, not rect count: a span holding two text nodes on ONE
+      // line yields two rects, and counting those would invent a wrap. Rounded,
+      // because a fractional dpr puts sub-pixel jitter on rect tops here.
+      lineBoxes = new Set([...rg.getClientRects()].map((r) => Math.round(r.top))).size;
+      // ⚠ AND THE WIDTH THE TEXT WOULD WANT ON ONE LINE, which is a DIFFERENT
+      // number from naturalW the moment a label has already wrapped — measured
+      // by pinning white-space to nowrap for one synchronous read and putting
+      // it straight back. See [r4]'s block for why this matters: naturalW is
+      // the union of the wrapped line boxes, so it is bounded by the column and
+      // reports a label that does not fit as one that exactly fills it.
+      const prevWS = first.style.whiteSpace;
+      first.style.whiteSpace = 'nowrap';
+      const rg2 = document.createRange();
+      rg2.selectNodeContents(first);
+      nowrapW = Math.ceil(rg2.getBoundingClientRect().width);
+      first.style.whiteSpace = prevWS;
     } catch { naturalW = -1; }
     // How many (span immediately followed by a control) pairs the row holds.
     // More than one means a second label mid-row, which no label column can
@@ -618,6 +678,7 @@ const COLUMN_PROBE = String.raw`
       labelW: Math.round(lr.width * 10) / 10,
       labelH: Math.round(lr.height * 10) / 10,
       overflowing: naturalW > first.clientWidth + 1,
+      lineBoxes, nowrapW,
       naturalW, scrollW: first.scrollWidth, clientW: first.clientWidth,
       lineH: lcs.lineHeight, fontSize: lcs.fontSize,
       pairs,
@@ -697,7 +758,16 @@ const BAND_ENUM_PROBE = String.raw`
   // "Band 0", "Band 0 · 8x4 · timer" — the index must END the token, so a
   // geometry glued straight onto it by textContent ("Band 08x4") is NOT a match
   // and the row that only titles the card is.
-  const RE = /^Band (\d+)(?:[\s·]|$)/;
+  // THE CARD IS TITLED 'Tile animation N' NOW (O50 triage, 2026-09-03).
+  // Wave 1 renamed it - the word "band" named two unrelated features, and
+  // this is the tile-animation half; BgAnimBandPanel renders the card's Field
+  // label as 'Tile animation ' + b.index. The old /^Band (\d+)/ matched
+  // nothing, so [D1b] reported "no element enumerates a band" from a tab where
+  // one card was on screen - which its own anti-vacuity clause correctly
+  // refused to call a pass. The index must still END the token, so a geometry
+  // glued straight on by textContent is not a match and the row that only
+  // titles the card is.
+  const RE = /^Tile animation (\d+)(?:[\s·]|$)/;
   const all = [...col.querySelectorAll('*')].filter((el) => RE.test(norm(el)));
   const innermost = all.filter((el) => !all.some((o) => o !== el && el.contains(o)));
   const hits = innermost.map((el) => ({
@@ -879,7 +949,16 @@ const PLANTS = {
   // duplicate in a separate section would be a row about section counts.
   duplicate: String.raw`
 (() => {
-  const RE = /^Band (\d+)(?:[\s·]|$)/;
+  // THE CARD IS TITLED 'Tile animation N' NOW (O50 triage, 2026-09-03).
+  // Wave 1 renamed it - the word "band" named two unrelated features, and
+  // this is the tile-animation half; BgAnimBandPanel renders the card's Field
+  // label as 'Tile animation ' + b.index. The old /^Band (\d+)/ matched
+  // nothing, so [D1b] reported "no element enumerates a band" from a tab where
+  // one card was on screen - which its own anti-vacuity clause correctly
+  // refused to call a pass. The index must still END the token, so a geometry
+  // glued straight on by textContent is not a match and the row that only
+  // titles the card is.
+  const RE = /^Tile animation (\d+)(?:[\s·]|$)/;
   const norm = (el) => (el.textContent || '').replace(/\s+/g, ' ').trim();
   const all = [...document.querySelectorAll('*')]
     .filter((el) => el.getBoundingClientRect().left > 400 && RE.test(norm(el)));
@@ -1192,13 +1271,38 @@ async function main() {
       `${offsets.length} distinct offsets, spread ${spread}px: ` + JSON.stringify(byOffset));
 
     // ---- L2: no label truncated or wrapped ------------------------------
-    const bad = m.rows.filter((r) => r.overflowing
-      || r.labelH > (parseFloat(r.lineH) || parseFloat(r.fontSize) * 1.6) + 2);
+    //
+    // ⚠ THE WRAP ARM WAS AIMED AT THE WRONG QUANTITY, and it is the failure
+    // docs/OVERSEER.md bar 2b names — a guard that fires correctly on a
+    // violation while measuring something the property is not about. Repaired
+    // in the O50 triage, 2026-09-03.
+    //
+    // It read the label ELEMENT'S HEIGHT against a line height:
+    //     r.labelH > (parseFloat(r.lineH) || parseFloat(r.fontSize) * 1.6) + 2
+    // `lineHeight` computes to `normal` here, so `parseFloat` is NaN and the
+    // threshold is the fontSize fallback — and the label span is a FLEX ITEM,
+    // stretched to the row's height by its sibling control. A 26-30px Select
+    // therefore made every label beside one "wrapped".
+    //
+    // What it reported: `Plane B curve to: text 42px in 64px, h=30`. A 42px
+    // string in a 64px box cannot wrap; the row was flagged purely on a height
+    // its own control set. Ten such rows were red, and this file's whole job is
+    // to say whether the Effects column is messy — a false positive here is a
+    // layout parcel opened against a column that is fine.
+    //
+    // The direct measurement is the number of LINE BOXES the text occupies: a
+    // Range over the label's contents yields one client rect per line, so 1 is
+    // one line whatever the box around it does. Truncation keeps its own arm
+    // (`overflowing`, natural text width against the client width), because
+    // truncated and wrapped are different failures of the same fixed column.
+    const bad = m.rows.filter((r) => r.overflowing || r.lineBoxes > 1);
     const widest = m.rows.reduce((a, r) => (r.naturalW > a.naturalW ? r : a), m.rows[0]);
     check('L2', 'no label is truncated or wrapped by its own column',
       bad.length === 0,
       bad.length
-        ? JSON.stringify(bad.map((r) => `${r.label}: text ${r.naturalW}px in ${r.clientW}px, h=${r.labelH} lineH=${r.lineH}`))
+        ? JSON.stringify(bad.map((r) => `${r.label}: text ${r.naturalW}px in ${r.clientW}px, `
+          + `${r.lineBoxes} line box(es), needs ${r.nowrapW}px unwrapped, element h=${r.labelH} `
+          + `(stretched by its control; not the wrap signal)`))
         : `${m.rows.length} labels all fit; widest text "${widest.label}" = ${widest.naturalW}px `
           + `in a ${widest.clientW}px column`);
 
@@ -1289,16 +1393,31 @@ async function main() {
     // new arrival state rests on: the section is THERE (so the capability and
     // the band count are on screen), and it is SHUT (so it is costing the column
     // nothing). [D1b] then asks the duplicate question with it open.
-    const bandsSection = m.sections.find((s) => /^BG animation bands/.test(s.title));
+    // ⚠ AND IT IS ON ANOTHER TAB NOW (O50 triage, 2026-09-03). `aeon.bganim.bands`
+    // is the **Tile anim** job since d-26b, and a section on an inactive tab is
+    // UNMOUNTED — so looking for it in the Parallax column found nothing and the
+    // row reported "the capability and the band count are not on screen at all"
+    // about a section that is one tab away and shut, exactly as intended. The
+    // excursion is explicit, its result is printed, and the tab is put back so
+    // phase 2 below still measures the Parallax column.
+    const d1Tab = await c.evalExpr(SUBTAB(TILE_ANIM_TAB));
+    await sleep(800);
+    const mTile = await c.json(COLUMN_PROBE);
+    const bandsSection = mTile.error ? undefined
+      : mTile.sections.find((s) => TILE_ANIM_SECTION.test(s.title));
     const arrivalEnum = await c.json(BAND_ENUM_PROBE);
+    const backToParallax = await c.evalExpr(SUBTAB('Parallax'));
+    await sleep(800);
     target('D1', 'the band list is present in the column and arrives CLOSED, enumerating nothing',
       !!bandsSection && bandsSection.expanded === false
         && !arrivalEnum.error && arrivalEnum.hits.length === 0,
       bandsSection
         ? `"${bandsSection.title}" expanded=${bandsSection.expanded}, box ${Math.round(bandsSection.rect.h)}px; `
           + `${arrivalEnum.error ?? `${arrivalEnum.hits.length} band(s) enumerated at arrival`}`
-        : `NO SECTION TITLED "BG animation bands" IN THE COLUMN — the capability and the `
-          + `band count are not on screen at all. Sections: ${JSON.stringify(titles)}`);
+        : `NO SECTION MATCHING ${TILE_ANIM_SECTION} ON THE ${TILE_ANIM_TAB} TAB — the `
+          + `capability and the band count are not on screen at all. Sub-tab click -> ${d1Tab}, `
+          + `back -> ${backToParallax}. Sections there: `
+          + `${JSON.stringify(mTile.error ?? mTile.sections.map((x) => x.title))}`);
 
     // ---- the reports the owner is owed ----------------------------------
     report('r1', 'column overflow (how much taller its content is than the column)',
@@ -1377,8 +1496,22 @@ async function main() {
       + JSON.stringify(engagedNow.map((s) => `${s.isColumn ? 'THE COLUMN' : s.tag}(+${s.over}px):"${s.text}"`)));
     report('r3', 'per-section painted height',
       JSON.stringify(m.sections.map((s) => `${s.title}: box ${Math.round(s.rect.h)}px, body ${s.bodyH}px`)));
-    report('r4', 'label TEXT widths, measured with a Range — what the label column must fit',
-      JSON.stringify([...new Set(m.rows.map((r) => `${r.label}=${r.naturalW}px`))]));
+    // ⚠ THIS REPORT IS WHERE `LABEL_W` COMES FROM, AND IT COULD NOT SEE A LABEL
+    // THAT HAD ALREADY WRAPPED (O50 triage, 2026-09-03).
+    //
+    // column-layout.tsx says so in as many words: "LABEL_W was picked by
+    // measuring every label in the rendered column with a DOM Range
+    // (scratchpad/effects-column-harness.mjs, row r4)". But a Range over a
+    // WRAPPED label returns the union of its line boxes, which is bounded by
+    // the column — so a label too wide to fit reports as one that fills it
+    // exactly, and a re-derivation of LABEL_W from this list would confirm the
+    // width that caused the wrap. `Plane B curve to` printed 42px here while
+    // wanting 84px on one line. Both numbers are reported now, side by side,
+    // and the second is the one the column must fit.
+    report('r4', 'label TEXT widths — rendered (wrapped) vs what ONE LINE would need; '
+      + 'the second is what the label column must fit',
+      JSON.stringify([...new Set(m.rows.map((r) => `${r.label}=${r.naturalW}px`
+        + (r.nowrapW > r.naturalW ? ` (needs ${r.nowrapW}px unwrapped)` : '')))]));
     report('r5', 'label column width as rendered, per row',
       JSON.stringify(m.rows.map((r) => `${r.label}=${r.offset}`)));
 
@@ -1427,12 +1560,14 @@ async function main() {
         off2.length === 1,
         `${off2.length} distinct offsets over ${mine.length} rows: ` + JSON.stringify(by2));
       const bad2 = mine.filter((r) => r.overflowing
-        || r.labelH > (parseFloat(r.lineH) || parseFloat(r.fontSize) * 1.6) + 2);
+        // Same repair as [L2]: line boxes, not the flex-stretched element height.
+        || r.lineBoxes > 1);
       const widest2 = mine.reduce((a, r) => (r.naturalW > a.naturalW ? r : a), mine[0]);
       check('L2b', 'no label anywhere in the column is truncated or wrapped',
         bad2.length === 0,
         bad2.length
-          ? JSON.stringify(bad2.map((r) => `${r.label}: text ${r.naturalW}px in ${r.clientW}px`))
+          ? JSON.stringify(bad2.map((r) => `${r.label}: text ${r.naturalW}px in ${r.clientW}px, `
+            + `${r.lineBoxes} line box(es)`))
           : `${mine.length} labels; widest text "${widest2.label}" = ${widest2.naturalW}px `
             + `in a ${widest2.clientW}px column`);
       const multi2 = mine.filter((r) => r.pairs > 1);
@@ -1459,6 +1594,19 @@ async function main() {
       // section that arrives closed is still a duplicate, and phase 1 cannot
       // see it. This is the same alternative-green-path argument [i5] makes for
       // the label rows.
+      // ⚠ ON THE TILE ANIM TAB, AND WITH ITS OWN SECTIONS OPENED. Phase 2's
+      // OPEN_ALL above opened every section of the tab that was showing, which
+      // is Parallax; the band list lives on another one and is unmounted until
+      // it is selected (O50 triage, 2026-09-03). [D2] below runs from here too,
+      // because the preview strip whose honesty label it reads is in the same
+      // panel. The tab is NOT put back: both remaining rows are about this job,
+      // and every height row has already been taken.
+      const d1bTab = await c.evalExpr(SUBTAB(TILE_ANIM_TAB));
+      await sleep(800);
+      const openedTile = await c.json(OPEN_ALL);
+      await sleep(900);
+      report('r.tile', 'the Tile anim tab, for [D1b] and [D2]',
+        `sub-tab -> ${d1bTab}; opened on it: ${JSON.stringify(openedTile)}`);
       await bandEnum('D1b', 'no band is enumerated twice with EVERY section open');
     } else {
       check('L1b', 'the label column still holds with EVERY section open', false,
