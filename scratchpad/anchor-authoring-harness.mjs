@@ -433,9 +433,9 @@ const WARNINGS = String.raw`(() => {
  * needing LESS — a spread, not a verdict — and it prints every number it read.
  * Only then is `[W1]`'s judgement worth anything.
  */
-const FIT = String.raw`(() => {
+const FIT = (sectionRe = ANCHORS_RE) => String.raw`(() => {
   const hdr = [...document.querySelectorAll('div')]
-    .filter((d) => d.style && d.style.cursor === 'pointer' && ${ANCHORS_RE}.test((d.textContent || '').trim()))
+    .filter((d) => d.style && d.style.cursor === 'pointer' && ${sectionRe}.test((d.textContent || '').trim()))
     .pop();
   if (!hdr) return { found: false };
   const root = hdr.parentElement;
@@ -932,7 +932,7 @@ async function main() {
     // twenty-five green rows said nothing about it.
     await c.evalExpr(OPEN_SECTION(ANCHORS_RE, CHANNEL_SEL));
     await sleep(500);
-    const fit = await c.json(FIT);
+    const fit = await c.json(FIT());
     if (fit.found !== true) throw new Error('the anchors section was not found for the [W*] rows');
     // ⚠ THE ARTIFACT IS PRINTED, NOT SUMMARISED. A width gate that says only
     // "3 controls truncate" cannot be audited for its AIM by anyone who did not
@@ -985,15 +985,60 @@ async function main() {
     // The label half, asked in the section [L2] cannot see: [L2] measures the
     // Parallax column, and this section is on another sub-tab and therefore
     // UNMOUNTED while that harness runs.
-    const labelBad = fit.controls.filter((r) => r.labelNeed > r.labelHave);
+    //
+    // ⚠ W2 HAS ITS OWN FORMATTER AND THAT IS NOT AN ACCIDENT. It first reused
+    // `shown`, which is written for OPTION records — so on its very first red
+    // run it printed `"Channel 0" · "undefined": needs undefinedpx` for all six
+    // labels. The row was RIGHT and its evidence was worthless, and no green run
+    // could ever have shown that: a gate's failure message is only exercised
+    // when it fails, which is the one moment somebody needs to read it.
+    const shownLabel = (r) => `"${r.label}": needs ${r.labelNeed}px, `
+      + `has ${r.labelHave}px of label column`;
+    const labelBad = fit.controls.filter((r) => !(r.labelNeed > 0) || r.labelNeed > r.labelHave);
+    const widestLabel = fit.controls.reduce(
+      (a, r) => (r.labelNeed > a.labelNeed ? r : a), fit.controls[0]);
     check('W2', 'and no label in this section is wider than the shared label column it sits in',
       labelBad.length === 0,
       labelBad.length
-        ? labelBad.map(shown).join('\n        ')
-        : `all ${fit.controls.length} labels fit; widest is `
-          + `"${fit.controls.reduce((a, r) => (r.labelNeed > a.labelNeed ? r : a), fit.controls[0]).label}" `
-          + `at ${Math.max(...fit.controls.map((r) => r.labelNeed))}px in `
-          + `${fit.controls[0].labelHave}px`);
+        ? labelBad.map((r) => (r.labelNeed > 0
+          ? `TOO WIDE by ${r.labelNeed - r.labelHave}px — ${shownLabel(r)}`
+          : `COULD NOT MEASURE — ${shownLabel(r)}`)).join('\n        ')
+        : `all ${fit.controls.length} labels fit; widest is ${shownLabel(widestLabel)} `
+          + `(${widestLabel.labelHave - widestLabel.labelNeed}px to spare)`);
+
+    // ── W3. THE SAME MEASUREMENT NEXT DOOR — REPORTED, DELIBERATELY NOT GATED ──
+    //
+    // `aeon.effects.preset.channels` is the sibling section on this same tab,
+    // drawing the same `Field` rows into the same 190px selects from the same
+    // three-state vocabulary. It is NOT this parcel's surface and its strings
+    // were not touched, so a gate here would leave this file red over somebody
+    // else's wording and teach the next reader to skip it. It is measured
+    // anyway, because "I did not look" and "I looked and it is fine" are
+    // different claims and only one of them is worth writing down.
+    //
+    // ⚠ IF THIS PRINTS TRUNCATIONS THEY ARE REAL DEFECTS, not noise, and they
+    // belong in the packet with these numbers beside them. The gate that would
+    // own them is a copy of [W1] pointed at this section, once its wording has
+    // an owner.
+    const CHANNELS_RE = String.raw`/^Preset — .* — cycles, variants\b/`;
+    await c.evalExpr(OPEN_SECTION(CHANNELS_RE, `document.querySelector('#aeon\\\\.effects\\\\.preset\\\\.channels select')`));
+    await sleep(700);
+    const nfit = await c.json(FIT(CHANNELS_RE));
+    if (nfit.found !== true || nfit.controls.length === 0) {
+      note('W3', 'THE NEIGHBOURING SECTION WAS NOT MEASURED: '
+        + `found=${nfit.found}, ${nfit.found ? nfit.controls.length : '-'} selects. `
+        + 'Not a pass — nothing was checked next door.');
+    } else {
+      const nOpts = nfit.controls.flatMap(
+        (r) => r.opts.map((o) => ({ ...o, label: r.label, have: r.have })));
+      const nBad = nOpts.filter((o) => o.w > 0 && o.w > o.have);
+      note('W3', `NEIGHBOUR "cycles, variants" (not gated here): ${nOpts.length} options over `
+        + `${nfit.controls.length} selects, ${nBad.length} TRUNCATED.`
+        + (nBad.length
+          ? `\n        ` + [...new Set(nBad.map((o) => `"${o.text}" needs ${o.w}px, has ${o.have}px`))]
+            .join('\n        ')
+          : ' Every choice fits.'));
+    }
 
     // ── 9. THE CAPTURE FOR THE OWNER ───────────────────────────────────────
     // ⚠ THE LOOK IS UNRATIFIED. He ruled the shape of this facet, not this
