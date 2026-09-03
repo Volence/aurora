@@ -7,10 +7,35 @@
 //   1  boot, open s1disasm, GHZ1 ready
 //   2  LEVEL-FREE OPEN: with the level store reset to IDLE, Edit-art on $01
 //      still checks Sonic's doc out (zone-free base row) — 88 frames
-//   3  HONEST RENDER: frame 1 (MS_Stand) draws substantially (coverage>400 —
+//   3a HONEST RENDER: frame 1 (MS_Stand) draws substantially (coverage>400 —
 //      anti-vacuous, a recognizable sprite not a stray pixel); frame 0
-//      (MS_Null) is genuinely blank; the timeline/picker are EMPTY (the
-//      sonani dialect stays unparsed — no fake anims)
+//      (MS_Null) is genuinely blank
+//   3b HONEST TIMELINE: the anim picker holds exactly the entries the fixture's
+//      own `Ani_Sonic` table declares, in table order.
+//
+//      ⚠ THIS ROW USED TO ASSERT THE OPPOSITE, AND THAT IS WHY IT WAS RED.
+//      Until 2026-09-03 row 3 read `anims.length === 0 && steps.length === 0`
+//      with the comment "the sonani dialect stays unparsed — no fake anims".
+//      That was true when it was written and stopped being true at
+//      `72921f62` (2026-08-21, "Sonic's timeline opens — sonani link
+//      un-excluded, 31 anims, specials honest-dynamic"): the picker is
+//      populated on purpose now. The row was asserting the ABSENCE of a
+//      feature the product shipped, so it went red on the app getting better
+//      and stayed red for thirteen days — nothing in `package.json` names this
+//      file, so nothing re-ran it.
+//
+//      The replacement is NOT a relaxation. `31` is never typed here: the
+//      expectation is READ OUT OF THE FIXTURE at run time (`id_*: sonani`
+//      rows in `_anim/Sonic.asm`, which is exactly what
+//      `core/import/sonic-anim-import.ts` names an entry after — `idLabel`
+//      minus its `id_` prefix), and compared as an ordered list of NAMES, so
+//      a parser that drops, reorders, invents or mis-labels an entry fails
+//      naming it. A frozen count could not see any of those.
+//
+//      `steps` (the PLAYABLE timeline, a different field from the picker)
+//      is still asserted empty on open, as its own row 3c — nothing
+//      auto-selects an anim — so that claim fails by its own name instead of
+//      as part of a three-way conjunction.
 //   4  VENUE: the sprite list files Sonic under "Shared objects" (not "GHZ
 //      objects"), and the Boss Items named doc row sits there too
 //   5  SPRING SWAP: the $41 doc's frame 4 hashes 358b89d8 — the Nem_VSpring
@@ -26,7 +51,7 @@
 
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as http from 'node:http';
@@ -132,6 +157,30 @@ const SPRITE_ROW_SCAN = `(() => {
   });
 })()`;
 
+/**
+ * THE EXPECTATION FOR ROW 3b, DERIVED FROM THE FIXTURE — never a pin.
+ *
+ * `_anim/Sonic.asm` declares its animation table as one `id_<Name>: sonani
+ * SonAni_<Name>` line per entry under `Ani_Sonic:`. `sonic-anim-import.ts`
+ * walks those same rows in order and names each entry `idLabel.replace(/^id_/,
+ * '')`, so this is the parser's input read independently, not a copy of its
+ * output. Returns `null` when the file cannot be read or holds no table rows —
+ * the caller REFUSES on that rather than comparing against an empty list, which
+ * would make "the app parsed nothing" and "the fixture has nothing" the same
+ * green.
+ */
+function fixtureSonicAnimNames(s1dir) {
+  let text;
+  try { text = readFileSync(join(s1dir, '_anim/Sonic.asm'), 'utf8'); }
+  catch { return null; }
+  const names = [];
+  for (const line of text.split('\n')) {
+    const m = line.match(/^id_(\w+):\s*sonani\b/);
+    if (m) names.push(m[1]);
+  }
+  return names.length ? names : null;
+}
+
 async function main() {
   // A STALE dist/ MAKES EVERY ROW VACUOUS. Both halves of that question name
   // the tree the run is AGAINST, never the tree this file lives in — the O52
@@ -197,11 +246,31 @@ async function main() {
       && sSonic.activeDocId === 'doc:sprite:s1:1' && sSonic.frames === 88,
       `levelBefore=${lvlDown.status} opened=${sonicOpened} levelAfter=${lvlStillDown.status} doc=${sSonic.activeDocId} frames=${sSonic.frames}`);
 
-    // --- Row 3: honest render + honest empty timeline -----------------------
-    check('3', 'frame 1 (MS_Stand) renders substantially; frame 0 (MS_Null) blank; NO anim entries (sonani stays unparsed)',
-      sSonic.frameCoverage[1] > 400 && sSonic.frameCoverage[0] === 0
-      && sSonic.anims.length === 0 && sSonic.steps.length === 0,
-      `coverage[0..2]=${JSON.stringify(sSonic.frameCoverage.slice(0, 3))} anims=${sSonic.anims.length} steps=${sSonic.steps.length}`);
+    // --- Row 3a: honest render ----------------------------------------------
+    check('3a', 'frame 1 (MS_Stand) renders substantially; frame 0 (MS_Null) is blank',
+      sSonic.frameCoverage[1] > 400 && sSonic.frameCoverage[0] === 0,
+      `coverage[0..2]=${JSON.stringify(sSonic.frameCoverage.slice(0, 3))}`);
+
+    // --- Row 3b: honest timeline, against the FIXTURE's own table ------------
+    const wantAnims = fixtureSonicAnimNames(S1DIR);
+    if (wantAnims === null) {
+      throw new Error(`${S1DIR}/_anim/Sonic.asm could not be read, or holds no "id_*: sonani" table `
+        + 'rows, so row [3b] has no expectation to compare against. This is UNMEASURABLE, not a '
+        + 'pass: an empty expectation would match an app that parsed nothing.');
+    }
+    const gotAnims = sSonic.anims.map((a) => a.name);
+    const animsMatch = JSON.stringify(gotAnims) === JSON.stringify(wantAnims);
+    check('3b', `the anim picker is exactly the fixture's Ani_Sonic table (${wantAnims.length} entries), in table order`,
+      animsMatch,
+      animsMatch
+        ? `${gotAnims.length} entries, first/last = ${gotAnims[0]}/${gotAnims[gotAnims.length - 1]}`
+        : `want ${wantAnims.length} ${JSON.stringify(wantAnims)}\n        got  ${gotAnims.length} ${JSON.stringify(gotAnims)}`
+          + `\n        missing=${JSON.stringify(wantAnims.filter((n) => !gotAnims.includes(n)))}`
+          + ` extra=${JSON.stringify(gotAnims.filter((n) => !wantAnims.includes(n)))}`);
+
+    // --- Row 3c: nothing auto-selects into the PLAYABLE timeline -------------
+    check('3c', 'opening the doc loads no steps into the playable timeline (no anim auto-selected)',
+      sSonic.steps.length === 0, `steps=${sSonic.steps.length}`);
 
     // --- Setup for the venue scan: a level (the sprite list is zone-aware),
     // then sprite mode frontmost via the spring doc it also tests -------------
