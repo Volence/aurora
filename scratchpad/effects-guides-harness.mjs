@@ -617,6 +617,56 @@ async function main() {
       + `after one further undo world_y=${sceneOf(doc)?.layers?.[0]?.world_y}, `
       + `expected ${START_WORLD_Y} (${expectedWorldY} means the no-op ate the undo)`);
 
+    // ---- 6c-6d. THE ARROW KEYS, PRESSED MID-DRAG (EW-SHAPE-DRAG). --------
+    //
+    // As of 2026-09-02 the parallax preview is ON by default on this sub-tab,
+    // and while it is on the ARROW KEYS take the camera instead of panning the
+    // map (`cameraKeys`). On a locked scene ArrowDown does not merely move a
+    // session reference — it runs `commitVOffset`, a real undoable edit to the
+    // SCENE, from a window-level keydown with no pointer event at all. That is
+    // the exact shape of the incident `guideDrag`'s witness was written for.
+    //
+    // ⚠ THE WITNESS DOES NOT COVER THIS ONE, and that is why it is measured
+    // rather than reasoned about. The witness compares the LAYER; `v_offset` is
+    // a SCENE field, so the layer serializes identically and the commit goes
+    // ahead. The question is whether it goes ahead CORRECTLY — and the answer
+    // has to come off the running app, because the two edits are genuinely
+    // separate (one layer top, one scene offset) and "two undo steps" is the
+    // right answer here where it would be the wrong answer for one gesture.
+    const arrow = async (key) => {
+      const vk = key === 'ArrowDown' ? 40 : 38;
+      await c.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key, code: key, windowsVirtualKeyCode: vk });
+      await c.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key, windowsVirtualKeyCode: vk });
+      await sleep(400);
+    };
+    const voBefore = sceneOf(doc).v_offset ?? 0;
+    const arrowTargetY = expectY(START_WORLD_Y) + 90;
+    await mouse('mousePressed', aimX, aimY(expectY(START_WORLD_Y)));
+    await mouse('mouseMoved', aimX, aimY(expectY(START_WORLD_Y) + 45));
+    await arrow('ArrowDown');
+    await mouse('mouseMoved', aimX, aimY(arrowTargetY));
+    await mouse('mouseReleased', aimX, aimY(arrowTargetY));
+    await sleep(700);
+    doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
+    const voAfter = sceneOf(doc).v_offset ?? 0;
+    const arrowExpect = worldYAt(aimY(arrowTargetY));
+    check('6c', 'ANTI-VACUOUS: the arrow key really did fire mid-drag and moved v_offset',
+      voAfter !== voBefore, `v_offset ${voBefore} -> ${voAfter}`);
+    check('6d', 'an arrow key mid-drag does not break the drag: the release still commits the '
+      + 'dragged top, and the camera edit is a SEPARATE undo step',
+      sceneOf(doc).layers[0].world_y === arrowExpect,
+      `world_y=${sceneOf(doc).layers[0].world_y} expected=${arrowExpect} `
+      + `(released at clientY ${aimY(arrowTargetY)})`);
+    // Back to START_WORLD_Y for section 7: two edits, two undos — which is the
+    // 6d claim's other half, asserted rather than assumed.
+    await undo();
+    await undo();
+    doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
+    check('6e', 'two undos put BOTH back — one for the drag, one for the camera',
+      sceneOf(doc).layers[0].world_y === START_WORLD_Y && (sceneOf(doc).v_offset ?? 0) === voBefore,
+      `world_y=${sceneOf(doc).layers[0].world_y} (want ${START_WORLD_Y}) `
+      + `v_offset=${sceneOf(doc).v_offset ?? 0} (want ${voBefore})`);
+
     // ---- 7. A DRAG WHOSE SUBJECT MOVES UNDER IT. -------------------------
     // Two layers, then remove layer 0 MID-DRAG through a synthetic DOM click —
     // a non-pointer path, which is the shape of the bug already on record here.
