@@ -148,10 +148,16 @@ const LAG_SRC = readFileSync(`${ROOT}/src/core/formats/effects/preset-lag.ts`, '
 const LAG_DATE = (LAG_SRC.match(/PRESET_LAG_MEASURED_ON = '(\d{4}-\d{2}-\d{2})'/) || [])[1];
 const LAG_LEAD = (LAG_SRC.match(/PRESET_LAG_LEAD = '([^']+)'/) || [])[1];
 if (!LAG_DATE || !LAG_LEAD) throw new Error('preset-lag.ts no longer carries the date/lead this harness reads');
-const LAG_PREMISE_M = LAG_SRC.match(/PRESET_KEYS_AWAITING_AEON: readonly string\[\] = Object\.freeze\(\[([^\]]*)\]\)/);
+// ⚠ `=\s*`, NOT `= `. EW-CHANNELS-FILTER re-filled this premise on 2026-09-03 and
+// the declaration WRAPPED onto a second line; the literal single space made this
+// harness THROW at import — before its first row — on a repo where nothing about
+// the cycles/variants surface had changed. Found while adding the sibling
+// moving-anchor section; the breakage is on master and predates that work.
+const LAG_PREMISE_M = LAG_SRC.match(/PRESET_KEYS_AWAITING_AEON: readonly string\[\] =\s*Object\.freeze\(\[([^\]]*)\]\)/);
 if (!LAG_PREMISE_M) throw new Error('preset-lag.ts no longer carries the premise list this harness reads');
 const LAG_KEYS = LAG_PREMISE_M[1].split(',').map((s) => s.trim().replace(/^'|'$/g, '')).filter(Boolean);
-/** EMPTY since 2026-09-02: aeon MERGED item 5, so the sentence retired. */
+/** RE-FILLED 2026-09-03 by EW-CHANNELS-WRITER: aeon's generator refuses the two
+ *  anchor keys BY REFUSING THE WHOLE DOCUMENT, so the sentence is back on screen. */
 const PREMISE_OPEN = LAG_KEYS.length > 0;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
