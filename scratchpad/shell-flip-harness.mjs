@@ -22,12 +22,101 @@
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import * as http from 'node:http';
+import { readFileSync } from 'node:fs';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9343);
 const S1DIR = siblingPathOrUnresolved('s1disasm');
-const AEONDIR = siblingPathOrUnresolved('aeon') + '/';   // trailing slash: matches the recents entry
+// ⚠ NO TRAILING SLASH, and the comment that used to sit here asserting one
+// "matches the recents entry" was simply WRONG. `addRecentProject` stores
+// through `normalizeProjectPath` (src/shared/project-path.ts), which strips
+// trailing separators, and HomeTab renders `title={r.path}` — so L583's
+// `button[title=<AEONDIR>]` searched for a title the app can never render and
+// the aeon half of this sweep died at "aeon unreachable", reporting the
+// Explorer's collapse toggle as the closest thing it found. O53 §5 named this
+// as one of three sites; this is the last of them.
+const AEONDIR = siblingPathOrUnresolved('aeon');
+
+/* ═════════════════════════════════════════════════════════════════════════════
+ * EXPECTATIONS DERIVED FROM THE APP'S OWN DECLARATIONS, not pinned.
+ *
+ * Four rows here were frozen pictures of an August shell and asserted the
+ * ABSENCE of things the product has since shipped on purpose: a four-pill bar
+ * with "NO Collision pill" (`collision` joined S1_FACETS at Stage 3b,
+ * 2026-08-17, and `art` moved last on 2026-08-14), a Layout dock still carrying
+ * `place-object` (it left `facetTools.layout` on 2026-08-14), and "exactly s1's
+ * FOUR overlays" (s1 declares seven in OVERLAY_KEYS_BY_ENGINE). A pinned list
+ * cannot tell a regression from a decision; these read the declarations the app
+ * itself renders from, so what still fails is a bar/dock/menu that disagrees
+ * with its own source of truth.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+function readSource(rel) {
+  const path = `${ROOT}/${rel}`;
+  try { return readFileSync(path, 'utf8'); }
+  catch (e) { throw new Error(`cannot read ${path} (${e.code ?? e.message}) — this harness derives its expectations from it; an unreadable source is UNMEASURABLE, not a pass`); }
+}
+function idsIn(text, re, what, rel) {
+  const m = re.exec(text);
+  if (!m) throw new Error(`${rel} no longer spells ${what} the way this harness reads it — re-derive rather than pinning the old answer`);
+  const out = [...m[1].matchAll(/'([A-Za-z0-9_-]+)'/g)].map((x) => x[1]);
+  if (!out.length) throw new Error(`${what} in ${rel} parsed to an EMPTY list — refusing to compare against nothing`);
+  return out;
+}
+/** The pill row s1 produces: granted ∩ registered, sorted by `order`. */
+function expectedS1Pills() {
+  const grant = idsIn(readSource('src/core/project/s1/index.ts'),
+    /export const S1_FACETS = \[([^\]]*)\]/, '`export const S1_FACETS = [ … ]`', 's1/index.ts');
+  const body = /const BUILTIN_FACETS: FacetDescriptor\[\] = \[([\s\S]*?)\n\];/
+    .exec(readSource('src/core/shell/facets.ts'));
+  if (!body) throw new Error('core/shell/facets.ts no longer spells `const BUILTIN_FACETS: FacetDescriptor[] = [ … ];`');
+  const rows = [...body[1].matchAll(/\{\s*id:\s*'([a-z-]+)',\s*label:\s*'([^']+)',\s*order:\s*(\d+)\s*\}/g)]
+    .map((m) => ({ id: m[1], label: m[2], order: Number(m[3]) }));
+  if (!rows.length) throw new Error('BUILTIN_FACETS parsed EMPTY');
+  return rows.filter((f) => grant.includes(f.id)).sort((a, b) => a.order - b.order).map((f) => f.label);
+}
+/** The pill row aeon produces, by the same rule. */
+function expectedAeonPills() {
+  const grant = idsIn(readSource('src/core/project/aeon/index.ts'),
+    /facets:\s*\[([^\]]*)\]/, "aeon's `facets: [ … ]` grant", 'aeon/index.ts');
+  const body = /const BUILTIN_FACETS: FacetDescriptor\[\] = \[([\s\S]*?)\n\];/
+    .exec(readSource('src/core/shell/facets.ts'));
+  if (!body) throw new Error('core/shell/facets.ts no longer spells `const BUILTIN_FACETS: FacetDescriptor[] = [ … ];`');
+  const rows = [...body[1].matchAll(/\{\s*id:\s*'([a-z-]+)',\s*label:\s*'([^']+)',\s*order:\s*(\d+)\s*\}/g)]
+    .map((m) => ({ id: m[1], label: m[2], order: Number(m[3]) }));
+  return rows.filter((f) => grant.includes(f.id)).sort((a, b) => a.order - b.order).map((f) => f.label);
+}
+
+/** The Layout rail: `facetTools.layout`, sorted into `TOOL_IDS` order, labelled. */
+function expectedLayoutTools() {
+  const s1 = readSource('src/core/project/s1/index.ts');
+  const block = /facetTools:\s*\{([\s\S]*?)\n\s*\},/.exec(s1);
+  if (!block) throw new Error('core/project/s1/index.ts no longer declares a `facetTools: { … }` block');
+  const ids = idsIn(block[1], /\n\s*layout:\s*\[([^\]]*)\]/, 'facetTools.layout', 's1/index.ts');
+  const order = idsIn(readSource('src/core/project/adapter.ts'),
+    /export const TOOL_IDS = \[([\s\S]*?)\] as const;/, 'TOOL_IDS', 'adapter.ts');
+  const lm = /export const TOOL_LABELS: Record<ToolId, string> = \{([\s\S]*?)\n\};/
+    .exec(readSource('src/renderer/workspace/tool-meta.ts'));
+  if (!lm) throw new Error('tool-meta.ts no longer spells `export const TOOL_LABELS: Record<ToolId, string> = { … };`');
+  const labels = {};
+  for (const row of lm[1].matchAll(/'?([a-z-]+)'?:\s*'([^']+)'/g)) labels[row[1]] = row[2];
+  return [...ids].sort((a, b) => order.indexOf(a) - order.indexOf(b)).map((id) => labels[id]);
+}
+/** Every tool label in the vocabulary — for the "no aeon-only tool leaked" row. */
+function allToolLabels() {
+  const lm = /export const TOOL_LABELS: Record<ToolId, string> = \{([\s\S]*?)\n\};/
+    .exec(readSource('src/renderer/workspace/tool-meta.ts'));
+  const out = [];
+  for (const row of lm[1].matchAll(/'?([a-z-]+)'?:\s*'([^']+)'/g)) out.push(row[2]);
+  if (!out.length) throw new Error('TOOL_LABELS parsed EMPTY');
+  return out;
+}
+/** How many overlay checkboxes the View menu owes for the s1 engine. */
+function expectedS1OverlayCount() {
+  return idsIn(readSource('src/renderer/state/viewStore.ts'),
+    /OVERLAY_KEYS_BY_ENGINE[\s\S]*?\n\s*s1:\s*\[([^\]]*)\]/,
+    "`OVERLAY_KEYS_BY_ENGINE`'s `s1:` row", 'viewStore.ts').length;
+}
 const ROOT = AURORA_DIR;
 // The worktree's node_modules has no electron binary (partial install); the
 // main tree's is the same version from the same package.json, and the app code
@@ -138,33 +227,45 @@ const ACTIVE_TOOL = `
 // control — it was one control plus one readout, which the 2/1 asymmetry gives
 // away. The header is everything in the EditorShell app bar, which is the
 // FacetBar's parent.
+// ⚠ `button,span`, NOT `span`. `598be067` (2026-08-16, "the §5 accessibility
+// and consistency calls") made every INTERACTIVE Chip a real `<button>`, leaving
+// spans for the readouts — the primitive's own comment names the plane switch
+// and Undo/Redo among them. All four chip probes here were span-only, so
+// `chipCount('FG')` counted 0 with the control on screen and `chipEnabled`
+// answered null, which took six rows down between them. The SCOPING note above
+// is unchanged and still load-bearing; the element type is what moved.
 const chipCount = (label) => `
   (() => {
     const hdr = document.querySelector('[aria-label="Facets"]');
     if (!hdr) return -1;
-    return [...hdr.parentElement.querySelectorAll('span')]
+    return [...hdr.parentElement.querySelectorAll('button,span')]
       .filter((e) => e.children.length === 0 && e.textContent.trim() === ${JSON.stringify(label)}).length;
   })()`;
 // Deliberately UNSCOPED — the count of the same label anywhere on screen, so the
 // report can state where the extra one lives instead of hiding it.
 const chipCountAnywhere = (label) => `
-  [...document.querySelectorAll('span')]
+  [...document.querySelectorAll('button,span')]
     .filter((e) => e.children.length === 0 && e.textContent.trim() === ${JSON.stringify(label)}).length`;
 const clickChip = (label) => `
   (() => {
-    const s = [...document.querySelectorAll('span')]
-      .find((e) => e.children.length === 0 && e.textContent.trim() === ${JSON.stringify(label)});
+    const all = [...document.querySelectorAll('button,span')]
+      .filter((e) => e.children.length === 0 && e.textContent.trim() === ${JSON.stringify(label)});
+    const s = all.find((e) => e.tagName === 'BUTTON') || all[0];
     if (!s) return false;
     s.click(); return true;
   })()`;
-// Chip's disabled state is opacity:0.5 (and no onClick). The Undo/Redo chips are
-// the cleanest available read of history depth: enabled == the stack is non-empty.
+// The Undo/Redo chips are the cleanest available read of history depth: enabled
+// == the stack is non-empty. Enabledness comes off the button's own `disabled`
+// property, which is what LevelWorkspace writes (`disabled={!history?.canUndo}`);
+// opacity is a styling consequence of it. A span keeps the opacity rule, having
+// no `disabled`.
 const chipEnabled = (label) => `
   (() => {
-    const s = [...document.querySelectorAll('span')]
-      .find((e) => e.children.length === 0 && e.textContent.trim() === ${JSON.stringify(label)});
+    const all = [...document.querySelectorAll('button,span')]
+      .filter((e) => e.children.length === 0 && e.textContent.trim() === ${JSON.stringify(label)});
+    const s = all.find((e) => e.tagName === 'BUTTON') || all[0];
     if (!s) return null;
-    return getComputedStyle(s).opacity === '1';
+    return s.tagName === 'BUTTON' ? !s.disabled : getComputedStyle(s).opacity === '1';
   })()`;
 
 const CANVAS_RECT = `
@@ -237,6 +338,23 @@ async function connect() {
 async function classicPhase(c) {
   console.log('\n=== CLASSIC (s1disasm) ===');
 
+  // ⚠ THE FACET AND THE PANEL STATE ARE PERSISTED, and this harness never
+  // reset them. Measured 2026-09-03: a run that inherited the Palette facet
+  // from a previous app run reported a one-tool rail ({"View":1,"Stamp
+  // Chunk":0,…}) and a right panel of Palette sections, and went on describing
+  // the failures as if it were on Layout — eight rows, all of them about a
+  // facet nobody selected. `localStorage.clear()` + an explicit pill click
+  // below is the fix, and the pill click is now ASSERTED rather than assumed.
+  await c.evalExpr('localStorage.clear(); 1');
+  // Seed the aeon recents row BEFORE the project opens: HomeTab refetches
+  // recents only when `noProject`/`currentPath` moves (HomeTab.tsx:71-75), and
+  // the card only exists if this machine's recent-projects.json already lists
+  // the aeon checkout this run resolved — a ten-entry LRU every harness in this
+  // population rewrites. Measured 2026-09-03: it held eight OTHER agents'
+  // throwaway aeon copies and not the resolved one, so whether the aeon phase
+  // could start depended on which instrument had run last. Registering the path
+  // is SETUP, through the app's own IPC; no gesture under test is replaced.
+  await c.evalExpr(`window.api.addRecentProject(${JSON.stringify(AEONDIR)}, 'aeon (harness)')`);
   await c.evalExpr(`window.__dbg.openDir(${JSON.stringify(S1DIR)})`);
   await sleep(1500);
   const preState = await c.evalExpr('window.__dbg.levelState()');
@@ -260,13 +378,19 @@ async function classicPhase(c) {
   // Open a known act through the real activation path.
   await c.evalExpr('window.__dbg.activate("ghz", 1)');
   await sleep(2500);
+  // The facet every row below is about, SET and asserted. See the note at the
+  // top of this phase for what an inherited facet did to eight of them.
+  await c.evalExpr(clickPill('Layout'));
+  await sleep(500);
+  check('the classic phase is on the Layout facet (set, not inherited from the last run)',
+    (await c.evalExpr(ACTIVE_PILL)) === 'Layout', String(await c.evalExpr(ACTIVE_PILL)));
 
   // --- pills ---------------------------------------------------------------
   const pills = await c.evalExpr(PILLS);
-  check('four pills — Layout, Art, Objects, Palette',
-    JSON.stringify(pills) === JSON.stringify(['Layout', 'Art', 'Objects', 'Palette']), JSON.stringify(pills));
-  check('NO Collision pill (the s1 profile dropped that grant)',
-    Array.isArray(pills) && !pills.includes('Collision'), JSON.stringify(pills));
+  const wantPills = expectedS1Pills();
+  check(`the pill row is what the s1 profile GRANTS, in shell order — ${wantPills.join(' / ')}`,
+    JSON.stringify(pills) === JSON.stringify(wantPills),
+    `want ${JSON.stringify(wantPills)}  got ${JSON.stringify(pills)}`);
 
   // --- layout paints -------------------------------------------------------
   const rect = await c.evalExpr(CANVAS_RECT);
@@ -288,15 +412,21 @@ async function classicPhase(c) {
   check('the neutral status bar reports the act (classic port)', /chunks/.test(scope), scope);
 
   // --- tool dock: each tool exactly once ------------------------------------
-  const declared = ['View', 'Stamp Chunk', 'Select', 'Place Object'];
+  // DERIVED. This pinned `place-object` onto Layout, which left
+  // `facetTools.layout` when the Objects facet was restored (owner,
+  // 2026-08-14 — the three-step history is written out beside the declaration
+  // in core/project/s1/index.ts). The claim worth keeping is not the list but
+  // the RELATION: the rail is exactly what the manifest declares for this
+  // facet, each tool once, and nothing outside that declaration.
+  const declared = expectedLayoutTools();
+  const vocabulary = allToolLabels();
   const counts = {};
-  for (const t of [...declared, 'Marquee', 'Paint Tile', 'Place Ring', 'Eraser']) {
-    counts[t] = await c.evalExpr(toolCount(t));
-  }
-  check('tool dock = view / stamp-chunk / select / place-object, EACH EXACTLY ONCE',
+  for (const t of vocabulary) counts[t] = await c.evalExpr(toolCount(t));
+  check(`the Layout rail is exactly facetTools.layout, each once — ${declared.join(' / ')}`,
     declared.every((t) => counts[t] === 1), JSON.stringify(counts));
-  check('no aeon-only tool leaked into classic\'s dock',
-    ['Marquee', 'Paint Tile', 'Place Ring', 'Eraser'].every((t) => counts[t] === 0), JSON.stringify(counts));
+  check('no tool OUTSIDE the declaration is in the rail (nothing aeon-only leaked)',
+    vocabulary.filter((t) => !declared.includes(t)).every((t) => counts[t] === 0),
+    JSON.stringify(counts));
 
   // --- FG/BG exactly once, and it drives the plane -------------------------
   const fg = await c.evalExpr(chipCount('FG'));
@@ -306,18 +436,15 @@ async function classicPhase(c) {
     fg === 1 && bg === 1, `header FG:${fg} BG:${bg} (whole screen FG:${fgAny} — the extra is the status bar's plane READOUT, not a control)`);
   await c.evalExpr(clickChip('BG'));
   await sleep(300);
-  const bgActive = await c.evalExpr(`
+  const chipBg = (label) => `
     (() => {
-      const s = [...document.querySelectorAll('span')]
-        .find((e) => e.children.length === 0 && e.textContent.trim() === 'BG');
+      const all = [...document.querySelectorAll('button,span')]
+        .filter((e) => e.children.length === 0 && e.textContent.trim() === ${JSON.stringify(label)});
+      const s = all.find((e) => e.tagName === 'BUTTON') || all[0];
       return s ? getComputedStyle(s).backgroundColor : null;
-    })()`);
-  const fgActiveAfter = await c.evalExpr(`
-    (() => {
-      const s = [...document.querySelectorAll('span')]
-        .find((e) => e.children.length === 0 && e.textContent.trim() === 'FG');
-      return s ? getComputedStyle(s).backgroundColor : null;
-    })()`);
+    })()`;
+  const bgActive = await c.evalExpr(chipBg('BG'));
+  const fgActiveAfter = await c.evalExpr(chipBg('FG'));
   check('clicking BG changes the lit plane chip', bgActive !== fgActiveAfter, `BG:${bgActive} FG:${fgActiveAfter}`);
   await c.evalExpr(clickChip('FG'));
   await sleep(250);
@@ -336,9 +463,13 @@ async function classicPhase(c) {
     [...document.querySelectorAll('label')]
       .filter((l) => l.querySelector('input[type=checkbox]'))
       .map((l) => l.textContent.trim())`);
-  check('the View menu offers exactly s1\'s four overlays',
-    Array.isArray(overlayLabels) && overlayLabels.length === 4,
-    overlays ? String(overlays) : JSON.stringify(overlayLabels));
+  // DERIVED from `OVERLAY_KEYS_BY_ENGINE.s1`, which is what ViewMenu renders
+  // from. The pin of `4` was the August set; s1 declares more now, and a count
+  // frozen against the old one reports growth as breakage.
+  const wantOverlays = expectedS1OverlayCount();
+  check(`the View menu offers exactly the ${wantOverlays} overlays s1 declares`,
+    Array.isArray(overlayLabels) && overlayLabels.length === wantOverlays,
+    overlays ? String(overlays) : `want ${wantOverlays}, got ${overlayLabels.length}: ${JSON.stringify(overlayLabels)}`);
   const toggled = await c.evalExpr(`
     (() => {
       const boxes = [...document.querySelectorAll('label input[type=checkbox]')];
@@ -481,33 +612,31 @@ async function classicPhase(c) {
   check('gap 5: the ART facet now has its own chunk picker',
     Array.isArray(artSections) && artSections.includes('Chunks') && artSections.includes('Palette'),
     JSON.stringify(artSections));
-  // classicLevelStore.composerOpen defaults to FALSE, so the dock renders only
-  // its collapse button until expanded — a first pass looked for the Chunk/Block/
-  // Tile tabs, found none, and called the composer missing. It is present and
-  // collapsed, which is its own finding (see the report): as a bottom strip
-  // collapsed-by-default kept it out of the way, but as the whole canvas it
-  // means the Art facet opens as one button on an empty field.
-  const collapsed = await c.evalExpr(`
+  // ⚠ PREMISE RETIRED, not tuned. Two rows here measured a control that no
+  // longer exists: the composer's COLLAPSE button. They were written when
+  // `classicLevelStore.composerOpen` defaulted to false and the Art facet
+  // opened as "one button on an empty field" — which those rows recorded as a
+  // finding, and which was then FIXED: the composer is unconditional in the
+  // canvas slot now, with no collapse control at all. (capture-harness carries
+  // the positive form of the same fact — "the composer is NOT collapsible any
+  // more", collapse buttons: 0 — and it passes.) Asserting `collapsed === 1`
+  // and `defaultOpen === false` is asserting the presence and the state of a
+  // button the product deliberately removed.
+  //
+  // The third row was VACUOUS rather than stale: it clicked the (absent)
+  // collapse button and then asserted the Chunk/Block/Tile tabs were on screen.
+  // They are always on screen now, so it passed having done nothing. What it
+  // meant to establish — the composer really is mounted here — is asserted
+  // directly below, together with the absence of the collapse control, so a
+  // return of the collapsed-by-default behaviour fails by name.
+  const collapseButtons = await c.evalExpr(`
     [...document.querySelectorAll('button')].filter((e) => /Composer/.test(e.textContent)).length`);
-  check('the composer is mounted in the Art canvas slot', collapsed === 1, `collapse buttons: ${collapsed}`);
-  const defaultOpen = await c.evalExpr(`
-    (() => {
-      const b = [...document.querySelectorAll('button')].find((e) => /Composer/.test(e.textContent));
-      return b ? b.textContent.trim().startsWith('▾') : null;
-    })()`);
-  check('NOTE (not a regression): the composer defaults to COLLAPSED in the canvas slot',
-    defaultOpen === false, `expanded by default: ${defaultOpen}`);
-  await c.evalExpr(`
-    (() => {
-      const b = [...document.querySelectorAll('button')].find((e) => /Composer/.test(e.textContent));
-      if (b) b.click(); return !!b;
-    })()`);
-  await sleep(600);
   const composerAlive = await c.evalExpr(`
     (() => [...document.querySelectorAll('button')]
       .map((e) => e.textContent.trim()).filter((t) => /^(Chunk|Block|Tile)$/.test(t)).length)()`);
-  check('expanding it reveals the Chunk/Block/Tile tabs (composer works in the canvas)',
-    composerAlive === 3, `tab labels: ${composerAlive}`);
+  check('the composer is mounted in the Art canvas slot UNCONDITIONALLY — its tier tabs are on screen with no collapse control to press first',
+    composerAlive === 3 && collapseButtons === 0,
+    `Chunk/Block/Tile tabs: ${composerAlive}; collapse buttons: ${collapseButtons} (must be 0 — the collapsed-by-default Art facet was the defect these rows recorded, and it was fixed)`);
 
   // --- L1 for the composer pair --------------------------------------------
   await c.evalExpr(clickPill('Palette'));
@@ -547,21 +676,34 @@ async function classicPhase(c) {
   // ON PURPOSE — awaiting it (awaitPromise:true resolves only after openAct
   // finishes) meant the poll started after loading was already over, and the
   // check reported the empty state missing when it had simply been too late.
+  // ⚠ MANUFACTURE THE STATE; DO NOT RACE IT. This polled for the LOADING banner
+  // in 25ms steps while an act loaded, and its own comment records a previous
+  // round losing that race the other way. A row that can only be observed by
+  // winning a race reports the machine's speed, not the product — it is exactly
+  // the shape that made this file's sibling `capture-harness` pass on a bare
+  // window and fail under xvfb on the same build, one minute apart.
+  //
+  // `__dbg.resetLevel()` puts the level store back to IDLE with the project
+  // still open — "project open, no act", the state the empty branch is FOR —
+  // and the idle status is asserted before anything is read, so an act that
+  // failed to unload cannot be mistaken for a rendered empty state.
   await c.evalExpr(clickPill('Art'));
   await sleep(500);
-  await c.evalExpr('window.__dbg.activate("mz", 2); 1');
-  let sawEmpty = false, sawText = '';
-  for (let i = 0; i < 80; i++) {
-    const t = await c.evalExpr(`
-      (() => {
-        const m = /Loading .{0,40}?…|Open a level from the Explorer|Failed to load level/.exec(document.body.textContent);
-        return m ? m[0] : '';
-      })()`);
-    if (t) { sawEmpty = true; sawText = t; break; }
-    await sleep(25);
+  await c.evalExpr('window.__dbg.resetLevel(); 1');
+  await sleep(600);
+  const artIdle = await c.evalExpr('JSON.stringify(window.__dbg.levelState())');
+  if (JSON.parse(artIdle).status === 'ready') {
+    throw new Error('resetLevel() did not take the level store out of `ready`, so the empty-state '
+      + 'branch below was never entered. UNMEASURABLE — every reading would be about a populated '
+      + 'surface.');
   }
+  const emptyText = await c.evalExpr(`
+    (() => {
+      const m = /Loading .{0,40}?…|Open a level from the Explorer|Failed to load level|No act open/.exec(document.body.textContent);
+      return m ? m[0] : '';
+    })()`);
   check('gap 4: the art canvas shows an EMPTY STATE rather than a blank window',
-    sawEmpty === true, sawEmpty ? `saw "${sawText}"` : 'never rendered any empty-state text');
+    emptyText !== '', `level=${artIdle}; empty-state text: ${emptyText ? `"${emptyText}"` : 'NONE'}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -581,8 +723,13 @@ async function aeonPhase(c) {
   }
   await sleep(4000);
   const pills = await c.evalExpr(PILLS);
-  check('aeon still shows its six pills',
-    Array.isArray(pills) && pills.length === 6, JSON.stringify(pills));
+  // DERIVED from aeon's own `facets:` grant + BUILTIN_FACETS' order, for the
+  // same reason the classic pill row is: `6` was the August count and aeon has
+  // been granted more since, so the pin reported growth as breakage.
+  const wantAeonPills = expectedAeonPills();
+  check(`aeon shows what ITS profile grants, in shell order — ${wantAeonPills.join(' / ')}`,
+    JSON.stringify(pills) === JSON.stringify(wantAeonPills),
+    `want ${JSON.stringify(wantAeonPills)}  got ${JSON.stringify(pills)}`);
   const rect = await c.evalExpr(CANVAS_RECT);
   check('aeon\'s canvas still renders', !!rect && rect.w > 200, rect ? `${Math.round(rect.w)}x${Math.round(rect.h)}` : 'none');
   const painted = await c.evalExpr(`
@@ -615,7 +762,7 @@ async function main() {
     if (only !== 'aeon') await classicPhase(c);
     if (only !== 'classic') {
       c.close();
-      electron.kill('SIGKILL');
+      await killTree(electron, { quiet: true });
       await sleep(1200);
       electron = launch();
       const c2 = await connect();
@@ -625,7 +772,12 @@ async function main() {
       c.close();
     }
   } finally {
-    electron.kill('SIGKILL');
+    // ⚠ `kill('SIGKILL')` killed ONE process, not the tree: Electron's
+    // GPU/renderer/zygote children inherit the stdio pipes, so node's event loop
+    // never drained and this file HUNG after printing its summary. The O50 sweep
+    // capped it at 600s and called its tally a lower bound. `killTree` was
+    // imported here and unused.
+    await killTree(electron, { quiet: true });
   }
   console.log(fails.length ? `\nFAILED (${fails.length}): ${fails.join(', ')}` : '\nALL PASS');
   console.log(`\n${results.filter((r) => r.ok).length}/${results.length} checks passed`);
