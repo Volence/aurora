@@ -51,6 +51,17 @@
 // They are only measurements BESIDE their phase's control row ([c1], [r1]),
 // which is what says a write happened. Read them as a pair or not at all.
 //
+// ⚠ AND [c4] WAS ACTUALLY VACUOUS, FOUND BY ITS OWN RED-FIRST PLANT. Plant P5
+// pointed Clear's command at `activeSectionIndex + 1` — a wipe of the wrong
+// SECTION, the worst thing either button could do — and [c4] stayed GREEN. The
+// command carries the entry list built from section 0, so it only touches the
+// indices section 0 had content at, and section 1 held ZERO at every one of
+// them: a write that landed in the wrong section destroyed nothing and the row
+// was satisfied by an absence. The fix is the same rule the preservation rows
+// already obey — the CONTROL DESTINATION is authored too (see "control
+// destinations authored" below), so a mis-targeted apply now has something to
+// destroy. P5 re-run is RED.
+//
 // [k1] — "no keystroke reaches the wholesale writers" — has the matching
 // hazard from the other direction: it would go green if the keystrokes never
 // arrived. Its positive control is that the SAME `Input.dispatchKeyEvent`
@@ -430,11 +441,16 @@ async function main() {
       + `${FIX.without.length} over empty cells`);
 
     /** Author unowned bits into the fixture cells and REFUSE unless they land. */
+    const remembered = new Set();
     async function seed(sec, plane, remember) {
       const landed = [];
       for (const i of FIXTURE) {
         const was = await collAt(c, sec, plane, i);
-        if (remember) restore.push({ sec, plane, index: i, word: was ?? 0 });
+        // ONCE per cell. A second seed of the same cell would record the
+        // ALREADY-SEEDED word as its "original", and the restore at the end
+        // would then put the fixture back instead of the run's opening state.
+        const k = `${sec}/${plane}/${i}`;
+        if (remember && !remembered.has(k)) { remembered.add(k); restore.push({ sec, plane, index: i, word: was ?? 0 }); }
         const want = ((was ?? 0) | PROBE) & 0xFFFF;
         const got = await poke(c, sec, plane, i, want);
         if (got === null) throw new Error(`FIXTURE REFUSED: collisionPoke(${sec},${plane},${i}) returned null`);
@@ -449,6 +465,26 @@ async function main() {
 
     const seeded = await seed(SEC, PLANE, true);
     note('seeded', FIXTURE.map((i, k) => `${i}:=${hex(seeded[k])}`).join('  '));
+
+    // ⚠ AND THE CONTROL DESTINATIONS TOO — THE ROW THIS FIXES WAS VACUOUS.
+    //
+    // [c4] ("section N+1 is untouched") went GREEN under a plant that pointed
+    // Clear's command at `activeSectionIndex + 1`. The command still carried
+    // section 0's entry list — only the cells section 0 had content in — and
+    // section 1's plane happened to hold ZERO at every one of those indices, so
+    // a write that landed in entirely the wrong section changed nothing
+    // measurable and the row was satisfied by an absence.
+    //
+    // A scope row needs its control destination AUTHORED for exactly the reason
+    // a preservation row does. These put a non-zero word at the fixture indices
+    // in the other plane and the other section — indices that ARE in the entry
+    // list, because the fixture made them non-zero here — so a mis-targeted
+    // apply now has something to destroy.
+    await seed(SEC, 'b', true);
+    if (OTHER !== null) await seed(OTHER, PLANE, true);
+    note('control destinations authored',
+      `section ${SEC} plane b and section ${OTHER ?? '—'} plane ${PLANE} carry ${hex(PROBE)} at the `
+      + 'same fixture indices, so a write aimed at the wrong plane or the wrong section is visible');
 
     // The history must be EMPTY here for the "exactly one undo step" rows below
     // to mean anything: `collisionPoke` bypasses the command system on purpose,
