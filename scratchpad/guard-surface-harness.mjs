@@ -116,6 +116,112 @@ const DIVISORS = [];
 for (let v = 1; v <= TABLE_BYTES; v++) if (TABLE_BYTES % v === 0) DIVISORS.push(v);
 const MASK_VALUES = SCHEMA.properties.left_column_mask.enum;
 
+/* ═════════════════════════════════════════════════════════════════════════════
+ * THE SIX FIXTURES — WRITTEN HERE, WHICH THEY WERE NOT BEFORE.
+ *
+ * ⚠ THIS IS WHY THE FILE WAS RED AT 9/22, AND IT IS THE ONLY REASON.
+ *
+ * The harness's own header says "the scenes are written into a THROWAWAY COPY
+ * of aeon as `.json` files" — and no code in it ever wrote one. They were made
+ * by hand, at a shell, during the parcel that landed this file
+ * (`e0b1ec52`, 2026-08-27; the recipe is in
+ * docs/reviews/2026-08-27-guard-surface-gaps.md §5, `cp <fixture>.json …`).
+ * Nothing recorded the JSON, so the six scenes existed on exactly one machine
+ * for one afternoon. Every later run opened a copy of aeon that has never
+ * carried them.
+ *
+ * The failure SHAPE is what makes this worth writing down. `[1c]` is the
+ * harness's own anti-vacuous row and it reported
+ *     scenes=["ojz_act1_depth","ojz_act1_start"]
+ * which reads as "the codec dropped six scenes" — an app defect — when the
+ * truth is "nobody wrote them". Thirteen of the twenty-two rows are downstream
+ * of that one missing setup step, and each of them prints an EMPTY finder
+ * (`[]`, `value=undefined`), which is the same output a deleted feature gives.
+ *
+ * Each fixture is the GAME'S OWN `ojz_act1_start` with one or two authored
+ * fields changed, exactly as §3.1 and §4.1 of that packet describe them, and
+ * the base is READ FROM THE COPY rather than transcribed — so a scene the game
+ * reshapes carries the fixtures with it instead of stranding them.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Where a game's effects scenes live, relative to a checkout. */
+const EFFECTS_REL = 'games/sonic4/data/editor/effects';
+/** The shipped scene every fixture is a one-field edit of. */
+const BASE_SCENE = 'ojz_act1_start';
+
+/**
+ * The anchor shifts the ROW 64 fixture must carry, and the trap in them.
+ *
+ * `15` is the NO-DEFORM SENTINEL in this space, so a fixture reaching for "big
+ * shifts" by saturating lands on the case the engine PERMITS while believing it
+ * authored the refused one (packet §3.2, which measured `r64_b` building green).
+ * These two must therefore be live values, and the advisory quotes them back —
+ * rows [4c] asserts the exact pair, so they are named once, here.
+ */
+const LIVE_DSA = 3;
+const LIVE_DSB = 2;
+const SENTINEL = SCHEMA.$defs.layer.properties.dsa.default; // 15, from the schema
+
+/** A period the schema accepts and the engine refuses: any non-divisor of the
+ *  table length. 100 is the packet's, and the advisory text quotes it. */
+const BAD_PERIOD = 100;
+/** …and a legal one, for the control. Taken from the computed divisors. */
+const GOOD_PERIOD = DIVISORS[DIVISORS.indexOf(64) >= 0 ? DIVISORS.indexOf(64) : DIVISORS.length - 3];
+
+function writeFixtures(aeonDir) {
+  const dir = `${aeonDir}/${EFFECTS_REL}`;
+  const base = JSON.parse(readFileSync(`${dir}/${BASE_SCENE}.json`, 'utf8'));
+  if (!Array.isArray(base.layers) || base.layers.length < 4) {
+    throw new Error(`${dir}/${BASE_SCENE}.json has ${base.layers?.length ?? 0} layer(s); the ROW 64 `
+      + 'fixtures put a curve on layer 3, so this harness cannot build them. That is UNMEASURABLE, '
+      + 'not a pass — fix the base scene or retarget the fixture.');
+  }
+  const clone = () => JSON.parse(JSON.stringify(base));
+  const curved = () => {
+    const s = clone();
+    // A curve on layer 3 — `to` a factor the layer is not already at, so the
+    // ramp is real rather than a no-op the guard could legitimately ignore.
+    s.layers[3] = { ...s.layers[3], curve: { to: s.layers[4]?.fb ?? 'FACTOR_1_2' } };
+    return s;
+  };
+  // `deform_fg` is a `sceneDeform`, NOT a bare `tableRef`: "none" or
+  // `{ shared: { table, speed } }`, both required, closed. Reading that off the
+  // schema rather than guessing is the difference between a fixture the codec
+  // loads and one it lists under `unreadableScenes` — which is what [1d] is for.
+  const deformShape = SCHEMA.$defs.sceneDeform.oneOf
+    .find((b) => b.type === 'object' && b.properties?.shared);
+  if (!deformShape) {
+    throw new Error('the schema\'s sceneDeform no longer has a `{ shared: … }` form, so the ROW 63 '
+      + 'fixtures cannot be built against it. UNMEASURABLE — re-derive the fixture from the new shape.');
+  }
+  const withDeform = (period) => {
+    const s = clone();
+    s.deform_fg = { shared: { table: { generator: 'sine', amplitude: 8, period }, speed: 1 } };
+    return s;
+  };
+  const scenes = {
+    // ROW 62: the value the picker will not let an author choose, arriving as a file.
+    gap_sprite_mask: { ...clone(), left_column_mask: 'sprite_mask' },
+    gap_accept_control: { ...clone(), left_column_mask: 'accept' },
+    // ROW 64: a curve layer AND an anchor with LIVE shifts / with the sentinel.
+    gap_curve_anchor: { ...curved(), anchor: { at: { channel: 0, dsa: LIVE_DSA, dsb: LIVE_DSB } } },
+    gap_curve_boundary: { ...curved(), anchor: { at: { channel: 0, dsa: SENTINEL, dsb: SENTINEL } } },
+    // ROW 63: a period the engine refuses, and one it accepts.
+    gap_period_100: withDeform(BAD_PERIOD),
+    gap_period_64: withDeform(GOOD_PERIOD),
+  };
+  const written = [];
+  for (const [id, scene] of Object.entries(scenes)) {
+    scene.id = id;
+    // Short on purpose: WARNING_ROWS collects panel leaves longer than 40
+    // characters, so a chatty fixture name would show up as a warning row.
+    scene.name = `${id} fixture`;
+    writeFileSync(`${dir}/${id}.json`, `${JSON.stringify(scene, null, 2)}\n`);
+    written.push(id);
+  }
+  return { dir, written, base: base.id, layers: base.layers.length };
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(path, timeoutMs = 1500) {
   return new Promise((resolve, reject) => {
@@ -224,6 +330,54 @@ function panelIsDrawn(text) {
   return typeof text === 'string' && text !== 'no-panel' && PANEL_ALIVE.test(text);
 }
 
+/**
+ * OPEN A `CollapsibleSection` BY ITS HEADER, and prove it opened.
+ *
+ * ⚠ THE SCENE FORM ARRIVES COLLAPSED. `EffectsScenePanel.tsx:853` passes
+ * `defaultCollapsed` to `aeon.effects.scene`, and a collapsed section renders
+ * NO CHILDREN AT ALL (CollapsibleSection's own comment: "its children are not
+ * rendered"), so `left_column_mask`, `v_deform` and the `deform_fg` sub-form are
+ * absent from the DOM rather than hidden. Every finder for them came back `[]`,
+ * which reads exactly like a deleted control. The harness cleared
+ * `localStorage` at boot, so the persisted state that would have overridden the
+ * default was gone too — this is one of the cases where the reset that makes a
+ * run reproducible is also what puts the control out of reach.
+ *
+ * Returns the number of `select`/`input` controls the section now exposes, and
+ * REFUSES when the header is not there — an unfindable header is not "the
+ * section has no controls".
+ */
+async function openSection(c, titlePrefix) {
+  const before = await c.evalExpr('document.querySelectorAll(\'select,input\').length');
+  const hit = await c.evalExpr(String.raw`
+    (() => {
+      const want = ${JSON.stringify(titlePrefix)};
+      const head = [...document.querySelectorAll('div')].find((d) => {
+        if (d.getAttribute('style') === null || !/cursor: *pointer/.test(d.getAttribute('style'))) return false;
+        const t = (d.textContent || '').replace(/\s+/g, ' ').trim();
+        return t.startsWith(want);
+      });
+      if (!head) return 'no-header';
+      const b = head.getBoundingClientRect();
+      if (b.width === 0 || b.height === 0) return 'zero-rect';
+      head.click();
+      return 'clicked';
+    })()`);
+  if (hit !== 'clicked') {
+    throw new Error(`the section header starting "${titlePrefix}" was ${hit} — the controls this `
+      + 'harness reads live inside it, and an unfindable header is UNMEASURABLE, not an empty '
+      + 'section. Re-derive the title from the panel that renders it.');
+  }
+  await sleep(500);
+  const after = await c.evalExpr('document.querySelectorAll(\'select,input\').length');
+  if (after <= before) {
+    throw new Error(`clicking "${titlePrefix}" did not add any control to the DOM `
+      + `(${before} -> ${after}); it was probably already open and this closed it, or the header `
+      + 'is not the toggle any more.');
+  }
+  return { before, after };
+}
+
 async function selectScene(c, id) {
   await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(id)})`);
   await sleep(700);
@@ -235,6 +389,13 @@ async function selectScene(c, id) {
 async function main() {
   console.log(`aeon dir under test : ${AEONDIR}`);
   console.log(`uptime              : ${execSync('uptime').toString().trim()}`);
+  // The fixtures, BEFORE the app is launched. They are written into the
+  // throwaway copy the two refusals above have already established this is.
+  const fx = writeFixtures(AEONDIR);
+  console.log(`fixtures written    : ${fx.written.length} into ${fx.dir}`);
+  console.log(`  from              : ${fx.base} (${fx.layers} layers), one or two authored fields each`);
+  console.log(`  anchor shifts     : dsa ${LIVE_DSA} / dsb ${LIVE_DSB} live, ${SENTINEL}/${SENTINEL} sentinel`);
+  console.log(`  periods           : ${BAD_PERIOD} (refused) / ${GOOD_PERIOD} (control), of ${TABLE_BYTES}-byte table`);
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
@@ -306,6 +467,13 @@ async function main() {
 
     // ═══ ROW 62 — sprite_mask that ARRIVED in the file ═══════════════════
     let text = await selectScene(c, 'gap_sprite_mask');
+    // The Scene form is `defaultCollapsed` and `localStorage` was cleared, so
+    // every control below is out of the DOM until this runs. Section state is
+    // keyed by section ID, not by scene, so one open covers every scene the
+    // rows select afterwards.
+    const opened = await openSection(c, 'Scene — ');
+    note('1e setup', `the Scene form was collapsed on arrival; opening it took the page from `
+      + `${opened.before} to ${opened.after} select/input controls`);
     check('2a', 'ANTI-VACUOUS: the panel is drawn for the sprite_mask scene',
       panelIsDrawn(text), `drawn=${panelIsDrawn(text)} len=${String(text).length}`);
     const rows62 = await c.json(WARNING_ROWS);

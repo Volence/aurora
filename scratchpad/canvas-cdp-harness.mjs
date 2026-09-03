@@ -39,6 +39,35 @@ const PORT = Number(process.env.PORT ?? 9364);
 // deriving it from this file's own location fixes it for every future one.
 // Resolves identically to the old literal when run from the main checkout.
 const ROOT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '');
+
+/**
+ * THE NEW-CANVAS DEFAULTS, READ FROM THE CONSTANT THE DIALOG RENDERS FROM.
+ *
+ * `shell/new-canvas.ts` exports `NEW_CANVAS_DEFAULTS` and `NewCanvasDialog`
+ * seeds its three fields from it, so this is the dialog's own source of truth
+ * read independently rather than a number frozen in a harness. Rows 11c and
+ * 11m used to pin `128`; the product moved to 256 at `598be067` (2026-08-16)
+ * with the reasoning written out beside the constant, and the rows reported
+ * that as a failure for eighteen days.
+ *
+ * REFUSES rather than defaulting: if the constant cannot be read, the two rows
+ * have no expectation, and an invented one would pass against anything.
+ */
+function newCanvasDefaults() {
+  const path = `${ROOT}/src/renderer/shell/new-canvas.ts`;
+  let text;
+  try { text = readFileSync(path, 'utf8'); }
+  catch (e) { throw new Error(`cannot read ${path} (${e.code ?? e.message}) — rows 11c/11m have no expectation to compare the dialog against; UNMEASURABLE, not a pass`); }
+  const m = /export const NEW_CANVAS_DEFAULTS: [^=]*=\s*\{([\s\S]*?)\n\};/.exec(text);
+  if (!m) throw new Error('shell/new-canvas.ts no longer spells `export const NEW_CANVAS_DEFAULTS … = { … };` — re-derive the dialog\'s defaults rather than pinning the old ones');
+  const width = /width:\s*(\d+)/.exec(m[1]);
+  const height = /height:\s*(\d+)/.exec(m[1]);
+  const profileId = /profileId:\s*'([^']+)'/.exec(m[1]);
+  if (!width || !height || !profileId) {
+    throw new Error(`NEW_CANVAS_DEFAULTS parsed but is missing width/height/profileId: ${JSON.stringify(m[1])}`);
+  }
+  return { width: Number(width[1]), height: Number(height[1]), profileId: profileId[1] };
+}
 // WHICH BUILT TREE THIS RUNS AGAINST (O72) — question 2, and NOT `ROOT`'s
 // question 1. A linked worktree has no node_modules/ and no dist/, so the tree
 // carrying the build can be a different directory from the one this file lives
@@ -119,6 +148,32 @@ function neg(id, name, ok, detail) {
 function note(id, name, detail) {
   console.log(`NOTE  [${id}] ${name}${detail !== undefined ? ` — ${detail}` : ''}`);
   results.push({ id, name, ok: null, detail });
+}
+
+/**
+ * ROWS THAT DID NOT RUN, SAID OUT LOUD AND BY NAME.
+ *
+ * THE DEFECT THIS EXISTS FOR (O50-C, measured 2026-09-03). `sessionD` used to
+ * bail with a bare `if (!st) return;` the moment `[14a]` could not read the
+ * document's state. Seven rows — 14a2, 14b, 14c, 14d, 14e, 14f, 14g — then
+ * vanished from the tally with nothing said about them, so the run printed
+ * `checks: 45` instead of `checks: 52` and NOTHING in the output distinguished
+ * "seven rows passed" from "seven rows were never attempted". The O50 sweep's
+ * record of this file is exactly that artefact: `36 passed, 9 failed` = 45, and
+ * the missing seven are these.
+ *
+ * A row that could not be attempted is not a pass and it is not a failure; it
+ * is an absence, and an absence that does not print is indistinguishable from
+ * success. These are counted separately, printed by id, and they set a
+ * non-zero exit — a run that could not ask its questions is not a green run.
+ */
+const unexercisedRows = [];
+function unexercised(ids, reason) {
+  for (const id of ids) {
+    console.log(`UNEXERCISED  [${id}] NOT ATTEMPTED — ${reason}`);
+    results.push({ id, name: '(not attempted)', ok: null, unexercised: true, detail: reason });
+    unexercisedRows.push(`[${id}] ${reason}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -559,9 +614,34 @@ async function session(label, body) {
     // scratchpad/storage-flush-probe.mjs writes two markers, tears the app down
     // both ways, and relaunches — with a signal alone the later marker comes
     // back `null`; with `window.close()` first, both come back.
+    //
+    // ⚠ AND THE FIXED 4 s WAS NOT ENOUGH — MEASURED, 2026-09-03, NOT REASONED
+    // ABOUT. With `window.close()` + `await sleep(4000)` this teardown lost the
+    // area anyway in 2 of 5 runs (once at session C, once at session D), at
+    // load ~3, with no other instrument running and no poison applied: the next
+    // session booted to `keys present: ["aurora.session.v1:no-project"]` — the
+    // fresh boot's own key written, the previous session's gone. A blind sleep
+    // is a guess about how long a shutdown takes, and the guess was wrong 40% of
+    // the time; the thing actually worth waiting for is the PROCESS BEING GONE,
+    // because Chromium flushes its areas on shutdown. So: wait for the exit,
+    // bounded, and SAY which way it went — an app that had to be signalled is
+    // the case where the area is at risk, and a run that cannot say which
+    // happened cannot explain its own restart rows later.
     if (c) {
+      // ⚠ TRIED AND REVERTED, RECORDED SO IT IS NOT RE-TRIED: a 6 s settle HERE,
+      // before the close, on the theory that Chromium's throttled commit needed
+      // a live page to fire in. It did not help — 1 trip in 2 runs with it, the
+      // same rate as without — so it is not in the code, only in this comment.
+      // The flake is UNDIAGNOSED and is reported rather than papered over.
       try { await c.send('Runtime.evaluate', { expression: 'window.close()' }); } catch { /* the target dies mid-call */ }
-      await sleep(4000);
+      const exitT0 = Date.now();
+      const EXIT_GRACE_MS = 20000;
+      while (child.exitCode === null && child.signalCode === null && Date.now() - exitT0 < EXIT_GRACE_MS) {
+        await sleep(100);
+      }
+      const exited = child.exitCode !== null || child.signalCode !== null;
+      console.log(`   window.close() -> app ${exited ? `EXITED on its own after ${Date.now() - exitT0}ms`
+        : `STILL RUNNING after ${EXIT_GRACE_MS}ms — the localStorage area is at risk on this teardown`}`);
       try { c.close(); } catch { /* */ }
     }
     await killGroup();
@@ -591,6 +671,59 @@ async function waitRestored(c, maxMs = 45000) {
   // it runs — reading it afterwards reports the pruned result, not what was
   // stored.
   const before = await storedSessions(c).catch(() => ({}));
+
+  // ⚠ THE PRECONDITION, ASSERTED BEFORE ANY ROW IS ALLOWED TO JUDGE THE APP.
+  //
+  // Every restart row below — 13a-tab, 13a-focus, 13a-pixels, 13b-pane, 13c,
+  // 13d, 14a — reads what the previous session left in `localStorage` under
+  // `aurora.session.v1:<project dir>`. If that key is NOT THERE when this
+  // session boots, the app has nothing to restore FROM, and each of those rows
+  // fails with wording that describes a PRODUCT failure: "the canvas TAB does
+  // not survive a restart". It is not a product failure. It is this harness
+  // being handed an empty profile.
+  //
+  // THAT IS NOT HYPOTHETICAL — it is the O50 sweep's record of this file,
+  // reproduced exactly on 2026-09-03. `~/.config/<app>/Local Storage` is ONE
+  // profile shared by this whole instrument population, 114 call sites in
+  // `scratchpad/*.mjs` call `localStorage.clear()`, and the sweep could not
+  // have run its 89 launches serially in the window it records (this file alone
+  // takes ~190 s). Injecting a single `localStorage.clear()` between session A
+  // and session B reproduces the sweep's tally to the row: 36 passed, 9 failed,
+  // the same nine ids, with seven further rows silently unexercised.
+  //
+  // A SECOND CAUSE, FOUND BY THIS GUARD RATHER THAN REASONED ABOUT, and the
+  // reason the message below names two: it tripped SPONTANEOUSLY at session C
+  // on 2026-09-03 — 1 of 3 runs, load ~3, no other instrument running and no
+  // poison applied. So the teardown's `window.close()` + FIXED 4 s does not
+  // reliably get the area to disk either. That flake is NOT fixed here; it is
+  // reported. What is fixed is that it can no longer be mistaken for the app
+  // losing a canvas tab.
+  //
+  // So: REFUSE, and name both mechanisms rather than the one that was looked
+  // for first. An environment condition must never be reported as an app
+  // defect, and "we could not read our own profile back" must never render as
+  // "the app lost your work".
+  const key = `aurora.session.v1:${S1DIR}`;
+  if (!Object.prototype.hasOwnProperty.call(before, key)) {
+    throw new Error(
+      `UNMEASURABLE — no stored session for this project at boot.\n`
+      + `  wanted localStorage key: ${key}\n`
+      + `  keys actually present:   ${JSON.stringify(Object.keys(before))}\n`
+      + `  The previous session wrote that key; this one cannot see it. TWO causes are known,\n`
+      + `  BOTH environmental, and this refusal does not distinguish them:\n`
+      + `    (a) ANOTHER INSTRUMENT CLEARED THE PROFILE. ~/.config/<app>/Local Storage is one\n`
+      + `        directory shared by this whole population and 114 call sites in scratchpad/\n`
+      + `        call localStorage.clear(). Run this harness with no other Aurora-launching\n`
+      + `        instrument running concurrently.\n`
+      + `    (b) THE PREVIOUS SESSION'S FLUSH NEVER REACHED DISK. Chromium commits a\n`
+      + `        localStorage area on a throttled timer; the teardown above gives it\n`
+      + `        window.close() plus a FIXED 4 s, which is not a guarantee. Observed\n`
+      + `        spontaneously on 2026-09-03 — 1 of 3 runs, at load ~3, with nothing else\n`
+      + `        running — so this is a live flake in the teardown, not a hypothetical.\n`
+      + `  EITHER WAY IT IS NOT AN APP DEFECT. Do NOT record the restart rows as failures on\n`
+      + `  the strength of this run; re-run it, and if it trips repeatedly investigate (b).`);
+  }
+
   let last = null;
   await c.evalExpr(`window.__dbg.openDir(${JSON.stringify(S1DIR)})`).catch(() => {});
   while (Date.now() - t0 < maxMs) {
@@ -1041,11 +1174,16 @@ async function secondPass() {
   await session('F — reopened in a NEW SESSION (the original defect)', (c) => sessionF(c, shared));
   writeFileSync(`${SHOTS}/results-pass2.json`, JSON.stringify(results, null, 2));
   console.log('\n================ SUMMARY (pass 2) ================');
-  console.log(`checks: ${results.filter((r) => !r.negative && r.ok !== null).length}, fails: ${fails.length}`);
+  console.log(`checks: ${results.filter((r) => !r.negative && r.ok !== null).length}, fails: ${fails.length}`
+    + `, unexercised: ${unexercisedRows.length}`);
   if (fails.length) console.log('FAILED:\n  ' + fails.join('\n  '));
+  if (unexercisedRows.length) {
+    console.log('!!! ROWS NOT ATTEMPTED (an absence, not a pass — the check count above is short by this many):\n  '
+      + unexercisedRows.join('\n  '));
+  }
   if (negFails.length) console.log('!!! NEGATIVE CONTROLS THAT DID NOT FAIL (harness is blind):\n  ' + negFails.join('\n  '));
   else console.log('all negative controls correctly reported FAIL');
-  if (fails.length || negFails.length) process.exitCode = 1;
+  if (fails.length || negFails.length || unexercisedRows.length) process.exitCode = 1;
 }
 
 // ===========================================================================
@@ -1087,11 +1225,16 @@ async function main() {
 
   writeFileSync(`${SHOTS}/results.json`, JSON.stringify(results, null, 2));
   console.log('\n================ SUMMARY ================');
-  console.log(`checks: ${results.filter((r) => !r.negative && r.ok !== null).length}, fails: ${fails.length}`);
+  console.log(`checks: ${results.filter((r) => !r.negative && r.ok !== null).length}, fails: ${fails.length}`
+    + `, unexercised: ${unexercisedRows.length}`);
   if (fails.length) console.log('FAILED:\n  ' + fails.join('\n  '));
+  if (unexercisedRows.length) {
+    console.log('!!! ROWS NOT ATTEMPTED (an absence, not a pass — the check count above is short by this many):\n  '
+      + unexercisedRows.join('\n  '));
+  }
   if (negFails.length) console.log('!!! NEGATIVE CONTROLS THAT DID NOT FAIL (harness is blind):\n  ' + negFails.join('\n  '));
   else console.log('all negative controls correctly reported FAIL');
-  if (fails.length || negFails.length) process.exitCode = 1;
+  if (fails.length || negFails.length || unexercisedRows.length) process.exitCode = 1;
 }
 
 // --- session A -------------------------------------------------------------
@@ -1156,9 +1299,25 @@ async function row11(c) {
   check('11b', 'it opens with no refusal on screen and Create disabled (no name yet)',
     snap.error === null && snap.createDisabled === true,
     `error=${snap.error === null ? 'none' : 'PRESENT'}; createDisabled=${snap.createDisabled}; opacity=${snap.createOpacity}`);
-  check('11c', 'it opens on the documented defaults (128x128, genesis-level-art)',
-    snap.nums[0] === '128' && snap.nums[1] === '128' && snap.profile === 'genesis-level-art',
-    `nums=${JSON.stringify(snap.nums)} profile=${snap.profile} options=${JSON.stringify(snap.profileOptions)}`);
+  // ⚠ THIS PINNED 128x128 AND THE APP MOVED TO 256x256 ON PURPOSE, at
+  // `598be067` (2026-08-16). The reasoning is written out beside the constant
+  // in `shell/new-canvas.ts`: 256x256 is ONE CHUNK, the smallest size a commit
+  // can take, and 128 made `canvasChunkCapacity` floor to zero — a dialog that
+  // opened on a size the commit panel could only answer "nothing to commit yet"
+  // for. So the row was asserting a default the product had deliberately
+  // retired, and printing `nums=["256","256"]` as a failure.
+  //
+  // Read from the constant now, not typed. The claim that survives is the one
+  // worth having: the dialog OPENS ON ITS OWN DECLARED DEFAULTS. A dialog whose
+  // fields disagree with `NEW_CANVAS_DEFAULTS` still fails, and so does a
+  // profile id the select does not offer.
+  const wantDefaults = newCanvasDefaults();
+  check('11c', `it opens on its own declared defaults (${wantDefaults.width}x${wantDefaults.height}, ${wantDefaults.profileId})`,
+    snap.nums[0] === String(wantDefaults.width) && snap.nums[1] === String(wantDefaults.height)
+    && snap.profile === wantDefaults.profileId
+    && (snap.profileOptions ?? []).includes(wantDefaults.profileId),
+    `want ${wantDefaults.width}x${wantDefaults.height} ${wantDefaults.profileId}; `
+    + `nums=${JSON.stringify(snap.nums)} profile=${snap.profile} options=${JSON.stringify(snap.profileOptions)}`);
 
   // --- focus: does autoFocus land on the name field, and is there a trap? ---
   const focus0 = await c.json('window.__c.activeDesc()');
@@ -1283,8 +1442,10 @@ async function row11(c) {
   await openNewCanvasDialog(c);
   const reopened = await c.json('window.__c.dlgSnapshot()');
   check('11m', 'Escape then reopening gives a fresh form',
-    reopened.name === '' && reopened.nums[0] === '128',
-    `name=${JSON.stringify(reopened.name)} nums=${JSON.stringify(reopened.nums)}`);
+    reopened.name === '' && reopened.nums[0] === String(wantDefaults.width)
+    && reopened.nums[1] === String(wantDefaults.height),
+    `want name "" and ${wantDefaults.width}x${wantDefaults.height}; `
+    + `name=${JSON.stringify(reopened.name)} nums=${JSON.stringify(reopened.nums)}`);
   await escape(c);
   await sleep(300);
 
@@ -1948,8 +2109,8 @@ async function sessionB(c, shared) {
   note('13a', 'stored session AFTER the restore ran (a faithful readout of the live sessionStore)',
     JSON.stringify(restored.storedAfterRestore));
 
-  const storedBefore = firstSessionPayload(restored.storedBeforeOpen);
-  const storedAfter = firstSessionPayload(restored.storedAfterRestore);
+  const storedBefore = sessionPayloadFor(restored.storedBeforeOpen, S1DIR);
+  const storedAfter = sessionPayloadFor(restored.storedAfterRestore, S1DIR);
   const toasts = await c.json('window.__dbg.canvas.toasts()');
   const docs = await c.json('window.__dbg.canvas.docIds()');
   const active = await c.evalExpr('window.__dbg.canvas.activeDocId()');
@@ -1993,14 +2154,27 @@ async function sessionB(c, shared) {
   await c.evalExpr(INSTALL);
 }
 
-/** The parsed payload of the first stored-session key that names a project. */
-function firstSessionPayload(map) {
+/**
+ * The parsed stored-session payload FOR THE PROJECT UNDER TEST.
+ *
+ * ⚠ THIS USED TO TAKE THE FIRST KEY THAT WAS NOT `no-project`, whichever
+ * project that named. One profile is shared by every instrument in
+ * `scratchpad/`, so on a machine where anything else has opened a project the
+ * map carries several `aurora.session.v1:<dir>` keys and insertion order
+ * decides which one this returns. `[13a-focus]` would then compare ANOTHER
+ * project's `activeId` against this run's canvas tab and report the app as
+ * having lost the focus it never held — the same class of fault as the empty
+ * profile `waitRestored` now refuses over, but quieter, because it produces a
+ * plausible wrong answer instead of an absence.
+ *
+ * Keyed on the project directory now, and `null` when that key is absent
+ * rather than falling back to a neighbour's.
+ */
+function sessionPayloadFor(map, projectDir) {
   if (!map) return null;
-  for (const [k, v] of Object.entries(map)) {
-    if (/no-project/.test(k)) continue;
-    try { return JSON.parse(v); } catch { return null; }
-  }
-  return null;
+  const v = map[`aurora.session.v1:${projectDir}`];
+  if (v === undefined) return null;
+  try { return JSON.parse(v); } catch { return null; }
 }
 
 // --- session C: the PNG is gone --------------------------------------------
@@ -2012,7 +2186,7 @@ async function sessionC(c, shared) {
   const domToasts = await c.json('window.__c.toasts()');
   const docs = await c.json('window.__dbg.canvas.docIds()');
   await shot(c, '21-restart-png-deleted');
-  const storedBefore = firstSessionPayload(restored.storedBeforeOpen);
+  const storedBefore = sessionPayloadFor(restored.storedBeforeOpen, S1DIR);
   check('13b-toast', 'with the PNG deleted, the boot restore raises NO toast',
     toasts.length === 0 && domToasts.length === 0 && !docs.includes(shared.docId),
     `the stored session handed to the restore had activeId=${storedBefore ? storedBefore.activeId : '?'} `
@@ -2086,7 +2260,15 @@ async function sessionD(c, shared) {
   check('14a', 'a canvas with an unreadable sidecar still OPENS, with the rejection recorded on its source',
     focused === true && st !== null && st.source !== null && st.source.sidecarRejected === true,
     `state=${JSON.stringify(st)}`);
-  if (!st) return;
+  if (!st) {
+    // Every row below this point reads `st`/the loaded document, so none of
+    // them can be asked. They are NAMED rather than silently dropped — see
+    // `unexercised`.
+    unexercised(['14a2', '14b', '14c', '14d', '14e', '14f', '14g'],
+      `[14a] could not read the document's state (docIds=${JSON.stringify(docs)}, wanted ${JSON.stringify(shared.docId)}), `
+      + 'and every row below it reads that state');
+    return;
+  }
   check('14a2', 'the LOAD itself warns about the rejected sidecar (R12) — before any save',
     loadToasts.some((t) => /sidecar/i.test(t.text)),
     `the document was ${bootDocs.includes(shared.docId) ? 'already loaded by the restore' : 'loaded by a tab click'}; `
