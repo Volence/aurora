@@ -198,6 +198,48 @@ npx vitest run src/renderer/providers/__tests__/effects-sub-tabs.test.ts --repor
   | grep -E "Tests |Test Files |FAIL " | sed 's/^/    /'
 restore src/renderer/providers/effects-sub-tabs.ts
 
+echo
+echo "════ P8 — the NO-BUILD disclosure is dropped from the anchors section ════"
+echo "     (PRESET_KEYS_AWAITING_AEON names both keys this section authors, and the"
+echo "      sentence says the generator refuses the WHOLE DOCUMENT — an author who"
+echo "      cannot see it breaks aeon's build with no warning at all)"
+python3 - <<'PY'
+p='src/renderer/components/effects/BandPresetPanel.tsx'
+s=open(p).read()
+s=s.replace("""          <SectionBody>
+            <PresetLagDisclosure />
+            <AnchorChannelsBlock""",
+"""          <SectionBody>
+            <AnchorChannelsBlock""")
+open(p,'w').write(s)
+PY
+show src/renderer/components/effects/BandPresetPanel.tsx "<AnchorChannelsBlock"
+echo "    runner: npx vitest run src/renderer/components/effects/__tests__/preset-lag-disclosure.test.ts"
+npx vitest run src/renderer/components/effects/__tests__/preset-lag-disclosure.test.ts --reporter=dot 2>&1 \
+  | grep -E "Tests |Test Files |FAIL " | sed 's/^/    /'
+restore src/renderer/components/effects/BandPresetPanel.tsx
+
+echo
+echo "════ P9 — the panel spells a rung of its own instead of reading the ladder ════"
+echo "     (a literal shift in the component is a second opinion about a base-2"
+echo "      logarithm — the one thing on this path that fails in silence)"
+python3 - <<'PY'
+p='src/renderer/components/effects/BandPresetPanel.tsx'
+s=open(p).read()
+s=s.replace("""              {ANCHOR_AMP_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}""",
+"""              {[2, 3, 4].map((amp_shift = 4) => (
+                <option key={amp_shift} value={amp_shift}>{`shift ${amp_shift}`}</option>
+              ))}""")
+open(p,'w').write(s)
+PY
+show src/renderer/components/effects/BandPresetPanel.tsx "amp_shift = 4"
+echo "    runner: npx vitest run src/renderer/components/effects/__tests__/preset-lag-disclosure.test.ts"
+npx vitest run src/renderer/components/effects/__tests__/preset-lag-disclosure.test.ts --reporter=dot 2>&1 \
+  | grep -E "Tests |Test Files |FAIL " | sed 's/^/    /'
+restore src/renderer/components/effects/BandPresetPanel.tsx
+
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
