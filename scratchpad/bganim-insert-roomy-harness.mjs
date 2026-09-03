@@ -149,7 +149,7 @@ const OPEN_NEW_BAND = String.raw`
       && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN';
   };
   const hdr = [...document.querySelectorAll('div')].filter(isHeader)
-    .find((h) => (h.firstElementChild.textContent || '').trim() === 'New band');
+    .find((h) => (h.firstElementChild.textContent || '').trim() === 'New tile animation');
   if (!hdr) return 'no-section';
   if (hdr.parentElement.parentElement.children.length > 1) return 'already-open';
   hdr.click();
@@ -174,10 +174,26 @@ const OPEN_BAND_LIST = String.raw`
       && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN';
   };
   const hdr = [...document.querySelectorAll('div')].filter(isHeader)
-    .find((h) => /^BG animation bands/.test((h.firstElementChild.textContent || '').trim()));
+    .find((h) => /^Tile animations\b/.test((h.firstElementChild.textContent || '').trim()));
   if (!hdr) return 'no-section';
   if (hdr.parentElement.parentElement.children.length > 1) return 'already-open';
   hdr.click();
+  return 'clicked';
+})()`;
+
+// ⚠ AND BOTH SECTIONS ARE ON THE `tileAnim` SUB-TAB NOW (2026-09-02, the
+// `three_sub_tabs_plus_section_strip` ruling — providers/effects-sub-tabs.ts).
+// A section on an INACTIVE tab is not collapsed, it is NOT MOUNTED, and the
+// facet arrives on `parallax`. Without this the two openers above return
+// 'no-section' and the run aborts before its first real row — which is exactly
+// how the O50 sweep found this file (4/6, both states dead at `.X`).
+// The tab button is a real <button onClick> (EffectsSubTabBar.tsx), so a DOM
+// .click() is the gesture it listens for.
+const SELECT_TILE_ANIM_TAB = String.raw`
+(() => {
+  const t = document.querySelector('[data-effects-sub-tab="tileAnim"]');
+  if (!t) return 'no-tab-bar';
+  t.click();
   return 'clicked';
 })()`;
 
@@ -216,13 +232,28 @@ const clickByText = (re, tag = 'button') => String.raw`
   el.click();
   return true;
 })()`;
+// ⚠ RETURNS THE MATCH COUNT, and the callers assert it is 1. The insert verb's
+// label is a bare "Add" now (see the ADD_INSERT note below), which is short
+// enough that a second control could answer to it — and a row reading the WRONG
+// enabled button would report the feature working. Bar 2c: a matcher's
+// uniqueness is not the source's uniqueness.
 const CONTROL_BY_TEXT = (re, tag = 'button') => String.raw`
 (() => {
-  const el = [...document.querySelectorAll(${JSON.stringify(tag)})]
-    .find((e) => ${re}.test(((e.textContent || '') + ' ' + (e.getAttribute('aria-label') || '')).trim()));
+  const all = [...document.querySelectorAll(${JSON.stringify(tag)})]
+    .filter((e) => ${re}.test(((e.textContent || '') + ' ' + (e.getAttribute('aria-label') || '')).trim()));
+  const el = all[0];
   if (!el) return null;
-  return { text: (el.textContent || '').trim(), disabled: !!el.disabled, title: el.title || '' };
+  return { text: (el.textContent || '').trim(), disabled: !!el.disabled, title: el.title || '',
+    matches: all.length };
 })()`;
+// ⚠ THE INSERT VERB IS LABELLED "Add", NOT "Add band" (023e0ed9 + O55).
+// `BgAnimBandPanel.tsx:859-866` carries the reason in the source: "Add band" is
+// the exact string EFFECTS-W1 defect 2 was booked against — a cold reader's
+// first click built a TILE ANIMATION while reading it as a RASTER BAND — so the
+// chip is now a bare `Add` inside a Field labelled "Blank tile animation",
+// under the "From new art" group. The old regex matched nothing, and rows 4c/4a
+// reported the control as ABSENT (`null`) rather than as renamed.
+const ADD_INSERT = '/^Add$/';
 const SELECT_BY_TITLE = (re) => `[...document.querySelectorAll('select')].find((e) => ${re}.test(e.title || ''))`;
 const INPUT_BY_TITLE = (re) => `[...document.querySelectorAll('input')].find((e) => ${re}.test(e.title || ''))`;
 const BODY_TEXT = `(document.body.innerText || '').replace(/\\s+/g, ' ')`;
@@ -306,16 +337,22 @@ async function openAndReach(c, dir) {
   const pill = await c.evalExpr(clickByText('/^Effects$/'));
   check('2a', 'the Effects pill is on the facet bar [instrument]', pill === true);
   await sleep(1500);
+  const tabbed = await c.evalExpr(SELECT_TILE_ANIM_TAB);
+  await sleep(1000);
+  const subTab = await c.evalExpr('window.__dbg.parallaxPreview().subTab');
+  check('2a2', 'the Tile anim sub-tab is active, so its sections are MOUNTED [instrument]',
+    subTab === 'tileAnim',
+    `SELECT_TILE_ANIM_TAB -> ${JSON.stringify(tabbed)}; store subTab=${JSON.stringify(subTab)}`);
   await c.evalExpr(OPEN_BAND_LIST);
   await sleep(400);
   const openedNewBand = await c.evalExpr(OPEN_NEW_BAND);
-  if (openedNewBand === 'no-section') throw new Error('no "New band" section on screen');
+  if (openedNewBand === 'no-section') throw new Error('no "New tile animation" section on screen');
   await sleep(900);
   const headings = await c.json(
     `[...document.querySelectorAll('span')].map(e => (e.textContent||'').trim())
-      .filter(t => /^(BG animation bands|New band$|From existing tiles$|From new art$)/.test(t))`);
+      .filter(t => /^(Tile animations|New tile animation$|From existing tiles$|From new art$)/.test(t))`);
   check('2b', 'the band panel is mounted with BOTH sources as peers [instrument]',
-    headings.some((h) => h.startsWith('BG animation bands'))
+    headings.some((h) => h.startsWith('Tile animations'))
       && headings.includes('From existing tiles') && headings.includes('From new art'),
     JSON.stringify(headings));
 }
@@ -377,9 +414,10 @@ async function runRoomy() {
     check('4b', 'the "From new art" line prices the band at cols*rows against the derived free count',
       !!costLine && Number(costLine[1]) === N && Number(costLine[2]) === expectedFree,
       costLine ? costLine[0] : 'no cost line');
-    const addBtn = await c.json(CONTROL_BY_TEXT('/^Add band$/'));
+    const addBtn = await c.json(CONTROL_BY_TEXT(ADD_INSERT));
     check('4c', 'ADD BAND (insert) is ENABLED on the roomy document, and its title is not a refusal',
-      !!addBtn && addBtn.disabled === false && /^Add a blank/.test(addBtn.title), JSON.stringify(addBtn));
+      !!addBtn && addBtn.matches === 1 && addBtn.disabled === false
+      && /^Add a blank/.test(addBtn.title), JSON.stringify(addBtn));
     const promoteBtn = await c.json(CONTROL_BY_TEXT('/^Promote$/'));
     check('4d', 'PROMOTE is enabled too — the two sources are peers, neither gated on the other',
       !!promoteBtn && promoteBtn.disabled === false, JSON.stringify(promoteBtn));
@@ -388,7 +426,7 @@ async function runRoomy() {
     const pictureBefore = await c.json(RENDER_IN_APP);
     const hash0 = await c.evalExpr('window.__dbg.aeon.bgOverrideHash()');
     await shot(c, 'roomy-1-before-click');
-    const clicked = await c.evalExpr(clickByText('/^Add band$/'));
+    const clicked = await c.evalExpr(clickByText(ADD_INSERT));
     await sleep(900);
 
     const bands1 = await c.json('window.__dbg.aeon.bands()');
@@ -483,8 +521,12 @@ async function runLive() {
     check('3e', 'the live document is SATURATED — free = 0 — the property this state exists for',
       expectedFree === 0 && budget.tileSlotsRemaining === 0 && placed.tiles.length === TILE_CAPACITY,
       `free=${expectedFree}`);
-    const addBtn = await c.json(CONTROL_BY_TEXT('/^Add band$/'));
-    const refusalRe = /adding a band puts its \d+ tile\(s\) INTO the blob, and the blob has 0 free slot\(s\) of (\d+)/;
+    const addBtn = await c.json(CONTROL_BY_TEXT(ADD_INSERT));
+    // ⚠ THE REFUSAL'S OWN WORDS moved at 023e0ed9 with everything else: the
+    // provider says "adding a TILE ANIMATION puts its N tile(s) INTO the blob"
+    // (providers/bg-anim-aeon.ts:559). Taken from the provider, not from a
+    // passing run.
+    const refusalRe = /adding a tile animation puts its \d+ tile\(s\) INTO the blob, and the blob has 0 free slot\(s\) of (\d+)/;
     check('4a', 'ADD BAND is DISABLED, and its title is the provider\'s refusal naming 0 free of the contract\'s capacity',
       !!addBtn && addBtn.disabled === true && refusalRe.test(addBtn.title)
         && Number((addBtn.title.match(refusalRe) || [])[1]) === TILE_CAPACITY,
@@ -494,7 +536,7 @@ async function runLive() {
     const promoteBtn = await c.json(CONTROL_BY_TEXT('/^Promote$/'));
     check('4c', 'PROMOTE is ENABLED on the saturated document — the peer gesture that spends no slots',
       !!promoteBtn && promoteBtn.disabled === false, JSON.stringify(promoteBtn));
-    const clicked = await c.evalExpr(clickByText('/^Add band$/'));
+    const clicked = await c.evalExpr(clickByText(ADD_INSERT));
     const bands = await c.json('window.__dbg.aeon.bands()');
     check('4d', 'clicking the disabled control does nothing: still zero bands',
       clicked === 'disabled' && bands.length === 0, `click=${clicked} bands=${bands.length}`);
