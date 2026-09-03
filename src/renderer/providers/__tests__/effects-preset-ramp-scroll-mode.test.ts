@@ -31,7 +31,9 @@
 // unsettled one.
 
 import { describe, it, expect } from 'vitest';
-import type { EffectsScene, EffectsSceneLibrary } from '../../../core/formats/effects/scene';
+import type {
+  EffectsScene, EffectsSceneLibrary, EffectsTableRef,
+} from '../../../core/formats/effects/scene';
 import {
   RAMP_SCROLL_LEAD, RAMP_SCROLL_COLUMN_SPAN, RAMP_SCROLL_COLUMN_WIDTH_PX,
   RAMP_SCROLL_MODE_NOTE, RAMP_SCROLL_MODE_MEASURED_AT,
@@ -41,6 +43,8 @@ import { rampScrollBindings, rampScrollModeAdvisory } from '../effects-preset';
 import { vDeformValue } from '../effects-aeon';
 
 const PRESET = 'aurora_local_rampmode_probe';
+/** The schema's own zero generator — the simplest legal `$defs/tableRef`. */
+const TABLE: EffectsTableRef = { generator: 'zero' };
 const OTHER = 'somebody_elses_preset';
 
 /** A scene with no per-column table — the FULL-SCREEN arm's cause. */
@@ -57,7 +61,7 @@ function flatScene(id: string, over: Partial<EffectsScene> = {}): EffectsScene {
  */
 function vDeformScene(id: string): EffectsScene {
   return flatScene(id, {
-    v_deform: { columns: { table: { zero: true }, speed: 0, amp_shift: 0 } },
+    v_deform: { columns: { table: TABLE, speed: 0, amp_shift: 0 } },
     left_column_mask: 'accept',
   } as Partial<EffectsScene>);
 }
@@ -104,8 +108,8 @@ describe('the fixtures really differ in the ONE key the rule turns on', () => {
    */
   it('deform_fg/deform_bg do NOT narrow the ramp — only v_deform does', () => {
     const wobble = flatScene('w', {
-      deform_fg: { shared: { table: { zero: true }, speed: 3 } },
-      deform_bg: { shared: { table: { zero: true }, speed: 3 } },
+      deform_fg: { shared: { table: TABLE, speed: 3 } },
+      deform_bg: { shared: { table: TABLE, speed: 3 } },
     } as Partial<EffectsScene>);
     // Anti-vacuous: the plant really is on the document.
     expect((wobble as { deform_bg?: unknown }).deform_bg).toBeDefined();
