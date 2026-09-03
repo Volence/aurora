@@ -1367,11 +1367,15 @@ function RampCard({ library, presetId, ramp, run }: {
         <span title={RAMP_MUST_NOT}>{RAMP_MUST_NOT_SHORT}</span>
       </Hint>
 
-      {/* THE KEY AEON'S GENERATOR DOES NOT ACCEPT YET, and this is the sharper
-          flavour of the lag: `ramp` is absent from `effects_gen.py`'s vocabulary
-          entirely, so a preset carrying it does not merely lose the key — the
-          WHOLE DOCUMENT is refused and the build fails. The leaf derives that
-          from the measured premise and renders nothing the day it empties. */}
+      {/* THE LAG DISCLOSURE, THIRD MOUNT SITE — SILENT SINCE 2026-09-03.
+          `ramp` WAS the sharper flavour (absent from aeon's vocabulary
+          entirely, so a preset carrying it failed the build outright); aeon's
+          page ACCEPTS it at `c7ee7075` and the premise emptied, so this leaf
+          now renders nothing. IT STAYS MOUNTED ANYWAY: a mounted leaf returning
+          `null` IS the retired state, and re-arming stays a one-line edit in
+          `core/formats/effects/preset-lag.ts` that reaches all three sites at
+          once. Unmounting it here is how the next lag misses this card.
+          ⚠ MERGED, NOT CERTIFIED: nothing here has seen a ROM obey `ramp`. */}
       <PresetLagDisclosure />
 
       <Field label="Top" title={RAMP_FIELD_TITLES.top}>
