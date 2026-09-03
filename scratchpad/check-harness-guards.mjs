@@ -249,7 +249,25 @@ catch (e) { unmeasurable.push(`lib/harness-guard.mjs unreadable: ${e.message}`);
 if (guardSrc) {
   const missing = REQUIRED_EXPORTS.filter((n) =>
     !new RegExp(`export\\s+(async\\s+)?(function|const|let)\\s+${n}\\b`).test(guardSrc));
-  if (missing.length) fails.push(`G4 lib/harness-guard.mjs no longer exports: ${missing.join(', ')}`);
+  if (missing.length) {
+    // ⚠ O52: G4 COULD NOT FAIL THIS CHECK, and the header two rules up says why
+    // it must — "without this the whole check is vacuous the day someone renames
+    // an export". FOUND BY PLANTING, exactly as the `alwaysFatal` block above
+    // was: renaming `RECENT_PROJECT_FILES` printed
+    //     G4 lib/harness-guard.mjs no longer exports: RECENT_PROJECT_FILES
+    // and the run exited 0. The tracked/untracked split keys on
+    // `msg.replace(/^\s*[GS]\d+ /,'').split(':')[0]`, which for this message is
+    // the whole phrase `lib/harness-guard.mjs no longer exports` — not a path
+    // `git ls-files` knows — so every G4 failure was filed as "untracked,
+    // present in this working tree only" and printed rather than gated. Same
+    // shape as the G6 stale-exemption case, one rule over: THE FAILURE WAS
+    // PRINTED, AND PRINTED IS NOT GATED. G4 is a claim about this repo's own
+    // guard module, never about a file the repo may not carry, so it belongs in
+    // `alwaysFatal` for exactly the stated reason.
+    const msg = `G4 lib/harness-guard.mjs no longer exports: ${missing.join(', ')}`;
+    fails.push(msg);
+    alwaysFatal.add(msg);
+  }
   console.log(`G4  lib/harness-guard.mjs exports ${REQUIRED_EXPORTS.length - missing.length}/${REQUIRED_EXPORTS.length} required names`
     + `${missing.length ? ` — MISSING ${missing.join(', ')}` : ''}`);
 }
