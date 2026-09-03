@@ -149,26 +149,278 @@ const REQUIRED_EXPORTS = [
  * So: `keepStrings: true` for the token hunts (G2, G3), `false` for the
  * structural scan (G1), which needs to see call shapes and would otherwise trip
  * over an `xvfb-run` mentioned in a log line.
+ *
+ * ⚠ AND THE SECOND VERSION HAD NO REGEX-LITERAL CASE, WHICH DESYNCHRONISED THE
+ * WHOLE SCANNER ON ONE APOSTROPHE (O77 §5b, repaired in O79). On
+ * `/a row in aeon's band-demo table/` it read the `'` as a string open, ran
+ * forward to the next `'` — hundreds of characters and several lines away —
+ * and everything in between was emitted VERBATIM under `keepStrings: true`,
+ * `//` comments included. band-preset-harness.mjs's own comment saying *"there
+ * is no `pkill` on a pattern anywhere in this file"* survived stripping and
+ * tripped G2 as a `pkill` CALL. The report was exactly backwards. A regex
+ * containing `//` (`/https?:\/\//`) was worse and in the blind direction: the
+ * `/` `/` pair read as a line comment and the REST OF THE LINE was deleted.
+ *
+ * ═══ THE DIVISION-VS-REGEX RULE, AND WHAT IT GETS WRONG ═══
+ *
+ * A `/` opens a regex iff the preceding significant token cannot END an
+ * expression. `prevIsValue` tracks that: it is set after an identifier, a
+ * number, a closing string/template/regex, `]`, and `++`/`--`, and cleared
+ * after every other punctuator, at start of input, and after the keywords that
+ * can be followed by an expression (`return`, `typeof`, `case`, `in`, `of`,
+ * `new`, `delete`, `void`, `throw`, `do`, `else`, `yield`, `await`,
+ * `instanceof`). `)` is resolved by looking back at what precedes its MATCHING
+ * `(`: an `if`/`while`/`for`/`switch`/`catch`/`with` head leaves statement
+ * position, so `if (x) /re/.test(y)` is a regex, while `slice(i) / 2` is
+ * division. Two further nets, both cheap and both decisive: a regex body
+ * cannot contain a raw newline, so a tentative regex that does not close on
+ * its own line is RETRACTED and re-read as division; and a `'`/`"` string
+ * cannot contain one either, so a quote scan that crosses a newline means the
+ * scanner is out of sync and says so instead of running on.
+ *
+ * THE ONE CASE IT REFUSES TO GUESS is a `/` immediately after `}`, which is a
+ * block end (statement position, so a regex) or an object-literal/function-
+ * expression end (a value, so division) with no local way to tell. Guessing it
+ * either way is how a checker becomes silently blind in a corner, so it is
+ * pushed to `notes` and the caller renders it UNMEASURABLE, which fails.
+ * Measured over this repo's whole scratchpad/ population: zero occurrences.
+ *
+ * CASES THE RULE IS KNOWN TO GET WRONG, none of which can hide a token:
+ *   · a keyword name used as a PROPERTY (`m.delete / 2`, `x.of / 2`) reads as
+ *     the keyword, so the `/` is tried as a regex;
+ *   · a `)` that ends a statement-position expression through ASI, or a regex
+ *     after a `)` whose `(` is not a control-flow head;
+ *   · `return` / `throw` on one line with the `/` on the next (ASI again).
+ * Every one of them is a MIS-CLASSIFICATION, not a deletion: the tentative
+ * regex either closes on its line and is copied out character-for-character, or
+ * does not and is retracted with a note. Measured over all 182 .mjs files in
+ * scratchpad/, in both modes: not one of these fires.
+ *
+ * Regex literals are emitted VERBATIM in BOTH modes, never blanked. That is
+ * deliberate and it is what makes this change unable to be blinder than what it
+ * replaces: recognising a regex only stops the scanner mistaking its contents
+ * for a string or a comment, it never deletes a character that the old scanner
+ * kept. A `/` misread AS a regex therefore also costs nothing under
+ * `keepStrings: true` — the same characters come out either way.
+ *
+ * @param notes optional array; ambiguities and desyncs are pushed here. A
+ *   caller that passes it MUST treat a non-empty array as unmeasurable.
  */
-function stripInert(src, { keepStrings = false } = {}) {
+const REGEX_OK_AFTER_WORD = new Set([
+  'return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'throw',
+  'case', 'do', 'else', 'yield', 'await',
+]);
+
+function stripInert(src, { keepStrings = false } = {}, notes = null) {
+  const note = (m) => { if (notes) notes.push(m); };
+  const lineAt = (idx) => src.slice(0, idx).split('\n').length;
   let out = '';
   let i = 0;
   const n = src.length;
+  // Can the token just consumed END an expression? Decides `/`.
+  let prevIsValue = false;
   while (i < n) {
     const c = src[i];
     const d = src[i + 1];
-    if (c === '/' && d === '/') { while (i < n && src[i] !== '\n') { if (src[i] === '\n') break; i++; } continue; }
-    if (c === '/' && d === '*') { i += 2; while (i < n && !(src[i] === '*' && src[i + 1] === '/')) i++; i += 2; continue; }
-    if (c === '"' || c === "'" || c === '`') {
+    if (c === '/' && d === '/') { while (i < n && src[i] !== '\n') i++; continue; }
+    if (c === '/' && d === '*') {
+      i += 2;
+      while (i < n && !(src[i] === '*' && src[i + 1] === '/')) i++;
+      if (i >= n) { note(`unterminated /* */ comment opened before line ${lineAt(i)}`); break; }
+      i += 2;
+      continue;
+    }
+    if (c === '"' || c === "'") {
       const q = c; const start = i; i++;
-      while (i < n && src[i] !== q) { if (src[i] === '\\') i++; i++; }
+      while (i < n && src[i] !== q && src[i] !== '\n') { if (src[i] === '\\') i++; i++; }
+      if (i >= n || src[i] === '\n') {
+        // A single- or double-quoted string cannot cross a newline. Reaching one
+        // means this quote was not a string open at all and the scan is out of
+        // sync — the exact failure O77 §5b hit. Say so; never run on.
+        note(`a ${q === "'" ? 'single' : 'double'}-quoted string opened at line `
+          + `${lineAt(start)} never closed on its line — the scanner is out of sync here`);
+        out += src.slice(start, i);
+        continue;
+      }
       i++;
       out += keepStrings ? src.slice(start, i) : '""';
+      prevIsValue = true;
+      continue;
+    }
+    if (c === '`') {
+      const start = i;
+      const end = scanTemplate(src, i);
+      if (end < 0) {
+        // A template that cannot be bracketed is the SECOND desync source, and
+        // it was in here before the regex one: the old scan ran backtick to
+        // backtick, so a NESTED template inside a `${}` closed the outer one
+        // early and everything after it was read as code. Four files in this
+        // population do that. Loud, not guessed.
+        note(`a template literal opened at line ${lineAt(start)} could not be bracketed `
+          + '(unterminated, or a `${}` this scanner cannot balance)');
+        out += src.slice(start); i = n;
+        continue;
+      }
+      i = end;
+      out += keepStrings ? src.slice(start, i) : '""';
+      prevIsValue = true;
+      continue;
+    }
+    if (c === '/') {
+      // `}` is the case with no local answer. Refuse it loudly.
+      let k = out.length - 1;
+      while (k >= 0 && /\s/.test(out[k])) k--;
+      if (k >= 0 && out[k] === '}') {
+        note(`a \`/\` follows \`}\` at line ${lineAt(i)} — regex or division cannot be `
+          + 'decided here without a parser, and this check will not guess');
+        out += c; i++; prevIsValue = false;
+        continue;
+      }
+      // `)` overrides the flag: only a look-back at its matching `(` can say
+      // whether it ended a control-flow head (statement position → regex) or a
+      // call (value → division).
+      const endsWithParen = k >= 0 && out[k] === ')';
+      const isValue = endsWithParen ? closeParenIsValue(out) : prevIsValue;
+      if (!isValue) {
+        const end = scanRegex(src, i);
+        if (end > 0) { out += src.slice(i, end); i = end; prevIsValue = true; continue; }
+        // Did not close on its line: it was not a regex. Fall through as division.
+        note(`a \`/\` at line ${lineAt(i)} read as a regex start by the token before it did `
+          + 'not close on its own line — treated as division; verify by hand');
+      }
+      out += c; i++; prevIsValue = false;
+      continue;
+    }
+    if (/[A-Za-z_$]/.test(c)) {
+      let j = i; while (j < n && /[A-Za-z0-9_$]/.test(src[j])) j++;
+      const word = src.slice(i, j);
+      out += word; i = j;
+      prevIsValue = !REGEX_OK_AFTER_WORD.has(word);
+      continue;
+    }
+    if (/[0-9]/.test(c)) {
+      let j = i; while (j < n && /[0-9a-fA-FxXoObBeE._]/.test(src[j])) j++;
+      out += src.slice(i, j); i = j; prevIsValue = true;
       continue;
     }
     out += c; i++;
+    if (!/\s/.test(c)) {
+      // `]` and `)` end a value; `++`/`--` do too. Everything else does not.
+      // `)` is refined by closeParenIsValue() at the `/` above, which is the
+      // only place the distinction matters.
+      prevIsValue = c === ']' || c === ')'
+        || ((c === '+' || c === '-') && out[out.length - 2] === c);
+    }
   }
   return out;
+}
+
+/**
+ * Scan a regex literal starting at `src[i] === '/'`. Returns the index one past
+ * its closing `/` plus flags, or -1 if it does not close on its own line — a
+ * regex body cannot contain a raw newline, so that answer is decisive, not a
+ * guess. Handles `\/` and a `/` inside a `[...]` character class.
+ */
+function scanRegex(src, i) {
+  let j = i + 1;
+  let inClass = false;
+  for (; j < src.length; j++) {
+    const ch = src[j];
+    if (ch === '\n') return -1;
+    if (ch === '\\') { j++; continue; }
+    if (inClass) { if (ch === ']') inClass = false; continue; }
+    if (ch === '[') { inClass = true; continue; }
+    if (ch === '/') { j++; while (j < src.length && /[a-z]/.test(src[j])) j++; return j; }
+  }
+  return -1;
+}
+
+/**
+ * Bracket a template literal starting at `src[i] === '`'`, returning the index
+ * one past its closing backtick, or -1.
+ *
+ * ⚠ A `${}` IS CODE AND CAN HOLD ANOTHER TEMPLATE. The scan this replaced went
+ * backtick-to-backtick, so `` `a ${x ? `b's c` : 'd'}` `` ended at the INNER
+ * opener and the rest was read as code — the same desync class as the missing
+ * regex case, and it is live in four files here (band-trunk-demo ×2,
+ * crossover-paint-harness, effects-column-harness). Interiors are balanced by
+ * `scanInterp`, which knows strings, comments, nested templates and regexes.
+ */
+function scanTemplate(src, i) {
+  let j = i + 1;
+  while (j < src.length) {
+    const ch = src[j];
+    if (ch === '\\') { j += 2; continue; }
+    if (ch === '`') return j + 1;
+    if (ch === '$' && src[j + 1] === '{') {
+      const e = scanInterp(src, j + 1);
+      if (e < 0) return -1;
+      j = e; continue;
+    }
+    j++;
+  }
+  return -1;
+}
+
+/** Balance a `${` … `}` interior. `src[i] === '{'`; returns the index one past
+ *  the matching `}`, or -1 when a literal inside it cannot be bracketed. */
+function scanInterp(src, i) {
+  let depth = 0;
+  let j = i;
+  let lastSig = '';
+  while (j < src.length) {
+    const ch = src[j]; const d = src[j + 1];
+    if (ch === '{') { depth++; j++; lastSig = ch; continue; }
+    if (ch === '}') { depth--; j++; if (depth === 0) return j; lastSig = ch; continue; }
+    if (ch === '/' && d === '/') { while (j < src.length && src[j] !== '\n') j++; continue; }
+    if (ch === '/' && d === '*') {
+      j += 2;
+      while (j < src.length && !(src[j] === '*' && src[j + 1] === '/')) j++;
+      if (j >= src.length) return -1;
+      j += 2; continue;
+    }
+    if (ch === '`') { const e = scanTemplate(src, j); if (e < 0) return -1; j = e; lastSig = ch; continue; }
+    if (ch === '"' || ch === "'") {
+      const q = ch; let k = j + 1;
+      while (k < src.length && src[k] !== q && src[k] !== '\n') { if (src[k] === '\\') k++; k++; }
+      if (k >= src.length || src[k] === '\n') return -1;
+      j = k + 1; lastSig = ch; continue;
+    }
+    if (ch === '/' && !/[A-Za-z0-9_$)\]'"`]/.test(lastSig)) {
+      const e = scanRegex(src, j);
+      if (e > 0) { j = e; lastSig = '/'; continue; }
+    }
+    if (!/\s/.test(ch)) lastSig = ch;
+    j++;
+  }
+  return -1;
+}
+
+/**
+ * The `)` case. `out` ends (modulo whitespace) at a `)`; walk back to its
+ * matching `(` and ask what precedes it. A control-flow head — `if`, `while`,
+ * `for`, `switch`, `catch`, `with` — leaves the parser in STATEMENT position,
+ * where a following `/` is a regex; anything else (a call, a grouping, an arrow
+ * parameter list) is a value, where it is division. Returns true for "value",
+ * i.e. division. Anything it cannot bracket is treated as a value, which is the
+ * status-quo reading and cannot delete a character either way.
+ */
+function closeParenIsValue(out) {
+  let k = out.length - 1;
+  while (k >= 0 && /\s/.test(out[k])) k--;
+  if (k < 0 || out[k] !== ')') return false;
+  let depth = 0;
+  for (; k >= 0; k--) {
+    if (out[k] === ')') depth++;
+    else if (out[k] === '(') { depth--; if (depth === 0) break; }
+  }
+  if (k < 0) return true;
+  let w = k - 1;
+  while (w >= 0 && /\s/.test(out[w])) w--;
+  let e = w;
+  while (w >= 0 && /[A-Za-z0-9_$]/.test(out[w])) w--;
+  const word = out.slice(w + 1, e + 1);
+  return !['if', 'while', 'for', 'switch', 'catch', 'with'].includes(word);
 }
 
 /** The literal text of a call's arguments, `(` through its matching `)`.
@@ -301,7 +553,24 @@ for (const path of listFiles(DIR, ['.mjs'])) {
   // Bracketing a call whose strings are intact can fail on a literal paren
   // inside a string; that returns null and is reported UNMEASURABLE, which is
   // loud. Silently misclassifying is not.
-  const tok = stripInert(raw, { keepStrings: true });
+  // LOUD ON A SCANNER IT CANNOT TRUST. `stripInert` refuses to guess a `/`
+  // after `}` and reports any quote scan that crosses a newline; either means
+  // the token hunts below are running over text this check cannot vouch for, so
+  // the file is UNMEASURABLE — never a pass. (O79; the failure it replaces was
+  // silent in one direction and exactly backwards in the other.)
+  const stripNotes = [];
+  // Drained at BOTH strip calls, because there is a `continue` between them and
+  // a note dropped on that path is a file this check silently stopped vouching
+  // for. Deduped: the two passes see the same source.
+  const drainStripNotes = () => {
+    while (stripNotes.length) {
+      const m = stripNotes.shift();
+      const line = `${rel}: the comment/string scanner could not vouch for this file — ${m}`;
+      if (!unmeasurable.includes(line)) unmeasurable.push(line);
+    }
+  };
+  const tok = stripInert(raw, { keepStrings: true }, stripNotes);
+  drainStripNotes();
   const src = tok;
 
   // ── find every spawn-ish call ────────────────────────────────────────────
@@ -366,7 +635,8 @@ for (const path of listFiles(DIR, ['.mjs'])) {
   // "`killTree(child.pid)` spelling" inside a check LABEL. (The cost: a call
   // written inside a template literal's `${}` is blanked with the string and
   // not seen — no harness does that, and a launcher's teardown never should.)
-  const shape = stripInert(raw, { keepStrings: false });
+  const shape = stripInert(raw, { keepStrings: false }, stripNotes);
+  drainStripNotes();
   if (!isGuardModule && !isThisChecker && /\bprocess\.exit\s*\(/.test(shape)) {
     const dropped = [];
     const kt = /(?<![\w.$])killTree\s*\(/g;
