@@ -64,6 +64,7 @@
     "harness:curve-option-disabled": "node scratchpad/curve-option-disabled-harness.mjs",
     "harness:effects-drift": "node scratchpad/effects-drift-harness.mjs",
     "harness:effects-sub-tabs": "node scratchpad/effects-sub-tabs-harness.mjs",
+    "harness:effects-preview-default": "node scratchpad/effects-preview-default-harness.mjs",
     "harness:effects-guide": "node scratchpad/effects-guide-harness.mjs",
     "harness:effects-refusal": "node scratchpad/effects-refusal-harness.mjs",
     "harness:effects-section-picker": "node scratchpad/effects-section-picker-harness.mjs",
