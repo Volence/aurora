@@ -67,6 +67,7 @@
     "harness:effects-preview-default": "node scratchpad/effects-preview-default-harness.mjs",
     "harness:effects-guide": "node scratchpad/effects-guide-harness.mjs",
     "harness:effects-guides": "node scratchpad/effects-guides-harness.mjs",
+    "harness:save-file-count": "node scratchpad/save-file-count-harness.mjs",
     "harness:effects-refusal": "node scratchpad/effects-refusal-harness.mjs",
     "harness:effects-section-picker": "node scratchpad/effects-section-picker-harness.mjs",
     "harness:effects-section-strip": "node scratchpad/effects-section-strip-harness.mjs",
