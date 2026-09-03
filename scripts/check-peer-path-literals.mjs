@@ -593,8 +593,36 @@ const WRITE_VERBS_DEST_FIRST = [
 const WRITE_VERBS_DEST_SECOND = ['cpSync', 'copyFileSync', 'renameSync', 'linkSync', 'symlinkSync'];
 const WRITE_VERBS = [...WRITE_VERBS_DEST_FIRST, ...WRITE_VERBS_DEST_SECOND];
 
-const RESOLVER_DEFAULT_CALL = new RegExp(`(?:${PEER_DEFAULT_RESOLVERS.join('|')})\\s*\\(`);
-const RESOLVER_OVERRIDE_CALL = new RegExp(`${PEER_OVERRIDE_RESOLVER}\\s*\\(`);
+/**
+ * The two call regexes for ONE file — canonical names PLUS whatever that file
+ * imported them AS.
+ *
+ * ⚠ FOUND BY THE SECOND RED-FIRST PLANT, NOT BY READING. A plant spelled
+ * `import { siblingPathOrUnresolved as _sp }` and then `rmSync` on a path built
+ * from `_sp('s1disasm')` left the gate at exit 0 — the call site never carries
+ * the canonical text, so a regex over it sees an empty world, and a rule that
+ * can be escaped by renaming an import polices only the people who did not.
+ * This is rule 4's `IMPORTED_CHECKOUT_NAMES` lesson arriving one rule later,
+ * except that here the local name is DERIVABLE rather than a convention: the
+ * import statement says exactly which export it renamed.
+ */
+function resolverCalls(code) {
+  const def = new Set(PEER_DEFAULT_RESOLVERS);
+  const ovr = new Set([PEER_OVERRIDE_RESOLVER]);
+  for (const m of code.matchAll(/\bimport\s*\{([^}]*)\}\s*from\s*['"][^'"]+['"]/g)) {
+    for (const spec of m[1].split(',')) {
+      const [imported, renamed] = spec.trim().split(/\s+as\s+/).map((s) => s.trim());
+      const local = renamed || imported;
+      if (!imported || !local) continue;
+      if (PEER_DEFAULT_RESOLVERS.includes(imported)) def.add(local);
+      if (imported === PEER_OVERRIDE_RESOLVER) ovr.add(local);
+    }
+  }
+  return {
+    isDefault: new RegExp(`(?<![.\\w$])(?:${[...def].join('|')})\\s*\\(`),
+    isOverride: new RegExp(`(?<![.\\w$])(?:${[...ovr].join('|')})\\s*\\(`),
+  };
+}
 
 /** Every `const|let|var NAME = EXPR` in one file, EXPR possibly spanning lines. */
 function* bindings(code) {
@@ -646,12 +674,13 @@ function composesPathOver(expr, name) {
  * exemption entry.
  */
 function peerDefaultAliases(code) {
+  const call = resolverCalls(code);
   const def = new Set(), ovr = new Set();
   for (let pass = 0; pass < 8; pass++) {
     const before = def.size + ovr.size;
     for (const [name, expr] of bindings(code)) {
-      if (RESOLVER_DEFAULT_CALL.test(expr) || [...def].some((d) => composesPathOver(expr, d))) { def.add(name); continue; }
-      if (RESOLVER_OVERRIDE_CALL.test(expr) || [...ovr].some((o) => composesPathOver(expr, o))) ovr.add(name);
+      if (call.isDefault.test(expr) || [...def].some((d) => composesPathOver(expr, d))) { def.add(name); continue; }
+      if (call.isOverride.test(expr) || [...ovr].some((o) => composesPathOver(expr, o))) ovr.add(name);
     }
     if (def.size + ovr.size === before) break;
   }
@@ -934,6 +963,15 @@ const CANARIES = [
       "const LOCALWORK = join(ROOT, 'scratchpad/work-canary');",
       `${CANARY_COPY}(CANVASD, LOCALWORK, { recursive: true });`,
       `${CANARY_COPY}(LOCALWORK, CANVASD, { recursive: true });`,
+      // Lines 32-34: THE RESOLVER IMPORTED UNDER ANOTHER NAME. The second
+      // red-first plant escaped the rule entirely by writing
+      // `import { … as _sp }`, because the call site then carries none of the
+      // canonical text and a regex over it reports an empty world. The local
+      // name is not a convention here — the import statement names it — so this
+      // canary line is what keeps that seed alive.
+      `import { ${CANARY_DEFAULT_RESOLVER} as _cr } from './sibling-root.mjs';`,
+      `const S2 = _cr('${CANARY_PEER}');`,
+      `${CANARY_WRITE_DIR}(S2, { recursive: true, force: true });`,
     ].join('\n'),
     at: [
       [3, 'sibling-literal'], [4, 'session-scratchpad'], [5, 'unratified-env'], [6, 'unratified-env'],
@@ -941,6 +979,7 @@ const CANARIES = [
       [13, 'checkout-as-build-tree'], [15, 'checkout-as-build-tree'],
       [17, 'checkout-as-build-tree'],
       [20, 'peer-tree-write'], [22, 'peer-tree-write'], [31, 'peer-tree-write'],
+      [34, 'peer-tree-write'],
     ],
   },
   {
