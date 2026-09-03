@@ -82,10 +82,12 @@
 //        the clicked one") describes an event that can no longer occur. It is
 //        not deleted quietly and it is not re-pointed at something vacuous; the
 //        full accounting, and what replaces it, is at the retirement block.
-//   [k3] [k4] [k5] [k6] NEW — the positive form of the ruling: neither button
-//        keeps focus after a real click, a bare Space afterwards changes
-//        nothing, and a SECOND real click still fires (the anti-cheat row,
-//        without which the other three pass on buttons that simply do nothing).
+//   [k3] [k4] [k5] [k6] [k7] NEW — the positive form of the ruling: neither
+//        button keeps focus after a real click, a bare Space afterwards changes
+//        nothing, a SECOND real click still fires (the anti-cheat row, without
+//        which the others pass on buttons that simply do nothing), and a press
+//        that changes NOTHING drops focus too ([k7], the row that makes
+//        "unconditional" a measurement rather than a comment).
 //   [c8] REWORDED — it used to say "pressed with focus still on the button",
 //        and proved `isTypingTarget`'s <button> exemption in passing. The
 //        Ctrl+Z now arrives from <body>. What it ASSERTS is unchanged (one
@@ -598,7 +600,7 @@ async function main() {
     // in the note rather than inferred from a comment.
     const focusAfter = await c.json(String.raw`(() => {
       const a = document.activeElement;
-      return { tag: a ? a.tagName : null, text: a ? (a.textContent || '').trim() : null,
+      return { tag: a ? a.tagName : null, text: a ? (a.textContent || '').trim().slice(0, 32) : null,
                isClear: a === window.__o48b.el('sec1') };
     })()`);
     note('focus after the click', JSON.stringify(focusAfter));
@@ -846,18 +848,19 @@ async function main() {
     // that is the vacuity this file already paid for once at [c4]. So it is
     // RETIRED rather than re-pointed, and deliberately not deleted in silence.
     //
-    // WHAT REPLACES IT. Four positive rows below, which assert the ruling
+    // WHAT REPLACES IT. Five positive rows below, which assert the ruling
     // instead of the old behaviour: [k3]/[k4] the button does not keep focus,
     // [k5] a bare Space afterwards changes nothing on the plane, [k6] a second
     // real click still fires (without which [k3]-[k5] could all be satisfied by
-    // simply breaking the buttons).
+    // simply breaking the buttons), and [k7] a press that changes NOTHING drops
+    // focus too — the row that gates the UNCONDITIONAL half of the design.
     //
     // WHAT IS NOT LOST WITH IT. The undo property [k2] asserted still has an
     // owner: [c8]/[c9] prove one Ctrl+Z restores a CLICKED wipe exactly,
     // unowned bits included, and [c10]/[r9] pin the one-command-per-press half.
     // Nothing that only [k2] covered has gone unmeasured.
 
-    console.log('\n=== [k3..k6] d-27 — the button acts and DROPS FOCUS ===');
+    console.log('\n=== [k3..k7] d-27 — the button acts and DROPS FOCUS ===');
     const planeStats = () =>
       c.json(`window.__o48b.stats(window.__o48b.read(${SEC}, '${PLANE}'), ${M.unowned}, ${M.owned})`);
     const focusNow = (handle) => c.json(String.raw`(() => {
@@ -970,6 +973,30 @@ async function main() {
       + `(isTheResetButton=${focusAfterResetBlur.isTheButton}); the click changed `
       + `${resetBlurDiff.changed} cells. Reset is a SEPARATE onClick from Clear's — a blur wired to `
       + 'only one of the two would pass [k3] and fail here.');
+
+    // ── [k7] THE NO-OP PRESS, which is the half a cheaper fix would miss ──
+    //
+    // The plane is now AT the baseline, so this second consecutive Reset takes
+    // `if (!entries.length) return` and writes nothing ([r7] proves that return
+    // is real and pushes no phantom undo step). It is measured HERE because it
+    // is the case d-27's implementation had a choice about: blurring inside the
+    // handler AFTER the early returns would satisfy [k3] and [k4] and leave the
+    // button focused on exactly the press an author is least likely to notice —
+    // and a repeat Space is most pointless precisely when the last press did
+    // nothing. `actAndDropFocus` blurs BEFORE the action for that reason, and
+    // this row is what makes "unconditional" a measurement rather than a claim
+    // in a comment.
+    await c.evalExpr(`window.__o48b.snap('preNoopPress', ${SEC}, '${PLANE}')`);
+    await clickHandle(c, RESET, 'Reset (no-op press — already at the baseline)');
+    const focusAfterNoop = await focusNow(RESET);
+    const noopDiff = await c.json(`window.__o48b.diff('preNoopPress', ${SEC}, '${PLANE}')`);
+    check('k7', 'd-27 is UNCONDITIONAL: a press that changes NOTHING (second consecutive Reset, the '
+      + '`!entries.length` early return) still drops focus',
+      noopDiff.changed === 0 && focusAfterNoop.isTheButton === false,
+      `the press changed ${noopDiff.changed} cells (0 = it really did take the early return, which is `
+      + `what makes this the no-op path) and activeElement after it is <${focusAfterNoop.tag}> `
+      + `"${focusAfterNoop.text}" (isTheResetButton=${focusAfterNoop.isTheButton}). An implementation `
+      + 'that blurred only on the acting path passes [k3] and [k4] and fails HERE.');
     for (let i = 0; i < 3 && (await canUndo(c)); i++) { await ctrlZ(c); await sleep(300); }
 
     // ── restore the poked fixture cells ──────────────────────────────────
