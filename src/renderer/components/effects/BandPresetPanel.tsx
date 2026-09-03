@@ -65,17 +65,44 @@ import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import type { AnyCommand } from '../../../core/editing/commands';
 import type {
   EffectsPresetLibrary, EffectsPresetBand, EffectsPreset, EffectsPresetCycleChannel,
-  EffectsPresetPalVariant,
+  EffectsPresetPalVariant, EffectsPresetRamp,
 } from '../../../core/formats/effects/preset';
 import {
   EFFECTS_PRESET_BAND_KEYS, presetArmFields, presetDefFields,
   EFFECTS_PRESET_MAX_PATCH, ANCHOR_PHASE_RANGE,
+  // THE NARROWING QUESTION, ASKED ONCE. `bands` left the schema's top-level
+  // `required` when `ramp` arrived and the root became a `oneOf`, so a preset
+  // carries EXACTLY ONE raster program. This is the codec's helper for asking
+  // which; testing `bands` for undefined here would be a second spelling of a
+  // rule that lives in the contract.
+  presetRasterChannel, presetFp16ToNumber,
 } from '../../../core/formats/effects/preset';
 import {
   PRESET_HEADLINE, presetLimitsShort, NO_PREVIEW, NO_PREVIEW_SHORT,
   BAND_FIELD_TITLES, armFieldTitle, armOptions, armLabel,
   bandArm, bandArmAdvisory,
-  presetListEntries, resolveSelectedPreset, presetIdRefusal,
+  presetListEntries, presetListSummary, resolveSelectedPreset, presetIdRefusal,
+  // ═══ THE DENSE RASTER CHANNEL (EW-RAMP-CONTROL, ROADMAP row 128) ═══
+  //
+  // ⚠ ONE RATE AND ONE START OVER A SPAN — there is no curve editor here, no
+  // multi-point widget and no per-line table, and there must never be one:
+  // `RasterRampProgram` has a single `rrp_step` and a single `rrp_start` and no
+  // field that could receive a table, so a control offering per-line values
+  // would author a document that validates, generates and is silently wrong on
+  // hardware. `RAMP_MUST_NOT` is the contract's own statement of it, parsed out
+  // of the schema, and is painted in the card below at `RAMP_MUST_NOT_SHORT`.
+  //
+  // Every bound, refusal and sentence is the provider's, as everything else on
+  // this surface is — including the two the codec parcel left explicitly for
+  // this one: the `top + lines` span (a valid-looking pair that fails the
+  // build) and the VSRAM display lag (a readout one line high looks correct).
+  RAMP_FIELD_TITLES, RAMP_TITLE, RAMP_KEYS, RAMP_MUST_NOT, RAMP_MUST_NOT_SHORT,
+  RAMP_RATE_UNIT, RAMP_DISPLAY_LAG_NOTE,
+  rampSpanRefusal, rampAddrRefusal, rampAddrGloss, rampRateRefusal, rampRateUnits,
+  rampDisplayGloss, rampDriftSummary,
+  setRampSpanCommand, setRampAddrCommand, setRampRateCommand,
+  RASTER_CHANNEL_OPTIONS, rasterChannelSwapAdvisory, setRasterChannelCommand,
+  bandControlsRefusal,
   RASTER_REF_ROW, presetRefOptions, unassignablePresetRef, sectionPresetCommand,
   createPresetCommand, deletePresetCommand,
   addBandCommand, removeBandCommand, lastBandRefusal, deletePresetRefusal,
@@ -264,8 +291,12 @@ export default function BandPresetPanel(): React.ReactElement | null {
                       minWidth: 0, overflow: 'hidden',
                       textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>{e.label}</span>
+                    {/* `ramp`, or `N bands` — the PROVIDER's sentence. A ramp
+                        document has no `bands` key at all, so a bare count
+                        rendered it as "0 bands", which reads as a broken preset
+                        rather than a different kind of one. */}
                     <span style={{ opacity: 0.7, flexShrink: 0 }}>
-                      {e.bands} band{e.bands === 1 ? '' : 's'}
+                      {presetListSummary(e)}
                     </span>
                   </button>
                 ))}
@@ -425,6 +456,38 @@ export default function BandPresetPanel(): React.ReactElement | null {
                 style={textInput} />
             </Field>
 
+            {/* ═══ WHICH RASTER PROGRAM THIS DOCUMENT CARRIES (row 128) ═══
+
+                A `<select>` and not a pair of buttons, and not a confirm
+                dialog. The panel's own precedent is the band's ON arm, which
+                REPLACES an arm body on a select change and says so in one line
+                ("the author's old arm body is NOT lost to them — the swap is
+                one undo step"); this is the same shape one level up.
+
+                ⚠ IT IS DESTRUCTIVE AND IT IS ONE Ctrl+Z, which is the bar it
+                had to clear. `setRasterChannelCommand` goes through
+                `editPresetCommand`, so the command carries the WHOLE old
+                document and the whole new one and undo re-places the old one
+                verbatim — every band back, in order, with its colours. That is
+                why the affordance exists at all: decision cards d-29 and d-30
+                are about destructive controls that are NOT one undo away.
+
+                THE ADVISORY IS UNCONDITIONAL AND SITS UNDER IT, naming what
+                the switch would discard — `deletePresetRefusal`'s ruling that
+                a confirm asks "are you sure?" about a consequence the author
+                cannot see, while a sentence NAMES it. */}
+            <Field label="Raster" title={RAMP_TITLE}>
+              <Select title={RAMP_TITLE}
+                value={presetRasterChannel(selected) ?? ''}
+                onChange={(v) => run(setRasterChannelCommand(library, selected.id, v))}
+                style={{ flex: 1, minWidth: 0 }}>
+                {RASTER_CHANNEL_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </Select>
+            </Field>
+            <Hint under>{rasterChannelSwapAdvisory(selected)}</Hint>
+
             {(selected.bands ?? []).map((band, i) => (
               <BandCard key={i} library={library} presetId={selected.id} index={i} band={band}
                 run={run}
@@ -435,7 +498,26 @@ export default function BandPresetPanel(): React.ReactElement | null {
                 setColoursRefusal={(r) => setColoursRefusal((s) => ({ ...s, [i]: r }))} />
             ))}
 
-            <Chip onClick={() => run(addBandCommand(library, selected.id))}>Add raster band</Chip>
+            {/* ═══ THE DEAD CONTROL, WITH ITS REASON BESIDE IT ═══
+
+                `addBandCommand` became a SILENT NO-OP on a ramp document when
+                the root became a `oneOf` — correctly, because growing a `bands`
+                key onto a ramp preset would author the both-keys document the
+                schema refuses, on every click. But a control that goes dead
+                with no sentence is this repo's standing complaint, and the
+                owner has been on the receiving end of it. `bandControlsRefusal`
+                is ONE predicate read by the `disabled` flag AND by the Hint, so
+                the greyed chip and the reason cannot disagree. */}
+            <Chip disabled={bandControlsRefusal(selected) !== null}
+              title={bandControlsRefusal(selected) ?? undefined}
+              onClick={() => run(addBandCommand(library, selected.id))}>Add raster band</Chip>
+            {bandControlsRefusal(selected) !== null && (
+              <Hint tone="warning" style={{ marginTop: T.s2 }}>{bandControlsRefusal(selected)}</Hint>
+            )}
+
+            {selected.ramp !== undefined && (
+              <RampCard library={library} presetId={selected.id} ramp={selected.ramp} run={run} />
+            )}
           </SectionBody>
         </CollapsibleSection>
       )}
@@ -1210,6 +1292,171 @@ function BandCard({
         Writes {EFFECTS_PRESET_BAND_KEYS.join(', ')} — all four, every time.
         No field here has a default.
         {arm !== null && ` The ON arm is ${armLabel(arm)}; exactly one arm is allowed.`}
+      </Hint>
+    </Card>
+  );
+}
+
+/**
+ * THE RAMP CARD — the dense raster channel's whole authoring surface.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ║ ONE RATE, ONE START, ONE SPAN — AND THAT IS DELIBERATELY ALL THERE IS   ║
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Five fields, because the ramp has five keys and the constructor defaults none
+ * of them. THERE IS NO CURVE EDITOR HERE, no multi-point widget and no per-line
+ * table, and none may ever be added: `RasterRampProgram` has a single
+ * `rrp_step` and a single `rrp_start` and no field that could receive a table,
+ * so a control offering per-line values would author a document that validates,
+ * generates, and is then silently wrong on hardware. The contract's own
+ * statement of that is painted at the top of this card (`RAMP_MUST_NOT_SHORT`)
+ * with the full sentence — parsed out of the schema, not retyped — on its title.
+ *
+ * ⚠ THE TWO NUMBERS THAT LOOK FINE AND ARE NOT, both handled by the provider:
+ *
+ *   • `top` and `lines` can EACH be in range while `top + lines` is not. 222 and
+ *     220 satisfy every schema keyword and the pair is refused by the engine, so
+ *     `rampSpanRefusal` refuses it HERE, at typing time, with the schema's own
+ *     number — not at somebody else's build.
+ *   • A rate that has no spelling is REFUSED AND NOT ROUNDED. The interval
+ *     between -1 and 0 is unreachable in this encoding (the sign lives on the
+ *     whole part), so `-0.5` cannot be written at all; `rampRateRefusal` names
+ *     the nearest values that CAN be, and nothing here snaps.
+ *
+ * ⚠ AND NO min/max ON ANY SPINNER, aeon's §E.4, exactly as the band card: those
+ * attributes govern the arrows and `:invalid` and stop no typed value. `refuse`
+ * is the only thing that withholds a commit. `step` IS set on the two rate
+ * fields, and it is not a range: without it a browser snaps a fractional value
+ * to a whole number on one arrow press, which would turn 0.25 into 1.
+ *
+ * THE LAG IS APPLIED IN EXACTLY ONE PLACE ON THIS CARD — the display readout
+ * under Lines, which is a claim about SCREEN lines. The Top field is the
+ * ENGINE's top and is written to the file verbatim. No stage of the engine path
+ * compensates (measured by the engine lane, 2026-09-03), so the compensation is
+ * ours and this is where it lives; `rampDisplaySpan`'s docblock carries the
+ * whole reasoning and `RAMP_DISPLAY_LAG_NOTE` is the readout's own title.
+ *
+ * NO PREVIEW IS DRAWN, and that is not an oversight: nothing in this editor has
+ * ever drawn a raster program, `NO_PREVIEW` says so at the top of the panel, and
+ * a drawn ramp is exactly where the display lag would be most dangerous.
+ */
+function RampCard({ library, presetId, ramp, run }: {
+  library: EffectsPresetLibrary;
+  presetId: string;
+  ramp: EffectsPresetRamp;
+  run: (c: AnyCommand | null) => void;
+}): React.ReactElement {
+  // WHY THE REFUSAL OUTLIVES THE BLUR — `BandCard`'s reason, unchanged:
+  // `NumberField` resyncs its text to the document when focus leaves, so an
+  // illegal number visibly snaps back, and if the sentence went with it the
+  // author would watch their value vanish with no explanation. It is cleared on
+  // the box's next focus, so it is never stale advice about a value they have
+  // moved on from.
+  const [why, setWhy] = React.useState<Record<string, string | null>>({});
+  const said = (k: string): string | null => why[k] ?? null;
+  const say = (k: string) => (r: string | null): void => setWhy((s) => ({ ...s, [k]: r }));
+
+  return (
+    <Card>
+      {/* THE MUST NOT, PAINTED. `LimitBlock`'s split, for its reason: the
+          contract sentence carries engine line numbers and an artifact section
+          and is owed to the agent surface; what an author has to ACT ON is the
+          two clauses. Both halves reach this element. */}
+      <Hint tone="warning">
+        <span title={RAMP_MUST_NOT}>{RAMP_MUST_NOT_SHORT}</span>
+      </Hint>
+
+      {/* THE KEY AEON'S GENERATOR DOES NOT ACCEPT YET, and this is the sharper
+          flavour of the lag: `ramp` is absent from `effects_gen.py`'s vocabulary
+          entirely, so a preset carrying it does not merely lose the key — the
+          WHOLE DOCUMENT is refused and the build fails. The leaf derives that
+          from the measured premise and renders nothing the day it empties. */}
+      <PresetLagDisclosure />
+
+      <Field label="Top" title={RAMP_FIELD_TITLES.top}>
+        <NumberField title={RAMP_FIELD_TITLES.top} width={72} value={ramp.top}
+          refuse={(n) => rampSpanRefusal(ramp, presetId, 'top', n)}
+          onRefusal={say('top')}
+          onChange={(n) => run(setRampSpanCommand(library, presetId, 'top', n))} />
+      </Field>
+      {said('top') !== null && <Hint under tone="warning">{said('top')}</Hint>}
+
+      <Field label="Lines" title={RAMP_FIELD_TITLES.lines}>
+        <NumberField title={RAMP_FIELD_TITLES.lines} width={72} value={ramp.lines}
+          refuse={(n) => rampSpanRefusal(ramp, presetId, 'lines', n)}
+          onRefusal={say('lines')}
+          onChange={(n) => run(setRampSpanCommand(library, presetId, 'lines', n))} />
+      </Field>
+      {said('lines') !== null && <Hint under tone="warning">{said('lines')}</Hint>}
+
+      {/* ═══ THE ONE PLACE THE DISPLAY LAG IS APPLIED ═══
+
+          Two spans, said as two spans: the lines the run WRITES on (the
+          document's own numbers, which is what Top above holds) and the lines a
+          viewer SEES it on, which is one later. A readout that printed only the
+          second would be read back as `top`; one that printed only the first
+          would be a screen claim that is one line high and looks right. */}
+      <Hint under>
+        <span title={RAMP_DISPLAY_LAG_NOTE}>{rampDisplayGloss(ramp)}</span>
+      </Hint>
+
+      <Field label="addr" title={RAMP_FIELD_TITLES.addr}>
+        <NumberField title={RAMP_FIELD_TITLES.addr} width={72} value={ramp.target.vsram.addr}
+          refuse={(n) => rampAddrRefusal(ramp, presetId, n)}
+          onRefusal={say('addr')}
+          onChange={(n) => run(setRampAddrCommand(library, presetId, n))} />
+        {/* The `addr` gloss idiom the band card set (a13) — the integer stays,
+            the meaning sits beside it in the control column. It INVENTS
+            NOTHING: the contract establishes 0 and 2 and says in as many words
+            that an odd address's meaning is not established. */}
+        <span style={{ fontSize: T.tXs, color: T.textLo, minWidth: 0 }}>
+          {rampAddrGloss(ramp.target.vsram.addr)}
+        </span>
+      </Field>
+      {said('addr') !== null && <Hint under tone="warning">{said('addr')}</Hint>}
+
+      {/* ═══ THE TWO fp16 FIELDS, AS DECIMAL PIXELS ═══
+
+          An author thinks in pixels of vertical scroll, not in a `{whole,
+          frac256}` pair, so the boxes take a decimal and the CODEC converts.
+          `presetFp16ToNumber` / `presetFp16FromNumber` are the one conversion
+          and are not re-implemented here: the sign lives on `whole` and applies
+          to the whole value, so `{whole: -1, frac256: 128}` is -1.5 and not
+          -0.5, and a second opinion about that in a panel would be a whole pixel
+          of error with both numbers still inside their declared ranges. */}
+      <Field label="Start" title={RAMP_FIELD_TITLES.start}>
+        <NumberField title={RAMP_FIELD_TITLES.start} width={88}
+          step={RAMP_RATE_UNIT} value={presetFp16ToNumber(ramp.start)}
+          refuse={(n) => rampRateRefusal(ramp, presetId, 'start', n)}
+          onRefusal={say('start')}
+          onChange={(n) => run(setRampRateCommand(library, presetId, 'start', n))} />
+        <span style={{ fontSize: T.tXs, color: T.textLo, minWidth: 0 }}>
+          {rampRateUnits('start')}
+        </span>
+      </Field>
+      {said('start') !== null && <Hint under tone="warning">{said('start')}</Hint>}
+
+      <Field label="Step" title={RAMP_FIELD_TITLES.step}>
+        <NumberField title={RAMP_FIELD_TITLES.step} width={88}
+          step={RAMP_RATE_UNIT} value={presetFp16ToNumber(ramp.step)}
+          refuse={(n) => rampRateRefusal(ramp, presetId, 'step', n)}
+          onRefusal={say('step')}
+          onChange={(n) => run(setRampRateCommand(library, presetId, 'step', n))} />
+        <span style={{ fontSize: T.tXs, color: T.textLo, minWidth: 0 }}>
+          {rampRateUnits('step')}
+        </span>
+      </Field>
+      {said('step') !== null && <Hint under tone="warning">{said('step')}</Hint>}
+
+      {/* WHAT THE RAMP DOES, in the author's own arithmetic — and the shape that
+          makes a curve unthinkable: a first value, a last value and a total is
+          the whole vocabulary a linear run has, and there is nowhere in that
+          sentence for a per-line list to go. */}
+      <Hint under>{rampDriftSummary(ramp)}</Hint>
+
+      <Hint under>
+        Writes {RAMP_KEYS.join(', ')} — all five, every time. No field here has a default.
       </Hint>
     </Card>
   );
