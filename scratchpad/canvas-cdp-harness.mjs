@@ -40,8 +40,11 @@ import * as http from 'node:http';
 import { basename, resolve as resolvePath } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { writeFileSync, mkdirSync, existsSync, readFileSync, rmSync, cpSync } from 'node:fs';
-import { spawnGuarded, killTree, restoreDiscoveryNow, readDiscoveryNow, resolveOwnedDiscovery } from './lib/harness-guard.mjs';
+import { spawnGuarded, killTree, restoreDiscoveryNow, readDiscoveryNow, resolveOwnedDiscovery, descendants, APP_NAMES } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import {
+  resolveLeveldbDir, bytesOnDisk, awaitFlushed, flushMarker, flushRefusal, FLUSH_MARKER_KEY,
+} from './lib/storage-flush.mjs';
 
 const PORT = Number(process.env.PORT ?? 9364);
 // SELF-LOCATING, not hardcoded. This file used to name the main checkout
@@ -181,6 +184,21 @@ const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(',').map((s) => s
 const run = (id) => !ONLY || ONLY.has(id);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * HOW LONG THE TEARDOWN WILL WAIT FOR CHROMIUM TO COMMIT THE AREA.
+ *
+ * Not a guess about how long a shutdown takes — the barrier normally returns in
+ * a few seconds and this is only the point at which "it never happened" becomes
+ * the honest answer. Chromium's commit delay is ~5 s at rest and grows with the
+ * page's write volume, so this is an order of magnitude above the resting delay
+ * and still bounded. `FLUSH_BARRIER_MS=0` forces the refusal, which is how the
+ * red-first proof of this gate is taken (see the packet).
+ */
+const FLUSH_BARRIER_MS = Number(process.env.FLUSH_BARRIER_MS ?? 60000);
+/** How many markers the barrier will spend before giving up on a session store
+ *  that keeps moving under it. See `flushBarrier`. */
+const FLUSH_BARRIER_ATTEMPTS = Number(process.env.FLUSH_BARRIER_ATTEMPTS ?? 3);
 
 function getJSON(path, timeoutMs = 1500) {
   return new Promise((resolve, reject) => {
@@ -687,6 +705,8 @@ async function session(label, body) {
   const killGroup = () => killTree(child, { graceMs: 4000 });
 
   let c;
+  let bodyThrew = false;
+  let flushFailure = null;
   try {
     c = cdp(await waitForTarget());
     await c.ready;
@@ -702,6 +722,9 @@ async function session(label, body) {
     if (!dbgOk) throw new Error('__dbg.canvas never installed — was the build made with VITE_AURORA_DEBUG=1?');
     await c.evalExpr(INSTALL);
     return await body(c);
+  } catch (e) {
+    bodyThrew = true;
+    throw e;
   } finally {
     // CLOSE THE WINDOW BEFORE KILLING THE PROCESS. Chromium commits a
     // localStorage area on a throttled timer and on unload, so a signal alone
@@ -712,24 +735,48 @@ async function session(label, body) {
     // both ways, and relaunches — with a signal alone the later marker comes
     // back `null`; with `window.close()` first, both come back.
     //
-    // ⚠ AND THE FIXED 4 s WAS NOT ENOUGH — MEASURED, 2026-09-03, NOT REASONED
-    // ABOUT. With `window.close()` + `await sleep(4000)` this teardown lost the
-    // area anyway in 2 of 5 runs (once at session C, once at session D), at
-    // load ~3, with no other instrument running and no poison applied: the next
-    // session booted to `keys present: ["aurora.session.v1:no-project"]` — the
-    // fresh boot's own key written, the previous session's gone. A blind sleep
-    // is a guess about how long a shutdown takes, and the guess was wrong 40% of
-    // the time; the thing actually worth waiting for is the PROCESS BEING GONE,
-    // because Chromium flushes its areas on shutdown. So: wait for the exit,
-    // bounded, and SAY which way it went — an app that had to be signalled is
-    // the case where the area is at risk, and a run that cannot say which
-    // happened cannot explain its own restart rows later.
+    // ═════════════════════════════════════════════════════════════════════
+    // ⚠ AND `window.close()` PLUS ANY SLEEP IS NOT A FLUSH. O77/O79.
+    // ═════════════════════════════════════════════════════════════════════
+    //
+    // O50 measured this teardown losing the area in **4 of 9 runs (~44%)**, at
+    // load ~3, with no poison and nothing else running, and left it open
+    // (`docs/reviews/2026-09-03-o50-triage-c.md` §3.5/§6) after two attempted
+    // fixes failed. Both failed for one reason, and it is the whole diagnosis:
+    //
+    //   THE APP IS FULLY GONE ~50 ms AFTER `window.close()`. Measured here
+    //   2026-09-03 over 12 launches: 49–51 ms, every one. The old fixed
+    //   `sleep(4000)` was ~3.95 s spent watching a process that had already
+    //   exited, which is why NOBODY COULD HAVE FIXED THIS BY LENGTHENING IT.
+    //   And a settle BEFORE the close (O50 tried 6 s) is a guess about a delay
+    //   that is not a constant: Chromium's localStorage commit timer is ~5 s at
+    //   rest and its rate limiter pushes it further out the more the page has
+    //   been writing — and Aurora's persist subscription fires on EVERY session-
+    //   or workspace-store change, so a busy harness session is exactly the
+    //   workload that stretches it.
+    //
+    // So neither a longer wait on the PROCESS nor a blind wait before it can
+    // work. WAIT ON THE ARTIFACT: `awaitFlushed` writes a unique marker into the
+    // page's localStorage and polls the profile's own `Local Storage/leveldb`
+    // until those bytes are there — the exact condition the NEXT launch reads
+    // back. Only then is the window closed. See `scratchpad/lib/storage-flush.mjs`
+    // for why a marker proves the session key (one WriteBatch per area, so a
+    // later write cannot land ahead of an earlier one) and why the profile is
+    // OBSERVED from /proc rather than assumed to be `~/.config/aurora` — it is
+    // `~/.config/Electron`, and watching the wrong one is how the first pass of
+    // this investigation produced a confident, wrong 0-of-6.
+    //
+    // ⚠ IT IS NOT "ALWAYS PASS". A flush that genuinely does not happen inside
+    // the bound stops the run HERE, naming the profile and the wait, instead of
+    // one session later in the wording of an app defect.
+    if (c && !bodyThrew) {
+      const flushed = await flushBarrier(c, child, label);
+      if (!flushed.ok) flushFailure = flushed.message;
+    } else if (c) {
+      console.log('   flush barrier SKIPPED — the session body threw, so there is no result to '
+        + 'carry forward and the error below is the finding');
+    }
     if (c) {
-      // ⚠ TRIED AND REVERTED, RECORDED SO IT IS NOT RE-TRIED: a 6 s settle HERE,
-      // before the close, on the theory that Chromium's throttled commit needed
-      // a live page to fire in. It did not help — 1 trip in 2 runs with it, the
-      // same rate as without — so it is not in the code, only in this comment.
-      // The flake is UNDIAGNOSED and is reported rather than papered over.
       try { await c.send('Runtime.evaluate', { expression: 'window.close()' }); } catch { /* the target dies mid-call */ }
       const exitT0 = Date.now();
       const EXIT_GRACE_MS = 20000;
@@ -751,7 +798,67 @@ async function session(label, body) {
     for (const d of restoreDiscoveryNow()) console.log(`   restored ${d}`);
     console.log(`   discovery on disk after restore:\n        ${readDiscoveryNow()}`);
     console.log(`   port free after teardown: ${await portFree()}`);
+    // LAST, so the teardown above still runs in full — the ORDERED SIGTERM, the
+    // display reaping and the discovery restore are load-bearing (O16/O20/O65/
+    // O66) and a refusal must never skip them. Thrown only when the body did NOT
+    // throw, so a real failure is never masked by this one.
+    if (flushFailure !== null) throw new Error(flushFailure);
   }
+}
+
+/**
+ * THE BARRIER, at the one call site that has a live CDP client and a live tree.
+ *
+ * Resolves the profile from the pids of the tree that is still running (it has
+ * to happen BEFORE `window.close()` — /proc cannot be asked about a dead
+ * process), writes the marker, and polls that profile's leveldb for it.
+ *
+ * ⚠ THE ORDERING CHECK. The marker proves every EARLIER write to the same area
+ * is committed, which is only the session key if the app did not write again
+ * after it. The app is idle here (the body has returned, no input is pending),
+ * but idle is an argument and this is a measurement: the stored session is read
+ * before and after and a change is reported rather than assumed away.
+ */
+async function flushBarrier(c, child, label) {
+  const pids = descendants(child.pid);
+  const { dir, how, why } = resolveLeveldbDir({ pids, appNames: APP_NAMES });
+  if (dir === null) {
+    return { ok: false, message: `FLUSH BARRIER UNMEASURABLE — ${why}.\n`
+      + '  This teardown cannot show the session it built reached disk, so the next session\'s\n'
+      + '  restart rows would be judging an unknown precondition. Refusing rather than guessing.' };
+  }
+  const readSession = () => c.evalExpr(`localStorage.getItem(${JSON.stringify(`aurora.session.v1:${S1DIR}`)})`).catch(() => null);
+  for (let attempt = 1; attempt <= FLUSH_BARRIER_ATTEMPTS; attempt++) {
+    const before = await readSession();
+    const mark = flushMarker(`${label.slice(0, 1)}${attempt}`);
+    const r = await awaitFlushed({
+      mark,
+      write: (m) => c.evalExpr(`localStorage.setItem(${JSON.stringify(FLUSH_MARKER_KEY)}, ${JSON.stringify(m)}); 1`),
+      present: () => bytesOnDisk(dir, mark),
+      maxMs: FLUSH_BARRIER_MS,
+      sleep,
+    });
+    if (!r.flushed) return { ok: false, message: flushRefusal({ waitedMs: r.waitedMs, dir, how, label }) };
+    const after = await readSession();
+    if (before !== after) {
+      // The app wrote again AFTER the marker, so the marker's batch does not
+      // cover that write and this attempt proved nothing about it. Go round
+      // again with a fresh marker rather than reporting a barrier that held.
+      console.log(`   flush barrier: attempt ${attempt} superseded — the stored session changed while `
+        + 'the marker was in flight, so a fresh marker is needed to cover it');
+      continue;
+    }
+    console.log(`   flush barrier: localStorage on disk after ${r.waitedMs}ms / ${r.polls} poll(s)`
+      + `${attempt > 1 ? ` (attempt ${attempt})` : ''}`
+      + `\n        profile ${dir}\n        ${how}`
+      + `\n        stored session ${before === null ? 'ABSENT under this project key (session A opens the project mid-body)' : `${before.length}B`}`
+      + ', unchanged across the barrier');
+    return { ok: true };
+  }
+  return { ok: false, message: `FLUSH BARRIER NEVER SETTLED — the stored session changed under every one of `
+    + `${FLUSH_BARRIER_ATTEMPTS} markers, so no marker's commit batch covers the app's last write and this\n`
+    + `  teardown cannot show what it leaves behind. The app is supposed to be idle once the session body\n`
+    + `  has returned; something is still writing. profile ${dir} (${how}).` };
 }
 
 /** Wait until the app has finished restoring its project on a cold start. A
