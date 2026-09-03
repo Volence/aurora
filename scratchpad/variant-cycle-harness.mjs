@@ -156,8 +156,9 @@ if (!LAG_DATE || !LAG_LEAD) throw new Error('preset-lag.ts no longer carries the
 const LAG_PREMISE_M = LAG_SRC.match(/PRESET_KEYS_AWAITING_AEON: readonly string\[\] =\s*Object\.freeze\(\[([^\]]*)\]\)/);
 if (!LAG_PREMISE_M) throw new Error('preset-lag.ts no longer carries the premise list this harness reads');
 const LAG_KEYS = LAG_PREMISE_M[1].split(',').map((s) => s.trim().replace(/^'|'$/g, '')).filter(Boolean);
-/** RE-FILLED 2026-09-03 by EW-CHANNELS-WRITER: aeon's generator refuses the two
- *  anchor keys BY REFUSING THE WHOLE DOCUMENT, so the sentence is back on screen. */
+/** EMPTY again since 2026-09-03: aeon merged item 4's step 4 and its generator
+ *  now reads `patch_world_ys` / `patch_motion`, so the sentence retired for the
+ *  second time. Read, never assumed — this flag has flipped four times. */
 const PREMISE_OPEN = LAG_KEYS.length > 0;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -540,7 +541,19 @@ async function main() {
       PREMISE_OPEN
         ? (disc.leaf === true && disc.text.startsWith(LAG_LEAD)
           && disc.text.includes(`Measured ${LAG_DATE}`) && disc.text.includes(`Expires (${LAG_DATE})`)
-          && /refuses (?:it|both) by name at origin\/master/.test(disc.text)
+          // ⚠ WORDING-AGNOSTIC ON PURPOSE, fixed 2026-09-03. This clause used to
+          // pin `/refuses (?:it|both) by name at origin\/master/` — the 12aecd5
+          // phrasing. EW-CHANNELS-WRITER re-worded the sentence for the sharper
+          // `patch_*` lag ("does not accept them at origin/master and refuses
+          // the WHOLE DOCUMENT") and this row went red on a correct screen; it
+          // was one of the four pre-existing failures the EW-TIMELINE-CLOCK
+          // control run isolated. The two clauses below are the ones BOTH
+          // wordings have carried, and the exact phrasing is owned by
+          // preset-lag-disclosure.test.ts, which drives the derivation directly.
+          // A copy of today's sentence here would be a second source of truth
+          // that goes stale the next time the premise's flavour changes.
+          && /at origin\/master/.test(disc.text)
+          && /nothing set below reaches a ROM/.test(disc.text)
           && disc.rects > 0 && disc.visible !== false && disc.hitInside === true
           && disc.beforeCycles === true && disc.sameBody === true)
         : disc.leaf === false,
