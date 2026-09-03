@@ -5,6 +5,7 @@ import { useProjectStore, getCurrentAct } from '../../state/projectStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import { paletteLineUsageCounts } from '../../../core/art/usage';
 import { T, Chip } from '../ui';
+import { actAndDropFocus } from '../ui/act-and-drop-focus';
 
 const btn: React.CSSProperties = {
   padding: `${T.s1} ${T.s3}`,
@@ -75,17 +76,29 @@ export default function SpritePaletteHeader() {
       {lineNote && <span style={note}>⚠ {lineNote}</span>}
       <Chip active={mode === 'standalone'} onClick={() => st().setPaletteMode('standalone')}>Standalone</Chip>
       <span style={{ flex: 1 }} />
+      {/* ⚠ BOTH OF THESE ACT AND THEN DROP FOCUS (d-27) — see
+          `ui/act-and-drop-focus.ts`. This header is always mounted, so before
+          the ruling a click left the button focused and a bare Space wiped
+          again with no confirmation. TWO separate dispatch lines and two
+          separate harness rows: a blur wired to one of two near-identical call
+          sites is this repo's dominant way for a defect to survive a
+          convincing green.
+          Neither writer has an early return — `clearPalette` and `clearCanvas`
+          both `recordEdit` and set unconditionally — so their no-op press is a
+          SECOND consecutive press over already-blank state. It changes nothing
+          an author can see, which is exactly the press d-27 says must still
+          drop focus. */}
       <button
         style={btn}
         title="Clear palette → standalone, blank"
-        onClick={() => st().clearPalette()}
+        onClick={(e) => actAndDropFocus(e, () => st().clearPalette())}
       >
         Clear palette
       </button>
       <button
         style={btn}
         title="Clear canvas → blank pixels"
-        onClick={() => st().clearCanvas()}
+        onClick={(e) => actAndDropFocus(e, () => st().clearCanvas())}
       >
         Clear canvas
       </button>

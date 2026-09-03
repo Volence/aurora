@@ -48,6 +48,7 @@
 import React from 'react';
 import { T, Panel, SectionBody, CollapsibleSection, Select, NumberField, Chip, IconButton } from '../ui';
 import { Field, Hint, Card, Advisory } from './column-layout';
+import { actAndDropFocus } from '../ui/act-and-drop-focus';
 import { useProjectStore, getActiveLevel } from '../../state/projectStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
@@ -503,9 +504,19 @@ export default function EffectsScenePanel(): React.ReactElement {
             // and set the label column's width for every other row in it.
             <Card key={i}>
               <Field label={`Layer ${i}`}>
+                {/* ⚠ ACTS AND THEN DROPS FOCUS (d-27, see
+                    `ui/act-and-drop-focus.ts`), and this is the `key={i}`
+                    LIST-REMOVAL shape — the sharper failure. The card is keyed
+                    by INDEX, so after this removes layer `i` the button does
+                    not go with the layer it deleted: React re-uses it for the
+                    layer that slid down into slot `i`. Before the ruling it
+                    kept focus, and a bare Space did not repeat the action, it
+                    RETARGETED it at the neighbour — hold Space on "Remove
+                    layer 2" and layers 2, 3 and 4 go, one keystroke each,
+                    until the `min` floor disables the button. */}
                 <IconButton icon={<span>Remove</span>} label={`Remove layer ${i}`}
                   disabled={selected.layers.length <= EFFECTS_LAYER_COUNT.min}
-                  onClick={() => run(removeLayerCommand(library, selected.id, i))} />
+                  onClick={(e) => actAndDropFocus(e, () => run(removeLayerCommand(library, selected.id, i)))} />
               </Field>
               {/*
                 THE LABEL AND THE BOUND FOLLOW THE SCENE'S SPACE (owner feedback

@@ -18,6 +18,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const SRC = readFileSync(join(__dirname, '..', 'CollisionPalette.tsx'), 'utf8');
+// The d-27 helper MOVED OUT of CollisionPalette.tsx on 2026-09-03 when the
+// survey's nine other controls became callers. Read from where it lives now,
+// and keep reading BOTH files: the helper's body and the two call sites are
+// separately breakable, and only one of them is here.
+const HELPER_SRC = readFileSync(join(__dirname, '..', 'ui', 'act-and-drop-focus.ts'), 'utf8');
 
 describe('Clear and Reset say that the loop crossover goes with the wipe', () => {
   // Anti-vacuous: if the file stopped containing the buttons at all, every
@@ -47,12 +52,20 @@ describe('Clear and Reset say that the loop crossover goes with the wipe', () =>
     // void` parameter), so a `[^)]*` for the parameter list stops in the middle
     // of it and reports the helper ABSENT while it is right there — a false
     // negative that reads exactly like the defect this row watches for.
-    const at = SRC.indexOf('function actAndDropFocus');
+    //
+    // ⚠ AND IT IS READ FROM `ui/act-and-drop-focus.ts`, NOT FROM THIS
+    // DIRECTORY'S .tsx. When the helper moved out on 2026-09-03 an
+    // `SRC.indexOf` here would have reported it ABSENT — the same false
+    // negative, from a different cause. The import in CollisionPalette.tsx is
+    // pinned separately below so a helper that exists but is no longer reached
+    // from this file cannot pass either.
+    expect(SRC).toContain("import { actAndDropFocus } from './ui/act-and-drop-focus';");
+    const at = HELPER_SRC.indexOf('export function actAndDropFocus');
     expect(at, 'actAndDropFocus not found — the d-27 wiring cannot be judged').toBeGreaterThan(-1);
-    const end = SRC.indexOf('\n}', at);
+    const end = HELPER_SRC.indexOf('\n}', at);
     expect(end, 'actAndDropFocus has no closing brace — refusing to judge a partial read')
       .toBeGreaterThan(at);
-    const helper = SRC.slice(at, end);
+    const helper = HELPER_SRC.slice(at, end);
     expect(helper).toContain('.blur()');
     // BEFORE the action, so an early return inside the handler cannot skip it.
     expect(helper.indexOf('.blur()')).toBeLessThan(helper.indexOf('act()'));

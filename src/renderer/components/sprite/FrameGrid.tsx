@@ -6,6 +6,7 @@ import type { PixelBuffer } from '../../../core/art/pixel-ops';
 import type { Color } from '../../../core/model/s4-types';
 import { resolveDisplayPalette } from '../../../core/art/sprite-palette';
 import { T } from '../ui';
+import { actAndDropFocus } from '../ui/act-and-drop-focus';
 import { CHECKER_A, CHECKER_B, OOB_MARKER } from '../../canvas/canvas-colors';
 
 function Thumb({ buffer, colors, size }: { buffer: PixelBuffer; colors: Color[]; size: number }) {
@@ -50,7 +51,17 @@ export default function FrameGrid() {
         <span style={{ flex: 1 }} />
         <button style={styles.op} title="Add blank frame" onClick={() => useSpriteStore.getState().addFrame()}>+ Frame</button>
         <button style={styles.op} title="Duplicate current" onClick={() => useSpriteStore.getState().duplicateFrame()}>Duplicate</button>
-        <button style={styles.op} title="Delete current" onClick={() => useSpriteStore.getState().deleteFrame()}>Delete</button>
+        {/* ⚠ DELETE ACTS AND THEN DROPS FOCUS (d-27) — see
+            `ui/act-and-drop-focus.ts`. This button is in a header that never
+            unmounts, so before the ruling a click left it focused and a bare
+            Space deleted the next frame, and the next, one keystroke each.
+            It is also the survey's cleanest NO-OP case, which is why the blur
+            is unconditional: `deleteFrame` opens with `if (s.frames.length <=
+            1) return`, so on a one-frame sprite the press writes nothing at
+            all — and a repeat Space is most pointless exactly there. Adding
+            (+ Frame) and Duplicate are non-destructive and keep focus. */}
+        <button style={styles.op} title="Delete current"
+          onClick={(e) => actAndDropFocus(e, () => useSpriteStore.getState().deleteFrame())}>Delete</button>
       </div>
       {!collapsed && (
         <div style={styles.grid}>

@@ -52,6 +52,7 @@
 import React from 'react';
 import { T, SectionBody, CollapsibleSection, Select, NumberField, Chip, IconButton } from '../ui';
 import { Field, Hint, Card, CONTROL_INSET } from './column-layout';
+import { actAndDropFocus } from '../ui/act-and-drop-focus';
 // THE APP'S OWN SWATCH AND THE APP'S OWN PICKER. `GenesisColorSliders` is the
 // R/G/B control both palette panels mount, and `swatchCss` is the one CRAM-word
 // → CSS conversion in this tree. Neither is re-derived here: a second `>> 9 & 7`
@@ -738,8 +739,18 @@ function CycleChannelCard({ library, presetId, index, channel, run }: {
   return (
     <Card>
       <Field label={`Channel ${index}`}>
+        {/* ⚠ ACTS AND THEN DROPS FOCUS (d-27, see `ui/act-and-drop-focus.ts`),
+            and this is the `key={i}` LIST-REMOVAL shape. The card does not
+            unmount with the channel it deleted: React re-uses it for the
+            channel that slid down into slot `index`. Before the ruling a click
+            left it focused and a bare Space did not repeat the action, it
+            RETARGETED it at the neighbour.
+            The purest instance of the defect on this panel — no `disabled`
+            predicate, no refusal, no confirmation: the press removes and the
+            schema accepts an empty `cycles` list, so nothing stopped a held
+            Space walking the whole channel list away. */}
         <IconButton icon={<span>Remove</span>} label={`Remove cycle channel ${index}`}
-          onClick={() => run(removeCycleChannelCommand(library, presetId, index))} />
+          onClick={(e) => actAndDropFocus(e, () => run(removeCycleChannelCommand(library, presetId, index)))} />
       </Field>
       {/* STILL NO min/max — the band spinners' rule (aeon E.4), for the same
           reason: the constructor's ensure names the bound and the measurement,
@@ -1035,9 +1046,17 @@ function BandCard({
         {/* DISABLED WITH A REASON, NOT HIDDEN. `lastBandRefusal` is the same
             predicate `removeBandCommand` returns null on, read from one place,
             so the greyed button and the sentence under it cannot disagree. */}
+        {/* ⚠ AND IT ACTS AND THEN DROPS FOCUS (d-27, see
+            `ui/act-and-drop-focus.ts`). Same `key={i}` list-removal shape as
+            the cycle channel above: the button survives its own click and
+            re-aims at the band that slid into slot `index`, so a repeat Space
+            destroyed the NEIGHBOUR rather than repeating the press. The
+            `disabled` above is the schema floor and not a focus guard — it
+            only stops the LAST band going, which is precisely the one press
+            this button was already safe on. */}
         <IconButton icon={<span>Remove</span>} label={`Remove raster band ${index}`}
           disabled={lastRefusal !== null}
-          onClick={() => run(removeBandCommand(library, presetId, index))} />
+          onClick={(e) => actAndDropFocus(e, () => run(removeBandCommand(library, presetId, index)))} />
       </Field>
       {lastRefusal !== null && <Hint under>{lastRefusal}</Hint>}
 

@@ -3,6 +3,7 @@ import { useEditorStore, executeCommand } from '../state/editorStore';
 import { useProjectStore, getActiveLevel } from '../state/projectStore';
 import { useViewStore } from '../state/viewStore';
 import { angleDegrees } from '../../core/collision/collision-model';
+import { actAndDropFocus } from './ui/act-and-drop-focus';
 import type { CollisionProfile } from '../../core/collision/collision-model';
 import { resolvePlaneWords, SECTION_PLANE_WORDS } from '../../core/collision/collision-cell-resolve';
 import { flipProfile } from '../../core/collision/collision-flip';
@@ -37,40 +38,14 @@ const FLOOR_LABEL: Record<Solidity, string> = {
   all: 'solid', top: 'jump-thru', 'sides-bottom': 'L/R/B', none: 'none',
 };
 
-/**
- * A DESTRUCTIVE BUTTON ACTS AND THEN DROPS FOCUS — decision d-27, the owner's
- * words: *"just being a button that acts and then drops focus is how it should
- * work right?"*
- *
- * WHY IT EXISTS. Measured 2026-09-02 (O48b, `[k2]`, the collision-destructive
- * harness): after a real mouse click the `Reset`/`Clear` button KEEPS keyboard
- * focus — `document.activeElement` was that `<button>` — and a bare SPACE then
- * re-fired the whole wholesale wipe with no confirmation. **Enter did not**,
- * over the same CDP input channel, which is why it read as an accident rather
- * than a design. Both wipes are one Ctrl+Z away, so this is a surprise and not
- * a data-loss risk; d-27 chose the smallest fix over a confirmation dialog.
- *
- * ⚠ THE BLUR IS UNCONDITIONAL, AND IT HAPPENS BEFORE THE ACTION. Both handlers
- * carry silent early returns (`if (!entries.length) return`, `if (!engine)
- * return`), and the no-op press is EXACTLY the case where a repeat Space is
- * most pointless and least noticed. Blurring only on the path that wrote
- * something would leave the defect alive in the half an author cannot see. Doing
- * it first — rather than after `act()` — is what makes "unconditional" true by
- * construction rather than by every future edit remembering it, and neither
- * handler reads focus.
- *
- * Clicking again still works normally: a click focuses the button afresh, so a
- * keyboard-only author reaches it again with Tab. Ctrl+Z is unaffected —
- * `LevelWorkspace`'s `isTypingTarget` lets the undo through from `<body>` for
- * the same reason it exempts `<button>`.
- *
- * SCOPE: these two buttons only. Other destructive controls in the app were not
- * surveyed by d-27 and are not changed here.
- */
-function actAndDropFocus(e: React.MouseEvent<HTMLButtonElement>, act: () => void) {
-  e.currentTarget.blur();
-  act();
-}
+// d-27's ACT-AND-DROP-FOCUS HELPER MOVED OUT OF THIS FILE, 2026-09-03.
+//
+// It shipped here because both of its callers were here. The d-27 survey then
+// found the same shape on nine more controls in five other files, so it now
+// lives at `ui/act-and-drop-focus.ts` beside `focus-trap.ts` — the whole reason
+// WHY the blur is unconditional and why it runs BEFORE the action is written
+// there, in full, and is not repeated here. Nothing about the behaviour of
+// these two buttons changed with the move.
 
 /**
  * The picker's boxes are UNSCALED canvases — one unit is one screen pixel — so

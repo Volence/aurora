@@ -2,6 +2,7 @@ import React from 'react';
 import { useSpriteStore } from '../state/spriteStore';
 import type { SpriteTool, SpriteTransform } from '../state/spriteStore';
 import { OptionBar, Chip, Divider, NumberField, T } from '../components/ui';
+import { actAndDropFocus } from '../components/ui/act-and-drop-focus';
 import {
   GlyphButton, TransformGrid, DitherConfig, MirrorButton, ZoomControl,
 } from '../components/art-shared/ToolColumnParts';
@@ -49,11 +50,23 @@ export default function SpriteToolOptions({
 
   return (
     <OptionBar>
-      {/* New-sprite size presets + custom size */}
+      {/* New-sprite size presets + custom size.
+          ⚠ THESE CHIPS ACT AND THEN DROP FOCUS (d-27) — and they are the
+          SHARPEST case the survey found, sharper than the collision wipes the
+          ruling was made on. `newSprite` replaces the whole sprite document —
+          every frame, every anim step, the origin — AND calls
+          `activeSpriteHistory().clear()`, so unlike Reset/Clear this is NOT one
+          Ctrl+Z away. The chips are permanently mounted in the option bar, so
+          before d-27 a click left one focused and a bare Space threw the
+          document away again with no confirmation and nothing to undo with.
+          See `ui/act-and-drop-focus.ts`.
+          SCOPE: this makes the chips drop focus and NOTHING ELSE. Whether a
+          new-sprite wipe should be undoable, or should confirm, is a separate
+          question filed for the owner; `newSprite` itself is untouched. */}
       <span style={{ color: T.textLo }}>New</span>
       <span style={{ display: 'inline-flex', gap: 4 }}>
         {SIZE_PRESETS.map((s) => (
-          <Chip key={s} onClick={() => st().newSprite(s, s)}>{s}</Chip>
+          <Chip key={s} onClick={(e) => actAndDropFocus(e, () => st().newSprite(s, s))}>{s}</Chip>
         ))}
       </span>
       {/* `v || 8` USED TO BE THE EMPTY-BOX ARM: emptying the box handed this a
@@ -64,7 +77,11 @@ export default function SpriteToolOptions({
       <NumberField value={newSize} min={8} max={128} width={48}
         title="custom size (px)"
         onChange={(v) => onNewSize(Math.max(8, Math.min(128, v || 8)))} />
-      <Chip onClick={() => st().newSprite(newSize, newSize)}>New □</Chip>
+      {/* Same writer, same ruling, its OWN dispatch line — see the block above.
+          A blur wired to the preset chips and not to this one is exactly the
+          shape this repo loses defects in, so the harness gives it its own
+          row rather than assuming the loop above covers it. */}
+      <Chip onClick={(e) => actAndDropFocus(e, () => st().newSprite(newSize, newSize))}>New □</Chip>
 
       <Divider />
 

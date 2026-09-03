@@ -7,6 +7,7 @@ import type { PixelBuffer } from '../../../core/art/pixel-ops';
 import type { Color } from '../../../core/model/s4-types';
 import { resolveDisplayPalette } from '../../../core/art/sprite-palette';
 import { T } from '../ui';
+import { actAndDropFocus } from '../ui/act-and-drop-focus';
 import { CHECKER_A, CHECKER_B, OOB_MARKER } from '../../canvas/canvas-colors';
 import SonicDynamicPreview from './SonicDynamicPreview';
 import { useSonicPreviewStore } from '../../state/sonicPreviewStore';
@@ -179,7 +180,22 @@ export default function Timeline() {
               <input type="number" min={1} max={127} value={st.duration} style={styles.dur}
                 onChange={(e) => useSpriteStore.getState().setStepDuration(i, Number(e.target.value))}
                 title="hold (1/60s)" />
-              <button style={styles.del} title="remove step" onClick={() => useSpriteStore.getState().removeStep(i)}>×</button>
+              {/* ⚠ ACTS AND THEN DROPS FOCUS (d-27) — and this is the
+                  `key={i}` LIST-REMOVAL shape, which is worse than a repeat
+                  fire. The row this button lives in is keyed by INDEX, so
+                  after it removes step `i` it does not unmount with the step it
+                  deleted: React re-uses the same DOM button for the step that
+                  slid down into slot `i`. Before the ruling it kept focus, and
+                  a bare Space did not repeat the action — it RETARGETED it at
+                  the neighbour, walking down the timeline one keystroke per
+                  step. See `ui/act-and-drop-focus.ts`.
+                  It has no no-op path of its own: the button only exists while
+                  a step exists at `i`, and `removeStep` has no early return.
+                  What makes the blur unconditional here is the shared helper,
+                  which blurs before `act()` and cannot be reached past a
+                  return that has not run yet. */}
+              <button style={styles.del} title="remove step"
+                onClick={(e) => actAndDropFocus(e, () => useSpriteStore.getState().removeStep(i))}>×</button>
             </div>
           </div>
         ))}
