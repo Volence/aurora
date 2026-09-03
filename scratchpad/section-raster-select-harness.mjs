@@ -698,9 +698,21 @@ async function main() {
     check('6b', 'the select falls back to the unbind option — which is why silence would LIE',
       ghostView.found === true && ghostView.widget === '' && ghostView.offersGhost === false,
       `widget = ${JSON.stringify(ghostView.widget)}, offers ghost_preset = ${ghostView.offersGhost}`);
-    check('6c', 'a warning naming the id sits UNDER the select — and it is painted, not merely present',
+    // ⚠ THE SENTENCE NAMES THE SECTION, and this row did not know it until
+    // 2026-09-03. `unassignablePresetRef` grew a `${where}` prefix in 9c387987
+    // ("the panel refuses at typing time what the build refuses at build time",
+    // EFFECTS-W1 defect 7) precisely so the reader is not left working out
+    // WHICH section's sidecar carries the dangling id — one control draws every
+    // section in turn. Nobody re-ran this harness, so the row sat red on master
+    // for an app change that made the panel BETTER. Found by the shared-preset-
+    // namespace parcel, which had to run this file and could not read its tally.
+    // The section number is derived from SEC_A, not typed, so moving the planted
+    // section moves the expectation with it.
+    check('6c', `a warning naming BOTH section ${SEC_A} and the dangling id sits UNDER the select `
+      + '— and it is painted, not merely present',
       ghostView.leaf === true
-      && /^Assigned to "ghost_preset", which is not a raster preset in this project\.$/.test(ghostView.text)
+      && new RegExp(`^Section ${SEC_A} is assigned to "ghost_preset", which is not a raster `
+        + 'preset in this project\\.$').test(ghostView.text)
       && ghostView.rects > 0 && ghostView.visible !== false
       && ghostView.hitInside === true && ghostView.afterSelect === true,
       JSON.stringify(ghostView));
