@@ -1,7 +1,13 @@
 # EW-TIMELINE-CLOCK — the moving anchor gets an authoring surface, and the one clock
 
 **Branch** `feat/ew-timeline-clock` · **2026-09-03** · ROADMAP row 95, DoD item 12, `EFFECTS-W1`.
-Seven commits, `ffb4faf6` … `c1e445d1`, on top of master `f21dc346`.
+Ten commits, `ffb4faf6` … the tip, cut from master at `f21dc346`.
+
+⚠ **MASTER MOVED UNDER THIS PARCEL.** It is `dfb6be6f` as this is written — the O50 harness-triage
+lane merged 29 commits mid-session — and `f21dc346` is the merge-base, so **every "master" figure
+below is the merge-base, not master's tip.** `git merge-tree --write-tree master feat/ew-timeline-clock`
+exits 0: the branch merges cleanly. The one file both sides touch conceptually is
+`src/renderer/providers/effects-aeon.ts`, which O50 edited and this branch does not.
 
 Step 3½ of the four-step anchor chain. `EW-CHANNELS-WRITER` (merge `b5c5284b`, packet
 `2026-09-03-ew-channels-writer.md`) taught the codec to accept, round-trip and write
@@ -232,8 +238,9 @@ skips **by design in a linked worktree** and names that in its own reason — th
 the main checkout, I ran in an agent worktree. Neither number is wrong; they are two configurations.
 
 `npx tsc --noEmit` clean, exit 0. All seven `check:*` green:
-`harness-guards` **189 clean / 189 classified · 0 failures · 0 unmeasurable** (188 before; the new
-harness is the 189th), `ledger-timestamps`, `object-stringify`, `peer-path-literals`,
+`harness-guards` **190 clean / 190 classified · 0 failures · 0 unmeasurable** (182 `.mjs` + 8 `.sh`;
+this branch adds one of each — the harness and the poison script), `ledger-timestamps`,
+`object-stringify`, `peer-path-literals`,
 `pseudo-skip` (5937 bodies), `python-resolver`, `test-collection` (472/472). The 8 skips are
 pre-existing, each names its reason, none is mine.
 
@@ -242,7 +249,41 @@ branch's source, under xvfb at 1680×1050, against an `rsync` copy of aeon at
 `$SCRATCH/aeon-copy` (`.git`, `.claude`, `build`, `tools/asl` excluded; 154 MB). `../aeon` was never
 written to.
 
-### 5.1 Poisons — twelve, red-first, each restored from a COMMITTED baseline
+### 5.1 Four neighbouring instruments, and a control that says which failures are mine
+
+Adding a fifth section to the Colour tab is the kind of change that reddens other people's
+harnesses, so the ones that stand on this tab were run.
+
+| harness | result | mine? |
+|---|---|---|
+| `effects-sub-tabs` | **13/13** | needed a one-line edit — below |
+| `effects-section-picker` | **15/15** | no change |
+| `effects-section-strip` | **15/15** | no change |
+| `variant-cycle` | **27/31** | **NO** — control below |
+
+**`effects-sub-tabs` needed an edit and the edit is load-bearing.** That harness derives *which*
+sections belong to which tab from the provider's own table, then looks each id's on-screen HEADING
+up in its own `TITLE_OF` map. A section in the table with no entry there makes the lookup
+`undefined` — measured, by taking the line back off disk and re-running: the harness **ABORTED**
+on `Cannot read properties of undefined (reading 'toUpperCase')` before its first section row.
+
+⚠ **`variant-cycle` COULD NOT RUN AT ALL, ON MASTER, AND IT IS NOT THIS BRANCH'S DOING.**
+`PRESET_KEYS_AWAITING_AEON` was re-filled by EW-CHANNELS-WRITER and its declaration **wrapped onto
+a second line**; the harness's literal `= Object.freeze([` stopped matching and it threw at import,
+before its first row. Fixed here (`=\s*`), because an instrument that cannot start is one nobody
+learns from.
+
+With it running it is **27/31**, and the four failures are **not this parcel's**: the same build
+with the new section disabled behind a `{false && …}` guard, rebuilt, on a **fresh** aeon extract,
+reports **the identical 27/31 and the identical four row ids**. `[2f]`'s cause is determined and
+recorded rather than repaired: it requires the disclosure text to match
+`/refuses (?:it|both) by name at origin\/master/`, and EW-CHANNELS-WRITER deliberately **re-worded**
+that sentence to the sharper *"does not accept them at origin/master and refuses the WHOLE
+DOCUMENT"*. It is a stale finder from that landing, its repair is one regex, and it belongs to that
+row rather than to a layout parcel. `[6d]`, `[6e]` and `[7b]` are left with their cause
+**undetermined** — they are stated as pre-existing on the strength of the control, not diagnosed.
+
+### 5.2 Poisons — twelve, red-first, each restored from a COMMITTED baseline
 
 `scratchpad/poisons-anchor-authoring.sh`, baseline `c1e445d1`. Every one: the mutation applied, then
 **quoted back from disk** (`git diff --stat` naming the file plus the mutated line read with `grep`)
