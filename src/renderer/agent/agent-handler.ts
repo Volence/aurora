@@ -986,7 +986,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         presets: library.presets.map(p => ({
           id: p.id,
           name: typeof p.name === 'string' ? p.name : null,
-          bands: p.bands.length,
+          bands: (p.bands ?? []).length,
         })),
         // NOT silently omitted, on list_effects_scenes' rule: a file that would
         // not parse is a preset id an agent must not take and a file it must not

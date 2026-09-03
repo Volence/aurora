@@ -1,13 +1,24 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://empyrean/contract/aurora-effects-preset.schema.json",
-  "title": "Aurora Effects Raster Preset Document (wave 2: bands, cycles, variants)",
+  "title": "Aurora Effects Raster Preset Document (wave 2: bands, cycles, variants, patch anchors, ramp)",
   "description": "Wire shape for one raster preset document, games/sonic4/data/editor/effects/presets/<preset_id>.json (aeon repo, editor-owned tree). A BAND IS NOT A SCENE FIELD: a scene is a parallax_config; the raster program is a channel of an EffectsPreset bound per SECTION (aeon docs/superpowers/specs/2026-08-28-raster-band-ownership-design.md section 16.1), so bands live here, in the directory docs/AURORA_EFFECTS_SCHEMA.md section 7 reserved for them. NORMATIVE for SHAPE only: which keys exist, their JSON types, and the exactly-one arm rule. NUMERIC BOUNDS ARE DELIBERATELY NOT RESTATED HERE (screen-line range, CRAM address range, burst ceilings, band count, height minimum, the palette-line-0 rule): the engine's own ensures in engine/effects/raster_dsl.emp fire at build time with the measurement behind each rule, and aeon's generator forwards values verbatim so the author reads that sentence (aeon tools/EFFECTS_CONSUMER_CONTRACT.md section 2.4 at c03b9812, the consumer half this schema pairs with). Closed: any key not listed is refused; adding one is a contract change. cycles and variants were added 2026-08-30 (docs/AURORA_EFFECTS_SCHEMA.md section 7.2, DoD item 5, against aeon's demand artifact 8ec2b05d): they are OTHER CHANNELS OF THE SAME EffectsPreset record the raster program is a channel of (ep_cycle and ep_variants are fields of that record, aeon engine/effects/preset.emp:56-67), which is why they live in this document beside bands and why one rasterRef binds the whole of it (ruling Q1). Reserved and refused by name (still wave-2 open): fires. Known limits with NO enforcing assertion, stated so a silence is not read as coverage: nothing checks that an authored preset is BOUND to a section (an unbound preset costs ROM and shows nothing; binding is a hand-authored preset() call, BAND-FIRST-CONSUMER territory); nothing checks the total ROM cost of the preset set; the runtime variant-to-pal_line binding behind a pal_region band cannot be checked at build time (a document carrying BOTH bands and variants makes the slot half of that binding visible in one file, but no assertion is added here: ruling Q6 defers it, because an absent variants entry means the section keeps its hand-authored slot and the document is not the whole truth); nothing checks that a band is VISIBLE; nothing here refuses an empty cycles array or a variants array longer than the engine's slot count, both of which are the generator's refusals (section 7.2).",
   "type": "object",
   "required": [
     "schema",
-    "id",
-    "bands"
+    "id"
+  ],
+  "oneOf": [
+    {
+      "required": [
+        "bands"
+      ]
+    },
+    {
+      "required": [
+        "ramp"
+      ]
+    }
   ],
   "properties": {
     "schema": {
@@ -88,10 +99,99 @@
           }
         ]
       }
+    },
+    "ramp": {
+      "$ref": "#/$defs/ramp",
+      "description": "The dense-tier RAMP: one linear per-scanline vertical-scroll run, RasterRampProgram (aeon engine/effects/raster.emp:582-593), built by raster_ramp_program(top, lines, cmd, start, step) (raster.emp:629-678). Added 2026-09-03 (docs/AURORA_EFFECTS_SCHEMA.md section 7.4, DoD item 6, against aeon's key-shape artifact docs/superpowers/specs/2026-09-03-item6-dense-perline-vscroll-key-shape.md at aeon 9e85baf0, authored at item 6's landing cf3dfb1a). ONE OBJECT, never an array: a preset has exactly one raster: channel (EffectsPreset.ep_raster, preset.emp:62/141), so there is one ramp per document. EXACTLY ONE OF bands OR ramp per document, asserted by this file's top-level oneOf: both lower into the SAME raster: slot and the engine has no combinator that mixes a sparse fire list with a dense run (artifact sections 1.5, 2, 8: no ensure refuses the pair because no code accepts it), so the contract refuses the pair here, the strict side, and WIDENS to allow both only when aeon ships a combinator and its own refusal; a schema can widen later and cannot narrow (protocol.md section 11.18's rule, applied to this file). ABSENT ramp on a bands document means what absent bands meant before: nothing (the document is the other kind); a section with no rasterRef keeps its hand-authored raster channel (effects_gen.py:1972). THE MUST NOT: a ramp authors exactly ONE linear rate (step) and ONE starting offset (start) over a top/lines span. NO per-line curve, NO independent per-line values: RasterRampProgram has one rrp_step and one rrp_start and no field that could receive a table (raster.emp:590-591; artifact section 6). A control offering per-line values would write what the engine cannot honour. WHAT AN AUTHOR SEES: a VSRAM target's value j displays on screen line top + j + 1 (the N+1 VSRAM latency, raster.emp:602-609, measured in aeon docs/benchmarks/effects-p3/RAMP-EVIDENCE.md), and the constructor does NOT compensate; an editor preview that draws value j on line top + j is one line high. GATING: the run renders only in a game whose Game.SCANLINE_CAPS declares CAP_DENSE_TIER ($0200, scene_dsl.emp:289; sonic4 yes, demo no). The ensure lives at the CALL SITE, not in the constructor (ojz_effects.emp:1048-1049; a comptime fn's free names resolve where it is called), so the generator MUST re-emit that ensure beside every raster_ramp_program() it emits, or an ungated game builds a program the interpreter silently no-ops (artifact section 1.4, 3.3). COST, information only: 304 of the 488 cycles per scanline (RASTER_DENSE_LINE_RAMP_CYC, raster_dsl.emp:1897, measured from a two-point fixture across three boots), a build-wide ensure keeps it under the window (:1908-1909); 34 bytes of ROM per emitted program. GENERATOR OBLIGATIONS (aeon, step 4): accept a document with ramp and no bands (bands is no longer required here); lower cmd as vdp_comm(VSRAM, WRITE, target.vsram.addr), never accept a raw command word from the document; lower start and step ONLY through fp16(whole, frac256), never as a raw integer, because raster_ramp_program's start/step carry NO ensure of their own and fp16's two ensures (raster.emp:685-686) are the entire authored-range contract (artifact section 7); route the program through the same per-section chooser bands uses (effects_gen.py:2693-2694) so two raster-channel writers never race for one field; keep the ep_raster/ep_patched exclusivity (preset.emp:153-154), so a section bound to a patched: template refuses a ramp document exactly as it refuses a bands document."
     }
   },
   "unevaluatedProperties": false,
   "$defs": {
+    "ramp": {
+      "type": "object",
+      "description": "One dense-tier ramp, the document face of raster_ramp_program(top, lines, cmd, start, step). All five inputs are REQUIRED because the constructor defaults none of them (raster.emp:629-678); cmd is spelled as target (an arm plus a byte address) and lowered by the generator. The span bounds restate the engine's ensures so an author meets the refusal in the editor rather than at somebody else's build: top >= 3 (raster.emp:631), lines >= 1 (:632), top + lines <= 223 (:640-641, the frame-rewind interlock, not the raw 224-line screen); the sum cannot be written in this schema and is the generator's and the engine's to refuse, so the per-field maxima here (top <= 222, lines <= 220) are only the loosest values the sum admits, not the contract for the pair.",
+      "required": [
+        "top",
+        "lines",
+        "target",
+        "start",
+        "step"
+      ],
+      "properties": {
+        "top": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 222,
+          "description": "First screen line of the run. 3 is the floor (raster.emp:631); 222 is the largest value any lines >= 1 admits under top + lines <= 223. For a VSRAM target the first written value DISPLAYS on top + 1, not top (the N+1 latency, raster.emp:602-609)."
+        },
+        "lines": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 220,
+          "description": "Run length in scanlines, one write per line. 1 is the floor (raster.emp:632); 220 is the largest value top >= 3 admits under top + lines <= 223. Cost is 304 cycles per line of the 488 available (raster_dsl.emp:1897, :1744)."
+        },
+        "target": {
+          "$ref": "#/$defs/ramp_target"
+        },
+        "start": {
+          "$ref": "#/$defs/fp16",
+          "description": "The accumulator's value on the run's first line, in pixels of vertical scroll, spelled as fp16(whole, frac256). Lowered to raster_ramp_program's start (raster.emp:629), which the engine reads as a signed 16.16 initial accumulator (rrp_start, :590)."
+        },
+        "step": {
+          "$ref": "#/$defs/fp16",
+          "description": "The per-line delta, in pixels of vertical scroll PER SCANLINE, a RATE: each line adds step to the accumulator and writes the whole part. Spelled as fp16(whole, frac256); lowered to raster_ramp_program's step (raster.emp:629), rrp_step (:591), signed. This is the ONLY per-line vocabulary a ramp has; there is no per-line curve (artifact section 6)."
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "ramp_target": {
+      "type": "object",
+      "description": "Where the run writes, spelled as an explicit target arm plus an explicit byte address rather than a raw VDP command word (the pal_region precedent, effects_gen.py:471-478: spelled out beats one fact computed twice). EXACTLY ONE ARM and only vsram exists in this contract: item 6 is per-line VERTICAL SCROLL, and a CRAM ramp, which the engine constructor also accepts (raster.emp:652-659), gets its own arm by its own CR when something authors one; nothing is reserved for it here (the anchor-mover rule: no arm with nothing behind it).",
+      "required": [
+        "vsram"
+      ],
+      "properties": {
+        "vsram": {
+          "type": "object",
+          "required": [
+            "addr"
+          ],
+          "properties": {
+            "addr": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 78,
+              "description": "The VSRAM byte address the ramp writes every line, 0..78 (engine ensure addr <= 78, raster.emp:654-655; VSRAM is 80 bytes). Plane A's whole-plane vertical scroll is 0 and plane B's is 2; per-column entries follow in pairs. Whether an ODD address is meaningful is NOT ESTABLISHED (the engine refuses only > 78), so this contract does not refuse it either; an author wanting a whole-plane scroll writes 0 or 2. rrp_mask is DERIVED as 0 for a VSRAM target and is never authored (raster.emp:660-661)."
+            }
+          },
+          "unevaluatedProperties": false
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "fp16": {
+      "type": "object",
+      "description": "A signed fixed-point value spelled the way the engine's fp16(whole, frac256) helper takes it (aeon engine/effects/raster.emp:684-689), so the generator emits fp16(whole, frac256) verbatim and no raw 16.16 literal ever reaches raster_ramp_program(). THE AUTHORED RANGE IS THE CONTRACT and it is fp16's two ensures: whole in -512..511 (raster.emp:686), frac256 in 0..255 (:685). The STORAGE is a u32 carrying signed 16.16 (rrp_start/rrp_step, raster.emp:590-591) and could hold a whole part of roughly -32768..32767, about 64 times the authored range; a control built on the storage width offers an author values the build refuses. State the range, note the width, never the reverse (artifact section 7; the same rule patch_world_ys states for u16 and 32767). VALUE: whole + frac256/256, so {whole: 0, frac256: 128} is one half; a negative value is whole negative with frac256 still 0..255 and the magnitude ADDED to it, exactly as fp16 computes it ((whole * 65536) - (frac256 * 256) for whole < 0, :687), so {whole: -1, frac256: 128} is -1.5, not -0.5. UNITS for step: pixels of vertical scroll per scanline (a rate); for start: pixels, the accumulator's initial value on the run's first line.",
+      "required": [
+        "whole",
+        "frac256"
+      ],
+      "properties": {
+        "whole": {
+          "type": "integer",
+          "minimum": -512,
+          "maximum": 511,
+          "description": "The integer part, -512..511, fp16's own ensure (raster.emp:686). Required, no default."
+        },
+        "frac256": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255,
+          "description": "The sub-pixel part in 1/256 px, 0..255, fp16's own ensure (raster.emp:685). Required, no default; write 0 for a whole number."
+        }
+      },
+      "unevaluatedProperties": false
+    },
     "patch_motion_entry": {
       "type": "object",
       "description": "One authored motion: exactly one arm. Only sweep exists; zero arms, two arms or an unknown arm are refused here and by the generator's shape check (aeon effects_gen.py, step 4).",

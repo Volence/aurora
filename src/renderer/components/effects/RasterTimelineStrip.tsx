@@ -190,15 +190,15 @@ export default function RasterTimelineStrip(): React.ReactElement {
 
   // Why the dragged edge has stopped, or null. ONE derivation, the provider's,
   // read by the plate on the canvas and by the hint under it.
-  const held = (drag !== null && preset?.bands[drag.index])
-    ? bandEdgeNotice(preset.bands[drag.index], drag.edge, drag.requested)
+  const held = (drag !== null && preset?.bands?.[drag.index])
+    ? bandEdgeNotice(preset.bands[drag.index]!, drag.edge, drag.requested)
     : null;
 
   // ── the gesture's three ends ─────────────────────────────────────────────
 
   function beginDrag(index: number, edge: 'top' | 'bot', stripY: number): void {
     if (preset === null) return;
-    const band = preset.bands[index];
+    const band = preset.bands?.[index];
     if (!band) return;
     witness.current = { presetId: preset.id, band: JSON.stringify(band) };
     setDrag(presetDragFor(preset, index, edge, stripY));
@@ -219,7 +219,7 @@ export default function RasterTimelineStrip(): React.ReactElement {
     setDrag(null);
     witness.current = null;
     if (d === null || w === null || preset === null || preset.id !== w.presetId) return;
-    const band = preset.bands[d.index];
+    const band = preset.bands?.[d.index];
     if (!band || JSON.stringify(band) !== w.band) return;
     if (band[d.edge] === d.line) return;
     run(setBandFieldCommand(presetLibrary, preset.id, d.index, d.edge, d.line));
@@ -230,7 +230,7 @@ export default function RasterTimelineStrip(): React.ReactElement {
     if (preset === null) return;
     const index = presetBandAt(presetRows, stripX, stripY);
     if (index === null) return;
-    const band = preset.bands[index];
+    const band = preset.bands?.[index];
     if (!band) return;
     const refusal = bandSplitRefusal(band);
     if (refusal !== null) { setSplitRefused(`Band ${index}: ${refusal}`); return; }

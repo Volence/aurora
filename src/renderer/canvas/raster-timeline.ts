@@ -456,7 +456,7 @@ export function rasterTimelinePresetRows(
   preset: EffectsPreset | null, drag: RasterTimelinePresetDrag | null,
 ): RasterTimelinePresetBandRow[] {
   if (preset === null) return [];
-  return preset.bands.map((band, index) => {
+  return (preset.bands ?? []).map((band, index) => {
     const held = drag !== null && drag.index === index
       ? { ...band, [drag.edge]: drag.line } as EffectsPresetBand
       : band;
@@ -534,7 +534,7 @@ export function presetBandAt(
 export function presetDragFor(
   preset: EffectsPreset | null, index: number, edge: 'top' | 'bot', canvasY: number,
 ): RasterTimelinePresetDrag | null {
-  const band = preset?.bands[index];
+  const band = preset?.bands?.[index];
   if (!band) return null;
   const requested = stripYToLine(canvasY);
   return { index, edge, line: clampBandEdge(band, edge, requested), requested };

@@ -184,7 +184,7 @@ describe('reading a preset', () => {
     const p = parseEffectsPreset(AUTHORED_PROBE, 'authored_probe');
     expect(p.id).toBe('authored_probe');
     expect(p.bands).toHaveLength(2);
-    expect(p.bands[0]).toEqual({
+    expect(p.bands![0]).toEqual({
       top: 112, bot: 156, sh: false, on: { cram: { addr: 74, colours: [14] } },
     });
   });

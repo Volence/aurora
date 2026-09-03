@@ -489,7 +489,7 @@ export function presetListEntries(library: EffectsPresetLibrary): PresetListEntr
   return library.presets.map((p) => ({
     id: p.id,
     label: (typeof p.name === 'string' && p.name !== '') ? p.name : p.id,
-    bands: p.bands.length,
+    bands: (p.bands ?? []).length,
   }));
 }
 
@@ -864,7 +864,7 @@ export function editPresetCommand(
 export function addBandCommand(
   library: EffectsPresetLibrary, id: string,
 ): SetEffectsPresetCommand | null {
-  return editPresetCommand(library, id, `Add band to ${id}`, (p) => { p.bands.push(newBand()); });
+  return editPresetCommand(library, id, `Add band to ${id}`, (p) => { if (!p.bands) return; p.bands.push(newBand()); });
 }
 
 /**
@@ -881,10 +881,11 @@ export function removeBandCommand(
   library: EffectsPresetLibrary, id: string, index: number,
 ): SetEffectsPresetCommand | null {
   const existing = library.presets.find((p) => p.id === id);
-  if (!existing || index < 0 || index >= existing.bands.length) return null;
-  if (existing.bands.length <= 1) return null;
+  const existingBands = existing?.bands ?? [];
+  if (!existing || index < 0 || index >= existingBands.length) return null;
+  if (existingBands.length <= 1) return null;
   return editPresetCommand(library, id, `Remove band ${index} from ${id}`,
-    (p) => { p.bands.splice(index, 1); });
+    (p) => { if (!p.bands) return; p.bands.splice(index, 1); });
 }
 
 /**
@@ -896,7 +897,7 @@ export function removeBandCommand(
  * disabled button with a reason and a disabled button with a coincidence.
  */
 export function lastBandRefusal(preset: EffectsPreset): string | null {
-  if (preset.bands.length > 1) return null;
+  if ((preset.bands ?? []).length > 1) return null;
   return `preset "${preset.id}": this is its only raster band, and a preset must have at least `
     + 'one — the schema refuses an empty bands list, because a document that emits a zero-band '
     + 'program is a document that should not exist. Delete the preset instead.';
@@ -907,7 +908,7 @@ export function setBandFieldCommand<K extends 'top' | 'bot' | 'sh'>(
   library: EffectsPresetLibrary, id: string, index: number, field: K, value: EffectsPresetBand[K],
 ): SetEffectsPresetCommand | null {
   return editPresetCommand(library, id, `Band ${index} ${field}`, (p) => {
-    const band = p.bands[index];
+    const band = p.bands?.[index];
     if (!band) return;
     band[field] = value;
   });
@@ -928,7 +929,7 @@ export function setBandArmCommand(
 ): SetEffectsPresetCommand | null {
   if (!EFFECTS_PRESET_ON_ARMS.includes(arm)) return null;
   return editPresetCommand(library, id, `Band ${index} ON arm`, (p) => {
-    const band = p.bands[index];
+    const band = p.bands?.[index];
     if (!band) return;
     if (bandArm(band) === arm) return;
     band.on = (arm === 'cram'
@@ -943,7 +944,7 @@ export function setArmFieldCommand(
   library: EffectsPresetLibrary, id: string, index: number, field: string, value: number,
 ): SetEffectsPresetCommand | null {
   return editPresetCommand(library, id, `Band ${index} ${field}`, (p) => {
-    const band = p.bands[index];
+    const band = p.bands?.[index];
     if (!band) return;
     const arm = bandArm(band);
     if (arm === null) return;
@@ -1000,7 +1001,7 @@ export function setColoursCommand(
   library: EffectsPresetLibrary, id: string, index: number, colours: number[],
 ): SetEffectsPresetCommand | null {
   return editPresetCommand(library, id, `Band ${index} colours`, (p) => {
-    const band = p.bands[index];
+    const band = p.bands?.[index];
     if (!band || !('cram' in band.on)) return;
     band.on.cram.colours = colours.slice();
   });
@@ -1085,7 +1086,7 @@ export function setColourCommand(
   library: EffectsPresetLibrary, id: string, index: number, at: number, word: number,
 ): SetEffectsPresetCommand | null {
   return editPresetCommand(library, id, `Band ${index} colour ${at}`, (p) => {
-    const band = p.bands[index];
+    const band = p.bands?.[index];
     if (!band || !('cram' in band.on)) return;
     const colours = band.on.cram.colours;
     if (!Array.isArray(colours) || at < 0 || at >= colours.length) return;
@@ -1880,13 +1881,14 @@ export function bandEdgeNotice(
  * to be visible with nobody asking.
  */
 export function bandCollisionAdvisory(preset: EffectsPreset, index: number): string | null {
-  const band = preset.bands[index];
+  const bands = preset.bands ?? [];
+  const band = bands[index];
   if (!band) return null;
   const mine = bandFireLines(band);
   const mySpan = bandCramSpan(band);
-  for (let j = 0; j < preset.bands.length; j++) {
+  for (let j = 0; j < bands.length; j++) {
     if (j === index) continue;
-    const other = preset.bands[j];
+    const other = bands[j];
     if (!other) continue;
     // ⚠ THE PAIR IS NAMED IN INDEX ORDER, NOT IN ASKING ORDER, and that is not
     // tidiness: a collision is a fact about a PAIR, and both members are asked
@@ -1904,8 +1906,8 @@ export function bandCollisionAdvisory(preset: EffectsPreset, index: number): str
     const spansMeet = mySpan.start < theirSpan.end && theirSpan.start < mySpan.end;
     const linesMeet = band.top < other.bot && other.top < band.bot;
     if (spansMeet && linesMeet) {
-      const first = preset.bands[lo];
-      const second = preset.bands[hi];
+      const first = bands[lo]!;
+      const second = bands[hi]!;
       return `preset "${preset.id}": Raster band ${lo} (lines ${first.top}..${first.bot}) and `
         + `Raster band ${hi} (lines ${second.top}..`
         + `${second.bot}) overlap vertically AND share CRAM bytes `
@@ -1983,18 +1985,20 @@ export function splitBandCommand(
   library: EffectsPresetLibrary, id: string, index: number, requestedLine: number,
 ): SetEffectsPresetCommand | null {
   const existing = library.presets.find((p) => p.id === id);
-  const band = existing?.bands[index];
+  const band = existing?.bands?.[index];
   if (!existing || !band) return null;
   if (bandSplitRefusal(band) !== null) return null;
   const cut = bandSplitLine(band, requestedLine);
   return editPresetCommand(library, id, `Split band ${index} of ${id} at line ${cut}`, (p) => {
-    const b = p.bands[index];
+    const bands = p.bands;
+    if (!bands) return;
+    const b = bands[index];
     if (!b) return;
     const lower: EffectsPresetBand = {
       top: cut + 1, bot: b.bot, sh: b.sh, on: structuredClone(b.on),
     };
     b.bot = cut;
-    p.bands.splice(index + 1, 0, lower);
+    bands.splice(index + 1, 0, lower);
   });
 }
 

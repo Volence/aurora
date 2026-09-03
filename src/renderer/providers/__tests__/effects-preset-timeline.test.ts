@@ -245,7 +245,7 @@ describe('what a split is', () => {
     const p = preset([band(40, 120)]);
     const cmd = splitBandCommand(library(p), p.id, 0, 80);
     expect(cmd).not.toBeNull();
-    const bands = cmd!.newPreset!.bands;
+    const bands = cmd!.newPreset!.bands!;
     expect(bands).toHaveLength(2);
     expect(bands[0]).toMatchObject({ top: 40, bot: 80 });
     expect(bands[1]).toMatchObject({ top: 81, bot: 120 });
@@ -286,10 +286,10 @@ describe('what a split is', () => {
   it('carries the ON op and `sh` to BOTH halves, as a COPY rather than a shared object', () => {
     const p = preset([band(40, 120, 96, 3, 1)]);
     const next = splitBandCommand(library(p), p.id, 0, 80)!.newPreset!;
-    expect(next.bands[1].on).toEqual(next.bands[0].on);
-    expect(next.bands[1].on).not.toBe(next.bands[0].on);
-    expect(next.bands[1].sh).toBe(1);
-    expect(bandCramSpan(next.bands[1])).toEqual({ start: 96, end: 102 });
+    expect(next.bands![1].on).toEqual(next.bands![0].on);
+    expect(next.bands![1].on).not.toBe(next.bands![0].on);
+    expect(next.bands![1].sh).toBe(1);
+    expect(bandCramSpan(next.bands![1])).toEqual({ start: 96, end: 102 });
   });
 
   it('THE BAND ID CANNOT COLLIDE: the halves share `sa` and differ in `top`', () => {
@@ -299,13 +299,13 @@ describe('what a split is', () => {
     const p = preset([band(40, 120, 96, 3)]);
     const next = splitBandCommand(library(p), p.id, 0, 80)!.newPreset!;
     const idOf = (b: EffectsPresetBand): number => b.top * 128 + bandCramSpan(b)!.start;
-    expect(idOf(next.bands[0])).not.toBe(idOf(next.bands[1]));
+    expect(idOf(next.bands![0])).not.toBe(idOf(next.bands![1]));
   });
 
   it('inserts the lower half IMMEDIATELY AFTER the upper, leaving other bands where they were', () => {
     const p = preset([band(10, 30, 200), band(40, 120), band(150, 180, 210)]);
     const next = splitBandCommand(library(p), p.id, 1, 80)!.newPreset!;
-    expect(next.bands.map((b) => [b.top, b.bot]))
+    expect(next.bands!.map((b) => [b.top, b.bot]))
       .toEqual([[10, 30], [40, 80], [81, 120], [150, 180]]);
   });
 

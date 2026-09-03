@@ -372,8 +372,8 @@ describe('list_effects_presets reads the binding back', () => {
   it('keeps everything the reply already carried', async () => {
     const r = await ask({ kind: 'list-effects-presets' }) as Record<string, unknown>;
     expect(r.presets).toEqual([
-      { id: 'glare', name: 'Glare', bands: glare().bands.length },
-      { id: 'dusk', name: 'Dusk', bands: dusk().bands.length },
+      { id: 'glare', name: 'Glare', bands: glare().bands!.length },
+      { id: 'dusk', name: 'Dusk', bands: dusk().bands!.length },
     ]);
     expect(r.unreadable).toEqual([
       { path: 'data/editor/effects/presets/broken.json', reason: 'not valid JSON' },

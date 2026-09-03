@@ -213,6 +213,115 @@ export interface EffectsPresetPatchMotion {
 }
 
 /**
+ * A signed fixed-point value, `$defs.fp16` — the document face of aeon's
+ * `fp16(whole, frac256)` helper (`engine/effects/raster.emp:684-689`).
+ *
+ * ═══ THE SIGN RULE, AND WHY IT IS NOT THE OBVIOUS ONE ═══
+ *
+ * `frac256` IS A MAGNITUDE. The sign lives on `whole` ALONE and applies to the
+ * whole value, so `{whole: -1, frac256: 128}` is **-1.5**, not -0.5. The obvious
+ * implementation, `whole + frac256 / 256`, yields -0.5 for that input — wrong by
+ * a whole pixel, with both numbers still inside their declared ranges, so NO
+ * SCHEMA CAN CATCH IT. `presetFp16ToNumber` below is the one conversion, and
+ * `EFFECTS_PRESET_FP16_SIGNED_EXAMPLE` re-derives that row from the schema's own
+ * sentence at module load rather than trusting this comment.
+ *
+ * The authored range is `fp16`'s own two ensures (`whole` -512..511,
+ * `frac256` 0..255) and NOT the storage width: `rrp_start`/`rrp_step` are u32
+ * fields carrying signed 16.16 whose whole part could span roughly
+ * -32768..32767, about 64x what the build accepts. State the range, note the
+ * width, never the reverse.
+ *
+ * A CONSEQUENCE WORTH KNOWING BEFORE A CONTROL IS BUILT: because the sign is
+ * `whole`'s, the interval (-1, 0) is UNREACHABLE. There is no spelling of -0.5;
+ * `{whole: 0, frac256: 128}` is +0.5. The smallest negative magnitude below one
+ * pixel does not exist in this encoding.
+ */
+export interface EffectsPresetFp16 {
+  /** Integer part, -512..511. Carries the SIGN of the whole value. */
+  whole: number;
+  /** Sub-pixel part in 1/256 px, 0..255. A MAGNITUDE — never negative. */
+  frac256: number;
+}
+
+/**
+ * Where a ramp writes — `$defs.ramp_target`. EXACTLY ONE ARM, and `vsram` is the
+ * only arm this contract has.
+ *
+ * No `cram` arm exists and NONE IS RESERVED, on the same rule that kept an
+ * `approach` arm out of `patch_motion`: the engine constructor does accept a CRAM
+ * target (`raster.emp:652-659`), but nothing authors one, and an arm with nothing
+ * behind it is a key that advertises a shape this codec is not shaped for. A CRAM
+ * ramp arrives by its own contract change. This is therefore a plain interface
+ * and not a union with one member.
+ */
+export interface EffectsPresetRampTarget {
+  vsram: {
+    /**
+     * The VSRAM byte address written every line, 0..78. Plane A's whole-plane
+     * vertical scroll is 0 and plane B's is 2. Whether an ODD address is
+     * meaningful is NOT ESTABLISHED — the engine refuses only `> 78` and this
+     * codec refuses exactly what the schema refuses.
+     */
+    addr: number;
+  };
+}
+
+/**
+ * The dense-tier ramp — `$defs.ramp`, the document face of
+ * `raster_ramp_program(top, lines, cmd, start, step)` (`raster.emp:629-678`).
+ * All five members are required because the constructor defaults none of them.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ║ THE MUST NOT: A PER-LINE CURVE IS NOT AUTHORABLE, AND NEVER WILL BE HERE ║
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A ramp authors exactly ONE linear rate (`step`) and ONE starting offset
+ * (`start`) over a `top`/`lines` span. There are no independent per-line values
+ * and there is no curve. `RasterRampProgram` has one `rrp_step` and one
+ * `rrp_start` and NO FIELD THAT COULD RECEIVE A TABLE (`raster.emp:590-591`), so
+ * a control offering per-line values would author what the engine cannot honour —
+ * the document would validate, generate, and then be silently wrong on hardware.
+ *
+ * THE NAME IS THE ENFORCEMENT. The key is `ramp` — the tree's own spelling
+ * (`RasterRampProgram` / `raster_ramp_program` / `OP_RUN_RAMP`) — and a ramp is
+ * linear by definition, so the forbidden model is INEXPRESSIBLE rather than
+ * merely refused. The schema object is closed, so a `curve` key is refused by
+ * closure; the contract vectors carry that refusal as a named row. If a future
+ * control wants a curve, that is an engine change first and a contract change
+ * second, in that order, and never a widened `curve` key here (aeon DoD item 12
+ * names that road explicitly and closes it).
+ *
+ * Do not confuse this with `SceneCurve.To` (`scene_dsl.emp:392`), an older and
+ * unrelated use of the word "ramp" for the BG HScroll factor curve.
+ *
+ * ═══ ONE RASTER PROGRAM PER DOCUMENT ═══
+ *
+ * `ramp` and `bands` lower into the SAME `raster:` channel and the engine has no
+ * combinator that mixes a sparse fire list with a dense run. Exactly one of them
+ * per document, spelled as the schema's top-level `oneOf`; see
+ * `EFFECTS_PRESET_RASTER_CHANNELS`.
+ */
+export interface EffectsPresetRamp {
+  /**
+   * First screen line of the run, 3..222. NOTE the display offset: for a VSRAM
+   * target the value written on run index `j` DISPLAYS on line
+   * `top + j + EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG`.
+   */
+  top: number;
+  /** Run length in scanlines, 1..220. One write per line. */
+  lines: number;
+  target: EffectsPresetRampTarget;
+  /** The accumulator's value on the run's FIRST line, in pixels. */
+  start: EffectsPresetFp16;
+  /**
+   * The per-line delta, in pixels of vertical scroll PER SCANLINE — a RATE.
+   * This is the ONLY per-line vocabulary a ramp has.
+   */
+  step: EffectsPresetFp16;
+}
+
+/**
  * The preset document. `bands` is the raster channel; `cycles` and `variants`
  * (empyrean 12aecd5, AURORA_EFFECTS_SCHEMA.md §7.2) and `patch_world_ys` /
  * `patch_motion` (empyrean d36d704, §7.3) are OTHER CHANNELS OF THE SAME
@@ -248,7 +357,28 @@ export interface EffectsPreset {
   id: string;
   /** Display label. Writer-owned: read by nothing, dropped on lowering. */
   name?: unknown;
-  bands: EffectsPresetBand[];
+  /**
+   * The SPARSE raster channel. OPTIONAL SINCE empyrean 9233883 (§7.4): `bands`
+   * left the schema's top-level `required` list when `ramp` arrived, and a
+   * ramp-only document is legal. A document still carries exactly one raster
+   * program — see `ramp` below and `EFFECTS_PRESET_RASTER_CHANNELS`.
+   *
+   * WHY THIS IS OPTIONAL RATHER THAN A DISCRIMINATED UNION OF TWO DOCUMENT
+   * TYPES: a union would make `preset.bands` a narrowing question at all
+   * fifty-odd read sites, most of which are panels that legitimately mean "the
+   * bands, if this document has any" and already handle an empty list. The
+   * exactly-one rule is not weakened by that choice — it is asserted by the
+   * schema's top-level `oneOf` on every parse AND on every serialize, which is
+   * where a document is actually accepted or refused. `presetRasterChannel`
+   * below is the narrowing helper for code that needs to branch.
+   */
+  bands?: EffectsPresetBand[];
+  /**
+   * The DENSE raster channel. Mutually exclusive with `bands` — the same
+   * `raster:` slot, and no combinator exists. See `EffectsPresetRamp` for the
+   * per-line-curve MUST NOT.
+   */
+  ramp?: EffectsPresetRamp;
   cycles?: EffectsPresetCycleChannel[] | null;
   variants?: (EffectsPresetPalVariant | null)[];
   /**
@@ -474,6 +604,259 @@ export const ANCHOR_PHASE_RANGE: Readonly<{ min: number; max: number }> = Object
   min: schemaNode(PHASE).minimum as number,
   max: schemaNode(PHASE).maximum as number,
 });
+
+// ---------------------------------------------------------------------------
+// The ramp key (empyrean 9233883, §7.4) — bounds, the fp16 SIGN RULE, and the
+// display lag. Every number below is READ OUT of the vendored schema; none is
+// typed beside it, and every prose read throws at module load when its sentence
+// moves rather than yielding a plausible-looking wrong value.
+// ---------------------------------------------------------------------------
+
+/** An inclusive `{min, max}` read off one schema node's own minimum/maximum. */
+function schemaRange(path: string[]): Readonly<{ min: number; max: number }> {
+  const node = schemaNode(path);
+  const min = node.minimum;
+  const max = node.maximum;
+  if (typeof min !== 'number' || typeof max !== 'number') {
+    throw new Error(
+      `aurora-effects-preset.schema.json no longer bounds ${path.join('.')} with both a numeric ` +
+      'minimum and maximum, which this module reads its range from. Re-read the schema — do NOT ' +
+      'hardcode the bounds.',
+    );
+  }
+  return Object.freeze({ min, max });
+}
+
+const RAMP = ['$defs', 'ramp'] as const;
+
+/**
+ * The two raster channels, read off the schema's TOP-LEVEL `oneOf` rather than
+ * restated: exactly one of these keys per document.
+ *
+ * Read from the `oneOf` and not from `properties`, because it is the `oneOf`
+ * that carries the exclusivity. If a third channel is ever added, or the
+ * exclusivity is ever relaxed, this list changes with it and the gate that
+ * asserts its contents goes red.
+ */
+export const EFFECTS_PRESET_RASTER_CHANNELS: readonly string[] = (() => {
+  const branches = (EFFECTS_PRESET_SCHEMA as Record<string, unknown>).oneOf;
+  if (!Array.isArray(branches) || branches.length === 0) {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer carries a top-level oneOf, which is where the ' +
+      'exactly-one-raster-channel rule lives and where EFFECTS_PRESET_RASTER_CHANNELS is derived ' +
+      'from. Re-read the schema — do NOT hardcode the channel names.',
+    );
+  }
+  const names = branches.map((b) => {
+    const req = (b as Record<string, unknown>).required;
+    if (!Array.isArray(req) || req.length !== 1 || typeof req[0] !== 'string') {
+      throw new Error(
+        'a top-level oneOf branch in aurora-effects-preset.schema.json is not the single-`required`' +
+        ' shape EFFECTS_PRESET_RASTER_CHANNELS reads. Re-read the schema.',
+      );
+    }
+    return req[0];
+  });
+  return Object.freeze(names.slice().sort());
+})();
+
+/**
+ * Which raster channel a document carries, or null when it carries neither.
+ *
+ * The narrowing helper the `EffectsPreset` interface's comment points at: code
+ * that must branch on the channel asks HERE rather than testing `bands` for
+ * undefined, so there is one spelling of the question. It reports what the
+ * document HAS; it is not the refusal — the schema's `oneOf` is, on parse and on
+ * serialize alike, and it is what refuses a document carrying both.
+ */
+export function presetRasterChannel(preset: Partial<EffectsPreset>): 'bands' | 'ramp' | null {
+  if (preset.ramp !== undefined) return 'ramp';
+  if (preset.bands !== undefined) return 'bands';
+  return null;
+}
+
+/** `top`'s inclusive range, 3..222 in the vendored schema. */
+export const EFFECTS_PRESET_RAMP_TOP_RANGE = schemaRange([...RAMP, 'properties', 'top']);
+
+/** `lines`'s inclusive range, 1..220 in the vendored schema. */
+export const EFFECTS_PRESET_RAMP_LINES_RANGE = schemaRange([...RAMP, 'properties', 'lines']);
+
+/** The VSRAM byte address's inclusive range, 0..78 in the vendored schema. */
+export const EFFECTS_PRESET_RAMP_VSRAM_ADDR_RANGE =
+  schemaRange(['$defs', 'ramp_target', 'properties', 'vsram', 'properties', 'addr']);
+
+/**
+ * `top + lines <= 223` — the frame-rewind interlock, READ OUT OF THE SCHEMA'S
+ * OWN PROSE because JSON Schema cannot express a constraint over two fields.
+ *
+ * THIS IS WHY THE PER-FIELD MAXIMA ARE NOT THE CONTRACT. `top <= 222` and
+ * `lines <= 220` are only the loosest values the SUM admits; `{top: 222,
+ * lines: 220}` satisfies both and is refused by the engine. The schema itself
+ * says so and refuses neither, so this bound is the generator's and the engine's
+ * — a control that offers the per-field maxima as a valid pair offers a build
+ * failure. Stated here so the follow-up control has one place to read it.
+ */
+export const EFFECTS_PRESET_RAMP_SPAN_MAX: number = schemaNumberFromProse(
+  [...RAMP],
+  /top \+ lines <= (\d+)/,
+  'the top + lines span bound',
+);
+
+/**
+ * THE VSRAM DISPLAY LAG, +1, AND WHY IT IS A NAMED CONSTANT.
+ *
+ * The value a VSRAM run writes on its index `j` DISPLAYS on screen line
+ * `top + j + 1`, not `top + j`. That is the N+1 VSRAM latency
+ * (`raster.emp:602-609`, measured in aeon `docs/benchmarks/effects-p3/RAMP-EVIDENCE.md`),
+ * and THE CONSTRUCTOR DOES NOT COMPENSATE FOR IT — so anything that previews,
+ * draws, or hit-tests a ramp against screen lines must add it, or it is one line
+ * high everywhere. A preview that is one line out looks correct, which is why
+ * this is a constant with the reasoning beside it rather than a `+ 1` typed into
+ * whichever renderer needs it first.
+ *
+ * Derived from the schema's own `top` sentence, loudly: if that sentence stops
+ * saying `top + 1` this throws at module load instead of silently yielding a lag
+ * of zero, which would be indistinguishable from "no lag" in every output.
+ *
+ * NOT APPLIED BY THIS CODEC. A document's `top` is the ENGINE's `top`, written
+ * and read verbatim; the lag is a DISPLAY fact, and applying it here would put
+ * the compensation in the file, where the generator would apply it a second time.
+ */
+export const EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG: number = (() => {
+  const lag = schemaNumberFromProse(
+    [...RAMP, 'properties', 'top'],
+    /DISPLAYS on top \+ (\d+)/,
+    'the VSRAM display lag',
+  );
+  if (!Number.isInteger(lag) || lag < 1) {
+    throw new Error(
+      `the VSRAM display-lag sentence in aurora-effects-preset.schema.json parsed to ${lag}, which ` +
+      'is not a positive whole number of scanlines. A lag of 0 is indistinguishable from "no lag" ' +
+      'in every rendered output, so this refuses rather than shipping it.',
+    );
+  }
+  return lag;
+})();
+
+/** `fp16.whole`'s inclusive range — the SIGNED part, -512..511. */
+export const EFFECTS_PRESET_FP16_WHOLE_RANGE =
+  schemaRange(['$defs', 'fp16', 'properties', 'whole']);
+
+/** `fp16.frac256`'s inclusive range — a MAGNITUDE in 1/256 px, 0..255. */
+export const EFFECTS_PRESET_FP16_FRAC_RANGE =
+  schemaRange(['$defs', 'fp16', 'properties', 'frac256']);
+
+/** How many `frac256` units make one pixel, read off the field's own maximum. */
+const FP16_UNITS_PER_PIXEL = EFFECTS_PRESET_FP16_FRAC_RANGE.max + 1;
+
+/**
+ * ═══ THE fp16 SIGN RULE, THE ONE CONVERSION, AND THE TRAP ═══
+ *
+ * `frac256` is a MAGNITUDE and the sign is `whole`'s alone, applying to the whole
+ * value. So the conversion is NOT `whole + frac256 / 256`:
+ *
+ *     whole >= 0  ->  whole + frac256 / 256
+ *     whole <  0  ->  whole - frac256 / 256      <-- the one that surprises
+ *
+ * `{whole: -1, frac256: 128}` is therefore **-1.5**. The naive form yields -0.5,
+ * a whole pixel out, with BOTH NUMBERS STILL IN RANGE — no schema, and no
+ * round-trip through this codec, can catch that. It is the same class as the
+ * band-seed unit bug: a legal-looking document that puts the effect somewhere
+ * else entirely.
+ *
+ * The engine spells it `(whole * 65536) - (frac256 * 256)` for `whole < 0`
+ * (`raster.emp:687`), i.e. it moves AWAY from zero in both directions.
+ *
+ * `EFFECTS_PRESET_FP16_SIGNED_EXAMPLE` below re-derives the -1.5 row from the
+ * schema's own sentence at module load, so this function is checked against the
+ * contract rather than against this comment.
+ */
+export function presetFp16ToNumber(fp: EffectsPresetFp16): number {
+  const magnitude = Math.abs(fp.whole) + fp.frac256 / FP16_UNITS_PER_PIXEL;
+  return fp.whole < 0 ? -magnitude : magnitude;
+}
+
+/**
+ * The inverse: a pixel value as the fp16 object the schema declares, or null
+ * when it cannot be spelled exactly.
+ *
+ * NULL RATHER THAN THE NEAREST, on the rule `anchorAmpRungForPeakPx` already
+ * sets in this file: a converter that quietly rounded would move an author's
+ * value without saying so. Two separate ways a value has no spelling, and both
+ * return null:
+ *
+ *   • it is not a whole number of 1/256 px (`0.3` is not representable);
+ *   • it lies in the open interval (-1, 0). The sign is `whole`'s, so a negative
+ *     value needs a negative `whole`, and there is none between -1 and 0. -0.5
+ *     HAS NO SPELLING in this encoding. That is the encoding's own hole, not a
+ *     limitation of this function, and a control must show it rather than snap
+ *     across it.
+ *
+ * Out-of-range values return null too — the authored range is fp16's ensures,
+ * and offering an author a value the build refuses is the failure §7.4 names.
+ */
+export function presetFp16FromNumber(px: number): EffectsPresetFp16 | null {
+  if (!Number.isFinite(px)) return null;
+  const units = px * FP16_UNITS_PER_PIXEL;
+  if (!Number.isInteger(units)) return null;
+  const negative = px < 0;
+  const magnitude = Math.abs(units);
+  const whole = (negative ? -1 : 1) * Math.floor(magnitude / FP16_UNITS_PER_PIXEL);
+  const frac256 = magnitude % FP16_UNITS_PER_PIXEL;
+  // The (-1, 0) hole: a negative value whose whole part rounds to -0 cannot be
+  // spelled, because `{whole: 0, ...}` is POSITIVE.
+  if (negative && whole === 0 && frac256 !== 0) return null;
+  if (whole < EFFECTS_PRESET_FP16_WHOLE_RANGE.min || whole > EFFECTS_PRESET_FP16_WHOLE_RANGE.max) {
+    return null;
+  }
+  return { whole, frac256 };
+}
+
+/**
+ * The schema's own worked negative example, `{whole, frac256} -> value`, parsed
+ * out of the `$defs.fp16` description.
+ *
+ * THIS IS THE GATE ON THE SIGN RULE, and it is why the rule above is not merely
+ * asserted in a test written from the same prose a human read. The schema states
+ * the example precisely because the value semantics "are not the obvious ones";
+ * this reads that sentence and `test/formats/effects-preset-ramp.test.ts` asserts
+ * `presetFp16ToNumber` reproduces it. If empyrean ever restates the example with
+ * different numbers, the row moves with the contract; if it DROPS the sentence,
+ * this throws at module load rather than leaving the trap unguarded.
+ */
+export const EFFECTS_PRESET_FP16_SIGNED_EXAMPLE: Readonly<{
+  fp: EffectsPresetFp16;
+  value: number;
+}> = (() => {
+  const description = String(schemaNode(['$defs', 'fp16']).description ?? '');
+  const m = /\{whole: (-?\d+), frac256: (\d+)\} is (-?\d+(?:\.\d+)?), not (-?\d+(?:\.\d+)?)/
+    .exec(description);
+  if (!m) {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer states the worked NEGATIVE fp16 example ' +
+      '("{whole: -1, frac256: 128} is -1.5, not -0.5") that EFFECTS_PRESET_FP16_SIGNED_EXAMPLE is ' +
+      'derived from. That sentence is the only contract-side statement of the sign rule, and the ' +
+      'naive conversion (whole + frac256/256) is wrong by a whole pixel with both numbers still ' +
+      'in range. Re-read the schema and re-derive — do NOT hardcode -1.5.',
+    );
+  }
+  const fp = Object.freeze({ whole: Number(m[1]), frac256: Number(m[2]) });
+  const value = Number(m[3]);
+  const naive = Number(m[4]);
+  if (fp.whole >= 0) {
+    throw new Error(
+      'the worked fp16 example in aurora-effects-preset.schema.json is no longer NEGATIVE, so it ' +
+      'no longer exercises the sign rule it exists to state. Re-read the schema.',
+    );
+  }
+  if (value === naive) {
+    throw new Error(
+      'the worked fp16 example in aurora-effects-preset.schema.json no longer distinguishes the ' +
+      'correct value from the naive one, so it can no longer catch the sign trap. Re-read the schema.',
+    );
+  }
+  return Object.freeze({ fp, value });
+})();
 
 /**
  * The rung with EXACTLY this peak, or null.

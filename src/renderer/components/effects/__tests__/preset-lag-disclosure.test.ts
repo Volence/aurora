@@ -1,6 +1,6 @@
 // THE NO-ROM DISCLOSURE above the preset's channel and anchor controls —
-// RETIRED 2026-09-03, and this file is what stops either state from becoming an
-// unmeasured claim.
+// ARMED 2026-09-03 for `ramp`, and this file is what stops either state from
+// becoming an unmeasured claim.
 //
 // ROADMAP §5.1 row 97 (second half), the O62/O64 class: a control for a key the
 // engine does not consume yet must say so on screen, and the saying must retire
@@ -8,42 +8,48 @@
 // (core/formats/effects/preset-lag.ts: PRESET_KEYS_AWAITING_AEON); the drift
 // test MEASURES that constant's subject against aeon at origin/master.
 //
-// ═══ THIS FILE HAS NOW BEEN RE-AIMED THREE TIMES, AND THAT IS THE POINT ═══
+// ═══ THIS FILE HAS NOW BEEN RE-AIMED FOUR TIMES, AND THAT IS THE POINT ═══
 //
 // armed (`['cycles','variants']`) → retired 2026-09-02 (aeon merged item 5) →
 // armed again 2026-09-03 (empyrean d36d704 declared item 4's `patch_world_ys` /
-// `patch_motion` and aeon's step 4 had not run) → RETIRED again, later the same
-// day, when step 4 ran. Measured firsthand at aeon `origin/master` `b7f4bdeb`,
-// page blob `22a42064`: `PRESET_KEYS` (`tools/effects_gen.py:285-286`) carries
-// both names, `_check_patch_world_ys` / `_check_patch_motion` shape-check them,
-// `render_patch_motion` and the `fn_sec_patch_*` emitters lower them, and the
-// page's machine-checked block lists both under `preset:`.
+// `patch_motion` and aeon's step 4 had not run) → retired again, later the same
+// day, when step 4 ran → ARMED AGAIN, 2026-09-03, for `ramp`: empyrean `9233883`
+// declared item 6's authoring key (§7.4) and aeon's step 4 has not run.
 //
-// A FILE WHOSE EVERY ROW SAID "the sentence is on screen" WOULD NOW EITHER BE
-// DELETED OR QUIETLY INVERTED INTO ASSERTIONS OF `null`, which is the failure
-// mode this repo cares most about: a suite that still passes while asserting
-// nothing about a retired feature. So the rows are RE-AIMED, not removed, and
-// they keep the shape both states need:
+// Measured firsthand at aeon `origin/master` `dd17f7c9`, page blob `62ca6426`:
+// the machine-checked block's `preset:` row is
+// `bands, cycles, id, patch_motion, patch_world_ys, schema, variants` — no
+// `ramp` — `preset-refused:` is `fires` alone, and `tools/effects_gen.py`
+// contains the string `ramp` ZERO TIMES in any case.
 //
-//   1. THE RETIREMENT IS ASSERTED, not assumed — the premise is empty, and the
-//      leaf really returns null BECAUSE of that and not for some other reason.
-//   2. THE WORDING IS STILL FULLY ASSERTED, by driving the derivation with an
-//      EXPLICIT list: the retired premise's own value, replayed, and checked
-//      against the schema so the replay is real vocabulary rather than fiction.
-//      If a lag re-opens, the sentence that comes back is still the right one.
-//   3. THE POISON IS THE LOAD-BEARING DIRECTION FOR THIS STATE: stub the
-//      constant back to NON-empty and the leaf must render the WHOLE sentence.
-//      A leaf hard-wired to `return null` would pass rows 1 and 2 and fail here.
-//   4. THE RETIREMENT IS STILL MEASURED: the drift test must still read aeon's
-//      page at a committed revision, compute the WIDE lag, and assert it EMPTY.
-//      Delete that row — or narrow the measurement — and this file goes red.
+// A FILE WHOSE EVERY ROW SAID "the sentence is retired" WOULD NOW EITHER BE
+// DELETED OR QUIETLY INVERTED, which is the failure mode this repo cares most
+// about: a suite that still passes while asserting nothing. So the rows are
+// RE-AIMED, not removed, and they keep the shape both states need:
 //
-// ⚠ THE REPLAYED LAG IS THE SHARPER FLAVOUR, AND THE ROWS KEEP ITS WORDING.
+//   1. THE ARMING IS ASSERTED, not assumed — the premise names exactly the
+//      lagging key, that key is a real OPTIONAL root key of the schema, and the
+//      leaf really renders BECAUSE of the premise and not for some other reason.
+//   2. THE WORDING IS FULLY ASSERTED against the LIVE premise, which is what an
+//      author actually sees today. The historical replay stays beside it so the
+//      sharper flavour's wording keeps its own coverage.
+//   3. THE POISON IS THE LOAD-BEARING DIRECTION FOR THIS STATE, and it INVERTS
+//      with the premise: stub the constant EMPTY and the leaf must fall SILENT.
+//      A leaf hard-wired to render a literal would pass rows 1 and 2 and fail
+//      here — and it is the direction that proves the sentence will actually
+//      retire on the day aeon ships, rather than becoming a permanent fixture.
+//   4. THE ARMING IS STILL MEASURED: the drift test must read aeon's page at a
+//      committed revision, compute the WIDE lag, and assert it EQUALS the
+//      premise. Delete that row — or narrow the measurement — and this file
+//      goes red.
+//
+// ⚠ THE LIVE LAG IS THE SHARPER FLAVOUR, AND THE ROWS KEEP ITS WORDING.
 // `cycles`/`variants` were in aeon's `preset-refused` list — declined BY NAME,
 // so a document carrying one lowered WITHOUT it. `patch_world_ys` /
 // `patch_motion` were not in aeon's vocabulary at all, so `_check_keys` took the
 // unknown-key path and `_refuse` RAISED: a preset carrying either FAILED AEON'S
-// BUILD OUTRIGHT. The rows below assert the sentence still says that, because
+// BUILD OUTRIGHT. `ramp` IS THAT SAME FLAVOUR TODAY, measured above. The rows
+// below assert the sentence still says that, because
 // softening it to the 12aecd5 wording would understate a re-opened lag of this
 // flavour — and nothing on screen would be there to notice.
 //
@@ -114,30 +120,57 @@ function expand(node: unknown): unknown {
  */
 const THE_LAG_THAT_WAS: readonly string[] = Object.freeze(['patch_motion', 'patch_world_ys']);
 
-describe('the premise has RETIRED — and the retirement is asserted, not assumed', () => {
-  it('the premise is EMPTY, and the keys it held are optional root keys the schema declares', () => {
+/**
+ * THE LIVE PREMISE, sorted — what an author sees on screen TODAY. Read from the
+ * constant, never restated, so this file cannot agree with itself about which
+ * key is lagging.
+ */
+const LIVE = [...PRESET_KEYS_AWAITING_AEON].sort();
+
+describe('the premise is ARMED — and the arming is asserted, not assumed', () => {
+  it('the premise is NON-EMPTY, and every key in it is an optional root key the schema declares', () => {
     expect(
       PRESET_KEYS_AWAITING_AEON,
-      'PRESET_KEYS_AWAITING_AEON is NOT empty — a lag has re-opened. That is not a failure of '
-      + 'this row: re-aim this file at the sentence being ON screen (git log it for the shape it '
-      + 'had on 2026-09-03), and see the drift test\'s lag row, which measures it.',
-    ).toEqual([]);
-    // Anti-vacuous for the wording rows: the replayed list is real vocabulary —
-    // root keys of the schema, and OPTIONAL ones, because a required key could
-    // never have been "not consumed".
-    expect(THE_LAG_THAT_WAS.length).toBeGreaterThan(0);
-    for (const k of THE_LAG_THAT_WAS) {
+      'PRESET_KEYS_AWAITING_AEON is EMPTY — the lag has closed. That is not a failure of this '
+      + 'row: re-aim this file at the sentence being OFF screen (this file records the shape it '
+      + 'had while retired), and see the drift test\'s lag row, which measures it.',
+    ).not.toEqual([]);
+    // Anti-vacuous: the premise is real vocabulary — root keys of the schema,
+    // and OPTIONAL ones, because a REQUIRED key could never be "not consumed"
+    // (every document would carry it, and none would build).
+    for (const k of LIVE) {
       expect(EFFECTS_PRESET_ROOT_KEYS, `${k} is not a root key of the schema`).toContain(k);
       expect(EFFECTS_PRESET_SCHEMA.required as string[]).not.toContain(k);
     }
+    // ...and the replay used by the wording rows below is real vocabulary too.
+    expect(THE_LAG_THAT_WAS.length).toBeGreaterThan(0);
+    for (const k of THE_LAG_THAT_WAS) {
+      expect(EFFECTS_PRESET_ROOT_KEYS, `${k} is not a root key of the schema`).toContain(k);
+    }
   });
 
-  it('so there is NO sentence, and no element — the derivation and the leaf both say nothing', () => {
-    expect(presetLagDisclosure()).toBeNull();
-    expect(PresetLagDisclosure()).toBeNull();
-    // ...and it is the PREMISE that silenced them, not something else: the same
-    // derivation with a non-empty list still speaks.
-    expect(presetLagDisclosure(THE_LAG_THAT_WAS)).not.toBeNull();
+  it('so there IS a sentence, and the leaf renders it — both driven by the premise', () => {
+    const live = presetLagDisclosure();
+    expect(live).not.toBeNull();
+    // The leaf says exactly what the derivation says — not a literal that
+    // happens to contain the right words.
+    expect(textOf(expand(PresetLagDisclosure()))).toBe(live);
+    // ...and every lagging key is named in it, verbatim.
+    for (const k of LIVE) expect(live!).toContain(`\`${k}\``);
+    // ...and it is the PREMISE that speaks, not something else: the same
+    // derivation with an empty list is silent.
+    expect(presetLagDisclosure([])).toBeNull();
+  });
+
+  it('the LIVE sentence says the sharper flavour — this lag fails the build outright', () => {
+    // Measured in the header: `ramp` is in NEITHER of aeon's lists, so
+    // `_check_keys` takes the unknown-key path and `_refuse` raises. Softening
+    // this wording to the 12aecd5 "lowers without it" flavour would understate
+    // what an author is risking, and nothing on screen would be there to notice.
+    const s = presetLagDisclosure()!;
+    expect(s).toMatch(/refuses the WHOLE DOCUMENT/);
+    expect(s).toMatch(/will not build/);
+    expect(s).toMatch(/nothing set below reaches a ROM/);
   });
 });
 
@@ -184,51 +217,62 @@ describe('the wording, driven with an explicit replay — what a re-opened lag w
 });
 
 /**
- * THE POISON, RE-INVERTED WITH THE PREMISE — FOR THE SECOND TIME.
+ * THE POISON, RE-INVERTED WITH THE PREMISE — FOR THE THIRD TIME.
  *
- * It stubbed the constant EMPTY and required silence while the sentence was on
- * screen; that was the right direction then. With the premise retired the empty
- * stub IS the production state, so it would prove nothing: a leaf hard-wired to
- * `return null` would sail through it. The load-bearing direction now is the
- * other one. Stub the constant back to NON-empty — the exact shape of a
- * re-opened lag — and the leaf must produce the WHOLE sentence again.
+ * It stubbed the constant NON-empty and required the whole sentence while the
+ * premise was retired; that was the right direction then. With the premise ARMED
+ * the non-empty stub IS the production state, so it would prove nothing: a leaf
+ * hard-wired to render a literal would sail through it. The load-bearing
+ * direction now is the other one. Stub the constant EMPTY — the exact shape of
+ * the day aeon ships the key — and the leaf must fall SILENT.
+ *
+ * THIS IS THE DIRECTION THAT PROVES THE SENTENCE CAN RETIRE AT ALL. A
+ * disclosure that cannot be switched off is the O62/O64 defect in waiting: it
+ * stays on screen after it stops being true, teaching the author to ignore the
+ * panel's warnings.
  *
  * It stubs the DERIVED FACT, not the sentence: a leaf that rendered a literal
- * regardless of the constant would pass a text check and fail the
+ * regardless of the constant would fail the silence check here and the
  * `toBe(presetLagDisclosure(...))` below.
  */
-describe('the render gate — POISON: the premise stubbed back to NON-empty', () => {
+describe('the render gate — POISON: the premise stubbed back to EMPTY', () => {
   afterEach(() => {
     vi.doUnmock(LAG_MODULE);
     vi.resetModules();
   });
 
-  it('with PRESET_KEYS_AWAITING_AEON re-filled, the leaf renders the WHOLE sentence as body text', async () => {
+  it('with PRESET_KEYS_AWAITING_AEON emptied, the leaf falls SILENT', async () => {
     vi.resetModules();
     vi.doMock(LAG_MODULE, async (importOriginal) => {
       const real = await importOriginal<typeof import('../../../../core/formats/effects/preset-lag')>();
-      return { ...real, PRESET_KEYS_AWAITING_AEON: THE_LAG_THAT_WAS };
+      return { ...real, PRESET_KEYS_AWAITING_AEON: Object.freeze([]) };
     });
     const poisoned = await import('../PresetLagDisclosure');
-    // The stub took: the module the leaf sees has the re-filled list.
+    // The stub took: the module the leaf sees has the emptied list.
     const lag = await import(LAG_MODULE);
-    expect(lag.PRESET_KEYS_AWAITING_AEON).toEqual([...THE_LAG_THAT_WAS]);
+    expect(lag.PRESET_KEYS_AWAITING_AEON).toEqual([]);
 
-    const el = poisoned.PresetLagDisclosure();
-    expect(el, 'the leaf renders nothing on a NON-empty premise — the gate is stuck shut, and a '
-      + 're-opened lag would reach an author with no disclosure at all, above controls whose '
-      + 'output fails aeon\'s build').not.toBeNull();
-    // Whole, as body text, not a title= attribute — and equal to the derivation,
-    // so it is not a literal that happens to contain the right words.
-    expect(textOf(expand(el))).toBe(presetLagDisclosure(THE_LAG_THAT_WAS));
-    // Warning tone, so it is not mistaken for a footnote.
-    expect((el as React.ReactElement<{ tone?: string }>).props.tone).toBe('warning');
+    expect(
+      poisoned.PresetLagDisclosure(),
+      'the leaf still renders on an EMPTY premise — the gate is stuck OPEN, so this disclosure '
+      + 'cannot retire. It would stay above the controls after aeon ships the key, which is the '
+      + 'O62/O64 defect: a warning that outlives its reason teaches the author to ignore every '
+      + 'warning the panel gives.',
+    ).toBeNull();
   });
 
-  it('and unstubbed — production, today — it is silent again', async () => {
+  it('and unstubbed — production, today — it SPEAKS, whole, as body text, in warning tone', async () => {
     vi.resetModules();
     const fresh = await import('../PresetLagDisclosure');
-    expect(fresh.PresetLagDisclosure()).toBeNull();
+    const el = fresh.PresetLagDisclosure();
+    expect(el, 'the leaf renders nothing on a NON-empty premise — an open lag is reaching an '
+      + 'author with no disclosure at all, above controls whose output fails the build')
+      .not.toBeNull();
+    // Whole, as body text, not a title= attribute — and equal to the derivation,
+    // so it is not a literal that happens to contain the right words.
+    expect(textOf(expand(el))).toBe(presetLagDisclosure(PRESET_KEYS_AWAITING_AEON));
+    // Warning tone, so it is not mistaken for a footnote.
+    expect((el as React.ReactElement<{ tone?: string }>).props.tone).toBe('warning');
   });
 
   it('the derivation itself returns null on an empty list and a sentence otherwise', () => {
@@ -241,15 +285,16 @@ describe('the render gate — POISON: the premise stubbed back to NON-empty', ()
 /**
  * ═══ NEITHER THE SENTENCE NOR ITS ABSENCE MAY OUTLIVE THE MEASUREMENT ═══
  *
- * The armed shape of this block asked: while the premise is non-empty, does the
- * drift test still assert the measured lag equals it? The retired shape asks the
- * mirror question, and it is the one that matters more, because the state it
- * guards is SILENCE. Nothing on screen says "these keys are not consumed" any
- * more; the only reason that is honest is that a row in the drift test reads
- * aeon's page at a committed revision every run and asserts the lag is EMPTY.
- * Delete THAT row — or narrow what it measures — and the retirement becomes a
- * claim nobody checks: exactly the O62/O64 defect, wearing the opposite costume.
- * So this block goes red if either happens.
+ * The retired shape of this block asked: with nothing on screen, does the drift
+ * test still read aeon's page and assert the lag is EMPTY? The ARMED shape asks
+ * the mirror question. There IS a sentence on screen now, and it names a key and
+ * tells an author their document will not build — so the thing that must not rot
+ * is the PREMISE. It is hand-typed, it is the only statement of the fact, and
+ * the only reason it is honest is that a row in the drift test reads aeon's page
+ * at a committed revision every run and asserts the measured lag EQUALS it.
+ * Delete THAT row — or narrow what it measures — and the sentence becomes a
+ * claim nobody checks: exactly the O62/O64 defect. So this block goes red if
+ * either happens.
  *
  * Read on the drift test's SOURCE with comments stripped, so a mention in prose
  * cannot satisfy it.
@@ -257,16 +302,22 @@ describe('the render gate — POISON: the premise stubbed back to NON-empty', ()
 describe('the retirement cannot outlive its measurement either', () => {
   const src = stripComments(readFileSync(DRIFT_TEST_PATH, 'utf8'));
 
-  it('the drift test no longer couples to the premise — one statement of the retirement, not two', () => {
-    expect(PRESET_KEYS_AWAITING_AEON).toEqual([]);
-    // A measuring row that still asserted `lag equals <the empty constant>`
-    // would be the same check spelled through an indirection nobody can read.
-    expect(src, 'the drift test still names the premise constant while that constant is empty — '
-      + 'the lag row was left coupled to a list with nothing in it; assert the empty lag directly')
-      .not.toMatch(/PRESET_KEYS_AWAITING_AEON/);
+  it('the drift test COUPLES to the premise — the hand-typed list is measured, not trusted', () => {
+    expect(PRESET_KEYS_AWAITING_AEON).not.toEqual([]);
+    // ⚠ THE COUPLING RULE INVERTS WITH THE PREMISE, and both directions are
+    // right in their own state. While the list is EMPTY, a row asserting
+    // `lag equals <the empty constant>` is one claim spelled through an
+    // indirection nobody can read, so the drift test must NOT name it. While the
+    // list is NON-EMPTY it is a hand-typed premise a panel renders a warning
+    // from, and the only thing that can keep it honest is a row comparing it to
+    // aeon's page at TIP — so the drift test MUST name it.
+    expect(src, 'the drift test no longer names the premise constant while that constant is '
+      + 'NON-empty — the sentence above the controls is now a hand-typed claim with nothing '
+      + 'measuring it')
+      .toMatch(/PRESET_KEYS_AWAITING_AEON/);
   });
 
-  it('...but it STILL MEASURES the WIDE lag, at a committed revision, and asserts it EMPTY', () => {
+  it('...and it STILL MEASURES the WIDE lag, at a committed revision, against the premise', () => {
     // Anti-vacuous: the file really is the drift test and really reads aeon.
     expect(src).toMatch(/peerRepo\('aeon'\)/);
     expect(src).toMatch(/readAtRev\(aeon, tip, PAGE\)/);
@@ -283,28 +334,30 @@ describe('the retirement cannot outlive its measurement either', () => {
     // blind, so the SHAPE is pinned here and not only the assertion.
     //
     // The left side is READ from aeon, never a second constant, so it cannot
-    // agree with itself; the right side is the empty set, so the row carries no
-    // key name at all.
+    // agree with itself; the right side is the premise, reached through the
+    // import, so the row still carries no key name of its own.
     expect(
       src,
       'the drift test no longer computes the lag as "every schema-declared root key aeon does not '
-      + 'ACCEPT" and asserts it EMPTY. Nothing now watches whether the retirement is still true: '
-      + 'aeon un-building one of these keys would leave Aurora authoring a key that reaches the '
-      + 'file and nothing further — with no sentence above the controls and no red row anywhere — '
-      + 'and a contract that declared a new key aeon has not built would be equally invisible. If '
-      + 'the row is still there but the LEFT SIDE has been narrowed back to preset-refused, that '
-      + 'is the 2026-09-03 hole being reintroduced. Restore it.',
+      + 'ACCEPT" and compares it to the premise. Nothing now watches whether the sentence on '
+      + 'screen is still true: aeon shipping the key would leave a warning above the controls '
+      + 'saying a document will not build when it now does — and a contract that declared a '
+      + 'FURTHER key aeon has not built would reach an author with no disclosure at all. If the '
+      + 'row is still there but the LEFT SIDE has been narrowed back to preset-refused, that is '
+      + 'the 2026-09-03 hole being reintroduced. Restore it.',
     ).toMatch(
-      /const lag = schemaOptional\.filter\(\(k\) => !keys\.preset\.includes\(k\)\)\.sort\(\);\s*expect\(\s*lag,[\s\S]*?\)\.toEqual\(\[\]\);/,
+      /const lag = schemaOptional\.filter\(\(k\) => !keys\.preset\.includes\(k\)\)\.sort\(\);[\s\S]*?expect\(\s*lag,[\s\S]*?\)\.toEqual\(LAGGING\);/,
     );
     // And the other side of the same coin, so the row cannot pass on a page that
     // simply stopped listing what it refuses.
     expect(src).toMatch(/keys\['preset-refused'\]\.filter\(\(k\) => !schemaReserved\.includes\(k\)\)/);
 
     // The drift test carries NO literal copy of any lagging key name to drift
-    // from — neither the pair that retired today nor the pair that retired on
-    // 2026-09-02.
-    for (const k of [...THE_LAG_THAT_WAS, 'cycles', 'variants']) {
+    // from — not the LIVE premise's, not the pair that retired earlier today,
+    // and not the pair that retired on 2026-09-02. This is why the row asserting
+    // the top-level `oneOf` over there names `bands` structurally and asserts
+    // the other branch by shape rather than by name.
+    for (const k of [...LIVE, ...THE_LAG_THAT_WAS, 'cycles', 'variants']) {
       expect(src, `the drift test hardcodes "${k}" — a key name may live in the premise list and `
         + 'nowhere else').not.toContain(`'${k}'`);
     }
@@ -391,22 +444,29 @@ describe('the panel mounts the leaf first in the ANCHORS section too, unconditio
     expect(code.indexOf('<AnchorChannelsBlock', leaf)).toBeGreaterThan(leaf);
   });
 
-  it('⚠ THE SENTENCE IS RETIRED FOR THIS SECTION\'S KEYS — and the sentence it WOULD say survives', () => {
+  it('⚠ THE SENTENCE IS RETIRED FOR THIS SECTION\'S OWN KEYS — and the one it WOULD say survives', () => {
     // The two keys this section authors, named here because the section's own
     // controls are what makes them load-bearing — not as a copy of the premise.
     const authored: readonly string[] = ['patch_world_ys', 'patch_motion'];
 
     // 1. THE RETIREMENT, for exactly these keys: the live premise names neither,
-    //    so the leaf above the anchor controls is silent.
+    //    so nothing the leaf says today is ABOUT this section's controls.
+    //
+    //    ⚠ THE LEAF IS NOT SILENT ANY MORE, and that is not a contradiction.
+    //    It is mounted in BOTH sections and derived from ONE premise, so while
+    //    any key lags it speaks in both places. What this row asserts is the
+    //    narrower and more useful fact: this section's own two keys are not the
+    //    reason. Asserting the leaf returns null here would couple an anchors
+    //    row to an unrelated key's lag and go red every time one opens.
     for (const k of authored) {
       expect(
         PRESET_KEYS_AWAITING_AEON,
         `${k} is back in the premise — a lag has re-opened on a key THIS section authors. `
-        + 'Re-aim this row at the sentence being on screen (git log it for the shape it had on '
-        + '2026-09-03) rather than relaxing it.',
+        + 'Re-aim this row at the sentence being about this section (this file records the shape '
+        + 'it had while armed) rather than relaxing it.',
       ).not.toContain(k);
     }
-    expect(presetLagDisclosure(PRESET_KEYS_AWAITING_AEON)).toBeNull();
+    for (const k of authored) expect(presetLagDisclosure()).not.toContain(`\`${k}\``);
 
     // 2. AND THE WORDING THESE KEYS EARNED IS STILL ASSERTED, driven by the
     //    replay. If the lag re-opens on either one, an author gets a sentence

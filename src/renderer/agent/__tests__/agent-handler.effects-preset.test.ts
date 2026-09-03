@@ -143,12 +143,12 @@ describe('list_effects_presets', () => {
     // ANTI-VACUOUS: the instrument saw a library with something in it. Both
     // numbers are DERIVED from the fixture, not typed beside it — a row that
     // hardcoded `bands: 2` would keep passing if the fixture grew a band.
-    expect((r.presets as unknown[]).length).toBe(glare().bands.length > 0 ? 1 : 0);
+    expect((r.presets as unknown[]).length).toBe(glare().bands!.length > 0 ? 1 : 0);
     expect(r.presets).toEqual([
       // `name` is an OBJECT here, and the reply reports null rather than the
       // panel's `label` collapse: an agent must be able to tell "no string name"
       // from "named after itself", which `presetListEntries` deliberately cannot.
-      { id: 'glare', name: null, bands: glare().bands.length },
+      { id: 'glare', name: null, bands: glare().bands!.length },
     ]);
     expect(r.unreadable).toEqual([
       { path: 'data/editor/effects/presets/broken.json', reason: 'not valid JSON' },
@@ -200,8 +200,8 @@ describe('get_effects_preset', () => {
     // The three subjects the fixture exists for, named individually so a failure
     // says which one was flattened.
     expect(r.preset.name).toEqual({ label: 'Glare', authored_by: 'hand' });
-    expect(r.preset.bands[0].sh, 'the integer spelling of `sh` must survive un-normalised').toBe(1);
-    expect(r.preset.bands[1].on).toEqual({
+    expect(r.preset.bands![0].sh, 'the integer spelling of `sh` must survive un-normalised').toBe(1);
+    expect(r.preset.bands![1].on).toEqual({
       pal_region: { addr: 74, slot: 3, pal_line: 2, entry: 5, count: 2 },
     });
   });
