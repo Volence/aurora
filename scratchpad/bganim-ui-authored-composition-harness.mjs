@@ -14,21 +14,35 @@
 //
 // ═══ WHAT THIS RUN IS, AND WHAT IT DELIBERATELY IS NOT ═══
 //
-// It is HERMETIC. It copies aeon's project to a tempdir and opens THAT, with
-// `editor_bg_override.json` taken from the `ls-remote`-resolved pushed
-// revision rather than the sibling working tree — which is somebody's live
-// directory. aeon's real tree is never written to.
+// It runs against a THROWAWAY COPY of an aeon checkout, which the OPERATOR
+// makes and names in `AEON_DIR`. It does not merely read that tree: it opens it
+// as a project, presses Ctrl+S, and REQUIRES the bytes of
+// `games/sonic4/data/editor_bg_override.json` to change (row 5a below aborts
+// the run when they do not). So the tree it is pointed at is written to, by
+// design, and it must therefore never be the aeon lane's live checkout. See the
+// two-refusal block at `AEONDIR` below.
 //
-// That is a deliberate choice against the two traps ROADMAP item 29 names.
-// Writing aeon's real file makes the level-staleness mtime gate fire BY
-// CONSTRUCTION (`editor_bg_override.json` is on the gate's INPUT side), and a
-// staleness stop presents as the `anims` refusal gate rejecting Aurora's bytes
-// when it never judged them. Staying hermetic means neither trap can fire,
-// which beats navigating them. THE COST, STATED: this run says nothing about
-// the build, the ROM, or the staleness gate. Nothing here assembles the
-// emitted .emp and the band has never run on hardware. That is item 29's
-// scope — "the composition" — and the ROM half remains unproven, exactly as
-// the item-27 probe already recorded.
+// ⚠ WHAT THIS BLOCK USED TO SAY, AND WHY THAT MATTERS (O54). Until this
+// revision these lines claimed the run was "HERMETIC", that it "copies aeon's
+// project to a tempdir and opens THAT" with the override file "taken from the
+// `ls-remote`-resolved pushed revision", and that "aeon's real tree is never
+// written to". NONE of that was in the code. `AEONDIR` was
+// `siblingPathOrUnresolved('aeon')` — the resolver's DEFAULT, i.e. the sibling
+// working tree the paragraph itself called "somebody's live directory" — bound
+// once as a `const` and never reassigned. There was no copy step, no tempdir and
+// no `ls-remote`. A prose containment is not a containment; the refusals below
+// are, because they are executable.
+//
+// Staying off the live tree is also a deliberate choice against the two traps
+// ROADMAP item 29 names. Writing aeon's real file makes the level-staleness
+// mtime gate fire BY CONSTRUCTION (`editor_bg_override.json` is on the gate's
+// INPUT side), and a staleness stop presents as the `anims` refusal gate
+// rejecting Aurora's bytes when it never judged them. Running against a copy
+// means neither trap can fire, which beats navigating them. THE COST, STATED:
+// this run says nothing about the build, the ROM, or the staleness gate.
+// Nothing here assembles the emitted .emp and the band has never run on
+// hardware. That is item 29's scope — "the composition" — and the ROM half
+// remains unproven, exactly as the item-27 probe already recorded.
 //
 // ═══ THE ANTI-VACUOUS PROBLEM, WHICH IS THIS HARNESS'S REAL RISK ═══
 //
@@ -46,8 +60,11 @@
 // comparison cannot be reached by an empty document.
 //
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npm run build
-// Run: node scratchpad/bganim-ui-authored-composition-harness.mjs
-import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
+// Run: AEON_DIR=<a throwaway copy of aeon> \
+//        node scratchpad/bganim-ui-authored-composition-harness.mjs
+import {
+  AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved,
+} from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -73,7 +90,62 @@ const ROOT = AURORA_DIR;
 const RUN = announceRunRoot(runTarget(ROOT));
 const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
 const MAIN = RUN.main;
-const AEONDIR = siblingPathOrUnresolved('aeon');
+/**
+ * THE COPY IS REQUIRED, SO THERE IS NO DEFAULT. Two refusals, two questions.
+ *
+ * Until O54 this read `siblingPathOrUnresolved('aeon')` — the resolver used
+ * correctly, and therefore invisible to `check-peer-path-literals` (no sibling
+ * literal, no raw `process.env`), pointing straight at the aeon lane's LIVE
+ * checkout. The header block above described a tempdir copy that the code never
+ * made, and `main()` printed "aeon's real tree is NOT this path" while `AEONDIR`
+ * was exactly that path. This harness does not merely read the tree: it opens it
+ * as a project, dispatches a real Ctrl+S, and row 5a REQUIRES
+ * `editor_bg_override.json` to change on disk — a run that did not write into
+ * another lane's working tree was DEFINED as a failed run. Review bar 19
+ * (`docs/OVERSEER.md`) in its worst form; the bar's original instance only read.
+ *
+ * No default is available honestly. A throwaway copy is something an operator
+ * MAKES; every candidate default is either a dead path — which never trips the
+ * second guard, so the run gets past the refusal and dies later and further away
+ * (`docs/OVERSEER.md`, SUITE-PATHS) — or the live tree the guard exists to
+ * refuse. So it REFUSES when nothing is set, the contract's step 4 in its
+ * loudest form, through `checkoutOverride`, which also buys the aliases, the
+ * two-spellings-disagree refusal and the set-but-wrong error a hand-rolled
+ * `process.env.AEON_DIR` had none of.
+ *
+ * The SECOND refusal compares against the RESOLVED default location rather than
+ * a literal, because a literal stops guarding the moment the suite moves, and
+ * `siblingPath` would compare `AEON_DIR` against itself and refuse every run.
+ * `siblingDefaultPathOrUnresolved` is the one answer that ignores `AEON_DIR`.
+ *
+ * ONE GATE PER CONDITION. "Nothing was set" and "what was set is the live tree"
+ * are different environments needing different fixes, so they are different
+ * throws with different messages.
+ */
+const aeonOverride = checkoutOverride('aeon');
+if (aeonOverride === null) {
+  throw new Error(
+    'AEON_DIR is unset, and this harness has no honest default: it OPENS the tree it '
+    + 'is pointed at as a project, presses Ctrl+S, and REQUIRES '
+    + 'games/sonic4/data/editor_bg_override.json to change on disk (row 5a), so it must '
+    + `be pointed at a throwaway copy of aeon. Make one (e.g. \`cp -r `
+    + `${siblingDefaultPathOrUnresolved('aeon')} $(mktemp -d)/aeon\`) and set AEON_DIR to `
+    + 'it. Refusing rather than guessing: the guess this replaced was the aeon lane\'s '
+    + 'LIVE checkout, under a header claiming a tempdir copy the code never made. '
+    + '(empyrean contract/SUITE_PATHS.md, precedence step 4; aurora docs/OVERSEER.md '
+    + 'review bar 19)',
+  );
+}
+const AEONDIR = aeonOverride.value;
+if (AEONDIR === siblingDefaultPathOrUnresolved('aeon')) {
+  throw new Error(
+    `${aeonOverride.name}=${AEONDIR} is the real aeon tree — this harness saves through `
+    + 'the app and requires the override document it opens to be REWRITTEN, so it must '
+    + `never write there. Point it at a throwaway copy (e.g. \`cp -r `
+    + `${siblingDefaultPathOrUnresolved('aeon')} $(mktemp -d)/aeon\`). `
+    + '(aurora docs/OVERSEER.md review bar 19)',
+  );
+}
 const OVERRIDE_FILE = `${AEONDIR}/games/sonic4/data/editor_bg_override.json`;
 const SHOTS = `${ROOT}/scratchpad/shots-bganim-band`;
 mkdirSync(SHOTS, { recursive: true });
@@ -291,8 +363,9 @@ mkdirSync(EMIT_DIR, { recursive: true });
 async function main() {
   console.log(`\nDERIVED FROM THE VENDORED CONTRACT (${CONTRACT.source.repo}@${CONTRACT.source.commit.slice(0, 7)}):`);
   console.log(`  BG_TILE_CAPACITY = ${TILE_CAPACITY}   TILE_BYTES = ${TILE_BYTES}   PHASE_BANKS = ${PHASE_BANKS}`);
-  console.log(`  project under test: ${AEONDIR}`);
-  console.log(`  (aeon's real tree is NOT this path unless you overrode AEON_DIR)\n`);
+  console.log(`  project under test: ${AEONDIR}  (from ${aeonOverride.name})`);
+  console.log(`  THIS TREE IS WRITTEN TO. The guards above have already checked it is`);
+  console.log(`  not ${siblingDefaultPathOrUnresolved('aeon')}.\n`);
 
   // The pristine bytes, kept for the comparison's "before" side. Captured from
   // disk BEFORE the app touches anything, so it cannot be a post-hoc rebuild.
@@ -331,7 +404,7 @@ async function main() {
     await sleep(4000);
     await waitDbg();
 
-    // ---- 1. Open the TEMP COPY. ----------------------------------------
+    // ---- 1. Open the operator's copy (AEON_DIR; guarded at import). -----
     await c.evalExpr(`window.__dbg.aeon.open(${JSON.stringify(AEONDIR)})`)
       .catch((e) => console.log('        aeon open threw:', e.message));
     let st = null;
@@ -346,7 +419,14 @@ async function main() {
     // ---- 2. Reach the band panel by real clicks. ------------------------
     await sleep(2000);
     const clickedPill = await c.evalExpr(clickByText('/^Effects$/'));
-    check('2a', 'the Effects pill is on the facet bar [instrument check]', clickedPill === true);
+    // `clickByText` answers THREE things — `true` clicked, `'disabled'` found but
+    // off, `false` NOT ON SCREEN — and the row asserted `=== true` while printing
+    // no detail, so "the facet is missing" and "the facet is disabled" arrived as
+    // the same bare FAIL. Different environments, different fixes; print which.
+    check('2a', 'the Effects pill is on the facet bar [instrument check]', clickedPill === true,
+      clickedPill === true ? 'clicked'
+        : clickedPill === 'disabled' ? 'found but DISABLED'
+          : 'NOT FOUND — no button matching /^Effects$/ in the document');
     await sleep(1500);
     await c.evalExpr(OPEN_BAND_LIST);
     await sleep(400);
