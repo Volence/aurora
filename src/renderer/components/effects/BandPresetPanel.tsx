@@ -404,7 +404,15 @@ export default function BandPresetPanel(): React.ReactElement | null {
             // ONE derivation the disabled state and the sentence both read.
             <IconButton icon={<span>Delete</span>} label={`Delete preset ${selected.id}`}
               disabled={deleteRefusal !== null}
-              onClick={() => run(deletePresetCommand(library, selected.id))} />
+              // d-27. Measured, not read: with two presets present this button
+              // survives its own press, is RETARGETED at `library.presets[0]`
+              // through `resolveSelectedPreset`'s fallback, and keeps keyboard
+              // focus (`docs/reviews/2026-09-03-d27-disputed-six.md`,
+              // `[bpd-a..c]`). The `disabled` guard above does NOT cover the
+              // stray Space: it is derived for the SELECTED preset, so after
+              // the delete it is re-derived for the new target and the author
+              // gets no signal that the button under their finger changed file.
+              onClick={(e) => actAndDropFocus(e, () => run(deletePresetCommand(library, selected.id)))} />
           }>
           <SectionBody>
             {deleteRefusal !== null && <Hint tone="warning">{deleteRefusal}</Hint>}

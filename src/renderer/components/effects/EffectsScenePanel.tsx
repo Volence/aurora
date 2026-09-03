@@ -864,7 +864,15 @@ export default function EffectsScenePanel(): React.ReactElement {
         <CollapsibleSection id="aeon.effects.scene" title={`Scene — ${selected.id}`}
           defaultCollapsed
           right={<IconButton icon={<span>Delete</span>} label={`Delete scene ${selected.id}`}
-            onClick={() => run(deleteSceneCommand(library, selected.id))} />}>
+            // d-27, AND THIS IS THE STRONGEST INSTANCE OF IT IN THE APP. Both
+            // earlier passes excluded this button as self-unmounting; clicking
+            // it (`docs/reviews/2026-09-03-d27-disputed-six.md`, `[esd-a..c]`)
+            // showed the opposite with TWO scenes present: the same DOM node
+            // survives, `resolveSelectedScene` falls back to `library.scenes[0]`
+            // so its label silently becomes another file's, and it KEEPS
+            // KEYBOARD FOCUS. A bare Space then does not re-delete the document
+            // that is gone — it deletes a DIFFERENT one.
+            onClick={(e) => actAndDropFocus(e, () => run(deleteSceneCommand(library, selected.id)))} />}>
          <SectionBody>
           <Field label="Name">
             <input value={typeof selected.name === 'string' ? selected.name : ''}

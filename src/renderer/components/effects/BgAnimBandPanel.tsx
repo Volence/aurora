@@ -165,6 +165,7 @@
 
 import React from 'react';
 import { T, SectionBody, CollapsibleSection, Select, NumberField, Chip, IconButton } from '../ui';
+import { actAndDropFocus } from '../ui/act-and-drop-focus';
 import { Field, Row, Hint, Group, Card, CONTROL_INSET } from './column-layout';
 import BgAnimPreviewStrip from './BgAnimPreviewStrip';
 import { useProjectStore, getActiveLevel } from '../../state/projectStore';
@@ -560,21 +561,43 @@ export default function BgAnimBandPanel(): React.ReactElement {
                 {' '}<HideLensChip onHide={() => setLensTarget(null)} />
               </Hint>
             )}
+            {/* ⚠ BOTH OF THESE GO THROUGH d-27's HELPER, AND THEY ARE A
+                NEAR-IDENTICAL PAIR — a change made to one of them reads exactly
+                like a change made to the other. Both were excluded from the
+                d-27 survey as self-unmounting and both exclusions were WRONG,
+                measured by clicking (`docs/reviews/2026-09-03-d27-disputed-six.md`).
+                `Demote` survives with a successor band present (the cards are
+                `key={b.index}`, so card 0 is re-used by the band that slides
+                down) and keeps focus; `Remove`'s FIRST press REFUSES, applies
+                nothing at all, and keeps focus — which is the `[k7]` shape the
+                unconditional blur exists for. */}
             <Row style={{ marginLeft: CONTROL_INSET }}>
               <IconButton icon={<span>Demote</span>}
                 label={`Demote tile animation ${b.index} to static tiles`}
-                onClick={() => { setPendingRemoval(null); apply(demoteBandCommand(doc, b.index)); }} />
+                onClick={(e) => actAndDropFocus(e, () => {
+                  setPendingRemoval(null); apply(demoteBandCommand(doc, b.index));
+                })} />
               <IconButton icon={<span>Remove</span>}
                 label={`Remove tile animation ${b.index}`}
-                onClick={() => {
+                onClick={(e) => actAndDropFocus(e, () => {
                   // First press asks the COMMAND, which refuses when cells draw
                   // the band and says how many. That refusal IS the prompt —
                   // the panel never invents its own count.
+                  //
+                  // ⚠ THE BLUR IS OUTSIDE THIS FUNCTION ON PURPOSE. The refusing
+                  // path returns having written nothing, and that is precisely
+                  // the press an author cannot tell from "the click did not
+                  // register"; blurring inside, after the refusal, would leave
+                  // the defect alive in the half nobody can see. The
+                  // confirmation this reveals is a SECOND control, so the still
+                  // -focused button is not the one that would complete the
+                  // removal — dropping focus is what stops a stray Space
+                  // re-asking a question that has already been answered.
                   const r = removeBandCommand(doc, b.index, false);
                   if (r.ok) { setPendingRemoval(null); apply(r); return; }
                   setRefusalText(r.reason);
                   setPendingRemoval(b.index);
-                }} />
+                })} />
             </Row>
             {/* THE BANK STRIP (parcel I): phase 0..7 as thumbnails, click to
                 draw one in the Art facet; Shift regenerates 1..7 from phase 0.
