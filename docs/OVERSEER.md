@@ -870,10 +870,15 @@ What stays live:
   Treat `test` in an aeon path as unlabelled until checked.
   ⚠ **`engine/level/bg_anim.emp:103` reads *"call once per frame from the main loop"* — that is the
   CONTRACT THE PROC WAS WRITTEN TO, not a description of what calls it.** A reader who greps the
-  definition finds a sentence that looks exactly like proof of a call site. That makes three
-  perishable-claim-in-a-code-comment instances across three repos; the hub is holding it at three
-  and declined to write a bar from a single afternoon. **If runtime work here turns up a fourth,
-  tell them.**
+  definition finds a sentence that looks exactly like proof of a call site. **The fourth instance was
+  found and relayed 2026-09-03 (O47) — this instruction is SPENT; do not re-relay.** It is the
+  sharpest of the set and worth knowing while reading any aeon comment: inside ONE revision
+  (`e190297c`), `tools/collision_pipeline.py`'s XOVER block says the engine does not read
+  `CrossoverTable`, while `tools/ojz_strip_gen.py` **prints on every bake** that it does, and
+  `player_common.emp` defines `Player_LoopCrossover` and `jbsr`s it in the per-frame path. **So the
+  mechanism is not "nobody re-reads a comment" — it is that the two artifacts are never met in the
+  same sitting:** one is source you read while implementing, the other is runtime output you read
+  while operating. A comment can be refuted in front of its own author, routinely, and survive.
 - **`.lst` listings carry a third `EQU` section**; oracle-next's parser handles it.
   Equates can never answer address lookups in either direction.
 
