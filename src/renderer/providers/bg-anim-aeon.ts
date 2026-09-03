@@ -423,7 +423,7 @@ export interface BandBudget {
  * IT IS ON SCREEN BECAUSE OF THE DEAD-BUTTON RULE. `insertBand` refuses at every
  * size on the only real document there is, and an author who meets a disabled
  * control with no number beside it learns nothing. `tileSlotsRemaining: 0` next
- * to a greyed "Add band" is the difference between a broken editor and an
+ * to a greyed "Add" is the difference between a broken editor and an
  * editor telling the truth about a full blob.
  */
 export function bandBudget(doc: BgOverrideDocument | null): BandBudget {

@@ -1,8 +1,13 @@
 // THE TWO BAND VERBS, ONCE.
 //
-// `BgAnimBandPanel` carries `Promote` and `Add band`; parcel B puts the same
-// two on the Effects facet's tool-options bar as `Promote from tile N` and
-// `Add blank band`, so the collapsed panel section is no longer the only door
+// `BgAnimBandPanel` carries `Promote` and `Add` (under a `Blank tile animation`
+// field label); parcel B puts the same two on the Effects facet's tool-options
+// bar as `Promote from tile N` and `Add blank tile animation`, spelled out
+// there because a toolbar chip carries no field label of its own. Both label
+// pairs moved in the 023e0ed9 rename and again in O55, which is why this
+// comment states them rather than a test asserting them from here — the
+// authority is `band-vocabulary.test.ts`, which now reads JSX text as well as
+// quoted strings. So the collapsed panel section is no longer the only door
 // (triage 2026-08-26 §A.2/§A.3). Two surfaces, ONE derivation: the label, the
 // disabled reason and the command each chip runs come from `bandVerbs`, and
 // these rows pin that the reasons ARE the panel's predicates

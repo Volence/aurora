@@ -434,15 +434,15 @@ export default function BgAnimBandPanel(): React.ReactElement {
         )}
         {state !== null && state.unreadable !== null && (
           <Hint tone="warning" style={{ marginBottom: 0 }}>
-            <code>{state.unreadable.path}</code> exists and could not be read, so no band can be
-            edited. Aurora will NOT overwrite it. Reason: {state.unreadable.reason}
+            <code>{state.unreadable.path}</code> exists and could not be read, so no tile
+            animation can be edited. Aurora will NOT overwrite it. Reason: {state.unreadable.reason}
           </Hint>
         )}
         {state !== null && state.unreadable === null && doc === null && (
           <Hint style={{ marginBottom: 0 }}>
-            This project has no <code>editor_bg_override.json</code>. Bands live in that document,
-            which also carries the Plane B layout and its tile blob — there is nothing to animate
-            until it exists.
+            This project has no <code>editor_bg_override.json</code>. Tile animations live in that
+            document, which also carries the Plane B layout and its tile blob — there is nothing to
+            animate until it exists.
           </Hint>
         )}
 
@@ -454,10 +454,10 @@ export default function BgAnimBandPanel(): React.ReactElement {
 
         {doc !== null && rows.length === 0 && (
           <Hint>
-            No bands yet. A band declares a contiguous range of the background&apos;s tile blob
-            animated: its slots become a prefix of <code>tiles</code> and the runtime shifts them
-            along the band&apos;s own axis — left, or up if it is vertical. Promote a static range
-            below.
+            No tile animations yet. A tile animation declares a contiguous range of the
+            background&apos;s tile blob animated: its slots become a prefix of <code>tiles</code>
+            and the runtime shifts them along its own axis — left, or up if it is vertical.
+            Promote a static range below.
           </Hint>
         )}
 
@@ -473,7 +473,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
             per-band lines below it are the ones whose CONTENT differs per band:
             geometry, slots, driver, resolved rate, verdict. */}
         {doc !== null && rows.length > 0 && (
-          <Hint>lossless — Demote keeps a band&apos;s art, it just stops animating</Hint>
+          <Hint>lossless — Demote keeps the art, it just stops animating</Hint>
         )}
 
         {rows.map((b) => {
@@ -856,12 +856,20 @@ export default function BgAnimBandPanel(): React.ReactElement {
             <Chip disabled={insertOff !== null}
               title={insertOff ?? `Add a blank ${cols}x${bandRowCount} tile animation (${tileCount} tiles)`}
               onClick={() => apply(verbs.add.run())}>
-              Add band
+              {/* NOT "Add band". That is the exact string EFFECTS-W1 defect 2 was
+                  booked against — the cold reader's FIRST click built a tile
+                  animation while reading it as a raster band (walkthrough
+                  §a4/§a5). The 023e0ed9 rename moved every QUOTED label and
+                  missed this one because it is JSX TEXT, which
+                  `band-vocabulary.test.ts` did not read; O55 measured it still
+                  on screen and widened the gate to see children like this. */}
+              Add
             </Chip>
           </Field>
           <Hint under style={{ marginBottom: 0 }}>
-            The band arrives blank and unreferenced; nothing on screen changes until you point
-            layout cells at it. (Its phase 0 is blank art, so every fill mode agrees here.)
+            The tile animation arrives blank and unreferenced; nothing on screen changes until
+            you point layout cells at it. (Its phase 0 is blank art, so every fill mode agrees
+            here.)
           </Hint>
           {insertOff && <Hint under tone="warning" style={{ marginTop: T.s2, marginBottom: 0 }}>{insertOff}</Hint>}
         </Group>

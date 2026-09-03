@@ -28,18 +28,45 @@
 //
 // It reads SOURCE, not a render — the node suite has no DOM. It scans the
 // enumerated files below, strips comments, extracts every string and template
-// literal, and refuses one that carries the other feature's noun. It therefore
-// covers *authored strings in these files* and nothing else: a label composed
-// at runtime from two halves, or a string in a file not on the list, is outside
-// it. The list is spelled out rather than globbed for exactly that reason — a
-// glob that silently stops matching is how a gate covers less than it claims.
+// literal AND every JSX text child, and refuses one that carries the other
+// feature's noun. It therefore covers *authored text in these files* and
+// nothing else: a label composed at runtime from two halves, or a string in a
+// file not on the list, is outside it. The list is spelled out rather than
+// globbed for exactly that reason — a glob that silently stops matching is how
+// a gate covers less than it claims.
 //
-// ⚠ IT CANNOT SEE THE SCREEN. `scratchpad/effects-vocabulary-harness.mjs` is
-// the instrument that reads the running app's rendered text.
+// ═══ THE JSX HALF, AND WHY IT IS HERE (O55, 2026-09-03) ═══
+//
+// The first version of this row scanned QUOTED LITERALS ONLY. A JSX text child
+// is not a literal — `<Chip>Add band</Chip>` is a `JsxText` node — so the
+// rename this file exists to enforce was measured STILL BROKEN on screen three
+// weeks after it went green:
+//
+//     <BUTTON>  "Add band"
+//     <DIV>     "The band arrives blank and unreferenced; …"
+//     <DIV>     "lossless — Demote keeps a band's art, it just stops animating"
+//
+// measured in the running app by `scratchpad/o55-new-band-door-probe.mjs` row
+// 6b, with every section of the Tile anim sub-tab opened first. `Add band` is
+// not an incidental miss: it is the exact control EFFECTS-W1 defect 2 was
+// booked against — the cold reader's FIRST click, which built a tile animation
+// while he read the word as a raster band.
+//
+// The extraction is the TypeScript parser's, not a regex over `>text<`. A regex
+// cannot tell a JSX child from `a > b && c < d` and would have to guess; the
+// parser knows, so this row's coverage claim is exact rather than approximate.
+//
+// ⚠ IT STILL CANNOT SEE THE SCREEN. A label assembled from a variable, or one
+// in a file not listed, is outside it either way. The instrument that reads the
+// rendered text is `scratchpad/o55-new-band-door-probe.mjs` (rows 6a/6b).
+// An earlier version of this docblock pointed at
+// `scratchpad/effects-vocabulary-harness.mjs`, which has never existed in this
+// repo — the pointer is corrected here rather than left as a second promise.
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import ts from 'typescript';
 import { AURORA_DIR } from '../../../../../test/support/sibling-root.mjs';
 
 /** The surfaces that author TILE ANIMATIONS. None may say "band". */
@@ -110,10 +137,50 @@ function isProse(text: string): boolean {
   return /\s/.test(text.trim()) && text.trim() !== '';
 }
 
+/**
+ * Every JSX TEXT CHILD in the source — the half a literal scan cannot see.
+ *
+ * `<Chip>Add band</Chip>` puts its label in a `JsxText` node, not in a string,
+ * so a scan over quotes reads a file with that label in it as clean. The
+ * parser is used rather than a `>([^<]*)</` regex because that regex cannot
+ * distinguish a JSX child from the tail of `n > 0 ? a : b` followed by the next
+ * `<`, and a gate that guesses about its own subject cannot state its coverage.
+ *
+ * ⚠ THE WHITESPACE-ONLY CHILDREN ARE DROPPED, NOT THE MULTI-LINE ONES. JSX
+ * folds a wrapped sentence into ONE text child carrying its newlines and
+ * indentation, so the run of whitespace is collapsed rather than the child
+ * discarded — otherwise a hint written across three lines (which is how every
+ * long one in these files is written) would be invisible to this row.
+ *
+ * `.ts` files have no JSX and yield nothing here; that is not a silent zero,
+ * the anti-vacuous row below names which files are expected to yield text.
+ */
+function jsxText(src: string, rel: string): string[] {
+  const sf = ts.createSourceFile(rel, src, ts.ScriptTarget.Latest, false, ts.ScriptKind.TSX);
+  const out: string[] = [];
+  const walk = (node: ts.Node): void => {
+    if (ts.isJsxText(node)) {
+      const t = node.text.replace(/\s+/g, ' ').trim();
+      if (t !== '') out.push(t);
+    }
+    node.forEachChild(walk);
+  };
+  sf.forEachChild(walk);
+  return out;
+}
+
+/**
+ * Everything in this file a person could read: quoted prose plus JSX children.
+ * Comments are stripped for the literal half (a docblock explaining the rename
+ * must not fail it); the parser drops them from the JSX half by construction.
+ */
+function readableText(rel: string): string[] {
+  const raw = readFileSync(join(AURORA_DIR, rel), 'utf8');
+  return [...literals(stripComments(raw)).filter(isProse), ...jsxText(raw, rel)];
+}
+
 function offendingLiterals(rel: string, pattern: RegExp, allow: Set<string>): string[] {
-  const src = stripComments(readFileSync(join(AURORA_DIR, rel), 'utf8'));
-  return literals(src)
-    .filter((t) => isProse(t) && pattern.test(t) && !allow.has(t.trim()));
+  return readableText(rel).filter((t) => pattern.test(t) && !allow.has(t.trim()));
 }
 
 describe('the two effects features have two names, and they share no word', () => {
@@ -154,6 +221,44 @@ describe('the two effects features have two names, and they share no word', () =
     const empty = counts.filter((c) => c.prose === 0).map((c) => c.rel);
     expect(empty, `these files yielded NO prose literals at all, so their rows above measured `
       + `nothing: ${empty.join(', ')}`).toEqual([]);
+  });
+
+  // AND THE JSX HALF SEPARATELY, because it is the half that was missing and a
+  // parser that silently returned `[]` — a `ScriptKind` typo, a TypeScript
+  // upgrade renaming `isJsxText` — would put this row's coverage back exactly
+  // where it was while every assertion above stayed green.
+  //
+  // ⚠ NOT "every .tsx yields text". That was this row's first shape and it was
+  // WRONG, not merely strict: `BandBankStrip.tsx` renders a canvas, a row of
+  // thumbnails and an `IconButton` whose label is a constant — every child of
+  // every element is an element or a `{…}` expression, so it has NO JSX text
+  // and correctly yields zero. A row asserting otherwise fails on a file with
+  // nothing wrong with it. So the extractor is proved on a FIXTURE it cannot
+  // be right about by accident, and the real files are asserted in aggregate.
+  it('ANTI-VACUOUS: the JSX extractor really extracts JSX text', () => {
+    // A positive control, including the multi-line child that is how every long
+    // hint in these files is written — the case a naive extractor drops.
+    const fixture = `
+      const A = () => (<Chip title="not this">Add band</Chip>);
+      const B = () => (<Hint under>
+        The band arrives blank
+        and unreferenced.
+      </Hint>);
+      const C = (n: number) => n > 0 ? 1 : 2;   // NOT a JSX child
+    `;
+    expect(jsxText(fixture, 'fixture.tsx')).toEqual([
+      'Add band', 'The band arrives blank and unreferenced.',
+    ]);
+
+    const counts = [...TILE_ANIMATION_SOURCES, ...RASTER_BAND_SOURCES].map((rel) => ({
+      rel, jsx: jsxText(readFileSync(join(AURORA_DIR, rel), 'utf8'), rel).length,
+    }));
+    const tsxTotal = counts.filter((c) => c.rel.endsWith('.tsx')).reduce((a, c) => a + c.jsx, 0);
+    expect(tsxTotal, `the listed .tsx files yielded NO JSX text at all, so the JSX half of the `
+      + `rows above measured nothing: ${JSON.stringify(counts)}`).toBeGreaterThan(0);
+    const tsWithSome = counts.filter((c) => c.rel.endsWith('.ts') && c.jsx > 0).map((c) => c.rel);
+    expect(tsWithSome, `these non-JSX files yielded JSX text, so the parser is misreading them: `
+      + `${tsWithSome.join(', ')}`).toEqual([]);
   });
 
   // AND THE NAMES THEMSELVES. The ruling is a property, so it is asserted as
