@@ -187,13 +187,13 @@
 // output, so a short run cannot quietly masquerade as a precise one.
 
 import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
-import { spawn, execSync } from 'node:child_process';
-import { writeFileSync, statSync, existsSync, mkdirSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
-import { resolveRunRoot, describeRunRoot } from './lib/run-root.mjs';
+import { resolveRunRoot, describeRunRoot, assertFreshBuild, electronBin } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9427);
 
@@ -221,7 +221,14 @@ const PORT = Number(process.env.PORT ?? 9427);
 // at all, so a property proved only here is proved nowhere.
 const RUN_ROOT = resolveRunRoot(dirname(dirname(fileURLToPath(import.meta.url))));
 const { root: ROOT, here: HERE, borrowed: BORROWED } = RUN_ROOT;
-const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
+// O52: through `electronBin`, not hand-composed. This was the ONE file of the
+// eighteen that spelled the binary path itself, so it silently ignored
+// `ELECTRON_BIN` — the override `docs/OVERSEER.md` documents as the one an agent
+// worktree uses, and the one every other harness honours. It only ever worked
+// because the walk lands on the main checkout, which has a node_modules; pin
+// AURORA_BUILT_TREE at a built tree without one and it refused at the guard
+// below while the override that answers exactly that case sat unread.
+const ELECTRON = electronBin(ROOT);
 const AEON_DIR = siblingPathOrUnresolved('aeon');               // OPEN ONLY — never saved
 const SHOTS = join(HERE, 'scratchpad/shots-mapviewport-baseline');
 mkdirSync(SHOTS, { recursive: true });
@@ -831,14 +838,10 @@ async function main() {
     throw new Error(`no built app at ${ROOT}/dist/main/index.mjs — run VITE_AURORA_DEBUG=1 npm run build there first`);
   }
   if (!existsSync(ELECTRON)) throw new Error(`no electron binary at ${ELECTRON} — npm install in ${ROOT}`);
-  // A STALE dist/ MAKES EVERY ROW VACUOUS.
-  const distM = statSync(join(ROOT, 'dist/main/index.mjs')).mtimeMs;
-  const newest = execSync(
-    `find ${JSON.stringify(join(ROOT, 'src'))} -name '*.ts' -o -name '*.tsx' | xargs stat -c %Y | sort -n | tail -1`,
-    { shell: '/bin/bash' }).toString().trim();
-  if (Number(newest) * 1000 > distM) {
-    throw new Error('dist/ is STALER than src/ — run VITE_AURORA_DEBUG=1 npm run build first');
-  }
+  // A STALE dist/ MAKES EVERY ROW VACUOUS. Both halves of that question name
+  // the tree the run is AGAINST, never the tree this file lives in — the O52
+  // block in lib/run-root.mjs says why, and this is the only spelling of it.
+  assertFreshBuild(RUN_ROOT);
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
 
   let app = null, c = null;
