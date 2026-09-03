@@ -38,6 +38,41 @@ const FLOOR_LABEL: Record<Solidity, string> = {
 };
 
 /**
+ * A DESTRUCTIVE BUTTON ACTS AND THEN DROPS FOCUS — decision d-27, the owner's
+ * words: *"just being a button that acts and then drops focus is how it should
+ * work right?"*
+ *
+ * WHY IT EXISTS. Measured 2026-09-02 (O48b, `[k2]`, the collision-destructive
+ * harness): after a real mouse click the `Reset`/`Clear` button KEEPS keyboard
+ * focus — `document.activeElement` was that `<button>` — and a bare SPACE then
+ * re-fired the whole wholesale wipe with no confirmation. **Enter did not**,
+ * over the same CDP input channel, which is why it read as an accident rather
+ * than a design. Both wipes are one Ctrl+Z away, so this is a surprise and not
+ * a data-loss risk; d-27 chose the smallest fix over a confirmation dialog.
+ *
+ * ⚠ THE BLUR IS UNCONDITIONAL, AND IT HAPPENS BEFORE THE ACTION. Both handlers
+ * carry silent early returns (`if (!entries.length) return`, `if (!engine)
+ * return`), and the no-op press is EXACTLY the case where a repeat Space is
+ * most pointless and least noticed. Blurring only on the path that wrote
+ * something would leave the defect alive in the half an author cannot see. Doing
+ * it first — rather than after `act()` — is what makes "unconditional" true by
+ * construction rather than by every future edit remembering it, and neither
+ * handler reads focus.
+ *
+ * Clicking again still works normally: a click focuses the button afresh, so a
+ * keyboard-only author reaches it again with Tab. Ctrl+Z is unaffected —
+ * `LevelWorkspace`'s `isTypingTarget` lets the undo through from `<body>` for
+ * the same reason it exempts `<button>`.
+ *
+ * SCOPE: these two buttons only. Other destructive controls in the app were not
+ * surveyed by d-27 and are not changed here.
+ */
+function actAndDropFocus(e: React.MouseEvent<HTMLButtonElement>, act: () => void) {
+  e.currentTarget.blur();
+  act();
+}
+
+/**
  * The picker's boxes are UNSCALED canvases — one unit is one screen pixel — so
  * the widths are proportional to the box, and a 120px preview reads as a
  * scaled-up 22px thumbnail. The paint ghost, which draws the same shapes into a
@@ -355,9 +390,12 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
               Loop row in this same palette and it is destroyed by both buttons,
               and until O48b neither string said so — the reach was correct and the
               wording understated it, which is the half a reader acts on. */}
-          <button onClick={resetToEngine} title={`Reset section ${activeSection} collision (this plane) to the engine baseline, including any loop crossover — undoable`}
+          {/* Both of these ACT AND THEN DROP FOCUS (d-27) — see actAndDropFocus.
+              A bare Space used to re-fire the wipe on the button the last click
+              left focused; it no longer reaches either writer. */}
+          <button onClick={(e) => actAndDropFocus(e, resetToEngine)} title={`Reset section ${activeSection} collision (this plane) to the engine baseline, including any loop crossover — undoable`}
             style={styles.subtleBtn}>Reset</button>
-          <button onClick={clearSection} title={`Erase ALL collision in section ${activeSection} (this plane), including any loop crossover — undoable`}
+          <button onClick={(e) => actAndDropFocus(e, clearSection)} title={`Erase ALL collision in section ${activeSection} (this plane), including any loop crossover — undoable`}
             style={styles.subtleBtn}>Clear</button>
         </div>
       )}
