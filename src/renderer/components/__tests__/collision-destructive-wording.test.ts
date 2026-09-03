@@ -22,9 +22,40 @@ const SRC = readFileSync(join(__dirname, '..', 'CollisionPalette.tsx'), 'utf8');
 describe('Clear and Reset say that the loop crossover goes with the wipe', () => {
   // Anti-vacuous: if the file stopped containing the buttons at all, every
   // assertion below would pass over an empty string. Prove the subject is here.
+  //
+  // ⚠ THE SPELLING MOVED ONCE, AND THIS ROW CAUGHT IT — which is the whole
+  // point of a probe that pins a literal. d-27 (2026-09-03) routed both onClicks
+  // through `actAndDropFocus` so the button drops keyboard focus as it fires,
+  // and the old `onClick={resetToEngine}` text stopped existing. The probe is
+  // re-pointed at the new spelling rather than loosened to a regex that could
+  // never notice again.
   it('the file really carries both wholesale writers', () => {
-    expect(SRC).toContain('onClick={resetToEngine}');
-    expect(SRC).toContain('onClick={clearSection}');
+    expect(SRC).toContain('onClick={(e) => actAndDropFocus(e, resetToEngine)}');
+    expect(SRC).toContain('onClick={(e) => actAndDropFocus(e, clearSection)}');
+  });
+
+  // d-27, and READ WHAT THIS IS: a SPELLING pin, not a behaviour gate. It cannot
+  // prove the blur runs, that it runs unconditionally, or that the button still
+  // works — the node suite cannot see React, a DOM or a click. Rows [k3]-[k7] of
+  // `scratchpad/collision-destructive-harness.mjs` press the real buttons in the
+  // real app and are what prove all four; each was shown RED first under a plant
+  // that removed the blur (P6/P7), one that kept the blur but broke the button
+  // (P8), and one that blurred only on the acting path (P9). This row exists so
+  // the wiring cannot be dropped in a refactor that never runs the harness.
+  it('both destructive buttons go through the act-and-drop-focus helper, which blurs', () => {
+    // Sliced, not regexed: the signature itself contains `()` (the `act: () =>
+    // void` parameter), so a `[^)]*` for the parameter list stops in the middle
+    // of it and reports the helper ABSENT while it is right there — a false
+    // negative that reads exactly like the defect this row watches for.
+    const at = SRC.indexOf('function actAndDropFocus');
+    expect(at, 'actAndDropFocus not found — the d-27 wiring cannot be judged').toBeGreaterThan(-1);
+    const end = SRC.indexOf('\n}', at);
+    expect(end, 'actAndDropFocus has no closing brace — refusing to judge a partial read')
+      .toBeGreaterThan(at);
+    const helper = SRC.slice(at, end);
+    expect(helper).toContain('.blur()');
+    // BEFORE the action, so an early return inside the handler cannot skip it.
+    expect(helper.indexOf('.blur()')).toBeLessThan(helper.indexOf('act()'));
   });
 
   it("Reset's tooltip names the loop crossover", () => {
