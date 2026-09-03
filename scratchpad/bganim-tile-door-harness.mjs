@@ -223,6 +223,23 @@ const clickByText = (re, tag = 'button') => String.raw`
   return true;
 })()`;
 
+/**
+ * SHOW ONE OF THE EFFECTS COLUMN'S THREE JOBS — d-26b's sub-tabs (EW-SHAPE-TABS).
+ *
+ * A section belonging to another job is **UNMOUNTED, not hidden**, so every
+ * control under it is absent from the DOM rather than collapsed — which reads
+ * exactly like a deleted feature. Section 6's `New tile animation` disclosure
+ * lives on the `tileAnim` job; the facet arrives on `parallax`.
+ * (Same helper, same wording, as `bganim-strip-range-harness.mjs`.)
+ */
+const SUBTAB = (id) => String.raw`
+(() => {
+  const t = document.querySelector('[data-effects-sub-tab="' + ${JSON.stringify(id)} + '"]');
+  if (!t) return 'no-sub-tab';
+  t.click();
+  return 'ok';
+})()`;
+
 /** Open one CollapsibleSection by header text. */
 const SECTION_STATE = (re, click) => String.raw`
 (() => {
@@ -655,6 +672,92 @@ async function main() {
       + 'open document\'s own 1x1 tile (8x8 doc px), square, at 2x or better',
       !!surface, `crosshair canvases ${JSON.stringify(canvases)}`);
 
+    // ---- 4e. THE MECHANISM, ASSERTED ON A RUN THAT PASSES ------------------
+    //
+    // ⚠ [4b2] IS IN THE FAILURE BRANCH AND THEREFORE CANNOT HOLD THE FIX. It
+    // only runs when the door refuses, so a green run never executes it: the one
+    // fact that was false — THE STRIP MOVED BETWEEN THE TWO HALVES — would go
+    // unasserted on exactly the runs that claim the bug is gone. [4b] proves the
+    // OUTCOME (a document opened, `gestures` advanced past the container). This
+    // row proves the CAUSE is dead, and the two are not the same claim: a door
+    // moved onto `mousedown`, or onto a click-count timer, would satisfy [4b]
+    // with the panel still sliding under the cursor.
+    //
+    // ⚠ AND IT IS NOT VACUOUS BY BEING QUIET. The tool is DISARMED to
+    // `stamp-band` first, through the panel's own band card, and the row then
+    // requires the tool to be `paint-tile` BETWEEN the halves. So the reflow
+    // trigger is proved to FIRE — the tool-options section really does mount
+    // mid-gesture, which is a transition, not a still frame — and the strip is
+    // required to be unmoved ANYWAY. A build that simply stopped arming the tool
+    // on the first click fails this row rather than passing it, and so does one
+    // whose options column is empty for unrelated reasons.
+    await goToStrip();
+    // Disarm through the real control, and CHECK it took: `.click()` is not a
+    // click on a surface that listens for something else, and a silent no-op
+    // here would leave the tool already on `paint-tile` and make the mid-gesture
+    // reading below prove nothing at all.
+    await c.evalExpr(String.raw`
+      (() => { const b = document.getElementById('art-browser-bands');
+        if (!b || b.children.length === 0) return 'no-card';
+        b.children[0].click(); return 'ok'; })()`);
+    await sleep(600);
+    const geomE = await c.json(STRIP_GEOM);
+    const preTool = (await c.json(BANDROW)).tool;
+    const aimE = geomE ? aimIn(geomE, gridColsOf(geomE))(SLOT_A) : null;
+    if (!aimE || preTool === 'paint-tile') {
+      unmeasurable('4e', 'the strip does not move BETWEEN the halves of a double click',
+        `preTool=${preTool} (must not already be paint-tile) `
+        + `aim=${JSON.stringify(aimE)} box=${JSON.stringify(geomE)}`);
+    } else {
+      // The same probe as `AT_AIM`, re-aimed — built here rather than by
+      // string-substituting the other one, which would depend on two client
+      // coordinates never colliding with any other number in it.
+      const AT_E = `(() => {
+        const el = document.elementFromPoint(${aimE.x}, ${aimE.y});
+        if (!el) return null;
+        const path = [];
+        for (let e = el; e && path.length < 5; e = e.parentElement) {
+          path.push(e.tagName + (e.id ? '#' + e.id : ''));
+        }
+        return { path, dpr: window.devicePixelRatio };
+      })()`;
+      const gestE0 = (await openRep()).gestures;
+      const panelE0 = await c.json(BANDROW);
+      const t0 = Date.now();
+      await press(aimE, 1); await sleep(40); await release(aimE, 1);
+      const midGeom = await c.json(STRIP_GEOM);
+      const midPanel = await c.json(BANDROW);
+      const midAim = await c.json(AT_E);
+      const gapMs = Date.now() - t0;
+      await press(aimE, 2); await sleep(40); await release(aimE, 2); await sleep(1200);
+      // ⚠ NOT GATED ON, AND SAYING SO: a SUCCESSFUL open switches to the Art
+      // facet, which unmounts the strip, so `null` here is the door working. It
+      // is printed because on a build where the door refuses it is the box, and
+      // then it is the interesting number.
+      const endGeom = await c.json(STRIP_GEOM);
+      const repE = await openRep();
+      const openE = await artOpen();
+      check('4e', 'THE MECHANISM IS DEAD — with `stamp-band` armed first, the first half of a '
+        + 'double click arms `paint-tile` (so the tool-options section really does MOUNT '
+        + 'mid-gesture) and the strip DOES NOT MOVE anyway: same top, same left, the aim still '
+        + `over the strip canvas, and the second half therefore lands on slot ${SLOT_A} and opens it`,
+        !!geomE && !!midGeom
+        && preTool === 'stamp-band' && midPanel.tool === 'paint-tile'
+        && midGeom.top === geomE.top && midGeom.left === geomE.left
+        && !!midAim && midAim.path[0] === 'CANVAS#art-browser-canvas'
+        && repE.gestures === gestE0 + 1 && repE.openedTileIndex === SLOT_A
+        && !!openE && openE.target.kind === 'tile' && openE.target.tileIndex === SLOT_A,
+        `inter-click gap ${gapMs}ms`
+        + `\n        strip BEFORE  =${JSON.stringify(geomE)}`
+        + `\n        strip BETWEEN =${JSON.stringify(midGeom)}`
+        + `\n        strip AFTER   =${JSON.stringify(endGeom)}  (null = the Art facet took over, i.e. the door worked)`
+        + `\n        under the aim BETWEEN: ${JSON.stringify(midAim)}`
+        + `\n        tool BEFORE=${preTool} -> BETWEEN=${midPanel.tool} (must be stamp-band -> paint-tile)`
+        + `\n        panel BEFORE : ${JSON.stringify(panelE0)}`
+        + `\n        panel BETWEEN: ${JSON.stringify(midPanel)}`
+        + `\n        report=${JSON.stringify(repE)}  open=${JSON.stringify(openE)}`);
+    }
+
     // ---- 5. THE PREFIX SLOT STILL ANSWERS, AND AS A TILE -------------------
     // Not the row's target (bank 0 already reaches the prefix) but the door must
     // not throw on it and must not open a BANK for it.
@@ -683,10 +786,31 @@ async function main() {
     // run resolves to 11 columns whatever the snapping code does, so the row
     // would agree with almost any arithmetic. At rows=4 the same run must snap
     // DOWN to 2 columns, which is a number only the real rule produces.
+    // ⚠ SECTION 6 HAD NEVER RUN. Until the strip's double click was fixed, this
+    // file threw at [4b] and sections 5-8 were unreachable, so the two stale
+    // literals below sat undiscovered while the O50 sweep repaired the identical
+    // pair in six sibling harnesses. Both are the SAME 2026-09-02 pair those six
+    // carried, and neither is an app defect — the drag itself answered correctly
+    // on the first run that reached it (`{kind:"range", anchorSlot:34,
+    // releaseSlot:44, staticBase:34, cols:11, rows:1}`), at rows=1 because the
+    // Rows control was never touched:
+    //
+    //   1. THE SUB-TAB. `providers/effects-sub-tabs.ts:94` puts
+    //      `aeon.bganim.new` on the `tileAnim` job; the facet arrives on
+    //      `parallax` and the section is UNMOUNTED, not collapsed.
+    //   2. THE RENAME, at 023e0ed9 ("effects: `band` names ONE feature now —
+    //      tile animation vs raster band"): the disclosure is titled
+    //      `New tile animation` (`BgAnimBandPanel.tsx:635`), not `New band`.
+    //
+    // Symptom before the repair: `setRows=no-element`, `candidate rows=1`, and
+    // [6a] failing as its consequence — at rows=1 the floor-division is the
+    // identity, which is the very degeneracy [6-pre] exists to prevent.
     const ROWS = 4;
     await c.evalExpr(clickByText('/^Effects$/'));
     await sleep(1400);
-    await c.evalExpr(SECTION_STATE('/^New band/', true));
+    const subTab = await c.evalExpr(SUBTAB('tileAnim'));
+    await sleep(1000);
+    const openedNew = await c.evalExpr(SECTION_STATE('/^New tile animation/', true));
     await sleep(500);
     const setRows = await c.evalExpr(String.raw`
       (() => {
@@ -703,7 +827,8 @@ async function main() {
     check('6-pre', `ANTI-VACUOUS for the drag: the panel's own Rows control really set rows=${ROWS}, `
       + 'so the run below has to SNAP rather than pass through',
       setRows === 'ok' && candRows === ROWS,
-      `setRows=${setRows} candidate rows=${candRows}`);
+      `subTab=${subTab} SECTION_STATE(New tile animation)=${JSON.stringify(openedNew)} `
+      + `setRows=${setRows} candidate rows=${candRows}`);
     await goToStrip();
     const dragFrom = FPS + 2;
     const dragTo = dragFrom + 10;                 // an 11-slot run, not a whole
