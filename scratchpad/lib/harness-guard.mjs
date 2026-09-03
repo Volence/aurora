@@ -227,11 +227,97 @@ import { spawn } from 'node:child_process';
 import { readdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** Both paths the app publishes its Aether port to. The owner's app writes
  *  these too — that is the whole problem. */
 export const DISCOVERY_FILES = ['.aurora', '.sonic-level-editor']
   .map((sub) => join(homedir(), sub, 'mcp.json'));
+
+// ── HAZARD 1c: THE OTHER SHARED GLOBAL FILE, WHICH COST THE OWNER DATA ─────
+//
+// O52, 2026-09-03. `~/.config/<app>/recent-projects.json` is a SECOND file with
+// exactly hazard 1's shape and it was outside this guard entirely. Every harness
+// that opens a project appends to it (`src/main/recent-projects.ts`
+// `addRecentProject` -> `writeFileSync(join(app.getPath('userData'),
+// 'recent-projects.json'))`), it is capped at ten entries, it lives in no repo,
+// and nothing cleaned it up.
+//
+// WHAT THAT COST. The O50 census ran 89 harnesses in one night. Each one
+// unshifted its own `mkdtemp` project onto the list, so after ten runs every one
+// of the OWNER'S ten entries had been pushed off the end. The sweep then deleted
+// its temp directories, leaving ten rows pointing at nothing, and reset the file
+// to `[]`. His recent-projects list was destroyed by a test run and cannot be
+// reconstructed. MEASURED AGAIN HERE before the fix, one run of
+// build-console-overlap-harness: the file went from one entry (his aeon) to two,
+// row 0 being `/tmp/aurora-build-console-jQz4Mw` — a directory that no longer
+// existed by the time the run ended.
+//
+// It is also a READ hazard, the dangerous direction, exactly as with the
+// discovery files: `palette-drag-harness` and `palette-grid-harness` NAVIGATE by
+// this list, and both died in the census with `aeon recent row unreachable`
+// while printing a recent list made entirely of other harnesses' temp
+// directories. A test whose result is a function of what ran before it is the
+// one thing a test must not be.
+//
+// The treatment is the EXISTING one, widened rather than reinvented: these paths
+// join the same snapshot/restore that already covers the two `mcp.json` files,
+// so the same `spawnGuarded` first-launch capture, the same `finally`, and the
+// same exit/SIGINT/uncaught net put them back.
+//
+// ⚠ ITS ONE HONEST LIMIT, STATED RATHER THAN DISCOVERED LATER: a byte-for-byte
+// restore also erases a project the owner opens DURING a run. That window is a
+// run long, it is the same trade the discovery-file restore already makes, and
+// the alternative — merging his row back in — is a bespoke rule for one file.
+// The discovery files have a pid to arbitrate with; a recents list has nothing
+// comparable, so there is no non-bespoke version of "keep his newer entry".
+
+/**
+ * WHICH DIRECTORY, DERIVED. Electron's `app.getPath('userData')` on Linux is
+ * `$XDG_CONFIG_HOME` (or `~/.config`) joined with `app.getName()`, and the app
+ * name is NOT one value here — it depends on how the app was started, which is
+ * why there are three real files on this box:
+ *
+ *   Electron            `electron <root>/dist/main/index.mjs` — the argument is
+ *                       a FILE, so there is no package.json at the app path and
+ *                       Electron falls back to its own default name. THIS IS
+ *                       EVERY HARNESS LAUNCH, and the one the census evicted.
+ *   <package.json name> `electron .` (`npm run dev`) — the app path is the repo,
+ *                       so the name comes from package.json. THIS IS THE OWNER.
+ *                       Read from the file rather than typed, so a rename cannot
+ *                       silently drop his directory out of the guarded set.
+ *   sonic-level-editor  the legacy name, still on disk here, and already carried
+ *                       for the discovery file one line above.
+ *
+ * All three are guarded. Guarding a path no run touches costs nothing (an absent
+ * file snapshots as `null` and restores as a delete); missing the one that IS
+ * touched costs somebody their data, which is what happened.
+ */
+export const APP_NAMES = (() => {
+  const names = ['Electron', 'sonic-level-editor'];
+  try {
+    const pkg = JSON.parse(readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8'));
+    if (typeof pkg.productName === 'string') names.push(pkg.productName);
+    if (typeof pkg.name === 'string') names.push(pkg.name);
+  } catch { /* a checkout without a readable package.json still guards the other two */ }
+  return [...new Set(names)];
+})();
+
+/** Every `recent-projects.json` an Aurora launched on this machine could write. */
+export const RECENT_PROJECT_FILES = APP_NAMES.map((n) =>
+  join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), n, 'recent-projects.json'));
+
+/**
+ * EVERY SHARED GLOBAL FILE A RUN MUST GIVE BACK, with what kind each is.
+ *
+ * One list, because there is one snapshot, one restore and one exit net. A
+ * second bespoke mechanism for the second file is how the first one came to
+ * cover only half the hazard.
+ */
+export const GUARDED_GLOBAL_FILES = [
+  ...DISCOVERY_FILES.map((f) => ({ f, kind: 'discovery' })),
+  ...RECENT_PROJECT_FILES.map((f) => ({ f, kind: 'recents' })),
+];
 
 /** Paths a *reader* may look in. Superset of DISCOVERY_FILES: several probes
  *  historically also consulted ~/.config/aurora and ~/.aether. */
@@ -240,11 +326,11 @@ export const DISCOVERY_READ_PATHS = ['.aurora', '.config/aurora', '.aether', '.s
 
 // ── HAZARD 1a: snapshot / restore ──────────────────────────────────────────
 
-/** Byte-for-byte capture of both discovery files. `content: null` means the
- *  file did not exist, and restore must then DELETE rather than write. */
+/** Byte-for-byte capture of every guarded global file. `content: null` means
+ *  the file did not exist, and restore must then DELETE rather than write. */
 export function snapshotDiscovery() {
-  return DISCOVERY_FILES.map((f) => {
-    try { return { f, content: readFileSync(f, 'utf8') }; } catch { return { f, content: null }; }
+  return GUARDED_GLOBAL_FILES.map(({ f, kind }) => {
+    try { return { f, kind, content: readFileSync(f, 'utf8') }; } catch { return { f, kind, content: null }; }
   });
 }
 
@@ -262,11 +348,15 @@ export function restoreDiscovery(snap) {
   const done = [];
   const ours = new Set();
   for (const r of ownedRoots()) for (const p of descendants(r)) ours.add(p);
-  for (const { f, content } of snap ?? []) {
+  for (const { f, kind, content } of snap ?? []) {
     try {
       let cur = null;
       try { cur = JSON.parse(readFileSync(f, 'utf8')); } catch { /* absent or not JSON */ }
-      if (cur && Number.isInteger(cur.pid) && !ours.has(cur.pid) && alive(cur.pid)) {
+      // The pid arbitration is a DISCOVERY-file rule and says so. A recents list
+      // is a JSON array with no pid in it, so this branch could never fire on
+      // one anyway — naming the kind is what stops a later reader believing the
+      // recents file has a liveness rule it does not have.
+      if (kind !== 'recents' && cur && Number.isInteger(cur.pid) && !ours.has(cur.pid) && alive(cur.pid)) {
         done.push(`${f} LEFT ALONE — it now names LIVE pid ${cur.pid}, which is not ours; `
           + 'an app started since our snapshot owns this file and our bytes are stale');
         continue;
@@ -296,9 +386,19 @@ export function restoreDiscovery(snap) {
  * why `resolveOwnedDiscovery` tests DESCENT and not this.
  */
 export function describeDiscovery(snap) {
-  return (snap ?? []).map(({ f, content }) =>
-    `${f} ${content === null ? '(absent)' : `${content.length}B ${livenessOf(content)} `
+  return (snap ?? []).map(({ f, kind, content }) =>
+    `${f} ${content === null ? '(absent)' : `${content.length}B ${kind === 'recents' ? entriesOf(content) : livenessOf(content)} `
       + JSON.stringify(content).slice(0, 120)}`).join('\n        ');
+}
+
+/** `N recent entr(y|ies)`, or why the question could not be asked. The recents
+ *  file's counterpart to `livenessOf`: printing its bytes without saying how
+ *  many rows are in it is how ten evictions look like one write. */
+export function entriesOf(content) {
+  let j;
+  try { j = JSON.parse(content); } catch { return '[unparseable — no entries to count]'; }
+  if (!Array.isArray(j)) return `[not an array (${typeof j}) — COUNT UNKNOWABLE]`;
+  return `[${j.length} recent ${j.length === 1 ? 'entry' : 'entries'}]`;
 }
 
 /** `pid N ALIVE|DEAD`, or why the question could not be asked. Never blank —
