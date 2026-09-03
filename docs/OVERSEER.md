@@ -160,6 +160,16 @@ the cheap fix is to ask, because the owner is usually one sentence away.
 
 ### Addressing the hub
 
+⚠ **REPORT TO THE HUB EVERY TIME YOU FINISH A PIECE OF WORK OR STOP — OWNER, 2026-09-03T05:21:01Z**,
+verbatim: *"tell the agents any time theyy finish work or stop to report to you please, loosk like
+aeon's stopped right now"* (empyrean `f04afe3`, verified reachable from `origin/main` and read at
+that revision here, not from the relay). A landing, a boundary, a block, an owner question, or an
+agent returning and leaving nothing running — each gets one message saying what landed (SHA from
+git output, never typed from memory) or why you stopped, and what you need. **Going quiet without a
+message is the state he named**, and he named it while watching a lane whose board still claimed it
+was working. Note what the rule is really about: `lane-status.json` already carries all of this, and
+he asked anyway — a file he has to go and read is not a report.
+
 **Send hub traffic to the lane named `empyrean`**, not to a session display name. The 2026-08-29
 episode that established this — a dock session that accepted `SendMessage` and silently held three
 reports undelivered, and the owner's hedged *"1. I think so"* behind it — is in
