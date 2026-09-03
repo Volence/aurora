@@ -34,7 +34,12 @@ const RUN = announceRunRoot(runTarget(ROOT));
 const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
 const MAIN = RUN.main;
 const S1DIR = siblingPathOrUnresolved('s1disasm');
-const AEONDIR = siblingPathOrUnresolved('aeon') + '/';
+// ⚠ NO TRAILING SLASH. Row 18 hunts a Home recents card by
+// `button[title="<path>"]`, and HomeTab renders `title={r.path}` — the path
+// exactly as `recent-projects.json` stores it, which never carries one. The
+// `+ '/'` that used to be here made that selector unmatchable, so the row
+// reported "no aeon recents row reachable" whatever the recents file held.
+const AEONDIR = siblingPathOrUnresolved('aeon');
 const SHOTS = `${ROOT}/scratchpad/shots`;
 mkdirSync(SHOTS, { recursive: true });
 
@@ -244,9 +249,19 @@ const INSTALL_HELPERS = String.raw`
   H.lockedThumbs = () => H.thumbs().filter((b) => b.textContent.includes('\u{1F512}')).slice(0, 6).map((b) => b.title);
   H.thumbTitle = (i) => { const t = H.thumbs(); return t[i] ? t[i].title : null; };
   H.clickThumb = (title) => { const b = H.thumbs().find((e) => e.title === title); if (!b) return false; b.click(); return true; };
+  // WARNING: THIS LOOKED AT <span> ONLY, AND IT IS WHY MOST OF THIS FILE WAS RED.
+  // 598be067 (2026-08-16) made every INTERACTIVE Chip a real <button>, leaving
+  // spans for the readouts -- so this returned null for Undo, drainUndo()'s
+  // (=== true) loop pressed nothing and returned 0, and "the stack is empty"
+  // and "I cannot see the control" printed the same number. Enabledness comes
+  // off the button's own disabled property now (which is what the component
+  // writes); spans keep the opacity rule, having no disabled property.
   H.chipEnabled = (label) => {
-    const s = [...document.querySelectorAll('span')].find((e) => e.children.length === 0 && e.textContent.trim() === label);
-    return s ? getComputedStyle(s).opacity === '1' : null;
+    const all = [...document.querySelectorAll('button,span')]
+      .filter((x) => x.children.length === 0 && x.textContent.trim() === label);
+    const e = all.find((x) => x.tagName === 'BUTTON') || all[0];
+    if (!e) return null;
+    return e.tagName === 'BUTTON' ? !e.disabled : getComputedStyle(e).opacity === '1';
   };
   H.toasts = () => document.body.innerText.split('\n').map((l) => l.trim())
     .filter((l) => /view-only|square selection|refused|failed:/i.test(l));
@@ -351,11 +366,29 @@ const grid = (c) => c.json('window.__h.grid()');
 const diff = (a, b) => { const o = []; for (let i = 0; i < 64; i++) if (a[i] !== b[i]) o.push([i % 8, (i / 8) | 0]); return o; };
 const same = (a, b) => !!a && !!b && a.join('|') === b.join('|');
 
-/** Ctrl+Z until the Undo chip goes disabled; returns the press count. */
+/**
+ * Ctrl+Z until the Undo chip goes disabled; returns the press count.
+ *
+ * ⚠ REFUSES WHEN THE CHIP CANNOT BE READ AT ALL. When `chipEnabled` returned
+ * `null` (the chip had become a `<button>` — see its comment), this loop's
+ * `=== true` was simply false, it pressed nothing, and it returned `0`. Every
+ * row that counts undo steps then read 0 and every row that asserts "the stack
+ * is empty afterwards" read `false`, and neither could tell that from a real
+ * measurement. That one silent 0 accounts for most of the 16 red rows this
+ * file carried.
+ */
 async function drain(c, limit = 60) {
   let n = 0;
-  while (n < limit && (await c.evalExpr('window.__h.chipEnabled("Undo")')) === true) { await ctrlZ(c); await sleep(230); n++; }
-  return n;
+  for (;;) {
+    const enabled = await c.evalExpr('window.__h.chipEnabled("Undo")');
+    if (enabled === null) {
+      throw new Error('the Undo chip could not be found, so "is there anything left to undo" has '
+        + 'NO ANSWER. UNMEASURABLE, not "the stack is empty" — returning 0 here is what made this '
+        + 'harness report undo counts it had never taken. Fix __h.chipEnabled.');
+    }
+    if (enabled !== true || n >= limit) return n;
+    await ctrlZ(c); await sleep(230); n++;
+  }
 }
 /** Ctrl+Z until the tile grid matches `target`; returns press count, or -1. */
 async function undoUntilGrid(c, target, limit = 8) {
@@ -403,6 +436,23 @@ async function main() {
     note('env', '__dbg surface', JSON.stringify(await c.evalExpr('Object.keys(window.__dbg)')));
 
     await c.evalExpr('localStorage.clear(); 1');
+    // ⚠ SEED THE AEON RECENTS ROW **BEFORE** THE CLASSIC PROJECT OPENS, and
+    // that order is the whole of it. Row 18 opens aeon by clicking its card on
+    // Home, and HomeTab refetches recents only when `noProject` or
+    // `currentPath` changes (HomeTab.tsx:71-75) — so a row registered later in
+    // the run is on disk and not on screen. Opening the classic act below moves
+    // `currentPath`, which is the refetch this seed rides in on.
+    //
+    // WHY IT HAS TO BE SEEDED AT ALL: the card exists only if this machine's
+    // `~/.config/Electron/recent-projects.json` already lists the aeon checkout
+    // this run resolved, and that file is a ten-entry LRU that every harness in
+    // this population rewrites. Measured 2026-09-03: it held eight OTHER agents'
+    // throwaway aeon copies and not the resolved one, so whether row 18 could
+    // run depended on which instrument had run last — and it reported the miss
+    // as a FAIL, which reads like a product failure. Registering the path is
+    // SETUP, through the app's own IPC (the same call `useProject.openPath`
+    // makes on a successful open); the gestures under test are untouched.
+    await c.evalExpr(`window.api.addRecentProject(${JSON.stringify(AEONDIR)}, 'aeon (harness)')`);
     await c.evalExpr(`window.__dbg.openDir(${JSON.stringify(S1DIR)})`);
     await sleep(1800);
     await c.evalExpr('window.__dbg.activate("ghz", 1)');
@@ -954,6 +1004,12 @@ async function runChecks(c) {
   // ===== 18: cross-engine =====
   await c.evalExpr('window.__h.clickBar("Flip horizontal")'); await sleep(600);
   await drain(c);
+  // The recents row was seeded at boot — see the note there for why, and why it
+  // has to happen before the classic act opens.
+  await c.evalExpr(`
+    (() => { const b = [...document.querySelectorAll('button')].find((e) => e.textContent.trim() === 'Home');
+      if (b) { b.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); b.click(); } return !!b; })()`);
+  await sleep(1500);
   let opened = await c.evalExpr(`
     (() => { const b = document.querySelector('button[title=${JSON.stringify(AEONDIR)}]');
              if (!b) return 'not-found'; b.click(); return 'clicked'; })()`);
