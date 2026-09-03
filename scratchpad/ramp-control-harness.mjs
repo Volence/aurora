@@ -13,6 +13,9 @@
 //        schema's own number, and the document does not move
 //   [rt] an unrepresentable rate is refused, names what IS available, and
 //        NOTHING SNAPS — plus the legal sibling that proves the field is live
+//   [ns] the SIGN disclosure: a NEGATIVE value is disclosed as unbuildable (and
+//        the refusal that RECOMMENDS `-1` says so beside its true arithmetic),
+//        and on a POSITIVE document the sentence is GONE
 //   [ds] the display readout shows the write span AND the screen span, one
 //        line apart
 //
@@ -673,6 +676,127 @@ async function main() {
       !!afterLegal.ramp.step && afterLegal.ramp.step.whole === -1
       && afterLegal.ramp.step.frac256 === 128,
       `step is now ${JSON.stringify(afterLegal.ramp.step)} after typing -1.5`);
+
+    // ══════════════════════════════════════════════════════════════════════
+    // [ns] THE SIGN: a NEGATIVE value does not reach the game, a POSITIVE
+    //      one does — and the panel must say EXACTLY that much
+    //
+    // ⚠ THE ROW ABOVE ([rt-c]) IS THE REASON THIS BLOCK EXISTS. `-1.5` is
+    // representable, the codec writes it, the document is well-formed, the
+    // schema accepts it, and aeon's GENERATOR accepts it — and the ROM still
+    // does not build, because `raster_ramp_program` declares `rrp_start` /
+    // `rrp_step` as `u32` and forwards the signed value RAW. So [rt-c] is a
+    // green row about a document that cannot ship, and nothing above it says so.
+    //
+    // AND THE SCOPE IS THE HARD PART. "ramp does not reach the game" RETIRED
+    // earlier the same day and re-arming it would be a false warning. A POSITIVE
+    // ramp builds and runs, so [ns-d] drives the surface to a positive document
+    // and requires the sentence to be GONE. Presence without absence would pass
+    // on a leaf that always speaks.
+    //
+    // The needles are the exported constants' own words
+    // (core/formats/effects/ramp-sign-lag.ts: RAMP_SIGN_LAG_LEAD,
+    // RAMP_SIGN_CAVEAT_LEAD); `ramp-sign-lag-disclosure.test.ts` pins THIS FILE's
+    // copies against those constants, so a re-word cannot leave this rig green
+    // against words the app no longer paints.
+    // ══════════════════════════════════════════════════════════════════════
+    console.log('\n=== [ns] the SIGN: negative does not build, positive does ===');
+    const NS_LEAD = 'A NEGATIVE value here does not reach the game.';
+    const NS_CAVEAT = 'A NEGATIVE ONE WILL NOT BUILD TODAY';
+
+    // ── [ns-a] the refusal that RECOMMENDED -1 now says -1 will not build ──
+    const beforeCav = await doc(c);
+    await typeInto(c, 'step', '-0.5', 'Step (the unrepresentable rate, again)');
+    const afterCav = await doc(c);
+    // ⚠ THE NEEDLES ARE BUILT AS DATA AND `JSON.stringify`d IN, never spliced as
+    // escaped source. A needle written `'\`step\`...'` inside a template literal
+    // reaches the page correctly and leaves BACKSLASHES in this file, so the
+    // node-side row that pins these copies against the exported constants can
+    // no longer find them — measured, not imagined.
+    const NS_CAVEAT_NEEDLES = ['The nearest rates you CAN have are -1 and 0', NS_CAVEAT,
+      'does not fit u32', 'still the nearest value this ENCODING can spell'];
+    const caveatSentence = await c.json('window.__rp.paintedRect(\'HAS NO SPELLING\', '
+      + `${JSON.stringify(NS_CAVEAT_NEEDLES)})`);
+    await shot(c, 'ns-caveat');
+    check('ns-a', '⚠ THE REFUSAL STILL NAMES -1 AND 0 — THE ARITHMETIC IS NOT CORRUPTED — AND IT '
+      + 'NOW SAYS -1 WILL NOT BUILD. A refusal that names a nearest-representable alternative '
+      + 'carries the authority of a fix: the author types -0.5, is told to use -1, and THAT '
+      + 'document fails at emission. The neighbours are a true fact about the ENCODING and are '
+      + 'left alone; the build limitation rides beside them. And the document did not move',
+      !!caveatSentence && caveatSentence.inScroller === true && caveatSentence.allPresent === true
+      && JSON.stringify(afterCav.ramp.step) === JSON.stringify(beforeCav.ramp.step),
+      `painted refusal = ${JSON.stringify(caveatSentence)}; step `
+      + `${JSON.stringify(beforeCav.ramp.step)} → ${JSON.stringify(afterCav.ramp.step)} `
+      + `(unchanged=${JSON.stringify(afterCav.ramp.step) === JSON.stringify(beforeCav.ramp.step)})`);
+
+    // ── [ns-b] a representable NEGATIVE: the document MOVES and speaks ────
+    await typeInto(c, 'start', '0', 'Start (positive, so only `step` is named)');
+    await typeInto(c, 'step', '-1.5', 'Step (a representable NEGATIVE)');
+    const negDoc = await doc(c);
+    // ⚠ THE SEARCH NEEDLE IS FROM THE BODY, NOT THE LEAD, AND THAT IS LOAD-
+    // BEARING. `paintedRect` takes the LAST `div,span` whose innerText contains
+    // the needle — the innermost one. The leaf paints its lead in its own
+    // `<span>` for emphasis and the rest as a sibling TEXT NODE, so searching by
+    // the lead lands on that 46-character span and every body needle reports
+    // false against a sentence that is fully on screen. Measured on the first
+    // run of this row. Searching by a phrase that appears ONLY in the body
+    // resolves to the containing Hint, whose innerText is the whole sentence —
+    // lead included, which is why the lead stays in the needle list.
+    const NS_NEG_NEEDLES = [NS_LEAD, '`step` (px per scanline) is negative',
+      'raster_ramp_program', 'u32', 'A POSITIVE value in the same field builds and runs today',
+      'this is about the sign, not about `ramp`'];
+    const negSentence = await c.json('window.__rp.paintedRect(\'raster_ramp_program\', '
+      + `${JSON.stringify(NS_NEG_NEEDLES)})`);
+    await shot(c, 'ns-negative');
+    check('ns-b', '⚠ A REPRESENTABLE NEGATIVE LANDS IN THE DOCUMENT AND THE PANEL DISCLOSES IT. '
+      + 'The two halves in one condition: `step` really is {whole: -1, frac256: 128} in the model '
+      + '(so this is not a refusal that withheld the edit) AND the sentence is painted, names the '
+      + 'field, names the mechanism, and says in as many words that a POSITIVE value in the same '
+      + 'box builds — the scope that keeps this from re-arming the `ramp` claim that retired',
+      !!negDoc.ramp.step && negDoc.ramp.step.whole === -1 && negDoc.ramp.step.frac256 === 128
+      && !!negSentence && negSentence.inScroller === true && negSentence.allPresent === true,
+      `step = ${JSON.stringify(negDoc.ramp.step)}; start = ${JSON.stringify(negDoc.ramp.start)}; `
+      + `painted disclosure = ${JSON.stringify(negSentence)}`);
+
+    // ── [ns-c] `start` is the same u32 and the same raw forward ──────────
+    await typeInto(c, 'start', '-2', 'Start (also NEGATIVE)');
+    const bothDoc = await doc(c);
+    const NS_BOTH_NEEDLES = [NS_LEAD, '`start` (px) and `step` (px per scanline) are negative'];
+    const bothSentence = await c.json('window.__rp.paintedRect(\'raster_ramp_program\', '
+      + `${JSON.stringify(NS_BOTH_NEEDLES)})`);
+    await shot(c, 'ns-both');
+    check('ns-c', '`start` is disclosed too, and the sentence names BOTH — `rrp_start` is the same '
+      + '`u32` and the same raw forward as `rrp_step`, so a run that merely BEGINS below the rest '
+      + 'position is as unbuildable as one that ramps upward. A disclosure scoped to `step` alone '
+      + 'would leave the other half silent',
+      !!bothDoc.ramp.start && bothDoc.ramp.start.whole === -2
+      && !!bothSentence && bothSentence.inScroller === true && bothSentence.allPresent === true,
+      `start = ${JSON.stringify(bothDoc.ramp.start)}; painted = ${JSON.stringify(bothSentence)}`);
+
+    // ── [ns-d] THE OTHER DIRECTION: positive, and the sentence is GONE ────
+    await typeInto(c, 'start', '0', 'Start (back to a positive document)');
+    await typeInto(c, 'step', '1.5', 'Step (POSITIVE — this one builds)');
+    const posDoc = await doc(c);
+    // BOTH ENDS OF THE SENTENCE, because the lead lives in its own span and the
+    // body in a sibling text node — a check on one alone could go null while the
+    // other was still painted. Neither phrase appears anywhere else on the
+    // surface (the rate refusal's caveat shares the MECHANISM words, not these).
+    const stillThere = await c.json(`window.__rp.paintedRect(${JSON.stringify(NS_LEAD)})`);
+    const stillBody = await c.json('window.__rp.paintedRect('
+      + `${JSON.stringify('A POSITIVE value in the same field builds and runs today')})`);
+    await shot(c, 'ns-positive');
+    check('ns-d', '⚠ AND ON A POSITIVE DOCUMENT THE SENTENCE IS GONE. This is the direction the '
+      + 'parcel exists for: "ramp does not reach the game" RETIRED earlier the same day, and a '
+      + 'disclosure that spoke on every ramp would be a FALSE WARNING — the same defect as the '
+      + 'recommendation that opened this row, wearing the other hat. The document really is '
+      + 'positive (so the surface was driven, not merely left alone) and nothing on screen says a '
+      + 'negative word',
+      !!posDoc.ramp.step && posDoc.ramp.step.whole === 1 && posDoc.ramp.step.frac256 === 128
+      && !!posDoc.ramp.start && posDoc.ramp.start.whole === 0 && posDoc.ramp.start.frac256 === 0
+      && stillThere === null && stillBody === null,
+      `start = ${JSON.stringify(posDoc.ramp.start)}, step = ${JSON.stringify(posDoc.ramp.step)}; `
+      + `paintedRect(lead) = ${JSON.stringify(stillThere)}, paintedRect(body) = `
+      + `${JSON.stringify(stillBody)} (both must be null)`);
 
     // ══════════════════════════════════════════════════════════════════════
     // [ds] THE DISPLAY READOUT

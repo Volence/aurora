@@ -155,6 +155,7 @@ import { sectionRasterAdvisory, rasterChooserName } from '../../../core/formats/
 import { openGuide } from '../../state/guideStore';
 import { EFFECTS_GUIDE_SLUG, GUIDE_ANCHORS } from '../guide/guides';
 import { PresetLagDisclosure } from './PresetLagDisclosure';
+import { RampSignLagDisclosure } from './RampSignLagDisclosure';
 
 const EMPTY_LIBRARY: EffectsPresetLibrary = { presets: [], unreadable: [], notices: [] };
 
@@ -1412,6 +1413,18 @@ function RampCard({ library, presetId, ramp, run }: {
           once. Unmounting it here is how the next lag misses this card.
           ⚠ MERGED, NOT CERTIFIED: nothing here has seen a ROM obey `ramp`. */}
       <PresetLagDisclosure />
+
+      {/* THE SIGN DISCLOSURE — A NARROWER FACT ONE LAYER FURTHER DOWN, AND IT
+          IS NOT THE ONE ABOVE RE-ARMED. `ramp` is accepted by aeon's generator
+          and a POSITIVE ramp builds and runs; what does not build is a NEGATIVE
+          16.16, because `raster_ramp_program` declares `rrp_start`/`rrp_step` as
+          `u32` and forwards the signed value raw. The leaf is handed the
+          document's own two values and speaks only when one of them is below
+          zero, so an author ramping downward sees nothing at all.
+          See core/formats/effects/ramp-sign-lag.ts for the revision measured
+          and the retirement condition. */}
+      <RampSignLagDisclosure
+        start={presetFp16ToNumber(ramp.start)} step={presetFp16ToNumber(ramp.step)} />
 
       <Field label="Top" title={RAMP_FIELD_TITLES.top}>
         <NumberField title={RAMP_FIELD_TITLES.top} width={72} value={ramp.top}
