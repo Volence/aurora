@@ -238,7 +238,26 @@ pass. The helper is still located by **slice, not regex**: `[^)]*` for the
 parameter list stops inside the `act: () => void` parameter's own parens and
 reports the helper ABSENT while it is sitting right there.
 
-## The six the survey excluded — two confirmed, four DISPUTED and NOT acted on
+## The six the survey excluded — two confirmed, four DISPUTED, and the four are now FIXED
+
+> ## ✅ AND THE FOUR ARE NOW WIRED — 2026-09-03
+>
+> `docs/reviews/2026-09-03-d27-four-survivors.md`, instrument
+> `npm run harness:d27-four-survivors` (20 rows, 20/20, five plants), applies
+> `actAndDropFocus` to all four of the disputed controls. **The exclusion list
+> in this section is therefore down to TWO** — `AeonChunkActions.tsx`'s `Clear`
+> and `SectionGridNav.tsx`'s `Remove`, the two whose self-unmounting this
+> section's successor confirmed by clicking.
+>
+> One thing that parcel found which neither reading did: **`Remove`'s refusing
+> press is the only honest `[k7]` in the whole d-27 arc** — a press an author
+> can really perform that writes nothing at all — and the cheaper
+> blur-only-on-the-acting-path design fails exactly that row and no other
+> (its plant P5). The four rows this file marked as having no reachable no-op
+> press keep that status; three of the four new sites have none either, and
+> those are NOTEs rather than rows.
+>
+> ⚠ `Clear`'s missing undo is **d-30**, still the owner's, and untouched.
 
 > ## ⚠ THIS SECTION IS SUPERSEDED BY A MEASUREMENT — 2026-09-03
 >
@@ -306,7 +325,10 @@ reading rather than a measurement exactly the wrong move.
 
 - **`newSprite`'s recoverability** — d-29, master `204825c3`, the owner's.
 - **No dialogs, confirmations or toasts.** Not chosen by d-27.
-- **The six excluded controls** — unchanged, including the four disputed above.
+- **The six excluded controls** — unchanged *by this parcel*, including the four
+  disputed above. ⚠ **Four of them were wired on 2026-09-03**
+  (`docs/reviews/2026-09-03-d27-four-survivors.md`); the two that really do
+  unmount themselves are still unwired and correctly so.
 - **No emulator.** Nothing here touched `mcp__oracle__*`.
 - **Nothing saved.** Neither harness issues a save and the app has no autosave
   (`shell/close-guard.ts`). The sprite run edits an S1 document in memory and —

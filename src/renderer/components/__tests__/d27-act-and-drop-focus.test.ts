@@ -25,6 +25,18 @@ import { join } from 'node:path';
 const RENDERER = join(__dirname, '..', '..');
 const read = (rel: string) => readFileSync(join(RENDERER, rel), 'utf8');
 
+/**
+ * Whitespace-normalised, because a wired handler is not always one line.
+ *
+ * The four sites added on 2026-09-03 include two whose action is a BLOCK
+ * (`BgAnimBandPanel`'s Demote and Remove), and prettier wraps those across
+ * lines. A raw `toContain` on a multi-line fragment pins the FORMATTER, not the
+ * wiring: a reflow would redden this file while the blur is still there, and
+ * the next reader would learn to distrust the row. Every `call` below is
+ * therefore matched against the normalised source.
+ */
+const norm = (s: string): string => s.replace(/\s+/g, ' ');
+
 const HELPER_REL = 'components/ui/act-and-drop-focus.ts';
 
 /**
@@ -33,21 +45,22 @@ const HELPER_REL = 'components/ui/act-and-drop-focus.ts';
  * that file uses to reach the helper; `call` is a fragment of the wired
  * `onClick` that must contain the helper's name.
  *
- * ⚠ THE SIX THE SURVEY EXCLUDED ARE ABSENT BECAUSE THEY ARE NOT FIXED, NOT
- * BECAUSE THEY ARE SAFE. The survey excluded them on the grounds that they
- * unmount themselves; `docs/reviews/2026-09-03-d27-disputed-six.md` CLICKED all
- * six (`npm run harness:d27-disputed-six`) and found that claim holds for only
- * two: `AeonChunkActions.tsx`'s Clear and `SectionGridNav.tsx`'s Remove really
- * do unmount. **`EffectsScenePanel`'s Delete scene, `BandPresetPanel`'s Delete
- * preset, and BOTH `BgAnimBandPanel` controls survive their own press and KEEP
- * KEYBOARD FOCUS** — the two Deletes retargeted at a different document. They
- * are absent from `SITES` because nothing has been wired at them yet, and the
- * day one is, it belongs here. Adding a row for an UNWIRED site would redden
- * this file, which is the correct direction and not the point of the list.
+ * ⚠ TWO OF THE SURVEY'S SIX EXCLUSIONS ARE STILL ABSENT, AND ONLY TWO. The
+ * survey excluded six controls on the grounds that they unmount themselves;
+ * `docs/reviews/2026-09-03-d27-disputed-six.md` CLICKED all six
+ * (`npm run harness:d27-disputed-six`) and found the claim holds for only two:
+ * `AeonChunkActions.tsx`'s Clear and `SectionGridNav.tsx`'s Remove really do
+ * unmount, so d-27 does not apply to them and they are correctly not listed.
+ * The other four — `EffectsScenePanel`'s Delete scene, `BandPresetPanel`'s
+ * Delete preset, and BOTH `BgAnimBandPanel` controls — survive their own press
+ * and KEPT KEYBOARD FOCUS, the two Deletes retargeted at a different document.
+ * **All four are now wired and are in `SITES` below**
+ * (`docs/reviews/2026-09-03-d27-four-survivors.md`, instrument
+ * `npm run harness:d27-four-survivors`).
  *
- * ⚠ `AeonChunkActions.tsx`'s Clear is separately in the d-29 class: it wipes the
- * chunk library and one Ctrl+Z does not bring it back. That is recoverability,
- * not focus, and it is not this file's subject.
+ * ⚠ `AeonChunkActions.tsx`'s Clear is separately in the d-29/d-30 class: it
+ * wipes the chunk library and one Ctrl+Z does not bring it back. That is
+ * recoverability, not focus, and it is not this file's subject.
  */
 const SITES: Array<{ rel: string; importFrom: string; writer: string; calls: string[] }> = [
   {
@@ -83,16 +96,36 @@ const SITES: Array<{ rel: string; importFrom: string; writer: string; calls: str
   },
   {
     rel: 'components/effects/EffectsScenePanel.tsx', importFrom: '../ui/act-and-drop-focus',
-    writer: 'removeLayerCommand — key={i} list removal, same retarget shape',
-    calls: ['actAndDropFocus(e, () => run(removeLayerCommand(library, selected.id, i)))'],
+    writer: 'removeLayerCommand — key={i} list removal, same retarget shape; AND deleteSceneCommand, '
+      + 'which deletes a WHOLE DOCUMENT and, measured, left the same button focused and renamed at '
+      + 'another scene',
+    calls: [
+      'actAndDropFocus(e, () => run(removeLayerCommand(library, selected.id, i)))',
+      'actAndDropFocus(e, () => run(deleteSceneCommand(library, selected.id)))',
+    ],
   },
   {
     rel: 'components/effects/BandPresetPanel.tsx', importFrom: '../ui/act-and-drop-focus',
     writer: 'removeBandCommand / removeCycleChannelCommand — the purest instance of the shape: the '
-      + 'channel Remove has no disabled predicate, no refusal and no confirmation at any count',
+      + 'channel Remove has no disabled predicate, no refusal and no confirmation at any count; AND '
+      + 'deletePresetCommand, whose `disabled` guard is re-derived for the NEW target after the delete',
     calls: [
       'actAndDropFocus(e, () => run(removeBandCommand(library, presetId, index)))',
       'actAndDropFocus(e, () => run(removeCycleChannelCommand(library, presetId, index)))',
+      'actAndDropFocus(e, () => run(deletePresetCommand(library, selected.id)))',
+    ],
+  },
+  {
+    // ⚠ A NEAR-IDENTICAL PAIR IN ONE `Row`. Demote and Remove sit two lines
+    // apart and read the same; a fix (or a plant) landing on the wrong one of
+    // them survives a full build looking convincing. Both are pinned, and the
+    // Remove one is pinned by SLICE below rather than by a fragment, because
+    // comments sit between its `actAndDropFocus(` and its writer.
+    rel: 'components/effects/BgAnimBandPanel.tsx', importFrom: '../ui/act-and-drop-focus',
+    writer: 'demoteBandCommand — key={b.index} band cards, so card 0 is re-used by the successor '
+      + 'band; and removeBandCommand, whose FIRST press REFUSES and writes nothing at all',
+    calls: [
+      'actAndDropFocus(e, () => { setPendingRemoval(null); apply(demoteBandCommand(doc, b.index)); })',
     ],
   },
 ];
@@ -108,10 +141,40 @@ describe('d-27: every surveyed control that stays mounted goes through actAndDro
       expect(src, `${site.rel} does not import the helper — the d-27 wiring cannot be judged`)
         .toContain(`import { actAndDropFocus } from '${site.importFrom}';`);
       for (const call of site.calls) {
-        expect(src, `${site.rel} lost the wiring at: ${call}`).toContain(call);
+        expect(norm(src), `${site.rel} lost the wiring at: ${call}`).toContain(norm(call));
       }
     });
   }
+
+  // ⚠ THE ONE SITE A FRAGMENT CANNOT PIN, pinned by SLICE instead.
+  //
+  // `BgAnimBandPanel`'s Remove carries two comment blocks BETWEEN
+  // `actAndDropFocus(e, () => {` and the `removeBandCommand` call it wraps, so
+  // no contiguous fragment contains both halves and a fragment covering only the
+  // first half would pass on a handler wired to the WRONG writer — which is
+  // exactly the failure mode of a near-identical pair in one `Row`. The slice
+  // runs from this button's own `aria-label` to the writer, and asserts the blur
+  // is inside it.
+  it('components/effects/BgAnimBandPanel.tsx — the Remove button\'s REFUSING press goes through the '
+    + 'helper too, and the blur wraps the whole handler rather than sitting after the refusal', () => {
+    const src = read('components/effects/BgAnimBandPanel.tsx');
+    const at = src.indexOf('label={`Remove tile animation ${b.index}`}');
+    expect(at, 'the Remove button is not in this file under the label the harness aims at — the '
+      + 'wiring cannot be judged, and `npm run harness:d27-four-survivors` aims by that same '
+      + 'aria-label').toBeGreaterThan(-1);
+    const writer = src.indexOf('removeBandCommand(doc, b.index, false)', at);
+    expect(writer, 'the Remove handler no longer asks the command for a refusal first')
+      .toBeGreaterThan(at);
+    const handler = src.slice(at, writer);
+    expect(handler, 'Remove\'s onClick does not go through actAndDropFocus — its FIRST press writes '
+      + 'nothing and keeps focus, which is the [k7] case d-27 rests on')
+      .toContain('onClick={(e) => actAndDropFocus(e,');
+    // And the Demote beside it is a DIFFERENT button: the slice must not have
+    // swallowed it, or this row would be pinning the neighbour's wiring.
+    expect(handler, 'the slice from the Remove label to removeBandCommand contains the Demote '
+      + 'writer — the two buttons have been reordered and this row is judging the wrong one')
+      .not.toContain('demoteBandCommand');
+  });
 
   it('the helper itself still blurs, and still blurs BEFORE the action', () => {
     // Sliced, not regexed: the signature contains `()` (the `act: () => void`

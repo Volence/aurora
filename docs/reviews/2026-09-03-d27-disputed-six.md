@@ -5,6 +5,26 @@
 same commit as the file) — **31 rows, 31/31** on the restored committed baseline.
 **Nothing was fixed here. This row is the measurement.**
 
+> ## ✅ THE FOUR THIS FILE FOUND WRONG ARE NOW FIXED — 2026-09-03
+>
+> The four exclusions this packet disputed and measured
+> (`EffectsScenePanel`'s Delete scene, `BandPresetPanel`'s Delete preset, and
+> both `BgAnimBandPanel` controls) **all go through `actAndDropFocus` now**:
+> `docs/reviews/2026-09-03-d27-four-survivors.md`, instrument
+> `npm run harness:d27-four-survivors` (20 rows, 20/20, five plants — including
+> the pair proof that reddens `Demote` and `Remove` independently of each
+> other, and the cheaper blur-only-on-the-acting-path design failing
+> `[rem-k7]` alone).
+>
+> **The two exclusions this file CONFIRMED are still correct and still
+> unwired** — `AeonChunkActions.tsx`'s `Clear` and `SectionGridNav.tsx`'s
+> `Remove` really do unmount themselves. §"Recommendation" below is updated in
+> place.
+>
+> ⚠ `Clear`'s missing undo — the finding at the top of this file — is **NOT**
+> closed by that parcel. It is **d-30**, open with the owner, and neither
+> `clearChunks` nor `projectStore.ts` was touched.
+
 **Environment.** `ELECTRON_BIN` = the main checkout's `node_modules/.bin/electron`
 (a linked worktree has no `node_modules`); `AURORA_BUILT_TREE` = this worktree, so
 the run measures THIS build. `VITE_AURORA_DEBUG=1 npm run build` before every run,
@@ -268,16 +288,26 @@ measures clicks, and the key half belongs with whatever fix, if any, follows.
 
 ---
 
-## Recommendation — a recommendation, not a change
+## Recommendation — a recommendation, not a change **[ACTED ON 2026-09-03]**
 
-**Four controls now carry the d-27 shape and are not on the fixed list:**
+**Four controls now carry the d-27 shape and are not on the fixed list** — they
+are ON it as of `docs/reviews/2026-09-03-d27-four-survivors.md`, and the
+outcome of each is in the last column:
 
-| control | why it qualifies | recoverable? |
-|---|---|---|
-| `EffectsScenePanel.tsx:867` Delete scene | survives, **retargets at another document**, keeps focus | one Ctrl+Z |
-| `BandPresetPanel.tsx:407` Delete preset | same, and the guard silently re-derives for the new target | one Ctrl+Z |
-| `BgAnimBandPanel.tsx:564` `Demote` | survives, keeps focus, `key={i}` list | one Ctrl+Z |
-| `BgAnimBandPanel.tsx:567` `Remove` | survives the refusing press, keeps focus | nothing applied |
+| control | why it qualifies | recoverable? | outcome |
+|---|---|---|---|
+| `EffectsScenePanel.tsx:867` Delete scene | survives, **retargets at another document**, keeps focus | one Ctrl+Z | **WIRED**, rows `[esd-a]` `[esd-b]`, plant P1 |
+| `BandPresetPanel.tsx:407` Delete preset | same, and the guard silently re-derives for the new target | one Ctrl+Z | **WIRED**, rows `[bpd-a]` `[bpd-b]`, plant P2 |
+| `BgAnimBandPanel.tsx:564` `Demote` | survives, keeps focus, `key={i}` list | one Ctrl+Z | **WIRED**, rows `[dem-a]` `[dem-b]`, plant P3 |
+| `BgAnimBandPanel.tsx:567` `Remove` | survives the refusing press, keeps focus | nothing applied | **WIRED**, row `[rem-k7]` — the arc's only honest `[k7]`, plants P4 and P5 |
+
+⚠ **The paragraphs below are the recommendation AS WRITTEN, kept unedited.**
+Two of its reservations were answered rather than overridden: the retarget is
+deliberately left alone (a selection question d-27 did not rule on, and both
+`-b` rows measure it without mentioning focus), and `Remove` was NOT patched on
+a reading — `[rem-k7]` measures that its refusing press still writes nothing and
+now drops the keyboard, and the confirmation-chip observation is booked as a
+NOTE with no fix built for it.
 
 The first two are the strongest case: `actAndDropFocus` is already imported in both
 files, both are `IconButton`s that already forward the click event, and the retarget
