@@ -95,8 +95,8 @@
 
 import { siblingDefaultPathOrUnresolved, checkoutOverride } from '../test/support/sibling-root.mjs';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, statSync, mkdtempSync, existsSync, cpSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync, statSync, mkdtempSync, existsSync, cpSync, mkdirSync, rmSync } from 'node:fs';
+import { join, basename } from 'node:path';
 import { tmpdir } from 'node:os';
 import { session, resolveOwnedDiscovery, sleep, ROOT } from './canvas-cdp-harness.mjs';
 
@@ -458,6 +458,46 @@ check('8', `CONTROL: the change forms exactly ${2 * H} run(s) of ${2 * W} words 
   `${runs.length} run(s) of lengths [${runs.map((r) => r.length).join(',')}]; starts [${runs.map((r) => r[0]).join(',')}]`);
 
 console.log(`\n=== ${pass} passed, ${fail} failed`);
-console.log(`=== the file to carry into the bake: ${join(WORKTREE, A_REL)}`);
+
+// KEEP THE FILE, DROP THE TREE (O48e). The last line naming a real .collattr.bin
+// is the point of this harness — it is the artifact a bake would consume — but
+// keeping the whole ~52 MB worktree to hold two files left one copy per run
+// lying in /tmp forever. So the two painted planes are lifted into a small
+// directory that survives, and the worktree goes.
+//
+// ⚠ THE NAMED FILE IS COPIED BEFORE THE TREE IS REMOVED, AND THE REMOVAL IS
+// GATED ON THAT COPY EXISTING. A cleanup that deletes first and reports a path
+// into the deleted tree would print a line that reads exactly like the old one
+// and names nothing — the failure would be invisible in the output, which is
+// the shape this lane has spent the night finding.
+// ⚠ THE NAME MUST NOT MATCH THE WORKTREE GLOB. The throwaway trees are
+// `aurora-crossover-paint-<random>`, so a sweep of `aurora-crossover-paint-*`
+// — the obvious way to reclaim them, and what the overseer typed within a
+// minute of this landing — would take the kept artifact with them. A name
+// that shares the worktrees' prefix is a name that gets deleted by any
+// correct cleanup of the worktrees.
+const KEEP = join(tmpdir(), 'aurora-crossover-kept');
+let kept = null;
+try {
+  mkdirSync(KEEP, { recursive: true });
+  for (const rel of [A_REL, B_REL]) {
+    cpSync(join(WORKTREE, rel), join(KEEP, basename(rel)));
+  }
+  const a = join(KEEP, basename(A_REL));
+  kept = statSync(a).size > 0 ? a : null;
+} catch (e) {
+  console.log(`=== could not keep the painted file: ${e.message}`);
+}
+
+if (kept) {
+  rmSync(WORKTREE, { recursive: true, force: true });
+  console.log(`=== the file to carry into the bake: ${kept}`);
+  console.log(`=== (its plane-B twin is beside it; the ${PROVENANCE} worktree has been removed)`);
+} else {
+  // Could not save it, so the tree STAYS — a named file that does not exist is
+  // worse than the disk cost this change exists to remove.
+  console.log(`=== the file to carry into the bake: ${join(WORKTREE, A_REL)}`);
+  console.log(`=== KEPT THE WORKTREE because the copy failed: ${WORKTREE}`);
+}
 console.log(`=== that tree was made this run and is not reused: ${PROVENANCE}`);
 process.exit(fail === 0 ? 0 : 1);
