@@ -51,6 +51,7 @@
     "harness:art-agent": "node scratchpad/art-agent-harness.mjs",
     "harness:band-art-foreground": "node scratchpad/band-art-foreground-harness.mjs",
     "harness:band-preset": "node scratchpad/band-preset-harness.mjs",
+    "harness:base-swap-control": "node scratchpad/base-swap-control-harness.mjs",
     "harness:bg-dangling-ref": "node scratchpad/bg-dangling-ref-harness.mjs",
     "harness:bg-override-paints": "node scratchpad/bg-override-paints-harness.mjs",
     "harness:bg-tile-picker": "node scratchpad/bg-tile-picker-harness.mjs",
