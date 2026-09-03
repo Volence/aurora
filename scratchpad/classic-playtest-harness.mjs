@@ -59,7 +59,7 @@ import net from 'node:net';
 import * as http from 'node:http';
 import * as esbuild from 'esbuild';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
-import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { runTarget, announceRunRoot, assertFreshBuild } from './lib/run-root.mjs';
 import { requiredAetherMethods, methodGap } from './lib/aether-methods.mjs';
 
 const PORT = Number(process.env.PORT ?? 9382);
@@ -157,16 +157,10 @@ const wordsToBE = (ws) => { const b = Buffer.alloc(32); ws.forEach((w, i) => b.w
 
 async function main() {
   if (existsSync(SOCK)) rmSync(SOCK);       // a stale socket file refuses the bind
-  // A STALE dist/ MAKES EVERY ROW VACUOUS: this harness once passed 19/19
-  // against a planted source defect because the bundle predated the plant.
-  // Refuse to run when any source file is newer than the built main bundle.
-  const distM = statSync(MAIN).mtimeMs;
-  const newest = execSync(
-    `find ${JSON.stringify(join(ROOT, 'src'))} -name '*.ts' -o -name '*.tsx' | xargs stat -c %Y | sort -n | tail -1`,
-    { shell: '/bin/bash' }).toString().trim();
-  if (Number(newest) * 1000 > distM) {
-    throw new Error('dist/ is STALER than src/ — run VITE_AURORA_DEBUG=1 npm run build first');
-  }
+  // A STALE dist/ MAKES EVERY ROW VACUOUS. Both halves of that question name
+  // the tree the run is AGAINST, never the tree this file lives in — the O52
+  // block in lib/run-root.mjs says why, and this is the only spelling of it.
+  assertFreshBuild(RUN);
   const preStatus = execSync('git status --short', { cwd: S1DIR }).toString();
   const preGhzPal = sha(GHZPAL); const preSonicPal = sha(SONICPAL);
   const preRomSha = existsSync(ROM) ? sha(ROM) : '(absent)';

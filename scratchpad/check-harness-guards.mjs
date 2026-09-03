@@ -53,6 +53,14 @@
 //       red-first. A captured promise (`await`, `return`, `=`, `=>`, an
 //       argument) is fine; only the dropped one is the hazard.
 //
+//   G7  (O52) Nothing hand-rolls the `dist/`-vs-`src/` staleness gate. The
+//       eighteen inline copies compared the BUILT tree's bundle against the
+//       CALLER'S OWN `src/` — the same question-1/question-2 confusion
+//       lib/run-root.mjs exists to end — so from a linked worktree, where those
+//       are two directories and `src/` mtimes are checkout time, the gate fired
+//       unconditionally and no fresh build could satisfy it. See the rule's own
+//       block below for the derivation.
+//
 //   G6  (O49) A TRACKED harness-like file that NO `package.json` script can
 //       reach fails, naming the file and the exact script line to add. See the
 //       long note above the G6 pass for the population, the reachability rule,
@@ -90,6 +98,12 @@ const REQUIRED_EXPORTS = [
   'spawnGuarded', 'killTree', 'killTreeSync', 'descendants', 'isDescendantOf',
   'snapshotDiscovery', 'restoreDiscovery', 'restoreDiscoveryNow', 'readDiscoveryNow', 'setDiscoveryBaseline',
   'resolveOwnedDiscovery', 'ownedRoots', 'DISCOVERY_FILES',
+  // O52 / HAZARD 1c. The recents file is guarded by being IN the list the
+  // snapshot iterates. Rename either name and `snapshotDiscovery` silently goes
+  // back to covering two files out of five while every launcher still "imports
+  // the guard" — the same dead-code shape the entries below are listed for, and
+  // this one has already destroyed the owner's recent-projects list once.
+  'RECENT_PROJECT_FILES', 'GUARDED_GLOBAL_FILES', 'APP_NAMES', 'entriesOf',
   // O20's reap. Listed here for the same reason as the rest: rename one of
   // these and killTree's `reap` branch becomes dead code, every launcher still
   // "imports the guard", and the X displays start leaking again silently.
@@ -235,7 +249,25 @@ catch (e) { unmeasurable.push(`lib/harness-guard.mjs unreadable: ${e.message}`);
 if (guardSrc) {
   const missing = REQUIRED_EXPORTS.filter((n) =>
     !new RegExp(`export\\s+(async\\s+)?(function|const|let)\\s+${n}\\b`).test(guardSrc));
-  if (missing.length) fails.push(`G4 lib/harness-guard.mjs no longer exports: ${missing.join(', ')}`);
+  if (missing.length) {
+    // ⚠ O52: G4 COULD NOT FAIL THIS CHECK, and the header two rules up says why
+    // it must — "without this the whole check is vacuous the day someone renames
+    // an export". FOUND BY PLANTING, exactly as the `alwaysFatal` block above
+    // was: renaming `RECENT_PROJECT_FILES` printed
+    //     G4 lib/harness-guard.mjs no longer exports: RECENT_PROJECT_FILES
+    // and the run exited 0. The tracked/untracked split keys on
+    // `msg.replace(/^\s*[GS]\d+ /,'').split(':')[0]`, which for this message is
+    // the whole phrase `lib/harness-guard.mjs no longer exports` — not a path
+    // `git ls-files` knows — so every G4 failure was filed as "untracked,
+    // present in this working tree only" and printed rather than gated. Same
+    // shape as the G6 stale-exemption case, one rule over: THE FAILURE WAS
+    // PRINTED, AND PRINTED IS NOT GATED. G4 is a claim about this repo's own
+    // guard module, never about a file the repo may not carry, so it belongs in
+    // `alwaysFatal` for exactly the stated reason.
+    const msg = `G4 lib/harness-guard.mjs no longer exports: ${missing.join(', ')}`;
+    fails.push(msg);
+    alwaysFatal.add(msg);
+  }
   console.log(`G4  lib/harness-guard.mjs exports ${REQUIRED_EXPORTS.length - missing.length}/${REQUIRED_EXPORTS.length} required names`
     + `${missing.length ? ` — MISSING ${missing.join(', ')}` : ''}`);
 }
@@ -351,6 +383,32 @@ for (const path of listFiles(DIR, ['.mjs'])) {
         + 'ordered SIGTERM/wait/then-X-server teardown, the exit net SIGKILLs the app, and that is the '
         + 'shape that left a Chromium SIGTRAP core on every SIGKILL-net run (O65). Spell it `await killTree(child)`.');
     }
+  }
+
+  // ── G7 (O52): a hand-rolled staleness gate ───────────────────────────────
+  //
+  // Eighteen instruments compared `statSync(MAIN).mtimeMs` — the tree the run is
+  // AGAINST — with `find ${join(ROOT, 'src')} … stat -c %Y` — the tree the file
+  // LIVES IN. One directory in the main checkout; two in a linked worktree,
+  // where `src/` mtimes are checkout time, so the gate fired unconditionally
+  // however fresh the bundle was. Every agent here works in a worktree, so for
+  // them it could refuse and could not pass.
+  //
+  // DERIVED FROM THE ARTIFACTS OF THE HAND-ROLL, not from a file list: the shell
+  // mtime scan (`stat -c %Y`) and the message the throw carried. Both are gone
+  // from the tree now — `lib/run-root.mjs` is where the comparison is spelled,
+  // and `assertFreshBuild(RUN)` is the only call site shape — so a nineteenth
+  // copy pasted out of an old file turns this red instead of quietly costing its
+  // author an afternoon. The false-positive check was run over the whole
+  // population: `crossover-paint` and `sweep-fix` use `mtimeMs` for other
+  // things, and neither matches either pattern.
+  const isRunRootModule = path === join(DIR, 'lib', 'run-root.mjs');
+  if (!isRunRootModule && !isThisChecker && (/stat -c %Y/.test(tok) || /STALER than src/.test(tok))) {
+    fails.push(`G7 ${rel}: hand-rolls the dist/-vs-src/ staleness gate. Its two operands name `
+      + 'DIFFERENT TREES the moment the caller lives in a linked worktree — the bundle from '
+      + '`runTarget()`, the sources from the caller\'s own location — so it fires unconditionally '
+      + 'from every agent worktree and can never pass. Call `assertFreshBuild(RUN)` from '
+      + 'lib/run-root.mjs, which asks about ONE tree and refuses loudly when it cannot ask at all.');
   }
 
   // ── G3 ───────────────────────────────────────────────────────────────────

@@ -45,7 +45,7 @@
 
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync, statSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,7 +53,7 @@ import { tmpdir } from 'node:os';
 import * as http from 'node:http';
 import * as esbuild from 'esbuild';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
-import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { runTarget, announceRunRoot, assertFreshBuild } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9397);
 const ROOT = AURORA_DIR;   // this worktree
@@ -236,14 +236,10 @@ function deriveSharedSpot(frames, dplc, recon) {
 }
 
 async function main() {
-  // --- Stale-dist guard (see header) ---------------------------------------
-  const distM = statSync(MAIN).mtimeMs;
-  const newest = execSync(
-    `find ${JSON.stringify(join(ROOT, 'src'))} -name '*.ts' -o -name '*.tsx' | xargs stat -c %Y | sort -n | tail -1`,
-    { shell: '/bin/bash' }).toString().trim();
-  if (Number(newest) * 1000 > distM) {
-    throw new Error('dist/ is STALER than src/ — run VITE_AURORA_DEBUG=1 npm run build first');
-  }
+  // A STALE dist/ MAKES EVERY ROW VACUOUS. Both halves of that question name
+  // the tree the run is AGAINST, never the tree this file lives in — the O52
+  // block in lib/run-root.mjs says why, and this is the only spelling of it.
+  assertFreshBuild(RUN);
   if (!existsSync(join(S1DIR, ART_REL))) throw new Error(`${S1DIR}/${ART_REL} missing — nothing to test`);
 
   // --- Real-disasm safety net: capture status BEFORE anything runs ---------

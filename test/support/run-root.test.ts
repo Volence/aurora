@@ -39,7 +39,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 
@@ -589,5 +589,208 @@ describe('run-root: the two halves of the O70 split, POINTED APART', () => {
     // The accessor that conflated the two questions is gone from the consumer.
     expect(src, 'the harness must not resolve its run target from the own-checkout variable')
       .not.toContain('auroraDirOverride');
+  });
+});
+
+/**
+ * O52 — THE STALENESS GATE, AND THE HALF IT WAS NEVER CAPABLE OF.
+ *
+ * Eighteen instruments carried this gate inline and every one of them compared
+ * `statSync(MAIN)` — the tree the run is AGAINST — against `find ${join(ROOT,
+ * 'src')}` — the tree the file LIVES IN. In the main checkout those are one
+ * directory. In a linked worktree they are two, and a worktree's `src/` mtimes
+ * are its CHECKOUT time, so the gate fired unconditionally however fresh the
+ * bundle was: it could refuse, and it could not pass.
+ *
+ * ⚠ SO "DOES IT FIRE?" IS A VACUOUS ROW HERE. A gate that fires unconditionally
+ * passes such a row trivially, and a test built out of it would re-certify the
+ * bug. The property is DISCRIMINATION — fires on a stale bundle, silent on a
+ * fresh one — and both halves are asserted against trees whose mtimes are set by
+ * hand, from a caller that lives somewhere else entirely (`here` !== `root`, the
+ * worktree shape). The fresh row is the one the shipped expression could not
+ * pass.
+ */
+describe('run-root: build freshness names ONE tree, and discriminates', () => {
+  /** A built tree with `src/` too, and both mtimes stamped. */
+  function makeTreeWithSource(label: string, distS: number, srcS: number): string {
+    const dir = makeBuiltTree(label);
+    mkdirSync(resolve(dir, 'src/renderer'), { recursive: true });
+    writeFileSync(resolve(dir, 'src/main.ts'), '// source\n', 'utf8');
+    writeFileSync(resolve(dir, 'src/renderer/App.tsx'), '// source\n', 'utf8');
+    utimesSync(resolve(dir, 'src/main.ts'), srcS, srcS);
+    utimesSync(resolve(dir, 'src/renderer/App.tsx'), srcS, srcS);
+    utimesSync(resolve(dir, 'dist/main/index.mjs'), distS, distS);
+    return dir;
+  }
+
+  /**
+   * `here` is a SEPARATE tree whose sources are NEWER than either bundle below —
+   * the worktree shape, and the exact operand the old expression used. Every row
+   * in this block therefore runs in the environment where the shipped gate was
+   * incapable of green.
+   */
+  function makeCallerTree(newestS: number): string {
+    const dir = mkdtempSync(resolve(tmpdir(), 'aurora-lives-in-'));
+    mkdirSync(resolve(dir, 'src'), { recursive: true });
+    writeFileSync(resolve(dir, 'src/main.ts'), '// a different tree\n', 'utf8');
+    utimesSync(resolve(dir, 'src/main.ts'), newestS, newestS);
+    return dir;
+  }
+
+  const T = 1_700_000_000;
+
+  it("is SILENT on a fresh bundle even when the CALLER's sources are newer", () => {
+    const root = makeTreeWithSource('fresh-build', T + 100, T);
+    const here = makeCallerTree(T + 9_999);      // newer than that bundle, as a checkout is
+    try {
+      const out = run(
+        `const f = S.buildFreshness({ root: ${JSON.stringify(root)}, here: ${JSON.stringify(here)}, borrowed: true });\n`
+        + 'process.stdout.write(JSON.stringify(f));',
+      );
+      expect(out.status, `stderr:\n${out.stderr}`).toBe(0);
+      const f = JSON.parse(out.stdout) as Record<string, unknown>;
+      expect(f.verdict, "the caller's own src/ must not enter the comparison at all").toBe('fresh');
+      expect(f.root).toBe(root);
+      expect(f.count, 'it must have actually found the sources it compared against').toBe(2);
+      // …and the operand it used is inside the tree the run is against.
+      expect(String(f.newestFile).startsWith(root)).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(here, { recursive: true, force: true });
+    }
+  });
+
+  it('FIRES on a stale bundle, from the same caller, naming the file and the tree', () => {
+    const root = makeTreeWithSource('stale-build', T, T + 100);
+    const here = makeCallerTree(T + 9_999);
+    try {
+      const out = run(
+        `const f = S.buildFreshness({ root: ${JSON.stringify(root)}, here: ${JSON.stringify(here)}, borrowed: true });\n`
+        + 'process.stdout.write(JSON.stringify(f));',
+      );
+      expect(out.status, `stderr:\n${out.stderr}`).toBe(0);
+      const f = JSON.parse(out.stdout) as Record<string, unknown>;
+      expect(f.verdict).toBe('stale');
+      // The two rows differ ONLY in the built tree's own mtimes: same caller,
+      // same shape, opposite verdicts. That is the discrimination.
+      expect(String(f.newestFile).startsWith(root)).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(here, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * LOUD ON UNMEASURABLE. A built tree with no `src/` cannot answer the question
+   * at all, and the one thing that must never happen is for it to answer
+   * "fresh". Both no-source shapes are covered because they fail differently: an
+   * absent directory and a present-but-empty one.
+   */
+  it('refuses — never passes — when the tree carries no sources to compare', () => {
+    const root = makeBuiltTree('no-src');
+    const empty = makeBuiltTree('empty-src');
+    mkdirSync(resolve(empty, 'src'), { recursive: true });
+    writeFileSync(resolve(empty, 'src/notes.md'), 'not a source\n', 'utf8');
+    try {
+      const out = run(
+        'const mk = (root) => S.buildFreshness({ root, here: root, borrowed: false });\n'
+        + `const a = mk(${JSON.stringify(root)});\n`
+        + `const b = mk(${JSON.stringify(empty)});\n`
+        + 'let threw = null;\n'
+        + `try { S.assertFreshBuild({ root: ${JSON.stringify(root)}, here: ${JSON.stringify(root)}, borrowed: false }, () => {}); }\n`
+        + 'catch (e) { threw = e.message; }\n'
+        + 'process.stdout.write(JSON.stringify({ a, b, threw }));',
+      );
+      expect(out.status, `stderr:\n${out.stderr}`).toBe(0);
+      const r = JSON.parse(out.stdout) as {
+        a: { verdict: string; why: string };
+        b: { verdict: string; why: string };
+        threw: string | null;
+      };
+      expect(r.a.verdict).toBe('unmeasurable');
+      expect(r.a.why).toContain('does not exist');
+      expect(r.b.verdict, 'a src/ with no .ts/.tsx is unmeasurable, not fresh').toBe('unmeasurable');
+      expect(r.b.why).toContain('no .ts/.tsx');
+      expect(r.threw, 'unmeasurable must REFUSE, not warn').toContain('BUILD FRESHNESS UNMEASURABLE');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(empty, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * A missing bundle is unmeasurable too, and it is the mapviewport shape: that
+   * harness `statSync`d a hand-composed `dist/` path, so a tree without one gave
+   * an ENOENT stack instead of a sentence. It now returns a verdict.
+   */
+  it('a tree with no built bundle is unmeasurable, not a crash', () => {
+    const dir = mkdtempSync(resolve(tmpdir(), 'aurora-unbuilt-'));
+    try {
+      const out = run(
+        `process.stdout.write(JSON.stringify(S.buildFreshness({ root: ${JSON.stringify(dir)}, here: ${JSON.stringify(dir)}, borrowed: false })));`,
+      );
+      expect(out.status, `stderr:\n${out.stderr}`).toBe(0);
+      const f = JSON.parse(out.stdout) as { verdict: string; why: string };
+      expect(f.verdict).toBe('unmeasurable');
+      expect(f.why).toContain('no readable built bundle');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * THE BORROWED HALF, ANSWERED RATHER THAN WAVED AT. "Are this checkout's
+   * sources in that bundle?" is not answerable from mtimes across two trees, so
+   * it is answered by CONTENT — and both directions are asserted, because a
+   * comparator that reported drift unconditionally would satisfy the second half
+   * alone.
+   */
+  it('borrowed drift is measured by content, and reports BOTH identical and drifted', () => {
+    const root = makeTreeWithSource('drift-root', T + 100, T);
+    const same = makeTreeWithSource('drift-same', T + 100, T);
+    const other = makeTreeWithSource('drift-other', T + 100, T);
+    writeFileSync(resolve(other, 'src/main.ts'), '// EDITED in the caller only\n', 'utf8');
+    writeFileSync(resolve(other, 'src/extra.ts'), '// only here\n', 'utf8');
+    try {
+      const out = run(
+        `const d = (here) => S.borrowedSourceDrift({ root: ${JSON.stringify(root)}, here, borrowed: true });\n`
+        + `process.stdout.write(JSON.stringify({ same: d(${JSON.stringify(same)}), other: d(${JSON.stringify(other)}) }));`,
+      );
+      expect(out.status, `stderr:\n${out.stderr}`).toBe(0);
+      const r = JSON.parse(out.stdout) as Record<string, {
+        comparable: boolean; differing: string[]; onlyHere: string[]; onlyRoot: string[]; total: number;
+      }>;
+      expect(r.same.comparable).toBe(true);
+      expect(r.same.differing, 'byte-identical sources must report NO drift').toEqual([]);
+      expect(r.same.onlyHere).toEqual([]);
+      expect(r.same.onlyRoot).toEqual([]);
+      expect(r.other.differing).toEqual(['main.ts']);
+      expect(r.other.onlyHere).toEqual(['extra.ts']);
+    } finally {
+      for (const d of [root, same, other]) rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * THE CONSUMERS ARE WIRED TO IT, and no copy of the old expression survives.
+   * Structural, for the same reason the mapviewport row above is: these files
+   * spawn Electron on import and cannot be executed here. The population is
+   * DERIVED — every tracked `.mjs` under scratchpad/ — so a nineteenth copy
+   * pasted into a new instrument fails this row rather than hiding behind a list.
+   */
+  it("no instrument still compares a built bundle against its OWN checkout's src/", () => {
+    const files = execFileSync('git', ['ls-files', 'scratchpad/*.mjs'], {
+      cwd: resolve(__dirname, '../..'), encoding: 'utf8',
+    }).split('\n').filter(Boolean);
+    expect(files.length, 'the population must be non-empty or this row asserts nothing')
+      .toBeGreaterThan(50);
+    const offenders: string[] = [];
+    for (const rel of files) {
+      if (rel.endsWith('scratchpad/lib/run-root.mjs')) continue;         // the one place it is spelled
+      if (rel.endsWith('scratchpad/check-harness-guards.mjs')) continue; // the rule's own text
+      const src = readFileSync(resolve(__dirname, '../..', rel), 'utf8');
+      if (/STALER than src/.test(src) || /stat -c %Y/.test(src)) offenders.push(rel);
+    }
+    expect(offenders, 'these still hand-roll the two-tree staleness gate').toEqual([]);
   });
 });

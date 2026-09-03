@@ -52,24 +52,42 @@
 // it writes into the owner's live aeon tree and reloads his live emulator.
 //
 // ⚠ IT WRITES NOTHING TO DISK. Ctrl+S is never pressed. The project it opens is
-// a PRIVATE COPY (scratchpad/fixtures/aeon-console-fix), never ../aeon.
+// a THROWAWAY EXTRACT this file makes, never ../aeon.
 //
 // ⚠ NO EMULATOR. Nothing here touches oracle or any emulator MCP tool.
 //
-// Make the fixture (gitignored — it is 56M of the owner's game data):
-//   rsync -a --exclude=.git --exclude=docs --exclude=tools \
-//     ../../aeon/ scratchpad/fixtures/aeon-console-fix/
-// (games/, art/ and engine/ must come across WHOLE — an `--exclude=*.bin`
-//  strips the tile blobs and the project then refuses to open.)
+// ═══ THE FIXTURE MAKES ITSELF (O52) ════════════════════════════════════════
+//
+// This header used to carry an `rsync` a human was expected to have run, and
+// the default project was `scratchpad/fixtures/aeon-console-fix` — a GITIGNORED
+// 56 MB directory the harness DID NOT CREATE. On a clean checkout it opened a
+// path that is not there, and its own anti-vacuous row `[1a] the aeon project is
+// open, with sections` was what said so. It was recorded GREEN in the O50 census
+// only because that sweep handed it an `AEON_DIR`. Exactly the O48d
+// crossover-paint shape: an instrument that had never been runnable on a clean
+// tree, whose own guard was the thing that knew.
+//
+// The O48d resolution is applied here unchanged, because it fits without
+// alteration: `materialise()` makes a FRESH `mkdtemp` per run out of a COMMITTED
+// aeon revision (`git archive` reads the object database, so aeon's working
+// tree is never opened, dirty or not), the run opens THAT, and the finally
+// removes it. No human step, no gitignored prerequisite, no 56 MB per run left
+// behind, and no dependence on what a previous run left.
+//
+//   env:  AEON_DIR  the aeon tree to take the fixture from. A git checkout is
+//                   archived at AEON_SHA; a plain extract is COPIED. Either way
+//                   the run opens a fresh mkdtemp, never the tree named here.
+//         AEON_SHA  the committed revision to archive (default `origin/master`).
 //
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npx electron-vite build
 // Run:                     node scratchpad/build-console-overlap-harness.mjs
 
-import { AURORA_DIR, checkoutOverride } from '../test/support/sibling-root.mjs';
-import { spawn } from 'node:child_process';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved } from '../test/support/sibling-root.mjs';
+import { execFileSync } from 'node:child_process';
+import { writeFileSync, mkdirSync, mkdtempSync, existsSync, cpSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
@@ -84,12 +102,40 @@ const ROOT = AURORA_DIR;
 const RUN = announceRunRoot(runTarget(ROOT));
 const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
 const MAIN = RUN.main;
-// A PRIVATE COPY. The owner is building in ../aeon right now; this harness must
-// not so much as open it.
-// The default is a fixture inside this repo, never the live tree; the override
-// goes through the resolver so it picks up the aliases and refuses a value that
-// is set but names nothing.
-const AEONDIR = checkoutOverride('aeon')?.value ?? resolve(ROOT, 'scratchpad/fixtures/aeon-console-fix');
+// ═══ THE TREE UNDER TEST — made here, fresh, never borrowed (O52/O48d) ═════
+//
+// The source is read-only in every branch. `git archive` takes a COMMITTED
+// revision out of the object database, so the owner's aeon working tree is
+// never read, dirty or not, and no run can depend on what a previous one left
+// behind. The copy branch exists only so a caller who already extracted an
+// archive can point at it. The override goes through the resolver so it picks up
+// the aliases and refuses a value that is set but names nothing.
+const AEON_SRC = checkoutOverride('aeon')?.value ?? siblingDefaultPathOrUnresolved('aeon');
+const AEON_SHA = process.env.AEON_SHA ?? 'origin/master';
+
+/** `project.json` is what makes a directory an aeon project — the marker the
+ *  copy branch checks, so a wrong `AEON_DIR` is refused HERE and not eight
+ *  hundred lines later as a red row about the app. */
+const PROJECT_MARKER = 'project.json';
+
+function materialise() {
+  const dir = mkdtempSync(join(tmpdir(), 'aurora-build-console-'));
+  if (existsSync(join(AEON_SRC, '.git'))) {
+    const sha = execFileSync('git', ['-C', AEON_SRC, 'rev-parse', AEON_SHA], { encoding: 'utf8' }).trim();
+    const tar = execFileSync('git', ['-C', AEON_SRC, 'archive', sha], { maxBuffer: 1 << 30 });
+    execFileSync('tar', ['-x', '-C', dir], { input: tar, maxBuffer: 1 << 30 });
+    return { dir, provenance: `git archive ${AEON_SRC} @ ${AEON_SHA} = ${sha}` };
+  }
+  if (!existsSync(join(AEON_SRC, PROJECT_MARKER))) {
+    console.log(`HARNESS REFUSES: ${AEON_SRC} is neither a git checkout nor an aeon extract `
+      + `(no ${PROJECT_MARKER}). Point AEON_DIR at an aeon checkout, or leave it unset.`);
+    process.exit(2);
+  }
+  cpSync(AEON_SRC, dir, { recursive: true });
+  return { dir, provenance: `copy of the extract at ${AEON_SRC} (no .git — revision unverifiable)` };
+}
+
+const { dir: AEONDIR, provenance: PROVENANCE } = materialise();
 const SCREEN = process.env.SCREEN ?? '1680x1050x24';
 const SHOTS = `${ROOT}/scratchpad/shots-build-console`;
 mkdirSync(SHOTS, { recursive: true });
@@ -352,6 +398,10 @@ const BUILD_LINES = Array.from({ length: 140 }, (_, i) =>
 
 async function main() {
   const t0 = Date.now();
+  // WHICH TREE THE PROJECT CAME FROM, said out loud. A fixture whose provenance
+  // is not printed is a fixture a reader has to take on trust, and this one was
+  // a directory nobody could account for until O52.
+  console.log(`project: ${AEONDIR}\n         ${PROVENANCE}`);
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
@@ -595,8 +645,22 @@ async function main() {
     process.exitCode = fails.length ? 1 : 0;
   } finally {
     try { c?.close(); } catch { /* ignore */ }
-    try { process.kill(-child.pid, 'SIGKILL'); } catch { /* ignore */ }
+    // O52: `killTree`, not a bare group SIGKILL. The import was already here and
+    // was never called, so this harness skipped the ordered app-then-X teardown
+    // AND the display reap — it leaked an `/tmp/xvfb-run.*` per run, which is
+    // hazard 4 in lib/harness-guard.mjs's own header.
+    try { await killTree(child); } catch { /* a finally must not throw over the failure it cleans up after */ }
   }
 }
+
+/** The 52 MB extract this run made, removed however the run ends. Nothing here
+ *  is saved (Ctrl+S is never pressed), so there is nothing in it to keep — and
+ *  a fixture that makes itself must also be a fixture that does not accumulate:
+ *  the O50 census found 3.8 GB of exactly this shape left by the family. */
+function dropFixture() {
+  try { rmSync(AEONDIR, { recursive: true, force: true }); }
+  catch (e) { console.log(`could not remove ${AEONDIR}: ${e.message}`); }
+}
+process.on('exit', dropFixture);
 
 main().catch((e) => { console.error('HARNESS ERROR:', e); process.exitCode = 2; });

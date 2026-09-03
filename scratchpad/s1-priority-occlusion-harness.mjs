@@ -48,7 +48,7 @@
 
 import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn, execSync } from 'node:child_process';
-import { existsSync, writeFileSync, mkdirSync, statSync, rmSync } from 'node:fs';
+import { existsSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as http from 'node:http';
@@ -57,7 +57,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { build } from 'esbuild';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
-import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { runTarget, announceRunRoot, assertFreshBuild } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9409);
 const ROOT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '');
@@ -461,14 +461,10 @@ function expectedOccluded(sRGB, mRGB) {
 }
 
 async function main() {
-  // A STALE dist/ MAKES EVERY ROW VACUOUS.
-  const distM = statSync(MAIN).mtimeMs;
-  const newest = execSync(
-    `find ${JSON.stringify(join(ROOT, 'src'))} \\( -name '*.ts' -o -name '*.tsx' \\) -print0 | xargs -0 stat -c %Y | sort -n | tail -1`,
-    { shell: '/bin/bash' }).toString().trim();
-  if (Number(newest) * 1000 > distM) {
-    throw new Error('dist/ is STALER than src/ — run VITE_AURORA_DEBUG=1 npm run build first');
-  }
+  // A STALE dist/ MAKES EVERY ROW VACUOUS. Both halves of that question name
+  // the tree the run is AGAINST, never the tree this file lives in — the O52
+  // block in lib/run-root.mjs says why, and this is the only spelling of it.
+  assertFreshBuild(RUN);
 
   // ---- search half (no app yet): derive the target from the real data ------
   const core = await loadCore();

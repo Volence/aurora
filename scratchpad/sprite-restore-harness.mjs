@@ -34,13 +34,13 @@
 // Usage: node scratchpad/sprite-restore-harness.mjs   (VERBOSE=1 for app logs)
 
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
-import { spawn, execSync } from 'node:child_process';
-import { statSync, writeFileSync, mkdirSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
-import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { runTarget, announceRunRoot, assertFreshBuild } from './lib/run-root.mjs';
 
 const PORT = Number(process.env.PORT ?? 9384);
 const ROOT = AURORA_DIR;   // this worktree
@@ -128,16 +128,10 @@ async function until(fn, tries = 40, ms = 250) {
 }
 
 async function main() {
-  // A STALE dist/ MAKES EVERY ROW VACUOUS: this repo's harnesses once passed
-  // 19/19 against a planted source defect because the bundle predated the
-  // plant. Refuse to run when any source file is newer than the built bundle.
-  const distM = statSync(MAIN).mtimeMs;
-  const newest = execSync(
-    `find ${JSON.stringify(join(ROOT, 'src'))} -name '*.ts' -o -name '*.tsx' | xargs stat -c %Y | sort -n | tail -1`,
-    { shell: '/bin/bash' }).toString().trim();
-  if (Number(newest) * 1000 > distM) {
-    throw new Error('dist/ is STALER than src/ — run VITE_AURORA_DEBUG=1 npm run build first');
-  }
+  // A STALE dist/ MAKES EVERY ROW VACUOUS. Both halves of that question name
+  // the tree the run is AGAINST, never the tree this file lives in — the O52
+  // block in lib/run-root.mjs says why, and this is the only spelling of it.
+  assertFreshBuild(RUN);
 
   let app = null, c = null;
   let ownerSession; // snapshot of the owner's real stored session for s1disasm

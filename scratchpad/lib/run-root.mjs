@@ -107,8 +107,9 @@
  * exactly the artifact that goes stale silently.
  */
 
-import { existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { createHash } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, dirname, relative } from 'node:path';
 
 import { auroraBuiltTree, AURORA_BUILT_TREE_ENV } from '../../test/support/sibling-root.mjs';
 
@@ -302,4 +303,243 @@ export function resolveRunRoot(here) {
       + `about to fail. Build it (\`npm run build\`) or set ${AURORA_BUILT_TREE_ENV} to a tree `
       + 'that is already built.',
   };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * IS THE BUNDLE I AM ABOUT TO RUN OLDER THAN THE SOURCES IT WAS BUILT FROM?
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O52, 2026-09-03. Eighteen instruments carried this gate inline, and every one
+ * of them wrote it as
+ *
+ *     const distM  = statSync(MAIN).mtimeMs;                    // question 2
+ *     const newest = find `${join(ROOT, 'src')}` … stat -c %Y;  // question 1
+ *     if (Number(newest) * 1000 > distM) throw 'dist/ is STALER than src/';
+ *
+ * — which is THE VERY CONFUSION THIS MODULE EXISTS TO END, surviving inside the
+ * one expression that mixes the two. `MAIN` comes from `runTarget()`: the tree
+ * the run is AGAINST. `ROOT` is the caller's own location: the tree the file
+ * LIVES IN. In the main checkout those are one directory and the comparison is
+ * sound. IN A LINKED WORKTREE THEY ARE TWO, and a fresh worktree's `src/`
+ * mtimes are its CHECKOUT TIME — later than any build that preceded it — so the
+ * gate fired unconditionally however fresh the bundle was.
+ *
+ * MEASURED on this machine, 2026-09-03T05:0xZ, one bundle, one instant, the two
+ * trees the operand can name:
+ *
+ *     dist/main/index.mjs (main checkout)      mtime 1788411497
+ *     newest .ts/.tsx under main/src           mtime 1788410271   ->  SILENT
+ *     newest .ts/.tsx under the worktree's src mtime 1788411610   ->  FIRES
+ *
+ * The 113 s that flip the verdict are the `git worktree add`, not a source
+ * edit. Every agent in this repo works in a worktree, so for them the gate was
+ * incapable of green — a refusal that carried no information.
+ *
+ * ── THE RULE ───────────────────────────────────────────────────────────────
+ *
+ * BOTH HALVES NAME `run.root`. The question is about ONE tree — the built one —
+ * and it is the only tree in which mtimes are commensurable, because the build
+ * and the sources it consumed were written by the same machine in one order.
+ * `run.here` never enters the comparison: mtimes do not compare across trees at
+ * all, and using one as the source operand is how this defect happened.
+ *
+ * ── WHAT `borrowed` DOES AND DOES NOT DO ───────────────────────────────────
+ *
+ * A borrowed run measures another tree's build. The staleness question is still
+ * answerable there — and is answered — but a SECOND question appears with it:
+ * *are this checkout's sources in that bundle?* Announcing "cannot check" would
+ * be a "couldn't check" rendered as green, which this repo does not do, so it is
+ * not announced: `borrowedSourceDrift` ANSWERS it, by CONTENT (the only
+ * instrument that works across trees), naming how many files under `src/`
+ * differ and which. Zero differing files is a positive result — the borrowed
+ * bundle's sources ARE this checkout's.
+ *
+ * ⚠ AND DRIFT IS A WARNING, NOT A REFUSAL — a deliberate ruling, recorded so a
+ * later reader does not mistake it for an oversight. Borrowing is legitimate
+ * (it is the whole reason this module exists: a linked worktree has no
+ * `node_modules` and no `dist/`), and it is CONFORMANT while it announces
+ * itself — "a derivation that legitimately differs and SAYS SO is conformant;
+ * one that differs silently is the defect". Refusing on drift would make these
+ * eighteen instruments unrunnable from any worktree whose branch touches
+ * `src/`, which is most of them: it would replace a gate that could never be
+ * green with a gate that could never be green, and call it a fix.
+ *
+ * ── WHEN IT GENUINELY CANNOT BE EVALUATED ──────────────────────────────────
+ *
+ * A tree with no `dist/main/index.mjs`, no `src/`, or no `.ts`/`.tsx` under it
+ * (a packaged or pinned build, say) leaves the question with no answer. That is
+ * `unmeasurable`, and `assertFreshBuild` REFUSES on it, loudly, naming which of
+ * the three it hit. It is never folded into `fresh`: an unanswerable question
+ * does not become a pass, here as everywhere else in this repo.
+ */
+
+/** Where the sources live, relative to a tree. One spelling, like the two above. */
+const SOURCE_REL = 'src';
+
+/** What the build actually compiles out of that directory. */
+const SOURCE_EXT = /\.(ts|tsx)$/;
+
+/**
+ * Newest `.ts`/`.tsx` under `dir`, walked in JS.
+ *
+ * NOT `find … | xargs stat -c %Y`, which is what the eighteen inline copies ran
+ * and which had two faults of its own beyond the tree mix: fourteen of them
+ * spelled it without `-print0`/`-0`, so one source path containing a space
+ * would have split into two nonexistent paths and `stat` would have printed an
+ * error to stderr while the pipeline still exited 0 with a WRONG maximum; and
+ * an empty result made `Number('') * 1000` = 0, which compares as "everything
+ * is fresh" — an empty source tree read as a pass. Both are gone: this returns
+ * `null` for "the directory is not there" and a `count` the caller checks.
+ */
+function newestSource(dir) {
+  let entries;
+  try { entries = readdirSync(dir, { withFileTypes: true, recursive: true }); }
+  catch { return null; }
+  let ms = -Infinity, file = null, count = 0;
+  for (const e of entries) {
+    if (!e.isFile() || !SOURCE_EXT.test(e.name)) continue;
+    const p = join(e.parentPath ?? e.path ?? dir, e.name);
+    let m;
+    try { m = statSync(p).mtimeMs; } catch { continue; }
+    count++;
+    if (m > ms) { ms = m; file = p; }
+  }
+  return { ms, file, count };
+}
+
+/** Every `.ts`/`.tsx` under `dir`, as tree-relative path -> sha1 of its bytes. */
+function sourceHashes(dir) {
+  let entries;
+  try { entries = readdirSync(dir, { withFileTypes: true, recursive: true }); }
+  catch { return null; }
+  const out = new Map();
+  for (const e of entries) {
+    if (!e.isFile() || !SOURCE_EXT.test(e.name)) continue;
+    const p = join(e.parentPath ?? e.path ?? dir, e.name);
+    try { out.set(relative(dir, p), createHash('sha1').update(readFileSync(p)).digest('hex')); }
+    catch { /* raced with a write; a file we cannot read is reported as missing below */ }
+  }
+  return out;
+}
+
+/**
+ * `{ verdict, … }` for the tree the run is against. `verdict` is one of:
+ *
+ *   `'fresh'`         the built bundle is newer than every source under it.
+ *   `'stale'`         a source under it is newer than the bundle — every row
+ *                     the caller is about to measure would be vacuous.
+ *   `'unmeasurable'`  the question has no answer in this tree; `why` says which
+ *                     of the three cases it is.
+ */
+export function buildFreshness(run) {
+  const root = run.root;
+  const main = distMain(root);
+  const srcDir = join(root, SOURCE_REL);
+  let distMs;
+  try { distMs = statSync(main).mtimeMs; }
+  catch (e) {
+    return {
+      verdict: 'unmeasurable', root, main, srcDir,
+      why: `there is no readable built bundle at ${main} (${e.code ?? e.message}), so "is the `
+        + 'bundle older than its sources" has no answer',
+    };
+  }
+  const src = newestSource(srcDir);
+  if (src === null) {
+    return {
+      verdict: 'unmeasurable', root, main, srcDir, distMs,
+      why: `${srcDir} does not exist, so the sources that built ${main} are not in this tree and `
+        + 'nothing in it can be compared against the bundle',
+    };
+  }
+  if (src.count === 0) {
+    return {
+      verdict: 'unmeasurable', root, main, srcDir, distMs,
+      why: `${srcDir} exists but holds no .ts/.tsx file, so there is no source mtime to compare `
+        + '(an empty maximum used to read as "everything is fresh")',
+    };
+  }
+  return {
+    verdict: src.ms > distMs ? 'stale' : 'fresh',
+    root, main, srcDir, distMs,
+    newestMs: src.ms, newestFile: src.file, count: src.count,
+    marginMs: distMs - src.ms,
+  };
+}
+
+/**
+ * DOES THE BORROWED BUILD CARRY THIS CHECKOUT'S SOURCES? By content, because
+ * mtimes are meaningless across two checkouts.
+ *
+ * `{ comparable, differing, onlyHere, onlyRoot, total }`, or `comparable:false`
+ * with a `why` when either `src/` cannot be read. Only meaningful when
+ * `run.borrowed`; `assertFreshBuild` calls it only then.
+ */
+export function borrowedSourceDrift(run) {
+  const here = sourceHashes(join(run.here, SOURCE_REL));
+  const there = sourceHashes(join(run.root, SOURCE_REL));
+  if (here === null || there === null) {
+    return {
+      comparable: false,
+      why: `${here === null ? join(run.here, SOURCE_REL) : join(run.root, SOURCE_REL)} could not be `
+        + 'read, so the two trees\' sources cannot be compared',
+    };
+  }
+  const differing = [], onlyHere = [];
+  for (const [rel, h] of here) {
+    if (!there.has(rel)) onlyHere.push(rel);
+    else if (there.get(rel) !== h) differing.push(rel);
+  }
+  const onlyRoot = [...there.keys()].filter((rel) => !here.has(rel));
+  return { comparable: true, differing, onlyHere, onlyRoot, total: here.size, thereTotal: there.size };
+}
+
+/** The provenance line a fresh run prints — rendered from the value, never a
+ *  second derivation of it, for the same reason `describeRunRoot` is. */
+export function describeFreshness(f, drift = null) {
+  const age = (ms) => `${(ms / 1000).toFixed(0)}s`;
+  let s = `build: FRESH in ${f.root} — dist/main/index.mjs is ${age(f.marginMs)} newer than the `
+    + `newest of ${f.count} .ts/.tsx under ${f.srcDir} (${f.newestFile})`;
+  if (drift) {
+    if (!drift.comparable) {
+      s += `\n      ⚠ BORROWED, AND THE DRIFT CHECK COULD NOT RUN: ${drift.why}. This run does not `
+        + 'establish that this checkout\'s sources are in that bundle.';
+    } else {
+      const moved = drift.differing.length + drift.onlyHere.length + drift.onlyRoot.length;
+      s += moved === 0
+        ? `\n      BORROWED but NOT DRIFTED: all ${drift.total} source files under src/ are `
+          + 'byte-identical between this checkout and the built tree, so that bundle IS this '
+          + 'checkout\'s sources.'
+        : `\n      ⚠ BORROWED AND DRIFTED: ${moved} source file(s) differ between this checkout and `
+          + `the built tree (${drift.differing.length} changed, ${drift.onlyHere.length} only here, `
+          + `${drift.onlyRoot.length} only there) — e.g. `
+          + `${[...drift.differing, ...drift.onlyHere, ...drift.onlyRoot].slice(0, 3).join(', ')}. `
+          + 'THE ROWS BELOW DO NOT MEASURE THOSE EDITS. Build in-tree to measure them.';
+    }
+  }
+  return s;
+}
+
+/**
+ * REFUSE TO MEASURE A VACUOUS RUN. Throws on `stale` and on `unmeasurable`;
+ * prints the verdict and, when borrowed, the drift, and returns the value.
+ *
+ * The call replaces the eighteen inline copies:  `assertFreshBuild(RUN);`
+ */
+export function assertFreshBuild(run, write = (s) => process.stderr.write(s)) {
+  const f = buildFreshness(run);
+  if (f.verdict === 'unmeasurable') {
+    throw new Error(`BUILD FRESHNESS UNMEASURABLE — ${f.why}. A run whose bundle cannot be shown `
+      + 'fresh is a run whose every row may be vacuous, so this refuses rather than proceeding. '
+      + `Build the tree the run is against (VITE_AURORA_DEBUG=1 npm run build in ${f.root}), or `
+      + `point ${AURORA_BUILT_TREE_ENV} at a tree that is built.`);
+  }
+  if (f.verdict === 'stale') {
+    throw new Error(`dist/ is STALER than src/ in ${f.root} — ${f.newestFile} is `
+      + `${((f.newestMs - f.distMs) / 1000).toFixed(0)}s newer than ${f.main}. Every row below `
+      + `would measure code that is not in the bundle. Run VITE_AURORA_DEBUG=1 npm run build in `
+      + `${f.root}.`);
+  }
+  write(`${describeFreshness(f, run.borrowed ? borrowedSourceDrift(run) : null)}\n`);
+  return f;
 }
