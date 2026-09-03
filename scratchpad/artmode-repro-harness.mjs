@@ -39,6 +39,22 @@ const PROBE = String.raw`
     }
     return { ink, n, fraction: +(ink / n).toFixed(3) };
   };
+  // EVERY PIXEL FIGURE BELOW IS REPORTED BESIDE THIS. devicePixelRatio under
+  // Xvfb has been observed at both 1 and 1.35 in the same session on this
+  // machine, which makes canvas client rects fractional and turns a correct
+  // off-by-one into something that reads like a feature defect. A run that does
+  // not state its dpr cannot be compared against another run's numbers.
+  P.dpr = () => ({
+    dpr: devicePixelRatio,
+    inner: [innerWidth, innerHeight],
+    // The main canvas' raw (unrounded) client rect — canvasInfo rounds, and
+    // the rounding is exactly what hides a fractional dpr.
+    rawRect: (() => {
+      const c = P.main(); if (!c) return null;
+      const r = c.getBoundingClientRect();
+      return [r.left, r.top, r.width, r.height];
+    })(),
+  });
   P.zoomLabel = () => {
     const e = [...document.querySelectorAll('*')].find(
       (x) => x.children.length === 0 && /^\d+×$/.test(x.textContent.trim()) && vis(x));
@@ -76,6 +92,7 @@ await session('art-mode repro', async (c) => {
   note('A', 'Assign', await c.evalExpr('window.__p2.click("Assign")'));
   await sleep(900);
   await c.evalExpr(PROBE);
+  note('A', 'dpr', await c.evalExpr('JSON.stringify(window.__p2.dpr())'));
   note('A', 'canvas', await c.evalExpr('JSON.stringify(window.__p2.canvasInfo())'));
   note('A', 'ink', await c.evalExpr('JSON.stringify(window.__p2.inkFraction())'));
   await shot(c, 'repro-assign');
@@ -84,6 +101,7 @@ await session('art-mode repro', async (c) => {
   note('B', 'Paint', await c.evalExpr('window.__p2.click("Paint")'));
   await sleep(1200);
   await c.evalExpr(PROBE);
+  note('B', 'dpr', await c.evalExpr('JSON.stringify(window.__p2.dpr())'));
   note('B', 'canvas', await c.evalExpr('JSON.stringify(window.__p2.canvasInfo())'));
   note('B', 'ink', await c.evalExpr('JSON.stringify(window.__p2.inkFraction())'));
   note('B', 'zoom label', await c.evalExpr('window.__p2.zoomLabel()'));
