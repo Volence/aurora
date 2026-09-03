@@ -45,6 +45,7 @@
 import type {
   EffectsPreset, EffectsPresetBand, EffectsPresetLibrary, EffectsPresetBandOn,
   EffectsPresetCycleChannel, EffectsPresetAnchorSweep, AnchorAmpRung, AnchorPeriodRung,
+  EffectsPresetRamp,
 } from '../../core/formats/effects/preset';
 import {
   EFFECTS_PRESET_ID_PATTERN, EFFECTS_PRESET_ON_ARMS, EFFECTS_PRESET_SCHEMA,
@@ -56,6 +57,29 @@ import {
   // be a silent doubling waiting for a reader who trusted the wrong copy.
   EFFECTS_PRESET_MAX_PATCH, EFFECTS_PRESET_WORLD_Y_RANGE, EFFECTS_PRESET_PATCH_ANCHOR_NONE,
   ANCHOR_AMP_RUNGS, ANCHOR_PERIOD_RUNGS, ANCHOR_PHASE_RANGE,
+  // ═══ THE `ramp` CHANNEL'S BOUNDS — EVERY ONE OF THEM THE CODEC'S ═══
+  //
+  // Read off the vendored schema in preset.ts with module-load guards that throw
+  // if the schema's wording moves, and imported here rather than re-derived. Two
+  // of them are traps and the reason they are constants at all:
+  //
+  //   • EFFECTS_PRESET_RAMP_SPAN_MAX — `top + lines <= 223`, which NO JSON
+  //     Schema keyword can express, so the per-field maxima are a valid-looking
+  //     pair that fails somebody else's build.
+  //   • EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG — a readout that is one line high
+  //     LOOKS correct. `rampDisplaySpan` at the foot of this file is the ONE
+  //     place on this surface that applies it, with the reasoning beside it.
+  EFFECTS_PRESET_RAMP_TOP_RANGE, EFFECTS_PRESET_RAMP_LINES_RANGE,
+  EFFECTS_PRESET_RAMP_VSRAM_ADDR_RANGE, EFFECTS_PRESET_RAMP_SPAN_MAX,
+  EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG,
+  EFFECTS_PRESET_FP16_WHOLE_RANGE, EFFECTS_PRESET_FP16_FRAC_RANGE,
+  // THE ONE CONVERSION, AND IT IS NOT RE-IMPLEMENTED HERE. The sign lives on
+  // `whole` and applies to the whole value, so `{whole: -1, frac256: 128}` is
+  // -1.5 and not -0.5 — a whole pixel of error with both numbers still in range,
+  // which no schema and no round trip could catch. `presetFp16FromNumber`
+  // returns null off-grid and MUST NOT be made to snap.
+  presetFp16FromNumber, presetFp16ToNumber,
+  presetRasterChannel, EFFECTS_PRESET_RASTER_CHANNELS,
 } from '../../core/formats/effects/preset';
 import type { SetEffectsPresetCommand, SetSectionRasterCommand } from '../../core/editing/commands';
 // THE BINDING LIMIT IS NOT RE-TYPED HERE. `PRESET_LIMITS.unbound` below is the
@@ -483,6 +507,18 @@ export interface PresetListEntry {
   /** `name` when the document has a string one, else the id — never an empty row. */
   label: string;
   bands: number;
+  /**
+   * WHICH RASTER PROGRAM THE DOCUMENT CARRIES, so the row can say `ramp` instead
+   * of `0 bands`.
+   *
+   * A ramp document has no `bands` key at all, and the count alone would render
+   * it as an empty band list — which reads as a broken or half-authored preset
+   * rather than a different kind of one. `presetRasterChannel` is the codec's
+   * narrowing helper and the one spelling of the question; `null` is a document
+   * that carries neither, which the schema refuses and which therefore only
+   * exists mid-edit.
+   */
+  channel: 'bands' | 'ramp' | null;
 }
 
 export function presetListEntries(library: EffectsPresetLibrary): PresetListEntry[] {
@@ -490,7 +526,14 @@ export function presetListEntries(library: EffectsPresetLibrary): PresetListEntr
     id: p.id,
     label: (typeof p.name === 'string' && p.name !== '') ? p.name : p.id,
     bands: (p.bands ?? []).length,
+    channel: presetRasterChannel(p),
   }));
+}
+
+/** What one list row says on its right — `3 bands`, or `ramp`. */
+export function presetListSummary(entry: PresetListEntry): string {
+  if (entry.channel === 'ramp') return 'ramp';
+  return `${entry.bands} band${entry.bands === 1 ? '' : 's'}`;
 }
 
 /**
@@ -895,8 +938,19 @@ export function removeBandCommand(
  * here once and both read it, rather than the component re-comparing a length it
  * happens to know. That is the brief's rule, and it is the difference between a
  * disabled button with a reason and a disabled button with a coincidence.
+ *
+ * ⚠ TWO ARMS SINCE THE ROOT BECAME A `oneOf`, AND THE CHANNEL IS ASKED FIRST.
+ * On a RAMP document `(preset.bands ?? []).length` is 0, so the floor arm below
+ * would answer "this is its only raster band" — FALSE, about a document that has
+ * no bands at all — and a reader would go looking for the band it named. The
+ * band controls really are refused there, but for a different reason, and
+ * `bandControlsRefusal` (at the foot of this file) is that reason.
+ * `removeBandCommand` refuses a ramp document too, on its index bound, so the
+ * two still refuse together; what changes is only which true sentence is given.
  */
 export function lastBandRefusal(preset: EffectsPreset): string | null {
+  const channel = bandControlsRefusal(preset);
+  if (channel !== null) return channel;
   if ((preset.bands ?? []).length > 1) return null;
   return `preset "${preset.id}": this is its only raster band, and a preset must have at least `
     + 'one — the schema refuses an empty bands list, because a document that emits a zero-band '
@@ -2528,3 +2582,573 @@ export const ANCHOR_TICK_HZ: number =
  */
 export const ANCHOR_MAX_PEAK_PX: number =
   ANCHOR_AMP_RUNGS.reduce((m, r) => Math.max(m, r.peak_px), 0);
+
+// ---------------------------------------------------------------------------
+// THE DENSE RASTER CHANNEL — `ramp`'s derivations, refusals and commands
+// ---------------------------------------------------------------------------
+//
+// ═══ WHAT THE CONTROL IS, AND WHAT IT MUST NEVER BECOME ═══
+//
+// ONE LINEAR RATE AND ONE START, OVER A `top`/`lines` SPAN. That is the whole
+// mechanism. `RasterRampProgram` has one `rrp_step` and one `rrp_start` and no
+// field that could receive a table, so a per-line curve is not merely refused
+// here — it is INEXPRESSIBLE, and a control that implied otherwise would let an
+// author write a document that validates, generates, and is silently wrong on
+// hardware. There is no curve editor below, no multi-point widget and no
+// per-line table, and there must never be one: that is an engine change first
+// and a contract change second, in that order. `RAMP_MUST_NOT` is the schema's
+// own statement of it, parsed out of the contract rather than retyped, so it
+// cannot drift from the rule it states.
+//
+// ═══ NOTHING HERE RE-DERIVES A BOUND ═══
+//
+// Every number below comes from `core/formats/effects/preset.ts`, which reads
+// them off the vendored schema with module-load guards. In particular
+// `EFFECTS_PRESET_RAMP_SPAN_MAX` — the per-field maxima are a VALID-LOOKING PAIR
+// THAT FAILS THE BUILD (`top` 222 and `lines` 220 each satisfy every schema
+// keyword and their sum does not) — and `EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG`,
+// whose whole point is that a readout one line high looks correct.
+
+/** The `ramp` key's own title — the contract's paragraph, at the point of use. */
+export const RAMP_TITLE = presetFieldTitle(['properties', 'ramp']);
+
+/** Every ramp field's title, straight from the schema. */
+export const RAMP_FIELD_TITLES = Object.freeze({
+  top: presetFieldTitle(['$defs', 'ramp', 'properties', 'top']),
+  lines: presetFieldTitle(['$defs', 'ramp', 'properties', 'lines']),
+  start: presetFieldTitle(['$defs', 'ramp', 'properties', 'start']),
+  step: presetFieldTitle(['$defs', 'ramp', 'properties', 'step']),
+  addr: presetFieldTitle(['$defs', 'ramp_target', 'properties', 'vsram', 'properties', 'addr']),
+  target: presetFieldTitle(['$defs', 'ramp_target']),
+});
+
+/** The ramp's required keys, in the schema's own `required` order. */
+export const RAMP_KEYS: readonly string[] =
+  Object.freeze([...(schemaNode(['$defs', 'ramp']).required as string[])]);
+
+/**
+ * THE MUST NOT, IN THE CONTRACT'S OWN WORDS — parsed, never retyped.
+ *
+ * The schema states it in the `ramp` property's description, and this reads that
+ * sentence. If empyrean ever drops it, this throws at module load rather than
+ * leaving the panel quietly asserting a rule the contract no longer states —
+ * which is the direction that matters, because the rule exists to stop a control
+ * being built that the engine cannot honour.
+ */
+export const RAMP_MUST_NOT: string = (() => {
+  const m = /THE MUST NOT: (.*?engine cannot honour\.)/s.exec(RAMP_TITLE);
+  if (!m || !/curve/i.test(m[1])) {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer states the per-line-curve MUST NOT in its ' +
+      '`ramp` property description, which is the only contract-side statement of it and the reason ' +
+      'this panel offers one rate and one start rather than a per-line table. Re-read the schema — ' +
+      'do NOT retype the sentence here.',
+    );
+  }
+  return m[1];
+})();
+
+/**
+ * The painted half of it, at an author's length.
+ *
+ * `presetLimitsShort()`'s split, for its reason: the contract sentence carries
+ * `raster.emp` line numbers and an artifact section number, which is owed to the
+ * agent surface and useless in a 285px column. The short one is PAINTED and the
+ * contract one is on the same element's `title`; `ramp-control-wording.test.ts`
+ * fails if either half stops reaching the panel, and asserts they make the same
+ * claim (both name the curve, both name the single rate).
+ */
+export const RAMP_MUST_NOT_SHORT =
+  'One rate and one start, over the whole span. There is no per-line curve and there cannot be '
+  + 'one: the engine has a single step and a single start and no field that could hold a table.';
+
+/**
+ * A brand-new ramp — every one of the five keys written, because the
+ * constructor defaults NONE of them (`newBand`'s rule, and the schema says so).
+ *
+ * THE NUMBERS ARE A STARTING POINT AN AUTHOR WILL REPLACE, not a validated or
+ * "safe" ramp: Aurora does not know what is safe on a scanline budget, and a
+ * seed that pretended to would be the clamp aeon's §E.4 forbids wearing a
+ * different hat. What they ARE is a ramp that BUILDS: `top` 64 + `lines` 128 is
+ * 192, inside `EFFECTS_PRESET_RAMP_SPAN_MAX`, so a fresh ramp is not born
+ * tripping the frame-rewind interlock for a reason the author had no hand in —
+ * the seed rule `newBand` sets for the band height rule.
+ *
+ * `addr` seeds 0, plane A's whole-plane vertical scroll, which is the one
+ * address the contract establishes a meaning for. `step` seeds a QUARTER PIXEL
+ * per scanline rather than zero: a zero step is legal and inert, and a control
+ * whose first state does nothing teaches the author it does nothing.
+ */
+export function newRamp(): EffectsPresetRamp {
+  return {
+    top: 64,
+    lines: 128,
+    target: { vsram: { addr: 0 } },
+    start: { whole: 0, frac256: 0 },
+    step: { whole: 0, frac256: 64 },
+  };
+}
+
+// ── the fp16 grid, as an author's decimal ───────────────────────────────────
+
+/**
+ * How many `frac256` units make one pixel, off the field's own maximum — the
+ * codec's own derivation, imported rather than a second `256` typed here.
+ */
+const RAMP_RATE_UNITS_PER_PX = EFFECTS_PRESET_FP16_FRAC_RANGE.max + 1;
+
+/** The smallest step an author can spell — one `frac256` unit. */
+export const RAMP_RATE_UNIT = 1 / RAMP_RATE_UNITS_PER_PX;
+
+/**
+ * The authored range's ends, BUILT FROM THE ENCODING rather than stated.
+ *
+ * The schema is explicit that the STORAGE is wider than the authored range —
+ * signed 16.16, roughly 64 times as much — and that "a control built on the
+ * storage width offers an author values the build refuses". So these come from
+ * `whole`'s and `frac256`'s own bounds through the codec's one conversion.
+ */
+export const RAMP_RATE_MIN: number = presetFp16ToNumber({
+  whole: EFFECTS_PRESET_FP16_WHOLE_RANGE.min, frac256: EFFECTS_PRESET_FP16_FRAC_RANGE.max,
+});
+export const RAMP_RATE_MAX: number = presetFp16ToNumber({
+  whole: EFFECTS_PRESET_FP16_WHOLE_RANGE.max, frac256: EFFECTS_PRESET_FP16_FRAC_RANGE.max,
+});
+
+/**
+ * A rate as text. Every representable value is a multiple of 1/256, which is
+ * exact in binary floating point, so `String` prints it without a tail.
+ */
+export function fmtRampPx(px: number): string {
+  return String(Math.round(px * RAMP_RATE_UNITS_PER_PX) / RAMP_RATE_UNITS_PER_PX);
+}
+
+/**
+ * WHY A TYPED RATE HAS NO SPELLING, or null when it has one.
+ *
+ * Four reasons and they get four different sentences, because "that number is
+ * not available" is useless without "here is what is". The one that surprises is
+ * `sign-hole`:
+ *
+ *   ⚠ THE INTERVAL BETWEEN -1 AND 0 IS UNREACHABLE. `frac256` is a MAGNITUDE and
+ *   the sign lives on `whole` alone, so a negative value needs a negative
+ *   `whole` and there is none between -1 and 0. `{whole: 0, frac256: 128}` is
+ *   **+**0.5. **-0.5 HAS NO SPELLING**, and a control that quietly rounded it to
+ *   0, or to -1, would move an author's rate without saying so — the same class
+ *   as the sign bug the codec parcel caught, which reads fine and is wrong.
+ *
+ * This is the DISCRIMINATOR; `presetFp16FromNumber` is the ANSWER, and
+ * `ramp-control.test.ts` cross-checks that the two agree on every case (this
+ * returns null exactly when that returns an object). Two functions because the
+ * codec must not grow a sentence and the panel must not grow a conversion.
+ */
+export type RampRateProblem = 'off-grid' | 'sign-hole' | 'above-range' | 'below-range';
+
+export function rampRateProblem(px: number): RampRateProblem | null {
+  if (!Number.isFinite(px)) return 'off-grid';
+  if (px > RAMP_RATE_MAX) return 'above-range';
+  if (px < RAMP_RATE_MIN) return 'below-range';
+  // The hole BEFORE the grid check, because a value in it is unreachable however
+  // it is rounded — "not on the 1/256 grid" would be a true sentence that sent
+  // the author looking for a nearby value that does not exist either.
+  if (px > -1 && px < 0) return 'sign-hole';
+  if (!Number.isInteger(px * RAMP_RATE_UNITS_PER_PX)) return 'off-grid';
+  return null;
+}
+
+/**
+ * The nearest values that DO have a spelling, below and above — what the
+ * refusal offers instead of the one that does not.
+ *
+ * Null on a side means there is nothing there: past the top of the range there
+ * is no larger value, and past the bottom no smaller one.
+ *
+ * ⚠ THE `-1` / `0` FALLBACK IS THE HOLE AND PROVABLY ONLY THE HOLE. Inside
+ * `[RAMP_RATE_MIN, RAMP_RATE_MAX]` the floor and ceiling are whole numbers of
+ * 1/256 by construction and cannot leave the `whole` range (both ends are
+ * themselves on the grid), so the only remaining way `presetFp16FromNumber` says
+ * null is the (-1, 0) interval — whose own edges are -1 and 0.
+ */
+export function rampRateNeighbours(px: number): { below: number | null; above: number | null } {
+  if (!Number.isFinite(px)) return { below: null, above: null };
+  if (px > RAMP_RATE_MAX) return { below: RAMP_RATE_MAX, above: null };
+  if (px < RAMP_RATE_MIN) return { below: null, above: RAMP_RATE_MIN };
+  const units = px * RAMP_RATE_UNITS_PER_PX;
+  const lo = Math.floor(units) / RAMP_RATE_UNITS_PER_PX;
+  const hi = Math.ceil(units) / RAMP_RATE_UNITS_PER_PX;
+  return {
+    below: presetFp16FromNumber(lo) !== null ? lo : -1,
+    above: presetFp16FromNumber(hi) !== null ? hi : 0,
+  };
+}
+
+/** `start` is a position, `step` is a rate — and the units say which. */
+export type RampRateField = 'start' | 'step';
+
+export function rampRateUnits(field: RampRateField): string {
+  return field === 'step' ? 'px per scanline' : 'px';
+}
+
+/**
+ * WHY THIS RATE CANNOT BE WRITTEN, or null.
+ *
+ * NOT A SNAP, and that is the whole point. `presetFp16FromNumber` returns null
+ * off-grid and MUST NOT be made to round; this is the sentence beside that
+ * refusal, and every branch of it NAMES WHAT THE AUTHOR CAN HAVE instead. It
+ * also says what the document still holds, `bandEdgeRefusal`'s rule: the box
+ * commits per keystroke, so an author typing `-0.5` walks through values that DO
+ * land, and the field they are looking at is not necessarily the value in the
+ * file.
+ */
+export function rampRateRefusal(
+  ramp: EffectsPresetRamp, presetId: string, field: RampRateField, px: number,
+): string | null {
+  const problem = rampRateProblem(px);
+  if (problem === null) return null;
+  const subject = `preset "${presetId}" ramp ${field}`;
+  const units = rampRateUnits(field);
+  const holds = `${field} is still ${fmtRampPx(presetFp16ToNumber(ramp[field]))} ${units}.`;
+  const n = rampRateNeighbours(px);
+  const pair = `${n.below === null ? '(nothing lower)' : fmtRampPx(n.below)} and `
+    + `${n.above === null ? '(nothing higher)' : fmtRampPx(n.above)}`;
+  if (problem === 'sign-hole') {
+    return `${subject}: ${px} ${units} HAS NO SPELLING in this encoding. frac256 is a MAGNITUDE `
+      + 'and the sign lives on whole alone, so a negative value needs a negative whole and there is '
+      + 'none between -1 and 0 — {whole: 0, frac256: 128} is +0.5, not -0.5. The whole interval '
+      + `between -1 and 0 is unreachable. The nearest rates you CAN have are ${pair}. Refused, and `
+      + `not rounded to either — ${holds}`;
+  }
+  if (problem === 'above-range' || problem === 'below-range') {
+    const end = problem === 'above-range'
+      ? `the largest is ${fmtRampPx(RAMP_RATE_MAX)}`
+      : `the smallest is ${fmtRampPx(RAMP_RATE_MIN)}`;
+    return `${subject}: ${px} ${units} is outside the AUTHORED range. fp16's whole part is `
+      + `${EFFECTS_PRESET_FP16_WHOLE_RANGE.min}..${EFFECTS_PRESET_FP16_WHOLE_RANGE.max} and its `
+      + `fraction 0..${EFFECTS_PRESET_FP16_FRAC_RANGE.max}/${RAMP_RATE_UNITS_PER_PX}, so ${end}. `
+      + 'The engine\'s STORAGE is wider — signed 16.16, about 64 times this — and a control built '
+      + 'on the storage width would offer you values the build refuses. '
+      + `Refused; ${holds}`;
+  }
+  return `${subject}: ${px} ${units} is not a whole number of 1/${RAMP_RATE_UNITS_PER_PX} px, `
+    + `which is the finest rate fp16(whole, frac256) can spell. The nearest it has are ${pair}. `
+    + `Refused, and not rounded to either — ${holds}`;
+}
+
+// ── the span, and the pair the per-field maxima do not describe ─────────────
+
+export type RampSpanField = 'top' | 'lines';
+
+/**
+ * WHY THIS `top` OR `lines` CANNOT BE WRITTEN, or null.
+ *
+ * ═══ THE PAIR IS THE POINT ═══
+ *
+ * `top <= 222` and `lines <= 220` are each satisfied by `{top: 222, lines: 220}`,
+ * and that document is REFUSED — by aeon's generator and by the engine, not by
+ * the schema, because no JSON Schema keyword constrains two fields. So the
+ * per-field maxima are a VALID-LOOKING PAIR THAT FAILS SOMEBODY ELSE'S BUILD,
+ * and this is where an author meets it instead: at the control, at typing time,
+ * with the schema's own number (`EFFECTS_PRESET_RAMP_SPAN_MAX`, read out of the
+ * contract's prose) and with the largest value the OTHER field then admits.
+ *
+ * NOT A CLAMP — `bandEdgeRefusal`'s rule, and aeon's §E.4. Nothing here
+ * substitutes a number the author did not type.
+ */
+export function rampSpanRefusal(
+  ramp: EffectsPresetRamp, presetId: string, field: RampSpanField, value: number,
+): string | null {
+  const subject = `preset "${presetId}" ramp ${field}`;
+  const holds = `${field} is still ${ramp[field]}.`;
+  if (!Number.isInteger(value)) {
+    return `${subject}: ${value} is not a whole number. `
+      + `${field === 'top' ? 'A screen line' : 'A run length'} is an integer. Refused; ${holds}`;
+  }
+  const range = field === 'top' ? EFFECTS_PRESET_RAMP_TOP_RANGE : EFFECTS_PRESET_RAMP_LINES_RANGE;
+  if (value < range.min || value > range.max) {
+    return `${subject}: ${value} is outside ${range.min}..${range.max}, which is what the schema `
+      + `declares for ${field} — and even inside it the PAIR is bounded: top + lines must be at `
+      + `most ${EFFECTS_PRESET_RAMP_SPAN_MAX}. Refused; ${holds}`;
+  }
+  const otherField: RampSpanField = field === 'top' ? 'lines' : 'top';
+  const other = ramp[otherField];
+  const sum = value + other;
+  if (sum > EFFECTS_PRESET_RAMP_SPAN_MAX) {
+    const room = EFFECTS_PRESET_RAMP_SPAN_MAX - value;
+    const otherRange = otherField === 'top'
+      ? EFFECTS_PRESET_RAMP_TOP_RANGE : EFFECTS_PRESET_RAMP_LINES_RANGE;
+    const largest = room < otherRange.min
+      ? `${room}, which is below ${otherField}'s own floor of ${otherRange.min} — move `
+        + `${otherField} down first`
+      : String(room);
+    return `${subject}: ${value} with ${otherField} ${other} spans to ${sum}, and top + lines must `
+      + `be at most ${EFFECTS_PRESET_RAMP_SPAN_MAX} — the frame-rewind interlock. ⚠ THE PER-FIELD `
+      + `MAXIMA ARE NOT THE PAIR'S CONTRACT: top ${EFFECTS_PRESET_RAMP_TOP_RANGE.max} and lines `
+      + `${EFFECTS_PRESET_RAMP_LINES_RANGE.max} each satisfy the schema and the pair is still `
+      + 'refused, by aeon\'s generator and by the engine rather than by the schema — which is why '
+      + `you meet it here and not at somebody else's build. With ${field} ${value} the largest `
+      + `${otherField} is ${largest}. Refused; ${holds}`;
+  }
+  return null;
+}
+
+/** Why this VSRAM address cannot be written, or null. */
+export function rampAddrRefusal(
+  ramp: EffectsPresetRamp, presetId: string, value: number,
+): string | null {
+  const subject = `preset "${presetId}" ramp target.vsram.addr`;
+  const holds = `the address is still ${ramp.target.vsram.addr}.`;
+  if (!Number.isInteger(value)) {
+    return `${subject}: ${value} is not a whole number. A VSRAM byte address is an integer. `
+      + `Refused; ${holds}`;
+  }
+  const r = EFFECTS_PRESET_RAMP_VSRAM_ADDR_RANGE;
+  if (value < r.min || value > r.max) {
+    return `${subject}: ${value} is outside ${r.min}..${r.max}, which is the engine's own ensure `
+      + `(addr <= ${r.max}). Refused; ${holds}`;
+  }
+  return null;
+}
+
+/**
+ * WHAT THIS ADDRESS MEANS, or as much of it as the contract establishes.
+ *
+ * ⚠ IT INVENTS NOTHING. The schema establishes exactly two meanings — 0 is
+ * plane A's whole-plane vertical scroll and 2 is plane B's — and says in as many
+ * words that whether an ODD address is meaningful IS NOT ESTABLISHED. So every
+ * other value gets a sentence saying the contract admits it and this editor does
+ * not know what it does, rather than a per-column gloss Aurora would be making
+ * up. `addrGloss` above is the CRAM one and is not this: a CRAM byte address and
+ * a VSRAM byte address share a spelling and nothing else.
+ */
+export function rampAddrGloss(addr: number): string {
+  if (addr === 0) return 'plane A, whole-plane vertical scroll';
+  if (addr === 2) return 'plane B, whole-plane vertical scroll';
+  return `admitted (0..${EFFECTS_PRESET_RAMP_VSRAM_ADDR_RANGE.max}); only 0 and 2 are established`;
+}
+
+// ── the display lag: the one place it is applied, and why ───────────────────
+
+/**
+ * ═══ WHERE THE LAG IS APPLIED, AND WHY IT IS APPLIED HERE ═══
+ *
+ * ⚠ MEASURED BY THE ENGINE LANE, 2026-09-03, AND SETTLED: **NO STAGE OF THE
+ * ENGINE PATH COMPENSATES FOR THE LAG.** Not the constructor, not the generator,
+ * not the interpreter. The compensation is PREVIEW-ONLY and it is ENTIRELY
+ * OURS — so there is no double-application to avoid anywhere, and the question
+ * "should this readout add it" has one answer: yes.
+ *
+ * `EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG` IS APPLIED BY THIS FUNCTION AND
+ * NOWHERE ELSE ON THIS SURFACE, because of what the two numbers mean:
+ *
+ *   • `ramp.top` is the ENGINE's `top`. The field, its refusal and the document
+ *     are all in engine coordinates, and the codec keeps them verbatim — a
+ *     document's `top` is written and read exactly as the engine reads it, and
+ *     baking a display correction into the FILE would change what the engine
+ *     runs in order to fix what an editor draws.
+ *   • THIS is a claim about SCREEN LINES — what an author will actually see —
+ *     and a screen-line claim that did not add the lag would be one line high
+ *     everywhere and WOULD LOOK CORRECT, which is precisely why the codec made
+ *     it a named constant instead of a `+ 1` in whichever renderer needed it
+ *     first.
+ *
+ * So: the fields stay in the engine's numbers, this one derived readout is in
+ * the screen's, and the panel LABELS it as a display span rather than letting it
+ * be read back as `top`. The lag appears exactly once on this surface, and
+ * `ramp-control.test.ts` asserts both halves — that this readout DOES add it,
+ * derived from the constant, and that nothing writes it into the document.
+ *
+ * A CORROBORATION WORTH KNOWING, and it is what makes this a reading of the
+ * constants rather than an opinion: with the lag applied, the last displayed
+ * line of a maximal run is `top + lines - 1 + 1` = `top + lines`, and the span
+ * interlock is `top + lines <= 223` — the last line of a 224-line screen. The
+ * two constants meet exactly at the bottom of the display. A lag of 0 would
+ * leave a line spare and a lag of 2 would run off the screen.
+ *
+ * ⚠ AND NO PIXELS ARE DRAWN. This surface has no ramp preview and does not claim
+ * one — `NO_PREVIEW` states the general case and nothing here weakens it. A
+ * drawn preview is where this constant is most dangerous; the decision not to
+ * build one in this parcel is recorded in the packet.
+ */
+export function rampDisplaySpan(ramp: EffectsPresetRamp): { first: number; last: number } {
+  const lag = EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG;
+  return { first: ramp.top + lag, last: ramp.top + ramp.lines - 1 + lag };
+}
+
+/** The painted readout: the run's own lines, then the lines a viewer sees. */
+export function rampDisplayGloss(ramp: EffectsPresetRamp): string {
+  const d = rampDisplaySpan(ramp);
+  return `writes on lines ${ramp.top}-${ramp.top + ramp.lines - 1}, shows on screen lines `
+    + `${d.first}-${d.last}`;
+}
+
+/** The reason, on the readout's own title — the contract half of the split. */
+export const RAMP_DISPLAY_LAG_NOTE: string =
+  'A VSRAM run\'s value for index j DISPLAYS on screen line top + j + '
+  + `${EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG} — the N+1 VSRAM latency (raster.emp:602-609) — and `
+  + 'NO STAGE OF THE ENGINE PATH compensates for it — not the constructor, not the generator '
+  + '(measured by the engine lane, 2026-09-03). The Top field above is the ENGINE\'s top and is '
+  + 'written to the file verbatim; the lag is a DISPLAY fact, so it is applied to this readout and '
+  + 'to nothing else. Correcting it in the document instead would change what the engine runs in '
+  + 'order to fix what an editor shows.';
+
+/**
+ * WHAT THE RAMP DOES, in one sentence of the author's own arithmetic.
+ *
+ * ⚠ THIS IS THE SHAPE THAT MAKES A CURVE UNTHINKABLE, and that is deliberate.
+ * The only quantities a ramp has are a first value, a rate and a length, so the
+ * only summary it can have is a first value, a last value and a total — there is
+ * nowhere in this sentence for a per-line list to go.
+ *
+ * The engine writes the WHOLE PART of the accumulator each line (the schema's
+ * own words); these are the accumulator's values, not the bytes written.
+ */
+export function rampDriftSummary(ramp: EffectsPresetRamp): string {
+  const start = presetFp16ToNumber(ramp.start);
+  const step = presetFp16ToNumber(ramp.step);
+  const end = start + step * (ramp.lines - 1);
+  return `One rate over ${ramp.lines} line${ramp.lines === 1 ? '' : 's'}: the accumulator starts `
+    + `at ${fmtRampPx(start)} px and ends at ${fmtRampPx(end)} px, a total of `
+    + `${fmtRampPx(end - start)} px. The engine writes the whole part of it every line.`;
+}
+
+// ── commands ───────────────────────────────────────────────────────────────
+
+/** Set `top` or `lines`. Null when the value is refused or nothing moved. */
+export function setRampSpanCommand(
+  library: EffectsPresetLibrary, id: string, field: RampSpanField, value: number,
+): SetEffectsPresetCommand | null {
+  return editPresetCommand(library, id, `Preset ${id} ramp ${field}`, (p) => {
+    if (!p.ramp) return;
+    if (rampSpanRefusal(p.ramp, id, field, value) !== null) return;
+    p.ramp[field] = value;
+  });
+}
+
+/** Set the VSRAM byte address the run writes every line. */
+export function setRampAddrCommand(
+  library: EffectsPresetLibrary, id: string, value: number,
+): SetEffectsPresetCommand | null {
+  return editPresetCommand(library, id, `Preset ${id} ramp addr`, (p) => {
+    if (!p.ramp) return;
+    if (rampAddrRefusal(p.ramp, id, value) !== null) return;
+    p.ramp.target.vsram.addr = value;
+  });
+}
+
+/**
+ * Set `start` or `step` from the author's decimal.
+ *
+ * ⚠ THE CONVERSION IS THE CODEC'S AND IS NOT RE-IMPLEMENTED HERE.
+ * `presetFp16FromNumber` owns the sign rule — `{whole: -1, frac256: 128}` is
+ * -1.5, not -0.5 — and it returns null rather than snapping. A second opinion
+ * about that in this file would be a whole pixel of error with both numbers
+ * still in range, which no schema and no round trip can catch.
+ */
+export function setRampRateCommand(
+  library: EffectsPresetLibrary, id: string, field: RampRateField, px: number,
+): SetEffectsPresetCommand | null {
+  const fp = presetFp16FromNumber(px);
+  if (fp === null) return null;
+  return editPresetCommand(library, id, `Preset ${id} ramp ${field}`, (p) => {
+    if (!p.ramp) return;
+    p.ramp[field] = fp;
+  });
+}
+
+// ── exactly one raster program, and switching between the two ──────────────
+
+/**
+ * WHY THE BAND CONTROLS CANNOT WRITE HERE, or null when they can.
+ *
+ * ═══ THE DEAD CONTROL WITH NO SENTENCE, WHICH THIS FIXES ═══
+ *
+ * `bands` left the schema's top-level `required` when `ramp` arrived, and the
+ * root became an `oneOf`: EXACTLY ONE of `bands` | `ramp`, both refused, neither
+ * refused. `addBandCommand`, `removeBandCommand` and `splitBandCommand` are
+ * therefore SILENT NO-OPS on a ramp document — correctly, because growing a
+ * `bands` key onto a ramp preset would author the both-keys document the schema
+ * refuses, on every click, in a panel that had no idea which kind of document it
+ * was looking at.
+ *
+ * But a no-op is a dead control, and a dead control with no sentence beside it
+ * is this repo's standing complaint. This is `lastBandRefusal`'s idiom applied
+ * to it: ONE predicate, read by the disabled control AND by the reason under it,
+ * so the greyed button and the sentence cannot disagree.
+ */
+export function bandControlsRefusal(preset: EffectsPreset): string | null {
+  if (presetRasterChannel(preset) !== 'ramp') return null;
+  return `preset "${preset.id}" carries a ramp, not bands. A preset holds EXACTLY ONE raster `
+    + 'program: bands and ramp lower into the same raster: slot and the engine has no combinator '
+    + 'that mixes a sparse fire list with a dense run, so the schema refuses a document carrying '
+    + 'both — which means the band controls cannot write here at all. Set the Raster program row '
+    + 'above back to bands to author bands; that discards the ramp, and it is one undo step.';
+}
+
+/** The two raster programs, off the schema's own top-level `oneOf`. */
+export const RASTER_CHANNEL_OPTIONS: readonly { value: string; label: string }[] =
+  Object.freeze(EFFECTS_PRESET_RASTER_CHANNELS.map((c) => Object.freeze({
+    value: c,
+    label: c === 'ramp' ? 'ramp — one dense per-line run' : 'bands — a sparse fire list',
+  })));
+
+/**
+ * WHAT SWITCHING THE RASTER PROGRAM WILL DISCARD — said BEFORE the switch, not
+ * after it.
+ *
+ * ═══ WHY THIS IS A SENTENCE AND NOT A CONFIRM DIALOG ═══
+ *
+ * `deletePresetRefusal`'s ruling, and the same reason: a confirm asks "are you
+ * sure?" about a consequence the author cannot see. This NAMES the consequence —
+ * how many bands, or that there is a ramp — which is the thing they would
+ * otherwise have had to find out by doing it.
+ *
+ * ⚠ AND IT IS ONE UNDO STEP, WHICH IS THE BAR THIS CONTROL HAD TO CLEAR.
+ * `editPresetCommand` builds a `set-effects-preset` carrying the WHOLE old
+ * document and the whole new one; undo re-places the old one verbatim, so Ctrl+Z
+ * restores exactly what was there, bands and all. That is `setBandArmCommand`'s
+ * established shape on this very panel ("the author's old arm body is NOT lost
+ * to them — the swap is one undo step"), and it is why a destructive conversion
+ * was buildable here at all: decision cards d-29 and d-30 are about destructive
+ * controls that are NOT one Ctrl+Z away, and this one is.
+ */
+export function rasterChannelSwapAdvisory(preset: EffectsPreset): string {
+  const channel = presetRasterChannel(preset);
+  const bands = (preset.bands ?? []).length;
+  const discards = channel === 'ramp'
+    ? 'this ramp'
+    : `${bands} raster band${bands === 1 ? '' : 's'}`;
+  const becomes = channel === 'ramp' ? 'a fresh one-band list' : 'a fresh ramp';
+  return `A preset holds exactly one raster program, so switching DISCARDS ${discards} and seeds `
+    + `${becomes}. It is ONE undo step — Ctrl+Z puts back exactly what was here.`;
+}
+
+/**
+ * Swap a preset's raster program.
+ *
+ * ONE `executeCommand`, ONE undo entry, and the old channel restored verbatim by
+ * it — see `rasterChannelSwapAdvisory` for why that was the condition of
+ * building this at all. The seed is `newRamp()` / `newBand()`, the same
+ * every-key-written seeds a fresh document gets.
+ *
+ * `delete` rather than assigning `undefined`: the writer must emit neither an
+ * absent key nor a null one, and an own property holding `undefined` is a
+ * different object from an absent key to everything that enumerates it. The
+ * `oneOf` is asserted on serialize as well as on parse, so a both-keys document
+ * could not reach disk — but it could reach a panel, which is worse, because
+ * there it silently looks like an editor that supports both.
+ */
+export function setRasterChannelCommand(
+  library: EffectsPresetLibrary, id: string, channel: string,
+): SetEffectsPresetCommand | null {
+  if (!EFFECTS_PRESET_RASTER_CHANNELS.includes(channel)) return null;
+  return editPresetCommand(library, id, `Preset ${id} raster program: ${channel}`, (p) => {
+    if (presetRasterChannel(p) === channel) return;
+    if (channel === 'ramp') {
+      delete p.bands;
+      p.ramp = newRamp();
+    } else {
+      delete p.ramp;
+      p.bands = [newBand()];
+    }
+  });
+}

@@ -719,8 +719,21 @@ export const EFFECTS_PRESET_RAMP_SPAN_MAX: number = schemaNumberFromProse(
  * of zero, which would be indistinguishable from "no lag" in every output.
  *
  * NOT APPLIED BY THIS CODEC. A document's `top` is the ENGINE's `top`, written
- * and read verbatim; the lag is a DISPLAY fact, and applying it here would put
- * the compensation in the file, where the generator would apply it a second time.
+ * and read verbatim; the lag is a DISPLAY fact, and correcting it in the FILE
+ * would change what the engine runs in order to fix what an editor draws.
+ *
+ * ⚠ THE REASON ABOVE WAS CORRECTED ON 2026-09-03, AND THE OLD ONE IS WORTH
+ * KNOWING BECAUSE IT WOULD TALK A MAINTAINER INTO THE WRONG CHANGE. This
+ * docblock used to end "...where the generator would apply it a second time",
+ * i.e. it justified not applying the lag by claiming somebody else already did.
+ * THAT CLAUSE WAS FALSE. The engine lane measured the whole path and confirmed
+ * that NO STAGE COMPENSATES — not this codec, not `tools/effects_gen.py`, not
+ * the constructor, not the interpreter. The compensation is PREVIEW-ONLY and it
+ * belongs entirely to whatever draws or describes a ramp in screen lines
+ * (today: `rampDisplaySpan` in `renderer/providers/effects-preset.ts`, the one
+ * place on that surface that applies it). The conclusion did not move; the
+ * reason did, and a reader who believed the old one would conclude there was a
+ * double-application to avoid and that a consumer adding the lag was a bug.
  */
 export const EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG: number = (() => {
   const lag = schemaNumberFromProse(
