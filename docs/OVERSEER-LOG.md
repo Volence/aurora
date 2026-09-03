@@ -704,3 +704,35 @@ The episode behind the bar: the clean checkout that built to two different CRCs,
   **tracks** that file and edits it all session, their main tree is effectively always dirty,
   which is why their golden freezes must run from a clean worktree. They had been reading that
   as a property of the freeze tooling; it is a property of the status-file convention.
+
+## Correction: `crossover-paint` was never the O66 shape (O48d, 2026-09-02)
+
+**O48's lane-log entry (2026-09-03T02:31:42Z) reads the `crossover-paint-harness` red as *"the
+not-re-runnable-on-a-reused-copy shape already banked at O66"*. That reading is wrong, and it is
+wrong in the direction that matters** — O48c already sharpened half of it; this closes the rest.
+Corrected here rather than in `docs/lane-log.jsonl`, which is append-only.
+
+- **O66's shape** (`section-raster-select`, `docs/OVERSEER.md` "FRESH COPY PER RUN IS NOW
+  ENFORCED"): green on a fresh copy, degraded on a **reused** one. The fresh tree is the good state.
+- **`crossover-paint`'s shape is the opposite, and worse: it could not run on a FRESH tree at all,
+  and only ever went green against one somebody had already painted into.** Three states, each
+  measured: on the stale scratch copy, row `[2]` red (the baseline already carried a prior run's
+  crossovers) while `[2c]` passed **because** that prior paint had made the two planes differ; on a
+  fresh `git archive` of aeon `origin/master`, `[2c]` red — both planes read the same word at the
+  hardcoded fixture `(56,16)`; with the directory absent, `ENOENT` in `words()`, because the harness
+  **depended on `../.aurora-crossover-paint` and did not create it**.
+- So a reused copy was the only tree it ever passed on. The O66 remedy (materialise fresh per run)
+  is still the right fix for the *second* defect, which is why the readings look alike; it does
+  nothing for the first, and a lane that stopped at "reuse" would have re-materialised the tree and
+  watched `[2c]` go red again.
+- **The generalisation, and it is not about copies:** an anti-vacuous guard reports on the FIXTURE,
+  not on the code. `[2c]` says *"a cross-plane clobber would be undetectable here"* — a fact about
+  the cells chosen, which no amount of re-materialising changes. Read a red anti-vacuous row as
+  naming the fixture; the one move it never licenses is relaxing the row.
+- **Closed by O48d** (`fix/o48d-crossover-fixture`, packet
+  `docs/reviews/2026-09-02-o48d-crossover-fixture.md`): the harness now materialises its own tree
+  fresh per run from a committed aeon revision, refuses leftover crossover state loudly instead of
+  scoring `[2]` red, derives plane A's fixture from the file and **authors** plane B's — measured:
+  in all nine `.collattr*.bin` pairs aeon commits there is not one cell where both planes carry
+  geometry and read differently, so the property `[2c]` asserts is not derivable whole from
+  committed data. 15/15 on a fresh archive; `PLANT=identical-planes` puts `[2c]` back to red.
