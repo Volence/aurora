@@ -12,7 +12,10 @@
  * Measured at aeon `origin/master` `81b2a719` through git objects:
  * `PRESET_KEYS` (`effects_gen.py:280`) is `{schema, id, bands, cycles,
  * variants}` and `docs/EDITOR_RASTER_PRESETS.md`'s machine-checked block lists
- * the same five.
+ * the same five. aeon's master moved to `63fa3f8c` during the same session (three
+ * DMA-reserve measurement commits) and the block is UNCHANGED there — re-read,
+ * not assumed. The drift row reads TIP on every run, so it is that row and not
+ * this comment that answers the question today.
  *
  * ═══ THIS LAG IS SHARPER THAN THE LAST ONE, AND THE SENTENCE SAYS SO ═══
  *
@@ -87,12 +90,18 @@
  *      list is the whole of what it takes to put the sentence back on screen.
  *
  * `src/renderer/components/effects/__tests__/preset-lag-disclosure.test.ts`
- * closes the loop from the other side: it asserts the list is empty AND that the
- * drift test still measures the refusal list, so a green suite cannot mean
- * "nobody is looking any more". Its sentence rows drive the derivation with an
- * EXPLICIT hypothetical list, so the wording is still fully asserted with the
- * premise retired (memory: a workaround outlives its defect; a hold carries its
- * date; a suite that passes while asserting nothing is the failure mode).
+ * closes the loop from the other side. It has been re-aimed with the premise
+ * twice and keeps the shape both states need: while the lag is OPEN it asserts
+ * every name here is an OPTIONAL root key the schema really declares (a premise
+ * naming something the contract never opened would disclose fiction), asserts
+ * the whole sentence against the derivation rather than a text match, drives the
+ * EMPTY case too so the retirement path cannot rot while unused, and pins that
+ * the drift test still names this constant and still computes the WIDE lag. Its
+ * poison stubs this list EMPTY and requires silence — the direction that proves
+ * the sentence is not hard-wired, which is the one that matters while a
+ * disclosure is on screen (memory: a workaround outlives its defect; a hold
+ * carries its date; a suite that passes while asserting nothing is the failure
+ * mode).
  *
  * Evaluate, do not obey: re-measure with `git -C <aeon> show
  * origin/master:docs/EDITOR_RASTER_PRESETS.md`, never by path into a working
