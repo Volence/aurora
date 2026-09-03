@@ -380,13 +380,40 @@ async function main() {
     await c.evalExpr('window.__dbg.setView(0, 0, 1)');
     await sleep(900);
     const view = await c.json('window.__dbg.view()');
-    // PARCEL C RE-AIM (2026-08-26): a LOCKED scene (v_factor 15, the default a
-    // new scene arrives with, and both shipped scenes) authors SCREEN lines, so
-    // line 0 sits at the TOP OF THE VIEWPORT (guideOriginWorldY = vp.y), not at
-    // world 0. Every row below that aimed by act Y now goes through `space`
-    // exactly as canvas/effects-guides.ts does: canvasY = (origin + top - vp.y) * zoom.
+    // ⚠ THIS HELPER HELD A REFUTED RULE AND WAS RED FOR SIX DAYS (fixed
+    // 2026-09-02). It is corrected here rather than replaced quietly, because
+    // the wrong rule is the one a reader arrives with — the same reason
+    // canvas/effects-guides.ts writes its own correction out instead of
+    // deleting it.
+    //
+    // WHAT IT SAID: parcel C's re-aim (2026-08-26) had a LOCKED scene's line 0
+    // sitting at the TOP OF THE VIEWPORT, so `originOf` returned `vp.y`.
+    //
+    // WHY THAT IS WRONG: `7ba5a638` (2026-08-27, "a locked layer's guide is a
+    // PLANE ROW, and it does not ride the frame") refuted it ON SCREEN, on the
+    // owner's own words — *"if I move the viewport it drags the layers which I
+    // don't want"*. `guideOriginWorldY` has returned 0 unconditionally ever
+    // since, in BOTH spaces, and lost its `origin` argument precisely so stale
+    // call sites would fail to compile. This is a call site in a language with
+    // no compiler, so it did not.
+    //
+    // HOW IT HID FOR SIX DAYS, and it is this file's own lesson rather than the
+    // app's: the two rules AGREE AT vp.y === 0, and every row here but one pins
+    // the camera at 0. Only 8d pans (to vp.y 64) and only 8d diverged — one row
+    // out of thirty-one, in a harness that is not in `package.json` and so was
+    // in nobody's regression set. Partial coverage went green over a refuted
+    // rule; the row that DID cover it was read as a feature bug.
+    //
+    // THE APP WAS NEVER WRONG. At vp.y 64, zoom 2, top 200 it drew 272 —
+    // (0 + 200 - 64) * 2, the current rule exactly. This file asked for 400,
+    // which is (64 + 200 - 64) * 2: the rule the owner rejected.
+    //
+    // It stays a FUNCTION OF vp rather than becoming the literal 0, so the shape
+    // of the contract is still visible at every call site, and it is still asked
+    // of `SPACE` — the space is a real published field that still changes the
+    // LABEL and the CAPTION. It no longer changes the POSITION.
     const SPACE = (await c.json('window.__dbg.aeon.guides()')).space;
-    const originOf = (vp) => (SPACE === 'screen' ? vp.y : 0);
+    const originOf = (_vp) => 0;
     note(`SPACE this scene authors in: ${JSON.stringify(SPACE)} (origin at view.y=${view.y} is ${originOf(view)})`);
     let doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
     check('3c', 'ANTI-VACUOUS: layer 0 is parked at a known world_y with a known camera',
@@ -622,6 +649,90 @@ async function main() {
     doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
     check('7c', 'ANTI-VACUOUS: the mid-drag removal was a normal undoable edit',
       sceneOf(doc).layers.length === 2, `layers=${sceneOf(doc).layers.length}`);
+
+    // ---- 7d-7g. ONE GUIDE DRAGGED PAST ANOTHER (EW-SHAPE-DRAG, 2026-09-02).
+    //
+    // The gesture neither refuses the crossing nor reorders — see the block in
+    // MapViewport for why both would be wrong. What it must not be is SILENT,
+    // and when both layers author a vsplit the crossing is an engine violation
+    // (`scene_vsplit_fires` ensures `line > prev`) that kills the build.
+    //
+    // ⚠ THE ROW HAS TO BE READ WHILE THE BUTTON IS STILL DOWN. That is the whole
+    // property: during a drag the DOCUMENT still holds the pre-drag top, so a
+    // notice asked of the stored array would appear one gesture late — after
+    // release, which is when it is no longer actionable. A row that pressed,
+    // released, and then looked would pass over exactly the defect being fixed.
+    // ⚠ BOTH TOPS MUST SIT INSIDE THE FIRE BAND (3..223), AND THAT IS THE POINT
+    // OF THE FIXTURE, not incidental setup. The first version of these rows left
+    // the layers where section 7 had them — 200 and 232 — and 232 is past the
+    // fire CEILING, so layer 1 carried a bound notice before the gesture began
+    // and the ordering notice never got its turn. That is the app behaving
+    // exactly as designed (a bound notice out-ranks an ordering one: "this top
+    // cannot exist" comes before "these two collide"), and it means a fixture
+    // out of band cannot test ordering at all. 100 and 150 are both legal, and
+    // the drag below lands on 180 — still legal, and below 150.
+    const ORDER_A = 100;
+    const ORDER_B = 150;
+    const setTop = (i, v) => c.evalExpr(SET_INPUT(
+      `[...document.querySelectorAll('input[type=number]')].find(e => new RegExp('^Layer ${i} (world_y|Screen line)').test(e.title||''))`,
+      v));
+    await setTop(0, ORDER_A);
+    await setTop(1, ORDER_B);
+    await sleep(700);
+    const setVsplit = (i, v) => c.evalExpr(SET_INPUT(
+      `[...document.querySelectorAll('select')].find(e => new RegExp('^Layer ${i} vsplit\\\\.at').test(e.title||''))`, v));
+    const vs0 = await setVsplit(0, 'at');
+    const vs1 = await setVsplit(1, 'at');
+    await sleep(700);
+    doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
+    const tops = sceneOf(doc).layers.map((l) => l.world_y);
+    const splits = sceneOf(doc).layers.map((l) => JSON.stringify(l.vsplit ?? null));
+    guides = await c.json('window.__dbg.aeon.guides()');
+    // The rule only bites when BOTH layers become fires, so a run where the
+    // selects did not take would otherwise report 7f green for the wrong reason.
+    check('7d', 'ANTI-VACUOUS: both layers now author a Plane B split, and layer 0 is ABOVE layer 1',
+      vs0 === 'ok' && vs1 === 'ok'
+      && sceneOf(doc).layers.every((l) => l.vsplit !== undefined && l.vsplit !== 'none')
+      && tops[0] === ORDER_A && tops[1] === ORDER_B,
+      `tops=${JSON.stringify(tops)} vsplit=${JSON.stringify(splits)} selects=${vs0}/${vs1}`);
+    check('7e', 'IN ORDER, THE CANVAS SAYS NOTHING — no notice on either guide',
+      guides.rows.every((r) => r.notice === null),
+      `notices=${JSON.stringify(guides.rows.map((r) => r.notice))}`);
+
+    // Drag layer 0 DOWN past layer 1, and LOOK WITHOUT LETTING GO.
+    const pastY = expectY(tops[1]) + 30;
+    await mouse('mousePressed', aimX, aimY(expectY(tops[0])));
+    await mouse('mouseMoved', aimX, aimY(pastY));
+    await sleep(500);
+    guides = await c.json('window.__dbg.aeon.guides()');
+    const orderDoc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
+    const ordered = guides.rows.find((r) => r.notice !== null && /not BELOW layer/.test(r.notice.text));
+    check('7f', 'DRAGGED PAST ITS NEIGHBOUR, THE CANVAS SAYS SO — mid-gesture, before release',
+      ordered !== undefined && ordered.notice.tone === 'illegal'
+      // …and it is the LIVE position talking, not the document's: the stored top
+      // has not moved, so a notice derived from the document could not exist.
+      && sceneOf(orderDoc).layers[0].world_y === tops[0],
+      `dragIndex=${guides.dragIndex} document still at ${sceneOf(orderDoc).layers[0].world_y} `
+      + `(started ${tops[0]}); notice=${JSON.stringify(guides.rows.map((r) => r.notice && r.notice.tone))}`
+      + ` text=${JSON.stringify(ordered?.notice?.text?.slice(0, 90) ?? null)}`);
+    // AND THE PIXELS. Everything above is a published report; this is the line.
+    // Red, on the row the report names, where 4d's cyan was.
+    const refusedPx = ordered
+      ? await c.json(PIXEL_AT(Math.round(rect.width * PROBE_X_FRAC),
+        Math.round(guides.rows.find((r) => r.index === ordered.index).canvasY)))
+      : null;
+    check('7g', 'the refused guide is drawn RED on the canvas, not merely reported',
+      refusedPx !== null && refusedPx.r > 150 && refusedPx.r - Math.max(refusedPx.g, refusedPx.b) > 40,
+      `pixel=${JSON.stringify(refusedPx)} at row ${ordered?.index}`);
+    await shot(c, '5-dragged-past-neighbour');
+
+    // Put it back: release where it started, then clear both splits.
+    await mouse('mouseMoved', aimX, aimY(expectY(tops[0])));
+    await mouse('mouseReleased', aimX, aimY(expectY(tops[0])));
+    await sleep(500);
+    await setVsplit(0, 'none');
+    await setVsplit(1, 'none');
+    await sleep(700);
 
     // ---- 8. THE FACET IS THE GATE. ---------------------------------------
     const paintsBefore = (await c.json('window.__dbg.aeon.guides()')).paints;
