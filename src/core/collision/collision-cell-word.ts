@@ -7,11 +7,23 @@ import { effectiveXFlip } from './collision-palette-organize';
  *    bit  10   X-flip  (mirror horizontally → the other slope direction)
  *    bit  11   Y-flip  (flip vertically → floor↔ceiling, up↔down)
  *    bits 12-13 solidity (this plane's path): none/top/sides-bottom/all
- *    bits 14-15 spare
- *  The build-time bake resolves the flip + solidity into the runtime 1-byte attr
- *  index (collision_pipeline flip_profile_x/y + flip_angle_x/y); the runtime
- *  collision plane stays one byte per cell. (The full Sonic "4 solidity bits" =
- *  this 2-bit field on plane A's word + the 2-bit field on plane B's word.) */
+ *    bits 14-15 LOOP CROSSOVER — NOT spare, and they have not been since
+ *              `layer-transition.ts` claimed them. This line said "spare" until
+ *              2026-09-03, and a stale "spare" is worse than no comment: it
+ *              reads as an invitation. (Found by the aeon lane while answering
+ *              a question I asked ON THE STRENGTH OF THIS TABLE.)
+ *  ⚠ THIS WORD IS A BAKE-TIME ARTIFACT AND IS NOT WHAT THE ENGINE READS, which
+ *  is the sentence below and is easy to skim past — I did, on 2026-09-03, and
+ *  told a peer lane "the cell word is 16 of 16 bits used, so there is no room"
+ *  as though that constrained the RUNTIME budget. It does not. The bake
+ *  resolves the flip + solidity into the runtime 1-byte attr index
+ *  (collision_pipeline flip_profile_x/y + flip_angle_x/y); the runtime
+ *  collision plane stays one byte per cell, and aeon measured 225 of its 256
+ *  interned slots FREE (31 used) on the same day this word was measured full.
+ *  A FULL AUTHORING WORD AND AN EMPTY RUNTIME BUDGET ARE BOTH TRUE AT ONCE.
+ *
+ *  (The full Sonic "4 solidity bits" = this 2-bit field on plane A's word +
+ *  the 2-bit field on plane B's word.) */
 export interface CollisionCell {
   shape: number;
   xFlip: boolean;
