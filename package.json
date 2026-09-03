@@ -46,6 +46,7 @@
     "gen:theme": "node scripts/gen-theme.mjs",
     "harness:aeon-priority-lens": "node scratchpad/aeon-priority-lens-harness.mjs",
     "harness:aether-method-gate": "node scratchpad/aether-method-gate-proof.mjs",
+    "harness:anchor-authoring": "node scratchpad/anchor-authoring-harness.mjs",
     "harness:animated-art": "node scratchpad/animated-art-harness.mjs",
     "harness:art-agent": "node scratchpad/art-agent-harness.mjs",
     "harness:band-art-foreground": "node scratchpad/band-art-foreground-harness.mjs",

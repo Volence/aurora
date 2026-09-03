@@ -329,3 +329,81 @@ describe('the panel mounts the leaf first in the channels section, unconditional
     expect(code).toMatch(/= \{Number\(values\[f\]\)\}/);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AND THE SAME, FIRST, IN THE MOVING-ANCHOR SECTION (ROADMAP row 95)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠ THE DISCLOSURE MATTERS MORE HERE THAN ANYWHERE ELSE IN THIS PANEL, and that
+// is measured rather than felt: `PRESET_KEYS_AWAITING_AEON` currently names
+// `patch_motion` and `patch_world_ys` — the two keys this section authors — and
+// the sentence it produces says the generator "refuses the WHOLE DOCUMENT, so a
+// preset carrying either key will not build". An author who cannot see that
+// sentence authors a preset that breaks aeon's build with no warning at all.
+//
+// A `CollapsibleSection` renders NO children while shut, so the leaf has to be
+// first and unconditional in the body for the same reason it is in the channels
+// section: anything before it is something an author could scroll past.
+describe('the panel mounts the leaf first in the ANCHORS section too, unconditionally', () => {
+  const code = stripComments(readFileSync(PANEL_PATH, 'utf8'));
+
+  it('the anchors section exists and its body opens with the disclosure', () => {
+    const section = code.indexOf('id="aeon.effects.preset.anchors"');
+    expect(section, 'no anchors section in the panel').toBeGreaterThan(0);
+    const body = code.indexOf('<SectionBody>', section);
+    const leaf = code.indexOf('<PresetLagDisclosure', section);
+    expect(body).toBeGreaterThan(section);
+    expect(leaf).toBeGreaterThan(body);
+    const between = code.slice(body + '<SectionBody>'.length, leaf);
+    expect(between.trim(),
+      `something sits between <SectionBody> and <PresetLagDisclosure>: ${between.trim()}`).toBe('');
+    // The controls come AFTER it, in the same body.
+    expect(code.indexOf('<AnchorChannelsBlock', leaf)).toBeGreaterThan(leaf);
+  });
+
+  it('⚠ THE SENTENCE ON SCREEN NAMES THE KEYS THIS SECTION AUTHORS, today', () => {
+    // Not a hardcoded pair: the premise is read, and the row states the two
+    // opposite readings so neither can pass silently.
+    const authored = ['patch_world_ys', 'patch_motion'];
+    const named = authored.filter((k) => PRESET_KEYS_AWAITING_AEON.includes(k));
+    if (named.length === 0) {
+      // aeon has landed step 4 — the disclosure retires and this section's
+      // controls become the ones whose output actually builds. Nothing to
+      // assert about the sentence; the row says so rather than passing mutely.
+      expect(presetLagDisclosure(PRESET_KEYS_AWAITING_AEON)).not.toContain('patch_world_ys');
+      return;
+    }
+    const sentence = presetLagDisclosure(PRESET_KEYS_AWAITING_AEON)!;
+    expect(sentence).not.toBeNull();
+    for (const k of named) expect(sentence).toContain(k);
+    // and it says what "not consumed yet" COSTS, which for these two keys is a
+    // failed build rather than a silently-dropped field.
+    expect(sentence).toMatch(/will not build|refuses the WHOLE DOCUMENT/);
+  });
+
+  it('the anchor controls read the provider and spell no rule of their own', () => {
+    for (const name of [
+      'ANCHOR_SEED_OPTIONS.map', 'ANCHOR_MOTION_OPTIONS.map',
+      'ANCHOR_AMP_OPTIONS.map', 'ANCHOR_PERIOD_OPTIONS.map',
+      'anchorChannelIndices(', 'anchorSeedState(', 'anchorMotionState(',
+      'anchorSeedRefusal', 'anchorPhaseRefusal', 'anchorExtendRefusal(',
+      'anchorMotionWithoutSeedAdvisory(',
+      'setAnchorSeedStateCommand(', 'setAnchorSeedCommand(', 'setAnchorMotionStateCommand(',
+      'setAnchorSweepShiftCommand(', 'setAnchorPhaseCommand(',
+    ]) {
+      expect(code, name).toContain(name);
+    }
+    // ⚠ NO LADDER, NO BOUND AND NO SCALE MAY BE SPELLED IN THE COMPONENT. A
+    // literal shift, a `* 256`, or a comparison against a rung here would be a
+    // second opinion about a base-2 logarithm — the one thing on this path that
+    // fails silently.
+    expect(code).not.toMatch(/amp_shift\s*[:=]\s*\d/);
+    expect(code).not.toMatch(/period_shift\s*[:=]\s*\d/);
+    expect(code).not.toMatch(/\*\s*256|\/\s*256/);
+    expect(code).not.toMatch(/patch_world_ys\s*=|patch_motion\s*=/);
+    // Titles are the schema's, through the provider.
+    expect(code).toMatch(/title=\{ANCHOR_SEED_TITLE\}/);
+    expect(code).toMatch(/title=\{ANCHOR_MOTION_TITLE\}/);
+    expect(code).toMatch(/anchorSweepFieldTitle\('amp_shift'\)/);
+  });
+});

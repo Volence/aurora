@@ -47,9 +47,9 @@ history of how it got there. **Nothing here was rewritten** — these are the ti
 
 ### EW-TIMELINE-CLOCK
 
-`size: M` · `state: open` · `blockedBy: FILE: aeon's P2b/anchor-mover landing (design doc status leaving 'design-only')` · `project: EFFECTS-W1`
+`size: M` · `state: done` · `blockedBy: None` · `project: EFFECTS-W1`
 
-> Raster timeline editing half, the CLOCK for moving bands — the other half of the DoD's timeline item, and genuinely gated. Needs aeon DoD item 4 (P2b moving-top + the time-driven anchor mover), which the ownership design still marks design-only. Also re-opens a ruled question: the preview is driver-faithful (camera bands preview clocklessly, only timer bands need a clock), so the clock is scoped to the anchor mover, not to the strip generally.
+> DELIVERED 2026-09-03 on branch `feat/ew-timeline-clock` (`ffb4faf6`…`c1e445d1`), packet `docs/reviews/2026-09-03-ew-timeline-clock.md`, ROADMAP row 95. The block lifted when EW-CHANNELS-WRITER landed the keys in the codec and nothing authored them. Both halves shipped: the `aeon.effects.preset.anchors` section on the Colour sub-tab (seed + motion + the two ladders as selects that cannot emit an off-ladder value), and the clock — `AnchorSweepPreview`, scoped to the anchor mover alone, drawing to its own canvas with no `setState`, mounted only while a sweep is authored. ⚠ THE STRIP DOES NOT SHOW A MOVING BAND AND CANNOT: this document carries no channel↔band link (a preset `band` is `top`/`bot`/`sh`/`on`), so that picture needs a contract change, not a parcel here — flagged rather than attempted. MapViewport's zero-idle-repaint property MEASURED intact (0 repaints / 301 preview frames / 301 page ticks over 5s), with a poison-found blind spot in that row reported rather than tuned away. NO EMULATOR AND NO ROM, and the on-screen disclosure says aeon's generator still refuses the whole document, so nothing authored here builds today. Two owner calls left open: the section's `defaultCollapsed` arrival, and truncated select labels in the 280px column. Found in passing and NOT this branch's: `variant-cycle-harness` threw at import on master (a wrapped `PRESET_KEYS_AWAITING_AEON` declaration) — fixed here — and its four failing rows are pre-existing, proven by a control run with the new section disabled.
 
 ### EW-PERLINE
 

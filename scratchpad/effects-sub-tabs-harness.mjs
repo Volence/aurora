@@ -121,6 +121,7 @@ const TITLE_OF = {
   'aeon.effects.presets': 'RASTER BAND PRESETS',
   'aeon.effects.preset.bands': 'PRESET — ',
   'aeon.effects.preset.channels': 'CYCLES',
+  'aeon.effects.preset.anchors': 'MOVING ANCHORS',
   'aeon.bganim.bands': 'TILE ANIMATIONS (',
   'aeon.bganim.new': 'NEW TILE ANIMATION',
 };

@@ -38,7 +38,10 @@ import type {
   EffectsPresetLibrary, EffectsPresetBand, EffectsPreset, EffectsPresetCycleChannel,
   EffectsPresetPalVariant,
 } from '../../../core/formats/effects/preset';
-import { EFFECTS_PRESET_BAND_KEYS, presetArmFields, presetDefFields } from '../../../core/formats/effects/preset';
+import {
+  EFFECTS_PRESET_BAND_KEYS, presetArmFields, presetDefFields,
+  EFFECTS_PRESET_MAX_PATCH, ANCHOR_PHASE_RANGE,
+} from '../../../core/formats/effects/preset';
 import {
   PRESET_HEADLINE, presetLimitsShort, NO_PREVIEW, NO_PREVIEW_SHORT,
   BAND_FIELD_TITLES, armFieldTitle, armOptions, armLabel,
@@ -57,7 +60,19 @@ import {
   VARIANT_FIELDS, variantFieldTitle, variantFieldSeed, setVariantFieldCommand,
   CRAM_LINES, variantLineOn, toggleVariantLineCommand,
   bandSubject, bandEdgeRefusal, variantLineRefusal, cycleFieldRefusal,
+  // THE MOVING ANCHOR (row 95). Every rule, option list and sentence below is
+  // the provider's, as everything else on this surface is; the ladders inside
+  // those option lists are the CODEC's, derived from the schema.
+  ANCHOR_SEED_TITLE, ANCHOR_MOTION_TITLE, anchorSweepFieldTitle,
+  ANCHOR_SEED_OPTIONS, ANCHOR_MOTION_OPTIONS, ANCHOR_AMP_OPTIONS, ANCHOR_PERIOD_OPTIONS,
+  anchorChannelIndices, anchorSeedState, anchorMotionState, anchorSeedValue, anchorSweepOf,
+  anchorSeedRefusal, anchorPhaseRefusal, anchorExtendRefusal, anchorMotionWithoutSeedAdvisory,
+  anchorSweepSummary,
+  setAnchorSeedStateCommand, setAnchorSeedCommand, setAnchorMotionStateCommand,
+  setAnchorSweepShiftCommand, setAnchorPhaseCommand,
 } from '../../providers/effects-preset';
+import type { AnchorSeedState, AnchorMotionState } from '../../providers/effects-preset';
+import { AnchorSweepPreview } from './AnchorSweepPreview';
 import { sectionRasterAdvisory, rasterChooserName } from '../../../core/formats/effects/section-wiring';
 import { openGuide } from '../../state/guideStore';
 import { EFFECTS_GUIDE_SLUG, GUIDE_ANCHORS } from '../guide/guides';
@@ -420,7 +435,230 @@ export default function BandPresetPanel(): React.ReactElement | null {
           </SectionBody>
         </CollapsibleSection>
       )}
+
+      {/* ═══ THE MOVING ANCHOR (ROADMAP row 95 / EW-TIMELINE-CLOCK) ═══
+
+          A SECTION OF ITS OWN, on the Colour job, for the fold reason the
+          cycles/variants split was made for: four channel cards, each with two
+          pickers, a world Y, three sweep controls and a live preview, is the
+          tallest thing this panel can draw. Folded into the bands section an
+          author scrolling for "Add raster band" would pass all of it.
+
+          ⚠ AND THE HEADER COUNTS, which the two sections above it do not. O55
+          measured this facet leading with its worse door: a creation surface
+          behind a shut accordion with nothing on the arrival screen saying it
+          exists. A shut section whose own title reads "moving anchors (2/4)"
+          says both that the feature is here and that this preset already uses
+          it — the `Tile animations (n/4)` idiom, which is the one header on
+          this facet that announces itself. */}
+      {selected && (
+        <CollapsibleSection
+          id="aeon.effects.preset.anchors"
+          title={`Preset — ${selected.id} — moving anchors${anchorHeaderCount(selected)}`}
+          defaultCollapsed>
+          <SectionBody>
+            <PresetLagDisclosure />
+            <AnchorChannelsBlock library={library} preset={selected} run={run} />
+          </SectionBody>
+        </CollapsibleSection>
+      )}
     </>
+  );
+}
+
+/**
+ * `` (n/4)`` when this preset spells any channel, and nothing when it spells
+ * none — so a preset that does not use the feature does not carry a `0/4` that
+ * reads like a broken counter.
+ *
+ * The denominator is the schema's `maxItems`, through the codec's constant. The
+ * numerator counts channels either key SPELLS — an index either array reaches —
+ * because that is what an author has authored here, and an unreached channel is
+ * by definition something they have not.
+ */
+function anchorHeaderCount(preset: EffectsPreset): string {
+  const seeds = Array.isArray(preset.patch_world_ys) ? preset.patch_world_ys.length : 0;
+  const motion = Array.isArray(preset.patch_motion) ? preset.patch_motion.length : 0;
+  const n = Math.max(seeds, motion);
+  return n === 0 ? '' : ` (${n}/${EFFECTS_PRESET_MAX_PATCH})`;
+}
+
+/**
+ * The moving-anchor channels.
+ *
+ * ═══ THE SENTENCE THAT COMES BEFORE THE CONTROLS ═══
+ *
+ * O56 measured the loop feature's entire on-screen vocabulary before an author
+ * interacts with it: one word, four characters, with every explanation in a
+ * hover or in text that only appears after you have already understood enough to
+ * click. Its first recommendation is a one-line hint present BEFORE the feature
+ * is armed. This is that line, and it is why it is not a tooltip.
+ */
+function AnchorChannelsBlock({ library, preset, run }: {
+  library: EffectsPresetLibrary; preset: EffectsPreset; run: (c: AnyCommand | null) => void;
+}): React.ReactElement {
+  return (
+    <>
+      <Hint>
+        A patch channel pins a band to a point in the LEVEL instead of to a screen line, so it
+        stays with the scenery as the camera moves — and a sweep makes that point drift up and
+        down on a timer. Set a world Y to place it; add a sweep to move it.
+      </Hint>
+      {anchorChannelIndices(preset).map((i) => (
+        <AnchorChannelCard key={i} library={library} preset={preset} index={i} run={run} />
+      ))}
+      <Hint style={{ marginBottom: 0 }}>
+        Saved to <code>data/editor/effects/presets/{preset.id}.json</code> as
+        {' '}<code>patch_world_ys</code> and <code>patch_motion</code>. A short array is left
+        short and an absent key is not written.
+      </Hint>
+    </>
+  );
+}
+
+/**
+ * One channel: its seed, its motion, and — when the motion is a sweep — the one
+ * clock in this editor.
+ *
+ * THE TWO PICKERS ARE THE SAME SHAPE AS `variants`' SLOT PICKER because they are
+ * the same three states, and an author who has met one has met the other. What
+ * is different is `anchorExtendRefusal`: two positional arrays with independent
+ * lengths means a state can be unreachable at an index the other key already
+ * reaches, and the option is DISABLED with the reason under it rather than
+ * silently filling the gap with a `null` the author did not author.
+ */
+function AnchorChannelCard({ library, preset, index, run }: {
+  library: EffectsPresetLibrary; preset: EffectsPreset; index: number;
+  run: (c: AnyCommand | null) => void;
+}): React.ReactElement {
+  const seedState = anchorSeedState(preset, index);
+  const motionState = anchorMotionState(preset, index);
+  const seed = anchorSeedValue(preset, index);
+  const sweep = anchorSweepOf(preset, index);
+  const seedBlocked = anchorExtendRefusal(preset, 'seed', index);
+  const motionBlocked = anchorExtendRefusal(preset, 'motion', index);
+  const noSeed = anchorMotionWithoutSeedAdvisory(preset, index);
+  const [seedRefusal, setSeedRefusal] = React.useState<string | null>(null);
+  const [phaseRefusal, setPhaseRefusal] = React.useState<string | null>(null);
+  return (
+    <Card>
+      <Field label={`Channel ${index}`} title={ANCHOR_SEED_TITLE}>
+        <Select title={ANCHOR_SEED_TITLE} value={seedState} style={{ flex: 1, minWidth: 0 }}
+          onChange={(v) => run(setAnchorSeedStateCommand(
+            library, preset.id, index, v as AnchorSeedState))}>
+          {ANCHOR_SEED_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}
+              disabled={seedBlocked !== null && o.value !== seedState}>{o.label}</option>
+          ))}
+        </Select>
+      </Field>
+      {seedBlocked !== null && <Hint under tone="warning">{seedBlocked}</Hint>}
+
+      {/* THE WORLD Y. No min/max on the spinner — `refuse` is the only thing
+          that withholds a commit (NumberField's own rule), and the two refusals
+          it enforces are the schema's: the u16 range and the sentinel spelled
+          as an integer. ⚠ NOTHING HERE MULTIPLIES. `drift.rate` is 1/256 px per
+          frame and the scene panel multiplies by 256 on export; a world Y put
+          through that habit lands 256 times down the level, validates clean,
+          and the band silently never appears. */}
+      {seedState === 'authored' && (
+        <>
+          <Field label="World Y" title={ANCHOR_SEED_TITLE}>
+            <NumberField title={ANCHOR_SEED_TITLE} width={80} value={seed ?? 0}
+              refuse={anchorSeedRefusal}
+              onRefusal={setSeedRefusal}
+              onChange={(n) => run(setAnchorSeedCommand(library, preset.id, index, n))} />
+            <span style={{ fontSize: T.tXs, color: T.textLo }}>px, level space</span>
+          </Field>
+          {seedRefusal !== null && <Hint under tone="warning">{seedRefusal}</Hint>}
+        </>
+      )}
+
+      <Field label="Movement" title={ANCHOR_MOTION_TITLE}>
+        <Select title={ANCHOR_MOTION_TITLE} value={motionState} style={{ flex: 1, minWidth: 0 }}
+          onChange={(v) => run(setAnchorMotionStateCommand(
+            library, preset.id, index, v as AnchorMotionState))}>
+          {ANCHOR_MOTION_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}
+              disabled={motionBlocked !== null && o.value !== motionState}>{o.label}</option>
+          ))}
+        </Select>
+      </Field>
+      {motionBlocked !== null && <Hint under tone="warning">{motionBlocked}</Hint>}
+      {/* A MOTION ON A CHANNEL WITH NO SEED SHOWS NOTHING, in the schema's own
+          words. Without this the author ships a no-op and nothing in the suite
+          tells them: aeon's generator lowers it without complaint. */}
+      {noSeed !== null && <Hint under tone="warning">{noSeed}</Hint>}
+
+      {sweep !== null && (
+        <>
+          {/* ⚠ BOTH SHIFTS ARE BASE-2 LOGARITHMS AND THESE SELECTS ARE THE
+              LADDERS THEMSELVES. The schema restates their ranges "only as the
+              rungs the UI must offer" and says a slider "must SNAP to a rung:
+              rounding a shift instead of snapping silently doubles or halves
+              the amplitude or the period, invisibly at author time". A select
+              fed from `ANCHOR_AMP_OPTIONS` cannot emit an off-ladder value at
+              all — there is nothing left to round. The labels are the physical
+              quantity, because px and seconds are what an author judges and a
+              shift is not. */}
+          <Field label="Travel" title={anchorSweepFieldTitle('amp_shift')}>
+            <Select title={anchorSweepFieldTitle('amp_shift')} value={String(sweep.amp_shift)}
+              style={{ flex: 1, minWidth: 0 }}
+              onChange={(v) => run(setAnchorSweepShiftCommand(
+                library, preset.id, index, 'amp_shift', Number(v)))}>
+              {ANCHOR_AMP_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Cycle" title={anchorSweepFieldTitle('period_shift')}>
+            <Select title={anchorSweepFieldTitle('period_shift')} value={String(sweep.period_shift)}
+              style={{ flex: 1, minWidth: 0 }}
+              onChange={(v) => run(setAnchorSweepShiftCommand(
+                library, preset.id, index, 'period_shift', Number(v)))}>
+              {ANCHOR_PERIOD_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </Select>
+          </Field>
+          {/* `phase` IS THE ONE CONTINUOUS FIELD and the one optional one:
+              present → a spinner and an unset; absent → a chip that writes it.
+              An absent `phase` is `anchor_sweep()`'s own default and a different
+              document from an explicit 0 — the `dir` idiom, one section up. */}
+          <Field label="Start at" title={anchorSweepFieldTitle('phase')}>
+            {sweep.phase !== undefined ? (
+              <>
+                <NumberField title={anchorSweepFieldTitle('phase')} width={64}
+                  value={sweep.phase}
+                  refuse={anchorPhaseRefusal}
+                  onRefusal={setPhaseRefusal}
+                  onChange={(n) => run(setAnchorPhaseCommand(library, preset.id, index, n))} />
+                <span style={{ fontSize: T.tXs, color: T.textLo }}>
+                  /{ANCHOR_PHASE_RANGE.max + 1} of a cycle
+                </span>
+                <IconButton icon={<span>Unset</span>} label={`Unset phase on channel ${index}`}
+                  onClick={() => run(setAnchorPhaseCommand(library, preset.id, index, undefined))} />
+              </>
+            ) : (
+              <Chip title={'phase is absent — anchor_sweep() defaults it to 0. Set it to write a '
+                + 'value, which is a different document from an absent field.'}
+                onClick={() => run(setAnchorPhaseCommand(library, preset.id, index, 0))}>
+                absent — set
+              </Chip>
+            )}
+          </Field>
+          {phaseRefusal !== null && <Hint under tone="warning">{phaseRefusal}</Hint>}
+          {anchorSweepSummary(sweep) !== null && (
+            <Hint under>{anchorSweepSummary(sweep)}</Hint>
+          )}
+          {/* THE CLOCK. Mounted only here — for a channel whose motion is an
+              authored sweep — so there is no loop running when nothing is
+              animating. See AnchorSweepPreview.tsx's header for why that is
+              structural and what it does NOT draw. */}
+          <AnchorSweepPreview sweep={sweep} channel={index} />
+        </>
+      )}
+    </Card>
   );
 }
 

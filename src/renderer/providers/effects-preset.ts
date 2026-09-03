@@ -37,11 +37,18 @@
 
 import type {
   EffectsPreset, EffectsPresetBand, EffectsPresetLibrary, EffectsPresetBandOn,
-  EffectsPresetCycleChannel,
+  EffectsPresetCycleChannel, EffectsPresetAnchorSweep, AnchorAmpRung, AnchorPeriodRung,
 } from '../../core/formats/effects/preset';
 import {
   EFFECTS_PRESET_ID_PATTERN, EFFECTS_PRESET_ON_ARMS, EFFECTS_PRESET_SCHEMA,
   presetArmIssue, presetOnArms, presetArmFields, presetDefFields, effectsPresetPath,
+  // THE MOVING ANCHOR'S BOUNDS AND LADDERS — every one of them DERIVED FROM THE
+  // SCHEMA in the codec (EW-CHANNELS-WRITER) and imported here, never re-derived
+  // and never retyped. The ladders in particular: `amp_shift` and `period_shift`
+  // are base-2 logarithms, and a second opinion about a rung in this file would
+  // be a silent doubling waiting for a reader who trusted the wrong copy.
+  EFFECTS_PRESET_MAX_PATCH, EFFECTS_PRESET_WORLD_Y_RANGE, EFFECTS_PRESET_PATCH_ANCHOR_NONE,
+  ANCHOR_AMP_RUNGS, ANCHOR_PERIOD_RUNGS, ANCHOR_PHASE_RANGE,
 } from '../../core/formats/effects/preset';
 import type { SetEffectsPresetCommand, SetSectionRasterCommand } from '../../core/editing/commands';
 // THE BINDING LIMIT IS NOT RE-TYPED HERE. `PRESET_LIMITS.unbound` below is the
@@ -1844,3 +1851,478 @@ export function splitBandCommand(
     p.bands.splice(index + 1, 0, lower);
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THE MOVING ANCHOR — `patch_world_ys` + `patch_motion` (EW-TIMELINE-CLOCK)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// EW-CHANNELS-WRITER (empyrean d36d704 / AURORA_EFFECTS_SCHEMA.md §7.3) taught
+// the codec to accept, round-trip and write these two keys, and carried the
+// ladders and converters so THIS surface would not re-derive them. Nothing
+// authored them until now. Everything below is either read from the schema or
+// imported from `core/formats/effects/preset.ts`; no bound and no ladder is
+// retyped here.
+//
+// ═══ THE FOUR PROPERTIES A CONTROL ON THIS PATH CAN SILENTLY VIOLATE ═══
+//
+// 1. BOTH SHIFTS ARE BASE-2 LOGARITHMS. The schema's own words: the ranges are
+//    "restated here only as THE RUNGS THE UI MUST OFFER", and "a slider must
+//    SNAP to a rung: rounding a shift instead of snapping silently doubles or
+//    halves the amplitude or the period, invisibly at author time". So this
+//    surface OFFERS THE RUNGS — `ANCHOR_AMP_OPTIONS` / `ANCHOR_PERIOD_OPTIONS`
+//    are the ladders themselves, and a control fed from them cannot emit an
+//    off-ladder value at all, which is the stronger form of "must snap": there
+//    is nothing left to snap. `phase` is the only continuous field.
+//
+// 2. THREE STATES PER INDEX, AND THEY ARE THREE. An index the array does not
+//    reach KEEPS the section's hand-authored value; `null` is the sentinel
+//    (`PATCH_ANCHOR_NONE` for a seed, `ANCHOR_MOTION_NONE` for a motion); a
+//    value authors it. ⚠ **`0` IS A REAL WORLD Y** — above the screen top, the
+//    most invasive state a channel can have — so no control here may map a
+//    cleared field to 0, and `newAnchorWorldY` is deliberately not 0.
+//    `anchorSeedRefusal` refuses the sentinel spelled as an integer for the
+//    matching reason: two spellings of "unused" is one too many.
+//
+// 3. A MOTION ON A CHANNEL WITH NO SEED SHOWS NOTHING. The schema says it;
+//    `ANCHOR_MOTION_WITHOUT_SEED` is that sentence read out of the contract,
+//    and `anchorMotionWithoutSeedAdvisory` puts it under the control that
+//    produced the state instead of letting an author ship a no-op.
+//
+// 4. THE SEED IS WHOLE PIXELS, 1:1. `EFFECTS_PRESET_PATCH_SEED_UNITS_PER_PIXEL`
+//    is 1 and NOTHING ON THIS PATH MULTIPLIES — the `drift.rate` habit (×256 on
+//    export) lands a world Y 256 times down the level, where 224 × 256 = 57344
+//    validates clean and the band silently never appears. The codec has a row
+//    that goes red if anything here starts converting; it is not defeated.
+//
+// ═══ NO PADDING, AND NO HOLES EITHER ═══
+//
+// A SHORT ARRAY IS LEGAL AND IS NEVER PADDED — padding turns "the section keeps
+// its hand-authored channel" into "the editor authored something here", which is
+// a different document. The consequence is that a positional array cannot grow a
+// HOLE either, so this surface offers a state change only at an index the array
+// already reaches or ends exactly at (the `variants` slot rule), and
+// `anchorExtendRefusal` is the sentence for the one case that leaves —
+// authoring channel 2's motion while channel 1's is unspelled.
+//
+// AND AURORA NEVER WRITES AN EMPTY ARRAY. When the last spelled channel of a key
+// is taken back to `unreached` the KEY IS DELETED, because `[]` and absent mean
+// exactly the same thing for these two keys (unlike `cycles`, whose `[]` is the
+// generator's own refusal and is preserved verbatim). Writing `[]` would put a
+// key in the file that the author never asked for.
+
+/** How the document spells one channel's SEED. */
+export type AnchorSeedState = 'unreached' | 'unused' | 'authored';
+/** How the document spells one channel's MOTION. */
+export type AnchorMotionState = 'unreached' | 'still' | 'sweep';
+
+export const ANCHOR_SEED_TITLE = presetFieldTitle(['properties', 'patch_world_ys']);
+export const ANCHOR_MOTION_TITLE = presetFieldTitle(['properties', 'patch_motion']);
+export const ANCHOR_SWEEP_TITLE = presetFieldTitle(['$defs', 'anchor_sweep']);
+
+/** One sweep field's title, straight from the schema. */
+export function anchorSweepFieldTitle(field: string): string {
+  return presetFieldTitle(['$defs', 'anchor_sweep', 'properties', field]);
+}
+
+/**
+ * THE SENTENCE ABOUT A MOTION WITH NO SEED — the schema's own, extracted rather
+ * than retyped, and extracted LOUDLY. If the contract stops saying it this
+ * throws at module load instead of quietly advising something the schema no
+ * longer holds — `EMPTY_CYCLES_ADVISORY`'s posture, one key over.
+ */
+export const ANCHOR_MOTION_WITHOUT_SEED: string = (() => {
+  const m = /A seed without a motion is legal and stationary;[^.]*\./.exec(ANCHOR_SEED_TITLE);
+  if (!m) {
+    throw new Error('the schema\'s `patch_world_ys` description no longer carries its "A seed '
+      + 'without a motion is legal and stationary" sentence — re-read the contract before '
+      + 'advising an author about a motion with no seed');
+  }
+  return m[0];
+})();
+
+/**
+ * THE SEED A NEW SWEEP IS BORN WITH — the schema's OWN shipped precedent, parsed
+ * out of its prose ("The shipped hand-authored precedent is OJZ_Preset_Sec0,
+ * anchor_sweep(amp_shift: 4, period_shift: 1)"), never typed beside it.
+ *
+ * Two numbers Aurora does not get to invent: a fresh sweep is the one motion in
+ * the shipped game, which is a starting point an author can SEE working rather
+ * than a pair of ladder ends this repo picked. `phase` is left ABSENT because it
+ * is the one field `anchor_sweep()` defaults, and an absent optional field is a
+ * different document from an explicit 0 that happens to equal the default.
+ */
+export function newAnchorSweep(): EffectsPresetAnchorSweep {
+  const m = /anchor_sweep\(amp_shift: (\d+), period_shift: (\d+)\)/.exec(ANCHOR_SWEEP_TITLE);
+  if (!m) {
+    throw new Error('the schema\'s `anchor_sweep` description no longer names its shipped '
+      + 'hand-authored precedent in the shape anchor_sweep(amp_shift: N, period_shift: N) that a '
+      + 'new sweep is seeded from — do NOT hardcode a rung pair: read the contract and re-derive');
+  }
+  return { amp_shift: Number(m[1]), period_shift: Number(m[2]) };
+}
+
+/**
+ * The world Y a brand-new channel is born on.
+ *
+ * NOT 0, AND NOT A NUMBER THIS FILE INVENTED EITHER: it is the middle of the
+ * engine's own visible band, `(EFFECTS_FIRE_LINE_MIN + EFFECTS_FIRE_LINE_MAX)/2`,
+ * imported from the one module that declares that bound. With the camera at the
+ * top of a level that is a seed an author can see, and it is a starting point to
+ * type over rather than a value Aurora claims is right — `newBand`'s posture.
+ *
+ * ⚠ THE ONE VALUE IT MUST NOT BE IS 0, and that is not a style preference: 0 is
+ * a real world Y above the screen top and the most invasive state a channel can
+ * have, so a control that seeded it would author that state by default every
+ * time an author opened a channel.
+ */
+export function newAnchorWorldY(): number {
+  return Math.round((EFFECTS_FIRE_LINE_MIN + EFFECTS_FIRE_LINE_MAX) / 2);
+}
+
+/** The amplitude ladder as `<Select>` options — the rungs, in the schema's order. */
+export const ANCHOR_AMP_OPTIONS: readonly { value: number; label: string }[] = Object.freeze(
+  ANCHOR_AMP_RUNGS.map((r) => Object.freeze({
+    value: r.amp_shift,
+    label: `±${r.peak_px} px (${r.peak_to_peak_px} px of travel)`,
+  })),
+);
+
+/**
+ * The period ladder as `<Select>` options.
+ *
+ * SECONDS FIRST AND TICKS BESIDE THEM: seconds is what an author can judge, and
+ * ticks is what the engine counts. Both come off the rung, so the two can never
+ * disagree. Two decimals because the first rung is 4.27 s and rounding it to 4
+ * would put a number on screen that is not the one the file means.
+ */
+export const ANCHOR_PERIOD_OPTIONS: readonly { value: number; label: string }[] = Object.freeze(
+  ANCHOR_PERIOD_RUNGS.map((r) => Object.freeze({
+    value: r.period_shift,
+    label: `every ${r.seconds.toFixed(2)} s (${r.ticks} ticks)`,
+  })),
+);
+
+/** The rung a sweep's `amp_shift` names, or null when the file is off-ladder. */
+export function anchorAmpRungOf(sweep: EffectsPresetAnchorSweep): AnchorAmpRung | null {
+  return ANCHOR_AMP_RUNGS.find((r) => r.amp_shift === sweep.amp_shift) ?? null;
+}
+
+/** The rung a sweep's `period_shift` names, or null when the file is off-ladder. */
+export function anchorPeriodRungOf(sweep: EffectsPresetAnchorSweep): AnchorPeriodRung | null {
+  return ANCHOR_PERIOD_RUNGS.find((r) => r.period_shift === sweep.period_shift) ?? null;
+}
+
+/**
+ * One line saying what this sweep DOES, in the units an author thinks in.
+ *
+ * Null when either shift is off the ladder. A hand-written file the schema would
+ * refuse cannot reach this panel today, but a sentence that invented a number
+ * for one would be worse than no sentence at all.
+ */
+export function anchorSweepSummary(sweep: EffectsPresetAnchorSweep): string | null {
+  const amp = anchorAmpRungOf(sweep);
+  const period = anchorPeriodRungOf(sweep);
+  if (!amp || !period) return null;
+  const steps = ANCHOR_PHASE_RANGE.max + 1;
+  const pct = Math.round(((sweep.phase ?? 0) / steps) * 100);
+  return `${amp.peak_to_peak_px} px of travel, up and down, once every `
+    + `${period.seconds.toFixed(2)} s — starting ${pct}% into the cycle`;
+}
+
+/** The state of channel `index`'s SEED as the document spells it. */
+export function anchorSeedState(preset: EffectsPreset, index: number): AnchorSeedState {
+  const a = preset.patch_world_ys;
+  if (!Array.isArray(a) || index >= a.length) return 'unreached';
+  return a[index] === null ? 'unused' : 'authored';
+}
+
+/** The state of channel `index`'s MOTION as the document spells it. */
+export function anchorMotionState(preset: EffectsPreset, index: number): AnchorMotionState {
+  const a = preset.patch_motion;
+  if (!Array.isArray(a) || index >= a.length) return 'unreached';
+  return a[index] === null ? 'still' : 'sweep';
+}
+
+/** Channel `index`'s authored world Y, or null when it is not authored. */
+export function anchorSeedValue(preset: EffectsPreset, index: number): number | null {
+  const a = preset.patch_world_ys;
+  if (!Array.isArray(a) || index >= a.length) return null;
+  const v = a[index];
+  return typeof v === 'number' ? v : null;
+}
+
+/** Channel `index`'s authored sweep, or null when it carries no motion object. */
+export function anchorSweepOf(
+  preset: EffectsPreset, index: number,
+): EffectsPresetAnchorSweep | null {
+  const a = preset.patch_motion;
+  if (!Array.isArray(a) || index >= a.length) return null;
+  const m = a[index];
+  return m && typeof m === 'object' ? m.sweep : null;
+}
+
+/**
+ * The channels the panel draws: every channel EITHER key reaches, plus one to
+ * extend into — capped at `EFFECTS_PRESET_MAX_PATCH`, which is the schema's own
+ * `maxItems` and not a number chosen here.
+ *
+ * `variants` draws its slots the same way and for the same reason. The cap is
+ * the one difference: `variants` has none in the schema, `patch_world_ys` has 4.
+ */
+export function anchorChannelIndices(preset: EffectsPreset): number[] {
+  const seeds = Array.isArray(preset.patch_world_ys) ? preset.patch_world_ys.length : 0;
+  const motion = Array.isArray(preset.patch_motion) ? preset.patch_motion.length : 0;
+  const n = Math.min(Math.max(seeds, motion) + 1, EFFECTS_PRESET_MAX_PATCH);
+  return Array.from({ length: n }, (_, i) => i);
+}
+
+/**
+ * The three seed spellings, each labelled with what it WRITES.
+ *
+ * ⚠ `unused` READS "null", NOT "0" AND NOT A BARE "none". The whole hazard this
+ * key carries is that 0 is a real — and the most invasive — world Y; a picker
+ * saying "none" beside a number field is one an author can reasonably read as
+ * "zero". The option says the spelling the file gets.
+ */
+export const ANCHOR_SEED_OPTIONS: readonly { value: AnchorSeedState; label: string }[] =
+  Object.freeze([
+    { value: 'unreached', label: 'keep the section\'s hand-authored anchor (array ends here)' },
+    { value: 'unused', label: 'channel unused (null)' },
+    { value: 'authored', label: 'follow a world Y (whole pixels)' },
+  ]);
+
+/** The three motion spellings, on the same terms. */
+export const ANCHOR_MOTION_OPTIONS: readonly { value: AnchorMotionState; label: string }[] =
+  Object.freeze([
+    { value: 'unreached', label: 'keep the section\'s hand-authored motion (array ends here)' },
+    { value: 'still', label: 'no motion — the anchor stays on its seed (null)' },
+    { value: 'sweep', label: 'sweep — up and down about the seed (object)' },
+  ]);
+
+/**
+ * Why this world Y cannot be written, or null.
+ *
+ * TWO REFUSALS AND NOTHING ELSE, both of them the schema's own and neither of
+ * them a clamp: the u16 range, and the sentinel spelled as an integer. Every
+ * other number is forwarded verbatim — this surface does not know where a level
+ * ends, and the band spinners' rule (aeon §E.4) holds here too.
+ */
+export function anchorSeedRefusal(worldY: number): string | null {
+  if (!Number.isInteger(worldY)) {
+    return 'A world Y is a whole pixel of absolute level space — there is no sub-pixel here.';
+  }
+  if (worldY < EFFECTS_PRESET_WORLD_Y_RANGE.min || worldY > EFFECTS_PRESET_WORLD_Y_RANGE.max) {
+    return `The engine field is a u16, so a world Y is ${EFFECTS_PRESET_WORLD_Y_RANGE.min} to `
+      + `${EFFECTS_PRESET_WORLD_Y_RANGE.max}. ${worldY} would not validate and could not be saved.`;
+  }
+  if (worldY === EFFECTS_PRESET_PATCH_ANCHOR_NONE) {
+    return `${EFFECTS_PRESET_PATCH_ANCHOR_NONE} is the engine's "channel unused" sentinel and the `
+      + 'schema refuses it as a number, so the two spellings cannot both mean it. To leave this '
+      + 'channel unused pick "channel unused (null)" above.';
+  }
+  return null;
+}
+
+/** Why this phase cannot be written, or null. `phase` is the one continuous field. */
+export function anchorPhaseRefusal(phase: number): string | null {
+  if (!Number.isInteger(phase)
+    || phase < ANCHOR_PHASE_RANGE.min || phase > ANCHOR_PHASE_RANGE.max) {
+    return `Phase is a whole step into the 256-entry sine table: ${ANCHOR_PHASE_RANGE.min} to `
+      + `${ANCHOR_PHASE_RANGE.max}, one full cycle.`;
+  }
+  return null;
+}
+
+/**
+ * Why a channel's state cannot be changed on this key yet, or null.
+ *
+ * THE ONE CASE A POSITIONAL ARRAY LEAVES. Both arrays are positional and neither
+ * may grow a hole, so a channel can only be spelled when its key's array already
+ * reaches it or ends exactly at it. Authoring channel 2's motion while channel
+ * 1's is unspelled would have to invent channel 1 — and the only value it could
+ * invent is `null`, which is not "unspelled", it is "no motion": a different
+ * document. So it REFUSES, and names the channel to spell first.
+ *
+ * ⚠ THIS IS A REFUSAL, NOT A CLAMP AND NOT A FILL. Filling the gap would be one
+ * click and would silently author a channel the author was not looking at —
+ * `deletePresetRefusal`'s reasoning, on a smaller surface.
+ */
+export function anchorExtendRefusal(
+  preset: EffectsPreset, key: 'seed' | 'motion', index: number,
+): string | null {
+  const arr = key === 'seed' ? preset.patch_world_ys : preset.patch_motion;
+  const len = Array.isArray(arr) ? arr.length : 0;
+  if (index <= len) return null;
+  const what = key === 'seed' ? 'anchor' : 'motion';
+  return `Channel ${len}'s ${what} is not spelled yet, and a positional array cannot have a hole. `
+    + `Spell channel ${len} first — anything but "array ends here" will do.`;
+}
+
+/**
+ * The sentence under a motion authored on a channel with no seed, or null.
+ *
+ * The SCHEMA'S OWN sentence (`ANCHOR_MOTION_WITHOUT_SEED`), shown exactly when
+ * the document is in the state it describes: a sweep at an index whose seed is
+ * not authored. An author who writes that ships a no-op, and nothing else in the
+ * suite would tell them — aeon's generator lowers it without complaint, and in a
+ * game whose `SCANLINE_CAPS` does not raise `CAP_ANCHOR_MOTION` the whole motion
+ * is a silent no-op anyway (the schema's `patch_motion` sentence, one hover away
+ * on this field's own title).
+ */
+export function anchorMotionWithoutSeedAdvisory(
+  preset: EffectsPreset, index: number,
+): string | null {
+  if (anchorMotionState(preset, index) !== 'sweep') return null;
+  if (anchorSeedState(preset, index) === 'authored') return null;
+  return ANCHOR_MOTION_WITHOUT_SEED;
+}
+
+/** Drop a key that has become an empty array. Aurora never writes `[]` here. */
+function pruneEmptyAnchorKey(p: EffectsPreset, key: 'patch_world_ys' | 'patch_motion'): void {
+  const arr = p[key];
+  if (Array.isArray(arr) && arr.length === 0) delete p[key];
+}
+
+/**
+ * Author one channel's SEED spelling.
+ *
+ *   unreached — the array ENDS BEFORE this channel: it and every channel after
+ *               it are dropped, and an array left empty takes its key with it.
+ *   unused    — `null` at the index.
+ *   authored  — a number at the index, `newAnchorWorldY()` and never 0.
+ *
+ * An index past the end of the array (`anchorExtendRefusal`'s case) and an index
+ * at or past `EFFECTS_PRESET_MAX_PATCH` both change nothing, so a caller that is
+ * not the panel cannot open a hole or overrun the schema's `maxItems` either.
+ */
+export function setAnchorSeedStateCommand(
+  library: EffectsPresetLibrary, id: string, index: number, state: AnchorSeedState,
+): SetEffectsPresetCommand | null {
+  return editPresetCommand(library, id, `Preset ${id} channel ${index} anchor: ${state}`, (p) => {
+    const a = Array.isArray(p.patch_world_ys) ? p.patch_world_ys : [];
+    if (index < 0 || index > a.length || index >= EFFECTS_PRESET_MAX_PATCH) return;
+    p.patch_world_ys = a;
+    if (state === 'unreached') a.length = Math.min(index, a.length);
+    else if (state === 'unused') a[index] = null;
+    else if (typeof a[index] !== 'number') a[index] = newAnchorWorldY();
+    pruneEmptyAnchorKey(p, 'patch_world_ys');
+  });
+}
+
+/** Set one channel's authored world Y. A refused value never reaches the document. */
+export function setAnchorSeedCommand(
+  library: EffectsPresetLibrary, id: string, index: number, worldY: number,
+): SetEffectsPresetCommand | null {
+  if (anchorSeedRefusal(worldY) !== null) return null;
+  return editPresetCommand(library, id, `Preset ${id} channel ${index} world Y`, (p) => {
+    const a = p.patch_world_ys;
+    if (!Array.isArray(a) || index < 0 || index >= a.length) return;
+    if (typeof a[index] !== 'number') return;
+    a[index] = worldY;
+  });
+}
+
+/** Author one channel's MOTION spelling. Mirrors the seed's three states exactly. */
+export function setAnchorMotionStateCommand(
+  library: EffectsPresetLibrary, id: string, index: number, state: AnchorMotionState,
+): SetEffectsPresetCommand | null {
+  return editPresetCommand(library, id, `Preset ${id} channel ${index} motion: ${state}`, (p) => {
+    const a = Array.isArray(p.patch_motion) ? p.patch_motion : [];
+    if (index < 0 || index > a.length || index >= EFFECTS_PRESET_MAX_PATCH) return;
+    p.patch_motion = a;
+    if (state === 'unreached') a.length = Math.min(index, a.length);
+    else if (state === 'still') a[index] = null;
+    else {
+      const cur = a[index];
+      if (!cur || typeof cur !== 'object') a[index] = { sweep: newAnchorSweep() };
+    }
+    pruneEmptyAnchorKey(p, 'patch_motion');
+  });
+}
+
+/**
+ * Set one shift on a channel's sweep.
+ *
+ * ⚠ THE VALUE IS A RUNG, NOT A PHYSICAL QUANTITY, and this REFUSES anything the
+ * ladder does not carry rather than rounding it. `ANCHOR_AMP_OPTIONS` /
+ * `ANCHOR_PERIOD_OPTIONS` are the only thing the panel feeds it, so from the UI
+ * the refusal is unreachable — it is here because an agent, a paste or a later
+ * caller is not the UI, and a shift rounded by one rung is a doubling that
+ * nothing downstream would report.
+ */
+export function setAnchorSweepShiftCommand(
+  library: EffectsPresetLibrary, id: string, index: number,
+  field: 'amp_shift' | 'period_shift', shift: number,
+): SetEffectsPresetCommand | null {
+  const onLadder = field === 'amp_shift'
+    ? ANCHOR_AMP_RUNGS.some((r) => r.amp_shift === shift)
+    : ANCHOR_PERIOD_RUNGS.some((r) => r.period_shift === shift);
+  if (!onLadder) return null;
+  return editPresetCommand(library, id, `Preset ${id} channel ${index} ${field}`, (p) => {
+    const a = p.patch_motion;
+    if (!Array.isArray(a) || index < 0 || index >= a.length) return;
+    const m = a[index];
+    if (!m || typeof m !== 'object' || !m.sweep) return;
+    m.sweep[field] = shift;
+  });
+}
+
+/**
+ * Set or unset a sweep's `phase`. `undefined` deletes it, handing the value back
+ * to `anchor_sweep()`'s own default of 0 — a different document from an explicit
+ * 0, which is why the panel offers both spellings.
+ */
+export function setAnchorPhaseCommand(
+  library: EffectsPresetLibrary, id: string, index: number, phase: number | undefined,
+): SetEffectsPresetCommand | null {
+  if (phase !== undefined && anchorPhaseRefusal(phase) !== null) return null;
+  return editPresetCommand(library, id, `Preset ${id} channel ${index} phase`, (p) => {
+    const a = p.patch_motion;
+    if (!Array.isArray(a) || index < 0 || index >= a.length) return;
+    const m = a[index];
+    if (!m || typeof m !== 'object' || !m.sweep) return;
+    if (phase === undefined) delete m.sweep.phase;
+    else m.sweep.phase = phase;
+  });
+}
+
+/**
+ * WHERE THE ANCHOR IS AT TICK `t`, in pixels of offset from its seed.
+ *
+ * THE PREVIEW'S ONE PIECE OF ARITHMETIC, and it lives here rather than inside
+ * the canvas that draws it so that a node row can read it: peak `256 >>
+ * amp_shift` px, one cycle `256 << period_shift` ticks, `phase` a whole step
+ * into a 256-entry sine table. Every number comes off a rung; nothing is retyped
+ * and nothing is scaled.
+ *
+ * ⚠ IT IS NOT A CLAIM ABOUT A SCREEN, AND THAT LIMIT IS STRUCTURAL. The band's
+ * screen line is `anchor - Camera_Y`, and THIS DOCUMENT DOES NOT SAY WHICH BAND
+ * A CHANNEL DRIVES — a preset `band` carries `top`, `bot`, `sh` and `on`, and no
+ * channel index — so nothing here can draw a moving band. What this returns is
+ * the EXCURSION about the seed, which is exactly what the two authored rungs
+ * mean and no more.
+ */
+export function anchorOffsetAtTick(sweep: EffectsPresetAnchorSweep, tick: number): number {
+  const amp = anchorAmpRungOf(sweep);
+  const period = anchorPeriodRungOf(sweep);
+  if (!amp || !period) return 0;
+  const steps = ANCHOR_PHASE_RANGE.max + 1;
+  const turns = (tick / period.ticks) + ((sweep.phase ?? 0) / steps);
+  return amp.peak_px * Math.sin(turns * 2 * Math.PI);
+}
+
+/**
+ * Logic ticks per second, taken from a RUNG (`ticks / seconds`) rather than
+ * typed as 60. The ladder already carries both, so the preview's clock and the
+ * period labels cannot come to disagree about how long a cycle is.
+ */
+export const ANCHOR_TICK_HZ: number =
+  ANCHOR_PERIOD_RUNGS[0].ticks / ANCHOR_PERIOD_RUNGS[0].seconds;
+
+/**
+ * The tallest peak on the ladder — what the preview scales its envelope to, so
+ * a 1 px sweep LOOKS like a 1 px sweep beside a 64 px one instead of every rung
+ * filling the strip and every sweep looking identical.
+ */
+export const ANCHOR_MAX_PEAK_PX: number =
+  ANCHOR_AMP_RUNGS.reduce((m, r) => Math.max(m, r.peak_px), 0);

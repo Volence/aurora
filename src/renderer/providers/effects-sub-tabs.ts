@@ -78,8 +78,13 @@ export const EFFECTS_SUB_TABS: readonly EffectsSubTab[] = [
     label: 'Colour',
     blurb: 'RASTER BANDS: a range of screen lines over which the palette is repainted, '
       + 'plus its cycles and variants. Costs no tiles.',
+    // `aeon.effects.preset.anchors` is the MOVING ANCHOR (ROADMAP row 95): a
+    // patch channel's world-Y seed and its sweep. It is on Colour rather than
+    // Parallax because it is a property of the raster PRESET document — the
+    // same file as the bands, the cycles and the variants beside it — and not
+    // of a scene's layers, however much "it moves" sounds like the scroll job.
     sections: ['aeon.effects.timeline', 'aeon.effects.presets', 'aeon.effects.preset.bands',
-      'aeon.effects.preset.channels'],
+      'aeon.effects.preset.channels', 'aeon.effects.preset.anchors'],
   },
   {
     id: 'tileAnim',
