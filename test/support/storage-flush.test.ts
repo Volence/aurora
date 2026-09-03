@@ -1,25 +1,29 @@
 /**
- * O79 — THE TEARDOWN FLUSH BARRIER, EXERCISED WHERE `npm test` CAN SEE IT.
+ * O79 — THE TEARDOWN FLUSH CHECK, EXERCISED WHERE `npm test` CAN SEE IT.
  *
  * `scratchpad/canvas-cdp-harness.mjs` is four sequential Electron launches and
  * every restart row reads what the previous launch left in `localStorage`. O50
  * measured that precondition failing spontaneously in **4 of 9 runs**
  * (`docs/reviews/2026-09-03-o50-triage-c.md` §3.5) and left it open after two
- * attempted fixes. The cause is Chromium's throttled localStorage commit racing
- * a process that is gone ~50 ms after `window.close()`; the fix is a barrier
- * that waits for the BYTES ON DISK instead of for a duration.
+ * attempted fixes. This parcel's measurements are in
+ * `docs/reviews/2026-09-03-canvas-harness-teardown-flake.md`; the short version
+ * is that Chromium's own commit for a busy session here is 44-54 s away, that
+ * `window.close()` pre-empts that timer and carries the flush, and that what the
+ * teardown was missing was therefore not a WAIT but a CHECK.
  *
  * WHY THE SUBJECT IS `scratchpad/lib/storage-flush.mjs` AND NOT THE HARNESS —
  * the same reason `run-root.test.ts` gives for its own split: the harness spawns
  * an Electron against a built `dist/` under an X server, so `npm test` can never
  * execute it, and a property proved only inside it is proved nowhere. The
- * barrier's decisions live in a module this file drives directly, with every
- * filesystem and clock dependency injected.
+ * check's decisions live in a module this file drives directly, with every
+ * filesystem dependency injected.
  *
- * ⚠ THE ROW THAT MATTERS MOST IS `awaitFlushed` RETURNING `flushed: false`.
- * The failure mode of this whole parcel would be a barrier that gets to green by
- * never being able to fail. The timeout row asserts the opposite, and the
- * harness refuses on it.
+ * ⚠ THE ROW THAT MATTERS MOST IS `bytesOnDisk` ANSWERING FALSE. The failure mode
+ * of this whole parcel would be a check that gets to green by never being able
+ * to fail. Its live proof is the packet's negative control — delete the
+ * `window.close()` line and three of four sessions report their last write
+ * missing — and its unit proof is the row below with a populated database and an
+ * absent marker.
  *
  * ⚠ AND THE SECOND-MOST IS `resolveLeveldbDir` REFUSING BETWEEN TWO PROFILES.
  * The first pass of this investigation watched `~/.config/aurora` — the OWNER'S
@@ -39,7 +43,7 @@ import { join, resolve } from 'node:path';
 
 import {
   LEVELDB_REL, leveldbDirOf, leveldbDirsHeldBy, candidateLeveldbDirs, resolveLeveldbDir,
-  bytesOnDisk, awaitFlushed, flushMarker, flushRefusal, FLUSH_MARKER_KEY,
+  bytesOnDisk, flushMarker, flushRefusal, FLUSH_MARKER_KEY,
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore -- a .mjs sibling with no types; the harness imports it the same way
 } from '../../scratchpad/lib/storage-flush.mjs';
@@ -155,15 +159,15 @@ describe('resolveLeveldbDir — observes, or refuses; it never guesses', () => {
   });
 });
 
-describe('bytesOnDisk — the predicate the barrier polls', () => {
+describe('bytesOnDisk — the predicate the check reads', () => {
   it('finds a marker written into the write-ahead log', () => {
     const d = tmp();
     try {
       writeFileSync(join(d, '000010.log'), Buffer.concat([
-        Buffer.from([0, 1, 2, 3]), Buffer.from('aurora.flushbarrier.42.abc', 'latin1'), Buffer.from([9]),
+        Buffer.from([0, 1, 2, 3]), Buffer.from('aurora.flushcheck.42.abc', 'latin1'), Buffer.from([9]),
       ]));
-      expect(bytesOnDisk(d, 'aurora.flushbarrier.42.abc')).toBe(true);
-      expect(bytesOnDisk(d, 'aurora.flushbarrier.42.abd')).toBe(false);
+      expect(bytesOnDisk(d, 'aurora.flushcheck.42.abc')).toBe(true);
+      expect(bytesOnDisk(d, 'aurora.flushcheck.42.abd')).toBe(false);
     } finally { rmSync(d, { recursive: true, force: true }); }
   });
 
@@ -189,38 +193,28 @@ describe('bytesOnDisk — the predicate the barrier polls', () => {
   });
 });
 
-describe('awaitFlushed — waits for the ARTIFACT, and can fail', () => {
-  const noSleep = async (): Promise<void> => {};
-
-  it('writes the marker BEFORE it starts polling', async () => {
-    const order: string[] = [];
-    await awaitFlushed({
-      mark: 'm', write: async () => { order.push('write'); },
-      present: async () => { order.push('poll'); return true; },
-      now: () => 0, sleep: noSleep,
-    });
-    expect(order).toEqual(['write', 'poll']);
-  });
-
-  it('returns flushed once the bytes appear, counting the polls it took', async () => {
-    let n = 0;
-    let t = 0;
-    const r = await awaitFlushed({
-      mark: 'm', write: async () => {}, present: async () => ++n >= 4,
-      maxMs: 10000, pollMs: 100, now: () => (t += 25), sleep: noSleep,
-    });
-    expect(r.flushed).toBe(true);
-    expect(r.polls).toBe(4);
-  });
-
-  it('⚠ RETURNS flushed:false ON TIMEOUT — the row that keeps this barrier from being "always pass"', async () => {
-    let t = 0;
-    const r = await awaitFlushed({
-      mark: 'm', write: async () => {}, present: async () => false,
-      maxMs: 500, pollMs: 100, now: () => (t += 200), sleep: noSleep,
-    });
-    expect(r.flushed).toBe(false);
-    expect(r.waitedMs).toBeGreaterThanOrEqual(500);
+describe('bytesOnDisk is the whole verdict — there is no wait to soften it', () => {
+  /**
+   * ⚠ THE ROW THAT KEEPS THIS FROM BEING A GATE THAT CANNOT FAIL. There is no
+   * timeout branch left to test, because there is no wait: the check is one
+   * read, after the process is gone. So what has to be shown is that the read
+   * ANSWERS FALSE for the state the check exists to catch — a marker the app
+   * wrote that never reached the database.
+   *
+   * The live half of this is the negative control in the packet: delete the
+   * `window.close()` line from the teardown and the harness reports
+   * `this session's last write is on disk: false` for three of its four
+   * sessions. This row is the same property with the filesystem in a mkdtemp.
+   */
+  it('answers false for a marker the database never received', () => {
+    const d = tmp();
+    try {
+      // A database with real content in it — the FALSE must come from the marker
+      // being absent, not from the directory being empty or unreadable.
+      writeFileSync(join(d, '000010.log'), Buffer.from('aurora.session.v1:/p/proj{"tabs":[]}', 'latin1'));
+      expect(bytesOnDisk(d, 'aurora.session.v1:/p/proj')).toBe(true);
+      expect(bytesOnDisk(d, flushMarker('A1'))).toBe(false);
+    } finally { rmSync(d, { recursive: true, force: true }); }
   });
 });
 
@@ -239,35 +233,61 @@ describe('the marker itself', () => {
 });
 
 describe('flushRefusal — what a reader is told when the flush genuinely did not happen', () => {
-  it('names the profile it watched, how it resolved it, and how long it waited', () => {
-    const m = flushRefusal({ waitedMs: 61234, dir: '/cfg/Electron/x', how: 'observed: ...', label: 'C — restart' });
+  it('names the profile it watched, how it resolved it, and how the teardown went', () => {
+    const m = flushRefusal({
+      dir: '/cfg/Electron/x', how: 'observed: held open by the launched tree',
+      label: 'C — restart', exitNote: 'the app was STILL RUNNING and had to be signalled',
+    });
     expect(m).toContain('/cfg/Electron/x');
-    expect(m).toContain('61234');
+    expect(m).toContain('observed: held open by the launched tree');
     expect(m).toContain('C — restart');
-    expect(m).toMatch(/NOT an app defect|not an app defect/i);
+    expect(m).toContain('had to be signalled');
+    expect(m).toMatch(/NOT AN APP DEFECT/);
+  });
+
+  it('reads without a teardown note when there is none', () => {
+    const m = flushRefusal({ dir: '/d', how: 'derived', label: 'B' });
+    expect(m).not.toContain('teardown:');
   });
 });
 
-describe('the harness calls the barrier BEFORE it closes the window', () => {
+describe('the harness wires the check, and the exit net, in the right order', () => {
   /**
-   * Order is the whole fix. The app is gone ~50 ms after `window.close()`, so a
-   * barrier placed after it would wait on a dead process — which is precisely
-   * the defect being repaired, re-introduced. A source-order row is a weak
-   * instrument in general, but this property has no runtime witness `npm test`
-   * can reach, and its absence is silent: the harness would still print a
-   * barrier line and still go green.
+   * Order is the fix. The marker has to be written to a LIVE page and the
+   * profile resolved from a LIVE tree, so arming must precede the close; and the
+   * answer is only final once the process is gone, so settling must follow the
+   * reap. A source-order row is a weak instrument in general, but these
+   * properties have no runtime witness `npm test` can reach, and their absence
+   * is silent: the harness would still print its lines and still go green.
    */
-  it('flushBarrier() appears in session() ahead of the window.close() evaluate', () => {
+  it('arms BEFORE the window.close() evaluate and settles AFTER the tree is reaped', () => {
     const src: string = readFileSync(HARNESS, 'utf8');
-    const barrier = src.indexOf('await flushBarrier(c, child, label)');
+    const arm = src.indexOf('await armFlushCheck(c, child, label)');
     const close = src.indexOf("expression: 'window.close()'");
-    expect(barrier).toBeGreaterThan(-1);
-    expect(close).toBeGreaterThan(-1);
-    expect(barrier).toBeLessThan(close);
+    const kill = src.indexOf('await killGroup();');
+    const settle = src.indexOf('settleFlushCheck(flushCheck)');
+    expect(Math.min(arm, close, kill, settle)).toBeGreaterThan(-1);
+    expect(arm).toBeLessThan(close);
+    expect(close).toBeLessThan(kill);
+    expect(kill).toBeLessThan(settle);
   });
 
-  it('refuses the run when the barrier reports false, rather than logging and continuing', () => {
+  it('refuses the run when the check reports false, rather than logging and continuing', () => {
     const src: string = readFileSync(HARNESS, 'utf8');
     expect(src).toMatch(/if \(flushFailure !== null\) throw new Error\(flushFailure\);/);
+  });
+
+  it('rejects every in-flight CDP request when the socket closes, so a dead target cannot end the run at exit 0', () => {
+    const src: string = readFileSync(HARNESS, 'utf8');
+    expect(src).toMatch(/ws\.addEventListener\('close',[^\n]*failPending/);
+    expect(src).toMatch(/ws\.addEventListener\('error',[^\n]*failPending/);
+  });
+
+  it('exits non-zero if the run ever ends without printing a summary', () => {
+    const src: string = readFileSync(HARNESS, 'utf8');
+    expect(src).toContain('installSummaryNet();');
+    expect(src).toMatch(/if \(code === 0\) process\.exitCode = 3;/);
+    // Both entry points must arm it, or the net covers only one of them.
+    expect(src.split('noteSummaryPrinted();').length - 1).toBe(2);
   });
 });

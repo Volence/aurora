@@ -14,55 +14,73 @@
  * running: the next session booted to `keys present: ["aurora.session.v1:
  * no-project"]` — its own fresh key written, the previous session's gone.
  *
- * ── THE MECHANISM, AND WHY NEITHER ATTEMPTED FIX COULD WORK ────────────────
+ * ── THE MECHANISM, MEASURED — AND IT IS NOT THE ONE THE OPEN ITEM ASSUMED ──
  *
  * Chromium does not write `localStorage` through to disk. A renderer's
  * `setItem` mutates an in-memory area in the storage service and schedules a
- * leveldb commit on a **throttled timer** — 5 s at rest, and the rate limiter
- * pushes it further out the more the page has been writing. Aurora's session
- * persist subscription (`src/renderer/shell/session-lifecycle.ts`) fires on
- * EVERY session- or workspace-store change, so a busy harness session is
- * exactly the workload that stretches that delay.
+ * leveldb commit on a **rate-limited timer**. Aurora's session persist
+ * subscription (`src/renderer/shell/session-lifecycle.ts`) fires on EVERY
+ * session- or workspace-store change, so a harness session generates a great
+ * many commit batches and buys a correspondingly long delay. **Measured here
+ * per session, twice, agreeing to within 25 ms: 1.7 s for this harness's light
+ * first session and 43.8 s / 48.3 s / 54.0 s for its three busy ones.**
  *
- * The teardown then gives the area no time at all. Measured on this machine
- * 2026-09-03: **the app is fully gone ~50 ms after `window.close()`** (12
- * launches, exit 49–51 ms). So:
+ * And the app is **fully gone ~50 ms after `window.close()`** (12 launches, exit
+ * 49–51 ms), so the old teardown's fixed `sleep(4000)` was ~3.95 s spent
+ * watching a process that had already exited. O50 got that exactly right.
  *
- *   - LENGTHENING THE SLEEP CANNOT WORK. The old fixed `sleep(4000)` was ~3.95 s
- *     spent watching a process that had already exited. Nothing writes during it.
- *   - A SETTLE *BEFORE* THE CLOSE IS A GUESS ABOUT A DELAY THAT IS NOT CONSTANT.
- *     O50 tried 6 s and measured 1 trip in 2 runs. A blind duration cannot beat
- *     an adaptive timer; it can only pick a number that is usually enough.
+ * ⚠ **BUT `window.close()` COMMITS THE AREA, so the idle timer never comes into
+ * it, and that is what the open item did not know.** Measured both ways with
+ * this module's own predicate:
  *
- * ── WHAT THIS DOES INSTEAD: WAIT FOR THE ARTIFACT, NOT FOR A DURATION ──────
+ *   - with the close: the session's last write is on disk **20 of 20 sessions**
+ *     (5 runs), and the run-level guard tripped **0 times in 9 runs** on master;
+ *   - with the close REMOVED and a signal alone: **sessions B, C and D lose it,
+ *     3 of 4 in one run** — precisely the three whose idle commit is three
+ *     quarters of a minute away, while the light session A (1.7 s) survives
+ *     inside the SIGTERM grace.
  *
- * The thing the next session needs is not "some seconds elapsed" and not "the
- * process exited". It is **bytes in the profile's leveldb**. So:
+ * So there is nothing to WAIT for. A pre-close barrier was built, worked, and is
+ * gone: it cost this harness 173 s -> 320 s a run to wait out a timer the close
+ * pre-empts. What is left worth doing is CHECKING, at no cost, that the flush
+ * actually happened — because a teardown that quietly loses the area is
+ * indistinguishable, one session later, from the app losing a canvas tab.
  *
- *   1. write a unique marker into the SAME origin's `localStorage`;
- *   2. poll the profile's `Local Storage/leveldb/*.{log,ldb}` for those bytes;
- *   3. only when they are there, close the window and tear the tree down.
+ * ── WHAT THIS DOES: VERIFY THE ARTIFACT, AFTER THE PROCESS IS GONE ─────────
+ *
+ *   1. before the close, write a unique marker into the SAME origin's
+ *      `localStorage` — the app's own last write, plus one, at the same instant;
+ *   2. after the window is closed, the tree reaped and the teardown settled,
+ *      look for those bytes in the profile's `Local Storage/leveldb/*.{log,ldb}`;
+ *   3. if they are not there, REFUSE, naming this teardown.
+ *
+ * ⚠ **THE CHECK IS AFTER THE EXIT AND DOES NOT WAIT, ON PURPOSE.** The process
+ * is gone; nothing more will ever be written. A bounded retry here would be the
+ * exact mistake the open item diagnosed — watching a dead process — with a
+ * longer timeout.
  *
  * ⚠ **WHY A MARKER PROVES THE SESSION KEY.** Chromium accumulates a storage
  * area's pending writes into ONE leveldb `WriteBatch` and commits the whole
  * batch. A write cannot be committed ahead of an earlier uncommitted write to
  * the same area. So a marker written LAST, seen on disk, means every earlier
  * write to that area — the session key included — is on disk too. The caller
- * still checks the session value did not change under it (`stableValue`), so
- * the ordering argument is asserted rather than assumed.
+ * still checks the session value did not change under it, so the ordering
+ * argument is asserted rather than assumed.
  *
  * ⚠ **AND WHY NOT GREP FOR THE SESSION KEY ITSELF.** The leveldb log is
  * append-only: the key's NAME survives on disk long after a `localStorage
  * .clear()`, so its presence proves nothing about the current value. A unique
- * marker has no such history.
+ * marker has no such history. **This is also why the new check is strictly
+ * stronger than the guard it backs up**: `waitRestored` asserts the key is
+ * PRESENT at the next boot, and a stale-but-present value passes it. The
+ * negative-control run above scored 52/52 with three sessions' last writes
+ * lost, because what survived on disk happened to still match.
  *
  * ── THIS IS NOT "ALWAYS PASS" ──────────────────────────────────────────────
  *
- * `awaitFlushed` RETURNS `{ flushed: false, … }` on timeout and the caller
- * refuses. A flush that genuinely does not happen still stops the run, by name,
- * with the profile it watched and how long it waited — it just stops it at the
- * teardown that lost the data instead of one session later in the wording of an
- * app defect ("the canvas TAB does not survive a restart").
+ * The negative control is the proof: delete `window.close()` from the teardown
+ * and `bytesOnDisk` answers **false** for three of the four sessions. The state
+ * this check exists to catch was constructed, and the check caught it.
  *
  * ── THE PROFILE IS OBSERVED, NOT GUESSED ──────────────────────────────────-
  *
@@ -194,52 +212,55 @@ export function bytesOnDisk(dir, needle, readDir = readdirSync, readFile = readF
 
 /** A marker no app code writes and no app code reads. Deliberately WITHOUT the
  *  substring "session": `canvas-cdp-harness`'s `storedSessions()` reports every
- *  key matching /session/i, and a barrier that shows up in the evidence a row
- *  prints is a barrier that changed the measurement. */
+ *  key matching /session/i, and a check that shows up in the evidence a row
+ *  prints is a check that changed the measurement. */
 export function flushMarker(label = '') {
-  return `aurora.flushbarrier.${Date.now()}.${Math.random().toString(36).slice(2, 10)}${label ? `.${label}` : ''}`;
+  return `aurora.flushcheck.${Date.now()}.${Math.random().toString(36).slice(2, 10)}${label ? `.${label}` : ''}`;
 }
 
 /** The key the marker is written under. */
-export const FLUSH_MARKER_KEY = 'aurora.flushbarrier';
+export const FLUSH_MARKER_KEY = 'aurora.flushcheck';
 
 /**
- * THE BARRIER. Resolves `{ flushed, waitedMs, polls, dir, how }`.
+ * ⚠ `awaitFlushed` WAS HERE AND IS DELIBERATELY GONE — read this before adding
+ * one back.
  *
- * Everything it touches is injected, so `test/support/storage-flush.test.ts`
- * drives every branch — including the timeout — without an Electron:
- *   `write(mark)`  put the marker in the page's localStorage (async)
- *   `present()`    is it on disk yet
- *   `now()` / `sleep(ms)`
+ * The first version of this module POLLED the profile for the marker BEFORE the
+ * window was closed, bounded at 180 s. It worked, and it printed the number that
+ * broke this investigation open: a busy session's own scheduled commit is
+ * 43.8-54.2 s away (four sessions, two runs, agreeing to within 25 ms). But it
+ * was answering a question nobody had: `window.close()` COMMITS THE AREA, so
+ * waiting for the idle timer buys nothing and cost this harness 173 s -> 320 s
+ * per run. Measured, both sides, §2.3/§3 of the packet:
  *
- * ⚠ THE TIMEOUT IS A RESULT, NOT AN EXCEPTION, and `flushed:false` is a real
- * verdict the caller must refuse on. It is not "wait a bit longer and hope":
- * the condition polled for is the exact byte the next launch reads back, so a
- * false here means the data is genuinely not on disk.
+ *   - with `window.close()`:    the session's last write is on disk 20 of 20
+ *                               sessions (5 runs), and the run-level guard
+ *                               tripped 0 times in 9 runs on master;
+ *   - with `window.close()` REMOVED and a signal alone: sessions B, C and D lose
+ *                               it, 3 of 4 in one run — the three whose idle
+ *                               commit is three quarters of a minute out.
+ *
+ * So the close is the mechanism that carries the flush, and there is nothing to
+ * wait for. What is left worth doing is CHECKING, after the process is gone,
+ * that it happened — which is what this module does now, at no cost. And a wait
+ * AFTER the exit would be the very mistake O50 named: the app is gone ~50 ms
+ * after the close, so nothing will write during it.
  */
-export async function awaitFlushed({ mark, write, present, maxMs = 60000, pollMs = 100, now = Date.now, sleep }) {
-  const t0 = now();
-  await write(mark);
-  let polls = 0;
-  for (;;) {
-    polls++;
-    if (await present()) return { flushed: true, waitedMs: now() - t0, polls };
-    if (now() - t0 >= maxMs) return { flushed: false, waitedMs: now() - t0, polls };
-    await sleep(pollMs);
-  }
-}
 
-/** The refusal a caller prints when `awaitFlushed` comes back false. One
- *  spelling, so the harness and its proof quote the same words. */
-export function flushRefusal({ waitedMs, dir, how, label }) {
-  return `LOCALSTORAGE NEVER REACHED DISK — the teardown of session ${label} waited ${waitedMs} ms and the\n`
-    + `  marker it wrote is still not in the profile's leveldb, so the area this session built is\n`
-    + `  about to be lost when the process exits (~50 ms after window.close()).\n`
+/** The refusal a caller prints when the marker is not on disk after the exit.
+ *  One spelling, so the harness and its proof quote the same words. */
+export function flushRefusal({ dir, how, label, exitNote = '' }) {
+  return `LOCALSTORAGE NEVER REACHED DISK — session ${label} is gone and the marker it wrote a moment\n`
+    + `  before the close is NOT in the profile's leveldb. Everything that session wrote after\n`
+    + `  Chromium's last commit is lost, and a commit for a busy session here is 44-54 s out.\n`
     + `      profile watched: ${dir}\n`
     + `      how resolved:    ${how}\n`
-    + `  THE NEXT SESSION WOULD HAVE REPORTED THIS AS AN APP DEFECT — "the canvas TAB does not\n`
-    + `  survive a restart" — because it reads the session this one was supposed to leave behind.\n`
-    + `  It is not an app defect. Chromium commits a localStorage area on a throttled timer whose\n`
-    + `  delay grows with write volume; this run's did not fire inside the bound. Re-run on a\n`
-    + `  quieter machine, and if it repeats raise the bound rather than reading the rows below.`;
+    + (exitNote ? `      teardown:        ${exitNote}\n` : '')
+    + `  THE NEXT SESSION WOULD HAVE JUDGED THE APP ON THIS — the restart rows read the session\n`
+    + `  this one was supposed to leave behind, and they fail in the wording of a product defect\n`
+    + `  ("the canvas TAB does not survive a restart"). IT IS NOT AN APP DEFECT.\n`
+    + `  This is normally carried by \`window.close()\`, which commits the area: with the close in\n`
+    + `  place the last write survived 20 of 20 sessions here, and with it removed three of four\n`
+    + `  lost it. So look at the teardown, not at the rows: did the close reach the page, did the\n`
+    + `  app exit on its own, and was another instrument on the same profile at the time?`;
 }

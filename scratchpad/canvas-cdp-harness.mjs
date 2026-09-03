@@ -43,7 +43,7 @@ import { writeFileSync, mkdirSync, existsSync, readFileSync, rmSync, cpSync } fr
 import { spawnGuarded, killTree, restoreDiscoveryNow, readDiscoveryNow, resolveOwnedDiscovery, descendants, APP_NAMES } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 import {
-  resolveLeveldbDir, bytesOnDisk, awaitFlushed, flushMarker, flushRefusal, FLUSH_MARKER_KEY,
+  resolveLeveldbDir, bytesOnDisk, flushMarker, flushRefusal, FLUSH_MARKER_KEY,
 } from './lib/storage-flush.mjs';
 
 const PORT = Number(process.env.PORT ?? 9364);
@@ -186,35 +186,12 @@ const run = (id) => !ONLY || ONLY.has(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * HOW LONG THE TEARDOWN WILL WAIT FOR CHROMIUM TO COMMIT THE AREA.
- *
- * ⚠ THIS IS NOT A GUESS ABOUT HOW LONG A SHUTDOWN TAKES — it is the point at
- * which "it never happened" becomes the honest answer, and the barrier returns
- * the moment the bytes land rather than sleeping to it.
- *
- * AND THE REAL DELAY IS FAR BIGGER THAN ANYONE ASSUMED, WHICH IS THE HEADLINE
- * MEASUREMENT OF THIS PARCEL. Printed per session, twice, 2026-09-03:
- *
- *     session A (light)   1.7 s / 1.9 s
- *     session B           54.0 s / 54.2 s
- *     session C           48.3 s / 48.3 s
- *     session D           43.8 s / 43.8 s
- *
- * Every busy session waits THREE QUARTERS OF A MINUTE for its own writes to
- * reach disk, and the two runs agree to within 25 ms — a reproducibility that
- * rules load out and points at Chromium's per-area commit RATE LIMITER (a
- * budget of commits per hour, so the delay is a function of how many batches
- * the session generated, which in a scripted harness is fixed). The old
- * teardown gave that ~4 s of a dead process. It is not surprising it lost the
- * area in 4 runs of 9; it is surprising it ever kept it.
- *
- * 180 s is three-and-a-bit times the worst observed wait. `FLUSH_BARRIER_MS=0`
- * forces the refusal, which is how the red-first proof of this gate is taken.
+ * HOW MANY MARKERS THE FLUSH CHECK WILL SPEND before it gives up on a session
+ * store that keeps moving under it. See `armFlushCheck`. It is not a retry of
+ * the CHECK — the check runs once, after the process is gone — only of the
+ * moment at which the marker is placed.
  */
-const FLUSH_BARRIER_MS = Number(process.env.FLUSH_BARRIER_MS ?? 180000);
-/** How many markers the barrier will spend before giving up on a session store
- *  that keeps moving under it. See `flushBarrier`. */
-const FLUSH_BARRIER_ATTEMPTS = Number(process.env.FLUSH_BARRIER_ATTEMPTS ?? 3);
+const FLUSH_MARKER_ATTEMPTS = Number(process.env.FLUSH_MARKER_ATTEMPTS ?? 3);
 
 function getJSON(path, timeoutMs = 1500) {
   return new Promise((resolve, reject) => {
@@ -238,6 +215,31 @@ async function waitForTarget() {
   }
   throw new Error('CDP target never appeared');
 }
+/**
+ * ⚠ A CDP CLIENT WHOSE SOCKET DIES MID-REQUEST USED TO END THE WHOLE RUN AT
+ * EXIT 0, SILENTLY — O79, found while measuring the teardown flake, and it is
+ * the worse of the two defects.
+ *
+ * `pending` was settled ONLY by a matching `message`. Nothing listened for
+ * `close` or `error`. So when the target went away with a request in flight —
+ * a renderer crash, an app that quit early, a target swap — that request's
+ * promise never settled and never rejected. The `await` never returned; the
+ * child's stdio pipes then closed with the child; node's event loop emptied;
+ * **node exited with status 0, part way through the run, printing no summary
+ * and no error.**
+ *
+ * MEASURED: 2 of 24 runs (~8%) on 2026-09-03, both at session A's boundary,
+ * both `rc=0`, both cutting the log at ~45% with the last line an ordinary
+ * NOTE. A sweep reading exit codes records those as PASSES. That is the O78
+ * class — a green exit code over a run that did not happen — arriving by a
+ * different road.
+ *
+ * TWO GUARDS, because the first only covers the cause that is known:
+ *   1. HERE — every in-flight request is rejected when the socket closes or
+ *      errors, so the failure becomes a thrown error with a non-zero exit.
+ *   2. `installSummaryNet()` — a `process.on('exit')` that fires if the entry
+ *      point ever leaves without printing its summary, whatever the reason.
+ */
 function cdp(wsUrl) {
   const ws = new WebSocket(wsUrl);
   let nextId = 1;
@@ -246,11 +248,25 @@ function cdp(wsUrl) {
     const msg = JSON.parse(ev.data);
     if (msg.id && pending.has(msg.id)) { pending.get(msg.id)(msg); pending.delete(msg.id); }
   });
+  /** Fail every request the socket can no longer answer. A request that can
+   *  never be answered must REJECT; leaving it pending is how a run ends at
+   *  exit 0 with nothing said. */
+  const failPending = (whyText) => {
+    if (pending.size === 0) return;
+    const n = pending.size;
+    for (const [id, settle] of pending) {
+      settle({ id, error: { code: -1, message: `CDP SOCKET ${whyText} with ${n} request(s) in flight — this one cannot be answered` } });
+    }
+    pending.clear();
+  };
+  ws.addEventListener('close', (ev) => failPending(`CLOSED (code ${ev?.code ?? '?'})`));
+  ws.addEventListener('error', () => failPending('ERRORED'));
   const ready = new Promise((res, rej) => { ws.addEventListener('open', res); ws.addEventListener('error', rej); });
   const send = (method, params = {}) => new Promise((resolve, reject) => {
     const id = nextId++;
     pending.set(id, (m) => (m.error ? reject(new Error(`${method}: ${JSON.stringify(m.error)}`)) : resolve(m.result)));
-    ws.send(JSON.stringify({ id, method, params }));
+    try { ws.send(JSON.stringify({ id, method, params })); }
+    catch (e) { pending.delete(id); reject(new Error(`${method}: CDP socket would not accept the request (${e.message})`)); }
   });
   const evalExpr = async (expr) => {
     const r = await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true });
@@ -262,6 +278,35 @@ function cdp(wsUrl) {
 }
 
 // ---------------------------------------------------------------------------
+/**
+ * ⚠ A RUN THAT ENDS WITHOUT A SUMMARY MUST NOT EXIT 0. O79.
+ *
+ * Two of 24 runs on 2026-09-03 ended at ~45% with `rc=0`, no summary line, no
+ * error, and an ordinary NOTE as the last thing in the log. The cause found and
+ * fixed was `cdp()` never rejecting an in-flight request when its socket died
+ * (see the block above `cdp`), which left node with an empty event loop and an
+ * unfinished job — and node exits 0 on an empty event loop, by design.
+ *
+ * ⚠ THIS NET IS NOT THAT FIX AND MUST NOT BE READ AS REDUNDANT WITH IT. The
+ * fix closes ONE road to a silent exit; this closes the CLASS. Any future road —
+ * a dropped promise, a swallowed rejection, an `unref`ed handle — reaches the
+ * same exit(0), and a sweep reading exit codes would record it as a pass.
+ *
+ * `noteSummaryPrinted()` is called by each entry point immediately after its
+ * SUMMARY block; the exit handler fires when that never happened.
+ */
+let summaryPrinted = false;
+function noteSummaryPrinted() { summaryPrinted = true; }
+function installSummaryNet() {
+  process.on('exit', (code) => {
+    if (summaryPrinted) return;
+    console.log('\n!!! THIS RUN ENDED WITHOUT PRINTING A SUMMARY — it did NOT complete, and the rows it did');
+    console.log('    print are a prefix of a run, not a result. Exiting non-zero so no sweep reading exit');
+    console.log(`    codes records it as a pass (node was about to exit ${code}).`);
+    if (code === 0) process.exitCode = 3;
+  });
+}
+
 const results = [];
 const fails = [];
 const negFails = [];
@@ -752,44 +797,46 @@ async function session(label, body) {
     // back `null`; with `window.close()` first, both come back.
     //
     // ═════════════════════════════════════════════════════════════════════
-    // ⚠ AND `window.close()` PLUS ANY SLEEP IS NOT A FLUSH. O77/O79.
+    // ⚠ AND NOW IT IS CHECKED RATHER THAN ASSUMED. O79.
     // ═════════════════════════════════════════════════════════════════════
     //
-    // O50 measured this teardown losing the area in **4 of 9 runs (~44%)**, at
-    // load ~3, with no poison and nothing else running, and left it open
-    // (`docs/reviews/2026-09-03-o50-triage-c.md` §3.5/§6) after two attempted
-    // fixes failed. Both failed for one reason, and it is the whole diagnosis:
+    // O50 measured this teardown losing the area in 4 of 9 runs (~44%) and left
+    // it open (`docs/reviews/2026-09-03-o50-triage-c.md` §3.5/§6) after two
+    // attempted fixes failed. It got the key fact exactly right — THE APP IS
+    // FULLY GONE ~50 ms AFTER `window.close()` (12 launches here: 49–51 ms), so
+    // the old fixed `sleep(4000)` was ~3.95 s of watching a corpse and nobody
+    // could have fixed this by lengthening it — and drew the wrong conclusion
+    // from it. Measured 2026-09-03, and the numbers are in
+    // `docs/reviews/2026-09-03-canvas-harness-teardown-flake.md`:
     //
-    //   THE APP IS FULLY GONE ~50 ms AFTER `window.close()`. Measured here
-    //   2026-09-03 over 12 launches: 49–51 ms, every one. The old fixed
-    //   `sleep(4000)` was ~3.95 s spent watching a process that had already
-    //   exited, which is why NOBODY COULD HAVE FIXED THIS BY LENGTHENING IT.
-    //   And a settle BEFORE the close (O50 tried 6 s) is a guess about a delay
-    //   that is not a constant: Chromium's localStorage commit timer is ~5 s at
-    //   rest and its rate limiter pushes it further out the more the page has
-    //   been writing — and Aurora's persist subscription fires on EVERY session-
-    //   or workspace-store change, so a busy harness session is exactly the
-    //   workload that stretches it.
+    //   - Chromium's own scheduled commit for a busy session here is 43.8 s /
+    //     48.3 s / 54.0 s away (1.7 s for the light session A). Enormous, and
+    //     reproducible to 25 ms across runs.
+    //   - BUT `window.close()` COMMITS THE AREA, so that timer never comes into
+    //     it. With the close, this session's last write is on disk 20 of 20
+    //     sessions; with the close REMOVED and a signal alone, sessions B, C and
+    //     D lose it, 3 of 4.
     //
-    // So neither a longer wait on the PROCESS nor a blind wait before it can
-    // work. WAIT ON THE ARTIFACT: `awaitFlushed` writes a unique marker into the
-    // page's localStorage and polls the profile's own `Local Storage/leveldb`
-    // until those bytes are there — the exact condition the NEXT launch reads
-    // back. Only then is the window closed. See `scratchpad/lib/storage-flush.mjs`
-    // for why a marker proves the session key (one WriteBatch per area, so a
-    // later write cannot land ahead of an earlier one) and why the profile is
-    // OBSERVED from /proc rather than assumed to be `~/.config/aurora` — it is
-    // `~/.config/Electron`, and watching the wrong one is how the first pass of
-    // this investigation produced a confident, wrong 0-of-6.
+    // So there is nothing to wait FOR, and a pre-close wait for that timer was
+    // built, measured (it cost the run 173 s -> 320 s) and removed. What is
+    // worth doing is CHECKING, at no cost, that the flush happened:
+    // `armFlushCheck` writes a unique marker into the page a moment before the
+    // close, and `settleFlushCheck` — AFTER the process is gone and the tree is
+    // reaped — looks for those bytes in the profile's own leveldb.
     //
-    // ⚠ IT IS NOT "ALWAYS PASS". A flush that genuinely does not happen inside
-    // the bound stops the run HERE, naming the profile and the wait, instead of
-    // one session later in the wording of an app defect.
+    // ⚠ THE CHECK IS DELIBERATELY AFTER THE EXIT AND DOES NOT RETRY. Nothing
+    // will be written by a dead process, and a bounded retry there would be the
+    // same mistake with a longer timeout.
+    //
+    // ⚠ IT IS NOT "ALWAYS PASS": deleting the `window.close()` line below makes
+    // it answer false for three of four sessions. That is the constructed state,
+    // and the check catches it.
+    let flushCheck = null;
     if (c && !bodyThrew) {
-      const flushed = await flushBarrier(c, child, label);
-      if (!flushed.ok) flushFailure = flushed.message;
+      flushCheck = await armFlushCheck(c, child, label);
+      if (flushCheck.armed === false) flushFailure = flushCheck.message;
     } else if (c) {
-      console.log('   flush barrier SKIPPED — the session body threw, so there is no result to '
+      console.log('   flush check SKIPPED — the session body threw, so there is no result to '
         + 'carry forward and the error below is the finding');
     }
     if (c) {
@@ -800,8 +847,10 @@ async function session(label, body) {
         await sleep(100);
       }
       const exited = child.exitCode !== null || child.signalCode !== null;
-      console.log(`   window.close() -> app ${exited ? `EXITED on its own after ${Date.now() - exitT0}ms`
-        : `STILL RUNNING after ${EXIT_GRACE_MS}ms — the localStorage area is at risk on this teardown`}`);
+      const exitNote = exited ? `window.close() -> the app exited on its own after ${Date.now() - exitT0}ms`
+        : `window.close() -> the app was STILL RUNNING after ${EXIT_GRACE_MS}ms and had to be signalled`;
+      console.log(`   ${exitNote}`);
+      if (flushCheck) flushCheck.exitNote = exitNote;
       try { c.close(); } catch { /* */ }
     }
     await killGroup();
@@ -814,6 +863,13 @@ async function session(label, body) {
     for (const d of restoreDiscoveryNow()) console.log(`   restored ${d}`);
     console.log(`   discovery on disk after restore:\n        ${readDiscoveryNow()}`);
     console.log(`   port free after teardown: ${await portFree()}`);
+    // THE VERDICT, and it is taken HERE: the process is gone, the tree is
+    // reaped, the settle has elapsed. Nothing will be written after this point,
+    // so what is on disk now is what the next session will read.
+    if (flushCheck && flushCheck.armed) {
+      const v = settleFlushCheck(flushCheck);
+      if (!v.ok && flushFailure === null) flushFailure = v.message;
+    }
     // LAST, so the teardown above still runs in full — the ORDERED SIGTERM, the
     // display reaping and the discovery restore are load-bearing (O16/O20/O65/
     // O66) and a refusal must never skip them. Thrown only when the body did NOT
@@ -823,76 +879,75 @@ async function session(label, body) {
 }
 
 /**
- * THE BARRIER, at the one call site that has a live CDP client and a live tree.
+ * ARM THE FLUSH CHECK — before the close, while there is still a page to write
+ * to and a live tree whose /proc entries name the profile.
  *
- * Resolves the profile from the pids of the tree that is still running (it has
- * to happen BEFORE `window.close()` — /proc cannot be asked about a dead
- * process), writes the marker, and polls that profile's leveldb for it.
+ * Returns the state `settleFlushCheck` reads after the process is gone, or
+ * `{ armed: false, message }` when the profile cannot be resolved — which is a
+ * refusal, not a skip: a teardown that cannot say where it writes cannot say
+ * what it left behind either.
+ *
+ * WHY IT IS SPLIT IN TWO. The profile has to be resolved from a LIVE tree
+ * (/proc cannot be asked about a dead process) and the marker has to be written
+ * to a LIVE page, but the only moment the answer is final is AFTER the process
+ * has gone. Two halves, one question.
  *
  * ⚠ THE ORDERING CHECK. The marker proves every EARLIER write to the same area
  * is committed, which is only the session key if the app did not write again
  * after it. The app is idle here (the body has returned, no input is pending),
  * but idle is an argument and this is a measurement: the stored session is read
- * before and after and a change is reported rather than assumed away.
- *
- * ⚠ ONE FORCING STEP WAS TRIED AND DID NOTHING — recorded here, the way O50
- * recorded its two, so it is not re-tried. `Page.navigate` to `about:blank`
- * after the marker, on the theory that dropping the renderer's binding to the
- * area makes the browser commit it immediately instead of on its timer. One
- * full run each arm, 2026-09-03: 1908/54229/48294/43791 ms with the navigate
- * against 1713/53980/48316/43797 ms without — identical to within 25 ms on
- * three of the four sessions, and the run time was 320 s both ways. The delay is
- * not something the client can shorten from outside; it is a budget the page
- * already spent. The barrier waits it out, and the run is ~2.5 min longer than
- * it was for that reason — which is the price of the number being true.
+ * either side of the marker and a fresh marker is spent if it moved.
  */
-async function flushBarrier(c, child, label) {
+async function armFlushCheck(c, child, label) {
   const pids = descendants(child.pid);
   const { dir, how, why } = resolveLeveldbDir({ pids, appNames: APP_NAMES });
   if (dir === null) {
-    return { ok: false, message: `FLUSH BARRIER UNMEASURABLE — ${why}.\n`
+    return { armed: false, message: `FLUSH CHECK UNMEASURABLE — ${why}.\n`
       + '  This teardown cannot show the session it built reached disk, so the next session\'s\n'
       + '  restart rows would be judging an unknown precondition. Refusing rather than guessing.' };
   }
   const readSession = () => c.evalExpr(`localStorage.getItem(${JSON.stringify(`aurora.session.v1:${S1DIR}`)})`).catch(() => null);
-  for (let attempt = 1; attempt <= FLUSH_BARRIER_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= FLUSH_MARKER_ATTEMPTS; attempt++) {
     const before = await readSession();
     const mark = flushMarker(`${label.slice(0, 1)}${attempt}`);
-    let after = before;
-    const r = await awaitFlushed({
-      mark,
-      write: async (m) => {
-        await c.evalExpr(`localStorage.setItem(${JSON.stringify(FLUSH_MARKER_KEY)}, ${JSON.stringify(m)}); 1`);
-        // THE ORDERING CHECK, TAKEN HERE AND NOT AFTER THE WAIT. What has to be
-        // true is that the app wrote nothing AFTER the marker, and that is
-        // settled the moment the marker is in; reading it later would also mean
-        // holding the page open for the whole wait for no further reason.
-        after = await readSession();
-      },
-      present: () => bytesOnDisk(dir, mark),
-      maxMs: FLUSH_BARRIER_MS,
-      sleep,
-    });
-    if (!r.flushed) return { ok: false, message: flushRefusal({ waitedMs: r.waitedMs, dir, how, label }) };
+    await c.evalExpr(`localStorage.setItem(${JSON.stringify(FLUSH_MARKER_KEY)}, ${JSON.stringify(mark)}); 1`);
+    const after = await readSession();
     if (before !== after) {
-      // The app wrote again AFTER the marker, so the marker's batch does not
-      // cover that write and this attempt proved nothing about it. Go round
-      // again with a fresh marker rather than reporting a barrier that held.
-      console.log(`   flush barrier: attempt ${attempt} superseded — the stored session changed while `
-        + 'the marker was in flight, so a fresh marker is needed to cover it');
+      console.log(`   flush check: attempt ${attempt} superseded — the stored session changed while the `
+        + 'marker was being placed, so the marker\'s commit batch would not cover it');
       continue;
     }
-    console.log(`   flush barrier: localStorage on disk after ${r.waitedMs}ms / ${r.polls} poll(s)`
-      + `${attempt > 1 ? ` (attempt ${attempt})` : ''}`
-      + `\n        profile ${dir}\n        ${how}`
-      + `\n        stored session ${before === null ? 'ABSENT under this project key (session A opens the project mid-body)' : `${before.length}B`}`
-      + ', unchanged across the barrier');
-    return { ok: true };
+    // A FREE DIAGNOSTIC, AND THE ONE THAT OVERTURNED THIS PARCEL'S FIRST
+    // DIAGNOSIS: had Chromium already committed on its own timer, or is the
+    // close about to carry it? Busy sessions read false here and true after the
+    // close, and that difference is the whole finding.
+    const already = bytesOnDisk(dir, mark);
+    console.log(`   flush check armed: profile ${dir}\n        ${how}\n        stored session `
+      + `${before === null ? 'ABSENT under this project key (session A opens the project mid-body)' : `${before.length}B`}`
+      + `, unchanged while the marker was placed; already committed on Chromium's own timer: ${already}`);
+    return { armed: true, dir, how, label, mark, already, exitNote: '' };
   }
-  return { ok: false, message: `FLUSH BARRIER NEVER SETTLED — the stored session changed under every one of `
-    + `${FLUSH_BARRIER_ATTEMPTS} markers, so no marker's commit batch covers the app's last write and this\n`
-    + `  teardown cannot show what it leaves behind. The app is supposed to be idle once the session body\n`
+  return { armed: false, message: 'FLUSH CHECK NEVER SETTLED — the stored session changed under every one of '
+    + `${FLUSH_MARKER_ATTEMPTS} markers, so no marker's commit batch covers the app's last write and this\n`
+    + '  teardown cannot show what it leaves behind. The app is supposed to be idle once the session body\n'
     + `  has returned; something is still writing. profile ${dir} (${how}).` };
+}
+
+/**
+ * THE VERDICT, after the process is gone and the tree is reaped.
+ *
+ * One read. No retry, no wait — see `scratchpad/lib/storage-flush.mjs`: a dead
+ * process writes nothing, and a bounded retry here would be the mistake this
+ * parcel diagnosed, with a longer timeout.
+ */
+function settleFlushCheck(st) {
+  const landed = bytesOnDisk(st.dir, st.mark);
+  console.log(`   flush check: this session's last write is on disk: ${landed}`
+    + `${st.already ? ' (Chromium had already committed it on its own timer before the close)'
+      : landed ? ' (it was NOT before the close — the close is what carried it)'
+        : ' (it was not before the close either, and the close did not carry it)'}`);
+  if (landed) return { ok: true };
+  return { ok: false, message: flushRefusal(st) };
 }
 
 /** Wait until the app has finished restoring its project on a cold start. A
@@ -1435,6 +1490,7 @@ async function secondPass() {
   if (negFails.length) console.log('!!! NEGATIVE CONTROLS THAT DID NOT FAIL (harness is blind):\n  ' + negFails.join('\n  '));
   else console.log('all negative controls correctly reported FAIL');
   if (fails.length || negFails.length || unexercisedRows.length) process.exitCode = 1;
+  noteSummaryPrinted();
 }
 
 // ===========================================================================
@@ -1486,6 +1542,7 @@ async function main() {
   if (negFails.length) console.log('!!! NEGATIVE CONTROLS THAT DID NOT FAIL (harness is blind):\n  ' + negFails.join('\n  '));
   else console.log('all negative controls correctly reported FAIL');
   if (fails.length || negFails.length || unexercisedRows.length) process.exitCode = 1;
+  noteSummaryPrinted();
 }
 
 // --- session A -------------------------------------------------------------
@@ -2593,6 +2650,7 @@ async function sessionD(c, shared) {
 // export above) must not launch Electron and drive fourteen rows as a side
 // effect of the import.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  installSummaryNet();
   const entry = process.env.PASS === '2' ? secondPass : main;
   entry().catch((e) => { console.error('HARNESS ERROR:', e); process.exitCode = 2; });
 }
