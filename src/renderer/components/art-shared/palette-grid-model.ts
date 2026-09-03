@@ -22,13 +22,22 @@
 // whose schema does the same job for the object inspectors.
 
 import type React from 'react';
-import { decodeGenesisColor, encodeGenesisColor } from '../../../core/formats/palette';
+import {
+  decodeGenesisColor, encodeGenesisColor, CRAM_LINE_ENTRIES,
+} from '../../../core/formats/palette';
 
 /** The three Genesis colour channels, each 3 bits (0-7) of a CRAM word. */
 export type Channel = 'r' | 'g' | 'b';
 
-/** Colours per palette line. Fixed by the VDP, not by either engine. */
-export const LINE_LENGTH = 16;
+/**
+ * Colours per palette line. Fixed by the VDP, not by either engine.
+ *
+ * ⚠ IT IS THE CORE CONSTANT, NOT A SECOND 16. It read `= 16` until the effects
+ * panel needed the same fact to say where a CRAM byte address lands; two
+ * spellings of one hardware number is how two surfaces drift. `CRAM_LINE_ENTRIES`
+ * is the one, in core/formats/palette, beside the word arithmetic it belongs to.
+ */
+export const LINE_LENGTH = CRAM_LINE_ENTRIES;
 
 /**
  * Colour 0 of every line is the BACKDROP: the VDP draws it as transparent in

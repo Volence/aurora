@@ -63,6 +63,8 @@
 //                          the run must ABORT rather than pass section 3
 //   PLANT=rot-section    … rot the bands-section header selector with the `\b`
 //                          that really failed here; row 4c must go red
+//   PLANT=rot-swatch     … rot the colour-swatch finder (section 7's every row
+//                          reads that list); row 7b must catch it and ABORT
 
 import { AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { writeFileSync, readFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
@@ -216,6 +218,61 @@ const OPEN_SECTION = (re, proofSelector) => String.raw`
 
 /** Did the section really open? Re-checked after a settle, never synchronously. */
 const SECTION_IS_OPEN = (proofSelector) => `!!(${proofSelector})`;
+
+/**
+ * ONE COLLAPSIBLE SECTION'S OWN BOX — height, and how many children it has.
+ *
+ * The section ROOT is the header div's parent: `CollapsibleSection` renders
+ * `<div>{header}{!collapsed && children}</div>`, so `children === 1` IS the
+ * shut state (structurally, not by reading a chevron's rotation) and the height
+ * of that div is the height the column pays for the section.
+ *
+ * ⚠ THE HEIGHT ALONE CANNOT TELL SHUT FROM OPEN-AND-EMPTY, which is why the
+ * child count travels with it. A row that only compared numbers would call a
+ * section that failed to render its body "shut" and report a flattering figure.
+ */
+const SECTION_BOX = (re) => String.raw`
+(() => {
+  const hdr = [...document.querySelectorAll('div')]
+    .filter((d) => d.style && d.style.cursor === 'pointer' && ${re}.test((d.textContent || '').trim()))
+    .pop();
+  if (!hdr || !hdr.parentElement) return null;
+  const root = hdr.parentElement;
+  const b = root.getBoundingClientRect();
+  return { height: Math.round(b.height * 100) / 100, children: root.childElementCount,
+           headerHeight: Math.round(hdr.getBoundingClientRect().height * 100) / 100 };
+})()`;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION 7's PAGE-SIDE HELPERS — the colour picker (EW-COLOUR-PICKER)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * The band's swatch buttons.
+ *
+ * `PLANT=rot-swatch` points this at an attribute the panel never writes, so it
+ * matches NOTHING — every row in section 7 reads off this list, so a rot here
+ * is the worst thing that can happen to that section and row 7b is the floor
+ * that must catch it.
+ */
+const SWATCHES = PLANT === 'rot-swatch'
+  ? String.raw`[...document.querySelectorAll('[data-band-colours]')]`
+  : String.raw`[...document.querySelectorAll('[data-band-colour]')]`;
+
+/**
+ * A CRAM word as the CSS colour Chrome will report, re-derived HERE.
+ *
+ * NOT imported from the app, deliberately. The claim of row 7c is "the swatch
+ * shows the colour the word means", and checking the app's rendering against the
+ * app's own conversion would only prove it called its own function. This is the
+ * VDP's 0BGR layout written out independently (3 bits per channel, low bit of
+ * each nibble dead, scaled 0-7 → 0-255), matched against `getComputedStyle`.
+ */
+const CSS_OF_WORD = String.raw`
+((w) => {
+  const s = (v) => Math.round(v * 255 / 7);
+  return 'rgb(' + s((w >> 1) & 7) + ', ' + s((w >> 5) & 7) + ', ' + s((w >> 9) & 7) + ')';
+})`;
 
 /**
  * The limit block's own element: the div carrying the warning-coloured left
@@ -531,24 +588,70 @@ async function main() {
       selNow === PRESET_ID && idBox === '',
       `selectedPreset = ${JSON.stringify(selNow)}, id box = ${JSON.stringify(idBox)}`);
     const BANDS_PROOF = `[...document.querySelectorAll('input')].find((e) => e.placeholder === '${PRESET_ID}')`;
-    const openedBands = await c.evalExpr(OPEN_SECTION(
-      // NEITHER \b NOR (?!\w) HERE, and BOTH cost a run. The header's
-      // textContent runs straight into the `right` slot's own label —
-      // "Preset — harness_bandDelete" — so there is no word boundary between
-      // "d" and "D", and "D" is itself a word character. The bound that is
-      // actually correct comes from the ID'S OWN CHARSET (^[a-z][a-z0-9_]{0,31}$
-      // in the schema): no legal id character can follow, so a longer id cannot
-      // be matched by mistake, and any action label can.
-      PLANT === 'rot-section'
-        // THE PLANT: the `\b` this really carried for two runs. "Preset —
-        // harness_bandDelete" has no boundary between "d" and "D".
-        ? String.raw`/^Preset — ${PRESET_ID}\b/`
-        : String.raw`/^Preset — ${PRESET_ID}(?![a-z0-9_])/`, BANDS_PROOF));
+
+    // ---- 4b0. THE SECTION'S SHUT HEIGHT, BEFORE IT IS EVER OPENED. --------
+    //
+    // ROADMAP row 97 / O15's precedent: a parcel that adds controls to a section
+    // measures that section SHUT and OPEN, before and after, and reports all four
+    // numbers. The shut number is the one that must not move — an author scrolling
+    // past a collapsed section pays its height whether or not they want it.
+    //
+    // ⚠ IT IS MEASURED HERE, NOT LATER, and the ordering is the measurement. This
+    // section is `defaultCollapsed`, so this is the only moment in the run when it
+    // is shut; row 4c opens it and nothing closes it again. The BEFORE half of the
+    // pair comes from running THIS FILE against a build of master — same
+    // instrument, two builds — rather than from a number typed into a packet.
+    // NEITHER \b NOR (?!\w) HERE, and BOTH cost a run. The header's textContent
+    // runs straight into the `right` slot's own label — "Preset —
+    // harness_bandDelete" — so there is no word boundary between "d" and "D",
+    // and "D" is itself a word character. The bound that is actually correct
+    // comes from the ID'S OWN CHARSET (^[a-z][a-z0-9_]{0,31}$ in the schema): no
+    // legal id character can follow, so a longer id cannot be matched by
+    // mistake, and any action label can.
+    //
+    // ⚠ AND A SPACE MAY NOT FOLLOW EITHER — found by EW-COLOUR-PICKER, 2026-09-03,
+    // and it is a THIRD rot of this same selector. `(?![a-z0-9_])` was correct
+    // when one section carried this prefix. There are now THREE:
+    //
+    //     Preset — harness_bandDelete                     <- the bands editor
+    //     Preset — harness_band — cycles, variants        <- ROADMAP row 97
+    //     Preset — harness_band — moving anchors          <- ROADMAP row 95
+    //
+    // …and `OPEN_SECTION` takes `.pop()`, the LAST match. So this harness had
+    // been clicking the MOVING ANCHORS header open and then looking for the band
+    // editor's controls inside it: rows 4c, 4d, 4e and 4f all failed, naming the
+    // controls rather than the selector, on a panel where every one of them
+    // works. Excluding a following SPACE keeps the two suffixed sections out
+    // while still admitting any action label, which cannot begin with one.
+    const BANDS_RE = PLANT === 'rot-section'
+      // THE PLANT: the `\b` this really carried for two runs.
+      ? String.raw`/^Preset — ${PRESET_ID}\b/`
+      : String.raw`/^Preset — ${PRESET_ID}(?![a-z0-9_ ])/`;
+    const shutBox = await c.json(SECTION_BOX(BANDS_RE));
+    check('4b0', 'the band section is SHUT and is a header only — no body in the DOM',
+      shutBox !== null && shutBox.children === 1 && shutBox.height > 0,
+      `SHUT HEIGHT = ${shutBox && shutBox.height}px, children=${shutBox && shutBox.children} `
+      + `(a CollapsibleSection renders no children while shut, so 1 = header alone)`);
+
+    const openedBands = await c.evalExpr(OPEN_SECTION(BANDS_RE, BANDS_PROOF));
     await sleep(900);
     const bandsOpen = await c.evalExpr(SECTION_IS_OPEN(BANDS_PROOF));
     check('4c', 'the band editor section opens',
       bandsOpen === true && openedBands !== 'no-header',
       `bands section → ${openedBands}, open after settle = ${bandsOpen}`);
+
+    // ---- 4c2. THE SECTION'S OPEN HEIGHT, ON A FRESH PRESET. --------------
+    //
+    // The second of the four numbers, taken at a DEFINED document state: the
+    // preset row 4a just created, whose one band is `newBand()` — top 112, bot
+    // 128, sh off, cram addr 74, colours [0]. Nothing has been edited yet, so
+    // this number is comparable between two builds; taken after row 4d it would
+    // be a height of whatever the run happened to have typed.
+    const openBox = await c.json(SECTION_BOX(BANDS_RE));
+    check('4c2', 'the band section is OPEN and its body is in the DOM',
+      openBox !== null && openBox.children > 1 && openBox.height > (shutBox?.height ?? 0),
+      `OPEN HEIGHT = ${openBox && openBox.height}px (shut was ${shutBox && shutBox.height}px), `
+      + `children=${openBox && openBox.children}`);
 
     const topField = String.raw`[...document.querySelectorAll('input')]
       .find((e) => /^Screen line the effect turns ON\b/.test(e.title || ''))`;
@@ -587,6 +690,236 @@ async function main() {
       && armSel.options.every((o) => !o.disabled)
       && armSel.options.map((o) => o.value).sort().join(',') === 'cram,pal_region',
       JSON.stringify(armSel));
+
+    // ═════════════════════════════════════════════════════════════════════
+    // 7. CRAM AUTHORING IS SIGHTED — EW-COLOUR-PICKER, defect 13's colour half
+    // ═════════════════════════════════════════════════════════════════════
+    //
+    // The cold-read walkthrough measured this surface asking an author to know
+    // the BBB GGG RRR packing and convert it to base 10 by hand (a12), and to
+    // read `addr = 74` off a three-letter label with no rendering of where it
+    // lands (a13). The node suite (providers/__tests__/effects-preset-colours,
+    // core/formats/__tests__/cram-geometry) owns the DOCUMENT half of the fix;
+    // it cannot see a swatch. These rows are the pixels.
+    //
+    // ⚠ RUN BEFORE SECTION 5 ON PURPOSE. The Ctrl+S below then carries a colour
+    // this section picked, so row 5c's file-on-disk check covers the picker's
+    // write as well as the spinner's.
+    //
+    // WHAT WOULD MAKE THIS GREEN WITHOUT THE FEATURE:
+    //   • the swatch selector matches nothing and every `.every()` passes over an
+    //     empty list — row 7b asserts a COUNT against the document's own array
+    //     before anything else reads the list, and PLANT=rot-swatch reproduces it;
+    //   • the swatches are in the DOM but painted outside the scrolling column —
+    //     row 7e compares their rect to the SCROLLER's box, never checkVisibility;
+    //   • the sliders move and nothing is written — row 7g reads the DOCUMENT
+    //     back through `presetsJson()` and compares every OTHER entry too.
+    const colDoc0 = JSON.parse(await c.evalExpr('window.__dbg.aeon.presetsJson()'))
+      .find((p) => p.id === PRESET_ID);
+    const cram0 = colDoc0 && colDoc0.bands[0].on.cram;
+    check('7a', 'ANTI-VACUOUS FLOOR: the band under test really carries a cram arm',
+      cram0 !== undefined && cram0 !== null && Array.isArray(cram0.colours)
+      && cram0.colours.length > 0 && Number.isInteger(cram0.addr),
+      `on = ${JSON.stringify(colDoc0 && colDoc0.bands[0].on)}`);
+
+    const swatchInfo = await c.json(String.raw`(() => {
+      const els = ${SWATCHES};
+      return els.map((e) => ({
+        i: Number(e.getAttribute('data-band-colour')),
+        bg: getComputedStyle(e).backgroundColor,
+        title: e.title || '',
+        w: Math.round(e.getBoundingClientRect().width),
+        h: Math.round(e.getBoundingClientRect().height),
+      }));
+    })()`);
+    check('7b', 'one swatch per colour — the count comes from the DOCUMENT, not from the DOM',
+      swatchInfo.length === cram0.colours.length
+      && swatchInfo.map((s) => s.i).join(',') === cram0.colours.map((_, i) => i).join(','),
+      swatchInfo.length === 0
+        ? 'NO SWATCH MATCHED — selector rot, or the strip is not rendered'
+        : `${swatchInfo.length} swatches for ${cram0.colours.length} colours: `
+          + JSON.stringify(swatchInfo.map((s) => ({ i: s.i, bg: s.bg, size: `${s.w}x${s.h}` }))));
+    if (swatchInfo.length === 0) {
+      throw new Error('no swatches — the rest of section 7 cannot be measured');
+    }
+
+    const swatchPaint = await c.json(String.raw`(() => {
+      const words = ${JSON.stringify(cram0.colours)};
+      const cssOf = ${CSS_OF_WORD};
+      return ${SWATCHES}.map((e, i) => ({
+        i, want: cssOf(words[i]), got: getComputedStyle(e).backgroundColor,
+      }));
+    })()`);
+    check('7c', 'each swatch is PAINTED the colour its CRAM word decodes to (0BGR, re-derived here)',
+      swatchPaint.length === cram0.colours.length && swatchPaint.every((p) => p.got === p.want),
+      JSON.stringify(swatchPaint));
+
+    const glossRow = await c.json(String.raw`(() => {
+      const box = [...document.querySelectorAll('input')]
+        .find((e) => /^CRAM BYTE address the colours are written to\b/.test(e.title || ''));
+      if (!box) return null;
+      const row = box.parentElement;
+      const label = row.firstElementChild;
+      return {
+        value: box.value,
+        min: box.getAttribute('min'), max: box.getAttribute('max'),
+        labelText: (label.textContent || '').trim(),
+        labelWidth: Math.round(label.getBoundingClientRect().width * 100) / 100,
+        gloss: [...row.querySelectorAll('span')]
+          .map((s) => (s.textContent || '').trim())
+          .filter((t) => /^line /.test(t))[0] || null,
+        rowRight: Math.round(row.getBoundingClientRect().right),
+        cardRight: Math.round((() => {
+          let p = row.parentElement;
+          while (p && !(p.style && /solid/.test(p.style.border || ''))) p = p.parentElement;
+          return (p || row).getBoundingClientRect().right;
+        })()),
+      };
+    })()`);
+    // THE EXPECTATION IS DERIVED, AND FROM THE CONTRACT'S ARITHMETIC — not from
+    // the app's constants and not typed. The vendored schema states the geometry
+    // as two shift formulas in `$defs.pal_region`'s own descriptions
+    // ("addr >> 5 == pal_line", "(addr >> 1) & 15 == entry"); those two shifts
+    // are written out here so this instrument and the app agree only if both are
+    // right. core/formats/__tests__/cram-geometry.test.ts is what pins the
+    // formulas to the vendored bytes.
+    const wantGloss = `line ${cram0.addr >> 5} · entry ${(cram0.addr >> 1) & 15}`;
+    check('7d', "`addr` carries a derived `line N · entry M` gloss BESIDE the raw number (a13)",
+      glossRow !== null && glossRow.gloss === wantGloss
+      && Number(glossRow.value) === cram0.addr,
+      glossRow === null ? 'the addr spinner was not found at all'
+        : `addr=${glossRow.value} gloss=${JSON.stringify(glossRow.gloss)} want=${JSON.stringify(wantGloss)}`);
+    // THE NUMBER STAYS TYPEABLE AND UNCLAMPED. The gloss is an addition; if it
+    // ever arrives with a min/max it has become the clamp aeon E.4 forbids.
+    check('7d2', 'the addr spinner still carries NO min/max, and the label column did not move',
+      glossRow !== null && glossRow.min === null && glossRow.max === null
+      && glossRow.labelWidth === 64,
+      `min=${glossRow && glossRow.min} max=${glossRow && glossRow.max} `
+      + `label "${glossRow && glossRow.labelText}" = ${glossRow && glossRow.labelWidth}px `
+      + `(LABEL_W is 64 and this parcel must not move it)`);
+    check('7d3', 'the addr row does not overflow the band card it sits in',
+      glossRow !== null && glossRow.rowRight <= glossRow.cardRight + 1,
+      `row right ${glossRow && glossRow.rowRight} vs card right ${glossRow && glossRow.cardRight}`);
+
+    // IS IT ON SCREEN? checkVisibility() and getClientRects() both return GREEN
+    // for an element scrolled 2,635px out of its scroller — measured in this
+    // repo. Containment in the SCROLLER's own box is the test.
+    await c.evalExpr(String.raw`(() => {
+      const e = ${SWATCHES}[0]; if (e) e.scrollIntoView({ block: 'center' }); return 'ok';
+    })()`);
+    await sleep(500);
+    const onScreen = await c.json(String.raw`(() => {
+      const e = ${SWATCHES}[0];
+      if (!e) return null;
+      const b = e.getBoundingClientRect();
+      let sc = e.parentElement;
+      while (sc && !(sc.scrollHeight > sc.clientHeight + 1)) sc = sc.parentElement;
+      const o = sc ? sc.getBoundingClientRect() : { top: 0, bottom: innerHeight, left: 0, right: innerWidth };
+      return {
+        rect: { top: Math.round(b.top), left: Math.round(b.left),
+                w: Math.round(b.width), h: Math.round(b.height) },
+        scroller: { top: Math.round(o.top), bottom: Math.round(o.bottom),
+                    left: Math.round(o.left), right: Math.round(o.right) },
+        inside: b.top >= o.top - 1 && b.bottom <= o.bottom + 1
+                && b.left >= o.left - 1 && b.right <= o.right + 1,
+        // PRINTED AS EVIDENCE, NEVER AS THE GATE — the paint trio is two thirds
+        // vacuous and this repo has the measurement.
+        trio: { vis: e.checkVisibility ? e.checkVisibility() : null,
+                rects: e.getClientRects().length > 0 },
+      };
+    })()`);
+    check('7e', 'the swatch is inside the PAINTED box of its scroller, at a real size',
+      onScreen !== null && onScreen.inside === true
+      && onScreen.rect.w >= 8 && onScreen.rect.h >= 8,
+      JSON.stringify(onScreen));
+
+    // ---- 7f/7g. THE PICKER ACTUALLY WRITES. ------------------------------
+    //
+    // A real click on the swatch (not `.click()` on something nothing listens
+    // to — this IS a <button> and React does listen), then the shared R/G/B
+    // sliders. `pointerup` is what `GenesisColorSliders` commits on.
+    const slidersBefore = await c.evalExpr(
+      `document.querySelectorAll('input[type=range]').length`);
+    await c.evalExpr(String.raw`(() => { ${SWATCHES}[0].click(); return 'ok'; })()`);
+    await sleep(600);
+    const slidersAfter = await c.evalExpr(
+      `document.querySelectorAll('input[type=range]').length`);
+    check('7f', 'clicking a swatch opens the app\'s own R/G/B sliders under the strip',
+      slidersAfter - slidersBefore === 3,
+      `range inputs ${slidersBefore} -> ${slidersAfter} (GenesisColorSliders draws three)`);
+
+    const beforeColours = cram0.colours.slice();
+    const drove = await c.evalExpr(String.raw`
+      (() => {
+        const s = [...document.querySelectorAll('input[type=range]')];
+        if (s.length < 3) return 'no-sliders';
+        const r = s[s.length - 3];   // R, G, B in order; take this panel's R
+        const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        set.call(r, '7');
+        r.dispatchEvent(new Event('input', { bubbles: true }));
+        r.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+        return 'ok';
+      })()`);
+    await sleep(800);
+    const colDoc1 = JSON.parse(await c.evalExpr('window.__dbg.aeon.presetsJson()'))
+      .find((p) => p.id === PRESET_ID);
+    const after0 = colDoc1.bands[0].on.cram.colours;
+    // R at level 7 is bits 3..1 set: the low nibble of the word reads 0xE.
+    const changedOnly = after0.length === beforeColours.length
+      && after0.every((w, i) => (i === 0 ? true : w === beforeColours[i]));
+    check('7g', 'driving R to 7 writes the DOCUMENT — entry 0 only, every other entry untouched',
+      drove === 'ok' && changedOnly && after0[0] !== beforeColours[0]
+      && ((after0[0] >> 1) & 7) === 7 && Number.isInteger(after0[0]),
+      `colours ${JSON.stringify(beforeColours)} -> ${JSON.stringify(after0)}; `
+      + `R level of entry 0 = ${(after0[0] >> 1) & 7}; drove=${drove}`);
+    // THE WIRE FORM. A picker that started writing `"$0E00"` or an object would
+    // still look right on screen and would break every consumer of the file.
+    check('7g2', 'what it wrote is a plain decimal integer — the wire format did not move',
+      after0.every((w) => Number.isInteger(w))
+      && /"colours":\s*\[\s*\d/.test(JSON.stringify(colDoc1).replace(/\s+/g, ' ')),
+      `typeof entries: ${JSON.stringify(after0.map((w) => typeof w))}`);
+
+    // ---- 7h. ONE GESTURE, ONE UNDO STEP. ---------------------------------
+    //
+    // A drag emits an onChange per slider tick and commits on pointerup AND on
+    // the blur after it. If either wrote history, one undo would land the author
+    // mid-drag instead of before it. A real Ctrl+Z, and the assertion is the
+    // WHOLE array back at its pre-gesture value.
+    await c.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'z', code: 'KeyZ',
+      windowsVirtualKeyCode: 90, nativeVirtualKeyCode: 90, modifiers: 2 });
+    await c.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'z', code: 'KeyZ',
+      windowsVirtualKeyCode: 90, nativeVirtualKeyCode: 90, modifiers: 2 });
+    await sleep(900);
+    const undone = JSON.parse(await c.evalExpr('window.__dbg.aeon.presetsJson()'))
+      .find((p) => p.id === PRESET_ID).bands[0].on.cram.colours;
+    check('7h', 'ONE Ctrl+Z restores the colour list exactly — one gesture, one step',
+      JSON.stringify(undone) === JSON.stringify(beforeColours),
+      `after undo ${JSON.stringify(undone)}, want ${JSON.stringify(beforeColours)}`);
+
+    // Redo the pick so section 5 saves a document the picker authored.
+    await c.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'z', code: 'KeyZ',
+      windowsVirtualKeyCode: 90, nativeVirtualKeyCode: 90, modifiers: 10 });
+    await c.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'z', code: 'KeyZ',
+      windowsVirtualKeyCode: 90, nativeVirtualKeyCode: 90, modifiers: 10 });
+    await sleep(700);
+    const redone = JSON.parse(await c.evalExpr('window.__dbg.aeon.presetsJson()'))
+      .find((p) => p.id === PRESET_ID).bands[0].on.cram.colours;
+
+    // ---- 7i. THE TEXT FIELD STILL READS THE DOCUMENT. --------------------
+    //
+    // The list field and the swatches are two views of one array. If the field
+    // kept a draft across a swatch edit, an author would see the swatch change
+    // under a box still showing the old numbers — two sources of truth, in one
+    // card.
+    const listBox = await c.evalExpr(String.raw`
+      (() => {
+        const e = [...document.querySelectorAll('input')]
+          .find((x) => x.placeholder === '14 3584');
+        return e ? e.value : null;
+      })()`);
+    check('7i', 'the raw decimal list field is still there and shows the document, not a stale draft',
+      listBox !== null && listBox === redone.join(' '),
+      `field = ${JSON.stringify(listBox)}, document = ${JSON.stringify(redone.join(' '))}`);
 
     // ---- 5. ROUND-TRIP A DOCUMENT AURORA DID NOT AUTHOR. -----------------
     //

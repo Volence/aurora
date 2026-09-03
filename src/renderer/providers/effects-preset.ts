@@ -65,6 +65,15 @@ import { EFFECTS_FIRE_LINE_MIN, EFFECTS_FIRE_LINE_MAX } from './effects-aeon';
 // private `{value,label}` twin would let the two per-section pickers drift in
 // shape as well as in wording.
 import type { FactorOption } from './effects-aeon';
+// THE CRAM GEOMETRY IS THE HARDWARE'S AND IS NOT RE-DERIVED HERE. `addr` is a
+// BYTE address and an entry is a WORD, so the divisor between an address and a
+// palette line is 32 and not 16 — the constants and `cramLocation` live beside
+// the rest of the Genesis word arithmetic, where the palette editor already
+// reads them, and cram-geometry.test.ts cross-checks that derivation against the
+// two shift formulas the vendored schema states in its own descriptions.
+import {
+  cramLocation, fmtGenesisWord, CRAM_LINE_ENTRIES, CRAM_LINE_COUNT, CRAM_WORD_BYTES,
+} from '../../core/formats/palette';
 
 // ---------------------------------------------------------------------------
 // THE THREE LIMITS — one source, read by the panel and by the wording gate
@@ -984,6 +993,126 @@ export function setColoursCommand(
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// MAKING CRAM SIGHTED — THE SWATCH AND THE ADDRESS GLOSS (EW-COLOUR-PICKER)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// The cold-read walkthrough (docs/reviews/2026-09-02-effects-cold-walkthrough.md,
+// a12 / a13, defect 13's colour half) measured what this surface asked of an
+// author: `colours` wanted a decimal integer with no swatch anywhere — to learn
+// what one looked like the reader opened a shipped preset and read `14` and
+// `3584` out of it — and `addr = 74` had no rendering at all beyond a three-letter
+// label, "though the panel elsewhere is happy to render a line mask as L0 L1 L2 L3
+// chips". Both halves are answered here, and neither changes a byte of the wire.
+//
+// ⚠ THE WIRE FORMAT DOES NOT MOVE, and that is the `lines` bitmask precedent
+// (ROADMAP row 97) applied a second time: ONE TOGGLE FLIPS ONE BIT, THE READOUT
+// PRINTS THE INTEGER. `colours` stays an array of decimal integers; `addr` stays
+// a byte address. The swatch is added BESIDE the text field an author may already
+// be using, never instead of it, and the gloss is added BESIDE the raw spinner.
+// An author who knows the BBB GGG RRR packing loses nothing.
+
+/**
+ * What `addr` MEANS, in the palette editor's own vocabulary.
+ *
+ * ⚠ DERIVED FROM `cramLocation`, WHICH IS DERIVED FROM THE HARDWARE CONSTANTS —
+ * never from the value of a neighbouring field. `pal_region` carries `pal_line`
+ * and `entry` as their own keys, and the obvious shortcut is to print those:
+ * that would print what the FILE claims rather than what the ADDRESS says, and
+ * the schema's own description of both keys is that they "must AGREE with addr"
+ * — a rule the engine checks, which means a document can be on screen while they
+ * disagree. This function is the address's answer, so the gloss stays true for
+ * the `cram` arm (which has no such keys at all) and stays USEFUL for
+ * `pal_region` (where a disagreement is now visible instead of silent).
+ *
+ * The three abnormal cases are NAMED rather than rendered as a plausible
+ * location, because a confident "line 6 · entry 5" for an address the engine
+ * will refuse is worse than the silence this replaces.
+ */
+export function addrGloss(addr: number): string {
+  const at = cramLocation(addr);
+  if (at === null) return 'not a CRAM address';
+  const where = `line ${at.line} · entry ${at.entry}`;
+  if (!at.inCram) return `${where} — past CRAM's ${CRAM_LINE_COUNT} lines`;
+  if (!at.aligned) return `${where} — odd byte, not a word boundary`;
+  return where;
+}
+
+/**
+ * One swatch's hover text: which colour of the list it is, where in CRAM it
+ * lands, and the word itself in both spellings the author may meet.
+ *
+ * BOTH SPELLINGS ON PURPOSE. The document holds decimal (that is the wire form
+ * and what the text field beside the swatches shows); every other Genesis
+ * surface in this app shows `$0EEE` (`fmtGenesisWord`). An author moving between
+ * the palette facet and this panel has to be able to carry a colour across, and
+ * a swatch that shows one spelling makes them do the conversion the walkthrough
+ * was complaining about.
+ */
+export function colourSwatchTitle(addr: number, i: number, word: number): string {
+  const at = cramLocation(addr + i * CRAM_WORD_BYTES);
+  const where = at === null ? 'not a CRAM address'
+    : `line ${at.line} · entry ${at.entry}`;
+  return `Colour ${i} → ${where} — ${word} (${fmtGenesisWord(word)}). `
+    + 'Click to open the R/G/B sliders. The list beside it stays the wire value.';
+}
+
+/**
+ * Set ONE colour of the list, leaving every other entry byte-identical.
+ *
+ * ONE GESTURE, ONE UNDO STEP, and `editPresetCommand` supplies both halves: it
+ * clones, mutates, and returns NULL when the document did not change. That last
+ * clause is what makes the shared slider control safe here — `GenesisColorSliders`
+ * commits on pointerup AND again on the blur that follows, and the second commit
+ * carries the same word, so it builds no command and burns no undo slot. (The
+ * palette grid solves the same double-commit by clearing a pre-drag snapshot;
+ * this surface has no snapshot to clear, and does not need one.)
+ */
+export function setColourCommand(
+  library: EffectsPresetLibrary, id: string, index: number, at: number, word: number,
+): SetEffectsPresetCommand | null {
+  return editPresetCommand(library, id, `Band ${index} colour ${at}`, (p) => {
+    const band = p.bands[index];
+    if (!band || !('cram' in band.on)) return;
+    const colours = band.on.cram.colours;
+    if (!Array.isArray(colours) || at < 0 || at >= colours.length) return;
+    colours[at] = word;
+  });
+}
+
+/**
+ * The span this band's colours occupy, when it runs off the end of its line —
+ * or null when it does not.
+ *
+ * ⚠ AN ADVISORY, NOT A REFUSAL, and the line is the same one `parseColours` draws:
+ * that function refuses SHAPE (a token that is not an integer means no document
+ * can be built at all) and forwards VALUE verbatim, because aeon §E.4 says a
+ * writer must not range-check or clamp — the author is owed the engine's own
+ * refusal with the measurement behind it. This sentence exists because the length
+ * is authored in one control and the address in another, so the two can be
+ * individually reasonable and jointly refused, and nothing on screen said so:
+ * `stream_cram`'s value rules include "span within the line" (the schema's own
+ * words, `$defs.cram.properties.addr`).
+ *
+ * The bound is CRAM_LINE_ENTRIES, so it moves with the hardware constant and not
+ * with a 16 typed here.
+ */
+export function cramSpanAdvisory(
+  band: EffectsPresetBand, presetId: string, index: number,
+): string | null {
+  if (!('cram' in band.on)) return null;
+  const { addr, colours } = band.on.cram;
+  if (!Array.isArray(colours) || colours.length === 0) return null;
+  const at = cramLocation(addr);
+  if (at === null) return null;
+  const end = at.entry + colours.length;
+  if (end <= CRAM_LINE_ENTRIES) return null;
+  return `${bandSubject(presetId, index)}: ${colours.length} colours from entry ${at.entry} `
+    + `run to entry ${end - 1}, past the end of line ${at.line} — a CRAM line holds `
+    + `${CRAM_LINE_ENTRIES}. stream_cram requires the span to stay within the line, so this `
+    + 'builds red. Lower the address or shorten the list.';
+}
+
 /** Set the writer-owned display label, or drop it when the author clears it. */
 export function setPresetNameCommand(
   library: EffectsPresetLibrary, id: string, name: string,
@@ -1271,11 +1400,15 @@ export function setVariantFieldCommand(
 
 /**
  * The CRAM lines a `lines` mask names, for the checkbox spelling: bit n ⇔ line
- * n. Four lines, because the Genesis CRAM has four; the wire value is still the
- * integer, and bits above line 3 — a hand-written file could carry them — are
- * preserved by `toggleVariantLineCommand`, which flips ONE bit and nothing else.
+ * n. Four lines, because the Genesis CRAM has four — and it now COUNTS from
+ * `CRAM_LINE_COUNT` rather than spelling `[0, 1, 2, 3]`, so this list and the
+ * address gloss cannot come to disagree about how many lines there are. The wire
+ * value is still the integer, and bits above the last line — a hand-written file
+ * could carry them — are preserved by `toggleVariantLineCommand`, which flips
+ * ONE bit and nothing else.
  */
-export const CRAM_LINES: readonly number[] = Object.freeze([0, 1, 2, 3]);
+export const CRAM_LINES: readonly number[] =
+  Object.freeze(Array.from({ length: CRAM_LINE_COUNT }, (_, i) => i));
 
 export function variantLineOn(mask: number, line: number): boolean {
   return (mask & (1 << line)) !== 0;
