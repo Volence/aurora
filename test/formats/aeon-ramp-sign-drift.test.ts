@@ -177,6 +177,41 @@ describe(`the negative ramp value — measured at aeon ${AEON_PATH} @ ${TIP}`, (
       });
     });
 
+  /**
+   * ⚠ THE DETECTOR MUST BE ABLE TO SEE AN ENCODE, or the row above is a
+   * green-forever claim that "the premise still holds" — the partial-coverage
+   * shape. aeon's tree cannot be mutated from here, so the READER is exercised
+   * on a synthetic literal of the shape their fix will have, plus the shape it
+   * has today. Both directions, on the same parser the row above uses.
+   */
+  it('⚠ the reader can DISTINGUISH a forward from an encode — proved on both shapes', () => {
+    const shell = (starts: string, steps: string) => `x
+pub comptime fn raster_ramp_program(top: int, lines: int, cmd: int,
+                                    start: int, step: int) -> RasterRampProgram {
+    return RasterRampProgram{
+        rrp_op:         OP_RUN_RAMP,
+        rrp_start:      ${starts},
+        rrp_step:       ${steps},
+    }
+}
+`;
+    const raw = returnedLiteral(shell('start', 'step'))!;
+    expect(raw).not.toBeNull();
+    expect(assignedTo(raw, 'rrp_start')).toBe('start');
+    expect(assignedTo(raw, 'rrp_step')).toBe('step');
+
+    // The shape an encode takes: the parameter goes through something.
+    const encoded = returnedLiteral(shell('u32_bits(start)', 'u32_bits(step)  // two\'s complement'))!;
+    expect(assignedTo(encoded, 'rrp_start')).toBe('u32_bits(start)');
+    expect(assignedTo(encoded, 'rrp_step')).toBe('u32_bits(step)');
+    expect(assignedTo(encoded, 'rrp_start')).not.toBe('start');
+
+    // And it does NOT read the struct DECLARATION, which spells the same field
+    // names with a type — the question that looks identical and is not.
+    const declOnly = `struct RasterRampProgram {\n    rrp_start: u32,\n    rrp_step: u32,\n}\n`;
+    expect(returnedLiteral(declOnly)).toBeNull();
+  });
+
   it('the sentence names the ENGINE SOURCE at origin/master as its measurement, not a page', () => {
     expect(RAMP_SIGN_LAG_MEASUREMENT).toContain(AEON_PATH);
     expect(RAMP_SIGN_LAG_MEASUREMENT).toContain('raster_ramp_program');
