@@ -422,3 +422,28 @@ export const CAMERA_PREVIEW_LABEL_BG = 'rgba(12, 14, 18, 0.82)';
 export const CAMERA_PREVIEW_LABEL_TEXT = 'rgba(215, 226, 238, 0.95)';
 /** The absence line, and a LOCKED band's caption — both are "read this twice". */
 export const CAMERA_PREVIEW_LABEL_WARN = 'rgba(240, 198, 116, 0.98)';
+
+// ---- The moving-anchor sweep preview (effects/AnchorSweepPreview.tsx) ------
+//
+// ⚠ THESE ARE HERE RATHER THAN RESOLVED FROM THE THEME AT DRAW TIME, and that
+// is this module's own ruling and not a shortcut. `T.raised` is the STRING
+// `var(--raised)`; assigning one to `ctx.fillStyle` is not an error — the
+// assignment is silently ignored and the context keeps whatever colour it had —
+// so a canvas that reached for a token would have drawn in one flat wrong
+// colour and looked deliberate. Each constant below names the token it mirrors,
+// as every other block in this file does.
+//
+// The preview is a small strip inside a panel, not a lens over the map, so it
+// borrows the PANEL's language (raised ground, border rule, accent line) rather
+// than claiming a hue out of the overlay family above.
+
+/** The strip's ground. Mirrors `--raised`. */
+export const ANCHOR_PREVIEW_BG = '#1A1E2A';
+/** The seed line — where the anchor sits with no motion. Mirrors `--border`. */
+export const ANCHOR_PREVIEW_SEED = '#2A2F3D';
+/** The ±peak envelope, at a wash alpha. Mirrors `--accent` (#34D399). */
+export const ANCHOR_PREVIEW_ENVELOPE = 'rgba(52, 211, 153, 0.22)';
+/** The sweep curve itself. Mirrors `--accent`. */
+export const ANCHOR_PREVIEW_CURVE = '#34D399';
+/** The playhead — where the anchor is NOW. Mirrors `--text-hi`. */
+export const ANCHOR_PREVIEW_PLAYHEAD = '#E8EAF2';
