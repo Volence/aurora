@@ -28,6 +28,7 @@
 // `components/effects/__tests__/ramp-control-wording.test.ts`.
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   EFFECTS_PRESET_RAMP_TOP_RANGE,
   EFFECTS_PRESET_RAMP_LINES_RANGE,
@@ -49,6 +50,7 @@ import {
 import {
   newRamp, newPreset, newBand,
   RAMP_KEYS, RAMP_MUST_NOT, RAMP_MUST_NOT_SHORT, RAMP_DISPLAY_LAG_NOTE,
+  RAMP_DISPLAY_INSTRUMENT,
   RAMP_RATE_MIN, RAMP_RATE_MAX, RAMP_RATE_UNIT,
   rampSpanRefusal, rampAddrRefusal, rampAddrGloss,
   rampRateProblem, rampRateNeighbours, rampRateRefusal,
@@ -339,6 +341,78 @@ describe('the VSRAM display lag is applied to the readout and to nothing else', 
       .toContain(`lands on top + ${EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET}`);
     expect(RAMP_DISPLAY_LAG_NOTE).toMatch(/j STARTS AT 1/);
     expect(RAMP_DISPLAY_LAG_NOTE).toMatch(/NO STAGE OF THE ENGINE PATH compensates/);
+  });
+
+  /**
+   * ═══ THE PAINTED NUMBERS NAME THEIR INSTRUMENT ═══
+   *
+   * ⚠ WHAT THIS ROW IS FOR, and it is not a wording preference. Until empyrean
+   * `bfc000e` this note stated the display geometry FLATLY and closed "measured
+   * by the engine lane" — every word true, and it read as SETTLED MACHINE
+   * BEHAVIOUR. It is an INSTRUMENT'S READING: as read on oracle's Rust core,
+   * with the legacy C++ core reading both raster tiers one line earlier on the
+   * same bytes, the landing line UNPINNED in the Rust core's own recon, and NO
+   * HARDWARE REFEREE anywhere on this project. A number an author is shown with
+   * no instrument beside it is a number they will act on as fact.
+   *
+   * ⚠ AND THE EXPECTATIONS ARE DERIVED FROM THE SCHEMA, NOT COPIED FROM THE
+   * MODULE. This file re-reads the vendored contract with its OWN regexes and
+   * requires the painted string to carry those spans, so the row is a second
+   * independent reading rather than `RAMP_DISPLAY_INSTRUMENT` compared to
+   * itself. If the module ever hand-writes the attribution, these fail.
+   */
+  it('the painted note attributes its numbers to the instrument that read them', () => {
+    const schema = JSON.parse(readFileSync(
+      new URL('../../../core/formats/effects/aurora-effects-preset.schema.json', import.meta.url),
+      'utf8',
+    )) as { properties: Record<string, { description?: string }>;
+            $defs: Record<string, { properties?: Record<string, { description?: string }> }> };
+
+    // Anti-vacuous: the two nodes really are the ones that carry the clauses.
+    const rampProse = String(schema.properties.ramp.description ?? '');
+    const topProse = String(schema.$defs.ramp.properties!.top.description ?? '');
+    expect(rampProse.length).toBeGreaterThan(1000);
+    expect(topProse.length).toBeGreaterThan(200);
+
+    // The KEY paragraph's verdict, read here rather than imported.
+    const verdict = /so (top\+\d+ is the instrument's reading today and not a ratified hardware fact)/
+      .exec(rampProse);
+    expect(verdict, 'the contract no longer states the instrument verdict').not.toBeNull();
+    expect(RAMP_DISPLAY_LAG_NOTE).toContain(verdict![1]);
+
+    // The `top` field's compact clause, minus the intra-document cross-reference.
+    const attr = /(AS READ ON ORACLE'S RUST CORE) \(([^)]*)\)/.exec(topProse);
+    expect(attr, 'the contract no longer names the instrument').not.toBeNull();
+    expect(RAMP_DISPLAY_LAG_NOTE).toContain(attr![1]);
+    expect(RAMP_DISPLAY_LAG_NOTE)
+      .toContain(attr![2].replace(/,\s*see the ramp description$/, ''));
+
+    // The three facts the note owes an author, each stated rather than implied.
+    expect(RAMP_DISPLAY_LAG_NOTE).toMatch(/no hardware referee exists/i);
+    expect(RAMP_DISPLAY_LAG_NOTE).toMatch(/unpinned/i);
+    expect(RAMP_DISPLAY_LAG_NOTE).toMatch(/legacy core reads one line earlier/i);
+
+    // ⚠ AND THE WITHDRAWN ATTRIBUTION IS NOT PAINTED. aeon's own two-core test
+    // refuted "the engine moved fire+1 -> fire+2 on 2026-08-19" — both tiers
+    // shift by one line between the two cores on the same bytes — and empyrean
+    // withdrew it. It must never reach an author from this surface.
+    expect(RAMP_DISPLAY_LAG_NOTE).not.toMatch(/2026-08-19/);
+    expect(RAMP_DISPLAY_LAG_NOTE).not.toMatch(/fire\s*\+\s*[12]/);
+  });
+
+  /**
+   * The interlock, exercised rather than trusted: the verdict names a line
+   * offset of its own and it is the SAME quantity `$defs.ramp.properties.top`
+   * yields. Three contract statements of one number, and this asks two of them.
+   */
+  it('the instrument verdict names the same offset the top sentence yields', () => {
+    expect(RAMP_DISPLAY_INSTRUMENT.verdict)
+      .toContain(`top+${EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET}`);
+    expect(RAMP_DISPLAY_INSTRUMENT.attribution).toMatch(/^AS READ ON /);
+    // The cross-reference an author cannot follow from a tooltip is dropped, and
+    // nothing else is: the clause still ends inside its own parenthesis.
+    expect(RAMP_DISPLAY_INSTRUMENT.attribution).not.toMatch(/see the ramp description/);
+    expect(RAMP_DISPLAY_INSTRUMENT.attribution).toMatch(/\)$/);
   });
 
   /**
