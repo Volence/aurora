@@ -4579,6 +4579,28 @@ export function setBaseSwapRestoreLineCommand(
   });
 }
 
+/**
+ * WHERE A BAND'S **NEW** OFF FIRE GOES when an author first asks for one.
+ *
+ * ⚠ THIS LIVES HERE AND NOT IN THE PANEL, and the reason is the rule one line
+ * below it: `line + 1` is arithmetic over a FIRE LINE, and every other piece of
+ * fire-line arithmetic on this surface (`baseSwapInsideRows`) is derived from
+ * the schema's prose precisely so no second copy exists. A panel that spelled
+ * `band.line + 1` itself would be that second copy, in the file with the least
+ * chance of being read next to the contract.
+ *
+ * The choice is the SMALLEST legal one: the very next fire line, which makes a
+ * band that swaps NO row in full. That is deliberate rather than unhelpful — it
+ * is the only position Aurora can pick without deciding how tall the author's
+ * band should be, `baseSwapInsideRowsText` says out loud that nothing is fully
+ * swapped yet, and the spinner is right there. Null when there is no room at
+ * all, i.e. the ON fire is already on the last legal line.
+ */
+export function newBaseSwapRestoreLine(band: EffectsPresetBaseSwapBand): number | null {
+  const next = band.line + 1;
+  return next > EFFECTS_PRESET_BASE_SWAP_RESTORE_LINE_RANGE.max ? null : next;
+}
+
 /** Set the VRAM base a band re-points its plane at. Null when refused or nothing moved. */
 export function setBaseSwapTargetCommand(
   library: EffectsPresetLibrary, id: string, index: number, value: number,

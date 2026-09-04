@@ -37,9 +37,15 @@ import {
   EFFECTS_PRESET_PROGRAM_ARMS,
   EFFECTS_PRESET_ROOT_KEYS,
   EFFECTS_PRESET_BASE_SWAP_KEYS,
+  EFFECTS_PRESET_BASE_SWAP_MIN_BANDS,
+  EFFECTS_PRESET_BASE_SWAP_OPTIONAL_KEYS,
+  EFFECTS_PRESET_BASE_SWAP_PLANES,
+  EFFECTS_PRESET_BASE_SWAP_ORDER_AUTHORITY,
   EFFECTS_PRESET_BASE_SWAP_LINE_RANGE,
+  EFFECTS_PRESET_BASE_SWAP_RESTORE_LINE_RANGE,
   EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE,
   EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE,
+  baseSwapFires, baseSwapOrderRefusal,
   EFFECTS_PRESET_RAMP_TOP_RANGE,
   isBaseSwapTargetAligned,
   presetRasterChannel,
@@ -102,7 +108,7 @@ const RAMP: EffectsPresetRamp = {
  * empyrean and aeon. Aurora does not adjudicate it and no row here asserts they
  * agree; it is recorded in test/fixtures/effects/ojz_sec6_baseswap.provenance.json.
  */
-const BASE_SWAP: EffectsPresetBaseSwap = { line: 160, target: 57344 };
+const BASE_SWAP: EffectsPresetBaseSwap = [{ plane: 'PlaneA', line: 160, target: 57344 }];
 
 const ID = 'ojz_sec6_baseswap';
 const base = { schema: 1 as const, id: ID };
@@ -261,13 +267,25 @@ describe('the top-level oneOf with THREE arms: exactly one raster program', () =
 // THE BOUNDS, READ OFF THE SCHEMA — INCLUDING THE GRANULE
 // ═══════════════════════════════════════════════════════════════════════════
 describe('base_swap bounds are the schema\'s, not retyped beside it', () => {
-  it('the object is CLOSED and both members are required', () => {
-    const fields = presetDefFields('base_swap');
-    expect(fields.required).toEqual(['line', 'target']);
-    expect(fields.optional).toEqual([]);
-    expect(EFFECTS_PRESET_BASE_SWAP_KEYS).toEqual(['line', 'target']);
-    expect((EFFECTS_PRESET_SCHEMA.$defs as Record<string, JsonSchema>)
-      .base_swap.unevaluatedProperties).toBe(false);
+  it('the KEY is a bounded LIST and the BAND is a closed object', () => {
+    // ⚠ THE NODE MOVED. `presetDefFields` reads `$defs.<def>` directly, which is
+    // now the ARRAY node and carries no `required`/`properties` at all — so the
+    // band's fields are read one level down, under `items`. A reader still
+    // aimed at the old place gets `undefined`, not a wrong answer.
+    const def = (EFFECTS_PRESET_SCHEMA.$defs as Record<string, JsonSchema>).base_swap;
+    expect(def.type).toBe('array');
+    expect(def.minItems).toBe(EFFECTS_PRESET_BASE_SWAP_MIN_BANDS);
+    expect(def.required, 'the LIST node carries a `required` — the band fields have not moved '
+      + 'under `items` and every derivation in preset.ts is reading the wrong node').toBeUndefined();
+
+    const band = def.items as JsonSchema;
+    expect(EFFECTS_PRESET_BASE_SWAP_KEYS).toEqual(['plane', 'line', 'target']);
+    expect(band.required).toEqual([...EFFECTS_PRESET_BASE_SWAP_KEYS]);
+    expect(EFFECTS_PRESET_BASE_SWAP_OPTIONAL_KEYS).toEqual(['restore_line']);
+    expect(band.unevaluatedProperties).toBe(false);
+    // The plane enum is CLOSED to two, and those two are what the codec exports.
+    expect((band.properties as Record<string, JsonSchema>).plane.enum)
+      .toEqual([...EFFECTS_PRESET_BASE_SWAP_PLANES]);
   });
 
   it('line is fire()\'s range and is NOT the ramp\'s top range', () => {
@@ -289,12 +307,22 @@ describe('base_swap bounds are the schema\'s, not retyped beside it', () => {
     expect(span / EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE).toBe(8);
   });
 
-  it('WHAT 57344 MEANS: $E000, VRAM_PLANE_B, seven granules up', () => {
+  it('WHAT 57344 MEANS: $E000, seven granules up — and the contract no longer NAMES it', () => {
     // The comment that makes the key legible, asserted so it cannot rot: the
-    // shipped target is Plane B's nametable base, and it is granule-aligned.
-    expect(BASE_SWAP.target).toBe(0xE000);
-    expect(BASE_SWAP.target / EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE).toBe(7);
-    expect(isBaseSwapTargetAligned(BASE_SWAP.target)).toBe(true);
+    // contract's worked target is seven granules up and granule-aligned.
+    expect(BASE_SWAP[0].target).toBe(0xE000);
+    expect(BASE_SWAP[0].target / EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE).toBe(7);
+    expect(isBaseSwapTargetAligned(BASE_SWAP[0].target)).toBe(true);
+    // ⚠ AND THE NAME IS GONE AT `8f56c2c`. The old `target` description ended
+    // "targets 57344 ($E000, VRAM_PLANE_B)" — the rewrite dropped it, so no
+    // reader of this schema may put VRAM_PLANE_B on an authorable address any
+    // more. The two VRAM_PLANE_* names left in the key's prose are the HOME
+    // bases an OFF fire writes, "the engine's fact, never authored".
+    const target = String(((((EFFECTS_PRESET_SCHEMA.$defs as Record<string, {
+      items: { properties: Record<string, { description: string }> };
+    }>).base_swap).items).properties).target.description);
+    expect(target).not.toContain('VRAM_PLANE_B');
+    expect(target).toMatch(/multiple of 8192/);
   });
 
   it('isBaseSwapTargetAligned refuses off-granule and out-of-range, and does NOT snap', async () => {
@@ -322,7 +350,7 @@ describe('base_swap bounds are the schema\'s, not retyped beside it', () => {
 describe('multipleOf actually asserts, and is not ignored', () => {
   it('refuses 57345 and names the granule', () => {
     const issues = validateAgainstSchema(
-      { ...base, base_swap: { line: 160, target: 57345 } }, S,
+      { ...base, base_swap: [{ plane: 'PlaneA', line: 160, target: 57345 }] }, S,
     );
     expect(
       issues,
@@ -331,17 +359,19 @@ describe('multipleOf actually asserts, and is not ignored', () => {
       + 'address with nothing else visibly wrong.',
     ).not.toEqual([]);
     expect(issues.map((i) => i.message).join(' ')).toMatch(/not a multiple of 8192/);
-    expect(issues.map((i) => i.path)).toContain('/base_swap/target');
+    expect(issues.map((i) => i.path)).toContain('/base_swap/0/target');
   });
 
   it('accepts every one of the eight aligned addresses, and refuses their neighbours', () => {
     const g = EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE;
     for (let t = EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.min;
       t <= EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.max; t += g) {
-      expect(validateAgainstSchema({ ...base, base_swap: { line: 160, target: t } }, S))
-        .toEqual([]);
-      expect(validateAgainstSchema({ ...base, base_swap: { line: 160, target: t + 1 } }, S))
-        .not.toEqual([]);
+      expect(validateAgainstSchema(
+        { ...base, base_swap: [{ plane: 'PlaneA', line: 160, target: t }] }, S,
+      )).toEqual([]);
+      expect(validateAgainstSchema(
+        { ...base, base_swap: [{ plane: 'PlaneA', line: 160, target: t + 1 }] }, S,
+      )).not.toEqual([]);
     }
   });
 
@@ -464,6 +494,7 @@ describe('the shipped section-6 document opens', () => {
     // must report. If aeon re-authors section 6 as a `bands` document this row
     // follows it instead of going red about a number.
     const RASTER_KEYS = ['bands', 'ramp', 'base_swap'] as const;
+    void 0;
     const present = RASTER_KEYS.filter((k) => k in RAW);
     expect(present, 'the vendored document must carry exactly one raster program').toHaveLength(1);
     expect(presetRasterChannel(preset)).toBe(present[0]);
@@ -476,19 +507,53 @@ describe('the shipped section-6 document opens', () => {
     // `toEqual(RAW.base_swap)` is not a tautology — the codec could have
     // coerced, defaulted, renamed or rescaled, and this is what says it did not.
     const swap = preset.base_swap as EffectsPresetBaseSwap;
-    expect(Object.keys(swap).sort()).toEqual([...EFFECTS_PRESET_BASE_SWAP_KEYS].sort());
+    // ⚠ A LIST NOW, AND THE SHIPPED DOCUMENT REALLY USES MORE THAN ONE BAND.
+    // A row that only ever saw index 0 would be green on a codec that dropped
+    // every band after the first, which is the whole risk of this migration.
+    expect(Array.isArray(swap)).toBe(true);
+    expect(swap.length).toBeGreaterThan(1);
     expect(swap).toEqual(RAW.base_swap);
-    expect(Number.isInteger(swap.line) && Number.isInteger(swap.target)).toBe(true);
+    expect(swap).toHaveLength((RAW.base_swap as unknown[]).length);
 
-    // …and that the document aeon ships is one the CONTRACT admits. These read
-    // the schema's own bounds, so they fail if aeon ever ships a preset the
-    // editor would have to refuse — the real "can an author open section 6?".
-    expect(swap.line).toBeGreaterThanOrEqual(EFFECTS_PRESET_BASE_SWAP_LINE_RANGE.min);
-    expect(swap.line).toBeLessThanOrEqual(EFFECTS_PRESET_BASE_SWAP_LINE_RANGE.max);
-    expect(swap.target).toBeGreaterThanOrEqual(EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.min);
-    expect(swap.target).toBeLessThanOrEqual(EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.max);
-    expect(isBaseSwapTargetAligned(swap.target)).toBe(true);
+    for (const [i, band] of swap.entries()) {
+      const declared = [...EFFECTS_PRESET_BASE_SWAP_KEYS,
+        ...EFFECTS_PRESET_BASE_SWAP_OPTIONAL_KEYS].sort();
+      for (const k of Object.keys(band)) {
+        expect(declared, `band ${i} carries an undeclared key "${k}"`).toContain(k);
+      }
+      for (const k of EFFECTS_PRESET_BASE_SWAP_KEYS) {
+        expect(band, `band ${i} lost required key "${k}"`).toHaveProperty(k);
+      }
+      expect(Number.isInteger(band.line) && Number.isInteger(band.target)).toBe(true);
+      expect(EFFECTS_PRESET_BASE_SWAP_PLANES, `band ${i} plane`).toContain(band.plane);
+
+      // …and that the document aeon ships is one the CONTRACT admits. These read
+      // the schema's own bounds, so they fail if aeon ever ships a preset the
+      // editor would have to refuse — the real "can an author open section 6?".
+      expect(band.line).toBeGreaterThanOrEqual(EFFECTS_PRESET_BASE_SWAP_LINE_RANGE.min);
+      expect(band.line).toBeLessThanOrEqual(EFFECTS_PRESET_BASE_SWAP_LINE_RANGE.max);
+      expect(band.target).toBeGreaterThanOrEqual(EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.min);
+      expect(band.target).toBeLessThanOrEqual(EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.max);
+      expect(isBaseSwapTargetAligned(band.target)).toBe(true);
+      if (band.restore_line !== undefined) {
+        expect(band.restore_line)
+          .toBeGreaterThanOrEqual(EFFECTS_PRESET_BASE_SWAP_RESTORE_LINE_RANGE.min);
+        expect(band.restore_line)
+          .toBeLessThanOrEqual(EFFECTS_PRESET_BASE_SWAP_RESTORE_LINE_RANGE.max);
+      }
+    }
     expect(validateAgainstSchema(RAW, S)).toEqual([]);
+
+    // ⚠ AND THE ONE THING NEITHER THE SCHEMA NOR AEON'S GENERATOR CHECKS: the
+    // flattened fire sequence ascends strictly. `fire_lines` would refuse it at
+    // .emp BUILD time, so a shipped document that failed here would be one aeon
+    // cannot build — worth knowing about Aurora's derivation AND about aeon's
+    // tree, and this is the only place the two meet.
+    expect(baseSwapOrderRefusal(swap), 'the SHIPPED section-6 document would be refused by '
+      + `${EFFECTS_PRESET_BASE_SWAP_ORDER_AUTHORITY.symbol} at build time`).toBeNull();
+    expect(baseSwapFires(swap)).toHaveLength(
+      swap.length + swap.filter((b) => b.restore_line !== undefined).length,
+    );
   });
 
   it('is what section 6 is BOUND to — the reason the editor had to open it', () => {

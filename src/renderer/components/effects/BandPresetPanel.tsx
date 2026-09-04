@@ -72,7 +72,7 @@ import type { EffectsSceneLibrary } from '../../../core/formats/effects/scene';
 import {
   EFFECTS_PRESET_BAND_KEYS, EFFECTS_PRESET_BASE_SWAP_KEYS,
   EFFECTS_PRESET_BASE_SWAP_OPTIONAL_KEYS, EFFECTS_PRESET_BASE_SWAP_PLANES,
-  EFFECTS_PRESET_BASE_SWAP_RESTORE_LINE_RANGE, presetArmFields, presetDefFields,
+  presetArmFields, presetDefFields,
   EFFECTS_PRESET_MAX_PATCH, ANCHOR_PHASE_RANGE,
   // THE NARROWING QUESTION, ASKED ONCE. `bands` left the schema's top-level
   // `required` when `ramp` arrived and the root became a `oneOf`, so a preset
@@ -141,6 +141,7 @@ import {
   addBaseSwapBandRefusal, lastBaseSwapBandRefusal,
   setBaseSwapLineCommand, setBaseSwapTargetCommand, setBaseSwapPlaneCommand,
   setBaseSwapRestoreLineCommand, addBaseSwapBandCommand, removeBaseSwapBandCommand,
+  newBaseSwapRestoreLine,
   // ═══ THE PATCHED ARM (EW-BOUNDARY-PANEL, ROADMAP row 151) ═══
   //
   // EIGHT NUMBERS AND TWO FLAGS, and the asymmetry with the three cards above it
@@ -1964,10 +1965,9 @@ function BaseSwapBandCard({ library, presetId, index, band, bands, run, lastRefu
         <label style={{ display: 'flex', alignItems: 'center', gap: T.s1, fontSize: T.tXs }}>
           <input type="checkbox" checked={hasRestore}
             aria-label={`Band ${index} has a restore line`}
+            disabled={!hasRestore && newBaseSwapRestoreLine(band) === null}
             onChange={(e) => run(setBaseSwapRestoreLineCommand(library, presetId, index,
-              e.target.checked
-                ? Math.min(band.line + 1, EFFECTS_PRESET_BASE_SWAP_RESTORE_LINE_RANGE.max)
-                : undefined))} />
+              e.target.checked ? (newBaseSwapRestoreLine(band) ?? undefined) : undefined))} />
           <span>ends at a line</span>
         </label>
         {hasRestore && (

@@ -34,25 +34,35 @@
  * CURRENT schema with that fact recorded in the fixture — never rendered as a
  * pass.
  *
- * RUN (bundled, because this repo ships no standalone TS runner):
+ * RUN (bundled, because this repo ships no standalone TS runner), from the
+ * repo root, passing the revision whose schema PRECEDES the amendment:
+ *
  *   npx esbuild scratchpad/regen-preset-canonical-golden.mts --bundle \
  *     --platform=node --format=esm --packages=external \
- *     --outfile=<tmp>/regen.mjs && node <tmp>/regen.mjs
+ *     --outfile=scratchpad/regen-emit/regen.mjs \
+ *   && node scratchpad/regen-emit/regen.mjs <rev-before-the-amendment>
+ *
+ * ⚠ THE BUNDLE MUST LAND INSIDE THIS REPO (`scratchpad/*-emit/` is gitignored).
+ * `siblingPathOrUnresolved` anchors on the RUNNING MODULE'S OWN LOCATION, so a
+ * bundle emitted to /tmp resolves the suite root from /tmp and refuses — which
+ * is the resolver behaving correctly and the invocation being wrong.
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import {
   canonicalizeBySchema, validateAgainstSchema, type JsonSchema,
 } from '../src/core/formats/effects/json-schema-subset';
 import { canonicalJsonPretty } from '../src/core/formats/canonical-json';
+// @ts-expect-error — plain-Node resolver, no types; the only sanctioned way to
+// reach a peer checkout from a scratchpad instrument.
+import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 
 // ⚠ RESOLVED FROM THE WORKING DIRECTORY, NOT FROM `import.meta.url`. This module
 // is BUNDLED to a temp path before it runs, so `import.meta.url` points at the
 // bundle and not at the repo — a resolution that looks right and silently reads
 // the wrong tree. Run it from anywhere inside the Aurora checkout.
 const REPO = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
-const GOLDEN = resolve(REPO, 'test/fixtures/effects/preset-canonical-golden.json');
+const GOLDEN = `${REPO}/test/fixtures/effects/preset-canonical-golden.json`;
 const SCHEMA_PATH = 'src/core/formats/effects/aurora-effects-preset.schema.json';
 const AEON_DIR = 'games/sonic4/data/editor/effects/presets';
 
@@ -60,8 +70,13 @@ function git(repo: string, ...args: string[]): string {
   return execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8' });
 }
 
-/** The aeon checkout beside this repo — the same resolution the tests use. */
-const aeon = (process.env.AEON_DIR ?? resolve(REPO, '..', 'aeon'));
+/**
+ * The aeon checkout — through the SUITE RESOLVER, never a literal and never
+ * `resolve(REPO, '..', 'aeon')`. A hand-rolled sibling path is one machine's
+ * layout, ignores AEON_DIR / EMPYREAN_SUITE_ROOT, and is exactly what
+ * `scripts/check-peer-path-literals.mjs` refuses (it caught this file).
+ */
+const aeon = siblingPathOrUnresolved('aeon');
 git(aeon, 'rev-parse', '--git-dir');
 
 const aeonTip = git(aeon, 'rev-parse', 'origin/master').trim();
