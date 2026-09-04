@@ -13,16 +13,38 @@
  * no section rebases"), and the editor's `sectionWorldOffset` lays sections out
  * on the same grid at the same scale.
  *
- * ⚠ THAT CORRESPONDENCE IS ASSUMED, NOT CHECKED (corrected 2026-09-04). This
- * paragraph used to say it was "checked at runtime by
+ * ⚠ IT WAS ASSUMED AND UNCHECKED UNTIL 2026-09-04, and the claim of a check was
+ * worse than the gap: this paragraph used to say it was "checked at runtime by
  * `scratchpad/warp-mailbox-harness`" — an instrument that has never existed in
- * this repo, in the tree or in its history. What does exist answers other
- * questions: `warp-math.test.ts` is arithmetic only (rounding, the act clamp,
- * the protocol clamp), and `scratchpad/warp-tearing-harness.mjs` diffs the
- * plane nametable between two routes to the SAME destination, which is silent
- * about whether that destination is the pixel the editor meant. So "the two
- * origins match" is exactly the sort of thing that is true until it isn't, and
- * nothing here would notice the day it stops being true.
+ * this repo, in the tree or in its history. The two things that DO exist answer
+ * other questions and must not be read as covering this one:
+ * `warp-math.test.ts` is arithmetic only (rounding, the act clamp, the protocol
+ * clamp) and never leaves the editor; `scratchpad/warp-tearing-harness.mjs`
+ * diffs the plane nametable between two routes to the SAME destination, which
+ * is silent about whether that destination is the pixel the editor meant.
+ *
+ * IT IS CHECKED NOW, live, by `test/live/aeon-warp-correspondence.test.ts`
+ * (opt-in: `AURORA_LIVE_AEON_WARP=1`, needs a built `s4.debug.bin` and
+ * `oracle-aether`; run it after changing this file, `src/main/aether/warp.ts`, or
+ * aeon's `Debug_Warp_Consume` / `Player_BoundsInit`). It warps to two known
+ * editor world pixels and reads `Player_1`'s SST position OUT OF RAM — a
+ * screenshot cannot answer this — and asserts the player is at the cursor
+ * pixel, that two different pixels give two different landings differing by
+ * exactly the distance asked for, and that the act clamp's legitimate
+ * editor/engine DISAGREEMENT is the size the two margins say it is. First run
+ * 2026-09-04 on aeon's 3x3 act: (1024,96) and (1801,429) both landed exactly,
+ * delta (0,0) — see `docs/reviews/2026-09-04-warp-correspondence.md`.
+ *
+ * ⚠ THE ENGINE CLAMPS TIGHTER THAN THIS FILE DOES, and that is the one place
+ * the two do not agree. `warpTargetFor` clamps to the last addressable pixel of
+ * the act (`grid * SECTION_PX - 1`); aeon clamps to its own playable edges
+ * (`Player_Bound_Right` = width - PBOUND_RIGHT_MARGIN, `Player_Bound_Bottom` =
+ * height - SCREEN_HEIGHT), so a cursor in the act's last 24 px of width or last
+ * 224 px of height lands short of where it was put. Measured, not deduced. That
+ * is the engine's business — it publishes back where it actually put the player
+ * and `warpTo` reports it as `clamped` — but a caller that ever needs the two
+ * to agree at the edges has to read the bounds off the engine, not compute them
+ * here.
  */
 
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../model/s4-types';
