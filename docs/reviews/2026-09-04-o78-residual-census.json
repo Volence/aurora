@@ -94,7 +94,918 @@
     },
     "non_launchers_cannot_reach_the_reaper": "harness-guard.mjs installNet() (line ~1044) loops only over children registered by spawnGuarded; with none registered, killTreeSync/reapDisplays is never called"
   },
-  "step2_step3_measurements": [],
+  "step2_step3_measurements": [
+    {
+      "script": "harness:aeon-priority-lens",
+      "class": "SELFKILL",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 31,
+      "outer_tmpdir": "/tmp/xvfb-run.MSIDWm",
+      "tally": "24/24 rows passed",
+      "uptime": "00:15:51 up 9 days, 16:04,  1 user,  load average: 8.01, 8.58, 7.77",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:animated-art",
+      "class": "SELFKILL",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 41,
+      "outer_tmpdir": "/tmp/xvfb-run.0UrSp3",
+      "tally": "20/20 rows passed",
+      "uptime": "00:16:22 up 9 days, 16:05,  1 user,  load average: 7.26, 8.33, 7.71",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:band-art-foreground",
+      "class": "SELFKILL",
+      "npm_exit": "1",
+      "outer_exit": "1",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 7,
+      "outer_tmpdir": "/tmp/xvfb-run.b8q2I3",
+      "tally": "0/0 PASSED, 2 NOT MEASURABLE",
+      "uptime": "00:17:04 up 9 days, 16:06,  1 user,  load average: 6.27, 7.94, 7.60",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:bg-override-paints",
+      "class": "SELFKILL",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 24,
+      "outer_tmpdir": "/tmp/xvfb-run.HlySWK",
+      "tally": "20/20 rows passed, 1 noted",
+      "uptime": "00:17:12 up 9 days, 16:06,  1 user,  load average: 6.41, 7.94, 7.61",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:bg-tile-picker",
+      "class": "SELFKILL",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 25,
+      "outer_tmpdir": "/tmp/xvfb-run.nl5BuY",
+      "tally": "28/28 rows passed, 1 noted",
+      "uptime": "00:17:37 up 9 days, 16:06,  1 user,  load average: 6.07, 7.74, 7.55",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:bganim-band",
+      "class": "SELFKILL",
+      "npm_exit": "1",
+      "outer_exit": "1",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 15,
+      "outer_tmpdir": "/tmp/xvfb-run.zgC7zb",
+      "tally": "HARNESS ERROR: Error: no \"New band\" section on screen",
+      "uptime": "00:18:03 up 9 days, 16:07,  1 user,  load average: 5.40, 7.42, 7.45",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:bganim-band-lens",
+      "class": "SELFKILL",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 40,
+      "outer_tmpdir": "/tmp/xvfb-run.yuIbOn",
+      "tally": "43/44 rows passed, 1 NOT MEASURABLE on this document",
+      "uptime": "00:18:18 up 9 days, 16:07,  1 user,  load average: 5.25, 7.29, 7.40",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:bganim-insert-roomy",
+      "class": "SELFKILL",
+      "npm_exit": "1",
+      "outer_exit": "1",
+      "refused_inherited": "YES",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 86,
+      "outer_tmpdir": "/tmp/xvfb-run.g0FR08",
+      "tally": "25/26 rows passed",
+      "uptime": "00:18:58 up 9 days, 16:08,  1 user,  load average: 4.29, 6.79, 7.23",
+      "verdict": "REACHED THE REAPER ALIVE"
+    },
+    {
+      "script": "harness:bganim-motion",
+      "class": "SELFKILL",
+      "npm_exit": "2",
+      "outer_exit": "2",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ABSENT",
+      "seconds": 3,
+      "outer_tmpdir": "/tmp/xvfb-run.yzleeB",
+      "tally": "HARNESS ERROR: Error: ENOENT: no such file or directory, open '/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a79f5ac54eb15d28f/scratchpad/fixtures/aeon-bganim-coherent/games/sonic4/data/editor_bg_override.json'",
+      "uptime": "00:20:24 up 9 days, 16:09,  1 user,  load average: 6.25, 6.84, 7.21",
+      "verdict": "UNMEASURABLE",
+      "reason": "the instrument was ABSENT: the run died before harness-guard was imported, so the tell could not print either way"
+    },
+    {
+      "script": "harness:bganim-phase-shift",
+      "class": "SELFKILL",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 20,
+      "outer_tmpdir": "/tmp/xvfb-run.vIjoVU",
+      "tally": "20/20 rows passed",
+      "uptime": "00:20:28 up 9 days, 16:09,  1 user,  load average: 6.31, 6.85, 7.21",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:bganim-rate-shift",
+      "class": "SELFKILL",
+      "npm_exit": "1",
+      "outer_exit": "1",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 15,
+      "outer_tmpdir": "/tmp/xvfb-run.smrgno",
+      "tally": "HARNESS ERROR: Error: no \"New band\" section on screen",
+      "uptime": "00:20:48 up 9 days, 16:09,  1 user,  load average: 5.99, 6.74, 7.16",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:bganim-strip-range",
+      "class": "SELFKILL",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 29,
+      "outer_tmpdir": "/tmp/xvfb-run.6aUOop",
+      "tally": "40/40 PASSED",
+      "uptime": "00:21:03 up 9 days, 16:10,  1 user,  load average: 5.85, 6.67, 7.13",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:bganim-tile-door",
+      "class": "SELFKILL",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 40,
+      "outer_tmpdir": "/tmp/xvfb-run.tx3IKl",
+      "tally": "=== 20/20 checks passed",
+      "uptime": "00:21:32 up 9 days, 16:10,  1 user,  load average: 5.64, 6.55, 7.08",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:bganim-ui-authored-composition",
+      "class": "SELFKILL",
+      "npm_exit": "2",
+      "outer_exit": "2",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 15,
+      "outer_tmpdir": "/tmp/xvfb-run.i2auLv",
+      "tally": "HARNESS ERROR: no \"New band\" section on screen",
+      "uptime": "00:22:12 up 9 days, 16:11,  1 user,  load average: 5.68, 6.45, 7.02",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:camera",
+      "class": "SELFKILL",
+      "npm_exit": null,
+      "outer_exit": "124",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "UNKNOWN",
+      "loader": "ACTIVE",
+      "seconds": 240,
+      "outer_tmpdir": "/tmp/xvfb-run.Q6QxmE",
+      "tally": null,
+      "uptime": "00:22:27 up 9 days, 16:11,  1 user,  load average: 5.51, 6.38, 6.99",
+      "verdict": "UNMEASURABLE",
+      "reason": "capped at the 240 s run timeout — killed, never a pass"
+    },
+    {
+      "script": "harness:camera-preview",
+      "class": "SELFKILL",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 58,
+      "outer_tmpdir": "/tmp/xvfb-run.c3pJzY",
+      "tally": "26/26 rows passed",
+      "uptime": "00:26:27 up 9 days, 16:15,  1 user,  load average: 3.47, 5.07, 6.35",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:chunkgrid-hint",
+      "class": "SELFKILL",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 31,
+      "outer_tmpdir": "/tmp/xvfb-run.UTEyUZ",
+      "tally": "20/20 rows passed",
+      "uptime": "00:27:25 up 9 days, 16:16,  1 user,  load average: 6.74, 5.56, 6.43",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:classic-playtest",
+      "class": "SELFKILL",
+      "npm_exit": "1",
+      "outer_exit": "1",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 30,
+      "outer_tmpdir": "/tmp/xvfb-run.HPmp94",
+      "tally": "18/19 rows passed — FAILED: 8",
+      "uptime": "00:27:56 up 9 days, 16:17,  1 user,  load average: 5.95, 5.49, 6.38",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:collision-destructive",
+      "class": "SELFKILL",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 15,
+      "outer_tmpdir": "/tmp/xvfb-run.LmBkHZ",
+      "tally": "════ 30/30 ════",
+      "uptime": "00:28:26 up 9 days, 16:17,  1 user,  load average: 5.52, 5.43, 6.33",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:collision-edit",
+      "class": "SELFKILL",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 41,
+      "outer_tmpdir": "/tmp/xvfb-run.XxqShP",
+      "tally": "7/7 rows passed",
+      "uptime": "00:28:41 up 9 days, 16:17,  1 user,  load average: 6.11, 5.56, 6.35",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:collision-legibility",
+      "class": "SELFKILL",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 54,
+      "outer_tmpdir": "/tmp/xvfb-run.2kG09n",
+      "tally": "=== 18/18 PASSED ===",
+      "uptime": "00:29:22 up 9 days, 16:18,  1 user,  load average: 4.37, 5.18, 6.19",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:collision-lens",
+      "class": "SELFKILL",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 34,
+      "outer_tmpdir": "/tmp/xvfb-run.CBsHl1",
+      "tally": "6/6 rows passed",
+      "uptime": "00:30:17 up 9 days, 16:19,  1 user,  load average: 4.46, 5.04, 6.08",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:collision-mark-normal",
+      "class": "SELFKILL",
+      "npm_exit": "1",
+      "outer_exit": "1",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 62,
+      "outer_tmpdir": "/tmp/xvfb-run.LmqylP",
+      "tally": "=== 13/14 PASSED ===",
+      "uptime": "00:30:51 up 9 days, 16:19,  1 user,  load average: 7.45, 5.78, 6.30",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:collision-needle",
+      "class": "SELFKILL",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 26,
+      "outer_tmpdir": "/tmp/xvfb-run.wv5ZSF",
+      "tally": "5/5 rows passed",
+      "uptime": "00:31:54 up 9 days, 16:20,  1 user,  load average: 4.86, 5.35, 6.11",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:collision-preservation",
+      "class": "SELFKILL",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 9,
+      "outer_tmpdir": "/tmp/xvfb-run.p5bQfv",
+      "tally": "════ 12/12 ════",
+      "uptime": "00:32:20 up 9 days, 16:21,  1 user,  load average: 4.46, 5.21, 6.04",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:composer-fill",
+      "class": "SELFKILL",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "NO",
+      "outer_tmpdir_survives": "YES",
+      "loader": "ACTIVE",
+      "seconds": 18,
+      "outer_tmpdir": "/tmp/xvfb-run.KY8EIB",
+      "tally": null,
+      "uptime": "00:32:30 up 9 days, 16:21,  1 user,  load average: 4.00, 5.09, 5.99",
+      "verdict": "did not reach the reaper alive"
+    },
+    {
+      "script": "harness:crash",
+      "class": "SELFKILL",
+      "npm_exit": null,
+      "outer_exit": null,
+      "refused_inherited": null,
+      "outer_tmpdir_survives": null,
+      "loader": null,
+      "seconds": null,
+      "outer_tmpdir": null,
+      "tally": "PASS: 20/20 act switches, no crash.",
+      "uptime": "00:32:48 up 9 days, 16:21,  1 user,  load average: 3.59, 4.92, 5.92",
+      "verdict": "UNMEASURABLE"
+    },
+    {
+      "script": "harness:curve-editor",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:curve-vsplit-reachable",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:d27-disputed-six",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:d27-effects-focus",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:d27-four-survivors",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:d27-sprite-focus",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:effects-column",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:effects-guides",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:effects-scene",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:guard-surface",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:handover-band",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:layer-bound",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:live-palette-e2e",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:mapviewport-baseline",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:marquee",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:marquee-flip",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:marquee-flip-button",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:marquee-snap-modifier",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:marquee-stamp",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:micro-type",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:numberfield-empty",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:o55-new-band-door",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:o56-loop-authoring-door",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:object-label",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:paint-through",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:palette-drag",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:palette-grid",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:paste-pan",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:priority-lens",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:raster-timeline",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:restore",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:s1-anim",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:s1-boss-sprites",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:s1-layout-anim",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:s1-library-presentation",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:s1-nonlevel-families",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:s1-priority-occlusion",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:s1-saveback-cdp",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:s1-sonic-preview",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:s1-sonic-sprite",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:screen-frame",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:screen-frame-guides",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:section-column",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:section-header-action",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:slot-range-onscreen",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:sprite-restore",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:sweep-fix",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:tile-editor",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:toast-overflow",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:tool-keys",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:vsplit-advisory",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:writer-originated-scene",
+      "class": "SELFKILL",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:anchor-authoring",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:band-preset",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:base-swap-control",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:bg-dangling-ref",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:bg-wrap",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:build-console-overlap",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:canvas-cdp",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:capture",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:chunk-links",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:collision-read",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:collision-say-both",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:composer-collision-gesture",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:composer-priority",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:curve-option-disabled",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:effects-bob",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:effects-deform",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:effects-drift",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:effects-guide",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:effects-preview-default",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:effects-refusal",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:effects-section-picker",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:effects-section-strip",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:effects-sub-tabs",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:guard-proof",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:loop-paint",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:ozone-x11",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:ramp-control",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:ramp-scroll-mode",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:save-file-count",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:section-raster-select",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:shell-flip",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:tile-attributes",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:timeline-edit",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:tool-split",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:variant-cycle",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:window-icon",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:xvfb-reap",
+      "class": "KILLTREE",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:aether-method-gate",
+      "class": "NON_LAUNCHER",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:art-agent",
+      "class": "NON_LAUNCHER",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:boot-override",
+      "class": "NON_LAUNCHER",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:collision-agent",
+      "class": "NON_LAUNCHER",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:collision-gesture",
+      "class": "NON_LAUNCHER",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:commit-cdp",
+      "class": "NON_LAUNCHER",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:commit-collision",
+      "class": "NON_LAUNCHER",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:constraints-cdp",
+      "class": "NON_LAUNCHER",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:crossover-paint",
+      "class": "NON_LAUNCHER",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:discovery-exit-net",
+      "class": "NON_LAUNCHER",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:explorer-canvases",
+      "class": "NON_LAUNCHER",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:import-cdp",
+      "class": "NON_LAUNCHER",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:paint-regression",
+      "class": "NON_LAUNCHER",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:palette-push",
+      "class": "NON_LAUNCHER",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:schema-revendor",
+      "class": "NON_LAUNCHER",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:tier-zoom",
+      "class": "NON_LAUNCHER",
+      "verdict": "NOT RUN"
+    },
+    {
+      "script": "harness:warp-tearing",
+      "class": "NON_LAUNCHER",
+      "verdict": "NOT RUN"
+    }
+  ],
   "rows": [
     {
       "script": "harness:aeon-priority-lens",
@@ -1692,5 +2603,14 @@
       "self_signal": true,
       "classification": "KILLTREE"
     }
-  ]
+  ],
+  "measurement_totals": {
+    "SELFKILL / did not reach the reaper alive": 23,
+    "SELFKILL / REACHED THE REAPER ALIVE": 1,
+    "SELFKILL / UNMEASURABLE": 3,
+    "SELFKILL / NOT RUN": 52,
+    "KILLTREE / NOT RUN": 37,
+    "NON_LAUNCHER / NOT RUN": 17
+  },
+  "measurement_generated": "2026-09-04T04:35:54.150Z"
 }
