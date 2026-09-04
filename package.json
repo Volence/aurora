@@ -108,6 +108,7 @@
     "harness:composer-fill": "node scratchpad/composer-fill-harness.mjs",
     "harness:composer-priority": "node scratchpad/composer-priority-harness.mjs",
     "harness:confirm-destroy": "node scratchpad/confirm-destroy-harness.mjs",
+    "harness:confirm-focus": "node scratchpad/confirm-focus-harness.mjs",
     "harness:constraints-cdp": "node scratchpad/constraints-cdp-harness.mjs",
     "harness:crash": "node scratchpad/crash-harness.mjs",
     "harness:crossover-paint": "node scratchpad/crossover-paint-harness.mjs",
