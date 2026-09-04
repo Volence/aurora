@@ -88,6 +88,11 @@ import {
   // returns null off-grid and MUST NOT be made to snap.
   presetFp16FromNumber, presetFp16ToNumber,
   presetRasterChannel, EFFECTS_PRESET_RASTER_CHANNELS,
+  // ⚠ TWO LISTS SINCE empyrean c4a1da2, and they answer different questions.
+  // PROGRAM_ARMS is the exclusivity set (all four arms of the top-level oneOf);
+  // RASTER_CHANNELS is the subset that writes ep_raster. See the section header
+  // over `bandControlsRefusal` for the three defects the split prevented.
+  presetProgramArm, EFFECTS_PRESET_PROGRAM_ARMS,
   // ═══ THE `base_swap` CHANNEL'S BOUNDS — ALSO ALL THE CODEC'S ═══
   //
   // Read off the vendored schema with module-load guards (empyrean 5bd76ba,
@@ -589,8 +594,15 @@ export interface PresetListEntry {
    * `'bands' | 'ramp' | null` until `base_swap` arrived (empyrean 5bd76ba) and
    * the restatement was the ONLY thing that had to be edited for a third raster
    * channel. Deriving it means the next channel is a codec change alone.
+   *
+   * ⚠ AND IT IS THE PROGRAM ARM, NOT THE RASTER CHANNEL (empyrean `c4a1da2`).
+   * `presetRasterChannel` returns null for a `boundary` document — correctly,
+   * because a boundary is not a raster program — and the row would then have
+   * fallen through to the band COUNT and rendered a whole patched program as
+   * `0 bands`. That is the exact defect `presetListSummary`'s docblock below is
+   * about, arriving one field earlier than the fix that was written for it.
    */
-  channel: ReturnType<typeof presetRasterChannel>;
+  channel: ReturnType<typeof presetProgramArm>;
 }
 
 export function presetListEntries(library: EffectsPresetLibrary): PresetListEntry[] {
@@ -598,7 +610,7 @@ export function presetListEntries(library: EffectsPresetLibrary): PresetListEntr
     id: p.id,
     label: (typeof p.name === 'string' && p.name !== '') ? p.name : p.id,
     bands: (p.bands ?? []).length,
-    channel: presetRasterChannel(p),
+    channel: presetProgramArm(p),
   }));
 }
 
@@ -615,12 +627,12 @@ export function presetListEntries(library: EffectsPresetLibrary): PresetListEntr
  * `if` per channel with the count as its fallthrough, so the fourth arm would
  * have gone straight back to reading `0 bands`. Now the only test is the
  * POSITIVE one — is this the channel that HAS a count? — and every other
- * channel, present or future, gets the noun `RASTER_CHANNEL_NOUNS` already has
- * to carry for it (a channel with no noun cannot load this module at all).
+ * arm, present or future, gets the noun `PROGRAM_ARM_NOUNS` already has to carry
+ * for it (an arm with no noun cannot load this module at all).
  */
 export function presetListSummary(entry: PresetListEntry): string {
   if (entry.channel !== null && entry.channel !== 'bands') {
-    return RASTER_CHANNEL_NOUNS[entry.channel] ?? entry.channel;
+    return PROGRAM_ARM_NOUNS[entry.channel] ?? entry.channel;
   }
   return `${entry.bands} band${entry.bands === 1 ? '' : 's'}`;
 }
@@ -3885,9 +3897,9 @@ export function baseSwapSummary(bs: EffectsPresetBaseSwap): string {
  * NEITHER (`newBand`'s rule, and the schema says so in as many words).
  *
  * ⚠ THE TWO NUMBERS ARE THE CONTRACT'S OWN WORKED EXAMPLE, PARSED, NOT CHOSEN.
- * The schema states that the shipped section-6 preset fires on 160 and targets
- * $E000 (VRAM_PLANE_B), and those are exactly the two values a fresh swap gets.
- * The reason is `newRamp`'s and one more:
+ * The schema states which line the shipped section-6 preset fires on and that it
+ * targets $E000 (VRAM_PLANE_B), and those are exactly the two values a fresh
+ * swap gets. The reason is `newRamp`'s and one more:
  *
  *   • A SEED MUST NOT BE BORN ILLEGAL — asserted below against the line range
  *     and the granule, not assumed.
@@ -3899,14 +3911,52 @@ export function baseSwapSummary(bs: EffectsPresetBaseSwap): string {
  * It is NOT a claim that this is the right swap for their section — Aurora does
  * not know that, and a seed that pretended to would be the clamp aeon's §E.4
  * forbids wearing a different hat.
+ *
+ * ═══ ⚠ THE SENTENCE NOW CARRIES **TWO** LINE NUMBERS, AND THE STALE ONE IS
+ * FIRST. READ THE MATCHER BEFORE TRUSTING THE VALUE. ═══
+ *
+ * Until empyrean `c4a1da2` the schema read "The shipped section-6 preset fires
+ * on 160." — one number, present tense, and `/fires on (\d+)/` could not be
+ * wrong. It now reads "…fired on 160 as bound at aeon 850d4c60 and on 3 since
+ * aeon 8bf6df74", because the owner moved the swap to the top of the frame. The
+ * OBVIOUS repair — relax the old regex to `/fired on (\d+)/` — matches, is
+ * green, and seeds **160**: a value that stopped being the binding, taken from a
+ * clause whose whole job is to say so. The clause this reads is therefore the
+ * `since` one, the current binding is what a fresh document gets, and the
+ * HISTORICAL number is parsed too and asserted to be DIFFERENT — because if the
+ * two clauses ever collapse back into one value, a matcher aimed at either half
+ * is indistinguishable from a matcher aimed at the other, and this derivation
+ * would have no way to notice it had started reading history.
  */
 const BASE_SWAP_SEED_LINE: number = (() => {
-  const m = /shipped section-6 preset fires on (\d+)/.exec(BASE_SWAP_FIELD_TITLES.line);
+  const sentence = BASE_SWAP_FIELD_TITLES.line;
+  const m = /and on (\d+) since aeon [0-9a-f]{6,}/.exec(sentence);
   if (!m) {
     throw new Error(
-      'aurora-effects-preset.schema.json no longer states the shipped section-6 fire line in '
-      + '$defs.base_swap.properties.line, which is where a fresh swap\'s seed line is read from. '
-      + 'Re-read the schema — do NOT type a line number here.',
+      'aurora-effects-preset.schema.json no longer states the CURRENT shipped section-6 fire line '
+      + 'in $defs.base_swap.properties.line, in the shape "…and on <line> since aeon <rev>", which '
+      + 'is where a fresh swap\'s seed line is read from. ⚠ DO NOT REPAIR THIS BY MATCHING THE '
+      + 'OTHER HALF OF THE SENTENCE: that clause states the line the preset was bound to at an '
+      + 'EARLIER aeon revision and seeding from it would put a stale binding in every new document. '
+      + 'Re-read the schema — and do NOT type a line number here.',
+    );
+  }
+  const was = /preset fired on (\d+) as bound at aeon [0-9a-f]{6,}/.exec(sentence);
+  if (!was) {
+    throw new Error(
+      'aurora-effects-preset.schema.json states a CURRENT section-6 fire line but no longer states '
+      + 'the superseded one it replaced. Both halves are read here on purpose: with only one '
+      + 'number present, a matcher aimed at the historical clause and a matcher aimed at the '
+      + 'current one return the same value and nothing can tell them apart. Re-read the sentence '
+      + 'and re-derive both, or collapse this to a single-number read deliberately.',
+    );
+  }
+  if (Number(was[1]) === Number(m[1])) {
+    throw new Error(
+      `aurora-effects-preset.schema.json states the same section-6 fire line (${m[1]}) as both the `
+      + 'superseded and the current binding. That makes this derivation unable to prove it is '
+      + 'reading the current clause, which is the one thing it exists to prove. Re-read the '
+      + 'sentence.',
     );
   }
   const line = Number(m[1]);
@@ -4057,10 +4107,37 @@ export function setBaseSwapTargetCommand(
 // 2026-09-03, and on the day a third arrived a ternary mislabelled it, an
 // if/else authored the two-key document the schema refuses, and a `!== 'ramp'`
 // test woke the band controls on a document with no bands. All three were
-// invisible while there were two. Every list below is DERIVED from
-// `EFFECTS_PRESET_RASTER_CHANNELS` (the schema's own `oneOf`) or is a MAP keyed
-// by channel with a module-load guard, so a fourth arm is a data change and the
-// places that must learn about it SAY SO OUT LOUD instead of guessing.
+// invisible while there were two. Every list below is DERIVED from the schema's
+// own `oneOf` or is a MAP keyed by arm with a module-load guard, so a new arm is
+// a data change and the places that must learn about it SAY SO OUT LOUD instead
+// of guessing.
+//
+// ═══ ⚠ AND THE FOURTH ARM SPLIT THE QUESTION IN TWO (empyrean c4a1da2) ═══
+//
+// `boundary` is an arm of the same `oneOf` and is NOT a raster channel: it
+// lowers into `EffectsPreset.ep_patched`, the sibling of the `ep_raster` field
+// the other three share. So this section now reads TWO derived lists and they
+// are not interchangeable:
+//
+//   `EFFECTS_PRESET_PROGRAM_ARMS`     — "may these two keys coexist?" (no).
+//                                        Everything about EXCLUSIVITY reads this:
+//                                        what a switch must DELETE, what the band
+//                                        controls collide with, what a document
+//                                        CARRIES.
+//   `EFFECTS_PRESET_RASTER_CHANNELS`  — "does this key write ep_raster?".
+//                                        The Raster row's OPTIONS read this, and
+//                                        only this: offering `boundary` there
+//                                        would be offering to SEED a patched
+//                                        program, which is a separate parcel.
+//
+// THE DEFECTS THE SPLIT PREVENTED, each of which was live for the length of one
+// re-vendor: `presetRasterChannel` returns null on a boundary document, so
+// `bandControlsRefusal` woke the band controls on it (a click would author
+// bands + boundary); `setRasterChannelCommand`'s delete loop ran over the RASTER
+// list, so switching a boundary document to bands would have LEFT the boundary
+// in place and authored the two-arm document the `oneOf` refuses; and the swap
+// advisory would have offered to discard "0 raster bands" from a document
+// carrying a whole patched program.
 
 /**
  * WHY THE BAND CONTROLS CANNOT WRITE HERE, or null when they can.
@@ -4081,7 +4158,15 @@ export function setBaseSwapTargetCommand(
  * so the greyed button and the sentence cannot disagree.
  */
 export function bandControlsRefusal(preset: EffectsPreset): string | null {
-  const channel = presetRasterChannel(preset);
+  // ⚠ THE PROGRAM ARM, NOT THE RASTER CHANNEL. It was `presetRasterChannel`
+  // until empyrean `c4a1da2`, and on a `boundary` document that returns NULL —
+  // "this preset carries no raster program", which is TRUE and is the wrong
+  // question. The band controls came back to life on a document carrying a
+  // patched program, and a click would have grown a `bands` key onto it and
+  // authored the two-arm document the `oneOf` refuses. Asking what the document
+  // CARRIES is right for every arm there will be; asking what raster channel it
+  // carries is right only while every arm is a raster channel.
+  const arm = presetProgramArm(preset);
   // ⚠ ASKED AS "IS IT bands?", NOT AS "IS IT ramp?". It was the latter until
   // `base_swap` arrived (empyrean 5bd76ba) and a THIRD channel appeared — at
   // which point `!== 'ramp'` returned null on a base_swap document, the band
@@ -4089,26 +4174,35 @@ export function bandControlsRefusal(preset: EffectsPreset): string | null {
   // them was a silent no-op with no sentence beside it. A negative test against
   // one sibling is wrong the moment there are two; the positive test against the
   // channel these controls DO write is right for every channel there will be.
-  if (channel === null || channel === 'bands') return null;
-  return `preset "${preset.id}" carries a ${RASTER_CHANNEL_NOUNS[channel]}, not bands. A preset `
-    + 'holds EXACTLY ONE raster program: every raster key lowers into the same raster: slot and '
-    + 'the engine has no combinator that mixes them, so the schema refuses a document carrying '
-    + 'two — which means the band controls cannot write here at all. Set the Raster program row '
-    + `above back to bands to author bands; that discards the ${RASTER_CHANNEL_NOUNS[channel]}, `
-    + 'and it is one undo step.';
+  if (arm === null || arm === 'bands') return null;
+  const noun = PROGRAM_ARM_NOUNS[arm];
+  return `preset "${preset.id}" carries a ${noun}, not bands. A preset holds EXACTLY ONE `
+    + 'program: the schema\'s top-level oneOf refuses a document carrying two, and the engine '
+    + 'has no combinator that mixes them — which means the band controls cannot write here at '
+    + `all. ${EFFECTS_PRESET_RASTER_CHANNELS.includes(arm)
+      ? 'Set the Raster program row above back to bands to author bands; that discards the '
+        + `${noun}, and it is one undo step.`
+      : `A ${noun} is not a raster program at all — it installs into the patched channel, the `
+        + 'sibling field — so the Raster program row above cannot convert it. Edit the JSON '
+        + 'directly, or remove the key there, to author bands in this preset.'}`;
 }
 
 /**
- * ONE NOUN PER RASTER CHANNEL, so a sentence can name what a document carries.
+ * ONE NOUN PER PROGRAM ARM, so a sentence can name what a document carries.
  *
- * Keyed by the codec's channel names and checked against the schema's own
- * `oneOf` at module load: a channel with no noun here would otherwise reach a
- * sentence as `undefined`, which is the shape of "a preset carries a undefined".
+ * ⚠ KEYED BY **ARM**, NOT BY RASTER CHANNEL (widened at empyrean `c4a1da2`).
+ * Every sentence that names what a preset carries must be able to name a
+ * `boundary` too — `bandControlsRefusal` and `rasterEditorGapFor` both reach
+ * one — and a map keyed by the raster list would have handed them `undefined`,
+ * which is the shape of "a preset carries a undefined". Checked against the
+ * schema's own `oneOf` at module load, so a fifth arm is a data change that says
+ * so out loud.
  */
-const RASTER_CHANNEL_NOUNS: Record<string, string> = {
+const PROGRAM_ARM_NOUNS: Record<string, string> = {
   bands: 'band list',
   ramp: 'ramp',
   base_swap: 'base swap',
+  boundary: 'patchable palette boundary',
 };
 
 /**
@@ -4150,11 +4244,11 @@ const RASTER_CHANNEL_EDITORS: readonly string[] = Object.freeze(['bands', 'ramp'
 // ═══ THE MODULE-LOAD GUARDS — every per-channel registry, checked against the
 // schema's own channel set, so a channel cannot be added to the contract and
 // quietly fall out of any of them.
-for (const c of EFFECTS_PRESET_RASTER_CHANNELS) {
-  if (RASTER_CHANNEL_NOUNS[c] === undefined) {
+for (const c of EFFECTS_PRESET_PROGRAM_ARMS) {
+  if (PROGRAM_ARM_NOUNS[c] === undefined) {
     throw new Error(
-      `raster channel "${c}" is declared by aurora-effects-preset.schema.json's top-level oneOf `
-      + 'but has no noun in RASTER_CHANNEL_NOUNS, so every sentence that names what a document '
+      `program arm "${c}" is declared by aurora-effects-preset.schema.json's top-level oneOf `
+      + 'but has no noun in PROGRAM_ARM_NOUNS, so every sentence that names what a document '
       + 'carries would say "undefined". Add the noun — and decide whether the panel can seed it '
       + '(RASTER_CHANNEL_SEEDS) and whether it has an editor (RASTER_CHANNEL_EDITORS) rather than '
       + 'letting either default.',
@@ -4199,7 +4293,7 @@ export function rasterChannelSeedRefusal(channel: string): string | null {
   // used to say what a `base_swap` seed would need ("a screen line and a VRAM
   // base address"), which was true for exactly one channel and would have been
   // quietly wrong for the next one to arrive without a seed.
-  return `a ${RASTER_CHANNEL_NOUNS[channel]} cannot be authored in this panel yet: switching to a `
+  return `a ${PROGRAM_ARM_NOUNS[channel]} cannot be authored in this panel yet: switching to a `
     + 'channel means seeding a fresh one and this panel has no seed for that channel. A document '
     + 'that already carries one opens, reads and saves correctly; only creating one from here is '
     + 'missing.';
@@ -4225,16 +4319,24 @@ export function rasterChannelSeedRefusal(channel: string): string | null {
  */
 export function rasterEditorGapFor(channel: string | null, presetId: string): string | null {
   if (channel === null || RASTER_CHANNEL_EDITORS.includes(channel)) return null;
-  const noun = RASTER_CHANNEL_NOUNS[channel] ?? channel;
+  const noun = PROGRAM_ARM_NOUNS[channel] ?? channel;
   return `preset "${presetId}" carries a ${noun}, and this panel has no editor for it yet. The `
     + 'document opens, reads and saves correctly and nothing here has changed it — but its fields '
     + 'cannot be edited from this panel, so edit the JSON directly until this channel has a card. '
     + 'Switching the Raster program row above would DISCARD it.';
 }
 
-/** The same question, asked of a document. */
+/**
+ * The same question, asked of a document.
+ *
+ * ⚠ THE PROGRAM ARM, NOT THE RASTER CHANNEL (empyrean `c4a1da2`). A `boundary`
+ * document has no raster channel, so `presetRasterChannel` returns null and this
+ * would have reported NO GAP for a document this panel has no editor for at all
+ * — the precise silence `rasterEditorGapFor`'s docblock calls "the fourth arm's
+ * landing pad", arriving as a null rather than as an unknown channel name.
+ */
 export function rasterEditorGap(preset: EffectsPreset): string | null {
-  return rasterEditorGapFor(presetRasterChannel(preset), preset.id);
+  return rasterEditorGapFor(presetProgramArm(preset), preset.id);
 }
 
 /**
@@ -4294,7 +4396,7 @@ export const RASTER_CHANNEL_OPTIONS: readonly { value: string; label: string }[]
  * controls that are NOT one Ctrl+Z away, and this one is.
  */
 export function rasterChannelSwapAdvisory(preset: EffectsPreset): string {
-  const channel = presetRasterChannel(preset);
+  const channel = presetProgramArm(preset);
   const bands = (preset.bands ?? []).length;
   // ⚠ WHAT IT DISCARDS IS KNOWN; WHAT IT BECOMES IS NOT. This advisory is
   // painted UNDER the select and BEFORE the gesture, so it cannot know which
@@ -4308,7 +4410,7 @@ export function rasterChannelSwapAdvisory(preset: EffectsPreset): string {
   // channel there will ever be.
   const discards = channel === 'bands' || channel === null
     ? `${bands} raster band${bands === 1 ? '' : 's'}`
-    : `this ${RASTER_CHANNEL_NOUNS[channel]}`;
+    : `this ${PROGRAM_ARM_NOUNS[channel]}`;
   return `A preset holds exactly one raster program, so switching DISCARDS ${discards} and seeds a `
     + 'fresh one of whichever program you pick. It is ONE undo step — Ctrl+Z puts back exactly '
     + 'what was here.';
@@ -4334,13 +4436,19 @@ export function setRasterChannelCommand(
 ): SetEffectsPresetCommand | null {
   if (rasterChannelSeedRefusal(channel) !== null) return null;
   return editPresetCommand(library, id, `Preset ${id} raster program: ${channel}`, (p) => {
-    if (presetRasterChannel(p) === channel) return;
+    if (presetProgramArm(p) === channel) return;
     // ⚠ EVERY OTHER CHANNEL IS DELETED, NOT JUST THE ONE SIBLING. This was an
     // if/else over two keys; with three channels an if/else would leave the
     // third in place and author the two-key document the `oneOf` refuses — which
     // serialize would catch, but only after the panel had shown an editor that
     // appeared to support both.
-    for (const c of EFFECTS_PRESET_RASTER_CHANNELS) {
+    // ⚠ EVERY **ARM**, NOT EVERY RASTER CHANNEL (empyrean `c4a1da2`). This loop
+    // ran over `EFFECTS_PRESET_RASTER_CHANNELS` until the fourth arm landed, at
+    // which point switching a `boundary` document to bands would have LEFT the
+    // boundary in place and authored the two-arm document the `oneOf` refuses —
+    // the same defect the if/else had, one list wider. Exclusivity is the
+    // `oneOf`'s question and the `oneOf`'s list answers it.
+    for (const c of EFFECTS_PRESET_PROGRAM_ARMS) {
       if (c !== channel) delete (p as unknown as Record<string, unknown>)[c];
     }
     // ⚠ THE SEED IS LOOKED UP, NOT CHOSEN. This was
