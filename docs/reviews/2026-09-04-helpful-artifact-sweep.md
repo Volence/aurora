@@ -1,0 +1,246 @@
+# The helpful artifact, swept — a gate for the mechanical half, a census for the rest
+
+**2026-09-04 · branch `fix/helpful-artifact-sweep` · base `eb426df3`**
+
+On 2026-09-03 this repo found and fixed six comments that were **worse than their own
+absence**: a stale `spare` on bits that had been the loop crossover for weeks; two
+headers saying the band limits *render in full* nine lines above the code that hovers
+them; both of those headers citing a gate file **`effects-preset-wording.test.ts` that
+has never existed**; a refusal that computed and named `-1` as a nearest usable rate; a
+docblock contradicted by its own next two lines; and ten stale *contested* notes, one
+of them a painted `title`. Every one of them reads as care, and that is what kept
+anybody from re-checking it.
+
+All six were fixed. This parcel is about the ones nobody had hit.
+
+---
+
+## 1. The gate: `scripts/check-cited-paths.mjs`
+
+    npm run check:cited-paths          # and in the `npm test` chain
+
+It reads the **whole-line comments** of every `.ts/.tsx/.mjs/.mts/.py/.sh` file under
+`src/`, `test/`, `scripts/`, `scratchpad/` and fails when a comment cites an in-repo
+path or a bare source filename that is not on disk.
+
+**Final tree: 1,257 files, 1,877 in-repo citations, two rules, both fired on their
+canaries, eight negative canaries silent.**
+
+### Which surface, and why not one of the two that already exist
+
+The brief asked for an extension rather than a duplicate. Both candidates were read
+first, and neither can carry this rule:
+
+* **`scripts/check-peer-path-literals.mjs`** is the closest, and its central thesis is
+  the exact inverse of this one — *"comments are records, executable lines are
+  coupling"*. It calls `stripComments()` before any rule runs, so **the text this gate
+  reads is the text that one deletes first**. A comments-only rule bolted into it would
+  also falsify its own summary line (*"no **executable** line …"*), which is the one
+  sentence a reader of that gate trusts. It is also blind to `.md` and has no notion of
+  a bare filename.
+* **`scratchpad/check-harness-guards.mjs`** is scoped to launcher safety in
+  `scratchpad/` and never reaches `src/`, where five of the six defects lived.
+
+So: a separate instrument, with its own population, its own extraction, and its own
+summary line — wired into the same `npm test` chain, immediately after
+`check-peer-path-literals`.
+
+### The two rules
+
+| id | what fails |
+|---|---|
+| `cited-path-missing` | a comment naming a path rooted at `src/`, `test/`, `scripts/` or `scratchpad/` that is not on disk (as a file, a directory, or a module once one of `.ts/.tsx/.mjs/.mts/.js/.py/.sh` is appended) |
+| `cited-file-missing` | a comment naming a bare source filename (`.ts/.tsx/.mjs/.mts`) matching no file under those roots |
+
+`cited-file-missing` exists because **the defect that prompted this gate was spelled
+that way**: `effects-preset-wording.test.ts`, no directory in front of it at all.
+
+### What it does NOT cover — eleven holes, in the file's own header
+
+A gate that hides its coverage is an instance of this family, so every exclusion is
+written down where the next reader will meet it:
+
+1. **Peer paths are never failed on.** `aeon`, `sigil`, `empyrean`, `seraph`, `oracle`,
+   `s1disasm` may simply not be present (an agent worktree usually has none of them), so
+   "not on disk" says nothing about the citation. They are **not silently skipped**:
+   every comment line naming one is counted, and the count is on the summary line —
+   **575 lines this run**.
+2. **`docs/…` is not checked at all**, and this is the biggest hole. Every repo in the
+   suite has a `docs/`, and this repo's comments cite the peers' by exactly that
+   spelling: `docs/DEFERRED_WORK.md` and `docs/BUGS.md` in four files are **aeon's**,
+   `docs/LOOP_CROSSOVER_ENCODING.md` is aeon's. Judging the token would fail correct
+   citations. Counted with the peer traffic above.
+3. **Markdown is not scanned.** `docs/plans/*`, `docs/reviews/*` and the ROADMAP are
+   **dated records** — a 2026-05-02 plan naming a file renamed in June was right on its
+   own day. Measured before deciding: **387 distinct rooted paths in this repo's
+   markdown do not resolve**, nearly all of that shape. The rule enforced here is for
+   *live instructions to a maintainer*.
+4. **Only whole-line comments are read** (first non-blank characters `//`, `/*`, `*`,
+   `*/`, or `#`). A trailing comment after code is not read. That is a real loss, taken
+   on purpose: separating a trailing `//` from a division sign or a regex needs the
+   tokenizer whose desync produced **two** of 2026-09-03's other defects, and a citation
+   gate that can be blinded by one apostrophe is not worth having. Judging each line on
+   its own cannot desync.
+5. **A line number is not checked** — `effects-preset.ts:58` passes on the file alone.
+6. **A symbol name is not checked** — `presetLimitsShort()` in prose is invisible here.
+7. **A path built at runtime is invisible** — this reads comments, not code.
+8. **Git-ignored paths pass unchecked** (17 this run): `scratchpad/shots-*/`, the
+   hardlinked aeon fixtures, the one-off probes named individually in `.gitignore`. They
+   are legitimately absent in a fresh checkout.
+9. **Placeholders are skipped**: a token containing — or immediately followed by, with
+   at most one intervening `-` — `<`, `>`, `*`, `?`, `…`; and a token ending a line whose
+   last character is `-` (a path hyphen-wrapped onto the next line).
+10. **`cited-file-missing` only judges a compound name** (stem contains `-`, `_`, or an
+    uppercase letter). `emit.ts`, `test.ts`, `proof.mjs`, `app.mjs` and `classic.ts` are
+    used in this repo's comments as generic nouns and cannot be told from real one-word
+    filenames. **So a citation to a genuinely one-word module — `guides.ts` — is not
+    checked** unless it is written as a path.
+11. **A line may declare its own absence** (`has never existed`, `there is no …`, and six
+    more spellings; **13 citations this run**). The best repair for a fabricated citation
+    keeps the wrong name and says it is wrong — that is what O79 wrote — and a gate that
+    taxed that repair would be paid in deleted history. The hole: a marker silences every
+    in-repo citation **on its line**, the accidental one included. It must be on the same
+    line as the token.
+
+### Two mechanisms that keep the gate from becoming the thing it polices
+
+* **A written `EXEMPT` table — 8 rows, each with its reason** — and a run **FAILS when an
+  exemption no longer matches any citation**, naming the row to delete. That fired three
+  times while this was being written, which is the demonstration.
+* **Loud on unmeasurable, exit 2 not 0**: an unreadable source, a `git` that will not
+  answer, a root that is not a directory, an empty population, a population yielding no
+  citations at all, a canary that stopped firing, a *negative* canary that started.
+
+### Red-first evidence — three poisons, mutation quoted from disk, restored from the committed baseline `26f738eb`
+
+| # | mutation | result |
+|---|---|---|
+| **P1** | appended to `src/core/aether/warp-math.ts`: `// See src/core/aether/no-such-file-planted.ts for the derivation.` | **RED, exit 1** — `warp-math.ts:89 [cited-path-missing] src/core/aether/no-such-file-planted.ts` |
+| **P2** | inserted in `src/renderer/components/guide/markdown-lite.ts`: ``// The parser is gated by `markdown-lite-parser.test.ts`, which is thorough.`` | **RED, exit 1** — `markdown-lite.ts:45 [cited-file-missing] markdown-lite-parser.test.ts`. Note P2's own preamble line contains "never existed" two lines above and did **not** silence it: markers are per-line. |
+| **P3** | `isCommentLine` returns `false` in both dialects — a reader that sees nothing | **COULD NOT MEASURE, exit 2** — *"rule `cited-path-missing` did not fire on its canary"*. Not a green. |
+
+Each restored with `git checkout --` from the committed baseline and the gate re-run to
+`OK` before the next was planted. The canaries themselves are the standing regression
+control: three positive (both dialects for `cited-path-missing`, one for
+`cited-file-missing`) and **eight negative** — a present path, a present bare name, an
+executable line, a `docs/` token, a peer token, a placeholder, a generic one-word name,
+and a hyphen-wrapped path — all built from tokens **derived** from the population, with
+the absent ones asserted absent before use.
+
+---
+
+## 2. What the gate found: nine fabricated citations
+
+Every replacement was checked against the tree, not against plausibility, and where the
+tree gave no answer the comment now says so.
+
+| site | cited | verdict |
+|---|---|---|
+| `src/core/aether/warp-math.ts:15` | `scratchpad/warp-mailbox-harness` | **Never existed, in tree or history.** The comment claimed the editor/engine origin correspondence *"is checked at runtime … rather than assumed"* — **a citation that names a proof carries the authority of a proof.** No instrument checks it: `warp-math.test.ts` is arithmetic only, `warp-tearing-harness.mjs` diffs two routes to the *same* destination (silent about whether that destination is the pixel the editor meant), and `boot-restore`/`warp-route` test the mailbox, not the origins. The paragraph now says the correspondence is **assumed**, and names what each nearby instrument does instead. |
+| `src/renderer/components/ui/act-and-drop-focus.ts:51` | `scratchpad/d27-focus-survey-harness.mjs` | Never existed, under the heading **"WHAT PROVES IT"**. The survey's nine are six in `d27-sprite-focus-harness.mjs` and three in `d27-effects-focus-harness.mjs` — read off both headers, which count them. Repointed to both. |
+| `src/renderer/providers/effects-preset.ts:2820` | `ramp-control.test.ts` | Never existed. The cross-check is `__tests__/effects-preset-ramp-control.test.ts` **§2** (lines 221-236 assert exactly *"returns null exactly when that returns an object"*). |
+| `src/renderer/providers/effects-preset.ts:3057` | `ramp-control.test.ts` | Never existed. Both halves of the display-lag claim are **§3** (lines 262-361). |
+| `src/renderer/components/guide/markdown-lite.ts:37` | `markdown-lite.test.ts` | Never existed. The real gate is `guide/__tests__/guides.test.ts`, which imports `parseGuide/inline/slugify` and parses the **real shipped guide** via `?raw` — exactly the property the comment claimed. |
+| `src/core/level-classic/object-sprite.ts:9` | `classic-object-art.ts` | Never existed; sole mention in the repo. The module that reads the art/mappings files and wraps the indices in an `ImageBitmap` is `src/renderer/state/classicObjectArtStore.ts` (its own header states both halves). |
+| `src/renderer/state/__tests__/classicLevelStore.test.ts:975` | `classic-write.ts` | Never existed. The overhang refusal lives in `src/core/level-classic/collision-write.ts`. |
+| `src/renderer/canvas/__tests__/loop-lens-wiring.test.ts:1` | `overlay-priority-wiring.ts` | The sibling of a test file is a test file: `overlay-priority-wiring.test.ts`. |
+| `src/renderer/debug-hooks.ts:4` | `scratchpad/crash-investigation/launch.sh` | Never existed. The flag is set by the operator as `VITE_AURORA_DEBUG=1 npm run build` — the command `scratchpad/lib/run-root.mjs` names when it refuses a stale bundle — and `scratchpad/crash-harness.mjs` is the driver this module was written for. |
+
+### The eight exemptions, and why each is right to name something absent
+
+Four **worked examples and counterfactuals**: `check-peer-path-literals.mjs`'s
+`sibling-root-RENAMED.mjs` (the sentence's subject is a file deliberately not readable),
+`check-test-collection.mjs`'s `src/renderer/foo.test.ts` and `scratchpad/x.test.ts`, and
+`check-harness-guards.mjs`'s `scratchpad/x.mjs`.
+
+Four **provenance and quotation**: `map-status-model.ts` and `map-status-classic.test.ts`
+naming `ClassicProjectView.tsx` (the pre-re-home classic bar — **verified deleted** in
+`git log --diff-filter=D`, so the sentence about "the legacy bar" is a record, not a
+pointer); `aeon/load.ts`'s two spellings of `src/renderer/hooks/load-collision.ts` (the
+file this module was ported *from*, deleted by that port — also verified in history).
+
+That history check is what separated these from the nine above: `ClassicProjectView.tsx`
+and `load-collision.ts` **did exist and were deleted**; `classic-write.ts`,
+`ramp-control.test.ts`, `markdown-lite.test.ts`, `classic-object-art.ts` and
+`overlay-priority-wiring.ts` have **never** appeared in this repo's history at all.
+
+`test/support/run-root.test.ts`'s four quoted basenames needed no exemption in the end:
+they are named individually in `.gitignore`, so exclusion 8 already covers them — which
+is the paragraph's own point.
+
+---
+
+## 3. Census (b): a stated condition that may have resolved
+
+Grepped for `contested`, `pending`, `awaiting`, `not yet`, `once … lands`, `blocked on`,
+`temporarily`, `for the moment`, `as of now`, `will land`, `soon to be` in comments under
+`src/` and `scripts/`: **56 hits**, of which the great majority are *in-flight UI state*
+("a pending paste", "pending timers", "pending writeGuarded") and not stated conditions
+at all. The nine that are:
+
+| site | claim | verdict |
+|---|---|---|
+| **All five `contested` sites** — `preset-lag.ts:62`, `ramp-scroll-mode.ts:99`, `BandPresetPanel.tsx:1462`, `effects-preset-ramp-scroll-mode.test.ts:28`, `ramp-scroll-mode-harness.mjs:41` | the `top + 1` display-span disagreement | **CORRECT AS-IS.** Every one already says **SETTLED**, names empyrean `e9409dc`, gives the direction it settled in, and two of them add *"do not re-add a caveat saying it is"*. The `BandPresetPanel` one is a JSX `{/* … */}` comment and paints nothing — checked, because instance 6 of the original six **was** a painted `title`. |
+| `ramp-sign-lag-disclosure.test.ts:254` / `ramp-sign-lag.ts:128` | `RAMP_SIGN_FIELDS_AWAITING_AEON` | **CORRECT AS-IS, and exemplary.** Dated `2026-09-03`, pinned to aeon `origin/master ddaab282`, with a named retirement detector (`test/formats/aeon-ramp-sign-drift.test.ts`) that reports the day the constructor starts encoding. A hold that carries its date, its owner and what ends it. |
+| `bganim-preview-aeon.ts:260,273` | *"THE VERTICAL WORD IS NOT YET WATCHED"* | **CORRECT AS-IS.** It labels itself `DERIVED-FROM-A-CONFIRMED-MECHANISM, not watched`, states which half was confirmed on the ROM and when, and is structured so a contradicting run edits **one constant**. Confirming it needs a ROM run this lane is not permitted to make. |
+| `explorer-data.ts:6` | *"Level Art / Palettes / UI & Screens are still pending"* | **CORRECT AS-IS, checked**: only the `Canvases` and `Object Library` groups are built in that file. |
+| `agent-handler.ts:460`, `editorStore.ts:229` | *"not blocked on aeon's encoding anchor"* | **CORRECT AS-IS.** A structural claim (each plane carries its own 16-bit word), not a temporal one; `both-planes-paint.ts` derives it at length. |
+| `effects-aeon.ts:1971`, `effects-aeon.test.ts:1183` | *"the rule … is pending the owner's review (it touches ROADMAP rows 37/58/66)"* | **LEFT, AND FLAGGED AS UNSURE.** Rows 37, 58 and 66 are all now **DELIVERED**, but none of them is the rule quoted, and a search of the ROADMAP for `originate`/`advisory` found no row recording a ruling on *"the control that owns a value refuses to originate an illegal one"*. Absence of a record is not evidence the hold expired, and rewriting it on that basis would be the same defect with a fresh date. **It carries no date and no owner — that is the improvement to make when someone can ask.** |
+
+---
+
+## 4. Census (c): a comment asserting a rendered behaviour
+
+Grepped for `renders in full`, `never a tooltip`, `always shown`, `always visible`,
+`is not a tooltip`, `spare`, `unused`, `reserved for`, `no longer used`, then a second
+sweep for `never a hover`, `no tooltip`, `never hidden`, `always painted`,
+`never truncat`: **52 + 6 hits**. Most are domain vocabulary — *unused* palette slots,
+*spare* tile slots — and are about data, not rendering. The ones that assert a rendered
+behaviour:
+
+| site | claim | verdict |
+|---|---|---|
+| `effects-preset.ts:280` | *"the author still reads it here, **in full**, in the block that never truncates"* — sitting on `body: RASTER_SECTION_BINDING_LIMIT` | **FIXED. This is instance 2's exact defect, in the very file whose header (lines 25-34) states the amended rule.** `LimitBlock` paints `SHORT_BODIES` and carries `body` on the same element's `title`. |
+| `effects-preset.ts:824` | *"`RASTER_SECTION_BINDING_LIMIT`, **rendered in full** by `LimitBlock`"* | **FIXED**, same defect, same file, 544 lines further down. |
+| `section-raster-select.test.ts:234` | *"**renders in full** at the top of this very section"* | **FIXED**, third surviving site, in the gate for the very control the sentence is about. |
+| `core/editing/collision-word.ts:39` | *"any feature that might one day use **the spare bits**"* | **FIXED.** The same stale `spare` as instance 1, four paragraphs above that file's own section explaining that bits 15:14 **are** the loop crossover. The mask-complement rule the paragraph defends is correct and untouched; only the adjective was left over. |
+| `BandPresetPanel.tsx:32`, `band-preset-wording.test.ts:26,638`, `collision-cell-word.ts:10-12` | | **CORRECT AS-IS** — these are yesterday's repairs, and they read correctly. |
+| `theme.ts:67` | *"toast always visible, even over a dialog"* | **CORRECT AS-IS**: `Z.toast` 1300 > `Z.modal` 1100, in the same declaration. |
+| `effects-aeon.ts:2060,2064` | *"Never hidden"* on `diagnosis`/`remedies` | **CORRECT AS-IS** — a **requirement on any surface**, stated as such in the docblock above ("a surface that hides `remedies` has inverted the ruling"), not a report of current rendering. |
+| `agent-handler.ts:129` | *"`section.tiles` — unused today, reserved for future per-section art"* | **LEFT.** The field is *read* in four places (`section.tiles ?? zone.tileset.tiles`) but nothing writes it, and `atlas-migration.ts` nulls it; `MapViewport.tsx:884` says the same thing independently. Ambiguous rather than wrong. |
+| `classic-save.ts:107`, `art-commit.test.ts:23` | *"unused … but kept"* | **CORRECT AS-IS**, both verified at the call site (`_handle`; and `art-commit.ts:24` really does import all three names the mock carries). |
+
+**Three fixed sites of one claim, one stale adjective, three left with reasons.** The
+three "renders in full" survivors matter more than their count: O79 fixed this sentence
+in three places on 2026-09-03 and a grep for the *phrase* would have found these — which
+is the argument for the census running on phrases rather than on the files that were
+touched.
+
+---
+
+## 5. Deliberately not done
+
+* **No markdown gate.** Exclusion 3 above, with the 387-path measurement behind it.
+  Making the ROADMAP's dated rows pass would mean either exempting them wholesale (a
+  gate that is green over its largest population) or rewriting history.
+* **`docs/` citations are unjudged**, exclusion 2. Distinguishing aurora's `docs/` from
+  aeon's needs a marker convention nobody has agreed to; a heuristic here is exactly the
+  "covers 70%, trusted for 100%" shape.
+* **No emulator, no peer-tree write, no ROM run** — which is why the vertical scroll
+  word in `bganim-preview-aeon.ts` is reported and not resolved.
+
+## 6. Suite
+
+`npm test` **exit 0 — 489 files / 487 passed / 2 skipped, 6,871 tests / 6,863 passed /
+8 skipped**, every skip naming its reason. All eight sibling gates green:
+`check-test-collection` 489/489 collected, `check-pseudo-skip` 6,232 bodies,
+`check-peer-path-literals` 5 rules / 1,257 files, **`check-cited-paths` 1,877
+citations**, `check-object-stringify`, `check-ledger-timestamps`,
+`check-python-resolver` 7 rows, `check-harness-guards` 200 clean / 0 failures /
+0 unmeasurable.
+
+⚠ **This is a linked worktree, where `npm test` reads ONE FEWER PASS AND ONE MORE SKIP
+than the main checkout** — `test/support/sibling-root.test.ts`'s step-3 row cannot
+measure the main-checkout configuration from here and says so. Master `eb426df3` reads
+**6864 / 7**; the totals are identical at **6871**. This is the sixth time an agent has
+had cause to write this sentence; it is not a discrepancy.
