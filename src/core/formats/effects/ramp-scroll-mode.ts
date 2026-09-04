@@ -95,8 +95,19 @@
  * and a control at `top: 128` derived 129 and measured 130 — the same +1 at two
  * different tops. THAT SETTLED IN THE MEASUREMENT'S FAVOUR (empyrean `e9409dc`):
  * the contract's own sentence was the wrong one, it now reads `top + 2`, Aurora
- * re-vendored it, and the readout derives the corrected number. IT IS NO LONGER
- * CONTESTED — do not re-add a caveat saying it is.
+ * re-vendored it, and the readout derives the corrected number. THE TWO READERS
+ * NO LONGER DISAGREE — do not re-add a caveat saying they do.
+ *
+ * ⚠ WHAT "SETTLED" DOES NOT MEAN, sharpened at empyrean `bfc000e` (2026-09-04).
+ * The contract now states its own INSTRUMENT: `top + 2` is as read on oracle's
+ * RUST core; oracle's legacy C++ core reads both raster tiers one line earlier on
+ * the same ROM bytes and is disqualified as a referee because it disagrees with
+ * ITSELF by 79-83 of 224 rows between two identical boots; the landing line is
+ * UNPINNED in the Rust core's own recon; and NO HARDWARE REFEREE exists. So the
+ * settled thing is that two readers now agree, not that the machine has answered.
+ * (The "the engine moved fire+1 -> fire+2 on 2026-08-19" attribution that rode
+ * alongside is WITHDRAWN — aeon's two-core test refuted its own finding.) None
+ * of that touches this file, for the reason the next paragraph gives.
  *
  * What this paragraph is still FOR is the structural claim it was making, which
  * the settlement did not change and which is why nothing in this file needed

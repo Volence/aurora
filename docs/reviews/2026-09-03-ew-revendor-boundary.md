@@ -5,6 +5,22 @@
 
 Everything below was measured in this worktree unless it says RELAYED.
 
+> ⚠ **SUPERSEDED IN ONE RESPECT, 2026-09-04 — read this before quoting a number
+> from this packet.** Every measurement here still stands. What has changed is
+> **whose numbers they are.** empyrean `d5e0e7a` and `bfc000e` (re-vendored in
+> `parcel/lag-attribution-false`, packet
+> `docs/reviews/2026-09-04-lag-attribution-false.md`) state that the ramp display
+> lines are **as read on oracle's Rust core**; oracle's legacy C++ core reads
+> **both** raster tiers one line earlier on the same ROM bytes and is
+> disqualified as a referee because it disagrees with **itself** by 79–83 of 224
+> rows between two identical boots, not because it is known wrong; the landing
+> line is **UNPINNED** in the Rust core's own recon; and **no hardware referee
+> exists on this project.** So where this packet says the question "SETTLED in
+> the measurement's favour", read: **the two readers agree** — Aurora's
+> derivation and aeon's measurement — **not that hardware has answered.**
+> `top + 2` is the instrument's reading today, not a ratified hardware fact. The
+> derived constants and their values are unchanged.
+
 ---
 
 ## 1. The contract, hashed rather than believed
@@ -138,9 +154,18 @@ document carrying `target: {cram: …}` is **refused**, not merely unhandled.
 
 ## 5. Sparse vs dense — the check, and the answer
 
-RELAYED (empyrean `e9409dc`'s message): the engine moved `fire+1 → fire+2` on
+> ⚠ **THE RELAYED CLAIM BELOW WAS WITHDRAWN AT empyrean `d5e0e7a` (2026-09-03)
+> AND IS STRUCK, NOT DELETED.** aeon's own two-core test refuted its own finding:
+> **BOTH raster tiers shift by one line between oracle's Rust core and oracle's
+> legacy C++ core on the same ROM bytes**, so what moved on 2026-08-19 was the
+> reading instrument, not the engine. Do not cite it. The MEASURED paragraph that
+> follows the strike is unaffected — it is a statement about Aurora's own source,
+> and its answer ("no finding") is the same either way. See
+> `docs/reviews/2026-09-04-lag-attribution-false.md`.
+
+~~RELAYED (empyrean `e9409dc`'s message): the engine moved `fire+1 → fire+2` on
 2026-08-19 (aeon `c44c80ad..727715f4`) and the **sparse tier is still `fire+1`**;
-the two tiers agreed then and disagree now.
+the two tiers agreed then and disagree now.~~
 
 MEASURED HERE: **nothing in Aurora models sparse and dense as sharing a landing
 rule.** Swept `effects-aeon.ts`, `effects-preset.ts` and

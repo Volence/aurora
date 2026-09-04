@@ -42,7 +42,13 @@
 // rendered 5..223 where the panel derived 4..223, at two different tops
 // (2026-09-03). It SETTLED in the ROM's favour at empyrean `e9409dc`: the
 // contract now says the first written value displays on `top + 2`, Aurora
-// re-vendored it, and the readout derives it. Nothing here touched it before or
+// re-vendored it, and the readout derives it. ⚠ THAT "REAL ROM" WAS ORACLE'S
+// RUST CORE, and empyrean `bfc000e` (2026-09-04) put the attribution into the
+// contract: the legacy C++ core reads both raster tiers one line earlier on the
+// same ROM bytes and is disqualified as a referee for being self-inconsistent by
+// 79-83 of 224 rows between two identical boots; the landing line is UNPINNED in
+// the Rust core's own recon; NO HARDWARE REFEREE exists. What settled is that
+// two readers agree, not that the machine answered. Nothing here touched it before or
 // after, which is the point — the subject is the HORIZONTAL extent, and
 // `harness: ramp-control` owns the vertical one.
 //

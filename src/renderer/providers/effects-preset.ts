@@ -3111,6 +3111,118 @@ export function rampDisplayGloss(ramp: EffectsPresetRamp): string {
 }
 
 /**
+ * ═══ WHOSE NUMBERS THESE ARE — PARSED, NOT ASSERTED ═══
+ *
+ * ⚠ THE PROBLEM THIS EXISTS TO FIX. Until empyrean `bfc000e` the note below
+ * stated `top + 1` / `top + 2` FLATLY and closed "NO STAGE OF THE ENGINE PATH
+ * compensates ... (measured by the engine lane, 2026-09-03)". Every word of that
+ * was true and it read as SETTLED MACHINE BEHAVIOUR, because nothing on the
+ * surface said who had measured the display lines or on what. They are an
+ * INSTRUMENT'S READING:
+ *
+ *   • as read on **oracle's Rust core**;
+ *   • oracle's LEGACY C++ core reads both raster tiers ONE LINE EARLIER on the
+ *     same ROM bytes, and is disqualified as a referee not because it is known
+ *     wrong but because it disagrees with ITSELF by 79-83 of 224 rows between
+ *     two identical boots;
+ *   • the landing line is **UNPINNED** in the Rust core's own recon;
+ *   • **NO HARDWARE REFEREE EXISTS** on this project to settle it.
+ *
+ * A one-line difference between two scanline-granularity models can be a model
+ * boundary with neither wrong about the VDP. So `top + 2` is what the instrument
+ * reads today, not a ratified hardware fact, and an author is owed that.
+ *
+ * ⚠ ALSO WITHDRAWN AT THE SAME LANDING, and NOT restated anywhere here: the
+ * earlier attribution that *"the engine moved fire+1 -> fire+2 on 2026-08-19"*.
+ * aeon's own two-core test refuted its own finding — BOTH tiers shift by one
+ * line between the two cores on the same bytes, so the shift was the reading
+ * instrument changing, not the engine. Do not reintroduce it.
+ *
+ * WHY THIS IS PARSED AND NOT TYPED. It is the same argument as `RAMP_MUST_NOT`
+ * above, and it is stronger here because this string is PAINTED — it ships as
+ * the `title` of the ramp readout in `BandPresetPanel.tsx`, so it is read by an
+ * author rather than by a maintainer. A hand-written attribution rots exactly
+ * the way the flat sentence it replaces rotted: silently, while still reading as
+ * confident. Both halves below are spans of the contract's own text, each with a
+ * module-load refusal naming its regex and its node.
+ *
+ * THE TWO HALVES COME FROM THE TWO DIFFERENT NODES, deliberately — the same
+ * split `RAMP_KEY` documents in the codec:
+ *
+ *   • `verdict` — from `properties.ramp` (the KEY paragraph): the contract's own
+ *     summary judgement, *"top+N is the instrument's reading today and not a
+ *     ratified hardware fact"*.
+ *   • `attribution` — from `$defs.ramp.properties.top`: the compact clause the
+ *     contract itself wrote at author length, naming the core, the disqualified
+ *     referee, the unpinned line and the missing hardware referee.
+ *
+ * ⚠ AND THE VERDICT'S NUMBER IS INTERLOCKED WITH THE DERIVED CONSTANT. The
+ * verdict states a line offset of its own (`top+2`); if it ever stops matching
+ * `EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET`, which is parsed from a
+ * DIFFERENT sentence in a DIFFERENT node, this refuses at module load rather
+ * than painting two numbers that disagree. That is a third independent statement
+ * of the same quantity, which is what makes it worth checking at all.
+ *
+ * THE CONNECTIVE WORDS IN THE NOTE ARE MINE; every claim is the contract's.
+ */
+export const RAMP_DISPLAY_INSTRUMENT: Readonly<{ verdict: string; attribution: string }> = (() => {
+  /** The KEY paragraph's summary judgement, with the offset it names captured. */
+  const VERDICT_RE =
+    /so (top\+(\d+) is the instrument's reading today and not a ratified hardware fact)/;
+  const v = VERDICT_RE.exec(RAMP_TITLE);
+  if (!v) {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer states, in its `ramp` property description, ' +
+      `that the display line is an INSTRUMENT'S READING rather than a hardware fact (looked for ` +
+      `${VERDICT_RE}). That sentence is the only contract-side statement of it, and this module ` +
+      'PAINTS it to an author. Re-read the schema and re-derive — do NOT retype the sentence, ' +
+      'and do NOT drop it: dropping it silently restores the flat over-attribution this whole ' +
+      'derivation exists to end.',
+    );
+  }
+  if (Number(v[2]) !== EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET) {
+    throw new Error(
+      `aurora-effects-preset.schema.json's ramp attribution names top+${v[2]} while its \`top\` ` +
+      `field sentence yields ${EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET}. Two nodes of one ` +
+      'contract disagree about one quantity; painting either would ship a number the contract ' +
+      'does not agree with itself about. Re-read BOTH sentences — do NOT reconcile them here.',
+    );
+  }
+
+  /**
+   * The `top` field's compact clause. The trailing intra-document cross-
+   * reference is dropped because it points at a paragraph an author reading a
+   * tooltip cannot see; nothing else is edited, and the drop is anchored so a
+   * reworded clause refuses instead of being silently half-trimmed.
+   */
+  const ATTRIBUTION_RE = /(AS READ ON ORACLE'S RUST CORE) \(([^)]*)\)/;
+  const a = ATTRIBUTION_RE.exec(RAMP_FIELD_TITLES.top);
+  if (!a) {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer names the INSTRUMENT its ramp display line was ' +
+      `read on, in $defs.ramp.properties.top's description (looked for ${ATTRIBUTION_RE}). This ` +
+      'module paints that attribution beside the number; without it the readout asserts an ' +
+      'instrument reading as settled machine behaviour, which is the defect this constant ' +
+      'closes. Re-read the schema — do NOT retype the clause.',
+    );
+  }
+  const caveats = a[2].replace(/,\s*see the ramp description$/, '');
+  for (const owed of [/no hardware referee/i, /unpinned/i, /legacy core/i]) {
+    if (!owed.test(caveats)) {
+      throw new Error(
+        `the ramp instrument clause in aurora-effects-preset.schema.json no longer states ${owed} ` +
+        `— it now reads "${caveats}". The note this feeds promises an author three specific ` +
+        'facts (a disqualified second core, an unpinned landing line, and no hardware referee); a ' +
+        'clause missing one of them would paint a hollow caveat that LOOKS like an attribution. ' +
+        'Re-read the contract and re-derive what it actually says now.',
+      );
+    }
+  }
+
+  return Object.freeze({ verdict: v[1], attribution: `${a[1]} (${caveats})` });
+})();
+
+/**
  * The reason, on the readout's own title — the contract half of the split.
  *
  * ⚠ THIS SENTENCE QUANTIFIES OVER `j`, so it takes the PER-INDEX LAG, and the
@@ -3119,6 +3231,12 @@ export function rampDisplayGloss(ramp: EffectsPresetRamp): string {
  * differ by one because `j` starts at 1. Both are stated here, each from its own
  * constant, precisely so a reader can see that the two lines of the readout are
  * answering two different questions and are not a contradiction.
+ *
+ * ⚠ AND THE NUMBERS ARE ATTRIBUTED. See `RAMP_DISPLAY_INSTRUMENT` above: these
+ * are an instrument's readings, the attribution is PARSED out of the contract
+ * rather than written here, and it is painted rather than kept in a comment
+ * because the person misled by an unattributed number is the author, not the
+ * maintainer.
  */
 export const RAMP_DISPLAY_LAG_NOTE: string =
   'A VSRAM run\'s value for index j DISPLAYS on screen line top + j + '
@@ -3132,6 +3250,8 @@ export const RAMP_DISPLAY_LAG_NOTE: string =
   + `bottom (top + lines = ${EFFECTS_PRESET_RAMP_SPAN_MAX}) puts its last value on line `
   + `${EFFECTS_PRESET_RAMP_SPAN_MAX + EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET - 1}, where it `
   + 'can never be seen. '
+  + `WHOSE NUMBERS THESE ARE: ${RAMP_DISPLAY_INSTRUMENT.verdict} — `
+  + `${RAMP_DISPLAY_INSTRUMENT.attribution}. `
   + 'NO STAGE OF THE ENGINE PATH compensates for any of it — not the constructor, not the generator '
   + '(measured by the engine lane, 2026-09-03). The Top field above is the ENGINE\'s top and is '
   + 'written to the file verbatim; the lag is a DISPLAY fact, so it is applied to this readout and '

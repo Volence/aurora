@@ -194,6 +194,16 @@ A VSRAM run's value `j` **displays on line `top + j + 1`** (the N+1 latency,
 `raster.emp:602-609`), and the constructor does not compensate. A preview drawing at
 `top + j` is one line high **and looks correct**.
 
+> ⚠ **WHOSE NUMBER THAT IS — added 2026-09-04, empyrean `bfc000e`.** These
+> display lines are **as read on oracle's Rust core**. oracle's legacy C++ core
+> reads **both** raster tiers one line earlier on the same ROM bytes, and is
+> disqualified as a referee because it disagrees with **itself** by 79–83 of 224
+> rows between two identical boots — not because it is known wrong. The landing
+> line is **UNPINNED** in the Rust core's own recon, and **no hardware referee
+> exists on this project.** The derivation described in this section is unchanged
+> and still right; what is new is that a sentence about it owes an instrument.
+> See `docs/reviews/2026-09-04-lag-attribution-false.md`.
+
 `EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG` is a named constant with the reasoning beside it, so
 the control parcel cannot re-derive it wrong. It is derived from the schema's `top` sentence
 and **refuses a lag of 0 loudly at module load**, because 0 is indistinguishable from "no

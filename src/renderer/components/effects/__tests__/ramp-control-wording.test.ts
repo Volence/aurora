@@ -235,7 +235,12 @@ describe('the scroll-mode sentence is mounted, split, and derived nowhere here',
    * EXERCISED. A real ROM rendered 5..223 where the card derived 4..223
    * (2026-09-03, two different tops, the same +1); the contract SETTLED it in
    * the ROM's favour at empyrean `e9409dc` and the readout moved to `top + 2`.
-   * This row did not, which is exactly what it was written to guarantee: the
+   * ⚠ THAT "ROM" WAS ORACLE'S RUST CORE, and `bfc000e` (2026-09-04) put the
+   * attribution in the contract: the legacy C++ core reads both raster tiers one
+   * line earlier on the same bytes and is disqualified as a referee for being
+   * self-inconsistent across identical boots, the landing line is UNPINNED, and
+   * no hardware referee exists — so `top + 2` is an instrument's reading.
+   * This row did not move for that either, which is exactly what it was written to guarantee: the
    * sentence is about the HORIZONTAL extent and must not be wired to the
    * vertical one.
    */

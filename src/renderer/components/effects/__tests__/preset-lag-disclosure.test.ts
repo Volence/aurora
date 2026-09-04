@@ -74,7 +74,14 @@
 // the witness is emulation rather than silicon. (The one-line disagreement about
 // the first-displayed-line rule that this header used to flag alongside those is
 // SETTLED — empyrean `e9409dc`, in the measurement's favour; the contract says
-// `top + 2` and Aurora derives it. Do not re-add it as a caveat.) None of that
+// `top + 2` and Aurora derives it. Do not re-add it as a caveat. ⚠ AND "SETTLED"
+// MEANS THE TWO READERS AGREE, NOT THAT HARDWARE ANSWERED — empyrean `bfc000e`,
+// 2026-09-04: `top + 2` is as read on oracle's RUST core, the legacy C++ core
+// reads both raster tiers one line earlier on the same bytes and is disqualified
+// as a referee for being self-inconsistent across identical boots, the landing
+// line is UNPINNED in the Rust core's own recon, and no hardware referee exists.
+// The attribution is PARSED and PAINTED on the ramp readout, not left here.)
+// None of that
 // changes a single row in this file, which measures aeon's PAGE at
 // `origin/master` and nothing else — it is written down so the next reader does
 // not mistake the branch for the tip. The whole record is in

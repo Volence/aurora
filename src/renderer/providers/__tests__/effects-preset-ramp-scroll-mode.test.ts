@@ -28,7 +28,13 @@
 // display-span readout was contested by one line (a real ROM rendered 5..223
 // where the panel derived 4..223, at two different tops, 2026-09-03); it SETTLED
 // in the ROM's favour at empyrean `e9409dc`, the contract now says `top + 2` and
-// the readout derives it. The separation still stands and this file is the
+// the readout derives it. ⚠ "THE ROM" WAS AN EMULATOR, AND `bfc000e`
+// (2026-09-04) MADE THE CONTRACT SAY SO: `top + 2` is as read on oracle's RUST
+// core; the legacy C++ core reads both raster tiers one line earlier on the same
+// bytes and is disqualified as a referee for self-inconsistency (79-83 of 224
+// rows between two identical boots); the landing line is UNPINNED in the Rust
+// core's own recon; no hardware referee exists. Two readers agreeing is what
+// settled, not the machine answering. The separation still stands and this file is the
 // evidence it was worth having: the number moved and not one row here changed.
 // This sentence is about the HORIZONTAL extent, and a row that reached for
 // `rampDisplaySpan` would tie it to a fact it does not depend on.

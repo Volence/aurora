@@ -61,6 +61,21 @@ deliberately uses step-0 twins, which measure which lines the run *reaches*, not
 the rate applied to them); it is **emulation, not silicon**; and it is on a
 branch.
 
+> ⚠ **THE PARAGRAPH BELOW IS A DATED RECORD AND ITS PRESENT TENSE IS NO LONGER
+> TRUE (2026-09-04).** The one-line disagreement closed at empyrean `e9409dc`:
+> the contract's `top` sentence was the wrong one, it now reads `top + 2`, and
+> Aurora's constant derives that — so Aurora no longer derives `top + 1`.
+> ⚠ **AND THE CLOSING IS NARROWER THAN "the measurement won"** (empyrean
+> `bfc000e`): the number is **as read on oracle's Rust core**, oracle's legacy
+> C++ core reads both raster tiers one line earlier on the same ROM bytes and is
+> disqualified as a referee for disagreeing with **itself** by 79–83 of 224 rows
+> between two identical boots, the landing line is **UNPINNED** in the Rust
+> core's own recon, and **no hardware referee exists.** So what settled is that
+> two readers agree — not that hardware has answered. This packet's own point,
+> that a comment reporting only the good half is a defect, is exactly why the
+> paragraph is annotated rather than deleted. See
+> `docs/reviews/2026-09-04-lag-attribution-false.md`.
+
 **And the span is contested by exactly one line — written in, deliberately.**
 Aurora derives first-displayed-line `top + 1`
 (`EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG`, parsed from the contract schema's own

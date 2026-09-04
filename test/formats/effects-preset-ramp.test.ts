@@ -15,6 +15,16 @@
 //      schema's own sentence, not from a comment.
 //   2. THE VSRAM DISPLAY LAG. A run's value j displays on line top + j + 1. A
 //      preview drawing it at top + j is one line high, which looks correct.
+//      ⚠ WHOSE NUMBER THAT IS (empyrean `bfc000e`, 2026-09-04): as read on
+//      ORACLE'S RUST CORE. The legacy C++ core reads both raster tiers one line
+//      earlier on the same ROM bytes and is disqualified as a referee because it
+//      is self-inconsistent by 79-83 of 224 rows between two identical boots;
+//      the landing line is UNPINNED in the Rust core's own recon; NO HARDWARE
+//      REFEREE exists. The rows below still derive whatever the contract states,
+//      which is the right design — this note is about what may be SAID of the
+//      result, and the saying is `RAMP_DISPLAY_INSTRUMENT`'s job in the renderer.
+//      (The "the engine moved fire+1 -> fire+2 on 2026-08-19" attribution is
+//      WITHDRAWN: aeon's two-core test refuted its own finding.)
 //   3. THE MUST NOT. A ramp is ONE linear rate over a span. There is no per-line
 //      curve, and there cannot be one — the engine has no field to receive it.
 //
