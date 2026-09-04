@@ -330,6 +330,22 @@ absent, not a skip. The seeds must be on the same filesystem as this repo (§4).
   `d27-effects-focus` escalates and polls. Not fixed here — this parcel
   measures, and changing a harness's teardown mid-census would have invalidated
   the rows already taken. Worth a row of its own.
+  **CLOSED 2026-09-04 by `parcel/bganim-teardown-verified`.** The shape was in
+  THREE files, not one — `bganim-insert-roomy` (twice), `bganim-phase-shift` and
+  `handover/handover-band`, siblings of one ancestor, each of which **imported
+  `killTree` and never called it**. All three now `await killTree(child)` and
+  then poll `portFree()`, and WARN loudly on survivors or on a port still held.
+  `check-harness-guards` gained **G8**: a launcher fails if the first call after
+  a SIGTERM is a fixed wait and nothing between that signal and the next
+  escalates or verifies. Red-first on all four sites, and on a planted deletion
+  of `band-trunk-demo`'s SIGKILL — a file this parcel does not otherwise touch,
+  so the rule is keyed on the shape rather than on these three names.
+  `scratchpad/teardown-verified-probe.mjs` (`npm run harness:teardown-verified`)
+  measures the behaviour on a SIGTERM-ignoring tree: the old shape returned
+  **1505 ms after the signal with 4 of 4 pids still running**, and `killTree` on
+  the SAME tree left none. NOT re-run end to end — the rigs need a built
+  Electron binary, which an agent worktree does not have; TAGGED for the
+  foreground.
 - **The negative rows are single runs.** A stability pass — every self-killer
   run 3× — would turn the 36 floor into something closer to a number. Not paid
   for here, and §2 is the reason it is worth paying for.

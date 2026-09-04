@@ -341,6 +341,45 @@ async function launch() {
   return { child, c };
 }
 
+/**
+ * Teardown, VERIFIED rather than timed.
+ *
+ * ⚠ WHAT THIS REPLACES. The `finally` below used to SIGTERM the group, wait a
+ * FIXED `sleep(1500)`, and then `rmSync(dir)` — no SIGKILL if the tree ignored
+ * the SIGTERM, and no check that anything had actually gone. The census
+ * (docs/reviews/2026-09-04-o78-residual-census.md §2) caught this shape in the
+ * sibling `bganim-insert-roomy-harness.mjs` with its own tell on 1 of 4 runs:
+ * the run that failed a row and aborted early reached the exit net with its
+ * tree still alive, the three clean runs did not. It passed or failed by luck.
+ * **A fixed-duration wait is not a wait; only a verified one is.**
+ *
+ * `killTree` is the O65 ordered sequence — app pids SIGTERMed first, a bounded
+ * grace spent waiting for them to be GONE (not zombies), then the wrapper's
+ * group so the X server goes down under nothing, then SIGKILL over what is
+ * left, then the X-artifact reap — and it RETURNS the survivor list, which is
+ * the whole point: `sleep()` cannot tell you it failed and this can. It was
+ * already imported by this file and never called. The port is polled after it
+ * because the port is what the NEXT run of this harness depends on:
+ * `launch()` opens with `if (!(await portFree())) throw`.
+ *
+ * LOUD, NEVER SILENT: an unkillable survivor and a port that never frees are
+ * both WARNed with what was observed, and neither throws — a `finally` must
+ * not throw over the failure it is cleaning up after.
+ */
+async function teardown(child, dir) {
+  const { survivors, tree } = await killTree(child);
+  if (survivors.length) {
+    console.log(`WARN       teardown could NOT kill ${survivors.length} of ${tree.length} process(es) `
+      + `after SIGTERM, grace and SIGKILL: ${survivors.join(',')} — the tree this run launched is still up`);
+  }
+  for (let i = 0; i < 30 && !(await portFree()); i++) await sleep(500);
+  if (!(await portFree())) {
+    console.log(`WARN       port ${PORT} is STILL SERVING a CDP target 15 s after the tree was killed — `
+      + 'the next run of this harness will refuse to launch');
+  }
+  rmSync(dir, { recursive: true, force: true });
+}
+
 async function main() {
   console.log(`DERIVED FROM THE VENDORED CONTRACT (${CONTRACT.source.repo}@${CONTRACT.source.commit.slice(0, 7)}):`);
   console.log(`  BG_TILE_CAPACITY=${TILE_CAPACITY}  PHASE_BANKS=${PHASE_BANKS}  TILE_WIDTH_PX=${TILE_W}  MAX_BANDS=${MAX_BANDS}`);
@@ -558,9 +597,7 @@ async function main() {
     console.log(`  emitted → ${EMIT_DIR}/{live-before,live-promoted-shift,aurora-claims}.json`);
   } finally {
     try { c.close(); } catch { /* */ }
-    try { process.kill(-child.pid, 'SIGTERM'); } catch { /* */ }
-    await sleep(1500);
-    rmSync(dir, { recursive: true, force: true });
+    await teardown(child, dir);
   }
 
   console.log(`\n${'='.repeat(70)}`);
