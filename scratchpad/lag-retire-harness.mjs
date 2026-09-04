@@ -139,6 +139,20 @@ const LAG_SRC = readLagSource();
 const LEAD = LAG_SRC.lead;
 const PREMISE = LAG_SRC.keys;
 
+/**
+ * THE WHOLE CLAIM THE SENTENCE MAKES, so `PAINTED` can pick the element that
+ * carries all of it rather than the lead-words <span> nested inside it.
+ *
+ * Every key name comes from the premise READ OFF DISK; the two wording fragments
+ * are the sharper-flavour half the derivation writes for a key aeon's page does
+ * not mention at all, which is what `boundary`'s lag was. Empty premise means an
+ * empty extra list, which is correct: on a production run nothing carries the
+ * lead at all and the selection is never reached.
+ */
+const LAG_NEEDLES = PREMISE.length
+  ? [LEAD, ...PREMISE.map((k) => `\`${k}\``), 'WHOLE DOCUMENT', 'will not build']
+  : [LEAD];
+
 // ⚠ MUST NOT COLLIDE WITH A PRESET AEON SHIPS. The fixture is created THROUGH
 // the panel into a copy of aeon's editor tree, so its id shares a namespace with
 // every preset aeon commits; a short id (`ramp_probe`) collided with a real file
@@ -313,16 +327,27 @@ const ADD_BAND = String.raw`([...document.querySelectorAll('button')]
  * printed beside every reading because it has been observed at both 1 and 1.35
  * in one session on this machine.
  */
-const PAINTED = (needle) => String.raw`
+const PAINTED = (needle, needles = []) => String.raw`
 (() => {
+  const want = ${JSON.stringify(needles)};
   const all = [...document.querySelectorAll('div,span')]
     .filter((e) => (e.innerText || '').includes(${JSON.stringify(needle)}));
   if (!all.length) return { found: false, matches: 0, dpr: window.devicePixelRatio };
-  // The SHORTEST element carrying the needle — the smallest thing an author
-  // could point at and say "it says that". \`.pop()\` alone takes the innermost
-  // match, which for this leaf is a 31-character lead <span> inside the Hint
-  // that carries the rest of the sentence.
-  const hit = all.slice().sort(
+  // ⚠ THE SHORTEST ELEMENT THAT CARRIES THE WHOLE CLAIM, NOT THE SHORTEST MATCH,
+  // AND THE DIFFERENCE COST A POISON RUN. \`PresetLagDisclosure\` renders its lead
+  // words in their OWN 31-character <span> inside the Hint that carries the rest
+  // of the sentence, so selecting the shortest element containing the LEAD picks
+  // that span and every other needle then reads as absent — against a sentence
+  // that is fully on screen. (scratchpad/boundary-control-harness.mjs documents
+  // this exact trap; this file walked into it the moment the helper was
+  // simplified, and only the paired presence run could see it: the ABSENCE run
+  // never reaches this selection, because absence is \`all.length === 0\`.)
+  // So: among the elements carrying EVERY needle, take the shortest; with no
+  // such element fall back to the shortest overall so the failure is honest
+  // rather than null.
+  const whole = all.filter((e) => want.every((n) => (e.innerText || '').includes(n)));
+  const pool = whole.length ? whole : all;
+  const hit = pool.slice().sort(
     (a, b) => (a.innerText || '').length - (b.innerText || '').length)[0];
   hit.scrollIntoView({ block: 'center' });
   const b = hit.getBoundingClientRect();
@@ -338,6 +363,10 @@ const PAINTED = (needle) => String.raw`
     inScroller: b.bottom > sb.top && b.top < sb.bottom && b.right > sb.left && b.left < sb.right,
     scroller: sc ? (sc.className || sc.tagName) : 'viewport',
     length: full.length,
+    // ⚠ MATCHED IN THE PAGE, AGAINST THE FULL innerText. \`text\` below is a
+    // TRUNCATED PREVIEW for the console and must never be what a row tests.
+    has: Object.fromEntries(want.map((n) => [n, full.includes(n)])),
+    allPresent: want.every((n) => full.includes(n)),
     text: full.slice(0, 260) + (full.length > 260 ? ' …[truncated for the console only]' : ''),
     full,
   };
@@ -623,7 +652,7 @@ async function main() {
         continue;
       }
 
-      const lag = await c.json(PAINTED(LEAD));
+      const lag = await c.json(PAINTED(LEAD, LAG_NEEDLES));
       if (EXPECT === 'absent') {
         check(`${s.id}-b`, `⚠ THE NO-BUILD DISCLOSURE IS GONE FROM ${s.label} — the sentence that `
           + 'told an author their document "will not build" is not on this surface, measured on a '
@@ -638,20 +667,19 @@ async function main() {
               + `text = ${JSON.stringify(lag.text)}`
             : `absent (0 elements carry ${JSON.stringify(LEAD)}); dpr ${lag && lag.dpr}`);
       } else {
-        // The key names are the PREMISE READ OFF DISK, never typed here, so this
-        // row measures the tree it was actually built from.
-        const namesEvery = !!lag && lag.found && PREMISE.every((k) => lag.full.includes(`\`${k}\``));
+        // ⚠ EVERY NEEDLE IS DERIVED — the key names from the premise READ OFF
+        // DISK, the wording from the sharper flavour the derivation writes — so
+        // this row measures the tree it was actually built from rather than a
+        // sentence somebody typed here.
         check(`${s.id}-b`, `⚠ PAIRED POISON RUN: with PRESET_KEYS_AWAITING_AEON stubbed back to `
           + `${JSON.stringify(PREMISE)} ON DISK and rebuilt, the disclosure IS PAINTED at `
-          + `${s.label} — a real element whose rect lands inside its own scroller — and it names `
-          + 'every key in the premise plus the sharper-flavour wording. This is what makes the '
-          + 'production run\'s absence a measurement: same file, same selectors, same gestures, '
-          + 'opposite premise, opposite result',
+          + `${s.label} — a real element whose rect lands inside its own scroller — and it carries `
+          + `the WHOLE claim ${JSON.stringify(LAG_NEEDLES)}, not just the lead words. This is what `
+          + 'makes the production run\'s absence a measurement: same file, same selectors, same '
+          + 'gestures, opposite premise, opposite result',
           !!lag && lag.found === true && lag.inScroller === true && lag.w > 0 && lag.h > 0
-          && namesEvery && lag.full.includes('WHOLE DOCUMENT')
-          && lag.full.includes('will not build'),
-          `painted = ${JSON.stringify(lag && { ...lag, full: undefined })}; names every premise `
-          + `key ${JSON.stringify(PREMISE)} = ${namesEvery}`);
+          && lag.allPresent === true,
+          `painted = ${JSON.stringify(lag && { ...lag, full: undefined })}`);
       }
     }
 
