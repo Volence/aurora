@@ -74,6 +74,17 @@
 //       verifies (a liveness or port poll). See the rule's own block for what
 //       it deliberately does NOT cover.
 //
+//   G9  (O50) A file a `harness:*` script NAMES must be able to print a FAIL.
+//       G6 governs the other direction — a harness-like file no script can
+//       reach. This one governs the file a script DOES reach, and it exists
+//       because the two are indistinguishable from outside: a diagnostic and a
+//       gate have the same name shape and the same exit code, and only the rows
+//       they emit separate them. Registering a report-only probe would produce a
+//       rig that is GREEN FOREVER and looks exactly like the other 140.
+//       ZERO files violate it today; it is a RATCHET, not a repair, and the
+//       header says so rather than letting a future reader read 0 failures as
+//       0 risk. Measured 2026-09-04: 141 registered, 141 print both words.
+//
 //   G6  (O49) A TRACKED harness-like file that NO `package.json` script can
 //       reach fails, naming the file and the exact script line to add. See the
 //       long note above the G6 pass for the population, the reachability rule,
@@ -1328,6 +1339,52 @@ if (unmeasurable.length) {
 // worktree this gate was built in was blind to them. Worktree isolation is what
 // makes an agent safe AND what makes it unable to see the tree it protects.
 let trackedFails = fails;
+// ── G9 (O50): a REGISTERED harness must be able to print a FAIL ─────────────
+// Deliberately a SOURCE test and not a run: running every harness here would
+// make this gate cost minutes inside `npm test`. The weaker instrument is
+// stated rather than hidden — see the ⚠ below for exactly what it cannot see.
+{
+  let pkg = null;
+  try {
+    pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  } catch (e) {
+    unmeasurable.push(`G9: cannot read package.json (${e.message}) — the registered population is `
+      + 'unknown, so no file could be judged. NOT a pass.');
+  }
+  if (pkg) {
+    const scripts = Object.entries(pkg.scripts ?? {}).filter(([k]) => k.startsWith('harness:'));
+    if (scripts.length === 0) {
+      unmeasurable.push('G9: package.json has no `harness:*` scripts at all. Either the prefix moved '
+        + 'or the read is wrong; an empty population cannot be reported as clean.');
+    }
+    for (const [name, cmd] of scripts) {
+      const m = /(scratchpad\/[\w.-]+\.mjs)/.exec(String(cmd));
+      if (!m) continue;                       // not a scratchpad rig; G9 says nothing about it
+      const rel = m[1];
+      let src = null;
+      try {
+        src = readFileSync(new URL('../' + rel, import.meta.url), 'utf8');
+      } catch (e) {
+        unmeasurable.push(`G9 ${rel}: named by \`${name}\` and unreadable (${e.message}). A script `
+          + 'pointing at a file that is not there is not a pass.');
+        continue;
+      }
+      // ⚠ THE LIMIT, STATED: this asks whether the file can PRINT both words,
+      // not whether an assertion is reachable. A rig whose FAIL branch is dead
+      // still passes G9. It catches the shape that actually occurs — a
+      // report-only probe, which prints neither — and claims nothing beyond it.
+      const canPass = src.includes('PASS');
+      const canFail = src.includes('FAIL');
+      if (!canPass || !canFail) {
+        const missing = [!canPass && 'PASS', !canFail && 'FAIL'].filter(Boolean).join(' and ');
+        fails.push(`G9 ${rel}: registered as \`${name}\` but never prints ${missing}, so no run of it `
+          + 'can report a failure — it would be GREEN FOREVER. Either give it rows, or unregister it '
+          + 'and add it to RETIRED_UNREGISTERED with the record that closed its investigation.');
+      }
+    }
+  }
+}
+
 let untrackedFails = [];
 try {
   const tracked = new Set(
