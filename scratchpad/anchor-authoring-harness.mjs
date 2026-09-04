@@ -1206,7 +1206,11 @@ async function main() {
       REFUSED_ON(0).length === 0
       && card0.found === true
       && !card0.text.includes('cannot fit channel')
-      && !/clamped up to/.test(card0.text),
+      && !/clamped up to/.test(card0.text)
+      // ...and no CLEARANCE either. Added after a plant painting "Fits ✓" on
+      // every cannot-tell channel left this row green while [10c] caught it:
+      // an absence-of-warning row does not, by itself, forbid a reassurance.
+      && !/\bfits\b/i.test(card0.text) && !/✓/.test(card0.text),
       `ch0 refusable rungs = ${JSON.stringify(REFUSED_ON(0))} (empty is the measured fact)\n        `
       + `CARD 0 TEXT ON SCREEN:\n        `
       + (card0.found ? card0.text.split('\n').map((l) => `| ${l}`).join('\n        ') : '(no card)'));
