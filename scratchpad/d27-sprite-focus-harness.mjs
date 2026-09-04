@@ -42,6 +42,70 @@
 //       implementation — blur inside each handler, after its early returns —
 //       fails. See the P-plants in the review packet.
 //
+// ═══ d-29 PUT A DIALOG BETWEEN [sp1]/[sp2] AND THEIR WRITER ════════════════
+//
+// Master `ed4df57e` landed d-29 `guard_when_dirty` (`shell/new-sprite-guard.ts`,
+// `docs/decisions.jsonl` `d-29-new-sprite-clears-undo-answered`): the size chips
+// and `New □` now ASK before replacing a document that has unsaved edits. Both
+// chip sites are pressed here on documents that are dirty at that point in the
+// run, so d-29 CONSUMED THE PREMISE of six rows — and the run did not merely go
+// red, it ABORTED: measured on `ed4df57e`, `[sp1-a]` failed, the dialog it
+// raised was never dismissed, and `[sp1-c]`'s aim then landed on the backdrop
+// and threw AIM REFUSED. 20 PASS / 1 FAIL and NINE ROWS THAT NEVER EXECUTED
+// (`sp1-c`, `sp1-d`, `sp2-a`..`sp2-d`, `fg-d0`, `fg-d`, `z1`).
+//
+// ⚠ AND THE ONE ROW THAT STAYED GREEN WAS THE WORST OF THEM. `[sp1-b]` passed
+// with the dialog STANDING OVER IT: its Space was sent at a screen covered by a
+// modal backdrop, so "the document did not change" was true for a reason that
+// has nothing to do with d-27. A row that cannot reach its subject and reports
+// PASS is this repo's worst failure mode, and it is why these rows were TAUGHT
+// TO ANSWER THE DIALOG rather than retired.
+//
+// WHY TAUGHT AND NOT RETIRED. The subject of this file is d-27 focus behaviour,
+// not document replacement; the replacement assertion is SCAFFOLDING that proves
+// the button acted. d-29 did not touch the subject — the chip still blurs before
+// `newSpriteGuarded` is even called (`ui/act-and-drop-focus.ts` blurs FIRST) —
+// it only put a step in front of the scaffolding. Retiring the six would have
+// dropped d-27 coverage on two of the survey's six sprite sites while the
+// property they measure is still live, trading a red row for a hole. Contrast
+// `[k2]` of `scratchpad/collision-destructive-harness.mjs`, which the owner's own
+// d-27 ruling retired EXPLICITLY: there the ruling made the row's own claim
+// false. Here it did not.
+//
+// ═══ …AND THE DIALOG IS A NEW d-27 PARTICIPANT NOBODY HAD MEASURED ════════
+//
+// The chip drops focus on press. But the dialog it raises is now the thing on
+// screen, and d-27's question applies to it verbatim: WHEN IT CLOSES, WHERE DOES
+// FOCUS LAND, AND DOES A BARE SPACE RE-FIRE ANYTHING? `ConfirmDialog` sets no
+// initial focus and installs no focus trap (`ui/focus-trap.ts` names it as "the
+// obvious second caller" and is NOT wired to it), and its buttons unmount on
+// answer — so the answer is not obvious and had never been read off the real
+// app for these two sites. `[k3]` of `scratchpad/confirm-destroy-harness.mjs`
+// asks it for the Chunks Clear button and nothing asked it here. The three ways
+// the dialog closes are three code paths — a window keydown listener (Esc), and
+// each button's own `onClick` (Cancel, Discard) — so they get THREE rows each:
+//
+//   -e1  after ESC closes it
+//   -e2  after CANCEL is clicked with a real mouse
+//   -e3  after DISCARD is clicked with a real mouse
+//
+// Each asserts the same three things: the dialog is gone, `activeElement` is
+// NEITHER the chip NOR any other `<button>` (nothing Space could activate), and
+// a bare Space + Enter afterwards writes nothing AND RAISES NO DIALOG.
+//
+// ⚠ "RAISES NO DIALOG" IS THE SHARP HALF, and it is sharper than anything the
+// pre-d-29 rows could assert. The Space is sent on a document that is DIRTY, so
+// a Space that reached `newSpriteGuarded` would put the dialog back on screen —
+// visibly — even though `newSprite` itself would then be waiting on an answer
+// and would have written nothing yet. Before d-29 a Space that reached the
+// writer and a Space that did not were distinguishable only by the bytes it
+// changed; now the guard itself is the detector.
+//
+// ⚠ AND `-b` MOVED WITH IT. "A Space straight after the click" now means "a
+// Space WHILE THE DIALOG STANDS", which is a different and worthwhile claim —
+// does Space confirm or cancel the dialog by accident? — so that is what `-b`
+// now asserts at these two sites, and the far-side Space lives in `-e1`..`-e3`.
+//
 // ⚠ ONLY FIVE OF THE SIX SITES HAVE A `-d`, AND THAT IS A FINDING, NOT A GAP.
 // A `[k7]` row needs a press an author can actually perform that writes
 // nothing. Five of these have one:
@@ -228,6 +292,7 @@ async function key(c, k, code, vk, modifiers = 0) {
 const ctrlZ = (c) => key(c, 'z', 'KeyZ', 90, 2);
 const space = (c) => key(c, ' ', 'Space', 32);
 const enter = (c) => key(c, 'Enter', 'Enter', 13);
+const escape = (c) => key(c, 'Escape', 'Escape', 27);
 
 /**
  * A REAL CLICK ON A REAL BUTTON, aimed at integer client pixels.
@@ -289,6 +354,107 @@ const focusNow = (c, handle) => c.json(String.raw`(() => {
 })()`);
 
 /**
+ * ANSWER d-29's DIALOG — and if there ISN'T one, SAY SO and let the row go red.
+ *
+ * ⚠ THIS SHAPE IS FOR THE RED-FIRST RUNS, and it is the difference between
+ * evidence and a stack trace. Under a plant that removes the blur, or one that
+ * removes the guard, the dialog may not be there; a bare
+ * `clickHandle('dlg:Cancel')` would then throw HANDLE ABSENT and kill the whole
+ * run at the first plant, so the packet could only ever say "it crashed" — one
+ * abort per plant, naming no rows. Reporting the absence and continuing lets
+ * each plant redden its OWN named rows and leave the others green, which is the
+ * claim a per-site plant is supposed to establish.
+ *
+ * Borrowed wholesale from `scratchpad/confirm-destroy-harness.mjs`, deliberately
+ * rather than invented a second time: that file is the one that proved d-29 in
+ * the real app, and two harnesses driving one dialog two different ways is how
+ * they end up disagreeing about it.
+ */
+async function answerDialog(c, label) {
+  const info = await c.json('window.__d27.info()');
+  if (info === null) {
+    note(`DIALOG ABSENT — cannot click "${label}"`,
+      'no [role="alertdialog"] is on screen, so there was nothing to answer. Every row below that '
+      + 'expected this dialog will now read the UNANSWERED state and go red, which is the point: this '
+      + 'is what a run looks like when d-29\'s guard is not there.');
+    return false;
+  }
+  await clickHandle(c, `dlg:${label}`, `the dialog's "${label}" button`);
+  return true;
+}
+
+/**
+ * Leave no dialog standing between phases.
+ *
+ * The dialog's backdrop is `position: fixed; inset: 0`, so one left up by a
+ * failing row makes every later aim land on the backdrop and REFUSE — turning a
+ * plant's row-level red into a whole-run abort. THAT IS NOT HYPOTHETICAL: it is
+ * exactly what `ed4df57e` did to this file before this parcel (see the header).
+ * This clears it with Esc and says out loud that it had to.
+ */
+async function ensureNoDialog(c, where) {
+  for (let i = 0; i < 3; i++) {
+    if ((await c.json('window.__d27.info()')) === null) return;
+    note(`UNEXPECTED DIALOG STANDING at ${where}`,
+      'dismissing it with Esc so the aims below are not eaten by its backdrop. In a green run this '
+      + 'never prints; when it does, a row above did not go the way it expected.');
+    await escape(c);
+    await sleep(500);
+  }
+}
+
+/**
+ * THE FAR SIDE OF THE DIALOG — the row this parcel exists for.
+ *
+ * d-27 asks one question and the dialog is a new participant in it: when the
+ * dialog closes, is there anything left holding keyboard focus that a bare Space
+ * could re-fire? This asserts three things, and prints each half separately so a
+ * red names WHICH half:
+ *
+ *   1. the dialog is really gone (a standing dialog would make 2 and 3 measure
+ *      the modal instead of the app, which is the [sp1-b] defect this parcel
+ *      found and is not allowed to reintroduce);
+ *   2. `activeElement` is NEITHER the chip NOR any other `<button>`. The "any
+ *      button" half is DERIVED, not copied: what makes a Space dangerous is a
+ *      focused button for it to activate, so "no button holds focus" is the
+ *      property, and naming only the chip would miss focus parked on the
+ *      dialog's own Discard button if the dialog ever stopped unmounting it.
+ *   3. a bare Space and a bare Enter afterwards write nothing AND RAISE NO
+ *      DIALOG. The document is DIRTY when they are sent (asserted), so a key
+ *      that reached `newSpriteGuarded` would put the dialog back on screen even
+ *      though it would not have written a byte yet.
+ *
+ * The watcher is armed BEFORE the keys and latches: a single sample afterwards
+ * cannot tell "never appeared" from "appeared and closed".
+ */
+async function farSideOfDialog(c, id, site, handle, closedBy, dirtySnap) {
+  const gone = await c.json('window.__d27.info()');
+  const foc = await focusNow(c, handle);
+  const before = dirtySnap;
+  await c.evalExpr('window.__d27.watchStart()');
+  await space(c); await sleep(400);
+  await enter(c); await sleep(400);
+  const seen = await c.evalExpr('window.__d27.watchStop()');
+  const after = await snap(c);
+  check(id, `${site}: after the d-29 dialog closes via ${closedBy}, NOTHING is left holding keyboard `
+    + 'focus — not the chip, not any other button — and a bare SPACE (and Enter) neither writes nor '
+    + 'raises the dialog again',
+    gone === null && foc.isTheButton === false && foc.tag !== 'BUTTON'
+    && before.unsavedEdits === true && after.key === before.key && seen === false,
+    `dialog after ${closedBy} = ${gone}; activeElement = <${foc.tag}> "${foc.text}" `
+    + `(isTheChip=${foc.isTheButton}, isAnyButton=${foc.tag === 'BUTTON'}); document `
+    + `${before.brief} → ${after.brief} (fingerprint identical = ${after.key === before.key}); the `
+    + `dialog watcher, armed before the keys and latching, reported seen=${seen}. VACUITY GUARD: the `
+    + `document was DIRTY (unsavedEdits=${before.unsavedEdits}) when the keys were sent, so a key that `
+    + 'reached newSpriteGuarded would have put the dialog straight back — a CLEAN document would make '
+    + 'this row pass on a Space that fired, because d-29 lets a clean press through silently. POSITIVE '
+    + 'CONTROL for the watcher: it reported seen=true in the -a row of THIS SITE, in THIS run; POSITIVE '
+    + 'CONTROL for the key channel: the -e1 row of this site closed its dialog with an Esc sent over '
+    + 'the same Input.dispatchKeyEvent path these keys travel.');
+  return after;
+}
+
+/**
  * THE WHOLE-DOCUMENT FINGERPRINT the "-b" and "-d" rows compare.
  *
  * `frameHashes` (FNV-1a per frame), `steps`, the frame size, the frame count
@@ -332,15 +498,26 @@ async function snap(c) {
  *    their `title`, which is authored text in the component.
  *  - `addStep` is the Timeline's `+ Frame N`, distinguished from FrameGrid's
  *    `+ Frame` by the absence of a title attribute AND the trailing index.
+ *  - `dlg:<label>` is a button INSIDE the `role="alertdialog"` whose text is
+ *    exactly `<label>`, so answering d-29's dialog can never hit the page
+ *    behind it. Same predicate as `scratchpad/confirm-destroy-harness.mjs`.
  *
  * `el()` returns null rather than throwing so `clickHandle` can report HANDLE
  * ABSENT with the handle's name — a run that silently clicked the wrong thing
  * is the failure this table exists to prevent.
+ *
+ * `watchStart`/`watchStop` are the dialog detector the `-d` and `-e*` rows need.
+ * A single sample after a press cannot tell "no dialog ever appeared" from "one
+ * appeared and went"; the observer runs from before the press to after it and
+ * LATCHES. It seeds itself with a direct check so a dialog already standing
+ * counts. Its positive control is the `-a` row of each chip site, which reports
+ * seen=true in the same run.
  */
 const INSTALL_HANDLES = (presets) => String.raw`
 (() => {
   const PRESETS = ${JSON.stringify(presets)};
   const btns = () => [...document.querySelectorAll('button')];
+  const dialog = () => document.querySelector('[role="alertdialog"]');
   const table = {
     presetBox: () => {
       const want = PRESETS.join(',');
@@ -358,6 +535,7 @@ const INSTALL_HANDLES = (presets) => String.raw`
     addStep: () => btns().find((b) => !b.getAttribute('title')
       && /^\+ Frame \d+$/.test((b.textContent || '').trim())) || null,
   };
+  let obs = null, seen = false;
   window.__d27 = {
     el(h) {
       const m = /^preset(\d+)$/.exec(h);
@@ -368,12 +546,42 @@ const INSTALL_HANDLES = (presets) => String.raw`
       }
       const s = /^stepDel(\d+)$/.exec(h);
       if (s) return document.querySelectorAll('button[title="remove step"]')[Number(s[1])] || null;
+      const d = /^dlg:(.+)$/.exec(h);
+      if (d) {
+        const dl = dialog();
+        if (!dl) return null;
+        return [...dl.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === d[1]) || null;
+      }
       return table[h] ? table[h]() : null;
+    },
+    info() {
+      const d = dialog();
+      if (!d) return null;
+      return {
+        label: d.getAttribute('aria-label'),
+        text: (d.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 400),
+        buttons: [...d.querySelectorAll('button')].map((b) => (b.textContent || '').trim()),
+      };
+    },
+    watchStart() {
+      this.watchStop();
+      seen = !!dialog();
+      obs = new MutationObserver(() => { if (dialog()) seen = true; });
+      obs.observe(document.body, { childList: true, subtree: true });
+      return seen;
+    },
+    watchStop() {
+      if (obs) { obs.disconnect(); obs = null; }
+      if (dialog()) seen = true;
+      const was = seen;
+      seen = false;
+      return was;
     },
     stepDelCount: () => document.querySelectorAll('button[title="remove step"]').length,
     presetCount: () => (table.presetBox() ? table.presetBox().children.length : -1),
   };
-  return { presets: window.__d27.presetCount(), steps: window.__d27.stepDelCount() };
+  return { presets: window.__d27.presetCount(), steps: window.__d27.stepDelCount(),
+           dialogNow: !!dialog() };
 })()`;
 
 async function main() {
@@ -453,10 +661,13 @@ async function main() {
       boot.s.activeDocId != null && boot.s.frames > 1,
       `doc=${boot.s.activeDocId} ${boot.brief} · proj=${JSON.stringify(proj)} level=${lvl.status}`);
     check('b2', 'ANTI-VACUOUS: the handle table found the size-preset chips and they are exactly the '
-      + "component's SIZE_PRESETS — no row below can pass by finding nothing",
-      handles.presets === SIZE_PRESETS.length,
+      + "component's SIZE_PRESETS — no row below can pass by finding nothing — and NO d-29 dialog is "
+      + 'standing before anything has been pressed',
+      handles.presets === SIZE_PRESETS.length && handles.dialogNow === false,
       `presetBox children=${handles.presets}, SIZE_PRESETS=${JSON.stringify(SIZE_PRESETS)} `
-      + `(read from ${TOOLOPTS_SRC.replace(ROOT + '/', '')}); remove-step buttons on screen=${handles.steps}`);
+      + `(read from ${TOOLOPTS_SRC.replace(ROOT + '/', '')}); remove-step buttons on screen=${handles.steps}; `
+      + `dialog on screen at boot = ${handles.dialogNow}. A dialog already up would make every aim below `
+      + 'land on its backdrop and REFUSE, which is how this file aborted on ed4df57e.');
     if (!boot.s.activeDocId || boot.s.frames <= 1) {
       throw new Error('no usable sprite document — every row below would be vacuous');
     }
@@ -758,130 +969,267 @@ async function main() {
     // ⚠ THESE ARE THE SHARPEST TWO SITES IN THE SURVEY, sharper than the
     // collision wipes d-27 was ruled on: `newSprite` replaces the whole
     // document AND calls `activeSpriteHistory().clear()`, so there is no
-    // Ctrl+Z afterwards. That is why [sp1-b]/[sp2-b] rebuild their fixture
-    // through `__dbg.spritePaint` and name their positive control separately.
+    // Ctrl+Z afterwards.
+    //
+    // ⚠ AND THEY ARE THE ONLY TWO OF THE SIX BEHIND d-29's DIALOG. Every press
+    // below on a DIRTY document raises `ConfirmDialog` instead of replacing
+    // anything, so these rows ANSWER IT — see the d-29 block in the header for
+    // why they were taught rather than retired, and for what the `-e*` rows add
+    // that no row anywhere had. The other four sites are untouched by d-29 and
+    // their rows above are unchanged.
     // ═══════════════════════════════════════════════════════════════════════
     console.log('\n=== [sp1] size-preset chips (shell/SpriteToolOptions.tsx) ===');
     const big = SIZE_PRESETS[SIZE_PRESETS.length - 1];
     const mid = SIZE_PRESETS[SIZE_PRESETS.length - 2];
+
+    // ── [sp1-a] THE PRESS: the chip blurs BEFORE the guard is even called ──
+    //
+    // `actAndDropFocus` blurs `e.currentTarget` and only THEN runs the action,
+    // so d-27's property at this site is untouched by d-29 and is still read off
+    // the same press. What changed is the "it still acted" half: the writer no
+    // longer runs on this press at all, so the proof that the press REACHED the
+    // writer is now THE DIALOG ITSELF — a chip wired to nothing raises none.
     const sp1Pre = await snap(c);
-    await clickHandle(c, `preset${big}`, `size-preset chip "${big}"`);
+    check('sp1-0', 'ANTI-VACUOUS fixture: the document [sp1-a] presses on really carries unsaved edits, '
+      + 'so d-29\'s guard is on its ASKING arm — a clean document would replace silently and every '
+      + 'dialog row below would be measuring the wrong branch',
+      sp1Pre.unsavedEdits === true,
+      `${sp1Pre.brief} — left dirty by the [fg] phase above, not by anything this block did`);
+    await c.evalExpr('window.__d27.watchStart()');
+    await clickHandle(c, `preset${big}`, `size-preset chip "${big}" (DIRTY document)`);
     const sp1FocusA = await focusNow(c, `preset${big}`);
+    const sp1InfoA = await c.json('window.__d27.info()');
+    const sp1SeenA = await c.evalExpr('window.__d27.watchStop()');
     const sp1A = await snap(c);
+    await shot(c, 'sp1-dialog');
     check('sp1-a', `shell/SpriteToolOptions.tsx size-preset chip "${big}": after a REAL CLICK the chip `
-      + 'does not keep keyboard focus — AND the same click still replaced the whole document',
-      sp1FocusA.isTheButton === false && sp1A.s.frameW === big && sp1A.s.frameH === big
-      && sp1A.s.frames === 1 && sp1A.canUndo === false,
+      + 'does not keep keyboard focus — AND the same click still REACHED the writer, which since d-29 '
+      + 'means it raised the confirm dialog, and the document is untouched while that stands',
+      sp1FocusA.isTheButton === false && sp1InfoA !== null && /discard/i.test(sp1InfoA.label ?? '')
+      && sp1A.key === sp1Pre.key && sp1A.unsavedEdits === true && sp1SeenA === true,
       `activeElement = <${sp1FocusA.tag}> "${sp1FocusA.text}" (isTheChip=${sp1FocusA.isTheButton}); `
-      + `${sp1Pre.brief} → ${sp1A.brief}. canUndo is now ${sp1A.canUndo} because newSprite CLEARS the `
-      + 'history — this document is NOT one Ctrl+Z away, which is why this site is worse than the two '
-      + 'collision buttons d-27 was ruled on.');
+      + `dialog = ${JSON.stringify(sp1InfoA)}; ${sp1Pre.brief} → ${sp1A.brief} (fingerprint identical). `
+      + 'd-27 IS UNAFFECTED BY d-29 HERE and that is the mechanism, not a coincidence: '
+      + '`ui/act-and-drop-focus.ts` blurs e.currentTarget BEFORE it calls act(), so the blur happens '
+      + 'whether the guard asks or writes. The "still acted" half of this row is now carried by the '
+      + 'DIALOG — a chip wired to nothing raises none — and the "untouched while it stands" half is in '
+      + 'the condition, because a guard that asked and replaced anyway would satisfy a '
+      + `dialog-exists assertion perfectly. The watcher reported seen=${sp1SeenA}, which is the POSITIVE `
+      + 'CONTROL every -e* row below borrows.');
 
-    // The fixture for the Space is built with __dbg.spritePaint, not a click,
-    // and NOT with Ctrl+Z — there is no history left to undo through.
-    await paint(6);
-    const sp1PreSpace = await snap(c);
+    // ── [sp1-b] A SPACE WHILE THE DIALOG STANDS ANSWERS NOTHING ────────────
+    //
+    // ⚠ THIS ROW REPLACES ONE THAT PASSED FOR THE WRONG REASON. On `ed4df57e`
+    // the old [sp1-b] sent its Space at a screen covered by this very dialog's
+    // backdrop and reported PASS; "the document did not change" was true because
+    // the modal was in the way, which says nothing about d-27. The claim is now
+    // the one that press actually tests: does a bare Space confirm or cancel the
+    // dialog by accident? `ConfirmDialog` sets no initial focus and installs no
+    // focus trap, so this is a real question and not a formality.
+    const sp1PreB = await snap(c);
     await space(c); await sleep(400);
-    const sp1Space = await snap(c);
     await enter(c); await sleep(400);
-    const sp1Enter = await snap(c);
-    check('sp1-b', `shell/SpriteToolOptions.tsx size-preset chip "${big}": a bare SPACE straight after `
-      + 'the click reaches no writer — the painted pixels survive (Enter sent separately too)',
-      sp1PreSpace.s.frameCoverage[0] > 0
-      && sp1Space.key === sp1PreSpace.key && sp1Enter.key === sp1PreSpace.key,
-      `frame 0 coverage ${sp1PreSpace.s.frameCoverage[0]} → after Space ${sp1Space.s.frameCoverage[0]} `
-      + `→ after Enter ${sp1Enter.s.frameCoverage[0]}. VACUITY GUARD: the canvas held `
-      + `${sp1PreSpace.s.frameCoverage[0]} non-zero pixels when the keys were sent, so a Space that `
-      + 're-fired newSprite would have blanked them and been visible — a virgin blank document would '
-      + 'make this row pass on a Space that fired. POSITIVE CONTROL: this site cannot use Ctrl+Z (the '
-      + 'history is gone), so it borrows [tl-b]/[fg-b]/[pal-b], where a Ctrl+Z on the SAME '
-      + 'Input.dispatchKeyEvent channel visibly landed in this same run.');
+    const sp1InfoB = await c.json('window.__d27.info()');
+    const sp1B = await snap(c);
+    check('sp1-b', `shell/SpriteToolOptions.tsx size-preset chip "${big}": a bare SPACE (and Enter) `
+      + 'WHILE THE DIALOG STANDS answers it neither way — it is still on screen and the painted pixels '
+      + 'and the dirty flag are still there',
+      sp1PreB.s.frameCoverage[0] > 0 && sp1PreB.unsavedEdits === true
+      && sp1InfoB !== null && sp1B.key === sp1PreB.key && sp1B.unsavedEdits === true,
+      `dialog after the keys = ${JSON.stringify(sp1InfoB?.buttons)}; ${sp1PreB.brief} → ${sp1B.brief}. `
+      + `VACUITY GUARD: the document held ${sp1PreB.s.frameCoverage[0]} non-zero pixels and `
+      + 'unsavedEdits=true when the keys were sent, so a Space that had reached "Discard & start new" '
+      + 'would have blanked them AND closed the dialog — both visible. POSITIVE CONTROL for the key '
+      + 'channel: the Esc in [sp1-e1] immediately below travels the same Input.dispatchKeyEvent path '
+      + 'and DOES close it.');
 
-    await clickHandle(c, `preset${mid}`, `size-preset chip "${mid}" (second real click, different chip)`);
+    // ── [sp1-e1] ESC — the window keydown listener path ────────────────────
+    await escape(c); await sleep(500);
+    await farSideOfDialog(c, 'sp1-e1', `shell/SpriteToolOptions.tsx size-preset chip "${big}"`,
+      `preset${big}`, 'Esc', await snap(c));
+
+    // ── [sp1-e2] CANCEL, clicked with a real mouse — its own onClick ───────
+    await ensureNoDialog(c, 'the start of [sp1-e2]');
+    await c.evalExpr('window.__d27.watchStart()');
+    await clickHandle(c, `preset${big}`, `size-preset chip "${big}" (dirty, second press)`);
+    const sp1PreCancel = await snap(c);
+    const sp1CancelOk = await answerDialog(c, 'Cancel');
+    await c.evalExpr('window.__d27.watchStop()');
+    note('[sp1-e2] the close', `Cancel clicked = ${sp1CancelOk}; document while the dialog stood = `
+      + `${sp1PreCancel.brief}`);
+    await farSideOfDialog(c, 'sp1-e2', `shell/SpriteToolOptions.tsx size-preset chip "${big}"`,
+      `preset${big}`, 'a real mouse click on Cancel', await snap(c));
+
+    // ── [sp1-c] THE ANTI-CHEAT ROW: a DIFFERENT chip, and DISCARD proceeds ─
+    //
+    // The scaffolding that proves the control acted, now on the far side of the
+    // dialog. A DIFFERENT chip on purpose: the presets render from one map, and
+    // a second press of the SAME chip is idempotent and could not tell a live
+    // control from a dead one.
+    await ensureNoDialog(c, 'the start of [sp1-c]');
+    const sp1PreC = await snap(c);
+    await c.evalExpr('window.__d27.watchStart()');
+    await clickHandle(c, `preset${mid}`, `size-preset chip "${mid}" (dirty, DIFFERENT chip)`);
     const sp1FocusC = await focusNow(c, `preset${mid}`);
+    const sp1InfoC = await c.json('window.__d27.info()');
+    await answerDialog(c, 'Discard & start new');
+    const sp1SeenC = await c.evalExpr('window.__d27.watchStop()');
     const sp1C = await snap(c);
     check('sp1-c', `shell/SpriteToolOptions.tsx size-preset chips: a SECOND real click — on the "${mid}" `
-      + 'chip, its OWN dispatch line — still replaces the document and drops focus again',
-      sp1C.s.frameW === mid && sp1C.s.frameH === mid && sp1FocusC.isTheButton === false,
-      `${sp1PreSpace.brief} → ${sp1C.brief}; activeElement after = <${sp1FocusC.tag}> `
-      + `"${sp1FocusC.text}" (isTheChip=${sp1FocusC.isTheButton}). A DIFFERENT chip on purpose: the `
-      + 'presets are rendered from one map, and a second press of the SAME chip is idempotent and could '
-      + 'not tell a live control from a dead one.');
+      + 'chip, its OWN dispatch line — drops focus again, asks again, and on DISCARD really does replace '
+      + 'the document',
+      sp1FocusC.isTheButton === false && sp1InfoC !== null && sp1SeenC === true
+      && sp1C.s.frameW === mid && sp1C.s.frameH === mid && sp1C.s.frames === 1
+      && sp1C.canUndo === false && sp1C.unsavedEdits === false && sp1PreC.unsavedEdits === true,
+      `${sp1PreC.brief} → ${sp1C.brief}; activeElement right after the CHIP press = `
+      + `<${sp1FocusC.tag}> "${sp1FocusC.text}" (isTheChip=${sp1FocusC.isTheButton}); dialog raised = `
+      + `${JSON.stringify(sp1InfoC?.buttons)}. canUndo is now ${sp1C.canUndo} because newSprite CLEARS `
+      + 'the history — this document is NOT one Ctrl+Z away, which is why this site is worse than the '
+      + 'two collision buttons d-27 was ruled on and why d-29 put a dialog in front of it. Without this '
+      + 'row, "the dialog appears" and "the chip is dead" would be the same artifact.');
 
+    // ── [sp1-e3] DISCARD — the third close path, measured on its own ───────
+    await paint(6);
+    await farSideOfDialog(c, 'sp1-e3', `shell/SpriteToolOptions.tsx size-preset chip "${mid}"`,
+      `preset${mid}`, 'a real mouse click on Discard & start new', await snap(c));
+
+    // ── [sp1-d] THE NO-OP PRESS — and d-29's CLEAN arm ────────────────────
+    //
+    // The fixture is a CLEAN document (the paint above is undone first), so this
+    // row now carries d-29's other half too: a clean press sees NO DIALOG AT ALL
+    // and still drops focus. That is the row an implementation that confirmed
+    // unconditionally would fail, and it is measured on the same press.
+    await ensureNoDialog(c, 'the start of [sp1-d]');
+    await clickHandle(c, `preset${mid}`, `size-preset chip "${mid}" (clearing the paint for [sp1-d])`);
+    await answerDialog(c, 'Discard & start new');
+    await ensureNoDialog(c, 'after clearing the paint for [sp1-d]');
     const sp1PreNoop = await snap(c);
+    check('sp1-d0', 'ANTI-VACUOUS: the document [sp1-d] presses on is genuinely CLEAN, so d-29 is on '
+      + 'its SILENT arm and a dialog appearing there would be the defect, not the design',
+      sp1PreNoop.unsavedEdits === false && sp1PreNoop.canUndo === false,
+      `${sp1PreNoop.brief}`);
+    await c.evalExpr('window.__d27.watchStart()');
     await clickHandle(c, `preset${mid}`, `size-preset chip "${mid}" (NO-OP press — already that document)`);
     const sp1FocusD = await focusNow(c, `preset${mid}`);
+    const sp1SeenD = await c.evalExpr('window.__d27.watchStop()');
     const sp1D = await snap(c);
     check('sp1-d', 'd-27 IS UNCONDITIONAL at the size-preset chips: a press that changes NOTHING (the '
-      + 'document is already a virgin blank at that size) still drops focus',
+      + 'document is already a virgin blank at that size) still drops focus — and d-29 stays SILENT on '
+      + 'it, because there is nothing to lose',
       sp1D.key === sp1PreNoop.key && sp1D.canUndo === false && sp1D.unsavedEdits === false
-      && sp1FocusD.isTheButton === false,
+      && sp1FocusD.isTheButton === false && sp1SeenD === false,
       `the press left the fingerprint identical (${sp1PreNoop.brief} → ${sp1D.brief}) and activeElement `
-      + `is <${sp1FocusD.tag}> (isTheChip=${sp1FocusD.isTheButton}). ⚠ READ THE MECHANISM: newSprite has `
-      + 'no early return — this is a no-op by IDEMPOTENCE (a second blankDoc at the same size is '
-      + 'byte-identical), not by a return. An implementation that blurred only on the acting path fails '
-      + 'this row.');
+      + `is <${sp1FocusD.tag}> (isTheChip=${sp1FocusD.isTheButton}); dialog watcher seen=${sp1SeenD}. `
+      + '⚠ READ THE MECHANISM: newSprite has no early return — this is a no-op by IDEMPOTENCE (a second '
+      + 'blankDoc at the same size is byte-identical), not by a return. An implementation that blurred '
+      + 'only on the acting path fails this row. The seen=false half is d-29\'s clean arm, which an '
+      + 'implementation that confirmed UNCONDITIONALLY would fail while passing every dialog row above.');
 
     // ═══════════════════════════════════════════════════════════════════════
     // [sp2] shell/SpriteToolOptions.tsx — `New □`
     //
-    // ITS OWN FOUR ROWS. `New □` and the preset chips call the same writer from
-    // TWO SEPARATE dispatch lines twenty lines apart, and a blur wired to the
-    // map above and not to this one would pass every [sp1] row.
+    // ITS OWN ROWS, ALL OF THEM. `New □` and the preset chips call the same
+    // writer from TWO SEPARATE dispatch lines twenty lines apart, and a blur —
+    // or, now, a GUARD — wired to the map above and not to this one would pass
+    // every [sp1] row.
     // ═══════════════════════════════════════════════════════════════════════
     console.log('\n=== [sp2] `New □` (shell/SpriteToolOptions.tsx) ===');
+    await ensureNoDialog(c, 'the start of the [sp2] phase');
     await paint(6);
     const sp2Pre = await snap(c);
-    await clickHandle(c, 'newBox', 'New □');
+    check('sp2-0', 'ANTI-VACUOUS fixture: the document `New □` is pressed on carries painted pixels AND '
+      + 'unsaved edits, so d-29 is on its ASKING arm and there is something for a re-fire to destroy',
+      sp2Pre.unsavedEdits === true && sp2Pre.s.frameCoverage[0] > 0,
+      `${sp2Pre.brief} — painted through __dbg.spritePaint, which moves no focus and clicks nothing`);
+    await c.evalExpr('window.__d27.watchStart()');
+    await clickHandle(c, 'newBox', 'New □ (DIRTY document)');
     const sp2FocusA = await focusNow(c, 'newBox');
+    const sp2InfoA = await c.json('window.__d27.info()');
+    const sp2SeenA = await c.evalExpr('window.__d27.watchStop()');
     const sp2A = await snap(c);
     check('sp2-a', 'shell/SpriteToolOptions.tsx `New □`: after a REAL CLICK the chip does not keep '
-      + 'keyboard focus — AND the same click still replaced the whole document',
-      sp2FocusA.isTheButton === false && sp2Pre.s.frameCoverage[0] > 0
-      && sp2A.s.frameCoverage[0] === 0 && sp2A.canUndo === false,
+      + 'keyboard focus — AND the same click still REACHED the writer (it raised d-29\'s dialog), with '
+      + 'the document untouched while that stands',
+      sp2FocusA.isTheButton === false && sp2InfoA !== null && /discard/i.test(sp2InfoA.label ?? '')
+      && sp2A.key === sp2Pre.key && sp2A.unsavedEdits === true && sp2SeenA === true,
       `activeElement = <${sp2FocusA.tag}> "${sp2FocusA.text}" (isTheChip=${sp2FocusA.isTheButton}); `
-      + `${sp2Pre.brief} → ${sp2A.brief}. The "still acted" half is measured as the painted pixels `
-      + `going ${sp2Pre.s.frameCoverage[0]} → ${sp2A.s.frameCoverage[0]}, which a dead chip could not do.`);
+      + `dialog = ${JSON.stringify(sp2InfoA)}; ${sp2Pre.brief} → ${sp2A.brief} (fingerprint identical). `
+      + 'ITS OWN DISPATCH LINE: a blur or a guard wired to the preset map and not to this chip would '
+      + 'pass every [sp1] row and fail here.');
+
+    const sp2PreB = await snap(c);
+    await space(c); await sleep(400);
+    await enter(c); await sleep(400);
+    const sp2InfoB = await c.json('window.__d27.info()');
+    const sp2B = await snap(c);
+    check('sp2-b', 'shell/SpriteToolOptions.tsx `New □`: a bare SPACE (and Enter) WHILE THE DIALOG '
+      + 'STANDS answers it neither way — it is still on screen and the painted pixels survive',
+      sp2PreB.s.frameCoverage[0] > 0 && sp2PreB.unsavedEdits === true
+      && sp2InfoB !== null && sp2B.key === sp2PreB.key && sp2B.unsavedEdits === true,
+      `dialog after the keys = ${JSON.stringify(sp2InfoB?.buttons)}; ${sp2PreB.brief} → ${sp2B.brief}. `
+      + 'Same vacuity guard and same positive control as [sp1-b], measured again here because this is '
+      + 'the OTHER dispatch line and the file does not let one site ride on another.');
+
+    await escape(c); await sleep(500);
+    await farSideOfDialog(c, 'sp2-e1', 'shell/SpriteToolOptions.tsx `New □`', 'newBox', 'Esc',
+      await snap(c));
+
+    await ensureNoDialog(c, 'the start of [sp2-e2]');
+    await c.evalExpr('window.__d27.watchStart()');
+    await clickHandle(c, 'newBox', 'New □ (dirty, second press)');
+    const sp2CancelOk = await answerDialog(c, 'Cancel');
+    await c.evalExpr('window.__d27.watchStop()');
+    note('[sp2-e2] the close', `Cancel clicked = ${sp2CancelOk}`);
+    await farSideOfDialog(c, 'sp2-e2', 'shell/SpriteToolOptions.tsx `New □`', 'newBox',
+      'a real mouse click on Cancel', await snap(c));
+
+    await ensureNoDialog(c, 'the start of [sp2-c]');
+    const sp2PreC = await snap(c);
+    await c.evalExpr('window.__d27.watchStart()');
+    await clickHandle(c, 'newBox', 'New □ (dirty, over painted pixels)');
+    const sp2FocusC = await focusNow(c, 'newBox');
+    const sp2InfoC = await c.json('window.__d27.info()');
+    await answerDialog(c, 'Discard & start new');
+    const sp2SeenC = await c.evalExpr('window.__d27.watchStop()');
+    const sp2C = await snap(c);
+    check('sp2-c', 'shell/SpriteToolOptions.tsx `New □`: a SECOND real click drops focus again, asks '
+      + 'again, and on DISCARD really does replace the document',
+      sp2FocusC.isTheButton === false && sp2InfoC !== null && sp2SeenC === true
+      && sp2PreC.s.frameCoverage[0] > 0 && sp2C.s.frameCoverage[0] === 0
+      && sp2C.canUndo === false && sp2C.unsavedEdits === false,
+      `frame 0 coverage ${sp2PreC.s.frameCoverage[0]} → ${sp2C.s.frameCoverage[0]}; activeElement right `
+      + `after the CHIP press = <${sp2FocusC.tag}> (isTheChip=${sp2FocusC.isTheButton}); dialog raised = `
+      + `${JSON.stringify(sp2InfoC?.buttons)}. The pixels are what make this row discriminating: `
+      + '`New □` is idempotent over a virgin document, so a press with nothing painted could not tell a '
+      + 'live chip from a dead one — and with nothing painted the document would be clean and d-29 '
+      + 'would not ask at all.');
 
     await paint(6);
-    const sp2PreSpace = await snap(c);
-    await space(c); await sleep(400);
-    const sp2Space = await snap(c);
-    await enter(c); await sleep(400);
-    const sp2Enter = await snap(c);
-    check('sp2-b', 'shell/SpriteToolOptions.tsx `New □`: a bare SPACE straight after the click reaches '
-      + 'no writer — the painted pixels survive (Enter sent separately too)',
-      sp2PreSpace.s.frameCoverage[0] > 0
-      && sp2Space.key === sp2PreSpace.key && sp2Enter.key === sp2PreSpace.key,
-      `frame 0 coverage ${sp2PreSpace.s.frameCoverage[0]} → after Space ${sp2Space.s.frameCoverage[0]} `
-      + `→ after Enter ${sp2Enter.s.frameCoverage[0]}. Same vacuity guard and same borrowed positive `
-      + 'control as [sp1-b]: newSprite clears the history, so the fixture is rebuilt through '
-      + '__dbg.spritePaint rather than Ctrl+Z, and nothing was clicked in between.');
+    await farSideOfDialog(c, 'sp2-e3', 'shell/SpriteToolOptions.tsx `New □`', 'newBox',
+      'a real mouse click on Discard & start new', await snap(c));
 
-    const sp2PreC = await snap(c);
-    await clickHandle(c, 'newBox', 'New □ (second real click, over painted pixels)');
-    const sp2FocusC = await focusNow(c, 'newBox');
-    const sp2C = await snap(c);
-    check('sp2-c', 'shell/SpriteToolOptions.tsx `New □`: a SECOND real click still replaces the document '
-      + 'and drops focus again',
-      sp2PreC.s.frameCoverage[0] > 0 && sp2C.s.frameCoverage[0] === 0
-      && sp2FocusC.isTheButton === false,
-      `frame 0 coverage ${sp2PreC.s.frameCoverage[0]} → ${sp2C.s.frameCoverage[0]}; activeElement after `
-      + `= <${sp2FocusC.tag}> (isTheChip=${sp2FocusC.isTheButton}). The pixels are what make this row `
-      + 'discriminating: `New □` is idempotent over a virgin document, so a second press with nothing '
-      + 'painted could not tell a live chip from a dead one.');
-
+    // ── [sp2-d] the no-op press, on a CLEAN document ──────────────────────
+    await ensureNoDialog(c, 'the start of [sp2-d]');
+    await clickHandle(c, 'newBox', 'New □ (clearing the paint for [sp2-d])');
+    await answerDialog(c, 'Discard & start new');
+    await ensureNoDialog(c, 'after clearing the paint for [sp2-d]');
     const sp2PreNoop = await snap(c);
+    check('sp2-d0', 'ANTI-VACUOUS: the document [sp2-d] presses on is genuinely CLEAN, so d-29 is on '
+      + 'its SILENT arm',
+      sp2PreNoop.unsavedEdits === false && sp2PreNoop.canUndo === false,
+      `${sp2PreNoop.brief}`);
+    await c.evalExpr('window.__d27.watchStart()');
     await clickHandle(c, 'newBox', 'New □ (NO-OP press — already that document)');
     const sp2FocusD = await focusNow(c, 'newBox');
+    const sp2SeenD = await c.evalExpr('window.__d27.watchStop()');
     const sp2D = await snap(c);
     check('sp2-d', 'd-27 IS UNCONDITIONAL at `New □`: a press that changes NOTHING (the document is '
-      + 'already a virgin blank at that size) still drops focus',
+      + 'already a virgin blank at that size) still drops focus — and d-29 stays SILENT on it',
       sp2D.key === sp2PreNoop.key && sp2D.canUndo === false && sp2D.unsavedEdits === false
-      && sp2FocusD.isTheButton === false,
+      && sp2FocusD.isTheButton === false && sp2SeenD === false,
       `the press left the fingerprint identical (${sp2PreNoop.brief} → ${sp2D.brief}) and activeElement `
-      + `is <${sp2FocusD.tag}> (isTheChip=${sp2FocusD.isTheButton}). Same mechanism note as [sp1-d]: `
-      + 'idempotence, not an early return.');
+      + `is <${sp2FocusD.tag}> (isTheChip=${sp2FocusD.isTheButton}); dialog watcher seen=${sp2SeenD}. `
+      + 'Same mechanism note as [sp1-d]: idempotence, not an early return.');
 
     // ═══════════════════════════════════════════════════════════════════════
     // [fg-d] — the sharpest [k7] in the file, and it is measured LAST on
@@ -889,6 +1237,15 @@ async function main() {
     // history, which is exactly the state `deleteFrame`'s early return needs.
     // ═══════════════════════════════════════════════════════════════════════
     console.log('\n=== [fg-d] FrameGrid Delete on the `frames.length <= 1` EARLY RETURN ===');
+    // ⚠ THE LAST BACKDROP HOLE, AND IT WAS FOUND BY A PLANT, NOT BY READING.
+    // Under the P5 plant (d-29's clean arm removed, so the guard confirms
+    // UNCONDITIONALLY) `[sp2-d]`'s no-op press leaves a dialog standing, and
+    // this section's aim then landed on its backdrop and ABORTED the run —
+    // taking `[fg-d]` and `[z1]` with it and reporting one stack trace instead
+    // of "P5 reddens sp1-d and sp2-d and nothing else". A plant is supposed to
+    // redden its OWN rows; every phase boundary that can inherit a dialog needs
+    // this, and this was the one boundary that did not have it.
+    await ensureNoDialog(c, 'the start of the [fg-d] phase');
     const fgPreNoop = await snap(c);
     check('fg-d0', 'ANTI-VACUOUS: the document is on the early-return path — exactly one frame, and a '
       + 'CLEAN history, so a press that reached `recordEdit` would be visible in BOTH flags',
