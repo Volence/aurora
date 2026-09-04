@@ -58,9 +58,14 @@ const HELPER_REL = 'components/ui/act-and-drop-focus.ts';
  * (`docs/reviews/2026-09-03-d27-four-survivors.md`, instrument
  * `npm run harness:d27-four-survivors`).
  *
- * ⚠ `AeonChunkActions.tsx`'s Clear is separately in the d-29/d-30 class: it
- * wipes the chunk library and one Ctrl+Z does not bring it back. That is
- * recoverability, not focus, and it is not this file's subject.
+ * ⚠ AND `AeonChunkActions.tsx`'s Clear IS NOW LISTED — the survey's exclusion
+ * of it EXPIRED with d-30. Its exemption was never "it is not destructive"; it
+ * was the measured claim that the button UNMOUNTS on its own press, because
+ * `hasChunks` goes false the instant the library empties. d-30
+ * (`confirm_before`) puts a confirmation in front of the wipe, so the CANCEL
+ * path now leaves that button mounted AND focused with the library intact —
+ * exactly the shape d-27 was ruled on. The premise that exempted it is
+ * consumed, so it joins the list rather than keeping a stale pass.
  */
 const SITES: Array<{ rel: string; importFrom: string; writer: string; calls: string[] }> = [
   {
@@ -69,12 +74,30 @@ const SITES: Array<{ rel: string; importFrom: string; writer: string; calls: str
     calls: ['actAndDropFocus(e, resetToEngine)', 'actAndDropFocus(e, clearSection)'],
   },
   {
+    // ⚠ THE WRITER MOVED (d-29). Both chips now call `newSpriteGuarded` from
+    // `shell/new-sprite-guard.ts` rather than the store's `newSprite` directly:
+    // the guard confirms when the document has unsaved edits and calls the
+    // store unchanged when it does not. The blur is still first and still
+    // unconditional — `actAndDropFocus` blurs before `act()`, and the confirm
+    // happens inside `act()` — so this file's subject is untouched. Pinning the
+    // guard's name here is deliberate: reverting either chip to `st().newSprite`
+    // would restore the d-29 defect while leaving the d-27 blur in place, and
+    // this line is what makes that revert visible to `npm test`.
     rel: 'shell/SpriteToolOptions.tsx', importFrom: '../components/ui/act-and-drop-focus',
-    writer: 'newSprite — replaces the whole document AND clears its history, so NOT one Ctrl+Z away',
+    writer: 'newSpriteGuarded — replaces the whole document AND clears its history, so NOT one '
+      + 'Ctrl+Z away; d-29 put a confirm in front of it for a dirty document',
     calls: [
-      'actAndDropFocus(e, () => st().newSprite(s, s))',
-      'actAndDropFocus(e, () => st().newSprite(newSize, newSize))',
+      'actAndDropFocus(e, () => { void newSpriteGuarded(s, s); })',
+      'actAndDropFocus(e, () => { void newSpriteGuarded(newSize, newSize); })',
     ],
+  },
+  {
+    // See the ⚠ note above SITES: listed as of d-30, when the confirm made this
+    // button survive its own press.
+    rel: 'components/AeonChunkActions.tsx', importFrom: './ui/act-and-drop-focus',
+    writer: 'clearChunkLibrary — empties the whole chunk library, and `clearChunks` is a bare store '
+      + 'write that never enters the undo machinery, so Ctrl+Z does not bring it back',
+    calls: ['actAndDropFocus(e, () => { void clearChunkLibrary(); })'],
   },
   {
     rel: 'components/sprite/FrameGrid.tsx', importFrom: '../ui/act-and-drop-focus',
