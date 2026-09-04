@@ -91,15 +91,21 @@
  * ═══ THIS SENTENCE IS INDEPENDENT OF THE DISPLAY READOUT, DELIBERATELY ═══
  *
  * ⚠ On 2026-09-03 a real ROM contradicted the ramp card's `top + 1` display
- * span: `{top: 3, lines: 220}` derives 4..223 and the machine rendered 5..223,
+ * span: `{top: 3, lines: 220}` derived 4..223 and the machine rendered 5..223,
  * and a control at `top: 128` derived 129 and measured 130 — the same +1 at two
- * different tops. `EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG` and its readout are
- * CONTESTED and are the contract's question, not this module's. **Nothing here
- * reads `rampDisplaySpan`, `ramp.top` or `ramp.lines`, and nothing here depends
- * on the first displayed line being right.** This is a claim about the
- * HORIZONTAL extent of the effect and about which documents decide it; the
- * vertical span it occupies is the readout's business and stays there. If that
- * constant moves, no sentence in this file moves with it.
+ * different tops. THAT SETTLED IN THE MEASUREMENT'S FAVOUR (empyrean `e9409dc`):
+ * the contract's own sentence was the wrong one, it now reads `top + 2`, Aurora
+ * re-vendored it, and the readout derives the corrected number. IT IS NO LONGER
+ * CONTESTED — do not re-add a caveat saying it is.
+ *
+ * What this paragraph is still FOR is the structural claim it was making, which
+ * the settlement did not change and which is why nothing in this file needed
+ * editing when the number moved: **nothing here reads `rampDisplaySpan`,
+ * `ramp.top` or `ramp.lines`, and nothing here depends on the first displayed
+ * line being right.** This is a claim about the HORIZONTAL extent of the effect
+ * and about which documents decide it; the vertical span it occupies is the
+ * readout's business and stays there. Those constants moved and no sentence in
+ * this file moved with them — the separation held, measured rather than hoped.
  *
  * ═══ IT DOES NOT GATE, WARN OR REFUSE ═════════════════════════════════════
  *
@@ -227,7 +233,7 @@ export const RAMP_SCROLL_MODE_NOTE: string =
   + 'property of the scene you bind. The WIDTH is the hardware granule: per-column VSRAM '
   + `addresses 20 pairs of ${RAMP_SCROLL_COLUMN_WIDTH_PX} px on an H40 display. `
   + 'This sentence reads no line numbers: it is about the horizontal extent of the effect and '
-  + 'is independent of the ramp\'s display-span readout, which is contested.';
+  + 'is independent of the ramp\'s display-span readout.';
 
 // ---------------------------------------------------------------------------
 // The sentence

@@ -33,7 +33,8 @@ import {
   EFFECTS_PRESET_RAMP_LINES_RANGE,
   EFFECTS_PRESET_RAMP_VSRAM_ADDR_RANGE,
   EFFECTS_PRESET_RAMP_SPAN_MAX,
-  EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG,
+  EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG,
+  EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET,
   EFFECTS_PRESET_FP16_WHOLE_RANGE,
   EFFECTS_PRESET_FP16_FRAC_RANGE,
   presetFp16FromNumber,
@@ -270,46 +271,73 @@ describe('the VSRAM display lag is applied to the readout and to nothing else', 
    * constructor. The compensation is preview-only and it is ours, so a readout
    * that speaks in SCREEN lines must add the lag, exactly once.
    *
-   * The expectation is DERIVED FROM THE CONSTANT, never from the number 1: if
+   * The expectation is DERIVED FROM THE CONSTANT, never from a typed number: if
    * the contract ever restates the latency the row moves with it, and a row that
-   * hardcoded `+ 1` would keep passing while the readout went wrong.
+   * hardcoded `+ 1` would keep passing while the readout went wrong. (It very
+   * nearly did: empyrean `e9409dc` moved the first-line offset from 1 to 2.)
+   *
+   * ⚠ AND THE SPAN TAKES THE **FIRST-LINE OFFSET**, NOT THE PER-INDEX LAG. They
+   * are different quantities that agreed until `e9409dc`. `..._INDEX_LAG` is
+   * asserted against the NOTE below, which is the sentence that quantifies over
+   * `j`; putting it here instead would make this row pass one line high.
    */
-  it('the readout adds the lag exactly once, to both ends of the span', () => {
+  it('the readout adds the FIRST-LINE OFFSET exactly once, to both ends of the span', () => {
     const ramp = { ...newRamp(), top: 64, lines: 128 };
     const span = rampDisplaySpan(ramp);
-    expect(span.first).toBe(ramp.top + EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG);
+    expect(span.first).toBe(ramp.top + EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET);
     expect(span.last)
-      .toBe(ramp.top + ramp.lines - 1 + EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG);
-    // ANTI-VACUOUS: the lag is not zero, so "applied" and "not applied" are
-    // distinguishable readings. A lag of 0 is refused at the codec's module load
-    // for exactly this reason, and this row would be meaningless without it.
-    expect(EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG).toBeGreaterThan(0);
+      .toBe(ramp.top + ramp.lines - 1 + EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET);
+    // ANTI-VACUOUS: the offset is not zero, so "applied" and "not applied" are
+    // distinguishable readings. An offset of 0 is refused at the codec's module
+    // load for exactly this reason, and this row would be meaningless without it.
+    expect(EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET).toBeGreaterThan(0);
     expect(span.first).not.toBe(ramp.top);
+    // ...and it is NOT the per-index lag, so the two cannot be swapped silently.
+    expect(span.first).not.toBe(ramp.top + EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG);
   });
 
   /**
-   * THE CORROBORATION. With the lag applied, a maximal run's last displayed line
-   * is `top + lines`, and the span interlock caps that at 223 — the last line of
-   * a 224-line screen. The two constants meet exactly at the bottom of the
-   * display, which is what makes the lag a reading of the contract rather than
-   * an opinion: a lag of 0 would leave a line spare, a lag of 2 would run off.
+   * ⚠ THE BOTTOM EDGE GOES ONE LINE OVER, AND THAT IS THE CONTRACT.
+   *
+   * This row used to assert the opposite: that a maximal run's last displayed
+   * line landed exactly on `EFFECTS_PRESET_RAMP_SPAN_MAX` (223, the last line of
+   * a 224-line screen), offered as corroboration that the offset was 1. The
+   * contract settled at 2 (empyrean `e9409dc`), and its own words are that a run
+   * occupies `top + 2 .. top + lines + 1` — so a maximal run's last value lands
+   * on 224, ONE PAST the screen, and a 220-line run from `top` 3 renders 219.
+   * The row is kept, inverted, so the old reasoning cannot come back as a fix.
    */
-  it('a maximal run\'s last DISPLAYED line lands exactly on the span bound', () => {
-    const top = 3;
+  it('a maximal run\'s last DISPLAYED line lands ONE PAST the span bound', () => {
+    const top = EFFECTS_PRESET_RAMP_TOP_RANGE.min;
     const lines = EFFECTS_PRESET_RAMP_SPAN_MAX - top;
     expect(rampSpanRefusal({ ...newRamp(), top }, ID, 'lines', lines)).toBeNull();
     expect(rampDisplaySpan({ ...newRamp(), top, lines }).last)
-      .toBe(EFFECTS_PRESET_RAMP_SPAN_MAX);
+      .toBe(EFFECTS_PRESET_RAMP_SPAN_MAX + 1);
+    // ...which is what the offset being 2 rather than 1 MEANS, stated as the
+    // count of lines an author actually sees out of a maximal run.
+    const span = rampDisplaySpan({ ...newRamp(), top, lines });
+    const visible = EFFECTS_PRESET_RAMP_SPAN_MAX - span.first + 1;
+    expect(visible).toBe(lines - 1);
   });
 
   it('the painted readout shows BOTH spans, so neither can be read as the other', () => {
     const ramp = { ...newRamp(), top: 64, lines: 128 };
     const gloss = rampDisplayGloss(ramp);
-    expect(gloss).toContain('64-191');                 // the lines it writes on
-    expect(gloss).toContain('65-192');                 // the lines a viewer sees
+    const span = rampDisplaySpan(ramp);
+    expect(gloss).toContain(`${ramp.top}-${ramp.top + ramp.lines - 1}`);  // lines written on
+    expect(gloss).toContain(`${span.first}-${span.last}`);                // lines a viewer sees
     expect(gloss).toMatch(/screen lines/);
-    // And the reason is reachable on the same readout.
-    expect(RAMP_DISPLAY_LAG_NOTE).toContain(String(EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG));
+    // And the reason is reachable on the same readout. ⚠ THE NOTE IS THE
+    // PER-INDEX SENTENCE, so it must state the per-index lag and NOT the offset
+    // in the `top + j + N` position — one number there would be false prose.
+    expect(RAMP_DISPLAY_LAG_NOTE)
+      .toContain(`top + j + ${EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG}`);
+    expect(RAMP_DISPLAY_LAG_NOTE)
+      .not.toContain(`top + j + ${EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET}`);
+    // ...and it states the first-line offset too, since the span above uses it.
+    expect(RAMP_DISPLAY_LAG_NOTE)
+      .toContain(`lands on top + ${EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET}`);
+    expect(RAMP_DISPLAY_LAG_NOTE).toMatch(/j STARTS AT 1/);
     expect(RAMP_DISPLAY_LAG_NOTE).toMatch(/NO STAGE OF THE ENGINE PATH compensates/);
   });
 
@@ -332,7 +360,7 @@ describe('the VSRAM display lag is applied to the readout and to nothing else', 
     // ⚠ AND THE DISPLAY SPAN OF THE SAME DOCUMENT IS ONE LINE LATER, so this is
     // not "the lag is nowhere" — it is "the lag is in the readout and not the file".
     expect(rampDisplaySpan(cmd.newPreset!.ramp!).first)
-      .toBe(32 + EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG);
+      .toBe(32 + EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET);
   });
 });
 

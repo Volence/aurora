@@ -24,11 +24,14 @@
 // ONLY the bound scene's `v_deform`, and requires the sentence to change — which
 // no constant answer can do.
 //
-// ⚠ AND NOTHING HERE READS A LINE NUMBER. The card's display-span readout is
-// contested (a real ROM rendered 5..223 where the panel derives 4..223, at two
-// different tops, 2026-09-03). This sentence is about the HORIZONTAL extent, and
-// a row here that reached for `rampDisplaySpan` would tie a settled fact to an
-// unsettled one.
+// ⚠ AND NOTHING HERE READS A LINE NUMBER. That was written while the card's
+// display-span readout was contested by one line (a real ROM rendered 5..223
+// where the panel derived 4..223, at two different tops, 2026-09-03); it SETTLED
+// in the ROM's favour at empyrean `e9409dc`, the contract now says `top + 2` and
+// the readout derives it. The separation still stands and this file is the
+// evidence it was worth having: the number moved and not one row here changed.
+// This sentence is about the HORIZONTAL extent, and a row that reached for
+// `rampDisplaySpan` would tie it to a fact it does not depend on.
 
 import { describe, it, expect } from 'vitest';
 import type {

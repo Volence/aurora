@@ -80,7 +80,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded } from './lib/harness-guard.mjs';
@@ -94,6 +94,50 @@ const MAIN = RUN.main;
 const AEONDIR = siblingPathOrUnresolved('aeon');
 const SHOTS = join(ROOT, 'scratchpad/shots-ramp-control');
 mkdirSync(SHOTS, { recursive: true });
+
+// ═══ THE DISPLAY GEOMETRY IS TWO NUMBERS AND THIS RUN TYPES NEITHER ═══
+//
+// ⚠ A .mjs HARNESS IMPORTS NOTHING FROM THE TYPESCRIPT, so it cannot read
+// `EFFECTS_PRESET_RAMP_VSRAM_*` and a number typed here would sit stale through
+// a contract change with nothing to notice — which is exactly what happened to
+// the `=== 1` this replaced. So the harness parses the SAME vendored schema
+// sentences the codec parses, with its own regexes, and refuses loudly if either
+// moves. That makes this run a SECOND independent reading of the contract rather
+// than a restatement of the module's parse.
+//
+// The two are different quantities and differ by exactly one because `j` STARTS
+// AT 1 (the interpreter adds the step before it writes, so `start` is never
+// emitted): value j displays on `top + j + INDEX_LAG`, and the FIRST value —
+// index 1 — therefore displays on `top + FIRST_LINE_OFFSET`. A SPAN takes the
+// offset; only a sentence quantifying over j takes the lag.
+const { FIRST_LINE_OFFSET, INDEX_LAG } = (() => {
+  const schema = JSON.parse(readFileSync(
+    join(ROOT, 'src/core/formats/effects/aurora-effects-preset.schema.json'), 'utf8'));
+  // ⚠ TWO DIFFERENT NODES: the per-index rule is in the KEY's paragraph
+  // (`properties.ramp`), the first-line rule on the FIELD
+  // (`$defs.ramp.properties.top`). Reading either from the other finds nothing.
+  const rampProse = String(schema.properties.ramp.description ?? '');
+  const topProse = String(schema.$defs.ramp.properties.top.description ?? '');
+  const lagM = /value j \(= start \+ j\*step\) displays on screen line top \+ j \+ (\d+)/
+    .exec(rampProse);
+  const offM = /DISPLAYS on top \+ (\d+)/.exec(topProse);
+  if (!lagM || !offM) {
+    throw new Error(
+      'ramp-control-harness: aurora-effects-preset.schema.json no longer states the ramp display '
+      + 'geometry in the shape this run reads it from (per-index sentence '
+      + `${lagM ? 'found' : 'MISSING'}, top sentence ${offM ? 'found' : 'MISSING'}). Re-read the `
+      + 'schema and update the derivation — do NOT hardcode either number.');
+  }
+  const lag = Number(lagM[1]);
+  const off = Number(offM[1]);
+  if (off !== lag + 1) {
+    throw new Error(
+      `ramp-control-harness: the schema's two ramp display sentences no longer agree — per-index `
+      + `lag ${lag} puts the first value (j = 1) on top + ${lag + 1}, but the top sentence says `
+      + `top + ${off}. One of them moved, or j no longer starts at 1. Re-read both.`);
+  }
+  return { FIRST_LINE_OFFSET: off, INDEX_LAG: lag };
+})();
 
 // ⚠ THIS ID MUST NOT COLLIDE WITH A PRESET AEON SHIPS, and it did.
 //
@@ -814,17 +858,22 @@ async function main() {
       !!wrote && Number(wrote[1]) === wTop && Number(wrote[2]) === wBot,
       `document top=${wTop} lines=${dsDoc.ramp.lines} (write span ${wTop}-${wBot}); readout = `
       + `${JSON.stringify(readout)}`);
-    check('ds-b', '⚠ AND THE SCREEN SPAN IS EXACTLY ONE VSRAM LATENCY LATER, at BOTH ends. This is '
-      + 'the judgement made visible: the Top field and the file are in the ENGINE\'s numbers, and '
-      + 'this readout — the only screen-line claim on the surface — adds the lag. No stage of the '
-      + 'engine path compensates (engine lane, 2026-09-03), so a readout that did not add it would '
-      + 'be one line high everywhere AND WOULD LOOK CORRECT',
+    check('ds-b', `⚠ AND THE SCREEN SPAN IS EXACTLY ${FIRST_LINE_OFFSET} LINE(S) LATER, at BOTH `
+      + 'ends. This is the judgement made visible: the Top field and the file are in the ENGINE\'s '
+      + 'numbers, and this readout — the only screen-line claim on the surface — adds the offset. '
+      + 'No stage of the engine path compensates (engine lane, 2026-09-03), so a readout that did '
+      + 'not add it would be one line high everywhere AND WOULD LOOK CORRECT. ⚠ THE EXPECTED DELTA '
+      + 'IS THE FIRST-LINE OFFSET AND NOT THE PER-INDEX LAG — they are different quantities that '
+      + `differ by one (j starts at 1), and this run PARSED both out of the vendored schema: `
+      + `offset ${FIRST_LINE_OFFSET} from the top sentence, per-index lag ${INDEX_LAG} from the `
+      + 'ramp description. Neither number is typed here',
       !!shown && !!wrote
-      && Number(shown[1]) - Number(wrote[1]) === 1
-      && Number(shown[2]) - Number(wrote[2]) === 1,
+      && Number(shown[1]) - Number(wrote[1]) === FIRST_LINE_OFFSET
+      && Number(shown[2]) - Number(wrote[2]) === FIRST_LINE_OFFSET,
       `writes ${wrote && wrote[0]} · ${shown && shown[0]} · delta at first=`
       + `${shown && wrote ? Number(shown[1]) - Number(wrote[1]) : 'n/a'} at last=`
-      + `${shown && wrote ? Number(shown[2]) - Number(wrote[2]) : 'n/a'}`);
+      + `${shown && wrote ? Number(shown[2]) - Number(wrote[2]) : 'n/a'} · expected `
+      + `${FIRST_LINE_OFFSET} (schema-derived)`);
     check('ds-c', 'the reason is reachable on the readout itself, not only in a docblock',
       !!readout && (await c.evalExpr(String.raw`(() => {
         const e = [...document.querySelectorAll('span')]
@@ -846,9 +895,13 @@ async function main() {
     //
     // THE SPAN IS DERIVED, NOT CHOSEN: `{top: 3, lines: 220}` is the longest
     // legal run that also ends EXACTLY on the span bound — `lines` at its
-    // maximum and `top + lines === EFFECTS_PRESET_RAMP_SPAN_MAX`. It displays
-    // on 4..223, and 223 is the last line of a 224-line screen, so a display-lag
-    // error falls off the end instead of shifting subtly. `step` is -1.5, the
+    // maximum and `top + lines === EFFECTS_PRESET_RAMP_SPAN_MAX`. ⚠ WHERE IT
+    // DISPLAYS WAS RESTATED ON 2026-09-03 (empyrean `e9409dc`) and the old note
+    // here said 4..223: it displays on 5..224, so its LAST value lands one past
+    // the bottom of a 224-line screen and only 219 of the 220 lines can be seen.
+    // That is the contract's own arithmetic, and it is still the right subject
+    // for a witness — a display-offset error falls off the end of the screen
+    // instead of shifting subtly. `step` is -1.5, the
     // schema's own worked example, so the ROM proves the SIGN RULE end to end
     // and not merely the plumbing; `addr` 2 is plane B full-width, measured by
     // the engine lane (VSCR 0 at the probe point) rather than chosen.
@@ -869,8 +922,10 @@ async function main() {
         + `target=${JSON.stringify(w.ramp.target)}`);
       console.log('  write span (ENGINE lines, what the file says): '
         + `${w.ramp.top}..${w.ramp.top + w.ramp.lines - 1}`);
-      console.log('  display span (SCREEN lines, one VSRAM latency later): '
-        + `${w.ramp.top + 1}..${w.ramp.top + w.ramp.lines}`);
+      console.log(`  display span (SCREEN lines, +${FIRST_LINE_OFFSET} — schema-derived, NOT `
+        + 'typed): '
+        + `${w.ramp.top + FIRST_LINE_OFFSET}..`
+        + `${w.ramp.top + w.ramp.lines - 1 + FIRST_LINE_OFFSET}`);
     }
 
     // ══════════════════════════════════════════════════════════════════════

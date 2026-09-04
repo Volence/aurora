@@ -304,9 +304,12 @@ export interface EffectsPresetRampTarget {
  */
 export interface EffectsPresetRamp {
   /**
-   * First screen line of the run, 3..222. NOTE the display offset: for a VSRAM
-   * target the value written on run index `j` DISPLAYS on line
-   * `top + j + EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG`.
+   * First screen line of the run, 3..222. NOTE the display offset, and note
+   * that it is TWO numbers: for a VSRAM target the value written on run index
+   * `j` DISPLAYS on line `top + j + EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG`, and
+   * because `j` starts at 1 the FIRST value displays on
+   * `top + EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET`. Never use one for the
+   * other's question.
    */
   top: number;
   /** Run length in scanlines, 1..220. One write per line. */
@@ -697,6 +700,19 @@ function schemaRange(path: string[]): Readonly<{ min: number; max: number }> {
 const RAMP = ['$defs', 'ramp'] as const;
 
 /**
+ * ⚠ THE RAMP'S PROSE LIVES IN TWO PLACES AND THEY ARE NOT INTERCHANGEABLE.
+ *
+ * `$defs.ramp` (`RAMP` above) carries the SHAPE rules — the fields, the span
+ * interlock `top + lines <= 223`, the per-field sentences. `properties.ramp`
+ * carries the KEY's paragraph: what the channel is, the exclusivity with
+ * `bands`, the generator obligations, and — the reason this constant exists —
+ * the PER-INDEX display sentence and the CRAM sentence. A derivation that reads
+ * the wrong one of the two throws at module load rather than yielding a
+ * plausible number, which is how this path was found in the first place.
+ */
+const RAMP_KEY = ['properties', 'ramp'] as const;
+
+/**
  * The raster channels, read off the schema's TOP-LEVEL `oneOf` rather than
  * restated: exactly one of these keys per document.
  *
@@ -779,52 +795,151 @@ export const EFFECTS_PRESET_RAMP_SPAN_MAX: number = schemaNumberFromProse(
 );
 
 /**
- * THE VSRAM DISPLAY LAG, +1, AND WHY IT IS A NAMED CONSTANT.
+ * ═══ THE RAMP'S DISPLAY GEOMETRY IS **TWO** NUMBERS, NOT ONE ═══
  *
- * The value a VSRAM run writes on its index `j` DISPLAYS on screen line
- * `top + j + 1`, not `top + j`. That is the N+1 VSRAM latency
- * (`raster.emp:602-609`, measured in aeon `docs/benchmarks/effects-p3/RAMP-EVIDENCE.md`),
- * and THE CONSTRUCTOR DOES NOT COMPENSATE FOR IT — so anything that previews,
- * draws, or hit-tests a ramp against screen lines must add it, or it is one line
- * high everywhere. A preview that is one line out looks correct, which is why
- * this is a constant with the reasoning beside it rather than a `+ 1` typed into
- * whichever renderer needs it first.
+ * ⚠ READ THIS BEFORE USING EITHER CONSTANT BELOW. Until empyrean `e9409dc` this
+ * module exported ONE constant, `EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG`, and two
+ * consumers used it two different ways — as a FIRST-LINE OFFSET in
+ * `rampDisplaySpan` and as a PER-INDEX LAG in the readout's own title. While the
+ * contract said `top + 1` in both sentences the two readings happened to agree
+ * and nothing distinguished them. THEY NO LONGER AGREE, and one number serving
+ * both would have painted a false sentence at an author. So the quantity is
+ * split, each half is parsed from ITS OWN schema sentence, and the name says
+ * which question it answers.
  *
- * Derived from the schema's own `top` sentence, loudly: if that sentence stops
- * saying `top + 1` this throws at module load instead of silently yielding a lag
- * of zero, which would be indistinguishable from "no lag" in every output.
+ * THE TWO QUESTIONS, AND WHY THE ANSWERS DIFFER BY EXACTLY ONE:
  *
- * NOT APPLIED BY THIS CODEC. A document's `top` is the ENGINE's `top`, written
- * and read verbatim; the lag is a DISPLAY fact, and correcting it in the FILE
- * would change what the engine runs in order to fix what an editor draws.
+ *   • "Where does the value at run index `j` land?"   -> `..._INDEX_LAG` (1)
+ *         value j (= start + j*step) displays on screen line `top + j + 1`.
+ *   • "Where does the FIRST thing an author sees land?" -> `..._FIRST_LINE_OFFSET` (2)
+ *         the first written value displays on `top + 2`.
  *
- * ⚠ THE REASON ABOVE WAS CORRECTED ON 2026-09-03, AND THE OLD ONE IS WORTH
- * KNOWING BECAUSE IT WOULD TALK A MAINTAINER INTO THE WRONG CHANGE. This
- * docblock used to end "...where the generator would apply it a second time",
- * i.e. it justified not applying the lag by claiming somebody else already did.
- * THAT CLAUSE WAS FALSE. The engine lane measured the whole path and confirmed
- * that NO STAGE COMPENSATES — not this codec, not `tools/effects_gen.py`, not
- * the constructor, not the interpreter. The compensation is PREVIEW-ONLY and it
- * belongs entirely to whatever draws or describes a ramp in screen lines
- * (today: `rampDisplaySpan` in `renderer/providers/effects-preset.ts`, the one
- * place on that surface that applies it). The conclusion did not move; the
- * reason did, and a reader who believed the old one would conclude there was a
- * double-application to avoid and that a consumer adding the lag was a bug.
+ * The difference is NOT a second latency and NOT a rounding: **`j` STARTS AT 1.**
+ * The interpreter adds `step` to the accumulator BEFORE it writes, so `start`
+ * itself is never emitted and there is no index 0. Substituting j = 1 into the
+ * per-index rule gives `top + 1 + 1` = `top + 2`, which is the `top` sentence,
+ * and the interlock below asserts exactly that rather than trusting the pair.
+ *
+ * CONSEQUENCE WORTH KNOWING, and it is the schema's own words: a run of `lines`
+ * values occupies screen lines `top + 2 .. top + lines + 1`. With the span
+ * interlock at `top + lines <= 223`, a MAXIMAL run puts its last value on line
+ * 224 — one past the bottom of a 224-line screen (0..223) — so a 220-line run
+ * from `top` 3 renders 219 lines. The old docblock here claimed the opposite
+ * ("a lag of 2 would run off the screen", offered as corroboration that the lag
+ * was 1); it was reasoning from a first-line offset of 1 and it is now known to
+ * have been reasoning from a wrong premise. The bottom edge really is one line
+ * over, and that is a fact about the ENGINE, not an error in this derivation.
+ *
+ * ⚠ CRAM IS A THIRD RULE AND WE CANNOT EXPRESS IT. The contract now also states
+ * the CRAM case: a CRAM target's value `j` displays on `top + j` — ONE LINE
+ * EARLIER than VSRAM, because the N+1 latency is VSRAM's alone. There is no CRAM
+ * constant below ON PURPOSE: `$defs.ramp_target` declares `properties: {vsram}`,
+ * `required: [vsram]` and `unevaluatedProperties: false`, so a CRAM ramp CANNOT
+ * BE AUTHORED through this contract at all and a CRAM path here would be code
+ * with no document that could reach it. `EFFECTS_PRESET_RAMP_TARGET_ARMS` below
+ * pins that, so whoever adds the arm is stopped by a failing derivation and
+ * finds this paragraph instead of assuming the VSRAM numbers generalise.
+ *
+ * NEITHER IS APPLIED BY THIS CODEC. A document's `top` is the ENGINE's `top`,
+ * written and read verbatim; both numbers are DISPLAY facts, and correcting one
+ * in the FILE would change what the engine runs in order to fix what an editor
+ * draws. NO STAGE OF THE ENGINE PATH COMPENSATES either — not this codec, not
+ * `tools/effects_gen.py`, not the constructor, not the interpreter (measured by
+ * the engine lane, 2026-09-03) — so there is no double-application to avoid, and
+ * the compensation belongs entirely to whatever draws or describes a ramp in
+ * screen lines.
+ *
+ * ⚠ AND AN OLDER CORRECTION KEPT BECAUSE IT WOULD STILL MISLEAD. This docblock
+ * once ended "...where the generator would apply it a second time", i.e. it
+ * justified not applying the lag by claiming somebody else already did. THAT
+ * CLAUSE WAS FALSE; see the measurement above. A reader who believed it would
+ * conclude a consumer adding the offset was a bug.
  */
-export const EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG: number = (() => {
+
+/**
+ * THE PER-INDEX LAG, **1**. Value `j` displays on screen line `top + j + LAG`.
+ *
+ * Parsed from the `properties.ramp` description's own sentence, "value j (=
+ * start + j*step) displays on screen line top + j + 1" — the KEY's paragraph,
+ * not `$defs.ramp`'s; see `RAMP_KEY`. Use this ONLY in a statement that
+ * quantifies over `j`. It is NOT where the run starts — `j` starts at 1, so the
+ * first line is `EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET` below.
+ */
+export const EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG: number = (() => {
   const lag = schemaNumberFromProse(
-    [...RAMP, 'properties', 'top'],
-    /DISPLAYS on top \+ (\d+)/,
-    'the VSRAM display lag',
+    [...RAMP_KEY],
+    /value j \(= start \+ j\*step\) displays on screen line top \+ j \+ (\d+)/,
+    'the VSRAM per-index display lag',
   );
   if (!Number.isInteger(lag) || lag < 1) {
     throw new Error(
-      `the VSRAM display-lag sentence in aurora-effects-preset.schema.json parsed to ${lag}, which ` +
-      'is not a positive whole number of scanlines. A lag of 0 is indistinguishable from "no lag" ' +
-      'in every rendered output, so this refuses rather than shipping it.',
+      `the VSRAM per-index display-lag sentence in aurora-effects-preset.schema.json parsed to ` +
+      `${lag}, which is not a positive whole number of scanlines. A lag of 0 is indistinguishable ` +
+      'from "no lag" in every rendered output, so this refuses rather than shipping it.',
     );
   }
   return lag;
+})();
+
+/**
+ * THE FIRST-LINE OFFSET, **2**. The run's FIRST written value displays on
+ * `top + OFFSET`, and its last on `top + lines - 1 + OFFSET`.
+ *
+ * Parsed from `$defs.ramp.properties.top`'s own sentence, "the first written
+ * value DISPLAYS on top + 2". Use this for a span, a highlight, a hit-test or
+ * any other claim about where the run BEGINS on screen. It is NOT a per-index
+ * lag — see `EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG` and the block above.
+ */
+export const EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET: number = (() => {
+  const off = schemaNumberFromProse(
+    [...RAMP, 'properties', 'top'],
+    /DISPLAYS on top \+ (\d+)/,
+    'the VSRAM first-line display offset',
+  );
+  if (!Number.isInteger(off) || off < 1) {
+    throw new Error(
+      `the VSRAM first-line display-offset sentence in aurora-effects-preset.schema.json parsed ` +
+      `to ${off}, which is not a positive whole number of scanlines. An offset of 0 is ` +
+      'indistinguishable from "no lag" in every rendered output, so this refuses rather than ' +
+      'shipping it.',
+    );
+  }
+  if (off !== EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG + 1) {
+    throw new Error(
+      `aurora-effects-preset.schema.json's two ramp display sentences no longer agree: the ` +
+      `per-index rule gives value j on top + j + ${EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG} and, with ` +
+      'j starting at 1, that puts the FIRST value on top + ' +
+      `${EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG + 1}, but the top sentence says top + ${off}. One of ` +
+      'the two moved, or j no longer starts at 1. Re-read both sentences and re-derive BOTH ' +
+      'constants — do NOT reconcile them by hardcoding either number.',
+    );
+  }
+  return off;
+})();
+
+/**
+ * The arms `$defs.ramp_target` actually declares — **`['vsram']` today**.
+ *
+ * This exists to keep the CRAM paragraph above HONEST rather than merely
+ * written down. The contract states a CRAM display rule (`top + j`, one line
+ * earlier) but declares no CRAM arm, so no document can carry one; if an arm is
+ * ever added, the guard below throws at module load and whoever added it reads
+ * the block above before assuming VSRAM's two numbers generalise.
+ */
+export const EFFECTS_PRESET_RAMP_TARGET_ARMS: readonly string[] = (() => {
+  const arms = Object.keys(
+    schemaNode(['$defs', 'ramp_target']).properties as Record<string, unknown>,
+  );
+  if (arms.length !== 1 || arms[0] !== 'vsram') {
+    throw new Error(
+      `$defs.ramp_target in aurora-effects-preset.schema.json now declares [${arms.join(', ')}], ` +
+      'not [vsram] alone. Aurora derives its ramp display geometry from the VSRAM sentences only ' +
+      '— a CRAM target displays ONE LINE EARLIER (value j on top + j, not top + j + ' +
+      `${EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG}) — so a new arm needs its own derived constants and ` +
+      'its own readout wording before any span or gloss can be trusted for it.',
+    );
+  }
+  return Object.freeze(arms);
 })();
 
 /** `fp16.whole`'s inclusive range — the SIGNED part, -512..511. */

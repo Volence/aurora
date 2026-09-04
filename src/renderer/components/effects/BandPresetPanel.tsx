@@ -1449,12 +1449,17 @@ function RampCard({ library, presetId, ramp, run, scroll }: {
           EDITOR'S OWN ramp document: the authored -1.5 px/line is in the ROM
           record and moves the picture against a four-byte control. But it is on
           `origin/parcel/aurora-ramp-witness`, which is NOT an ancestor of aeon's
-          master; it is emulation, not silicon; and the first-displayed-line rule
-          this card's own span readout applies is CONTESTED BY ONE LINE by that
-          same run — we derive `top + 1`, they measured `top + 2` on two
-          different tops. Nothing in Aurora has measured a ROM. The full record,
-          including what the witness does NOT say, is in
-          `core/formats/effects/preset-lag.ts`. */}
+          master; and it is emulation, not silicon. Nothing in Aurora has
+          measured a ROM. The full record, including what the witness does NOT
+          say, is in `core/formats/effects/preset-lag.ts`.
+          ⚠ THE ONE-LINE DISAGREEMENT THAT USED TO BE FLAGGED HERE IS SETTLED
+          AND IS NOT A CAVEAT ANY MORE (empyrean `e9409dc`, 2026-09-03). The
+          measurement was right and this editor's derivation was reading a
+          contract sentence that was wrong: the first written value displays on
+          `top + 2`, not `top + 1`. The contract now says so, Aurora re-vendored
+          it, and the span readout on this card derives `top + 2` from
+          `EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET`. Do not re-add a
+          contested note about it. */}
       <PresetLagDisclosure />
 
       {/* THE SIGN DISCLOSURE — A NARROWER FACT ONE LAYER FURTHER DOWN, AND IT
@@ -1491,11 +1496,11 @@ function RampCard({ library, presetId, ramp, run, scroll }: {
           `CAP_PER_COL_VSRAM` conjunct and the relayed column span ride on this
           element's own `title`.
 
-          ⚠ IT READS NO LINE NUMBERS. The card's display-span readout is
-          CONTESTED (a real ROM rendered 5..223 where we derive 4..223, at two
-          different tops); this sentence is about the HORIZONTAL extent and
-          touches neither `rampDisplaySpan` nor the lag constant, so it does not
-          move when that question is settled. */}
+          ⚠ IT READS NO LINE NUMBERS, and that is why it did not move when the
+          display-span question SETTLED (empyrean `e9409dc`, 2026-09-03: the
+          first written value displays on `top + 2`, and the card's readout now
+          derives it). This sentence is about the HORIZONTAL extent and touches
+          neither `rampDisplaySpan` nor either display constant. */}
       {scroll !== null && (
         <Hint under>
           <span title={scroll.full}>{scroll.short}</span>
