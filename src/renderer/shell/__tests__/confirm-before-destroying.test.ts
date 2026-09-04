@@ -32,7 +32,7 @@ import { documentHistoryHub } from '../../state/history-hub';
 import { registerHistoryFactories } from '../../state/history-factories';
 import { newSpriteGuarded, newSpriteWouldDestroy } from '../new-sprite-guard';
 import { clearChunkLibrary } from '../../providers/chunk-library-import';
-import type { Chunk, Project } from '../../../core/types';
+import type { ChunkDef, S4Project } from '../../../core/model/s4-types';
 
 /** Let the microtask the guard is parked on run. */
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
@@ -144,14 +144,14 @@ describe('d-29: the sprite size chips ask before replacing a DIRTY document', ()
 });
 
 describe('d-30: Clear in the Chunks section asks before emptying the library', () => {
-  const chunk = (id: string): Chunk => ({ id, name: id, cells: [] } as unknown as Chunk);
+  const chunk = (id: string): ChunkDef => ({ id, name: id, cells: [] } as unknown as ChunkDef);
   const withChunks = (n: number): void => {
     useProjectStore.setState({
       project: {
         chunkLibrary: Array.from({ length: n }, (_, i) => chunk(`c${i}`)),
         bgLibrary: [],
         zones: [],
-      } as unknown as Project,
+      } as unknown as S4Project,
     });
   };
 
