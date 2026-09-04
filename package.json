@@ -181,6 +181,7 @@
     "harness:slot-range-onscreen": "node scratchpad/slot-range-onscreen-harness.mjs",
     "harness:sprite-restore": "node scratchpad/sprite-restore-harness.mjs",
     "harness:sweep-fix": "node scratchpad/sweep-fix-harness.mjs",
+    "harness:teardown-verified": "node scratchpad/teardown-verified-probe.mjs",
     "harness:tier-zoom": "node scratchpad/tier-zoom-harness.mjs",
     "harness:tile-attributes": "node scratchpad/tile-attribute-harness.mjs",
     "harness:tile-editor": "node scratchpad/tile-editor-harness.mjs",
