@@ -560,7 +560,9 @@ describe('the band controls on a ramp document are refused WITH A REASON', () =>
     const why = bandControlsRefusal(rampPreset())!;
     expect(why).not.toBeNull();
     expect(why).toMatch(/^preset "probe" carries a ramp, not bands\./);
-    expect(why).toMatch(/EXACTLY ONE raster program/);
+    expect(why).toMatch(/EXACTLY ONE program/)  // ⚠ 'raster program' until empyrean c4a1da2: the
+      // fourth arm, `boundary`, is a PATCHED program and the rule covers it too, so
+      // the sentence dropped a word it could no longer justify.;
     expect(why).toMatch(/no combinator/);
     // THE WAY OUT, which is what makes it a reason rather than a wall.
     expect(why).toMatch(/Raster program row/);

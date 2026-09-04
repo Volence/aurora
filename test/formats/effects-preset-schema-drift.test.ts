@@ -29,8 +29,20 @@ import {
 import {
   EFFECTS_PRESET_SCHEMA, EFFECTS_PRESET_BAND_KEYS, EFFECTS_PRESET_ON_ARMS,
   EFFECTS_PRESET_RESERVED_KEYS, EFFECTS_PRESET_ROOT_KEYS, presetArmFields, presetDefFields,
+  EFFECTS_PRESET_PROGRAM_ARMS, EFFECTS_PRESET_RASTER_CHANNELS,
 } from '../../src/core/formats/effects/preset';
+import { PRESET_KEYS_AWAITING_AEON } from '../../src/core/formats/effects/preset-lag';
 import { peerRepo, resolveRev, readAtRev, isAncestor } from '../support/peer-repo';
+
+/**
+ * THE OPEN LAG, read from the ONE place it is written.
+ *
+ * Re-introduced 2026-09-04 (empyrean `c4a1da2` declared `boundary` and aeon's
+ * step 4 has not run). It is a READ, never a second copy: the names live in
+ * `PRESET_KEYS_AWAITING_AEON` and the panel's disclosure is derived from the
+ * same constant, so a key cannot be excused here and left undisclosed there.
+ */
+const LAGGING = [...PRESET_KEYS_AWAITING_AEON].sort();
 
 const SCHEMA_PATH = resolve(
   __dirname, '../../src/core/formats/effects/aurora-effects-preset.schema.json',
@@ -515,15 +527,25 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
       // reason it forbids the rest: a key name lives in the premise list and
       // nowhere else.
       //
-      // ⚠ RE-PINNED 2 -> 3 at empyrean 5bd76ba (the base_swap CR). The count is
-      // the number of MUTUALLY EXCLUSIVE raster channels the contract declares,
-      // so it rises by one per raster-key CR and is expected to keep rising; it
-      // must never FALL, which would mean an arm was dropped and a document that
-      // used to be legal is not.
+      // ⚠ RE-PINNED 2 -> 3 at empyrean 5bd76ba (the base_swap CR), AND 3 -> 4 at
+      // c4a1da2 (the boundary CR) — WHERE THE COUNT ALSO STOPPED MEANING WHAT
+      // THIS COMMENT SAID IT MEANT. It read "the number of MUTUALLY EXCLUSIVE
+      // RASTER channels", which was true while every arm competed for
+      // `ep_raster`; `boundary` is an arm of the same `oneOf` that lowers into
+      // `ep_patched` instead, so the count is the number of mutually exclusive
+      // PROGRAMS and is strictly larger than the raster set. It rises by one per
+      // authoring-key CR and must never FALL, which would mean an arm was dropped
+      // and a document that used to be legal is not.
       const oneOfNames = (EFFECTS_PRESET_SCHEMA.oneOf as { required: string[] }[])
         .map((b) => b.required[0]).sort();
-      expect(oneOfNames, 'the exactly-one-raster-program rule left `required` and no top-level '
-        + 'oneOf took it over').toHaveLength(3);
+      expect(oneOfNames, 'the exactly-one-program rule left `required` and no top-level '
+        + 'oneOf took it over').toHaveLength(EFFECTS_PRESET_PROGRAM_ARMS.length);
+      expect(oneOfNames, 'EFFECTS_PRESET_PROGRAM_ARMS is no longer this `oneOf` read back')
+        .toEqual([...EFFECTS_PRESET_PROGRAM_ARMS].sort());
+      expect(EFFECTS_PRESET_PROGRAM_ARMS.length, 'the arm set and the raster-channel set have '
+        + 'collapsed back into one list — either `boundary` left the contract or the ep_patched '
+        + 'derivation in preset.ts has stopped separating them')
+        .toBeGreaterThan(EFFECTS_PRESET_RASTER_CHANNELS.length);
       for (const n of oneOfNames) expect(EFFECTS_PRESET_ROOT_KEYS).toContain(n);
       expect(oneOfNames).toContain('bands');
       expect(schemaIgnored).toEqual(['name']);
@@ -627,7 +649,7 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
         `${SPLIT(tip)} aeon's page knows a root key the schema neither declares nor reserves`,
       ).toEqual([]);
       expect(
-        schemaVocabulary.filter((k) => !pageVocabulary.includes(k)),
+        schemaVocabulary.filter((k) => !pageVocabulary.includes(k) && !LAGGING.includes(k)),
         `${SPLIT(tip)} the schema knows these root keys and aeon's page does not mention them at `
         + 'all. If aeon has RENAMED one, this is the split. If instead the contract has DECLARED '
         + 'a key aeon has not built, that is the contract leading its consumer — a lag, the state '
@@ -730,15 +752,18 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
         + '  • AEON HAS UN-BUILT A KEY IT USED TO LOWER — that is a REGRESSION, not a lag, and it '
         + 'is what this row exists to catch: the vocabulary row above stays green through it, '
         + 'because the name merely moves from the page\'s `preset:` row to `preset-refused:`. '
-        + 'Report it to aeon BEFORE re-filling anything here.',
-      ).toEqual([]);
+        + 'Report it to aeon BEFORE re-filling anything here.\n'
+        + `  • OR THE LAG CLOSED: aeon now accepts a key ${JSON.stringify(LAGGING)} claims it does `
+        + 'not. Empty PRESET_KEYS_AWAITING_AEON, re-date it, and the panel\'s sentence retires '
+        + 'with this row — do NOT empty it on a merge announcement, this row reads TIP.',
+      ).toEqual(LAGGING);
 
       // The same fact from the other side, so the row cannot pass on a page that
       // simply stopped listing its refusals: every name aeon REFUSES is one the
       // schema still reserves. (While a lag is open this clause gains the
       // premise list as a second allowed source — see the 2026-09-03 shape.)
       expect(
-        keys['preset-refused'].filter((k) => !schemaReserved.includes(k)),
+        keys['preset-refused'].filter((k) => !schemaReserved.includes(k) && !LAGGING.includes(k)),
         `${SPLIT(tip)} aeon refuses a root key the schema does not reserve. If the schema DECLARES `
         + 'it, that is a lag and the row above owns it; if the schema does not know the name at '
         + 'all, that is a split.',

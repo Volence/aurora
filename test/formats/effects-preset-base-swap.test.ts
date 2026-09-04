@@ -34,6 +34,7 @@ import { basename, join, resolve } from 'node:path';
 import {
   EFFECTS_PRESET_SCHEMA,
   EFFECTS_PRESET_RASTER_CHANNELS,
+  EFFECTS_PRESET_PROGRAM_ARMS,
   EFFECTS_PRESET_ROOT_KEYS,
   EFFECTS_PRESET_BASE_SWAP_KEYS,
   EFFECTS_PRESET_BASE_SWAP_LINE_RANGE,
@@ -55,6 +56,18 @@ import {
 } from '../../src/core/formats/effects/json-schema-subset';
 
 const S = EFFECTS_PRESET_SCHEMA as unknown as JsonSchema;
+
+/**
+ * HOW MANY FORMS THE EVALUATOR WILL NAME — read off the schema, never typed.
+ *
+ * The refusal messages below quote "matches N of the M allowed forms", and M was
+ * the literal `3` until empyrean `c4a1da2` added a FOURTH arm (`boundary`) that
+ * is not a raster channel. Every one of those rows went red on a message that
+ * had become MORE correct, which is the cost of pinning a count: the assertion
+ * that the refusal came from the exactly-one rule is worth keeping, and the
+ * arithmetic in it is not Aurora's to state.
+ */
+const ARM_COUNT = (EFFECTS_PRESET_SCHEMA.oneOf as unknown[]).length;
 
 /** The contract's own worked band, so the matrix rows use a REAL bands arm. */
 const BAND = { top: 64, bot: 96, sh: false, on: { cram: { addr: 34, colours: [546, 306] } } };
@@ -99,12 +112,25 @@ const base = { schema: 1 as const, id: ID };
 // ═══════════════════════════════════════════════════════════════════════════
 describe('the top-level oneOf with THREE arms: exactly one raster program', () => {
   it('the schema really carries the construct these rows are about', () => {
-    // Anti-vacuous, and the premise of every row below: three arms, each a
-    // single-`required` branch over a declared root key, and none of them in the
-    // top-level `required` list (requiring one would make the other two illegal).
+    // Anti-vacuous, and the premise of every row below: each arm is a
+    // single-`required` branch over a declared root key, and none of them is in
+    // the top-level `required` list (requiring one would make the others
+    // illegal).
+    //
+    // ⚠ THE ARM COUNT AND THE RASTER-CHANNEL COUNT ARE NO LONGER THE SAME
+    // NUMBER, which is why this row asserts them separately. empyrean `c4a1da2`
+    // added `boundary`, a fourth arm of the same `oneOf` that lowers into
+    // `ep_patched` rather than `ep_raster` — so the exclusivity set grew and the
+    // raster set did not. The three names below are still the whole of
+    // `EFFECTS_PRESET_RASTER_CHANNELS`, and THAT is the load-bearing claim of
+    // this file: if `boundary` ever leaked into it, this row goes red before any
+    // panel offers a raster editor for a patched program.
     const arms = EFFECTS_PRESET_SCHEMA.oneOf as { required: string[] }[];
     expect(Array.isArray(arms)).toBe(true);
-    expect(arms).toHaveLength(3);
+    expect(arms).toHaveLength(EFFECTS_PRESET_PROGRAM_ARMS.length);
+    expect(EFFECTS_PRESET_PROGRAM_ARMS.length).toBeGreaterThan(
+      EFFECTS_PRESET_RASTER_CHANNELS.length,
+    );
     expect(EFFECTS_PRESET_RASTER_CHANNELS).toEqual(['bands', 'base_swap', 'ramp']);
     const required = EFFECTS_PRESET_SCHEMA.required as string[];
     for (const c of EFFECTS_PRESET_RASTER_CHANNELS) {
@@ -160,9 +186,10 @@ describe('the top-level oneOf with THREE arms: exactly one raster program', () =
         + "fails aeon's build — and the editor just said it was fine.",
       ).not.toEqual([]);
       // The refusal is the exactly-one rule's, not a coincidence off some other
-      // keyword: the evaluator names how many of the three forms matched.
+      // keyword: the evaluator names how many of the arms matched, and the arm
+      // COUNT is read off the schema (see `ARM_COUNT`) rather than pinned.
       expect(issues.map((i) => i.message).join(' '))
-        .toMatch(/matches \d+ of the 3 allowed forms/);
+        .toMatch(new RegExp(`matches \\d+ of the ${ARM_COUNT} allowed forms`));
       expect(issues.map((i) => i.path)).toContain('');
       // ...and the codec refuses it on BOTH paths. The writer matters
       // independently: a panel builds a document without it ever passing the
@@ -177,7 +204,8 @@ describe('the top-level oneOf with THREE arms: exactly one raster program', () =
   it('NONE is REFUSED — a preset document must carry one raster program', () => {
     const issues = validateAgainstSchema({ ...base }, S);
     expect(issues, 'a document carrying NO raster program was accepted').not.toEqual([]);
-    expect(issues.map((i) => i.message).join(' ')).toMatch(/matches none of the 3 allowed forms/);
+    expect(issues.map((i) => i.message).join(' '))
+      .toMatch(new RegExp(`matches none of the ${ARM_COUNT} allowed forms`));
     expect(() => parseEffectsPreset(JSON.stringify(base), ID)).toThrow(EffectsPresetError);
   });
 

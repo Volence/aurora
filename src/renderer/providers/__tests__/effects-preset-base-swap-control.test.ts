@@ -532,7 +532,9 @@ describe('every per-channel surface is a registry, not a branch', () => {
       if (c === 'bands') { expect(why).toBeNull(); continue; }
       expect(why, `the band controls came back to life on a ${c} document`).not.toBeNull();
       expect(why).not.toContain('undefined');
-      expect(why).toMatch(/EXACTLY ONE raster program/);
+      expect(why).toMatch(/EXACTLY ONE program/)  // ⚠ 'raster program' until empyrean c4a1da2: the
+      // fourth arm, `boundary`, is a PATCHED program and the rule covers it too, so
+      // the sentence dropped a word it could no longer justify.;
     }
   });
 

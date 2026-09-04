@@ -321,14 +321,38 @@
  * again LATER THE SAME DAY, when it did; `['ramp']` on 2026-09-03 when empyrean
  * 9233883 declared item 6's authoring key and aeon's step 4 had not run; EMPTY
  * again LATER THE SAME DAY AGAIN, when aeon's page grew `ramp` into its accepted
- * `preset:` row at `c7ee7075`. Re-fill it (and only it) the day the drift row
- * reports a lag again — the sentence comes back on screen in both mount sites by
- * construction.
+ * `preset:` row at `c7ee7075`; and `['boundary']` since 2026-09-04, below.
+ *
+ * ═══ RE-ARMED 2026-09-04: empyrean `c4a1da2` DECLARED `boundary` (§7.6) AND
+ * AEON'S STEP 4 HAS NOT RUN. ═══
+ *
+ * MEASURED FIRSTHAND through git objects at aeon `origin/master` `8e45ebac`,
+ * not relayed: `docs/EDITOR_RASTER_PRESETS.md`'s machine-checked block reads
+ *
+ *   preset:         bands, base_swap, cycles, id, patch_motion, patch_world_ys,
+ *                   ramp, schema, variants
+ *   preset-ignored: name
+ *   preset-refused: fires
+ *
+ * `boundary` appears in NONE of the three rows. ⚠ THAT IS THE SHARPER FLAVOUR OF
+ * LAG AND THE DISCLOSURE'S WORDING TURNS ON IT: a key in `preset-refused:` is a
+ * name aeon KNOWS and declines; a key aeon's page does not mention at all is one
+ * its generator meets as an unknown property and rejects the WHOLE DOCUMENT for.
+ * So a preset Aurora writes under `boundary` today does not build at all — it is
+ * not a key that reaches the file and stops there, it is a file that fails.
+ * `presetLagDisclosure`'s sentence already says exactly that ("refuses the WHOLE
+ * DOCUMENT, so a preset carrying the key will not build"), which is why it needs
+ * no new wording for this arming.
+ *
+ * Re-empty it (and only it) the day the drift row reports the lag closed — the
+ * sentence retires with the row, in both mount sites, by construction. Do NOT
+ * empty it on a merge announcement: the row reads aeon's TIP, and an
+ * announcement is not a merge.
  */
-export const PRESET_KEYS_AWAITING_AEON: readonly string[] = Object.freeze([]);
+export const PRESET_KEYS_AWAITING_AEON: readonly string[] = Object.freeze(['boundary']);
 
 /** The date the premise above was last measured — printed inside the sentence. */
-export const PRESET_LAG_MEASURED_ON = '2026-09-03';
+export const PRESET_LAG_MEASURED_ON = '2026-09-04';
 
 /** Where the measurement lives, named in the sentence so a reader can re-run it. */
 export const PRESET_LAG_MEASUREMENT =
