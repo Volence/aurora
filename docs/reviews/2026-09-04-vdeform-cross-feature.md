@@ -450,14 +450,118 @@ that explain *why* the split is gone are all on the panel. Adding a line to only
 the new case would be the inconsistency; adding it to both reaches into the
 v_factor case this parcel was not sent to. Booked as an observation, not a defect.
 
-### 7.4 TAGGED for foreground — nothing here was attempted
+### 7.4 TAGGED for foreground — CLOSED 2026-09-04 by VDEFORM-WITNESS
 
-- **No CDP harness row changed**, and none was run. The new sentence is painted by
-  a `Hint` mounted exactly as the ramp card's is, and the wording rows hold the
-  mount structurally — but **no instrument in this parcel has seen it on screen**,
-  and a source test cannot. If the ramp-scroll-mode harness is extended, the
-  natural row is: author a scene with a `v_deform`, bind it and a ramp preset to
-  one section, and read the painted sentence off the V-deform row.
+**What this section said when the parcel landed, kept verbatim because it is the
+statement the follow-up answers:** *"No CDP harness row changed, and none was run.
+The new sentence is painted by a `Hint` mounted exactly as the ramp card's is, and
+the wording rows hold the mount structurally — but no instrument in this parcel
+has seen it on screen, and a source test cannot. If the ramp-scroll-mode harness
+is extended, the natural row is: author a scene with a `v_deform`, bind it and a
+ramp preset to one section, and read the painted sentence off the V-deform row."*
+
+**IT HAS NOW BEEN SEEN.** Branch `parcel/vdeform-witness`, five rows added as
+section 10 of `scratchpad/effects-deform-harness.mjs` — the harness whose stated
+purpose #3 is already *"a warning that is a string and not a pixel"*, and which is
+registered as `harness:effects-deform` (no second `package.json` entry was added).
+
+**THE TWO SENTENCES, AS READ OFF THE DOM** — quoted from the run, not paraphrased:
+
+- `[10c]` **the narrowing arm.** The element is **absent** before the toggle and,
+  after one change event on the real `v_deform` select, carries:
+
+  > THIS NARROWS A RAMP ELSEWHERE: V deform puts VSRAM in per-column mode, and
+  > Section 2 binds this scene and preset "aurora_ramp_witness" — whose VSRAM ramp
+  > therefore scrolls a single 16-pixel column instead of the full width. That ramp
+  > is edited in the Colour panel, and its own card says the same thing from the
+  > other side. Assumes this game declares CAP_PER_COL_VSRAM — sonic4 does.
+
+- `[10d]` **the decline arm — the row this follow-up is for.**
+
+  > THIS MAY NARROW A RAMP ELSEWHERE — AURORA CANNOT READ THE PRESET: section 5
+  > binds preset "vdeform_witness_absent", which is not a preset in this project;
+  > and section 6 binds preset "vdeform_witness_unreadable", whose file could not
+  > be read, so whether they carry a VSRAM ramp this would narrow to one 16-pixel
+  > column is not decidable from here.
+
+  Both spellings of the refusal in one sentence, each naming **which** failure its
+  section hit, and no narrowing claim anywhere in it.
+
+**NOTHING IS TYPED INTO AN ASSERTION.** Every expected fragment is lifted out of
+`src/core/formats/effects/ramp-scroll-mode.ts` at run time — `RAMP_SCROLL_COLUMN_WIDTH_PX`,
+both `V_DEFORM_RAMP_LEAD` arms, the head of `V_DEFORM_RAMP_NOTE`, and `unknownWhy`'s
+**two clause templates**, which are then filled with the section index read from
+`activeSection()` and the preset ids read from `rasterRef(N)`. Read from `RUN.root`,
+not `ROOT`, so the expectations come from the sources that built the bundle under
+test. The extractor **refuses** rather than defaulting: a renamed constant stops the
+run naming what it could not find.
+
+⚠ **ONE TRAP THE EXTRACTOR WALKED INTO FIRST.** `RAMP_SCROLL_LEAD` — the other end
+of this same defect, forty lines up in the same module — also has a key spelled
+`unknown`, and it is declared **first**. A file-wide regex lifts the ramp card's
+words and `[10d]` would have asserted a string the scene panel never paints. The
+lead block is extracted and searched on its own.
+
+⚠ **THE ELEMENT IS FOUND BY ITS HOVER, NOT BY THE PAINTED WORDS.**
+`V_DEFORM_RAMP_NOTE` is the same string on both arms, so the locator does not
+assume which sentence is there. A locator keyed on *"starts with THIS NARROWS…"*
+would report `no-element` for a decline branch mutated into a confident claim, and
+a row reading that as "absent" goes **green on the exact defect this closes**.
+
+⚠ **THE RECT IS COMPARED TO THE SCROLLER'S BOX** — not `checkVisibility()`, not
+`getClientRects()`, both of which are green for an element scrolled out of its own
+container. This panel is `<Panel width={300} scroll>` with the V-deform row well
+down it, so that is the live failure mode here. `[10e]` also asserts the two arms
+were **different strings** on the same box with the same hover, so a panel that
+mounted and stood still cannot report `[10c]`/`[10d]` as passing.
+
+⚠ **THE DECLINE STATE CANNOT BE AUTHORED BY ANY GESTURE, AND THAT IS MEASURED.**
+`presetRefOptions` offers `''` plus **loaded** presets only, so the picker cannot
+write an unresolvable id; and `deletePresetRefusal` **disables** Delete while any
+section binds the preset, so the other order is refused too. Both refusals are
+correct and neither should change. The state is nonetheless ordinary on disk — the
+sidecar is hand-editable and aeon's generator writes it, which is
+`unassignablePresetRef`'s own stated reason for existing — so it is constructed on
+disk in a **copy** of the aeon project under `os.tmpdir()`, never that working tree
+(the `//harness-canvas-writers` ruling, d-28 COPY ONLY WHERE IT CAN WRITE). Three
+files: `section_5.meta.json` → an id with no document, `section_6.meta.json` → a
+document that is not JSON, and that document. The copy and the three files are
+printed by the run before any row executes, and the copy is removed in the
+`finally`.
+
+**RED-FIRST, shown applied on disk and restored from committed `54fb6aa9`.**
+`vDeformRampBindings`'s unresolvable-preset arm changed to
+`carries: 'ramp', reason: null` — folding the decline into the confident arm, which
+is the defect itself rather than a proxy for it. `[10d]` went red and **printed the
+fabricated sentence it caught** ("THIS NARROWS A RAMP ELSEWHERE: … Sections 5 and 6
+bind this scene and presets "vdeform_witness_absent" and "vdeform_witness_unreadable"
+— whose VSRAM ramp therefore scrolls a single 16-pixel column…"), while `[10c]` and
+`[10e]` stayed green — so the plant is aimed at the decline branch and not at the
+section. Baseline restored, rebuilt, **43/43** again.
+
+**43/43 rows, run IN-TREE.** The run was executed in a linked worktree that was
+itself built (`VITE_AURORA_DEBUG=1 npm run build` against a borrowed
+`node_modules`), so `run-root` reports `in-tree` rather than **BORROWED** and the
+bundle under test is this branch's own sources — which is what makes the red-first
+mutation measurable at all. Borrowing the main checkout's `dist/` would have run
+**master's** bundle, in which the plant does not exist and `[10d]` cannot go red.
+
+⚠ **AND ONE ENVIRONMENTAL FINDING WORTH THE NEXT LANE'S TIME, because it makes a
+gate REFUSE rather than fail.** The obvious way to build in a worktree is
+`ln -s <main>/node_modules node_modules`. Do not: `git check-ignore` answers
+`fatal: pathspec 'node_modules/…' is beyond a symbolic link` (exit 128), and
+`check-cited-paths`' ignore-query self-proof reads that as *"the exit-0 arm is not
+behaving"* and **stops the whole `npm test` chain before vitest runs**. The gate is
+right — it cannot prove its own exclusion arm, so it refuses instead of measuring —
+and the diagnosis is invisible from the message, which talks about `.gitignore`.
+The working shape is a **real directory whose entries are symlinks**
+(`mkdir node_modules; ln -s <main>/node_modules/* node_modules/`, plus the dot
+entries): `node_modules` is then a real path git can answer for, `node_modules/.bin/electron`
+still resolves, and both the build and `npm test` run. Suite in that configuration:
+**6914 passed / 9 skipped (6923); 489 files passed / 3 skipped (492)** — a linked
+worktree, so `sibling-root` step 3 is unmeasurable and this differs from a main
+checkout by one pass / one skip.
+
 - **No emulator, ever.** Nothing here has watched a ROM narrow a ramp or refuse a
   scene. Every engine fact is `git show`n source at `e81fd349`.
 
