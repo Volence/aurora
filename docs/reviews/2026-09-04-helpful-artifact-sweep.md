@@ -181,7 +181,7 @@ at all. The nine that are:
 | site | claim | verdict |
 |---|---|---|
 | **All five `contested` sites** — `preset-lag.ts:62`, `ramp-scroll-mode.ts:99`, `BandPresetPanel.tsx:1462`, `effects-preset-ramp-scroll-mode.test.ts:28`, `ramp-scroll-mode-harness.mjs:41` | the `top + 1` display-span disagreement | **CORRECT AS-IS.** Every one already says **SETTLED**, names empyrean `e9409dc`, gives the direction it settled in, and two of them add *"do not re-add a caveat saying it is"*. The `BandPresetPanel` one is a JSX `{/* … */}` comment and paints nothing — checked, because instance 6 of the original six **was** a painted `title`. |
-| `ramp-sign-lag-disclosure.test.ts:254` / `ramp-sign-lag.ts:128` | `RAMP_SIGN_FIELDS_AWAITING_AEON` | **CORRECT AS-IS, and exemplary.** Dated `2026-09-03`, pinned to aeon `origin/master ddaab282`, with a named retirement detector (`test/formats/aeon-ramp-sign-drift.test.ts`) that reports the day the constructor starts encoding. A hold that carries its date, its owner and what ends it. |
+| `ramp-sign-lag-disclosure.test.ts:254` / `ramp-sign-lag.ts` | `RAMP_SIGN_FIELDS_AWAITING_AEON` | **CORRECT AS-IS WHEN WRITTEN, AND SINCE RETIRED — see §4c.** The constant is now `Object.freeze([])` on master and the drift detector is green at 6 rows. Judged exemplary here for a reason the next hours proved:** Dated `2026-09-03`, pinned to aeon `origin/master ddaab282`, with a named retirement detector (`test/formats/aeon-ramp-sign-drift.test.ts`) that reports the day the constructor starts encoding. A hold that carries its date, its owner and what ends it. |
 | `bganim-preview-aeon.ts:260,273` | *"THE VERTICAL WORD IS NOT YET WATCHED"* | **CORRECT AS-IS.** It labels itself `DERIVED-FROM-A-CONFIRMED-MECHANISM, not watched`, states which half was confirmed on the ROM and when, and is structured so a contradicting run edits **one constant**. Confirming it needs a ROM run this lane is not permitted to make. |
 | `explorer-data.ts:6` | *"Level Art / Palettes / UI & Screens are still pending"* | **CORRECT AS-IS, checked**: only the `Canvases` and `Object Library` groups are built in that file. |
 | `agent-handler.ts:460`, `editorStore.ts:229` | *"not blocked on aeon's encoding anchor"* | **CORRECT AS-IS.** A structural claim (each plane carries its own 16-bit word), not a temporal one; `both-planes-paint.ts` derives it at length. |
@@ -433,10 +433,17 @@ line here, not a parcel, as asked.
 
 ---
 
-## 4c. ⚠ The suite is RED, and the red is the census's own subject arriving live
+## 4c. The hold this census praised expired inside the same session — and has now been retired
 
-`test/formats/aeon-ramp-sign-drift.test.ts` fails on the finished tree. **It is not mine**,
+`test/formats/aeon-ramp-sign-drift.test.ts` went red mid-session. **It was never mine**,
 and it is the most interesting thing this parcel produced.
+
+**RESOLVED ON MASTER before this branch landed** (`fix/retire-ramp-sign-lag`, merge
+`76ae5c6f`, ROADMAP row 138): `RAMP_SIGN_FIELDS_AWAITING_AEON` is now `Object.freeze([])`,
+the disclosure and the rate caveat retire by construction, and the detector is green at 6
+rows. This branch is rebased onto that, so the account below is history — kept because the
+*shape* is the parcel's whole subject and because a packet that quietly deleted its own
+red would be the very artifact being swept.
 
 Section 3 above called `RAMP_SIGN_FIELDS_AWAITING_AEON` **exemplary** — dated, pinned to
 aeon `origin/master ddaab282`, with a named retirement detector. **Within the same session
@@ -464,11 +471,10 @@ premise has cleared: **the ramp card's disclosure and the caveat inside the rate
 are now a FALSE WARNING** — an artifact that looks like care and is wrong, which is this
 parcel's entire subject, arriving three hours after the census praised the hold.
 
-**NOT RETIRED HERE, deliberately.** The fix is one constant
-(`src/core/formats/effects/ramp-sign-lag.ts`, which retires both surfaces by construction),
-but it changes author-facing warnings across 5 files and deserves its own branch, its own
-red-first proof that the disclosure disappears, and its own row. The confirmation the
-detector asks for is done and recorded above, so whoever takes it can move immediately.
+**NOT RETIRED HERE, deliberately** — it changes author-facing warnings across 5 files and
+deserved its own branch, its own red-first proof that the disclosure disappears, and its
+own row. That judgement held: it landed as exactly that, as its own parcel, and the
+confirmation recorded above is the one the detector asked for.
 
 **Attribution, measured not asserted:** my branch touches none of the five ramp-sign files
 (`git diff --name-only eb426df3..HEAD`), and between the green second run and the red third
@@ -489,19 +495,17 @@ the only repo change was `scripts/check-cited-paths.mjs`.
 
 ## 6. Suite
 
-⚠ **`npm test` is exit 1 on the finished tree — 489 files / 486 passed / 1 failed /
-2 skipped, 6,871 tests / 6,862 passed / 1 failed / 8 skipped.** The single failure is
-`aeon-ramp-sign-drift.test.ts` and is **external to this parcel** — see §4c for the
-timing, the blob and the attribution. Two earlier full runs on this same branch were
-**exit 0 at 6,863 passed / 0 failed**; aeon pushed the encode between them. All eight gates green:
-`check-test-collection` 489/489 collected, `check-pseudo-skip` 6,232 bodies,
-`check-peer-path-literals` 5 rules / 1,257 files, **`check-cited-paths` 1,877
-citations**, `check-object-stringify`, `check-ledger-timestamps`,
-`check-python-resolver` 7 rows, `check-harness-guards` 200 clean / 0 failures /
-0 unmeasurable.
+`npm test` **exit 0 — 489 files / 487 passed / 2 skipped; 6,878 tests / 6,870 passed /
+8 skipped**, every skip naming its reason. Rebased onto master `b139bc54` (which carries
+the ramp-sign retirement of §4c), so these numbers are against a green base rather than
+carrying another parcel's red. All eight gates green: `check-test-collection` 489/489
+collected, `check-pseudo-skip` 6,232 bodies, `check-peer-path-literals` 5 rules,
+**`check-cited-paths` 1,257 files / 1,878 citations / 4 arms proven / 0 unanswerable**,
+`check-object-stringify`, `check-ledger-timestamps`, `check-python-resolver`,
+`check-harness-guards` 200 clean / 0 failures / 0 unmeasurable.
 
-⚠ **This is a linked worktree, where `npm test` reads ONE FEWER PASS AND ONE MORE SKIP
-than the main checkout** — `test/support/sibling-root.test.ts`'s step-3 row cannot
-measure the main-checkout configuration from here and says so. Master `eb426df3` reads
-**6864 / 7**; the totals are identical at **6871**. This is the sixth time an agent has
-had cause to write this sentence; it is not a discrepancy.
+⚠ **A linked worktree reads ONE FEWER PASS AND ONE MORE SKIP than the main checkout**
+(`test/support/sibling-root.test.ts`'s step-3 row cannot measure the main-checkout
+configuration from here, and says so). Master reads **6,871 / 7**; this reads **6,870 / 8**;
+**the total is 6,878 either way.** Several agents have flagged this in good faith; it is
+not a discrepancy.
