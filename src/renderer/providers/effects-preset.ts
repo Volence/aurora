@@ -102,6 +102,13 @@ import {
   EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE, EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE,
   isBaseSwapTargetAligned,
 } from '../../core/formats/effects/preset';
+// THE SCREEN BAND EACH PATCH CHANNEL IS CONFINED TO — aeon's generated sidecar,
+// vendored beside the schema. It is the ONLY artifact in the suite that says
+// whether a sweep can physically fit, and its test is ONE-DIRECTIONAL: a
+// refusal is certain, a fit is CANNOT TELL. `AnchorBandFit` has no `fits` arm
+// for that reason; see channel-bands.ts's header before adding a reassurance.
+import { anchorBandFit } from '../../core/formats/effects/channel-bands';
+import type { AnchorBandFit } from '../../core/formats/effects/channel-bands';
 import type { SetEffectsPresetCommand, SetSectionRasterCommand } from '../../core/editing/commands';
 // THE BINDING LIMIT IS NOT RE-TYPED HERE. `PRESET_LIMITS.unbound` below is the
 // AUTHOR-FACING copy of a sentence the agent replies and the published tool
@@ -2325,6 +2332,73 @@ export function anchorSweepSummary(sweep: EffectsPresetAnchorSweep): string | nu
   const pct = Math.round(((sweep.phase ?? 0) / steps) * 100);
   return `${amp.peak_to_peak_px} px of travel, up and down, once every `
     + `${period.seconds.toFixed(2)} s — starting ${pct}% into the cycle`;
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * CAN THIS SWEEP FIT ITS CHANNEL'S BAND? — the one question aeon's generated
+ * band sidecar can answer, asked in the one direction it can be answered in.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Returns a sentence only for `cannot-fit`. THERE IS DELIBERATELY NO SENTENCE
+ * FOR ANYTHING ELSE, and each silence is a different fact:
+ *
+ *   • `cannot-tell` (travel <= lines). NOT a clearance. The latched line is
+ *     `anchor - Camera_Y`, so where the sweep sits inside [lo, hi] is decided by
+ *     the camera at run time and is unknowable here. A green "fits" badge is the
+ *     obvious thing to build and is the one thing this data forbids: an author
+ *     told it fits stops looking, and Aurora cannot honour that. The only true
+ *     sentence would be "we cannot tell", which is what an empty hint already
+ *     means everywhere else on this panel.
+ *   • `no-band` (channels 2 and 3 today — `patch_world_ys` reaches 4, aeon
+ *     declares bands for 0 and 1). Nothing is known, so nothing is said. This is
+ *     NOT the same silence as above and the tests assert the two separately.
+ *
+ * ⚠ THE WORDING NAMES BOTH EDGES AND "CLIPPED" IS NOT ONE OF THE WORDS. Leaving
+ * the band is ASYMMETRIC and one over-long sweep reaches both ends depending on
+ * the camera: past `hi` the record is NOT EMITTED — the band vanishes for that
+ * frame and is not pinned to `hi`; below `lo` it IS emitted, clamped up, so the
+ * boundary pins at the top of the band and stays visible. A single tidy verb
+ * would describe at most one of those and would be wrong about the other half of
+ * the time. The two behaviours are read out of the sidecar's own `edges` block
+ * (`channel-bands.ts` throws at load if either stops saying what it says today).
+ *
+ * ⚠ NOTHING HERE CONVERTS. `travelPx` and `band.lines` are both SCREEN LINES,
+ * 1:1 with the authored `patchable(lo:, hi:)`; the engine's single -1 lives in
+ * Raster_BuildSchedule and is already applied. Any ±1 added here is a defect.
+ */
+export function anchorSweepBandFit(
+  sweep: EffectsPresetAnchorSweep, index: number,
+): AnchorBandFit | null {
+  const amp = anchorAmpRungOf(sweep);
+  // Off-ladder: the file is one the schema would refuse, and inventing a travel
+  // for it would put a number on screen that no document means.
+  if (amp === null) return null;
+  return anchorBandFit(index, amp.peak_to_peak_px);
+}
+
+/**
+ * The sentence, or null. `anchorSeedRefusal`'s shape, one control over.
+ *
+ * The travel it quotes is `ANCHOR_AMP_RUNGS`' own `peak_to_peak_px` — THE SAME
+ * NUMBER `anchorSweepSummary` puts under the select — so the warning and the
+ * summary can never disagree about how far a sweep moves. `channel-bands.ts`
+ * asserts at load that that quantity equals aeon's `2 * (256 >> amp_shift)`.
+ */
+export function anchorSweepBandRefusal(
+  sweep: EffectsPresetAnchorSweep, index: number,
+): string | null {
+  const fit = anchorSweepBandFit(sweep, index);
+  if (fit === null || fit.verdict !== 'cannot-fit') return null;
+  const { travelPx, band } = fit;
+  return `${travelPx} px of travel cannot fit channel ${index}: the engine confines this `
+    + `channel's boundary to screen lines ${band.lo}–${band.hi}, which is ${band.lines} `
+    + `line${band.lines === 1 ? '' : 's'} counted inclusively, and ${travelPx} > ${band.lines}. `
+    + 'The camera decides where the sweep sits in that band, so both ends are reachable and they '
+    + `do not behave alike: past line ${band.hi} the record is not emitted at all — no boundary is `
+    + `drawn anywhere and the band vanishes for that frame, it does not pin to ${band.hi}; below `
+    + `line ${band.lo} it is still emitted, clamped up to ${band.lo}, so the boundary pins at the `
+    + 'top of the band and stays visible. Pick a smaller Travel.';
 }
 
 /** The state of channel `index`'s SEED as the document spells it. */
