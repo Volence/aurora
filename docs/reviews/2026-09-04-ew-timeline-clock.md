@@ -258,7 +258,8 @@ captured with channel 1 back on the violating rung so the new sentence is in fra
 - **`cannot-tell` says nothing on screen, deliberately.** The only true sentence would be
   "we cannot tell", which is what an empty hint already means everywhere on this panel. If an
   author ever asks for it, the verdict is already exposed by `anchorSweepBandFit`.
-- **The `no-band` silence for channels 2 and 3 is invisible to an author.** They see nothing
-  and cannot tell it apart from a fit. Making that visible needs aeon to declare bands for
-  those channels, or a sentence saying "aeon declares no band for this channel", which is a
-  wording call I did not make unilaterally.
+- ~~**The `no-band` silence for channels 2 and 3 is invisible to an author.**~~ **CLOSED
+  2026-09-04 by EW-NOBAND-SILENCE** (`docs/reviews/2026-09-04-ew-noband-silence.md`, ROADMAP row
+  146). The wording call was ruled by the overseer and the hub; `anchorSweepNoBandAdvisory`
+  states the coverage gap in a NEUTRAL hint, and `cannot-tell` deliberately stays silent on an
+  argument that is asserted (`[6i]`, `[6j]`) rather than commented.
