@@ -1,10 +1,10 @@
 import { findMatchingBlockCells } from './collision-block';
-import { cellTileIndices } from './collision-cell';
+import { cellTileIndices, cellCrossoverIndices } from './collision-cell';
 import {
   buildPlaneEntries, buildBothPlanesEntries, buildPlaneCellEntries, buildBothPlanesCellEntries,
   type BothPlanesEntries, type CellWordPlan,
 } from './both-planes-paint';
-import type { CrossoverBrush, CollisionPlaneId } from './layer-transition';
+import type { CrossoverBrush, CollisionPlaneId, CrossoverSpan } from './layer-transition';
 
 export interface CellRC { cellCol: number; cellRow: number; }
 
@@ -78,6 +78,26 @@ export function collisionRectIndices(
   return indices;
 }
 
+/** The subset of `collisionRectIndices` a crossover mark of `span` covers, or
+ *  `null` for `'cell'` — the default, meaning "the whole rectangle", which is
+ *  the value the merge treats as "no narrowing" rather than as an empty set.
+ *
+ *  Returning null rather than the full set is deliberate: `crossoverAt` present
+ *  and complete, and `crossoverAt` absent, must be the same write, and the only
+ *  way to guarantee that is for the default path not to build a set at all. */
+export function collisionRectCrossoverIndices(
+  x: number, y: number, w: number, h: number, tileWidth: number, span: CrossoverSpan,
+): Set<number> | null {
+  if (span === 'cell') return null;
+  const out = new Set<number>();
+  for (let r = 0; r < h; r++) {
+    for (let c = 0; c < w; c++) {
+      for (const index of cellCrossoverIndices(x + c, y + r, tileWidth, span)) out.add(index);
+    }
+  }
+  return out;
+}
+
 /**
  * The agent's `paint_collision` when it names `plane: "both"` — the same
  * gesture the "A+B" chip drives on the human road, through the same builder.
@@ -95,6 +115,11 @@ export function paintCollisionRectBothPlanes(args: {
   tileWidth: number; bothPlanes: boolean;
   aimedPlaneId?: CollisionPlaneId;
   crossover?: CrossoverBrush;
+  /** How wide the MARK is, in 8px engine trigger cells. Defaults to `'cell'`
+   *  (the whole 16px cell), which is what every caller meant before mark widths
+   *  existed; `'left'`/`'right'` narrow the crossover ONLY — the geometry still
+   *  fills the rectangle. See layer-transition.ts's CrossoverSpan block. */
+  crossoverSpan?: CrossoverSpan;
 }): BothPlanesEntries {
   return buildBothPlanesEntries({
     aimedPlaneWords: args.aimedPlane,
@@ -104,6 +129,8 @@ export function paintCollisionRectBothPlanes(args: {
     bothPlanes: args.bothPlanes,
     aimedPlaneId: args.aimedPlaneId,
     crossover: args.crossover,
+    crossoverAt: collisionRectCrossoverIndices(
+      args.x, args.y, args.w, args.h, args.tileWidth, args.crossoverSpan ?? 'cell'),
   });
 }
 
@@ -176,6 +203,10 @@ export function paintCollisionCellEntries(args: {
  *  sub-tiles a cell covers or which word belongs to it. */
 export function collisionRectCells(
   x: number, y: number, w: number, h: number, tileWidth: number, words: (number | null)[],
+  /** How wide the MARK is. `'cell'` (the default) leaves `crossoverIndices`
+   *  ABSENT rather than setting it to the whole cell, so the narrowed path and
+   *  the default path are the same write. */
+  span: CrossoverSpan = 'cell',
 ): CellWordPlan[] {
   const cells: CellWordPlan[] = [];
   for (let r = 0; r < h; r++) {
@@ -183,6 +214,9 @@ export function collisionRectCells(
       cells.push({
         indices: cellTileIndices(x + c, y + r, tileWidth),
         word: words[r * w + c] ?? null,
+        ...(span === 'cell'
+          ? {}
+          : { crossoverIndices: cellCrossoverIndices(x + c, y + r, tileWidth, span) }),
       });
     }
   }
@@ -212,11 +246,15 @@ export function paintCollisionCellsBothPlanes(args: {
   tileWidth: number; bothPlanes: boolean;
   aimedPlaneId?: CollisionPlaneId;
   crossover?: CrossoverBrush;
+  /** How wide the MARK is — carried on the CELL PLAN, so the same plan reaches
+   *  both planes' merges and a two-way pair lands on the SAME 8px column. */
+  crossoverSpan?: CrossoverSpan;
 }): BothPlanesEntries & { skipped: number } {
   return buildBothPlanesCellEntries({
     aimedPlaneWords: args.aimedPlane,
     otherPlaneWords: args.otherPlane,
-    cells: collisionRectCells(args.x, args.y, args.w, args.h, args.tileWidth, args.words),
+    cells: collisionRectCells(
+      args.x, args.y, args.w, args.h, args.tileWidth, args.words, args.crossoverSpan ?? 'cell'),
     bothPlanes: args.bothPlanes,
     aimedPlaneId: args.aimedPlaneId,
     crossover: args.crossover,

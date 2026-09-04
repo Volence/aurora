@@ -87,11 +87,23 @@ export function buildPlaneEntries(
    *  ordinary shape stroke means. */
   crossover: CrossoverBrush = 'keep',
   planeId?: CollisionPlaneId,
+  /** When present, the crossover is authored ONLY at these sub-tile indices;
+   *  every other index in `indices` is written with `keep`.
+   *
+   *  THE GEOMETRY AND THE MARK ARE TWO WIDTHS OF ONE STROKE. A narrowed
+   *  crossover (`CrossoverSpan` 'left'/'right') still reshapes the whole 16px
+   *  cell — only the two bits move at 8px. Passing this as a SUBSET of the same
+   *  `indices` rather than as a second call is what keeps that a single merge
+   *  against a single destination: two `buildPlaneEntries` calls over
+   *  overlapping index sets would each diff against the UNMODIFIED plane and
+   *  the second would silently drop the first's word. */
+  crossoverAt?: ReadonlySet<number> | null,
 ): CollisionCellWrite[] {
   const entries: CollisionCellWrite[] = [];
   for (const index of indices) {
     const oldColl = plane[index] ?? 0;
-    const newColl = collisionPaintWord(brushWord, oldColl, crossover, planeId);
+    const here = crossoverAt && !crossoverAt.has(index) ? 'keep' : crossover;
+    const newColl = collisionPaintWord(brushWord, oldColl, here, planeId);
     if (oldColl !== newColl) entries.push({ index, oldColl, newColl });
   }
   return entries;
@@ -127,12 +139,17 @@ export function buildBothPlanesEntries(args: {
    *  legal crossover value is per-plane. */
   aimedPlaneId?: CollisionPlaneId;
   crossover?: CrossoverBrush;
+  /** The sub-tile indices the MARK covers, when it is narrower than the stroke
+   *  (see `buildPlaneEntries`). ⚠ THE SAME SET GOES TO BOTH PLANES, and that is
+   *  the point: a two-way pair only flips the layer when both planes carry the
+   *  mark at the SAME 8px column. */
+  crossoverAt?: ReadonlySet<number> | null;
 }): BothPlanesEntries {
   const crossover = args.crossover ?? 'keep';
   // `indices` may be a one-shot iterator; materialise before the second pass.
   const idx = [...args.indices];
   const aimed = buildPlaneEntries(
-    args.aimedPlaneWords, idx, args.brushWord, crossover, args.aimedPlaneId);
+    args.aimedPlaneWords, idx, args.brushWord, crossover, args.aimedPlaneId, args.crossoverAt);
   if (!args.bothPlanes || !args.otherPlaneWords) return { aimed, other: [] };
   // ⚠ THE OTHER PLANE GETS THE OTHER PLANE'S CROSSOVER VALUE, not a copy.
   //
@@ -149,7 +166,8 @@ export function buildBothPlanesEntries(args: {
   const otherId = args.aimedPlaneId === undefined ? undefined : otherPlane(args.aimedPlaneId);
   return {
     aimed,
-    other: buildPlaneEntries(args.otherPlaneWords, idx, args.brushWord, crossover, otherId),
+    other: buildPlaneEntries(
+      args.otherPlaneWords, idx, args.brushWord, crossover, otherId, args.crossoverAt),
   };
 }
 
@@ -179,7 +197,14 @@ export function buildBothPlanesEntries(args: {
  *  and means "leave this cell alone" — on BOTH planes when the stroke writes
  *  both, because a caller who declined to name a word for a cell has declined
  *  it for the cell, not for one plane of it. */
-export interface CellWordPlan { indices: readonly number[]; word: number | null }
+export interface CellWordPlan {
+  indices: readonly number[];
+  word: number | null;
+  /** The subset of `indices` the CROSSOVER covers, when the mark is narrower
+   *  than the cell (`CrossoverSpan` 'left'/'right'). Absent = the whole cell,
+   *  which is what every caller meant before mark widths existed. */
+  crossoverIndices?: readonly number[];
+}
 
 /** What a per-cell build produced: the writes, and how many cells were declined
  *  (`word: null`). `skipped` counts CELLS, never sub-tile entries, so it is
@@ -210,7 +235,8 @@ export function buildPlaneCellEntries(
   let skipped = 0;
   for (const cell of cells) {
     if (cell.word === null || cell.word === undefined) { skipped++; continue; }
-    for (const e of buildPlaneEntries(plane, cell.indices, cell.word, crossover, planeId)) {
+    const at = cell.crossoverIndices ? new Set(cell.crossoverIndices) : null;
+    for (const e of buildPlaneEntries(plane, cell.indices, cell.word, crossover, planeId, at)) {
       entries.push(e);
     }
   }
