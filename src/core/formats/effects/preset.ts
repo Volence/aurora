@@ -386,6 +386,99 @@ export interface EffectsPresetBaseSwap {
 }
 
 /**
+ * `$defs.tint_region` — the staged palette region a `boundary` switches on.
+ *
+ * ⚠ IT IS `$defs.pal_region` MINUS `addr`, AND THE ABSENCE IS THE POINT.
+ * `fx_tint_band` DERIVES the CRAM destination from `pal_line` and `entry`
+ * (aeon `raster_dsl.emp:657`, `0 * 128 + pal_line * 32 + entry * 2`), so a
+ * document carrying `addr` would be one fact with two sources. The schema
+ * closes this object, which means an `addr` here is REFUSED rather than
+ * accepted-and-cross-checked — see contract vector case 32.
+ *
+ * NO RANGE IS RESTATED on any member. Every one is `stream_pal_region`'s own
+ * ensure (`raster_dsl.emp:267-281`) and the schema deliberately leaves them
+ * unbounded, §7.1's shape-only posture: the ENGINE's message carries the
+ * measurement, and a bound copied here would be a second unmeasured copy of it.
+ */
+export interface EffectsPresetTintRegion {
+  /** Which `Pal_Variant_Stage` slot the colours are streamed FROM. Not a CRAM destination. */
+  slot: number;
+  /** The staging source's palette line, and the line the derived CRAM address lands on. */
+  pal_line: number;
+  /** The staging source's first entry, and the entry the derived address lands on. */
+  entry: number;
+  /** How many colours are swapped. */
+  count: number;
+}
+
+/**
+ * A PATCHABLE PALETTE BOUNDARY — `$defs.boundary`, empyrean `c4a1da2` §7.6.
+ *
+ * One raster fire that switches a staged palette region at a screen line and
+ * never switches back, whose line is then MOVED every frame by a patch
+ * channel's world anchor. This is the shipped moving water
+ * (`ojz_effects.emp:1556-1557`), and until this key it was a shape a DOCUMENT
+ * could not express: a `band` is TWO fires (the ON plus a derived restore) and
+ * `patchable()` takes exactly one, so the shape a document could author could
+ * not move and the shape that moves could not be authored.
+ *
+ * ═══ ⚠ IT IS NOT A RASTER CHANNEL, AND THAT IS THE ASYMMETRY TO READ TWICE ═══
+ *
+ * `bands`, `ramp` and `base_swap` are mutually exclusive because all three
+ * compete for ONE field, `EffectsPreset.ep_raster`. `boundary` is exclusive with
+ * all of them for a DIFFERENT reason: it lowers into the SIBLING field
+ * `ep_patched`, and `preset()` refuses a record carrying both because whichever
+ * installs last wins destructively (`preset.emp:153-154`). So it is the fourth
+ * arm of the same top-level `oneOf` and the fourth member of
+ * `EFFECTS_PRESET_PROGRAM_ARMS`, but it is NOT in
+ * `EFFECTS_PRESET_RASTER_CHANNELS` — see those two constants for how the split
+ * is derived rather than typed.
+ *
+ * ═══ ABSENT MEANS NONE. THERE IS NO NULL SPELLING. ═══
+ *
+ * A `null` arm would be a document with zero programs, which this schema
+ * refuses (contract vector case 27). Say nothing to say none — exactly as
+ * `ramp` and `base_swap` already spell it, and unlike `cycles`, whose `null`
+ * really does mean "cycling OFF".
+ *
+ * ═══ IT MOVES ONLY IF THE SAME INDEX IS SEEDED **AND** SWEPT ═══
+ *
+ * `channel` is the index space of `patch_world_ys` / `patch_motion` (and a
+ * scene's `anchor.at.channel`). A boundary alone is a boundary that sits still;
+ * "make this water move" is `boundary` PLUS both positional keys at that index,
+ * in ONE document — which is contract vector case 25, and what
+ * `boundaryMotionAdvisory` says out loud.
+ */
+export interface EffectsPresetBoundary {
+  /**
+   * The template's DEFAULT screen line, where the boundary sits before any
+   * patch. `fire()`'s own ensure, 3..223 — read the range from
+   * `EFFECTS_PRESET_BOUNDARY_LINE_RANGE`, never retyped.
+   *
+   * ⚠ `patchable()` ADDITIONALLY refuses a line outside `[lo, hi]`
+   * (`raster_dsl.emp:475-476`), which JSON Schema cannot express. That is the
+   * GENERATOR's refusal; `boundaryAdvisories` may warn and must never be the
+   * only check.
+   */
+  line: number;
+  /** The patch channel this boundary follows, 0..`RASTER_MAX_PATCH`-1. Authored, never assigned. */
+  channel: number;
+  /** Lowest SCREEN LINE the boundary may be patched to. Below it the engine CLAMPS UP and still emits. */
+  lo: number;
+  /** Highest SCREEN LINE the boundary may be patched to. Past it the engine DROPS the record. */
+  hi: number;
+  /** WHAT it switches: exactly one arm, `pal_region`. No cram arm exists and none is reserved. */
+  on: { pal_region: EffectsPresetTintRegion };
+  /** Shadow/Highlight on the boundary's ONE fire. Required, no default. `band.sh`'s spelling. */
+  sh: boolean | 0 | 1;
+  /**
+   * Re-ship the staged colours at the frame top when the anchor leaves the TOP
+   * of the screen. OPTIONAL, default `false` — `patchable()`'s own default.
+   */
+  offscreen_ship?: boolean | 0 | 1;
+}
+
+/**
  * The preset document. `bands` is the raster channel; `cycles` and `variants`
  * (empyrean 12aecd5, AURORA_EFFECTS_SCHEMA.md §7.2) and `patch_world_ys` /
  * `patch_motion` (empyrean d36d704, §7.3) are OTHER CHANNELS OF THE SAME
@@ -449,6 +542,14 @@ export interface EffectsPreset {
    * neither capability-gated nor DEBUG-gated; see `EffectsPresetBaseSwap`.
    */
   base_swap?: EffectsPresetBaseSwap;
+  /**
+   * The PATCHED channel (empyrean c4a1da2, §7.6). Mutually exclusive with all
+   * three raster channels — but for the OTHER reason: it lowers into
+   * `ep_patched`, not `ep_raster`, and `preset()` refuses a record carrying
+   * both. There is no `null` spelling; absent means none. See
+   * `EffectsPresetBoundary`.
+   */
+  boundary?: EffectsPresetBoundary;
   cycles?: EffectsPresetCycleChannel[] | null;
   variants?: (EffectsPresetPalVariant | null)[];
   /**
@@ -713,27 +814,37 @@ const RAMP = ['$defs', 'ramp'] as const;
 const RAMP_KEY = ['properties', 'ramp'] as const;
 
 /**
- * The raster channels, read off the schema's TOP-LEVEL `oneOf` rather than
- * restated: exactly one of these keys per document.
+ * ═══ THE EXCLUSIVE ARMS OF THE DOCUMENT, read off the schema's TOP-LEVEL
+ * `oneOf` rather than restated: EXACTLY ONE of these keys per document. ═══
  *
  * Read from the `oneOf` and not from `properties`, because it is the `oneOf`
- * that carries the exclusivity. When a channel is added, or the exclusivity is
- * ever relaxed, this list changes with it and the gate that asserts its contents
- * goes red.
+ * that carries the exclusivity. When an arm is added, or the exclusivity is ever
+ * relaxed, this list changes with it and the gates that assert its contents go
+ * red.
  *
- * ⚠ IT WAS TWO AND IS NOW THREE (`base_swap`, empyrean 5bd76ba). Nothing here
- * needed editing for that, which is the point of deriving it — but the sentence
- * "the two raster channels" was in this docblock and would have gone quietly
- * wrong, so treat the COUNT as a thing that moves and the DERIVATION as the
- * thing that does not.
+ * ⚠ IT WAS CALLED `EFFECTS_PRESET_RASTER_CHANNELS` UNTIL empyrean `c4a1da2`,
+ * AND THE RENAME IS NOT COSMETIC. Through 9233883 and 5bd76ba the `oneOf`'s arms
+ * and the ep_raster channels were the SAME SET, so one name served both
+ * questions and nothing distinguished them. `boundary` splits them: it is the
+ * fourth arm of this `oneOf` and it is NOT a raster channel — it lowers into
+ * `EffectsPreset.ep_patched`, the SIBLING of the `ep_raster` field the other
+ * three share, and `preset()` refuses a record carrying both because whichever
+ * installs last wins destructively (aeon `preset.emp:153-154`). A list read off
+ * the `oneOf` and NAMED "raster channels" was therefore answering the wrong
+ * question the moment this arm landed — the same class of defect as a constant
+ * used as two quantities, one directory up.
+ *
+ * WHICH QUESTION IS WHICH:
+ *   • "may these two keys coexist?"        → `EFFECTS_PRESET_PROGRAM_ARMS` (no)
+ *   • "does this key write ep_raster?"     → `EFFECTS_PRESET_RASTER_CHANNELS`
  */
-export const EFFECTS_PRESET_RASTER_CHANNELS: readonly string[] = (() => {
+export const EFFECTS_PRESET_PROGRAM_ARMS: readonly string[] = (() => {
   const branches = (EFFECTS_PRESET_SCHEMA as Record<string, unknown>).oneOf;
   if (!Array.isArray(branches) || branches.length === 0) {
     throw new Error(
       'aurora-effects-preset.schema.json no longer carries a top-level oneOf, which is where the ' +
-      'exactly-one-raster-channel rule lives and where EFFECTS_PRESET_RASTER_CHANNELS is derived ' +
-      'from. Re-read the schema — do NOT hardcode the channel names.',
+      'exactly-one-program rule lives and where EFFECTS_PRESET_PROGRAM_ARMS is derived from. ' +
+      'Re-read the schema — do NOT hardcode the arm names.',
     );
   }
   const names = branches.map((b) => {
@@ -741,7 +852,7 @@ export const EFFECTS_PRESET_RASTER_CHANNELS: readonly string[] = (() => {
     if (!Array.isArray(req) || req.length !== 1 || typeof req[0] !== 'string') {
       throw new Error(
         'a top-level oneOf branch in aurora-effects-preset.schema.json is not the single-`required`' +
-        ' shape EFFECTS_PRESET_RASTER_CHANNELS reads. Re-read the schema.',
+        ' shape EFFECTS_PRESET_PROGRAM_ARMS reads. Re-read the schema.',
       );
     }
     return req[0];
@@ -750,21 +861,112 @@ export const EFFECTS_PRESET_RASTER_CHANNELS: readonly string[] = (() => {
 })();
 
 /**
- * Which raster channel a document carries, or null when it carries neither.
+ * THE ARMS THAT LOWER INTO `ep_patched` INSTEAD OF `ep_raster` — DERIVED from
+ * each arm's own description, not classified by hand.
+ *
+ * The schema states the lowering field in the arm's own paragraph: `boundary`
+ * reads "it lowers into EffectsPreset.ep_patched, the sibling of the ep_raster
+ * field the other three share". So the split between the two questions above is
+ * a READING of the contract rather than a list Aurora maintains beside it.
+ *
+ * ⚠ WHAT HAPPENS IF THIS DERIVATION GOES WRONG, because "an empty list" is the
+ * shape a broken regex returns and this must not be able to pass quietly. If the
+ * sentence moves, `boundary` falls back INTO `EFFECTS_PRESET_RASTER_CHANNELS`,
+ * and the renderer's per-channel registries — `RASTER_CHANNEL_NOUNS`,
+ * `RASTER_CHANNEL_LABELS` — have module-load guards that throw on a channel with
+ * no entry. So the failure surfaces as a LOUD refusal to load the panel, not as
+ * a boundary document silently offered a raster editor. That is the direction
+ * this file is allowed to fail in; it is asserted by a poison row in
+ * test/formats/effects-preset-boundary.test.ts rather than assumed.
+ */
+export const EFFECTS_PRESET_PATCHED_ARMS: readonly string[] = Object.freeze(
+  EFFECTS_PRESET_PROGRAM_ARMS.filter((arm) => {
+    const node = (EFFECTS_PRESET_SCHEMA.properties as Record<string, Record<string, unknown>>)[arm];
+    if (node === undefined) {
+      throw new Error(
+        `aurora-effects-preset.schema.json's top-level oneOf names "${arm}", which its ` +
+        '`properties` does not declare. An arm with no property node is a document key nothing ' +
+        'can describe. Re-read the schema.',
+      );
+    }
+    return /lowers into EffectsPreset\.ep_patched/.test(String(node.description ?? ''));
+  }),
+);
+
+/**
+ * The RASTER channels: the arms that compete for `EffectsPreset.ep_raster`.
+ *
+ * The complement of `EFFECTS_PRESET_PATCHED_ARMS` within
+ * `EFFECTS_PRESET_PROGRAM_ARMS`, so the two lists cannot drift apart and neither
+ * is typed. Every per-channel registry in the renderer is keyed off THIS list;
+ * the exclusivity rule is keyed off `EFFECTS_PRESET_PROGRAM_ARMS`.
+ */
+export const EFFECTS_PRESET_RASTER_CHANNELS: readonly string[] = Object.freeze(
+  EFFECTS_PRESET_PROGRAM_ARMS.filter((a) => !EFFECTS_PRESET_PATCHED_ARMS.includes(a)),
+);
+
+// ═══ THE INTERLOCK: the two lists really do partition the arms. A split that
+// lost or duplicated an arm would leave a key that no registry is keyed by and
+// no exclusivity rule names — the silent state both lists exist to prevent.
+{
+  const union = [...EFFECTS_PRESET_RASTER_CHANNELS, ...EFFECTS_PRESET_PATCHED_ARMS].sort();
+  if (union.join(',') !== [...EFFECTS_PRESET_PROGRAM_ARMS].sort().join(',')) {
+    throw new Error(
+      'the raster/patched split of aurora-effects-preset.schema.json\'s top-level oneOf does not ' +
+      `partition it: arms ${JSON.stringify(EFFECTS_PRESET_PROGRAM_ARMS)}, raster ` +
+      `${JSON.stringify(EFFECTS_PRESET_RASTER_CHANNELS)}, patched ` +
+      `${JSON.stringify(EFFECTS_PRESET_PATCHED_ARMS)}. Re-read the schema.`,
+    );
+  }
+  if (EFFECTS_PRESET_RASTER_CHANNELS.length === 0) {
+    throw new Error(
+      'every arm of aurora-effects-preset.schema.json\'s top-level oneOf now claims to lower into ' +
+      'ep_patched, so there is no raster channel left. Either the contract has changed shape or ' +
+      'the ep_patched sentence is matching arms it should not. Re-read the schema.',
+    );
+  }
+}
+
+/**
+ * Which EXCLUSIVE ARM a document carries, or null when it carries none.
+ *
+ * ⚠ ASK THIS, NOT `presetRasterChannel`, WHENEVER THE QUESTION IS "what program
+ * is in this document" OR "what would this edit collide with". A boundary
+ * document has NO raster channel, so `presetRasterChannel` correctly returns
+ * null for it — and a caller that read that null as "this document is empty,
+ * anything may be written here" would author the two-arm document the schema
+ * refuses. That is precisely what `bandControlsRefusal` did until `boundary`
+ * landed.
+ *
+ * It reports what the document HAS; it is not the refusal. The schema's `oneOf`
+ * is, on parse and on serialize alike.
+ */
+export function presetProgramArm(preset: Partial<EffectsPreset>): string | null {
+  const carried = EFFECTS_PRESET_PROGRAM_ARMS
+    .filter((a) => (preset as Record<string, unknown>)[a] !== undefined);
+  // More than one is a document the schema refuses; report the first by the
+  // schema's own order rather than inventing a precedence, and let the refusal
+  // come from where refusals come from.
+  return carried.length > 0 ? carried[0] : null;
+}
+
+/**
+ * Which RASTER channel a document carries, or null when it carries none.
  *
  * The narrowing helper the `EffectsPreset` interface's comment points at: code
  * that must branch on the channel asks HERE rather than testing `bands` for
  * undefined, so there is one spelling of the question. It reports what the
  * document HAS; it is not the refusal — the schema's `oneOf` is, on parse and on
  * serialize alike, and it is what refuses a document carrying both.
+ *
+ * ⚠ NULL HAS TWO CAUSES SINCE empyrean `c4a1da2` and they are not the same
+ * document: a preset with NO program at all, and a preset carrying a `boundary`,
+ * which is a program in the sibling field. Use `presetProgramArm` when the
+ * difference matters — and it usually does.
  */
-export function presetRasterChannel(
-  preset: Partial<EffectsPreset>,
-): 'bands' | 'ramp' | 'base_swap' | null {
-  if (preset.base_swap !== undefined) return 'base_swap';
-  if (preset.ramp !== undefined) return 'ramp';
-  if (preset.bands !== undefined) return 'bands';
-  return null;
+export function presetRasterChannel(preset: Partial<EffectsPreset>): string | null {
+  const arm = presetProgramArm(preset);
+  return arm !== null && EFFECTS_PRESET_RASTER_CHANNELS.includes(arm) ? arm : null;
 }
 
 /** `top`'s inclusive range, 3..222 in the vendored schema. */
@@ -1223,6 +1425,101 @@ export function isBaseSwapTargetAligned(target: number): boolean {
     && target <= EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.max
     && target % EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE === 0;
 }
+
+// ---------------------------------------------------------------------------
+// The boundary key (empyrean c4a1da2, §7.6) — the fourth arm, and the FIRST one
+// that is not a raster channel. Ranges read off the schema; the two cross-field
+// rules the schema CANNOT express live in `boundary.ts`, deliberately marked
+// advisory, and are the GENERATOR's to enforce.
+// ---------------------------------------------------------------------------
+
+const BOUNDARY = ['$defs', 'boundary'] as const;
+
+/** `boundary`'s required member names, in the schema's own `required` order. */
+export const EFFECTS_PRESET_BOUNDARY_KEYS: readonly string[] =
+  Object.freeze([...(schemaNode([...BOUNDARY]).required as string[])]);
+
+/**
+ * The DEFAULT fire line's inclusive range, 3..223 in the vendored schema —
+ * `fire()`'s own ensure, the same one `base_swap.line` restates.
+ *
+ * ⚠ IN RANGE IS NOT LEGAL. `patchable()` additionally refuses a `line` outside
+ * this document's own `[lo, hi]`, and no JSON Schema keyword can say that. See
+ * `boundaryAdvisories`.
+ */
+export const EFFECTS_PRESET_BOUNDARY_LINE_RANGE =
+  schemaRange([...BOUNDARY, 'properties', 'line']);
+
+/** The patch channel index's inclusive range, 0..`RASTER_MAX_PATCH`-1. */
+export const EFFECTS_PRESET_BOUNDARY_CHANNEL_RANGE =
+  schemaRange([...BOUNDARY, 'properties', 'channel']);
+
+/** `lo`'s inclusive range. SCREEN lines — nothing on this path converts. */
+export const EFFECTS_PRESET_BOUNDARY_LO_RANGE = schemaRange([...BOUNDARY, 'properties', 'lo']);
+
+/** `hi`'s inclusive range. SCREEN lines — nothing on this path converts. */
+export const EFFECTS_PRESET_BOUNDARY_HI_RANGE = schemaRange([...BOUNDARY, 'properties', 'hi']);
+
+/**
+ * ⚠ THE PATCH CHANNEL INDEX SPACE IS ONE SPACE, and this asserts it rather than
+ * leaving two documents to agree by coincidence.
+ *
+ * `boundary.channel` indexes `patch_world_ys` / `patch_motion`; those arrays are
+ * bounded by `EFFECTS_PRESET_MAX_PATCH` (`maxItems`), and `channel` is bounded
+ * by its own `minimum`/`maximum`. Two independent statements of `RASTER_MAX_PATCH`
+ * in one file. If they ever disagree, an author could name a channel no
+ * positional key can reach — a boundary that can never be made to move, with
+ * nothing on screen saying why.
+ */
+{
+  const c = EFFECTS_PRESET_BOUNDARY_CHANNEL_RANGE;
+  if (c.min !== 0 || c.max !== EFFECTS_PRESET_MAX_PATCH - 1) {
+    throw new Error(
+      `aurora-effects-preset.schema.json bounds boundary.channel at ${c.min}..${c.max} but bounds ` +
+      `patch_world_ys at ${EFFECTS_PRESET_MAX_PATCH} items, so the two statements of ` +
+      'RASTER_MAX_PATCH disagree. A channel outside the positional keys\' reach is a boundary ' +
+      'that can never be seeded or swept. Re-read the schema — do NOT reconcile them here.',
+    );
+  }
+}
+
+/** `on`'s declared arms — exactly one, `pal_region`, and no cram arm is reserved. */
+export const EFFECTS_PRESET_BOUNDARY_ON_ARMS: readonly string[] = Object.freeze(
+  Object.keys(schemaNode([...BOUNDARY, 'properties', 'on', 'properties'])),
+);
+
+/**
+ * `$defs.tint_region`'s required members — and the proof that `addr` is NOT one
+ * of them.
+ *
+ * The whole point of `tint_region` existing beside `pal_region` is the ABSENCE
+ * of `addr`, so the absence is asserted at module load rather than left to a
+ * vector row: if the contract ever grew it back, this codec would be silently
+ * accepting a document with two sources for one CRAM address.
+ */
+export const EFFECTS_PRESET_TINT_REGION_KEYS: readonly string[] = (() => {
+  const fields = presetDefFields('tint_region');
+  const declared = [...fields.required, ...fields.optional];
+  if (declared.includes('addr')) {
+    throw new Error(
+      'aurora-effects-preset.schema.json\'s $defs.tint_region now declares `addr`. It exists ' +
+      'precisely because fx_tint_band DERIVES the CRAM address from pal_line and entry, so an ' +
+      'authored addr would be one fact with two sources. If the contract really has changed, ' +
+      'this codec and its refusal need rewriting — do not just widen the type.',
+    );
+  }
+  const palRegion = presetDefFields('pal_region');
+  const expected = [...palRegion.required, ...palRegion.optional].filter((k) => k !== 'addr').sort();
+  if ([...declared].sort().join(',') !== expected.join(',')) {
+    throw new Error(
+      'aurora-effects-preset.schema.json\'s $defs.tint_region is no longer $defs.pal_region minus ' +
+      `addr: tint_region declares ${JSON.stringify([...declared].sort())}, pal_region minus addr ` +
+      `is ${JSON.stringify(expected)}. The schema's own words for tint_region are "$defs.` +
+      'pal_region WITHOUT addr"; if that has stopped being true, read it again.',
+    );
+  }
+  return Object.freeze([...fields.required]);
+})();
 
 /**
  * The wave-2 vocabulary the contract has AGREED and this generator has NOT

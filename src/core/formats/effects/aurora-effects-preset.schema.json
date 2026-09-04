@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://empyrean/contract/aurora-effects-preset.schema.json",
-  "title": "Aurora Effects Raster Preset Document (wave 2: bands, cycles, variants, patch anchors, ramp, base_swap)",
+  "title": "Aurora Effects Raster Preset Document (wave 2: bands, cycles, variants, patch anchors, ramp, base_swap, boundary)",
   "description": "Wire shape for one raster preset document, games/sonic4/data/editor/effects/presets/<preset_id>.json (aeon repo, editor-owned tree). A BAND IS NOT A SCENE FIELD: a scene is a parallax_config; the raster program is a channel of an EffectsPreset bound per SECTION (aeon docs/superpowers/specs/2026-08-28-raster-band-ownership-design.md section 16.1), so bands live here, in the directory docs/AURORA_EFFECTS_SCHEMA.md section 7 reserved for them. NORMATIVE for SHAPE only: which keys exist, their JSON types, and the exactly-one arm rule. NUMERIC BOUNDS ARE DELIBERATELY NOT RESTATED HERE (screen-line range, CRAM address range, burst ceilings, band count, height minimum, the palette-line-0 rule): the engine's own ensures in engine/effects/raster_dsl.emp fire at build time with the measurement behind each rule, and aeon's generator forwards values verbatim so the author reads that sentence (aeon tools/EFFECTS_CONSUMER_CONTRACT.md section 2.4 at c03b9812, the consumer half this schema pairs with). Closed: any key not listed is refused; adding one is a contract change. cycles and variants were added 2026-08-30 (docs/AURORA_EFFECTS_SCHEMA.md section 7.2, DoD item 5, against aeon's demand artifact 8ec2b05d): they are OTHER CHANNELS OF THE SAME EffectsPreset record the raster program is a channel of (ep_cycle and ep_variants are fields of that record, aeon engine/effects/preset.emp:56-67), which is why they live in this document beside bands and why one rasterRef binds the whole of it (ruling Q1). Reserved and refused by name (still wave-2 open): fires. Known limits with NO enforcing assertion, stated so a silence is not read as coverage: nothing checks that an authored preset is BOUND to a section (an unbound preset costs ROM and shows nothing; binding is a hand-authored preset() call, BAND-FIRST-CONSUMER territory); nothing checks the total ROM cost of the preset set; the runtime variant-to-pal_line binding behind a pal_region band cannot be checked at build time (a document carrying BOTH bands and variants makes the slot half of that binding visible in one file, but no assertion is added here: ruling Q6 defers it, because an absent variants entry means the section keeps its hand-authored slot and the document is not the whole truth); nothing checks that a band is VISIBLE; nothing here refuses an empty cycles array or a variants array longer than the engine's slot count, both of which are the generator's refusals (section 7.2).",
   "type": "object",
   "required": [
@@ -22,6 +22,11 @@
     {
       "required": [
         "base_swap"
+      ]
+    },
+    {
+      "required": [
+        "boundary"
       ]
     }
   ],
@@ -111,11 +116,126 @@
     },
     "base_swap": {
       "$ref": "#/$defs/base_swap",
-      "description": "The mid-frame nametable-base SWAP: one OP_SET_REG raster fire on one screen line re-pointing Plane A's base register (VDP reg $02) at a VRAM address, the Batman & Robin trick, item 11a. Added 2026-09-03 (docs/AURORA_EFFECTS_SCHEMA.md section 7.5, DoD item 11, against aeon's shape note docs/superpowers/specs/2026-09-03-item11a-base-swap-key-shape.md at the landing aeon 850d4c60, which SHIPPED the key ahead of this CR by its own booking's call, with a real section bound: presets/ojz_sec6_baseswap.json {line: 160, target: 57344} via section_6.meta.json rasterRef). ONE CLOSED OBJECT, never an array: one raster: channel per preset. EXACTLY ONE OF bands, ramp OR base_swap per document (this file's top-level oneOf): all three lower into the same EffectsPreset.ep_raster channel (preset.emp:62/141) and no combinator exists; the contract refuses the pair on the strict side and widens only when aeon ships one (the ramp rule, section 7.4). ABSENT: no swap; the section's raster channel is whatever bands or ramp says, or Raster_Program_None if nothing is bound. LOWERING (aeon effects_gen.py at 850d4c60): raster_program([fire(line, [reg_set($8200 | vdp_base_reg(VdpBase.PlaneA, target))])]), the SAME three calls the hand-authored OJZ_BaseSwap makes; the generator forwards both values VERBATIM and restates no range, the engine constructs own them. NO capability bit gates it, unlike ramp's CAP_DENSE_TIER: OP_SET_REG dispatches unconditionally in every game, so no ensure is re-emitted at the generated call site; a real asymmetry with ramp, stated so nobody assumes one by analogy. NOT DEBUG-gated on the generated path: the section-6 emission is unconditional pub data reaching s4.bin (aeon measured EditorRaster_OJZ_Act1_ojz_sec6_baseswap at $013446 in the release listing, its 22 bytes identical to OJZ_BaseSwap's own program). WHAT AN AUTHOR SEES: from the swap line down, Plane A draws from the target nametable; the top of the frame is untouched, and the swap is self-restoring at the frame top (aeon item 11a on-screen captures, aeon 587873d9)."
+      "description": "The mid-frame nametable-base SWAP: one OP_SET_REG raster fire on one screen line re-pointing Plane A's base register (VDP reg $02) at a VRAM address, the Batman & Robin trick, item 11a. Added 2026-09-03 (docs/AURORA_EFFECTS_SCHEMA.md section 7.5, DoD item 11, against aeon's shape note docs/superpowers/specs/2026-09-03-item11a-base-swap-key-shape.md at the landing aeon 850d4c60, which SHIPPED the key ahead of this CR by its own booking's call, with a real section bound: presets/ojz_sec6_baseswap.json {line: 160, target: 57344} via section_6.meta.json rasterRef; that document reads {line: 3} since aeon 8bf6df74, the owner's 'the swap goes to the top', so 160 is the value AT 850d4c60 and not the current binding). ONE CLOSED OBJECT, never an array: one raster: channel per preset. EXACTLY ONE OF bands, ramp OR base_swap per document (this file's top-level oneOf): all three lower into the same EffectsPreset.ep_raster channel (preset.emp:62/141) and no combinator exists; the contract refuses the pair on the strict side and widens only when aeon ships one (the ramp rule, section 7.4). ABSENT: no swap; the section's raster channel is whatever bands or ramp says, or Raster_Program_None if nothing is bound. LOWERING (aeon effects_gen.py at 850d4c60): raster_program([fire(line, [reg_set($8200 | vdp_base_reg(VdpBase.PlaneA, target))])]), the SAME three calls the hand-authored OJZ_BaseSwap makes; the generator forwards both values VERBATIM and restates no range, the engine constructs own them. NO capability bit gates it, unlike ramp's CAP_DENSE_TIER: OP_SET_REG dispatches unconditionally in every game, so no ensure is re-emitted at the generated call site; a real asymmetry with ramp, stated so nobody assumes one by analogy. NOT DEBUG-gated on the generated path: the section-6 emission is unconditional pub data reaching s4.bin (aeon measured EditorRaster_OJZ_Act1_ojz_sec6_baseswap at $013446 in the release listing, its 22 bytes identical to OJZ_BaseSwap's own program). WHAT AN AUTHOR SEES: from the swap line down, Plane A draws from the target nametable; the top of the frame is untouched, and the swap is self-restoring at the frame top (aeon item 11a on-screen captures, aeon 587873d9)."
+    },
+    "boundary": {
+      "$ref": "#/$defs/boundary",
+      "description": "A patchable palette BOUNDARY: one raster fire switching a staged palette region at a screen line, moved every frame by patch channel `channel`'s world anchor; the shipped moving water, authorable for the first time. Added 2026-09-04 (docs/AURORA_EFFECTS_SCHEMA.md section 7.6, DoD item 4's authoring half, aeon key-shape artifact 3d917657). The FOURTH exclusive arm of the top-level oneOf: it lowers into EffectsPreset.ep_patched, the sibling of the ep_raster field the other three share, and preset() refuses both at once (aeon engine/effects/preset.emp:153-154). Absent = the section keeps its hand-authored program; no null spelling. Pair it with patch_world_ys[channel] and patch_motion[channel] in the same document to make it move. Shape and every rule: $defs.boundary."
     }
   },
   "unevaluatedProperties": false,
   "$defs": {
+    "boundary": {
+      "type": "object",
+      "required": [
+        "line",
+        "channel",
+        "lo",
+        "hi",
+        "on",
+        "sh"
+      ],
+      "description": "A PATCHABLE palette BOUNDARY: ONE raster fire that switches a staged palette region at a screen line and never switches back, whose line is then MOVED every frame by a patch channel's world anchor. This is the shipped moving water (aeon games/sonic4/data/effects/ojz_effects.emp:1556-1557 at origin/master 7c1a0f78: patchable(fx_tint_band(line: 100, slot: 0, pal_line: 2, entry: 4, count: 3, sh: 1), ch: 0, lo: 3, hi: 220, offscreen_ship: 1)), and it is the shape a document could not declare until now: a band ($defs.band) is TWO fires (ON plus a derived restore) and patchable() takes exactly one (raster_dsl.emp:461-462), so the shape a document could author could not move and the shape that moves could not be authored. Added 2026-09-04 (docs/AURORA_EFFECTS_SCHEMA.md section 7.6, EFFECTS-W1 DoD item 4's authoring half, against aeon's key-shape artifact docs/superpowers/specs/2026-09-04-channel-band-key-shape.md at aeon 3d917657, on origin/docs/key-shapes-9c-and-channel-band). LOWERING (aeon's artifact section 4; step 4 is aeon's generator): patchable(fx_tint_band(line, slot, pal_line, entry, count, sh), ch: channel, lo, hi, offscreen_ship), the SAME call the hand-authored program makes; every value forwarded VERBATIM, 1:1, no unit conversion on any field. A FOURTH EXCLUSIVE ARM of this document's top-level oneOf, exclusive for a DIFFERENT REASON than the other three are with each other: bands, ramp and base_swap compete for ONE field, EffectsPreset.ep_raster; a patchable fire list lowers into the SIBLING field ep_patched (preset.emp:62-63, via patched_program raster_dsl.emp:3576), and preset() refuses a record carrying both because whichever installs last wins DESTRUCTIVELY (preset.emp:153-154). ONE CLOSED OBJECT, never an array: one patched template per preset. ABSENT means the section keeps whatever raster or patched program it had; there is NO null spelling (a null arm would be a document with zero programs, which this schema refuses; say nothing to say none). The CHANNEL is the same index space as patch_world_ys, patch_motion and a scene's anchor.at.channel, authored and never an encoder-assigned ordinal (raster_dsl.emp:452-455): the anchor that moves this boundary is patch_world_ys[channel] seeded and patch_motion[channel] swept, so a moving water is boundary plus both positional keys at that index, in the same document. Bounds restated here are single-field engine ensures so the editor is the first refusal (raster_dsl.emp:360-361 fire, :463-467 and :475-478 patchable); TWO refusals the schema CANNOT express and the generator owes (aeon's artifact section 4): line outside [lo, hi] (:475-476), and a sweep whose peak-to-peak travel 2 * (256 >> amp_shift) exceeds hi - lo + 1 lines (today only tools/test_anchor_sweep_band.py holds both numbers, for the hand-authored module; once both live in one document the check belongs in effects_gen.py beside _check_patch_context). Travel that leaves [lo, hi] is handled ASYMMETRICALLY by the engine (raster.emp:1979-1983): past hi the record is DROPPED for the frame, below lo it is CLAMPED UP and still emitted, returning on the first frame the latched line re-enters the band. What an author sees: from the boundary line down, the named colours are the staged variant's; above it the base palette; the line follows the world anchor.",
+      "properties": {
+        "line": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 223,
+          "description": "The template's DEFAULT screen line, where the boundary sits before any patch, and the line the fire is built at. fire()'s own ensure, 3..223 (raster_dsl.emp:360-361: lines 0-2 belong to the priming records), restated here; patchable() additionally refuses a line outside its own [lo, hi] (:475-476), a cross-field rule this schema cannot express and the generator must. Required, no default. The shipped water uses 100."
+        },
+        "channel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "description": "The patch channel this boundary follows, 0..RASTER_MAX_PATCH-1 (RASTER_MAX_PATCH = 4, raster_dsl.emp:2131; ensure at :463-464). The SAME index space as patch_world_ys[i], patch_motion[i] and a scene's anchor.at.channel; authored, never assigned by an encoder (:452-455). Two patchable records may not share a channel (guard 11, :3144-3166 at the artifact's revision): one boundary per channel per section. Required."
+        },
+        "lo": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 223,
+          "description": "The lowest SCREEN LINE the boundary may be patched to; with hi, the band the anchor is confined to. SCREEN lines, not fire lines: the engine converts once (subq.w #1, raster.emp:1977) and an editor that subtracted 1 would be the class of bug section 7.3 forbids. lo >= 3, lo <= hi (raster_dsl.emp:465-467); the lo <= hi half is cross-field and the generator's. Required. Below lo the engine CLAMPS UP and still emits (raster.emp:1981-1983)."
+        },
+        "hi": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 223,
+          "description": "The highest SCREEN LINE the boundary may be patched to. hi <= 223 (raster_dsl.emp:465-466). Required. Past hi the engine DROPS the record for that frame and the tint is absent until the latched line re-enters [lo, hi] (raster.emp:1979-1980); a sweep must fit: 2 * (256 >> amp_shift) <= hi - lo + 1, the check the generator owes once both numbers live in one document."
+        },
+        "offscreen_ship": {
+          "description": "When this channel's anchor leaves the TOP of the screen, re-ship the staged colours at the frame top so the tint survives the camera leaving the band at the lo end (patchable's offscreen_ship, raster_dsl.emp:150-154, :477-478); true is what the shipped water sets. Requires exactly one stream_pal_region op on the fire (:486-487), which fx_tint_band always has, so the document cannot get this wrong. false/0 or true/1, the sh spelling (aeon _render_bool_int). OPTIONAL, default false: patchable's own default (:460).",
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "integer",
+              "enum": [
+                0,
+                1
+              ]
+            }
+          ]
+        },
+        "on": {
+          "type": "object",
+          "description": "WHAT the boundary switches: exactly one arm, pal_region, the staged palette region fx_tint_band streams (raster_dsl.emp:654-663 builds region_boundary(:436-443) from it). The region carries NO addr: fx_tint_band DERIVES the CRAM address from pal_line and entry (:657, 0 * 128 + pal_line * 32 + entry * 2), so a document carrying addr would be one fact computed twice, and $defs.tint_region refuses it by closure. A cram arm is deliberately NOT here and none is reserved: fx_tint_band takes a staged region only, and a boundary that writes raw CRAM words would be a different constructor and its own CR. A vsplit arm (the shipped program's second patchable record, fx_vscroll_split at ojz_effects.emp:1558-1559) is deliberately NOT reserved either, per the approach precedent of section 7.3: patchable's offscreen_ship requires a stream_pal_region op a vscroll split does not have (:486-487), so a reserved arm would carry a hole; adding one later is its own CR.",
+          "properties": {
+            "pal_region": {
+              "$ref": "#/$defs/tint_region"
+            }
+          },
+          "required": [
+            "pal_region"
+          ],
+          "unevaluatedProperties": false
+        },
+        "sh": {
+          "description": "Shadow/Highlight on for the boundary: false/0 = one stream op on the fire; true/1 adds reg_sh_on to the SAME fire, one fire either way (region_boundary raster_dsl.emp:438-442: sh adds an op, never a fire, which is why this shape stays patchable). Same spelling as $defs.band.sh. Required, no default, deliberately (whether an effect changes a mode register is stated at the call site). The shipped water sets it.",
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "integer",
+              "enum": [
+                0,
+                1
+              ]
+            }
+          ]
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "tint_region": {
+      "type": "object",
+      "required": [
+        "slot",
+        "pal_line",
+        "entry",
+        "count"
+      ],
+      "description": "$defs.pal_region WITHOUT addr: the four arguments fx_tint_band takes (raster_dsl.emp:654-655). The CRAM destination is derived by the constructor from pal_line and entry (:657), so addr is refused here by closure rather than accepted and cross-checked: a document is one source for one byte. Every range is stream_pal_region's own ensure (:267-281: slot 0..1, pal_line 1..3, entry 0..15, count within RASTER_BURST_MAX_DEEP and within the line) and is NOT restated, section 7.1's shape-only posture; the engine message carries the measurement.",
+      "properties": {
+        "slot": {
+          "type": "integer",
+          "description": "Which Pal_Variant_Stage slot the colours are streamed FROM; not the CRAM destination. raster_dsl.emp stream_pal_region (slot range)."
+        },
+        "pal_line": {
+          "type": "integer",
+          "description": "The staging source's palette line, and the line the derived CRAM address lands on. raster_dsl.emp stream_pal_region."
+        },
+        "entry": {
+          "type": "integer",
+          "description": "The staging source's first entry, and the entry the derived CRAM address lands on. raster_dsl.emp stream_pal_region."
+        },
+        "count": {
+          "type": "integer",
+          "description": "How many colours are swapped. raster_dsl.emp stream_pal_region (burst ceiling, entry + count within the line). The runtime binding of the variant to pal_line is NOT checkable at build time."
+        }
+      },
+      "unevaluatedProperties": false
+    },
     "base_swap": {
       "type": "object",
       "description": "One mid-frame base swap, the document face of raster_program([fire(line, [reg_set($8200 | vdp_base_reg(VdpBase.PlaneA, target))])]). Both members REQUIRED (the fire and the register op default nothing); the object is CLOSED. Ranges restate the two engine ensures the value meets next (fire's line range, vdp_base_reg's granule) so the editor is the first refusal, never a silently wrong register byte.",
@@ -128,7 +248,7 @@
           "type": "integer",
           "minimum": 3,
           "maximum": 223,
-          "description": "The screen line the swap fires on, one OP_SET_REG fire. Authored range is fire()'s own ensure, 3..223 (aeon engine/effects/raster_dsl.emp:360-361: lines 0-2 belong to the priming records, 223 is the frame-rewind interlock), restated here so an author meets the refusal in the editor; the generator forwards it verbatim. Required, no default. The shipped section-6 preset fires on 160."
+          "description": "The screen line the swap fires on, one OP_SET_REG fire. Authored range is fire()'s own ensure, 3..223 (aeon engine/effects/raster_dsl.emp:360-361: lines 0-2 belong to the priming records, 223 is the frame-rewind interlock), restated here so an author meets the refusal in the editor; the generator forwards it verbatim. Required, no default. The shipped section-6 preset fired on 160 as bound at aeon 850d4c60 and on 3 since aeon 8bf6df74 (the owner's 'the swap goes to the top')."
         },
         "target": {
           "type": "integer",

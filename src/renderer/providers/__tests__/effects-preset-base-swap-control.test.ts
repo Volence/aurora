@@ -33,6 +33,8 @@
 // `components/effects/__tests__/base-swap-control-wording.test.ts`.
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import {
   EFFECTS_PRESET_BASE_SWAP_KEYS,
   EFFECTS_PRESET_BASE_SWAP_LINE_RANGE,
@@ -105,6 +107,54 @@ describe('a fresh base swap is legal by construction, and is the contract\'s wor
     expect(isBaseSwapTargetAligned(seed.target)).toBe(true);
     expect(seed.line).toBeGreaterThanOrEqual(LINE.min);
     expect(seed.line).toBeLessThanOrEqual(LINE.max);
+  });
+
+  /**
+   * ═══ ⚠ THE SENTENCE THIS SEED IS PARSED FROM NOW CARRIES **TWO** LINE
+   * NUMBERS, AND THE STALE ONE IS FIRST. ═══
+   *
+   * Until empyrean `c4a1da2` the schema read "The shipped section-6 preset fires
+   * on 160." — one number, present tense, and the derivation could not be wrong.
+   * It now reads "…fired on 160 as bound at aeon 850d4c60 and on 3 since aeon
+   * 8bf6df74", because the owner moved the swap to the top of the frame. The
+   * OBVIOUS repair to the broken regex — relax `/fires on/` to `/fired on/` —
+   * matches, is green, and seeds **160**, a value the sentence exists to say is
+   * superseded.
+   *
+   * ⚠ AND EVERY ROW ABOVE STAYS GREEN THROUGH THAT. 160 is inside the line
+   * range, on no granule that matters, and refused by nothing: the seed rows
+   * check LEGALITY, and a stale binding is perfectly legal. So the wrong repair
+   * was invisible to this whole file until this row.
+   *
+   * THE CHECK IS AGAINST A SECOND, INDEPENDENT DOCUMENT — not a second reading
+   * of the same sentence, which would agree with a wrong derivation for the same
+   * reason. `preset-canonical-golden.json` carries aeon's OWN section-6 preset,
+   * byte-for-byte from `origin/master`; the line it actually binds is the line a
+   * fresh document must be seeded with. Two repos, one number.
+   */
+  it('seeds the CURRENT binding, not the superseded one the same sentence names', () => {
+    const golden = JSON.parse(readFileSync(
+      resolve(__dirname, '../../../../test/fixtures/effects/preset-canonical-golden.json'), 'utf8',
+    )) as { documents: Record<string, string> };
+    const shipped = JSON.parse(golden.documents.ojz_sec6_baseswap) as
+      { base_swap: { line: number } };
+    // Anti-vacuous: the fixture really is aeon's section-6 base-swap document.
+    expect(Number.isInteger(shipped.base_swap.line)).toBe(true);
+    expect(
+      newBaseSwap().line,
+      "a fresh base_swap is not seeded with the line aeon's section-6 preset actually binds. If "
+      + 'the schema sentence names two lines, this derivation is reading the SUPERSEDED clause — '
+      + 'the historical value, which is legal, in range and refused by nothing, so every other '
+      + 'row in this file stays green while new documents are born stale.',
+    ).toBe(shipped.base_swap.line);
+    // ...and the schema really does name a DIFFERENT, superseded line beside it,
+    // so this row is guarding against a live hazard rather than a hypothetical.
+    const was = /preset fired on (\d+) as bound at aeon [0-9a-f]{6,}/
+      .exec(BASE_SWAP_FIELD_TITLES.line);
+    expect(was, "the schema no longer names a superseded section-6 line — if it has gone back to "
+      + 'stating one number, this row still holds but its hazard is gone; see BASE_SWAP_SEED_LINE')
+      .toBeTruthy();
+    expect(Number(was![1])).not.toBe(newBaseSwap().line);
   });
 
   /**
@@ -532,7 +582,9 @@ describe('every per-channel surface is a registry, not a branch', () => {
       if (c === 'bands') { expect(why).toBeNull(); continue; }
       expect(why, `the band controls came back to life on a ${c} document`).not.toBeNull();
       expect(why).not.toContain('undefined');
-      expect(why).toMatch(/EXACTLY ONE raster program/);
+      expect(why).toMatch(/EXACTLY ONE program/)  // ⚠ 'raster program' until empyrean c4a1da2: the
+      // fourth arm, `boundary`, is a PATCHED program and the rule covers it too, so
+      // the sentence dropped a word it could no longer justify.;
     }
   });
 

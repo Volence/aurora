@@ -63,6 +63,13 @@ import {
 
 const S = EFFECTS_PRESET_SCHEMA as unknown as JsonSchema;
 
+/**
+ * HOW MANY FORMS THE EVALUATOR WILL NAME — read off the schema, never typed.
+ * See test/formats/effects-preset-base-swap.test.ts's copy for why: this was the
+ * literal `3` and went red when empyrean `c4a1da2` added a fourth arm.
+ */
+const ARM_COUNT = (EFFECTS_PRESET_SCHEMA.oneOf as unknown[]).length;
+
 /** The contract's own worked band, so the four-way rows use a REAL bands arm. */
 const BAND = { top: 64, bot: 96, sh: false, on: { cram: { addr: 34, colours: [546, 306] } } };
 
@@ -98,6 +105,14 @@ describe('the top-level oneOf: exactly one raster program per document', () => {
     // rows below would never reach.
     expect(EFFECTS_PRESET_SCHEMA.required as string[]).not.toContain('bands');
     expect(Array.isArray(EFFECTS_PRESET_SCHEMA.oneOf)).toBe(true);
+    // ⚠ THE `oneOf` NOW HAS MORE ARMS THAN THERE ARE RASTER CHANNELS. empyrean
+    // `c4a1da2` added `boundary`, which is the fourth arm of this same `oneOf`
+    // and is NOT a raster channel — it lowers into `ep_patched`, the sibling of
+    // the `ep_raster` field these three share. So the count the evaluator quotes
+    // in its refusal (`ARM_COUNT`) and the list this file is about are two
+    // different numbers, and neither is typed.
+    expect((EFFECTS_PRESET_SCHEMA.oneOf as unknown[]).length)
+      .toBeGreaterThan(EFFECTS_PRESET_RASTER_CHANNELS.length);
     // ⚠ RE-PINNED 2 -> 3 at empyrean 5bd76ba: `base_swap` is the third arm. It
     // is asserted here (rather than loosened to a length check) because this row
     // is the premise of the four below, and a channel silently VANISHING from the
@@ -128,14 +143,16 @@ describe('the top-level oneOf: exactly one raster program per document', () => {
     ).not.toEqual([]);
     // The refusal is the exactly-one rule's, not a coincidence from some other
     // keyword: the evaluator says it matched TWO forms.
-    expect(issues.map((i) => i.message).join(' ')).toMatch(/matches 2 of the 3 allowed forms/);
+    expect(issues.map((i) => i.message).join(' '))
+      .toMatch(new RegExp(`matches 2 of the ${ARM_COUNT} allowed forms`));
     expect(issues.map((i) => i.path)).toContain('');
   });
 
   it('NEITHER is REFUSED — a preset document must carry one raster program', () => {
     const issues = validateAgainstSchema({ ...base }, S);
     expect(issues, 'a document carrying NO raster program was accepted').not.toEqual([]);
-    expect(issues.map((i) => i.message).join(' ')).toMatch(/matches none of the 3 allowed forms/);
+    expect(issues.map((i) => i.message).join(' '))
+      .toMatch(new RegExp(`matches none of the ${ARM_COUNT} allowed forms`));
   });
 
   it('...and the codec refuses both-and-neither too, not only the raw validator', () => {

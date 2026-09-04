@@ -316,6 +316,60 @@ export type AnchorBandFit =
 export function anchorBandFit(channel: number, travelPx: number): AnchorBandFit {
   const band = EFFECTS_CHANNEL_BANDS.get(channel);
   if (band === undefined) return { verdict: 'no-band', channel, travelPx };
-  if (travelPx > band.lines) return { verdict: 'cannot-fit', channel, travelPx, band };
-  return { verdict: 'cannot-tell', channel, travelPx, band };
+  return anchorFitAgainstBand(band, travelPx);
+}
+
+/**
+ * The same one-directional verdict, against a band supplied by the CALLER
+ * instead of looked up in aeon's vendored map.
+ *
+ * ═══ WHY THIS EXISTS, AND WHY IT IS THE SAME FUNCTION ═══
+ *
+ * Until empyrean `c4a1da2` a channel's `[lo, hi]` could only come from aeon's
+ * hand-authored module, so the lookup and the comparison were one step. The
+ * `boundary` key lets a DOCUMENT declare its own `lo` and `hi` — and a document
+ * that declares them supersedes the vendored map for its own channel, because
+ * the vendored map is a reading of the hand-authored program the document is
+ * replacing. So the band now has two possible sources and the RULE must have
+ * exactly one implementation: this one. `boundary.ts` calls it with a band built
+ * from the document; `anchorBandFit` calls it with a band built from aeon's
+ * file; neither restates `travel > lines`.
+ *
+ * ⚠ AND THE ONE-DIRECTIONAL RULE COMES WITH IT. There is still no `fits` arm.
+ * A caller handing in a document's own band gets `cannot-tell`, not a clearance,
+ * for exactly the reason the header gives: the latched line is `anchor -
+ * Camera_Y`, so where the sweep sits inside `[lo, hi]` is camera-dependent and
+ * unknowable at author time. That property is a fact about the ENGINE and does
+ * not become weaker because the band was authored rather than measured.
+ */
+export function anchorFitAgainstBand(band: EffectsChannelBand, travelPx: number): AnchorBandFit {
+  if (travelPx > band.lines) {
+    return { verdict: 'cannot-fit', channel: band.channel, travelPx, band };
+  }
+  return { verdict: 'cannot-tell', channel: band.channel, travelPx, band };
+}
+
+/**
+ * A band from numbers a DOCUMENT declares, with `lines` derived the one way the
+ * contract derives it, or `null` when the pair cannot make a band at all.
+ *
+ * ⚠ `lines` IS AN INCLUSIVE COUNT AND IS NOT AUTHORED. The vendored file STATES
+ * its own `lines` and the loader above CHECKS it rather than computing it — the
+ * right posture for a value someone else generated. Here there is no second
+ * statement to check against: the document declares `lo` and `hi` only, so the
+ * count is computed, and it is computed as `hi - lo + 1` because that is what
+ * aeon's `how_to_use` says the number means ("an INCLUSIVE COUNT of lines in
+ * [lo, hi]", so travel == lines is the widest sweep that fits). The sentence is
+ * guarded at module load; this arithmetic is the same sentence applied.
+ *
+ * `lo > hi` returns null rather than a negative-length band: that pair is one of
+ * the two cross-field refusals the schema cannot express, it belongs to aeon's
+ * generator, and a fit verdict computed over it would be a second wrong answer
+ * layered on the first.
+ */
+export function effectsChannelBandFromDocument(
+  channel: number, lo: number, hi: number, source: string,
+): EffectsChannelBand | null {
+  if (!Number.isInteger(lo) || !Number.isInteger(hi) || hi < lo) return null;
+  return Object.freeze({ channel, lo, hi, lines: hi - lo + 1, source });
 }
