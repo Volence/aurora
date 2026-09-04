@@ -301,9 +301,21 @@ const ANCHOR_MOVEMENT_SEL = String.raw`
  */
 const PAINTED = (needle, needles = []) => String.raw`
 (() => {
-  const hit = [...document.querySelectorAll('div,span')]
-    .filter((e) => (e.innerText || '').includes(${JSON.stringify(needle)}))
-    .pop();
+  const want = ${JSON.stringify(needles)};
+  const all = [...document.querySelectorAll('div,span')]
+    .filter((e) => (e.innerText || '').includes(${JSON.stringify(needle)}));
+  // ⚠ THE TIGHTEST ELEMENT THAT CARRIES THE WHOLE CLAIM, NOT THE LAST MATCH.
+  // \`.pop()\` alone took the INNERMOST match, and \`PresetLagDisclosure\` renders
+  // its lead words in their own <span> inside the Hint that carries the rest —
+  // so a needle aimed at the lead selected a 31-character element and every
+  // other needle read as absent, against a sentence that really was on screen.
+  // The element chosen is the SHORTEST one containing every needle, which is the
+  // smallest thing an author could point at and say "it says that"; with no such
+  // element the last match is returned so the failure is honest rather than null.
+  const whole = all.filter((e) => want.every((n) => (e.innerText || '').includes(n)));
+  const pool = whole.length ? whole : all;
+  const hit = pool.slice().sort(
+    (a, b) => (a.innerText || '').length - (b.innerText || '').length)[0];
   if (!hit) return null;
   hit.scrollIntoView({ block: 'center' });
   const b = hit.getBoundingClientRect();
@@ -311,7 +323,6 @@ const PAINTED = (needle, needles = []) => String.raw`
   while (sc && !(sc.scrollHeight > sc.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
   const sb = sc ? sc.getBoundingClientRect() : { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
   const full = (hit.innerText || '').trim().replace(/\s+/g, ' ');
-  const want = ${JSON.stringify(needles)};
   const has = {};
   for (const n of want) has[n] = full.includes(n);
   return {
