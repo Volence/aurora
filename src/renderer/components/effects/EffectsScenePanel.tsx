@@ -931,7 +931,6 @@ export default function EffectsScenePanel(): React.ReactElement {
                               library, selected.id, i, 'rowRemap', rowRemapWithPlaneY(rr, n)))} />
                           <Select title={`Layer ${i} ${LAYER_ROW_REMAP_ROW.heightTitle}`}
                             value={String(rr.height_shift)}
-                            data-testid={`layer-${i}-rowremap-height`}
                             onChange={(v) => run(setLayerFieldCommand(
                               library, selected.id, i, 'rowRemap',
                               rowRemapWithHeightShift(rr, Number(v))))}
@@ -947,9 +946,19 @@ export default function EffectsScenePanel(): React.ReactElement {
                     {why !== null && <Hint under tone="warning">{why}</Hint>}
                     {unbuildable !== null
                       && <Hint under tone="warning">{unbuildable}</Hint>}
+                    {/* THE SPAN IS NOT DECORATION. `Hint` takes {children,
+                        under, tone, style} and DROPS anything else, and TS does
+                        not catch a hyphenated JSX attribute on a component — so
+                        `data-testid` passed to <Hint> silently never reaches the
+                        DOM. It did here, and the harness's precondition rows
+                        read zero nodes while the sentences were visibly on
+                        screen: a testid that asserts nothing, found by driving
+                        the app rather than by reading the source. The extras
+                        line below already wraps for the same reason. */}
                     {unmet.map((m) => (
-                      <Hint key={m} under tone="warning"
-                        data-testid={`layer-${i}-rowremap-precondition`}>{m}</Hint>
+                      <Hint key={m} under tone="warning">
+                        <span data-testid={`layer-${i}-rowremap-precondition`}>{m}</span>
+                      </Hint>
                     ))}
                     {rr !== null && (
                       <Hint under>{EFFECTS_ROW_REMAP_CAPABILITY_NOTE}</Hint>

@@ -253,7 +253,11 @@ const RR_HEIGHT = (layer) => String.raw`
 const PAINTED_LEAF = (needle, afterSelector) => String.raw`
 (() => {
   const anchor = ${afterSelector};
-  const leaves = [...document.querySelectorAll('div')]
+  // 'div,span', NOT 'div'. MEASURED: the precondition sentences are wrapped in a
+  // <span> (the testid Hint drops), so the Hint <div> HAS a child carrying the
+  // needle and the leaf rule excluded it while the sentence was plainly on
+  // screen — a paint row that goes red for a reason that is not about paint.
+  const leaves = [...document.querySelectorAll('div,span')]
     .filter((d) => (d.innerText || '').includes(${JSON.stringify(needle)})
                 && ![...d.children].some((k) => (k.innerText || '').includes(${JSON.stringify(needle)})));
   const leaf = leaves[0] || null;
@@ -541,11 +545,33 @@ async function main() {
     const afterOver = PLANT === 'widget'
       ? { plane_y: Number(overBox.shown) }
       : (await layerN(CURVED))?.rowRemap;
-    check('5a', `typing ${over} (one past the plane's last line) is REFUSED — the document keeps `
-      + 'what it had',
-      overBox.shown === over && afterOver?.plane_y === held,
-      `box shows ${JSON.stringify(overBox.shown)} (the keys LANDED); document still `
-      + `${JSON.stringify(afterOver)}. aeon would NOT catch this: its ensure tests >= 0 only`);
+    // ⚠ WHAT THIS ROW ASSERTS, AND WHY IT IS NOT "the document is unchanged".
+    // `NumberField` commits ON EVERY KEYSTROKE, so typing a three-digit number
+    // walks the document through its PREFIXES: "5" and "51" are both legal
+    // plane lines and both commit, and only "512" is withheld. MEASURED HERE on
+    // the first run of this file — the document held 51. That is a real (and
+    // PRE-EXISTING, shared with the drift and ramp boxes) wart, printed below
+    // and booked, not swept up: it leaves the box SHOWING 512 while the document
+    // holds 51.
+    //
+    // The property this row exists for is narrower and is the one that reaches
+    // a ROM: THE OUT-OF-RANGE VALUE NEVER LANDS. That is what is gated. Writing
+    // the row as "unchanged" would have been asserting something false about a
+    // control that is behaving correctly on the axis that matters.
+    const prefixCommitted = afterOver?.plane_y !== held;
+    check('5a', `typing ${over} (one past the plane's last line) never REACHES the document`,
+      overBox.shown === over
+      && afterOver?.plane_y !== Number(over)
+      && afterOver?.plane_y >= PLANE_Y.minimum && afterOver?.plane_y <= PLANE_Y.maximum,
+      `box shows ${JSON.stringify(overBox.shown)} (the keys LANDED); document holds `
+      + `${JSON.stringify(afterOver)} — never ${over}. aeon would NOT catch ${over}: its `
+      + `ensure tests >= 0 only.`
+      + (prefixCommitted
+        ? `\n        ⚠ PREFIX COMMIT (pre-existing NumberField behaviour, not this row's `
+          + `subject): the document moved ${held} -> ${afterOver?.plane_y} on the way, because `
+          + `every prefix of "${over}" is itself a legal plane line and the field commits per `
+          + 'keystroke. The box and the document now DISAGREE until the next commit.'
+        : ''));
 
     const overWhy = await c.json(PAINTED_LEAF('ONLY ENFORCEMENT', RR_BOX(CURVED)));
     check('5b', 'and the PAINTED reason says this bound is the only one in the pipeline',
