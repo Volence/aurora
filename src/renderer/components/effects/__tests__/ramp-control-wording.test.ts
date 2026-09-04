@@ -26,7 +26,8 @@ import {
   RAMP_MUST_NOT, RAMP_MUST_NOT_SHORT, RAMP_KEYS,
 } from '../../../providers/effects-preset';
 import {
-  EFFECTS_PRESET_RAMP_SPAN_MAX, EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG,
+  EFFECTS_PRESET_RAMP_SPAN_MAX,
+  EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET, EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG,
 } from '../../../../core/formats/effects/preset';
 
 const PANEL = join(__dirname, '..', 'BandPresetPanel.tsx');
@@ -154,18 +155,22 @@ describe('the panel spells no ramp rule of its own', () => {
   /**
    * The `tableRefParamOptions` idiom: a predicate and its sentence come from ONE
    * source both the control and the advisory read. Two numbers in particular
-   * must never appear here — the span bound and the display lag — because both
-   * are derived from the contract's own prose with a module-load guard, and a
-   * copy typed beside a control is a copy that cannot go red when the contract
-   * moves.
+   * must never appear here — the span bound and the display geometry — because
+   * all of them are derived from the contract's own prose with a module-load
+   * guard, and a copy typed beside a control is a copy that cannot go red when
+   * the contract moves. THE DISPLAY GEOMETRY IS TWO CONSTANTS since empyrean
+   * `e9409dc`, and neither may be named here: picking either one in a panel is
+   * picking which question the readout answers, and that is the provider's job.
    */
-  it('does not retype the span bound or the display lag', () => {
+  it('does not retype the span bound or either display constant', () => {
     expect(code).not.toContain(String(EFFECTS_PRESET_RAMP_SPAN_MAX));
-    expect(code).not.toContain('EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG');
+    expect(code).not.toContain('EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET');
+    expect(code).not.toContain('EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG');
     // ANTI-VACUOUS: those constants really are non-trivial numbers, so their
     // absence is a claim about this file and not about arithmetic.
     expect(EFFECTS_PRESET_RAMP_SPAN_MAX).toBeGreaterThan(200);
-    expect(EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG).toBeGreaterThan(0);
+    expect(EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET).toBeGreaterThan(0);
+    expect(EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG).toBeGreaterThan(0);
   });
 
   it('does not convert an fp16 pair itself', () => {
@@ -226,11 +231,13 @@ describe('the scroll-mode sentence is mounted, split, and derived nowhere here',
   });
 
   /**
-   * ⚠ INDEPENDENT OF THE CONTESTED READOUT. A real ROM rendered 5..223 where the
-   * card derives 4..223 (2026-09-03, two different tops, the same +1), so the
-   * display lag is an open contract question. This sentence is about the
-   * HORIZONTAL extent and must not be wired to the vertical one, or settling that
-   * question would silently move this one.
+   * ⚠ INDEPENDENT OF THE DISPLAY READOUT, AND THAT INDEPENDENCE HAS NOW BEEN
+   * EXERCISED. A real ROM rendered 5..223 where the card derived 4..223
+   * (2026-09-03, two different tops, the same +1); the contract SETTLED it in
+   * the ROM's favour at empyrean `e9409dc` and the readout moved to `top + 2`.
+   * This row did not, which is exactly what it was written to guarantee: the
+   * sentence is about the HORIZONTAL extent and must not be wired to the
+   * vertical one.
    */
   it('the scroll sentence is not derived from the display span or the lag', () => {
     const at = rampCard.indexOf('scroll.short');

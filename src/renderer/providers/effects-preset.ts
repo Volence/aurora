@@ -66,12 +66,20 @@ import {
   //   • EFFECTS_PRESET_RAMP_SPAN_MAX — `top + lines <= 223`, which NO JSON
   //     Schema keyword can express, so the per-field maxima are a valid-looking
   //     pair that fails somebody else's build.
-  //   • EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG — a readout that is one line high
-  //     LOOKS correct. `rampDisplaySpan` at the foot of this file is the ONE
-  //     place on this surface that applies it, with the reasoning beside it.
+  //   • THE DISPLAY GEOMETRY, WHICH IS **TWO** CONSTANTS AND NOT ONE. A readout
+  //     that is one line high LOOKS correct, and until empyrean e9409dc a single
+  //     `..._DISPLAY_LAG` served both questions because the contract's two
+  //     sentences happened to give the same number. They differ now:
+  //       – EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET (2) — where the run
+  //         BEGINS on screen. `rampDisplaySpan` at the foot of this file is the
+  //         ONE place on this surface that applies it.
+  //       – EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG (1) — where value `j` lands.
+  //         `RAMP_DISPLAY_LAG_NOTE` is the ONE place that states it.
+  //     They differ by one because `j` starts at 1; preset.ts has the whole
+  //     reasoning and an interlock that re-derives one from the other.
   EFFECTS_PRESET_RAMP_TOP_RANGE, EFFECTS_PRESET_RAMP_LINES_RANGE,
   EFFECTS_PRESET_RAMP_VSRAM_ADDR_RANGE, EFFECTS_PRESET_RAMP_SPAN_MAX,
-  EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG,
+  EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET, EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG,
   EFFECTS_PRESET_FP16_WHOLE_RANGE, EFFECTS_PRESET_FP16_FRAC_RANGE,
   // THE ONE CONVERSION, AND IT IS NOT RE-IMPLEMENTED HERE. The sign lives on
   // `whole` and applies to the whole value, so `{whole: -1, frac256: 128}` is
@@ -2674,8 +2682,11 @@ export const ANCHOR_MAX_PEAK_PX: number =
 // them off the vendored schema with module-load guards. In particular
 // `EFFECTS_PRESET_RAMP_SPAN_MAX` — the per-field maxima are a VALID-LOOKING PAIR
 // THAT FAILS THE BUILD (`top` 222 and `lines` 220 each satisfy every schema
-// keyword and their sum does not) — and `EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG`,
-// whose whole point is that a readout one line high looks correct.
+// keyword and their sum does not) — and the two display constants,
+// `EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET` and
+// `EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG`, whose whole point is that a readout one
+// line high looks correct. They are DIFFERENT QUANTITIES that agreed until
+// empyrean `e9409dc`; do not substitute one for the other.
 
 /** The `ramp` key's own title — the contract's paragraph, at the point of use. */
 export const RAMP_TITLE = presetFieldTitle(['properties', 'ramp']);
@@ -3019,7 +3030,14 @@ export function rampAddrGloss(addr: number): string {
  * OURS — so there is no double-application to avoid anywhere, and the question
  * "should this readout add it" has one answer: yes.
  *
- * `EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG` IS APPLIED BY THIS FUNCTION AND
+ * ⚠ THIS FUNCTION USES THE **FIRST-LINE OFFSET**, NOT THE PER-INDEX LAG. They
+ * are different quantities and they differ by one (`j` starts at 1, so the first
+ * written value is index 1 and lands at `top + 1 + 1`). A span is a claim about
+ * where the run BEGINS and ENDS, so it takes the offset; only a sentence that
+ * quantifies over `j` takes `EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG`, and the one
+ * such sentence on this surface is `RAMP_DISPLAY_LAG_NOTE` below.
+ *
+ * `EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET` IS APPLIED BY THIS FUNCTION AND
  * NOWHERE ELSE ON THIS SURFACE, because of what the two numbers mean:
  *
  *   • `ramp.top` is the ENGINE's `top`. The field, its refusal and the document
@@ -3039,12 +3057,17 @@ export function rampAddrGloss(addr: number): string {
  * `ramp-control.test.ts` asserts both halves — that this readout DOES add it,
  * derived from the constant, and that nothing writes it into the document.
  *
- * A CORROBORATION WORTH KNOWING, and it is what makes this a reading of the
- * constants rather than an opinion: with the lag applied, the last displayed
- * line of a maximal run is `top + lines - 1 + 1` = `top + lines`, and the span
- * interlock is `top + lines <= 223` — the last line of a 224-line screen. The
- * two constants meet exactly at the bottom of the display. A lag of 0 would
- * leave a line spare and a lag of 2 would run off the screen.
+ * ⚠ WHAT THE BOTTOM EDGE ACTUALLY DOES, CORRECTED 2026-09-03 (empyrean
+ * `e9409dc`), BECAUSE THE OLD PARAGRAPH HERE ARGUED THE WRONG WAY ROUND. It used
+ * to read "the two constants meet exactly at the bottom of the display... a lag
+ * of 2 would run off the screen", offered as corroboration that the offset was
+ * 1. The offset IS 2, and the run DOES go one line over: the last displayed line
+ * of a run is `top + lines - 1 + 2` = `top + lines + 1`, so at the span interlock
+ * `top + lines <= 223` a MAXIMAL run puts its last value on line 224 — one past
+ * the bottom of a 224-line screen (0..223), where it can never be seen. A
+ * 220-line run from `top` 3 therefore RENDERS 219 LINES. That is the contract's
+ * own sentence and a fact about the engine, not a defect in this derivation, and
+ * an argument of the old shape must not be used to "correct" the constant back.
  *
  * ⚠ AND NO PIXELS ARE DRAWN. This surface has no ramp preview and does not claim
  * one — `NO_PREVIEW` states the general case and nothing here weakens it. A
@@ -3052,8 +3075,8 @@ export function rampAddrGloss(addr: number): string {
  * build one in this parcel is recorded in the packet.
  */
 export function rampDisplaySpan(ramp: EffectsPresetRamp): { first: number; last: number } {
-  const lag = EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG;
-  return { first: ramp.top + lag, last: ramp.top + ramp.lines - 1 + lag };
+  const offset = EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET;
+  return { first: ramp.top + offset, last: ramp.top + ramp.lines - 1 + offset };
 }
 
 /** The painted readout: the run's own lines, then the lines a viewer sees. */
@@ -3063,11 +3086,29 @@ export function rampDisplayGloss(ramp: EffectsPresetRamp): string {
     + `${d.first}-${d.last}`;
 }
 
-/** The reason, on the readout's own title — the contract half of the split. */
+/**
+ * The reason, on the readout's own title — the contract half of the split.
+ *
+ * ⚠ THIS SENTENCE QUANTIFIES OVER `j`, so it takes the PER-INDEX LAG, and the
+ * span readout it titles takes the FIRST-LINE OFFSET. Interpolating one number
+ * into both is how this string would ship a false statement to an author: they
+ * differ by one because `j` starts at 1. Both are stated here, each from its own
+ * constant, precisely so a reader can see that the two lines of the readout are
+ * answering two different questions and are not a contradiction.
+ */
 export const RAMP_DISPLAY_LAG_NOTE: string =
   'A VSRAM run\'s value for index j DISPLAYS on screen line top + j + '
-  + `${EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG} — the N+1 VSRAM latency (raster.emp:602-609) — and `
-  + 'NO STAGE OF THE ENGINE PATH compensates for it — not the constructor, not the generator '
+  + `${EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG} — the N+1 VSRAM latency (raster.emp:602-609). `
+  + 'AND j STARTS AT 1: the interpreter adds the step before it writes, so `start` itself is never '
+  + `emitted and the FIRST value an author sees lands on top + `
+  + `${EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET}, not top + `
+  + `${EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG}. A run of `
+  + `lines values therefore occupies screen lines top + ${EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET}`
+  + ` .. top + lines + ${EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET - 1}, so a run at the very `
+  + `bottom (top + lines = ${EFFECTS_PRESET_RAMP_SPAN_MAX}) puts its last value on line `
+  + `${EFFECTS_PRESET_RAMP_SPAN_MAX + EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET - 1}, where it `
+  + 'can never be seen. '
+  + 'NO STAGE OF THE ENGINE PATH compensates for any of it — not the constructor, not the generator '
   + '(measured by the engine lane, 2026-09-03). The Top field above is the ENGINE\'s top and is '
   + 'written to the file verbatim; the lag is a DISPLAY fact, so it is applied to this readout and '
   + 'to nothing else. Correcting it in the document instead would change what the engine runs in '

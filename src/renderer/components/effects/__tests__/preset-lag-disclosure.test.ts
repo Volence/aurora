@@ -70,12 +70,15 @@
 // used to carry as hearsay has been read firsthand through git objects: aeon
 // `origin/parcel/aurora-ramp-witness` `a1a76741` fixes the constructor's missing
 // two's-complement encode (`7a5d237d`) and drives a running machine on THIS
-// editor's own document. ⚠ THAT BRANCH IS NOT AN ANCESTOR OF AEON'S MASTER, the
-// witness is emulation rather than silicon, and the first-displayed-line rule is
-// CONTESTED BY ONE LINE by that same run. None of that changes a single row in
-// this file, which measures aeon's PAGE at `origin/master` and nothing else —
-// it is written down so the next reader does not mistake the branch for the
-// tip. The whole record is in `core/formats/effects/preset-lag.ts`.
+// editor's own document. ⚠ THAT BRANCH IS NOT AN ANCESTOR OF AEON'S MASTER and
+// the witness is emulation rather than silicon. (The one-line disagreement about
+// the first-displayed-line rule that this header used to flag alongside those is
+// SETTLED — empyrean `e9409dc`, in the measurement's favour; the contract says
+// `top + 2` and Aurora derives it. Do not re-add it as a caveat.) None of that
+// changes a single row in this file, which measures aeon's PAGE at
+// `origin/master` and nothing else — it is written down so the next reader does
+// not mistake the branch for the tip. The whole record is in
+// `core/formats/effects/preset-lag.ts`.
 //
 // ⚠ WHAT THESE ROWS CANNOT SEE. No React DOM here. The leaf is called as a
 // plain function and its element tree walked (the object-inspector-field-bounds

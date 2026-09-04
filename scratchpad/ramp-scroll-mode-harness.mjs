@@ -38,10 +38,13 @@
 //
 // ═══ ⚠ THIS RUN READS NO LINE NUMBERS ═════════════════════════════════════
 //
-// The card's display-span readout is CONTESTED — a real ROM rendered 5..223
-// where the panel derives 4..223, at two different tops (2026-09-03). Nothing
-// here touches it. The subject is the HORIZONTAL extent, and `harness:
-// ramp-control` owns the vertical one.
+// The card's display-span readout WAS contested by one line — a real ROM
+// rendered 5..223 where the panel derived 4..223, at two different tops
+// (2026-09-03). It SETTLED in the ROM's favour at empyrean `e9409dc`: the
+// contract now says the first written value displays on `top + 2`, Aurora
+// re-vendored it, and the readout derives it. Nothing here touched it before or
+// after, which is the point — the subject is the HORIZONTAL extent, and
+// `harness: ramp-control` owns the vertical one.
 //
 // ═══ ⚠ THE PROBE IDS ARE NAMESPACED, AND THAT IS NOT DECORATION ═══════════
 //

@@ -59,19 +59,41 @@
  *     it measures which lines the run REACHES, not the rate it applies to them.
  *   - IT IS EMULATION, NOT SILICON. oracle is Exodus-derived.
  *
- * ⚠ AND THE SPAN IS CONTESTED BY EXACTLY ONE LINE — do not read the above as a
- * clean success; a comment that reported only the good half would be this same
- * defect pointing the other way. Aurora derives first-displayed-line `top + 1`
- * (`EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG` in `preset.ts`, parsed from the
- * contract schema's own sentence). aeon's arm 4 MEASURED `top + 2`, on two
- * documents with different tops: `top 3` first rendered on line 5, and a control
- * at `top 128` first rendered on line 130 — two tops, the same one-line
- * disagreement. AURORA HAS NOT CORRECTED ITS CONSTANT AND MUST NOT: it is parsed
- * from the contract on purpose, and aeon has likewise marked its own three
- * statements of the rule CONTESTED rather than silently fixing them, pending a
- * third `top` and a different (CRAM) target. Their reasoning is at aeon
- * `docs/DEFERRED_WORK.md` § "RAMP BOUNDARY" and
- * `docs/benchmarks/effects-p3/RAMP-EVIDENCE.md`, both on that same branch.
+ * ⚠ THE SPAN WAS CONTESTED BY EXACTLY ONE LINE. **IT IS SETTLED, AND THE
+ * MEASUREMENT WON** (empyrean `e9409dc`, 2026-09-03). The history is kept
+ * because the resolution is the interesting part and because a reader who finds
+ * only the old caveat will "fix" the wrong side:
+ *
+ *   - Aurora derived first-displayed-line `top + 1` from the contract schema's
+ *     own `top` sentence. aeon's arm 4 MEASURED `top + 2`, on two documents with
+ *     different tops: `top 3` first rendered on line 5, and a control at
+ *     `top 128` first rendered on line 130 — two tops, the same one-line
+ *     disagreement.
+ *   - AURORA CORRECTLY DID NOT PATCH ITS CONSTANT. The number is parsed from the
+ *     contract on purpose, so the fix had to be a contract fix, and it was: the
+ *     schema's `top` sentence now reads `top + 2`, its `ramp` description states
+ *     the per-index rule as `top + j + 1` WITH `j` STARTING AT 1 (the
+ *     interpreter adds the step before it writes, so `start` is never emitted),
+ *     and Aurora re-vendored at `dce3a9b4`. aeon re-measured over 19 tops
+ *     spanning 3..220 and 9 run lengths.
+ *   - THE SENTENCE THAT WAS WRONG WAS THE CONTRACT'S, not this editor's
+ *     derivation, and that is the whole argument for deriving rather than
+ *     typing: the defect surfaced as a disagreement between two independent
+ *     readers instead of hiding in a `+ 1` somebody had typed.
+ *   - CONSEQUENCE, now the contract's own words: a run occupies screen lines
+ *     `top + 2 .. top + lines + 1`, so a MAXIMAL run (`top + lines == 223`) puts
+ *     its last value on line 224 where it can never be seen, and a 220-line run
+ *     from `top` 3 renders 219 lines.
+ *
+ * The display geometry is now TWO derived constants in `preset.ts`,
+ * `EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET` (2) and
+ * `EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG` (1) — different quantities, and the
+ * docblock there says why. aeon's reasoning is at `docs/DEFERRED_WORK.md`
+ * § "RAMP BOUNDARY" and `docs/benchmarks/effects-p3/RAMP-EVIDENCE.md`.
+ *
+ * ⚠ DO NOT READ THIS AS RETIRING THE REST OF THE CAVEAT ABOVE. The witness is
+ * still a peer's unmerged branch and still emulation; only the one-line span
+ * disagreement closed.
  *
  * "Accepted at the door", "obeyed by a machine on a peer's unmerged branch" and
  * "certified" are THREE different facts, and only the first two exist today.

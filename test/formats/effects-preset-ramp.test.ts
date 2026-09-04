@@ -32,7 +32,9 @@ import {
   EFFECTS_PRESET_RAMP_LINES_RANGE,
   EFFECTS_PRESET_RAMP_VSRAM_ADDR_RANGE,
   EFFECTS_PRESET_RAMP_SPAN_MAX,
-  EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG,
+  EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG,
+  EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET,
+  EFFECTS_PRESET_RAMP_TARGET_ARMS,
   EFFECTS_PRESET_FP16_WHOLE_RANGE,
   EFFECTS_PRESET_FP16_FRAC_RANGE,
   EFFECTS_PRESET_FP16_SIGNED_EXAMPLE,
@@ -325,19 +327,83 @@ describe('ramp bounds, derived from the schema and never typed beside it', () =>
       .toBe(EFFECTS_PRESET_RAMP_SPAN_MAX);
   });
 
-  it('⚠ THE VSRAM DISPLAY LAG IS +1 — a preview drawing at top + j is one line high', () => {
-    expect(EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG).toBe(1);
-    // The constant exists so the control parcel cannot re-derive it wrong; the
-    // row states the formula it is FOR, in the form a renderer will use it.
-    const displayLineOf = (ramp: EffectsPresetRamp, j: number): number =>
-      ramp.top + j + EFFECTS_PRESET_RAMP_VSRAM_DISPLAY_LAG;
-    expect(displayLineOf(RAMP, 0)).toBe(129);
-    expect(displayLineOf(RAMP, RAMP.lines - 1)).toBe(192);
-    // ...and it is NOT applied by the codec: a document's `top` is the engine's
-    // `top`, written and read verbatim. Applying it here would put the
-    // compensation in the file, where the generator would apply it again.
+  /**
+   * ⚠ TWO NUMBERS, NOT ONE — the split landed with empyrean `e9409dc`.
+   *
+   * The per-index lag and the first-line offset agreed (both 1) until the
+   * contract corrected its `top` sentence, which is exactly why one constant
+   * served both for as long as it did. This row re-derives BOTH from the
+   * vendored schema's own prose with regexes written HERE, independently of the
+   * codec's, so it is a second reading of the contract rather than a restatement
+   * of the module's parse. Neither number is typed into an expectation.
+   */
+  it('⚠ THE DISPLAY GEOMETRY IS TWO NUMBERS — per-index lag, and first-line offset', () => {
+    // ⚠ THE TWO SENTENCES LIVE IN TWO DIFFERENT NODES. The per-index rule is in
+    // the KEY's paragraph (`properties.ramp`); the first-line rule is on the
+    // FIELD (`$defs.ramp.properties.top`). Reading either from the other's node
+    // finds nothing — which is how the codec's first draft of this derivation
+    // was caught.
+    const defs = EFFECTS_PRESET_SCHEMA.$defs as Record<string, Record<string, unknown>>;
+    const props = EFFECTS_PRESET_SCHEMA.properties as Record<string, Record<string, unknown>>;
+    const rampProse = String(props.ramp.description ?? '');
+    const topProse = String(
+      ((defs.ramp.properties as Record<string, Record<string, unknown>>).top).description ?? '',
+    );
+    const indexFromProse = Number(
+      /value j \(= start \+ j\*step\) displays on screen line top \+ j \+ (\d+)/
+        .exec(rampProse)![1],
+    );
+    const firstFromProse = Number(/DISPLAYS on top \+ (\d+)/.exec(topProse)![1]);
+    expect(EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG).toBe(indexFromProse);
+    expect(EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET).toBe(firstFromProse);
+
+    // ANTI-VACUOUS, AND THE WHOLE POINT OF THE SPLIT: the two really are
+    // different, so substituting one for the other is a visible error and not a
+    // stylistic choice. If a future contract makes them equal again this row
+    // fails and a reader is sent to the docblock before collapsing them.
+    expect(EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET)
+      .not.toBe(EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG);
+
+    // ...and they differ by exactly one BECAUSE j STARTS AT 1. The schema says
+    // so in the same sentence; the arithmetic is the reason, not a coincidence.
+    expect(rampProse).toMatch(/j STARTS AT 1/);
+    const displayLineOf = (r: EffectsPresetRamp, j: number): number =>
+      r.top + j + EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG;
+    expect(displayLineOf(RAMP, 1)).toBe(RAMP.top + EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET);
+    // The LAST index is `lines`, not `lines - 1`, for the same reason.
+    expect(displayLineOf(RAMP, RAMP.lines))
+      .toBe(RAMP.top + RAMP.lines - 1 + EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET);
+
+    // ...and neither is applied by the codec: a document's `top` is the engine's
+    // `top`, written and read verbatim. Applying either here would put the
+    // compensation in the file, which is what the engine runs.
     const round = parseEffectsPreset(JSON.stringify({ ...base, ramp: RAMP }), ID);
     expect(round.ramp!.top).toBe(RAMP.top);
+  });
+
+  /**
+   * ⚠ THE CRAM RULE DIFFERS BY ONE AND WE CANNOT EXPRESS IT.
+   *
+   * The contract states a CRAM display rule — value `j` on `top + j`, one line
+   * earlier than VSRAM — but `$defs.ramp_target` declares no CRAM arm, so no
+   * document can carry one. This row pins BOTH halves so the note beside the
+   * constants stays true: the sentence exists, and the arm does not.
+   */
+  it('states a CRAM display rule one line earlier, and admits no CRAM arm to use it', () => {
+    const defs = EFFECTS_PRESET_SCHEMA.$defs as Record<string, Record<string, unknown>>;
+    const props = EFFECTS_PRESET_SCHEMA.properties as Record<string, Record<string, unknown>>;
+    const rampProse = String(props.ramp.description ?? '');
+    expect(rampProse).toMatch(/A CRAM target is one line earlier: value j displays on top \+ j\./);
+    // The arm list is the reason Aurora ships no CRAM path, and it is derived.
+    expect(EFFECTS_PRESET_RAMP_TARGET_ARMS).toEqual(['vsram']);
+    const target = defs.ramp_target;
+    expect(Object.keys(target.properties as Record<string, unknown>)).toEqual(['vsram']);
+    expect(target.required).toEqual(['vsram']);
+    expect(target.unevaluatedProperties).toBe(false);
+    // A CRAM document is therefore REFUSED, not merely unhandled.
+    const cram = { ...RAMP, target: { cram: { addr: 0 } } } as unknown as EffectsPresetRamp;
+    expect(() => parseEffectsPreset(JSON.stringify({ ...base, ramp: cram }), ID))
+      .toThrow(EffectsPresetError);
   });
 });
 
