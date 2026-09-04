@@ -331,6 +331,28 @@ async function main() {
     note('canvas geometry', `dpr=${geom.dpr} rect=(${geom.left},${geom.top},${geom.rw}x${geom.rh}) `
       + `canvas.width=${geom.w} height=${geom.h}`);
 
+    // ── [arm] THE FACET AND THE TOOL, AND THIS IS FATAL ───────────────────
+    //
+    // The collision palette (and therefore every chip below) renders only on the
+    // COLLISION facet, and tool hotkeys are facet-scoped. The
+    // collision-preservation harness once pressed 'c' on the Layout facet, armed
+    // nothing, and both of its rows went GREEN ON THE BROKEN BUILD — green on
+    // the ABSENCE of a stroke. Measured on the first run of THIS harness too:
+    // with the tool left at `view` the crossover chips were not in the DOM at
+    // all and [v0] correctly said so.
+    await c.evalExpr("window.__dbg.aeon.setLayer('fg')");
+    const facet = await c.json("window.__dbg.aeon.setFacet('collision')");
+    await c.evalExpr("document.getElementById('map-canvas').focus()");
+    await key(c, 'c', 'KeyC', 67);
+    await sleep(200);
+    const toolNow = (await c.json('window.__dbg.aeon.state()')).tool;
+    check('arm', "the REAL hotkey 'c' armed paint-collision on the collision facet",
+      toolNow === 'paint-collision', `facet=${facet?.facet} tool=${toolNow}`);
+    if (toolNow !== 'paint-collision') {
+      throw new Error('paint-collision never armed — every gesture row below would measure a stroke '
+        + 'that did not happen and would go green on its absence. Refusing to run them.');
+    }
+
     // ── [geom] the RUNNING build agrees with the source this file parsed ──
     //
     // The only row that can catch a STALE dist/. Everything above reads source
@@ -342,12 +364,24 @@ async function main() {
 
     /** Seed a cell on both planes with a known word and NO crossover, recording
      *  what was there so [r1] can put it back. */
+    /** Cells already recorded, so a second phase seeding the SAME cell does not
+     *  record the word the FIRST phase poked in.
+     *
+     *  ⚠ A REAL HARNESS BUG, caught by [r1] on the first run. Every phase seeds
+     *  the same cell (40,20); without this the restore list held the pristine
+     *  word AND three poked ones for each index, and replaying it in order put a
+     *  poked word back last. [r1] correctly reported the document was not
+     *  restored — the row doing its job on the instrument rather than the app. */
+    const recorded = new Set();
     async function seed(cc, cr, word) {
       const idx = cellTiles(cc, cr);
       for (const plane of ['a', 'b']) {
         for (const i of idx) {
           const was = await collAt(c, plane, i);
-          restore.push({ plane, index: i, word: was });
+          if (!recorded.has(`${plane}:${i}`)) {
+            recorded.add(`${plane}:${i}`);
+            restore.push({ plane, index: i, word: was });
+          }
           const got = await poke(c, plane, i, word);
           if (got === null) throw new Error(`FIXTURE REFUSED: collisionPoke(${plane},${i}) returned null`);
         }
@@ -402,6 +436,7 @@ async function main() {
     const CC = 40, CR = 20;            // an unremarkable cell, well inside the section
     const BASE = 0x3001;               // shape 1, solidity all — recomputed below
     console.log('\n=== [h] a real gesture at HALF width marks the sub-column under the cursor ===');
+    const halfAims = {};
     for (const side of ['left', 'right']) {
       await undoAll(`before the ${side}-half gesture`);
       const armInfo = await c.json("window.__dbg.aeon.armCollisionBrush({ plane: 'a', shape: 1, "
@@ -426,11 +461,20 @@ async function main() {
       // this repo's harnesses have needed before.
       const tileCol = CC * SUB_COLS + (side === 'left' ? 0 : SUB_COLS - 1);
       const tileRow = CR * SUB_ROWS;
-      await setView(c, Math.max(0, tileCol * TILE_PX - 60), Math.max(0, tileRow * TILE_PX - 60), ZOOM);
+      // ⚠ PARK ON THE CELL, NOT ON THE HALF. The first green run parked on the
+      // half, which moved the viewport 8 world px between the two sides — so
+      // both aims came out at the SAME client pixel (540,330) and the two rows
+      // were two different viewports rather than two different aims. Both
+      // inverted correctly, so nothing was wrong, but "same screen, two
+      // pixels, two answers" is the claim worth making and this is what makes
+      // it. The printed aims must now DIFFER by TILE_PX * zoom.
+      await setView(c, Math.max(0, CC * SUB_COLS * TILE_PX - 60), Math.max(0, tileRow * TILE_PX - 60), ZOOM);
       await sleep(200);
       const aim = await aimAtTile(c, tileCol, tileRow);
       note('aim', `${side} half of cell (${CC},${CR}) = tile (${tileCol},${tileRow}) `
-        + `= integer client (${aim.x},${aim.y}) · dpr=${geom.dpr} zoom=${aim.vp.zoom}`);
+        + `= integer client (${aim.x},${aim.y}) · dpr=${geom.dpr} zoom=${aim.vp.zoom} `
+        + `· viewport x=${aim.vp.x}`);
+      halfAims[side] = aim;
       await mouse(c, 'mousePressed', aim.x, aim.y);
       await mouse(c, 'mouseReleased', aim.x, aim.y);
       await sleep(300);
@@ -439,9 +483,17 @@ async function main() {
       for (const i of idx) { wA[i] = await collAt(c, 'a', i); wB[i] = await collAt(c, 'b', i); }
       note('words', `A ${idx.map((i) => `${i}:${hex(wA[i])}/${xoverOf(wA[i])}`).join(' ')}`);
 
-      checkNonDiscriminating(`h0-${side}`, `CONTROL: the ${side} gesture reached the cell at all (its shape changed)`,
-        idx.every((i) => wA[i] !== BASE || wB[i] !== BASE),
-        'green on master too; it only rules out "the click missed the canvas"');
+      // ⚠ `some`, NOT `every`, AND THAT WAS A REAL HARNESS BUG. The first run
+      // asked for EVERY sub-tile to differ from the seed — which is exactly what
+      // a half-cell mark does NOT do — so the control went red while the feature
+      // rows it exists to protect went green. A control that fails when the
+      // feature works is worse than no control: it invites someone to "fix" the
+      // feature. The honest question is "did the click land at all", which is
+      // ANY sub-tile moving.
+      checkNonDiscriminating(`h0-${side}`, `CONTROL: the ${side} gesture reached the cell at all`,
+        idx.some((i) => wA[i] !== BASE || wB[i] !== BASE),
+        'green on master too; it only rules out "the click missed the canvas", which would make '
+        + `[h2-${side}] pass on an empty cell`);
       check(`h1-${side}`, `the MARK landed on the ${side} 8px sub-column only, on BOTH planes, with each plane's own value`,
         want.every((i) => xoverOf(wA[i]) === 'to-b' && xoverOf(wB[i]) === 'to-a'),
         `marked ${want.map((i) => `${xoverOf(wA[i])}/${xoverOf(wB[i])}`).join(' ')}`);
@@ -461,6 +513,14 @@ async function main() {
         + `severity=${aHalf.severity}`);
       await shot(c, `h-${side}-half-mark`);
     }
+
+    check('h5', '⚠ THE TWO HALVES WERE TWO DIFFERENT PIXELS ON THE SAME SCREEN, one tile apart',
+      halfAims.left && halfAims.right
+      && halfAims.left.vp.x === halfAims.right.vp.x
+      && halfAims.right.x - halfAims.left.x === TILE_PX * ZOOM,
+      `left=(${halfAims.left?.x},${halfAims.left?.y}) right=(${halfAims.right?.x},${halfAims.right?.y}) `
+      + `viewport x ${halfAims.left?.vp.x} vs ${halfAims.right?.vp.x} · `
+      + `expected dx = TILE_PX*zoom = ${TILE_PX * ZOOM}`);
 
     // ═══════════════════════════════════════════════════════════════════════
     // [x] THE SAME GESTURE AT CELL WIDTH — and the audit catches it
