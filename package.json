@@ -137,6 +137,7 @@
     "harness:guard-surface": "node scratchpad/guard-surface-harness.mjs",
     "harness:handover-band": "node scratchpad/handover/handover-band-harness.mjs",
     "harness:import-cdp": "node scratchpad/import-cdp-harness.mjs",
+    "harness:lag-retire": "node scratchpad/lag-retire-harness.mjs",
     "harness:layer-bound": "node scratchpad/layer-bound-harness.mjs",
     "harness:live-palette-e2e": "node scratchpad/live-palette-e2e-harness.mjs",
     "harness:loop-paint": "node scratchpad/loop-paint-harness.mjs",
