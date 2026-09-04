@@ -17,7 +17,8 @@
 | *(harness)* | `scratchpad/reels-panel-harness.mjs` + `harness:reels-panel` in `package.json` |
 | `be98e5da` | the harness's own defect: its floor value collided with the seed |
 | `f6dc1491` | ROADMAP row 151 |
-| *(this file)* | the packet |
+| `f29c6b16` | five bare `256`s in my own prose, named by an existing gate (§6.1a) |
+| `7adfb1f5` + this revision | the packet |
 
 Files changed:
 
@@ -131,11 +132,21 @@ The description carries two UI notes the panel uses and one qualifier that gover
 | State | Test Files | Tests |
 |---|---|---|
 | **BEFORE** (`e04eed21`, the branch point) | 494 passed, 3 skipped (497) | **7046 passed, 9 skipped (7055)** |
-| **AFTER** (tip) | *(see §6.5)* | *(see §6.5)* |
+| **AFTER** (tip) | 495 passed, 3 skipped (498) | **7082 passed, 9 skipped (7091)** |
+
+Both `rc=0`. The arithmetic sums: 7055 → 7091 is **+36**, which is exactly this parcel's one new file; 497 → 498 is that file; 7046 → 7082 is the same +36 with nothing else moved.
 
 Both are full `npm test` runs — `check-test-collection`, `check-pseudo-skip`, `check-peer-path-literals`, `check-cited-paths`, `check-object-stringify`, `check-ledger-timestamps`, `check-python-resolver`, `check-harness-guards`, `npm run typecheck` (`tsc --noEmit`), then `vitest run` — run to completion, not exited early at a gate.
 
 The suite was **fully green at the branch point**. (EW-REELS-CODEC's packet recorded 2 failures in the parallel boundary lane; those landed and are gone.)
+
+### ⚠ 6.1a An existing gate caught five bare `256`s in my own prose
+
+The **first** AFTER run was `1 failed | 7081 passed`. The red row was `effects-drift.test.ts > no second copy of the factor exists in the effects source`, and all five offenders were mine and all five were PROSE: three user-facing strings and two lines inside a JSX block comment. That gate strips `//` comments and `*`-prefixed block-comment lines; it does not see inside a string literal or a `{/* */}` continuation line.
+
+**The gate was not touched.** It exists so the ×256 cannot be re-typed anywhere near this code, and widening it to ignore string bodies would have weakened someone else's guard to make my sentences fit — the "safety held by an omission" failure, from the destroying side. The prose changed instead, and it reads better for it: a user-facing message saying "no ×256" was jargon. Where the factor genuinely had to be named it is now spelled `x256`, which is the **contract's own spelling** (the schema says "No x256." and "drift.rate's x256 export conversion") and which that gate's regex excludes because the digits follow a word character.
+
+One node row moved with the sentence, and it records why the digits are absent so the next reader does not "restore" them. Fixed at `f29c6b16`; the AFTER numbers above are the re-run.
 
 ### 6.2 The ten poisons — each with its mutation on disk, its run, and its restore
 
@@ -165,6 +176,8 @@ The suite was **fully green at the branch point**. (EW-REELS-CODEC's packet reco
 ```
 ════ 25/25 rows · 20.6s ════
 ```
+
+Run on the FINAL tree, against a fresh copy of the aeon project, after the ×256 plant of §6.5 was restored and the app rebuilt — not carried over from the earlier run.
 
 Every bound and the DEBUG sentence are read **from the vendored schema at startup** — not imported from `scene-ui.ts` (which would make the row "the panel paints what the module says", true of a module that says the wrong thing) and not typed into the harness (which drifts the moment the contract does).
 
