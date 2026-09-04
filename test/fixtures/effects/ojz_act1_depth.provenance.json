@@ -4,23 +4,27 @@
   "aeon": {
     "repo": "git@github.com:Volence/aeon.git",
     "path": "games/sonic4/data/editor/effects/ojz_act1_depth.json",
-    "revision": "88909bb3e05e0e10b979b2c492259d8db377a0e5",
-    "revision_is": "aeon origin/master AT THE MOMENT OF VENDORING (2026-08-28 ~15:44). aeon's master advanced to 5b09649c1493d6a574c2f4911d07d431a9ba9384 within five minutes of this being written, which is the point: this key records WHERE THESE BYTES CAME FROM, not aeon's current tip. The currency check compares CONTENT at aeon's tip, not commit SHAs, so a peer's ordinary commits do not turn Aurora red — only a change to this document does.",
-    "blob": "e5a334f0f54e1ed00bf6c691f7ad4ec18d33fa36",
-    "last_changed_by": "1d1c96d4165a495469b5c4145fd3b36a5b9178fa (2026-08-26) feat(showcase): d-15 — the OJZ showcase adopts vertical depth and a curved horizon",
+    "revision": "999816717b6c362c6a1096731693efcb0465fe41",
+    "revision_is": "aeon origin/master AT THE MOMENT OF RE-VENDORING (2026-09-04). This key records WHERE THESE BYTES CAME FROM, not aeon's current tip — aeon's master advances constantly and did so during this very re-vendor. The currency check compares CONTENT at aeon's tip, not commit SHAs, so a peer's ordinary commits do not turn Aurora red; only a change to this document does, which is exactly what happened here.",
+    "blob": "3a74644bff3d0d0ff71f69c59b2ff3f23e7315d8",
+    "last_changed_by": "7ebf340ab1c416520d65a3c712f6d4d457b8ab5b — `reels(step 4b): the `reels` key, its rung-1-only refusal, and the runtime selection`",
     "resolved_by": "git -C ../aeon ls-remote origin refs/heads/master (returned 88909bb3…, matching the local remote-tracking ref), read with git -C ../aeon show <rev>:<path> — never the sibling working tree",
     "revision_published": "88909bb3… is the tip of aeon's PUBLISHED master, not a local-only SHA; test/formats/aeon-fixture-currency.test.ts re-asserts that on every run"
   },
   "fixture": {
     "path": "test/fixtures/effects/ojz_act1_depth.json",
-    "bytes": 989,
-    "sha256": "6d69c6c23734d783abf4d72ecd375f6b2114df0190bec9203525869c9ae709cc",
-    "git_blob": "e5a334f0f54e1ed00bf6c691f7ad4ec18d33fa36",
+    "bytes": 1074,
+    "sha256": "c6109e1f4f695f451000dd9813bfe9cd2d06cf8066905b2aafbf609c1d0f7534",
+    "git_blob": "3a74644bff3d0d0ff71f69c59b2ff3f23e7315d8",
     "identical_to_source": "byte-for-byte; the git blob id above is the SAME object aeon stores, which is the check test/formats/aeon-fixture-currency.test.ts makes"
   },
   "what_the_two_checks_measure": {
     "round_trip": "test/formats/effects-scene-curve-vsplit.test.ts — a property of AURORA's parser/serializer over this document. Reads ONLY this fixture. A pinned blob is the right instrument: the question is about the round trip, not about currency.",
     "currency": "test/formats/aeon-fixture-currency.test.ts — is this pin still what aeon ships? A pinned blob CANNOT answer that (it equals itself by construction), so that check reads aeon's origin/master through git objects, names the revision it read, FAILS on drift, and SKIPS LOUDLY when it cannot run."
   },
-  "re_vendor": "git -C <aeon> fetch origin && git -C <aeon> show origin/master:games/sonic4/data/editor/effects/ojz_act1_depth.json > test/fixtures/effects/ojz_act1_depth.json — then update `aeon.revision`, `aeon.blob`, `fixture.sha256` and `fixture.git_blob` here."
+  "re_vendor": "git -C <aeon> fetch origin && git -C <aeon> show origin/master:games/sonic4/data/editor/effects/ojz_act1_depth.json > test/fixtures/effects/ojz_act1_depth.json — then update `aeon.revision`, `aeon.blob`, `fixture.sha256` and `fixture.git_blob` here.",
+  "re_vendor_history_current_last": [
+    "e5a334f0 — 88909bb3, first vendoring (2026-08-28), off the live-tree defect.",
+    "3a74644b — 99981671, re-vendored 2026-09-04 because aeon's step 4b ADDED a `reels` key (rates [3,-5,2,-4,6]) to this shipped scene. That is the first real authored reels document in the suite, so this fixture now exercises Aurora's reels codec against aeon's own content rather than against a document Aurora invented."
+  ]
 }

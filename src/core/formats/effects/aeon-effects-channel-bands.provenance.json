@@ -5,10 +5,10 @@
   "aeon": {
     "repo": "git@github.com:Volence/aeon.git",
     "path": "games/sonic4/data/generated/effects_channel_bands.json",
-    "revision": "776a3ea1ad30d59f0b43ec4f2b39a812390e5038",
-    "revision_subject": "status: four merged, master green on all four shapes",
-    "blob": "a00e3bb0a7f4445a9d886734a14ee8b0a905bbd9",
-    "last_changed_by": "8d217dd4 — `fix(sidecar): the fit test is PEAK-TO-PEAK, not peak — wrong by 2x, permissively`. THE PIN IS DELIBERATELY AT OR AFTER THAT COMMIT AND THE REASON IS THE WHOLE FEATURE: before 8d217dd4 the file's own `how_to_use` compared PEAK EXCURSION (`256 >> amp_shift`) against `lines`, which is half the real travel, so a warning built on the earlier wording would have stayed silent on sweeps that certainly do not fit. `git log --follow` over the path names exactly two commits, d593070a (the file's introduction) and 8d217dd4 (that correction); the blob has not moved since.",
+    "revision": "999816717b6c362c6a1096731693efcb0465fe41",
+    "revision_subject": "bar: a status echo assembled from a separate query can describe a world that did not happen",
+    "blob": "d6f8bf63e173ca588cb327e1a2ac24e0802d7df8",
+    "last_changed_by": "7ebf340ab1c416520d65a3c712f6d4d457b8ab5b — `reels(step 4b): the `reels` key, its rung-1-only refusal, and the runtime selection`. THE CHANGE IS THE TWO `source` LINE NUMBERS ONLY (1556->1563, 1558->1565), because ojz_effects.emp grew above them. Every band value — lo, hi, lines, and the asymmetric edge behaviour — is byte-identical, so nothing this document is authoritative FOR has moved.",
     "resolved_by": "git -C <AEON_DIR> show 776a3ea1:games/sonic4/data/generated/effects_channel_bands.json — read through git OBJECTS, never through the sibling working tree, which on this machine is a live lane checkout. The blob id above was read back two independent ways and they agree: `git -C <AEON_DIR> rev-parse 776a3ea1:<path>` in aeon, and `git hash-object` on the bytes that landed here. AEON_DIR was TYPED in an interactive shell command (a worktree shell cannot import the resolver inline) and no absolute peer path entered a committed file.",
     "revision_published": "776a3ea1 is an ancestor of aeon origin/master (52be83a90ae225ff661bb4ec44c207bed3ea4df2 when this was written), checked with `git merge-base --is-ancestor`; and origin/master:<path> resolves to the SAME blob a00e3bb0 — so the pin is current at aeon's tip, not merely correctly cited. Both facts are re-asserted on every run by test/formats/effects-channel-bands-drift.test.ts rather than left as prose here.",
     "branch_that_answers_currency": "origin/master"
@@ -16,7 +16,7 @@
   "vendored": {
     "path": "src/core/formats/effects/aeon-effects-channel-bands.json",
     "bytes": 1964,
-    "git_blob": "a00e3bb0a7f4445a9d886734a14ee8b0a905bbd9",
+    "git_blob": "d6f8bf63e173ca588cb327e1a2ac24e0802d7df8",
     "identical_to_source": "byte-for-byte; the git blob id above is the SAME object aeon stores, and test/formats/effects-channel-bands-drift.test.ts recomputes it from these bytes on every run"
   },
   "what_this_document_is_authoritative_FOR_and_what_it_is_not": {
@@ -27,6 +27,7 @@
   },
   "re_vendor": "git -C <AEON_DIR> fetch origin && git -C <AEON_DIR> show origin/master:games/sonic4/data/generated/effects_channel_bands.json > src/core/formats/effects/aeon-effects-channel-bands.json — then update `aeon.revision`, `aeon.revision_subject`, `aeon.blob`, `vendored.bytes`, `vendored.git_blob` and `pin_history_current_last` here, and re-run the suite: channel-bands.ts's module-load guards will tell you if a load-bearing sentence moved, rather than quietly warning on a rule the contract no longer holds.",
   "pin_history_current_last": [
-    "a00e3bb0 — 776a3ea1, landing (EW-TIMELINE-CLOCK, 2026-09-04). The file's first appearance in Aurora. Blob byte-identical at aeon origin/master 52be83a9 at the moment of vendoring."
+    "a00e3bb0 — 776a3ea1, landing (EW-TIMELINE-CLOCK, 2026-09-04). The file's first appearance in Aurora. Blob byte-identical at aeon origin/master 52be83a9 at the moment of vendoring.",
+    "d6f8bf63 — 99981671, re-vendored 2026-09-04. Line-number drift only from aeon's reels step 4b; no band value changed. Re-vendored rather than pinned back because the currency row's job is to track aeon's tip, and a stale pin held for cosmetic drift teaches the next reader to ignore the row."
   ]
 }
