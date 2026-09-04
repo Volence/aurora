@@ -45,7 +45,7 @@
 import type {
   EffectsPreset, EffectsPresetBand, EffectsPresetLibrary, EffectsPresetBandOn,
   EffectsPresetCycleChannel, EffectsPresetAnchorSweep, AnchorAmpRung, AnchorPeriodRung,
-  EffectsPresetRamp, EffectsPresetBaseSwap,
+  EffectsPresetRamp, EffectsPresetBaseSwap, EffectsPresetBaseSwapBand,
 } from '../../core/formats/effects/preset';
 import {
   EFFECTS_PRESET_ID_PATTERN, EFFECTS_PRESET_ON_ARMS, EFFECTS_PRESET_SCHEMA,
@@ -95,17 +95,28 @@ import {
   presetProgramArm, EFFECTS_PRESET_PROGRAM_ARMS, EFFECTS_PRESET_PATCHED_ARMS,
   // ═══ THE `base_swap` CHANNEL'S BOUNDS — ALSO ALL THE CODEC'S ═══
   //
-  // Read off the vendored schema with module-load guards (empyrean 5bd76ba,
-  // §7.5) and imported, never retyped beside a control — the defect this family
-  // has produced twice. The granule is the one to know about:
-  // EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE is `multipleOf` 8192, and an
-  // unaligned target is NOT a range error — VDP reg $02 encodes only the address
-  // bits above the granule and DROPS the rest silently, so the failure is a
-  // different address with nothing else visibly wrong. `isBaseSwapTargetAligned`
-  // REPORTS it; there is deliberately no snap in the codec and none here.
-  EFFECTS_PRESET_BASE_SWAP_KEYS, EFFECTS_PRESET_BASE_SWAP_LINE_RANGE,
+  // Read off the vendored schema with module-load guards (empyrean 5bd76ba
+  // §7.5, amended `8f56c2c` T3) and imported, never retyped beside a control —
+  // the defect this family has produced twice. The granule is the one to know
+  // about: EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE is `multipleOf` 8192, and an
+  // unaligned target is NOT a range error — the plane base register encodes only
+  // the address bits above the granule and DROPS the rest silently, so the
+  // failure is a different address with nothing else visibly wrong.
+  // `isBaseSwapTargetAligned` REPORTS it; there is deliberately no snap in the
+  // codec and none here.
+  //
+  // ⚠ AND TWO OF THESE ARE NOT BOUNDS AT ALL. `baseSwapInsideRows` answers
+  // "which rows does this band actually swap?" — `line+1 .. restore_line-1`,
+  // because BOTH edge lines are FIRE lines and each edge row is half one picture
+  // and half the other. `baseSwapOrderRefusal` derives the strict-ascent rule
+  // that NEITHER the schema NOR aeon's generator enforces, so an author meets it
+  // here instead of at .emp build time in `fire_lines`.
+  EFFECTS_PRESET_BASE_SWAP_KEYS, EFFECTS_PRESET_BASE_SWAP_OPTIONAL_KEYS,
+  EFFECTS_PRESET_BASE_SWAP_LINE_RANGE, EFFECTS_PRESET_BASE_SWAP_RESTORE_LINE_RANGE,
   EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE, EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE,
-  isBaseSwapTargetAligned,
+  EFFECTS_PRESET_BASE_SWAP_PLANES, EFFECTS_PRESET_BASE_SWAP_MIN_BANDS,
+  EFFECTS_PRESET_BASE_SWAP_ORDER_AUTHORITY,
+  isBaseSwapTargetAligned, baseSwapInsideRows, baseSwapFires, baseSwapOrderRefusal,
   // ═══ THE `boundary` ARM'S BOUNDS (empyrean c4a1da2, §7.6) ═══
   //
   // ⚠ FOUR RANGES ARRIVE AND FOUR FIELDS ARRIVE WITHOUT ONE. `line`, `channel`,
@@ -3699,12 +3710,35 @@ export function setRampRateCommand(
 //
 // ═══ WHAT THE CONTROL IS ═══
 //
-// TWO NUMBERS AND DELIBERATELY NOTHING ELSE: a screen `line` and a VRAM
-// `target`. At that line, one OP_SET_REG fire re-points Plane A's nametable base
-// register (VDP reg $02) at `target`; from there down, Plane A draws from a
-// different nametable — the "Batman & Robin trick". The document is a CLOSED
-// object of exactly those two required members, so a third control here would be
-// authoring a key the schema refuses.
+// A **LIST** OF BANDS since empyrean `8f56c2c` (T3, 2026-09-04), and that is a
+// HARD BREAK: `base_swap` was one closed `{line, target}` object, the old form
+// is REFUSED, and there is no legacy arm. Each band names a `plane`
+// (`PlaneA`/`PlaneB` — the register IS the content of an inversion), a `line`,
+// a `target`, and OPTIONALLY a `restore_line`; the bands flatten IN DOCUMENT
+// ORDER into one raster program. Absent `restore_line` = runs to the bottom of
+// the display, which is exactly the shipped single-edge shape the old key
+// expressed.
+//
+// ═══ ⚠ TWO THINGS ON THIS SURFACE THAT NOBODY GUESSES RIGHT ═══
+//
+//   A. `restore_line` IS NEITHER INCLUSIVE NOR EXCLUSIVE. It and `line` are both
+//      FIRE lines; the register changes about 45% of the way ACROSS the
+//      scanline, so each edge row is half one picture and half the other. The
+//      FULLY SWAPPED rows are `line+1 .. restore_line-1`, and the schema states
+//      a measured witness for it (`3..64` reads INSIDE as `4..63`). Any sentence
+//      here that names rows uses `baseSwapInsideRows`, whose offsets are parsed
+//      out of that prose and checked against that witness — never an inclusive
+//      range typed by hand.
+//   B. ORDER IS ENFORCED BY NEITHER THE SCHEMA NOR AEON'S GENERATOR. A document
+//      can validate, pass the generator's shape check, and FAIL AT .emp BUILD
+//      TIME in `fire_lines`. Aurora derives that rule (strict ascent over the
+//      flattened fire sequence) so the author meets it while typing — and every
+//      message NAMES `fire_lines` as the real authority, so nobody later reads
+//      Aurora as the enforcer and "fixes" a build by editing this file.
+//      ⚠ THE EDIT-TIME REFUSAL ONLY REFUSES AN EDIT THAT BREAKS AN ALREADY-SOUND
+//      LIST. An out-of-order document can arrive (the codec accepts one because
+//      the contract does), and refusing every edit on it would lock the author
+//      out of the only surface that can repair it.
 //
 // ═══ ⚠ TWO ASYMMETRIES WITH `ramp`, AND A READER WHO JUST READ THAT BLOCK WILL
 //     CARRY BOTH ACROSS WRONGLY ═══
@@ -3729,10 +3763,16 @@ export function setRampRateCommand(
 // `target` is a raw VRAM BYTE ADDRESS and an author meeting `57344` in a bare
 // number box has no way to know that. Every place this surface shows one, it
 // shows the hex beside the decimal (`fmtVramBase`) and NAMES the address when
-// the contract names it (`BASE_SWAP_NAMED_TARGETS`, parsed out of the schema:
-// 57344 = $E000 = VRAM_PLANE_B). It NAMES NOTHING THE CONTRACT DOES NOT —
+// the contract names it. It NAMES NOTHING THE CONTRACT DOES NOT —
 // `rampAddrGloss`'s rule, for the same reason: a per-address gloss Aurora made
 // up would be an invention wearing a contract's clothes.
+//
+// ⚠ AND AT `8f56c2c` THE CONTRACT STOPPED NAMING ANY. The pre-amendment `target`
+// description ended "targets 57344 ($E000, VRAM_PLANE_B)"; the rewrite dropped
+// it, so `BASE_SWAP_NAMED_TARGETS` is now legitimately EMPTY and the gloss says
+// the contract names no address rather than supplying one. Read that constant's
+// docblock before adding a name back: the empty set is MEASURED over the whole
+// key's prose, not a lookup that failed.
 //
 // ═══ ⚠ AND NOTHING SNAPS ═══
 //
@@ -3745,10 +3785,22 @@ export function setRampRateCommand(
 /** The `base_swap` key's own title — the contract's paragraph, at the point of use. */
 export const BASE_SWAP_TITLE = presetFieldTitle(['properties', 'base_swap']);
 
-/** Every base_swap field's title, straight from the schema. */
+/** The BAND's own node title — `$defs.base_swap`, which is now the LIST's node. */
+export const BASE_SWAP_LIST_TITLE = presetFieldTitle(['$defs', 'base_swap']);
+
+/**
+ * Every base_swap BAND field's title, straight from the schema.
+ *
+ * ⚠ THE PATH GAINED AN `items` SEGMENT at empyrean `8f56c2c`. Reading
+ * `['$defs','base_swap','properties',f]` now returns the empty string rather
+ * than a wrong string, which is why these are spelled out rather than looped
+ * over a name list that could silently go blank.
+ */
 export const BASE_SWAP_FIELD_TITLES = Object.freeze({
-  line: presetFieldTitle(['$defs', 'base_swap', 'properties', 'line']),
-  target: presetFieldTitle(['$defs', 'base_swap', 'properties', 'target']),
+  plane: presetFieldTitle(['$defs', 'base_swap', 'items', 'properties', 'plane']),
+  line: presetFieldTitle(['$defs', 'base_swap', 'items', 'properties', 'line']),
+  target: presetFieldTitle(['$defs', 'base_swap', 'items', 'properties', 'target']),
+  restore_line: presetFieldTitle(['$defs', 'base_swap', 'items', 'properties', 'restore_line']),
 });
 
 /**
@@ -3792,6 +3844,13 @@ export const BASE_SWAP_ASYMMETRIES_SHORT =
  * Aurora draws no raster program (`NO_PREVIEW`), so what the swap LOOKS like is
  * a claim this editor cannot make on its own evidence. It can quote the one who
  * measured it: aeon's on-screen captures, via the schema.
+ *
+ * ⚠ THE QUOTED SENTENCE PREDATES THE LIST and describes ONE edge on Plane A
+ * running to the frame bottom. That is still exactly what a single band with no
+ * `restore_line` does, and it is still the contract's only measured statement
+ * about what a swap looks like — so it is quoted unchanged and the panel says
+ * beside it that a band with a `restore_line` ends earlier. Aurora does not
+ * upgrade a measured sentence on the strength of a shape change.
  */
 export const BASE_SWAP_WHAT_YOU_SEE: string = (() => {
   const m = /WHAT AN AUTHOR SEES: ([\s\S]*?)(?:\s*$)/.exec(BASE_SWAP_TITLE);
@@ -3828,59 +3887,86 @@ export function fmtVramBaseBoth(addr: number): string {
 }
 
 /**
- * THE ADDRESSES THE CONTRACT NAMES — parsed out of the schema, and NOTHING IS
- * INVENTED BESIDE THEM.
+ * THE ADDRESSES THE CONTRACT NAMES — and at empyrean `8f56c2c` THAT SET BECAME
+ * **EMPTY**. Read this before writing a name into any gloss.
  *
- * The schema names exactly one: the shipped section-6 target, `57344 ($E000,
- * VRAM_PLANE_B)`. `rampAddrGloss`'s rule applies unchanged — every other legal
- * address gets a sentence saying the contract admits it and this editor does not
- * know what is there, rather than a name Aurora would be making up. A wrong name
- * on a VRAM base is worse than none: it would tell an author they are pointing
- * at a plane they are not.
+ * ═══ WHAT CHANGED, AND WHY AN EMPTY MAP IS THE CORRECT ANSWER ═══
  *
- * Guarded three ways at module load: the decimal and the hex must agree, the
- * address must be inside the declared range, and it must be ON the granule —
- * because the contract's own worked example failing its own constraint would
- * mean one of the two had moved.
+ * The pre-`8f56c2c` `target` description ended "The shipped section-6 preset
+ * targets 57344 ($E000, VRAM_PLANE_B)", and that was the ONE address Aurora was
+ * ever allowed to put a name on. The amendment rewrote that description down to
+ * the range and the granule; the two `VRAM_PLANE_*` names that remain in the
+ * `$defs.base_swap` prose are the HOME bases an OFF fire writes, described as
+ * "the engine's fact, never authored", and carry NO addresses. So the contract
+ * now names no authorable address at all, and `rampAddrGloss`'s rule — name
+ * nothing the contract does not — makes the honest answer "none".
+ *
+ * ═══ ⚠ AND EMPTY IS **MEASURED**, NOT A LOOKUP THAT FAILED ═══
+ *
+ * An empty map produced by a regex that stopped matching at one path is
+ * indistinguishable from an empty map produced by a contract that stopped
+ * naming anything — the first is a bug, the second is a fact, and a silent zero
+ * would ship the bug. So the scan runs over a POPULATION: every description in
+ * the `base_swap` key node and the whole band node. The population is asserted
+ * non-empty and asserted to still contain the words this scan is about, so
+ * "zero names found" is a reading of prose that is provably there rather than a
+ * reading of prose that has gone missing.
  */
 export const BASE_SWAP_NAMED_TARGETS: ReadonlyMap<number, string> = (() => {
-  const desc = BASE_SWAP_FIELD_TITLES.target;
-  const m = /targets (\d+) \(\$([0-9A-Fa-f]+), (VRAM_[A-Z0-9_]+)/.exec(desc);
-  if (!m) {
+  const bandNode = schemaNode(['$defs', 'base_swap']);
+  const prose = [
+    BASE_SWAP_TITLE,
+    JSON.stringify(bandNode),
+  ].join('\n');
+  // ANTI-VACUOUS: the haystack must actually be the base_swap prose. Without
+  // this, a path that had moved would scan an empty string and report "the
+  // contract names nothing" about a contract it never read.
+  if (prose.length < 500 || !/base_swap|nametable/.test(prose)) {
     throw new Error(
-      'aurora-effects-preset.schema.json no longer names a worked VRAM base in '
-      + '$defs.base_swap.properties.target (the shipped "57344 ($E000, VRAM_PLANE_B)"), which is '
-      + 'the ONLY address this editor is allowed to put a name on. Re-read the schema — do NOT '
-      + 'retype the address or invent a second one.',
+      'the base_swap prose this scan reads its named VRAM addresses out of came back empty or '
+      + 'unrecognisable, which would make "the contract names no address" a statement about a '
+      + 'failed lookup rather than about the contract. Re-read the schema paths before trusting '
+      + 'any address gloss.',
     );
   }
-  const dec = Number(m[1]);
-  const hex = parseInt(m[2], 16);
-  if (dec !== hex) {
-    throw new Error(
-      `the schema's worked base address disagrees with itself: ${dec} decimal is not $${m[2]}. One `
-      + 'of the two was edited by hand; re-read the schema.',
-    );
+  const found = new Map<number, string>();
+  for (const m of prose.matchAll(/(\d+) \(\$([0-9A-Fa-f]+), (VRAM_[A-Z0-9_]+)\)/g)) {
+    const dec = Number(m[1]);
+    const hex = parseInt(m[2], 16);
+    if (dec !== hex) {
+      throw new Error(
+        `the schema's worked base address disagrees with itself: ${dec} decimal is not $${m[2]}. `
+        + 'One of the two was edited by hand; re-read the schema.',
+      );
+    }
+    if (!isBaseSwapTargetAligned(dec)) {
+      throw new Error(
+        `the schema's own worked base address ${dec} is not a legal base_swap target (range `
+        + `${EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.min}..`
+        + `${EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.max}, granule `
+        + `${EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE}). The worked example and the constraints `
+        + 'have drifted apart; re-read both.',
+      );
+    }
+    found.set(dec, m[3]);
   }
-  if (!isBaseSwapTargetAligned(dec)) {
-    throw new Error(
-      `the schema's own worked base address ${dec} is not a legal base_swap target (range `
-      + `${EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.min}..${EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.max}`
-      + `, granule ${EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE}). The worked example and the `
-      + 'constraints have drifted apart; re-read both.',
-    );
-  }
-  return Object.freeze(new Map<number, string>([[dec, m[3]]]));
+  return Object.freeze(found);
 })();
+
+/** The sentence used wherever a gloss has to say the contract names nothing here. */
+const BASE_SWAP_NO_NAMES =
+  'the contract names no VRAM base address, so this editor will not name one either';
 
 /**
  * WHAT THIS ADDRESS IS, as much of it as the contract establishes — the gloss
  * that sits beside the number box.
  *
- * ⚠ IT INVENTS NOTHING, and that is the whole design. One address is named by
- * the contract; every other legal one is reported as admitted, on the granule,
- * and unnamed. An unaligned one says so first, because that is the only thing
- * about it worth reading.
+ * ⚠ IT INVENTS NOTHING, and that is the whole design. Since `8f56c2c` the
+ * contract names no address at all, so every legal one is reported as admitted,
+ * on the granule, and UNNAMED. An unaligned one says so first, because that is
+ * the only thing about it worth reading. If empyrean ever names one again,
+ * `BASE_SWAP_NAMED_TARGETS` picks it up and this starts naming it — with no
+ * edit here.
  */
 export function baseSwapTargetGloss(target: number): string {
   const named = BASE_SWAP_NAMED_TARGETS.get(target);
@@ -3889,80 +3975,168 @@ export function baseSwapTargetGloss(target: number): string {
     return `${fmtVramBase(target)} — NOT on the $${EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE
       .toString(16).toUpperCase()} granule`;
   }
+  if (BASE_SWAP_NAMED_TARGETS.size === 0) {
+    return `${fmtVramBase(target)} — on the granule; ${BASE_SWAP_NO_NAMES}`;
+  }
   const only = [...BASE_SWAP_NAMED_TARGETS].map(([a, n]) => `${fmtVramBase(a)} (${n})`).join(', ');
   return `${fmtVramBase(target)} — on the granule; the contract names only ${only}`;
 }
 
 /**
- * WHAT THE SWAP DOES, in one sentence of the document's own numbers.
+ * WHICH ROWS THIS BAND ACTUALLY SWAPS, in a sentence — and the ONE fact on this
+ * surface nobody guesses right.
  *
- * The `rampDriftSummary` idiom: the arithmetic an author would otherwise do in
- * their head, from the two values in front of them. It states the mechanism and
- * the address in BOTH bases, and it names the target only when the contract
- * does — so this sentence is never the place a made-up plane name gets in.
+ * ⚠ `line` AND `restore_line` ARE BOTH FIRE LINES. The register changes about
+ * 45% of the way across each of them, so each edge row is half one picture and
+ * half the other; the rows that are FULLY swapped are `line+1 .. restore_line-1`
+ * (`baseSwapInsideRows`, whose offsets are parsed out of the schema and checked
+ * against the schema's own measured witness). Neither the inclusive reading nor
+ * the exclusive one is right, so this sentence never states a naked range
+ * without also naming the two half-swapped edge rows.
+ *
+ * With no `restore_line`, the band runs to the bottom of the display and this
+ * says so IN WORDS rather than naming a last row: the schema states no display
+ * height and Aurora will not invent one.
  */
-export function baseSwapSummary(bs: EffectsPresetBaseSwap): string {
-  const named = BASE_SWAP_NAMED_TARGETS.get(bs.target);
-  const what = named === undefined
-    ? `the nametable at ${fmtVramBaseBoth(bs.target)}`
-    : `${fmtVramBaseBoth(bs.target)} — ${named}`;
-  return `At screen line ${bs.line}, Plane A's base register (VDP reg $02) is re-pointed at `
-    + `${what}. One fire, one register write; the ${bs.line} line${bs.line === 1 ? '' : 's'} above `
-    + 'it are untouched.';
+export function baseSwapInsideRowsText(band: EffectsPresetBaseSwapBand): string {
+  const rows = baseSwapInsideRows(band);
+  if (rows.toBottom) {
+    return `Fully swapped from row ${rows.first} to the bottom of the display (no restore_line, `
+      + `so the frame-top flush ends it). Row ${band.line} is the fire line itself — half one `
+      + 'picture and half the other.';
+  }
+  if (rows.empty) {
+    return `NO row is fully swapped: the OFF fire on ${band.restore_line} is the very next fire `
+      + `after the ON fire on ${band.line}, so you get two half-swapped edge rows and nothing `
+      + 'between them.';
+  }
+  return `Fully swapped rows ${rows.first}..${rows.last}. ⚠ NOT ${band.line}..`
+    + `${band.restore_line}: both of those are FIRE lines, the register changes partway across `
+    + 'each of them, and each is half one picture and half the other.';
 }
 
-// ── the seed, from the contract's own worked example ────────────────────────
+/**
+ * WHAT ONE BAND DOES, in one sentence of the document's own numbers.
+ *
+ * The `rampDriftSummary` idiom: the arithmetic an author would otherwise do in
+ * their head. It states the plane, the address in BOTH bases, and the rows —
+ * and it names the target only when the contract does, so this sentence is
+ * never the place a made-up plane name gets in.
+ */
+export function baseSwapBandSummary(band: EffectsPresetBaseSwapBand): string {
+  const named = BASE_SWAP_NAMED_TARGETS.get(band.target);
+  const what = named === undefined
+    ? `the nametable at ${fmtVramBaseBoth(band.target)}`
+    : `${fmtVramBaseBoth(band.target)} — ${named}`;
+  const off = band.restore_line === undefined
+    ? 'There is no OFF fire: it runs to the bottom of the display.'
+    : `A second fire on line ${band.restore_line} puts that plane back on its own home base.`;
+  return `At screen line ${band.line}, ${band.plane}'s base register is re-pointed at ${what}. `
+    + `${off} ${baseSwapInsideRowsText(band)}`;
+}
 
 /**
- * A BRAND-NEW BASE SWAP — both keys written, because the constructor defaults
- * NEITHER (`newBand`'s rule, and the schema says so in as many words).
+ * WHAT THE WHOLE LIST DOES — how many bands, and how many fires they flatten to.
  *
- * ⚠ THE TWO NUMBERS ARE THE CONTRACT'S OWN WORKED EXAMPLE, PARSED, NOT CHOSEN.
- * The schema states which line the shipped section-6 preset fires on and that it
- * targets $E000 (VRAM_PLANE_B), and those are exactly the two values a fresh
- * swap gets. The reason is `newRamp`'s and one more:
+ * The fire count is the number an author has no other way to see, and it is the
+ * one `fire_lines` actually counts at build time.
+ */
+export function baseSwapSummary(bands: readonly EffectsPresetBaseSwapBand[]): string {
+  const fires = baseSwapFires(bands);
+  const n = bands.length;
+  return `${n} band${n === 1 ? '' : 's'}, flattened IN DOCUMENT ORDER into one raster program of `
+    + `${fires.length} fire${fires.length === 1 ? '' : 's'} `
+    + `(${fires.map((f) => f.line).join(', ')}).`;
+}
+
+/**
+ * THE STANDING ORDER WARNING — what is wrong with this list as it stands, or null.
  *
- *   • A SEED MUST NOT BE BORN ILLEGAL — asserted below against the line range
- *     and the granule, not assumed.
- *   • A SEED MUST NOT BE BORN INERT. A `target` this editor cannot name is a
- *     first state whose effect the panel cannot explain; $E000 is the one
- *     address the contract explains, so a fresh swap is one the author can read
- *     a sentence about.
+ * ⚠ THIS IS AN ADVISORY, NOT A REFUSAL, AND THE DIFFERENCE IS WHY AN AUTHOR CAN
+ * STILL FIX A BROKEN DOCUMENT. The codec accepts an out-of-order list because
+ * the contract accepts one, so Aurora can be handed one — from aeon's tree, from
+ * a hand edit, from a peer. If every control refused while the list was broken,
+ * the author would be locked out of the only surface that could repair it. So a
+ * standing break is PAINTED here, and the edit-time refusal
+ * (`baseSwapEditOrderRefusal`) only ever refuses an edit that BREAKS AN
+ * ALREADY-SOUND list.
+ */
+export function baseSwapOrderAdvisory(bands: readonly EffectsPresetBaseSwapBand[]): string | null {
+  return baseSwapOrderRefusal(bands);
+}
+
+// ── the seed, from what the contract still states ───────────────────────────
+
+/**
+ * A FRESH BAND'S PLANE — the `LOWERING` sentence's own variant, cross-checked
+ * against the `plane` enum.
  *
- * It is NOT a claim that this is the right swap for their section — Aurora does
- * not know that, and a seed that pretended to would be the clamp aeon's §E.4
- * forbids wearing a different hat.
+ * Not "the first enum member": the schema's lowering example spells
+ * `vdp_base_reg(VdpBase.PlaneA, target)`, so PlaneA is the variant the contract
+ * itself writes when it writes one. It must also BE one of the two spellings the
+ * enum admits, or the seed would be born refused.
+ */
+const BASE_SWAP_SEED_PLANE: string = (() => {
+  const m = /vdp_base_reg\(VdpBase\.([A-Za-z][A-Za-z0-9]*), target\)/.exec(BASE_SWAP_TITLE);
+  if (!m) {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer shows the lowering call '
+      + '`vdp_base_reg(VdpBase.<variant>, target)` in its `base_swap` property description, which '
+      + 'is where a fresh band\'s plane is read from. ⚠ DO NOT SUBSTITUTE THE FIRST ENUM MEMBER: '
+      + 'the enum is a set of legal spellings and says nothing about which one the contract '
+      + 'writes. Re-read the schema — do NOT type a plane name here.',
+    );
+  }
+  if (!EFFECTS_PRESET_BASE_SWAP_PLANES.includes(m[1])) {
+    throw new Error(
+      `the schema's own lowering example names VdpBase.${m[1]}, which is not one of the spellings `
+      + `its plane enum admits (${EFFECTS_PRESET_BASE_SWAP_PLANES.join(', ')}). A seed built from `
+      + 'it would be born refused; the two statements have drifted apart, re-read both.',
+    );
+  }
+  return m[1];
+})();
+
+/**
+ * A FRESH BAND'S FIRE LINE.
  *
- * ═══ ⚠ THE SENTENCE NOW CARRIES **TWO** LINE NUMBERS, AND THE STALE ONE IS
- * FIRST. READ THE MATCHER BEFORE TRUSTING THE VALUE. ═══
+ * ═══ ⚠ THE SENTENCE CARRIES **TWO** LINE NUMBERS AND THE STALE ONE IS FIRST ═══
  *
- * Until empyrean `c4a1da2` the schema read "The shipped section-6 preset fires
- * on 160." — one number, present tense, and `/fires on (\d+)/` could not be
- * wrong. It now reads "…fired on 160 as bound at aeon 850d4c60 and on 3 since
- * aeon 8bf6df74", because the owner moved the swap to the top of the frame. The
- * OBVIOUS repair — relax the old regex to `/fired on (\d+)/` — matches, is
- * green, and seeds **160**: a value that stopped being the binding, taken from a
- * clause whose whole job is to say so. The clause this reads is therefore the
- * `since` one, the current binding is what a fresh document gets, and the
- * HISTORICAL number is parsed too and asserted to be DIFFERENT — because if the
- * two clauses ever collapse back into one value, a matcher aimed at either half
- * is indistinguishable from a matcher aimed at the other, and this derivation
- * would have no way to notice it had started reading history.
+ * The `base_swap` property description reads "…presets/ojz_sec6_baseswap.json
+ * {line: 160, target: 57344} … that document reads {line: 3} since aeon
+ * 8bf6df74 … so 160 is the value AT 850d4c60 and not the current binding". The
+ * OBVIOUS matcher — the first `line: N` in the paragraph — is green and seeds
+ * **160**, a value taken from a clause whose whole job is to say it is stale.
+ * So the CURRENT clause is what is read, the HISTORICAL one is parsed too, and
+ * the two are asserted DIFFERENT: if they ever collapse into one value, a
+ * matcher aimed at either half is indistinguishable from one aimed at the other
+ * and this derivation could not prove it was reading the current clause.
+ *
+ * ⚠ AND THE DISCLAIMER IS SCOPED, WHICH IS WHY THE TARGET BELOW MAY BE READ FROM
+ * THE SAME CLAUSE. "so 160 is the value AT 850d4c60 and not the current binding"
+ * names the LINE and only the line; no clause supersedes the target. That scope
+ * is asserted rather than assumed — see `BASE_SWAP_SEED_TARGET`.
+ *
+ * ⚠ BOTH NUMBERS DESCRIBE THE PRE-LIST DOCUMENT. aeon's section-6 document is
+ * two bands now. The schema has not restated a worked band, and Aurora does not
+ * get to invent one, so a fresh band is seeded from the last worked values the
+ * contract does state and the author moves it. It is NOT a claim that this is
+ * the right band for their section.
  */
 const BASE_SWAP_SEED_LINE: number = (() => {
-  const sentence = BASE_SWAP_FIELD_TITLES.line;
-  const m = /and on (\d+) since aeon [0-9a-f]{6,}/.exec(sentence);
+  const sentence = BASE_SWAP_TITLE;
+  const m = /that document reads \{line: (\d+)\} since aeon [0-9a-f]{6,}/.exec(sentence);
   if (!m) {
     throw new Error(
       'aurora-effects-preset.schema.json no longer states the CURRENT shipped section-6 fire line '
-      + 'in $defs.base_swap.properties.line, in the shape "…and on <line> since aeon <rev>", which '
-      + 'is where a fresh swap\'s seed line is read from. ⚠ DO NOT REPAIR THIS BY MATCHING THE '
-      + 'OTHER HALF OF THE SENTENCE: that clause states the line the preset was bound to at an '
-      + 'EARLIER aeon revision and seeding from it would put a stale binding in every new document. '
+      + 'in its `base_swap` property description, in the shape "that document reads {line: N} '
+      + 'since aeon <rev>", which is where a fresh band\'s seed line is read from. ⚠ DO NOT REPAIR '
+      + 'THIS BY MATCHING THE OTHER HALF OF THE SENTENCE: that clause states the line the preset '
+      + 'was bound to at an EARLIER aeon revision and the paragraph says so in as many words. '
       + 'Re-read the schema — and do NOT type a line number here.',
     );
   }
-  const was = /preset fired on (\d+) as bound at aeon [0-9a-f]{6,}/.exec(sentence);
+  const was = /presets\/ojz_sec6_baseswap\.json \{line: (\d+), target: (\d+)\}/.exec(sentence);
   if (!was) {
     throw new Error(
       'aurora-effects-preset.schema.json states a CURRENT section-6 fire line but no longer states '
@@ -3992,20 +4166,187 @@ const BASE_SWAP_SEED_LINE: number = (() => {
   return line;
 })();
 
-const BASE_SWAP_SEED_TARGET: number = [...BASE_SWAP_NAMED_TARGETS.keys()][0];
+/**
+ * A FRESH BAND'S VRAM BASE — the shipped section-6 target, and the ONLY address
+ * the contract still writes down anywhere.
+ *
+ * ⚠ IT COMES OUT OF THE HISTORICAL CLAUSE, DELIBERATELY, AND THE SCOPE OF THAT
+ * CLAUSE'S DISCLAIMER IS ASSERTED. The paragraph writes `{line: 160, target:
+ * 57344}` and then disclaims exactly one of them: "so **160** is the value AT
+ * 850d4c60 and not the current binding". The disclaimer names the LINE. This
+ * checks that — if the disclaimer ever grows to name the target too, the target
+ * stops being derivable from here and this throws rather than seeding a value
+ * the contract has just said is stale.
+ *
+ * ⚠ AND THE NAME IS GONE. Before `8f56c2c` this address came with
+ * "($E000, VRAM_PLANE_B)" and a fresh band was one the panel could explain. The
+ * amendment removed every address name from the key's prose, so the seed is now
+ * legal and unexplained — `BASE_SWAP_NAMED_TARGETS` says why, and the gloss says
+ * so on screen instead of inventing a name.
+ */
+const BASE_SWAP_SEED_TARGET: number = (() => {
+  const sentence = BASE_SWAP_TITLE;
+  const m = /presets\/ojz_sec6_baseswap\.json \{line: (\d+), target: (\d+)\}/.exec(sentence);
+  if (!m) {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer states the shipped section-6 target in its '
+      + '`base_swap` property description, in the shape "{line: N, target: M}", which is the only '
+      + 'VRAM base address the contract still writes down and where a fresh band\'s seed target is '
+      + 'read from. Re-read the schema — do NOT type an address here.',
+    );
+  }
+  const disclaimed = /so (\d+) is the value AT [0-9a-f]{6,} and not the current binding/
+    .exec(sentence);
+  if (!disclaimed) {
+    throw new Error(
+      'aurora-effects-preset.schema.json states a superseded section-6 binding but no longer says '
+      + 'WHICH of its two numbers is superseded. The seed target is read out of that clause '
+      + 'precisely because the disclaimer names the LINE and not the target; without the '
+      + 'disclaimer this derivation cannot know whether the address is still current. Re-read the '
+      + 'sentence.',
+    );
+  }
+  if (disclaimed[1] === m[2]) {
+    throw new Error(
+      `aurora-effects-preset.schema.json now disclaims the section-6 TARGET (${m[2]}) as "not the `
+      + 'current binding", so it may no longer be used as a seed. Re-read the schema for a '
+      + 'current worked address — do NOT seed from a value the contract has just called stale.',
+    );
+  }
+  const target = Number(m[2]);
+  if (!isBaseSwapTargetAligned(target)) {
+    throw new Error(
+      `the schema's own worked base address ${target} is not a legal base_swap target (range `
+      + `${EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.min}..`
+      + `${EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.max}, granule `
+      + `${EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE}). A seed born illegal would put a fresh `
+      + 'document in a state the author had no hand in; re-read both.',
+    );
+  }
+  return target;
+})();
 
+/**
+ * A BRAND-NEW BAND — every required key written, because the constructor
+ * defaults NONE (`newBand`'s rule, and the schema says so in as many words).
+ *
+ * ⚠ NO `restore_line`, AND THAT IS A DERIVED CHOICE RATHER THAN AN OMISSION.
+ * The schema calls an absent `restore_line` "the shipped single-edge shape" —
+ * the one shape the pre-list key could express and the one aeon shipped. Where a
+ * band ENDS is the author's decision and Aurora has no basis for one, so a fresh
+ * band runs to the bottom of the display and the author adds an end if they want
+ * one. `BASE_SWAP_SINGLE_EDGE_IS_SHIPPED` asserts the contract still says so.
+ */
+const BASE_SWAP_SINGLE_EDGE_IS_SHIPPED: boolean = (() => {
+  if (!/the shipped single-edge shape/.test(BASE_SWAP_FIELD_TITLES.restore_line)) {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer describes an ABSENT restore_line as "the '
+      + 'shipped single-edge shape" at $defs.base_swap.items.properties.restore_line. A fresh '
+      + 'band omits restore_line on the strength of that sentence — if absence has stopped being '
+      + 'the shipped shape, re-read the schema before seeding one.',
+    );
+  }
+  return true;
+})();
+
+export function newBaseSwapBand(): EffectsPresetBaseSwapBand {
+  // Referenced so the guard above cannot be dead-code-eliminated or drift into
+  // an unread constant: the seed's shape depends on it.
+  if (!BASE_SWAP_SINGLE_EDGE_IS_SHIPPED) throw new Error('unreachable');
+  return { plane: BASE_SWAP_SEED_PLANE, line: BASE_SWAP_SEED_LINE, target: BASE_SWAP_SEED_TARGET };
+}
+
+/**
+ * A BRAND-NEW `base_swap` KEY — a LIST holding exactly the minimum the schema
+ * admits, which is `minItems`, read and not typed.
+ *
+ * A SEED MUST NOT BE BORN ILLEGAL, and since `8f56c2c` that includes the
+ * ordering rule the schema does not enforce: the assertion below runs
+ * `baseSwapOrderRefusal` over the seed at module load, so a fresh document can
+ * never be one `fire_lines` would refuse at build time.
+ */
 export function newBaseSwap(): EffectsPresetBaseSwap {
-  return { line: BASE_SWAP_SEED_LINE, target: BASE_SWAP_SEED_TARGET };
+  return Array.from({ length: EFFECTS_PRESET_BASE_SWAP_MIN_BANDS }, () => newBaseSwapBand());
+}
+
+{
+  const seed = newBaseSwap();
+  const why = baseSwapOrderRefusal(seed);
+  if (why !== null) {
+    throw new Error(
+      `a brand-new base_swap is born in a state ${EFFECTS_PRESET_BASE_SWAP_ORDER_AUTHORITY.symbol} `
+      + `would refuse at build time: ${why} The seed is derived from the schema's own worked `
+      + 'values, so either those values or minItems have moved. Re-read both before shipping a '
+      + 'constructor that authors a document the build rejects.',
+    );
+  }
 }
 
 // ── the refusals ────────────────────────────────────────────────────────────
 
+/** The band this index names, or null — every refusal below is index-safe. */
+function bandAt(
+  bands: readonly EffectsPresetBaseSwapBand[], index: number,
+): EffectsPresetBaseSwapBand | null {
+  return (index >= 0 && index < bands.length) ? bands[index] : null;
+}
+
+/**
+ * WOULD THIS EDIT BREAK THE FIRE ORDER — the one cross-band refusal, and the
+ * only place Aurora applies a rule no schema keyword can express.
+ *
+ * ⚠ IT REFUSES ONLY AN EDIT THAT BREAKS AN ALREADY-SOUND LIST. If the document
+ * arrived out of order — and it can, because the contract accepts one and the
+ * codec must too — every edit is allowed through, because refusing them all
+ * would lock the author out of the only surface that can repair it. The standing
+ * break reaches them as `baseSwapOrderAdvisory` instead.
+ */
+function baseSwapEditOrderRefusal(
+  before: readonly EffectsPresetBaseSwapBand[],
+  after: readonly EffectsPresetBaseSwapBand[],
+  subject: string, holds: string,
+): string | null {
+  if (baseSwapOrderRefusal(before) !== null) return null;
+  const why = baseSwapOrderRefusal(after);
+  return why === null ? null : `${subject}: ${why} Refused; ${holds}`;
+}
+
+/** The list with one band's field replaced — the candidate an order check runs on. */
+function withBandChange(
+  bands: readonly EffectsPresetBaseSwapBand[], index: number,
+  change: Partial<EffectsPresetBaseSwapBand> & { restore_line?: number | undefined },
+  dropRestore = false,
+): EffectsPresetBaseSwapBand[] {
+  return bands.map((b, i) => {
+    if (i !== index) return b;
+    const next = { ...b, ...change };
+    if (dropRestore) delete next.restore_line;
+    return next;
+  });
+}
+
+/** Why this band's plane cannot be written, or null. */
+export function baseSwapPlaneRefusal(
+  bands: readonly EffectsPresetBaseSwapBand[], presetId: string, index: number, value: string,
+): string | null {
+  const band = bandAt(bands, index);
+  if (band === null) return null;
+  if (EFFECTS_PRESET_BASE_SWAP_PLANES.includes(value)) return null;
+  return `preset "${presetId}" base_swap band ${index} plane: ${JSON.stringify(value)} is not one `
+    + `of ${EFFECTS_PRESET_BASE_SWAP_PLANES.join(' or ')}. The key is CLOSED to those two: `
+    + 'VdpBase has five variants and three of them name the window, the sprite table and hscroll, '
+    + 'and a forwarded SpriteTable would re-point the sprite table mid-frame — sigil cannot refuse '
+    + `a legal call, so the refusal has to be here. Refused; plane is still ${band.plane}.`;
+}
+
 /** Why this fire line cannot be written, or null. */
 export function baseSwapLineRefusal(
-  bs: EffectsPresetBaseSwap, presetId: string, value: number,
+  bands: readonly EffectsPresetBaseSwapBand[], presetId: string, index: number, value: number,
 ): string | null {
-  const subject = `preset "${presetId}" base_swap line`;
-  const holds = `line is still ${bs.line}.`;
+  const band = bandAt(bands, index);
+  if (band === null) return null;
+  const subject = `preset "${presetId}" base_swap band ${index} line`;
+  const holds = `line is still ${band.line}.`;
   if (!Number.isInteger(value)) {
     return `${subject}: ${value} is not a whole number. A screen line is an integer. `
       + `Refused; ${holds}`;
@@ -4018,7 +4359,39 @@ export function baseSwapLineRefusal(
       + `lines: a ramp's top stops at ${EFFECTS_PRESET_RAMP_TOP_RANGE.max} because a run needs a `
       + `line after it, and a swap is a single fire that reaches ${r.max}. Refused; ${holds}`;
   }
-  return null;
+  return baseSwapEditOrderRefusal(bands, withBandChange(bands, index, { line: value }),
+    subject, holds);
+}
+
+/**
+ * Why this RESTORE line cannot be written, or null. `undefined` means "remove
+ * it", which is always legal — a band with no OFF fire runs to the bottom of the
+ * display, the shipped single-edge shape.
+ */
+export function baseSwapRestoreLineRefusal(
+  bands: readonly EffectsPresetBaseSwapBand[], presetId: string, index: number,
+  value: number | undefined,
+): string | null {
+  const band = bandAt(bands, index);
+  if (band === null) return null;
+  const subject = `preset "${presetId}" base_swap band ${index} restore_line`;
+  const holds = band.restore_line === undefined
+    ? 'the band still has no restore_line, and runs to the bottom of the display.'
+    : `restore_line is still ${band.restore_line}.`;
+  if (value === undefined) {
+    return baseSwapEditOrderRefusal(bands, withBandChange(bands, index, {}, true), subject, holds);
+  }
+  if (!Number.isInteger(value)) {
+    return `${subject}: ${value} is not a whole number. A screen line is an integer. `
+      + `Refused; ${holds}`;
+  }
+  const r = EFFECTS_PRESET_BASE_SWAP_RESTORE_LINE_RANGE;
+  if (value < r.min || value > r.max) {
+    return `${subject}: ${value} is outside ${r.min}..${r.max}, the same fire() ensure the ON `
+      + `line meets. Refused; ${holds}`;
+  }
+  return baseSwapEditOrderRefusal(bands, withBandChange(bands, index, { restore_line: value }),
+    subject, holds);
 }
 
 /**
@@ -4055,22 +4428,24 @@ export function baseSwapTargetNeighbours(
  * ═══ THE GRANULE IS THE POINT, AND IT IS NOT A ROUNDING CONVENIENCE ═══
  *
  * An unaligned target is NOT out of range and fails loudly NOWHERE downstream:
- * VDP reg $02 encodes only the address bits above the granule and DROPS the rest
- * SILENTLY, so the VDP fetches from a different address than every `VRAM_*`
- * consumer reads and writes and nothing else looks wrong. The engine's own
- * ensure names the granule in its refusal and the schema's `multipleOf` is that
- * same refusal one step earlier; this is it one step earlier again, at the
- * control, at typing time.
+ * the plane base register encodes only the address bits above the granule and
+ * DROPS the rest SILENTLY, so the VDP fetches from a different address than
+ * every `VRAM_*` consumer reads and writes and nothing else looks wrong. The
+ * engine's own ensure names the granule in its refusal and the schema's
+ * `multipleOf` is that same refusal one step earlier; this is it one step
+ * earlier again, at the control, at typing time.
  *
  * NOT A SNAP, and here that rule has hardware behind it rather than taste:
  * rounding to the nearest granule produces A DIFFERENT PLANE'S PICTURE, without
  * saying so. So the neighbours are OFFERED and nothing is written.
  */
 export function baseSwapTargetRefusal(
-  bs: EffectsPresetBaseSwap, presetId: string, value: number,
+  bands: readonly EffectsPresetBaseSwapBand[], presetId: string, index: number, value: number,
 ): string | null {
-  const subject = `preset "${presetId}" base_swap target`;
-  const holds = `target is still ${fmtVramBaseBoth(bs.target)}.`;
+  const band = bandAt(bands, index);
+  if (band === null) return null;
+  const subject = `preset "${presetId}" base_swap band ${index} target`;
+  const holds = `target is still ${fmtVramBaseBoth(band.target)}.`;
   const g = EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE;
   const r = EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE;
   const n = baseSwapTargetNeighbours(value);
@@ -4088,37 +4463,165 @@ export function baseSwapTargetRefusal(
   }
   if (!isBaseSwapTargetAligned(value)) {
     return `${subject}: ${fmtVramBaseBoth(value)} is not on the ${fmtVramBase(g)} granule. ⚠ THIS `
-      + 'IS NOT A RANGE ERROR AND IT FAILS LOUDLY NOWHERE: Plane A\'s base register (VDP reg $02) '
-      + 'encodes only the address bits ABOVE the granule and DROPS the rest SILENTLY, so an '
+      + 'IS NOT A RANGE ERROR AND IT FAILS LOUDLY NOWHERE: the plane base register encodes only '
+      + 'the address bits ABOVE the granule and DROPS the rest SILENTLY, so an '
       + 'unaligned base is a DIFFERENT ADDRESS than every VRAM_* consumer reads and writes, with '
       + `nothing else visibly wrong. The nearest legal bases are ${pair}. Refused, and NOT snapped `
-      + 'to either — snapping would point Plane A at another picture without telling you. '
+      + 'to either — snapping would point that plane at another picture without telling you. '
       + `${holds}`;
   }
   return null;
 }
 
+/**
+ * Where a brand-new band would have to start, or null when there is no room.
+ *
+ * A band appended to the list is flattened AFTER every fire already in it, so
+ * its ON fire must sit strictly above the last one. That line is COMPUTED from
+ * the document (`last fire + 1`), never seeded from the contract's worked value,
+ * because the worked value would collide with a list that already reaches it.
+ * On an EMPTY list the contract's own seed line is used.
+ */
+function baseSwapAppendLine(bands: readonly EffectsPresetBaseSwapBand[]): number | null {
+  const fires = baseSwapFires(bands);
+  if (fires.length === 0) return BASE_SWAP_SEED_LINE;
+  const next = fires[fires.length - 1].line + 1;
+  return next > EFFECTS_PRESET_BASE_SWAP_LINE_RANGE.max ? null : next;
+}
+
+/**
+ * Why another band cannot be added, or null.
+ *
+ * The list flattens in document order, so a new band's fire has to go ABOVE the
+ * last one — and when the last fire is already on the final legal line there is
+ * nowhere to put it. The author is told that rather than shown a disabled button
+ * with no reason, and nothing is reordered on their behalf.
+ */
+export function addBaseSwapBandRefusal(preset: EffectsPreset): string | null {
+  const bands = preset.base_swap;
+  if (bands === undefined) {
+    return `preset "${preset.id}" is not a base-swap document, so it has no bands to add to. `
+      + 'Switch its raster program first.';
+  }
+  if (baseSwapAppendLine(bands) !== null) return null;
+  const r = EFFECTS_PRESET_BASE_SWAP_LINE_RANGE;
+  const a = EFFECTS_PRESET_BASE_SWAP_ORDER_AUTHORITY;
+  return `preset "${preset.id}": there is nowhere to put another band. Bands flatten into ONE `
+    + `raster program in document order, so a new one has to fire ABOVE the last fire in the list `
+    + `— and that is already on line ${r.max}, the last line \`fire()\` admits. `
+    + `\`${a.symbol}\` (aeon ${a.file}) refuses a repeated or descending line at build time. Move `
+    + 'an existing band up first.';
+}
+
+/**
+ * Why this band cannot be removed, or null.
+ *
+ * REFUSES THE LAST ONE. `minItems` is 1, so a zero-band list does not validate
+ * and could not be written — the same rule and the same sentence shape as
+ * `lastBandRefusal`. The predicate lives here once and both the disabled button
+ * and its reason read it.
+ */
+export function lastBaseSwapBandRefusal(preset: EffectsPreset): string | null {
+  const bands = preset.base_swap;
+  if (bands === undefined) {
+    return `preset "${preset.id}" is not a base-swap document, so it has no base-swap band to `
+      + 'remove. Switch its raster program first.';
+  }
+  if (bands.length > EFFECTS_PRESET_BASE_SWAP_MIN_BANDS) return null;
+  return `preset "${preset.id}": this is its only base-swap band, and the schema refuses a list `
+    + `shorter than ${EFFECTS_PRESET_BASE_SWAP_MIN_BANDS} — a document that emits a zero-fire `
+    + 'raster program is a document that should not exist. Delete the preset instead.';
+}
+
 // ── the commands ────────────────────────────────────────────────────────────
 
-/** Set the screen line the swap fires on. Null when refused or nothing moved. */
-export function setBaseSwapLineCommand(
-  library: EffectsPresetLibrary, id: string, value: number,
+/** Set which plane a band re-points. Null when refused or nothing moved. */
+export function setBaseSwapPlaneCommand(
+  library: EffectsPresetLibrary, id: string, index: number, value: string,
 ): SetEffectsPresetCommand | null {
-  return editPresetCommand(library, id, `Preset ${id} base_swap line`, (p) => {
-    if (!p.base_swap) return;
-    if (baseSwapLineRefusal(p.base_swap, id, value) !== null) return;
-    p.base_swap.line = value;
+  return editPresetCommand(library, id, `Preset ${id} base_swap band ${index} plane`, (p) => {
+    const bands = p.base_swap;
+    if (!bands || bandAt(bands, index) === null) return;
+    if (baseSwapPlaneRefusal(bands, id, index, value) !== null) return;
+    bands[index].plane = value;
   });
 }
 
-/** Set the VRAM base Plane A is re-pointed at. Null when refused or nothing moved. */
-export function setBaseSwapTargetCommand(
-  library: EffectsPresetLibrary, id: string, value: number,
+/** Set the screen line a band's ON fire is on. Null when refused or nothing moved. */
+export function setBaseSwapLineCommand(
+  library: EffectsPresetLibrary, id: string, index: number, value: number,
 ): SetEffectsPresetCommand | null {
-  return editPresetCommand(library, id, `Preset ${id} base_swap target`, (p) => {
+  return editPresetCommand(library, id, `Preset ${id} base_swap band ${index} line`, (p) => {
+    const bands = p.base_swap;
+    if (!bands || bandAt(bands, index) === null) return;
+    if (baseSwapLineRefusal(bands, id, index, value) !== null) return;
+    bands[index].line = value;
+  });
+}
+
+/**
+ * Set — or REMOVE, with `undefined` — the screen line a band's OFF fire is on.
+ *
+ * Removing it is not "clearing a number to zero": it makes the band run to the
+ * bottom of the display, which is a different picture and the shipped
+ * single-edge shape. The key is DELETED rather than written as null, because the
+ * schema closes the band object and admits no null spelling.
+ */
+export function setBaseSwapRestoreLineCommand(
+  library: EffectsPresetLibrary, id: string, index: number, value: number | undefined,
+): SetEffectsPresetCommand | null {
+  return editPresetCommand(library, id, `Preset ${id} base_swap band ${index} restore_line`, (p) => {
+    const bands = p.base_swap;
+    if (!bands || bandAt(bands, index) === null) return;
+    if (baseSwapRestoreLineRefusal(bands, id, index, value) !== null) return;
+    if (value === undefined) delete bands[index].restore_line;
+    else bands[index].restore_line = value;
+  });
+}
+
+/** Set the VRAM base a band re-points its plane at. Null when refused or nothing moved. */
+export function setBaseSwapTargetCommand(
+  library: EffectsPresetLibrary, id: string, index: number, value: number,
+): SetEffectsPresetCommand | null {
+  return editPresetCommand(library, id, `Preset ${id} base_swap band ${index} target`, (p) => {
+    const bands = p.base_swap;
+    if (!bands || bandAt(bands, index) === null) return;
+    if (baseSwapTargetRefusal(bands, id, index, value) !== null) return;
+    bands[index].target = value;
+  });
+}
+
+/**
+ * Append one band, seeded to start after the last fire already in the list.
+ *
+ * Null when `addBaseSwapBandRefusal` has a reason — the disabled button and its
+ * sentence read the same predicate.
+ */
+export function addBaseSwapBandCommand(
+  library: EffectsPresetLibrary, id: string,
+): SetEffectsPresetCommand | null {
+  const existing = library.presets.find((p) => p.id === id);
+  if (!existing || addBaseSwapBandRefusal(existing) !== null) return null;
+  return editPresetCommand(library, id, `Add base-swap band to ${id}`, (p) => {
+    const bands = p.base_swap;
+    if (!bands) return;
+    const line = baseSwapAppendLine(bands);
+    if (line === null) return;
+    bands.push({ ...newBaseSwapBand(), line });
+  });
+}
+
+/** Remove one band. Refuses the last one — see `lastBaseSwapBandRefusal`. */
+export function removeBaseSwapBandCommand(
+  library: EffectsPresetLibrary, id: string, index: number,
+): SetEffectsPresetCommand | null {
+  const existing = library.presets.find((p) => p.id === id);
+  const bands = existing?.base_swap ?? [];
+  if (!existing || index < 0 || index >= bands.length) return null;
+  if (lastBaseSwapBandRefusal(existing) !== null) return null;
+  return editPresetCommand(library, id, `Remove base-swap band ${index} from ${id}`, (p) => {
     if (!p.base_swap) return;
-    if (baseSwapTargetRefusal(p.base_swap, id, value) !== null) return;
-    p.base_swap.target = value;
+    p.base_swap.splice(index, 1);
   });
 }
 
