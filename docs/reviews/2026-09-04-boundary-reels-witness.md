@@ -77,7 +77,7 @@ adding data moved the layout. Resolve per build, by name.
 
 ## 5. What is NOT witnessed, and why — both are findings
 
-**Neither effect was observed EXECUTING. No claim is made that one did.**
+**Neither effect was observed EXECUTING when this was first written. THE REELS HALF NOW HAS BEEN — see §7, added after aeon supplied the missing poke. The boundary half still has not.**
 
 1. **Reels has no call site in the shipped game path.** `OJZ_Reels_Fill`'s only caller is
    `games/sonic4/test/ojz_scroll_test.emp` — a test game state. A breakpoint on it does not
@@ -103,3 +103,44 @@ correctly failed the repo: vitest's `include` covers `test/**` and `src/**/__tes
 only, so a test-shaped file in `scratchpad/` is one that **looks like coverage and runs
 never**. The gate caught it the same hour it was written. It is deliberately NOT left in
 `test/`: it writes into a peer tree and must never run as part of `npm test`.
+
+
+---
+
+## 7. THE REELS RUNTIME WITNESS — the walk selects the authored table
+
+*(Added after §5.1/§5.2 went to aeon and aeon answered: `OJZ_Reels_Fill` sits behind
+`tst.b OJZ_Reel_Active`, whose **only writer anywhere in the tree** is their witness tool
+poking it over the bus. There is no hotkey, deliberately — every remaining pad chord was
+enumerated against this shape's readers and none was free. **So the breakpoint never firing
+across 642 frames was correct behaviour, not a defect**, and the way in is the RAM cell.)*
+
+Same private own-instance server, same authored DEBUG ROM (`3f919cc7`), symbols bound from
+its own listing.
+
+**Control and test differ in ONE value: the active parallax config.**
+
+| | `Parallax_Current_Config` | walk outcome | `a2` after the walk |
+|---|---|---|---|
+| **control** | `0x13DD4` — `EditorSceneBinding_OJZ_Act1_Sec0` (whatever the scene happened to be) | **MISS** | **`0x14806` = `OJZ_Reel_Speed`, the demo fallback** |
+| **test** | `0x13E92` — `EditorSceneBinding_OJZ_Act1_Sec4`, the config the binding table names | **HIT** | **`0x13FCF` — one byte into `0x13FCE`, the AUTHORED table** |
+
+In the test pass `d1` reads `0x00013E92` (the bound config, fetched from
+`EditorReelBindings_OJZ_Act1`) and `d2` reads `0x00013FCE` (the authored rates), and `a2`
+lands inside the authored table with band 0 already consumed. **`0x13FCE` is where §3
+measured Aurora's `[7,-6,4,-2,1]`, absent from the control ROM.**
+
+**The control is what makes this a witness rather than a screenshot of a pointer.** In the
+miss pass `d2` ALSO holds `0x13FCE` — the routine reads the candidate either way — and `a2`
+still ends at the fallback. So "the authored address appears in a register" proves nothing on
+its own; **only `a2` separates the two outcomes**, and only the paired run shows that it does.
+
+**What this does and does not establish.** It establishes that the association walk selects the
+Aurora-authored table when the active config is the one the generator bound. It does **not**
+establish that a player reaches that state by playing: the config was poked, as was
+`OJZ_Reel_Active`. Aeon reads *"show on screen or in a witness"* as satisfied by a poke-driven
+witness and notes `OJZ_BaseSwap` was accepted the same way; **that reading is theirs and the
+hub's to settle, not this lane's, and it is recorded here rather than assumed.**
+
+**Still not witnessed:** the boundary program executing. It is lowered and bound to section 6
+(§4); nothing here drove the player into section 6.
