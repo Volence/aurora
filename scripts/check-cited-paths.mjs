@@ -444,19 +444,30 @@ function canarySources(present, presentBase) {
  *
  *   · the ignore query's exit-1 arm fired only in a tree with nothing ignored;
  *   · a citation naming a path outside the repo exit-128'd the whole batch;
- *   · and the walk DESCENDED THROUGH SYMLINKS. `scratchpad/fixtures/aeon-
- *     build-pin/aeon-current` is a symlink to an entire foreign checkout — its
- *     own `.git`, its own `.claude` — and git refuses any path beyond one
- *     (`fatal: pathspec … is beyond a symbolic link`). On the owner's machine
- *     the walk enumerated **5,821** files where the repository holds 1,257, and
- *     **4,565 of them were git-ignored, most inside that symlinked repo.**
+ *   · and on the owner's machine the walk enumerated **5,821** files where the
+ *     repository holds 1,257 — **4,565 of them git-ignored**, nearly all inside
+ *     the hardlinked copies of the aeon tree that `.gitignore` lists
+ *     (`scratchpad/fixtures/aeon-*`, made with `cp -al`, so REAL directories).
+ *     The gate then paid a `check-ignore` call to throw 79% of its own
+ *     population away, and that call is the one with three fatal modes.
+ *
+ * ⚠ IT IS NOT SYMLINK DESCENT, and the first version of this comment said it
+ * was — asserted from a plausible review note rather than measured, in the one
+ * file that exists to stop exactly that. MEASURED: `readdirSync(dir,
+ * {withFileTypes: true})` reports a symlink-to-directory as
+ * `isDirectory() === false`, so the walk never entered one. What the symlink
+ * (`scratchpad/fixtures/aeon-build-pin/aeon-current` → a whole foreign
+ * checkout) actually broke is the CITATION query: a comment naming a path
+ * beyond it — `check-harness-guards.mjs:448` names that very path — makes git
+ * answer `fatal: pathspec … is beyond a symbolic link`, exit 128, losing every
+ * other citation in the batch. That is fixed by the per-path fallback in
+ * `ignoredSet`, not by this population change.
  *
  * One command removes all three at once, and it is the same question this file
  * was always asking:
  *
  *     git ls-files --cached --others --exclude-standard -- <roots>
  *
- *   · symlinks vanish — git never walks beyond one, and never leaves the repo;
  *   · ignored files vanish — `--exclude-standard` IS the rule the gate was
  *     calling `check-ignore` to apply, so that whole query disappears from the
  *     population path, and with it every one of its 128 modes;
@@ -775,8 +786,8 @@ const deadExemptions = EXEMPT.filter((e) => !usedExemptions.has(e));
 console.log(
   `${PREFIX}: read the whole-line comments of ${sources.length} ${EXTS.join('/')} file(s) under `
   + `${ROOTS.join(', ')} — the population git reports (\`ls-files --cached --others `
-  + '--exclude-standard`), not a filesystem walk, so symlinked trees and ignored output '
-  + `are absent by construction — and found `
+  + '--exclude-standard`), not a filesystem walk, so ignored output is absent by '
+  + `construction rather than filtered back out — and found `
   + `${run.tokens} in-repo citation(s) against 2 rule(s) — cited-path-missing, cited-file-missing `
   + '(both fired on their canaries; 8 negative canaries silent).\n'
   + `${PREFIX}: aurora ${ROOT}\n`
