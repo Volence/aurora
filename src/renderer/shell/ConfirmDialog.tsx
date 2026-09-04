@@ -71,10 +71,27 @@ export default function ConfirmDialog() {
     const apply = () => {
       const panel = panelRef.current;
       if (!panel) return;
-      const active = document.activeElement;
-      // Already somewhere in the dialog — a user's own Tab, or our first pass
-      // that nothing clobbered. Leave it alone.
-      if (active && active !== document.body && panel.contains(active)) return;
+      const active = document.activeElement as HTMLElement | null;
+      // Already somewhere SAFE in the dialog — a user's own Tab, or our first
+      // pass that nothing clobbered. Leave it alone.
+      //
+      // ⚠ THE `!== 'danger'` CLAUSE IS THE WHOLE INVARIANT AND IT WAS MISSING
+      // ONCE. Without it this deferred to whatever already held focus inside
+      // the panel — INCLUDING a destructive button. MEASURED: with the literal
+      // P3 edit (`autoFocus={b.tone === 'danger'}`) applied on top of the fix,
+      // React's autoFocus lands during commit, this early return fired, and the
+      // dialog opened with Discard focused at FOUR of the five doors the CDP
+      // harness reaches — nine rows red, the sprite destroyed by one Space
+      // exactly as the d-27 packet measured. The one door that survived was the
+      // tab-close ✕, and only because focus there was on <body> at re-assert
+      // time so this return did not fire.
+      //
+      // So: never defer to a destructive focus. The rule this component
+      // enforces is "the focused element is not a destructive button", and a
+      // guard that yields to one has inverted it. Deferring to a SAFE focus is
+      // still right — that is what stops it fighting a user's own Tab.
+      if (active && active !== document.body && panel.contains(active)
+        && active.dataset.tone !== 'danger') return;
       const i = safeFocusIndex(request.buttons);
       if (i === null) return; // every option destroys something: focus nothing.
       const target = Array.from(panel.querySelectorAll<HTMLButtonElement>('button[data-confirm-key]'))

@@ -153,8 +153,15 @@ describe('§A ConfirmDialog wiring', () => {
     expect(dialogCode).toContain('setTimeout(apply, 0)');
     expect(dialogCode).toContain('clearTimeout(t)');
     // And it must decline when focus is already inside the panel, or the
-    // re-assert would drag a user's own Tab back to Cancel.
+    // re-assert would drag a user's own Tab back to Cancel...
     expect(dialogCode).toContain('panel.contains(active)');
+    // ...but it must NOT decline to a DESTRUCTIVE focus. Without this clause
+    // the early return deferred to whatever already held focus in the panel,
+    // including a danger button, so the literal P3 edit defeated the whole fix
+    // at four of the five doors the CDP harness reaches (nine rows red, the
+    // sprite destroyed by one Space). Measured, then fixed; this row is what
+    // stops the clause being tidied away as a redundant condition.
+    expect(dialogCode).toContain("active.dataset.tone !== 'danger'");
   });
 
   it('fires once per request, not on every render', () => {
