@@ -5006,7 +5006,22 @@ export const PROGRAM_ARM_OPTIONS: readonly { value: string; label: string }[] =
   }));
 
 /**
- * WHAT SWITCHING THE RASTER PROGRAM WILL DISCARD — said BEFORE the switch, not
+ * THE ROW'S OWN TITLE: the contract's paragraph for the program the document
+ * ACTUALLY CARRIES, or the exactly-one rule when it carries none.
+ *
+ * ⚠ IT WAS `RAMP_TITLE`, HARD-WIRED, AND THAT WAS WRONG FOR THREE ARMS OUT OF
+ * FOUR. The row is a choice among programs, so hovering it on a base_swap
+ * document explained the ramp. Reading the arm makes the hover text follow the
+ * document, and makes a fifth arm's paragraph arrive on the row for free.
+ */
+export function programArmRowTitle(preset: EffectsPreset): string {
+  const arm = presetProgramArm(preset);
+  if (arm === null) return String(EFFECTS_PRESET_SCHEMA.description ?? '');
+  return presetFieldTitle(['properties', arm]);
+}
+
+/**
+ * WHAT SWITCHING THE PROGRAM WILL DISCARD — said BEFORE the switch, not
  * after it.
  *
  * ═══ WHY THIS IS A SENTENCE AND NOT A CONFIRM DIALOG ═══

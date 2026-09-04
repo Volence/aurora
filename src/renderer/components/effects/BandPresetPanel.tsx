@@ -76,7 +76,11 @@ import {
   // carries EXACTLY ONE raster program. This is the codec's helper for asking
   // which; testing `bands` for undefined here would be a second spelling of a
   // rule that lives in the contract.
-  presetRasterChannel, presetFp16ToNumber,
+  presetRasterChannel, presetProgramArm, presetFp16ToNumber,
+  EFFECTS_PRESET_BOUNDARY_KEYS, EFFECTS_PRESET_TINT_REGION_KEYS,
+} from '../../../core/formats/effects/preset';
+import type {
+  EffectsPresetBoundary, EffectsPresetTintRegion,
 } from '../../../core/formats/effects/preset';
 import {
   PRESET_HEADLINE, presetLimitsShort, NO_PREVIEW, NO_PREVIEW_SHORT,
@@ -130,8 +134,29 @@ import {
   BASE_SWAP_ASYMMETRIES, BASE_SWAP_ASYMMETRIES_SHORT, BASE_SWAP_WHAT_YOU_SEE,
   baseSwapLineRefusal, baseSwapTargetRefusal, baseSwapTargetGloss, baseSwapSummary,
   setBaseSwapLineCommand, setBaseSwapTargetCommand,
+  // ═══ THE PATCHED ARM (EW-BOUNDARY-PANEL, ROADMAP row 151) ═══
+  //
+  // EIGHT NUMBERS AND TWO FLAGS, and the asymmetry with the three cards above it
+  // is that only FOUR of the numbers have a range in the contract. The tint
+  // region's `slot`, `pal_line`, `entry` and `count` are declared as bare
+  // integers on purpose (§7.1's shape-only posture — the ranges are the engine's
+  // ensures and its message carries the measurement), so the refusal for those
+  // four says the range is the engine's rather than inventing one.
+  //
+  // ⚠ AND THE TWO CROSS-FIELD RULES ARE **NOT** REFUSED, THEY ARE PAINTED.
+  // `lo <= hi` and `line` inside `[lo, hi]` are the generator's by the CR's
+  // ruling; the schema ACCEPTS both violations and so does the codec. Every
+  // sentence comes from `boundaryAdvisories` and carries `enforced_by`, which is
+  // a FIELD precisely so a surface that paints the text cannot drop the
+  // attribution — this card paints both halves.
+  BOUNDARY_TITLE, BOUNDARY_FIELD_TITLES, BOUNDARY_TINT_FIELD_TITLES, BOUNDARY_ON_ARM,
+  BOUNDARY_WHAT_YOU_SEE, BOUNDARY_OFFSCREEN_SHIP_OPTIONS,
+  boundaryFieldRefusal, boundaryTintRefusal, boundarySummary,
+  boundaryAdvisoriesFor, boundaryAdvisoryAttribution, boundaryOffscreenShipState,
+  setBoundaryFieldCommand, setBoundaryTintCommand, setBoundaryShCommand,
+  setBoundaryOffscreenShipCommand,
   PROGRAM_ARM_OPTIONS, programArmSwapAdvisory, setProgramArmCommand,
-  programArmEditorGap,
+  programArmEditorGap, programArmRowTitle,
   bandControlsRefusal,
   RASTER_REF_ROW, presetRefOptions, unassignablePresetRef, sectionPresetCommand,
   createPresetCommand, deletePresetCommand,
@@ -522,9 +547,18 @@ export default function BandPresetPanel(): React.ReactElement | null {
                 the switch would discard — `deletePresetRefusal`'s ruling that
                 a confirm asks "are you sure?" about a consequence the author
                 cannot see, while a sentence NAMES it. */}
-            <Field label="Raster" title={RAMP_TITLE}>
-              <Select title={RAMP_TITLE}
-                value={presetRasterChannel(selected) ?? ''}
+            {/* ⚠ "Program", NOT "Raster", SINCE EW-BOUNDARY-PANEL — and the
+                value is `presetProgramArm`, which is the load-bearing half.
+                `presetRasterChannel` returns NULL on a boundary document ("this
+                preset carries no raster program", true and the wrong question),
+                so this select painted a BLANK row for a document carrying a
+                whole patched program. The label followed the list: the row now
+                offers an arm that is not a raster program at all, and a row
+                called "Raster" offering `boundary` would teach the wrong model
+                of why these four are exclusive. */}
+            <Field label="Program" title={programArmRowTitle(selected)}>
+              <Select title={programArmRowTitle(selected)}
+                value={presetProgramArm(selected) ?? ''}
                 onChange={(v) => run(setProgramArmCommand(library, selected.id, v))}
                 style={{ flex: 1, minWidth: 0 }}>
                 {PROGRAM_ARM_OPTIONS.map((o) => (
@@ -578,6 +612,10 @@ export default function BandPresetPanel(): React.ReactElement | null {
             {selected.base_swap !== undefined && (
               <BaseSwapCard library={library} presetId={selected.id}
                 baseSwap={selected.base_swap} run={run} />
+            )}
+            {selected.boundary !== undefined && (
+              <BoundaryCard library={library} preset={selected}
+                boundary={selected.boundary} run={run} />
             )}
             {programArmEditorGap(selected) !== null && (
               <Hint tone="warning">{programArmEditorGap(selected)}</Hint>
@@ -1801,6 +1839,238 @@ function BaseSwapCard({ library, presetId, baseSwap, run }: {
       <Hint under>
         Writes {EFFECTS_PRESET_BASE_SWAP_KEYS.join(', ')} — both, every time.
         No field here has a default.
+      </Hint>
+    </Card>
+  );
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE PATCHED ARM'S CARD (EW-BOUNDARY-PANEL, ROADMAP row 151)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * The fourth arm of the top-level `oneOf`, and the first that is not a raster
+ * program: `boundary` lowers into `EffectsPreset.ep_patched`, the sibling of the
+ * field the other three share. Everything below is the provider's — every bound,
+ * every refusal, every sentence — as on the three cards above it.
+ *
+ * ═══ ⚠ THIS CARD IS WHERE THE FOUR ADVISORIES LAND, AND THREE OF THEM ARE
+ * SOMEBODY ELSE'S RULE ═══
+ *
+ * `lo <= hi` and `line` inside `[lo, hi]` are the GENERATOR's (aeon
+ * `raster_dsl.emp:465-467`, `:475-476`) and the sweep-fit rule is the check aeon
+ * says belongs beside `_check_patch_context`. The schema ACCEPTS all three
+ * violations and so does the codec — asserted, so the advisories are not
+ * theatre — and `boundary.ts`'s header forbids Aurora becoming the only check.
+ * So NOTHING HERE REFUSES THEM. They are painted, each with the `enforced_by`
+ * field beside it, and saving is never blocked. A control that greyed out on
+ * `lo > hi` would be refusing a document the contract accepts.
+ *
+ * ⚠ AND THE FOURTH HAS NO ENFORCER AT ALL, WHICH IS WHY IT IS THE IMPORTANT ONE.
+ * A boundary whose channel is not BOTH seeded (`patch_world_ys`) and SWEPT
+ * (`patch_motion`) is legal, builds, and SITS STILL. Nothing in aeon and nothing
+ * in Aurora refuses it, so an author who expected the shipped moving water and
+ * got a static line has no red anything to read — this sentence is the only
+ * thing that will tell them, and it is INDEX-wise: the same two keys authored at
+ * a different index leave the boundary just as still.
+ *
+ * ⚠ THE `enforced_by` FIELD IS PAINTED, NOT JUST THE TEXT. That is the whole
+ * reason it is a field rather than a docblock in `boundary.ts`: a surface that
+ * rendered `a.text` alone would look completely fine and would have dropped the
+ * attribution, which is the difference between "the editor thinks this is wrong"
+ * and "aeon's generator will reject this".
+ *
+ * ⚠ NO PREVIEW IS DRAWN. Nothing in this editor has ever drawn a raster program;
+ * what a boundary LOOKS like is QUOTED from the contract
+ * (`BOUNDARY_WHAT_YOU_SEE`) rather than claimed by an editor that has not seen
+ * one. `NO_PREVIEW` says so at the top of the panel.
+ *
+ * ⚠ NO min/max ON ANY SPINNER, aeon's §E.4, exactly as the other three cards:
+ * those attributes govern the arrows and `:invalid` and stop no typed value.
+ * `refuse` is the only thing that withholds a commit, and nothing snaps.
+ */
+function BoundaryCard({ library, preset, boundary, run }: {
+  library: EffectsPresetLibrary;
+  preset: EffectsPreset;
+  boundary: EffectsPresetBoundary;
+  run: (c: AnyCommand | null) => void;
+}): React.ReactElement {
+  // WHY THE REFUSAL OUTLIVES THE BLUR — `BandCard`'s reason, unchanged.
+  const [why, setWhy] = React.useState<Record<string, string | null>>({});
+  const said = (k: string): string | null => why[k] ?? null;
+  const say = (k: string) => (r: string | null): void => setWhy((s) => ({ ...s, [k]: r }));
+
+  const region = (boundary.on as unknown as Record<string, EffectsPresetTintRegion>)[
+    BOUNDARY_ON_ARM];
+  const advisories = boundaryAdvisoriesFor(preset);
+
+  return (
+    <Card>
+      {/* THE LAG DISCLOSURE, FIFTH MOUNT SITE — AND THE ONLY ONE THAT IS
+          SPEAKING. `PRESET_KEYS_AWAITING_AEON` holds `boundary` as of
+          2026-09-04, so this leaf renders the sentence rather than nothing, and
+          it is the SHARPER flavour: the key is in NONE of aeon's three rows on
+          `docs/EDITOR_RASTER_PRESETS.md`, so their generator meets it as an
+          unknown property and refuses the WHOLE DOCUMENT. A preset written under
+          this key does not build at all — it is not a key that reaches the file
+          and stops there, it is a file that fails.
+          ⚠ THE SENTENCE IS NOT WRITTEN HERE AND MUST NOT BE. It is derived from
+          that list in core/formats/effects/preset-lag.ts, so it retires the day
+          the drift row measures the lag closed — aeon's generator arm has not
+          landed yet, and when it does the sentence goes with it, in all five
+          mount sites, by construction. A second copy typed into this card would
+          outlive the fact, which is the O62/O64 class this whole apparatus
+          exists to avoid. */}
+      <PresetLagDisclosure />
+
+      {/* ═══ THE FOUR EDITOR-SIDE WARNINGS, WITH THEIR ATTRIBUTION ═══
+
+          Rendered from `boundaryAdvisories`, in its own stable order, each with
+          the `enforced_by` field beside the text. ⚠ AN EMPTY LIST IS NOT A
+          CLEARANCE and this card does not render one as such: there is no "looks
+          fine" line here, because two of the rules are Aurora's READING of
+          someone else's ensure and the sweep-fit test has no passing verdict at
+          the type level. Silence means nothing here is obviously wrong. */}
+      {advisories.map((a) => (
+        <Hint key={a.rule} tone="warning">
+          {a.text}
+          {' '}
+          <span style={{ color: T.textHi }}>{boundaryAdvisoryAttribution(a)}</span>
+        </Hint>
+      ))}
+
+      <Field label="Line" title={BOUNDARY_FIELD_TITLES.line}>
+        <NumberField title={BOUNDARY_FIELD_TITLES.line} width={72} value={boundary.line}
+          refuse={(n) => boundaryFieldRefusal(boundary, preset.id, 'line', n)}
+          onRefusal={say('line')}
+          onChange={(n) => run(setBoundaryFieldCommand(library, preset.id, 'line', n))} />
+        <span style={{ fontSize: T.tXs, color: T.textLo, minWidth: 0 }}>
+          screen line, before any patch
+        </span>
+      </Field>
+      {said('line') !== null && <Hint under tone="warning">{said('line')}</Hint>}
+
+      {/* ═══ THE CHANNEL, WHICH IS THE FIELD THAT DECIDES WHETHER THIS MOVES ═══
+
+          It is an INDEX into `patch_world_ys` / `patch_motion` — the same index
+          space a scene's `anchor.at.channel` uses — and it is authored, never
+          assigned. The `no-motion` advisory above is keyed to whatever is in
+          this box, so changing it can make a moving boundary still without
+          anything else on screen changing. */}
+      <Field label="Channel" title={BOUNDARY_FIELD_TITLES.channel}>
+        <NumberField title={BOUNDARY_FIELD_TITLES.channel} width={56} value={boundary.channel}
+          refuse={(n) => boundaryFieldRefusal(boundary, preset.id, 'channel', n)}
+          onRefusal={say('channel')}
+          onChange={(n) => run(setBoundaryFieldCommand(library, preset.id, 'channel', n))} />
+        <span style={{ fontSize: T.tXs, color: T.textLo, minWidth: 0 }}>
+          patch channel — seed and sweep it under &ldquo;moving anchors&rdquo;
+        </span>
+      </Field>
+      {said('channel') !== null && <Hint under tone="warning">{said('channel')}</Hint>}
+
+      <Field label="Lo" title={BOUNDARY_FIELD_TITLES.lo}>
+        <NumberField title={BOUNDARY_FIELD_TITLES.lo} width={72} value={boundary.lo}
+          refuse={(n) => boundaryFieldRefusal(boundary, preset.id, 'lo', n)}
+          onRefusal={say('lo')}
+          onChange={(n) => run(setBoundaryFieldCommand(library, preset.id, 'lo', n))} />
+        <span style={{ fontSize: T.tXs, color: T.textLo, minWidth: 0 }}>
+          lowest screen line — below it, CLAMPED UP and still drawn
+        </span>
+      </Field>
+      {said('lo') !== null && <Hint under tone="warning">{said('lo')}</Hint>}
+
+      <Field label="Hi" title={BOUNDARY_FIELD_TITLES.hi}>
+        <NumberField title={BOUNDARY_FIELD_TITLES.hi} width={72} value={boundary.hi}
+          refuse={(n) => boundaryFieldRefusal(boundary, preset.id, 'hi', n)}
+          onRefusal={say('hi')}
+          onChange={(n) => run(setBoundaryFieldCommand(library, preset.id, 'hi', n))} />
+        <span style={{ fontSize: T.tXs, color: T.textLo, minWidth: 0 }}>
+          highest screen line — past it, the record is DROPPED
+        </span>
+      </Field>
+      {said('hi') !== null && <Hint under tone="warning">{said('hi')}</Hint>}
+
+      {/* WHAT THE BOUNDARY DOES, in the author's own numbers — including the
+          band's LINE COUNT, which is `hi - lo + 1` and is the number nobody
+          computes correctly on sight, and the number the sweep-fit rule is
+          stated against. */}
+      <Hint under>{boundarySummary(boundary)}</Hint>
+
+      <Field label="S/H" title={BOUNDARY_FIELD_TITLES.sh}>
+        <Select title={BOUNDARY_FIELD_TITLES.sh}
+          value={(boundary.sh === true || boundary.sh === 1) ? 'on' : 'off'}
+          onChange={(v) => run(setBoundaryShCommand(library, preset.id, v === 'on'))}
+          style={{ flex: 1, minWidth: 0 }}>
+          {/* ⚠ NOT THE BAND'S TWO-FIRE / THREE-FIRE CHOICE, and the difference
+              matters: on a boundary, `sh` adds an OP to the SAME fire and never
+              a fire, which is exactly what keeps this shape patchable at all. */}
+          <option value="off">off — one stream op on the fire</option>
+          <option value="on">on — plus reg_sh_on, still ONE fire</option>
+        </Select>
+      </Field>
+
+      {/* ═══ THREE STATES, BECAUSE ABSENT IS ONE OF THEM ═══
+
+          `offscreen_ship` is OPTIONAL with `patchable`'s own default of false, so
+          "absent" and "false" mean the same thing to the engine and are
+          DIFFERENT DOCUMENTS on disk. A two-way toggle would materialise the key
+          on the first glance at the control — a diff on a file the author only
+          looked at. `variants`' slot picker is the established shape for exactly
+          this. */}
+      <Field label="Offscreen" title={BOUNDARY_FIELD_TITLES.offscreen_ship}>
+        <Select title={BOUNDARY_FIELD_TITLES.offscreen_ship}
+          value={boundaryOffscreenShipState(boundary)}
+          onChange={(v) => run(setBoundaryOffscreenShipCommand(
+            library, preset.id, v as 'absent' | 'off' | 'on'))}
+          style={{ flex: 1, minWidth: 0 }}>
+          {BOUNDARY_OFFSCREEN_SHIP_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </Select>
+      </Field>
+
+      {/* ═══ WHAT IT SWITCHES: THE ONE `on` ARM ═══
+
+          `pal_region`, and the arm NAME is read off the schema rather than typed
+          — a second arm, if one ever arrives, cannot be silently ignored by a
+          card that hard-coded the first. The region carries NO `addr`:
+          `fx_tint_band` DERIVES the CRAM address from `pal_line` and `entry`, so
+          a document carrying one would be one fact computed twice, and
+          `$defs.tint_region` refuses it by closure.
+
+          ⚠ NONE OF THESE FOUR HAS A DECLARED RANGE, AND THAT IS THE CONTRACT'S
+          CHOICE. §7.1's shape-only posture: the ranges are `stream_pal_region`'s
+          own ensures and the engine's message carries the measurement. So the
+          refusal here is integer-ness alone and it SAYS SO — a maximum invented
+          in this editor would stand between an author and a legal document. */}
+      <Hint under>
+        Switches one staged palette region (<code>{BOUNDARY_ON_ARM}</code>). No CRAM address is
+        authored: it is derived from pal_line and entry, so a document cannot state it twice.
+        These four have no range in the contract — the engine&rsquo;s own ensure carries it.
+      </Hint>
+      {EFFECTS_PRESET_TINT_REGION_KEYS.map((f) => (
+        <React.Fragment key={f}>
+          <Field label={f} title={BOUNDARY_TINT_FIELD_TITLES[f]}>
+            <NumberField title={BOUNDARY_TINT_FIELD_TITLES[f]} width={56}
+              value={(region as unknown as Record<string, number>)[f]}
+              refuse={(n) => boundaryTintRefusal(region, preset.id, f, n)}
+              onRefusal={say(f)}
+              onChange={(n) => run(setBoundaryTintCommand(library, preset.id, f, n))} />
+          </Field>
+          {said(f) !== null && <Hint under tone="warning">{said(f)}</Hint>}
+        </React.Fragment>
+      ))}
+
+      {/* WHAT THEY WILL SEE, IN THE CONTRACT'S WORDS. Aurora draws no raster
+          program, so this is quoted from the schema rather than claimed by an
+          editor that has measured nothing. */}
+      <Hint under>
+        <span title={BOUNDARY_TITLE}>{BOUNDARY_WHAT_YOU_SEE}</span>
+      </Hint>
+
+      <Hint under style={{ marginBottom: 0 }}>
+        Writes {EFFECTS_PRESET_BOUNDARY_KEYS.join(', ')} — every one, every time.
+        Only <code>offscreen_ship</code> is optional, and &ldquo;not written&rdquo; leaves it absent.
       </Hint>
     </Card>
   );
