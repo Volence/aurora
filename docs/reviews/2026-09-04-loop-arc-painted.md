@@ -61,3 +61,36 @@ the arc appearing, which is stronger than the control; the control itself is une
 aeon's working tree, **uncommitted, for them to commit by arrangement** — not an unattended
 write this time. Their file's caveat stands and is theirs: *"I cannot see the picture the way a
 person can — if a run looks wrong against the art, trust the art."*
+
+
+---
+
+## ✅ THE 11 VIOLATIONS ARE CLEARED — and two of them were mine in a way the first pass could not see
+
+`tools/test_collision_consistency.py`: **11 violations → 0** (33 passed), measured **after a
+bake**, which is the only point some of them exist at. `loop_crossover_gate.py` still reports
+**2 marked**. Reproduced aeon's 11 first rather than taking the list on trust.
+
+**Rule A — the angle claim.** A maximal run of full cells must carry a flat angle, and my fitted
+shapes were claiming 45°. **Every full-solid shape in the bank carries a slope angle except one:
+shape 255, angle `$FF`, the odd sentinel Rule A accepts.** 251 (the one my fitter kept choosing)
+is full-solid at `$E0` — the exact Knuckles-glide hazard the rule exists for.
+
+**Rule B — the pinholes were holes INSIDE my fitted shapes**, not missing cells: the sub-cell
+gaps (3 px, 11 px) are places where a circle-fitted profile does not fill its cell. Forced to
+shape 255 where a continuous surface is required.
+
+**⚠ AND A SECOND ROUND FOUND THE ONE I HAD CAUSED MYSELF: my marks were ERASING the arc.** I
+painted both crossover marks as `solidity: 'none'` — marked *air* — and **both mark cells carry
+geometry**. So each mark punched a hole in the surface it sits on. One showed up as the row-35
+gap; **the other was not in aeon's list at all and would have shipped**. Marks now keep the
+cell's own shape and solidity and only add the crossover, which is what my own loop plan did and
+what I failed to carry over.
+
+**A fourth cell was available and I did not need it.** aeon offered that its K = 3 thickness
+might be too thin at the left edge; the art does support cols 126–127. It was not the cause —
+the hole was inside a cell already in the list — so the arc stays at aeon's thickness.
+
+**Control for the suite total:** the full tool run shows **22 failed / 2374 passed**, and a
+**pristine tree built identically shows exactly the same 22 / 2374**. Those failures are
+`./build.sh` dirtying tracked generated files, not the paint. **My paint adds zero.**
