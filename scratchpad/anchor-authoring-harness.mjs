@@ -149,6 +149,8 @@ const WORLD_Y_MAX = SCHEMA.properties.patch_world_ys.items.oneOf[0].maximum;
 const BANDS = JSON.parse(
   readFileSync(`${ROOT}/src/core/formats/effects/aeon-effects-channel-bands.json`, 'utf8'));
 const BAND = (ch) => BANDS.channels[String(ch)] ?? null;
+/** The channels aeon DECLARES a band for, ascending — the feature's coverage. */
+const EFFECTS_DECLARED = Object.keys(BANDS.channels).map(Number).sort((a, b) => a - b);
 const TRAVEL_FORMULA = (() => {
   const m = /PEAK-TO-PEAK TRAVEL \((\d+) \* \((\d+) >> amp_shift\), whole pixels\) is <= channels\[c\]\.lines/
     .exec(BANDS.how_to_use ?? '');
@@ -380,6 +382,35 @@ const CARD_TEXT = (n) => String.raw`
   const card = ${CARD(n)};
   if (!card) return { found: false };
   return { found: true, text: (card.innerText || '').trim() };
+})()`;
+
+/**
+ * THE COLOUR ONE SENTENCE IS ACTUALLY PAINTED IN, inside channel N's card.
+ *
+ * `Hint` renders `NOTE` (`--text-lo`) or, with `tone="warning"`, `WARN`
+ * (`--warning`). Reading the JSX would only prove what the source says; this
+ * reads `getComputedStyle` off the live node and resolves BOTH tokens off the
+ * document root in the same call, so the row compares three measured values
+ * rather than one measured value against a colour typed into this file.
+ */
+const TONE_IN_CARD = (n, needle) => String.raw`
+(() => {
+  const card = ${CARD(n)};
+  if (!card) return { found: false };
+  const el = [...card.querySelectorAll('div')]
+    .filter((d) => (d.textContent || '').includes(${JSON.stringify(needle)}))
+    .filter((d) => ![...d.children].some((k) => (k.textContent || '').includes(${JSON.stringify(needle)})))
+    .pop();
+  if (!el) return { found: false, cardText: (card.innerText || '').trim() };
+  const cs = getComputedStyle(el);
+  const rs = getComputedStyle(document.documentElement);
+  const probe = document.createElement('span');
+  document.body.appendChild(probe);
+  const resolve = (v) => { probe.style.color = ''; probe.style.color = v; return getComputedStyle(probe).color; };
+  const note = resolve(rs.getPropertyValue('--text-lo').trim());
+  const warn = resolve(rs.getPropertyValue('--warning').trim());
+  probe.remove();
+  return { found: true, colour: cs.color, note, warn, text: (el.textContent || '').trim() };
 })()`;
 
 const CHANNEL_SEL = IN_ROW(String.raw`/^Channel 0$/`, 'select');
@@ -1236,6 +1267,75 @@ async function main() {
       + (card1Narrow.found
         ? card1Narrow.text.split('\n').map((l) => `| ${l}`).join('\n        ')
         : '(no card)'));
+
+    // ── 10d. THE CHANNEL AEON DOCUMENTS NOTHING ABOUT, ON SCREEN ───────────
+    //
+    // ⚠ THIS IS A PRESENCE ROW — A DISCRIMINATOR — AND [10b]/[10c] ARE NOT.
+    // Those two are absence assertions and go green against an app with no
+    // band feature at all; this one names a sentence that must be PAINTED, so
+    // it reddens when the advisory is missing, mis-worded, or aimed at the
+    // wrong channel. It is stated so nobody reads three rows as three proofs.
+    //
+    // ⚠ AND IT AIMS AT CHANNEL 2, NOT CHANNEL 0 OR 1. `RASTER_MAX_PATCH` is 4
+    // and aeon declares bands for 0 and 1, so channel 2 is the FIRST channel
+    // with no declaration — the silence this parcel replaced. A row driving
+    // the section's first `Travel` (channel 0) would measure a channel that
+    // HAS a band and could never see this sentence. The undeclared channel is
+    // read from the vendored sidecar in this process, not assumed to be 2.
+    const NOBAND = (() => {
+      for (let c = 0; c < MAX_PATCH; c++) if (BAND(c) === null) return c;
+      return null;
+    })();
+    if (NOBAND === null || NOBAND >= MAX_PATCH) {
+      note('10d', 'NOT MEASURED, NOT A PASS: aeon now declares a band for every channel this '
+        + 'panel offers, so there is no no-band card to look at. The advisory this row is about '
+        + 'cannot appear and this row can prove nothing — re-point it or delete it.');
+    } else {
+      // Channel N's card exists only once N-1 is spelled: the arrays are
+      // positional and are never given a hole, so walk up to it.
+      let opened = 'ok';
+      for (let ch = 2; ch <= NOBAND && opened === 'ok'; ch++) {
+        opened = await c.evalExpr(SET_SELECT(IN_CARD_ROW(ch, String.raw`/^Movement$/`, 'select'), 'sweep'));
+        await sleep(800);
+      }
+      await sleep(400);
+      const TRAVEL_N = IN_CARD_ROW(NOBAND, String.raw`/^Travel$/`, 'select');
+      await c.evalExpr(SCROLL_TO(TRAVEL_N));
+      await sleep(300);
+      const cardN = await c.json(CARD_TEXT(NOBAND));
+      const travelNPaint = await c.json(PAINT(TRAVEL_N));
+      const cardDeclared = await c.json(CARD_TEXT(EFFECTS_DECLARED[0]));
+      const tone = await c.json(TONE_IN_CARD(NOBAND, 'aeon declares no screen band'));
+      const saysN = (t) => cardN.found === true && cardN.text.includes(t);
+      check('10d', `⚠ A CHANNEL WITH NO DECLARED BAND SAYS SO — channel ${NOBAND}'s card states the `
+        + `coverage gap (${BANDS.game} declares bands for ${JSON.stringify(EFFECTS_DECLARED)} only), `
+        + 'in the NEUTRAL hint colour and with no clearance anywhere in it',
+        opened === 'ok'
+        && saysN(`aeon declares no screen band for channel ${NOBAND}`)
+        && saysN(BANDS.game)
+        && saysN('patchable(lo:, hi:)')
+        && saysN('never as a clearance')
+        // NOT a refusal, and not a reassurance either.
+        && !cardN.text.includes('cannot fit channel')
+        && !/\bfits\b/i.test(cardN.text) && !/✓/.test(cardN.text)
+        // ⚠ PER-CHANNEL, NOT A CONSTANT: a declared channel must NOT carry it.
+        // Without this the row passes on a string rendered under every sweep.
+        && cardDeclared.found === true
+        && !cardDeclared.text.includes('aeon declares no screen band')
+        // TONE, MEASURED: `--text-lo`, not `--warning`. Reaching an undeclared
+        // channel is not the author's mistake and there is nothing to fix, and
+        // a warning with no remedy teaches an author to ignore the colour.
+        && tone.found === true && tone.colour === tone.note && tone.colour !== tone.warn
+        // ...and it is PAINTED where the control is.
+        && travelNPaint.found === true && travelNPaint.insideScroller === true,
+        `undeclared channel ${NOBAND} (declared: ${JSON.stringify(EFFECTS_DECLARED)})  `
+        + `open→${opened}\n        `
+        + `hint colour ${tone.found ? `${tone.colour} (--text-lo ${tone.note}, --warning ${tone.warn})` : 'NOT FOUND'}\n        `
+        + `Travel select rect ${JSON.stringify(travelNPaint.rect)} `
+        + `insideScroller=${travelNPaint.insideScroller} hitIsSelf=${travelNPaint.hitIsSelf}\n        `
+        + `CARD ${NOBAND} TEXT ON SCREEN:\n        `
+        + (cardN.found ? cardN.text.split('\n').map((l) => `| ${l}`).join('\n        ') : '(no card)'));
+    }
 
     // Put channel 1 back to the violating rung so the capture below shows the
     // sentence this parcel adds.

@@ -157,7 +157,7 @@ import {
   ANCHOR_SEED_OPTIONS, ANCHOR_MOTION_OPTIONS, ANCHOR_AMP_OPTIONS, ANCHOR_PERIOD_OPTIONS,
   anchorChannelIndices, anchorSeedState, anchorMotionState, anchorSeedValue, anchorSweepOf,
   anchorSeedRefusal, anchorPhaseRefusal, anchorExtendRefusal, anchorMotionWithoutSeedAdvisory,
-  anchorSweepSummary, anchorSweepBandRefusal,
+  anchorSweepSummary, anchorSweepBandRefusal, anchorSweepNoBandAdvisory,
   setAnchorSeedStateCommand, setAnchorSeedCommand, setAnchorMotionStateCommand,
   setAnchorSweepShiftCommand, setAnchorPhaseCommand,
 } from '../../providers/effects-preset';
@@ -809,6 +809,22 @@ function AnchorChannelCard({ library, preset, index, run }: {
               a legal sweep IS the honest answer. */}
           {anchorSweepBandRefusal(sweep, index) !== null && (
             <Hint under tone="warning">{anchorSweepBandRefusal(sweep, index)}</Hint>
+          )}
+          {/* ═══ AND THE CHANNEL AEON DOCUMENTS NOTHING ABOUT SAYS SO ═══
+              `patch_world_ys` reaches 4 channels; aeon's sidecar declares
+              bands for 0 and 1. On 2 and 3 the fit check never runs, and
+              rendering nothing there is indistinguishable from rendering
+              nothing because a sweep is fine — which is the reassurance this
+              whole feature refuses to give. So the coverage gap is stated.
+              NEUTRAL, not `tone="warning"`: reaching channel 2 is not the
+              author's mistake and there is no smaller Travel to pick, and a
+              warning with no remedy teaches an author to ignore the colour.
+              `cannot-tell` is deliberately still silent — the three reasons
+              are in `anchorSweepNoBandAdvisory`'s header, and they are worth
+              reading before making these two consistent. These two hints are
+              mutually exclusive by construction (one verdict per channel). */}
+          {anchorSweepNoBandAdvisory(sweep, index) !== null && (
+            <Hint under>{anchorSweepNoBandAdvisory(sweep, index)}</Hint>
           )}
           <Field label="Cycle" title={anchorSweepFieldTitle('period_shift')}>
             <Select title={anchorSweepFieldTitle('period_shift')} value={String(sweep.period_shift)}
