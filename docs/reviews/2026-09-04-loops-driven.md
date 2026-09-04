@@ -294,8 +294,9 @@ at the predicted x, nothing about his state is close to leaving.
 **⚠ THE TWO HALVES OF THE ERROR ARE DIFFERENT KINDS AND SHOULD NOT BE REPORTED AS ONE
 "49 px".**
 
-- **x: predicted 733, last grounded 684 — 49 px, and unexplained.** No referent mismatch I
-  can name accounts for a horizontal offset.
+- **x: predicted 733, last grounded 684 — 49 px. DIAGNOSED in §4b** (the derivation used the
+  circle's extent where the player rides the cells'); left as written here because §4b is the
+  correction and this is what was believed when the split was made.
 - **y: predicted 767, actual 786 — 19 px, and this one may not be an error.** The player's
   collision height (`Sst.height_pixels`, `$17`) reads **39, declared FULL not half**, so
   half-height is 19.5. A derivation naming the **surface line** while this table reads the
@@ -317,6 +318,65 @@ splits and 1160 by different ones (`R4 R4` where the first run used `R1 R1 R4 R4
 two are cross-checked at the frames they share: **frame 1162's whole 64-byte player record is
 BYTE-IDENTICAL between the two runs**, and 1166 agrees. Same destination two ways.
 
+
+---
+
+## 4b. THE x HALF, DIAGNOSED — the derivation used the CIRCLE's extent where the player rides the CELLS'
+
+§4a split the error and left x at 49 px "unexplained". It is now explained, and the two
+halves turned out to have **different causes**, which is why splitting them was the step
+that mattered.
+
+**FIRST, THE y HALF IS CONFIRMED AS A REFERENT MISMATCH — and the fix makes x WORSE, which
+is the tell that they are separate.** `PLAYER_Y_RADIUS` is **19**, stated outright in the
+witness packet's own sizing argument (*"Δy is the rise of the player's **centre**,
+`2·(r_in − PLAYER_Y_RADIUS)`"*). The derived point `(733, 767)` is a **surface** point on
+the inner circle (measured radius 48.1 about `(768, 800)`, i.e. `r_in`); §4a's table reads
+the player's **centre**. Converting the prediction along the same ray to centre coordinates
+gives **`(746.9, 780.1)`**:
+
+| | predicted | observed (last grounded) | error |
+|---|---|---|---|
+| surface vs surface | `x = 733` | `684` | 49 px |
+| **centre vs centre** | `x = 747` | `684` | **63 px — worse** |
+| **centre vs centre** | `y = 780` | `786` | **6 px — nearly gone** |
+
+So the referent fix resolves y almost exactly and **enlarges** x. One correction cannot do
+both; there are two faults.
+
+**THE x FAULT: the prediction asked where the CIRCLE leaves row 47. The player rides the
+CELLS, and they extend five cells further west.** From `scratchpad/loop-plan.json`, cell row
+47 is painted `plane: both` across **cc 43…52**, i.e. world x **688…847**. The circle's own
+left branch exits the row at x = 733 — inside cell 45. But cells are 16 px and solid across
+their painted shape, so the surface continues west to the **start of cc 43, x = 688**.
+
+**It matches to the pixel once the player's WIDTH is used.** `Sst.width_pixels` (`$16`)
+reads **19, declared FULL**, so the half-width is 9:
+
+- centre `x = 684` → leading sensor at **693**, inside cc 43 (688…703) → **GROUND** ✓
+- centre `x = 678` → leading sensor at **687**, one pixel west of cc 43 → **AIR** ✓
+
+That is the observed transition exactly, at the frame observed (1162 → 1163).
+
+**The evidence that he is on the cells and not the circle** is in §4a's own table, read one
+column further: `y` is **786 for every frame from 1153 to 1163**, so the surface he is on is
+flat at `786 − 19 = 767` — the **bottom edge of cell row 47**, which is the very y the
+derivation named. Meanwhile his distance from the loop centre runs 31.4 → 61.6 → 85.2 px,
+crossing `r_out = 80` entirely. **He has left the circle and is riding the row.**
+
+⚠ **THE LAYOUT CHECK ALMOST WENT THE WRONG WAY, AND THE SANITY ROW IS WHY IT DID NOT.**
+Reading `section_0.collattr.bin` for row 47 returned **no geometry on either plane** — which
+reads as "the loop is not there" and would have refuted this. It is correct: the committed
+sidecar is the **base** section, and the loop is painted at build time, so the loop's cells
+are in `loop-plan.json`, not in the committed collattr. The layout hypothesis itself was
+confirmed first against a fact stated independently in the witness packet — rows 53-54 solid
+on both planes, cells 0-79 — which read **640/640 solid and 0/120 past the stated edge**.
+**Without that control, an empty result from the wrong file would have looked like a finding.**
+
+**What this means for the derivation, stated for whoever owns it:** its *conclusion* is right
+and its *method* is one step short. The right exit condition is **where plane A's painted
+cells in the row end**, not where the circle's branch leaves the row — and the answer must be
+taken at the player's sensor, not his centre.
 
 ---
 
