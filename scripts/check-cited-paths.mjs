@@ -60,6 +60,12 @@
 //      dropped: every comment line naming one is COUNTED and the count is on
 //      the summary line, so a reader can see how much of the file's citation
 //      traffic this gate declined to judge.
+//      ⚠ A PEER PATH IS ALSO THE ONE SHAPE THE IGNORE QUERY CANNOT SURVIVE.
+//      `check-ignore` exits 128 on any path leaving the repo and loses the whole
+//      batch with it, so these are filtered BEFORE the query, not after. The
+//      reachable spelling is not `../aeon/x.ts` — the lookbehind already stops
+//      that becoming a token — but a token rooted here that climbs out, like
+//      `src/../../aeon/x.ts`. See `judgeable()`.
 //   2. `docs/…` IS NOT CHECKED AT ALL, and this is the biggest hole. Every repo
 //      in the suite has a `docs/`, and this repo's comments cite the PEERS' by
 //      exactly that spelling — `docs/DEFERRED_WORK.md` and `docs/BUGS.md` in
@@ -92,7 +98,8 @@
 //      drives both arms of the query every run, because which arm a real run
 //      takes depends on which tree it is standing in. See its own note.
 //   9. PLACEHOLDERS ARE SKIPPED: a token containing — or immediately followed
-//      by — `<`, `>`, `*`, `?` or `…`, and a token that ends a line whose last
+//      by — `<`, `>`, `*`, `?`, `…` or `...` (three ASCII dots, the plain
+//      spelling of an elided path), and a token that ends a line whose last
 //      character is `-` (a path hyphen-wrapped onto the next line).
 //  10. R2 ONLY JUDGES A COMPOUND NAME: the stem must contain `-`, `_` or an
 //      uppercase letter. `emit.ts`, `test.ts`, `proof.mjs`, `app.mjs` and
@@ -168,13 +175,46 @@ const PATH_RE = new RegExp(`${BEFORE}((?:${ROOTS.join('|')})/[\\w./@\\-]*[\\w])`
 const BARE_RE = new RegExp(`${BEFORE}([\\w][\\w.@\\-]*\\.(?:${BARE_EXTS.join('|')}))(?![\\w/\\-])`, 'g');
 
 /**
+ * Can this gate hand the token to git at all?
+ *
+ * `check-ignore` REFUSES any path that leaves the repository — `../aeon/x.ts`
+ * and `/abs/x.ts` both exit **128**, and one such path poisons the whole batch
+ * it travels in. Measured 2026-09-04:
+ *
+ *     ../aeon/tools/effects_gen.py  128  fatal: ... is outside repository
+ *     /abs/path.ts                  128  fatal: Invalid path '/abs'
+ *     src/../../aeon/x.ts           128  fatal: ... is outside repository
+ *     engine/effects/raster.emp       1  (a BARE peer path is fine — just not ignored)
+ *
+ * ⚠ THE REACHABLE SHAPE IS NOT THE OBVIOUS ONE. `BEFORE`'s lookbehind already
+ * stops a bare `../aeon/src/foo.ts` from ever becoming a token — measured, it
+ * yields nothing at all. What DOES get through is a token that starts at one of
+ * this repo's own roots and then climbs out of it, because `PATH_RE`'s body
+ * happily eats `../`: `src/../../aeon/x.ts`, `scratchpad/../aeon/probe.mjs`.
+ * Those are peer citations wearing a local prefix, and rule 1 of this file's
+ * header already says peer paths are not judged — so they are dropped HERE,
+ * before the query, and counted with the rest of the unjudged.
+ *
+ * Belt and braces: `ignoredSet` filters them again. A path outside the repo can
+ * never be git-ignored, so dropping it costs no coverage, and the alternative
+ * is a gate that dies on a comment somebody wrote.
+ */
+function judgeable(token) {
+  if (token.startsWith('/')) return false;
+  return !token.split('/').includes('..');
+}
+
+/**
  * Characters that make a token a shape rather than a path (exclusion 9).
  * `PLACEHOLDER_AFTER` is tried against the REST OF THE LINE, and allows one
  * intervening `-`, because the capture stops at a word character: in
  * `scratchpad/fill-<mode>.json` and `composer-priority-*.test.ts` the token
  * ends before the hyphen and the shape character is two positions on.
  */
-const PLACEHOLDER_IN = /[<>*?…]/;
+// `...` — three ASCII dots — is an ELIDED path (`src/.../seam.ts`), the plain
+// spelling of the `…` beside it. It was in this rule's first draft and lost on
+// the way in; a run that meets one reports a citation nobody wrote.
+const PLACEHOLDER_IN = /[<>*?…]|\.\.\./;
 const PLACEHOLDER_AFTER = /^-?[<>*?…]/;
 
 /**
@@ -228,6 +268,7 @@ function citations(trimmed) {
     const after = trimmed.slice(end);
     if (PLACEHOLDER_IN.test(tok) || PLACEHOLDER_AFTER.test(after)) continue;
     if (wrapped(end)) continue;
+    if (!judgeable(tok)) { out.push({ rule: 'unjudgeable', token: tok }); continue; }
     out.push({ rule: 'cited-path-missing', token: tok });
   }
   for (const m of trimmed.matchAll(BARE_RE)) {
@@ -327,13 +368,14 @@ function pathResolves(token) {
  * @param sources   [{rel, text}]
  * @param resolveP  (token) => boolean   — R1
  * @param resolveB  (base)  => boolean   — R2
- * @returns {hits, notJudged, tokens}
+ * @returns {hits, notJudged, tokens, declared, escaping}
  */
 function scan(sources, resolveP, resolveB) {
   const hits = [];
   let notJudged = 0;
   let tokens = 0;
   let declared = 0;
+  let escaping = 0;
   for (const { rel, text } of sources) {
     const hash = HASH_DIALECT.some((x) => rel.endsWith(x));
     text.split('\n').forEach((raw, i) => {
@@ -342,13 +384,17 @@ function scan(sources, resolveP, resolveB) {
       if (NOT_JUDGED_RE.test(trimmed)) notJudged++;
       if (declaresAbsence(trimmed)) { declared += citations(trimmed).length; return; }
       for (const c of citations(trimmed)) {
+        // A path that leaves this repo is a PEER citation (header rule 1) and is
+        // also the one thing the ignore query cannot be handed. Counted, never
+        // judged, and — the part that matters — never sent to git.
+        if (c.rule === 'unjudgeable') { escaping++; notJudged++; continue; }
         tokens++;
         const ok = c.rule === 'cited-path-missing' ? resolveP(c.token) : resolveB(c.token);
         if (!ok) hits.push({ file: rel, line: i + 1, ...c, text: trimmed.slice(0, 150) });
       }
     });
   }
-  return { hits, notJudged, tokens, declared };
+  return { hits, notJudged, tokens, declared, escaping };
 }
 
 // ---------------------------------------------------------------------------
@@ -451,21 +497,37 @@ function ignoredSet(paths) {
     die('an empty path reached the ignore query — that is an internal fault in this '
       + "gate's own token extraction, not a problem with the tree");
   }
+  // THE BELT. `citations()` already drops these, so nothing should arrive here;
+  // if a future rule reintroduces one, drop it rather than let it exit-128 the
+  // whole batch. A path outside the repo can never be git-ignored, so this
+  // costs no coverage — and the failure it replaces was a gate dying on a
+  // comment somebody wrote.
+  const sendable = paths.filter(judgeable);
+  if (sendable.length === 0) return new Set();
   try {
     const listed = execFileSync('git', ['check-ignore', '--stdin'], {
       cwd: ROOT,
-      input: paths.join('\n'),
+      input: sendable.join('\n'),
       encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'ignore'],
+      // ⚠ CAPTURED, NEVER 'ignore'. The status alone says a query failed; only
+      // git's own line says WHY. Discarding it cost two review rounds of
+      // guessing at a `status 128` whose stderr named the offending path
+      // outright. A checker that knows something went wrong and cannot say
+      // what is a refusal nobody can act on.
+      stdio: ['pipe', 'pipe', 'pipe'],
       maxBuffer: 64 * 1024 * 1024,
     });
     return new Set(listed.split('\n').filter(Boolean));
   } catch (e) {
     // Exit 1 = "none of these is ignored". The ordinary answer, not a failure.
     if (e.status === 1) return new Set();
-    die(`the ignore query failed (status ${JSON.stringify(e.status)}: ${e.message.split('\n')[0]}) `
-      + '— this run cannot tell generated output from source, so it judges an unknown set '
-      + 'of files. Exit 1 is NOT this branch: it means nothing was ignored, and is handled above.');
+    const why = String(e.stderr ?? '').trim().split('\n')[0];
+    die(`the ignore query failed (status ${JSON.stringify(e.status)})`
+      + `${why ? `\n  git said: ${why}` : ' — git said nothing on stderr'}`
+      + '\n  This run cannot tell generated output from source, so it judges an unknown set of '
+      + 'files. Exit 1 is NOT this branch: it means nothing was ignored, and is handled above. '
+      + 'A status 128 naming a path is usually one this gate should not have sent — see '
+      + '`judgeable()`.');
     return new Set();
   }
 }
@@ -526,7 +588,26 @@ function proveIgnoredSet() {
     die(`the exit-0 arm is not behaving: asked about ${clean} and ${dirty} (under `
       + `.gitignore's \`${lit.pattern}\`), got ${JSON.stringify([...both])}`);
   }
-  return { clean, dirty, pattern: lit.pattern };
+
+  // ═══ THE THIRD ARM: A PATH THAT LEAVES THE REPOSITORY ═══
+  //
+  // `check-ignore` exits 128 on one, and ONE POISONS THE WHOLE BATCH — a single
+  // escaping token would take down a query carrying a hundred good ones. This
+  // arm had never executed either: no comment in the tree spells a traversal
+  // today (measured, zero), and the citation query only runs when there is
+  // already a violation. So the proof is synthetic and permanent rather than a
+  // hostage to what happens to be written in the tree this week.
+  const escaping = [`../${SUITE_PEERS[0]}/__check-cited-paths-ignore-probe__.ts`, '/__abs-probe__.ts'];
+  for (const bad of escaping) {
+    if (judgeable(bad)) die(`judgeable() thinks ${bad} can be sent to the ignore query; it cannot`);
+  }
+  const mixed = ignoredSet([...escaping, clean, dirty]);
+  if (!mixed.has(dirty) || mixed.size !== 1) {
+    die(`an escaping path took down a query that also carried real ones: asked about `
+      + `${JSON.stringify([...escaping, clean, dirty])}, got ${JSON.stringify([...mixed])}. `
+      + 'Every good path in that batch went unjudged.');
+  }
+  return { clean, dirty, pattern: lit.pattern, escaping };
 }
 const IGNORE_ARMS = proveIgnoredSet();
 
@@ -610,9 +691,14 @@ console.log(
   + `${run.declared} citation(s) sat on a line declaring its own absence `
   + `(${ABSENCE_MARKERS.map((m) => `"${m.trim()}"`).join(', ')}); `
   + `${EXEMPT.length} written exemption(s) applied.\n`
-  + `${PREFIX}: both arms of the ignore query proven this run — "nothing ignored" (exit 1, `
-  + `the ordinary answer, NOT a failure) and "something ignored" (exit 0), the latter `
-  + `against .gitignore's own \`${IGNORE_ARMS.pattern}\`.`,
+  + `${PREFIX}: ${run.escaping} citation(s) named a path that LEAVES this repo (a \`../\` `
+  + 'traversal or an absolute) — unjudgeable by rule 1, and never sent to the ignore query, '
+  + 'which exits 128 on one and loses the whole batch with it.\n'
+  + `${PREFIX}: all three arms of the ignore query proven this run — "nothing ignored" `
+  + '(exit 1, the ordinary answer, NOT a failure), "something ignored" (exit 0, against '
+  + `.gitignore's own \`${IGNORE_ARMS.pattern}\`), and "an escaping path does not take down `
+  + `the batch it travels in" (${IGNORE_ARMS.escaping.length} probes: `
+  + `${IGNORE_ARMS.escaping.join(', ')}).`,
 );
 
 if (deadExemptions.length) {
