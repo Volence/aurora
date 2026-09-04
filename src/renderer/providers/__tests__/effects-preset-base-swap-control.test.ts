@@ -1,5 +1,7 @@
-// The `base_swap` AUTHORING SURFACE — its two numbers, the granule that fails
-// loudly nowhere, and the three-channel arithmetic that must not be counted.
+// The `base_swap` AUTHORING SURFACE — a LIST of bands since empyrean `8f56c2c`:
+// the granule that fails loudly nowhere, the two edge lines that are neither
+// inclusive nor exclusive, the order rule NOBODY downstream enforces, and the
+// three-channel arithmetic that must not be counted.
 //
 // ═══ WHAT THIS FILE OWNS THAT THE CODEC'S OWN TESTS DO NOT ═══
 //
@@ -14,8 +16,21 @@
 //      bits silently, so an unaligned base is a different address with nothing
 //      else visibly wrong.
 //   2. THE ADDRESS IS SHOWN AS AN ADDRESS. Hex beside the decimal everywhere,
-//      and the contract's own name for the one address the contract names —
-//      and NO name for any other, ever.
+//      and the contract's own name for any address the contract names — and NO
+//      name for any other, ever. ⚠ AT `8f56c2c` THE CONTRACT STOPPED NAMING ANY,
+//      so the correct behaviour is now to name NONE and say so; the rows below
+//      measure the empty set over a defined population rather than trusting a
+//      lookup that returned nothing.
+//   2b. ⚠ THE EDGES ARE NEITHER INCLUSIVE NOR EXCLUSIVE. `line` and
+//      `restore_line` are BOTH fire lines and the register changes ~45% across
+//      each; the fully swapped rows are `line+1 .. restore_line-1`. Both natural
+//      readings are wrong, so the rows here check the schema's own measured
+//      witness rather than an inclusive range.
+//   2c. ⚠ ORDER IS ENFORCED BY NEITHER THE SCHEMA NOR AEON'S GENERATOR. Aurora
+//      derives strict ascent over the flattened fire sequence and NAMES
+//      `fire_lines` as the real authority. The rows prove Aurora refuses it,
+//      prove the SCHEMA does NOT (or the refusal would be theatre), and prove
+//      the codec still accepts such a document.
 //   3. THE LINE RANGE IS NOT THE RAMP'S, and the refusal says so rather than
 //      leaving the next reader to assume symmetry.
 //   4. THE CONVERSION IN AND OUT IS ONE UNDOABLE COMMAND that restores exactly
@@ -37,9 +52,17 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import {
   EFFECTS_PRESET_BASE_SWAP_KEYS,
+  EFFECTS_PRESET_BASE_SWAP_OPTIONAL_KEYS,
+  EFFECTS_PRESET_BASE_SWAP_MIN_BANDS,
+  EFFECTS_PRESET_BASE_SWAP_PLANES,
+  EFFECTS_PRESET_BASE_SWAP_INSIDE_OFFSETS,
+  EFFECTS_PRESET_BASE_SWAP_ORDER_AUTHORITY,
   EFFECTS_PRESET_BASE_SWAP_LINE_RANGE,
+  EFFECTS_PRESET_BASE_SWAP_RESTORE_LINE_RANGE,
   EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE,
   EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE,
+  EFFECTS_PRESET_SCHEMA,
+  baseSwapInsideRows, baseSwapFires, baseSwapOrderRefusal,
   EFFECTS_PRESET_RAMP_TOP_RANGE,
   EFFECTS_PRESET_RASTER_CHANNELS,
   EFFECTS_PRESET_PROGRAM_ARMS,
@@ -51,15 +74,22 @@ import {
   type EffectsPreset,
   type EffectsPresetLibrary,
   type EffectsPresetBaseSwap,
+  type EffectsPresetBaseSwapBand,
 } from '../../../core/formats/effects/preset';
 import {
-  newBaseSwap, newPreset, newBand, newRamp,
-  BASE_SWAP_TITLE, BASE_SWAP_FIELD_TITLES,
+  validateAgainstSchema, type JsonSchema,
+} from '../../../core/formats/effects/json-schema-subset';
+import {
+  newBaseSwap, newBaseSwapBand, newPreset, newBand, newRamp,
+  BASE_SWAP_TITLE, BASE_SWAP_LIST_TITLE, BASE_SWAP_FIELD_TITLES,
   BASE_SWAP_ASYMMETRIES, BASE_SWAP_ASYMMETRIES_SHORT, BASE_SWAP_WHAT_YOU_SEE,
   BASE_SWAP_NAMED_TARGETS, fmtVramBase, fmtVramBaseBoth,
-  baseSwapTargetGloss, baseSwapSummary,
-  baseSwapLineRefusal, baseSwapTargetRefusal, baseSwapTargetNeighbours,
-  setBaseSwapLineCommand, setBaseSwapTargetCommand,
+  baseSwapTargetGloss, baseSwapSummary, baseSwapBandSummary, baseSwapInsideRowsText,
+  baseSwapOrderAdvisory, addBaseSwapBandRefusal, lastBaseSwapBandRefusal,
+  baseSwapLineRefusal, baseSwapRestoreLineRefusal, baseSwapPlaneRefusal,
+  baseSwapTargetRefusal, baseSwapTargetNeighbours,
+  setBaseSwapLineCommand, setBaseSwapTargetCommand, setBaseSwapPlaneCommand,
+  setBaseSwapRestoreLineCommand, addBaseSwapBandCommand, removeBaseSwapBandCommand,
   setProgramArmCommand, programArmSwapAdvisory, programArmSeedRefusal,
   programArmEditorGap, programArmEditorGapFor,
   PROGRAM_ARM_OPTIONS, bandControlsRefusal,
@@ -72,8 +102,23 @@ const G = EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE;
 const LINE = EFFECTS_PRESET_BASE_SWAP_LINE_RANGE;
 const TARGET = EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE;
 
-function swapPreset(over: Partial<EffectsPresetBaseSwap> = {}): EffectsPreset {
-  return { schema: 1, id: ID, base_swap: { ...newBaseSwap(), ...over } };
+const S = EFFECTS_PRESET_SCHEMA as unknown as JsonSchema;
+const RESTORE = EFFECTS_PRESET_BASE_SWAP_RESTORE_LINE_RANGE;
+
+/** A document whose band 0 carries `over` on top of the contract's own seed. */
+function swapPreset(over: Partial<EffectsPresetBaseSwapBand> = {}): EffectsPreset {
+  const bands = newBaseSwap();
+  bands[0] = { ...bands[0], ...over };
+  return { schema: 1, id: ID, base_swap: bands };
+}
+/** A document carrying exactly these bands. */
+function swapOf(...bands: EffectsPresetBaseSwapBand[]): EffectsPreset {
+  return { schema: 1, id: ID, base_swap: bands };
+}
+/** One band, seeded from the contract and moved to `line`. */
+function bandAt(line: number, over: Partial<EffectsPresetBaseSwapBand> = {}):
+EffectsPresetBaseSwapBand {
+  return { ...newBaseSwapBand(), line, ...over };
 }
 function lib(...presets: EffectsPreset[]): EffectsPresetLibrary {
   return { presets, unreadable: [], notices: [] };
@@ -91,9 +136,43 @@ function documentOf(channel: string): EffectsPreset {
 // ---------------------------------------------------------------------------
 
 describe('a fresh base swap is legal by construction, and is the contract\'s worked example', () => {
-  it('writes both keys and no third — the object is CLOSED', () => {
-    expect([...EFFECTS_PRESET_BASE_SWAP_KEYS].sort()).toEqual(['line', 'target']);
-    expect(Object.keys(newBaseSwap()).sort()).toEqual([...EFFECTS_PRESET_BASE_SWAP_KEYS].sort());
+  it('is a LIST of minItems bands, not an object — the shape that broke', () => {
+    // ⚠ THE HARD BREAK, ASSERTED FROM THE SCHEMA RATHER THAN FROM THIS FILE.
+    // `base_swap` was one closed {line, target} object; the single-object form
+    // is REFUSED with no legacy arm, and a fresh document must be born in the
+    // new shape or every save is a document aeon's loader rejects.
+    expect(Array.isArray(newBaseSwap())).toBe(true);
+    expect(newBaseSwap()).toHaveLength(EFFECTS_PRESET_BASE_SWAP_MIN_BANDS);
+    expect(EFFECTS_PRESET_BASE_SWAP_MIN_BANDS).toBeGreaterThanOrEqual(1);
+    // ANTI-VACUOUS: the OLD shape really is refused now, so "it is a list" is a
+    // claim about a contract that changed and not a restatement of the type.
+    expect(validateAgainstSchema(
+      { schema: 1, id: ID, base_swap: { line: LINE.min, target: 0 } }, S,
+    ).length, 'the schema still ACCEPTS the pre-8f56c2c single-object form')
+      .toBeGreaterThan(0);
+  });
+
+  it('a band writes every required key and no undeclared one', () => {
+    expect([...EFFECTS_PRESET_BASE_SWAP_KEYS].sort()).toEqual(['line', 'plane', 'target']);
+    expect(Object.keys(newBaseSwapBand()).sort())
+      .toEqual([...EFFECTS_PRESET_BASE_SWAP_KEYS].sort());
+    // ⚠ AND `restore_line` IS OMITTED ON PURPOSE, not forgotten. Absent means
+    // the band runs to the BOTTOM OF THE DISPLAY — the shipped single-edge
+    // shape — and where a band ENDS is the author's decision, not Aurora's.
+    expect(EFFECTS_PRESET_BASE_SWAP_OPTIONAL_KEYS).toContain('restore_line');
+    expect(newBaseSwapBand().restore_line).toBeUndefined();
+    expect(baseSwapInsideRows(newBaseSwapBand()).toBottom).toBe(true);
+    expect(baseSwapInsideRows(newBaseSwapBand()).last).toBeNull();
+  });
+
+  it('the seeded plane is one the schema admits, and the enum is CLOSED to two', () => {
+    expect(EFFECTS_PRESET_BASE_SWAP_PLANES).toContain(newBaseSwapBand().plane);
+    expect(EFFECTS_PRESET_BASE_SWAP_PLANES.length).toBe(2);
+    // ANTI-VACUOUS: a spelling outside the enum really is refused by the schema,
+    // so the closure is the contract's and not this file's opinion.
+    expect(validateAgainstSchema(
+      swapPreset({ plane: 'SpriteTable' }), S,
+    ).length, 'the schema accepts a VdpBase variant that is not a plane').toBeGreaterThan(0);
   });
 
   /**
@@ -102,13 +181,18 @@ describe('a fresh base swap is legal by construction, and is the contract\'s wor
    * Both halves are checked against the CONSTANTS, not against the numbers the
    * seed happens to hold.
    */
-  it('is inside the line range and ON the granule', () => {
+  it('is inside the line range, ON the granule, and in ASCENDING fire order', () => {
     const seed = newBaseSwap();
-    expect(baseSwapLineRefusal(seed, ID, seed.line)).toBeNull();
-    expect(baseSwapTargetRefusal(seed, ID, seed.target)).toBeNull();
-    expect(isBaseSwapTargetAligned(seed.target)).toBe(true);
-    expect(seed.line).toBeGreaterThanOrEqual(LINE.min);
-    expect(seed.line).toBeLessThanOrEqual(LINE.max);
+    expect(baseSwapLineRefusal(seed, ID, 0, seed[0].line)).toBeNull();
+    expect(baseSwapTargetRefusal(seed, ID, 0, seed[0].target)).toBeNull();
+    expect(isBaseSwapTargetAligned(seed[0].target)).toBe(true);
+    expect(seed[0].line).toBeGreaterThanOrEqual(LINE.min);
+    expect(seed[0].line).toBeLessThanOrEqual(LINE.max);
+    // ⚠ AND LEGAL NOW INCLUDES THE RULE NO SCHEMA KEYWORD EXPRESSES. A seed that
+    // validated but that `fire_lines` refused at .emp build time would be a
+    // fresh document that cannot be built, and the author had no hand in it.
+    expect(baseSwapOrderRefusal(seed)).toBeNull();
+    expect(validateAgainstSchema(swapPreset(), S)).toEqual([]);
   });
 
   /**
@@ -139,41 +223,71 @@ describe('a fresh base swap is legal by construction, and is the contract\'s wor
       resolve(__dirname, '../../../../test/fixtures/effects/preset-canonical-golden.json'), 'utf8',
     )) as { documents: Record<string, string> };
     const shipped = JSON.parse(golden.documents.ojz_sec6_baseswap) as
-      { base_swap: { line: number } };
-    // Anti-vacuous: the fixture really is aeon's section-6 base-swap document.
-    expect(Number.isInteger(shipped.base_swap.line)).toBe(true);
+      { base_swap: { line: number }[] };
+    // Anti-vacuous: the fixture really is aeon's section-6 base-swap document,
+    // in the LIST shape, with at least one band.
+    expect(Array.isArray(shipped.base_swap)).toBe(true);
+    expect(shipped.base_swap.length).toBeGreaterThan(0);
+    expect(Number.isInteger(shipped.base_swap[0].line)).toBe(true);
     expect(
-      newBaseSwap().line,
+      newBaseSwap()[0].line,
       "a fresh base_swap is not seeded with the line aeon's section-6 preset actually binds. If "
       + 'the schema sentence names two lines, this derivation is reading the SUPERSEDED clause — '
       + 'the historical value, which is legal, in range and refused by nothing, so every other '
       + 'row in this file stays green while new documents are born stale.',
-    ).toBe(shipped.base_swap.line);
+    ).toBe(shipped.base_swap[0].line);
     // ...and the schema really does name a DIFFERENT, superseded line beside it,
     // so this row is guarding against a live hazard rather than a hypothetical.
-    const was = /preset fired on (\d+) as bound at aeon [0-9a-f]{6,}/
-      .exec(BASE_SWAP_FIELD_TITLES.line);
-    expect(was, "the schema no longer names a superseded section-6 line — if it has gone back to "
+    // ⚠ THE SENTENCE MOVED AT `8f56c2c`: the per-field `line` description was
+    // rewritten down to the range, and both worked line numbers now live in the
+    // KEY's description. A matcher still aimed at the field would find nothing
+    // and this row would go red for the right reason.
+    const was = /presets\/ojz_sec6_baseswap\.json \{line: (\d+), target: (\d+)\}/
+      .exec(BASE_SWAP_TITLE);
+    expect(was, 'the schema no longer names a superseded section-6 line — if it has gone back to '
       + 'stating one number, this row still holds but its hazard is gone; see BASE_SWAP_SEED_LINE')
       .toBeTruthy();
-    expect(Number(was![1])).not.toBe(newBaseSwap().line);
+    expect(Number(was![1])).not.toBe(newBaseSwap()[0].line);
   });
 
   /**
-   * AND IT IS THE ONE ADDRESS THE PANEL CAN EXPLAIN. A seed whose target this
-   * editor could not name would be a first state with no sentence about it —
-   * `newRamp`'s "a control whose first state does nothing teaches the author it
-   * does nothing", one step further: a control whose first state cannot be
-   * described teaches nothing at all.
+   * ═══ ⚠ THE CONTRACT STOPPED NAMING ADDRESSES AT `8f56c2c`, AND THIS ROW IS
+   * THE ONE THAT CHANGED SIDES ═══
+   *
+   * It used to read "seeds the address the contract NAMES, so the card can say
+   * what it does", and it was true: `target`'s description ended "targets 57344
+   * ($E000, VRAM_PLANE_B)". The amendment rewrote that description down to the
+   * range and the granule. The two `VRAM_PLANE_*` names that survive in the key's
+   * prose are the HOME bases an OFF fire writes — "the engine's fact, never
+   * authored" — and carry no addresses at all.
+   *
+   * So the seed is now legal and UNEXPLAINED, and the honest behaviour is to say
+   * so rather than to keep a name Aurora would be inventing. The seed target is
+   * still the shipped section-6 one (the only address the contract writes down
+   * anywhere), and the ROW BELOW asserts the gloss admits it has no name.
    */
-  it('seeds the address the contract NAMES, so the card can say what it does', () => {
-    expect(BASE_SWAP_NAMED_TARGETS.has(newBaseSwap().target)).toBe(true);
-    expect(baseSwapSummary(newBaseSwap())).toContain(BASE_SWAP_NAMED_TARGETS.get(newBaseSwap().target)!);
+  it('seeds a legal address the contract no longer NAMES, and says so', () => {
+    const seed = newBaseSwapBand();
+    expect(isBaseSwapTargetAligned(seed.target)).toBe(true);
+    expect(BASE_SWAP_NAMED_TARGETS.size).toBe(0);
+    expect(baseSwapTargetGloss(seed.target)).toContain('names no VRAM base address');
+    // ⚠ AND THE SEED IS STILL THE ONE ADDRESS THE CONTRACT WRITES DOWN, taken
+    // from the clause whose disclaimer names the LINE and not the target.
+    expect(BASE_SWAP_TITLE).toContain(String(seed.target));
   });
 
   it('the seeded document survives the codec\'s own round trip', () => {
     const text = serializeEffectsPreset(swapPreset());
     expect(parseEffectsPreset(text, ID)).toEqual(swapPreset());
+  });
+
+  it('a MULTI-band document round-trips, restore_line and all', () => {
+    const p = swapOf(
+      bandAt(LINE.min, { plane: EFFECTS_PRESET_BASE_SWAP_PLANES[1], restore_line: 64 }),
+      bandAt(100, { restore_line: 200 }),
+    );
+    expect(validateAgainstSchema(p, S)).toEqual([]);
+    expect(parseEffectsPreset(serializeEffectsPreset(p), ID)).toEqual(p);
   });
 });
 
@@ -187,36 +301,45 @@ describe('a VRAM base is shown as a VRAM base', () => {
     expect(fmtVramBase(TARGET.max)).toBe(`$${TARGET.max.toString(16).toUpperCase()}`);
     expect(fmtVramBase(TARGET.min)).toHaveLength(1 + digits);
     // The one an author will actually meet, both ways round.
-    const named = [...BASE_SWAP_NAMED_TARGETS.keys()][0];
-    expect(fmtVramBaseBoth(named)).toBe(`${fmtVramBase(named)} (${named})`);
-    expect(parseInt(fmtVramBase(named).slice(1), 16)).toBe(named);
+    const seed = newBaseSwapBand().target;
+    expect(fmtVramBaseBoth(seed)).toBe(`${fmtVramBase(seed)} (${seed})`);
+    expect(parseInt(fmtVramBase(seed).slice(1), 16)).toBe(seed);
   });
 
   /**
-   * ⚠ THE NAME IS THE SCHEMA'S AND THERE IS EXACTLY ONE. `rampAddrGloss`'s rule:
-   * the contract establishes what it establishes, and a per-address gloss Aurora
-   * made up would tell an author they are pointing Plane A at a plane they are
-   * not — worse than no name at all.
+   * ⚠ THE NAME IS THE SCHEMA'S, AND SINCE `8f56c2c` THERE ARE NONE.
+   * `rampAddrGloss`'s rule: the contract establishes what it establishes, and a
+   * per-address gloss Aurora made up would tell an author they are pointing a
+   * plane at a picture they are not — worse than no name at all.
+   *
+   * ⚠ THE EMPTY SET IS MEASURED, NOT ASSUMED. An empty map from a regex that
+   * stopped matching at one path is indistinguishable from a contract that
+   * stopped naming anything; the first is a bug and the second is a fact. So
+   * this row asserts the SEARCH SPACE is still real prose about this key — if
+   * the derivation had simply lost its haystack, the module throws at load and
+   * this file never runs at all.
    */
-  it('names the address the contract names, and NO OTHER', () => {
-    expect(BASE_SWAP_NAMED_TARGETS.size).toBe(1);
-    const [addr, name] = [...BASE_SWAP_NAMED_TARGETS][0];
-    // The name really came out of the schema's own prose.
-    expect(BASE_SWAP_FIELD_TITLES.target).toContain(name);
-    expect(BASE_SWAP_FIELD_TITLES.target).toContain(String(addr));
-    expect(baseSwapTargetGloss(addr)).toContain(name);
-    expect(baseSwapTargetGloss(addr)).toContain(fmtVramBase(addr));
+  it('names every address the contract names — which is now NONE — and no other', () => {
+    // The population really is the base_swap prose, and it really no longer
+    // carries an address name in the "N ($HEX, VRAM_NAME)" shape the gloss reads.
+    expect(BASE_SWAP_TITLE.length).toBeGreaterThan(500);
+    expect(BASE_SWAP_TITLE).toContain('base_swap');
+    expect(BASE_SWAP_FIELD_TITLES.target).toMatch(/multiple of/);
+    expect(/(\d+) \(\$[0-9A-Fa-f]+, VRAM_[A-Z0-9_]+\)/.test(BASE_SWAP_TITLE)).toBe(false);
+    expect(/(\d+) \(\$[0-9A-Fa-f]+, VRAM_[A-Z0-9_]+\)/.test(BASE_SWAP_FIELD_TITLES.target))
+      .toBe(false);
+    expect(BASE_SWAP_NAMED_TARGETS.size).toBe(0);
 
-    // Every OTHER legal base: admitted, on the granule, and unnamed.
+    // EVERY legal base: admitted, on the granule, and honestly unnamed.
     for (let a = TARGET.min; a <= TARGET.max; a += G) {
-      if (a === addr) continue;
       const gloss = baseSwapTargetGloss(a);
       expect(gloss, `gloss for ${a}`).toContain(fmtVramBase(a));
       expect(gloss, `gloss for ${a}`).toContain('on the granule');
-      // It may CITE the named address as the only one the contract names; it
-      // must never present this one as being it.
-      expect(gloss.startsWith(`${fmtVramBase(a)} — ${name}`), `gloss for ${a} claims the name`)
-        .toBe(false);
+      expect(gloss, `gloss for ${a}`).toContain('names no VRAM base address');
+      // ⚠ AND IT NEVER PUTS A VRAM_* NAME ON ONE. The two names still in the
+      // key's prose are HOME bases the engine writes, never authored — a gloss
+      // that reached for one would be naming the wrong thing entirely.
+      expect(/VRAM_[A-Z0-9_]+/.test(gloss), `gloss for ${a} invented a name`).toBe(false);
     }
   });
 
@@ -228,22 +351,35 @@ describe('a VRAM base is shown as a VRAM base', () => {
   });
 
   /**
-   * The summary is the arithmetic an author would do in their head. It states
-   * BOTH bases, so the sentence cannot be read as a count, and it names the
-   * target only when the contract does.
+   * The band summary is the arithmetic an author would do in their head. It
+   * states BOTH bases, so the sentence cannot be read as a count, and it names
+   * the plane the band actually re-points rather than assuming Plane A.
    */
-  it('the summary states the line, both bases, and the name only when there is one', () => {
-    const named = [...BASE_SWAP_NAMED_TARGETS.keys()][0];
-    const s = baseSwapSummary({ line: LINE.min, target: named });
-    expect(s).toContain(`line ${LINE.min}`);
-    expect(s).toContain(fmtVramBase(named));
-    expect(s).toContain(String(named));
-    expect(s).toContain(BASE_SWAP_NAMED_TARGETS.get(named)!);
+  it('the band summary states the plane, the line and both bases', () => {
+    const b = bandAt(LINE.min, { plane: EFFECTS_PRESET_BASE_SWAP_PLANES[1], target: TARGET.min });
+    const t = baseSwapBandSummary(b);
+    expect(t).toContain(`line ${LINE.min}`);
+    expect(t).toContain(EFFECTS_PRESET_BASE_SWAP_PLANES[1]);
+    expect(t).toContain(fmtVramBaseBoth(TARGET.min));
+    // ⚠ IT MUST NOT SAY "Plane A" ON A PlaneB BAND. The pre-list surface was
+    // hard-wired to Plane A because the key was; the register IS the content of
+    // the inversion, and a sentence naming the wrong one is worse than silence.
+    expect(t).not.toContain(EFFECTS_PRESET_BASE_SWAP_PLANES[0]);
+  });
 
-    const unnamed = named === TARGET.min ? TARGET.min + G : TARGET.min;
-    const u = baseSwapSummary({ line: 100, target: unnamed });
-    expect(u).toContain(fmtVramBaseBoth(unnamed));
-    expect(u).not.toContain(BASE_SWAP_NAMED_TARGETS.get(named)!);
+  /** The list summary is about the FLATTENED program — the fires, in order. */
+  it('the list summary counts bands and names every fire in document order', () => {
+    const bands = [bandAt(LINE.min, { restore_line: 64 }), bandAt(100, { restore_line: 200 })];
+    const t = baseSwapSummary(bands);
+    expect(t).toContain('2 bands');
+    expect(t).toContain('4 fires');
+    expect(t).toContain('DOCUMENT ORDER');
+    expect(t).toContain(`${LINE.min}, 64, 100, 200`);
+    // ANTI-VACUOUS: it really is derived from the fires, not from the length.
+    expect(baseSwapFires(bands).map((f) => f.line)).toEqual([LINE.min, 64, 100, 200]);
+    // A single edge is 1 band and 1 fire, and the singular reads correctly.
+    expect(baseSwapSummary([bandAt(LINE.min)])).toContain('1 band, flattened');
+    expect(baseSwapSummary([bandAt(LINE.min)])).toContain('1 fire ');
   });
 });
 
@@ -254,13 +390,14 @@ describe('a VRAM base is shown as a VRAM base', () => {
 describe('the fire line is refused at the control', () => {
   it('takes every line in the declared range and refuses both neighbours of it', () => {
     const bs = newBaseSwap();
-    expect(baseSwapLineRefusal(bs, ID, LINE.min)).toBeNull();
-    expect(baseSwapLineRefusal(bs, ID, LINE.max)).toBeNull();
-    expect(baseSwapLineRefusal(bs, ID, LINE.min - 1)).not.toBeNull();
-    expect(baseSwapLineRefusal(bs, ID, LINE.max + 1)).not.toBeNull();
-    expect(baseSwapLineRefusal(bs, ID, 12.5)).toMatch(/not a whole number/);
+    expect(baseSwapLineRefusal(bs, ID, 0, LINE.min)).toBeNull();
+    expect(baseSwapLineRefusal(bs, ID, 0, LINE.max)).toBeNull();
+    expect(baseSwapLineRefusal(bs, ID, 0, LINE.min - 1)).not.toBeNull();
+    expect(baseSwapLineRefusal(bs, ID, 0, LINE.max + 1)).not.toBeNull();
+    expect(baseSwapLineRefusal(bs, ID, 0, 12.5)).toMatch(/not a whole number/);
     // ...and it says what the document still holds — `bandEdgeRefusal`'s rule.
-    expect(baseSwapLineRefusal(bs, ID, LINE.max + 1)).toContain(`line is still ${bs.line}`);
+    expect(baseSwapLineRefusal(bs, ID, 0, LINE.max + 1))
+      .toContain(`line is still ${bs[0].line}`);
   });
 
   /**
@@ -271,7 +408,7 @@ describe('the fire line is refused at the control', () => {
    */
   it('the refusal names the ramp\'s different maximum, from both constants', () => {
     expect(LINE.max).not.toBe(EFFECTS_PRESET_RAMP_TOP_RANGE.max);
-    const why = baseSwapLineRefusal(newBaseSwap(), ID, LINE.max + 1)!;
+    const why = baseSwapLineRefusal(newBaseSwap(), ID, 0, LINE.max + 1)!;
     expect(why).toContain(String(LINE.max));
     expect(why).toContain(String(EFFECTS_PRESET_RAMP_TOP_RANGE.max));
     expect(why).toMatch(/NOT THE RAMP'S RANGE/);
@@ -295,7 +432,7 @@ describe('an off-granule target is refused, offered neighbours, and NOT snapped'
     let refused = 0;
     let accepted = 0;
     for (let v = TARGET.min; v < TARGET.min + 2 * G; v++) {
-      const ok = baseSwapTargetRefusal(bs, ID, v) === null;
+      const ok = baseSwapTargetRefusal(bs, ID, 0, v) === null;
       expect(ok, `target ${v}`).toBe(isBaseSwapTargetAligned(v));
       if (ok) accepted++; else refused++;
     }
@@ -309,9 +446,9 @@ describe('an off-granule target is refused, offered neighbours, and NOT snapped'
     const legal: number[] = [];
     for (let v = TARGET.min; v <= TARGET.max; v += G) legal.push(v);
     expect(legal).toHaveLength((TARGET.max - TARGET.min + 1) / G);
-    for (const v of legal) expect(baseSwapTargetRefusal(newBaseSwap(), ID, v)).toBeNull();
-    expect(baseSwapTargetRefusal(newBaseSwap(), ID, TARGET.max + 1)).not.toBeNull();
-    expect(baseSwapTargetRefusal(newBaseSwap(), ID, TARGET.min - 1)).not.toBeNull();
+    for (const v of legal) expect(baseSwapTargetRefusal(newBaseSwap(), ID, 0, v)).toBeNull();
+    expect(baseSwapTargetRefusal(newBaseSwap(), ID, 0, TARGET.max + 1)).not.toBeNull();
+    expect(baseSwapTargetRefusal(newBaseSwap(), ID, 0, TARGET.min - 1)).not.toBeNull();
   });
 
   /**
@@ -352,10 +489,10 @@ describe('an off-granule target is refused, offered neighbours, and NOT snapped'
    */
   it('the refusal says WHY, offers both neighbours, and says nothing was snapped', () => {
     const bs = newBaseSwap();
-    const off = bs.target - 1;
-    const why = baseSwapTargetRefusal(bs, ID, off)!;
+    const off = bs[0].target - 1;
+    const why = baseSwapTargetRefusal(bs, ID, 0, off)!;
     expect(why).not.toBeNull();
-    expect(why).toMatch(/^preset "probe" base_swap target:/);
+    expect(why).toMatch(/^preset "probe" base_swap band 0 target:/);
     expect(why).toContain(fmtVramBaseBoth(off));
     expect(why).toContain(fmtVramBase(G));
     expect(why).toMatch(/DROPS the rest SILENTLY/);
@@ -370,16 +507,16 @@ describe('an off-granule target is refused, offered neighbours, and NOT snapped'
     expect(n.below).not.toBe(n.above);
     expect(why).toContain(`are ${fmtVramBaseBoth(n.below!)} and ${fmtVramBaseBoth(n.above!)}`);
     expect(why).toMatch(/NOT snapped/);
-    expect(why).toContain(`target is still ${fmtVramBaseBoth(bs.target)}`);
+    expect(why).toContain(`target is still ${fmtVramBaseBoth(bs[0].target)}`);
   });
 
   it('a non-integer and an out-of-range address each get their own sentence', () => {
     const bs = newBaseSwap();
-    expect(baseSwapTargetRefusal(bs, ID, G + 0.5)).toMatch(/not a whole number/);
-    expect(baseSwapTargetRefusal(bs, ID, TARGET.max + G)).toMatch(/outside/);
+    expect(baseSwapTargetRefusal(bs, ID, 0, G + 0.5)).toMatch(/not a whole number/);
+    expect(baseSwapTargetRefusal(bs, ID, 0, TARGET.max + G)).toMatch(/outside/);
     // Each still hands over what IS available.
-    expect(baseSwapTargetRefusal(bs, ID, G + 0.5)).toContain(fmtVramBaseBoth(G));
-    expect(baseSwapTargetRefusal(bs, ID, TARGET.max + G)).toContain('nothing higher');
+    expect(baseSwapTargetRefusal(bs, ID, 0, G + 0.5)).toContain(fmtVramBaseBoth(G));
+    expect(baseSwapTargetRefusal(bs, ID, 0, TARGET.max + G)).toContain('nothing higher');
   });
 });
 
@@ -391,9 +528,9 @@ describe('the commands withhold exactly what the refusals refuse', () => {
   it('a refused line and a refused target write NOTHING', () => {
     const p = swapPreset();
     const before = JSON.stringify(p);
-    expect(setBaseSwapLineCommand(lib(p), ID, LINE.max + 1)).toBeNull();
-    expect(setBaseSwapTargetCommand(lib(p), ID, p.base_swap!.target - 1)).toBeNull();
-    expect(setBaseSwapTargetCommand(lib(p), ID, TARGET.max + G)).toBeNull();
+    expect(setBaseSwapLineCommand(lib(p), ID, 0, LINE.max + 1)).toBeNull();
+    expect(setBaseSwapTargetCommand(lib(p), ID, 0, p.base_swap![0].target - 1)).toBeNull();
+    expect(setBaseSwapTargetCommand(lib(p), ID, 0, TARGET.max + G)).toBeNull();
     // ⚠ AND NOTHING SNAPPED: the document is byte-identical, not rounded to the
     // nearest granule. Snapping would point Plane A at a different picture.
     expect(JSON.stringify(p)).toBe(before);
@@ -402,28 +539,355 @@ describe('the commands withhold exactly what the refusals refuse', () => {
   it('a legal line and a legal target DO move the document, and carry the old one', () => {
     const p = swapPreset();
     const before = JSON.stringify(p);
-    const line = setBaseSwapLineCommand(lib(p), ID, LINE.max)!;
+    const line = setBaseSwapLineCommand(lib(p), ID, 0, LINE.max)!;
     expect(line).not.toBeNull();
-    expect(line.newPreset!.base_swap!.line).toBe(LINE.max);
-    expect(line.newPreset!.base_swap!.target).toBe(p.base_swap!.target);
+    expect(line.newPreset!.base_swap![0].line).toBe(LINE.max);
+    expect(line.newPreset!.base_swap![0].target).toBe(p.base_swap![0].target);
     expect(JSON.stringify(line.oldPreset)).toBe(before);
 
-    const other = TARGET.min === p.base_swap!.target ? TARGET.min + G : TARGET.min;
-    const target = setBaseSwapTargetCommand(lib(p), ID, other)!;
-    expect(target.newPreset!.base_swap!.target).toBe(other);
+    const other = TARGET.min === p.base_swap![0].target ? TARGET.min + G : TARGET.min;
+    const target = setBaseSwapTargetCommand(lib(p), ID, 0, other)!;
+    expect(target.newPreset!.base_swap![0].target).toBe(other);
     expect(JSON.stringify(target.oldPreset)).toBe(before);
   });
 
   it('re-typing the value a field already holds burns no undo slot', () => {
     const p = swapPreset();
-    expect(setBaseSwapLineCommand(lib(p), ID, p.base_swap!.line)).toBeNull();
-    expect(setBaseSwapTargetCommand(lib(p), ID, p.base_swap!.target)).toBeNull();
+    expect(setBaseSwapLineCommand(lib(p), ID, 0, p.base_swap![0].line)).toBeNull();
+    expect(setBaseSwapTargetCommand(lib(p), ID, 0, p.base_swap![0].target)).toBeNull();
+    expect(setBaseSwapPlaneCommand(lib(p), ID, 0, p.base_swap![0].plane)).toBeNull();
+  });
+
+  it('an out-of-range BAND INDEX writes nothing rather than growing the list', () => {
+    const p = swapPreset();
+    const before = JSON.stringify(p);
+    for (const i of [-1, p.base_swap!.length, 99]) {
+      expect(setBaseSwapLineCommand(lib(p), ID, i, LINE.max), `line at index ${i}`).toBeNull();
+      expect(setBaseSwapTargetCommand(lib(p), ID, i, TARGET.min), `target at index ${i}`).toBeNull();
+      expect(setBaseSwapPlaneCommand(lib(p), ID, i, EFFECTS_PRESET_BASE_SWAP_PLANES[1]),
+        `plane at index ${i}`).toBeNull();
+      expect(setBaseSwapRestoreLineCommand(lib(p), ID, i, 100), `restore at index ${i}`).toBeNull();
+    }
+    expect(JSON.stringify(p)).toBe(before);
   });
 
   it('neither command touches a document that carries a different channel', () => {
     const ramp = { schema: 1 as const, id: ID, ramp: newRamp() };
-    expect(setBaseSwapLineCommand(lib(ramp), ID, LINE.max)).toBeNull();
-    expect(setBaseSwapTargetCommand(lib(ramp), ID, TARGET.min)).toBeNull();
+    expect(setBaseSwapLineCommand(lib(ramp), ID, 0, LINE.max)).toBeNull();
+    expect(setBaseSwapTargetCommand(lib(ramp), ID, 0, TARGET.min)).toBeNull();
+    expect(setBaseSwapPlaneCommand(lib(ramp), ID, 0, EFFECTS_PRESET_BASE_SWAP_PLANES[0]))
+      .toBeNull();
+    expect(setBaseSwapRestoreLineCommand(lib(ramp), ID, 0, 100)).toBeNull();
+    expect(addBaseSwapBandCommand(lib(ramp), ID)).toBeNull();
+    expect(removeBaseSwapBandCommand(lib(ramp), ID, 0)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5b. THE PLANE — a closed choice, and the register IS the content
+// ---------------------------------------------------------------------------
+
+describe('the plane is a choice, and a closed one', () => {
+  it('accepts exactly the schema\'s two spellings and refuses anything else', () => {
+    const bs = newBaseSwap();
+    for (const plane of EFFECTS_PRESET_BASE_SWAP_PLANES) {
+      expect(baseSwapPlaneRefusal(bs, ID, 0, plane), plane).toBeNull();
+    }
+    // ⚠ THE ONE THAT MATTERS. `VdpBase` has five variants; three name the
+    // window, the sprite table and hscroll, and a forwarded SpriteTable would
+    // re-point the sprite table MID-FRAME. sigil cannot refuse a legal call, so
+    // this refusal and the schema's enum are the whole defence.
+    const why = baseSwapPlaneRefusal(bs, ID, 0, 'SpriteTable')!;
+    expect(why).not.toBeNull();
+    expect(why).toContain('SpriteTable');
+    expect(why).toMatch(/sprite table mid-frame/);
+    expect(why).toContain(`plane is still ${bs[0].plane}`);
+    expect(baseSwapPlaneRefusal(bs, ID, 0, '')).not.toBeNull();
+    expect(baseSwapPlaneRefusal(bs, ID, 0, 'planea')).not.toBeNull();
+  });
+
+  it('switching the plane moves the document and nothing else', () => {
+    const p = swapPreset();
+    const other = EFFECTS_PRESET_BASE_SWAP_PLANES
+      .find((x) => x !== p.base_swap![0].plane)!;
+    const cmd = setBaseSwapPlaneCommand(lib(p), ID, 0, other)!;
+    expect(cmd.newPreset!.base_swap![0].plane).toBe(other);
+    expect(cmd.newPreset!.base_swap![0].line).toBe(p.base_swap![0].line);
+    expect(cmd.newPreset!.base_swap![0].target).toBe(p.base_swap![0].target);
+    // A refused spelling writes nothing.
+    expect(setBaseSwapPlaneCommand(lib(p), ID, 0, 'SpriteTable')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5c. ⚠ THE EDGES — NEITHER INCLUSIVE NOR EXCLUSIVE
+// ---------------------------------------------------------------------------
+
+describe('the rows a band actually swaps are the ones nobody guesses', () => {
+  /**
+   * ═══ THE WITNESS IS THE SCHEMA'S OWN MEASUREMENT ═══
+   *
+   * The schema states the rule (`line+1 .. restore_line-1`) AND a measured
+   * witness (`a 3..64 band is INSIDE 4..63`). Aurora parses the rule and CHECKS
+   * it against the witness at module load. This row re-reads the witness out of
+   * the contract and applies it end to end, so the property is tied to the
+   * contract's sentence and not to two integers typed here.
+   */
+  it('reproduces the schema\'s own measured witness, read back out of the schema', () => {
+    const m = /a (\d+)\.\.(\d+) band is INSIDE (\d+)\.\.(\d+)/.exec(BASE_SWAP_LIST_TITLE);
+    expect(m, 'the schema no longer carries the measured edge witness this row is built on')
+      .toBeTruthy();
+    const [line, restore, first, last] = m!.slice(1, 5).map(Number);
+    const rows = baseSwapInsideRows(bandAt(line, { restore_line: restore }));
+    expect(rows.first).toBe(first);
+    expect(rows.last).toBe(last);
+    // ⚠ AND BOTH NATURAL READINGS ARE WRONG, asserted so this row cannot pass by
+    // agreeing with an inclusive implementation. The witness has first !== line
+    // and last !== restore, which is exactly what makes the question a trap.
+    expect(rows.first).not.toBe(line);
+    expect(rows.last).not.toBe(restore);
+    expect(EFFECTS_PRESET_BASE_SWAP_INSIDE_OFFSETS).toEqual({ first: 1, last: -1 });
+  });
+
+  it('an ABSENT restore_line reports an OPEN end, never an invented last row', () => {
+    const rows = baseSwapInsideRows(bandAt(LINE.min));
+    expect(rows.toBottom).toBe(true);
+    expect(rows.last).toBeNull();
+    // ⚠ NOT ZERO AND NOT THE LINE MAXIMUM. The schema states no display height
+    // anywhere, so any number here would be Aurora inventing a fact in the one
+    // place an author would trust it.
+    expect(rows.last).not.toBe(0);
+    const text = baseSwapInsideRowsText(bandAt(LINE.min));
+    expect(text).toContain('bottom of the display');
+    expect(text).not.toMatch(/to row \d+/);
+  });
+
+  it('the sentence CORRECTS the inclusive reading rather than leaving it available', () => {
+    const text = baseSwapInsideRowsText(bandAt(3, { restore_line: 64 }));
+    expect(text).toContain('4..63');
+    // It names the pair an author would otherwise assume, and denies it.
+    expect(text).toContain('NOT 3..64');
+    expect(text).toMatch(/FIRE lines/);
+  });
+
+  it('a band with NO fully swapped row says so instead of printing a backwards range', () => {
+    const rows = baseSwapInsideRows(bandAt(100, { restore_line: 101 }));
+    expect(rows.empty).toBe(true);
+    expect(rows.first).toBe(101);
+    expect(rows.last).toBe(100);
+    const text = baseSwapInsideRowsText(bandAt(100, { restore_line: 101 }));
+    expect(text).toMatch(/NO row is fully swapped/);
+    expect(text).not.toContain('101..100');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5d. ⚠ THE ORDER RULE — NOBODY'S REFUSAL BUT `fire_lines`', MOVED EARLIER
+// ---------------------------------------------------------------------------
+
+describe('strict ascent is derived, refused early, and NAMES the real authority', () => {
+  /**
+   * ═══ THE ANTI-VACUOUS ROW, AND IT IS THE PREMISE OF EVERY OTHER ONE HERE ═══
+   *
+   * If the SCHEMA refused a descending list there would be nothing for Aurora to
+   * derive and every row below would be theatre. The schema explicitly does not,
+   * and neither does aeon's generator: a document validates, passes the shape
+   * check, and fails at `.emp` BUILD time in `fire_lines`. This row proves the
+   * gap it exists to close is real.
+   */
+  it('ANTI-VACUOUS: the schema and the CODEC both ACCEPT an out-of-order list', () => {
+    const descending = swapOf(bandAt(100), bandAt(50));
+    const overlapping = swapOf(bandAt(10, { restore_line: 100 }), bandAt(50, { restore_line: 120 }));
+    const duplicated = swapOf(bandAt(50), bandAt(50));
+    const inverted = swapOf(bandAt(100, { restore_line: 50 }));
+    for (const doc of [descending, overlapping, duplicated, inverted]) {
+      expect(validateAgainstSchema(doc, S), JSON.stringify(doc.base_swap)).toEqual([]);
+      expect(() => parseEffectsPreset(JSON.stringify(doc), ID)).not.toThrow();
+      expect(() => serializeEffectsPreset(doc)).not.toThrow();
+      // ...and Aurora DOES have something to say about each of them.
+      expect(baseSwapOrderRefusal(doc.base_swap!), JSON.stringify(doc.base_swap)).not.toBeNull();
+    }
+  });
+
+  it('refuses descending, duplicated, overlapping and inverted — all four by name', () => {
+    expect(baseSwapOrderRefusal([bandAt(100), bandAt(50)])).toMatch(/goes BACKWARDS from/);
+    expect(baseSwapOrderRefusal([bandAt(50), bandAt(50)])).toMatch(/DUPLICATES/);
+    expect(baseSwapOrderRefusal([bandAt(10, { restore_line: 100 }), bandAt(50)]))
+      .toMatch(/that is an overlap/);
+    expect(baseSwapOrderRefusal([bandAt(100, { restore_line: 50 })]))
+      .toMatch(/ends before it begins/);
+    // And ascending lists are silent, including one that touches at no point.
+    expect(baseSwapOrderRefusal([bandAt(3, { restore_line: 64 }), bandAt(65, { restore_line: 66 })]))
+      .toBeNull();
+    expect(baseSwapOrderRefusal([bandAt(LINE.min)])).toBeNull();
+  });
+
+  /**
+   * ⚠ DOCUMENT ORDER, NOT SORTED — and this row is the whole reason that
+   * distinction is written down. The schema's parenthetical says "sort every
+   * band's line and restore_line into one sequence and require strict ascent",
+   * and a SORT DESTROYS THE EVIDENCE: `[100, 50]` sorted is `[50, 100]`, which
+   * ascends. A check built on the parenthetical would accept every descending
+   * document and catch only exact duplicates.
+   */
+  it('a sorted check would MISS this, and the document-order check does not', () => {
+    const descending = [bandAt(100), bandAt(50)];
+    const fires = baseSwapFires(descending).map((f) => f.line);
+    expect(fires).toEqual([100, 50]);
+    // The sorted sequence ascends strictly — so the parenthetical's check passes.
+    const sorted = [...fires].sort((a, b) => a - b);
+    expect(sorted.every((v, i) => i === 0 || v > sorted[i - 1])).toBe(true);
+    // Aurora refuses it anyway, which is the stronger reading and the one the
+    // load-bearing sentence states.
+    expect(baseSwapOrderRefusal(descending)).not.toBeNull();
+  });
+
+  it('every message NAMES fire_lines and its file, so Aurora is not the enforcer', () => {
+    const a = EFFECTS_PRESET_BASE_SWAP_ORDER_AUTHORITY;
+    expect(a.symbol).toBe('fire_lines');
+    expect(a.file).toMatch(/raster_dsl\.emp$/);
+    // Derived, not typed: the schema really says both.
+    expect(BASE_SWAP_LIST_TITLE).toContain(a.symbol);
+    expect(BASE_SWAP_LIST_TITLE).toContain(a.file);
+    const why = baseSwapOrderRefusal([bandAt(100), bandAt(50)])!;
+    expect(why).toContain(a.symbol);
+    expect(why).toContain(a.file);
+    expect(why).toMatch(/NEITHER THE SCHEMA NOR AEON'S GENERATOR REFUSES THIS/);
+    expect(why).toMatch(/BUILD time/);
+  });
+
+  /**
+   * ⚠ THE REFUSAL FIRES ONLY ON AN EDIT THAT BREAKS AN ALREADY-SOUND LIST.
+   *
+   * An out-of-order document CAN arrive — the codec accepts one because the
+   * contract does. If every control refused while the list was broken, the
+   * author would be locked out of the only surface that could repair it, and
+   * the editor would be unusable on exactly the document that needs it most.
+   */
+  it('refuses the edit that BREAKS order, and lets every edit through once it IS broken', () => {
+    const sound = swapOf(bandAt(50), bandAt(100));
+    // Moving band 1 above band 0 is refused, and nothing is written.
+    expect(baseSwapLineRefusal(sound.base_swap!, ID, 1, 40)).toMatch(/not strictly ascending/);
+    expect(setBaseSwapLineCommand(lib(sound), ID, 1, 40)).toBeNull();
+    // A move that keeps ascent is fine.
+    expect(baseSwapLineRefusal(sound.base_swap!, ID, 1, 60)).toBeNull();
+    expect(setBaseSwapLineCommand(lib(sound), ID, 1, 60)).not.toBeNull();
+
+    // ⚠ THE ESCAPE HATCH. On a list that is ALREADY broken, the same edit is
+    // allowed — including one that leaves it broken, because a repair is often
+    // two moves and refusing the first would make the second unreachable.
+    const broken = swapOf(bandAt(100), bandAt(50));
+    expect(baseSwapOrderAdvisory(broken.base_swap!)).not.toBeNull();
+    expect(baseSwapLineRefusal(broken.base_swap!, ID, 1, 40)).toBeNull();
+    expect(setBaseSwapLineCommand(lib(broken), ID, 1, 40)).not.toBeNull();
+    // And the repair really is reachable: one legal move makes it sound again.
+    const fixed = setBaseSwapLineCommand(lib(broken), ID, 1, 150)!;
+    expect(baseSwapOrderRefusal(fixed.newPreset!.base_swap!)).toBeNull();
+  });
+
+  it('the standing advisory is the SAME predicate the refusal is built on', () => {
+    const broken = [bandAt(100), bandAt(50)];
+    expect(baseSwapOrderAdvisory(broken)).toBe(baseSwapOrderRefusal(broken));
+    expect(baseSwapOrderAdvisory([bandAt(50), bandAt(100)])).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5e. THE OFF FIRE — present or absent, never set-or-zero
+// ---------------------------------------------------------------------------
+
+describe('restore_line is added and removed, not cleared to a number', () => {
+  it('removing it DELETES the key rather than writing a null or a zero', () => {
+    const p = swapPreset({ restore_line: 100 });
+    const cmd = setBaseSwapRestoreLineCommand(lib(p), ID, 0, undefined)!;
+    expect(cmd).not.toBeNull();
+    expect('restore_line' in cmd.newPreset!.base_swap![0]).toBe(false);
+    // ⚠ A null spelling would be REFUSED by the schema: the band object is
+    // closed and admits no null. So "no restore" has exactly one spelling.
+    expect(validateAgainstSchema(cmd.newPreset!, S)).toEqual([]);
+    expect(() => serializeEffectsPreset(cmd.newPreset!)).not.toThrow();
+    expect(serializeEffectsPreset(cmd.newPreset!)).not.toContain('restore_line');
+  });
+
+  it('adding one takes the same range as the ON line and refuses outside it', () => {
+    const p = swapPreset();
+    expect(RESTORE.min).toBe(LINE.min);
+    expect(RESTORE.max).toBe(LINE.max);
+    expect(baseSwapRestoreLineRefusal(p.base_swap!, ID, 0, RESTORE.max)).toBeNull();
+    expect(baseSwapRestoreLineRefusal(p.base_swap!, ID, 0, RESTORE.max + 1)).toMatch(/outside/);
+    expect(baseSwapRestoreLineRefusal(p.base_swap!, ID, 0, 12.5)).toMatch(/not a whole number/);
+  });
+
+  /**
+   * ⚠ THE RANGE ALONE ACCEPTS A BAND THAT ENDS BEFORE IT BEGINS, which is why
+   * the order rule is the thing that refuses it. `restore_line`'s range is
+   * `line`'s range verbatim and the schema deliberately does not restate
+   * `restore_line > line` — `fire_lines` refuses the inverted pair by name.
+   */
+  it('an inverted pair is refused by the ORDER rule, not by the range', () => {
+    const p = swapPreset({ line: 100 });
+    // In range, and still refused.
+    expect(RESTORE.min).toBeLessThan(50);
+    const why = baseSwapRestoreLineRefusal(p.base_swap!, ID, 0, 50)!;
+    expect(why).not.toBeNull();
+    expect(why).toMatch(/ends before it begins/);
+    expect(why).toContain(EFFECTS_PRESET_BASE_SWAP_ORDER_AUTHORITY.symbol);
+    expect(setBaseSwapRestoreLineCommand(lib(p), ID, 0, 50)).toBeNull();
+    // And a restore ABOVE the line is accepted.
+    expect(baseSwapRestoreLineRefusal(p.base_swap!, ID, 0, 150)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5f. ADD and REMOVE — the list floor, and the one place there is nowhere to go
+// ---------------------------------------------------------------------------
+
+describe('bands are added and removed with reasons, never silently', () => {
+  it('a new band lands ABOVE the last fire, so the list stays sound', () => {
+    const p = swapOf(bandAt(50, { restore_line: 100 }));
+    const cmd = addBaseSwapBandCommand(lib(p), ID)!;
+    expect(cmd).not.toBeNull();
+    expect(cmd.newPreset!.base_swap!).toHaveLength(2);
+    expect(cmd.newPreset!.base_swap![1].line).toBe(101);
+    expect(baseSwapOrderRefusal(cmd.newPreset!.base_swap!)).toBeNull();
+    expect(validateAgainstSchema(cmd.newPreset!, S)).toEqual([]);
+  });
+
+  it('when the last fire is on the final legal line, ADD is refused WITH A REASON', () => {
+    const p = swapOf(bandAt(LINE.max));
+    const why = addBaseSwapBandRefusal(p)!;
+    expect(why).not.toBeNull();
+    expect(why).toContain(String(LINE.max));
+    expect(why).toContain(EFFECTS_PRESET_BASE_SWAP_ORDER_AUTHORITY.symbol);
+    // The disabled button and its sentence read ONE predicate.
+    expect(addBaseSwapBandCommand(lib(p), ID)).toBeNull();
+    // Control: one line lower and there IS room.
+    expect(addBaseSwapBandRefusal(swapOf(bandAt(LINE.max - 1)))).toBeNull();
+    expect(addBaseSwapBandCommand(lib(swapOf(bandAt(LINE.max - 1))), ID)).not.toBeNull();
+  });
+
+  it('the LAST band cannot be removed — minItems, with the schema\'s own reason', () => {
+    const one = swapOf(bandAt(50));
+    const why = lastBaseSwapBandRefusal(one)!;
+    expect(why).not.toBeNull();
+    expect(why).toContain(String(EFFECTS_PRESET_BASE_SWAP_MIN_BANDS));
+    expect(why).toMatch(/zero-fire raster program/);
+    expect(removeBaseSwapBandCommand(lib(one), ID, 0)).toBeNull();
+    // ANTI-VACUOUS: a zero-band list really is refused by the schema, so the
+    // floor is the contract's and not a preference.
+    expect(validateAgainstSchema({ schema: 1, id: ID, base_swap: [] }, S).length)
+      .toBeGreaterThan(0);
+  });
+
+  it('with two bands, removing one works and the other survives intact', () => {
+    const p = swapOf(bandAt(50), bandAt(100, { restore_line: 150 }));
+    expect(lastBaseSwapBandRefusal(p)).toBeNull();
+    const cmd = removeBaseSwapBandCommand(lib(p), ID, 0)!;
+    expect(cmd.newPreset!.base_swap!).toHaveLength(1);
+    expect(cmd.newPreset!.base_swap![0]).toEqual(p.base_swap![1]);
+    // Out-of-range indices write nothing.
+    expect(removeBaseSwapBandCommand(lib(p), ID, -1)).toBeNull();
+    expect(removeBaseSwapBandCommand(lib(p), ID, 2)).toBeNull();
   });
 });
 

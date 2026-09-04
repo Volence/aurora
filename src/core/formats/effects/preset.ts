@@ -325,10 +325,21 @@ export interface EffectsPresetRamp {
 }
 
 /**
- * The mid-frame nametable-base SWAP — `$defs.base_swap`, the document face of
- * `raster_program([fire(line, [reg_set($8200 | vdp_base_reg(VdpBase.PlaneA,
- * target))])])`. Both members are required; the object is CLOSED. The "Batman &
- * Robin trick": from `line` down, Plane A draws from a different nametable.
+ * ONE mid-frame nametable-base BAND — `$defs.base_swap.items`, the document face
+ * of an ON fire (`reg_set($8200|$8400 | vdp_base_reg(VdpBase.<plane>, target))`)
+ * and, when `restore_line` is present, an OFF fire writing the plane's own home
+ * base. The "Batman & Robin trick": from `line` down, that plane draws from a
+ * different nametable.
+ *
+ * ═══ ⚠ THE DOCUMENT KEY IS A **LIST** OF THESE. HARD BREAK, NO LEGACY ARM. ═══
+ *
+ * `base_swap` was ONE CLOSED OBJECT `{line, target}` until empyrean `8f56c2c`
+ * (T3, 2026-09-04). It is now `EffectsPresetBaseSwap` — an array of these bands,
+ * `minItems: 1`, flattened into one raster program IN DOCUMENT ORDER. The
+ * single-object form is REFUSED and there is deliberately no compatibility arm:
+ * a document that parses two ways is worse than one that fails loudly, and the
+ * only document in aeon's tree has already migrated. Nothing here reads the old
+ * shape, and nothing may be added that does.
  *
  * ═══ TWO ASYMMETRIES WITH `ramp`. DO NOT ASSUME SYMMETRY BY ANALOGY. ═══
  *
@@ -354,36 +365,88 @@ export interface EffectsPresetRamp {
  * channel and no combinator exists, so exactly one per document — the schema's
  * top-level `oneOf`, which grew its THIRD arm for this key. See
  * `EFFECTS_PRESET_RASTER_CHANNELS`, which is read off that `oneOf` and not
- * restated.
+ * restated. Still ONE raster channel however many bands the list holds.
+ *
+ * ═══ ⚠ ORDER IS NOT THE SCHEMA'S REFUSAL AND NOT THE GENERATOR'S ═══
+ *
+ * The flattened fire sequence must ascend STRICTLY across the whole list, bands
+ * included, and no band may overlap another — and NEITHER JSON Schema NOR aeon's
+ * generator enforces it. The authority is `fire_lines` at .emp BUILD time; see
+ * `EFFECTS_PRESET_BASE_SWAP_ORDER_AUTHORITY` and `baseSwapOrderRefusal`, which
+ * derive that refusal from the schema's own sentence so an author meets it here
+ * instead. The CODEC still accepts an out-of-order document, because the
+ * contract does — `boundaryAdvisories`' rule.
  */
-export interface EffectsPresetBaseSwap {
+export interface EffectsPresetBaseSwapBand {
   /**
-   * The screen line the swap fires on, 3..223 — `fire()`'s own ensure (lines 0-2
-   * belong to the priming records; 223 is the frame-rewind interlock). Read the
-   * range from `EFFECTS_PRESET_BASE_SWAP_LINE_RANGE`, never retyped.
+   * WHICH PLANE'S base register this band re-points — `'PlaneA'` (VDP reg $02)
+   * or `'PlaneB'` (reg $04), and nothing else. Read the two spellings from
+   * `EFFECTS_PRESET_BASE_SWAP_PLANES`, never retyped.
+   *
+   * ⚠ REQUIRED, NEVER DEFAULTED, and closed to those two. `VdpBase` has five
+   * variants and three of them name the window, the sprite table and hscroll; a
+   * forwarded `SpriteTable` would re-point the sprite table mid-frame and sigil
+   * cannot refuse a legal call. A document may never name a register number
+   * either: register and variant use different shifts (10 vs 13).
+   */
+  plane: string;
+  /**
+   * The screen line the band's ON fire is on, 3..223 — `fire()`'s own ensure
+   * (lines 0-2 belong to the priming records; 223 is the frame-rewind
+   * interlock). Read the range from `EFFECTS_PRESET_BASE_SWAP_LINE_RANGE`.
    *
    * ⚠ NOT the ramp's `top` range. A ramp's `top` maxes at 222 because a run needs
    * at least one line after it; a swap is a single fire and reaches 223.
+   *
+   * ⚠ AND IT IS A FIRE LINE, NOT THE FIRST SWAPPED ROW. See
+   * `baseSwapInsideRows` — the register changes partway ACROSS this scanline, so
+   * this row is half one picture and half the other.
    */
   line: number;
   /**
-   * The raw VRAM BYTE ADDRESS Plane A's base register (VDP reg $02) is
-   * re-pointed at — 0..65535, and a MULTIPLE OF 8192.
+   * The raw VRAM BYTE ADDRESS this band's plane base register is re-pointed at
+   * — 0..65535, and a MULTIPLE OF 8192.
    *
-   * ⚠ THIS IS AN ADDRESS, NOT AN INDEX OR A FLAG. The shipped section-6 preset
-   * targets **57344 = $E000 = VRAM_PLANE_B**, i.e. from line 160 down, Plane A
-   * draws Plane B's picture. A reader meeting `57344` with no comment has no way
-   * to know that, and a control that offered it as a bare number would be asking
-   * an author for a hexadecimal VRAM constant in decimal.
+   * ⚠ THIS IS AN ADDRESS, NOT AN INDEX OR A FLAG. The shipped section-6 document
+   * uses **57344 = $E000 = VRAM_PLANE_B**, i.e. from that band's line down, Plane
+   * A draws Plane B's picture. A reader meeting `57344` with no comment has no
+   * way to know that, and a control that offered it as a bare number would be
+   * asking an author for a hexadecimal VRAM constant in decimal.
    *
    * THE GRANULE IS WHY `multipleOf` IS HERE AND WHY IT IS NOT A ROUNDING
-   * CONVENIENCE: reg $02 encodes only the address bits ABOVE $2000 and DROPS the
-   * rest SILENTLY. An unaligned target is not out of range — it is a DIFFERENT
-   * address than every `VRAM_*` consumer reads and writes, with nothing else
-   * visibly wrong. See `EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE`.
+   * CONVENIENCE: the base register encodes only the address bits ABOVE $2000 and
+   * DROPS the rest SILENTLY. An unaligned target is not out of range — it is a
+   * DIFFERENT address than every `VRAM_*` consumer reads and writes, with nothing
+   * else visibly wrong. See `EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE`.
    */
   target: number;
+  /**
+   * OPTIONAL. The screen line the band's OFF fire is on, writing the plane's own
+   * home base (`VRAM_PLANE_A` / `VRAM_PLANE_B` — the engine's fact, never
+   * authored). Range as `line`.
+   *
+   * ⚠ **ABSENT IS NOT ZERO AND NOT "NO RESTORE AT ALL".** Absent means the band
+   * runs TO THE BOTTOM OF THE DISPLAY, ended by the frame-top flush — which is
+   * exactly the shipped single-edge shape the old object form had. Aurora does
+   * not know where the bottom of the display is (this schema never states a
+   * display height) and must not invent one; `baseSwapInsideRows` reports that
+   * end as open rather than guessing a number.
+   *
+   * ⚠ AND IT IS A FIRE LINE TOO — see `baseSwapInsideRows`. It is NEITHER
+   * inclusive NOR exclusive, and both natural answers are wrong.
+   */
+  restore_line?: number;
 }
+
+/**
+ * The `base_swap` KEY — a LIST of bands, `minItems: 1`, in document order.
+ *
+ * ⚠ NOT AN OBJECT. See `EffectsPresetBaseSwapBand` for the break. A reader who
+ * writes `preset.base_swap.line` is reading the pre-`8f56c2c` shape; the
+ * compiler catches it, which is why this is a named alias rather than an inline
+ * array type at the use site.
+ */
+export type EffectsPresetBaseSwap = EffectsPresetBaseSwapBand[];
 
 /**
  * `$defs.tint_region` — the staged palette region a `boundary` switches on.
@@ -537,9 +600,12 @@ export interface EffectsPreset {
    */
   ramp?: EffectsPresetRamp;
   /**
-   * The BASE-SWAP raster channel (empyrean 5bd76ba, §7.5). Mutually exclusive
-   * with `bands` and `ramp` — the same `raster:` slot. Unlike `ramp` it is
-   * neither capability-gated nor DEBUG-gated; see `EffectsPresetBaseSwap`.
+   * The BASE-SWAP raster channel (empyrean 5bd76ba §7.5, amended `8f56c2c` T3).
+   * Mutually exclusive with `bands` and `ramp` — the same `raster:` slot. Unlike
+   * `ramp` it is neither capability-gated nor DEBUG-gated.
+   *
+   * ⚠ A **LIST** OF BANDS SINCE `8f56c2c`, not the old `{line, target}` object.
+   * Hard break, no legacy arm — see `EffectsPresetBaseSwapBand`.
    */
   base_swap?: EffectsPresetBaseSwap;
   /**
@@ -1338,14 +1404,85 @@ export function anchorSnapCycleSeconds(seconds: number): AnchorPeriodRung {
 // see them: base_swap has NO capability gate (no CAP_DENSE_TIER analogue —
 // OP_SET_REG dispatches unconditionally) and its generated emission is NOT
 // DEBUG-gated (it is unconditional pub data in the release ROM). Do not carry
-// ramp's gating across by analogy; see `EffectsPresetBaseSwap`.
+// ramp's gating across by analogy; see `EffectsPresetBaseSwapBand`.
+//
+// ⚠ AND SINCE empyrean `8f56c2c` (T3, 2026-09-04) EVERY PER-FIELD NODE BELOW IS
+// UNDER `items`, NOT UNDER THE KEY. `base_swap` is an ARRAY now. `BASE_SWAP_BAND`
+// is the path that reaches a member; `BASE_SWAP` reaches the list. A read aimed
+// at the old place does not return a wrong value — it returns `undefined` and
+// throws, which is the failure mode this whole block is built for.
 // ---------------------------------------------------------------------------
 
 const BASE_SWAP = ['$defs', 'base_swap'] as const;
+const BASE_SWAP_BAND = [...BASE_SWAP, 'items'] as const;
 
-/** `base_swap`'s required member names, in the schema's own `required` order. */
+/** How many bands the list must carry at minimum — `minItems`, read off the node. */
+export const EFFECTS_PRESET_BASE_SWAP_MIN_BANDS: number = (() => {
+  const node = schemaNode([...BASE_SWAP]);
+  if (node.type !== 'array') {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer declares $defs.base_swap as an ARRAY (read: '
+      + `${JSON.stringify(node.type)}). Since empyrean 8f56c2c the key is a LIST of per-plane `
+      + 'bands and the single-object form is refused with no legacy arm. If the contract has '
+      + 'reverted, that is a second breaking migration and this module must be re-read, not '
+      + 'patched to accept both — a document that parses two ways is the thing the break exists '
+      + 'to prevent.',
+    );
+  }
+  const min = node.minItems;
+  if (typeof min !== 'number' || !Number.isInteger(min) || min < 1) {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer bounds $defs.base_swap with an integer '
+      + `minItems >= 1 (read: ${JSON.stringify(min)}). A minItems of 0 would admit a document `
+      + 'that emits a zero-fire raster program, which is the document the bands list is bounded '
+      + 'against for the same reason. Re-read the schema.',
+    );
+  }
+  return min;
+})();
+
+/** One band's required member names, in the schema's own `required` order. */
 export const EFFECTS_PRESET_BASE_SWAP_KEYS: readonly string[] =
-  Object.freeze([...(schemaNode([...BASE_SWAP]).required as string[])]);
+  Object.freeze([...(schemaNode([...BASE_SWAP_BAND]).required as string[])]);
+
+/**
+ * One band's DECLARED-BUT-OPTIONAL member names — today just `restore_line`.
+ *
+ * Split off `required` the way `presetDefFields` splits a `$defs` object, which
+ * cannot be used here because the fields moved under `items`. A panel that
+ * writes "writes <keys>" needs both halves and must not claim it always writes
+ * the optional one.
+ */
+export const EFFECTS_PRESET_BASE_SWAP_OPTIONAL_KEYS: readonly string[] = Object.freeze(
+  Object.keys(schemaNode([...BASE_SWAP_BAND]).properties as Record<string, unknown>)
+    .filter(k => !EFFECTS_PRESET_BASE_SWAP_KEYS.includes(k)),
+);
+
+/**
+ * THE TWO PLANE SPELLINGS — read off `plane`'s own `enum`, never typed.
+ *
+ * CLOSED to exactly these, and the closure is load-bearing rather than tidy:
+ * `VdpBase` has five variants and three of them name the window, the sprite
+ * table and hscroll. A forwarded `SpriteTable` would assemble and re-point the
+ * sprite table mid-frame, and sigil cannot refuse a legal call — so the refusal
+ * has to happen here and in the schema, not downstream.
+ *
+ * Derived LOUDLY: fewer than two spellings would make a "choice" of plane
+ * indistinguishable from a constant.
+ */
+export const EFFECTS_PRESET_BASE_SWAP_PLANES: readonly string[] = (() => {
+  const node = schemaNode([...BASE_SWAP_BAND, 'properties', 'plane']);
+  const values = node.enum;
+  if (!Array.isArray(values) || values.length < 2 || !values.every(v => typeof v === 'string')) {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer closes $defs.base_swap.items.properties.plane '
+      + `to an enum of at least two string spellings (read: ${JSON.stringify(values)}). That enum `
+      + 'is what keeps a document from naming a VdpBase variant that would re-point the sprite '
+      + 'table mid-frame. Re-read the schema — do NOT hardcode PlaneA/PlaneB.',
+    );
+  }
+  return Object.freeze([...(values as string[])]);
+})();
 
 /**
  * `line`'s inclusive range, 3..223 in the vendored schema — `fire()`'s ensure.
@@ -1355,7 +1492,19 @@ export const EFFECTS_PRESET_BASE_SWAP_KEYS: readonly string[] =
  * and a swap is one fire that reaches the last line before the rewind interlock.
  */
 export const EFFECTS_PRESET_BASE_SWAP_LINE_RANGE =
-  schemaRange([...BASE_SWAP, 'properties', 'line']);
+  schemaRange([...BASE_SWAP_BAND, 'properties', 'line']);
+
+/**
+ * `restore_line`'s inclusive range — the OFF fire's, and `fire()`'s ensure again.
+ *
+ * ⚠ THE SAME RANGE AS `line` AND THAT IS NOT AN OVERSIGHT. The schema does NOT
+ * restate `restore_line > line` here; `fire_lines` refuses the inverted pair by
+ * name at build time, and `baseSwapOrderRefusal` is where Aurora derives that.
+ * A control that read only this range would accept a band that ends before it
+ * begins.
+ */
+export const EFFECTS_PRESET_BASE_SWAP_RESTORE_LINE_RANGE =
+  schemaRange([...BASE_SWAP_BAND, 'properties', 'restore_line']);
 
 /**
  * `target`'s inclusive range, 0..65535 — `vdp_base_reg`'s parameter range. A
@@ -1363,7 +1512,7 @@ export const EFFECTS_PRESET_BASE_SWAP_LINE_RANGE =
  * the range alone is not the contract.
  */
 export const EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE =
-  schemaRange([...BASE_SWAP, 'properties', 'target']);
+  schemaRange([...BASE_SWAP_BAND, 'properties', 'target']);
 
 /**
  * THE $2000 GRANULE — `multipleOf`, read off the schema keyword itself.
@@ -1385,13 +1534,13 @@ export const EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE =
  * module load rather than shipping a vacuous granule.
  */
 export const EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE: number = (() => {
-  const node = schemaNode([...BASE_SWAP, 'properties', 'target']);
+  const node = schemaNode([...BASE_SWAP_BAND, 'properties', 'target']);
   const granule = node.multipleOf;
   if (typeof granule !== 'number' || !Number.isInteger(granule) || granule < 2) {
     throw new Error(
-      'aurora-effects-preset.schema.json no longer bounds $defs.base_swap.properties.target with ' +
-      `an integer multipleOf >= 2 (read: ${JSON.stringify(granule)}), which is where the Plane A ` +
-      'base-register granule is read from. A granule of 0 or 1 would make every address "aligned" ' +
+      'aurora-effects-preset.schema.json no longer bounds $defs.base_swap.items.properties.target ' +
+      `with an integer multipleOf >= 2 (read: ${JSON.stringify(granule)}), which is where the ` +
+      'plane base-register granule is read from. A granule of 0 or 1 would make every address "aligned" ' +
       'and is indistinguishable from no constraint at all, so this refuses rather than shipping ' +
       'it. Re-read the schema — do NOT hardcode $2000.',
     );
@@ -1424,6 +1573,213 @@ export function isBaseSwapTargetAligned(target: number): boolean {
     && target >= EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.min
     && target <= EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.max
     && target % EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE === 0;
+}
+
+// ── the edges: NEITHER inclusive NOR exclusive ──────────────────────────────
+
+/**
+ * ⚠ **BOTH EDGE LINES ARE FIRE LINES, AND BOTH NATURAL ANSWERS ARE WRONG.**
+ *
+ * "Is `restore_line` inclusive or exclusive?" has no correct answer. The base
+ * register changes about 45% of the way ACROSS that scanline, so the edge row is
+ * literally half one picture and half the other — and the same is true of
+ * `line`. The FULLY SWAPPED rows are therefore `line+1 .. restore_line-1`, which
+ * is neither the inclusive reading (`line..restore_line`) nor the exclusive one
+ * (`line..restore_line-1` or `line+1..restore_line`).
+ *
+ * ═══ THE OFFSETS ARE PARSED, AND THE PARSE IS CHECKED AGAINST THE WITNESS ═══
+ *
+ * The schema states the rule (`line+1 .. restore_line-1`) AND a measured witness
+ * (`a 3..64 band is INSIDE 4..63`). Both are read, and the offsets are required
+ * to REPRODUCE the witness — because an off-by-one in a matcher over a sentence
+ * about off-by-ones is exactly the failure this derivation exists to catch, and
+ * a witness that agreed by construction would catch nothing. Two facts from the
+ * contract, cross-checked, rather than one number typed here.
+ */
+const BASE_SWAP_INSIDE = (() => {
+  const desc = String(schemaNode([...BASE_SWAP]).description ?? '');
+  const rule = /the fully swapped rows are line\+(\d+) \.\. restore_line-(\d+)/.exec(desc);
+  if (!rule) {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer states which rows a base_swap band actually '
+      + 'swaps, in the shape "the fully swapped rows are line+N .. restore_line-M", at '
+      + '$defs.base_swap. ⚠ DO NOT REPAIR THIS BY ASSUMING AN INCLUSIVE RANGE: line and '
+      + 'restore_line are BOTH fire lines and the register changes partway across each of them, '
+      + 'so an inclusive reading claims two half-swapped rows are fully swapped and an exclusive '
+      + 'one claims the wrong one of them is not. Re-read the schema — do NOT type the offsets.',
+    );
+  }
+  const witness = /a (\d+)\.\.(\d+) band is INSIDE (\d+)\.\.(\d+)/.exec(desc);
+  if (!witness) {
+    throw new Error(
+      'aurora-effects-preset.schema.json states the swapped-row rule but no longer carries the '
+      + 'MEASURED witness ("a 3..64 band is INSIDE 4..63") that this module checks the parse '
+      + 'against. Without it a matcher that read the wrong two digits out of the rule would be '
+      + 'green and wrong by a row at each end. Re-read the schema.',
+    );
+  }
+  const first = Number(rule[1]);
+  const last = -Number(rule[2]);
+  const [wLine, wRestore, wFirst, wLast] = witness.slice(1, 5).map(Number);
+  if (wLine + first !== wFirst || wRestore + last !== wLast) {
+    throw new Error(
+      `the base_swap edge rule (line+${first} .. restore_line${last}) does not reproduce the `
+      + `schema's own measured witness (${wLine}..${wRestore} is INSIDE ${wFirst}..${wLast}). One `
+      + 'of the two sentences moved, or this matcher is reading the wrong digits out of one of '
+      + 'them. Re-read both before writing a row range into any panel.',
+    );
+  }
+  return Object.freeze({ first, last });
+})();
+
+/**
+ * The two offsets from a band's fire lines to the rows it FULLY swaps:
+ * `{first: +1, last: -1}` in the vendored schema. Exported so a test can assert
+ * the derivation, and so nothing else re-spells `+ 1`.
+ */
+export const EFFECTS_PRESET_BASE_SWAP_INSIDE_OFFSETS = BASE_SWAP_INSIDE;
+
+/** The rows one band actually swaps in full. */
+export interface BaseSwapInsideRows {
+  /** First fully swapped row — `line + 1`. */
+  first: number;
+  /**
+   * Last fully swapped row — `restore_line - 1`, or `null` when `restore_line`
+   * is ABSENT.
+   *
+   * ⚠ `null` MEANS "TO THE BOTTOM OF THE DISPLAY", NOT "NONE" AND NOT ZERO. The
+   * schema never states a display height, so Aurora does not know the number and
+   * must not invent one — an invented bottom row would be a made-up fact wearing
+   * the contract's clothes, in the one place an author would trust it.
+   */
+  last: number | null;
+  /** True when there is no OFF fire: the band runs to the bottom of the display. */
+  toBottom: boolean;
+  /**
+   * True when the band swaps NO row in full — an OFF fire on the very next line
+   * after the ON fire. Legal, and worth saying out loud: the author gets two
+   * half-swapped rows and nothing else.
+   */
+  empty: boolean;
+}
+
+/**
+ * WHICH ROWS THIS BAND ACTUALLY SWAPS — the answer any UI that names a range
+ * must use, and the one nobody guesses right.
+ *
+ * Returns `first = line + 1`. When `restore_line` is present, `last =
+ * restore_line - 1`; when it is absent the band runs to the bottom of the
+ * display and `last` is `null`, because the schema states no display height and
+ * this editor will not invent one.
+ */
+export function baseSwapInsideRows(band: EffectsPresetBaseSwapBand): BaseSwapInsideRows {
+  const first = band.line + BASE_SWAP_INSIDE.first;
+  if (band.restore_line === undefined) {
+    return { first, last: null, toBottom: true, empty: false };
+  }
+  const last = band.restore_line + BASE_SWAP_INSIDE.last;
+  return { first, last, toBottom: false, empty: last < first };
+}
+
+// ── ordering: NOBODY'S REFUSAL BUT `fire_lines`', DERIVED EARLIER ───────────
+
+/**
+ * WHO ACTUALLY REFUSES A BAD ORDER — parsed out of the schema, which names it.
+ *
+ * ⚠ AURORA IS NOT THE ENFORCER AND MUST NOT READ AS ONE. The schema says
+ * ordering is enforced by NEITHER itself NOR aeon's generator: a document can
+ * validate here, pass the generator's shape check, and fail at `.emp` build
+ * time. `fire_lines` is the authority, and every sentence Aurora writes about
+ * this names it — so that a reader who meets Aurora's refusal knows where the
+ * real one lives and does not later "fix" the build by editing this file.
+ */
+export const EFFECTS_PRESET_BASE_SWAP_ORDER_AUTHORITY: Readonly<{
+  symbol: string; file: string;
+}> = (() => {
+  const desc = String(schemaNode([...BASE_SWAP]).description ?? '');
+  const m = /the AUTHORITY is ([A-Za-z_][A-Za-z0-9_]*) in aeon (\S+\.emp)/.exec(desc);
+  if (!m || !/strictly ASCENDING across the whole list/.test(desc)) {
+    throw new Error(
+      'aurora-effects-preset.schema.json no longer states, at $defs.base_swap, that the flattened '
+      + 'fire sequence must be strictly ASCENDING and that the AUTHORITY is a named symbol in an '
+      + 'aeon .emp file. Aurora DERIVES its early refusal from that sentence and NAMES the '
+      + 'authority in it, precisely so nobody mistakes this editor for the enforcer. If the '
+      + 'contract has moved the rule (or acquired a schema keyword that expresses it), re-read it '
+      + '— do NOT retype "fire_lines" here, and do NOT keep refusing on a rule the contract has '
+      + 'stopped stating.',
+    );
+  }
+  return Object.freeze({ symbol: m[1], file: m[2] });
+})();
+
+/** One fire the flattened raster program will contain. */
+export interface BaseSwapFire {
+  /** The screen line it fires on. */
+  line: number;
+  /** Which band in the document it came from, 0-based. */
+  band: number;
+  /** `'on'` for the band's `line`, `'off'` for its `restore_line`. */
+  kind: 'on' | 'off';
+}
+
+/**
+ * FLATTEN the list the way the generator does — every band's `line`, then its
+ * `restore_line` when present, IN DOCUMENT ORDER.
+ *
+ * ⚠ DOCUMENT ORDER, NOT SORTED. The schema's own parenthetical says "sort … and
+ * require strict ascent", which would catch only DUPLICATES — a descending pair
+ * survives a sort. The sentence it abbreviates is the load-bearing one: "the
+ * flattened fire sequence must be strictly ASCENDING across the whole list", and
+ * the list is flattened in document order ("A LIST of … BANDS in document
+ * order"). Checking ascent on the document-order sequence is what refuses all
+ * three of the things `fire_lines` refuses by name — overlapping, descending and
+ * duplicated lines — and it is strictly stronger than the parenthetical.
+ */
+export function baseSwapFires(bands: readonly EffectsPresetBaseSwapBand[]): BaseSwapFire[] {
+  const out: BaseSwapFire[] = [];
+  bands.forEach((b, band) => {
+    out.push({ line: b.line, band, kind: 'on' });
+    if (b.restore_line !== undefined) out.push({ line: b.restore_line, band, kind: 'off' });
+  });
+  return out;
+}
+
+/**
+ * WHY THIS LIST WOULD FAIL AT BUILD TIME, or null.
+ *
+ * ═══ ⚠ THIS IS AURORA MOVING SOMEONE ELSE'S REFUSAL EARLIER, NOT OWNING IT ═══
+ *
+ * The schema ACCEPTS an out-of-order list and so does aeon's generator; the
+ * refusal happens at `.emp` build time in `fire_lines`, long after the author
+ * has left the editor. So this derives the same rule from the schema's sentence
+ * and applies it at authoring time — and NAMES `fire_lines` in every message, so
+ * a reader knows the real authority and does not go looking for the rule here.
+ *
+ * The CODEC does not call this. `parseEffectsPreset` must keep accepting every
+ * document the contract accepts (`boundaryAdvisories`' rule) or Aurora would
+ * refuse to open a file aeon ships; this is the CONTROL layer's refusal.
+ */
+export function baseSwapOrderRefusal(bands: readonly EffectsPresetBaseSwapBand[]): string | null {
+  const fires = baseSwapFires(bands);
+  const where = (f: BaseSwapFire): string =>
+    `band ${f.band}'s ${f.kind === 'on' ? 'line' : 'restore_line'} (${f.line})`;
+  for (let i = 1; i < fires.length; i += 1) {
+    const prev = fires[i - 1];
+    const cur = fires[i];
+    if (cur.line > prev.line) continue;
+    const a = EFFECTS_PRESET_BASE_SWAP_ORDER_AUTHORITY;
+    const how = cur.line === prev.line ? 'DUPLICATES' : 'goes BACKWARDS from';
+    const sameBand = prev.band === cur.band;
+    return `the flattened fire sequence is not strictly ascending: ${where(cur)} ${how} `
+      + `${where(prev)}. ${sameBand
+        ? 'A band whose restore_line does not exceed its line ends before it begins.'
+        : 'Bands are flattened into ONE raster program in document order, so a later band may '
+          + 'not start on or above where the previous one left off — that is an overlap.'} `
+      + `⚠ NEITHER THE SCHEMA NOR AEON'S GENERATOR REFUSES THIS: the document validates, the `
+      + `generator's shape check passes, and \`${a.symbol}\` (aeon ${a.file}) refuses it by name `
+      + 'at .emp BUILD time. Aurora refuses here so you meet it now instead of there.';
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------

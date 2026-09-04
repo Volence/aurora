@@ -66,10 +66,13 @@ import type { AnyCommand } from '../../../core/editing/commands';
 import type {
   EffectsPresetLibrary, EffectsPresetBand, EffectsPreset, EffectsPresetCycleChannel,
   EffectsPresetPalVariant, EffectsPresetRamp, EffectsPresetBaseSwap,
+  EffectsPresetBaseSwapBand,
 } from '../../../core/formats/effects/preset';
 import type { EffectsSceneLibrary } from '../../../core/formats/effects/scene';
 import {
-  EFFECTS_PRESET_BAND_KEYS, EFFECTS_PRESET_BASE_SWAP_KEYS, presetArmFields, presetDefFields,
+  EFFECTS_PRESET_BAND_KEYS, EFFECTS_PRESET_BASE_SWAP_KEYS,
+  EFFECTS_PRESET_BASE_SWAP_OPTIONAL_KEYS, EFFECTS_PRESET_BASE_SWAP_PLANES,
+  presetArmFields, presetDefFields,
   EFFECTS_PRESET_MAX_PATCH, ANCHOR_PHASE_RANGE,
   // THE NARROWING QUESTION, ASKED ONCE. `bands` left the schema's top-level
   // `required` when `ramp` arrived and the root became a `oneOf`, so a preset
@@ -132,8 +135,13 @@ import {
   // PAINTED in the card.
   BASE_SWAP_FIELD_TITLES, BASE_SWAP_TITLE,
   BASE_SWAP_ASYMMETRIES, BASE_SWAP_ASYMMETRIES_SHORT, BASE_SWAP_WHAT_YOU_SEE,
-  baseSwapLineRefusal, baseSwapTargetRefusal, baseSwapTargetGloss, baseSwapSummary,
-  setBaseSwapLineCommand, setBaseSwapTargetCommand,
+  baseSwapLineRefusal, baseSwapRestoreLineRefusal, baseSwapPlaneRefusal,
+  baseSwapTargetRefusal, baseSwapTargetGloss, baseSwapSummary, baseSwapBandSummary,
+  baseSwapInsideRowsText, baseSwapOrderAdvisory,
+  addBaseSwapBandRefusal, lastBaseSwapBandRefusal,
+  setBaseSwapLineCommand, setBaseSwapTargetCommand, setBaseSwapPlaneCommand,
+  setBaseSwapRestoreLineCommand, addBaseSwapBandCommand, removeBaseSwapBandCommand,
+  newBaseSwapRestoreLine,
   // ═══ THE PATCHED ARM (EW-BOUNDARY-PANEL, ROADMAP row 151) ═══
   //
   // EIGHT NUMBERS AND TWO FLAGS, and the asymmetry with the three cards above it
@@ -611,7 +619,7 @@ export default function BandPresetPanel(): React.ReactElement | null {
                 scroll={rampScroll} />
             )}
             {selected.base_swap !== undefined && (
-              <BaseSwapCard library={library} presetId={selected.id}
+              <BaseSwapCard library={library} preset={selected}
                 baseSwap={selected.base_swap} run={run} />
             )}
             {selected.boundary !== undefined && (
@@ -1704,61 +1712,72 @@ function RampCard({ library, presetId, ramp, run, scroll }: {
 }
 
 /**
- * THE BASE-SWAP CARD — the mid-frame nametable-base channel's whole surface.
+ * THE BASE-SWAP SURFACE — the mid-frame nametable-base channel, now a LIST.
  *
  * ═══════════════════════════════════════════════════════════════════════════
- * ║ TWO NUMBERS, AND ONE OF THEM IS AN ADDRESS THAT LOOKS LIKE A COUNT      ║
+ * ║ A LIST OF BANDS. HARD BREAK. AND TWO FACTS NOBODY GUESSES RIGHT.        ║
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Two fields, because the swap has two keys and the constructor defaults
- * neither. There is no third control here and there cannot be one: `$defs.
- * base_swap` is a CLOSED object of exactly `line` and `target`, so a widget
- * offering anything else would author a key the schema refuses.
+ * `base_swap` was ONE closed `{line, target}` object until empyrean `8f56c2c`
+ * (T3). It is a LIST of per-plane bands now, the old form is REFUSED with no
+ * legacy arm, and this surface is a list surface: one card per band, an add and
+ * a remove, and a summary of the flattened program under them.
  *
- * ⚠ `target` IS A RAW VRAM BYTE ADDRESS AND A BARE NUMBER BOX HIDES THAT.
- * `57344` is `$E000` is `VRAM_PLANE_B` — from the swap line down, Plane A draws
- * PLANE B's picture — and an author reading five digits in a spinner has no way
- * to know they are looking at an address at all. So the hex sits beside the box
- * (`baseSwapTargetGloss`) and the summary under it says both bases and the
- * contract's own name for the address. The panel NAMES NOTHING THE CONTRACT
- * DOES NOT: one address is named in the schema and every other legal one is
- * reported as admitted-and-unnamed, `rampAddrGloss`'s rule.
+ * ⚠ FACT 1 — `restore_line` IS NEITHER INCLUSIVE NOR EXCLUSIVE. It and `line`
+ * are BOTH fire lines: the base register changes about 45% of the way ACROSS
+ * that scanline, so each edge row is half one picture and half the other. The
+ * rows an author actually gets are `line+1 .. restore_line-1`. Every sentence
+ * on this card that names rows comes from `baseSwapInsideRowsText`, whose
+ * offsets are parsed out of the schema and cross-checked against the schema's
+ * own measured witness (`3..64` reads INSIDE as `4..63`) — never an inclusive
+ * range typed by hand, because both natural answers are wrong.
+ *
+ * ⚠ FACT 2 — ORDER IS ENFORCED BY NEITHER THE SCHEMA NOR AEON'S GENERATOR. The
+ * flattened fire sequence must ascend strictly across the whole list, and a
+ * document that does not is accepted here, accepted by the generator, and
+ * REFUSED AT .emp BUILD TIME by `fire_lines`. Aurora derives that rule so the
+ * author meets it while typing, and every message NAMES `fire_lines` as the
+ * authority so this editor is never mistaken for the enforcer.
+ *
+ * ⚠ AND A STANDING BREAK IS PAINTED, NOT REFUSED. An out-of-order document can
+ * arrive — the codec accepts one because the contract does. Refusing every edit
+ * on it would lock the author out of the only surface that could repair it, so
+ * `baseSwapOrderAdvisory` warns and the edit-time refusal fires only on an edit
+ * that would break an already-sound list.
+ *
+ * ⚠ `target` IS A RAW VRAM BYTE ADDRESS AND A BARE NUMBER BOX HIDES THAT. The
+ * hex sits beside the box (`baseSwapTargetGloss`). The panel NAMES NOTHING THE
+ * CONTRACT DOES NOT — and since `8f56c2c` the contract names NO address at all
+ * (the old "$E000 = VRAM_PLANE_B" sentence was dropped), so the gloss says so
+ * out loud instead of supplying a name Aurora would be inventing.
  *
  * ⚠ THE GRANULE IS REFUSED, NOT ROUNDED. `target` must be a multiple of $2000:
- * VDP reg $02 encodes only the bits above the granule and DROPS the rest
+ * the base register encodes only the bits above the granule and DROPS the rest
  * SILENTLY, so an unaligned value is not an error anywhere downstream — it is a
  * different address with nothing else visibly wrong. `baseSwapTargetRefusal`
- * names the two legal bases either side (COMPUTED, not typed) and nothing snaps:
- * snapping would point Plane A at another picture without telling the author.
+ * names the two legal bases either side (COMPUTED, not typed) and nothing snaps.
  *
  * ⚠ AND THE TWO ASYMMETRIES WITH `ramp` ARE PAINTED, NOT LEFT TO ANALOGY. No
  * capability gate and not DEBUG-gated — a reader who has just met `ramp`'s
- * CAP_DENSE_TIER assumes both wrongly, and an assumed capability gate is what a
- * control parcel silently builds a disabled button around. The contract's own
- * statement is on the same element's `title` (`presetLimitsShort()`'s split).
+ * CAP_DENSE_TIER assumes both wrongly.
  *
- * ⚠ NO min/max ON EITHER SPINNER, aeon's §E.4, exactly as the other two cards:
- * those attributes govern the arrows and `:invalid` and stop no typed value.
- * `refuse` is the only thing that withholds a commit.
+ * ⚠ NO min/max ON ANY SPINNER, aeon's §E.4, exactly as the other cards: those
+ * attributes govern the arrows and `:invalid` and stop no typed value. `refuse`
+ * is the only thing that withholds a commit.
  *
- * NO PREVIEW IS DRAWN. Nothing in this editor has ever drawn a raster program
- * and `NO_PREVIEW` says so at the top of the panel; what the swap LOOKS like is
- * quoted from the contract (`BASE_SWAP_WHAT_YOU_SEE`), which is aeon's measured
- * on-screen capture, rather than asserted by an editor that has not seen one.
+ * NO PREVIEW IS DRAWN. Nothing in this editor has ever drawn a raster program;
+ * what a swap LOOKS like is quoted from the contract (`BASE_SWAP_WHAT_YOU_SEE`).
  */
-function BaseSwapCard({ library, presetId, baseSwap, run }: {
+function BaseSwapCard({ library, preset, baseSwap, run }: {
   library: EffectsPresetLibrary;
-  presetId: string;
+  preset: EffectsPreset;
   baseSwap: EffectsPresetBaseSwap;
   run: (c: AnyCommand | null) => void;
 }): React.ReactElement {
-  // WHY THE REFUSAL OUTLIVES THE BLUR — `BandCard`'s reason, unchanged:
-  // `NumberField` resyncs its text to the document when focus leaves, so an
-  // illegal number visibly snaps back, and if the sentence went with it the
-  // author would watch their value vanish with no explanation.
-  const [why, setWhy] = React.useState<Record<string, string | null>>({});
-  const said = (k: string): string | null => why[k] ?? null;
-  const say = (k: string) => (r: string | null): void => setWhy((s) => ({ ...s, [k]: r }));
+  const presetId = preset.id;
+  const order = baseSwapOrderAdvisory(baseSwap);
+  const addWhy = addBaseSwapBandRefusal(preset);
+  const lastWhy = lastBaseSwapBandRefusal(preset);
 
   return (
     <Card>
@@ -1777,33 +1796,141 @@ function BaseSwapCard({ library, presetId, baseSwap, run }: {
           IT STAYS MOUNTED ANYWAY, `RampCard`'s reason: a mounted leaf returning
           null IS the retired state, and re-arming is a one-line edit in
           `core/formats/effects/preset-lag.ts` that must reach every card.
-          ⚠ CERTIFIED BY AEON, ON A BRANCH, WITH TWO STATED LIMITS — AND STILL
-          NOT BY AURORA (updated 2026-09-03; the previous wording said only that
-          aeon had measured the generated program in the RELEASE LISTING, which
-          is now an understatement). A running machine obeys the GENERATED
-          section-6 program, separated from the hand-written `OJZ_BaseSwap` demo
-          three independent ways: by ADDRESS (`Raster_Program` after the crossing
-          is the generated symbol, not the demo), by PATH (reached through the
-          engine's own boundary crossing, not a poke), and BY CONSTRUCTION in the
-          release shape (`OJZ_BaseSwap` emits zero bytes there). Footprint lines
-          161..223 contiguous, 0..160 byte-identical, in BOTH shapes; and the
-          boundary was DERIVED, not fitted — moving the document's line 160 to
-          100 moved the measured boundary to 101, and the unmutated tree went
-          cleanly red on the same ROM.
-          ⚠ THE TWO LIMITS ARE LOAD-BEARING AND MUST TRAVEL WITH THE CLAIM: the
-          RELEASE-shape binding is proved STATICALLY, NOT WALKED (the warp
-          mailbox is DEBUG-only, so the crossing itself is witnessed only in
-          DEBUG), and this is EMULATION, NOT SILICON. It is also on aeon
-          `origin/parcel/sec6-baseswap-certify` `7b11f929`, which is NOT an
-          ancestor of aeon's master. Nothing in Aurora has measured a ROM. */}
+          ⚠ THE AEON CERTIFICATION RECORDED HERE IS OF THE **SINGLE-EDGE**
+          SHAPE, AND THE KEY IS A LIST NOW. What aeon measured on a running
+          machine (footprint lines 161..223 contiguous, 0..160 byte-identical,
+          the boundary DERIVED by moving the document's line and watching the
+          measured boundary move with it) was the pre-`8f56c2c` one-fire
+          program. NOTHING has measured a two-band program on a running machine
+          — not aeon, and certainly not Aurora, which has never measured a ROM.
+          ⚠ AND THE TWO LIMITS ON THE OLD CLAIM STILL TRAVEL WITH IT: the
+          RELEASE-shape binding was proved STATICALLY, NOT WALKED (the warp
+          mailbox is DEBUG-only), and it was EMULATION, NOT SILICON. It is on
+          aeon `origin/parcel/sec6-baseswap-certify` `7b11f929`, which is NOT an
+          ancestor of aeon's master. */}
       <PresetLagDisclosure />
 
+      {/* ═══ THE STANDING ORDER BREAK — PAINTED, NOT REFUSED ═══
+
+          A document that arrives out of order is accepted by the codec because
+          the contract accepts it. If it were refused here the author could not
+          repair it, so it is shown and every control stays live. */}
+      {order !== null && <Hint tone="warning">{order}</Hint>}
+
+      {baseSwap.map((band, i) => (
+        <BaseSwapBandCard key={i} library={library} presetId={presetId} index={i} band={band}
+          bands={baseSwap} run={run} lastRefusal={lastWhy} />
+      ))}
+
+      {/* ═══ THE DEAD CONTROL, WITH ITS REASON BESIDE IT ═══
+
+          `addBaseSwapBandCommand` returns null when there is nowhere legal to
+          put another band — the list flattens in document order, so a new band
+          has to fire ABOVE the last fire in it. `addBaseSwapBandRefusal` is ONE
+          predicate read by the `disabled` flag AND by the Hint, so the greyed
+          chip and the reason cannot disagree. */}
+      <Chip disabled={addWhy !== null} title={addWhy ?? undefined}
+        onClick={() => run(addBaseSwapBandCommand(library, presetId))}>Add base-swap band</Chip>
+      {addWhy !== null && <Hint tone="warning" style={{ marginTop: T.s2 }}>{addWhy}</Hint>}
+
+      {/* WHAT THE WHOLE LIST FLATTENS TO — the fire count is the number an
+          author has no other way to see, and it is the one `fire_lines`
+          actually counts at build time. */}
+      <Hint under>{baseSwapSummary(baseSwap)}</Hint>
+
+      {/* WHAT THEY WILL SEE, IN THE CONTRACT'S WORDS. Aurora draws no raster
+          program, so this is quoted from the schema (aeon's on-screen capture)
+          rather than claimed by an editor that has measured nothing. The quote
+          predates the list and describes ONE edge running to the frame bottom,
+          which is still exactly what a band with no restore_line does — so it
+          is quoted unchanged and the sentence after it says what a restore_line
+          changes, rather than editing a measured claim. */}
+      <Hint under>
+        <span title={BASE_SWAP_TITLE}>{BASE_SWAP_WHAT_YOU_SEE}</span>
+      </Hint>
+      <Hint under>
+        ⚠ That sentence was measured on the single-edge shape. A band WITH a
+        restore_line ends there instead of at the frame bottom; nothing has
+        measured a multi-band program on a running machine.
+      </Hint>
+
+      <Hint under>
+        Each band writes {EFFECTS_PRESET_BASE_SWAP_KEYS.join(', ')} — all of them, every time.
+        {EFFECTS_PRESET_BASE_SWAP_OPTIONAL_KEYS.length > 0 && (
+          <> {EFFECTS_PRESET_BASE_SWAP_OPTIONAL_KEYS.join(', ')} {
+            EFFECTS_PRESET_BASE_SWAP_OPTIONAL_KEYS.length === 1 ? 'is' : 'are'
+          } optional, and absent is a different picture, not a zero.</>
+        )}
+      </Hint>
+    </Card>
+  );
+}
+
+/**
+ * ONE BAND'S CARD — plane, ON line, target, and an optional OFF line.
+ *
+ * ⚠ THE ROW SENTENCE IS THE POINT OF THIS CARD. `line` and `restore_line` are
+ * both FIRE lines and neither is the first or last swapped row; the swapped
+ * rows are `line+1 .. restore_line-1`. `baseSwapInsideRowsText` says that in
+ * words, INCLUDING the "not `line`..`restore_line`" correction, because an
+ * author reading two spinners labelled Line and Restore line will otherwise
+ * read them as an inclusive range and be wrong at both ends.
+ */
+function BaseSwapBandCard({ library, presetId, index, band, bands, run, lastRefusal }: {
+  library: EffectsPresetLibrary;
+  presetId: string;
+  index: number;
+  band: EffectsPresetBaseSwapBand;
+  bands: EffectsPresetBaseSwap;
+  run: (c: AnyCommand | null) => void;
+  lastRefusal: string | null;
+}): React.ReactElement {
+  // WHY THE REFUSAL OUTLIVES THE BLUR — `BandCard`'s reason, unchanged:
+  // `NumberField` resyncs its text to the document when focus leaves, so an
+  // illegal number visibly snaps back, and if the sentence went with it the
+  // author would watch their value vanish with no explanation.
+  const [why, setWhy] = React.useState<Record<string, string | null>>({});
+  const said = (k: string): string | null => why[k] ?? null;
+  const say = (k: string) => (r: string | null): void => setWhy((s) => ({ ...s, [k]: r }));
+  const hasRestore = band.restore_line !== undefined;
+
+  return (
+    <Card raised>
+      <Field label={`Base-swap band ${index}`}>
+        {/* DISABLED WITH A REASON, NOT HIDDEN — `lastBaseSwapBandRefusal` is the
+            same predicate `removeBaseSwapBandCommand` returns null on.
+            ⚠ AND IT ACTS AND THEN DROPS FOCUS (d-27): same `key={i}` list
+            removal shape as the raster bands, where the button survived its own
+            click and re-aimed at whatever slid into slot `index`. */}
+        <IconButton icon={<span>Remove</span>} label={`Remove base-swap band ${index}`}
+          disabled={lastRefusal !== null}
+          onClick={(e) => actAndDropFocus(e,
+            () => run(removeBaseSwapBandCommand(library, presetId, index)))} />
+      </Field>
+      {lastRefusal !== null && <Hint under>{lastRefusal}</Hint>}
+
+      {/* ═══ WHICH PLANE — A CHOICE, AND A CLOSED ONE ═══
+
+          The options are `EFFECTS_PRESET_BASE_SWAP_PLANES`, read off the
+          schema's own enum. There is no free-text spelling and no register
+          number: `VdpBase` has five variants and three of them name the window,
+          the sprite table and hscroll, and sigil cannot refuse a legal call. */}
+      <Field label="Plane" title={BASE_SWAP_FIELD_TITLES.plane}>
+        <Select title={BASE_SWAP_FIELD_TITLES.plane} value={band.plane}
+          onChange={(v) => run(setBaseSwapPlaneCommand(library, presetId, index, v))}
+          style={{ flex: 1, minWidth: 0 }}>
+          {EFFECTS_PRESET_BASE_SWAP_PLANES.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </Select>
+      </Field>
+
       <Field label="Line" title={BASE_SWAP_FIELD_TITLES.line}>
-        <NumberField title={BASE_SWAP_FIELD_TITLES.line} width={72} value={baseSwap.line}
-          refuse={(n) => baseSwapLineRefusal(baseSwap, presetId, n)}
+        <NumberField title={BASE_SWAP_FIELD_TITLES.line} width={72} value={band.line}
+          refuse={(n) => baseSwapLineRefusal(bands, presetId, index, n)}
           onRefusal={say('line')}
-          onChange={(n) => run(setBaseSwapLineCommand(library, presetId, n))} />
-        <span style={{ fontSize: T.tXs, color: T.textLo, minWidth: 0 }}>screen line</span>
+          onChange={(n) => run(setBaseSwapLineCommand(library, presetId, index, n))} />
+        <span style={{ fontSize: T.tXs, color: T.textLo, minWidth: 0 }}>ON fire</span>
       </Field>
       {said('line') !== null && <Hint under tone="warning">{said('line')}</Hint>}
 
@@ -1811,36 +1938,61 @@ function BaseSwapCard({ library, presetId, baseSwap, run }: {
 
           The `addr` gloss idiom (a13) with a second job: the integer stays in
           the box because the integer is what the file holds, and the hex — plus
-          the contract's name for it when the contract has one — sits beside it
-          in the control column. Without this the author is typing a decimal
-          rendering of a hexadecimal VRAM constant with nothing on screen
-          admitting it. */}
+          the contract's name for it IF the contract has one — sits beside it in
+          the control column. Since `8f56c2c` the contract has none, and the
+          gloss says that rather than inventing one. */}
       <Field label="Target" title={BASE_SWAP_FIELD_TITLES.target}>
-        <NumberField title={BASE_SWAP_FIELD_TITLES.target} width={88} value={baseSwap.target}
-          refuse={(n) => baseSwapTargetRefusal(baseSwap, presetId, n)}
+        <NumberField title={BASE_SWAP_FIELD_TITLES.target} width={88} value={band.target}
+          refuse={(n) => baseSwapTargetRefusal(bands, presetId, index, n)}
           onRefusal={say('target')}
-          onChange={(n) => run(setBaseSwapTargetCommand(library, presetId, n))} />
+          onChange={(n) => run(setBaseSwapTargetCommand(library, presetId, index, n))} />
         <span style={{ fontSize: T.tXs, color: T.textLo, minWidth: 0 }}>
-          {baseSwapTargetGloss(baseSwap.target)}
+          {baseSwapTargetGloss(band.target)}
         </span>
       </Field>
       {said('target') !== null && <Hint under tone="warning">{said('target')}</Hint>}
 
-      {/* WHAT THE SWAP DOES, in the author's own numbers — the arithmetic they
-          would otherwise do in their head, with the address in both bases. */}
-      <Hint under>{baseSwapSummary(baseSwap)}</Hint>
+      {/* ═══ THE OFF FIRE — PRESENT OR ABSENT, NOT SET-OR-ZERO ═══
 
-      {/* WHAT THEY WILL SEE, IN THE CONTRACT'S WORDS. Aurora draws no raster
-          program, so this is quoted from the schema (aeon's on-screen capture)
-          rather than claimed by an editor that has measured nothing. */}
-      <Hint under>
-        <span title={BASE_SWAP_TITLE}>{BASE_SWAP_WHAT_YOU_SEE}</span>
-      </Hint>
+          ⚠ ABSENT IS A DIFFERENT PICTURE, NOT AN EMPTY FIELD. With no
+          restore_line the band runs to the BOTTOM OF THE DISPLAY, ended by the
+          frame-top flush — the shipped single-edge shape. So the control is a
+          checkbox that ADDS or REMOVES the key, and the spinner only appears
+          when the key is there: a number box showing a blank or a 0 would read
+          as "no restore" while meaning "restore at line 0", which the schema
+          does not even admit. */}
+      <Field label="Restore" title={BASE_SWAP_FIELD_TITLES.restore_line}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: T.s1, fontSize: T.tXs }}>
+          <input type="checkbox" checked={hasRestore}
+            aria-label={`Band ${index} has a restore line`}
+            disabled={!hasRestore && newBaseSwapRestoreLine(band) === null}
+            onChange={(e) => run(setBaseSwapRestoreLineCommand(library, presetId, index,
+              e.target.checked ? (newBaseSwapRestoreLine(band) ?? undefined) : undefined))} />
+          <span>ends at a line</span>
+        </label>
+        {hasRestore && (
+          <NumberField title={BASE_SWAP_FIELD_TITLES.restore_line} width={72}
+            value={band.restore_line as number}
+            refuse={(n) => baseSwapRestoreLineRefusal(bands, presetId, index, n)}
+            onRefusal={say('restore_line')}
+            onChange={(n) => run(setBaseSwapRestoreLineCommand(library, presetId, index, n))} />
+        )}
+      </Field>
+      {said('restore_line') !== null && <Hint under tone="warning">{said('restore_line')}</Hint>}
+      {!hasRestore && (
+        <Hint under>
+          No restore line: this band runs to the bottom of the display, ended by the frame-top
+          flush. That is the shipped single-edge shape, not a missing value.
+        </Hint>
+      )}
 
-      <Hint under>
-        Writes {EFFECTS_PRESET_BASE_SWAP_KEYS.join(', ')} — both, every time.
-        No field here has a default.
-      </Hint>
+      {/* ⚠ WHICH ROWS ARE ACTUALLY SWAPPED — the one thing on this card an
+          author cannot work out from the two spinners above it, because both of
+          them are FIRE lines and neither is a swapped row. */}
+      <Hint under tone="warning">{baseSwapInsideRowsText(band)}</Hint>
+
+      {/* WHAT THIS BAND DOES, in the author's own numbers. */}
+      <Hint under>{baseSwapBandSummary(band)}</Hint>
     </Card>
   );
 }

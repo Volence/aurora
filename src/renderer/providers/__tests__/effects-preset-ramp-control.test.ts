@@ -673,7 +673,12 @@ describe('switching the raster program is ONE undoable command', () => {
     // The third channel reopened this: `bandControlsRefusal` asked "is it ramp?"
     // and so returned null on a base_swap document — band controls alive on a
     // preset with no `bands` key, every click a silent no-op.
-    const p = { schema: 1 as const, id: ID, base_swap: { line: 160, target: 57344 } };
+    // ⚠ A LIST since empyrean `8f56c2c`. Written out rather than seeded so this
+    // row stays a fixed shape the band-controls refusal is measured against.
+    const p = {
+      schema: 1 as const, id: ID,
+      base_swap: [{ plane: 'PlaneA', line: 160, target: 57344 }],
+    };
     const refusal = bandControlsRefusal(p);
     expect(refusal, 'the band controls came back to life on a base_swap document').not.toBeNull();
     expect(refusal).toContain('base swap');
