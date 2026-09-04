@@ -140,6 +140,23 @@ describe('§A ConfirmDialog wiring', () => {
     expect(dialogCode).toContain("data-tone={b.tone ?? 'neutral'}");
   });
 
+  it('RE-ASSERTS the focus after the browser’s own post-mousedown fix-up', () => {
+    // ⚠ NOT BELT-AND-BRACES, AND NOT SAFE TO "SIMPLIFY" AWAY. The tab strip's
+    // close ✕ raises this dialog from `onMouseDown`, so the effect focuses
+    // Cancel INSIDE the mousedown dispatch and Chromium's default action then
+    // clears focus to <body> — measured in the running app, and the reason
+    // `scratchpad/confirm-focus-harness.mjs` [d3] was the one red door. A timer
+    // callback is the next MACROTASK, ordered strictly after that default
+    // action; a microtask is not. The doors that raise the dialog from onClick
+    // never show this, so dropping these two lines reddens exactly one of the
+    // five CDP doors and nothing in this file — which is why this row exists.
+    expect(dialogCode).toContain('setTimeout(apply, 0)');
+    expect(dialogCode).toContain('clearTimeout(t)');
+    // And it must decline when focus is already inside the panel, or the
+    // re-assert would drag a user's own Tab back to Cancel.
+    expect(dialogCode).toContain('panel.contains(active)');
+  });
+
   it('fires once per request, not on every render', () => {
     // `[request]`, not `[]` and not undefined. On `[]` the dialog focuses only
     // the first request of the session; with no dep array it re-grabs focus on

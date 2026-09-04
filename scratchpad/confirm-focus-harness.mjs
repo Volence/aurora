@@ -236,7 +236,7 @@ const enter = (c) => key(c, 'Enter', 'Enter', 13, 0, '\r');
 const escape = (c) => key(c, 'Escape', 'Escape', 27);
 
 /** A REAL CLICK, aimed at integer client pixels and hit-tested before sending. */
-async function clickHandle(c, handle, label) {
+async function clickHandle(c, handle, label, settle = 500) {
   const geom = await c.json(String.raw`(() => {
     const el = window.__cf.el(${JSON.stringify(handle)});
     if (!el) return null;
@@ -274,7 +274,7 @@ async function clickHandle(c, handle, label) {
   await mouse(c, 'mousePressed', x, y);
   await sleep(40);
   await mouse(c, 'mouseReleased', x, y);
-  await sleep(500);
+  await sleep(settle);
   return { x, y };
 }
 
@@ -411,6 +411,29 @@ const INSTALL = (presets) => String.raw`
   return { presets: presetBox() ? presetBox().children.length : -1, dialogNow: !!dialog() };
 })()`;
 
+/**
+ * SAMPLE WHO HOLDS FOCUS OVER TIME, not once.
+ *
+ * ⚠ THE INSTRUMENT THAT FOUND THE ONLY REAL DEFECT THIS PARCEL SHIPPED A FIX
+ * FOR. A single reading cannot tell "the dialog never focused anything" from
+ * "it focused Cancel and something took it away a moment later", and those are
+ * completely different defects with completely different fixes. At the tab-close
+ * door the single reading said `<BODY>` and read exactly like the fix not being
+ * wired to that door; the truth was that the fix ran, succeeded, and was then
+ * overwritten by Chromium's own post-mousedown focus assignment. Printed
+ * automatically whenever a focus row goes red, so the next person gets the
+ * distinction for free instead of paying for it again.
+ */
+async function focusTimeline(c, ms = 1200, step = 100) {
+  const out = [];
+  for (let t = 0; t <= ms; t += step) {
+    const d = await c.json('window.__cf.dlg()');
+    out.push(`${t}ms:${d === null ? 'no-dialog' : d.activeBrief}`);
+    await sleep(step);
+  }
+  return out;
+}
+
 /** Everything about the sprite document a press at these sites could move. */
 async function snap(c) {
   const s = await c.json('window.__dbg.spriteState()');
@@ -434,9 +457,10 @@ function focusRow(id, doorName, info, extra = '') {
   const okDanger = info !== null && info.dangerCount >= 1;
   const okKeys = info !== null && info.keyedCount === info.buttonCount;
   const okFocus = info !== null && info.activeKey === SAFE_KEY && info.activeIsDanger === false;
+  const ok = okDanger && okKeys && okFocus;
   check(id, `${doorName}: the dialog opens with focus ON THE SAFE BUTTON ('${SAFE_KEY}') and NOT on `
     + 'a destructive one — and it really does contain a destructive one',
-    okDanger && okKeys && okFocus,
+    ok,
     info === null
       ? 'DIALOG ABSENT — nothing was on screen to read focus from, so this door was never measured. '
         + 'That is a red, not a skip: a run that cannot reach its subject measures nothing.'
@@ -446,6 +470,7 @@ function focusRow(id, doorName, info, extra = '') {
         + `activeKey=${JSON.stringify(info.activeKey)} activeIsDanger=${info.activeIsDanger} · `
         + `identity, not text: activeKey comes from document.activeElement === the button element. `
         + extra);
+  return ok;
 }
 
 async function main() {
@@ -562,8 +587,11 @@ async function main() {
     await clickHandle(c, `preset${big}`, `size-preset chip "${big}" (dirty document)`);
     const d1 = await c.json('window.__cf.dlg()');
     await shot(c, 'd1-chip-dialog');
-    focusRow('d1', 'size chip → "Discard this sprite?"', d1,
-      'This is the exact dialog P3 armed with Space.');
+    if (!focusRow('d1', 'size chip → "Discard this sprite?"', d1,
+      'This is the exact dialog P3 armed with Space.')) {
+      note('[d1] focus timeline — did focus LAND and LEAVE, or never land?',
+        (await focusTimeline(c)).join('  |  '));
+    }
     doorsReached.push('new-sprite-guard.ts (size chip)');
 
     const d1kPre = await snap(c);
@@ -607,9 +635,11 @@ async function main() {
     await clickHandle(c, 'newBox', 'New □ (dirty document)');
     const d2 = await c.json('window.__cf.dlg()');
     await shot(c, 'd2-newbox-dialog');
-    focusRow('d2', '`New □` → "Discard this sprite?"', d2,
+    if (!focusRow('d2', '`New □` → "Discard this sprite?"', d2,
       'A separate CONTROL onto the same ask() site: a fix wired to the chips\' map and not to this '
-      + 'dispatch line would pass every DOOR 1 row.');
+      + 'dispatch line would pass every DOOR 1 row.')) {
+      note('[d2] focus timeline', (await focusTimeline(c)).join('  |  '));
+    }
     doorsReached.push('new-sprite-guard.ts (New □)');
 
     await space(c); await sleep(600);
@@ -664,9 +694,13 @@ async function main() {
       + 'here is two buttons. Asserting "3" — which the source reads like at a glance — is what the '
       + 'first version of this file did, and it went red on a correct app.');
     if (d3IsSpriteTab) {
-      focusRow('d3', `tab close ✕ → "Unsaved sprite edits" (${d3Keys.join(' / ')})`, d3,
+      if (!focusRow('d3', `tab close ✕ → "Unsaved sprite edits" (${d3Keys.join(' / ')})`, d3,
         'A third ask() site, in a third file, reached by a real mouse press on a <span> affordance '
-        + 'rather than a <button>.');
+        + 'rather than a <button> — and THE ONLY DOOR IN THIS FILE THAT RAISES THE DIALOG FROM '
+        + '`onMouseDown`, which is what made it the one door the first version of the fix did not '
+        + 'hold at. See ConfirmDialog\'s focus effect for the mechanism.')) {
+        note('[d3] focus timeline', (await focusTimeline(c)).join('  |  '));
+      }
       doorsReached.push('tab-activation/sprite.ts (tab close ✕)');
 
       await space(c); await sleep(700);
@@ -722,10 +756,12 @@ async function main() {
       && d4Keys.includes('cancel'),
       `keys = ${JSON.stringify(d4Keys)} (asserted, not assumed — DOOR 3 taught this file that a `
       + 'button set read off the source at a glance can be wrong in the running app)');
-    focusRow('d4', 'project open → "Unsaved changes" (Save / Discard / Cancel)', d4,
+    if (!focusRow('d4', 'project open → "Unsaved changes" (Save / Discard / Cancel)', d4,
       'THE THREE-BUTTON DOOR, reached without a mouse at all: index 0 here is SAVE, so this is the '
       + 'one door that separates "focus cancel" from "focus the first button" — a rule that would be '
-      + 'correct at every other door in this file.');
+      + 'correct at every other door in this file.')) {
+      note('[d4] focus timeline', (await focusTimeline(c)).join('  |  '));
+    }
     if (d4 !== null) doorsReached.push('project-open-guard.ts (__dbg.canvas route)');
 
     await space(c); await sleep(700);
@@ -786,8 +822,10 @@ async function main() {
       await clickHandle(c, 'chunkClear', "the Chunks section's Clear button");
       const d5 = await c.json('window.__cf.dlg()');
       await shot(c, 'd5-clear-dialog');
-      focusRow('d5', 'Clear chunks → "Clear the chunk library?"', d5,
-        'A FOURTH ask() site, in a different engine, in a different session.');
+      if (!focusRow('d5', 'Clear chunks → "Clear the chunk library?"', d5,
+        'A FOURTH ask() site, in a different engine, in a different session.')) {
+        note('[d5] focus timeline', (await focusTimeline(c)).join('  |  '));
+      }
       if (d5 !== null) doorsReached.push('chunk-library-import.ts (Clear)');
 
       await space(c); await sleep(700);

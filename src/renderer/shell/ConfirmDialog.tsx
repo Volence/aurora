@@ -43,24 +43,55 @@ export default function ConfirmDialog() {
    * below is 1:1 and in order today, and a lookup that quietly depends on that
    * is a lookup that starts focusing the wrong button the day someone adds a
    * separator or reorders the row.
+   *
+   * ⚠ IT RUNS TWICE, AND THE SECOND TIME IS NOT BELT-AND-BRACES. MEASURED:
+   * the tab strip's close ✕ raises this dialog from `onMouseDown`, so `ask()`
+   * lands, React commits, and this effect focuses Cancel — all INSIDE the
+   * mousedown dispatch. Chromium then performs mousedown's DEFAULT ACTION,
+   * which is to assign focus from the pressed element; the ✕ is a `<span>` and
+   * not focusable, so focus is cleared to `<body>` and our focus is silently
+   * overwritten. Traced in the running app: the effect reported
+   * `focused; activeElement=IS-TARGET` and a read 100ms later said `<BODY>`.
+   *
+   * The size chips and `New □` do not show this because they raise the dialog
+   * from `onClick` — after mousedown's default action has already run — which
+   * is exactly why a harness that covered only those two doors would have
+   * reported this component fully working. A timer callback is the next
+   * MACROTASK, so it is ordered strictly after the default action; a microtask
+   * is not, and `requestAnimationFrame` depends on frame scheduling rather than
+   * on the thing being waited for.
+   *
+   * The immediate pass is kept so the common case is correct even if the timer
+   * never fires, and the re-assert declines to act when focus is already inside
+   * the panel — so it restores focus the browser took away without stealing
+   * focus a user moved on purpose.
    */
   useEffect(() => {
     if (!request) return;
-    const panel = panelRef.current;
-    if (!panel) return;
-    const i = safeFocusIndex(request.buttons);
-    if (i === null) return; // every option destroys something: focus nothing.
-    const target = Array.from(panel.querySelectorAll<HTMLButtonElement>('button[data-confirm-key]'))
-      .find((el) => el.dataset.confirmKey === request.buttons[i].key);
-    // ⚠ LAST LINE OF DEFENCE, and it is deliberately redundant with
-    // safeFocusIndex. The invariant this component must never break is "the
-    // focused element is not a destructive button", so it is restated here at
-    // the one place a .focus() actually happens. If a future edit to
-    // safe-focus.ts starts returning a danger index, this refuses rather than
-    // arming Space with it. The pure test is what pins the function; this is
-    // what makes the DOM call safe on its own terms.
-    if (!target || target.dataset.tone === 'danger') return;
-    target.focus();
+    const apply = () => {
+      const panel = panelRef.current;
+      if (!panel) return;
+      const active = document.activeElement;
+      // Already somewhere in the dialog — a user's own Tab, or our first pass
+      // that nothing clobbered. Leave it alone.
+      if (active && active !== document.body && panel.contains(active)) return;
+      const i = safeFocusIndex(request.buttons);
+      if (i === null) return; // every option destroys something: focus nothing.
+      const target = Array.from(panel.querySelectorAll<HTMLButtonElement>('button[data-confirm-key]'))
+        .find((el) => el.dataset.confirmKey === request.buttons[i].key);
+      // ⚠ LAST LINE OF DEFENCE, and it is deliberately redundant with
+      // safeFocusIndex. The invariant this component must never break is "the
+      // focused element is not a destructive button", so it is restated here at
+      // the one place a .focus() actually happens. If a future edit to
+      // safe-focus.ts starts returning a danger index, this refuses rather than
+      // arming Space with it. The pure test is what pins the function; this is
+      // what makes the DOM call safe on its own terms.
+      if (!target || target.dataset.tone === 'danger') return;
+      target.focus();
+    };
+    apply();
+    const t = window.setTimeout(apply, 0);
+    return () => window.clearTimeout(t);
   }, [request]);
 
   useEffect(() => {
