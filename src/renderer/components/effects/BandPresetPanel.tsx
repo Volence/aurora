@@ -157,7 +157,7 @@ import {
   ANCHOR_SEED_OPTIONS, ANCHOR_MOTION_OPTIONS, ANCHOR_AMP_OPTIONS, ANCHOR_PERIOD_OPTIONS,
   anchorChannelIndices, anchorSeedState, anchorMotionState, anchorSeedValue, anchorSweepOf,
   anchorSeedRefusal, anchorPhaseRefusal, anchorExtendRefusal, anchorMotionWithoutSeedAdvisory,
-  anchorSweepSummary,
+  anchorSweepSummary, anchorSweepBandRefusal,
   setAnchorSeedStateCommand, setAnchorSeedCommand, setAnchorMotionStateCommand,
   setAnchorSweepShiftCommand, setAnchorPhaseCommand,
 } from '../../providers/effects-preset';
@@ -798,6 +798,18 @@ function AnchorChannelCard({ library, preset, index, run }: {
               ))}
             </Select>
           </Field>
+          {/* ═══ THE SWEEP THAT CANNOT FIT — UNDER THE CONTROL THAT SETS IT ═══
+              aeon publishes the screen band each patch channel is confined to
+              (`patchable(lo:, hi:)`), and the fit test is ONE-DIRECTIONAL:
+              travel > lines is CERTAIN, travel <= lines is CANNOT TELL because
+              the latched line is `anchor - Camera_Y` and the camera decides
+              where the sweep sits. So this renders a warning and NEVER a
+              clearance — there is no "fits ✓" here, on purpose, and
+              `AnchorBandFit` has no arm that could produce one. The silence on
+              a legal sweep IS the honest answer. */}
+          {anchorSweepBandRefusal(sweep, index) !== null && (
+            <Hint under tone="warning">{anchorSweepBandRefusal(sweep, index)}</Hint>
+          )}
           <Field label="Cycle" title={anchorSweepFieldTitle('period_shift')}>
             <Select title={anchorSweepFieldTitle('period_shift')} value={String(sweep.period_shift)}
               style={{ flex: 1, minWidth: 0 }}

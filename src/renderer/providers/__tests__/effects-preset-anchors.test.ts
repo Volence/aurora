@@ -30,6 +30,7 @@ import {
   anchorSeedState, anchorMotionState, anchorSeedValue, anchorSweepOf, anchorChannelIndices,
   anchorSeedRefusal, anchorPhaseRefusal, anchorExtendRefusal, anchorMotionWithoutSeedAdvisory,
   anchorSweepSummary, anchorAmpRungOf, anchorPeriodRungOf, anchorOffsetAtTick,
+  anchorSweepBandFit, anchorSweepBandRefusal,
   newAnchorSweep, newAnchorWorldY,
   setAnchorSeedStateCommand, setAnchorSeedCommand, setAnchorMotionStateCommand,
   setAnchorSweepShiftCommand, setAnchorPhaseCommand,
@@ -44,7 +45,15 @@ import {
   EFFECTS_PRESET_PATCH_SEED_UNITS_PER_PIXEL,
   ANCHOR_AMP_RUNGS, ANCHOR_PERIOD_RUNGS, ANCHOR_PHASE_RANGE,
 } from '../../../core/formats/effects/preset';
-import type { EffectsPreset, EffectsPresetLibrary } from '../../../core/formats/effects/preset';
+import type {
+  EffectsPreset, EffectsPresetLibrary, EffectsPresetAnchorSweep,
+} from '../../../core/formats/effects/preset';
+// THE BANDS ARE AEON'S, VENDORED. Section 6's rows read the SAME module the
+// panel reads, so a row cannot pass against a band table nobody ships.
+import {
+  EFFECTS_CHANNEL_BANDS, anchorBandFit, anchorTravelPx,
+  EFFECTS_CHANNEL_BAND_EDGE_HI, EFFECTS_CHANNEL_BAND_EDGE_LO,
+} from '../../../core/formats/effects/channel-bands';
 import type { SetEffectsPresetCommand } from '../../../core/editing/commands';
 
 function library(p: EffectsPreset): EffectsPresetLibrary {
@@ -476,5 +485,163 @@ describe('everything this surface authors survives to the bytes', () => {
       { schema: 1, id: ID, bands: base().bands,
         patch_world_ys: [EFFECTS_PRESET_PATCH_ANCHOR_NONE] });
     expect(() => parseEffectsPreset(bad, ID)).toThrow(/32767|const/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 6. THE SWEEP THAT CANNOT FIT ITS CHANNEL'S BAND — a REFUSAL, never a pass
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// aeon publishes, in `games/sonic4/data/generated/effects_channel_bands.json`
+// (vendored at a pinned revision as
+// `src/core/formats/effects/aeon-effects-channel-bands.json`), the screen band
+// each patch channel's boundary is confined to. Its `how_to_use` is explicit
+// that the fit test is ONE-DIRECTIONAL:
+//
+//   travel > lines   → a CERTAIN refusal, worth warning on
+//   travel <= lines  → CANNOT TELL, never a clearance, because the latched
+//                      line is (anchor - Camera_Y) and where the sweep sits
+//                      inside [lo, hi] is decided by the camera at run time
+//
+// ⚠ WHAT WOULD MAKE THESE ROWS GREEN FOR A REASON OTHER THAN THE RULE HOLDING,
+// asked separately from "does the warning fire" (bar 2d's operational form).
+// THREE candidate green-paths, each ruled out by a named row below:
+//
+//   (i)  THE WARNING IS STRUCTURALLY UNREACHABLE ON THE CHANNEL UNDER TEST.
+//        With today's bands this is not hypothetical, it is the situation:
+//        channel 0 is 218 lines and the WIDEST rung on the ladder travels 128
+//        px, so NO legal sweep can ever be refused there. A suite that only
+//        exercised channel 0 would be green with the comparison inverted,
+//        deleted, or pointed at the wrong field. `[6b]` states that as a
+//        measured fact rather than letting it hide, and every firing row aims
+//        at channel 1 (2 lines), where six of seven rungs refuse.
+//   (ii) THE HELPER RETURNS NULL FOR AN UNRELATED REASON — an off-ladder
+//        amp_shift, or a channel with no band — so "no warning" is produced by
+//        a path that never reached the comparison. `[6d]`, `[6e]` and `[6g]`
+//        assert the VERDICT, not the sentence, so the three silences are told
+//        apart.
+//   (iii) THE MATCHER IS TOO LOOSE (bar 2c) — a row asserting merely "some
+//        string came back" would be satisfied by any refusal on this panel.
+//        `[6c]` pins the numbers IN the sentence and `[6f]` pins both edge
+//        behaviours, which no other refusal here mentions.
+//
+// ⚠ AND NOTHING BELOW CONVERTS. `lines` is a SCREEN-LINE count 1:1 with the
+// authored patchable(lo:, hi:); the engine's single -1 is applied on the far
+// side, in Raster_BuildSchedule. A ±1 anywhere in these rows would be the
+// defect, not a fix.
+
+describe('a sweep against its channel\'s screen band', () => {
+  const sweepAt = (amp: number): EffectsPresetAnchorSweep =>
+    ({ amp_shift: amp, period_shift: 1 });
+
+  it('[6a] the ladder Aurora LABELS with is the ladder aeon\'s fit rule computes', () => {
+    // The parcel's load-bearing assumption, asserted rather than believed:
+    // peak_to_peak_px really is 2 * (256 >> amp_shift) on every rung.
+    expect(ANCHOR_AMP_RUNGS.length).toBeGreaterThan(0);
+    for (const r of ANCHOR_AMP_RUNGS) {
+      expect(r.peak_to_peak_px, `amp_shift ${r.amp_shift}`).toBe(anchorTravelPx(r.amp_shift));
+    }
+    // ...and the summary under the select quotes that same number, so the
+    // warning and the label cannot disagree on screen.
+    for (const r of ANCHOR_AMP_RUNGS) {
+      expect(anchorSweepSummary(sweepAt(r.amp_shift)))
+        .toContain(`${r.peak_to_peak_px} px of travel`);
+    }
+  });
+
+  it('[6b] the refusal is REACHABLE on channel 1 and UNREACHABLE on channel 0 — measured', () => {
+    const ch0 = EFFECTS_CHANNEL_BANDS.get(0);
+    const ch1 = EFFECTS_CHANNEL_BANDS.get(1);
+    expect(ch0, 'aeon declares no band for channel 0').toBeDefined();
+    expect(ch1, 'aeon declares no band for channel 1').toBeDefined();
+
+    const verdicts = (c: number): string[] =>
+      ANCHOR_AMP_RUNGS.map((r) => anchorBandFit(c, r.peak_to_peak_px).verdict);
+
+    // Channel 0: 218 lines, widest rung 128 px. NO rung can be refused, so a
+    // row aimed here could never fail and would prove nothing about the rule.
+    expect(ANCHOR_MAX_PEAK_PX * 2).toBeLessThanOrEqual(ch0!.lines);
+    expect(new Set(verdicts(0))).toEqual(new Set(['cannot-tell']));
+
+    // Channel 1: 2 lines. Six of the seven rungs are refused; the seventh is
+    // the boundary case, travel == lines, which the contract calls the widest
+    // that fits — and which is therefore CANNOT TELL, not a refusal.
+    expect(verdicts(1).filter((v) => v === 'cannot-fit')).toHaveLength(6);
+    const narrowest = ANCHOR_AMP_RUNGS[ANCHOR_AMP_RUNGS.length - 1];
+    expect(narrowest.peak_to_peak_px).toBe(ch1!.lines);
+    expect(anchorBandFit(1, narrowest.peak_to_peak_px).verdict).toBe('cannot-tell');
+    // ...and one line more IS refused, so the boundary is at travel == lines
+    // and not one either side of it.
+    expect(anchorBandFit(1, ch1!.lines + 1).verdict).toBe('cannot-fit');
+  });
+
+  it('[6c] the sentence names the travel, the band and the count — from the document', () => {
+    const band = EFFECTS_CHANNEL_BANDS.get(1)!;
+    const msg = anchorSweepBandRefusal(sweepAt(4), 1);
+    expect(msg).not.toBeNull();
+    // 32 px of travel (amp_shift 4) against a 2-line band.
+    expect(msg).toContain('32 px of travel');
+    expect(msg).toContain('channel 1');
+    expect(msg).toContain(`${band.lo}–${band.hi}`);
+    expect(msg).toContain(`${band.lines} lines counted inclusively`);
+    expect(msg).toContain(`32 > ${band.lines}`);
+    // NO ±1 ANYWHERE. The numbers on screen are the document's own.
+    expect(msg).not.toContain(String(band.hi + 1));
+    expect(msg).not.toContain(String(band.lo - 1));
+  });
+
+  it('[6d] a legal sweep gets NO CLEARANCE — silence, and the verdict says why', () => {
+    // travel == lines: the widest that fits, and still not a pass.
+    const s = sweepAt(ANCHOR_AMP_RUNGS[ANCHOR_AMP_RUNGS.length - 1].amp_shift);
+    expect(anchorSweepBandRefusal(s, 1)).toBeNull();
+    expect(anchorSweepBandFit(s, 1)!.verdict).toBe('cannot-tell');
+    // Channel 0, every rung: silent, and for the SAME reason, not for want of a
+    // band. This is the row that would go red if somebody added a "fits" arm.
+    for (const r of ANCHOR_AMP_RUNGS) {
+      expect(anchorSweepBandRefusal(sweepAt(r.amp_shift), 0)).toBeNull();
+      expect(anchorSweepBandFit(sweepAt(r.amp_shift), 0)!.verdict).toBe('cannot-tell');
+    }
+  });
+
+  it('[6e] a channel with no declared band is CANNOT TELL, never a warning', () => {
+    // `patch_world_ys` reaches 4 channels; aeon declares bands for 0 and 1.
+    // 2 and 3 must be silent for a DIFFERENT reason from [6d], and the verdict
+    // is what separates them — a row asserting only "no message" could not.
+    for (let c = EFFECTS_CHANNEL_BANDS.size; c < EFFECTS_PRESET_MAX_PATCH; c++) {
+      expect(EFFECTS_CHANNEL_BANDS.has(c)).toBe(false);
+      for (const r of ANCHOR_AMP_RUNGS) {
+        expect(anchorSweepBandRefusal(sweepAt(r.amp_shift), c)).toBeNull();
+        expect(anchorSweepBandFit(sweepAt(r.amp_shift), c)!.verdict).toBe('no-band');
+      }
+    }
+    // Anti-vacuous: the loop above really ran over undeclared channels.
+    expect(EFFECTS_PRESET_MAX_PATCH).toBeGreaterThan(EFFECTS_CHANNEL_BANDS.size);
+  });
+
+  it('[6f] the sentence describes BOTH edges, and does not call either one "clipped"', () => {
+    const msg = anchorSweepBandRefusal(sweepAt(2), 1)!;
+    // Past hi: the record is NOT EMITTED — the band vanishes, and it does NOT
+    // pin to hi. Saying "clipped" or "pinned to the bottom" would be false.
+    expect(EFFECTS_CHANNEL_BAND_EDGE_HI.behaviour).toBe('drop');
+    expect(msg).toContain('not emitted at all');
+    expect(msg).toContain('vanishes for that frame');
+    expect(msg).toContain('does not pin to 223');
+    // Below lo: it IS emitted, clamped up, and stays visible. The opposite
+    // outcome from the same sweep.
+    expect(EFFECTS_CHANNEL_BAND_EDGE_LO.behaviour).toBe('clamp_up');
+    expect(msg).toContain('clamped up to 222');
+    expect(msg).toContain('stays visible');
+    // The one word that would flatten the asymmetry.
+    expect(msg.toLowerCase()).not.toContain('clip');
+  });
+
+  it('[6g] an OFF-LADDER sweep produces no sentence and no verdict', () => {
+    // A hand-written file the schema would refuse cannot reach this panel, but
+    // a warning that invented a travel for one would be worse than silence —
+    // `anchorSweepSummary`'s own rule, applied to the same input.
+    const off = { amp_shift: 99, period_shift: 1 } as EffectsPresetAnchorSweep;
+    expect(anchorAmpRungOf(off)).toBeNull();
+    expect(anchorSweepBandFit(off, 1)).toBeNull();
+    expect(anchorSweepBandRefusal(off, 1)).toBeNull();
   });
 });

@@ -28,6 +28,13 @@
 //      reads the DOCUMENT back. It is the row this parcel would be worthless
 //      without.
 //   4. THE CLOCK RUNS, AND COSTS THE MAP NOTHING. Rows [6*] and [7*].
+//   5. THE BAND WARNING IS ON SCREEN, ON THE ONE CHANNEL IT CAN REACH. aeon
+//      publishes the screen band each patch channel is confined to, and the fit
+//      test is ONE-DIRECTIONAL. Channel 0 is 218 lines and the widest rung
+//      travels 128px, so the warning CAN NEVER FIRE THERE — every other row in
+//      this file drives channel 0, so a row written the obvious way would be
+//      silent forever and read as coverage. Rows [10*] drive CHANNEL 1 (2
+//      lines) and keep channel 0 as the control in the same breath.
 //
 // ============================================================================
 // ⚠ THE IDLE-REPAINT PROPERTY, AND HOW ROW [6c] AVOIDS BEING VACUOUS
@@ -130,6 +137,30 @@ const PERIOD_SECONDS = (s) => (PERIOD_BASE * (2 ** s)) / HZ;
 const MAX_PATCH = SCHEMA.properties.patch_world_ys.maxItems;
 const SENTINEL = SCHEMA.properties.patch_world_ys.items.oneOf[0].not.const;
 const WORLD_Y_MAX = SCHEMA.properties.patch_world_ys.items.oneOf[0].maximum;
+
+// ── THE SCREEN BANDS, ALSO READ IN THIS PROCESS ──────────────────────────────
+//
+// aeon's generated sidecar, vendored at a pinned revision. Read here from the
+// FILE, and the travel formula PARSED out of its own `how_to_use`, for the same
+// reason the ladders above are: importing the app's `channel-bands.ts` would
+// make the rows below say "the panel shows what the provider computes", which
+// they cannot fail. aeon's own sentence said `256 >> amp_shift` — PEAK, half
+// the real travel — until aeon 8d217dd4, so the factor is never remembered.
+const BANDS = JSON.parse(
+  readFileSync(`${ROOT}/src/core/formats/effects/aeon-effects-channel-bands.json`, 'utf8'));
+const BAND = (ch) => BANDS.channels[String(ch)] ?? null;
+const TRAVEL_FORMULA = (() => {
+  const m = /PEAK-TO-PEAK TRAVEL \((\d+) \* \((\d+) >> amp_shift\), whole pixels\) is <= channels\[c\]\.lines/
+    .exec(BANDS.how_to_use ?? '');
+  if (!m) throw new Error('the vendored bands sidecar no longer states the peak-to-peak fit formula');
+  return { mult: Number(m[1]), base: Number(m[2]) };
+})();
+const TRAVEL_PX = (s) => TRAVEL_FORMULA.mult * (TRAVEL_FORMULA.base >> s);
+/** The rungs that CANNOT fit channel `ch`, widest first. Empty is a real answer. */
+const REFUSED_ON = (ch) => {
+  const b = BAND(ch);
+  return b === null ? [] : AMP_SHIFTS.filter((s) => TRAVEL_PX(s) > b.lines);
+};
 
 /** The section id this parcel adds, and the tab the table puts it on. */
 const SECTION_ID = 'aeon.effects.preset.anchors';
@@ -293,6 +324,62 @@ const OPEN_SECTION = (re, proofSelector) => String.raw`
   }
   hdr.click();
   return 'clicked';
+})()`;
+
+/**
+ * A CONTROL IN CHANNEL **N**'S CARD — and it exists because `IN_ROW` above
+ * cannot express the row this parcel needs.
+ *
+ * `IN_ROW` takes the FIRST element whose row-label matches, which for `Travel`
+ * is always channel 0's. That was harmless until EW-TIMELINE-CLOCK: aeon
+ * declares channel 0's band as 218 screen lines and the WIDEST rung on the
+ * amplitude ladder travels 128px, so the band warning CAN NEVER FIRE ON
+ * CHANNEL 0. A row driving `TRAVEL_SEL` and looking for that sentence would be
+ * silent forever and would read as coverage. The warning is reachable only on
+ * channel 1 (2 lines), which is a second card with an identically-labelled row.
+ *
+ * `Card` renders each channel's `Field`s as siblings, and a `Field` is
+ * `<div><span>label</span>{control}</div>` — so the card is the grandparent of
+ * the `Channel N` label, and every row inside it is found by the same
+ * label rule `IN_ROW` uses, scoped to that subtree.
+ */
+const CARD = (n) => String.raw`
+(() => {
+  const lab = [...document.querySelectorAll('span')]
+    .find((s) => new RegExp('^Channel ' + ${JSON.stringify(String(n))} + '$')
+      .test((s.textContent || '').trim()));
+  const row = lab && lab.parentElement;
+  return (row && row.parentElement) || null;
+})()`;
+
+const IN_CARD_ROW = (n, labelRe, tag) => String.raw`
+(() => {
+  const card = ${CARD(n)};
+  if (!card) return null;
+  return [...card.querySelectorAll(${JSON.stringify(tag)})]
+    .find((el) => {
+      const row = el.parentElement;
+      const lab = row && row.firstElementChild;
+      return !!(lab && lab.tagName === 'SPAN' && ${labelRe}.test((lab.textContent || '').trim()));
+    }) || null;
+})()`;
+
+/**
+ * Every sentence painted inside ONE channel's card.
+ *
+ * ⚠ NOT `WARNINGS`, WHICH READS THE WHOLE SECTION. A section-wide text match is
+ * satisfied by any other refusal on this surface — the seed refusal, the
+ * extend refusal, the motion-without-seed advisory — so a row asserting "the
+ * band sentence is on screen" against it would pass on somebody else's
+ * sentence (bar 2c: a matcher loose enough to catch a neighbouring error
+ * reports coverage it does not have). This is scoped to the card whose control
+ * produced the state.
+ */
+const CARD_TEXT = (n) => String.raw`
+(() => {
+  const card = ${CARD(n)};
+  if (!card) return { found: false };
+  return { found: true, text: (card.innerText || '').trim() };
 })()`;
 
 const CHANNEL_SEL = IN_ROW(String.raw`/^Channel 0$/`, 'select');
@@ -1039,6 +1126,120 @@ async function main() {
             .join('\n        ')
           : ' Every choice fits.'));
     }
+
+    // ── 10. THE SWEEP THAT CANNOT FIT ITS BAND, ON SCREEN ──────────────────
+    //
+    // EW-TIMELINE-CLOCK's second half. aeon publishes the screen band each
+    // patch channel's boundary is confined to, and its fit test is
+    // ONE-DIRECTIONAL: travel > lines is CERTAIN, travel <= lines is CANNOT
+    // TELL because the latched line is (anchor - Camera_Y) and the camera
+    // decides where the sweep sits.
+    //
+    // ⚠ THESE ROWS AIM AT CHANNEL 1, AND THE REASON IS THE WHOLE PARCEL.
+    // Channel 0 is 218 lines and the widest rung travels 128px, so the warning
+    // CANNOT FIRE THERE — a row driving the section's first `Travel` select
+    // (which is what every other row here does) would be silent forever with
+    // the rule inverted, deleted, or aimed at the wrong field, and would read
+    // as coverage. `[10b]` measures channel 0 as the CONTROL, in the same
+    // breath as `[10a]` fires on channel 1, so the pair distinguishes "the
+    // warning works" from "the warning is a constant".
+    await c.evalExpr(OPEN_SECTION(ANCHORS_RE, CHANNEL_SEL));
+    await sleep(500);
+
+    const B0 = BAND(0);
+    const B1 = BAND(1);
+    const REFUSED1 = REFUSED_ON(1);
+    console.log(`    bands       : ch0 ${B0 ? `[${B0.lo},${B0.hi}] ${B0.lines} lines` : 'NONE'}`
+      + `   ch1 ${B1 ? `[${B1.lo},${B1.hi}] ${B1.lines} lines` : 'NONE'}`);
+    console.log(`    refusable   : ch0 rungs ${JSON.stringify(REFUSED_ON(0))}`
+      + `   ch1 rungs ${JSON.stringify(REFUSED1)}  (from the VENDORED sidecar, in this process)`);
+
+    // Channel 0 must be sweeping for channel 1's card to exist at all: the
+    // arrays are positional and never given a hole, so index 1 is offered only
+    // when index 0 is spelled.
+    await c.evalExpr(SET_SELECT(MOVEMENT_SEL, 'sweep'));
+    await sleep(700);
+    const MOVEMENT_1 = IN_CARD_ROW(1, String.raw`/^Movement$/`, 'select');
+    const swept1 = await c.evalExpr(SET_SELECT(MOVEMENT_1, 'sweep'));
+    await sleep(800);
+    const TRAVEL_1 = IN_CARD_ROW(1, String.raw`/^Travel$/`, 'select');
+    // The WIDEST rung, which is the loudest violation the ladder can express.
+    const WIDE = REFUSED1[0];
+    const setWide = WIDE === undefined ? 'no-refusable-rung' : await c.evalExpr(SET_SELECT(TRAVEL_1, WIDE));
+    await sleep(700);
+    await c.evalExpr(SCROLL_TO(TRAVEL_1));
+    await sleep(300);
+    const card1 = await c.json(CARD_TEXT(1));
+    const travel1Paint = await c.json(PAINT(TRAVEL_1));
+    const wideTravel = WIDE === undefined ? null : TRAVEL_PX(WIDE);
+    // The five things the sentence must carry, each checked separately so a
+    // failure names which half of it is wrong.
+    const says = (s) => card1.found === true && card1.text.includes(s);
+    check('10a', `⚠ A SWEEP THAT CANNOT FIT IS CALLED OUT ON SCREEN, in channel 1's own card: `
+      + `${wideTravel}px of travel against a ${B1 ? B1.lines : '?'}-line band, with BOTH edge `
+      + 'behaviours named and neither called "clipped"',
+      swept1 === 'ok' && setWide === 'ok' && WIDE !== undefined && B1 !== null
+      && says(`${wideTravel} px of travel`)
+      && says('channel 1')
+      && says(`${B1.lo}–${B1.hi}`)
+      && says(`${wideTravel} > ${B1.lines}`)
+      // Past hi: NOT EMITTED, and explicitly not pinned to hi.
+      && says('not emitted at all') && says(`does not pin to ${B1.hi}`)
+      // Below lo: still emitted, clamped up, visible. The opposite outcome.
+      && says(`clamped up to ${B1.lo}`) && says('stays visible')
+      && !/clip/i.test(card1.text)
+      // ...and it is PAINTED where the control is, not merely in the DOM.
+      && travel1Paint.found === true && travel1Paint.insideScroller === true,
+      `movement→${swept1}  travel→${setWide} (amp_shift ${WIDE} = ${wideTravel}px)\n        `
+      + `Travel select rect ${JSON.stringify(travel1Paint.rect)} `
+      + `insideScroller=${travel1Paint.insideScroller} hitIsSelf=${travel1Paint.hitIsSelf}\n        `
+      + `CARD 1 TEXT ON SCREEN:\n        `
+      + (card1.found ? card1.text.split('\n').map((l) => `| ${l}`).join('\n        ') : '(no card)'));
+
+    // ⚠ THE CONTROL, AND IT IS NOT A FORMALITY. This is the row that separates
+    // "the warning is computed per channel" from "the warning is a constant
+    // string rendered whenever a sweep exists".
+    const card0 = await c.json(CARD_TEXT(0));
+    check('10b', 'CONTROL: the SAME rung on CHANNEL 0 paints NO band warning — channel 0 is '
+      + `${B0 ? B0.lines : '?'} lines and the widest rung travels ${TRAVEL_PX(AMP_SHIFTS[0])}px, so `
+      + 'no legal sweep can be refused there and the sentence must be absent',
+      REFUSED_ON(0).length === 0
+      && card0.found === true
+      && !card0.text.includes('cannot fit channel')
+      && !/clamped up to/.test(card0.text)
+      // ...and no CLEARANCE either. Added after a plant painting "Fits ✓" on
+      // every cannot-tell channel left this row green while [10c] caught it:
+      // an absence-of-warning row does not, by itself, forbid a reassurance.
+      && !/\bfits\b/i.test(card0.text) && !/✓/.test(card0.text),
+      `ch0 refusable rungs = ${JSON.stringify(REFUSED_ON(0))} (empty is the measured fact)\n        `
+      + `CARD 0 TEXT ON SCREEN:\n        `
+      + (card0.found ? card0.text.split('\n').map((l) => `| ${l}`).join('\n        ') : '(no card)'));
+
+    // ⚠ AND NO CLEARANCE, EVER. travel == lines is the widest that FITS by the
+    // contract's own arithmetic, and it is still CANNOT TELL: where the sweep
+    // sits inside [lo, hi] is camera-decided. A green "fits" badge here is the
+    // tempting build and the one this data forbids.
+    const NARROW = AMP_SHIFTS[AMP_SHIFTS.length - 1];
+    const setNarrow = await c.evalExpr(SET_SELECT(TRAVEL_1, NARROW));
+    await sleep(700);
+    const card1Narrow = await c.json(CARD_TEXT(1));
+    check('10c', `⚠ NO CLEARANCE IS EVER PAINTED: at ${TRAVEL_PX(NARROW)}px of travel — exactly `
+      + `channel 1's ${B1 ? B1.lines : '?'} lines, the widest that fits — the warning goes away and `
+      + 'NOTHING replaces it. "travel <= lines" is CANNOT TELL, not a pass',
+      setNarrow === 'ok' && card1Narrow.found === true
+      && !card1Narrow.text.includes('cannot fit channel')
+      && !/\bfits\b/i.test(card1Narrow.text)
+      && !/\bok\b/i.test(card1Narrow.text)
+      && !/✓/.test(card1Narrow.text),
+      `travel→${setNarrow} (amp_shift ${NARROW} = ${TRAVEL_PX(NARROW)}px, band lines `
+      + `${B1 ? B1.lines : '?'})\n        CARD 1 TEXT ON SCREEN:\n        `
+      + (card1Narrow.found
+        ? card1Narrow.text.split('\n').map((l) => `| ${l}`).join('\n        ')
+        : '(no card)'));
+
+    // Put channel 1 back to the violating rung so the capture below shows the
+    // sentence this parcel adds.
+    if (WIDE !== undefined) { await c.evalExpr(SET_SELECT(TRAVEL_1, WIDE)); await sleep(500); }
 
     // ── 9. THE CAPTURE FOR THE OWNER ───────────────────────────────────────
     // ⚠ THE LOOK IS UNRATIFIED. He ruled the shape of this facet, not this
