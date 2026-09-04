@@ -88,6 +88,9 @@
 //      is generated or local output (`scratchpad/shots-*/`, the hardlinked aeon
 //      fixtures, the one-off probes named individually in `.gitignore`), and it
 //      is legitimately absent in a fresh checkout. Counted on the summary line.
+//      ⚠ THIS EXCLUSION IS NOW VERIFIED RATHER THAN ASSERTED — `proveIgnoredSet`
+//      drives both arms of the query every run, because which arm a real run
+//      takes depends on which tree it is standing in. See its own note.
 //   9. PLACEHOLDERS ARE SKIPPED: a token containing — or immediately followed
 //      by — `<`, `>`, `*`, `?` or `…`, and a token that ends a line whose last
 //      character is `-` (a path hyphen-wrapped onto the next line).
@@ -410,9 +413,44 @@ if (files.length === 0) die(`no ${EXTS.join('/')} file under ${ROOTS.join(', ')}
  * check-peer-path-literals: a harness that has materialised a vendored copy of
  * a peer repo must not be able to change this gate's colour. Untracked-but-not-
  * ignored files ARE scanned; a brand-new comment is exactly what this catches.
+ *
+ * ═══ THE THREE EXIT CODES, AND THE ARM THAT NOTHING EXERCISED ═══
+ *
+ * `check-ignore --stdin` exits **1 when NOTHING in its input is ignored**,
+ * **0 when something is**, and **128 on a real fault** (a malformed pathspec).
+ * `execFileSync` throws on all three, so the ordinary answer — "nothing here is
+ * generated output" — arrives as an exception, and reading that as a failure
+ * would turn the commonest case in a fresh checkout into COULD NOT MEASURE.
+ * That is why `e.status` is inspected rather than the throw being trusted.
+ *
+ * ⚠ THAT BRANCH WAS CORRECT AND UNPROVEN UNTIL 2026-09-04, and the difference
+ * matters, because WHICH ARM A RUN TAKES DEPENDS ON WHICH TREE IT RUNS IN. The
+ * file-population call takes the 0-arm on the owner's machine (nine untracked
+ * probes named individually in `.gitignore` sit at `scratchpad/` depth 1 there)
+ * and the 1-arm in an agent worktree, which carries none of them. The CITATION
+ * call is worse: it only runs at all when there is already a violation, and
+ * every red run during construction happened to include an ignored path — so
+ * its 1-arm had never once executed. A branch whose coverage depends on which
+ * machine you are standing on is not covered. `proveIgnoredSet()` below drives
+ * BOTH arms deterministically, on every run, in whatever tree.
+ *
+ * 128 STAYS FATAL, deliberately. Widening the catch to swallow every failure
+ * would delete the one property this function has: it refuses rather than
+ * judging an unknown set of files.
  */
 function ignoredSet(paths) {
   if (paths.length === 0) return new Set();
+  // An empty element becomes an empty LINE, and git answers a blank pathspec
+  // with `fatal: empty string is not a valid pathspec` — exit 128, i.e. this
+  // gate refusing loudly for a fault of its OWN making. No call site can
+  // produce one today; if one ever does, say whose fault it is rather than
+  // reporting it as a problem with the tree. (Measured: a LONE empty input is
+  // exit 1 — empty stdin, nothing to check — and only an EMBEDDED empty line
+  // is the 128, which is why this cannot be left to the catch below.)
+  if (paths.some((p) => p === '')) {
+    die('an empty path reached the ignore query — that is an internal fault in this '
+      + "gate's own token extraction, not a problem with the tree");
+  }
   try {
     const listed = execFileSync('git', ['check-ignore', '--stdin'], {
       cwd: ROOT,
@@ -423,12 +461,74 @@ function ignoredSet(paths) {
     });
     return new Set(listed.split('\n').filter(Boolean));
   } catch (e) {
+    // Exit 1 = "none of these is ignored". The ordinary answer, not a failure.
     if (e.status === 1) return new Set();
-    die(`git check-ignore failed (${e.message}) — this run cannot tell generated output `
-      + 'from source, so it judges an unknown set of files');
+    die(`the ignore query failed (status ${JSON.stringify(e.status)}: ${e.message.split('\n')[0]}) `
+      + '— this run cannot tell generated output from source, so it judges an unknown set '
+      + 'of files. Exit 1 is NOT this branch: it means nothing was ignored, and is handled above.');
     return new Set();
   }
 }
+
+/**
+ * A `.gitignore` pattern that names a path outright — no glob, no negation — so
+ * a probe under it is certainly ignored. DERIVED by reading the file, never
+ * typed: a literal here would be a copied pin that went on "proving" the 0-arm
+ * long after the rule it names had gone.
+ */
+function literalIgnorePattern() {
+  let text;
+  try {
+    text = readFileSync(join(ROOT, '.gitignore'), 'utf8');
+  } catch {
+    return null;
+  }
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#') || line.startsWith('!')) continue;
+    if (/[*?[\]]/.test(line)) continue;
+    const body = line.replace(/\/$/, '');
+    if (!body || body.startsWith('/')) continue;
+    return { pattern: line, dir: line.endsWith('/'), body };
+  }
+  return null;
+}
+
+/**
+ * BOTH ARMS OF `ignoredSet`, ON EVERY RUN. Two queries, each with an answer
+ * this function knows in advance:
+ *
+ *   · a path nothing can ignore, ALONE → exit 1 → an EMPTY set. A build that
+ *     read exit 1 as a failure dies HERE, saying so, instead of in the middle
+ *     of a real run with a message about the tree.
+ *   · that same path beside one under a real `.gitignore` literal → exit 0 → a
+ *     set holding EXACTLY the ignored one. That proves the 0-arm, proves the
+ *     output is parsed onto the right member, and proves a not-ignored path is
+ *     not swept in with it.
+ */
+function proveIgnoredSet() {
+  const clean = join(ROOTS[0], '__check-cited-paths-ignore-probe__', 'not-ignored.ts');
+  const lit = literalIgnorePattern();
+  if (!lit) {
+    die('.gitignore holds no literal (glob-free, un-negated) pattern, so the 0-arm of the '
+      + 'ignore query cannot be proven. Hole 8 — "a cited path git ignores passes unchecked" '
+      + '— would then be an unverified exclusion, which is the shape this gate refuses.');
+  }
+  const dirty = lit.dir ? join(lit.body, '__check-cited-paths-ignore-probe__') : lit.body;
+
+  const alone = ignoredSet([clean]);
+  if (alone.size !== 0) {
+    die(`the exit-1 arm is not behaving: ${clean} came back ignored, so this run cannot `
+      + 'tell "nothing is ignored" from a broken read');
+  }
+  const both = ignoredSet([clean, dirty]);
+  if (!both.has(dirty) || both.has(clean) || both.size !== 1) {
+    die(`the exit-0 arm is not behaving: asked about ${clean} and ${dirty} (under `
+      + `.gitignore's \`${lit.pattern}\`), got ${JSON.stringify([...both])}`);
+  }
+  return { clean, dirty, pattern: lit.pattern };
+}
+const IGNORE_ARMS = proveIgnoredSet();
 
 const relFiles = files.map((f) => relative(ROOT, f));
 const ignoredFiles = ignoredSet(relFiles);
@@ -509,7 +609,10 @@ console.log(
   + `fails on; ${generated.length} citation(s) resolved to git-ignored output; `
   + `${run.declared} citation(s) sat on a line declaring its own absence `
   + `(${ABSENCE_MARKERS.map((m) => `"${m.trim()}"`).join(', ')}); `
-  + `${EXEMPT.length} written exemption(s) applied.`,
+  + `${EXEMPT.length} written exemption(s) applied.\n`
+  + `${PREFIX}: both arms of the ignore query proven this run — "nothing ignored" (exit 1, `
+  + `the ordinary answer, NOT a failure) and "something ignored" (exit 0), the latter `
+  + `against .gitignore's own \`${IGNORE_ARMS.pattern}\`.`,
 );
 
 if (deadExemptions.length) {
