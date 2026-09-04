@@ -1237,6 +1237,15 @@ async function main() {
     // history, which is exactly the state `deleteFrame`'s early return needs.
     // ═══════════════════════════════════════════════════════════════════════
     console.log('\n=== [fg-d] FrameGrid Delete on the `frames.length <= 1` EARLY RETURN ===');
+    // ⚠ THE LAST BACKDROP HOLE, AND IT WAS FOUND BY A PLANT, NOT BY READING.
+    // Under the P5 plant (d-29's clean arm removed, so the guard confirms
+    // UNCONDITIONALLY) `[sp2-d]`'s no-op press leaves a dialog standing, and
+    // this section's aim then landed on its backdrop and ABORTED the run —
+    // taking `[fg-d]` and `[z1]` with it and reporting one stack trace instead
+    // of "P5 reddens sp1-d and sp2-d and nothing else". A plant is supposed to
+    // redden its OWN rows; every phase boundary that can inherit a dialog needs
+    // this, and this was the one boundary that did not have it.
+    await ensureNoDialog(c, 'the start of the [fg-d] phase');
     const fgPreNoop = await snap(c);
     check('fg-d0', 'ANTI-VACUOUS: the document is on the early-return path — exactly one frame, and a '
       + 'CLEAN history, so a press that reached `recordEdit` would be visible in BOTH flags',
