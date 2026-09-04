@@ -150,6 +150,20 @@ describe('no bound, and no invented bound, is typed into the card', () => {
     expect(card, 'the card does not tell the author where the real bound lives')
       .toMatch(/no range in the contract/);
   });
+
+  /**
+   * ⚠ AND THE PER-FIELD GLOSSES ARE THE PROVIDER'S TOO. Two of them state ENGINE
+   * behaviour — past `hi` the record is dropped, below `lo` it is clamped up and
+   * still emitted — and a component that spelled those would be a second copy of
+   * a rule `boundarySummary` already owns, one line away from it and free to
+   * disagree. `band-preset-wording.test.ts`'s panel-wide no-`clamp` row caught
+   * exactly this while it was written here.
+   */
+  it('spells no engine behaviour of its own beside the spinners', () => {
+    expect(card).toContain('BOUNDARY_FIELD_GLOSS.');
+    expect(card, 'the card states engine behaviour in its own words').not.toMatch(/clamp/i);
+    expect(card).not.toMatch(/DROPPED/);
+  });
 });
 
 // ---------------------------------------------------------------------------

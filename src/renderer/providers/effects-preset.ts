@@ -4457,6 +4457,23 @@ export const BOUNDARY_BOUNDED_FIELDS: Readonly<Record<string, { min: number; max
 export type BoundaryNumberField = 'line' | 'channel' | 'lo' | 'hi';
 
 /**
+ * THE ONE-LINE GLOSS BESIDE EACH SPINNER — HERE, NOT IN THE PANEL.
+ *
+ * `band-preset-wording.test.ts`'s standing rule ("the panel spells no rule of
+ * its own") and it caught this: two of these sentences state ENGINE behaviour —
+ * past `hi` the record is dropped, below `lo` it is clamped up and still
+ * emitted — and a component that spelled them would be a second copy of a rule
+ * the provider already owns, free to disagree with `boundarySummary` beside it.
+ * The panel renders these; it does not author them.
+ */
+export const BOUNDARY_FIELD_GLOSS: Readonly<Record<BoundaryNumberField, string>> = Object.freeze({
+  line: 'screen line, before any patch',
+  channel: 'patch channel — seed and sweep it under “moving anchors”',
+  lo: 'lowest screen line — below it the engine clamps up and still draws',
+  hi: 'highest screen line — past it the engine drops the record',
+});
+
+/**
  * Why this value cannot be written to one of the boundary's BOUNDED fields, or
  * null.
  *

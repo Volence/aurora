@@ -623,19 +623,23 @@ describe('the panel mounts the leaf first in the ANCHORS section too, unconditio
         + 'premise — the derivation and the premise disagree').not.toContain(`\`${k}\``);
     }
     expect(textOf(expand(PresetLagDisclosure()))).toBe(live);
-    // ...and it is mounted in exactly FOUR places, so "silent" is a statement
+    // ...and it is mounted in exactly FIVE places, so "silent" is a statement
     // about every body and not about a leaf that quietly lost a mount site.
     //
-    // ⚠ FOUR, NOT THREE, AND IT WAS TWO BEFORE THAT. The `ramp` control card
+    // ⚠ FIVE, NOT FOUR, AND IT WAS TWO BEFORE THAT. The `ramp` control card
     // (row 128) grew the third when it landed and nothing pinned it; the
     // `base_swap` card (row 131) is the fourth, pinned in the same breath as it
-    // was written. The count is asserted here and each site in a row of its own.
-    // A mount site no row names is a mount site the next "tidy away the silent
-    // leaf" edit removes for free.
+    // was written; the `boundary` card (EW-BOUNDARY-PANEL) is the FIFTH, and it
+    // is the first mount site where the sentence is actually SPEAKING —
+    // `PRESET_KEYS_AWAITING_AEON` holds `boundary`, so the card's disclosure
+    // renders rather than returning null. The count is asserted here and each
+    // site in a row of its own. A mount site no row names is a mount site the
+    // next "tidy away the silent leaf" edit removes for free.
     expect(code.split('<PresetLagDisclosure').length - 1,
-      'the leaf is no longer mounted in exactly four bodies — channels, anchors, the ramp card and '
-      + 'the base-swap card. A lost mount site is a re-armed lag that never reaches that surface.',
-    ).toBe(4);
+      'the leaf is no longer mounted in exactly five bodies — channels, anchors, the ramp card, '
+      + 'the base-swap card and the boundary card. A lost mount site is a re-armed lag that never '
+      + 'reaches that surface.',
+    ).toBe(5);
 
     // 2. AND THE WORDING THESE KEYS EARNED IS STILL ASSERTED, driven by the
     //    replay. If the lag re-opens on either one, an author gets a sentence
@@ -700,7 +704,7 @@ describe('the panel mounts the leaf in the RAMP card too, and it stays while sil
     expect(card, 'no ramp control card in the panel').toBeGreaterThan(0);
     // The mount is BEFORE the fields it covers — the same rule as the sections.
     const mounts = [...code.matchAll(/<PresetLagDisclosure\s*\/>/g)].map((m) => m.index!);
-    expect(mounts, 'the leaf is not mounted four times').toHaveLength(4);
+    expect(mounts, 'the leaf is not mounted five times').toHaveLength(5);
     const inRamp = mounts.filter((i) => i < card);
     expect(inRamp.length, 'no PresetLagDisclosure mount precedes the ramp card\'s own controls')
       .toBeGreaterThan(0);
@@ -720,11 +724,17 @@ describe('the panel mounts the leaf in the RAMP card too, and it stays while sil
     // TRUE WHILE THE RAMP CARD WAS LAST IN THE FILE. The base-swap card (row
     // 131) is written after it and carries the fourth mount, so "the last mount
     // in the file" stopped meaning "the ramp card's". Re-aimed at the thing
-    // actually meant: it is the third of four, and exactly one mount follows it.
+    // actually meant: it is the third of the mounts, and the ones that follow
+    // it are the later cards' — TWO of them since EW-BOUNDARY-PANEL, which is
+    // the same lesson landing a second time. The row is now written against
+    // "which mount is this" and the count of later cards rather than against
+    // "is it the last", so a sixth card moves one number here instead of
+    // silently re-pointing the row at somebody else's mount.
     expect(mounts.indexOf(nearest)).toBe(2);
     expect(mounts.filter((i) => i > nearest),
-      'the ramp card\'s mount is no longer followed by exactly one more (the base-swap card\'s)',
-    ).toHaveLength(1);
+      'the ramp card\'s mount is no longer followed by the base-swap card\'s and the boundary '
+      + 'card\'s',
+    ).toHaveLength(2);
     // Nothing renders between the mount and the first ramp field but markup the
     // card owns — specifically, no guard on the mount line itself.
     const line = code.slice(0, nearest).lastIndexOf('\n');
@@ -807,7 +817,7 @@ describe('the panel mounts the leaf in the BASE-SWAP card too, and it stays whil
     const card = code.indexOf('setBaseSwapLineCommand(');
     expect(card, 'no base-swap control card in the panel').toBeGreaterThan(0);
     const mounts = [...code.matchAll(/<PresetLagDisclosure\s*\/>/g)].map((m) => m.index!);
-    expect(mounts, 'the leaf is not mounted four times').toHaveLength(4);
+    expect(mounts, 'the leaf is not mounted five times').toHaveLength(5);
     const before = mounts.filter((i) => i < card);
     expect(before.length, 'no PresetLagDisclosure mount precedes the base-swap card\'s controls')
       .toBeGreaterThan(0);
@@ -820,9 +830,17 @@ describe('the panel mounts the leaf in the BASE-SWAP card too, and it stays whil
       'the nearest mount above the base-swap controls belongs to another card or section — the '
       + 'base-swap card\'s own mount has been removed')
       .not.toMatch(/<CollapsibleSection|setRampSpanCommand\(|id="aeon\.effects\.preset\./);
-    // It is the LAST of the four, which is what makes this row and the ramp
-    // row above talk about two distinct mounts.
-    expect(nearest).toBe(Math.max(...mounts));
+    // ⚠ IT WAS "THE LAST OF THE FOUR" UNTIL EW-BOUNDARY-PANEL, and that
+    // spelling would now be false for a correct panel — the boundary card's
+    // mount is last. What the row actually needed was that this mount is
+    // DISTINCT from the ramp's (the clause above) and that the next one along
+    // belongs to the card that comes after, not to this one counted twice.
+    const after = mounts.filter((i) => i > nearest);
+    expect(after, 'the base-swap card is the last mount site again — the boundary card\'s mount '
+      + 'has been removed').toHaveLength(1);
+    expect(code.slice(nearest, after[0]),
+      'the mount after the base-swap card\'s does not sit before the boundary card\'s own '
+      + 'controls').toContain('setBaseSwapTargetCommand(');
     // No guard on the mount line itself.
     const line = code.slice(0, nearest).lastIndexOf('\n');
     const mountLine = code.slice(line + 1, code.indexOf('\n', nearest));
@@ -865,5 +883,83 @@ describe('the panel mounts the leaf in the BASE-SWAP card too, and it stays whil
   it('the card carries no hand-typed copy of the retired sentence', () => {
     expect(code).not.toMatch(/Not consumed by the engine yet/);
     expect(code).not.toMatch(/refuses the WHOLE DOCUMENT/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THE FIFTH MOUNT SITE — THE BOUNDARY CARD, AND THE FIRST ONE THAT SPEAKS
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠ EVERY OTHER MOUNT IN THIS FILE IS ASSERTED SILENT. This one is not: the
+// premise names `boundary`, which is the key this card authors, so the sentence
+// RENDERS here — and it is the sharper flavour, because aeon's page lists the
+// key in none of its three rows and their generator refuses the WHOLE DOCUMENT.
+// That makes this the one surface where the whole apparatus is doing its job
+// visibly, and the rows below assert both halves: the mount is there, and the
+// sentence it produces is the DERIVATION's own output rather than a literal the
+// card carries.
+describe('the panel mounts the leaf in the BOUNDARY card, where it is SPEAKING', () => {
+  const code = stripComments(readFileSync(PANEL_PATH, 'utf8'));
+
+  it('the boundary card mounts the leaf, propless and unguarded, before its fields', () => {
+    // Located by a control only this card has, not by a key name.
+    const card = code.indexOf('setBoundaryFieldCommand(');
+    expect(card, 'no boundary control card in the panel').toBeGreaterThan(0);
+    const mounts = [...code.matchAll(/<PresetLagDisclosure\s*\/>/g)].map((m) => m.index!);
+    expect(mounts, 'the leaf is not mounted five times').toHaveLength(5);
+    const before = mounts.filter((i) => i < card);
+    expect(before.length, 'no PresetLagDisclosure mount precedes the boundary card\'s controls')
+      .toBeGreaterThan(0);
+    const nearest = Math.max(...before);
+    // ...and it is THIS card's mount, not the base-swap card's leaking in from
+    // above: nothing between the mount and the boundary control opens another
+    // card. Without this clause the row would pass on a panel that deleted the
+    // boundary mount entirely.
+    expect(code.slice(nearest, card),
+      'the nearest mount above the boundary controls belongs to another card or section — the '
+      + 'boundary card\'s own mount has been removed')
+      .not.toMatch(/<CollapsibleSection|setBaseSwapLineCommand\(|id="aeon\.effects\.preset\./);
+    // No guard on the mount line itself.
+    const line = code.slice(0, nearest).lastIndexOf('\n');
+    const mountLine = code.slice(line + 1, code.indexOf('\n', nearest));
+    expect(mountLine).toMatch(/^\s*<PresetLagDisclosure\s*\/>\s*$/);
+    expect(mountLine).not.toMatch(/&&|\?|selected\.|section/);
+  });
+
+  /**
+   * ⚠ THE ROW THAT IS THE OPPOSITE OF EVERY OTHER ONE IN THIS FILE. Elsewhere
+   * the claim is "the sentence does not name THIS surface's keys". Here it must:
+   * `boundary` IS this card's key and the lag IS open on it, so an author
+   * authoring a boundary is told, on the card, that what they are writing does
+   * not build. The sentence is the derivation's own output, so if aeon's
+   * generator arm lands and the drift row empties the premise, this row goes red
+   * and is the reminder that the disclosure retired — it is NOT a claim that the
+   * lag is permanent, and re-arming the list to make it green would be the
+   * defect the whole apparatus exists to prevent.
+   */
+  it('the sentence NAMES this card\'s own key, and is the derivation\'s output not a literal', () => {
+    expect(
+      PRESET_KEYS_AWAITING_AEON,
+      'the lag no longer names `boundary`. If aeon\'s generator arm has landed that is CORRECT: '
+      + 'retire this row with the sentence, and do NOT re-arm the premise to make it green.',
+    ).toContain('boundary');
+    expect(EFFECTS_PRESET_ROOT_KEYS, 'boundary is not a root key of the schema')
+      .toContain('boundary');
+
+    const live = presetLagDisclosure(PRESET_KEYS_AWAITING_AEON);
+    expect(live, 'the premise names boundary and the leaf is silent').not.toBeNull();
+    expect(live!).toContain('`boundary`');
+    // ⚠ THE SHARPER FLAVOUR, which is the whole reason the wording was not
+    // softened when this lag re-opened: a key aeon's page does not mention at
+    // all is one its generator meets as an unknown property and rejects the
+    // WHOLE DOCUMENT for. "Reaches the file and stops there" would understate it.
+    expect(live!).toContain('WHOLE DOCUMENT');
+    expect(live!).toContain('will not build');
+    // ...and the leaf really renders THAT string, rather than the card carrying
+    // a copy of it that would outlive the premise.
+    expect(textOf(expand(PresetLagDisclosure()))).toBe(live);
+    expect(code.slice(code.indexOf('function BoundaryCard(')),
+      'the boundary card writes its own copy of the disclosure\'s sentence, which would outlive '
+      + 'the premise the derivation retires with').not.toMatch(/WHOLE DOCUMENT|will not build/);
   });
 });

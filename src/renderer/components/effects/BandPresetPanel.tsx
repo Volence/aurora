@@ -150,6 +150,7 @@ import {
   // a FIELD precisely so a surface that paints the text cannot drop the
   // attribution — this card paints both halves.
   BOUNDARY_TITLE, BOUNDARY_FIELD_TITLES, BOUNDARY_TINT_FIELD_TITLES, BOUNDARY_ON_ARM,
+  BOUNDARY_FIELD_GLOSS,
   BOUNDARY_WHAT_YOU_SEE, BOUNDARY_OFFSCREEN_SHIP_OPTIONS,
   boundaryFieldRefusal, boundaryTintRefusal, boundarySummary,
   boundaryAdvisoriesFor, boundaryAdvisoryAttribution, boundaryOffscreenShipState,
@@ -1945,7 +1946,7 @@ function BoundaryCard({ library, preset, boundary, run }: {
           onRefusal={say('line')}
           onChange={(n) => run(setBoundaryFieldCommand(library, preset.id, 'line', n))} />
         <span style={{ fontSize: T.tXs, color: T.textLo, minWidth: 0 }}>
-          screen line, before any patch
+          {BOUNDARY_FIELD_GLOSS.line}
         </span>
       </Field>
       {said('line') !== null && <Hint under tone="warning">{said('line')}</Hint>}
@@ -1963,7 +1964,7 @@ function BoundaryCard({ library, preset, boundary, run }: {
           onRefusal={say('channel')}
           onChange={(n) => run(setBoundaryFieldCommand(library, preset.id, 'channel', n))} />
         <span style={{ fontSize: T.tXs, color: T.textLo, minWidth: 0 }}>
-          patch channel — seed and sweep it under &ldquo;moving anchors&rdquo;
+          {BOUNDARY_FIELD_GLOSS.channel}
         </span>
       </Field>
       {said('channel') !== null && <Hint under tone="warning">{said('channel')}</Hint>}
@@ -1974,7 +1975,7 @@ function BoundaryCard({ library, preset, boundary, run }: {
           onRefusal={say('lo')}
           onChange={(n) => run(setBoundaryFieldCommand(library, preset.id, 'lo', n))} />
         <span style={{ fontSize: T.tXs, color: T.textLo, minWidth: 0 }}>
-          lowest screen line — below it, CLAMPED UP and still drawn
+          {BOUNDARY_FIELD_GLOSS.lo}
         </span>
       </Field>
       {said('lo') !== null && <Hint under tone="warning">{said('lo')}</Hint>}
@@ -1985,7 +1986,7 @@ function BoundaryCard({ library, preset, boundary, run }: {
           onRefusal={say('hi')}
           onChange={(n) => run(setBoundaryFieldCommand(library, preset.id, 'hi', n))} />
         <span style={{ fontSize: T.tXs, color: T.textLo, minWidth: 0 }}>
-          highest screen line — past it, the record is DROPPED
+          {BOUNDARY_FIELD_GLOSS.hi}
         </span>
       </Field>
       {said('hi') !== null && <Hint under tone="warning">{said('hi')}</Hint>}
