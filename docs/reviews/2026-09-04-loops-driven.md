@@ -120,6 +120,16 @@ run against a floor run — *"a floor run holds ≈ 0"*.
 **Ground speed never fell below `$0572` (5.45 px/f)**, far above the `$280` detach floor.
 He was never in danger of dropping off, which is why one clean run was enough.
 
+> ## ⛔ CORRECTED 2026-09-04 — THE TWO PARAGRAPHS BELOW REST ON A FRAME COUNT THAT WAS READ OFF TOO SPARSE A SAMPLE
+>
+> **The flip is at frame 1151, not 1152, and the lag is ONE frame, which is exactly what the
+> engine documents.** Re-measured frame by frame the same day; the table and the numbers are in
+> §3a below. The claim "two frames later" was never observed: **every row of the §3 table is a
+> run-step boundary** (the recipe's own arithmetic lands on exactly those ten frames and no
+> others), so **frames 1148, 1149 and 1151 were never sampled** — and 1151 is the frame the flip
+> actually happens on. Read the two paragraphs below as the record of what was believed before
+> the resample, not as findings.
+
 ⚠ **THE FLIP IS NOT ON THE FRAME OF ENTRY, AND I AM NOT ROUNDING THAT AWAY.** The recipe
 predicts `layer` goes 0→1 *"on the frame the player's centre first enters
 `x ∈ [736,751]` and `y ∈ [752,799]`"*. At frame 1150 he is at `(748, 779)` — **inside
@@ -142,6 +152,63 @@ What is established is the *symptom*: the flip lands two frames after window ent
 `xover_cell`'s high word corresponds to the previous frame's `x`. The mechanism is not
 established, by me or by anyone, and the word "latched" in the paragraph above should be
 read as naming the symptom rather than the cause.
+
+---
+
+## 3a. THE RESAMPLE — frame by frame, and the lag is ONE
+
+**Why this section exists:** §3's table samples only at run-step boundaries. That was invisible
+in the artifact, so a peer lane built a decision table on "two frames" before either of us asked
+what the spacing was. The absence of the unsampled frames is now loud instead of silent.
+
+**Frames sampled: 1147, 1148, 1149, 1150, 1151, 1152 — contiguous, no gaps.** Same private
+server (`oracle-aether` pid 435411, `mode: own-instance`, socket under `/tmp/oracle-mcp-*/`),
+loop ROM `loop-s4.debug.bin` reloaded and its own `.lst` bound (`binding: match`), `debug_flag`
+`$FF9036` read `0x00` so free flight was OFF and the run is real physics.
+
+Offsets were re-derived on this machine, not copied: `x` at `Player_1+$02` and `y` at
+`Player_1+$06` were located by matching frame 1147's known `(763, 770)`; `layer` at
+`Player_1+$2D` (`$FF9027`) and `xover_cell` at `Player_Blocks+$14` (`$FFE93A`) are the server's
+own `symbolDisp` arithmetic.
+
+| frame | x | y | in window | layer | `xover_cell` | hi, lo | derived from |
+|---|---|---|---|---|---|---|---|
+| 1147 | 763 | 770 | no | 0 | *(not sampled)* | | |
+| 1148 | 758 | 774 | no | 0 | `$02F8_0300` | 760, 768 | frame 1147 (x=763) |
+| 1149 | 753 | 777 | no | 0 | `$02F0_0300` | 752, 768 | frame 1148 (x=758) |
+| **1150** | **748** | **779** | **YES — ENTRY** | 0 | `$02F0_0300` | 752, 768 | frame 1149 (x=753) |
+| **1151** | **743** | **784** | yes | **1 — THE FLIP** | `$02E8_0300` | 744, 768 | frame 1150 (x=748) |
+| 1152 | 739 | 789 | yes | 1 | `$02E0_0310` | 736, 784 | frame 1151 (x=743) |
+
+**Entry is frame 1150 and the flip is frame 1151, both observed integers, neither derived.**
+
+- **Lag from "position first lands in the marked cell" to "`xover_cell` changes": 1 frame.**
+  The engine documents exactly 1 — `Player_LoopCrossover` runs in the shared per-frame preamble
+  and consumes LAST frame's resolved position, because the layer it writes must be in place
+  before this frame's sensors read it.
+- **Lag from "`xover_cell` changes" to "`Sst.layer` changes": 0 frames.** Both happen at 1151.
+
+**So the engine does exactly what it documents, and there is no unexplained second frame.**
+The "two frames" in §3 was the gap between two run-step samples, nothing more.
+
+**The one-frame derivation holds on every sampled frame, not just at the crossing** — all five
+`xover_cell` readings equal the PREVIOUS frame's position masked. That is five for five, which
+is what makes it the design rather than a coincidence at the boundary.
+
+⚠ **THE MASK IS ASYMMETRIC AND THE AUTHORED WINDOW SPANS TWO TRIGGER CELLS.** `x` quantises on
+**8 px** (`x & $FFF8`) and `y` on **16 px** (`y & $FFF0`). The recipe's window is `x ∈ [736,751]`
+— exactly 16 px, i.e. **two** trigger cells (736 and 744). So a single authored window produces
+more than one in-window cell id, and the id changed a second time *inside* the window at 1152
+(744 → 736) with `layer` already 1 and staying 1. The trigger is an equality on a cell id, so
+this is the geometry to check before reading any future entry-frame figure as off-by-one.
+
+**Method note, and it is the transferable half:** the resample split the recipe's tail `R3 R2`
+into five one-frame presses. That is a different input shape, so it was checked rather than
+assumed — the split path reproduces the original at **all three frames both paths observe**
+(1147 `(763,770)`, 1150 `(748,779)` layer 0 cell `$02F0_0300`, 1152 `(739,789)` layer 1). Same
+destination two ways, so the per-frame rows are the original run's, not a differently-driven
+one's.
+
 
 ---
 
