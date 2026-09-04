@@ -434,25 +434,65 @@ function canarySources(present, presentBase) {
 // GUARD 2 — a population to judge.
 // ---------------------------------------------------------------------------
 
-const files = [];
-for (const r of ROOTS) {
-  const p = join(ROOT, r);
+/**
+ * THE POPULATION — ASKED OF GIT, NOT WALKED OFF THE DISK.
+ *
+ * ⚠ THIS REPLACED A `readdirSync` WALK ON 2026-09-04, AFTER THE WALK PRODUCED
+ * THREE SEPARATE FAILURES OF ONE SHAPE. All three were the same defect wearing
+ * different clothes: **the gate's input set was a property of the machine it
+ * stood on rather than of the repository.**
+ *
+ *   · the ignore query's exit-1 arm fired only in a tree with nothing ignored;
+ *   · a citation naming a path outside the repo exit-128'd the whole batch;
+ *   · and the walk DESCENDED THROUGH SYMLINKS. `scratchpad/fixtures/aeon-
+ *     build-pin/aeon-current` is a symlink to an entire foreign checkout — its
+ *     own `.git`, its own `.claude` — and git refuses any path beyond one
+ *     (`fatal: pathspec … is beyond a symbolic link`). On the owner's machine
+ *     the walk enumerated **5,821** files where the repository holds 1,257, and
+ *     **4,565 of them were git-ignored, most inside that symlinked repo.**
+ *
+ * One command removes all three at once, and it is the same question this file
+ * was always asking:
+ *
+ *     git ls-files --cached --others --exclude-standard -- <roots>
+ *
+ *   · symlinks vanish — git never walks beyond one, and never leaves the repo;
+ *   · ignored files vanish — `--exclude-standard` IS the rule the gate was
+ *     calling `check-ignore` to apply, so that whole query disappears from the
+ *     population path, and with it every one of its 128 modes;
+ *   · `node_modules/` and `dist/` need no special-casing — they are ignored;
+ *   · and `--others` keeps UNTRACKED-BUT-NOT-IGNORED files, which is the point:
+ *     a brand-new comment is untracked at the moment its author runs the suite,
+ *     and that is exactly what this gate exists to catch.
+ *
+ * RECONCILED RATHER THAN ADOPTED. Measured in this worktree, the walk and this
+ * command return **the same 1,257 files, with zero on either side of the diff**
+ * — so the numbers that differed (1,257 here, 1,256 in a reviewer's checkout)
+ * were never two methods disagreeing. `git ls-tree eb426df3` holds **1,256**
+ * under these roots, and the one file present now and absent there is
+ * `scripts/check-cited-paths.mjs`: THIS FILE, counting itself. The reviewer
+ * measured the backed-out tree and I measured the branch.
+ */
+function population() {
+  let out;
   try {
-    if (!statSync(p).isDirectory()) throw new Error(`${p} is not a directory`);
+    out = execFileSync('git',
+      ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', ...ROOTS],
+      { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 });
   } catch (e) {
-    die(`cannot read ${p}: ${e.message}`);
+    const why = String(e.stderr ?? '').trim().split('\n')[0];
+    die(`could not list the repository's files (status ${JSON.stringify(e.status)})`
+      + `${why ? `\n  git said: ${why}` : ''}`
+      + '\n  Without a population this run examined an unknown set of files.');
+    return [];
   }
-  const walk = (dir) => {
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
-      if (e.name === 'node_modules' || e.name === 'dist') continue;
-      const q = join(dir, e.name);
-      if (e.isDirectory()) walk(q);
-      else if (EXTS.some((x) => e.name.endsWith(x))) files.push(q);
-    }
-  };
-  walk(p);
+  return out.split('\0').filter((f) => f && EXTS.some((x) => f.endsWith(x)));
 }
-if (files.length === 0) die(`no ${EXTS.join('/')} file under ${ROOTS.join(', ')}. Nothing was examined.`);
+
+const files = population();
+if (files.length === 0) {
+  die(`git lists no ${EXTS.join('/')} file under ${ROOTS.join(', ')}. Nothing was examined.`);
+}
 
 /**
  * Drop the files git IGNORES — same rule and same reason as
@@ -484,52 +524,93 @@ if (files.length === 0) die(`no ${EXTS.join('/')} file under ${ROOTS.join(', ')}
  * would delete the one property this function has: it refuses rather than
  * judging an unknown set of files.
  */
+/** Paths git refused to answer for, with its reason. Reported, never silent. */
+const UNQUERYABLE = [];
+
+/**
+ * One query. `{ok:true,set}` on 0 or 1; `{ok:false,status,why}` otherwise.
+ * Nothing here decides what a failure MEANS — that is the caller's job.
+ */
+function queryIgnored(paths) {
+  try {
+    const listed = execFileSync('git', ['check-ignore', '--stdin'], {
+      cwd: ROOT,
+      input: paths.join('\n'),
+      encoding: 'utf8',
+      // ⚠ CAPTURED, NEVER 'ignore'. The status alone says a query failed; only
+      // git's own line says WHY. Discarding it cost two review rounds guessing
+      // at a `status 128` whose stderr named the offending path outright, and
+      // then named the symlink in ONE run once it was kept.
+      stdio: ['pipe', 'pipe', 'pipe'],
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    return { ok: true, set: new Set(listed.split('\n').filter(Boolean)) };
+  } catch (e) {
+    // Exit 1 = "none of these is ignored". The ordinary answer, not a failure.
+    if (e.status === 1) return { ok: true, set: new Set() };
+    return { ok: false, status: e.status, why: String(e.stderr ?? '').trim().split('\n')[0] };
+  }
+}
+
+/**
+ * Which of these paths does git ignore?
+ *
+ * ═══ NO SINGLE TOKEN MAY KILL THIS QUERY ═══
+ *
+ * That is the general rule, and it is here because THREE separate defects were
+ * the same thing: a path this gate handed to git that git refuses, taking the
+ * whole batch — and every good path in it — down with one exit 128.
+ *
+ *     ../aeon/x.ts                          128  is outside repository
+ *     /abs/x.ts                             128  Invalid path '/abs'
+ *     scratchpad/…/aeon-current/            128  is beyond a symbolic link
+ *     '' embedded among others              128  empty string is not a valid pathspec
+ *
+ * Patching them one at a time was losing to the tree, because the offending
+ * shapes are a property of the machine, not of this repo. So: the ones this
+ * gate can recognise are filtered up front, and ANY OTHER refusal falls back to
+ * asking one path at a time — which cannot lose more than the single path git
+ * actually objected to. Those are collected in `UNQUERYABLE`, counted on the
+ * summary line with git's own reason, and treated as NOT ignored, so a citation
+ * this gate could not classify stays a violation rather than passing quietly.
+ *
+ * A query that fails for EVERY path is still fatal. That is not a bad path, it
+ * is a broken git, and judging an unknown set of files is what this refuses.
+ */
 function ignoredSet(paths) {
   if (paths.length === 0) return new Set();
-  // An empty element becomes an empty LINE, and git answers a blank pathspec
-  // with `fatal: empty string is not a valid pathspec` — exit 128, i.e. this
-  // gate refusing loudly for a fault of its OWN making. No call site can
-  // produce one today; if one ever does, say whose fault it is rather than
-  // reporting it as a problem with the tree. (Measured: a LONE empty input is
-  // exit 1 — empty stdin, nothing to check — and only an EMBEDDED empty line
-  // is the 128, which is why this cannot be left to the catch below.)
+  // An empty element becomes an empty LINE. Measured: a LONE empty input is a
+  // plain exit 1 (empty stdin, nothing to check) and only an EMBEDDED empty
+  // line is the 128 — so this cannot be left to the fallback, and it is an
+  // internal fault rather than anything about the tree.
   if (paths.some((p) => p === '')) {
     die('an empty path reached the ignore query — that is an internal fault in this '
       + "gate's own token extraction, not a problem with the tree");
   }
-  // THE BELT. `citations()` already drops these, so nothing should arrive here;
-  // if a future rule reintroduces one, drop it rather than let it exit-128 the
-  // whole batch. A path outside the repo can never be git-ignored, so this
-  // costs no coverage — and the failure it replaces was a gate dying on a
-  // comment somebody wrote.
+  // Recognised-unsendable, dropped before git sees them. A path outside the
+  // repo can never be git-ignored, so this costs no coverage.
   const sendable = paths.filter(judgeable);
   if (sendable.length === 0) return new Set();
-  try {
-    const listed = execFileSync('git', ['check-ignore', '--stdin'], {
-      cwd: ROOT,
-      input: sendable.join('\n'),
-      encoding: 'utf8',
-      // ⚠ CAPTURED, NEVER 'ignore'. The status alone says a query failed; only
-      // git's own line says WHY. Discarding it cost two review rounds of
-      // guessing at a `status 128` whose stderr named the offending path
-      // outright. A checker that knows something went wrong and cannot say
-      // what is a refusal nobody can act on.
-      stdio: ['pipe', 'pipe', 'pipe'],
-      maxBuffer: 64 * 1024 * 1024,
-    });
-    return new Set(listed.split('\n').filter(Boolean));
-  } catch (e) {
-    // Exit 1 = "none of these is ignored". The ordinary answer, not a failure.
-    if (e.status === 1) return new Set();
-    const why = String(e.stderr ?? '').trim().split('\n')[0];
-    die(`the ignore query failed (status ${JSON.stringify(e.status)})`
-      + `${why ? `\n  git said: ${why}` : ' — git said nothing on stderr'}`
-      + '\n  This run cannot tell generated output from source, so it judges an unknown set of '
-      + 'files. Exit 1 is NOT this branch: it means nothing was ignored, and is handled above. '
-      + 'A status 128 naming a path is usually one this gate should not have sent — see '
-      + '`judgeable()`.');
-    return new Set();
+
+  const whole = queryIgnored(sendable);
+  if (whole.ok) return whole.set;
+
+  // Something in the batch is unanswerable. Find out which, and keep the rest.
+  const set = new Set();
+  const refused = [];
+  for (const one of sendable) {
+    const r = queryIgnored([one]);
+    if (r.ok) { for (const x of r.set) set.add(x); } else refused.push({ path: one, why: r.why });
   }
+  if (refused.length === sendable.length && sendable.length > 1) {
+    die(`the ignore query failed for EVERY one of ${sendable.length} paths (status `
+      + `${JSON.stringify(whole.status)})`
+      + `${whole.why ? `\n  git said: ${whole.why}` : ' — git said nothing on stderr'}`
+      + '\n  That is not one bad path, it is a query this run cannot make, so it judges an '
+      + 'unknown set of files.');
+  }
+  UNQUERYABLE.push(...refused);
+  return set;
 }
 
 /**
@@ -607,22 +688,34 @@ function proveIgnoredSet() {
       + `${JSON.stringify([...escaping, clean, dirty])}, got ${JSON.stringify([...mixed])}. `
       + 'Every good path in that batch went unjudged.');
   }
-  return { clean, dirty, pattern: lit.pattern, escaping };
+  // ═══ THE FOURTH ARM: THE FALLBACK'S OWN DISCRIMINATOR ═══
+  //
+  // `ignoredSet` survives an unanswerable path by asking one at a time — but
+  // only if `queryIgnored` really does report a refusal rather than an empty
+  // answer. If it ever started returning `{ok:true, set:[]}` for a path git
+  // refuses, the fallback would silently classify every unanswerable citation
+  // as "not ignored" and the summary would report zero of them, forever.
+  const refusal = queryIgnored([escaping[0]]);
+  if (refusal.ok || !refusal.why) {
+    die(`the per-path fallback cannot see a refusal: asking about ${escaping[0]} returned `
+      + `${JSON.stringify(refusal)}. Every unanswerable citation would be silently `
+      + 'classified rather than counted.');
+  }
+  return { clean, dirty, pattern: lit.pattern, escaping, refusalSeen: refusal.why };
 }
 const IGNORE_ARMS = proveIgnoredSet();
 
-const relFiles = files.map((f) => relative(ROOT, f));
-const ignoredFiles = ignoredSet(relFiles);
+// Already repo-relative, already ignore-filtered, already symlink-free.
+const relFiles = files;
 const sources = [];
-for (const rel of relFiles.sort()) {
-  if (ignoredFiles.has(rel)) continue;
+for (const rel of relFiles.slice().sort()) {
   try {
     sources.push({ rel, text: readFileSync(join(ROOT, rel), 'utf8') });
   } catch (e) {
     die(`cannot read ${rel}: ${e.message}`);
   }
 }
-if (sources.length === 0) die(`every ${EXTS.join('/')} file under ${ROOTS.join(', ')} is git-ignored.`);
+if (sources.length === 0) die(`no readable ${EXTS.join('/')} file under ${ROOTS.join(', ')}.`);
 
 /** Basenames present under the four roots — the filesystem, not `git ls-files`. */
 const presentBases = new Set(relFiles.map((f) => f.split('/').pop()));
@@ -681,7 +774,9 @@ const deadExemptions = EXEMPT.filter((e) => !usedExemptions.has(e));
 
 console.log(
   `${PREFIX}: read the whole-line comments of ${sources.length} ${EXTS.join('/')} file(s) under `
-  + `${ROOTS.join(', ')} (${ignoredFiles.size} git-ignored file(s) excluded) and found `
+  + `${ROOTS.join(', ')} — the population git reports (\`ls-files --cached --others `
+  + '--exclude-standard`), not a filesystem walk, so symlinked trees and ignored output '
+  + `are absent by construction — and found `
   + `${run.tokens} in-repo citation(s) against 2 rule(s) — cited-path-missing, cited-file-missing `
   + '(both fired on their canaries; 8 negative canaries silent).\n'
   + `${PREFIX}: aurora ${ROOT}\n`
@@ -694,11 +789,16 @@ console.log(
   + `${PREFIX}: ${run.escaping} citation(s) named a path that LEAVES this repo (a \`../\` `
   + 'traversal or an absolute) — unjudgeable by rule 1, and never sent to the ignore query, '
   + 'which exits 128 on one and loses the whole batch with it.\n'
-  + `${PREFIX}: all three arms of the ignore query proven this run — "nothing ignored" `
+  + `${PREFIX}: ${UNQUERYABLE.length} cited path(s) git could not answer for`
+  + `${UNQUERYABLE.length ? ` — ${UNQUERYABLE.map((u) => `${u.path} (${u.why})`).join('; ')}` : ''}`
+  + '; each is treated as NOT ignored, so it stays a violation rather than passing quietly, '
+  + 'and no single one of them can take the query down.\n'
+  + `${PREFIX}: all four arms of the ignore query proven this run — "nothing ignored" `
   + '(exit 1, the ordinary answer, NOT a failure), "something ignored" (exit 0, against '
   + `.gitignore's own \`${IGNORE_ARMS.pattern}\`), and "an escaping path does not take down `
   + `the batch it travels in" (${IGNORE_ARMS.escaping.length} probes: `
-  + `${IGNORE_ARMS.escaping.join(', ')}).`,
+  + `${IGNORE_ARMS.escaping.join(', ')}), and "a refusal is visible to the per-path `
+  + 'fallback rather than reading as an empty answer".',
 );
 
 if (deadExemptions.length) {
