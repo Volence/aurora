@@ -210,13 +210,29 @@ async function mouse(c, type, x, y) {
     type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1,
   });
 }
-async function key(c, k, code, vk, modifiers = 0) {
+/**
+ * ⚠ `text` IS NOT DECORATION, AND THE FIRST VERSION OF THIS FILE GOT IT WRONG.
+ *
+ * A CDP `keyDown` WITHOUT `text` produces a keydown and NO keypress. Blink
+ * activates a focused `<button>` on SPACE at keyup and on ENTER at keypress —
+ * two different paths — so the textless form activates Space and silently does
+ * nothing for Enter. MEASURED here, not reasoned: `[d1e]` came back with the
+ * dialog still standing after Enter while `[d1k]`'s Space had closed it, which
+ * reads exactly like "the app ignores Enter" and is instead the harness never
+ * having sent one. That is this repo's synthetic-event failure wearing a
+ * different hat — a key the browser never turns into a press.
+ *
+ * Both keys now carry `text`, so the channel is uniform and faithful rather
+ * than accidentally correct for one of them. THE SPACE ROWS WERE RE-RUN UNDER
+ * THIS TIGHTENED CHANNEL, not carried over from the run that found it.
+ */
+async function key(c, k, code, vk, modifiers = 0, text = undefined) {
   const base = { key: k, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, modifiers };
-  await c.send('Input.dispatchKeyEvent', { type: 'keyDown', ...base });
+  await c.send('Input.dispatchKeyEvent', { type: 'keyDown', ...base, ...(text ? { text } : {}) });
   await c.send('Input.dispatchKeyEvent', { type: 'keyUp', ...base });
 }
-const space = (c) => key(c, ' ', 'Space', 32);
-const enter = (c) => key(c, 'Enter', 'Enter', 13);
+const space = (c) => key(c, ' ', 'Space', 32, 0, ' ');
+const enter = (c) => key(c, 'Enter', 'Enter', 13, 0, '\r');
 const escape = (c) => key(c, 'Escape', 'Escape', 27);
 
 /** A REAL CLICK, aimed at integer client pixels and hit-tested before sending. */
@@ -606,10 +622,18 @@ async function main() {
     // ═══════════════════════════════════════════════════════════════════════
     // DOOR 3 — shell/tab-activation/sprite.ts, the tab close ✕
     //
-    // THE THREE-BUTTON DOOR, and the one that discriminates hardest. Its
-    // buttons are Save / Discard / Cancel, so `index 0` is SAVE and `the only
-    // other button` is ambiguous: a focus rule that happened to be right at the
-    // two-button doors above can still be wrong here.
+    // A THIRD ask() SITE, in a third file, reached by a real mouse press on an
+    // affordance that is not a <button> at all (it is a <span> carrying an SVG,
+    // which is why the aim's elementFromPoint lands on a <path> and the hit
+    // test accepts a descendant).
+    //
+    // ⚠ ITS BUTTON SET IS DERIVED, NOT ASSUMED, and the first version of this
+    // file assumed wrong. `confirmCloseSpriteDoc` emits Save only when
+    // `doc.s1ArtSource !== null`; for the object-art document this harness
+    // opens it is null, so the real dialog is [discard, cancel] — TWO buttons,
+    // not the three the source reads like at a glance. The row below asserts
+    // what the dialog actually contains and prints it; the three-button shape is
+    // measured at DOOR 4, which really does emit Save / Discard / Cancel.
     // ═══════════════════════════════════════════════════════════════════════
     console.log('\n=== DOOR 3: the tab close ✕ (shell/tab-activation/sprite.ts) ===');
     await ensureNoDialog(c, 'the start of DOOR 3');
@@ -627,18 +651,22 @@ async function main() {
       d3 = await c.json('window.__cf.dlg()');
       await shot(c, 'd3-tabclose-dialog');
     }
-    const d3IsSpriteTab = d3 !== null && /sprite/i.test(d3.label ?? '');
+    const d3Keys = d3?.buttons?.map((b) => b.key) ?? [];
+    const d3IsSpriteTab = d3 !== null && /sprite/i.test(d3.label ?? '')
+      && d3Keys.includes('cancel') && d3Keys.includes('discard')
+      && d3Keys.every((k) => k === 'save' || k === 'discard' || k === 'cancel');
     check('d3n', 'the ✕ really opened the SPRITE TAB-CLOSE door and not some other dialog — asserted '
-      + "from the dialog's own aria-label, so a mis-aimed click cannot pass this",
-      d3IsSpriteTab && d3.buttonCount === 3,
+      + "from the dialog's own aria-label AND its key set, so a mis-aimed click cannot pass this",
+      d3IsSpriteTab,
       `dialog label = ${JSON.stringify(d3?.label)}, ${d3?.buttonCount} buttons `
-      + `${JSON.stringify(d3?.buttons?.map((b) => b.key))}. Three buttons is the point of this door: `
-      + 'index 0 here is SAVE, so a focus rule of "the first one" is wrong here and right at DOORS '
-      + '1-2, and only this door can tell them apart.');
+      + `${JSON.stringify(d3Keys)}. The set is CHECKED, not counted: confirmCloseSpriteDoc emits `
+      + 'Save only when the document has an s1ArtSource, and this one does not, so the real dialog '
+      + 'here is two buttons. Asserting "3" — which the source reads like at a glance — is what the '
+      + 'first version of this file did, and it went red on a correct app.');
     if (d3IsSpriteTab) {
-      focusRow('d3', 'tab close ✕ → "Unsaved sprite edits" (Save / Discard / Cancel)', d3,
-        'The three-button shape. Focus must be on cancel — not on Save (index 0, harmless but not '
-        + 'the no-op) and not on Discard.');
+      focusRow('d3', `tab close ✕ → "Unsaved sprite edits" (${d3Keys.join(' / ')})`, d3,
+        'A third ask() site, in a third file, reached by a real mouse press on a <span> affordance '
+        + 'rather than a <button>.');
       doorsReached.push('tab-activation/sprite.ts (tab close ✕)');
 
       await space(c); await sleep(700);
@@ -664,9 +692,16 @@ async function main() {
     // begins with `window.api.selectDirectory()`, an OS folder picker CDP
     // cannot drive; the "Open recent" commands are emitted only while no
     // project is open, which is the one state in which nothing can be dirty.
-    // `__dbg.aeon.projectOpenGuard()` calls the REAL `confirmProjectOpen` and
-    // deliberately skips only the folder picker — debug-hooks.ts:1030 sets out
-    // exactly what is and is not skipped. The real ConfirmDialog appears.
+    // `__dbg.canvas.projectOpenGuard()` calls the REAL `confirmProjectOpen`
+    // and deliberately skips only the folder picker — its doc comment in
+    // debug-hooks.ts (inside CanvasProbeApi, NOT AeonProbeApi, which is where I
+    // first looked for it) sets out exactly what is and is not skipped. The
+    // real ConfirmDialog appears on screen for this file to read.
+    //
+    // ⚠ THE THREE-BUTTON DOOR. This one really does emit Save / Discard /
+    // Cancel, so `index 0` here is SAVE: a focus rule of "the first button" is
+    // wrong here and RIGHT at every other door in this file, and this is the
+    // only place that can tell them apart.
     // ═══════════════════════════════════════════════════════════════════════
     console.log('\n=== DOOR 4: the project-open guard (shell/project-open-guard.ts) ===');
     await ensureNoDialog(c, 'the start of DOOR 4');
@@ -676,13 +711,22 @@ async function main() {
       d4Pre.dirty === true, d4Pre.brief);
     // Fire it WITHOUT awaiting: the guard parks on the dialog, so awaiting here
     // would deadlock the evaluation before a key could be sent.
-    await c.evalExpr('window.__cfGuard = window.__dbg.aeon.projectOpenGuard(); void 0');
+    await c.evalExpr('window.__cfGuard = window.__dbg.canvas.projectOpenGuard(); void 0');
     await sleep(900);
     const d4 = await c.json('window.__cf.dlg()');
     await shot(c, 'd4-projectopen-dialog');
+    const d4Keys = d4?.buttons?.map((b) => b.key) ?? [];
+    check('d4n', 'this door really is the THREE-BUTTON shape — Save / Discard / Cancel — so the row '
+      + 'below is discriminating "focus cancel" from "focus index 0", not restating DOOR 1',
+      d4 !== null && d4Keys.length === 3 && d4Keys[0] === 'save' && d4Keys.includes('discard')
+      && d4Keys.includes('cancel'),
+      `keys = ${JSON.stringify(d4Keys)} (asserted, not assumed — DOOR 3 taught this file that a `
+      + 'button set read off the source at a glance can be wrong in the running app)');
     focusRow('d4', 'project open → "Unsaved changes" (Save / Discard / Cancel)', d4,
-      'A THIRD button set, from a different file, reached without a mouse at all.');
-    if (d4 !== null) doorsReached.push('project-open-guard.ts (__dbg route)');
+      'THE THREE-BUTTON DOOR, reached without a mouse at all: index 0 here is SAVE, so this is the '
+      + 'one door that separates "focus cancel" from "focus the first button" — a rule that would be '
+      + 'correct at every other door in this file.');
+    if (d4 !== null) doorsReached.push('project-open-guard.ts (__dbg.canvas route)');
 
     await space(c); await sleep(700);
     const d4kDlg = await c.json('window.__cf.dlg()');
