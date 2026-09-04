@@ -1474,7 +1474,22 @@ function RampCard({ library, presetId, ramp, run, scroll }: {
           `top + 2`, not `top + 1`. The contract now says so, Aurora re-vendored
           it, and the span readout on this card derives `top + 2` from
           `EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET`. Do not re-add a
-          contested note about it. */}
+          contested note about it.
+          ⚠ BUT "SETTLED" IS NARROWER THAN THIS PARAGRAPH ONCE READ, and
+          empyrean `bfc000e` (2026-09-04) says so in the contract: what closed is
+          that AURORA'S DERIVATION AND AEON'S MEASUREMENT AGREE, not that the
+          machine answered. `top + 2` is as read on oracle's RUST core; the
+          legacy C++ core reads both raster tiers one line earlier on the same
+          ROM bytes and is disqualified as a referee because it is self-
+          inconsistent by 79-83 of 224 rows between two identical boots; the
+          landing line is UNPINNED in the Rust core's own recon; and NO HARDWARE
+          REFEREE exists. That attribution is not left in this comment — it is
+          PARSED from the schema and PAINTED, on the ramp readout's own `title`
+          (`RAMP_DISPLAY_INSTRUMENT`, folded into `RAMP_DISPLAY_LAG_NOTE`),
+          because the person misled by an unattributed number is the author.
+          (The "the engine moved fire+1 -> fire+2 on 2026-08-19" attribution that
+          rode alongside is WITHDRAWN: aeon's two-core test refuted its own
+          finding — both tiers shift by one line between the two cores.) */}
       <PresetLagDisclosure />
 
       {/* THE SIGN DISCLOSURE — SILENT SINCE 2026-09-03, AND MOUNTED ANYWAY.
@@ -1523,8 +1538,10 @@ function RampCard({ library, presetId, ramp, run, scroll }: {
           ⚠ IT READS NO LINE NUMBERS, and that is why it did not move when the
           display-span question SETTLED (empyrean `e9409dc`, 2026-09-03: the
           first written value displays on `top + 2`, and the card's readout now
-          derives it). This sentence is about the HORIZONTAL extent and touches
-          neither `rampDisplaySpan` nor either display constant. */}
+          derives it) — nor again when `bfc000e` (2026-09-04) attributed that
+          number to an INSTRUMENT (oracle's Rust core, no hardware referee, the
+          landing line unpinned). This sentence is about the HORIZONTAL extent
+          and touches neither `rampDisplaySpan` nor either display constant. */}
       {scroll !== null && (
         <Hint under>
           <span title={scroll.full}>{scroll.short}</span>

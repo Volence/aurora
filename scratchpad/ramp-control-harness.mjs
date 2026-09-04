@@ -140,6 +140,54 @@ const { FIRST_LINE_OFFSET, INDEX_LAG } = (() => {
 })();
 
 /**
+ * ═══ WHOSE NUMBERS THE CARD PAINTS — read from the contract, not typed ═══
+ *
+ * ⚠ WHY A HARNESS ROW AND NOT ONLY A NODE ROW. `RAMP_DISPLAY_LAG_NOTE` is
+ * COMPOSED AT RUNTIME from the vendored schema, so a `dist/` grep can show that
+ * the composition site and the contract clause both shipped and CANNOT show the
+ * composed sentence. Only a run of the real app can, and only a run of the real
+ * app can show it on the element an author actually hovers. Row [ds-d] below is
+ * that reading.
+ *
+ * ⚠ AND THE EXPECTATION IS DERIVED HERE TOO. A .mjs harness imports nothing from
+ * the TypeScript, so a phrase typed in this file would sit stale through a
+ * contract change with nothing to notice — the defect that put `=== 1` in this
+ * file once already. These spans come out of the SAME vendored schema the codec
+ * parses, with this file's own regexes, so the row is a second independent
+ * reading rather than a restatement of the module's parse.
+ *
+ * ⚠ AND IT REFUSES RATHER THAN SKIPPING. A missing clause means the contract
+ * stopped attributing its own numbers, which is precisely the condition the
+ * painted note exists to survive; a harness that shrugged at it would go quiet
+ * exactly when the answer mattered.
+ */
+const INSTRUMENT = (() => {
+  const schema = JSON.parse(readFileSync(
+    join(ROOT, 'src/core/formats/effects/aurora-effects-preset.schema.json'), 'utf8'));
+  const rampProse = String(schema.properties.ramp.description ?? '');
+  const topProse = String(schema.$defs.ramp.properties.top.description ?? '');
+  const vM = /so (top\+(\d+) is the instrument's reading today and not a ratified hardware fact)/
+    .exec(rampProse);
+  const aM = /(AS READ ON ORACLE'S RUST CORE) \(([^)]*)\)/.exec(topProse);
+  if (!vM || !aM) {
+    throw new Error(
+      'ramp-control-harness: aurora-effects-preset.schema.json no longer attributes the ramp '
+      + `display lines to the instrument that read them (verdict ${vM ? 'found' : 'MISSING'} in `
+      + `properties.ramp, attribution ${aM ? 'found' : 'MISSING'} in $defs.ramp.properties.top). `
+      + 'Row [ds-d] paints those spans back at an author; without them the card asserts an '
+      + 'instrument reading as settled machine behaviour. Re-read the schema — do NOT retype '
+      + 'the clause here.');
+  }
+  if (Number(vM[2]) !== FIRST_LINE_OFFSET) {
+    throw new Error(
+      `ramp-control-harness: the schema's attribution names top+${vM[2]} while its \`top\` `
+      + `sentence yields ${FIRST_LINE_OFFSET}. Two nodes of one contract disagree about one `
+      + 'quantity; this run will not pick one. Re-read both sentences.');
+  }
+  return { verdict: vM[1], attribution: `${aM[1]} (${aM[2].replace(/,\s*see the ramp description$/, '')})` };
+})();
+
+/**
  * ═══ THE SIGN DISCLOSURE'S PREMISE, READ FROM THE FILE THAT OWNS IT ═══
  *
  * ⚠ ROWS [ns-a]/[ns-b]/[ns-c] ASK WHICHEVER QUESTION THE PREMISE MAKES TRUE, and
@@ -978,6 +1026,34 @@ async function main() {
       'the readout\'s own `title` carries RAMP_DISPLAY_LAG_NOTE, which states the latency and that '
       + 'no stage of the engine path compensates.');
 
+    // ⚠ [ds-d] IS [ds-c]'s MISSING HALF, and it is the row this landing exists
+    // for. [ds-c] proves the reason reaches the author; it says nothing about
+    // WHOSE reason it is. The note used to state `top + 1` / `top + 2` flatly
+    // and close "measured by the engine lane" — true, and read as settled
+    // machine behaviour. Both spans below are the CONTRACT's own words, parsed
+    // above out of the vendored schema, so this row goes red if the module ever
+    // hand-writes the attribution or quietly drops it.
+    {
+      const titleOf = String.raw`(() => {
+        const e = [...document.querySelectorAll('span')]
+          .filter((s) => /shows on screen lines/.test(s.textContent || '')).pop();
+        return e ? (e.getAttribute('title') || '') : null;
+      })()`;
+      const title = await c.evalExpr(titleOf);
+      const has = (s) => typeof title === 'string' && title.includes(s);
+      check('ds-d', 'the painted numbers name the INSTRUMENT that read them',
+        has(INSTRUMENT.verdict) && has(INSTRUMENT.attribution)
+        && /no hardware referee exists/i.test(String(title))
+        // ...and the WITHDRAWN attribution never reaches an author.
+        && !/2026-08-19/.test(String(title)),
+        title === null
+          ? 'UNMEASURABLE: the display-span readout was not on screen, so its title could not be '
+            + 'read at all — this is not a pass'
+          : `the readout's title must carry the contract's own verdict (${INSTRUMENT.verdict}) and `
+            + 'its instrument clause, and must NOT carry the withdrawn 2026-08-19 engine-move '
+            + `attribution. title was: ${String(title).slice(0, 400)}`);
+    }
+
     // ══════════════════════════════════════════════════════════════════════
     // WITNESS MODE — `RAMP_WITNESS_OUT=<path>` authors the document aeon's
     // end-to-end proof runs against, THROUGH THE PANEL, and writes it out.
@@ -996,7 +1072,14 @@ async function main() {
     // the bottom of a 224-line screen and only 219 of the 220 lines can be seen.
     // That is the contract's own arithmetic, and it is still the right subject
     // for a witness — a display-offset error falls off the end of the screen
-    // instead of shifting subtly. `step` is -1.5, the
+    // instead of shifting subtly. ⚠ AND THE ARITHMETIC IS AN INSTRUMENT'S, not a
+    // hardware fact (empyrean `bfc000e`, 2026-09-04): the display lines are as
+    // read on ORACLE'S RUST CORE; the legacy C++ core reads both raster tiers one
+    // line earlier on the same ROM bytes and is disqualified as a referee for
+    // being self-inconsistent by 79-83 of 224 rows between two identical boots;
+    // the landing line is UNPINNED in the Rust core's own recon; NO HARDWARE
+    // REFEREE exists. A witness run therefore does not RATIFY 5..224 — it shows
+    // this editor and that instrument agreeing. `step` is -1.5, the
     // schema's own worked example, so the ROM proves the SIGN RULE end to end
     // and not merely the plumbing; `addr` 2 is plane B full-width, measured by
     // the engine lane (VSCR 0 at the probe point) rather than chosen.

@@ -57,12 +57,38 @@
  *   - WHAT THAT DOES *NOT* SAY: the on-screen SLOPE was never matched
  *     line-by-line against -1.5. The span arm deliberately uses step-0 twins, so
  *     it measures which lines the run REACHES, not the rate it applies to them.
- *   - IT IS EMULATION, NOT SILICON. oracle is Exodus-derived.
+ *   - IT IS EMULATION, NOT SILICON. ⚠ AND THE OLD SENTENCE HERE NAMED THE WRONG
+ *     CORE: it read "oracle is Exodus-derived", which is true of **oracle-old**,
+ *     the legacy C++ port. THE ORACLE that produced these readings is the
+ *     ground-up RUST core. The distinction is now load-bearing — see the
+ *     instrument paragraph below, where the two cores DISAGREE.
  *
- * ⚠ THE SPAN WAS CONTESTED BY EXACTLY ONE LINE. **IT IS SETTLED, AND THE
- * MEASUREMENT WON** (empyrean `e9409dc`, 2026-09-03). The history is kept
- * because the resolution is the interesting part and because a reader who finds
- * only the old caveat will "fix" the wrong side:
+ * ⚠ THE SPAN WAS CONTESTED BY EXACTLY ONE LINE, AND THE TWO READERS NOW AGREE
+ * (empyrean `e9409dc`, 2026-09-03). ⚠ BUT "SETTLED" MEANT LESS THAN THIS BLOCK
+ * ONCE CLAIMED, AND `bfc000e` (2026-09-04) SAYS SO IN THE CONTRACT ITSELF. What
+ * closed is the disagreement between AURORA'S DERIVATION and AEON'S MEASUREMENT:
+ * both now say `top + 2`. What did NOT close is whether `top + 2` is the
+ * machine's answer:
+ *
+ *   - the number is AS READ ON **oracle's Rust core**;
+ *   - oracle's LEGACY C++ core reads BOTH raster tiers one line earlier on the
+ *     same ROM bytes, and is disqualified as a referee because it disagrees with
+ *     ITSELF by 79-83 of 224 rows between two identical boots — NOT because it
+ *     is known to be wrong here;
+ *   - the landing line is UNPINNED in the Rust core's own recon;
+ *   - NO HARDWARE REFEREE EXISTS on this project.
+ *
+ * A one-line difference between two scanline-granularity models can be a model
+ * boundary with neither wrong about the VDP. So this paragraph's old "THE
+ * MEASUREMENT WON" is kept as history and must not be read as a hardware fact.
+ *
+ * ⚠ AND THE COROLLARY THAT WAS WITHDRAWN WITH IT: *"the engine moved fire+1 ->
+ * fire+2 on 2026-08-19"*. aeon's own two-core test refuted its own finding —
+ * BOTH tiers shift by one line between the two cores on the same bytes. Do not
+ * cite it.
+ *
+ * The history below is kept because the resolution is the interesting part and
+ * because a reader who finds only the old caveat will "fix" the wrong side:
  *
  *   - Aurora derived first-displayed-line `top + 1` from the contract schema's
  *     own `top` sentence. aeon's arm 4 MEASURED `top + 2`, on two documents with

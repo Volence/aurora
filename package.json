@@ -169,6 +169,7 @@
     "harness:s1-sonic-preview": "node scratchpad/s1-sonic-preview-harness.mjs",
     "harness:s1-sonic-sprite": "node scratchpad/s1-sonic-sprite-harness.mjs",
     "harness:save-file-count": "node scratchpad/save-file-count-harness.mjs",
+    "harness:schema-revendor": "node scratchpad/schema-revendor-proof.mjs",
     "harness:screen-frame": "node scratchpad/screen-frame-harness.mjs",
     "harness:screen-frame-guides": "node scratchpad/screen-frame-guides-harness.mjs",
     "harness:section-column": "node scratchpad/section-column-harness.mjs",

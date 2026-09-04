@@ -830,6 +830,30 @@ export const EFFECTS_PRESET_RAMP_SPAN_MAX: number = schemaNumberFromProse(
  * have been reasoning from a wrong premise. The bottom edge really is one line
  * over, and that is a fact about the ENGINE, not an error in this derivation.
  *
+ * ⚠ WHOSE NUMBERS THESE ARE — ADDED AT empyrean `bfc000e` (2026-09-04), AND IT
+ * CHANGES NO VALUE ABOVE. Everything in this block is stated as though the
+ * machine had been asked; it has not, and the contract now says so itself. The
+ * display lines are AS READ ON **oracle's Rust core**. oracle's LEGACY C++ core
+ * reads BOTH raster tiers one line earlier on the same ROM bytes, and it is
+ * disqualified as a referee NOT because it is known wrong here but because it
+ * disagrees with ITSELF by 79-83 of 224 rows between two identical boots. The
+ * landing line is UNPINNED in the Rust core's own recon (mid-line CRAM/VSRAM
+ * write timing is an interim model there). NO HARDWARE REFEREE EXISTS on this
+ * project. A one-line difference between two scanline-granularity models can be
+ * a model boundary with neither wrong about the VDP.
+ *
+ * SO: `1` and `2` are what the instrument reads today, not ratified hardware
+ * facts. THE DERIVATIONS BELOW DO NOT CHANGE — they parse whatever the contract
+ * states and that is still the right design; what changes is what may be SAID
+ * about them, which is why `RAMP_DISPLAY_INSTRUMENT` in the renderer parses this
+ * attribution out of the same schema and PAINTS it beside the numbers.
+ *
+ * ⚠ AND ONE ATTRIBUTION IS WITHDRAWN, NOT WEAKENED: *"the engine moved fire+1 ->
+ * fire+2 on 2026-08-19"*. aeon's own two-core test refuted its own finding —
+ * BOTH tiers shift by one line between the two cores on the same bytes, so what
+ * moved was the reading instrument, not the engine. Do not cite it, and do not
+ * treat the sparse tier's landing rule as settled either.
+ *
  * ⚠ CRAM IS A THIRD RULE AND WE CANNOT EXPRESS IT. The contract now also states
  * the CRAM case: a CRAM target's value `j` displays on `top + j` — ONE LINE
  * EARLIER than VSRAM, because the N+1 latency is VSRAM's alone. There is no CRAM
