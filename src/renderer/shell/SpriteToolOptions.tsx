@@ -3,6 +3,7 @@ import { useSpriteStore } from '../state/spriteStore';
 import type { SpriteTool, SpriteTransform } from '../state/spriteStore';
 import { OptionBar, Chip, Divider, NumberField, T } from '../components/ui';
 import { actAndDropFocus } from '../components/ui/act-and-drop-focus';
+import { newSpriteGuarded } from './new-sprite-guard';
 import {
   GlyphButton, TransformGrid, DitherConfig, MirrorButton, ZoomControl,
 } from '../components/art-shared/ToolColumnParts';
@@ -60,13 +61,16 @@ export default function SpriteToolOptions({
           before d-27 a click left one focused and a bare Space threw the
           document away again with no confirmation and nothing to undo with.
           See `ui/act-and-drop-focus.ts`.
-          SCOPE: this makes the chips drop focus and NOTHING ELSE. Whether a
-          new-sprite wipe should be undoable, or should confirm, is a separate
-          question filed for the owner; `newSprite` itself is untouched. */}
+          THE OTHER HALF IS NOW ANSWERED TOO (d-29, `guard_when_dirty`): the
+          chips ask before replacing a sprite that has unsaved edits, and a
+          CLEAN document still sees no dialog at all. Both chips route through
+          `newSpriteGuarded` — see `shell/new-sprite-guard.ts` for the mechanism
+          and for who ruled it. The store's `newSprite` is still unguarded, so a
+          THIRD call site must call the guard, not the store. */}
       <span style={{ color: T.textLo }}>New</span>
       <span style={{ display: 'inline-flex', gap: 4 }}>
         {SIZE_PRESETS.map((s) => (
-          <Chip key={s} onClick={(e) => actAndDropFocus(e, () => st().newSprite(s, s))}>{s}</Chip>
+          <Chip key={s} onClick={(e) => actAndDropFocus(e, () => { void newSpriteGuarded(s, s); })}>{s}</Chip>
         ))}
       </span>
       {/* `v || 8` USED TO BE THE EMPTY-BOX ARM: emptying the box handed this a
@@ -77,11 +81,12 @@ export default function SpriteToolOptions({
       <NumberField value={newSize} min={8} max={128} width={48}
         title="custom size (px)"
         onChange={(v) => onNewSize(Math.max(8, Math.min(128, v || 8)))} />
-      {/* Same writer, same ruling, its OWN dispatch line — see the block above.
-          A blur wired to the preset chips and not to this one is exactly the
-          shape this repo loses defects in, so the harness gives it its own
-          row rather than assuming the loop above covers it. */}
-      <Chip onClick={(e) => actAndDropFocus(e, () => st().newSprite(newSize, newSize))}>New □</Chip>
+      {/* Same writer, same two rulings, its OWN dispatch line — see the block
+          above. A blur (d-27) or a confirm (d-29) wired to the preset chips and
+          not to this one is exactly the shape this repo loses defects in, so
+          the harness gives it its own rows rather than assuming the loop above
+          covers it. */}
+      <Chip onClick={(e) => actAndDropFocus(e, () => { void newSpriteGuarded(newSize, newSize); })}>New □</Chip>
 
       <Divider />
 

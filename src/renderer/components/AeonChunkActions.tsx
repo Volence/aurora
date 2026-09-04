@@ -2,6 +2,7 @@ import React from 'react';
 import { T } from './ui';
 import { useProjectStore } from '../state/projectStore';
 import { clearChunkLibrary, importChunkFiles } from '../providers/chunk-library-import';
+import { actAndDropFocus } from './ui/act-and-drop-focus';
 
 /**
  * Aeon's chunk-grid header controls: import a chunk library from S2/S3K/hack
@@ -31,7 +32,28 @@ export default function AeonChunkActions(): React.ReactElement {
       <button onClick={() => { void handleImport(); }} style={styles.btn} disabled={importing}>
         {importing ? 'Importing...' : 'Import'}
       </button>
-      {hasChunks && <button onClick={clearChunkLibrary} style={styles.btn}>Clear</button>}
+      {/* d-30 (`confirm_before`): Clear now ASKS first — see
+          `providers/chunk-library-import.ts` for the mechanism and for who
+          ruled it. Two things about this line are deliberate:
+
+          • `void` on the promise. The handler stays synchronous; the dialog is
+            awaited inside the guard, and the button is left interactive behind
+            a modal that covers it anyway.
+          • `actAndDropFocus`. Before the confirm, this button dropped focus by
+            UNMOUNTING — `hasChunks` goes false the moment the library empties,
+            which is the reason d-27's survey did not list it. With a confirm in
+            front, the CANCEL path leaves it mounted and focused, so the
+            property that made it exempt no longer holds and it needs the same
+            explicit blur every other destructive control here has. Keeping an
+            existing property, not new scope. */}
+      {hasChunks && (
+        <button
+          onClick={(e) => actAndDropFocus(e, () => { void clearChunkLibrary(); })}
+          style={styles.btn}
+        >
+          Clear
+        </button>
+      )}
     </span>
   );
 }
