@@ -2,7 +2,7 @@
 /**
  * WHICH ROWS ARE DECIDED BY A PEER LANE'S UNCOMMITTED EDITS — measured, not read.
  *
- * ROADMAP row 78 / `docs/OVERSEER.md` bar 19. On this machine every sibling repo
+ * ROADMAP row 78 / `docs/OVERSEER-REVIEW-BARS.md` bar 19 (moved there 2026-09-04). On this machine every sibling repo
  * is another lane's LIVE checkout, so a test that opens one has its colour
  * decided by whatever that peer has typed and not committed. This instrument
  * answers, for every test file that names `s1disasm`, WHICH of three things it
