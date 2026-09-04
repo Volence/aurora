@@ -139,6 +139,45 @@ const { FIRST_LINE_OFFSET, INDEX_LAG } = (() => {
   return { FIRST_LINE_OFFSET: off, INDEX_LAG: lag };
 })();
 
+/**
+ * ═══ THE SIGN DISCLOSURE'S PREMISE, READ FROM THE FILE THAT OWNS IT ═══
+ *
+ * ⚠ ROWS [ns-a]/[ns-b]/[ns-c] ASK WHICHEVER QUESTION THE PREMISE MAKES TRUE, and
+ * they are told which by `core/formats/effects/ramp-sign-lag.ts` rather than by a
+ * constant in this file. Until 2026-09-03 the premise was `['start','step']` and
+ * those rows required the sentence PAINTED. aeon merged the two's-complement
+ * encode into `raster_ramp_program`, the premise emptied, and the rows now
+ * require the opposite: on a NEGATIVE document, nothing on this screen may still
+ * tell the author it will not build. A rig that kept demanding the sentence
+ * would go RED on a repo where nothing is wrong — which is exactly what happened
+ * to the sibling `variant-cycle-harness` and cost a run to isolate.
+ *
+ * A hand-typed flag here would be the second source of truth the parcel forbids,
+ * and it is the copy that goes stale first: the premise has already moved twice.
+ *
+ * ⚠ `=\s*\n?\s*`, NOT `= `. The sibling harness THREW at import — before its
+ * first row — for a whole day because a literal single space stopped matching a
+ * declaration that had wrapped onto a second line.
+ */
+const NS_PREMISE = (() => {
+  const src = readFileSync(join(ROOT, 'src/core/formats/effects/ramp-sign-lag.ts'), 'utf8');
+  const m = /RAMP_SIGN_FIELDS_AWAITING_AEON: readonly RampSignField\[\] =\s*\n?\s*Object\.freeze<RampSignField\[\]>\(\[([^\]]*)\]\)/
+    .exec(src);
+  if (!m) {
+    throw new Error(
+      'ramp-control-harness: ramp-sign-lag.ts no longer declares RAMP_SIGN_FIELDS_AWAITING_AEON '
+      + 'in the shape this run reads it from, so the [ns] rows cannot tell whether the sign '
+      + 'disclosure is ARMED or RETIRED and would assert whichever state was true when they were '
+      + 'written. Re-read the file and update the pattern — do NOT hardcode the state. '
+      + '(ramp-sign-lag-disclosure.test.ts row 26 pins this pattern against the declaration.)');
+  }
+  return m[1].split(',').map((s) => s.trim().replace(/^'|'$/g, '')).filter(Boolean);
+})();
+/** EMPTY since 2026-09-03: aeon's `raster_ramp_program` encodes the two's
+ *  complement at comptime (`origin/master` `065dc790`), so a negative ramp value
+ *  builds and the disclosure retired. Read, never assumed. */
+const NS_PREMISE_OPEN = NS_PREMISE.length > 0;
+
 // ⚠ THIS ID MUST NOT COLLIDE WITH A PRESET AEON SHIPS, and it did.
 //
 // This harness opens aeon's LIVE checkout read-only and creates its fixture
@@ -728,9 +767,20 @@ async function main() {
     // ⚠ THE ROW ABOVE ([rt-c]) IS THE REASON THIS BLOCK EXISTS. `-1.5` is
     // representable, the codec writes it, the document is well-formed, the
     // schema accepts it, and aeon's GENERATOR accepts it — and the ROM still
-    // does not build, because `raster_ramp_program` declares `rrp_start` /
-    // `rrp_step` as `u32` and forwards the signed value RAW. So [rt-c] is a
-    // green row about a document that cannot ship, and nothing above it says so.
+    // did not build, because `raster_ramp_program` declared `rrp_start` /
+    // `rrp_step` as `u32` and forwarded the signed value RAW. So [rt-c] was a
+    // green row about a document that could not ship, and nothing above it said so.
+    //
+    // ⚠ RETIRED 2026-09-03, AND THESE ROWS INVERTED WITH IT. aeon's constructor
+    // now encodes the two's complement at comptime (`origin/master` `065dc790`),
+    // `RAMP_SIGN_FIELDS_AWAITING_AEON` is empty, and a negative ramp builds. So
+    // [ns-a]/[ns-b]/[ns-c] no longer require the sentence PAINTED — they require
+    // it GONE, on the very documents that used to carry it, because a warning
+    // that outlives its premise is a FALSE WARNING and that is the same defect
+    // wearing the other hat. Which question each asks is decided by NS_PREMISE
+    // above, read from ramp-sign-lag.ts, so a re-arm flips them back with no edit
+    // here. Both branches screenshot: the retirement is photographed the way the
+    // sentence was.
     //
     // AND THE SCOPE IS THE HARD PART. "ramp does not reach the game" RETIRED
     // earlier the same day and re-arming it would be a false warning. A POSITIVE
@@ -757,20 +807,39 @@ async function main() {
     // reaches the page correctly and leaves BACKSLASHES in this file, so the
     // node-side row that pins these copies against the exported constants can
     // no longer find them — measured, not imagined.
-    const NS_CAVEAT_NEEDLES = ['The nearest rates you CAN have are -1 and 0', NS_CAVEAT,
-      'does not fit u32', 'still the nearest value this ENCODING can spell'];
+    // ⚠ THE ARITHMETIC HALF IS ASKED IN BOTH STATES, and separately from the
+    // caveat half. The refusal itself — "the nearest rates you CAN have are -1
+    // and 0" — is a true fact about the ENCODING and was never touched by either
+    // the arming or the retirement; only the addendum moved. Querying them
+    // together would have let a vanished refusal read as a retired caveat.
+    const NS_ARITH_NEEDLES = ['The nearest rates you CAN have are -1 and 0'];
+    const NS_CAVEAT_NEEDLES = [NS_CAVEAT, 'does not fit u32',
+      'still the nearest value this ENCODING can spell'];
+    const refusalSentence = await c.json('window.__rp.paintedRect(\'HAS NO SPELLING\', '
+      + `${JSON.stringify(NS_ARITH_NEEDLES)})`);
     const caveatSentence = await c.json('window.__rp.paintedRect(\'HAS NO SPELLING\', '
       + `${JSON.stringify(NS_CAVEAT_NEEDLES)})`);
-    await shot(c, 'ns-caveat');
-    check('ns-a', '⚠ THE REFUSAL STILL NAMES -1 AND 0 — THE ARITHMETIC IS NOT CORRUPTED — AND IT '
-      + 'NOW SAYS -1 WILL NOT BUILD. A refusal that names a nearest-representable alternative '
-      + 'carries the authority of a fix: the author types -0.5, is told to use -1, and THAT '
-      + 'document fails at emission. The neighbours are a true fact about the ENCODING and are '
-      + 'left alone; the build limitation rides beside them. And the document did not move',
-      !!caveatSentence && caveatSentence.inScroller === true && caveatSentence.allPresent === true
-      && JSON.stringify(afterCav.ramp.step) === JSON.stringify(beforeCav.ramp.step),
-      `painted refusal = ${JSON.stringify(caveatSentence)}; step `
-      + `${JSON.stringify(beforeCav.ramp.step)} → ${JSON.stringify(afterCav.ramp.step)} `
+    await shot(c, NS_PREMISE_OPEN ? 'ns-caveat' : 'ns-caveat-retired');
+    const nsaBase = !!refusalSentence && refusalSentence.inScroller === true
+      && refusalSentence.allPresent === true
+      && JSON.stringify(afterCav.ramp.step) === JSON.stringify(beforeCav.ramp.step);
+    check('ns-a', NS_PREMISE_OPEN
+      ? '⚠ THE REFUSAL STILL NAMES -1 AND 0 — THE ARITHMETIC IS NOT CORRUPTED — AND IT '
+        + 'NOW SAYS -1 WILL NOT BUILD. A refusal that names a nearest-representable alternative '
+        + 'carries the authority of a fix: the author types -0.5, is told to use -1, and THAT '
+        + 'document fails at emission. The neighbours are a true fact about the ENCODING and are '
+        + 'left alone; the build limitation rides beside them. And the document did not move'
+      : '⚠ THE REFUSAL STILL NAMES -1 AND 0 — THE ARITHMETIC SURVIVED THE RETIREMENT — AND THE '
+        + '"WILL NOT BUILD" CAVEAT IS GONE (premise empty in ramp-sign-lag.ts). aeon encodes the '
+        + 'two\'s complement now, so -1 builds and the recommendation IS a fix; a clause still '
+        + 'saying otherwise would be a false warning stapled to a correct sentence. And the '
+        + 'document did not move',
+      NS_PREMISE_OPEN
+        ? nsaBase && !!caveatSentence && caveatSentence.allPresent === true
+        : nsaBase && (caveatSentence === null || caveatSentence.allPresent === false),
+      `premise = ${JSON.stringify(NS_PREMISE)}; painted refusal = `
+      + `${JSON.stringify(refusalSentence)}; painted caveat = ${JSON.stringify(caveatSentence)}; `
+      + `step ${JSON.stringify(beforeCav.ramp.step)} → ${JSON.stringify(afterCav.ramp.step)} `
       + `(unchanged=${JSON.stringify(afterCav.ramp.step) === JSON.stringify(beforeCav.ramp.step)})`);
 
     // ── [ns-b] a representable NEGATIVE: the document MOVES and speaks ────
@@ -791,16 +860,32 @@ async function main() {
       'this is about the sign, not about `ramp`'];
     const negSentence = await c.json('window.__rp.paintedRect(\'raster_ramp_program\', '
       + `${JSON.stringify(NS_NEG_NEEDLES)})`);
-    await shot(c, 'ns-negative');
-    check('ns-b', '⚠ A REPRESENTABLE NEGATIVE LANDS IN THE DOCUMENT AND THE PANEL DISCLOSES IT. '
-      + 'The two halves in one condition: `step` really is {whole: -1, frac256: 128} in the model '
-      + '(so this is not a refusal that withheld the edit) AND the sentence is painted, names the '
-      + 'field, names the mechanism, and says in as many words that a POSITIVE value in the same '
-      + 'box builds — the scope that keeps this from re-arming the `ramp` claim that retired',
-      !!negDoc.ramp.step && negDoc.ramp.step.whole === -1 && negDoc.ramp.step.frac256 === 128
-      && !!negSentence && negSentence.inScroller === true && negSentence.allPresent === true,
-      `step = ${JSON.stringify(negDoc.ramp.step)}; start = ${JSON.stringify(negDoc.ramp.start)}; `
-      + `painted disclosure = ${JSON.stringify(negSentence)}`);
+    // ⚠ ASKED AT BOTH ENDS WHEN RETIRED, because the leaf paints its lead in its
+    // own `<span>` and the body as a sibling text node — one alone could go null
+    // while the other was still on screen.
+    const negLead = await c.json(`window.__rp.paintedRect(${JSON.stringify(NS_LEAD)})`);
+    await shot(c, NS_PREMISE_OPEN ? 'ns-negative' : 'ns-negative-retired');
+    // The DOCUMENT half is identical in both states: the edit must land either way.
+    const nsbDoc = !!negDoc.ramp.step && negDoc.ramp.step.whole === -1
+      && negDoc.ramp.step.frac256 === 128;
+    check('ns-b', NS_PREMISE_OPEN
+      ? '⚠ A REPRESENTABLE NEGATIVE LANDS IN THE DOCUMENT AND THE PANEL DISCLOSES IT. '
+        + 'The two halves in one condition: `step` really is {whole: -1, frac256: 128} in the model '
+        + '(so this is not a refusal that withheld the edit) AND the sentence is painted, names the '
+        + 'field, names the mechanism, and says in as many words that a POSITIVE value in the same '
+        + 'box builds — the scope that keeps this from re-arming the `ramp` claim that retired'
+      : '⚠ A REPRESENTABLE NEGATIVE LANDS IN THE DOCUMENT AND THE PANEL SAYS NOTHING ABOUT IT '
+        + '(premise empty in ramp-sign-lag.ts). `step` really is {whole: -1, frac256: 128} in the '
+        + 'model — so the surface was DRIVEN to the exact document that used to be disclosed, not '
+        + 'merely left alone — and no element on it still claims the value cannot build. aeon '
+        + 'encodes; this one ships',
+      NS_PREMISE_OPEN
+        ? nsbDoc && !!negSentence && negSentence.inScroller === true
+          && negSentence.allPresent === true
+        : nsbDoc && negSentence === null && negLead === null,
+      `premise = ${JSON.stringify(NS_PREMISE)}; step = ${JSON.stringify(negDoc.ramp.step)}; `
+      + `start = ${JSON.stringify(negDoc.ramp.start)}; painted disclosure = `
+      + `${JSON.stringify(negSentence)}; painted lead = ${JSON.stringify(negLead)}`);
 
     // ── [ns-c] `start` is the same u32 and the same raw forward ──────────
     await typeInto(c, 'start', '-2', 'Start (also NEGATIVE)');
@@ -808,14 +893,24 @@ async function main() {
     const NS_BOTH_NEEDLES = [NS_LEAD, '`start` (px) and `step` (px per scanline) are negative'];
     const bothSentence = await c.json('window.__rp.paintedRect(\'raster_ramp_program\', '
       + `${JSON.stringify(NS_BOTH_NEEDLES)})`);
-    await shot(c, 'ns-both');
-    check('ns-c', '`start` is disclosed too, and the sentence names BOTH — `rrp_start` is the same '
-      + '`u32` and the same raw forward as `rrp_step`, so a run that merely BEGINS below the rest '
-      + 'position is as unbuildable as one that ramps upward. A disclosure scoped to `step` alone '
-      + 'would leave the other half silent',
-      !!bothDoc.ramp.start && bothDoc.ramp.start.whole === -2
-      && !!bothSentence && bothSentence.inScroller === true && bothSentence.allPresent === true,
-      `start = ${JSON.stringify(bothDoc.ramp.start)}; painted = ${JSON.stringify(bothSentence)}`);
+    const bothLead = await c.json(`window.__rp.paintedRect(${JSON.stringify(NS_LEAD)})`);
+    await shot(c, NS_PREMISE_OPEN ? 'ns-both' : 'ns-both-retired');
+    const nscDoc = !!bothDoc.ramp.start && bothDoc.ramp.start.whole === -2;
+    check('ns-c', NS_PREMISE_OPEN
+      ? '`start` is disclosed too, and the sentence names BOTH — `rrp_start` is the same '
+        + '`u32` and the same raw forward as `rrp_step`, so a run that merely BEGINS below the rest '
+        + 'position is as unbuildable as one that ramps upward. A disclosure scoped to `step` alone '
+        + 'would leave the other half silent'
+      : '`start` is silent too, and that is the half a partial retirement would miss. `rrp_start` '
+        + 'took the same encode as `rrp_step`, so a run that BEGINS below the rest position builds '
+        + 'exactly as a downward ramp does — a disclosure left armed on `start` alone would be a '
+        + 'false warning nobody was looking for',
+      NS_PREMISE_OPEN
+        ? nscDoc && !!bothSentence && bothSentence.inScroller === true
+          && bothSentence.allPresent === true
+        : nscDoc && bothSentence === null && bothLead === null,
+      `premise = ${JSON.stringify(NS_PREMISE)}; start = ${JSON.stringify(bothDoc.ramp.start)}; `
+      + `painted = ${JSON.stringify(bothSentence)}; painted lead = ${JSON.stringify(bothLead)}`);
 
     // ── [ns-d] THE OTHER DIRECTION: positive, and the sentence is GONE ────
     await typeInto(c, 'start', '0', 'Start (back to a positive document)');

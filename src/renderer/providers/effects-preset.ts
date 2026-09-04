@@ -2879,14 +2879,25 @@ export function rampRateUnits(field: RampRateField): string {
  * land, and the field they are looking at is not necessarily the value in the
  * file.
  *
- * ⚠ AND EVERY BRANCH THAT NAMES A NEGATIVE ALTERNATIVE CARRIES A CAVEAT.
- * `rampSignRateCaveat` (core/formats/effects/ramp-sign-lag.ts) is appended when
- * the value this sentence just OFFERED is below zero, because aeon's
- * `raster_ramp_program` cannot encode a negative 16.16 today and the offer would
- * otherwise read as a fix. THE ARITHMETIC IS UNTOUCHED — `-1` and `0` really are
- * the nearest spellable values, and falsifying that to route around a build
- * limitation would put a lie in the panel to hide a defect in a peer. The caveat
- * rides beside the truth, and retires with the drift row.
+ * ⚠ THE NEGATIVE-OFFER CAVEAT RETIRED 2026-09-03 AND THE HOOK STAYS.
+ * `rampSignRateCaveat` (core/formats/effects/ramp-sign-lag.ts) used to append a
+ * clause when the value this sentence just OFFERED was below zero, because
+ * aeon's `raster_ramp_program` could not encode a negative 16.16 and the offer
+ * would otherwise read as a fix. aeon now encodes it (`origin/master`
+ * `065dc790`), `RAMP_SIGN_FIELDS_AWAITING_AEON` is `[]`, and the call below
+ * returns null on every branch — so this refusal carries its arithmetic alone,
+ * which is the state it was always meant to reach. THE ARITHMETIC WAS NEVER
+ * TOUCHED in either state — `-1` and `0` really are the nearest spellable
+ * values, and falsifying that to route around a build limitation would have put
+ * a lie in the panel to hide a defect in a peer.
+ *
+ * ⚠ THE THIRD ARGUMENT IS PASSED EXPLICITLY AND MUST STAY THAT WAY.
+ * `rampSignRateCaveat`'s `awaiting` parameter has a default, and a default
+ * parameter is a HIDDEN IMPORT: it resolves in ITS OWN module's scope, so an
+ * omitted argument reads the real constant straight through a test's stub and
+ * the retirement poison goes green against a caveat that is still hard-wired on
+ * — measured on this very function, not imagined.
+ * `__tests__/ramp-sign-lag-disclosure.test.ts` pins this call's spelling.
  */
 export function rampRateRefusal(
   ramp: EffectsPresetRamp, presetId: string, field: RampRateField, px: number,

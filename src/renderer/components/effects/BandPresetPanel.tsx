@@ -1462,15 +1462,24 @@ function RampCard({ library, presetId, ramp, run, scroll }: {
           contested note about it. */}
       <PresetLagDisclosure />
 
-      {/* THE SIGN DISCLOSURE — A NARROWER FACT ONE LAYER FURTHER DOWN, AND IT
-          IS NOT THE ONE ABOVE RE-ARMED. `ramp` is accepted by aeon's generator
-          and a POSITIVE ramp builds and runs; what does not build is a NEGATIVE
-          16.16, because `raster_ramp_program` declares `rrp_start`/`rrp_step` as
-          `u32` and forwards the signed value raw. The leaf is handed the
-          document's own two values and speaks only when one of them is below
-          zero, so an author ramping downward sees nothing at all.
-          See core/formats/effects/ramp-sign-lag.ts for the revision measured
-          and the retirement condition. */}
+      {/* THE SIGN DISCLOSURE — SILENT SINCE 2026-09-03, AND MOUNTED ANYWAY.
+          ⚠ IT RENDERS NOTHING TODAY. It disclosed that a NEGATIVE 16.16 could
+          not build, because aeon's `raster_ramp_program` declared
+          `rrp_start`/`rrp_step` as `u32` and forwarded the signed value raw.
+          aeon now encodes the two's complement at comptime (`origin/master`
+          `065dc790`, measured through git objects — the constructor, the blob
+          and the four lines of the encode are recorded in
+          core/formats/effects/ramp-sign-lag.ts), so
+          `RAMP_SIGN_FIELDS_AWAITING_AEON` is `[]` and this leaf returns null
+          for every document, negative or not.
+          ⚠ MERGED, NOT CERTIFIED: what cleared is a claim about aeon's SOURCE.
+          Nothing here has seen a ROM ramp downward.
+          IT STAYS MOUNTED BECAUSE THE PREMISE CAN COME BACK. The leaf is
+          derived, not literal: re-fill the constant and this same mount speaks
+          again with no edit here. Deleting it would be a "tidy away the silent
+          leaf" change that quietly retires the SURFACE along with the sentence
+          — `__tests__/ramp-sign-lag-disclosure.test.ts` pins the mount, its
+          count, and both surfaces returning under a replayed premise. */}
       <RampSignLagDisclosure
         start={presetFp16ToNumber(ramp.start)} step={presetFp16ToNumber(ramp.step)} />
 
