@@ -224,9 +224,10 @@
 // where the exit-handler net has to be synchronous and blunt.
 
 import { spawn } from 'node:child_process';
-import { readdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { randomBytes } from 'node:crypto';
+import { readdirSync, readFileSync, writeFileSync, rmSync, existsSync, mkdirSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** Both paths the app publishes its Aether port to. The owner's app writes
@@ -1047,6 +1048,10 @@ function installNet() {
     for (const c of [...registered]) { try { killTreeSync(c); } catch { /* */ } }
     registered.clear();
     if (snapshot) { try { restoreDiscovery(snapshot); } catch { /* */ } }
+    // HAZARD 6: the private profile is a temp directory this run created. It is
+    // removed AFTER the trees are killed — a Chromium still holding its leveldb
+    // open would otherwise rewrite files under a directory being deleted.
+    try { cleanupProfile(); } catch { /* */ }
   };
   process.on('exit', net);
   for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
@@ -1073,8 +1078,22 @@ export function spawnGuarded(cmd, args, opts = {}) {
     console.log(`guard: discovery snapshot taken before launch:\n        ${describeDiscovery(snapshot)}`);
   }
   installNet();
-  const pinned = pinOzoneToX11(cmd, args);
+  let pinned = pinOzoneToX11(cmd, args);
   if (pinned !== args) console.log(`guard: pinned Ozone to x11 (${OZONE_X11_FLAG}) — see HAZARD 5`);
+  const withProfile = pinUserDataDir(cmd, pinned);
+  if (withProfile !== pinned) {
+    if (!profileUsed) {
+      profileUsed = true;
+      try { mkdirSync(RUN_PROFILE_DIR, { recursive: true }); } catch { /* Chromium creates it too */ }
+      console.log(`guard: private profile for this RUN: ${RUN_PROFILE_DIR}`
+        + `${RUN_PROFILE_DERIVED ? '' : ` (from ${PROFILE_DIR_ENV})`} — see HAZARD 6`);
+    }
+    pinned = withProfile;
+  } else if (pinned !== args || isElectronBin(cmd) || args.some(isElectronBin)) {
+    // An Electron launch that was NOT pinned: the caller named its own profile.
+    // Say so — a run on the shared profile must never be silent about it.
+    console.log(`guard: NOT pinning a profile — the caller passed its own ${USER_DATA_DIR_SWITCH}`);
+  }
   const child = spawn(cmd, pinned, { detached: true, ...opts });
   registered.add(child);
   child.on('exit', () => { /* keep it registered: the tree may outlive the wrapper */ });
@@ -1113,6 +1132,239 @@ export function pinOzoneToX11(cmd, args) {
   if (i === -1) return args;                        // not an Electron launch
   a.splice(i + 1, 0, OZONE_X11_FLAG);
   return a;
+}
+
+// ── HAZARD 6: THE CHROMIUM PROFILE IS ONE DIRECTORY FOR THE WHOLE POPULATION
+//
+// O80, 2026-09-04. Hazard 1 and 1c are about two *files* every run shares.
+// This is about the *profile* they all share, and it is the same shape one
+// level up: an Electron launched as `electron <root>/dist/main/index.mjs` gets
+// Electron's own default app name, so EVERY harness in this population writes
+// its `localStorage` into the single directory
+//
+//     $XDG_CONFIG_HOME/Electron/Local Storage/leveldb
+//
+// ⚠ AND A HARNESS'S FIRST GESTURE IS USUALLY TO ERASE IT. The count is NOT
+// written here — see the note below — but `localStorage.clear()` is the
+// standard opening line of a CDP harness in scratchpad/, and it is not scoped
+// to that harness: it wipes the area for every instrument sharing the profile,
+// including one that is mid-run and depends on what it wrote a session ago.
+//
+// WHAT THAT COST. `canvas-cdp-harness` relaunches the app four times in one run
+// and each restart row reads what the PREVIOUS launch left under
+// `aurora.session.v1:<project>`. O50 measured that precondition failing in ~44%
+// of runs; O79 proved half of it was a flush that never reached disk and fixed
+// that half; `docs/reviews/2026-09-04-canvas-flake-explained.md` closed the row
+// with the other half explicitly UNFIXED and named it "environmental" — a rate
+// that is a function of what else happened to be running on the box. An
+// instrument whose verdict depends on its neighbours is not an instrument, and
+// the victim reported the interference as a possible product defect.
+//
+// ── THE TREATMENT: ONE PRIVATE PROFILE PER INSTRUMENT RUN ─────────────────
+//
+// Electron takes Chromium's `--user-data-dir=<path>` natively. VERIFIED here
+// rather than assumed (2026-09-04, Electron in this repo's node_modules, a
+// window-less probe): with the switch, `app.getPath('userData')` AND
+// `app.getPath('sessionData')` BOTH become the given directory, so the switch
+// moves the `localStorage` profile and `recent-projects.json` together. Without
+// it both read `/home/<user>/.config/Electron`.
+//
+// ⚠ PER INSTRUMENT *RUN*, NOT PER LAUNCH, AND THE DIFFERENCE IS THE WHOLE
+// DESIGN. `canvas-cdp-harness` DEPENDS on `localStorage` surviving from one of
+// its launches to the next — that persistence is the property its restart suite
+// exists to measure. A fresh profile per launch would break it in a way that
+// looks EXACTLY like the flake this exists to remove. So the directory is
+// derived ONCE per node process (`RUN_PROFILE_DIR`, below): stable across every
+// launch a single instrument makes, unique across concurrently running ones.
+//
+// ⚠ NO LIVE CENSUS IS WRITTEN INTO THIS COMMENT, ON PURPOSE. The refusal in
+// `canvas-cdp-harness` said "114 call sites"; that was right on the day it was
+// typed, and by 2026-09-04 a grep answered 133 across 120 files on this branch
+// while the packet that found the drift measured 136/123 on a different tree
+// the same day. Those three figures are quoted HERE only as the evidence that
+// the number drifts — none of them is a claim about now. `clearCallSiteCensus()`
+// below derives it at run time and the refusal renders that; no comment, this
+// one included, may state the current count.
+//
+// ── WHAT THIS DOES *NOT* REPLACE ──────────────────────────────────────────
+//
+// The snapshot/restore above stays, entire, and is not made redundant by this:
+//
+//   · the two `mcp.json` DISCOVERY FILES live under `$HOME`, not under
+//     `userData` (`src/main/discovery-file.ts` joins `homedir()`), so a private
+//     profile does not move them by so much as a byte. Hazard 1 is untouched.
+//   · `recent-projects.json` DOES move into the private profile — but only for
+//     a launch this module actually pinned. `pinUserDataDir` returns its
+//     argument unchanged when it cannot find an Electron binary in the command,
+//     and it defers to a `--user-data-dir` a caller passed itself. Those
+//     launches still write the shared file, and the restore is what covers them.
+//
+// A guard removed because "the new thing makes it unnecessary" is how the first
+// pass of hazard 1 came to cover only half of its own surface.
+
+/** The instruments this population is made of. `clearCallSiteCensus` walks
+ *  this directory; a caller may point it somewhere else (a test does). */
+export const INSTRUMENT_DIR = fileURLToPath(new URL('..', import.meta.url));
+
+/** What a call site looks like, tolerating the spacings a formatter can produce.
+ *  Exported so a test drives the SAME regex the census uses. */
+export const CLEAR_CALL_RE = /localStorage\s*\.\s*clear\s*\(/g;
+
+/**
+ * ⚠ COMMENTS ARE STRIPPED BEFORE COUNTING, and this is not tidiness.
+ *
+ * A raw grep of this repo answers a number that INCLUDES every block comment
+ * describing the hazard — this file's own HAZARD 6 note names the call twice,
+ * the packet-writing that goes with a parcel like this adds more, and the
+ * census therefore GROWS every time somebody documents it. A count that rises
+ * when the problem is being explained is a broken instrument. Measured
+ * 2026-09-04 on this branch, one tree, one regex, one instant: 138 with
+ * comments and 130 without. Those two are quoted as the SIZE OF THE ARTEFACT
+ * and are not a claim about the population now — the function below is.
+ *
+ * The stripper is crude on purpose (line comments and block comments, no
+ * tokeniser). Its one known blind spot is a `localStorage.clear()` written
+ * inside a STRING literal, which still counts; that errs toward over-reporting
+ * the hazard, which is the safe direction for this number.
+ */
+export function stripCommentsForCensus(src) {
+  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+}
+
+/**
+ * HOW BIG IS THE HAZARD, RIGHT NOW — derived, never typed.
+ *
+ * `{ sites, files, dir }`: `sites` counts occurrences, `files` counts the files
+ * holding at least one. **They are different units and the drift that started
+ * this parcel was partly a unit confusion**, so both are returned and any
+ * caller printing one must say which.
+ *
+ * This exists because a count in a comment is right on the day it is written
+ * and nothing re-derives it: the refusal in `canvas-cdp-harness` told operators
+ * "114 call sites" for as long as it took the population to reach a third more
+ * than that. Reading the directory costs a few milliseconds and is only paid on
+ * the path that renders a refusal.
+ */
+export function clearCallSiteCensus(dir = INSTRUMENT_DIR) {
+  let entries;
+  try { entries = readdirSync(dir, { withFileTypes: true, recursive: true }); }
+  catch (e) { return { sites: null, files: null, dir, why: `${dir} could not be read (${e.code ?? e.message})` }; }
+  let sites = 0, files = 0;
+  for (const e of entries) {
+    if (!e.isFile() || !/\.(mjs|cjs|js|ts|tsx)$/.test(e.name)) continue;
+    let src;
+    try { src = readFileSync(join(e.parentPath ?? e.path ?? dir, e.name), 'utf8'); } catch { continue; }
+    const n = (stripCommentsForCensus(src).match(CLEAR_CALL_RE) ?? []).length;
+    if (n > 0) { sites += n; files++; }
+  }
+  return { sites, files, dir };
+}
+
+/** One sentence a refusal can paste in, with the units named. */
+export function describeClearCensus(c = clearCallSiteCensus()) {
+  return c.sites === null
+    ? `the call-site census could not be taken: ${c.why}`
+    : `${c.sites} call site(s) across ${c.files} source file(s) (.mjs/.cjs/.js/.ts/.tsx, comments `
+      + `stripped) under ${c.dir} call localStorage.clear() — derived at the moment this message `
+      + 'was rendered, never typed';
+}
+
+/** Where every private harness profile is rooted. One directory so a sweep of
+ *  leftovers from killed runs is one `rm -rf`, not a search. */
+export const PROFILE_ROOT = join(tmpdir(), 'aurora-harness-profiles');
+
+/** Set this to make several cooperating processes share ONE profile. It exists
+ *  for the negative control in `profile-isolation-proof.mjs` — the arm that
+ *  reconstructs the hazard — and for an operator debugging a run's profile.
+ *  A directory named here is NOT deleted at exit: this process did not create
+ *  it and does not know who else is using it. */
+export const PROFILE_DIR_ENV = 'AURORA_HARNESS_PROFILE_DIR';
+
+/** Keep the derived profile after the run instead of deleting it. */
+export const KEEP_PROFILE_ENV = 'AURORA_HARNESS_KEEP_PROFILE';
+
+/** Chromium's switch. Spelled once so the pin and the "did the caller already
+ *  pass one" test cannot drift apart. */
+export const USER_DATA_DIR_SWITCH = '--user-data-dir';
+
+/**
+ * THE PROFILE THIS RUN OWNS — one derivation, at module load, so every launch
+ * in this process gets the same directory and no two processes get the same one.
+ *
+ * `pid` is the uniqueness that matters: two concurrent runs are two live
+ * processes and cannot share a pid. The random suffix is not for them — it is
+ * for a pid REUSED after a run died without cleaning up, which would otherwise
+ * hand a fresh instrument a dead one's `localStorage`. The instrument name is
+ * for the human reading `/tmp`.
+ */
+export const RUN_PROFILE_DIR = (() => {
+  const fromEnv = process.env[PROFILE_DIR_ENV];
+  if (fromEnv) return fromEnv;
+  const who = basename(process.argv[1] ?? 'node').replace(/\.[cm]?js$/, '').replace(/[^A-Za-z0-9._-]/g, '_')
+    || 'node';
+  return join(PROFILE_ROOT, `${who}-${process.pid}-${randomBytes(4).toString('hex')}`);
+})();
+
+/** True when this process DERIVED its profile, so it owns the cleanup. False
+ *  when an operator named one via the environment. */
+export const RUN_PROFILE_DERIVED = !process.env[PROFILE_DIR_ENV];
+
+/** Set once a launch has actually been pinned, so a process that never spawned
+ *  an Electron does not create or delete a directory it never used. */
+let profileUsed = false;
+
+/** Has any launch in this process been pinned to `RUN_PROFILE_DIR`? */
+export function profileInUse() { return profileUsed; }
+
+/**
+ * Insert `--user-data-dir=<dir>` immediately after the Electron binary.
+ *
+ * POSITION MATTERS for exactly the reason `pinOzoneToX11` documents: the
+ * command is usually `xvfb-run -a -s '…' <electron> <app.mjs> …`, so the switch
+ * cannot go at the front (xvfb-run eats it) or at the back (it becomes an
+ * argument to the app instead of a Chromium switch).
+ *
+ * Returns `args` UNCHANGED — by identity, so the caller can tell — when there
+ * is no Electron binary in the command, or when the caller already passed a
+ * `--user-data-dir` of its own. Deferring to the caller is deliberate: a
+ * harness that has a reason to name a profile is stating a requirement, and
+ * silently overriding it would be this module guessing.
+ */
+export function pinUserDataDir(cmd, args, dir = RUN_PROFILE_DIR) {
+  const a = [...args];
+  if (a.some((x) => typeof x === 'string' && x.startsWith(`${USER_DATA_DIR_SWITCH}=`))) return args;
+  const flag = `${USER_DATA_DIR_SWITCH}=${dir}`;
+  if (isElectronBin(cmd)) return [flag, ...a];
+  const i = a.findIndex(isElectronBin);
+  if (i === -1) return args;                        // not an Electron launch
+  a.splice(i + 1, 0, flag);
+  return a;
+}
+
+/**
+ * Delete this run's profile, unless it was named by the environment (someone
+ * else may still be using it) or the operator asked to keep it. Returns what it
+ * did, as a string, so the caller can print an artifact rather than a claim.
+ * Safe to call twice.
+ *
+ * ⚠ THE FOUR INPUTS ARE INJECTABLE AND THAT IS NOT A CONVENIENCE. `profileUsed`
+ * is module-private and is set only by `spawnGuarded`, so with the state read
+ * implicitly the ONLY branch a unit test could reach was "none used" — three of
+ * the four decisions, including the one that DELETES A DIRECTORY, would have
+ * had no test that could fail. Every default still comes from the real state,
+ * so a caller that passes nothing gets exactly the previous behaviour.
+ */
+export function cleanupProfile({
+  used = profileUsed,
+  derived = RUN_PROFILE_DERIVED,
+  dir = RUN_PROFILE_DIR,
+  keep = Boolean(process.env[KEEP_PROFILE_ENV]),
+} = {}) {
+  if (!used) return 'profile: none used (no Electron launch in this process)';
+  if (!derived) return `profile: ${dir} KEPT — named by ${PROFILE_DIR_ENV}, so this process does not own it`;
+  if (keep) return `profile: ${dir} KEPT — ${KEEP_PROFILE_ENV} is set`;
+  try { rmSync(dir, { recursive: true, force: true }); } catch { /* a locked file is not worth failing a run over */ }
+  return `profile: ${dir} removed (existsSync now ${existsSync(dir)})`;
 }
 
 /** Restore the files now and report what was put back. Safe to call twice;
