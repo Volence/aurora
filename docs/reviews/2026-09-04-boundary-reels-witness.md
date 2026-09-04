@@ -144,3 +144,62 @@ hub's to settle, not this lane's, and it is recorded here rather than assumed.**
 
 **Still not witnessed:** the boundary program executing. It is lowered and bound to section 6
 (§4); nothing here drove the player into section 6.
+
+
+---
+
+## 8. THE BOUNDARY HALF — NOT witnessed, and the reason is a measurement, not a shortfall
+
+The boundary program is lowered, in the ROM, and named by a generated chooser (§4). It is
+**not installed at runtime**, and the state is now characterised precisely rather than left
+as "did not get to it".
+
+### What was measured
+
+`Raster_InstallPatched` (`0x86C2`) is the engine's single entry for a patched program —
+`preset.emp` calls it only when `EffectsPreset.ep_patched(a3)` is non-zero, and takes
+`.no_patch` otherwise. Breakpointed across a full run:
+
+- **It fires exactly once per scene start**, at frame 69, with `a0 = 0x14762 =
+  `OJZ_TwoChannel`` — a hand-authored program, not Aurora's.
+- Teleporting the player **and** the camera into section 6 fires it **not at all**, while
+  crossing back **out** to section 0 fires it immediately with `OJZ_TwoChannel` again. That
+  asymmetry is the whole tell: the crossing machinery works; section 6 simply has nothing
+  patched to install.
+
+**The section arithmetic was derived, not guessed.** `GRID_W = 3` (act descriptor), sections
+`1 << SECTION_SIZE_SHIFT` = 2048 px, so section 6 is column 0, **row 2** — *below*, not to the
+right. My first attempt swept x and reached a clamped section 2; `Parallax_CheckBoundary`
+confirmed the corrected pose with `d0 = d6 = 6`.
+
+### The artifact that explains it
+
+`EffectsPreset` (engine/effects/preset.emp): `ep_raster @ $08`, `ep_patched @ $0C`. Read out
+of the built ROM, with section 0 as the control that proves the offset:
+
+| preset | `ep_raster` `$08` | `ep_patched` `$0C` |
+|---|---|---|
+| `OJZ_Preset_Sec0` `0x145F2` | `0` | **`0x14762` — `OJZ_TwoChannel`** |
+| `OJZ_Preset_Sec6` `0x14734` | **`0x86BC` — `Raster_Program_None`** | **`0`** |
+
+**Section 6 carries neither program.** So the generated chooser emits
+`if sec == 6 { out = EditorPatched_OJZ_Act1_aurora_boundary_witness }` and the program sits in
+the ROM at `0x13FE0`, while the preset object that section 6 actually resolves to has
+`ep_patched = 0`.
+
+### What this is NOT
+
+**A mechanism is not asserted here.** The plausible reading is that the preset was bound via
+the section sidecar's **`rasterRef`** — a key named for the RASTER arm — while `boundary` is a
+**PATCHED** arm, so the binding may lower the program without ever attaching it. **That is a
+hypothesis and it is untested.** Two things make it worth aeon's eyes rather than mine:
+`rasterRef` is the only preset-binding key a section sidecar has, and the codec parcel already
+established that `boundary` lowers into `ep_patched`, the sibling field.
+
+**A caveat that belongs to me, not to aeon:** I set `section_6.meta.json`'s `rasterRef` **by
+hand**, preserving the key set, rather than through Aurora's own writer. The generator did
+accept it — it reported "2 sidecar rasterRef(s)" and emitted the chooser — but a hand-edited
+sidecar is a legitimate suspect and is named here so nobody has to discover it.
+
+**Handed to aeon** with the artifact, per the standing split: the editor-side half is measured,
+the engine-side diagnosis is theirs.
