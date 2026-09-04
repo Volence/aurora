@@ -29,9 +29,8 @@
 // prose and the rows below read them from there.
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
-import { siblingPathOrUnresolved } from '../support/sibling-root.mjs';
+import { readFileSync } from 'node:fs';
+import { basename, join, resolve } from 'node:path';
 import {
   EFFECTS_PRESET_SCHEMA,
   EFFECTS_PRESET_RASTER_CHANNELS,
@@ -70,13 +69,25 @@ const RAMP: EffectsPresetRamp = {
 };
 
 /**
- * THE SHIPPED SECTION-6 DOCUMENT'S OWN VALUES — line 160, target $E000.
+ * THE CONTRACT'S PUBLISHED PASS VECTOR — line 160, target $E000.
  *
- * Not invented for this file: aeon bound exactly this at 850d4c60 and the
- * contract published it as its one new PASS vector. `the shipped section-6
- * document` describe block below reads the real file off disk when aeon is
- * present and asserts these are its values, so this constant cannot drift into
- * being a fixture nobody ships.
+ * Not invented for this file: empyrean published exactly this with the 5bd76ba
+ * amendment, and it is case 17 of the vendored vector set
+ * (test/fixtures/effects/effects-preset-vectors.json). This constant is the
+ * SYNTHETIC document the schema-matrix rows below are built on, and nothing more.
+ *
+ * ⚠ IT IS NO LONGER WHAT AEON SHIPS, AND MUST NOT BE ASSERTED TO BE. On
+ * 2026-09-03 the owner moved the swap to the top of the frame — aeon 8bf6df74,
+ * `line` 160 -> 3 — and the section-6 block at the bottom of this file, which
+ * asserted `preset.base_swap` equalled this constant, went red for it. That row
+ * was answering a question about a PEER REPO with an instrument that claims to
+ * be about our codec (docs/OVERSEER.md bar 19); it now derives its expectations
+ * from a vendored fixture, and the "has aeon moved?" question is asked, once,
+ * where it can actually be answered: test/formats/aeon-fixture-currency.test.ts.
+ *
+ * That the CONTRACT's vector and aeon's document now disagree is a fact about
+ * empyrean and aeon. Aurora does not adjudicate it and no row here asserts they
+ * agree; it is recorded in test/fixtures/effects/ojz_sec6_baseswap.provenance.json.
  */
 const BASE_SWAP: EffectsPresetBaseSwap = { line: 160, target: 57344 };
 
@@ -354,64 +365,136 @@ describe('base_swap is neither capability-gated nor DEBUG-gated', () => {
 // section_6.meta.json's rasterRef, and against the PREVIOUS vendored schema
 // Aurora refused it at parse ("unknown property \"base_swap\"") — so an author
 // could not open section 6 at all.
-const AEON = siblingPathOrUnresolved('aeon');
-const SHIPPED = join(AEON, 'games/sonic4/data/editor/effects/presets/ojz_sec6_baseswap.json');
-const META = join(AEON, 'games/sonic4/data/editor/ojz/act1/section_6.meta.json');
+// ⚠ THESE ROWS READ A VENDORED FIXTURE, NOT AEON'S WORKING TREE — bar 19.
+//
+// Until 2026-09-04 they read the two files above out of `siblingPathOrUnresolved('aeon')`
+// and compared them against constants spelled out here: `BASE_SWAP` and a
+// nine-line serialized string, both carrying `"line": 160`. On 2026-09-03 the
+// owner moved the swap to the top of the frame (aeon 8bf6df74, committed and
+// pushed) and both rows went red — for a change in a peer repo, in a suite whose
+// job is to report on Aurora's code. The agent that hit them filed them as
+// "pre-existing, not mine" and moved on, which is precisely the triage failure
+// bar 19 was written from.
+//
+// The repair is the bar's own shape: SEPARATE THE TWO QUESTIONS.
+//   · "does OUR codec open, keep and re-write this document?" — a property of
+//     our code, answered here against a pin, with every expectation DERIVED from
+//     the vendored bytes rather than restated as a constant. A constant that
+//     restates the document is not a stronger assertion, it is a second copy of
+//     the document that can go stale — which is exactly what happened.
+//   · "is that pin still what aeon ships?" — a pinned blob can NEVER answer it,
+//     so it lives in test/formats/aeon-fixture-currency.test.ts, which reads
+//     aeon at a COMMITTED revision, names it, fails on drift with a
+//     NOT AN AURORA REGRESSION prefix, and skips LOUDLY when it cannot run.
+//     Both fixtures below are rows in that file's table, and its completeness
+//     row fails if one is ever vendored and not listed there.
+//
+// The loud skip that used to guard these rows is GONE ON PURPOSE, and that is
+// not a regression to silence: a vendored fixture is committed here, so "could
+// not reach aeon" is no longer a state these rows can be in. A skip branch that
+// can never execute is itself the vacuous construct bar 2e names. The
+// loud-skip discipline did not disappear, it MOVED to the currency file, where
+// unmeasurability is real — see docs/reviews/2026-09-04-baseswap-vendor-fixture.md.
+const FIXTURES = resolve(__dirname, '../fixtures/effects');
+const SHIPPED = join(FIXTURES, 'ojz_sec6_baseswap.json');
+const META = join(FIXTURES, 'ojz_act1_section_6.meta.json');
+/** The id the codec must bind — DERIVED from the fixture's filename, which is the rule under test. */
+const SHIPPED_STEM = basename(SHIPPED, '.json');
+
+const SHIPPED_TEXT = readFileSync(SHIPPED, 'utf8');
+/** The document as plain JSON. Every expectation below is derived from THIS, never from a constant. */
+const RAW = JSON.parse(SHIPPED_TEXT) as Record<string, unknown>;
+
+/**
+ * An INDEPENDENT canonicaliser: recursive alphabetical key order, two-space
+ * indent, trailing newline (aeon §5). Deliberately written from the spec rather
+ * than by calling `serializeEffectsPreset`, so the round-trip row compares the
+ * writer against a second implementation instead of against itself.
+ */
+const canonical = (v: unknown): unknown => {
+  if (Array.isArray(v)) return v.map(canonical);
+  if (v !== null && typeof v === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(v as Record<string, unknown>).sort()) {
+      out[k] = canonical((v as Record<string, unknown>)[k]);
+    }
+    return out;
+  }
+  return v;
+};
 
 describe('the shipped section-6 document opens', () => {
-  // ⚠ SKIPPED WITH A REASON, NEVER QUIETLY: a row that cannot reach aeon's tree
-  // measured NOTHING, and a green total that swallowed it would be the silent
-  // zero this suite is not allowed to have.
-  const need = (ctx: { skip: (reason: string) => void }): boolean => {
-    if (existsSync(SHIPPED) && existsSync(META)) return true;
-    ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout at ${AEON} — this row opens aeon's REAL `
-      + 'shipped preset and its section binding, and could not. The synthetic rows above still '
-      + 'ran; what is unmeasured here is whether the document aeon actually ships opens.');
-    return false;
-  };
+  it('parses through the real codec, with the id/filename rule enforced', () => {
+    const preset = parseEffectsPreset(SHIPPED_TEXT, SHIPPED_STEM);
+    // The filename rule: the codec binds `id` to the stem it was handed, and
+    // refuses a document whose own `id` disagrees.
+    expect(preset.id).toBe(SHIPPED_STEM);
+    expect(() => parseEffectsPreset(SHIPPED_TEXT, 'a_different_stem')).toThrow(EffectsPresetError);
 
-  it('parses through the real codec, with the id/filename rule enforced', (ctx) => {
-    if (!need(ctx)) return;
-    const text = readFileSync(SHIPPED, 'utf8');
-    const preset = parseEffectsPreset(text, 'ojz_sec6_baseswap');
-    expect(preset.id).toBe('ojz_sec6_baseswap');
-    expect(presetRasterChannel(preset)).toBe('base_swap');
-    // Its values ARE the ones this file's constant carries, so BASE_SWAP above
-    // is aeon's document and not a fixture invented here.
-    expect(preset.base_swap).toEqual(BASE_SWAP);
-    expect(preset.bands).toBeUndefined();
-    expect(preset.ramp).toBeUndefined();
+    // The channel is DERIVED from the document rather than named here: whichever
+    // one of the three raster keys the document carries is the one the codec
+    // must report. If aeon re-authors section 6 as a `bands` document this row
+    // follows it instead of going red about a number.
+    const RASTER_KEYS = ['bands', 'ramp', 'base_swap'] as const;
+    const present = RASTER_KEYS.filter((k) => k in RAW);
+    expect(present, 'the vendored document must carry exactly one raster program').toHaveLength(1);
+    expect(presetRasterChannel(preset)).toBe(present[0]);
+    for (const k of RASTER_KEYS) {
+      if (k !== present[0]) expect(preset[k]).toBeUndefined();
+    }
+
+    // WHAT THE CODEC IS RESPONSIBLE FOR, over the channel it did parse: the
+    // exact declared key set, numbers left as numbers, values not rewritten.
+    // `toEqual(RAW.base_swap)` is not a tautology — the codec could have
+    // coerced, defaulted, renamed or rescaled, and this is what says it did not.
+    const swap = preset.base_swap as EffectsPresetBaseSwap;
+    expect(Object.keys(swap).sort()).toEqual([...EFFECTS_PRESET_BASE_SWAP_KEYS].sort());
+    expect(swap).toEqual(RAW.base_swap);
+    expect(Number.isInteger(swap.line) && Number.isInteger(swap.target)).toBe(true);
+
+    // …and that the document aeon ships is one the CONTRACT admits. These read
+    // the schema's own bounds, so they fail if aeon ever ships a preset the
+    // editor would have to refuse — the real "can an author open section 6?".
+    expect(swap.line).toBeGreaterThanOrEqual(EFFECTS_PRESET_BASE_SWAP_LINE_RANGE.min);
+    expect(swap.line).toBeLessThanOrEqual(EFFECTS_PRESET_BASE_SWAP_LINE_RANGE.max);
+    expect(swap.target).toBeGreaterThanOrEqual(EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.min);
+    expect(swap.target).toBeLessThanOrEqual(EFFECTS_PRESET_BASE_SWAP_TARGET_RANGE.max);
+    expect(isBaseSwapTargetAligned(swap.target)).toBe(true);
+    expect(validateAgainstSchema(RAW, S)).toEqual([]);
   });
 
-  it('is what section 6 is BOUND to — the reason the editor had to open it', (ctx) => {
-    if (!need(ctx)) return;
+  it('is what section 6 is BOUND to — the reason the editor had to open it', () => {
+    // A claim about the vendored PAIR, both pinned at the same aeon revision:
+    // the section's rasterRef names the id the codec parsed out of the preset
+    // beside it. It fails if one of the two is ever re-vendored alone.
     const meta = JSON.parse(readFileSync(META, 'utf8')) as { rasterRef: string | null };
-    expect(meta.rasterRef).toBe('ojz_sec6_baseswap');
+    const preset = parseEffectsPreset(SHIPPED_TEXT, SHIPPED_STEM);
+    expect(meta.rasterRef).toBe(preset.id);
   });
 
-  it('round-trips byte-for-byte through serialize, inventing and dropping nothing', (ctx) => {
-    if (!need(ctx)) return;
-    const preset = parseEffectsPreset(readFileSync(SHIPPED, 'utf8'), 'ojz_sec6_baseswap');
-    // Asserted against a SPELLED-OUT string, not against another serialize()
-    // call, so this measures the bytes rather than the writer agreeing with
-    // itself. Canonical order is alphabetical, recursively (aeon §5).
-    expect(serializeEffectsPreset(preset)).toBe([
-      '{',
-      '  "base_swap": {',
-      '    "line": 160,',
-      '    "target": 57344',
-      '  },',
-      '  "id": "ojz_sec6_baseswap",',
-      '  "name": "OJZ act 1 section 6 - mid-frame nametable base swap (EFFECTS-W1 item 11a)",',
-      '  "schema": 1',
-      '}',
-      '',
-    ].join('\n'));
+  it('round-trips byte-for-byte through serialize, inventing and dropping nothing', () => {
+    const preset = parseEffectsPreset(SHIPPED_TEXT, SHIPPED_STEM);
+    const written = serializeEffectsPreset(preset);
+
+    // ⚠ NOT `serialize(parse(x)) === x`: aeon authors id/name/schema/base_swap
+    // and canonical order is alphabetical, so the input is NOT canonical and
+    // that identity would be false for a correct writer. The property is
+    // "the writer emits the canonical rendering of what it read", and the
+    // expectation is computed above by a second implementation.
+    expect(written).toBe(`${JSON.stringify(canonical(RAW), null, 2)}\n`);
+
+    // The two halves of "inventing and dropping nothing", stated separately so a
+    // failure says which one broke.
+    expect(JSON.parse(written)).toEqual(RAW);
+    expect(Object.keys(JSON.parse(written) as object)).toEqual(Object.keys(RAW).sort());
+
+    // Idempotent: a second pass through the codec changes nothing, so an editor
+    // that opens and saves without editing does not churn the file.
+    expect(serializeEffectsPreset(parseEffectsPreset(written, SHIPPED_STEM))).toBe(written);
   });
 
-  it('THE CONTROL: the writer pads no absent channel onto a base_swap document', (ctx) => {
-    if (!need(ctx)) return;
-    const preset = parseEffectsPreset(readFileSync(SHIPPED, 'utf8'), 'ojz_sec6_baseswap');
+  it('THE CONTROL: the writer pads no absent channel onto a base_swap document', () => {
+    const preset = parseEffectsPreset(SHIPPED_TEXT, SHIPPED_STEM);
     const written = JSON.parse(serializeEffectsPreset(preset)) as Record<string, unknown>;
     // Anti-vacuous: the schema DECLARES every one of these, so the writer had
     // every opportunity to emit them. A writer that defaulted `bands: []` would
