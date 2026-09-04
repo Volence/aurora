@@ -26,7 +26,10 @@
 // affordances a form offers; the codec still refuses anything they let through.
 
 import type { JsonSchema } from './json-schema-subset';
-import { EFFECTS_SCENE_SCHEMA, EFFECTS_SCENE_ID_PATTERN } from './scene';
+import {
+  EFFECTS_SCENE_SCHEMA, EFFECTS_SCENE_ID_PATTERN,
+  EFFECTS_REEL_BAND_COUNT, EFFECTS_REEL_RATE_BOUNDS,
+} from './scene';
 import type {
   EffectsScene, EffectsFactor, EffectsFactorName, EffectsLayer, EffectsSceneLibrary,
 } from './scene';
@@ -1461,3 +1464,450 @@ export function clampRowRemapPlaneY(value: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, Math.round(value)));
 }
+
+// ---------------------------------------------------------------------------
+// §2.7 — `reels`, and the four facts a panel has to carry for it
+// ---------------------------------------------------------------------------
+//
+// `reels` arrived at empyrean `ff3f43f` (AURORA_EFFECTS_SCHEMA.md §2.7); the
+// codec half is EW-REELS-CODEC (`docs/reviews/2026-09-04-ew-reels-codec.md`)
+// and this is the authoring half's derivation layer. Five 64-px-wide vertical
+// strips of the BACKGROUND, each scrolling at its own rate — the slot-machine
+// reel demo, aeon `OJZ_Reels_Fill`.
+//
+// ═══ NOTHING BELOW IS TYPED. EVERY NUMBER AND EVERY SENTENCE IS READ ═══
+//
+// The reason is sharper here than anywhere else in this file. Four of this
+// key's constraints CANNOT be expressed as JSON keywords, so they exist only as
+// prose inside the contract's own `description`, and the panel is REQUIRED to
+// put one of them ON SCREEN. A component that typed that sentence out would be
+// a fifth copy of a fact that lives in the schema, in `EffectsReels`'s
+// docblock, in aeon's `.emp` and in the codec packet — free to drift from all
+// four, silently, on a key nothing can render.
+//
+//   1. THE UNIT COLLISION. `reels.rates` is SIGNED WHOLE PIXELS PER FRAME.
+//      There is no fixed point anywhere on the path. Its NEIGHBOUR
+//      `drift.rate` is 1/256 px and Aurora multiplies by 256 on export, so a
+//      panel copied from the drift path emits 768 for an intended 3. Nothing
+//      in this block converts anything: a rate is authored, stored and emitted
+//      as the same integer, and the only appearance of the factor below is in
+//      the ADVERSARIAL census at the end.
+//
+//      ⚠ AND THE HOLE THE CODEC PACKET NAMED IS CLOSED — MEASURED, NOT
+//      ASSERTED. §4.1 of that packet says "0 × 256 = 0, so the conversion
+//      applied to an all-zero document is legal and nothing anywhere catches
+//      it". That is right about the BOUND and one keyword short of the schema.
+//      `rates` also carries `uniqueItems`, and an all-zero array of
+//      `EFFECTS_REEL_BAND_COUNT` elements is five EQUAL values, which
+//      `uniqueItems` refuses. `EFFECTS_REEL_X256_SURVIVORS` below is the census
+//      that says so from the two constraints rather than from this comment.
+//
+//   2. ZERO IS A VALUE, deliberately unlike `drift.rate`'s `not: {const: 0}` —
+//      a stationary strip among moving ones is a real authored choice.
+//      `reelRateRefusal` therefore does NOT refuse 0, and `uniqueItems` is
+//      what caps it at one occurrence (`reelRatesRefusal`).
+//
+//   3. SCREEN ORDER IS ARRAY ORDER. Index `i` owns screen X `64i..64i+63`, and
+//      the contract's own words are that an editor which sorts `rates`
+//      "silently relocates every strip". `reelStripScreenX` exists so the SPAN
+//      can be the control's LABEL: a reordered array is then visibly out of
+//      order in the label column, rather than being a fact only a reader of the
+//      JSON could notice.
+//
+//   4. DEBUG TIER. The effect renders in NO release build, and no JSON keyword
+//      can say so — the contract says the panel must. `EFFECTS_REELS_DEBUG_NOTE`
+//      is that sentence, extracted verbatim.
+//
+// ⚠ THE GUIDANCE RANGE IS NOT A BOUND, and the contract says so in as many
+// words ("that is UI guidance, never a refusal"). `EFFECTS_REEL_RATE_GUIDANCE`
+// and `EFFECTS_REEL_RATE_BOUNDS` are two different quantities and the split is
+// `rowRemapBuildableToday`'s: a control that folded them together would refuse
+// a legal 100 for ever. The spinner's range is the SCHEMA's; the guidance is a
+// sentence under it.
+
+/** The `reels` node's own description — the only place four of its rules live. */
+const REELS_DESCRIPTION: string = (() => {
+  const d = at('properties', 'reels').description;
+  if (typeof d !== 'string' || d.length === 0) {
+    throw new Error(
+      'effects scene schema properties.reels has no string description. Four of this key\'s '
+      + 'constraints — the DEBUG tier, the screen-order map, the unit prohibition and the '
+      + 'binding rule — exist ONLY in that prose, and Aurora extracts rather than restates '
+      + 'them. Re-derive against the amended schema.',
+    );
+  }
+  return d;
+})();
+
+/** Pull one clause out of that description, LOUDLY. */
+function reelsClause(what: string, re: RegExp, group = 1): string {
+  const m = re.exec(REELS_DESCRIPTION);
+  if (!m || typeof m[group] !== 'string') {
+    throw new Error(
+      `effects scene schema properties.reels's description no longer states the "${what}" `
+      + `clause (looked for ${re}). Aurora shows an author the CONTRACT'S sentence rather than `
+      + 'a restatement of it, so there is nothing here to fall back to. Re-derive against the '
+      + 'amended schema.',
+    );
+  }
+  return m[group].trim();
+}
+
+/**
+ * THE SENTENCE THE PANEL IS REQUIRED TO PUT ON SCREEN — hazard 4.
+ *
+ * The contract's own words, in both lengths, because a 300px column cannot hold
+ * the long one and a hover cannot be the only place a required disclosure
+ * lives: `short` is PAINTED and `full` rides the same element's `title`. That
+ * split is `vDeformRampAdvisory`'s (`impact.short` / `impact.full`), and the
+ * ramp card's before it.
+ *
+ * ⚠ BOTH HALVES ARE EXTRACTED, NEITHER IS COMPOSED. The requirement is a fact
+ * about aeon's build (`OJZ_Reel_Speed`'s emitted length is 0 in release), and a
+ * paraphrase in a `.tsx` file is a claim about another repo that no gate in this
+ * one can re-check. If aeon ever ships the effect in release the contract drops
+ * the clause and this module's import fails — loudly, taking the suite with it —
+ * instead of leaving a panel warning about a limitation that is gone.
+ */
+export const EFFECTS_REELS_DEBUG_NOTE: { readonly short: string; readonly full: string } =
+  Object.freeze({
+    short: reelsClause('DEBUG tier, short',
+      /so (a scene saved with reels shows NOTHING in a release build)/),
+    full: reelsClause('DEBUG tier, full', /(DEBUG-ONLY[\s\S]*?must say so on screen\.)/),
+  });
+
+/**
+ * WHY THE BUILD MAY REFUSE THE KEY WITH NOTHING ON SCREEN SAYING SO.
+ *
+ * `advisoryReelsBinding` speaks ONLY in the negative case and says in its own
+ * words that its silence is not a clearance — so a surface that rendered that
+ * advisory ALONE would present silence as an all-clear, which is the defect its
+ * docblock names. This is the always-on half: the RULE, in aeon's words, shown
+ * whenever the key is present, so an absent warning reads as "Aurora has
+ * nothing to add" rather than as "the build will accept this".
+ */
+export const EFFECTS_REELS_BINDING_NOTE: { readonly short: string; readonly full: string } =
+  Object.freeze({
+    short: reelsClause('binding rule, short', /so (the generator REFUSES a reels key[^,]*)/),
+    full: reelsClause('binding rule, full',
+      /(BINDING \(section 2\.7\)[\s\S]*?silently reach other sections\.)/),
+  });
+
+/** The `rates` prohibition, verbatim — the sentence a refused rate is shown with. */
+export const EFFECTS_REEL_NO_X256: string = reelsClause('x256 prohibition',
+  /PROHIBITION: ([\s\S]*?\bbound is the ONLY place that mistake is caught today)/);
+
+/**
+ * How wide one strip is ON SCREEN, in pixels — walked out of the contract's own
+ * `screen X 64i..64i+63` and CROSS-CHECKED against its `column-pairs 4i..4i+3`
+ * in the same sentence.
+ *
+ * TWO STATEMENTS OF ONE GEOMETRY, so a contract that moved one and not the other
+ * fails this import rather than letting the panel label a strip with a span it
+ * does not own — and a wrong SPAN on a screen-order control is exactly the class
+ * of error the label exists to make visible.
+ */
+export const EFFECTS_REEL_STRIP_WIDTH_PX: number = (() => {
+  const x = /screen X (\d+)i\.\.(\d+)i\+(\d+)/.exec(REELS_DESCRIPTION);
+  if (!x) {
+    throw new Error(
+      'effects scene schema properties.reels no longer maps an index to a screen X span '
+      + '("screen X 64i..64i+63"). That map is the whole reason array order is screen order; '
+      + 're-derive it against the amended schema.',
+    );
+  }
+  const stride = Number(x[1]);
+  if (Number(x[2]) !== stride || Number(x[3]) !== stride - 1) {
+    throw new Error(
+      `effects scene schema properties.reels states the screen span as "${x[0]}", which is not `
+      + `a contiguous tiling: a stride of ${stride} must run ${stride}i..${stride}i+${stride - 1}.`,
+    );
+  }
+  const c = /column-pairs (\d+)i\.\.(\d+)i\+(\d+)/.exec(REELS_DESCRIPTION);
+  if (!c) {
+    throw new Error(
+      'effects scene schema properties.reels no longer states the column-pair span, so the '
+      + 'screen stride cannot be cross-checked against the geometry it comes from.',
+    );
+  }
+  const cols = Number(c[1]);
+  if (Number(c[2]) !== cols || Number(c[3]) !== cols - 1 || stride % cols !== 0) {
+    throw new Error(
+      `effects scene schema properties.reels says a strip is ${stride} px wide ("${x[0]}") and `
+      + `${cols} column-pairs ("${c[0]}"); ${stride} is not a whole multiple of ${cols}, so the `
+      + 'two statements of one geometry disagree.',
+    );
+  }
+  return stride;
+})();
+
+/** How many column-pairs a strip owns — the second half of the geometry above. */
+export const EFFECTS_REEL_COLS_PER_BAND: number =
+  Number((/column-pairs (\d+)i\.\.(\d+)i\+(\d+)/.exec(REELS_DESCRIPTION) as RegExpExecArray)[1]);
+
+/**
+ * The screen X span strip `index` owns — `64i .. 64i+63`.
+ *
+ * THE PANEL'S LABEL, NOT A TOOLTIP. Hazard 3 is that array order IS screen order
+ * and that an editor which reorders the array relocates every strip; the one
+ * cheap defence a form has is to label each row with the pixels it governs, so a
+ * row out of place is out of order ON SCREEN. Derived, so a contract that
+ * changed the stride relabels the column instead of lying in it.
+ */
+export function reelStripScreenX(index: number): { min: number; max: number } {
+  if (!Number.isInteger(index) || index < 0 || index >= EFFECTS_REEL_BAND_COUNT) {
+    throw new Error(
+      `reelStripScreenX: ${index} is not one of the ${EFFECTS_REEL_BAND_COUNT} strips. The band `
+      + 'count is a code shape in aeon (it sizes a RAM array and is compiled into a shift), not '
+      + 'a range an editor may extend.',
+    );
+  }
+  const w = EFFECTS_REEL_STRIP_WIDTH_PX;
+  return { min: index * w, max: index * w + w - 1 };
+}
+
+/**
+ * The byte phase a rate accumulates into — the cycle length in frames at rate 1.
+ *
+ * DERIVED FROM TWO INDEPENDENT SENTENCES of the same description ("wraps mod
+ * 256" and "256/|rate| frames") and cross-checked, the
+ * `EFFECTS_ROW_REMAP_BUILDABLE_SHIFT` pattern. One is the mechanism and one is
+ * the gloss; a contract that moved one and not the other would leave the readout
+ * below stating a period no engine keeps.
+ */
+export const EFFECTS_REEL_PHASE_SPAN: number = (() => {
+  const wrap = /wraps mod (\d+)/.exec(REELS_DESCRIPTION);
+  const gloss = /(\d+)\/\|rate\| frames/.exec(REELS_DESCRIPTION);
+  if (!wrap || !gloss) {
+    throw new Error(
+      'effects scene schema properties.reels no longer states BOTH the phase modulus '
+      + '("wraps mod N") and the cycle gloss ("N/|rate| frames"); the reel period readout is '
+      + 'derived from their agreement and has nothing to fall back to.',
+    );
+  }
+  if (wrap[1] !== gloss[1]) {
+    throw new Error(
+      `effects scene schema properties.reels says the phase wraps mod ${wrap[1]} and that a `
+      + `strip cycles every ${gloss[1]}/|rate| frames. Two statements of one quantity disagree.`,
+    );
+  }
+  return Number(wrap[1]);
+})();
+
+/**
+ * How many frames one full cycle of a strip takes, or `null` for a stationary
+ * strip — which has no cycle, and 0 is legal here (hazard 2).
+ *
+ * IN FRAMES, NOT SECONDS, deliberately. The contract glosses its worked example
+ * in seconds ("3 is a 1.4 s reel") but never states a refresh rate, and the one
+ * this file already holds — `EFFECTS_BOB_TICKS_PER_SECOND` — is a LOGIC TICK
+ * rate belonging to a different field. Borrowing it would be this file's own
+ * recorded mistake (`clampRowRemapPlaneY`: two spaces sharing one reader) for a
+ * conversion nobody asked for. Frames are exact, and are what the contract
+ * states.
+ */
+export function reelCycleFrames(rate: number): number | null {
+  if (!Number.isInteger(rate) || rate === 0) return null;
+  return EFFECTS_REEL_PHASE_SPAN / Math.abs(rate);
+}
+
+/**
+ * That cycle as words — "85.3 frames", or the stationary case said in full.
+ *
+ * ⚠ "STATIONARY" IS NOT "OFF" AND THIS IS THE STRING THAT HAS TO SAY SO. Zero
+ * is a legal, deliberate value here (hazard 2), so a readout that rendered it as
+ * an em-dash or a blank would put the one control state that means "this strip
+ * deliberately does not move" on screen looking exactly like a control nobody
+ * has filled in yet.
+ *
+ * THE FRACTION IS KEPT TO ONE DECIMAL rather than rounded to a whole frame: the
+ * contract's own worked example is 256/3, which is 85⅓, and a readout that said
+ * "85 frames" would be quietly claiming the phase divides evenly when the whole
+ * mechanism is a byte accumulator that wraps.
+ */
+export function reelCycleLabel(rate: number): string {
+  const frames = reelCycleFrames(rate);
+  if (frames === null) return 'stationary (0 is a legal, deliberate rate here)';
+  const shown = Math.round(frames * 10) / 10;
+  return `${shown} frames per cycle`;
+}
+
+/**
+ * THE USEFUL RANGE — AND IT IS NOT A BOUND.
+ *
+ * The contract's own qualifier is "that is UI guidance, never a refusal", so
+ * this is kept strictly apart from `EFFECTS_REEL_RATE_BOUNDS` and never reaches
+ * a spinner's `min`/`max` or a refusal. Same split and same reason as
+ * `rowRemapBuildableToday` beside `rowRemapHeightShiftRefusal`: a legal value an
+ * author has a reason for must stay authorable, and a control that folded the
+ * two would refuse a legal 100 for ever.
+ *
+ * The interlock is what makes it safe to keep them adjacent: guidance must sit
+ * INSIDE the legal span and the strobe threshold OUTSIDE the guidance, checked
+ * at module load, so a contract that swapped the two quantities fails the import
+ * rather than turning a hint into a bound.
+ */
+export const EFFECTS_REEL_RATE_GUIDANCE: {
+  readonly min: number; readonly max: number; readonly strobe: number; readonly sentence: string;
+} = (() => {
+  const range = /useful slider range is about (-?\d+)\.\.(-?\d+)/.exec(REELS_DESCRIPTION);
+  const strobe = /(\d+) and up is a strobe/.exec(REELS_DESCRIPTION);
+  if (!range || !strobe) {
+    throw new Error(
+      'effects scene schema properties.reels no longer states its useful slider range and its '
+      + 'strobe threshold. Both are UI GUIDANCE the contract wrote for a panel and neither is a '
+      + 'refusal; re-derive against the amended schema rather than typing numbers in.',
+    );
+  }
+  const min = Number(range[1]);
+  const max = Number(range[2]);
+  const strobeAt = Number(strobe[1]);
+  const bounds = EFFECTS_REEL_RATE_BOUNDS;
+  if (min >= max || min < bounds.min || max > bounds.max
+      || strobeAt <= max || strobeAt > bounds.max) {
+    throw new Error(
+      `effects scene schema properties.reels states a useful range of ${min}..${max} and a `
+      + `strobe threshold of ${strobeAt} against a legal span of ${bounds.min}..${bounds.max}. `
+      + 'Guidance must sit INSIDE the bound and the strobe threshold OUTSIDE the guidance, or '
+      + 'the two quantities have been confused for each other.',
+    );
+  }
+  return Object.freeze({
+    min, max, strobe: strobeAt,
+    sentence: reelsClause('useful range',
+      /(the useful slider range is about[^)]*never a refusal)/),
+  });
+})();
+
+/**
+ * Why this rate cannot be written, or null when it can — the ONE enforcement of
+ * this unit that exists anywhere in the pipeline today.
+ *
+ * ⚠ 0 IS NOT REFUSED (hazard 2). `drift.rate` spells `not: {const: 0}` and this
+ * node deliberately does not: a stationary strip among moving ones is a real
+ * authored choice. What caps it at one occurrence is `uniqueItems`, a property
+ * of the ARRAY, and therefore `reelRatesRefusal`'s job rather than this one's.
+ *
+ * THE MESSAGE CARRIES THE CONTRACT'S OWN PROHIBITION SENTENCE, because the
+ * single likeliest way to land outside this bound is a ×256 nobody typed — a
+ * panel or a paste off the drift path. 768 in this box means someone meant 3,
+ * and the sentence saying so is aeon's rather than Aurora's.
+ */
+export function reelRateRefusal(rate: number): string | null {
+  if (!Number.isInteger(rate)) {
+    return `a reel rate is a whole number of pixels per frame; ${rate} is not an integer. `
+      + 'There is no fixed point anywhere on this path.';
+  }
+  const { min, max } = EFFECTS_REEL_RATE_BOUNDS;
+  if (rate < min || rate > max) {
+    return `${rate} is outside the contract's ${min}..${max}. THE UNIT IS SIGNED WHOLE PIXELS `
+      + `PER FRAME — ${EFFECTS_REEL_NO_X256}.`;
+  }
+  return null;
+}
+
+/**
+ * Why this whole array cannot be written, or null when it can — length and
+ * `uniqueItems`, the two constraints no single box can see.
+ *
+ * SEPARATE FROM THE PER-VALUE REFUSAL, deliberately: a rate can be perfectly
+ * legal on its own and still be the second 0 in the array, and a control that
+ * asked only `reelRateRefusal` would author a document the codec refuses at
+ * load. `uniqueItems` is what the contract uses to cap a stationary strip at one
+ * occurrence, so this is hazard 2's other half.
+ */
+export function reelRatesRefusal(rates: readonly number[]): string | null {
+  if (rates.length !== EFFECTS_REEL_BAND_COUNT) {
+    return `a scene declares exactly ${EFFECTS_REEL_BAND_COUNT} reel rates and this has `
+      + `${rates.length}. The count is a COPY of aeon's REEL_BAND_COUNT, which sizes a RAM `
+      + 'array and is compiled into a shift — a code shape, not a field.';
+  }
+  for (let i = 0; i < rates.length; i++) {
+    const why = reelRateRefusal(rates[i]);
+    if (why !== null) return `strip ${i} (screen X ${reelStripScreenX(i).min}): ${why}`;
+  }
+  for (let i = 0; i < rates.length; i++) {
+    const j = rates.indexOf(rates[i]);
+    if (j !== i) {
+      const zero = rates[i] === 0
+        ? ' Zero IS a legal rate — a stationary strip is a real choice — but uniqueItems caps it '
+          + 'at ONE strip.'
+        : '';
+      return `strips ${j} and ${i} both scroll at ${rates[i]} px/frame, and the contract requires `
+        + 'the five to be PAIRWISE DISTINCT (two strips sharing a rate read as one wide strip).'
+        + zero;
+    }
+  }
+  return null;
+}
+
+/**
+ * WHY THIS RATE IS LEGAL AND PROBABLY NOT WHAT YOU WANTED, or null.
+ *
+ * NEVER A REFUSAL, and the contract is explicit about that. It carries two of
+ * the schema's own UI notes — the useful range and the strobe threshold — and
+ * the panel renders it at the hint tier, not the warning tier, for the same
+ * reason `rowRemapBuildableToday` is separate from `rowRemapHeightShiftRefusal`:
+ * the document is correct and the build will take it.
+ */
+export function reelRateGuidance(rate: number): string | null {
+  if (reelRateRefusal(rate) !== null) return null;
+  const g = EFFECTS_REEL_RATE_GUIDANCE;
+  if (Math.abs(rate) >= g.strobe) {
+    return `${rate} px/frame is a strobe — ${reelCycleLabel(rate)}. Legal; the contract's own `
+      + `guidance is a useful range of about ${g.min}..${g.max}.`;
+  }
+  if (rate < g.min || rate > g.max) {
+    return `${rate} px/frame is outside the contract's suggested ${g.min}..${g.max}. Legal, and `
+      + 'nothing refuses it — this is UI guidance, not a bound.';
+  }
+  return null;
+}
+
+/**
+ * EVERY LEGAL RATE WHOSE ×256 IS ALSO LEGAL — the census that closes the hole
+ * the codec packet left open, computed rather than argued.
+ *
+ * ═══ WHAT IT IS FOR ═══
+ *
+ * EW-REELS-CODEC §4.1 named one hole in "the bound is the only place the ×256
+ * mistake is caught": `0 × 256 = 0`, so a drift-shaped converter applied to an
+ * ALL-ZERO document emits a legal document. That sentence is right about the
+ * BOUND and one keyword short of the schema. `rates` also carries `uniqueItems`,
+ * and a document of `EFFECTS_REEL_BAND_COUNT` zeroes is that many EQUAL values,
+ * which `uniqueItems` refuses.
+ *
+ * So a ×256'd document survives the bound only if EVERY rate is in this census,
+ * and survives `uniqueItems` only if the five are distinct. This census's LENGTH
+ * is therefore the whole answer: while it is smaller than the band count, NO
+ * ×256'd document is legal, and the mistake is caught for every input rather
+ * than for every nonzero input.
+ *
+ * ⚠ THE FACTOR IS SPELLED HERE AND NOWHERE ELSE ON THIS PATH, AND THIS IS NOT
+ * THE WRITE PATH — it is the adversary, not a converter. Hazard 1 is that reels
+ * must never route through drift's arithmetic; `EFFECTS_DRIFT_UNITS_PER_PIXEL`
+ * is read here to compute what the mistake WOULD produce, which is the opposite
+ * of applying it. Every reels write stores the integer it was given.
+ */
+export const EFFECTS_REEL_X256_SURVIVORS: readonly number[] = Object.freeze((() => {
+  const { min, max } = EFFECTS_REEL_RATE_BOUNDS;
+  const out: number[] = [];
+  for (let r = min; r <= max; r++) {
+    if (reelRateRefusal(r * EFFECTS_DRIFT_UNITS_PER_PIXEL) === null) out.push(r);
+  }
+  return out;
+})());
+
+/**
+ * Is the ×256 mistake caught for EVERY document, not merely for every nonzero
+ * rate?
+ *
+ * True exactly when a ×256'd document cannot satisfy `items` and `uniqueItems`
+ * at once — i.e. when the survivor census cannot fill the array with distinct
+ * values. Derived from the two constraints, so a contract that widened the bound
+ * or dropped `uniqueItems` flips this to `false` and the gate reading it goes
+ * red, rather than leaving a comment claiming a defence the schema no longer
+ * provides.
+ */
+export const EFFECTS_REEL_X256_FULLY_CAUGHT: boolean =
+  EFFECTS_REEL_X256_SURVIVORS.length < EFFECTS_REEL_BAND_COUNT;

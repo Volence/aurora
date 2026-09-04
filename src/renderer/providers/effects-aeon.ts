@@ -25,6 +25,7 @@ import type {
 } from '../../core/editing/commands';
 import {
   EFFECTS_LAYER_DEFAULTS,
+  EFFECTS_REEL_BAND_COUNT, EFFECTS_REEL_RATE_BOUNDS, advisoryReelsBinding,
   type EffectsScene, type EffectsSceneLibrary, type EffectsFactor, type EffectsLayer,
   type EffectsTableRef, type EffectsCurve, type EffectsVSplit, type EffectsDrift,
   type EffectsSceneDeform, type EffectsVDeform, type EffectsLayerDeform,
@@ -53,6 +54,16 @@ import {
   EFFECTS_ROW_REMAP_HEIGHT_SHIFTS, EFFECTS_ROW_REMAP_BUILDABLE_SHIFT,
   EFFECTS_ROW_REMAP_GENERATOR_REFUSALS,
   rowRemapHeightLines, rowRemapBuildableToday, rowRemapOf, clampRowRemapPlaneY,
+  // §2.7 REELS. ⚠ `EFFECTS_REEL_RATE_BOUNDS` is imported here and the drift
+  // bounds above it are a DIFFERENT UNIT — 1/256 px there, whole px here. The
+  // two names sit four lines apart on purpose: an author of a future row who
+  // reaches for the wrong one is exactly the defect this key's docblock is
+  // about, and the two are easier to confuse when only one is in sight.
+  EFFECTS_REEL_RATE_GUIDANCE, EFFECTS_REEL_COLS_PER_BAND,
+  EFFECTS_REEL_STRIP_WIDTH_PX, EFFECTS_REELS_DEBUG_NOTE, EFFECTS_REELS_BINDING_NOTE,
+  EFFECTS_REEL_X256_SURVIVORS, EFFECTS_REEL_X256_FULLY_CAUGHT,
+  reelStripScreenX, reelCycleFrames, reelCycleLabel,
+  reelRateRefusal, reelRatesRefusal, reelRateGuidance,
 } from '../../core/formats/effects/scene-ui';
 import { BG_LAYOUT_WORDS, TILE_WIDTH_PX } from '../../core/formats/bg-override/bg-override';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
@@ -3307,4 +3318,302 @@ export {
   // here so the ONE source of the rules stays scene-ui's.
   EFFECTS_DRIFT_RATE_BOUNDS, EFFECTS_DRIFT_PX_BOUNDS, EFFECTS_DRIFT_UNITS_PER_PIXEL,
   driftPxPerFrameRefusal, driftRateToPxPerFrame, driftPxPerFrameToRate, driftRateOf,
+  // §2.7's contract half, re-exported for the same reason as drift's above: the
+  // ONE source of these rules is scene-ui's, and the panel hands
+  // `reelRateWriteRefusal` (not `reelRateRefusal`) to the box's `refuse`,
+  // because `uniqueItems` is a property of the array and not of a value.
+  // ⚠ NOTE THE UNIT SPLIT ON THIS VERY LINE: the drift bounds above are 1/256
+  // px and the reel bounds below are WHOLE px. Nothing converts between them,
+  // and there is deliberately no function here that could.
+  EFFECTS_REEL_BAND_COUNT, EFFECTS_REEL_RATE_BOUNDS, EFFECTS_REEL_RATE_GUIDANCE,
+  EFFECTS_REEL_STRIP_WIDTH_PX, EFFECTS_REEL_COLS_PER_BAND,
+  EFFECTS_REEL_X256_SURVIVORS, EFFECTS_REEL_X256_FULLY_CAUGHT,
+  reelStripScreenX, reelCycleFrames, reelCycleLabel,
+  reelRateRefusal, reelRatesRefusal, reelRateGuidance,
 };
+
+// ---------------------------------------------------------------------------
+// §2.7 — REELS, the authoring half (EW-REELS-PANEL)
+// ---------------------------------------------------------------------------
+//
+// Five 64-px-wide vertical strips of the BACKGROUND, each scrolling at its own
+// signed whole-pixel-per-frame rate. The codec half is EW-REELS-CODEC
+// (`docs/reviews/2026-09-04-ew-reels-codec.md`); every constraint below is read
+// out of the contract by `scene-ui.ts` §2.7 and nothing here restates one.
+//
+// ═══ WHY THIS ROW IS SHAPED THE WAY IT IS, HAZARD BY HAZARD ═══
+//
+// 1. ⚠⚠ THE UNIT COLLISION IS THE WHOLE DESIGN. `reels.rates` is SIGNED WHOLE
+//    PIXELS PER FRAME; the layer card directly above this row authors
+//    `drift.rate`, which is 1/256 px and goes through `driftPxPerFrameToRate`'s
+//    ×256 on the way to the document. Two adjacent rows in one column, two
+//    units, and the wrong one emits 768 for an intended 3.
+//
+//    SO THE REELS WRITE PATH HAS NO CONVERSION IN IT AT ALL. `setReelRateCommand`
+//    stores the integer it was handed. There is no `reelPxPerFrameToRate` and
+//    there must never be one: the moment this key has a converter, the drift
+//    row's converter and this row's converter differ by a factor of 256 and are
+//    one autocomplete apart. The absence is asserted BEHAVIOURALLY — the write
+//    is the identity over the whole legal span — because a comment saying "do
+//    not multiply" is not a gate.
+//
+//    ⚠ AND THE MISTAKE IS CAUGHT FOR EVERY DOCUMENT, WHICH THE CODEC PACKET
+//    THOUGHT IT WAS NOT. §4.1 of that packet names one hole: 0 × 256 is 0, so
+//    an all-zero document survives the bound. It does — and it does not survive
+//    `uniqueItems`, because five zeroes are not pairwise distinct.
+//    `EFFECTS_REEL_X256_FULLY_CAUGHT` is that argument as a computation over
+//    the two constraints, and the panel's own defence is one layer earlier: the
+//    box refuses out-of-bound values before a command is ever built.
+//
+// 2. ZERO IS A VALUE AND THE CONTROL MUST NOT TREAT IT AS "UNSET". Unlike
+//    `drift.rate` (`not: {const: 0}`), a stationary strip among moving ones is a
+//    real authored choice here — so a rate of 0 commits, reads back as 0, and
+//    the readout says "stationary", never a blank. What caps it at one strip is
+//    `uniqueItems`, which is why the box's refusal is `reelRateWriteRefusal`
+//    (the candidate ARRAY) and not `reelRateRefusal` (the value alone). Two
+//    neighbouring keys, opposite rulings on the same literal.
+//
+// 3. SCREEN ORDER IS ARRAY ORDER, SO THE LABEL IS THE SCREEN SPAN. The contract
+//    says an editor that sorts `rates` "silently relocates every strip". Nothing
+//    here sorts, reorders, filters or normalises: the panel maps the array in
+//    place and `setReelRateCommand` replaces exactly one index. There is
+//    deliberately NO add/remove/reorder affordance — the length is aeon's
+//    `REEL_BAND_COUNT`, which sizes a RAM array and is compiled into a shift.
+//    `reelStripLabel` puts `x 0–63` … `x 256–319` in the label column so an
+//    array that ever did get reordered is out of order ON SCREEN rather than
+//    only in the JSON.
+//
+// 4. DEBUG TIER, AND THE PANEL IS REQUIRED TO SAY SO. The mechanism's table,
+//    proc and on-switch all sit inside `if DEBUG == 1`, so a scene saved with
+//    `reels` validates, builds, ships and renders nothing. No JSON keyword can
+//    carry that, and the contract's own description says the editor panel must.
+//    `REELS_ROW.debug` is the CONTRACT'S SENTENCE (`EFFECTS_REELS_DEBUG_NOTE`),
+//    extracted rather than typed, so it cannot drift from the fact and goes
+//    loud if aeon ever ships the effect in release.
+//
+// ⚠ NO CAPABILITY CHECK, AND ITS ABSENCE IS DELIBERATE. There is no `CAP_` bit
+// for reels; the contract says "a generator arm must not emit a check that does
+// not exist". Do not pattern-match this onto `CAP_BAND_DRIFT`, and note that
+// this is the OPPOSITE call from `EFFECTS_ROW_REMAP_CAPABILITY_NOTE` beside it —
+// there a real capability exists and is not a function of the document, so it is
+// stated as a note; here there is nothing to state.
+//
+// ⚠ ABSENT IS ABSENT. `"reels": "none"` is REFUSED by the schema — there is no
+// `"none"` arm the way `drift`/`curve`/`vsplit`/`rowRemap` have one. Turning the
+// row off DELETES the key, and `reelsToggleCommand` is the only writer of that.
+
+/** The reels rows' labels, titles and the two sentences the panel must paint. */
+export const REELS_ROW = Object.freeze({
+  key: 'reels' as const,
+  label: 'Reels',
+  title: 'reels — five independently scrolling 64px-wide vertical strips of the BACKGROUND '
+    + '(the slot-machine reel). DEBUG BUILDS ONLY: '
+    + EFFECTS_REELS_DEBUG_NOTE.short,
+  none: 'none',
+  on: 'five strips',
+  /** Off state: absent is absent, and there is no `"none"` spelling to write. */
+  hint: 'off writes no key at all — this key has no "none" spelling, so absent IS off',
+  /** The unit, said where the numbers are typed. Hazard 1, on screen. */
+  unitHint: 'signed WHOLE pixels per frame, one strip per row, left to right. Not drift\'s '
+    + '1/256 px, and nothing on this path converts anything',
+  /** THE REQUIRED DISCLOSURE — the contract's own sentence, both lengths. */
+  debug: EFFECTS_REELS_DEBUG_NOTE,
+  /** The binding rule, always on, so the one-sided advisory's silence is not read as a pass. */
+  binding: EFFECTS_REELS_BINDING_NOTE,
+});
+
+/**
+ * The rates a freshly-enabled `reels` takes — THE SMALLEST DISTINCT POSITIVE
+ * WHOLE RATES, one per strip, derived from the band count.
+ *
+ * ⚠ NOT ZEROES, AND THIS IS THE ONE PLACE THE SEED HAD A WRONG ANSWER
+ * AVAILABLE. An all-stationary seed is the natural "neutral" choice and it is
+ * wrong twice over: `uniqueItems` REFUSES five equal values, so the document
+ * would not even load; and an all-zero `rates` is precisely the shape the codec
+ * packet named as the ×256 blind spot, so seeding it would put every new scene
+ * in the one state where a unit error is hardest to see.
+ *
+ * ⚠ NOR ONE VALUE REPEATED, for the first of those reasons alone. Whatever this
+ * seed is, it must be pairwise distinct — which is also why it cannot be "the
+ * midpoint" the way `BOB_SHIFT_SEED` is: a scalar field can seed a midpoint, a
+ * pairwise-distinct array cannot.
+ *
+ * The RULE is "the smallest distinct positive rates", and the numbers fall out
+ * of the band count. Positive and ascending so a new scene reads immediately as
+ * five separate strips (a negative rate reverses travel, it does not lift the
+ * strip); inside the contract's own useful range so the seed is never a strobe;
+ * and every one of those properties is checked here at module load rather than
+ * asserted in a comment, because a widened band count would otherwise walk this
+ * list off the end of the guidance without a word.
+ */
+export const REEL_RATE_SEED: readonly number[] = Object.freeze((() => {
+  const seed = Array.from({ length: EFFECTS_REEL_BAND_COUNT }, (_, i) => i + 1);
+  const refusal = reelRatesRefusal(seed);
+  if (refusal !== null) {
+    throw new Error(
+      `REEL_RATE_SEED ${JSON.stringify(seed)} is not a legal rates array: ${refusal}`,
+    );
+  }
+  const g = EFFECTS_REEL_RATE_GUIDANCE;
+  const stray = seed.filter((r) => r === 0 || r < g.min || r > g.max);
+  if (stray.length > 0) {
+    throw new Error(
+      `REEL_RATE_SEED ${JSON.stringify(seed)} contains ${JSON.stringify(stray)}, which is `
+      + `either stationary or outside the contract's useful range ${g.min}..${g.max}. A new `
+      + 'scene must not be born on a rate the contract itself calls a strobe, and must not be '
+      + 'born all-stationary — that is the one shape a drift-unit error hides in.',
+    );
+  }
+  return seed;
+})());
+
+/** Does this scene carry reels? ABSENT is the only off state; there is no `"none"`. */
+export function reelsEnabled(scene: Pick<EffectsScene, 'reels'>): boolean {
+  return scene.reels !== undefined;
+}
+
+/**
+ * The rates the form shows — the document's own array, IN DOCUMENT ORDER, or the
+ * seed when the scene carries no reels.
+ *
+ * ⚠ RETURNED AS-IS. No sort, no copy-and-sort, no normalise. Index `i` is strip
+ * `i` is screen X `64i..64i+63`, and the contract's word for an editor that
+ * reorders this array is that it "silently relocates every strip".
+ */
+export function reelRatesValue(scene: Pick<EffectsScene, 'reels'>): readonly number[] {
+  return scene.reels === undefined ? REEL_RATE_SEED : scene.reels.rates;
+}
+
+/** `x 0–63` … `x 256–319` — the strip's own screen span, as its label. */
+export function reelStripLabel(index: number): string {
+  const { min, max } = reelStripScreenX(index);
+  return `x ${min}–${max}`;
+}
+
+/** One box's title: which strip, which pixels, what the number does. */
+export function reelStripTitle(index: number, rate: number): string {
+  const { min, max } = reelStripScreenX(index);
+  return `reels.rates[${index}] — screen X ${min}..${max}, ${EFFECTS_REEL_COLS_PER_BAND} `
+    + `column-pairs. SIGNED WHOLE PIXELS PER FRAME (${reelCycleLabel(rate)}); the background `
+    + 'scrolls down by this much each frame and a negative rate reverses the travel, it does '
+    + 'not lift the strip';
+}
+
+/**
+ * Why this typed value cannot be written to THIS strip, or null when it can.
+ *
+ * ⚠ IT ASKS ABOUT THE CANDIDATE ARRAY, NOT THE VALUE. `uniqueItems` is a
+ * property of the array, so a rate that is perfectly legal on its own is refused
+ * when a sibling strip already scrolls at it — including 0, which is legal
+ * exactly once. A box that asked `reelRateRefusal` alone would author a document
+ * the codec refuses at load, which is the failure this repo has already paid for
+ * on `min`/`max` (EFFECTS-W1 defect 5: bounds on an `<input type="number">` stop
+ * no typed value).
+ */
+export function reelRateWriteRefusal(
+  scene: Pick<EffectsScene, 'reels'>, index: number, rate: number,
+): string | null {
+  const next = reelRatesValue(scene).slice();
+  if (index < 0 || index >= next.length) {
+    return `strip ${index} does not exist: a scene has exactly ${next.length} reel strips.`;
+  }
+  next[index] = rate;
+  return reelRatesRefusal(next);
+}
+
+/**
+ * Turn the reels on or off.
+ *
+ * OFF DELETES THE KEY, and there is nothing else it could do. `reels` has NO
+ * `"none"` spelling — `"reels": "none"` is refused by the schema — so unlike
+ * `drift`, `curve`, `vsplit` and `rowRemap`, whose toggles have a `"none"` arm
+ * to choose between, absent is the only representation of off. That is
+ * `v_deform`'s absent-key precedent, and the contract's reason is that the
+ * binding table is generated whole, so "keep" and "off" are the same state for
+ * it.
+ *
+ * ON SEEDS ALL FIVE, because there is no partial state: `minItems`/`maxItems`
+ * are both the band count, so the key exists with five rates or it does not
+ * exist. See `REEL_RATE_SEED` for why the seed is not zeroes.
+ */
+export function reelsToggleCommand(
+  library: EffectsSceneLibrary, id: string, on: boolean,
+): SetEffectsSceneCommand | null {
+  return editSceneCommand(library, id, `Scene ${id} reels`, (scene) => {
+    if (on) {
+      scene.reels = { rates: REEL_RATE_SEED.slice() };
+      return;
+    }
+    delete scene.reels;
+  });
+}
+
+/**
+ * Set ONE strip's rate — in place, at its index.
+ *
+ * ⚠ THE VALUE IS STORED AS GIVEN. There is no conversion on this path and there
+ * must never be one; the neighbouring `drift` row multiplies by 256 on the way
+ * to its document and this row does not, which is hazard 1 in one line of code.
+ *
+ * ⚠ IT REPLACES, IT NEVER SORTS OR REORDERS. Index is screen position.
+ *
+ * THROWS ON A REFUSED WRITE rather than clamping, on `setBobShiftCommand`'s
+ * precedent and for a sharper reason: the two ways to be wrong here are a ×256
+ * (which lands far outside the bound) and a duplicate (which is a legal number
+ * in an illegal place). A clamp would turn the first into a silently-wrong
+ * document at the bound — 127 px/frame for an intended 3 — and there is no
+ * substitute at all for the second. Unreachable from the form, which passes
+ * `reelRateWriteRefusal` to the box's `refuse`; this is for the caller that does
+ * not go through it.
+ */
+export function setReelRateCommand(
+  library: EffectsSceneLibrary, id: string, index: number, rate: number,
+): SetEffectsSceneCommand | null {
+  const existing = library.scenes.find((s) => s.id === id);
+  if (existing === undefined || existing.reels === undefined) return null;
+  const refusal = reelRateWriteRefusal(existing, index, rate);
+  if (refusal !== null) {
+    throw new Error(
+      `setReelRateCommand: refusing to author reels.rates[${index}] = ${rate} — ${refusal} `
+      + 'Aurora does not clamp this field: the unit is SIGNED WHOLE PIXELS PER FRAME and the '
+      + 'likeliest way to land outside the bound is drift.rate\'s x256 export conversion '
+      + 'applied here by mistake, so a '
+      + 'clamp would author the bound as though it were the intent.',
+    );
+  }
+  return editSceneCommand(library, id, `Scene ${id} reel ${index}`, (scene) => {
+    if (scene.reels === undefined) return;
+    scene.reels.rates[index] = rate;
+  });
+}
+
+/**
+ * The binding advisory, for the sections this act actually has.
+ *
+ * ⚠ THIS IS A LOOKUP, NOT A RULE. The refusal is aeon's — its generator keys
+ * the association table on the scene's lowered config label, which is unique
+ * only for a section bound at `Effects_ResolveParallax`'s rung 1 (an editor
+ * `sceneRef`). `advisoryReelsBinding` in the codec is one-sided by construction:
+ * it speaks only in the negative case, names aeon as the authority, does not
+ * block saving, and says in its own words that its silence is NOT a clearance.
+ * Nothing here softens that, and nothing here manufactures a "looks fine" —
+ * there is no such return value, on purpose. The panel pairs it with
+ * `REELS_ROW.binding`, which is always on, so an absent warning cannot be read
+ * as a pass.
+ *
+ * EMPTY SECTIONS ARE NOT PASSED THROUGH. An act slot with no section binds
+ * nothing, and the advisory treats an EMPTY list as "this project has no
+ * sections" and stays silent — a different fact from "no section binds this
+ * scene", and warning on the first is the loud-on-nothing failure that trains
+ * people to ignore a channel. Dropping the nulls is what keeps an act of empty
+ * slots in the first case rather than the second.
+ */
+export function reelsBindingAdvisories(
+  scene: EffectsScene,
+  sections: readonly ({ sceneRef?: string | null } | null)[],
+): string[] {
+  const refs = sections
+    .filter((s): s is { sceneRef?: string | null } => s !== null)
+    .map((s) => s.sceneRef ?? null);
+  return advisoryReelsBinding(scene, refs).map((a) => a.message);
+}
