@@ -743,9 +743,16 @@ async function main() {
     check('d4f', 'ANTI-VACUOUS fixture: the sprite is still dirty, which is what makes the '
       + 'project-open guard confirm rather than proceed silently',
       d4Pre.dirty === true, d4Pre.brief);
-    // Fire it WITHOUT awaiting: the guard parks on the dialog, so awaiting here
-    // would deadlock the evaluation before a key could be sent.
-    await c.evalExpr('window.__cfGuard = window.__dbg.canvas.projectOpenGuard(); void 0');
+    // ⚠ FIRE IT AND RECORD THE ANSWER IN THE PAGE — never hand the promise back
+    // to CDP. `Runtime.evaluate` with `awaitPromise` on a guard that is parked on
+    // a dialog NEVER RETURNS, and under a plant that stops the keys from
+    // answering the dialog it never will: the first version of this file HUNG
+    // here for ten minutes under plant PL-D instead of reddening its rows. A
+    // plant must redden rows, not deadlock the run — otherwise the one thing a
+    // red-first run is for (which rows does this break?) is unobtainable.
+    await c.evalExpr(`window.__cfAnswer = 'PENDING';
+      window.__dbg.canvas.projectOpenGuard().then((v) => { window.__cfAnswer = v; });
+      void 0`);
     await sleep(900);
     const d4 = await c.json('window.__cf.dlg()');
     await shot(c, 'd4-projectopen-dialog');
@@ -766,12 +773,15 @@ async function main() {
 
     await space(c); await sleep(700);
     const d4kDlg = await c.json('window.__cf.dlg()');
-    const d4Answer = await c.evalExpr('window.__cfGuard').catch(() => 'threw');
+    // Read the RECORDED answer, never the promise. 'PENDING' is a real reading
+    // and means the dialog was never answered — a red with a reason, not a hang.
+    const d4Answer = await c.evalExpr('window.__cfAnswer').catch(() => 'threw');
     const d4k = await snap(c);
     check('d4k', 'a real Space on the project-open dialog CANCELS: the guard resolves FALSE and the '
       + 'sprite keeps its unsaved edits',
       d4kDlg === null && d4Answer === false && d4k.key === d4Pre.key && d4k.dirty === true,
-      `dialog after Space = ${d4kDlg}; confirmProjectOpen() resolved ${JSON.stringify(d4Answer)}; `
+      `dialog after Space = ${d4kDlg}; confirmProjectOpen() resolved ${JSON.stringify(d4Answer)} `
+      + `('PENDING' = the guard is still parked, i.e. the key answered nothing); `
       + `${d4Pre.brief} → ${d4k.brief}. The RESOLVED VALUE is the sharp part: this is the only door `
       + 'where the answer is observable as a value rather than inferred from what survived, and false '
       + 'is the guard telling its caller not to proceed.');
