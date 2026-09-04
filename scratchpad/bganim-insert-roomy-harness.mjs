@@ -320,6 +320,64 @@ async function launch() {
   return { child, c };
 }
 
+/**
+ * Teardown, VERIFIED rather than timed. Both states go through this.
+ *
+ * ⚠ WHAT THIS REPLACES, AND HOW IT WAS MEASURED. Until now each state's
+ * `finally` was `process.kill(-child.pid, 'SIGTERM')`, a fixed
+ * `await sleep(1500)`, and then `rmSync(dir)` — no SIGKILL if the tree ignored
+ * the SIGTERM, and no check that anything had actually gone. The census
+ * (docs/reviews/2026-09-04-o78-residual-census.md §2) caught this harness with
+ * its own tell on 1 of 4 runs: the run that FAILED a row and aborted early
+ * reached the exit net with its tree still alive and printed
+ * `cleanup: X artifact REFUSED — … INHERITED`, while the three clean runs did
+ * not. It passed or failed by luck. **A fixed-duration wait is not a wait;
+ * only a verified one is.**
+ *
+ * TWO THINGS ARE VERIFIED HERE, because this rig has two ways to be hurt:
+ *   1. `killTree` is the O65 ordered sequence — app pids SIGTERMed first, a
+ *      bounded grace spent waiting for them to be GONE (not zombies), then the
+ *      wrapper's group so the X server goes down under nothing, then SIGKILL
+ *      over whatever is left, then the X-artifact reap. It RETURNS the survivor
+ *      list, which is the whole point: `sleep()` cannot tell you it failed and
+ *      this can. It was already imported by this file and never called.
+ *   2. THE PORT, which `killTree` knows nothing about and which this rig
+ *      uniquely needs: `runRoomy` and `runLive` launch TWICE IN ONE PROCESS on
+ *      the same `PORT`, and `launch()` opens with
+ *      `if (!(await portFree())) throw`. So a roomy teardown that returns early
+ *      does not merely leak — it takes the LIVE state's rows down with it, as
+ *      an `X` row whose message is about a port. `d27-effects-focus-harness`
+ *      polls the same way for the same reason (its `finally`, ~:846).
+ *
+ * LOUD, NEVER SILENT: an unkillable survivor and a port that never frees are
+ * both WARNed with what was observed. Neither throws — a `finally` must not
+ * throw over the failure it is cleaning up after — and both are visible in the
+ * log a run is read from.
+ *
+ * The X reap is safe to run per state and is NOT double-reaping: `killTree`
+ * captures `displayArtifacts(child.pid)` from THIS launch's tree only, before
+ * its first signal, so the roomy teardown reaps roomy's display and the live
+ * launch's Xvfb — which does not exist yet — is out of its scope by
+ * construction. Under an outer `xvfb-run` the reap REFUSES the inherited
+ * tempdir out loud (O78 gate 5); that refusal is correct behaviour, not a
+ * failure of this teardown.
+ */
+async function teardown(child, dir) {
+  const { survivors, tree } = await killTree(child);
+  if (survivors.length) {
+    console.log(`WARN       teardown could NOT kill ${survivors.length} of ${tree.length} process(es) `
+      + `after SIGTERM, grace and SIGKILL: ${survivors.join(',')} — the tree this run launched is `
+      + 'still up and everything below this line is measured beside it');
+  }
+  // The port is the observable that the NEXT launch actually depends on.
+  for (let i = 0; i < 30 && !(await portFree()); i++) await sleep(500);
+  if (!(await portFree())) {
+    console.log(`WARN       port ${PORT} is STILL SERVING a CDP target 15 s after the tree was killed — `
+      + 'the next state\'s launch() will refuse, and its rows will be missing rather than failed');
+  }
+  rmSync(dir, { recursive: true, force: true });
+}
+
 /** Open the project and reach the band panel; the shared preamble for both states. */
 async function openAndReach(c, dir) {
   await c.evalExpr(`window.__dbg.aeon.open(${JSON.stringify(dir)})`)
@@ -502,9 +560,7 @@ async function runRoomy() {
     console.log(`  emitted → ${EMIT_DIR}/{live-before,live-inserted,aurora-claims}.json`);
   } finally {
     try { c.close(); } catch { /* */ }
-    try { process.kill(-child.pid, 'SIGTERM'); } catch { /* */ }
-    await sleep(1500);
-    rmSync(dir, { recursive: true, force: true });
+    await teardown(child, dir);
   }
 }
 
@@ -543,9 +599,7 @@ async function runLive() {
     await shot(c, 'live-1-insert-refused');
   } finally {
     try { c.close(); } catch { /* */ }
-    try { process.kill(-child.pid, 'SIGTERM'); } catch { /* */ }
-    await sleep(1500);
-    rmSync(dir, { recursive: true, force: true });
+    await teardown(child, dir);
   }
 }
 
