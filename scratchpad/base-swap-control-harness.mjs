@@ -356,7 +356,14 @@ const INSTALL_HANDLES = String.raw`
   const fieldInput = (label) => { const r = rowFor(label); return r ? r.querySelector('input') : null; };
   window.__bs = {
     el(h) {
-      if (h === 'rasterSelect') { const r = rowFor('Raster'); return r ? r.querySelector('select') : null; }
+      // NOTE: the label is "Program", not "Raster", since EW-BOUNDARY-PANEL -- a row named
+      // Raster offering the boundary arm would teach the wrong model of why the arms are
+      // exclusive, so the panel renamed it and this lookup was never updated. It returned
+      // null from that day on and every row below failed, unseen because the harness was
+      // never run. It fails LOUD only because [f0] asserts the element is really on screen;
+      // a rig comparing after===before would have gone green on undefined===undefined.
+      // (No backticks in this comment: the whole block is inside a String.raw template.)
+      if (h === 'rasterSelect') { const r = rowFor('Program'); return r ? r.querySelector('select') : null; }
       if (h === 'line') return fieldInput('Line');
       if (h === 'target') return fieldInput('Target');
       if (h === 'addBand') return [...document.querySelectorAll('button')]
