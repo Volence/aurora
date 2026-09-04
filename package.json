@@ -55,6 +55,7 @@
     "harness:base-swap-control": "node scratchpad/base-swap-control-harness.mjs",
     "harness:boundary-control": "node scratchpad/boundary-control-harness.mjs",
     "harness:bg-dangling-ref": "node scratchpad/bg-dangling-ref-harness.mjs",
+    "harness:two-way-mark": "node scratchpad/two-way-mark-harness.mjs",
     "harness:bg-override-paints": "node scratchpad/bg-override-paints-harness.mjs",
     "harness:bg-tile-picker": "node scratchpad/bg-tile-picker-harness.mjs",
     "harness:bg-wrap": "node scratchpad/bg-wrap-harness.mjs",
