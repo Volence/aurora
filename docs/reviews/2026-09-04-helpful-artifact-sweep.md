@@ -274,6 +274,77 @@ comment reader) **still exit 2 COULD NOT MEASURE** — not turned green by the f
 
 ---
 
+## 4b-ii. Review round 3 — the real cause, and the reason two rounds were spent guessing
+
+**`check-ignore` refuses any path that leaves the repository, and one such path poisons
+the whole batch it travels in.** Measured, stderr captured:
+
+| input | exit | git said |
+|---|---|---|
+| `../aeon/tools/effects_gen.py` | **128** | `fatal: … is outside repository` |
+| `/abs/path.ts` | **128** | `fatal: Invalid path '/abs'` |
+| `src/../../aeon/x.ts` | **128** | `fatal: … is outside repository` |
+| `engine/effects/raster.emp` | 1 | *(a bare peer path is fine — just not ignored)* |
+| one good path **+** one escaping | **128** | the good one went unjudged with it |
+
+**The mechanism is the reviewer's; the spelling is not.** A bare `../aeon/src/foo.ts` in a
+comment yields **no token at all** — `BEFORE`'s lookbehind blocks a path preceded by `/`,
+measured over eight sample lines. What *is* reachable is a token that starts at one of this
+repo's own roots and then climbs out, because `PATH_RE`'s body eats `../`:
+`src/../../aeon/x.ts`, `scratchpad/../aeon/probe.mjs`. Recording the difference matters —
+the wrong spelling would send the next reader hunting for a filter that was already there.
+
+**Three fixes.**
+
+1. **stderr is captured, never `'ignore'`, and git's line goes into the `die()`.** This is
+   worth more than the fix it accompanies. The gate knew a query had failed and could not
+   say *why*, and that is precisely what cost two review rounds. It now prints
+   `git said: …` and points at `judgeable()`. Even the exit-1 case is now informative —
+   it reports *"git said nothing on stderr"*, which distinguishes it from a 128 at a glance.
+2. **A token that leaves the repo is unjudgeable** — header rule 1 already says peer paths
+   are not judged — so it is dropped at extraction, counted on the summary line, and never
+   sent to git. `ignoredSet` filters again as a belt. A path outside the repo can never be
+   git-ignored, so this costs no coverage.
+3. **A third arm in `proveIgnoredSet`**: two escaping probes travelling with two good paths
+   must not take the batch down.
+
+**Red-first discriminator, on one tree, with P5 = a real violation and a repo-escaping
+citation in the same run:**
+
+| gate | result |
+|---|---|
+| the `283bb415` shape (no filter, no third arm) | **exit 2, status 128**, `git said: fatal: src/../../aeon/x.ts … is outside repository` — the reviewer's failure, exactly |
+| current | **exit 1** — the real violation reported, the escaping token counted and not sent |
+
+⚠ **The token that killed it came from this gate's own header** — the docblock in which I
+wrote down the hazard. At `283bb415` my documentation of the trap would itself have sprung
+it on the next red run.
+
+**This arm had never executed, like the exit-1 arm before it**: zero traversal citations
+existed in the tree (measured), and the citation query only runs when there is already a
+violation. So the proof is synthetic and permanent rather than a hostage to what happens to
+be written in the tree this week. **That is now three consecutive defects in this gate of
+one shape — a branch whose coverage depended on the tree it was standing in.**
+
+**Also fixed, found while probing:** `...` (three ASCII dots) was in the placeholder rule's
+first draft and lost on the way into the gate, so an elided path like `src/.../seam.ts`
+would have been reported as a citation nobody wrote. `…` was covered; its plain spelling
+was not.
+
+### And the irreproducibility was itself an instance of tonight's theme
+
+My round-2 report said the main checkout had no `check-cited-paths.mjs` and concluded the
+quoted run could not have come from this code. **Both measurements were right and we were
+looking at different trees an hour apart** — the reviewer ran against the merge; I read the
+tree after it had been backed out. My reading was accurate, correctly sourced, and led to a
+wrong conclusion about *someone else's* run, because a working tree is a mutable artifact
+with no timestamp on it. The reviewer's `git reflog`-style evidence had a clock; my
+`ls` did not. **A measurement of a mutable tree is only a measurement of a moment**, and
+saying "this tree does not contain X" without saying *when* is the same missing-date defect
+this parcel's §3 flagged in `effects-aeon.ts`.
+
+---
+
 ## 4c. ⚠ The suite is RED, and the red is the census's own subject arriving live
 
 `test/formats/aeon-ramp-sign-drift.test.ts` fails on the finished tree. **It is not mine**,
