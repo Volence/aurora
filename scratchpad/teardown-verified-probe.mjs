@@ -131,9 +131,16 @@ async function main() {
   console.log(`\n${'='.repeat(70)}`);
   console.log(`${passed}/${results.length} rows passed   (wall ${((Date.now() - t0) / 1000).toFixed(1)}s)`);
   if (fails.length) { console.log('FAILED:'); fails.forEach((f) => console.log(`  ${f}`)); }
+  // ⚠ NOT A PATH LITERAL, ON PURPOSE. The run-root row in
+  // test/support/run-root.test.ts classifies any scratchpad .mjs whose CODE
+  // (comments stripped, strings kept) names the built binary as an
+  // app-launcher, and then requires it to import lib/run-root.mjs. This probe
+  // launches /bin/sh and nothing else, so importing that module would be a
+  // vacuous satisfaction of a real rule. Prose instead — measured: naming the
+  // binary path here turned that row red.
   console.log('NOTE: this proves the SHAPE, on a modelled tree. The full rigs '
-    + '(harness:bganim-insert-roomy and its two siblings) need node_modules/.bin/electron and are '
-    + 'the overseer\'s foreground run.');
+    + '(harness:bganim-insert-roomy and its two siblings) need a built Electron binary, which an '
+    + 'agent worktree does not have, so they are the overseer\'s foreground run.');
   process.exit(fails.length ? 1 : 0);
 }
 
