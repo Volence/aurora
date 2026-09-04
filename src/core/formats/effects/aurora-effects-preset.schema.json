@@ -116,7 +116,7 @@
     },
     "base_swap": {
       "$ref": "#/$defs/base_swap",
-      "description": "The mid-frame nametable-base SWAP: one OP_SET_REG raster fire on one screen line re-pointing Plane A's base register (VDP reg $02) at a VRAM address, the Batman & Robin trick, item 11a. Added 2026-09-03 (docs/AURORA_EFFECTS_SCHEMA.md section 7.5, DoD item 11, against aeon's shape note docs/superpowers/specs/2026-09-03-item11a-base-swap-key-shape.md at the landing aeon 850d4c60, which SHIPPED the key ahead of this CR by its own booking's call, with a real section bound: presets/ojz_sec6_baseswap.json {line: 160, target: 57344} via section_6.meta.json rasterRef; that document reads {line: 3} since aeon 8bf6df74, the owner's 'the swap goes to the top', so 160 is the value AT 850d4c60 and not the current binding). ONE CLOSED OBJECT, never an array: one raster: channel per preset. EXACTLY ONE OF bands, ramp OR base_swap per document (this file's top-level oneOf): all three lower into the same EffectsPreset.ep_raster channel (preset.emp:62/141) and no combinator exists; the contract refuses the pair on the strict side and widens only when aeon ships one (the ramp rule, section 7.4). ABSENT: no swap; the section's raster channel is whatever bands or ramp says, or Raster_Program_None if nothing is bound. LOWERING (aeon effects_gen.py at 850d4c60): raster_program([fire(line, [reg_set($8200 | vdp_base_reg(VdpBase.PlaneA, target))])]), the SAME three calls the hand-authored OJZ_BaseSwap makes; the generator forwards both values VERBATIM and restates no range, the engine constructs own them. NO capability bit gates it, unlike ramp's CAP_DENSE_TIER: OP_SET_REG dispatches unconditionally in every game, so no ensure is re-emitted at the generated call site; a real asymmetry with ramp, stated so nobody assumes one by analogy. NOT DEBUG-gated on the generated path: the section-6 emission is unconditional pub data reaching s4.bin (aeon measured EditorRaster_OJZ_Act1_ojz_sec6_baseswap at $013446 in the release listing, its 22 bytes identical to OJZ_BaseSwap's own program). WHAT AN AUTHOR SEES: from the swap line down, Plane A draws from the target nametable; the top of the frame is untouched, and the swap is self-restoring at the frame top (aeon item 11a on-screen captures, aeon 587873d9)."
+      "description": "The mid-frame nametable-base SWAP: one OP_SET_REG raster fire on one screen line re-pointing Plane A's base register (VDP reg $02) at a VRAM address, the Batman & Robin trick, item 11a. Added 2026-09-03 (docs/AURORA_EFFECTS_SCHEMA.md section 7.5, DoD item 11, against aeon's shape note docs/superpowers/specs/2026-09-03-item11a-base-swap-key-shape.md at the landing aeon 850d4c60, which SHIPPED the key ahead of this CR by its own booking's call, with a real section bound: presets/ojz_sec6_baseswap.json {line: 160, target: 57344} via section_6.meta.json rasterRef; that document reads {line: 3} since aeon 8bf6df74, the owner's 'the swap goes to the top', so 160 is the value AT 850d4c60 and not the current binding). AMENDED 2026-09-04 (T3, aeon 89ba7c5f): a LIST of band objects {plane, line, target, restore_line?} flattened into one raster program; the single-object form is REFUSED (hard break, no legacy arm); see $defs/base_swap. Still one raster: channel per preset. EXACTLY ONE OF bands, ramp OR base_swap per document (this file's top-level oneOf): all three lower into the same EffectsPreset.ep_raster channel (preset.emp:62/141) and no combinator exists; the contract refuses the pair on the strict side and widens only when aeon ships one (the ramp rule, section 7.4). ABSENT: no swap; the section's raster channel is whatever bands or ramp says, or Raster_Program_None if nothing is bound. LOWERING (aeon effects_gen.py at 850d4c60): raster_program([fire(line, [reg_set($8200 | vdp_base_reg(VdpBase.PlaneA, target))])]), the SAME three calls the hand-authored OJZ_BaseSwap makes; the generator forwards both values VERBATIM and restates no range, the engine constructs own them. NO capability bit gates it, unlike ramp's CAP_DENSE_TIER: OP_SET_REG dispatches unconditionally in every game, so no ensure is re-emitted at the generated call site; a real asymmetry with ramp, stated so nobody assumes one by analogy. NOT DEBUG-gated on the generated path: the section-6 emission is unconditional pub data reaching s4.bin (aeon measured EditorRaster_OJZ_Act1_ojz_sec6_baseswap at $013446 in the release listing, its 22 bytes identical to OJZ_BaseSwap's own program). WHAT AN AUTHOR SEES: from the swap line down, Plane A draws from the target nametable; the top of the frame is untouched, and the swap is self-restoring at the frame top (aeon item 11a on-screen captures, aeon 587873d9)."
     },
     "boundary": {
       "$ref": "#/$defs/boundary",
@@ -237,28 +237,47 @@
       "unevaluatedProperties": false
     },
     "base_swap": {
-      "type": "object",
-      "description": "One mid-frame base swap, the document face of raster_program([fire(line, [reg_set($8200 | vdp_base_reg(VdpBase.PlaneA, target))])]). Both members REQUIRED (the fire and the register op default nothing); the object is CLOSED. Ranges restate the two engine ensures the value meets next (fire's line range, vdp_base_reg's granule) so the editor is the first refusal, never a silently wrong register byte.",
-      "required": [
-        "line",
-        "target"
-      ],
-      "properties": {
-        "line": {
-          "type": "integer",
-          "minimum": 3,
-          "maximum": 223,
-          "description": "The screen line the swap fires on, one OP_SET_REG fire. Authored range is fire()'s own ensure, 3..223 (aeon engine/effects/raster_dsl.emp:360-361: lines 0-2 belong to the priming records, 223 is the frame-rewind interlock), restated here so an author meets the refusal in the editor; the generator forwards it verbatim. Required, no default. The shipped section-6 preset fired on 160 as bound at aeon 850d4c60 and on 3 since aeon 8bf6df74 (the owner's 'the swap goes to the top')."
+      "type": "array",
+      "minItems": 1,
+      "description": "A LIST of mid-frame nametable-base BANDS in document order, flattened into one raster program (aeon tools/effects_gen.py BASE_SWAP_KEYS, T3 2026-09-04, section 7.5 amended). Was one closed object with line and target (a single edge that ran to the bottom of the frame, restored only by the frame-top flush); that shape is REFUSED now, a HARD BREAK with no legacy arm (a document that parses two ways is worse than one that fails loudly; the only document in the tree migrated). Each band is one ON fire and, when restore_line is present, one OFF fire writing the plane's own home base (VRAM_PLANE_A / VRAM_PLANE_B, the engine's fact, never authored). ORDERING IS NOT ENFORCED BY THIS SCHEMA AND NOT BY AEON'S GENERATOR: the flattened fire sequence must be strictly ASCENDING across the whole list, bands included, and no band may overlap another; the AUTHORITY is fire_lines in aeon engine/effects/raster_dsl.emp, which refuses overlapping, descending or duplicated lines by name at .emp BUILD time. So a document can validate here, pass the generator's shape check, and fail at build; an editor that wants the refusal earlier derives it from this sentence (sort every band's line and restore_line into one sequence and require strict ascent). EDGES: line and restore_line are FIRE lines; the register changes about 45%% across that scanline, so each edge row is half one picture and half the other; the fully swapped rows are line+1 .. restore_line-1 (measured: a 3..64 band is INSIDE 4..63).",
+      "items": {
+        "type": "object",
+        "required": [
+          "plane",
+          "line",
+          "target"
+        ],
+        "properties": {
+          "plane": {
+            "type": "string",
+            "enum": [
+              "PlaneA",
+              "PlaneB"
+            ],
+            "description": "Which scroll plane's nametable base this band re-points: PlaneA is VDP reg $02, PlaneB is reg $04. REQUIRED, never defaulted: the register IS the content of the inversion (the owner's 'foreground in the background layer at the top, background in the foreground layer at the bottom' is two registers). CLOSED to the two plane variants: VdpBase has five variants and three name the window, the sprite table and hscroll; a forwarded SpriteTable would assemble and re-point the sprite table mid-frame, and sigil cannot refuse a legal call. A document may never name a register: register and variant use different shifts (10 vs 13) and the generator pairs them by name."
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 223,
+            "description": "The screen line the band's ON fire is on; fire()'s own ensure is 3..223 (aeon engine/effects/raster_dsl.emp:360-361), restated so the editor is the first refusal."
+          },
+          "target": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535,
+            "multipleOf": 8192,
+            "description": "The raw VRAM byte address the plane's base register is re-pointed at, 0..65535 (vdp_base_reg's range, aeon engine/vdp.emp:114), a multiple of 8192 (the register granule; bits below it drop silently, so the schema refuses them)."
+          },
+          "restore_line": {
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 223,
+            "description": "OPTIONAL. The screen line the band's OFF fire is on, writing the plane's own home base; ABSENT means the band runs to the bottom of the display, ended by the frame-top flush (the shipped single-edge shape). Must exceed line: not restated here, fire_lines refuses the inverted pair by name."
+          }
         },
-        "target": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 65535,
-          "multipleOf": 8192,
-          "description": "The raw VRAM byte address Plane A's base register is re-pointed at, 0..65535 (vdp_base_reg's parameter range, aeon engine/vdp.emp:114) and a MULTIPLE OF 8192 ($2000, Plane A's register granule, vdp.emp:116-117): reg $02 encodes only the address bits above the granule and DROPS the rest silently, so an unaligned target would make the VDP fetch from a different address than every VRAM_* consumer reads and writes, with nothing else visibly wrong; the engine's ensure names the granule in its refusal, and the multipleOf here is the same refusal one step earlier. Required, no default. The shipped section-6 preset targets 57344 ($E000, VRAM_PLANE_B, so Plane A draws Plane B's picture from the swap line down). No storage-width note is owed: the value is a plain comptime int on this path, never packed into a narrower field."
-        }
-      },
-      "unevaluatedProperties": false
+        "unevaluatedProperties": false
+      }
     },
     "ramp": {
       "type": "object",
