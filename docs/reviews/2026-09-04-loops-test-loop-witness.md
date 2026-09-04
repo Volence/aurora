@@ -449,10 +449,17 @@ leg and out of the loop. `angle` sweeps the full 256 units; `ground_speed` shoul
 to roughly `$300`-`$4C0` at the apex and never below `$280`.
 
 **Rightward run, CONTROL ROM:** `layer` **stays 0 for the whole run**. Because plane A
-holds the ring's top but not its left leg, he rides the ceiling past the apex and then
-**detaches at about `(710, 765)` and falls ~80 px into the loop's interior.** That
-visible difference is the control: "Sonic kept moving" is indistinguishable from
-"Sonic ran along flat ground", but "Sonic fell out of the top of the loop" is not.
+holds the ring's top band (rows 45-47) but not its left leg (rows 48-51, `cc43-45`), he
+rides the ceiling past the apex and then **runs out of geometry** on the way down the
+left side. Derived rather than guessed: within row 47 the inner surface's left branch
+runs from the apex `(768, 752)` down to `(733, 767)` — `|dx| = √(48² − 33²) = 34.9` at
+the row's bottom edge — and the cell below that point, `cc45` row 48, is **absent on
+plane A**. So his feet leave the geometry at about **`(733, 767)`** and he falls ~80 px
+into the loop's interior, landing on the floor inside the ring.
+
+That visible difference is what makes the control worth having: *"Sonic kept moving"* is
+indistinguishable from *"Sonic ran along flat ground"*, but *"Sonic fell out of the top
+of the loop"* is not.
 
 **A screenshot cannot settle this.** This lane has a 0-of-27 result on band pixels
 against screenshots that differed on every capture. The evidence is `layer` at `$2D`
