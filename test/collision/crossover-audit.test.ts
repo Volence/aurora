@@ -50,14 +50,30 @@ describe('auditCrossovers — nothing to say', () => {
 
 describe('auditCrossovers — a complete two-way crossover is OK', () => {
   it('counts the pair and says nothing', () => {
-    const a = auditCrossovers(plane(HAND_A), plane(HAND_B));
+    // ⚠ STRIDE 1 IS NOT A CONVENIENCE, IT IS THE FIXTURE. A one-column plane is
+    // a pair exactly ONE 8px engine trigger cell wide, which is the width at
+    // which a two-way pair actually flips the player's path. The same pair two
+    // columns wide is the defect the next describe() block covers, so this row
+    // would be worthless without saying which width it is.
+    const a = auditCrossovers(plane(HAND_A), plane(HAND_B), 1);
     expect(a.marksA).toBe(1);
     expect(a.marksB).toBe(1);
     expect(a.pairs).toBe(1);
     expect(a.oneWay).toBe(0);
     expect(a.selfMarks).toBe(0);
+    expect(a.cancellingMeasured).toBe(true);
+    expect(a.cancelling).toBe(0);
     expect(crossoverAuditSeverity(a)).toBe('ok');
     expect(crossoverAuditMessage(a)).toBeNull();
+  });
+
+  it('⚠ SAYS SO LOUDLY when it was given no stride and could not check cancellation', () => {
+    // The vacuity this flag exists to prevent: `cancelling: 0` beside a real
+    // pair count reads as an all-clear, and without a stride the scan never ran.
+    const a = auditCrossovers(plane(HAND_A), plane(HAND_B));
+    expect(a.cancellingMeasured).toBe(false);
+    expect(a.cancelling).toBe(0);
+    expect(crossoverAuditMessage(a)).toMatch(/did NOT run/);
   });
 });
 

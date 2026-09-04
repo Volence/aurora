@@ -91,12 +91,13 @@ import {
   SELECTION_MARQUEE, MAP_MARQUEE_FILL, MAP_MARQUEE_ART_ONLY,
 } from '../canvas/canvas-colors';
 import { angleDegrees, isAir, isKnownProfile } from '../../core/collision/collision-model';
-import { cellTileIndices } from '../../core/collision/collision-cell';
+import { cellTileIndices, cellCrossoverIndices, spanForTileCol } from '../../core/collision/collision-cell';
 import { collisionPaintTargets } from '../../core/collision/collision-paint';
 import { unpackCollisionCell, selectedCollisionWord } from '../../core/collision/collision-cell-word';
 import { collisionPaintWord } from '../../core/editing/collision-word';
 import { buildBothPlanesEntries, otherPlane } from '../../core/collision/both-planes-paint';
-import type { CrossoverBrush } from '../../core/collision/layer-transition';
+import type { CrossoverBrush, CrossoverSpan, CrossoverSpanMode } from '../../core/collision/layer-transition';
+import { crossoverSpanIsHalf } from '../../core/collision/layer-transition';
 import { resolveCell, resolvePlaneWords, ensureCollisionPlanes, SECTION_PLANE_WORDS } from '../../core/collision/collision-cell-resolve';
 import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
 import type { ShapeDrawCtx, ShapeDrawOpts } from '../../core/collision/collision-shape-draw';
@@ -364,6 +365,11 @@ export default function MapViewport() {
   // authoring a layer handoff and half of it preserving one would produce a
   // gesture whose single undo step reverts an inconsistent set of cells.
   const paintCrossover = useRef<CrossoverBrush>('keep');
+  /** The crossover MARK WIDTH, latched at mousedown with the rest of the mode.
+   *  `cell` is the default and today's behaviour; `half` narrows the mark to
+   *  the 8px sub-column under the cursor, which is the only width at which a
+   *  two-way pair changes the player's path (core/collision/layer-transition.ts). */
+  const paintCrossoverSpanMode = useRef<CrossoverSpanMode>('cell');
   // Marquee tool: the drag-start tile + section, fixed for the whole drag so the
   // marquee always resolves against the section the drag STARTED in even if the
   // cursor wanders over another section's world space.
@@ -2602,8 +2608,20 @@ export default function MapViewport() {
     // mode. `keep` — the default — is a no-op inside `collisionPaintWord`,
     // because the crossover bits fall outside the mask the brush owns.
     const crossover = paintCrossover.current;
+    // WHERE THE CURSOR IS *WITHIN* THE CELL IS NOW LOAD-BEARING, for the
+    // crossover and for nothing else. `info.col` is the 8px TILE column, so its
+    // low bit is the half the author is pointing at; `spanForTileCol` names it,
+    // and `cell` mode ignores it entirely. This is the only place the human
+    // road turns a gesture into a `CrossoverSpan` — the agent road names one.
+    const crossoverSpan: CrossoverSpan = crossoverSpanIsHalf(paintCrossoverSpanMode.current)
+      ? spanForTileCol(info.col)
+      : 'cell';
     const cellCol = info.col >> 1, cellRow = info.row >> 1;
-    const cellKey = `${info.sectionIndex}:${cellCol}:${cellRow}`;
+    // ⚠ THE DRAG CACHE IS KEYED ON THE SPAN TOO. Without it, dragging from one
+    // half of a cell to the other inside a single stroke would be "the same
+    // cursor cell — skip", and the second half could never be marked. In `cell`
+    // mode the span is constant, so this key is byte-for-byte what it was.
+    const cellKey = `${info.sectionIndex}:${cellCol}:${cellRow}:${crossoverSpan}`;
     if (lastPaintedCell.current === cellKey) return; // same cursor cell — skip
     lastPaintedCell.current = cellKey;
 
@@ -2628,9 +2646,17 @@ export default function MapViewport() {
     // make the Both chip silently do nothing on exactly that cell.
     if (brush === 1 && propagate) {
       const clicked = cellTileIndices(cellCol, cellRow, SECTION_TILES_WIDE);
-      const aimedDone = clicked.every((i) => ce[i] === collisionPaintWord(word, ce[i], crossover, plane));
+      // The guard has to ask about the SAME write the stroke would make, and a
+      // narrowed mark writes `keep` outside its half — so the crossover it
+      // tests per index is the crossover that index would actually get. A guard
+      // that assumed the whole cell got the mark would answer "already done"
+      // for a cell whose OTHER half is marked and let the stroke silently
+      // no-op, which is this parcel's own defect wearing the guard's hat.
+      const markAt = new Set(cellCrossoverIndices(cellCol, cellRow, SECTION_TILES_WIDE, crossoverSpan));
+      const xoAt = (i: number): CrossoverBrush => (markAt.has(i) ? crossover : 'keep');
+      const aimedDone = clicked.every((i) => ce[i] === collisionPaintWord(word, ce[i], xoAt(i), plane));
       const otherDone = !bothPlanes
-        || clicked.every((i) => otherCe[i] === collisionPaintWord(word, otherCe[i], crossover, otherPlane(plane)));
+        || clicked.every((i) => otherCe[i] === collisionPaintWord(word, otherCe[i], xoAt(i), otherPlane(plane)));
       if (aimedDone && otherDone) return;
     }
 
@@ -2641,8 +2667,17 @@ export default function MapViewport() {
       nametable: section.tileGrid.nametable, width: SECTION_TILES_WIDE, cellsW, cellsH,
     });
     const indices: number[] = [];
+    // The MARK's index set, narrower than the stroke's when the span is a half.
+    // `null` for `cell` — not "the same set" — so the default path is the write
+    // it has always been rather than a set that merely happens to be complete.
+    const crossoverAt = crossoverSpan === 'cell' ? null : new Set<number>();
     for (const t of targets) {
       for (const index of cellTileIndices(t.cellCol, t.cellRow, SECTION_TILES_WIDE)) indices.push(index);
+      if (crossoverAt) {
+        for (const index of cellCrossoverIndices(t.cellCol, t.cellRow, SECTION_TILES_WIDE, crossoverSpan)) {
+          crossoverAt.add(index);
+        }
+      }
     }
     // The brush owns its fields; each cell keeps the rest. Never `newColl:
     // word` — that replaced the whole 16-bit cell and zeroed everything the
@@ -2652,7 +2687,7 @@ export default function MapViewport() {
     // decider, called once per destination, is what buildBothPlanesEntries is.
     const { aimed: entries, other: otherEntries } = buildBothPlanesEntries({
       aimedPlaneWords: ce, otherPlaneWords: otherCe, indices, brushWord: word, bothPlanes,
-      aimedPlaneId: plane, crossover,
+      aimedPlaneId: plane, crossover, crossoverAt,
     });
     if (entries.length === 0 && otherEntries.length === 0) return;
     // Live, and recorded: a collision drag is one edit, not one per cell. (The
@@ -3021,6 +3056,7 @@ export default function MapViewport() {
       paintPropagate.current = e.altKey; // latch the mode for the whole stroke
       paintBothPlanes.current = useEditorStore.getState().collisionPaintBothPlanes;
       paintCrossover.current = useEditorStore.getState().collisionCrossoverBrush;
+      paintCrossoverSpanMode.current = useEditorStore.getState().collisionCrossoverSpanMode;
       paintCollisionCell(info, paintPropagate.current);
       isPaintDragging.current = true;
       e.preventDefault();

@@ -16,7 +16,7 @@ import {
   DEFAULT_BRUSH_ATTRIBUTES,
   type BrushPriority, type BrushAttributes,
 } from '../../core/editing/brush-word';
-import { crossoverBrushAuthors, type CrossoverBrush } from '../../core/collision/layer-transition';
+import { crossoverBrushAuthors, type CrossoverBrush, type CrossoverSpanMode } from '../../core/collision/layer-transition';
 import type { UndoStack } from '../../core/editing/undo-stack';
 import { useArtStore } from './artStore';
 import { BoundEditHistory } from '../../core/editing/bound-edit-history';
@@ -258,6 +258,28 @@ interface EditorState {
    * is what makes a two-way loop two ordinary strokes.
    */
   collisionCrossoverBrush: CrossoverBrush;
+  /**
+   * HOW WIDE A CROSSOVER MARK IS — and the ONLY control in the collision
+   * facet that is invisible until it is needed.
+   *
+   * `'cell'` (the default) marks the whole 16px cell, which is what the
+   * crossover brush has always done and what a one-way mark wants. `'half'`
+   * marks the ONE 8px sub-column the cursor is over, which is the only width at
+   * which a TWO-WAY pair changes the player's path at all: aeon's trigger fires
+   * once per 8px column entered, a 16px cell is two of them, and a pair painted
+   * across both hands the player over and straight back. The whole argument,
+   * with the constants it is derived from, is in
+   * core/collision/layer-transition.ts's CrossoverSpan block.
+   *
+   * ⚠ IT IS NOT A NEW PAINTING UNIT AND MUST NOT BECOME ONE. The 16px cell is
+   * right for everything else in this facet and this changes nothing about it:
+   * a stroke still reshapes the whole cell, and only the two crossover bits go
+   * anywhere narrower. The owner's standing note is that the effects tooling is
+   * already "confusing and convoluted", so this control renders ONLY while the
+   * crossover brush is armed — a collision painter who never touches loops
+   * never sees it, and there is no mode to leave.
+   */
+  collisionCrossoverSpanMode: CrossoverSpanMode;
   collisionBrushSize: number; // brush width in 16px blocks; 1 = reuse, >1 = positional N×N area
 
   /**
@@ -504,6 +526,9 @@ interface EditorState {
    * rescued from on the priority bit, one field further from anything visible.
    */
   setCollisionCrossoverBrush: (brush: CrossoverBrush) => void;
+  /** Set the crossover mark width. No lens-surfacing side effect: arming the
+   *  brush already did that, and this control cannot be reached without it. */
+  setCollisionCrossoverSpanMode: (mode: CrossoverSpanMode) => void;
   setCollisionBrushSize: (size: number) => void;
   setSelectedEffectsSceneId: (id: string | null) => void;
   setSelectedEffectsPresetId: (id: string | null) => void;
@@ -664,6 +689,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   collisionPaintPlane: 'a',
   collisionPaintBothPlanes: false,
   collisionCrossoverBrush: 'keep',
+  collisionCrossoverSpanMode: 'cell',
   collisionBrushSize: 1,
   selectedEffectsSceneId: null,
   selectedEffectsPresetId: null,
@@ -764,6 +790,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       'info',
     );
   },
+  setCollisionCrossoverSpanMode: (collisionCrossoverSpanMode) => set({ collisionCrossoverSpanMode }),
   setCollisionBrushSize: (size) => set({ collisionBrushSize: Math.max(1, Math.min(31, size | 0)) }),
   setSelectedEffectsSceneId: (id) => set({ selectedEffectsSceneId: id }),
   setSelectedEffectsPresetId: (id) => set({ selectedEffectsPresetId: id }),

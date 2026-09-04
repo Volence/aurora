@@ -549,7 +549,16 @@ interface AeonProbeApi {
      *  `setCollisionCrossoverBrush`, so the harness exercises the lens-surfacing
      *  side effect rather than a shortcut around it. */
     crossover?: 'keep' | 'clear' | 'hand-off';
-  }): { plane: 'a' | 'b'; word: number; bothPlanes: boolean; crossover: string };
+    /** The MARK WIDTH chip, which exists in the palette only while the
+     *  crossover brush authors. `half` narrows the mark to the 8px sub-column
+     *  under the cursor — the only width at which a two-way pair flips the
+     *  layer (core/collision/layer-transition.ts). Through the setter, like the
+     *  two above. */
+    crossoverSpanMode?: 'cell' | 'half';
+  }): {
+    plane: 'a' | 'b'; word: number; bothPlanes: boolean; crossover: string;
+    crossoverSpanMode: string;
+  };
   /**
    * The both-planes lens's last publish. Same role as `priorityLens()`: it
    * reports what the last repaint DREW, so a harness can tell "veiled N cells"
@@ -1209,11 +1218,13 @@ function installAeonProbe(): AeonProbeApi {
       // click can produce.
       if (sel.bothPlanes !== undefined) e.setCollisionPaintBothPlanes(sel.bothPlanes);
       if (sel.crossover !== undefined) e.setCollisionCrossoverBrush(sel.crossover);
+      if (sel.crossoverSpanMode !== undefined) e.setCollisionCrossoverSpanMode(sel.crossoverSpanMode);
       const s = useEditorStore.getState();
       return {
         plane: s.collisionPaintPlane,
         bothPlanes: s.collisionPaintBothPlanes,
         crossover: s.collisionCrossoverBrush,
+        crossoverSpanMode: s.collisionCrossoverSpanMode,
         word: selectedCollisionWord({
           shape: s.selectedCollisionProfile, entryFlipX: s.selectedCollisionEntryFlipX,
           userXFlip: s.selectedCollisionXFlip, yFlip: s.selectedCollisionYFlip,
@@ -1322,7 +1333,7 @@ function installAeonProbe(): AeonProbeApi {
     crossoverAudit: (sectionIndex) => {
       const sec = getCurrentAct(useProjectStore.getState())?.sections[sectionIndex];
       if (!sec) return null;
-      const a = auditCrossovers(sec.collisionEdit, sec.collisionEditB);
+      const a = auditCrossovers(sec.collisionEdit, sec.collisionEditB, SECTION_TILES_WIDE);
       return { ...a, severity: crossoverAuditSeverity(a) };
     },
     crossoverRefusal: (plane, crossover) =>

@@ -52,9 +52,20 @@ export type AgentRequest =
   // the others: `words` + `'both'` builds the cell plan once and hands it to
   // each plane's OWN merge; `words` + a crossover applies the crossover to
   // every cell the call WRITES and to none it skips.
+  //  • CROSSOVER SPAN — how WIDE the mark is, in 8px ENGINE TRIGGER CELLS.
+  //    OPTIONAL, absent means `'cell'` (the whole 16px cell, and what this tool
+  //    has always done). `'left'` / `'right'` mark ONE 8px sub-column of each
+  //    cell in the rectangle.
+  //
+  //    ⚠ IT IS THE ONLY WIDTH AT WHICH A TWO-WAY PAIR WORKS. aeon's trigger
+  //    fires once per 8px column entered (COLL_CELL_W = 8), so a two-way pair
+  //    spanning a whole 16px cell flips the layer twice and nets to nothing.
+  //    See core/collision/layer-transition.ts's CrossoverSpan block.
+  //    It narrows the MARK only — the geometry still fills the rectangle.
   | { kind: 'paint-collision'; section: number; plane: 'a' | 'b' | 'both'; x: number; y: number; w: number; h: number;
       word?: number; words?: (number | null)[];
-      crossover?: 'keep' | 'clear' | 'hand-off' }
+      crossover?: 'keep' | 'clear' | 'hand-off';
+      crossoverSpan?: 'cell' | 'left' | 'right' }
   // The READ half. Same 16px CELL units as paint-collision. `ascii` adds a
   // glyph grid a human can glance at; the JSON is the same either way.
   //

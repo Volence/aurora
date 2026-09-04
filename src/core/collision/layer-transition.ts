@@ -199,6 +199,73 @@ export function otherPlaneId(p: CollisionPlaneId): CollisionPlaneId {
  */
 export type CrossoverBrush = 'keep' | 'clear' | 'hand-off';
 
+// ═══ HOW WIDE A MARK IS, AND WHY THAT IS AN ENCODING QUESTION ════════════════
+//
+// A crossover is the ONLY field in the cell word whose consumer reads this file
+// more finely than Aurora paints it, so it is the only one whose WIDTH changes
+// what the game does.
+//
+// THE MEASUREMENT (docs/reviews/2026-09-04-loops-test-loop-witness.md §6, and
+// re-derived from source for docs/reviews/2026-09-04-loops-two-way-mark.md):
+//
+//   • `Player_LoopCrossover`'s edge trigger keys on a packed cell id masked
+//     $FFF8FFF0 — x quantises on `COLL_CELL_W` = 8px, y on `COLL_CELL_H` = 16px
+//     (aeon engine/system/constants.emp: BLOCK_TILE_SIZE 16 * 8 /
+//     BLOCK_COLL_COLS 16 = 8, and / BLOCK_COLL_ROWS 8 = 16).
+//   • aeon's bake indexes the saved plane's 8px SUB-TILE COLUMN directly
+//     (`apply_editor_collision_overlay`: `o = (cr * 2) * W + col`), so the file
+//     and the engine agree at 8px in X. Nothing on aeon's side collapses a
+//     sub-tile.
+//   • Aurora's cell is 16px, i.e. `CELL_SUBTILE_COLS` = 2 trigger cells wide.
+//
+// THE CONSEQUENCE, WHICH IS THE WHOLE REASON THIS TYPE EXISTS. The trigger
+// fires ONCE PER 8px COLUMN ENTERED, and it reads the mark from THE PLANE THE
+// PLAYER IS CURRENTLY ON. So a two-way pair — hand-off on A where hand-off is
+// also on B — flips the layer once per column crossed:
+//
+//     1 column  → 1 flip   ✓ a two-way crossover
+//     2 columns → 2 flips  ✗ NETS TO NOTHING
+//
+// A mark spanning a whole 16px cell is 2 columns. Therefore every two-way pair
+// that can be painted at cell width nets to nothing — not a corner case, every
+// one of them. (The player's top speed is 6px/frame, below the 8px column
+// width, so he cannot skip a column and dodge the second fire; and at a loop's
+// apex his y stays inside one 16px row, so the y half of the id adds no odd
+// fire.)
+//
+// ⚠ ONE-WAY MARKS ARE UNAFFECTED and stay cell-wide by default. `hand-off` on A
+// with NOTHING on B is idempotent — firing it twice is firing it once — so
+// width does not matter there, and that is the shape the first real loop used.
+// This type is the narrow exception, not a new unit of painting.
+/**
+ * How wide a crossover mark is, in 8px engine trigger cells.
+ *
+ * `'cell'` is the default EVERYWHERE and is what the field has always meant:
+ * the whole 16px cell, both sub-tile columns. `'left'` / `'right'` name one
+ * sub-tile column — the only width at which a two-way pair flips the layer.
+ *
+ * It is a property of the MARK, never of the geometry: a stroke still reshapes
+ * the whole 16px cell whatever this says. See `cellCrossoverIndices`.
+ */
+export type CrossoverSpan = 'cell' | 'left' | 'right';
+
+/**
+ * What the map brush's mark-width control offers.
+ *
+ * `'half'` is not a `CrossoverSpan` because the author does not pick a side —
+ * they point at one. `spanForTileCol` turns the 8px column under the cursor
+ * into the `left`/`right` the core takes, so the human road and the agent road
+ * reach the SAME parameter and there is one rule, not two.
+ */
+export type CrossoverSpanMode = 'cell' | 'half';
+
+/** Does this mark width need the author to have aimed at a half? The condition
+ *  the brush's span resolution and the palette's hint both turn on, so they
+ *  cannot drift. */
+export function crossoverSpanIsHalf(mode: CrossoverSpanMode): boolean {
+  return mode === 'half';
+}
+
 /** The value this brush writes on this plane, or null for `keep`. Cannot return
  *  a self-mark: `hand-off` is defined as the value that leaves the plane. */
 export function crossoverFor(brush: CrossoverBrush, plane: CollisionPlaneId): Crossover | null {

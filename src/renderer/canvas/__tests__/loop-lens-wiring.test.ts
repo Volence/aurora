@@ -23,6 +23,8 @@ import {
 import { SECTION_PLANE_WORDS } from '../../../core/collision/collision-cell-resolve';
 import { packCollisionCell } from '../../../core/collision/collision-cell-word';
 import { withCrossover } from '../../../core/collision/layer-transition';
+import { cellCrossoverIndices } from '../../../core/collision/collision-cell';
+import { CROSSOVER_SUBTILE_PX } from '../crossover-lens';
 import {
   BOTH_PLANES_FILL, CROSSOVER_FILL, CROSSOVER_ONE_WAY_FILL,
 } from '../canvas-colors';
@@ -149,14 +151,27 @@ describe('OverlayRenderer.render — the crossover lens gate', () => {
     expect(lens.crossover).toEqual({ pairedVeils: 0, oneWayVeils: 0, segments: 0 });
   });
 
+  // ⚠ THE LENS DRAWS 8px SUB-TILES NOW, NOT 16px CELLS, and these numbers moved
+  // BECAUSE OF THAT — see crossover-lens.ts's own block. A cell-wide mark still
+  // covers exactly the same 16x16 of screen; it is now emitted as the TWO 16x8
+  // horizontal runs the merge produces, because runs merge along a row and the
+  // cell is two sub-tile rows tall. The rects below are asserted in full so the
+  // change is a picture, not a count: `w: 16` on both is what says "a cell-wide
+  // mark still covers the whole cell", and it is the control for the half-cell
+  // rows underneath, where `w` is 8.
+  const SUB = CROSSOVER_SUBTILE_PX;
+
   it('veils a COMPLETE two-way crossover in the paired colour', () => {
     const { ctx, fills } = recCtx();
     const lens = new OverlayRenderer().render(
       ctx, [{ section: pair, offsetX: 0, offsetY: 0 }],
       overlays({ showCrossover: true }), viewport, undefined, null, 'a');
-    expect(byColour(fills, CROSSOVER_FILL)).toEqual([{ style: CROSSOVER_FILL, x: 80, y: 16, w: 16, h: 16 }]);
+    expect(byColour(fills, CROSSOVER_FILL)).toEqual([
+      { style: CROSSOVER_FILL, x: 80, y: 16, w: 2 * SUB, h: SUB },
+      { style: CROSSOVER_FILL, x: 80, y: 16 + SUB, w: 2 * SUB, h: SUB },
+    ]);
     expect(byColour(fills, CROSSOVER_ONE_WAY_FILL)).toEqual([]);
-    expect(lens.crossover.pairedVeils).toBe(1);
+    expect(lens.crossover.pairedVeils).toBe(2);
     expect(lens.crossover.oneWayVeils).toBe(0);
   });
 
@@ -168,11 +183,43 @@ describe('OverlayRenderer.render — the crossover lens gate', () => {
     const lens = new OverlayRenderer().render(
       ctx, [{ section: halfPainted, offsetX: 0, offsetY: 0 }],
       overlays({ showCrossover: true }), viewport, undefined, null, 'a');
-    expect(byColour(fills, CROSSOVER_ONE_WAY_FILL)).toHaveLength(1);
+    expect(byColour(fills, CROSSOVER_ONE_WAY_FILL)).toHaveLength(2);
     expect(byColour(fills, CROSSOVER_FILL)).toEqual([]);
-    expect(lens.crossover.oneWayVeils).toBe(1);
+    expect(lens.crossover.oneWayVeils).toBe(2);
     expect(lens.crossover.pairedVeils).toBe(0);
   });
+
+  // ═══ THE HALF-CELL MARK — INVISIBLE TO THIS LENS BEFORE 2026-09-04 ═══
+  //
+  // A mark on the RIGHT half of a cell is the case that made the old lens
+  // wrong rather than merely coarse: it sampled the cell's TOP-LEFT sub-tile,
+  // where a right-half mark leaves nothing, so it drew ZERO. An author could
+  // paint the only mark width at which a two-way crossover works and see no
+  // veil at all. Both halves are asserted, because a lens fixed only for the
+  // left half would pass a left-only row.
+  const halfPair = (span: 'left' | 'right') => section((a, b) => {
+    for (const i of cellCrossoverIndices(5, 1, SECTION_TILES_WIDE, span)) {
+      a[i] = withCrossover(SOLID, 'to-b');
+      b[i] = withCrossover(SOLID, 'to-a');
+    }
+  });
+
+  it.each(['left', 'right'] as const)(
+    'veils a %s-HALF two-way mark as the 8px-wide strip it actually is', (span) => {
+      const { ctx, fills } = recCtx();
+      const lens = new OverlayRenderer().render(
+        ctx, [{ section: halfPair(span), offsetX: 0, offsetY: 0 }],
+        overlays({ showCrossover: true }), viewport, undefined, null, 'a');
+      // Cell (5,1) starts at world x = 5 * 2 * SUB = 80. The marked half is one
+      // sub-tile column, so x is 80 or 80+SUB and the width is ONE SUB — DERIVED
+      // from the span, never typed, so a lens that drew the wrong half fails.
+      const x = span === 'left' ? 80 : 80 + SUB;
+      expect(byColour(fills, CROSSOVER_FILL)).toEqual([
+        { style: CROSSOVER_FILL, x, y: 16, w: SUB, h: SUB },
+        { style: CROSSOVER_FILL, x, y: 16 + SUB, w: SUB, h: SUB },
+      ]);
+      expect(lens.crossover.pairedVeils).toBe(2);
+    });
 
   it('shows the plane it was AIMED at — plane B sees its own marks', () => {
     const { ctx } = recCtx();
