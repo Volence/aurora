@@ -28,6 +28,7 @@ import {
   type EffectsScene, type EffectsSceneLibrary, type EffectsFactor, type EffectsLayer,
   type EffectsTableRef, type EffectsCurve, type EffectsVSplit, type EffectsDrift,
   type EffectsSceneDeform, type EffectsVDeform, type EffectsLayerDeform,
+  type EffectsRowRemap,
 } from '../../core/formats/effects/scene';
 import {
   EFFECTS_FACTOR_NAMES, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_LAYER_COUNT,
@@ -48,6 +49,10 @@ import {
   sceneIdRefusal, driftRateOf, driftRateToPxPerFrame, driftPxPerFrameToRate,
   driftRateRefusal, driftPxPerFrameRefusal,
   EFFECTS_DRIFT_UNITS_PER_PIXEL, EFFECTS_DRIFT_PX_BOUNDS, EFFECTS_DRIFT_RATE_BOUNDS,
+  EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS, EFFECTS_ROW_REMAP_HEIGHT_SHIFT_BOUNDS,
+  EFFECTS_ROW_REMAP_HEIGHT_SHIFTS, EFFECTS_ROW_REMAP_BUILDABLE_SHIFT,
+  EFFECTS_ROW_REMAP_GENERATOR_REFUSALS,
+  rowRemapHeightLines, rowRemapBuildableToday, rowRemapOf, clampRowRemapPlaneY,
 } from '../../core/formats/effects/scene-ui';
 import { BG_LAYOUT_WORDS, TILE_WIDTH_PX } from '../../core/formats/bg-override/bg-override';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
@@ -303,6 +308,282 @@ export function driftFromToggle(on: boolean): EffectsDrift | undefined {
 export function driftFromPxPerFrame(pxPerFrame: number): EffectsDrift {
   return { rate: driftPxPerFrameToRate(pxPerFrame) };
 }
+
+// ---------------------------------------------------------------------------
+// rowRemap — EW-9-ROWREMAP-CONTROL
+// ---------------------------------------------------------------------------
+//
+// Hydrocity's waterline, as a layer key. This strip's Plane-B scroll words are
+// re-fetched through a perspective index ladder, so screen line `i` takes the
+// value that belonged to line `ladder[i]`; the band compresses toward the
+// surface as the camera separates the background's picture of the surface from
+// the foreground's truth about it. empyrean `3992d16` (§2.6), aeon key-shape
+// artifact `3d917657` against the landed `SceneRemap.Ladder(t, y, h)`.
+//
+// ═══ WHAT THIS ROW HAS TO SAY THAT NO OTHER ROW ON THE CARD DOES ═══
+//
+// 1. THE PICKER SHOWS LINES AND WRITES A SHIFT. `height_shift` is a SHIFT
+//    (`H = 1 << shift`), every value 3..7 is legal, and an editor that exported
+//    a line count would land a band four times too tall WITH A GREEN BUILD. The
+//    option labels are built by `rowRemapHeightLines`, the only `<<` on this key
+//    in the repo; `rowRemapWithHeightShift` writes the shift and never touches
+//    it. Each label spells the shift beside the line count, so an author reading
+//    the file afterwards recognises what they picked.
+//
+// 2. FOUR OF THE FIVE LEGAL OPTIONS DO NOT BUILD TODAY, and saying so is not
+//    optional. Only `height_shift: 4` has a ladder (`row_remap_ladder16()`);
+//    aeon refuses the other four BY NAME until 9b's generator lands. The owner's
+//    recorded complaint about this tooling is exactly this failure — "it kept
+//    giving errors during build time that I would have to stop and revert the
+//    changes" — so the picker MARKS the buildable option, warns under the row
+//    when a non-buildable one is selected, and still LETS THE AUTHOR PICK IT: a
+//    control that hid four legal values would disagree with the format, and an
+//    author who opened a hand-authored `height_shift: 6` would be looking at a
+//    list that cannot represent their own file. Nothing here hardcodes "only 4
+//    works": the state and its reason are read from the contract
+//    (`EFFECTS_ROW_REMAP_BUILDABLE_SHIFT`), so when 9b lands and the clause goes,
+//    every warning here goes with it and no Aurora edit is needed.
+//
+// 3. THE THREE `scene()` PRECONDITIONS ARE CHECKABLE HERE AND NOWHERE ELSE THE
+//    AUTHOR CAN SEE. §2.6 ruling (3) keeps them OUT of the schema on purpose —
+//    "JSON Schema cannot express a cross-key conditional over an array element's
+//    siblings legibly, and the message is worth more than the encoding" — and
+//    assigns them to aeon's GENERATOR, with the engine `ensure`s kept for
+//    hand-authored `.emp`. So neither party the author is talking to refuses
+//    them until a build runs. Every input, though, is a key Aurora already holds
+//    in the open document: `anchor`, `deform_bg`, per-layer `curve` and `dsb`,
+//    and the layers array itself. `rowRemapPreconditions` reports them under the
+//    row, which is the difference between meeting them in the editor and meeting
+//    them in a build log.
+//
+//    ⚠ THEY ARE WARNINGS, NOT REFUSALS, and that follows §2.6 rather than
+//    softening it: the refusals belong to aeon's generator, the document stays
+//    schema-legal either way, and Aurora refusing to WRITE one would be a fourth
+//    party inventing a rule. What Aurora owes is that the author never learns it
+//    from a red build.
+//
+// 4. `ladder` AND `table` ARE REFUSED BY NAME. There is no control for either
+//    and nothing here writes one; `EFFECTS_ROW_REMAP_REFUSED_KEYS` reads the
+//    names out of the schema's `{"not": {}}` nodes, so a third reserved name
+//    would surface with no edit here.
+
+/**
+ * The `height_shift` a NEW remap is born on — the one that BUILDS, while the
+ * contract still names one.
+ *
+ * A NEW REMAP MUST NEVER BE BORN UNBUILDABLE. That is this parcel's whole
+ * owner-facing point, and it is why the seed is derived rather than chosen: when
+ * 9b lands and the contract stops naming a buildable shift,
+ * `EFFECTS_ROW_REMAP_BUILDABLE_SHIFT` reads `null` and the seed falls back to the
+ * narrowest band the format admits — the least the author is committed to before
+ * they have touched the picker, and still a number the schema produced.
+ */
+export const EFFECTS_ROW_REMAP_SEED_HEIGHT_SHIFT: number =
+  EFFECTS_ROW_REMAP_BUILDABLE_SHIFT ?? EFFECTS_ROW_REMAP_HEIGHT_SHIFT_BOUNDS.min;
+
+/** The row: label, titles, hint and its two states. Every bound comes from the schema. */
+export const LAYER_ROW_REMAP_ROW = Object.freeze({
+  key: 'rowRemap' as const,
+  label: 'Row remap',
+  title: 'rowRemap — this strip\'s Plane-B scroll words re-fetched through a perspective ladder, '
+    + 'so the band compresses toward a surface line as the camera moves (Hydrocity\'s waterline). '
+    + 'At most ONE strip per scene may carry it',
+  hint: 'the rows of this strip are reordered toward a surface line — one strip per scene, and '
+    + 'the scene needs an anchor and something for the remap to vary',
+  none: 'none',
+  on: 'ladder',
+  /** The plane-line box's own title: the coordinate space, said where the number is typed. */
+  planeYTitle: 'rowRemap.plane_y — the BG PLANE LINE where this strip\'s art paints the surface, '
+    + `${EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS.min}..${EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS.max}. NOT a `
+    + 'world Y and NOT a screen line (the runtime reads plane_y - Vscroll_BG); the same space as '
+    + 'a strip\'s vertical split. This range is the contract\'s ONLY enforcement — aeon checks the '
+    + 'floor and not the ceiling',
+  /** The picker's own title: the unit hazard, said where the choice is made. */
+  heightTitle: 'rowRemap.height_shift — the band height. The FILE STORES A SHIFT and this list '
+    + 'shows the lines it means (H = 1 << shift), because exporting a line count would land a '
+    + 'band four times too tall with no build error',
+  /** Suffix on the option the engine can build today; empty once the contract stops naming one. */
+  buildsSuffix: ' — builds today',
+});
+
+/** One `height_shift` as the picker offers it: the value, its label, and whether it builds. */
+export interface RowRemapHeightOption {
+  shift: number;
+  lines: number;
+  label: string;
+  buildsToday: boolean;
+}
+
+/**
+ * The height picker's options — every shift the schema admits, labelled in LINES
+ * with the shift spelled beside it, and the buildable one marked.
+ *
+ * NOTHING IS HIDDEN; see point 2 of the banner above.
+ */
+export const ROW_REMAP_HEIGHT_OPTIONS: readonly RowRemapHeightOption[] = Object.freeze(
+  EFFECTS_ROW_REMAP_HEIGHT_SHIFTS.map((shift) => {
+    const lines = rowRemapHeightLines(shift);
+    const buildsToday = rowRemapBuildableToday(shift) === null;
+    const named = EFFECTS_ROW_REMAP_BUILDABLE_SHIFT !== null;
+    return Object.freeze({
+      shift,
+      lines,
+      buildsToday,
+      label: `${lines} lines (shift ${shift})`
+        + (buildsToday && named ? LAYER_ROW_REMAP_ROW.buildsSuffix : ''),
+    });
+  }),
+);
+
+/** The payload the row's boxes show, or null when this strip carries no remap. */
+export function rowRemapFieldValue(
+  layer: Pick<EffectsLayer, 'rowRemap'>,
+): { plane_y: number; height_shift: number } | null {
+  return rowRemapOf(layer.rowRemap);
+}
+
+/**
+ * Turning the remap on or off.
+ *
+ * OFF CLEARS THE KEY — `setLayerFieldCommand`'s rule: absent and `"none"` lower
+ * to the same NULL ladder, and an absent key is the spelling that puts no diff
+ * on a file that never carried it.
+ *
+ * ON SEEDS THE STRIP'S OWN `world_y`, CLAMPED — `vsplitFromToggle`'s precedent,
+ * and for a stronger reason here: the contract says `plane_y` lives in the same
+ * coordinate space as `vsplit.at`, so the one number already on the card that is
+ * a plausible plane line is the strip's own top. It is a starting point to type
+ * over, not a claim that it is right, and it is CLAMPED because `plane_y`'s
+ * ceiling has no enforcement anywhere but the schema — an unclamped seed is the
+ * one value in this repo that could reach a ROM as a window pointing nowhere.
+ * The clamp uses `rowRemap`'s OWN bounds, not `vsplit`'s.
+ */
+export function rowRemapFromToggle(
+  on: boolean, layer: Pick<EffectsLayer, 'world_y'>,
+): EffectsRowRemap | undefined {
+  return on
+    ? {
+      plane_y: clampRowRemapPlaneY(layer.world_y),
+      height_shift: EFFECTS_ROW_REMAP_SEED_HEIGHT_SHIFT,
+    }
+    : undefined;
+}
+
+/**
+ * What a typed plane line writes, keeping the shift the strip already carries.
+ *
+ * ⚠ ONLY EVER REACHED THROUGH `rowRemapPlaneYRefusal` — `NumberField`'s `refuse`
+ * withholds the commit — and it does NOT clamp, for `driftFromPxPerFrame`'s
+ * reason: a clamp substitutes a number the author did not type. The seed above
+ * clamps because a seed has no author to disagree with; a typed value does.
+ */
+export function rowRemapWithPlaneY(
+  current: { plane_y: number; height_shift: number }, planeY: number,
+): EffectsRowRemap {
+  return { plane_y: planeY, height_shift: current.height_shift };
+}
+
+/**
+ * What a picked height writes — THE SHIFT, never the line count.
+ *
+ * The only function on the write path for this field, so the unit hazard has one
+ * place it could be got wrong and that place is three lines long.
+ */
+export function rowRemapWithHeightShift(
+  current: { plane_y: number; height_shift: number }, shift: number,
+): EffectsRowRemap {
+  return { plane_y: current.plane_y, height_shift: shift };
+}
+
+/**
+ * THE THREE `scene()` PRECONDITIONS, EVALUATED AGAINST THE OPEN DOCUMENT.
+ *
+ * Empty when this strip's remap is fine (or when it carries none); otherwise one
+ * sentence per unmet condition, each pairing AURORA'S FINDING about this document
+ * with THE CONTRACT'S OWN CLAUSE, so the rule an author reads is the one aeon
+ * wrote and only the diagnosis is Aurora's.
+ *
+ * WHY THREE AND NOT FOUR. The contract names a fourth — the game must raise
+ * `CAP_ROW_REMAP` — and it is the one that is NOT a function of the document:
+ * nothing in a scene file says which game will bind it. Reporting it per-layer
+ * would be a warning an author can neither satisfy nor dismiss, so it is stated
+ * once as a note (`EFFECTS_ROW_REMAP_CAPABILITY_NOTE`) and never as a verdict.
+ * Naming the one Aurora cannot see is the point: silence about it would read as
+ * coverage.
+ *
+ * THE PREDICATES ARE THE ENGINE'S. "Something to vary" is spelled by the
+ * contract as "its own curve, or a live dsb with a deform_bg table, or the scene
+ * anchor's live dsb with a deform_bg table", and that is what the first arm
+ * tests. The no-deform sentinels come from `EFFECTS_LAYER_DEFORM_BOUNDS` and
+ * `EFFECTS_ANCHOR_SHIFT_BOUNDS` as two SEPARATE reads, because the two shift
+ * spaces live in different `$defs` and agree only by coincidence today —
+ * `EFFECTS_ANCHOR_SHIFT_BOUNDS`'s own docblock records why that matters.
+ *
+ * `effectiveDsb` and not `layer.dsb`: `layer()` folds `own`'s `shift_b` over a
+ * layer's `dsb` (`scene_dsl.emp:558`), so a strip with its own deform table has
+ * a live amplitude its `dsb` field does not show.
+ */
+export function rowRemapPreconditions(scene: EffectsScene, index: number): string[] {
+  const layer = scene.layers[index];
+  if (!layer || rowRemapOf(layer.rowRemap) === null) return [];
+  const out: string[] = [];
+
+  const layerOff = EFFECTS_LAYER_DEFORM_BOUNDS.shift_b.max;
+  const anchorOff = EFFECTS_ANCHOR_SHIFT_BOUNDS.dsb.max;
+  const bgTable = sceneDeformValue(scene, 'deform_bg') !== null;
+  const ownCurve = curveFieldValue(layer) !== 'none';
+  const dsb = effectiveDsb(layer);
+  const anchor = scene.anchor !== undefined && scene.anchor !== 'none' ? scene.anchor.at : null;
+  const anchorLive = anchor !== null && anchor.dsb !== anchorOff;
+
+  // (1) Something to vary — else the remap is the IDENTITY and the effect is
+  //     ABSENT, not subtle. Each half of the diagnosis says which input was
+  //     missing, because "nothing to vary" alone does not tell an author where
+  //     to go.
+  if (!ownCurve && !(dsb !== layerOff && bgTable) && !(anchorLive && bgTable)) {
+    const why: string[] = ['no curve on this strip'];
+    why.push(dsb === layerOff
+      ? `its dsb is ${layerOff}, the no-deform sentinel`
+      : `its dsb is ${dsb} but the scene has no deform_bg table`);
+    why.push(anchor === null
+      ? 'no scene anchor'
+      : anchorLive
+        ? 'the anchor\'s dsb is live but the scene has no deform_bg table'
+        : `the anchor's dsb is ${anchorOff}`);
+    out.push(`nothing for the remap to vary — ${why.join('; ')}. `
+      + `The contract: "${EFFECTS_ROW_REMAP_GENERATOR_REFUSALS.vary}"`);
+  }
+
+  // (2) The scene must declare an anchor — the remap takes its channel from the
+  //     SCENE's `anchor`, never from a per-layer field.
+  if (anchor === null) {
+    out.push('this scene declares no anchor, and the remap takes its channel from the scene\'s '
+      + 'own anchor rather than from the strip. '
+      + `The contract: "${EFFECTS_ROW_REMAP_GENERATOR_REFUSALS.anchor}"`);
+  }
+
+  // (3) At most one remapped strip per scene — the others NAMED, so the author
+  //     knows where to go and does not have to open every card.
+  const others = scene.layers
+    .map((l, i) => (i !== index && rowRemapOf(l.rowRemap) !== null ? i : -1))
+    .filter((i) => i >= 0);
+  if (others.length > 0) {
+    out.push(`strip${others.length > 1 ? 's' : ''} ${others.join(', ')} `
+      + `${others.length > 1 ? 'also carry' : 'also carries'} a row remap. `
+      + `The contract: "${EFFECTS_ROW_REMAP_GENERATOR_REFUSALS.single}"`);
+  }
+
+  return out;
+}
+
+/**
+ * The fourth refusal, which is NOT a function of the document — stated once
+ * beside the row, so its absence from `rowRemapPreconditions` cannot be read as
+ * coverage.
+ */
+export const EFFECTS_ROW_REMAP_CAPABILITY_NOTE =
+  'Aurora cannot check the fourth condition from a scene file — nothing here says which game '
+  + `will bind it. The contract: "${EFFECTS_ROW_REMAP_GENERATOR_REFUSALS.capability}"`;
 
 /**
  * THE ENGINE'S layer() GUARD 4, AS ONE PREDICATE — the only place the rule is
@@ -2835,11 +3116,12 @@ export function removeLayerCommand(
 
 /**
  * The layer keys the card has a control for. `curve`/`vsplit` are parcel H,
- * `deform` is wave 2, `drift` is EW-DRIFT-CTL.
+ * `deform` is wave 2, `drift` is EW-DRIFT-CTL, `rowRemap` is EW-9-ROWREMAP-CONTROL.
  */
-export type LayerCardKey = 'world_y' | 'fa' | 'fb' | 'curve' | 'vsplit' | 'deform' | 'drift';
+export type LayerCardKey =
+  | 'world_y' | 'fa' | 'fb' | 'curve' | 'vsplit' | 'deform' | 'drift' | 'rowRemap';
 /** The optional ones, where the control has a "none" state that CLEARS the key. */
-export type LayerCardOptionalKey = 'curve' | 'vsplit' | 'deform' | 'drift';
+export type LayerCardOptionalKey = 'curve' | 'vsplit' | 'deform' | 'drift' | 'rowRemap';
 
 /**
  * Set one field of one layer.

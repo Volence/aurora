@@ -48,6 +48,10 @@
       },
       "fb": "FACTOR_1_4",
       "phase": 128,
+      "rowRemap": {
+        "height_shift": 4,
+        "plane_y": 101
+      },
       "vsplit": {
         "at": 192
       },

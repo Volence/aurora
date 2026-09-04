@@ -96,6 +96,9 @@ import {
   EFFECTS_LAYER_DEFORM_BOUNDS, EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS,
   LAYER_DRIFT_ROW, EFFECTS_DRIFT_PX_BOUNDS, EFFECTS_DRIFT_PX_STEP,
   driftPxFieldValue, driftFromToggle, driftFromPxPerFrame, driftPxPerFrameRefusal,
+  LAYER_ROW_REMAP_ROW, ROW_REMAP_HEIGHT_OPTIONS, EFFECTS_ROW_REMAP_CAPABILITY_NOTE,
+  rowRemapFieldValue, rowRemapFromToggle, rowRemapWithPlaneY, rowRemapWithHeightShift,
+  rowRemapPreconditions,
   vsplitVDeformAdvisoryParts,
 } from '../../providers/effects-aeon';
 // THE ONE CROSS-DOCUMENT QUESTION THIS PANEL ASKS. Every other reading here is a
@@ -103,6 +106,9 @@ import {
 // different directory, edited in a different panel, and it is the whole point of
 // the V-deform row's last line.
 import { vDeformRampAdvisory } from '../../providers/effects-preset';
+import {
+  EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS, rowRemapPlaneYRefusal, rowRemapBuildableToday,
+} from '../../../core/formats/effects/scene-ui';
 import type { EffectsPresetLibrary } from '../../../core/formats/effects/preset';
 
 const EMPTY_LIBRARY: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [] };
@@ -378,6 +384,12 @@ export default function EffectsScenePanel(): React.ReactElement {
   // refusal under layer 0's box. `NumberField` clears it on focus and on any
   // value that commits, so a stale sentence cannot outlive the number beside it.
   const [driftRefusal, setDriftRefusal] = React.useState<Record<number, string | null>>({});
+  // THE PLANE-LINE BOX'S REFUSAL, PER LAYER — same shape and same reason as the
+  // drift box's above. It matters more here: `plane_y`'s ceiling has NO
+  // enforcement in aeon at all (the ensure tests >= 0 only), so this sentence is
+  // the only thing between an author and a window that builds clean and points
+  // nowhere.
+  const [planeYRefusal, setPlaneYRefusal] = React.useState<Record<number, string | null>>({});
 
   // Keep the selection on something that exists: undoing a create, or opening a
   // different project, leaves a stale id behind.
@@ -388,7 +400,7 @@ export default function EffectsScenePanel(): React.ReactElement {
   // sentence under the new scene's layer of the same number. Cleared on the
   // change rather than keyed by `${id}:${i}`, because a refusal is a transient
   // fact about what the author just typed and nothing should carry it across.
-  React.useEffect(() => { setDriftRefusal({}); }, [selected?.id]);
+  React.useEffect(() => { setDriftRefusal({}); setPlaneYRefusal({}); }, [selected?.id]);
 
   // ONCE PER SCENE, NOT ONCE PER CARD. The advisory walks every layer and
   // returns `/layers/N` paths, so calling it inside the map would be N scans of
@@ -845,6 +857,112 @@ export default function EffectsScenePanel(): React.ReactElement {
                     </Field>
                     <Hint under style={{ marginBottom: 0 }}>{LAYER_DRIFT_ROW.hint}</Hint>
                     {why !== null && <Hint under tone="warning">{why}</Hint>}
+                  </>
+                );
+              })()}
+              {/* ROW REMAP (EW-9-ROWREMAP-CONTROL, empyrean 3992d16 section 2.6).
+                  Last on the card, under drift, because it is the only row that
+                  reorders the strip's own rows rather than moving it.
+
+                  ═══ THE PICKER SHOWS LINES AND THE FILE STORES A SHIFT ═══
+
+                  `height_shift` is a SHIFT — H = 1 << shift — and EVERY value
+                  3..7 is legal, so an editor that exported the line count would
+                  land a band four times too tall and the build would be GREEN.
+                  aeon's own ensure names the trap ("If you meant 64 LINES, you
+                  want 6"), and the contract asks an editor to DISPLAY 1 << shift
+                  and EXPORT the shift. The option labels come from
+                  ROW_REMAP_HEIGHT_OPTIONS (the one `<<` on this key in the repo)
+                  and `rowRemapWithHeightShift` writes `o.shift`.
+
+                  ═══ FOUR OF THE FIVE DO NOT BUILD, AND THE ROW SAYS SO ═══
+
+                  Only the shift with a generated ladder builds today; aeon
+                  refuses the rest BY NAME until its generator half lands. The
+                  buildable option carries a suffix in the list and a warning
+                  appears under the row for any other — the owner's recorded
+                  complaint about this tooling is precisely a build that fails
+                  after the fact ("errors during build time that I would have to
+                  stop and revert"). The options are NOT filtered: the values are
+                  legal, and an author who opened a hand-authored shift 6 must
+                  see their own file in the list. Nothing here says "only 4":
+                  `rowRemapBuildableToday` reads the state out of the contract and
+                  goes quiet on its own when 9b lands.
+
+                  ═══ THE THREE PRECONDITIONS, MET HERE OR IN A BUILD LOG ═══
+
+                  Section 2.6 keeps them OUT of the schema and gives them to
+                  aeon's generator, so nothing refuses them until a build runs —
+                  but all three are functions of keys this panel is already
+                  holding. They render as warnings, not refusals: the document
+                  stays legal, and Aurora is not a fourth party inventing a rule.
+                  The fourth condition (the game's CAP_ROW_REMAP) is NOT a
+                  function of the document and is stated as a note instead of
+                  being silently omitted. */}
+              {(() => {
+                const rr = rowRemapFieldValue(layer);
+                const why = planeYRefusal[i] ?? null;
+                const unbuildable = rr === null ? null : rowRemapBuildableToday(rr.height_shift);
+                const unmet = selected === null ? [] : rowRemapPreconditions(selected, i);
+                return (
+                  <>
+                    <Field label={LAYER_ROW_REMAP_ROW.label} title={LAYER_ROW_REMAP_ROW.title}>
+                      <Select title={`Layer ${i} ${LAYER_ROW_REMAP_ROW.title}`}
+                        value={rr === null ? 'none' : 'ladder'}
+                        onChange={(v) => {
+                          setPlaneYRefusal((st) => ({ ...st, [i]: null }));
+                          run(setLayerFieldCommand(
+                            library, selected.id, i, 'rowRemap',
+                            rowRemapFromToggle(v === 'ladder', layer)));
+                        }}
+                        style={{ width: 88 }}>
+                        <option value="none">{LAYER_ROW_REMAP_ROW.none}</option>
+                        <option value="ladder">{LAYER_ROW_REMAP_ROW.on}</option>
+                      </Select>
+                      {rr !== null && (
+                        <>
+                          <NumberField title={`Layer ${i} ${LAYER_ROW_REMAP_ROW.planeYTitle}`}
+                            min={EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS.min}
+                            max={EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS.max}
+                            width={64} value={rr.plane_y}
+                            refuse={(n) => rowRemapPlaneYRefusal(n)}
+                            onRefusal={(r) => setPlaneYRefusal((st) => ({ ...st, [i]: r }))}
+                            onChange={(n) => run(setLayerFieldCommand(
+                              library, selected.id, i, 'rowRemap', rowRemapWithPlaneY(rr, n)))} />
+                          <Select title={`Layer ${i} ${LAYER_ROW_REMAP_ROW.heightTitle}`}
+                            value={String(rr.height_shift)}
+                            onChange={(v) => run(setLayerFieldCommand(
+                              library, selected.id, i, 'rowRemap',
+                              rowRemapWithHeightShift(rr, Number(v))))}
+                            style={{ flex: 1, minWidth: 0 }}>
+                            {ROW_REMAP_HEIGHT_OPTIONS.map((o) => (
+                              <option key={o.shift} value={String(o.shift)}>{o.label}</option>
+                            ))}
+                          </Select>
+                        </>
+                      )}
+                    </Field>
+                    <Hint under style={{ marginBottom: 0 }}>{LAYER_ROW_REMAP_ROW.hint}</Hint>
+                    {why !== null && <Hint under tone="warning">{why}</Hint>}
+                    {unbuildable !== null
+                      && <Hint under tone="warning">{unbuildable}</Hint>}
+                    {/* THE SPAN IS NOT DECORATION. `Hint` takes {children,
+                        under, tone, style} and DROPS anything else, and TS does
+                        not catch a hyphenated JSX attribute on a component — so
+                        `data-testid` passed to <Hint> silently never reaches the
+                        DOM. It did here, and the harness's precondition rows
+                        read zero nodes while the sentences were visibly on
+                        screen: a testid that asserts nothing, found by driving
+                        the app rather than by reading the source. The extras
+                        line below already wraps for the same reason. */}
+                    {unmet.map((m) => (
+                      <Hint key={m} under tone="warning">
+                        <span data-testid={`layer-${i}-rowremap-precondition`}>{m}</span>
+                      </Hint>
+                    ))}
+                    {rr !== null && (
+                      <Hint under>{EFFECTS_ROW_REMAP_CAPABILITY_NOTE}</Hint>
+                    )}
                   </>
                 );
               })()}

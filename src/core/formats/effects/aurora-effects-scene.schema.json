@@ -367,6 +367,45 @@
             }
           ],
           "default": "none"
+        },
+        "rowRemap": {
+          "description": "EFFECTS-W1 item 9's ROW REMAP (added 2026-09-04, docs/AURORA_EFFECTS_SCHEMA.md section 2.6, aeon key-shape artifact 3d917657 docs/superpowers/specs/2026-09-04-item9-row-remap-key-shape.md, against the landed constructor SceneRemap.Ladder(t, y, h) at aeon d8baf84f engine/level/scene_dsl.emp:518-521). This layer's plane-B scroll words are re-fetched through a perspective-selected index ladder, so screen line i of the band takes the value that belonged to line ladder[i]; the band compresses toward the surface as the camera separates the background's picture of the surface from the foreground's truth about it. \"none\" or absent = this layer's plane-B scroll words are whatever the line loops wrote (every shipped layer but one); absent and \"none\" lower to the same eight bytes (a NULL ladder), so the distinction is an authoring one: \"none\" says the author chose no remap. Lowers to layer(rowRemap: SceneRemap.Ladder(<ladder derived from height_shift>, plane_y, height_shift)); both numbers forwarded VERBATIM, 1:1, no conversion on either side. THE LADDER IS NOT NAMED HERE: it is derived from height_shift (one number, one source; aeon scene_dsl.emp:879's two-sources rule). ladder and table are RESERVED and refused by name below; a named non-perspective ladder is a future second oneOf arm, not in this contract. It is the ONLY thing that raises CAP_ROW_REMAP, and the anchor channel comes from the SCENE's own anchor key, never from the layer (scene_dsl.emp:822-824). REFUSALS THIS SCHEMA DOES NOT ENCODE, owned by aeon's generator tools/effects_gen.py and re-stated as engine ensures for hand-authored scenes (scene_dsl.emp:1907, :1913, :1920): a remapped layer needs something to vary (its own curve, or a live dsb with a deform_bg table, or the scene anchor's live dsb with a deform_bg table), else the remap is the identity and the effect is ABSENT; the scene MUST declare anchor; at most ONE layer per scene may carry rowRemap; the game must raise CAP_ROW_REMAP. Verified in aeon SOURCE at d8baf84f that a document-bound section can seed the channel it needs (preset.emp:153-154, :283-290; effects_gen.py:1280-1281); no ROM has been built through this path yet, so the first 9c parcel builds it.",
+          "oneOf": [
+            {
+              "const": "none"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "plane_y": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 511,
+                  "description": "The BG PLANE LINE at which this layer's ART paints the surface. NOT a world Y and NOT a screen line: the runtime computes the background's image of the surface as (plane_y - Vscroll_BG); it is a different number from the layer's own world_y. Same coordinate space as vsplit.at. THIS SCHEMA IS THE ONLY ENFORCEMENT OF THE 511 CEILING: aeon's ensure at scene_dsl.emp:1008 tests >= 0 only, brm_plane_y is u16 (parallax.emp:420), so 512..65535 would emit a silently-wrong window (aeon row ROWREMAP-PLANEY-CEILING)."
+                },
+                "height_shift": {
+                  "type": "integer",
+                  "minimum": 3,
+                  "maximum": 7,
+                  "description": "A SHIFT, NOT A LINE COUNT: H = 1 << height_shift. 4 is a 16-line ladder (272 B), 6 is 64 lines (4,160 B, S3K LBZ2's own height), 7 is 128 lines (16,512 B); the ladder is (H+1) rows of H bytes, quadratic in H. Aeon refuses 0..2 and 8+ at build time (scene_dsl.emp:1006). UNIT HAZARD: an editor may DISPLAY 1 << height_shift beside the control and MUST EXPORT the shift; every value 3..7 is legal, so a conversion bug lands as a band four times too tall, not as a refusal. TODAY ONLY 4 BUILDS: row_remap_ladder16() (aeon parallax_dsl.emp:220) is the one ladder the engine can generate until 9b's generator lands; the generator refuses the other four by name meanwhile."
+                },
+                "ladder": {
+                  "not": {},
+                  "description": "RESERVED, refused by name: the ladder is derived from height_shift; a named ladder is the second-variant extension and is not in this contract yet."
+                },
+                "table": {
+                  "not": {},
+                  "description": "RESERVED, refused by name: see ladder."
+                }
+              },
+              "required": [
+                "plane_y",
+                "height_shift"
+              ],
+              "unevaluatedProperties": false
+            }
+          ],
+          "default": "none"
         }
       },
       "required": [
