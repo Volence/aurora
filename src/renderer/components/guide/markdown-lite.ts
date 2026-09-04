@@ -34,7 +34,9 @@
 //
 // NESTING IS NOT SUPPORTED and is not needed: a list inside a list, or a table
 // inside a quote, renders as its own top-level block. The guide is checked
-// against this by `markdown-lite.test.ts`, which parses the REAL shipped file
+// against this by `src/renderer/components/guide/__tests__/guides.test.ts`
+// (there is no `markdown-lite.test.ts`, and never has been), which parses the
+// REAL shipped file
 // rather than a fixture, so a future guide edit that reaches for a construct
 // this parser drops fails the suite instead of silently losing a paragraph.
 

@@ -48,7 +48,8 @@
 // WHAT PROVES IT. The node suite cannot see React, a DOM or a click, so nothing
 // in `vitest` can prove the blur runs. Rows `[k3]`-`[k7]` of
 // `scratchpad/collision-destructive-harness.mjs` (the two collision buttons) and
-// `scratchpad/d27-focus-survey-harness.mjs` (the survey's nine) press the real
+// `scratchpad/d27-sprite-focus-harness.mjs` (six of the survey's nine) and
+// `scratchpad/d27-effects-focus-harness.mjs` (the other three) press the real
 // buttons in the real app. `[k7]` — a press that changes NOTHING still drops
 // focus — is the row that dies under a blur-only-on-the-acting-path
 // implementation, and it is the one the owner's ruling actually rests on.

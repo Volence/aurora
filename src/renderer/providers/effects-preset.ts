@@ -2817,8 +2817,10 @@ export function fmtRampPx(px: number): string {
  *   as the sign bug the codec parcel caught, which reads fine and is wrong.
  *
  * This is the DISCRIMINATOR; `presetFp16FromNumber` is the ANSWER, and
- * `ramp-control.test.ts` cross-checks that the two agree on every case (this
- * returns null exactly when that returns an object). Two functions because the
+ * `__tests__/effects-preset-ramp-control.test.ts` §2 cross-checks that the two
+ * agree on every case (this returns null exactly when that returns an object).
+ * ⚠ THE NAME HERE USED TO BE `ramp-control.test.ts`, WHICH HAS NEVER EXISTED —
+ * the same defect O79 fixed twice in this file's header. Two functions because the
  * codec must not grow a sentence and the panel must not grow a conversion.
  */
 export type RampRateProblem = 'off-grid' | 'sign-hole' | 'above-range' | 'below-range';
@@ -3065,8 +3067,10 @@ export function rampAddrGloss(addr: number): string {
  * So: the fields stay in the engine's numbers, this one derived readout is in
  * the screen's, and the panel LABELS it as a display span rather than letting it
  * be read back as `top`. The lag appears exactly once on this surface, and
- * `ramp-control.test.ts` asserts both halves — that this readout DOES add it,
- * derived from the constant, and that nothing writes it into the document.
+ * `__tests__/effects-preset-ramp-control.test.ts` §3 asserts both halves — that
+ * this readout DOES add it, derived from the constant, and that nothing writes
+ * it into the document. (Same correction as §2's citation above: the old name
+ * `ramp-control.test.ts` has never existed.)
  *
  * ⚠ WHAT THE BOTTOM EDGE ACTUALLY DOES, CORRECTED 2026-09-03 (empyrean
  * `e9409dc`), BECAUSE THE OLD PARAGRAPH HERE ARGUED THE WRONG WAY ROUND. It used

@@ -972,7 +972,8 @@ describe('collision shape + diverge mode', () => {
   beforeEach(() => { openReady(); });
 
   it('defaults to no armed shape and Link — the non-destructive path spec §4.5 requires', () => {
-    // Isolate spends a block id and can grow the colind table (classic-write.ts's
+    // Isolate spends a block id and can grow the colind table
+    // (src/core/level-classic/collision-write.ts's
     // overhang refusal — GHZ/SBZ refuse it outright). Link only ever rewrites one
     // existing table entry. Defaulting to Isolate would make the more destructive
     // operation the one a user reaches with zero clicks; spec §4.5 forbids that,
