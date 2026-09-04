@@ -30,26 +30,43 @@
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npm run build
 // Run: AEON_DIR=<pinned checkout> npm run harness:loop-witness
 
-import { AURORA_DIR } from '../test/support/sibling-root.mjs';
+import { AURORA_DIR, checkoutOverride, siblingDefaultPath } from '../test/support/sibling-root.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 import { spawnGuarded, killTree, restoreDiscoveryNow, describeDiscovery,
          discoverySnapshot } from './lib/harness-guard.mjs';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve as resolvePath } from 'node:path';
 import * as http from 'node:http';
 
 const PORT = Number(process.env.PORT ?? 9421);
 const ROOT = AURORA_DIR;
 const RUN = announceRunRoot(runTarget(ROOT));
 const ELECTRON = RUN.electron;
-const AEONDIR = process.env.AEON_DIR;
+// Through the RESOLVER, not `process.env` — it honours the transitional aliases,
+// refuses when two spellings disagree, and errors when the variable is set but
+// names nothing. An override is REQUIRED here (see the refusal below), so this
+// is `checkoutOverride`, not `siblingPath`.
+const OVERRIDE = checkoutOverride('aeon');
+const AEONDIR = OVERRIDE?.value ?? null;
 const SHOTS = `${ROOT}/scratchpad/shots-loop-witness`;
 mkdirSync(SHOTS, { recursive: true });
 
 if (!AEONDIR || !existsSync(join(AEONDIR, 'games/sonic4/data/editor/ojz/act1'))) {
-  console.log(`HARNESS REFUSES: AEON_DIR=${AEONDIR ?? '(unset)'} is not an aeon checkout with editor data.`);
-  console.log('        Point it at a PINNED checkout — never at the live ../aeon.');
+  console.log(`HARNESS REFUSES: ${OVERRIDE?.name ?? 'AEON_DIR'}=${AEONDIR ?? '(unset)'} is not an `
+    + 'aeon checkout with editor data. Point it at a PINNED checkout.');
   process.exit(2);
+}
+// AND IT MUST NOT BE THE LIVE TREE. This harness SAVES; the live ../aeon is
+// another lane's working directory. The comparison is against
+// `siblingDefaultPath`, not `siblingPath` — with the override set the latter
+// answers with the override itself, so the guard would compare a value to itself.
+{
+  const live = siblingDefaultPath('aeon');
+  if (live && resolvePath(AEONDIR) === resolvePath(live)) {
+    console.log(`HARNESS REFUSES: ${OVERRIDE.name} names the LIVE aeon checkout (${live}).`);
+    console.log('        This harness paints and SAVES. Clone a pinned checkout and point it there.');
+    process.exit(2);
+  }
 }
 const PLAN = JSON.parse(readFileSync(`${ROOT}/scratchpad/loop-plan.json`, 'utf8'));
 const SEC = PLAN.section;
@@ -414,7 +431,10 @@ async function main() {
     await shot(c, 'final');
   } finally {
     try { c && c.close(); } catch { /* closing */ }
-    killTree(child);
+    // AWAITED. This file calls process.exit(); a dropped killTree promise means
+    // the exit runs before the ordered SIGTERM/wait teardown and the exit net
+    // SIGKILLs Electron — the shape that leaves a Chromium SIGTRAP core (O65).
+    await killTree(child);
     restoreDiscoveryNow();
   }
 

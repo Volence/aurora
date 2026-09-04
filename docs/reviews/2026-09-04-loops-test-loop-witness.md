@@ -483,6 +483,55 @@ sampled across frames, on both ROMs, from the same input.
 
 ---
 
+## 8b. Verification of this branch
+
+| what | result |
+|---|---|
+| `npm run harness:loop-witness` | **13 passed, 0 failed** — run **three times**, on **two different pinned trees**, the last one after every edit below |
+| the authored planes, across two independent runs on two trees | **byte-identical**: `section_0.collattr.bin` md5 `9a9c28bf84daee4f6b96c1a84671b080`, `.collattrb.bin` md5 `fc5ef06e112fa916372a693450bd2abd` both times |
+| `npx vitest run` | **6963 passed · 9 skipped · 0 failed** (491 files passed, 3 skipped); every skip named its reason |
+| `npx tsc --noEmit` | clean, exit 0 |
+| `npm run check:harness-guards` | **210 clean / 210 classified · 0 failures · 0 unmeasurable** (209 before this branch) |
+| `node scripts/check-peer-path-literals.mjs` | OK |
+| `git -C ../aeon status --porcelain` | **0**, before and after everything |
+
+**Two of my own defects were caught by this repo's gates and are reported, not hidden:**
+
+1. `check:harness-guards` failed the harness on a **dropped `killTree` promise** in a
+   file that calls `process.exit()` — the shape that SIGKILLs Electron and leaves a
+   Chromium SIGTRAP core (O65). Fixed to `await killTree(child)`; the harness was
+   **re-run after the fix** and is one of the three 13/13 runs above.
+2. `check-peer-path-literals` failed it for reading `process.env.AEON_DIR` directly
+   instead of going through the resolver. Fixed to `checkoutOverride('aeon')`, **and
+   the fix carried a real hardening**: the harness now also refuses when the override
+   names the LIVE `../aeon`, compared against `siblingDefaultPath` (comparing against
+   `siblingPath` would compare the override to itself). **Proven red-first, live:**
+
+   ```
+   $ AEON_DIR=/home/volence/sonic_hacks/aeon node scratchpad/loop-witness-harness.mjs
+   HARNESS REFUSES: AEON_DIR names the LIVE aeon checkout (/home/volence/sonic_hacks/aeon).
+           This harness paints and SAVES. Clone a pinned checkout and point it there.
+   ```
+   `git -C ../aeon status --porcelain | wc -l` = 0 before and after that run.
+
+### ⚠ `npm test` does not reach vitest **in a linked worktree**, and it is not this branch
+
+The chain stops at `check-cited-paths` with **`COULD NOT MEASURE`** — not a failure, a
+refusal to report a number it could not take, which is the behaviour this repo asks for.
+The cause is environmental and is worth knowing for every worktree agent:
+
+```
+$ git check-ignore -v node_modules/foo
+fatal: pathspec 'node_modules/foo' is beyond a symbolic link
+```
+
+A linked agent worktree has no `node_modules`, so it must be symlinked to the main
+checkout's — and `git check-ignore` refuses any path beyond a symlink, so the gate's own
+ignore probe cannot run. Everything before it in the chain is green (`check-test-collection`
+494/494, `check-pseudo-skip`, `check-peer-path-literals`), and the vitest aggregate above
+was taken with `npx vitest run`. O56 reported this chain blocked at
+`check-ledger-timestamps`; that entry is gone and the chain now gets four gates further.
+
 ## 9. Reproduction
 
 ```
