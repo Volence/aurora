@@ -433,6 +433,7 @@ describe('round trip', () => {
       resolve(__dirname, '../fixtures/effects/preset-canonical-golden.json'), 'utf8',
     )) as {
       produced_under_schema_blob: string;
+      unmeasurable_under_previous_schema: Record<string, string>;
       documents: Record<string, string>;
       canonical: Record<string, string>;
     };
@@ -445,10 +446,39 @@ describe('round trip', () => {
       golden.produced_under_schema_blob,
       'the golden was produced under the schema this repo carries NOW, so this row compares the '
       + 'new codec to itself and proves nothing about the re-vendor',
-    ).not.toBe(JSON.parse(readFileSync(
-      resolve(__dirname, '../fixtures/effects/effects-preset-vectors.provenance.json'), 'utf8',
-    )).empyrean.blob);
+    ).not.toBe(JSON.parse(readFileSync(resolve(
+      __dirname,
+      '../../src/core/formats/effects/aurora-effects-preset.schema.provenance.json',
+    ), 'utf8')).empyrean.blob);
     expect(Object.keys(golden.documents).sort()).toEqual(ids);
+
+    // ═══ ⚠ WHICH IDS THIS ROW ACTUALLY MEASURES, SAID OUT LOUD ═══
+    //
+    // A document whose own SHAPE migrated in the same re-vendor has NO
+    // before-half: the previous schema REFUSES it, so `canonicalizeBySchema`
+    // never descends into the migrated key and its output falls through
+    // unchanged — which reads as "identical under both" and measures nothing.
+    // The generator records those ids rather than counting them, and this row
+    // EXCLUDES them and then asserts the remainder is non-empty. Without the
+    // second half, a re-vendor that migrated every document would leave this
+    // row green over an empty population, which is the failure mode the whole
+    // fixture exists against.
+    const unmeasurable = Object.keys(golden.unmeasurable_under_previous_schema).sort();
+    for (const id of unmeasurable) {
+      expect(ids, `${id} is recorded as unmeasurable but is not in the golden at all`)
+        .toContain(id);
+      expect(
+        golden.unmeasurable_under_previous_schema[id].length,
+        `${id} is excluded from the before/after measurement with no reason recorded`,
+      ).toBeGreaterThan(40);
+    }
+    const measured = ids.filter((id) => !unmeasurable.includes(id));
+    expect(
+      measured.length,
+      'EVERY shipped preset is excluded from the before/after comparison, so this row is green '
+      + 'over an empty population and proves nothing about the re-vendor. Regenerate the golden '
+      + 'against a schema blob that still describes at least one shipped document.',
+    ).toBeGreaterThan(0);
 
     for (const id of ids) {
       const parsed = parseEffectsPreset(golden.documents[id], id);
@@ -457,12 +487,14 @@ describe('round trip', () => {
       // carries the new key.
       expect(parsed.boundary, `${id} carries a boundary key — this row's premise has changed`)
         .toBeUndefined();
+      if (!measured.includes(id)) continue;
       expect(
         serializeEffectsPreset(parsed),
-        `${id}.json no longer canonicalises to the bytes it did before the c4a1da2 re-vendor. The `
-        + 'amendment has moved canonical output for a document that predates the key, so opening '
-        + 'and saving an untouched preset would rewrite it. That is a MIGRATION of every shipped '
-        + 'preset and needs saying out loud — do not regenerate the golden to make this green.',
+        `${id}.json no longer canonicalises to the bytes it did before the re-vendor named in the `
+        + 'golden\'s $how_it_was_produced. The amendment has moved canonical output for a document '
+        + 'nobody touched, so opening and saving an untouched preset would rewrite it. That is a '
+        + 'MIGRATION of every shipped preset and needs saying out loud — do not regenerate the '
+        + 'golden to make this green.',
       ).toBe(golden.canonical[id]);
     }
   });
