@@ -218,6 +218,105 @@ touched.
 
 ---
 
+## 4b. The gate's own environment-shaped arm (found in review, 2026-09-04)
+
+A reviewer reported the gate dying in the main checkout with *"COULD NOT MEASURE — git
+check-ignore failed"* and diagnosed it as `ignoredSet` reading exit 1 as a failure.
+
+**The stated mechanism does not reproduce, and it was measured before anything was
+changed** — a plausible fix to code that is not broken is this parcel's own defect
+family:
+
+* `e.status` **is** `1` on the "nothing ignored" exit, and the catch has read it since
+  `26f738eb`. Probed with the identical `execFileSync` options on node v24.15.0:
+  `none-ignored → THREW status=1` (caught, empty Set); `some-ignored → RESOLVED`.
+* Every run in this worktree had already taken that arm for the file population — every
+  summary line says *"0 git-ignored file(s) excluded"*, which is only reachable through it.
+* `/home/volence/sonic_hacks/aurora/scripts/check-cited-paths.mjs` **does not exist**, and
+  that checkout's `package.json` test chain still reads
+  `check-peer-path-literals && check-object-stringify` with no cited-paths step. That tree
+  is at base `eb426df3`, unmerged, so the quoted run did not come from this code there.
+
+**The report was still right about the thing that matters.** That arm was never *proven*,
+and it is worse than untested: **which arm a run takes depends on which tree it stands
+in.** The population query takes exit 0 on the owner's machine (nine untracked probes
+named individually in `.gitignore` sit at `scratchpad/` depth 1 there) and exit 1 in an
+agent worktree carrying none of them. The **citation** query is worse — it only runs when
+there is already a violation, and every red run during construction happened to include an
+ignored path, so its exit-1 arm had **never once executed**.
+
+`proveIgnoredSet()` now drives both arms deterministically before any real work, and the
+summary line reports it, naming the `.gitignore` pattern used. Both probes are **derived**:
+the ignorable one is built from the first literal, glob-free, un-negated pattern in
+`.gitignore` (`node_modules/` today) rather than typed, so it cannot go on "proving" a rule
+that has been deleted. The positive query asks about both probes at once, which also proves
+the output is parsed onto the right member and that a not-ignored path is not swept in.
+
+**Red-first, and the discriminator is the point.** P4 = comment out the `e.status === 1`
+branch, i.e. exactly the defect described:
+
+| tree | gate | result |
+|---|---|---|
+| one git-ignored source file present (the owner's shape) | **OLD** (self-check removed) + P4 | **exit 0, GREEN** — the bug is live and invisible |
+| the same tree, the same bug | **NEW** (self-check on) | **exit 2, COULD NOT MEASURE**, naming exit 1 and saying it should have been handled |
+
+OLD's green there was an artifact of the environment. **128 stays fatal** — the catch was
+not widened; the loud refusal is the property worth keeping and it behaved correctly
+throughout. One genuine adjacent hazard was found while probing and is now guarded: an
+**embedded** empty line makes the query exit **128** (`fatal: empty string is not a valid
+pathspec`) while a *lone* empty input is a plain exit 1 — so an empty token would make this
+gate refuse loudly for a fault of its own. No call site can produce one; if one ever does,
+it now says whose fault it is.
+
+**All three original mutations re-run against the new baseline `283bb415`**, since the
+plant path goes through this code: P1 **RED exit 1**, P2 **RED exit 1**, P3 (blinded
+comment reader) **still exit 2 COULD NOT MEASURE** — not turned green by the fix.
+
+---
+
+## 4c. ⚠ The suite is RED, and the red is the census's own subject arriving live
+
+`test/formats/aeon-ramp-sign-drift.test.ts` fails on the finished tree. **It is not mine**,
+and it is the most interesting thing this parcel produced.
+
+Section 3 above called `RAMP_SIGN_FIELDS_AWAITING_AEON` **exemplary** — dated, pinned to
+aeon `origin/master ddaab282`, with a named retirement detector. **Within the same session
+that detector fired.** aeon's `origin/master` moved `ddaab282 → 065dc790` at
+**2026-09-03 20:41:52 -0400** (`git reflog show origin/master` in aeon); my second full run
+was green just before that push and the third, minutes later, red. `ddaab282` is precisely
+the revision the constant pins.
+
+**Confirmed by reading the blob, not the announcement** — aeon `065dc790`,
+`engine/effects/raster.emp`:
+
+```
+comptime var start_img = start
+if start_img < 0 { start_img = start_img + $100000000 }   // 2^32 — two's complement
+comptime var step_img  = step
+if step_img  < 0 { step_img  = step_img  + $100000000 }
+...
+    rrp_start:      start_img,
+    rrp_step:       step_img,
+```
+
+and the constructor's `ensure`s at `:802`/`:804` now bound `start`/`step` to
+`fp16(-512,255)..fp16(511,255)` — **negatives are intended to be authorable**. So the
+premise has cleared: **the ramp card's disclosure and the caveat inside the rate refusal
+are now a FALSE WARNING** — an artifact that looks like care and is wrong, which is this
+parcel's entire subject, arriving three hours after the census praised the hold.
+
+**NOT RETIRED HERE, deliberately.** The fix is one constant
+(`src/core/formats/effects/ramp-sign-lag.ts`, which retires both surfaces by construction),
+but it changes author-facing warnings across 5 files and deserves its own branch, its own
+red-first proof that the disclosure disappears, and its own row. The confirmation the
+detector asks for is done and recorded above, so whoever takes it can move immediately.
+
+**Attribution, measured not asserted:** my branch touches none of the five ramp-sign files
+(`git diff --name-only eb426df3..HEAD`), and between the green second run and the red third
+the only repo change was `scripts/check-cited-paths.mjs`.
+
+---
+
 ## 5. Deliberately not done
 
 * **No markdown gate.** Exclusion 3 above, with the 387-path measurement behind it.
@@ -231,8 +330,11 @@ touched.
 
 ## 6. Suite
 
-`npm test` **exit 0 — 489 files / 487 passed / 2 skipped, 6,871 tests / 6,863 passed /
-8 skipped**, every skip naming its reason. All eight sibling gates green:
+⚠ **`npm test` is exit 1 on the finished tree — 489 files / 486 passed / 1 failed /
+2 skipped, 6,871 tests / 6,862 passed / 1 failed / 8 skipped.** The single failure is
+`aeon-ramp-sign-drift.test.ts` and is **external to this parcel** — see §4c for the
+timing, the blob and the attribution. Two earlier full runs on this same branch were
+**exit 0 at 6,863 passed / 0 failed**; aeon pushed the encode between them. All eight gates green:
 `check-test-collection` 489/489 collected, `check-pseudo-skip` 6,232 bodies,
 `check-peer-path-literals` 5 rules / 1,257 files, **`check-cited-paths` 1,877
 citations**, `check-object-stringify`, `check-ledger-timestamps`,
