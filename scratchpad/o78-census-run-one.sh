@@ -30,10 +30,20 @@ mkdir -p "$LOGDIR" "$WORK"
 # A fresh writable copy per run. Several harnesses rewrite project files and
 # REFUSE a reused copy by design (section-raster-select aborts on leftovers),
 # so this is re-materialised every time and never points at a peer's live tree.
+# ⚠ THE COPY MUST LIVE ON THE SAME FILESYSTEM AS THE REPO. Measured
+# 2026-09-04: with the copies on /tmp (tmpfs) several harnesses died in 3 s
+# with `cp: cannot create hard link … Invalid cross-device link` — they
+# materialise their OWN fixture into $AEON_DIR with `cp -al` from
+# scratchpad/fixtures/, and a cross-device target makes that impossible. That
+# is a defect in the rig, not in the harness, and reading those rows as
+# UNMEASURABLE would have hidden a third of the census behind my own mistake.
+# The seed also keeps .git, because at least one harness runs `git status`
+# inside the copy.
+SEEDS=/home/volence/sonic_hacks/.o78-census
 AC="$WORK/aeon-$NAME"; SC="$WORK/s1-$NAME"
 rm -rf "$AC" "$SC"
-cp -a "$SCRATCH/aeon-seed" "$AC"
-cp -a "$SCRATCH/s1-seed" "$SC"
+cp -a "$SEEDS/aeon-seed" "$AC"
+cp -a "$SEEDS/s1-seed" "$SC"
 
 cd "$BASE" || exit 99
 START=$(date +%s)
