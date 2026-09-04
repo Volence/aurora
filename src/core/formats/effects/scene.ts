@@ -149,6 +149,46 @@ export type EffectsAnchor = 'none' | { at: { channel: number; dsa: number; dsb: 
  */
 export type EffectsDrift = 'none' | { rate: number };
 
+/**
+ * EFFECTS-W1 item 9's ROW REMAP — this layer's Plane-B scroll words re-fetched
+ * through a perspective index ladder, so screen line `i` of the band takes the
+ * value that belonged to line `ladder[i]` (empyrean `3992d16`,
+ * AURORA_EFFECTS_SCHEMA.md §2.6; aeon key-shape artifact `3d917657` against the
+ * landed constructor `SceneRemap.Ladder(t, y, h)`).
+ *
+ * TWO NUMBERS, BOTH FORWARDED VERBATIM, AND BOTH EASY TO GET WRONG IN A WAY NO
+ * BUILD CAN SEE.
+ *
+ * `height_shift` IS A SHIFT, NOT A LINE COUNT — `H = 1 << height_shift`. The
+ * contract's own words: "an editor may DISPLAY `1 << height_shift` beside the
+ * control and MUST EXPORT the shift", because every value 3..7 is legal, so a
+ * conversion bug lands as a band four times too tall rather than as a refusal.
+ * Aurora's control shows the line count and writes the shift; the conversion
+ * lives once, in `rowRemapHeightLines` (scene-ui.ts), and nothing else in this
+ * repo computes it.
+ *
+ * `plane_y` IS A PLANE-B LINE, 0..511 — the `vsplit.at` coordinate space. NOT a
+ * world Y and NOT a screen line: the runtime's only use of it is
+ * `plane_y - Vscroll_BG`, whose second term is a per-frame runtime quantity, so
+ * there is no editor arithmetic that could improve it. ⚠ THIS SCHEMA IS THE
+ * ONLY ENFORCEMENT OF THE 511 CEILING anywhere in the pipeline: aeon's ensure
+ * (`scene_dsl.emp:1008`) tests `>= 0` only and `brm_plane_y` is `u16`, so
+ * 512..65535 would emit a silently-wrong window (aeon's own booked row
+ * `ROWREMAP-PLANEY-CEILING`). The usual "the engine already refuses it"
+ * argument is inverted for this field.
+ *
+ * `ladder` and `table` are RESERVED and REFUSED BY NAME by the schema (the
+ * `"not": {}` idiom) — the ladder is derived from `height_shift`, one number
+ * with one source. Aurora offers neither and writes neither; the names are read
+ * back out of the schema by `EFFECTS_ROW_REMAP_REFUSED_KEYS` rather than listed.
+ *
+ * ABSENT vs `"none"`: both lower to the same NULL ladder, so the distinction is
+ * authorial — `"none"` says the author chose no remap. `setLayerFieldCommand`'s
+ * existing rule already spells that (clearing DELETES a key that is not
+ * explicitly `"none"` on disk).
+ */
+export type EffectsRowRemap = 'none' | { plane_y: number; height_shift: number };
+
 export interface EffectsLayer {
   world_y: number;
   fa: EffectsFactor;
@@ -161,6 +201,7 @@ export interface EffectsLayer {
   curve?: EffectsCurve;
   vsplit?: EffectsVSplit;
   drift?: EffectsDrift;
+  rowRemap?: EffectsRowRemap;
 }
 
 export interface EffectsScene {
