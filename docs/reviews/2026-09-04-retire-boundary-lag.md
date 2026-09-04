@@ -312,6 +312,29 @@ The harness runs against a **fresh `git archive origin/master` copy** of aeon in
 temp dir, deleted after — never the live checkout — so no save can reach the
 owner's tree and a preset aeon lands mid-run cannot change what was measured.
 
+The final harness figure is from a run on the **committed tree at `d2534d83`**,
+after a rebuild — not carried over from the earlier run.
+
+### 7.1 ⚠ Two instrument notes from the final pass, both near-misses
+
+1. **`assertFreshBuild` REFUSED the first attempt at that final run, correctly.**
+   The §6-item-4 fix edits a file under `src/`, so `dist/` became staler than
+   `src/` and the gate threw rather than measuring. It cannot know the edited file
+   is a test that never enters the bundle, and it should not guess: a run whose
+   bundle cannot be shown fresh is a run whose every row may be vacuous. Rebuilt,
+   re-run, 13/13. **This is the "loud on unmeasurable" property working**, and it
+   is recorded because the tempting reading — "it's only a test file, the number
+   still stands" — is exactly how a stale measurement gets reported as a fresh
+   one.
+
+2. ⚠ **AN `rc=0` I ALMOST BELIEVED WAS THE GREP'S, NOT THE HARNESS'S.** The run
+   before that was invoked as `npm run -s harness:lag-retire | grep … ; echo
+   rc=$?`, which reports the **last** command in the pipeline. It printed `rc=0`
+   over a harness that had already died on the freshness gate, and the grep
+   pattern happened to match nothing alarming. Caught by re-running with the
+   output redirected to a file and `$?` read off the harness itself. Every exit
+   code quoted in this packet was read that way.
+
 ---
 
 ## 8. ⚠ What this does NOT say
