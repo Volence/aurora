@@ -289,6 +289,27 @@ key set so a mis-aimed click cannot pass.
 **+23 rows, +2 files — exactly the two files added.** No pre-existing row changed
 state.
 
+### ⚠ A CURRENCY ROW WENT RED AFTER THAT, AND IT IS AEON'S, NOT THIS PARCEL'S
+
+The verification re-run **after the last write** came back
+**7164 passed / 1 failed / 9 skipped (7174)** — one row flipped, and it is
+`test/formats/effects-preset-schema-drift.test.ts`'s contract-leads-consumer lag
+row. **aeon pushed mid-session:** its `origin/master` is now `b3af9847`,
+*"merge(boundary): an author can write the boundary key and the bake reads it"*,
+committed **2026-09-04T12:35:23Z** — between this branch's green run and its
+re-verify. The row reports that the `boundary` lag has **closed**, which is the
+row doing its job.
+
+**Control, and it is decisive:** the same single test file run on the **base
+commit `d0c1a816`**, with none of this parcel checked out, is **red in exactly
+the same way**. This branch touches none of that test's inputs — the whole diff
+is nine files, four of them docs, and none under `src/core/formats` or
+`contract/`.
+
+**Not acted on, deliberately.** Emptying `PRESET_KEYS_AWAITING_AEON` is a
+re-vendor-adjacent change to another lane's contract surface and is explicitly
+not this parcel's to make from this branch. **Tagged for foreground follow-up.**
+
 `npm run harness:confirm-focus` on the final clean tree: **23/23, exit 0.**
 
 Environment, printed by the runs themselves: `dpr=1` on every aim of every run
