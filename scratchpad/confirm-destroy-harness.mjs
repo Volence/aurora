@@ -251,6 +251,54 @@ async function clickHandle(c, handle, label) {
 }
 
 /**
+ * ANSWER THE DIALOG — and if there ISN'T one, say so and let the row go red.
+ *
+ * ⚠ THIS SHAPE IS FOR THE RED-FIRST RUNS, and it is the difference between
+ * evidence and a stack trace. Under a plant that removes the guard, no dialog
+ * appears; a bare `clickHandle('dlg:Cancel')` would then throw HANDLE ABSENT
+ * and kill the whole run at the first plant, so the packet could only ever say
+ * "it crashed" — one abort for every plant, telling nobody WHICH rows the plant
+ * kills. Reporting the absence and continuing lets each plant redden its own
+ * named rows and leave the others green, which is the claim a per-site plant is
+ * supposed to establish.
+ *
+ * It is LOUD rather than silent for the obvious reason: an absent dialog that
+ * printed nothing would be indistinguishable from an answered one in a green
+ * run's log.
+ */
+async function answerDialog(c, label) {
+  const info = await c.json('window.__cd.info()');
+  if (info === null) {
+    note(`DIALOG ABSENT — cannot click "${label}"`,
+      'no [role="alertdialog"] is on screen, so there was nothing to answer. Every row below that '
+      + 'expected this dialog will now read the UNANSWERED state and go red, which is the point: '
+      + 'this is what a run looks like when the guard is not there.');
+    return false;
+  }
+  await clickHandle(c, `dlg:${label}`, `the dialog's "${label}" button`);
+  return true;
+}
+
+/**
+ * Leave no dialog standing between phases.
+ *
+ * A dialog's backdrop is `position: fixed; inset: 0`, so one left up by a
+ * failing row makes every later aim land on the backdrop and REFUSE — again
+ * turning a plant's row-level red into a whole-run abort. This clears it with
+ * Esc and says it had to.
+ */
+async function ensureNoDialog(c, where) {
+  for (let i = 0; i < 3; i++) {
+    if ((await c.json('window.__cd.info()')) === null) return;
+    note(`UNEXPECTED DIALOG STANDING at ${where}`,
+      'dismissing it with Esc so the aims below are not eaten by its backdrop. In a green run this '
+      + 'never prints; when it does, a row above did not go the way it expected.');
+    await escape(c);
+    await sleep(500);
+  }
+}
+
+/**
  * THE IN-PAGE HANDLE TABLE AND THE DIALOG WATCHER.
  *
  * Every handle is STRUCTURAL, never a screen position and never a bare text
@@ -493,7 +541,7 @@ async function main() {
     await c.evalExpr('window.__cd.watchStart()');
     await clickHandle(c, `preset${big}`, `size-preset chip "${big}" (dirty, second press)`);
     const n3Pre = await c.json('window.__cd.info()');
-    await clickHandle(c, 'dlg:Cancel', 'the dialog\'s Cancel button (a REAL click, not Esc)');
+    await answerDialog(c, 'Cancel');
     const n3 = await snap(c);
     const n3Info = await c.json('window.__cd.info()');
     const n3Seen = await c.evalExpr('window.__cd.watchStop()');
@@ -507,7 +555,7 @@ async function main() {
 
     await c.evalExpr('window.__cd.watchStart()');
     await clickHandle(c, `preset${big}`, `size-preset chip "${big}" (dirty, third press)`);
-    await clickHandle(c, 'dlg:Discard & start new', 'the dialog\'s Discard button');
+    await answerDialog(c, 'Discard & start new');
     const n4 = await snap(c);
     const n4Info = await c.json('window.__cd.info()');
     const n4Seen = await c.evalExpr('window.__cd.watchStop()');
@@ -520,6 +568,7 @@ async function main() {
       + '"the chip is dead" would be the same artifact.');
 
     // ── [c*] THE ROWS THIS FILE EXISTS FOR ────────────────────────────────
+    await ensureNoDialog(c, 'the start of the [c*] phase');
     console.log('\n=== [c*] a CLEAN sprite: NO dialog at all, and the action still happens ===');
     note('why these rows are the discriminating ones',
       'both rulings say "ask before destroying, AND ONLY WHEN SOMETHING WOULD ACTUALLY BE LOST". An '
@@ -545,6 +594,7 @@ async function main() {
       + 'nothing at all would also show no dialog. A DIFFERENT chip from [n1]-[n4] on purpose — the '
       + `presets render from one map, and a press of "${big}" again would have been idempotent.`);
 
+    await ensureNoDialog(c, 'between [c1] and [c2]');
     const c2Pre = await snap(c);
     await c.evalExpr('window.__cd.watchStart()');
     await clickHandle(c, 'newBox', 'New □ (CLEAN document — its OWN dispatch line)');
@@ -560,13 +610,14 @@ async function main() {
       + 'idempotent no-op could not be mistaken for a live chip. The inequality is asserted, not assumed.');
 
     // ── [n5]/[n6] `New □` DIRTY — its own dispatch line, both answers ──────
+    await ensureNoDialog(c, 'the start of the [n5]/[n6] phase');
     console.log('\n=== [n5]/[n6] `New □` on a DIRTY sprite — the second dispatch line ===');
     await paint(6);
     const n5Pre = await snap(c);
     await c.evalExpr('window.__cd.watchStart()');
     await clickHandle(c, 'newBox', 'New □ (dirty document)');
     const n5Info = await c.json('window.__cd.info()');
-    await clickHandle(c, 'dlg:Cancel', 'the dialog\'s Cancel button');
+    await answerDialog(c, 'Cancel');
     const n5 = await snap(c);
     const n5Seen = await c.evalExpr('window.__cd.watchStop()');
     check('n5', '`New □` on a DIRTY document asks first, and Cancel keeps the work — measured on its '
@@ -580,7 +631,7 @@ async function main() {
 
     await c.evalExpr('window.__cd.watchStart()');
     await clickHandle(c, 'newBox', 'New □ (dirty, second press)');
-    await clickHandle(c, 'dlg:Discard & start new', 'the dialog\'s Discard button');
+    await answerDialog(c, 'Discard & start new');
     const n6 = await snap(c);
     const n6Info = await c.json('window.__cd.info()');
     const n6Seen = await c.evalExpr('window.__cd.watchStop()');
@@ -589,6 +640,7 @@ async function main() {
       && n6.s.frameW === NEW_BOX_SIZE && n6Seen === true,
       `${n5.brief} → ${n6.brief}; watcher seen=${n6Seen}`);
 
+    await ensureNoDialog(c, 'the end of the sprite half');
     const saveInfo = await c.json('window.__dbg.spriteSaveInfo()');
     check('z1', 'nothing was saved: no Ctrl+S and no save call was issued, and the app has no '
       + 'autosave (shell/close-guard.ts) — every edit above lived and died in memory',
@@ -663,10 +715,11 @@ async function main() {
       k2Info === null && k2N === k0Ids.length && k2Seen === true,
       `dialog after Esc = ${k2Info}; chunkLibrary = ${k2N}; watcher seen=${k2Seen}`);
 
+    await ensureNoDialog(c, 'the start of [k3]');
     await c.evalExpr('window.__cd.watchStart()');
     await clickHandle(c, 'chunkClear', 'Clear (second press)');
     const k3Pre = await c.json('window.__cd.info()');
-    await clickHandle(c, 'dlg:Cancel', 'the dialog\'s Cancel button (a REAL click)');
+    await answerDialog(c, 'Cancel');
     const k3N = await chunkCount();
     const k3Info = await c.json('window.__cd.info()');
     const k3Still = await c.evalExpr('window.__cd.hasChunkClear()');
@@ -684,9 +737,10 @@ async function main() {
       + 'excluded it. The cancel path leaves it mounted, so the exemption expired and it now goes '
       + 'through actAndDropFocus like every other destructive control.');
 
+    await ensureNoDialog(c, 'the start of [k4]');
     await c.evalExpr('window.__cd.watchStart()');
     await clickHandle(c, 'chunkClear', 'Clear (third press)');
-    await clickHandle(c, 'dlg:Clear library', 'the dialog\'s Clear library button');
+    await answerDialog(c, 'Clear library');
     const k4N = await chunkCount();
     const k4Info = await c.json('window.__cd.info()');
     const k4Seen = await c.evalExpr('window.__cd.watchStop()');
