@@ -166,13 +166,24 @@ describe('CURRENCY: is the vendored channel-bands sidecar still what aeon publis
     // document vanishing at aeon's tip is drift of the loudest kind.
     expect(at.ok, at.ok ? '' : `${NOT_OURS} ${at.why}`).toBe(true);
     if (!at.ok) return;
+    // ⚠ THE DIAGNOSIS IS NOT ALWAYS "AEON MOVED", and a message that assumed so
+    // would send a reader to the wrong repo. Two things can differ here: aeon's
+    // tip, or OUR OWN vendored bytes (someone edited the copy to make something
+    // pass). The on-disk blob is printed beside both so the three ids identify
+    // which one drifted — the row above catches the local-edit case on its own,
+    // needing no peer at all, and this line keeps the two legible together.
+    const onDisk = gitBlobSha(BYTES);
     // CONTENT, not commit SHAs — aeon's ordinary commits must not turn us red.
     expect(
       at.text,
       `${NOT_OURS}\n`
       + `  pinned at aeon ${PROV.aeon.revision} (blob ${PROV.aeon.blob})\n`
       + `  aeon ${TIP} is now ${tip} (blob ${at.blob})\n`
-      + `  ${PROV.aeon.path} changed between them.\n`
+      + `  the bytes vendored here hash to ${onDisk}\n`
+      + `  ${onDisk === PROV.aeon.blob
+        ? `${PROV.aeon.path} changed in aeon between those two revisions.`
+        : 'THE VENDORED COPY HERE has been edited away from the pin — that is an Aurora-side '
+          + 'change, not aeon drift; see the byte-identity row above.'}\n`
       + `  Re-vendor:  git -C ${aeon} show ${tip}:${PROV.aeon.path} > ${PROV.vendored.path}\n`
       + '  then update the provenance sidecar (revision, revision_subject, blob, bytes,\n'
       + '  git_blob, pin_history_current_last). channel-bands.ts throws at load if a\n'
