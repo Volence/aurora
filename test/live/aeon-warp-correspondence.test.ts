@@ -22,8 +22,8 @@
 // WHAT IT CLOSES. `warp-math.ts` states a correspondence and, until this file,
 // said honestly that nothing checked it: *"The editor and the engine agree on
 // world pixels TODAY … ⚠ THAT CORRESPONDENCE IS ASSUMED, NOT CHECKED."* The
-// header used to claim a `scratchpad/warp-mailbox-harness` verified it — an
-// instrument that has never existed in this repo, in the tree or its history.
+// header used to cite `scratchpad/warp-mailbox-harness`, which has never existed
+// in this repo — not in the tree, and not anywhere in its history.
 //
 // What already existed answers other questions and must not be mistaken for
 // this one:
