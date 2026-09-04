@@ -15,7 +15,7 @@
 //   MODE=live  + loader  -> prints `cleanup: X artifact REFUSED — … INHERITED`
 //   MODE=live  - loader  -> prints NOTHING   (this is the blindness being fixed)
 //   MODE=dead  + loader  -> prints NOTHING   (a real negative, not a blind one)
-import { spawnGuarded, descendants, displayArtifacts } from './lib/harness-guard.mjs';
+import { spawnGuarded, descendants, displayArtifacts, killTree } from './lib/harness-guard.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
@@ -39,7 +39,17 @@ const child = spawnGuarded('/usr/bin/xvfb-run', ['-a', '/usr/bin/sleep', '25'], 
 await new Promise((r) => setTimeout(r, 3000));
 
 
-if (MODE === 'dead') {
+if (MODE === 'quietkill') {
+  // The FIFTH shape, and the one that made loader v1 lie. A KILLTREE-class
+  // harness may pass { quiet: true } — capture, shell-flip, tool-split,
+  // guard-proof and xvfb-reap all do — and killTree forwards it to
+  // reapDisplays at harness-guard.mjs:841. The teardown reaches the reaper
+  // with the tree fully alive, i.e. it IS the affected shape, and prints
+  // nothing at all unless that second site is un-quieted too.
+  console.log(`CONTROL before quiet killTree: ${shape(child.pid)}`);
+  await killTree(child, { quiet: true });
+  console.log('CONTROL quiet killTree returned');
+} else if (MODE === 'dead') {
   try { process.kill(-child.pid, 'SIGTERM'); } catch { /* */ }
   const t0 = Date.now();
   while (Date.now() - t0 < 8000) {

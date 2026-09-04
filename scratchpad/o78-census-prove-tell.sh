@@ -21,3 +21,7 @@ leg() {
 leg live-noloader  live no
 leg live-loader    live yes
 leg dead-loader    dead yes
+# v2: the { quiet: true } killTree shape. Red under loader v1 (which patched
+# only the exit net's :900 site), green under v2 (which also patches :841).
+leg quietkill-noloader quietkill no
+leg quietkill-loader   quietkill yes
