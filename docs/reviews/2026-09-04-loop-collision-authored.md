@@ -48,6 +48,24 @@ collision is solid**, so it is not the foreground picture. **If his loop is draw
 else, this collision is in the wrong place** — cheap to move, but someone who knows where the
 art lives should look before he tests it.
 
+## ✅ TWO CORRECTIONS, what is true now
+
+**The branch line below is WRONG.** aeon measured it: the files are **uncommitted on master**,
+`fix/swap-gate-lst-default` was already merged and deleted before my write landed, and **the
+auto-commit daemon is dead** (verified 2026-08-22 and again now). Nothing auto-committed,
+nothing at risk; aeon commits them normally once coordinates are settled. I read the branch off
+`git branch --show-current` and inherited the daemon claim from dispatch guidance without
+checking it — a live-state read and a stale invariant, both passed on as fact.
+
+**The coordinates are challenged and I believe they hold.** aeon read `objects.json` and
+`rings.json` (y 96–210) and inferred the y is ~600 px out. It is not: `collattr.bin` already
+carries a floor at cell rows 53–54, so floor top = 53×16 = **848**, and with `height_pixels` 39
+FULL the half-height is 19, so a player standing there sits at **829** — which is exactly the
+player's **measured** y in the witness run. The rings bracket the rings, not the playfield; the
+act descriptor spawns the player at (256, 256) and he **falls** to 829. And the loop was ridden
+through a full 256 of angle in that ROM, which geometry 600 px out of place cannot do.
+**Re-author held anyway until the owner says where the loop is.**
+
 ## Where it landed
 
 aeon's working tree, branch **`fix/swap-gate-lst-default`** (their swap-half branch, editor data
