@@ -157,6 +157,67 @@ describe('resolveLeveldbDir — observes, or refuses; it never guesses', () => {
     expect(r.dir).toBeNull();
     expect(r.why).toContain('none of the candidate profiles exists');
   });
+
+  /**
+   * O80 — A PINNED PROFILE IS KNOWLEDGE, AND WITHOUT THIS THE FIX WOULD HAVE
+   * BROKEN THIS MODULE.
+   *
+   * `spawnGuarded` now launches with `--user-data-dir=<this run's own
+   * directory>` (HAZARD 6 in `scratchpad/lib/harness-guard.mjs`), so the run's
+   * profile is a temp directory and NOT any `$XDG_CONFIG_HOME/<app name>` one.
+   * The RED row is the first of the pair: with the observation silent and no
+   * `profileDir`, the resolver hands back the shared candidate that happens to
+   * exist — the exact "watch a directory the run never writes" defect this
+   * module's header is about, arriving from a new direction.
+   */
+  it('⚠ RED: without the pinned profile, a silent /proc resolves to a SHARED directory this run never writes', () => {
+    const shared = `/cfg/Electron/${LEVELDB_REL}`;
+    const mine = `/tmp/aurora-harness-profiles/rig-1-abcd/${LEVELDB_REL}`;
+    const r = resolveLeveldbDir({
+      pids: [7], appNames: names, configHome: '/cfg',
+      readFds: () => [],
+      exists: (d: string) => d === shared || d === mine,
+    });
+    expect(r.dir, 'this is the wrong answer, and it is what the fix would have produced').toBe(shared);
+    expect(r.dir).not.toBe(mine);
+  });
+
+  it('GREEN: given the profile the run pinned, it takes that one and says where it came from', () => {
+    const shared = `/cfg/Electron/${LEVELDB_REL}`;
+    const profileDir = '/tmp/aurora-harness-profiles/rig-1-abcd';
+    const mine = `${profileDir}/${LEVELDB_REL}`;
+    const r = resolveLeveldbDir({
+      pids: [7], appNames: names, configHome: '/cfg',
+      readFds: () => [],
+      exists: (d: string) => d === shared || d === mine,
+      profileDir,
+    });
+    expect(r.dir).toBe(mine);
+    expect(r.how).toContain('--user-data-dir=');
+    expect(r.how).toContain(profileDir);
+  });
+
+  it('the OBSERVATION still wins over the pinned profile — it is the stronger evidence', () => {
+    const observed = `/tmp/somewhere-else/${LEVELDB_REL}`;
+    const r = resolveLeveldbDir({
+      pids: [7], appNames: names, configHome: '/cfg',
+      readFds: () => [`${observed}/LOCK`],
+      exists: () => true,
+      profileDir: '/tmp/aurora-harness-profiles/rig-1-abcd',
+    });
+    expect(r.dir).toBe(observed);
+    expect(r.how).toMatch(/observed/);
+  });
+
+  it('a pinned profile with nothing written to it yet is a refusal, not a false negative', () => {
+    const profileDir = '/tmp/aurora-harness-profiles/rig-1-abcd';
+    const r = resolveLeveldbDir({
+      pids: [7], appNames: names, configHome: '/cfg',
+      readFds: () => [], exists: () => false, profileDir,
+    });
+    expect(r.dir).toBeNull();
+    expect(r.why).toContain(profileDir);
+  });
 });
 
 describe('bytesOnDisk — the predicate the check reads', () => {

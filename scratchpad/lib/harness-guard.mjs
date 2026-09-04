@@ -1341,16 +1341,30 @@ export function pinUserDataDir(cmd, args, dir = RUN_PROFILE_DIR) {
   return a;
 }
 
-/** Delete this run's profile, unless it was named by the environment (someone
- *  else may still be using it) or the operator asked to keep it. Returns what
- *  it did, as a string, so the caller can print an artifact rather than a
- *  claim. Safe to call twice. */
-export function cleanupProfile() {
-  if (!profileUsed) return `profile: none used (no Electron launch in this process)`;
-  if (!RUN_PROFILE_DERIVED) return `profile: ${RUN_PROFILE_DIR} KEPT — named by ${PROFILE_DIR_ENV}, so this process does not own it`;
-  if (process.env[KEEP_PROFILE_ENV]) return `profile: ${RUN_PROFILE_DIR} KEPT — ${KEEP_PROFILE_ENV} is set`;
-  try { rmSync(RUN_PROFILE_DIR, { recursive: true, force: true }); } catch { /* a locked file is not worth failing a run over */ }
-  return `profile: ${RUN_PROFILE_DIR} removed (existsSync now ${existsSync(RUN_PROFILE_DIR)})`;
+/**
+ * Delete this run's profile, unless it was named by the environment (someone
+ * else may still be using it) or the operator asked to keep it. Returns what it
+ * did, as a string, so the caller can print an artifact rather than a claim.
+ * Safe to call twice.
+ *
+ * ⚠ THE FOUR INPUTS ARE INJECTABLE AND THAT IS NOT A CONVENIENCE. `profileUsed`
+ * is module-private and is set only by `spawnGuarded`, so with the state read
+ * implicitly the ONLY branch a unit test could reach was "none used" — three of
+ * the four decisions, including the one that DELETES A DIRECTORY, would have
+ * had no test that could fail. Every default still comes from the real state,
+ * so a caller that passes nothing gets exactly the previous behaviour.
+ */
+export function cleanupProfile({
+  used = profileUsed,
+  derived = RUN_PROFILE_DERIVED,
+  dir = RUN_PROFILE_DIR,
+  keep = Boolean(process.env[KEEP_PROFILE_ENV]),
+} = {}) {
+  if (!used) return 'profile: none used (no Electron launch in this process)';
+  if (!derived) return `profile: ${dir} KEPT — named by ${PROFILE_DIR_ENV}, so this process does not own it`;
+  if (keep) return `profile: ${dir} KEPT — ${KEEP_PROFILE_ENV} is set`;
+  try { rmSync(dir, { recursive: true, force: true }); } catch { /* a locked file is not worth failing a run over */ }
+  return `profile: ${dir} removed (existsSync now ${existsSync(dir)})`;
 }
 
 /** Restore the files now and report what was put back. Safe to call twice;
