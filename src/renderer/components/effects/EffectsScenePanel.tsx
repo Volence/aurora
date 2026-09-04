@@ -96,6 +96,13 @@ import {
   EFFECTS_LAYER_DEFORM_BOUNDS, EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS,
   LAYER_DRIFT_ROW, EFFECTS_DRIFT_PX_BOUNDS, EFFECTS_DRIFT_PX_STEP,
   driftPxFieldValue, driftFromToggle, driftFromPxPerFrame, driftPxPerFrameRefusal,
+  // §2.7 REELS. ⚠ `EFFECTS_REEL_RATE_BOUNDS` is WHOLE PIXELS PER FRAME and the
+  // drift line above is 1/256 px. Nothing on the reels path converts anything:
+  // `setReelRateCommand` stores the integer the box produced, and there is no
+  // `reelPxPerFrameToRate` to reach for by mistake.
+  REELS_ROW, EFFECTS_REEL_RATE_BOUNDS,
+  reelsEnabled, reelRatesValue, reelStripLabel, reelStripTitle, reelRateGuidance,
+  reelRateWriteRefusal, reelsToggleCommand, setReelRateCommand, reelsBindingAdvisories,
   LAYER_ROW_REMAP_ROW, ROW_REMAP_HEIGHT_OPTIONS, EFFECTS_ROW_REMAP_CAPABILITY_NOTE,
   rowRemapFieldValue, rowRemapFromToggle, rowRemapWithPlaneY, rowRemapWithHeightShift,
   rowRemapPreconditions,
@@ -390,6 +397,13 @@ export default function EffectsScenePanel(): React.ReactElement {
   // the only thing between an author and a window that builds clean and points
   // nowhere.
   const [planeYRefusal, setPlaneYRefusal] = React.useState<Record<number, string | null>>({});
+  // THE REEL BOXES' REFUSALS, PER STRIP — same shape as the two above, keyed by
+  // STRIP INDEX, which here is a screen position (strip `i` owns screen X
+  // `64i..64i+63`) rather than a list position. It matters as much as
+  // `plane_y`'s: a refused reel rate is nearly always a ×256 that belongs to
+  // `drift.rate`, and the `-128..127` bound this sentence explains is the only
+  // place in the whole pipeline that mistake is caught today.
+  const [reelRefusal, setReelRefusal] = React.useState<Record<number, string | null>>({});
 
   // Keep the selection on something that exists: undoing a create, or opening a
   // different project, leaves a stale id behind.
@@ -400,7 +414,9 @@ export default function EffectsScenePanel(): React.ReactElement {
   // sentence under the new scene's layer of the same number. Cleared on the
   // change rather than keyed by `${id}:${i}`, because a refusal is a transient
   // fact about what the author just typed and nothing should carry it across.
-  React.useEffect(() => { setDriftRefusal({}); setPlaneYRefusal({}); }, [selected?.id]);
+  React.useEffect(() => {
+    setDriftRefusal({}); setPlaneYRefusal({}); setReelRefusal({});
+  }, [selected?.id]);
 
   // ONCE PER SCENE, NOT ONCE PER CARD. The advisory walks every layer and
   // returns `/layers/N` paths, so calling it inside the map would be N scans of
@@ -1187,6 +1203,142 @@ export default function EffectsScenePanel(): React.ReactElement {
                         the same posture as vFactorHint. Neither ladder shows a
                         shift exponent anywhere on screen, deliberately. */}
                     <Hint under>{bobLine(selected)}</Hint>
+                  </>
+                )}
+              </>
+            );
+          })()}
+          {/*
+            ═══ THE REELS (EW-REELS-PANEL; empyrean `ff3f43f` §2.7, ROADMAP row
+            151) ═══
+
+            Five 64px-wide vertical strips of the BACKGROUND, each scrolling at
+            its own rate. Sits with the bob because both are scene-level motion
+            of the background plane, and above `Transition` because the deform
+            rows below it are the column's heaviest block.
+
+            ⚠⚠ THE ROW DIRECTLY ABOVE THE LAYER CARDS' DRIFT BOX AUTHORS A
+            DIFFERENT UNIT. `drift.rate` is 1/256 px and Aurora multiplies by
+            256 on export; `reels.rates` is SIGNED WHOLE PIXELS PER FRAME with
+            no fixed point anywhere on the path, so a box copied from that one
+            emits 768 for an intended 3. Nothing here converts: the value the
+            box produces is the value `setReelRateCommand` stores. The bound on
+            these spinners is the SCHEMA's, and `refuse` is what actually
+            withholds a commit — `min`/`max` on an `<input type="number">` stop
+            no typed value, which is EFFECTS-W1 defect 5 and the reason
+            `NumberField` has a `refuse` prop at all.
+
+            ⚠ FIVE ROWS, LABELLED BY SCREEN SPAN, IN DOCUMENT ORDER. Array order
+            IS screen order — index `i` owns screen X `64i..64i+63` — and the
+            contract's word for an editor that sorts this array is that it
+            "silently relocates every strip". So the label column carries the
+            PIXELS (`x 0–63` … `x 256–319`) rather than a strip number: an array
+            that ever did come back reordered is then out of order on screen and
+            not only in the JSON. `key={i}` is correct here for the same reason
+            it is usually wrong — the index is the identity, not a list
+            position — and there is deliberately no add, remove or reorder
+            affordance, because the length is aeon's `REEL_BAND_COUNT` and that
+            is a code shape (it sizes a RAM array and is compiled into a shift).
+
+            ⚠ ZERO COMMITS AND READS BACK AS "stationary". Unlike `drift.rate`
+            (`not: {const: 0}`), a still strip among moving ones is a real
+            authored choice here; `uniqueItems` caps it at one, which is why the
+            box's `refuse` asks about the candidate ARRAY.
+
+            ⚠⚠ THE DEBUG SENTENCE IS REQUIRED AND IS NOT WRITTEN HERE. The
+            effect renders in NO release build, no JSON keyword can say so, and
+            the contract's own description says the editor panel must. The
+            sentence is EXTRACTED from that description
+            (`EFFECTS_REELS_DEBUG_NOTE`), so it cannot drift from the fact and
+            goes loud if aeon ever ships the effect in release. Painted short,
+            contract long on the same element — the ramp card's split.
+
+            ⚠ AND THE BINDING NOTE IS ALWAYS ON WHILE THE WARNING IS NOT.
+            `advisoryReelsBinding` is one-sided by construction and says in its
+            own words that its silence is NOT a clearance; a surface that
+            rendered only the warning would turn that silence into an all-clear.
+            So the RULE (aeon's sentence) is permanent whenever the key is
+            present and the WARNING appears only in the negative case.
+
+            NO CAPABILITY NOTE, unlike the row-remap card's. There is no `CAP_`
+            bit for reels, and the contract says a generator arm must not emit a
+            check that does not exist — so there is nothing to state, and
+            stating one would be Aurora inventing a gate.
+          */}
+          {(() => {
+            const on = reelsEnabled(selected);
+            const rates = reelRatesValue(selected);
+            // GATED ON AN ACT BEING OPEN, `vDeformRampAdvisory`'s rule: with no
+            // act there are no sections, and the advisory's own contract is that
+            // an empty list means "this project has no sections" — a different
+            // fact from "no section binds this scene" — so it says nothing.
+            const binding = (!on || act === null)
+              ? [] : reelsBindingAdvisories(selected, act.sections);
+            return (
+              <>
+                <Field label={REELS_ROW.label} title={REELS_ROW.title}>
+                  {/* OFF DELETES THE KEY. There is no `"none"` spelling for
+                      `reels` — `"reels": "none"` is REFUSED by the schema — so
+                      unlike the deform and row-remap toggles beside it, absent
+                      is the only representation of off. */}
+                  <Select title={REELS_ROW.title} value={on ? 'on' : 'none'}
+                    onChange={(v) => {
+                      setReelRefusal({});
+                      run(reelsToggleCommand(library, selected.id, v === 'on'));
+                    }}
+                    style={{ width: 88 }}>
+                    <option value="none">{REELS_ROW.none}</option>
+                    <option value="on">{REELS_ROW.on}</option>
+                  </Select>
+                </Field>
+                {!on && <Hint under>{REELS_ROW.hint}</Hint>}
+                {on && (
+                  <>
+                    <Hint under tone="warning">
+                      <span data-testid="reels-debug-note" title={REELS_ROW.debug.full}>
+                        ⚠ {REELS_ROW.debug.short}
+                      </span>
+                    </Hint>
+                    {rates.map((rate, i) => (
+                      <React.Fragment key={i}>
+                        <Field label={reelStripLabel(i)}>
+                          <NumberField title={reelStripTitle(i, rate)}
+                            min={EFFECTS_REEL_RATE_BOUNDS.min}
+                            max={EFFECTS_REEL_RATE_BOUNDS.max}
+                            width={64} value={rate}
+                            refuse={(n) => reelRateWriteRefusal(selected, i, n)}
+                            onRefusal={(r) => setReelRefusal((st) => ({ ...st, [i]: r }))}
+                            onChange={(n) => run(
+                              setReelRateCommand(library, selected.id, i, n))} />
+                        </Field>
+                        {(reelRefusal[i] ?? null) !== null && (
+                          <Hint under tone="warning">
+                            <span data-testid={`reel-${i}-refusal`}>{reelRefusal[i]}</span>
+                          </Hint>
+                        )}
+                        {/* LEGAL, AND PROBABLY NOT WHAT YOU WANTED — the
+                            contract's own UI guidance, at the HINT tier, never
+                            the warning tier and never a refusal ("that is UI
+                            guidance, never a refusal"). */}
+                        {(() => {
+                          const g = reelRateGuidance(rate);
+                          return g === null ? null : (
+                            <Hint under>
+                              <span data-testid={`reel-${i}-guidance`}>{g}</span>
+                            </Hint>
+                          );
+                        })()}
+                      </React.Fragment>
+                    ))}
+                    <Hint under>{REELS_ROW.unitHint}</Hint>
+                    <Hint under>
+                      <span title={REELS_ROW.binding.full}>{REELS_ROW.binding.short}</span>
+                    </Hint>
+                    {binding.map((m) => (
+                      <Hint key={m} under tone="warning">
+                        <span data-testid="reels-binding-advisory">{m}</span>
+                      </Hint>
+                    ))}
                   </>
                 )}
               </>
