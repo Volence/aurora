@@ -187,7 +187,37 @@ of the built ROM, with section 0 as the control that proves the offset:
 the ROM at `0x13FE0`, while the preset object that section 6 actually resolves to has
 `ep_patched = 0`.
 
-### ✅ ANSWERED BY AEON — the hypothesis below is REFUTED, read this first
+### ⚠⚠ SUPERSEDED TWICE — READ THIS BLOCK, THEN THE ONE BELOW IT, THEN §8
+
+**Two trees, two different reasons, and the packet conflated them for a while.** Aeon
+re-measured and withdrew its own answer: **their tree contains no `boundary` document at
+all.** All six of their preset documents are `ramp` ×2, `bands` ×3, `base_swap` ×1; the only
+`boundary` one ever authored was deleted inside the boundary parcel's own commit. So in
+**aeon's** tree `ojz_act1_sec_patched` has **zero arms** and returns int `0` whatever the
+threading does, and their section 6 is not a boundary section at all — it carries
+`ojz_sec6_baseswap.json`, correctly routed to the **raster** arm and live at
+`ep_raster = $140EC`.
+
+**In THIS packet's tree the threading really is the proximate cause, and that is not a
+contradiction.** The measurements in §8 were taken on a disposable copy in which I had
+repointed section 6's `rasterRef` at my own boundary document — which is exactly why its
+`ep_raster` reads `Raster_Program_None` rather than aeon's `$140EC`. **The base_swap document
+was displaced by mine.** So here the chooser *did* have an arm and *did* emit the program at
+`0x13FE0`, and the preset still did not reference it.
+
+**Both statements are true of different trees:**
+
+| tree | boundary document? | chooser arms | why `Raster_InstallPatched` never fires |
+|---|---|---|---|
+| aeon `origin/master` | **none** | zero | there is no patched program in that ROM |
+| this packet's copy | mine, on section 6 | one, emitted at `0x13FE0` | the preset carries no `patched:` argument |
+
+**`ep_patched = 0` was correct in both, and it is worth naming what that means: a single
+correct reading supported two different explanations, and neither of us could have told them
+apart from that number alone.** The reading did not need revising; the tree it was attributed
+to did.
+
+### ⚠ THE FIRST ANSWER — accurate for this tree, over-read as a claim about aeon's
 
 **It is an unthreaded call site in aeon's hand-authored source, and `rasterRef` was the right
 key all along.** Measured in their tree: `effects_scenes.emp:373` defines
