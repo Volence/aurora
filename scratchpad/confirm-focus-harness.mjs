@@ -42,8 +42,9 @@
 //     EIGHT `ask()` sites in `src/`, parsed with the TypeScript compiler's own
 //     parser. Four of those eight are out of a headless harness's reach (see
 //     [z1]), and §B is what stops that gap from being a coverage gap.
-// Its §A is also the ONLY thing that reddens on the literal P3 edit — see the
-// note at [z2], which is a real finding about this file's own blind spot.
+// Its §A is also the only thing that reddens on the literal P3 STRING; [z2]
+// records what happened when that edit was actually planted here, which is not
+// what I predicted and is the sharpest thing this file found.
 //
 // ═══ THE ROW SHAPE, AND WHY IT IS NOT "SOMETHING IS FOCUSED" ══════════════
 //
@@ -872,17 +873,23 @@ async function main() {
       + 'of source. What is unmeasured for them is only the DOM half — that a .focus() lands — and '
       + 'that is one shared component, exercised five ways above.');
 
-    check('z2', 'FINDING, recorded because it bounds what a GREEN here means: this file CANNOT see '
-      + 'the literal P3 edit once the d-31 fix is in',
+    check('z2', 'WHAT A GREEN HERE MEANS about the literal P3 edit — stated, because I predicted it '
+      + 'wrong once and the plant is what corrected me',
       true,
-      'React applies `autoFocus` during the commit phase; ConfirmDialog\'s focus effect runs after it '
-      + 'and moves focus to cancel. So P3 applied ON TOP OF the fix leaves every row above green — '
-      + 'measured, not reasoned, in this parcel\'s packet. That is not a hole in the ruling but it IS '
-      + 'a hole in this instrument, and it is why §A of the node-suite guard forbids the string '
-      + '`autoFocus` in that file outright: §A is what reddens on P3, in npm test, in milliseconds. '
-      + 'What THIS file catches that §A cannot is any regression that changes where focus actually '
-      + 'lands — a rewritten safeFocusIndex, a focus-restore on close, a trap that steals it, a '
-      + 'global focus manager, or the fix simply being deleted.');
+      'PREDICTED: "P3 on top of the fix leaves every row green, because React applies autoFocus '
+      + 'during commit and the effect runs after it." MEASURED, and the prediction was FALSE: P3 took '
+      + 'this file to 14/23. React\'s autoFocus landed first, and the focus effect\'s early return — '
+      + '"already somewhere in the dialog, leave it alone" — DEFERRED TO THE DANGER BUTTON. Four of '
+      + 'the five doors opened with Discard focused and one Space took the sprite from 6 frames 40x40 '
+      + 'cov=370 dirty=true to 1 frame 64x64 cov=0 dirty=false. The d-27 P3 damage, reproduced '
+      + 'through a fix meant to end it. FIXED (the early return now refuses to defer to a '
+      + 'danger-toned focus) and RE-MEASURED: P3 on the hardened component is 23/23, focus on Cancel '
+      + 'at every door. So today this file does NOT redden on P3 — because P3 no longer does '
+      + 'anything, not because the instrument is blind. §A of the node-suite guard still forbids the '
+      + 'string outright, in npm test, in milliseconds. What THIS file catches that §A cannot is any '
+      + 'regression that moves where focus actually LANDS: a rewritten safeFocusIndex (PL-B/PL-E), a '
+      + 'dropped post-mousedown re-assert (PL-F, which reddens exactly [d3]/[d3k]), a focus-restore '
+      + 'on close, a trap that steals it, or the fix simply deleted (PL-D, 12/23).');
 
     note('nothing was written for the aeon half either',
       'no Ctrl+S and no save call was issued, no dialog was answered with anything but Cancel, and '
