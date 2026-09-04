@@ -1,7 +1,8 @@
 # d-31 — the confirm dialog focuses Cancel, and two things I was wrong about
 
 **Parcel** D31-CONFIRM-FOCUS · **branch** `feat/d31-confirm-focus` off `d0c1a816`
-· **tip** `f5b1758f` · seven commits.
+· **code tip** `f5b1758f` (seven commits), plus `8d2d9b73` carrying this packet,
+the ROADMAP row and the ledger entry, and the commit correcting this line.
 
 Card `d-31-confirm-dialog-focuses-nothing`, ruled **`focus_cancel_and_guard`**. Not
 re-litigated, and no premise of the card was found false. One premise was found
