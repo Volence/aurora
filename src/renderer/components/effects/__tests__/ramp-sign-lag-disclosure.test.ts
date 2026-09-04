@@ -504,7 +504,16 @@ describe('the panel still mounts the leaf on the ramp card, silent though it is'
     expect(harness, 'the harness does not read RAMP_SIGN_FIELDS_AWAITING_AEON out of the source, '
       + 'so its [ns] rows are pinned to whichever state was true the day they were written')
       .toContain('RAMP_SIGN_FIELDS_AWAITING_AEON');
-    expect(harness).toContain('NS_PREMISE_OPEN');
+    // ⚠ NOT JUST "IT MENTIONS THE CONSTANT". A rig that reads the premise and
+    // then ignores it — `const NS_PREMISE_OPEN = false` beside a live parse —
+    // passes a mention check and is exactly as pinned as one that never read it.
+    // These two pin the DERIVATION: the flag comes from the parsed list, and the
+    // parsed list comes from that file on disk.
+    expect(harness, 'NS_PREMISE_OPEN is not derived from the parsed premise — a hard-wired flag '
+      + 'makes the read decorative and the [ns] rows pinned to one state again')
+      .toContain('const NS_PREMISE_OPEN = NS_PREMISE.length > 0;');
+    expect(harness, 'NS_PREMISE is not parsed out of ramp-sign-lag.ts on disk')
+      .toMatch(/readFileSync\(join\(ROOT, 'src\/core\/formats\/effects\/ramp-sign-lag\.ts'\)/);
     // The regex it parses with must actually match the declaration as it stands
     // — the sibling harness THREW at import for a whole day because a one-space
     // literal stopped matching a wrapped declaration.
@@ -588,6 +597,39 @@ describe('POISON: RE-FILL the premise and BOTH surfaces must come BACK', () => {
     const prov = await import('../../../providers/effects-preset');
     expect(prov.rampRateRefusal(RAMP, 'p', 'step', -0.5)!).not.toContain(RAMP_SIGN_CAVEAT_LEAD);
   });
+
+  /**
+   * ⚠ THE MEASUREMENT MUST STILL EXIST, AND STILL BE A MEASUREMENT.
+   *
+   * Row 1's message says only `aeon-ramp-sign-drift.test.ts` is entitled to move
+   * the premise — and until this row, nothing checked that file still did
+   * anything. A drift row deleted, or quietly reduced to a claim about Aurora's
+   * own constants, leaves the retirement permanent and the re-arm impossible:
+   * the premise would then only ever move by hand, which is the one way this
+   * file's own message forbids. So this asserts the SHAPE of the measurement,
+   * not its value — that it opens a peer repo, at a resolved revision, on the
+   * engine source, and asserts the ENCODED state while the premise is empty.
+   *
+   * ⚠ SHAPE, DELIBERATELY, NOT VALUE. Asserting the value here would be the
+   * drift row's claim spelled a second time through an indirection nobody reads,
+   * and it would redden this file every time aeon's master moved.
+   */
+  it('33. the drift row still MEASURES aeon, at a committed revision, and asserts the encode',
+    () => {
+      const drift = readFileSync(
+        resolve(__dirname, '../../../../../test/formats/aeon-ramp-sign-drift.test.ts'), 'utf8',
+      );
+      expect(drift, 'the drift row no longer opens the aeon checkout').toContain("peerRepo('aeon')");
+      expect(drift, 'it no longer reads at a resolved revision — a path read would see a live '
+        + 'working tree instead of a committed blob').toContain('readAtRev(');
+      expect(drift, 'it no longer reads the ENGINE SOURCE, which is the only artifact that can '
+        + 'see this defect').toContain("const AEON_PATH = 'engine/effects/raster.emp'");
+      expect(drift, 'it no longer reads TIP').toContain("const TIP = 'origin/master'");
+      // And it still branches on the premise, so it can retire AND re-arm.
+      expect(drift).toContain('RAMP_SIGN_FIELDS_AWAITING_AEON.length > 0');
+      expect(drift, 'the drift row no longer tells a reader to RE-FILL when the constructor '
+        + 'forwards again — the re-arm has no handover').toContain('THE PREMISE IS BACK');
+    });
 
   it('32. the derivations themselves are the gate — both directions, both surfaces', () => {
     // Empty premise: silent.
