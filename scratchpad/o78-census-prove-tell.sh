@@ -19,16 +19,45 @@ ROOT=$(pwd)
 LOGDIR=${1:-$ROOT/scratchpad/o78-prove-logs}
 mkdir -p "$LOGDIR"
 
+# THE TRAP, covering EXIT **and** INT **and** TERM. `trap ... EXIT` alone does
+# not fire on SIGINT or SIGTERM, which is the vacuous shape this repo keeps
+# meeting. This script starts xvfb-run itself, and xvfb-run's own cleanup sits
+# on its success path only (/usr/bin/xvfb-run:184-192), so an interrupted leg
+# would leak the display lock, the socket and the wrapper tempdir. The tempdir
+# removed here is the one the current leg's own wrapper minted.
+CHILD=
+CUR_LOG=
+_cleanup() {
+  _st=$?
+  trap - EXIT INT TERM
+  if [ -n "$CHILD" ]; then
+    kill -TERM "-$CHILD" 2>/dev/null || kill -TERM "$CHILD" 2>/dev/null || true
+  fi
+  if [ -n "$CUR_LOG" ]; then
+    _xa=$(grep -m1 'inherited XAUTHORITY=' "$CUR_LOG" 2>/dev/null | sed 's/.*inherited XAUTHORITY=//')
+    if [ -n "$_xa" ]; then
+      _d=$(dirname "$_xa")
+      case "$_d" in /tmp/xvfb-run.*) rm -rf "$_d" ;; esac
+    fi
+  fi
+  exit "$_st"
+}
+trap _cleanup EXIT INT TERM
+
 leg() {
   tag="$1"; mode="$2"; loader="$3"
   out="$LOGDIR/prove-$tag.log"
+  CUR_LOG="$out"
   if [ "$loader" = yes ]; then
     MODE="$mode" NODE_OPTIONS="--import $ROOT/scratchpad/o78-reap-trace-register.mjs" \
-      xvfb-run -a node "$ROOT/scratchpad/o78-reap-trace-control.mjs" > "$out" 2>&1
+      xvfb-run -a node "$ROOT/scratchpad/o78-reap-trace-control.mjs" > "$out" 2>&1 &
   else
-    MODE="$mode" xvfb-run -a node "$ROOT/scratchpad/o78-reap-trace-control.mjs" > "$out" 2>&1
+    MODE="$mode" xvfb-run -a node "$ROOT/scratchpad/o78-reap-trace-control.mjs" > "$out" 2>&1 &
   fi
+  CHILD=$!
+  wait "$CHILD"
   e=$?
+  CHILD=
   hit=$(grep -c 'X artifact REFUSED.*INHERITED' "$out")
   echo "LEG $tag  mode=$mode loader=$loader  exit=$e  REFUSED_INHERITED_lines=$hit"
 }

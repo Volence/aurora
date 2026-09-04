@@ -89,6 +89,31 @@ START=$(date +%s)
   echo "MARK_UPTIME=$(uptime)"
 } > "$OUT"
 
+# THE TRAP, covering EXIT **and** INT **and** TERM. `trap ... EXIT` alone does
+# not fire on SIGINT or SIGTERM, which is the vacuous shape this repo keeps
+# meeting. This script starts the OUTER xvfb-run itself, and xvfb-run's own
+# cleanup sits on its success path only (/usr/bin/xvfb-run:184-192), so an
+# interrupted run leaks the display lock, the socket, the wrapper tempdir and a
+# ~330 MB pair of copies. The tempdir removed here is the one THIS script's own
+# wrapper minted — never an inherited one, because the only wrapper this script
+# starts is its own.
+CHILD=
+_cleanup() {
+  _st=$?
+  trap - EXIT INT TERM
+  if [ -n "$CHILD" ]; then
+    kill -TERM "-$CHILD" 2>/dev/null || kill -TERM "$CHILD" 2>/dev/null || true
+  fi
+  _xa=$(grep -m1 '^MARK_OUTER_XAUTH=' "$OUT" 2>/dev/null | sed 's/^MARK_OUTER_XAUTH=//')
+  if [ -n "$_xa" ]; then
+    _d=$(dirname "$_xa")
+    case "$_d" in /tmp/xvfb-run.*) rm -rf "$_d" ;; esac
+  fi
+  rm -rf "$AC" "$SC" 2>/dev/null || true
+  exit "$_st"
+}
+trap _cleanup EXIT INT TERM
+
 # NODE_OPTIONS carries the census instrument: the exit net reaps with
 # { quiet: true }, so without it the affirmative tell can NEVER print for a
 # self-killing harness and every one of those rows would read as clean. Proven
@@ -105,8 +130,11 @@ timeout -k 20 "$TMO" xvfb-run -a bash -c '
   echo "MARK_NPM_EXIT=$E"
   if [ -d "$D" ]; then echo "MARK_SURVIVES=YES"; else echo "MARK_SURVIVES=NO"; fi
   exit $E
-' >> "$OUT" 2>&1
+' >> "$OUT" 2>&1 &
+CHILD=$!
+wait "$CHILD"
 OE=$?
+CHILD=
 echo "MARK_OUTER_EXIT=$OE" >> "$OUT"
 echo "MARK_SECONDS=$(( $(date +%s) - START ))" >> "$OUT"
 
