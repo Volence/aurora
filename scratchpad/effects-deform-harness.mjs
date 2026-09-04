@@ -40,6 +40,17 @@
 //    presses Ctrl+Z ONCE; the whole attachment must go, and the key must be
 //    ABSENT rather than written back as the string "none".
 //
+// 6. A CROSS-DOCUMENT SENTENCE THAT WAS NEVER RENDERED (section 10,
+//    VDEFORM-WITNESS, 2026-09-04). The v_deform sweep gave the V-deform row a
+//    sentence about a document that is NOT on screen: turning the toggle on
+//    narrows every VSRAM ramp bound to every section this scene is bound to,
+//    and the row now says so — or DECLINES, when the binding is dangling or
+//    unreadable. Until this section that sentence was held by node-level
+//    wording rows only, which in this repo means nothing had ever seen it.
+//    Row 10c reads the narrowing arm off the DOM; row 10d reads the DECLINE
+//    arm, which is the one a happy-path harness never reaches and the one a
+//    confident wrong sentence hides in.
+//
 // ANTI-VACUOUS THROUGHOUT. Every row that could pass on an empty panel has a
 // companion proving the instrument saw its subject: the project is open with
 // sections, the scene is in the model, the row's `<select>` was FOUND (a missing
@@ -72,17 +83,23 @@
 // beside it. The one mouse event dispatched (row 5b's click on the layer card)
 // aims at the INTEGER centre of the element's own rect.
 //
-// ⚠ IT WRITES NOTHING TO DISK. Ctrl+S is never pressed. The run ends by undoing
-// the session back to the fixture's own scene list.
+// ⚠ IT WRITES NOTHING INTO ANY CHECKOUT. Ctrl+S is never pressed, and sections
+// 1-9 leave the opened project exactly as found (row 9a undoes the whole session
+// back to the fixture's own scene list). Section 10 does write — a ~16 MB COPY
+// of the aeon project under `os.tmpdir()`, removed in the `finally` — because
+// the state row 10d needs cannot be authored by any gesture this app has. It
+// never touches the aeon working tree; that is the `//harness-canvas-writers`
+// ruling in package.json (d-28, COPY ONLY WHERE IT CAN WRITE) applied here.
 //
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npx electron-vite build
 // Run:                     node scratchpad/effects-deform-harness.mjs
 
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { spawn } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, cpSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
@@ -133,6 +150,165 @@ const MASK_DEFAULT = SCHEMA.properties.left_column_mask.default;
 const SEED_PERIOD = TABLE_BRANCHES[0].properties.period.maximum;
 const SEED_AMPLITUDE = TABLE_BRANCHES[0].properties.amplitude.minimum;
 const FIRST_FORM = FORM_IDS[0];
+
+// ─── THE CROSS-DOCUMENT SENTENCE'S OWN CONSTANTS, READ OFF DISK ─────────────
+//
+// Section 10 asserts a PAINTED STRING, and a harness that types the string it
+// expects is a harness that agrees with whatever it was written from. So every
+// expectation down there is lifted out of the module that authors the sentence,
+// by regex, at run time — the leading words of each arm, the pixel width, the
+// two "why we cannot decide" templates and the head of the hover note.
+//
+// ⚠ FROM `RUN.root`, NOT `ROOT`. This reads the sources that BUILT THE BUNDLE
+// UNDER TEST, which is question 2 (scratchpad/lib/run-root.mjs). A borrowed run
+// executes another tree's `dist/`, and lifting the expected wording out of THIS
+// checkout's `src/` while the app runs somebody else's build is exactly the
+// mismatch that makes a red row unreadable. `SCHEMA` above still reads `ROOT`;
+// that is the pre-O72 idiom and is left alone rather than swept here.
+//
+// ⚠ AND IT REFUSES RATHER THAN DEFAULTING. A regex that stops matching (the
+// constant renamed, the quoting changed) must stop the run naming the constant
+// it could not find — a silent fallback would let section 10 assert a string
+// nothing in the app ever produces, and both halves would go red for a reason
+// that has nothing to do with the screen.
+const RAMP_MODE_SRC_PATH = `${RUN.root}/src/core/formats/effects/ramp-scroll-mode.ts`;
+const RAMP_MODE_SRC = readFileSync(RAMP_MODE_SRC_PATH, 'utf8');
+function fromRampModeSource(re, what) {
+  const m = RAMP_MODE_SRC.match(re);
+  if (m === null) {
+    throw new Error(`could not read ${what} out of ${RAMP_MODE_SRC_PATH}. Section 10 derives `
+      + 'every expected phrase from that module rather than typing it, so a constant that has '
+      + 'been renamed or requoted stops the run here instead of turning into a wrong expectation.');
+  }
+  return m[1];
+}
+/** The hardware granule the sentence quotes — 16 today, never typed here. */
+const COLUMN_WIDTH_PX = Number(fromRampModeSource(
+  /export const RAMP_SCROLL_COLUMN_WIDTH_PX\s*=\s*(\d+);/, 'RAMP_SCROLL_COLUMN_WIDTH_PX'));
+/**
+ * The leading words of the two arms the V-deform row can paint.
+ *
+ * ⚠ SCOPED TO ITS OWN BLOCK, and that is not tidiness. `RAMP_SCROLL_LEAD` — the
+ * OTHER end of the same defect, forty lines above it in the same file — also has
+ * a key spelled `unknown`, and it is declared FIRST. A file-wide `/unknown:
+ * '([^']*)'/` therefore lifts the RAMP CARD's words ("NOT DECIDED BY ANY
+ * DOCUMENT AURORA CAN READ:") and row 10c would assert a string the scene panel
+ * never paints. The block is extracted first and searched on its own.
+ */
+const V_DEFORM_LEAD_BLOCK = fromRampModeSource(
+  /export const V_DEFORM_RAMP_LEAD = Object\.freeze\(\{([\s\S]*?)\}\);/, 'V_DEFORM_RAMP_LEAD');
+function fromLeadBlock(key) {
+  const m = V_DEFORM_LEAD_BLOCK.match(new RegExp(`${key}: '([^']*)'`));
+  if (m === null) throw new Error(`V_DEFORM_RAMP_LEAD has no ${key} arm in ${RAMP_MODE_SRC_PATH}`);
+  return m[1];
+}
+const V_DEFORM_LEAD = { narrowed: fromLeadBlock('narrowed'), unknown: fromLeadBlock('unknown') };
+/** The first literal of the hover note — how the painted element is FOUND. */
+const V_DEFORM_NOTE_HEAD = fromRampModeSource(
+  /export const V_DEFORM_RAMP_NOTE: string =\s*'([^']*)'/, 'V_DEFORM_RAMP_NOTE head');
+/**
+ * The two DECLINE clauses, as templates, lifted from `unknownWhy` itself.
+ *
+ * This is the row that matters, so its expectation is not paraphrased: the
+ * harness takes the module's own two backticked sentences and substitutes the
+ * section index and preset id it OBSERVED through the probe. A mutation that
+ * makes the decline branch claim an answer cannot satisfy either of them.
+ */
+const UNKNOWN_WHY_SRC = fromRampModeSource(
+  /const unknownWhy = \(b: VDeformRampBinding\): string => \(([\s\S]*?)\);\n/, 'unknownWhy');
+const UNKNOWN_WHY_TEMPLATES = (() => {
+  const m = UNKNOWN_WHY_SRC.match(/\?\s*`([^`]*)`[\s\S]*?:\s*`([^`]*)`/);
+  if (m === null) {
+    throw new Error(`could not read unknownWhy's two clause templates out of ${RAMP_MODE_SRC_PATH}`);
+  }
+  const fill = (tpl) => (section, presetId) => tpl
+    .replace('${b.section}', String(section))
+    .replace('${b.presetId}', presetId);
+  return { unreadable: fill(m[1]), dangling: fill(m[2]) };
+})();
+/** The refusal's own closing words — "…is not decidable from here". */
+const NOT_DECIDABLE = fromRampModeSource(
+  /(is not decidable from here)/, 'the decline clause\'s closing words');
+
+// ─── THE ONE STATE NO GESTURE IN THIS APP CAN AUTHOR ───────────────────────
+//
+// Row 10c needs a section whose `rasterRef` names a preset Aurora cannot
+// resolve, and THAT IS UNREACHABLE THROUGH THE UI BY DESIGN, measured rather
+// than assumed:
+//
+//   • `presetRefOptions` offers `''` plus every LOADED preset, so the picker
+//     cannot write an id that is not in the library; and
+//   • `deletePresetRefusal` DISABLES the Delete button while any section binds
+//     the preset, so the other order — bind, then delete out from under it — is
+//     refused too.
+//
+// Both refusals are correct and neither is going away. The state is still
+// entirely ordinary on disk — the sidecar is hand-editable and aeon's generator
+// writes it too (`unassignablePresetRef`'s own docblock says so) — so the least
+// artificial reach is DISK, and what is constructed is named here and printed
+// by row 10a rather than buried:
+//
+//   a COPY of the real aeon project (never the peer's working tree — the
+//   `//harness-canvas-writers` ruling, d-28 COPY ONLY WHERE IT CAN WRITE),
+//   with exactly three added files:
+//     section_5.meta.json   rasterRef -> an id with no document  (DANGLING)
+//     section_6.meta.json   rasterRef -> a file that is not JSON (UNREADABLE)
+//     presets/<that id>.json   the file that is not JSON
+//
+// Everything else in section 10 is a real gesture on a real control: the scene
+// is authored through the form, the ramp preset is bound through the Colour
+// panel's own `rasterRef` select, the sections are bound through the scene
+// panel's own `sceneRef` select, and `v_deform` is toggled on the same control
+// rows 6e-6m drive.
+const WITNESS = Object.freeze({
+  /** Bound to a REAL ramp preset through the UI — the narrowing arm. */
+  narrowSection: 2,
+  /** `rasterRef` names a preset id with no document at all. */
+  danglingSection: 5,
+  danglingPreset: 'vdeform_witness_absent',
+  /** `rasterRef` names a document that exists and will not parse. */
+  unreadableSection: 6,
+  unreadablePreset: 'vdeform_witness_unreadable',
+  /** The scene authored in the fixture run and bound to those sections. */
+  sceneId: 'vdeform_witness_scene',
+});
+
+/**
+ * Stand up the fixture copy and return its directory.
+ *
+ * ⚠ A COPY OF TWO PATHS, not of the aeon checkout: `project.json` and
+ * `games/sonic4/data`, which is everything `project.json` points at (tileset,
+ * palette, dataPath, stripPath, bgLayout, bgTiles, objectLibrary, chunkLibrary)
+ * plus the two trees `section-wiring.ts` reads. ~16 MB. Copying the checkout
+ * would drag in `.git` and every agent worktree under it.
+ */
+function buildWitnessFixture() {
+  const dir = mkdtempSync(join(tmpdir(), 'aurora-vdeform-witness-'));
+  mkdirSync(join(dir, 'games/sonic4'), { recursive: true });
+  cpSync(`${AEONDIR}/games/sonic4/data`, join(dir, 'games/sonic4/data'), { recursive: true });
+  cpSync(`${AEONDIR}/project.json`, join(dir, 'project.json'));
+
+  const metaDir = join(dir, 'games/sonic4/data/editor/ojz/act1');
+  const patchMeta = (index, patch) => {
+    const p = join(metaDir, `section_${index}.meta.json`);
+    let doc = {};
+    try { doc = JSON.parse(readFileSync(p, 'utf8')); } catch { doc = {}; }
+    writeFileSync(p, `${JSON.stringify({ ...doc, ...patch }, null, 2)}\n`);
+    return p;
+  };
+  const wrote = [
+    patchMeta(WITNESS.danglingSection, { rasterRef: WITNESS.danglingPreset, sceneRef: null }),
+    patchMeta(WITNESS.unreadableSection, { rasterRef: WITNESS.unreadablePreset, sceneRef: null }),
+  ];
+  const badPath = join(dir, 'games/sonic4/data/editor/effects/presets',
+    `${WITNESS.unreadablePreset}.json`);
+  // NOT empty and not truncated JSON — a file that is unmistakably not a preset,
+  // so `parseEffectsPreset` throws and the loader files it under `unreadable`.
+  writeFileSync(badPath, 'this file is deliberately not JSON, so the preset loader files it '
+    + 'under `unreadable` and the V-deform row has something it genuinely cannot read.\n');
+  wrote.push(badPath);
+  return { dir, wrote };
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(path, timeoutMs = 1500) {
@@ -255,6 +431,67 @@ const PANEL_TEXT = String.raw`
   return (n.textContent || '');
 })()`;
 
+/**
+ * THE V-DEFORM ROW'S CROSS-DOCUMENT SENTENCE, AS A PIXEL — the element, its
+ * text, its box and the box of the scroller it lives in.
+ *
+ * FOUND BY THE HOVER, NOT BY THE PAINTED WORDS. `V_DEFORM_RAMP_NOTE` is the same
+ * string on BOTH arms, so this locator identifies the element without assuming
+ * which sentence it is carrying — which is the whole point. A probe that found
+ * the element by "starts with THIS NARROWS…" would report `no-element` for a
+ * decline branch that had been mutated into a confident claim, and a row reading
+ * that as "the narrowing sentence is absent" would go GREEN on the exact defect
+ * this section exists to catch.
+ *
+ * ⚠ THE RECT IS COMPARED TO THE SCROLLER'S BOX, not to `checkVisibility()` and
+ * not to `getClientRects().length`. Both of those are green for an element
+ * scrolled thousands of pixels out of its own scroll container; this panel is
+ * `<Panel width={300} scroll>` and the V-deform row sits well down it, so that
+ * is the live failure mode here rather than a hypothetical one. The element is
+ * scrolled into view first and the intersection is then MEASURED.
+ */
+const V_DEFORM_IMPACT = String.raw`
+(() => {
+  const el = [...document.querySelectorAll('span[title]')]
+    .find((e) => (e.title || '').startsWith(${JSON.stringify(V_DEFORM_NOTE_HEAD)}));
+  if (!el) return { found: false, text: null, rect: null, scroller: null, insideScroller: null };
+  el.scrollIntoView({ block: 'center' });
+  const r = el.getBoundingClientRect();
+  let sc = el.parentElement;
+  while (sc && !/(auto|scroll)/.test(getComputedStyle(sc).overflowY)) sc = sc.parentElement;
+  const s = sc ? sc.getBoundingClientRect() : null;
+  const box = (b) => ({ left: b.left, top: b.top, width: b.width, height: b.height });
+  return {
+    found: true,
+    text: el.textContent || '',
+    titleLength: (el.title || '').length,
+    rect: box(r),
+    scroller: s ? { tag: sc.tagName, ...box(s) } : null,
+    insideScroller: s === null ? null
+      : (r.bottom > s.top && r.top < s.bottom && r.right > s.left && r.left < s.right),
+  };
+})()`;
+
+/**
+ * THE ANTI-VACUOUS HALF OF EVERY ROW IN SECTION 10, spelled once.
+ *
+ * A row asserting a substring is equally green over an empty string it never
+ * looked at, so before any wording claim: the element was FOUND, it carries
+ * non-empty text, it carries the long-form hover, and its box actually
+ * intersects the box of the panel that scrolls it.
+ */
+function impactIsOnScreen(i) {
+  return !!i && i.found === true && typeof i.text === 'string' && i.text.length > 0
+    && i.titleLength > 0 && i.rect.width > 0 && i.rect.height > 0 && i.insideScroller === true;
+}
+/** What a reader checks the row's AIM against — printed, never summarised. */
+function describeImpact(i) {
+  if (!i || i.found !== true) return 'V-deform impact span: NOT IN THE DOM (no-element)';
+  return `V-deform impact span: rect=${JSON.stringify(i.rect)} `
+    + `scroller=${JSON.stringify(i.scroller)} insideScroller=${i.insideScroller} `
+    + `hover=${i.titleLength} chars\n        RENDERED TEXT (${i.text.length} chars): ${i.text}`;
+}
+
 /** The scene under test, BY ID — never `doc[0]`; the fixture has scenes of its own. */
 function sceneOf(doc) { return doc.find((s) => s.id === SCENE_ID) ?? null; }
 
@@ -312,6 +549,8 @@ async function main() {
   child.stderr.on('data', (d) => { if (process.env.VERBOSE) process.stderr.write(`[err] ${d}`); });
 
   let c;
+  /** Section 10's fixture copy — removed in the `finally`, never left behind. */
+  let fixture = null;
   try {
     c = cdp(await waitForTarget());
     await c.ready;
@@ -893,10 +1132,285 @@ async function main() {
       teardown > 0 && JSON.stringify(scenes.map((s) => s.id)) === JSON.stringify(scenes0.map((s) => s.id)),
       `${teardown} undos; left ${JSON.stringify(scenes.map((s) => s.id))}, `
       + `found ${JSON.stringify(scenes0.map((s) => s.id))}`);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 10. THE CROSS-DOCUMENT SENTENCE, ON SCREEN (VDEFORM-WITNESS)
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // WHAT THIS SECTION EXISTS FOR. The 2026-09-04 sweep gave the V-deform row
+    // a new painted sentence: turning `v_deform` on tells the author what it
+    // just did to a VSRAM ramp bound elsewhere, and DECLINES where the binding
+    // cannot be resolved. Every row holding that sentence until now has been a
+    // node-level wording row — and the node suite in this repo cannot see React
+    // or a rendered surface at all, which is the standing reason this file
+    // exists. A painted string with no screen witness is precisely the gap.
+    //
+    // TWO ARMS, AND THE SECOND IS THE ONE THAT MATTERS. A happy-path harness
+    // reaches the narrowing case and stops; the arm where Aurora must claim
+    // NEITHER answer is the arm a confident wrong sentence hides in, and it is
+    // unreachable through the UI (see WITNESS's block for the two refusals that
+    // make it so, and for exactly what is constructed to get there).
+    //
+    // IT RUNS LAST, AFTER ROW 9's TEARDOWN, on purpose: it REOPENS the project
+    // against the fixture copy, which discards the in-memory session above it.
+    // Row 9a has already proven that session unwound to the fixture's own scene
+    // list, so nothing is lost by replacing it here.
+    fixture = buildWitnessFixture();
+    note('THE CONSTRUCTED HALF, NAMED (row 10c cannot be reached through any gesture)',
+      `fixture project = ${fixture.dir}\n        `
+      + `a COPY of ${AEONDIR} (project.json + games/sonic4/data), never that working tree, `
+      + `with three files written:\n        `
+      + fixture.wrote.map((p) => `  ${p.slice(fixture.dir.length + 1)}`).join('\n        ')
+      + `\n        section ${WITNESS.danglingSection} -> rasterRef "${WITNESS.danglingPreset}" `
+      + `(no such document: DANGLING); section ${WITNESS.unreadableSection} -> rasterRef `
+      + `"${WITNESS.unreadablePreset}" (a document that is not JSON: UNREADABLE). `
+      + 'Everything else below is a real DOM event on a real control.');
+    note('THE EXPECTATIONS, LIFTED OUT OF THE MODULE THAT AUTHORS THE SENTENCE',
+      `${RAMP_MODE_SRC_PATH}\n        `
+      + `RAMP_SCROLL_COLUMN_WIDTH_PX = ${COLUMN_WIDTH_PX}\n        `
+      + `V_DEFORM_RAMP_LEAD.narrowed = ${JSON.stringify(V_DEFORM_LEAD.narrowed)}\n        `
+      + `V_DEFORM_RAMP_LEAD.unknown  = ${JSON.stringify(V_DEFORM_LEAD.unknown)}\n        `
+      + `unknownWhy dangling template  = ${JSON.stringify(UNKNOWN_WHY_TEMPLATES.dangling('N', 'ID'))}\n        `
+      + `unknownWhy unreadable template = ${JSON.stringify(UNKNOWN_WHY_TEMPLATES.unreadable('N', 'ID'))}`);
+
+    await c.evalExpr(`window.__dbg.aeon.open(${JSON.stringify(fixture.dir)})`)
+      .catch((e) => console.log('        fixture open threw:', e.message));
+    let fst = null;
+    for (let i = 0; i < 40; i++) {
+      fst = await c.json('window.__dbg.aeon.state()').catch(() => null);
+      if (fst && fst.open) break;
+      await sleep(400);
+    }
+    await sleep(1500);
+    // The facet and the scene form are re-established the way an author would
+    // find them after opening a project: the pill, then the collapsed form.
+    await c.evalExpr(clickByText('/^Effects$/'));
+    await sleep(1200);
+    const reopenedForm = await c.evalExpr(OPEN_SCENE_FORM);
+    await sleep(900);
+
+    const libraryPresets = JSON.parse(await c.evalExpr('window.__dbg.aeon.presetsJson()'));
+    const unreadablePresets = await c.json('window.__dbg.aeon.unreadablePresets()');
+    // THE RAMP PRESET IS CHOSEN BY WHAT IT CARRIES, never by an id typed here:
+    // `ramp` is the only preset shape per-column VSRAM mode can reach, so the
+    // subject of row 10b is "a preset in this project whose document has one".
+    const rampPreset = libraryPresets.find((p) => p.ramp !== undefined) ?? null;
+    const danglingRef = await c.evalExpr(
+      `window.__dbg.aeon.rasterRef(${WITNESS.danglingSection})`);
+    const unreadableRef = await c.evalExpr(
+      `window.__dbg.aeon.rasterRef(${WITNESS.unreadableSection})`);
+    check('10a', 'ANTI-VACUOUS: the fixture project is open and carries all three subjects — '
+      + 'a REAL ramp preset, a DANGLING rasterRef and an UNREADABLE one',
+      !!(fst && fst.open && fst.sections > 0)
+      && rampPreset !== null
+      && danglingRef === WITNESS.danglingPreset
+      && !libraryPresets.some((p) => p.id === WITNESS.danglingPreset)
+      && unreadableRef === WITNESS.unreadablePreset
+      && unreadablePresets.some((u) => u.path.endsWith(`/${WITNESS.unreadablePreset}.json`))
+      && (reopenedForm === 'clicked' || reopenedForm === 'already-open'),
+      `state=${JSON.stringify(fst)}\n        `
+      + `ramp preset in library = ${rampPreset === null ? 'NONE' : rampPreset.id} `
+      + `(chosen because its document carries a \`ramp\`, not by id)\n        `
+      + `rasterRef(${WITNESS.danglingSection})=${JSON.stringify(danglingRef)} `
+      + `present in library=${libraryPresets.some((p) => p.id === WITNESS.danglingPreset)}\n        `
+      + `rasterRef(${WITNESS.unreadableSection})=${JSON.stringify(unreadableRef)} `
+      + `unreadable=${JSON.stringify(unreadablePresets)}\n        `
+      + `scene form=${reopenedForm}`);
+    if (rampPreset === null) throw new Error('the fixture project has no ramp preset to narrow');
+
+    // ---- The scene, authored through the form. ---------------------------
+    await c.evalExpr(SET_INPUT(
+      `document.querySelector('input[placeholder="new_scene_id"]')`, WITNESS.sceneId));
+    await c.evalExpr(clickByText('/^New$/'));
+    await sleep(900);
+    const witnessSelected = await c.evalExpr('window.__dbg.aeon.selectedScene()');
+    check('10b', 'ANTI-VACUOUS: the witness scene was authored through the real form and the '
+      + 'panel is editing it',
+      witnessSelected === WITNESS.sceneId,
+      `selectedScene()=${witnessSelected}; scenes=`
+      + `${JSON.stringify((await c.json('window.__dbg.aeon.scenes()')).map((s) => s.id))}`);
+
+    // The two `<select>`s this section drives, found by their own titles.
+    const SCENE_REF_SELECT = String.raw`
+      [...document.querySelectorAll('select')]
+        .find(e => (e.title||'').startsWith('Which effects scene this section uses (sceneRef)'))`;
+    const RASTER_REF_SELECT = String.raw`
+      [...document.querySelectorAll('select')]
+        .find(e => (e.title||'').startsWith('Which raster band preset this section uses (rasterRef)'))`;
+    const V_DEFORM_SELECT = String.raw`
+      [...document.querySelectorAll('select')].find(e => (e.title||'').startsWith('v_deform'))`;
+    // `setActiveSection` is the store action the section picker's own click
+    // calls — the SAME setter, not a back door round a control. Both ref rows
+    // draw whichever section is active, so this is how a harness reaches
+    // section N's row at all.
+    const focusSection = async (index) => {
+      await c.evalExpr(`window.__dbg.aeon.setActiveSection(${index})`);
+      await sleep(700);
+    };
+    /**
+     * OPEN A COLLAPSED SECTION THE WAY AN AUTHOR DOES — one click on its header.
+     *
+     * ⚠ IDEMPOTENT, BY PROBING THE CONTROL AND NOT BY REMEMBERING. The header is
+     * a TOGGLE and the collapse state is PERSISTED in localStorage, so a blind
+     * click is an open on the first run of the day and a CLOSE on the second.
+     * The first run of row 10c found `rasterRef select=no-element`: the Colour
+     * tab's "Raster band presets" section is `defaultCollapsed`, and a
+     * CollapsibleSection renders no children while it is shut.
+     */
+    const openCollapsible = async (title, controlExpr) => {
+      const has = async () => c.evalExpr(`!!(${controlExpr})`);
+      if (await has()) return 'already-open';
+      const clicked = await c.evalExpr(String.raw`
+        (() => {
+          // CASE-INSENSITIVELY, because PanelHeader renders its title through
+          // text-transform: uppercase and Chrome's innerText reports the
+          // TRANSFORMED text. A case-sensitive startsWith found no header at
+          // all and the run reported the row's own control as missing.
+          const want = ${JSON.stringify(title)}.toUpperCase();
+          const hdr = [...document.querySelectorAll('div')]
+            .filter((d) => d.style && d.style.cursor === 'pointer'
+                        && (d.innerText || '').trim().toUpperCase().startsWith(want))[0];
+          if (!hdr) return 'no-header';
+          hdr.click();
+          return 'clicked';
+        })()`);
+      await sleep(900);
+      return (await has()) ? `opened (${clicked})` : `STILL ABSENT (${clicked})`;
+    };
+    const subTab = async (id) => {
+      const hit = await c.evalExpr(String.raw`
+        (() => {
+          const b = document.querySelector('[data-effects-sub-tab=${JSON.stringify(id)}]');
+          if (!b) return 'no-tab';
+          b.click();
+          return 'clicked';
+        })()`);
+      await sleep(900);
+      return hit;
+    };
+
+    // ---- 10c. THE NARROWING CASE, ON SCREEN. ------------------------------
+    await focusSection(WITNESS.narrowSection);
+    const colourTab = await subTab('colour');
+    const presetsSection = await openCollapsible('Raster band presets', RASTER_REF_SELECT);
+    const boundRamp = await c.evalExpr(SET_INPUT(RASTER_REF_SELECT, rampPreset.id));
+    await sleep(700);
+    await subTab('parallax');
+    await c.evalExpr(OPEN_SCENE_FORM);
+    await sleep(700);
+    const boundScene = await c.evalExpr(SET_INPUT(SCENE_REF_SELECT, WITNESS.sceneId));
+    await sleep(700);
+    const narrowBindings = {
+      section: await c.evalExpr('window.__dbg.aeon.activeSection()'),
+      rasterRef: await c.evalExpr(`window.__dbg.aeon.rasterRef(${WITNESS.narrowSection})`),
+      sceneRef: await c.evalExpr(`window.__dbg.aeon.sceneRef(${WITNESS.narrowSection})`),
+    };
+    // BEFORE the toggle: the row must not already be painting, or the assertion
+    // after it would be describing something that was there all along.
+    const impactBefore = await c.json(V_DEFORM_IMPACT);
+    await c.evalExpr(SET_INPUT(V_DEFORM_SELECT, 'on'));
+    await sleep(900);
+    const impactNarrow = await c.json(V_DEFORM_IMPACT);
+    await shot(c, '5-vdeform-narrows-a-ramp');
+    // EVERY EXPECTED FRAGMENT IS DERIVED: the lead and the pixel width out of
+    // ramp-scroll-mode.ts, the section index out of `activeSection()`, the
+    // preset id off the preset whose document carries a `ramp`.
+    const narrowNames = `Section ${narrowBindings.section} binds this scene and `
+      + `preset "${rampPreset.id}"`;
+    const narrowWidth = `single ${COLUMN_WIDTH_PX}-pixel column instead of the full width`;
+    check('10c', 'THE NARROWING SENTENCE IS ON SCREEN: with a ramp preset and this scene bound '
+      + 'to one section, turning V deform on PAINTS the consequence — naming the section, the '
+      + 'preset, and the single 16-pixel column — and it was not there before the toggle',
+      impactBefore.found === false
+      && impactIsOnScreen(impactNarrow)
+      && impactNarrow.text.startsWith(V_DEFORM_LEAD.narrowed)
+      && impactNarrow.text.includes(narrowNames)
+      && impactNarrow.text.includes(narrowWidth)
+      && !impactNarrow.text.includes(V_DEFORM_LEAD.unknown),
+      `gestures: colour tab=${colourTab} presets section=${presetsSection} `
+      + `rasterRef select=${boundRamp} sceneRef select=${boundScene}\n        `
+      + `model after the gestures: ${JSON.stringify(narrowBindings)}\n        `
+      + `BEFORE the v_deform toggle → ${describeImpact(impactBefore)}\n        `
+      + `AFTER  the v_deform toggle → ${describeImpact(impactNarrow)}\n        `
+      + `derived expectations: startsWith ${JSON.stringify(V_DEFORM_LEAD.narrowed)}; `
+      + `includes ${JSON.stringify(narrowNames)}; includes ${JSON.stringify(narrowWidth)}`);
+
+    // ---- 10d. THE DECLINE CASE, ON SCREEN. --------------------------------
+    //
+    // THE ROW THIS PARCEL IS FOR. Unbind the section that CAN be answered, bind
+    // the two that cannot, and read what the same element says. A confident
+    // sentence here — "nothing was narrowed", or a narrowing claim about a
+    // document Aurora never read — is the defect; the sentence must name WHICH
+    // failure each section hit and claim NEITHER answer.
+    await c.evalExpr(SET_INPUT(SCENE_REF_SELECT, ''));
+    await sleep(700);
+    for (const index of [WITNESS.danglingSection, WITNESS.unreadableSection]) {
+      await focusSection(index);
+      await c.evalExpr(OPEN_SCENE_FORM);
+      await sleep(500);
+      await c.evalExpr(SET_INPUT(SCENE_REF_SELECT, WITNESS.sceneId));
+      await sleep(700);
+    }
+    const declineBindings = {
+      narrowSectionSceneRef: await c.evalExpr(
+        `window.__dbg.aeon.sceneRef(${WITNESS.narrowSection})`),
+      danglingSceneRef: await c.evalExpr(
+        `window.__dbg.aeon.sceneRef(${WITNESS.danglingSection})`),
+      unreadableSceneRef: await c.evalExpr(
+        `window.__dbg.aeon.sceneRef(${WITNESS.unreadableSection})`),
+    };
+    const impactDecline = await c.json(V_DEFORM_IMPACT);
+    await shot(c, '6-vdeform-declines');
+    const danglingClause = UNKNOWN_WHY_TEMPLATES.dangling(WITNESS.danglingSection, danglingRef);
+    const unreadableClause = UNKNOWN_WHY_TEMPLATES.unreadable(
+      WITNESS.unreadableSection, unreadableRef);
+    check('10d', 'THE DECLINE IS ON SCREEN AND CLAIMS NEITHER ANSWER: with the only resolvable '
+      + 'binding removed, the same element says WHICH failure each section hit — one id with no '
+      + 'document, one document that will not parse — and that the answer is not decidable, '
+      + 'with no narrowing claim anywhere in it',
+      impactIsOnScreen(impactDecline)
+      && impactDecline.text.startsWith(V_DEFORM_LEAD.unknown)
+      && impactDecline.text.includes(danglingClause)
+      && impactDecline.text.includes(unreadableClause)
+      && impactDecline.text.includes(NOT_DECIDABLE)
+      && !impactDecline.text.includes(V_DEFORM_LEAD.narrowed),
+      `model after the gestures: ${JSON.stringify(declineBindings)}\n        `
+      + `${describeImpact(impactDecline)}\n        `
+      + `derived expectations: startsWith ${JSON.stringify(V_DEFORM_LEAD.unknown)}; `
+      + `includes ${JSON.stringify(danglingClause)}; includes ${JSON.stringify(unreadableClause)}; `
+      + `includes ${JSON.stringify(NOT_DECIDABLE)}; does NOT include `
+      + `${JSON.stringify(V_DEFORM_LEAD.narrowed)}`);
+
+    // ---- 10e. THE INSTRUMENT SAW ITS SUBJECT. -----------------------------
+    //
+    // The two rows above are substring claims, and a substring claim is green
+    // over a window it never opened. This one asserts the OPPOSITE property in
+    // one place: the element is a real box inside a real scroller, its two
+    // readings DIFFER, and neither is empty — so a run in which the panel never
+    // mounted, or mounted and stood still, cannot report 10c and 10d as passing.
+    check('10e', 'ANTI-VACUOUS: the element the two rows judged is one painted box inside the '
+      + 'panel scroller, and it said TWO DIFFERENT THINGS across the two states',
+      impactIsOnScreen(impactNarrow) && impactIsOnScreen(impactDecline)
+      && impactNarrow.text !== impactDecline.text
+      && impactNarrow.titleLength === impactDecline.titleLength
+      && panelIsDrawn(await c.evalExpr(PANEL_TEXT)),
+      `narrow  ${(impactNarrow.text ?? '').length} chars, rect ${JSON.stringify(impactNarrow.rect)}\n        `
+      + `decline ${(impactDecline.text ?? '').length} chars, rect ${JSON.stringify(impactDecline.rect)}\n        `
+      + `same hover on both arms (${impactNarrow.titleLength ?? 'n/a'} chars) — the note is the mechanism, `
+      + 'which does not change with the arm; the PAINTED half does');
   } finally {
     try { await c?.send('Page.reload'); } catch { /* going away anyway */ }
     c?.close();
-    try { process.kill(-child.pid, 'SIGTERM'); } catch { /* already gone */ }
+    // AWAITED, not dropped. `killTree` captures the process tree BEFORE it
+    // signals and reaps the Xvfb display it started; dropping the promise (or
+    // signalling the group by hand, which is what stood here) leaves the
+    // reaping half unrun. It never matches a pattern — only this child's own
+    // descendants — so a parallel lane's Electron is untouched.
+    try { await killTree(child); } catch { /* already gone */ }
+    if (fixture !== null) {
+      try { rmSync(fixture.dir, { recursive: true, force: true }); }
+      catch (e) { console.log(`        ⚠ fixture not removed: ${fixture.dir} (${e.message})`); }
+    }
   }
 
   const passed = results.filter((r) => r.ok).length;
