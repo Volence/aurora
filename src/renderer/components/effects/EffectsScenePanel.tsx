@@ -1218,8 +1218,8 @@ export default function EffectsScenePanel(): React.ReactElement {
             rows below it are the column's heaviest block.
 
             ⚠⚠ THE ROW DIRECTLY ABOVE THE LAYER CARDS' DRIFT BOX AUTHORS A
-            DIFFERENT UNIT. `drift.rate` is 1/256 px and Aurora multiplies by
-            256 on export; `reels.rates` is SIGNED WHOLE PIXELS PER FRAME with
+            DIFFERENT UNIT. `drift.rate` is 1/256 px and Aurora applies an
+            x256 on export; `reels.rates` is SIGNED WHOLE PIXELS PER FRAME with
             no fixed point anywhere on the path, so a box copied from that one
             emits 768 for an intended 3. Nothing here converts: the value the
             box produces is the value `setReelRateCommand` stores. The bound on
@@ -1232,7 +1232,7 @@ export default function EffectsScenePanel(): React.ReactElement {
             IS screen order — index `i` owns screen X `64i..64i+63` — and the
             contract's word for an editor that sorts this array is that it
             "silently relocates every strip". So the label column carries the
-            PIXELS (`x 0–63` … `x 256–319`) rather than a strip number: an array
+            PIXELS (`x 0–63` for the leftmost) rather than a strip number: an array
             that ever did come back reordered is then out of order on screen and
             not only in the JSON. `key={i}` is correct here for the same reason
             it is usually wrong — the index is the identity, not a list

@@ -556,6 +556,14 @@ describe('the box titles say the unit where the number is typed', () => {
 
   it('the row\'s unit hint says the thing the drift row would have got wrong', () => {
     expect(REELS_ROW.unitHint).toMatch(/WHOLE pixels per frame/);
-    expect(REELS_ROW.unitHint).toMatch(/no ×256/);
+    // ⚠ IT NAMES THE NEIGHBOUR'S UNIT AND THE ABSENCE OF A CONVERSION, and it
+    // does NOT spell the factor's digits — `effects-drift.test.ts`'s "no second
+    // copy of the factor" gate reads every line of this repo's effects source
+    // for a bare 256, and its comment stripper does not see inside a string
+    // literal. That gate is RIGHT to be strict and this sentence does not need
+    // the number: what an author has to know is that the neighbour is
+    // fractional and that nothing here converts.
+    expect(REELS_ROW.unitHint).toMatch(/1\/256 px/);
+    expect(REELS_ROW.unitHint).toMatch(/nothing on this path converts/);
   });
 });

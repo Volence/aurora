@@ -3415,7 +3415,7 @@ export const REELS_ROW = Object.freeze({
   hint: 'off writes no key at all — this key has no "none" spelling, so absent IS off',
   /** The unit, said where the numbers are typed. Hazard 1, on screen. */
   unitHint: 'signed WHOLE pixels per frame, one strip per row, left to right. Not drift\'s '
-    + '1/256 px: no ×256 anywhere on this path',
+    + '1/256 px, and nothing on this path converts anything',
   /** THE REQUIRED DISCLOSURE — the contract's own sentence, both lengths. */
   debug: EFFECTS_REELS_DEBUG_NOTE,
   /** The binding rule, always on, so the one-sided advisory's silence is not read as a pass. */
@@ -3461,7 +3461,7 @@ export const REEL_RATE_SEED: readonly number[] = Object.freeze((() => {
       `REEL_RATE_SEED ${JSON.stringify(seed)} contains ${JSON.stringify(stray)}, which is `
       + `either stationary or outside the contract's useful range ${g.min}..${g.max}. A new `
       + 'scene must not be born on a rate the contract itself calls a strobe, and must not be '
-      + 'born all-stationary — that is the one shape a ×256 unit error hides in.',
+      + 'born all-stationary — that is the one shape a drift-unit error hides in.',
     );
   }
   return seed;
@@ -3576,7 +3576,8 @@ export function setReelRateCommand(
     throw new Error(
       `setReelRateCommand: refusing to author reels.rates[${index}] = ${rate} — ${refusal} `
       + 'Aurora does not clamp this field: the unit is SIGNED WHOLE PIXELS PER FRAME and the '
-      + 'likeliest way to land outside the bound is a ×256 that belongs to drift.rate, so a '
+      + 'likeliest way to land outside the bound is drift.rate\'s x256 export conversion '
+      + 'applied here by mistake, so a '
       + 'clamp would author the bound as though it were the intent.',
     );
   }
