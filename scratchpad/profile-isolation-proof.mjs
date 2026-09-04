@@ -75,7 +75,7 @@
 // under `$HOME` except through `spawnGuarded`'s existing snapshot/restore.
 
 import { AURORA_DIR } from '../test/support/sibling-root.mjs';
-import { runTarget, announceRunRoot, assertFreshBuild } from './lib/run-root.mjs';
+import { runTarget, announceRunRoot, buildFreshness, describeFreshness, borrowedSourceDrift } from './lib/run-root.mjs';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -356,8 +356,45 @@ async function arm(tag, { sharedProfile, expectSurvives }) {
   }
 }
 
+/**
+ * ⚠ THIS FILE DOES NOT `assertFreshBuild`, AND THE REASON IS A RULING RATHER
+ * THAN AN OMISSION — say so here, because eighteen instruments do call it and a
+ * missing call reads as a forgotten one.
+ *
+ * That gate exists so a row does not measure code that is not in the bundle.
+ * NO ROW HERE READS ANYTHING THE APP RENDERS. The only app behaviour this file
+ * uses is `localStorage` and `location.origin` — Chromium primitives that a
+ * blank page has — and every quantity it judges is a property of the LAUNCHER
+ * (which profile directory the process opened) or of the browser (whether a key
+ * written by one process survives another's `clear()`). A bundle a fortnight
+ * stale would produce identical rows.
+ *
+ * The verdict is still PRINTED, because refusing to state it would be the
+ * "couldn't check rendered as green" shape. What is declined is REFUSING on it:
+ * this repo's other lanes edit `src/` constantly, and a rig about launcher
+ * behaviour that cannot run while somebody is mid-edit is a rig that is red for
+ * a reason having nothing to do with what it measures.
+ */
+function announceBuild() {
+  const f = buildFreshness(RUN);
+  if (f.verdict === 'unmeasurable') {
+    console.log(`build: UNMEASURABLE — ${f.why}. Not fatal here: see the note above.`);
+    return;
+  }
+  // ⚠ `describeFreshness` opens with the literal word FRESH whatever the
+  // verdict, so it is only safe to print on a fresh one. A stale build gets a
+  // line that says stale.
+  if (f.verdict === 'fresh') {
+    console.log(describeFreshness(f, RUN.borrowed ? borrowedSourceDrift(RUN) : null));
+  } else {
+    console.log(`build: STALE by ${((f.newestMs - f.distMs) / 1000).toFixed(0)}s in ${f.root} `
+      + `(${f.newestFile} is newer than ${f.main}) — NOT fatal here, and not waved through either: `
+      + 'no row below reads anything the app renders. See the note above this function.');
+  }
+}
+
 async function main() {
-  assertFreshBuild(RUN);
+  announceBuild();
   // A profile pinned in the OPERATOR'S environment would be inherited by both
   // children and make the private arm a second shared arm — green rows over a
   // premise that is false. Refuse rather than measure that.
