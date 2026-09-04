@@ -5,8 +5,9 @@
 // `VITE_AURORA_DEBUG=1 npm run build`, the command scratchpad/lib/run-root.mjs
 // names when it refuses a stale bundle, and scratchpad/crash-harness.mjs is the
 // crash driver this was written for. (This line used to cite a
-// `scratchpad/crash-investigation/launch.sh` that has never existed.) It is a thin
-// façade over the classic project/level/object-art stores so a headless CDP driver
+// `scratchpad/crash-investigation/launch.sh` that has never existed.)
+//
+// It is a thin façade over the classic project/level/object-art stores so a headless CDP driver
 // can open a project, load acts, and read load/paint state without reaching into
 // the bundled zustand internals. Tree-shaken out of any build where the flag is
 // unset — never present in a normal `npm run dev` / production bundle.

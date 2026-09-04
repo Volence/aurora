@@ -236,8 +236,8 @@ describe('the control adds no second wording of the limit', () => {
    * wording on the same element's `title` (`b8d16256`; the split is held by
    * band-preset-wording.test.ts). ⚠ THIS LINE SAID "renders in full" UNTIL
    * 2026-09-04, the pre-`b8d16256` ruling; do not read it as licence to paint
-   * the contract text. Either way a near-identical sentence beside the select is exactly the
-   * drift core/formats/raster-binding.ts exists to prevent. The row samples
+   * the contract text. Either way, a near-identical sentence beside the select
+   * is exactly the drift core/formats/raster-binding.ts exists to prevent. The row samples
    * distinctive phrases from the constant rather than the whole string, because
    * a FORK would be paraphrased, not pasted.
    */

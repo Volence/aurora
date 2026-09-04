@@ -8,8 +8,8 @@
 // Pure core: no fs, no canvas, no DOM. The renderer reads the art/map files
 // (src/renderer/state/classicObjectArtStore.ts — the name here used to be a
 // `classic-object-art.ts` that has never existed) and wraps the returned
-// indices in an ImageBitmap; the
-// headless render script (render-classic-act.mjs) does the same with fs.
+// indices in an ImageBitmap; the headless render script (render-classic-act.mjs)
+// does the same with fs.
 
 import { parseAsmMappings } from '../import/asm-mappings';
 import { parseTiles } from '../formats/tiles';
