@@ -669,7 +669,7 @@ async function main() {
     console.log('\n=== [dc] the band controls on a base_swap document ===');
     const addPost = await readHandle(c, 'addBand');
     const dcSentence = await c.json(`window.__bs.paintedRect('carries a base swap, not bands', `
-      + `['carries a base swap, not bands', 'EXACTLY ONE raster program', 'no combinator', `
+      + `['carries a base swap, not bands', 'EXACTLY ONE program', 'no combinator', `
       + `'one undo step'])`);
     await shot(c, 'dc-dead-chip');
     check('dc-a', 'the `Add raster band` chip is DISABLED on a base_swap document',
@@ -849,7 +849,7 @@ async function main() {
     // any 224-line frame could hold whatever the schema says.
     await typeInto(c, 'line', '9999', 'Line (absurd)');
     const afterLn = await doc(c);
-    const lnSentence = await c.json(`window.__bs.paintedRect('base_swap line:', `
+    const lnSentence = await c.json(`window.__bs.paintedRect('base_swap band 0 line:', `
       + `['is outside', 'frame-rewind interlock', 'NOT THE RAMP', 'line is still'])`);
     await shot(c, 'ln-refused');
     const lnRange = lnSentence
