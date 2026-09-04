@@ -232,6 +232,16 @@ export const EFFECTS_CHANNEL_BANDS: ReadonlyMap<number, EffectsChannelBand> = ((
   return out;
 })();
 
+/**
+ * The channels aeon declares a band for, ascending — the COVERAGE of this
+ * whole feature, stated as data so a sentence can name it instead of retyping
+ * it. `RASTER_MAX_PATCH` is 4 and this list has two entries today, and the gap
+ * between those two numbers is a thing an author is entitled to be told.
+ */
+export const EFFECTS_CHANNEL_BANDS_DECLARED: readonly number[] = Object.freeze(
+  [...EFFECTS_CHANNEL_BANDS.keys()].sort((a, b) => a - b),
+);
+
 /** What the engine does when the latched line leaves the band at one end. */
 export interface EffectsChannelBandEdge {
   /** aeon's own word: `drop` at hi, `clamp_up` at lo. */
@@ -283,7 +293,13 @@ export const EFFECTS_CHANNEL_BAND_EDGE_LO: EffectsChannelBandEdge =
  * statement available and it is spelled `cannot-tell`.
  */
 export type AnchorBandFit =
-  /** aeon declares no band for this channel (2 and 3 today). Nothing is known. */
+  /**
+   * aeon declares no band for this channel (2 and 3 today). Nothing is known —
+   * and since 2026-09-04 the panel SAYS SO rather than rendering nothing, because
+   * an author cannot tell a coverage gap from a clean result by looking at an
+   * empty space. See `anchorSweepNoBandAdvisory` for why this arm is spoken
+   * aloud while `cannot-tell` is not.
+   */
   | { verdict: 'no-band'; channel: number; travelPx: number }
   /** travel <= lines. NOT a clearance: where the sweep sits in [lo, hi] is camera-dependent. */
   | { verdict: 'cannot-tell'; channel: number; travelPx: number; band: EffectsChannelBand }

@@ -30,7 +30,7 @@ import {
   anchorSeedState, anchorMotionState, anchorSeedValue, anchorSweepOf, anchorChannelIndices,
   anchorSeedRefusal, anchorPhaseRefusal, anchorExtendRefusal, anchorMotionWithoutSeedAdvisory,
   anchorSweepSummary, anchorAmpRungOf, anchorPeriodRungOf, anchorOffsetAtTick,
-  anchorSweepBandFit, anchorSweepBandRefusal,
+  anchorSweepBandFit, anchorSweepBandRefusal, anchorSweepNoBandAdvisory,
   newAnchorSweep, newAnchorWorldY,
   setAnchorSeedStateCommand, setAnchorSeedCommand, setAnchorMotionStateCommand,
   setAnchorSweepShiftCommand, setAnchorPhaseCommand,
@@ -53,6 +53,7 @@ import type {
 import {
   EFFECTS_CHANNEL_BANDS, anchorBandFit, anchorTravelPx,
   EFFECTS_CHANNEL_BAND_EDGE_HI, EFFECTS_CHANNEL_BAND_EDGE_LO,
+  EFFECTS_CHANNEL_BANDS_DECLARED, EFFECTS_CHANNEL_BANDS_GAME,
 } from '../../../core/formats/effects/channel-bands';
 import type { SetEffectsPresetCommand } from '../../../core/editing/commands';
 
@@ -643,5 +644,144 @@ describe('a sweep against its channel\'s screen band', () => {
     expect(anchorAmpRungOf(off)).toBeNull();
     expect(anchorSweepBandFit(off, 1)).toBeNull();
     expect(anchorSweepBandRefusal(off, 1)).toBeNull();
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // AND THE SILENCE THAT WAS ITSELF A CLEARANCE — `no-band`, said out loud.
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // `EFFECTS_PRESET_MAX_PATCH` is 4; aeon's sidecar declares bands for 0 and 1.
+  // An author on channel 2 got `no-band` and the panel rendered NOTHING —
+  // exactly what a well-fitting sweep on channel 1 renders. Nothing reads as
+  // "we looked and it is fine", which is the reassurance this feature exists to
+  // withhold, so the coverage gap is now stated.
+  //
+  // ⚠ AND THE ASYMMETRY IS DELIBERATE, WHICH IS WHY IT IS ASSERTED AND NOT JUST
+  // COMMENTED. `cannot-tell` is ALSO permanently silent (channel 0 is 218 lines
+  // against a widest sweep of 128 px, so no legal rung is ever refused there)
+  // and somebody will want to make the two match. `[6i]` pins the structural
+  // fact that licenses the difference: the advisory only ever appears on a
+  // channel where a REFUSAL CAN NEVER APPEAR, so it never occupies the slot
+  // whose emptiness is what makes a refusal legible by showing up at all.
+
+  it('[6h] a channel aeon declares NO band for SAYS SO — it is not left blank', () => {
+    const undeclared: number[] = [];
+    for (let c = 0; c < EFFECTS_PRESET_MAX_PATCH; c++) {
+      if (!EFFECTS_CHANNEL_BANDS.has(c)) undeclared.push(c);
+    }
+    // Anti-vacuous, and LOUD if the data ever closes the gap: with every
+    // channel declared this row has nothing to measure and must say so rather
+    // than pass.
+    expect(undeclared.length,
+      'aeon now declares a band for EVERY channel — this row CANNOT MEASURE the no-band '
+      + 'advisory any more and is not a pass; delete it or point it at a real gap')
+      .toBeGreaterThan(0);
+
+    // The declared list the sentence quotes, rebuilt here from the data rather
+    // than copied off the screen.
+    expect(EFFECTS_CHANNEL_BANDS_DECLARED.length,
+      'CANNOT MEASURE the declared-channel phrasing: this row only knows how to spell a list '
+      + 'of one or two, and aeon now declares more')
+      .toBeLessThanOrEqual(2);
+    const declaredPhrase = EFFECTS_CHANNEL_BANDS_DECLARED.length === 1
+      ? `channel ${EFFECTS_CHANNEL_BANDS_DECLARED[0]}`
+      : `channels ${EFFECTS_CHANNEL_BANDS_DECLARED[0]} and ${EFFECTS_CHANNEL_BANDS_DECLARED[1]}`;
+
+    for (const c of undeclared) {
+      for (const r of ANCHOR_AMP_RUNGS) {
+        const msg = anchorSweepNoBandAdvisory(sweepAt(r.amp_shift), c);
+        expect(msg, `channel ${c}, amp_shift ${r.amp_shift}`).not.toBeNull();
+        // It names the channel, the GAME whose bands these are, the coverage,
+        // and the shape of the declaration an author would have to go and read.
+        expect(msg).toContain(`channel ${c}`);
+        expect(msg).toContain(EFFECTS_CHANNEL_BANDS_GAME);
+        expect(msg).toContain(declaredPhrase);
+        expect(msg).toContain('patchable(lo:, hi:)');
+        // ...and it says what is MISSING. Never a clearance — same bar as the
+        // rest of this path: no "fits", no "ok", no tick.
+        expect(msg).toContain('never as a clearance');
+        expect(msg!.toLowerCase()).not.toContain('fits');
+        expect(msg).not.toMatch(/\bok\b/i);
+        expect(msg).not.toContain('✓');
+        // The verdict behind it, so a sentence produced by some other path
+        // could not satisfy this row.
+        expect(anchorSweepBandFit(sweepAt(r.amp_shift), c)!.verdict).toBe('no-band');
+      }
+    }
+
+    // An OFF-LADDER sweep still gets nothing, on an undeclared channel too:
+    // the advisory follows `anchorSweepBandFit`'s null, not the channel index.
+    const off = { amp_shift: 99, period_shift: 1 } as EffectsPresetAnchorSweep;
+    expect(anchorSweepNoBandAdvisory(off, undeclared[0])).toBeNull();
+  });
+
+  it('[6i] the advisory NEVER lands in the slot a refusal can use — the reason cannot-tell stays silent', () => {
+    // THE STRUCTURAL PROPERTY, asserted rather than trusted. Both hints render
+    // in the same position under `Travel`. Leaving that position empty on a
+    // healthy sweep is what makes a refusal legible by APPEARING, so a
+    // permanent note there would cost the refusal its loudest signal — but only
+    // on a channel where a refusal can appear at all.
+    for (let c = 0; c < EFFECTS_PRESET_MAX_PATCH; c++) {
+      const refusable = ANCHOR_AMP_RUNGS
+        .filter((r) => anchorSweepBandRefusal(sweepAt(r.amp_shift), c) !== null);
+      const advised = ANCHOR_AMP_RUNGS
+        .filter((r) => anchorSweepNoBandAdvisory(sweepAt(r.amp_shift), c) !== null);
+      // Never both on one channel, and never both on one rung.
+      expect(refusable.length === 0 || advised.length === 0,
+        `channel ${c} produces BOTH a band refusal and a no-band advisory`).toBe(true);
+      // The advisory is all-or-nothing per channel: it is a property of the
+      // channel's declaration, not of the rung the author picked.
+      expect(advised.length === 0 || advised.length === ANCHOR_AMP_RUNGS.length,
+        `channel ${c} advises on ${advised.length} of ${ANCHOR_AMP_RUNGS.length} rungs`).toBe(true);
+      // And it appears on exactly the channels aeon does not declare.
+      expect(advised.length > 0).toBe(!EFFECTS_CHANNEL_BANDS.has(c));
+    }
+    // Anti-vacuous: this repo really does have both kinds of channel today, so
+    // the loop above compared something.
+    expect(EFFECTS_CHANNEL_BANDS.size).toBeGreaterThan(0);
+    expect(EFFECTS_PRESET_MAX_PATCH).toBeGreaterThan(EFFECTS_CHANNEL_BANDS.size);
+  });
+
+  it('[6j] CENSUS: every channel × rung, one verdict, and the sentences it is allowed', () => {
+    // The counts must SUM. A row that checks a couple of interesting cells
+    // cannot notice a cell that produces two sentences, or none where one is
+    // owed — and "cannot-tell says nothing" is a claim about EVERY such cell,
+    // not about the two this suite happens to name.
+    const seen: Record<string, number> = { 'no-band': 0, 'cannot-tell': 0, 'cannot-fit': 0 };
+    let cells = 0;
+    for (let c = 0; c < EFFECTS_PRESET_MAX_PATCH; c++) {
+      for (const r of ANCHOR_AMP_RUNGS) {
+        const s = sweepAt(r.amp_shift);
+        const fit = anchorSweepBandFit(s, c)!;
+        const refusal = anchorSweepBandRefusal(s, c);
+        const advisory = anchorSweepNoBandAdvisory(s, c);
+        const where = `channel ${c}, amp_shift ${r.amp_shift}`;
+        cells += 1;
+        seen[fit.verdict] += 1;
+        if (fit.verdict === 'cannot-fit') {
+          expect(refusal, where).not.toBeNull();
+          expect(advisory, where).toBeNull();
+        } else if (fit.verdict === 'no-band') {
+          expect(refusal, where).toBeNull();
+          expect(advisory, where).not.toBeNull();
+        } else {
+          // ⚠ `cannot-tell` SAYS NOTHING, AND THAT IS THE DELIBERATE HALF.
+          // It is aeon's own named verdict — the check RAN and the contract
+          // says its result is unknowable at author time — not a coverage gap
+          // of Aurora's. Making this speak too would put a permanent note in
+          // the refusal's own slot on every well-authored sweep in the editor.
+          // See `anchorSweepNoBandAdvisory`'s header before changing it.
+          expect(refusal, where).toBeNull();
+          expect(advisory, where).toBeNull();
+        }
+      }
+    }
+    expect(cells).toBe(EFFECTS_PRESET_MAX_PATCH * ANCHOR_AMP_RUNGS.length);
+    expect(seen['no-band'] + seen['cannot-tell'] + seen['cannot-fit']).toBe(cells);
+    // All three arms are actually exercised — a census over a sample that only
+    // reached one verdict would prove nothing about the other two.
+    for (const v of ['no-band', 'cannot-tell', 'cannot-fit']) {
+      expect(seen[v], `the census never reached "${v}"`).toBeGreaterThan(0);
+    }
   });
 });

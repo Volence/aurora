@@ -107,7 +107,9 @@ import {
 // whether a sweep can physically fit, and its test is ONE-DIRECTIONAL: a
 // refusal is certain, a fit is CANNOT TELL. `AnchorBandFit` has no `fits` arm
 // for that reason; see channel-bands.ts's header before adding a reassurance.
-import { anchorBandFit } from '../../core/formats/effects/channel-bands';
+import {
+  anchorBandFit, EFFECTS_CHANNEL_BANDS_DECLARED, EFFECTS_CHANNEL_BANDS_GAME,
+} from '../../core/formats/effects/channel-bands';
 import type { AnchorBandFit } from '../../core/formats/effects/channel-bands';
 import type { SetEffectsPresetCommand, SetSectionRasterCommand } from '../../core/editing/commands';
 // THE BINDING LIMIT IS NOT RE-TYPED HERE. `PRESET_LIMITS.unbound` below is the
@@ -2351,8 +2353,11 @@ export function anchorSweepSummary(sweep: EffectsPresetAnchorSweep): string | nu
  *     sentence would be "we cannot tell", which is what an empty hint already
  *     means everywhere else on this panel.
  *   • `no-band` (channels 2 and 3 today — `patch_world_ys` reaches 4, aeon
- *     declares bands for 0 and 1). Nothing is known, so nothing is said. This is
- *     NOT the same silence as above and the tests assert the two separately.
+ *     declares bands for 0 and 1). Nothing is known — and THAT IS NOW SAID OUT
+ *     LOUD by `anchorSweepNoBandAdvisory`, in a neutral hint, because an empty
+ *     space cannot tell an author "we checked and found nothing certain" apart
+ *     from "this feature does not reach your channel". This is NOT the same
+ *     silence as `cannot-tell` and the tests assert the two separately.
  *
  * ⚠ THE WORDING NAMES BOTH EDGES AND "CLIPPED" IS NOT ONE OF THE WORDS. Leaving
  * the band is ASYMMETRIC and one over-long sweep reaches both ends depending on
@@ -2399,6 +2404,72 @@ export function anchorSweepBandRefusal(
     + `drawn anywhere and the band vanishes for that frame, it does not pin to ${band.hi}; below `
     + `line ${band.lo} it is still emitted, clamped up to ${band.lo}, so the boundary pins at the `
     + 'top of the band and stays visible. Pick a smaller Travel.';
+}
+
+/** "channel 0", "channels 0 and 1", "channels 0, 1 and 2" — from the data. */
+function channelList(cs: readonly number[]): string {
+  const noun = cs.length === 1 ? 'channel' : 'channels';
+  if (cs.length <= 1) return `${noun} ${cs.join('')}`;
+  return `${noun} ${cs.slice(0, -1).join(', ')} and ${cs[cs.length - 1]}`;
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE CHANNEL AEON DOCUMENTS NOTHING ABOUT — said out loud, because an empty
+ * space is indistinguishable from a clean result.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `EFFECTS_PRESET_MAX_PATCH` is 4; aeon's bands sidecar declares 0 and 1. An
+ * author who reaches channel 2 gets `no-band`, and before this helper the panel
+ * rendered NOTHING there — the same nothing a well-fitting sweep on channel 1
+ * gets. Nothing reads as "we looked and it is fine", which is precisely the
+ * reassurance the whole feature exists to withhold, one layer up: the fit
+ * machinery never ran at all on this channel, and saying so is not optional.
+ *
+ * ═══ WHY THIS ARM SPEAKS AND `cannot-tell` DOES NOT — READ BEFORE "FIXING" ═══
+ *
+ * The asymmetry is deliberate. Someone will one day notice that `cannot-tell` is
+ * ALSO permanently silent — channel 0 is 218 lines against a widest sweep of 128
+ * px, so nothing an author can pick is ever refused there — and conclude the two
+ * should match. They should not, for three reasons, and only the third is taste:
+ *
+ *  1. THEY ARE DIFFERENT KINDS OF FACT. `cannot-tell` is a state aeon's contract
+ *     NAMES and defines: the check ran, compared travel against lines, and the
+ *     contract itself says the result is not knowable at author time. `no-band`
+ *     is not in that contract at all — it exists only because Aurora offers four
+ *     channels while aeon documents two, and that gap is AURORA'S to disclose.
+ *     A negative result and an un-run check are not the same report.
+ *  2. THE REFUSAL'S SLOT MUST STAY EMPTY WHERE A REFUSAL CAN LAND. On a channel
+ *     WITH a band, this position under `Travel` is where `anchorSweepBandRefusal`
+ *     appears; leaving it blank in the healthy case is what makes the refusal
+ *     legible by APPEARING rather than by being read. A permanent cannot-tell
+ *     note would turn that into text replaced by other text. On a `no-band`
+ *     channel no refusal can ever land in that slot — `anchorBandFit` returns
+ *     `no-band` for every rung — so this sentence collides with nothing. That is
+ *     a structural property, and `[6i]` asserts it rather than trusting it.
+ *  3. Every well-authored sweep in the editor lands in `cannot-tell`. A note
+ *     under every one of them is noise, and noise is how the one sentence that
+ *     IS certain gets skipped.
+ *
+ * ⚠ AND IT IS NOT A WARNING. `tone="warning"` is for something the author did;
+ * reaching channel 2 is not a mistake and there is no smaller Travel to pick.
+ * Every warning on this panel ends in an action; this one ends in a limit, so it
+ * renders as a plain `Hint`. A warning with no remedy teaches an author that the
+ * warning colour means nothing.
+ *
+ * ⚠ IT ALSO MUST NOT READ AS A CLEARANCE — no "fits", no "ok", no ✓, same bar as
+ * everything else on this path. It says what is MISSING.
+ */
+export function anchorSweepNoBandAdvisory(
+  sweep: EffectsPresetAnchorSweep, index: number,
+): string | null {
+  const fit = anchorSweepBandFit(sweep, index);
+  if (fit === null || fit.verdict !== 'no-band') return null;
+  return `aeon declares no screen band for channel ${index}. In ${EFFECTS_CHANNEL_BANDS_GAME} only `
+    + `${channelList(EFFECTS_CHANNEL_BANDS_DECLARED)} declare a patchable(lo:, hi:) range, so there `
+    + 'is no boundary to measure this sweep against and nothing here can tell you whether it will '
+    + 'land where you intend. Read this silence as missing information, never as a clearance: the '
+    + 'over-long-sweep warning under Travel cannot fire on this channel at all.';
 }
 
 /** The state of channel `index`'s SEED as the document spells it. */
