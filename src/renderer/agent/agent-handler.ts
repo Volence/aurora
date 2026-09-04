@@ -465,6 +465,11 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       const other = aimedId === 'b' ? section.collisionEdit! : section.collisionEditB!;
       // Absent means `keep`, never `clear` — see the protocol comment.
       const crossover = req.crossover ?? 'keep';
+      // Absent means `'cell'` — the width this tool has always painted. The
+      // narrow widths exist because aeon's trigger reads 8px columns and
+      // Aurora's cell is two of them, so a two-way pair at cell width nets to
+      // nothing (core/collision/layer-transition.ts's CrossoverSpan block).
+      const crossoverSpan = req.crossoverSpan ?? 'cell';
       // THE THREE AXES COMPOSE, AND NOTHING BRANCHES TWICE ON ANY OF THEM.
       // FORM picks the builder; PLANE and CROSSOVER are passed through to the
       // same `buildPlaneEntries` merge underneath either one. Both forms are
@@ -475,13 +480,13 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         ? paintCollisionCellsBothPlanes({
           x: req.x, y: req.y, w: req.w, h: req.h, words: req.words,
           aimedPlane: aimed, otherPlane: other, tileWidth: SECTION_TILES_WIDE, bothPlanes,
-          aimedPlaneId: aimedId, crossover,
+          aimedPlaneId: aimedId, crossover, crossoverSpan,
         })
         : {
           ...paintCollisionRectBothPlanes({
             x: req.x, y: req.y, w: req.w, h: req.h, word: req.word!,
             aimedPlane: aimed, otherPlane: other, tileWidth: SECTION_TILES_WIDE, bothPlanes,
-            aimedPlaneId: aimedId, crossover,
+            aimedPlaneId: aimedId, crossover, crossoverSpan,
           }),
           // The FILL form names a word for every cell in the rectangle, so it
           // can never skip one. Stated as a constant rather than left off the
@@ -516,11 +521,15 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       // check it either (anchor §8.2 assigns the loop-shaped check to Aurora).
       // So the number that says "this loop works in one direction" is returned
       // beside the paint that could have caused it.
-      const audit = auditCrossovers(section.collisionEdit, section.collisionEditB);
+      const audit = auditCrossovers(section.collisionEdit, section.collisionEditB, SECTION_TILES_WIDE);
       return {
         painted: entries.length, paintedOther: otherPlaneEntries.length, bothPlanes,
         skipped: plan.skipped,
         crossover,
+        // Reported back so a caller can SEE which width it painted at. A
+        // two-way pair authored at 'cell' is the defect this parcel exists to
+        // close, and the reply that could have said so said nothing.
+        crossoverSpan,
         crossoverAudit: {
           marksA: audit.marksA, marksB: audit.marksB, pairs: audit.pairs,
           oneWay: audit.oneWay, selfMarks: audit.selfMarks, reserved: audit.reserved,

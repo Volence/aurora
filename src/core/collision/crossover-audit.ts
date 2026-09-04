@@ -48,8 +48,12 @@
 // from the two planes alone, and everything that is not is left out rather than
 // approximated.
 
-import { readCrossover, type CrossoverRead } from './layer-transition';
+import {
+  readCrossover, crossoverTarget,
+  type CrossoverRead, type Crossover, type CollisionPlaneId,
+} from './layer-transition';
 import { isSolidCell } from './both-planes-paint';
+import { CELL_SUBTILE_ROWS } from './collision-cell';
 
 /** How many offending indices each list keeps. A cap, because a corrupt import
  *  could name every cell and the report is meant to be read. */
@@ -79,6 +83,25 @@ export interface CrossoverAudit {
    *  Aurora cannot author a 3 in the first place (`crossoverFor` derives the
    *  value from the brush and the plane; the brush has no such value). */
   reserved: number;
+  /** ⚠ A TWO-WAY CROSSOVER THAT NETS TO NOTHING — the defect this whole parcel
+   *  exists to close, and the one an author is LEAST able to see.
+   *
+   *  A run of horizontally adjacent marked 8px columns containing at least one
+   *  PAIR (marked on both planes) which a player traverses without changing
+   *  path: the marks fire, and fire again, and he leaves on the path he
+   *  entered on. See `scanCancellingRuns` for the simulation and
+   *  layer-transition.ts's CrossoverSpan block for why cell-width pairs land
+   *  here by construction.
+   *
+   *  ZERO WHEN THE AUDIT COULD NOT LOOK: this needs the plane's row stride, so
+   *  a caller that does not pass one gets `cancellingMeasured: false` and this
+   *  stays 0. A count of 0 is not "clean" unless that flag is true. */
+  cancelling: number;
+  /** Whether the cancellation scan actually ran (a stride was supplied). LOUD
+   *  ON UNMEASURABLE: `cancelling: 0` means two different things without it. */
+  cancellingMeasured: boolean;
+  /** First sub-tile index of each cancelling run, capped like the others. */
+  cancellingAt: number[];
   /** Solid on exactly one plane. Context, never judged. */
   divergent: number;
   /** Solid on both planes — what the "A+B" brush authors. */
@@ -90,31 +113,62 @@ export interface CrossoverAudit {
   oneWayAt: number[];
 }
 
+/** One maximal run of horizontally adjacent marked columns, and what a player
+ *  traversing it actually ends up on. Exported so a test can assert the
+ *  SIMULATION rather than only the count it feeds. */
+export interface CrossoverRun {
+  /** Sub-tile index of the run's first (leftmost) column. */
+  index: number;
+  /** Columns in the run — 8px ENGINE TRIGGER CELLS, not 16px Aurora cells. */
+  width: number;
+  /** Columns in the run marked on BOTH planes. */
+  pairs: number;
+  /** Entering rightward on path A, does the player leave on path B? */
+  flipsRightward: boolean;
+  /** Entering leftward on path B, does the player leave on path A? */
+  flipsLeftward: boolean;
+}
+
 /** `error` when the document would fail aeon's bake, `warn` for a one-way
  *  crossover, `ok` otherwise. A single predicate so no caller invents its own
  *  threshold. */
 export function crossoverAuditSeverity(a: CrossoverAudit): 'ok' | 'warn' | 'error' {
   if (a.selfMarks > 0 || a.reserved > 0) return 'error';
-  if (a.oneWay > 0) return 'warn';
+  // A CANCELLING PAIR IS A WARN, NOT AN ERROR, and the line is aeon's: `error`
+  // in this audit means "the bake will refuse this". The bake bakes a
+  // cancelling pair happily — every word in it is legal — and the player simply
+  // runs through the loop without ever leaving path A. So it is the loudest
+  // thing that is not a build failure, which is exactly the `warn` tier.
+  if (a.cancelling > 0 || a.oneWay > 0) return 'warn';
   return 'ok';
 }
 
 /**
  * Audit both collision planes of one section.
  *
- * `stride`/`rows` are not needed: every quantity here is per-cell and the
- * planes are parallel arrays, so the audit is index-wise. It reads the planes
- * at TILE resolution — all four sub-tiles of a 16px cell hold the same word, so
- * a cell whose sub-tiles DISAGREE (which only a bug can produce) is visible as
- * four separate counts rather than averaged away.
+ * MOST quantities here are index-wise and need no geometry: the planes are
+ * parallel arrays, and the audit reads them at SUB-TILE resolution — all four
+ * sub-tiles of a 16px cell used to hold the same word, so a cell whose
+ * sub-tiles disagree is visible as separate counts rather than averaged away.
+ *
+ * ⚠ `stride` IS THE EXCEPTION AND IT IS NOT OPTIONAL IN SPIRIT. The
+ * cancellation check asks a question about ADJACENCY — "what happens to a
+ * player running horizontally through these marks" — and adjacency is the one
+ * thing an index-wise scan cannot see. A caller that omits it gets
+ * `cancellingMeasured: false` and must not read `cancelling: 0` as clean; the
+ * message says so in words rather than leaving a zero to be misread.
  */
 export function auditCrossovers(
   planeA: ArrayLike<number> | null | undefined,
   planeB: ArrayLike<number> | null | undefined,
+  /** Sub-tile columns per row (SECTION_TILES_WIDE for an aeon section). Without
+   *  it the cancellation scan cannot run. */
+  stride?: number,
 ): CrossoverAudit {
   const out: CrossoverAudit = {
     cells: 0, marksA: 0, marksB: 0, pairs: 0, oneWay: 0,
     selfMarks: 0, reserved: 0, divergent: 0, solidBoth: 0,
+    cancelling: 0, cancellingMeasured: false, cancellingAt: [],
     selfMarkAt: [], reservedAt: [], oneWayAt: [],
   };
   if (!planeA || !planeB) return out;
@@ -145,6 +199,103 @@ export function auditCrossovers(
     if (sa && sb) out.solidBoth++;
     else if (sa || sb) out.divergent++;
   }
+
+  // The one question that needs geometry. Kept in its own pass rather than
+  // folded into the index-wise loop above, because it is a different KIND of
+  // check — a traversal, not a per-cell classification — and burying it in the
+  // same loop would make both harder to read and the `stride` refusal invisible.
+  if (stride && stride > 0) {
+    out.cancellingMeasured = true;
+    for (const run of scanCancellingRuns(planeA, planeB, n, stride)) {
+      push(out.cancellingAt, run.index, out.cancelling++);
+    }
+  }
+  return out;
+}
+
+/**
+ * Every marked run that a player runs through WITHOUT CHANGING PATH, though the
+ * run contains a two-way pair.
+ *
+ * ═══ WHY THIS IS A REAL TRAVERSAL AND NOT THE FITTED MODEL §8.2 REFUSES ═══
+ *
+ * The docblock at the top of this file says the audit does not decide whether a
+ * region IS a loop, because that needs surfaces, speeds and directions the
+ * encoding does not carry. This asks a strictly smaller question that needs
+ * NONE of them: given these marks and nothing else, does entering this run on
+ * one path and leaving the other side change which path you are on? The engine
+ * answers that with an equality on a cell id and a per-plane table lookup, and
+ * both are here. No radius is fitted and no geometry is consulted.
+ *
+ * ═══ THE THREE FACTS IT IS BUILT ON, EACH DERIVED ═══
+ *
+ *  1. The trigger fires ONCE PER 8px COLUMN entered (`COLL_CELL_W` = 8), so the
+ *     scan steps one sub-tile column at a time.
+ *  2. It reads the mark from THE PLANE THE PLAYER IS CURRENTLY ON
+ *     (`Collision_GetType(x, y, layer)`), so the walk carries a layer and looks
+ *     up that plane's word — which is what makes an even-width pair cancel and
+ *     an odd-width one flip.
+ *  3. The player CANNOT SKIP A COLUMN: top speed is 6px/frame, below the 8px
+ *     column width. So every column of a run is visited, exactly once, in order.
+ *
+ * A run's rows are scanned at each CELL'S TOP sub-tile row (`CELL_SUBTILE_ROWS`
+ * apart) — the sub-tile a cell's canonical word lives at, and the row aeon's
+ * bake samples. Scanning every sub-tile row would report each defect twice.
+ *
+ * ⚠ A RUN WITH NO PAIR IS NEVER REPORTED, however little it does. Two spatially
+ * separated ONE-WAY marks are the shape that works for a loop
+ * (docs/reviews/2026-09-04-loops-test-loop-witness.md §6), and each of them is
+ * a run that does nothing in one of the two directions ON PURPOSE. Reporting
+ * those would fire on the correct answer.
+ */
+export function scanCancellingRuns(
+  planeA: ArrayLike<number>, planeB: ArrayLike<number>, length: number, stride: number,
+): CrossoverRun[] {
+  const out: CrossoverRun[] = [];
+  const rows = Math.floor(length / stride);
+  const fires = (w: number | undefined, on: CollisionPlaneId): CollisionPlaneId | null => {
+    const c = readCrossover(w);
+    if (c === 'reserved' || c === 'none') return null;
+    const to = crossoverTarget(c as Crossover);
+    // A self-mark cannot fire — reading a plane's mark means being on it.
+    return to === null || to === on ? null : to;
+  };
+  const markedAt = (i: number): boolean => {
+    const a = readCrossover(planeA[i]), b = readCrossover(planeB[i]);
+    return a === 'to-a' || a === 'to-b' || b === 'to-a' || b === 'to-b';
+  };
+  for (let row = 0; row < rows; row += CELL_SUBTILE_ROWS) {
+    const base = row * stride;
+    for (let col = 0; col < stride; col++) {
+      if (!markedAt(base + col)) continue;
+      let end = col;
+      while (end + 1 < stride && markedAt(base + end + 1)) end++;
+      const width = end - col + 1;
+      let pairs = 0;
+      for (let c = col; c <= end; c++) {
+        const a = readCrossover(planeA[base + c]), b = readCrossover(planeB[base + c]);
+        const ma = a === 'to-a' || a === 'to-b', mb = b === 'to-a' || b === 'to-b';
+        if (ma && mb) pairs++;
+      }
+      // Walk it, once each way, exactly as the engine would.
+      let layer: CollisionPlaneId = 'a';
+      for (let c = col; c <= end; c++) {
+        const to = fires(layer === 'a' ? planeA[base + c] : planeB[base + c], layer);
+        if (to) layer = to;
+      }
+      const flipsRightward = layer !== 'a';
+      layer = 'b';
+      for (let c = end; c >= col; c--) {
+        const to = fires(layer === 'a' ? planeA[base + c] : planeB[base + c], layer);
+        if (to) layer = to;
+      }
+      const flipsLeftward = layer !== 'b';
+      if (pairs > 0 && (!flipsRightward || !flipsLeftward)) {
+        out.push({ index: base + col, width, pairs, flipsRightward, flipsLeftward });
+      }
+      col = end;
+    }
+  }
   return out;
 }
 
@@ -172,11 +323,40 @@ export function crossoverAuditMessage(a: CrossoverAudit): string | null {
       + `(first at index ${a.selfMarkAt[0]}) — a plane whose word sends you to the plane you are `
       + 'already on. It can never fire, and aeon\'s bake refuses it (rule R2).');
   }
+  // ⚠ THE CANCELLING LINE COMES BEFORE THE ONE-WAY LINE, deliberately. An author
+  // who has just been told "a loop needs the pair" and acts on it lands on
+  // exactly this defect, so the message that says the pair is not enough must
+  // not be underneath the one that asked for it.
+  if (a.cancelling > 0) {
+    parts.push(`${a.cancelling} TWO-WAY crossover${a.cancelling === 1 ? '' : 's'} that `
+      + `NET${a.cancelling === 1 ? 'S' : ''} TO NOTHING (first at index ${a.cancellingAt[0]}): `
+      + 'the pair is there on both planes, but it spans an even number of the 8px columns the '
+      + 'engine triggers on, so the player is handed over and handed straight back and leaves on '
+      + 'the path he arrived on. A 16px cell is TWO trigger columns, so a pair painted at the '
+      + 'default mark width always does this. Set the crossover mark width to "Half (8px)" and '
+      + 'paint the pair one sub-column wide — or use two spatially separated ONE-WAY marks, which '
+      + 'is what the first working loop used.');
+  }
   if (a.oneWay > 0) {
+    // WORDING REVISITED 2026-09-04 (the witness packet's §6 asked for it, and
+    // this parcel is why). The old sentence called a one-way mark "the single
+    // most likely authoring mistake" and told the reader to add the pair. For a
+    // LOOP that advice is actively wrong at the default mark width — it is what
+    // produces a cancelling pair — and two separated one-way marks are a
+    // correct, and simpler, way to build a two-way loop. So this now says what
+    // a one-way mark IS rather than implying it is a mistake.
     parts.push(`${a.oneWay} ONE-WAY crossover${a.oneWay === 1 ? '' : 's'} `
-      + `(first at index ${a.oneWayAt[0]}): marked on one plane only. Legal — that is what an `
-      + 'entry anchor looks like — but a two-way loop needs the mark on both planes, and a loop '
-      + 'painted one-way works in one direction and drops the player in the other.');
+      + `(first at index ${a.oneWayAt[0]}): marked on one plane only. Legal and often correct — an `
+      + 'entry or exit anchor looks like this, and so does a loop built from two separated one-way '
+      + 'marks (each fires only when approached on the plane that carries it, and firing twice is '
+      + 'the same as firing once). It is a MISTAKE only if you meant a single two-way handoff and '
+      + 'marked one plane; then mark the other plane at the same place, at "Half (8px)" mark width.');
+  }
+  if (!a.cancellingMeasured && (a.pairs > 0)) {
+    // LOUD ON UNMEASURABLE. `cancelling: 0` beside a real pair count is the one
+    // combination a reader would otherwise take as an all-clear.
+    parts.push('(The two-way cancellation check did NOT run — this audit was called without a row '
+      + 'stride, so nothing here says whether these pairs actually change the player\'s path.)');
   }
   return parts.length ? parts.join(' ') : null;
 }

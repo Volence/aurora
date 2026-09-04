@@ -1322,7 +1322,7 @@ function installAeonProbe(): AeonProbeApi {
     crossoverAudit: (sectionIndex) => {
       const sec = getCurrentAct(useProjectStore.getState())?.sections[sectionIndex];
       if (!sec) return null;
-      const a = auditCrossovers(sec.collisionEdit, sec.collisionEditB);
+      const a = auditCrossovers(sec.collisionEdit, sec.collisionEditB, SECTION_TILES_WIDE);
       return { ...a, severity: crossoverAuditSeverity(a) };
     },
     crossoverRefusal: (plane, crossover) =>

@@ -178,7 +178,30 @@ export const EDITOR_METHODS: EditorMethod[] = [
           + 'opposite value on each plane, which is a complete TWO-WAY crossover — the pair a loop '
           + 'needs to be traversable in both directions. With the "words" form it applies to every '
           + 'cell that is WRITTEN and to no cell whose word is null (a skipped cell keeps its own '
-          + 'crossover even under "clear").'),
+          + 'crossover even under "clear"). '
+          + 'IF YOU ARE AUTHORING A TWO-WAY CROSSOVER (plane:"both" + "hand-off"), READ '
+          + '"crossoverSpan" BELOW FIRST — at the default width a two-way pair does NOTHING.'),
+      // ⚠ THE ONE PARAMETER A TWO-WAY LOOP CANNOT BE AUTHORED WITHOUT.
+      //
+      // aeon's trigger (`Player_LoopCrossover`) fires once per 8px COLUMN
+      // entered — COLL_CELL_W = 8 — and their bake reads Aurora's saved plane
+      // at that same 8px column (`apply_editor_collision_overlay`:
+      // `o = (cr * 2) * W + col`). Aurora's cell is 16px, i.e. TWO trigger
+      // cells, so a two-way pair painted at cell width flips the layer twice
+      // and nets to nothing. See core/collision/layer-transition.ts.
+      //
+      // DEFAULT 'cell' because that is what this tool has always done and a
+      // one-way mark (the common case, and idempotent) does not care.
+      crossoverSpan: z.enum(['cell', 'left', 'right']).optional()
+        .describe('how WIDE each crossover mark is, in 8px ENGINE TRIGGER CELLS: "cell" (default, and '
+          + 'what omitting it means) marks the whole 16px cell; "left"/"right" mark ONE 8px sub-column '
+          + 'of every cell in the rectangle. ⚠ A TWO-WAY CROSSOVER ONLY WORKS AT "left" OR "right". The '
+          + 'engine fires the crossover once per 8px column the player enters, and a 16px cell is TWO '
+          + 'of them — so a two-way pair (plane:"both" + crossover:"hand-off") at the default width '
+          + 'flips the player\'s collision path twice and nets to NOTHING. Use "left" or "right" (either '
+          + 'one; pick the column you want the handoff to happen at) and paint the pair one cell wide. '
+          + 'A ONE-WAY mark — "hand-off" on a single plane — is idempotent and does not need this. '
+          + 'It narrows the MARK only: the shape and solidity still fill the whole rectangle.'),
     },
     description: 'Paint a w*h CELL rectangle (16px units) of one or BOTH collision planes. '
       + 'THE FORM: pass EITHER "word" (fill the whole rectangle with that packed cell word) OR "words" '

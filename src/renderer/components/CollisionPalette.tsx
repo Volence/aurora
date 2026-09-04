@@ -17,6 +17,7 @@ import { fitCellSizeToBox } from '../../core/collision/collision-angle-mark';
 import { clearCollisionEntries, resetToEngineEntries } from '../../core/editing/collision-word';
 import { otherPlane } from '../../core/collision/both-planes-paint';
 import { auditCrossovers, crossoverAuditMessage, crossoverAuditSeverity } from '../../core/collision/crossover-audit';
+import { SECTION_TILES_WIDE } from '../../core/model/s4-types';
 import { useToastStore } from '../state/toastStore';
 import { claimCollisionOverlay } from './collision-overlay-scope';
 import { T } from './ui';
@@ -295,7 +296,7 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
   // stroke. `liveEditNonce` is the app's own "something changed" signal.
   const auditSection = useProjectStore((s) => getActiveLevel(s)?.sections[activeSection] ?? null);
   const audit = useMemo(
-    () => (auditSection ? auditCrossovers(auditSection.collisionEdit, auditSection.collisionEditB) : null),
+    () => (auditSection ? auditCrossovers(auditSection.collisionEdit, auditSection.collisionEditB, SECTION_TILES_WIDE) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [auditSection, liveEdit],
   );
