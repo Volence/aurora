@@ -221,7 +221,9 @@ as a change rather than as a lone green tick.
 |---|---|
 | `npm test` at `0680b0d6` (before) | **500 files passed / 3 skipped; 7166 tests passed / 9 skipped; exit 0** |
 | `npm test` at `9fd8ce73`, code only | **500 files / 7166 tests, exit 0** — identical to before, which is the point: no existing row moved |
-| `npm test` at the tip, with this parcel's rows | **501 files passed / 3 skipped; 7188 tests passed / 9 skipped; exit 0** — `+1` file and `+22` rows, all of them added here (18 profile, 4 leveldb-resolver) |
+| `npm test` at the tip, with this parcel's rows | **501 files passed / 3 skipped; 7189 tests passed / 9 skipped; exit 0** — `+1` file and `+23` rows, all of them added here (19 profile, 4 leveldb-resolver) |
+| `npx vitest run`, six consecutive full runs | 6 × exit 0, 7189 passed, 0 `Test timed out` |
+| two concurrent full suites under 16 busy loops | both exit 0, 7189 passed, 0 `Test timed out` / `Hook timed out` |
 | `node scratchpad/check-harness-guards.mjs` | 217 clean / 217 classified · 0 failures · 0 unmeasurable |
 | `harness:profile-isolation` before / after | §1 |
 | `canvas-cdp-harness` (S1DISASM_DIR = a copy) | **52 checks, 0 fails, 0 unexercised, all negative controls correctly FAIL** — and all four sessions on one profile |
@@ -245,7 +247,10 @@ red, revert, tree byte-identical afterwards:
 |---|---|
 | flag appended at the END of argv | *inserts the switch IMMEDIATELY after the electron binary* |
 | comment stripping removed from the census | *counts calls, not the comments describing them* |
-| `RUN_PROFILE_DIR` keyed on the instrument name alone | *is a DIFFERENT value in two processes*; *carries a random suffix* |
+| `RUN_PROFILE_DIR` keyed on the instrument name alone | *is a DIFFERENT value in another process of the SAME instrument*; *carries a random suffix* |
+| the "caller already passed one" test disabled | *DEFERS to a `--user-data-dir` the caller passed*; *one spelling, not two* |
+| `cleanupProfile` ignoring its `used` flag | *says it used none*; *deletes nothing when nothing was pinned* |
+| `describeClearCensus` rendering an unreadable census as a count | *an unreadable census renders as a refusal* |
 | `resolveLeveldbDir`'s `profileDir` branch disabled | the GREEN pinned-profile row; the empty-profile refusal |
 
 **One real defect was found by writing them.** `cleanupProfile` read all four of its inputs from
@@ -253,6 +258,84 @@ module state, and `profileUsed` is module-private and set only by `spawnGuarded`
 branch a unit test could reach was "none used". Three of the four decisions, **including the one
 that deletes a directory**, had no test that could fail. The inputs are injectable now, with the
 real state as defaults.
+
+---
+
+## 7a. ⚠ THE PARCEL'S OWN TESTS SHIPPED A FLAKE OF EXACTLY THE CLASS IT REMOVES
+
+Caught by the coordinator on the merged tree, not by me:
+
+    npx vitest run, run 1   `the sentence a refusal pastes in …`   7386 ms   TIMED OUT
+    npx vitest run, run 2   the same row                                     passed
+    that file in isolation  the same row                          ~1400 ms   passed
+
+`Error: Test timed out in 5000ms`. **My reported "tip → exit 0" was a genuine
+run; the row passes about half the time.** A row that is green twice and red
+once ships wrong output to every reader who does not re-run it — which is the
+sentence this parcel's own ancestry is built on.
+
+**Where the time actually went, measured rather than assumed.** On an idle box a
+child `node` costs ~16 ms to spawn and import, and the repo walk ~15 ms more:
+
+    spawn + import only                 20 / 16 / 16 ms
+    spawn + import + census (real tree) 44 / 29 / 34 ms
+
+So **the spawn was about half the cost and every one of the 18 rows was paying
+it** — the file ran every row in a child, an idiom copied from
+`harness-guard-globals.test.ts`, which has a real reason for it (it needs a fake
+`$HOME` in place before the module derives its paths) that this file mostly does
+not. Fixing only the two census rows would have left sixteen others at roughly
+half the budget of one that had already blown it.
+
+**The fix removes the work rather than relocating it, and is not a timeout
+argument.** `scratchpad/lib/harness-guard.d.mts` gives the module the signature
+`tsconfig.json`'s `allowJs: false` needs — the treatment `aeon-shipped-preset.d.mts`
+beside it and `test/support/sibling-root.d.mts` already have — so the rows call
+it in process. The repo walk is done once in `beforeAll`. Only two facts are
+genuinely about module load (a second process's profile; the environment
+override), and those three children are spawned concurrently in the hook, where
+setup cost belongs; none of them walks anything.
+
+**Importing a launcher module into `npm test` was checked, not assumed:**
+`harness-guard.mjs` does nothing at module scope but derive paths and read
+`package.json`. `installNet()` — the exit/SIGINT/SIGTERM handlers — is reached
+only from `spawnGuarded` and `setDiscoveryBaseline`, and nothing in the suite
+calls either. The `.d.mts` deliberately does not declare that half of the
+module, so a `.ts` caller cannot reach for it.
+
+### The restructure nearly made the headline row vacuous, and the mutation caught it
+
+After the rewrite, the "keyed on the instrument name alone" plant went from
+failing **two** rows to failing **one**. `RUN_PROFILE_DIR` is
+`<root>/<instrument>-<pid>-<random>` and the instrument comes from
+`basename(process.argv[1])` — a vitest worker has a real `argv[1]`, a `node -e`
+child has none and falls back to `node`. Comparing this process against one
+child made the two differ **by name**, so the uniqueness row passed for the
+wrong reason. It now compares **two `-e` children**, which share an instrument
+name by construction, and asserts the shared prefix as well, so "they differ"
+cannot again be satisfied by them differing in the wrong place. Both rows fail
+under the plant again.
+
+### ⚠ The control says my box did NOT reproduce the coordinator's condition
+
+Six consecutive full runs went green, and so did two concurrent full suites
+under 16 busy loops on 16 cores. **That is not evidence on its own**: I put the
+PREVIOUS version of the test file back and repeated the identical contended run,
+and it stayed green too. A control that does nothing where the defect lives
+cannot distinguish a fix from the coin landing the other way.
+
+What the same-box, same-load, back-to-back comparison does show is the ratio:
+
+| row, under two concurrent suites + 16 busy loops | before | after |
+|---|---|---|
+| `the sentence a refusal pastes in …` | 75 ms / 61 ms | **0 ms / 1 ms** |
+| `finds a real, non-zero population in this repo` | 99 ms / 86 ms | **2 ms / 0 ms** |
+| slowest row of this parcel, either file | 101 ms / 142 ms | **8 ms / 5 ms** |
+
+**The evidence is the mechanism and the ratio, not the run count.** The row no
+longer performs IO or spawns a process; its worst observed duration anywhere is
+8 ms against a 5000 ms budget. Applied to the coordinator's own 7386 ms
+observation, a ~15–20× reduction lands it near 400 ms.
 
 ---
 

@@ -18,31 +18,94 @@
  * and an X server. So the parts that are pure functions of the module are
  * asserted here, where a rename or an inverted condition fails the suite.
  *
+ * ── ⚠ WHY THIS FILE SPAWNS ALMOST NOTHING, AFTER A FLAKE OF ITS OWN ────────
+ *
+ * THE FIRST VERSION RAN EVERY ROW IN A CHILD `node`, copied from
+ * `harness-guard-globals.test.ts` next door. That file has a REASON — it needs
+ * a fake `$HOME` in place before the module derives its paths at load — and
+ * this one mostly does not. The cost was invisible on an idle box and not
+ * invisible under the full suite:
+ *
+ *   full suite, run 1   `the sentence a refusal pastes in …`  7386 ms  TIMED OUT
+ *   full suite, run 2   the same row                                   passed
+ *   this file alone     the same row                          ~1400 ms passed
+ *
+ * — a row that is green twice and red once, which is precisely the class this
+ * whole parcel exists to remove. MEASURED where the time went, rather than
+ * assumed: on an idle box a child is ~16 ms to spawn and import and ~15 ms more
+ * to walk the repo, so **the spawn is about half the cost and EVERY row was
+ * paying it**. Fixing only the two census rows would have left sixteen others
+ * at roughly half the budget of one that had already blown it.
+ *
+ * ⚠ AND THE FIX IS NOT A BIGGER TIMEOUT. A raised number passes on this box
+ * today and says nothing about a slower one; this repo already ruled that way
+ * when `s1-io`'s round-trip timed out under CPU contention. The work is removed
+ * instead of relocated: `scratchpad/lib/harness-guard.d.mts` gives the module
+ * the signature `tsconfig.json`'s `allowJs: false` needs — the same treatment
+ * `aeon-shipped-preset.d.mts` and `test/support/sibling-root.d.mts` already
+ * have — so these rows call it IN PROCESS at microsecond cost.
+ *
+ * ⚠ IMPORTING A LAUNCHER MODULE INTO `npm test` IS A THING TO CHECK, NOT TO
+ * ASSUME. Verified before relying on it: `harness-guard.mjs` does nothing at
+ * module scope but derive paths and read `package.json`. `installNet()` — which
+ * installs the exit/SIGINT/SIGTERM handlers — is reached only from
+ * `spawnGuarded` and `setDiscoveryBaseline`, and nothing here calls either, so
+ * this file installs no process handlers, creates no directory and spawns no
+ * Electron. `harness-guard.d.mts` deliberately does not even declare that half.
+ *
+ * TWO facts genuinely need a second process, because they are properties of
+ * MODULE LOAD: that two processes derive different profiles, and that the
+ * environment override is honoured. Both are paid ONCE, concurrently, in
+ * `beforeAll` — a hook is where setup cost is expected — and both children only
+ * spawn and import; neither walks anything.
+ *
  * ⚠ NOTHING HERE READS OR WRITES A REAL PROFILE. Every path below is a string
- * or a `mkdtemp`, and the two rows that need a second process's answer get it
- * from a child node, not from a mutated global.
+ * or a `mkdtemp`.
  */
 
-import { describe, it, expect } from 'vitest';
-import { spawnSync } from 'node:child_process';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 
+import {
+  clearCallSiteCensus, describeClearCensus, pinUserDataDir, cleanupProfile,
+  RUN_PROFILE_DIR, RUN_PROFILE_DERIVED, PROFILE_ROOT, PROFILE_DIR_ENV,
+  type ClearCallSiteCensus,
+} from '../../scratchpad/lib/harness-guard.mjs';
+
 const GUARD = resolve(__dirname, '../../scratchpad/lib/harness-guard.mjs');
 
-/** Evaluate `body` against the guard module in a child process, so the
- *  module's own load-time derivation — the thing under test — actually runs. */
-function inChild(body: string, env: Record<string, string> = {}): { status: number; stdout: string; stderr: string } {
-  const src = `import * as G from ${JSON.stringify(GUARD)};\n${body}\n`;
-  const out = spawnSync(process.execPath, ['--input-type=module', '-e', src], {
-    env: { ...process.env, ...env }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+interface ForeignProfile { dir: string; derived: boolean; pid: number }
+
+/**
+ * Load the module in a SEPARATE process and report what it derived there.
+ *
+ * The only thing this is for is a fact about MODULE LOAD — a second process's
+ * profile, or the effect of an environment variable read at import. It spawns
+ * and imports and does nothing else; it walks nothing.
+ *
+ * ASYNC, so `beforeAll` can start all three at once. Serially, three spawns
+ * under the contention that produced this file's original 7.4 s row would land
+ * near the hook budget; concurrently the wall time is one spawn's, not three.
+ */
+function profileOfAnotherProcess(env: Record<string, string> = {}): Promise<ForeignProfile> {
+  const src = `import * as G from ${JSON.stringify(GUARD)};\n`
+    + 'process.stdout.write(JSON.stringify({ dir: G.RUN_PROFILE_DIR, derived: G.RUN_PROFILE_DERIVED, pid: process.pid }));\n';
+  return new Promise((res, rej) => {
+    const p = spawn(process.execPath, ['--input-type=module', '-e', src], {
+      env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let out = '', err = '';
+    p.stdout.on('data', (d) => { out += d; });
+    p.stderr.on('data', (d) => { err += d; });
+    p.on('error', rej);
+    p.on('close', (code) => {
+      if (code !== 0) { rej(new Error(`child exited ${code}:\n${err}`)); return; }
+      try { res(JSON.parse(out) as ForeignProfile); } catch (e) { rej(new Error(`unparseable child output ${JSON.stringify(out)}: ${String(e)}`)); }
+    });
   });
-  return { status: out.status ?? -1, stdout: out.stdout ?? '', stderr: out.stderr ?? '' };
-}
-function json<T>(r: { status: number; stdout: string; stderr: string }): T {
-  expect(r.status, `stderr:\n${r.stderr}`).toBe(0);
-  return JSON.parse(r.stdout) as T;
 }
 
 const ELECTRON = '/some/tree/node_modules/.bin/electron';
@@ -50,14 +113,42 @@ const MAIN = '/some/tree/dist/main/index.mjs';
 /** The command shape every launcher in scratchpad/ actually uses. */
 const XVFB_ARGS = ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, MAIN];
 
+/* ── everything paid once, where setup cost belongs ───────────────────────── */
+
+/** The walk of this repo, done ONE time for the whole file. */
+let realCensus: ClearCallSiteCensus;
 /**
- * ⚠ EVERY ROW GOES THROUGH A CHILD PROCESS, INCLUDING THE PURE ONES, and that
- * is not ceremony. The guard is a `.mjs` with no type declarations, so a direct
- * `import()` of it from a `.ts` file fails `npm run typecheck` with TS7016 —
- * measured, not anticipated. `harness-guard-globals.test.ts` next door reaches
- * the same module the same way for the same reason. Identity assertions still
- * work: the `===` is evaluated in the child and only its verdict crosses.
+ * ⚠ TWO CHILDREN, AND NOT "A CHILD AGAINST THIS PROCESS" — the restructure that
+ * removed this file's flake nearly made its headline row vacuous, and the
+ * mutation caught it.
+ *
+ * `RUN_PROFILE_DIR` is `<root>/<instrument>-<pid>-<random>`, where the
+ * instrument comes from `basename(process.argv[1])`. A vitest worker has a real
+ * `argv[1]`; a `node -e` child has none and falls back to `node`. So comparing
+ * this process against one child made the two differ BY NAME, and the mutation
+ * that strips the pid and the random suffix — the exact defect the row exists
+ * to catch — stopped failing it. Measured, not reasoned about: that plant went
+ * from failing two rows to failing one.
+ *
+ * Two `-e` children share an instrument name by construction, so the only thing
+ * left that can differ is the pid and the suffix. The row asserts the shared
+ * prefix as well, so "they differ" cannot again be satisfied by them differing
+ * in the wrong place.
  */
+let childA: ForeignProfile;
+let childB: ForeignProfile;
+/** A third, with the environment override set at its module load. */
+let overridden: ForeignProfile;
+
+beforeAll(async () => {
+  realCensus = clearCallSiteCensus();
+  [childA, childB, overridden] = await Promise.all([
+    profileOfAnotherProcess(),
+    profileOfAnotherProcess(),
+    profileOfAnotherProcess({ [PROFILE_DIR_ENV]: '/tmp/shared-by-two' }),
+  ]);
+});
+
 describe('pinUserDataDir — the switch, and WHERE it goes', () => {
   /**
    * POSITION IS THE ASSERTION, not presence. The command is `xvfb-run … <bin>
@@ -67,8 +158,7 @@ describe('pinUserDataDir — the switch, and WHERE it goes', () => {
    * placements pass a `toContain`, which is why this row indexes.
    */
   it('inserts the switch IMMEDIATELY after the electron binary, not at either end', () => {
-    const out = json<string[]>(inChild(
-      `process.stdout.write(JSON.stringify(G.pinUserDataDir('/usr/bin/xvfb-run', ${JSON.stringify(XVFB_ARGS)}, '/tmp/P')));`));
+    const out = pinUserDataDir('/usr/bin/xvfb-run', XVFB_ARGS, '/tmp/P');
     const i = out.indexOf(ELECTRON);
     expect(i, 'the binary must still be in the command').toBeGreaterThan(-1);
     expect(out[i + 1]).toBe('--user-data-dir=/tmp/P');
@@ -78,9 +168,7 @@ describe('pinUserDataDir — the switch, and WHERE it goes', () => {
   });
 
   it('puts it first when the command IS the electron binary', () => {
-    const out = json<string[]>(inChild(
-      `process.stdout.write(JSON.stringify(G.pinUserDataDir(${JSON.stringify(ELECTRON)}, [${JSON.stringify(MAIN)}], '/tmp/P')));`));
-    expect(out).toEqual(['--user-data-dir=/tmp/P', MAIN]);
+    expect(pinUserDataDir(ELECTRON, [MAIN], '/tmp/P')).toEqual(['--user-data-dir=/tmp/P', MAIN]);
   });
 
   /**
@@ -91,32 +179,24 @@ describe('pinUserDataDir — the switch, and WHERE it goes', () => {
    * `toEqual` here would be a check that cannot see the defect.
    */
   it('returns its argument UNCHANGED BY IDENTITY when the command has no electron in it', () => {
-    const r = json<{ same: boolean; out: string[] }>(inChild(`
-      const args = ['-a', '/usr/bin/some-other-tool', 'x'];
-      const out = G.pinUserDataDir('/usr/bin/xvfb-run', args, '/tmp/P');
-      process.stdout.write(JSON.stringify({ same: out === args, out }));`));
-    expect(r.same, 'the SAME array object, not an equal one').toBe(true);
-    expect(r.out.join(' ')).not.toContain('--user-data-dir');
+    const args = ['-a', '/usr/bin/some-other-tool', 'x'];
+    expect(pinUserDataDir('/usr/bin/xvfb-run', args, '/tmp/P'), 'the SAME array object, not an equal one').toBe(args);
+    expect(args.join(' ')).not.toContain('--user-data-dir');
   });
 
   it('DEFERS to a --user-data-dir the caller passed itself, also by identity', () => {
-    const r = json<{ same: boolean; out: string[] }>(inChild(`
-      const args = ['-a', ${JSON.stringify(ELECTRON)}, '--user-data-dir=/caller/said/so', ${JSON.stringify(MAIN)}];
-      const out = G.pinUserDataDir('/usr/bin/xvfb-run', args, '/tmp/P');
-      process.stdout.write(JSON.stringify({ same: out === args, out }));`));
-    expect(r.same).toBe(true);
-    expect(r.out).toContain('--user-data-dir=/caller/said/so');
-    expect(r.out.join(' '), 'and NOT both switches').not.toContain('/tmp/P');
+    const args = ['-a', ELECTRON, '--user-data-dir=/caller/said/so', MAIN];
+    expect(pinUserDataDir('/usr/bin/xvfb-run', args, '/tmp/P')).toBe(args);
+    expect(args).toContain('--user-data-dir=/caller/said/so');
+    expect(args.join(' '), 'and NOT both switches').not.toContain('/tmp/P');
   });
 
   it('the switch it writes is the one it tests for — one spelling, not two', () => {
     // Feeding its own output back must be a no-op, which is only true if the
     // "already has one" test recognises the flag this function writes.
-    const r = json<{ same: boolean }>(inChild(`
-      const once = G.pinUserDataDir('/usr/bin/xvfb-run', ${JSON.stringify(XVFB_ARGS)}, '/tmp/P');
-      const twice = G.pinUserDataDir('/usr/bin/xvfb-run', once, '/tmp/Q');
-      process.stdout.write(JSON.stringify({ same: twice === once }));`));
-    expect(r.same, 'a second pin would leave two --user-data-dir switches on one command').toBe(true);
+    const once = pinUserDataDir('/usr/bin/xvfb-run', XVFB_ARGS, '/tmp/P');
+    expect(pinUserDataDir('/usr/bin/xvfb-run', once, '/tmp/Q'),
+      'a second pin would leave two --user-data-dir switches on one command').toBe(once);
   });
 });
 
@@ -127,39 +207,57 @@ describe('RUN_PROFILE_DIR — stable within a run, unique across concurrent ones
    * relaunches four times in one run and reads what the previous launch left in
    * `localStorage` — the persistence its restart suite exists to measure. The
    * failure would look exactly like the flake this parcel removes.
+   *
+   * Reading it twice is not vacuous: a getter that re-derived per read — which
+   * is what "per launch" would look like in code — returns two different
+   * strings and fails here.
    */
   it('is the SAME value on every read inside one process', () => {
-    const r = json<{ a: string; b: string }>(inChild(
-      'process.stdout.write(JSON.stringify({ a: G.RUN_PROFILE_DIR, b: G.RUN_PROFILE_DIR }));'));
-    expect(r.a).toBe(r.b);
+    expect(RUN_PROFILE_DIR).toBe(RUN_PROFILE_DIR);
+    expect(typeof RUN_PROFILE_DIR).toBe('string');
   });
 
-  it('is a DIFFERENT value in two processes started back to back', () => {
-    const read = 'process.stdout.write(JSON.stringify({ dir: G.RUN_PROFILE_DIR, derived: G.RUN_PROFILE_DERIVED }));';
-    const one = json<{ dir: string; derived: boolean }>(inChild(read));
-    const two = json<{ dir: string; derived: boolean }>(inChild(read));
-    expect(one.dir).not.toBe(two.dir);
-    expect(one.derived).toBe(true);
-    // Anti-vacuous: they must still be two profiles of the SAME shape, under
-    // one root. "Different" would also be satisfied by one of them being junk.
-    expect(one.dir.startsWith(join(tmpdir(), 'aurora-harness-profiles'))).toBe(true);
-    expect(two.dir.startsWith(join(tmpdir(), 'aurora-harness-profiles'))).toBe(true);
+  /**
+   * THE HEADLINE CLAIM: two concurrently running instruments get two profiles.
+   *
+   * The two children are alike in everything the derivation reads except their
+   * pid, so a pass here cannot be explained by anything else — see the note on
+   * `childA`/`childB` above for the version of this row that could, and how the
+   * mutation found it.
+   */
+  it('is a DIFFERENT value in another process of the SAME instrument', () => {
+    expect(childA.pid, 'anti-vacuous: they really are two processes').not.toBe(childB.pid);
+    expect(childA.dir).not.toBe(childB.dir);
+    expect(childA.derived).toBe(true);
+    expect(childB.derived).toBe(true);
+
+    // …and they differ in the PID/suffix, not in the instrument name: both must
+    // sit under one root and share one prefix up to the pid.
+    const prefix = join(PROFILE_ROOT, 'node-');
+    expect(childA.dir.startsWith(prefix),
+      `both children must share the instrument prefix ${prefix}; got ${childA.dir}`).toBe(true);
+    expect(childB.dir.startsWith(prefix)).toBe(true);
+    // This process is a vitest worker, so its instrument name is its own; only
+    // its SHAPE is comparable, and that is all this asserts about it.
+    expect(RUN_PROFILE_DIR.startsWith(PROFILE_ROOT)).toBe(true);
+    expect(PROFILE_ROOT.startsWith(tmpdir())).toBe(true);
   });
 
   it('a pid alone would not be enough, so the name carries a random suffix too', () => {
-    const read = 'process.stdout.write(JSON.stringify({ dir: G.RUN_PROFILE_DIR, pid: process.pid }));';
-    const r = json<{ dir: string; pid: number }>(inChild(read));
-    expect(r.dir).toContain(String(r.pid));
+    expect(childA.dir).toContain(String(childA.pid));
     // …and something after the pid, so a REUSED pid cannot inherit the storage
     // of a run that died without cleaning up.
-    expect(r.dir.split(`-${r.pid}-`)[1] ?? '').toMatch(/^[0-9a-f]{8}$/);
+    expect(childA.dir.split(`-${childA.pid}-`)[1] ?? '').toMatch(/^[0-9a-f]{8}$/);
+    // Two runs of the same instrument at the same pid would still differ.
+    expect(childA.dir.split(`-${childA.pid}-`)[1]).not.toBe(childB.dir.split(`-${childB.pid}-`)[1]);
   });
 
   it('defers to AURORA_HARNESS_PROFILE_DIR, and then reports that it does not own it', () => {
-    const read = 'process.stdout.write(JSON.stringify({ dir: G.RUN_PROFILE_DIR, derived: G.RUN_PROFILE_DERIVED }));';
-    const r = json<{ dir: string; derived: boolean }>(inChild(read, { AURORA_HARNESS_PROFILE_DIR: '/tmp/shared-by-two' }));
-    expect(r.dir).toBe('/tmp/shared-by-two');
-    expect(r.derived, 'a directory this process did not create is not this process\'s to delete').toBe(false);
+    expect(overridden.dir).toBe('/tmp/shared-by-two');
+    expect(overridden.derived,
+      'a directory this process did not create is not this process\'s to delete').toBe(false);
+    // …and this process, with no override, still owns its own.
+    expect(RUN_PROFILE_DERIVED).toBe(true);
   });
 });
 
@@ -174,15 +272,11 @@ describe('cleanupProfile — deletes what it made, keeps what it was handed', ()
       const dir = join(root, 'derived-profile');
       mkdirSync(dir, { recursive: true });
       writeFileSync(join(dir, 'x'), 'bytes');
-      const r = json<{ existedBefore: boolean; said: string }>(inChild(`
-        const fs = await import('node:fs');
-        const dir = ${JSON.stringify(dir)};
-        const existedBefore = fs.existsSync(dir);
-        const said = G.cleanupProfile({ used: true, derived: true, dir, keep: false });
-        process.stdout.write(JSON.stringify({ existedBefore, said }));`));
-      expect(r.existedBefore, 'anti-vacuous: the directory and its contents existed').toBe(true);
-      expect(r.said).toContain('removed');
-      expect(existsSync(dir), 'the deletion is observed from HERE, not from the child\'s own report').toBe(false);
+      expect(existsSync(join(dir, 'x')), 'anti-vacuous: the directory and its contents existed').toBe(true);
+
+      const said = cleanupProfile({ used: true, derived: true, dir, keep: false });
+      expect(said).toContain('removed');
+      expect(existsSync(dir), 'the deletion is observed here, not taken from the return string').toBe(false);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -194,10 +288,10 @@ describe('cleanupProfile — deletes what it made, keeps what it was handed', ()
       const dir = join(root, 'shared-by-two');
       mkdirSync(dir, { recursive: true });
       writeFileSync(join(dir, 'x'), 'bytes');
-      const r = json<{ said: string }>(inChild(
-        `process.stdout.write(JSON.stringify({ said: G.cleanupProfile({ used: true, derived: false, dir: ${JSON.stringify(dir)}, keep: false }) }));`));
-      expect(r.said).toContain('KEPT');
-      expect(r.said).toContain('AURORA_HARNESS_PROFILE_DIR');
+
+      const said = cleanupProfile({ used: true, derived: false, dir, keep: false });
+      expect(said).toContain('KEPT');
+      expect(said).toContain(PROFILE_DIR_ENV);
       expect(existsSync(join(dir, 'x'))).toBe(true);
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -209,10 +303,10 @@ describe('cleanupProfile — deletes what it made, keeps what it was handed', ()
     try {
       const dir = join(root, 'derived-profile');
       mkdirSync(dir, { recursive: true });
-      const r = json<{ said: string }>(inChild(
-        `process.stdout.write(JSON.stringify({ said: G.cleanupProfile({ used: true, derived: true, dir: ${JSON.stringify(dir)}, keep: true }) }));`));
-      expect(r.said).toContain('KEPT');
-      expect(r.said).toContain('AURORA_HARNESS_KEEP_PROFILE');
+
+      const said = cleanupProfile({ used: true, derived: true, dir, keep: true });
+      expect(said).toContain('KEPT');
+      expect(said).toContain('AURORA_HARNESS_KEEP_PROFILE');
       expect(existsSync(dir)).toBe(true);
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -220,8 +314,7 @@ describe('cleanupProfile — deletes what it made, keeps what it was handed', ()
   });
 
   it('says it used none when the process never launched an Electron', () => {
-    const r = json<{ said: string }>(inChild('process.stdout.write(JSON.stringify({ said: G.cleanupProfile() }));'));
-    expect(r.said).toContain('none used');
+    expect(cleanupProfile({ used: false })).toContain('none used');
   });
 
   /** ⚠ AND IT MUST NOT DELETE ON THAT PATH. `used:false` with a real directory
@@ -232,9 +325,8 @@ describe('cleanupProfile — deletes what it made, keeps what it was handed', ()
     const root = mkdtempSync(join(tmpdir(), 'aurora-profile-cleanup-'));
     try {
       writeFileSync(join(root, 'x'), 'bytes');
-      const r = json<{ said: string }>(inChild(
-        `process.stdout.write(JSON.stringify({ said: G.cleanupProfile({ used: false, derived: true, dir: ${JSON.stringify(root)}, keep: false }) }));`));
-      expect(r.said).toContain('none used');
+      const said = cleanupProfile({ used: false, derived: true, dir: root, keep: false });
+      expect(said).toContain('none used');
       expect(existsSync(join(root, 'x'))).toBe(true);
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -253,6 +345,12 @@ describe('clearCallSiteCensus — derived, and NOT inflated by prose about itsel
    * NAMES the call, so the census rose every time somebody documented the
    * hazard. The fixture below has two real calls and three in comments, and the
    * answer must be two.
+   *
+   * ⚠ THIS ROW USES A FIXTURE, NOT THE REPO, AND THAT IS THE POINT. What is
+   * under test here is the DERIVATION — stripping, extensions, the two units —
+   * and a fixture answers it exactly, in microseconds, with a number that
+   * cannot drift. Only the anti-vacuous row below needs the real tree, and it
+   * reads the one walk done in `beforeAll`.
    */
   it('counts calls, not the comments describing them', () => {
     const d = mkdtempSync(join(tmpdir(), 'aurora-census-'));
@@ -269,8 +367,7 @@ describe('clearCallSiteCensus — derived, and NOT inflated by prose about itsel
       writeFileSync(join(d, 'c.mjs'), 'export const g = 1;\n');
       writeFileSync(join(d, 'notes.md'), 'localStorage.clear() localStorage.clear()\n');
 
-      const c = json<{ sites: number; files: number }>(inChild(
-        `process.stdout.write(JSON.stringify(G.clearCallSiteCensus(${JSON.stringify(d)})));`));
+      const c = clearCallSiteCensus(d);
       expect(c.sites, 'three of the five mentions in a.mjs are comments; b.ts has one').toBe(3);
       expect(c.files, 'c.mjs has none and notes.md is not a source file').toBe(2);
     } finally {
@@ -279,27 +376,47 @@ describe('clearCallSiteCensus — derived, and NOT inflated by prose about itsel
   });
 
   it('reports UNREADABLE rather than zero when the directory is not there', () => {
-    const c = json<{ sites: number | null; why?: string }>(inChild(
-      'process.stdout.write(JSON.stringify(G.clearCallSiteCensus("/definitely/not/here")));'));
+    const c = clearCallSiteCensus('/definitely/not/here');
     expect(c.sites, 'a directory that cannot be read must not answer 0 — that reads as "no hazard"').toBeNull();
     expect(c.why).toContain('could not be read');
   });
 
+  /**
+   * The SENTENCE, rendered from a fixture census so the wording is judged
+   * against numbers this row owns. Rendering the repo's own census here would
+   * have made a row about prose depend on a filesystem walk — which is exactly
+   * how this file came to have a 7.4 s row.
+   */
   it('the sentence a refusal pastes in names its units and its method', () => {
-    const s = json<{ s: string }>(inChild(
-      'process.stdout.write(JSON.stringify({ s: G.describeClearCensus(G.clearCallSiteCensus()) }));')).s;
-    expect(s).toMatch(/call site\(s\) across \d+ source file\(s\)/);
-    expect(s).toContain('comments');
-    expect(s).toContain('never typed');
+    const d = mkdtempSync(join(tmpdir(), 'aurora-census-'));
+    try {
+      writeFileSync(join(d, 'a.mjs'), 'localStorage.clear();\nlocalStorage.clear();\n');
+      const s = describeClearCensus(clearCallSiteCensus(d));
+      expect(s).toMatch(/2 call site\(s\) across 1 source file\(s\)/);
+      expect(s).toContain('comments');
+      expect(s).toContain('never typed');
+      expect(s, 'and it names the directory it counted, so two counts can be reconciled').toContain(d);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
   });
 
-  /** The live population must actually be non-trivial, or the refusal renders a
-   *  sentence that understates a hazard it exists to explain. */
+  it('an unreadable census renders as a refusal, not as a sentence claiming zero', () => {
+    const s = describeClearCensus(clearCallSiteCensus('/definitely/not/here'));
+    expect(s).toContain('could not be taken');
+    expect(s).not.toMatch(/\b0 call site/);
+  });
+
+  /**
+   * The live population must actually be non-trivial, or the refusal renders a
+   * sentence that understates a hazard it exists to explain. This is the ONE
+   * row that needs the real tree, and it reads the single walk from `beforeAll`
+   * rather than doing its own.
+   */
   it('finds a real, non-zero population in this repo', () => {
-    const c = json<{ sites: number; files: number }>(inChild(
-      'process.stdout.write(JSON.stringify(G.clearCallSiteCensus()));'));
-    expect(c.sites).toBeGreaterThan(50);
-    expect(c.files).toBeGreaterThan(50);
-    expect(c.sites).toBeGreaterThanOrEqual(c.files);
+    expect(realCensus.sites).toBeGreaterThan(50);
+    expect(realCensus.files).toBeGreaterThan(50);
+    expect(realCensus.sites!).toBeGreaterThanOrEqual(realCensus.files!);
+    expect(realCensus.dir).toContain('scratchpad');
   });
 });
