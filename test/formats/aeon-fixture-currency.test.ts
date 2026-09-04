@@ -1,12 +1,13 @@
 /**
  * CURRENCY — the question a pinned blob can never answer.
  *
- * `test/fixtures/effects/ojz_act1_depth.json` is aeon's shipped scene, vendored
- * here at a named revision. The round-trip golden that uses it
- * (`effects-scene-curve-vsplit.test.ts`) asks a question about AURORA'S CODEC and
- * is right to read only the pin. But it therefore cannot notice that aeon has
- * moved on: a pin equals itself by construction, so a "is it still current?"
- * check written against the pin passes forever and detects nothing.
+ * `test/fixtures/effects/` holds aeon's shipped documents, vendored here at named
+ * revisions. The codec tests that use them (`effects-scene-curve-vsplit.test.ts`
+ * for the scene, `effects-preset-base-swap.test.ts` for the section-6 preset and
+ * its section binding) ask questions about AURORA'S CODEC and are right to read
+ * only the pin. But they therefore cannot notice that aeon has moved on: a pin
+ * equals itself by construction, so a "is it still current?" check written
+ * against the pin passes forever and detects nothing.
  *
  * So that question gets its own instrument, here, and it obeys three rules:
  *
@@ -40,14 +41,31 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { peerRepo, resolveRev, readAtRev, isAncestor, gitBlobSha, AURORA_DIR } from '../support/peer-repo';
 
-const FIXTURE = resolve(__dirname, '../fixtures/effects/ojz_act1_depth.json');
-const PROVENANCE = resolve(__dirname, '../fixtures/effects/ojz_act1_depth.provenance.json');
-
-const prov = JSON.parse(readFileSync(PROVENANCE, 'utf8')) as {
+type Provenance = {
   aeon: { path: string; revision: string; blob: string };
-  fixture: { git_blob: string; sha256: string; bytes: number };
+  fixture: { path: string; git_blob: string; sha256: string; bytes: number };
 };
-const BYTES = readFileSync(FIXTURE, 'utf8');
+
+type Vendored = { name: string; fixture: string; provenance: string; prov: Provenance; bytes: string };
+
+/**
+ * EVERY aeon document vendored into this repo, and the ONE instrument that
+ * answers both questions about all of them. Adding a vendored fixture is adding
+ * a row here — deliberately, so a second copy of this machinery never gets
+ * written beside it. (`test/fixtures/effects/ojz_sec6_baseswap.json` and its
+ * section sidecar joined on 2026-09-04; see
+ * docs/reviews/2026-09-04-baseswap-vendor-fixture.md.)
+ */
+const VENDORED: Vendored[] = [
+  'ojz_act1_depth.json',
+  'ojz_sec6_baseswap.json',
+  'ojz_act1_section_6.meta.json',
+].map((name) => {
+  const fixture = resolve(__dirname, '../fixtures/effects', name);
+  const provenance = fixture.replace(/\.json$/, '.provenance.json');
+  const prov = JSON.parse(readFileSync(provenance, 'utf8')) as Provenance;
+  return { name, fixture, provenance, prov, bytes: readFileSync(fixture, 'utf8') };
+});
 
 // The branch whose tip answers "what does aeon ship TODAY". Committed, named,
 // and never the working tree.
@@ -56,55 +74,101 @@ const AEON_TIP = 'origin/master';
 /** Prefix every message with this so nobody triages it as an Aurora regression. */
 const NOT_OURS = 'NOT AN AURORA REGRESSION — a vendored aeon fixture is stale.';
 
-describe('the vendored aeon fixture and its provenance cannot drift apart', () => {
+describe('the vendored aeon fixtures and their provenance cannot drift apart', () => {
   /**
    * PIN INTEGRITY — always runs, needs no peer repo. Catches a fixture edited to
    * make something else pass, and a provenance record edited away from it.
    */
-  it('the fixture is the git blob its provenance names', () => {
-    expect(prov.aeon.revision, 'provenance has no 40-hex aeon revision').toMatch(/^[0-9a-f]{40}$/);
-    expect(prov.aeon.blob, 'provenance has no 40-hex aeon blob id').toMatch(/^[0-9a-f]{40}$/);
-    // Anti-vacuous: the recorded blob is aeon's OBJECT ID, so computing it here
-    // from the fixture's own bytes is a real comparison, not a tautology.
-    expect(gitBlobSha(BYTES)).toBe(prov.aeon.blob);
-    expect(prov.fixture.git_blob).toBe(prov.aeon.blob);
-    // BYTES not .length: the scene's `name` carries an em dash, so the decoded
-    // string is two units shorter than the file. The record is in BYTES.
-    expect(Buffer.byteLength(BYTES, 'utf8')).toBe(prov.fixture.bytes);
+  for (const v of VENDORED) {
+    it(`${v.name} is the git blob its provenance names`, () => {
+      expect(v.prov.aeon.revision, 'provenance has no 40-hex aeon revision').toMatch(/^[0-9a-f]{40}$/);
+      expect(v.prov.aeon.blob, 'provenance has no 40-hex aeon blob id').toMatch(/^[0-9a-f]{40}$/);
+      // Anti-vacuous: the recorded blob is aeon's OBJECT ID, so computing it here
+      // from the fixture's own bytes is a real comparison, not a tautology.
+      expect(gitBlobSha(v.bytes)).toBe(v.prov.aeon.blob);
+      expect(v.prov.fixture.git_blob).toBe(v.prov.aeon.blob);
+      // Bytes, not .length: ojz_act1_depth's `name` carries an em dash, so the
+      // decoded string is two units shorter than the file. The record is BYTES.
+      expect(Buffer.byteLength(v.bytes, 'utf8')).toBe(v.prov.fixture.bytes);
+    });
+  }
+
+  /**
+   * ⚠ THE TABLE ABOVE IS A LIST, AND A LIST GOES STALE SILENTLY. A fixture
+   * vendored from aeon and left out of `VENDORED` would get NO currency check at
+   * all, and nothing would say so: the suite total would be green and one
+   * document's drift would be invisible forever — the same silent zero this file
+   * exists to abolish. So the table is checked for completeness against the
+   * sidecars actually on disk.
+   *
+   * The population is "a sidecar whose `aeon` block names BOTH a `path` and a
+   * `blob`" — i.e. one claiming to hold a VERBATIM aeon blob, which is the only
+   * claim a content-currency comparison can be made against. Sidecars with an
+   * `aeon` block but no `aeon.path` (the two under test/fixtures/bg-override)
+   * describe a DERIVED artifact, not a copied one; there is no aeon file to
+   * compare them to byte-for-byte, and pretending otherwise would fail forever.
+   */
+  it('every sidecar claiming a verbatim aeon blob is IN the table above', () => {
+    const root = resolve(AURORA_DIR, 'test/fixtures');
+    const found: string[] = [];
+    const walk = (dir: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const p = resolve(dir, e.name);
+        if (e.isDirectory()) walk(p);
+        else if (e.name.endsWith('.provenance.json')) {
+          const doc = JSON.parse(readFileSync(p, 'utf8')) as Partial<Provenance>;
+          if (typeof doc.aeon?.path === 'string' && typeof doc.aeon?.blob === 'string') {
+            expect(typeof doc.fixture?.path, `${p} names an aeon blob but no fixture.path`).toBe('string');
+            found.push(doc.fixture!.path);
+          }
+        }
+      }
+    };
+    walk(root);
+    // Anti-vacuous: an empty sweep has measured nothing.
+    expect(found.length, 'no sidecar on disk claims a verbatim aeon blob — the sweep measured nothing').toBeGreaterThan(0);
+    const covered = VENDORED.map((v) => v.prov.fixture.path).sort();
+    expect(
+      found.sort(),
+      'a sidecar claims to hold a verbatim aeon blob but its fixture is not in VENDORED, so it gets NO'
+      + ' currency check — add it to the list at the top of this file',
+    ).toEqual(covered);
   });
 });
 
-describe('CURRENCY: is the vendored aeon fixture still what aeon ships?', () => {
+describe('CURRENCY: are the vendored aeon fixtures still what aeon ships?', () => {
   const aeon = peerRepo('aeon');
 
-  it(`matches games/…/ojz_act1_depth.json at aeon ${AEON_TIP}`, (ctx) => {
-    if (aeon === null) {
-      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR) — '
-        + `CANNOT MEASURE whether the pin ${prov.aeon.revision} is still current`);
-      return;
-    }
-    const tip = resolveRev(aeon, AEON_TIP);
-    if (tip === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon} — `
-        + `CANNOT MEASURE currency of pin ${prov.aeon.revision}`);
-      return;
-    }
-    const at = readAtRev(aeon, tip, prov.aeon.path);
-    // Not a skip: the revision resolved, so this WAS measured, and "the source
-    // file is gone at aeon's tip" is drift of the loudest kind.
-    expect(at.ok, at.ok ? '' : `${NOT_OURS} ${at.why}`).toBe(true);
-    if (!at.ok) return;
-    expect(
-      at.text,
-      `${NOT_OURS}\n`
-      + `  pinned at aeon ${prov.aeon.revision} (blob ${prov.aeon.blob})\n`
-      + `  aeon ${AEON_TIP} is now ${tip} (blob ${at.blob})\n`
-      + `  ${prov.aeon.path} changed between them.\n`
-      + `  Re-vendor:  git -C ${aeon} show ${tip}:${prov.aeon.path} > test/fixtures/effects/ojz_act1_depth.json\n`
-      + '  then update test/fixtures/effects/ojz_act1_depth.provenance.json (revision, blob, sha256, git_blob),\n'
-      + '  and re-check the round-trip golden in effects-scene-curve-vsplit.test.ts.',
-    ).toBe(BYTES);
-  });
+  for (const v of VENDORED) {
+    it(`${v.name} matches ${v.prov.aeon.path} at aeon ${AEON_TIP}`, (ctx) => {
+      if (aeon === null) {
+        ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR) — '
+          + `CANNOT MEASURE whether the pin ${v.prov.aeon.revision} for ${v.name} is still current`);
+        return;
+      }
+      const tip = resolveRev(aeon, AEON_TIP);
+      if (tip === null) {
+        ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon} — `
+          + `CANNOT MEASURE currency of pin ${v.prov.aeon.revision} for ${v.name}`);
+        return;
+      }
+      const at = readAtRev(aeon, tip, v.prov.aeon.path);
+      // Not a skip: the revision resolved, so this WAS measured, and "the source
+      // file is gone at aeon's tip" is drift of the loudest kind.
+      expect(at.ok, at.ok ? '' : `${NOT_OURS} ${at.why}`).toBe(true);
+      if (!at.ok) return;
+      expect(
+        at.text,
+        `${NOT_OURS}\n`
+        + `  pinned at aeon ${v.prov.aeon.revision} (blob ${v.prov.aeon.blob})\n`
+        + `  aeon ${AEON_TIP} is now ${tip} (blob ${at.blob})\n`
+        + `  ${v.prov.aeon.path} changed between them.\n`
+        + `  Re-vendor:  git -C ${aeon} show ${tip}:${v.prov.aeon.path} > ${v.prov.fixture.path}\n`
+        + `  then update ${v.provenance.slice(AURORA_DIR.length + 1)} (revision, blob, sha256, git_blob),\n`
+        + '  and re-check the codec rows that read it.',
+      ).toBe(v.bytes);
+    });
+  }
 
   /**
    * The revision you PINNED AT is an anchor too, and it is the one nobody

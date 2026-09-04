@@ -1,0 +1,27 @@
+{
+  "$what": "Provenance of ojz_act1_section_6.meta.json — aeon's OJZ act-1 section-6 sidecar, VENDORED into Aurora at a named aeon revision. Its `rasterRef` is the BINDING that makes ojz_sec6_baseswap.json a document the editor must be able to open: an author who selects section 6 opens exactly this preset.",
+  "$why_vendored": "It was read out of aeon's live working tree by test/formats/effects-preset-base-swap.test.ts alongside the preset. Same defect, same repair — see docs/OVERSEER.md bar 19 and docs/reviews/2026-09-04-baseswap-vendor-fixture.md. The vendored name differs from aeon's basename (`section_6.meta.json`) because this fixture directory is flat and holds documents from several acts; the aeon path below is authoritative.",
+  "aeon": {
+    "repo": "git@github.com:Volence/aeon.git",
+    "path": "games/sonic4/data/editor/ojz/act1/section_6.meta.json",
+    "branch_that_answers_currency": "origin/master",
+    "revision": "d8d2c952a50cd7ad48f0510c160bb708ce01d4cf",
+    "revision_is": "aeon origin/master AT THE MOMENT OF VENDORING (2026-09-04 ~05:20Z) — the same revision the preset beside it was pinned at, deliberately, so the pair is internally consistent at one point in aeon's history rather than stitched from two.",
+    "blob": "2fa39a2c8db54996c5f9531cac95030de03588c2",
+    "last_changed_by": "6ae88363d1b796130e68c88ec48fccc0e076ea20 (2026-09-03) feat(effects): EFFECTS-W1 item 11a authorable — base_swap preset key + real section 6 binding",
+    "resolved_by": "git -C <aeon> rev-parse origin/master, blob id from git -C <aeon> rev-parse <rev>:<path>, bytes extracted with git -C <aeon> show <rev>:<path> — never the sibling working tree. Re-hashed here with `git hash-object`, returning 2fa39a2c… , the same object aeon stores.",
+    "revision_published": "d8d2c952… is the tip of aeon's PUBLISHED master; the sidecar sweep in test/formats/aeon-fixture-currency.test.ts re-asserts reachability on every run"
+  },
+  "fixture": {
+    "path": "test/fixtures/effects/ojz_act1_section_6.meta.json",
+    "bytes": 104,
+    "sha256": "cfa192b08eea54286c93b701c7bb45571029288b63898440226bc2d8bd5de4af",
+    "git_blob": "2fa39a2c8db54996c5f9531cac95030de03588c2",
+    "identical_to_source": "byte-for-byte; the git blob id above is the SAME object aeon stores"
+  },
+  "what_the_two_checks_measure": {
+    "binding": "test/formats/effects-preset-base-swap.test.ts asserts this document's `rasterRef` equals the id the codec parsed OUT OF the preset fixture beside it. That is a cross-file consistency claim about the vendored PAIR — it fails if one of the two is re-vendored and the other is not — and it is the sentence that says why the preset fixture exists at all.",
+    "currency": "test/formats/aeon-fixture-currency.test.ts — the same content-currency instrument the preset gets, against aeon's origin/master."
+  },
+  "re_vendor": "git -C <aeon> fetch origin && git -C <aeon> show origin/master:games/sonic4/data/editor/ojz/act1/section_6.meta.json > test/fixtures/effects/ojz_act1_section_6.meta.json — then update `aeon.revision`, `aeon.blob`, `fixture.sha256` and `fixture.git_blob` here."
+}
