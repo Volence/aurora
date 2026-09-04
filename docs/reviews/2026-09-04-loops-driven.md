@@ -244,6 +244,13 @@ the loop is**, nearly stopped.
 This is a state divergence, not a picture — which matters in this repo, where a
 screenshot diff has already returned a 0-of-27 result on a question it could not answer.
 
+> ## ✅ MEASURED 2026-09-04 — the departure frame and point are now observed, not bracketed
+>
+> **Last grounded (684, 786) at frame 1162; first airborne (678, 786) at frame 1163.** The
+> section below was written off samples 10 frames apart and said only "at least 49 px". It is
+> now exact, and the shape of the error is not what "the arithmetic is wrong" suggested — see
+> §4a. **Frames sampled: 1152-1154, 1158, 1161-1163, 1166** (contiguous across the departure).
+
 ### ⚠ The control's predicted OUTCOME held; its predicted LOCATION did not
 
 The witness packet derived the fall-out point rather than estimating it, and named it:
@@ -257,6 +264,59 @@ must run out of geometry — is confirmed. Its *arithmetic for where* is not. I 
 diagnosed the difference and am not claiming to have; what I can say is that he stays on
 plane A's top band further west than the row-47 branch math predicts, which is a question
 for whoever next touches that derivation. **Booked, not fixed.**
+
+---
+
+## 4a. THE FALL-OUT POINT, MEASURED — and the y half may not be an error at all
+
+**Provenance:** control ROM `ctrl-s4.debug.bin` with its own `.lst` bound (`binding: match`),
+private own-instance server pid 435411, `debug_flag $FF9036` = `0x00` so free flight was OFF.
+Offsets from aeon's own `Sst` (`engine/objects/sst.emp`), not guessed: `x_pos` `$02`,
+`y_pos` `$06`, `angle` `$1F`, `PlayerV.ground_speed` `$30`, `PlayerV.player_state` `$32`.
+`PSTATE_GROUND` = 0, `PSTATE_AIR` = 6 (`games/sonic4/config/constants.emp`).
+
+| frame | x | y | angle | ground speed | `player_state` |
+|---|---|---|---|---|---|
+| 1152 | 739 | 788 | 96 | 5.77 | GROUND |
+| 1153 | 735 | 786 | 96 | 5.90 | GROUND |
+| 1154 | 731 | 786 | 96 | 6.00 | GROUND |
+| 1158 | 708 | 786 | 128 | 6.09 | GROUND |
+| 1161 | 690 | 786 | 128 | 6.09 | GROUND |
+| **1162** | **684** | **786** | 128 | 6.09 | **GROUND — last** |
+| **1163** | **678** | **786** | 130 | 6.09 | **AIR — first** |
+| 1166 | 660 | 787 | 136 | 6.09 | AIR |
+
+**THE PREDICTED x IS PASSED WHILE HE IS FIRMLY ON THE GROUND.** The derivation named
+`(733, 767)`. He crosses x = 733 between frames 1153 (x = 735) and 1154 (x = 731), and at
+both he is `GROUND` at y = 786. So the prediction is not merely early — at the moment he is
+at the predicted x, nothing about his state is close to leaving.
+
+**⚠ THE TWO HALVES OF THE ERROR ARE DIFFERENT KINDS AND SHOULD NOT BE REPORTED AS ONE
+"49 px".**
+
+- **x: predicted 733, last grounded 684 — 49 px, and unexplained.** No referent mismatch I
+  can name accounts for a horizontal offset.
+- **y: predicted 767, actual 786 — 19 px, and this one may not be an error.** The player's
+  collision height (`Sst.height_pixels`, `$17`) reads **39, declared FULL not half**, so
+  half-height is 19.5. A derivation naming the **surface line** while this table reads the
+  player's **centre** would differ by about exactly that. **This is a LEAD, not a diagnosis:**
+  19 ≠ 19.5, and I have not read what the derivation actually computed. My first guess was
+  worse and is recorded because it is the instructive one — `$16` reads 19 exactly and I took
+  it for a height radius; the struct says `$16` is **`width_pixels`**. A number that matches
+  is not a field that matches.
+
+**What this does and does not settle.** The derivation's *conclusion* — plane A holds the top
+band and not the left leg, so he must run out of geometry — is confirmed, now with the exact
+frame. Its *location* is wrong in x by 49 px with no explanation offered here. Whoever next
+touches that derivation should check the y referent first, because if the surface/centre
+reading is right then only one number is actually wrong and the row is half its apparent size.
+
+**Method:** the departure sits inside frames the original run never sampled, so this was a
+fresh replay stepping one frame at a time. The replay reaches 1152 by the original's own
+splits and 1160 by different ones (`R4 R4` where the first run used `R1 R1 R4 R4`), so the
+two are cross-checked at the frames they share: **frame 1162's whole 64-byte player record is
+BYTE-IDENTICAL between the two runs**, and 1166 agrees. Same destination two ways.
+
 
 ---
 
