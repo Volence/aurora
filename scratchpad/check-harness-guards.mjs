@@ -61,6 +61,19 @@
 //       unconditionally and no fresh build could satisfy it. See the rule's own
 //       block below for the derivation.
 //
+//   G8  (O80) A launcher must not treat a FIXED-DURATION SLEEP as its
+//       teardown's verification. `process.kill(-child.pid,'SIGTERM')` followed
+//       by `await sleep(1500)` and then an `rmSync` (or the next launch) waits
+//       a duration, not for an event: it cannot escalate when the graceful
+//       signal is ignored and it cannot report that the tree is still up.
+//       Measured on bganim-insert-roomy — 1 of 4 runs reached the exit net with
+//       its tree ALIVE and said so, the other 3 did not (O78 census §2) — so
+//       the rig passed or failed by luck. Fires only when BOTH halves are
+//       wrong: the first call after the signal is a fixed wait, AND nothing
+//       between that signal and the next escalates (SIGKILL, `killTree`) or
+//       verifies (a liveness or port poll). See the rule's own block for what
+//       it deliberately does NOT cover.
+//
 //   G6  (O49) A TRACKED harness-like file that NO `package.json` script can
 //       reach fails, naming the file and the exact script line to add. See the
 //       long note above the G6 pass for the population, the reachability rule,
@@ -435,6 +448,15 @@ function callText(src, openIdx) {
   return null;
 }
 
+/** Keywords that take a `(` and are NOT calls (G8's "first call after the
+ *  signal" walk). `catch (e)` is the one that matters — every teardown in this
+ *  tree is wrapped in one — and the rest are here so a `if (…)`/`while (…)`
+ *  between the signal and the wait cannot be read as the wait itself. */
+const CALL_KEYWORDS = new Set([
+  'catch', 'if', 'while', 'for', 'switch', 'do', 'return', 'typeof', 'new',
+  'await', 'else', 'try', 'function', 'delete', 'void', 'throw', 'in', 'of',
+]);
+
 /** Does this spawn become an Aurora Electron? The oracle emulator is spawned
  *  the same way and is NOT in scope: it never touches the discovery files. */
 const looksLikeAurora = (t) =>
@@ -652,6 +674,127 @@ for (const path of listFiles(DIR, ['.mjs'])) {
         + `${dropped.map((d) => `\`${d}\``).join(', ')}. The app gets NO grace: process.exit runs before the `
         + 'ordered SIGTERM/wait/then-X-server teardown, the exit net SIGKILLs the app, and that is the '
         + 'shape that left a Chromium SIGTRAP core on every SIGKILL-net run (O65). Spell it `await killTree(child)`.');
+    }
+  }
+
+  // ── G8 (O80): a fixed sleep standing in for "the tree is gone" ───────────
+  //
+  // A LAUNCHER MUST NOT TREAT A FIXED-DURATION SLEEP AS ITS TEARDOWN'S
+  // VERIFICATION. `sleep(1500)` cannot fail, cannot escalate, and cannot report
+  // that the tree is still up; whatever runs after it runs on a guess.
+  //
+  // Measured, not argued (docs/reviews/2026-09-04-o78-residual-census.md §2).
+  // bganim-insert-roomy's teardown was `process.kill(-child.pid,'SIGTERM')`, a
+  // fixed `await sleep(1500)`, then `rmSync(dir)`. Four runs of the same
+  // harness: three clean, and the fourth — the one that failed a row and
+  // aborted early, i.e. took a different path through the same code — reached
+  // the exit net with its tree STILL ALIVE and printed
+  // `cleanup: X artifact REFUSED — … INHERITED`. It passed or failed by luck,
+  // and a rig that launches twice in one process on one port takes the second
+  // launch down with it. A fixed-duration wait is not a wait; only a verified
+  // one is.
+  //
+  // ═══ WHAT IT ASKS, DERIVED ═══
+  //
+  // For every LAUNCHER (the classification above, not a filename), find each
+  // hand-rolled teardown SIGNAL: a `kill(`/`x.kill(`/`process.kill(` whose own
+  // bracketed argument list names SIGTERM. Two questions about each, and BOTH
+  // must be answered the wrong way before it fails:
+  //
+  //   1. IS THE VERY NEXT THING THE TEARDOWN DOES A FIXED WAIT? — the first
+  //      call after the signal (skipping the `catch`/`if`/… keywords and the
+  //      braces between) is `sleep(`, `sleepSync(`, `setTimeout(`, or a shelled
+  //      `sleep N`. "The next call" rather than "somewhere after", because the
+  //      hazard is the wait the signal is followed BY. Read as "somewhere
+  //      after", this fired on object-label-harness — a plain self-killer whose
+  //      teardown is one SIGTERM, with the next `sleep()` in a helper function
+  //      defined 200 lines below `main`. That is the file being right and the
+  //      rule being wrong, so the rule moved.
+  //   2. DOES NOTHING BETWEEN THAT SIGNAL AND THE NEXT ONE (or EOF) ESCALATE OR
+  //      VERIFY? — no SIGKILL, no `killTree(`, and no liveness/port poll
+  //      (`running(`, `alive(`, `descendants(`, `portFree(`, `stillRunningAs(`,
+  //      `pgrep`). This half is read WIDE on purpose: an escalation three lines
+  //      further down still counts, which is why storage-flush-probe (whose
+  //      SIGKILL is outside the `if` block holding the SIGTERM) is green.
+  //
+  // Both wrong ⇒ the sleep IS the verification, and that is the hazard.
+  //
+  // ═══ WHAT IT DOES NOT COVER — say it, do not let a reader assume it ═══
+  //
+  //   · A `sleep()` in a TEST BODY is not the hazard and is not read: only text
+  //     AFTER a SIGTERM signal site is scanned at all.
+  //   · A teardown that does not wait AT ALL does not fire. `classic-playtest`
+  //     SIGTERMs and `rmSync`s the workdir in the next statement; that is a
+  //     different shape (arguably worse) and the exit net is what covers it —
+  //     this rule is about the wait that LOOKS like verification.
+  //   · A signal with no sleep after it — the 79 self-killers that SIGTERM and
+  //     then `process.exit()` — is the exit net's business and G5's, not this
+  //     rule's. `installNet` runs `killTreeSync`, which escalates and reaps.
+  //   · SIGKILL is accepted as sufficient WITHOUT a poll. It cannot be ignored,
+  //     so the escalation half of the property is met even though the "observed
+  //     gone" half is not; tightening that would fire on ~20 files whose
+  //     teardown this parcel did not measure. Stated so the next reader knows
+  //     the line is here on purpose.
+  //   · Shell scripts have their own pass (S1/S5 below); this is the .mjs one.
+  //
+  // FALSE-POSITIVE CHECK, RUN BEFORE THIS WAS WRITTEN: over all 198 .mjs in
+  // scratchpad/, the shape appeared in exactly three files — bganim-insert-roomy
+  // (twice), bganim-phase-shift and handover/handover-band, siblings of one
+  // ancestor, all three fixed in the same commit as this rule. Every other
+  // SIGTERM-then-sleep teardown in the tree (aeon-priority-lens, band-art-
+  // foreground, band-trunk-demo, storage-flush-probe, live-palette-e2e and the
+  // fifteen `execSync('sleep 3')` files) escalates to SIGKILL and is green.
+  if (!isGuardModule && !isThisChecker && launches.length) {
+    // On `tok` (comments stripped, STRINGS KEPT) — the signal is only
+    // recognisable by the `'SIGTERM'` literal, which the shape scan blanks.
+    const SIGNAL = /(?<![\w.$])(?:[\w.$]+\.)?kill\s*\(/g;
+    const WAIT = /(?<![\w.$])(?:sleep|sleepSync|setTimeout)\s*\(|\bsleep\s+[\d.]/;
+    const VERIFIED = /SIGKILL|(?<![\w.$])(?:killTree|killTreeSync|running|alive|descendants|portFree|stillRunningAs)\s*\(|\bpgrep\b/;
+    const sites = [];
+    let unbracketable = false;
+    let g;
+    while ((g = SIGNAL.exec(tok))) {
+      const t = callText(tok, g.index + g[0].length - 1);
+      // LOUD, never skipped: a kill call this cannot bracket is a teardown this
+      // rule cannot read, and an unreadable teardown is not a clean one.
+      if (t === null) { unbracketable = true; continue; }
+      if (/SIGTERM/.test(t)) sites.push({ at: g.index, end: g.index + g[0].length - 1 + t.length });
+    }
+    const timed = [];
+    for (let i = 0; i < sites.length; i++) {
+      const span = tok.slice(sites[i].end, sites[i + 1] ? sites[i + 1].at : tok.length);
+      // Question 1: the FIRST call after the signal, name and arguments
+      // together — `execSync('sleep 3')` is a fixed wait as much as `sleep(3000)`
+      // is, and fifteen files in this tree spell it that way.
+      const CALL = /(?<![\w.$])([A-Za-z_$][\w.$]*)\s*\(/g;
+      let firstCall = null;
+      let cm;
+      while ((cm = CALL.exec(span))) {
+        if (CALL_KEYWORDS.has(cm[1])) continue;
+        const t = callText(span, cm.index + cm[0].length - 1);
+        if (t === null) { unbracketable = true; break; }
+        firstCall = cm[1] + t;
+        break;
+      }
+      // Question 2, read wide.
+      if (firstCall && WAIT.test(firstCall) && !VERIFIED.test(span)) {
+        timed.push(tok.slice(sites[i].at, sites[i].at + 56).split('\n')[0].trim());
+      }
+    }
+    // LOUD, never skipped: a call this cannot bracket is a teardown this rule
+    // cannot read, and an unreadable teardown is not a clean one.
+    if (unbracketable) {
+      unmeasurable.push(`${rel}: a call in or after a teardown signal could not be bracketed — `
+        + 'G8 cannot classify this file\'s teardown');
+    }
+    if (timed.length) {
+      fails.push(`G8 ${rel}: ${timed.length} teardown signal(s) whose only wait is a FIXED SLEEP — `
+        + `${timed.map((d) => `\`${d}\``).join(', ')}. Nothing after them escalates (no SIGKILL, no `
+        + 'killTree) and nothing verifies (no liveness or port poll), so whatever runs next — an rmSync '
+        + 'over a live app\'s project dir, or the next launch on the same port — runs on a guess. '
+        + 'Measured: this shape reached the exit net with a LIVE tree on 1 of 4 runs of one harness '
+        + '(O78 census §2). Call `await killTree(child)`, which escalates and returns its survivors, or '
+        + 'poll until the thing you actually need is observed free.');
     }
   }
 
