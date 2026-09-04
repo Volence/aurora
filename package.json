@@ -137,6 +137,7 @@
     "harness:layer-bound": "node scratchpad/layer-bound-harness.mjs",
     "harness:live-palette-e2e": "node scratchpad/live-palette-e2e-harness.mjs",
     "harness:loop-paint": "node scratchpad/loop-paint-harness.mjs",
+    "harness:loop-witness": "node scratchpad/loop-witness-harness.mjs",
     "harness:mapviewport-baseline": "node scratchpad/mapviewport-baseline-harness.mjs",
     "harness:marquee": "node scratchpad/marquee-harness.mjs",
     "harness:marquee-flip": "node scratchpad/marquee-flip-harness.mjs",
