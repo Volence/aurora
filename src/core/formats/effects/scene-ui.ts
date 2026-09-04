@@ -1161,3 +1161,303 @@ export function driftPxPerFrameRefusal(pxPerFrame: number): string | null {
   return `${pxPerFrame} px/frame is ${rate} in wire units `
     + `(1 px/frame = ${EFFECTS_DRIFT_UNITS_PER_PIXEL}). ${why}`;
 }
+
+// ---------------------------------------------------------------------------
+// §2.6 — `rowRemap`, a SHIFT that must never be exported as a line count
+// ---------------------------------------------------------------------------
+//
+// `rowRemap` arrived at empyrean `3992d16` (AURORA_EFFECTS_SCHEMA.md §2.6), filed
+// from aeon's key-shape artifact `3d917657` against the LANDED constructor
+// `SceneRemap.Ladder(t, y, h)` rather than against aeon's own design doc, none of
+// whose three proposed field names survived contact with the shipped code.
+//
+// The band's Plane-B scroll words are re-fetched through a perspective index
+// ladder, so screen line `i` takes the value that belonged to line `ladder[i]`.
+// Rows are reordered, repeated and dropped; the band compresses toward the
+// surface as the camera separates the background's picture of the surface from
+// the foreground's truth about it. Hydrocity's waterline.
+//
+// ═══ TWO NUMBERS, TWO WAYS TO BE WRONG THAT NO BUILD CAN SEE ═══
+//
+// 1. `height_shift` IS A SHIFT, NOT A LINE COUNT. `H = 1 << height_shift`, and
+//    the contract says in its own words that an editor "may DISPLAY
+//    `1 << height_shift` beside the control and MUST EXPORT the shift". EVERY
+//    value 3..7 is legal, so an editor that exported the line count would land a
+//    band FOUR TIMES TOO TALL rather than a refusal — aeon's own ensure names the
+//    trap ("If you meant 64 LINES, you want 6"). The `<<` therefore exists in
+//    exactly one place in this repo, `rowRemapHeightLines`, and the control's
+//    write path never calls it.
+//
+// 2. `plane_y` IS A PLANE-B LINE, 0..511 — the `vsplit.at` coordinate space, and
+//    a THIRD space on a surface that already reconciles world pixels and screen
+//    lines. The runtime's only use of it is `plane_y - Vscroll_BG`, whose second
+//    term is a per-frame quantity, so no editor arithmetic could improve it: the
+//    right conversion is none.
+//
+// ⚠ AND THE CEILING IS THIS SCHEMA'S ALONE. aeon's `ensure`
+// (`scene_dsl.emp:1008`) tests `>= 0` only, and `brm_plane_y` is `u16`, so
+// 512..65535 emits a SILENTLY-WRONG window — aeon booked that as
+// `ROWREMAP-PLANEY-CEILING`. The usual "the engine already refuses it" argument
+// is inverted here, which is why `rowRemapPlaneYRefusal` is not a convenience.
+
+/** The `oneOf` branch of `rowRemap` that carries the payload, as a path `at()` can walk. */
+const ROW_REMAP_OBJECT_PATH: (string | number)[] =
+  oneOfBranchWith(['$defs', 'layer', 'properties', 'rowRemap'], 'plane_y');
+
+/** `plane_y`'s bounds — a PLANE-B LINE, the `vsplit.at` space. */
+export const EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS =
+  boundsAt(...ROW_REMAP_OBJECT_PATH, 'properties', 'plane_y');
+
+/** `height_shift`'s bounds — SHIFTS, not line counts. */
+export const EFFECTS_ROW_REMAP_HEIGHT_SHIFT_BOUNDS =
+  boundsAt(...ROW_REMAP_OBJECT_PATH, 'properties', 'height_shift');
+
+/**
+ * Every shift the schema admits, low to high — the ladder a picker may offer.
+ *
+ * Enumerated FROM THE BOUNDS rather than typed, so a contract that widens the
+ * range grows the picker with no edit here and one that narrows it shrinks it.
+ */
+export const EFFECTS_ROW_REMAP_HEIGHT_SHIFTS: readonly number[] = Object.freeze((() => {
+  const { min, max } = EFFECTS_ROW_REMAP_HEIGHT_SHIFT_BOUNDS;
+  const out: number[] = [];
+  for (let s = min; s <= max; s++) out.push(s);
+  return out;
+})());
+
+/**
+ * The names the contract RESERVES and refuses inside the payload — `ladder` and
+ * `table` today.
+ *
+ * DERIVED, NOT LISTED, and derived from the MECHANISM rather than from the
+ * prose: a reserved name is a declared property whose schema is `{"not": {}}`,
+ * the refuse-everything idiom (an empty subschema matches every value, so its
+ * negation matches none). Reading the mechanism means a contract that reserves a
+ * THIRD name gets it surfaced here with no edit, and one that PROMOTES `ladder`
+ * to a real field drops it from this set the same way.
+ *
+ * ⚠ THE NODES THIS READS ARE INVISIBLE TO A SCALAR-LEAF WALK. `{"not": {}}` has
+ * no scalar under it, so a diff that flattens a document to its leaves reports
+ * nothing for either name — the two nodes that ARE the refusal. That is why this
+ * constant asks the schema for the shape instead of trusting a leaf census.
+ */
+export const EFFECTS_ROW_REMAP_REFUSED_KEYS: readonly string[] = Object.freeze((() => {
+  const props = at(...ROW_REMAP_OBJECT_PATH, 'properties');
+  const refused = Object.keys(props).filter((k) => {
+    const node = (props as Record<string, unknown>)[k] as Record<string, unknown> | null;
+    const not = node?.not;
+    return typeof not === 'object' && not !== null && Object.keys(not).length === 0;
+  });
+  if (refused.length === 0) {
+    throw new Error(
+      'effects scene schema $defs.layer.properties.rowRemap\'s payload declares no `{"not": {}}` ' +
+      'property — the reserved names Aurora refuses to offer were derived from that idiom, and ' +
+      'the mechanism is gone. Re-derive against the amended schema rather than listing names.',
+    );
+  }
+  return refused;
+})());
+
+/**
+ * The one `height_shift` that BUILDS today — 4, and read out of the contract
+ * rather than typed, because it is a statement about aeon's generator on a date
+ * and not a property of the format.
+ *
+ * DERIVED TWICE FROM TWO INDEPENDENT SENTENCES of the same description, the
+ * `EFFECTS_DRIFT_UNITS_PER_PIXEL` pattern: the "TODAY ONLY n BUILDS" clause gives
+ * the shift, and the ladder function aeon names (`row_remap_ladder16()`) gives
+ * the LINE COUNT. They are cross-checked through `1 << shift`, so a contract that
+ * moved one and not the other fails this module's import instead of letting the
+ * control bless an unbuildable value — which is the exact failure the owner has
+ * already paid for once ("it kept giving errors during build time that I would
+ * have to stop and revert the changes").
+ *
+ * `null` IS A LEGITIMATE ANSWER and the reason the type is nullable: when 9b's
+ * generator lands, the contract drops the clause, this reads `null`, and every
+ * consumer below stops warning — no Aurora edit, no stale caution left behind.
+ * A caution with no expiry is a false negative wearing caution's costume.
+ */
+export const EFFECTS_ROW_REMAP_BUILDABLE_SHIFT: number | null = (() => {
+  const path = [...ROW_REMAP_OBJECT_PATH, 'properties', 'height_shift'];
+  const description = at(...path).description;
+  if (typeof description !== 'string') {
+    throw new Error(`effects scene schema ${path.join('.')} has no string description`);
+  }
+  const only = /TODAY ONLY (\d+) BUILDS/.exec(description);
+  if (!only) return null;
+  const shift = Number(only[1]);
+
+  const ladder = /row_remap_ladder(\d+)\(\)/.exec(description);
+  if (!ladder) {
+    throw new Error(
+      `effects scene schema ${path.join('.')} still says "TODAY ONLY ${shift} BUILDS" but no ` +
+      'longer names the one ladder function it builds from, so the claim cannot be ' +
+      'cross-checked. Re-derive the buildable shift against the amended schema.',
+    );
+  }
+  const lines = Number(ladder[1]);
+  if ((1 << shift) !== lines) {
+    throw new Error(
+      `effects scene schema ${path.join('.')} says only shift ${shift} builds and names ` +
+      `row_remap_ladder${lines}() as the one ladder, but 1 << ${shift} is ${1 << shift}, not ` +
+      `${lines}. Two statements of one quantity disagree; re-read the contract.`,
+    );
+  }
+  const { min, max } = EFFECTS_ROW_REMAP_HEIGHT_SHIFT_BOUNDS;
+  if (shift < min || shift > max) {
+    throw new Error(
+      `effects scene schema ${path.join('.')} names ${shift} as the buildable shift, which is ` +
+      `outside its own ${min}..${max} range.`,
+    );
+  }
+  return shift;
+})();
+
+/**
+ * The band height a shift means, IN LINES — `1 << shift`. The only `<<` on this
+ * key anywhere in the repo, and it is display-only: nothing on the write path
+ * calls it.
+ */
+export function rowRemapHeightLines(shift: number): number {
+  return 1 << shift;
+}
+
+/** Why `plane_y` is not a legal plane line, or null when it is. */
+export function rowRemapPlaneYRefusal(planeY: number): string | null {
+  if (!Number.isInteger(planeY)) {
+    return `a plane line is a whole number; ${planeY} is not an integer.`;
+  }
+  const { min, max } = EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS;
+  if (planeY < min || planeY > max) {
+    return `${planeY} is outside the Plane-B line range ${min}..${max}. This bound is the `
+      + 'CONTRACT\'S ONLY ENFORCEMENT: aeon checks the floor and not the ceiling, so a larger '
+      + 'value would build clean and emit a window pointing nowhere.';
+  }
+  return null;
+}
+
+/** Why `height_shift` is not a legal shift, or null when it is. */
+export function rowRemapHeightShiftRefusal(shift: number): string | null {
+  if (!Number.isInteger(shift)) {
+    return `a height shift is a whole number; ${shift} is not an integer.`;
+  }
+  const { min, max } = EFFECTS_ROW_REMAP_HEIGHT_SHIFT_BOUNDS;
+  if (shift < min || shift > max) {
+    return `${shift} is outside the contract's ${min}..${max}. THIS IS A SHIFT, NOT A LINE `
+      + `COUNT — the band is 1 << shift lines tall, so ${min} is ${rowRemapHeightLines(min)} `
+      + `lines and ${max} is ${rowRemapHeightLines(max)}. If you meant `
+      + `${rowRemapHeightLines(max)} lines, you want ${max}.`;
+  }
+  return null;
+}
+
+/**
+ * Why a legal shift will still fail aeon's build TODAY, or null when it will not.
+ *
+ * SEPARATE FROM THE REFUSAL ABOVE, deliberately, and the separation is the whole
+ * point: `height_shift: 6` is a correct document that this schema accepts and
+ * aeon's generator refuses by name, because only one ladder exists so far. A
+ * control that folded the two together would either refuse a legal value
+ * forever, or offer five options of which four break the build in silence.
+ * Aurora says which is which and lets the author choose.
+ *
+ * SPELLED AS THE CURRENT STATE WITH ITS REASON, never as "only 4 works": the
+ * sentence names what unblocks it, so it retires itself when 9b lands and the
+ * contract drops the clause (`EFFECTS_ROW_REMAP_BUILDABLE_SHIFT` then reads
+ * `null` and this returns `null` for every shift).
+ */
+export function rowRemapBuildableToday(shift: number): string | null {
+  const only = EFFECTS_ROW_REMAP_BUILDABLE_SHIFT;
+  if (only === null || shift === only) return null;
+  return `${shift} (${rowRemapHeightLines(shift)} lines) is a legal shift that does NOT BUILD `
+    + `yet: the engine can generate only the ${rowRemapHeightLines(only)}-line ladder, so aeon `
+    + `refuses every other shift by name until its generator half lands. ${only} `
+    + `(${rowRemapHeightLines(only)} lines) is the one that builds today.`;
+}
+
+/** The payload a layer's `rowRemap` carries, or null for `"none"` / absent. */
+export function rowRemapOf(
+  rowRemap: EffectsLayer['rowRemap'],
+): { plane_y: number; height_shift: number } | null {
+  if (rowRemap === undefined || rowRemap === 'none') return null;
+  return rowRemap;
+}
+
+/**
+ * THE FOUR REFUSALS THIS SCHEMA DELIBERATELY DOES NOT ENCODE, in the contract's
+ * own words — extracted from the `rowRemap` description, never paraphrased here.
+ *
+ * §2.6 ruling (3) puts them OUTSIDE the schema on purpose: "JSON Schema cannot
+ * express a cross-key conditional over an array element's siblings legibly, and
+ * the message is worth more than the encoding." They belong to aeon's GENERATOR,
+ * with the engine `ensure`s kept for hand-authored `.emp`. So nothing an author
+ * is talking to refuses them until a build runs — which is exactly why Aurora
+ * checks the three that ARE functions of the open document and says so.
+ *
+ * THE SENTENCE THE AUTHOR READS IS AEON'S, NOT AURORA'S. A restatement here
+ * would be a fourth copy of a rule that lives in three places already (the
+ * engine's ensure, the generator, this description), free to drift from all
+ * three. Each clause is located by a distinguishing phrase and the read is LOUD:
+ * a contract that stops carrying one fails this module's import, which takes the
+ * suite with it, rather than leaving a control advising something the contract no
+ * longer holds.
+ */
+export const EFFECTS_ROW_REMAP_GENERATOR_REFUSALS: Readonly<Record<
+  'vary' | 'anchor' | 'single' | 'capability', string
+>> = (() => {
+  const path = ['$defs', 'layer', 'properties', 'rowRemap'];
+  const description = at(...path).description;
+  if (typeof description !== 'string') {
+    throw new Error(`effects scene schema ${path.join('.')} has no string description`);
+  }
+  const head = /REFUSALS THIS SCHEMA DOES NOT ENCODE[^:]*:([\s\S]*?)(?:\.\s|\.$)/.exec(description);
+  if (!head) {
+    throw new Error(
+      `effects scene schema ${path.join('.')}'s description no longer carries a "REFUSALS THIS ` +
+      'SCHEMA DOES NOT ENCODE ...:" clause. Aurora derives the sentences it shows an author from ' +
+      'that clause rather than restating the rules; re-derive against the amended schema.',
+    );
+  }
+  // The clause list opens after the parenthetical that cites aeon's three
+  // `ensure` lines, and those cites are `file:line` — so the FIRST clause comes
+  // back carrying the tail of a citation whenever the head regex stopped at a
+  // colon inside it. Strip a leading citation from each clause rather than
+  // trying to spell a head pattern that anticipates every future parenthetical:
+  // a clause is what follows the last `): ` or `: ` in its own text, if any.
+  const clauses = head[1]
+    .split(';')
+    .map((c) => c.replace(/^[\s\S]*?\):\s*/, '').trim())
+    .filter((c) => c.length > 0);
+  const find = (what: string, needle: RegExp): string => {
+    const hit = clauses.find((c) => needle.test(c));
+    if (hit === undefined) {
+      throw new Error(
+        `effects scene schema ${path.join('.')}'s refusal clause no longer states the ` +
+        `"${what}" condition (looked for ${needle}). It has ${clauses.length} clause(s): ` +
+        `${JSON.stringify(clauses)}. Re-derive against the amended schema.`,
+      );
+    }
+    return hit;
+  };
+  return Object.freeze({
+    vary: find('nothing to vary', /to vary/),
+    anchor: find('no anchor declared', /declare anchor/),
+    single: find('more than one remapped layer', /at most ONE layer/),
+    capability: find('capability not raised', /CAP_ROW_REMAP/),
+  });
+})();
+
+/**
+ * Clamp a plane line into `rowRemap`'s OWN range.
+ *
+ * NOT `clampVSplitAt`, even though the two ranges are the same numbers today and
+ * the contract calls them the same coordinate space. They are different schema
+ * nodes, and `EFFECTS_ANCHOR_SHIFT_BOUNDS`'s docblock already records what
+ * happens when this repo lets two spaces share one reader: an amendment moves one
+ * and the other silently starts clamping to a bound that is not its own.
+ */
+export function clampRowRemapPlaneY(value: number): number {
+  const { min, max } = EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS;
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
