@@ -105,6 +105,7 @@
 import { readdirSync, readFileSync, readlinkSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { RUN_PROFILE_DIR } from './harness-guard.mjs';
 
 /** Chromium's on-disk home for a localStorage area, relative to a profile. */
 export const LEVELDB_REL = 'Local Storage/leveldb';
@@ -196,7 +197,20 @@ export function profileLeveldbDir(profileDir) {
  * when exactly ONE candidate exists on disk. Two present candidates with no
  * observation is a refusal, not a coin flip.
  */
-export function resolveLeveldbDir({ pids, appNames, readFds = defaultReadFds, exists = existsSync, configHome, profileDir = null }) {
+/**
+ * ⚠ `profileDir` DEFAULTS TO THIS RUN'S PRIVATE PROFILE, and that default is the
+ * whole point of the parameter. It used to default to `null`, which meant "search
+ * the SHARED `~/.config/<app>` candidates" — so a caller that simply did not think
+ * about it fell back to a directory this run never writes, and got told "never
+ * flushed" about a flush that happened. `spawnGuarded` pins every launch to
+ * `RUN_PROFILE_DIR`, so the honest default for the observer is the same directory
+ * the launcher used.
+ *
+ * PASS `profileDir: null` EXPLICITLY to ask for the shared-candidate search. It is
+ * still reachable, deliberately — the unit rows below exercise it — but it is now
+ * something a caller has to type, and typing it is the record that it was meant.
+ */
+export function resolveLeveldbDir({ pids, appNames, readFds = defaultReadFds, exists = existsSync, configHome, profileDir = RUN_PROFILE_DIR }) {
   const held = leveldbDirsHeldBy(pids, readFds);
   if (held.length === 1) return { dir: held[0], how: `observed: held open by the launched tree (${[...pids].length} pid(s))` };
   if (held.length > 1) {

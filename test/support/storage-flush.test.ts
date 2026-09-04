@@ -36,6 +36,7 @@
  * real profile.
  */
 
+import { RUN_PROFILE_DIR } from '../../scratchpad/lib/harness-guard.mjs';
 import { describe, it, expect } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -106,9 +107,29 @@ describe('candidateLeveldbDirs — the fallback list', () => {
 describe('resolveLeveldbDir — observes, or refuses; it never guesses', () => {
   const names = ['Electron', 'aurora'];
 
-  it('takes the one the tree actually holds open, and SAYS it observed it', () => {
+  /**
+   * ⚠ THE ROW THIS PARCEL EXISTS FOR. Every row around it passes `profileDir`
+   * explicitly — so every one of them would stay green if the default went back
+   * to `null`, and none of them can see the hazard. This one omits it, which is
+   * what a caller that never thought about the profile does.
+   */
+  it('a caller that OMITS profileDir cannot reach the shared ~/.config candidates', () => {
+    const shared = `/cfg/Electron/${LEVELDB_REL}`;
     const r = resolveLeveldbDir({
       pids: [7], appNames: names, configHome: '/cfg',
+      readFds: () => [],            // /proc silent: the fallback path is the one under test
+      exists: () => true,           // every candidate "exists", so only the CHOICE distinguishes
+    });
+    // Derived from the launcher's own pin rather than restated here: whatever
+    // spawnGuarded would have passed is what the observer must watch.
+    expect(r.dir).toContain(RUN_PROFILE_DIR);
+    expect(r.dir).not.toBe(shared);
+    expect(r.how).toMatch(/--user-data-dir/);
+  });
+
+  it('takes the one the tree actually holds open, and SAYS it observed it', () => {
+    const r = resolveLeveldbDir({
+      pids: [7], appNames: names, configHome: '/cfg', profileDir: null,
       readFds: () => [`/cfg/Electron/${LEVELDB_REL}/LOCK`],
       exists: () => true,
     });
@@ -118,7 +139,7 @@ describe('resolveLeveldbDir — observes, or refuses; it never guesses', () => {
 
   it('⚠ REFUSES when the observation is ambiguous, naming both databases', () => {
     const r = resolveLeveldbDir({
-      pids: [7], appNames: names, configHome: '/cfg',
+      pids: [7], appNames: names, configHome: '/cfg', profileDir: null,
       readFds: () => [`/cfg/Electron/${LEVELDB_REL}/LOCK`, `/cfg/aurora/${LEVELDB_REL}/LOCK`],
       exists: () => true,
     });
@@ -130,7 +151,7 @@ describe('resolveLeveldbDir — observes, or refuses; it never guesses', () => {
   it('falls back to the single candidate that exists, and says it DERIVED it', () => {
     const only = `/cfg/Electron/${LEVELDB_REL}`;
     const r = resolveLeveldbDir({
-      pids: [7], appNames: names, configHome: '/cfg',
+      pids: [7], appNames: names, configHome: '/cfg', profileDir: null,
       readFds: () => [],
       exists: (d: string) => d === only,
     });
@@ -140,7 +161,7 @@ describe('resolveLeveldbDir — observes, or refuses; it never guesses', () => {
 
   it('⚠ REFUSES when /proc is silent and TWO candidate profiles exist — the wrong-profile defect this parcel actually hit', () => {
     const r = resolveLeveldbDir({
-      pids: [7], appNames: names, configHome: '/cfg',
+      pids: [7], appNames: names, configHome: '/cfg', profileDir: null,
       readFds: () => [],
       exists: () => true,
     });
@@ -152,7 +173,7 @@ describe('resolveLeveldbDir — observes, or refuses; it never guesses', () => {
 
   it('refuses when nothing is observed and no candidate exists', () => {
     const r = resolveLeveldbDir({
-      pids: [7], appNames: names, configHome: '/cfg', readFds: () => [], exists: () => false,
+      pids: [7], appNames: names, configHome: '/cfg', profileDir: null, readFds: () => [], exists: () => false,
     });
     expect(r.dir).toBeNull();
     expect(r.why).toContain('none of the candidate profiles exists');
@@ -174,7 +195,7 @@ describe('resolveLeveldbDir — observes, or refuses; it never guesses', () => {
     const shared = `/cfg/Electron/${LEVELDB_REL}`;
     const mine = `/tmp/aurora-harness-profiles/rig-1-abcd/${LEVELDB_REL}`;
     const r = resolveLeveldbDir({
-      pids: [7], appNames: names, configHome: '/cfg',
+      pids: [7], appNames: names, configHome: '/cfg', profileDir: null,
       readFds: () => [],
       exists: (d: string) => d === shared || d === mine,
     });
@@ -187,7 +208,7 @@ describe('resolveLeveldbDir — observes, or refuses; it never guesses', () => {
     const profileDir = '/tmp/aurora-harness-profiles/rig-1-abcd';
     const mine = `${profileDir}/${LEVELDB_REL}`;
     const r = resolveLeveldbDir({
-      pids: [7], appNames: names, configHome: '/cfg',
+      pids: [7], appNames: names, configHome: '/cfg', profileDir: null,
       readFds: () => [],
       exists: (d: string) => d === shared || d === mine,
       profileDir,
@@ -200,7 +221,7 @@ describe('resolveLeveldbDir — observes, or refuses; it never guesses', () => {
   it('the OBSERVATION still wins over the pinned profile — it is the stronger evidence', () => {
     const observed = `/tmp/somewhere-else/${LEVELDB_REL}`;
     const r = resolveLeveldbDir({
-      pids: [7], appNames: names, configHome: '/cfg',
+      pids: [7], appNames: names, configHome: '/cfg', profileDir: null,
       readFds: () => [`${observed}/LOCK`],
       exists: () => true,
       profileDir: '/tmp/aurora-harness-profiles/rig-1-abcd',
@@ -212,7 +233,7 @@ describe('resolveLeveldbDir — observes, or refuses; it never guesses', () => {
   it('a pinned profile with nothing written to it yet is a refusal, not a false negative', () => {
     const profileDir = '/tmp/aurora-harness-profiles/rig-1-abcd';
     const r = resolveLeveldbDir({
-      pids: [7], appNames: names, configHome: '/cfg',
+      pids: [7], appNames: names, configHome: '/cfg', profileDir: null,
       readFds: () => [], exists: () => false, profileDir,
     });
     expect(r.dir).toBeNull();
