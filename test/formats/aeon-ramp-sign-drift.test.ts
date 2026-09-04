@@ -1,6 +1,17 @@
 // THE RETIREMENT CONDITION FOR THE NEGATIVE-VALUE DISCLOSURE, as a property of
 // an artifact read at a committed revision.
 //
+// ⚠ IT FIRED. 2026-09-03: aeon merged the two's-complement encode, this row went
+// RED with "THE PREMISE HAS CLEARED — and the disclosure has not", and
+// `RAMP_SIGN_FIELDS_AWAITING_AEON` was emptied on the strength of THIS ROW and
+// nothing else. **The row was not deleted with the sentence.** Its question is
+// unchanged; only the answer it demands has flipped. With the premise empty it
+// now asserts the constructor still puts BOTH parameters through something, and
+// reddens the day a bare forward comes back — telling the next reader to RE-FILL
+// and re-date. That inversion is the whole reason the pin changed VALUE rather
+// than being removed: a deleted pin retires the coverage along with the claim,
+// and then a regression in aeon is invisible here forever.
+//
 // ═══ WHAT IT MEASURES, AND WHY IT IS THIS FILE AND NOT A PAGE ═══
 //
 // `src/core/formats/effects/ramp-sign-lag.ts` says a NEGATIVE ramp value cannot
@@ -222,6 +233,49 @@ pub comptime fn raster_ramp_program(top: int, lines: int, cmd: int,
     // ...and the file it names is the file this row actually opens.
     const self = readFileSync(resolve(__dirname, 'aeon-ramp-sign-drift.test.ts'), 'utf8');
     expect(self).toContain(`const AEON_PATH = '${AEON_PATH}'`);
+  });
+
+  /**
+   * ⚠ THE RECORDED REVISION MUST REPRODUCE THE MEASUREMENT IT IS CITED FOR.
+   *
+   * `RAMP_SIGN_LAG_MEASURED_AT` is printed inside the sentence as the evidence a
+   * reader is invited to re-run, and `ramp-sign-lag.ts` quotes the four lines of
+   * the encode beside it. A citation nobody checks is the same instrument as a
+   * disclosure nobody checks: it survives the fact it was written about. This
+   * pins it at the RECORDED revision, not at TIP — a commit is immutable, so the
+   * row is stable while aeon's master moves, and it reddens only if the citation
+   * is edited to name a revision that does not say what the file claims it says.
+   *
+   * TIP is the row above's job; this row is about the RECORD.
+   */
+  it('the RECORDED revision really carries what this file says it carries', (ctx) => {
+    onAeon(ctx, () => {
+      const aeon = peerRepo('aeon')!;
+      const rec = resolveRev(aeon, RAMP_SIGN_LAG_MEASURED_AT);
+      expect(rec, `the recorded revision ${RAMP_SIGN_LAG_MEASURED_AT} does not resolve in ${aeon} `
+        + '— the sentence cites evidence a reader cannot open').not.toBeNull();
+      const at = readAtRev(aeon, rec!, AEON_PATH);
+      expect(at.ok, at.ok ? '' : `aeon ${rec}: ${at.why}`).toBe(true);
+      if (!at.ok) return;
+      const literal = returnedLiteral(at.text)!;
+      expect(literal).not.toBeNull();
+      const spelled = WIRE.map(({ field }) => `${field}: ${assignedTo(literal, field)}`).join(', ');
+      // Whatever state the record claims, the record must SHOW it.
+      if (RAMP_SIGN_FIELDS_AWAITING_AEON.length === 0) {
+        expect(
+          WIRE.filter(({ field, param }) => assignedTo(literal, field) === param),
+          `ramp-sign-lag.ts records the premise as CLEARED at aeon ${RAMP_SIGN_LAG_MEASURED_AT}, `
+          + `but at that revision the constructor spells \`${spelled}\` — a bare forward. The `
+          + 'retirement is dated to a revision that does not support it. Re-measure and re-date.',
+        ).toEqual([]);
+      } else {
+        expect(
+          WIRE.filter(({ field, param }) => assignedTo(literal, field) === param).map((w) => w.param),
+          `ramp-sign-lag.ts records the premise as OPEN at aeon ${RAMP_SIGN_LAG_MEASURED_AT}, but `
+          + `at that revision the constructor spells \`${spelled}\` — it already encodes.`,
+        ).toEqual([...RAMP_SIGN_FIELDS].sort());
+      }
+    });
   });
 
   it('the measured revision is recorded where a reader will find it', () => {
