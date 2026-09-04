@@ -265,7 +265,61 @@ No emulator was touched. Several harnesses (`classic-playtest`,
 shared or on-screen instance was attached. Verified across every file naming
 `ORACLE_SOCKET`.
 
-## 7. Open, and tagged
+## 7. This parcel's own instruments, held to the repo's gates
+
+Both gates that police `scratchpad/` were run against the files this parcel
+adds, and both failed them first.
+
+- **`node scripts/check-peer-path-literals.mjs`** flagged **6 executable lines**
+  in the two `.sh` files under `sibling-literal` and `session-scratchpad` — an
+  absolute `/home/…` naming the suite root, and a line naming this agent
+  session's own tmpdir, which stops existing when the session does. Both
+  scripts now spell the suite's four steps in-file the way
+  `scratchpad/handover/run-handover.sh` does, and `ELECTRON_BIN` is an override
+  over a derived default that **refuses loudly** when the binary is absent. The
+  gate now reports **0 hits in `scratchpad/o78-*`**. It still fails repo-wide
+  with 37 lines, none of them mine: all are in the untracked
+  `scratchpad/fixtures/aeon-band-art-fg/`, mtime `2026-09-03 22:29`, before
+  this branch existed.
+
+- **`node scratchpad/check-harness-guards.mjs`** failed both scripts under rule
+  **S1** — a `.sh` that starts `xvfb-run`/`electron` itself must trap EXIT
+  **and** INT **and** TERM. Neither had a trap at all, and the leak was real:
+  an interrupted run left the display lock, the socket, the wrapper tempdir and
+  ~330 MB of per-run copies behind, which this sweep did repeatedly. Both now
+  trap all three, signal the wrapper's group, and remove what they own. Gate:
+  **206 clean / 206, 0 failures** (was 204/206, both failures mine).
+
+  Proven in both directions on a genuinely interrupted run — no `MARK_DONE` in
+  either log, so the normal exit path did not do the cleaning:
+
+  | | exit | tempdir | aeon copy | s1 copy |
+  |---|---|---|---|---|
+  | with the trap | 143 | gone | gone | gone |
+  | `trap _cleanup EXIT INT TERM` → `:` | 143 | **left** | **left** | **left** |
+
+  **The first version of that test was wrong and looked right.** It signalled
+  with `SIGINT`, and a background job in a non-interactive shell inherits
+  `SIG_IGN` for INT — a signal ignored on entry cannot be trapped. The run
+  simply finished (`MARK_DONE` present, 30 s) and the normal path cleaned up,
+  which is indistinguishable from the trap working. `SIGTERM` is not ignored
+  that way, and the `MARK_DONE` count is what tells an interrupted run from a
+  finished one.
+
+### Reproducing the census
+
+```sh
+VITE_AURORA_DEBUG=1 npm run build            # a plain build has no debug hooks
+rsync -a --exclude=.claude <suite>/aeon/     $O78_SEEDS/aeon-seed/
+rsync -a --exclude=.claude <suite>/s1disasm/ $O78_SEEDS/s1-seed/
+sh scratchpad/o78-census-prove-tell.sh <logdir>            # the instrument's 5 legs
+sh scratchpad/o78-census-run-one.sh <name> <logdir> <workdir> [timeout]
+```
+
+`O78_SEEDS` defaults to `<suite root>/.o78-census` and is a hard error when
+absent, not a skip. The seeds must be on the same filesystem as this repo (§4).
+
+## 8. Open, and tagged
 
 - **TAGGED for foreground follow-up — `harness:camera`, `harness:crash`,
   `harness:restore` do not finish in 900 s** under `xvfb-run -a npm run`.
