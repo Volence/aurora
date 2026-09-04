@@ -31,18 +31,25 @@ import {
   EFFECTS_PRESET_RESERVED_KEYS, EFFECTS_PRESET_ROOT_KEYS, presetArmFields, presetDefFields,
   EFFECTS_PRESET_PROGRAM_ARMS, EFFECTS_PRESET_RASTER_CHANNELS,
 } from '../../src/core/formats/effects/preset';
-import { PRESET_KEYS_AWAITING_AEON } from '../../src/core/formats/effects/preset-lag';
 import { peerRepo, resolveRev, readAtRev, isAncestor } from '../support/peer-repo';
 
-/**
- * THE OPEN LAG, read from the ONE place it is written.
+/*
+ * ⚠ THERE IS NO `LAGGING` CONSTANT HERE, AND ITS ABSENCE IS THE ASSERTION.
  *
- * Re-introduced 2026-09-04 (empyrean `c4a1da2` declared `boundary` and aeon's
- * step 4 has not run). It is a READ, never a second copy: the names live in
- * `PRESET_KEYS_AWAITING_AEON` and the panel's disclosure is derived from the
- * same constant, so a key cannot be excused here and left undisclosed there.
+ * While a lag is OPEN this file reads `PRESET_KEYS_AWAITING_AEON` from
+ * `src/core/formats/effects/preset-lag.ts` and pins the measured lag to it — a
+ * hand-typed premise a panel renders a warning from has to be compared against
+ * aeon's tip by something. While the lag is CLOSED that coupling inverts: a row
+ * asserting "the measured lag equals <a constant known to be empty>" is one
+ * claim spelled through an indirection nobody can read, so the row below
+ * asserts the EMPTY SET directly and this file names the constant nowhere in
+ * its code. `preset-lag-disclosure.test.ts` pins BOTH directions, and which one
+ * it demands flips with the premise.
+ *
+ * Re-introduced 2026-09-04 for `boundary` (empyrean `c4a1da2`), removed again
+ * LATER THE SAME DAY when aeon `b3af9847` grew the key into its accepted
+ * `preset:` row. `git log` this file for the shape it has while a lag is open.
  */
-const LAGGING = [...PRESET_KEYS_AWAITING_AEON].sort();
 
 const SCHEMA_PATH = resolve(
   __dirname, '../../src/core/formats/effects/aurora-effects-preset.schema.json',
@@ -649,7 +656,7 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
         `${SPLIT(tip)} aeon's page knows a root key the schema neither declares nor reserves`,
       ).toEqual([]);
       expect(
-        schemaVocabulary.filter((k) => !pageVocabulary.includes(k) && !LAGGING.includes(k)),
+        schemaVocabulary.filter((k) => !pageVocabulary.includes(k)),
         `${SPLIT(tip)} the schema knows these root keys and aeon's page does not mention them at `
         + 'all. If aeon has RENAMED one, this is the split. If instead the contract has DECLARED '
         + 'a key aeon has not built, that is the contract leading its consumer — a lag, the state '
@@ -681,10 +688,21 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
    * exactly `PRESET_KEYS_AWAITING_AEON`" (2026-09-03, empyrean d36d704 declared
    * item 4's keys), "the lag is EMPTY" again (2026-09-03, item 4's step 4
    * merged), the premise list once more (2026-09-03, empyrean 9233883 declared
-   * item 6's `ramp`), and now EMPTY again (2026-09-03, aeon `c7ee7075` grew
-   * `ramp` into its accepted `preset:` row). Each time its own message named the
-   * fix, and each time the fix was to change what it asserts — never to remove
-   * it.
+   * item 6's `ramp`), EMPTY again (2026-09-03, aeon `c7ee7075` grew `ramp` into
+   * its accepted `preset:` row), the premise list an eighth time (2026-09-04,
+   * empyrean `c4a1da2` declared §7.6's `boundary`), and now EMPTY again
+   * (2026-09-04, aeon `b3af9847` grew `boundary` into its accepted `preset:`
+   * row). Each time its own message named the fix, and each time the fix was to
+   * change what it asserts — never to remove it.
+   *
+   * ⚠ ITS MESSAGE IS WHAT RETIRED THE `boundary` DISCLOSURE, AND THAT IS THE
+   * POINT OF WRITING IT THIS WAY. The 2026-09-04 red carried three named causes
+   * with three different fixes; the one that applied was the third, and its own
+   * warning — "do NOT empty it on a merge announcement, this row reads TIP" —
+   * is the reason the retirement was gated on reading aeon's blob at
+   * `b3af9847` rather than on being told the arm had landed. That third bullet
+   * only exists while a lag is open, so it is gone again below; `git log` this
+   * row for it.
    *
    * DELETING IT WOULD LEAVE NOTHING WATCHING. aeon un-building a key moves that
    * name from the page's `preset:` row into `preset-refused:` (or off the page
@@ -714,8 +732,8 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
    * rot into an unmeasured claim.
    */
   it(`the contract-leads-consumer lag at aeon ${page.kind === 'ok' ? page.tip.slice(0, 8) : TIP} is `
-     + 'EMPTY — aeon accepts every key the schema declares (retired 2026-09-03, item 6; red in '
-     + 'both directions)', (ctx) => {
+     + 'EMPTY — aeon accepts every key the schema declares (retired 2026-09-04, the `boundary` '
+     + 'arm; red in both directions)', (ctx) => {
     onPage(ctx, ({ tip, keys }) => {
       // Anti-vacuous: this row is only meaningful because the schema declares
       // keys BEYOND the required ones for aeon to have built, and because
@@ -752,18 +770,15 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
         + '  • AEON HAS UN-BUILT A KEY IT USED TO LOWER — that is a REGRESSION, not a lag, and it '
         + 'is what this row exists to catch: the vocabulary row above stays green through it, '
         + 'because the name merely moves from the page\'s `preset:` row to `preset-refused:`. '
-        + 'Report it to aeon BEFORE re-filling anything here.\n'
-        + `  • OR THE LAG CLOSED: aeon now accepts a key ${JSON.stringify(LAGGING)} claims it does `
-        + 'not. Empty PRESET_KEYS_AWAITING_AEON, re-date it, and the panel\'s sentence retires '
-        + 'with this row — do NOT empty it on a merge announcement, this row reads TIP.',
-      ).toEqual(LAGGING);
+        + 'Report it to aeon BEFORE re-filling anything here.',
+      ).toEqual([]);
 
       // The same fact from the other side, so the row cannot pass on a page that
       // simply stopped listing its refusals: every name aeon REFUSES is one the
       // schema still reserves. (While a lag is open this clause gains the
       // premise list as a second allowed source — see the 2026-09-03 shape.)
       expect(
-        keys['preset-refused'].filter((k) => !schemaReserved.includes(k) && !LAGGING.includes(k)),
+        keys['preset-refused'].filter((k) => !schemaReserved.includes(k)),
         `${SPLIT(tip)} aeon refuses a root key the schema does not reserve. If the schema DECLARES `
         + 'it, that is a lag and the row above owns it; if the schema does not know the name at '
         + 'all, that is a split.',
