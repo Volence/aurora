@@ -16,7 +16,8 @@ import {
   SCENE_FORM_CHOICES, layerExtras, layerExtrasLine,
   layerTopSpace, layerTopBounds, clampLayerTop, planeLineOf, PLANE_LINE_SPAN,
   fireLineAdvisory, layerEmitsFire, fireScreenLineOf, vsplitOrderAdvisory,
-  vsplitLockAdvisory, sceneVsplitLockAdvisory, VSPLIT_LOCK_CLAUSES, clampVFactor,
+  vsplitLockAdvisory, sceneVsplitLockAdvisory, VSPLIT_LOCK_CLAUSES, VSPLIT_VDEFORM_CLAUSES,
+  clampVFactor,
   vsplitLockAdvisoryParts, sceneVsplitLockAdvisoryParts, joinAdvisory,
   guideBoundNotice,
   EFFECTS_FIRE_LINE_MIN, EFFECTS_FIRE_LINE_MAX,
@@ -1884,7 +1885,19 @@ describe('deform advisories — what the build would refuse, said first', () => 
     scene.layers.push({ world_y: 64, fa: 'FACTOR_1', fb: 'FACTOR_1', vsplit: { at: 20 } });
     const a = sceneDeformAdvisories(scene).join('\n');
     expect(a).toMatch(/layer 1 authors a Plane B split/);
-    expect(a).toMatch(/same VSRAM word/);
+    // ⚠ COMPOSED, NOT RETYPED — and this row USED to retype it, as
+    // `/same VSRAM word/`. That phrasing said the two writers share an address
+    // and nothing about what the author would see; when the sentence was widened
+    // on 2026-09-04 to name the consequence ("one 16-pixel column of forty") and
+    // moved onto `VSPLIT_VDEFORM_CLAUSES` so three surfaces could share one
+    // declaration, this row went red for the wording rather than the fact. A row
+    // that pins a PHRASE goes red on every improvement and green on any
+    // replacement that happens to contain it; asserting the clause the surface
+    // composes is the same claim without either failure mode.
+    expect(a).toContain(VSPLIT_VDEFORM_CLAUSES.sceneIs);
+    expect(a).toContain(VSPLIT_VDEFORM_CLAUSES.remedies);
+    // and the fact the old phrase was reaching for is still stated:
+    expect(a).toMatch(/same VSRAM/);
     // Without the split there is nothing to collide with.
     scene.layers.pop();
     expect(sceneDeformAdvisories(scene)).toEqual([]);
