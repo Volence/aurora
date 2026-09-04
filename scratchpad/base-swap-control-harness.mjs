@@ -18,8 +18,26 @@
 //        SIDE, and NOTHING SNAPS — plus the legal sibling that proves the box
 //        is live
 //   [hx] the address is shown AS AN ADDRESS: the hex beside the box parses back
-//        to the document's own decimal, and the contract's name is on it
+//        to the document's own decimal, and the panel ADMITS the contract names
+//        no address (it stopped naming one at empyrean 8f56c2c)
 //   [as] the two asymmetries with `ramp` are PAINTED, not hover-only
+//
+// ═══ ⚠ MIGRATED FOR THE LIST SHAPE 2026-09-04, AND **NOT YET RE-RUN** ══════
+//
+// `base_swap` became a LIST of per-plane bands at empyrean `8f56c2c`. This file
+// was written against the single `{line, target}` object and read
+// `.base_swap.line` / `.base_swap.target` in eighteen places; every one of those
+// now yields `undefined`, and `undefined === undefined` is how a harness goes
+// fully green over a control that is not on screen. The reads were repointed
+// through `band0()`, which THROWS on the wrong shape rather than returning null.
+//
+// ⚠ THE MIGRATION IS A SOURCE CHANGE THAT NOTHING HAS EXECUTED. This rig drives
+// the real app under CDP and the agent that migrated it did not run it. The
+// rows below are the OLD rows aimed at the new shape; NOTHING here has been
+// observed since the break, and the surface itself is new (a list container, an
+// add control, a plane <Select>, a restore_line presence toggle) so there are
+// rows this file does NOT yet have. Treat a green run as the first evidence,
+// not a re-confirmation — and add rows for the new controls when it is run.
 //
 // ═══ ⚠ NO ROW HERE MAY PASS VACUOUSLY ═════════════════════════════════════
 //
@@ -426,6 +444,32 @@ async function doc(c) {
   return all.find((p) => p.id === PRESET_ID) ?? null;
 }
 
+/**
+ * BAND 0 of a base_swap document — the ONE place this file assumes a shape.
+ *
+ * ⚠ `base_swap` IS A LIST since empyrean `8f56c2c` (T3). It was one closed
+ * `{line, target}` object, and eighteen rows in this file read `.base_swap.line`
+ * / `.base_swap.target` directly. Every one of those reads would now be
+ * `undefined` — and `undefined === undefined` is how a whole harness goes green
+ * over a control that is not there. The reads go through here so a future shape
+ * change breaks ONE function loudly instead of eighteen silently.
+ *
+ * It THROWS rather than returning null: a row that got `undefined` back would
+ * compare two undefineds and pass.
+ */
+function band0(document) {
+  const bands = document?.base_swap;
+  if (!Array.isArray(bands) || bands.length === 0) {
+    throw new Error(
+      'the probe preset does not carry a base_swap LIST with at least one band (read: '
+      + `${JSON.stringify(bands)}). Since empyrean 8f56c2c the key is an array, minItems 1; if it `
+      + 'has changed shape again, fix this helper rather than letting every row below compare two '
+      + 'undefineds and pass.',
+    );
+  }
+  return bands[0];
+}
+
 /** `$E000` → 57344. The one piece of arithmetic this file does, on the app's own text. */
 function hexOf(text) {
   const m = /\$([0-9A-Fa-f]+)/.exec(text ?? '');
@@ -556,11 +600,12 @@ async function main() {
       !!advisory && advisory.inScroller === true && advisory.allPresent === true
       && !/fresh ramp|fresh base swap|fresh one-band/.test(advisory.full),
       `advisory = ${JSON.stringify(advisory && { ...advisory, full: undefined })}`);
-    check('cv-a', 'the switch REALLY CONVERTED THE DOCUMENT — `base_swap` is present with both '
+    check('cv-a', 'the switch REALLY CONVERTED THE DOCUMENT — `base_swap` is present as a LIST whose first band carries every required key '
       + 'keys, and the `bands` key is GONE, not emptied. ⚠ THE CLAIM IS ABOUT THE DOCUMENT, read '
       + 'back through the model, not about a handler having run or a select showing a new label',
       !!swapDoc && swapDoc.base_swap !== undefined && !('bands' in swapDoc)
-      && ['line', 'target'].every((k) => k in swapDoc.base_swap),
+      && Array.isArray(swapDoc.base_swap) && swapDoc.base_swap.length >= 1
+      && ['plane', 'line', 'target'].every((k) => k in swapDoc.base_swap[0]),
       `driven by: ${gesture}; document = ${JSON.stringify(swapDoc)} (was ${BANDS_JSON})`);
     check('cv-b', 'and it never authored the multi-key document the schema refuses — exactly one '
       + 'raster program at every instant',
@@ -676,18 +721,29 @@ async function main() {
     const hxDoc = await doc(c);
     const gloss = await c.evalExpr('window.__bs.targetGloss()');
     const summary = await c.json(`window.__bs.paintedRect('base register', `
-      + `['re-pointed at', 'Plane A']) `);
+      + `['re-pointed at']) `);
     await shot(c, 'hx-gloss');
     check('hx-a', '⚠ THE GLOSS BESIDE THE BOX IS THE SAME ADDRESS IN HEX, PARSED BACK AND COMPARED '
       + 'TO THE DOCUMENT — not a string this file recognises. An author meeting five decimal '
       + 'digits in a spinner has no way to know they are looking at a VRAM base at all',
-      typeof gloss === 'string' && hexOf(gloss) === hxDoc.base_swap.target,
-      `document target = ${hxDoc.base_swap.target}; gloss = ${JSON.stringify(gloss)}; the hex in it `
+      typeof gloss === 'string' && hexOf(gloss) === band0(hxDoc).target,
+      `document target = ${band0(hxDoc).target}; gloss = ${JSON.stringify(gloss)}; the hex in it `
       + `parses to ${hexOf(gloss)}`);
-    check('hx-b', 'and the contract\'s NAME for that address is on screen beside it — the whole '
-      + 'reason the number is meaningful. The name is matched as a VRAM_* symbol shape, not as a '
-      + 'literal this file carries',
-      typeof gloss === 'string' && /VRAM_[A-Z0-9_]+/.test(gloss),
+    // ⚠ THIS ROW CHANGED SIDES AT `8f56c2c`, and the reason is worth reading
+    // before "fixing" it back. It used to assert the contract's NAME for the
+    // address was on screen (`VRAM_PLANE_B`), because `target`'s description
+    // ended "targets 57344 ($E000, VRAM_PLANE_B)". The amendment rewrote that
+    // description down to the range and the granule, so the contract names NO
+    // authorable address any more — and the panel's rule has always been to name
+    // nothing the contract does not. The correct on-screen behaviour is now to
+    // SAY SO, and a VRAM_* name appearing here would mean the editor had started
+    // inventing one.
+    check('hx-b', '⚠ AND THE PANEL ADMITS IT CANNOT NAME THE ADDRESS. The contract stopped naming '
+      + 'any VRAM base at empyrean 8f56c2c, so the gloss must say the contract names none rather '
+      + 'than supplying a name Aurora would be making up — a wrong name on a VRAM base tells an '
+      + 'author they are pointing a plane at a picture they are not',
+      typeof gloss === 'string' && /names no VRAM base address/.test(gloss)
+      && !/VRAM_[A-Z0-9_]+/.test(gloss),
       `gloss = ${JSON.stringify(gloss)}`);
     // ⚠ NOT `hexOf(summary.full)`, AND THE FIRST VERSION OF THIS ROW WAS. That
     // takes the FIRST `$` in the sentence, which is `$02` — the VDP register
@@ -703,8 +759,8 @@ async function main() {
       + 'numbers — the line it fires on and the address in BOTH bases, agreeing with each other '
       + 'and with the document',
       !!summary && summary.inScroller === true && summary.allPresent === true
-      && summary.full.includes(String(hxDoc.base_swap.line))
-      && summaryPairs.some((p) => p.hex === p.dec && p.dec === hxDoc.base_swap.target),
+      && summary.full.includes(String(band0(hxDoc).line))
+      && summaryPairs.some((p) => p.hex === p.dec && p.dec === band0(hxDoc).target),
       `document = ${JSON.stringify(hxDoc.base_swap)}; addresses in the summary = `
       + `${JSON.stringify(summaryPairs)}; summary = ${JSON.stringify(summary && summary.text)}`);
 
@@ -716,7 +772,7 @@ async function main() {
     // ⚠ THE TYPED VALUE IS DERIVED FROM THE DOCUMENT, NOT FROM THE CONTRACT.
     // One less than a legal base is off-granule for ANY granule above 1, so this
     // row survives a re-vendor that changes the granule.
-    const offGranule = beforeGr.base_swap.target - 1;
+    const offGranule = band0(beforeGr).target - 1;
     await typeInto(c, 'target', String(offGranule), 'Target (one below a legal base)');
     const afterGr = await doc(c);
     const grSentence = await c.json(`window.__bs.paintedRect('granule', `
@@ -726,12 +782,12 @@ async function main() {
     check('gr-a', '⚠ AN OFF-GRANULE BASE IS REFUSED AT TYPING TIME AND THE DOCUMENT DOES NOT MOVE '
       + '— the two halves in one condition, because a refusal that only paints is decoration and a '
       + 'silent withhold is the defect this parcel exists to remove. NOTHING SNAPPED: the target '
-      + 'is byte-identical, not rounded to the nearest granule, which would have pointed Plane A '
+      + 'is byte-identical, not rounded to the nearest granule, which would have pointed the band\'s plane '
       + 'at a different picture without saying so',
-      afterGr.base_swap.target === beforeGr.base_swap.target
+      band0(afterGr).target === band0(beforeGr).target
       && !!grSentence && grSentence.inScroller === true && grSentence.allPresent === true,
-      `target ${beforeGr.base_swap.target} → ${afterGr.base_swap.target} (unchanged=`
-      + `${afterGr.base_swap.target === beforeGr.base_swap.target}); typed ${offGranule}; painted `
+      `target ${band0(beforeGr).target} → ${band0(afterGr).target} (unchanged=`
+      + `${band0(afterGr).target === band0(beforeGr).target}); typed ${offGranule}; painted `
       + `refusal = ${JSON.stringify({ ...grSentence, full: undefined })}`);
 
     // THE NEIGHBOURS, READ OFF THE SCREEN AND CHECKED BY ARITHMETIC.
@@ -768,14 +824,14 @@ async function main() {
     const afterLegal = await doc(c);
     check('gr-d', 'ANTI-VACUOUS: the very same box accepts the legal base the refusal offered, so '
       + '[gr-a] measured a REFUSAL and not a dead field',
-      afterLegal.base_swap.target === below,
+      band0(afterLegal).target === below,
       `typed ${below} (offered by the refusal itself); target is now `
-      + `${afterLegal.base_swap.target}`);
+      + `${band0(afterLegal).target}`);
     const glossNow = await c.evalExpr('window.__bs.targetGloss()');
     check('gr-e', 'and the gloss beside the box FOLLOWED the new address — the hex tracks the '
       + 'document rather than being painted once',
-      hexOf(glossNow) === afterLegal.base_swap.target,
-      `gloss = ${JSON.stringify(glossNow)} for target ${afterLegal.base_swap.target}`);
+      hexOf(glossNow) === band0(afterLegal).target,
+      `gloss = ${JSON.stringify(glossNow)} for target ${band0(afterLegal).target}`);
 
     // ══════════════════════════════════════════════════════════════════════
     // [ln] THE FIRE LINE — and the range that is NOT the ramp's
@@ -795,10 +851,10 @@ async function main() {
       ? /ramp's top stops at (\d+)/.exec(lnSentence.full) : null;
     check('ln-a', 'a fire line outside the engine\'s own ensure is REFUSED at typing time and the '
       + 'document does not move',
-      afterLn.base_swap.line === beforeLn.base_swap.line
+      band0(afterLn).line === band0(beforeLn).line
       && !!lnSentence && lnSentence.inScroller === true && lnSentence.allPresent === true,
-      `line ${beforeLn.base_swap.line} → ${afterLn.base_swap.line} (unchanged=`
-      + `${afterLn.base_swap.line === beforeLn.base_swap.line}); painted refusal = `
+      `line ${band0(beforeLn).line} → ${band0(afterLn).line} (unchanged=`
+      + `${band0(afterLn).line === band0(beforeLn).line}); painted refusal = `
       + `${JSON.stringify({ ...lnSentence, full: undefined })}`);
     check('ln-b', '⚠ AND IT STATES THE ASYMMETRY WITH THE RAMP rather than leaving the next reader '
       + 'to assume symmetry: a swap is one fire and reaches the last line before the rewind '
@@ -814,8 +870,8 @@ async function main() {
     const afterMax = await doc(c);
     check('ln-c', 'ANTI-VACUOUS: the same box accepts the maximum the refusal itself named, so '
       + '[ln-a] measured a refusal and not a dead field',
-      afterMax.base_swap.line === maxLine,
-      `typed ${maxLine} (read off the app\'s own sentence); line is now ${afterMax.base_swap.line}`);
+      band0(afterMax).line === maxLine,
+      `typed ${maxLine} (read off the app\'s own sentence); line is now ${band0(afterMax).line}`);
 
     // ══════════════════════════════════════════════════════════════════════
     // Leave the app as we found it — the probe preset was never saved, but the
