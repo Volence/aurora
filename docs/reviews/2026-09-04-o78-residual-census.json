@@ -1,7 +1,7 @@
 {
   "parcel": "O78-RESIDUAL-72",
   "generated": "2026-09-04T03:45:07.152Z",
-  "master_at_branch": "00972ba054f42eb03cc0c379461a42c856b538e4",
+  "master_at_branch": "7599cc48b1ce6ff75cfd8a7f946c58dee17e656c",
   "step1": {
     "method": [
       "population = every `harness:*` script in package.json, resolved to its scratchpad/*.mjs file",
@@ -107,6 +107,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.MSIDWm",
       "tally": "24/24 rows passed",
       "uptime": "00:15:51 up 9 days, 16:04,  1 user,  load average: 8.01, 8.58, 7.77",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -121,6 +122,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.0UrSp3",
       "tally": "20/20 rows passed",
       "uptime": "00:16:22 up 9 days, 16:05,  1 user,  load average: 7.26, 8.33, 7.71",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -135,6 +137,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.b8q2I3",
       "tally": "0/0 PASSED, 2 NOT MEASURABLE",
       "uptime": "00:17:04 up 9 days, 16:06,  1 user,  load average: 6.27, 7.94, 7.60",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -149,6 +152,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.HlySWK",
       "tally": "20/20 rows passed, 1 noted",
       "uptime": "00:17:12 up 9 days, 16:06,  1 user,  load average: 6.41, 7.94, 7.61",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -163,6 +167,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.nl5BuY",
       "tally": "28/28 rows passed, 1 noted",
       "uptime": "00:17:37 up 9 days, 16:06,  1 user,  load average: 6.07, 7.74, 7.55",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -177,6 +182,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.zgC7zb",
       "tally": "HARNESS ERROR: Error: no \"New band\" section on screen",
       "uptime": "00:18:03 up 9 days, 16:07,  1 user,  load average: 5.40, 7.42, 7.45",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -191,6 +197,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.yuIbOn",
       "tally": "43/44 rows passed, 1 NOT MEASURABLE on this document",
       "uptime": "00:18:18 up 9 days, 16:07,  1 user,  load average: 5.25, 7.29, 7.40",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -202,10 +209,50 @@
       "outer_tmpdir_survives": "YES",
       "loader": "ACTIVE",
       "seconds": 86,
-      "outer_tmpdir": "/tmp/xvfb-run.g0FR08",
+      "outer_tmpdir": "/tmp/xvfb-run.VqTP9Y",
       "tally": "25/26 rows passed",
       "uptime": "00:18:58 up 9 days, 16:08,  1 user,  load average: 4.29, 6.79, 7.23",
-      "verdict": "REACHED THE REAPER ALIVE"
+      "launched": true,
+      "verdict": "REACHED THE REAPER ALIVE",
+      "observations": [
+        {
+          "run": "sweep (primary)",
+          "refused_inherited": "YES",
+          "npm_exit": "1",
+          "outer_exit": "1",
+          "seconds": 86,
+          "tally": "25/26 rows passed",
+          "uptime": "00:18:58 up 9 days, 16:08, load average: 4.29, 6.79, 7.23",
+          "verdict": "REACHED THE REAPER ALIVE",
+          "source": "rows.tsv and the committed JSON at cc577d38; the log was later overwritten by the re-runs"
+        },
+        {
+          "run": "repeat 1",
+          "refused_inherited": "NO",
+          "npm_exit": "0",
+          "outer_exit": "0",
+          "seconds": 36,
+          "tally": "38/38 rows passed"
+        },
+        {
+          "run": "repeat 2",
+          "refused_inherited": "NO",
+          "npm_exit": "0",
+          "outer_exit": "0",
+          "seconds": 36,
+          "tally": "38/38 rows passed"
+        },
+        {
+          "run": "repeat 3",
+          "refused_inherited": "NO",
+          "npm_exit": "0",
+          "outer_exit": "0",
+          "seconds": 35,
+          "tally": "38/38 rows passed",
+          "uptime": "02:33:23 up 9 days, 18:22, load average: 8.29, 7.15, 8.39"
+        }
+      ],
+      "note": "INTERMITTENT, and the intermittency is the point. The affected run took a DIFFERENT path from the clean ones — 25 of 26 rows with a failure and exit 1 in 86 s, against 38 of 38 and exit 0 in ~36 s for all three re-runs. Its teardown is a bare process.kill(-child.pid, 'SIGTERM') followed by a FIXED await sleep(1500) with no SIGKILL escalation and no check that the tree is gone (bganim-insert-roomy-harness.mjs:504-506, 546-548), where the packet's clean example d27-effects-focus escalates to SIGKILL and then POLLS portFree() until it is actually free. A fixed-duration wait is not a wait. Consequence for this whole census: ONE clean run of a self-killer does not establish that it is unaffected, which applies to the packet's 6/6 and to all 74 of my own negative rows equally."
     },
     {
       "script": "harness:bganim-motion",
@@ -215,10 +262,11 @@
       "refused_inherited": "NO",
       "outer_tmpdir_survives": "YES",
       "loader": "ABSENT",
-      "seconds": 3,
-      "outer_tmpdir": "/tmp/xvfb-run.yzleeB",
+      "seconds": 4,
+      "outer_tmpdir": "/tmp/xvfb-run.VgSvGk",
       "tally": "HARNESS ERROR: Error: ENOENT: no such file or directory, open '/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a79f5ac54eb15d28f/scratchpad/fixtures/aeon-bganim-coherent/games/sonic4/data/editor_bg_override.json'",
-      "uptime": "00:20:24 up 9 days, 16:09,  1 user,  load average: 6.25, 6.84, 7.21",
+      "uptime": "02:29:41 up 9 days, 18:18,  1 user,  load average: 4.81, 6.54, 8.60",
+      "launched": false,
       "verdict": "UNMEASURABLE",
       "reason": "the instrument was ABSENT: the run died before harness-guard was imported, so the tell could not print either way"
     },
@@ -234,6 +282,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.vIjoVU",
       "tally": "20/20 rows passed",
       "uptime": "00:20:28 up 9 days, 16:09,  1 user,  load average: 6.31, 6.85, 7.21",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -248,6 +297,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.smrgno",
       "tally": "HARNESS ERROR: Error: no \"New band\" section on screen",
       "uptime": "00:20:48 up 9 days, 16:09,  1 user,  load average: 5.99, 6.74, 7.16",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -262,6 +312,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.6aUOop",
       "tally": "40/40 PASSED",
       "uptime": "00:21:03 up 9 days, 16:10,  1 user,  load average: 5.85, 6.67, 7.13",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -276,6 +327,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.tx3IKl",
       "tally": "=== 20/20 checks passed",
       "uptime": "00:21:32 up 9 days, 16:10,  1 user,  load average: 5.64, 6.55, 7.08",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -290,6 +342,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.i2auLv",
       "tally": "HARNESS ERROR: no \"New band\" section on screen",
       "uptime": "00:22:12 up 9 days, 16:11,  1 user,  load average: 5.68, 6.45, 7.02",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -300,12 +353,13 @@
       "refused_inherited": "NO",
       "outer_tmpdir_survives": "UNKNOWN",
       "loader": "ACTIVE",
-      "seconds": 240,
-      "outer_tmpdir": "/tmp/xvfb-run.Q6QxmE",
+      "seconds": 900,
+      "outer_tmpdir": "/tmp/xvfb-run.CaVRHE",
       "tally": null,
-      "uptime": "00:22:27 up 9 days, 16:11,  1 user,  load average: 5.51, 6.38, 6.99",
+      "uptime": "01:40:49 up 9 days, 17:29,  1 user,  load average: 8.51, 7.48, 8.64",
+      "launched": true,
       "verdict": "UNMEASURABLE",
-      "reason": "capped at the 240 s run timeout — killed, never a pass"
+      "reason": "capped at the run timeout after 900s — the run was KILLED, never a pass"
     },
     {
       "script": "harness:camera-preview",
@@ -319,6 +373,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.c3pJzY",
       "tally": "26/26 rows passed",
       "uptime": "00:26:27 up 9 days, 16:15,  1 user,  load average: 3.47, 5.07, 6.35",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -333,6 +388,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.UTEyUZ",
       "tally": "20/20 rows passed",
       "uptime": "00:27:25 up 9 days, 16:16,  1 user,  load average: 6.74, 5.56, 6.43",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -347,6 +403,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.HPmp94",
       "tally": "18/19 rows passed — FAILED: 8",
       "uptime": "00:27:56 up 9 days, 16:17,  1 user,  load average: 5.95, 5.49, 6.38",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -361,6 +418,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.LmBkHZ",
       "tally": "════ 30/30 ════",
       "uptime": "00:28:26 up 9 days, 16:17,  1 user,  load average: 5.52, 5.43, 6.33",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -375,6 +433,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.XxqShP",
       "tally": "7/7 rows passed",
       "uptime": "00:28:41 up 9 days, 16:17,  1 user,  load average: 6.11, 5.56, 6.35",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -389,6 +448,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.2kG09n",
       "tally": "=== 18/18 PASSED ===",
       "uptime": "00:29:22 up 9 days, 16:18,  1 user,  load average: 4.37, 5.18, 6.19",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -403,6 +463,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.CBsHl1",
       "tally": "6/6 rows passed",
       "uptime": "00:30:17 up 9 days, 16:19,  1 user,  load average: 4.46, 5.04, 6.08",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -417,6 +478,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.LmqylP",
       "tally": "=== 13/14 PASSED ===",
       "uptime": "00:30:51 up 9 days, 16:19,  1 user,  load average: 7.45, 5.78, 6.30",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -431,6 +493,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.wv5ZSF",
       "tally": "5/5 rows passed",
       "uptime": "00:31:54 up 9 days, 16:20,  1 user,  load average: 4.86, 5.35, 6.11",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -445,6 +508,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.p5bQfv",
       "tally": "════ 12/12 ════",
       "uptime": "00:32:20 up 9 days, 16:21,  1 user,  load average: 4.46, 5.21, 6.04",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -459,6 +523,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.KY8EIB",
       "tally": null,
       "uptime": "00:32:30 up 9 days, 16:21,  1 user,  load average: 4.00, 5.09, 5.99",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -469,12 +534,13 @@
       "refused_inherited": "NO",
       "outer_tmpdir_survives": "UNKNOWN",
       "loader": "ACTIVE",
-      "seconds": 240,
-      "outer_tmpdir": "/tmp/xvfb-run.HV4i9I",
+      "seconds": 900,
+      "outer_tmpdir": "/tmp/xvfb-run.1PCcZi",
       "tally": "PASS: 20/20 act switches, no crash.",
-      "uptime": "00:32:48 up 9 days, 16:21,  1 user,  load average: 3.59, 4.92, 5.92",
+      "uptime": "01:55:50 up 9 days, 17:44,  1 user,  load average: 21.69, 13.81, 10.43",
+      "launched": true,
       "verdict": "UNMEASURABLE",
-      "reason": "capped at the 240 s run timeout — killed, never a pass"
+      "reason": "capped at the run timeout after 900s — the run was KILLED, never a pass"
     },
     {
       "script": "harness:curve-editor",
@@ -488,6 +554,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.J4Mh5J",
       "tally": "30/30 rows passed",
       "uptime": "00:36:48 up 9 days, 16:25,  1 user,  load average: 4.84, 4.55, 5.50",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -502,6 +569,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.uVAknL",
       "tally": "30/30 checks passed   (wall 22.2s, loadavg now 4.62 4.52 5.42)",
       "uptime": "00:37:35 up 9 days, 16:26,  1 user,  load average: 4.61, 4.52, 5.44",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -516,6 +584,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.EqbH40",
       "tally": "════ 27/31 ════",
       "uptime": "00:38:00 up 9 days, 16:27,  1 user,  load average: 4.62, 4.52, 5.42",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -530,6 +599,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.6XTy5S",
       "tally": "════ 19/19 ════",
       "uptime": "00:38:44 up 9 days, 16:27,  1 user,  load average: 5.06, 4.64, 5.41",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -544,6 +614,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.VUdRbE",
       "tally": "════ 20/20 ════",
       "uptime": "00:39:25 up 9 days, 16:28,  1 user,  load average: 6.68, 5.11, 5.54",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -558,6 +629,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.22MVdv",
       "tally": "════ 30/30 ════",
       "uptime": "00:39:59 up 9 days, 16:29,  1 user,  load average: 6.24, 5.17, 5.54",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -572,6 +644,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.WYETyj",
       "tally": "25/25 gated rows passed  (12 reports)",
       "uptime": "00:40:41 up 9 days, 16:29,  1 user,  load average: 5.29, 5.09, 5.50",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -586,6 +659,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.3qqbZt",
       "tally": "38/38 rows passed",
       "uptime": "00:41:03 up 9 days, 16:30,  1 user,  load average: 4.74, 4.97, 5.45",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -600,6 +674,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.uZ1UCn",
       "tally": "42/42 rows passed",
       "uptime": "00:41:45 up 9 days, 16:30,  1 user,  load average: 4.65, 4.92, 5.42",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -614,6 +689,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.n0qWJ9",
       "tally": "TOTAL 22/22 rows PASSED",
       "uptime": "00:42:48 up 9 days, 16:31,  1 user,  load average: 6.13, 5.30, 5.51",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -628,6 +704,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.8rvAzA",
       "tally": "HARNESS ERROR: no band in the model",
       "uptime": "00:43:09 up 9 days, 16:32,  1 user,  load average: 5.98, 5.33, 5.52",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -642,6 +719,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.5HMSIP",
       "tally": "47/47 rows passed",
       "uptime": "00:43:30 up 9 days, 16:32,  1 user,  load average: 6.20, 5.43, 5.55",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -656,6 +734,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.pD8G1e",
       "tally": "9/9 rows passed",
       "uptime": "00:44:15 up 9 days, 16:33,  1 user,  load average: 5.28, 5.31, 5.50",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -670,6 +749,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.n4vP0g",
       "tally": "36/36 rows passed",
       "uptime": "00:44:38 up 9 days, 16:33,  1 user,  load average: 5.10, 5.27, 5.48",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -684,6 +764,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.kBdJya",
       "tally": "34/34 rows passed",
       "uptime": "00:45:45 up 9 days, 16:34,  1 user,  load average: 5.59, 5.37, 5.50",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -698,6 +779,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.h5zb8e",
       "tally": "40/40 rows passed",
       "uptime": "00:46:11 up 9 days, 16:35,  1 user,  load average: 5.19, 5.30, 5.48",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -712,6 +794,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.wAGqlH",
       "tally": "=== 25/25 PASSED ===",
       "uptime": "00:46:36 up 9 days, 16:35,  1 user,  load average: 6.13, 5.53, 5.55",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -726,6 +809,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.0QerZ2",
       "tally": "33/33 rows passed",
       "uptime": "00:46:57 up 9 days, 16:36,  1 user,  load average: 6.35, 5.63, 5.58",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -740,6 +824,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.jtfQ0s",
       "tally": "7/7 rows passed",
       "uptime": "00:47:18 up 9 days, 16:36,  1 user,  load average: 5.96, 5.59, 5.57",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -754,6 +839,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.5EFC23",
       "tally": "5/5 rows passed",
       "uptime": "00:47:36 up 9 days, 16:36,  1 user,  load average: 5.68, 5.55, 5.55",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -768,6 +854,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.2QgNIq",
       "tally": "13/13 rows passed",
       "uptime": "00:48:03 up 9 days, 16:37,  1 user,  load average: 6.33, 5.72, 5.61",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -782,6 +869,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.GGAHZH",
       "tally": "16/16 rows passed",
       "uptime": "00:48:25 up 9 days, 16:37,  1 user,  load average: 6.47, 5.79, 5.64",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -796,6 +884,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.3mfyvl",
       "tally": "15/15 rows passed",
       "uptime": "00:48:43 up 9 days, 16:37,  1 user,  load average: 5.89, 5.70, 5.61",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -810,6 +899,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.TVInrV",
       "tally": "23/23 rows passed",
       "uptime": "00:49:00 up 9 days, 16:38,  1 user,  load average: 5.62, 5.65, 5.60",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -824,6 +914,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.LtrHlA",
       "tally": "NOTE  [6-visual] GHZ Platform ($18) area before/after six divergences (supplementary — screenshots 13/15) — map canvas hash 327017985 -> 327017985 (equal=true); object at (4640,488); ledge at {\"x\":379",
       "uptime": "00:50:04 up 9 days, 16:39,  1 user,  load average: 6.81, 5.88, 5.67",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -838,6 +929,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.aVqXAd",
       "tally": null,
       "uptime": "00:50:47 up 9 days, 16:39,  1 user,  load average: 5.73, 5.72, 5.63",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -852,6 +944,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.uKkEws",
       "tally": "45/45 agree",
       "uptime": "00:51:17 up 9 days, 16:40,  1 user,  load average: 5.06, 5.56, 5.57",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -866,6 +959,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.kPUTFF",
       "tally": "17/17 rows passed",
       "uptime": "00:51:58 up 9 days, 16:41,  1 user,  load average: 7.34, 6.05, 5.74",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -880,6 +974,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.ChGLLz",
       "tally": "9/9 rows passed",
       "uptime": "00:52:14 up 9 days, 16:41,  1 user,  load average: 6.53, 5.93, 5.70",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -894,6 +989,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.qo9USq",
       "tally": "25/25 rows passed",
       "uptime": "00:52:43 up 9 days, 16:41,  1 user,  load average: 12.42, 7.49, 6.23",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -904,12 +1000,13 @@
       "refused_inherited": "NO",
       "outer_tmpdir_survives": "UNKNOWN",
       "loader": "ACTIVE",
-      "seconds": 240,
-      "outer_tmpdir": "/tmp/xvfb-run.qw5Yc3",
+      "seconds": 900,
+      "outer_tmpdir": "/tmp/xvfb-run.A4W7kL",
       "tally": null,
-      "uptime": "00:53:23 up 9 days, 16:42,  1 user,  load average: 10.06, 7.48, 6.28",
+      "uptime": "02:10:52 up 9 days, 17:59,  1 user,  load average: 15.54, 9.08, 9.13",
+      "launched": true,
       "verdict": "UNMEASURABLE",
-      "reason": "capped at the 240 s run timeout — killed, never a pass"
+      "reason": "capped at the run timeout after 900s — the run was KILLED, never a pass"
     },
     {
       "script": "harness:s1-anim",
@@ -923,6 +1020,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.iIOeld",
       "tally": "6/6 rows passed",
       "uptime": "00:57:23 up 9 days, 16:46,  1 user,  load average: 5.73, 6.77, 6.30",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -937,6 +1035,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.hIeko3",
       "tally": "6/6 rows passed",
       "uptime": "00:57:47 up 9 days, 16:46,  1 user,  load average: 4.88, 6.51, 6.22",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -951,6 +1050,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.OoBTp5",
       "tally": "22/22 rows passed",
       "uptime": "00:58:07 up 9 days, 16:47,  1 user,  load average: 4.31, 6.27, 6.15",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -965,6 +1065,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.lP8XsI",
       "tally": "6/6 rows passed",
       "uptime": "00:58:40 up 9 days, 16:47,  1 user,  load average: 4.75, 6.21, 6.14",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -979,6 +1080,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.dRXGBM",
       "tally": "9/9 rows passed",
       "uptime": "00:59:00 up 9 days, 16:48,  1 user,  load average: 4.75, 6.12, 6.11",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -993,6 +1095,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.RdB2Ag",
       "tally": "30/30 rows passed",
       "uptime": "00:59:20 up 9 days, 16:48,  1 user,  load average: 4.92, 6.06, 6.09",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -1007,6 +1110,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.TiKSiv",
       "tally": "ALL PASS  (6/6)",
       "uptime": "01:00:00 up 9 days, 16:49,  1 user,  load average: 5.20, 5.99, 6.06",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -1021,6 +1125,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.5eTbjy",
       "tally": "8/8 rows passed",
       "uptime": "01:00:31 up 9 days, 16:49,  1 user,  load average: 13.20, 7.73, 6.63",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -1035,6 +1140,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.OrNYhr",
       "tally": "8/8 rows passed",
       "uptime": "01:00:44 up 9 days, 16:49,  1 user,  load average: 13.57, 8.10, 6.77",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -1049,6 +1155,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.RARjvr",
       "tally": "12/12 rows passed",
       "uptime": "01:01:04 up 9 days, 16:50,  1 user,  load average: 11.29, 7.93, 6.75",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -1063,6 +1170,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.yv2pFF",
       "tally": "33/33 rows passed",
       "uptime": "01:01:28 up 9 days, 16:50,  1 user,  load average: 9.61, 7.80, 6.74",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -1077,6 +1185,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.GTmXis",
       "tally": "65/65 rows passed   (+12 NOT-MEASURED / context notes)",
       "uptime": "01:02:08 up 9 days, 16:51,  1 user,  load average: 8.00, 7.62, 6.72",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -1091,6 +1200,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.WXWbFZ",
       "tally": "31/31 rows passed",
       "uptime": "01:03:29 up 9 days, 16:52,  1 user,  load average: 7.63, 7.88, 6.90",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -1105,6 +1215,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.FhLj6f",
       "tally": "5/5 rows passed",
       "uptime": "01:04:05 up 9 days, 16:53,  1 user,  load average: 13.79, 9.28, 7.40",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -1119,6 +1230,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.2LLQuc",
       "tally": "10/10 rows passed",
       "uptime": "01:04:28 up 9 days, 16:53,  1 user,  load average: 16.14, 10.07, 7.70",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -1133,6 +1245,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.C4se1o",
       "tally": null,
       "uptime": "01:04:44 up 9 days, 16:53,  1 user,  load average: 18.12, 10.97, 8.05",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -1147,6 +1260,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.MWJ1RI",
       "tally": "mirror=true ditherCfg=false pixelPerfect=true transforms(7/7)=true zoom=true | brushSpace=false Rpt=false paletteLine=false",
       "uptime": "01:05:02 up 9 days, 16:54,  1 user,  load average: 16.51, 10.96, 8.09",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -1161,6 +1275,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.DGylgf",
       "tally": "15/15 rows passed",
       "uptime": "01:06:46 up 9 days, 16:55,  1 user,  load average: 11.04, 11.21, 8.53",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -1175,6 +1290,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.aptMzk",
       "tally": "8/8 rows passed",
       "uptime": "01:06:54 up 9 days, 16:55,  1 user,  load average: 10.56, 11.10, 8.52",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -1189,6 +1305,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.HCQFTQ",
       "tally": "45/45 rows passed",
       "uptime": "01:07:15 up 9 days, 16:56,  1 user,  load average: 9.40, 10.80, 8.48",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -1203,6 +1320,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.PjUw4V",
       "tally": "37/37 checks passed",
       "uptime": "01:07:51 up 9 days, 16:56,  1 user,  load average: 16.93, 12.42, 9.10",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -1217,6 +1335,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.eAGoBr",
       "tally": "════ 28/28 rows · 38.6s ════",
       "uptime": "01:08:39 up 9 days, 16:57,  1 user,  load average: 17.08, 13.46, 9.64",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1231,21 +1350,23 @@
       "outer_tmpdir": "/tmp/xvfb-run.TsPoXl",
       "tally": "=== 44 rows, 0 failed, 26.2s ===",
       "uptime": "01:09:22 up 9 days, 16:58,  1 user,  load average: 12.11, 12.61, 9.52",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
       "script": "harness:base-swap-control",
       "class": "KILLTREE",
-      "npm_exit": "1",
-      "outer_exit": "1",
-      "refused_inherited": "NO",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "YES",
       "outer_tmpdir_survives": "YES",
       "loader": "ACTIVE",
-      "seconds": 3,
-      "outer_tmpdir": "/tmp/xvfb-run.HFIyXM",
-      "tally": "HARNESS ERROR: dist/ is STALER than src/ in /home/volence/sonic_hacks/aurora — /home/volence/sonic_hacks/aurora/src/renderer/providers/effects-aeon.ts is 5532s newer than /home/volence/sonic_hacks/aurora/dist/main/index.mjs. Every row below would measure code that is not in the bundle. Run VITE_AURORA_DEBUG=1 npm run build in /home/volence/sonic_hacks/aurora.",
-      "uptime": "01:09:51 up 9 days, 16:58,  1 user,  load average: 10.35, 12.14, 9.46",
-      "verdict": "did not reach the reaper alive"
+      "seconds": 34,
+      "outer_tmpdir": "/tmp/xvfb-run.A37tpm",
+      "tally": "RESULT  25/25 rows passed",
+      "uptime": "02:25:53 up 9 days, 18:14,  1 user,  load average: 5.88, 8.25, 9.59",
+      "launched": true,
+      "verdict": "REACHED THE REAPER ALIVE"
     },
     {
       "script": "harness:bg-dangling-ref",
@@ -1259,6 +1380,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.04ImrK",
       "tally": "26 passed, 0 failed, 0 noted (26 rows)",
       "uptime": "01:09:55 up 9 days, 16:58,  1 user,  load average: 10.08, 12.05, 9.44",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1273,6 +1395,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.VoQJm9",
       "tally": "12/27 rows passed",
       "uptime": "01:10:09 up 9 days, 16:59,  1 user,  load average: 9.48, 11.82, 9.41",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1287,20 +1410,22 @@
       "outer_tmpdir": "/tmp/xvfb-run.cwbDwh",
       "tally": "=== 21/21 rows passed ===",
       "uptime": "01:10:30 up 9 days, 16:59,  1 user,  load average: 9.05, 11.56, 9.37",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
       "script": "harness:canvas-cdp",
       "class": "KILLTREE",
-      "npm_exit": "1",
-      "outer_exit": "1",
+      "npm_exit": "0",
+      "outer_exit": "0",
       "refused_inherited": "NO",
       "outer_tmpdir_survives": "YES",
       "loader": "ACTIVE",
-      "seconds": 175,
-      "outer_tmpdir": "/tmp/xvfb-run.Y2ThYk",
+      "seconds": 176,
+      "outer_tmpdir": "/tmp/xvfb-run.UpjqiP",
       "tally": "=== session: D — a rejected sidecar, read on screen (rows 11/14) (port 9364 verified free) ===",
-      "uptime": "01:10:52 up 9 days, 16:59,  1 user,  load average: 8.46, 11.26, 9.32",
+      "uptime": "01:36:56 up 9 days, 17:26,  1 user,  load average: 8.67, 8.38, 9.29",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
@@ -1308,29 +1433,30 @@
       "class": "KILLTREE",
       "npm_exit": "0",
       "outer_exit": "0",
-      "refused_inherited": "NO",
+      "refused_inherited": "YES",
       "outer_tmpdir_survives": "YES",
       "loader": "ACTIVE",
       "seconds": 62,
-      "outer_tmpdir": "/tmp/xvfb-run.avRD5l",
+      "outer_tmpdir": "/tmp/xvfb-run.d9cRXE",
       "tally": null,
-      "uptime": "01:13:47 up 9 days, 17:02,  1 user,  load average: 10.27, 10.23, 9.23",
-      "verdict": "did not reach the reaper alive"
+      "uptime": "01:34:26 up 9 days, 17:23,  1 user,  load average: 6.26, 9.25, 9.73",
+      "launched": true,
+      "verdict": "REACHED THE REAPER ALIVE"
     },
     {
       "script": "harness:chunk-links",
       "class": "KILLTREE",
-      "npm_exit": "2",
-      "outer_exit": "2",
-      "refused_inherited": "NO",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "YES",
       "outer_tmpdir_survives": "YES",
-      "loader": "ABSENT",
-      "seconds": 4,
-      "outer_tmpdir": "/tmp/xvfb-run.zlkxvo",
-      "tally": "HARNESS ERROR: dist/ is STALER than src/ in /home/volence/sonic_hacks/aurora — /home/volence/sonic_hacks/aurora/src/renderer/providers/effects-aeon.ts is 5532s newer than /home/volence/sonic_hacks/aurora/dist/main/index.mjs. Every row below would measure code that is not in the bundle. Run VITE_AURORA_DEBUG=1 npm run build in /home/volence/sonic_hacks/aurora.",
-      "uptime": "01:14:49 up 9 days, 17:03,  1 user,  load average: 8.54, 9.69, 9.11",
-      "verdict": "UNMEASURABLE",
-      "reason": "the instrument was ABSENT: the run died before harness-guard was imported, so the tell could not print either way"
+      "loader": "ACTIVE",
+      "seconds": 25,
+      "outer_tmpdir": "/tmp/xvfb-run.yZTRoU",
+      "tally": "11/11 rows passed",
+      "uptime": "02:28:22 up 9 days, 18:17,  1 user,  load average: 4.76, 6.95, 8.90",
+      "launched": true,
+      "verdict": "REACHED THE REAPER ALIVE"
     },
     {
       "script": "harness:collision-read",
@@ -1344,52 +1470,53 @@
       "outer_tmpdir": "/tmp/xvfb-run.G8VSOb",
       "tally": "=== 32/32 rows passed  (wall clock 4.7s) ===",
       "uptime": "01:14:53 up 9 days, 17:03,  1 user,  load average: 8.54, 9.69, 9.11",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
       "script": "harness:collision-say-both",
       "class": "KILLTREE",
-      "npm_exit": "2",
-      "outer_exit": "2",
-      "refused_inherited": "NO",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "YES",
       "outer_tmpdir_survives": "YES",
-      "loader": "ABSENT",
-      "seconds": 3,
-      "outer_tmpdir": "/tmp/xvfb-run.MY4Xgo",
-      "tally": "HARNESS ERROR: Error: dist/ is STALER than src/ in /home/volence/sonic_hacks/aurora — /home/volence/sonic_hacks/aurora/src/renderer/providers/effects-aeon.ts is 5532s newer than /home/volence/sonic_hacks/aurora/dist/main/index.mjs. Every row below would measure code that is not in the bundle. Run VITE_AURORA_DEBUG=1 npm run build in /home/volence/sonic_hacks/aurora.",
-      "uptime": "01:15:01 up 9 days, 17:04,  1 user,  load average: 7.91, 9.52, 9.06",
-      "verdict": "UNMEASURABLE",
-      "reason": "the instrument was ABSENT: the run died before harness-guard was imported, so the tell could not print either way"
+      "loader": "ACTIVE",
+      "seconds": 9,
+      "outer_tmpdir": "/tmp/xvfb-run.J0DzrA",
+      "tally": "════ 12/12 ════",
+      "uptime": "02:28:48 up 9 days, 18:17,  1 user,  load average: 5.31, 6.89, 8.83",
+      "launched": true,
+      "verdict": "REACHED THE REAPER ALIVE"
     },
     {
       "script": "harness:composer-collision-gesture",
       "class": "KILLTREE",
-      "npm_exit": "2",
-      "outer_exit": "2",
-      "refused_inherited": "NO",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "YES",
       "outer_tmpdir_survives": "YES",
-      "loader": "ABSENT",
-      "seconds": 3,
-      "outer_tmpdir": "/tmp/xvfb-run.VDtCtR",
-      "tally": "HARNESS ERROR: dist/ is STALER than src/ in /home/volence/sonic_hacks/aurora — /home/volence/sonic_hacks/aurora/src/renderer/providers/effects-aeon.ts is 5532s newer than /home/volence/sonic_hacks/aurora/dist/main/index.mjs. Every row below would measure code that is not in the bundle. Run VITE_AURORA_DEBUG=1 npm run build in /home/volence/sonic_hacks/aurora.",
-      "uptime": "01:15:05 up 9 days, 17:04,  1 user,  load average: 7.60, 9.43, 9.03",
-      "verdict": "UNMEASURABLE",
-      "reason": "the instrument was ABSENT: the run died before harness-guard was imported, so the tell could not print either way"
+      "loader": "ACTIVE",
+      "seconds": 19,
+      "outer_tmpdir": "/tmp/xvfb-run.cdH0xa",
+      "tally": "════ 13/13 ════",
+      "uptime": "02:28:57 up 9 days, 18:18,  1 user,  load average: 5.77, 6.94, 8.83",
+      "launched": true,
+      "verdict": "REACHED THE REAPER ALIVE"
     },
     {
       "script": "harness:composer-priority",
       "class": "KILLTREE",
-      "npm_exit": "2",
-      "outer_exit": "2",
-      "refused_inherited": "NO",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "YES",
       "outer_tmpdir_survives": "YES",
-      "loader": "ABSENT",
-      "seconds": 3,
-      "outer_tmpdir": "/tmp/xvfb-run.AKF5kl",
-      "tally": "HARNESS ERROR: dist/ is STALER than src/ in /home/volence/sonic_hacks/aurora — /home/volence/sonic_hacks/aurora/src/renderer/providers/effects-aeon.ts is 5532s newer than /home/volence/sonic_hacks/aurora/dist/main/index.mjs. Every row below would measure code that is not in the bundle. Run VITE_AURORA_DEBUG=1 npm run build in /home/volence/sonic_hacks/aurora.",
-      "uptime": "01:15:08 up 9 days, 17:04,  1 user,  load average: 7.39, 9.36, 9.01",
-      "verdict": "UNMEASURABLE",
-      "reason": "the instrument was ABSENT: the run died before harness-guard was imported, so the tell could not print either way"
+      "loader": "ACTIVE",
+      "seconds": 24,
+      "outer_tmpdir": "/tmp/xvfb-run.nMXLUi",
+      "tally": "11/11 rows passed",
+      "uptime": "02:29:17 up 9 days, 18:18,  1 user,  load average: 5.40, 6.78, 8.73",
+      "launched": true,
+      "verdict": "REACHED THE REAPER ALIVE"
     },
     {
       "script": "harness:curve-option-disabled",
@@ -1403,6 +1530,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.A9yWso",
       "tally": "=== 27 rows, 0 failed, 19.3s ===",
       "uptime": "01:15:11 up 9 days, 17:04,  1 user,  load average: 7.39, 9.36, 9.01",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1417,6 +1545,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.4NZUNI",
       "tally": "14/14 gated rows passed",
       "uptime": "01:15:34 up 9 days, 17:04,  1 user,  load average: 8.36, 9.37, 9.02",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1431,6 +1560,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.iFY8dw",
       "tally": "43/43 rows passed",
       "uptime": "01:15:52 up 9 days, 17:04,  1 user,  load average: 7.41, 9.11, 8.94",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1445,6 +1575,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.zr02e3",
       "tally": "════ 21/21 rows · 21.3s ════",
       "uptime": "01:16:50 up 9 days, 17:05,  1 user,  load average: 6.30, 8.46, 8.72",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1459,6 +1590,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.diOKUR",
       "tally": "════ 11/11 rows · 13.5s ════",
       "uptime": "01:17:15 up 9 days, 17:06,  1 user,  load average: 6.03, 8.22, 8.63",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1473,6 +1605,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.hmWjwM",
       "tally": "════ 16/16 rows · 57.1s ════",
       "uptime": "01:17:32 up 9 days, 17:06,  1 user,  load average: 6.04, 8.12, 8.59",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1487,6 +1620,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.SFZjwr",
       "tally": "════ 13/13 rows · 17.5s ════",
       "uptime": "01:18:32 up 9 days, 17:07,  1 user,  load average: 6.67, 7.95, 8.51",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1501,6 +1635,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.xoIk6p",
       "tally": "════ 14/15 rows · 19.8s ════",
       "uptime": "01:18:53 up 9 days, 17:07,  1 user,  load average: 9.24, 8.37, 8.63",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1515,6 +1650,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.4SEREj",
       "tally": "════ 14/15 rows · 50.1s ════",
       "uptime": "01:19:17 up 9 days, 17:08,  1 user,  load average: 10.46, 8.76, 8.75",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1529,6 +1665,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.NQ3QZ2",
       "tally": "════ 13/13 rows · 32.8s ════",
       "uptime": "01:20:11 up 9 days, 17:09,  1 user,  load average: 10.22, 9.22, 8.92",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1540,9 +1677,10 @@
       "outer_tmpdir_survives": "YES",
       "loader": "ACTIVE",
       "seconds": 29,
-      "outer_tmpdir": "/tmp/xvfb-run.w7laBR",
+      "outer_tmpdir": "/tmp/xvfb-run.JYKzV1",
       "tally": "════ 16/16 ════",
-      "uptime": "01:20:47 up 9 days, 17:09,  1 user,  load average: 7.45, 8.64, 8.74",
+      "uptime": "01:36:10 up 9 days, 17:25,  1 user,  load average: 4.87, 7.96, 9.21",
+      "launched": false,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1557,6 +1695,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.g8CEjC",
       "tally": "════ 45/45 ════",
       "uptime": "01:21:17 up 9 days, 17:10,  1 user,  load average: 12.39, 9.55, 9.03",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1568,38 +1707,41 @@
       "outer_tmpdir_survives": "YES",
       "loader": "ACTIVE",
       "seconds": 10,
-      "outer_tmpdir": "/tmp/xvfb-run.9rJSoP",
+      "outer_tmpdir": "/tmp/xvfb-run.Dq6iIx",
       "tally": "════ 4/4 rows passed ════",
-      "uptime": "01:21:29 up 9 days, 17:10,  1 user,  load average: 15.07, 10.27, 9.27",
+      "uptime": "01:39:52 up 9 days, 17:28,  1 user,  load average: 5.53, 7.00, 8.58",
+      "launched": true,
       "verdict": "did not reach the reaper alive"
     },
     {
       "script": "harness:ramp-control",
       "class": "KILLTREE",
-      "npm_exit": "1",
-      "outer_exit": "1",
-      "refused_inherited": "NO",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "YES",
       "outer_tmpdir_survives": "YES",
       "loader": "ACTIVE",
-      "seconds": 3,
-      "outer_tmpdir": "/tmp/xvfb-run.gWlOZj",
-      "tally": "HARNESS ERROR: dist/ is STALER than src/ in /home/volence/sonic_hacks/aurora — /home/volence/sonic_hacks/aurora/src/renderer/providers/effects-aeon.ts is 5532s newer than /home/volence/sonic_hacks/aurora/dist/main/index.mjs. Every row below would measure code that is not in the bundle. Run VITE_AURORA_DEBUG=1 npm run build in /home/volence/sonic_hacks/aurora.",
-      "uptime": "01:21:39 up 9 days, 17:10,  1 user,  load average: 15.14, 10.46, 9.34",
-      "verdict": "did not reach the reaper alive"
+      "seconds": 38,
+      "outer_tmpdir": "/tmp/xvfb-run.051Yzf",
+      "tally": "RESULT  23/23 rows passed",
+      "uptime": "02:26:27 up 9 days, 18:15,  1 user,  load average: 5.52, 7.89, 9.42",
+      "launched": true,
+      "verdict": "REACHED THE REAPER ALIVE"
     },
     {
       "script": "harness:ramp-scroll-mode",
       "class": "KILLTREE",
-      "npm_exit": "1",
-      "outer_exit": "1",
-      "refused_inherited": "NO",
+      "npm_exit": "0",
+      "outer_exit": "0",
+      "refused_inherited": "YES",
       "outer_tmpdir_survives": "YES",
       "loader": "ACTIVE",
-      "seconds": 3,
-      "outer_tmpdir": "/tmp/xvfb-run.cy7RF4",
-      "tally": "HARNESS ERROR: dist/ is STALER than src/ in /home/volence/sonic_hacks/aurora — /home/volence/sonic_hacks/aurora/src/renderer/providers/effects-aeon.ts is 5532s newer than /home/volence/sonic_hacks/aurora/dist/main/index.mjs. Every row below would measure code that is not in the bundle. Run VITE_AURORA_DEBUG=1 npm run build in /home/volence/sonic_hacks/aurora.",
-      "uptime": "01:21:43 up 9 days, 17:10,  1 user,  load average: 15.14, 10.46, 9.34",
-      "verdict": "did not reach the reaper alive"
+      "seconds": 52,
+      "outer_tmpdir": "/tmp/xvfb-run.wpuBAP",
+      "tally": "RESULT  11/11 rows passed",
+      "uptime": "02:27:05 up 9 days, 18:16,  1 user,  load average: 5.84, 7.66, 9.28",
+      "launched": true,
+      "verdict": "REACHED THE REAPER ALIVE"
     },
     {
       "script": "harness:save-file-count",
@@ -1613,6 +1755,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.kvEbJA",
       "tally": "════ 8/8 rows · 24.3s ════",
       "uptime": "01:21:46 up 9 days, 17:10,  1 user,  load average: 14.33, 10.37, 9.32",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1627,6 +1770,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.OcN7mo",
       "tally": "════ 23/23 rows · 30.6s ════",
       "uptime": "01:22:14 up 9 days, 17:11,  1 user,  load average: 13.46, 10.55, 9.42",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1634,14 +1778,15 @@
       "class": "KILLTREE",
       "npm_exit": "1",
       "outer_exit": "1",
-      "refused_inherited": "NO",
+      "refused_inherited": "YES",
       "outer_tmpdir_survives": "YES",
       "loader": "ACTIVE",
       "seconds": 25,
-      "outer_tmpdir": "/tmp/xvfb-run.L6k4dG",
+      "outer_tmpdir": "/tmp/xvfb-run.io4FoO",
       "tally": "39/42 checks passed",
-      "uptime": "01:22:48 up 9 days, 17:11,  1 user,  load average: 9.86, 9.98, 9.27",
-      "verdict": "did not reach the reaper alive"
+      "uptime": "01:35:28 up 9 days, 17:24,  1 user,  load average: 5.70, 8.52, 9.44",
+      "launched": true,
+      "verdict": "REACHED THE REAPER ALIVE"
     },
     {
       "script": "harness:tile-attributes",
@@ -1655,6 +1800,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.VspI0n",
       "tally": "════ 49/49 ════",
       "uptime": "01:23:14 up 9 days, 17:12,  1 user,  load average: 9.83, 10.00, 9.30",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1669,6 +1815,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.ik39H1",
       "tally": "39/39 rows passed  (dpr 1, display :95, port 9439)",
       "uptime": "01:23:28 up 9 days, 17:12,  1 user,  load average: 9.23, 9.86, 9.26",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1676,14 +1823,15 @@
       "class": "KILLTREE",
       "npm_exit": "0",
       "outer_exit": "0",
-      "refused_inherited": "NO",
+      "refused_inherited": "YES",
       "outer_tmpdir_survives": "YES",
       "loader": "ACTIVE",
       "seconds": 16,
-      "outer_tmpdir": "/tmp/xvfb-run.FcERGK",
+      "outer_tmpdir": "/tmp/xvfb-run.Fkknwt",
       "tally": null,
-      "uptime": "01:23:57 up 9 days, 17:13,  1 user,  load average: 9.37, 9.82, 9.26",
-      "verdict": "did not reach the reaper alive"
+      "uptime": "01:35:54 up 9 days, 17:24,  1 user,  load average: 5.41, 8.22, 9.32",
+      "launched": true,
+      "verdict": "REACHED THE REAPER ALIVE"
     },
     {
       "script": "harness:variant-cycle",
@@ -1697,6 +1845,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.7dcVEt",
       "tally": "════ 31/31 rows · 33.3s ════",
       "uptime": "01:24:13 up 9 days, 17:13,  1 user,  load average: 8.74, 9.66, 9.22",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1711,6 +1860,7 @@
       "outer_tmpdir": "/tmp/xvfb-run.8bIbNh",
       "tally": "4/4 rows passed · 1 UNMEASURABLE: x1",
       "uptime": "01:24:50 up 9 days, 17:13,  1 user,  load average: 12.74, 10.71, 9.60",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1722,9 +1872,10 @@
       "outer_tmpdir_survives": "YES",
       "loader": "ACTIVE",
       "seconds": 13,
-      "outer_tmpdir": "/tmp/xvfb-run.xIPdZ8",
+      "outer_tmpdir": "/tmp/xvfb-run.ib967B",
       "tally": "════ 22 pass / 0 fail ════",
-      "uptime": "01:24:58 up 9 days, 17:14,  1 user,  load average: 12.36, 10.67, 9.59",
+      "uptime": "01:36:39 up 9 days, 17:25,  1 user,  load average: 4.80, 7.65, 9.07",
+      "launched": true,
       "verdict": "REACHED THE REAPER ALIVE"
     },
     {
@@ -1735,12 +1886,13 @@
       "refused_inherited": "NO",
       "outer_tmpdir_survives": "YES",
       "loader": "ABSENT",
-      "seconds": 4,
-      "outer_tmpdir": "/tmp/xvfb-run.MPBe7r",
+      "seconds": 3,
+      "outer_tmpdir": "/tmp/xvfb-run.Vih26u",
       "tally": "9/9 rows passed",
-      "uptime": "01:25:13 up 9 days, 17:14,  1 user,  load average: 14.57, 11.23, 9.79",
-      "verdict": "UNMEASURABLE",
-      "reason": "the instrument was ABSENT: the run died before harness-guard was imported, so the tell could not print either way"
+      "uptime": "02:29:45 up 9 days, 18:18,  1 user,  load average: 4.66, 6.48, 8.57",
+      "launched": false,
+      "verdict": "did not reach the reaper alive",
+      "basis": "structural (never registers a child); harness-guard was never imported at all"
     },
     {
       "script": "harness:art-agent",
@@ -1754,7 +1906,9 @@
       "outer_tmpdir": "/tmp/xvfb-run.hUxBWA",
       "tally": "10/10",
       "uptime": "01:25:19 up 9 days, 17:14,  1 user,  load average: 16.58, 11.76, 9.98",
-      "verdict": "did not reach the reaper alive"
+      "launched": true,
+      "verdict": "did not reach the reaper alive",
+      "basis": "structural (never registers a child) and the instrument was live"
     },
     {
       "script": "harness:boot-override",
@@ -1764,12 +1918,13 @@
       "refused_inherited": "NO",
       "outer_tmpdir_survives": "YES",
       "loader": "ABSENT",
-      "seconds": 18,
-      "outer_tmpdir": "/tmp/xvfb-run.sCHyAZ",
+      "seconds": 20,
+      "outer_tmpdir": "/tmp/xvfb-run.3ulR2X",
       "tally": "ALL PASS (12/12)",
-      "uptime": "01:25:36 up 9 days, 17:14,  1 user,  load average: 15.24, 11.72, 10.00",
-      "verdict": "UNMEASURABLE",
-      "reason": "the instrument was ABSENT: the run died before harness-guard was imported, so the tell could not print either way"
+      "uptime": "02:29:49 up 9 days, 18:18,  1 user,  load average: 4.66, 6.48, 8.57",
+      "launched": false,
+      "verdict": "did not reach the reaper alive",
+      "basis": "structural (never registers a child); harness-guard was never imported at all"
     },
     {
       "script": "harness:collision-agent",
@@ -1783,7 +1938,9 @@
       "outer_tmpdir": "/tmp/xvfb-run.5NMaGW",
       "tally": "8/8",
       "uptime": "01:25:54 up 9 days, 17:14,  1 user,  load average: 12.18, 11.25, 9.88",
-      "verdict": "did not reach the reaper alive"
+      "launched": true,
+      "verdict": "did not reach the reaper alive",
+      "basis": "structural (never registers a child) and the instrument was live"
     },
     {
       "script": "harness:collision-gesture",
@@ -1797,7 +1954,9 @@
       "outer_tmpdir": "/tmp/xvfb-run.6NBAXo",
       "tally": "9/9",
       "uptime": "01:26:13 up 9 days, 17:15,  1 user,  load average: 11.90, 11.24, 9.90",
-      "verdict": "did not reach the reaper alive"
+      "launched": true,
+      "verdict": "did not reach the reaper alive",
+      "basis": "structural (never registers a child) and the instrument was live"
     },
     {
       "script": "harness:commit-cdp",
@@ -1811,7 +1970,9 @@
       "outer_tmpdir": "/tmp/xvfb-run.hoEHs2",
       "tally": "7/7 checks passed",
       "uptime": "01:26:58 up 9 days, 17:16,  1 user,  load average: 10.28, 10.83, 9.82",
-      "verdict": "did not reach the reaper alive"
+      "launched": true,
+      "verdict": "did not reach the reaper alive",
+      "basis": "structural (never registers a child) and the instrument was live"
     },
     {
       "script": "harness:commit-collision",
@@ -1825,7 +1986,9 @@
       "outer_tmpdir": "/tmp/xvfb-run.uWufsd",
       "tally": "8/8 rows passed",
       "uptime": "01:27:25 up 9 days, 17:16,  1 user,  load average: 11.12, 11.05, 9.93",
-      "verdict": "did not reach the reaper alive"
+      "launched": true,
+      "verdict": "did not reach the reaper alive",
+      "basis": "structural (never registers a child) and the instrument was live"
     },
     {
       "script": "harness:constraints-cdp",
@@ -1839,7 +2002,9 @@
       "outer_tmpdir": "/tmp/xvfb-run.xWwyCc",
       "tally": "30 passed, 0 failed, 7 notes",
       "uptime": "01:28:26 up 9 days, 17:17,  1 user,  load average: 16.42, 12.16, 10.36",
-      "verdict": "did not reach the reaper alive"
+      "launched": true,
+      "verdict": "did not reach the reaper alive",
+      "basis": "structural (never registers a child) and the instrument was live"
     },
     {
       "script": "harness:crossover-paint",
@@ -1853,7 +2018,9 @@
       "outer_tmpdir": "/tmp/xvfb-run.y8OEL0",
       "tally": "=== 15 passed, 0 failed",
       "uptime": "01:29:10 up 9 days, 17:18,  1 user,  load average: 12.29, 11.62, 10.26",
-      "verdict": "did not reach the reaper alive"
+      "launched": true,
+      "verdict": "did not reach the reaper alive",
+      "basis": "structural (never registers a child) and the instrument was live"
     },
     {
       "script": "harness:discovery-exit-net",
@@ -1867,7 +2034,9 @@
       "outer_tmpdir": "/tmp/xvfb-run.rMwkqH",
       "tally": "7/7 rows passed",
       "uptime": "01:29:31 up 9 days, 17:18,  1 user,  load average: 11.01, 11.37, 10.20",
-      "verdict": "did not reach the reaper alive"
+      "launched": false,
+      "verdict": "did not reach the reaper alive",
+      "basis": "structural (never registers a child) and the instrument was live"
     },
     {
       "script": "harness:explorer-canvases",
@@ -1881,7 +2050,9 @@
       "outer_tmpdir": "/tmp/xvfb-run.4SLFik",
       "tally": "2/2 checks passed",
       "uptime": "01:29:35 up 9 days, 17:18,  1 user,  load average: 10.85, 11.33, 10.20",
-      "verdict": "did not reach the reaper alive"
+      "launched": true,
+      "verdict": "did not reach the reaper alive",
+      "basis": "structural (never registers a child) and the instrument was live"
     },
     {
       "script": "harness:import-cdp",
@@ -1895,7 +2066,9 @@
       "outer_tmpdir": "/tmp/xvfb-run.nxRTRV",
       "tally": "4/4 checks passed",
       "uptime": "01:29:51 up 9 days, 17:18,  1 user,  load average: 10.36, 11.20, 10.17",
-      "verdict": "did not reach the reaper alive"
+      "launched": true,
+      "verdict": "did not reach the reaper alive",
+      "basis": "structural (never registers a child) and the instrument was live"
     },
     {
       "script": "harness:paint-regression",
@@ -1909,7 +2082,9 @@
       "outer_tmpdir": "/tmp/xvfb-run.QAzWg6",
       "tally": "1/1 checks passed",
       "uptime": "01:30:09 up 9 days, 17:19,  1 user,  load average: 13.52, 11.81, 10.39",
-      "verdict": "did not reach the reaper alive"
+      "launched": true,
+      "verdict": "did not reach the reaper alive",
+      "basis": "structural (never registers a child) and the instrument was live"
     },
     {
       "script": "harness:palette-push",
@@ -1919,12 +2094,13 @@
       "refused_inherited": "NO",
       "outer_tmpdir_survives": "YES",
       "loader": "ABSENT",
-      "seconds": 5,
-      "outer_tmpdir": "/tmp/xvfb-run.f5Khfd",
+      "seconds": 4,
+      "outer_tmpdir": "/tmp/xvfb-run.qL6plA",
       "tally": "9/9 rows passed",
-      "uptime": "01:30:29 up 9 days, 17:19,  1 user,  load average: 15.06, 12.34, 10.60",
-      "verdict": "UNMEASURABLE",
-      "reason": "the instrument was ABSENT: the run died before harness-guard was imported, so the tell could not print either way"
+      "uptime": "02:30:10 up 9 days, 18:19,  1 user,  load average: 6.67, 6.77, 8.61",
+      "launched": false,
+      "verdict": "did not reach the reaper alive",
+      "basis": "structural (never registers a child); harness-guard was never imported at all"
     },
     {
       "script": "harness:schema-revendor",
@@ -1935,11 +2111,12 @@
       "outer_tmpdir_survives": "YES",
       "loader": "ABSENT",
       "seconds": 3,
-      "outer_tmpdir": "/tmp/xvfb-run.k4Xg6B",
+      "outer_tmpdir": "/tmp/xvfb-run.tQyXyj",
       "tally": "==== 6 / 6 self-test row(s) pass ====",
-      "uptime": "01:30:34 up 9 days, 17:19,  1 user,  load average: 14.50, 12.27, 10.59",
-      "verdict": "UNMEASURABLE",
-      "reason": "the instrument was ABSENT: the run died before harness-guard was imported, so the tell could not print either way"
+      "uptime": "02:30:15 up 9 days, 18:19,  1 user,  load average: 6.85, 6.81, 8.61",
+      "launched": false,
+      "verdict": "did not reach the reaper alive",
+      "basis": "structural (never registers a child); harness-guard was never imported at all"
     },
     {
       "script": "harness:tier-zoom",
@@ -1953,7 +2130,9 @@
       "outer_tmpdir": "/tmp/xvfb-run.B21pyi",
       "tally": "3/3 checks passed",
       "uptime": "01:30:37 up 9 days, 17:19,  1 user,  load average: 14.50, 12.27, 10.59",
-      "verdict": "did not reach the reaper alive"
+      "launched": true,
+      "verdict": "did not reach the reaper alive",
+      "basis": "structural (never registers a child) and the instrument was live"
     },
     {
       "script": "harness:warp-tearing",
@@ -1963,12 +2142,13 @@
       "refused_inherited": "NO",
       "outer_tmpdir_survives": "YES",
       "loader": "ABSENT",
-      "seconds": 16,
-      "outer_tmpdir": "/tmp/xvfb-run.KxaI1G",
+      "seconds": 17,
+      "outer_tmpdir": "/tmp/xvfb-run.oFRZYC",
       "tally": "12/13 rows passed",
-      "uptime": "01:30:58 up 9 days, 17:20,  1 user,  load average: 12.18, 11.88, 10.49",
-      "verdict": "UNMEASURABLE",
-      "reason": "the instrument was ABSENT: the run died before harness-guard was imported, so the tell could not print either way"
+      "uptime": "02:30:18 up 9 days, 18:19,  1 user,  load average: 6.85, 6.81, 8.61",
+      "launched": false,
+      "verdict": "did not reach the reaper alive",
+      "basis": "structural (never registers a child); harness-guard was never imported at all"
     }
   ],
   "rows": [
@@ -3573,11 +3753,9 @@
     "SELFKILL / did not reach the reaper alive": 74,
     "SELFKILL / REACHED THE REAPER ALIVE": 1,
     "SELFKILL / UNMEASURABLE": 4,
-    "KILLTREE / REACHED THE REAPER ALIVE": 25,
-    "KILLTREE / did not reach the reaper alive": 8,
-    "KILLTREE / UNMEASURABLE": 4,
-    "NON_LAUNCHER / UNMEASURABLE": 5,
-    "NON_LAUNCHER / did not reach the reaper alive": 12
+    "KILLTREE / REACHED THE REAPER ALIVE": 35,
+    "KILLTREE / did not reach the reaper alive": 2,
+    "NON_LAUNCHER / did not reach the reaper alive": 17
   },
-  "measurement_generated": "2026-09-04T05:31:21.355Z"
+  "measurement_generated": "2026-09-04T06:34:16.508Z"
 }
