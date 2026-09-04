@@ -42,8 +42,10 @@ import {
   EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE,
   EFFECTS_PRESET_RAMP_TOP_RANGE,
   EFFECTS_PRESET_RASTER_CHANNELS,
+  EFFECTS_PRESET_PROGRAM_ARMS,
   isBaseSwapTargetAligned,
   presetRasterChannel,
+  presetProgramArm,
   parseEffectsPreset,
   serializeEffectsPreset,
   type EffectsPreset,
@@ -58,9 +60,9 @@ import {
   baseSwapTargetGloss, baseSwapSummary,
   baseSwapLineRefusal, baseSwapTargetRefusal, baseSwapTargetNeighbours,
   setBaseSwapLineCommand, setBaseSwapTargetCommand,
-  setRasterChannelCommand, rasterChannelSwapAdvisory, rasterChannelSeedRefusal,
-  rasterEditorGap, rasterEditorGapFor,
-  RASTER_CHANNEL_OPTIONS, bandControlsRefusal,
+  setProgramArmCommand, programArmSwapAdvisory, programArmSeedRefusal,
+  programArmEditorGap, programArmEditorGapFor,
+  PROGRAM_ARM_OPTIONS, bandControlsRefusal,
   presetListEntries, presetListSummary,
   RAMP_TITLE,
 } from '../effects-preset';
@@ -79,7 +81,7 @@ function lib(...presets: EffectsPreset[]): EffectsPresetLibrary {
 /** A fresh document per channel, built by the panel's OWN seeds — never typed. */
 function documentOf(channel: string): EffectsPreset {
   const p: EffectsPreset = { schema: 1, id: ID };
-  const cmd = setRasterChannelCommand(lib(p), ID, channel);
+  const cmd = setProgramArmCommand(lib(p), ID, channel);
   if (cmd === null || !cmd.newPreset) throw new Error(`no seed for channel "${channel}"`);
   return cmd.newPreset;
 }
@@ -438,30 +440,36 @@ describe('switching into and out of base_swap is ONE undoable command', () => {
    * guarantee is structural: `editPresetCommand` carries the WHOLE old document,
    * so undo re-places it verbatim.
    *
-   * ⚠ EVERY PAIR IS ENUMERATED FROM THE SCHEMA'S CHANNEL LIST, not typed out, so
-   * a fourth arm cannot arrive and leave a direction silently untested.
+   * ⚠ EVERY PAIR IS ENUMERATED FROM THE SCHEMA'S ARM LIST, not typed out, so a
+   * fifth arm cannot arrive and leave a direction silently untested.
+   *
+   * ⚠ AND IT WAS THE RASTER LIST UNTIL EW-BOUNDARY-PANEL, WHICH IS THE SHAPE
+   * THIS ROW'S OWN COMMENT WARNED ABOUT. `boundary` did arrive, the enumeration
+   * stayed green over the three raster channels, and both directions through the
+   * fourth arm — the ones where a delete loop keyed to the wrong list authors the
+   * two-arm document — were the untested ones. Twelve ordered pairs now, not six.
    */
-  it('every channel converts to every other, discarding one and restoring it EXACTLY', () => {
+  it('every arm converts to every other, discarding one and restoring it EXACTLY', () => {
     let pairs = 0;
-    for (const from of EFFECTS_PRESET_RASTER_CHANNELS) {
-      for (const to of EFFECTS_PRESET_RASTER_CHANNELS) {
+    for (const from of EFFECTS_PRESET_PROGRAM_ARMS) {
+      for (const to of EFFECTS_PRESET_PROGRAM_ARMS) {
         if (from === to) continue;
         pairs++;
         const p = documentOf(from);
         p.name = 'a name';
         p.cycles = null;
         const before = JSON.stringify(p);
-        const cmd = setRasterChannelCommand(lib(p), ID, to)!;
+        const cmd = setProgramArmCommand(lib(p), ID, to)!;
         expect(cmd, `${from} -> ${to} produced no command`).not.toBeNull();
         expect(cmd.type).toBe('set-effects-preset');
         // The forward step really converted, and to the channel that was asked
         // for — not to "the other one".
-        expect(presetRasterChannel(cmd.newPreset!)).toBe(to);
+        expect(presetProgramArm(cmd.newPreset!)).toBe(to);
         expect(from in cmd.newPreset!, `${from} survived the switch to ${to}`).toBe(false);
         // Exactly one raster key at every instant — the both-keys document the
         // schema refuses is never authored, even transiently.
         expect(Object.keys(cmd.newPreset!)
-          .filter((k) => EFFECTS_PRESET_RASTER_CHANNELS.includes(k))).toHaveLength(1);
+          .filter((k) => EFFECTS_PRESET_PROGRAM_ARMS.includes(k))).toHaveLength(1);
         expect(() => serializeEffectsPreset(cmd.newPreset!)).not.toThrow();
         // The channels that are not the raster one are untouched.
         expect(cmd.newPreset!.name).toBe('a name');
@@ -471,9 +479,9 @@ describe('switching into and out of base_swap is ONE undoable command', () => {
       }
     }
     // ANTI-VACUOUS: the enumeration really produced every ordered pair.
-    const n = EFFECTS_PRESET_RASTER_CHANNELS.length;
+    const n = EFFECTS_PRESET_PROGRAM_ARMS.length;
     expect(pairs).toBe(n * (n - 1));
-    expect(n).toBeGreaterThanOrEqual(3);
+    expect(n).toBeGreaterThanOrEqual(4);
   });
 
   it('bands -> base_swap keeps every band for the undo, in order, with its colours', () => {
@@ -481,7 +489,7 @@ describe('switching into and out of base_swap is ONE undoable command', () => {
     p.bands!.push({ ...newBand(), top: 10, bot: 20 });
     p.bands!.push({ ...newBand(), top: 30, bot: 40, on: { cram: { addr: 34, colours: [1, 2, 3] } } });
     const before = JSON.stringify(p);
-    const cmd = setRasterChannelCommand(lib(p), ID, 'base_swap')!;
+    const cmd = setProgramArmCommand(lib(p), ID, 'base_swap')!;
     expect(cmd.newPreset!.base_swap).toEqual(newBaseSwap());
     expect('bands' in cmd.newPreset!).toBe(false);
     expect(JSON.stringify(cmd.oldPreset)).toBe(before);
@@ -489,9 +497,9 @@ describe('switching into and out of base_swap is ONE undoable command', () => {
     expect(cmd.oldPreset!.bands![2].on).toEqual({ cram: { addr: 34, colours: [1, 2, 3] } });
   });
 
-  it('re-selecting the channel a document already has burns no undo slot', () => {
-    for (const c of EFFECTS_PRESET_RASTER_CHANNELS) {
-      expect(setRasterChannelCommand(lib(documentOf(c)), ID, c), c).toBeNull();
+  it('re-selecting the arm a document already has burns no undo slot', () => {
+    for (const c of EFFECTS_PRESET_PROGRAM_ARMS) {
+      expect(setProgramArmCommand(lib(documentOf(c)), ID, c), c).toBeNull();
     }
   });
 });
@@ -509,17 +517,30 @@ describe('every per-channel surface is a registry, not a branch', () => {
    * `EFFECTS_PRESET_RASTER_CHANNELS`, so they measure whatever the contract
    * declares rather than the three that happen to exist.
    */
-  it('every declared channel has a label, a seed and an editor', () => {
-    for (const c of EFFECTS_PRESET_RASTER_CHANNELS) {
-      const option = RASTER_CHANNEL_OPTIONS.find((o) => o.value === c);
+  it('every declared ARM has a label, a seed and an editor', () => {
+    // ⚠ RE-AIMED FROM `EFFECTS_PRESET_RASTER_CHANNELS` TO THE ARMS BY
+    // EW-BOUNDARY-PANEL, and the widening is the point rather than a fix for a
+    // broken row. Driven by the raster list, this row was green on a panel that
+    // could not author `boundary` at all — it asked "does every arm that writes
+    // ep_raster have a card", which is a narrower question than "does every arm
+    // the dropdown OFFERS have one". The dropdown is derived from the arms, so
+    // the arms are what it has to cover.
+    for (const c of EFFECTS_PRESET_PROGRAM_ARMS) {
+      const option = PROGRAM_ARM_OPTIONS.find((o) => o.value === c);
       expect(option, `channel "${c}" is missing from the dropdown`).toBeDefined();
       expect(option!.label).not.toBe('');
       // The seam this parcel filled: no option says "not authorable here yet".
       expect(option!.label, `"${c}" is still unauthorable`).not.toMatch(/not authorable/);
-      expect(rasterChannelSeedRefusal(c), `"${c}" has no seed`).toBeNull();
-      expect(rasterEditorGapFor(c, ID), `"${c}" has no editor`).toBeNull();
+      expect(programArmSeedRefusal(c), `"${c}" has no seed`).toBeNull();
+      expect(programArmEditorGapFor(c, ID), `"${c}" has no editor`).toBeNull();
     }
-    expect(RASTER_CHANNEL_OPTIONS).toHaveLength(EFFECTS_PRESET_RASTER_CHANNELS.length);
+    expect(PROGRAM_ARM_OPTIONS).toHaveLength(EFFECTS_PRESET_PROGRAM_ARMS.length);
+    // ...and the raster set is a STRICT SUBSET of what the row offers, which is
+    // the fact the old spelling of this row could not see: a document can carry
+    // a program that is not a raster program at all.
+    expect(EFFECTS_PRESET_PROGRAM_ARMS.length).toBeGreaterThan(
+      EFFECTS_PRESET_RASTER_CHANNELS.length,
+    );
   });
 
   /**
@@ -546,7 +567,7 @@ describe('every per-channel surface is a registry, not a branch', () => {
    */
   it('names what it discards and promises no particular destination', () => {
     for (const c of EFFECTS_PRESET_RASTER_CHANNELS) {
-      const advisory = rasterChannelSwapAdvisory(documentOf(c));
+      const advisory = programArmSwapAdvisory(documentOf(c));
       expect(advisory).toMatch(/DISCARDS/);
       expect(advisory).toMatch(/ONE undo step/);
       for (const other of EFFECTS_PRESET_RASTER_CHANNELS) {
@@ -558,8 +579,8 @@ describe('every per-channel surface is a registry, not a branch', () => {
     // It still names the discarded body, which is the whole point of it.
     const bands = newPreset(ID);
     bands.bands!.push(newBand());
-    expect(rasterChannelSwapAdvisory(bands)).toContain('2 raster bands');
-    expect(rasterChannelSwapAdvisory(documentOf('base_swap'))).toContain('this base swap');
+    expect(programArmSwapAdvisory(bands)).toContain('2 raster bands');
+    expect(programArmSwapAdvisory(documentOf('base_swap'))).toContain('this base swap');
   });
 
   /** No list row reads `0 bands` for a document that has no `bands` key. */
@@ -591,13 +612,13 @@ describe('every per-channel surface is a registry, not a branch', () => {
   /**
    * ⚠ THE FOURTH ARM'S LANDING PAD, MEASURED AGAINST A CHANNEL THAT DOES NOT
    * EXIST. Every declared channel has a card today, so a row that could only
-   * pass a real document through `rasterEditorGap` would assert nothing until
+   * pass a real document through `programArmEditorGap` would assert nothing until
    * the defect had already shipped.
    */
   it('a channel with no card on this panel gets a sentence, not an empty section', () => {
     const future = 'future_arm';
     expect(EFFECTS_PRESET_RASTER_CHANNELS).not.toContain(future);
-    const gap = rasterEditorGapFor(future, ID)!;
+    const gap = programArmEditorGapFor(future, ID)!;
     expect(gap).not.toBeNull();
     expect(gap).toContain(ID);
     expect(gap).toContain(future);
@@ -607,8 +628,8 @@ describe('every per-channel surface is a registry, not a branch', () => {
     expect(gap).toMatch(/opens, reads and saves correctly/);
     expect(gap).toMatch(/DISCARD/);
     // ...and it is silent for every document that can exist today.
-    for (const c of EFFECTS_PRESET_RASTER_CHANNELS) expect(rasterEditorGap(documentOf(c))).toBeNull();
-    expect(rasterEditorGap({ schema: 1, id: ID })).toBeNull();
+    for (const c of EFFECTS_PRESET_RASTER_CHANNELS) expect(programArmEditorGap(documentOf(c))).toBeNull();
+    expect(programArmEditorGap({ schema: 1, id: ID })).toBeNull();
   });
 });
 

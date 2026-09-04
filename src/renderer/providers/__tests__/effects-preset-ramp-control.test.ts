@@ -42,6 +42,7 @@ import {
   presetFp16ToNumber,
   presetRasterChannel,
   EFFECTS_PRESET_RASTER_CHANNELS,
+  EFFECTS_PRESET_PROGRAM_ARMS,
   parseEffectsPreset,
   serializeEffectsPreset,
   type EffectsPreset,
@@ -56,8 +57,8 @@ import {
   rampRateProblem, rampRateNeighbours, rampRateRefusal,
   rampDisplaySpan, rampDisplayGloss, rampDriftSummary,
   setRampSpanCommand, setRampAddrCommand, setRampRateCommand,
-  setRasterChannelCommand, rasterChannelSwapAdvisory, RASTER_CHANNEL_OPTIONS,
-  rasterChannelSeedRefusal,
+  setProgramArmCommand, programArmSwapAdvisory, PROGRAM_ARM_OPTIONS,
+  programArmSeedRefusal,
   bandControlsRefusal, lastBandRefusal, addBandCommand, removeBandCommand,
   presetListEntries, presetListSummary,
 } from '../effects-preset';
@@ -565,7 +566,10 @@ describe('the band controls on a ramp document are refused WITH A REASON', () =>
       // the sentence dropped a word it could no longer justify.;
     expect(why).toMatch(/no combinator/);
     // THE WAY OUT, which is what makes it a reason rather than a wall.
-    expect(why).toMatch(/Raster program row/);
+    // ⚠ "Program row", not "Raster program row", since EW-BOUNDARY-PANEL: the
+    // row offers an arm that is not a raster program, so the label it points at
+    // no longer carries that word.
+    expect(why).toMatch(/Program row above/);
     expect(why).toMatch(/one undo step/);
     // ...and it is silent on a bands document, so it is a condition, not decor.
     expect(bandControlsRefusal(newPreset(ID))).toBeNull();
@@ -605,15 +609,17 @@ describe('the band controls on a ramp document are refused WITH A REASON', () =>
 
 describe('switching the raster program is ONE undoable command', () => {
   it('offers exactly the schema\'s channels, and says which cannot be seeded here', () => {
-    // ⚠ RE-PINNED 2026-09-03 (empyrean 5bd76ba): two channels became three. The
-    // list is EVERY channel the contract declares, not every channel this panel
-    // can author, because the same list is what the Select renders the CURRENT
-    // channel from — omitting one would show a base_swap document the wrong
-    // program's name.
-    expect(RASTER_CHANNEL_OPTIONS.map((o) => o.value).sort())
-      .toEqual([...EFFECTS_PRESET_RASTER_CHANNELS].sort());
-    expect(RASTER_CHANNEL_OPTIONS.map((o) => o.value).sort())
-      .toEqual(['bands', 'base_swap', 'ramp']);
+    // ⚠ RE-PINNED 2026-09-03 (empyrean 5bd76ba): two channels became three; and
+    // RE-AIMED 2026-09-04 (EW-BOUNDARY-PANEL) from the RASTER list to the ARM
+    // list, when the fourth arm gained a seed. The list is EVERY arm the
+    // contract declares, not every arm this panel can author, because the same
+    // list is what the Select renders the CURRENT program from — omitting one
+    // would show that document the wrong program's name, or (for `boundary`,
+    // which has no raster channel at all) a BLANK row.
+    expect(PROGRAM_ARM_OPTIONS.map((o) => o.value).sort())
+      .toEqual([...EFFECTS_PRESET_PROGRAM_ARMS].sort());
+    expect(PROGRAM_ARM_OPTIONS.map((o) => o.value).sort())
+      .toEqual(['bands', 'base_swap', 'boundary', 'ramp']);
     // No option is silently dead: one that cannot be seeded says so in its own
     // label AND is refused by the command, from the one predicate.
     //
@@ -621,22 +627,22 @@ describe('switching the raster program is ONE undoable command', () => {
     // `ramp` itself, because switching to the channel a document already carries
     // is a legitimate no-op and would otherwise be indistinguishable from a
     // refusal — the exact confusion this row is here to prevent.
-    for (const o of RASTER_CHANNEL_OPTIONS) {
-      const refusal = rasterChannelSeedRefusal(o.value);
+    for (const o of PROGRAM_ARM_OPTIONS) {
+      const refusal = programArmSeedRefusal(o.value);
       expect(o.label).not.toBe('');
       expect(o.label.includes('not authorable here yet')).toBe(refusal !== null);
       const probe = o.value === 'ramp' ? newPreset(ID, 'n') : rampPreset();
       expect(presetRasterChannel(probe)).not.toBe(o.value);
       expect(
-        setRasterChannelCommand(lib(probe), ID, o.value) === null,
+        setProgramArmCommand(lib(probe), ID, o.value) === null,
         `option "${o.value}" ${refusal === null ? 'is offered but produces no command' : 'is '
-          + 'refused by rasterChannelSeedRefusal yet produced a command anyway'}`,
+          + 'refused by programArmSeedRefusal yet produced a command anyway'}`,
       ).toBe(refusal !== null);
     }
     // Anti-vacuous: the loop really ran over every declared channel, and at
     // least one of them is seedable — or it proves nothing.
-    expect(RASTER_CHANNEL_OPTIONS).toHaveLength(EFFECTS_PRESET_RASTER_CHANNELS.length);
-    expect(RASTER_CHANNEL_OPTIONS.some((o) => rasterChannelSeedRefusal(o.value) === null)).toBe(true);
+    expect(PROGRAM_ARM_OPTIONS).toHaveLength(EFFECTS_PRESET_PROGRAM_ARMS.length);
+    expect(PROGRAM_ARM_OPTIONS.some((o) => programArmSeedRefusal(o.value) === null)).toBe(true);
     // ⚠ RE-PINNED 2026-09-03 (ROADMAP row 131). This row's second half used to
     // require an UNSEEDABLE channel to exist, which was `base_swap` — and that
     // parcel's whole job was to give it a seed, so the row would have gone red
@@ -645,12 +651,12 @@ describe('switching the raster program is ONE undoable command', () => {
     // contract does not declare is refused, with a sentence.
     const notAChannel = 'not_a_raster_channel';
     expect(EFFECTS_PRESET_RASTER_CHANNELS).not.toContain(notAChannel);
-    expect(rasterChannelSeedRefusal(notAChannel)).not.toBeNull();
-    expect(setRasterChannelCommand(lib(rampPreset()), ID, notAChannel)).toBeNull();
+    expect(programArmSeedRefusal(notAChannel)).not.toBeNull();
+    expect(setProgramArmCommand(lib(rampPreset()), ID, notAChannel)).toBeNull();
     // ...and every channel the contract DOES declare can be authored here today,
     // so no dropdown entry is dead.
     for (const c of EFFECTS_PRESET_RASTER_CHANNELS) {
-      expect(rasterChannelSeedRefusal(c), `channel "${c}" has no seed`).toBeNull();
+      expect(programArmSeedRefusal(c), `channel "${c}" has no seed`).toBeNull();
     }
   });
 
@@ -658,9 +664,9 @@ describe('switching the raster program is ONE undoable command', () => {
     // The defect this row exists for: the labels were
     // `c === 'ramp' ? ramp-label : bands-label`, so base_swap rendered as
     // "bands — a sparse fire list" the moment the contract declared it.
-    const labels = RASTER_CHANNEL_OPTIONS.map((o) => o.label);
+    const labels = PROGRAM_ARM_OPTIONS.map((o) => o.label);
     expect(new Set(labels).size).toBe(labels.length);
-    for (const o of RASTER_CHANNEL_OPTIONS) expect(o.label).toContain(o.value.replace('_', ' '));
+    for (const o of PROGRAM_ARM_OPTIONS) expect(o.label).toContain(o.value.replace('_', ' '));
   });
 
   it('a base_swap document keeps its band controls DEAD, and says why', () => {
@@ -695,7 +701,7 @@ describe('switching the raster program is ONE undoable command', () => {
     const before = JSON.stringify(p);
     expect(p.bands).toHaveLength(3);
 
-    const cmd = setRasterChannelCommand(lib(p), ID, 'ramp')!;
+    const cmd = setProgramArmCommand(lib(p), ID, 'ramp')!;
     expect(cmd).not.toBeNull();
     // ONE command — one undo entry.
     expect(cmd.type).toBe('set-effects-preset');
@@ -715,7 +721,7 @@ describe('switching the raster program is ONE undoable command', () => {
   it('ramp -> bands discards the ramp, and oldPreset restores it EXACTLY', () => {
     const p = rampPreset({ top: 7, lines: 11 });
     const before = JSON.stringify(p);
-    const cmd = setRasterChannelCommand(lib(p), ID, 'bands')!;
+    const cmd = setProgramArmCommand(lib(p), ID, 'bands')!;
     expect(presetRasterChannel(cmd.newPreset!)).toBe('bands');
     expect('ramp' in cmd.newPreset!).toBe(false);
     expect(cmd.newPreset!.bands).toEqual([newBand()]);
@@ -725,7 +731,7 @@ describe('switching the raster program is ONE undoable command', () => {
   it('never authors the both-keys document the schema refuses', () => {
     for (const start of [newPreset(ID), rampPreset()]) {
       for (const to of ['bands', 'ramp']) {
-        const cmd = setRasterChannelCommand(lib(start), ID, to);
+        const cmd = setProgramArmCommand(lib(start), ID, to);
         if (cmd === null) continue;   // already that channel — a no-op, not an undo entry
         const keys = Object.keys(cmd.newPreset!);
         expect(keys.filter((k) => k === 'bands' || k === 'ramp')).toHaveLength(1);
@@ -736,16 +742,16 @@ describe('switching the raster program is ONE undoable command', () => {
   });
 
   it('re-selecting the channel a document already has burns no undo slot', () => {
-    expect(setRasterChannelCommand(lib(rampPreset()), ID, 'ramp')).toBeNull();
-    expect(setRasterChannelCommand(lib(newPreset(ID)), ID, 'bands')).toBeNull();
-    expect(setRasterChannelCommand(lib(rampPreset()), ID, 'nonsense')).toBeNull();
+    expect(setProgramArmCommand(lib(rampPreset()), ID, 'ramp')).toBeNull();
+    expect(setProgramArmCommand(lib(newPreset(ID)), ID, 'bands')).toBeNull();
+    expect(setProgramArmCommand(lib(rampPreset()), ID, 'nonsense')).toBeNull();
   });
 
   it('the advisory NAMES what would be discarded, before the switch', () => {
     const p = newPreset(ID);
     p.bands!.push(newBand());
-    expect(rasterChannelSwapAdvisory(p)).toContain('2 raster bands');
-    expect(rasterChannelSwapAdvisory(p)).toMatch(/ONE undo step/);
-    expect(rasterChannelSwapAdvisory(rampPreset())).toContain('this ramp');
+    expect(programArmSwapAdvisory(p)).toContain('2 raster bands');
+    expect(programArmSwapAdvisory(p)).toMatch(/ONE undo step/);
+    expect(programArmSwapAdvisory(rampPreset())).toContain('this ramp');
   });
 });

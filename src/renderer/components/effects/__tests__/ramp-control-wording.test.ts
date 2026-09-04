@@ -277,17 +277,17 @@ describe('the dead band control carries its reason', () => {
 
 describe('the raster-program switch says what it discards, before it is used', () => {
   it('the advisory is unconditional and sits under the control', () => {
-    expect(code).toMatch(/<Hint under>\{rasterChannelSwapAdvisory\(selected\)\}<\/Hint>/);
+    expect(code).toMatch(/<Hint under>\{programArmSwapAdvisory\(selected\)\}<\/Hint>/);
     // Unconditional: it is NOT inside a `&&` guard that would hide it until the
     // author had already switched once.
-    const at = code.indexOf('rasterChannelSwapAdvisory(selected)');
+    const at = code.indexOf('programArmSwapAdvisory(selected)');
     const line = code.slice(code.lastIndexOf('\n', at) + 1, code.indexOf('\n', at));
     expect(line).not.toContain('&&');
   });
 
   it('the options come from the schema\'s own oneOf, not from a literal pair', () => {
-    expect(code).toMatch(/RASTER_CHANNEL_OPTIONS\.map\(/);
-    expect(code).toMatch(/setRasterChannelCommand\(library, selected\.id, v\)/);
+    expect(code).toMatch(/PROGRAM_ARM_OPTIONS\.map\(/);
+    expect(code).toMatch(/setProgramArmCommand\(library, selected\.id, v\)/);
     expect(code).not.toMatch(/value="ramp"/);
     expect(code).not.toMatch(/value="bands"/);
   });

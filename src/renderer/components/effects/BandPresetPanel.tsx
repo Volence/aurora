@@ -130,8 +130,8 @@ import {
   BASE_SWAP_ASYMMETRIES, BASE_SWAP_ASYMMETRIES_SHORT, BASE_SWAP_WHAT_YOU_SEE,
   baseSwapLineRefusal, baseSwapTargetRefusal, baseSwapTargetGloss, baseSwapSummary,
   setBaseSwapLineCommand, setBaseSwapTargetCommand,
-  RASTER_CHANNEL_OPTIONS, rasterChannelSwapAdvisory, setRasterChannelCommand,
-  rasterEditorGap,
+  PROGRAM_ARM_OPTIONS, programArmSwapAdvisory, setProgramArmCommand,
+  programArmEditorGap,
   bandControlsRefusal,
   RASTER_REF_ROW, presetRefOptions, unassignablePresetRef, sectionPresetCommand,
   createPresetCommand, deletePresetCommand,
@@ -511,7 +511,7 @@ export default function BandPresetPanel(): React.ReactElement | null {
                 one undo step"); this is the same shape one level up.
 
                 ⚠ IT IS DESTRUCTIVE AND IT IS ONE Ctrl+Z, which is the bar it
-                had to clear. `setRasterChannelCommand` goes through
+                had to clear. `setProgramArmCommand` goes through
                 `editPresetCommand`, so the command carries the WHOLE old
                 document and the whole new one and undo re-places the old one
                 verbatim — every band back, in order, with its colours. That is
@@ -525,14 +525,14 @@ export default function BandPresetPanel(): React.ReactElement | null {
             <Field label="Raster" title={RAMP_TITLE}>
               <Select title={RAMP_TITLE}
                 value={presetRasterChannel(selected) ?? ''}
-                onChange={(v) => run(setRasterChannelCommand(library, selected.id, v))}
+                onChange={(v) => run(setProgramArmCommand(library, selected.id, v))}
                 style={{ flex: 1, minWidth: 0 }}>
-                {RASTER_CHANNEL_OPTIONS.map((o) => (
+                {PROGRAM_ARM_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </Select>
             </Field>
-            <Hint under>{rasterChannelSwapAdvisory(selected)}</Hint>
+            <Hint under>{programArmSwapAdvisory(selected)}</Hint>
 
             {(selected.bands ?? []).map((band, i) => (
               <BandCard key={i} library={library} presetId={selected.id} index={i} band={band}
@@ -567,7 +567,7 @@ export default function BandPresetPanel(): React.ReactElement | null {
                 A card is genuinely per-channel content — five spinners here,
                 two there, a list of band cards above — and cannot be derived
                 from the schema the way the dropdown is. What IS derived is
-                whether one is MISSING: `rasterEditorGap` reads the registry of
+                whether one is MISSING: `programArmEditorGap` reads the registry of
                 channels that have a card, so a fourth arm opens with a sentence
                 saying its fields are not editable here instead of rendering an
                 empty section under a Raster row that names it correctly. */}
@@ -579,8 +579,8 @@ export default function BandPresetPanel(): React.ReactElement | null {
               <BaseSwapCard library={library} presetId={selected.id}
                 baseSwap={selected.base_swap} run={run} />
             )}
-            {rasterEditorGap(selected) !== null && (
-              <Hint tone="warning">{rasterEditorGap(selected)}</Hint>
+            {programArmEditorGap(selected) !== null && (
+              <Hint tone="warning">{programArmEditorGap(selected)}</Hint>
             )}
           </SectionBody>
         </CollapsibleSection>
