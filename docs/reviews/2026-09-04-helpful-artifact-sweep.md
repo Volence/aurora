@@ -345,6 +345,94 @@ this parcel's §3 flagged in `effects-aeon.ts`.
 
 ---
 
+## 4b-iii. Review round 4 — the general fix: ask git, stop losing to the tree
+
+A third distinct 128, and the stderr capture named it in one run instead of two rounds:
+`fatal: pathspec 'scratchpad/fixtures/aeon-build-pin/aeon-current/' is beyond a symbolic
+link`. That is four defects of one shape, so this round replaces the mechanism rather than
+patching a fourth cause. **All four were the same thing: the gate's input set was a
+property of the machine it stood on rather than of the repository.**
+
+### The population now comes from git
+
+    git ls-files --cached --others --exclude-standard -z -- src test scripts scratchpad
+
+Ignored files are absent by construction — `--exclude-standard` *is* the rule the gate was
+calling `check-ignore` to apply — so that query leaves the population path entirely, taking
+all of its fatal modes and its exit-1 arm with it. `node_modules/` and `dist/` need no
+special-casing. `--others` keeps untracked-but-not-ignored files, which is the point: a
+brand-new comment is untracked at the moment its author runs the suite.
+
+### The 1256/1257 reconciliation — and it is not two methods disagreeing
+
+| measurement | count |
+|---|---|
+| the walk, in this worktree | **1257** |
+| `git ls-files …`, in this worktree | **1257** |
+| files in one and not the other | **0, both directions** |
+| `git ls-tree eb426df3` under the same roots | **1256** |
+| present now, absent at base | `scripts/check-cited-paths.mjs` |
+
+**The one file is the gate counting itself.** The reviewer measured the backed-out tree;
+I measured the branch. Same lesson as §4b-ii, one layer down: a working tree is a moment,
+not a fact.
+
+### ⚠ And a cause I asserted instead of measuring, in this very file
+
+The first version of the new header said *"the walk DESCENDED THROUGH SYMLINKS"*. **It does
+not.** `readdirSync(dir, {withFileTypes: true})` reports a symlink-to-directory as
+`isDirectory() === false` — probed on a purpose-built tree, the walk collected only the
+real file and never entered the link. I also mis-read my own discriminator mid-round: the
+old gate's 1258 was 1257 **+ the untracked probe file I had just created**, not a file from
+inside the symlink.
+
+I wrote a plausible causal claim into a permanent header one round after saying that a
+plausible fix to unbroken code is this parcel's own defect family. Corrected in place
+(`8d48100c`) rather than quietly, because the wrong sentence would send the next reader
+after the wrong mechanism. What is actually true, and both halves still justify their fix:
+
+* **The 5,821-vs-1,257 gap is the hardlinked aeon copies** that `.gitignore` lists
+  (`scratchpad/fixtures/aeon-*`, made with `cp -al`, so *real* directories). The walk
+  enumerated them and then paid a `check-ignore` call to throw 79% of its own population
+  away — and that call is the one with three fatal modes.
+* **The 128 came from the citation query, not the population.** A comment naming a path
+  beyond the symlink — `check-harness-guards.mjs:448` names
+  `scratchpad/fixtures/aeon-build-pin/aeon-current` itself — makes git refuse and lose
+  every other citation in the batch. That is fixed by the per-path fallback, not by the
+  population change.
+
+### The general rule for what remains: no single token may kill the query
+
+The citation query must still ask git about individual cited paths (hole 8). Rather than
+naming a fifth shape: recognised-unsendable paths are filtered up front, and **any other
+refusal falls back to asking one path at a time**, which cannot lose more than the single
+path git objected to. Those land in `UNQUERYABLE`, are counted on the summary line **with
+git's own reason**, and are treated as *not* ignored — so a citation the gate could not
+classify stays a violation rather than passing quietly. A query that fails for *every*
+path is still fatal: that is a broken git, not a bad path. A **fourth proven arm** asserts
+that a refusal is *visible* to the fallback rather than reading as an empty answer —
+without it, every unanswerable citation would be silently classified and the count would
+read zero forever.
+
+### Red-first, with the reviewer's shape planted: a symlink to a foreign checkout, and a violating citation beyond it
+
+| gate | result |
+|---|---|
+| pre-`74ba870f` | **exit 2, COULD NOT MEASURE** — `git said: fatal: pathspec '…/aeon-current/absent-probe.ts' is beyond a symbolic link` |
+| current | **exit 1** — the real violation reported, and the unanswerable path counted with git's reason |
+
+### The exposure beyond this gate
+
+`grep` for hand-rolled walks that skip `node_modules`/`dist` **by name** — the signature of
+a filesystem walk standing in for a repository query — finds **four more gates in the
+`npm test` chain**: `check-object-stringify.mjs`, `check-peer-path-literals.mjs`,
+`check-pseudo-skip.mjs`, `check-test-collection.mjs`. On the owner's machine each of them
+is enumerating the hardlinked aeon copies and paying to discard them, and any of them that
+hands a walked path to git carries the same refusal modes. **Reported, not fixed** — one
+line here, not a parcel, as asked.
+
+---
+
 ## 4c. ⚠ The suite is RED, and the red is the census's own subject arriving live
 
 `test/formats/aeon-ramp-sign-drift.test.ts` fails on the finished tree. **It is not mine**,
