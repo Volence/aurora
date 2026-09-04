@@ -54,7 +54,7 @@ const ANNOTATION_KEYWORDS = [
 const ASSERTION_KEYWORDS = [
   '$ref', 'type', 'const', 'enum', 'pattern', 'minimum', 'maximum', 'multipleOf',
   'properties', 'required', 'unevaluatedProperties',
-  'items', 'minItems', 'maxItems', 'oneOf', 'anyOf', 'not',
+  'items', 'minItems', 'maxItems', 'uniqueItems', 'oneOf', 'anyOf', 'not',
 ] as const;
 
 export const SUPPORTED_KEYWORDS: ReadonlySet<string> = new Set<string>([
@@ -83,11 +83,17 @@ const IN_PLACE_APPLICATORS = [
  * `unevaluatedProperties` are DELIBERATELY ABSENT, and so is `$ref` (whose
  * target could carry any of them). Anything not on this list is treated as
  * "might annotate", which is the safe side.
+ *
+ * `uniqueItems` joined the list with `reels` (empyrean ff3f43f). It belongs for
+ * the same reason `minItems` does: it asserts a property of the ARRAY instance
+ * and names no object property as evaluated, so it cannot change what
+ * `unevaluatedProperties` sees. Listing it is not a widening of trust — it is
+ * the whitelist doing its job on a keyword that provably qualifies.
  */
 const NON_ANNOTATING_KEYWORDS: ReadonlySet<string> = new Set<string>([
   ...ANNOTATION_KEYWORDS,
   'type', 'const', 'enum', 'pattern', 'minimum', 'maximum', 'multipleOf',
-  'required', 'minItems', 'maxItems',
+  'required', 'minItems', 'maxItems', 'uniqueItems',
 ]);
 
 /**
@@ -188,6 +194,18 @@ function assertSupported(schema: JsonSchema, where: string): void {
       }
     }
   }
+  // `uniqueItems` — a BOOLEAN by definition. Both values are implemented (false
+  // is the default and asserts nothing), so unlike `unevaluatedProperties` this
+  // is not a "only one value implemented" refusal; it refuses a SHAPE that is
+  // not a boolean at all, on the type-array precedent above, so a schema
+  // spelling it wrong is caught by the whole-schema walk rather than by the
+  // first document that happens to reach the node.
+  if (schema.uniqueItems !== undefined && typeof schema.uniqueItems !== 'boolean') {
+    throw new UnsupportedSchemaError(
+      `uniqueItems at ${where || '<root>'} is ${JSON.stringify(schema.uniqueItems)}; JSON Schema ` +
+      'defines it as a boolean and this evaluator implements no other shape.',
+    );
+  }
   if (schema.unevaluatedProperties !== undefined) {
     if (schema.unevaluatedProperties !== false) {
       throw new UnsupportedSchemaError(
@@ -271,6 +289,41 @@ function deepEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+/**
+ * JSON Schema's INSTANCE EQUALITY, which `deepEqual` above is not.
+ *
+ * ═══ WHY A SECOND EQUALITY, AND WHY `uniqueItems` MUST NOT USE THE FIRST ═══
+ *
+ * The spec defines two instances as equal when they have the same value —
+ * and for objects that means the same members, WITHOUT REGARD TO ORDER.
+ * `JSON.stringify` preserves insertion order, so `deepEqual({a:1,b:2},
+ * {b:2,a:1})` is FALSE where the spec says TRUE. For `const` and `enum` that
+ * skew errs toward REFUSING something legal — annoying, visible, and the safe
+ * direction. For `uniqueItems` the sign flips: it would call a real duplicate
+ * DISTINCT and ACCEPT an array the real schema rejects, which is the one
+ * failure mode this file's header promises not to have. So the keyword gets an
+ * equality that is order-insensitive at every depth.
+ *
+ * `deepEqual` is deliberately left alone: changing what `const`/`enum` mean is
+ * a wider change than this keyword needs, and its skew is on the loud side.
+ * (NaN and -0 do not arise — a JSON document cannot carry either.)
+ */
+function sameInstance(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((item, i) => sameInstance(item, b[i]));
+  }
+  if (typeof a === 'object' && a !== null && typeof b === 'object' && b !== null) {
+    const ka = Object.keys(a as Record<string, unknown>);
+    const kb = Object.keys(b as Record<string, unknown>);
+    if (ka.length !== kb.length) return false;
+    return ka.every(k => k in (b as Record<string, unknown>)
+      && sameInstance((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
+  }
+  return false;
+}
+
 function validateNode(
   value: unknown,
   schema: JsonSchema,
@@ -343,6 +396,31 @@ function validateNode(
     }
     if (typeof schema.maxItems === 'number' && value.length > schema.maxItems) {
       issues.push({ path, message: `has ${value.length} items, maximum ${schema.maxItems}` });
+    }
+    // `uniqueItems` — every element pairwise distinct under INSTANCE equality.
+    //
+    // ARRIVED WITH `reels` (empyrean ff3f43f), the first in either committed
+    // contract schema: `reels.rates` is five signed per-frame pixel rates in
+    // SCREEN ORDER, and two strips sharing a rate read on screen as one wide
+    // strip rather than as two — a picture the author did not ask for, with no
+    // other symptom. Zero is legal here (unlike `drift.rate`), so this keyword
+    // and not a `not: {const: 0}` is what caps a stationary strip at one.
+    //
+    // The message names the VALUE and BOTH POSITIONS, because "not unique" on
+    // an array of five small integers is not enough to find the typo, and the
+    // positions are the screen order the contract warns about relocating.
+    if (schema.uniqueItems === true) {
+      for (let i = 0; i < value.length; i++) {
+        const j = value.findIndex((other, k) => k > i && sameInstance(value[i], other));
+        if (j !== -1) {
+          issues.push({
+            path,
+            message: `items ${i} and ${j} are both ${JSON.stringify(value[i])}; the schema ` +
+              'requires every item to be distinct',
+          });
+          break; // one report per array — the author fixes the pair, then re-reads
+        }
+      }
     }
     if (schema.items !== undefined) {
       const itemSchema = schema.items as JsonSchema;

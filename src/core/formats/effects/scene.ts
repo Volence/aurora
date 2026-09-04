@@ -9,7 +9,7 @@
 //     (golden protocol) — read at empyrean 069cf59, an ancestor of c2c81e2.
 //   • empyrean contract/schema/aurora-effects-scene.schema.json — the
 //     machine-readable half, vendored beside this file. Its git blob hash is
-//     c73d5b4282ddc845dcff49ecda21d499a9cd3c43 and the vendored copy is pinned
+//     05f58fb9a68d03ea79e672e41d9daec1517b3b87 and the vendored copy is pinned
 //     against that hash by test/formats/effects-schema-drift.test.ts, which
 //     reads it from aurora-effects-scene.schema.provenance.json — THE SIDECAR IS
 //     THE ONE MACHINE-READABLE COPY and this line is prose beside it. The BLOB
@@ -42,7 +42,17 @@
 //     parsed documents reports exactly two differences, the two added nodes.
 //     `bob_shift`'s `anyOf` is the first in either committed schema and forced
 //     json-schema-subset.ts to implement the keyword — the coverage gate named
-//     it. See the `bob_shift` field note below for the three traps).
+//     it. See the `bob_shift` field note below for the three traps) →
+//     b3e0ab31 (3992d16, `$defs.layer.properties.rowRemap` ADDED — item 9's row
+//     remap; see EffectsRowRemap below) →
+//     05f58fb9 (ff3f43f, `properties.reels` ADDED at the ROOT between `v_deform`
+//     and `anchor` — item 10's authoring half, aeon's OJZ_Reels_Fill at
+//     `660aabc0`. 12 leaf additions, 0 removals, 0 changes; the root object
+//     stays closed at eighteen properties. Its `uniqueItems` is the first in
+//     either committed schema and forced json-schema-subset.ts to implement the
+//     keyword — the coverage gate named it, again. See the `EffectsReels` note
+//     below for the four traps, the loudest being that the unit is WHOLE PIXELS
+//     while its neighbour `drift.rate` is 1/256 px).
 //   • aeon tools/EFFECTS_CONSUMER_CONTRACT.md §2.1/§2.3 at aeon 00607dd5 — the
 //     consumer's read set, and the drift rule that governs both directions.
 //
@@ -189,6 +199,71 @@ export type EffectsDrift = 'none' | { rate: number };
  */
 export type EffectsRowRemap = 'none' | { plane_y: number; height_shift: number };
 
+/**
+ * EFFECTS-W1 item 10's REELS — up to five independently scrolling 64-px-wide
+ * vertical strips of the BACKGROUND, the slot-machine-reel demo (empyrean
+ * `ff3f43f`, AURORA_EFFECTS_SCHEMA.md §2.7; aeon `OJZ_Reels_Fill`,
+ * games/sonic4/data/effects/ojz_effects.emp at `660aabc0`).
+ *
+ * ⚠⚠ THIS EFFECT SHOWS IN NO RELEASE BUILD, AND NO JSON KEYWORD CAN SAY SO.
+ * The mechanism's table, its proc and its on-switch all sit inside
+ * `if DEBUG == 1` — `OJZ_Reel_Speed`'s EMITTED LENGTH IS 0 in release
+ * (ojz_effects.emp:1766-1767) and the only writer of `OJZ_Reel_Active` is
+ * aeon's `tools/reels_witness.py`. So a scene saved with `reels` validates,
+ * builds, ships, and renders NOTHING. A panel for this key MUST SAY THAT ON
+ * SCREEN; it is the one fact about the field a document cannot carry.
+ *
+ * AND IT IS NOT CAPABILITY-GATED. There is NO `CAP_` bit for reels — the
+ * contract says so in as many words, and adds that "a generator arm must not
+ * emit a check that does not exist". Aurora therefore adds no capability check
+ * of any kind here. Do not pattern-match this onto `CAP_BAND_DRIFT`.
+ *
+ * ⚠ THE UNIT IS SIGNED WHOLE PIXELS PER FRAME. THERE IS NO FIXED POINT
+ * ANYWHERE ON THIS PATH — the engine does `add.b (a2)+, d0` into a byte phase
+ * that wraps mod 256. `drift.rate`'s ×256 export conversion MUST NOT be applied
+ * here. A panel or converter copied from the drift path emits **768 for an
+ * intended 3**, and the `-128..127` bound is the ONLY place that mistake is
+ * caught today (aeon has no magnitude ensure yet). Nothing in the reels path
+ * calls `driftPxPerFrameToRate` / `driftRateToPxPerFrame`, the only two places
+ * in this repo the ×256 lives, and both are named for drift; a future panel
+ * must keep it that way. `EFFECTS_REEL_RATE_BOUNDS` below is read out of the
+ * schema so the bound cannot drift from the contract that enforces it.
+ *
+ * ⚠ SCREEN ORDER IS ARRAY ORDER. Index `i` owns screen X `64i .. 64i+63`
+ * (column-pairs `4i..4i+3`; the column→band map is a hardcoded `lsr.b #2`). The
+ * contract's own words: an editor that sorts `rates` or round-trips them
+ * through a dict keyed by band name "silently relocates every strip". This
+ * codec never does — parse hands back what `JSON.parse` produced,
+ * `canonicalizeBySchema` maps arrays POSITIONALLY, and `canonicalJsonPretty`
+ * sorts OBJECT keys only — and a permutation round-trip is asserted rather than
+ * argued, in test/formats/effects-reels.test.ts.
+ *
+ * ZERO IS A VALUE HERE, deliberately unlike `drift.rate` (whose schema spells
+ * `"not": {"const": 0}` because `Rate(0)` and `None` are indistinguishable in
+ * ROM). A stationary strip among moving ones is a real authored choice;
+ * `uniqueItems` caps it at one occurrence. Two neighbouring keys, opposite
+ * rulings on the same literal.
+ *
+ * ABSENT = NO REELS. There is no `"none"` spelling — the binding table is
+ * generated whole, so "keep" and "off" are the same state for it. That is
+ * `v_deform`'s absent-key precedent and NOT `drift`/`curve`/`vsplit`/`rowRemap`'s
+ * `oneOf` with a `"none"` arm; do not add a null arm for consistency.
+ *
+ * THE GEOMETRY IS FIXED AT FIVE STRIPS OF FOUR COLUMN-PAIRS. `REEL_BAND_COUNT`
+ * and `REEL_COLS_PER_BAND` (aeon games/sonic4/config/constants.emp) size a RAM
+ * array and are COMPILED INTO A SHIFT, so a band count is a code shape and not
+ * a field. `minItems`/`maxItems` 5 is a COPY of that constant; a
+ * `cols_per_band` key is refused by the node's closure. Do not invent one.
+ *
+ * NOT AUTHORABLE FROM AURORA YET, deliberately: this parcel is the codec half.
+ * What Aurora owes the field now is reading it, round-tripping it verbatim, and
+ * not destroying it.
+ */
+export interface EffectsReels {
+  /** Exactly five signed whole px/frame rates, pairwise distinct, in SCREEN ORDER. */
+  rates: number[];
+}
+
 export interface EffectsLayer {
   world_y: number;
   fa: EffectsFactor;
@@ -264,6 +339,12 @@ export interface EffectsScene {
   deform_fg?: EffectsSceneDeform;
   deform_bg?: EffectsSceneDeform;
   v_deform?: EffectsVDeform;
+  /**
+   * The five reels. See `EffectsReels` above for the four hazards — DEBUG tier,
+   * whole-pixel units (NO ×256), screen order is array order, and absent means
+   * absent because there is no `"none"` spelling.
+   */
+  reels?: EffectsReels;
   anchor?: EffectsAnchor;
   left_column_mask?: 'undeclared' | 'sprite_mask' | 'factor0_lock' | 'accept';
   /*
@@ -324,6 +405,50 @@ export const EFFECTS_LAYER_DEFAULTS = {
   dsb: schemaProp(['$defs', 'layer', 'properties', 'dsb']).default as number,
   phase: schemaProp(['$defs', 'layer', 'properties', 'phase']).default as number,
 } as const;
+
+/**
+ * How many reel strips a scene declares — aeon's `REEL_BAND_COUNT`, reached
+ * here as the `rates` array's own length bound rather than typed.
+ *
+ * THE TWO BOUNDS ARE CHECKED AGAINST EACH OTHER, not just read. `minItems` and
+ * `maxItems` both spell the same engine constant, so a contract that moved one
+ * and not the other would leave this module quietly reporting the wrong band
+ * count for a schema that no longer means it — the loud-on-unmeasurable failure
+ * this file's derivations exist to avoid. It throws instead.
+ */
+export const EFFECTS_REEL_BAND_COUNT: number = (() => {
+  const rates = schemaProp(['properties', 'reels', 'properties', 'rates']);
+  const min = rates.minItems as number;
+  const max = rates.maxItems as number;
+  if (typeof min !== 'number' || min !== max) {
+    throw new Error(
+      `effects scene schema: reels.rates declares minItems ${JSON.stringify(min)} and maxItems ` +
+      `${JSON.stringify(max)}. Both are copies of aeon's REEL_BAND_COUNT and must agree; a band ` +
+      'count is a code shape (it sizes a RAM array and is compiled into a shift), not a range.',
+    );
+  }
+  return min;
+})();
+
+/**
+ * The legal rate span, read out of the schema's `items` node.
+ *
+ * ⚠ THE UNIT IS SIGNED WHOLE PIXELS PER FRAME — see `EffectsReels`. These are
+ * NOT the 1/256-px units `EFFECTS_DRIFT_RATE_BOUNDS` carries, and this bound is
+ * the ONLY enforcement of the range anywhere in the pipeline today.
+ */
+export const EFFECTS_REEL_RATE_BOUNDS: { readonly min: number; readonly max: number } = (() => {
+  const item = schemaProp(['properties', 'reels', 'properties', 'rates', 'items']);
+  const min = item.minimum as number;
+  const max = item.maximum as number;
+  if (typeof min !== 'number' || typeof max !== 'number' || min >= max) {
+    throw new Error(
+      'effects scene schema: reels.rates.items declares no usable minimum/maximum pair ' +
+      `(${JSON.stringify(min)}..${JSON.stringify(max)})`,
+    );
+  }
+  return { min, max };
+})();
 
 /**
  * §2.1 "Deliberately excluded from the JSON surface". Both are byte-identity
@@ -621,6 +746,56 @@ export interface SceneAdvisory { path: string; message: string }
  * (EFFECTS_LAYER_DEFAULTS), so even the advisory cannot drift on what "at their
  * defaults" means.
  */
+/**
+ * The reels BINDING warning, as ADVICE — and one-sided advice at that.
+ *
+ * §2.7: aeon's generator emits one DEBUG-gated `[i8; REEL_BAND_COUNT]` table per
+ * authoring scene plus an association table keyed on the scene's LOWERED CONFIG
+ * LABEL, matched at runtime against `Parallax_Current_Config`. That label is
+ * unique only for a section bound at `Effects_ResolveParallax`'s RUNG 1 — an
+ * editor `sceneRef`. So the generator REFUSES `reels` on a scene whose sections
+ * resolve through a preset (rung 2) or the act default (rung 3), where the
+ * pointer is shared and the rates would silently reach other sections.
+ *
+ * ⚠ THAT REFUSAL IS AEON'S, AND THIS IS NOT IT. Aurora does not model
+ * `Effects_ResolveParallax`, does not know a preset's contents, and cannot see
+ * the generator's constants; a second rulebook here would be free to drift from
+ * the one that actually decides, in either its condition or its wording. What
+ * this is licensed to be (§2, "Aurora may pre-check anything it likes as
+ * advisory UX") is a pure function nothing in the read or write path calls.
+ *
+ * ⚠⚠ AND IT IS ONE-SIDED ON PURPOSE. It speaks only in the NEGATIVE case — no
+ * section in the project names this scene by `sceneRef`, so no section can
+ * possibly reach it at rung 1. SILENCE IS NOT A CLEARANCE: a scene that IS named
+ * by a `sceneRef` may still be refused for a reason only aeon can see, and a
+ * surface must never present the absence of this warning as a guarantee that the
+ * build will accept the key. There is deliberately no "looks fine" return value
+ * for a caller to render as one.
+ *
+ * `sceneRefs` is every section meta sidecar's `sceneRef` in the project (null =
+ * act default). Passing an EMPTY list means "this project has no sections",
+ * which is a different fact from "no section binds this scene" — so the function
+ * says nothing at all rather than warning about a project it was handed none of.
+ */
+export function advisoryReelsBinding(
+  scene: EffectsScene,
+  sceneRefs: readonly (string | null)[],
+): SceneAdvisory[] {
+  if (scene.reels === undefined) return [];
+  if (sceneRefs.length === 0) return [];
+  if (sceneRefs.some(ref => ref === scene.id)) return [];
+  return [{
+    path: '/reels',
+    message:
+      `EDITOR-SIDE WARNING, not the refusal: no section in this project names "${scene.id}" in ` +
+      'its sceneRef, and aeon\'s generator refuses a reels key on a scene whose sections resolve ' +
+      'through a preset or the act default instead of an editor sceneRef (the association table ' +
+      'is keyed on the lowered config label, which is unique only for a sceneRef-bound section). ' +
+      'Saving is not blocked, and this check is one-sided — its silence is not a clearance, ' +
+      'because only the build can say whether the key is accepted.',
+  }];
+}
+
 export function advisoryLayerDeformConflicts(scene: EffectsScene): SceneAdvisory[] {
   const out: SceneAdvisory[] = [];
   scene.layers.forEach((layer, i) => {

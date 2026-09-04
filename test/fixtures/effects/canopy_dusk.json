@@ -129,6 +129,15 @@
   ],
   "left_column_mask": "sprite_mask",
   "name": "Canopy — dusk",
+  "reels": {
+    "rates": [
+      3,
+      -5,
+      2,
+      -4,
+      6
+    ]
+  },
   "schema": 1,
   "transition": "instant",
   "v_center": 112,

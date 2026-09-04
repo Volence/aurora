@@ -526,6 +526,28 @@
       ],
       "default": "none"
     },
+    "reels": {
+      "type": "object",
+      "description": "The REELS: up to five independently scrolling 64-pixel-wide vertical background strips, the slot-machine-reel demo (aeon games/sonic4/data/effects/ojz_effects.emp OJZ_Reels_Fill), authorable and bindable per scene for the first time. Added 2026-09-04 (docs/AURORA_EFFECTS_SCHEMA.md section 2.7, EFFECTS-W1 DoD item 10's authoring half, DEBUG TIER, against aeon's decision note docs/superpowers/specs/2026-09-04-reels-per-scene-key-shape.md at aeon 660aabc0, which defers to the survey docs/superpowers/specs/2026-09-03-item10a-reels-key-shape.md). DEBUG-ONLY, and no JSON keyword can say so: the mechanism's table, proc and on-switch all sit inside if DEBUG == 1 (OJZ_Reel_Speed's length is 0 in release, ojz_effects.emp:1766-1767; the only writer of OJZ_Reel_Active is tools/reels_witness.py), so a scene saved with reels shows NOTHING in a release build and the editor panel must say so on screen. Not capability-gated: no CAP_ bit exists for reels, and a generator arm must not emit a check that does not exist. ONE MEMBER, rates: EXACTLY FIVE signed integers, -128..127, pairwise distinct, in SCREEN ORDER: index i owns column-pairs 4i..4i+3, screen X 64i..64i+63 (the column-to-band map is a hardcoded lsr.b #2, ojz_effects.emp:1817); an editor that sorts or round-trips rates through a dict keyed by band name silently relocates every strip, so the generator emits in document order, verbatim. UNIT: SIGNED WHOLE PIXELS PER FRAME, no fixed point anywhere on the path (add.b (a2)+, d0 into a byte phase that wraps mod 256; a strip's phase cycles every 256/|rate| frames, so 3 is a 1.4 s reel, 16 is fast and legible, 64 and up is a strobe; the useful slider range is about -16..16 and that is UI guidance, never a refusal). PROHIBITION: drift.rate's x256 export conversion MUST NOT be applied here; a panel copied from the drift panel would emit 768 for an intended 3, and this -128..127 bound is the ONLY place that mistake is caught today (the engine has no magnitude ensure; aeon's implementing parcel adds one beside the generated table, section 2.7). ZERO IS ALLOWED, deliberately unlike drift.rate: a stationary strip among moving ones is a real authored choice; uniqueItems caps it at one. The geometry is FIXED at 5 strips of 4 column-pairs: REEL_BAND_COUNT and REEL_COLS_PER_BAND (games/sonic4/config/constants.emp:66-67) size a RAM array and are compiled into a shift, so a band count is a code shape, not a field; minItems/maxItems 5 is a COPY of that constant and aeon's generator re-derives it from constants.emp and refuses a disagreeing length. ABSENT = no reels for this scene (v_deform's absent-key precedent); there is no 'none' spelling, because the binding table is generated whole and 'keep' and 'off' are the same state for it. BINDING (section 2.7): the generator emits one DEBUG-gated [i8; REEL_BAND_COUNT] table per authoring scene plus an association table keyed on the scene's lowered config label, matched at runtime against Parallax_Current_Config; that label is unique ONLY for a section bound at Effects_ResolveParallax's rung 1 (an editor sceneRef, preset.emp:190-195), so the generator REFUSES a reels key on a scene whose sections resolve through a preset (rung 2) or the act default (rung 3), where the pointer is shared and the rates would silently reach other sections. What an author sees: each strip's BACKGROUND scrolls at its own rate, the foreground is untouched by construction (the FG word is copied unchanged, ojz_effects.emp:1813), and the excursion is 0..255 px below the camera's BG base, always downward; a negative rate reverses the travel, it does not lift the strip.",
+      "required": [
+        "rates"
+      ],
+      "properties": {
+        "rates": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": -128,
+            "maximum": 127
+          },
+          "description": "Five signed whole-pixel-per-frame rates in screen order, left strip first. Pairwise distinct (two strips sharing a rate read as one wide strip; the engine's distinct5 ensure guards the hand table, and the generated table gets the same guard from aeon's implementing parcel). -128..127 is the i8 the table is declared as and, until aeon's ensure lands, the only enforcement of it. No x256."
+        }
+      },
+      "unevaluatedProperties": false
+    },
     "anchor": {
       "oneOf": [
         {

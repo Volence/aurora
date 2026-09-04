@@ -441,6 +441,78 @@ describe('effects scene schema — vendored copy drift gate', () => {
   });
 
   /**
+   * `uniqueItems` — implemented at empyrean ff3f43f's re-pin, the FIRST in
+   * either committed contract schema. `reels.rates` is five per-frame pixel
+   * rates in SCREEN ORDER, and two strips sharing a rate read on screen as one
+   * wide strip: a picture the author did not ask for, with no other symptom.
+   * Zero is legal on this key (unlike `drift.rate`, whose schema spells
+   * `not: {const: 0}`), so `uniqueItems` and nothing else is what caps a
+   * stationary strip at one.
+   *
+   * ASSERTED ON THE COMMITTED SCHEMA'S OWN NODE, on the `not` and `anyOf`
+   * rows' precedent: a hand-built `{uniqueItems: true}` would prove the
+   * evaluator can do something, not that it does it to the field that needs it.
+   * AND THE SUBJECT ARRAY IS DERIVED from the node's own bounds — five distinct
+   * legal rates built from `items.minimum`, so a schema that moved either bound
+   * or the length moves this row's subject with it.
+   */
+  it('implements `uniqueItems`, on the committed reels.rates node', () => {
+    const reels = (EFFECTS_SCENE_SCHEMA.properties as Record<string, JsonSchema>).reels;
+    const rates = (reels.properties as Record<string, JsonSchema>).rates;
+    // Anti-vacuous: the field really exists and really declares the keyword.
+    expect(rates, 'properties.reels.properties.rates is absent').toBeDefined();
+    expect(rates.uniqueItems).toBe(true);
+
+    const n = rates.minItems as number;
+    const lo = (rates.items as JsonSchema).minimum as number;
+    // n distinct legal values, derived: lo, lo+1, … — every one inside the bound.
+    const distinct = Array.from({ length: n }, (_, i) => lo + i);
+    expect(validateAgainstSchema(distinct, rates, EFFECTS_SCENE_SCHEMA)).toEqual([]);
+
+    // ...and the same array with ONE value repeated is refused, naming both
+    // positions. Only the last element changes, so length and bounds still hold
+    // and `uniqueItems` is the only keyword that can be producing the refusal.
+    const repeated = [...distinct.slice(0, n - 1), distinct[0]];
+    const issues = validateAgainstSchema(repeated, rates, EFFECTS_SCENE_SCHEMA);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].message).toMatch(new RegExp(`items 0 and ${n - 1} are both ${distinct[0]}`));
+  });
+
+  /**
+   * ...and it uses INSTANCE equality, not `JSON.stringify`.
+   *
+   * The spec compares objects by MEMBERS, without regard to key order; a
+   * stringify comparison calls `{a:1,b:2}` and `{b:2,a:1}` distinct and would
+   * therefore ACCEPT an array the real schema rejects — this evaluator's one
+   * forbidden direction. The committed schema has no object-valued array items
+   * today, which is exactly why nothing else would catch the substitution (the
+   * `anyOf`-is-not-`oneOf` row above exists for the same reason).
+   */
+  it('compares array items by members, not by key order', () => {
+    const objects: JsonSchema = { type: 'array', uniqueItems: true };
+    const reordered = [{ a: 1, b: 2 }, { b: 2, a: 1 }];
+    const issues = validateAgainstSchema(reordered, objects);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].message).toMatch(/items 0 and 1 are both/);
+
+    // ...and genuinely different members are still distinct, so this is an
+    // equality and not a wall that refuses every pair of objects.
+    expect(validateAgainstSchema([{ a: 1, b: 2 }, { a: 1, b: 3 }], objects)).toEqual([]);
+    expect(validateAgainstSchema([{ a: 1 }, { a: 1, b: 2 }], objects)).toEqual([]);
+  });
+
+  /**
+   * `uniqueItems: false` is the keyword's DEFAULT and asserts nothing; a
+   * non-boolean is a shape this evaluator refuses at the node, not at the first
+   * document that reaches it (the type-array lesson, empyrean 12aecd5).
+   */
+  it('treats uniqueItems:false as the no-op it is, and refuses a non-boolean', () => {
+    expect(validateAgainstSchema([1, 1, 1], { type: 'array', uniqueItems: false })).toEqual([]);
+    expect(() => assertSchemaSupported({ type: 'array', uniqueItems: 'yes' } as JsonSchema))
+      .toThrow(/uniqueItems at <root> is "yes"/);
+  });
+
+  /**
    * ...and the distinction from `oneOf` is asserted, because implementing a
    * keyword as its near neighbour is invisible until the day it is not. On a
    * value matching BOTH arms, `anyOf` accepts and `oneOf` refuses. The committed
