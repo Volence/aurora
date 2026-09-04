@@ -6,8 +6,10 @@
 // `parseTiles`, and `renderFrameToIndices` (Task 15's inverse renderer).
 //
 // Pure core: no fs, no canvas, no DOM. The renderer reads the art/map files
-// (classic-object-art.ts) and wraps the returned indices in an ImageBitmap; the
-// headless render script (render-classic-act.mjs) does the same with fs.
+// (src/renderer/state/classicObjectArtStore.ts — the name here used to be a
+// `classic-object-art.ts` that has never existed) and wraps the returned
+// indices in an ImageBitmap; the headless render script (render-classic-act.mjs)
+// does the same with fs.
 
 import { parseAsmMappings } from '../import/asm-mappings';
 import { parseTiles } from '../formats/tiles';

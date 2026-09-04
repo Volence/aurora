@@ -1444,14 +1444,29 @@ function RampCard({ library, presetId, ramp, run, scroll }: {
           `null` IS the retired state, and re-arming stays a one-line edit in
           `core/formats/effects/preset-lag.ts` that reaches all three sites at
           once. Unmounting it here is how the next lag misses this card.
-          ⚠ MERGED, AND WITNESSED ON A PEER'S BRANCH — NOT CERTIFIED, AND NOT
-          BY AURORA (updated 2026-09-03). aeon drove a running machine on THIS
-          EDITOR'S OWN ramp document: the authored -1.5 px/line is in the ROM
-          record and moves the picture against a four-byte control. But it is on
-          `origin/parcel/aurora-ramp-witness`, which is NOT an ancestor of aeon's
-          master; and it is emulation, not silicon. Nothing in Aurora has
-          measured a ROM. The full record, including what the witness does NOT
-          say, is in `core/formats/effects/preset-lag.ts`.
+          ⚠ MERGED AND WITNESSED — STILL NOT CERTIFIED, AND NOT BY AURORA.
+          aeon drove a running machine on THIS EDITOR'S OWN ramp document: the
+          authored -1.5 px/line is in the ROM record and moves the picture
+          against a four-byte control.
+
+          ⚠ THE WITNESS HAS SINCE LANDED (corrected 2026-09-04). This block said
+          the run was on `origin/parcel/aurora-ramp-witness`, "which is NOT an
+          ancestor of aeon's master". THAT WAS TRUE WHEN WRITTEN and rotted a
+          few hours later, when aeon merged it — nobody edited this file and
+          nothing here was wrong; someone else's merge falsified it. Re-measured
+          at aeon master `065dc790`: `merge-base --is-ancestor
+          origin/parcel/aurora-ramp-witness origin/master` exits 0.
+          ⚠ AND NOTE WHICH DIRECTION ROTS, because that is why the corrected
+          sentence is safer than the one it replaces: "NOT an ancestor" decays
+          the moment anybody merges, while "IS an ancestor" is monotonic — it
+          can only stop being true if aeon REWRITES HISTORY. So the condition
+          that falsifies this line is a force-push to aeon's master, and nothing
+          less. Re-check it then; a merge cannot break it.
+
+          What has NOT changed is the half that mattered: it is EMULATION, NOT
+          SILICON, and nothing in Aurora has measured a ROM. The full record,
+          including what the witness does NOT say, is in
+          `core/formats/effects/preset-lag.ts`.
           ⚠ THE ONE-LINE DISAGREEMENT THAT USED TO BE FLAGGED HERE IS SETTLED
           AND IS NOT A CAVEAT ANY MORE (empyrean `e9409dc`, 2026-09-03). The
           measurement was right and this editor's derivation was reading a

@@ -1,4 +1,4 @@
-// THE WIRING, not the arithmetic — the sibling of overlay-priority-wiring.ts.
+// THE WIRING, not the arithmetic — the sibling of overlay-priority-wiring.test.ts.
 //
 // A perfectly-tested lens nobody calls reproduces the defect exactly: an author
 // paints a field nothing depicts. So these rows prove `OverlayRenderer.render`

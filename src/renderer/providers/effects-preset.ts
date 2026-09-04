@@ -276,8 +276,12 @@ export const PRESET_LIMITS: readonly PresetLimit[] = Object.freeze([
     // descriptions in main/ — and `bg-binding.ts` learned the hard way that two
     // hand-written near-identical sentences is how a limit ends up stated two
     // different ways. It lives in core/formats/raster-binding.ts because main
-    // must not import the renderer; the author still reads it here, in full, in
-    // the block that never truncates.
+    // must not import the renderer; the author still reads it here, on the
+    // `title` of the block's own element, with `SHORT_BODIES.unbound` painted
+    // beside it — this file's header, lines 25-34. ⚠ THIS READ "in full, in the
+    // block that never truncates" UNTIL 2026-09-04, which is the ruling
+    // `b8d16256` amended; a reader who acted on it would undo EFFECTS-W1
+    // defect 3.
     body: RASTER_SECTION_BINDING_LIMIT,
   }),
   Object.freeze({
@@ -821,8 +825,13 @@ export function replacePresetCommand(
  * IN THE PROVIDER, NOT THE PANEL, on this file's own rule — but note what is
  * NOT here. `title` defines the two kinds of value the control offers; it does
  * NOT restate where the binding stops. That sentence is
- * `RASTER_SECTION_BINDING_LIMIT`, rendered in full by `LimitBlock` at the top of
- * the very section this control sits in, and a second near-identical wording
+ * `RASTER_SECTION_BINDING_LIMIT`, which `LimitBlock` carries at the top of the
+ * very section this control sits in — the author-length half PAINTED, the
+ * contract wording on the same element's `title` (this file's own header, lines
+ * 25-34; `b8d16256`, EFFECTS-W1 defect 3). ⚠ THIS SENTENCE SAID "rendered in
+ * full" UNTIL 2026-09-04, which is the un-amended ruling O79 corrected in three
+ * other places and would talk a reader into undoing that fix. A second
+ * near-identical wording
  * beside the select is precisely the drift core/formats/raster-binding.ts exists
  * to prevent (bg-binding.ts learned it the expensive way). If this control ever
  * seems to need something the constant does not say, that is a change to the
@@ -2817,8 +2826,10 @@ export function fmtRampPx(px: number): string {
  *   as the sign bug the codec parcel caught, which reads fine and is wrong.
  *
  * This is the DISCRIMINATOR; `presetFp16FromNumber` is the ANSWER, and
- * `ramp-control.test.ts` cross-checks that the two agree on every case (this
- * returns null exactly when that returns an object). Two functions because the
+ * `__tests__/effects-preset-ramp-control.test.ts` §2 cross-checks that the two
+ * agree on every case (this returns null exactly when that returns an object).
+ * ⚠ THE NAME HERE USED TO BE `ramp-control.test.ts`, WHICH HAS NEVER EXISTED —
+ * the same defect O79 fixed twice in this file's header. Two functions because the
  * codec must not grow a sentence and the panel must not grow a conversion.
  */
 export type RampRateProblem = 'off-grid' | 'sign-hole' | 'above-range' | 'below-range';
@@ -3065,8 +3076,10 @@ export function rampAddrGloss(addr: number): string {
  * So: the fields stay in the engine's numbers, this one derived readout is in
  * the screen's, and the panel LABELS it as a display span rather than letting it
  * be read back as `top`. The lag appears exactly once on this surface, and
- * `ramp-control.test.ts` asserts both halves — that this readout DOES add it,
- * derived from the constant, and that nothing writes it into the document.
+ * `__tests__/effects-preset-ramp-control.test.ts` §3 asserts both halves — that
+ * this readout DOES add it, derived from the constant, and that nothing writes
+ * it into the document. (Same correction as §2's citation above: the old name
+ * `ramp-control.test.ts` has never existed.)
  *
  * ⚠ WHAT THE BOTTOM EDGE ACTUALLY DOES, CORRECTED 2026-09-03 (empyrean
  * `e9409dc`), BECAUSE THE OLD PARAGRAPH HERE ARGUED THE WRONG WAY ROUND. It used

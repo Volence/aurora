@@ -11,9 +11,18 @@
  * The editor and the engine agree on world pixels TODAY: an aeon act is flat
  * world coordinates end to end (`section.emp:3` — "the level scrolls live with
  * no section rebases"), and the editor's `sectionWorldOffset` lays sections out
- * on the same grid at the same scale. That correspondence is checked at runtime
- * by `scratchpad/warp-mailbox-harness` rather than assumed, because "the two
- * origins match" is exactly the sort of thing that is true until it isn't.
+ * on the same grid at the same scale.
+ *
+ * ⚠ THAT CORRESPONDENCE IS ASSUMED, NOT CHECKED (corrected 2026-09-04). This
+ * paragraph used to say it was "checked at runtime by
+ * `scratchpad/warp-mailbox-harness`" — an instrument that has never existed in
+ * this repo, in the tree or in its history. What does exist answers other
+ * questions: `warp-math.test.ts` is arithmetic only (rounding, the act clamp,
+ * the protocol clamp), and `scratchpad/warp-tearing-harness.mjs` diffs the
+ * plane nametable between two routes to the SAME destination, which is silent
+ * about whether that destination is the pixel the editor meant. So "the two
+ * origins match" is exactly the sort of thing that is true until it isn't, and
+ * nothing here would notice the day it stops being true.
  */
 
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../model/s4-types';
