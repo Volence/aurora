@@ -160,6 +160,7 @@
     "harness:ramp-control": "node scratchpad/ramp-control-harness.mjs",
     "harness:ramp-scroll-mode": "node scratchpad/ramp-scroll-mode-harness.mjs",
     "harness:raster-timeline": "node scratchpad/raster-timeline-harness.mjs",
+    "harness:reels-panel": "node scratchpad/reels-panel-harness.mjs",
     "harness:restore": "node scratchpad/restore-harness.mjs",
     "harness:row-remap-control": "node scratchpad/row-remap-control-harness.mjs",
     "harness:s1-anim": "node scratchpad/s1-anim-harness.mjs",
