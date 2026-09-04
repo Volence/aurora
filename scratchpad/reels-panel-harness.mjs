@@ -463,9 +463,18 @@ async function main() {
       Number(box0.min) === RATE_MIN && Number(box0.max) === RATE_MAX,
       `min=${box0.min} max=${box0.max} against contract ${RATE_MIN}..${RATE_MAX}`);
 
-    // The contract's own worked example. Chosen because the ×256 of it is the
-    // number the contract itself names: 768.
-    const WANT = 3;
+    // ⚠ THE FLOOR'S VALUE IS DERIVED FROM WHAT THE DOCUMENT ALREADY HOLDS, and
+    // the first version of this row was not. It typed the contract's worked
+    // example (3) into strip 0 — and 3 was already strip 2's rate, so
+    // `uniqueItems` REFUSED it and the anti-vacuous floor read as a failure of
+    // hazard 1 while the panel was behaving exactly as specified. The control
+    // acted inside its own sample window. So: the smallest positive rate the
+    // scene does NOT already carry, printed.
+    const WANT = (() => {
+      for (let r = 1; r <= RATE_MAX; r++) if (!seeded.rates.includes(r)) return r;
+      throw new Error('no free rate — the seed fills the span, which cannot happen');
+    })();
+    console.log(`    FLOOR VALUE : ${WANT} (absent from ${JSON.stringify(seeded.rates)})`);
     await clickAt(REEL_BOX(0));
     await sleep(250);
     await typeText(String(WANT));
@@ -474,13 +483,19 @@ async function main() {
     const read0 = PLANT === 'x256' ? afterLegal.rates[0] * DRIFT_UNITS : afterLegal.rates[0];
     check('4c', `ANTI-VACUOUS FLOOR + HAZARD 1: typing ${WANT} lands ${WANT}, never ${WANT * DRIFT_UNITS}`,
       read0 === WANT,
-      `model rates = ${JSON.stringify(afterLegal.rates)}; strip 0 = ${read0}; `
-      + `a panel copied from the drift path would hold ${WANT * DRIFT_UNITS}`);
-    check('4d', 'and the box shows what the document holds',
+      `model rates = ${JSON.stringify(afterLegal.rates)}; strip 0 = ${read0} `
+      + `(was ${seeded.rates[0]}); a panel copied from the drift path would hold `
+      + `${WANT * DRIFT_UNITS}`);
+    check('4d', 'and the box shows the value that committed',
       (await c.evalExpr(String.raw`(${REEL_BOX(0)}).value`)) === String(WANT));
 
     // ---- 5. THE ×256 TYPED IN, AND THE REFUSAL PAINTED. ------------------
-    const OOPS = String(WANT * DRIFT_UNITS);
+    //
+    // ⚠ 768 REGARDLESS OF THE FLOOR VALUE. This is the contract's OWN worked
+    // example — "a panel copied from the drift panel would emit 768 for an
+    // intended 3" — and tying it to the floor's derived value would have made
+    // the number this row types depend on what the seed happened to be.
+    const OOPS = String(3 * DRIFT_UNITS);
     await clickAt(REEL_BOX(0));
     await sleep(250);
     await typeText(OOPS);
