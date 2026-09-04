@@ -50,6 +50,14 @@ const MAIN = '/some/tree/dist/main/index.mjs';
 /** The command shape every launcher in scratchpad/ actually uses. */
 const XVFB_ARGS = ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, MAIN];
 
+/**
+ * ⚠ EVERY ROW GOES THROUGH A CHILD PROCESS, INCLUDING THE PURE ONES, and that
+ * is not ceremony. The guard is a `.mjs` with no type declarations, so a direct
+ * `import()` of it from a `.ts` file fails `npm run typecheck` with TS7016 —
+ * measured, not anticipated. `harness-guard-globals.test.ts` next door reaches
+ * the same module the same way for the same reason. Identity assertions still
+ * work: the `===` is evaluated in the child and only its verdict crosses.
+ */
 describe('pinUserDataDir — the switch, and WHERE it goes', () => {
   /**
    * POSITION IS THE ASSERTION, not presence. The command is `xvfb-run … <bin>
@@ -58,9 +66,9 @@ describe('pinUserDataDir — the switch, and WHERE it goes', () => {
    * the shared profile while every log line said it was pinned. Both wrong
    * placements pass a `toContain`, which is why this row indexes.
    */
-  it('inserts the switch IMMEDIATELY after the electron binary, not at either end', async () => {
-    const G = await import('../../scratchpad/lib/harness-guard.mjs');
-    const out = G.pinUserDataDir('/usr/bin/xvfb-run', XVFB_ARGS, '/tmp/P') as string[];
+  it('inserts the switch IMMEDIATELY after the electron binary, not at either end', () => {
+    const out = json<string[]>(inChild(
+      `process.stdout.write(JSON.stringify(G.pinUserDataDir('/usr/bin/xvfb-run', ${JSON.stringify(XVFB_ARGS)}, '/tmp/P')));`));
     const i = out.indexOf(ELECTRON);
     expect(i, 'the binary must still be in the command').toBeGreaterThan(-1);
     expect(out[i + 1]).toBe('--user-data-dir=/tmp/P');
@@ -69,9 +77,9 @@ describe('pinUserDataDir — the switch, and WHERE it goes', () => {
     expect(out[out.length - 1], 'NOT at the back, where it is an app argument').toBe(MAIN);
   });
 
-  it('puts it first when the command IS the electron binary', async () => {
-    const G = await import('../../scratchpad/lib/harness-guard.mjs');
-    const out = G.pinUserDataDir(ELECTRON, [MAIN], '/tmp/P') as string[];
+  it('puts it first when the command IS the electron binary', () => {
+    const out = json<string[]>(inChild(
+      `process.stdout.write(JSON.stringify(G.pinUserDataDir(${JSON.stringify(ELECTRON)}, [${JSON.stringify(MAIN)}], '/tmp/P')));`));
     expect(out).toEqual(['--user-data-dir=/tmp/P', MAIN]);
   });
 
@@ -79,26 +87,36 @@ describe('pinUserDataDir — the switch, and WHERE it goes', () => {
    * BY IDENTITY, because `spawnGuarded` uses `!==` to decide whether a profile
    * was pinned — and therefore whether to create the directory, print the line,
    * and hand the path to the flush check. A copied array that happens to be
-   * equal would make all three fire on a launch that was never pinned.
+   * equal would make all three fire on a launch that was never pinned, so
+   * `toEqual` here would be a check that cannot see the defect.
    */
-  it('returns its argument UNCHANGED BY IDENTITY when the command has no electron in it', async () => {
-    const G = await import('../../scratchpad/lib/harness-guard.mjs');
-    const args = ['-a', '/usr/bin/some-other-tool', 'x'];
-    expect(G.pinUserDataDir('/usr/bin/xvfb-run', args, '/tmp/P')).toBe(args);
+  it('returns its argument UNCHANGED BY IDENTITY when the command has no electron in it', () => {
+    const r = json<{ same: boolean; out: string[] }>(inChild(`
+      const args = ['-a', '/usr/bin/some-other-tool', 'x'];
+      const out = G.pinUserDataDir('/usr/bin/xvfb-run', args, '/tmp/P');
+      process.stdout.write(JSON.stringify({ same: out === args, out }));`));
+    expect(r.same, 'the SAME array object, not an equal one').toBe(true);
+    expect(r.out.join(' ')).not.toContain('--user-data-dir');
   });
 
-  it('DEFERS to a --user-data-dir the caller passed itself, also by identity', async () => {
-    const G = await import('../../scratchpad/lib/harness-guard.mjs');
-    const args = ['-a', ELECTRON, '--user-data-dir=/caller/said/so', MAIN];
-    expect(G.pinUserDataDir('/usr/bin/xvfb-run', args, '/tmp/P')).toBe(args);
+  it('DEFERS to a --user-data-dir the caller passed itself, also by identity', () => {
+    const r = json<{ same: boolean; out: string[] }>(inChild(`
+      const args = ['-a', ${JSON.stringify(ELECTRON)}, '--user-data-dir=/caller/said/so', ${JSON.stringify(MAIN)}];
+      const out = G.pinUserDataDir('/usr/bin/xvfb-run', args, '/tmp/P');
+      process.stdout.write(JSON.stringify({ same: out === args, out }));`));
+    expect(r.same).toBe(true);
+    expect(r.out).toContain('--user-data-dir=/caller/said/so');
+    expect(r.out.join(' '), 'and NOT both switches').not.toContain('/tmp/P');
   });
 
-  it('the switch it writes is the one it tests for — one spelling, not two', async () => {
-    const G = await import('../../scratchpad/lib/harness-guard.mjs');
-    const once = G.pinUserDataDir('/usr/bin/xvfb-run', XVFB_ARGS, '/tmp/P') as string[];
+  it('the switch it writes is the one it tests for — one spelling, not two', () => {
     // Feeding its own output back must be a no-op, which is only true if the
     // "already has one" test recognises the flag this function writes.
-    expect(G.pinUserDataDir('/usr/bin/xvfb-run', once, '/tmp/Q')).toBe(once);
+    const r = json<{ same: boolean }>(inChild(`
+      const once = G.pinUserDataDir('/usr/bin/xvfb-run', ${JSON.stringify(XVFB_ARGS)}, '/tmp/P');
+      const twice = G.pinUserDataDir('/usr/bin/xvfb-run', once, '/tmp/Q');
+      process.stdout.write(JSON.stringify({ same: twice === once }));`));
+    expect(r.same, 'a second pin would leave two --user-data-dir switches on one command').toBe(true);
   });
 });
 
