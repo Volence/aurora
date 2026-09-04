@@ -129,8 +129,19 @@ both ranges** — and `layer` is still `0`. It is `1` two frames later at `(739,
 752 is `x & $FFF8` for **x ≈ 753**, which is where he was on the *previous* frame. **The
 trigger's cell id is latched one frame behind the position you read beside it**, which is
 exactly the size of the discrepancy. The prediction is right about the window and about
-the direction; it is off by the latch. Anyone building a gate on "flips on the entry
+the direction; it is off by one frame. Anyone building a gate on "flips on the entry
 frame" would write a flaky one.
+
+⚠ **AND THE SENTENCE ABOVE TELLS ONE STORY WHERE THE OBSERVATION SUPPORTS TWO** — the
+aeon lane's correction, accepted, and the better reading of my own measurement. "The cell
+id is latched one frame behind" is a claim about the *read site*. But the identical
+numbers are equally consistent with **a correctly-latched cell being read one frame after
+the position it is compared against** — i.e. an ordering property of the caller, not a
+stale latch. **Those want different fixes, and nothing I measured distinguishes them.**
+What is established is the *symptom*: the flip lands two frames after window entry, and
+`xover_cell`'s high word corresponds to the previous frame's `x`. The mechanism is not
+established, by me or by anyone, and the word "latched" in the paragraph above should be
+read as naming the symptom rather than the cause.
 
 ---
 
