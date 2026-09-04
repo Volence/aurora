@@ -912,10 +912,22 @@ export function sceneDeformAdvisories(scene: EffectsScene): string[] {
   }
   const vDeform = vDeformValue(scene) !== null;
   const vsplitLayer = scene.layers.findIndex((l) => vsplitFieldValue(l) !== null);
+  // ⚠ COMPOSED, NOT TYPED OUT — `VSPLIT_VDEFORM_CLAUSES` is the declaration and
+  // this is one of its three surfaces (the layer card and the raster strip are
+  // the others). Until 2026-09-04 this was the ONLY place in Aurora that said
+  // anything about the pair, which is the position ROADMAP row 80 judged
+  // insufficient for the twin refusal one ensure above it in aeon's source.
+  //
+  // THE MECHANISM CLAUSE IS DELIBERATELY NOT HERE. These arms render as plain
+  // warning hints with no hover, and `column-layout.tsx`'s `Advisory` block
+  // records what an unsplit advisory costs this column (the v_factor row's ran
+  // to 21 wrapped lines / ~460px). The diagnosis and the remedies are what an
+  // author must act on; the "one column of forty" mechanism rides on the layer
+  // card's `Advisory`, which has a hover to put it in.
   if (vDeform && vsplitLayer >= 0) {
     out.push(
-      `V deform is on and layer ${vsplitLayer} authors a Plane B split — both write the same `
-      + 'VSRAM word, and the build refuses the pair. Author one of them.',
+      `layer ${vsplitLayer} authors a Plane B split while ${VSPLIT_VDEFORM_CLAUSES.sceneIs} — `
+      + `the build refuses this scene. ${VSPLIT_VDEFORM_CLAUSES.remedies}`,
     );
   }
   const mask = scene.left_column_mask ?? EFFECTS_LEFT_COLUMN_MASK_UNDECLARED;
@@ -2020,6 +2032,123 @@ export const VSPLIT_LOCK_CLAUSES = Object.freeze({
   remedyHorizontal: VSPLIT_LOCK_REMEDY_HORIZONTAL,
   remedies: VSPLIT_LOCK_REMEDIES,
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ║ THE TWO-WRITER RULING'S **SECOND** REFUSAL, WHICH HAD ONE SURFACE       ║
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// aeon's `scene()` carries TWO ensures against a `vsplit`, not one, and they sit
+// next to each other in the same block (`engine/level/scene_dsl.emp`, measured
+// here at `origin/master` `e81fd349` through git objects):
+//
+//   ensure(any_vsplit == 0 || v_factor == 15,               …)   ← the lock
+//   ensure(any_vsplit == 0 || scene_vdeform_is_none(v_deform) == 1, …)   ← THIS
+//
+// and the engine's own words for the second one are:
+//
+//   "in per-column mode (VDP reg $0B bit 2) VSRAM entry 1 is PLANE B OF COLUMN
+//    0, not the plane, and Vscroll_Write ships the whole 80-byte column buffer
+//    by DMA each frame — so a whole-plane mid-frame write below the line would
+//    shift ONE 16-px column of forty and leave the rest where the column buffer
+//    put them."
+//
+// ⚠ AURORA HAD ONE SENTENCE FOR IT AND THREE FOR ITS TWIN, AND THAT ASYMMETRY IS
+// THE DEFECT. `sceneDeformAdvisories` said it, in the Deform section — which is
+// EXACTLY the position ROADMAP row 80 judged insufficient for the lock half:
+// "it was, until row 80, the ONLY thing in Aurora that said anything about this
+// combination, in a collapsible section away from the controls that create it".
+// Row 80's ruling is not about `v_factor`; it is about where a cross-field
+// refusal has to appear. The second refusal simply never had it applied.
+//
+// SO THESE CLAUSES EXIST FOR ROW 80'S REASON, and the three surfaces that
+// compose them are the three that compose `VSPLIT_LOCK_CLAUSES`: the layer card
+// that creates the split, the strip that draws it, and the scene-level list.
+// One declaration; no surface retypes it; no two can drift apart.
+
+/**
+ * What the scene is doing, in the field the author can see.
+ *
+ * SUBJECT-FREE, `VSPLIT_LOCK_SCENE_IS`'s reason: every surface composing it
+ * already has a subject of its own.
+ */
+const VSPLIT_VDEFORM_SCENE_IS =
+  'this scene attaches a per-column V deform table, which puts VSRAM in per-column '
+  + 'mode (VDP reg $0B bit 2)';
+
+/**
+ * THE MECHANISM, transcribed from the ensure rather than paraphrased.
+ *
+ * ⚠ THE NUMBER THAT MAKES IT LEGIBLE IS "ONE OF FORTY". A reader told only that
+ * "both write the same word" has been told a fact about addressing and nothing
+ * about what they will SEE — and what they will see is a 16-pixel sliver moving
+ * while the other 39 columns stay put. That is the sentence the old one-liner
+ * was missing.
+ */
+const VSPLIT_VDEFORM_MECHANISM =
+  'Two writers, one word — but in per-column mode that word is not the plane. VSRAM entry 1 '
+  + 'is PLANE B OF COLUMN 0, the frame-top writer ships the whole 80-byte column buffer every '
+  + 'frame, and the split\'s whole-plane write below its line would shift ONE 16-pixel column '
+  + 'of forty and leave the other thirty-nine where the column buffer put them.';
+
+/** REMEDY 1 — keep the split; the per-column wobble goes. */
+const VSPLIT_VDEFORM_REMEDY_SPLIT =
+  'turn V deform off and keep the split as whole-plane vertical depth';
+
+/** REMEDY 2 — keep the wobble; the depth goes onto the horizontal factors. */
+const VSPLIT_VDEFORM_REMEDY_VDEFORM =
+  'keep V deform and drop the split, expressing the depth horizontally instead (the layer\'s '
+  + 'Plane B factor, or a Plane B curve)';
+
+/** Both remedies, as one sentence. The engine's own closing words are the shape. */
+const VSPLIT_VDEFORM_REMEDIES =
+  `Whole-plane vertical depth and per-column V deform are two spellings of the same VSRAM; `
+  + `author one of them. Either ${VSPLIT_VDEFORM_REMEDY_SPLIT}, or `
+  + `${VSPLIT_VDEFORM_REMEDY_VDEFORM}.`;
+
+/** The clauses, exported so every surface composes the SAME words and no test retypes them. */
+export const VSPLIT_VDEFORM_CLAUSES = Object.freeze({
+  sceneIs: VSPLIT_VDEFORM_SCENE_IS,
+  mechanism: VSPLIT_VDEFORM_MECHANISM,
+  remedySplit: VSPLIT_VDEFORM_REMEDY_SPLIT,
+  remedyVDeform: VSPLIT_VDEFORM_REMEDY_VDEFORM,
+  remedies: VSPLIT_VDEFORM_REMEDIES,
+});
+
+/**
+ * The layer card's half: this layer authors a split and this scene has a
+ * `v_deform`, so the build refuses the scene — in parts, or null.
+ *
+ * ⚠ A DIFFERENT EVENT FROM THE SCENE-LEVEL ONE, `sceneVsplitLockAdvisoryParts`'s
+ * precedent exactly. This answers "what did turning this split on do?" for the
+ * author whose hand is on the vsplit select; `sceneDeformAdvisories` answers
+ * "what does this scene now refuse?" for the author who is looking at the deform
+ * section. The two routes are taken by different people at different moments and
+ * neither one passes through the other's control.
+ *
+ * Null when the scene has no `v_deform`, and null when this layer has no split.
+ */
+export function vsplitVDeformAdvisoryParts(
+  scene: Pick<EffectsScene, 'v_deform'>,
+  layer: Pick<EffectsLayer, 'vsplit'>,
+): VsplitLockAdvisoryParts | null {
+  if (vDeformValue(scene) === null) return null;
+  if (!layerEmitsFire(layer)) return null;
+  return {
+    diagnosis: `this layer authors a Plane B split while ${VSPLIT_VDEFORM_SCENE_IS} `
+      + '— the build refuses this scene.',
+    mechanism: VSPLIT_VDEFORM_MECHANISM,
+    remedies: VSPLIT_VDEFORM_REMEDIES,
+  };
+}
+
+/** The layer advisory as one sentence — for surfaces that cannot hold three parts. */
+export function vsplitVDeformAdvisory(
+  scene: Pick<EffectsScene, 'v_deform'>,
+  layer: Pick<EffectsLayer, 'vsplit'>,
+): string | null {
+  const parts = vsplitVDeformAdvisoryParts(scene, layer);
+  return parts === null ? null : joinAdvisory(parts);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // THE SHAPE OF THAT RULING — ROADMAP O15 (2026-08-30)

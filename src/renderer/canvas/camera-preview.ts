@@ -427,6 +427,24 @@ export function cameraPreviewPlan(scene: EffectsScene, camX: number, camY: numbe
   // scene whose Plane B tracks the camera vertically, so an unlocked scene
   // carrying one does not build at all — there is no in-game appearance for the
   // preview to imitate, and applying it anyway would invent one.
+  //
+  // ⚠ AND ONLY WITHOUT A V DEFORM, WHICH IS THE SAME ARGUMENT AND WAS MISSING.
+  // The two-writer ruling is TWO ensures, not one: `scene()` refuses a vsplit
+  // beside `SceneVDeform.Columns` as flatly as it refuses one on an unlocked
+  // plane, because in per-column mode VSRAM entry 1 is column 0's Plane B rather
+  // than the plane. So a scene with `v_factor: 15` AND a `v_deform` was drawing a
+  // full-width split across the whole preview for a document that does not
+  // build — the exact invention the paragraph above forbids, arrived at by
+  // transcribing one half of a guard whose halves sit on different fields.
+  //
+  // ⚠ NOT DRAWN AS ONE COLUMN EITHER, and that is the point rather than a
+  // shortcut. There is no in-game appearance to imitate: the build refuses the
+  // scene, so the sliver never renders. Painting one would be a picture of a ROM
+  // that cannot exist, which is worse than the full-width lie it replaces.
+  // `sceneDeformAdvisories`, the layer card's `vsplitVDeformAdvisoryParts` and
+  // the raster strip's `splitRefusal` all say WHY the split is not here; a
+  // preview is not the surface to explain a build refusal on.
+  const vDeformOn = scene.v_deform !== undefined && scene.v_deform !== 'none';
   let vscroll = vscrollBase;
   for (let j = 0; j < rotated.length; j++) {
     const { source, screenTop } = rotated[j];
@@ -434,7 +452,7 @@ export function cameraPreviewPlan(scene: EffectsScene, camX: number, camY: numbe
       ? Math.max(screenTop, rotated[j + 1].screenTop)
       : SCREEN_HEIGHT;
     const layer = layers[source];
-    const split = vLocked && layer.vsplit !== undefined && layer.vsplit !== 'none'
+    const split = vLocked && !vDeformOn && layer.vsplit !== undefined && layer.vsplit !== 'none'
       ? layer.vsplit.at : null;
     if (split !== null) vscroll = split;
     // TRANSCRIPTION 5. The span is the band's own screen extent, which on this
