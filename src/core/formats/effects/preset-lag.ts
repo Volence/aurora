@@ -2,9 +2,66 @@
  * The contract-leads-consumer lag on the raster preset document, as ONE fact
  * with ONE measurement behind it.
  *
- * ═══ THE LAG IS EMPTY. RETIRED (AGAIN) 2026-09-03 — ITEM 6'S STEP 4 HAS RUN. ═══
+ * ═══ THE LAG IS EMPTY. RETIRED (AGAIN) 2026-09-04 — THE `boundary` ARM RAN. ═══
  *
- * THE FOURTH ARMING HAS RETIRED. empyrean `9233883` (AURORA_EFFECTS_SCHEMA.md
+ * THE FIFTH ARMING HAS RETIRED, on the same day it was raised. empyrean
+ * `c4a1da2` (AURORA_EFFECTS_SCHEMA.md §7.6) declared EFFECTS-W1's `boundary`
+ * authoring key; Aurora vendored it, wrote the codec and built the panel card
+ * (merges `3394e8f6` and `d47c69f8`); and AEON'S GENERATOR ARM HAS NOW RUN.
+ * Measured firsthand through git objects at aeon `origin/master` `b3af9847`
+ * ("merge(boundary): an author can write the boundary key and the bake reads
+ * it", 2026-09-04 08:35:23 -0400):
+ *
+ *   preset:          bands, base_swap, boundary, cycles, id, patch_motion,
+ *                    patch_world_ys, ramp, schema, variants
+ *   preset-ignored:  name
+ *   preset-refused:  fires
+ *
+ * `boundary` IS in the `preset:` row — the ACCEPTED list — so the sentence the
+ * panel was painting above five sets of controls ("a preset carrying the key
+ * will not build") is FALSE, and an author reading it was being told not to use
+ * a key that works. That is the O62/O64 defect in its live form, and it is what
+ * this retirement removes.
+ *
+ * ⚠ THE TIP WAS RE-READ, NOT RELAYED. The arming block below was written against
+ * aeon `8e45ebac`, where `boundary` was in none of the three rows; a merge
+ * announcement is not a merge and the drift row reads TIP, so the retirement was
+ * gated on reading `b3af9847`'s own blob rather than on being told. The drift
+ * row's independent read agrees: its title resolves the tip to `b3af9847` and it
+ * measured the lag as `[]`.
+ *
+ * ⚠ WHAT THIS DOES NOT SAY, AND THE LIMIT IS THE SAME ONE EVERY RETIREMENT HERE
+ * CARRIES. Nothing in this repository has seen a boundary preset BUILD, and
+ * nothing has seen a ROM obey one. What retired is a sentence about what aeon's
+ * PAGE ACCEPTS — the vocabulary, which is the fact this file can measure.
+ * "Accepted at the door" and "certified" are different facts; certification is
+ * aeon's pytest lane and sigil's attest chain, and no row here stands in for
+ * either. aeon's own merge message records two findings the CR did not carry —
+ * `boundary` lowers into `ep_patched` rather than `ep_raster`, and a fourth
+ * `{stem}_sec_patched` chooser was added to keep a patched image out of the
+ * static raster channel — which is aeon's build's business, not this row's.
+ *
+ * ⚠ THE HEADER BANNER WENT STALE ONCE AND IT IS WORTH KNOWING WHY. Between
+ * `3394e8f6` (the arming) and this commit, THIS BANNER still read "THE LAG IS
+ * EMPTY. RETIRED (AGAIN) 2026-09-03" while the constant below held
+ * `['boundary']`. The arming re-aimed the constant's own docblock and both test
+ * files and left the prose above them saying the opposite. Nothing measured the
+ * banner, so nothing went red. It is the same class as the sentence this parcel
+ * retires — a label outliving its justification — one layer up, in a comment.
+ *
+ * RE-OPEN CONDITION FOR `boundary`, stated so this retirement cannot become
+ * permanent by accident: if aeon's build REFUSES a document Aurora actually
+ * writes under `boundary` — a bound, a unit, a sentinel, an `offscreen_ship`
+ * spelling or the `CAP_` capability behind the patched arm — then "aeon reads
+ * this key" is true of the vocabulary and false of the documents this editor
+ * produces, and the disclosure comes back with wording that says so. (That
+ * condition has fired before, on `ramp`: see `ramp-sign-lag.ts`, the narrower
+ * sentence an Aurora document produced when aeon's constructor could not encode
+ * a negative step.)
+ *
+ * ═══ THE PREVIOUS RETIREMENT (ITEM 6), KEPT FOR ITS REASONING ═══
+ *
+ * THE FOURTH ARMING RETIRED 2026-09-03. empyrean `9233883` (AURORA_EFFECTS_SCHEMA.md
  * §7.4) declared EFFECTS-W1 DoD item 6's authoring key, `ramp`; Aurora vendored
  * it and wrote the codec (step 3, merge `3d76791d`); and AEON'S STEP 4 HAS NOW
  * RUN. Measured firsthand through git objects at aeon `origin/master`
@@ -286,16 +343,19 @@
  *      own source.
  *   2. `presetLagDisclosure` DERIVES the panel's sentence from it, and returns
  *      null — no sentence — when the list is empty. It is mounted
- *      unconditionally and propless in `BandPresetPanel`, in BOTH the channels
- *      section and the anchors section, so re-filling this list is the whole of
- *      what it takes to put the sentence back on screen in both places. The
- *      leaves STAY MOUNTED while silent: that is what keeps re-arming a one-line
- *      edit in this file.
+ *      unconditionally and propless in `BandPresetPanel` at FIVE sites: the
+ *      channels section, the anchors section, and the ramp, base-swap and
+ *      boundary cards. So re-filling this list is the whole of what it takes to
+ *      put the sentence back on screen at every one of them, and emptying it is
+ *      the whole of what it takes to retire it from every one — no component
+ *      edit, which is the claim `EW-BOUNDARY-LAG-RETIRE` measured rather than
+ *      assumed. The leaves STAY MOUNTED while silent: that is what keeps
+ *      re-arming a one-line edit in this file.
  *
  * `src/renderer/components/effects/__tests__/preset-lag-disclosure.test.ts`
  * closes the loop from the other side. It has now been re-aimed with the premise
- * FIVE times (armed → retired → armed → retired → armed → retired) and keeps
- * the shape both
+ * SEVEN times (armed → retired → armed → retired → armed → retired → armed →
+ * retired) and keeps the shape both
  * states need. With the lag CLOSED it asserts the retirement rather than assuming
  * it (the list is empty, and the leaf is silent BECAUSE of that and not for some
  * other reason); it keeps the WORDING fully asserted by driving the derivation
@@ -321,37 +381,49 @@
  * again LATER THE SAME DAY, when it did; `['ramp']` on 2026-09-03 when empyrean
  * 9233883 declared item 6's authoring key and aeon's step 4 had not run; EMPTY
  * again LATER THE SAME DAY AGAIN, when aeon's page grew `ramp` into its accepted
- * `preset:` row at `c7ee7075`; and `['boundary']` since 2026-09-04, below.
+ * `preset:` row at `c7ee7075`; `['boundary']` on 2026-09-04 when empyrean
+ * `c4a1da2` declared §7.6's authoring key and aeon's generator arm had not run;
+ * and EMPTY again LATER THE SAME DAY, when it did.
  *
- * ═══ RE-ARMED 2026-09-04: empyrean `c4a1da2` DECLARED `boundary` (§7.6) AND
- * AEON'S STEP 4 HAS NOT RUN. ═══
+ * ═══ RETIRED 2026-09-04: AEON'S `boundary` GENERATOR ARM HAS RUN. ═══
  *
- * MEASURED FIRSTHAND through git objects at aeon `origin/master` `8e45ebac`,
+ * MEASURED FIRSTHAND through git objects at aeon `origin/master` `b3af9847`,
  * not relayed: `docs/EDITOR_RASTER_PRESETS.md`'s machine-checked block reads
  *
- *   preset:         bands, base_swap, cycles, id, patch_motion, patch_world_ys,
- *                   ramp, schema, variants
+ *   preset:         bands, base_swap, boundary, cycles, id, patch_motion,
+ *                   patch_world_ys, ramp, schema, variants
  *   preset-ignored: name
  *   preset-refused: fires
  *
- * `boundary` appears in NONE of the three rows. ⚠ THAT IS THE SHARPER FLAVOUR OF
- * LAG AND THE DISCLOSURE'S WORDING TURNS ON IT: a key in `preset-refused:` is a
- * name aeon KNOWS and declines; a key aeon's page does not mention at all is one
- * its generator meets as an unknown property and rejects the WHOLE DOCUMENT for.
- * So a preset Aurora writes under `boundary` today does not build at all — it is
- * not a key that reaches the file and stops there, it is a file that fails.
- * `presetLagDisclosure`'s sentence already says exactly that ("refuses the WHOLE
- * DOCUMENT, so a preset carrying the key will not build"), which is why it needs
- * no new wording for this arming.
+ * `boundary` is in the `preset:` row — the ACCEPTED list. The arming below it
+ * was read at `8e45ebac`, where the key was in none of the three rows; between
+ * that revision and this one aeon merged the arm (`b3af9847`, "an author can
+ * write the boundary key and the bake reads it"). So the sharper-flavour claim
+ * the disclosure was making — that aeon's generator meets the key as an unknown
+ * property and refuses the WHOLE DOCUMENT — is no longer true of any of the
+ * five surfaces that were painting it.
  *
- * Re-empty it (and only it) the day the drift row reports the lag closed — the
- * sentence retires with the row, in both mount sites, by construction. Do NOT
+ * ⚠ THE RETIREMENT WAS GATED ON A TIP READ, NOT AN ANNOUNCEMENT, which is the
+ * instruction the drift row's own message carries and the reason this is a
+ * measurement rather than a one-line edit. Two independent reads agree: this
+ * comment's, and the drift row's, which resolves `origin/master` itself and
+ * computed the lag as `[]` against a premise of `['boundary']`.
+ *
+ * Re-fill it the day the drift row reports a lag re-opened — the sentence comes
+ * back at all FIVE mount sites, by construction, with no component edit. Do NOT
  * empty it on a merge announcement: the row reads aeon's TIP, and an
  * announcement is not a merge.
  */
-export const PRESET_KEYS_AWAITING_AEON: readonly string[] = Object.freeze(['boundary']);
+export const PRESET_KEYS_AWAITING_AEON: readonly string[] = Object.freeze([]);
 
-/** The date the premise above was last measured — printed inside the sentence. */
+/**
+ * The date the premise above was last measured — printed inside the sentence.
+ *
+ * Unchanged in value by this retirement and that is not an oversight: the
+ * arming and the retirement were measured on the SAME DAY, hours apart (aeon
+ * `8e45ebac` then `b3af9847`). The field is a staleness bound for a reader, and
+ * a day is its resolution.
+ */
 export const PRESET_LAG_MEASURED_ON = '2026-09-04';
 
 /** Where the measurement lives, named in the sentence so a reader can re-run it. */

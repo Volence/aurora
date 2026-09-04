@@ -33,7 +33,7 @@ import {
   EFFECTS_PRESET_BOUNDARY_KEYS, EFFECTS_PRESET_TINT_REGION_KEYS,
   EFFECTS_PRESET_BOUNDARY_LINE_RANGE,
 } from '../../../../core/formats/effects/preset';
-import { PRESET_KEYS_AWAITING_AEON } from '../../../../core/formats/effects/preset-lag';
+import { PRESET_KEYS_AWAITING_AEON, presetLagDisclosure } from '../../../../core/formats/effects/preset-lag';
 
 const PANEL = join(__dirname, '..', 'BandPresetPanel.tsx');
 const panel = readFileSync(PANEL, 'utf8');
@@ -200,19 +200,46 @@ describe('the sentences that must be on screen, not in a hover', () => {
   });
 
   /**
-   * ⚠ AND THE PREMISE IS ARMED, WHICH IS WHY THAT MOUNT IS NOT DECORATION.
-   * Measured here rather than assumed: `boundary` is in the awaiting list, so
-   * this card's disclosure RENDERS. If aeon's generator arm lands and the drift
-   * row empties the list, this row goes red and is the reminder that the
-   * sentence retired — it is not a claim that the lag is permanent.
+   * ⚠ THIS ROW SAID "ARMED" AND ITS OWN MESSAGE RETIRED IT, 2026-09-04.
+   *
+   * It asserted `boundary` was in the awaiting list, so this card's disclosure
+   * RENDERED — and it said what to do when that stopped being true: *"If aeon's
+   * generator arm has landed that is CORRECT and this row retires with the
+   * sentence … do not re-arm the list to make this green."* aeon `b3af9847` grew
+   * `boundary` into its accepted `preset:` row (re-confirmed at `75cd390f`), the
+   * drift row measured the lag EMPTY, and this row was retired rather than
+   * relaxed.
+   *
+   * ⚠ AND THIS FILE WAS THE FOURTH READER OF THE PREMISE, NOT THE THIRD. The
+   * retirement parcel was scoped to `preset-lag.ts`, the drift row and
+   * `preset-lag-disclosure.test.ts`; this row is in a DIFFERENT file, about a
+   * different subject (the boundary card's wording), and only the full suite
+   * found it. A census of who reads a premise is not the same as the list of
+   * files a change was scoped to.
+   *
+   * WHAT IS ASSERTED NOW is the mirror, so the mount above is still not
+   * decoration: the premise does not name this card's key, the leaf is silent
+   * BECAUSE of that, and the sentence a re-opened lag would put back is still
+   * fully asserted.
    */
-  it('the premise this card discloses is currently ARMED for `boundary`', () => {
+  it('the premise this card discloses is RETIRED for `boundary` — and the mount still matters', () => {
     expect(
       PRESET_KEYS_AWAITING_AEON,
-      'the lag no longer names `boundary`. If aeon\'s generator arm has landed that is CORRECT and '
-      + 'this row retires with the sentence — re-read core/formats/effects/preset-lag.ts and the '
-      + 'drift row, and do not re-arm the list to make this green',
-    ).toContain('boundary');
+      '`boundary` is back in the lag — a lag has re-opened on the key THIS card authors, so its '
+      + 'disclosure is on screen again. Re-aim this row at the sentence being ON screen (git log '
+      + 'it for the shape it had while armed) rather than relaxing it.',
+    ).not.toContain('boundary');
+    // The leaf this card mounts renders nothing today...
+    expect(presetLagDisclosure(PRESET_KEYS_AWAITING_AEON)).toBeNull();
+    // ...and the silence is the PREMISE's doing, not a leaf that stopped
+    // working: the same derivation, handed this card's key back, still speaks
+    // the whole sharper-flavour sentence. Without this half the retirement
+    // could have quietly disabled the disclosure and this row would not care.
+    const wouldSay = presetLagDisclosure(['boundary']);
+    expect(wouldSay).not.toBeNull();
+    expect(wouldSay!).toContain('`boundary`');
+    expect(wouldSay!).toContain('WHOLE DOCUMENT');
+    expect(wouldSay!).toContain('will not build');
   });
 
   it('what an author sees is QUOTED from the contract, and the schema paragraph is reachable', () => {
