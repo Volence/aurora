@@ -150,6 +150,17 @@ const REQUIRED_EXPORTS = [
   // becomes dead code while every launcher still "imports the guard" and every
   // harness silently goes back to measuring the owner's desktop.
   'pinOzoneToX11', 'OZONE_X11_FLAG',
+  // O80 / HAZARD 6. `spawnGuarded` also injects `--user-data-dir=<this run's
+  // own profile>` through `pinUserDataDir`, so two instruments cannot clear
+  // each other's localStorage. Listed for the same reason as every name above:
+  // rename one and the injection becomes dead code while every launcher still
+  // "imports the guard" and the whole population silently goes back to sharing
+  // ~/.config/Electron — a failure that shows up as another instrument's
+  // unexplained flake, never as an error here.
+  'pinUserDataDir', 'USER_DATA_DIR_SWITCH', 'RUN_PROFILE_DIR', 'PROFILE_DIR_ENV',
+  'cleanupProfile', 'profileInUse',
+  // The census the refusal renders instead of quoting a number that goes stale.
+  'clearCallSiteCensus', 'describeClearCensus',
 ];
 
 // ── source scanning ────────────────────────────────────────────────────────

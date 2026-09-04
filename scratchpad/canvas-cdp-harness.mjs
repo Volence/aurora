@@ -40,7 +40,7 @@ import * as http from 'node:http';
 import { basename, resolve as resolvePath } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { writeFileSync, mkdirSync, existsSync, readFileSync, rmSync, cpSync } from 'node:fs';
-import { spawnGuarded, killTree, restoreDiscoveryNow, readDiscoveryNow, resolveOwnedDiscovery, descendants, APP_NAMES } from './lib/harness-guard.mjs';
+import { spawnGuarded, killTree, restoreDiscoveryNow, readDiscoveryNow, resolveOwnedDiscovery, descendants, APP_NAMES, RUN_PROFILE_DIR, profileInUse, describeClearCensus } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 import {
   resolveLeveldbDir, bytesOnDisk, flushMarker, flushRefusal, FLUSH_MARKER_KEY,
@@ -910,7 +910,11 @@ async function session(label, body) {
  */
 async function armFlushCheck(c, child, label) {
   const pids = descendants(child.pid);
-  const { dir, how, why } = resolveLeveldbDir({ pids, appNames: APP_NAMES });
+  // O80: pass the profile this run pinned, so the fallback cannot hand back a
+  // shared directory this run never writes. `null` when nothing was pinned.
+  const { dir, how, why } = resolveLeveldbDir({
+    pids, appNames: APP_NAMES, profileDir: profileInUse() ? RUN_PROFILE_DIR : null,
+  });
   if (dir === null) {
     return { armed: false, message: `FLUSH CHECK UNMEASURABLE — ${why}.\n`
       + '  This teardown cannot show the session it built reached disk, so the next session\'s\n'
@@ -985,14 +989,27 @@ async function waitRestored(c, maxMs = 45000) {
   // not survive a restart". It is not a product failure. It is this harness
   // being handed an empty profile.
   //
-  // THAT IS NOT HYPOTHETICAL — it is the O50 sweep's record of this file,
-  // reproduced exactly on 2026-09-03. `~/.config/<app>/Local Storage` is ONE
-  // profile shared by this whole instrument population, 114 call sites in
-  // `scratchpad/*.mjs` call `localStorage.clear()`, and the sweep could not
+  // THAT WAS NOT HYPOTHETICAL — it is the O50 sweep's record of this file,
+  // reproduced exactly on 2026-09-03. `~/.config/<app>/Local Storage` was ONE
+  // profile shared by this whole instrument population, a great many call sites
+  // in `scratchpad/` call `localStorage.clear()` (the message below DERIVES the
+  // figure at the moment it is rendered — the number that used to stand here in
+  // prose was a fifth low by the time anyone read it), and the sweep could not
   // have run its 89 launches serially in the window it records (this file alone
   // takes ~190 s). Injecting a single `localStorage.clear()` between session A
   // and session B reproduces the sweep's tally to the row: 36 passed, 9 failed,
   // the same nine ids, with seven further rows silently unexercised.
+  //
+  // ⚠ AND CAUSE (a) IS STRUCTURALLY PREVENTED AS OF O80, which is why the past
+  // tense above. `spawnGuarded` now pins `--user-data-dir` to a directory
+  // derived once per NODE PROCESS (`RUN_PROFILE_DIR`, HAZARD 6 in
+  // `lib/harness-guard.mjs`): stable across this run's four launches, so the
+  // persistence these restart rows measure is untouched, and unique across
+  // concurrent runs, so no other instrument can reach this one's area. The
+  // message below still names (a), for the same reason it still names (b): a
+  // refusal must describe the world and not the fix. If this trips now, the
+  // first thing to check is whether the launch went through `spawnGuarded` at
+  // all — the profile line it prints at launch says which directory was used.
   //
   // A SECOND CAUSE, FOUND BY THIS GUARD RATHER THAN REASONED ABOUT, and the
   // reason the message below names two: it tripped SPONTANEOUSLY at session C
@@ -1024,10 +1041,14 @@ async function waitRestored(c, maxMs = 45000) {
       + `  keys actually present:   ${JSON.stringify(Object.keys(before))}\n`
       + `  The previous session wrote that key; this one cannot see it. TWO causes are known,\n`
       + `  BOTH environmental, and this refusal does not distinguish them:\n`
-      + `    (a) ANOTHER INSTRUMENT CLEARED THE PROFILE. ~/.config/<app>/Local Storage is one\n`
-      + `        directory shared by this whole population and 114 call sites in scratchpad/\n`
-      + `        call localStorage.clear(). Run this harness with no other Aurora-launching\n`
-      + `        instrument running concurrently.\n`
+      + `    (a) ANOTHER INSTRUMENT CLEARED THE PROFILE. This was the shared-profile hazard:\n`
+      + `        ~/.config/<app>/Local Storage was one directory for the whole population, and\n`
+      + `        ${describeClearCensus()}.\n`
+      + `        It is PREVENTED as of O80 — spawnGuarded pins --user-data-dir to one profile\n`
+      + `        per node process, so no other instrument can reach this run's area. This run's\n`
+      + `        profile: ${RUN_PROFILE_DIR} (in use: ${profileInUse()}).\n`
+      + `        If that says "in use: false", the launch did NOT go through the guard and the\n`
+      + `        hazard is back for this run — that is the first thing to check.\n`
       + `    (b) THE PREVIOUS SESSION'S FLUSH NEVER REACHED DISK. Chromium commits a\n`
       + `        localStorage area on a rate-limited timer — MEASURED at 44-54 s for this\n`
       + `        harness's busy sessions — while the app is gone ~50 ms after window.close().\n`

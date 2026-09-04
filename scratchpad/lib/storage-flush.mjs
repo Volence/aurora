@@ -169,6 +169,26 @@ export function candidateLeveldbDirs(appNames, configHome = process.env.XDG_CONF
 }
 
 /**
+ * ⚠ O80: WHEN THE RUN PINNED ITS OWN PROFILE, THE CANDIDATE LIST IS A SINGLETON
+ * AND IT IS NOT A GUESS.
+ *
+ * `spawnGuarded` now launches with `--user-data-dir=<this run's own directory>`
+ * (HAZARD 6), so the profile is KNOWN to the launcher — it is not one of
+ * several app-name-shaped possibilities. Without this, the fallback would keep
+ * offering `$XDG_CONFIG_HOME/<app name>/…`, and on this machine exactly one of
+ * those exists (left behind by every pre-O80 run), so the resolver would have
+ * confidently returned a directory this run never writes and reported "never
+ * flushed" for a flush that happened. That is precisely the defect this
+ * module's header was written about, one cause later.
+ *
+ * The observation still comes first and still wins. This only replaces the
+ * GUESS, and only when the caller can say which profile it pinned.
+ */
+export function profileLeveldbDir(profileDir) {
+  return join(profileDir, LEVELDB_REL);
+}
+
+/**
  * `{ dir, how }` for the profile this run is actually writing, or
  * `{ dir: null, why }`.
  *
@@ -176,11 +196,17 @@ export function candidateLeveldbDirs(appNames, configHome = process.env.XDG_CONF
  * when exactly ONE candidate exists on disk. Two present candidates with no
  * observation is a refusal, not a coin flip.
  */
-export function resolveLeveldbDir({ pids, appNames, readFds = defaultReadFds, exists = existsSync, configHome }) {
+export function resolveLeveldbDir({ pids, appNames, readFds = defaultReadFds, exists = existsSync, configHome, profileDir = null }) {
   const held = leveldbDirsHeldBy(pids, readFds);
   if (held.length === 1) return { dir: held[0], how: `observed: held open by the launched tree (${[...pids].length} pid(s))` };
   if (held.length > 1) {
     return { dir: null, why: `the launched tree holds ${held.length} different Local Storage/leveldb directories open (${held.join(', ')}) — this run writes to more than one profile and the barrier cannot say which one carries the session` };
+  }
+  // O80: a pinned profile is knowledge, not a candidate. See profileLeveldbDir.
+  if (profileDir !== null) {
+    const dir = profileLeveldbDir(profileDir);
+    if (exists(dir)) return { dir, how: `derived: /proc named no open leveldb, and this run launched with --user-data-dir=${profileDir}` };
+    return { dir: null, why: `/proc named no open leveldb for the launched tree, and this run's own pinned profile has no ${LEVELDB_REL} in it yet (${dir}) — nothing has been written to it, so there is nothing to check` };
   }
   const present = candidateLeveldbDirs(appNames, configHome).filter((d) => exists(d));
   if (present.length === 1) return { dir: present[0], how: `derived: /proc named no open leveldb, and exactly one candidate profile exists (${present[0]})` };
