@@ -135,8 +135,8 @@ import { bandArm, bandCollisionAdvisory, clampBandEdge } from '../providers/effe
 import { factorLabel } from '../../core/formats/effects/scene-ui';
 import type { CameraPreviewPlan, CameraPreviewBand } from './camera-preview';
 import {
-  layerTopSpace, fireScreenLineOf, layerEmitsFire, vsplitFieldValue,
-  EFFECTS_FIRE_LINE_MIN, EFFECTS_FIRE_LINE_MAX, VSPLIT_LOCK_CLAUSES,
+  layerTopSpace, fireScreenLineOf, layerEmitsFire, vsplitFieldValue, vDeformValue,
+  EFFECTS_FIRE_LINE_MIN, EFFECTS_FIRE_LINE_MAX, VSPLIT_LOCK_CLAUSES, VSPLIT_VDEFORM_CLAUSES,
   type LayerTopSpace,
 } from '../providers/effects-aeon';
 import { SCREEN_HEIGHT } from '../../core/model/screen';
@@ -362,7 +362,8 @@ export function rasterTimelineSpaceNotice(
  * `vsplitLockAdvisory` in `providers/effects-aeon.ts`.
  */
 export function splitRefusal(
-  scene: Pick<EffectsScene, 'v_factor' | 'v_offset'>, layer: Pick<EffectsLayer, 'world_y' | 'vsplit'>,
+  scene: Pick<EffectsScene, 'v_factor' | 'v_offset' | 'v_deform'>,
+  layer: Pick<EffectsLayer, 'world_y' | 'vsplit'>,
 ): string | null {
   if (layerTopSpace(scene) !== 'screen') {
     // Phrased to follow the strip's own subject ("Layer N's split …"), which is
@@ -370,6 +371,27 @@ export function splitRefusal(
     return `cannot be baked: ${VSPLIT_LOCK_CLAUSES.sceneIs(scene.v_factor)}, so it has no fire `
       + `line and the build refuses the WHOLE SCENE. ${VSPLIT_LOCK_CLAUSES.mechanism} `
       + VSPLIT_LOCK_CLAUSES.remedies;
+  }
+  // ⚠ AEON'S SECOND VSPLIT ENSURE, AND IT WAS MISSING HERE.
+  //
+  // `scene()` refuses a vsplit on a per-column scene as flatly as it refuses one
+  // on an unlocked scene — the two ensures are adjacent lines in
+  // `engine/level/scene_dsl.emp`. This function transcribed the first and not the
+  // second, so a scene with `v_factor: 15` AND a `v_deform` drew its splits as
+  // perfectly good marks with no refusal at all, on a document the build will not
+  // accept. A guard whose two halves sit on different scene fields is exactly the
+  // one a transcription drops; `curveAnchorDeformAdvisory`'s docblock says the
+  // same thing about the anchor guard, and this is the second instance.
+  //
+  // ORDER MATTERS AND IS DELIBERATE: the lock arm goes first because it is the
+  // one that destroys the FIRE LINE (`layerTopSpace` decides whether a layer top
+  // is even a screen line), so the sentence below it would be arithmetic on a
+  // quantity that does not exist. This arm's scene has a fire line; what it does
+  // not have is a plane to apply it to.
+  if (vDeformValue(scene) !== null) {
+    return `cannot be authored beside a V deform: ${VSPLIT_VDEFORM_CLAUSES.sceneIs}, and the `
+      + `build refuses the WHOLE SCENE. ${VSPLIT_VDEFORM_CLAUSES.mechanism} `
+      + VSPLIT_VDEFORM_CLAUSES.remedies;
   }
   const line = fireScreenLineOf(scene, layer.world_y);
   if (line >= EFFECTS_FIRE_LINE_MIN && line <= EFFECTS_FIRE_LINE_MAX) return null;

@@ -96,9 +96,18 @@ import {
   EFFECTS_LAYER_DEFORM_BOUNDS, EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS,
   LAYER_DRIFT_ROW, EFFECTS_DRIFT_PX_BOUNDS, EFFECTS_DRIFT_PX_STEP,
   driftPxFieldValue, driftFromToggle, driftFromPxPerFrame, driftPxPerFrameRefusal,
+  vsplitVDeformAdvisoryParts,
 } from '../../providers/effects-aeon';
+// THE ONE CROSS-DOCUMENT QUESTION THIS PANEL ASKS. Every other reading here is a
+// fact about the scene in front of the author; this one is about a preset in a
+// different directory, edited in a different panel, and it is the whole point of
+// the V-deform row's last line.
+import { vDeformRampAdvisory } from '../../providers/effects-preset';
+import type { EffectsPresetLibrary } from '../../../core/formats/effects/preset';
 
 const EMPTY_LIBRARY: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [] };
+/** `BandPresetPanel`'s idiom — an absent library is an empty one, never a null check at the call. */
+const EMPTY_PRESETS: EffectsPresetLibrary = { presets: [], unreadable: [], notices: [] };
 
 const textInput: React.CSSProperties = {
   flex: 1, minWidth: 0, background: T.raised, color: T.textHi,
@@ -674,6 +683,22 @@ export default function EffectsScenePanel(): React.ReactElement {
                 const lock = vsplitLockAdvisoryParts(selected, layer);
                 return lock === null ? null : <Advisory under {...lock} />;
               })()}
+              {/* THE RULING'S **SECOND** REFUSAL, WHICH ROW 80 NEVER REACHED.
+                  aeon's `scene()` refuses a vsplit beside a `v_deform` on the
+                  line after it refuses one on an unlocked plane, and until
+                  2026-09-04 Aurora said so in exactly one place — the Deform
+                  section's advisory list — which is the position row 80 judged
+                  insufficient for the twin. Same argument, same fix: the sentence
+                  goes under the control that trips it.
+                  BOTH CAN SHOW AT ONCE and neither is suppressed. An unlocked
+                  scene that also carries a V deform breaks two ensures, the
+                  remedies differ (one moves `v_factor`, the other moves
+                  `v_deform`), and choosing which of two real refusals the author
+                  is allowed to see is `sceneDeformAdvisories`' guard-3 mistake. */}
+              {(() => {
+                const vd = vsplitVDeformAdvisoryParts(selected, layer);
+                return vd === null ? null : <Advisory under {...vd} />;
+              })()}
               {/* THE STRIP'S OWN DEFORM (wave 2). `own` overrides the scene's
                   plane-shared table for this strip alone, and it carries the
                   same `tableRef` the scene rows do — so the same sub-form.
@@ -1161,6 +1186,52 @@ export default function EffectsScenePanel(): React.ReactElement {
             );
           })()}
           <Hint under style={{ marginBottom: 0 }}>{V_DEFORM_ROW.hint}</Hint>
+          {/* ═══ WHAT THIS TOGGLE JUST DID TO A DOCUMENT NOT ON SCREEN ═══
+
+              THE AUTHORING END OF THE RAMP DEFECT. `docs/reviews/
+              2026-09-03-ew-ramp-scroll-mode.md` closed the READING end: a ramp
+              card now says whether its five numbers are a full-screen scroll or
+              a 16-pixel sliver. It could not close the WRITING end, because the
+              writing end is here — one select, on a scene, that silently narrows
+              every VSRAM ramp bound to every section this scene is bound to.
+
+              UNDER THE ROW, NOT ABOVE IT, and the placement is the opposite call
+              from the ramp card's for the opposite reason. There the sentence
+              had to come FIRST because it changes what the five numbers below it
+              MEAN. Here it changes nothing about the three controls above it —
+              the table, the speed and the amplitude do exactly what their labels
+              say — so it is a consequence of the row, and a consequence reads
+              after its cause.
+
+              NEUTRAL TONE, NO WARNING COLOUR, NOT A GATE. A one-column ramp is a
+              legitimate thing to author, and unlike the two advisories below
+              this one it is NOT a build refusal: aeon cannot see a preset
+              document, so this pairing builds green and runs. That is exactly
+              why it must be said here — no build will ever say it — and exactly
+              why it must not be dressed as an error. The refusals in the list
+              below stay `tone="warning"`; this one does not.
+
+              PAINTED SHORT / CONTRACT LONG on the same element, the ramp card's
+              own split, so the measured aeon chain rides on the hover rather
+              than in a 285px column. */}
+          {(() => {
+            // GATED ON THE STATE THAT HAS THE CONSEQUENCE, and on an act being
+            // open. With no act there are no sections and so no bindings to
+            // resolve — `BandPresetPanel` paints nothing in that state for the
+            // same reason, and one panel answering where its mirror stays silent
+            // is the disagreement `sectionSceneRef` exists to prevent.
+            if (act === null) return null;
+            if (vDeformValue(selected) === null) return null;
+            const impact = vDeformRampAdvisory(
+              selected.id, act.sections, act.sceneRef,
+              state.project?.effectsPresets ?? EMPTY_PRESETS,
+            );
+            return impact === null ? null : (
+              <Hint under style={{ marginBottom: 0 }}>
+                <span title={impact.full}>{impact.short}</span>
+              </Hint>
+            );
+          })()}
           {/* THE POLICY V DEFORM MAKES MANDATORY.
               Shown when there is a V deform to adjudicate — and ALSO whenever
               the document already declares a policy without one, which the

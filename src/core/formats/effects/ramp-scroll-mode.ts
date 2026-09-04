@@ -381,3 +381,151 @@ export function rampScrollModeSentence(
   }
   return { short, full: RAMP_SCROLL_MODE_NOTE };
 }
+
+// ---------------------------------------------------------------------------
+// THE SAME FACT, SEEN FROM THE SCENE PANEL — WHERE THE KEY IS ACTUALLY TYPED
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ║ THE KEY IS AUTHORED HERE AND THE DAMAGE IS DONE OVER THERE              ║
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Everything above is the RAMP CARD's half: an author looking at five numbers is
+ * told which of two effects they make. That closed the READING end of the defect
+ * and left the WRITING end open — and the writing end is the one with the
+ * author's hand on it.
+ *
+ * `v_deform` is a toggle on a SCENE. Flipping it to `columns` puts VSRAM in
+ * per-column mode for every section that scene is bound to, and any VSRAM `ramp`
+ * bound to one of those sections stops scrolling the plane and starts scrolling
+ * one 16-pixel column. The scene panel could not say so. An author turned on a
+ * per-column wobble, got the wobble they asked for, and silently narrowed a ramp
+ * in a document they were not looking at, in a panel they had not opened.
+ *
+ * ⚠ THE TWO DIRECTIONS RESOLVE THE BINDING THE SAME WAY OR THEY ARE WORSE THAN
+ * NEITHER. Two panels disagreeing about which scene a section takes would each
+ * be individually plausible and jointly useless, so both go through
+ * `sectionSceneRef` in `renderer/providers/effects-preset.ts` — one fallback
+ * chain, written once, read from both ends. A rule each side spells for itself
+ * passes whenever both are wrong together.
+ *
+ * ⚠ AND IT DECLINES, exactly as the five cases above do. A section can bind a
+ * preset whose FILE Aurora could not read, or name a preset id that is not in
+ * this project at all. Whether such a document carries a `ramp` is not knowable
+ * from here, so this SAYS that rather than guessing. "Probably no ramp, most
+ * presets are band presets" is the same drawn lie in the mirror.
+ *
+ * ═══ WHAT IS DELIBERATELY SILENT, AND WHY THAT IS NOT THE SAME DEFECT ═══
+ *
+ *   • A scene with NO `v_deform`. There is no consequence yet, so there is no
+ *     sentence. The ramp card's "nothing bound" case HAD to speak because the
+ *     five numbers under it are meaningless without it; a V-deform row means
+ *     exactly what it says on its own, and a line on every scene that has none
+ *     would be a warning about nothing on the majority of scenes.
+ *   • Sections bound to a preset carrying `bands` or `base_swap` and no `ramp`.
+ *     NOT a hedge — DERIVED. `$defs.band.properties.on` has no `vsram` arm at all
+ *     (`EFFECTS_PRESET_BAND_ON_ARMS`, and the schema sentence behind it: a band's
+ *     restore is derived from the ON op's CRAM span and a VSRAM op has none), and
+ *     `base_swap` writes a nametable base register. `ramp` is the only preset
+ *     shape that writes VSRAM, so it is the only one per-column mode can reach.
+ *   • No act open. `BandPresetPanel` paints nothing in that state for the same
+ *     reason — with no act there are no sections and so no bindings to resolve —
+ *     and one surface answering where the other stays silent would be the
+ *     disagreement this module exists to prevent.
+ */
+
+/** What one section bound to this scene carries, for the V-deform sentence. */
+export interface VDeformRampBinding {
+  /** The section index — what `section_N.meta.json` is N of. */
+  section: number;
+  /** The preset id in the section's `rasterRef`. */
+  presetId: string;
+  /**
+   * `ramp` — the preset was read and carries a `ramp`, so it IS narrowed.
+   * `unknown` — the preset could not be resolved, so whether it is narrowed is
+   * not decidable here. A preset that READ and carries no `ramp` produces no row
+   * at all; see the docblock's third bullet for why that is a derivation and not
+   * a silence.
+   */
+  carries: 'ramp' | 'unknown';
+  /** Set exactly when `carries` is `'unknown'`, and null exactly when it is not. */
+  reason: 'preset-dangling' | 'preset-unreadable' | null;
+  /** Whether the section reached this scene by its own ref or by the act default. */
+  via: 'section' | 'act';
+}
+
+/**
+ * The leading words of each arm — how a test, a harness and a reader find it.
+ *
+ * IN THE AUTHOR'S VOCABULARY, like `RAMP_SCROLL_LEAD`: what has to be legible at
+ * a glance is that something ELSEWHERE just changed.
+ */
+export const V_DEFORM_RAMP_LEAD = Object.freeze({
+  narrowed: 'THIS NARROWS A RAMP ELSEWHERE:',
+  unknown: 'THIS MAY NARROW A RAMP ELSEWHERE — AURORA CANNOT READ THE PRESET:',
+});
+
+/**
+ * The contract-length half, on the painted element's own `title`.
+ *
+ * It ends by quoting `RAMP_SCROLL_MODE_NOTE` rather than restating the chain: it
+ * IS the same chain, read from the other end, and a second transcription would
+ * be a second thing to drift out of agreement with aeon's source.
+ */
+export const V_DEFORM_RAMP_NOTE: string =
+  'Turning V deform on attaches a per-column VSRAM table to this scene, and that raises VDP '
+  + 'register $0B bit 2 (VSCR) for every section this scene is bound to. In per-column mode a '
+  + 'VSRAM address addresses one 16-pixel column rather than the whole plane, so a raster `ramp` '
+  + 'bound to the same section — a different document, edited in the Colour panel — writes a '
+  + 'column instead of a plane. It still builds: aeon refuses a `vsplit` beside a `v_deform` '
+  + 'because both are on the scene it can see, but no comptime check can reach a preset '
+  + 'document, so this one is silent everywhere except here and on that ramp\'s own card. '
+  + RAMP_SCROLL_MODE_NOTE;
+
+/**
+ * What turning `v_deform` on does to ramps bound elsewhere, or null when there is
+ * nothing to say.
+ *
+ * ⚠ NEUTRAL, AND NOT A REFUSAL. Nothing here is a build error. aeon refuses a
+ * `vsplit` beside a `v_deform` — `sceneDeformAdvisories` carries that one and it
+ * IS a refusal, in warning tone — but aeon cannot see a preset document at all,
+ * so a narrowed ramp builds green and runs. That is precisely why it needs saying
+ * here (the build will never say it) and precisely why it must not be dressed as
+ * an error (a one-column ramp is a thing an author may want).
+ */
+export function vDeformRampSentence(
+  bindings: readonly VDeformRampBinding[],
+): { short: string; full: string } | null {
+  const narrowed = bindings.filter((b) => b.carries === 'ramp');
+  const unknown = bindings.filter((b) => b.carries === 'unknown');
+  if (narrowed.length === 0 && unknown.length === 0) return null;
+
+  const presetList = (rows: readonly VDeformRampBinding[]): string => {
+    const ids: string[] = [];
+    rows.forEach((b) => { if (!ids.includes(b.presetId)) ids.push(b.presetId); });
+    const quoted = ids.map((i) => `"${i}"`);
+    if (quoted.length === 1) return `preset ${quoted[0]}`;
+    return `presets ${quoted.slice(0, -1).join(', ')} and ${quoted[quoted.length - 1]}`;
+  };
+  const unknownWhy = (b: VDeformRampBinding): string => (b.reason === 'preset-unreadable'
+    ? `section ${b.section} binds preset "${b.presetId}", whose file could not be read`
+    : `section ${b.section} binds preset "${b.presetId}", which is not a preset in this project`);
+
+  const parts: string[] = [];
+  if (narrowed.length > 0) {
+    parts.push(`${V_DEFORM_RAMP_LEAD.narrowed} V deform puts VSRAM in per-column mode, and `
+      + `${sectionList(narrowed.map((b) => b.section))} `
+      + `${narrowed.length === 1 ? 'binds' : 'bind'} this scene and `
+      + `${presetList(narrowed)} — whose VSRAM ramp therefore scrolls a single `
+      + `${RAMP_SCROLL_COLUMN_WIDTH_PX}-pixel column instead of the full width. That ramp is `
+      + 'edited in the Colour panel, and its own card says the same thing from the other side. '
+      + 'Assumes this game declares CAP_PER_COL_VSRAM — sonic4 does.');
+  }
+  if (unknown.length > 0) {
+    parts.push(`${V_DEFORM_RAMP_LEAD.unknown} ${joinClauses(unknown.map(unknownWhy))}, so `
+      + `whether ${unknown.length === 1 ? 'it carries' : 'they carry'} a VSRAM ramp this would `
+      + `narrow to one ${RAMP_SCROLL_COLUMN_WIDTH_PX}-pixel column is not decidable from here.`);
+  }
+  return { short: parts.join(' '), full: V_DEFORM_RAMP_NOTE };
+}

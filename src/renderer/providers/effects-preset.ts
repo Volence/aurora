@@ -147,10 +147,10 @@ import {
 // at a revision, and a renderer provider is not where a cross-tool measurement
 // should be restated.
 import {
-  rampScrollModeSentence,
+  rampScrollModeSentence, vDeformRampSentence,
 } from '../../core/formats/effects/ramp-scroll-mode';
 import type {
-  RampScrollBinding, RampScrollUnknownReason,
+  RampScrollBinding, RampScrollUnknownReason, VDeformRampBinding,
 } from '../../core/formats/effects/ramp-scroll-mode';
 // THE ONE DERIVATION OF "DOES THIS SCENE ATTACH A PER-COLUMN TABLE".
 // `vDeformValue` is what the scene panel's own V-deform row reads; testing
@@ -3313,6 +3313,29 @@ export function rampDriftSummary(ramp: EffectsPresetRamp): string {
  * applied one layer further out — and the `unreadable` test is spelled the same
  * way it is there, so the two cannot disagree about which failure it was.
  */
+/**
+ * WHICH SCENE A SECTION TAKES — the fallback chain, written ONCE.
+ *
+ * ⚠ IT IS READ FROM BOTH ENDS. `rampScrollBindings` asks "given this preset,
+ * whose scene decides its mode?"; `vDeformRampBindings` asks the mirror, "given
+ * this scene, whose ramp did it just narrow?". Two panels that resolved the
+ * binding differently would each be individually plausible and jointly useless —
+ * so the chain is here, and neither caller spells it a second time.
+ *
+ * `sceneRef: null` is THE ACT DEFAULT, not "no scene" (`Section.sceneRef`'s own
+ * docblock). A null act default in turn is not an arm at all: below it sits
+ * aeon's hand-authored `act_parallax_config` in `act_descriptor.emp`, a file this
+ * editor has never opened, and `ref: null` is how that reaches a caller.
+ */
+export function sectionSceneRef(
+  section: { sceneRef: string | null },
+  actSceneRef: string | null,
+): { ref: string | null; via: 'section' | 'act' } {
+  return section.sceneRef !== null
+    ? { ref: section.sceneRef, via: 'section' }
+    : { ref: actSceneRef, via: 'act' };
+}
+
 export function rampScrollBindings(
   sections: readonly ({ rasterRef: string | null; sceneRef: string | null } | null)[],
   actSceneRef: string | null,
@@ -3322,8 +3345,7 @@ export function rampScrollBindings(
   const out: RampScrollBinding[] = [];
   sections.forEach((s, index) => {
     if (!s || s.rasterRef !== presetId) return;
-    const via: 'section' | 'act' = s.sceneRef !== null ? 'section' : 'act';
-    const ref = s.sceneRef !== null ? s.sceneRef : actSceneRef;
+    const { ref, via } = sectionSceneRef(s, actSceneRef);
     if (ref === null) {
       out.push({ section: index, mode: 'unknown', sceneId: null, via: null, reason: 'act-unset' });
       return;
@@ -3367,6 +3389,86 @@ export function rampScrollModeAdvisory(
   presetId: string,
 ): { short: string; full: string } {
   return rampScrollModeSentence(rampScrollBindings(sections, actSceneRef, scenes, presetId));
+}
+
+// ── the mirror: what THIS SCENE's v_deform does to ramps bound elsewhere ────
+
+/**
+ * WHOSE RAMP THIS SCENE JUST NARROWED — `rampScrollBindings` read backwards.
+ *
+ * The join is the same one, walked from the other end: a section names a scene
+ * (`sectionSceneRef`) and a raster preset (`rasterRef`), and this asks which
+ * sections land on THIS scene and what their preset carries.
+ *
+ * ⚠ ONLY `ramp` PRESETS PRODUCE A ROW, AND THAT IS DERIVED RATHER THAN ASSUMED.
+ * A preset is `bands`, `ramp` or `base_swap` (`presetRasterChannel`). Bands write
+ * CRAM — `$defs.band.properties.on` has no `vsram` arm at all, which
+ * `EFFECTS_PRESET_BAND_ON_ARMS` holds and the schema states in as many words —
+ * and `base_swap` writes a nametable base register. `ramp`'s target is `vsram`
+ * and it is `$defs.ramp_target`'s ONLY arm. So `ramp` is the only preset shape
+ * per-column VSRAM mode can reach, and a read preset carrying none is a silence
+ * with a derivation behind it rather than a hedge.
+ *
+ * ⚠ AN UNRESOLVABLE PRESET IS `unknown`, NOT ABSENT. The sidecar is hand-editable
+ * and aeon's generator writes it too, so a `rasterRef` can name a preset that was
+ * deleted, renamed, or sits in `unreadable`. Whether such a document carries a
+ * ramp cannot be known from here, and folding it into "nothing was narrowed"
+ * would be the mirror image of the guess the ramp card's fifth case refuses.
+ */
+export function vDeformRampBindings(
+  sceneId: string,
+  sections: readonly ({ rasterRef: string | null; sceneRef: string | null } | null)[],
+  actSceneRef: string | null,
+  presets: EffectsPresetLibrary,
+): VDeformRampBinding[] {
+  const out: VDeformRampBinding[] = [];
+  sections.forEach((s, index) => {
+    if (!s || s.rasterRef === null) return;
+    const { ref, via } = sectionSceneRef(s, actSceneRef);
+    // `ref === null` is the act default with no act scene — the section's config
+    // is aeon's `act_descriptor.emp`, which is NOT this scene. Nothing to say.
+    if (ref === null || ref !== sceneId) return;
+    const presetId = s.rasterRef;
+    const preset = presets.presets.find((p) => p.id === presetId);
+    if (preset !== undefined) {
+      if (preset.ramp === undefined) return;
+      out.push({ section: index, presetId, carries: 'ramp', reason: null, via });
+      return;
+    }
+    // The `unreadable` test is spelled exactly as `rampScrollBindings` spells the
+    // scene one, so the two surfaces cannot disagree about which failure it was.
+    const unreadable = presets.unreadable.some((u) => u.path.endsWith(`/${presetId}.json`));
+    out.push({
+      section: index,
+      presetId,
+      carries: 'unknown',
+      reason: unreadable ? 'preset-unreadable' : 'preset-dangling',
+      via,
+    });
+  });
+  return out;
+}
+
+/**
+ * The scene panel's V-deform sentence, or null when there is nothing to say.
+ *
+ * ONE CALL FOR THE PANEL, `rampScrollModeAdvisory`'s shape — and null-when-silent
+ * rather than an empty string, so the panel's mount is a plain conditional and
+ * cannot paint an empty hint.
+ *
+ * ⚠ THE CALLER GATES ON `v_deform`, NOT THIS FUNCTION. This one answers "who
+ * binds this scene and carries a ramp", which is true whether or not the deform
+ * is on; the panel asks it only in the state where the answer has a consequence.
+ * Keeping the gate at the mount is what lets a test exercise the join without
+ * having to author a deform to see it.
+ */
+export function vDeformRampAdvisory(
+  sceneId: string,
+  sections: readonly ({ rasterRef: string | null; sceneRef: string | null } | null)[],
+  actSceneRef: string | null,
+  presets: EffectsPresetLibrary,
+): { short: string; full: string } | null {
+  return vDeformRampSentence(vDeformRampBindings(sceneId, sections, actSceneRef, presets));
 }
 
 // ── commands ───────────────────────────────────────────────────────────────

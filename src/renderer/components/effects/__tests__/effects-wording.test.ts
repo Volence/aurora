@@ -292,3 +292,67 @@ describe('the band panel prints no slot range of its own', () => {
     expect(code.match(/\$?\{slotSpanPhrase\([^)]*\)\}/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ║ THE V-DEFORM ROW'S TWO CROSS-FEATURE SENTENCES ARE ACTUALLY MOUNTED     ║
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠ WHAT A SOURCE TEST CAN AND CANNOT SAY, `ramp-control-wording.test.ts`'s
+// split. It cannot see a pixel or mount a component — that is a CDP harness,
+// which this suite does not run. What it CAN hold is structural, and structural
+// is exactly where these two sentences were lost: both derivations existed and
+// returned correct strings while NOTHING CALLED THEM. `advisoryLayerDeformConflicts`
+// was a pure function nobody called for weeks (this panel's own line 60 records
+// it), so "the provider is right" is not evidence that an author sees anything.
+describe('the scene panel mounts what v_deform changes elsewhere', () => {
+  // Comments stripped, the sibling files' rule: a claim discussed in a comment
+  // must not satisfy a row that means "the panel CALLS this".
+  const panelCode = scenePanel
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+
+  it('the V-deform row calls vDeformRampAdvisory and paints its short half', () => {
+    expect(panelCode).toContain('vDeformRampAdvisory(');
+    // PAINTED, not hover-only. The pattern is the ramp card's: `short` inside the
+    // element, `full` on its `title`. A sentence an author must act on cannot
+    // live only in a tooltip.
+    expect(panelCode).toMatch(/title=\{impact\.full\}[\s\S]{0,40}\{impact\.short\}/);
+  });
+
+  it('and it is gated on the state that HAS the consequence, not painted always', () => {
+    expect(panelCode).toMatch(/vDeformValue\(selected\) === null\) return null/);
+    // ⚠ AND ON AN ACT. With no act there are no sections, so there is no binding
+    // to resolve — `BandPresetPanel` is silent in that state and these two must
+    // not disagree.
+    expect(panelCode).toMatch(/if \(act === null\) return null/);
+  });
+
+  it('the ramp sentence is NOT in the warning list — it is not a build refusal', () => {
+    // aeon cannot see a preset document, so this pairing builds green and runs.
+    // Dressing it as an error would make the two real refusals beside it cheaper.
+    const at = panelCode.indexOf('vDeformRampAdvisory(');
+    expect(at).toBeGreaterThan(-1);
+    const mount = panelCode.slice(at, at + 400);
+    expect(mount).not.toContain('tone="warning"');
+  });
+
+  it('the layer card mounts the SECOND vsplit refusal beside the first', () => {
+    // ROADMAP row 80 put the lock refusal under the control that trips it; the
+    // v_deform refusal one ensure below it never got the same treatment.
+    expect(panelCode).toContain('vsplitLockAdvisoryParts(selected, layer)');
+    expect(panelCode).toContain('vsplitVDeformAdvisoryParts(selected, layer)');
+  });
+
+  it('and neither of the two refusals suppresses the other', () => {
+    // Two independent conditionals, not an if/else — the remedies differ, and
+    // choosing which of two real refusals an author may see is the mistake
+    // `sceneDeformAdvisories`' guard 3 records.
+    expect(panelCode).not.toMatch(/vsplitLockAdvisoryParts[\s\S]{0,200}else/);
+    const lockAt = panelCode.indexOf('vsplitLockAdvisoryParts(selected, layer)');
+    const vdAt = panelCode.indexOf('vsplitVDeformAdvisoryParts(selected, layer)');
+    expect(vdAt).toBeGreaterThan(lockAt);
+    // Each returns its own `<Advisory …/>`, so both can render at once.
+    expect(panelCode.match(/<Advisory under \{\.\.\.\w+\} \/>/g)?.length ?? 0)
+      .toBeGreaterThanOrEqual(3);
+  });
+});
