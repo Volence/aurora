@@ -72,8 +72,9 @@ import {
 } from '../../src/core/formats/effects/channel-bands';
 import { validateAgainstSchema, type JsonSchema } from '../../src/core/formats/effects/json-schema-subset';
 import {
-  bandControlsRefusal, addBandCommand, rasterEditorGap, rasterChannelSwapAdvisory,
-  setRasterChannelCommand, presetListEntries, presetListSummary, RASTER_CHANNEL_OPTIONS,
+  bandControlsRefusal, addBandCommand, programArmEditorGap, programArmEditorGapFor,
+  programArmSwapAdvisory,
+  setProgramArmCommand, presetListEntries, presetListSummary, PROGRAM_ARM_OPTIONS,
 } from '../../src/renderer/providers/effects-preset';
 import { peerRepo, resolveRev, readAtRev } from '../support/peer-repo';
 
@@ -265,16 +266,30 @@ describe('the fourth oneOf arm is a PROGRAM and NOT a raster channel', () => {
 
       // ═══ AND THE CONSEQUENCE IS LOUD ═══
       //
-      // The renderer's per-channel registries are keyed by the raster list and
-      // each has a module-load guard. With `boundary` in that list and no noun
-      // for it, importing the provider must THROW — which is what makes an
-      // empty patched list survivable rather than silent.
+      // ⚠ THE KILL PATH MOVED IN EW-BOUNDARY-PANEL AND THIS ROW WOULD OTHERWISE
+      // HAVE GONE QUIETLY VACUOUS. It used to be that the renderer's per-channel
+      // registries were keyed by the RASTER list and had no entry for
+      // `boundary`, so a poisoned classification made the provider refuse to
+      // load. Keying them by ARM (which is what lets the fourth arm be authored)
+      // removed that: the poisoned module now loads perfectly, every registry
+      // finds its entry, and only the PROSE is wrong. The old assertion would
+      // have started failing — but a green-path repair (dropping it, or widening
+      // the matcher) would have left an empty patched set with NO loud
+      // consequence anywhere, which is precisely the state this poison exists to
+      // make impossible.
+      //
+      // What still has an opinion is the dropdown LABEL, which is hand-written
+      // in the provider and says "(patched, not raster)" for this arm. The label
+      // and the derivation are two independent statements of one fact and
+      // `PROGRAM_ARM_OPTIONS` asserts they agree in BOTH directions, so a
+      // collapsed classification throws there.
       await expect(
         import('../../src/renderer/providers/effects-preset'),
-        'the provider loaded happily with boundary counted as a raster channel. The per-channel '
-        + 'registries have stopped guarding, so a patched program would be offered a raster '
-        + 'editor and a Raster-row seed with nothing saying so.',
-      ).rejects.toThrow(/RASTER_CHANNEL_NOUNS|RASTER_CHANNEL_LABELS/);
+        'the provider loaded happily with boundary counted as a raster channel AND with a label '
+        + 'that calls it patched. The two independent statements of the classification have '
+        + 'stopped being compared, so an empty patched set is now silent — which is the exact '
+        + 'failure mode this poison was written to rule out.',
+      ).rejects.toThrow(/PROGRAM_ARM_LABELS/);
     });
   });
 });
@@ -729,27 +744,56 @@ describe('the panel on a boundary document: refusals, not silence', () => {
     ).not.toBeNull();
     expect(why!).not.toContain('undefined');
     expect(why!).toMatch(/EXACTLY ONE program/);
-    // ...and the WAY OUT it offers is the honest one: the Raster row cannot
-    // convert a patched program, so it must not be offered as the fix.
+    // ...and it still names WHY this arm is exclusive with bands, which is not
+    // the reason the other two are: it installs into the patched channel.
     expect(why!).toMatch(/not a raster program at all/);
-    expect(why!).not.toMatch(/Set the Raster program row above back to bands/);
+    // ⚠ THE WAY OUT WAS RE-AIMED BY EW-BOUNDARY-PANEL AND THE OLD ASSERTION WAS
+    // THE INTERESTING KIND OF WRONG. It read `not.toMatch(/Set the Raster
+    // program row above back to bands/)` — correct while the row had no seed for
+    // `boundary`, because a row that cannot convert must not be offered as the
+    // fix. The moment the seed landed, "edit the JSON directly" became an
+    // instruction to do by hand a thing one control does — and the old negative
+    // assertion STAYED GREEN through it, because the new sentence spells the row
+    // differently. The row now asserts the POSITIVE: the way out is the control
+    // that exists.
+    expect(why!, 'the refusal still tells an author to edit the JSON by hand, but the Program row '
+      + 'above can now convert this document in one undoable step').toMatch(/Program row above/);
+    expect(why!).not.toMatch(/edit the JSON directly/);
     // And the command really is a no-op, so the sentence is not describing a
     // refusal that does not happen.
     expect(addBandCommand(library as never, ID)).toBeNull();
   });
 
-  it('the panel SAYS it has no editor for this document', () => {
-    const gap = rasterEditorGap(doc);
+  /**
+   * ⚠ RE-AIMED BY EW-BOUNDARY-PANEL — AND THE GAP SENTENCE DID ITS JOB BEFORE IT
+   * RETIRED.
+   *
+   * This row asserted that a boundary document opens with a sentence saying the
+   * panel has no editor for it. It was true, it was the honest state, and the
+   * follow-on parcel built the editor — so the sentence retires, in the one way
+   * a "this surface is missing" sentence is allowed to: because the surface
+   * arrived. Retiring it by DELETING the row would leave the landing pad with no
+   * reader at all, so what is asserted now is both halves: it is silent for this
+   * arm BECAUSE the arm is in the editor registry, and it still fires for an arm
+   * that is not.
+   */
+  it('the panel has an editor for this document now, and the landing pad still fires', () => {
     expect(
-      gap,
-      'a boundary document opens with no editor and nothing on screen saying so — the exact dead '
-      + 'surface rasterEditorGapFor exists to prevent, arriving as a null channel rather than as '
-      + 'an unknown channel name',
-    ).not.toBeNull();
-    expect(gap!).toContain('patchable palette boundary');
+      programArmEditorGap(doc),
+      'a boundary document still reports "no editor for it yet" after EW-BOUNDARY-PANEL built '
+      + 'one — either the card was not registered in PROGRAM_ARM_EDITORS, or it was removed',
+    ).toBeNull();
+    // ...and the sentence is not gone, it is unearned. An arm the panel has no
+    // card for still gets it, which is the whole reason the helper takes an ARM
+    // rather than a document: the defect it guards against cannot be reached by
+    // any real document until it has already shipped.
+    const gap = programArmEditorGapFor('a_fifth_arm', ID);
+    expect(gap, 'the landing pad has stopped firing for an arm with no card — a fifth arm would '
+      + 'open, select correctly in the derived Program row, and render nothing').not.toBeNull();
+    expect(gap!).toContain('a_fifth_arm');
     expect(gap!).not.toContain('undefined');
     // The control: a document the panel CAN edit gets no gap sentence.
-    expect(rasterEditorGap({ ...base, bands: [] } as unknown as EffectsPreset)).toBeNull();
+    expect(programArmEditorGap({ ...base, bands: [] } as unknown as EffectsPreset)).toBeNull();
   });
 
   it('the library row names the program instead of reading "0 bands"', () => {
@@ -759,11 +803,14 @@ describe('the panel on a boundary document: refusals, not silence', () => {
     expect(presetListSummary(entry)).not.toContain('band');
   });
 
-  it('switching the Raster row DELETES the boundary — it does not leave a two-arm document', () => {
-    // The Raster row does not OFFER boundary (seeding one is the follow-on
-    // parcel), so this is the one direction that can be driven today.
-    expect(RASTER_CHANNEL_OPTIONS.map((o) => o.value)).not.toContain('boundary');
-    const cmd = setRasterChannelCommand(library as never, ID, 'bands');
+  it('switching the Program row DELETES the boundary — it does not leave a two-arm document', () => {
+    // ⚠ RE-AIMED BY EW-BOUNDARY-PANEL. This asserted the row does NOT offer
+    // `boundary`, which was the codec parcel's deliberate scope line. The row
+    // now offers it — and offering it makes the OTHER direction drivable, which
+    // is the one this row could not reach before: a two-arm document is authored
+    // by whichever direction is not tested.
+    expect(PROGRAM_ARM_OPTIONS.map((o) => o.value)).toContain('boundary');
+    const cmd = setProgramArmCommand(library as never, ID, 'bands');
     expect(cmd).not.toBeNull();
     const after = cmd!.newPreset!;
     expect(
@@ -776,10 +823,31 @@ describe('the panel on a boundary document: refusals, not silence', () => {
     // ...and the result is a document the codec accepts, which is the only
     // check that cannot be fooled by the key set looking right.
     expect(() => serializeEffectsPreset(after)).not.toThrow();
+
+    // ═══ THE OTHER DIRECTION, WHICH ONLY EXISTS NOW ═══
+    //
+    // Every raster arm must be deleted on the way IN as well. A delete loop over
+    // the raster list would pass the row above (it deletes `bands` fine) and
+    // author `bands` + `boundary` here — the same two-arm document, reached from
+    // the other side.
+    const back = setProgramArmCommand(
+      { presets: [after], unreadable: [] } as never, ID, 'boundary',
+    );
+    expect(back).not.toBeNull();
+    const bounded = back!.newPreset!;
+    expect(presetProgramArm(bounded)).toBe('boundary');
+    for (const arm of ['bands', 'ramp', 'base_swap']) {
+      expect(
+        (bounded as unknown as Record<string, unknown>)[arm],
+        `switching INTO boundary left the "${arm}" key in place, authoring the two-arm document `
+        + 'the top-level oneOf refuses',
+      ).toBeUndefined();
+    }
+    expect(() => serializeEffectsPreset(bounded)).not.toThrow();
   });
 
   it('the swap advisory names what would be DISCARDED, not "0 bands"', () => {
-    const s = rasterChannelSwapAdvisory(doc);
+    const s = programArmSwapAdvisory(doc);
     expect(s).toContain('patchable palette boundary');
     expect(s).not.toMatch(/0 raster bands/);
   });

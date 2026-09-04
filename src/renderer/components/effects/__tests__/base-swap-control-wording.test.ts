@@ -215,8 +215,8 @@ describe('the card is mounted on the document that carries the channel', () => {
    * (that list is derived from the schema) and render an empty section under it.
    */
   it('a channel with no editor here paints a reason, from one predicate', () => {
-    expect(code).toMatch(/\{rasterEditorGap\(selected\) !== null && \(/);
-    expect(code).toMatch(/<Hint tone="warning">\{rasterEditorGap\(selected\)\}<\/Hint>/);
+    expect(code).toMatch(/\{programArmEditorGap\(selected\) !== null && \(/);
+    expect(code).toMatch(/<Hint tone="warning">\{programArmEditorGap\(selected\)\}<\/Hint>/);
   });
 
   /**
@@ -233,7 +233,7 @@ describe('the card is mounted on the document that carries the channel', () => {
     expect(code).not.toMatch(/selected\.ramp !== undefined \?/);
     expect(code).not.toMatch(/selected\.base_swap !== undefined \?/);
     // The dropdown is the schema's list, never a typed pair or triple.
-    expect(code).toMatch(/RASTER_CHANNEL_OPTIONS\.map\(/);
+    expect(code).toMatch(/PROGRAM_ARM_OPTIONS\.map\(/);
     expect(code).not.toMatch(/value="base_swap"/);
   });
 });

@@ -873,7 +873,7 @@ export const EFFECTS_PRESET_PROGRAM_ARMS: readonly string[] = (() => {
  * shape a broken regex returns and this must not be able to pass quietly. If the
  * sentence moves, `boundary` falls back INTO `EFFECTS_PRESET_RASTER_CHANNELS`,
  * and the renderer's per-channel registries — `RASTER_CHANNEL_NOUNS`,
- * `RASTER_CHANNEL_LABELS` — have module-load guards that throw on a channel with
+ * `PROGRAM_ARM_LABELS` — have module-load guards that throw on a channel with
  * no entry. So the failure surfaces as a LOUD refusal to load the panel, not as
  * a boundary document silently offered a raster editor. That is the direction
  * this file is allowed to fail in; it is asserted by a poison row in
