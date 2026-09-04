@@ -9,7 +9,7 @@ rather than effort failures.
 Both documents were written by **Aurora's own serializer**, not typed as JSON:
 `serializeEffectsPreset` / `serializeEffectsScene`, each round-tripped back through
 Aurora's own reader before it left (`serialize(parse(bytes)) === bytes`). The script is
-`scratchpad/witness-author.test.ts`.
+`scratchpad/witness-author.vitest-source.ts`.
 
 - **Boundary preset** `aurora_boundary_witness.json`, seeded from `newBoundary()` — the
   panel's own contract-derived seed, so no number in it was invented here.
@@ -95,7 +95,11 @@ adding data moved the layout. Resolve per build, by name.
 
 ## 6. Reproduction
 
-`scratchpad/witness-author.test.ts` writes both documents. It cannot run from `scratchpad/`
-— vitest's `include` covers `test/**` and `src/**/__tests__/**` only — so copy it to `test/`,
-run it with `WITNESS_AEON=<aeon copy>`, and delete it again. It is deliberately NOT left in
+`scratchpad/witness-author.vitest-source.ts` writes both documents. Copy it to
+`test/witness-author.test.ts`, run it with `WITNESS_AEON=<aeon copy>`, and delete it again.
+
+⚠ **It is deliberately NOT named `*.test.ts` on disk.** It was, and `check-test-collection`
+correctly failed the repo: vitest's `include` covers `test/**` and `src/**/__tests__/**`
+only, so a test-shaped file in `scratchpad/` is one that **looks like coverage and runs
+never**. The gate caught it the same hour it was written. It is deliberately NOT left in
 `test/`: it writes into a peer tree and must never run as part of `npm test`.
