@@ -258,8 +258,22 @@ async function main() {
     await setView(c, Math.round(vx), Math.round(vy), zoom);
     note('viewport parked', `${JSON.stringify(await view(c))} for cells `
       + `(${box.c0}..${box.c1}, ${box.r0}..${box.r1})`);
-    await c.evalExpr("window.__dbg.aeon.setLayer && window.__dbg.aeon.setLayer('fg')");
+    await c.evalExpr("window.__dbg.aeon.setLayer('fg')");
     await c.evalExpr("window.__dbg.aeon.armCollisionBrush({ brush: 1 })");
+    // ARM THE TOOL, with the REAL hotkey, and make it fatal. Tool hotkeys are
+    // facet-scoped; the first run of this harness stroked 84 times with the
+    // 'view' tool armed and every gesture was a no-op — the document never went
+    // dirty. A row that measures an absent stroke goes green on its absence.
+    await c.evalExpr("document.getElementById('map-canvas').focus()");
+    await key(c, 'c', 'KeyC', 67);
+    await sleep(200);
+    const toolNow = (await c.json('window.__dbg.aeon.state()')).tool;
+    check('arm', "the REAL hotkey 'c' armed paint-collision on the collision facet",
+      toolNow === 'paint-collision', `facet=${facet?.facet} tool=${toolNow}`);
+    if (toolNow !== 'paint-collision') {
+      throw new Error('paint-collision never armed — every stroke below would be a no-op and every '
+        + 'row after it would measure a stroke that did not happen. Refusing to run them.');
+    }
 
     // ── STROKING ───────────────────────────────────────────────────────────
     //
