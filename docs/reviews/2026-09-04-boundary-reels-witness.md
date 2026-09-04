@@ -187,9 +187,35 @@ of the built ROM, with section 0 as the control that proves the offset:
 the ROM at `0x13FE0`, while the preset object that section 6 actually resolves to has
 `ep_patched = 0`.
 
+### ✅ ANSWERED BY AEON — the hypothesis below is REFUTED, read this first
+
+**It is an unthreaded call site in aeon's hand-authored source, and `rasterRef` was the right
+key all along.** Measured in their tree: `effects_scenes.emp:373` defines
+`ojz_act1_sec_patched(sec, hand)` and **calls it nowhere**, while `OJZ_Preset_Sec6 = preset(...)`
+carries **no `patched:` argument at all**. So the generator did everything right, the
+hand-edited sidecar was accepted correctly, and `2 sidecar rasterRef(s)` was a true report.
+`ep_patched` is `0` and `Raster_InstallPatched` correctly never fires.
+
+**My `rasterRef`-is-named-for-raster reading was wrong, and my own sidecar edit was innocent.**
+A section sidecar's `rasterRef` binds the section to its preset document; which *arm* that
+document lowers into is decided by the document's own keys. **There is no missing authoring key
+and no Aurora row here.**
+
+**It was already tagged in aeon's own boundary landing (`b3af9847`)** — *"Call site not threaded…
+the first document authoring the key owes TWO edits in the same parcel."* This document is that
+first one. ⚠ **The lesson is mine: I read the contract page and the generated source, and not the
+landing report of the feature I was witnessing.** Tagged follow-ups live in landing reports, and
+a measurement session rediscovered one that was written down.
+
+The two edits are aeon's and are one parcel by construction: add `patched: ojz_act1_sec_patched(sec: 6)`,
+**and** change that section's raster call to `hand: 0` rather than `Raster_Program_None` — because
+`preset()` asserts `ep_raster == 0 || ep_patched == 0` and `Raster_Program_None` is a real
+non-zero label (`$86BC`, which the table above shows). Doing the first alone fails the build,
+which is at least loud.
+
 ### What this is NOT
 
-**A mechanism is not asserted here.** The plausible reading is that the preset was bound via
+**A mechanism is not asserted here** (and the reading below turned out wrong — see the block above; it is kept as what was believed at the time). The plausible reading is that the preset was bound via
 the section sidecar's **`rasterRef`** — a key named for the RASTER arm — while `boundary` is a
 **PATCHED** arm, so the binding may lower the program without ever attaching it. **That is a
 hypothesis and it is untested.** Two things make it worth aeon's eyes rather than mine:
