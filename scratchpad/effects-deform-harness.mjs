@@ -1311,7 +1311,7 @@ async function main() {
     await c.evalExpr(SET_INPUT(V_DEFORM_SELECT, 'on'));
     await sleep(900);
     const impactNarrow = await c.json(V_DEFORM_IMPACT);
-    await shot(c, '5-vdeform-narrows-a-ramp');
+    await shot(c, '6-vdeform-narrows-a-ramp');
     // EVERY EXPECTED FRAGMENT IS DERIVED: the lead and the pixel width out of
     // ramp-scroll-mode.ts, the section index out of `activeSection()`, the
     // preset id off the preset whose document carries a `ramp`.
@@ -1360,7 +1360,7 @@ async function main() {
         `window.__dbg.aeon.sceneRef(${WITNESS.unreadableSection})`),
     };
     const impactDecline = await c.json(V_DEFORM_IMPACT);
-    await shot(c, '6-vdeform-declines');
+    await shot(c, '7-vdeform-declines');
     const danglingClause = UNKNOWN_WHY_TEMPLATES.dangling(WITNESS.danglingSection, danglingRef);
     const unreadableClause = UNKNOWN_WHY_TEMPLATES.unreadable(
       WITNESS.unreadableSection, unreadableRef);
