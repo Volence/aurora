@@ -37,26 +37,47 @@
 // one-way colour is what carries the other plane's information, so the lens is
 // never silently about only half the data.
 //
+// ═══ ⚠ IT DRAWS 8px SUB-TILES, NOT 16px CELLS, AND THAT IS NOT A DETAIL ═══
+//
+// Every other collision depiction in Aurora is per 16px cell, because that is
+// the unit an author paints. The crossover is the one field whose CONSUMER
+// reads the saved plane more finely than that: aeon's trigger fires once per
+// 8px column (`COLL_CELL_W` = 8) and its bake indexes Aurora's sub-tile column
+// directly. So a mark can legally exist on ONE HALF of a cell — that is exactly
+// what the "Half (8px)" mark width authors, and it is the only width at which a
+// two-way pair does anything at all
+// (core/collision/layer-transition.ts's CrossoverSpan block).
+//
+// A lens that sampled the cell's top-left sub-tile — which this one did — would
+// draw a left-half mark as a full cell and a RIGHT-half mark AS NOTHING AT ALL.
+// That is the "two bits nothing depicts" state this lens exists to end, so it
+// reads each sub-tile's own word and the picture is the data.
+//
 // ═══ COST ═══
 //
-// Windowed to the viewport exactly like the priority and both-planes lenses —
-// a section is 128x128 cells and an act may hold 48, so an unwindowed scan is
-// ~786k probes per repaint against ~15.7ms of measured frame headroom. Two
-// passes here rather than one, because the two marks are different colours and
-// `drawTileLens` merges runs per colour; the second pass only runs when the
-// first found something to be asymmetric about.
+// Windowed to the viewport exactly like the priority and both-planes lenses.
+// The sub-tile grid is 4x the cell grid, so a viewport-sized pass costs ~4x
+// what the cell-grid version did — a few tens of thousands of probes against
+// ~15.7ms of measured frame headroom (docs: MapViewport has no clock, ~+0.050ms
+// per extra full-viewport pass). Two passes here rather than one, because the
+// two marks are different colours and `drawTileLens` merges runs per colour.
 //
 // NO CLOCK, NO CACHE — inside the pass that already repaints on a pan, a zoom,
 // a store change, a paint edit and an undo.
 
-import { SECTION_TILES_WIDE } from '../../core/model/s4-types';
+import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../core/model/s4-types';
 import { readCrossover } from '../../core/collision/layer-transition';
+import { CELL_SUBTILE_COLS } from '../../core/collision/collision-cell';
 import {
   CROSSOVER_FILL, CROSSOVER_EDGE, CROSSOVER_ONE_WAY_FILL, CROSSOVER_ONE_WAY_EDGE,
 } from './canvas-colors';
 import { drawTileLens, type TileLensDrawn } from './tile-lens';
-import { BOTH_PLANES_CELL_PX, SECTION_CELLS_WIDE, SECTION_CELLS_HIGH } from './both-planes-lens';
+import { BOTH_PLANES_CELL_PX } from './both-planes-lens';
 import type { LensViewport } from './priority-lens';
+
+/** The 8px sub-tile edge, DERIVED from the cell size and the cell's sub-tile
+ *  count so the lens's unit and the paint's unit cannot drift apart. */
+export const CROSSOVER_SUBTILE_PX = BOTH_PLANES_CELL_PX / CELL_SUBTILE_COLS;
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -93,19 +114,20 @@ export function drawSectionCrossovers(
   const { x: vpX, y: vpY, width, height, zoom } = viewport;
   const vpW = width / zoom, vpH = height / zoom;
   const localVpX = vpX - offsetX, localVpY = vpY - offsetY;
-  const C = BOTH_PLANES_CELL_PX;
+  const C = CROSSOVER_SUBTILE_PX;
   const window = {
-    cols: SECTION_CELLS_WIDE, rows: SECTION_CELLS_HIGH,
+    cols: SECTION_TILES_WIDE, rows: SECTION_TILES_HIGH,
     colStart: Math.floor(localVpX / C), colEnd: Math.ceil((localVpX + vpW) / C),
     rowStart: Math.floor(localVpY / C), rowEnd: Math.ceil((localVpY + vpH) / C),
     tilePx: C, originX: offsetX, originY: offsetY, invZoom: 1 / zoom,
   };
   if (window.colEnd <= window.colStart || window.rowEnd <= window.rowStart) return NOTHING;
 
-  // A collision cell's word lives at its top-left 8px sub-tile; the other three
-  // carry the same word by every writer's construction.
-  const at = (plane: ArrayLike<number> | null, cx: number, cy: number): number | undefined =>
-    plane?.[(cy * 2) * SECTION_TILES_WIDE + cx * 2];
+  // EACH SUB-TILE'S OWN WORD. A cell-wide mark carries the same value in all
+  // four and draws as one 16px square; a half-cell mark carries it in one
+  // column and draws as the 8x16 strip it actually is.
+  const at = (plane: ArrayLike<number> | null, tx: number, ty: number): number | undefined =>
+    plane?.[ty * SECTION_TILES_WIDE + tx];
   // `reserved` (the illegal value 3) is deliberately NOT drawn as a crossover:
   // it is not one, it is a defect, and the audit reports it in words with a
   // cell index. Veiling it amber would present a build-breaking value as a

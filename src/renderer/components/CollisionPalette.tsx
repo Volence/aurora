@@ -17,6 +17,7 @@ import { fitCellSizeToBox } from '../../core/collision/collision-angle-mark';
 import { clearCollisionEntries, resetToEngineEntries } from '../../core/editing/collision-word';
 import { otherPlane } from '../../core/collision/both-planes-paint';
 import { auditCrossovers, crossoverAuditMessage, crossoverAuditSeverity } from '../../core/collision/crossover-audit';
+import { crossoverBrushAuthors } from '../../core/collision/layer-transition';
 import { SECTION_TILES_WIDE } from '../../core/model/s4-types';
 import { useToastStore } from '../state/toastStore';
 import { claimCollisionOverlay } from './collision-overlay-scope';
@@ -146,6 +147,8 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
   const setBothPlanes = useEditorStore((s) => s.setCollisionPaintBothPlanes);
   const crossover = useEditorStore((s) => s.collisionCrossoverBrush);
   const setCrossover = useEditorStore((s) => s.setCollisionCrossoverBrush);
+  const spanMode = useEditorStore((s) => s.collisionCrossoverSpanMode);
+  const setSpanMode = useEditorStore((s) => s.setCollisionCrossoverSpanMode);
   // Re-read on every live edit so the audit follows the strokes, not the mount.
   const liveEdit = useEditorStore((s) => s.liveEditVersion);
   const brush = useEditorStore((s) => s.collisionBrushSize);
@@ -406,6 +409,50 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
               style={{ ...styles.planeBtn, ...(crossover === value ? styles.planeSel : {}) }}>{label}</button>
           ))}
         </div>
+      )}
+      {/*
+        THE MARK WIDTH — AND IT IS INVISIBLE UNTIL IT IS NEEDED, ON PURPOSE.
+        ────────────────────────────────────────────────────────────────────
+        It renders only while the crossover brush AUTHORS (`crossoverBrushAuthors`,
+        the same rule-wired condition that surfaces the crossover lens), so a
+        collision painter who never touches a loop never meets it and there is
+        no mode to leave. The owner's standing note is that the effects tooling
+        is already "confusing and convoluted"; an always-on fourth axis on the
+        collision brush would be that mistake again, one facet over.
+
+        WHY IT HAS TO EXIST AT ALL, in one line: aeon's crossover trigger fires
+        once per 8px column entered and Aurora's cell is 16px = TWO of them, so
+        a two-way pair painted at cell width hands the player over and straight
+        back. `Half` marks the sub-column the CURSOR is on — the author aims at
+        a half rather than picking a side, which is why the store holds
+        'cell'|'half' and the core takes 'cell'|'left'|'right'.
+
+        DEFAULT IS `cell`: unchanged behaviour, and the width a ONE-WAY mark
+        wants (a one-way mark is idempotent, so its width does not matter).
+      */}
+      {variant === 'map' && crossoverBrushAuthors(crossover) && (
+        <>
+          <div style={styles.planes}>
+            <span style={styles.planeLabel}>Mark</span>
+            {([
+              ['cell', 'Cell (16px)', 'Mark the WHOLE 16px cell (the default). Right for a ONE-WAY mark — an entry or exit anchor, or either half of a loop built from two separated one-way marks — because a one-way mark fires idempotently and its width does not matter.'],
+              ['half', 'Half (8px)', 'Mark only the 8px half-cell UNDER THE CURSOR. This is the only width at which a TWO-WAY crossover works: the engine fires the crossover once per 8px column the player enters, a 16px cell is two of them, and a pair marked across both hands the player over and straight back. The shape and solidity still fill the whole cell — only the crossover narrows.'],
+            ] as const).map(([value, label, title]) => (
+              <button key={value} onClick={() => setSpanMode(value)} title={title}
+                style={{ ...styles.planeBtn, ...(spanMode === value ? styles.planeSel : {}) }}>{label}</button>
+            ))}
+          </div>
+          <div style={styles.hint}>
+            {spanMode === 'half'
+              ? 'Marking the 8px half-cell under the cursor. A TWO-WAY pair (this brush on both '
+                + 'planes at the same half, or with "A+B" on) flips the player\u2019s path here. At '
+                + '"Cell" width it would flip twice and net to nothing.'
+              : 'Marking the whole 16px cell. Fine for a ONE-WAY mark. ⚠ A TWO-WAY pair at this '
+                + 'width does NOTHING — the engine triggers every 8px and a cell is two of them, '
+                + 'so the player is handed over and handed straight back. Switch to "Half (8px)" '
+                + 'for a two-way handoff.'}
+          </div>
+        </>
       )}
       {variant === 'map' && auditNote && (
         <div style={{ ...styles.hint, color: auditSeverity === 'error' ? T.error : T.warning }}>

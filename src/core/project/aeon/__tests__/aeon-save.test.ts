@@ -7,7 +7,9 @@ import { serializeBgLibraryIndex, parseBgLibraryIndex } from '../../../formats/b
 import { serializeBgTiles, BG_WIDTH } from '../../../formats/bg-tiles';
 import { serializeTiles } from '../../../export/tile-dedup';
 import { serializeSectionMeta, parseSectionMeta } from '../../../formats/section-meta';
-import { serializeCollAttr } from '../../../formats/s4-collattr';
+import { serializeCollAttr, parseCollAttr } from '../../../formats/s4-collattr';
+import { cellTileIndices, cellCrossoverIndices } from '../../../collision/collision-cell';
+import { withCrossover, readCrossover } from '../../../collision/layer-transition';
 import { STRIP_ROWS, STRIP_COLS, WIDE_STRIP_SIZE } from '../../../formats/s4-strips';
 import { packCollisionCell } from '../../../collision/collision-cell-word';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../../model/s4-types';
@@ -696,6 +698,73 @@ describe('buildAeonSavePlan — editable collision planes', () => {
     expect(outAgain.get(COLL_B_PATH)!).toEqual(out.get(COLL_B_PATH)!);   // measure noise
     expect(out.get(COLL_A_PATH)!).toEqual(serializeCollAttr(AUTHORED_A));
     expect(out.get(COLL_B_PATH)!).toEqual(serializeCollAttr(AUTHORED_B));
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ⚠ THE SUB-CELL ROUND TRIP — the question LOOPS-TWO-WAY-MARK could not
+  // answer from anywhere else.
+  //
+  // Aurora paints collision in 16px cells and every writer had, until
+  // 2026-09-04, written all four of a cell's 8px sub-tiles IDENTICALLY. The
+  // loop crossover breaks that on purpose: aeon's trigger fires once per 8px
+  // COLUMN, so a two-way mark must occupy ONE sub-tile column or it flips the
+  // player twice and nets to nothing (core/collision/layer-transition.ts).
+  //
+  // Everything upstream of here was already known to be 8px granular — aeon's
+  // bake indexes the sub-tile column directly, and the file is one word per
+  // sub-tile. NEITHER OF THOSE ESTABLISHES THE ROUND TRIP. If Aurora's own
+  // load→save normalised a cell to a single word anywhere — a resolve, a
+  // baseline fill, a `understood` fallback — a half-cell mark would work in the
+  // editor and be gone from the file, which is a feature that does nothing in
+  // the game and says nothing about it.
+  //
+  // So this drives the REAL load and the REAL save plan over a plane whose two
+  // sub-tile columns DISAGREE, and asserts the disagreement on the far side.
+  it('⚠ preserves a mark on ONE 8px sub-column of a cell — load, save, and the byte that differs', async () => {
+    const files = authoredFixture();
+    // Build the half-cell mark with the SAME function the brush uses, so the
+    // fixture cannot drift from what an author can actually paint.
+    const a = Uint16Array.from(AUTHORED_A);
+    const b = Uint16Array.from(AUTHORED_B);
+    const CELL_COL = 11, CELL_ROW = 7;
+    const all = cellTileIndices(CELL_COL, CELL_ROW, SECTION_TILES_WIDE);
+    const marked = cellCrossoverIndices(CELL_COL, CELL_ROW, SECTION_TILES_WIDE, 'right');
+    const base = packCollisionCell({ shape: 0x11, xFlip: false, yFlip: false, solidity: 'all' });
+    for (const i of all) { a[i] = base; b[i] = base; }
+    for (const i of marked) {
+      a[i] = withCrossover(base, 'to-b');     // plane A hands you to B
+      b[i] = withCrossover(base, 'to-a');     // plane B hands you back
+    }
+    files.set(COLL_A_PATH, serializeCollAttr(a));
+    files.set(COLL_B_PATH, serializeCollAttr(b));
+
+    // ANTI-VACUOUS, and this is the row that could actually have failed: the
+    // cell's sub-tiles genuinely disagree going IN. A fixture whose four
+    // sub-tiles were equal would round-trip under a normalising save too.
+    const unmarked = all.filter((i) => !marked.includes(i));
+    expect(marked.length).toBeGreaterThan(0);
+    expect(unmarked.length).toBeGreaterThan(0);
+    expect(new Set(marked.map((i) => i % SECTION_TILES_WIDE)).size).toBe(1);
+    expect(a[marked[0]!]).not.toBe(a[unmarked[0]!]);
+
+    const out = await loadSaveApply(files);
+    const backA = parseCollAttr(out.get(COLL_A_PATH)!);
+    const backB = parseCollAttr(out.get(COLL_B_PATH)!);
+    // The mark survived on exactly the sub-tiles it was written to, on BOTH
+    // planes, with the correct per-plane value — and NOT on the other half.
+    for (const i of marked) {
+      expect(readCrossover(backA[i])).toBe('to-b');
+      expect(readCrossover(backB[i])).toBe('to-a');
+    }
+    for (const i of unmarked) {
+      expect(readCrossover(backA[i])).toBe('none');
+      expect(readCrossover(backB[i])).toBe('none');
+    }
+    // And nothing else moved: the geometry is intact across the whole cell.
+    for (const i of all) {
+      expect(backA[i]! & ~(3 << 14)).toBe(base);
+      expect(backB[i]! & ~(3 << 14)).toBe(base);
+    }
   });
 
   it('leaves a .collattr.bin it could not read byte-identical, as a well-formed one is', async () => {
