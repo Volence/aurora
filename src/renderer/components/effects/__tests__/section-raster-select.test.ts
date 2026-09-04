@@ -231,8 +231,12 @@ describe('a binding that names nothing is SAID, not silently redrawn as unbound'
 describe('the control adds no second wording of the limit', () => {
   /**
    * ⚠ THE ONE THING THIS PARCEL WAS FORBIDDEN TO DO. `RASTER_SECTION_BINDING_LIMIT`
-   * is one sentence for four audiences and renders in full at the top of this
-   * very section; a near-identical sentence beside the select is exactly the
+   * is one sentence for four audiences and `LimitBlock` already carries it at
+   * the top of this very section — the author-length half painted, the contract
+   * wording on the same element's `title` (`b8d16256`; the split is held by
+   * band-preset-wording.test.ts). ⚠ THIS LINE SAID "renders in full" UNTIL
+   * 2026-09-04, the pre-`b8d16256` ruling; do not read it as licence to paint
+   * the contract text. Either way a near-identical sentence beside the select is exactly the
    * drift core/formats/raster-binding.ts exists to prevent. The row samples
    * distinctive phrases from the constant rather than the whole string, because
    * a FORK would be paraphrased, not pasted.

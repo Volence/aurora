@@ -35,8 +35,12 @@
 //
 // ═══ THE RULE: THE BRUSH OWNS ITS FIELDS, THE CELL KEEPS THE REST ═══
 //
-// This is a rule about the WORD, not about any feature that might one day use
-// the spare bits. It is stated as a mask complement rather than as "preserve
+// This is a rule about the WORD, not about any feature that uses the bits the
+// brush does not own. (That phrase read "the spare bits" until 2026-09-04, four
+// paragraphs above the section below explaining that bits 15:14 are the LOOP
+// CROSSOVER and have been since `layer-transition.ts` claimed them — the same
+// stale "spare" that `collision-cell-word.ts` carried in its bit table.) It is
+// stated as a mask complement rather than as "preserve
 // bits 15:14" precisely so that it stays true when the layout changes: the day
 // `packCollisionCell` starts writing bit 14, `COLLISION_CELL_OWNED_MASK` widens
 // on its own and the brush starts owning it, with no edit here.
