@@ -190,6 +190,7 @@
     "harness:section-raster-select": "node scratchpad/section-raster-select-harness.mjs",
     "harness:scene-anchor-writer": "node scratchpad/scene-anchor-writer-harness.mjs",
     "harness:sec7-fa-fix": "node scratchpad/sec7-fa-fix-harness.mjs",
+    "harness:sec7-ui-reauthor": "node scratchpad/sec7-ui-reauthor-harness.mjs",
     "harness:sec7-worldwater": "node scratchpad/sec7-worldwater-harness.mjs",
     "harness:shell-flip": "node scratchpad/shell-flip-harness.mjs",
     "harness:slot-range-onscreen": "node scratchpad/slot-range-onscreen-harness.mjs",
