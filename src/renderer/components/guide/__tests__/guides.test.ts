@@ -14,6 +14,7 @@ import { describe, it, expect } from 'vitest';
 import { GUIDES, GUIDE_ANCHORS, EFFECTS_GUIDE_SLUG, guideBySlug, guideBlocks, guideSections }
   from '../guides';
 import { parseGuide, inline, slugify } from '../markdown-lite';
+import { planFileNeedsWrite } from '../../../../core/project/aeon/save-skip';
 
 const effects = guideBySlug(EFFECTS_GUIDE_SLUG)!;
 
@@ -130,5 +131,58 @@ describe('the parser handles everything the shipped guide actually uses', () => 
     expect(inline('a **b c').map((r) => r.text).join('')).toBe('a **b c');
     expect(inline('a `b c').map((r) => r.text).join('')).toBe('a `b c');
     expect(inline('').length).toBe(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// §6's SAVE SENTENCE, TIED TO THE SAVE PATH THAT HAS TO MAKE IT TRUE.
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// The sentence this replaced — "Saving rewrites every editor file in the act,
+// not just the ones you touched, so expect a large `git status`" — was true of
+// the save path until `save-skip.ts` landed on 2026-09-02, and was still on the
+// page on 2026-09-05 when a cold reader's real save moved TWO files
+// (docs/reviews/2026-09-05-effects-cold-read.md, C6). A label that outlived its
+// defect; its cost is that it teaches an author to discount the NEXT warning.
+//
+// It went stale because nothing connected the prose to the predicate. These
+// rows are that connection, in the direction that matters: if someone weakens
+// `planFileNeedsWrite` back to byte identity, this file goes red and names the
+// guide sentence that would then be a lie. The prose row is the other direction
+// and is deliberately narrow — it pins the CLAIM, not the wording.
+describe("§6's save claim is the save path's actual rule", () => {
+  const enc = (s: string) => new TextEncoder().encode(s);
+
+  /** §6's own text, so a row cannot pass by matching a word somewhere else. */
+  const saveSection = (() => {
+    const from = effects.source.indexOf('## 6. Save, and build');
+    if (from < 0) throw new Error('the guide has no "## 6. Save, and build" heading');
+    const to = effects.source.indexOf('\n## ', from + 1);
+    return effects.source.slice(from, to === -1 ? undefined : to);
+  })();
+
+  it('a document whose MEANING did not move is not written', () => {
+    // Same parsed value, different bytes on every axis the retracted sentence
+    // called "re-serialisation": key order, indentation, and the trailing
+    // newline aeon's `json.dumps` writers do not emit.
+    const onDisk = enc('{"sceneRef":"ojz_act1_start","paletteRef":null}');
+    const planned = enc('{\n  "paletteRef": null,\n  "sceneRef": "ojz_act1_start"\n}\n');
+    expect(planFileNeedsWrite('json', onDisk, planned)).toBe(false);
+  });
+
+  it('a document whose meaning DID move is still written — the floor', () => {
+    // Without this row the one above is satisfied by a predicate that returns
+    // false for everything, which would make the guide's sentence true and the
+    // editor useless.
+    const onDisk = enc('{"sceneRef":"ojz_act1_start","paletteRef":null}');
+    const changed = enc('{"sceneRef":"coldread_drift","paletteRef":null}');
+    expect(planFileNeedsWrite('json', onDisk, changed)).toBe(true);
+  });
+
+  it('§6 states that rule, and no longer promises a large git status', () => {
+    expect(saveSection, 'the retracted over-warning is back in §6 — see C6')
+      .not.toMatch(/large `git status`/);
+    expect(saveSection, '§6 no longer tells the author what a save writes')
+      .toMatch(/only when that file's\s+meaning changed/);
   });
 });

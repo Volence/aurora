@@ -330,9 +330,16 @@ Scenes have no such restriction — bind a scene to any section.
 ## 6. Save, and build
 
 **Ctrl+S.** There is no Save button on a level tab; the dot on the tab title is the
-only sign you have unsaved work. Saving rewrites every editor file in the act, not
-just the ones you touched, so expect a large `git status` — most of it is
-re-serialisation, not change.
+only sign you have unsaved work. **A save writes a file only when that file's
+meaning changed.** Every JSON document Aurora writes is compared against the one
+already on disk as a *parsed value*, so indentation, key order and the trailing
+newline do not count as a change, and a document you did not touch is left alone.
+So read your `git status` after a save — it is the work you actually did, and a
+file in it you never opened is worth opening rather than scrolling past.
+
+One thing that is bigger than you expect, and it is the diff and not the file
+count: a document whose meaning *did* change is rewritten in full canonical form,
+so it can pick up formatting aeon's own writers do not emit.
 
 Then, in your aeon checkout:
 
