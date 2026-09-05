@@ -56,7 +56,7 @@ export async function sheetFromBytes(doc: LevelDoc, bytes: Uint8Array): Promise<
   try {
     png = await decodeIndexedPng(bytes);
   } catch (e) {
-    throw new Error(`${(e as Error).message} — the importer needs an INDEXED (paletted) PNG`);
+    throw new Error(`${(e as Error).message}; the importer needs an INDEXED (paletted) PNG`);
   }
   const palette = flattenDocPalette(doc);
   const mapped = importPngAgainstPalette(png, palette);
@@ -82,7 +82,7 @@ export function explainSheetRefusal(refusal: PngImportRefusal): string {
   }
   const cells = refusal.cells ?? [];
   const where = cells.slice(0, 4).map((c) => `(${c.x},${c.y})`).join(' ');
-  return `${cells.length} cell${cells.length === 1 ? '' : 's'} mix colours that no single palette line holds — `
+  return `${cells.length} cell${cells.length === 1 ? '' : 's'} mix colours that no single palette line holds: `
     + `${where}${cells.length > 4 ? ' and more' : ''}. Each 8×8 cell must draw from one line.`;
 }
 
@@ -104,6 +104,6 @@ export function sheetRefusalResolution(refusal: PngImportRefusal): string {
       + '(the zone palette is shared by every act in the zone).';
   }
   return 'Redraw those cells so each 8×8 draws from a single line. Widening the palette only helps '
-    + 'if the missing colour is added to the LINE the cell\'s other colours already use — putting it '
+    + 'if the missing colour is added to the LINE the cell\'s other colours already use; putting it '
     + 'on any other line leaves this refusal unchanged.';
 }

@@ -161,12 +161,12 @@ export function s1UnavailableRowNote(id: number, zone: string | null): string {
     case 'available':
       return '';
     case 'invisible':
-      return 'Invisible trigger — no sprite art to edit (the map draws it as a ghost marker)';
+      return 'Invisible trigger: no sprite art to edit (the map draws it as a ghost marker)';
     case 'art-elsewhere': {
       const zones = s1LinkedZones(id).map(zoneCaps).join(', ');
       return zone !== null
-        ? `Not loaded in ${zoneCaps(zone)} — this zone's Pattern Load Cues never queue its art; it loads in ${zones}`
-        : `Zone-scoped art (${zones}) — open one of those acts to edit it`;
+        ? `Not loaded in ${zoneCaps(zone)}: this zone's Pattern Load Cues never queue its art; it loads in ${zones}`
+        : `Zone-scoped art (${zones}); open one of those acts to edit it`;
     }
     case 'no-art-link':
       return 'No sprite art linked in Aurora\'s table yet';
@@ -188,8 +188,8 @@ export function s1PlacementWarning(id: number, zone: string, name: string): stri
     case 'invisible':
       return null;
     case 'art-elsewhere':
-      return `${name} (${s1ObjectHex(id)}) placed, but ${zoneCaps(zone)}'s Pattern Load Cues never load its art — in-game it will draw whatever tiles sit in its VRAM slot. Its art loads in ${a.zones.map(zoneCaps).join(', ')}`;
+      return `${name} (${s1ObjectHex(id)}) placed, but ${zoneCaps(zone)}'s Pattern Load Cues never load its art: in-game it will draw whatever tiles sit in its VRAM slot. Its art loads in ${a.zones.map(zoneCaps).join(', ')}`;
     case 'no-art-link':
-      return `${name} (${s1ObjectHex(id)}) placed, but no table links art for it — nothing shows ${zoneCaps(zone)} loading its art, so it may draw wrong tiles in-game`;
+      return `${name} (${s1ObjectHex(id)}) placed, but no table links art for it: nothing shows ${zoneCaps(zone)} loading its art, so it may draw wrong tiles in-game`;
   }
 }

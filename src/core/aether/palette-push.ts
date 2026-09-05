@@ -45,7 +45,7 @@ export const PAL_BASE_DIRTY_SYMBOL = 'Pal_Base_Dirty';
 export function palBaseOffset(line: number, entry: number): number {
   if (line === 0) {
     throw new Error(
-      'Pal_Base does not include line 0 — it is the character palette and the engine never writes it',
+      'Pal_Base does not include line 0: it is the character palette and the engine never writes it',
     );
   }
   if (!Number.isInteger(line) || line < PAL_BASE_FIRST_LINE || line > PAL_BASE_LAST_LINE) {

@@ -77,7 +77,7 @@ const MAX_BLOCKS_TOTAL = 0x400; // 1024
  * the sentence.
  */
 function escapeFromLinkOverhang(doc: LevelDoc): string {
-  return `Isolate cannot escape it either — this zone ships ${doc.blocks.length} blocks against ${doc.collision.colind.length} entries, so a clone would grow the table over the same overhang. Edit a block within the table, or restamp this cell to a block that is.`;
+  return `Isolate cannot escape it either: this zone ships ${doc.blocks.length} blocks against ${doc.collision.colind.length} entries, so a clone would grow the table over the same overhang. Edit a block within the table, or restamp this cell to a block that is.`;
 }
 
 /**
@@ -158,10 +158,10 @@ function fullyContainedBlocks(
  */
 function escapeFromIsolateGrowth(doc: LevelDoc, blockId: number, contained: boolean): string {
   if (blockId >= doc.collision.colind.length) {
-    return `Link cannot set block ${blockId} either — it is past the end of the table. Edit a block within the table, or restamp this cell to a block that is.`;
+    return `Link cannot set block ${blockId} either: it is past the end of the table. Edit a block within the table, or restamp this cell to a block that is.`;
   }
   if (contained) {
-    return `Use Link: no chunk-definition cell outside this one names block ${blockId}, so Link changes exactly what Isolate would have changed here — and costs no table entry.`;
+    return `Use Link: no chunk-definition cell outside this one names block ${blockId}, so Link changes exactly what Isolate would have changed here, and costs no table entry.`;
   }
   return `Use Link, accepting it changes every use of block ${blockId}.`;
 }
@@ -246,13 +246,13 @@ export function skipRefusal(doc: LevelDoc, reason: CollisionSkipReason, blockId:
     case 'outside-layout':
       return `this cell is outside the act's layout (${doc.fg.width * 16} x ${doc.fg.height * 16} cells)`;
     case 'air':
-      return 'no chunk is stamped here — this cell is air';
+      return 'no chunk is stamped here; this cell is air';
     case 'block0':
-      return 'block 0 is the blank block — the engine short-circuits before reading its collision, so a shape here can never apply';
+      return 'block 0 is the blank block: the engine short-circuits before reading its collision, so a shape here can never apply';
     case 'no-such-block':
-      return `this cell names block ${blockId}, but this act has only ${doc.blocks.length} blocks — the reference is dangling. Restamp the cell to a block that exists.`;
+      return `this cell names block ${blockId}, but this act has only ${doc.blocks.length} blocks; the reference is dangling. Restamp the cell to a block that exists.`;
     case 'overhang':
-      return `block ${blockId} is past the end of this zone's collision table (${doc.collision.colind.length} entries) — the overhang resolves into the adjacent zone's table in ROM, so Aurora cannot set it without silently changing other blocks. ${escapeFromLinkOverhang(doc)}`;
+      return `block ${blockId} is past the end of this zone's collision table (${doc.collision.colind.length} entries); the overhang resolves into the adjacent zone's table in ROM, so Aurora cannot set it without silently changing other blocks. ${escapeFromLinkOverhang(doc)}`;
   }
 }
 
@@ -311,7 +311,7 @@ export function planCollisionWrite(
   if (newBlockId >= MAX_BLOCKS_TOTAL) {
     return {
       kind: 'refused',
-      why: `block capacity reached: ${MAX_BLOCKS_TOTAL} blocks max (chunk cells reference blocks with a 10-bit field) — this zone's ceiling has no room for another clone`,
+      why: `block capacity reached: ${MAX_BLOCKS_TOTAL} blocks max (chunk cells reference blocks with a 10-bit field); this zone's ceiling has no room for another clone`,
     };
   }
 
@@ -329,7 +329,7 @@ export function planCollisionWrite(
     const contained = fullyContainedBlocks(doc, [blockId], [{ chunkIndex, cellIndex }]).length === 1;
     return {
       kind: 'refused',
-      why: `isolating this block would grow this zone's collision table by ${extendsTableBy} entr${extendsTableBy === 1 ? 'y' : 'ies'} (${colind.length} → ${newBlockId + 1}) — those entries resolve into the adjacent zone's table in ROM, so Aurora cannot define them. ${escapeFromIsolateGrowth(doc, blockId, contained)}`,
+      why: `isolating this block would grow this zone's collision table by ${extendsTableBy} entr${extendsTableBy === 1 ? 'y' : 'ies'} (${colind.length} → ${newBlockId + 1}); those entries resolve into the adjacent zone's table in ROM, so Aurora cannot define them. ${escapeFromIsolateGrowth(doc, blockId, contained)}`,
     };
   }
 
@@ -650,9 +650,9 @@ export function planCollisionRect(
 function skipPhrase(reason: CollisionSkipReason): string {
   switch (reason) {
     case 'outside-layout': return 'outside the layout';
-    case 'air': return 'air — no chunk is stamped there';
+    case 'air': return 'air: no chunk is stamped there';
     case 'block0': return 'the blank block 0, whose collision the engine never reads';
-    case 'no-such-block': return 'blocks this act does not have — dangling references';
+    case 'no-such-block': return 'blocks this act does not have (dangling references)';
     case 'overhang': return 'blocks past the end of this zone\'s collision table';
   }
 }
@@ -673,11 +673,11 @@ function skipPhrase(reason: CollisionSkipReason): string {
  */
 function dominantSkipWhy(skipped: { reason: CollisionSkipReason; count: number }[]): string {
   if (skipped.length === 0) {
-    return 'no cells were given to write to — a rectangle with a zero width or height covers none';
+    return 'no cells were given to write to: a rectangle with a zero width or height covers none';
   }
   const total = skipped.reduce((n, s) => n + s.count, 0);
   const top = skipped.reduce((a, b) => (b.count > a.count ? b : a));
-  return `no cell in this rectangle could take a shape — ${top.count} of ${total} ${top.count === 1 ? 'is' : 'are'} ${skipPhrase(top.reason)}`;
+  return `no cell in this rectangle could take a shape: ${top.count} of ${total} ${top.count === 1 ? 'is' : 'are'} ${skipPhrase(top.reason)}`;
 }
 
 /**
@@ -767,11 +767,11 @@ function planIsolateRect(
         kind: 'isolate-grows-table', needed, spare: Math.max(0, tableSpare),
         colindLength: colind.length, blocks: doc.blocks.length, linkEquivalent,
       },
-      why: `isolating this rectangle needs ${needed} new block${needed === 1 ? '' : 's'} and this zone's collision table has room for ${Math.max(0, tableSpare)} — it would grow by ${grow} entr${grow === 1 ? 'y' : 'ies'} (${colind.length} → ${doc.blocks.length + needed}), and those entries resolve into the adjacent zone's table in ROM, so Aurora cannot define them.`,
+      why: `isolating this rectangle needs ${needed} new block${needed === 1 ? '' : 's'} and this zone's collision table has room for ${Math.max(0, tableSpare)}: it would grow by ${grow} entr${grow === 1 ? 'y' : 'ies'} (${colind.length} → ${doc.blocks.length + needed}), and those entries resolve into the adjacent zone's table in ROM, so Aurora cannot define them.`,
       resolution: !allInTable
-        ? 'Link cannot set every block in this rectangle either — some are past the end of the table. Paint over blocks that are within it.'
+        ? 'Link cannot set every block in this rectangle either: some are past the end of the table. Paint over blocks that are within it.'
         : guaranteed
-          ? `Use Link: every chunk-definition cell naming ${needed === 1 ? 'this block' : 'these blocks'} is inside this selection, so Link changes exactly what Isolate would have changed — and costs no table entry.`
+          ? `Use Link: every chunk-definition cell naming ${needed === 1 ? 'this block' : 'these blocks'} is inside this selection, so Link changes exactly what Isolate would have changed, and costs no table entry.`
           : 'Use Link, accepting it changes every use of these blocks zone-wide, or paint a smaller rectangle.',
       report: base,
     };

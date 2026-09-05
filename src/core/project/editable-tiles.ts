@@ -33,9 +33,9 @@ export function tileLockReason(
   tileIndex: number,
 ): string | null {
   if (!range) return null;
-  if (tileIndex >= range.baseTileCount) return 'gap/appended tile — not editable in v1';
+  if (tileIndex >= range.baseTileCount) return 'gap/appended tile, not editable in v1';
   if (range.animRanges.some((r) => tileIndex >= r.start && tileIndex < r.start + r.count)) {
-    return 'animated-art slot — not editable in v1';
+    return 'animated-art slot, not editable in v1';
   }
   return null;
 }

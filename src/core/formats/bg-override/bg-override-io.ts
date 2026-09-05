@@ -105,7 +105,7 @@ export async function loadBgOverride(fa: FileAccess, dataRoot: string): Promise<
       severity: 'error',
       message:
         `${path} exists but could not be read (${reason}). Aurora is ignoring it and will NOT ` +
-        'overwrite the file — fix it by hand and reopen.',
+        'overwrite the file; fix it by hand and reopen.',
     });
     return state;
   }
@@ -126,7 +126,7 @@ export async function loadBgOverride(fa: FileAccess, dataRoot: string): Promise<
       severity: 'error',
       message:
         `${path} exists but could not be read as a BG override document (${reason}). Aurora is ` +
-        'ignoring it and will NOT overwrite the file — fix it by hand and reopen.',
+        'ignoring it and will NOT overwrite the file; fix it by hand and reopen.',
     });
   }
   return state;

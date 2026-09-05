@@ -506,7 +506,7 @@ function expectDisclosure(text: string): void {
   expect(text).toMatch(/THAT CLAUSE EXPIRES when the \[5\] literal in test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document changes/);
   expect(text).toMatch(/when those tests are renamed or the pytest lane leaves the NO_LINT block that FAST=1 switches off/);
   expect(text).toMatch(/when test_every_preset_document_is_REACHABLE drops its sidecar arm/);
-  expect(text).toMatch(/or when a second binding ships — owner: aeon's lane/);
+  expect(text).toMatch(/or when a second binding ships \(owner: aeon's lane\)/);
   expect(text).toMatch(/re-read tools\/test_effects_seam_gate\.py, tools\/test_raster_cycle_table_lint\.py and build\.sh/);
   // ⚠ WRONG REWRITES, named: the refusal is aeon's and it is the FAST=0 build's.
   // A sentence that put the gate on this side, or on the FAST=1 build, would

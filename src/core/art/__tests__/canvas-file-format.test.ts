@@ -165,13 +165,13 @@ describe('canvas file format', () => {
     expect(newer.ok).toBe(false);
     if (!newer.ok) {
       expect(newer.error).toMatch(/version 2 is newer/);
-      expect(newer.error).toMatch(/update Aurora/);
+      expect(newer.error).toMatch(/Update Aurora/);
     }
     const older = parseCanvasSidecar(JSON.stringify({ version: 0, profile: 'none', ...validRest }));
     expect(older.ok).toBe(false);
     if (!older.ok) {
       expect(older.error).toMatch(/version 0 is older/);
-      expect(older.error).toMatch(/update Aurora/);
+      expect(older.error).toMatch(/Update Aurora/);
     }
   });
 

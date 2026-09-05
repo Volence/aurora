@@ -237,7 +237,7 @@ export function planSurfaceEdit(input: PlanInput): PlanResult {
         if (id > MAX_BLOCK_REF) {
           return {
             ok: false,
-            reason: 'block limit reached — the pool cannot hold a 1025th block (10-bit chunk-cell field). Switch to Link mode to edit every place at once.',
+            reason: 'block limit reached: the pool cannot hold a 1025th block (10-bit chunk-cell field). Switch to Link mode to edit every place at once.',
           };
         }
         const srcBlock = doc.blocks[c.blockId];
@@ -280,7 +280,7 @@ export function planSurfaceEdit(input: PlanInput): PlanResult {
       if (slot === null) {
         return {
           ok: false,
-          reason: 'no free editable tile slot to hold the divergent copy — this zone is at its tile limit. Switch to Link mode to edit every place at once.',
+          reason: 'no free editable tile slot to hold the divergent copy: this zone is at its tile limit. Switch to Link mode to edit every place at once.',
         };
       }
       avail.allocated.add(slot);

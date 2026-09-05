@@ -162,7 +162,7 @@ describe('a flood of section-file failures is ONE notice', () => {
     expect(summary).toContain(`+${failures - NAMED_IN_SUMMARY} more`);
     // The named ones are paths the reader can actually go and open — not a
     // truncated prefix or an id nobody can find on disk.
-    const named = summary.split(' — ')[1].split('. ')[0].split(', ').slice(0, NAMED_IN_SUMMARY);
+    const named = summary.split('read: ')[1].split('. ')[0].split(', ').slice(0, NAMED_IN_SUMMARY);
     expect(named).toHaveLength(NAMED_IN_SUMMARY);
     for (const p of named) expect(p.startsWith('data/ojz/act1/section_')).toBe(true);
   });

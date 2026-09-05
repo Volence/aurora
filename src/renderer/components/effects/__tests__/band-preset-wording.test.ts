@@ -375,7 +375,7 @@ describe('the three limits say the words that carry them', () => {
     expect(l.body).toMatch(/test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document/);
     expect(l.body).toMatch(/tools\/test_raster_cycle_table_lint\.py::test_every_preset_document_is_REACHABLE/);
     // The unbind, in the author's terms — the select's own option is named.
-    expect(l.body).toMatch(/UNBINDING SECTION 5 — null from this tool, or the select's Hand-authored raster option/);
+    expect(l.body).toMatch(/UNBINDING SECTION 5 \(null from this tool, or the select's Hand-authored raster option\)/);
     expect(l.body).toMatch(/leaves the bound set empty and the document ojz_sec5_showcase\.json orphaned/);
     expect(l.body).toMatch(/"no sidecar carries a rasterRef — step 6's band is gone"/);
     expect(l.body).toMatch(/"the bound sections are \[\], not \[5\]"/);
@@ -384,7 +384,7 @@ describe('the three limits say the words that carry them', () => {
     expect(l.body).toMatch(/runs only in the canonical FAST=0 build: FAST=1 sets NO_LINT=1, the pytest lane sits under NO_LINT, and FAST=1 builds the tree/);
     expect(l.body).toMatch(/NOTHING HERE PREVENTS THE WRITE/);
     expect(l.body).toMatch(/THAT CLAUSE EXPIRES when the \[5\] literal in test_section_5_is_the_bound_one_and_its_id_is_the_shipped_document changes/);
-    expect(l.body).toMatch(/or when a second binding ships — owner: aeon's lane/);
+    expect(l.body).toMatch(/or when a second binding ships \(owner: aeon's lane\)/);
     expect(l.body).not.toMatch(/(?:this editor|Aurora|the panel|this tool|the select) (?:refuses|prevents|blocks|greys out|disables)/i);
     expect(l.body).not.toMatch(/FAST=1 (?:also )?(?:refuses|rejects)/i);
     expect(l.body).not.toMatch(/FAST=0 builds (?:it|the tree)/i);

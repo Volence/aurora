@@ -134,12 +134,12 @@ export function parseCanvasSidecar(json: string): SidecarParse {
     if (typeof v === 'number' && v > CANVAS_SIDECAR_VERSION) {
       return {
         ok: false,
-        error: `sidecar version ${v} is newer than this Aurora understands (it reads up to version ${CANVAS_SIDECAR_VERSION}) — update Aurora; opening now ignores this file's settings, and saving would overwrite them`,
+        error: `sidecar version ${v} is newer than this Aurora understands (it reads up to version ${CANVAS_SIDECAR_VERSION}). Update Aurora; opening now ignores this file's settings, and saving would overwrite them`,
       };
     }
     return {
       ok: false,
-      error: `sidecar version ${String(v)} is older than this Aurora writes (version ${CANVAS_SIDECAR_VERSION}) — update Aurora to migrate it`,
+      error: `sidecar version ${String(v)} is older than this Aurora writes (version ${CANVAS_SIDECAR_VERSION}). Update Aurora to migrate it`,
     };
   }
   if (!Array.isArray(o.palette) || o.palette.length !== CANVAS_COLORS) {
@@ -190,7 +190,7 @@ export async function encodeCanvasFiles(doc: CanvasDoc): Promise<{ png: Uint8Arr
   // of range for a 30-colour palette") for what is actually a corrupt
   // PALETTE. Catch it here, with the noun that is actually wrong.
   if (doc.palette.length !== CANVAS_COLORS) {
-    throw new Error(`canvas palette must hold ${CANVAS_COLORS} CRAM words (got ${doc.palette.length}) — this document is corrupt`);
+    throw new Error(`canvas palette must hold ${CANVAS_COLORS} CRAM words (got ${doc.palette.length}): this document is corrupt`);
   }
   const png = await encodeIndexedPng({
     width: doc.pixels.width,
@@ -249,7 +249,7 @@ export async function decodeCanvasFiles(png: Uint8Array, sidecarJson: string | n
   if (img.width > CANVAS_MAX_SIDE || img.height > CANVAS_MAX_SIDE) {
     throw new Error(
       `this PNG is ${img.width}x${img.height}px; a canvas holds at most ${CANVAS_MAX_SIDE}x${CANVAS_MAX_SIDE} ` +
-      `pixels (the undo history clones the whole pixel buffer per edit) — resize it before opening`,
+      `pixels (the undo history clones the whole pixel buffer per edit). Resize it before opening`,
     );
   }
 
@@ -264,7 +264,7 @@ export async function decodeCanvasFiles(png: Uint8Array, sidecarJson: string | n
   if (img.palette.length > CANVAS_COLORS) {
     throw new Error(
       `this PNG has ${img.palette.length} colours; a canvas holds ${CANVAS_COLORS} ` +
-      `(${CANVAS_LINES} lines x ${CANVAS_LINE_LENGTH}) — reduce its palette before opening it`,
+      `(${CANVAS_LINES} lines x ${CANVAS_LINE_LENGTH}). Reduce its palette before opening it`,
     );
   }
 
@@ -277,7 +277,7 @@ export async function decodeCanvasFiles(png: Uint8Array, sidecarJson: string | n
   // overwrite a sidecar it could not read (see CanvasLoad.sidecarRejected).
   const sidecarRejected = parsed !== null && !parsed.ok;
   if (parsed && !parsed.ok) {
-    warnings.push(`the sidecar could not be read (${parsed.error}); opening the art without it — the canvas is unconstrained until this is fixed, and the sidecar file will not be overwritten on save`);
+    warnings.push(`the sidecar could not be read (${parsed.error}); opening the art without it: the canvas is unconstrained until this is fixed, and the sidecar file will not be overwritten on save`);
   }
   const sidecar = parsed && parsed.ok ? parsed.sidecar : null;
   // NOTE (review correction R2): `constraintProfile` takes a plain string and

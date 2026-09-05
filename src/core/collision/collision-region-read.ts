@@ -208,13 +208,13 @@ const SLOPE_THRESHOLD_PX = 4;
 export const COLLISION_ASCII_LEGEND =
   `${GLYPH_AIR} air   ${GLYPH_INERT} shape present but solidity=none (stops nothing)   `
   + `${GLYPH_UNKNOWN} shape index not in the loaded tables\n`
-  + `${GLYPH_MIXED} MIXED — this cell's four 8px sub-tiles disagree; read cells[][].sub\n`
+  + `${GLYPH_MIXED} MIXED: this cell's four 8px sub-tiles disagree; read cells[][].sub\n`
   + `${GLYPH_FULL} full block   ${GLYPH_WALL} vertical face   ${GLYPH_CEILING} hangs from the top   `
   + `${GLYPH_SLOPE_UP_RIGHT} rises to the right   ${GLYPH_SLOPE_UP_LEFT} rises to the left   `
   + `${GLYPH_FLOOR} flat partial floor\n`
   + 'Glyphs show GEOMETRY ONLY (the profile heights the canvas overlay draws). '
   + `They do NOT show solidity beyond the ${GLYPH_INERT} case, nor which way a `
-  + 'ceiling slopes — read cells[][].solidity and cells[][].angle for those.';
+  + 'ceiling slopes; read cells[][].solidity and cells[][].angle for those.';
 
 /**
  * The glyph for one already-read cell.

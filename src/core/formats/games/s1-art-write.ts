@@ -264,7 +264,7 @@ export function encodeS1ArtWriteBackDelta(
     if (differsAtMask(c.indices, re, masks[i])) {
       return {
         ok: false,
-        error: `conflicting edits: frame ${i} cannot re-render to its edited pixels — `
+        error: `conflicting edits: frame ${i} cannot re-render to its edited pixels; `
           + `another edited frame changed a shared pool tile differently. Revert one of the edits to save.`,
       };
     }

@@ -586,7 +586,7 @@ function planLayoutRemap(
     if (next === 0) {
       throw new BgOverrideError(
         `layout[${i}] draws tile ${idx} with no attribute bits set, and renumbering it to tile ` +
-        `${to} would make the whole word 0 — which the consumer reads as the BLANK escape, not as ` +
+        `${to} would make the whole word 0, which the consumer reads as the BLANK escape, not as ` +
         'tile 0. The nametable cannot express "tile 0, no attributes", so that cell would silently ' +
         'go blank. Give it a palette line, or order the bands so the tile does not land on 0.',
       );
@@ -643,7 +643,7 @@ function planBandArrival(
     throw new BgOverrideError(
       `the band spells slot_base ${JSON.stringify(band.slot_base)} but list position ${at} puts it ` +
       `at slot ${slotBase}. Bands pack contiguously from slot 0 in list order, so slot_base is ` +
-      'derived and may only be spelled out to agree — it cannot place a band.',
+      'derived and may only be spelled out to agree; it cannot place a band.',
     );
   }
   return { layout, tiles, bands, at, n, slotBase };
@@ -669,7 +669,7 @@ export function planBandInsertion(
   if (tiles.length + n > BG_TILE_CAPACITY) {
     throw new BgOverrideError(
       `the band needs ${n} slot(s) at the front of a ${tiles.length}-tile blob, which would make ` +
-      `${tiles.length + n} — over the BG tile capacity of ${BG_TILE_CAPACITY}. Animated slots are a ` +
+      `${tiles.length + n}, over the BG tile capacity of ${BG_TILE_CAPACITY}. Animated slots are a ` +
       'PREFIX of `tiles` rather than an addition to it, so they are counted here exactly once.',
     );
   }
@@ -700,7 +700,7 @@ export function planBandRemoval(
   if (!Number.isInteger(bandIndex) || bandIndex < 0 || bandIndex >= bands.length) {
     throw new BgOverrideError(
       `cannot remove band ${bandIndex}: the document has ${bands.length} band(s)` +
-      (bands.length === 0 ? ' — there is nothing to remove.' : `, indexed 0..${bands.length - 1}.`),
+      (bands.length === 0 ? ', so there is nothing to remove.' : `, indexed 0..${bands.length - 1}.`),
     );
   }
 
@@ -809,7 +809,7 @@ function requirePromotableRange(
   if (staticBase + n > tiles.length) {
     throw new BgOverrideError(
       `cannot promote tiles ${staticBase}..${staticBase + n}: the static blob has only ` +
-      `${tiles.length} tiles. Promotion declares art the blob ALREADY carries to be animated — it ` +
+      `${tiles.length} tiles. Promotion declares art the blob ALREADY carries to be animated; it ` +
       'never adds any, so the whole range has to be there first.',
     );
   }
@@ -817,7 +817,7 @@ function requirePromotableRange(
     throw new BgOverrideError(
       `cannot promote tiles ${staticBase}..${staticBase + n}: slots 0..${animated} already belong ` +
       'to the bands this document carries. Animated slots are a PREFIX of `tiles`, so a promotable ' +
-      'range starts at or after the end of that prefix — promoting art that is already animated ' +
+      'range starts at or after the end of that prefix; promoting art that is already animated ' +
       'would mean two bands DMAing over the same slots.',
     );
   }
@@ -895,7 +895,7 @@ export function planBandPromotion(
     throw new BgOverrideError(
       `refusing to promote tiles ${staticBase}..${staticBase + n}: the band's phases[0] is not that ` +
       'art. Promotion declares an existing static range animated, so phase 0 is READ from the blob ' +
-      'rather than supplied — build the band with bandFromStaticTiles, or keep phases[0] equal to ' +
+      'rather than supplied; build the band with bandFromStaticTiles, or keep phases[0] equal to ' +
       'the range and author banks 1.. only. A band whose phase 0 differs would change the picture ' +
       'at rest, or would break `phases[0] == tiles[slot_base : slot_base + cols*rows]`, and both of ' +
       'those bake cleanly.',
@@ -945,7 +945,7 @@ export function planBandDemotion(
   if (!Number.isInteger(bandIndex) || bandIndex < 0 || bandIndex >= bands.length) {
     throw new BgOverrideError(
       `cannot demote band ${bandIndex}: the document has ${bands.length} band(s)` +
-      (bands.length === 0 ? ' — there is nothing to demote.' : `, indexed 0..${bands.length - 1}.`),
+      (bands.length === 0 ? ', so there is nothing to demote.' : `, indexed 0..${bands.length - 1}.`),
     );
   }
 
@@ -960,14 +960,14 @@ export function planBandDemotion(
   if (!Number.isInteger(to) || to < animatedAfter) {
     throw new BgOverrideError(
       `cannot demote band ${bandIndex} to tile ${JSON.stringify(to)}: with this band gone the ` +
-      `remaining bands own slots 0..${animatedAfter}, and demoted art is STATIC — it must land at ` +
+      `remaining bands own slots 0..${animatedAfter}, and demoted art is STATIC: it must land at ` +
       `or after ${animatedAfter}, or it would sit inside another band's prefix.`,
     );
   }
   if (to + n > tiles.length) {
     throw new BgOverrideError(
       `cannot demote band ${bandIndex} to tiles ${to}..${to + n}: the blob has ${tiles.length} ` +
-      'tiles and demotion does not grow it — the band\'s slots MOVE into the static region rather ' +
+      'tiles and demotion does not grow it: the band\'s slots MOVE into the static region rather ' +
       'than being added to it, so the whole range must already fit.',
     );
   }

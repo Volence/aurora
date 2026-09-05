@@ -351,7 +351,7 @@ export async function decodeIndexedPng(bytes: Uint8Array): Promise<DecodedIndexe
       // accurate to V8, meaningless to a user looking at a corrupt file.
       if (data.length < 13) {
         throw new Error(
-          `PNG IHDR chunk is truncated or corrupt (needs 13 bytes, got ${data.length}) — the file is likely an incomplete download or a partial write`,
+          `PNG IHDR chunk is truncated or corrupt (needs 13 bytes, got ${data.length}); the file is likely an incomplete download or a partial write`,
         );
       }
       ihdrSeen = true;
@@ -381,7 +381,7 @@ export async function decodeIndexedPng(bytes: Uint8Array): Promise<DecodedIndexe
   // so the two directions should agree here too rather than let a decoded
   // zero-size image quietly exist.
   if (width <= 0 || height <= 0) {
-    throw new Error(`PNG has invalid dimensions ${width}x${height} — its IHDR chunk looks corrupt`);
+    throw new Error(`PNG has invalid dimensions ${width}x${height}; its IHDR chunk looks corrupt`);
   }
   // Checked BEFORE inflate — see MAX_PNG_DIMENSION's own comment for why that
   // ordering is the whole point, not a style choice.
@@ -392,13 +392,13 @@ export async function decodeIndexedPng(bytes: Uint8Array): Promise<DecodedIndexe
   }
   if (colorType !== 3) {
     throw new Error(
-      `this PNG is colour type ${colorType}, not indexed — re-export it as an indexed (paletted) PNG`,
+      `this PNG is colour type ${colorType}, not indexed; re-export it as an indexed (paletted) PNG`,
     );
   }
-  if (interlace !== 0) throw new Error('interlaced PNGs are not supported — re-export without Adam7 interlacing');
+  if (interlace !== 0) throw new Error('interlaced PNGs are not supported; re-export without Adam7 interlacing');
   if (![1, 2, 4, 8].includes(depth)) {
     throw new Error(
-      `unsupported indexed bit depth ${depth} — indexed PNGs must be 1, 2, 4 or 8 bits per pixel; re-export at one of those depths`,
+      `unsupported indexed bit depth ${depth}: indexed PNGs must be 1, 2, 4 or 8 bits per pixel; re-export at one of those depths`,
     );
   }
   // `!palette` catches a missing PLTE; `palette.length === 0` catches a PLTE
@@ -408,7 +408,7 @@ export async function decodeIndexedPng(bytes: Uint8Array): Promise<DecodedIndexe
   // ("an indexed PNG palette holds 1..256 colours"); the two directions
   // should not disagree about what a valid palette is.
   if (!palette || palette.length === 0) {
-    throw new Error('indexed PNG has no PLTE palette chunk — re-export as an indexed (paletted) PNG with a palette');
+    throw new Error('indexed PNG has no PLTE palette chunk; re-export as an indexed (paletted) PNG with a palette');
   }
   if (idatParts.length === 0) throw new Error('PNG has no image data (no IDAT chunk)');
 

@@ -292,7 +292,7 @@ async function readSidecarState(fa: FileAccess): Promise<SidecarState> {
   try {
     bytes = (await fa.exists(SIDECAR)) ? await fa.read(SIDECAR) : null;
   } catch {
-    return { config: {}, issues: [{ where: '$', message: 'sidecar unreadable — ignoring it' }] };
+    return { config: {}, issues: [{ where: '$', message: 'sidecar unreadable; ignoring it' }] };
   }
   return readProjectConfig(bytes);
 }

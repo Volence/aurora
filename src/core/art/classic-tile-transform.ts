@@ -135,7 +135,7 @@ export function resolveTileTransform(
   if (action === 'rotate-90' && region.w !== region.h) { // rule B
     return {
       bytes: null,
-      refusal: `Rotate needs a square selection — this marquee is ${region.w}×${region.h}.`,
+      refusal: `Rotate needs a square selection; this marquee is ${region.w}×${region.h}.`,
     };
   }
 
@@ -147,6 +147,6 @@ export function resolveTileTransform(
   // gets to be refused out loud.
   const bytes = tileBytesIfChanged(before, after);
   if (!bytes) return NOTHING;                            // genuine no-op — no undo entry, no toast
-  if (locked) return { bytes: null, refusal: 'This tile is view-only — transform refused.' };
+  if (locked) return { bytes: null, refusal: 'This tile is view-only; transform refused.' };
   return { bytes, refusal: null };
 }
