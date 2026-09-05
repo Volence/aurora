@@ -221,7 +221,8 @@
     "test": "node scripts/check-test-collection.mjs && node scripts/check-pseudo-skip.mjs && node scripts/check-peer-path-literals.mjs && node scripts/check-cited-paths.mjs && node scripts/check-object-stringify.mjs && node scripts/check-tsx-dashes.mjs && node scripts/check-ledger-timestamps.mjs && node scripts/check-python-resolver.mjs && node scratchpad/check-harness-guards.mjs && npm run typecheck && vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "lane-log": "node scripts/append-lane-log.mjs"
+    "lane-log": "node scripts/append-lane-log.mjs",
+    "revendor": "node scripts/revendor.mjs"
   },
   "keywords": [],
   "author": "",
