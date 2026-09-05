@@ -142,7 +142,7 @@ import {
   addBaseSwapBandRefusal, lastBaseSwapBandRefusal,
   setBaseSwapLineCommand, setBaseSwapTargetCommand, setBaseSwapPlaneCommand,
   setBaseSwapRestoreLineCommand, addBaseSwapBandCommand, removeBaseSwapBandCommand,
-  newBaseSwapRestoreLine,
+  newBaseSwapRestoreLine, newBaseSwapRestoreLineRefusal,
   // ═══ THE PATCHED ARM (EW-BOUNDARY-PANEL, ROADMAP row 151) ═══
   //
   // EIGHT NUMBERS AND TWO FLAGS, and the asymmetry with the three cards above it
@@ -2031,6 +2031,11 @@ function BaseSwapBandCard({ library, presetId, index, band, bands, run, lastRefu
           does not even admit. */}
       <Field label="Restore" title={BASE_SWAP_FIELD_TITLES.restore_line}>
         <label style={{ display: 'flex', alignItems: 'center', gap: T.s1, fontSize: T.tXs }}>
+          {/* DEAD WITH A REASON BESIDE IT (EW-INERT-CONTROL-SILENCE). This box
+              went inert with NO sentence anywhere — not a title, not an aria
+              string, nothing computed — once the ON fire reached the last legal
+              line. `newBaseSwapRestoreLineRefusal` is the SAME predicate the
+              `disabled` flag reads, so the two cannot disagree. */}
           <input type="checkbox" checked={hasRestore}
             aria-label={`Band ${index} has a restore line`}
             disabled={!hasRestore && newBaseSwapRestoreLine(band) === null}
@@ -2052,6 +2057,9 @@ function BaseSwapBandCard({ library, presetId, index, band, bands, run, lastRefu
           No restore line: this band runs to the bottom of the display, ended by the frame-top
           flush. That is the shipped single-edge shape, not a missing value.
         </Hint>
+      )}
+      {!hasRestore && newBaseSwapRestoreLineRefusal(band) !== null && (
+        <Hint under tone="warning">{newBaseSwapRestoreLineRefusal(band)}</Hint>
       )}
 
       {/* ⚠ WHICH ROWS ARE ACTUALLY SWAPPED — the one thing on this card an
