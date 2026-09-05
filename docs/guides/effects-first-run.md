@@ -341,28 +341,45 @@ One thing that is bigger than you expect, and it is the diff and not the file
 count: a document whose meaning *did* change is rewritten in full canonical form,
 so it can pick up formatting aeon's own writers do not emit.
 
-Then, in your aeon checkout:
+Then, in your aeon checkout. **The re-bake is a step of this path, not a recovery
+from an error:**
 
 ```
-FAST=1 ./build.sh        # fast iteration
-./build.sh               # the real one — run this before you land anything
+tools/regenerate-level.sh   # re-bake the level tree from what you just saved
+./build.sh                  # the real one — run this before you land anything
+
+FAST=1 ./build.sh           # the iteration loop — re-bakes for you, skips the gates
 ```
 
-**`FAST=1` does not check what you just authored.** It skips the effects seam gate
-and the whole test lane, so a section binding the real build refuses builds green
-under `FAST=1`. Run the plain `./build.sh` before you believe it.
+**Why a save on its own is not enough.** aeon's generated level tree is a
+*committed* artifact — `games/<game>/prebuild.sh` is a documented no-op — so nothing
+rebuilds it just because you saved. Both builds ask `tools/level_staleness.py`
+whether the committed tree was baked from the editor sources that are there now, and
+after any save the answer is no. What happens next is the only difference between
+the two commands:
 
-### If a build error will not go away
+- **`./build.sh` refuses, and it refuses *early*.** The staleness gate runs before
+  anything is assembled, so a red build here is not a verdict on what you authored —
+  nothing downstream has looked at it yet. The message names which check fired,
+  lists your files by name, and gives `tools/regenerate-level.sh` as the remedy.
+  Re-bake and run it again.
+- **`FAST=1 ./build.sh` runs the re-bake for you** and prints how long it took. That
+  is the loop's whole point, and it is why the fast path needs no separate step.
 
-**If you deleted or reverted a file and the same error keeps coming back, it is not
-you.** `FAST=1` decides whether to regenerate by comparing file timestamps, and
-deleting a file does not change any timestamp — so it keeps assembling the old
-generated data. The fix:
+**`touch` is not a shortcut past this.** The gate has a second arm that reads no
+timestamps at all — it compares a content stamp of your editor sources against the
+one the last re-bake wrote — so a delete, a rename or a revert moves the answer
+whatever the mtimes say. Touching a file silences only the timestamp arm, and it
+lights that arm again in the process; the tree stays stale and the same error comes
+back. Re-bake.
 
-```
-touch games/sonic4/data/editor/effects/*.json
-FAST=1 ./build.sh
-```
+### If a build error will not go away after you reverted
+
+**Re-bake — it is the reverting case, not a stuck build.** Removing a document the
+way a person reverts (`rm`) is exactly what the content-stamp arm exists for: an
+added, removed, renamed or modified editor source all move the answer, so
+`tools/regenerate-level.sh` clears the generated module that still carries the
+deleted document's data. There is nothing to touch and nothing to force.
 
 ### If the build says the re-bake failed and mentions donors
 
