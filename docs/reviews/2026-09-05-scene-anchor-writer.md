@@ -58,7 +58,13 @@ rc=0                                        ← the CONTROL: the grep really sea
 ```
 
 The empty result is only worth anything beside that control, and rc is reported
-rather than a pipe's. Every read of the live tree went through git objects at a
+rather than a pipe's.
+
+> A **third** reading at 09:49:52 is back to ` M docs/lane-status.json` alone —
+> the other lane committed those files at aeon `c1d0a6be` *"scene(sec7): land
+> aurora's authored water scene"*, so the two `??` rows in the END capture became
+> tracked rather than disappearing. That is the attribution confirmed from the
+> other side: they were that parcel's, mid-flight. Every read of the live tree went through git objects at a
 named revision (`show`, `rev-parse`, `status`); the clone was `--no-hardlinks`;
 all authoring and building happened in a private clone under the session
 scratchpad; and the harness carries a guard (`siblingDefaultPathOrUnresolved`)
