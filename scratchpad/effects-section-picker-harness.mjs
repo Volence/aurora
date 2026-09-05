@@ -480,7 +480,7 @@ async function main() {
       (() => {
         const hdrs = [...document.querySelectorAll('div')]
           .filter((d) => d.style && d.style.cursor === 'pointer'
-                      && /^Preset — ojz_sec5_showcase(?!\s—)/.test((d.textContent || '').trim()));
+                      && /^Preset: ojz_sec5_showcase(?!\s·)/.test((d.textContent || '').trim()));
         if (hdrs.length) hdrs[hdrs.length - 1].click();
         return 'ok';
       })()`);

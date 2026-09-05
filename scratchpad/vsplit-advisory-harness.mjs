@@ -342,7 +342,7 @@ const DOM_ORDER = (phrase) => String.raw`
     && ![...el.children].some((k) => (k.textContent || '').includes(want)));
   if (!leaf) return { found: false };
   const vf = [...document.querySelectorAll('input[type=number]')]
-    .find((e) => /^v_factor — /.test(e.title || ''));
+    .find((e) => /^v_factor: /.test(e.title || ''));
   const l0 = [...document.querySelectorAll('select')]
     .find((e) => /^Layer 0 vsplit\.at/.test(e.title || ''));
   if (!vf || !l0) return { found: true, vf: !!vf, l0: !!l0 };
@@ -664,7 +664,7 @@ async function main() {
 
     const topField = (i) =>
       `[...document.querySelectorAll('input[type=number]')].find(e => new RegExp('^Layer ${i} (world_y|Screen line)').test(e.title||''))`;
-    const vfField = `[...document.querySelectorAll('input[type=number]')].find(e => /^v_factor — /.test(e.title||''))`;
+    const vfField = `[...document.querySelectorAll('input[type=number]')].find(e => /^v_factor: /.test(e.title||''))`;
     const vsplitSel = (i) =>
       `[...document.querySelectorAll('select')].find(e => new RegExp('^Layer ${i} vsplit\\\\.at').test(e.title||''))`;
 

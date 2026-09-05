@@ -514,7 +514,7 @@ async function main() {
       && (packed.op === 0 || packed.op === 1),
       JSON.stringify(packed));
     const packedFields = await c.json(
-      `[...document.querySelectorAll('input[type=number]')].map(e => e.title).filter(t => /^s[12] —/.test(t))`);
+      `[...document.querySelectorAll('input[type=number]')].map(e => e.title).filter(t => /^s[12]:/.test(t))`);
     check('5d', 'the packed s1/s2 spinners appear once the custom form is chosen',
       packedFields.length >= 2, JSON.stringify(packedFields));
 
@@ -842,7 +842,7 @@ async function main() {
         const topTitles = [...section.querySelectorAll('input[type=number]')]
           .map((e) => e.title || '').filter((t) => /^Layer \d+ /.test(t)).slice(0, 3);
         const spinners = [...section.querySelectorAll('input[type=number]')]
-          .filter((e) => /^s[12] —/.test(e.title || ''));
+          .filter((e) => /^s[12]:/.test(e.title || ''));
         const pr = panel.getBoundingClientRect();
         const sr = section.getBoundingClientRect();
         const hr = header.getBoundingClientRect();

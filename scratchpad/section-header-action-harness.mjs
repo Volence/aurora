@@ -656,7 +656,7 @@ async function main() {
     // here — which is precisely why the persisted write is the load-bearing one.
     // If the delete had toggled `aeon.effects.scene` on the way out, the write
     // would survive the unmount and be waiting for the next session.
-    const sceneProbe = await c.json(SECTION_PROBE('/^Scene — /'));
+    const sceneProbe = await c.json(SECTION_PROBE('/^Scene: /'));
     if (!sceneProbe.found || !sceneProbe.actionPt) {
       unmeasurable('5a', 'the Scene section and its Delete control are on screen',
         sceneProbe.why ?? 'no action control in the Scene header');

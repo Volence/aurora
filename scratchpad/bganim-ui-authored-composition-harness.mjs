@@ -463,8 +463,8 @@ async function main() {
       !!printedBlob, printedBlob ?? 'no "Blob N/N tiles … free" on screen');
 
     // ---- 4. AUTHOR THE BAND WITH REAL GESTURES. ------------------------
-    const typedCols = await c.evalExpr(SET_INPUT(INPUT_BY_TITLE('/^cols —/'), 2));
-    const chosenRows = await c.evalExpr(SET_INPUT(SELECT_BY_TITLE('/rows —/'), 1));
+    const typedCols = await c.evalExpr(SET_INPUT(INPUT_BY_TITLE('/^cols:/'), 2));
+    const chosenRows = await c.evalExpr(SET_INPUT(SELECT_BY_TITLE('/rows:/'), 1));
     check('4a', 'the cols field and rows picker take real input',
       typedCols === 'ok' && chosenRows === 'ok', `cols=${typedCols} rows=${chosenRows}`);
     await sleep(400);

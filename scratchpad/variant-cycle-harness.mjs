@@ -289,7 +289,7 @@ const NUM_IN = (label) => IN_ROW(String.raw`/^${label}$/`, 'input[type="number"]
 // `\b`, NEVER `$` — a `right` slot's label would run straight into a bare
 // title (band-preset-harness paid two runs for exactly that).
 const BANDS_RE = String.raw`/^Raster band presets\b/`;
-const CHANNELS_RE = (id) => String.raw`/^Preset — ${id} — cycles, variants\b/`;
+const CHANNELS_RE = (id) => String.raw`/^Preset: ${id} · cycles, variants\b/`;
 
 const OPEN_SECTION = (re, proofSelector) => String.raw`
 (() => {
@@ -492,7 +492,7 @@ async function main() {
     await sleep(900);
     const chanIsOpen = await c.evalExpr(`!!(${CYCLES_SEL})`);
     heightsAfter = await c.json(HEIGHTS(SHIPPED_ID));
-    check('2c', `the "Preset — ${SHIPPED_ID} — cycles, variants" section exists, was SHUT, and opens`,
+    check('2c', `the "Preset: ${SHIPPED_ID} · cycles, variants" section exists, was SHUT, and opens`,
       chanOpened === 'clicked' && chanIsOpen === true,
       `open → ${chanOpened}; cycles select present after = ${chanIsOpen}; `
       + `before ${JSON.stringify(heightsBefore)} after ${JSON.stringify(heightsAfter)}`);
@@ -633,7 +633,7 @@ async function main() {
       const row = [...document.querySelectorAll('div')].find((x) => x.firstElementChild && x.firstElementChild.tagName === 'SPAN'
         && (x.firstElementChild.textContent || '').trim() === 'dir');
       if (!row) return 'no-row';
-      const chip = [...row.querySelectorAll('button')].find((b) => /absent — set/.test(b.textContent || ''));
+      const chip = [...row.querySelectorAll('button')].find((b) => /absent · set/.test(b.textContent || ''));
       if (!chip) return 'no-chip'; chip.click(); return true;
     })()`);
     await sleep(600);

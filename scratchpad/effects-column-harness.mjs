@@ -1191,7 +1191,7 @@ async function main() {
     if (clicked !== true) throw new Error('could not reach the Effects facet');
 
     // The SUBJECT: the owner's own scene, read off the DOM heading that names
-    // the selected scene — the section title is `Scene — ${selected.id}`, and
+    // the selected scene — the section title is `Scene: ${selected.id}`, and
     // no leftover paint can produce it for a scene that is not selected.
     //
     // ⚠ THE SUBJECT IS NOW SELECTED BY CLICKING, NOT ASSUMED (2026-08-26, the
@@ -1209,7 +1209,7 @@ async function main() {
     const pickSubject = String.raw`
 (async () => {
   const titles = () => [...document.querySelectorAll('span')]
-    .map((e) => (e.textContent || '').trim()).filter((t) => /^Scene — /.test(t));
+    .map((e) => (e.textContent || '').trim()).filter((t) => /^Scene: /.test(t));
   if (titles().some((t) => t.includes(${JSON.stringify(SUBJECT_SCENE)}))) return 'already';
   const buttons = [...document.querySelectorAll('button')]
     .filter((b) => b.getBoundingClientRect().left > 400 && /\d+ layers?$/.test((b.textContent || '').trim()));
@@ -1227,7 +1227,7 @@ async function main() {
     await sleep(600);
     const sceneTitles = await c.json(
       `[...document.querySelectorAll('span')].map(e => (e.textContent||'').trim())
-        .filter(t => /^Scene — /.test(t))`);
+        .filter(t => /^Scene: /.test(t))`);
     const onSubject = sceneTitles.some((t) => t.includes(SUBJECT_SCENE));
     check('i2', `the selected scene is the owner's banded canopy (${SUBJECT_SCENE}) [instrument]`,
       onSubject, `${picked}; on screen: ${JSON.stringify(sceneTitles)}`);
@@ -1355,7 +1355,12 @@ async function main() {
     // ---- A1: the arrival state ------------------------------------------
     const open = m.sections.filter((s) => s.expanded).map((s) => s.title);
     const closed = m.sections.filter((s) => !s.expanded).map((s) => s.title);
-    const norm = (t) => t.replace(/\s*—.*$/, '').replace(/\s*\(.*$/, '').trim();
+    // Cuts a section title down to its SUBJECT. It used to cut at the em dash,
+    // which is what `Scene — <id>` and `Preset — <id> — cycles, variants` spelled
+    // before the 2026-09-05 dash ruling; those now read `Scene: <id>` and
+    // `Preset: <id> · cycles, variants`, so the cut is at the colon or the middle
+    // dot, whichever comes first.
+    const norm = (t) => t.replace(/\s*[:·].*$/, '').replace(/\s*\(.*$/, '').trim();
     const openN = open.map(norm).sort();
     const wantN = [...EXPECTED_OPEN].sort();
     target('A1', 'exactly the intended sections are open on arrival (clean panel state)',

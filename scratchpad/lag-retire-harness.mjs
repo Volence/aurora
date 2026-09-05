@@ -524,7 +524,7 @@ async function main() {
     await sleep(1400);
     await c.evalExpr(`window.__dbg.aeon.selectPreset(${JSON.stringify(PRESET_ID)})`);
     await sleep(900);
-    await c.evalExpr(OPEN_SECTION(String.raw`/^Preset — ` + PRESET_ID + String.raw`(?![-a-z0-9_ ])/`,
+    await c.evalExpr(OPEN_SECTION(String.raw`/^Preset: ` + PRESET_ID + String.raw`(?![-a-z0-9_ ])/`,
       `[...document.querySelectorAll('button')].some(b => (b.textContent||'').trim() === 'Add raster band')`));
     await sleep(900);
 
@@ -550,7 +550,7 @@ async function main() {
     // "Saved to …/<id>.json" hint — and must find it PAINTED.
     console.log('\n=== [ctl] the finder is not blind: it locates a sentence that IS on screen ===');
     await c.evalExpr(OPEN_SECTION(
-      String.raw`/^Preset — ` + PRESET_ID + String.raw` — cycles, variants/`,
+      String.raw`/^Preset: ` + PRESET_ID + String.raw` · cycles, variants/`,
       IN_ROW(String.raw`/^cycles$/`, 'select')));
     await sleep(900);
     // ⚠ THE NEEDLE IS THE PROBE'S OWN FILE PATH, AND THE FIRST SPELLING OF THIS
@@ -588,7 +588,7 @@ async function main() {
         controlName: 'the `cycles` state select',
         async reach() {
           await c.evalExpr(OPEN_SECTION(
-            String.raw`/^Preset — ` + PRESET_ID + String.raw` — cycles, variants/`,
+            String.raw`/^Preset: ` + PRESET_ID + String.raw` · cycles, variants/`,
             IN_ROW(String.raw`/^cycles$/`, 'select')));
           await sleep(900);
         },
@@ -600,7 +600,7 @@ async function main() {
         controlName: 'the `Channel 0` anchor seed select',
         async reach() {
           await c.evalExpr(OPEN_SECTION(
-            String.raw`/^Preset — ` + PRESET_ID + String.raw` — moving anchors/`,
+            String.raw`/^Preset: ` + PRESET_ID + String.raw` · moving anchors/`,
             IN_ROW(String.raw`/^Channel 0$/`, 'select')));
           await sleep(900);
         },

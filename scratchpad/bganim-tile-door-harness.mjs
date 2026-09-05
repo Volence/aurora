@@ -814,7 +814,7 @@ async function main() {
     await sleep(500);
     const setRows = await c.evalExpr(String.raw`
       (() => {
-        const el = [...document.querySelectorAll('select')].find(e => /^rows —/.test(e.title || ''));
+        const el = [...document.querySelectorAll('select')].find(e => /^rows:/.test(e.title || ''));
         if (!el) return 'no-element';
         Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set
           .call(el, ${JSON.stringify(String(ROWS))});

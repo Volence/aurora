@@ -148,7 +148,7 @@ const sameColors = (a, b) => a.length === 16 && b.length === 16
   && a.every((c, i) => c.r === b[i].r && c.g === b[i].g && c.b === b[i].b && c.a === b[i].a);
 
 // The 13 Parcel B display names, as S1ObjectSection renders them (the row's
-// title is "Open <name>'s art + mappings" / "<name> — currently open").
+// title is "Open <name>'s art + mappings" / "<name> (currently open)").
 const FAMILY_NAMES = [
   'Shield & Invincibility', 'HUD', 'Title Screen Sonic', 'Press Start / TM',
   'Title Cards', 'Game Over', 'Continue Screen', 'Ending Sonic',

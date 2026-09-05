@@ -313,7 +313,7 @@ const SUBTAB = (id) => String.raw`
  *
  * `.pop()` takes the LAST matching header, which is why every caller's regex
  * has to exclude its siblings: this panel renders three sections whose titles
- * all begin `Preset — <id>`.
+ * all begin `Preset: <id>`.
  */
 const OPEN_SECTION = (re, proofSelector) => String.raw`
 (() => {
@@ -624,11 +624,11 @@ async function main() {
     await c.evalExpr(`window.__dbg.aeon.selectPreset(${JSON.stringify(PRESET_ID)})`);
     await sleep(800);
     // ⚠ THE REGEX EXCLUDES ITS OWN SIBLINGS. Three sections on this panel are
-    // titled "Preset — <id>…" and OPEN_SECTION takes the LAST match, so a bare
+    // titled "Preset: <id>…" and OPEN_SECTION takes the LAST match, so a bare
     // prefix would open "cycles, variants" and the band rows would find no
     // buttons at all.
     const bandsOpen = await c.evalExpr(OPEN_SECTION(
-      String.raw`/^Preset — ` + PRESET_ID + String.raw`(?![-a-z0-9_ ])/`,
+      String.raw`/^Preset: ` + PRESET_ID + String.raw`(?![-a-z0-9_ ])/`,
       `document.querySelector('button[aria-label^="Remove raster band"]')`));
     await sleep(900);
     await c.evalExpr(INSTALL_HANDLES);
@@ -728,7 +728,7 @@ async function main() {
     // rather than by poking the store, so the fixture is built by the same path
     // an author would use.
     const cycOpen = await c.evalExpr(OPEN_SECTION(
-      String.raw`/^Preset — ` + PRESET_ID + String.raw` — cycles/`,
+      String.raw`/^Preset: ` + PRESET_ID + String.raw` · cycles/`,
       'window.__d27e.cyclesSelect()'));
     await sleep(900);
     await c.evalExpr(INSTALL_HANDLES);

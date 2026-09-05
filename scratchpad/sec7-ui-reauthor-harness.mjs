@@ -551,7 +551,7 @@ async function main() {
       `the card holds ${selB && selB.layers ? selB.layers.length : 'n/a'} layer(s)`);
     // The scene-level section is `defaultCollapsed` — v_factor / v_offset are
     // not in the DOM until its header is clicked.
-    const openedB = await ensureSection(c, String.raw`/^Scene — /`, NUM_BY_TITLE(String.raw`/^v_offset\b/`));
+    const openedB = await ensureSection(c, String.raw`/^Scene: /`, NUM_BY_TITLE(String.raw`/^v_offset\b/`));
     check('2b', 'the scene-level section (v_factor / v_offset) is reachable',
       openedB === 'already-open' || openedB === 'opened', `ensureSection -> ${openedB}`);
     await shot(c, '01-path-b-before');
@@ -683,7 +683,7 @@ async function main() {
       grown !== null && grown.layers.length === target.layers.length,
       `the scene holds ${grown ? grown.layers.length : 'n/a'} layer(s)`);
 
-    await ensureSection(c, String.raw`/^Scene — /`, NUM_BY_TITLE(String.raw`/^v_offset\b/`));
+    await ensureSection(c, String.raw`/^Scene: /`, NUM_BY_TITLE(String.raw`/^v_offset\b/`));
     await runPlan(c, plan, 'A');
     printDiff('committed target -> the document the APP HOLDS (path A, pre-save)',
       leafDiff(target, await c.json(`(${SCENE_JSON()})`)));

@@ -107,7 +107,7 @@ const INSTALL_2B = String.raw`
     const m = /frame \d+×\d+ tiles( \(one sprite is \d+×\d+ max\))?/.exec(H.status() || '');
     return m ? m[0].trim() : null;
   };
-  H.constraintsOff = () => (H.status() || '').includes('constraints —');
+  H.constraintsOff = () => (H.status() || '').includes('constraints --');
   /** Unique-tile count as a NUMBER, straight off the screen. */
   H.uniqueTiles = () => {
     const m = /tiles (\d+) unique/.exec(H.status() || '');
@@ -426,7 +426,7 @@ async function body(c) {
     const redOff = await c.json(`window.__c.redCells(${BUF}, ${BUF})`);
     const tilesOff = await c.evalExpr('window.__c.uniqueTiles()');
     const clashChipEnabled = await c.evalExpr('window.__c.chipEnabled("Clashes")');
-    check('8a', 'every readout becomes "constraints —"', off === true,
+    check('8a', 'every readout becomes "constraints --"', off === true,
       `status: ${JSON.stringify(await c.evalExpr('window.__c.status()'))}`);
     check('8b', 'no stale number survives the switch-off', tilesOff === null, `unique=${tilesOff}`);
     check('8c', 'the tint disappears', redOff.length === 0, JSON.stringify(redOff));

@@ -383,7 +383,7 @@ async function main() {
     await sleep(1000);
 
     const opened = await c.evalExpr(OPEN_SECTION(
-      String.raw`/^Scene — ` + SCENE + String.raw`(?!\s—)/`, REELS_SELECT));
+      String.raw`/^Scene: ` + SCENE + String.raw`(?!\s·)/`, REELS_SELECT));
     await sleep(900);
     const toggle = await c.json(String.raw`(() => {
       const el = ${REELS_SELECT};

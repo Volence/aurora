@@ -594,7 +594,7 @@ async function main() {
     // THE BAND EDITOR IS A SECOND COLLAPSED SECTION, titled for the preset it
     // belongs to. Its children are not mounted until it is opened, so the
     // spinners below do not exist yet.
-    watchMiss('3 expand band editor', await c.evalExpr(expandSection(`Preset — ${PRESET_ID}`)));
+    watchMiss('3 expand band editor', await c.evalExpr(expandSection(`Preset: ${PRESET_ID}`)));
     await sleep(600);
 
     // The fixture band, through the real spinners the panel gives an author.

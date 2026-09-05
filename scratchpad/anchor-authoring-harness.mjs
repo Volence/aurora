@@ -327,8 +327,8 @@ const HEADERS = String.raw`(() => {
 })()`;
 
 const ANCHORS_RE = PLANT === 'rot-section'
-  ? String.raw`/^Preset — .* — NO SUCH SECTION\b/`
-  : String.raw`/^Preset — .* — moving anchors\b/`;
+  ? String.raw`/^Preset: .* · NO SUCH SECTION\b/`
+  : String.raw`/^Preset: .* · moving anchors\b/`;
 
 const OPEN_SECTION = (re, proofSelector) => String.raw`
 (() => {
@@ -1157,7 +1157,7 @@ async function main() {
     // belong in the packet with these numbers beside them. The gate that would
     // own them is a copy of [W1] pointed at this section, once its wording has
     // an owner.
-    const CHANNELS_RE = String.raw`/^Preset — .* — cycles, variants\b/`;
+    const CHANNELS_RE = String.raw`/^Preset: .* · cycles, variants\b/`;
     await c.evalExpr(OPEN_SECTION(CHANNELS_RE, `document.querySelector('#aeon\\\\.effects\\\\.preset\\\\.channels select')`));
     await sleep(700);
     const nfit = await c.json(FIT(CHANNELS_RE));

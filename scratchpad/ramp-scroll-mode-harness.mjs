@@ -363,7 +363,7 @@ async function toColour(c) {
   await c.evalExpr(OPEN_SECTION(String.raw`/^Raster band presets\b/`,
     `document.querySelector('input[placeholder="new_preset_id"]')`));
   await sleep(500);
-  await c.evalExpr(OPEN_SECTION(String.raw`/^Preset — ` + PRESET_ID + String.raw`(?![-a-z0-9_ ])/`,
+  await c.evalExpr(OPEN_SECTION(String.raw`/^Preset: ` + PRESET_ID + String.raw`(?![-a-z0-9_ ])/`,
     `${SEL_RASTER_PROGRAM}`));
   await sleep(600);
 }
@@ -464,7 +464,7 @@ async function main() {
     // command, so the fixture is a document the engine would accept.
     await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_VDEF)})`);
     await sleep(800);
-    await c.evalExpr(OPEN_SECTION(String.raw`/^Scene — ` + SCENE_VDEF + String.raw`(?![-a-z0-9_ ])/`,
+    await c.evalExpr(OPEN_SECTION(String.raw`/^Scene: ` + SCENE_VDEF + String.raw`(?![-a-z0-9_ ])/`,
       SEL_VDEFORM));
     await sleep(800);
     const vdefSel = await readEl(c, SEL_VDEFORM);
@@ -501,7 +501,7 @@ async function main() {
     await sleep(1200);
     await c.evalExpr(`window.__dbg.aeon.selectPreset(${JSON.stringify(PRESET_ID)})`);
     await sleep(900);
-    await c.evalExpr(OPEN_SECTION(String.raw`/^Preset — ` + PRESET_ID + String.raw`(?![-a-z0-9_ ])/`,
+    await c.evalExpr(OPEN_SECTION(String.raw`/^Preset: ` + PRESET_ID + String.raw`(?![-a-z0-9_ ])/`,
       SEL_RASTER_PROGRAM));
     await sleep(900);
     const progSel = await readEl(c, SEL_RASTER_PROGRAM);

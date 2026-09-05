@@ -604,7 +604,7 @@ async function main() {
     await drive(c, 'R8 v_center', SET_INPUT(NUM_BY_TITLE('/^v_center/'), N));
     await sleep(300);
     // `/^v_offset$/` until 2026-08-27, same silent no-match as the factor rows
-    // above: the title is "v_offset — signed pixel offset added after the shift,
+    // above: the title is "v_offset: signed pixel offset added after the shift,
     // …". Row 6b is what caught it, by reading the DOCUMENT rather than trusting
     // the gesture — the key was simply absent from the authored scene.
     await drive(c, 'R8 v_offset', SET_INPUT(NUM_BY_TITLE('/^v_offset\\b/'), -N));

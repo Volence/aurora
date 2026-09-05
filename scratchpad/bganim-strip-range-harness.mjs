@@ -477,7 +477,7 @@ async function main() {
     const openedNew = await c.evalExpr(SECTION_STATE('/^New tile animation/', true));
     await sleep(500);
     const setRows = await c.evalExpr(SET_INPUT(
-      `[...document.querySelectorAll('select')].find(e => /^rows —/.test(e.title || ''))`, ROWS));
+      `[...document.querySelectorAll('select')].find(e => /^rows:/.test(e.title || ''))`, ROWS));
     await sleep(400);
     const cand5 = await c.json('window.__dbg.aeon.bandCandidate()');
     check('5a', `ANTI-VACUOUS: the panel's own Rows control really set rows=${ROWS} — the strip's `

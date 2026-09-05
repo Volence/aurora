@@ -394,13 +394,13 @@ async function main() {
       bands0.length === 0 && !Array.isArray(placed.anims), `bands=${bands0.length}`);
 
     // ── the FILL SELECTOR: exists, defaults to copy, takes 'shift' ──
-    const fillSel = await c.json(`(() => { const el = ${SELECT_BY_TITLE('/phase fill —/')}; `
+    const fillSel = await c.json(`(() => { const el = ${SELECT_BY_TITLE('/phase fill:/')}; `
       + 'return el ? { value: el.value, options: [...el.options].map(o => o.value) } : null; })()');
     check('3a', "the Banks 1–7 selector exists, offers copy/blank/shift, and DEFAULTS to 'copy'",
       !!fillSel && fillSel.value === 'copy'
         && eq([...fillSel.options].sort(), ['blank', 'copy', 'shift']),
       JSON.stringify(fillSel));
-    const pickedFill = await c.evalExpr(SET_INPUT(SELECT_BY_TITLE('/phase fill —/'), 'shift'));
+    const pickedFill = await c.evalExpr(SET_INPUT(SELECT_BY_TITLE('/phase fill:/'), 'shift'));
     await sleep(400);
     const noteText = await c.evalExpr(BODY_TEXT);
     check('3b', "selecting 'shift' takes, and the panel's note now promises motion",
@@ -414,9 +414,9 @@ async function main() {
       pickedFill === 'ok' ? (noteText.match(/banks 1–7 are phase 0[^.]*\./) || ['note not found'])[0] : pickedFill);
 
     // ── geometry + base, then PROMOTE ──
-    const typedCols = await c.evalExpr(SET_INPUT(INPUT_BY_TITLE('/^cols —/'), COLS));
-    const chosenRows = await c.evalExpr(SET_INPUT(SELECT_BY_TITLE('/rows —/'), ROWS));
-    const typedBase = await c.evalExpr(SET_INPUT(INPUT_BY_TITLE('/^static base —/'), BASE));
+    const typedCols = await c.evalExpr(SET_INPUT(INPUT_BY_TITLE('/^cols:/'), COLS));
+    const chosenRows = await c.evalExpr(SET_INPUT(SELECT_BY_TITLE('/rows:/'), ROWS));
+    const typedBase = await c.evalExpr(SET_INPUT(INPUT_BY_TITLE('/^static base:/'), BASE));
     check('4a', `the form takes ${COLS}x${ROWS} from tile ${BASE}`,
       typedCols === 'ok' && chosenRows === 'ok' && typedBase === 'ok',
       `cols=${typedCols} rows=${chosenRows} base=${typedBase}`);

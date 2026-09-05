@@ -463,8 +463,8 @@ async function runRoomy() {
     const COLS = process.env.BAND ? Number(process.env.BAND.split('x')[0])
       : Math.max(1, Math.floor(expectedFree / ROWS / 4));
     const N = COLS * ROWS;
-    const typedCols = await c.evalExpr(SET_INPUT(INPUT_BY_TITLE('/^cols —/'), COLS));
-    const chosenRows = await c.evalExpr(SET_INPUT(SELECT_BY_TITLE('/rows —/'), ROWS));
+    const typedCols = await c.evalExpr(SET_INPUT(INPUT_BY_TITLE('/^cols:/'), COLS));
+    const chosenRows = await c.evalExpr(SET_INPUT(SELECT_BY_TITLE('/rows:/'), ROWS));
     check('4a', `the cols field and rows picker take real input (${COLS}x${ROWS} = ${N} slots)`,
       typedCols === 'ok' && chosenRows === 'ok', `cols=${typedCols} rows=${chosenRows}`);
     await sleep(400);
