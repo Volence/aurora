@@ -88,7 +88,7 @@ describe('linkage copy — linked/unique vocabulary, real usage numbers, no shar
     it(`${name} says "Linked" and states the mechanism, not a warning`, () => {
       const call = /<SharedBanner[\s\S]*?text=\{`([^`]*)`\}/.exec(src);
       expect(call, `${name}'s banner text is not a template literal — cannot check its content`).not.toBeNull();
-      expect(call![1], `${name}'s banner does not open with "Linked —"`).toMatch(/^Linked —/);
+      expect(call![1], `${name}'s banner does not open with "Linked:"`).toMatch(/^Linked: /);
       expect(call![1], `${name}'s banner does not say edits propagate`).toMatch(/Edits appear in/);
     });
   }

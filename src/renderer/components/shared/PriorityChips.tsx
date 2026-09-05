@@ -34,15 +34,15 @@ export interface PriorityChipSpec {
 export const PRIORITY_CHIPS: readonly PriorityChipSpec[] = [
   {
     value: 'keep', label: 'Keep',
-    title: 'Priority keep: leaves each cell\'s existing priority bit alone (default)',
+    title: 'Priority: keep. Leaves each cell\'s existing priority bit alone (default)',
   },
   {
     value: 'on', label: 'On',
-    title: 'Priority on: painted tiles draw IN FRONT of the player',
+    title: 'Priority: on. Painted tiles draw IN FRONT of the player',
   },
   {
     value: 'off', label: 'Off',
-    title: 'Priority off: painted tiles draw BEHIND the player',
+    title: 'Priority: off. Painted tiles draw BEHIND the player',
   },
 ];
 

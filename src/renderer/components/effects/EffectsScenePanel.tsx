@@ -261,15 +261,15 @@ function FactorField<N extends string | undefined = undefined>({ value, onChange
         const packed = value as EffectsPackedFactor;
         return (
         <div style={{ display: 'flex', alignItems: 'center', gap: T.s1 }}>
-          <NumberField title="s1 — first shift (15 = term zero / locked)" width={44}
+          <NumberField title="s1: first shift (15 = term zero / locked)" width={44}
             min={EFFECTS_PACKED_FACTOR_BOUNDS.s1.min} max={EFFECTS_PACKED_FACTOR_BOUNDS.s1.max}
             value={packed.s1}
             onChange={(n) => onChange({ ...packed, s1: clampPackedField('s1', n) } as V)} />
-          <NumberField title="s2 — second shift (15 = single term)" width={44}
+          <NumberField title="s2: second shift (15 = single term)" width={44}
             min={EFFECTS_PACKED_FACTOR_BOUNDS.s2.min} max={EFFECTS_PACKED_FACTOR_BOUNDS.s2.max}
             value={packed.s2}
             onChange={(n) => onChange({ ...packed, s2: clampPackedField('s2', n) } as V)} />
-          <Select title="op — add or subtract the second term" value={String(packed.op)}
+          <Select title="op: add or subtract the second term" value={String(packed.op)}
                   onChange={(v) => onChange({ ...packed, op: v === '1' ? 1 : 0 } as V)} style={{ width: 56 }}>
             <option value="0">+</option>
             <option value="1">−</option>
@@ -317,7 +317,7 @@ function TableRefField({ table, onChange, titlePrefix }: {
             spinners never says the call; `tableRefLabel` is the one place it is
             said, and it used to be said on the read-only extras line that the
             deform row has now replaced. */}
-        <Select title={`${titlePrefix} table — ${tableRefLabel(table)}`} value={form}
+        <Select title={`${titlePrefix} table: ${tableRefLabel(table)}`} value={form}
           onChange={(v) => onChange(tableRefFromForm(v, table))}
           style={{ flex: 1, minWidth: 0 }}>
           {tableRefFormOptions().map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -338,7 +338,7 @@ function TableRefField({ table, onChange, titlePrefix }: {
           return (
             <Field key={p.key} label={tableParamLabel(p.key)}>
               <Select
-                title={`${titlePrefix} ${p.key} — must divide the `
+                title={`${titlePrefix} ${p.key}: must divide the `
                   + `${EFFECTS_DEFORM_TABLE_BYTES}-byte table; the build refuses any other value`}
                 value={String(tableRefParamValue(table, p.key))}
                 onChange={(v) => onChange(setTableRefParam(table, p.key, Number(v)))}
@@ -361,7 +361,7 @@ function TableRefField({ table, onChange, titlePrefix }: {
           <Field key={p.key} label={tableParamLabel(p.key)}>
             <NumberField
               title={`${titlePrefix} ${p.key}`
-                + (p.min !== null && p.max !== null ? ` (${p.min}..${p.max})` : ' — unbounded')}
+                + (p.min !== null && p.max !== null ? ` (${p.min}..${p.max})` : ' (unbounded)')}
               min={p.min ?? undefined} max={p.max ?? undefined} width={72}
               value={tableRefParamValue(table, p.key)}
               onChange={(n) => onChange(setTableRefParam(table, p.key, n))} />
@@ -371,7 +371,7 @@ function TableRefField({ table, onChange, titlePrefix }: {
       {binPath !== null && (
         <Field label={TABLE_REF_ROW.binLabel} title={TABLE_REF_ROW.binTitle}>
           <input value={binPath} placeholder="tables/name.bin"
-            title={`${titlePrefix} bin — ${TABLE_REF_ROW.binRule}`}
+            title={`${titlePrefix} bin: ${TABLE_REF_ROW.binRule}`}
             onChange={(e) => onChange({ bin: e.target.value })}
             style={textInput} />
         </Field>
@@ -465,7 +465,7 @@ export default function EffectsScenePanel(): React.ReactElement {
         {entries.length === 0 && (
           <Hint>
             No effects scenes yet. A scene is one file under
-            {' '}<code>data/editor/effects/</code> — create one below.
+            {' '}<code>data/editor/effects/</code>. Create one below.
           </Hint>
         )}
         {entries.length > 0 && (
@@ -614,8 +614,8 @@ export default function EffectsScenePanel(): React.ReactElement {
                           narrowing is only mentioned when it HAS been narrowed,
                           so a plain layer's tooltip is unchanged. */}
                       <NumberField title={`Layer ${i} ${top.label} (${top.min}..${top.max})`
-                          + (top.space === 'screen' ? ' — a plane line; the scene is locked' : '')
-                          + (topNarrowed !== null ? ` — ${topNarrowed}` : '')}
+                          + (top.space === 'screen' ? '; a plane line, so the scene is locked' : '')
+                          + (topNarrowed !== null ? `; ${topNarrowed}` : '')}
                         min={top.min} max={top.max} width={72}
                         value={layer.world_y}
                         onChange={(n) => run(setLayerFieldCommand(
@@ -663,7 +663,7 @@ export default function EffectsScenePanel(): React.ReactElement {
               <Field label={PLANE_FACTOR_ROWS.fb.label} title={PLANE_FACTOR_ROWS.fb.title}>
                 <FactorField title={`Layer ${i} ${PLANE_FACTOR_ROWS.fb.title}`
                     + (reach === null ? ''
-                      : ` — ${bandReachClause(bandReach(layer, i, reach.travelX), reach.travelX)}`)}
+                      : `, ${bandReachClause(bandReach(layer, i, reach.travelX), reach.travelX)}`)}
                   value={layer.fb}
                   onChange={(f) => run(setLayerFieldCommand(library, selected.id, i, 'fb', f))} />
               </Field>
@@ -1128,7 +1128,7 @@ export default function EffectsScenePanel(): React.ReactElement {
           this is the ARRIVAL state only. It is `defaultCollapsed`, which the
           persisted state overrides in both directions. */}
       {selected && (
-        <CollapsibleSection id="aeon.effects.scene" title={`Scene — ${selected.id}`}
+        <CollapsibleSection id="aeon.effects.scene" title={`Scene: ${selected.id}`}
           defaultCollapsed
           right={<IconButton icon={<span>Delete</span>} label={`Delete scene ${selected.id}`}
             // d-27, AND THIS IS THE STRONGEST INSTANCE OF IT IN THE APP. Both
@@ -1174,7 +1174,7 @@ export default function EffectsScenePanel(): React.ReactElement {
               lock sentinel, which is why it is also the new-scene default.
             */}
             <NumberField
-              title={`v_factor — background vertical shift, ${EFFECTS_V_FACTOR_BOUNDS.min}`
+              title={`v_factor: background vertical shift, ${EFFECTS_V_FACTOR_BOUNDS.min}`
                 + `..${EFFECTS_V_FACTOR_BOUNDS.max}; `
                 + `${EFFECTS_V_FACTOR_BOUNDS.max} locks the plane to v_offset`}
               min={EFFECTS_V_FACTOR_BOUNDS.min} max={EFFECTS_V_FACTOR_BOUNDS.max}
@@ -1245,7 +1245,7 @@ export default function EffectsScenePanel(): React.ReactElement {
               through unclamped. clampVCenter/clampVOffset read the schema's
               range, which is the range aeon refuses beyond at emit.
             */}
-            <NumberField title={`v_center — the act-axis row the vertical factor pivots about, `
+            <NumberField title={`v_center: the act-axis row the vertical factor pivots about, `
                 + `${EFFECTS_V_CENTER_BOUNDS.min}..${EFFECTS_V_CENTER_BOUNDS.max}`}
               min={EFFECTS_V_CENTER_BOUNDS.min} max={EFFECTS_V_CENTER_BOUNDS.max} width={72}
               value={typeof selected.v_center === 'number' ? selected.v_center : 0}
@@ -1253,7 +1253,7 @@ export default function EffectsScenePanel(): React.ReactElement {
                 library, selected.id, 'v_center', clampVCenter(n)))} />
           </Field>
           <Field label="V offset">
-            <NumberField title={`v_offset — signed pixel offset added after the shift, `
+            <NumberField title={`v_offset: signed pixel offset added after the shift, `
                 + `${EFFECTS_V_OFFSET_BOUNDS.min}..${EFFECTS_V_OFFSET_BOUNDS.max}`}
               min={EFFECTS_V_OFFSET_BOUNDS.min} max={EFFECTS_V_OFFSET_BOUNDS.max} width={72}
               value={typeof selected.v_offset === 'number' ? selected.v_offset : 0}
@@ -1741,7 +1741,7 @@ export default function EffectsScenePanel(): React.ReactElement {
        <SectionBody>
         {!section ? (
           <Hint style={{ marginBottom: 0 }}>
-            Section {activeSectionIndex} is empty — nothing to assign a scene to.
+            Section {activeSectionIndex} is empty: nothing to assign a scene to.
           </Hint>
         ) : (
           <>

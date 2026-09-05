@@ -346,7 +346,7 @@ export default function BandPresetPanel(): React.ReactElement | null {
           {entries.length === 0 && (
             <Hint>
               No raster presets yet. A preset is one file under
-              {' '}<code>data/editor/effects/presets/</code> — create one below.
+              {' '}<code>data/editor/effects/presets/</code>. Create one below.
             </Hint>
           )}
           {entries.length > 0 && (
@@ -444,7 +444,7 @@ export default function BandPresetPanel(): React.ReactElement | null {
               lines. */}
           {!section ? (
             <Hint style={{ marginTop: T.s3, marginBottom: 0 }}>
-              Section {activeSectionIndex} is empty — nothing to assign a preset to.
+              Section {activeSectionIndex} is empty: nothing to assign a preset to.
             </Hint>
           ) : (
             <>
@@ -505,7 +505,7 @@ export default function BandPresetPanel(): React.ReactElement | null {
       {selected && (
         <CollapsibleSection
           id="aeon.effects.preset.bands"
-          title={`Preset — ${selected.id}`}
+          title={`Preset: ${selected.id}`}
           defaultCollapsed
           right={
             // GUARDED, WITH THE REASON UNDER IT (EFFECTS-W1 defect 11). This
@@ -533,7 +533,7 @@ export default function BandPresetPanel(): React.ReactElement | null {
           }>
           <SectionBody>
             {deleteRefusal !== null && <Hint tone="warning">{deleteRefusal}</Hint>}
-            <Field label="Name" title="name — the writer's display label. Read by nothing and
+            <Field label="Name" title="name: the writer's display label. Read by nothing and
               dropped when the generator lowers this document; it exists for you, not the build.">
               <input
                 value={typeof selected.name === 'string' ? selected.name : ''}
@@ -662,7 +662,7 @@ export default function BandPresetPanel(): React.ReactElement | null {
       {selected && (
         <CollapsibleSection
           id="aeon.effects.preset.channels"
-          title={`Preset — ${selected.id} — cycles, variants`}
+          title={`Preset: ${selected.id} · cycles, variants`}
           defaultCollapsed>
           <SectionBody>
             <PresetLagDisclosure />
@@ -694,7 +694,7 @@ export default function BandPresetPanel(): React.ReactElement | null {
       {selected && (
         <CollapsibleSection
           id="aeon.effects.preset.anchors"
-          title={`Preset — ${selected.id} — moving anchors${anchorHeaderCount(selected)}`}
+          title={`Preset: ${selected.id} · moving anchors${anchorHeaderCount(selected)}`}
           defaultCollapsed>
           <SectionBody>
             <PresetLagDisclosure />
@@ -741,7 +741,7 @@ function AnchorChannelsBlock({ library, preset, run }: {
     <>
       <Hint>
         A patch channel pins a band to a point in the LEVEL instead of to a screen line, so it
-        stays with the scenery as the camera moves — and a sweep makes that point drift up and
+        stays with the scenery as the camera moves. A sweep makes that point drift up and
         down on a timer. Set a world Y to place it; add a sweep to move it.
       </Hint>
       {anchorChannelIndices(preset).map((i) => (
@@ -908,10 +908,10 @@ function AnchorChannelCard({ library, preset, index, run }: {
                   onClick={() => run(setAnchorPhaseCommand(library, preset.id, index, undefined))} />
               </>
             ) : (
-              <Chip title={'phase is absent — anchor_sweep() defaults it to 0. Set it to write a '
+              <Chip title={'phase is absent: anchor_sweep() defaults it to 0. Set it to write a '
                 + 'value, which is a different document from an absent field.'}
                 onClick={() => run(setAnchorPhaseCommand(library, preset.id, index, 0))}>
-                absent — set
+                absent · set
               </Chip>
             )}
           </Field>
@@ -1018,9 +1018,9 @@ function CycleChannelCard({ library, presetId, index, channel, run }: {
                 onClick={() => run(setCycleFieldCommand(library, presetId, index, f, undefined))} />
             </>
           ) : (
-            <Chip title={`${f} is absent — the constructor's default. Set it to write a value.`}
+            <Chip title={`${f} is absent: the constructor's default. Set it to write a value.`}
               onClick={() => run(setCycleFieldCommand(library, presetId, index, f, 0))}>
-              absent — set
+              absent · set
             </Chip>
           )}
         </Field>
@@ -1096,7 +1096,7 @@ function VariantSlotCard({ library, preset, index, run }: {
                 const why = variantLineRefusal(preset.id, index, Number(values[f]), line);
                 return (
                   <Chip key={line} active={variantLineOn(Number(values[f]), line)}
-                    title={why ?? `CRAM line ${line} — bit ${line} of the mask`}
+                    title={why ?? `CRAM line ${line}, bit ${line} of the mask`}
                     onClick={() => {
                       if (why !== null) { setLineRefusal(why); return; }
                       setLineRefusal(null);
@@ -1125,7 +1125,7 @@ function VariantSlotCard({ library, preset, index, run }: {
           The absent ones are one row of chips, each of which WRITES the field
           — a seed to type over, not a default Aurora claims to know. */}
       {slot !== null && unset.length > 0 && (
-        <Field label="absent" title="Fields not written — each is the constructor's default until set.">
+        <Field label="absent" title="Fields not written: each is the constructor's default until set.">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: T.s1, flex: 1, minWidth: 0 }}>
             {unset.map((f) => (
               <Chip key={f} title={variantFieldTitle(f)}
@@ -1354,8 +1354,8 @@ function BandCard({
             // would put a diff on every load/save of a hand-written document.
             typeof band.sh === 'number' ? (v === 'on' ? 1 : 0) : v === 'on'))}
           style={{ flex: 1, minWidth: 0 }}>
-          <option value="off">off — two-fire band</option>
-          <option value="on">on — three-fire S/H shape</option>
+          <option value="off">off (two-fire band)</option>
+          <option value="on">on (three-fire S/H shape)</option>
         </Select>
       </Field>
 
@@ -1480,7 +1480,7 @@ function BandCard({
               changes what the band costs and not only how it looks. */}
           <Hint under>
             {band.on.cram.colours.length} colour
-            {band.on.cram.colours.length === 1 ? '' : 's'} — also the derived restore's word count.
+            {band.on.cram.colours.length === 1 ? '' : 's'}, also the derived restore's word count.
           </Hint>
           {/* THE TWO CONTROLS ARE JOINTLY REFUSABLE, so the sentence is under
               both of them. The length is authored above, the address below, and
@@ -1496,7 +1496,7 @@ function BandCard({
           all four really are written every time. There is no default for any of
           them in the JSON or in the engine. */}
       <Hint under>
-        Writes {EFFECTS_PRESET_BAND_KEYS.join(', ')} — all four, every time.
+        Writes {EFFECTS_PRESET_BAND_KEYS.join(', ')}, all four, every time.
         No field here has a default.
         {arm !== null && ` The ON arm is ${armLabel(arm)}; exactly one arm is allowed.`}
       </Hint>
@@ -1773,7 +1773,7 @@ function RampCard({ library, presetId, ramp, run, scroll }: {
       <Hint under>{rampDriftSummary(ramp)}</Hint>
 
       <Hint under>
-        Writes {RAMP_KEYS.join(', ')} — all five, every time. No field here has a default.
+        Writes {RAMP_KEYS.join(', ')}, all five, every time. No field here has a default.
       </Hint>
     </Card>
   );
@@ -1923,7 +1923,7 @@ function BaseSwapCard({ library, preset, baseSwap, run }: {
       </Hint>
 
       <Hint under>
-        Each band writes {EFFECTS_PRESET_BASE_SWAP_KEYS.join(', ')} — all of them, every time.
+        Each band writes {EFFECTS_PRESET_BASE_SWAP_KEYS.join(', ')}, all of them, every time.
         {EFFECTS_PRESET_BASE_SWAP_OPTIONAL_KEYS.length > 0 && (
           <> {EFFECTS_PRESET_BASE_SWAP_OPTIONAL_KEYS.join(', ')} {
             EFFECTS_PRESET_BASE_SWAP_OPTIONAL_KEYS.length === 1 ? 'is' : 'are'
@@ -2225,8 +2225,8 @@ function BoundaryCard({ library, preset, boundary, run }: {
           {/* ⚠ NOT THE BAND'S TWO-FIRE / THREE-FIRE CHOICE, and the difference
               matters: on a boundary, `sh` adds an OP to the SAME fire and never
               a fire, which is exactly what keeps this shape patchable at all. */}
-          <option value="off">off — one stream op on the fire</option>
-          <option value="on">on — plus reg_sh_on, still ONE fire</option>
+          <option value="off">off (one stream op on the fire)</option>
+          <option value="on">on (plus reg_sh_on, still ONE fire)</option>
         </Select>
       </Field>
 
@@ -2267,7 +2267,7 @@ function BoundaryCard({ library, preset, boundary, run }: {
       <Hint under>
         Switches one staged palette region (<code>{BOUNDARY_ON_ARM}</code>). No CRAM address is
         authored: it is derived from pal_line and entry, so a document cannot state it twice.
-        These four have no range in the contract — the engine&rsquo;s own ensure carries it.
+        These four have no range in the contract: the engine&rsquo;s own ensure carries it.
       </Hint>
       {EFFECTS_PRESET_TINT_REGION_KEYS.map((f) => (
         <React.Fragment key={f}>
@@ -2290,7 +2290,7 @@ function BoundaryCard({ library, preset, boundary, run }: {
       </Hint>
 
       <Hint under style={{ marginBottom: 0 }}>
-        Writes {EFFECTS_PRESET_BOUNDARY_KEYS.join(', ')} — every one, every time.
+        Writes {EFFECTS_PRESET_BOUNDARY_KEYS.join(', ')}, every one, every time.
         Only <code>offscreen_ship</code> is optional, and &ldquo;not written&rdquo; leaves it absent.
       </Hint>
     </Card>

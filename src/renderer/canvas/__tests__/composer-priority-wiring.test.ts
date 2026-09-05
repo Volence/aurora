@@ -109,7 +109,12 @@ describe('one vocabulary, two mounts', () => {
     // not a copy edit — the file has to say so.
     expect(raw('components', 'shared', 'PriorityChips.tsx'))
       .toMatch(/KEEP THESE STRINGS STABLE/);
-    for (const c of PRIORITY_CHIPS) expect(c.title).toMatch(/^Priority: (keep|on|off) —/);
+    // The prefix `Priority: <state>` is the SELECTOR half and is what must not
+    // move: scratchpad/tile-attribute-harness.mjs matches /^Priority: keep/ and
+    // friends. What follows it is prose, and the 2026-09-05 dash ruling turned
+    // that from a dash into a full stop; this row pins the prefix, not the
+    // punctuation after it.
+    for (const c of PRIORITY_CHIPS) expect(c.title).toMatch(/^Priority: (keep|on|off)\. /);
   });
 });
 
