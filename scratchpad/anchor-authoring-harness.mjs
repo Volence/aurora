@@ -152,23 +152,28 @@ const BAND = (ch) => BANDS.channels[String(ch)] ?? null;
 /** The channels aeon DECLARES a band for, ascending — the feature's coverage. */
 const EFFECTS_DECLARED = Object.keys(BANDS.channels).map(Number).sort((a, b) => a - b);
 const TRAVEL_FORMULA = (() => {
-  // ⚠⚠ TRANSITIONAL DUAL ARM — `CHBAND-PROSE-REPIN`, added 2026-09-05. ⚠⚠
-  // The SECOND of the two byte-identical copies of this regex; the other is in
-  // src/core/formats/effects/channel-bands.ts. aeon is restating the sentence
-  // in the refusal direction (`... whole pixels) is <=` -> `... EXCEEDS`), so
-  // both tails are accepted until that text is vendored. THE `is <=` ARM IS
-  // OWED A DELETION once it is — step 3 of an expand-then-contract.
+  // ⚠ THE TAIL IS `EXCEEDS`, AND ONLY `EXCEEDS`. `CHBAND-PROSE-REPIN` closed
+  // 2026-09-05. The SECOND of the two byte-identical copies of this regex; the
+  // other is in src/core/formats/effects/channel-bands.ts. aeon's sentence used
+  // to open clearance-shaped (`... whole pixels) is <=`) while the SAME string
+  // said `never a clearance` further down; it was restated in the refusal
+  // direction at aeon b8913cda, a transitional arm here accepted both across
+  // the migration, and that arm is now deleted at BOTH copies together.
   //
   // ⚠ AND THIS COPY STAYS INDEPENDENT. It deliberately does NOT import
   // channel-bands.ts (see the note above): importing it would make the rows
   // below say "the panel shows what the provider computes", which they cannot
-  // fail. Widen it in place; do not "fix" the duplication by importing.
-  // Only the multiplier and the base are read, and they are 2 and 256 under
-  // either phrasing — the comparison direction is hard-coded in REFUSED_ON
-  // below and is not inferred from this sentence.
-  const m = /PEAK-TO-PEAK TRAVEL \((\d+) \* \((\d+) >> amp_shift\), whole pixels\) (?:is <=|EXCEEDS) channels\[c\]\.lines/
+  // fail. Edit it in place; do not "fix" the duplication by importing. What
+  // keeps the two copies honest is that they are compared byte for byte in
+  // test/formats/effects-channel-bands-prose-repin.test.ts — this one throws on
+  // no-match and nothing runs it on the way to a green suite, so left to itself
+  // it is the copy that would silently stay behind.
+  //
+  // Only the multiplier and the base are read (2 and 256); the comparison
+  // direction is hard-coded in REFUSED_ON below and is never inferred here.
+  const m = /PEAK-TO-PEAK TRAVEL \((\d+) \* \((\d+) >> amp_shift\), whole pixels\) EXCEEDS channels\[c\]\.lines/
     .exec(BANDS.how_to_use ?? '');
-  if (!m) throw new Error('the vendored bands sidecar no longer states the peak-to-peak fit formula');
+  if (!m) throw new Error('the vendored bands sidecar no longer states the peak-to-peak fit formula in the refusal direction ("... whole pixels) EXCEEDS channels[c].lines"). If it says "is <=" it has regressed to the retired clearance-shaped wording — refused, not accepted (CHBAND-PROSE-REPIN)');
   return { mult: Number(m[1]), base: Number(m[2]) };
 })();
 const TRAVEL_PX = (s) => TRAVEL_FORMULA.mult * (TRAVEL_FORMULA.base >> s);
