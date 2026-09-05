@@ -27,6 +27,9 @@ import {
   EFFECTS_V_OFFSET_BOUNDS,
   EFFECTS_V_CENTER_DEFAULT,
   EFFECTS_V_OFFSET_DEFAULT,
+  EFFECTS_ANCHOR_CHANNEL_BOUNDS,
+  EFFECTS_ANCHOR_SHIFT_BOUNDS,
+  EFFECTS_ANCHOR_NONE,
   isNamedFactor,
   factorLabel,
   isValidSceneId,
@@ -236,6 +239,107 @@ describe('scene-level enumerations and bounds (schema §2.1/§2.2)', () => {
       const onDisk = JSON.parse(serializeEffectsScene(newEffectsScene('probe')));
       onDisk[field] = max + 1;
       expect(() => parseEffectsScene(JSON.stringify(onDisk), 'probe'))
+        .toThrow(new RegExp(`${field}: ${max + 1} is above the maximum ${max}`));
+    }
+  });
+
+  /**
+   * THE THREE NUMBERS INSIDE `anchor.at`, EACH DERIVED SEPARATELY.
+   *
+   * They are 0..3 / 0..15 / 0..15 today and it would be one line to read one
+   * bound and reuse it three times. That is exactly the coupling
+   * `EFFECTS_ANCHOR_SHIFT_BOUNDS`'s docblock exists to refuse — the shifts are
+   * shift AMOUNTS whose top is a no-deform sentinel, `channel` is an ORDINAL
+   * whose top is an ordinary channel, and a reader that shared a bound between
+   * them would silently test the wrong sentinel the day the contract moves one.
+   * Walked by hand out of the raw JSON, three separate walks.
+   */
+  it('reads anchor.at\'s channel and both shift bounds as THREE separate derivations', () => {
+    const atArm = S.properties.anchor.oneOf.find((b: any) => b?.properties?.at);
+    expect(atArm, 'the schema no longer has an anchor `at` branch').toBeTruthy();
+    const props = atArm.properties.at.properties;
+    expect(EFFECTS_ANCHOR_CHANNEL_BOUNDS)
+      .toEqual({ min: props.channel.minimum, max: props.channel.maximum });
+    expect(EFFECTS_ANCHOR_SHIFT_BOUNDS.dsa)
+      .toEqual({ min: props.dsa.minimum, max: props.dsa.maximum });
+    expect(EFFECTS_ANCHOR_SHIFT_BOUNDS.dsb)
+      .toEqual({ min: props.dsb.minimum, max: props.dsb.maximum });
+    // ANTI-VACUOUS: all three walks landed on real, distinct schema nodes rather
+    // than on one node reached three ways.
+    expect(atArm.required).toEqual(['at']);
+    expect(atArm.properties.at.required.slice().sort()).toEqual(['channel', 'dsa', 'dsb']);
+  });
+
+  /**
+   * THE TWO OFFS ARE DIFFERENT STATES, AND THE SCHEMA SAYS SO IN TWO PLACES.
+   *
+   * `anchor: "none"` is no anchored split at all; an anchor whose two shifts are
+   * both the sentinel still splits the bands and just deforms neither plane.
+   * `rowRemap`'s precondition 2 needs the second and is not satisfied by the
+   * first, so a control that offered one "off" would be offering an author a
+   * choice they cannot see. This row is what keeps the two constants from being
+   * folded together.
+   */
+  it('derives anchor\'s "no anchor" spelling, and it is NOT the shift sentinel', () => {
+    expect(EFFECTS_ANCHOR_NONE).toBe(
+      S.properties.anchor.oneOf.map((b: any) => b?.const).find((c: any) => typeof c === 'string'),
+    );
+    expect(EFFECTS_ANCHOR_NONE).toBe(S.properties.anchor.default);
+    // Different TYPES, not merely different values — which is the structural
+    // reason they can never be confused at the wire and the reason the UI must
+    // not confuse them either.
+    expect(typeof EFFECTS_ANCHOR_NONE).toBe('string');
+    expect(typeof EFFECTS_ANCHOR_SHIFT_BOUNDS.dsb.max).toBe('number');
+    // And both really are accepted by the codec: an anchor with both shifts on
+    // the sentinel is a legal document, not a spelling of "none".
+    for (const anchor of [
+      EFFECTS_ANCHOR_NONE,
+      { at: {
+        channel: EFFECTS_ANCHOR_CHANNEL_BOUNDS.min,
+        dsa: EFFECTS_ANCHOR_SHIFT_BOUNDS.dsa.max,
+        dsb: EFFECTS_ANCHOR_SHIFT_BOUNDS.dsb.max,
+      } },
+    ]) {
+      const scene = newEffectsScene('probe');
+      (scene as unknown as Record<string, unknown>).anchor = anchor;
+      expect(() => serializeEffectsScene(scene), `anchor ${JSON.stringify(anchor)} was refused`)
+        .not.toThrow();
+      // Round-tripped, not merely accepted: the codec writes it and reads it back
+      // as the same value, which is what a writer for this key depends on.
+      const text = serializeEffectsScene(scene);
+      expect(parseEffectsScene(text, 'probe').anchor).toEqual(anchor);
+    }
+  });
+
+  it('offers anchor.at ranges the codec really enforces at both ends', () => {
+    // ANTI-VACUOUS, on the v_center row's pattern: every legal value in each of
+    // the three ranges serializes, and one past each end is refused with the
+    // bounds rule's own wording. A clamp into a range nothing enforces would
+    // otherwise look exactly like this.
+    const seed = () => ({
+      channel: EFFECTS_ANCHOR_CHANNEL_BOUNDS.min,
+      dsa: EFFECTS_ANCHOR_SHIFT_BOUNDS.dsa.max,
+      dsb: EFFECTS_ANCHOR_SHIFT_BOUNDS.dsb.max,
+    });
+    for (const [field, { min, max }] of [
+      ['channel', EFFECTS_ANCHOR_CHANNEL_BOUNDS],
+      ['dsa', EFFECTS_ANCHOR_SHIFT_BOUNDS.dsa],
+      ['dsb', EFFECTS_ANCHOR_SHIFT_BOUNDS.dsb],
+    ] as const) {
+      for (let v = min; v <= max; v++) {
+        const scene = newEffectsScene('probe');
+        (scene as unknown as Record<string, unknown>).anchor = { at: { ...seed(), [field]: v } };
+        expect(() => serializeEffectsScene(scene), `anchor.at.${field} ${v} was refused`)
+          .not.toThrow();
+      }
+      const scene = newEffectsScene('probe');
+      (scene as unknown as Record<string, unknown>).anchor =
+        { at: { ...seed(), [field]: min - 1 } };
+      expect(() => serializeEffectsScene(scene), `anchor.at.${field} ${min - 1} was accepted`)
+        .toThrow(new RegExp(`${field}: ${min - 1} is below the minimum ${min}`));
+      (scene as unknown as Record<string, unknown>).anchor =
+        { at: { ...seed(), [field]: max + 1 } };
+      expect(() => serializeEffectsScene(scene), `anchor.at.${field} ${max + 1} was accepted`)
         .toThrow(new RegExp(`${field}: ${max + 1} is above the maximum ${max}`));
     }
   });

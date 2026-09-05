@@ -87,6 +87,12 @@ import {
   sceneDeformValue, sceneDeformFromToggle, vDeformValue, vDeformFromToggle,
   layerDeformValue, layerDeformFromToggle, layerDeformAdvisory, sceneDeformAdvisories,
   layerCurveDeformAdvisory,
+  // §9.1 — the anchored band split. ⚠ `anchorShiftOptions` is a LADDER PER
+  // FIELD and the sentinel is not on it; see effects-aeon's §9.1 block before
+  // reaching for a NumberField here.
+  ANCHOR_ROW, anchorValue, anchorChannelOptions, anchorShiftOptions,
+  anchorToggleCommand, setAnchorChannelCommand, setAnchorShiftCommand,
+  anchorDeformAdvisories,
   LEFT_COLUMN_MASK_ROW, leftColumnMaskOptions, leftColumnMaskValue,
   leftColumnMaskRowVisible, leftColumnMaskCommand, vDeformToggleCommand,
   BOB_ROW, BOB_AMPLITUDE_OPTIONS, BOB_PERIOD_OPTIONS,
@@ -1410,6 +1416,88 @@ export default function EffectsScenePanel(): React.ReactElement {
             );
           })}
           <Hint under>{SCENE_DEFORM_ROW_SHARED.hint}</Hint>
+          {/* ═══ THE WORLD-ANCHORED BAND SPLIT (§9.1) ═══
+
+              PLACED WITH THE PLANE TABLES AND NOT WITH THE LAYER CARDS, because
+              the two shifts below are only meaningful against a table one of
+              the two rows above attaches: the anchor overrides `band_deform_shift_a/b`
+              in every band from the split down, and those bands sample
+              `deform_fg` / `deform_bg`. A row whose numbers do nothing without
+              its neighbour belongs beside its neighbour.
+
+              ⚠⚠ THE LADDERS ARE `<select>`s AND THAT IS THE WHOLE SAFETY
+              ARGUMENT. `dsa`/`dsb` are 0..15 where 15 means NO DEFORM, so a
+              spinner dragged toward its maximum authors "does not move" — the
+              opposite of the gesture, silently, with a green build. The list
+              runs least motion first, the sentinel is not on it, and off is a
+              NAMED entry at the top. effects-aeon's §9.1 block has the full
+              argument; `V center`'s comment fifteen rows up has the reason a
+              bounded NumberField would not have been a substitute.
+
+              TWO OFFS, TWO CONTROLS. This toggle is "no anchor at all"; the two
+              ladders' off entries are "this plane takes no deform" on an anchor
+              that still splits. `rowRemap` needs the second and is not
+              satisfied by the first. */}
+          {(() => {
+            const at = anchorValue(selected);
+            return (
+              <>
+                <Field label={ANCHOR_ROW.label} title={ANCHOR_ROW.title}>
+                  <Select title={ANCHOR_ROW.title} value={at === null ? 'none' : 'on'}
+                    onChange={(v) => run(anchorToggleCommand(library, selected.id, v === 'on'))}
+                    style={{ width: 88 }}>
+                    <option value="none">{ANCHOR_ROW.none}</option>
+                    <option value="on">{ANCHOR_ROW.on}</option>
+                  </Select>
+                </Field>
+                {at === null && <Hint under>{ANCHOR_ROW.hint}</Hint>}
+                {at !== null && (
+                  <>
+                    <Field label={ANCHOR_ROW.channelLabel} title={ANCHOR_ROW.channelTitle}>
+                      <Select title={ANCHOR_ROW.channelTitle} value={String(at.channel)}
+                        onChange={(v) => run(setAnchorChannelCommand(
+                          library, selected.id, Number(v)))}
+                        style={{ flex: 1, minWidth: 0 }}>
+                        {anchorChannelOptions().map((o) => (
+                          <option key={o.channel} value={o.channel} title={o.title}>{o.label}</option>
+                        ))}
+                      </Select>
+                    </Field>
+                    {/* ONE LOOP OVER THE TWO PLANES, on the deform rows' own
+                        reasoning above: two hand-written blocks is exactly the
+                        copy that lets one plane grow a rung the other does not
+                        have. Each ladder is built from its OWN field's bounds —
+                        `anchorShiftOptions(field)` — never from a shared one. */}
+                    {([['dsa', ANCHOR_ROW.planeALabel], ['dsb', ANCHOR_ROW.planeBLabel]] as const)
+                      .map(([field, label]) => (
+                        <Field key={field} label={label}>
+                          <Select title={`anchor.at.${field}`} value={String(at[field])}
+                            onChange={(v) => run(setAnchorShiftCommand(
+                              library, selected.id, field, Number(v)))}
+                            style={{ flex: 1, minWidth: 0 }}>
+                            {anchorShiftOptions(field).map((o) => (
+                              <option key={o.shift} value={o.shift} title={o.title}>{o.label}</option>
+                            ))}
+                          </Select>
+                        </Field>
+                      ))}
+                    <Hint under style={{ marginBottom: 0 }}>{ANCHOR_ROW.bindingHint}</Hint>
+                    {/* THE STATE NO BUILD WILL EVER REPORT. A live shift with no
+                        table to sample is flat-pathed at runtime: the scene
+                        compiles, ships and does not move. Warning-toned because
+                        the author asked for motion and will not get it — unlike
+                        the ramp note below, which is a consequence of a
+                        legitimate choice. */}
+                    {anchorDeformAdvisories(selected).map((a) => (
+                      <Hint key={a} under tone="warning" style={{ marginBottom: 0 }}>
+                        <span data-testid="anchor-deform-advisory">{a}</span>
+                      </Hint>
+                    ))}
+                  </>
+                )}
+              </>
+            );
+          })()}
           {/* THE PER-COLUMN ONE, kept visually beside the plane rows and said to
               be a different thing in its own hint: `v_deform` is per-column
               VERTICAL scroll (VDP reg $0B bit 2), not a third plane table. */}
