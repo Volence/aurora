@@ -366,6 +366,14 @@ the two commands:
 - **`FAST=1 ./build.sh` runs the re-bake for you** and prints how long it took. That
   is the loop's whole point, and it is why the fast path needs no separate step.
 
+**What `FAST=1` still will not tell you.** It skips the whole test lane and every
+gate that has to read the listing the build just emitted, so a green FAST run is not
+a landing. It does run one check first — the editor-scene binding seam, read out of
+the source — so binding a preset to a section nothing threads now fails in the loop
+instead of at landing. What it cannot answer is whether your effect actually
+*reached the ROM*: the reachability evidence is minted by the build it runs before.
+Run the plain `./build.sh` before you believe it.
+
 **`touch` is not a shortcut past this.** The gate has a second arm that reads no
 timestamps at all — it compares a content stamp of your editor sources against the
 one the last re-bake wrote — so a delete, a rename or a revert moves the answer
@@ -381,17 +389,14 @@ added, removed, renamed or modified editor source all move the answer, so
 `tools/regenerate-level.sh` clears the generated module that still carries the
 deleted document's data. There is nothing to touch and nothing to force.
 
-### If the build says the re-bake failed and mentions donors
+### If the re-bake itself fails
 
-```
-ERROR: the FAST re-bake failed. Run tools/regenerate-level.sh directly to see why
-  (it needs the out-of-repo donors: sonic_hack + skdisasm/...)
-```
-
-That message is usually wrong about the cause. Do what it says — run
-`tools/regenerate-level.sh` by hand — and read the last line. It is often something
-precise like *"rasterRef 'x' names no preset document … Known ids: …"*, which
-happens when you delete a preset a section still points at.
+**Read the re-bake's own output — the build prints it in full, and it is the part
+that names your file.** The failing line is usually precise: *"rasterRef 'x' names
+no preset document … Known ids: …"*, which is what you get when you delete a preset
+a section still points at. Missing out-of-repo donors is the *other* cause and the
+build says so as a footnote, after its output — suspect it only when nothing above
+names a file or an id.
 
 ---
 
