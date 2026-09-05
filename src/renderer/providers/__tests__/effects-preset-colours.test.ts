@@ -97,8 +97,8 @@ describe('addrGloss says where an address lands, in the palette editor\'s words'
     expect(addrGloss(past)).toMatch(
       new RegExp(`past CRAM's ${CRAM_LINE_COUNT} lines$`));
     // and each still leads with the location, so an author can act on it
-    expect(addrGloss(75)).toMatch(/^line \d+ · entry \d+ — /);
-    expect(addrGloss(past)).toMatch(/^line \d+ · entry \d+ — /);
+    expect(addrGloss(75)).toMatch(/^line \d+ · entry \d+: /);
+    expect(addrGloss(past)).toMatch(/^line \d+ · entry \d+: /);
   });
 
   it('reads the ADDRESS, never a sibling key that claims to agree with it', () => {
@@ -136,7 +136,7 @@ describe('a swatch names its own destination and its own word, both spellings', 
     for (const i of [0, 1, 2, 3]) {
       const at = cramLocation(addr + i * CRAM_WORD_BYTES)!;
       expect(colourSwatchTitle(addr, i, 14))
-        .toMatch(new RegExp(`Colour ${i} → line ${at.line} · entry ${at.entry} —`));
+        .toMatch(new RegExp(`Colour ${i} → line ${at.line} · entry ${at.entry}:`));
     }
   });
 

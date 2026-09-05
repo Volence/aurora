@@ -2550,7 +2550,7 @@ export function anchorSweepBandRefusal(
     + `channel's boundary to screen lines ${band.lo} to ${band.hi}, which is ${band.lines} `
     + `line${band.lines === 1 ? '' : 's'} counted inclusively, and ${travelPx} > ${band.lines}. `
     + 'The camera decides where the sweep sits in that band, so both ends are reachable and they '
-    + `do not behave alike: past line ${band.hi} the record is not emitted at all: no boundary is `
+    + `do not behave alike: past line ${band.hi} the record is not emitted at all, so no boundary is `
     + `drawn anywhere and the band vanishes for that frame, it does not pin to ${band.hi}; below `
     + `line ${band.lo} it is still emitted, clamped up to ${band.lo}, so the boundary pins at the `
     + 'top of the band and stays visible. Pick a smaller Travel.';
