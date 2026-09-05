@@ -29,8 +29,15 @@ import {
   type EffectsScene, type EffectsSceneLibrary, type EffectsFactor, type EffectsLayer,
   type EffectsTableRef, type EffectsCurve, type EffectsVSplit, type EffectsDrift,
   type EffectsSceneDeform, type EffectsVDeform, type EffectsLayerDeform,
-  type EffectsRowRemap,
+  type EffectsRowRemap, type EffectsAnchor,
 } from '../../core/formats/effects/scene';
+// The anchor's channel row shows each channel's DECLARED SCREEN BAND beside its
+// ordinal. Two different documents, deliberately: the schema says which channel
+// ordinals may be written, this sidecar says what aeon has declared about them
+// for one game — see `anchorChannelOptions`.
+import {
+  EFFECTS_CHANNEL_BANDS, EFFECTS_CHANNEL_BANDS_GAME,
+} from '../../core/formats/effects/channel-bands';
 import {
   EFFECTS_FACTOR_NAMES, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_LAYER_COUNT,
   EFFECTS_WORLD_Y_BOUNDS, EFFECTS_V_FACTOR_BOUNDS, EFFECTS_V_CENTER_BOUNDS,
@@ -38,7 +45,7 @@ import {
   EFFECTS_V_FACTOR_LOCK, EFFECTS_VSPLIT_AT_BOUNDS,
   EFFECTS_TABLE_REF_FORMS, EFFECTS_TABLE_REF_BIN_PATTERN, EFFECTS_DEFORM_TABLE_BYTES,
   EFFECTS_LAYER_DEFORM_BOUNDS, EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS,
-  EFFECTS_ANCHOR_SHIFT_BOUNDS,
+  EFFECTS_ANCHOR_SHIFT_BOUNDS, EFFECTS_ANCHOR_CHANNEL_BOUNDS, EFFECTS_ANCHOR_NONE,
   EFFECTS_LEFT_COLUMN_MASK_UNDECLARED, EFFECTS_LEFT_COLUMN_MASK_VALUES, EFFECTS_FACTOR_ZERO,
   EFFECTS_SCENE_KEY_DEFAULTS, EFFECTS_LAYER_KEY_DEFAULTS,
   type TableRefParam,
@@ -3313,6 +3320,12 @@ export {
   bobPeakPixels, bobPeriodSeconds, bobShiftRefusal,
   EFFECTS_LAYER_DEFORM_BOUNDS, EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS,
   EFFECTS_DEFORM_TABLE_BYTES, EFFECTS_TABLE_REF_FORMS,
+  // §9.1's contract half. ⚠ THREE BOUNDS THAT AGREE BY COINCIDENCE: the two
+  // shift bounds carry a top-of-range NO-DEFORM sentinel and the channel bound
+  // does not — its top is an ordinary channel. Re-exported rather than
+  // reimplemented for the same reason drift's and reels' are: the one source of
+  // these rules is scene-ui's.
+  EFFECTS_ANCHOR_SHIFT_BOUNDS, EFFECTS_ANCHOR_CHANNEL_BOUNDS, EFFECTS_ANCHOR_NONE,
   // The drift row's contract half. `driftPxPerFrameRefusal` is what the card
   // hands `NumberField`'s `refuse`, and it is re-exported rather than reimplemented
   // here so the ONE source of the rules stays scene-ui's.
@@ -3616,4 +3629,401 @@ export function reelsBindingAdvisories(
     .filter((s): s is { sceneRef?: string | null } => s !== null)
     .map((s) => s.sceneRef ?? null);
   return advisoryReelsBinding(scene, refs).map((a) => a.message);
+}
+
+// ---------------------------------------------------------------------------
+// §9.1 — THE SCENE ANCHOR, the authoring half (EW-SCENE-ANCHOR-WRITER)
+// ---------------------------------------------------------------------------
+//
+// `anchor: SceneAnchor.At(channel, dsa, dsb)` — the world-anchored band split.
+// The engine finds the band the anchored line falls in, manufactures a split
+// entry there, and then OVERRIDES BOTH DEFORM SHIFTS in every band from the
+// split DOWN (aeon engine/level/parallax.emp, `.anchor_shift_write`). That is
+// how a waterline gets a different plane-B treatment below the surface than
+// above it without authoring two scenes.
+//
+// UNTIL THIS PARCEL THERE WAS A READER AND NO WRITER. `rowRemapPreconditions`
+// above has read `scene.anchor` since the remap row shipped and produces the
+// sentence "this scene declares no anchor" — for a key nothing in Aurora could
+// author. `docs/reviews/2026-09-05-sec7-scene.md` §4(b) found it by hitting it:
+// a scene was authored through the panel, `rowRemap` was set, and the build
+// refused with aeon's precondition 2 and no control to reach for.
+//
+// ═══ THE HAZARD, AND EVERY DECISION BELOW IS ANSWERING IT ═══
+//
+// ⚠⚠ `dsa`/`dsb` ARE 0..15 AND 15 IS THE OFF SENTINEL, NOT THE MAXIMUM. The
+// shift is a right-shift of the deform table's sample — aeon's `deform_asr`
+// (engine/level/parallax_dsl.emp), FLOOR division by `2^n` — so a BIGGER number
+// is LESS motion, and the top of the range is none at all. `scene_anchor_dsa`
+// and `scene_anchor_dsb` (engine/level/scene_dsl.emp) return exactly 15 for
+// `SceneAnchor.None`, and every guard in that file spells the test `!= 15`.
+//
+// So a spinner or a slider over the raw field is wrong the way `bob_shift`'s
+// would be, and worse in one respect: dragging toward the maximum authors LESS
+// motion until it authors NONE, and the document validates, builds, ships and
+// renders a flat plane. Four decisions follow.
+//
+// 1. THE SHIFTS ARE CLOSED LADDERS, `<select>`s over the LIVE shifts only. The
+//    sentinel is NOT a rung. A list has no state that can express a value it
+//    does not contain, which is the guard `min`/`max` on a `NumberField`
+//    provably is not — this panel's own `V center` comment says it ("min/max
+//    only bind the spinner; a typed value goes through unclamped").
+//
+//    ORDERED LEAST MOTION FIRST, which is the shift order REVERSED, on
+//    `BOB_AMPLITUDE_OPTIONS`' precedent and for its reason: a list of
+//    magnitudes reads small-to-large, and ordering by the underlying shift
+//    would leak the inversion back into the one place it is being hidden.
+//
+// 2. OFF IS A NAMED CHOICE, and it is named for what it DOES ("off — no
+//    deform"), never for the number it writes. It sits at the TOP of the list,
+//    adjacent to the QUIETEST rung — the opposite end from the loudest — which
+//    is `BOB_ROW`'s objection to folding an off value into a ladder answered by
+//    position rather than by a second control. An author choosing off and an
+//    author choosing maximum deform are at opposite ends of this list, and
+//    neither is reachable from the other by a drag.
+//
+// 3. NOTHING CLAMPS. `setAnchorShiftCommand` and `setAnchorChannelCommand`
+//    THROW on a value outside the contract's range instead of folding it to the
+//    nearest legal one. On the shifts that is the whole point — a clamp toward
+//    the maximum lands on the sentinel, i.e. it answers "as much deform as
+//    possible" with "none", silently. On the channel it matters for a different
+//    reason: `channel` has no sentinel, so a clamp there authors "the last
+//    channel", a real channel carrying somebody else's band.
+//
+// 4. THE TWO OFFS ARE TWO CONTROLS. `anchor: "none"` (no split at all) is the
+//    row's own toggle; `dsa`/`dsb` at the sentinel (a split that deforms
+//    neither plane) is a value on each ladder. `EFFECTS_ANCHOR_NONE`'s docblock
+//    has the contract half; the authoring half is that `rowRemap` needs the
+//    SECOND — precondition 2 wants a channel to read and does not care about
+//    deform — so conflating them would hide the state an author has to reach.
+
+/** The anchor rows' labels and titles, in one place so the panel decides layout. */
+export const ANCHOR_ROW = Object.freeze({
+  key: 'anchor' as const,
+  label: 'Anchor',
+  title: 'anchor — the world-anchored band split. The engine splits the band the anchored '
+    + 'line falls in and overrides BOTH deform shifts in every band from the split DOWN, '
+    + 'which is how a waterline treats the plane differently below the surface than above it.',
+  /** The toggle's two states. "none" is the schema's own word for the off one. */
+  none: EFFECTS_ANCHOR_NONE,
+  on: 'at a channel',
+  /** Off state: what the absence means, and the other off it is NOT. */
+  hint: 'off writes no anchor at all — the split does not happen. An anchor that splits the '
+    + 'bands and deforms NEITHER plane is a different thing: turn it on and leave both '
+    + 'planes off.',
+  channelLabel: 'Channel',
+  channelTitle: 'anchor.at.channel — WHICH patch channel carries the world line this scene '
+    + 'splits on. An ordinal, not a shift: it has no off value, and the channel\'s world Y '
+    + 'and its motion are authored on the PRESET document (patch_world_ys / patch_motion), '
+    + 'not here.',
+  planeALabel: 'Plane A',
+  planeBLabel: 'Plane B',
+  /** Where the two numbers this row does NOT carry actually live. Sec7 packet §4(d). */
+  bindingHint: 'the channel\'s world Y and its motion live on the preset (patch_world_ys / '
+    + 'patch_motion), bound by rasterRef — this row picks which channel, not where it sits',
+});
+
+/**
+ * One rung of an anchor deform ladder, or its off entry.
+ *
+ * `off` is a FIELD and not an absence: the panel renders the same `<option>`
+ * shape either way and the tests ask this flag rather than pattern-matching a
+ * label, so "the sentinel is named" is a property of the data.
+ */
+export interface AnchorShiftOption {
+  /** The value written to the document — for the off entry, the sentinel. */
+  shift: number;
+  label: string;
+  title: string;
+  off: boolean;
+}
+
+/** Which of the anchor's two shift fields a ladder is for. */
+export type AnchorShiftField = 'dsa' | 'dsb';
+
+/** The plane each shift drives, in the words the engine uses. */
+const ANCHOR_SHIFT_PLANE: Readonly<Record<AnchorShiftField, string>> = Object.freeze({
+  dsa: 'Plane A (foreground)',
+  dsb: 'Plane B (background)',
+});
+
+/**
+ * The deform ladder for ONE of the anchor's two shift fields, LEAST MOTION
+ * FIRST, with off at the top.
+ *
+ * PER FIELD, NEVER SHARED. `dsa` and `dsb` have their own bounds in
+ * `EFFECTS_ANCHOR_SHIFT_BOUNDS` — read separately because the two live in
+ * different schema nodes and agree only by coincidence — so the ladder is built
+ * from the field's OWN bounds and its own sentinel. A single shared ladder is
+ * the bug this function's shape exists to make unwritable.
+ *
+ * THE SENTINEL IS NOT A RUNG. It appears exactly once, as the off entry;
+ * `anchorShiftLadder` below is the rung list with it excluded, and the tests
+ * assert the exclusion rather than this comment promising it.
+ */
+export function anchorShiftOptions(field: AnchorShiftField): readonly AnchorShiftOption[] {
+  const { min, max } = EFFECTS_ANCHOR_SHIFT_BOUNDS[field];
+  const plane = ANCHOR_SHIFT_PLANE[field];
+  const out: AnchorShiftOption[] = [{
+    shift: max,
+    label: 'off — no deform',
+    title: `anchor.at.${field} = ${max} — the NO-DEFORM sentinel. ${plane} takes no deform `
+      + 'from this anchor at all. It is the TOP of the field\'s range and it means none, '
+      + 'which is why it is named here and is not a rung on the ladder below it.',
+    off: true,
+  }];
+  // Descending shift == ascending motion, because the shift is an inverse: the
+  // engine floor-divides the table sample by 2^shift (aeon `deform_asr`,
+  // engine/level/parallax_dsl.emp).
+  for (let shift = max - 1; shift >= min; shift -= 1) {
+    const divisor = 2 ** shift;
+    out.push({
+      shift,
+      label: shift === min ? `÷${divisor} — the whole table` : `÷${divisor}`,
+      title: `anchor.at.${field} = ${shift} — ${plane} deforms by the attached table's sample `
+        + `divided by ${divisor} (the engine's asr.w, i.e. floor division by 2^${shift}). `
+        + 'A SMALLER shift is MORE motion. How far that actually moves depends on the '
+        + 'table\'s own amplitude, which aeon checks at build time and Aurora does not '
+        + 'compute here.',
+      off: false,
+    });
+  }
+  return Object.freeze(out);
+}
+
+/** The LIVE rungs of a field's ladder — the ladder with the sentinel taken out. */
+export function anchorShiftLadder(field: AnchorShiftField): readonly AnchorShiftOption[] {
+  return anchorShiftOptions(field).filter((o) => !o.off);
+}
+
+/** One channel the anchor may latch to, with whatever aeon declares about its band. */
+export interface AnchorChannelOption {
+  channel: number;
+  label: string;
+  title: string;
+}
+
+/**
+ * Every channel `anchor.at.channel` admits, ascending, each carrying the SCREEN
+ * BAND aeon declares for it when there is one.
+ *
+ * THE RANGE IS THE SCHEMA'S AND THE BANDS ARE THE VENDORED DOCUMENT'S, and they
+ * are two different facts on purpose: the schema says which ordinals are legal
+ * to write, `EFFECTS_CHANNEL_BANDS` says what aeon has declared about them for
+ * one game. A channel with no declared band is still offered — refusing to
+ * offer it would be Aurora deciding a channel does not exist because a sidecar
+ * has not described it, which is the "editor refused a file the build accepts"
+ * failure scene.ts calls FAR WORSE.
+ */
+export function anchorChannelOptions(): readonly AnchorChannelOption[] {
+  const { min, max } = EFFECTS_ANCHOR_CHANNEL_BOUNDS;
+  const out: AnchorChannelOption[] = [];
+  for (let channel = min; channel <= max; channel += 1) {
+    const band = EFFECTS_CHANNEL_BANDS.get(channel);
+    out.push({
+      channel,
+      label: band === undefined ? `${channel}` : `${channel} — lines ${band.lo}–${band.hi}`,
+      title: band === undefined
+        ? `anchor.at.channel = ${channel}. ${EFFECTS_CHANNEL_BANDS_GAME} declares no screen `
+          + 'band for this channel, so nothing here can say where its line may sit.'
+        : `anchor.at.channel = ${channel} — ${EFFECTS_CHANNEL_BANDS_GAME} declares its `
+          + `boundary may sit on screen lines ${band.lo}..${band.hi} (${band.lines} lines, `
+          + `${band.source}).`,
+    });
+  }
+  return Object.freeze(out);
+}
+
+/** This scene's anchor as its three numbers, or null when it declares none. */
+export function anchorValue(
+  scene: Pick<EffectsScene, 'anchor'>,
+): { channel: number; dsa: number; dsb: number } | null {
+  const a = scene.anchor;
+  if (a === undefined || a === EFFECTS_ANCHOR_NONE) return null;
+  return (a as Exclude<EffectsAnchor, string>).at;
+}
+
+/** Does this scene declare an anchored split at all? */
+export function anchorEnabled(scene: Pick<EffectsScene, 'anchor'>): boolean {
+  return anchorValue(scene) !== null;
+}
+
+/**
+ * The anchor a freshly-enabled row takes: the FIRST channel, and BOTH PLANES
+ * OFF.
+ *
+ * ⚠ THE SEED IS THE SENTINEL ON BOTH SHIFTS, AND THAT IS THE CAREFUL CHOICE.
+ * Turning the row on is a request for a SPLIT; it is not a request for deform.
+ * Seeding a live shift would author motion nobody asked for, and it would do it
+ * in the one shape aeon refuses outright — `scene()` refuses a scene carrying a
+ * curve layer AND an anchor with live shifts (`curveAnchorDeformAdvisory` says
+ * so on screen), and design §2's own composing case is named in that refusal:
+ * "a PURE-BOUNDARY anchor (dsa 15, dsb 15) composes with curves". So the seed
+ * is the state that is legal beside everything else and expresses exactly what
+ * the gesture asked for.
+ *
+ * IT IS ALSO WHAT `rowRemap` NEEDS AND ALL IT NEEDS: precondition 2 wants a
+ * channel to read (`Effects_Screen_L[ch]`), not an amplitude.
+ *
+ * The channel is the range's own first ordinal. There is no better answer
+ * available here — which channel carries the surface is a fact about the
+ * PRESET's `patch_world_ys`, a different document — so the row shows every
+ * channel's declared band beside it and the author picks.
+ */
+export const ANCHOR_SEED: Readonly<{ channel: number; dsa: number; dsb: number }> = Object.freeze({
+  channel: EFFECTS_ANCHOR_CHANNEL_BOUNDS.min,
+  dsa: EFFECTS_ANCHOR_SHIFT_BOUNDS.dsa.max,
+  dsb: EFFECTS_ANCHOR_SHIFT_BOUNDS.dsb.max,
+});
+
+/**
+ * Turn the anchored split on or off.
+ *
+ * OFF DELETES THE KEY, unless the file SPELLS the default — `setSceneFieldCommand`'s
+ * rule, and `anchor`'s schema default is the string `"none"`, so an absent key
+ * and a spelled `"none"` are the same document and the one already on disk is
+ * the one that stays. Rewriting an author's explicit line to say what its
+ * absence would have said is a diff nobody asked for.
+ *
+ * ON SEEDS ALL THREE, because `at` requires all three: `channel`, `dsa` and
+ * `dsb` are the schema's `required`, so the key exists complete or not at all.
+ * See `ANCHOR_SEED` for why both shifts are seeded to the no-deform sentinel.
+ */
+export function anchorToggleCommand(
+  library: EffectsSceneLibrary, id: string, on: boolean,
+): SetEffectsSceneCommand | null {
+  return editSceneCommand(library, id, `Scene ${id} anchor`, (scene) => {
+    if (on) {
+      scene.anchor = { at: { ...ANCHOR_SEED } };
+      return;
+    }
+    if (scene.anchor === EFFECTS_SCENE_KEY_DEFAULTS.get('anchor')) return;
+    delete scene.anchor;
+  });
+}
+
+/**
+ * Point the anchor at a different patch channel.
+ *
+ * THROWS ON AN OUT-OF-RANGE CHANNEL rather than clamping, on
+ * `setReelRateCommand`'s precedent — and the reason is NOT the sentinel reason
+ * the shifts have. `channel` has no sentinel: every value in its range is a
+ * real channel, so a clamp does not author "off", it authors SOMEBODY ELSE'S
+ * BAND, with no visible difference from the value the caller asked for. There
+ * is no substitute value this function could pick that is not a guess about
+ * intent.
+ *
+ * Unreachable from the form, whose `<select>` is built from
+ * `anchorChannelOptions`; this is for the caller that does not go through it.
+ */
+export function setAnchorChannelCommand(
+  library: EffectsSceneLibrary, id: string, channel: number,
+): SetEffectsSceneCommand | null {
+  const { min, max } = EFFECTS_ANCHOR_CHANNEL_BOUNDS;
+  if (!Number.isInteger(channel) || channel < min || channel > max) {
+    throw new Error(
+      `setAnchorChannelCommand: refusing to author anchor.at.channel ${channel} — the contract `
+      + `admits ${min}..${max}. Aurora does not clamp this field: every value in that range is `
+      + 'a REAL channel, so a clamp would silently point the split at a different channel\'s '
+      + 'band rather than at the one asked for. There is no "off" here — turning the anchor '
+      + 'off is anchorToggleCommand.',
+    );
+  }
+  const existing = library.scenes.find((s) => s.id === id);
+  if (existing === undefined || anchorValue(existing) === null) return null;
+  return editSceneCommand(library, id, `Scene ${id} anchor channel`, (scene) => {
+    const at = anchorValue(scene);
+    if (at === null) return;
+    scene.anchor = { at: { ...at, channel } };
+  });
+}
+
+/**
+ * Set ONE plane's anchored deform shift.
+ *
+ * ⚠ THROWS ON AN OUT-OF-RANGE SHIFT AND NEVER CLAMPS, and this is the field the
+ * whole parcel is shaped around. `Math.min(max, Math.max(min, v))` over this
+ * range lands every too-large value on the SENTINEL: a caller asking for "as
+ * much deform as this field can carry" would be answered with NO DEFORM, and
+ * the document would validate, build and render a flat plane. A clamp toward
+ * the bottom is no better — `min` is the loudest possible setting, so the wrong
+ * end is dramatic instead of silent. Neither end is a defensible guess.
+ *
+ * WRITING THE SENTINEL IS LEGAL AND IS NOT A SPECIAL CASE. It is what the
+ * ladder's named off entry does, and it is a different state from "no anchor"
+ * (which is `anchorToggleCommand`), so it must be writable while the anchor
+ * stays declared. The asymmetry with `setBobShiftCommand` — which redirects its
+ * sentinel to its toggle — is deliberate: `bob_shift`'s sentinel IS that whole
+ * feature's off switch, and this one is one plane's.
+ */
+export function setAnchorShiftCommand(
+  library: EffectsSceneLibrary, id: string, field: AnchorShiftField, shift: number,
+): SetEffectsSceneCommand | null {
+  const { min, max } = EFFECTS_ANCHOR_SHIFT_BOUNDS[field];
+  if (!Number.isInteger(shift) || shift < min || shift > max) {
+    throw new Error(
+      `setAnchorShiftCommand: refusing to author anchor.at.${field} ${shift} — the contract `
+      + `admits ${min}..${max}, where ${max} is the NO-DEFORM sentinel and ${min} is the `
+      + 'LOUDEST setting. Aurora does not clamp this field: a clamp toward the top authors '
+      + '"no deform" for a caller who asked for the most, and a clamp toward the bottom '
+      + 'authors the most for a caller who asked for none. Turning the whole anchor off is '
+      + 'anchorToggleCommand.',
+    );
+  }
+  const existing = library.scenes.find((s) => s.id === id);
+  if (existing === undefined || anchorValue(existing) === null) return null;
+  return editSceneCommand(library, id, `Scene ${id} anchor ${field}`, (scene) => {
+    const at = anchorValue(scene);
+    if (at === null) return;
+    scene.anchor = { at: { ...at, [field]: shift } };
+  });
+}
+
+/**
+ * What an anchored deform shift will actually do, when the answer is NOTHING.
+ *
+ * THE SILENT STATE THIS CONTROL MAKES REACHABLE. aeon's precondition-1 message
+ * says it in one clause — "A live shift with NO table is flat-pathed at runtime
+ * and does not count" — and it is not a build refusal: the scene compiles,
+ * ships and renders a flat plane. Nothing else on this panel would say so,
+ * because until this parcel nothing could author the shift.
+ *
+ * THE TABLE RULE IS THE ENGINE'S, transcribed from `scene_dsl.emp`'s own
+ * comment on the left-column guard: "that plane's scene-level attachment
+ * (deform_fg for A, deform_bg for B — band_table_a/b resolve exactly this
+ * fallback), or any layer's own() table, which serves BOTH planes".
+ *
+ * ADVISORY, NEVER PREVENTION (row 58): the ladder still offers every shift and
+ * the document still saves. One sentence per plane, and silence when the anchor
+ * is off or a plane is — silence here means "nothing to say", which is the
+ * truth about a pure-boundary anchor.
+ */
+export function anchorDeformAdvisories(scene: EffectsScene): string[] {
+  const at = anchorValue(scene);
+  if (at === null) return [];
+  const anyOwn = scene.layers.some((l) => layerDeformValue(l) !== null);
+  const out: string[] = [];
+  for (const [field, plane, key, label] of [
+    ['dsa', ANCHOR_ROW.planeALabel, 'deform_fg', SCENE_DEFORM_ROWS.deform_fg.label],
+    ['dsb', ANCHOR_ROW.planeBLabel, 'deform_bg', SCENE_DEFORM_ROWS.deform_bg.label],
+  ] as const) {
+    if (at[field] === EFFECTS_ANCHOR_SHIFT_BOUNDS[field].max) continue;
+    if (anyOwn || sceneDeformValue(scene, key) !== null) continue;
+    out.push(`the anchor deforms ${plane} (${field} ${at[field]}) but this scene attaches no `
+      + `table it can sample — ${label} is off and no strip attaches its own. The engine `
+      + 'flat-paths a live shift with no table: the build stays green and the plane does not '
+      + `move. Attach ${label}, or take ${plane} to off.`);
+  }
+  return out;
+}
+
+/** The anchor's one-line readout: which channel, and what each plane does. */
+export function anchorLine(scene: Pick<EffectsScene, 'anchor'>): string | null {
+  const at = anchorValue(scene);
+  if (at === null) return null;
+  const say = (field: AnchorShiftField): string => {
+    const o = anchorShiftOptions(field).find((x) => x.shift === at[field]);
+    return o === undefined ? `${field} ${at[field]}` : o.label.replace(/ —.*$/, '');
+  };
+  return `channel ${at.channel} · A ${say('dsa')} · B ${say('dsb')}`;
 }
