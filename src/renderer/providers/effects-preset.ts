@@ -1202,6 +1202,34 @@ export function setArmFieldCommand(
  * precisely what §E.4 names. The disagreement is written up in
  * `docs/reviews/2026-09-05-coldread-fixes.md` rather than resolved by this
  * parcel. What is enforced is only the half every source agrees on.
+ *
+ * ⚠ RULED 2026-09-05 (overseer), so this is SETTLED for this path and does not
+ * need re-opening: THE GRID RULE STAYS OUT OF `parseColours`. Three reasons, and
+ * the third is the one that decides it.
+ *
+ *  1. An off-grid word is REDUNDANT, NOT IMPOSSIBLE. The hardware ignores the
+ *     dead bits, so the swatch painting its masked colour is TRUTHFUL — it shows
+ *     what a Mega Drive would show. That is categorically unlike `143584`, which
+ *     is not a word at all and which the swatch was painting by masking a number
+ *     the wire cannot hold. So the defect C7 exists to close is closed ENTIRELY
+ *     by the wire-type bound; the grid is a different question that does not
+ *     reach it.
+ *  2. `sameGenesisColor` is right about the world: a palette lifted from a
+ *     disasm carries junk in the dead bits and is still that colour. Refusing it
+ *     would reject real data for being untidy.
+ *  3. PRECEDENT, ON THE OTHER AXIS, AND IT IS THIS REPO'S OWN: `boundary.ts`'s
+ *     header already forbids Aurora becoming the only check, and the boundary
+ *     panel deliberately refuses nothing cross-field for exactly this reason — a
+ *     control that refuses what the generator accepts LOOKS LIKE DILIGENCE and
+ *     is a bound we invented. aeon's `stream_cram` bounds `addr` and
+ *     `colours.len` and says nothing about a colour's value. Same hazard, same
+ *     answer, already written down one file over.
+ *
+ * WHAT IS *NOT* SETTLED, and is booked rather than left implicit: `core/agent/
+ * validation.ts` DOES refuse off-grid words on the palette-authoring path. That
+ * inconsistency is real — the same word is refused there and accepted here — but
+ * it is a question about THAT path, it blocks nothing, and resolving it by
+ * copying its rule to here would be the invented bound this ruling rejects.
  */
 export function parseColours(
   text: string, subject?: string,
