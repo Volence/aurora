@@ -35,10 +35,20 @@
 //
 // WHAT IT COUNTS
 //
-// Every dash inside a StringLiteral, a JsxText, or any part of a template
-// literal, in BOTH spellings: the character, and the backslash-u escape, which
-// renders identically and which no character grep can see. The components
-// sweep found its 210th that way after a first count of 209.
+// Every dash inside a StringLiteral, a JsxText, a RegularExpressionLiteral, or
+// any part of a template literal, in BOTH spellings: the character, and the
+// backslash-u escape, which renders identically and which no character grep can
+// see. The components sweep found its 210th that way after a first count of 209.
+//
+// THE REGEX LITERAL IS IN THE LIST ON PURPOSE, and it is a hole the two sibling
+// gates still have. A regex literal is neither a comment nor a string, so a
+// dash inside one is invisible to check-src-dashes and check-tsx-dashes alike.
+// Measured on 2026-09-05: that hole has NO live occupants in either of their
+// populations, and SEVEN in the buckets this parcel censused (two here, five in
+// the deferred harness scripts). "There are none of these today" is exactly the
+// exclusion this repo has been burned by, so the kind is counted structurally
+// here rather than left out on a count that happens to be zero. The two live
+// ones are allowed BY NAME below, because they are quotations, not prose.
 //
 // WHAT IT DELIBERATELY DOES NOT COUNT, and why in each case
 //
@@ -135,7 +145,24 @@ const CODE_EXT = /\.(ts|tsx|mts|cts|mjs|cjs|js|jsx)$/;
  * offending line and must itself be free of both dashes (asserted below, or this
  * file could not hold its own self-scan). `produced_by` is what emits it.
  */
-const ALLOWANCES = [];
+const ALLOWANCES = [
+  {
+    file: 'src/renderer/agent/__tests__/agent-handler.assign-section-preset.test.ts',
+    text: 'no sidecar carries a rasterRef',
+    why: 'a regex matching RASTER_SECTION_BINDING_LIMIT, which quotes aeon\'s own pytest '
+      + 'failure message verbatim so an author can match a build log. Rewriting the pattern '
+      + 'would make the test assert a message aeon does not emit.',
+    produced_by: 'src/core/formats/raster-binding.ts, itself an allowed quotation in '
+      + 'scripts/check-src-dashes.mjs, read from aeon tools/test_effects_seam_gate.py:758',
+  },
+  {
+    file: 'src/renderer/components/effects/__tests__/band-preset-wording.test.ts',
+    text: 'no sidecar carries a rasterRef',
+    why: 'the same quotation, asserted here against the disclosure body the panel renders',
+    produced_by: 'src/core/formats/raster-binding.ts, itself an allowed quotation in '
+      + 'scripts/check-src-dashes.mjs, read from aeon tools/test_effects_seam_gate.py:758',
+  },
+];
 
 const git = (...args) => execFileSync('git', ['-C', ROOT, ...args], { encoding: 'utf8' })
   .split('\n').filter(Boolean);
@@ -198,6 +225,8 @@ const STRINGY = new Set([
   ts.SyntaxKind.TemplateMiddle,
   ts.SyntaxKind.TemplateTail,
   ts.SyntaxKind.JsxText,
+  // Neither a comment nor a string. See THE REGEX LITERAL above.
+  ts.SyntaxKind.RegularExpressionLiteral,
 ]);
 
 /** Byte ranges of every comment, found by walking to the leaf tokens. */
@@ -287,14 +316,15 @@ function canary() {
     `// a comment ${EM} and an escape ${esc(3)} in a comment too`,
     `const inString = "prose ${EN} here";`,
     'const inTemplate = `prose ' + esc(4) + ' here`;',
+    `const inRegex = /prose ${EM} here/;`,
   ].join('\n');
   const hits = scan('canary.ts', src);
   const spellings = hits.map((h) => h.spelling).sort().join(',');
-  const ok = hits.length === 2 && spellings === 'escape,literal';
+  const ok = hits.length === 3 && spellings === 'escape,literal,literal';
   if (!ok) {
-    console.error(`${SELF}: THE CANARY FAILED. Its own classifier was given four known`);
-    console.error('positives (comment and code, character and escape) and did not come back');
-    console.error(`with exactly the two code ones. It saw ${hits.length}: ${spellings || '(none)'}.`);
+    console.error(`${SELF}: THE CANARY FAILED. Its own classifier was given five known`);
+    console.error('positives (comment, string, template and regex; character and escape) and did');
+    console.error(`not come back with exactly the three code ones. It saw ${hits.length}: ${spellings || '(none)'}.`);
     console.error('A count from a broken classifier is not a clean tree, it is no measurement');
     console.error('at all, so this refuses rather than reporting zero.');
     for (const h of hits) console.error(`  line ${h.line} (${h.spelling})  ${h.src}`);
