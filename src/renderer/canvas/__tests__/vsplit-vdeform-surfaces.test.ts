@@ -206,7 +206,7 @@ describe('the layer card — row 80 applied to the refusal it never reached', ()
     const s = splitPlusVDeform();
     const parts = vsplitVDeformAdvisoryParts(s, s.layers[1])!;
     expect(parts.diagnosis).toContain('this layer authors a Plane B split');
-    expect(parts.diagnosis).toContain('the build refuses this scene');
+    expect(parts.diagnosis).toContain('The build refuses this scene');
     expect(parts.mechanism).toBe(VSPLIT_VDEFORM_CLAUSES.mechanism);
     expect(parts.remedies).toBe(VSPLIT_VDEFORM_CLAUSES.remedies);
     // ⚠ THE DIAGNOSIS IS THE HALF THAT CAN NEVER BE HOVER-ONLY — the precedent

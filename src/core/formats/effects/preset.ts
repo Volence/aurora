@@ -708,8 +708,8 @@ function schemaNumberFromProse(path: string[], re: RegExp, what: string): number
   if (!m) {
     throw new Error(
       `aurora-effects-preset.schema.json no longer states ${what} at ${path.join('.')} in the ` +
-      `shape ${re} that this module reads it from. Re-read the schema and update the derivation ` +
-      '— do NOT hardcode the number: it is an engine constant, and a second unmeasured copy of ' +
+      `shape ${re} that this module reads it from. Re-read the schema and update the derivation; ` +
+      'do NOT hardcode the number: it is an engine constant, and a second unmeasured copy of ' +
       'one is exactly what this reader exists to avoid.',
     );
   }
@@ -857,7 +857,7 @@ function schemaRange(path: string[]): Readonly<{ min: number; max: number }> {
   if (typeof min !== 'number' || typeof max !== 'number') {
     throw new Error(
       `aurora-effects-preset.schema.json no longer bounds ${path.join('.')} with both a numeric ` +
-      'minimum and maximum, which this module reads its range from. Re-read the schema — do NOT ' +
+      'minimum and maximum, which this module reads its range from. Re-read the schema; do NOT ' +
       'hardcode the bounds.',
     );
   }
@@ -910,7 +910,7 @@ export const EFFECTS_PRESET_PROGRAM_ARMS: readonly string[] = (() => {
     throw new Error(
       'aurora-effects-preset.schema.json no longer carries a top-level oneOf, which is where the ' +
       'exactly-one-program rule lives and where EFFECTS_PRESET_PROGRAM_ARMS is derived from. ' +
-      'Re-read the schema — do NOT hardcode the arm names.',
+      'Re-read the schema; do NOT hardcode the arm names.',
     );
   }
   const names = branches.map((b) => {
@@ -1203,7 +1203,7 @@ export const EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET: number = (() => {
       'j starting at 1, that puts the FIRST value on top + ' +
       `${EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG + 1}, but the top sentence says top + ${off}. One of ` +
       'the two moved, or j no longer starts at 1. Re-read both sentences and re-derive BOTH ' +
-      'constants — do NOT reconcile them by hardcoding either number.',
+      'constants; do NOT reconcile them by hardcoding either number.',
     );
   }
   return off;
@@ -1225,9 +1225,9 @@ export const EFFECTS_PRESET_RAMP_TARGET_ARMS: readonly string[] = (() => {
   if (arms.length !== 1 || arms[0] !== 'vsram') {
     throw new Error(
       `$defs.ramp_target in aurora-effects-preset.schema.json now declares [${arms.join(', ')}], ` +
-      'not [vsram] alone. Aurora derives its ramp display geometry from the VSRAM sentences only ' +
-      '— a CRAM target displays ONE LINE EARLIER (value j on top + j, not top + j + ' +
-      `${EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG}) — so a new arm needs its own derived constants and ` +
+      'not [vsram] alone. Aurora derives its ramp display geometry from the VSRAM sentences only. ' +
+      'A CRAM target displays ONE LINE EARLIER (value j on top + j, not top + j + ' +
+      `${EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG}), so a new arm needs its own derived constants and ` +
       'its own readout wording before any span or gloss can be trusted for it.',
     );
   }
@@ -1333,7 +1333,7 @@ export const EFFECTS_PRESET_FP16_SIGNED_EXAMPLE: Readonly<{
       '("{whole: -1, frac256: 128} is -1.5, not -0.5") that EFFECTS_PRESET_FP16_SIGNED_EXAMPLE is ' +
       'derived from. That sentence is the only contract-side statement of the sign rule, and the ' +
       'naive conversion (whole + frac256/256) is wrong by a whole pixel with both numbers still ' +
-      'in range. Re-read the schema and re-derive — do NOT hardcode -1.5.',
+      'in range. Re-read the schema and re-derive; do NOT hardcode -1.5.',
     );
   }
   const fp = Object.freeze({ whole: Number(m[1]), frac256: Number(m[2]) });
@@ -1425,7 +1425,7 @@ export const EFFECTS_PRESET_BASE_SWAP_MIN_BANDS: number = (() => {
       + `${JSON.stringify(node.type)}). Since empyrean 8f56c2c the key is a LIST of per-plane `
       + 'bands and the single-object form is refused with no legacy arm. If the contract has '
       + 'reverted, that is a second breaking migration and this module must be re-read, not '
-      + 'patched to accept both — a document that parses two ways is the thing the break exists '
+      + 'patched to accept both: a document that parses two ways is the thing the break exists '
       + 'to prevent.',
     );
   }
@@ -1478,7 +1478,7 @@ export const EFFECTS_PRESET_BASE_SWAP_PLANES: readonly string[] = (() => {
       'aurora-effects-preset.schema.json no longer closes $defs.base_swap.items.properties.plane '
       + `to an enum of at least two string spellings (read: ${JSON.stringify(values)}). That enum `
       + 'is what keeps a document from naming a VdpBase variant that would re-point the sprite '
-      + 'table mid-frame. Re-read the schema — do NOT hardcode PlaneA/PlaneB.',
+      + 'table mid-frame. Re-read the schema; do NOT hardcode PlaneA/PlaneB.',
     );
   }
   return Object.freeze([...(values as string[])]);
@@ -1542,7 +1542,7 @@ export const EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE: number = (() => {
       `with an integer multipleOf >= 2 (read: ${JSON.stringify(granule)}), which is where the ` +
       'plane base-register granule is read from. A granule of 0 or 1 would make every address "aligned" ' +
       'and is indistinguishable from no constraint at all, so this refuses rather than shipping ' +
-      'it. Re-read the schema — do NOT hardcode $2000.',
+      'it. Re-read the schema; do NOT hardcode $2000.',
     );
   }
   // The range and the granule are two schema facts that must agree: the address
@@ -1606,7 +1606,7 @@ const BASE_SWAP_INSIDE = (() => {
       + '$defs.base_swap. ⚠ DO NOT REPAIR THIS BY ASSUMING AN INCLUSIVE RANGE: line and '
       + 'restore_line are BOTH fire lines and the register changes partway across each of them, '
       + 'so an inclusive reading claims two half-swapped rows are fully swapped and an exclusive '
-      + 'one claims the wrong one of them is not. Re-read the schema — do NOT type the offsets.',
+      + 'one claims the wrong one of them is not. Re-read the schema; do NOT type the offsets.',
     );
   }
   const witness = /a (\d+)\.\.(\d+) band is INSIDE (\d+)\.\.(\d+)/.exec(desc);
@@ -1704,8 +1704,8 @@ export const EFFECTS_PRESET_BASE_SWAP_ORDER_AUTHORITY: Readonly<{
       + 'fire sequence must be strictly ASCENDING and that the AUTHORITY is a named symbol in an '
       + 'aeon .emp file. Aurora DERIVES its early refusal from that sentence and NAMES the '
       + 'authority in it, precisely so nobody mistakes this editor for the enforcer. If the '
-      + 'contract has moved the rule (or acquired a schema keyword that expresses it), re-read it '
-      + '— do NOT retype "fire_lines" here, and do NOT keep refusing on a rule the contract has '
+      + 'contract has moved the rule (or acquired a schema keyword that expresses it), re-read it; '
+      + 'do NOT retype "fire_lines" here, and do NOT keep refusing on a rule the contract has '
       + 'stopped stating.',
     );
   }
@@ -1774,7 +1774,7 @@ export function baseSwapOrderRefusal(bands: readonly EffectsPresetBaseSwapBand[]
       + `${where(prev)}. ${sameBand
         ? 'A band whose restore_line does not exceed its line ends before it begins.'
         : 'Bands are flattened into ONE raster program in document order, so a later band may '
-          + 'not start on or above where the previous one left off — that is an overlap.'} `
+          + 'not start on or above where the previous one left off: that is an overlap.'} `
       + `⚠ NEITHER THE SCHEMA NOR AEON'S GENERATOR REFUSES THIS: the document validates, the `
       + `generator's shape check passes, and \`${a.symbol}\` (aeon ${a.file}) refuses it by name `
       + 'at .emp BUILD time. Aurora refuses here so you meet it now instead of there.';
@@ -1834,7 +1834,7 @@ export const EFFECTS_PRESET_BOUNDARY_HI_RANGE = schemaRange([...BOUNDARY, 'prope
       `aurora-effects-preset.schema.json bounds boundary.channel at ${c.min}..${c.max} but bounds ` +
       `patch_world_ys at ${EFFECTS_PRESET_MAX_PATCH} items, so the two statements of ` +
       'RASTER_MAX_PATCH disagree. A channel outside the positional keys\' reach is a boundary ' +
-      'that can never be seeded or swept. Re-read the schema — do NOT reconcile them here.',
+      'that can never be seeded or swept. Re-read the schema; do NOT reconcile them here.',
     );
   }
 }
@@ -1861,7 +1861,7 @@ export const EFFECTS_PRESET_TINT_REGION_KEYS: readonly string[] = (() => {
       'aurora-effects-preset.schema.json\'s $defs.tint_region now declares `addr`. It exists ' +
       'precisely because fx_tint_band DERIVES the CRAM address from pal_line and entry, so an ' +
       'authored addr would be one fact with two sources. If the contract really has changed, ' +
-      'this codec and its refusal need rewriting — do not just widen the type.',
+      'this codec and its refusal need rewriting; do not just widen the type.',
     );
   }
   const palRegion = presetDefFields('pal_region');
@@ -1907,7 +1907,7 @@ export const EFFECTS_PRESET_RESERVED_KEYS: readonly string[] = (() => {
     throw new Error(
       'aurora-effects-preset.schema.json no longer carries the "Reserved and refused by name" ' +
       'sentence its reserved-key list is derived from. Re-read the schema and update ' +
-      'EFFECTS_PRESET_RESERVED_KEYS\'s derivation — do NOT hardcode the names.',
+      'EFFECTS_PRESET_RESERVED_KEYS\'s derivation; do NOT hardcode the names.',
     );
   }
   const names = m[1].split(',').map(s => s.trim()).filter(s => s.length > 0);
@@ -1995,8 +1995,8 @@ export function presetArmIssue(on: unknown): string | null {
   }
   if (recognised.length > 1) {
     return `on declares ${recognised.length} arms (${recognised.join(' and ')}); exactly one is ` +
-      'allowed. Two arms would be two writes and therefore two restores, which is two bands — ' +
-      'author the second one as a second band.';
+      'allowed. Two arms would be two writes and therefore two restores, which is two bands. ' +
+      'Author the second one as a second band.';
   }
   return null;
 }
@@ -2244,15 +2244,15 @@ export async function loadEffectsPresetLibrary(
       severity: 'error',
       message:
         `${only.path} exists but could not be read as a raster preset (${only.reason}). ` +
-        'Aurora is ignoring it and will NOT overwrite the file — fix it by hand and reopen.',
+        'Aurora is ignoring it and will NOT overwrite the file; fix it by hand and reopen.',
     });
   } else if (unreadable.length > 1) {
     notices.push({
       severity: 'error',
       message:
-        `${unreadable.length} files in ${dir} exist but could not be read as raster presets — ` +
+        `${unreadable.length} files in ${dir} exist but could not be read as raster presets: ` +
         `${nameSome(unreadable.map((u) => u.path))}. ` +
-        'Aurora is ignoring them and will NOT overwrite them — fix them by hand and reopen. ' +
+        'Aurora is ignoring them and will NOT overwrite them; fix them by hand and reopen. ' +
         'Each file and its own reason is in the developer console.',
     });
   }

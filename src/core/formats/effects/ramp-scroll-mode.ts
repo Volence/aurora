@@ -210,7 +210,7 @@ export const RAMP_SCROLL_LEAD = Object.freeze({
   full: 'FULL-SCREEN:',
   column: 'ONE 16-PIXEL COLUMN:',
   split: 'TWO DIFFERENT EFFECTS, BY SECTION:',
-  unbound: 'FULL-SCREEN OR A 16-PIXEL COLUMN — THE BINDING DECIDES:',
+  unbound: 'FULL-SCREEN OR A 16-PIXEL COLUMN, THE BINDING DECIDES:',
   unknown: 'NOT DECIDED BY ANY DOCUMENT AURORA CAN READ:',
 });
 
@@ -229,7 +229,7 @@ export const RAMP_SCROLL_MODE_NOTE: string =
   + 'and the bit is raised by the SCENE bound to the section this preset is bound to: '
   + 'scene_dsl.emp lowers a scene\'s v_deform to pcfg_v_deform_table_bg (0 for "none", the '
   + 'table otherwise) and parallax.emp ORs in %100 when that pointer is non-null, over a base '
-  + `of %11 (per-line HScroll, always) — so $0B reads $03 or $07. Measured in aeon's source at `
+  + `of %11 (per-line HScroll, always), so $0B reads $03 or $07. Measured in aeon's source at `
   + `origin/master ${RAMP_SCROLL_MODE_MEASURED_AT} on ${RAMP_SCROLL_MODE_MEASURED_ON} `
   + '(scene_dsl.emp:1285-1290 and :2970, parallax.emp:1059-1070). '
   + 'IT IS v_deform AND NOT deform_fg/deform_bg: those are the "shared" plane-wide HORIZONTAL '
@@ -239,8 +239,8 @@ export const RAMP_SCROLL_MODE_NOTE: string =
   + 'this editor opens; aeon\'s demo game declares 0, and on it a v_deform scene would stay '
   + 'full-width. '
   + 'WHERE THE 16 PIXELS LAND IS RELAYED, NOT MEASURED HERE: the aeon lane measured the strip at '
-  + `x = ${RAMP_SCROLL_COLUMN_SPAN.first}-${RAMP_SCROLL_COLUMN_SPAN.last} on their scene 10 — not `
-  + 'x = 0-15 — and attributes the offset to the plane\'s own H-scroll, so the position is a '
+  + `x = ${RAMP_SCROLL_COLUMN_SPAN.first}-${RAMP_SCROLL_COLUMN_SPAN.last} on their scene 10 (not `
+  + 'x = 0-15) and attributes the offset to the plane\'s own H-scroll, so the position is a '
   + 'property of the scene you bind. The WIDTH is the hardware granule: per-column VSRAM '
   + `addresses 20 pairs of ${RAMP_SCROLL_COLUMN_WIDTH_PX} px on an H40 display. `
   + 'This sentence reads no line numbers: it is about the horizontal extent of the effect and '
@@ -272,7 +272,7 @@ function viaClause(bindings: readonly RampScrollBinding[]): string {
   const anyAct = bindings.some((b) => b.via === 'act');
   const anySection = bindings.some((b) => b.via === 'section');
   if (anyAct && anySection) return ' (some by their own sceneRef, some by the act default)';
-  if (anyAct) return ' (the act default — no section names a scene of its own)';
+  if (anyAct) return ' (the act default; no section names a scene of its own)';
   return '';
 }
 
@@ -330,7 +330,7 @@ export function rampScrollModeSentence(
   // is the arm the bit actually changes. Painted, not hover-only: it names the
   // one condition under which the sentence above it would be wrong.
   const cap = column.length > 0
-    ? ' Assumes this game declares CAP_PER_COL_VSRAM — sonic4 does.'
+    ? ' Assumes this game declares CAP_PER_COL_VSRAM; sonic4 does.'
     : '';
 
   let short: string;
@@ -368,7 +368,7 @@ export function rampScrollModeSentence(
       + `${RAMP_SCROLL_COLUMN_WIDTH_PX}-pixel column, not the screen. `
       + `${sectionList(column.map((b) => b.section))} bind${column.length === 1 ? 's' : ''} this `
       + `preset and ${sceneList(column)}${column.length === 1 ? ' has' : ' have'} a \`v_deform\``
-      + `${viaClause(column)}, which puts VSRAM in per-column mode — every other column keeps the `
+      + `${viaClause(column)}, which puts VSRAM in per-column mode; every other column keeps the `
       + 'plane\'s own scroll. WHICH 16 pixels is a property of that scene, not of this document: '
       + `the aeon lane measured the strip at x = ${RAMP_SCROLL_COLUMN_SPAN.first}-`
       + `${RAMP_SCROLL_COLUMN_SPAN.last}, not x = 0-15.${cap}`;
@@ -463,7 +463,7 @@ export interface VDeformRampBinding {
  */
 export const V_DEFORM_RAMP_LEAD = Object.freeze({
   narrowed: 'THIS NARROWS A RAMP ELSEWHERE:',
-  unknown: 'THIS MAY NARROW A RAMP ELSEWHERE — AURORA CANNOT READ THE PRESET:',
+  unknown: 'THIS MAY NARROW A RAMP ELSEWHERE, AURORA CANNOT READ THE PRESET:',
 });
 
 /**
@@ -477,7 +477,7 @@ export const V_DEFORM_RAMP_NOTE: string =
   'Turning V deform on attaches a per-column VSRAM table to this scene, and that raises VDP '
   + 'register $0B bit 2 (VSCR) for every section this scene is bound to. In per-column mode a '
   + 'VSRAM address addresses one 16-pixel column rather than the whole plane, so a raster `ramp` '
-  + 'bound to the same section — a different document, edited in the Colour panel — writes a '
+  + 'bound to the same section (a different document, edited in the Colour panel) writes a '
   + 'column instead of a plane. It still builds: aeon refuses a `vsplit` beside a `v_deform` '
   + 'because both are on the scene it can see, but no comptime check can reach a preset '
   + 'document, so this one is silent everywhere except here and on that ramp\'s own card. '
@@ -517,10 +517,10 @@ export function vDeformRampSentence(
     parts.push(`${V_DEFORM_RAMP_LEAD.narrowed} V deform puts VSRAM in per-column mode, and `
       + `${sectionList(narrowed.map((b) => b.section))} `
       + `${narrowed.length === 1 ? 'binds' : 'bind'} this scene and `
-      + `${presetList(narrowed)} — whose VSRAM ramp therefore scrolls a single `
+      + `${presetList(narrowed)}, whose VSRAM ramp therefore scrolls a single `
       + `${RAMP_SCROLL_COLUMN_WIDTH_PX}-pixel column instead of the full width. That ramp is `
       + 'edited in the Colour panel, and its own card says the same thing from the other side. '
-      + 'Assumes this game declares CAP_PER_COL_VSRAM — sonic4 does.');
+      + 'Assumes this game declares CAP_PER_COL_VSRAM; sonic4 does.');
   }
   if (unknown.length > 0) {
     parts.push(`${V_DEFORM_RAMP_LEAD.unknown} ${joinClauses(unknown.map(unknownWhy))}, so `

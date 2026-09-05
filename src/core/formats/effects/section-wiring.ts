@@ -291,7 +291,7 @@ export function sectionRasterAdvisory(
     return `Sections ${listOf(sectionSharers(w, sectionIndex))} all share the preset record `
       + `${w.bindings[sectionIndex]}, so giving section ${sectionIndex} a band would give `
       + `section${sharers.length === 1 ? '' : 's'} ${listOf(sharers)} the same band. aeon's build `
-      + 'refuses that and asks for the record to be split first — one preset per section that '
+      + 'refuses that and asks for the record to be split first: one preset per section that '
       + 'needs its own raster channel.';
   }
   if (state === 'unbound') {
@@ -299,8 +299,8 @@ export function sectionRasterAdvisory(
       + 'nothing for a raster program to hang off. A programmer gives it one.';
   }
   // 'unthreaded'
-  return `Section ${sectionIndex}'s preset record ${w.bindings[sectionIndex]} is its own — nothing `
-    + 'else shares it — but nothing threads the raster chooser into it yet, so aeon\'s canonical '
+  return `Section ${sectionIndex}'s preset record ${w.bindings[sectionIndex]} is its own (nothing `
+    + 'else shares it) but nothing threads the raster chooser into it yet, so aeon\'s canonical '
     + `build refuses a binding here ("no preset threads ${chooserFn}(sec: ${sectionIndex})"). `
     + 'That is one line in aeon, not a redesign. The binding is written either way.';
 }
@@ -861,12 +861,12 @@ export function extraChannelsAdvisory(
       : `${where} threads ${g.chooserFn} for sec ${sectionIndex} only at `
         + `${g.channel.indexParam} ${g.got.join(', ')}, and the document reaches `
         + `${g.want.join(', ')}`;
-    return `• ${g.channel.key} — ${what}. Write, inside that preset(): `
+    return `• ${g.channel.key}: ${what}. Write, inside that preset(): `
       + `${channelPrescription(g.channel, g.chooserFn, sectionIndex)}`;
   });
   return `${docId ?? 'The bound preset'} carries `
     + `${gaps.length === 1 ? 'a key' : 'keys'} beyond its raster program, and one rasterRef `
-    + 'binds the WHOLE document (aeon ruling Q1) — so every key it carries owes its own '
+    + 'binds the WHOLE document (aeon ruling Q1), so every key it carries owes its own '
     + 'chooser at this section\'s preset(). A row nothing calls is a row nothing reads, which '
     + 'presents as an assignment that did nothing, and aeon\'s build refuses it by name:\n'
     + `${lines.join('\n')}\n`

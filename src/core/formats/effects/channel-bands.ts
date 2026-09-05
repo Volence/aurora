@@ -137,11 +137,11 @@ export const EFFECTS_CHANNEL_BANDS_GAME: string = typeof DOC.game === 'string' &
 {
   const how = prose('how_to_use');
   if (!/travel > lines is a CERTAIN refusal/.test(how)) {
-    fail('no longer says that travel > lines is a CERTAIN refusal — the only thing Aurora warns on');
+    fail('no longer says that travel > lines is a CERTAIN refusal, the only thing Aurora warns on');
   }
   if (!/travel <= lines is CANNOT TELL, never a clearance/.test(how)) {
     fail('no longer says that travel <= lines is CANNOT TELL and never a clearance. If aeon has '
-      + 'made the fit two-directional, `AnchorBandFit` can grow a `fits` arm — until then it '
+      + 'made the fit two-directional, `AnchorBandFit` can grow a `fits` arm; until then it '
       + 'deliberately cannot');
   }
   if (!/`lines` is an INCLUSIVE COUNT of lines in \[lo, hi\]/.test(how)) {
@@ -326,7 +326,7 @@ function edge(which: 'lo' | 'hi', expected: string, phrases: RegExp[]): EffectsC
   }
   for (const p of phrases) {
     if (!p.test(note)) {
-      fail(`\`edges.${which}.note\` no longer says ${String(p)} — the asymmetry the warning `
+      fail(`\`edges.${which}.note\` no longer says ${String(p)}: the asymmetry the warning `
         + 'describes is read from these words');
     }
   }

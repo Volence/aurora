@@ -539,7 +539,7 @@ export function parseEffectsScene(text: string, filenameStem: string): EffectsSc
     throw new EffectsSceneError(
       `${filenameStem}.json declares "schema": ${JSON.stringify(obj.schema)}; wave 1 refuses ` +
       'anything but 1. There is no migration machinery in v1 (AURORA_EFFECTS_SCHEMA.md §2, ' +
-      'Versioning) — a new schema version is a contract change, not a file the reader upgrades.',
+      'Versioning). A new schema version is a contract change, not a file the reader upgrades.',
     );
   }
 
@@ -573,7 +573,7 @@ export function parseEffectsScene(text: string, filenameStem: string): EffectsSc
   if (scene.id !== filenameStem) {
     throw new EffectsSceneError(
       `${filenameStem}.json declares "id": ${JSON.stringify(scene.id)}; the filename stem and the ` +
-      'id must match (AURORA_EFFECTS_SCHEMA.md §2, Identity — the generator refuses a mismatch).',
+      'id must match (AURORA_EFFECTS_SCHEMA.md §2, Identity; the generator refuses a mismatch).',
     );
   }
 
@@ -754,15 +754,15 @@ export async function loadEffectsSceneLibrary(
       severity: 'error',
       message:
         `${only.path} exists but could not be read as an effects scene (${only.reason}). ` +
-        'Aurora is ignoring it and will NOT overwrite the file — fix it by hand and reopen.',
+        'Aurora is ignoring it and will NOT overwrite the file; fix it by hand and reopen.',
     });
   } else if (unreadable.length > 1) {
     notices.push({
       severity: 'error',
       message:
-        `${unreadable.length} files in ${dir} exist but could not be read as effects scenes — ` +
+        `${unreadable.length} files in ${dir} exist but could not be read as effects scenes: ` +
         `${nameSome(unreadable.map((u) => u.path))}. ` +
-        'Aurora is ignoring them and will NOT overwrite them — fix them by hand and reopen. ' +
+        'Aurora is ignoring them and will NOT overwrite them; fix them by hand and reopen. ' +
         'Each file and its own reason is in the developer console.',
     });
   }
@@ -841,7 +841,7 @@ export function advisoryReelsBinding(
       'its sceneRef, and aeon\'s generator refuses a reels key on a scene whose sections resolve ' +
       'through a preset or the act default instead of an editor sceneRef (the association table ' +
       'is keyed on the lowered config label, which is unique only for a sceneRef-bound section). ' +
-      'Saving is not blocked, and this check is one-sided — its silence is not a clearance, ' +
+      'Saving is not blocked, and this check is one-sided: its silence is not a clearance, ' +
       'because only the build can say whether the key is accepted.',
   }];
 }
@@ -858,7 +858,7 @@ export function advisoryLayerDeformConflicts(scene: EffectsScene): SceneAdvisory
       path: `/layers/${i}`,
       message:
         `deform.own is set alongside ${clashes.join('/')}; both lower into the same record fields ` +
-        '(two-sources guard). sigil refuses this at build time with the exact reason — ' +
+        '(two-sources guard). sigil refuses this at build time with the exact reason; ' +
         'clear one source before building.',
     });
   });

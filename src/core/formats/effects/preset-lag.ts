@@ -463,5 +463,5 @@ export function presetLagDisclosure(keys: readonly string[] = PRESET_KEYS_AWAITI
     `emulator has shown ${one ? 'it' : 'either'}. ` +
     `Measured ${PRESET_LAG_MEASURED_ON} by ${PRESET_LAG_MEASUREMENT}. ` +
     `Expires (${PRESET_LAG_MEASURED_ON}): the day that row goes red because aeon lowers ` +
-    `${one ? 'the key' : 'the keys'} — this sentence retires with the row.`;
+    `${one ? 'the key' : 'the keys'}; this sentence retires with the row.`;
 }
