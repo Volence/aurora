@@ -56,7 +56,7 @@ export default function ToastContainer() {
           title="Collapse"
           style={{ ...styles.toast, ...styles.overflow, ...styles.sticky, borderColor: T.info }}
         >
-          {`Showing all ${toasts.length} — click to collapse`}
+          {`Showing all ${toasts.length}. Click to collapse`}
         </div>
       )}
       {stack.visible.map((toast) => {

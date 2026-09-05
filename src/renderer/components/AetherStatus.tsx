@@ -29,7 +29,7 @@ export default function AetherStatus(): React.ReactElement {
   // taken back.
   const title = error
     ? `Aether: ${error}`
-    : connected ? 'Connected to the emulator — click to disconnect' : 'Click to connect to the emulator';
+    : connected ? 'Connected to the emulator. Click to disconnect' : 'Click to connect to the emulator';
 
   return (
     <button

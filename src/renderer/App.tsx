@@ -165,11 +165,11 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler);
   }, [toggleExplorer, startBuild]);
 
-  // -- window title: Aurora — <project> — <tab> ----------------------------
+  // -- window title: Aurora - <project> - <tab> ----------------------------
   useEffect(() => {
     const projectName = classicOpen ? classicLabel : config?.name;
     const parts = ['Aurora', projectName, activeTab && activeTab.kind !== 'home' ? activeTab.title : null];
-    document.title = parts.filter(Boolean).join(' — ');
+    document.title = parts.filter(Boolean).join(' - ');
   }, [classicOpen, classicLabel, config, activeTab]);
 
   // -- ⌘K ------------------------------------------------------------------

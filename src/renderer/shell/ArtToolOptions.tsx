@@ -290,7 +290,7 @@ export default function ArtToolOptions({ before, caps = FULL_CAPS }: { before?: 
           <Chip
             active={showPriority}
             onClick={() => setOverlay('showPriority', !showPriority)}
-            title="Priority lens — veil the cells that draw IN FRONT of the player (View ▸ Priority on the map)"
+            title="Priority lens: veils the cells that draw IN FRONT of the player (View ▸ Priority on the map)"
           >Priority lens</Chip>
           <Divider />
         </>
