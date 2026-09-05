@@ -141,6 +141,7 @@
     "harness:effects-section-strip": "node scratchpad/effects-section-strip-harness.mjs",
     "harness:effects-sub-tabs": "node scratchpad/effects-sub-tabs-harness.mjs",
     "harness:explorer-canvases": "node scratchpad/explorer-canvases-harness.mjs",
+    "harness:floor-curve-end": "node scratchpad/floor-curve-end-harness.mjs",
     "harness:guard-proof": "node scratchpad/harness-guard-proof.mjs",
     "harness:guard-surface": "node scratchpad/guard-surface-harness.mjs",
     "harness:handover-band": "node scratchpad/handover/handover-band-harness.mjs",
