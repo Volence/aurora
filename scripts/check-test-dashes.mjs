@@ -104,10 +104,14 @@
 // A PLANTED VIOLATION, EVERY RUN. A gate that reports zero is indistinguishable
 // from a gate that looks at nothing, and this repo's dominant defect class is
 // the guard that asserts nothing. So before it believes any count, this file
-// runs its classifier over a synthetic source carrying four known positives --
-// comment and code, character and escape -- and refuses to print OK unless it
-// saw the two code ones and neither comment one. If the AST walk breaks, the
-// canary dies loudly instead of the gate quietly reporting a clean tree.
+// runs its classifier over a synthetic source carrying five known positives (a
+// comment, a string, a template and a regex; both spellings) and refuses to
+// print OK unless it saw exactly the three code ones and neither comment one.
+// If the AST walk breaks, the canary dies loudly instead of the gate quietly
+// reporting a clean tree. Proven by mutation on 2026-09-05: deleting
+// `ts.SyntaxKind.RegularExpressionLiteral` from STRINGY takes the canary from
+// three hits to two and the gate refuses with exit 1, without reaching the
+// tree at all.
 //
 // Run: node scripts/check-test-dashes.mjs   (also in the `npm test` chain)
 
