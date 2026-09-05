@@ -1053,10 +1053,24 @@ describe('layerTopSpace — a locked scene authors screen lines, an unlocked one
 
   it('layerCountLine states the cap and its scope where the owner reads it', () => {
     const s = locked();
+    const base = `${EFFECTS_LAYER_COUNT.min} of ${EFFECTS_LAYER_COUNT.max} layers `
+      + '(per scene; scenes are assigned per section)';
+    // ⚠ THE FIXTURE SITS AT THE FLOOR, which is why this row is where the new
+    // clause showed up. That is not an accident of the fixture: a NEW SCENE
+    // arrives at exactly `min` layers, so the floor is the first state an
+    // author sees and the `Remove layer` buttons are dead in it
+    // (EW-INERT-CONTROL-SILENCE).
+    expect(s.layers.length).toBe(EFFECTS_LAYER_COUNT.min);
+    expect(layerCountLine(s).startsWith(base)).toBe(true);
+    expect(layerCountLine(s)).toMatch(/Remove is off/);
+    expect(layerCountLine(s)).toContain(String(EFFECTS_LAYER_COUNT.min));
+
+    // ABOVE THE FLOOR THE CLAUSE IS GONE — it costs a line only where the
+    // buttons are actually dead, and Remove works everywhere else.
+    s.layers.push({ world_y: 32, fa: 'FACTOR_1', fb: 'FACTOR_1' });
+    expect(s.layers.length).toBeGreaterThan(EFFECTS_LAYER_COUNT.min);
     expect(layerCountLine(s))
       .toBe(`${s.layers.length} of ${EFFECTS_LAYER_COUNT.max} layers (per scene; scenes are assigned per section)`);
-    s.layers.push({ world_y: 32, fa: 'FACTOR_1', fb: 'FACTOR_1' });
-    expect(layerCountLine(s).startsWith(`${s.layers.length} of ${EFFECTS_LAYER_COUNT.max} layers`)).toBe(true);
   });
 
   it('vFactorHint says what the sentinel means inline, from the constant', () => {

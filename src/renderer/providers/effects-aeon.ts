@@ -2911,8 +2911,18 @@ export function sceneVsplitLockAdvisory(
  * always derived, so only the sentence describing it was ever wrong.
  */
 export function layerCountLine(scene: Pick<EffectsScene, 'layers'>): string {
-  return `${scene.layers.length} of ${EFFECTS_LAYER_COUNT.max} layers `
+  const base = `${scene.layers.length} of ${EFFECTS_LAYER_COUNT.max} layers `
     + '(per scene; scenes are assigned per section)';
+  // AND WHY EVERY `Remove layer` BUTTON IS DEAD, WHEN THEY ARE
+  // (EW-INERT-CONTROL-SILENCE, the census row beside cold read C5). At the floor
+  // the buttons grey with no sentence anywhere, and the state is not rare: a
+  // NEW SCENE ARRIVES AT EXACTLY ONE LAYER, so it is the first thing an author
+  // meets. It rides in the count line, which is already rendered, and it says
+  // the number rather than the word "minimum" because the schema's `minItems`
+  // is what decides.
+  if (scene.layers.length > EFFECTS_LAYER_COUNT.min) return base;
+  return `${base}. Remove is off: the schema keeps at least `
+    + `${EFFECTS_LAYER_COUNT.min}, so this one cannot go.`;
 }
 
 /**
