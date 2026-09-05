@@ -167,6 +167,7 @@
     "harness:palette-grid": "node scratchpad/palette-grid-harness.mjs",
     "harness:palette-push": "node scratchpad/palette-push-harness.mjs",
     "harness:paste-pan": "node scratchpad/paste-pan-harness.mjs",
+    "harness:plane-y-referent": "node scratchpad/plane-y-referent-capture.mjs",
     "harness:priority-lens": "node scratchpad/priority-lens-harness.mjs",
     "harness:profile-isolation": "node scratchpad/profile-isolation-proof.mjs",
     "harness:ramp-control": "node scratchpad/ramp-control-harness.mjs",

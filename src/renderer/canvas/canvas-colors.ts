@@ -343,6 +343,28 @@ export const EFFECTS_GUIDE_REFUSED = 'rgba(255, 96, 96, 0.95)';
 export const EFFECTS_GUIDE_REFUSED_BG = 'rgba(40, 10, 12, 0.90)';
 export const EFFECTS_GUIDE_REFUSED_TEXT = 'rgba(255, 205, 200, 0.97)';
 
+// --- A row remap's `plane_y`, drawn ON the background art -------------------
+//
+// `plane_y` is aeon's own words "the BG PLANE LINE at which this layer's art
+// paints the surface the effect is about" (engine/level/parallax.emp:391-393).
+// The map draws Plane B at world origin, so plane row P is map world Y P, and
+// this rule is that row of the author's own art. It answers one question and it
+// is the question a number in a box cannot: is that on my waterline?
+//
+// ⚠ WHITE, AND IT IS NOT A MEMBER OF THE CYAN FAMILY. A layer guide is a
+// DIVISION the author drags; this is a REFERENT the author aims at, and the two
+// are different objects rather than two states of one. The cyan family already
+// carries three degrees of one axis (enabled / disabled / active) and the
+// refusal red is the categorical escape from it; a fourth cyan would be read as
+// a fourth degree. White is unclaimed at this weight (the tile grid is the only
+// white on the canvas and it is a thin 8-px lattice, never a labelled full-width
+// rule), and it is the colour a surface line reads as.
+export const EFFECTS_SURFACE_LINE = 'rgba(255, 255, 255, 0.95)';
+/** A dark casing stroked UNDER the white one, so the rule survives bright art. */
+export const EFFECTS_SURFACE_CASING = 'rgba(0, 0, 0, 0.55)';
+export const EFFECTS_SURFACE_LABEL_BG = 'rgba(12, 14, 20, 0.85)';
+export const EFFECTS_SURFACE_LABEL_TEXT = 'rgba(255, 255, 255, 0.97)';
+
 // --- The BgAnim band lens (ROADMAP item 43 part 2, effects facet) -------------
 //
 // MAGENTA, AND IT WAS TESTED ON THE PERSON WHO COMMISSIONED THE FEATURE.
