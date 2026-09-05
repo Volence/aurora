@@ -161,7 +161,7 @@ export default function CommitPlanView({ pixels, palette, gridOrigin, onApplied 
               {view.offers.includes('adopt-into-zone') && (
                 <Chip onClick={() => setResolution('adopt-into-zone')}
                       active={resolution === 'adopt-into-zone'}
-                      title="Write these colours into the zone palette — every act sharing it changes">
+                      title="Write these colours into the zone palette. Every act sharing it changes">
                   Adopt into the zone
                 </Chip>
               )}
@@ -177,7 +177,7 @@ export default function CommitPlanView({ pixels, palette, gridOrigin, onApplied 
               {reportLines(plan.report, collisionPlan?.applied).map((l) => <div key={l}>{l}</div>)}
             </div>
             <Chip onClick={() => setGiveCollision((v) => !v)} active={giveCollision}
-                  title="Give new art solid, flat collision — the artist refines it in the Collision facet afterward">
+                  title="Give new art solid, flat collision. The artist refines it in the Collision facet afterward">
               Give new art collision
             </Chip>
           </div>

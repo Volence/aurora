@@ -86,7 +86,7 @@ export default function ImportSheetDialog({ onClose }: { onClose: () => void }) 
 
         <div style={styles.body}>
           {!levelDoc || !ref ? (
-            <div style={styles.note}>Open a level act first — a sheet is imported into one.</div>
+            <div style={styles.note}>Open a level act first: a sheet is imported into one.</div>
           ) : (
             <>
               <div style={styles.note}>

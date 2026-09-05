@@ -205,7 +205,7 @@ function CanvasToolDock() {
           // The shortcut is printed from the same table the handler reads, so a
           // rebinding cannot leave the tooltip teaching the old key. A shortcut
           // nobody can discover is not a shortcut.
-          label={`${label} — ${TOOL_KEYS[t].toUpperCase()}`}
+          label={`${label} (${TOOL_KEYS[t].toUpperCase()})`}
           active={tool === t}
           onClick={() => useCanvasStore.getState().setTool(t)}
         />
@@ -240,7 +240,7 @@ function CanvasToolOptions({ docId, onFit }: { docId: string; onFit: () => void 
     <OptionBar>
       <Chip onClick={onFit}>Fit</Chip>
       <span style={{ color: T.textLo }}>
-        {zoom}× · {doc ? `${doc.pixels.width}×${doc.pixels.height}px` : '—'}
+        {zoom}× · {doc ? `${doc.pixels.width}×${doc.pixels.height}px` : '--'}
       </span>
 
       <Divider />
@@ -271,7 +271,7 @@ function CanvasToolOptions({ docId, onFit }: { docId: string; onFit: () => void 
       <Chip
         active={constraintsLive}
         title={'Check this canvas against its profile as you draw. Off is the unconstrained '
-          + 'escape hatch — draw freely, reconcile deliberately; re-enabling rescans.'}
+          + 'escape hatch: draw freely, reconcile deliberately; re-enabling rescans.'}
         onClick={() => st().setConstraintsLive(!constraintsLive)}
       >
         Constraints
@@ -345,7 +345,7 @@ function CanvasDocSection({ docId }: { docId: string }) {
     <div style={styles.section}>
       <div style={styles.stat}><span>Size</span><b>{doc.pixels.width}×{doc.pixels.height}</b></div>
 
-      <label style={styles.row} title="Which target the constraint checks describe. Nothing is prevented — plan 2B reports violations; this only chooses which rules apply and which grids are offered.">
+      <label style={styles.row} title="Which target the constraint checks describe. Nothing is prevented. Plan 2B reports violations; this only chooses which rules apply and which grids are offered.">
         <span style={styles.dim}>Profile</span>
         <select
           style={styles.select}
@@ -481,7 +481,7 @@ function CanvasStatusBar({ docId }: { docId: string }) {
             // a readout that keeps showing its last value while nothing is being
             // checked is the exact shape of a guard that asserts nothing.
             <span style={{ color: T.textLo }} title="Constraint checking is off (Constraints chip)">
-              constraints —
+              constraints --
             </span>
           )}
           {/* Both spellings, because both are true and each is the one some

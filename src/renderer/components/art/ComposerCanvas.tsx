@@ -309,7 +309,7 @@ export default function ComposerCanvas() {
     const act = getCurrentAct(useProjectStore.getState());
     const uses = act ? (tileUsageCounts(act).get(tileIndex) ?? 0) : 0;
     useToastStore.getState().addToast(
-      `tile #${tileIndex} used ${uses}× in this act — edited everywhere`, 'info');
+      `tile #${tileIndex} used ${uses}× in this act, so this edit lands everywhere`, 'info');
   }
 
   /** One set-tileset-tiles command for writes landing on a single atlas tile. */
@@ -597,7 +597,7 @@ export default function ComposerCanvas() {
       // `pri:` is on the chip because the chips are in the OPTION BAR at the top
       // of the frame and the artist's eyes are on the canvas. The flips are here
       // for the same reason and have no other home at all (X/Y keys, a ref).
-      ? `stamp #${s.brushTile}  flip[X]:${flipRef.current.hf ? 'H' : '–'} [Y]:${flipRef.current.vf ? 'V' : '–'}`
+      ? `stamp #${s.brushTile}  flip[X]:${flipRef.current.hf ? 'H' : 'off'} [Y]:${flipRef.current.vf ? 'V' : 'off'}`
         + `  pri:${s.stampPriority}`
       : s.tool === 'palette-apply'
       ? `palette line ${s.paletteLine} → cells`
@@ -719,7 +719,7 @@ export default function ComposerCanvas() {
               // if the doc has unsaved edits, warn that they were left out.
               if (o.dirty) {
                 useToastStore.getState().addToast(
-                  'Copied saved chunk state — unsaved edits not included', 'info');
+                  'Copied saved chunk state. Unsaved edits are not included', 'info');
               }
               e.preventDefault();
             }

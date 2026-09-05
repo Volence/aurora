@@ -62,7 +62,7 @@ export default function SpriteDocUnloaded({ tabId, title }: { tabId: string; tit
         <button style={styles.button} onClick={() => { void requestFocusTabId(tabId); }}>
           {waitingForAct ? 'Try again' : 'Retry'}
         </button>
-        <div style={styles.hint}>Closing this tab is always safe — nothing is loaded to lose.</div>
+        <div style={styles.hint}>Closing this tab is always safe: nothing is loaded to lose.</div>
       </div>
     </div>
   );

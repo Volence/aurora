@@ -182,7 +182,7 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
         title="Re-encode the edited pixels with Nemesis and write them back to the source .nem art file (mtime-guarded)."
         onClick={handleSaveArt}>Save art → {s1ArtSource.relPath}</button>
       <div style={styles.notice}>
-        S1 mappings are read-only in v1 — pixel edits save back to the source art;
+        S1 mappings are read-only in v1: pixel edits save back to the source art;
         piece, shape, and added/removed-frame changes are not written.
       </div>
     </div>
@@ -219,7 +219,7 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
 
           <CollapsibleSection
             id="sprite.open"
-            title="Open — import a sprite to edit or convert"
+            title="Open (import a sprite to edit or convert)"
             defaultCollapsed={classicOpen}
           >
           <div style={styles.section}>
@@ -230,7 +230,7 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
                 {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
               </select>
             </label>
-            <label style={styles.fmtRow} title="Art compression of the picked art file. This is per-SPRITE, not per-game — e.g. most S3K badnik art is Kosinski-moduled; some is Nemesis or uncompressed.">
+            <label style={styles.fmtRow} title="Art compression of the picked art file. This is per-SPRITE, not per-game. For example, most S3K badnik art is Kosinski-moduled; some is Nemesis or uncompressed.">
               <span style={styles.dim}>Art comp.</span>
               <select style={styles.fmtSelect} value={openComp} onChange={(e) => setOpenComp(e.target.value as CompressionKind)}>
                 {COMPRESSIONS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
@@ -245,7 +245,7 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
               Scan disassembly project…
             </button>
             <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy}
-              title="Load an animation script (.asm) for the current sprite — classic Sonic ($FF/$FE) or S4-engine (AF_*) form."
+              title="Load an animation script (.asm) for the current sprite: classic Sonic ($FF/$FE) or S4-engine (AF_*) form."
               onClick={async () => { if (busy) return; setBusy(true); try { await loadSpriteAnimations(); } finally { setBusy(false); } }}>
               Load animations…
             </button>
@@ -263,7 +263,7 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
                       <span style={styles.scanBadges}>
                         <span style={styles.scanGame}>{s.game.toUpperCase()}</span>
                         {s.dplc && <span style={styles.scanTag} title="DPLC found">D</span>}
-                        <span style={{ ...styles.scanTag, opacity: s.art ? 1 : 0.35 }} title={s.art ? 'art auto-paired' : 'art not found — pick on open'}>A</span>
+                        <span style={{ ...styles.scanTag, opacity: s.art ? 1 : 0.35 }} title={s.art ? 'art auto-paired' : 'art not found. Pick one on open'}>A</span>
                       </span>
                       <button style={styles.scanOpen} disabled={busy}
                         onClick={async () => { if (busy) return; setBusy(true); try { await openDiscoveredSet(scan.baseDir, s, openComp); } finally { setBusy(false); } }}>Open</button>
@@ -283,7 +283,7 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
                 <div style={styles.btnRow}>
                   <select style={{ ...styles.nameInput, flex: 1 }} value=""
                     onChange={(e) => { if (e.target.value) { setSpriteName(e.target.value); } }}>
-                    <option value="">{available.length ? `— pick saved (${available.length}) —` : '— none saved yet —'}</option>
+                    <option value="">{available.length ? `-- pick saved (${available.length}) --` : '-- none saved yet --'}</option>
                     {available.map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                   <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleLoad}>Load</button>
@@ -314,7 +314,7 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
             <div style={styles.btnRow}>
               <button style={{ ...styles.primary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleExport}>Export</button>
               <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy}
-                title="Save the mappings (+ DPLC) as disassembly .asm macro source (spritePiece/dplcEntry) — to port back into a Sonic 1/2/3K disassembly."
+                title="Save the mappings (+ DPLC) as disassembly .asm macro source (spritePiece/dplcEntry), to port back into a Sonic 1/2/3K disassembly."
                 onClick={async () => { if (busy) return; setBusy(true); try { await exportSpriteAsm(spriteName); } finally { setBusy(false); } }}>Export .asm…</button>
             </div>
           </div>

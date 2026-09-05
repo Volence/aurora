@@ -165,7 +165,7 @@ export default function Timeline() {
       <div style={styles.steps}>
         {dyn && (
           <div style={styles.hint}>
-            Dynamic {DYN_MODE_LABEL[dyn.mode]} script — Sonic_Animate picks frames and cadence from the
+            Dynamic {DYN_MODE_LABEL[dyn.mode]} script: Sonic_Animate picks frames and cadence from the
             scrubbed inertia/angle; there are no editable steps.
           </div>
         )}

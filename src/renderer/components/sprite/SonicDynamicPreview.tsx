@@ -105,7 +105,7 @@ export default function SonicDynamicPreview({ name, dynamic, frames, colors, spe
           : <div style={styles.hint}>starting…</div>}
       </div>
       <div style={styles.status} title="variant · frame · hold (interpreter output)">
-        {sample ? `${sample.variant} · f${hex(sample.frame)} · hold ${sample.hold + 1}t` : '—'}
+        {sample ? `${sample.variant} · f${hex(sample.frame)} · hold ${sample.hold + 1}t` : '--'}
       </div>
       <label style={styles.row} title="sonic inertia">
         <span style={styles.label}>spd {hex(inertia)}</span>

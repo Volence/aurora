@@ -198,7 +198,7 @@ export default function TilesetPanel() {
 
     if (hoverLabelRef.current) {
       hoverLabelRef.current.textContent = newIdx >= 0
-        ? `#${newIdx} (0x${newIdx.toString(16).toUpperCase()}) — used ${usageRef.current.get(newIdx) ?? 0}× in this act`
+        ? `#${newIdx} (0x${newIdx.toString(16).toUpperCase()}), used ${usageRef.current.get(newIdx) ?? 0}× in this act`
         : '';
     }
   }, [itemSize, itemCount]);
@@ -250,7 +250,7 @@ export default function TilesetPanel() {
     if (!o || o.liveTileIndex === null || !z || !level) return;
     const atlas = z.tileset.tiles;
     if (atlas.length + 1 > 0x800) {
-      useToastStore.getState().addToast('Tileset full (2048 tiles) — cannot duplicate', 'error');
+      useToastStore.getState().addToast('Tileset full (2048 tiles). Cannot duplicate', 'error');
       return;
     }
     const src = atlas[o.liveTileIndex];
@@ -293,7 +293,7 @@ export default function TilesetPanel() {
       return;
     }
     if (atlas.length + result.newTiles.length > 0x800) {
-      useToastStore.getState().addToast('Tileset full (2048 tiles) — cannot add', 'error');
+      useToastStore.getState().addToast('Tileset full (2048 tiles). Cannot add', 'error');
       return;
     }
 
@@ -312,9 +312,9 @@ export default function TilesetPanel() {
     } else if (entry.hFlip || entry.vFlip) {
       // Dedup matched only after flipping — say so, since the art won't look
       // identical to what was drawn.
-      useToastStore.getState().addToast(`Matches existing tile #${tileIdx} (flipped) — opened it`, 'info');
+      useToastStore.getState().addToast(`Matches existing tile #${tileIdx} (flipped). Opened it`, 'info');
     } else {
-      useToastStore.getState().addToast(`Identical tile already exists — opened #${tileIdx}`, 'info');
+      useToastStore.getState().addToast(`Identical tile already exists. Opened #${tileIdx}`, 'info');
     }
     // Add-to-tileset resolves the new doc to a live atlas tile — never dirty at
     // this point, so openDocument directly (no guard needed).
@@ -359,7 +359,7 @@ export default function TilesetPanel() {
           {liveTileOpen && open && (
             <>
               <span style={styles.liveInfo}>
-                tile #{open.liveTileIndex} — used {usage.get(open.liveTileIndex!) ?? 0}× in this act
+                tile #{open.liveTileIndex}, used {usage.get(open.liveTileIndex!) ?? 0}× in this act
               </span>
               <button style={styles.actionButton} onClick={handleDuplicate}
                 title="Copy this tile to a new atlas slot and edit the copy (map keeps the original)">
