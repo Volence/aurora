@@ -634,9 +634,22 @@ async function main() {
         after !== null && before !== null && after.plane_y === before.plane_y
         && after.plane_y !== over && after.plane_y !== Number(planeState.max),
         `plane_y stayed ${after?.plane_y} (was ${before?.plane_y}); the box's own advertised max `
-        + `is ${planeState.max}. Refusal on screen = ${/plane_y/.test(refusalText)}. A clamp `
-        + 'would substitute a number the author did not type, and this range is the contract\'s '
-        + 'ONLY enforcement - aeon checks the floor and not the ceiling.');
+        + `is ${planeState.max}. A clamp would substitute a number the author did not type, and `
+        + 'this range is the contract\'s ONLY enforcement - aeon checks the floor and not the '
+        + 'ceiling.');
+      // ⚠ AND THE AUTHOR IS TOLD WHY. The first run of this harness probed for
+      // the string "plane_y" and reported "Refusal on screen = false", which
+      // reads exactly like a silent refusal - a control that eats a keystroke
+      // and explains nothing. It was the PROBE that was wrong: the sentence
+      // `rowRemapPlaneYRefusal` produces never says "plane_y", it names the
+      // range. Matched here on the wording the function actually emits, so a
+      // real silence would fail this row instead of being excused by it.
+      check('6e2', 'and the refusal is on screen, in the contract\'s own words',
+        /outside the Plane-B line range/.test(refusalText),
+        'the sentence is rowRemapPlaneYRefusal\'s: "... is outside the Plane-B line range '
+        + '0..511. This bound is the CONTRACT\'S ONLY ENFORCEMENT: aeon checks the floor and '
+        + 'not the ceiling, so a larger value would build clean and emit a window pointing '
+        + 'nowhere."');
       await drive(c, `plane_y -> ${PLANE_Y}`, SET_INPUT(REMAP_PLANEY, PLANE_Y));
       await sleep(500);
     }
@@ -674,20 +687,71 @@ async function main() {
       `option = ${JSON.stringify(downOption)} · document now `
       + `curve=${JSON.stringify(downDoc?.layers?.[REMAP_LAYER]?.curve)} over fb=`
       + `${JSON.stringify(downDoc?.layers?.[REMAP_LAYER]?.fb)}`);
-    check('7b', 'and the panel says NOTHING about the direction of the ramp - this is the '
-      + 'FINDING, measured off the rendered text',
-      !/(descend|downhill|ramps down|garbl)/i.test(downText),
+    // ⚠ THIS ROW IS INVERTED FROM ITS FIRST RUN, AND THAT IS THE PARCEL.
+    // On the first pass it asserted the panel said NOTHING - `!/(descend|
+    // garbl)/i` over the rendered text - and it PASSED, which is how the gap
+    // was measured rather than argued. `curveDescendingAdvisory` landed after
+    // that reading; the row now asserts the sentence is there. The before
+    // state is on record in the packet and in that commit.
+    check('7b', 'the panel now WARNS that the ramp runs downward, off the rendered text',
+      /ramps DOWNWARD/.test(downText) && /garbl/i.test(downText),
       'aeon df3b8810: "a DESCENDING parallax curve garbles the background and an ascending one '
       + 'does not. Every curve shipped in this tree ramps upward, so nothing had ever exercised '
       + 'the other direction." aeon\'s layer() refuses only the DEGENERATE case (both ends '
-      + 'equal), so nothing between the picker and the ROM mentions direction.');
-    await shotAt(c, CURVE_SEL, '06-descending-curve-unremarked');
+      + 'equal), so before this parcel nothing between the picker and the ROM mentioned '
+      + 'direction. It is a WARNING and not a refusal - see [7e].');
+    await shotAt(c, CURVE_SEL, '06-descending-curve-warned');
     await drive(c, `layer ${REMAP_LAYER} curve.to back UPWARD`, SET_SELECT(CURVE_SEL, CURVE_TO));
     await sleep(500);
     const backUp = await c.json(`(${SCENE_JSON()})`);
     check('7c', 'the probe is undone - the saved scene ramps upward',
       JSON.stringify(backUp?.layers?.[REMAP_LAYER]?.curve) === JSON.stringify({ to: CURVE_TO }),
       `curve=${JSON.stringify(backUp?.layers?.[REMAP_LAYER]?.curve)}`);
+
+    // ── [7d] ⚠ THE ALIAS PAIR, WHICH A BUILD REFUSED ─────────────────────
+    //
+    // `FACTOR_LOCKED` and `FACTOR_0` are ONE VALUE with two spellings (aeon
+    // `parallax_dsl.emp`: `pub const FACTOR_0 = FACTOR_LOCKED`, both $0FF).
+    // `curveGoesNowhere` compared SPELLINGS, so Aurora greyed nothing and said
+    // nothing while aeon's layer() guard 4 - which compares the packed VALUE -
+    // refused the pair and wrote no ROM:
+    //
+    //   error: layer(): curve: To(255) is the same factor as this layer's fb
+    //
+    // Both halves of that pair have real controls, so this is reachable by
+    // gestures rather than only by a hand edit. `fb` is driven for real; then
+    // the curve list is read off the DOM, where the fix has to show up as the
+    // ENGINE'S OWN REFUSAL attached to BOTH spellings.
+    const fbSel = SEL_BY_TITLE(String.raw`/^Layer ${REMAP_LAYER} fb\b/`);
+    const fbToZero = await drive(c, `layer ${REMAP_LAYER} fb -> FACTOR_0`,
+      SET_SELECT(fbSel, 'FACTOR_0'));
+    await sleep(600);
+    const aliasList = await c.json(OPTIONS_OF(CURVE_SEL));
+    const greyed = aliasList === null ? []
+      : aliasList.options.filter((o) => o.disabled).map((o) => o.value);
+    check('7d', 'with fb on FACTOR_0 the curve picker greys BOTH spellings of that one factor',
+      fbToZero === 'ok' && greyed.includes('FACTOR_0') && greyed.includes('FACTOR_LOCKED'),
+      `disabled options = ${JSON.stringify(greyed)}. Before this parcel only the matching `
+      + 'SPELLING was greyed, so an author could land FACTOR_LOCKED on an fb of FACTOR_0 and '
+      + 'the build refused it. The option carries the engine\'s own reason: '
+      + `${JSON.stringify(aliasList?.options.find((o) => o.value === 'FACTOR_LOCKED')?.title)}`);
+    await shotAt(c, CURVE_SEL, '06b-alias-greyed');
+    // Restore fb, and re-assert the greying FOLLOWED it rather than being stuck
+    // on - a picker that disabled those two always would pass [7d] for free.
+    await drive(c, `layer ${REMAP_LAYER} fb back to ${CURVE_FROM}`,
+      SET_SELECT(fbSel, CURVE_FROM));
+    await sleep(600);
+    const afterRestore = await c.json(OPTIONS_OF(CURVE_SEL));
+    const greyedNow = afterRestore === null ? []
+      : afterRestore.options.filter((o) => o.disabled).map((o) => o.value);
+    check('7e', 'and the greying tracks fb - back on ' + CURVE_FROM + ' only that one value is '
+      + 'refused, and the DESCENDING option is NOT greyed',
+      greyedNow.length === 1 && greyedNow[0] === CURVE_FROM
+      && !greyedNow.includes(CURVE_DOWN),
+      `disabled options = ${JSON.stringify(greyedNow)}. aeon REFUSES the equal pair and PERMITS `
+      + 'a descending one, so Aurora greys the first and only warns about the second: the '
+      + 'mechanism behind the garbling is unestablished, and a control that refused it would '
+      + 'be Aurora inventing a rule the engine does not have.');
 
     // ── [8] THE PRECONDITIONS, READ OFF THE SCREEN ────────────────────────
     const pageText = await c.evalExpr('document.body.innerText');
@@ -753,7 +817,27 @@ async function main() {
         `remapped strips = ${JSON.stringify(onDisk.layers
           .map((l, i) => (l.rowRemap !== undefined && l.rowRemap !== 'none' ? i : -1))
           .filter((i) => i >= 0))}`);
-      writeFileSync(join(SHOTS, `${SCENE_ID}.json`), readFileSync(SCENE_PATH));
+      // ⚠ THE CONTROL THAT MAKES THE ROM STILL THIS RUN'S. The ROM handed over
+      // was built from the document the FIRST pass saved; this pass runs
+      // against an app whose curve row has since gained two behaviours. If the
+      // bytes the app writes had moved, that ROM would no longer be the one
+      // this harness authors, and every hash in the packet would be about a
+      // document nothing here produced any more. Compared against the COMMITTED
+      // capture, byte for byte, rather than re-derived from the same objects.
+      const capture = join(SHOTS, `${SCENE_ID}.json`);
+      if (existsSync(capture)) {
+        const now = readFileSync(SCENE_PATH);
+        const then = readFileSync(capture);
+        check('9h', 'the app still writes the IDENTICAL document, so the built ROM is still '
+          + 'this scene\'s',
+          Buffer.compare(now, then) === 0,
+          `${now.length} B now vs ${then.length} B in the committed capture. The curve fix is a `
+          + 'reader and an advisory; it must not have changed a single authored byte.');
+      } else {
+        cannotMeasure('9h', 'the saved bytes match the committed capture',
+          `no capture at ${capture} to compare against`);
+      }
+      writeFileSync(capture, readFileSync(SCENE_PATH));
     } else {
       cannotMeasure('9c', 'the remap reached disk', 'the scene file was never written');
     }
