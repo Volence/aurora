@@ -171,6 +171,7 @@ import type { FactorOption } from './effects-aeon';
 // two shift formulas the vendored schema states in its own descriptions.
 import {
   cramLocation, fmtGenesisWord, CRAM_LINE_ENTRIES, CRAM_LINE_COUNT, CRAM_WORD_BYTES,
+  CRAM_WORD_MAX,
 } from '../../core/formats/palette';
 // THE NEGATIVE-VALUE CAVEAT LIVES IN core/, NOT HERE, for `preset-lag.ts`'s
 // reason: it is a self-retiring disclosure whose premise is measured against a
@@ -1160,6 +1161,47 @@ export function setArmFieldCommand(
  * cannot build a document at all, so it refuses with `coloursRefusal` and writes
  * nothing. It does NOT range-check the integers it does parse — that is §E.4's
  * line, and the engine's own refusal carries the burst ceiling behind it.
+ *
+ * ═══ EXCEPT FOR THE WIDTH, WHICH IS SHAPE (cold read 2026-09-05, C7) ═══
+ *
+ * `Number.isInteger` and nothing else let `143584` commit in silence, and the
+ * swatch beside the box then painted a plausible GREEN for it — because the
+ * decode MASKS. That is the worst outcome available: wrong output that looks
+ * like it worked. `0143584` was reached by an ordinary accident (the `colours`
+ * box is `<input type=text>`, so it appends rather than replacing) and nothing
+ * on the card said a word.
+ *
+ * ⚠ THE BOUND IS THE WIRE TYPE AND NOT A RANGE OPINION, which is the whole
+ * reason it may be asserted here at all. Read, not assumed:
+ *
+ *   • aeon `games/sonic4/data/effects/ojz_effects.emp` @305af2221, line 265 —
+ *     the shipping declaration of a raster program:
+ *         pub data OJZ_TestRaster: [u16; raster_words(OJZ_TEST_PROG)]
+ *             = raster_program(OJZ_TEST_PROG)
+ *   • aeon `engine/effects/raster_dsl.emp` @305af2221, line 3646 — where a
+ *     colour lands inside that array:
+ *         ON body  op_words(Cram) = [OP_CRAM, comm>>16, comm&$FFFF, SPIN,
+ *                                    len-1] ++ colours
+ *   • Aurora's own sentence for the same fact, `core/agent/validation.ts:8` —
+ *         `color $${word} is not a 16-bit word`
+ *
+ * So a colour IS one u16 of the emitted program. `143584` names no CRAM word at
+ * all, exactly as `"x"` names no integer — the same class of fault as the check
+ * above it, not a range aeon leaves to the engine. §E.4 forbids inventing a
+ * bound; it does not require accepting a number the wire cannot hold.
+ *
+ * ⚠⚠ AND THE STRICTER RULE IS DELIBERATELY NOT APPLIED, because this repo does
+ * not agree with itself about it. `core/agent/validation.ts` ALSO refuses any
+ * word with `(word & $F111) !== 0` ("channels must be even values 0-$E") — the
+ * 0BGR0 grid. But `core/formats/palette.ts`'s `sameGenesisColor` says the
+ * opposite about the same bits, in its own docblock: "Two words that differ only
+ * outside the mask are THE SAME COLOUR … a palette read out of a disasm can
+ * carry junk in the dead bits". And aeon's `stream_cram` bounds `addr` and
+ * `colours.len` and NOTHING about a colour's value, so a grid check here would
+ * refuse documents aeon's build accepts — a bound Aurora made up, which is
+ * precisely what §E.4 names. The disagreement is written up in
+ * `docs/reviews/2026-09-05-coldread-fixes.md` rather than resolved by this
+ * parcel. What is enforced is only the half every source agrees on.
  */
 export function parseColours(
   text: string, subject?: string,
@@ -1183,6 +1225,16 @@ export function parseColours(
     if (!Number.isInteger(n)) {
       return { ok: false, reason: `${where}"${t}" is not an integer. Colours are CRAM words — `
         + 'decimal, or 0x-prefixed hex.' };
+    }
+    if (n < 0 || n > CRAM_WORD_MAX) {
+      // NAMES WHAT IS STILL IN THE DOCUMENT, like every refusal on this surface
+      // — and says the swatch is not to be trusted here, because it masks and
+      // will happily paint an out-of-range word as a legal colour.
+      return { ok: false, reason: `${where}"${t}" is not a CRAM word. A colour is ONE 16-bit `
+        + `word (0..${CRAM_WORD_MAX}, or $0000..$FFFF) — it is emitted into the raster `
+        + 'program\'s [u16; …] array, so a wider number names no colour at all. Refused; the '
+        + 'colour list in the document is unchanged. (The swatch masks, so it would have shown '
+        + 'you a plausible colour for this.)' };
     }
     colours.push(n);
   }
@@ -1259,8 +1311,32 @@ export function colourSwatchTitle(addr: number, i: number, word: number): string
   const at = cramLocation(addr + i * CRAM_WORD_BYTES);
   const where = at === null ? 'not a CRAM address'
     : `line ${at.line} · entry ${at.entry}`;
+  // THE SWATCH AND THE COMMIT MUST NOT DISAGREE ABOUT WHAT IS LEGAL. `parseColours`
+  // now refuses a word the wire cannot hold, but a document can still carry one
+  // — off disk, or through the agent path, which goes via the schema and the
+  // schema states no bound. `decodeGenesisColor` MASKS, so it would paint a
+  // plausible colour for it. `addrGloss`'s rule, one field over: name the
+  // abnormal case rather than rendering a confident answer for it.
+  if (!cramWordIsPaintable(word)) {
+    return `Colour ${i} → ${where} — ${word} is NOT a CRAM word (a colour is one 16-bit word, `
+      + `0..${CRAM_WORD_MAX}). No swatch is drawn for it: the decode masks, so any colour shown `
+      + 'here would be invented. Retype the list to replace it.';
+  }
   return `Colour ${i} → ${where} — ${word} (${fmtGenesisWord(word)}). `
     + 'Click to open the R/G/B sliders. The list beside it stays the wire value.';
+}
+
+/**
+ * Is this word one the swatch may DRAW — i.e. does the decode see all of it?
+ *
+ * ⚠ NOT "is this a good colour". `decodeGenesisColor` reads bits 1-3, 5-7 and
+ * 9-11 and masks everything else away, so it answers for any number at all,
+ * confidently and wrongly. The rule here is `parseColours`' rule and the same
+ * `CRAM_WORD_MAX` — see that function's docblock for what it is derived from and
+ * for why the STRICTER `& $F111` grid rule is deliberately not applied.
+ */
+export function cramWordIsPaintable(word: number): boolean {
+  return Number.isInteger(word) && word >= 0 && word <= CRAM_WORD_MAX;
 }
 
 /**

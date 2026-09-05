@@ -175,7 +175,7 @@ import {
   // EW-COLOUR-PICKER — defect 13's colour half. Every one of these is a
   // derivation or a sentence, and every one of them is the PROVIDER's: the
   // component below draws swatches and does not know what a CRAM line is.
-  addrGloss, colourSwatchTitle, setColourCommand, cramSpanAdvisory,
+  addrGloss, colourSwatchTitle, setColourCommand, cramSpanAdvisory, cramWordIsPaintable,
   CYCLES_TITLE, CYCLES_STATE_OPTIONS, cyclesState, setCyclesStateCommand,
   addCycleChannelCommand, removeCycleChannelCommand, setCycleFieldCommand, cycleFieldTitle,
   emptyCyclesAdvisory,
@@ -1210,11 +1210,23 @@ function ColourSwatches({ library, presetId, index, addr, colours, run, onEdited
             aria-label={`Colour ${i} of raster band ${index}`}
             data-band-colour={i}
             onClick={() => setSel((cur) => (cur === i ? null : i))}
+            data-band-colour-unpaintable={cramWordIsPaintable(word) ? undefined : ''}
             style={{
               width: 16, height: 16, padding: 0, boxSizing: 'border-box',
-              background: swatchCss(sel === i && draft !== null ? draft : word),
+              // ⚠ A WORD THE WIRE CANNOT HOLD GETS NO COLOUR, because the decode
+              // MASKS and would invent one — the cold read's C7, where `143584`
+              // painted a cheerful green. `parseColours` now refuses such a word
+              // at commit, but a document can still arrive carrying one (off
+              // disk, or through the agent path, whose schema states no bound),
+              // and the swatch is the second consumer of the same rule. It must
+              // not disagree with the first. Diagonal bars, not a colour: the
+              // title says what it is.
+              background: cramWordIsPaintable(word)
+                ? swatchCss(sel === i && draft !== null ? draft : word)
+                : `repeating-linear-gradient(45deg, ${T.warning} 0 2px, transparent 2px 4px)`,
               borderWidth: sel === i ? 2 : 1, borderStyle: 'solid',
-              borderColor: sel === i ? T.textHi : T.border,
+              borderColor: sel === i ? T.textHi
+                : cramWordIsPaintable(word) ? T.border : T.warning,
               borderRadius: 2, cursor: 'pointer',
             }} />
         ))}
