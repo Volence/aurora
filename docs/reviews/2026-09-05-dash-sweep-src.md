@@ -355,6 +355,39 @@ dead that its instrument could not see. A gate would have said so the same day.
 It still needs design, because it must not go red on the tests bucket's pending
 work. It is a proposal here, not a landing.
 
+## A third route, on the SHIPPED artifact, and what it found beyond this bucket
+
+Both counting routes read source. A build was made
+(`VITE_AURORA_DEBUG=1 npm run build`) and the same esbuild comment-stripping
+count run over `dist/`, which measures what actually ships rather than what the
+tree says. The raw count is 2,910, and every one of those is a comment the
+debug build preserves; with comments stripped, **291 dashes survive in the
+built artifact's strings**. All 291 are attributed, by sampling rather than by
+assumption:
+
+| where | count | what it is |
+|---|---|---|
+| `dist/main/index.mjs` | 140 | `iconv-lite`'s codepage tables. Third party, and not text at all: they are character-set maps that happen to contain the characters. |
+| `classicProjectStore` chunk | 80 | `bganim-consumer-contract.json`, vendored, bundled because it is imported. Excluded by the sidecar rule. |
+| `index` chunk | 69 | `docs/guides/effects-first-run.md`, imported with Vite's `?raw` and rendered VERBATIM into the Guide tab. |
+| `classic-surface-buffer` chunk | 2 | exactly the two sanctioned aeon quotations. |
+
+**So the shipped tool text carries the 2 this parcel sanctioned, and 69 that
+belong to a file outside it.** `docs/guides/effects-first-run.md` carries 65
+U+2014 and 4 U+2013, and it is not documentation that sits beside the app: it
+IS a page an author reads inside Aurora, on the Guide tab. The components
+parcel found the same file and corrected exactly one quotation in it, naming
+the rest as somebody's bucket. It still is. **It is a real residual under the
+owner's ruling and it is named here so the next parcel does not have to
+rediscover it**; `docs/` is outside this parcel's scope and it was not touched.
+
+The vendored 80 were checked rather than relayed. `bg-override.ts` reads that
+contract through one loud accessor, and every read is a value, a default, a key
+name, an ownership tag or a requiredness flag. No `why`, `note` or `$comment`
+prose field is read into any rendered string, so none of those 80 reaches an
+author. That is the components parcel's claim, re-derived here rather than
+quoted.
+
 ## Suite
 
 Measured in this worktree, with the full `npm test` chain.
