@@ -34,11 +34,14 @@
 // bganim-preview.ts, which both already depend on it. Identity, no offset.
 
 import type { EffectsLayer } from '../../core/formats/effects/scene';
+import { rowRemapOf, rowRemapHeightLines } from '../../core/formats/effects/scene-ui';
 import type { LayerTopSpace } from '../providers/effects-aeon';
 import {
   EFFECTS_GUIDE_LINE, EFFECTS_GUIDE_LINE_DISABLED, EFFECTS_GUIDE_ACTIVE,
   EFFECTS_GUIDE_LABEL_BG, EFFECTS_GUIDE_LABEL_TEXT,
   EFFECTS_GUIDE_REFUSED, EFFECTS_GUIDE_REFUSED_BG, EFFECTS_GUIDE_REFUSED_TEXT,
+  EFFECTS_SURFACE_LINE, EFFECTS_SURFACE_CASING,
+  EFFECTS_SURFACE_LABEL_BG, EFFECTS_SURFACE_LABEL_TEXT,
 } from './canvas-colors';
 
 /** The map viewport, in the shape the draw pass already has one. */
@@ -272,6 +275,173 @@ export function layerGuideGeometry(
   return out;
 }
 
+// ═══ `plane_y` GETS A REFERENT: THE ROW OF THE AUTHOR'S OWN BG ART ═══
+//
+// THE PROBLEM THIS EXISTS FOR, in the closing finding of the parcel that made
+// the field authorable (docs/reviews/2026-09-05-rowremap-author.md section 6
+// item 3): "`plane_y` has no help beyond its range. The box refuses past 511 and
+// says why, but nothing anywhere relates the number to the strip, to the
+// anchored split, or to the art." A control that can only say what a number is
+// NOT is honest and useless.
+//
+// AEON'S OWN DEFINITION, quoted rather than paraphrased
+// (engine/level/parallax.emp:391-393, read at a2bb5904):
+//
+//     brm_plane_y   the BG PLANE LINE at which this layer's art paints the
+//                   surface the effect is about. Half of the perspective
+//                   quantity: the BG's image of that surface is at screen line
+//                   `brm_plane_y - Vscroll_BG`.
+//
+// So it is a row of the BACKGROUND ART, and the author is the only party who
+// knows which row that is. Drawing the rule puts the question in a form a person
+// can answer by looking: is that on my waterline?
+//
+// ⚠ THE SCREEN LINE IS A DIFFERENT QUANTITY AND IS DELIBERATELY NOT DRAWN HERE.
+// `plane_y - Vscroll_BG` is where the surface lands on the SCREEN, and its second
+// term is a per-frame runtime value; the camera preview inside the screen frame
+// is the surface that models that. What this rule marks is the term the document
+// owns, and that term has no camera in it at all.
+//
+// ═══ WHY WORLD Y IS THE PLANE ROW, IN BOTH SPACES, WITH NO LOCK TEST ═══
+//
+// `SectionRenderer.renderBg` is `ctx.drawImage(this.bg.canvas, 0, 0)` under the
+// viewport transform, so plane row P sits at map world Y = P. That is a fact
+// about how the MAP composites Plane B, not about a scene's vertical mapping, so
+// it holds on a locked scene and an unlocked one alike. The layer guides above
+// needed a whole correction block to establish their origin (see it); this rule
+// needs none, because it was never measured from a layer.
+//
+// ⚠ AND IT DOES NOT MOVE WHEN `v_offset` MOVES. That is the same trap row 65 fell
+// into for the guides and is worth naming here before someone re-derives it:
+// `v_offset` is where the SCREEN sits on the plane, and this rule is a row OF the
+// plane. Subtracting it would weld the waterline to the view box.
+
+/** Where one `plane_y` rule ends up, and what the label says about it. */
+export interface SurfaceGeometry {
+  /** The layer whose `rowRemap` names this line. */
+  index: number;
+  /** The document's `plane_y`, a Plane-B row. */
+  planeY: number;
+  /** `1 << height_shift`, shown so the two numbers of the key read together. */
+  heightLines: number;
+  canvasY: number;
+  onScreen: boolean;
+}
+
+/**
+ * The `plane_y` rules for a viewport, in layer order.
+ *
+ * Split from the draw for the reason `layerGuideGeometry` is: the node suite can
+ * assert placement without a canvas, and `__dbg` reports what was DRAWN rather
+ * than letting a harness recompute the answer it is checking.
+ *
+ * A layer with no `rowRemap`, or with `"none"`, contributes nothing. A DISABLED
+ * layer still contributes one, for the reason a disabled layer still draws a
+ * guide: the panel still lists the field and the author is still editing it.
+ */
+export function surfaceGeometry(
+  layers: readonly EffectsLayer[], vp: GuideViewport,
+): SurfaceGeometry[] {
+  const out: SurfaceGeometry[] = [];
+  for (let i = 0; i < layers.length; i++) {
+    const rr = rowRemapOf(layers[i].rowRemap);
+    if (rr === null) continue;
+    // No origin term. See the block above: the plane is drawn at world 0.
+    const canvasY = worldYToCanvasY(rr.plane_y, vp.y, vp.zoom);
+    out.push({
+      index: i,
+      planeY: rr.plane_y,
+      heightLines: rowRemapHeightLines(rr.height_shift),
+      canvasY,
+      onScreen: canvasY >= 0 && canvasY <= vp.height,
+    });
+  }
+  return out;
+}
+
+/** The caption that says what the white rule IS, or null when none is drawn. */
+export function surfaceCaption(rows: readonly SurfaceGeometry[]): string | null {
+  if (rows.length === 0) return null;
+  return 'white rule = plane_y, the BG art row the remap treats as the surface';
+}
+
+/**
+ * Draw the `plane_y` rules over the already-composed map.
+ *
+ * NO CLOCK, NO STATE, for the reason `drawLayerGuides` states: this runs inside
+ * the draw pass that already repaints on a pan, a zoom, a store change and an
+ * undo. MapViewport's measured zero-idle-repaint property is untouched.
+ *
+ * DRAWN AFTER THE GUIDES so a `plane_y` sitting exactly on a layer top is still
+ * visible, which is the case the seed value produces: the rowRemap parcel seeded
+ * `plane_y` from the strip's own top, so the two coincide on a fresh document and
+ * the referent would be invisible on the one scene most likely to be opened.
+ */
+export function drawSurfaceMarks(
+  ctx: CanvasRenderingContext2D, vp: GuideViewport, rows: readonly SurfaceGeometry[],
+): void {
+  if (rows.length === 0) return;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.font = '10px system-ui, sans-serif';
+  ctx.textBaseline = 'middle';
+  for (const row of rows) {
+    if (!row.onScreen) continue;
+    // Half-pixel offset, same reason as the guides: a 1px line on an integer
+    // coordinate straddles two device rows and smears.
+    const y = Math.round(row.canvasY) + 0.5;
+
+    // The casing first, unbroken, so the dashes read on white art as well as on
+    // black. A dashed white line alone vanishes over OJZ's bright water tiles,
+    // which is exactly the art this key is for.
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(vp.width, y);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = EFFECTS_SURFACE_CASING;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(vp.width, y);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = EFFECTS_SURFACE_LINE;
+    // A long dash, not the guides' short one: the two dash patterns are what
+    // separate a referent from a division at a glance, before either label is
+    // read.
+    ctx.setLineDash([12, 6]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // The label names the KEY, not just the number, because the whole defect is
+    // that the number related to nothing. `H=` rides along so the band height
+    // and the surface row are read together, which is how they are authored.
+    const text = `L${row.index} plane_y=${row.planeY} (surface, H=${row.heightLines})`;
+    const w = ctx.measureText(text).width;
+    // Right-hand column, so it never collides with the guides' left-hand labels
+    // on a scene where a top and a plane_y coincide.
+    const boxX = Math.max(4, vp.width - w - 16);
+    const boxY = row.canvasY < 16 ? y + 2 : y - 15;
+    ctx.fillStyle = EFFECTS_SURFACE_LABEL_BG;
+    ctx.fillRect(boxX, boxY, w + 8, 13);
+    ctx.fillStyle = EFFECTS_SURFACE_LABEL_TEXT;
+    ctx.fillText(text, boxX + 4, boxY + 7);
+  }
+
+  // Said once, bottom-right, ABOVE the guides' own caption. A white rule with no
+  // sentence is a mystery overlay, and the sentence is the half that converts the
+  // number in the box into a question the author can answer.
+  const caption = surfaceCaption(rows);
+  if (caption !== null) {
+    const w = ctx.measureText(caption).width;
+    ctx.fillStyle = EFFECTS_SURFACE_LABEL_BG;
+    ctx.fillRect(vp.width - w - 12, vp.height - 32, w + 8, 13);
+    ctx.fillStyle = EFFECTS_SURFACE_LABEL_TEXT;
+    ctx.fillText(caption, vp.width - w - 8, vp.height - 32 + 7);
+  }
+  ctx.restore();
+}
+
 /**
  * Greedy word wrap against the context's CURRENT font, in canvas px.
  *
@@ -454,6 +624,13 @@ export interface GuideReport {
   /** The space the rows were drawn in (`layerTopSpace(scene)`); null when inactive. */
   space: LayerTopSpace | null;
   rows: GuideGeometry[];
+  /**
+   * The `plane_y` rules drawn this repaint, empty when the scene authors no
+   * remap. PUBLISHED rather than re-derivable for the reason the whole report
+   * exists: a harness that recomputed it from the scene would prove two copies
+   * of one sum agree, which stays true when nothing is drawn.
+   */
+  surfaces: SurfaceGeometry[];
   dragIndex: number | null;
   hoverIndex: number | null;
   /** Advanced on every publish, so a harness can prove a repaint HAPPENED. */
@@ -461,7 +638,8 @@ export interface GuideReport {
 }
 
 let lastReport: GuideReport = {
-  active: false, sceneId: null, space: null, rows: [], dragIndex: null, hoverIndex: null, paints: 0,
+  active: false, sceneId: null, space: null, rows: [], surfaces: [],
+  dragIndex: null, hoverIndex: null, paints: 0,
 };
 
 export function publishGuideReport(r: Omit<GuideReport, 'paints'>): void {

@@ -52,7 +52,7 @@ import { OverlayRenderer } from '../canvas/OverlayRenderer';
 import type { SectionOverlayInfo } from '../canvas/OverlayRenderer';
 import {
   drawLayerGuides, guideAtCanvasY, canvasYToWorldY, canvasYToLayerTop, layerGuideGeometry,
-  publishGuideReport,
+  drawSurfaceMarks, surfaceGeometry, publishGuideReport,
 } from '../canvas/effects-guides';
 import {
   cameraPreviewPlan, drawCameraPreview, publishCameraPreviewReport,
@@ -1459,14 +1459,27 @@ export default function MapViewport() {
         notices,
       };
       drawLayerGuides(ctx, viewport, guideScene.layers, opts);
+      // AFTER the guides, and the order is not cosmetic: the rowRemap parcel
+      // seeds `plane_y` from the strip's own top, so on a fresh document the
+      // white rule sits exactly on a cyan one. Drawn first it would be the half
+      // that disappears, on the one scene most likely to be opened.
+      //
+      // NOT DRAGGED, deliberately. `guideAtCanvasY` is untouched, so a cursor
+      // near a coincident pair still grabs the LAYER TOP and nothing else: a
+      // referent the author aims at is not a handle, and making it one would put
+      // two draggable lines on one pixel row.
+      const surfaces = surfaceGeometry(guideScene.layers, viewport);
+      drawSurfaceMarks(ctx, viewport, surfaces);
       publishGuideReport({
         active: true, sceneId: guideScene.id, space: opts.space,
         rows: layerGuideGeometry(guideScene.layers, viewport, opts),
+        surfaces,
         dragIndex: opts.dragIndex, hoverIndex: opts.hoverIndex,
       });
     } else {
       publishGuideReport({
-        active: false, sceneId: null, space: null, rows: [], dragIndex: null, hoverIndex: null,
+        active: false, sceneId: null, space: null, rows: [], surfaces: [],
+        dragIndex: null, hoverIndex: null,
       });
     }
 

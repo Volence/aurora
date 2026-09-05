@@ -15,6 +15,7 @@ import {
   worldYToCanvasY, canvasYToWorldY, guideAtCanvasY, layerGuideGeometry,
   layerIsEnabled, GUIDE_GRAB_PX, publishGuideReport, lastGuideReport,
   guideOriginWorldY, canvasYToLayerTop, guideCaption,
+  surfaceGeometry, surfaceCaption,
   type GuideViewport,
 } from '../effects-guides';
 import { EFFECTS_WORLD_Y_BOUNDS, clampWorldY } from '../../providers/effects-aeon';
@@ -159,12 +160,12 @@ describe('a drag cannot author a world_y the schema refuses', () => {
 describe('the guide report', () => {
   it('starts inactive, and every publish advances the paint counter', () => {
     const before = lastGuideReport().paints;
-    publishGuideReport({ active: false, sceneId: null, space: null, rows: [], dragIndex: null, hoverIndex: null });
+    publishGuideReport({ active: false, sceneId: null, space: null, rows: [], surfaces: [], dragIndex: null, hoverIndex: null });
     expect(lastGuideReport().active).toBe(false);
     expect(lastGuideReport().paints).toBe(before + 1);
     publishGuideReport({
       active: true, sceneId: 'sky', space: 'act', dragIndex: 2, hoverIndex: null,
-      rows: layerGuideGeometry([layer(0)], vp(0, 1)),
+      rows: layerGuideGeometry([layer(0)], vp(0, 1)), surfaces: [],
     });
     expect(lastGuideReport().sceneId).toBe('sky');
     expect(lastGuideReport().paints).toBe(before + 2);
@@ -272,5 +273,106 @@ describe('a locked scene draws its guides on the plane, at world origin', () => 
     const after = layerGuideGeometry([layer(112)], vp(0, 1), { space: 'screen' })[0].canvasY;
     expect(after).toBe(before);
     expect(after).toBe(112);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `plane_y` HAS A REFERENT: the row of the author's own BG art
+// ---------------------------------------------------------------------------
+//
+// WHAT THIS FILE CAN SAY ABOUT IT, and it is narrower than it looks. It can
+// prove the rule lands on the plane row and on nothing else, that it is
+// independent of the two quantities it would be wrong to fold in (`v_offset`
+// and the layer's own top), and that a layer with no remap contributes none. It
+// CANNOT see a canvas, so it says nothing about whether the white rule is
+// actually painted; the CDP capture under docs/captures/2026-09-05-plane-y/ is
+// what says that, and this block's existence must not be read as covering it.
+
+describe('the plane_y surface rule', () => {
+  const remapped = (world_y: number, plane_y: number, height_shift = 4): EffectsLayer => ({
+    ...layer(world_y), rowRemap: { plane_y, height_shift },
+  });
+
+  it('lands on the plane row, because the map draws Plane B at world origin', () => {
+    // The engine's definition is a BG PLANE LINE (parallax.emp:391-393) and
+    // SectionRenderer.renderBg blits the plane at (0,0), so plane row P is map
+    // world Y P. At vpY 0, zoom 1, that is the number itself.
+    expect(surfaceGeometry([remapped(96, 96)], vp(0, 1))[0].canvasY).toBe(96);
+    expect(surfaceGeometry([remapped(96, 160)], vp(0, 1))[0].canvasY).toBe(160);
+  });
+
+  it('goes through the SAME transform as the guides, at every pan and zoom', () => {
+    // A second copy of the pan/zoom mapping is the defect this module was shaped
+    // to prevent; the rule is a new line on the same canvas and must not acquire
+    // one. Derived from `worldYToCanvasY` rather than restated.
+    for (const zoom of [0.25, 1, 2.5, 8]) {
+      for (const vpY of [0, 37, 500]) {
+        for (const planeY of [0, 96, 223, 511]) {
+          expect(surfaceGeometry([remapped(0, planeY)], vp(vpY, zoom))[0].canvasY)
+            .toBe(worldYToCanvasY(planeY, vpY, zoom));
+        }
+      }
+    }
+  });
+
+  it('IS NOT THE LAYER TOP: moving the top does not move the rule', () => {
+    // The defect being prevented is the one the rowRemap parcel's seed invites.
+    // `plane_y` is seeded FROM the strip's own top, so on a fresh document the
+    // two coincide, and a reader could conclude the rule is drawn at the top.
+    expect(surfaceGeometry([remapped(96, 96)], vp(0, 1))[0].canvasY).toBe(96);
+    expect(surfaceGeometry([remapped(0, 96)], vp(0, 1))[0].canvasY).toBe(96);
+    expect(surfaceGeometry([remapped(300, 96)], vp(0, 1))[0].canvasY).toBe(96);
+    // ...and the anti-vacuity twin: the rule DOES move when plane_y moves, so a
+    // function that returned a constant would fail this pair rather than pass it.
+    expect(surfaceGeometry([remapped(96, 97)], vp(0, 1))[0].canvasY).toBe(97);
+  });
+
+  it('takes no v_offset term, so the rule is not welded to the view box', () => {
+    // Row 65's trap, one axis over. `v_offset` is where the SCREEN sits on the
+    // plane; this is a row OF the plane. `surfaceGeometry` is not even given the
+    // scene, which is how the term is made unpassable rather than merely unused.
+    expect(surfaceGeometry.length).toBe(2);
+    const head = surfaceGeometry.toString().slice(0, 80);
+    expect(head).not.toMatch(/scene/);
+  });
+
+  it('draws one per REMAPPED layer and none for the rest', () => {
+    const rows = surfaceGeometry(
+      [layer(0), remapped(96, 96), layer(160), remapped(200, 208, 6)], vp(0, 1));
+    expect(rows.map((r) => r.index)).toEqual([1, 3]);
+    expect(rows.map((r) => r.planeY)).toEqual([96, 208]);
+  });
+
+  it('reports `rowRemap: "none"` as no rule, the same as an absent key', () => {
+    const none: EffectsLayer = { ...layer(96), rowRemap: 'none' };
+    expect(surfaceGeometry([none], vp(0, 1))).toEqual([]);
+    expect(surfaceGeometry([layer(96)], vp(0, 1))).toEqual([]);
+  });
+
+  it('carries H as LINES for the label, and the file still stores a SHIFT', () => {
+    // The one `<<` on this key lives in `rowRemapHeightLines`; the label reads
+    // it, and nothing on the write path does. A geometry row that carried the
+    // shift under a `heightLines` name is the mistake this asserts against.
+    expect(surfaceGeometry([remapped(0, 96, 4)], vp(0, 1))[0].heightLines).toBe(16);
+    expect(surfaceGeometry([remapped(0, 96, 7)], vp(0, 1))[0].heightLines).toBe(128);
+  });
+
+  it('still draws for a DISABLED layer, as a guide does', () => {
+    const off: EffectsLayer = { ...remapped(96, 96), enabled: false };
+    expect(surfaceGeometry([off], vp(0, 1))).toHaveLength(1);
+  });
+
+  it('marks a rule scrolled off the viewport, and the draw skips it', () => {
+    expect(surfaceGeometry([remapped(0, 96)], vp(0, 1, 600))[0].onScreen).toBe(true);
+    expect(surfaceGeometry([remapped(0, 96)], vp(700, 1, 600))[0].onScreen).toBe(false);
+  });
+
+  it('captions itself only when a rule is drawn', () => {
+    expect(surfaceCaption([])).toBeNull();
+    const caption = surfaceCaption(surfaceGeometry([remapped(0, 96)], vp(0, 1)));
+    // The sentence has to name the KEY and the ART, because the defect is that
+    // the number related to neither.
+    expect(caption).toMatch(/plane_y/);
+    expect(caption).toMatch(/BG art row/);
   });
 });
