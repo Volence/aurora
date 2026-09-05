@@ -377,18 +377,18 @@ export const EFFECTS_LAYER_DEFORM_BOUNDS = Object.freeze({
 });
 
 /**
- * A LAYER's own `dsa`/`dsb` — the THIRD shift space in this contract, and the
+ * A LAYER's own `dsa`/`dsb` - the THIRD shift space in this contract, and the
  * one a strip authors directly.
  *
  * ⚠ IT IS NOT `EFFECTS_LAYER_DEFORM_BOUNDS` AND IT IS NOT
  * `EFFECTS_ANCHOR_SHIFT_BOUNDS`, and all three are 0..15 today. The three live
  * in three different schema nodes:
  *
- *   · `$defs/layer/properties/dsa` — THIS one, the strip's plain amplitude;
- *   · `$defs/layerDeform`'s `own.shift_a` — the same wire byte reached through
+ *   · `$defs/layer/properties/dsa` - THIS one, the strip's plain amplitude;
+ *   · `$defs/layerDeform`'s `own.shift_a` - the same wire byte reached through
  *     an attached table (they lower into the SAME record fields, which is what
  *     §2.2's two-sources guard is about);
- *   · `properties/anchor`'s `at.dsa` — the overlay's, on a different object.
+ *   · `properties/anchor`'s `at.dsa` - the overlay's, on a different object.
  *
  * They agree by coincidence, not by construction, and the coincidence has
  * already been leaned on: `layerCurveDeformAdvisory` read a LAYER's sentinel out
@@ -419,12 +419,12 @@ export const EFFECTS_LAYER_SHIFT_BOUNDS = Object.freeze({
 });
 
 /**
- * The value that means NO DEFORM on one of a layer's two planes — derived
+ * The value that means NO DEFORM on one of a layer's two planes - derived
  * TWICE, from two independent statements in the contract, and checked.
  *
  * The schema says the same fact in two places for these fields: `maximum` is 15
  * and `default` is 15. That is not redundancy to collapse, it is a cross-check
- * this module gets for free and the anchor's pair could not have — `anchor.at`
+ * this module gets for free and the anchor's pair could not have - `anchor.at`
  * declares all three of its keys `required` with NO default, so its sentinel is
  * derivable only from `maximum`. Here the two must agree, because the whole
  * write rule rests on them being the same number:
@@ -433,7 +433,7 @@ export const EFFECTS_LAYER_SHIFT_BOUNDS = Object.freeze({
  *     control authors it by accident (`[[top-of-range-is-a-sentinel]]`);
  *   · `default` = 15 makes it the ABSENT value, which is why OFF may clear the
  *     key instead of writing it (aeon's `layer(… dsa: int = 15, dsb: int = 15)`
- *     from the other side — an omitted key and a spelled 15 are one document).
+ *     from the other side - an omitted key and a spelled 15 are one document).
  *
  * A contract that decoupled them would mean one of those two sentences had
  * stopped being true without the other, and the control built on both would be
@@ -447,7 +447,7 @@ export const EFFECTS_LAYER_SHIFT_NONE: number = (() => {
     if (dflt !== max) {
       throw new Error(
         `effects scene schema $defs.layer.properties.${field} declares maximum ${max} but `
-        + `default ${JSON.stringify(dflt)} — the no-deform sentinel is derived from BOTH (the `
+        + `default ${JSON.stringify(dflt)} - the no-deform sentinel is derived from BOTH (the `
         + 'top of the range a control must not clamp into, and the value an absent key already '
         + 'means). Those two have just stopped being the same number; re-derive the layer '
         + 'deform ladder and its clear rule against the amended contract.',
@@ -457,7 +457,7 @@ export const EFFECTS_LAYER_SHIFT_NONE: number = (() => {
   const { max } = EFFECTS_LAYER_SHIFT_BOUNDS.dsa;
   if (max !== EFFECTS_LAYER_SHIFT_BOUNDS.dsb.max) {
     throw new Error(
-      'effects scene schema $defs.layer.properties dsa/dsb no longer share a maximum — the '
+      'effects scene schema $defs.layer.properties dsa/dsb no longer share a maximum - the '
       + 'no-deform sentinel is per FIELD from here on; split this constant before building a '
       + 'ladder from it.',
     );

@@ -363,7 +363,7 @@ describe('scene-level enumerations and bounds (schema §2.1/§2.2)', () => {
     expect(EFFECTS_LAYER_SHIFT_BOUNDS.dsb).toEqual({ min: lp.dsb.minimum, max: lp.dsb.maximum });
     // ANTI-VACUOUS: the three spaces are three DISTINCT schema nodes, so the two
     // walks above landed somewhere the other constants do not reach. (Their
-    // VALUES agree today — that is the coincidence, and asserting the values
+    // VALUES agree today - that is the coincidence, and asserting the values
     // differed would be asserting the bug.)
     const ownArm = S.$defs.layerDeform.oneOf.find((b: any) => b?.properties?.own);
     expect(ownArm, 'the schema no longer has a layerDeform `own` branch').toBeTruthy();
@@ -375,9 +375,9 @@ describe('scene-level enumerations and bounds (schema §2.1/§2.2)', () => {
   /**
    * THE SENTINEL IS SAID TWICE AND THE TWO MUST AGREE.
    *
-   * `maximum` makes 15 the top of the range — the value a clamping control
+   * `maximum` makes 15 the top of the range - the value a clamping control
    * authors by accident. `default` makes 15 the value an ABSENT key already
-   * means — which is what licenses OFF to clear the key instead of writing it,
+   * means - which is what licenses OFF to clear the key instead of writing it,
    * and it is aeon's `layer(… dsa: int = 15, dsb: int = 15)` from the other
    * side. The control rests on both sentences, so this row asserts they are the
    * same number rather than trusting that they still are.
@@ -413,7 +413,7 @@ describe('scene-level enumerations and bounds (schema §2.1/§2.2)', () => {
         const scene = newEffectsScene('probe');
         (scene.layers[0] as unknown as Record<string, unknown>)[field] = v;
         expect(() => serializeEffectsScene(scene), `layer ${field} ${v} was refused`).not.toThrow();
-        // Round-tripped, not merely accepted — a writer for this key depends on
+        // Round-tripped, not merely accepted - a writer for this key depends on
         // reading back what it wrote.
         expect(parseEffectsScene(serializeEffectsScene(scene), 'probe').layers[0][field]).toBe(v);
       }

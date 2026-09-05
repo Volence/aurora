@@ -1,11 +1,11 @@
-// A LAYER's `dsa`/`dsb` — the two ladders and the writer, checked without React.
+// A LAYER's `dsa`/`dsb` - the two ladders and the writer, checked without React.
 //
 // WHAT THIS FILE IS REALLY FOR. The keys it authors have a TOP-OF-RANGE
 // SENTINEL: 0..15 where **15 means the plane does not move**, so a control that
 // clamps toward its maximum authors the exact opposite of what the gesture asked
 // for, and the document validates, builds and renders flat. Every row is either
 // about that inversion or about the thing that makes this pair different from
-// the anchor's — a layer's shifts are OPTIONAL with `default: 15`, so "off" has
+// the anchor's - a layer's shifts are OPTIONAL with `default: 15`, so "off" has
 // two spellings on disk and the writer has to choose between them per document
 // rather than once.
 //
@@ -38,7 +38,7 @@ function library(scenes: EffectsScene[]): EffectsSceneLibrary {
 }
 
 function applied(cmd: ReturnType<typeof setLayerShiftCommand>): EffectsScene {
-  expect(cmd, 'the command was null — nothing was authored').not.toBeNull();
+  expect(cmd, 'the command was null - nothing was authored').not.toBeNull();
   const next = cmd!.newScene;
   expect(next, 'the command carries no document').not.toBeNull();
   return next!;
@@ -86,7 +86,7 @@ describe('a layer deform ladder never offers the sentinel as a rung', () => {
     for (const field of FIELDS) {
       const off = layerShiftOptions(field).find((o) => o.off)!;
       expect(off.label, field).toMatch(/off/i);
-      // The number lives in the title, not the label — a label reading "15"
+      // The number lives in the title, not the label - a label reading "15"
       // beside a list of divisors is the inversion made visible to nobody.
       expect(off.label, field).not.toMatch(new RegExp(`\\b${EFFECTS_LAYER_SHIFT_NONE}\\b`));
       expect(off.title, field).toMatch(new RegExp(`\\b${EFFECTS_LAYER_SHIFT_NONE}\\b`));
@@ -107,7 +107,7 @@ describe('a layer deform ladder never offers the sentinel as a rung', () => {
       const rungs = opts.slice(1).map((o) => o.shift);
       expect(rungs, field).toEqual([...rungs].sort((a, b) => b - a));
       expect(rungs[rungs.length - 1], field).toBe(min);
-      // The loudest setting is the LAST option — the farthest place on the list
+      // The loudest setting is the LAST option - the farthest place on the list
       // from off, so no drag crosses from one to the other.
       expect(opts[opts.length - 1].shift, field).toBe(min);
       expect(opts[opts.length - 1].off, field).toBe(false);
@@ -156,7 +156,7 @@ describe('driving a ladder to its extreme, and choosing off', () => {
 });
 
 // ---------------------------------------------------------------------------
-// What OFF actually puts on disk — the decision this parcel had to make
+// What OFF actually puts on disk - the decision this parcel had to make
 // ---------------------------------------------------------------------------
 
 describe('OFF preserves the document\'s own convention rather than imposing one', () => {
@@ -203,7 +203,7 @@ describe('OFF preserves the document\'s own convention rather than imposing one'
    * A file that SPELLS the sentinel, is driven to a live shift, and is then
    * taken back to off ends with the key ABSENT. The invariant this control keeps
    * is "a field nobody touched keeps its spelling", not "every byte survives
-   * every round trip" — and it is exactly what curve/vsplit/deform/drift have
+   * every round trip" - and it is exactly what curve/vsplit/deform/drift have
    * done since parcel H. Written down so a later reader meets the rule rather
    * than discovering it as a surprise diff.
    */
@@ -278,7 +278,7 @@ describe('setLayerShiftCommand refuses out of range and never clamps', () => {
 // What the card says about a shift that will do nothing
 // ---------------------------------------------------------------------------
 
-describe('layerShiftAdvisories — the state no build will report', () => {
+describe('layerShiftAdvisories - the state no build will report', () => {
   it('warns when a plane is live and the scene attaches no table it can sample', () => {
     const scene = sceneWith({ dsb: 2 });
     const msgs = layerShiftAdvisories(scene, 0);
@@ -287,7 +287,7 @@ describe('layerShiftAdvisories — the state no build will report', () => {
     expect(msgs[0]).toMatch(/flat-paths/);
   });
 
-  it('is SILENT when both planes are off — silence means nothing to say', () => {
+  it('is SILENT when both planes are off - silence means nothing to say', () => {
     expect(layerShiftAdvisories(sceneWith(), 0)).toEqual([]);
     expect(layerShiftAdvisories(sceneWith({ dsa: EFFECTS_LAYER_SHIFT_NONE }), 0)).toEqual([]);
   });

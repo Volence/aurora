@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// layer-dsa-dsb — AUTHOR A STRIP'S OWN DEFORM AMPLITUDE THROUGH THE UI, AND
+// layer-dsa-dsb - AUTHOR A STRIP'S OWN DEFORM AMPLITUDE THROUGH THE UI, AND
 // PROVE THE TOP-OF-RANGE SENTINEL CANNOT BE AUTHORED BY ACCIDENT
 // ═══════════════════════════════════════════════════════════════════════════
 //
@@ -9,7 +9,7 @@
 //
 // The node suite (`src/renderer/providers/__tests__/effects-layer-shift.test.ts`)
 // proves the writer's rules; it cannot see a `<select>`. What only a run against
-// the real app can answer is whether the OPTIONS ON SCREEN carry those rules —
+// the real app can answer is whether the OPTIONS ON SCREEN carry those rules -
 // and that is the half the hazard lives in.
 //
 // ── THE HAZARD, IN ONE PARAGRAPH ──────────────────────────────────────────
@@ -22,7 +22,7 @@
 // "does not move", and the document validates, builds, ships and renders flat.
 // Rows [5a]/[5b] are that hazard measured on the live DOM:
 //
-//   [5a]  drive each ladder to its LAST option — the end of a drag — and read
+//   [5a]  drive each ladder to its LAST option - the end of a drag - and read
 //         the document back. The value written must NOT be the sentinel.
 //   [5b]  drive each ladder to its OFF entry from a LIVE shift and read the
 //         document back. The plane must read off, and the STRIP must still be
@@ -35,7 +35,7 @@
 //
 // The anchor's `at` requires all three of its keys, so its sentinel has exactly
 // one spelling. A LAYER's pair is OPTIONAL with `default: 15`, so absent and 15
-// are the same document — and BOTH conventions are live in aeon's tree today:
+// are the same document - and BOTH conventions are live in aeon's tree today:
 //
 //   ojz_act1_start / _depth / _floor      13 layers, every one spells dsa/dsb 15
 //   ojz_act1_sec7_worldwater (Aurora's)    3 layers, every one omits them
@@ -69,7 +69,7 @@ const ELECTRON = RUN.electron;
 const MAIN = RUN.main;
 
 // ⚠ READ THROUGH THE RESOLVER, NEVER OFF `process.env`. This harness SAVES, so
-// it genuinely REQUIRES an explicit override — the case `checkoutOverride`
+// it genuinely REQUIRES an explicit override - the case `checkoutOverride`
 // exists for. Reading `process.env.AEON_DIR` by hand sees ONE spelling and
 // silently misses the aliases and the disagreement refusal.
 const AEONDIR = checkoutOverride('aeon')?.value ?? '';
@@ -94,10 +94,10 @@ function check(id, name, ok, detail) {
   results.push({ id, name, ok });
   if (!ok) fails.push(`[${id}] ${name}`);
 }
-/** NOT a pass and NOT a zero — its own bucket, and it makes the run non-zero. */
+/** NOT a pass and NOT a zero - its own bucket, and it makes the run non-zero. */
 function cannotMeasure(id, name, why) {
   console.log(`UNMEASURED  [${id}] ${name}\n        ${why}`);
-  unmeasured.push(`[${id}] ${name} — ${why}`);
+  unmeasured.push(`[${id}] ${name} - ${why}`);
 }
 function note(what, detail) {
   console.log(`NOTE       ${what}${detail !== undefined ? `\n        ${detail}` : ''}`);
@@ -158,7 +158,7 @@ async function shot(c, name) {
 }
 /**
  * A CAPTURE OF THE ROWS THIS PARCEL ADDED, not of wherever the panel is parked.
- * Scrolling is for the PICTURE only and is never used to reach a control —
+ * Scrolling is for the PICTURE only and is never used to reach a control -
  * every drive below finds its element by title, which does not care where the
  * scroller is.
  */
@@ -248,7 +248,7 @@ const SUBTAB = (id) => String.raw`
  * ⚠ `element.click()` IS NOT A CLICK where the app listens for pointer events:
  * a synthetic click no-ops, every later reading comes off the previous screen,
  * and the rig gets written up as a product defect. This returns the rect so the
- * caller dispatches a real press/release at INTEGER client pixels —
+ * caller dispatches a real press/release at INTEGER client pixels -
  * `devicePixelRatio` varies run to run on this box and a fractional target
  * resolves one pixel off.
  */
@@ -292,7 +292,7 @@ async function drive(c, label, expr) {
 
 /**
  * A SECTION MAY ARRIVE COLLAPSED, and a `no-element` on a collapsed section is
- * NAVIGATION MISSING, not a control missing — the mistake the anchor packet's
+ * NAVIGATION MISSING, not a control missing - the mistake the anchor packet's
  * §3 records costing it a run. Opened by a REAL POINTER GESTURE on the title
  * span, idempotent BY MEASUREMENT: it clicks, probes for a control that only
  * exists inside the section, and clicks again if it is still absent.
@@ -345,7 +345,7 @@ function SCENE_JSON(id) {
  *
  * ⚠⚠ THIS WAS A `<select>` DRIVE AND IT SILENTLY HIT THE WRONG CONTROL. The
  * first version found "the first <select> carrying an option whose value is this
- * scene id" — which is the SECTION's `sceneRef` dropdown, not the picker. Every
+ * scene id" - which is the SECTION's `sceneRef` dropdown, not the picker. Every
  * gesture returned `ok`, the ledger was clean, and the panel never changed
  * scene: rows [7a]/[7b] then read the ladder of the scene that was ALREADY
  * selected and passed, because by that point in the run every plane on it was
@@ -410,7 +410,7 @@ async function main() {
 
   // ⚠ BOTH VARIABLES OR NEITHER. A worktree has no `node_modules/.bin/electron`
   // and no `dist/`, so without AURORA_BUILT_TREE the resolver walks UP and
-  // borrows the MAIN checkout's built tree — every row then runs green against
+  // borrows the MAIN checkout's built tree - every row then runs green against
   // an app this parcel did not build.
   if (RUN.borrowed) {
     throw new Error(`REFUSING: the run root was BORROWED from ${RUN.root}, which is not the tree `
@@ -425,12 +425,12 @@ async function main() {
   note('run root', `${RUN.root} · borrowed=${RUN.borrowed === true} · electron=${ELECTRON}`);
   note('sentinel, read from the committed contract',
     `$defs.layer.properties.dsa: minimum=${LOUDEST} maximum=${SENTINEL} `
-    + `default=${SCHEMA.$defs.layer.properties.dsa.default} — the top of the range IS the off `
+    + `default=${SCHEMA.$defs.layer.properties.dsa.default} - the top of the range IS the off `
     + 'value, which is the whole hazard');
   assertFreshBuild(RUN);
 
   if (AEONDIR === '' || !existsSync(AEONDIR)) {
-    throw new Error('AEON_DIR must name a WRITABLE aeon clone — this harness SAVES. '
+    throw new Error('AEON_DIR must name a WRITABLE aeon clone - this harness SAVES. '
       + 'Never point it at the live checkout.');
   }
   // ⚠ THE DEFAULT-LOCATION FORM, AND THE CHOICE IS LOAD-BEARING. Through the
@@ -440,7 +440,7 @@ async function main() {
   const liveAeon = siblingDefaultPathOrUnresolved('aeon');
   if (resolve(AEONDIR) === resolve(liveAeon)) {
     throw new Error(`Refusing: the override names aeon's DEFAULT checkout (${liveAeon}), which is `
-      + 'a live lane tree another agent may be editing. This harness SAVES — point it at a clone.');
+      + 'a live lane tree another agent may be editing. This harness SAVES - point it at a clone.');
   }
 
   const scenePath = (id) => join(AEONDIR, 'games/sonic4/data/editor/effects', `${id}.json`);
@@ -477,7 +477,7 @@ async function main() {
       haveDbg = await c.evalExpr('!!(window.__dbg && window.__dbg.aeon)');
       if (!haveDbg) await sleep(500);
     }
-    if (!haveDbg) throw new Error('window.__dbg absent — needs a VITE_AURORA_DEBUG=1 build');
+    if (!haveDbg) throw new Error('window.__dbg absent - needs a VITE_AURORA_DEBUG=1 build');
 
     // ⚠ THE ONE NON-UI DOOR, AND IT IS DECLARED. aeon's only real open route is
     // a NATIVE FOLDER PICKER that CDP cannot drive. Everything after this line
@@ -538,7 +538,7 @@ async function main() {
         + `insideScroller=${o.insideScroller} · ${o.options.length} options · value=${o.value}`);
     }
 
-    // ── [4] WHAT THE LADDER OFFERS — read off the DOM, not off the source ──
+    // ── [4] WHAT THE LADDER OFFERS - read off the DOM, not off the source ──
     for (const field of ['dsa', 'dsb']) {
       const o = ladders[field];
       if (o === null || o === undefined) continue;
@@ -558,7 +558,7 @@ async function main() {
         JSON.stringify(o.options.map((x) => x.label)));
     }
 
-    // ── [5a] DRIVEN TO THE EXTREME — the end of a drag ─────────────────────
+    // ── [5a] DRIVEN TO THE EXTREME - the end of a drag ─────────────────────
     for (const field of ['dsa', 'dsb']) {
       const o = ladders[field];
       if (o === null || o === undefined) continue;
@@ -593,7 +593,7 @@ async function main() {
         `choosing OFF on ${field} turns the plane off, and the STRIP is still there`,
         r === 'ok' && effective === SENTINEL && doc.layers.length === before.layers.length,
         `before=${JSON.stringify(was)} after=${JSON.stringify(after)} (effective ${effective}). `
-        + 'One plane\'s off is not the strip\'s off — the layer is still in the scene and still '
+        + 'One plane\'s off is not the strip\'s off - the layer is still in the scene and still '
         + `scrolling (${doc.layers.length} layers, world_y ${doc.layers[0].world_y}).`);
       // THE WRITE DECISION, measured on the app's own document: this scene was
       // created by Aurora and never carried the key, so OFF must not add it.
@@ -629,7 +629,7 @@ async function main() {
       SET_SELECT(SHIFT_SEL(0, 'dsa'), String(LOUDEST + 4)));
     await sleep(500);
     const mineDsa = (await c.json(`(${SCENE_JSON(SCENE_ID)})`)).layers[0].dsa;
-    note('picker control', `${SCENE_ID} layer 0 dsa parked at ${mineDsa} — any row below that `
+    note('picker control', `${SCENE_ID} layer 0 dsa parked at ${mineDsa} - any row below that `
       + 'reads `off` therefore is NOT looking at this scene\'s card');
 
     for (const [id, tag, expectSpelled] of [
@@ -651,7 +651,7 @@ async function main() {
       const now = await c.evalExpr(SELECTED_SCENE);
       if (now !== id) {
         cannotMeasure(tag, `round-trip ${id}`,
-          `the panel still shows ${JSON.stringify(now)} after clicking ${id}'s button — every `
+          `the panel still shows ${JSON.stringify(now)} after clicking ${id}'s button - every `
           + 'reading below would have come off the wrong card');
         continue;
       }
@@ -660,7 +660,7 @@ async function main() {
         cannotMeasure(tag, `round-trip ${id}`, 'the layer 0 dsa ladder is not in the DOM');
         continue;
       }
-      // Whatever the spelling, the ladder must SHOW off — the two spellings are
+      // Whatever the spelling, the ladder must SHOW off - the two spellings are
       // the same state and a form that rendered one of them blank would be
       // inventing a third.
       const showsOff = Number(o.value) === SENTINEL;
@@ -698,7 +698,7 @@ async function main() {
         : JSON.stringify(spellsAfter.layers.map((l) => ({ dsa: l.dsa, dsb: l.dsb }))));
     // ANTI-VACUOUS: the run really did write something, so [8a]/[8b] are
     // "unchanged by a save that happened" and not "unchanged because nothing
-    // was saved". ⚠ DISTRUST A CLEAN RESULT — two files that look identical to
+    // was saved". ⚠ DISTRUST A CLEAN RESULT - two files that look identical to
     // their BEFORE state are exactly what a save that never ran looks like.
     check('8c', `the run DID author a file: ${SCENE_ID}.json carries the live shift`,
       mine !== null && mine.layers[0].dsb === LOUDEST + 1,
@@ -713,13 +713,13 @@ async function main() {
     // survived" was "the file was never touched". That is a true statement about
     // a no-op gesture and it is NOT the claim the write rule needs.
     //
-    // These two rows force a real rewrite — a live shift on ONE layer — and then
+    // These two rows force a real rewrite - a live shift on ONE layer - and then
     // ask what happened to the OTHER layers' spelling. That is the serializer
     // being exercised on the exact question, rather than sitting the round out.
     //
     // ⚠ THE EDIT IS ON LAYER 0, AND THE FIRST DRAFT AIMED AT LAYER 1 AND GOT
     // `no-element`. The card list renders ONLY THE SELECTED STRIP, so
-    // `Layer 1 dsb` is legitimately not in the DOM until layer 1 is selected —
+    // `Layer 1 dsb` is legitimately not in the DOM until layer 1 is selected -
     // navigation missing, not a control missing, the same reading the anchor
     // packet records for a collapsed section. The gesture ledger is what caught
     // it; without it both rows would have reported "unchanged" off a gesture
@@ -759,7 +759,7 @@ async function main() {
       const kept = expectSpelled
         ? others.every((l) => l.dsa === SENTINEL && l.dsb === SENTINEL)
         : others.every((l) => l.dsa === undefined && l.dsb === undefined);
-      // And the edited layer's OTHER plane keeps its convention too — the write
+      // And the edited layer's OTHER plane keeps its convention too - the write
       // touched dsb, so dsa on that same strip is an untouched neighbour.
       const siblingKept = expectSpelled
         ? after.layers[0].dsa === SENTINEL

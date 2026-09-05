@@ -1,4 +1,4 @@
-// WHICH SCHEMA NODE A CONSTANT IS ACTUALLY READ FROM — proved by moving the
+// WHICH SCHEMA NODE A CONSTANT IS ACTUALLY READ FROM - proved by moving the
 // node, not by comparing the number it yields.
 //
 // ═══ WHY THIS FILE EXISTS, WHICH IS A VACUITY THIS PARCEL FOUND IN ITSELF ═══
@@ -6,11 +6,11 @@
 // This contract has THREE 0..15 shift spaces: a layer's plain `dsa`/`dsb`,
 // `$defs/layerDeform`'s `own.shift_a`/`shift_b`, and the anchor's `at.dsa`/`dsb`.
 // The anchor parcel could prove its two constants were separate derivations by
-// comparing values, because `channel` is 0..3 and the shifts are 0..15 — the
+// comparing values, because `channel` is 0..3 and the shifts are 0..15 - the
 // numbers differ, so pooling them showed up as a failing assertion.
 //
-// HERE ALL THREE SPACES ARE 0..15. So the obvious row — "assert the constant
-// equals `$defs.layer.properties.dsa`'s minimum and maximum" — PASSES with
+// HERE ALL THREE SPACES ARE 0..15. So the obvious row - "assert the constant
+// equals `$defs.layer.properties.dsa`'s minimum and maximum" - PASSES with
 // `EFFECTS_LAYER_SHIFT_BOUNDS = EFFECTS_ANCHOR_SHIFT_BOUNDS` substituted for it,
 // which is precisely the defect it claims to prevent. That row is in
 // scene-ui.test.ts and it is worth keeping (it catches a mistyped path), but on
@@ -23,7 +23,7 @@
 // followed and which did NOT. A pooled constant fails the "did not follow" half.
 //
 // ⚠ THE PERTURBATION IS OF THE SCHEMA, WHICH THE ANCHOR PACKET'S §5 WARNS
-// AGAINST — for its own gates, and correctly: both sides of those rows derive
+// AGAINST - for its own gates, and correctly: both sides of those rows derive
 // from the schema, so a contract amendment moves them together and the row stays
 // honest. That reasoning does not apply here because these rows do not compare
 // the module against the schema. They compare the module against ITSELF under a
@@ -77,7 +77,7 @@ describe('the three 0..15 shift spaces are three derivations, proved by moving o
 
   /**
    * ⚠ THIS ROW MOVES BOTH LAYER FIELDS, AND THE FIRST DRAFT MOVED ONLY `dsa`.
-   * The module refused that schema outright — `EFFECTS_LAYER_SHIFT_NONE`'s own
+   * The module refused that schema outright - `EFFECTS_LAYER_SHIFT_NONE`'s own
    * cross-check fired, because a layer whose two fields carry different
    * sentinels has no single "off" for a shared ladder to write. Recorded rather
    * than quietly fixed: the guard caught its author, which is the only evidence
@@ -97,7 +97,7 @@ describe('the three 0..15 shift spaces are three derivations, proved by moving o
     expect(m.EFFECTS_LAYER_SHIFT_BOUNDS.dsa.max).toBe(moved);
     expect(m.EFFECTS_LAYER_SHIFT_BOUNDS.dsb.max).toBe(moved);
     expect(m.EFFECTS_LAYER_SHIFT_NONE).toBe(moved);
-    // Did NOT follow — the half a pooled constant fails:
+    // Did NOT follow - the half a pooled constant fails:
     expect(m.EFFECTS_ANCHOR_SHIFT_BOUNDS.dsa.max).toBe(SHARED_MAX);
     expect(m.EFFECTS_ANCHOR_SHIFT_BOUNDS.dsb.max).toBe(SHARED_MAX);
     expect(m.EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.max).toBe(SHARED_MAX);

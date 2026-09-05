@@ -94,10 +94,10 @@ import {
   ANCHOR_ROW, anchorValue, anchorChannelOptions, anchorShiftOptions,
   anchorToggleCommand, setAnchorChannelCommand, setAnchorShiftCommand,
   anchorDeformAdvisories,
-  // §9.2 — a LAYER's own deform amplitude. ⚠ SAME INVERSION, DIFFERENT OBJECT:
+  // §9.2 - a LAYER's own deform amplitude. ⚠ SAME INVERSION, DIFFERENT OBJECT:
   // a ladder per field with the sentinel off it, and `setLayerShiftCommand`
   // throws rather than clamping. What differs from §9.1 is what OFF puts on
-  // disk — these keys are optional and defaulted, so off CLEARS unless the file
+  // disk - these keys are optional and defaulted, so off CLEARS unless the file
   // spells it. effects-aeon's §9.2 block has the argument.
   LAYER_SHIFT_ROW, layerShiftOptions, layerShiftValue, setLayerShiftCommand,
   layerShiftAdvisories,
@@ -854,7 +854,7 @@ export default function EffectsScenePanel(): React.ReactElement {
                         file". THAT IS NO LONGER TRUE for two of the three: the
                         two ladders below author dsa/dsb directly, so this
                         warning is now reachable by two gestures on this very
-                        card — turn `own` on, then lower a plane. It sits
+                        card - turn `own` on, then lower a plane. It sits
                         BETWEEN the `own` table above and the ladders below on
                         purpose: both of its halves are visible from it. */}
                     {deformConflicts.filter((c) => c.path === `/layers/${i}`).map((c) => (
@@ -865,7 +865,7 @@ export default function EffectsScenePanel(): React.ReactElement {
               })()}
               {/* ═══ THIS STRIP'S OWN DEFORM AMPLITUDE, ONE LADDER PER PLANE (§9.2) ═══
 
-                  ⚠⚠ `<select>`s, AND THAT IS THE WHOLE SAFETY ARGUMENT — the
+                  ⚠⚠ `<select>`s, AND THAT IS THE WHOLE SAFETY ARGUMENT - the
                   same one the anchor's pair carries five hundred rows down.
                   `dsa`/`dsb` are 0..15 where **15 means NO DEFORM**, so a
                   spinner dragged toward its maximum authors "this plane does not
@@ -908,7 +908,7 @@ export default function EffectsScenePanel(): React.ReactElement {
                 ))}
               <Hint under style={{ marginBottom: 0 }}>{LAYER_SHIFT_ROW.hint}</Hint>
               {/* THE STATE NO BUILD WILL EVER REPORT: a live shift with no table
-                  to sample is flat-pathed at runtime — the scene compiles, ships
+                  to sample is flat-pathed at runtime - the scene compiles, ships
                   and does not move. Warning-toned because the author asked for
                   motion and will not get it. */}
               {layerShiftAdvisories(selected, i).map((a) => (
