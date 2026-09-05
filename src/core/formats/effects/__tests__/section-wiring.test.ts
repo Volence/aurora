@@ -313,13 +313,21 @@ describe('against aeon\'s real ojz/act1 — the numbers as they stand today', ()
     // sharers) until aeon landed item 11a's base_swap and gave 6 a preset of its
     // own. CONFIRMED INTENDED with aeon; not a regression, and not a rename —
     // section 6 LEFT the shared record, which is why the row below moved too.
+    //
+    // ⚠ RE-PINNED 2026-09-05: section 7 was `OJZ_Preset_Plain` (the last of the
+    // sharers alongside 8) until aeon landed item 9c's live patch channels and
+    // gave 7 a preset of its own, `OJZ_Preset_Sec7` — the `OJZ_WorldWater` pair
+    // whose bands are channels 2 and 3 in `aeon-effects-channel-bands.json`.
+    // aeon's own act_descriptor.emp says so in a comment above the `use` line.
+    // Not a regression and not a rename: section 7 LEFT the shared record, which
+    // is why the row below moved too — and this time it left NOBODY behind it.
     expect(b[0]).toBe('OJZ_Preset_Sec0');
     expect(b[6]).toBe('OJZ_Preset_Sec6');
-    expect(b[7]).toBe('OJZ_Preset_Plain');
+    expect(b[7]).toBe('OJZ_Preset_Sec7');
     expect(b[8]).toBe('OJZ_Preset_Plain');
   });
 
-  it('SEVEN sections own their preset; 7 and 8 share one', (ctx) => {
+  it('ALL NINE sections now own their preset — nothing is shared any more', (ctx) => {
     if (!need(ctx)) return;
     const w: SectionRasterWiring = {
       bindings: descriptorEffectsBindings(desc, 'ojz'),
@@ -327,13 +335,35 @@ describe('against aeon\'s real ojz/act1 — the numbers as they stand today', ()
       descriptor: { path: DESC, parsed: true },
       library: { path: LIB, parsed: true },
     };
-    // ⚠ RE-PINNED 2026-09-03 with the row above, and it is ONE aeon landing seen
-    // twice: section 6 acquired its own preset record for item 11a's base_swap,
-    // so it joined the eligible set and left the sharer set. 0-5 -> 0-6, and the
-    // sharers 6,7,8 -> 7,8. CONFIRMED INTENDED with aeon.
-    expect(eligibleSections(w, 9)).toEqual([0, 1, 2, 3, 4, 5, 6]);
-    for (const s of [7, 8]) expect(sectionRasterState(w, s)).toBe('shared');
-    expect(sectionSharers(w, 7)).toEqual([7, 8]);
+    // ⚠ RE-PINNED 2026-09-05 with the row above, and it is ONE aeon landing seen
+    // twice: section 7 acquired `OJZ_Preset_Sec7` for item 9c, so it joined the
+    // eligible set and left the sharer set. Eligible 0-6 -> 0-8.
+    //
+    // ⚠⚠ AND THE SHARER SET IS NOW EMPTY, WHICH THIS ROW NO LONGER MEASURES.
+    // `OJZ_Preset_Plain` is section 8's alone, so NO section is in the `shared`
+    // state against aeon's real tree and the old `toBe('shared')` assertions had
+    // nothing left to assert. They are not silently dropped: the `shared` state
+    // is still covered by the SYNTHETIC rows earlier in this file, which build a
+    // wiring with a genuinely shared record. What is gone is the confirmation
+    // that aeon still SHIPS one — so this row asserts the emptiness explicitly
+    // and goes red the day a section is pointed at another's record again.
+    expect(eligibleSections(w, 9)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+    const shared: number[] = [];
+    for (let s = 0; s < 9; s++) {
+      if (sectionRasterState(w, s) === 'shared') shared.push(s);
+      // Every section is its own only sharer — the data form of "nothing is
+      // shared", checked per section rather than inferred from the list above.
+      expect(sectionSharers(w, s), `section ${s}`).toEqual([s]);
+    }
+    expect(shared,
+      'aeon ships a SHARED preset record again — re-pin this row and the one above, and note '
+      + 'which sections share it; the shared state is reachable against the real tree once more')
+      .toEqual([]);
+    // Anti-vacuous: nine sections really were examined, and they really do bind
+    // nine DISTINCT records — an empty or single-record binding map would
+    // satisfy "nothing is shared" while measuring nothing.
+    expect(Object.keys(w.bindings).length).toBe(9);
+    expect(new Set(Object.values(w.bindings)).size).toBe(9);
   });
 
   it('exactly TWO sections are threaded today — and it is not the same fact as eligible', (ctx) => {
