@@ -1,10 +1,10 @@
 /**
  * CURRENCY — is the in-app guide's account of aeon's build still what aeon does?
  *
- * `docs/guides/effects-first-run.md` §6 tells a first-time author what to run
+ * `docs/guides/effects-first-run.md` §7 tells a first-time author what to run
  * after Ctrl+S. Every sentence in it is a claim about a SHELL SCRIPT IN ANOTHER
  * REPO, so nothing in this repo can keep it true, and the thing that happens to
- * a claim nobody re-checks is on the page beside it: until this parcel §6 quoted
+ * a claim nobody re-checks is on the page beside it: until this parcel §7 quoted
  * a build message —
  *
  *     ERROR: the FAST re-bake failed. Run tools/regenerate-level.sh directly to see why
@@ -15,7 +15,7 @@
  * written when they were true. See docs/reviews/2026-09-05-guide-sentences.md.
  *
  * This file is the instrument for the other half of that: it reads aeon at a
- * COMMITTED REVISION and asserts the STRUCTURE §6 describes, not the wording of
+ * COMMITTED REVISION and asserts the STRUCTURE §7 describes, not the wording of
  * any message. It follows `aeon-fixture-currency.test.ts`'s three rules exactly,
  * because they are the same rules and it is the same hazard:
  *
@@ -75,45 +75,45 @@ const AEON_TIP = 'origin/master';
 /** Prefix every message with this so nobody triages it as an Aurora regression. */
 const NOT_OURS = 'NOT AN AURORA REGRESSION — aeon\'s build path moved and a guide sentence went stale with it.';
 
-/** §6 of the shipped guide — the same bytes the app renders (guides.ts `?raw`). */
+/** §7 of the shipped guide — the same bytes the app renders (guides.ts `?raw`). */
 const SAVE_AND_BUILD = (() => {
   const src = readFileSync(resolve(AURORA_DIR, 'docs/guides/effects-first-run.md'), 'utf8');
-  const from = src.indexOf('## 6. Save, and build');
-  if (from < 0) throw new Error('the guide has no "## 6. Save, and build" heading');
+  const from = src.indexOf('## 7. Save, and build');
+  if (from < 0) throw new Error('the guide has no "## 7. Save, and build" heading');
   const to = src.indexOf('\n## ', from + 1);
   return src.slice(from, to === -1 ? undefined : to);
 })();
 
-describe('CURRENCY: §6 tells the author to run what aeon actually requires', () => {
+describe('CURRENCY: §7 tells the author to run what aeon actually requires', () => {
   const aeon = peerRepo('aeon');
 
   /**
    * The claim: "The re-bake is a step of this path, not a recovery from an
-   * error" — so §6 must name the tool, and the tool must exist at aeon's tip.
+   * error" — so §7 must name the tool, and the tool must exist at aeon's tip.
    * A guide command that is not a file is the worst kind of wrong: it looks
    * like the author's environment is broken.
    */
   it('names tools/regenerate-level.sh, and that script exists at aeon\'s tip', (ctx) => {
-    expect(SAVE_AND_BUILD, '§6 no longer names the re-bake — see C10, the whole point')
+    expect(SAVE_AND_BUILD, '§7 no longer names the re-bake — see C10, the whole point')
       .toContain('tools/regenerate-level.sh');
     if (aeon === null) {
       ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR) — '
-        + 'CANNOT MEASURE whether tools/regenerate-level.sh is still what §6 should name');
+        + 'CANNOT MEASURE whether tools/regenerate-level.sh is still what §7 should name');
       return;
     }
     const tip = resolveRev(aeon, AEON_TIP);
     if (tip === null) {
       ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon} — `
-        + 'CANNOT MEASURE the re-bake tool §6 names');
+        + 'CANNOT MEASURE the re-bake tool §7 names');
       return;
     }
     const at = readAtRev(aeon, tip, 'tools/regenerate-level.sh');
     expect(at.ok, at.ok ? '' : `${NOT_OURS}\n  aeon ${AEON_TIP} is ${tip}\n  ${at.why}\n`
-      + '  §6 tells the author to run it as step one. Find its replacement and rewrite §6.').toBe(true);
+      + '  §7 tells the author to run it as step one. Find its replacement and rewrite §7.').toBe(true);
   });
 
   /**
-   * The two claims §6 makes about what happens after a save, and the ONLY thing
+   * The two claims §7 makes about what happens after a save, and the ONLY thing
    * separating the two commands it prints:
    *
    *   "./build.sh refuses, and it refuses EARLY"
@@ -126,13 +126,13 @@ describe('CURRENCY: §6 tells the author to run what aeon actually requires', ()
   it('build.sh still re-bakes under FAST and refuses without it, before it assembles', (ctx) => {
     if (aeon === null) {
       ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR) — '
-        + 'CANNOT MEASURE the staleness branch §6 describes');
+        + 'CANNOT MEASURE the staleness branch §7 describes');
       return;
     }
     const tip = resolveRev(aeon, AEON_TIP);
     if (tip === null) {
       ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon} — `
-        + 'CANNOT MEASURE the staleness branch §6 describes');
+        + 'CANNOT MEASURE the staleness branch §7 describes');
       return;
     }
     const at = readAtRev(aeon, tip, 'build.sh');
@@ -144,14 +144,14 @@ describe('CURRENCY: §6 tells the author to run what aeon actually requires', ()
     // The gate itself.
     const gateAt = sh.indexOf('level_staleness.py');
     expect(gateAt, `${NOT_OURS}\n${where}`
-      + '  build.sh no longer runs tools/level_staleness.py at all, so §6\'s whole account of\n'
-      + '  "a save makes the tree stale" is obsolete. Rewrite §6.').toBeGreaterThan(-1);
+      + '  build.sh no longer runs tools/level_staleness.py at all, so §7\'s whole account of\n'
+      + '  "a save makes the tree stale" is obsolete. Rewrite §7.').toBeGreaterThan(-1);
 
     // The branch it feeds, isolated so the two arms below are read from IT and
     // not from a coincidental match elsewhere in a 900-line script.
     const branchAt = sh.indexOf('if [[ "$STALE" == "1" ]]; then', gateAt);
     expect(branchAt, `${NOT_OURS}\n${where}`
-      + '  build.sh no longer branches on a $STALE flag after the gate; §6 describes two arms\n'
+      + '  build.sh no longer branches on a $STALE flag after the gate; §7 describes two arms\n'
       + '  (FAST re-bakes / canonical refuses) that may no longer be two arms. Re-read it.').toBeGreaterThan(-1);
     const branchEnd = sh.indexOf('\nfi\n', branchAt);
     expect(branchEnd).toBeGreaterThan(branchAt);
@@ -163,40 +163,40 @@ describe('CURRENCY: §6 tells the author to run what aeon actually requires', ()
       return [branch.slice(0, elseAt), branch.slice(elseAt)];
     })();
 
-    // ARM 1 — §6: "FAST=1 ./build.sh runs the re-bake for you". Read off
+    // ARM 1 — §7: "FAST=1 ./build.sh runs the re-bake for you". Read off
     // `shellExec`: the arm must INVOKE the re-bake, not mention it.
     expect(fastArm, 'the FAST arm was not isolated — the branch has no `FAST == "1"` test in it')
       .toMatch(/if \[\[ "\$FAST" == "1" \]\]/);
     expect(shellExec(fastArm), `${NOT_OURS}\n${where}`
       + '  the FAST arm of the staleness branch no longer RUNS the re-bake (it may still name it\n'
-      + '  in a message — that is what this row refuses to accept), so §6\'s "the iteration loop —\n'
+      + '  in a message — that is what this row refuses to accept), so §7\'s "the iteration loop —\n'
       + '  re-bakes for you" is wrong and the loop needs the step spelled out.')
       .toMatch(/^\s*"?\$\{TOOLS\}\/regenerate-level\.sh/m);
 
-    // ARM 2 — §6: "./build.sh refuses", and names the remedy.
+    // ARM 2 — §7: "./build.sh refuses", and names the remedy.
     expect(canonicalArm, `${NOT_OURS}\n${where}`
-      + '  the canonical arm no longer exits non-zero — §6 tells the author the plain build\n'
+      + '  the canonical arm no longer exits non-zero — §7 tells the author the plain build\n'
       + '  REFUSES until the tree is re-baked, which would then be a false warning.')
       .toContain('exit 1');
     expect(canonicalArm, `${NOT_OURS}\n${where}`
-      + '  the canonical arm no longer names tools/regenerate-level.sh as the remedy; §6 says\n'
-      + '  the build\'s own message gives it, which is why §6 does not transcribe the message.')
+      + '  the canonical arm no longer names tools/regenerate-level.sh as the remedy; §7 says\n'
+      + '  the build\'s own message gives it, which is why §7 does not transcribe the message.')
       .toContain('regenerate-level.sh');
 
-    // §6: "it refuses EARLY … nothing downstream has looked at it yet". The one
+    // §7: "it refuses EARLY … nothing downstream has looked at it yet". The one
     // sentence that tells an author a red build here is not a verdict on their work.
     const assembleAt = sh.indexOf('"${SIGIL_BUILD}" build');
     expect(assembleAt, `${NOT_OURS}\n${where}`
-      + '  cannot find the assemble step in build.sh, so the ORDER §6 claims is unmeasured here.')
+      + '  cannot find the assemble step in build.sh, so the ORDER §7 claims is unmeasured here.')
       .toBeGreaterThan(-1);
     expect(branchAt, `${NOT_OURS}\n${where}`
-      + '  the staleness branch no longer precedes the assemble. §6 tells the author a stale\n'
+      + '  the staleness branch no longer precedes the assemble. §7 tells the author a stale\n'
       + '  build stops BEFORE anything judges their bytes — that is the sentence at risk.')
       .toBeLessThan(assembleAt);
   });
 
   /**
-   * §6: "`touch` is not a shortcut past this … a second arm that reads no
+   * §7: "`touch` is not a shortcut past this … a second arm that reads no
    * timestamps at all". The guide said the opposite until this parcel, and
    * prescribed `touch` as the fix; the rewrite rests entirely on arm B existing.
    */
@@ -207,17 +207,17 @@ describe('CURRENCY: §6 tells the author to run what aeon actually requires', ()
     // literal this line used to hold did not survive that. The SENTENCE is what
     // is under test, so the assertion tolerates where the `**` sits and nothing
     // else. See scripts/check-guide-text.mjs, check A.
-    expect(SAVE_AND_BUILD, '§6 no longer warns that `touch` is not a shortcut. It used to PRESCRIBE it.')
+    expect(SAVE_AND_BUILD, '§7 no longer warns that `touch` is not a shortcut. It used to PRESCRIBE it.')
       .toMatch(/`touch` \*{0,2}is not a shortcut past this/);
     if (aeon === null) {
       ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR) — '
-        + 'CANNOT MEASURE whether the content-stamp arm §6 rests on still exists');
+        + 'CANNOT MEASURE whether the content-stamp arm §7 rests on still exists');
       return;
     }
     const tip = resolveRev(aeon, AEON_TIP);
     if (tip === null) {
       ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon} — `
-        + 'CANNOT MEASURE the content-stamp arm §6 rests on');
+        + 'CANNOT MEASURE the content-stamp arm §7 rests on');
       return;
     }
     const at = readAtRev(aeon, tip, 'tools/level_staleness.py');
@@ -225,13 +225,13 @@ describe('CURRENCY: §6 tells the author to run what aeon actually requires', ()
     if (!at.ok) return;
     // Structural, not prose: the stamp is a written artifact and a flag, and the
     // arm is a sha256 comparison against it. A gate with only a timestamp arm
-    // CANNOT see a delete, which is the case §6 sends the author to re-bake for.
+    // CANNOT see a delete, which is the case §7 sends the author to re-bake for.
     expect(at.text, `${NOT_OURS}\n  aeon ${AEON_TIP} is ${tip}\n`
-      + '  tools/level_staleness.py no longer writes/reads an editor-source stamp. §6 tells the\n'
+      + '  tools/level_staleness.py no longer writes/reads an editor-source stamp. §7 tells the\n'
       + '  author a delete or a revert is caught whatever the mtimes say — without this arm it\n'
       + '  is not, and the old `touch` advice would be back on the table.').toMatch(/--stamp/);
     expect(at.text, `${NOT_OURS}\n  aeon ${AEON_TIP} is ${tip}\n`
-      + '  tools/level_staleness.py no longer hashes the editor sources, so the arm §6 describes\n'
+      + '  tools/level_staleness.py no longer hashes the editor sources, so the arm §7 describes\n'
       + '  ("compares a content stamp … reads no timestamps at all") is gone.').toMatch(/sha256/);
   });
 });

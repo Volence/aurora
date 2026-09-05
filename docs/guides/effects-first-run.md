@@ -22,7 +22,7 @@ Three separate things, which look similar and are not:
 | background **tiles** to animate in place | a **tile animation** | the **Tile anim** sub-tab |
 
 The fourth one is **not** a colour effect and shares no mechanism with the second,
-which is why they are on different sub-tabs. See §7.
+which is why they are on different sub-tabs. See §8.
 
 **The right panel is three sub-tabs under one permanent strip.** The strip says
 which section you are editing and what it is bound to, and never moves; the three
@@ -32,16 +32,16 @@ and the other two are not rendered at all.
 ```
 Editing   [ Section 0            ▾ ]        ← the strip: always there, never scrolls
 scene ojz_act1_start · raster hand-authored
-✓ own preset  ✓ threaded  ✗ its channels    ← can this section carry a band? §5
+✓ own preset  ✓ threaded  ✗ its channels    ← can this section carry a band? §6
 [ Parallax ][  Colour  ][ Tile anim ]       ← the three jobs
 
   Parallax                        Colour                            Tile anim
   ────────                        ──────                            ─────────
-  SCENES §2                       RASTER TIMELINE                   TILE ANIMATIONS (n/4) §7
-  LAYERS (n/16 per scene) §2      RASTER BAND PRESETS §3            NEW TILE ANIMATION §7
+  SCENES §2                       RASTER TIMELINE                   TILE ANIMATIONS (n/4) §8
+  LAYERS (n/16 per scene) §2      RASTER BAND PRESETS §3            NEW TILE ANIMATION §8
   SCENE: <id>                     PRESET: <id> §3
-  SECTION ASSIGNMENT §5           PRESET: <id> · CYCLES, VARIANTS §4
-                                  PRESET: <id> · MOVING ANCHORS
+  SECTION ASSIGNMENT §6           PRESET: <id> · CYCLES, VARIANTS §4
+                                  PRESET: <id> · MOVING ANCHORS §5
 ```
 
 `PROPERTIES` sits below all three. It is a readout of whatever is selected, not
@@ -264,7 +264,149 @@ If you do not need `variants`, leave the slot on
 
 ---
 
-## 5. Bind it to a section
+## 5. Make a band follow the scenery (a moving anchor)
+
+The raster band of §3 is nailed to the screen. `Top` and `Bot` are screen lines, so the
+stripe stays exactly where it is while the level scrolls underneath it. A **moving anchor**
+unpins that. You give one of the preset's four **patch channels** a point in the **level**,
+and the engine turns that point into a screen line on every frame, so the boundary rides
+with the scenery instead of with the camera. A **sweep** then makes the point drift up and
+down on a timer, whether the camera moves or not, the way `Drift` in §2 does for a
+parallax layer.
+
+Still on the **Colour** sub-tab and still inside your preset, open
+`PRESET: <id> · MOVING ANCHORS`.
+
+**The section title carries a count once the preset uses one.** It reads 1/4, 2/4 and so
+on, and it counts the channels this preset has written something for, not the channels
+that are moving. A preset that uses none carries no count at all, so there is never a 0/4
+on screen to read as a broken counter.
+
+1. On `Channel 0`, set the first dropdown to `follow a world Y`. A `World Y` box appears,
+   already holding a value near the middle of the screen.
+2. Type the level Y you want the boundary to follow.
+3. Set `Movement` to `sweep up and down`. Three more rows appear, and a strip that draws
+   the sweep.
+
+| field | what it means | sane first value |
+|---|---|---|
+| `Channel 0` | which channel you are writing, and how. `keep hand-authored anchor` leaves whatever the section already had, and `channel unused (null)` writes the engine's own "unused" spelling | `follow a world Y` |
+| `World Y` | the point in the level the boundary follows, in whole pixels down from the top of the act | the value it arrives with |
+| `Movement` | the same three states for the motion: `keep hand-authored motion`, `no motion (null)`, or a sweep | `sweep up and down` |
+| `Travel` | how far the point swings. Seven fixed rungs | `±16 px (32 px of travel)` |
+| `Cycle` | how long one full up and down takes. Nine fixed rungs | `8.53 s (512 ticks)` |
+| `Start at` | where in the cycle it begins, in 256ths of a cycle. Optional, and it arrives absent | leave it on `absent · set` |
+
+`Travel` and `Cycle` are dropdowns rather than number boxes, and that is the engine's
+shape rather than a simplification: both are powers of two, so there are seven amplitudes
+and nine periods and nothing at all in between. A value you cannot pick here is a value
+you could not have shipped.
+
+**Those two numbers are two different measurements.** In `±16 px (32 px of travel)` the
+first is how far the point goes from its `World Y` in one direction, and the second is the
+whole swing, top to bottom, peak to peak. The second is the one every other number on this
+page is measured against, the band check below included.
+
+### `World Y` is whole pixels, and it is not `Drift`'s number
+
+⚠ `Drift` in §2 is the one row on this tab where the box and the file hold different
+numbers: you type px/frame and Aurora writes 256ths on the way out. `World Y` does not do
+that. The box, the file and the engine all hold the same whole pixel of level space, and
+the row says so with `px, level space` printed beside it. A world Y multiplied by 256 out
+of that habit lands 256 times down the level, saves and validates without a complaint, and
+the band then simply never appears.
+
+### What Aurora will not let you write
+
+- A `World Y` that is not a whole number, or one outside 0 to 65535. The engine's field is
+  16 bits wide.
+- `32767` typed into `World Y`. That is the engine's own "this channel is unused" value,
+  and two spellings of the same thing is one too many: pick `channel unused (null)`.
+- A `Start at` outside 0 to 255. That range is one whole cycle.
+- A channel whose earlier neighbour you have not written yet. The two settings are
+  positional lists that cannot have a hole in them, so Aurora refuses the change and names
+  the channel to write first.
+
+**One thing it warns about instead of refusing:** a `Movement` on a channel with no
+`World Y`. That saves, aeon's build accepts it, and it shows nothing whatsoever. The
+sentence Aurora puts under the control is the schema's own.
+
+**And one nothing warns about at all:** a sweep is only read by a game whose engine
+switches anchor motion on. The game this project builds does; another game on this engine
+need not, and there an authored sweep is installed and never read. That is a silent no-op
+rather than an error.
+
+### ⚠ Aurora cannot tell you that a sweep fits
+
+aeon publishes the screen band each channel's boundary is confined to, and Aurora measures
+your `Travel` against it. **That check runs in one direction only.**
+
+If the travel is wider than the band, it is certain: the sweep cannot stay inside it
+whatever the camera does. A warning appears under `Travel` with both numbers, with what
+happens at each end of the band, and with the remedy, which is a smaller `Travel`.
+
+If the travel is not wider than the band, **Aurora says nothing, and nothing is not a
+clearance.** The screen line the boundary lands on is your world Y minus the camera's Y,
+so where inside the band the sweep actually sits is decided by where the camera happens to
+be, which nothing can know while you are still authoring. There is no green tick beside
+`Travel` and there is not going to be one. Aurora can prove a sweep is too wide; it can
+never prove one is safe.
+
+aeon's own build runs the same test across the whole act, so an over-wide sweep fails
+there too. It is the same one-directional test rather than a second opinion, so a green
+build is not the clearance either.
+
+> A sweep with no warning under it has not been approved. It has only failed to be caught. If it matters exactly where that boundary lands, the thing that settles it is running the ROM and looking.
+
+Two consequences worth having:
+
+- On a channel whose band is wider than the widest rung on the ladder,
+  `±64 px (128 px of travel)`, no warning can ever appear, whatever you pick. Silence there
+  is guaranteed rather than earned, and it is the same silence a well-judged sweep gets.
+- **The two ends of the band do not behave alike**, which is why the warning names both.
+  Past the bottom of the band the record is not emitted at all: no boundary is drawn
+  anywhere and the band vanishes for that frame rather than pinning to the bottom line.
+  Above the top of the band it is still emitted, pinned onto the top line, and stays
+  visible. The warning calls that second one "clamped up", which is about the line number
+  going up and not about the boundary rising up the screen. A sweep one rung too wide
+  therefore reads as a band flickering out once a cycle,
+  which looks like a rendering bug rather than like an amplitude somebody chose.
+
+### The strip that draws the sweep, and what it does not prove
+
+`sweep up and down` adds a small animated strip to the bottom of the channel. It is the
+only thing in this editor that runs on a timer. It draws one full cycle of the sweep you
+authored: the `World Y` as the centre line, the peak excursion as a band either side of
+it, the curve itself, and a dot moving along the curve in real time at the `Cycle` you
+picked. `Pause` stops it, and pausing removes the loop rather than idling it, so a stopped
+strip reads `preview paused` and costs nothing at all.
+
+**It is not a picture of your band on a screen**, and that is structural rather than
+unfinished. A band carries `Top`, `Bot`, `S/H` and `ON` and no channel number, so the
+document never says which band a channel drives. A strip that drew a stripe sliding up and
+down a screen would have had to invent that link, and would be a picture of a program your
+file does not describe.
+
+**Nothing in Aurora has ever seen one of these move.** The strip is the arithmetic your two
+rungs mean, drawn faithfully. It is not a frame from an emulator, and it is not an answer
+to the question above that Aurora cannot answer.
+
+Two smaller things about it, both deliberate:
+
+- **Every strip is drawn to the same scale**, the tallest rung on the ladder, so
+  `±1 px (2 px of travel)` really does look nearly flat beside `±64 px (128 px of travel)`.
+  Letting each sweep fill its own strip would have drawn all seven rungs the same picture,
+  which is the `Travel` control lying about its own value.
+- **When it cannot draw the curve it draws nothing.** A file written by hand can carry a
+  value that is not on either ladder; the dropdowns here cannot produce one. If one ever
+  reaches the strip, it paints an empty frame rather than a plausible looking wrong curve.
+
+A preset that carries moving anchors owes aeon a generated chooser for that key as well as
+for its bands, which is condition **3** in §6.
+
+---
+
+## 6. Bind it to a section
 
 Two separate bindings, now on two different sub-tabs, both acting on **the section
 named in the strip at the top**:
@@ -305,7 +447,7 @@ because conflating them is how the wrong answer got published twice in one day:
 |---|---|---|
 | **1**, `own preset` | no other section binds this section's preset record | a programmer **splits a preset record** |
 | **2**, `threaded` | some `preset()` also threads the raster chooser on this index | **one line of aeon** |
-| **3**, `its channels` | the preset bound here today owes a generated chooser for every **other** key it carries (`cycles`, `variants`, moving anchors), and has one | **one line of aeon**, on a different chooser |
+| **3**, `its channels` | the preset bound here today owes a generated chooser for every **other** key it carries (`cycles`, `variants`, the moving anchors of §5), and has one | **one line of aeon**, on a different chooser |
 
 The strip prints these as **three rows**, each with its own `✓` / `✗` / `?`, because
 which one you fail decides what you do next, and a single verdict cannot tell you
@@ -338,7 +480,7 @@ Scenes have no such restriction: bind a scene to any section.
 
 ---
 
-## 6. Save, and build
+## 7. Save, and build
 
 **Ctrl+S.** There is no Save button on a level tab; the dot on the tab title is the
 only sign you have unsaved work. **A save writes a file only when that file's
@@ -410,7 +552,7 @@ names a file or an id.
 
 ---
 
-## 7. Tile animations are not raster bands
+## 8. Tile animations are not raster bands
 
 Two features on this tab used to share the word "band". They no longer do: the two
 names share no word, **and they are on different sub-tabs**, so they can no longer
@@ -441,7 +583,7 @@ If you are looking for a coloured stripe, you want the **Colour** sub-tab, not t
 
 ---
 
-## 8. Quick reference
+## 9. Quick reference
 
 | I want to… | go to |
 |---|---|
@@ -451,6 +593,8 @@ If you are looking for a coloured stripe, you want the **Colour** sub-tab, not t
 | make a coloured stripe | `Colour` → `RASTER BAND PRESETS` → `Preset id` → `New` |
 | make colours shimmer | `Colour` → `PRESET: <id> · CYCLES, VARIANTS` → `cycles` → `authored script (array of channels)` |
 | delete a preset a section binds | unbind that section first: Aurora refuses the delete and says which |
+| make a stripe follow the scenery instead of the screen | `Colour` → `PRESET: <id> · MOVING ANCHORS` → `Channel 0` → `follow a world Y` |
+| make that point move on a timer | that channel's `Movement` row → `sweep up and down` |
 | animate background tiles | `Tile anim` → `NEW TILE ANIMATION` |
 | change which section I am editing | the section strip pinned to the top of the Effects panel |
 | change which job I am doing | the three buttons under the strip: `Parallax` / `Colour` / `Tile anim` |
@@ -466,16 +610,21 @@ If you are looking for a coloured stripe, you want the **Colour** sub-tab, not t
 - Lighting `L0` in a `variants` line mask.
 - A `colours` list that is empty or holds a non-integer.
 - A `Drift` of `0`, or anything that rounds to it, or one past ±16 px/frame.
+- A `World Y` that is fractional, outside 0 to 65535, or the unused sentinel `32767`.
+- A `Start at` outside 0 to 255.
+- A moving-anchor channel written while an earlier channel is still unwritten.
 
 ### Things the build can still refuse
 
-- Binding a raster preset to a section aeon has not threaded yet (§5). Aurora warns
+- Binding a raster preset to a section aeon has not threaded yet (§6). Aurora warns
   at the control and does not block it, because that is aeon's fact to change.
 - A band whose colour is invisible against the palette it repaints. Nothing anywhere
   catches that: not this panel, not the schema, not the build.
 - Overlapping bands that share CRAM colours, or two bands firing on one screen line.
   Aurora warns; it does not refuse, because a nested band over a disjoint colour span
   is legal and walling it would refuse programs the engine builds.
+- A sweep whose `Travel` is too wide for its channel's band (§5). Aurora warns at the
+  control; the silence on every other sweep is not a clearance and never becomes one.
 
 Deleting a preset a section still binds used to be on this list. It is not any more:
 Aurora refuses the delete, names the sections that bind it, and tells you to set them

@@ -202,6 +202,36 @@ const RENDERED = [
   { text: 'L2', file: `${EFFECTS}/BandPresetPanel.tsx` },
   { text: 'L3', file: `${EFFECTS}/BandPresetPanel.tsx` },
 
+  // §5's moving anchors. The section title and the six control labels are this
+  // panel's own JSX; the option labels and the two ladders are the provider's,
+  // and the strip's chip and its stopped state are the preview component's.
+  { text: 'PRESET: <id> · MOVING ANCHORS', file: `${EFFECTS}/BandPresetPanel.tsx` },
+  { text: 'World Y', file: `${EFFECTS}/BandPresetPanel.tsx` },
+  { text: 'px, level space', file: `${EFFECTS}/BandPresetPanel.tsx` },
+  { text: 'Movement', file: `${EFFECTS}/BandPresetPanel.tsx` },
+  { text: 'Travel', file: `${EFFECTS}/BandPresetPanel.tsx` },
+  { text: 'Cycle', file: `${EFFECTS}/BandPresetPanel.tsx` },
+  { text: 'Start at', file: `${EFFECTS}/BandPresetPanel.tsx` },
+  { text: 'absent · set', file: `${EFFECTS}/BandPresetPanel.tsx` },
+
+  { text: 'keep hand-authored anchor', file: 'src/renderer/providers/effects-preset.ts' },
+  { text: 'channel unused (null)', file: 'src/renderer/providers/effects-preset.ts' },
+  { text: 'follow a world Y', file: 'src/renderer/providers/effects-preset.ts' },
+  { text: 'keep hand-authored motion', file: 'src/renderer/providers/effects-preset.ts' },
+  { text: 'no motion (null)', file: 'src/renderer/providers/effects-preset.ts' },
+  { text: 'sweep up and down', file: 'src/renderer/providers/effects-preset.ts' },
+  // The two ladders are GENERATED labels, so these rows check the template that
+  // makes them and not a literal anyone typed. `2 * (256 >> amp_shift)` is the
+  // travel in the brackets; the ± number beside it is half of that, and the
+  // guide says which is which.
+  { text: '±1 px (2 px of travel)', file: 'src/renderer/providers/effects-preset.ts' },
+  { text: '±16 px (32 px of travel)', file: 'src/renderer/providers/effects-preset.ts' },
+  { text: '±64 px (128 px of travel)', file: 'src/renderer/providers/effects-preset.ts' },
+  { text: '8.53 s (512 ticks)', file: 'src/renderer/providers/effects-preset.ts' },
+
+  { text: 'Pause', file: `${EFFECTS}/AnchorSweepPreview.tsx` },
+  { text: 'preview paused', file: `${EFFECTS}/AnchorSweepPreview.tsx` },
+
   { text: 'cram (raw colours)', file: 'src/renderer/providers/effects-preset.ts' },
   { text: 'off (null)', file: 'src/renderer/providers/effects-preset.ts' },
   { text: 'authored script (array of channels)', file: 'src/renderer/providers/effects-preset.ts' },
@@ -225,7 +255,16 @@ const RENDERED = [
   { text: 'dir', file: 'src/core/formats/effects/aurora-effects-preset.schema.json' },
 ];
 
-/** Rows that appear only in the panel schematic (a fenced block). */
+/**
+ * Rows the panel schematic claims. A fenced block contributes no inline spans,
+ * so these are checked for PRESENCE IN A FENCE as well as against their source.
+ *
+ * ⚠ A row here is not a statement that the label appears NOWHERE ELSE. Since
+ * §5 was written, `PRESET: <id> · MOVING ANCHORS` is also quoted in prose and so
+ * also carries a `RENDERED` row: the two rows assert different things about the
+ * same string (the schematic still names it; the prose's copy of it is still
+ * what the panel titles that section) and neither makes the other redundant.
+ */
 const DIAGRAM = [
   { text: 'PRESET: <id> · MOVING ANCHORS', file: `${EFFECTS}/BandPresetPanel.tsx` },
   { text: 'LAYERS (n/16 per scene)', file: `${EFFECTS}/EffectsScenePanel.tsx` },
