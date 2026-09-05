@@ -81,7 +81,7 @@
       "There is deliberately NO DEFAULT. The default used to be the LIVE sibling checkout, so",
       "`npm run harness:canvas-cdp` with nothing set recursively deleted the canvas artwork stored",
       "in it (20 real files were sitting there on 2026-09-03). The guard is at the top of",
-      "scratchpad/canvas-cdp-harness.mjs, refuses at import — before any rmSync — and refuses again",
+      "scratchpad/canvas-cdp-harness.mjs, refuses at import \u2014 before any rmSync \u2014 and refuses again",
       "if the variable is pointed at the live checkout anyway. d-28, COPY ONLY WHERE IT CAN WRITE.",
       "  cp -r <sibling>/s1disasm /tmp/s1disasm-copy",
       "  S1DISASM_DIR=/tmp/s1disasm-copy npm run harness:canvas-cdp",
@@ -220,7 +220,8 @@
     "preview": "electron-vite preview",
     "test": "node scripts/check-test-collection.mjs && node scripts/check-pseudo-skip.mjs && node scripts/check-peer-path-literals.mjs && node scripts/check-cited-paths.mjs && node scripts/check-object-stringify.mjs && node scripts/check-tsx-dashes.mjs && node scripts/check-ledger-timestamps.mjs && node scripts/check-python-resolver.mjs && node scratchpad/check-harness-guards.mjs && npm run typecheck && vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lane-log": "node scripts/append-lane-log.mjs"
   },
   "keywords": [],
   "author": "",
