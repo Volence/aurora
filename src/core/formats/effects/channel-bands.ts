@@ -50,14 +50,31 @@
  *
  * ─── WHAT A GREEN ON THIS MODULE DOES *NOT* RULE OUT ───────────────────────
  *
- * With the bands sonic4 declares today, the refusal is REACHABLE ON EXACTLY ONE
- * CHANNEL. Channel 0 is 218 lines and the widest rung on the ladder travels 128
- * px, so no legal sweep can ever be refused there; channel 1 is 2 lines, so six
- * of the seven rungs are refused and the seventh (amp_shift 8, 2 px) is the
- * cannot-tell boundary case. Channels 2 and 3 have no declared band at all.
- * That asymmetry is a property of the DATA, not of this code, and it is why the
- * tests plant a violating sweep on channel 1 specifically: a suite that only
- * ever exercised channel 0 would be green forever with the rule inverted.
+ * With the bands sonic4 declares today, the refusal is REACHABLE ON TWO OF THE
+ * FOUR CHANNELS, and which two is a property of the DATA rather than of this
+ * code. The ladder's widest rung travels 128 px, so:
+ *
+ *   • channel 0 (218 lines) — no legal sweep can ever be refused.
+ *   • channel 1 (2 lines)   — six of the seven rungs are refused; the seventh
+ *                             (amp_shift 8, 2 px) is the cannot-tell boundary.
+ *   • channel 2 (158 lines) — no legal sweep can ever be refused.
+ *   • channel 3 (62 lines)  — amp_shift 2 (128 px) and 3 (64 px) are refused;
+ *                             the remaining five rungs are cannot-tell.
+ *
+ * That is why the tests plant a violating sweep on channel 1 specifically: a
+ * suite that only ever exercised channel 0 would be green forever with the rule
+ * inverted.
+ *
+ * ⚠ AND `no-band` IS CURRENTLY UNREACHABLE THROUGH THE PANEL. Channels 2 and 3
+ * had no declared band until the 2026-09-05 re-vendor (aeon `ddd8881a`) added
+ * them for OJZ act 1 section 7's `OJZ_WorldWater` pair; with all of 0..3
+ * declared and `EFFECTS_PRESET_MAX_PATCH` at 4, no channel an author can select
+ * returns `no-band`. The arm and `anchorSweepNoBandAdvisory` are deliberately
+ * KEPT — the gap is a fact about aeon's data, and it reopens the moment aeon
+ * retires a `patchable()` or Aurora grows a fifth channel. `[6e0]` in
+ * `effects-preset-anchors.test.ts` asserts the gap is closed rather than
+ * assuming it, and the `no-band` rows there drive a synthetic undeclared
+ * channel so the arm keeps its coverage.
  */
 
 import bandsJson from './aeon-effects-channel-bands.json';
@@ -139,13 +156,38 @@ export const EFFECTS_CHANNEL_BANDS_GAME: string = typeof DOC.game === 'string' &
  * that was wrong in aeon's first cut was the leading 2.
  */
 const TRAVEL = (() => {
-  const m = /PEAK-TO-PEAK TRAVEL \((\d+) \* \((\d+) >> amp_shift\), whole pixels\) is <= channels\[c\]\.lines/
+  // ⚠⚠ TRANSITIONAL DUAL ARM — `CHBAND-PROSE-REPIN`, added 2026-09-05. ⚠⚠
+  //
+  // aeon is restating this sentence in the REFUSAL direction: the tail
+  // `... whole pixels) is <= channels[c].lines` becomes `... EXCEEDS
+  // channels[c].lines`. This accepts BOTH so there is no moment at which the
+  // vendored document and this parser disagree and the editor refuses to LOAD
+  // (every miss here is `fail()`, which throws at module load).
+  //
+  // ── WHAT REMOVES IT ──────────────────────────────────────────────────────
+  // The `is <=` arm comes out once aeon's new text is vendored here, at which
+  // point only `EXCEEDS` exists in any document this repo pins. That is step 3
+  // of an expand-then-contract and it is OWED — a tolerance added for a
+  // migration is exactly the thing that outlives its reason because nobody
+  // remembers why it is there. If you are reading this after the sidecar says
+  // `EXCEEDS`, delete the `is <=` alternative and this comment with it.
+  //
+  // ── WHY ACCEPTING TWO OPPOSITE STATEMENTS IS NOT A CONTRADICTION ─────────
+  // The two phrasings are opposite STATEMENTS, but this regex extracts only the
+  // multiplier and the base (2 and 256), which are identical either way. The
+  // comparison DIRECTION is not inferred from this sentence anywhere: it is
+  // written once, in `anchorFitAgainstBand` (`travelPx > band.lines`), and it
+  // is held by the two interlocks above — which survive aeon's rewording
+  // VERBATIM and are deliberately NOT widened — and by `AnchorBandFit` having
+  // no `fits` member at the type level. Checked before widening, not assumed.
+  const m = /PEAK-TO-PEAK TRAVEL \((\d+) \* \((\d+) >> amp_shift\), whole pixels\) (?:is <=|EXCEEDS) channels\[c\]\.lines/
     .exec(prose('how_to_use'));
   if (!m) {
     fail('no longer states the fit formula as "PEAK-TO-PEAK TRAVEL (2 * (256 >> amp_shift), whole '
-      + 'pixels) is <= channels[c].lines". That exact sentence is what the ladder is checked '
-      + 'against; it was wrong by 2x, permissively, until aeon 8d217dd4, so it is parsed and '
-      + 'never remembered');
+      + 'pixels)" followed by either "is <= channels[c].lines" or "EXCEEDS channels[c].lines". '
+      + 'That sentence is what the ladder is checked against; it was wrong by 2x, permissively, '
+      + 'until aeon 8d217dd4, so it is parsed and never remembered. BOTH tails are accepted only '
+      + 'for the CHBAND-PROSE-REPIN migration — see the comment above');
   }
   const multiplier = Number(m[1]);
   const base = Number(m[2]);
@@ -235,8 +277,10 @@ export const EFFECTS_CHANNEL_BANDS: ReadonlyMap<number, EffectsChannelBand> = ((
 /**
  * The channels aeon declares a band for, ascending — the COVERAGE of this
  * whole feature, stated as data so a sentence can name it instead of retyping
- * it. `RASTER_MAX_PATCH` is 4 and this list has two entries today, and the gap
- * between those two numbers is a thing an author is entitled to be told.
+ * it. `RASTER_MAX_PATCH` is 4 and this list has FOUR entries as of the
+ * 2026-09-05 re-vendor, so the gap it exists to disclose is currently empty —
+ * see the header. It is still computed rather than asserted away, because the
+ * gap is aeon's data to reopen and an author is entitled to be told when it is.
  */
 export const EFFECTS_CHANNEL_BANDS_DECLARED: readonly number[] = Object.freeze(
   [...EFFECTS_CHANNEL_BANDS.keys()].sort((a, b) => a - b),
@@ -294,7 +338,9 @@ export const EFFECTS_CHANNEL_BAND_EDGE_LO: EffectsChannelBandEdge =
  */
 export type AnchorBandFit =
   /**
-   * aeon declares no band for this channel (2 and 3 today). Nothing is known —
+   * aeon declares no band for this channel — NONE in sonic4 as of the
+   * 2026-09-05 re-vendor, which declares all of 0..3; see the header for why
+   * this arm is kept anyway. Nothing is known —
    * and since 2026-09-04 the panel SAYS SO rather than rendering nothing, because
    * an author cannot tell a coverage gap from a clean result by looking at an
    * empty space. See `anchorSweepNoBandAdvisory` for why this arm is spoken
