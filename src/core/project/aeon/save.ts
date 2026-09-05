@@ -54,11 +54,95 @@ export interface AeonSaveFile {
   compare?: SaveCompare;
 }
 
+/**
+ * One planned DELETION — the part of a save an author would most want to see
+ * before it happens, so it is a first-class member of the plan and carries its
+ * own sentence rather than being a bare path the glue has to describe.
+ */
+export interface AeonSaveRemoval {
+  /** Project-relative path to unlink. */
+  path: string;
+  /** What used to live here, in the author's words: `scene "ojz_act1_start"`. */
+  what: string;
+}
+
 export interface AeonSavePlan {
   /** Every write, in order, keyed by project-relative path. */
   files: AeonSaveFile[];
+  /**
+   * Every deletion, AFTER every write — see `removalsFor` and the ordering note
+   * on it. Empty on the overwhelming majority of saves.
+   */
+  removals: AeonSaveRemoval[];
+  /**
+   * The paths that will hold an editor-owned effects document once this plan
+   * has been applied — the new value for each library's `loadedPaths` ledger.
+   * The GLUE assigns it, and only after the writes and removals it actually
+   * completed; see `state/aeon-save.ts`.
+   */
+  ledgers: { scenePaths: string[]; presetPaths: string[] };
   /** True when project.json was retargeted (it is then also present in files). */
   configChanged: boolean;
+}
+
+/**
+ * WHICH FILES A SAVE MAY DELETE, and the argument for why it is safe.
+ *
+ * ═══ THE DEFECT THIS EXISTS FOR ═══════════════════════════════════════════
+ *
+ * Until 2026-09-05 this plan pushed a write for every document IN a library and
+ * had no removal step at all, so `Delete scene` removed the scene from the
+ * SESSION and left its file on disk — and the scene was back on the next open.
+ * Measured end to end (`npm run harness:deleted-scene-returns`, rows [1e]/[1h]):
+ * the file's inode, mtime and size were identical either side of the Ctrl+S.
+ * The identical loop writes the raster presets, and the identical thing happened
+ * to them ([2d]/[2f]). That is silent data loss in the authoring surface: the
+ * author's deletion is undone without a word.
+ *
+ * ═══ A PLAN THAT DELETES IS MORE DANGEROUS THAN ONE THAT DOES NOT ═════════
+ *
+ * The failure this could introduce is worse than the one it removes, so the
+ * removable set is derived from WHAT WAS LOADED, never from what is on disk:
+ *
+ *   removable = (paths this session read, or wrote, as a document of this kind)
+ *               MINUS (paths the library still claims)
+ *
+ * `known` is the library's `loadedPaths` ledger, whose comment carries the rest
+ * of the argument. Concretely, three classes of file can never be removed
+ * however this is called:
+ *
+ *   • a document in a checkout Aurora has not opened — it is in no ledger;
+ *   • a `.json` here that the parser REFUSED — the loader puts it in
+ *     `unreadable` and keeps it out of `loadedPaths`, so Aurora neither
+ *     overwrites it (the throw further down) nor deletes it. `unreadable` is
+ *     passed in and subtracted a SECOND time so the rule holds even if a future
+ *     loader ever admitted such a path to the ledger;
+ *   • a file that is not a document of this kind at all — a `.bin` deform table,
+ *     an author's notes — the loader skips it and it enters no list.
+ *
+ * ═══ ORDERING: WRITES FIRST, THEN REMOVALS ════════════════════════════════
+ *
+ * `files` is applied in full before `removals`, and a crash between the two
+ * leaves the new state written AND the deleted documents still on disk — which
+ * is precisely the pre-fix behaviour: the author re-opens and finds the scene
+ * they deleted has come back, and nothing else is wrong. Removals first would
+ * mean a crash could take the file away while the rest of the save (the meta
+ * sidecar that stops pointing at it, the section wiring) never landed, leaving a
+ * project whose sections reference a document that no longer exists. Between
+ * "an undone deletion" and "a dangling reference and a destroyed file", the
+ * recoverable one goes last.
+ */
+export function removalsFor(
+  known: readonly string[],
+  keep: readonly string[],
+  unreadable: readonly string[],
+  describe: (path: string) => string,
+): AeonSaveRemoval[] {
+  const keeping = new Set(keep);
+  const refused = new Set(unreadable);
+  return known
+    .filter(p => !keeping.has(p) && !refused.has(p))
+    .map(path => ({ path, what: describe(path) }));
 }
 
 export async function buildAeonSavePlan(
@@ -70,6 +154,7 @@ export async function buildAeonSavePlan(
   opts: { legacyAtlasMerged: boolean },
 ): Promise<AeonSavePlan> {
   const files: AeonSaveFile[] = [];
+  const removals: AeonSaveRemoval[] = [];
 
   const zone = project.zones.find(z => z.id === zoneId);
   const act = zone?.acts.find(a => a.id === actId);
@@ -352,6 +437,14 @@ export async function buildAeonSavePlan(
     }
     files.push({ path, bytes: new TextEncoder().encode(serializeEffectsScene(scene)), compare: 'json' });
   }
+  // AND THE DELETIONS. A scene the session removed from the library is a file
+  // this save must unlink — see `removalsFor` above for why the set is derived
+  // from `loadedPaths` and not from the directory.
+  const scenePathsKept = project.effectsScenes.scenes.map(s => effectsScenePath(dataRoot, s.id));
+  removals.push(...removalsFor(
+    project.effectsScenes.loadedPaths, scenePathsKept, [...unreadableScenePaths],
+    p => `scene ${JSON.stringify(p.slice(p.lastIndexOf('/') + 1).replace(/\.json$/, ''))}`,
+  ));
 
   // The RASTER PRESET documents, on the identical rule and for the identical
   // reason: an unreadable file at the path a preset would be written to is a
@@ -375,6 +468,11 @@ export async function buildAeonSavePlan(
     }
     files.push({ path, bytes: new TextEncoder().encode(serializeEffectsPreset(preset)), compare: 'json' });
   }
+  const presetPathsKept = project.effectsPresets.presets.map(p => effectsPresetPath(dataRoot, p.id));
+  removals.push(...removalsFor(
+    project.effectsPresets.loadedPaths, presetPathsKept, [...unreadablePresetPaths],
+    p => `raster preset ${JSON.stringify(p.slice(p.lastIndexOf('/') + 1).replace(/\.json$/, ''))}`,
+  ));
 
   // The BG override document. `saveFileFor` owns all three "write nothing"
   // cases — no file on disk, a file that would not parse, and a document that
@@ -442,5 +540,12 @@ export async function buildAeonSavePlan(
     }
   }
 
-  return { files, configChanged };
+  return {
+    files,
+    removals,
+    // What will be on disk once this plan is applied. The glue narrows it by
+    // whatever it could not actually remove before assigning it.
+    ledgers: { scenePaths: scenePathsKept, presetPaths: presetPathsKept },
+    configChanged,
+  };
 }

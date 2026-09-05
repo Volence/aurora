@@ -87,8 +87,8 @@ import type { EffectsSceneLibrary } from '../../../core/formats/effects/scene';
 import type { EffectsPresetLibrary } from '../../../core/formats/effects/preset';
 import type { AnyCommand } from '../../../core/editing/commands';
 
-const EMPTY_LIBRARY: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [] };
-const EMPTY_PRESETS: EffectsPresetLibrary = { presets: [], unreadable: [], notices: [] };
+const EMPTY_LIBRARY: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [], loadedPaths: [] };
+const EMPTY_PRESETS: EffectsPresetLibrary = { presets: [], unreadable: [], notices: [], loadedPaths: [] };
 
 /**
  * The camera the strip is drawn for — the SAME resolution `MapViewport`'s

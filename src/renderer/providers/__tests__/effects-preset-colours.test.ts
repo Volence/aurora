@@ -48,7 +48,7 @@ import type { SetEffectsPresetCommand } from '../../../core/editing/commands';
 const ID = 'colour_probe';
 
 function library(p: EffectsPreset): EffectsPresetLibrary {
-  return { presets: [p], unreadable: [], notices: [] };
+  return { presets: [p], unreadable: [], notices: [], loadedPaths: [] };
 }
 
 /** A preset whose one band writes `colours` at `addr`. */

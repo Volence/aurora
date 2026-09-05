@@ -203,12 +203,12 @@ import { EFFECTS_GUIDE_SLUG, GUIDE_ANCHORS } from '../guide/guides';
 import { PresetLagDisclosure } from './PresetLagDisclosure';
 import { RampSignLagDisclosure } from './RampSignLagDisclosure';
 
-const EMPTY_LIBRARY: EffectsPresetLibrary = { presets: [], unreadable: [], notices: [] };
+const EMPTY_LIBRARY: EffectsPresetLibrary = { presets: [], unreadable: [], notices: [], loadedPaths: [] };
 // THE SCENE LIBRARY, FOR ONE QUESTION ONLY: does the scene bound to the section
 // bound to this preset carry a `v_deform`? That bit decides whether a VSRAM
 // `ramp` is a full-screen scroll or a 16-pixel sliver, and it lives in a
 // DIFFERENT DOCUMENT — see `rampScrollModeAdvisory`. This panel writes no scene.
-const EMPTY_SCENES: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [] };
+const EMPTY_SCENES: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [], loadedPaths: [] };
 
 const textInput: React.CSSProperties = {
   flex: 1, minWidth: 0, background: T.raised, color: T.textHi,

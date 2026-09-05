@@ -62,7 +62,7 @@ import rawSchema from '../../../core/formats/effects/aurora-effects-scene.schema
 const S = rawSchema as unknown as Record<string, any>;
 
 function library(scenes: EffectsScene[] = [], unreadable: EffectsSceneLibrary['unreadable'] = []): EffectsSceneLibrary {
-  return { scenes, unreadable, notices: [] };
+  return { scenes, unreadable, notices: [], loadedPaths: [] };
 }
 
 const canopy = () => {

@@ -57,7 +57,7 @@ const lib = (ids: string[], unreadable: string[] = []): EffectsPresetLibrary => 
   unreadable: unreadable.map((id) => ({
     path: `/p/data/editor/effects/presets/${id}.json`, reason: 'not JSON',
   })),
-  notices: [],
+  notices: [], loadedPaths: [],
 });
 
 describe('the slice this file measures is bounded', () => {

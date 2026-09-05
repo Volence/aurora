@@ -24,7 +24,7 @@ const NONE = LAYER_PROPS.curve.oneOf[0].const as string; // "none"
 const AT = LAYER_PROPS.vsplit.oneOf[1].properties.at as { minimum: number; maximum: number };
 
 function library(scenes: EffectsScene[]): EffectsSceneLibrary {
-  return { scenes, unreadable: [], notices: [] };
+  return { scenes, unreadable: [], notices: [], loadedPaths: [] };
 }
 
 /** A scene that never had the keys, plus one layer spelling both as explicit "none". */

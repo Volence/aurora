@@ -69,7 +69,7 @@ function rampPreset(over: Partial<ReturnType<typeof newRamp>> = {}): EffectsPres
   return { schema: 1, id: ID, ramp: { ...newRamp(), ...over } };
 }
 function lib(...presets: EffectsPreset[]): EffectsPresetLibrary {
-  return { presets, unreadable: [], notices: [] };
+  return { presets, unreadable: [], notices: [], loadedPaths: [] };
 }
 
 // ---------------------------------------------------------------------------

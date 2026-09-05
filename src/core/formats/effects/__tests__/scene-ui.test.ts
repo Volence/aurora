@@ -384,7 +384,7 @@ describe('scene identity', () => {
     const library: EffectsSceneLibrary = {
       scenes: [newEffectsScene('canopy_dusk')],
       unreadable: [{ path: 'data/editor/effects/broken.json', reason: 'nope' }],
-      notices: [],
+      notices: [], loadedPaths: [],
     };
     expect([...takenSceneIds(library)].sort()).toEqual(['broken', 'canopy_dusk']);
     // ...and the refusal SAYS which kind of collision it is, because the two need

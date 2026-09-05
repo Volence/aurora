@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS, unwrapBinaryRead } from '../shared/ipc-types';
-import type { RecentProject, GuardedWriteFile, GuardedWriteResult, ReadManyEntry, AetherStatusPayload, AetherWarpResult, AetherBuildResult } from '../shared/ipc-types';
+import type { RecentProject, GuardedWriteFile, GuardedWriteResult, ReadManyEntry, DeleteOutcome, AetherStatusPayload, AetherWarpResult, AetherBuildResult } from '../shared/ipc-types';
 import { AGENT_REQUEST_CHANNEL, AGENT_RESPONSE_CHANNEL } from '../shared/agent-protocol';
 import type { AgentRequestEnvelope, AgentResponseEnvelope } from '../shared/agent-protocol';
 
@@ -47,6 +47,10 @@ const api = {
 
   writeGuarded: (basePath: string, files: GuardedWriteFile[]): Promise<GuardedWriteResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.WRITE_GUARDED, basePath, files),
+
+  /** Remove ONE project-relative file. See main/file-io.ts deleteProjectFile. */
+  deleteFile: (basePath: string, relativePath: string): Promise<DeleteOutcome> =>
+    ipcRenderer.invoke(IPC_CHANNELS.DELETE_FILE, basePath, relativePath),
 
   // Env-guarded paint instrumentation (AURORA_PERF=1). The flag is read from the
   // process env here (the renderer process inherits main's env), exposed as a

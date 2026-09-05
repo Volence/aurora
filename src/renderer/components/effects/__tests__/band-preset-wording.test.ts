@@ -826,7 +826,7 @@ describe('the narrowed control carries its reason', () => {
   });
 
   it('the create refusal explains the id rule rather than just refusing', () => {
-    const empty = { presets: [], unreadable: [], notices: [] };
+    const empty = { presets: [], unreadable: [], notices: [], loadedPaths: [] };
     expect(presetIdRefusal('Bad-Id', empty)).toMatch(/lower case/);
     expect(presetIdRefusal('Bad-Id', empty)).toMatch(/\.emp symbol/);
     expect(presetIdRefusal('good_id', empty)).toBeNull();
@@ -841,7 +841,7 @@ describe('the narrowed control carries its reason', () => {
     const lib = {
       presets: [],
       unreadable: [{ path: 'games/sonic4/data/editor/effects/presets/broken.json', reason: 'x' }],
-      notices: [],
+      notices: [], loadedPaths: [],
     };
     expect(presetIdRefusal('broken', lib)).toMatch(/exists but could not be read/);
     expect(presetIdRefusal('broken', lib)).toMatch(/would destroy it/);

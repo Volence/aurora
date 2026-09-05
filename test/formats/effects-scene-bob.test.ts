@@ -85,7 +85,7 @@ const HOLE = Array.from({ length: SENTINEL + 1 }, (_, i) => i)
   .filter(v => v !== SENTINEL && (v < LADDER.min || v > LADDER.max));
 
 function library(scenes: EffectsScene[]): EffectsSceneLibrary {
-  return { scenes, unreadable: [], notices: [] };
+  return { scenes, unreadable: [], notices: [], loadedPaths: [] };
 }
 /** A scene with a bob, built through the control's own affordances. */
 function bobbing(id = 'probe'): EffectsScene {

@@ -59,7 +59,7 @@ const line = () => ({ colors: Array.from({ length: 16 }, black) });
  */
 const section = () => ({ rasterRef: null, sceneRef: null, objects: [], rings: [] });
 
-const emptySceneLibrary = () => ({ scenes: [], unreadable: [], notices: [] });
+const emptySceneLibrary = () => ({ scenes: [], unreadable: [], notices: [], loadedPaths: [] });
 
 function fakeProject(library: EffectsPresetLibrary): never {
   return {
@@ -106,7 +106,7 @@ const glare = (): EffectsPreset => ({
   ],
 });
 
-const emptyLibrary = (): EffectsPresetLibrary => ({ presets: [], unreadable: [], notices: [] });
+const emptyLibrary = (): EffectsPresetLibrary => ({ presets: [], unreadable: [], notices: [], loadedPaths: [] });
 
 const lib = () => useProjectStore.getState().project!.effectsPresets;
 const scenes = () => useProjectStore.getState().project!.effectsScenes;
@@ -136,7 +136,7 @@ describe('list_effects_presets', () => {
     open({
       presets: [glare()],
       unreadable: [{ path: 'data/editor/effects/presets/broken.json', reason: 'not valid JSON' }],
-      notices: [],
+      notices: [], loadedPaths: [],
     });
     const r = await ask({ kind: 'list-effects-presets' }) as Record<string, unknown>;
 
@@ -159,13 +159,13 @@ describe('list_effects_presets', () => {
     // The control for the row above. Without it, `name: null` could be the
     // handler ignoring `name` entirely and would look identical.
     const named: EffectsPreset = { ...glare(), name: 'Glare' };
-    open({ presets: [named], unreadable: [], notices: [] });
+    open({ presets: [named], unreadable: [], notices: [], loadedPaths: [] });
     const r = await ask({ kind: 'list-effects-presets' }) as { presets: { name: unknown }[] };
     expect(r.presets[0].name).toBe('Glare');
   });
 
   it('reports the per-section column AND the PANEL\'S OWN sentence beside it', async () => {
-    open({ presets: [glare()], unreadable: [], notices: [] });
+    open({ presets: [glare()], unreadable: [], notices: [], loadedPaths: [] });
     const r = await ask({ kind: 'list-effects-presets' }) as Record<string, unknown>;
 
     // ⚠ THIS ROW USED TO ASSERT THE OPPOSITE, and the reversal is deliberate.
@@ -192,7 +192,7 @@ describe('list_effects_presets', () => {
 });
 
 describe('get_effects_preset', () => {
-  beforeEach(() => open({ presets: [glare()], unreadable: [], notices: [] }));
+  beforeEach(() => open({ presets: [glare()], unreadable: [], notices: [], loadedPaths: [] }));
 
   it('returns the WHOLE document, including values no control can produce', async () => {
     const r = await ask({ kind: 'get-effects-preset', id: 'glare' }) as { preset: EffectsPreset };
@@ -209,7 +209,7 @@ describe('get_effects_preset', () => {
   it('distinguishes "no such preset" from "that file would not parse"', async () => {
     await expect(ask({ kind: 'get-effects-preset', id: 'nope' })).rejects.toThrow(/not found/);
     open({
-      presets: [], notices: [],
+      presets: [], notices: [], loadedPaths: [],
       unreadable: [{ path: 'data/editor/effects/presets/broken.json', reason: 'not valid JSON' }],
     });
     await expect(ask({ kind: 'get-effects-preset', id: 'broken' }))
@@ -290,7 +290,7 @@ describe('set_effects_preset', () => {
 
   it('refuses a CREATE whose id collides with an unreadable file', async () => {
     open({
-      presets: [], notices: [],
+      presets: [], notices: [], loadedPaths: [],
       unreadable: [{ path: 'data/editor/effects/presets/broken.json', reason: 'x' }],
     });
     await expect(ask({
@@ -301,7 +301,7 @@ describe('set_effects_preset', () => {
   });
 
   it('replaces an existing preset, and a re-send of the SAME document is not an undo step', async () => {
-    open({ presets: [glare()], unreadable: [], notices: [] });
+    open({ presets: [glare()], unreadable: [], notices: [], loadedPaths: [] });
 
     const unchanged = await ask({ kind: 'set-effects-preset', id: 'glare', preset: glare() });
     expect(unchanged).toEqual({ id: 'glare', changed: false });
@@ -319,7 +319,7 @@ describe('set_effects_preset', () => {
   });
 
   it('deletes with preset: null, and reports honestly when there was nothing there', async () => {
-    open({ presets: [glare()], unreadable: [], notices: [] });
+    open({ presets: [glare()], unreadable: [], notices: [], loadedPaths: [] });
     expect(await ask({ kind: 'set-effects-preset', id: 'glare', preset: null }))
       .toEqual({ id: 'glare', deleted: true });
     expect(lib().presets).toEqual([]);

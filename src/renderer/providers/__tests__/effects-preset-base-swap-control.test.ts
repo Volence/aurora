@@ -121,7 +121,7 @@ EffectsPresetBaseSwapBand {
   return { ...newBaseSwapBand(), line, ...over };
 }
 function lib(...presets: EffectsPreset[]): EffectsPresetLibrary {
-  return { presets, unreadable: [], notices: [] };
+  return { presets, unreadable: [], notices: [], loadedPaths: [] };
 }
 /** A fresh document per channel, built by the panel's OWN seeds — never typed. */
 function documentOf(channel: string): EffectsPreset {

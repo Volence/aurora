@@ -124,9 +124,9 @@ import {
 } from '../../../core/formats/effects/scene-ui';
 import type { EffectsPresetLibrary } from '../../../core/formats/effects/preset';
 
-const EMPTY_LIBRARY: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [] };
+const EMPTY_LIBRARY: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [], loadedPaths: [] };
 /** `BandPresetPanel`'s idiom — an absent library is an empty one, never a null check at the call. */
-const EMPTY_PRESETS: EffectsPresetLibrary = { presets: [], unreadable: [], notices: [] };
+const EMPTY_PRESETS: EffectsPresetLibrary = { presets: [], unreadable: [], notices: [], loadedPaths: [] };
 
 const textInput: React.CSSProperties = {
   flex: 1, minWidth: 0, background: T.raised, color: T.textHi,

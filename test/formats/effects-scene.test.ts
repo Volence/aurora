@@ -462,7 +462,11 @@ describe('effects scene library', () => {
   /** §2: "the generator treats an absent directory as 'no editor scenes' (not an error)". */
   it('reads an absent directory as no editor scenes', async () => {
     const lib = await loadEffectsSceneLibrary(memFs({}), ROOT);
-    expect(lib).toEqual({ scenes: [], unreadable: [], notices: [] });
+    // EXHAUSTIVE on purpose — a new field on the library that the absent-
+    // directory path forgot to fill would land here rather than at whatever
+    // consumer happened to read it first. `loadedPaths` is what a save may
+    // REMOVE, so on this path it must be empty and not undefined.
+    expect(lib).toEqual({ scenes: [], unreadable: [], notices: [], loadedPaths: [] });
   });
 
   it('loads every scene in the directory, sorted, ignoring non-json entries', async () => {

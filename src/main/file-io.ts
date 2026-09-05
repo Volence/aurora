@@ -1,6 +1,40 @@
-import { readFile, readdir, stat } from 'fs/promises';
+import { readFile, readdir, stat, unlink } from 'fs/promises';
 import { resolve } from 'path';
 import { isRelPathSafe } from '../shared/rel-path';
+import type { DeleteOutcome } from '../shared/ipc-types';
+
+/**
+ * Remove ONE project-relative file. The only deleting primitive in the app.
+ *
+ * ⚠ WHAT THIS DOES NOT DO, all on purpose. No recursion, no directories, no
+ * globs, one path per call — so the blast radius of a caller's mistake is one
+ * file. `isRelPathSafe` is a HARD refusal here rather than the tolerant `false`
+ * the read probes use, and there is no absolute-path exception of the kind
+ * `file:read-binary` still carries for legacy callers: this channel is new, so
+ * it starts closed.
+ *
+ * `deleted: false` means the path was ALREADY gone (ENOENT), which is the
+ * caller's desired end state and is reported rather than raised — a save that
+ * removes a document somebody else has already removed has not failed. Every
+ * other fs error (EISDIR, EPERM, EBUSY) comes back as `ok: false` WITH ITS
+ * MESSAGE, because the caller's ledger has to keep that path so the next save
+ * retries it (see state/aeon-save.ts).
+ */
+export async function deleteProjectFile(
+  basePath: string, relativePath: string,
+): Promise<DeleteOutcome> {
+  if (!isRelPathSafe(relativePath)) {
+    return { ok: false, reason: `unsafe project-relative path (escapes root): '${relativePath}'` };
+  }
+  try {
+    await unlink(resolve(basePath, relativePath));
+    return { ok: true, deleted: true };
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
+    if (e?.code === 'ENOENT') return { ok: true, deleted: false };
+    return { ok: false, reason: e?.message ?? String(err) };
+  }
+}
 
 export async function readBinaryFile(basePath: string, relativePath: string): Promise<Buffer> {
   const fullPath = resolve(basePath, relativePath);

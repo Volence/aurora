@@ -50,7 +50,7 @@ function preset(bands: EffectsPresetBand[], id = 'edge_test'): EffectsPreset {
 }
 
 function library(p: EffectsPreset): EffectsPresetLibrary {
-  return { presets: [p], unreadable: [], notices: [] };
+  return { presets: [p], unreadable: [], notices: [], loadedPaths: [] };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

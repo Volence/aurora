@@ -28,6 +28,16 @@ export const IPC_CHANNELS = {
   // legacy absolute-path exception).
   FILE_MTIME: 'file:mtime',
   WRITE_GUARDED: 'file:write-guarded',
+  // ⚠ THE ONLY CHANNEL IN AURORA THAT DELETES A FILE, and it is deliberately
+  // the narrowest one here: one project-relative path per call, rel-path-guarded
+  // with NO legacy absolute-path exception, no recursion, no directories. It
+  // exists for `state/aeon-save.ts`'s removal step (a document the author
+  // deleted in the panel must leave the disk, or their deletion is silently
+  // undone on the next open) and for nothing else. WHICH paths may be named is
+  // not this channel's business and must never become it — that judgement lives
+  // in `core/project/aeon/save.ts`'s `removalsFor`, which derives the set from
+  // what the editor LOADED rather than from what is on disk.
+  DELETE_FILE: 'file:delete',
   // Env-guarded paint instrumentation (AURORA_PERF=1). The renderer posts one
   // summary line per act load; main prints it to the launch terminal so we get
   // real paint numbers off the user's machine without a CDP session. Fire-and-
@@ -155,6 +165,18 @@ export interface AetherStatusPayload {
 }
 
 export type IpcChannels = typeof IPC_CHANNELS;
+
+/**
+ * What DELETE_FILE did to one path.
+ *
+ * `{ ok: true, deleted: false }` is a SUCCESS and means the file was already
+ * absent — the caller's desired end state, reached by somebody else. Only
+ * `{ ok: false }` is a failure, and it carries the fs message so the caller can
+ * keep that path in its ledger and retry on the next save.
+ */
+export type DeleteOutcome =
+  | { ok: true; deleted: boolean }
+  | { ok: false; reason: string };
 
 export interface RecentProject {
   path: string;
