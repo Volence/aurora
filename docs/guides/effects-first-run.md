@@ -332,13 +332,13 @@ Scenes have no such restriction — bind a scene to any section.
 **Ctrl+S.** There is no Save button on a level tab; the dot on the tab title is the
 only sign you have unsaved work. **A save writes a file only when that file's
 meaning changed.** Every JSON document Aurora writes is compared against the one
-already on disk as a *parsed value*, so indentation, key order and the trailing
+already on disk as a parsed value, so indentation, key order and the trailing
 newline do not count as a change, and a document you did not touch is left alone.
 So read your `git status` after a save — it is the work you actually did, and a
 file in it you never opened is worth opening rather than scrolling past.
 
 One thing that is bigger than you expect, and it is the diff and not the file
-count: a document whose meaning *did* change is rewritten in full canonical form,
+count: a document whose meaning has changed is rewritten in full canonical form,
 so it can pick up formatting aeon's own writers do not emit.
 
 Then, in your aeon checkout. **The re-bake is a step of this path, not a recovery
@@ -352,17 +352,16 @@ FAST=1 ./build.sh           # the iteration loop — re-bakes for you, skips the
 ```
 
 **Why a save on its own is not enough.** aeon's generated level tree is a
-*committed* artifact — `games/<game>/prebuild.sh` is a documented no-op — so nothing
+committed artifact — `games/<game>/prebuild.sh` is a documented no-op — so nothing
 rebuilds it just because you saved. Both builds ask `tools/level_staleness.py`
 whether the committed tree was baked from the editor sources that are there now, and
 after any save the answer is no. What happens next is the only difference between
 the two commands:
 
-- **`./build.sh` refuses, and it refuses *early*.** The staleness gate runs before
-  anything is assembled, so a red build here is not a verdict on what you authored —
-  nothing downstream has looked at it yet. The message names which check fired,
-  lists your files by name, and gives `tools/regenerate-level.sh` as the remedy.
-  Re-bake and run it again.
+- **`./build.sh` refuses, and it refuses before it assembles anything.** So a red
+  build here is not a verdict on what you authored — nothing downstream has looked
+  at it yet. The message names which check fired, lists your files by name, and
+  gives `tools/regenerate-level.sh` as the remedy. Re-bake and run it again.
 - **`FAST=1 ./build.sh` runs the re-bake for you** and prints how long it took. That
   is the loop's whole point, and it is why the fast path needs no separate step.
 
@@ -371,7 +370,7 @@ gate that has to read the listing the build just emitted, so a green FAST run is
 a landing. It does run one check first — the editor-scene binding seam, read out of
 the source — so binding a preset to a section nothing threads now fails in the loop
 instead of at landing. What it cannot answer is whether your effect actually
-*reached the ROM*: the reachability evidence is minted by the build it runs before.
+reached the ROM: the reachability evidence is minted by the build it runs before.
 Run the plain `./build.sh` before you believe it.
 
 **`touch` is not a shortcut past this.** The gate has a second arm that reads no
@@ -394,7 +393,7 @@ deleted document's data. There is nothing to touch and nothing to force.
 **Read the re-bake's own output — the build prints it in full, and it is the part
 that names your file.** The failing line is usually precise: *"rasterRef 'x' names
 no preset document … Known ids: …"*, which is what you get when you delete a preset
-a section still points at. Missing out-of-repo donors is the *other* cause and the
+a section still points at. Missing out-of-repo donors is the other cause, and the
 build says so as a footnote, after its output — suspect it only when nothing above
 names a file or an id.
 
