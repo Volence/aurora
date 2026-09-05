@@ -43,7 +43,7 @@
     "check:pseudo-skip": "node scripts/check-pseudo-skip.mjs",
     "check:python-resolver": "node scripts/check-python-resolver.mjs",
     "check:src-dashes": "node scripts/check-src-dashes.mjs",
-  "check:guide-text": "node scripts/check-guide-text.mjs",
+    "check:guide-text": "node scripts/check-guide-text.mjs",
     "check:test-collection": "node scripts/check-test-collection.mjs",
     "check:tsx-dashes": "node scripts/check-tsx-dashes.mjs",
     "dev": "electron-vite dev",
@@ -228,7 +228,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lane-log": "node scripts/append-lane-log.mjs",
-    "revendor": "node scripts/revendor.mjs"
+    "revendor": "node scripts/revendor.mjs",
+    "land": "node scripts/land.mjs"
   },
   "keywords": [],
   "author": "",
