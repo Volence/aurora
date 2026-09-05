@@ -418,7 +418,7 @@ export default function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
     if (chunkIndex === null) return;
     const words = doc.chunks[chunkIndex].cells.map((c, index) => ({ index, word: packChunkCell(c) }));
     const res = classicAddChunk(words);
-    if (res.ok) { setSelectedChunkId(res.id); useToastStore.getState().addToast(`Duplicated to chunk ${hex(res.id)} — stamp it where you want it`, 'info'); }
+    if (res.ok) { setSelectedChunkId(res.id); useToastStore.getState().addToast(`Duplicated to chunk ${hex(res.id)}. Stamp it where you want it`, 'info'); }
     else useToastStore.getState().addToast(res.error, 'error');
   };
   const newBlankChunk = () => {
@@ -453,7 +453,7 @@ export default function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
             this chunk). So it is hoisted above the mode branch, shown once. */}
         {chunkIndex !== null && placements > 1 && (
           <SharedBanner
-            text={`Linked — placed ${placements}×. Edits appear in every placement.`}
+            text={`Linked: placed ${placements}×. Edits appear in every placement.`}
             onDuplicate={duplicateChunk}
             dupLabel="Duplicate chunk"
           />

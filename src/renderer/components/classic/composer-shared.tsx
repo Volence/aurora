@@ -26,8 +26,8 @@ export const hex = (n: number) => `$${n.toString(16).toUpperCase()}`;
 // artist is choosing. The enum spellings stay in the comment above, where they
 // belong: they are provenance for whoever checks the mapping, not UI copy.
 export const SOLIDITY = [
-  { v: 0, label: 'None', full: 'Not solid — the player passes straight through', tint: null as string | null },
-  { v: 1, label: 'Top', full: 'Solid from above only — you can jump up through it', tint: 'rgba(80,160,255,0.30)' },
+  { v: 0, label: 'None', full: 'Not solid: the player passes straight through', tint: null as string | null },
+  { v: 1, label: 'Top', full: 'Solid from above only: you can jump up through it', tint: 'rgba(80,160,255,0.30)' },
   { v: 2, label: 'LRB', full: 'Solid from the sides and below, but not from above', tint: 'rgba(255,170,60,0.30)' },
   { v: 3, label: 'All', full: 'Solid from every direction', tint: 'rgba(255,70,70,0.32)' },
 ];

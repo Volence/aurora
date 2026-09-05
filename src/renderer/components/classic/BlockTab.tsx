@@ -356,7 +356,7 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
             be isolated: painting the owning chunk cell on the Chunk tab. */}
         {blockUse.cells > 1 && (
           <SharedBanner
-            text={`Linked — used in ${blockUse.containers} chunk${blockUse.containers === 1 ? '' : 's'} · ${blockUse.cells} cell${blockUse.cells === 1 ? '' : 's'}. Edits appear in all of them. To change one place only, paint it on the Chunk tab (Isolate).`}
+            text={`Linked: used in ${blockUse.containers} chunk${blockUse.containers === 1 ? '' : 's'} · ${blockUse.cells} cell${blockUse.cells === 1 ? '' : 's'}. Edits appear in all of them. To change one place only, paint it on the Chunk tab (Isolate).`}
             onDuplicate={duplicateBlock}
             dupLabel="Duplicate block"
           />
@@ -459,7 +459,7 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
             />
           ))}
         </div>
-        <div style={styles.hintRow}>browse-only — selecting never edits</div>
+        <div style={styles.hintRow}>browse-only: selecting never edits</div>
       </div>
       <div style={styles.paletteCol}>
         <div style={styles.paletteHead}>Tiles ({tileCount}) · click to set cell {['TL', 'TR', 'BL', 'BR'][selCell]}</div>
@@ -473,7 +473,7 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
             />
           ))}
         </div>
-        <div style={styles.hintRow}>⚠ clicking here REWRITES cell {['TL', 'TR', 'BL', 'BR'][selCell]} — to browse tiles without editing, use the Tile tab's strip</div>
+        <div style={styles.hintRow}>⚠ clicking here REWRITES cell {['TL', 'TR', 'BL', 'BR'][selCell]}. To browse tiles without editing, use the Tile tab's strip</div>
       </div>
     </div>
   );

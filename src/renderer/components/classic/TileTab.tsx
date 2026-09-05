@@ -361,7 +361,7 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
 
   const copyTile = useCallback(() => {
     setTileClipboard(new Uint8Array(buffer.data));
-    useToastStore.getState().addToast(`Copied tile ${hex(composerTileIndex)} — select another tile and Paste`, 'info');
+    useToastStore.getState().addToast(`Copied tile ${hex(composerTileIndex)}. Select another tile and Paste`, 'info');
   }, [buffer, composerTileIndex, setTileClipboard]);
 
   const pasteTile = useCallback(() => {
@@ -420,7 +420,7 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
             surface has no chunk cell either); the two answer different questions
             and both are wanted. */}
         {!locked && tileUse.cells > 1 && (
-          <SharedBanner text={`Linked — used in ${tileUse.containers} block${tileUse.containers === 1 ? '' : 's'} · ${tileUse.cells} cell${tileUse.cells === 1 ? '' : 's'}. Edits appear in all of them. To change one place only, paint it on the Chunk tab (Isolate).`} />
+          <SharedBanner text={`Linked: used in ${tileUse.containers} block${tileUse.containers === 1 ? '' : 's'} · ${tileUse.cells} cell${tileUse.cells === 1 ? '' : 's'}. Edits appear in all of them. To change one place only, paint it on the Chunk tab (Isolate).`} />
         )}
         {/* SCROLLER + HOLDER, the shape both shared hooks are written against
             (see ComposerCanvas's frame/scroller/holder) — the pan hook adjusts
@@ -488,7 +488,7 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
               <button
                 key={i}
                 onClick={() => useArtStore.getState().setSelectedColor(i)}
-                title={i === 0 ? 'index 0 — transparent' : `index ${i}`}
+                title={i === 0 ? 'index 0 (transparent)' : `index ${i}`}
                 style={{
                   width: 22, height: 22, flexShrink: 0, cursor: 'pointer', borderRadius: 3,
                   backgroundColor: bg,
@@ -514,7 +514,7 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
             />
           ))}
         </div>
-        <div style={styles.hintRow}>browse-only — selecting never edits · badge = used-in count · no badge = unused (safe to repurpose) · 🔒 = view-only</div>
+        <div style={styles.hintRow}>browse-only: selecting never edits · badge = used-in count · no badge = unused (safe to repurpose) · 🔒 = view-only</div>
       </div>
     </div>
   );

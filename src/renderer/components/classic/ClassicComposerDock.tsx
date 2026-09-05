@@ -139,7 +139,7 @@ export default function ClassicComposerDock() {
         </div>
         <SelectionTrail />
         <span style={{ flex: 1 }} />
-        <span style={styles.dockHint}>shared tile/block/chunk editing — usage counts warn before shared edits</span>
+        <span style={styles.dockHint}>shared tile/block/chunk editing: usage counts warn before shared edits</span>
       </div>
       <div style={styles.dockContent}>
         {tab === 'chunk' && <ChunkTab doc={doc} usage={usage} />}

@@ -75,12 +75,12 @@ export default function TileBrushOptions() {
           <Chip
             active={hFlip}
             onClick={() => setH(!hFlip)}
-            title="Brush: horizontal flip — mirror the painted tile left-to-right"
+            title="Brush horizontal flip: mirror the painted tile left-to-right"
           >X flip</Chip>
           <Chip
             active={vFlip}
             onClick={() => setV(!vFlip)}
-            title="Brush: vertical flip — mirror the painted tile top-to-bottom"
+            title="Brush vertical flip: mirror the painted tile top-to-bottom"
           >Y flip</Chip>
         </Row>
         <Row label="Priority">

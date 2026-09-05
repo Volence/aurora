@@ -57,11 +57,11 @@ export default function ClassicMapToolOptions(): React.ReactElement {
           : tool === 'paint-collision'
             ? (collisionShape != null
                 ? `click to write shape ${collisionShape} (${collisionDiverge === 'link' ? 'Link' : 'Isolate'}) to the block under the cursor`
-                : 'no shape armed — pick one in the Collision panel')
+                : 'no shape armed: pick one in the Collision panel')
             : armedId != null
             ? `click to place ${s1ObjectName(armedId)} · Esc cancels`
             : tool === 'place-object'
-              ? 'no object armed — pick one from the Objects panel · Esc cancels'
+              ? 'no object armed: pick one from the Objects panel · Esc cancels'
               : tool === 'select'
                 ? (plane === 'fg'
                     // THE LAST CLAUSE HAS TO BE TRUE ON EVERY FACET THIS BAR
@@ -78,7 +78,7 @@ export default function ClassicMapToolOptions(): React.ReactElement {
                     // and matches the `place-object` branch three lines up,
                     // which already says "the Objects panel".
                     ? 'click selects · drag moves · drag START to move spawn · Del removes · arm from the Objects panel to place'
-                    : 'objects are FG-only — switch to FG to edit · drag to pan')
+                    : 'objects are FG-only: switch to FG to edit · drag to pan')
                 : 'drag to pan · right-click eyedrops · scroll to zoom'}
       </span>
     </OptionBar>
