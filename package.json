@@ -122,6 +122,7 @@
     "harness:d27-sprite-focus": "node scratchpad/d27-sprite-focus-harness.mjs",
     "harness:discovery-exit-net": "node scratchpad/discovery-exit-net-proof.mjs",
     "harness:effects-bob": "node scratchpad/effects-bob-harness.mjs",
+    "harness:effects-cold-read": "node scratchpad/effects-cold-read-harness.mjs",
     "harness:effects-column": "node scratchpad/effects-column-harness.mjs",
     "harness:effects-deform": "node scratchpad/effects-deform-harness.mjs",
     "harness:effects-drift": "node scratchpad/effects-drift-harness.mjs",
