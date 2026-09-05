@@ -39,8 +39,9 @@ something tidy, so it is a row and it runs first.
 | `[0c]` | that base actually holds `layers[2].vsplit.at = 67`. Without this row, "the key was removed" is vacuously true of a document that never had it. |
 
 aeon's `HEAD` copy of the file is the same blob (`git rev-parse
-HEAD:games/sonic4/data/editor/effects/ojz_act1_sec7_worldwater.json` at `ebef9ae3`), so
-the base, the capture and aeon agree.
+HEAD:games/sonic4/data/editor/effects/ojz_act1_sec7_worldwater.json`), so the base, the
+capture and aeon agree. Checked twice, at `ebef9ae3` when the clone was taken and again
+at `8620085c` after another lane committed to aeon mid-session: the blob did not move.
 
 ## The full leaf diff
 
