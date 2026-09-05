@@ -374,7 +374,7 @@ async function main() {
 
     const headings = await c.json(
       `[...document.querySelectorAll('span')].map(e => (e.textContent||'').trim())
-        .filter(t => /^(Scenes|Layers|Section assignment|Scene —)/.test(t))`);
+        .filter(t => /^(Scenes|Layers|Section assignment|Scene:)/.test(t))`);
     check('2b', 'the Effects panel is mounted (its own section headings are on screen)',
       headings.some((h) => h === 'Scenes') && headings.some((h) => h === 'Section assignment'),
       JSON.stringify(headings));

@@ -234,7 +234,7 @@ const byTitle = (tag, prefix) =>
  */
 const OPEN_SCENE_FORM = String.raw`
 (() => {
-  const has = () => !!(${byTitle('input', 'v_offset —')});
+  const has = () => !!(${byTitle('input', 'v_offset:')});
   if (has()) return 'already-open';
   const hdr = [...document.querySelectorAll('div')]
     .filter((d) => d.style && d.style.cursor === 'pointer'
@@ -582,7 +582,7 @@ async function main() {
     await shot(c, '02-payload-changed-marker-did-not-move');
 
     // ---- 8. v_offset moves the whole ruler --------------------------------
-    watchMiss('8 v_offset', await onParallax(SET_INPUT(byTitle('input', 'v_offset —'), V_OFFSET)));
+    watchMiss('8 v_offset', await onParallax(SET_INPUT(byTitle('input', 'v_offset:'), V_OFFSET)));
     await sleep(800);
     rep = await c.json('window.__dbg.aeon.rasterTimeline()');
     check('8a', `v_offset ${V_OFFSET} lifted both fire lines by exactly ${V_OFFSET} `
@@ -597,7 +597,7 @@ async function main() {
       `at ${TOP_A2 - V_OFFSET}: ${rowSummary(moved ?? [])}\n        at ${TOP_A2}: ${rowSummary(vacated ?? [])}`);
     await shot(c, '03-v-offset-shifted');
     // Put it back so the closing screenshot is the one worth showing.
-    await onParallax(SET_INPUT(byTitle('input', 'v_offset —'), 0));
+    await onParallax(SET_INPUT(byTitle('input', 'v_offset:'), 0));
     await sleep(700);
 
     // ---- 9. THE CONTROLS, and the blanket miss row ------------------------

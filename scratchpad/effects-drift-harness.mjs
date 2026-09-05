@@ -213,7 +213,7 @@ const OPEN_SECTION = (re, proofSelector) => String.raw`
  */
 const DRIFT_SELECT = (layer) => String.raw`
 (() => [...document.querySelectorAll('select')]
-  .find((s) => (s.title || '').startsWith('Layer ' + ${layer} + ' drift.rate — ')) || null)()`;
+  .find((s) => (s.title || '').startsWith('Layer ' + ${layer} + ' drift.rate: ')) || null)()`;
 
 /** The px/frame box for one layer, by the same rule. */
 const DRIFT_BOX = (layer) => String.raw`

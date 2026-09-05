@@ -244,7 +244,7 @@ const REEL_BOX = (i) => String.raw`
 const REELS_SELECT = String.raw`
 (() => {
   const sels = [...document.querySelectorAll('select')]
-    .filter((s) => (s.title || '').startsWith('reels —'));
+    .filter((s) => (s.title || '').startsWith('reels:'));
   return sels[0] || null;
 })()`;
 

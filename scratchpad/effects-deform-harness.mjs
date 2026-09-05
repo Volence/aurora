@@ -715,7 +715,7 @@ async function main() {
         .map((r) => r.title))}`);
 
     // THE FORM PICKER OFFERS THE WHOLE CONTRACT. Six branches, not two.
-    const formSelect = rows.find((r) => r.tag === 'SELECT' && / table — /.test(r.title));
+    const formSelect = rows.find((r) => r.tag === 'SELECT' && / table: /.test(r.title));
     check('4c', 'the table picker offers EXACTLY the schema\'s tableRef branches, in schema order',
       !!formSelect && formSelect.options.join(',') === FORM_IDS.join(','),
       `rendered=${JSON.stringify(formSelect?.options)} schema=${JSON.stringify(FORM_IDS)}`);
@@ -730,7 +730,7 @@ async function main() {
     const OTHER = FORM_IDS.find((f) => f !== FIRST_FORM && paramsOf(f).length > 0
       && paramsOf(f).join() !== paramsOf(FIRST_FORM).join());
     await c.evalExpr(SET_INPUT(
-      `[...document.querySelectorAll('select')].find(e => (e.title||'').startsWith('deform_fg') && / table — /.test(e.title))`,
+      `[...document.querySelectorAll('select')].find(e => (e.title||'').startsWith('deform_fg') && / table: /.test(e.title))`,
       OTHER));
     await sleep(600);
     rows = await c.json(CONTROLS_TITLED('deform_fg'));
@@ -746,7 +746,7 @@ async function main() {
 
     // ROW 4f — THE RAW .bin BRANCH, and its refusal ON SCREEN.
     await c.evalExpr(SET_INPUT(
-      `[...document.querySelectorAll('select')].find(e => (e.title||'').startsWith('deform_fg') && / table — /.test(e.title))`,
+      `[...document.querySelectorAll('select')].find(e => (e.title||'').startsWith('deform_fg') && / table: /.test(e.title))`,
       'bin'));
     await sleep(500);
     await c.evalExpr(SET_INPUT(
@@ -851,7 +851,7 @@ async function main() {
 
     // Give a plane amplitude: the inert advisory must clear, and only it.
     await c.evalExpr(SET_INPUT(
-      `[...document.querySelectorAll('input')].find(e => /^Layer 0 shift_b —/.test(e.title||''))`, '0'));
+      `[...document.querySelectorAll('input')].find(e => /^Layer 0 shift_b:/.test(e.title||''))`, '0'));
     await sleep(600);
     text = await c.evalExpr(PANEL_TEXT);
     doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
@@ -952,7 +952,7 @@ async function main() {
     const layerCount = sceneOf(doc).layers.length;
     for (let i = 0; i < layerCount; i++) {
       await c.evalExpr(SET_INPUT(
-        `[...document.querySelectorAll('select')].find(e => (e.title||'').startsWith('Layer ${i} fb —'))`,
+        `[...document.querySelectorAll('select')].find(e => (e.title||'').startsWith('Layer ${i} fb:'))`,
         'FACTOR_0'));
       await sleep(250);
     }
@@ -982,7 +982,7 @@ async function main() {
     // Plane-B amplitude (shift_b back to the no-sample sentinel) and the claim
     // becomes one this scene CAN make: the advisory must clear entirely.
     await c.evalExpr(SET_INPUT(
-      `[...document.querySelectorAll('input')].find(e => /^Layer 0 shift_b —/.test(e.title||''))`,
+      `[...document.querySelectorAll('input')].find(e => /^Layer 0 shift_b:/.test(e.title||''))`,
       String(LAYER_DEFAULTS.dsb)));
     await sleep(700);
     text = await c.evalExpr(PANEL_TEXT);
@@ -1067,7 +1067,7 @@ async function main() {
     // and the deform toggle (wave 2) — authoring a pair the build forbids. This
     // is reachable entirely through the UI, which is what separates it from 7a.
     await c.evalExpr(SET_INPUT(
-      `[...document.querySelectorAll('select')].find(e => (e.title||'').startsWith('Layer 1 curve.to —'))`,
+      `[...document.querySelectorAll('select')].find(e => (e.title||'').startsWith('Layer 1 curve.to:'))`,
       'FACTOR_1_2'));
     await sleep(500);
     const curveOnly = await c.evalExpr(PANEL_TEXT);

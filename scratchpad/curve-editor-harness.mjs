@@ -482,7 +482,7 @@ async function main() {
 
     // Layer 0's Plane-B factor, through the picker an author uses.
     watchMiss('2c fb select', await c.evalExpr(SET_INPUT(
-      selectByTitle('Layer 0 fb —'), FB)));
+      selectByTitle('Layer 0 fb:'), FB)));
     await sleep(600);
     const sceneOf = (doc) => doc.find((s) => s.id === SCENE_ID) ?? null;
     let doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
@@ -537,7 +537,7 @@ async function main() {
 
     // ---- 5. Author the curve, and check the arithmetic. -------------------
     watchMiss('5 curve select', await c.evalExpr(SET_INPUT(
-      selectByTitle('Layer 0 curve.to —'), TO)));
+      selectByTitle('Layer 0 curve.to:'), TO)));
     await sleep(900);
     doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
     check('5a', `the curve picker wrote {to: ${TO}} to the DOCUMENT`,
@@ -660,7 +660,7 @@ async function main() {
     const sceneForm = await c.evalExpr(String.raw`
       (() => {
         const has = () => [...document.querySelectorAll('input')]
-          .some((e) => (e.title || '').startsWith('v_offset —'));
+          .some((e) => (e.title || '').startsWith('v_offset:'));
         if (has()) return 'already-open';
         const hdr = [...document.querySelectorAll('div')]
           .filter((d) => d.style && d.style.cursor === 'pointer'
@@ -678,7 +678,7 @@ async function main() {
     let vOff = 0;
     for (const cand of [0, 128, 256, 384, 64, 192, 320, 448]) {
       watchMiss('6 v_offset', await c.evalExpr(SET_INPUT(
-        `[...document.querySelectorAll('input[type=number]')].find(e => (e.title||'').startsWith('v_offset —'))`,
+        `[...document.querySelectorAll('input[type=number]')].find(e => (e.title||'').startsWith('v_offset:'))`,
         cand)));
       await sleep(800);
       const vo = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'))
@@ -743,7 +743,7 @@ async function main() {
 
     // Now take the curve away and re-sample the SAME two rows.
     watchMiss('6 curve off', await c.evalExpr(SET_INPUT(
-      selectByTitle('Layer 0 curve.to —'), '__none__')));
+      selectByTitle('Layer 0 curve.to:'), '__none__')));
     await sleep(900);
     doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
     const curveGone = sceneOf(doc)?.layers?.[0]?.curve;
@@ -785,7 +785,7 @@ async function main() {
     //     the RAMP — nothing but a per-line scroll can produce that.
     // A build with no ramp gives every row the same shift, 0, and fails.
     watchMiss('6f curve on', await c.evalExpr(SET_INPUT(
-      selectByTitle('Layer 0 curve.to —'), TO)));
+      selectByTitle('Layer 0 curve.to:'), TO)));
     await sleep(900);
     const scanRows = [];
     for (let k = 1; k <= 12; k++) {
@@ -802,7 +802,7 @@ async function main() {
     await toggleViewOverlay(c, '/^Compose the background in the frame/');
     await sleep(700);
     watchMiss('6f curve off', await c.evalExpr(SET_INPUT(
-      selectByTitle('Layer 0 curve.to —'), '__none__')));
+      selectByTitle('Layer 0 curve.to:'), '__none__')));
     await sleep(900);
     const repFlat2 = await c.json('window.__dbg.aeon.cameraPreview()');
     for (const l of scanRows) offRows[l] = await sampleRow(l);         // curve OFF
@@ -872,7 +872,7 @@ async function main() {
     // to == fb: the pair the engine REFUSES, and the one that renders exactly
     // like no curve at all. It is here so no row above can be read as having
     // been proved with it.
-    watchMiss('7 curve=fb', await c.evalExpr(SET_INPUT(selectByTitle('Layer 0 curve.to —'), FB)));
+    watchMiss('7 curve=fb', await c.evalExpr(SET_INPUT(selectByTitle('Layer 0 curve.to:'), FB)));
     await sleep(900);
     const repSame = await c.json('window.__dbg.aeon.cameraPreview()');
     const sameRamp = repSame.bands[0].ramp;
@@ -899,7 +899,7 @@ async function main() {
 
     // ---- 8. The picture for the owner's display. --------------------------
     await toggleViewOverlay(c, '/^Compose the background in the frame/');
-    watchMiss('8 curve back', await c.evalExpr(SET_INPUT(selectByTitle('Layer 0 curve.to —'), TO)));
+    watchMiss('8 curve back', await c.evalExpr(SET_INPUT(selectByTitle('Layer 0 curve.to:'), TO)));
     await sleep(1000);
     await shot(c, 'FOR-THE-OWNER-curve-ramp');
     const finalRep = await c.json('window.__dbg.aeon.cameraPreview()');

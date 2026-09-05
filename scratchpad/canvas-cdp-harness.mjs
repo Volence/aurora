@@ -428,7 +428,7 @@ const INSTALL = String.raw`
 
   // --- palette ------------------------------------------------------------
   /** The canvas palette's swatches. palette-canvas.ts's port titles them
-   *  'line L, index N — paints P' (and 'index 0 — transparent…; paints P'), so
+   *  'line L, index N: paints P' (and 'index 0: transparent…; paints P'), so
    *  the trailing "paints P" is the unambiguous key: it IS the 0..63 canvas
    *  index the swatch arms. */
   H.swatches = () => [...document.querySelectorAll('button[title]')]

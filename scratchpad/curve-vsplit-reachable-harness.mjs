@@ -332,7 +332,7 @@ const CURVE_DRIVE_SEL = (i) => (PLANT === 'rot-curve-gesture'
   : CURVE_SEL(i));
 const CURVE_SEL = (i) => (PLANT === 'rot-curve-selector'
   // THE PLANT: end-anchored, as `/^v_offset$/` and `/^Layer i fa$/` were. The
-  // rendered title is `Layer 0 curve.to — the Plane B factor at …`, so this
+  // rendered title is `Layer 0 curve.to: the Plane B factor at …`, so this
   // matches NOTHING and the picker keeps its default `none` — which is a legal
   // value, which is exactly why the real rots stayed invisible.
   ? `/^Layer ${i} curve\\.to$/`

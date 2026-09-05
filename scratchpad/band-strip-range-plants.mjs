@@ -124,7 +124,7 @@ const PLANTS = [
   {
     id: 'silent-refusal',
     what: 'a refusal renders as an EMPTY label — the gesture goes quiet',
-    from: "  if (outcome.kind === 'refused') return `no range — ${outcome.reason}`;",
+    from: "  if (outcome.kind === 'refused') return `no range: ${outcome.reason}`;",
     to:   "  if (outcome.kind === 'refused') return '';",
     expect: /stated on the line, never swallowed/,
   },
@@ -146,8 +146,8 @@ const PLANTS = [
     id: 'paragraph-on-the-line',
     what: 'THE DEFECT THE CDP HARNESS FOUND: the whole refusal paragraph put back on the '
       + 'one line, which wrapped the header row and moved the tile grid under the cursor',
-    from: "  if (outcome.kind === 'refused') return `no range — ${outcome.reason}`;",
-    to:   "  if (outcome.kind === 'refused') return `no range — ${outcome.hint}`;",
+    from: "  if (outcome.kind === 'refused') return `no range: ${outcome.reason}`;",
+    to:   "  if (outcome.kind === 'refused') return `no range: ${outcome.hint}`;",
     expect: /EVERY line is ONE line/,
   },
   {

@@ -411,7 +411,7 @@ async function main() {
       // features. Taken from the provider, not from a passing run.
       pickedFill === 'ok' && /pre-shifted 1 px per bank/.test(noteText)
         && /tile animation MOVES with no further authoring/.test(noteText),
-      pickedFill === 'ok' ? (noteText.match(/banks 1–7 are phase 0[^.]*\./) || ['note not found'])[0] : pickedFill);
+      pickedFill === 'ok' ? (noteText.match(/banks 1 to 7 are phase 0[^.]*\./) || ['note not found'])[0] : pickedFill);
 
     // ── geometry + base, then PROMOTE ──
     const typedCols = await c.evalExpr(SET_INPUT(INPUT_BY_TITLE('/^cols:/'), COLS));

@@ -647,14 +647,14 @@ async function main() {
     console.log('\n=== [ad] the four editor-side warnings, and who enforces each ===');
     const still = await c.json(PAINTED('this boundary follows patch channel',
       ['That is LEGAL and it BUILDS', 'SEEDED', 'SWEPT', 'Enforced by:',
-        'nothing — this document is legal and builds']));
+        'nothing; this document is legal and builds']));
     await shot(c, 'ad-no-motion');
     const bNow = (await doc(c)).boundary;
     check('ad-a', '⚠ THE ADVISORY WITH NO ENGINE ENFORCER IS ON SCREEN, AND IT PAINTS ITS OWN '
       + 'ATTRIBUTION. A fresh boundary is a STILL boundary: nothing in aeon and nothing in Aurora '
       + 'refuses it, so an author who expected the shipped moving water and got a static line has '
       + 'no red anything to read — this sentence is the only thing that will tell them. And it '
-      + 'carries "Enforced by: nothing — this document is legal and builds", which is the whole '
+      + 'carries "Enforced by: nothing; this document is legal and builds", which is the whole '
       + 'reason `enforced_by` is a FIELD: a surface that painted `text` alone would look '
       + 'completely fine and would have dropped it',
       !!still && still.inScroller === true && still.allPresent === true,
