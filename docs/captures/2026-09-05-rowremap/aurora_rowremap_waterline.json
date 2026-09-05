@@ -1,0 +1,36 @@
+{
+  "anchor": {
+    "at": {
+      "channel": 0,
+      "dsa": 15,
+      "dsb": 15
+    }
+  },
+  "id": "aurora_rowremap_waterline",
+  "layers": [
+    {
+      "fa": "FACTOR_1",
+      "fb": "FACTOR_1_8",
+      "world_y": 0
+    },
+    {
+      "curve": {
+        "to": "FACTOR_1_2"
+      },
+      "fa": "FACTOR_1",
+      "fb": "FACTOR_1_8",
+      "rowRemap": {
+        "height_shift": 4,
+        "plane_y": 96
+      },
+      "world_y": 96
+    },
+    {
+      "fa": "FACTOR_1",
+      "fb": "FACTOR_1_2",
+      "world_y": 160
+    }
+  ],
+  "schema": 1,
+  "v_factor": 15
+}

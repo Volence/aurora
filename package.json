@@ -173,6 +173,7 @@
     "harness:reels-panel": "node scratchpad/reels-panel-harness.mjs",
     "harness:restore": "node scratchpad/restore-harness.mjs",
     "harness:row-remap-control": "node scratchpad/row-remap-control-harness.mjs",
+    "harness:rowremap-author": "node scratchpad/rowremap-author-harness.mjs",
     "harness:s1-anim": "node scratchpad/s1-anim-harness.mjs",
     "harness:s1-boss-sprites": "node scratchpad/s1-boss-sprites-harness.mjs",
     "harness:s1-layout-anim": "node scratchpad/s1-layout-anim-harness.mjs",
