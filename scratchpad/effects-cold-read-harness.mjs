@@ -47,8 +47,10 @@
 //   chain rather than spawning its own, so a press could push a ROM into a game
 //   window the owner has open). Building is done by a shell command against a
 //   private clone instead.
-// ⚠ IT NEVER OPENS /home/volence/sonic_hacks/aeon. `PROJECT` must be a path the
-//   operator passes in, and the intended value is a throwaway `git clone`.
+// ⚠ IT NEVER OPENS THE OWNER'S LIVE AEON WORKING TREE. `PROJECT` must be a path
+//   the operator passes in, the intended value is a throwaway `git clone`, and
+//   the tree that is refused is DERIVED (`siblingDefaultPathOrUnresolved`) so it
+//   follows the suite if the suite moves — see the note at `LIVE_AEON`.
 //
 // ═══ THE ONE DEBUG-DOOR CONCESSION, STATED OUT LOUD ═══════════════════════
 //
@@ -58,42 +60,105 @@
 // Everything after it is real UI interaction through /click and /key.
 //
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npm run build
-// From a linked worktree:  ELECTRON_BIN=<main checkout>/node_modules/.bin/electron
+//
+// FROM A LINKED WORKTREE, BOTH OF THESE, AND THE SECOND IS NOT OPTIONAL:
+//
+//     ELECTRON_BIN=<main checkout>/node_modules/.bin/electron
+//     AURORA_BUILT_TREE=<this worktree>
+//
+// `resolveRunRoot` calls a tree runnable only when it carries BOTH
+// `node_modules/.bin/electron` AND `dist/main/index.mjs`. A worktree never has
+// the first, so without the pin the walk goes UP and lands on the main
+// checkout's `dist/` — measured here: `walked up 3 level(s) … to the nearest
+// built tree /home/volence/sonic_hacks/aurora`. That run launches successfully,
+// against SOMEBODY ELSE'S BUILD, and a debug build made in this worktree is
+// never executed. `announceRunRoot` prints `BORROWED` when that happens, and
+// that line is the only thing between an operator and measuring the wrong app.
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
+import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { AURORA_DIR, siblingDefaultPathOrUnresolved } from '../test/support/sibling-root.mjs';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const ROOT = dirname(HERE);                       // the checkout this file lives in
+// ── TWO DIFFERENT QUESTIONS, ANSWERED BY TWO DIFFERENT RESOLVERS ───────────
+//
+// `AURORA_DIR` is "which checkout am I", observed from the resolver's own file
+// location. The tree carrying `dist/main/index.mjs` and
+// `node_modules/.bin/electron` is a DIFFERENT question, and in a linked agent
+// worktree it is a DIFFERENT DIRECTORY: a worktree has neither, so a build path
+// composed off the checkout name points at a file that is not there and the run
+// dies with an ENOENT *inside* `xvfb-run` that reads exactly like "the CDP
+// target never appeared". That is the `ELECTRON_BIN` trap's sibling, and the
+// first version of this file had it — `join(ROOT, 'dist/main/index.mjs')` — and
+// survived only because the operator happened to export `ELECTRON_BIN` and run
+// after a build in this worktree.
+//
+// So: `ROOT` for the tree I EDIT (screenshots, cwd), `RUN` for the tree I RUN.
+// `runTarget` walks up for a tree carrying BOTH artifacts and honours
+// `AURORA_BUILT_TREE`; `RUN.electron` honours `ELECTRON_BIN`; and
+// `announceRunRoot` PRINTS the tree it chose and marks it BORROWED when that is
+// not the tree this file lives in — the announcement the artifacts carve-out
+// owes, and the thing that makes a borrowed build visible instead of silent.
+const ROOT = AURORA_DIR;                          // question 1: where I live
+const RUN = announceRunRoot(runTarget(ROOT));     // question 2: what I run
+const ELECTRON = RUN.electron;
+const MAIN = RUN.main;
+
 const PORT = Number(process.env.PORT ?? 9611);    // CDP
 const CTRL = Number(process.env.CTRL ?? 9612);    // this file's control port
 const PROJECT = process.env.PROJECT;
 const SHOTS = process.env.SHOTS ?? join(ROOT, 'docs/captures/2026-09-05-effects-cold-read');
 
-// ⚠ THE ELECTRON BINARY IS NOT IN A WORKTREE. npm resolves `node_modules` UP
-// the tree for every package, so a worktree looks fully installed — but
-// `node_modules/.bin/` is not walked, so `.bin/electron` is simply absent and
-// the failure only shows at launch. ELECTRON_BIN is how a worktree run borrows
-// the main checkout's binary, and it is REQUIRED rather than guessed: a silent
-// fallback to a path that does not exist is the same invisible failure.
-const ELECTRON = process.env.ELECTRON_BIN;
-const MAIN = join(ROOT, 'dist/main/index.mjs');
+/**
+ * THE TREE THIS HARNESS MUST NEVER OPEN — derived, and derived by the DEFAULT
+ * route on purpose.
+ *
+ * `siblingDefaultPath`, NOT `siblingPath`, and that is the whole subtlety.
+ * `PROJECT` is meant to be a throwaway clone; the thing being guarded against is
+ * the owner's live aeon working tree, which lives at the default location beside
+ * this repo. Routed through `siblingPath` this guard would be WORSE THAN THE
+ * LITERAL it replaces, in both directions:
+ *
+ *   · with `AEON_DIR` pointing at a throwaway clone, `siblingPath` answers with
+ *     that clone — so a legitimate `PROJECT=<that clone>` run would be REFUSED,
+ *     the guard comparing the value against itself;
+ *   · and worse, in that same state `PROJECT=<the real tree>` would PASS,
+ *     because the real tree is no longer what `siblingPath` names. The guard
+ *     fails open on precisely the case it exists for.
+ *
+ * The default location is the thing being guarded against, so the default
+ * location is what the resolver has to be asked for. (This is the reasoning
+ * `sibling-root.mjs` gives at `siblingDefaultPath` itself, for the seven
+ * harnesses that already had to make this choice.)
+ */
+const LIVE_AEON = siblingDefaultPathOrUnresolved('aeon');
+const norm = (p) => String(p).replace(/\/+$/, '');
 
 if (!PROJECT) {
   console.error('PROJECT=<path to a THROWAWAY aeon clone> is required. Never the owner\'s tree.');
   process.exit(2);
 }
-if (PROJECT.replace(/\/+$/, '') === '/home/volence/sonic_hacks/aeon') {
-  console.error('REFUSED: PROJECT is the owner\'s live aeon working tree. Clone it first.');
+if (norm(PROJECT) === norm(LIVE_AEON)) {
+  console.error(`REFUSED: PROJECT is the owner's live aeon working tree (${LIVE_AEON}). Clone it first.`);
   process.exit(2);
 }
-if (!ELECTRON) {
-  console.error('ELECTRON_BIN is required (a worktree has no node_modules/.bin/electron).');
-  process.exit(2);
+// ⚠ A BUILT TREE IS NOT OPTIONAL, AND ITS ABSENCE MUST NOT REACH `xvfb-run`.
+// `runTarget` answers with a path whether or not anything is at it, so the
+// existence check is the caller's. Refusing HERE, naming the file and the
+// overrides, is the difference between a two-line message and the ENOENT the
+// [checkout-as-build-tree] rule exists to prevent — which surfaces 45 seconds
+// later as "CDP target never appeared" and blames the app.
+for (const [what, p, how] of [['dist/main/index.mjs', MAIN, 'AURORA_BUILT_TREE'],
+                              ['node_modules/.bin/electron', ELECTRON, 'ELECTRON_BIN']]) {
+  if (!existsSync(p)) {
+    console.error(`REFUSED: ${what} is not at ${p}. Build with \`VITE_AURORA_DEBUG=1 npm run build\` `
+      + `in a tree that has node_modules, or point ${how} at one that does. `
+      + '(A linked worktree has neither artifact — that is what this check is for.)');
+    process.exit(2);
+  }
 }
 mkdirSync(SHOTS, { recursive: true });
 
@@ -279,10 +344,14 @@ async function main() {
     const aeonKeys = await c.json('Object.keys(window.__dbg.aeon ?? {})').catch(() => []);
     check('r2', 'the throwaway aeon clone actually opened', !!ast && !ast.__threw,
       `__dbg.aeon keys = ${JSON.stringify(aeonKeys)}\n        state = ${JSON.stringify(ast).slice(0, 400)}`);
+    // Same derivation as the launch guard, and deliberately the same one: this
+    // row is the guard's WITNESS after the app has actually opened something, so
+    // if the two disagreed about which tree is "live" the witness would be
+    // attesting to a different proposition than the guard enforced.
     check('r3', 'the opened project is NOT the owner\'s live aeon working tree',
-      !JSON.stringify(ast ?? {}).includes('/home/volence/sonic_hacks/aeon"')
-      && PROJECT.replace(/\/+$/, '') !== '/home/volence/sonic_hacks/aeon',
-      `PROJECT=${PROJECT}`);
+      !JSON.stringify(ast ?? {}).includes(`${LIVE_AEON}"`)
+      && norm(PROJECT) !== norm(LIVE_AEON),
+      `PROJECT=${PROJECT}\n        live tree refused (derived) = ${LIVE_AEON}`);
     // ⚠ A "READY" line over a broken rig is how a rig defect becomes a product
     // defect in somebody's report. Refuse the handover instead.
     if (fails.length) {
