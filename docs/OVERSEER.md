@@ -381,8 +381,21 @@ What stays live:
   **certain rather than conditional**. Run `tools/regenerate-level.sh` after the save and
   before the build.
   **Why it matters more than an extra step:** the gate hard-fails *before* a ROM is emitted,
-  so a staleness stop presents as the `anims` refusal gate rejecting Aurora's bytes when it
-  never judged them. Attribute the failure to a STAGE before reading it as a verdict.
+  so the stop is a STAGE and not a verdict on your bytes.
+  ⚠ **CORRECTED 2026-09-05, and the correction is the more useful half — this row said the stop
+  "presents as the `anims` refusal gate rejecting Aurora's bytes when it never judged them", and
+  that is NO LONGER TRUE.** Measured against aeon `origin/master`: the staleness stop **names
+  itself**, names which arm fired, lists the author's own files and gives the remedy, all before
+  anything assembles (gate at `build.sh:438`, assemble at `:775`). A cold reader called it the best
+  message of the day. The thing that DID mis-attribute was the `FAST=1` re-bake banner, which used
+  to be `> /dev/null` with a fixed message that guessed at the cause — **aeon fixed that on
+  2026-09-02** (their own comment at the arm says so). So this row was describing a defect that was
+  repaired three days before it was read, and it was relayed into a dispatch brief as fact on
+  09-05. **A label outlives its justification, and a boot doc is where that costs the most.**
+  Two live facts that survive the correction: `FAST=1` **auto-runs the re-bake** (the arm's own
+  words: *"re-bake instead of scolding"*), so only the plain `./build.sh` refuses after a save; and
+  `touch` is **NOT a remedy** — aeon's message says so, and applying it measurably lit an mtime arm
+  that had been quiet.
   **Companion, same family as the byte-neutral CRC bar:** if the build does not run, leftover
   ROMs on disk greet you with four matching CRCs from a build that never happened. `rm -f`
   the ROMs first so existence proves freshness.
