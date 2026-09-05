@@ -46,6 +46,7 @@ import {
   EFFECTS_TABLE_REF_FORMS, EFFECTS_TABLE_REF_BIN_PATTERN, EFFECTS_DEFORM_TABLE_BYTES,
   EFFECTS_LAYER_DEFORM_BOUNDS, EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS,
   EFFECTS_ANCHOR_SHIFT_BOUNDS, EFFECTS_ANCHOR_CHANNEL_BOUNDS, EFFECTS_ANCHOR_NONE,
+  EFFECTS_LAYER_SHIFT_BOUNDS, EFFECTS_LAYER_SHIFT_NONE,
   EFFECTS_LEFT_COLUMN_MASK_UNDECLARED, EFFECTS_LEFT_COLUMN_MASK_VALUES, EFFECTS_FACTOR_ZERO,
   EFFECTS_SCENE_KEY_DEFAULTS, EFFECTS_LAYER_KEY_DEFAULTS,
   type TableRefParam,
@@ -1808,9 +1809,15 @@ export function layerCurveDeformAdvisory(layer: EffectsLayer): string | null {
       + 'curve and deform on one strip (the fill\'s curve loop has no registers left for a '
       + 'sampled channel). Move the deform to another strip, or drop the curve.';
   }
-  const off = EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.max;
-  const dsa = layer.dsa ?? EFFECTS_LAYER_DEFAULTS.dsa;
-  const dsb = layer.dsb ?? EFFECTS_LAYER_DEFAULTS.dsb;
+  // ⚠ THIS READ USED TO COME OUT OF `EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.max` -
+  // a LAYER's sentinel taken from the `layerDeform` def next door, because the
+  // two numbers matched. That is the coincidence `EFFECTS_LAYER_SHIFT_BOUNDS`'
+  // docblock is about, and it was harmless only while nothing could author these
+  // two keys. Now that the card can, a sentinel one node over would mean this
+  // advisory fires on the wrong value the day the contract moves either def.
+  const off = EFFECTS_LAYER_SHIFT_NONE;
+  const dsa = layerShiftValue(layer, 'dsa');
+  const dsb = layerShiftValue(layer, 'dsb');
   if (dsa === off && dsb === off) return null;
   return `this strip authors a curve and a live deform amplitude (dsa ${dsa} / dsb ${dsb}; `
     + `${off} is the no-deform sentinel) — the build forbids curve and deform on one strip.`;
@@ -3306,9 +3313,22 @@ export function removeLayerCommand(
  * `deform` is wave 2, `drift` is EW-DRIFT-CTL, `rowRemap` is EW-9-ROWREMAP-CONTROL.
  */
 export type LayerCardKey =
-  | 'world_y' | 'fa' | 'fb' | 'curve' | 'vsplit' | 'deform' | 'drift' | 'rowRemap';
-/** The optional ones, where the control has a "none" state that CLEARS the key. */
-export type LayerCardOptionalKey = 'curve' | 'vsplit' | 'deform' | 'drift' | 'rowRemap';
+  | 'world_y' | 'fa' | 'fb' | 'curve' | 'vsplit' | 'deform' | 'drift' | 'rowRemap'
+  | 'dsa' | 'dsb';
+/**
+ * The optional ones, where the control has a "none" state that CLEARS the key.
+ *
+ * `dsa`/`dsb` JOINED AT EW-LAYER-DSA-DSB and they are the first NUMBERS here -
+ * every earlier member's off state is the string `"none"` or an object's
+ * absence. Nothing below had to change for that, because the rule was never
+ * about the value's shape: it is "the value equals this key's own schema
+ * default", and `EFFECTS_LAYER_KEY_DEFAULTS` answers it for a number exactly as
+ * it does for a word. That is the derivation paying off - a hand-written list of
+ * none-valued keys would have needed a new arm here and would have got the
+ * numeric case subtly wrong.
+ */
+export type LayerCardOptionalKey =
+  'curve' | 'vsplit' | 'deform' | 'drift' | 'rowRemap' | 'dsa' | 'dsb';
 
 /**
  * Set one field of one layer.
@@ -3400,6 +3420,248 @@ export function setSceneFieldCommand<K extends SceneFormKey>(
 }
 
 // ---------------------------------------------------------------------------
+// §9.2 - a LAYER's own deform amplitude, one ladder per plane
+// ---------------------------------------------------------------------------
+//
+// The anchor's pair (§9.1) is the overlay's; this is the strip's own, and it is
+// the pair aeon's `layer()` banner names: "dsa/dsb: per-plane deform-amplitude
+// shifts (15 = no deform on that plane)".
+//
+// ⚠ THE SAME INVERSION, AND THE SAME FOUR ANSWERS. 0..15 where **15 means the
+// plane does not move**, so a spinner or slider dragged to its maximum authors
+// silence and looks like it worked. §9.1's block has the full argument; what
+// follows is what differs HERE, because the two pairs are not the same object
+// and one of the differences changes what OFF writes.
+//
+// ═══ THE DIFFERENCE THAT MATTERS: WHAT "OFF" PUTS ON DISK ═══
+//
+// `anchor.at` declares channel/dsa/dsb all `required`, with NO default. An
+// anchor's sentinel therefore has exactly one spelling - the literal 15 - and
+// `setAnchorShiftCommand` writes it.
+//
+// A LAYER's `dsa`/`dsb` are OPTIONAL and declare `default: 15`. Absent and 15
+// are the same document: aeon's signature is `layer(…, dsa: int = 15, dsb: int
+// = 15, …)` and its generator emits a key only when the document carries one.
+// So this control has a choice the anchor's did not, and the choice is already
+// RULED in this file - `setLayerFieldCommand`'s rule, which `curve`, `vsplit`,
+// `deform`, `drift` and `rowRemap` all use:
+//
+//     OFF CLEARS THE KEY, unless the file SPELLS the default, which is LEFT AS
+//     SPELLED.
+//
+// That is neither "always write 15" nor "always omit", and the conditional is
+// the whole point: it means the control has no house style of its own and
+// PRESERVES THE DOCUMENT'S. Both conventions are live in the tree - every
+// shipped aeon scene writes `dsa: 15, dsb: 15` on every layer, and the scenes
+// Aurora has authored omit them - and both must survive a round trip through a
+// panel that now has a control for the key. A control that always wrote 15
+// would add two lines to every layer of every Aurora scene the first time
+// anyone opened one; a control that always deleted would strip a line from
+// every layer of every aeon scene. Each is a diff nobody asked for, in a file
+// an author reviews by eye.
+//
+// The rule is honest about its one lossy edge and it is worth stating: a file
+// that spells `dsa: 15`, is moved to a live shift, and is then taken back to
+// off ends with the key ABSENT rather than respelled. The invariant preserved
+// is "a field nobody touched keeps its spelling", not "every byte survives every
+// round trip" - and it is exactly the invariant curve/vsplit/deform/drift have
+// had since parcel H.
+//
+// ═══ AND ONE THING THAT IS THE SAME: NOTHING CLAMPS ═══
+//
+// `setLayerShiftCommand` throws. §9.1's reasoning transfers unchanged, because
+// the range and the sentinel's position in it are the same.
+
+/** Which of a layer's two shift fields a ladder is for. */
+export type LayerShiftField = 'dsa' | 'dsb';
+
+/** The plane each of a layer's shifts drives, in the engine's words. */
+const LAYER_SHIFT_PLANE: Readonly<Record<LayerShiftField, string>> = Object.freeze({
+  dsa: 'Plane A (foreground)',
+  dsb: 'Plane B (background)',
+});
+
+/** The two rows' labels and titles, in one place so the panel decides layout. */
+export const LAYER_SHIFT_ROW = Object.freeze({
+  planeALabel: 'Plane A',
+  planeBLabel: 'Plane B',
+  hint: 'how much of the scene\'s deform table this strip takes on each plane. Off is a '
+    + 'choice, not the absence of one: it leaves the plane flat while the strip still '
+    + 'scrolls.',
+});
+
+/**
+ * One rung of a layer's deform ladder, or its off entry.
+ *
+ * `off` is a FIELD, not an absence - the panel renders the same `<option>` shape
+ * either way and the tests ask this flag rather than pattern-matching a label,
+ * so "the sentinel is named" is a property of the data. §9.1's `AnchorShiftOption`
+ * from the other side.
+ */
+export interface LayerShiftOption {
+  /** The shift this option MEANS. For the off entry, the no-deform sentinel. */
+  shift: number;
+  label: string;
+  title: string;
+  off: boolean;
+}
+
+/**
+ * The deform ladder for ONE of a layer's two shift fields, LEAST MOTION FIRST,
+ * with off at the top.
+ *
+ * PER FIELD, NEVER SHARED, and built from `EFFECTS_LAYER_SHIFT_BOUNDS[field]` -
+ * the LAYER's own bounds, not the anchor's and not `layerDeform`'s `own`. Three
+ * schema nodes hold 0..15 and they agree by coincidence; that constant's
+ * docblock has the argument and `layer-shift-derivation.test.ts` holds it.
+ *
+ * THE SENTINEL IS NOT A RUNG. It appears exactly once, as the off entry.
+ */
+export function layerShiftOptions(field: LayerShiftField): readonly LayerShiftOption[] {
+  const { min, max } = EFFECTS_LAYER_SHIFT_BOUNDS[field];
+  const plane = LAYER_SHIFT_PLANE[field];
+  const out: LayerShiftOption[] = [{
+    shift: EFFECTS_LAYER_SHIFT_NONE,
+    label: 'off (no deform)',
+    title: `${field} = ${EFFECTS_LAYER_SHIFT_NONE} - the NO-DEFORM sentinel. ${plane} takes no `
+      + 'deform on this strip at all. It is the TOP of the field\'s range and it means none, '
+      + 'which is why it is named here and is not a rung on the ladder below it. Choosing it '
+      + 'CLEARS the key unless the file already spells it: an absent key and this value are '
+      + 'the same document to the build.',
+    off: true,
+  }];
+  // Descending shift == ascending motion: the engine floor-divides the table
+  // sample by 2^shift (aeon `deform_asr`, engine/level/parallax_dsl.emp).
+  for (let shift = max - 1; shift >= min; shift -= 1) {
+    const divisor = 2 ** shift;
+    out.push({
+      shift,
+      label: shift === min ? `÷${divisor} (the whole table)` : `÷${divisor}`,
+      title: `${field} = ${shift} - ${plane} deforms by the scene table's sample divided by `
+        + `${divisor} (the engine's asr.w, i.e. floor division by 2^${shift}). A SMALLER shift `
+        + 'is MORE motion. How far that actually moves depends on the table\'s own amplitude, '
+        + 'which aeon checks at build time and Aurora does not compute here.',
+      off: false,
+    });
+  }
+  return Object.freeze(out);
+}
+
+/** The LIVE rungs of a field's ladder - the ladder with the sentinel taken out. */
+export function layerShiftLadder(field: LayerShiftField): readonly LayerShiftOption[] {
+  return layerShiftOptions(field).filter((o) => !o.off);
+}
+
+/**
+ * What one of a layer's planes actually does - the key's value, or what its
+ * ABSENCE already means.
+ *
+ * The `??` is the contract's, not a convenience: `default: 15` is what makes an
+ * absent key readable at all, and it is the same fact `EFFECTS_LAYER_SHIFT_NONE`
+ * cross-checks against `maximum`. A form that rendered an absent key as blank
+ * would be showing an author a third state the document does not have.
+ */
+export function layerShiftValue(layer: EffectsLayer, field: LayerShiftField): number {
+  return layer[field] ?? EFFECTS_LAYER_SHIFT_NONE;
+}
+
+/**
+ * Is this plane's shift SPELLED on disk, as opposed to meant by absence?
+ *
+ * Both are the same document to the build. The distinction exists for the write
+ * rule - a spelled default is left as spelled - and for a UI that wants to say
+ * which it is. Never for deciding what the plane DOES; that is `layerShiftValue`.
+ */
+export function layerShiftIsSpelled(layer: EffectsLayer, field: LayerShiftField): boolean {
+  return layer[field] !== undefined;
+}
+
+/**
+ * Set ONE plane's deform amplitude on ONE strip.
+ *
+ * ⚠ THROWS ON AN OUT-OF-RANGE SHIFT AND NEVER CLAMPS. `Math.min(max, Math.max(
+ * min, v))` over this range lands every too-large value on the SENTINEL: a
+ * caller asking for "as much deform as this plane can carry" would be answered
+ * with NO DEFORM, and the document would validate, build and render flat. A
+ * clamp toward the bottom is no better - `min` is the loudest possible setting,
+ * so the wrong end is dramatic instead of silent. Neither end is a defensible
+ * guess, so this names the range and stops. `setAnchorShiftCommand`'s and
+ * `setBobShiftCommand`'s precedent.
+ *
+ * Unreachable from the form, whose `<select>` cannot produce an out-of-range
+ * value; it is for the caller that goes round it - a port, a paste, a future
+ * gesture.
+ *
+ * THE SENTINEL IS ROUTED THROUGH `setLayerFieldCommand`, DELIBERATELY. Asking
+ * for no deform is asking for the key's default, and what to put on disk for a
+ * defaulted key is already ruled once in this file for five other keys. Calling
+ * that function rather than restating its rule is what stops this control
+ * growing a sixth, differently-worded answer to the same question - the drift
+ * `EFFECTS_LAYER_KEY_DEFAULTS` was derived to stop, one layer up.
+ */
+export function setLayerShiftCommand(
+  library: EffectsSceneLibrary, id: string, index: number,
+  field: LayerShiftField, shift: number,
+): SetEffectsSceneCommand | null {
+  const { min, max } = EFFECTS_LAYER_SHIFT_BOUNDS[field];
+  if (!Number.isInteger(shift) || shift < min || shift > max) {
+    throw new Error(
+      `setLayerShiftCommand: refusing to author layer ${index} ${field} ${shift} - the contract `
+      + `admits ${min}..${max}, where ${EFFECTS_LAYER_SHIFT_NONE} is the NO-DEFORM sentinel and `
+      + `${min} is the LOUDEST setting. Aurora does not clamp this field: a clamp toward the top `
+      + 'authors "no deform" for a caller who asked for the most, and a clamp toward the bottom '
+      + 'authors the most for a caller who asked for none.',
+    );
+  }
+  return setLayerFieldCommand(
+    library, id, index, field,
+    shift === EFFECTS_LAYER_SHIFT_NONE ? undefined : shift,
+  );
+}
+
+/**
+ * What a live layer shift will actually do, when the answer is NOTHING.
+ *
+ * THE SILENT STATE THIS CONTROL MAKES REACHABLE, and the layer twin of
+ * `anchorDeformAdvisories`. aeon's precondition-1 message says it in one clause
+ * - "A live shift with NO table is flat-pathed at runtime and does not count" -
+ * and it is NOT a build refusal: the scene compiles, ships and renders a flat
+ * plane. Nothing else on this card would say so, because until this parcel
+ * nothing could author the shift.
+ *
+ * THE TABLE RULE IS THE ENGINE'S, transcribed from `scene_dsl.emp`'s own comment
+ * on the left-column guard: "that plane's scene-level attachment (deform_fg for
+ * A, deform_bg for B - band_table_a/b resolve exactly this fallback), or any
+ * layer's own() table, which serves BOTH planes". The `own` suppression is
+ * deliberately generous: it is the same one the anchor's advisory uses, and a
+ * false silence is better here than a false warning, because this function is
+ * ADVICE and the build is the rulebook.
+ *
+ * ADVISORY, NEVER PREVENTION: the ladder still offers every shift and the
+ * document still saves. Silence means "nothing to say", which is the truth about
+ * a strip whose planes are both off.
+ */
+export function layerShiftAdvisories(scene: EffectsScene, index: number): string[] {
+  const layer = scene.layers[index];
+  if (layer === undefined) return [];
+  const anyOwn = scene.layers.some((l) => layerDeformValue(l) !== null);
+  const out: string[] = [];
+  for (const [field, plane, key, label] of [
+    ['dsa', LAYER_SHIFT_PLANE.dsa, 'deform_fg', SCENE_DEFORM_ROWS.deform_fg.label],
+    ['dsb', LAYER_SHIFT_PLANE.dsb, 'deform_bg', SCENE_DEFORM_ROWS.deform_bg.label],
+  ] as const) {
+    const shift = layerShiftValue(layer, field);
+    if (shift === EFFECTS_LAYER_SHIFT_NONE) continue;
+    if (anyOwn || sceneDeformValue(scene, key) !== null) continue;
+    out.push(`this strip deforms ${plane} (${field} ${shift}) but the scene attaches no table `
+      + `it can sample - ${label} is off and no strip attaches its own. The engine flat-paths `
+      + 'a live shift with no table: the build stays green and the plane does not move. '
+      + `Attach ${label}, or take ${plane} to off.`);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Layer extras — what a layer carries beyond world_y / fa / fb (parcel E)
 // ---------------------------------------------------------------------------
 //
@@ -3424,8 +3686,14 @@ export function setSceneFieldCommand<K extends SceneFormKey>(
 // grew a real row for it (`LAYER_DRIFT_ROW`). A value the card edits is not
 // repeated here.
 //
-// What is left is exactly the set with no control anywhere on the card: `dsa`,
-// `dsb`, `phase` and `enabled`.
+// `dsa` AND `dsb` LEFT IT AT EW-LAYER-DSA-DSB, on the same rule and the same
+// precedent: they got a ladder each (§9.2 above), and a value the card edits is
+// not repeated here. They were the last two members that were ALSO half of the
+// two-sources guard, so the guard's advisory is no longer the only place an
+// author can see them.
+//
+// What is left is exactly the set with no control anywhere on the card: `phase`
+// and `enabled`.
 //
 // THE px/frame RULING OUTLIVED THIS LINE. It used to be the one place the
 // decision was visible; it is now the row's own spinner, its title and its
@@ -3434,7 +3702,7 @@ export function setSceneFieldCommand<K extends SceneFormKey>(
 
 export interface LayerExtra {
   /** The §2.2 key the descriptor is about. */
-  key: 'dsa' | 'dsb' | 'phase' | 'enabled';
+  key: 'phase' | 'enabled';
   /** The descriptor as the card prints it. */
   text: string;
 }
@@ -3462,7 +3730,7 @@ export function tableRefLabel(t: EffectsTableRef): string {
 /** Every non-default §2.2 key on a layer that the card has no control for. */
 export function layerExtras(layer: EffectsLayer): LayerExtra[] {
   const out: LayerExtra[] = [];
-  for (const key of ['dsa', 'dsb', 'phase'] as const) {
+  for (const key of ['phase'] as const) {
     const v = layer[key];
     if (v !== undefined && v !== EFFECTS_LAYER_DEFAULTS[key]) out.push({ key, text: `${key} ${v}` });
   }
@@ -3495,6 +3763,11 @@ export {
   // reimplemented for the same reason drift's and reels' are: the one source of
   // these rules is scene-ui's.
   EFFECTS_ANCHOR_SHIFT_BOUNDS, EFFECTS_ANCHOR_CHANNEL_BOUNDS, EFFECTS_ANCHOR_NONE,
+  // §9.2's contract half - the LAYER's own pair, which is a THIRD 0..15 shift
+  // space and not either of the two above. Re-exported rather than
+  // reimplemented for the reason the anchor's are: the one source of these
+  // rules is scene-ui's.
+  EFFECTS_LAYER_SHIFT_BOUNDS, EFFECTS_LAYER_SHIFT_NONE,
   // The drift row's contract half. `driftPxPerFrameRefusal` is what the card
   // hands `NumberField`'s `refuse`, and it is re-exported rather than reimplemented
   // here so the ONE source of the rules stays scene-ui's.

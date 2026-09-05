@@ -94,6 +94,13 @@ import {
   ANCHOR_ROW, anchorValue, anchorChannelOptions, anchorShiftOptions,
   anchorToggleCommand, setAnchorChannelCommand, setAnchorShiftCommand,
   anchorDeformAdvisories,
+  // §9.2 - a LAYER's own deform amplitude. ⚠ SAME INVERSION, DIFFERENT OBJECT:
+  // a ladder per field with the sentinel off it, and `setLayerShiftCommand`
+  // throws rather than clamping. What differs from §9.1 is what OFF puts on
+  // disk - these keys are optional and defaulted, so off CLEARS unless the file
+  // spells it. effects-aeon's §9.2 block has the argument.
+  LAYER_SHIFT_ROW, layerShiftOptions, layerShiftValue, setLayerShiftCommand,
+  layerShiftAdvisories,
   LEFT_COLUMN_MASK_ROW, leftColumnMaskOptions, leftColumnMaskValue,
   leftColumnMaskRowVisible, leftColumnMaskCommand, vDeformToggleCommand,
   BOB_ROW, BOB_AMPLITUDE_OPTIONS, BOB_PERIOD_OPTIONS,
@@ -838,18 +845,77 @@ export default function EffectsScenePanel(): React.ReactElement {
                       const clash = layerCurveDeformAdvisory(layer);
                       return clash === null ? null : <Hint under tone="warning">{clash}</Hint>;
                     })()}
-                    {/* THE TWO-SOURCES GUARD, wired at last. §2.2: when `own` is
-                        present, this layer's dsa/dsb/phase must be absent or at
-                        their defaults, because both lower into the SAME record
-                        fields. The card has no control for dsa/dsb/phase, so
-                        this state arrives from a HAND-EDITED file — which is
-                        precisely when an author has no other way to be told. */}
+                    {/* THE TWO-SOURCES GUARD. §2.2: when `own` is present, this
+                        layer's dsa/dsb/phase must be absent or at their
+                        defaults, because both lower into the SAME record fields.
+
+                        ⚠ IT USED TO SAY "the card has no control for
+                        dsa/dsb/phase, so this state arrives from a HAND-EDITED
+                        file". THAT IS NO LONGER TRUE for two of the three: the
+                        two ladders below author dsa/dsb directly, so this
+                        warning is now reachable by two gestures on this very
+                        card - turn `own` on, then lower a plane. It sits
+                        BETWEEN the `own` table above and the ladders below on
+                        purpose: both of its halves are visible from it. */}
                     {deformConflicts.filter((c) => c.path === `/layers/${i}`).map((c) => (
                       <Hint key={c.path} under tone="warning">{c.message}</Hint>
                     ))}
                   </>
                 );
               })()}
+              {/* ═══ THIS STRIP'S OWN DEFORM AMPLITUDE, ONE LADDER PER PLANE (§9.2) ═══
+
+                  ⚠⚠ `<select>`s, AND THAT IS THE WHOLE SAFETY ARGUMENT - the
+                  same one the anchor's pair carries five hundred rows down.
+                  `dsa`/`dsb` are 0..15 where **15 means NO DEFORM**, so a
+                  spinner dragged toward its maximum authors "this plane does not
+                  move": the opposite of the gesture, silently, with a green
+                  build. The list runs least motion first, the sentinel is not on
+                  it, and off is a NAMED entry at the top.
+
+                  WHAT OFF WRITES IS NOT WHAT THE ANCHOR'S OFF WRITES, and the
+                  contract decides it rather than taste: `anchor.at` requires all
+                  three of its keys, so its sentinel is always spelled; these two
+                  are optional with `default: 15`, so absent and 15 are one
+                  document and off CLEARS the key unless the file already spells
+                  it. That is `setLayerFieldCommand`'s rule, which curve, vsplit,
+                  deform, drift and rowRemap have all used since parcel H, and
+                  `setLayerShiftCommand` routes through that function rather than
+                  restating it.
+
+                  PLACED AFTER THE DEFORM ROW because these amplitudes sample
+                  the table that row attaches (or the scene's plane-shared one),
+                  and immediately after the two-sources warning, which is the
+                  one state where these two controls and that one disagree. */}
+              {([['dsa', LAYER_SHIFT_ROW.planeALabel],
+                 ['dsb', LAYER_SHIFT_ROW.planeBLabel]] as const)
+                .map(([field, label]) => (
+                  <Field key={field} label={label}>
+                    <Select title={`Layer ${i} ${field}`}
+                      value={String(layerShiftValue(layer, field))}
+                      onChange={(v) => run(setLayerShiftCommand(
+                        library, selected.id, i, field, Number(v)))}
+                      style={{ flex: 1, minWidth: 0 }}>
+                      {/* ONE LOOP OVER THE TWO PLANES, on the anchor row's
+                          reasoning: two hand-written blocks is exactly the copy
+                          that lets one plane grow a rung the other has not. Each
+                          ladder is built from its OWN field's bounds. */}
+                      {layerShiftOptions(field).map((o) => (
+                        <option key={o.shift} value={o.shift} title={o.title}>{o.label}</option>
+                      ))}
+                    </Select>
+                  </Field>
+                ))}
+              <Hint under style={{ marginBottom: 0 }}>{LAYER_SHIFT_ROW.hint}</Hint>
+              {/* THE STATE NO BUILD WILL EVER REPORT: a live shift with no table
+                  to sample is flat-pathed at runtime - the scene compiles, ships
+                  and does not move. Warning-toned because the author asked for
+                  motion and will not get it. */}
+              {layerShiftAdvisories(selected, i).map((a) => (
+                <Hint key={a} under tone="warning" style={{ marginBottom: 0 }}>
+                  <span data-testid={`layer-${i}-shift-advisory`}>{a}</span>
+                </Hint>
+              ))}
               {/* DRIFT (EW-DRIFT-CTL). The one row on this card that moves the
                   strip with the camera STANDING STILL, which is why it sits
                   last: everything above it is camera-relative.

@@ -144,6 +144,7 @@
     "harness:import-cdp": "node scratchpad/import-cdp-harness.mjs",
     "harness:lag-retire": "node scratchpad/lag-retire-harness.mjs",
     "harness:layer-bound": "node scratchpad/layer-bound-harness.mjs",
+    "harness:layer-dsa-dsb": "node scratchpad/layer-dsa-dsb-harness.mjs",
     "harness:live-palette-e2e": "node scratchpad/live-palette-e2e-harness.mjs",
     "harness:loop-paint": "node scratchpad/loop-paint-harness.mjs",
     "harness:loop-witness": "node scratchpad/loop-witness-harness.mjs",

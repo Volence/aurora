@@ -415,7 +415,7 @@ describe('layerExtras (parcel E)', () => {
     expect(layerExtrasLine(baseLayer())).toBeNull();
   });
 
-  it('names dsa/dsb/phase and disabled in schema key order — curve/vsplit (parcel H) and deform (wave 2) have controls now', () => {
+  it('names phase and disabled in schema key order - curve/vsplit (H), deform (wave 2), drift and now dsa/dsb have controls', () => {
     const layer: EffectsLayer = {
       ...baseLayer(), dsa: 3, dsb: 4, phase: 9, enabled: false,
       deform: { own: { table: { generator: 'sine', amplitude: 8, period: 64 }, shift_a: 1, shift_b: 2, phase: 0, speed: 1 } },
@@ -423,12 +423,19 @@ describe('layerExtras (parcel E)', () => {
       vsplit: { at: 112 },
     };
     const extras = layerExtras(layer);
-    expect(extras.map((e) => e.key)).toEqual(['dsa', 'dsb', 'phase', 'enabled']);
-    expect(extras.map((e) => e.text)).toEqual(['dsa 3', 'dsb 4', 'phase 9', 'disabled']);
-    // A layer carrying ONLY the three keys the card now edits gets no line at
-    // all: the read-only line must not duplicate a control sitting above it.
+    // ⚠ dsa/dsb LEFT THIS LINE AT EW-LAYER-DSA-DSB, on the rule every earlier
+    // member left by: a value the card edits is not repeated read-only under it.
+    // The layer above carries dsa 3 / dsb 4 and the line says NOTHING about
+    // them, which is the assertion - a duplicated readout beside a live control
+    // is how an author learns to distrust one of the two.
+    expect(extras.map((e) => e.key)).toEqual(['phase', 'enabled']);
+    expect(extras.map((e) => e.text)).toEqual(['phase 9', 'disabled']);
+    expect(layerExtrasLine(layer)).not.toMatch(/dsa|dsb/);
+    // A layer carrying ONLY keys the card now edits gets no line at all.
     expect(layerExtrasLine({
       ...baseLayer(),
+      dsa: 3,
+      dsb: 4,
       curve: { to: 'FACTOR_3_8' },
       vsplit: { at: 20 },
       deform: { own: { table: { generator: 'zero' }, shift_a: 15, shift_b: 15, phase: 0, speed: 0 } },
