@@ -94,7 +94,7 @@ describe('assign_section_bg still does exactly what it did', () => {
    * first, read back off the act rather than out of the reply that claims it.
    */
   it('writes the ref, reports changed, and consumes one undo step', async () => {
-    expect(actHistory().canUndo, 'the fixture already had history — the row below would measure nothing').toBe(false);
+    expect(actHistory().canUndo, 'the fixture already had history: the row below would measure nothing').toBe(false);
     const r = await ask({ kind: 'assign-section-bg', section: 1, bgId: 'sky' }) as Record<string, unknown>;
     expect(r.changed).toBe(true);
     expect(r.section).toBe(1);
@@ -150,7 +150,7 @@ describe('the reply says where the success stops', () => {
     expect(r.binding).toBe(BG_SECTION_BINDING_LIMIT);
   });
 
-  it('and on the no-op reply too — the same conclusion is available either way', async () => {
+  it('and on the no-op reply too: the same conclusion is available either way', async () => {
     await ask({ kind: 'assign-section-bg', section: 1, bgId: 'sky' });
     const r = await ask({ kind: 'assign-section-bg', section: 1, bgId: 'sky' }) as Record<string, unknown>;
     expect(r.changed).toBe(false);
@@ -257,7 +257,7 @@ describe('a ref the library cannot answer is reported, not swallowed', () => {
     expect(rows[1]).toEqual({ index: 1, bgId: 'sky', dangling: false });
   });
 
-  it('a section on the act default is NOT dangling — unbound and broken are different', async () => {
+  it('a section on the act default is NOT dangling: unbound and broken are different', async () => {
     open({ refs: [null, null] });
     const rows = (await ask({ kind: 'list-bgs' }) as Record<string, unknown>)
       .sections as { dangling: boolean }[];

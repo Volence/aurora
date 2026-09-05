@@ -137,7 +137,7 @@ describe('aeonAdapter.detect', () => {
     });
   });
 
-  it('matches even when the aeon project is otherwise broken (engine only) — validation is deferred to the loader', async () => {
+  it('matches even when the aeon project is otherwise broken (engine only): validation is deferred to the loader', async () => {
     // No name, no zones — loadS4Config would reject this, but detect only sniffs
     // engine so the EXISTING loader still runs and surfaces its usual error.
     expect(await aeonAdapter.detect(memFs({ 'project.json': '{"engine":"s4"}' }))).toEqual({
@@ -198,7 +198,7 @@ describe('explainAeonReject', () => {
     ).toBe('project.json found but engine is "undefined", expected "s4"');
   });
 
-  it('returns null for a valid aeon project.json (engine "s4" — not a reject)', async () => {
+  it('returns null for a valid aeon project.json (engine "s4", not a reject)', async () => {
     expect(await explainAeonReject(memFs({ 'project.json': aeonJson() }))).toBeNull();
   });
 });
@@ -257,7 +257,7 @@ describe('aeon + s1 registry routing (disjoint fingerprints)', () => {
     expect(match?.type).toBe('s1');
   });
 
-  it('returns null for a non-aurora project.json — routes to neither adapter', async () => {
+  it('returns null for a non-aurora project.json: routes to neither adapter', async () => {
     registerAdapter(s1Adapter);
     registerAdapter(aeonAdapter);
     expect(

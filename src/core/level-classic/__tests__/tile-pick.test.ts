@@ -60,7 +60,7 @@ describe('firstNonBlankBlock', () => {
     expect(firstNonBlankBlock(blocks, TILES)).toBe(2);
   });
 
-  it('does NOT count a flip/pal/pri-only cell — none of those draws a pixel', () => {
+  it('does NOT count a flip/pal/pri-only cell: none of those draws a pixel', () => {
     // THE BUG. S1 Green Hill's block $000 has cells on palette line 2 pointing
     // at the blank tile $000, so the old "non-default cell" rule landed the
     // Block tier on four black quadrants — with no message any source guard
@@ -124,7 +124,7 @@ describe('firstEditableChunkId', () => {
   });
   const blank = (): ChunkDef256 => chunk();
 
-  it('returns an ENGINE ID, not an index — chunks[0] is $01', () => {
+  it('returns an ENGINE ID, not an index: chunks[0] is $01', () => {
     expect(firstEditableChunkId([chunk(cell(4))])).toBe(1);
   });
 
@@ -137,7 +137,7 @@ describe('firstEditableChunkId', () => {
     expect(firstEditableChunkId([blank(), chunk(cell(0, { xf: true }))])).toBe(2);
   });
 
-  it('falls back to the first REAL chunk when every chunk is blank — never to air', () => {
+  it('falls back to the first REAL chunk when every chunk is blank: never to air', () => {
     // Air is the one id the Chunk tab cannot edit, so an all-blank pool still
     // lands on something editable. Blank chunks are legitimate data.
     expect(firstEditableChunkId([blank(), blank()])).toBe(1);

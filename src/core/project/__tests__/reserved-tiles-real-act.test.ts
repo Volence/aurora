@@ -217,7 +217,7 @@ describe('object-aware tile claimability, real s1disasm', () => {
       const handle = await s1Adapter.open(fa);
       const ghz1 = handle.levels!.list().find((r) => r.zone === 'ghz' && r.act === 1)!;
       await handle.levels!.read(ghz1);
-      expect(refusedOne, 'the fixture never hit a mappings file — the act reserves nothing').toBe(true);
+      expect(refusedOne, 'the fixture never hit a mappings file: the act reserves nothing').toBe(true);
       expect(handle.levels!.reservedTiles!(ghz1)).toBeNull();
     },
   );

@@ -115,7 +115,7 @@ function expectedFrameCount(key: string, link: ObjectArtLink): number {
   return FRAME_COUNTS[key];
 }
 
-describe('S1 non-level families — every row: real files, real render', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
+describe('S1 non-level families, every row: real files, real render', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
   it('covers exactly the transcribed family set (a new row must bring its pins)', () => {
     expect([...Object.keys(FRAME_COUNTS), ...Object.keys(GRID_GEOMETRY)].sort())
       .toEqual(FAMILIES.map(([k]) => k).sort());
@@ -204,7 +204,7 @@ describe('S1 non-level families — every row: real files, real render', { skip:
 });
 
 describe('family-specific pins (hand-transcribed from the disasm)', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
-  it('shield: stars frames 4-7 index Nem_Stars frame-local — tile $23 max, beyond Shield.nem\'s 27 tiles', () => {
+  it('shield: stars frames 4-7 index Nem_Stars frame-local: tile $23 max, beyond Shield.nem\'s 27 tiles', () => {
     // _maps/Shield and Invincibility.asm .stars3/.stars4 reference tiles up to
     // $1B+9-1; Shield.nem decodes to 27 tiles ($1B) so WITHOUT the per-frame
     // obGfx swap (_incObj/38:28,33) those pieces would fall off the pool.
@@ -217,7 +217,7 @@ describe('family-specific pins (hand-transcribed from the disasm)', { skip: !ref
     expect(starMax).toBeLessThanOrEqual(starsTiles.length);
   });
 
-  it('shield: frame 0 is the table\'s deliberate invisible entry (`.shield1+$B`) — zero pieces', () => {
+  it('shield: frame 0 is the table\'s deliberate invisible entry (`.shield1+$B`), zero pieces', () => {
     const frames = parseAsmMappings(readText('_maps/Shield and Invincibility.asm'));
     expect(frames[0].pieces).toEqual([]);
   });
@@ -253,7 +253,7 @@ describe('family-specific pins (hand-transcribed from the disasm)', { skip: !ref
     expect(S1_NAMED_ART_DOCS.titlecards.link.sources?.[0]).toMatchObject({ artFile: 'artnem/HUD.nem', tileBase: 0x6ca - 0x580 });
   });
 
-  it('gameover: frame 0 is the hand-transcribed "GAME" pair — 2 pieces, 4x2 cells at tiles 0 and 8', () => {
+  it('gameover: frame 0 is the hand-transcribed "GAME" pair, 2 pieces, 4x2 cells at tiles 0 and 8', () => {
     // _maps/Game Over.asm .game: spritePiece -$48,-8,4,2,0 / -$28,-8,4,2,8.
     const frames = parseAsmMappings(readText('_maps/Game Over.asm'));
     expect(frames[0].pieces.map((p) => [p.xOffset, p.yOffset, p.widthCells, p.heightCells, p.tile]))

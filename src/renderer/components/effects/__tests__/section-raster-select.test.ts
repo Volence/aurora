@@ -146,7 +146,7 @@ describe('what the select offers', () => {
     // rule too. A row that reddens for someone else's defect cannot tell you
     // which one you have.
     const values = presetRefOptions(lib(['good'], ['broken'])).map((o) => o.value);
-    expect(values, 'the readable preset vanished — this row would pass vacuously')
+    expect(values, 'the readable preset vanished: this row would pass vacuously')
       .toContain('good');
     expect(values).not.toContain('broken');
   });

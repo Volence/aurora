@@ -140,7 +140,7 @@ function firstDiff(a: Uint8ClampedArray, b: Uint8ClampedArray): number {
 
 // ---------------------------------------------------------------------------
 
-describe('composeNametable — equivalence with the per-tile canvas path', () => {
+describe('composeNametable: equivalence with the per-tile canvas path', () => {
   it('matches the reference for every flip/palette combination of one tile', () => {
     const tilesWide = 8, tilesHigh = 8;
     const w = tilesWide * 8, h = tilesHigh * 8;

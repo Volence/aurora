@@ -167,7 +167,7 @@ describe('a flood of section-file failures is ONE notice', () => {
     for (const p of named) expect(p.startsWith('data/ojz/act1/section_')).toBe(true);
   });
 
-  it('keeps the channel it was moved onto — coalescing is not a downgrade', async () => {
+  it('keeps the channel it was moved onto: coalescing is not a downgrade', async () => {
     // The inversion guard. A "fix" that quietened the wall by demoting it to a
     // warning, or to the 2.2s success dwell, would undo the whole point of
     // taking these off the success channel in the first place.
@@ -238,7 +238,7 @@ describe('the effects libraries coalesce on the same terms', () => {
     expect(lib.notices[0].message.startsWith(`${lib.unreadable.length} files in `)).toBe(true);
   });
 
-  it('one broken scene keeps its own message — the common case did not get worse', async () => {
+  it('one broken scene keeps its own message: the common case did not get worse', async () => {
     const files = new Map<string, Uint8Array>();
     files.set('data/editor/effects/broken.json', new TextEncoder().encode('{ nope'));
     const lib = await loadEffectsSceneLibrary(memFa(files), DATA_ROOT);

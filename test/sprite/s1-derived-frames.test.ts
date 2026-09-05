@@ -71,7 +71,7 @@ function renderAlone(frame: SpriteFrame, tiles: Tile[]) {
   };
 }
 
-describe('S1 sideways spring — derivation vs parser+composer', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
+describe('S1 sideways spring: derivation vs parser+composer', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
   // HAND-TRANSCRIBED from _maps/Springs.asm (argument order per
   // _MapMacros.asm): the full six-frame table.
   //   0 .spg_Up:       (-$10,-8, 4x1, tile 0) (-$10,0, 4x1, tile 4)
@@ -123,7 +123,7 @@ describe('S1 sideways spring — derivation vs parser+composer', { skip: !refere
     }
   });
 
-  it('composer: .spg_LeftExt (frame 5) scatters exactly as derived — plate at +$10, body, two lone 1x1s', () => {
+  it('composer: .spg_LeftExt (frame 5) scatters exactly as derived: plate at +$10, body, two lone 1x1s', () => {
     const frames = maps('Springs.asm');
     const { width, height, originX, originY, indices } = renderAlone(frames[5], markedTiles(16));
     // DERIVED bounds: x -8..$18, y -$10..$10 → 32x32 canvas, origin (8,16).
@@ -149,7 +149,7 @@ describe('S1 sideways spring — derivation vs parser+composer', { skip: !refere
   });
 });
 
-describe('flip/negative-offset sweep — other objects, hand-derived', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
+describe('flip/negative-offset sweep: other objects, hand-derived', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
   it('GHZ Ball .check2 (frame 2): h+v-flipped quadrants place tiles AND pixels mirrored', () => {
     // HAND-TRANSCRIBED from _maps/GHZ Ball.asm .check2:
     //   (-$18,-$18, 3x3, tile $12)  (0,-$18, 3x3, tile $1B)
@@ -212,7 +212,7 @@ import { resolveObjectArt } from '../../src/core/project/profiles/s1-object-art'
 import { resolveEffectiveObjectArt } from '../../src/core/project/profiles/object-subtype-rules';
 
 describe('spring $41 art pairing (the actual source of the "scrambled" look)', () => {
-  it('base link opens Nem_HSpring; the horizontal-subtype rule swaps to Nem_VSpring frame 3 — matching _incObj/41 Springs.asm:43/54-55', () => {
+  it('base link opens Nem_HSpring; the horizontal-subtype rule swaps to Nem_VSpring frame 3: matching _incObj/41 Springs.asm:43/54-55', () => {
     const base = resolveObjectArt(0x41)!;
     expect(base.artFile).toBe('artnem/Spring Horizontal.nem');
     // Subtype $10 = horizontal (Direction bits 4-5 = 1): the engine sets

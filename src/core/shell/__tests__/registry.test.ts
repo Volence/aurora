@@ -33,7 +33,7 @@ describe('createRegistry', () => {
     expect(reg.list()).toEqual([]);
   });
 
-  it('list() returns a copy — mutating it does not affect the registry', () => {
+  it('list() returns a copy: mutating it does not affect the registry', () => {
     const reg = createRegistry<Widget>('Widget');
     reg.register({ id: 'a', label: 'A' });
     const snapshot = reg.list();

@@ -100,7 +100,7 @@ describe('the geometry pickers', () => {
     }
   });
 
-  it('and no row count it REFUSES would have worked — the picker is not over-restrictive', () => {
+  it('and no row count it REFUSES would have worked: the picker is not over-restrictive', () => {
     // The complement, which is the half a "every offer is legal" row cannot see:
     // an enumeration that returned only `[1]` would pass the row above.
     const offered = new Set(rowChoices());
@@ -363,7 +363,7 @@ describe('a printed slot range names the last slot it contains', () => {
     expect(slotSpanDigits(40, -3)).toBe(NO_SLOTS_PHRASE);
   });
 
-  it('the empty range is worded, not arithmetic — no `0..-1` reaches a reader', () => {
+  it('the empty range is worded, not arithmetic: no `0..-1` reaches a reader', () => {
     // DECIDED, not inherited: a naive `base + count - 1` renders `0..-1` on the
     // empty document, which is not a range anyone can act on.
     for (const base of [0, 32]) {
@@ -526,13 +526,13 @@ describe('the rate reaches the document through BOTH doors, and only when asked'
     expect(Object.hasOwn(promoted({ cols: 1, rows: 1, rateShift: 0 }), 'rate_shift')).toBe(true);
   });
 
-  it('INSERTION does the same — the two doors are peers here too', () => {
+  it('INSERTION does the same: the two doors are peers here too', () => {
     expect(Object.hasOwn(inserted({ cols: 1, rows: 1 }), 'rate_shift')).toBe(false);
     expect(inserted({ cols: 1, rows: 1, rateShift: 5 }).rate_shift).toBe(5);
     expect(inserted({ cols: 1, rows: 1, rateShift: 0 }).rate_shift).toBe(0);
   });
 
-  it('and the band row reads back what the panel prints — value AND explicitness', () => {
+  it('and the band row reads back what the panel prints: value AND explicitness', () => {
     // The read side the panel renders, not the raw band: an absent key must show
     // the contract's default AND say it is not spelled, which is what stops an
     // author from believing the file pins a rate it does not.

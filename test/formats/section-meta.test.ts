@@ -202,7 +202,7 @@ describe('section meta sidecar ({prefix}.meta.json)', () => {
    * stick." Pinned as CURRENT BEHAVIOUR on the contract's instruction — the
    * consumer is the party that refuses a non-string by name, not this parser.
    */
-  it('reads a numeric rasterRef as null, silently — why the id is a string', () => {
+  it('reads a numeric rasterRef as null, silently: why the id is a string', () => {
     expect(parseSectionMeta('{"rasterRef": 3}').rasterRef).toBeNull();
     expect(parseSectionMeta('{"rasterRef": {"id": "canopy_tint"}}').rasterRef).toBeNull();
     // And the erasure that follows from it.
@@ -295,7 +295,7 @@ describe('section meta sidecar ({prefix}.meta.json)', () => {
    * an integer index" (consumer list §2.2). The silent null is the hazard the
    * string-id ruling routes around; it is not a defect to fix here.
    */
-  it('reads a numeric sceneRef as null, silently — why the id is a string', () => {
+  it('reads a numeric sceneRef as null, silently: why the id is a string', () => {
     expect(parseSectionMeta('{"sceneRef": 3}').sceneRef).toBeNull();
     expect(parseSectionMeta('{"sceneRef": null}').sceneRef).toBeNull();
     expect(parseSectionMeta('{"sceneRef": {"id": "canopy_dusk"}}').sceneRef).toBeNull();

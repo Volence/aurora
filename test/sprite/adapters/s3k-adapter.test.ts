@@ -6,7 +6,7 @@ const fx = (n: string) => new Uint8Array(readFileSync(new URL(`../../fixtures/ma
 const map = fx('s3k_obj0B_map.bin');
 const dplc = fx('s3k_obj08_dplc.bin');
 
-describe('s3k adapter — vs real assembled Ver 3 fixture', () => {
+describe('s3k adapter: vs real assembled Ver 3 fixture', () => {
   const frames = s3kAdapter.readMappings(map);
 
   it('recovers all 5 frames (6-byte pieces, no 2P word)', () => {
@@ -26,7 +26,7 @@ describe('s3k adapter — vs real assembled Ver 3 fixture', () => {
   });
 });
 
-describe('s3k adapter — reads real Sonic Clean Engine (S.C.E.) mappings', () => {
+describe('s3k adapter: reads real Sonic Clean Engine (S.C.E.) mappings', () => {
   // S.C.E. is S3K-based: its sprite mappings use the Ver-3 6-byte piece layout.
   // Assembled verbatim from S.C.E. "Map - Insta-Shield.asm" (pure dc.b/dc.w).
   const frames = s3kAdapter.readMappings(fx('sce_instashield_map.bin'));
@@ -45,7 +45,7 @@ describe('s3k adapter — reads real Sonic Clean Engine (S.C.E.) mappings', () =
   });
 });
 
-describe('s3k adapter — DPLC reversed packing + count-1 header', () => {
+describe('s3k adapter: DPLC reversed packing + count-1 header', () => {
   const perFrame = s3kAdapter.readDPLC!(dplc);
 
   it('reads expanded source-tile lists despite the reversed entry packing', () => {
@@ -79,7 +79,7 @@ describe('s3k adapter — DPLC reversed packing + count-1 header', () => {
   });
 });
 
-describe('s3k adapter — vs REAL skdisasm DPLC data (closes the bit-order risk)', () => {
+describe('s3k adapter: vs REAL skdisasm DPLC data (closes the bit-order risk)', () => {
   // Assembled verbatim from skdisasm "DPLC - Miniboss Splash.asm" (literal dc.w,
   // no macros) — independent ground truth for the reversed Ver-3 entry packing.
   const real = s3kAdapter.readDPLC!(fx('s3k_real_dplc_minibosssplash.bin'));

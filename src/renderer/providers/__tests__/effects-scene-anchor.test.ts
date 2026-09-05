@@ -43,13 +43,13 @@ function library(scenes: EffectsScene[]): EffectsSceneLibrary {
 
 /** The document a command would land — what the store writes to disk. */
 function applied(cmd: ReturnType<typeof anchorToggleCommand>): EffectsScene {
-  expect(cmd, 'the command was null — nothing was authored').not.toBeNull();
+  expect(cmd, 'the command was null: nothing was authored').not.toBeNull();
   const next = cmd!.newScene;
   expect(next, 'the command carries no document').not.toBeNull();
   return next!;
 }
 
-describe('the anchor deform ladders — the sentinel is a NAMED CHOICE, never a rung', () => {
+describe('the anchor deform ladders: the sentinel is a NAMED CHOICE, never a rung', () => {
   it('offers exactly the field\'s own legal shifts, once each', () => {
     for (const field of SHIFT_FIELDS) {
       const { min, max } = EFFECTS_ANCHOR_SHIFT_BOUNDS[field];
@@ -127,7 +127,7 @@ describe('the anchor deform ladders — the sentinel is a NAMED CHOICE, never a 
   });
 });
 
-describe('the channel row — an ORDINAL whose top is not an off', () => {
+describe('the channel row: an ORDINAL whose top is not an off', () => {
   it('offers every channel the schema admits, ascending', () => {
     const { min, max } = EFFECTS_ANCHOR_CHANNEL_BOUNDS;
     expect(anchorChannelOptions().map((o) => o.channel))
@@ -150,7 +150,7 @@ describe('the channel row — an ORDINAL whose top is not an off', () => {
     expect(EFFECTS_CHANNEL_BANDS.size).toBeGreaterThan(0);
   });
 
-  it('has NO off entry — the channel\'s off is the whole anchor being absent', () => {
+  it('has NO off entry: the channel\'s off is the whole anchor being absent', () => {
     // The trap this row exists against: `channel` sits in the same object as two
     // fields whose top means "none", and it would read as symmetric. It is not.
     for (const o of anchorChannelOptions()) expect(o.label).not.toMatch(/off|none/i);
@@ -373,7 +373,7 @@ describe('what the new control can now author, and what it must say about it', (
    * key with no writer. Driven through the toggle, so what clears it is the
    * gesture, not a hand-built object.
    */
-  it('CLEARS rowRemap precondition 2 — the reason this writer exists', () => {
+  it('CLEARS rowRemap precondition 2: the reason this writer exists', () => {
     const s = newEffectsScene('waterline');
     s.layers[0] = { ...s.layers[0], rowRemap: { plane_y: 64, height_shift: 4 } };
     const before = rowRemapPreconditions(s, 0);

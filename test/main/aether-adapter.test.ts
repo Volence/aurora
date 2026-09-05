@@ -8,7 +8,7 @@ const forward = (impl: (p: { kind: string }) => unknown = () => ({ ok: true })) 
 const req = (method: string, params?: unknown, id: number | undefined = 1): JsonRpcRequest =>
   ({ jsonrpc: '2.0', ...(id === undefined ? {} : { id }), method, params });
 
-describe('Aether adapter — handshake', () => {
+describe('Aether adapter: handshake', () => {
   it('initialize advertises protocolVersion, methods, capabilities (D4)', async () => {
     const r = await handleRequest(req('initialize', { protocolVersion: 1 }), forward()) as JsonRpcSuccess;
     const res = r.result as ReturnType<typeof capabilities>;
@@ -25,7 +25,7 @@ describe('Aether adapter — handshake', () => {
     expect((r.error.data as { supported: number[] }).supported).toEqual([1]);
   });
 
-  it('initialized is a notification — no response', async () => {
+  it('initialized is a notification: no response', async () => {
     expect(await handleRequest({ jsonrpc: '2.0', method: 'initialized' }, forward())).toBeNull();
   });
 
@@ -35,7 +35,7 @@ describe('Aether adapter — handshake', () => {
   });
 });
 
-describe('Aether adapter — method dispatch', () => {
+describe('Aether adapter: method dispatch', () => {
   it('forwards a known method as { kind, ...params } and returns the result', async () => {
     const fwd = forward((p) => ({ echoed: p }));
     const r = await handleRequest(req('editor/goto', { section: 2, x: 10, y: 5 }), fwd) as JsonRpcSuccess;

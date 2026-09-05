@@ -298,7 +298,7 @@ describe('run-root: the two halves of the O70 split, POINTED APART', () => {
       );
       const r = JSON.parse(out.stdout) as Record<string, string | boolean>;
       expect(r.borrowed).toBe(false);
-      expect(r.line, 'it still names the tree — that half is owed on every run').toContain(built);
+      expect(r.line, 'it still names the tree: that half is owed on every run').toContain(built);
       expect(r.line, 'nothing was borrowed, so nothing may say so').not.toContain('BORROWED');
       expect(r.line).toContain('in-tree:');
     } finally {
@@ -547,7 +547,7 @@ describe('run-root: the two halves of the O70 split, POINTED APART', () => {
       if (!/from '\.{1,2}\/(?:\.\.\/)*lib\/run-root\.mjs'/.test(code)) missing.push(rel);
     }
     // ANTI-VACUOUS: an enumeration that found nothing proves nothing.
-    expect(launchers.length, 'no instrument launches the app — the enumeration found nothing')
+    expect(launchers.length, 'no instrument launches the app: the enumeration found nothing')
       .toBeGreaterThan(50);
     expect(missing, `these launch the built app without the run-target module:\n${missing.join('\n')}`)
       .toEqual([]);
@@ -686,7 +686,7 @@ describe('run-root: build freshness names ONE tree, and discriminates', () => {
    * "fresh". Both no-source shapes are covered because they fail differently: an
    * absent directory and a present-but-empty one.
    */
-  it('refuses — never passes — when the tree carries no sources to compare', () => {
+  it('refuses, never passes, when the tree carries no sources to compare', () => {
     const root = makeBuiltTree('no-src');
     const empty = makeBuiltTree('empty-src');
     mkdirSync(resolve(empty, 'src'), { recursive: true });

@@ -68,7 +68,7 @@ const LIB: BgLibraryEntry[] = [{
 const BOUND = `${BG_OVERRIDE_CONSUMER_OUT_DIR}/`;
 const UNBOUND = `${BG_OVERRIDE_CONSUMER_OUT_DIR.replace(/act1$/, 'act2')}/`;
 
-describe('resolveDisplayedBg — the override outranks the library on the act it binds', () => {
+describe('resolveDisplayedBg: the override outranks the library on the act it binds', () => {
   it('paints the OVERRIDE on the bound act, even when the section names a library entry', () => {
     const r = resolveDisplayedBg(act(BOUND, 'lib-1'), LIB, 0, holder(doc(3)));
     expect(r?.source).toBe('override');
@@ -79,7 +79,7 @@ describe('resolveDisplayedBg — the override outranks the library on the act it
     expect(r?.libraryId).toBeNull();
   });
 
-  it('paints the LIBRARY on an act the override does NOT bind — the anti-regression half', () => {
+  it('paints the LIBRARY on an act the override does NOT bind: the anti-regression half', () => {
     const r = resolveDisplayedBg(act(UNBOUND, 'lib-1'), LIB, 0, holder(doc(3)));
     expect(r?.source).toBe('library');
     expect(r?.layout).toBe(LIB[0].layout);
@@ -122,7 +122,7 @@ describe('resolveDisplayedBg — the override outranks the library on the act it
     expect(resolveDisplayedBg(a, [], 0, holder(null))).toBeNull();
   });
 
-  it('hands back THE SAME layout array each time for the override — the renderer holds it', () => {
+  it('hands back THE SAME layout array each time for the override: the renderer holds it', () => {
     const h = holder(doc(3));
     const a = act(BOUND, 'lib-1');
     expect(resolveDisplayedBg(a, LIB, 0, h)?.layout)

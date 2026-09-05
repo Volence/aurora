@@ -132,7 +132,7 @@ describe('list_effects_presets', () => {
     expect(r.unreadable).toEqual([]);
   });
 
-  it('names unreadable preset files — an id an agent must not take', async () => {
+  it('names unreadable preset files: an id an agent must not take', async () => {
     open({
       presets: [glare()],
       unreadable: [{ path: 'data/editor/effects/presets/broken.json', reason: 'not valid JSON' }],
@@ -186,7 +186,7 @@ describe('list_effects_presets', () => {
     // agent's reply must not be able to describe this limit differently.
     const unbound = PRESET_LIMITS.find(l => l.key === 'unbound');
     expect(unbound, 'PRESET_LIMITS no longer carries the `unbound` limit this reply reads').toBeTruthy();
-    expect(unbound!.body.length, 'the limit body is empty — this row would assert nothing').toBeGreaterThan(40);
+    expect(unbound!.body.length, 'the limit body is empty: this row would assert nothing').toBeGreaterThan(40);
     expect(r.sectionBinding).toBe(unbound!.body);
   });
 });
@@ -244,7 +244,7 @@ describe('set_effects_preset', () => {
     // DERIVED from the codec's own list, which is itself derived from the
     // schema's `description` — nothing here types "fires".
     const reserved = EFFECTS_PRESET_RESERVED_KEYS[0];
-    expect(reserved, 'the codec exposes no reserved keys — this row has no subject').toBeTruthy();
+    expect(reserved, 'the codec exposes no reserved keys: this row has no subject').toBeTruthy();
 
     const doc = { ...glare(), [reserved]: 1 } as unknown;
     await expect(ask({ kind: 'set-effects-preset', id: 'glare', preset: doc }))
@@ -274,7 +274,7 @@ describe('set_effects_preset', () => {
     expect(actHistory().canUndo).toBe(false);
   });
 
-  it('refuses an empty bands list — the schema\'s minItems, not a shape restated here', async () => {
+  it('refuses an empty bands list: the schema\'s minItems, not a shape restated here', async () => {
     await expect(ask({
       kind: 'set-effects-preset', id: 'glare', preset: { schema: 1, id: 'glare', bands: [] },
     })).rejects.toThrow(/schema/);

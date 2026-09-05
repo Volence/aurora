@@ -97,7 +97,7 @@ describe('an unserved method is a named condition, not a failed call', () => {
     expect(sock.written.length).toBe(before);
   });
 
-  it('names it from a -32601 reply too — a method can be ADVERTISED AND UNIMPLEMENTED', async () => {
+  it('names it from a -32601 reply too: a method can be ADVERTISED AND UNIMPLEMENTED', async () => {
     const { sock, client } = await connected();
     // The advertised list says this one is fine, so the pre-check passes and
     // ONLY the reply can prove otherwise. This is the route the list cannot
@@ -217,7 +217,7 @@ describe('the handshake records WHAT ANSWERED, not just that something did', () 
     expect(client.handshake!.serverName).toBe(FIXTURE.serverName);
   });
 
-  it('can still pre-check when the server advertised no list at all — by not pre-checking', async () => {
+  it('can still pre-check when the server advertised no list at all: by not pre-checking', async () => {
     // A server that sends no `methods` cannot be feature-detected. Refusing
     // everything would be a client bug dressed as a server gap, so `call` lets
     // it through and the -32601 route is what catches a real hole. Stated as a

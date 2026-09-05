@@ -88,7 +88,7 @@ describe('the skip reporter is wired into vitest.config.ts', () => {
     //     prints test logs regardless of what follows it.
     expect(
       source,
-      'vitest.config.ts must name \'default\' as its FIRST reporter — see the header of this ' +
+      'vitest.config.ts must name \'default\' as its FIRST reporter: see the header of this ' +
         'file for the second property that depends on it',
     ).toMatch(/reporters\s*:\s*\[\s*['"]default['"]/);
   });
@@ -137,7 +137,7 @@ describe('the config points a reader at both of the pin\'s guards', () => {
     expect(pointers, `vitest.config.ts does not mention ${self}`).toContain(self);
   });
 
-  it('points at a SECOND, different guard — the behavioural one', () => {
+  it('points at a SECOND, different guard: the behavioural one', () => {
     const self = relative(REPO, __filename);
     const others = [...new Set(pointers)].filter((p) => p !== self);
     expect(

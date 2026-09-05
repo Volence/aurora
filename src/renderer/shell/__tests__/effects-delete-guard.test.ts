@@ -99,7 +99,7 @@ describe('deleteSceneGuarded', () => {
     expect(run.mock.calls[0][0]).not.toBeNull();
   });
 
-  it('does NOTHING on cancel — and "cancel" is whatever Esc and the backdrop answer', async () => {
+  it('does NOTHING on cancel, and "cancel" is whatever Esc and the backdrop answer', async () => {
     const run = vi.fn();
     const lib = useProjectStore.getState().project!.effectsScenes;
     for (const answer of [SAFE_CONFIRM_KEY, 'something-nobody-wrote']) {
@@ -130,7 +130,7 @@ describe('deleteSceneGuarded', () => {
       useProjectStore.getState().project!.effectsScenes, 'keeper', vi.fn());
     const buttons = seen[0].buttons;
     const i = safeFocusIndex(buttons);
-    expect(i, 'no safe button — a bare Space would be aimed at the destructive one')
+    expect(i, 'no safe button: a bare Space would be aimed at the destructive one')
       .not.toBeNull();
     expect(buttons[i!].tone).not.toBe('danger');
     // And the destructive arm is TONED, or safe-focus cannot recognise it.

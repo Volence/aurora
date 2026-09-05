@@ -211,7 +211,7 @@ describe('warpTo and the machine it borrows', () => {
  * than a refusal.
  */
 describe('warpTo and a server that does not serve what it needs', () => {
-  it('does NOT call an unserved lookup a release ROM — it names the method instead', async () => {
+  it('does NOT call an unserved lookup a release ROM: it names the method instead', async () => {
     const c = fakeClient({ unserved: ['emulator/lookup_symbol'] });
     const r = await warpTo(c as never, 0x100, 0x100);
 

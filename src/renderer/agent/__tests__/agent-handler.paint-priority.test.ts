@@ -107,7 +107,7 @@ describe('paint_region is a DECIDER: an omitted pri keeps the cell\'s depth', ()
     expect(after.priority).toBe(false);
   });
 
-  it('pri:false CLEARS a set bit — the discriminator that keeps "keep" honest', async () => {
+  it('pri:false CLEARS a set bit: the discriminator that keeps "keep" honest', async () => {
     seed(3, 4, LOADED);
     await handleAgentRequest({
       kind: 'paint-region', section: 0, x: 3, y: 4, w: 1, h: 1,
@@ -148,7 +148,7 @@ describe('paint_region is a DECIDER: an omitted pri keeps the cell\'s depth', ()
     }
   });
 
-  it('the FLIPS still follow the request, and that is the rule — not a second defect', async () => {
+  it('the FLIPS still follow the request, and that is the rule: not a second defect', async () => {
     // Under "the brush owns the picture", an entry naming a tile and no flip has
     // named an UNFLIPPED picture. This row reddens if someone makes hf/vf
     // tri-state to match pri.
@@ -188,7 +188,7 @@ describe('paint_region is a DECIDER: an omitted pri keeps the cell\'s depth', ()
 });
 
 describe('save_chunk is a CREATOR: an omitted pri means no priority', () => {
-  it('createChunkDef hands back a zeroed nametable — the classification, verified', async () => {
+  it('createChunkDef hands back a zeroed nametable: the classification, verified', async () => {
     // The whole reason save_chunk keeps omitted-means-off: it has no
     // destination. If this stops being true, the verdict has to be revisited.
     const res = await handleAgentRequest({

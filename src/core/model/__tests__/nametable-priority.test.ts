@@ -27,12 +27,12 @@ describe('tileWordDrawsAboveSprites', () => {
     }
   });
 
-  it('reads the bit the encoder writes — derived, not typed', () => {
+  it('reads the bit the encoder writes: derived, not typed', () => {
     // packNametableWord(0,0,true,false,false) IS the priority bit alone.
     expect(NAMETABLE_PRIORITY_BIT).toBe(packNametableWord(0, 0, true, false, false));
   });
 
-  it('EXCLUDES the empty word for free — the renderer\'s own "this cell draws" gate', () => {
+  it('EXCLUDES the empty word for free: the renderer\'s own "this cell draws" gate', () => {
     // composeNametable skips `word === 0` as transparent, and a transparent
     // cell cannot occlude anything. A high-priority word is necessarily
     // non-zero, so the two gates coincide and no extra check is needed. If a
@@ -47,7 +47,7 @@ describe('tileWordDrawsAboveSprites', () => {
     }
   });
 
-  it('does NOT special-case tile index 0 — the renderer draws it like any other', () => {
+  it('does NOT special-case tile index 0: the renderer draws it like any other', () => {
     // 0xC000 = tile 0, palette 2, priority. Real OJZ sections contain these
     // (7-20 per section, measured 2026-08-28), and hiding them would be the
     // lens inventing a rule composeNametable does not follow.

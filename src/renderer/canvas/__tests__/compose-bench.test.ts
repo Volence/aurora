@@ -67,7 +67,7 @@ describe('bench', () => {
   it('composition throughput', {
     skip: !process.env.AURORA_BENCH,
     meta: {
-      skipReason: 'AURORA_BENCH is not set — this row is an opt-in measurement harness that '
+      skipReason: 'AURORA_BENCH is not set: this row is an opt-in measurement harness that '
         + 'PRINTS rather than asserts, so it is off by default; see the file header to run it',
     },
   }, () => {

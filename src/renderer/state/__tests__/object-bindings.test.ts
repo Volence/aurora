@@ -31,7 +31,7 @@ describe('projectStore.objectBindings', () => {
     expect(useProjectStore.getState().objectBindings).toEqual({ spring: 'spring_up' });
   });
 
-  it('is cleared by reset — bindings name sprites under the OLD project root', () => {
+  it('is cleared by reset: bindings name sprites under the OLD project root', () => {
     useProjectStore.getState().setObjectBindings({ spring: 'spring_up' });
     useProjectStore.getState().reset();
     expect(useProjectStore.getState().objectBindings).toEqual({});

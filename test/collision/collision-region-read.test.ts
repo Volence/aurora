@@ -71,7 +71,7 @@ describe('SECTION_CELLS_WIDE/HIGH', () => {
   });
 });
 
-describe('readCollisionCell — the four sub-tiles', () => {
+describe('readCollisionCell: the four sub-tiles', () => {
   it('reports a uniform cell as its word, unpacked, with no mixed/sub fields', () => {
     const plane = new Uint16Array(width * width);
     const word = packCollisionCell({ shape: 5, xFlip: true, yFlip: false, solidity: 'top' });
@@ -83,7 +83,7 @@ describe('readCollisionCell — the four sub-tiles', () => {
     expect(cell).toMatchObject({ shape: 5, xFlip: true, yFlip: false, solidity: 'top' });
   });
 
-  it('DOES NOT SAMPLE a disagreeing cell — word is null, all four are reported', () => {
+  it('DOES NOT SAMPLE a disagreeing cell: word is null, all four are reported', () => {
     // THE CENTRAL CLAIM. The top-left sub-tile is a perfectly plausible answer
     // and is exactly what OverlayRenderer.drawCollisionOverlay draws; a reader
     // that returned it would be green on every real act and silently wrong here.
@@ -122,7 +122,7 @@ describe('readCollisionCell — the four sub-tiles', () => {
     expect(cell.mixed).toBe(true);
   });
 
-  it('returns the RAW word — bits no Aurora field owns survive the read', () => {
+  it('returns the RAW word: bits no Aurora field owns survive the read', () => {
     const base = packCollisionCell({ shape: 7, xFlip: false, yFlip: true, solidity: 'sides-bottom' });
     const word = (base | COLLISION_CELL_UNOWNED_MASK) & 0xFFFF;
     const plane = new Uint16Array(width * width);

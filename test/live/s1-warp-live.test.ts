@@ -87,11 +87,11 @@ const ORACLE = sibling('oracle', 'target/release/oracle-aether');
 const missing: string[] = [];
 if (!OPTED_IN) missing.push('AURORA_LIVE_S1_WARP=1 not set');
 if (!S1) missing.push('no sibling s1disasm with a built s1built.bin');
-else if (!existsSync(join(S1, 'sonic.lst'))) missing.push('s1disasm has no sonic.lst — build it');
-if (!ORACLE) missing.push('no sibling oracle with target/release/oracle-aether — cargo build --release');
+else if (!existsSync(join(S1, 'sonic.lst'))) missing.push('s1disasm has no sonic.lst: build it');
+if (!ORACLE) missing.push('no sibling oracle with target/release/oracle-aether: cargo build --release');
 
 const row = missing.length === 0 ? it : it.skip;
-const why = missing.length === 0 ? '' : ` — SKIPPED: ${missing.join('; ')}`;
+const why = missing.length === 0 ? '' : ` (SKIPPED: ${missing.join('; ')})`;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -142,7 +142,7 @@ describe('play-from-cursor moves Sonic in a real S1', () => {
         }
       }
       // ANTI-VACUOUS GATE 1. Every figure below would describe an intro screen.
-      expect(mode, 'never reached a level — the result below would be about the title screen')
+      expect(mode, 'never reached a level: the result below would be about the title screen')
         .toBe(ID_LEVEL);
 
       // ANTI-VACUOUS GATE 2. Entering the level is not the level being ready:

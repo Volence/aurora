@@ -168,7 +168,7 @@ describe('the panels render the constants rather than a second copy of the words
   // which is the half a node suite can otherwise never see (`disabled` marked
   // in the provider and dropped on the floor by the component renders a
   // completely normal, fully green, still-broken dropdown).
-  it('EffectsScenePanel greys the refused curve option — curveFieldOptions reaches the <option>', () => {
+  it('EffectsScenePanel greys the refused curve option: curveFieldOptions reaches the <option>', () => {
     // The narrowed list is asked for, on the CURVE row and nowhere else:
     // `fa`/`fb` are the factor space itself and have no refused member.
     expect(scenePanel).toMatch(/options=\{curveFieldOptions\(layer\)\}/);
@@ -350,7 +350,7 @@ describe('the scene panel mounts what v_deform changes elsewhere', () => {
     expect(panelCode).toMatch(/if \(act === null\) return null/);
   });
 
-  it('the ramp sentence is NOT in the warning list — it is not a build refusal', () => {
+  it('the ramp sentence is NOT in the warning list: it is not a build refusal', () => {
     // aeon cannot see a preset document, so this pairing builds green and runs.
     // Dressing it as an error would make the two real refusals beside it cheaper.
     const at = panelCode.indexOf('vDeformRampAdvisory(');

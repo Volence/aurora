@@ -42,7 +42,7 @@ function makeDoc(): LevelDoc {
   };
 }
 
-describe('buildUsageIndex — tile → blocks', () => {
+describe('buildUsageIndex: tile → blocks', () => {
   const idx = buildUsageIndex(makeDoc());
 
   it('reverse lookup lists distinct blocks per tile (sorted)', () => {
@@ -61,7 +61,7 @@ describe('buildUsageIndex — tile → blocks', () => {
   });
 });
 
-describe('buildUsageIndex — block → chunks', () => {
+describe('buildUsageIndex: block → chunks', () => {
   const idx = buildUsageIndex(makeDoc());
 
   it('reverse lookup lists distinct chunk indices per block (sorted)', () => {
@@ -80,7 +80,7 @@ describe('buildUsageIndex — block → chunks', () => {
   });
 });
 
-describe('buildUsageIndex — chunk placements', () => {
+describe('buildUsageIndex: chunk placements', () => {
   const idx = buildUsageIndex(makeDoc());
 
   it('counts layout placements across fg + bg, masking the loop bit', () => {

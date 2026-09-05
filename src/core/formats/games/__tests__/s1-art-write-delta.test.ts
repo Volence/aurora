@@ -120,7 +120,7 @@ function load(mapRel: string, artRel: string, dplcRel?: string): Loaded {
 
 const HAVE = referenceCheckout(S1_PINNED);
 
-describe('delta writer — uncompressed flat mapping (Giant Ring)', { skip: !HAVE, meta: { skipReason: S1_ABSENT } }, () => {
+describe('delta writer: uncompressed flat mapping (Giant Ring)', { skip: !HAVE, meta: { skipReason: S1_ABSENT } }, () => {
   const L = () => load('_maps/Giant Ring.asm', 'artunc/Giant Ring.unc');
 
   it('zero-edit save is BYTE-IDENTICAL to the source .unc', () => {
@@ -136,7 +136,7 @@ describe('delta writer — uncompressed flat mapping (Giant Ring)', { skip: !HAV
     expect(res.bytes.length).toBe(artBytes.length);
   });
 
-  it('an edit changes EXACTLY the edited tile records — every other byte identical', () => {
+  it('an edit changes EXACTLY the edited tile records: every other byte identical', () => {
     const L1 = L();
     const { frames, artBytes, canvases, originX, originY, tiles } = L1;
 
@@ -180,7 +180,7 @@ describe('delta writer — uncompressed flat mapping (Giant Ring)', { skip: !HAV
   });
 });
 
-describe('delta writer — Sonic DPLC shared pool', { skip: !HAVE, meta: { skipReason: S1_ABSENT } }, () => {
+describe('delta writer: Sonic DPLC shared pool', { skip: !HAVE, meta: { skipReason: S1_ABSENT } }, () => {
   const L = () => load('_maps/Sonic.asm', 'artunc/Sonic.unc', '_maps/Sonic - Dynamic Gfx Script.asm');
 
   it('zero-edit save is BYTE-IDENTICAL to artunc/Sonic.unc', () => {

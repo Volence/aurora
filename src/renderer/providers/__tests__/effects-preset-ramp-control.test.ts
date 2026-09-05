@@ -110,7 +110,7 @@ describe('the span pair is refused AT THE CONTROL, with the schema\'s own number
     expect(why).toContain(`the largest lines is ${EFFECTS_PRESET_RAMP_SPAN_MAX - 100}`);
   });
 
-  it('the mirror direction refuses too — the bound is on the PAIR, not on `top`', () => {
+  it('the mirror direction refuses too: the bound is on the PAIR, not on `top`', () => {
     const ramp = { ...newRamp(), top: 200 };
     expect(rampSpanRefusal(ramp, ID, 'lines', 100)).not.toBeNull();
     expect(rampSpanRefusal(ramp, ID, 'lines', EFFECTS_PRESET_RAMP_SPAN_MAX - 200)).toBeNull();
@@ -124,7 +124,7 @@ describe('the span pair is refused AT THE CONTROL, with the schema\'s own number
   });
 
   /** ⚠ THE COMMAND WITHHOLDS THE WRITE — a refusal that only paints is decoration. */
-  it('the refused pair is NOT WRITTEN — the document is unchanged', () => {
+  it('the refused pair is NOT WRITTEN: the document is unchanged', () => {
     const p = rampPreset({ lines: EFFECTS_PRESET_RAMP_LINES_RANGE.max });
     const before = JSON.stringify(p);
     const cmd = setRampSpanCommand(lib(p), ID, 'top', EFFECTS_PRESET_RAMP_TOP_RANGE.max);
@@ -168,7 +168,7 @@ describe('an unrepresentable rate is refused and names what IS available', () =>
     expect(why).toContain('px per scanline');
   });
 
-  it('NOTHING SNAPS — the command refuses the write outright', () => {
+  it('NOTHING SNAPS: the command refuses the write outright', () => {
     const p = rampPreset();
     const before = JSON.stringify(p);
     expect(setRampRateCommand(lib(p), ID, 'step', -0.5)).toBeNull();
@@ -422,7 +422,7 @@ describe('the VSRAM display lag is applied to the readout and to nothing else', 
    * shows — so `top` goes to disk verbatim, through every command on this
    * surface and through the codec's own writer.
    */
-  it('the document keeps the ENGINE\'s top — the lag never reaches disk', () => {
+  it('the document keeps the ENGINE\'s top: the lag never reaches disk', () => {
     // `top` 32 with the seed's `lines` 128 spans to 160, inside the interlock —
     // so this row measures the WRITE and not the span refusal.
     const p = rampPreset({ top: 64 });
@@ -498,7 +498,7 @@ describe('a ramp authored through the controls round-trips byte for byte', () =>
       .toContain(String(EFFECTS_PRESET_RAMP_VSRAM_ADDR_RANGE.max));
   });
 
-  it('the summary says one rate, one start, one total — and no per-line list', () => {
+  it('the summary says one rate, one start, one total, and no per-line list', () => {
     const s = rampDriftSummary({ ...newRamp(), top: 64, lines: 128 });
     expect(s).toMatch(/^One rate over 128 lines:/);
     // start 0, step 0.25, 127 further lines -> 31.75

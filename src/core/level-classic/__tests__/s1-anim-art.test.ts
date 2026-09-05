@@ -89,7 +89,7 @@ describe('SBZ smoke machines (hand-derived timelines)', () => {
     ).toEqual([0, 0, 1, 7, 7, 0, 0, 1]);
   });
 
-  it('resting state is BLANK — the first 6 file tiles twice (.clearSky)', () => {
+  it('resting state is BLANK: the first 6 file tiles twice (.clearSky)', () => {
     expect(smokeSlotTiles(0)).toEqual([0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5]);
     expect(smokeSlotTiles(1)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
     expect(smokeSlotTiles(3)).toEqual(Array.from({ length: 12 }, (_, i) => 24 + i));

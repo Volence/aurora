@@ -7,7 +7,7 @@ import { reconstructFromFrames } from '../../../src/core/import/sprite-import';
 const txt = (n: string) => readFileSync(new URL(`../../fixtures/mappings/src/${n}`, import.meta.url), 'utf8');
 const bin = (n: string) => new Uint8Array(readFileSync(new URL(`../../fixtures/mappings/${n}`, import.meta.url)));
 
-describe('assembleDataAsm — raw dc.b/dc.w mapping .asm (Flex 2 output)', () => {
+describe('assembleDataAsm: raw dc.b/dc.w mapping .asm (Flex 2 output)', () => {
   it('macro parser returns [] (it is raw bytes, not macro call-sites)', () => {
     expect(parseAsmMappings(txt('plantbadmaps.asm'))).toEqual([]);
   });

@@ -4,7 +4,7 @@ import { s1Adapter } from '../../../src/core/formats/games/s1';
 
 const fx = (n: string) => new Uint8Array(readFileSync(new URL(`../../fixtures/mappings/${n}`, import.meta.url)));
 
-describe('s1 adapter — vs REAL s1disasm mapping data (Ball Hog)', () => {
+describe('s1 adapter: vs REAL s1disasm mapping data (Ball Hog)', () => {
   const frames = s1Adapter.readMappings(fx('s1_ballhog_map.bin'));
 
   it('recovers all 6 frames with a byte piece-count header', () => {
@@ -28,7 +28,7 @@ describe('s1 adapter — vs REAL s1disasm mapping data (Ball Hog)', () => {
   });
 });
 
-describe('s1 adapter — vs REAL s1disasm DPLC data (Sonic Dynamic Gfx Script)', () => {
+describe('s1 adapter: vs REAL s1disasm DPLC data (Sonic Dynamic Gfx Script)', () => {
   const perFrame = s1Adapter.readDPLC!(fx('s1_sonicdplc.bin'));
 
   it('recovers 88 frames; Null is empty, Stand loads tiles 0..16', () => {

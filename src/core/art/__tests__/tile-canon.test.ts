@@ -51,7 +51,7 @@ describe('canonicalTile', () => {
     expect(a.yf).toBe(b.yf);
   });
 
-  it('distinguishes a transposed tile — the VDP has no transpose bit', () => {
+  it('distinguishes a transposed tile: the VDP has no transpose bit', () => {
     const e = entries((x, y) => (x === 0 && y === 1 ? 1 : 0));
     const transposed = entries((x, y) => (x === 1 && y === 0 ? 1 : 0));
     expect(canonicalTile(e).key).not.toBe(canonicalTile(transposed).key);

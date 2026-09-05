@@ -14,7 +14,7 @@ const obj = (over: Partial<S1ObjectEntry> = {}): S1ObjectEntry => ({
 });
 
 describe('classicObjectSchema', () => {
-  it('lists exactly the fields S1 objects have — including respawn', () => {
+  it('lists exactly the fields S1 objects have, including respawn', () => {
     // respawn is honestly classic-only: the S1 object word has a bit for it and
     // aeon's placement format has nowhere to put one. It belongs on this schema
     // and must NOT appear on aeon's.
@@ -94,7 +94,7 @@ describe('commitClassicPatch', () => {
     expect(objects[0]).toEqual(obj());                // and the input is not mutated
   });
 
-  it('clamps to CLASSIC limits — x past $FFFF, y past $FFF', () => {
+  it('clamps to CLASSIC limits: x past $FFFF, y past $FFF', () => {
     const calls: S1ObjectEntry[][] = [];
     const set = (next: S1ObjectEntry[]): CommitResult => { calls.push(next); return { ok: true }; };
     commitClassicPatch(set, [obj()], 0, { x: 0x99999, y: 0x9999 }, schema);

@@ -60,7 +60,7 @@ describe('PixelViewport.gestureSelection', () => {
     // The claim that made this an additive prop rather than a substrate change.
     // Neither aeon's composer nor the sprite canvas mentions it, so both get the
     // pre-existing `selection ?? null` and cannot have changed behaviour.
-    expect(COMPOSER, 'aeon now passes gestureSelection — re-check its locked-tile story')
+    expect(COMPOSER, 'aeon now passes gestureSelection: re-check its locked-tile story')
       .not.toMatch(/gestureSelection/);
     expect(SPRITE_HOST, 'the sprite canvas now passes gestureSelection')
       .not.toMatch(/gestureSelection/);
@@ -81,7 +81,7 @@ describe('PixelViewport.gestureSelection', () => {
 // calls `preventDefault()`, so ungated it swallows Space from a focused button in
 // the sprite editor. The gate cannot live inside the hook: SpriteMode is its third
 // caller and is the very thing `levelKeysEnabled()` goes false for.
-describe('useHandPan — the keyboard gate', () => {
+describe('useHandPan: the keyboard gate', () => {
   it('takes an optional gate and consults it on keydown', () => {
     expect(HAND_PAN, 'the enabled option is gone').toMatch(/enabled\?:\s*\(\)\s*=>\s*boolean/);
     // Scoped to the HANDLER BODY, not the file. `enabledRef.current` is assigned
@@ -90,7 +90,7 @@ describe('useHandPan — the keyboard gate', () => {
     // the actual bug (the listener is bound once on mount, so a captured
     // predicate would answer for the first render forever).
     const body = /const onKeyDown = \(e: KeyboardEvent\) => \{([\s\S]*?)\n {4}\};/.exec(HAND_PAN);
-    expect(body, 'the Space keydown handler is gone — re-read this test').not.toBeNull();
+    expect(body, 'the Space keydown handler is gone: re-read this test').not.toBeNull();
     expect(body![1], 'the keydown does not consult the gate at all').toMatch(/gate\(\)[\s\S]*?return/);
     expect(body![1], 'the gate is read out of a stale closure').toMatch(/enabledRef\.current/);
   });

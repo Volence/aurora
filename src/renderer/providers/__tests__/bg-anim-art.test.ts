@@ -173,12 +173,12 @@ describe('the strip', () => {
 // that drives the real app (`scratchpad/bganim-tile-door-harness.mjs`); what
 // lives here is the gate, the bounds and the wording, which are exactly the
 // parts a harness aiming one gesture cannot sweep.
-describe('resolveStripOpen — which strip double click opens a slot', () => {
+describe('resolveStripOpen: which strip double click opens a slot', () => {
   const inputs = (over: Partial<StripOpenInputs> = {}): StripOpenInputs => ({
     layer: 'bg', origin: 'override', slot: 0, doc: golden(), ...over,
   });
 
-  it('opens the slot under the pointer, PAST THE ANIMATED PREFIX — the row\'s own target', () => {
+  it('opens the slot under the pointer, PAST THE ANIMATED PREFIX: the row\'s own target', () => {
     const doc = golden();
     // Derived, never pinned: the first slot no band owns is the sum of the
     // bands' tile counts, which is what `bandBudget().firstPromotableSlot`
@@ -196,7 +196,7 @@ describe('resolveStripOpen — which strip double click opens a slot', () => {
     expect(od.doc.cells[0].atlasTile).toBe(staticSlot);
   });
 
-  it('opens a PREFIX slot too — that write lands in the owning band\'s phases[0]', () => {
+  it('opens a PREFIX slot too: that write lands in the owning band\'s phases[0]', () => {
     const doc = golden();
     expect(resolveStripOpen(inputs({ slot: 0, doc }))).toEqual({ kind: 'open', tileIndex: 0 });
     expect(openBgTileDocument(doc, 0)!.bgOverride).toEqual({ kind: 'tile', tileIndex: 0 });

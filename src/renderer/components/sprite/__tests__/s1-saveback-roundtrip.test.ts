@@ -191,7 +191,7 @@ function findEditSpot(
   throw new Error('unmeasurable: no single-coverage edit spot found');
 }
 
-describe('S1 save-back round trip — Sonic (uncompressed + DPLC)', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
+describe('S1 save-back round trip: Sonic (uncompressed + DPLC)', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
   it('zero-edit save writes a BYTE-IDENTICAL art file and touches nothing else', async () => {
     const ok = await openDiscoveredSet(tempDir, SONIC_SET, 'uncompressed');
     expect(ok).toBe(true);
@@ -245,7 +245,7 @@ describe('S1 save-back round trip — Sonic (uncompressed + DPLC)', { skip: !ref
   });
 });
 
-describe('S1 save-back round trip — Giant Ring (uncompressed flat)', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
+describe('S1 save-back round trip: Giant Ring (uncompressed flat)', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
   it('zero-edit save is byte-identical; an edit changes only the derived tile records', async () => {
     const ok = await openDiscoveredSet(tempDir, RING_SET, 'uncompressed');
     expect(ok).toBe(true);

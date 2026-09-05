@@ -130,7 +130,7 @@ describe('chunkIndexForId', () => {
   // A doc whose chunk count is what matters (3 chunks → valid ids 1..3).
   const doc: LevelDoc = { ...validDoc(), chunks: [chunk(), chunk(), chunk()] };
 
-  it('maps id 0 to null (blank/air — no chunk drawn)', () => {
+  it('maps id 0 to null (blank/air: no chunk drawn)', () => {
     expect(chunkIndexForId(doc, 0)).toBeNull();
   });
 
@@ -270,7 +270,7 @@ describe('validateLevelDoc', () => {
     );
   });
 
-  it('flags an object x of $FFFF (the objpos terminator sentinel — not a real X)', () => {
+  it('flags an object x of $FFFF (the objpos terminator sentinel, not a real X)', () => {
     const d = validDoc();
     d.objects[0].x = 0xffff;
     expect(validateLevelDoc(d)).toContainEqual(
@@ -308,7 +308,7 @@ describe('validateLevelDoc', () => {
 // (skipIf-gated so CI without the disasm tree stays green.)
 // ---------------------------------------------------------------------------
 
-describe('real bg layouts fit the 64x8 bg limit', { skip: !fs.existsSync(`${S1DIR}/levels`), meta: { skipReason: `${S1DIR}/levels is absent — this machine has no s1disasm checkout` } }, () => {
+describe('real bg layouts fit the 64x8 bg limit', { skip: !fs.existsSync(`${S1DIR}/levels`), meta: { skipReason: `${S1DIR}/levels is absent: this machine has no s1disasm checkout` } }, () => {
   const dir = `${S1DIR}/levels`;
   const bgFiles = fs.existsSync(dir)
     ? fs.readdirSync(dir).filter((f) => /bg.*\.bin$/i.test(f))

@@ -217,7 +217,7 @@ describe('chunk identity survives close-and-reopen', () => {
       .toContain('games/sonic4/data/editor/ojz/act1/section_0.tiles.bin');
   });
 
-  it('an ABSENT sidecar is silent — every project saved before this feature existed', async () => {
+  it('an ABSENT sidecar is silent: every project saved before this feature existed', async () => {
     const fa = memFa(fixtureFiles());
     const r = await loadAeonProject(fa, '/proj');
     const section = r.project.zones[0].acts[0].sections[0]!;

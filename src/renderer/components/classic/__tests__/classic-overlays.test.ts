@@ -175,7 +175,7 @@ describe('drawCollision angle mark', () => {
   // THE ASYMMETRY, ON CLASSIC'S SURFACE. The old bar was symmetric and so could
   // not say which side of the surface was solid; this row is the one that fails
   // if the stem is ever dropped back to a plain segment.
-  it('the stem leaves the surface on the open side — up, for a floor', () => {
+  it('the stem leaves the surface on the open side (up, for a floor)', () => {
     const { ctx, pts } = needleCtx(DETAIL_SCALE);
     drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true);
     const core = corePts(pts);
@@ -296,7 +296,7 @@ function priorityDoc(xf: boolean, yf: boolean, allLow = false): LevelDoc {
 }
 
 describe('drawPriority', () => {
-  it('veils exactly the high tile — at TL unflipped, mirrored to TR when the CHUNK cell is x-flipped', () => {
+  it('veils exactly the high tile: at TL unflipped, mirrored to TR when the CHUNK cell is x-flipped', () => {
     const plain = priorityCtx();
     drawPriority(plain.ctx, priorityDoc(false, false), 0, 0, 1, 1);
     expect(plain.rects).toEqual([{ x: 0, y: 0, w: 8, h: 8 }]); // TL tile of cell (0,0)

@@ -106,7 +106,7 @@ describe('linkage copy: linked/unique vocabulary, real usage numbers, no shared/
       .not.toMatch(/[0-9]/);
   });
 
-  it('TileTab passes no onDuplicate — this banner has no button', () => {
+  it('TileTab passes no onDuplicate: this banner has no button', () => {
     const call = /<SharedBanner[\s\S]*?\/>/.exec(TILE_TAB);
     expect(call).not.toBeNull();
     expect(call![0], 'TileTab banner grew an onDuplicate: spec says no button here').not.toMatch(/onDuplicate/);
@@ -131,8 +131,8 @@ describe('linkage copy: linked/unique vocabulary, real usage numbers, no shared/
 
   it('no tab wires a "Make unique" command: A8 explicitly descoped it', () => {
     for (const [name, src] of [['TileTab', TILE_TAB], ['BlockTab', BLOCK_TAB], ['ChunkTab', CHUNK_TAB]] as const) {
-      expect(src, `${name} references planMakeUnique — A8 descoped this`).not.toMatch(/planMakeUnique/i);
-      expect(src, `${name} has a "Make unique" control — A8 descoped this`).not.toMatch(/make unique/i);
+      expect(src, `${name} references planMakeUnique: A8 descoped this`).not.toMatch(/planMakeUnique/i);
+      expect(src, `${name} has a "Make unique" control: A8 descoped this`).not.toMatch(/make unique/i);
     }
   });
 });

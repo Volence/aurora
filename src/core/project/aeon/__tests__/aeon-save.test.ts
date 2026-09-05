@@ -456,7 +456,7 @@ describe('buildAeonSavePlan', () => {
    * or removing the tail each time — would still satisfy the row above, and
    * aeon's tree would gain a diff on every no-edit save forever.
    */
-  it('canonicalises exactly once — re-saving the canonical body is a byte no-op', async () => {
+  it('canonicalises exactly once: re-saving the canonical body is a byte no-op', async () => {
     const first = await savedSidecarFrom(SCENE_META_ON_DISK);
     expect(first).toBe(canonicalisedByAurora(SCENE_META_ON_DISK));   // the one-time step
     expect(first).not.toBe(SCENE_META_ON_DISK);                      // anti-vacuous: it really moved
@@ -647,7 +647,7 @@ describe('buildAeonSavePlan', () => {
   // This guards the retirement in the direction that can regress: a save plan
   // that starts emitting engine assembly again. The path prefix is derived from
   // the act's own dataPath rather than pinned, so moving the act moves the guard.
-  it('writes editor files only — no engine assembly, nothing under export/', async () => {
+  it('writes editor files only: no engine assembly, nothing under export/', async () => {
     const fa = memFa(fixtureFiles());
     const r = await loadAeonProject(fa, '/proj');
     const plan = await buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
@@ -676,7 +676,7 @@ describe('buildAeonSavePlan', () => {
  * baked strip baseline. Truncation is worse still: it never reaches the catch,
  * so the short plane is written back short and certified as the section's.
  */
-describe('buildAeonSavePlan — editable collision planes', () => {
+describe('buildAeonSavePlan: editable collision planes', () => {
   /** The baseline bytes a section with no authored planes saves — precisely what
    *  an unreadable plane must NOT be replaced by. */
   async function baselineBytes(path: string): Promise<Uint8Array> {
@@ -720,7 +720,7 @@ describe('buildAeonSavePlan — editable collision planes', () => {
   //
   // So this drives the REAL load and the REAL save plan over a plane whose two
   // sub-tile columns DISAGREE, and asserts the disagreement on the far side.
-  it('⚠ preserves a mark on ONE 8px sub-column of a cell — load, save, and the byte that differs', async () => {
+  it('⚠ preserves a mark on ONE 8px sub-column of a cell: load, save, and the byte that differs', async () => {
     const files = authoredFixture();
     // Build the half-cell mark with the SAME function the brush uses, so the
     // fixture cannot drift from what an author can actually paint.
@@ -917,7 +917,7 @@ describe('a bglib manifest naming entries whose bodies are absent', () => {
       .toEqual([{ id: ABSENT, name: 'In-game forest (engine v15)' }]);
   });
 
-  it('a whole checkout reports NOTHING unresolved — empty is the ordinary answer', async () => {
+  it('a whole checkout reports NOTHING unresolved: empty is the ordinary answer', async () => {
     const files = bgFixture();
     files.set(`data/editor/ojz_bg_${ABSENT}.bin`, bgLayoutBytes());
     files.set(`data/editor/ojz_bg_${ABSENT}_tiles.bin`, serializeBgTiles([tile(4)]));

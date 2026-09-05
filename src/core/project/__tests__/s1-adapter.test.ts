@@ -343,7 +343,7 @@ describe('s1Adapter golden (real s1disasm)', () => {
       await s1Adapter.detect(fa),
       `s1Adapter.detect() refused ${S1DIR}. Its fingerprint wants ${S1_FINGERPRINT.file} plus `
       + `non-empty ${S1_FINGERPRINT.dirsWithEntries.join(', ')}; absent or empty here: `
-      + `${fingerprintMisses.length > 0 ? fingerprintMisses.join(', ') : '(none — so this is an Aurora defect, not a checkout one)'}`,
+      + `${fingerprintMisses.length > 0 ? fingerprintMisses.join(', ') : '(none: so this is an Aurora defect, not a checkout one)'}`,
     ).toEqual({ type: 's1', label: LABEL });
 
     const handle = await s1Adapter.open(fa);
@@ -352,7 +352,7 @@ describe('s1Adapter golden (real s1disasm)', () => {
       .map((e) => `${e.key} -> ${e.path}`);
     expect(
       misses,
-      `${misses.length} profile entr(y/ies) did not resolve under ${S1DIR} — an INCOMPLETE `
+      `${misses.length} profile entr(y/ies) did not resolve under ${S1DIR}: an INCOMPLETE `
       + `s1disasm checkout looks exactly like this:\n${misses.join('\n')}`,
     ).toEqual([]);
     expect(
@@ -364,7 +364,7 @@ describe('s1Adapter golden (real s1disasm)', () => {
     const unavailable = handle.levels!.list().filter((r) => !r.available);
     expect(
       unavailable.map((r) => `${r.zone}${r.act}: ${r.reason}`),
-      `${unavailable.length} act(s) are unavailable under ${S1DIR} — the reasons name profile `
+      `${unavailable.length} act(s) are unavailable under ${S1DIR}: the reasons name profile `
       + `KEYS, so cross-reference them against that tree:\n`
       + `${unavailable.map((r) => `${r.zone}${r.act}: ${r.reason}`).join('\n')}`,
     ).toEqual([]);

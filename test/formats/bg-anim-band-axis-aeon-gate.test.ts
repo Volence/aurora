@@ -181,7 +181,7 @@ function runAeonGuard(doc: unknown): Probe {
 /** Skip loudly, in the one shape this repo's skip-report accepts. */
 function skipUnlessReady(ctx: { skip: (why: string) => void }): boolean {
   if (work !== null) return false;
-  ctx.skip(`SKIPPED, NOT PASSED — NOTHING WAS MEASURED against aeon: ${setupWhy}. `
+  ctx.skip(`SKIPPED, NOT PASSED: NOTHING WAS MEASURED against aeon: ${setupWhy}. `
     + `This row runs aeon ${AXIS_REV}'s own axis guard against bytes Aurora wrote; `
     + 'without it the vertical band is proven only by Aurora asserting about Aurora.');
   return true;
@@ -190,13 +190,13 @@ function skipUnlessReady(ctx: { skip: (why: string) => void }): boolean {
 describe('the pin this parcel was built against is still aeon history', () => {
   it(`aeon ${AXIS_REV.slice(0, 8)} is reachable from ${AEON_TIP}`, (ctx) => {
     if (aeon === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR) — `
+      ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR), so `
         + `CANNOT MEASURE whether ${AXIS_REV} is still in aeon's published history`);
       return;
     }
     const tip = resolveRev(aeon, AEON_TIP);
     if (tip === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon} — `
+      ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon}, so `
         + `CANNOT MEASURE the currency of pin ${AXIS_REV}`);
       return;
     }
@@ -205,7 +205,7 @@ describe('the pin this parcel was built against is still aeon history', () => {
     // or reverted, and every derivation in this parcel needs re-reading.
     expect(
       isAncestor(aeon, AXIS_REV, tip),
-      `NOT AN AURORA REGRESSION IN ITSELF — aeon ${AXIS_REV} is no longer an ancestor of `
+      `NOT AN AURORA REGRESSION IN ITSELF: aeon ${AXIS_REV} is no longer an ancestor of `
       + `${AEON_TIP} (${tip}). The motion-axis contract Aurora transcribed came from that `
       + 'commit; re-read tools/EFFECTS_CONSUMER_CONTRACT.md §1.2 and tools/inject_editor_bg.py '
       + 'at the new tip before trusting anything in bg-anim-band-axis.test.ts.',
@@ -255,7 +255,7 @@ describe('AEON\'S OWN GUARD, run against bytes Aurora wrote', () => {
    * THE RED ARM, IN THE SAME RUN. Without it the row above is "aeon admitted
    * something", which aeon does for almost everything on purpose.
    */
-  it('REFUSES the same band with HORIZONTALLY-filled phases — the accident the guard is for', (ctx) => {
+  it('REFUSES the same band with HORIZONTALLY-filled phases: the accident the guard is for', (ctx) => {
     if (skipUnlessReady(ctx)) return;
     const doc = verticalBandDocument();
     const band = documentBands(doc)[0];

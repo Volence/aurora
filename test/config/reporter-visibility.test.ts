@@ -107,7 +107,7 @@ describe('a passing test\'s console output still reaches the run output', () => 
     canary = runChild([]);
   }, 240_000);
 
-  describe('CONTROL — the muting this guards against is real in this vitest', () => {
+  describe('CONTROL: the muting this guards against is real in this vitest', () => {
     it('the control child ran the fixture at all', () => {
       // The raw stderr write bypasses vitest's console capture, so it is present
       // whether or not the run was muted. Its ABSENCE would mean the control
@@ -125,7 +125,7 @@ describe('a passing test\'s console output still reaches the run output', () => 
       expect(
         control.output,
         'The `agent` reporter no longer mutes a passing test\'s console.log. That is not a ' +
-          'failure of this repo — but it means the canary below cannot fail, and a guard that ' +
+          'failure of this repo, but it means the canary below cannot fail, and a guard that ' +
           'cannot fail is not a guard. Re-derive what suppresses console output in this vitest ' +
           'version and re-point this file, or retire it deliberately.',
       ).not.toContain(CONSOLE_LOG_MARKER);
@@ -133,7 +133,7 @@ describe('a passing test\'s console output still reaches the run output', () => 
     });
   });
 
-  describe('CANARY — with the repo\'s real config, the same output comes through', () => {
+  describe('CANARY: with the repo\'s real config, the same output comes through', () => {
     it('the canary child ran the fixture and succeeded', () => {
       expect(canary.output, `canary child output:\n${canary.output}`).toContain(RAW_STDERR_MARKER);
       expect(canary.status, `canary child exited ${canary.status}:\n${canary.output}`).toBe(0);
@@ -153,7 +153,7 @@ describe('a passing test\'s console output still reaches the run output', () => 
     });
   });
 
-  describe('CANARY — the skip reporter is not merely named, it runs and names a skip', () => {
+  describe('CANARY: the skip reporter is not merely named, it runs and names a skip', () => {
     // The same config line carries a second property. The text guard can see
     // that the skip reporter is listed; only a real run can see that it loaded,
     // received the skip, and printed the reason.

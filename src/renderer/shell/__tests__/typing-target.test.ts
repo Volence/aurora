@@ -23,7 +23,7 @@ describe('isTypingTarget', () => {
   ])('claims %s', (_l, target) => expect(isTypingTarget(target)).toBe(true));
 
   it.each([
-    ['a range slider — the palette drag case', el('INPUT', { type: 'range' })],
+    ['a range slider: the palette drag case', el('INPUT', { type: 'range' })],
     ['a checkbox', el('INPUT', { type: 'checkbox' })],
     ['a radio', el('INPUT', { type: 'radio' })],
     ['a button-typed input', el('INPUT', { type: 'button' })],

@@ -103,7 +103,7 @@ function readChain(): Read {
   if (aeon === null) {
     return {
       kind: 'skip',
-      why: 'SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR) — CANNOT '
+      why: 'SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR), so CANNOT '
         + 'MEASURE whether a scene\'s v_deform still raises VDP $0B bit 2, so the ramp card\'s '
         + 'full-screen/one-column sentence is neither confirmed nor refuted here.',
     };
@@ -112,7 +112,7 @@ function readChain(): Read {
   if (tip === null) {
     return {
       kind: 'skip',
-      why: `SKIPPED, NOT PASSED: ${TIP} does not resolve in ${aeon} (unfetched? shallow?) — `
+      why: `SKIPPED, NOT PASSED: ${TIP} does not resolve in ${aeon} (unfetched? shallow?), so `
         + 'CANNOT MEASURE the VSRAM mode chain.',
     };
   }
@@ -141,7 +141,7 @@ function onAeon(ctx: { skip: (why: string) => void }, body: (r: Read & { kind: '
   body(READ);
 }
 
-describe(`the VSRAM mode chain — measured at aeon ${TIP}`, () => {
+describe(`the VSRAM mode chain: measured at aeon ${TIP}`, () => {
   it('LINK 1+2: a scene\'s v_deform is what fills pcfg_v_deform_table_bg', (ctx) => {
     onAeon(ctx, ({ tip, sceneDsl }) => {
       // Anti-vacuous: a real file, not an empty read.
@@ -162,7 +162,7 @@ describe(`the VSRAM mode chain — measured at aeon ${TIP}`, () => {
           sceneDsl.slice(sceneDsl.indexOf('fn scene_vdeform_table'),
             sceneDsl.indexOf('fn scene_vdeform_table') + 260),
         ),
-        `scene_vdeform_table at aeon ${tip} no longer maps SceneVDeform.None to 0 — "no v_deform" `
+        `scene_vdeform_table at aeon ${tip} no longer maps SceneVDeform.None to 0: "no v_deform" `
         + 'may no longer mean "null table pointer", which is the whole of the full-screen arm.',
       ).toBe(true);
     });
@@ -179,7 +179,7 @@ describe(`the VSRAM mode chain — measured at aeon ${TIP}`, () => {
         + `(${JSON.stringify(gate)}). The ramp card tells authors that a scene WITHOUT a `
         + 'v_deform scrolls the full width and one WITH it narrows to a 16-pixel column; that '
         + 'sentence is exactly this gate. Re-read `.update_mode` and edit '
-        + 'src/core/formats/effects/ramp-scroll-mode.ts — including its quoted listing.',
+        + 'src/core/formats/effects/ramp-scroll-mode.ts, including its quoted listing.',
       ).toEqual({ capBlock: true, loadsTable: true, branchesOnZero: true, orsBit2: true });
     });
   });
@@ -245,7 +245,7 @@ ${body}
       expect(
         (s4! & bit!) !== 0,
         `sonic4's SCANLINE_CAPS (${s4}) no longer declares CAP_PER_COL_VSRAM (${bit}) at aeon `
-        + `${tip}. The ramp card's one-column arm assumes it does — on a game without the bit a `
+        + `${tip}. The ramp card's one-column arm assumes it does: on a game without the bit a `
         + 'v_deform scene stays FULL-WIDTH, so the sentence would be wrong for the very data '
         + 'this editor opens. Edit src/core/formats/effects/ramp-scroll-mode.ts.',
       ).toBe(true);

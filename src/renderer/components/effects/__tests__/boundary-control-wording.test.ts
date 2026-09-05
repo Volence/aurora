@@ -60,7 +60,7 @@ const code = panel
 const card = (() => {
   const at = code.indexOf('function BoundaryCard(');
   if (at < 0) {
-    throw new Error('BoundaryCard is gone from BandPresetPanel.tsx — this file measures it');
+    throw new Error('BoundaryCard is gone from BandPresetPanel.tsx: this file measures it');
   }
   const rest = code.slice(at + 1);
   const next = rest.search(/\nfunction \w+\(/);
@@ -180,7 +180,7 @@ describe('the sentences that must be on screen, not in a hover', () => {
   it('every advisory paints its `enforced_by`, not just its text', () => {
     expect(card).toContain('boundaryAdvisoriesFor(preset)');
     expect(card).toContain('{a.text}');
-    expect(card, 'the card paints the advisory text and drops who enforces it — which is the '
+    expect(card, 'the card paints the advisory text and drops who enforces it: which is the '
       + 'difference between "the editor thinks this is wrong" and "aeon will reject this"')
       .toContain('boundaryAdvisoryAttribution(a)');
   });
@@ -222,10 +222,10 @@ describe('the sentences that must be on screen, not in a hover', () => {
    * BECAUSE of that, and the sentence a re-opened lag would put back is still
    * fully asserted.
    */
-  it('the premise this card discloses is RETIRED for `boundary` — and the mount still matters', () => {
+  it('the premise this card discloses is RETIRED for `boundary`: the mount still matters', () => {
     expect(
       PRESET_KEYS_AWAITING_AEON,
-      '`boundary` is back in the lag — a lag has re-opened on the key THIS card authors, so its '
+      '`boundary` is back in the lag: a lag has re-opened on the key THIS card authors, so its '
       + 'disclosure is on screen again. Re-aim this row at the sentence being ON screen (git log '
       + 'it for the shape it had while armed) rather than relaxing it.',
     ).not.toContain('boundary');
@@ -269,7 +269,7 @@ describe('the card does not become the enforcer of somebody else\'s rule', () =>
     expect(card).not.toMatch(/boundary\.lo\s*[<>]/);
     expect(card).not.toMatch(/boundary\.hi\s*[<>]/);
     expect(card).not.toMatch(/boundary\.line\s*[<>]/);
-    expect(card, 'a control in this card is disabled — every field here is authorable, and the '
+    expect(card, 'a control in this card is disabled: every field here is authorable, and the '
       + 'two cross-field rules are advisories by the contract\'s own ruling')
       .not.toMatch(/\bdisabled=/);
   });

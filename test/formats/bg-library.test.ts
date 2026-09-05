@@ -74,7 +74,7 @@ describe('an entry the manifest names and the checkout does not have', () => {
       .toBe(serializeBgLibraryIndex(lib));
   });
 
-  it('an id in both is the LOADED entry — re-authoring under the same id wins', () => {
+  it('an id in both is the LOADED entry: re-authoring under the same id wins', () => {
     expect(mergeBgLibraryIndex(
       [{ id: 'a', name: 'A, remade' }],
       [{ id: 'a', name: 'A, as the manifest had it' }],

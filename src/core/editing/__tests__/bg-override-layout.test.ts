@@ -121,7 +121,7 @@ describe('set-bg-override-layout', () => {
     expect(view.layout[index]).toBe(was);
   });
 
-  it('touches nothing but the cells it names — tiles, anims and the rest of the plane hold', () => {
+  it('touches nothing but the cells it names: tiles, anims and the rest of the plane hold', () => {
     const doc = freshDoc();
     const l = level(doc);
     const h = new EditHistory();

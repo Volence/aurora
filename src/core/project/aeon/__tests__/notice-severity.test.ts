@@ -94,7 +94,7 @@ function severitiesFor(notices: readonly Notice[], needle: string): NoticeSeveri
 }
 
 describe('load notices carry a producer-assigned severity', () => {
-  it('markUnreadable — a section file that exists and will not read is NOT a success', async () => {
+  it('markUnreadable: a section file that exists and will not read is NOT a success', async () => {
     const files = fixtureFiles();
     // Valid JSON syntax, wrong shape for the objects reader — a truncated hand
     // edit, which is exactly the case markUnreadable was written for.
@@ -106,7 +106,7 @@ describe('load notices carry a producer-assigned severity', () => {
     expect(r.notices.some((n) => n.message.includes('section_0.objects.json'))).toBe(true);
   });
 
-  it('atlas unification — the one genuine SUCCESS stays on the success channel', async () => {
+  it('atlas unification: the one genuine SUCCESS stays on the success channel', async () => {
     // Guards the inversion: a fix that paints every notice a warning is the same
     // defect wearing the other colour.
     const files = fixtureFiles({ ...PROJECT_JSON, chunkLibrary: 'data/chunks.json' });

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { generateAnimationAsm } from '../../src/core/export/sprite-anim-export';
 import type { SpriteAnimation } from '../../src/core/export/sprite-anim-export';
 
-describe('generateAnimationAsm — table + base form', () => {
+describe('generateAnimationAsm: table + base form', () => {
   it('emits an offset table then per-animation blocks (dynamic duration, loop)', () => {
     const anims: SpriteAnimation[] = [
       { name: 'Walk', duration: 'dynamic', steps: [{ frame: 7 }, { frame: 8 }], control: { kind: 'loop' } },
@@ -50,7 +50,7 @@ describe('generateAnimationAsm — table + base form', () => {
   });
 });
 
-describe('generateAnimationAsm — inline event tags', () => {
+describe('generateAnimationAsm: inline event tags', () => {
   it('emits a sound event before its frame', () => {
     const asm = generateAnimationAsm('A', [
       { name: 'Atk', duration: 3, steps: [{ frame: 1 }, { frame: 2, events: [{ kind: 'sound', soundId: 0x81 }] }], control: { kind: 'loop' } },
@@ -87,7 +87,7 @@ describe('generateAnimationAsm — inline event tags', () => {
   });
 });
 
-describe('generateAnimationAsm — structural validation', () => {
+describe('generateAnimationAsm: structural validation', () => {
   const ok = { duration: 1 as const, steps: [{ frame: 0 }], control: { kind: 'loop' as const } };
   it('throws on an empty anims array', () => {
     expect(() => generateAnimationAsm('Ani_X', [])).toThrow(/anims is empty/);
@@ -114,7 +114,7 @@ describe('generateAnimationAsm — structural validation', () => {
 
 import { generatePerFrameAnimationAsm } from '../../src/core/export/sprite-anim-export';
 
-describe('generatePerFrameAnimationAsm — per-frame duration form', () => {
+describe('generatePerFrameAnimationAsm: per-frame duration form', () => {
   it('emits frame,duration pairs terminated by the control code', () => {
     const asm = generatePerFrameAnimationAsm('Ani_X', [
       { name: 'Walk', steps: [{ frame: 7, duration: 6 }, { frame: 8, duration: 4 }], control: { kind: 'loop' } },

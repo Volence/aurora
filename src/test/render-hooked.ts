@@ -35,7 +35,7 @@ function internals(): DispatcherSlot {
   const slot = (React as unknown as Record<string, DispatcherSlot | undefined>)[INTERNALS_KEY];
   if (!slot || !('H' in slot)) {
     throw new Error(
-      `renderHooked: react ${React.version} does not expose ${INTERNALS_KEY}.H — `
+      `renderHooked: react ${React.version} does not expose ${INTERNALS_KEY}.H: `
       + 'this harness can no longer install a hook dispatcher, so every row that '
       + 'uses it is unmeasurable rather than passing.',
     );

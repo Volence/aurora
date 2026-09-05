@@ -30,7 +30,7 @@ describe('canvasCells', () => {
     expect(cells[2]).toEqual({ x: 11, y: 0, w: 5, h: 8, full: false });
   });
 
-  it('treats an origin of 8 as an origin of 0 — the grid repeats every 8px', () => {
+  it('treats an origin of 8 as an origin of 0: the grid repeats every 8px', () => {
     expect(canvasCells(16, 8, { originX: 8, originY: 0 }))
       .toEqual(canvasCells(16, 8, { originX: 0, originY: 0 }));
   });
@@ -78,7 +78,7 @@ describe('findCellClashes', () => {
     ]);
   });
 
-  it('evaluates a partial cell — a clash in the offset band is still a clash', () => {
+  it('evaluates a partial cell: a clash in the offset band is still a clash', () => {
     const b = buf(16, 8, (x) => canvasIndex(x === 0 ? 1 : 0, 5));
     const clashes = findCellClashes(b, { originX: 3, originY: 0 }, 4);
     expect(clashes).toHaveLength(1);
@@ -109,7 +109,7 @@ describe('colorsPerLine', () => {
     expect(colorsPerLine(b)).toEqual([3, 0, 1, 0]);
   });
 
-  it('never counts entry 0 — it is transparency, not a colour choice', () => {
+  it('never counts entry 0: it is transparency, not a colour choice', () => {
     expect(colorsPerLine(buf(8, 8, () => 0))).toEqual([0, 0, 0, 0]);
   });
 
@@ -290,7 +290,7 @@ describe('evaluateCanvasConstraints', () => {
       .toBeNull();
   });
 
-  it('rounds a ragged canvas UP when sizing the frame — a part-tile still costs a tile', () => {
+  it('rounds a ragged canvas UP when sizing the frame: a part-tile still costs a tile', () => {
     const r = evaluateCanvasConstraints({
       pixels: buf(20, 8, () => canvasIndex(0, 1)), profile: constraintProfile('genesis-sprite'), origin,
     });

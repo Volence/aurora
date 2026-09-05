@@ -39,7 +39,7 @@ function nametable(marks: [number, number][], fillLow = false): Uint16Array {
 const vp = (x: number, y: number, width: number, height: number, zoom = 1) =>
   ({ x, y, width: width * zoom, height: height * zoom, zoom });
 
-describe('drawSectionPriority — the tile geometry', () => {
+describe('drawSectionPriority: the tile geometry', () => {
   it('veils a high tile at its WORLD position (section offset + tile * 8)', () => {
     const { ctx, rects } = recCtx();
     // Tile (10, 4) of a section whose world origin is (2048, 0).
@@ -57,7 +57,7 @@ describe('drawSectionPriority — the tile geometry', () => {
     expect(rects).toEqual([{ x: 80, y: 32, w: 8, h: 8 }]);
   });
 
-  it('uses the SAME colours as classic\'s lens — one language, not two', () => {
+  it('uses the SAME colours as classic\'s lens: one language, not two', () => {
     const { ctx, styles } = recCtx();
     drawSectionPriority(ctx, vp(0, 0, 320, 224), nametable([[1, 1]]), 0, 0);
     expect(styles).toEqual([PRIORITY_FILL, PRIORITY_EDGE]);
@@ -71,7 +71,7 @@ describe('drawSectionPriority — the tile geometry', () => {
   });
 });
 
-describe('drawSectionPriority — the viewport window', () => {
+describe('drawSectionPriority: the viewport window', () => {
   it('SKIPS a section that is entirely off-screen', () => {
     const { ctx, rects } = recCtx();
     // Camera on section 0; the nametable belongs to a section at world x=2048.
@@ -80,7 +80,7 @@ describe('drawSectionPriority — the viewport window', () => {
     expect(drawn.veils).toBe(0);
   });
 
-  it('probes only the visible tiles — a 320x224 view touches ~41x29, not 65,536', () => {
+  it('probes only the visible tiles: a 320x224 view touches ~41x29, not 65,536', () => {
     let probes = 0;
     const { ctx } = recCtx();
     const counting = new Uint16Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);

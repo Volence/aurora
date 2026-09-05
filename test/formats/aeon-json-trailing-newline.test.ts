@@ -162,7 +162,7 @@ describe('every JSON writer aimed at aeon\'s tree ends in exactly one newline', 
     expect(endsInExactlyOneNewline(text)).toBe(true);
   });
 
-  it('serializeEffectsScene (already compliant at 87c9ea8 — and not doubled by the chokepoint)', () => {
+  it('serializeEffectsScene (already compliant at 87c9ea8, and not doubled by the chokepoint)', () => {
     const scene = parseEffectsScene(SCENE_GOLDEN, 'canopy_dusk');
     const text = serializeEffectsScene(scene);
     expect(text.endsWith('}\n')).toBe(true);
@@ -263,7 +263,7 @@ describe('F2: parse → serialize of aeon\'s on-disk files', () => {
    * below, and for the same reason: the discrepancy is aeon's tree to update on
    * its own next save, not this test's to hide.
    */
-  it('section_4.meta.json round-trips with no byte lost — only contracted nulls added', (ctx) => {
+  it('section_4.meta.json round-trips with no byte lost: only contracted nulls added', (ctx) => {
     if (skipUnlessPresent(ctx, META, "aeon's on-disk section_4.meta.json")) return;
     const text = readFileSync(META!, 'utf8');
     expect(text.endsWith('\n'), 'the ruling was made on this file carrying the byte').toBe(true);
@@ -294,7 +294,7 @@ describe('F2: parse → serialize of aeon\'s on-disk files', () => {
     expect(canonicalJsonPretty(onDisk)).toBe(text);
   });
 
-  it('editor_bg_override.json round-trips up to the ruled trailer — and reports the on-disk state', (ctx) => {
+  it('editor_bg_override.json round-trips up to the ruled trailer, and reports the on-disk state', (ctx) => {
     if (skipUnlessPresent(ctx, OVERRIDE, "aeon's on-disk editor_bg_override.json")) return;
     const text = readFileSync(OVERRIDE!, 'utf8');
     const out = serializeBgOverride(parseBgOverride(text).doc);

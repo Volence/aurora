@@ -201,7 +201,7 @@ describe('the axis is two names, a default, and two key tables that SWAP', () =>
 
 // ── OBLIGATION 1: slot order ────────────────────────────────────────────────
 
-describe('OBLIGATION 1 — the slot order, which nothing downstream can check', () => {
+describe('OBLIGATION 1: the slot order, which nothing downstream can check', () => {
   const band = { cols: 4, rows: 8 };
 
   /**
@@ -296,7 +296,7 @@ describe('OBLIGATION 1 — the slot order, which nothing downstream can check', 
 
 // ── OBLIGATION 2: the phases are translations along the declared axis ───────
 
-describe('OBLIGATION 2 — the shift fill rolls ALONG THE AXIS', () => {
+describe('OBLIGATION 2: the shift fill rolls ALONG THE AXIS', () => {
   it('rolls x on a horizontal band and y on a vertical one, at named pixels', () => {
     for (const axis of BGANIM_BAND_AXES) {
       const b = { cols: 4, rows: 8, axis };
@@ -330,7 +330,7 @@ describe('OBLIGATION 2 — the shift fill rolls ALONG THE AXIS', () => {
     // Bank 1 onward: every one differs from the horizontal roll by the same
     // amount. Bank 0 is excluded because k=0 makes both rolls the identity.
     for (let k = 1; k < BGANIM_PHASE_BANKS; k++) {
-      expect(pixelPlane(b, banks[k]), `bank ${k} IS a horizontal roll — aeon would refuse this band`)
+      expect(pixelPlane(b, banks[k]), `bank ${k} IS a horizontal roll: aeon would refuse this band`)
         .not.toEqual(hRoll(k));
     }
   });
@@ -384,7 +384,7 @@ describe('OBLIGATION 2 — the shift fill rolls ALONG THE AXIS', () => {
 
 // ── OBLIGATION 3: the key survives a round trip ─────────────────────────────
 
-describe('OBLIGATION 3 — `axis` survives load, edit-something-else, save', () => {
+describe('OBLIGATION 3: `axis` survives load, edit-something-else, save', () => {
   it('is written, re-read, and re-written unchanged', () => {
     const doc = verticalBandDocument();
     const once = serializeBgOverride(doc);
@@ -393,7 +393,7 @@ describe('OBLIGATION 3 — `axis` survives load, edit-something-else, save', () 
     expect(serializeBgOverride(back)).toBe(once);
   });
 
-  it('survives an edit to a DIFFERENT key — the case the guard cannot see through', () => {
+  it('survives an edit to a DIFFERENT key: the case the guard cannot see through', () => {
     const doc = verticalBandDocument();
     // Touch things that rebuild or copy bands: a pixel write, a second band
     // promoted after it, and the serializer's own canonical reorder.

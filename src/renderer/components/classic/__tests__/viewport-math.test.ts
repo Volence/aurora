@@ -381,7 +381,7 @@ describe('fitCamera', () => {
     expect(fitCamera(CANVAS, 0, null).zoom).toBe(1);
   });
 
-  it('a plane switch NEVER changes the zoom — the 58% -> 200% bug', () => {
+  it('a plane switch NEVER changes the zoom: the 58% -> 200% bug', () => {
     for (const planeH of [BG_H, FG_H, CHUNK_PX, 32 * CHUNK_PX]) {
       for (const zoom of [FIT_ZOOM_MIN, 0.3, 0.58, 1, FIT_ZOOM_MAX, 8]) {
         expect(fitCamera(CANVAS, planeH, { x: 0, y: 0, zoom }).zoom, `${planeH}@${zoom}`)
@@ -411,7 +411,7 @@ describe('fitCamera', () => {
     expect(fitCamera(CANVAS, CHUNK_PX, { x: 0, y: 5000, zoom: 1 }).y).toBe(0);
   });
 
-  it('the bound is in WORLD units — zoom changes how much plane is visible', () => {
+  it('the bound is in WORLD units: zoom changes how much plane is visible', () => {
     // canvasH/zoom, not canvasH: at 2x only half the canvas height of world is
     // on screen, so more of a short plane is legitimately scrollable.
     expect(fitCamera(CANVAS, BG_H, { x: 0, y: 9999, zoom: 2 }).y).toBe(BG_H - CANVAS / 2);

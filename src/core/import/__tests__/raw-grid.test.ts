@@ -33,7 +33,7 @@ describe('synthesizeGridFrames', () => {
     });
   });
 
-  it('renders top tile above bottom tile — the HUD blit order (2 consecutive tiles per digit)', () => {
+  it('renders top tile above bottom tile: the HUD blit order (2 consecutive tiles per digit)', () => {
     const frames = synthesizeGridFrames(4, { widthCells: 1, heightCells: 2 });
     const tiles = [fill(1), fill(2), fill(3), fill(4)];
     const px = renderFrameToIndices(frames[1], tiles, 8, 16, 0, 0);

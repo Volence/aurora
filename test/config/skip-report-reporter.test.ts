@@ -65,7 +65,7 @@ function run(modules: SkipReportTestModule[]): { out: string; exitCode: typeof p
 const savedExitCode = process.exitCode;
 afterEach(() => { process.exitCode = savedExitCode; });
 
-describe('skip-report reporter — what it says about skips', () => {
+describe('skip-report reporter: what it says about skips', () => {
   it('NAMES a skipped test and prints the reason from `meta.skipReason`', () => {
     const { out, exitCode } = run([
       testModule('test/x.test.ts', [
@@ -96,7 +96,7 @@ describe('skip-report reporter — what it says about skips', () => {
   it('accepts a reason carried in the test NAME, via the marker', () => {
     const { out, exitCode } = run([
       testModule('test/z.test.ts', [
-        { fullName: 'live > warps — SKIPPED: AURORA_LIVE_S1_WARP=1 not set', state: 'skipped' },
+        { fullName: 'live > warps (SKIPPED: AURORA_LIVE_S1_WARP=1 not set)', state: 'skipped' },
       ]),
     ]);
     expect(out).toContain('[name]');
@@ -125,7 +125,7 @@ describe('skip-report reporter — what it says about skips', () => {
   });
 });
 
-describe('skip-report reporter — enforcement', () => {
+describe('skip-report reporter: enforcement', () => {
   it('FAILS the run, naming the row, when a skip gives no reason at all', () => {
     const { out, exitCode } = run([
       testModule('test/mute.test.ts', [{ fullName: 'block > mute row', state: 'skipped' }]),
@@ -136,7 +136,7 @@ describe('skip-report reporter — enforcement', () => {
     expect(exitCode).toBe(1);
   });
 
-  it('does NOT fail merely because a test skipped — a named skip is green', () => {
+  it('does NOT fail merely because a test skipped: a named skip is green', () => {
     // The explicit non-goal: skipping is legitimate, silence is the defect.
     const { out, exitCode } = run([
       testModule('test/named.test.ts', [
@@ -165,7 +165,7 @@ describe('skip-report reporter — enforcement', () => {
   });
 });
 
-describe('skip-report reporter — the zero case says so out loud', () => {
+describe('skip-report reporter: the zero case says so out loud', () => {
   it('states that nothing skipped, rather than printing nothing', () => {
     // Printing nothing on a clean run would be indistinguishable from the
     // reporter having been dropped from the config.

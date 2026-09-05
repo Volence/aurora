@@ -8,7 +8,7 @@ const txt = (n: string) => readFileSync(new URL(`../../fixtures/mappings/src/${n
 // classic dialect emits none, so every frame is {index, xFlip:false, yFlip:false}.
 const fr = (index: number) => ({ index, xFlip: false, yFlip: false });
 
-describe('parseSonicAnimScript — classic S2 animation format (raw $FF/$FE bytes)', () => {
+describe('parseSonicAnimScript: classic S2 animation format (raw $FF/$FE bytes)', () => {
   const anims = parseSonicAnimScript(txt('pitcherplant_anim.asm'));
 
   it('reads all three anims in table order', () => {
@@ -28,7 +28,7 @@ describe('parseSonicAnimScript — classic S2 animation format (raw $FF/$FE byte
   });
 });
 
-describe('parseSonicAnimScript — real skdisasm Anim file with a LEADING table label', () => {
+describe('parseSonicAnimScript: real skdisasm Anim file with a LEADING table label', () => {
   // Anim - Mushroom Cap.asm starts with `Ani_MHZMushroomCap_:` then the dc.w table.
   const anims = parseSonicAnimScript(txt('skdisasm_mushroomcap_anim.asm'));
 

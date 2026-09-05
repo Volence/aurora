@@ -149,7 +149,7 @@ function withScenes(extra: Record<string, string> = {}): Map<string, Uint8Array>
 
 const decode = (b: Uint8Array | undefined) => b === undefined ? undefined : new TextDecoder().decode(b);
 
-describe('loadAeonProject — the effects-scene library', () => {
+describe('loadAeonProject: the effects-scene library', () => {
   it('reports an EMPTY library, no error and no notice when editor/effects/ is absent', async () => {
     const files = fixtureFiles();
     // The premise, asserted rather than assumed: nothing in this fixture lives
@@ -207,7 +207,7 @@ describe('loadAeonProject — the effects-scene library', () => {
   });
 });
 
-describe('buildAeonSavePlan — the effects-scene library', () => {
+describe('buildAeonSavePlan: the effects-scene library', () => {
   async function planPaths(files: Map<string, Uint8Array>) {
     const fa = memFa(files);
     const r = await loadAeonProject(fa, '/proj');

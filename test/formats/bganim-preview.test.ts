@@ -124,7 +124,7 @@ describe('the step expression is the engine\'s', () => {
     }
   });
 
-  it('at step 0 every slot maps to itself — the rest state is the identity', () => {
+  it('at step 0 every slot maps to itself: the rest state is the identity', () => {
     const { coarseColumns } = bandPhase(0);
     for (let t = 0; t < 32; t++) expect(bandSlotSource(t, { cols: 8, rows: 4 }, coarseColumns)).toBe(t);
   });
@@ -146,7 +146,7 @@ describe('drivers name a scalar source, never an axis', () => {
     expect(() => bandDriverValue('camera_z', inputs)).toThrow(/unknown BgAnim driver/);
   });
 
-  it('only `timer` is time-varying — camera_y is NOT vertical motion, and NOT a clock', () => {
+  it('only `timer` is time-varying: camera_y is NOT vertical motion, and NOT a clock', () => {
     expect(bandIsTimeVarying(band({ driver: 'timer' }))).toBe(true);
     expect(bandIsTimeVarying(band({ driver: 'camera_x' }))).toBe(false);
     expect(bandIsTimeVarying(band({ driver: 'camera_y' }))).toBe(false);
@@ -199,7 +199,7 @@ describe('the editor pan maps onto Camera_X/Y', () => {
     expect(editorPanToCameraPx(65537.5)).toBe(1);
   });
 
-  it('is NOT scaled by zoom — vpX is already unzoomed world px', () => {
+  it('is NOT scaled by zoom: vpX is already unzoomed world px', () => {
     // Guards the ruling's §4 prediction, which was the other way round. If a
     // zoom factor is ever reintroduced here it must be argued at the call site,
     // not slipped in: this row would fail.
@@ -233,7 +233,7 @@ describe('the step key is what gates a repaint', () => {
   });
 });
 
-describe('the substitution licence — the prefix identity against the DISPLAYED blob', () => {
+describe('the substitution licence: the prefix identity against the DISPLAYED blob', () => {
   const b = band({ cols: 2, rows: 2 });
   const asTiles = (rows: number[][]) => rows.map((pixels) => ({ pixels: Uint8Array.from(pixels) }));
 

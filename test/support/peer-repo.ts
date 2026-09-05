@@ -85,7 +85,7 @@ export function readAtRev(repo: string, rev: string, path: string): PeerBlob {
   const sha = resolveRev(repo, rev);
   if (sha === null) return { ok: false, why: `revision ${rev} does not resolve in ${repo} (unfetched? shallow?)` };
   const text = git(repo, ['show', `${sha}:${path}`]);
-  if (text === null) return { ok: false, why: `MEASURED: ${path} is ABSENT at ${rev} (${sha}) — deleted or renamed` };
+  if (text === null) return { ok: false, why: `MEASURED: ${path} is ABSENT at ${rev} (${sha}): deleted or renamed` };
   const blob = git(repo, ['rev-parse', `${sha}:${path}`])?.trim() ?? '';
   return { ok: true, text, blob };
 }
