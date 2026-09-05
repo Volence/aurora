@@ -48,7 +48,7 @@ function doc4(marks: Array<[number, number]>): ComposerDoc {
   return doc;
 }
 
-describe('drawComposerPriority — the cell is the subject', () => {
+describe('drawComposerPriority: the cell is the subject', () => {
   it('veils exactly the priority cell, at its DOC position', () => {
     const { ctx, rects } = recCtx();
     const drawn = drawComposerPriority(ctx, doc4([[1, 2]]), 1);
@@ -76,7 +76,7 @@ describe('drawComposerPriority — the cell is the subject', () => {
     expect(rects).toEqual([{ x: 8, y: 0, w: 8, h: 8 }]);
   });
 
-  it('SCALES BY ZOOM through tilePx — the context is translated, never scaled', () => {
+  it('SCALES BY ZOOM through tilePx: the context is translated, never scaled', () => {
     // PixelViewport hands drawOverlay an unscaled context (every other overlay
     // in ComposerCanvas multiplies by z itself). A lens that passed tilePx=8
     // and invZoom=1/zoom would put an 8px veil at (8,16) on a canvas where that
@@ -101,14 +101,14 @@ describe('drawComposerPriority — the cell is the subject', () => {
     expect(drawn.veils).toBe(1);
   });
 
-  it('uses the SHARED colours — the same violet the map and classic paint', () => {
+  it('uses the SHARED colours: the same violet the map and classic paint', () => {
     const { ctx, styles } = recCtx();
     drawComposerPriority(ctx, doc4([[0, 0]]), 1);
     expect(styles).toContain(`fill:${PRIORITY_FILL}`);
     expect(styles).toContain(`stroke:${PRIORITY_EDGE}`);
   });
 
-  it('outlines the region — a lone marked cell gets four boundary segments', () => {
+  it('outlines the region: a lone marked cell gets four boundary segments', () => {
     const { ctx, pts } = recCtx();
     const drawn = drawComposerPriority(ctx, doc4([[1, 1]]), 1);
     expect(drawn.segments).toBe(4);
@@ -116,7 +116,7 @@ describe('drawComposerPriority — the cell is the subject', () => {
   });
 });
 
-describe('countPriorityCells — the model half of the report', () => {
+describe('countPriorityCells: the model half of the report', () => {
   it('counts the cells the document says carry priority', () => {
     expect(countPriorityCells(doc4([]))).toBe(0);
     expect(countPriorityCells(doc4([[0, 0], [3, 3]]))).toBe(2);

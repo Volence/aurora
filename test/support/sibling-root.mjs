@@ -240,7 +240,7 @@ function pickEnv(canonical, aliases) {
   for (const other of found.slice(1)) {
     if (expand(other.value) !== expand(first.value)) {
       throw new SuitePathError(
-        `${first.name}=${first.value} and ${other.name}=${other.value} DISAGREE — this names one `
+        `${first.name}=${first.value} and ${other.name}=${other.value} DISAGREE: this names one `
         + `directory, so two different answers is a wrong environment, not a preference. Unset `
         + `${other.name} (a transitional alias) and set only ${canonical}. `
         + '(empyrean contract/SUITE_PATHS.md @ 82982b7f)',
@@ -257,7 +257,7 @@ function pickEnv(canonical, aliases) {
 function requireDir(pick, step, what) {
   if (!isDir(expand(pick.value))) {
     throw new SuitePathError(
-      `${pick.name}=${pick.value} is not a directory — ${what}. Precedence step ${step} refuses `
+      `${pick.name}=${pick.value} is not a directory: ${what}. Precedence step ${step} refuses `
       + 'rather than falling through: a variable that is set but wrong is evidence of a wrong '
       + 'environment, and the next step would hide it. To reproduce a machine WITHOUT the '
       + `reference trees, point ${pick.name} at an EMPTY directory (\`$(mktemp -d)\`), not at an `
@@ -419,7 +419,7 @@ function checkOwnCheckoutClaim() {
       + `${AURORA_DIR}. Setting it to something else cannot move this repo; it can only relocate `
       + 'the repo under test silently, so it is refused. That row in the contract\'s variable table '
       + `exists so OTHER tools can name aurora. If you meant "run against the built tree over `
-      + `there" — a different question — set ${AURORA_BUILT_TREE_ENV}=${pick.value} instead. `
+      + `there" (a different question), set ${AURORA_BUILT_TREE_ENV}=${pick.value} instead. `
       + '(empyrean contract/SUITE_PATHS.md @ fba68d5, "A resolver\'s OWN checkout is observed, '
       + 'not resolved")',
     );
@@ -439,7 +439,7 @@ const OWN_CHECKOUT_CLAIM = checkOwnCheckoutClaim();
  */
 export function auroraDirSource() {
   const checked = OWN_CHECKOUT_CLAIM === null ? ''
-    : ` (${OWN_CHECKOUT_CLAIM.name}=${OWN_CHECKOUT_CLAIM.value} agrees — a consistency check, `
+    : ` (${OWN_CHECKOUT_CLAIM.name}=${OWN_CHECKOUT_CLAIM.value} agrees: a consistency check, `
       + 'not an override)';
   return `own: this module's own location (${fileURLToPath(import.meta.url)}) → ${AURORA_DIR}`
     + checked;
@@ -464,7 +464,7 @@ export function auroraBuiltTree() {
   if (pick === null) return null;
   if (!isDir(expand(pick.value))) {
     throw new SuitePathError(
-      `${pick.name}=${pick.value} is not a directory — it is meant to name a BUILT aurora tree `
+      `${pick.name}=${pick.value} is not a directory: it is meant to name a BUILT aurora tree `
       + '(one with `node_modules/` and `dist/`) for this run to execute against. It refuses rather '
       + 'than falling back to the tree this instrument lives in: a run that quietly measured a '
       + 'different build than the one you named is the failure this variable exists to prevent. '
@@ -500,7 +500,7 @@ function resolveSuiteRoot() {
   }
   return {
     root: null,
-    source: `step 4: REFUSED — ${SUITE_ROOT_ENV} is unset (aliases: ${SUITE_ROOT_ENV_ALIASES.join(', ')}) `
+    source: `step 4: REFUSED; ${SUITE_ROOT_ENV} is unset (aliases: ${SUITE_ROOT_ENV_ALIASES.join(', ')}) `
       + `and \`git rev-parse --git-common-dir\` in ${AURORA_DIR} produced nothing, so there is no `
       + 'directory to call the suite root',
   };
@@ -679,7 +679,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const built = auroraBuiltTree();
   process.stdout.write(`aurora ${AURORA_DIR}\n`);
   process.stdout.write(`from   ${auroraDirSource()}\n`);
-  process.stdout.write(`built  ${built === null ? `(none — ${AURORA_BUILT_TREE_ENV} unset)` : built.value}\n`);
+  process.stdout.write(`built  ${built === null ? `(none: ${AURORA_BUILT_TREE_ENV} unset)` : built.value}\n`);
   process.stdout.write(`suite  ${root ?? '(unresolved)'}\n`);
   process.stdout.write(`from   ${source}\n`);
 }

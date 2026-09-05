@@ -143,7 +143,7 @@ describe('the load records WHICH files it actually read', () => {
       .toEqual([`${PRESET_DIR}keeper_p.json`, `${PRESET_DIR}victim_p.json`]);
   });
 
-  it('keeps a file it could NOT parse out of loadedPaths — the loader will not overwrite it '
+  it('keeps a file it could NOT parse out of loadedPaths: the loader will not overwrite it '
     + 'and the save must not delete it either', async () => {
     const files = fixtureFiles();
     files.set(`${SCENE_DIR}broken.json`, new TextEncoder().encode('{ "schema": 1, "id": "broken"'));
@@ -160,7 +160,7 @@ describe('the load records WHICH files it actually read', () => {
   });
 });
 
-describe('buildAeonSavePlan — removals', () => {
+describe('buildAeonSavePlan: removals', () => {
   it('plans NO removal for a project that was opened and is being saved unchanged', async () => {
     const files = fixtureFiles();
     const r = await openFixture(files);
@@ -187,7 +187,7 @@ describe('buildAeonSavePlan — removals', () => {
     expect(plan.files.some((f) => f.path === `${SCENE_DIR}keeper.json`)).toBe(true);
   });
 
-  it('plans the removal of a raster preset the session dropped — the identical loop, '
+  it('plans the removal of a raster preset the session dropped: the identical loop, '
     + 'measured rather than assumed', async () => {
     const files = fixtureFiles();
     const r = await openFixture(files);
@@ -241,7 +241,7 @@ describe('buildAeonSavePlan — removals', () => {
     });
 });
 
-describe('removalsFor — the rule itself, with the loader out of the way', () => {
+describe('removalsFor: the rule itself, with the loader out of the way', () => {
   const describePath = (p: string) => `thing ${p}`;
 
   it('removes a known path the library no longer claims', () => {

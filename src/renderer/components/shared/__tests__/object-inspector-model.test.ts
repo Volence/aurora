@@ -64,7 +64,7 @@ describe('clampPatch', () => {
     expect(clampPatch(schema, { x: 9999, subtype: 300 })).toEqual({ x: 0x7ff, subtype: 0xff });
   });
 
-  it('drops a field the schema does not declare — an engine cannot be asked for what it lacks', () => {
+  it('drops a field the schema does not declare: an engine cannot be asked for what it lacks', () => {
     // The whole point of a per-engine schema: aeon has no `respawn`, so a patch
     // naming it must never reach the write path.
     expect(clampPatch(schema, { respawn: true, x: 4 })).toEqual({ x: 4 });
@@ -85,7 +85,7 @@ describe('runCommit', () => {
     expect(runCommit(() => ({ ok: false as const, error: 'nope' }))).toEqual({ ok: false, error: 'nope' });
   });
 
-  it('treats a void write as success — aeon commands return nothing', () => {
+  it('treats a void write as success: aeon commands return nothing', () => {
     expect(runCommit(() => { /* executeCommand returns void */ })).toEqual({ ok: true });
   });
 

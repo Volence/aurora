@@ -105,7 +105,7 @@ const VENDORED_ROOTS: Record<string, { dir: string; remake: string }> = {
 export function referencePathSource(name: string): string {
   const vendored = VENDORED_ROOTS[name];
   if (vendored !== undefined) {
-    return `${name} is VENDORED IN THIS REPO at ${vendored.dir} — no environment variable `
+    return `${name} is VENDORED IN THIS REPO at ${vendored.dir}: no environment variable `
       + `selects it, and no peer checkout is consulted; rebuild it with \`${vendored.remake}\``;
   }
   return siblingPathSource(name);
@@ -257,7 +257,7 @@ export function referenceCheckoutReason(name: string): string {
   if (vendored !== undefined) {
     const missing = (REFERENCE_MARKERS[name] ?? []).filter((m) => !existsSync(resolve(vendored.dir, m)));
     return `SKIPPED, NOT PASSED: ${vendored.dir} is VENDORED IN THIS REPO and is `
-      + `${existsSync(vendored.dir) ? `incomplete — missing ${missing.join(', ')}` : 'ABSENT'}. `
+      + `${existsSync(vendored.dir) ? `incomplete: missing ${missing.join(', ')}` : 'ABSENT'}. `
       + 'That is an AURORA defect (a deleted or half-merged fixture), NOT a machine without a '
       + `disassembly: no peer checkout is involved. Rebuild with \`${vendored.remake}\`. `
       + 'The vendored tree\'s own integrity is asserted by '
@@ -269,11 +269,11 @@ export function referenceCheckoutReason(name: string): string {
       + '(see S1DISASM_DIR / EMPYREAN_SUITE_ROOT), so these rows measure nothing';
   }
   if (!existsSync(root)) {
-    return `SKIPPED, NOT PASSED: ${root} is absent — this machine has no ${name} checkout, `
+    return `SKIPPED, NOT PASSED: ${root} is absent: this machine has no ${name} checkout, `
       + 'so these rows measure nothing';
   }
   const missing = (REFERENCE_MARKERS[name] ?? []).filter((m) => !existsSync(resolve(root, m)));
-  return `SKIPPED, NOT PASSED: ${root} EXISTS but is not a ${name} checkout — it is missing `
+  return `SKIPPED, NOT PASSED: ${root} EXISTS but is not a ${name} checkout: it is missing `
     + `${missing.join(', ')}. These rows measure nothing, and had they run they would have `
     + 'failed in their own vocabulary rather than naming this directory';
 }
@@ -313,15 +313,15 @@ function nearestExistingAncestor(path: string): string | null {
  */
 export function unmeasurable(path: string | null, what: string): string {
   if (path === null) {
-    return `SKIPPED, NOT PASSED: cannot measure ${what} — no sibling checkout could be resolved `
+    return `SKIPPED, NOT PASSED: cannot measure ${what}: no sibling checkout could be resolved `
       + 'at all (see EMPYREAN_SUITE_ROOT / <NAME>_DIR), so this row measures nothing';
   }
   const near = nearestExistingAncestor(path);
   const context = near === null
-    ? ' — and no directory above it exists either'
+    ? '; and no directory above it exists either'
     : `; the deepest directory above it that DOES exist is ${near}, so if that is the checkout, `
       + 'this is an INCOMPLETE checkout rather than an absent one';
-  return `SKIPPED, NOT PASSED: cannot measure ${what} — ${path} is not on this machine${context}. `
+  return `SKIPPED, NOT PASSED: cannot measure ${what}: ${path} is not on this machine${context}. `
     + 'This row measures nothing';
 }
 
@@ -405,7 +405,7 @@ export function describeRequiringFixture(
   }
   describe(name, () => {
     it(
-      'BLOCK NOT COLLECTED — its body reads the fixture, so it was not executed at all',
+      'BLOCK NOT COLLECTED: its body reads the fixture, so it was not executed at all',
       { skip: true, meta: { skipReason: unmeasurable(path, what) } },
       () => {},
     );
@@ -415,7 +415,7 @@ export function describeRequiringFixture(
 export function declareUnenumerated(count: number, path: string | null, what: string): void {
   if (count > 0) return;
   it(
-    `${what} — NOTHING ENUMERATED (0 rows registered)`,
+    `${what}: NOTHING ENUMERATED (0 rows registered)`,
     { skip: true, meta: { skipReason: unmeasurable(path, what) } },
     () => {},
   );

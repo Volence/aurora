@@ -86,7 +86,7 @@ function overlays(over: Partial<OverlayOptions> = {}): OverlayOptions {
 const viewport = { x: 0, y: 0, width: 800, height: 600, zoom: 1 };
 const byColour = (fills: { style: string }[], c: string) => fills.filter((f) => f.style === c);
 
-describe('OverlayRenderer.render — the both-planes lens gate', () => {
+describe('OverlayRenderer.render: the both-planes lens gate', () => {
   const bothSolid = section((a, b) => { put(a, 3, 2, SOLID); put(b, 3, 2, SOLID); });
 
   it('draws NOTHING with the toggle off, though the cell IS solid on both', () => {
@@ -133,7 +133,7 @@ describe('OverlayRenderer.render — the both-planes lens gate', () => {
   });
 });
 
-describe('OverlayRenderer.render — the crossover lens gate', () => {
+describe('OverlayRenderer.render: the crossover lens gate', () => {
   const pair = section((a, b) => {
     put(a, 5, 1, withCrossover(SOLID, 'to-b'));
     put(b, 5, 1, withCrossover(SOLID, 'to-a'));
@@ -221,7 +221,7 @@ describe('OverlayRenderer.render — the crossover lens gate', () => {
       expect(lens.crossover.pairedVeils).toBe(2);
     });
 
-  it('shows the plane it was AIMED at — plane B sees its own marks', () => {
+  it('shows the plane it was AIMED at: plane B sees its own marks', () => {
     const { ctx } = recCtx();
     // Same half-painted fixture, aimed at B: B has no mark, so B's lens is
     // empty. A lens that ignored the aim would report A's mark either way.
@@ -246,7 +246,7 @@ describe('OverlayRenderer.render — the crossover lens gate', () => {
     expect(byColour(fills, CROSSOVER_ONE_WAY_FILL)).toEqual([]);
   });
 
-  it('the two lenses are independent — each toggle drives only its own', () => {
+  it('the two lenses are independent: each toggle drives only its own', () => {
     const { ctx, fills } = recCtx();
     new OverlayRenderer().render(
       ctx, [{ section: pair, offsetX: 0, offsetY: 0 }],

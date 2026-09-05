@@ -24,7 +24,7 @@ const CLIP = { widthTiles: 2 } as never;
 const MARQUEE = { sectionIndex: 0, col: 0, row: 0, w: 2, h: 2 } as never;
 
 describe('flipAxisForKey', () => {
-  it('X is the horizontal mirror and Y the vertical — the engine\'s own vocabulary '
+  it('X is the horizontal mirror and Y the vertical: the engine\'s own vocabulary '
     + '(collision-cell-word.ts names bit 10 xFlip, "mirror horizontally")', () => {
     expect(flipAxisForKey('x')).toBe('h');
     expect(flipAxisForKey('y')).toBe('v');
@@ -42,7 +42,7 @@ describe('flipAxisForKey', () => {
   });
 
   it('THE COLLISION CHECK: neither letter is any tool\'s, across the WHOLE '
-    + 'vocabulary — a tool moving between facets can never start shadowing it', () => {
+    + 'vocabulary, so a tool moving between facets can never start shadowing it', () => {
     for (const key of ['x', 'y']) {
       expect(toolForKey(key)).toBe(null);
       expect(Object.values(TOOL_KEYS)).not.toContain(key);
@@ -55,7 +55,7 @@ describe('flipAxisForKey', () => {
 });
 
 describe('resolveFlip', () => {
-  it('paste mode mirrors the CLIPBOARD, whatever tool is armed — paste is a mode '
+  it('paste mode mirrors the CLIPBOARD, whatever tool is armed: paste is a mode '
     + 'the author entered and the ghost under the cursor is what he is looking at', () => {
     for (const tool of ['marquee', 'paint-tile', 'view', 'select']) {
       expect(resolveFlip({ pasting: true, mapClipboard: CLIP, tool, marquee: null }))
@@ -82,7 +82,7 @@ describe('resolveFlip', () => {
     }
   });
 
-  it('nothing selected, not pasting — the key falls through', () => {
+  it('nothing selected, not pasting: the key falls through', () => {
     expect(resolveFlip({ pasting: false, mapClipboard: CLIP, tool: 'marquee', marquee: null }))
       .toBe(null);
   });
@@ -138,7 +138,7 @@ function resetEditor(): void {
   setFlipGhostRepaint(null);
 }
 
-describe('performMapFlip — one action, both surfaces', () => {
+describe('performMapFlip: one action, both surfaces', () => {
   // THE BUTTON'S DISABLED RULE IS THE KEY'S NO-OP RULE. The panel disables on
   // `resolveFlip(...) === null`; if the action did anything in a state
   // `resolveFlip` calls ineligible, the panel would be teaching a rule the map
@@ -187,7 +187,7 @@ describe('performMapFlip — one action, both surfaces', () => {
     resetEditor();
   });
 
-  it('mirrors on the AXIS asked for — h and v are different transforms here', () => {
+  it('mirrors on the AXIS asked for: h and v are different transforms here', () => {
     resetEditor();
     const c0 = clip();
     const ed = useEditorStore.getState();

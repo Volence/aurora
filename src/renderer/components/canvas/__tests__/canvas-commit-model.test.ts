@@ -23,13 +23,13 @@ describe('canvasChunkCapacity', () => {
     expect(canvasChunkCapacity(128, 128).total).toBe(0);
   });
 
-  it('caps at 16 for the largest canvas — 1024px is 4 chunks a side', () => {
+  it('caps at 16 for the largest canvas: 1024px is 4 chunks a side', () => {
     expect(canvasChunkCapacity(1024, 1024).total).toBe(16);
   });
 });
 
 describe('defaultTargets', () => {
-  it('appends by default — never silently replaces existing art', () => {
+  it('appends by default: never silently replaces existing art', () => {
     expect(defaultTargets(3)).toEqual([
       { chunkFileIndex: null }, { chunkFileIndex: null }, { chunkFileIndex: null },
     ]);
@@ -122,7 +122,7 @@ const overhangPlan = (blockIds: number[]): CanvasCommitPlan => ({
 }) as CanvasCommitPlan;
 
 describe('reportLines and the colind overhang', () => {
-  it('adds no line — and no claim of any kind — when nothing was skipped', () => {
+  it('adds no line (and no claim of any kind) when nothing was skipped', () => {
     // Every id inside the table: withCollision skips nothing, and the preview
     // must not gain a reassuring "0 skipped" row in the common case.
     const applied = withCollision(overhangPlan([1, 2, 3]), 400).applied;
@@ -132,7 +132,7 @@ describe('reportLines and the colind overhang', () => {
     expect(text).not.toMatch(/overhang/i);
   });
 
-  it('states the skip — count and the overhang reason — when blocks were refused', () => {
+  it('states the skip (count and the overhang reason) when blocks were refused', () => {
     // Two ids past a 400-entry table, one inside. The expected count is read
     // back from the transform that owns the rule, not asserted as a literal.
     const applied = withCollision(overhangPlan([5, 400, 401]), 400).applied;

@@ -65,7 +65,7 @@ function lastOwnedSlot(r: SlotRange): number {
 /** Attribute bits ABOVE the index mask: priority + palette line 2 + hFlip. */
 const ATTRS = (0x8000 | (2 << 13) | 0x0800) & ~LAYOUT_TILE_INDEX_MASK;
 
-describe('layoutWordSlot — the mask and the escape, both from the contract', () => {
+describe('layoutWordSlot: the mask and the escape, both from the contract', () => {
   it('reads the blob-local index out of a word carrying attributes', () => {
     expect(layoutWordSlot(ATTRS | 300)).toBe(300);
   });
@@ -88,7 +88,7 @@ describe('layoutWordSlot — the mask and the escape, both from the contract', (
   });
 });
 
-describe('rangeCovers — half-open, and empty ranges cover nothing', () => {
+describe('rangeCovers: half-open, and empty ranges cover nothing', () => {
   it('includes the base and excludes base+count', () => {
     const r = slotRange(10, 2, 2); // 4 slots: 10, 11, 12, 13
     expect(r.count).toBe(4);
@@ -103,10 +103,10 @@ describe('rangeCovers — half-open, and empty ranges cover nothing', () => {
   });
 });
 
-describe('bandCoverage — WHERE the cells are', () => {
+describe('bandCoverage: WHERE the cells are', () => {
   const COLS = 8, ROWS = 4;
 
-  it('resolves a covered cell to the right (col, row) — and a transpose fails it', () => {
+  it('resolves a covered cell to the right (col, row), and a transpose fails it', () => {
     const layout = blank(COLS, ROWS);
     // col 5, row 2. Deliberately col !== row, and deliberately on a plane that
     // is not square: a transposed implementation computes col 2 / row 5, and
@@ -128,7 +128,7 @@ describe('bandCoverage — WHERE the cells are', () => {
     expect(cov.cells.map((c) => [c.col, c.slot])).toEqual([[3, 40], [4, 41]]);
   });
 
-  it('finds EVERY cell that names a slot — the de-duplicated footprint', () => {
+  it('finds EVERY cell that names a slot: the de-duplicated footprint', () => {
     // The property the whole feature exists for: one slot, many cells. aeon's
     // live 8x4 band has a slot painting 964 cells of sky.
     const layout = blank(COLS, ROWS);
@@ -141,7 +141,7 @@ describe('bandCoverage — WHERE the cells are', () => {
     expect(cov.undrawnSlots).toBe(0);
   });
 
-  it('ignores attribute bits — the same art flipped or repalettised still counts', () => {
+  it('ignores attribute bits: the same art flipped or repalettised still counts', () => {
     const layout = blank(COLS, ROWS);
     layout[3] = 40;
     layout[4] = ATTRS | 40;
@@ -196,7 +196,7 @@ describe('bandCoverage — WHERE the cells are', () => {
   });
 });
 
-describe('coverageSummary — the shape, and NOTHING ELSE', () => {
+describe('coverageSummary: the shape, and NOTHING ELSE', () => {
   const COLS = 8, ROWS = 4;
 
   it('states the total and the largest single-slot footprint', () => {
@@ -236,7 +236,7 @@ describe('coverageSummary — the shape, and NOTHING ELSE', () => {
     expect(coverageSummary(cov)).not.toContain('..');   // no span punctuation at all
   });
 
-  it('IS NEUTRAL — a huge footprint reads as a number, never as an alarm', () => {
+  it('IS NEUTRAL: a huge footprint reads as a number, never as an alarm', () => {
     // ⚠ THE RULING THIS ROW PINS. Promotion animates a range's tiles wherever
     // the picture uses them; scatter is legal and sometimes intended, and
     // whether 964 cells of stepping sky is the look wanted is the owner's call.
@@ -267,7 +267,7 @@ describe('coverageSummary — the shape, and NOTHING ELSE', () => {
   });
 });
 
-describe('coverageBounds — so the caption can sit beside what it describes', () => {
+describe('coverageBounds, so the caption can sit beside what it describes', () => {
   const COLS = 8, ROWS = 4;
 
   it('is the box of the covered cells, and is not transposed', () => {
@@ -278,12 +278,12 @@ describe('coverageBounds — so the caption can sit beside what it describes', (
     expect(coverageBounds(cov.cells)).toEqual({ minCol: 2, minRow: 1, maxCol: 6, maxRow: 3 });
   });
 
-  it('is null when nothing is covered — the caption falls back to the corner', () => {
+  it('is null when nothing is covered: the caption falls back to the corner', () => {
     expect(coverageBounds([])).toBeNull();
   });
 });
 
-describe('coverageSubject — WHAT the highlight is, in the author\'s words', () => {
+describe('coverageSubject: WHAT the highlight is, in the author\'s words', () => {
   // ⚠ THE DEFECT THIS FIXES, in the owner's own sentence about the first
   // revision: the wash "read as 'something/information' — just didn't know what
   // it was". The canvas printed `band 0 · slots 0..32` and a cell count, and
@@ -308,7 +308,7 @@ describe('coverageSubject — WHAT the highlight is, in the author\'s words', ()
     expect(s).not.toContain('band null');
   });
 
-  it('a range of NO SLOTS is said in words — "a band at no slots" is not English', () => {
+  it('a range of NO SLOTS is said in words: "a band at no slots" is not English', () => {
     // DECIDED, not inherited. Substituting the empty phrase into either
     // sentence breaks it: the candidate reads "a band at no slots would
     // animate", and the band form would claim cells are highlighted while
@@ -325,7 +325,7 @@ describe('coverageSubject — WHAT the highlight is, in the author\'s words', ()
     }
   });
 
-  it('IS NEUTRAL — it names a subject, never a verdict', () => {
+  it('IS NEUTRAL: it names a subject, never a verdict', () => {
     for (const s of [coverageSubject('band', 0, slotRange(0, 8, 4)),
       coverageSubject('candidate', null, slotRange(34, 4, 2))]) {
       expect(s).not.toMatch(/warn|caution|careful|danger|problem|too many|excessiv|beware|!/i);
@@ -334,7 +334,7 @@ describe('coverageSubject — WHAT the highlight is, in the author\'s words', ()
   });
 });
 
-describe('bandOwningSlot — the walk that must not run off the end', () => {
+describe('bandOwningSlot: the walk that must not run off the end', () => {
   // `bandSlotBases` returns bands.length + 1 entries; the tail is where the NEXT
   // band would go. A walk over `bases` instead of over `tileCounts` indexes a
   // count one past the end, compares against NaN, and quietly reports the LAST
@@ -365,14 +365,14 @@ describe('bandOwningSlot — the walk that must not run off the end', () => {
   });
 });
 
-describe('markFromLayoutWord — what a click on one cell means', () => {
+describe('markFromLayoutWord: what a click on one cell means', () => {
   const bands = [band(4, 2)]; // slots 0..7
   const bases = bandSlotBases(bands);
   const counts = [8];
   const FIRST_PROMOTABLE = 8;
   const BLOB = 340;
 
-  it('an ANIMATED index selects that band — the map becomes band navigation', () => {
+  it('an ANIMATED index selects that band: the map becomes band navigation', () => {
     expect(markFromLayoutWord(ATTRS | 5, bases, counts, FIRST_PROMOTABLE, BLOB))
       .toEqual({ kind: 'band', index: 0, slot: 5 });
   });
@@ -382,7 +382,7 @@ describe('markFromLayoutWord — what a click on one cell means', () => {
       .toEqual({ kind: 'candidate', staticBase: 200, slot: 200 });
   });
 
-  it('a BLANK cell seeds nothing — it is not slot 0', () => {
+  it('a BLANK cell seeds nothing: it is not slot 0', () => {
     // Seeding 0 from a blank cell would mark the first ANIMATED slot from a cell
     // that draws no tile at all.
     expect(markFromLayoutWord(0, bases, counts, FIRST_PROMOTABLE, BLOB)).toEqual({ kind: 'blank' });
@@ -444,7 +444,7 @@ describe('band-coverage prints no slot span of its own', () => {
     expect(src.match(/slotSpanPhrase\(/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 
-  it('the half-open COVERAGE arithmetic is untouched — only the sentences moved', () => {
+  it('the half-open COVERAGE arithmetic is untouched: only the sentences moved', () => {
     // The scoping rule of this parcel, pinned rather than remembered: the
     // selection maths must stay exclusive. A "fix" that pushed `- 1` into
     // `rangeCovers` or `slotRange` would make every readout right and every

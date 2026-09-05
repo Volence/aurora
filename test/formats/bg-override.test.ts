@@ -246,7 +246,7 @@ describe('the ownership boundary (sole writer of record)', () => {
     expect(keys.indexOf('a_first')).toBeLessThan(keys.indexOf('layout'));
   });
 
-  it('sorts RECURSIVELY — inside a band, and inside a key it does not understand', () => {
+  it('sorts RECURSIVELY: inside a band, and inside a key it does not understand', () => {
     // Python's sort_keys is recursive, so "the equivalent on the Aurora side"
     // is too. A band is the in-contract nested object; the unknown key is the
     // one nothing in this repo models, and it must sort just the same.
@@ -486,7 +486,7 @@ describe('an empty `anims` key is unauthored, not invalid', () => {
 
 // ── The invariants ──────────────────────────────────────────────────────────
 
-describe('band invariants — each one is a document that would bake CLEANLY', () => {
+describe('band invariants: each one is a document that would bake CLEANLY', () => {
   it('accepts a well-formed band (the control every refusal below is measured against)', () => {
     expect(issuesOf(withOneBand())).toBe('');
   });
@@ -553,7 +553,7 @@ describe('band invariants — each one is a document that would bake CLEANLY', (
     expect(issuesOf(doc)).toMatch(/covers slots 0\.\.8 but the static tile blob has only 4 tiles/);
   });
 
-  it('refuses phases[0] that is not the tiles it covers — the identity that bakes cleanly', () => {
+  it('refuses phases[0] that is not the tiles it covers: the identity that bakes cleanly', () => {
     const doc = withOneBand();
     // The exact corruption a "merge that preserves anims" would ship:
     // regenerate the art only, keep the bands.
@@ -603,7 +603,7 @@ describe('band invariants — each one is a document that would bake CLEANLY', (
     expect(issuesOf(doc)).toBe('');
   });
 
-  it('refuses an `anims` key that is present but empty — on the WRITE path', () => {
+  it('refuses an `anims` key that is present but empty: on the WRITE path', () => {
     // aeon's own gate asserts the no-bands document has NO `anims` key: "an
     // empty `anims` key is neither absent nor authored". That binds the writer.
     // The reader's half of this is the normalization suite below.
@@ -641,7 +641,7 @@ describe('document invariants', () => {
     expect(issuesOf(doc)).toBe('');
   });
 
-  it('does NOT add animated slots to the capacity — they are a prefix of tiles', () => {
+  it('does NOT add animated slots to the capacity: they are a prefix of tiles', () => {
     // empyrean §5.1's correction, as a behaviour: a full 448-tile blob with a
     // band over its front is legal. Under the old `tiles + animated <= 448`
     // rule this document would have been refused, which is what would have told
@@ -696,7 +696,7 @@ describe('bg-override writer', () => {
     expect(text.startsWith(`{"${Object.keys(doc).slice().sort()[0]}":`)).toBe(true);
   });
 
-  it('is idempotent — the writer has one canonical rendering', () => {
+  it('is idempotent: the writer has one canonical rendering', () => {
     const doc = withOneBand();
     doc.palette = [7];
     const once = serializeBgOverride(doc);

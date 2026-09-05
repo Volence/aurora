@@ -67,7 +67,7 @@ describe('the fixture carries what the rows below need', () => {
   });
 });
 
-describe('bandOwningSlot — the prefix rule, transcribed', () => {
+describe('bandOwningSlot: the prefix rule, transcribed', () => {
   it('maps every prefix slot to exactly the band whose range covers it', () => {
     const bands = documentBands(GOLDEN);
     for (let i = 0; i < prefix; i++) {
@@ -159,7 +159,7 @@ describe('set-bg-override-tiles', () => {
     expect(() => makeSetBgOverrideTilesCommand(d, [])).toThrow(BgOverrideError);
   });
 
-  it('the command owns copies — mutating the caller\'s array after building it changes nothing', () => {
+  it('the command owns copies: mutating the caller\'s array after building it changes nothing', () => {
     const l = level();
     const h = new EditHistory();
     const px = flat(0x7);
@@ -176,7 +176,7 @@ describe('set-bg-override-tiles', () => {
   });
 });
 
-describe('set-bg-override-phases — one bank, independently', () => {
+describe('set-bg-override-phases: one bank, independently', () => {
   it('sets bank k without touching bank 0, the tiles, or any other band', () => {
     const l = level();
     const h = new EditHistory();
@@ -199,7 +199,7 @@ describe('set-bg-override-phases — one bank, independently', () => {
     expect(bytes(l)).toBe(GOLDEN_BYTES);
   });
 
-  it('setting bank 0 ALSO rewrites the prefix tiles — phase 0 IS the rest state', () => {
+  it('setting bank 0 ALSO rewrites the prefix tiles: phase 0 IS the rest state', () => {
     const l = level();
     const h = new EditHistory();
     const bandIndex = documentBands(GOLDEN).length - 1;
@@ -228,7 +228,7 @@ describe('set-bg-override-phases — one bank, independently', () => {
   });
 });
 
-describe('regenerate-shift — banks 1..7 from the EDITED phase 0, on demand', () => {
+describe('regenerate-shift: banks 1..7 from the EDITED phase 0, on demand', () => {
   it('rebuilds banks 1..7 with the same fill the creation door uses, leaving phase 0 alone', () => {
     const l = level();
     const h = new EditHistory();

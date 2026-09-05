@@ -50,8 +50,8 @@ const colOf = (index: number, stride = W) => index % stride;
 // 1. The arithmetic, derived from cellTileIndices and never from a literal
 // ───────────────────────────────────────────────────────────────────────────
 
-describe('cellCrossoverIndices — the mark is a subset of the cell, always', () => {
-  it("'cell' is EXACTLY what a stroke covers — the default cannot narrow anything", () => {
+describe('cellCrossoverIndices: the mark is a subset of the cell, always', () => {
+  it("'cell' is EXACTLY what a stroke covers: the default cannot narrow anything", () => {
     // The load-bearing back-compat row: if these two ever differ, every stroke
     // ever painted at the default width changed meaning.
     for (const [cc, cr] of [[0, 0], [3, 5], [31, 63]] as const) {
@@ -59,7 +59,7 @@ describe('cellCrossoverIndices — the mark is a subset of the cell, always', ()
     }
   });
 
-  it('the two halves PARTITION the cell — disjoint, and together the whole thing', () => {
+  it('the two halves PARTITION the cell: disjoint, and together the whole thing', () => {
     const all = cellTileIndices(4, 6, W);
     const left = cellCrossoverIndices(4, 6, W, 'left');
     const right = cellCrossoverIndices(4, 6, W, 'right');
@@ -67,7 +67,7 @@ describe('cellCrossoverIndices — the mark is a subset of the cell, always', ()
     expect([...left, ...right].sort((x, y) => x - y)).toEqual([...all].sort((x, y) => x - y));
   });
 
-  it('each half is ONE sub-tile column, full height — the shape the engine reads', () => {
+  it('each half is ONE sub-tile column, full height: the shape the engine reads', () => {
     // ONE COLUMN is what makes the pair flip; FULL HEIGHT is what makes it
     // readable at all, because aeon's bake samples the cell's TOP sub-tile row
     // and a mark on the bottom row alone would never be seen.
@@ -116,7 +116,7 @@ function apply(plane: Uint16Array, entries: { index: number; newColl: number }[]
   for (const e of entries) plane[e.index] = e.newColl;
 }
 
-describe('the stroke — geometry at 16px, the MARK at 8px', () => {
+describe('the stroke: geometry at 16px, the MARK at 8px', () => {
   it.each(['left', 'right'] as const)(
     '%s: reshapes the WHOLE cell and marks ONE half, on both planes, with the right value',
     (span) => {
@@ -154,7 +154,7 @@ describe('the stroke — geometry at 16px, the MARK at 8px', () => {
       }
     });
 
-  it("the per-cell ('words') form narrows identically — two forms of one tool, one rule", () => {
+  it("the per-cell ('words') form narrows identically: two forms of one tool, one rule", () => {
     const fill = planes(), cells = planes();
     const args = {
       x: 2, y: 2, w: 2, h: 1, tileWidth: W, bothPlanes: true,
@@ -199,7 +199,7 @@ describe('the stroke — geometry at 16px, the MARK at 8px', () => {
 // 3. THE DISCRIMINATOR — does the mark actually flip the layer?
 // ───────────────────────────────────────────────────────────────────────────
 
-describe('⚠ the cancellation — the same gesture at two widths, and only one works', () => {
+describe('⚠ the cancellation: the same gesture at two widths, and only one works', () => {
   /** Paint a two-way pair at `span` and audit it. Everything real: the shipped
    *  builders, the shipped audit. */
   function pairAt(span: CrossoverSpan) {
@@ -254,7 +254,7 @@ describe('⚠ the cancellation — the same gesture at two widths, and only one 
     return scanCancellingRuns(wa, wb, wa.length, W);
   }
 
-  it('does NOT fire on two SEPARATED one-way marks — the shape that actually works', () => {
+  it('does NOT fire on two SEPARATED one-way marks: the shape that actually works', () => {
     // The witness packet's §6 layout: plane A carries a mark at one place,
     // plane B at another, nothing paired. Reporting this would fire on the
     // correct answer, which is the failure mode a parity-only check has.
@@ -268,7 +268,7 @@ describe('⚠ the cancellation — the same gesture at two widths, and only one 
     expect(scanCancellingRuns(a, b, a.length, W)).toEqual([]);
   });
 
-  it('an ODD run of paired columns flips — the parity is the mechanism, not the width', () => {
+  it('an ODD run of paired columns flips: the parity is the mechanism, not the width', () => {
     // Three adjacent paired columns: A→B, B→A, A→B. Net: flipped. This is what
     // says the check models the traversal rather than testing `width % 2`
     // against a cell size it happens to know.

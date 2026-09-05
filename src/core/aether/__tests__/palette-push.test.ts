@@ -26,7 +26,7 @@ describe('Pal_Base geometry', () => {
     expect((PAL_BASE_LAST_LINE - PAL_BASE_FIRST_LINE + 1) * 16 * 2).toBe(PAL_BASE_BYTES);
   });
 
-  it('offsets line 1 to zero — the buffer starts at line 1, not line 0', () => {
+  it('offsets line 1 to zero: the buffer starts at line 1, not line 0', () => {
     expect(palBaseOffset(1, 0)).toBe(0);
     expect(palBaseOffset(1, 15)).toBe(30);
   });
@@ -41,7 +41,7 @@ describe('Pal_Base geometry', () => {
     expect(palBaseOffset(PAL_BASE_LAST_LINE, 15) + 2).toBe(PAL_BASE_BYTES);
   });
 
-  it('refuses line 0 — the character palette the engine never writes', () => {
+  it('refuses line 0: the character palette the engine never writes', () => {
     expect(() => palBaseOffset(0, 0)).toThrow(/line 0/i);
   });
 
@@ -159,7 +159,7 @@ describe('classicPaletteSymbol', () => {
 describe('planClassicPalettePushWords', () => {
   const words = Array.from({ length: 16 }, (_, i) => (i * 0x0102) & 0x0eee);
 
-  it('plans exactly ONE write — S1 has no dirty flag and none may be invented', () => {
+  it('plans exactly ONE write: S1 has no dirty flag and none may be invented', () => {
     // The VBlank copy is unconditional (writeCRAM v_palette,0 — sonic.asm:740
     // and five siblings), so a second "flag" write would target a symbol that
     // does not exist in sonic.lst and would gate the whole feature off.
@@ -168,7 +168,7 @@ describe('planClassicPalettePushWords', () => {
     expect(plan.symbols).toEqual(['v_palette_line_2']);
   });
 
-  it("writes 32 bytes at offset 0 of the line's OWN symbol — no base arithmetic", () => {
+  it("writes 32 bytes at offset 0 of the line's OWN symbol: no base arithmetic", () => {
     const plan = planClassicPalettePushWords(2, words);
     expect(plan.writes[0].symbol).toBe('v_palette_line_3');
     expect(plan.writes[0].offset).toBe(0);
@@ -184,7 +184,7 @@ describe('planClassicPalettePushWords', () => {
     expect(plan.writes[0].bytes[7]).toBe(0x06);
   });
 
-  it("allows line 0 — classic's line 0 is an ordinary act line, not aeon's character invariant", () => {
+  it("allows line 0: classic's line 0 is an ordinary act line, not aeon's character invariant", () => {
     expect(planClassicPalettePushWords(0, words).symbols).toEqual(['v_palette_line_1']);
   });
 });

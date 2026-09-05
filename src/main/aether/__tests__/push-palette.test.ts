@@ -182,7 +182,7 @@ describe('pushPaletteWords on a classic (S1) project', () => {
     expect((writes[0].params.bytes as string).length).toBe(2 + 64);
   });
 
-  it('pushes line 0 — an ordinary act line on classic', async () => {
+  it('pushes line 0: an ordinary act line on classic', async () => {
     const c = fakeClient({ symbols: s1Symbols });
     const r = await pushPaletteWords(c as never, 0, words, 'classic');
     expect(r.pushed).toBe(true);
@@ -190,7 +190,7 @@ describe('pushPaletteWords on a classic (S1) project', () => {
     expect(writes[0].params.addr).toBe('0x110000');
   });
 
-  it('keeps the pause/resume envelope — write_memory is require_paused', async () => {
+  it('keeps the pause/resume envelope: write_memory is require_paused', async () => {
     const c = fakeClient({ symbols: s1Symbols });
     await pushPaletteWords(c as never, 1, words, 'classic');
     const order = c.calls.map((x) => x.method);
@@ -198,7 +198,7 @@ describe('pushPaletteWords on a classic (S1) project', () => {
     expect(order.at(-1)).toBe('emulator/resume');
   });
 
-  it('gates NoSymbols against an aeon ROM — resolution IS the family detection', async () => {
+  it('gates NoSymbols against an aeon ROM: resolution IS the family detection', async () => {
     // A classic push while the running ROM only serves aeon symbols must grey
     // out, never write: the aeon listing has no v_palette_line_2.
     const c = fakeClient();                                // aeon default symbols
@@ -216,7 +216,7 @@ describe('pushPaletteWords on a classic (S1) project', () => {
     expect(c.calls).toHaveLength(0);
   });
 
-  it('defaults to the aeon geometry when no kind is given — existing callers unchanged', async () => {
+  it('defaults to the aeon geometry when no kind is given: existing callers unchanged', async () => {
     const c = fakeClient();
     const r = await pushPaletteWords(c as never, 1, words);
     expect(r.pushed).toBe(true);
@@ -232,7 +232,7 @@ describe('pushPaletteWords on a classic (S1) project', () => {
  * artist's ROM, and making it when the ROM was never asked is a fabrication.
  */
 describe('pushPalette and a server that does not serve what it needs', () => {
-  it('does NOT call an unserved lookup "no symbols" — it names the method', async () => {
+  it('does NOT call an unserved lookup "no symbols": it names the method', async () => {
     const c = fakeClient({ methods: ['emulator/write_memory', 'emulator/pause', 'emulator/resume'] });
     const r = await pushPaletteLine(c as never, 1, line());
 

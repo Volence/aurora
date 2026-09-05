@@ -144,7 +144,7 @@ describe('cycles: the three spellings are told apart and authored exactly', () =
     expect(optional).toEqual(['dir']);
   });
 
-  it('sets every field verbatim — no bound, no rounding — including values the engine will refuse', () => {
+  it('sets every field verbatim: no bound, no rounding, including values the engine will refuse', () => {
     const one = { ...newPreset(ID), cycles: [newCycleChannel()] };
     // line 0 is the character's and the constructor refuses it; period 0 and
     // a negative count are outside every ensure. All three are FORWARDED: the
@@ -155,7 +155,7 @@ describe('cycles: the three spellings are told apart and authored exactly', () =
     }
   });
 
-  it('dir — the only optional field — can be set and UNSET, and a required field cannot be unset', () => {
+  it('dir (the only optional field) can be set and UNSET, and a required field cannot be unset', () => {
     const one = { ...newPreset(ID), cycles: [newCycleChannel()] };
     const withDir = after(setCycleFieldCommand(library(one), ID, 0, 'dir', 1));
     expect(withDir.cycles![0].dir).toBe(1);
@@ -178,7 +178,7 @@ describe('cycles: the three spellings are told apart and authored exactly', () =
 // variants — positional, three states per index
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('variants: absent key, unreached slot, null slot, authored slot — all distinct', () => {
+describe('variants: absent key, unreached slot, null slot, authored slot; all distinct', () => {
   it('reads the key state and every slot state the schema names', () => {
     expect(variantsState(newPreset(ID))).toBe('absent');
     expect(variantsState({ ...newPreset(ID), variants: [] })).toBe('present');
@@ -215,7 +215,7 @@ describe('variants: absent key, unreached slot, null slot, authored slot — all
     expect(variantSlotIndices({ ...newPreset(ID), variants: [null, {}] })).toEqual([0, 1, 2]);
   });
 
-  it('extending slot 0: cleared writes [null]; authored writes [{}] — an object with no invented numbers', () => {
+  it('extending slot 0: cleared writes [null]; authored writes [{}], an object with no invented numbers', () => {
     const empty = { ...newPreset(ID), variants: [] };
     const cleared = after(setVariantSlotStateCommand(library(empty), ID, 0, 'cleared'));
     expect(cleared.variants).toEqual([null]);
@@ -223,7 +223,7 @@ describe('variants: absent key, unreached slot, null slot, authored slot — all
     expect(authored.variants).toEqual([{}]);
   });
 
-  it('clearing both slots is [null, null] — the schema\'s own spelling; there is no key-level null', () => {
+  it('clearing both slots is [null, null]: the schema\'s own spelling; there is no key-level null', () => {
     const one = after(setVariantSlotStateCommand(library({ ...newPreset(ID), variants: [] }), ID, 0, 'cleared'));
     const two = after(setVariantSlotStateCommand(library(one), ID, 1, 'cleared'));
     expect(two.variants).toEqual([null, null]);
@@ -392,7 +392,7 @@ describe('round trip: what the panel does not touch, it does not change', () => 
    * the codec frame survives a suite the codec's own round-trip passes. So the
    * two paths a preset takes through this module are asserted directly.
    */
-  it('newPreset authors NEITHER item-4 key — absent is a state, not a gap to fill', () => {
+  it('newPreset authors NEITHER item-4 key: absent is a state, not a gap to fill', () => {
     const fresh = newPreset(ID);
     expect('patch_world_ys' in fresh).toBe(false);
     expect('patch_motion' in fresh).toBe(false);

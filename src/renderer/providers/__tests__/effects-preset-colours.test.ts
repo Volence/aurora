@@ -181,7 +181,7 @@ describe('setColourCommand writes ONE entry and leaves the document otherwise id
     expect(strip(next)).toBe(strip(before));
   });
 
-  it('writes a plain decimal integer — the wire format does not move', () => {
+  it('writes a plain decimal integer: the wire format does not move', () => {
     const next = after(setColourCommand(library(cramPreset(74, [0])), ID, 0, 0, 3584));
     const written = (next.bands![0].on as { cram: { colours: number[] } }).cram.colours[0];
     expect(typeof written).toBe('number');
@@ -191,7 +191,7 @@ describe('setColourCommand writes ONE entry and leaves the document otherwise id
     expect(serializeEffectsPreset(next)).not.toContain('$0E00');
   });
 
-  it('the same word again is a NO-OP — the double commit burns no undo slot', () => {
+  it('the same word again is a NO-OP: the double commit burns no undo slot', () => {
     // `GenesisColorSliders` commits on pointerup AND on the blur that follows.
     // Without this, one drag would be two history entries and an undo would land
     // the author back on the colour they just picked.
@@ -272,7 +272,7 @@ describe('a colour must be a word the wire can hold', () => {
     expect(reason).toMatch(/swatch masks/);
   });
 
-  it('the bound is the ENTRY WIDTH, checked at both edges — no off-by-one', () => {
+  it('the bound is the ENTRY WIDTH, checked at both edges: no off-by-one', () => {
     expect(parseColours(String(LIMIT))).toEqual({ ok: true, colours: [LIMIT] });
     expect(parseColours(String(LIMIT + 1)).ok).toBe(false);
     expect(parseColours('0').ok).toBe(true);
@@ -282,14 +282,14 @@ describe('a colour must be a word the wire can hold', () => {
     expect(parseColours('0x10000').ok).toBe(false);
   });
 
-  it('one bad word in a list refuses the WHOLE list — a partial write is not a fix', () => {
+  it('one bad word in a list refuses the WHOLE list: a partial write is not a fix', () => {
     const r = parseColours('14 143584 3584');
     expect(r.ok).toBe(false);
     // And a legal list of the same shape still commits, so the row is not vacuous.
     expect(parseColours('14 3584 14')).toEqual({ ok: true, colours: [14, 3584, 14] });
   });
 
-  it('the STRICTER grid rule is deliberately NOT applied — sources disagree', () => {
+  it('the STRICTER grid rule is deliberately NOT applied: sources disagree', () => {
     // `core/agent/validation.ts` refuses `(word & $F111) !== 0` ("channels must
     // be even values 0-$E"); `core/formats/palette.ts`'s `sameGenesisColor` says
     // words differing only outside `GENESIS_WORD_MASK` are THE SAME COLOUR, and
@@ -368,7 +368,7 @@ describe('cramSpanAdvisory: a span that runs off the end of its line says so', (
     expect(cramSpanAdvisory(cramPreset(-4, [0, 0]).bands![0], ID, 0)).toBeNull();
   });
 
-  it('ADVISES — it does not refuse the value, which is aeon E.4\'s line', () => {
+  it('ADVISES: it does not refuse the value, which is aeon E.4\'s line', () => {
     // The panel must still WRITE a span the engine will reject: §E.4 forbids a
     // writer range-checking or clamping, so the author gets the engine's own
     // refusal with its measurement. The advisory is a sentence, and the command
@@ -424,7 +424,7 @@ describe('the panel reaches these derivations, and keeps the raw controls', () =
     expect(code).not.toMatch(/max=\{/);
   });
 
-  it('spells no CRAM geometry of its own — it asks the provider', () => {
+  it('spells no CRAM geometry of its own: it asks the provider', () => {
     // The panel's own law: a rule spelled in a component is a rule the advisory
     // beside it can disagree with.
     expect(code).not.toMatch(/>>\s*5/);

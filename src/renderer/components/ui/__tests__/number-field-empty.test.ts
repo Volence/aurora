@@ -100,7 +100,7 @@ function box(
   };
 }
 
-describe('NumberField — the empty box commits nothing', () => {
+describe('NumberField: the empty box commits nothing', () => {
   it('is really rendering a live number input (anti-vacuous guard for every row below)', () => {
     // If the harness silently rendered nothing, or `find` matched some other
     // element, every row below would be driving a handler that is not on
@@ -177,7 +177,7 @@ describe('NumberField — the empty box commits nothing', () => {
   });
 });
 
-describe('NumberField — a clamp to a non-zero floor no longer rewrites the box mid-typing', () => {
+describe('NumberField: a clamp to a non-zero floor no longer rewrites the box mid-typing', () => {
   it('keeps the author\'s own text while the box is focused', () => {
     // The adjacent wrinkle: "From tile" clamps to the first promotable slot, so
     // the FIRST keystroke of `19250` used to commit `2`, clamp up to 19200, and
@@ -239,7 +239,7 @@ describe('a refusal after a partial commit says the value already moved', () => 
     return { b, reasons };
   }
 
-  it('THE COLD READER\'S GESTURE — 250 over 40 names the 40 it destroyed', () => {
+  it('THE COLD READER\'S GESTURE: 250 over 40 names the 40 it destroyed', () => {
     const { b, reasons } = refusing(40);
     b.focus();
     b.type('2');    // legal on its own — commits
@@ -352,7 +352,7 @@ function find(node: unknown): React.ReactElement<Record<string, unknown>> | null
   return el.props ? find((el.props as { children?: unknown }).children) : null;
 }
 
-describe('ObjectInspector — the whole path from the keystroke to the commit', () => {
+describe('ObjectInspector: the whole path from the keystroke to the commit', () => {
   it('an emptied object field writes nothing (item 40\'s guard can finally fire)', () => {
     // Composed of the two techniques on purpose: `FieldRow` is walked for the
     // `NumberField` element it really renders (item 40's row), and that element
@@ -446,7 +446,7 @@ describe('fields.tsx wiring', () => {
     expect(commitAt, 'and the commit is behind that guard').toBeGreaterThan(guardAt);
   });
 
-  it('the box SELECTS its contents on focus — the cause of `40112`', () => {
+  it('the box SELECTS its contents on focus: the cause of `40112`', () => {
     // Behaviour, not source: the harness counts the `select()` the component
     // calls on the focused element.
     const b = box({ value: 112 });
@@ -515,7 +515,7 @@ describe('every NumberField on screen is the one with the contract', () => {
   const renderers = files.filter((f) => f.src.includes('<NumberField'));
 
   it('finds the call sites at all (anti-vacuous guard for the two rows below)', () => {
-    expect(renderers.length, 'no file renders a NumberField — the scan is dead').toBeGreaterThan(1);
+    expect(renderers.length, 'no file renders a NumberField: the scan is dead').toBeGreaterThan(1);
   });
 
   it('has exactly one definition of it, in fields.tsx', () => {

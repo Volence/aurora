@@ -66,14 +66,14 @@ const code = panel
 function bodyOf(name: string): string {
   const at = code.indexOf(`function ${name}(`);
   if (at < 0) {
-    throw new Error(`${name} is gone from BandPresetPanel.tsx — this file measures it`);
+    throw new Error(`${name} is gone from BandPresetPanel.tsx: this file measures it`);
   }
   const rest = code.slice(at);
   // The function's own closing brace: the first `}` in column 0 after it. Every
   // brace inside the body is indented, and this does not depend on what happens
   // to be written next in the file.
   const end = rest.indexOf('\n}\n');
-  if (end < 0) throw new Error(`${name} has no closing brace in column 0 — the slice is unbounded`);
+  if (end < 0) throw new Error(`${name} has no closing brace in column 0: the slice is unbounded`);
   return rest.slice(0, end + 3);
 }
 
@@ -102,7 +102,7 @@ describe('the slice this file measures is bounded', () => {
   });
 });
 
-describe('the band card has exactly the band\'s own shape — every key, one control', () => {
+describe('the band card has exactly the band\'s own shape: every key, one control', () => {
   /**
    * ⚠ ONE CONTROL PER BAND KEY, AND THE COUNT IS DERIVED FROM THE SCHEMA. The
    * band object is CLOSED, so a control for anything outside
@@ -116,7 +116,7 @@ describe('the band card has exactly the band\'s own shape — every key, one con
    * still counted only `<NumberField>` would silently stop covering two of the
    * four keys.
    */
-  it('mounts one control per band key — spinners, one select, one presence toggle', () => {
+  it('mounts one control per band key: spinners, one select, one presence toggle', () => {
     const keys = [...EFFECTS_PRESET_BASE_SWAP_KEYS, ...EFFECTS_PRESET_BASE_SWAP_OPTIONAL_KEYS];
     expect(keys).toHaveLength(4);
     // line, target, restore_line — three number fields.
@@ -268,7 +268,7 @@ describe('the panel spells no base_swap rule of its own', () => {
     expect(EFFECTS_PRESET_BASE_SWAP_PLANES.length).toBe(2);
   });
 
-  it('does no address arithmetic of its own — no hex, no masking, no rounding', () => {
+  it('does no address arithmetic of its own: no hex, no masking, no rounding', () => {
     expect(card).not.toMatch(/toString\(16\)/);
     expect(card).not.toMatch(/0x[0-9a-fA-F]/);
     // A bitwise mask or a shift would be the panel re-deriving what reg $02

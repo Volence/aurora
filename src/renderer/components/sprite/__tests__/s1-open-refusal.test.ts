@@ -87,7 +87,7 @@ const SPRING_SET: DiscoveredSpriteSet = {
   frameSources: [{ firstFrame: 3, lastFrame: 5, art: 'artnem/Spring Vertical.nem', compression: 'nemesis' }],
 };
 
-describe('openDiscoveredSet — Sonic DPLC open captures a save-back target', whenS1Files('the Sonic DPLC open', spriteSetFiles(SONIC_SET)), () => {
+describe('openDiscoveredSet: Sonic DPLC open captures a save-back target', whenS1Files('the Sonic DPLC open', spriteSetFiles(SONIC_SET)), () => {
   it('opens 88 frames and captures an in-place target carrying compression + DPLC lists', async () => {
     const ok = await openDiscoveredSet(S1DIR, SONIC_SET, 'uncompressed');
     expect(ok).toBe(true);
@@ -117,14 +117,14 @@ describe('openDiscoveredSet — Sonic DPLC open captures a save-back target', wh
     expect(src.originalTiles).toHaveLength(uncBytes / 32);
   });
 
-  it('animations stay ABSENT — the sonani dialect is not parsed (honest empty timeline)', async () => {
+  it('animations stay ABSENT: the sonani dialect is not parsed (honest empty timeline)', async () => {
     await openDiscoveredSet(S1DIR, SONIC_SET, 'uncompressed');
     expect(useSpriteStore.getState().characterAnims).toEqual([]);
     expect(useSpriteStore.getState().steps).toEqual([]);
   });
 });
 
-describe('openDiscoveredSet — Spring per-frame art swap', whenS1Files('the Spring per-frame art swap', spriteSetFiles(SPRING_SET)), () => {
+describe('openDiscoveredSet: Spring per-frame art swap', whenS1Files('the Spring per-frame art swap', spriteSetFiles(SPRING_SET)), () => {
   it('frames 3-5 draw Nem_VSpring (hand-derived pixels); frames 0-2 keep Nem_HSpring; save refuses honestly', async () => {
     // Control open: the OLD single-pool behavior (no frameSources).
     await openDiscoveredSet(S1DIR, { ...SPRING_SET, frameSources: undefined }, 'nemesis');
@@ -186,7 +186,7 @@ describe('openDiscoveredSet — Spring per-frame art swap', whenS1Files('the Spr
   });
 });
 
-describe('openDiscoveredSet — positive control: the capture guard is not over-tightened', whenS1Files('the Signpost positive control', spriteSetFiles(SIGNPOST_SET)), () => {
+describe('openDiscoveredSet (positive control): the capture guard is not over-tightened', whenS1Files('the Signpost positive control', spriteSetFiles(SIGNPOST_SET)), () => {
   it('Signpost (plain non-DPLC Nemesis) still captures an in-place target, no refusal recorded', async () => {
     const ok = await openDiscoveredSet(S1DIR, SIGNPOST_SET, 'nemesis');
     expect(ok).toBe(true);

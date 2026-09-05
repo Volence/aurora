@@ -176,7 +176,7 @@ describe('factor picker', () => {
 });
 
 describe('scene list and section assignment', () => {
-  it('labels a scene by its name, falling back to the id — never an empty row', () => {
+  it('labels a scene by its name, falling back to the id: never an empty row', () => {
     const named = newEffectsScene('canopy', 'Canopy at dusk');
     const unnamed = newEffectsScene('rocks');
     expect(sceneListEntries(library([named, unnamed]))).toEqual([
@@ -272,7 +272,7 @@ describe('scene commands', () => {
     expect(JSON.parse(serializeEffectsScene(cmd!.newScene!))).not.toHaveProperty('name');
   });
 
-  it('does not touch the live library — only the command carries the new state', () => {
+  it('does not touch the live library: only the command carries the new state', () => {
     const live = canopy();
     const lib = library([live]);
     setLayerFieldCommand(lib, 'canopy', 0, 'world_y', 512);
@@ -356,7 +356,7 @@ describe('scene commands', () => {
   });
 });
 
-describe('resolveSelectedScene — the selection the panel and the map canvas SHARE', () => {
+describe('resolveSelectedScene: the selection the panel and the map canvas SHARE', () => {
   // Lifted out of EffectsScenePanel by ROADMAP item 43 so MapViewport can
   // resolve the same id the same way. Every case below is behaviour the panel
   // already had; the point of testing it here is that it now has two callers
@@ -369,7 +369,7 @@ describe('resolveSelectedScene — the selection the panel and the map canvas SH
     expect(resolveSelectedScene(lib, 'canyon')?.id).toBe('canyon');
   });
 
-  it('falls back to the FIRST scene for a stale id — undo-a-create, or another project', () => {
+  it('falls back to the FIRST scene for a stale id: undo-a-create, or another project', () => {
     const lib = library([canopy(), canyon()]);
     expect(resolveSelectedScene(lib, 'deleted_by_undo')?.id).toBe('canopy');
   });
@@ -405,7 +405,7 @@ const LAYER_PROPS = S.$defs.layer.properties as Record<string, any>;
 const baseLayer = (): EffectsLayer => ({ world_y: 0, fa: 'FACTOR_1', fb: 'FACTOR_1' });
 
 describe('layerExtras (parcel E)', () => {
-  it('a layer at every schema default has NOTHING extra — no empty line on the card', () => {
+  it('a layer at every schema default has NOTHING extra: no empty line on the card', () => {
     const dflt: EffectsLayer = {
       ...baseLayer(),
       dsa: LAYER_PROPS.dsa.default, dsb: LAYER_PROPS.dsb.default, phase: LAYER_PROPS.phase.default,
@@ -445,7 +445,7 @@ describe('layerExtras (parcel E)', () => {
     expect(layerExtrasLine(layer)).toBe(extras.map((e) => e.text).join(' · '));
   });
 
-  it('spells every table form the codec knows — on tableRefLabel, which the deform ROWS now carry', () => {
+  it('spells every table form the codec knows: on tableRefLabel, which the deform ROWS now carry', () => {
     // `tableRefLabel` left the extras line with `deform` in wave 2 and is
     // exported for the table sub-form's title. Same six spellings, checked at
     // the function rather than through a line that no longer prints them.
@@ -479,7 +479,7 @@ describe('layerExtras (parcel E)', () => {
   // test/formats/aeon-fixture-currency.test.ts. See
   // docs/reviews/2026-08-28-golden-live-tree.md.
   const SHIPPED = resolve(__dirname, '../../../../test/fixtures/effects/ojz_act1_depth.json');
-  it('every layer of the shipped ojz_act1_depth.json — nothing extra on any layer; the curve is on the controls, not the line', () => {
+  it('every layer of the shipped ojz_act1_depth.json: nothing extra on any layer; the curve is on the controls, not the line', () => {
     // Committed here, so absence is a broken checkout: hard failure, not a skip.
     const text = readFileSync(SHIPPED, 'utf8');
     const scene = parseEffectsScene(text, 'ojz_act1_depth');
@@ -589,7 +589,7 @@ describe('curve / vsplit controls (parcel H)', () => {
     expect(clampVSplitAt(4000)).toBe(LAYER_PROPS.vsplit.oneOf[1].properties.at.maximum);
   });
 
-  it('advises when the ramp goes nowhere — the engine refuses curve.to == fb (scene_dsl layer() guard 4)', () => {
+  it('advises when the ramp goes nowhere: the engine refuses curve.to == fb (scene_dsl layer() guard 4)', () => {
     expect(curveAdvisory(baseLayer())).toBeNull();
     expect(curveAdvisory({ ...baseLayer(), fb: 'FACTOR_1_4', curve: { to: 'FACTOR_3_8' } })).toBeNull();
     const flat = curveAdvisory({ ...baseLayer(), fb: 'FACTOR_1_4', curve: { to: 'FACTOR_1_4' } });
@@ -607,7 +607,7 @@ describe('curve / vsplit controls (parcel H)', () => {
   // option DISABLED WITH A REASON — never dropped.
   // -------------------------------------------------------------------------
 
-  it('curveFieldOptions RENDERS the refused value, disabled, with the engine\'s reason — never drops it', () => {
+  it('curveFieldOptions RENDERS the refused value, disabled, with the engine\'s reason: never drops it', () => {
     const opts = curveFieldOptions({ fb: 'FACTOR_1_4' });
     // STILL PRESENT. A `<select>` missing its own value silently shows a
     // different one, so a file carrying `curve.to FACTOR_1_4` beside
@@ -725,7 +725,7 @@ describe('curve / vsplit controls (parcel H)', () => {
     }
   });
 
-  it('the custom (packed) escape hatch is never disabled — it is a sentinel, not a value', () => {
+  it('the custom (packed) escape hatch is never disabled: it is a sentinel, not a value', () => {
     for (const fb of EFFECTS_FACTOR_NAMES) {
       const custom = curveFieldOptions({ fb }).find((o) => o.value === CUSTOM_FACTOR_VALUE);
       expect(custom!.disabled, `custom must stay reachable with fb ${fb}`).toBe(false);
@@ -982,7 +982,7 @@ describe('curve / vsplit controls (parcel H)', () => {
 // Which space a layer top is authored in (owner feedback 2026-08-26, point 4)
 // ---------------------------------------------------------------------------
 
-describe('layerTopSpace — a locked scene authors screen lines, an unlocked one world Y', () => {
+describe('layerTopSpace: a locked scene authors screen lines, an unlocked one world Y', () => {
   // The engine's own words (aeon scene_dsl.emp `scene_plane_line`): "For a
   // locked plane the authoring space IS the plane, so the mapping is the
   // identity." Both shipped scenes are locked, so for every scene that exists
@@ -1107,7 +1107,7 @@ const sceneWith = (patch: Partial<EffectsScene>): EffectsScene =>
 // most of them assert that a layer is NOT advised, because a blanket 3..223
 // would make Aurora refuse scenes the build accepts.
 
-describe('fireLineAdvisory — only the layers that actually become raster fires', () => {
+describe('fireLineAdvisory: only the layers that actually become raster fires', () => {
   const locked = (vo = 0) =>
     ({ ...newEffectsScene('l', 'L'), v_factor: EFFECTS_V_FACTOR_LOCK, v_offset: vo });
   const unlocked = () => ({ ...newEffectsScene('u', 'U'), v_factor: 2, v_center: 0, v_offset: 0 });
@@ -1159,7 +1159,7 @@ describe('fireLineAdvisory — only the layers that actually become raster fires
     for (const y of [0, 1, 2]) expect(fireLineAdvisory(locked(), split(y))).not.toBeNull();
   });
 
-  it('the LINE is `top - v_offset`, not the top — both shipped scenes hide this', () => {
+  it('the LINE is `top - v_offset`, not the top: both shipped scenes hide this', () => {
     // aeon scene_dsl.emp:2456-2461, `scene_vsplit_line`. v_offset is 0 in both
     // shipped scenes, which is exactly why `3 <= world_y <= 223` would have
     // looked right forever.
@@ -1226,7 +1226,7 @@ describe('fireLineAdvisory — only the layers that actually become raster fires
 // a literal — one scene's GAME DATA, not an engine rule, and there is no engine
 // cap on vsplit count at all. It is deliberately NOT transcribed here.
 
-describe('vsplitOrderAdvisory — the ordering rule, transcribed from the DSL and not from game data', () => {
+describe('vsplitOrderAdvisory: the ordering rule, transcribed from the DSL and not from game data', () => {
   const locked = (vo = 0) =>
     ({ ...newEffectsScene('l', 'L'), v_factor: EFFECTS_V_FACTOR_LOCK, v_offset: vo });
   const unlocked = () => ({ ...newEffectsScene('u', 'U'), v_factor: 2, v_center: 0, v_offset: 0 });
@@ -1249,7 +1249,7 @@ describe('vsplitOrderAdvisory — the ordering rule, transcribed from the DSL an
     expect(back[1]).toContain('not BELOW');
   });
 
-  it('THE FIRST SPLIT CAN NEVER TRIP IT — the engine seeds `prev` at -1', () => {
+  it('THE FIRST SPLIT CAN NEVER TRIP IT: the engine seeds `prev` at -1', () => {
     for (const y of [0, 3, 223, 500]) {
       expect(vsplitOrderAdvisory(locked(), [split(y)], 0)).toBeNull();
     }
@@ -1310,7 +1310,7 @@ describe('vsplitOrderAdvisory — the ordering rule, transcribed from the DSL an
 // produces no advisory, and so does a completely broken implementation. Every
 // positive row below is paired with a LOCKED control that must stay silent.
 
-describe('vsplitLockAdvisory — a split on a camera-tracked plane, said on the LAYER', () => {
+describe('vsplitLockAdvisory: a split on a camera-tracked plane, said on the LAYER', () => {
   const locked = () => ({ ...newEffectsScene('l', 'L'), v_factor: EFFECTS_V_FACTOR_LOCK });
   const unlocked = (vf = 3) => ({ ...newEffectsScene('u', 'U'), v_factor: vf });
   const plain = (world_y = 40): EffectsLayer => ({ world_y, fa: 'FACTOR_1', fb: 'FACTOR_1' });
@@ -1341,14 +1341,14 @@ describe('vsplitLockAdvisory — a split on a camera-tracked plane, said on the 
     }
   });
 
-  it('`at: 0` is a REAL split — the test is presence, not truthiness', () => {
+  it('`at: 0` is a REAL split: the test is presence, not truthiness', () => {
     // `layerEmitsFire` transcribes `scene_vsplit_is_none(...) == 0`. A
     // falsiness test here would exempt the one split whose payload is zero.
     expect(vsplitLockAdvisory(unlocked(), split(40, 0))).not.toBeNull();
     expect(vsplitLockAdvisory(unlocked(), { ...plain(), vsplit: 'none' })).toBeNull();
   });
 
-  it('⚠ NAMES THE MECHANISM, not just the illegality — the FIRE_FLOOR_IS_THE_BOX precedent', () => {
+  it('⚠ NAMES THE MECHANISM, not just the illegality: the FIRE_FLOOR_IS_THE_BOX precedent', () => {
     const a = vsplitLockAdvisory(unlocked(3), split()) ?? '';
     // Composed from the shared clauses, never retyped here.
     expect(a).toContain(VSPLIT_LOCK_CLAUSES.mechanism);
@@ -1364,7 +1364,7 @@ describe('vsplitLockAdvisory — a split on a camera-tracked plane, said on the 
     expect(a).toContain(`${EFFECTS_V_FACTOR_LOCK} is the lock sentinel`);
   });
 
-  it('⚠ CARRIES BOTH REMEDIES — they are different products, not two spellings', () => {
+  it('⚠ CARRIES BOTH REMEDIES: they are different products, not two spellings', () => {
     const a = vsplitLockAdvisory(unlocked(), split()) ?? '';
     expect(a).toContain(VSPLIT_LOCK_CLAUSES.remedyLock);
     expect(a).toContain(VSPLIT_LOCK_CLAUSES.remedyHorizontal);
@@ -1378,14 +1378,14 @@ describe('vsplitLockAdvisory — a split on a camera-tracked plane, said on the 
     expect(VSPLIT_LOCK_CLAUSES.remedyHorizontal).toMatch(/every frame/);
   });
 
-  it('says the WHOLE SCENE is refused, because it is — the fault is not this layer\'s alone', () => {
+  it('says the WHOLE SCENE is refused, because it is: the fault is not this layer\'s alone', () => {
     // `scene()` refuses the constructor call. Wording that blamed the layer
     // would send the author to delete a split when locking the plane keeps it.
     expect(vsplitLockAdvisory(unlocked(), split())).toContain('WHOLE SCENE');
   });
 });
 
-describe('sceneVsplitLockAdvisory — the same rule with the SCENE as its subject', () => {
+describe('sceneVsplitLockAdvisory: the same rule with the SCENE as its subject', () => {
   const sceneWith = (v_factor: number, layers: EffectsLayer[]) =>
     ({ ...newEffectsScene('s', 'S'), v_factor, layers });
   const plain = (world_y = 40): EffectsLayer => ({ world_y, fa: 'FACTOR_1', fb: 'FACTOR_1' });
@@ -1397,7 +1397,7 @@ describe('sceneVsplitLockAdvisory — the same rule with the SCENE as its subjec
     expect(sceneVsplitLockAdvisory(sceneWith(EFFECTS_V_FACTOR_LOCK, layers))).toBeNull();
   });
 
-  it('⚠ DISCRIMINATING: unlocked with NO split is silent — that scene is perfectly legal', () => {
+  it('⚠ DISCRIMINATING: unlocked with NO split is silent; that scene is perfectly legal', () => {
     // The other half of the pair. A build that keyed only on `v_factor` would
     // shout at every camera-tracked scene in the game.
     expect(sceneVsplitLockAdvisory(sceneWith(4, [plain(0), plain(80)]))).toBeNull();
@@ -1414,7 +1414,7 @@ describe('sceneVsplitLockAdvisory — the same rule with the SCENE as its subjec
     expect(many).toContain('layers 0, 2, 3 author Plane B splits');
   });
 
-  it('composes the SAME clauses as the layer sentence — one rule, not three', () => {
+  it('composes the SAME clauses as the layer sentence: one rule, not three', () => {
     const s = sceneWith(4, [split(0)]);
     const scn = sceneVsplitLockAdvisory(s) ?? '';
     const lyr = vsplitLockAdvisory(s, s.layers[0]) ?? '';
@@ -1500,7 +1500,7 @@ describe('sceneVsplitLockAdvisory — the same rule with the SCENE as its subjec
     }
   });
 
-  it('⚠ O15: WHICH LAYERS is in the diagnosis — the half that can never be hidden', () => {
+  it('⚠ O15: WHICH LAYERS is in the diagnosis; the half that can never be hidden', () => {
     // The scene surface is the only one that can name the guilty layers, and it
     // is the fact the v_factor route destroys. A refactor that moved it into
     // the mechanism would put the one irreplaceable fact behind a click.
@@ -1598,7 +1598,7 @@ describe('clampLayerTop bounds a fire-emitting layer to the fire line, and nothi
 // because without one the suite cannot tell "the fire bound works" from
 // "everything is bounded".
 
-describe('guideBoundNotice — the fire bound is a MOVING wall, and it now says so', () => {
+describe('guideBoundNotice: the fire bound is a MOVING wall, and it now says so', () => {
   const locked = (vo = 0) =>
     ({ ...newEffectsScene('l', 'L'), v_factor: EFFECTS_V_FACTOR_LOCK, v_offset: vo });
   const unlocked = (vo = 0) =>
@@ -1629,7 +1629,7 @@ describe('guideBoundNotice — the fire bound is a MOVING wall, and it now says 
     + ` (lines 0-${EFFECTS_FIRE_LINE_MIN - 1} belong to the priming records)`;
   const FIRE_REMEDY = `drop the split: a layer without one may sit anywhere in 0..${PLANE_LINE_SPAN - 1}`;
 
-  it('the bound MOVES with v_offset — four offsets, four different floors', () => {
+  it('the bound MOVES with v_offset: four offsets, four different floors', () => {
     // ANTI-FIXED-WALL: if any of these coincided, the row could not tell a
     // derived bound from a literal.
     expect(new Set(OFFSETS.map(fireMin)).size).toBe(OFFSETS.length);
@@ -1669,7 +1669,7 @@ describe('guideBoundNotice — the fire bound is a MOVING wall, and it now says 
     }
   });
 
-  it('SAYS NOTHING anywhere inside the band — the whole legal strip, at every v_offset', () => {
+  it('SAYS NOTHING anywhere inside the band: the whole legal strip, at every v_offset', () => {
     for (const vo of OFFSETS) {
       const scene = locked(vo);
       for (let y = fireMin(vo); y <= fireMax(vo); y++) {
@@ -1841,7 +1841,7 @@ describe('guideBoundNotice — the fire bound is a MOVING wall, and it now says 
   });
 });
 
-describe('tableRef — every form the contract admits, derived from it', () => {
+describe('tableRef: every form the contract admits, derived from it', () => {
   it('the dropdown offers exactly the schema branches, in schema order', () => {
     const want = TABLE_BRANCHES.map((b) => ('bin' in b.properties ? 'bin' : b.properties.generator.const));
     expect(tableRefFormOptions().map((o) => o.value)).toEqual(want);
@@ -1992,7 +1992,7 @@ describe('tableRef — every form the contract admits, derived from it', () => {
     expect(tableRefAdvisory({ generator: 'zero' })).toBeNull();
   });
 
-  it('period is a PICKER over the divisors, computed — not a spinner over 256 values', () => {
+  it('period is a PICKER over the divisors, computed, not a spinner over 256 values', () => {
     // ROADMAP row 63. The engine's rule is `256 % period == 0`
     // (parallax_dsl.emp:52 and :87, both measured refusing at 100 and each
     // naming its own generator), so exactly nine values build. The spinner
@@ -2139,7 +2139,7 @@ describe('the four deform attachments read and write', () => {
     expect(S.$defs.sceneDeform.oneOf[1].properties.shared.properties.speed.minimum).toBeUndefined();
   });
 
-  it('setSceneFieldCommand carries an OBJECT value — the first non-scalar on this path', () => {
+  it('setSceneFieldCommand carries an OBJECT value: the first non-scalar on this path', () => {
     const lib = library([newEffectsScene('s')]);
     const cmd = setSceneFieldCommand(lib, 's', 'deform_fg', { shared: { table, speed: 3 } });
     expect(cmd!.newScene!.deform_fg).toEqual({ shared: { table, speed: 3 } });
@@ -2155,7 +2155,7 @@ describe('the four deform attachments read and write', () => {
     expect('deform_bg' in cleared!.newScene!).toBe(false);
   });
 
-  it('an attachment SPELLED "none" on disk is left as spelled — clearing it is a no-op', () => {
+  it('an attachment SPELLED "none" on disk is left as spelled: clearing it is a no-op', () => {
     // The rule setLayerFieldCommand has always had for curve/vsplit, which the
     // scene path had no none-defaulted key to need until wave 2. Without it,
     // toggling the row off would silently rewrite a hand-authored line.
@@ -2187,7 +2187,7 @@ describe('the four deform attachments read and write', () => {
   });
 });
 
-describe('deform advisories — what the build would refuse, said first', () => {
+describe('deform advisories: what the build would refuse, said first', () => {
   const table = { generator: 'sine' as const, amplitude: 8, period: 64 };
   const shared = { shared: { table, speed: 0 } } as const;
   const own = { own: { table, shift_a: 0, shift_b: 0, phase: 0, speed: 0 } } as const;
@@ -2234,7 +2234,7 @@ describe('deform advisories — what the build would refuse, said first', () => 
     expect(sceneDeformAdvisories(scene)).toEqual([]);
   });
 
-  it('V deform without a left_column_mask policy — and the advisory names the ROW that answers it', () => {
+  it('V deform without a left_column_mask policy: the advisory names the ROW that answers it', () => {
     const scene = sceneWith({ v_deform: columns });
     const a = sceneDeformAdvisories(scene).join('\n');
     expect(a).toMatch(/no left_column_mask policy/);
@@ -2310,7 +2310,7 @@ describe('deform advisories — what the build would refuse, said first', () => 
     }
   });
 
-  it('a curve layer beside an anchor with LIVE deform shifts — the fourth guard-5 ensure', () => {
+  it('a curve layer beside an anchor with LIVE deform shifts: the fourth guard-5 ensure', () => {
     // ROADMAP row 64, aeon scene_dsl.emp:1251. MEASURED before it was believed:
     // the identical document builds rc=1 with "this scene carries a curve layer
     // AND an anchor with live deform shifts (anchor dsa 3 / dsb 2 …)" while
@@ -2374,7 +2374,7 @@ describe('deform advisories — what the build would refuse, said first', () => 
       .toBe(S.properties.anchor.oneOf[1].properties.at.properties.dsa.minimum);
   });
 
-  it('every advisory is ADVICE — the writer still emits each of these documents', () => {
+  it('every advisory is ADVICE: the writer still emits each of these documents', () => {
     // The posture scene.ts states: Aurora pre-checks, sigil is the rulebook. A
     // scene Aurora warns about must still save, or the editor has become a
     // second rulebook free to refuse what the build accepts.
@@ -2410,7 +2410,7 @@ describe('deform advisories — what the build would refuse, said first', () => 
 //   :1347 factor0_lock, half two: no live plane-B amplitude WITH a table
 //   :1354 sprite_mask -> refused outright
 
-describe('left_column_mask — the policy, gated both ways on v_deform', () => {
+describe('left_column_mask: the policy, gated both ways on v_deform', () => {
   const MASK_VALUES = S.properties.left_column_mask.enum as string[];
   const MASK_DEFAULT = S.properties.left_column_mask.default as string;
   const table = { generator: 'sine' as const, amplitude: 8, period: 64 };
@@ -2545,7 +2545,7 @@ describe('left_column_mask — the policy, gated both ways on v_deform', () => {
   });
 
   // ── the mutual gate (scene_dsl.emp:1288 / :1293) ────────────────────────
-  it('the row is visible when there is a V deform — or when a stale policy needs clearing', () => {
+  it('the row is visible when there is a V deform, or when a stale policy needs clearing', () => {
     expect(leftColumnMaskRowVisible(newEffectsScene('plain'))).toBe(false);
     expect(leftColumnMaskRowVisible(sceneWith({ v_deform: columns }))).toBe(true);
     // The build-refused state a hand-edited file can reach: policy, no subject.
@@ -2586,7 +2586,7 @@ describe('left_column_mask — the policy, gated both ways on v_deform', () => {
     expect(MASK_DEFAULT).not.toBe('none');
   });
 
-  it('curve and deform on one strip is advised — two controls four rows apart on one card', () => {
+  it('curve and deform on one strip is advised: two controls four rows apart on one card', () => {
     const off = S.$defs.layer.properties.dsb.default as number;
     const plain: EffectsLayer = { world_y: 0, fa: 'FACTOR_1', fb: 'FACTOR_1' };
     expect(layerCurveDeformAdvisory(plain)).toBeNull();
@@ -2610,7 +2610,7 @@ describe('left_column_mask — the policy, gated both ways on v_deform', () => {
     })).toMatch(/both a curve and its own deform table/);
   });
 
-  it('every one of these is ADVICE — the writer still emits each document', () => {
+  it('every one of these is ADVICE: the writer still emits each document', () => {
     const bad = sceneWith({ v_deform: columns, left_column_mask: 'factor0_lock' });
     bad.layers[0] = {
       ...bad.layers[0], curve: { to: 'FACTOR_1_2' },
@@ -2684,7 +2684,7 @@ describe('a Plane A factor that does not track the camera gets a sentence', () =
     expect(factorOptions().map((o) => o.value)).toContain('FACTOR_1_8');
   });
 
-  it('is RENDERED under the fa control — the panel is wired to it', () => {
+  it('is RENDERED under the fa control: the panel is wired to it', () => {
     const panel = readFileSync(
       resolve(__dirname, '../../components/effects/EffectsScenePanel.tsx'), 'utf8');
     // Between the fa row and the fb row, not somewhere else on the card.

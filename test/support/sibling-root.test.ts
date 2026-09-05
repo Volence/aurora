@@ -108,7 +108,7 @@ function runBoth(body: string, env: Record<string, string> = {}): Run {
   };
 }
 
-describe('sibling-root: step 1 — the explicit checkout variable', () => {
+describe('sibling-root: step 1: the explicit checkout variable', () => {
   it('AEON_DIR answers, and the source names step 1', () => {
     const suite = makeFakeSuite();
     const elsewhere = mkdtempSync(resolve(tmpdir(), 'aurora-aeon-copy-'));
@@ -191,7 +191,7 @@ describe('sibling-root: the alias announcement', () => {
     expect(r.stderr).toContain('AURORA_AEON_REPO is a transitional alias');
   });
 
-  it('THE CANONICAL NAME PRINTS NOTHING — the anti-vacuous half of the row above', () => {
+  it('THE CANONICAL NAME PRINTS NOTHING: the anti-vacuous half of the row above', () => {
     const a = mkdtempSync(resolve(tmpdir(), 'aurora-aeon-a-'));
     const r = runBoth('process.stdout.write(R.siblingPath("aeon"));', { AEON_DIR: a });
     expect(r.stdout).toBe(a);
@@ -207,7 +207,7 @@ describe('sibling-root: the alias announcement', () => {
   });
 });
 
-describe('sibling-root: step 2 — EMPYREAN_SUITE_ROOT joined with the repo name', () => {
+describe('sibling-root: step 2: EMPYREAN_SUITE_ROOT joined with the repo name', () => {
   it('resolves a peer under a suite root that exists only in a tmpdir', () => {
     const suite = makeFakeSuite();
     const out = run(
@@ -220,7 +220,7 @@ describe('sibling-root: step 2 — EMPYREAN_SUITE_ROOT joined with the repo name
     expect(source).toMatch(/^step 2: EMPYREAN_SUITE_ROOT=/);
   });
 
-  it('STILL OWES STEP 1 — the contract amendment, as a row', () => {
+  it('STILL OWES STEP 1: the contract amendment, as a row', () => {
     const suite = makeFakeSuite();
     const elsewhere = mkdtempSync(resolve(tmpdir(), 'aurora-aeon-copy-'));
     const out = run(
@@ -255,7 +255,7 @@ describe('sibling-root: step 2 — EMPYREAN_SUITE_ROOT joined with the repo name
   });
 });
 
-describe('sibling-root: step 3 — derivation from this repo, via --git-common-dir', () => {
+describe('sibling-root: step 3: derivation from this repo, via --git-common-dir', () => {
   // Called INSIDE each row, never in the describe body: a throw during
   // collection takes the whole file and every row in it (fixture-tree.ts's
   // `describeRequiringFixture` header records three files and 29 tests lost
@@ -341,8 +341,8 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
     } catch (e) {
       ctx.skip(
         'SKIPPED, NOT PASSED: could not build a linked worktree to measure from, so the '
-        + 'property step 3 exists for — --git-common-dir answering where --show-toplevel '
-        + `answers wrongly — was NOT measured by this run. \`git worktree add\` in ${repo} `
+        + 'property step 3 exists for (--git-common-dir answering where --show-toplevel '
+        + `answers wrongly) was NOT measured by this run. \`git worktree add\` in ${repo} `
         + `failed: ${(e as Error).message}`,
       );
       return;
@@ -380,7 +380,7 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
        */
       const unmeasurable = (why: string): never => {
         throw new Error(
-          `UNMEASURABLE — this bed cannot discriminate, so it proves NOTHING about step 3. `
+          `UNMEASURABLE: this bed cannot discriminate, so it proves NOTHING about step 3. `
           + `FIX THE BED, NOT THE RESOLVER.\n${pair}\n    reason: ${why}`,
         );
       };
@@ -390,7 +390,7 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
       // having re-measured the main-checkout case.
       if (wrongRoot === viaCommon) {
         unmeasurable(
-          `the worktree at ${wt.dir} is not behaving as a linked worktree — the two derivations `
+          `the worktree at ${wt.dir} is not behaving as a linked worktree: the two derivations `
           + 'AGREE here, which is the main-checkout case wearing a worktree\'s name',
         );
       }
@@ -416,7 +416,7 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
       if (existsSync(resolve(wrongRoot, basename(mainCheckout)))) {
         unmeasurable(
           `the WRONG derivation would still find ${basename(mainCheckout)} beside it, at `
-          + `${resolve(wrongRoot, basename(mainCheckout))} — so a resolver using --show-toplevel `
+          + `${resolve(wrongRoot, basename(mainCheckout))}, so a resolver using --show-toplevel `
           + 'could land on the right peer by accident and this row could not tell',
         );
       }
@@ -443,7 +443,7 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
       }
       if (announce![1] !== wt.dir) {
         unmeasurable(
-          `the resolver announced \`${source}\` — it derived from ${announce![1]}, not from the `
+          `the resolver announced \`${source}\`: it derived from ${announce![1]}, not from the `
           + `linked worktree ${wt.dir} this row built, so the measurement is of that tree instead. `
           + 'The bed must EXECUTE THE WORKTREE\'S OWN COPY of sibling-root.mjs',
         );
@@ -657,7 +657,7 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
      */
     const unmeasurable = (why: string): never => {
       throw new Error(
-        'UNMEASURABLE — this bed cannot discriminate, so it proves NOTHING about step 3 from '
+        'UNMEASURABLE: this bed cannot discriminate, so it proves NOTHING about step 3 from '
         + `${label}. FIX THE BED, NOT THE RESOLVER.\n${facts}\n    reason: ${why}`,
       );
     };
@@ -669,7 +669,7 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
     // defect these rows exist for.
     if (isAbsolute(raw)) {
       unmeasurable(
-        `git answers ${JSON.stringify(raw)} — already absolute — at ${bed.anchor}, so this bed is `
+        `git answers ${JSON.stringify(raw)} (already absolute) at ${bed.anchor}, so this bed is `
         + 'not a main checkout and re-measures the linked-worktree case',
       );
     }
@@ -717,7 +717,7 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
     }
     if (announce![1] !== bed.anchor) {
       unmeasurable(
-        `the resolver announced \`${source}\` — it derived from ${announce![1]}, not from the main `
+        `the resolver announced \`${source}\`: it derived from ${announce![1]}, not from the main `
         + `checkout ${bed.anchor} this row built, so it measured that tree instead`,
       );
     }
@@ -755,8 +755,8 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
     } catch (e) {
       ctx.skip(
         'SKIPPED, NOT PASSED: could not build a scratch main checkout to measure from, so the '
-        + 'configuration production actually runs in — a main-checkout root, where '
-        + '`git rev-parse --git-common-dir` answers the relative `.git` — was NOT measured by this '
+        + 'configuration production actually runs in (a main-checkout root, where '
+        + '`git rev-parse --git-common-dir` answers the relative `.git`) was NOT measured by this '
         + `run. \`git init\` failed: ${(e as Error).message}`,
       );
       return;
@@ -780,8 +780,8 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
     } catch (e) {
       ctx.skip(
         'SKIPPED, NOT PASSED: could not build a scratch main checkout to measure from, so the '
-        + 'third git output shape — `../../.git`, relative WITH `..`, from a subdirectory of a '
-        + `main checkout — was NOT measured by this run. \`git init\` failed: ${(e as Error).message}`,
+        + 'third git output shape (`../../.git`, relative WITH `..`, from a subdirectory of a '
+        + `main checkout) was NOT measured by this run. \`git init\` failed: ${(e as Error).message}`,
       );
       return;
     }
@@ -835,7 +835,7 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
    * a linked worktree — deliberately, so there are not two ways of asking the
    * same question that could drift apart.
    */
-  it('and THIS checkout, when it is a main one — the configuration production runs in', (ctx) => {
+  it('and THIS checkout, when it is a main one: the configuration production runs in', (ctx) => {
     // The subject's own anchor, read back from the subject rather than
     // recomputed here: it is what step 3 hands git as `cwd`, so it is the only
     // directory whose git output shape says anything about this run.
@@ -858,7 +858,7 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
     if (isAbsolute(raw)) {
       ctx.skip(
         'SKIPPED, NOT PASSED: step 3 was NOT measured in this repo\'s real MAIN CHECKOUT by this '
-        + `run — the production configuration. This run is standing in a LINKED WORKTREE (${anchor}), `
+        + `run: the production configuration. This run is standing in a LINKED WORKTREE (${anchor}), `
         + `where \`git rev-parse --git-common-dir\` answers the absolute ${raw} whether it is asked to `
         + 'or not, so the relative output shape production consumes does not exist here to be '
         + 'measured. The two rows above measured that shape on a repository they built; this row is '
@@ -882,14 +882,14 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
 
     // eslint-disable-next-line no-console
     console.log(
-      `step 3 measured in THIS repo's REAL MAIN CHECKOUT — the production configuration\n`
+      `step 3 measured in THIS repo's REAL MAIN CHECKOUT: the production configuration\n`
       + `    anchor, which is git's cwd and the subject's AURORA_DIR = ${anchor}\n`
       + `    git rev-parse --git-common-dir                          = ${JSON.stringify(raw)}\n`
       + `    …--path-format=absolute --git-common-dir                = ${common}\n`
       + `    RIGHT derivation dirname(dirname(absolute))             = ${expected}\n`
       + `    same derivation on git's DEFAULT output                 = ${JSON.stringify(withoutTheFlag)}\n`
       + `    resolver answered → ${derived}\n    ${source}\n`
-      + '    (this row does NOT discriminate a bed-ignoring resolver — see its header)',
+      + '    (this row does NOT discriminate a bed-ignoring resolver: see its header)',
     );
 
     expect(
@@ -908,7 +908,7 @@ describe('sibling-root: step 3 — derivation from this repo, via --git-common-d
   });
 });
 
-describe('sibling-root: step 4 — refuse, naming what was looked for and where', () => {
+describe('sibling-root: step 4: refuse, naming what was looked for and where', () => {
   /**
    * Forced by COPYING the subject outside any git repository: the derivation is
    * anchored to the module's own location, so a copy at `<tmp>/test/support/`
@@ -1045,7 +1045,7 @@ describe('sibling-root: the names the contract ratified', () => {
    * announced aliases, and the new built-tree name, each taken from the
    * resolver's own exports so a rename moves both sides together.
    */
-  it('OWNED_ENV — what the gate polices — holds every name this module reads', () => {
+  it('OWNED_ENV (what the gate polices) holds every name this module reads', () => {
     const out = run(
       'const missing = [R.SUITE_ROOT_ENV, ...R.SUITE_ROOT_ENV_ALIASES, R.AURORA_DIR_ENV, '
       + '...R.AURORA_DIR_ENV_ALIASES, R.AURORA_BUILT_TREE_ENV, '
@@ -1084,7 +1084,7 @@ describe('sibling-root: the names the contract ratified', () => {
  * here is a path typed by hand, so no row can pass by naming a string that
  * happens to be right on one machine.
  */
-describe('sibling-root: AURORA_DIR — this repo\'s own checkout, OBSERVED', () => {
+describe('sibling-root: AURORA_DIR: this repo\'s own checkout, OBSERVED', () => {
   /**
    * The tree the subject lives in, derived from the path used to import it:
    * `<tree>/test/support/sibling-root.mjs` → three levels up from the FILE.
@@ -1128,7 +1128,7 @@ describe('sibling-root: AURORA_DIR — this repo\'s own checkout, OBSERVED', () 
    * rather than merely a non-zero exit. (`DISAGREE` is the other message's word
    * and appears in neither of these two.)
    */
-  it('SET AND DISAGREEING is REFUSED — it is a consistency check, not an override', () => {
+  it('SET AND DISAGREEING is REFUSED: it is a consistency check, not an override', () => {
     const elsewhere = mkdtempSync(resolve(tmpdir(), 'aurora-not-this-tree-'));
     const out = runExpectingFailure(
       'process.stdout.write(R.AURORA_DIR);', { AURORA_DIR: elsewhere },
@@ -1152,7 +1152,7 @@ describe('sibling-root: AURORA_DIR — this repo\'s own checkout, OBSERVED', () 
     expect(out.stderr).not.toContain('DISAGREE');
   });
 
-  it('SET AND AGREEING is accepted, silent, and moves nothing — the anti-vacuous half', () => {
+  it('SET AND AGREEING is accepted, silent, and moves nothing: the anti-vacuous half', () => {
     const here = observed();
     const out = runBoth(
       'process.stdout.write(R.AURORA_DIR + "\\n" + R.auroraDirSource());',
@@ -1216,7 +1216,7 @@ describe('sibling-root: AURORA_DIR — this repo\'s own checkout, OBSERVED', () 
     );
   });
 
-  it('AURORA_ROOT pointed at ANOTHER tree is refused, not obeyed — the migration is not a loophole', () => {
+  it('AURORA_ROOT pointed at ANOTHER tree is refused, not obeyed: the migration is not a loophole', () => {
     const elsewhere = mkdtempSync(resolve(tmpdir(), 'aurora-not-this-tree-'));
     const out = runExpectingFailure('process.stdout.write(R.AURORA_DIR);', { AURORA_ROOT: elsewhere });
     expect(out.status).not.toBe(0);
@@ -1295,7 +1295,7 @@ describe('sibling-root: AURORA_DIR — this repo\'s own checkout, OBSERVED', () 
  * spelling, and one token away from `AURORA_DIR` is where the two questions
  * fused in the first place.
  */
-describe('sibling-root: AURORA_BUILT_TREE — which built tree a run executes against', () => {
+describe('sibling-root: AURORA_BUILT_TREE: which built tree a run executes against', () => {
   it('is null when nothing is set, so a caller can walk up and find one itself', () => {
     expect(run('process.stdout.write(String(R.auroraBuiltTree()));').stdout).toBe('null');
   });

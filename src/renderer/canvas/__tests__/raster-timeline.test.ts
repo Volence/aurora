@@ -115,7 +115,7 @@ describe('the two axes, and exactly where they meet', () => {
     expect(v.splits.map((s) => s.y)).not.toContain(lineToStripY(44));
   });
 
-  it('v_offset shifts the fire line and the strip follows it — not the world_y', () => {
+  it('v_offset shifts the fire line and the strip follows it: not the world_y', () => {
     // The differential row. A strip that drew `world_y` straight onto the screen
     // ruler is green at v_offset 0 and wrong everywhere else, which is the
     // single most likely way to build this feature incorrectly.
@@ -162,7 +162,7 @@ describe('the two axes, and exactly where they meet', () => {
     expect(v.splits[0].refusal).toContain(VSPLIT_LOCK_CLAUSES.remedyHorizontal);
   });
 
-  it('the LOCKED notice is absent — an advisory that is always on screen is decoration', () => {
+  it('the LOCKED notice is absent: an advisory that is always on screen is decoration', () => {
     expect(rasterTimelineSpaceNotice(scene([], { v_factor: LOCK }))).toBeNull();
     expect(viewOf(twoSplits()).notices).toEqual([]);
   });
@@ -193,7 +193,7 @@ describe('bands come from the plan the frame is drawn from', () => {
     expect(v.bands.reduce((a, b) => a + b.h, 0)).toBe(SCREEN_HEIGHT * RASTER_TIMELINE_SCALE);
   });
 
-  it('the ruler IS the frame — 224 lines, from core/model/screen', () => {
+  it('the ruler IS the frame: 224 lines, from core/model/screen', () => {
     // NOT a literal: `SCREEN_HEIGHT` is where the agreement with aeon's
     // `engine/system/constants.emp` is enforced.
     expect(RASTER_TIMELINE_LINES).toBe(SCREEN_HEIGHT);
@@ -202,7 +202,7 @@ describe('bands come from the plan the frame is drawn from', () => {
       .toBe((RASTER_TIMELINE_LINES - 1) * RASTER_TIMELINE_SCALE);
   });
 
-  it('a DISABLED band still owns its rows — the engine inherits, it does not skip', () => {
+  it('a DISABLED band still owns its rows: the engine inherits, it does not skip', () => {
     // `.band_disabled` gives the band above's scroll; a strip that omitted the
     // band would disagree with the frame about which rows exist.
     const s = scene([
@@ -230,7 +230,7 @@ describe('bands come from the plan the frame is drawn from', () => {
 // The fire bound, said on the strip
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('splitRefusal — the engine\'s two rules, and the null majority', () => {
+describe('splitRefusal: the engine\'s two rules, and the null majority', () => {
   it('says nothing at all across the whole legal band', () => {
     // The null case is the majority case. An advisory that is always on screen
     // is read as decoration within a day.
@@ -240,7 +240,7 @@ describe('splitRefusal — the engine\'s two rules, and the null majority', () =
     }
   });
 
-  it('refuses lines 0..2 by name — they belong to the priming records', () => {
+  it('refuses lines 0..2 by name: they belong to the priming records', () => {
     for (const top of [0, 1, 2]) {
       const s = scene([layer(top, 'FACTOR_1_4', { vsplit: { at: 10 } })]);
       const r = splitRefusal(s, s.layers[0]);
@@ -309,7 +309,7 @@ describe('what the strip refuses to claim', () => {
     expect(RASTER_TIMELINE_GESTURES).not.toBe(RASTER_TIMELINE_GRAMMAR);
   });
 
-  it('the drawn absence line FITS the strip — it is never ellipsised', () => {
+  it('the drawn absence line FITS the strip: it is never ellipsised', () => {
     // The footer is measured against the strip's own width using the same 9px
     // metric the draw uses. A phrase long enough to overflow must be shortened,
     // never cut: half a sentence about what the app cannot show reads as chrome.
@@ -355,7 +355,7 @@ function stubCtx(): CanvasRenderingContext2D & { calls: string[] } {
   return ctx;
 }
 
-describe('drawRasterTimeline — what it issues', () => {
+describe('drawRasterTimeline: what it issues', () => {
   it('fills one rectangle per band with a positive height, and strokes one rule per placed split', () => {
     const v = viewOf(twoSplits());
     const ctx = stubCtx();
@@ -495,7 +495,7 @@ describe('the ruler runs both ways', () => {
     }
   });
 
-  it('and it does NOT round — a pointer between two lines asks for a fraction', () => {
+  it('and it does NOT round: a pointer between two lines asks for a fraction', () => {
     // Rounding here would make `bandEdgeNotice` speak about a value the pointer
     // is not actually at; `clampBandEdge` is the one that rounds, once.
     expect(stripYToLine(lineToStripY(66) + 0.6)).toBeCloseTo(66.6, 6);
@@ -576,7 +576,7 @@ describe('the gesture\'s value is computed in exactly one place', () => {
     expect(d).toEqual({ index: 0, edge: 'top', line: 89, requested: 200 });
   });
 
-  it('and the PREVIEW draws that same held value — not the raw pointer', () => {
+  it('and the PREVIEW draws that same held value: not the raw pointer', () => {
     // ⚠ THE TWO-COPIES DEFECT THIS ROW EXISTS FOR: if the preview drew the raw
     // request and the commit wrote the clamped one, the band would jump on
     // release, at the bound, where an author is already confused.
@@ -594,7 +594,7 @@ describe('the gesture\'s value is computed in exactly one place', () => {
   });
 });
 
-describe('drawRasterTimeline — the preset column', () => {
+describe('drawRasterTimeline: the preset column', () => {
   it('fills one rectangle per band and strokes TWO handles for each: it is an INTERVAL', () => {
     // ⚠ THE GRAMMAR, COUNTED. A split gets one rule and no closing edge because
     // the mechanism has none; a palette band gets two, because it has a paired
@@ -645,7 +645,7 @@ describe('the report carries the editable column too', () => {
       { clientX: 10, clientY: 20, x: 3, y: 4, line: 5, hit: 'edge 0.top' });
   });
 
-  it('and a pointer reading does NOT advance `paints` — a mouse move is not a draw', () => {
+  it('and a pointer reading does NOT advance `paints`: a mouse move is not a draw', () => {
     const before = lastRasterTimelineReport().paints;
     publishRasterTimelinePointer(null);
     expect(lastRasterTimelineReport().paints).toBe(before);

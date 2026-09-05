@@ -88,7 +88,7 @@ describe('the fixture assumptions this file leans on', () => {
   });
 });
 
-describe('the gate — a slot index only means something in THIS document\'s blob', () => {
+describe('the gate: a slot index only means something in THIS document\'s blob', () => {
   it('a foreground drag is a plain pick, however far it travelled', () => {
     const r = resolveStripDrag(drag({ layer: 'fg', origin: 'tileset', anchorSlot: 40, releaseSlot: 90 }));
     expect(r).toEqual({ kind: 'pick', why: 'not-the-override-blob' });
@@ -111,12 +111,12 @@ describe('the gate — a slot index only means something in THIS document\'s blo
     expect(r).toEqual({ kind: 'pick', why: 'not-the-override-blob' });
   });
 
-  it('on the override, press and release on ONE slot is the pick — today\'s behaviour', () => {
+  it('on the override, press and release on ONE slot is the pick: today\'s behaviour', () => {
     const r = resolveStripDrag(drag({ anchorSlot: 77, releaseSlot: 77 }));
     expect(r).toEqual({ kind: 'pick', why: 'same-slot' });
   });
 
-  it('an INCONSISTENT source — an FG layer claiming the override origin — is a plain pick', () => {
+  it('an INCONSISTENT source (an FG layer claiming the override origin) is a plain pick', () => {
     // The two fields are defaulted independently at the call site
     // (`src?.layer ?? 'fg'`, `src?.origin ?? 'none'`), and this pair is the one
     // shape that would let a FOREGROUND index aim a background band. Measured:
@@ -135,7 +135,7 @@ describe('the gate — a slot index only means something in THIS document\'s blo
   });
 });
 
-describe('extent — the run divides by rows and rounds DOWN to whole columns', () => {
+describe('extent: the run divides by rows and rounds DOWN to whole columns', () => {
   it('a run of exactly cols*rows resolves to exactly cols', () => {
     // 40..55 inclusive is 16 slots; 16 / 4 = 4 columns.
     const r = resolveStripDrag(drag({ anchorSlot: 40, releaseSlot: 55 }));
@@ -170,7 +170,7 @@ describe('extent — the run divides by rows and rounds DOWN to whole columns', 
     expect(back).toEqual(fwd);
   });
 
-  it('rows is carried through untouched — the strip aims the base and the width only', () => {
+  it('rows is carried through untouched: the strip aims the base and the width only', () => {
     for (const rows of [1, 2, 4, 8]) {
       const r = resolveStripDrag(drag({ rows, anchorSlot: 64, releaseSlot: 64 + 8 * rows - 1 }));
       expect(r).toMatchObject({ kind: 'range', rows, cols: 8 });
@@ -178,7 +178,7 @@ describe('extent — the run divides by rows and rounds DOWN to whole columns', 
   });
 });
 
-describe('the base clamp — and the order it happens in', () => {
+describe('the base clamp, and the order it happens in', () => {
   it('a run starting inside the animated prefix starts at firstPromotableSlot instead', () => {
     const r = resolveStripDrag(drag({ anchorSlot: 20, releaseSlot: 47, firstPromotableSlot: 32 }));
     expect(r).toMatchObject({ kind: 'range', staticBase: 32, clampedToPrefix: true });
@@ -219,7 +219,7 @@ describe('the base clamp — and the order it happens in', () => {
   });
 });
 
-describe('the two refusals — loud, and unchanged candidate', () => {
+describe('the two refusals: loud, and unchanged candidate', () => {
   it('a run entirely inside the animated prefix is refused, naming the prefix', () => {
     const fps = 32;
     const r = resolveStripDrag(drag({ anchorSlot: 4, releaseSlot: 20, firstPromotableSlot: fps }));
@@ -264,7 +264,7 @@ describe('the two refusals — loud, and unchanged candidate', () => {
     expect(r.kind === 'refused' && r.hint).toContain(`rows*${TILE_BYTES}`);
   });
 
-  it('rows 0 cannot divide by zero — it is refused before the arithmetic', () => {
+  it('rows 0 cannot divide by zero: it is refused before the arithmetic', () => {
     const r = resolveStripDrag(drag({ rows: 0, anchorSlot: 40, releaseSlot: 55 }));
     expect(r.kind).toBe('refused');
   });
@@ -326,7 +326,7 @@ describe('the gesture aims something the CODEC accepts', () => {
   });
 });
 
-describe('the label — the strip\'s only surface', () => {
+describe('the label: the strip\'s only surface', () => {
   it('a range names the slots it OWNS and the geometry on the LINE', () => {
     // ⚠ THIS ROW SHIPPED PINNING THE DEFECT — `toContain('40..56')`, with the
     // comment `base .. base + cols*rows` stating it as the intent. `56` is the
@@ -348,7 +348,7 @@ describe('the label — the strip\'s only surface', () => {
     expect(stripDragLabel(r)).not.toContain(`..${last + 1}`);
   });
 
-  it('the LINE carries no noun and the TITLE carries it — the split the box forced', () => {
+  it('the LINE carries no noun and the TITLE carries it: the split the box forced', () => {
     // THE PAIR IS THE POINT, not either half. Asserting only that the line is
     // short would be satisfied by a line that dropped the span; asserting only
     // that the title is long would be satisfied by a line that never shortened.
@@ -408,7 +408,7 @@ describe('the label — the strip\'s only surface', () => {
     }
   });
 
-  it('a drag can never resolve to a zero-slot range — so the empty phrase is a defence', () => {
+  it('a drag can never resolve to a zero-slot range, so the empty phrase is a defence', () => {
     // WHY THE READOUTS CARRY NO ZERO GUARD OF THEIR OWN, measured rather than
     // asserted: `rowChoices()` starts at 1 and an illegal `rows` is refused
     // before the range branch, while `cols = min(max(1, …), maxCols)` with
@@ -450,7 +450,7 @@ describe('the label — the strip\'s only surface', () => {
     expect(stripDragHint(r)).toContain('start moved past the animated prefix');
   });
 
-  it('EVERY line is ONE line and stays short — a readout that wrapped moved the grid', () => {
+  it('EVERY line is ONE line and stays short: a readout that wrapped moved the grid', () => {
     // MEASURED, NOT A STYLE PREFERENCE. The first build put the refusal
     // paragraph on the line; it wrapped, the picker's header row grew two text
     // lines, and the tile grid moved 36px down UNDER THE CURSOR — the next press
@@ -491,14 +491,14 @@ describe('the label — the strip\'s only surface', () => {
     expect(stripDragHint(r).length).toBeGreaterThan(stripDragLabel(r).length);
   });
 
-  it('a pick writes NOTHING to the line or the hint — the strip\'s own readout stands', () => {
+  it('a pick writes NOTHING to the line or the hint: the strip\'s own readout stands', () => {
     expect(stripDragLabel(resolveStripDrag(drag({ anchorSlot: 9, releaseSlot: 9 })))).toBe('');
     expect(stripDragHint(resolveStripDrag(drag({ anchorSlot: 9, releaseSlot: 9 })))).toBe('');
     expect(stripDragLabel(resolveStripDrag(
       drag({ layer: 'fg', origin: 'tileset', anchorSlot: 9, releaseSlot: 40 })))).toBe('');
   });
 
-  it('the range line is NEUTRAL about the footprint — no warning vocabulary', () => {
+  it('the range line is NEUTRAL about the footprint: no warning vocabulary', () => {
     // The same rule `coverageSummary` carries: scatter is legal and sometimes
     // intended, and this line describes a range, never judges one.
     for (const spec of [{ anchorSlot: 40, releaseSlot: 55 }, { anchorSlot: 20, releaseSlot: 47 },
@@ -511,7 +511,7 @@ describe('the label — the strip\'s only surface', () => {
   });
 });
 
-describe('the report — which branch ran, when the store cannot say', () => {
+describe('the report: which branch ran, when the store cannot say', () => {
   it('gestures advances on every release, resolved or not', () => {
     const before = lastStripDragReport().gestures;
     const refused = resolveStripDrag(drag({ anchorSlot: 4, releaseSlot: 20 }));
@@ -590,7 +590,7 @@ describe('band-strip-range prints no slot span of its own', () => {
     expect(src).not.toMatch(/const end = /);
   });
 
-  it('the SNAPPING and CLAMPING arithmetic is untouched — only the strings moved', () => {
+  it('the SNAPPING and CLAMPING arithmetic is untouched: only the strings moved', () => {
     // The scoping rule of this parcel, pinned rather than remembered. The run
     // is INCLUSIVE and the blob bound is EXCLUSIVE; a `- 1` pushed into either
     // would make the sentences right and the aimed range wrong.

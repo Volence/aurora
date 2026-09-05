@@ -64,13 +64,13 @@ describe('the table of which sub-tab owns which section', () => {
     expect(new Set(found.map((s) => s.file)).size).toBe(4);
   });
 
-  it('claims every section the effects panels declare — none is rendered nowhere', () => {
+  it('claims every section the effects panels declare: none is rendered nowhere', () => {
     for (const { file, id } of declaredSections()) {
       expect(subTabOfSection(id), `${file} declares ${id}, which no sub-tab renders`).not.toBeNull();
     }
   });
 
-  it('claims NOTHING the panels do not declare — a stale id is a dead tab row', () => {
+  it('claims NOTHING the panels do not declare: a stale id is a dead tab row', () => {
     const declared = new Set(declaredSections().map((s) => s.id));
     for (const tab of EFFECTS_SUB_TABS) {
       for (const id of tab.sections) {
@@ -89,7 +89,7 @@ describe('the table of which sub-tab owns which section', () => {
     }
   });
 
-  it('⚠ PUTS THE TWO "BAND" FEATURES ON DIFFERENT TABS — the walkthrough\'s §c1', () => {
+  it('⚠ PUTS THE TWO "BAND" FEATURES ON DIFFERENT TABS: the walkthrough\'s §c1', () => {
     // A tile animation (a block of background TILES with phase banks) and a
     // raster band (a range of SCREEN LINES that repaints CRAM) were adjacent
     // sections in one list, which is how one author read them as one feature
@@ -101,7 +101,7 @@ describe('the table of which sub-tab owns which section', () => {
     expect(tileAnim).not.toBe(raster);
   });
 
-  it('leaves `aeon.props` OUT — it is the facet\'s readout, not one of the three jobs', () => {
+  it('leaves `aeon.props` OUT: it is the facet\'s readout, not one of the three jobs', () => {
     // Mounted by effects-facet directly, outside the tab body, deliberately.
     expect(subTabOfSection('aeon.props')).toBeNull();
   });
@@ -118,7 +118,7 @@ describe('the table of which sub-tab owns which section', () => {
   });
 });
 
-describe('revealEffectsSection — the seam between a reveal and a sub-tab', () => {
+describe('revealEffectsSection: the seam between a reveal and a sub-tab', () => {
   beforeEach(() => {
     savePanelState({});
     useEditorStore.getState().setEffectsSubTab('parallax');
@@ -133,7 +133,7 @@ describe('revealEffectsSection — the seam between a reveal and a sub-tab', () 
     expect(isCollapsed(loadPanelState(), BANDS_SECTION_ID, true)).toBe(false);
   });
 
-  it('⚠ SWITCHES BEFORE IT NOTIFIES — the order band-follow depends on', () => {
+  it('⚠ SWITCHES BEFORE IT NOTIFIES: the order band-follow depends on', () => {
     // The follow-up asks the panel to scroll to a card that does not exist
     // until the section is both mounted (tab) and rendered (disclosure). A
     // listener firing while the store still says `parallax` is the reveal
@@ -160,7 +160,7 @@ describe('revealEffectsSection — the seam between a reveal and a sub-tab', () 
   });
 });
 
-describe('followBand goes through that door — the toolbar verb reaches the panel', () => {
+describe('followBand goes through that door: the toolbar verb reaches the panel', () => {
   beforeEach(() => {
     savePanelState({});
     useEditorStore.getState().setEffectsSubTab('parallax');

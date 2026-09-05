@@ -99,11 +99,11 @@ describe('the cleared document', () => {
   });
 });
 
-describe('refusals — each names the document this codec must not half-load', () => {
+describe('refusals: each names the document this codec must not half-load', () => {
   const good = () => JSON.parse(serializeSectionChunkLinks(layer())!) as Record<string, unknown>;
   const parse = (doc: unknown, tiles = TILES) => () => parseSectionChunkLinks(JSON.stringify(doc), tiles);
 
-  it('a plane that is SHORT for this section — the .collattr.bin lesson', () => {
+  it('a plane that is SHORT for this section: the .collattr.bin lesson', () => {
     // Same document, a section one tile bigger. Nothing about the JSON is
     // malformed; it simply is not this section's plane.
     expect(parse(good(), TILES + 1)).toThrow(new RegExp(`runs cover ${TILES} tiles; this section has ${TILES + 1}`));
@@ -119,7 +119,7 @@ describe('refusals — each names the document this codec must not half-load', (
     expect(parse(doc)).toThrow(/names placement 99, which this document does not declare/);
   });
 
-  it('a placement no run names (an EMPTY copy — the dangling reference mirrored)', () => {
+  it('a placement no run names (an EMPTY copy: the dangling reference mirrored)', () => {
     const doc = good();
     (doc.placements as unknown[]).push({ id: 77, chunkId: 'ghost', baseCol: 0, baseRow: 0, collision: false });
     expect(parse(doc)).toThrow(/placement 77 is declared but no run names it/);
@@ -151,7 +151,7 @@ describe('refusals — each names the document this codec must not half-load', (
     }
   });
 
-  it('a chunkId that is not a string — the sceneRef trap, refused instead of read as null', () => {
+  it('a chunkId that is not a string: the sceneRef trap, refused instead of read as null', () => {
     const doc = good();
     (doc.placements as Array<Record<string, unknown>>)[0].chunkId = 12;
     // parseSectionMeta reads a wrong-typed value as null and erases it on the
@@ -167,7 +167,7 @@ describe('refusals — each names the document this codec must not half-load', (
     expect(parse({ runs: [] })).toThrow(/no placements array/);
   });
 
-  it('placements with no runs at all — every copy would be nowhere', () => {
+  it('placements with no runs at all: every copy would be nowhere', () => {
     const doc = good();
     doc.runs = [];
     expect(parse(doc)).toThrow(/declares 2 placement\(s\) but no runs naming them/);

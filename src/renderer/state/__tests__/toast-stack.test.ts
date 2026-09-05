@@ -43,7 +43,7 @@ function conserved(input: Toast[], stack: ReturnType<typeof toastStack>): boolea
   return JSON.stringify(ids) === JSON.stringify(input.map((x) => x.id).sort((a, b) => a - b));
 }
 
-describe('toastStack — bounding', () => {
+describe('toastStack: bounding', () => {
   it('paints everything while the stack is within the cap', () => {
     const input = many('info', MAX_VISIBLE_TOASTS);
     const s = toastStack(input);
@@ -60,7 +60,7 @@ describe('toastStack — bounding', () => {
     expect(input.length).toBeGreaterThan(MAX_VISIBLE_TOASTS);
   });
 
-  it('drops nothing — visible plus hidden is the whole input', () => {
+  it('drops nothing: visible plus hidden is the whole input', () => {
     const input = [...many('error', 30), ...many('success', 9), ...many('warning', 4)];
     const s = toastStack(input);
     expect(conserved(input, s)).toBe(true);
@@ -82,7 +82,7 @@ describe('toastStack — bounding', () => {
   });
 });
 
-describe('toastStack — an error is never what gets hidden', () => {
+describe('toastStack: an error is never what gets hidden', () => {
   it('keeps a failure on screen behind a whole cap-full of later successes', () => {
     // THE PLANT THIS FILE WAS WRITTEN FOR, and saveAllDirty's literal shape: the
     // failure toasts first, the acknowledgements pile in after it. A cap that
@@ -126,7 +126,7 @@ describe('overflowLabel', () => {
     expect(overflowLabel(toastStack(many('info', 1)))).toBeNull();
   });
 
-  it('never says "0 errors" — a zero beside that word reads as a reassurance', () => {
+  it('never says "0 errors": a zero beside that word reads as a reassurance', () => {
     const s = toastStack(many('success', MAX_VISIBLE_TOASTS + 5));
     expect(s.hiddenCount).toBeGreaterThan(0); // anti-vacuous
     expect(s.hiddenErrorCount).toBe(0);
@@ -163,7 +163,7 @@ describe('the error channel keeps a copy the screen cannot lose', () => {
       .toEqual(['[toast] games/x/section_3.meta.json exists but could not be read']);
   });
 
-  it('does NOT mirror acknowledgements — a log full of them buries the failures too', () => {
+  it('does NOT mirror acknowledgements: a log full of them buries the failures too', () => {
     useToastStore.getState().addToast('Saved 1 level(s)', 'success');
     useToastStore.getState().addToast('behind a loop', 'warning');
     useToastStore.getState().addToast('note', 'info');
@@ -173,7 +173,7 @@ describe('the error channel keeps a copy the screen cannot lose', () => {
   });
 });
 
-describe('toastStack — expanded', () => {
+describe('toastStack: expanded', () => {
   it('shows everything and reports a hidden count of zero, which is then TRUE', () => {
     const input = many('error', MAX_VISIBLE_TOASTS + 40);
     const s = toastStack(input, true);

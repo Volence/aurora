@@ -30,7 +30,7 @@ const RESERVED = SOLID | (3 << 14);
 
 const plane = (...w: number[]) => Uint16Array.from(w);
 
-describe('auditCrossovers — nothing to say', () => {
+describe('auditCrossovers: nothing to say', () => {
   it('is silent and OK on unmarked content, however solid', () => {
     const a = auditCrossovers(plane(SOLID, SOLID, AIR), plane(SOLID, SOLID, AIR));
     expect(a.marksA).toBe(0);
@@ -48,7 +48,7 @@ describe('auditCrossovers — nothing to say', () => {
   });
 });
 
-describe('auditCrossovers — a complete two-way crossover is OK', () => {
+describe('auditCrossovers: a complete two-way crossover is OK', () => {
   it('counts the pair and says nothing', () => {
     // ⚠ STRIDE 1 IS NOT A CONVENIENCE, IT IS THE FIXTURE. A one-column plane is
     // a pair exactly ONE 8px engine trigger cell wide, which is the width at
@@ -77,7 +77,7 @@ describe('auditCrossovers — a complete two-way crossover is OK', () => {
   });
 });
 
-describe('auditCrossovers — WARN: a loop that works in one direction', () => {
+describe('auditCrossovers: WARN: a loop that works in one direction', () => {
   it('flags a mark on plane A with none on B, and names the cell', () => {
     // THE ROW THIS FILE EXISTS FOR. On the map these cells look identical to a
     // correct pair — each plane's overlay is drawn separately — and aeon's bake
@@ -97,14 +97,14 @@ describe('auditCrossovers — WARN: a loop that works in one direction', () => {
     expect(crossoverAuditSeverity(a)).toBe('warn');
   });
 
-  it('CONTROL: the pair case does NOT warn — the rule is asymmetry, not presence', () => {
+  it('CONTROL: the pair case does NOT warn; the rule is asymmetry, not presence', () => {
     // Without this, an audit that warned on every crossover would pass the rows
     // above and make the feature unusable-by-warning.
     expect(crossoverAuditSeverity(auditCrossovers(plane(HAND_A), plane(HAND_B)))).toBe('ok');
   });
 });
 
-describe('auditCrossovers — ERROR: what aeon\'s bake hard-errors on', () => {
+describe('auditCrossovers: ERROR: what aeon\'s bake hard-errors on', () => {
   it('catches a self-mark on plane A (rule R2) and names the rule', () => {
     const a = auditCrossovers(plane(SELF_A), plane(SOLID));
     expect(a.selfMarks).toBe(1);
@@ -144,7 +144,7 @@ describe('auditCrossovers — ERROR: what aeon\'s bake hard-errors on', () => {
   });
 });
 
-describe('auditCrossovers — the context numbers', () => {
+describe('auditCrossovers: the context numbers', () => {
   it('counts divergent and solid-both cells separately', () => {
     const a = auditCrossovers(plane(SOLID, SOLID, AIR), plane(SOLID, AIR, AIR));
     expect(a.solidBoth).toBe(1);

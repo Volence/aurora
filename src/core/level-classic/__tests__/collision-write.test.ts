@@ -73,7 +73,7 @@ describe('planCollisionWrite', () => {
     expect(r).toMatchObject({ kind: 'link', entries: [{ blockId: 2, value: 7 }] });
   });
 
-  it('refuses block 0 — the engine never reads its collision', () => {
+  it('refuses block 0: the engine never reads its collision', () => {
     // PLAN DISCREPANCY: the plan's verbatim fixture overrode only probe.blockId
     // here, but doc()'s cell 5 (the probe's default cellIndex) is block 3 — so
     // under "re-derive from the doc" (required by the very next test) this
@@ -173,7 +173,7 @@ describe('planCollisionWrite', () => {
     expect(why, 'recommends a mode that would crash on a block that does not exist').not.toMatch(/Use Isolate/i);
   });
 
-  it('refuses a DANGLING block ref in isolate mode too — there is nothing to clone', () => {
+  it('refuses a DANGLING block ref in isolate mode too: there is nothing to clone', () => {
     // Isolate means "clone the block, keep its pixels, change its shape". With
     // no block to clone the operation is meaningless, and the plan it used to
     // build carried `def: undefined` straight into classicPaintSurface.
@@ -295,13 +295,13 @@ describe('classifyCollisionCell', () => {
   const at = (chunkIndex: number | null, cellIndex: number) =>
     ({ chunkId: 1, chunkIndex, cellIndex, looping: false, loopAmbiguous: false });
 
-  it('skips air — no chunk is stamped at this cell', () => {
+  it('skips air: no chunk is stamped at this cell', () => {
     const d = doc();
     expect(classifyCollisionCell(d, at(null, 0), 7, 'link').kind).toBe('skip');
     expect((classifyCollisionCell(d, at(null, 0), 7, 'link') as { reason: string }).reason).toBe('air');
   });
 
-  it('skips block 0 — the blank block the engine short-circuits before', () => {
+  it('skips block 0: the blank block the engine short-circuits before', () => {
     const d = doc();
     d.chunks[0].cells[1] = { ...d.chunks[0].cells[1], block: 0 };
     expect((classifyCollisionCell(d, at(0, 1), 7, 'link') as { reason: string }).reason).toBe('block0');
@@ -327,7 +327,7 @@ describe('classifyCollisionCell', () => {
     expect((classifyCollisionCell(d, at(0, 2), 7, 'isolate') as { reason: string }).reason).toBe('no-such-block');
   });
 
-  it('tests the dangling ref BEFORE the no-op — a dangling ref must never report success', () => {
+  it('tests the dangling ref BEFORE the no-op: a dangling ref must never report success', () => {
     // THE ORDER, PINNED. The no-op test reads `colind[blockId] ?? 0`, so a
     // dangling ref past the end of the table answers 0 for a shape it does not
     // have. Asked for shape 0 it would return `noop` — reporting SUCCESS on
@@ -342,7 +342,7 @@ describe('classifyCollisionCell', () => {
     expect((r as { reason: string }).reason).toBe('no-such-block');
   });
 
-  it('skips the overhang in LINK mode only — isolate’s limit is aggregate', () => {
+  it('skips the overhang in LINK mode only: isolate’s limit is aggregate', () => {
     const d = doc();
     d.chunks[0].cells[2] = { ...d.chunks[0].cells[2], block: 1 };
     d.collision.colind = new Uint8Array(1);
@@ -365,7 +365,7 @@ describe('classifyCollisionCell', () => {
 // means one store command. Partial by design in ONE direction — per-cell skips
 // (air, block 0, a link overhang, past the layout edge) are expected inside any
 // real rectangle, because a slope's bounding box contains air.
-describe('planCollisionRect — link', () => {
+describe('planCollisionRect: link', () => {
   const rect = (x: number, y: number, w: number, h: number) => ({ x, y, w, h });
   /** doc() with the named chunk-definition cells pointed at real blocks. */
   const withCells = (assign: [number, number][]) => {
@@ -495,7 +495,7 @@ describe('planCollisionRect — link', () => {
   });
 });
 
-describe('planCollisionRect — isolate', () => {
+describe('planCollisionRect: isolate', () => {
   const rect = (x: number, y: number, w: number, h: number) => ({ x, y, w, h });
 
   it('mints ONE clone per distinct block, not one per cell', () => {
@@ -609,7 +609,7 @@ describe('planCollisionRect — isolate', () => {
     expect(r.report.noop).toBe(1);
   });
 
-  it('reports no blockCellsAffected for isolate — that number is link-only', () => {
+  it('reports no blockCellsAffected for isolate: that number is link-only', () => {
     const d = doc();
     d.chunks[0].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
     const r = planCollisionRect(d, rect(0, 0, 1, 1), 7, 'isolate');
@@ -641,7 +641,7 @@ describe('planCollisionCells', () => {
     expect(r.report.blocks).toBe(3);
   });
 
-  it('DEDUPES repeated cells — a freehand drag revisits them constantly', () => {
+  it('DEDUPES repeated cells: a freehand drag revisits them constantly', () => {
     // The planner must not depend on its caller having deduped: it is pure core
     // with a second, agent-shaped caller. Without this, `applied` counts a cell
     // once per visit and every reported number is fiction.
@@ -660,7 +660,7 @@ describe('planCollisionCells', () => {
       .toEqual([{ reason: 'block0', count: 1 }]);
   });
 
-  it('is what planCollisionRect is built on — same answer for the same cells', () => {
+  it('is what planCollisionRect is built on: same answer for the same cells', () => {
     // The guard against a SECOND copy of the decision. If the rect stops
     // delegating, the human gesture and the agent tool drift apart silently.
     const d = withCells([[0, 1], [1, 2], [16, 3], [17, 1]]);
@@ -696,7 +696,7 @@ describe('planCollisionCells', () => {
 //
 // The refusal is unchanged. Only the sentence, and the machine-readable set
 // beside it, are.
-describe('planCollisionRect — isolate refusal, containment', () => {
+describe('planCollisionRect: isolate refusal, containment', () => {
   const rect = (x: number, y: number, w: number, h: number) => ({ x, y, w, h });
   const resolutionOf = (r: ReturnType<typeof planCollisionRect>) => (r as { resolution: string }).resolution;
   const refusalOf = (r: ReturnType<typeof planCollisionRect>) =>
@@ -771,7 +771,7 @@ describe('planCollisionRect — isolate refusal, containment', () => {
     expect(refusalOf(r).linkEquivalent).toEqual([]);
   });
 
-  it('hedges for a MIXED selection — one block contained, one not', () => {
+  it('hedges for a MIXED selection: one block contained, one not', () => {
     // The guarantee is all-or-nothing on purpose: it is one sentence about the
     // whole call, and "some of these are free" is not something a caller can
     // act on without knowing which. `linkEquivalent` carries the which.
@@ -795,7 +795,7 @@ describe('planCollisionRect — isolate refusal, containment', () => {
 // only a cell-by-cell probe answers that, which is the round-trip the reply
 // exists to save. `applied` and `blocks` stay aggregates because they are
 // about BLOCKS; this list is about CELLS.
-describe('planCollisionCells — skippedCells', () => {
+describe('planCollisionCells: skippedCells', () => {
   const rect = (x: number, y: number, w: number, h: number) => ({ x, y, w, h });
   const withCells = (assign: [number, number][]) => {
     const d = doc();
@@ -848,7 +848,7 @@ describe('planCollisionCells — skippedCells', () => {
     expect(r.report.skippedCellsTruncated).toBe(true);
   });
 
-  it('is FIRST-N IN SCAN ORDER — not sampled, not grouped by reason, not deduped', () => {
+  it('is FIRST-N IN SCAN ORDER: not sampled, not grouped by reason, not deduped', () => {
     // Deterministic and identical across a retry of the same call: a sampled or
     // set-ordered list would make two identical calls disagree, which is worse
     // than no list at all.

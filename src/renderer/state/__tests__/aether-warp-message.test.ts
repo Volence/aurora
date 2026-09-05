@@ -79,7 +79,7 @@ describe('the classic play-from-cursor message', () => {
       warped: false,
       landed: { x: 80, y: 1084 },
       from: { x: 80, y: 1084 },
-      error: 'the poke did not take — the player is back at (80, 1084), where he started.',
+      error: 'the poke did not take: the player is back at (80, 1084), where he started.',
     });
     const msg = await useAetherStore.getState().warp(592, 1084, 'classic');
     expect(msg).not.toMatch(/^Warp failed/);

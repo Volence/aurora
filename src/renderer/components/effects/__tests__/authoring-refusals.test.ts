@@ -70,7 +70,7 @@ describe('a band edge outside the fire bound is REFUSED, not forwarded', () => {
     }
   });
 
-  it('a LEGAL value is silent — this is a refusal, not a permanent wall', () => {
+  it('a LEGAL value is silent: this is a refusal, not a permanent wall', () => {
     // ANTI-VACUOUS. A predicate that returned a sentence for everything would
     // satisfy every row above and make the control unusable.
     expect(bandEdgeRefusal(band, 'p', 0, 'top', 40)).toBeNull();
@@ -80,7 +80,7 @@ describe('a band edge outside the fire bound is REFUSED, not forwarded', () => {
     expect(bandEdgeRefusal(band, 'p', 0, 'top', b.max)).toBeNull();
   });
 
-  it('a non-integer is refused too — a screen line has no fractional part', () => {
+  it('a non-integer is refused too: a screen line has no fractional part', () => {
     expect(bandEdgeRefusal(band, 'p', 0, 'top', 40.5)).toMatch(/not a whole number/);
   });
 });
@@ -105,7 +105,7 @@ describe('Top >= Bot is REFUSED, and the message says how to escape it', () => {
     expect(bandEdgeRefusal(band, 'p', 0, 'bot', 113)).toBeNull();
   });
 
-  it('a NEIGHBOURING band is NOT refused — rules 3 and 4 stay advisory', () => {
+  it('a NEIGHBOURING band is NOT refused: rules 3 and 4 stay advisory', () => {
     // The line this parcel deliberately did not cross. Two bands over disjoint
     // CRAM spans may nest, so walling an edge off with a neighbour's value
     // would refuse programs the engine builds. They advise instead.
@@ -121,7 +121,7 @@ describe('Top >= Bot is REFUSED, and the message says how to escape it', () => {
   });
 });
 
-describe('L0 in a variants line mask is REFUSED — the one click that cost a build', () => {
+describe('L0 in a variants line mask is REFUSED: the one click that cost a build', () => {
   it('lighting L0 is refused and quotes the build message it prevents', () => {
     const why = variantLineRefusal('ojz_water', 1, 0b1110, 0);
     expect(why).not.toBeNull();
@@ -224,7 +224,7 @@ describe('the controls are wired to the refusals, not to min/max', () => {
 });
 
 describe('the number box itself', () => {
-  it('selects its contents on focus — the cause of `40112`, fixed at the source', () => {
+  it('selects its contents on focus: the cause of `40112`, fixed at the source', () => {
     expect(fields).toMatch(/e\.currentTarget\.select\(\)/);
   });
 
@@ -252,7 +252,7 @@ describe('the number box itself', () => {
     expect(commitAt, 'and the commit is behind that guard').toBeGreaterThan(guardAt);
   });
 
-  it('a field with NO `refuse` behaves exactly as before — this is additive', () => {
+  it('a field with NO `refuse` behaves exactly as before: this is additive', () => {
     // The prop is optional and `?? null` means absent === "nothing refuses", so
     // the dozen other NumberFields in the app are untouched.
     expect(fields).toMatch(/const why = refuse\?\.\(n\) \?\? null;/);

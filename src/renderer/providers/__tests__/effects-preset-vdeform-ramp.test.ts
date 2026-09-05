@@ -111,7 +111,7 @@ function sceneLib(scenes: EffectsScene[]): EffectsSceneLibrary {
 type Section = { rasterRef: string | null; sceneRef: string | null } | null;
 const sec = (rasterRef: string | null, sceneRef: string | null): Section => ({ rasterRef, sceneRef });
 
-describe('vDeformRampBindings — the join, walked backwards', () => {
+describe('vDeformRampBindings: the join, walked backwards', () => {
   it('[a1] a section binding this scene AND a ramp preset is a narrowed row', () => {
     const rows = vDeformRampBindings(
       SCENE, [sec('r1', SCENE)], null, presetLib([rampPreset('r1')]),
@@ -132,7 +132,7 @@ describe('vDeformRampBindings — the join, walked backwards', () => {
     expect(rows[0].carries).toBe('ramp');
   });
 
-  it('[a3] a band preset produces NO row — the derived silence, with its control', () => {
+  it('[a3] a band preset produces NO row: the derived silence, with its control', () => {
     // Same section, same scene, same binding shape as [a1]. Only the preset's
     // SHAPE moves, and it is the thing that decides.
     expect(vDeformRampBindings(
@@ -149,7 +149,7 @@ describe('vDeformRampBindings — the join, walked backwards', () => {
     )).toEqual([]);
   });
 
-  it('[a5] an act default of null is NOT this scene — it is aeon`s act_descriptor', () => {
+  it('[a5] an act default of null is NOT this scene: it is aeon`s act_descriptor', () => {
     // The bottom of the chain is a file Aurora has never opened. Reading a null
     // act default as "this scene" would claim every unbound section.
     expect(vDeformRampBindings(
@@ -187,7 +187,7 @@ describe('vDeformRampBindings — the join, walked backwards', () => {
   });
 });
 
-describe('vDeformRampSentence — and what it refuses to claim', () => {
+describe('vDeformRampSentence, and what it refuses to claim', () => {
   it('[b1] silent when nothing is narrowed and nothing is undecidable', () => {
     expect(vDeformRampSentence([])).toBeNull();
   });
@@ -239,7 +239,7 @@ describe('vDeformRampSentence — and what it refuses to claim', () => {
     expect(unreadable).not.toContain('not a preset in this project');
   });
 
-  it('[b5] a narrowed row and an undecidable row both appear — neither is suppressed', () => {
+  it('[b5] a narrowed row and an undecidable row both appear: neither is suppressed', () => {
     const s = vDeformRampSentence([
       { section: 0, presetId: 'r1', carries: 'ramp', reason: null, via: 'section' },
       { section: 3, presetId: 'gone', carries: 'unknown', reason: 'preset-dangling', via: 'act' },
@@ -279,7 +279,7 @@ describe('vDeformRampSentence — and what it refuses to claim', () => {
   });
 });
 
-describe('the seam — both directions resolve the binding through ONE chain', () => {
+describe('the seam: both directions resolve the binding through ONE chain', () => {
   it('[c1] sectionSceneRef is what both ends call, and it spells the act default', () => {
     expect(sectionSceneRef({ sceneRef: 'mine' }, 'acts')).toEqual({ ref: 'mine', via: 'section' });
     expect(sectionSceneRef({ sceneRef: null }, 'acts')).toEqual({ ref: 'acts', via: 'act' });

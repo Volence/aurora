@@ -43,7 +43,7 @@ describe('planSpriteDocActivation', () => {
       tabId: 'doc:sprite:aeon:motobug', activeDocId: UNTITLED_SPRITE_DOC_ID, isOpen: false, classicActLoaded: true,
     })).toEqual({ kind: 'open', engine: 'aeon', ref: 'motobug' });
   });
-  it('opens regardless of dirtiness — parking the outgoing doc discards nothing', () => {
+  it('opens regardless of dirtiness: parking the outgoing doc discards nothing', () => {
     expect(planSpriteDocActivation({
       tabId: 'doc:sprite:s1:42', activeDocId: 'doc:sprite:aeon:motobug', isOpen: false, classicActLoaded: true,
     })).toEqual({ kind: 'open', engine: 's1', ref: '42' });
@@ -54,7 +54,7 @@ describe('planSpriteDocActivation', () => {
     })).toEqual({ kind: 'none' });
   });
 
-  it('the untitled tab is its OWN case — never a loader ref', () => {
+  it('the untitled tab is its OWN case: never a loader ref', () => {
     // There is nothing on disk called "untitled": routing it down the load path
     // would toast a bogus failure and roll the tab straight back.
     expect(planSpriteDocActivation({
@@ -182,7 +182,7 @@ describe('activateSpriteDocTarget', () => {
     expect(useSpriteStore.getState().frames[0].data[0]).toBe(1);
   });
 
-  it('dirtiness is per document — a parked doc stays dirty, a fresh one is clean', async () => {
+  it('dirtiness is per document: a parked doc stays dirty, a fresh one is clean', async () => {
     stubLoaders();
     await activateSpriteDocTarget(AEON_TAB);
     useSpriteStore.getState().setBuffer(frameFilledWith(7)); // dirties the aeon doc
@@ -293,7 +293,7 @@ describe('the untitled sprite tab', () => {
     expect(useSpriteStore.getState().frames[0].data[0]).toBe(9);
   });
 
-  it('does not collide with a real sprite tab — both stay open, each with its own pixels', async () => {
+  it('does not collide with a real sprite tab: both stay open, each with its own pixels', async () => {
     stubLoaders();
     useSpriteStore.getState().setBuffer(frameFilledWith(9));
     await activateSpriteDocTarget(AEON_TAB);
@@ -425,7 +425,7 @@ describe('an s1 sprite tab activated with no classic act loaded', () => {
     expect(useSpriteStore.getState().activeDocId).toBe(S1_TAB);
   });
 
-  it('does not defer AEON sprite tabs — library sprites need no act', async () => {
+  it('does not defer AEON sprite tabs: library sprites need no act', async () => {
     const calls = stubLoaders();
 
     expect(await activateSpriteDocTarget(AEON_TAB)).toBe(true);
@@ -495,7 +495,7 @@ describe('spriteTabCanResolveWithoutAct', () => {
     expect(spriteTabCanResolveWithoutAct(ZONAL_TAB)).toBe(true);
   });
 
-  it('false for a zone-scoped id with no key — the legacy-session deferral survives', () => {
+  it('false for a zone-scoped id with no key: the legacy-session deferral survives', () => {
     expect(spriteTabCanResolveWithoutAct(ZONAL_TAB)).toBe(false);
   });
 
@@ -503,14 +503,14 @@ describe('spriteTabCanResolveWithoutAct', () => {
     expect(spriteTabCanResolveWithoutAct(ZONE_FREE_TAB)).toBe(true);
   });
 
-  it('false whenever the classic project is closed — the checkout needs the dir', () => {
+  it('false whenever the classic project is closed: the checkout needs the dir', () => {
     useClassicProjectStore.setState({ status: 'closed' });
     useWorkspaceStore.getState().setS1Zone(ZONAL_TAB, { zone: 'slz', act: 1 });
     expect(spriteTabCanResolveWithoutAct(ZONAL_TAB)).toBe(false);
     expect(spriteTabCanResolveWithoutAct(ZONE_FREE_TAB)).toBe(false);
   });
 
-  it('false for aeon tabs and non-sprite ids — this is an s1-only question', () => {
+  it('false for aeon tabs and non-sprite ids: this is an s1-only question', () => {
     expect(spriteTabCanResolveWithoutAct(AEON_TAB)).toBe(false);
     expect(spriteTabCanResolveWithoutAct('level:ghz:1')).toBe(false);
   });
@@ -524,7 +524,7 @@ describe('planSpriteDocActivation with canResolveWithoutAct', () => {
     })).toEqual({ kind: 'open', engine: 's1', ref: '28' });
   });
 
-  it('still defers when it cannot (and when the flag is absent — old callers)', () => {
+  it('still defers when it cannot (and when the flag is absent, old callers)', () => {
     expect(planSpriteDocActivation({
       tabId: ZONAL_TAB, activeDocId: UNTITLED_SPRITE_DOC_ID,
       isOpen: false, classicActLoaded: false, canResolveWithoutAct: false,

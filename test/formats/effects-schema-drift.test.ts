@@ -207,7 +207,7 @@ function gitBlobHash(bytes: Buffer): string {
     .digest('hex');
 }
 
-describe('effects scene schema — vendored copy drift gate', () => {
+describe('effects scene schema: vendored copy drift gate', () => {
   it('the vendored schema is byte-identical to the pinned contract blob', () => {
     const bytes = readFileSync(SCHEMA_PATH);
     // Anti-vacuous: we hashed a real schema, not an empty or missing file.
@@ -554,18 +554,18 @@ describe('effects scene schema — vendored copy drift gate', () => {
 describe('CURRENCY: is the vendored schema still what empyrean publishes?', () => {
   const empyrean = peerRepo('empyrean');
   const TIP = PROV.empyrean.branch_that_answers_currency;
-  const NOT_OURS = 'NOT AN AURORA REGRESSION — the vendored effects contract schema is stale.';
+  const NOT_OURS = 'NOT AN AURORA REGRESSION: the vendored effects contract schema is stale.';
 
   it(`matches ${PROV.empyrean.path} at empyrean ${TIP}`, (ctx) => {
     if (empyrean === null) {
       ctx.skip('SKIPPED, NOT PASSED: no empyrean checkout beside this repo (set '
-        + 'AURORA_EMPYREAN_REPO) — CANNOT MEASURE whether the pin '
+        + 'AURORA_EMPYREAN_REPO); CANNOT MEASURE whether the pin '
         + `${PROV.empyrean.revision} is still current`);
       return;
     }
     const tip = resolveRev(empyrean, TIP);
     if (tip === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${empyrean} — CANNOT MEASURE `
+      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${empyrean}; CANNOT MEASURE `
         + `currency of pin ${PROV.empyrean.revision}`);
       return;
     }
@@ -595,19 +595,19 @@ describe('CURRENCY: is the vendored schema still what empyrean publishes?', () =
    */
   it('the pinned empyrean revision is PUBLISHED, not local-only', (ctx) => {
     if (empyrean === null) {
-      ctx.skip('SKIPPED, NOT PASSED: no empyrean checkout beside this repo — CANNOT MEASURE '
+      ctx.skip('SKIPPED, NOT PASSED: no empyrean checkout beside this repo; CANNOT MEASURE '
         + `whether ${PROV.empyrean.revision} is reachable from ${TIP}`);
       return;
     }
     const tip = resolveRev(empyrean, TIP);
     if (tip === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${empyrean} — CANNOT MEASURE `
+      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${empyrean}; CANNOT MEASURE `
         + 'reachability');
       return;
     }
     expect(
       isAncestor(empyrean, PROV.empyrean.revision, tip),
-      `${PROV.empyrean.revision} is NOT reachable from empyrean ${TIP} (${tip}) — local-only, or `
+      `${PROV.empyrean.revision} is NOT reachable from empyrean ${TIP} (${tip}): local-only, or `
       + 'the branch was rewritten; a peer cannot check a pin at a SHA they cannot fetch',
     ).toBe(true);
   });

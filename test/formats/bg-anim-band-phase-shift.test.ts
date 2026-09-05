@@ -149,7 +149,7 @@ describe('the independent instrument and fixture are real', () => {
   });
 });
 
-describe("phaseFill: 'shift' — banks are phase 0 rolled k px", () => {
+describe("phaseFill: 'shift': banks are phase 0 rolled k px", () => {
   it('bank k of a promoted band equals the independent roll of the blob range, for every bank', () => {
     const { doc, base } = docWith(COLS, ROWS);
     const band = bandFromStaticTiles(doc, base, { cols: COLS, rows: ROWS, phaseFill: 'shift' });
@@ -164,7 +164,7 @@ describe("phaseFill: 'shift' — banks are phase 0 rolled k px", () => {
     }
   });
 
-  it('bank 0 is untouched — it IS the blob range, so the promotion command accepts the band', () => {
+  it('bank 0 is untouched: it IS the blob range, so the promotion command accepts the band', () => {
     const { doc, base } = docWith(COLS, ROWS);
     const band = bandFromStaticTiles(doc, base, { cols: COLS, rows: ROWS, phaseFill: 'shift' });
     expect(band.phases![0]).toEqual(doc.tiles.slice(base, base + COLS * ROWS));
@@ -202,7 +202,7 @@ describe("phaseFill: 'shift' — banks are phase 0 rolled k px", () => {
     }
   });
 
-  it('refuses a phase 0 that is not the band\'s own shape — the shift permutes exactly its pixels', () => {
+  it('refuses a phase 0 that is not the band\'s own shape: the shift permutes exactly its pixels', () => {
     expect(() => shiftedPhaseBanks({ cols: COLS, rows: ROWS }, asymmetricTiles(COLS, ROWS).slice(1)))
       .toThrow('cannot derive shifted phase banks');
   });
@@ -237,7 +237,7 @@ describe('the other fills are unchanged', () => {
     }
   });
 
-  it('refuses `phases` and `phaseFill` together — `phases` already spells every bank', () => {
+  it('refuses `phases` and `phaseFill` together: `phases` already spells every bank', () => {
     const phases = Array.from({ length: BGANIM_PHASE_BANKS },
       () => asymmetricTiles(COLS, ROWS));
     expect(() => createBand({ cols: COLS, rows: ROWS, phases, phaseFill: 'shift' }))

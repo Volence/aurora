@@ -45,7 +45,7 @@ import { peerRepo, readAtRev } from '../support/peer-repo';
  */
 function unownedProbe(): number {
   const lowest = COLLISION_CELL_UNOWNED_MASK & -COLLISION_CELL_UNOWNED_MASK;
-  expect(lowest, 'unowned mask is empty — every preservation row here would be vacuous').toBeGreaterThan(0);
+  expect(lowest, 'unowned mask is empty: every preservation row here would be vacuous').toBeGreaterThan(0);
   return lowest;
 }
 /** The full unowned field set, for the rows that want every unowned bit lit. */
@@ -63,7 +63,7 @@ const BRUSH = packCollisionCell({ shape: 0x123, xFlip: true, yFlip: false, solid
 const OTHER = packCollisionCell({ shape: 0x0A5, xFlip: false, yFlip: true, solidity: 'all' });
 
 describe('collision-word: the owned mask is derived, and matches the engine', () => {
-  it('is exactly what packCollisionCell can set — shape | xFlip | yFlip | solidity', () => {
+  it('is exactly what packCollisionCell can set: shape | xFlip | yFlip | solidity', () => {
     // Derivation shown, not a literal: OR the four fields at full width.
     const derived = 0x3FF | 0x400 | 0x800 | (0x3 << 12);
     expect(COLLISION_CELL_OWNED_MASK).toBe(derived);
@@ -112,7 +112,7 @@ describe('collision-word: the owned mask is derived, and matches the engine', ()
   it('agrees with aeon collision_pipeline.py field constants at a committed revision', (ctx) => {
     const repo = peerRepo('aeon');
     if (repo === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AURORA_AEON_REPO) — cannot cross-check ${PIPELINE} at ${AEON_REV}`);
+      ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AURORA_AEON_REPO): cannot cross-check ${PIPELINE} at ${AEON_REV}`);
       return;
     }
     const blob = readAtRev(repo, AEON_REV, PIPELINE);

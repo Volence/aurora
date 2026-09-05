@@ -98,7 +98,7 @@ const R3: Row = {
   measuredDrift: 0.09375,
 };
 
-describe('anchored zoom — the measured rows', () => {
+describe('anchored zoom: the measured rows', () => {
   it('reproduces the drift the app was measured to have, from the old formula', () => {
     // If this ever goes green-by-accident the whole file is worthless: it is the
     // half that proves the oracle can SEE the bug.
@@ -133,7 +133,7 @@ describe('anchored zoom — the measured rows', () => {
   });
 });
 
-describe('anchored zoom — the clamped case (row 2)', () => {
+describe('anchored zoom: the clamped case (row 2)', () => {
   it('asks for a negative scroll, which is why zero is unreachable', () => {
     const truth = anchorAt(R2.pointer, R2.before.origin - R2.before.scroll, R2.before.zoom);
     expect(truth).toBe(1);      // the cursor sits on art pixel 1.0 of the centred tile
@@ -172,7 +172,7 @@ describe('anchored zoom — the clamped case (row 2)', () => {
   });
 });
 
-describe('anchored zoom — canvas edges', () => {
+describe('anchored zoom: canvas edges', () => {
   // The probe deliberately sampled 30% into the box because the box CENTRE is a
   // fixed point of auto-centring and hides the bug. The edges are the other
   // interesting points: they are where a mis-anchored zoom throws the pixel off
@@ -231,7 +231,7 @@ describe('anchored zoom — canvas edges', () => {
   });
 });
 
-describe('anchored zoom — the other two hosts', () => {
+describe('anchored zoom: the other two hosts', () => {
   it('fixes aeon, whose padding is four times classic\'s', () => {
     // ComposerCanvas: `styles.holder` = { margin: auto, padding: 24 }. A 128px
     // chunk at zoom 4 is 512px in a 600px viewport, so it is centred too:
@@ -267,7 +267,7 @@ describe('anchored zoom — the other two hosts', () => {
   });
 });
 
-describe('anchored zoom — the arithmetic itself', () => {
+describe('anchored zoom: the arithmetic itself', () => {
   it('reads the anchor off the canvas rect, scroll and all', () => {
     // `canvasEdge` already contains the scroll, which is the whole reason the
     // capture side needs no scroll term: these two must agree.
@@ -288,7 +288,7 @@ describe('anchored zoom — the arithmetic itself', () => {
     }
   });
 
-  it('keeps fractions — rounding the anchor is what makes a zoom creep', () => {
+  it('keeps fractions: rounding the anchor is what makes a zoom creep', () => {
     expect(anchorAt(75, 6, 32)).toBeCloseTo(2.15625, 12);
     expect(anchorAt(75, 6, 32) % 1).not.toBe(0);
   });
@@ -355,7 +355,7 @@ describe('AnchorSlot', () => {
     expect(s.take()).toEqual(a);
   });
 
-  it('EMPTIES on take — an anchor is spendable exactly once', () => {
+  it('EMPTIES on take: an anchor is spendable exactly once', () => {
     // The layout-effect bug in one line: `take()` clears before the caller has a
     // chance to return early on a guard, so a second consumer gets nothing.
     const s = new AnchorSlot();
@@ -383,7 +383,7 @@ describe('AnchorSlot', () => {
   });
 });
 
-describe('anchored zoom — wiring', () => {
+describe('anchored zoom: wiring', () => {
   it('spends the anchor through the slot rather than a bare ref', () => {
     // Comment-stripped source: the docblock above discusses every one of these
     // names at length, so a raw read would pass on prose alone.
@@ -400,10 +400,10 @@ describe('anchored zoom — wiring', () => {
     // The order is the assertion. `take()` below `if (!a || !scroller || !canvas)`
     // would compile and behave identically in the happy path.
     const effect = /useLayoutEffect\(\(\)\s*=>\s*\{([\s\S]*?)\n\s*\}, \[/.exec(HOOK);
-    expect(effect, 'the post-zoom layout effect is gone — check what replaced it').not.toBeNull();
+    expect(effect, 'the post-zoom layout effect is gone: check what replaced it').not.toBeNull();
     const body = effect![1];
     expect(body.indexOf('.take()'), 'the layout effect never consumes the slot').toBeGreaterThanOrEqual(0);
-    expect(body.indexOf('return'), 'the early-out guard is gone — re-read this test').toBeGreaterThanOrEqual(0);
+    expect(body.indexOf('return'), 'the early-out guard is gone: re-read this test').toBeGreaterThanOrEqual(0);
     expect(body.indexOf('.take()'), 'a guard can return before the anchor is consumed')
       .toBeLessThan(body.indexOf('return'));
   });
@@ -420,7 +420,7 @@ describe('anchored zoom — wiring', () => {
     for (const [name, src] of HOSTS) {
       expect(src, `${name} does not pass a canvas ref to the zoom hook`)
         .toMatch(/useAnchoredZoom\([^)]*canvasRef\s*,/);
-      expect(src, `${name} never fills canvasRef in — the hook would silently stop anchoring`)
+      expect(src, `${name} never fills canvasRef in: the hook would silently stop anchoring`)
         .toMatch(/canvasRef=\{canvasRef\}/);
     }
   });

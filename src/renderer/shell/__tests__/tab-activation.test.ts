@@ -26,7 +26,7 @@ describe('planLevelActivation', () => {
       .toEqual({ kind: 'none' });
   });
 
-  it('aeon level tabs always switch (all acts resident in memory — no loss possible)', () => {
+  it('aeon level tabs always switch (all acts resident in memory; no loss possible)', () => {
     expect(planLevelActivation({ tabId: 'level:ehz:act1', engine: 'aeon', classicLoadedRef: null, classicDirty: false }))
       .toEqual({ kind: 'aeon-switch', zone: 'ehz', act: 'act1' });
   });
@@ -194,7 +194,7 @@ describe('activateLevelTarget aeon viewport snapshot/restore', () => {
     expect({ x: v.vpX, y: v.vpY, zoom: v.zoom }).toEqual({ x: 30, y: 40, zoom: 2 });
   });
 
-  it('refuses an act id the project does not have — and touches nothing', async () => {
+  it('refuses an act id the project does not have, and touches nothing', async () => {
     // The bug: nothing checked, so setCurrentAct wrote a phantom id and
     // useActTabSync opened a tab titled for it, hosting an editor whose
     // getCurrentAct() is null. Reachable without the debug hook: a level tab
@@ -374,7 +374,7 @@ describe('requestCloseTab', () => {
 // switching tabs parks documents instead of discarding them. So every dirty
 // sprite-doc close confirms — for a parked (background) document as much as the
 // checked-out one — and the closed document's undo stack goes with it.
-describe('requestCloseTab — sprite-doc documents', () => {
+describe('requestCloseTab: sprite-doc documents', () => {
   const HOME = { id: 'home', kind: 'home' as const, title: 'Home' };
   const SPRITE_TAB = spriteDocTab('s1', '13', 'Signpost'); // 'doc:sprite:s1:13'
   const OTHER_SPRITE = spriteDocTab('s1', '28', 'Bridge');  // 'doc:sprite:s1:28'
@@ -512,7 +512,7 @@ describe('requestCloseTab — sprite-doc documents', () => {
 // AND stops a reopened tab from inheriting the history of a document the user
 // already threw away. The zone-art document is the exception: it is shared by
 // every act tab of its zone.
-describe('requestCloseTab — undo-stack disposal', () => {
+describe('requestCloseTab: undo-stack disposal', () => {
   const HOME = { id: 'home', kind: 'home' as const, title: 'Home' };
   const GHZ1 = classicLevelTab({ zone: 'ghz', act: 1, label: 'GHZ 1', available: true });
   const GHZ2 = classicLevelTab({ zone: 'ghz', act: 2, label: 'GHZ 2', available: true });

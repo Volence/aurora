@@ -137,7 +137,7 @@ async function withPremise(awaiting: readonly RampSignField[]): Promise<{
   const sign = await import(SIGN_MODULE);
   expect(
     [...sign.RAMP_SIGN_FIELDS_AWAITING_AEON],
-    'THE PREMISE STUB DID NOT TAKE, so every assertion built on this rig is vacuous — it would '
+    'THE PREMISE STUB DID NOT TAKE, so every assertion built on this rig is vacuous: it would '
     + 'pass against a leaf hard-wired shut and a caveat hard-wired on alike.',
   ).toEqual([...awaiting]);
   const leaf = await import('../RampSignLagDisclosure');
@@ -151,19 +151,19 @@ afterEach(() => {
 });
 
 describe('the premise has RETIRED, and the retirement is asserted rather than assumed', () => {
-  it('1. the premise is EMPTY — aeon\'s constructor encodes, so no field is lagging', () => {
+  it('1. the premise is EMPTY: aeon\'s constructor encodes, so no field is lagging', () => {
     expect(
       [...RAMP_SIGN_FIELDS_AWAITING_AEON],
       'RAMP_SIGN_FIELDS_AWAITING_AEON is not empty. If this is a RE-ARM, only '
-      + 'test/formats/aeon-ramp-sign-drift.test.ts is entitled to have done it — that row reads '
+      + 'test/formats/aeon-ramp-sign-drift.test.ts is entitled to have done it: that row reads '
       + 'aeon\'s constructor at TIP through git objects and reddens when it forwards a bare '
-      + 'parameter again, and its message is the handover. If it is anything else — a hand edit, '
-      + 'a merge announcement, a guess — it is a FALSE WARNING being put back on an author\'s '
+      + 'parameter again, and its message is the handover. If it is anything else (a hand edit, '
+      + 'a merge announcement, a guess) it is a FALSE WARNING being put back on an author\'s '
       + 'screen, which is the defect this disclosure was written against, wearing the other hat.',
     ).toEqual([]);
   });
 
-  it('2. the replay is REAL vocabulary — `THE_LAG_THAT_WAS` is exactly the two ramp sign fields',
+  it('2. the replay is REAL vocabulary: `THE_LAG_THAT_WAS` is exactly the two ramp sign fields',
     () => {
       expect(
         [...THE_LAG_THAT_WAS].sort(),
@@ -176,16 +176,16 @@ describe('the premise has RETIRED, and the retirement is asserted rather than as
       expect(rampSignLagDisclosure([...THE_LAG_THAT_WAS])).not.toBeNull();
     });
 
-  it('3. BOTH SURFACES RENDER NOTHING — the sentence and the caveat are off screen', () => {
+  it('3. BOTH SURFACES RENDER NOTHING: the sentence and the caveat are off screen', () => {
     // The card's leaf, on the most negative document there is.
     expect(
       RampSignLagDisclosure({ start: -2, step: -1.5 }),
-      'the ramp card still discloses a negative value after aeon encoded it — a FALSE WARNING '
+      'the ramp card still discloses a negative value after aeon encoded it: a FALSE WARNING '
       + 'telling the author a document will not build when it now does.',
     ).toBeNull();
     // The refusal's caveat, on the input that carried it while the lag was open.
     const said = rampRateRefusal(RAMP, 'p', 'step', -0.5)!;
-    expect(said, 'the sign-hole refusal vanished entirely — something other than the caveat was '
+    expect(said, 'the sign-hole refusal vanished entirely: something other than the caveat was '
       + 'retired').not.toBeNull();
     expect(said).not.toContain(RAMP_SIGN_CAVEAT_LEAD);
     // ...and the true arithmetic SURVIVED the retirement. Only the addendum went.
@@ -210,7 +210,7 @@ describe('the premise has RETIRED, and the retirement is asserted rather than as
   });
 
   /** ⚠ THE SCOPE. The sentence must not re-arm the claim that retired before it. */
-  it('6. ⚠ IT IS ABOUT THE SIGN, NOT ABOUT `ramp` — the retired claim is NOT restated', () => {
+  it('6. ⚠ IT IS ABOUT THE SIGN, NOT ABOUT `ramp`: the retired claim is NOT restated', () => {
     const said = rampSignLagDisclosure([...THE_LAG_THAT_WAS])!;
     // It says the positive case works, in as many words. Without this clause a
     // reader takes it for "ramp does not reach the game", which is false.
@@ -222,7 +222,7 @@ describe('the premise has RETIRED, and the retirement is asserted rather than as
     expect(said).not.toContain('effects_gen.py');
   });
 
-  it('7. it names the mechanism precisely enough to be checked — u32, raw forward, emission', () => {
+  it('7. it names the mechanism precisely enough to be checked: u32, raw forward, emission', () => {
     const said = rampSignLagDisclosure(['step'])!;
     expect(said).toContain('raster_ramp_program');
     expect(said).toContain('`rrp_start`');
@@ -253,16 +253,16 @@ describe('the premise has RETIRED, and the retirement is asserted rather than as
   });
 });
 
-describe('the gate: which values speak, and which see nothing — REPLAYED under the filled premise',
+describe('the gate: which values speak, and which see nothing (REPLAYED under the filled premise)',
   () => {
-    it('9. a POSITIVE ramp saw NOTHING — every ramp that has ever existed in this tier', async () => {
+    it('9. a POSITIVE ramp saw NOTHING: every ramp that has ever existed in this tier', async () => {
       expect(rampSignLagFields({ start: 0, step: 1.5 }, THE_LAG_THAT_WAS)).toEqual([]);
       expect(rampSignLagFields({ start: 12, step: 0.25 }, THE_LAG_THAT_WAS)).toEqual([]);
       const { leaf } = await withPremise(THE_LAG_THAT_WAS);
       expect(leaf({ start: 0, step: 1.5 })).toBeNull();
     });
 
-    it('10. ZERO is not negative — `0` encodes to `0` and fits u32 fine', async () => {
+    it('10. ZERO is not negative: `0` encodes to `0` and fits u32 fine', async () => {
       expect(rampSignLagFields({ start: 0, step: 0 }, THE_LAG_THAT_WAS)).toEqual([]);
       const { leaf } = await withPremise(THE_LAG_THAT_WAS);
       expect(leaf({ start: 0, step: 0 })).toBeNull();
@@ -280,7 +280,7 @@ describe('the gate: which values speak, and which see nothing — REPLAYED under
       expect(text).not.toContain('`start` (px)');
     });
 
-    it('12. a negative `start` spoke too — `rrp_start` was the same u32 and the same raw forward',
+    it('12. a negative `start` spoke too: `rrp_start` was the same u32 and the same raw forward',
       async () => {
         expect(rampSignLagFields({ start: -2, step: 1 }, THE_LAG_THAT_WAS)).toEqual(['start']);
         const { leaf } = await withPremise(THE_LAG_THAT_WAS);
@@ -289,7 +289,7 @@ describe('the gate: which values speak, and which see nothing — REPLAYED under
         expect(text).toContain('`start` (px) is negative');
       });
 
-    it('13. both negative named both, in the order the panel paints them — THE PLURAL BRANCH',
+    it('13. both negative named both, in the order the panel paints them: THE PLURAL BRANCH',
       async () => {
         expect(rampSignLagFields({ start: -2, step: -1.5 }, THE_LAG_THAT_WAS))
           .toEqual(['start', 'step']);
@@ -307,14 +307,14 @@ describe('the gate: which values speak, and which see nothing — REPLAYED under
     });
   });
 
-describe('the REFUSAL that recommended an unbuildable value — and what it says now', () => {
+describe('the REFUSAL that recommended an unbuildable value, and what it says now', () => {
   /**
    * ⚠ THE ARITHMETIC IS PREMISE-INDEPENDENT AND IS CHECKED AGAINST PRODUCTION.
    * `-0.5` has no fp16 spelling, and the refusal names `-1` and `0` as the
    * nearest that do. That was true while the lag was open and it is true now;
    * the retirement removed the addendum and nothing else.
    */
-  it('15. the sign-hole refusal still names -1 and 0 — THE ARITHMETIC IS NOT CORRUPTED', () => {
+  it('15. the sign-hole refusal still names -1 and 0: THE ARITHMETIC IS NOT CORRUPTED', () => {
     expect(rampRateProblem(-0.5)).toBe('sign-hole');
     expect(rampRateNeighbours(-0.5)).toEqual({ below: -1, above: 0 });
     const said = rampRateRefusal(RAMP, 'p', 'step', -0.5)!;
@@ -333,7 +333,7 @@ describe('the REFUSAL that recommended an unbuildable value — and what it says
       expect(said).toContain('still the nearest value this ENCODING can spell');
     });
 
-  it('17. the caveat fired ONLY on a negative offer — a positive one was left alone', async () => {
+  it('17. the caveat fired ONLY on a negative offer; a positive one was left alone', async () => {
     const { refusal } = await withPremise(THE_LAG_THAT_WAS);
     // Off-grid ABOVE zero: the named pair is 1 and 1.00390625, both positive.
     const up = refusal(RAMP, 'p', 'step', 1.001)!;
@@ -349,7 +349,7 @@ describe('the REFUSAL that recommended an unbuildable value — and what it says
     expect(under).toContain(RAMP_SIGN_CAVEAT_LEAD);
   });
 
-  it('18. an off-grid NEGATIVE offer carried it too — both named values below zero', async () => {
+  it('18. an off-grid NEGATIVE offer carried it too: both named values below zero', async () => {
     const { refusal } = await withPremise(THE_LAG_THAT_WAS);
     const said = refusal(RAMP, 'p', 'step', -1.001)!;
     expect(rampRateProblem(-1.001)).toBe('off-grid');
@@ -360,7 +360,7 @@ describe('the REFUSAL that recommended an unbuildable value — and what it says
     expect(said).toContain(`${n.below} and ${n.above} are negative`);
   });
 
-  it('19. a rate that is FINE gets no sentence at all — the refusal is still null', () => {
+  it('19. a rate that is FINE gets no sentence at all: the refusal is still null', () => {
     expect(rampRateRefusal(RAMP, 'p', 'step', -1.5)).toBeNull();
     expect(rampRateRefusal(RAMP, 'p', 'step', 1.5)).toBeNull();
   });
@@ -400,7 +400,7 @@ describe('the panel still mounts the leaf on the ramp card, silent though it is'
   it('21. the ramp card mounts it, fed the document\'s own two values through the codec', () => {
     const line = code.split('\n').findIndex((l) => /<RampSignLagDisclosure/.test(l));
     expect(line, 'BandPresetPanel does not mount RampSignLagDisclosure at all. It renders nothing '
-      + 'today, which is why deleting it is invisible — and why re-filling the premise would then '
+      + 'today, which is why deleting it is invisible, and why re-filling the premise would then '
       + 'put the sentence back on NO screen.').toBeGreaterThan(-1);
     const mount = code.split('\n').slice(line, line + 2).join('\n');
     // Fed from the document through the ONE conversion, not from a second
@@ -412,7 +412,7 @@ describe('the panel still mounts the leaf on the ramp card, silent though it is'
     expect(code.split('<RampSignLagDisclosure').length - 1).toBe(1);
   });
 
-  it('22. it is mounted UNCONDITIONALLY — no `&&` guard one level up that could silence it', () => {
+  it('22. it is mounted UNCONDITIONALLY: no `&&` guard one level up that could silence it', () => {
     const line = code.split('\n').find((l) => /<RampSignLagDisclosure/.test(l))!;
     expect(line.trim().startsWith('<RampSignLagDisclosure')).toBe(true);
     expect(line).not.toContain('&&');
@@ -437,7 +437,7 @@ describe('the panel still mounts the leaf on the ramp card, silent though it is'
    * lag was open, because the re-arm poison below is the only thing that can see
    * a broken caveat, and it is the poison such a default would defeat.
    */
-  it('24. ⚠ the provider passes the premise EXPLICITLY — the default parameter is a hidden import',
+  it('24. ⚠ the provider passes the premise EXPLICITLY: the default parameter is a hidden import',
     () => {
       const prov = readFileSync(
         resolve(__dirname, '../../../providers/effects-preset.ts'), 'utf8',
@@ -509,7 +509,7 @@ describe('the panel still mounts the leaf on the ramp card, silent though it is'
     // passes a mention check and is exactly as pinned as one that never read it.
     // These two pin the DERIVATION: the flag comes from the parsed list, and the
     // parsed list comes from that file on disk.
-    expect(harness, 'NS_PREMISE_OPEN is not derived from the parsed premise — a hard-wired flag '
+    expect(harness, 'NS_PREMISE_OPEN is not derived from the parsed premise: a hard-wired flag '
       + 'makes the read decorative and the [ns] rows pinned to one state again')
       .toContain('const NS_PREMISE_OPEN = NS_PREMISE.length > 0;');
     expect(harness, 'NS_PREMISE is not parsed out of ramp-sign-lag.ts on disk')
@@ -534,7 +534,7 @@ describe('the panel still mounts the leaf on the ramp card, silent though it is'
     expect(pkg.scripts['harness:ramp-control']).toBe('node scratchpad/ramp-control-harness.mjs');
   });
 
-  it('28. the leaf holds no literal sentence either — it derives, and derives once', () => {
+  it('28. the leaf holds no literal sentence either; it derives, and derives once', () => {
     const leaf = readFileSync(LEAF, 'utf8');
     expect(leaf).toContain('rampSignLagDisclosure');
     expect(leaf).toContain('rampSignLagFields');
@@ -566,8 +566,8 @@ describe('POISON: RE-FILL the premise and BOTH surfaces must come BACK', () => {
     expect(
       el,
       'the leaf renders NOTHING for a negative `step` even with the premise RE-FILLED. The '
-      + 'retirement has been made permanent by accident — a `return null`, a dropped premise '
-      + 'read, or a deleted derivation — so if aeon ever forwards a bare parameter again the '
+      + 'retirement has been made permanent by accident (a `return null`, a dropped premise '
+      + 'read, or a deleted derivation), so if aeon ever forwards a bare parameter again the '
       + 'author will author a document that CANNOT BUILD and the panel will say nothing.',
     ).not.toBeNull();
     // Equal to the derivation, so a hard-wired literal cannot pass either.
@@ -578,19 +578,19 @@ describe('POISON: RE-FILL the premise and BOTH surfaces must come BACK', () => {
   it('30. the refusal\'s caveat comes back too, on the same input production leaves bare', async () => {
     const { refusal } = await withPremise(THE_LAG_THAT_WAS);
     const said = refusal(RAMP, 'p', 'step', -0.5)!;
-    expect(said, 'the sign-hole refusal vanished entirely — the caveat was appended to the wrong '
+    expect(said, 'the sign-hole refusal vanished entirely: the caveat was appended to the wrong '
       + 'thing').not.toBeNull();
     expect(
       said,
       'the refusal does NOT regain its caveat with the premise RE-FILLED, so the re-arm reaches '
-      + 'the card but not the refusal — and the refusal is the surface that RECOMMENDS the '
+      + 'the card but not the refusal, and the refusal is the surface that RECOMMENDS the '
       + 'unbuildable value, with all the authority a named alternative carries.',
     ).toContain(RAMP_SIGN_CAVEAT_LEAD);
     // The true arithmetic is present in BOTH states; it is not what moves.
     expect(said).toContain('The nearest rates you CAN have are -1 and 0');
   });
 
-  it('31. ...and unstubbed — production, today — BOTH are silent again', async () => {
+  it('31. ...and unstubbed (production, today), BOTH are silent again', async () => {
     vi.resetModules();
     const leaf = await import('../RampSignLagDisclosure');
     expect(leaf.RampSignLagDisclosure({ start: -2, step: -1.5 })).toBeNull();
@@ -620,7 +620,7 @@ describe('POISON: RE-FILL the premise and BOTH surfaces must come BACK', () => {
         resolve(__dirname, '../../../../../test/formats/aeon-ramp-sign-drift.test.ts'), 'utf8',
       );
       expect(drift, 'the drift row no longer opens the aeon checkout').toContain("peerRepo('aeon')");
-      expect(drift, 'it no longer reads at a resolved revision — a path read would see a live '
+      expect(drift, 'it no longer reads at a resolved revision: a path read would see a live '
         + 'working tree instead of a committed blob').toContain('readAtRev(');
       expect(drift, 'it no longer reads the ENGINE SOURCE, which is the only artifact that can '
         + 'see this defect').toContain("const AEON_PATH = 'engine/effects/raster.emp'");
@@ -628,10 +628,10 @@ describe('POISON: RE-FILL the premise and BOTH surfaces must come BACK', () => {
       // And it still branches on the premise, so it can retire AND re-arm.
       expect(drift).toContain('RAMP_SIGN_FIELDS_AWAITING_AEON.length > 0');
       expect(drift, 'the drift row no longer tells a reader to RE-FILL when the constructor '
-        + 'forwards again — the re-arm has no handover').toContain('THE PREMISE IS BACK');
+        + 'forwards again: the re-arm has no handover').toContain('THE PREMISE IS BACK');
     });
 
-  it('32. the derivations themselves are the gate — both directions, both surfaces', () => {
+  it('32. the derivations themselves are the gate: both directions, both surfaces', () => {
     // Empty premise: silent.
     expect(rampSignLagDisclosure([])).toBeNull();
     expect(rampSignLagFields({ start: -2, step: -1.5 }, [])).toEqual([]);

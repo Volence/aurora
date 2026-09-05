@@ -488,7 +488,7 @@ const shapeAt = (cx: number, cy: number) => {
 };
 
 describe('classic-set-block-collision', () => {
-  it('THROWS when no level is open — that is a fault, not a refusal', async () => {
+  it('THROWS when no level is open: that is a fault, not a refusal', async () => {
     await expect(handleAgentRequest({
       kind: 'classic-set-block-collision', x: 16, y: 0, w: 1, h: 1, shape: 7,
     })).rejects.toThrow(/no classic level is open/);
@@ -546,7 +546,7 @@ describe('classic-set-block-collision', () => {
     expect(shapeAt(16, 0)).toBe(0);
   });
 
-  it('is idempotent — a repeat is ok:true with noop, not a refusal', async () => {
+  it('is idempotent: a repeat is ok:true with noop, not a refusal', async () => {
     openReady(collisionDoc());
     const req = { kind: 'classic-set-block-collision' as const, x: 16, y: 0, w: 2, h: 1, shape: 7 };
     await handleAgentRequest(req);
@@ -583,7 +583,7 @@ describe('agent-handler collision write route', () => {
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/(^|[^:])\/\/.*$/gm, '$1');
     const start = src.indexOf("case 'classic-set-block-collision'");
-    expect(start, 'no such case in agent-handler.ts — this guard is blind').toBeGreaterThan(-1);
+    expect(start, 'no such case in agent-handler.ts: this guard is blind').toBeGreaterThan(-1);
     const rest = src.slice(start);
     const end = rest.indexOf('\n    case ');
     const body = end === -1 ? rest : rest.slice(0, end);

@@ -16,7 +16,7 @@ import { planFileNeedsWrite, jsonValueEqual } from '../save-skip';
 
 const enc = (s: string) => new TextEncoder().encode(s);
 
-describe('planFileNeedsWrite — the noise the byte test let through', () => {
+describe('planFileNeedsWrite: the noise the byte test let through', () => {
   it('skips a document that differs ONLY by the §8 trailing newline', () => {
     // 22 of the 23. aeon's Python writers use json.dumps, which emits no
     // trailing newline; Aurora's canonical file form ends in exactly one.
@@ -50,7 +50,7 @@ describe('planFileNeedsWrite — the noise the byte test let through', () => {
   });
 });
 
-describe('planFileNeedsWrite — every class of real change still reaches disk', () => {
+describe('planFileNeedsWrite: every class of real change still reaches disk', () => {
   it('writes when the file is absent on disk', () => {
     expect(planFileNeedsWrite('json', null, enc('{"a":1}\n'))).toBe(true);
     expect(planFileNeedsWrite('section-meta', null, enc('{}\n'))).toBe(true);
@@ -95,7 +95,7 @@ describe('planFileNeedsWrite — every class of real change still reaches disk',
       .toBe(true);
   });
 
-  it('writes a sidecar whose ref actually changed — bind, rebind and UNBIND', () => {
+  it('writes a sidecar whose ref actually changed: bind, rebind and UNBIND', () => {
     const bound = '{"bgLayoutRef":null,"paletteRef":null,"rasterRef":"ojz_sec5_showcase","sceneRef":null}\n';
     const unbound = '{"bgLayoutRef":null,"paletteRef":null,"rasterRef":null,"sceneRef":null}\n';
     const other = '{"bgLayoutRef":null,"paletteRef":null,"rasterRef":"other","sceneRef":null}\n';
@@ -108,7 +108,7 @@ describe('planFileNeedsWrite — every class of real change still reaches disk',
     expect(planFileNeedsWrite('section-meta', enc(bound), enc(other))).toBe(true);
   });
 
-  it('writes a sidecar carrying a NUMERIC ref — the relaxation is null-only', () => {
+  it('writes a sidecar carrying a NUMERIC ref: the relaxation is null-only', () => {
     // parseSectionMeta nulls a non-string SILENTLY, which is the stated reason
     // aeon's generator refuses `rasterRef: 3` by name. `3` is not `null`, so
     // this is a difference and the save still normalises it.

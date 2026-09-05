@@ -83,7 +83,7 @@ describe('effects scene paths', () => {
   });
 });
 
-describe('effects scene reader — identity and version', () => {
+describe('effects scene reader: identity and version', () => {
   it('accepts a minimal scene: the four required keys and nothing more', () => {
     const scene = parseEffectsScene(MINIMAL, 'plain');
     expect(scene.id).toBe('plain');
@@ -123,7 +123,7 @@ describe('effects scene reader — identity and version', () => {
    * The row asserts the refusal is SPECIFIC, not merely that something threw: an
    * unrelated defect making every parse throw would satisfy "it throws".
    */
-  it('REFUSES a legacy scene still carrying the retired `precision` — closed schema', () => {
+  it('REFUSES a legacy scene still carrying the retired `precision`: closed schema', () => {
     const legacy = withDoc((d) => { d.precision = 'cell'; });
     expect(() => parseEffectsScene(legacy, 'plain'))
       .toThrow(/does not match the effects scene schema/);
@@ -162,7 +162,7 @@ describe('effects scene reader — identity and version', () => {
   });
 });
 
-describe('effects scene ids — the BG-library asymmetry', () => {
+describe('effects scene ids: the BG-library asymmetry', () => {
   /**
    * §2 Identity: `^[a-z][a-z0-9_]{0,31}$`. "The id becomes part of generated
    * .emp symbol names (labels), which is why hyphens and arbitrary unicode —
@@ -197,7 +197,7 @@ describe('effects scene ids — the BG-library asymmetry', () => {
   });
 });
 
-describe('effects scene reader — the closed schema', () => {
+describe('effects scene reader: the closed schema', () => {
   it('refuses an unknown top-level key', () => {
     expect(() => parseEffectsScene(withDoc(d => { d.presets = []; }), 'plain'))
       .toThrow(/unknown property "presets" \(the schema is closed\)/);
@@ -307,7 +307,7 @@ describe('effects scene reader — the closed schema', () => {
   });
 });
 
-describe('effects scene writer — round trip', () => {
+describe('effects scene writer: round trip', () => {
   /**
    * §2: "Aurora's wave-1 UI may expose a subset of fields, but its writer must
    * round-trip fields it does not edit." Proven on disk bytes against a
@@ -427,7 +427,7 @@ describe('effects scene writer — round trip', () => {
    * because §5's letter once reached scene files and would have minified them,
    * and the ruling that says otherwise lives in the other repo.
    */
-  it('ends in exactly one LF — the canonical file form (empyrean e1ebd20 §8)', () => {
+  it('ends in exactly one LF: the canonical file form (empyrean e1ebd20 §8)', () => {
     const text = serializeEffectsScene(parseEffectsScene(MINIMAL, 'plain'));
     expect(text.endsWith('}\n')).toBe(true);
     expect(text.endsWith('\n\n')).toBe(false);
@@ -438,7 +438,7 @@ describe('effects scene writer — round trip', () => {
     expect(serializeEffectsScene(parseEffectsScene(MINIMAL.trimEnd(), 'plain'))).toBe(text);
   });
 
-  it('pretty-prints at indent 2 — the scalar document class', () => {
+  it('pretty-prints at indent 2: the scalar document class', () => {
     const text = serializeEffectsScene(parseEffectsScene(MINIMAL, 'plain'));
     expect(text).toContain('\n');
     expect(text.split('\n')[1].startsWith('  "')).toBe(true);

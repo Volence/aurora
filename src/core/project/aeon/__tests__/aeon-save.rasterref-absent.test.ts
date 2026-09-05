@@ -174,7 +174,7 @@ async function untouchedSaveOf(onDisk: string): Promise<{ input: string; output:
   return { input: onDisk, output: new TextDecoder().decode(written[0]!.bytes) };
 }
 
-describe('SAVE-ADDS-RASTERREF-NULL — a no-edit save of a sidecar that has no rasterRef key', () => {
+describe('SAVE-ADDS-RASTERREF-NULL: a no-edit save of a sidecar that has no rasterRef key', () => {
   it('aeon section_4 (canonical tail): emits the input with exactly `"rasterRef": null` inserted', async () => {
     const { input, output } = await untouchedSaveOf(AEON_SECTION_4_META);
     expect(output).not.toBe(input);            // the hub's report, reproduced
@@ -187,7 +187,7 @@ describe('SAVE-ADDS-RASTERREF-NULL — a no-edit save of a sidecar that has no r
     expect(output).toBe(withKeyInserted(input));
   });
 
-  it('the parsed STATE is unchanged — absent and null are one state (schema §3.1)', async () => {
+  it('the parsed STATE is unchanged: absent and null are one state (schema §3.1)', async () => {
     for (const body of [AEON_SECTION_0_META, AEON_SECTION_4_META]) {
       const { input, output } = await untouchedSaveOf(body);
       expect(parseSectionMeta(output)).toEqual(parseSectionMeta(input));

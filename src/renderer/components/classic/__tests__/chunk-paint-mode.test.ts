@@ -32,7 +32,7 @@ const strip = (src: string) => src
 
 const CHUNK_TAB = strip(read('ChunkTab.tsx'));
 
-describe('ChunkTab paint mode — the composed write path', () => {
+describe('ChunkTab paint mode: the composed write path', () => {
   it('imports planSurfaceEdit and classicPaintSurface from the real modules', () => {
     expect(CHUNK_TAB).toMatch(/import\s*\{\s*planSurfaceEdit[^}]*\}\s*from\s*'\.\.\/\.\.\/\.\.\/core\/art\/classic-surface-plan'/);
     expect(CHUNK_TAB).toMatch(/\bclassicPaintSurface\b/);
@@ -40,20 +40,20 @@ describe('ChunkTab paint mode — the composed write path', () => {
       .toMatch(/import\s*\{[^}]*\bclassicPaintSurface\b[^}]*\}\s*from\s*'\.\.\/\.\.\/state\/classicLevelStore'/);
   });
 
-  it('calls planSurfaceEdit BEFORE classicPaintSurface — a plan is built, then applied', () => {
+  it('calls planSurfaceEdit BEFORE classicPaintSurface: a plan is built, then applied', () => {
     const planCall = CHUNK_TAB.indexOf('planSurfaceEdit(');
     const applyCall = CHUNK_TAB.indexOf('classicPaintSurface(');
     expect(planCall, 'planSurfaceEdit( is never called').toBeGreaterThan(-1);
     expect(applyCall, 'classicPaintSurface( is never called').toBeGreaterThan(-1);
-    expect(planCall, 'classicPaintSurface is called before planSurfaceEdit — the plan must exist first')
+    expect(planCall, 'classicPaintSurface is called before planSurfaceEdit: the plan must exist first')
       .toBeLessThan(applyCall);
   });
 
-  it('NEVER calls classicEditTiles — that command has no divergence and no reserved-tile guard', () => {
+  it('NEVER calls classicEditTiles: that command has no divergence and no reserved-tile guard', () => {
     expect(CHUNK_TAB).not.toMatch(/\bclassicEditTiles\b/);
   });
 
-  it('diffWrites feeds planSurfaceEdit\'s writes — the gesture result is diffed, not resent whole', () => {
+  it('diffWrites feeds planSurfaceEdit\'s writes: the gesture result is diffed, not resent whole', () => {
     expect(CHUNK_TAB).toMatch(/\bdiffWrites\(/);
     // The write list planSurfaceEdit receives must be the diff's OUTPUT, not the
     // raw GestureResult buffer — otherwise every gesture would re-plan all
@@ -63,7 +63,7 @@ describe('ChunkTab paint mode — the composed write path', () => {
     expect(planArgs![1]).toMatch(/writes,?\s*$|writes:/m);
   });
 
-  it('threads reservedTiles (T4) into the plan — the whole point of task 5c', () => {
+  it('threads reservedTiles (T4) into the plan: the whole point of task 5c', () => {
     const planArgs = /planSurfaceEdit\(\{([\s\S]*?)\}\);/.exec(CHUNK_TAB);
     expect(planArgs).not.toBeNull();
     expect(planArgs![1], 'reservedTiles is not passed to planSurfaceEdit').toMatch(/reservedTiles/);
@@ -87,7 +87,7 @@ describe('ChunkTab paint mode — the composed write path', () => {
     expect(CHUNK_TAB).toMatch(/controller=\{paintControllerRef\.current\}/);
   });
 
-  it('on a refused plan, toasts `reason` VERBATIM — the message names the Link-mode escape', () => {
+  it('on a refused plan, toasts `reason` VERBATIM: the message names the Link-mode escape', () => {
     // Not `${planResult.reason}` glued into a bigger string and not a rewritten
     // literal — passed straight through, since classic-surface-plan.ts's
     // refusal strings were written to be actionable on their own.
@@ -95,19 +95,19 @@ describe('ChunkTab paint mode — the composed write path', () => {
   });
 });
 
-describe('ChunkTab — Assign | Paint toggle (Task 11, "decided")', () => {
+describe('ChunkTab: Assign | Paint toggle (Task 11, "decided")', () => {
   it('defaults to assign and offers both values through the store', () => {
     expect(CHUNK_TAB).toMatch(/useClassicLevelStore\(\(s\)\s*=>\s*s\.chunkPaintMode\)/);
     expect(CHUNK_TAB).toMatch(/setChunkPaintMode\('assign'\)/);
     expect(CHUNK_TAB).toMatch(/setChunkPaintMode\('paint'\)/);
   });
 
-  it('the assignment grid (classicEditChunkCells) is still reachable — Paint does not replace it', () => {
+  it('the assignment grid (classicEditChunkCells) is still reachable: Paint does not replace it', () => {
     expect(CHUNK_TAB).toMatch(/\bclassicEditChunkCells\(/);
   });
 });
 
-describe('ChunkTab — Link | Isolate + limits readout', () => {
+describe('ChunkTab: Link | Isolate + limits readout', () => {
   it('offers both Link and Isolate through the shared store field, isolate by default', () => {
     expect(CHUNK_TAB).toMatch(/useClassicLevelStore\(\(s\)\s*=>\s*s\.paintDivergeMode\)/);
     expect(CHUNK_TAB).toMatch(/setPaintDivergeMode\('isolate'\)/);
@@ -117,7 +117,7 @@ describe('ChunkTab — Link | Isolate + limits readout', () => {
   it('the limits readout says "limit" vocabulary and never "budget"', () => {
     expect(CHUNK_TAB, 'no limits readout string found (expected "blocks N/N" and "tiles N/N")')
       .toMatch(/blocks \$\{[^}]+\}\/\$\{[^}]+\}.*tiles \$\{[^}]+\}\/\$\{[^}]+\}/);
-    expect(CHUNK_TAB, 'ChunkTab says "budget" — no surveyed tool uses that word; say "limit"')
+    expect(CHUNK_TAB, 'ChunkTab says "budget": no surveyed tool uses that word; say "limit"')
       .not.toMatch(/budget/i);
   });
 });

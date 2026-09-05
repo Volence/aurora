@@ -42,7 +42,7 @@ describe('the world<->canvas Y transform', () => {
     }
   });
 
-  it('puts the viewport top edge at canvas y=0 — the guide origin IS the pan', () => {
+  it('puts the viewport top edge at canvas y=0: the guide origin IS the pan', () => {
     expect(worldYToCanvasY(512, 512, 3)).toBe(0);
     expect(canvasYToWorldY(0, 512, 3)).toBe(512);
   });
@@ -78,7 +78,7 @@ describe('MapViewport has ONE spelling of that transform', () => {
   });
 });
 
-describe('guideAtCanvasY — the grab zone', () => {
+describe('guideAtCanvasY: the grab zone', () => {
   const layers = [layer(0), layer(400), layer(1200)];
 
   it('grabs a guide the cursor is exactly on', () => {
@@ -104,7 +104,7 @@ describe('guideAtCanvasY — the grab zone', () => {
     expect(at(403, 1)).toBe(1);
   });
 
-  it('gives an overlap to the later layer — the one drawn on top', () => {
+  it('gives an overlap to the later layer: the one drawn on top', () => {
     expect(guideAtCanvasY(400, [layer(400), layer(400)], vp(0, 1))).toBe(1);
   });
 
@@ -135,7 +135,7 @@ describe('layerGuideGeometry', () => {
     expect(rows.map((r) => r.enabled)).toEqual([false, true, true]);
   });
 
-  it('treats an absent `enabled` as true — the schema default', () => {
+  it('treats an absent `enabled` as true: the schema default', () => {
     expect(layerIsEnabled(layer(0))).toBe(true);
     expect(layerIsEnabled(layer(0, true))).toBe(true);
     expect(layerIsEnabled(layer(0, false))).toBe(false);
@@ -194,7 +194,7 @@ describe('a locked scene draws its guides on the plane, at world origin', () => 
     expect(guideOriginWorldY('act')).toBe(0);
   });
 
-  it('does NOT subtract v_offset — that belongs to the FIRE LINE, not the position', () => {
+  it('does NOT subtract v_offset: that belongs to the FIRE LINE, not the position', () => {
     // `scene_vsplit_line = scene_plane_line - v_offset` is the screen line a
     // vsplit fires on (fireScreenLineOf / fireLineAdvisory own it). A guide is
     // drawn where the layer IS; the fire line is what the layer BECOMES.

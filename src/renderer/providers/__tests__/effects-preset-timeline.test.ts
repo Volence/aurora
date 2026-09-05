@@ -58,7 +58,7 @@ function library(p: EffectsPreset): EffectsPresetLibrary {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('what a band occupies', () => {
-  it('a cram band spans two bytes per colour from addr — the LENGTH is the size', () => {
+  it('a cram band spans two bytes per colour from addr: the LENGTH is the size', () => {
     expect(bandCramSpan(band(10, 20, 74, 3))).toEqual({ start: 74, end: 80 });
   });
 
@@ -70,7 +70,7 @@ describe('what a band occupies', () => {
     expect(bandCramSpan(b)).toEqual({ start: 96, end: 104 });
   });
 
-  it('a plain band fires TWICE — its two edges, and nothing between them', () => {
+  it('a plain band fires TWICE: its two edges, and nothing between them', () => {
     expect(bandFireLines(band(40, 60))).toEqual([40, 60]);
   });
 
@@ -100,7 +100,7 @@ describe('what bounds an edge', () => {
     expect(bandEdgeBounds(band(50, 100), 'bot').max).toBe(MAX);
   });
 
-  it('top is held UNDER bot, and bot is held OVER top — the order rule, both ways', () => {
+  it('top is held UNDER bot, and bot is held OVER top: the order rule, both ways', () => {
     expect(bandEdgeBounds(band(50, 100), 'top').max).toBe(99);
     expect(bandEdgeBounds(band(50, 100), 'bot').min).toBe(51);
   });
@@ -135,7 +135,7 @@ describe('what bounds an edge', () => {
 });
 
 describe('the sentence a held edge says', () => {
-  it('SAYS NOTHING while the drag is legal — swept over the whole legal band', () => {
+  it('SAYS NOTHING while the drag is legal: swept over the whole legal band', () => {
     // The majority case, and a requirement rather than a nicety: an advisory
     // that is always on screen is read as decoration within a day.
     const b = band(MIN, MAX);
@@ -172,7 +172,7 @@ describe('the sentence a held edge says', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('what one band collides with in the rest of the preset', () => {
-  it('ABUTTING BANDS ARE REFUSED — bot == the next top is one fire line, not a tight fit', () => {
+  it('ABUTTING BANDS ARE REFUSED: bot == the next top is one fire line, not a tight fit', () => {
     // The rule that decides what a split is. `compose` merges same-line fires
     // into ONE record and `raster_program` refuses it: "the restore's fire
     // carries the restore ONLY".
@@ -192,12 +192,12 @@ describe('what one band collides with in the rest of the preset', () => {
     expect(bandCollisionAdvisory(p, 1)).toContain('screen line 80');
   });
 
-  it('ONE CLEAR LINE IS ENOUGH — the ADMISSION that makes the row above mean something', () => {
+  it('ONE CLEAR LINE IS ENOUGH: the ADMISSION that makes the row above mean something', () => {
     expect(bandCollisionAdvisory(preset([band(40, 80), band(81, 120)]), 0)).toBeNull();
     expect(bandCollisionAdvisory(preset([band(40, 80), band(81, 120)]), 1)).toBeNull();
   });
 
-  it('an S/H band\'s DE-MIX line collides too — the fire a two-edge model cannot see', () => {
+  it('an S/H band\'s DE-MIX line collides too: the fire a two-edge model cannot see', () => {
     // {100,140,sh} fires at 100, 139 and 140. A neighbour whose top is 139 shares
     // a line with a fire neither band's `top`/`bot` mentions.
     const p = preset([band(100, 140, 74, 1, true), band(139, 180, 200, 1)]);
@@ -215,7 +215,7 @@ describe('what one band collides with in the rest of the preset', () => {
     expect(s).toContain('CRAM bytes 76..77');
   });
 
-  it('BUT NESTING OVER DISJOINT CRAM IS LEGAL, and is left alone — the second admission', () => {
+  it('BUT NESTING OVER DISJOINT CRAM IS LEGAL, and is left alone: the second admission', () => {
     // ⚠ THE ROW THAT STOPS THIS BECOMING A WALL. `check_band_ownership` is a
     // PER-CRAM-ENTRY walk: two bands that never touch the same entry are not its
     // business, and an editor that refused this would refuse a program the engine
@@ -255,7 +255,7 @@ describe('what a split is', () => {
     expect(bands[1].top).toBe(81);
   });
 
-  it('THE PRODUCT DOES NOT COLLIDE WITH ITSELF — swept over every legal cut', () => {
+  it('THE PRODUCT DOES NOT COLLIDE WITH ITSELF: swept over every legal cut', () => {
     // ⚠ THE LOAD-BEARING ROW. A split is the one gesture that CREATES a
     // neighbouring pair, so a split whose halves shared a fire line would author
     // a program that parks the raster counter — silently, in the engine's own
@@ -274,7 +274,7 @@ describe('what a split is', () => {
     expect(cuts).toBe(78);
   });
 
-  it('and an S/H split does not collide either — the de-mix line is inside its own half', () => {
+  it('and an S/H split does not collide either: the de-mix line is inside its own half', () => {
     const p = preset([band(100, 140, 74, 1, true)]);
     for (let cut = 101; cut <= 138; cut++) {
       const next = splitBandCommand(library(p), p.id, 0, cut)!.newPreset!;
@@ -335,7 +335,7 @@ describe('what a split is', () => {
     expect(cmd.description).toContain('line 80');
   });
 
-  it('the panel\'s own seed band is splittable — a default an author cannot use is a defect', () => {
+  it('the panel\'s own seed band is splittable: a default an author cannot use is a defect', () => {
     expect(bandSplitRefusal(newBand())).toBeNull();
   });
 });
@@ -457,7 +457,7 @@ describe('the gap rule is banked with an expiry, not asserted as an engine law',
     expect(t).toMatch(/stays exactly as strict as it is/);
   });
 
-  it('the canonical anchors are the GAP RULE block\'s alone — appearing exactly once', () => {
+  it('the canonical anchors are the GAP RULE block\'s alone: appearing exactly once', () => {
     const raw = flatten(PROVIDER);
     const anchors = [
       /WRITTEN 2026-08-30, verified against aeon `2e976223`/g,
@@ -482,7 +482,7 @@ describe('the gap rule is banked with an expiry, not asserted as an engine law',
       const t = flatten(rel);
       // ANTI-VACUOUS: a file that no longer states the claim does not belong on
       // the list, and must fail here rather than pass by saying nothing.
-      expect(t, `${rel} no longer states the claim — take it off CLAIM_SITES`)
+      expect(t, `${rel} no longer states the claim: take it off CLAIM_SITES`)
         .toMatch(/abutting/i);
       expect(t, `${rel} states the prohibition without aeon's own qualification`)
         .toMatch(/OVERLAP IS DESIGNED, NOT IMPOSSIBLE/i);

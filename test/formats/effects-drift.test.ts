@@ -472,7 +472,7 @@ describe('the extras line no longer speaks for drift', () => {
 // only place an author learns the bound before a red build.
 
 describe('the drift row seeds, converts and refuses', () => {
-  it('seeds a legal, non-zero rate — the corpus\'s slowest', () => {
+  it('seeds a legal, non-zero rate: the corpus\'s slowest', () => {
     console.log(`--- seed --- rate=${EFFECTS_DRIFT_SEED_RATE} `
       + `px=${driftRateToPxPerFrame(EFFECTS_DRIFT_SEED_RATE)} step=${EFFECTS_DRIFT_PX_STEP}`);
     // ⅛ px/frame, which the SCHEMA'S OWN DESCRIPTION names as S3K AIZ1's clouds.
@@ -552,10 +552,10 @@ describe('the drift row seeds, converts and refuses', () => {
   it('refuses zero, everything that rounds to zero, and everything out of range', () => {
     const { min, max } = EFFECTS_DRIFT_PX_BOUNDS;
     const rows: { px: number; refused: boolean; why: string }[] = [
-      { px: 0, refused: true, why: 'zero — indistinguishable from none in ROM' },
+      { px: 0, refused: true, why: 'zero: indistinguishable from none in ROM' },
       { px: 0.001, refused: true, why: 'rounds to zero on the wire' },
       { px: -0.001, refused: true, why: 'rounds to zero, leftward' },
-      { px: 1 / EFFECTS_DRIFT_UNITS_PER_PIXEL, refused: false, why: 'one wire unit — the slowest legal' },
+      { px: 1 / EFFECTS_DRIFT_UNITS_PER_PIXEL, refused: false, why: 'one wire unit: the slowest legal' },
       { px: min, refused: false, why: 'the bound itself' },
       { px: max, refused: false, why: 'the bound itself' },
       { px: min - 0.01, refused: true, why: 'past the bound, leftward' },
@@ -634,7 +634,7 @@ describe('the drift row seeds, converts and refuses', () => {
    * look identical in source and stop nothing), so this row exists to catch a
    * REWIRE in a suite run, never to stand in for the harness.
    */
-  it('the panel hands the box the refusal and the conversion (SOURCE ONLY — see the harness)', () => {
+  it('the panel hands the box the refusal and the conversion (SOURCE ONLY: see the harness)', () => {
     const panel = readFileSync(resolve(
       __dirname, '../../src/renderer/components/effects/EffectsScenePanel.tsx'), 'utf8');
     // Comments stripped: this file's own prose names both functions.

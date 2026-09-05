@@ -140,7 +140,7 @@ describe('the fourth oneOf arm is a PROGRAM and NOT a raster channel', () => {
     expect(
       EFFECTS_PRESET_RASTER_CHANNELS,
       'boundary has leaked into the RASTER channel list. It lowers into ep_patched, the SIBLING '
-      + 'of the ep_raster field bands/ramp/base_swap share — so every per-channel registry keyed '
+      + 'of the ep_raster field bands/ramp/base_swap share. Every per-channel registry keyed '
       + 'off this list (nouns, labels, seeds, editors) would now claim to speak for a patched '
       + 'program, and the panel would offer to seed one.',
     ).not.toContain('boundary');
@@ -178,7 +178,7 @@ describe('the fourth oneOf arm is a PROGRAM and NOT a raster channel', () => {
     expect(presetProgramArm(doc)).toBe('boundary');
     expect(
       presetRasterChannel(doc),
-      'presetRasterChannel names boundary as a raster channel — a caller branching on it would '
+      'presetRasterChannel names boundary as a raster channel: a caller branching on it would '
       + 'reach for a raster editor for a patched program',
     ).toBeNull();
     // ...and it still answers correctly for the three that ARE raster channels,
@@ -239,7 +239,7 @@ describe('the fourth oneOf arm is a PROGRAM and NOT a raster channel', () => {
       vi.resetModules();
     });
 
-    it('boundary falls INTO the raster channels — and the renderer refuses to load', async () => {
+    it('boundary falls INTO the raster channels, and the renderer refuses to load', async () => {
       const real = JSON.parse(readFileSync(SCHEMA_PATH, 'utf8')) as
         { properties: Record<string, { description?: string }> };
       // Anti-vacuous: the sentence really is in the bytes we are removing it
@@ -259,7 +259,7 @@ describe('the fourth oneOf arm is a PROGRAM and NOT a raster channel', () => {
       expect(poisoned.EFFECTS_PRESET_PATCHED_ARMS).toEqual([]);
       expect(
         poisoned.EFFECTS_PRESET_RASTER_CHANNELS,
-        'the ep_patched sentence was removed and boundary did NOT fall into the raster channels — '
+        'the ep_patched sentence was removed and boundary did NOT fall into the raster channels, '
         + 'so this poison is not exercising the derivation it claims to, and the split above is '
         + 'green for a reason this row cannot see',
       ).toContain('boundary');
@@ -287,7 +287,7 @@ describe('the fourth oneOf arm is a PROGRAM and NOT a raster channel', () => {
         import('../../src/renderer/providers/effects-preset'),
         'the provider loaded happily with boundary counted as a raster channel AND with a label '
         + 'that calls it patched. The two independent statements of the classification have '
-        + 'stopped being compared, so an empty patched set is now silent — which is the exact '
+        + 'stopped being compared, so an empty patched set is now silent, which is the exact '
         + 'failure mode this poison was written to rule out.',
       ).rejects.toThrow(/PROGRAM_ARM_LABELS/);
     });
@@ -319,7 +319,7 @@ describe('boundary bounds and $defs.tint_region', () => {
         .patch_world_ys.maxItems);
   });
 
-  it('`on` has exactly ONE arm, pal_region — no cram arm, and none reserved', () => {
+  it('`on` has exactly ONE arm, pal_region: no cram arm, and none reserved', () => {
     expect(EFFECTS_PRESET_BOUNDARY_ON_ARMS).toEqual(['pal_region']);
     // A cram arm is refused (contract vector case 33) — asserted here through
     // the codec so the "no arm is reserved" claim is about behaviour.
@@ -352,7 +352,7 @@ describe('boundary bounds and $defs.tint_region', () => {
     expect(() => parseEffectsPreset(JSON.stringify(withAddr), ID)).toThrow(EffectsPresetError);
   });
 
-  it('there is NO null spelling — absent means none', () => {
+  it('there is NO null spelling: absent means none', () => {
     // A null arm would be a document with zero programs (contract vector 27).
     expect(() => parseEffectsPreset(JSON.stringify({ ...base, boundary: null }), ID))
       .toThrow(EffectsPresetError);
@@ -384,7 +384,7 @@ describe('round trip', () => {
     expect(back.boundary!.offscreen_ship).toBe(SHIPPED_WATER.offscreen_ship);
   });
 
-  it('the whole moving water in ONE document — boundary + seed + motion at the same index', () => {
+  it('the whole moving water in ONE document: boundary + seed + motion at the same index', () => {
     // The contract's case 25: this is what "make this water move" is.
     const c = VECTORS.cases.find((v) => v.doc.boundary !== undefined
       && v.doc.patch_world_ys !== undefined && v.doc.patch_motion !== undefined);
@@ -485,7 +485,7 @@ describe('round trip', () => {
       expect(parsed.id).toBe(id);
       // The premise of "no shipped document is refused today": not one of them
       // carries the new key.
-      expect(parsed.boundary, `${id} carries a boundary key — this row's premise has changed`)
+      expect(parsed.boundary, `${id} carries a boundary key: this row's premise has changed`)
         .toBeUndefined();
       if (!measured.includes(id)) continue;
       expect(
@@ -493,7 +493,7 @@ describe('round trip', () => {
         `${id}.json no longer canonicalises to the bytes it did before the re-vendor named in the `
         + 'golden\'s $how_it_was_produced. The amendment has moved canonical output for a document '
         + 'nobody touched, so opening and saving an untouched preset would rewrite it. That is a '
-        + 'MIGRATION of every shipped preset and needs saying out loud — do not regenerate the '
+        + 'MIGRATION of every shipped preset and needs saying out loud: do not regenerate the '
         + 'golden to make this green.',
       ).toBe(golden.canonical[id]);
     }
@@ -509,13 +509,13 @@ describe('round trip', () => {
   it('CURRENCY: the golden\'s source documents are still what aeon ships', (ctx) => {
     const aeon = peerRepo('aeon');
     if (aeon === null) {
-      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR) — CANNOT '
+      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR). CANNOT '
         + 'MEASURE whether preset-canonical-golden.json still describes aeon\'s preset library');
       return;
     }
     const tip = resolveRev(aeon, 'origin/master');
     if (tip === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: origin/master does not resolve in ${aeon} — CANNOT MEASURE`);
+      ctx.skip(`SKIPPED, NOT PASSED: origin/master does not resolve in ${aeon}. CANNOT MEASURE`);
       return;
     }
     const golden = JSON.parse(readFileSync(
@@ -530,7 +530,7 @@ describe('round trip', () => {
     }
     expect(
       drifted,
-      'NOT AN AURORA REGRESSION — preset-canonical-golden.json\'s source documents are stale '
+      'NOT AN AURORA REGRESSION: preset-canonical-golden.json\'s source documents are stale '
       + 'against aeon origin/master. Re-generate the fixture FROM THE SCHEMA THIS REPO CARRIED '
       + 'WHEN THE DOCUMENTS LAST AGREED (its $how_it_was_produced field says how), or the '
       + 'before/after property the row above measures is lost.',
@@ -638,7 +638,7 @@ describe('the sweep-fits rule against the document\'s OWN lo/hi', () => {
     patch_motion: [{ sweep: { amp_shift, period_shift: 3 } }],
   });
 
-  it('the formula is channel-bands.ts\'s, applied to a document band — nothing is restated here', () => {
+  it('the formula is channel-bands.ts\'s, applied to a document band: nothing is restated here', () => {
     // ANTI-VACUOUS AND THE POINT OF THE ROW: the travel this file compares
     // against is the SAME number `anchorTravelPx` produces from aeon's own
     // sentence, and the same number the preset schema's amplitude ladder states.
@@ -692,12 +692,12 @@ describe('the sweep-fits rule against the document\'s OWN lo/hi', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // A BOUNDARY MOVES ONLY IF THE SAME INDEX IS SEEDED **AND** SWEPT
 // ═══════════════════════════════════════════════════════════════════════════
-describe('the pairing rule — legal, buildable, and still', () => {
+describe('the pairing rule: legal, buildable, and still', () => {
   const at = (channel: number, extra: Partial<EffectsPreset> = {}) => ({
     ...base, boundary: { ...SHIPPED_WATER, channel }, ...extra,
   }) as Partial<EffectsPreset>;
 
-  it('boundary alone is ACCEPTED — and earns the sentence, because nothing refuses it', () => {
+  it('boundary alone is ACCEPTED, and earns the sentence, because nothing refuses it', () => {
     const doc = at(0);
     expect(validateAgainstSchema(doc, S)).toEqual([]);
     expect(() => parseEffectsPreset(JSON.stringify(doc), ID)).not.toThrow();
@@ -709,16 +709,16 @@ describe('the pairing rule — legal, buildable, and still', () => {
     expect(a!.text).toContain('patch_motion[0]');
   });
 
-  it('SEEDED but not SWEPT is still still — and only the missing half is named', () => {
+  it('SEEDED but not SWEPT is still still, and only the missing half is named', () => {
     const a = boundaryAdvisories(at(0, { patch_world_ys: [1024] }))
       .find((x) => x.rule === 'no-motion');
-    expect(a, 'a seeded-but-unswept boundary produced no advisory — a stationary anchor reads as '
+    expect(a, 'a seeded-but-unswept boundary produced no advisory: a stationary anchor reads as '
       + 'motion').toBeTruthy();
     expect(a!.text).toContain('patch_motion[0]');
     expect(a!.text, 'the sentence names the key that IS authored').not.toContain('patch_world_ys[0]');
   });
 
-  it('SWEPT but not SEEDED is named too — the other half of the same rule', () => {
+  it('SWEPT but not SEEDED is named too: the other half of the same rule', () => {
     const a = boundaryAdvisories(at(0, { patch_motion: [{ sweep: { amp_shift: 4, period_shift: 3 } }] }))
       .find((x) => x.rule === 'no-motion');
     expect(a).toBeTruthy();
@@ -772,7 +772,7 @@ describe('the panel on a boundary document: refusals, not silence', () => {
       why,
       'the band controls are live on a boundary document. Clicking one grows a `bands` key onto '
       + 'a preset that already carries a program, which is the two-arm document the schema '
-      + 'refuses — authored on every click, with no sentence anywhere.',
+      + 'refuses, authored on every click, with no sentence anywhere.',
     ).not.toBeNull();
     expect(why!).not.toContain('undefined');
     expect(why!).toMatch(/EXACTLY ONE program/);
@@ -813,14 +813,14 @@ describe('the panel on a boundary document: refusals, not silence', () => {
     expect(
       programArmEditorGap(doc),
       'a boundary document still reports "no editor for it yet" after EW-BOUNDARY-PANEL built '
-      + 'one — either the card was not registered in PROGRAM_ARM_EDITORS, or it was removed',
+      + 'one: either the card was not registered in PROGRAM_ARM_EDITORS, or it was removed',
     ).toBeNull();
     // ...and the sentence is not gone, it is unearned. An arm the panel has no
     // card for still gets it, which is the whole reason the helper takes an ARM
     // rather than a document: the defect it guards against cannot be reached by
     // any real document until it has already shipped.
     const gap = programArmEditorGapFor('a_fifth_arm', ID);
-    expect(gap, 'the landing pad has stopped firing for an arm with no card — a fifth arm would '
+    expect(gap, 'the landing pad has stopped firing for an arm with no card: a fifth arm would '
       + 'open, select correctly in the derived Program row, and render nothing').not.toBeNull();
     expect(gap!).toContain('a_fifth_arm');
     expect(gap!).not.toContain('undefined');
@@ -835,7 +835,7 @@ describe('the panel on a boundary document: refusals, not silence', () => {
     expect(presetListSummary(entry)).not.toContain('band');
   });
 
-  it('switching the Program row DELETES the boundary — it does not leave a two-arm document', () => {
+  it('switching the Program row DELETES the boundary: it does not leave a two-arm document', () => {
     // ⚠ RE-AIMED BY EW-BOUNDARY-PANEL. This asserted the row does NOT offer
     // `boundary`, which was the codec parcel's deliberate scope line. The row
     // now offers it — and offering it makes the OTHER direction drivable, which
@@ -848,7 +848,7 @@ describe('the panel on a boundary document: refusals, not silence', () => {
     expect(
       (after as unknown as Record<string, unknown>).boundary,
       'switching a boundary document to bands LEFT the boundary in place, authoring the two-arm '
-      + 'document the top-level oneOf refuses — the delete loop is running over the raster list '
+      + 'document the top-level oneOf refuses: the delete loop is running over the raster list '
       + 'instead of over the arms',
     ).toBeUndefined();
     expect(presetProgramArm(after)).toBe('bands');

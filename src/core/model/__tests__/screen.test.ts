@@ -69,14 +69,14 @@ function constantsAtTip(): Measured | { skip: string } {
   const aeon = peerRepo('aeon');
   if (aeon === null) {
     return {
-      skip: `SKIPPED, NOT PASSED: no aeon checkout beside this repo (set ${checkoutEnv('aeon')}) — `
+      skip: `SKIPPED, NOT PASSED: no aeon checkout beside this repo (set ${checkoutEnv('aeon')}): `
         + `CANNOT MEASURE whether Aurora's ${SCREEN_WIDTH}x${SCREEN_HEIGHT} still matches the engine`,
     };
   }
   const tip = resolveRev(aeon, AEON_TIP);
   if (tip === null) {
     return {
-      skip: `SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon} (unfetched? shallow?) — `
+      skip: `SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon} (unfetched? shallow?): `
         + `CANNOT MEASURE ${SCREEN_CONSTANT_SOURCE.file}`,
     };
   }
@@ -106,7 +106,7 @@ describe('core/model/screen mirrors aeon engine.constants', () => {
       const theirs = readConst(got.text, symbol);
       expect(
         theirs,
-        `${symbol} not found in ${SCREEN_CONSTANT_SOURCE.file} at aeon ${got.rev} — the constant `
+        `${symbol} not found in ${SCREEN_CONSTANT_SOURCE.file} at aeon ${got.rev}: the constant `
         + 'was renamed or its spelling changed; update SCREEN_CONSTANT_SOURCE to match.',
       ).not.toBeNull();
       expect(

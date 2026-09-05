@@ -67,7 +67,7 @@ function apply(plane: Uint16Array, entries: { index: number; newColl: number }[]
  */
 function legalCrossover(c: CrossoverRead): Crossover {
   if (c === 'reserved') {
-    throw new Error('read the RESERVED crossover value 3 — the paint wrote an illegal word');
+    throw new Error('read the RESERVED crossover value 3: the paint wrote an illegal word');
   }
   return c;
 }
@@ -113,7 +113,7 @@ const WORDS_2x2 = [solid(1), solid(2), solid(3), solid(4)];
 // [m1] words × plane:"both" × crossover:keep
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('[m1] words + plane:"both" — per-cell words, each plane merged against ITS OWN word', () => {
+describe('[m1] words + plane:"both": per-cell words, each plane merged against ITS OWN word', () => {
   it('writes the same per-cell picture to both planes and keeps each plane\'s own crossover', () => {
     const { a, b } = seedDistinguishable();
     const plan = paintCollisionCellsBothPlanes({
@@ -183,7 +183,7 @@ describe('[m1] words + plane:"both" — per-cell words, each plane merged agains
 // [m2] words × crossover — the tri-state applies PER WRITTEN CELL
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('[m2] words + crossover — per cell, and only on the cells it writes', () => {
+describe('[m2] words + crossover: per cell, and only on the cells it writes', () => {
   for (const plane of ['a', 'b'] as CollisionPlaneId[]) {
     it(`hand-off on plane ${plane.toUpperCase()} marks every WRITTEN cell with ${handOffFrom(plane)}, and no skipped one`, () => {
       const { a, b } = seedDistinguishable();
@@ -254,7 +254,7 @@ describe('[m2] words + crossover — per cell, and only on the cells it writes',
 // [m3] words × plane:"both" × crossover:hand-off — the two-way pair, per cell
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('[m3] words + both + hand-off — one call, both halves of a two-way loop', () => {
+describe('[m3] words + both + hand-off: one call, both halves of a two-way loop', () => {
   it('writes the OTHER plane\'s value on the other plane, per cell, and never a self-mark', () => {
     const a = fresh(); const b = fresh();
     for (const [cc, cr] of CELLS) { setCell(a, cc, cr, solid(11)); setCell(b, cc, cr, solid(22)); }
@@ -399,7 +399,7 @@ describe('[m5] get_collision_region refuses plane:"both", in prose', () => {
     expect(validateCollisionReadPlane('b')).toBeNull();
   });
 
-  it('refuses "both" and SAYS WHY — the asymmetry with paint_collision is named', () => {
+  it('refuses "both" and SAYS WHY: the asymmetry with paint_collision is named', () => {
     const err = validateCollisionReadPlane('both')!;
     console.log(`[m5] refusal: ${err}`);
     expect(err).not.toBeNull();
@@ -427,7 +427,7 @@ describe('[m6] word XOR words survives the merge, under every plane and crossove
   it('both forms at once is still refused', () => {
     expect(validateCollisionWrite(5, [1, 2, 3, 4], 2, 2)).toMatch(/not both/);
   });
-  it('neither form is still refused — a crossover alone is not a paint', () => {
+  it('neither form is still refused: a crossover alone is not a paint', () => {
     expect(validateCollisionWrite(undefined, undefined, 1, 1)).toMatch(/neither/);
   });
 });

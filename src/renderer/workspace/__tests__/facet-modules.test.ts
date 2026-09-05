@@ -123,7 +123,7 @@ describe('registerS1FacetModules registers every facet the s1 profile grants', (
     }
   });
 
-  it('leaves aeon untouched — the two registrations are independent', async () => {
+  it('leaves aeon untouched: the two registrations are independent', async () => {
     const { registerS1FacetModules } = await import('../register-facets');
     registerS1FacetModules();
     expect(moduleFor('aeon', 'layout')).toBeNull();
@@ -207,7 +207,7 @@ describe('registerS1FacetModules registers every facet the s1 profile grants', (
     expect(moduleFor('aeon', 'parallax')?.ToolOptions).not.toBe(layout);
   });
 
-  it('gives every facet its own right panel — the columns are what differ', async () => {
+  it('gives every facet its own right panel: the columns are what differ', async () => {
     // The three map facets share a canvas, a hint line and a status bar; the
     // COLUMN (and the tool rail) is the whole of the difference between them, so
     // four distinct functions is the minimum for four facets that are not each
@@ -244,7 +244,7 @@ function column(name: string): string {
 // point on this branch, and none of them fails anything else: a column is a
 // list of JSX tags, so a section that moves out simply stops rendering.
 describe('the s1 columns hold what their facets are for', () => {
-  it('LAYOUT is TERRAIN — the chunk picker, and no object sections', () => {
+  it('LAYOUT is TERRAIN: the chunk picker, and no object sections', () => {
     // The object sections have moved in and out of this column twice. They are
     // OUT: Layout is terrain and Objects is placement, the division aeon uses.
     // Carrying the list and the inspector here (alongside `place-object` on
@@ -256,7 +256,7 @@ describe('the s1 columns hold what their facets are for', () => {
     expect(layout).not.toContain('ClassicObjectList');
   });
 
-  it('LAYOUT has no selection stub either — classic has no properties surface', () => {
+  it('LAYOUT has no selection stub either: classic has no properties surface', () => {
     // Aeon's Layout passes `AeonPropertiesPanel showObjectSelection` as a
     // read-only readout for the selection its `select` tool makes. Classic has
     // no properties surface at all (providers/properties-classic.ts is the
@@ -266,7 +266,7 @@ describe('the s1 columns hold what their facets are for', () => {
     expect(column('ClassicLayoutPanels')).not.toContain('showObjectSelection');
   });
 
-  it('OBJECTS carries the inspector and the library — placement, not terrain', () => {
+  it('OBJECTS carries the inspector and the library: placement, not terrain', () => {
     // The facet's whole content. Deleted in the merge and restored: what made
     // Layout → Objects feel like a scene change was the pill ORDER (`art` sat
     // between them), not the split. Asserted against a chunk picker as well, so
@@ -356,7 +356,7 @@ describe('the s1 columns mount the chunk picker', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('mounts it unconditionally — no `tool === stamp-chunk` gate', () => {
+  it('mounts it unconditionally: no `tool === stamp-chunk` gate', () => {
     // Aeon's gate arbitrates a shared slot (Chunks / Marquee / Paste, all
     // `map.palette`); classic grants neither marquee nor paste, and its picker
     // ARMS the stamp tool, so gating it on stamping is circular. Asserted on the
@@ -414,7 +414,7 @@ describe('resolveFacet', () => {
     expect(resolveFacet('aeon', S1_GRANT, 'layout')).toBe('layout');
   });
 
-  it('is null when the engine serves nothing granted — FacetUnavailable stays', () => {
+  it('is null when the engine serves nothing granted: FacetUnavailable stays', () => {
     expect(resolveFacet('s1', S1_GRANT, 'layout')).toBeNull();
     registerFacetModule(['s1'], stub('rings')); // served but not granted
     expect(resolveFacet('s1', S1_GRANT, 'layout')).toBeNull();

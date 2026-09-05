@@ -96,8 +96,8 @@ describe('buildPlaneEntries', () => {
   });
 });
 
-describe('buildBothPlanesEntries — the defect this module exists to prevent', () => {
-  it('⚠ each plane keeps ITS OWN unowned bits — the merge is NOT computed once', () => {
+describe('buildBothPlanesEntries: the defect this module exists to prevent', () => {
+  it('⚠ each plane keeps ITS OWN unowned bits: the merge is NOT computed once', () => {
     // THE ROW. A single merge against plane A, broadcast to plane B, would give
     // plane B `BRUSH | probeA` — plane A's reserved bits, invented onto a cell
     // that never had them.
@@ -114,7 +114,7 @@ describe('buildBothPlanesEntries — the defect this module exists to prevent', 
     expect(unownedCollisionBits(other[0]!.newColl)).toBe(probeB);
   });
 
-  it('CONTROL: both planes really were written — the owned fields changed on each', () => {
+  it('CONTROL: both planes really were written; the owned fields changed on each', () => {
     const a = new Uint16Array([probeA]);
     const b = new Uint16Array([probeB]);
     const { aimed, other } = buildBothPlanesEntries({
@@ -160,7 +160,7 @@ describe('buildBothPlanesEntries — the defect this module exists to prevent', 
     expect(other).toEqual([]);
   });
 
-  it('handles a one-shot iterator — both passes see the same indices', () => {
+  it('handles a one-shot iterator: both passes see the same indices', () => {
     // `indices` arrives as a generator from the rect builder in one road; a
     // naive two-pass implementation would silently paint the aimed plane and
     // then find the iterator exhausted for the other.
@@ -176,7 +176,7 @@ describe('buildBothPlanesEntries — the defect this module exists to prevent', 
 });
 
 describe('the crossover half of a both-planes stroke', () => {
-  it('⚠ each plane gets ITS OWN handoff value — the two-way pair, not a copy', () => {
+  it('⚠ each plane gets ITS OWN handoff value: the two-way pair, not a copy', () => {
     // THE ROW. Copying the aimed plane's value onto the other writes TO_B into
     // plane B's own word, which is a SELF-MARK: a provable no-op that aeon's
     // bake refuses with a HARD BUILD ERROR (rule R2). One value computed once
@@ -234,7 +234,7 @@ describe('the crossover half of a both-planes stroke', () => {
   });
 });
 
-describe('solidOnBothPlanes — the DERIVED fact the lens draws', () => {
+describe('solidOnBothPlanes: the DERIVED fact the lens draws', () => {
   const solid = packCollisionCell({ shape: 3, xFlip: false, yFlip: false, solidity: 'all' });
   const jumpThru = packCollisionCell({ shape: 3, xFlip: false, yFlip: false, solidity: 'top' });
   const shapeButNoSolidity = packCollisionCell({ shape: 3, xFlip: false, yFlip: false, solidity: 'none' });
@@ -248,7 +248,7 @@ describe('solidOnBothPlanes — the DERIVED fact the lens draws', () => {
     expect(solidOnBothPlanes(0, 0)).toBe(false);
   });
 
-  it('a shape with solidity "none" is NOT solid — it bakes to air', () => {
+  it('a shape with solidity "none" is NOT solid: it bakes to air', () => {
     expect(isSolidCell(shapeButNoSolidity)).toBe(false);
     expect(solidOnBothPlanes(solid, shapeButNoSolidity)).toBe(false);
   });

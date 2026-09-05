@@ -452,7 +452,7 @@ describe('the three limits say the words that carry them', () => {
   it('LIMIT 1 IS the shared constant, not a second wording of it', () => {
     const l = PRESET_LIMITS.find((x) => x.key === 'unbound')!;
     expect(RASTER_SECTION_BINDING_LIMIT.length,
-      'the shared constant is empty — this row would assert nothing').toBeGreaterThan(200);
+      'the shared constant is empty: this row would assert nothing').toBeGreaterThan(200);
     expect(l.body).toBe(RASTER_SECTION_BINDING_LIMIT);
   });
 
@@ -651,7 +651,7 @@ describe('the panel renders the limits, unconditionally, in the body', () => {
    * must be painted, and the long text must still be reachable — so neither
    * half can quietly become the other.
    */
-  it('every contract limit has an author-length sibling — none can be dropped', () => {
+  it('every contract limit has an author-length sibling: none can be dropped', () => {
     const short = presetLimitsShort();
     expect(short.map((l) => l.key)).toEqual(PRESET_LIMITS.map((l) => l.key));
     for (const l of short) {
@@ -674,7 +674,7 @@ describe('the panel renders the limits, unconditionally, in the body', () => {
     // the landing. The bound is generous so ordinary wording edits do not fail
     // it, and tight enough that the 6,508-character `unbound` body coming back
     // into the render does.
-    expect(contract, `the contract text is only ${contract} chars — has it been cut instead `
+    expect(contract, `the contract text is only ${contract} chars: has it been cut instead `
       + 'of moved? It is owed to the agent reply and the tool descriptions').toBeGreaterThan(6000);
     expect(painted, `the painted block is ${painted} chars against a contract ${contract}`)
       .toBeLessThan(2000);
@@ -762,7 +762,7 @@ describe('the panel spells no rule of its own', () => {
    * reads the ENGINE's refusal with the measurement behind it. A `min=`/`max=`
    * here is the clamp that ruling forbids wearing an HTML attribute's hat.
    */
-  it('puts no range on the band spinners — aeon E.4', () => {
+  it('puts no range on the band spinners: aeon E.4', () => {
     const numberFields = [...code.matchAll(/<NumberField[\s\S]*?\/>/g)].map((m) => m[0]);
     // ANTI-VACUOUS: there really are spinners to check.
     expect(numberFields.length).toBeGreaterThanOrEqual(3);
@@ -802,7 +802,7 @@ describe('the narrowed control carries its reason', () => {
    * answer rather than an omission: both are legal in every document, so
    * `tableRefParamOptions`' test forbids disabling either.
    */
-  it('offers both arms enabled — neither is refusable by document content', () => {
+  it('offers both arms enabled: neither is refusable by document content', () => {
     const opts = armOptions('cram');
     expect(opts.map((o) => o.value)).toEqual(['cram', 'pal_region']);
     expect(opts.every((o) => !o.disabled)).toBe(true);

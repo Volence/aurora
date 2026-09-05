@@ -52,7 +52,7 @@ describe('the crossover field, as Aurora holds it', () => {
     expect(CROSSOVER_BITS & COLLISION_CELL_OWNED_MASK).toBe(0);
   });
 
-  it('is exactly the bits the collision brush does NOT own — so a stroke has always preserved it', () => {
+  it('is exactly the bits the collision brush does NOT own, so a stroke has always preserved it', () => {
     // The load-bearing consequence, asserted rather than asserted-in-prose: the
     // 2026-08-28 preservation rule was stated as a mask complement, so every
     // stroke, stamp, paste and agent call already carries crossovers.
@@ -95,7 +95,7 @@ describe('the crossover field, as Aurora holds it', () => {
   });
 });
 
-describe('self-marks — the illegal state, made unreachable rather than guarded', () => {
+describe('self-marks: the illegal state, made unreachable rather than guarded', () => {
   it('hand-off is the value that LEAVES the plane', () => {
     expect(handOffFrom('a')).toBe('to-b');
     expect(handOffFrom('b')).toBe('to-a');
@@ -130,7 +130,7 @@ describe('self-marks — the illegal state, made unreachable rather than guarded
     }
   });
 
-  it('CONTROL: the brush DOES author a real handoff — it is not refusing everything', () => {
+  it('CONTROL: the brush DOES author a real handoff; it is not refusing everything', () => {
     // Without this, a `crossoverFor` that always returned 'none' would pass the
     // row above by never producing anything at all.
     expect(crossoverFor('hand-off', 'a')).toBe('to-b');
@@ -148,7 +148,7 @@ describe('self-marks — the illegal state, made unreachable rather than guarded
   });
 });
 
-describe('crossoverBrushAuthors — the condition the lens arms on', () => {
+describe('crossoverBrushAuthors: the condition the lens arms on', () => {
   it('is true for exactly the states that write the field', () => {
     expect(crossoverBrushAuthors('keep')).toBe(false);
     expect(crossoverBrushAuthors('clear')).toBe(true);
@@ -161,7 +161,7 @@ describe('collisionPaintWord carries the crossover through the ONE decider', () 
   const destWithMark = withCrossover(
     packCollisionCell({ shape: 9, xFlip: true, yFlip: false, solidity: 'top' }), 'to-b');
 
-  it('keep PRESERVES an existing crossover — and needs no code to do it', () => {
+  it('keep PRESERVES an existing crossover, and needs no code to do it', () => {
     expect(readCrossover(destWithMark)).toBe('to-b'); // the row is not vacuous
     expect(readCrossover(collisionPaintWord(BRUSH, destWithMark))).toBe('to-b');
     expect(readCrossover(collisionPaintWord(BRUSH, destWithMark, 'keep', 'a'))).toBe('to-b');
@@ -191,7 +191,7 @@ describe('collisionPaintWord carries the crossover through the ONE decider', () 
   });
 });
 
-describe('CURRENCY — the constants agree with aeon\'s committed anchor', () => {
+describe('CURRENCY: the constants agree with aeon\'s committed anchor', () => {
   // `ctx.skip(reason)`, never `console.warn(…); return`. A `return` from a test
   // body is recorded as a PASS: the word "SKIP" in a console line reaches no
   // reporter, no total and no gate, so this row sat in the green column on every
@@ -200,7 +200,7 @@ describe('CURRENCY — the constants agree with aeon\'s committed anchor', () =>
   it(`parses ${ANCHOR} at ${AEON_REV} and matches every value`, (ctx) => {
     const repo = peerRepo('aeon');
     if (repo === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AURORA_AEON_REPO) — cannot cross-check ${ANCHOR} at ${AEON_REV}`);
+      ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AURORA_AEON_REPO); cannot cross-check ${ANCHOR} at ${AEON_REV}`);
       return;
     }
     const blob = readAtRev(repo, AEON_REV, ANCHOR);
@@ -246,7 +246,7 @@ describe('CURRENCY — the constants agree with aeon\'s committed anchor', () =>
     // sentence in a document, and so it turns red if aeon ever moves either.
     const repo = peerRepo('aeon');
     if (repo === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AURORA_AEON_REPO) — cannot cross-check ${PIPELINE} at ${AEON_REV}`);
+      ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AURORA_AEON_REPO); cannot cross-check ${PIPELINE} at ${AEON_REV}`);
       return;
     }
     const blob = readAtRev(repo, AEON_REV, PIPELINE);

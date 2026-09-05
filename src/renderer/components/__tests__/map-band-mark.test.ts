@@ -24,7 +24,7 @@ describe('shouldMarkBand', () => {
     expect(shouldMarkBand('mark-band', true, LEFT)).toBe(true);
   });
 
-  it('View seeds nothing — a pan-click is a pan-click (the owner\'s defect)', () => {
+  it('View seeds nothing: a pan-click is a pan-click (the owner\'s defect)', () => {
     expect(shouldMarkBand('view', true, LEFT)).toBe(false);
   });
 
@@ -33,7 +33,7 @@ describe('shouldMarkBand', () => {
     expect(marking).toEqual(['mark-band']);
   });
 
-  it('no tool marks at all outside the Effects facet — that facet owns the lens', () => {
+  it('no tool marks at all outside the Effects facet: that facet owns the lens', () => {
     for (const t of TOOL_IDS) expect(shouldMarkBand(t, false, LEFT), t).toBe(false);
   });
 

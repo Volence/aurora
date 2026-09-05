@@ -80,7 +80,7 @@ describe('defaultCanvasPalette (R18\'s visible ramp)', () => {
 });
 
 describe('mostVisiblePaintIndex', () => {
-  it('arms a VISIBLE colour on the default ramp — line 0\'s white', () => {
+  it('arms a VISIBLE colour on the default ramp: line 0\'s white', () => {
     const p = defaultCanvasPalette();
     const i = mostVisiblePaintIndex(p);
     expect(paletteLuminance(p[i])).toBeGreaterThan(200);
@@ -121,7 +121,7 @@ describe('mostVisiblePaintIndex', () => {
     expect(mostVisiblePaintIndex([])).toBe(canvasIndex(0, 1));
   });
 
-  it('an all-black palette lands on entry 1 — the same value, by selection not fallback', () => {
+  it('an all-black palette lands on entry 1: the same value, by selection not fallback', () => {
     expect(mostVisiblePaintIndex(blankCanvasPalette())).toBe(canvasIndex(0, 1));
   });
 });

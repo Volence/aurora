@@ -85,7 +85,7 @@ function travelRegexSourceIn(path: string): string {
   const src = readFileSync(path, 'utf8');
   const line = src.split('\n').find((l) => l.includes('PEAK-TO-PEAK TRAVEL \\('));
   if (line === undefined) {
-    throw new Error(`${path} no longer contains the travel-formula regex — if the parser moved, `
+    throw new Error(`${path} no longer contains the travel-formula regex: if the parser moved, `
       + 'this gate is measuring nothing and must be re-pointed, not deleted');
   }
   const m = /\/(PEAK-TO-PEAK TRAVEL .*channels\\\[c\\\]\\\.lines)\//.exec(line);
@@ -148,14 +148,14 @@ describe('CHBAND-PROSE-REPIN: the travel formula parses ONLY aeon\'s refusal-dir
     // to miss for some unrelated reason.
     const doc = JSON.parse(readFileSync(BANDS_JSON, 'utf8')) as { how_to_use: string };
     const tail = doc.how_to_use.slice(doc.how_to_use.indexOf(' It is travel, not peak excursion:'));
-    expect(tail, 'the vendored sentence no longer has the clause this fixture splices onto — '
+    expect(tail, 'the vendored sentence no longer has the clause this fixture splices onto: '
       + 'rebuild the fixture rather than deleting the row').not.toHaveLength(0);
     expect(re().exec(RETIRED_SENTENCE + tail)).toBeNull();
   });
 
   it('parses aeon\'s CURRENT wording to multiplier 2 and base 256', () => {
     const m = re().exec(CURRENT_SENTENCE);
-    expect(m, 'the current wording no longer parses — the editor would refuse to LOAD')
+    expect(m, 'the current wording no longer parses: the editor would refuse to LOAD')
       .not.toBeNull();
     expect(Number(m![1])).toBe(2);
     expect(Number(m![2])).toBe(256);
@@ -173,12 +173,12 @@ describe('CHBAND-PROSE-REPIN: the travel formula parses ONLY aeon\'s refusal-dir
       .toContain('EXCEEDS channels[c].lines');
     expect(doc.how_to_use).not.toContain('is <= channels[c].lines');
     const m = re().exec(doc.how_to_use);
-    expect(m, 'the vendored document does not parse — the editor would refuse to LOAD')
+    expect(m, 'the vendored document does not parse: the editor would refuse to LOAD')
       .not.toBeNull();
     expect([Number(m![1]), Number(m![2])]).toEqual([2, 256]);
   });
 
-  it('a comparison the parser never knew still fails loudly — it was narrowed, not loosened', () => {
+  it('a comparison the parser never knew still fails loudly: it was narrowed, not loosened', () => {
     expect(re().exec(UNKNOWN_SENTENCE),
       'the pattern accepts an unrecognised comparison. Contracting to one phrasing must NARROW '
       + 'it; a pattern loose enough to swallow a third has stopped checking the sentence, and '
@@ -189,7 +189,7 @@ describe('CHBAND-PROSE-REPIN: the travel formula parses ONLY aeon\'s refusal-dir
     expect(re().exec('A sweep fits when it is small enough.')).toBeNull();
   });
 
-  it('THE DIRECTION IS NOT READ FROM THE SENTENCE — it is written once, in code', () => {
+  it('THE DIRECTION IS NOT READ FROM THE SENTENCE: it is written once, in code', () => {
     // The premise the whole migration rested on, asserted rather than argued:
     // the parser reads the multiplier and the base out of `how_to_use` and
     // never the comparison. That is why two opposite phrasings could safely be
@@ -214,7 +214,7 @@ describe('CHBAND-PROSE-REPIN: the travel formula parses ONLY aeon\'s refusal-dir
     expect(code.length).toBeGreaterThan(src.length / 4);
     const comparisons = code.match(/travelPx\s*[<>]=?\s*band\.lines/g) ?? [];
     expect(comparisons,
-      'the fit comparison is written more than once — the ONE-DIRECTIONAL rule now has two '
+      'the fit comparison is written more than once: the ONE-DIRECTIONAL rule now has two '
       + 'implementations and they can disagree')
       .toEqual(['travelPx > band.lines']);
   });

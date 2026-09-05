@@ -42,7 +42,7 @@ const addAt = (bandIndex: number): AnyCommand => ({
 const removeAt = (bandIndex: number): AnyCommand =>
   ({ ...(addAt(bandIndex) as unknown as Record<string, unknown>), adding: false } as unknown as AnyCommand);
 
-describe('newBandIndexOf — the index the MODEL used, not "it must be the last one"', () => {
+describe('newBandIndexOf: the index the MODEL used, not "it must be the last one"', () => {
   it('reads the plan the command carries', () => {
     // `planBandInsertion` records `bandIndex: at` (bg-anim-band.ts:614) and the
     // command holds the plan (commands.ts:285-291). Re-deriving "bands.length"
@@ -62,7 +62,7 @@ describe('newBandIndexOf — the index the MODEL used, not "it must be the last 
   });
 });
 
-describe('bandCardDomId — a card that can be addressed at all', () => {
+describe('bandCardDomId: a card that can be addressed at all', () => {
   it('is stable, distinct per band, and a legal DOM id', () => {
     expect(bandCardDomId(0)).toBe('aeon-band-card-0');
     expect(bandCardDomId(0)).not.toBe(bandCardDomId(1));
@@ -70,7 +70,7 @@ describe('bandCardDomId — a card that can be addressed at all', () => {
   });
 });
 
-describe('revealPanel — a ONE-WAY door that actually notifies', () => {
+describe('revealPanel: a ONE-WAY door that actually notifies', () => {
   beforeEach(() => { savePanelState({}); });
 
   it('opens a section that persisted state had shut', () => {
@@ -80,7 +80,7 @@ describe('revealPanel — a ONE-WAY door that actually notifies', () => {
     expect(isCollapsed(loadPanelState(), BANDS_SECTION_ID, true)).toBe(false);
   });
 
-  it('beats defaultCollapsed, which is the whole case — both band sections default shut', () => {
+  it('beats defaultCollapsed, which is the whole case: both band sections default shut', () => {
     expect(isCollapsed(loadPanelState(), BANDS_SECTION_ID, true)).toBe(true);
     revealPanel(BANDS_SECTION_ID);
     expect(isCollapsed(loadPanelState(), BANDS_SECTION_ID, true)).toBe(false);
@@ -108,7 +108,7 @@ describe('revealPanel — a ONE-WAY door that actually notifies', () => {
   });
 });
 
-describe('followBand — chrome, and PROVABLY not a second undo step', () => {
+describe('followBand: chrome, and PROVABLY not a second undo step', () => {
   beforeEach(() => {
     savePanelState({});
     useEditorStore.setState({ bandLensTarget: null, bandReveal: null });

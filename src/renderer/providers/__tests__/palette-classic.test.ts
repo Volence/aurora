@@ -30,7 +30,7 @@ function recorder(result: CommandResult = OK) {
 }
 
 describe('CLASSIC_PALETTE_POLICY', () => {
-  it('locks no line — classic has no sprite-reserved palette to protect', () => {
+  it('locks no line: classic has no sprite-reserved palette to protect', () => {
     // The single substantive difference from aeon's Art mount, stated as data.
     expect(CLASSIC_PALETTE_POLICY.lockedLines).toEqual([]);
     expect(swatchClick(0, 7, CLASSIC_PALETTE_POLICY)).toEqual({ select: true, edit: true });
@@ -98,7 +98,7 @@ describe('commitClassicSwatch', () => {
     }
   });
 
-  it('hands over a COPY — the store must not alias the open document', () => {
+  it('hands over a COPY: the store must not alias the open document', () => {
     const { calls, set } = recorder();
     const palettes = [line(0x0111)];
     commitClassicSwatch(set, palettes, 0, 3, 0x0eee);
@@ -162,7 +162,7 @@ describe('the classic port keys on the FINE palette clock', () => {
     expect(SRC).toMatch(/\(s\) => s\.doc\?\.palettes/);
   });
 
-  it('previews and drains NOTHING — classic writes no document mid-drag', () => {
+  it('previews and drains NOTHING: classic writes no document mid-drag', () => {
     // Aeon needs a teardown because its preview mutates the open document. Giving
     // classic one would mean giving it that hazard; its preview is the grid's own
     // draft word, discarded harmlessly if the panel goes away.

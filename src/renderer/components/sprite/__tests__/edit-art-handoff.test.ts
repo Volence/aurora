@@ -262,10 +262,10 @@ describe('editObjectArtCheckout', () => {
 
   const S1TREE = referencePath(S1_PINNED);
   it(
-    'Sonic ($01): the sonani-dialect timeline opens — every table anim listed, specials DYNAMIC', {
+    'Sonic ($01): the sonani-dialect timeline opens: every table anim listed, specials DYNAMIC', {
       skip: !existsSync(join(S1TREE, '_anim/Sonic.asm')),
       meta: {
-        skipReason: `${join(S1TREE, '_anim/Sonic.asm')} is absent — no s1disasm checkout on this machine`,
+        skipReason: `${join(S1TREE, '_anim/Sonic.asm')} is absent: no s1disasm checkout on this machine`,
       },
     }, async () => {
     // The sonani parcel closes the audit §1.4 exclusion: the checkout parses
@@ -307,7 +307,7 @@ describe('editObjectArtCheckout', () => {
     expect(scripts.push).toHaveLength(7);
   });
 
-  it('Spring ($41): the frameSources slice rides into the set — frames 3-5 name Nem_VSpring', async () => {
+  it('Spring ($41): the frameSources slice rides into the set: frames 3-5 name Nem_VSpring', async () => {
     // _incObj/41 Springs.asm:54-58 swaps obGfx to ArtTile_Spring_Vertical for
     // the sideways frames; the row transcribes that as a per-frame-range
     // replacement pool the open path renders from.
@@ -479,14 +479,14 @@ describe('editObjectArtCheckout', () => {
 // S1 anim Parcel 1 — the checkout auto-loads the object's `_anim` script into
 // the timeline/picker. The reader seam feeds REAL s1disasm text from fs (the
 // tree is read-only), so these are integration-grade without window.api.
-describe('editObjectArtCheckout — animation auto-load', () => {
+describe('editObjectArtCheckout: animation auto-load', () => {
   const S1DIR = referencePath(S1_PINNED);
   const realReader = async (_base: string, rel: string) => readFileSync(join(S1DIR, rel), 'utf8');
   const treePresent = existsSync(join(S1DIR, '_anim'));
   /** Why the two rows below skip when they skip — read by scripts/skip-report-reporter.mjs. */
   const ANIM_ABSENT = {
     skip: !treePresent,
-    meta: { skipReason: `${join(S1DIR, '_anim')} is absent — no s1disasm checkout on this machine` },
+    meta: { skipReason: `${join(S1DIR, '_anim')} is absent: no s1disasm checkout on this machine` },
   };
 
   it('Crabmeat: loads all 8 anims with flips into the picker + timeline', ANIM_ABSENT, async () => {

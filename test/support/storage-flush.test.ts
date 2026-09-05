@@ -52,7 +52,7 @@ const HARNESS = resolve(__dirname, '../../scratchpad/canvas-cdp-harness.mjs');
 
 function tmp(): string { return mkdtempSync(join(tmpdir(), 'aurora-flush-')); }
 
-describe('leveldbDirOf — the observation, from one open-file path', () => {
+describe('leveldbDirOf: the observation, from one open-file path', () => {
   it('extracts the database directory from a file the browser holds open', () => {
     expect(leveldbDirOf(`/home/u/.config/Electron/${LEVELDB_REL}/LOCK`))
       .toBe(`/home/u/.config/Electron/${LEVELDB_REL}`);
@@ -67,12 +67,12 @@ describe('leveldbDirOf — the observation, from one open-file path', () => {
     expect(leveldbDirOf(undefined)).toBeNull();
   });
 
-  it('does not match the directory itself, only files inside it — a bare dir fd is not a database in use', () => {
+  it('does not match the directory itself, only files inside it: a bare dir fd is not a database in use', () => {
     expect(leveldbDirOf(`/home/u/.config/Electron/${LEVELDB_REL}`)).toBeNull();
   });
 });
 
-describe('leveldbDirsHeldBy — every profile the launched tree has open', () => {
+describe('leveldbDirsHeldBy: every profile the launched tree has open', () => {
   const fds: Record<number, string[]> = {
     10: ['/dev/null', 'socket:[1]', `/p/A/${LEVELDB_REL}/LOCK`, `/p/A/${LEVELDB_REL}/000001.log`],
     11: ['/dev/urandom'],
@@ -94,7 +94,7 @@ describe('leveldbDirsHeldBy — every profile the launched tree has open', () =>
   });
 });
 
-describe('candidateLeveldbDirs — the fallback list', () => {
+describe('candidateLeveldbDirs: the fallback list', () => {
   it('composes one database path per app name under the config home', () => {
     expect(candidateLeveldbDirs(['Electron', 'aurora'], '/cfg')).toEqual([
       `/cfg/Electron/${LEVELDB_REL}`,
@@ -103,7 +103,7 @@ describe('candidateLeveldbDirs — the fallback list', () => {
   });
 });
 
-describe('resolveLeveldbDir — observes, or refuses; it never guesses', () => {
+describe('resolveLeveldbDir: observes, or refuses; it never guesses', () => {
   const names = ['Electron', 'aurora'];
 
   it('takes the one the tree actually holds open, and SAYS it observed it', () => {
@@ -138,7 +138,7 @@ describe('resolveLeveldbDir — observes, or refuses; it never guesses', () => {
     expect(r.how).toMatch(/derived/);
   });
 
-  it('⚠ REFUSES when /proc is silent and TWO candidate profiles exist — the wrong-profile defect this parcel actually hit', () => {
+  it('⚠ REFUSES when /proc is silent and TWO candidate profiles exist: the wrong-profile defect this parcel actually hit', () => {
     const r = resolveLeveldbDir({
       pids: [7], appNames: names, configHome: '/cfg',
       readFds: () => [],
@@ -197,7 +197,7 @@ describe('resolveLeveldbDir — observes, or refuses; it never guesses', () => {
     expect(r.how).toContain(profileDir);
   });
 
-  it('the OBSERVATION still wins over the pinned profile — it is the stronger evidence', () => {
+  it('the OBSERVATION still wins over the pinned profile: it is the stronger evidence', () => {
     const observed = `/tmp/somewhere-else/${LEVELDB_REL}`;
     const r = resolveLeveldbDir({
       pids: [7], appNames: names, configHome: '/cfg',
@@ -220,7 +220,7 @@ describe('resolveLeveldbDir — observes, or refuses; it never guesses', () => {
   });
 });
 
-describe('bytesOnDisk — the predicate the check reads', () => {
+describe('bytesOnDisk: the predicate the check reads', () => {
   it('finds a marker written into the write-ahead log', () => {
     const d = tmp();
     try {
@@ -240,7 +240,7 @@ describe('bytesOnDisk — the predicate the check reads', () => {
     } finally { rmSync(d, { recursive: true, force: true }); }
   });
 
-  it("⚠ IGNORES leveldb's own text LOG — that file names paths and open events, not committed values", () => {
+  it("⚠ IGNORES leveldb's own text LOG: that file names paths and open events, not committed values", () => {
     const d = tmp();
     try {
       writeFileSync(join(d, 'LOG'), 'Recovering log #9 mark-only-in-LOG\n');
@@ -249,12 +249,12 @@ describe('bytesOnDisk — the predicate the check reads', () => {
     } finally { rmSync(d, { recursive: true, force: true }); }
   });
 
-  it('answers false — not throws — for a database directory that is not there', () => {
+  it('answers false (not throws) for a database directory that is not there', () => {
     expect(bytesOnDisk('/nonexistent/aurora-flush', 'anything')).toBe(false);
   });
 });
 
-describe('bytesOnDisk is the whole verdict — there is no wait to soften it', () => {
+describe('bytesOnDisk is the whole verdict: there is no wait to soften it', () => {
   /**
    * ⚠ THE ROW THAT KEEPS THIS FROM BEING A GATE THAT CANNOT FAIL. There is no
    * timeout branch left to test, because there is no wait: the check is one
@@ -293,15 +293,15 @@ describe('the marker itself', () => {
   });
 });
 
-describe('flushRefusal — what a reader is told when the flush genuinely did not happen', () => {
+describe('flushRefusal: what a reader is told when the flush genuinely did not happen', () => {
   it('names the profile it watched, how it resolved it, and how the teardown went', () => {
     const m = flushRefusal({
       dir: '/cfg/Electron/x', how: 'observed: held open by the launched tree',
-      label: 'C — restart', exitNote: 'the app was STILL RUNNING and had to be signalled',
+      label: 'C: restart', exitNote: 'the app was STILL RUNNING and had to be signalled',
     });
     expect(m).toContain('/cfg/Electron/x');
     expect(m).toContain('observed: held open by the launched tree');
-    expect(m).toContain('C — restart');
+    expect(m).toContain('C: restart');
     expect(m).toContain('had to be signalled');
     expect(m).toMatch(/NOT AN APP DEFECT/);
   });

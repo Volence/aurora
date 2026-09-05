@@ -119,8 +119,8 @@ describe('s1ArtFacet mounts the pixel chrome', () => {
   it('declares both a ToolDock and a ToolOptions', async () => {
     const { s1ArtFacet } = await import('../facets/s1-facets');
     expect(s1ArtFacet.id).toBe('art');
-    expect(s1ArtFacet.ToolDock, 'no ToolDock — classic cannot select a tool').toBeTypeOf('function');
-    expect(s1ArtFacet.ToolOptions, 'no ToolOptions — no mirror/dither/pixel-perfect').toBeTypeOf('function');
+    expect(s1ArtFacet.ToolDock, 'no ToolDock: classic cannot select a tool').toBeTypeOf('function');
+    expect(s1ArtFacet.ToolOptions, 'no ToolOptions: no mirror/dither/pixel-perfect').toBeTypeOf('function');
   });
 
   it('gates its options bar on the same predicate as the dock', () => {
@@ -211,7 +211,7 @@ describe('the tile editor zooms and pans', () => {
     // canvas — so this asks about declared constants rather than the digits.
     const decls = [...TILE_TAB_CODE.matchAll(/const\s+([A-Za-z_$][\w$]*)\s*=\s*(\d+)\s*;/g)];
     for (const [, name, value] of decls) {
-      expect(Number(value), `const ${name} = ${value} — a canvas is ${'`8 * zoom`'}, not a constant`)
+      expect(Number(value), `const ${name} = ${value}: a canvas is ${'`8 * zoom`'}, not a constant`)
         .not.toBeOneOf([26, 208]);
     }
   });
@@ -252,7 +252,7 @@ describe('the tile editor zooms and pans', () => {
   // the difference between a papercut and losing work on a tile you came back to.
   it('disarms the Escape-cancel flag when the tile changes', () => {
     const effect = /useEffect\(\(\) => \{([\s\S]*?)\}, \[composerTileIndex\]\)/.exec(TILE_TAB_CODE);
-    expect(effect, 'the per-tile reset effect is gone — where does the marquee reset now?').not.toBeNull();
+    expect(effect, 'the per-tile reset effect is gone: where does the marquee reset now?').not.toBeNull();
     expect(effect![1], 'the per-tile reset drops the marquee but leaves the cancel flag armed')
       .toMatch(/cancelledRef\.current\s*=\s*false/);
     expect(effect![1]).toMatch(/setSelection\(null\)/);
@@ -263,7 +263,7 @@ describe('the tile editor zooms and pans', () => {
     // zoom into that key would redraw all of them on every wheel notch, for a
     // strip whose thumbnails are a fixed size and cannot change with zoom.
     const key = /const versionKeyFor\s*=[^\n]*\n?/.exec(TILE_TAB_CODE);
-    expect(key, 'versionKeyFor is gone — check what the strip is keyed on now').not.toBeNull();
+    expect(key, 'versionKeyFor is gone: check what the strip is keyed on now').not.toBeNull();
     expect(key![0], 'the tile strip key depends on zoom').not.toMatch(/zoom/i);
   });
 });
@@ -278,9 +278,9 @@ describe('the composer tabs\' Escape cancel', () => {
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/(^|[^:])\/\/.*$/gm, '$1');
 
-  it('is ChunkTab\'s alone — BlockTab has no stroke to cancel', () => {
+  it('is ChunkTab\'s alone: BlockTab has no stroke to cancel', () => {
     expect(readClassic('ChunkTab.tsx'), 'ChunkTab lost its Escape cancel').toMatch(/useEscapeCancel\(/);
-    expect(readClassic('BlockTab.tsx'), 'BlockTab grew one — the shared docblocks now understate it')
+    expect(readClassic('BlockTab.tsx'), 'BlockTab grew one: the shared docblocks now understate it')
       .not.toMatch(/useEscapeCancel\(|strokeRef/);
   });
 

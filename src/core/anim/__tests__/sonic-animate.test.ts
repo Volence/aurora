@@ -38,7 +38,7 @@ const treePresent = existsSync(SONIC_ASM);
 const guarded = (name: string, fn: () => void): void => {
   describe(name, {
     skip: !treePresent,
-    meta: { skipReason: `${SONIC_ASM} is absent — no s1disasm checkout on this machine` },
+    meta: { skipReason: `${SONIC_ASM} is absent: no s1disasm checkout on this machine` },
   }, fn);
 };
 
@@ -88,7 +88,7 @@ function frameTrace(scripts: SonicSpecialScripts, mode: 'walkrun' | 'roll' | 'pu
   return out;
 }
 
-guarded('sonicHoldReload — the confirmed duration formulas at many inertia points', () => {
+guarded('sonicHoldReload: the confirmed duration formulas at many inertia points', () => {
   it('walk/run: max(0,$800−|inertia|)>>8 at every distinct observed duration', () => {
     // The study observed every distinct duration 2..8; sweep those + extremes.
     for (const i of [0, 0x80, 0x100, 0x2ff, 0x300, 0x5ff, 0x600, 0x700, 0x7ff, 0x800, 0xc00]) {
@@ -108,7 +108,7 @@ guarded('sonicHoldReload — the confirmed duration formulas at many inertia poi
   });
 });
 
-guarded('variant selection — the $600 boundary (study-confirmed at exactly $600)', () => {
+guarded('variant selection: the $600 boundary (study-confirmed at exactly $600)', () => {
   let scripts!: SonicSpecialScripts;
   beforeAll(() => { scripts = realScripts(); });
   it('walkrun: $5FF walks, $600 runs (boundary sample took run in the capture)', () => {
@@ -131,7 +131,7 @@ guarded('variant selection — the $600 boundary (study-confirmed at exactly $60
   });
 });
 
-guarded('rotation fan-out — octant formula and ×6/×4 offsets', () => {
+guarded('rotation fan-out: octant formula and ×6/×4 offsets', () => {
   let scripts!: SonicSpecialScripts;
   beforeAll(() => { scripts = realScripts(); });
   it('sonicOctant matches the formula at both facings across the detent angles', () => {
@@ -177,7 +177,7 @@ guarded('rotation fan-out — octant formula and ×6/×4 offsets', () => {
   });
 });
 
-guarded('golden sequences — N-tick traces cycle the 6 script frames + offset', () => {
+guarded('golden sequences: N-tick traces cycle the 6 script frames + offset', () => {
   let scripts!: SonicSpecialScripts;
   beforeAll(() => { scripts = realScripts(); });
 
@@ -225,7 +225,7 @@ guarded('golden sequences — N-tick traces cycle the 6 script frames + offset',
     expect(trace).toEqual(expected);
   });
 
-  it('walk→run switch mid-cycle keeps the animation position (no reset — the padding contract)', () => {
+  it('walk→run switch mid-cycle keeps the animation position (no reset: the padding contract)', () => {
     // Advance walk to aniFrame 5 (frame walk[4]), then raise inertia to run
     // speed: the interpreter must read run's body at the SAME index, where the
     // padding afEnd loops it to run[0] — exactly why the file pads specials.

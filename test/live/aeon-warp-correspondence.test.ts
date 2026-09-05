@@ -132,12 +132,12 @@ const ORACLE = sibling('oracle', 'target/release/oracle-aether');
 
 const missing: string[] = [];
 if (!OPTED_IN) missing.push('AURORA_LIVE_AEON_WARP=1 not set');
-if (!AEON) missing.push('no sibling aeon with a built s4.debug.bin — ./build.sh DEBUG=1');
-else if (!existsSync(join(AEON, 's4.debug.lst'))) missing.push('aeon has no s4.debug.lst beside the ROM — rebuild it');
-if (!ORACLE) missing.push('no sibling oracle with target/release/oracle-aether — cargo build --release');
+if (!AEON) missing.push('no sibling aeon with a built s4.debug.bin: ./build.sh DEBUG=1');
+else if (!existsSync(join(AEON, 's4.debug.lst'))) missing.push('aeon has no s4.debug.lst beside the ROM: rebuild it');
+if (!ORACLE) missing.push('no sibling oracle with target/release/oracle-aether: cargo build --release');
 
 const row = missing.length === 0 ? it : it.skip;
-const why = missing.length === 0 ? '' : ` — SKIPPED: ${missing.join('; ')}`;
+const why = missing.length === 0 ? '' : ` (SKIPPED: ${missing.join('; ')})`;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const hex = (n: number) => '0x' + (n >>> 0).toString(16).toUpperCase();
@@ -198,7 +198,7 @@ describe('aeon world pixels: the editor and the engine mean the same thing', () 
       for (const [name, v] of [['Sst.x_pos', OFF_X], ['Sst.y_pos', OFF_Y],
         ['SECTION_SIZE_SHIFT', SECTION_SHIFT], ['SCREEN_HEIGHT', SCREEN_HEIGHT],
         ['PBOUND_RIGHT_MARGIN', RIGHT_MARGIN]] as const) {
-        expect(v, `could not derive ${name} from the aeon checkout — this row cannot measure anything`)
+        expect(v, `could not derive ${name} from the aeon checkout: this row cannot measure anything`)
           .not.toBeNull();
       }
 
@@ -217,7 +217,7 @@ describe('aeon world pixels: the editor and the engine mean the same thing', () 
 
       const actPtrCell = await client.resolve('Current_Act_Ptr');
       const actPtr = await readLong(actPtrCell);
-      expect(actPtr, 'Current_Act_Ptr is null — no act is loaded, so every figure below would be about a menu')
+      expect(actPtr, 'Current_Act_Ptr is null: no act is loaded, so every figure below would be about a menu')
         .not.toBe(0);
       expect(actPtr, 'Current_Act_Ptr is not a plausible ROM pointer').toBeLessThan(0x400000);
 
@@ -233,13 +233,13 @@ describe('aeon world pixels: the editor and the engine mean the same thing', () 
       // 24-bit `$FF8F72`. Comparing the raw values makes a true statement fail.
       const A24 = 0xffffff;
       const leader = (0xff0000 | await readWord(camTarget)) & A24;
-      expect(leader, 'the camera leader is not Player_1 — this row is reading the wrong object')
+      expect(leader, 'the camera leader is not Player_1: this row is reading the wrong object')
         .toBe(player & A24);
 
       const boundRight = await readWord(await client.resolve('Player_Bound_Right'));
       const boundBottom = await readWord(await client.resolve('Player_Bound_Bottom'));
-      expect(boundRight, 'Player_Bound_Right is 0 — the act bounds are not live yet').toBeGreaterThan(0);
-      expect(boundBottom, 'Player_Bound_Bottom is 0 — the act bounds are not live yet').toBeGreaterThan(0);
+      expect(boundRight, 'Player_Bound_Right is 0: the act bounds are not live yet').toBeGreaterThan(0);
+      expect(boundBottom, 'Player_Bound_Bottom is 0: the act bounds are not live yet').toBeGreaterThan(0);
 
       // The act's section grid, RECOVERED from the engine's own live clamp
       // edges and its own margin constants (`Player_BoundsInit`:
@@ -262,7 +262,7 @@ describe('aeon world pixels: the editor and the engine mean the same thing', () 
       // the read below is a fixed one frame after the consume.
       const paused = await client.call('emulator/pause') as { wasRunning?: boolean };
       expect(paused?.wasRunning,
-        'the server did not report the machine as already paused — every figure below would be off by an unknown number of frames')
+        'the server did not report the machine as already paused: every figure below would be off by an unknown number of frames')
         .toBe(false);
 
       /** Warp through the SHIPPED call and read the machine independently. */
@@ -291,8 +291,8 @@ describe('aeon world pixels: the editor and the engine mean the same thing', () 
       const DX = 777, DY = 333;            // deliberately not round: a grid snap cannot coincide
       const B = { x: A.x + DX, y: A.y + DY };
       for (const p of [A, B]) {
-        expect(p.x, 'point is outside the act — pick a smaller one').toBeLessThan(boundRight);
-        expect(p.y, 'point is outside the act — pick a smaller one').toBeLessThan(boundBottom);
+        expect(p.x, 'point is outside the act: pick a smaller one').toBeLessThan(boundRight);
+        expect(p.y, 'point is outside the act: pick a smaller one').toBeLessThan(boundBottom);
       }
 
       const a = await go(A.x, A.y);
@@ -315,8 +315,8 @@ describe('aeon world pixels: the editor and the engine mean the same thing', () 
       // here even if a single-point check had passed.
       expect(b.px - a.px, 'the two warps did not differ by the x distance asked for').toBe(DX);
       expect(b.py - a.py, 'the two warps did not differ by the y distance asked for').toBe(DY);
-      expect(b.px, 'both warps landed on the same x — a stuck value would look exactly like this').not.toBe(a.px);
-      expect(b.py, 'both warps landed on the same y — a stuck value would look exactly like this').not.toBe(a.py);
+      expect(b.px, 'both warps landed on the same x: a stuck value would look exactly like this').not.toBe(a.px);
+      expect(b.py, 'both warps landed on the same y: a stuck value would look exactly like this').not.toBe(a.py);
 
       // ---- CLAMP 1: the act clamp, ASSERTED rather than avoided -------------
       // A cursor far outside the act. The editor clamps to the last addressable
@@ -355,11 +355,11 @@ describe('aeon world pixels: the editor and the engine mean the same thing', () 
       // exercise it and does not pretend to. `warp-math.test.ts` covers the
       // arithmetic; only an act wider than 32 sections would make it live.
       const lastPixel = Math.max(act.gridWidth * SECTION_PX_WIDE, act.gridHeight * SECTION_PX_HIGH) - 1;
-      expect(lastPixel, 'this act DOES reach the u16 mailbox ceiling — the protocol clamp is live and this row must grow a case for it')
+      expect(lastPixel, 'this act DOES reach the u16 mailbox ceiling: the protocol clamp is live and this row must grow a case for it')
         .toBeLessThanOrEqual(WARP_COORD_MAX);
       expect(far.t.clampedToProtocol, 'the protocol clamp fired on an act that cannot reach it').toBe(false);
       expect(far.t.reachable).toBe(true);
-      say(`protocol clamp: inert here — the act's last pixel is ${lastPixel}, ceiling is ${WARP_COORD_MAX}`);
+      say(`protocol clamp: inert here (the act's last pixel is ${lastPixel}, ceiling is ${WARP_COORD_MAX})`);
     } finally {
       client?.disconnect();
       srv?.kill();

@@ -28,7 +28,7 @@ function level(objects: ObjectPlacement[]): { level: S4Level; section: Section }
 }
 
 describe('aeonObjectSchema', () => {
-  it('lists exactly the fields an aeon placement has — and NOT respawn', () => {
+  it('lists exactly the fields an aeon placement has, and NOT respawn', () => {
     // The engine's placement word has no respawn bit, so there is no control for
     // it. A disabled or ignored one would be dead chrome.
     expect(aeonObjectSchema(LIBRARY, 'ring').map((f) => f.id)).toEqual([
@@ -58,7 +58,7 @@ describe('aeonObjectSchema', () => {
     expect(type.options.map((o) => o.value)).toEqual(['ring', 'spike', 'ghost']);
   });
 
-  it('survives an absent library — an unloaded project is not a crash', () => {
+  it('survives an absent library: an unloaded project is not a crash', () => {
     const type = aeonObjectSchema(undefined, 'ring')[0];
     if (type.kind !== 'select') throw new Error('type field must be a select');
     expect(type.options.map((o) => o.value)).toEqual(['ring']);
@@ -78,7 +78,7 @@ describe('aeonObjectFields', () => {
 });
 
 describe('applyAeonPatch', () => {
-  it('keeps the typeId a string — no numeric coercion', () => {
+  it('keeps the typeId a string: no numeric coercion', () => {
     expect(applyAeonPatch(placement(), { typeId: 'spike' })).toEqual(placement({ typeId: 'spike' }));
   });
 
@@ -107,7 +107,7 @@ describe('commitAeonPatch', () => {
     expect(history.canUndo).toBe(false);   // ONE step, not three
   });
 
-  it('clamps to SECTION-LOCAL limits — where classic would have allowed $9999', () => {
+  it('clamps to SECTION-LOCAL limits: where classic would have allowed $9999', () => {
     const { level: lvl, section } = level([placement()]);
     const exec = (cmd: AnyCommand, l: S4Level): void => { new EditHistory().execute(cmd, l); };
     commitAeonPatch(exec, lvl, 0, 0, { x: 0x9999, y: 0x9999 }, schema);
@@ -155,7 +155,7 @@ describe('commitAeonPatch', () => {
     expect(history.canUndo).toBe(false);
   });
 
-  it('drops a field aeon does not have — a respawn patch writes nothing', () => {
+  it('drops a field aeon does not have: a respawn patch writes nothing', () => {
     const { level: lvl } = level([placement()]);
     const history = new EditHistory();
     const exec = (cmd: AnyCommand, l: S4Level): void => { history.execute(cmd, l); };
@@ -176,7 +176,7 @@ describe('hasAeonObjectPreview', () => {
     expect(hasAeonObjectPreview(new Map([['ring', sprite(16, 16)]]), 'ring')).toBe(true);
   });
 
-  it('is false for a type the sprite map does not carry — the common aeon case', () => {
+  it('is false for a type the sprite map does not carry: the common aeon case', () => {
     expect(hasAeonObjectPreview(new Map([['ring', sprite(16, 16)]]), 'spike')).toBe(false);
   });
 
@@ -190,7 +190,7 @@ describe('hasAeonObjectPreview', () => {
     expect(hasAeonObjectPreview(new Map([['', sprite(16, 16)]]), '')).toBe(false);
   });
 
-  it('is false for a CLOSED bitmap — width 0 means the publisher revoked it', () => {
+  it('is false for a CLOSED bitmap: width 0 means the publisher revoked it', () => {
     expect(hasAeonObjectPreview(new Map([['ring', sprite(0, 0)]]), 'ring')).toBe(false);
     expect(hasAeonObjectPreview(new Map([['ring', sprite(16, 0)]]), 'ring')).toBe(false);
   });

@@ -21,7 +21,7 @@ const buf8 = (f: (x: number, y: number) => number = () => 0): PixelBuffer => {
   return { width: 8, height: 8, data };
 };
 
-describe('resolveTileGesture — the marquee answer (rule 1)', () => {
+describe('resolveTileGesture: the marquee answer (rule 1)', () => {
   it('leaves the marquee alone for a pencil stroke (the key is absent, not null)', () => {
     const before = buf8();
     const c = new PixelEditController(cfg('pencil'));
@@ -52,7 +52,7 @@ describe('resolveTileGesture — the marquee answer (rule 1)', () => {
   });
 });
 
-describe('resolveTileGesture — locked tiles (rule 2)', () => {
+describe('resolveTileGesture: locked tiles (rule 2)', () => {
   it('refuses a fill on a locked tile', () => {
     const before = buf8();
     const c = new PixelEditController(cfg('fill'));
@@ -124,7 +124,7 @@ describe('resolveTileGesture — locked tiles (rule 2)', () => {
   });
 });
 
-describe('resolveTileGesture — no change, no undo entry (rule 3)', () => {
+describe('resolveTileGesture: no change, no undo entry (rule 3)', () => {
   it('commits nothing when a stroke repaints the colour already there', () => {
     const before = buf8(() => 3);
     const c = new PixelEditController(cfg('pencil', 3));
@@ -148,7 +148,7 @@ describe('resolveTileGesture — no change, no undo entry (rule 3)', () => {
   });
 });
 
-describe('resolveTileGesture — the bytes it hands the command', () => {
+describe('resolveTileGesture: the bytes it hands the command', () => {
   it('returns 32 bytes that decode back to the drawn pixels', () => {
     const before = buf8();
     const c = new PixelEditController(cfg('pencil', 9));

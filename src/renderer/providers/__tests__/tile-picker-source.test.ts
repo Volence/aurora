@@ -81,7 +81,7 @@ const FG = modelTiles(N, 1);
 const BOUND = `${BG_OVERRIDE_CONSUMER_OUT_DIR}/`;
 const UNBOUND = `${BG_OVERRIDE_CONSUMER_OUT_DIR.replace(/act1$/, 'act2')}/`;
 
-describe('resolveTilePickerSource — the picker shows the array the stroke writes', () => {
+describe('resolveTilePickerSource: the picker shows the array the stroke writes', () => {
   it('shows the zone TILESET in FG mode, by array identity', () => {
     const s = resolveTilePickerSource('fg', zone(FG), act(BOUND, 'lib-1'), LIB, 0, holder(doc(3, N)));
     expect(s.origin).toBe('tileset');
@@ -144,13 +144,13 @@ describe('the thumbnail cache key discriminates what LENGTH could not', () => {
   const a = modelTiles(N, 1);
   const b = modelTiles(N, 2);
 
-  it('is stale for a DIFFERENT array of the SAME LENGTH — the old key\'s blind spot', () => {
+  it('is stale for a DIFFERENT array of the SAME LENGTH: the old key\'s blind spot', () => {
     expect(a.length).toBe(b.length);                     // the precondition
     expect([...a[0].pixels]).not.toEqual([...b[0].pixels]); // ...and different art
     expect(tileThumbCacheStale({ tiles: a, paletteLine: 0 }, b, 0)).toBe(true);
   });
 
-  it('is fresh for the same array and palette line — it is a cache, after all', () => {
+  it('is fresh for the same array and palette line: it is a cache, after all', () => {
     expect(tileThumbCacheStale({ tiles: a, paletteLine: 2 }, a, 2)).toBe(false);
   });
 
@@ -225,7 +225,7 @@ describe('the labels name the space the index lives in', () => {
 // the stamp lays exactly that pattern. Slot bases are derived by walking the
 // list (bandSlotBases), never typed; the fixtures use two shapes so a rule
 // that only held for 8x4 would show.
-describe('tilePickerBandGroups — the prefix by band', () => {
+describe('tilePickerBandGroups: the prefix by band', () => {
   const band = (cols: number, rows: number) => ({
     cols, rows, pattern_px: cols * 8,
     phases: Array.from({ length: 8 }, () => rawTiles(cols * rows, 0)),
@@ -305,7 +305,7 @@ describe('tilePickerBandGroups — the prefix by band', () => {
     expect(tilePickerBandLabel(g1)).not.toContain(`..${lastOwned(g1) + 1}`);
   });
 
-  it('and the LINE is short: no noun, no geometry — both are on the card already', () => {
+  it('and the LINE is short: no noun, no geometry; both are on the card already', () => {
     const h = holder(bandedDoc());
     const s = resolveTilePickerSource('bg', zone(FG), act(BOUND, 'lib-1'), LIB, 0, h);
     const g = tilePickerBandGroups(s, h)[0];
