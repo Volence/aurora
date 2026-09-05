@@ -118,24 +118,36 @@ const SITES: Array<{ rel: string; importFrom: string; writer: string; calls: str
     calls: ['actAndDropFocus(e, () => useSpriteStore.getState().removeStep(i))'],
   },
   {
+    // ⚠ THE DELETE'S WRITER MOVED (deleted-scene-returns, 2026-09-05), exactly as
+    // d-29 moved the sprite chips': `deleteSceneGuarded` (shell/effects-delete-guard.ts)
+    // confirms when the scene has a FILE and calls `deleteSceneCommand` unchanged
+    // when it does not. It moved because the save now UNLINKS that file — this
+    // button used to be recoverable by simply not saving. The blur is still first
+    // and still unconditional (`actAndDropFocus` blurs before `act()`; the confirm
+    // is inside `act()`), so this file's subject is untouched. Pinning the guard's
+    // name is deliberate: reverting to the bare command would restore an unasked
+    // destruction while leaving the d-27 blur in place, and this line is what makes
+    // that revert visible to `npm test`.
     rel: 'components/effects/EffectsScenePanel.tsx', importFrom: '../ui/act-and-drop-focus',
-    writer: 'removeLayerCommand — key={i} list removal, same retarget shape; AND deleteSceneCommand, '
-      + 'which deletes a WHOLE DOCUMENT and, measured, left the same button focused and renamed at '
+    writer: 'removeLayerCommand — key={i} list removal, same retarget shape; AND '
+      + 'deleteSceneGuarded, which deletes a WHOLE DOCUMENT — and its FILE, since the save '
+      + 'gained a removal step — and, measured, left the same button focused and renamed at '
       + 'another scene',
     calls: [
       'actAndDropFocus(e, () => run(removeLayerCommand(library, selected.id, i)))',
-      'actAndDropFocus(e, () => run(deleteSceneCommand(library, selected.id)))',
+      'actAndDropFocus(e, () => { void deleteSceneGuarded(library, selected.id, run); })',
     ],
   },
   {
     rel: 'components/effects/BandPresetPanel.tsx', importFrom: '../ui/act-and-drop-focus',
     writer: 'removeBandCommand / removeCycleChannelCommand — the purest instance of the shape: the '
       + 'channel Remove has no disabled predicate, no refusal and no confirmation at any count; AND '
-      + 'deletePresetCommand, whose `disabled` guard is re-derived for the NEW target after the delete',
+      + 'deletePresetGuarded, whose `disabled` refusal is re-derived for the NEW target after the delete',
     calls: [
       'actAndDropFocus(e, () => run(removeBandCommand(library, presetId, index)))',
       'actAndDropFocus(e, () => run(removeCycleChannelCommand(library, presetId, index)))',
-      'actAndDropFocus(e, () => run(deletePresetCommand(library, selected.id)))',
+      // Same move as the scene Delete above, and for the same reason.
+      'actAndDropFocus(e, () => { void deletePresetGuarded(library, selected.id, run); })',
     ],
   },
   {
