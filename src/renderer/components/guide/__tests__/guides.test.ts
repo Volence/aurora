@@ -135,7 +135,7 @@ describe('the parser handles everything the shipped guide actually uses', () => 
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// §6's SAVE SENTENCE, TIED TO THE SAVE PATH THAT HAS TO MAKE IT TRUE.
+// §7's SAVE SENTENCE, TIED TO THE SAVE PATH THAT HAS TO MAKE IT TRUE.
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // The sentence this replaced — "Saving rewrites every editor file in the act,
@@ -150,13 +150,13 @@ describe('the parser handles everything the shipped guide actually uses', () => 
 // `planFileNeedsWrite` back to byte identity, this file goes red and names the
 // guide sentence that would then be a lie. The prose row is the other direction
 // and is deliberately narrow — it pins the CLAIM, not the wording.
-describe("§6's save claim is the save path's actual rule", () => {
+describe("§7's save claim is the save path's actual rule", () => {
   const enc = (s: string) => new TextEncoder().encode(s);
 
-  /** §6's own text, so a row cannot pass by matching a word somewhere else. */
+  /** §7's own text, so a row cannot pass by matching a word somewhere else. */
   const saveSection = (() => {
-    const from = effects.source.indexOf('## 6. Save, and build');
-    if (from < 0) throw new Error('the guide has no "## 6. Save, and build" heading');
+    const from = effects.source.indexOf('## 7. Save, and build');
+    if (from < 0) throw new Error('the guide has no "## 7. Save, and build" heading');
     const to = effects.source.indexOf('\n## ', from + 1);
     return effects.source.slice(from, to === -1 ? undefined : to);
   })();
@@ -179,10 +179,10 @@ describe("§6's save claim is the save path's actual rule", () => {
     expect(planFileNeedsWrite('json', onDisk, changed)).toBe(true);
   });
 
-  it('§6 states that rule, and no longer promises a large git status', () => {
-    expect(saveSection, 'the retracted over-warning is back in §6 — see C6')
+  it('§7 states that rule, and no longer promises a large git status', () => {
+    expect(saveSection, 'the retracted over-warning is back in §7 — see C6')
       .not.toMatch(/large `git status`/);
-    expect(saveSection, '§6 no longer tells the author what a save writes')
+    expect(saveSection, '§7 no longer tells the author what a save writes')
       .toMatch(/only when that file's\s+meaning changed/);
   });
 });
