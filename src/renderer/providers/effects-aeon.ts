@@ -72,6 +72,12 @@ import {
   reelStripScreenX, reelCycleFrames, reelCycleLabel,
   reelRateRefusal, reelRatesRefusal, reelRateGuidance,
 } from '../../core/formats/effects/scene-ui';
+// aeon's named-factor table and its 9-bit packing, transcribed there from
+// `engine/level/parallax_dsl.emp` and gated by
+// `test/formats/effects-factor-decode.test.ts`. `curveGoesNowhere` and
+// `curveDescendingAdvisory` both need a factor's VALUE rather than its
+// spelling, and this is where the repo already keeps it.
+import { packFactor, resolveFactor, factorRatio } from '../../core/formats/effects/factor-decode';
 import { BG_LAYOUT_WORDS, TILE_WIDTH_PX } from '../../core/formats/bg-override/bg-override';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
 
@@ -675,14 +681,45 @@ export const EFFECTS_ROW_REMAP_CAPABILITY_NOTE =
  * restates it, so the sentence under the row and the greyed row in the list
  * cannot come to disagree after an edit to one of them.
  *
- * Equality is BY VALUE, so a packed triple spelled twice is caught too — the
- * comparison a `===` would miss and the reason this is `JSON.stringify` rather
- * than the obvious operator. Both operands are schema-shaped (a `FACTOR_*`
- * string, or `{s1,s2,op}` written in that key order by every producer in this
- * module), so key order is not a hazard here.
+ * ⚠ EQUALITY IS THE ENGINE'S - THE PACKED VALUE - AND IT USED TO BE THE
+ * SPELLING. This compared `JSON.stringify(to) === JSON.stringify(fb)`, whose
+ * docblock claimed it caught everything a `===` would miss and that "no named
+ * factor equals a packed triple by value". Both halves were wrong, and one of
+ * them was found by a build refusing (2026-09-05):
+ *
+ *   $ fb: FACTOR_0, curve: To(FACTOR_LOCKED)      authored through both controls
+ *   error: layer(): curve: To(255) is the same factor as this layer's fb, so
+ *          the ramp's two ends are equal and the emitted HScroll is
+ *          byte-identical to the flat path
+ *
+ * `FACTOR_LOCKED` and `FACTOR_0` are ONE VALUE with two spellings - aeon's
+ * `parallax_dsl.emp` says so outright (`pub const FACTOR_0 = FACTOR_LOCKED`,
+ * both $0FF) and `factor-decode.ts`'s own table records it. aeon's guard reads
+ * `curve_to != fb` on the packed NUMBERS, so it saw one factor; Aurora saw two
+ * strings, greyed nothing, warned nothing, and let the document save. That is
+ * the whole gap: this predicate is advertised as "the engine's guard 4, as one
+ * predicate" and it was comparing a different quantity than the engine.
+ *
+ * The second miss follows from the same mistake and needs no separate fix: a
+ * `fb` spelled as a PACKED TRIPLE through the spinners against a `to` spelled
+ * as the NAME of that same factor (or the reverse) is one value in aeon and two
+ * shapes in `JSON.stringify`. The old docblock asserted that pair was
+ * impossible.
+ *
+ * `packFactor(resolveFactor(...))` is aeon's own 9-bit encoding
+ * (`(op << 8) | (s2 << 4) | s1`), computed from the table `factor-decode.ts`
+ * transcribes from `parallax_dsl.emp` - so this is the repo's existing, gated
+ * fact rather than a new one. An unknown name resolves to `null`, and two
+ * unknowns are NOT declared equal: `resolveFactor` cannot happen for a
+ * schema-valid document, and answering "these are the same factor" about two
+ * values neither party can evaluate would be a guess with a build error behind
+ * it.
  */
 export function curveGoesNowhere(fb: EffectsFactor, to: EffectsFactor): boolean {
-  return JSON.stringify(to) === JSON.stringify(fb);
+  const a = resolveFactor(fb);
+  const b = resolveFactor(to);
+  if (a === null || b === null) return false;
+  return packFactor(a) === packFactor(b);
 }
 
 /**
@@ -714,6 +751,73 @@ export function curveAdvisory(layer: Pick<EffectsLayer, 'fb' | 'curve'>): string
   if (to === 'none') return null;
   if (!curveGoesNowhere(layer.fb, to)) return null;
   return curveFlatReason(to);
+}
+
+/**
+ * ⚠ A CURVE THAT RAMPS DOWNWARD GARBLES THE BACKGROUND, AND NOTHING ELSE
+ * BETWEEN THE PICKER AND THE ROM SAYS SO.
+ *
+ * `fb` is Plane B's factor at the strip's TOP and `curve.to` is its factor at
+ * the strip's BOTTOM (aeon `engine/level/scene_dsl.emp:441`). aeon bisected the
+ * defect on a live machine on 2026-09-05 and states the correlation flatly
+ * (`df3b8810`): "a DESCENDING parallax curve garbles the background and an
+ * ascending one does not. Every curve shipped in this tree ramps upward, so
+ * nothing had ever exercised the other direction." It removed both descending
+ * curves from the shipped section-7 scene and `05b8ad10` confirmed on a rebuilt
+ * ROM that the reported garbage was gone.
+ *
+ * WHY AURORA IS THE ONLY PLACE THIS CAN BE SAID. `layer()`'s guard 4 refuses
+ * only the DEGENERATE case, where the two ends are equal - the case
+ * `curveAdvisory` above covers. There is no engine guard on direction, the
+ * generator does not look, and `row_remap_gate` prints a curve-only band's
+ * plane line without gating its magnitude. So a descending curve builds green
+ * in all four shapes and the author finds out by looking at the screen.
+ *
+ * AND IT IS ON THE ROW REMAP'S CRITICAL PATH. aeon's precondition 1 gives three
+ * ways to make a `rowRemap` vary, and route (c) - "a `curve:` on that layer" -
+ * is the only one that needs no deform table. Every remap authored that way
+ * runs through this picker.
+ *
+ * ⚠ ADVICE, NEVER PREVENTION, AND THE REASON IS NOT TASTE. The mechanism is
+ * UNESTABLISHED - aeon booked it that way on purpose, recording that its own
+ * sign derivation was a lead the code then refuted ("the positive-spread path
+ * already takes correct floor division, so the correlation survives and its
+ * cause does not"). A repo that greyed these options would be encoding a rule
+ * nobody has established, on a value the format admits and the engine accepts,
+ * and an author who opened a hand-authored descending curve could not see their
+ * own file in the list. That is the same posture `rowRemapPreconditions` takes,
+ * for the same stated reason: Aurora is not a fourth party inventing a rule.
+ * `curveFieldOptions` is deliberately NOT changed by this.
+ *
+ * THE COMPARISON IS THE RATIO, NOT THE SCROLL. `factorRatio`'s own docblock
+ * says it is a fraction "for LABELS and for the agreement test", because
+ * `decodeFactorScroll` is the real function of `camX` and rounds per term. That
+ * caution is about using the fraction AS a scroll value; the question here is
+ * only which end of the ramp is the larger factor, which is an ordering of the
+ * two operands and not an evaluation of either. `factorRatio` reads the packed
+ * triple (`2^-s1 ± 2^-s2`), so it answers for the locked sentinel (0) and for a
+ * hand-spelled packed triple as well as for a name.
+ *
+ * NOT AN EQUALITY CASE. Equal ends are `curveAdvisory`'s, which the engine
+ * really does refuse, so this returns null there rather than saying two things
+ * about one strip.
+ */
+export function curveDescendingAdvisory(layer: Pick<EffectsLayer, 'fb' | 'curve'>): string | null {
+  const to = curveFieldValue(layer);
+  if (to === 'none') return null;
+  const from = factorRatio(layer.fb);
+  const dest = factorRatio(to);
+  // Cross-multiplied, so two fractions with different denominators compare
+  // without a division. Both denominators are positive powers of two.
+  const descends = dest.num * from.den < from.num * dest.den;
+  if (!descends) return null;
+  return `this strip's Plane B ramps DOWNWARD, from ${factorLabel(layer.fb)} at its top to `
+    + `${factorLabel(to)} at its bottom. aeon bisected a descending parallax curve as the cause `
+    + 'of a garbled background on a live machine (2026-09-05): "a DESCENDING parallax curve '
+    + 'garbles the background and an ascending one does not". The mechanism is UNESTABLISHED '
+    + 'and no build refuses this, so it is advice and not a refusal: every curve shipped in '
+    + 'aeon\'s tree ramps upward. Ramp to a factor above '
+    + `${factorLabel(layer.fb)}, or take the curve off.`;
 }
 
 /** A factor `<select>` option that can carry the engine's refusal of itself. */

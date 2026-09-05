@@ -68,7 +68,7 @@ import {
   factorOptions, clampPackedField,
   factorFieldSelectValue, factorFieldFromSelect, NONE_FACTOR_VALUE,
   curveFieldValue, curveFromField, curveFieldOptions,
-  vsplitFieldValue, vsplitFromToggle, curveAdvisory, clampVSplitAt,
+  vsplitFieldValue, vsplitFromToggle, curveAdvisory, curveDescendingAdvisory, clampVSplitAt,
   LAYER_CURVE_ROW, LAYER_VSPLIT_ROW, EFFECTS_VSPLIT_AT_BOUNDS,
   clampVFactor, clampVCenter, clampVOffset,
   layerTopBounds, clampLayerTop, planeLineOf, fireLineAdvisory, vsplitOrderAdvisory,
@@ -691,6 +691,28 @@ export default function EffectsScenePanel(): React.ReactElement {
               {(() => {
                 const advice = curveAdvisory(layer);
                 return advice === null ? null : <Hint under tone="warning">{advice}</Hint>;
+              })()}
+              {/* ⚠ THE DIRECTION OF THE RAMP, which no build checks. `fb` is
+                  Plane B at the strip's TOP and `curve.to` at its BOTTOM, and a
+                  DESCENDING curve garbles the background - bisected on a live
+                  machine 2026-09-05 (aeon df3b8810), mechanism unestablished.
+                  `layer()` refuses only the DEGENERATE case above, so this is
+                  the one thing about a curve that reaches a ROM green and wrong.
+                  It matters most here because route (c) of the row remap's
+                  precondition 1 - the only route needing no deform table - is
+                  "a `curve:` on that layer", so every remap authored that way
+                  comes through this picker.
+
+                  A SECOND HINT AND NOT A LONGER FIRST ONE: the two say
+                  different kinds of thing. `curveAdvisory` reports a refusal
+                  the build will make; this reports a correlation nothing
+                  enforces. Folding them would let a reader carry the first
+                  one's authority onto the second. And the option is NOT greyed
+                  - see `curveDescendingAdvisory` for why prevention would be
+                  Aurora inventing a rule. */}
+              {(() => {
+                const down = curveDescendingAdvisory(layer);
+                return down === null ? null : <Hint under tone="warning">{down}</Hint>;
               })()}
               {/* THE SPLIT (parcel H). none / row, and the row spinner only when
                   set. `clampVSplitAt` is the bound — NumberField's min/max only
