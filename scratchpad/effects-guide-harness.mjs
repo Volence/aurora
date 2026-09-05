@@ -389,6 +389,57 @@ async function main() {
       railed.links >= 6 && railed.after !== railed.before && railed.inView === true,
       JSON.stringify(railed));
 
+    // ---- 5. OVERSEER ADDITIONS, 2026-09-05. --------------------------------
+    //
+    // The landed gate is SOURCE level. Two things it cannot see, both created by
+    // this parcel's own edits, both visible only painted.
+    //
+    // NOTE ON SPELLING: a backtick cannot appear inside String.raw`...`, so the
+    // page side builds the character with fromCharCode. My first version wrote it
+    // literally and the file would not parse, which is the honest failure mode;
+    // a version that parsed and searched for the wrong character would not be.
+    const painted = await c.json(String.raw`(() => {
+      const TICK = String.fromCharCode(96);
+      const p = ${GUIDE_PANE};
+      const t = p.innerText || '';
+      const ticks = (t.split(TICK).length - 1);
+      const around = [];
+      let i = t.indexOf(TICK);
+      while (i !== -1 && around.length < 6) {
+        around.push(t.slice(Math.max(0, i - 45), i + 45));
+        i = t.indexOf(TICK, i + 1);
+      }
+      const pre = [...p.querySelectorAll('pre')].map((e) => e.innerText);
+      return { ticks: ticks, around: around, pre: pre };
+    })()`);
+    // [5a] A code span nested in bold PAINTS its backticks. 21 were un-nested by
+    // this parcel. The document's fenced blocks legitimately contain none, so the
+    // correct painted count is ZERO, and a survivor is printed with its context
+    // rather than merely counted.
+    check('5a', 'no code span still paints its backticks (the nested-in-bold defect)',
+      painted.ticks === 0,
+      painted.ticks === 0 ? 'zero backtick characters in the painted pane'
+        : painted.ticks + ' painted; first contexts: ' + JSON.stringify(painted.around));
+
+    // [5b] The panel schematic was RE-LAID and its meaning IS its column
+    // alignment. The parser can return the right block KIND over mangled
+    // contents, so this compares the painted block to the bytes on disk. The
+    // wanted text is taken from the document, never retyped here.
+    const fences = GUIDE_MD.split('\n```');
+    const diagram = fences.find((b) => b.includes('SCENES') && b.includes('Tile anim'));
+    const norm = (x) => x.replace(/^\w*\n/, '').split('\n')
+      .map((l) => l.replace(/\s+$/, '')).filter((l) => l.length > 0);
+    const want = diagram ? norm(diagram) : null;
+    const got = want ? (painted.pre.map(norm).find((b) => b.some((l) => l.includes('SCENES'))) || null) : null;
+    const same = !!(want && got && want.length === got.length && want.every((l, i) => l === got[i]));
+    const firstDiff = (want && got) ? want.map((l, i) => [l, got[i]]).find(([a, b]) => a !== b) : null;
+    check('5b', 'the re-laid panel schematic paints byte for byte as the document has it',
+      same,
+      want === null ? 'UNMEASURABLE: no schematic fence found on disk. NOT a pass.'
+        : got === null ? 'UNMEASURABLE: ' + painted.pre.length + ' pre block(s) painted, none carrying SCENES. NOT a pass.'
+        : same ? want.length + ' lines identical'
+        : 'disk ' + want.length + ' lines, painted ' + got.length + '; first differing: ' + JSON.stringify(firstDiff));
+
     const shot = await c.send('Page.captureScreenshot', { format: 'png' });
     writeFileSync(`${SHOTS}/effects-guide.png`, Buffer.from(shot.data, 'base64'));
     console.log(`\n    screenshot  : ${SHOTS}/effects-guide.png`);
