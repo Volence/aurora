@@ -393,6 +393,70 @@ export const EFFECTS_ANCHOR_SHIFT_BOUNDS = Object.freeze({
   dsb: boundsAt(...oneOfBranchWith(['properties', 'anchor'], 'at'), 'properties', 'at', 'properties', 'dsb'),
 });
 
+/**
+ * `anchor.at.channel` — WHICH patch channel the split latches to.
+ *
+ * A THIRD NUMBER IN THE SAME OBJECT AND THE ONLY ONE OF THE THREE THAT IS AN
+ * INDEX. `dsa`/`dsb` above are shift AMOUNTS with a top-of-range sentinel; this
+ * one is an ordinal into the same space `patch_world_ys` / `patch_motion` index
+ * on the PRESET document, and it has no sentinel at all — the "no anchor" state
+ * is the absence of the whole `at` object, which the engine lowers to
+ * `PARALLAX_ANCHOR_NONE` ($FF), a value this range cannot even hold.
+ *
+ * So a control must not treat its ends the way it treats the shifts' ends: the
+ * top of THIS range is an ordinary channel, and clamping into it authors "the
+ * last channel", not "off". Derived separately from the two shifts for the same
+ * reason they are derived separately from each other — three bounds in one
+ * object that agree by coincidence, not by construction.
+ */
+export const EFFECTS_ANCHOR_CHANNEL_BOUNDS =
+  boundsAt(...oneOfBranchWith(['properties', 'anchor'], 'at'), 'properties', 'at', 'properties', 'channel');
+
+/**
+ * `anchor`'s own "off" spelling, read out of the schema's `const` arm.
+ *
+ * NOT THE SHIFT SENTINEL, AND THE DISTINCTION IS THE WHOLE POINT OF THIS FIELD.
+ * There are TWO offs on this key and they are different objects:
+ *
+ *   · `anchor: "none"` — no anchored split at all. This constant. The engine
+ *     lowers it to channel $FF and both shifts to 15.
+ *   · `anchor: {at: {…, dsa: 15, dsb: 15}}` — an anchor that DOES split the
+ *     bands and deforms neither plane. `EFFECTS_ANCHOR_SHIFT_BOUNDS.*.max`.
+ *
+ * A UI that conflated them would offer one "off" for two states an author picks
+ * between, and the second is the one `rowRemap`'s precondition 2 requires (the
+ * remap needs a channel to read; it does not need deform). Read from the schema
+ * rather than typed so the word cannot drift, and asserted to be the declared
+ * default — the `"none"` arm and the default are the same fact stated twice, and
+ * a contract that separated them would mean this key's absence no longer means
+ * off.
+ */
+export const EFFECTS_ANCHOR_NONE: string = (() => {
+  const branches = at('properties', 'anchor').oneOf;
+  if (!Array.isArray(branches)) {
+    throw new Error('effects scene schema properties.anchor is no longer a oneOf');
+  }
+  const constArm = branches
+    .map((b) => (b as Record<string, unknown>).const)
+    .find((c) => typeof c === 'string');
+  if (typeof constArm !== 'string') {
+    throw new Error(
+      'effects scene schema properties.anchor declares no string `const` arm — the "no anchor '
+      + 'at all" spelling was read out of it, and it is a different state from an anchor whose '
+      + 'two deform shifts are both the no-deform sentinel.',
+    );
+  }
+  const dflt = at('properties', 'anchor').default;
+  if (dflt !== constArm) {
+    throw new Error(
+      `effects scene schema properties.anchor's const arm (${JSON.stringify(constArm)}) is no `
+      + `longer its default (${JSON.stringify(dflt)}). An absent \`anchor\` key means "off" only `
+      + 'while those two agree.',
+    );
+  }
+  return constArm;
+})();
+
 /** `v_deform.columns.amp_shift` — 0..15, read out of the schema. */
 export const EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS =
   boundsAt(...oneOfBranchWith(['properties', 'v_deform'], 'columns'), 'properties', 'columns', 'properties', 'amp_shift');
