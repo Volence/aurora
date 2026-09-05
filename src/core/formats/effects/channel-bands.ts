@@ -156,13 +156,38 @@ export const EFFECTS_CHANNEL_BANDS_GAME: string = typeof DOC.game === 'string' &
  * that was wrong in aeon's first cut was the leading 2.
  */
 const TRAVEL = (() => {
-  const m = /PEAK-TO-PEAK TRAVEL \((\d+) \* \((\d+) >> amp_shift\), whole pixels\) is <= channels\[c\]\.lines/
+  // ⚠⚠ TRANSITIONAL DUAL ARM — `CHBAND-PROSE-REPIN`, added 2026-09-05. ⚠⚠
+  //
+  // aeon is restating this sentence in the REFUSAL direction: the tail
+  // `... whole pixels) is <= channels[c].lines` becomes `... EXCEEDS
+  // channels[c].lines`. This accepts BOTH so there is no moment at which the
+  // vendored document and this parser disagree and the editor refuses to LOAD
+  // (every miss here is `fail()`, which throws at module load).
+  //
+  // ── WHAT REMOVES IT ──────────────────────────────────────────────────────
+  // The `is <=` arm comes out once aeon's new text is vendored here, at which
+  // point only `EXCEEDS` exists in any document this repo pins. That is step 3
+  // of an expand-then-contract and it is OWED — a tolerance added for a
+  // migration is exactly the thing that outlives its reason because nobody
+  // remembers why it is there. If you are reading this after the sidecar says
+  // `EXCEEDS`, delete the `is <=` alternative and this comment with it.
+  //
+  // ── WHY ACCEPTING TWO OPPOSITE STATEMENTS IS NOT A CONTRADICTION ─────────
+  // The two phrasings are opposite STATEMENTS, but this regex extracts only the
+  // multiplier and the base (2 and 256), which are identical either way. The
+  // comparison DIRECTION is not inferred from this sentence anywhere: it is
+  // written once, in `anchorFitAgainstBand` (`travelPx > band.lines`), and it
+  // is held by the two interlocks above — which survive aeon's rewording
+  // VERBATIM and are deliberately NOT widened — and by `AnchorBandFit` having
+  // no `fits` member at the type level. Checked before widening, not assumed.
+  const m = /PEAK-TO-PEAK TRAVEL \((\d+) \* \((\d+) >> amp_shift\), whole pixels\) (?:is <=|EXCEEDS) channels\[c\]\.lines/
     .exec(prose('how_to_use'));
   if (!m) {
     fail('no longer states the fit formula as "PEAK-TO-PEAK TRAVEL (2 * (256 >> amp_shift), whole '
-      + 'pixels) is <= channels[c].lines". That exact sentence is what the ladder is checked '
-      + 'against; it was wrong by 2x, permissively, until aeon 8d217dd4, so it is parsed and '
-      + 'never remembered');
+      + 'pixels)" followed by either "is <= channels[c].lines" or "EXCEEDS channels[c].lines". '
+      + 'That sentence is what the ladder is checked against; it was wrong by 2x, permissively, '
+      + 'until aeon 8d217dd4, so it is parsed and never remembered. BOTH tails are accepted only '
+      + 'for the CHBAND-PROSE-REPIN migration — see the comment above');
   }
   const multiplier = Number(m[1]);
   const base = Number(m[2]);
