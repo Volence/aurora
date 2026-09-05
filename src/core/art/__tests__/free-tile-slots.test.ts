@@ -33,7 +33,7 @@ describe('countFreeTileSlots', () => {
     })).toBe(1); // 1 only
   });
 
-  it('is zero for a pool with no spare slots at all — the Labyrinth case', () => {
+  it('is zero for a pool with no spare slots at all: the Labyrinth case', () => {
     expect(countFreeTileSlots({
       poolTileCount: 3, usage: usageOf([1, 2]), reserved: null, isEditable: () => true,
     })).toBe(0);

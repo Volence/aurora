@@ -88,12 +88,12 @@ const readHost = (...p: string[]) => readFileSync(join(__dirname, '..', '..', ..
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/(^|[^:])\/\/.*$/gm, '$1');
 
-describe('cappedZoom — what the hosts pass it', () => {
+describe('cappedZoom: what the hosts pass it', () => {
   it('aeon\'s composer caps against the larger axis, not the width', () => {
     const src = readHost('art', 'ComposerCanvas.tsx');
     const call = /cappedZoom\(([^;]*?)\);/.exec(src);
     expect(call, 'ComposerCanvas no longer caps its zoom at all').not.toBeNull();
-    expect(call![1], 'the composer caps on width alone — a tall doc is under-capped')
+    expect(call![1], 'the composer caps on width alone: a tall doc is under-capped')
       .toMatch(/Math\.max\(\s*doc\.widthTiles\s*,\s*doc\.heightTiles\s*\)/);
   });
 

@@ -144,7 +144,7 @@ describe('cloneSection', () => {
    * collision fields and `unreadable` remain deliberately DROPPED, unchanged by
    * that ruling and out of its scope.
    */
-  it('CARRIES chunkLinks, deeply — copy/paste keeps chunk identity (d-18c)', () => {
+  it('CARRIES chunkLinks, deeply: copy/paste keeps chunk identity (d-18c)', () => {
     const src = sec(0, 1);
     src.chunkLinks = {
       placements: [{ id: 3, chunkId: 'canopy', baseCol: 2, baseRow: 4, collision: true }],

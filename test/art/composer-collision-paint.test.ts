@@ -34,7 +34,7 @@ describe('paintDocCollision', () => {
     expect(doc.collisionA[1 * 8 + 1]).toBe(0);
   });
 
-  it('a 3x3 doc has no backing cell for the odd trailing edge — painting it is a no-op', () => {
+  it('a 3x3 doc has no backing cell for the odd trailing edge: painting it is a no-op', () => {
     const doc = createDoc(3, 3); // chunkCellCount(3,3) = 1 cell; tile (2,2) maps past it
     const before = new Uint16Array(doc.collisionA);
     expect(paintDocCollision(doc, 'a', 2, 2, 0x1234)).toBe(false);

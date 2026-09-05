@@ -146,7 +146,7 @@ describe('the bar defers because classic\'s map facets speak for themselves', ()
     expect(src).toMatch(/ownHintLine:\s*true/);
   });
 
-  it('aeon does NOT suppress it — its map facets have no such bar', () => {
+  it('aeon does NOT suppress it: its map facets have no such bar', () => {
     const src = readFileSync(join(__dirname, '..', 'map-status-aeon.ts'), 'utf8');
     expect(src).not.toContain('ownHintLine');
   });

@@ -114,9 +114,25 @@ const ALLOWANCES = [
 const tracked = (glob) => execFileSync('git', ['-C', ROOT, 'ls-files', '--', glob], { encoding: 'utf8' })
   .split('\n').filter(Boolean);
 
-/** Vendored: a file with a sibling `<name>.provenance.json`. See the docblock. */
+/**
+ * Vendored: a file with a sibling `<name>.provenance.<anything>`. See the docblock.
+ *
+ * THE EXTENSION IS A WILDCARD, corrected 2026-09-05. This rule matched
+ * `.provenance.json` only. The repo has 11 markers and one of them is
+ * `test/fixtures/effects/writer_session_ojz.provenance.md`, so the narrow rule
+ * called a genuinely vendored file "not vendored". No vendored file is in THIS
+ * gate's population today, which is exactly why the defect could sit here
+ * unnoticed and be copied into a gate whose population does contain one. See
+ * `scripts/check-test-dashes.mjs`, which additionally refuses if any marker in
+ * the tree fails to name a subject the rule recognises.
+ */
 const allTracked = new Set(tracked('.'));
-const isVendored = (rel) => allTracked.has(rel.replace(/\.[^./]+$/, '') + '.provenance.json');
+const PROVENANCE = /\.provenance\.[^./]+$/;
+const isVendored = (rel) => {
+  const base = rel.replace(/\.[^./]+$/, '') + '.provenance.';
+  for (const f of allTracked) if (f.startsWith(base) && PROVENANCE.test(f)) return true;
+  return false;
+};
 
 function sourceFiles() {
   return tracked('src/**/*.ts')

@@ -86,7 +86,7 @@ describe('tileBytesIfChanged', () => {
     expect(tileBytesIfChanged(before, after)).not.toBeNull();
   });
 
-  it('knows nothing about locks — that verdict belongs to the callers', () => {
+  it('knows nothing about locks: that verdict belongs to the callers', () => {
     // Deliberate: the transform resolver has to distinguish "no-op" (silent) from
     // "locked" (toasted), and folding the two together here is what forced it to
     // lie about the lock. Same inputs, same answer, whatever the caller's state.

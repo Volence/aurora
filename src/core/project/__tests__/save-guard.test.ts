@@ -19,7 +19,7 @@ describe('planGuardedWrite decision table', () => {
     expect(planGuardedWrite(files, {})).toEqual({ ok: false, conflicts: ['a.bin'] });
   });
 
-  it('OK: expected null (new file) and still absent — we create it', () => {
+  it('OK: expected null (new file) and still absent, we create it', () => {
     const files: GuardedFileSpec[] = [{ relPath: 'new.bin', expectedMtimeMs: null }];
     expect(planGuardedWrite(files, { 'new.bin': null })).toEqual({ ok: true });
     expect(planGuardedWrite(files, {})).toEqual({ ok: true });

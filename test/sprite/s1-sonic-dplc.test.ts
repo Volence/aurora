@@ -32,7 +32,7 @@ const S1DIR = referencePath(S1_PINNED);
 const S1_ABSENT = referenceCheckoutReason(S1_PINNED);
 const read = (rel: string) => fs.readFileSync(path.join(S1DIR, rel));
 
-describe('S1 Sonic DPLC — real-file parse, hand-derived entries', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
+describe('S1 Sonic DPLC: real-file parse, hand-derived entries', { skip: !referenceCheckout(S1_PINNED), meta: { skipReason: S1_ABSENT } }, () => {
   const dplc = () => parseAsmDPLC(read('_maps/Sonic - Dynamic Gfx Script.asm').toString('utf8'));
   const maps = () => parseAsmMappings(read('_maps/Sonic.asm').toString('utf8'));
 
@@ -41,7 +41,7 @@ describe('S1 Sonic DPLC — real-file parse, hand-derived entries', { skip: !ref
     expect(maps()).toHaveLength(88);
   });
 
-  it('frame 0 (SonPLC_Null) is the legal EMPTY entry — a no-op frame', () => {
+  it('frame 0 (SonPLC_Null) is the legal EMPTY entry: a no-op frame', () => {
     expect(dplc()[0]).toEqual([]);
     expect(maps()[0].pieces).toEqual([]); // MS_Null: bare spriteHeader
   });
@@ -59,7 +59,7 @@ describe('S1 Sonic DPLC — real-file parse, hand-derived entries', { skip: !ref
     // silent luck.
   });
 
-  it('frame 2 (SonPLC_Wait1) is the contiguous 17..31 — a NON-identity list, so DPLC resolution is load-bearing', () => {
+  it('frame 2 (SonPLC_Wait1) is the contiguous 17..31: a NON-identity list, so DPLC resolution is load-bearing', () => {
     // HAND-TRANSCRIBED: SonPLC_Wait1: dplcEntry 6,$11 / 6,$17 / 3,$1D
     // → [$11..$16] ++ [$17..$1C] ++ [$1D..$1F] = 17..31 (15 tiles).
     const wait1 = dplc()[2];

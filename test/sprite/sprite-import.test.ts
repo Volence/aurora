@@ -110,7 +110,7 @@ const haveSonic = existsSync(`${ENGINE}/data/mappings/sonic.bin`);
 describe('real Sonic data (s4_engine)', () => {
   it('parses 224 frames and reconstructs sane, non-empty character bitmaps', (ctx) => {
     if (!haveSonic) {
-      ctx.skip(`SKIPPED, NOT PASSED: ${ENGINE}/data/mappings/sonic.bin is absent — the s4_engine `
+      ctx.skip(`SKIPPED, NOT PASSED: ${ENGINE}/data/mappings/sonic.bin is absent: the s4_engine `
         + 'tree is gone from this machine, so this row measures nothing at all and has not for some time');
       return;
     }

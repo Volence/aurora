@@ -81,7 +81,7 @@ describe('Eggman tail frames against the real files', { skip: !referenceCheckout
     const cov = recon.frames.map((f) => f.reduce((n, px) => n + (px !== 0 ? 1 : 0), 0));
     expect(cov[11], '.escapeflame1').toBeGreaterThanOrEqual(100);
     expect(cov[12], '.escapeflame2').toBeGreaterThanOrEqual(100);
-    expect(cov[10], '.blank (zero spritePiece rows — the control)').toBe(0);
+    expect(cov[10], '.blank (zero spritePiece rows: the control)').toBe(0);
     expect(cov[0], '.ship').toBeGreaterThan(500);
     // ANTI-VACUOUS: the same frames against the primary file ALONE are blank —
     // proves the coverage above comes from the composed exhaust tiles.

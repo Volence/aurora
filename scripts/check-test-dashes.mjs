@@ -166,6 +166,28 @@ const ALLOWANCES = [
     produced_by: 'src/core/formats/raster-binding.ts, itself an allowed quotation in '
       + 'scripts/check-src-dashes.mjs, read from aeon tools/test_effects_seam_gate.py:758',
   },
+  {
+    file: 'test/config/skip-report-reporter.test.ts',
+    text: 'todo',
+    why: 'A DEFERRAL MARKER, not a permanent permission. The test asserts, byte for byte, a '
+      + 'line the skip reporter prints; the reporter lives in scripts/, which NO dash gate '
+      + 'covers (147 in-code dashes across 15 files, measured 2026-09-05, nearly all of it '
+      + 'gate output a person reads on a failing npm test). The rule this parcel applied to '
+      + 'coupled pairs: sweep the pair when the producer is inside the bucket (as with '
+      + 'test/support/sibling-root.mjs), allow it when the producer is outside. When scripts/ '
+      + 'is swept, this allowance goes stale and this gate FAILS, which is the reminder.',
+    produced_by: 'scripts/skip-report-reporter.mjs:195',
+  },
+  {
+    file: 'test/formats/effects-scene-writer-originated.test.ts',
+    text: 'expect(doc.name).toContain',
+    why: 'THE CHARACTER IS THE SUBJECT OF THE ROW. It asserts that the non-ASCII in a '
+      + 'VENDORED fixture survived the writer\'s rendering rather than coming back as an '
+      + 'escape. Rewriting it would delete the only row that proves the passthrough, and '
+      + 'the fixture it reads may not be edited at all.',
+    produced_by: 'test/fixtures/effects/writer_session_ojz.json, vendored (its marker is '
+      + 'writer_session_ojz.provenance.md, the one .md-spelled marker in the tree)',
+  },
 ];
 
 const git = (...args) => execFileSync('git', ['-C', ROOT, ...args], { encoding: 'utf8' })
@@ -179,8 +201,55 @@ if (allTracked.length === 0) {
 }
 const trackedSet = new Set(allTracked);
 
-/** Vendored: a file with a sibling `<name>.provenance.json`. See the docblock. */
-const isVendored = (rel) => trackedSet.has(rel.replace(/\.[^./]+$/, '') + '.provenance.json');
+/**
+ * Vendored: a file with a sibling `<name>.provenance.<anything>`. See the docblock.
+ *
+ * THE EXTENSION IS A WILDCARD ON PURPOSE, and this is not hypothetical. The
+ * version of this rule inherited from check-src-dashes matched `.provenance.json`
+ * only. This repo has 11 provenance markers and ONE of them is
+ * `test/fixtures/effects/writer_session_ojz.provenance.md`, whose subject is the
+ * fixture carrying the non-ASCII character an assertion in this very bucket
+ * exists to prove survived the writer. The narrow rule called the one vendored
+ * file in the population "not vendored". A structural check below refuses if any
+ * marker in the tree fails to name a subject this rule recognises.
+ */
+const PROVENANCE = /\.provenance\.[^./]+$/;
+const isVendored = (rel) => {
+  const base = rel.replace(/\.[^./]+$/, '') + '.provenance.';
+  for (const f of trackedSet) if (f.startsWith(base) && PROVENANCE.test(f)) return true;
+  return false;
+};
+
+/**
+ * Every provenance marker must name a subject the rule above recognises. A
+ * marker whose subject the rule misses is a vendored file being swept, and a
+ * marker whose subject is gone is a permission with no live subject.
+ */
+function assertVendoredRuleSeesEveryMarker() {
+  const markers = allTracked.filter((f) => PROVENANCE.test(f));
+  if (markers.length === 0) {
+    console.error(`${SELF}: found NO .provenance.* markers anywhere in the tree.`);
+    console.error('This repo has them. An enumeration that finds none is broken, not clean.');
+    process.exit(1);
+  }
+  const orphans = [];
+  for (const m of markers) {
+    const stem = m.replace(PROVENANCE, '');
+    const subjects = allTracked.filter((f) => f !== m && f.replace(/\.[^./]+$/, '') === stem);
+    if (subjects.length === 0) { orphans.push(`${m}: names no subject file`); continue; }
+    for (const s of subjects) {
+      if (!isVendored(s)) orphans.push(`${m}: its subject ${s} is NOT recognised as vendored`);
+    }
+  }
+  if (orphans.length > 0) {
+    console.error(`${SELF}: ${orphans.length} provenance marker(s) do not line up with a subject.`);
+    console.error('A vendored file must keep upstream punctuation, so a marker this gate cannot');
+    console.error('follow is a file this gate would sweep. Refusing rather than guessing.');
+    for (const o of orphans) console.error(`  ${o}`);
+    process.exit(1);
+  }
+  return markers.length;
+}
 
 const inTestTree = (rel) => CODE_EXT.test(rel)
   && (DIRS.some((d) => rel.startsWith(d)) || rel.includes(IN_TESTS_DIR));
@@ -348,6 +417,7 @@ for (const a of ALLOWANCES) {
   }
 }
 
+const markerCount = assertVendoredRuleSeesEveryMarker();
 const pop = files();
 const shapedCount = assertPopulationCoversVitestDefault(pop);
 
@@ -397,8 +467,9 @@ console.log(`${SELF.replace('scripts/', '').replace('.mjs', '')}: OK: ${pop.leng
   + `test tree (test/, src/test/, any __tests__/) plus this gate itself, no U+2014 or U+2013 in any `
   + `string, template or JSX text, in either spelling. The planted canary saw its ${canarySaw} code `
   + `positives and neither comment one, so the classifier is live. ${shapedCount} test-shaped file(s) `
-  + `by vitest's own default glob, all inside the population. Out of scope and saying so: comments `
+  + `by vitest's own default glob, all inside the population; ${markerCount} provenance marker(s), `
+  + `each naming a subject the vendored rule recognises. Out of scope and saying so: comments `
   + `(no tool shows one to a person), scratchpad/ harness scripts (a separate deferred bucket), .tsx `
   + `(check-tsx-dashes) and non-test src .ts (check-src-dashes), and any file with a sibling `
-  + `.provenance.json (vendored, byte identity with upstream). ${ALLOWANCES.length} quoted `
+  + `.provenance.* marker (vendored, byte identity with upstream). ${ALLOWANCES.length} quoted `
   + `expected-value string(s), each still live.`);

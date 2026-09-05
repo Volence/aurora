@@ -34,7 +34,7 @@ describe('isBlankChunk', () => {
 });
 
 describe('firstEditableChunk', () => {
-  it('skips leading blanks — aeon OJZ opens on $00, which is one', () => {
+  it('skips leading blanks: aeon OJZ opens on $00, which is one', () => {
     expect(firstEditableChunk([BLANK('a'), BLANK('b'), chunk('c', [1, 0, 0, 0])])?.id).toBe('c');
   });
 
@@ -42,7 +42,7 @@ describe('firstEditableChunk', () => {
     expect(firstEditableChunk([BLANK('a'), BLANK('b')])?.id).toBe('a');
   });
 
-  it('is null for an empty library — the launcher is the honest screen then', () => {
+  it('is null for an empty library: the launcher is the honest screen then', () => {
     expect(firstEditableChunk([])).toBeNull();
   });
 });

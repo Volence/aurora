@@ -109,7 +109,7 @@ describe('§A [canary] the source reader looks at code, not prose', () => {
 });
 
 describe('§A ConfirmDialog wiring', () => {
-  it('contains no autoFocus at all — the exact P3 shape', () => {
+  it('contains no autoFocus at all: the exact P3 shape', () => {
     // Deliberately the crudest possible rule, on the smallest possible file.
     // `autoFocus` on ANY control in this dialog puts a button under the Space
     // key before the reader has read the question, and the only autoFocus
@@ -326,7 +326,7 @@ describe('§B every confirm door in src/', () => {
       for (const buttons of site.variants) {
         const where = `${site.file}:${site.line} [${buttons.map((b) => b.key).join(',')}]`;
         const i = safeFocusIndex(buttons);
-        expect(i, `${where}: focuses NOTHING — every option destroys something. `
+        expect(i, `${where}: focuses NOTHING; every option destroys something. `
           + 'Give the door a cancel button.').not.toBeNull();
         expect(isDestructiveButton(buttons[i as number]),
           `${where}: focus lands on the DESTRUCTIVE button '${buttons[i as number].key}'`).toBe(false);

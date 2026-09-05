@@ -87,7 +87,7 @@ describe('list_effects_scenes', () => {
     expect(r.sections).toEqual([{ index: 0, sceneId: null }, { index: 1, sceneId: null }]);
   });
 
-  it('names unreadable scene files — an id an agent must not take', async () => {
+  it('names unreadable scene files: an id an agent must not take', async () => {
     open({
       scenes: [canopy()],
       unreadable: [{ path: 'data/editor/effects/broken.json', reason: 'not valid JSON' }],

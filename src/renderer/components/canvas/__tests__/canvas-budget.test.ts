@@ -12,7 +12,7 @@ describe('shapeTileBudget', () => {
       .toEqual({ act: { zone: 'GHZ', act: 1 }, freeSlots: 17, poolUsed: 239, poolTotal: 256 });
   });
 
-  it('survives a zone at its limit — zero free is a number, not a missing one', () => {
+  it('survives a zone at its limit: zero free is a number, not a missing one', () => {
     expect(shapeTileBudget({ ref: { zone: 'LZ', act: 1 }, poolTileCount: 256, freeSlots: 0 }))
       .toMatchObject({ freeSlots: 0, poolUsed: 256 });
   });

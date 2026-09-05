@@ -165,7 +165,7 @@ describe('ambient commands route by command scope, not by focus', () => {
     expect(documentHistoryHub.historyFor('level:ojz:act1').canUndo).toBe(true);
   });
 
-  it('throws when no act is current — a command with nowhere to go must be loud', () => {
+  it('throws when no act is current: a command with nowhere to go must be loud', () => {
     useProjectStore.getState().reset();
     useSessionStore.setState({ activeId: 'level:ojz:act1' });
     expect(() => executeAmbientCommand(setPal(1), { sections: [] })).toThrow(/no current act/i);

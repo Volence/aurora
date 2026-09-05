@@ -157,7 +157,7 @@ describe('drawObjects sprite occlusion pass', () => {
     expect(calls).toEqual([{ col: 0, row: 0, dx: -84, dy: -84 }]);
   });
 
-  it('fallback hex-box objects (no sprite) are editor chrome — never occluded', () => {
+  it('fallback hex-box objects (no sprite) are editor chrome: never occluded', () => {
     const ctx = makeRecordingCtx();
     const hi = makeFakeCanvas('hipri');
     drawObjects(ctx, doc(), 1, new Map(), '', null, null, undefined, occl(hi));
