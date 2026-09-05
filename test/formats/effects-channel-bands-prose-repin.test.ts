@@ -1,28 +1,49 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// CHBAND-PROSE-REPIN — the TRANSITIONAL dual arm on the travel-formula parser
+// CHBAND-PROSE-REPIN — CLOSED 2026-09-05. What this file guards NOW is that the
+// retired phrasing is REFUSED, which is a different property from the one it
+// was born holding.
 // ═══════════════════════════════════════════════════════════════════════════
 //
-// aeon is restating one sentence of `effects_channel_bands.json`'s `how_to_use`
-// in the REFUSAL direction. The tail
+// aeon restated one sentence of `effects_channel_bands.json`'s `how_to_use` in
+// the REFUSAL direction. The tail
 //
-//     ... whole pixels) is <= channels[c].lines
+//     ... whole pixels) is <= channels[c].lines          (RETIRED)
 //
-// becomes
+// became
 //
-//     ... whole pixels) EXCEEDS channels[c].lines
+//     ... whole pixels) EXCEEDS channels[c].lines        (CURRENT)
 //
-// Every miss on that parser is `fail()`, which THROWS AT MODULE LOAD — so a
-// parser that knew only one phrasing would not degrade a warning, it would stop
-// the editor from starting the moment the new document was vendored. We
-// therefore land an expand-then-contract: accept BOTH now, aeon lands their
-// text, and the old arm comes out afterwards.
+// ── WHY IT WAS WORTH A THREE-STEP MIGRATION ──────────────────────────────
 //
-// ⚠ THIS FILE IS THE RECORD OF A DEBT. The `is <=` arm is OWED A DELETION once
-// aeon's wording is vendored here (`CHBAND-PROSE-REPIN`). A tolerance added for
-// a migration is the classic thing that outlives its reason, so the row
-// `the OLD arm is still load-bearing` below exists to be READ when it fails:
-// the day the vendored document says EXCEEDS, that row tells you the migration
-// is over and the old alternative — and this whole file — should go.
+// The retired sentence was CLEARANCE-SHAPED — "a sweep fits when travel is <=
+// lines" — while a later sentence in the SAME string said "travel <= lines is
+// CANNOT TELL, never a clearance". Two people could implement that document
+// accurately and build OPPOSITE warnings, and the clearance is the one this
+// data cannot support. aeon removed the contradiction rather than documenting
+// it.
+//
+// Every miss on the travel-formula parser is `fail()`, which THROWS AT MODULE
+// LOAD — so a parser that knew only one phrasing would not degrade a warning,
+// it would stop the editor from STARTING the moment the other document was
+// vendored. Hence expand-then-contract, in three steps:
+//
+//   1. Aurora bbdf1890  — both parsers accept EITHER tail.
+//   2. aeon   b8913cda  — the new text lands.
+//   3. Aurora (here)    — vendor it, and DELETE the transitional arm.
+//
+// ── ⚠ WHY THIS FILE SURVIVED STEP 3 INSTEAD OF BEING DELETED WITH THE ARM ──
+//
+// Its header used to say this whole file should go when the migration ended.
+// That was wrong, and deleting it would have thrown away the only thing that
+// distinguishes an arm that is GONE from an arm that is merely UNUSED. With the
+// vendored document saying EXCEEDS, a parser that still accepted `is <=` would
+// pass every other test in this repo forever — nothing would ever hand it the
+// retired sentence. So the row that once asserted the old arm was load-bearing
+// now asserts the old phrasing is REFUSED, and the harness rows do the same.
+// The tolerance is measured as absent rather than assumed absent.
+//
+// A tolerance added for a migration is the classic thing that outlives its
+// reason. This file is what made that one mortal.
 //
 // ── WHY THIS TESTS THE REGEX SOURCE AND NOT A FUNCTION ────────────────────
 //
@@ -42,8 +63,8 @@
 // shows what the provider computes", which they cannot fail — so the
 // duplication is load-bearing rather than sloppy. What makes it safe is that
 // the two copies AGREE, and nothing asserted that before this file: the
-// harness's copy would have kept the old pattern, thrown on aeon's new text,
-// and done it more quietly than the app would.
+// harness's copy would have kept the old pattern and done it more quietly than
+// the app would, since nothing runs it on the way to a green suite.
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -72,24 +93,24 @@ function travelRegexSourceIn(path: string): string {
   return m[1];
 }
 
-/** aeon's CURRENT wording — what the vendored document says today. */
-const OLD_SENTENCE = 'A sweep on channel c fits when its PEAK-TO-PEAK TRAVEL '
+/** aeon's RETIRED wording — clearance-shaped, refused since aeon b8913cda. */
+const RETIRED_SENTENCE = 'A sweep on channel c fits when its PEAK-TO-PEAK TRAVEL '
   + '(2 * (256 >> amp_shift), whole pixels) is <= channels[c].lines.';
 
-/** aeon's NEW wording, restated in the refusal direction. The reason for the arm. */
-const NEW_SENTENCE = 'A sweep on channel c is a CERTAIN REFUSAL when its PEAK-TO-PEAK TRAVEL '
+/** aeon's CURRENT wording — the refusal direction, and what is vendored here. */
+const CURRENT_SENTENCE = 'A sweep on channel c is a CERTAIN REFUSAL when its PEAK-TO-PEAK TRAVEL '
   + '(2 * (256 >> amp_shift), whole pixels) EXCEEDS channels[c].lines.';
 
 /**
- * A sentence that states the formula with a comparison NEITHER arm knows. The
- * widening must accept two specific phrasings, not "anything after the
- * parenthesis" — a regex loosened to `.*` would pass both rows above while
- * having stopped checking the sentence at all.
+ * A sentence that states the formula with a comparison the parser has never
+ * known. It separates "narrowed back to one phrasing" from "loosened to `.*`":
+ * a pattern that swallowed anything after the parenthesis would pass the
+ * current-wording row while having stopped checking the sentence at all.
  */
 const UNKNOWN_SENTENCE = 'A sweep on channel c fits when its PEAK-TO-PEAK TRAVEL '
   + '(2 * (256 >> amp_shift), whole pixels) is roughly channels[c].lines.';
 
-describe('CHBAND-PROSE-REPIN: the travel formula parses under BOTH of aeon\'s phrasings', () => {
+describe('CHBAND-PROSE-REPIN: the travel formula parses ONLY aeon\'s refusal-direction wording', () => {
   const source = travelRegexSourceIn(CHANNEL_BANDS_TS);
   const re = (): RegExp => new RegExp(source);
 
@@ -99,65 +120,69 @@ describe('CHBAND-PROSE-REPIN: the travel formula parses under BOTH of aeon\'s ph
     expect(source).toContain('PEAK-TO-PEAK TRAVEL');
     expect(source).toContain('amp_shift');
     expect(source).toContain('channels');
-    // Two capture groups — the multiplier and the base — survive the widening.
+    // Two capture groups — the multiplier and the base — survive the narrowing.
     // The 2 was the number aeon got wrong (permissively) before 8d217dd4, so a
-    // widening that dropped a group would be the same defect wearing a new hat.
-    expect(new RegExp(source).exec(OLD_SENTENCE)).toHaveLength(3);
+    // contraction that dropped a group would be the same defect wearing a hat.
+    expect(new RegExp(source).exec(CURRENT_SENTENCE)).toHaveLength(3);
   });
 
-  it('the OLD arm is still load-bearing — DELETE IT when this row fails', () => {
-    // ⚠ READ THIS WHEN IT GOES RED. It fails when the vendored document has
-    // moved to aeon's new wording, and that failure is the SIGNAL THAT THE
-    // MIGRATION IS OVER, not a regression: at that point no document this repo
-    // pins says `is <=`, the transitional alternative in channel-bands.ts and
-    // in anchor-authoring-harness.mjs has nothing left to accept, and it — plus
-    // this whole file — should be deleted. Booked as CHBAND-PROSE-REPIN.
+  it('THE ARM IS GONE: the RETIRED `is <=` phrasing is REFUSED, not merely unused', () => {
+    // ⚠ THE ROW THIS FILE EXISTS FOR SINCE STEP 3. Nothing else in this repo
+    // ever hands the parser the retired sentence — the vendored document says
+    // EXCEEDS — so a transitional arm left in by accident would be invisible
+    // forever and green forever. This row is the only thing that can tell
+    // "deleted" from "dormant", which is why it replaced the row that used to
+    // assert the arm was still load-bearing rather than being deleted with it.
+    expect(re().exec(RETIRED_SENTENCE),
+      'the transitional `is <=` arm is STILL PRESENT in channel-bands.ts. CHBAND-PROSE-REPIN '
+      + 'closed on 2026-09-05: aeon retired the clearance-shaped wording at b8913cda because it '
+      + 'contradicted the same string\'s "never a clearance" clause, and this repo pins that '
+      + 'text. A document opening `fits when ... is <=` has REGRESSED and must stop the editor')
+      .toBeNull();
+  });
+
+  it('...and the same is true of the whole retired `how_to_use`, not one hand-built clause', () => {
+    // The negative above rests on one synthesised sentence. This one rebuilds
+    // the retired opening in front of the REAL remainder of the vendored
+    // string, so the refusal is not an artefact of a short fixture that happens
+    // to miss for some unrelated reason.
     const doc = JSON.parse(readFileSync(BANDS_JSON, 'utf8')) as { how_to_use: string };
-    expect(doc.how_to_use,
-      'the vendored sidecar has moved to aeon\'s new wording — CHBAND-PROSE-REPIN step 3 is now '
-      + 'due: drop the `is <=` alternative from channel-bands.ts AND from '
-      + 'scratchpad/anchor-authoring-harness.mjs, and delete this file')
-      .toContain('is <= channels[c].lines');
-    // ...and the live document really does parse, so the app loads today.
-    expect(re().exec(doc.how_to_use)).not.toBeNull();
+    const tail = doc.how_to_use.slice(doc.how_to_use.indexOf(' It is travel, not peak excursion:'));
+    expect(tail, 'the vendored sentence no longer has the clause this fixture splices onto — '
+      + 'rebuild the fixture rather than deleting the row').not.toHaveLength(0);
+    expect(re().exec(RETIRED_SENTENCE + tail)).toBeNull();
   });
 
   it('parses aeon\'s CURRENT wording to multiplier 2 and base 256', () => {
-    const m = re().exec(OLD_SENTENCE);
+    const m = re().exec(CURRENT_SENTENCE);
     expect(m, 'the current wording no longer parses — the editor would refuse to LOAD')
       .not.toBeNull();
     expect(Number(m![1])).toBe(2);
     expect(Number(m![2])).toBe(256);
   });
 
-  it('parses aeon\'s NEW wording to the SAME multiplier 2 and base 256', () => {
-    // The row the widening exists for. Against the document vendored today this
-    // is the only row that can tell the two patterns apart: the old pattern
-    // passes every other row in this file and fails only here.
-    const m = re().exec(NEW_SENTENCE);
-    expect(m,
-      'aeon\'s reworded how_to_use does NOT parse. Every miss on this regex is fail(), which '
-      + 'throws at module load, so vendoring their new text would stop the editor from starting')
+  it('the VENDORED document is the current wording, and it really parses', () => {
+    // The app loads today, asserted against the bytes on disk rather than
+    // against the fixture above — the two could drift, and the file that
+    // matters is the one the module imports.
+    const doc = JSON.parse(readFileSync(BANDS_JSON, 'utf8')) as { how_to_use: string };
+    expect(doc.how_to_use,
+      'the vendored sidecar does not carry aeon\'s refusal-direction wording. If it has gone '
+      + 'back to `is <=`, that is a re-vendor at a pre-b8913cda revision and the module will '
+      + 'throw at load')
+      .toContain('EXCEEDS channels[c].lines');
+    expect(doc.how_to_use).not.toContain('is <= channels[c].lines');
+    const m = re().exec(doc.how_to_use);
+    expect(m, 'the vendored document does not parse — the editor would refuse to LOAD')
       .not.toBeNull();
-    expect(Number(m![1])).toBe(2);
-    expect(Number(m![2])).toBe(256);
+    expect([Number(m![1]), Number(m![2])]).toEqual([2, 256]);
   });
 
-  it('the two phrasings agree on the numbers — which is why accepting both is safe', () => {
-    // The whole safety argument in one row. The two sentences are opposite
-    // STATEMENTS, and accepting both would be indefensible if the parser read
-    // the comparison out of them. It does not: it reads the multiplier and the
-    // base, and those are identical under either phrasing. The direction is
-    // written once, in `anchorFitAgainstBand`, and asserted below.
-    const a = re().exec(OLD_SENTENCE)!;
-    const b = re().exec(NEW_SENTENCE)!;
-    expect([a[1], a[2]]).toEqual([b[1], b[2]]);
-  });
-
-  it('a comparison NEITHER arm knows still fails loudly — the widening is not `.*`', () => {
+  it('a comparison the parser never knew still fails loudly — it was narrowed, not loosened', () => {
     expect(re().exec(UNKNOWN_SENTENCE),
-      'the pattern now accepts an unrecognised comparison. It was widened to two specific '
-      + 'phrasings; a pattern loose enough to swallow a third has stopped checking the sentence')
+      'the pattern accepts an unrecognised comparison. Contracting to one phrasing must NARROW '
+      + 'it; a pattern loose enough to swallow a third has stopped checking the sentence, and '
+      + 'would make the refusal row above pass for the wrong reason')
       .toBeNull();
     // And a sentence with no formula at all, so the negative is not resting on
     // one carefully-built string.
@@ -165,9 +190,11 @@ describe('CHBAND-PROSE-REPIN: the travel formula parses under BOTH of aeon\'s ph
   });
 
   it('THE DIRECTION IS NOT READ FROM THE SENTENCE — it is written once, in code', () => {
-    // The premise the widening rests on, asserted rather than argued. If a
-    // future edit ever inferred `>` vs `<=` from `how_to_use`, accepting two
-    // opposite statements would become genuinely wrong instead of temporary.
+    // The premise the whole migration rested on, asserted rather than argued:
+    // the parser reads the multiplier and the base out of `how_to_use` and
+    // never the comparison. That is why two opposite phrasings could safely be
+    // accepted at once during the migration, and why aeon's rewording moved no
+    // logic here.
     const src = readFileSync(CHANNEL_BANDS_TS, 'utf8');
     expect(src, 'the one place the comparison direction is written')
       .toContain('if (travelPx > band.lines)');
@@ -197,8 +224,10 @@ describe('CHBAND-PROSE-REPIN: the harness\'s independent copy of the regex agree
   it('anchor-authoring-harness.mjs carries the SAME pattern, byte for byte', () => {
     // The duplication is deliberate — see this file's header — but two copies
     // that must agree and are never compared is how one of them stays behind.
-    // The harness throws on no-match, so aeon's new text would break it too, and
-    // more quietly than the app: nothing runs it on the way to a green suite.
+    // ⚠ THE ASYMMETRY THAT MAKES THIS ROW NECESSARY: the harness throws on
+    // no-match and NOTHING RUNS IT on the way to a green suite, so a step-3
+    // deletion applied to the app module and forgotten here would leave a live
+    // `is <=` arm that no red could ever reach.
     const app = travelRegexSourceIn(CHANNEL_BANDS_TS);
     const harness = travelRegexSourceIn(HARNESS_MJS);
     expect(harness,
@@ -209,14 +238,18 @@ describe('CHBAND-PROSE-REPIN: the harness\'s independent copy of the regex agree
       .toBe(app);
   });
 
-  it('the harness\'s copy parses BOTH phrasings too', () => {
+  it('the harness\'s copy parses the CURRENT wording and REFUSES the retired one', () => {
+    // Asserted against the harness's own extracted pattern rather than inferred
+    // from the byte-equality row above, so this stays a real measurement if
+    // that row is ever relaxed.
     const re = new RegExp(travelRegexSourceIn(HARNESS_MJS));
-    for (const [name, s] of [['current', OLD_SENTENCE], ['new', NEW_SENTENCE]] as const) {
-      const m = re.exec(s);
-      expect(m, `the harness cannot parse aeon's ${name} wording, and it THROWS on no-match`)
-        .not.toBeNull();
-      expect([Number(m![1]), Number(m![2])]).toEqual([2, 256]);
-    }
+    const m = re.exec(CURRENT_SENTENCE);
+    expect(m, 'the harness cannot parse aeon\'s current wording, and it THROWS on no-match')
+      .not.toBeNull();
+    expect([Number(m![1]), Number(m![2])]).toEqual([2, 256]);
+    expect(re.exec(RETIRED_SENTENCE),
+      'the harness still carries the transitional `is <=` arm after CHBAND-PROSE-REPIN step 3')
+      .toBeNull();
     expect(re.exec(UNKNOWN_SENTENCE)).toBeNull();
   });
 });

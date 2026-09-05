@@ -156,38 +156,43 @@ export const EFFECTS_CHANNEL_BANDS_GAME: string = typeof DOC.game === 'string' &
  * that was wrong in aeon's first cut was the leading 2.
  */
 const TRAVEL = (() => {
-  // ⚠⚠ TRANSITIONAL DUAL ARM — `CHBAND-PROSE-REPIN`, added 2026-09-05. ⚠⚠
+  // ⚠ THE TAIL IS `EXCEEDS`, AND ONLY `EXCEEDS`. `CHBAND-PROSE-REPIN` closed
+  // 2026-09-05 — a three-step expand-then-contract across two repos, and this
+  // is the contract half.
   //
-  // aeon is restating this sentence in the REFUSAL direction: the tail
-  // `... whole pixels) is <= channels[c].lines` becomes `... EXCEEDS
-  // channels[c].lines`. This accepts BOTH so there is no moment at which the
-  // vendored document and this parser disagree and the editor refuses to LOAD
-  // (every miss here is `fail()`, which throws at module load).
+  // aeon's sentence used to open CLEARANCE-SHAPED (`A sweep ... fits when its
+  // ... TRAVEL ... is <= channels[c].lines`) while a later sentence in the SAME
+  // string said `travel <= lines is CANNOT TELL, never a clearance`. Two people
+  // could implement that document accurately and build OPPOSITE warnings, so
+  // aeon restated the test in the refusal direction only, at b8913cda, and this
+  // repo pins that text. A transitional arm here accepted the old tail as well
+  // — added at bbdf1890, deleted the moment the new document was vendored,
+  // because every miss below is `fail()`, which throws at module load: a parser
+  // that knew only one phrasing would not degrade a warning, it would stop the
+  // editor from STARTING at whichever instant the two repos disagreed.
   //
-  // ── WHAT REMOVES IT ──────────────────────────────────────────────────────
-  // The `is <=` arm comes out once aeon's new text is vendored here, at which
-  // point only `EXCEEDS` exists in any document this repo pins. That is step 3
-  // of an expand-then-contract and it is OWED — a tolerance added for a
-  // migration is exactly the thing that outlives its reason because nobody
-  // remembers why it is there. If you are reading this after the sidecar says
-  // `EXCEEDS`, delete the `is <=` alternative and this comment with it.
+  // ⚠ DO NOT RE-WIDEN THIS TO ACCEPT `is <=` AGAIN. The old phrasing is now
+  // REFUSED, deliberately and loudly, and that refusal is asserted in
+  // `test/formats/effects-channel-bands-prose-repin.test.ts` — which is what
+  // makes the arm's absence a property rather than an accident. A document
+  // opening with the clearance wording is a document that has REGRESSED to the
+  // contradiction, and it should stop the editor rather than load.
   //
-  // ── WHY ACCEPTING TWO OPPOSITE STATEMENTS IS NOT A CONTRADICTION ─────────
-  // The two phrasings are opposite STATEMENTS, but this regex extracts only the
-  // multiplier and the base (2 and 256), which are identical either way. The
-  // comparison DIRECTION is not inferred from this sentence anywhere: it is
-  // written once, in `anchorFitAgainstBand` (`travelPx > band.lines`), and it
-  // is held by the two interlocks above — which survive aeon's rewording
-  // VERBATIM and are deliberately NOT widened — and by `AnchorBandFit` having
-  // no `fits` member at the type level. Checked before widening, not assumed.
-  const m = /PEAK-TO-PEAK TRAVEL \((\d+) \* \((\d+) >> amp_shift\), whole pixels\) (?:is <=|EXCEEDS) channels\[c\]\.lines/
+  // Only the multiplier and the base are read out of the sentence (2 and 256);
+  // the comparison DIRECTION is never inferred from prose. It is written once,
+  // in `anchorFitAgainstBand` (`travelPx > band.lines`), held by the two
+  // interlocks above, and by `AnchorBandFit` having no `fits` member at the
+  // type level.
+  const m = /PEAK-TO-PEAK TRAVEL \((\d+) \* \((\d+) >> amp_shift\), whole pixels\) EXCEEDS channels\[c\]\.lines/
     .exec(prose('how_to_use'));
   if (!m) {
     fail('no longer states the fit formula as "PEAK-TO-PEAK TRAVEL (2 * (256 >> amp_shift), whole '
-      + 'pixels)" followed by either "is <= channels[c].lines" or "EXCEEDS channels[c].lines". '
-      + 'That sentence is what the ladder is checked against; it was wrong by 2x, permissively, '
-      + 'until aeon 8d217dd4, so it is parsed and never remembered. BOTH tails are accepted only '
-      + 'for the CHBAND-PROSE-REPIN migration — see the comment above');
+      + 'pixels) EXCEEDS channels[c].lines". That sentence is what the ladder is checked against; '
+      + 'it was wrong by 2x, permissively, until aeon 8d217dd4, so it is parsed and never '
+      + 'remembered. ⚠ IF THE DOCUMENT SAYS "is <= channels[c].lines" IT HAS GONE BACKWARDS: that '
+      + 'clearance-shaped wording was retired at aeon b8913cda precisely because it contradicted '
+      + 'the same string\'s "never a clearance" clause, and it is refused here rather than '
+      + 'accepted (CHBAND-PROSE-REPIN, closed 2026-09-05)');
   }
   const multiplier = Number(m[1]);
   const base = Number(m[2]);
@@ -237,7 +242,21 @@ export interface EffectsChannelBand {
   lo: number;
   /** Bottommost screen line the boundary may sit on. */
   hi: number;
-  /** INCLUSIVE count of lines in [lo, hi]. A sweep of travel == lines is the widest that fits. */
+  /**
+   * INCLUSIVE count of lines in [lo, hi].
+   *
+   * ⚠ STATED ONLY IN THE REFUSAL DIRECTION, deliberately, and do not "improve"
+   * it back: travel EXCEEDING `lines` is a CERTAIN refusal; travel within
+   * `lines` is CANNOT TELL and is NEVER a clearance, because the latched line
+   * is (anchor - Camera_Y) and where the sweep sits inside [lo, hi] is
+   * camera-dependent and unknowable at author time. This comment read "a sweep
+   * of travel == lines is the widest that fits" until 2026-09-05 — the same
+   * clearance-shaped phrasing aeon removed from `how_to_use` at their
+   * `b8913cda`, left behind here because the fix travelled to where the rule is
+   * PARSED and not to where it is DESCRIBED. `AnchorBandFit` has no `fits`
+   * member at the type level, so this was prose a reader could act on and code
+   * could not.
+   */
   lines: number;
   /** Where the band is declared, in aeon's source. */
   source: string;
