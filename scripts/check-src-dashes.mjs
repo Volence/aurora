@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 // NO EM DASH AND NO EN DASH IN NON-COMPONENT SOURCE TEXT.
 //
-// Owner ruling, 2026-09-05, all tools: no U+2014 and no U+2013 in any user
-// facing text, labels, panel prose, tooltips, refusals or generated help.
+// Owner ruling, 2026-09-05, all tools: no U+2014 and no U+2013 in TEXT A TOOL
+// SHOWS A PERSON, nor in the instruction docs agents read. Committed history is
+// not retro swept. In this bucket that means labels, panel prose, tooltips,
+// refusals and generated help; it also means a thrown Error and anything
+// printed, which is wider than "the app" and is the point of the next
+// paragraph but one.
 // `src/**/*.tsx` was swept that day and is held by `scripts/check-tsx-dashes.mjs`.
 // This is its SIBLING for the other half: the non-test `src/**/*.ts` prose
 // (providers, core, stores, the agent tool descriptions) plus the one generated
@@ -26,12 +30,23 @@
 //
 // WHAT IT DELIBERATELY DOES NOT COUNT, and why in each case
 //
-// COMMENTS. This repo's comments are its design record. They are not user
-// facing, the ruling is about text a person reads in the app, and a gate that
-// failed on them would be asking for the record to be degraded.
+// COMMENTS. The reason given here until 2026-09-05 was "the ruling is about
+// text a person reads in the app". THAT WAS WRONG, and it was wrong in the
+// direction that costs work: read that way, a vitest failure line, a harness
+// `check()` label and a thrown Error all look out of scope, because none of
+// them is in the app. All three are a tool showing a person text and all three
+// are in. The rule (comments are exempt) survives; only its justification
+// changes, and it changes to the one that actually holds: NO TOOL SHOWS A
+// COMMENT TO A PERSON. A comment is never printed, thrown or logged. This
+// repo's comments are its design record besides, and a gate that failed on them
+// would be asking for the record to be degraded in exchange for nothing anyone
+// ever reads. A wrong reason attached to a correct rule is how the rule gets
+// applied in the wrong scope later, which is exactly what happened here.
 //
-// TESTS. `src/**/__tests__/` and `src/test/` are a later pass and are not this
-// gate's population. `test/` at the repo root likewise.
+// TESTS. `src/**/__tests__/`, `src/test/` and `test/` at the repo root are a
+// separate bucket, swept on 2026-09-05 and held by
+// `scripts/check-test-dashes.mjs`. The harness scripts under `scratchpad/` are
+// deferred; that gate's docblock carries the count and the cut.
 //
 // VENDORED DOCUMENTS, EXCLUDED STRUCTURALLY. A file whose whole point is byte
 // identity with an upstream revision must keep upstream's punctuation, and the
@@ -227,7 +242,8 @@ if (bad) process.exit(1);
 
 console.log(`check-src-dashes: OK: ${srcs.length} non-test .ts file(s) and ${cssFiles.length} `
   + 'stylesheet(s) under src, no U+2014 or U+2013 in any string or template, in either spelling. '
-  + `Out of scope and saying so: comments (the design record), tests, .tsx (held by `
+  + `Out of scope and saying so: comments (no tool shows one to a person), the test tree (held `
+  + `by check-test-dashes), .tsx (held by `
   + `check-tsx-dashes), and any file with a sibling .provenance.json (vendored, byte identity `
   + `with upstream). ${ALLOWANCES.length} sanctioned verbatim quotation(s) of aeon's own `
   + 'messages, each still live.');

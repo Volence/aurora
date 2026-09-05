@@ -18,15 +18,22 @@
 // ── WHAT IT DELIBERATELY DOES NOT COUNT ───────────────────────────────────
 //
 // COMMENTS. This repo's comments are its design record and carry 1,576 dashes
-// in this bucket alone. They are not user-facing, the ruling is about text a
-// person reads in the app, and a gate that failed on them would be asking for
-// the record to be degraded.
+// in this bucket alone. The reason recorded here until 2026-09-05 was "the
+// ruling is about text a person reads in the app". THAT WAS WRONG, in the
+// direction that costs work: read that way, a vitest failure line and a thrown
+// Error look out of scope because neither is in the app, and both are squarely
+// in. The rule survives; the justification changes to the one that holds. NO
+// TOOL SHOWS A COMMENT TO A PERSON: a comment is never printed, thrown or
+// logged. And a gate that failed on them would be asking for the design record
+// to be degraded in exchange for nothing anyone ever reads.
 //
-// THE OTHER BUCKETS. `src/**/*.ts` (providers, core, stores) and the tests were
-// separate passes on 2026-09-05 and were NOT this parcel's. Scoping the gate to
-// the bucket that is actually clean is what keeps it green today instead of red
-// on work nobody has done yet. When those buckets are swept, widen GLOB here
-// and say so in this docblock.
+// THE OTHER BUCKETS. `src/**/*.ts` (providers, core, stores) is held by
+// `scripts/check-src-dashes.mjs`; the test tree (`test/`, `src/test/`, any
+// `__tests__/`) by `scripts/check-test-dashes.mjs`. Both were separate passes
+// on 2026-09-05 and neither was this parcel's. Scoping each gate to the bucket
+// its own sweep cleaned is what lets them fail independently and name which
+// sweep regressed. The harness scripts under `scratchpad/` are still deferred;
+// check-test-dashes carries that count and cut.
 //
 // Run: node scripts/check-tsx-dashes.mjs   (also in the `npm test` chain)
 
