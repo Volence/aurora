@@ -448,8 +448,14 @@ async function main() {
       + `${JSON.stringify(dead.length === 1 ? dead[0].title : null)})`);
 
     // ---- 4. THE CLAIM: the sentence is PAINTED, with nothing hovered. -----
-    const painted = await c.json(READ_PAINTED(`/so fb itself \\(.*\\) is greyed/`));
-    check('4a', 'a sentence naming the refusal is rendered in the page at all',
+    // ⚠ A BROAD FINDER ON PURPOSE. An earlier cut searched for the exact phrase
+    // this fix ships, which turned every PARTIAL break into a total one: a
+    // generic "one entry is greyed" - the sentence a plausible simpler fix would
+    // have written - vanished from the finder and aborted the run at [4a],
+    // instead of being caught by [4b] as the naming failure it actually is.
+    // Poison must resemble reality, so the finder must match the near-miss too.
+    const painted = await c.json(READ_PAINTED(`/is greyed/`));
+    check('4a', 'a sentence about the refusal is rendered in the page at all',
       painted.found === true, `matches=${painted.count} text=${JSON.stringify(painted.text ?? null)}`);
     if (!painted.found) throw new Error('no painted sentence — rows 4b..5c cannot be measured');
 
@@ -478,7 +484,7 @@ async function main() {
     await c.evalExpr(SET_SELECT(FB_SEL(0), FB_B));
     await sleep(600);
     scene = await readDoc();
-    const moved = await c.json(READ_PAINTED(`/so fb itself \\(.*\\) is greyed/`));
+    const moved = await c.json(READ_PAINTED(`/is greyed/`));
     check('5a', `the sentence FOLLOWS the layer: fb ${FB_B} now, and ${FB_A} is no longer named`,
       scene.layers[0].fb === FB_B && moved.found === true
       && moved.text.includes(FB_B) && !moved.text.includes(FB_A),
@@ -516,7 +522,7 @@ async function main() {
       })()`);
     await sleep(800);
     scene = await readDoc();
-    const gone = await c.json(READ_PAINTED(`/so fb itself \\(.*\\) is greyed/`));
+    const gone = await c.json(READ_PAINTED(`/is greyed/`));
     const bare = await c.json(READ_PAINTED(`/^Plane B speed ramps from fb at this strip's top/`));
     check('5b', 'with fb on an UNCLAIMED packed triple nothing is refused, and the clause is GONE',
       spun.ok === true
@@ -599,7 +605,7 @@ async function main() {
       (() => {
         const el = ${SEL_BY_TITLE(CURVE_SEL(0))};
         const leaves = [...document.querySelectorAll('div, span, p')]
-          .filter((d) => d.children.length === 0 && /so fb itself \(.*\) is greyed/.test((d.textContent || '').trim()));
+          .filter((d) => d.children.length === 0 && /is greyed/.test((d.textContent || '').trim()));
         const adv = leaves[leaves.length - 1];
         if (adv) adv.scrollIntoView({ block: 'center' });
         const a = el.getBoundingClientRect();
