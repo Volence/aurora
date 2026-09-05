@@ -43,6 +43,7 @@
     "check:pseudo-skip": "node scripts/check-pseudo-skip.mjs",
     "check:python-resolver": "node scripts/check-python-resolver.mjs",
     "check:test-collection": "node scripts/check-test-collection.mjs",
+    "check:tsx-dashes": "node scripts/check-tsx-dashes.mjs",
     "dev": "electron-vite dev",
     "gen:theme": "node scripts/gen-theme.mjs",
     "harness:aeon-priority-lens": "node scratchpad/aeon-priority-lens-harness.mjs",
@@ -217,7 +218,7 @@
     "poisons:rasterref": "node scratchpad/rasterref-partial-extension-poisons.mjs",
     "poisons:timeline-edit": "node scratchpad/timeline-edit-poisons.mjs",
     "preview": "electron-vite preview",
-    "test": "node scripts/check-test-collection.mjs && node scripts/check-pseudo-skip.mjs && node scripts/check-peer-path-literals.mjs && node scripts/check-cited-paths.mjs && node scripts/check-object-stringify.mjs && node scripts/check-ledger-timestamps.mjs && node scripts/check-python-resolver.mjs && node scratchpad/check-harness-guards.mjs && npm run typecheck && vitest run",
+    "test": "node scripts/check-test-collection.mjs && node scripts/check-pseudo-skip.mjs && node scripts/check-peer-path-literals.mjs && node scripts/check-cited-paths.mjs && node scripts/check-object-stringify.mjs && node scripts/check-tsx-dashes.mjs && node scripts/check-ledger-timestamps.mjs && node scripts/check-python-resolver.mjs && node scratchpad/check-harness-guards.mjs && npm run typecheck && vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
