@@ -125,7 +125,7 @@ describe('the reach advisory: n = min(|p|, span/2)', () => {
     const sentence = rowRemapReachAdvisory(two, 0);
     expect(sentence).not.toBeNull();
     expect(sentence).not.toMatch(/does nothing/);
-    expect(sentence).toMatch(/capped at 1 line\b/);
+    expect(sentence).toMatch(/at most half of them: 1\./);
   });
 
   it('reports the cap and the shortfall as the engine computes them', () => {
@@ -135,9 +135,14 @@ describe('the reach advisory: n = min(|p|, span/2)', () => {
     expect(rowRemapHeightLines(4) - 1 - engineReach(8, 4)).toBe(11);
     const sentence = rowRemapReachAdvisory(s, 0) as string;
     expect(sentence).toMatch(/8 screen lines/);
-    expect(sentence).toMatch(/capped at 4 lines/);
-    expect(sentence).toMatch(/deepest step moves 15/);
-    expect(sentence).toMatch(/11 of those steps/);
+    expect(sentence).toMatch(/at most half of them: 4\./);
+    expect(sentence).toMatch(/steps down to 15 lines/);
+    expect(sentence).toMatch(/11 steps are out of reach/);
+    // The one-step case, which is the boundary the census walks past without
+    // reading: span 28 with H=16 is reach 14 against a deepest step of 15.
+    const one = rowRemapReachAdvisory(locked([layer(0, remap(0, 4)), layer(28)]), 0) as string;
+    expect(engineReach(28, 4)).toBe(14);
+    expect(one).toMatch(/1 step is out of reach/);
   });
 
   it('names the cap as the PROTECTION, so the symptom read is clipped not garbled', () => {
@@ -145,7 +150,7 @@ describe('the reach advisory: n = min(|p|, span/2)', () => {
     // sentence that implied the overrun still happens would send the author
     // hunting a corruption that the engine already prevents.
     const sentence = rowRemapReachAdvisory(locked([layer(0, remap(0, 4)), layer(8)]), 0) as string;
-    expect(sentence).toMatch(/clipped effect and not a broken one/);
+    expect(sentence).toMatch(/clipped rather than broken/);
     expect(sentence).toMatch(/reading inside this band/);
   });
 

@@ -356,9 +356,9 @@ export const EFFECTS_GUIDE_REFUSED_TEXT = 'rgba(255, 205, 200, 0.97)';
 // are different objects rather than two states of one. The cyan family already
 // carries three degrees of one axis (enabled / disabled / active) and the
 // refusal red is the categorical escape from it; a fourth cyan would be read as
-// a fourth degree. White is unclaimed at this weight — the tile grid is the only
+// a fourth degree. White is unclaimed at this weight (the tile grid is the only
 // white on the canvas and it is a thin 8-px lattice, never a labelled full-width
-// rule — and it is the colour a surface line reads as.
+// rule), and it is the colour a surface line reads as.
 export const EFFECTS_SURFACE_LINE = 'rgba(255, 255, 255, 0.95)';
 /** A dark casing stroked UNDER the white one, so the rule survives bright art. */
 export const EFFECTS_SURFACE_CASING = 'rgba(0, 0, 0, 0.55)';

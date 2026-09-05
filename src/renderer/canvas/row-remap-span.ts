@@ -201,28 +201,32 @@ export function rowRemapReachAdvisory(scene: EffectsScene, layerIndex: number): 
 
   const H = rowRemapHeightLines(rr.height_shift);
   const reach = Math.floor(spanLines / 2);
-  const where = `This band runs from its own top to the next layer's top, ${spanLines} screen `
-    + `line${spanLines === 1 ? '' : 's'}`;
+  const where = `${spanLines} screen line${spanLines === 1 ? '' : 's'} from this band's top to `
+    + 'the next layer\'s top';
 
+  // ⚠ MEASURED AGAINST THE BOX IT RENDERS IN, and shortened once because of it.
+  // The layer cards sit in a ~150px scroller (column-layout's LIST floor), and
+  // the first draft of this sentence was 229px tall in it: an advisory an author
+  // has to scroll a scroller to read is the "advisory becomes decoration"
+  // failure arriving by height instead of by count. Everything the engine's two
+  // branches decide is still here; the prose around them is not.
+  //
   // FINDING A subsumes finding B arithmetically, and they are still ONE sentence
   // rather than two hints, because they are one inequality at two magnitudes,
   // unlike `curveAdvisory` and `curveDescendingAdvisory` (a refusal and a
   // correlation, which are different KINDS of claim). Stacking "does nothing"
-  // under "does less than asked" would be two paragraphs of one rule, which is
-  // the advisory-becomes-decoration failure this repo has already named.
+  // under "does less than asked" would be two paragraphs of one rule.
   if (reach === 0) {
-    return `${where}, and the remap needs at least 2 to move anything: the engine halves the `
-      + 'span and takes its no-remap branch when the half is zero. The effect is authored and '
-      + 'does nothing, at every camera position. Move the next layer\'s top down to make this '
-      + 'band taller.';
+    return `${where}, and the remap needs 2 to move anything: the engine halves the span and `
+      + 'takes its no-remap branch at zero. This effect does nothing, at every camera position. '
+      + 'Make the band taller.';
   }
   if (reach < H - 1) {
-    return `${where}, and the remap moves at most half of them, so it is capped at ${reach} `
-      + `line${reach === 1 ? '' : 's'}. height_shift ${rr.height_shift} builds a ladder whose `
-      + `deepest step moves ${H - 1}, so ${H - 1 - reach} of those steps cannot be reached from `
-      + 'any camera position. The cap is what keeps the remap reading inside this band rather '
-      + 'than fetching the next one\'s scroll words, so the result is a clipped effect and not '
-      + 'a broken one. Make the band taller, or lower height_shift.';
+    return `${where}, and the remap moves at most half of them: ${reach}. height_shift `
+      + `${rr.height_shift}'s ladder steps down to ${H - 1} lines, so ${H - 1 - reach} `
+      + `step${H - 1 - reach === 1 ? ' is' : 's are'} out of reach at every camera position. The `
+      + 'cap is what keeps the remap reading inside this band, so the result is clipped rather '
+      + 'than broken. Make the band taller, or lower height_shift.';
   }
   return null;
 }
