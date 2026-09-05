@@ -39,6 +39,8 @@ import {
   LEFT_COLUMN_MASK_ROW, leftColumnMaskOptions, leftColumnMaskValue, leftColumnMaskRowVisible,
   leftColumnMaskCommand, leftColumnMaskAdvisory, factor0LockRefusal, vDeformToggleCommand,
   layerCurveDeformAdvisory,
+  // the sec7 fa fix — the Plane A advisory
+  planeAFactorAdvisory, PLANE_A_GAMEPLAY_PLANE,
 } from '../effects-aeon';
 import {
   EFFECTS_FACTOR_NAMES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS,
@@ -2304,5 +2306,64 @@ describe('the deform rows say what they are, inside the column', () => {
     // have drifted into two descriptions.
     expect(SCENE_DEFORM_ROWS.deform_fg.title.replace(/Plane A/, 'Plane B').replace(/_fg/, '_bg'))
       .toBe(SCENE_DEFORM_ROWS.deform_bg.title);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE PLANE A ADVISORY — the sentence `ojz_act1_sec7_worldwater` never got
+// ---------------------------------------------------------------------------
+//
+// The scene that prompted this shipped `fa` FACTOR_1_8 on layer 0 and
+// FACTOR_3_4 on layer 2, and the panel said nothing; the owner read the result
+// off the running game as "the fg loading wrong". These rows are pinned to the
+// CONDITION (a NAMED factor that is not FACTOR_1), and to the advice-not-
+// refusal posture, rather than to the wording of the sentence.
+describe('a Plane A factor that does not track the camera gets a sentence', () => {
+  it('speaks for exactly the non-FACTOR_1 named factors, and for the real scene', () => {
+    // The tracking value is silent — an advisory that is always on screen is
+    // read as decoration, which is `guideBoundNotice`'s own stated bar.
+    expect(planeAFactorAdvisory({ fa: 'FACTOR_1' })).toBeNull();
+
+    // Every OTHER named factor speaks — SWEPT, not sampled, so a value added to
+    // the factor space later cannot slip through unadvised.
+    const spoke = EFFECTS_FACTOR_NAMES.filter((f) => planeAFactorAdvisory({ fa: f }) !== null);
+    expect(spoke).toEqual(EFFECTS_FACTOR_NAMES.filter((f) => f !== 'FACTOR_1'));
+    expect(spoke.length).toBe(EFFECTS_FACTOR_NAMES.length - 1);
+
+    // A PACKED factor says nothing: `{s1,s2,op}` can encode 1:1 and reading it
+    // from here would need the engine's decoder.
+    expect(planeAFactorAdvisory({ fa: { s1: 2, s2: 4, op: 1 } })).toBeNull();
+
+    // THE ACTUAL DEFECT, as the landed document spells it.
+    expect(planeAFactorAdvisory({ fa: 'FACTOR_1_8' })).toMatch(/FACTOR_1_8/);
+    expect(planeAFactorAdvisory({ fa: 'FACTOR_3_4' })).toMatch(/FACTOR_3_4/);
+
+    // It carries aeon's own two sentences rather than a paraphrase, and says
+    // outright that it does not block.
+    const said = planeAFactorAdvisory({ fa: 'FACTOR_1_8' }) ?? '';
+    expect(said).toContain(PLANE_A_GAMEPLAY_PLANE);
+    expect(said).toContain('fa tracks the camera (FACTOR_1)');
+    expect(said).toMatch(/nothing here refuses it/);
+  });
+
+  it('is ADVICE: the document still writes, and the picker keeps every option', () => {
+    const s = newEffectsScene('plane_a');
+    s.layers[0] = { ...s.layers[0], fa: 'FACTOR_1_8' };
+    expect(planeAFactorAdvisory(s.layers[0])).not.toBeNull();
+    expect(() => serializeEffectsScene(s)).not.toThrow();
+    // Nothing in this parcel touched the factor picker's option list.
+    expect(factorOptions().map((o) => o.value)).toContain('FACTOR_1_8');
+  });
+
+  it('is RENDERED under the fa control — the panel is wired to it', () => {
+    const panel = readFileSync(
+      resolve(__dirname, '../../components/effects/EffectsScenePanel.tsx'), 'utf8');
+    // Between the fa row and the fb row, not somewhere else on the card.
+    const faRow = panel.indexOf('PLANE_FACTOR_ROWS.fa.label');
+    const advisory = panel.indexOf('planeAFactorAdvisory(layer)');
+    const fbRow = panel.indexOf('PLANE_FACTOR_ROWS.fb.label');
+    expect(faRow).toBeGreaterThan(-1);
+    expect(advisory).toBeGreaterThan(faRow);
+    expect(fbRow).toBeGreaterThan(advisory);
   });
 });
