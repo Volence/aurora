@@ -352,6 +352,10 @@ be, which nothing can know while you are still authoring. There is no green tick
 `Travel` and there is not going to be one. Aurora can prove a sweep is too wide; it can
 never prove one is safe.
 
+aeon's own build runs the same test across the whole act, so an over-wide sweep fails
+there too. It is the same one-directional test rather than a second opinion, so a green
+build is not the clearance either.
+
 > A sweep with no warning under it has not been approved. It has only failed to be caught. If it matters exactly where that boundary lands, the thing that settles it is running the ROM and looking.
 
 Two consequences worth having:
@@ -362,8 +366,10 @@ Two consequences worth having:
 - **The two ends of the band do not behave alike**, which is why the warning names both.
   Past the bottom of the band the record is not emitted at all: no boundary is drawn
   anywhere and the band vanishes for that frame rather than pinning to the bottom line.
-  Above the top of the band it is still emitted, clamped down onto the top line, and stays
-  visible. A sweep one rung too wide therefore reads as a band flickering out once a cycle,
+  Above the top of the band it is still emitted, pinned onto the top line, and stays
+  visible. The warning calls that second one "clamped up", which is about the line number
+  going up and not about the boundary rising up the screen. A sweep one rung too wide
+  therefore reads as a band flickering out once a cycle,
   which looks like a rendering bug rather than like an amplitude somebody chose.
 
 ### The strip that draws the sweep, and what it does not prove
@@ -371,9 +377,9 @@ Two consequences worth having:
 `sweep up and down` adds a small animated strip to the bottom of the channel. It is the
 only thing in this editor that runs on a timer. It draws one full cycle of the sweep you
 authored: the `World Y` as the centre line, the peak excursion as a band either side of
-it, the curve itself, and a dot moving along the curve in real time at the `Cycle` you picked. `Pause`
-stops it, and pausing removes the loop rather than idling it, so a stopped strip reads
-`preview paused` and costs nothing at all.
+it, the curve itself, and a dot moving along the curve in real time at the `Cycle` you
+picked. `Pause` stops it, and pausing removes the loop rather than idling it, so a stopped
+strip reads `preview paused` and costs nothing at all.
 
 **It is not a picture of your band on a screen**, and that is structural rather than
 unfinished. A band carries `Top`, `Bot`, `S/H` and `ON` and no channel number, so the
