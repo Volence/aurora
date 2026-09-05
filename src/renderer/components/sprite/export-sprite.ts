@@ -238,8 +238,8 @@ async function captureS1ArtSource(
   }
   if (artCompression === 'uncompressed' && artBytes.length % 32 !== 0) {
     store.setSaveBackRefusal(
-      `${name} can't save back in place: its art file is ${artBytes.length} bytes — not a whole number `
-      + `of 32-byte tiles — so an in-place write would drop the trailing bytes. Editing and Export still work.`);
+      `${name} can't save back in place: its art file is ${artBytes.length} bytes (not a whole number `
+      + `of 32-byte tiles), so an in-place write would drop the trailing bytes. Editing and Export still work.`);
     return;
   }
   try {
@@ -310,7 +310,7 @@ export async function saveSpriteArt(docId?: string, report?: SaveReport): Promis
   // reorder happened, which would write pixels into the wrong tiles. Refuse
   // rather than silently corrupt art (mappings can't grow/shrink for S1 in v1).
   if (frames.length !== src.frameCount) {
-    toast(`Frame add/remove isn't writable for S1 (opened ${src.frameCount}, now ${frames.length}) — revert frame changes to save art`, 'error');
+    toast(`Frame add/remove isn't writable for S1 (opened ${src.frameCount}, now ${frames.length}); revert frame changes to save art`, 'error');
     return;
   }
   const editedFrames: EditedFrame[] = frames.map((f) => ({ indices: f.data, width: f.width, height: f.height }));
@@ -343,7 +343,7 @@ export async function saveSpriteArt(docId?: string, report?: SaveReport): Promis
     return;
   }
   if ('conflicts' in out) {
-    toast(`Save aborted — ${src.relPath} changed on disk since it was opened. Reopen to pick up external changes.`, 'error');
+    toast(`Save aborted: ${src.relPath} changed on disk since it was opened. Reopen to pick up external changes.`, 'error');
     return;
   }
   if (out.failed) { toast(`Art save failed at ${out.failed.path}: ${out.failed.message}`, 'error'); return; }
@@ -352,7 +352,7 @@ export async function saveSpriteArt(docId?: string, report?: SaveReport): Promis
   // — re-read it rather than trusting the pre-write snapshot. A document closed
   // mid-write has nothing left to update.
   const after = spriteDocState(targetId);
-  if (!after) { toast(`Saved art to ${src.relPath} — S1 mappings are read-only in v1`, 'success'); return; }
+  if (!after) { toast(`Saved art to ${src.relPath}; S1 mappings are read-only in v1`, 'success'); return; }
 
   // Refresh the guarded-write baseline so a follow-up save doesn't spuriously
   // conflict. Rebuilt from the document's CURRENT source (not the captured one)
@@ -364,12 +364,12 @@ export async function saveSpriteArt(docId?: string, report?: SaveReport): Promis
   const stillMatches = framesEqual(after.frames, frames);
   if (stillMatches) patchSpriteDoc(targetId, { unsavedEdits: false });
   const sharedNote = coAffected.length
-    ? ` — shared pool tiles also changed frame${coAffected.length === 1 ? '' : 's'} ${coAffected.join(', ')}`
+    ? ` (shared pool tiles also changed frame${coAffected.length === 1 ? '' : 's'} ${coAffected.join(', ')})`
     : '';
   toast(
     stillMatches
-      ? `Saved art to ${src.relPath}${sharedNote} — S1 mappings are read-only in v1`
-      : `Saved art to ${src.relPath}${sharedNote}, but edits made during the save are still unsaved — save again`,
+      ? `Saved art to ${src.relPath}${sharedNote}; S1 mappings are read-only in v1`
+      : `Saved art to ${src.relPath}${sharedNote}, but edits made during the save are still unsaved; save again`,
     stillMatches ? 'success' : 'info',
   );
 }
@@ -433,7 +433,7 @@ export async function openSprite(sourceFormat: SpriteFormatId = 's2', artCompres
   if (!mapPath) return;
   const artPath = await window.api.selectFile('Select art file (.nem / .bin)', [{ name: 'Art', extensions: ['nem', 'bin'] }]);
   if (!artPath) return;
-  const dplcPath = await window.api.selectFile('Optional DPLC file (.asm / .bin — cancel to skip)', [{ name: 'DPLC', extensions: ['asm', 'bin'] }]);
+  const dplcPath = await window.api.selectFile('Optional DPLC file (.asm / .bin; cancel to skip)', [{ name: 'DPLC', extensions: ['asm', 'bin'] }]);
   try {
     const frames = framesFromMapping(mapPath, await readAbsolute(mapPath), adapter);
     if (frames.length === 0) { toast('No sprite mappings found in that file', 'error'); return; }
@@ -516,7 +516,7 @@ export function sonicTimelineAnims(parse: SonicAnimParse, frameCount: number): C
         name: e.name,
         steps: [],
         dynamic: { mode: e.special, scripts },
-        note: `Dynamic ${SONIC_MODE_LABEL[e.special]} script — Sonic_Animate computes frames and cadence `
+        note: `Dynamic ${SONIC_MODE_LABEL[e.special]} script: Sonic_Animate computes frames and cadence `
           + 'from inertia/angle (scrub them in the preview). '
           + 'Semantics: docs/reviews/2026-08-21-sonic-animate-live-study.md.',
       });
@@ -639,7 +639,7 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
             compression: ex.compression, tileBase: ex.tileBase,
           });
         } catch {
-          toast(`Composite art source ${ex.art} unavailable — its frames will render blank`, 'info');
+          toast(`Composite art source ${ex.art} unavailable; its frames will render blank`, 'info');
         }
       }
       const basePool = composeTilePool(slices);
@@ -658,7 +658,7 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
               tiles: parseTiles(compressionFor(fs.compression).decompress(bytes)),
             });
           } catch {
-            toast(`Frame art source ${fs.art} unavailable — frames ${fs.firstFrame}–${fs.lastFrame} will render from the primary art`, 'info');
+            toast(`Frame art source ${fs.art} unavailable; frames ${fs.firstFrame} to ${fs.lastFrame} will render from the primary art`, 'info');
           }
         }
         recon = reconstructFromFramePools(
@@ -797,12 +797,12 @@ async function paletteLineFromFile(baseDir: string, relPath: string, line: numbe
   try {
     bytes = await readPalImpl(baseDir, relPath);
   } catch {
-    toast(`Palette ${relPath} unreadable — colors not seeded`, 'info');
+    toast(`Palette ${relPath} unreadable; colors not seeded`, 'info');
     return undefined;
   }
   const start = line * 32;
   if (bytes.length < start + 32) {
-    toast(`Palette ${relPath} is ${bytes.length} bytes — it has no line ${line}; colors not seeded`, 'info');
+    toast(`Palette ${relPath} is ${bytes.length} bytes: it has no line ${line}; colors not seeded`, 'info');
     return undefined;
   }
   const words = new Uint16Array(16);

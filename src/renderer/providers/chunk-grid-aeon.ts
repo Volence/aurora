@@ -62,7 +62,7 @@ export function aeonChunkLabel(order: ReadonlyMap<string, number>, id: string): 
 export function aeonChunkTitle(chunk: ChunkDef | undefined, blank: boolean): string {
   if (!chunk) return '';
   return blank
-    ? `${chunk.name} — blank (transparent) chunk; stamping it erases the area`
+    ? `${chunk.name}: blank (transparent) chunk; stamping it erases the area`
     : chunk.name;
 }
 

@@ -153,7 +153,7 @@ export async function s1WarpTo(
       gate: WarpGateReason.NoOffsets,
       error:
         `could not read ${S1_OFFSET_SOURCE.x}/${S1_OFFSET_SOURCE.y} from ` +
-        `${join(opts.projectDir, S1_OFFSET_SOURCE.file)} — they are equates, so they come from the ` +
+        `${join(opts.projectDir, S1_OFFSET_SOURCE.file)}: they are equates, so they come from the ` +
         'disassembly rather than from the ROM\'s symbols',
     };
   }
@@ -314,7 +314,7 @@ function classify(
       warped: false,
       clamped: false,
       error:
-        `the poke did not take — the player is back at (${from.x}, ${from.y}), where he started. ` +
+        `the poke did not take: the player is back at (${from.x}, ${from.y}), where he started. ` +
         'S1 re-seeds Sonic from the start position table while the act is still loading, and a ' +
         'poke in that window is discarded silently. Try again once the act is running.',
     };

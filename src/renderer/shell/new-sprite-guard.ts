@@ -109,7 +109,7 @@ export async function newSpriteGuarded(w: number, h: number): Promise<boolean> {
   const answer = await useConfirmStore.getState().ask({
     title: 'Discard this sprite?',
     body: 'This sprite has unsaved edits. Starting a new one replaces every frame, '
-      + 'every animation step and the palette, and clears the undo history — '
+      + 'every animation step and the palette, and clears the undo history: '
       + 'Ctrl+Z will not bring it back.',
     buttons: [
       { key: 'discard', label: 'Discard & start new', tone: 'danger' },

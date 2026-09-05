@@ -143,7 +143,7 @@ export function overflowLabel(stack: ToastStack): string | null {
   if (stack.hiddenCount === 0) return null;
   const e = stack.hiddenErrorCount;
   const errors = e > 0 ? ` (${e} error${e === 1 ? '' : 's'})` : '';
-  return `+${stack.hiddenCount} more${errors} — click to show all`;
+  return `+${stack.hiddenCount} more${errors}: click to show all`;
 }
 
 interface ToastState {

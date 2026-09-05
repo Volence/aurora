@@ -635,7 +635,7 @@ function drawCameraPreviewCaptions(
   // making a claim about what the ROM would show; the line is the boundary of
   // that claim, and it is on the canvas rather than only in a doc because the
   // author reading the rectangle is the person the claim is made to.
-  const note = `preview: Plane B only — no ${plan.absent.join('; no ')}`;
+  const note = `preview: Plane B only; no ${plan.absent.join('; no ')}`;
   const w = ctx.measureText(note).width;
   const by = frame.y + frame.h - 8;
   ctx.fillStyle = CAPTION_BG;

@@ -135,14 +135,14 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
         // below counts and samples, and a count that lost WHICH document went
         // would make the author's next step impossible (the rule
         // state/save-outcome-report.ts states for its own fold).
-        console.warn(`[aeon-save] removed ${r.what} — ${r.path}`
+        console.warn(`[aeon-save] removed ${r.what}: ${r.path}`
           + (outcome.deleted ? '' : ' (it was already gone)'));
       } else {
         // KEPT IN THE LEDGER. A path this save could not remove must still be
         // removable by the next one; dropping it here would make one EPERM
         // permanent.
         failedRemovals.add(r.path);
-        console.warn(`[aeon-save] could NOT remove ${r.what} — ${r.path}: `
+        console.warn(`[aeon-save] could NOT remove ${r.what} at ${r.path}: `
           + `${outcome ? outcome.reason : 'no delete channel on window.api'}`);
       }
     }
@@ -177,11 +177,11 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
     const removedNote = removed.length === 1
       ? ` · removed ${removed[0]}`
       : removed.length > 1
-        ? ` · removed ${removed.length} files — ${nameSome(removed)}`
+        ? ` · removed ${removed.length} files: ${nameSome(removed)}`
         : '';
     if (withheld.length) {
       useToastStore.getState().addToast(
-        `Project saved, but edits made during the save are still unsaved — save again${removedNote}`,
+        `Project saved, but edits made during the save are still unsaved; save again${removedNote}`,
         'info',
       );
     } else {
@@ -194,7 +194,7 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
     if (failedRemovals.size > 0) {
       useToastStore.getState().addToast(
         `Project saved, but ${failedRemovals.size} deleted document`
-        + `${failedRemovals.size === 1 ? '' : 's'} could not be removed from disk — `
+        + `${failedRemovals.size === 1 ? '' : 's'} could not be removed from disk: `
         + `${nameSome([...failedRemovals])}. They will be retried on the next save; `
         + 'each reason is in the developer console.',
         'error',

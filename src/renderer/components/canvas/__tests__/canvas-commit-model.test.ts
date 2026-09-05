@@ -140,7 +140,7 @@ describe('reportLines and the colind overhang', () => {
     const lines = reportLines(report({ blocksWithoutCollision: 3 }), applied);
     const line = lines.find((l) => l.startsWith('skipped:'));
     expect(line).toBe(
-      'skipped: 2 blocks keep no shape — their ids are past the end of this zone\'s '
+      'skipped: 2 blocks keep no shape because their ids are past the end of this zone\'s '
       + 'collision table; in ROM those entries resolve into the adjacent zone\'s table, '
       + 'so stamping one changes other blocks\' in-game collision',
     );
@@ -151,7 +151,7 @@ describe('reportLines and the colind overhang', () => {
     expect(applied.skippedOverhang).toBe(1);
     const line = reportLines(report({ blocksWithoutCollision: 2 }), applied)
       .find((l) => l.startsWith('skipped:'));
-    expect(line).toMatch(/^skipped: 1 block keeps no shape — its id is past the end/);
+    expect(line).toMatch(/^skipped: 1 block keeps no shape because its id is past the end/);
   });
 });
 

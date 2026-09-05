@@ -484,7 +484,7 @@ describe('the label — the strip\'s only surface', () => {
 
   it('a refusal is stated on the line, never swallowed, with the reasoning on the hint', () => {
     const r = resolveStripDrag(drag({ anchorSlot: 4, releaseSlot: 20 }));
-    expect(stripDragLabel(r)).toMatch(/^no range — /);
+    expect(stripDragLabel(r)).toMatch(/^no range: /);
     expect(stripDragLabel(r)).toContain('already belong to tile animations');
     expect(stripDragHint(r)).toContain('animated prefix');
     // The line is a summary of the hint, never the whole of it.

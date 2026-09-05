@@ -174,7 +174,7 @@ export function performMapFlip(axis: FlipAxis): FlipOutcome {
   if (!cmd) {
     // A rectangle that is already its own mirror. An empty undo step would be
     // worse than a sentence.
-    toast(`Nothing to flip — this selection already reads the same ${
+    toast(`Nothing to flip: this selection already reads the same ${
       axis === 'h' ? 'left to right' : 'top to bottom'}.`, 'info');
     return { kind: 'selection', changed: false, ghostRepainted: false };
   }
@@ -190,7 +190,7 @@ export function performMapFlip(axis: FlipAxis): FlipOutcome {
   // silent.
   const reason = artOnlyReason(m.col, m.row, m.w, m.h);
   toast(
-    reason ? `${flipDescription(axis, label)} — art only. ${reason}`
+    reason ? `${flipDescription(axis, label)}: art only. ${reason}`
       : flipDescription(axis, label),
     reason ? 'info' : 'success');
   return { kind: 'selection', changed: true, ghostRepainted: false };

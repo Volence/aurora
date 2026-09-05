@@ -79,7 +79,7 @@ export async function startBuildAndRunWithToasts(): Promise<void> {
   const r = await startBuildAndRun();
   if (r.route === 'none') {
     useToastStore.getState().addToast(
-      'Build & Run needs a project open — aeon or a classic disassembly', 'info');
+      'Build & Run needs a project open: aeon or a classic disassembly', 'info');
     return;
   }
   if (!r.ran) return;                       // the save already said why

@@ -47,8 +47,8 @@ describe('aeonObjectSchema', () => {
     const type = aeonObjectSchema(LIBRARY, 'ring')[0];
     if (type.kind !== 'select') throw new Error('type field must be a select');
     expect(type.options).toEqual([
-      { value: 'ring', label: 'ring — Ring' },
-      { value: 'spike', label: 'spike — Spike' },
+      { value: 'ring', label: 'ring · Ring' },
+      { value: 'spike', label: 'spike · Spike' },
     ]);
   });
 

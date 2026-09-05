@@ -98,7 +98,7 @@ export function commitReachNote(width: number, height: number): string | null {
   if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
   if (width >= CHUNK_PX && height >= CHUNK_PX) return null;
   return `Smaller than one ${CHUNK_PX}x${CHUNK_PX} chunk, so this cannot be committed into a level `
-    + 'as it stands — commit works on whole chunks. Fine for art you will paste or import from.';
+    + 'as it stands: commit works on whole chunks. Fine for art you will paste or import from.';
 }
 
 /** Which field a refusal is about, so the dialog can point at it. */
@@ -161,7 +161,7 @@ export function newCanvasFieldErrors(
       // user to assume Aurora means some other kind of already.
       errors.name =
         `A canvas named "${clash}" already exists (${canvasPngPath(clash)}). `
-        + 'Creating over it would replace that art with a blank canvas — pick another name, '
+        + 'Creating over it would replace that art with a blank canvas; pick another name, '
         + 'or open the existing one from the Explorer.';
     }
   }

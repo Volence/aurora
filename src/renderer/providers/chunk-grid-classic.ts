@@ -52,7 +52,7 @@ export function classicChunkLabel(id: string): string {
 
 export function classicChunkTitle(id: string): string {
   return Number(id) === 0
-    ? 'Air ($00) — stamp to erase a cell'
+    ? 'Air ($00): stamp to erase a cell'
     : `Chunk ${hexLabel(Number(id))}`;
 }
 

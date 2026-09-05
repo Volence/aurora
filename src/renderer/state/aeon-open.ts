@@ -123,7 +123,7 @@ export async function openAeonProject(dir: string): Promise<boolean> {
       const rest = unresolved.length - Math.min(3, unresolved.length);
       useToastStore.getState().addToast(
         `${unresolved.length} background${unresolved.length === 1 ? '' : 's'} named by this ` +
-        `zone's library could not be opened — ${shown}${rest > 0 ? `, +${rest} more` : ''}. ` +
+        `zone's library could not be opened: ${shown}${rest > 0 ? `, +${rest} more` : ''}. ` +
         'Their layout/tile files are not in this checkout; sections that reference them show ' +
         'the act default. Editing still works, and saving will not drop their names.',
         'warning');

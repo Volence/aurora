@@ -189,7 +189,7 @@ export async function bootRestoreTo(
       // wherever this stopped.
       return {
         restored: false, gate: BootRestoreGate.InitNotReached, resumed: false,
-        error: `the boot never reached ${BOOT_INIT_SYMBOL} — no write window`,
+        error: `the boot never reached ${BOOT_INIT_SYMBOL}: no write window`,
       };
     }
 

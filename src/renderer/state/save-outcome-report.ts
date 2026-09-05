@@ -120,7 +120,7 @@ export function reportSaveOutcomes(outcomes: readonly SaveOutcome[], noun: strin
   for (const [type, ids] of byChannel) {
     const what = type === 'error' ? 'could not be fully saved' : 'were saved with something to report';
     toast(
-      `${ids.length} ${noun}${ids.length === 1 ? '' : 's'} ${what} — ${nameSome(ids)}. ` +
+      `${ids.length} ${noun}${ids.length === 1 ? '' : 's'} ${what}: ${nameSome(ids)}. ` +
       'Each one and its own reason is in the developer console.',
       type,
     );

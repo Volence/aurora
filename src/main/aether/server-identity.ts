@@ -150,7 +150,7 @@ export function identifyServer(init: InitializeIdentityFields): ServerIdentity {
       refusal:
         'The Aether server did not say WHICH implementation it is. `implementation` is a required '
         + 'field of the initialize result (protocol.md §2.1), and without it Aurora cannot tell the '
-        + `Rust core (${SUPPORTED_IMPLEMENTATION}) from the legacy C++ server — they resolve the same `
+        + `Rust core (${SUPPORTED_IMPLEMENTATION}) from the legacy C++ server: they resolve the same `
         + 'socket path and only the first to hold it answers. Refusing rather than guessing. '
         + `Build: ${describeBuild(serverBuild)}.`,
       warning: null,
@@ -164,7 +164,7 @@ export function identifyServer(init: InitializeIdentityFields): ServerIdentity {
       serverBuild,
       verdict: 'superseded',
       refusal:
-        `The Aether socket is held by "${implementation}" — ${supersededReason}. Aurora drives `
+        `The Aether socket is held by "${implementation}": ${supersededReason}. Aurora drives `
         + `"${SUPPORTED_IMPLEMENTATION}". Stop that server (or point ORACLE_SOCKET elsewhere) and `
         + `reconnect. Build: ${describeBuild(serverBuild)}.`,
       warning: null,
@@ -180,8 +180,8 @@ export function identifyServer(init: InitializeIdentityFields): ServerIdentity {
       warning:
         `The Aether server reports implementation "${implementation}", which this build of Aurora `
         + `does not know (it drives "${SUPPORTED_IMPLEMENTATION}"). That is either a protocol.md §2.1 `
-        + 'registry amendment newer than this client — legitimate, and not a reason to refuse a '
-        + 'session — or a server that is not what it claims. Proceeding, loudly. '
+        + 'registry amendment newer than this client (legitimate, and not a reason to refuse a '
+        + 'session) or a server that is not what it claims. Proceeding, loudly. '
         + `Build: ${describeBuild(serverBuild)}.`,
     };
   }

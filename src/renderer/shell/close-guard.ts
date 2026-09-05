@@ -57,7 +57,7 @@ export async function confirmAppClose(): Promise<boolean> {
     // as a hang.
     if (planProjectOpen(currentOpenDirtySnapshot()).kind === 'confirm') {
       useToastStore.getState().addToast(
-        'Close cancelled — unsaved changes remain (save or discard them first).',
+        'Close cancelled: unsaved changes remain (save or discard them first).',
         'error',
       );
       return false;

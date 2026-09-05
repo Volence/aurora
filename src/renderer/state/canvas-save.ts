@@ -91,7 +91,7 @@ export async function saveCanvasDocument(
       // its dot so a retry is possible.
       if (p) refreshBaselines(docId, p.pngMtimeMs, p.sidecarMtimeMs);
       throw new Error(
-        `${res.error} — ${p ? p.unwritten.length + 1 : 'some'} file(s) of this canvas did not land. ` +
+        `${res.error}: ${p ? p.unwritten.length + 1 : 'some'} file(s) of this canvas did not land. ` +
         'The canvas is still marked unsaved; fix the error and save again.',
       );
     }
@@ -110,7 +110,7 @@ export async function saveCanvasDocument(
     if (res.kind === 'channel-error') {
       // The disk state is UNKNOWN — the call never came back — so deliberately
       // refresh no baselines. Same posture as classic-save.ts's channel-error.
-      throw new Error(`${res.error} — the canvas may or may not have been written; reopen it to check.`);
+      throw new Error(`${res.error}: the canvas may or may not have been written; reopen it to check.`);
     }
     throw new Error(res.error); // invalid-name: nothing was sent to disk
   }
@@ -124,7 +124,7 @@ export async function saveCanvasDocument(
   // is the silent case: the dot would have cleared over unsaved pixels.
   if (!cleared) {
     say(
-      `Saved "${doc.name}", but edits made during the save are still unsaved — save again`,
+      `Saved "${doc.name}", but edits made during the save are still unsaved; save again`,
       'info',
     );
   }

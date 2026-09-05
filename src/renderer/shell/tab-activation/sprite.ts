@@ -280,7 +280,7 @@ export async function confirmCloseSpriteDoc(docId: string): Promise<boolean> {
     body: canSave
       ? 'Closing this sprite tab discards its unsaved edits and undo history.'
       : 'Closing this sprite tab discards its unsaved edits and undo history. '
-        + 'This sprite has no save-back file — export it from the sprite editor to keep the edits.',
+        + 'This sprite has no save-back file; export it from the sprite editor to keep the edits.',
     buttons: [
       ...(canSave ? [{ key: 'save', label: 'Save & close', tone: 'primary' as const }] : []),
       { key: 'discard', label: 'Discard & close', tone: 'danger' as const },
@@ -297,7 +297,7 @@ export async function confirmCloseSpriteDoc(docId: string): Promise<boolean> {
     // protect. Abort and say so — a silent abort looks like a dead button.
     if (spriteDocState(docId)?.unsavedEdits) {
       useToastStore.getState().addToast(
-        'Close cancelled — the sprite art could not be saved.', 'error');
+        'Close cancelled: the sprite art could not be saved.', 'error');
       return false;
     }
     return true;

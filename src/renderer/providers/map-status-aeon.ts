@@ -26,9 +26,9 @@ const AETHER = React.createElement(AetherStatus);
  * than the shared hint in workspace/tool-meta.ts.
  */
 export function stampContext(chunkCount: number, selectedChunkId: string | null): string {
-  if (chunkCount === 0) return 'No chunks loaded — import chunks first';
+  if (chunkCount === 0) return 'No chunks loaded; import chunks first';
   if (!selectedChunkId) return 'Select a chunk from the library panel';
-  return `Chunk: ${selectedChunkId} — Alt: art only`;
+  return `Chunk: ${selectedChunkId} · Alt: art only`;
 }
 
 /**
@@ -54,7 +54,7 @@ export function sectionScope(
   const dangling = danglingBgRef(bgRef, bgLibrary);
   return dangling === null
     ? `Section ${activeSectionIndex}`
-    : `Section ${activeSectionIndex} · BG ${dangling} missing — showing act default`;
+    : `Section ${activeSectionIndex} · BG ${dangling} missing, showing act default`;
 }
 
 export function useAeonMapStatusPort(): MapStatusPort {

@@ -589,7 +589,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         throw new Error(`chunk size must be 1-64 tiles per axis, got ${req.w}x${req.h}`);
       }
       if (req.w % 2 !== 0 || req.h % 2 !== 0) {
-        throw new Error(`chunk size (${req.w}x${req.h}) must be even — collision cells are 16px/2-tile aligned`);
+        throw new Error(`chunk size (${req.w}x${req.h}) must be even: collision cells are 16px/2-tile aligned`);
       }
       if (!Array.isArray(req.entries) || req.entries.length !== req.w * req.h) {
         throw new Error(`entries length ${Array.isArray(req.entries) ? req.entries.length : typeof req.entries} != ${req.w}x${req.h}`);
@@ -646,7 +646,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         throw new Error(`chunk ${chunk.widthTiles}x${chunk.heightTiles} at (${req.x},${req.y}) is out of bounds (section is ${SECTION_TILES_WIDE}x${SECTION_TILES_HIGH} tiles)`);
       }
       if (req.x % 2 !== 0 || req.y % 2 !== 0) {
-        throw new Error(`stamp position (${req.x},${req.y}) must be even — collision cells are 16px/2-tile aligned`);
+        throw new Error(`stamp position (${req.x},${req.y}) must be even: collision cells are 16px/2-tile aligned`);
       }
 
       // Lazily seed both collision planes before stamping, same as the UI tool.
@@ -713,7 +713,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         throw new Error(
           `the BG tile blob holds 1-${BG_TILE_CAPACITY} tiles, got `
           + `${Array.isArray(req.tiles) ? req.tiles.length : typeof req.tiles}. `
-          + `${BG_TILE_CAPACITY} is the BG VRAM region $8000..$B7FF, not a policy — the sprite `
+          + `${BG_TILE_CAPACITY} is the BG VRAM region $8000..$B7FF, not a policy: the sprite `
           + `attribute table sits at $B800, so tile ${BG_TILE_CAPACITY} would spray into it.`,
         );
       }
@@ -789,7 +789,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
             throw new Error(
               `bg "${req.bgId}" (${named.name}) is named by the zone's bglib manifest but its ` +
               'layout/tile binaries are not in this checkout, so there is nothing to display. ' +
-              'Aeon tracks the manifest and not the bodies — the files have to come from the ' +
+              'Aeon tracks the manifest and not the bodies: the files have to come from the ' +
               'authoring machine before this ref can resolve.');
           }
           throw new Error(`bg "${req.bgId}" not found in the library (use list-bgs)`);
@@ -1187,7 +1187,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         // Stated on every reply because it is the fact that decides which of the
         // two authoring doors an agent should reach for.
         note: '`driver` names the scalar source (camera_x/camera_y/timer) and NEVER an axis; '
-          + 'which way a band moves is its own `axis` key — horizontal (the default, scrolls '
+          + 'which way a band moves is its own `axis` key: horizontal (the default, scrolls '
           + 'LEFT) or vertical (scrolls UP). Adding a band grows the tile blob; promoting an '
           + 'existing static range does not.',
         actSections: ctx.act.sections.length,
@@ -1266,7 +1266,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       await ensureLayoutFacet();
       requireProject();
       const canvas = document.getElementById('map-canvas') as HTMLCanvasElement | null;
-      if (!canvas) throw new Error('map canvas not found — is the viewport mounted?');
+      if (!canvas) throw new Error('map canvas not found; is the viewport mounted?');
       const view = useViewStore.getState();
       const prevShowBg = view.overlays.showBgPlane;
       if (req.showBg) view.setOverlay('showBgPlane', true);
@@ -1364,7 +1364,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         if (Object.values(loaded.dirty).some(Boolean)) {
           throw new Error(
             `Unsaved changes in ${loaded.ref?.label ?? 'the loaded act'}. Reading ${req.zone}/${req.act} ` +
-            'reloads from disk and would discard them — save first (classic-save-level), then retry.',
+            'reloads from disk and would discard them; save first (classic-save-level), then retry.',
           );
         }
         await useClassicLevelStore.getState().openAct(ref);
@@ -1519,16 +1519,16 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
           return result;
         case 'conflict':
           throw new Error(
-            `Save aborted — ${result.conflicts.length} file(s) changed on disk since the act was read ` +
+            `Save aborted: ${result.conflicts.length} file(s) changed on disk since the act was read ` +
             `(${result.conflicts.slice(0, 3).join(', ')}). Reopen the act to pick up the external changes.`,
           );
         case 'partial':
           throw new Error(
-            `Save incomplete — the write failed at ${result.failed.path} (${result.failed.message}); ` +
+            `Save incomplete: the write failed at ${result.failed.path} (${result.failed.message}); ` +
             `${result.unwritten.length} further file(s) did not land. The act is still marked unsaved.`,
           );
         case 'error':
-          throw new Error('Save failed — see the editor notice for the reason. Nothing was written.');
+          throw new Error('Save failed: see the editor notice for the reason. Nothing was written.');
       }
     }
 
@@ -1679,7 +1679,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         // aeon's line 0 is the character palette; the engine owns it. The
         // store refuses it silently, so the refusal is said HERE, in words.
         if (req.line === 0) {
-          return { pushed: false, reason: 'line 0 is the character palette on aeon — the engine owns it' };
+          return { pushed: false, reason: 'line 0 is the character palette on aeon; the engine owns it' };
         }
         words = colors.map(encodeGenesisColor);
       }
@@ -1693,10 +1693,10 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
           // not serve the lookup — is a confident wrong answer that sends them
           // to rebuild something that was never at fault.
           reason: s.palette
-            ? `the running ROM carries ${s.paletteKind} palette symbols, not ${kind} — wrong emulator for this project`
+            ? `the running ROM carries ${s.paletteKind} palette symbols, not ${kind}; wrong emulator for this project`
             : s.paletteUnservedMethod
-              ? `the connected Aether server does not serve ${s.paletteUnservedMethod}, so the live-palette symbols were never looked up — this is a server gap, not a ROM problem`
-              : 'this ROM has no live-palette symbols — live palette is unavailable',
+              ? `the connected Aether server does not serve ${s.paletteUnservedMethod}, so the live-palette symbols were never looked up; this is a server gap, not a ROM problem`
+              : 'this ROM has no live-palette symbols; live palette is unavailable',
         };
       }
       s.pushPaletteLine(req.line, words, kind);
@@ -1719,9 +1719,9 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       // always precedes the build on both routes.
       const { startBuildAndRun } = await import('../state/build-and-run');
       const routed = await startBuildAndRun();
-      if (routed.route === 'none') throw new Error('build_and_run needs a project open — aeon or a classic disassembly');
+      if (routed.route === 'none') throw new Error('build_and_run needs a project open: aeon or a classic disassembly');
       if (!routed.ran) {
-        return { ok: false, summary: 'the pre-build save failed, so the build was refused — it would have assembled the previous state' };
+        return { ok: false, summary: 'the pre-build save failed, so the build was refused: it would have assembled the previous state' };
       }
       const after = useAetherStore.getState();
       return {

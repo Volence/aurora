@@ -340,7 +340,7 @@ export function rasterTimelineSpaceNotice(
 ): string | null {
   if (layerTopSpace(scene) === 'screen') return null;
   return `Plane B tracks the camera (v_factor ${scene.v_factor}), so a layer top has no `
-    + 'fixed screen line — these rows are where the tops land for THIS camera only, '
+    + 'fixed screen line: these rows are where the tops land for THIS camera only, '
     + 'and the engine refuses a split on this scene.';
 }
 
@@ -426,7 +426,7 @@ export function rasterTimelineAbsences(hasPreset = false): string[] {
  */
 export const RASTER_TIMELINE_GRAMMAR =
   'A split is ONE edge: from its line to the bottom of the frame, until the next split '
-  + 'supersedes it — there is no paired restore and no end line, and nothing here edits one. '
+  + 'supersedes it: there is no paired restore and no end line, and nothing here edits one. '
   + 'A palette band is an INTERVAL with two edges, and those two edges are the ones you drag.';
 
 /**

@@ -212,7 +212,7 @@ describe('resolveStripOpen — which strip double click opens a slot', () => {
     for (const origin of ['library', 'act', 'none'] as const) {
       const out = resolveStripOpen(inputs({ origin }));
       expect(out.kind).toBe('refused');
-      expect(stripOpenLabel(out)).toMatch(/^no edit — /);
+      expect(stripOpenLabel(out)).toMatch(/^no edit: /);
       expect(stripOpenHint(out).length).toBeGreaterThan(stripOpenLabel(out).length);
     }
     // And an `override` origin with no document is the same refusal, not a throw.

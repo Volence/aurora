@@ -280,7 +280,7 @@ export function coverageSubject(
   // nothing is highlighted, and why.
   if (slots === NO_SLOTS_PHRASE) {
     const subject = kind === 'band' ? `tile animation ${bandIndex}` : 'this candidate';
-    return `highlighted: nothing — ${subject} covers ${NO_SLOTS_PHRASE}`;
+    return `highlighted: nothing; ${subject} covers ${NO_SLOTS_PHRASE}`;
   }
   return kind === 'band'
     ? `highlighted: the cells tile animation ${bandIndex} animates (${slots})`

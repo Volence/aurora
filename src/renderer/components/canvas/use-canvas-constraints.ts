@@ -133,8 +133,8 @@ export const BUDGET_TOOLTIP =
  * clash tint and no number anywhere that explains where the stray pixels are.
  */
 export function colorsReadout(perLine: number[], max: number, profileLines = perLine.length): string {
-  const shown = perLine.map((n, i) => (i < profileLines || n > 0 ? String(n) : '—'));
-  while (shown.length > profileLines && shown[shown.length - 1] === '—') shown.pop();
+  const shown = perLine.map((n, i) => (i < profileLines || n > 0 ? String(n) : '--'));
+  while (shown.length > profileLines && shown[shown.length - 1] === '--') shown.pop();
   return `colours ${shown.join('·')} / ${max} per line`;
 }
 

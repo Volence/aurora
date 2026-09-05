@@ -127,7 +127,7 @@ export async function clearChunkLibrary(): Promise<boolean> {
     const answer = await useConfirmStore.getState().ask({
       title: 'Clear the chunk library?',
       body: `This removes all ${count} chunks from the project. Undo will not bring them `
-        + 'back — the only way back is to re-open the project from disk, which loses any '
+        + 'back: the only way back is to re-open the project from disk, which loses any '
         + 'other unsaved edits with it.',
       buttons: [
         { key: 'clear', label: 'Clear library', tone: 'danger' },

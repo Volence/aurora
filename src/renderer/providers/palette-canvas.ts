@@ -194,8 +194,8 @@ export function useCanvasPaletteGridPort(docId: string): PaletteGridPort {
     commit,
     drain: DRAIN_NOTHING,
     title: (line, idx) => (idx === TRANSPARENT_INDEX
-      ? `index 0 — transparent (the eraser); paints ${canvasIndex(line, idx)}`
-      : `line ${line}, index ${idx} — paints ${canvasIndex(line, idx)}`),
+      ? `index 0: transparent (the eraser); paints ${canvasIndex(line, idx)}`
+      : `line ${line}, index ${idx}: paints ${canvasIndex(line, idx)}`),
     heading: (line, idx) => `Line ${line} · Index ${idx}`,
     lineLabel: (line) => String(line),
     hint: 'click a swatch to paint with it · index 0 is the eraser · colours are this canvas’s own',

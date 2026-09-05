@@ -316,9 +316,9 @@ describe('coverageSubject — WHAT the highlight is, in the author\'s words', ()
     const empty: SlotRange = { base: 34, count: 0 };
     expect(rangeCovers(empty, 34)).toBe(false);   // ANTI-VACUOUS: it really owns nothing
     expect(coverageSubject('band', 2, empty))
-      .toBe(`highlighted: nothing — tile animation 2 covers ${NO_SLOTS_PHRASE}`);
+      .toBe(`highlighted: nothing; tile animation 2 covers ${NO_SLOTS_PHRASE}`);
     expect(coverageSubject('candidate', null, empty))
-      .toBe(`highlighted: nothing — this candidate covers ${NO_SLOTS_PHRASE}`);
+      .toBe(`highlighted: nothing; this candidate covers ${NO_SLOTS_PHRASE}`);
     for (const s of [coverageSubject('band', 2, empty), coverageSubject('candidate', null, empty)]) {
       expect(s).not.toContain('..');            // never a backwards `34..33`
       expect(s.startsWith('highlighted:')).toBe(true);

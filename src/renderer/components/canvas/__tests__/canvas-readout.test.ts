@@ -14,7 +14,7 @@ describe('colorsReadout', () => {
   // reports (line-out-of-range). The readout must not hide the pixels, or the
   // artist sees a tint with no number anywhere that explains it.
   it('still shows a line the profile does not have, when it is in use', () => {
-    expect(colorsReadout([5, 0, 3, 0], 15, 1)).toBe('colours 5·—·3 / 15 per line');
+    expect(colorsReadout([5, 0, 3, 0], 15, 1)).toBe('colours 5·--·3 / 15 per line');
   });
 });
 

@@ -31,7 +31,7 @@ export const GUIDES: readonly Guide[] = Object.freeze([
   Object.freeze({
     slug: EFFECTS_GUIDE_SLUG,
     title: 'Backgrounds that move',
-    blurb: 'Parallax, raster bands, palette cycles and tile animations — your first ten minutes.',
+    blurb: 'Parallax, raster bands, palette cycles and tile animations: your first ten minutes.',
     source: effectsFirstRun,
   }),
 ]);

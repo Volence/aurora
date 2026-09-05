@@ -719,7 +719,7 @@ function requireClassicHistory<T>(
   if (!(stack instanceof ctor)) {
     throw new Error(
       `classic commit: document '${id}' holds a ${(stack as object)?.constructor?.name ?? typeof stack}, ` +
-        `not a ${ctor.name} — the history factory built it for a different engine ` +
+        `not a ${ctor.name}: the history factory built it for a different engine ` +
         `(is the classic project actually open?).`,
     );
   }
@@ -1196,7 +1196,7 @@ export function classicCommitCanvas(plan: CanvasCommitPlan): CommandResult {
   for (const def of plan.chunkAppends) nextChunks.push({ cells: def.cells.map((c) => ({ ...c })) });
   if (nextChunks.length > MAX_ADDRESSABLE_CHUNKS) {
     return err(
-      `chunk capacity reached: ${MAX_ADDRESSABLE_CHUNKS} chunks max — engine ids 1..$7F, `
+      `chunk capacity reached: ${MAX_ADDRESSABLE_CHUNKS} chunks max; engine ids 1..$7F, `
       + 'the layout loop bit (bit 7) makes $80+ unaddressable',
     );
   }
@@ -1206,7 +1206,7 @@ export function classicCommitCanvas(plan: CanvasCommitPlan): CommandResult {
     if (!isInt(line) || line < 1 || line > 3) {
       // Line 0 is Sonic's, shared game-wide. The planner refuses drift there;
       // this is the second door, because the save path writes Sonic.bin happily.
-      return err(`palette line ${line} cannot be written by a commit (1..3 only — line 0 is Sonic's)`);
+      return err(`palette line ${line} cannot be written by a commit (1..3 only; line 0 is Sonic's)`);
     }
     if (!(colors instanceof Uint16Array) || colors.length !== 16) {
       return err(`palette line ${line} must have 16 colors (got ${colors?.length})`);
@@ -1268,7 +1268,7 @@ export function classicSetColind(entries: { blockId: number; value: number }[]):
     // here can never apply in game — writing it would be an edit the editor
     // shows and the console ignores.
     if (blockId === 0) {
-      return err('block 0 is the blank block — the engine short-circuits before reading its collision, so a shape here can never apply');
+      return err('block 0 is the blank block: the engine short-circuits before reading its collision, so a shape here can never apply');
     }
     // 1, not 0, is the low bound now: block 0 is refused above with its own
     // reason, so quoting 0..N-1 here would name a range whose first value this
@@ -1284,7 +1284,7 @@ export function classicSetColind(entries: { blockId: number; value: number }[]):
     // Refused rather than guessed; reading the true values needs cross-file
     // reach Aurora does not have. See classicPaintSurface for the same fact.
     if (blockId >= colind.length) {
-      return err(`block ${blockId} is past the end of this zone's collision table (${colind.length} entries) — the overhang resolves into the adjacent zone's table in ROM, so Aurora cannot set it without silently changing other blocks`);
+      return err(`block ${blockId} is past the end of this zone's collision table (${colind.length} entries); the overhang resolves into the adjacent zone's table in ROM, so Aurora cannot set it without silently changing other blocks`);
     }
     if (!isInt(value) || value < 0 || value > 255) {
       return err(`colind value ${value} out of range 0..255`);
@@ -1340,7 +1340,7 @@ export function classicAddChunk(cells?: { index: number; word: number }[]): AddR
   if (!doc) return err('no classic level is open');
   if (doc.chunks.length >= MAX_ADDRESSABLE_CHUNKS) {
     return err(
-      `chunk capacity reached: ${MAX_ADDRESSABLE_CHUNKS} chunks max — engine ids 1..$7F, ` +
+      `chunk capacity reached: ${MAX_ADDRESSABLE_CHUNKS} chunks max; engine ids 1..$7F, ` +
         `the layout loop bit (bit 7) makes $80+ unaddressable`,
     );
   }

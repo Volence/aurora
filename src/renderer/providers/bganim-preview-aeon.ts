@@ -327,7 +327,7 @@ export function bandMotion(
  */
 export const BAND_MECHANISM_HINT =
   'A tile animation is a cols x rows tile pattern with 8 frames swapped over the same tiles, so '
-  + 'it scrolls inside its own window — left, or up if its axis is vertical. Every cell that '
+  + 'it scrolls inside its own window: left, or up if its axis is vertical. Every cell that '
   + 'points at it moves the same way.';
 
 export type BandStatusKind = 'previewing' | 'no-cells' | 'refused' | 'unresolved';

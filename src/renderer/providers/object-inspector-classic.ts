@@ -53,7 +53,7 @@ export function classicObjectSchema(currentId: number): readonly ObjectField[] {
   // actors, named for their sprite docs) could never round-trip through objpos.
   const ids = S1_OBJECT_LIST.filter((e) => e.id <= CLASSIC_OBJECT_LIMITS.id).map((e) => e.id);
   const options = (ids.includes(id) ? ids : [...ids, id].sort((a, b) => a - b))
-    .map((id) => ({ value: String(id), label: `${s1ObjectHex(id)} — ${s1ObjectName(id)}` }));
+    .map((id) => ({ value: String(id), label: `${s1ObjectHex(id)} · ${s1ObjectName(id)}` }));
   return [
     { kind: 'select', id: 'id', label: 'Type', options },
     { kind: 'int', id: 'subtype', label: 'Subtype', min: 0, max: CLASSIC_OBJECT_LIMITS.subtype, hex: true, title: 'Subtype (hex byte)' },
@@ -197,7 +197,7 @@ export function useClassicObjectInspectorPort(): ObjectInspectorPort {
     commit,
     title: obj && idx != null ? `Object #${idx} · ${s1ObjectHex(obj.id)}` : '',
     emptyHint: armedId != null
-      ? `Placing ${s1ObjectName(armedId)} — click the map to drop it, or press Esc to cancel.`
+      ? `Placing ${s1ObjectName(armedId)}: click the map to drop it, or press Esc to cancel.`
       : 'No object selected. Pick the Select tool and click a marker.',
     versionKey: `${zone}:${paletteEpoch}:${tileEpoch}:${artVersion}`,
     Preview,

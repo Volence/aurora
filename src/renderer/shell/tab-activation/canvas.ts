@@ -299,7 +299,7 @@ export async function confirmCloseCanvasDoc(docId: string): Promise<boolean> {
       await saveCanvasDocument(docId);
     } catch (e) {
       useToastStore.getState().addToast(
-        `Close cancelled — ${e instanceof Error ? e.message : String(e)}`, 'error');
+        `Close cancelled: ${e instanceof Error ? e.message : String(e)}`, 'error');
       return false;
     }
     // Re-read the flag rather than trusting "it did not throw" (the sprite path's
@@ -307,7 +307,7 @@ export async function confirmCloseCanvasDoc(docId: string): Promise<boolean> {
     // closing would destroy the work Save was meant to protect.
     if (useCanvasStore.getState().isDirty(docId)) {
       useToastStore.getState().addToast(
-        'Close cancelled — the canvas could not be saved.', 'error');
+        'Close cancelled: the canvas could not be saved.', 'error');
       return false;
     }
     return true;
