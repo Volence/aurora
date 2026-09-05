@@ -97,6 +97,20 @@
 // subject has outlived its reason and must be deleted rather than left
 // standing.
 //
+// A TEST TITLE IS AN IDENTIFIER IN PRACTICE, so repair its PUNCTUATION ONLY
+//
+// People grep for titles, and landed plan and review documents quote them.
+// Measured over this parcel's own 1,006 changed titles: 111 had some citation
+// elsewhere in the repo, and 34 of those were quoted IN FULL by a document. A
+// repair that touches only the punctuation region leaves every distinctive word
+// in place, so a grep and a partial quotation both still land; the 77 that were
+// fragment matches survived for exactly that reason. Nothing in this repo
+// SELECTS a test by title (no `--testNamePattern`, no `vitest -t` outside a
+// captured log), so a stale quotation is a stale pointer and not a broken tool.
+// Rewriting the documents was declined on the ruling's own terms: committed
+// history is not retro swept, and a landed review quoting the title as it stood
+// that day is correct as a record. The 34 are listed in this parcel's commit.
+//
 // TWO PROPERTIES THIS FILE HOLDS ABOUT ITSELF
 //
 // SELF-VISIBILITY. `scripts/check-tsx-dashes.mjs` is scoped to `.tsx` and so
