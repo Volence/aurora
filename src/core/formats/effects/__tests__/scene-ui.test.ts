@@ -30,6 +30,8 @@ import {
   EFFECTS_ANCHOR_CHANNEL_BOUNDS,
   EFFECTS_ANCHOR_SHIFT_BOUNDS,
   EFFECTS_ANCHOR_NONE,
+  EFFECTS_LAYER_SHIFT_BOUNDS,
+  EFFECTS_LAYER_SHIFT_NONE,
   isNamedFactor,
   factorLabel,
   isValidSceneId,
@@ -340,6 +342,87 @@ describe('scene-level enumerations and bounds (schema §2.1/§2.2)', () => {
       (scene as unknown as Record<string, unknown>).anchor =
         { at: { ...seed(), [field]: max + 1 } };
       expect(() => serializeEffectsScene(scene), `anchor.at.${field} ${max + 1} was accepted`)
+        .toThrow(new RegExp(`${field}: ${max + 1} is above the maximum ${max}`));
+    }
+  });
+
+  /**
+   * A LAYER'S OWN dsa/dsb, DERIVED FROM `$defs/layer` AND FROM NOWHERE ELSE.
+   *
+   * Three shift spaces in this contract read 0..15 today: a layer's plain
+   * `dsa`/`dsb`, `$defs/layerDeform`'s `own.shift_a`/`shift_b`, and the anchor's
+   * `at.dsa`/`dsb`. Sharing a bound between any two of them is one line and
+   * looks harmless while the numbers agree. It is the coupling that INVERTS a
+   * control the day one moves: the sentinel would be offered as a rung and the
+   * loudest rung labelled off. Walked by hand out of the raw JSON, by a
+   * different route than the module takes.
+   */
+  it('reads a LAYER\'s dsa/dsb bounds out of $defs.layer, not out of the two neighbouring shift spaces', () => {
+    const lp = S.$defs.layer.properties;
+    expect(EFFECTS_LAYER_SHIFT_BOUNDS.dsa).toEqual({ min: lp.dsa.minimum, max: lp.dsa.maximum });
+    expect(EFFECTS_LAYER_SHIFT_BOUNDS.dsb).toEqual({ min: lp.dsb.minimum, max: lp.dsb.maximum });
+    // ANTI-VACUOUS: the three spaces are three DISTINCT schema nodes, so the two
+    // walks above landed somewhere the other constants do not reach. (Their
+    // VALUES agree today — that is the coincidence, and asserting the values
+    // differed would be asserting the bug.)
+    const ownArm = S.$defs.layerDeform.oneOf.find((b: any) => b?.properties?.own);
+    expect(ownArm, 'the schema no longer has a layerDeform `own` branch').toBeTruthy();
+    expect(ownArm.properties.own.properties.shift_a).not.toBe(lp.dsa);
+    const atArm = S.properties.anchor.oneOf.find((b: any) => b?.properties?.at);
+    expect(atArm.properties.at.properties.dsa).not.toBe(lp.dsa);
+  });
+
+  /**
+   * THE SENTINEL IS SAID TWICE AND THE TWO MUST AGREE.
+   *
+   * `maximum` makes 15 the top of the range — the value a clamping control
+   * authors by accident. `default` makes 15 the value an ABSENT key already
+   * means — which is what licenses OFF to clear the key instead of writing it,
+   * and it is aeon's `layer(… dsa: int = 15, dsb: int = 15)` from the other
+   * side. The control rests on both sentences, so this row asserts they are the
+   * same number rather than trusting that they still are.
+   *
+   * ⚠ THE ANCHOR'S PAIR COULD NOT HAVE THIS ROW, and the difference is the whole
+   * reason the two controls WRITE differently: `anchor.at` declares channel, dsa
+   * and dsb all `required` with no default, so an anchor's sentinel must be
+   * SPELLED. A layer's is optional and defaulted, so it need not be.
+   */
+  it('derives a layer\'s no-deform sentinel from BOTH maximum and default, and they agree', () => {
+    const lp = S.$defs.layer.properties;
+    for (const field of ['dsa', 'dsb'] as const) {
+      expect(EFFECTS_LAYER_SHIFT_NONE, field).toBe(lp[field].maximum);
+      expect(EFFECTS_LAYER_SHIFT_NONE, field).toBe(lp[field].default);
+    }
+    // The structural asymmetry this row's docblock rests on, asserted rather
+    // than asserted-in-prose: the layer's pair is OPTIONAL and defaulted, the
+    // anchor's is REQUIRED and undefaulted.
+    expect(S.$defs.layer.required).not.toContain('dsa');
+    expect(S.$defs.layer.required).not.toContain('dsb');
+    const atArm = S.properties.anchor.oneOf.find((b: any) => b?.properties?.at);
+    expect(atArm.properties.at.required).toContain('dsa');
+    expect(atArm.properties.at.properties.dsa.default).toBeUndefined();
+  });
+
+  it('offers a layer dsa/dsb range the codec really enforces at both ends', () => {
+    // ANTI-VACUOUS, on the anchor row's pattern: every legal value serializes
+    // and one past each end is refused in the bounds rule's own wording. A
+    // ladder over a range nothing enforces would otherwise look identical.
+    for (const field of ['dsa', 'dsb'] as const) {
+      const { min, max } = EFFECTS_LAYER_SHIFT_BOUNDS[field];
+      for (let v = min; v <= max; v++) {
+        const scene = newEffectsScene('probe');
+        (scene.layers[0] as unknown as Record<string, unknown>)[field] = v;
+        expect(() => serializeEffectsScene(scene), `layer ${field} ${v} was refused`).not.toThrow();
+        // Round-tripped, not merely accepted — a writer for this key depends on
+        // reading back what it wrote.
+        expect(parseEffectsScene(serializeEffectsScene(scene), 'probe').layers[0][field]).toBe(v);
+      }
+      const scene = newEffectsScene('probe');
+      (scene.layers[0] as unknown as Record<string, unknown>)[field] = min - 1;
+      expect(() => serializeEffectsScene(scene), `layer ${field} ${min - 1} was accepted`)
+        .toThrow(new RegExp(`${field}: ${min - 1} is below the minimum ${min}`));
+      (scene.layers[0] as unknown as Record<string, unknown>)[field] = max + 1;
+      expect(() => serializeEffectsScene(scene), `layer ${field} ${max + 1} was accepted`)
         .toThrow(new RegExp(`${field}: ${max + 1} is above the maximum ${max}`));
     }
   });

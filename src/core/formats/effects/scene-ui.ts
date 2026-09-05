@@ -377,6 +377,95 @@ export const EFFECTS_LAYER_DEFORM_BOUNDS = Object.freeze({
 });
 
 /**
+ * A LAYER's own `dsa`/`dsb` — the THIRD shift space in this contract, and the
+ * one a strip authors directly.
+ *
+ * ⚠ IT IS NOT `EFFECTS_LAYER_DEFORM_BOUNDS` AND IT IS NOT
+ * `EFFECTS_ANCHOR_SHIFT_BOUNDS`, and all three are 0..15 today. The three live
+ * in three different schema nodes:
+ *
+ *   · `$defs/layer/properties/dsa` — THIS one, the strip's plain amplitude;
+ *   · `$defs/layerDeform`'s `own.shift_a` — the same wire byte reached through
+ *     an attached table (they lower into the SAME record fields, which is what
+ *     §2.2's two-sources guard is about);
+ *   · `properties/anchor`'s `at.dsa` — the overlay's, on a different object.
+ *
+ * They agree by coincidence, not by construction, and the coincidence has
+ * already been leaned on: `layerCurveDeformAdvisory` read a LAYER's sentinel out
+ * of `EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.max` because the numbers matched. That
+ * is the exact reading `EFFECTS_ANCHOR_SHIFT_BOUNDS`' docblock records as the
+ * hazard, one node over. An amendment moving any one of the three would leave
+ * the others silently testing the wrong sentinel, and a wrong sentinel here
+ * INVERTS a control: the value that means "no deform" would be offered as a
+ * rung and the loudest rung would be labelled off.
+ *
+ * NOT POOLED WITH `phase` EITHER, which is this def's neighbouring number and
+ * the analogue of the anchor's `channel`: `phase` is 0..255 with default 0, an
+ * ORDINAL into the sample table where 0 is a legal phase meaning "no offset",
+ * not an off switch. Its top is an ordinary phase. Clamping a shift toward its
+ * top authors silence; clamping a phase toward its top authors a different
+ * phase. Two different hazards, so two different derivations.
+ *
+ * ⚠ A VALUE COMPARISON CANNOT DEFEND THIS. All three spaces read 0..15, so a
+ * test asserting this constant equals `$defs.layer.properties.dsa`'s bounds
+ * passes just as well when it has been pooled with either neighbour. The rows
+ * that actually hold the separation are in
+ * `__tests__/layer-shift-derivation.test.ts`, which moves one node at a time and
+ * asserts which constants followed.
+ */
+export const EFFECTS_LAYER_SHIFT_BOUNDS = Object.freeze({
+  dsa: boundsAt('$defs', 'layer', 'properties', 'dsa'),
+  dsb: boundsAt('$defs', 'layer', 'properties', 'dsb'),
+});
+
+/**
+ * The value that means NO DEFORM on one of a layer's two planes — derived
+ * TWICE, from two independent statements in the contract, and checked.
+ *
+ * The schema says the same fact in two places for these fields: `maximum` is 15
+ * and `default` is 15. That is not redundancy to collapse, it is a cross-check
+ * this module gets for free and the anchor's pair could not have — `anchor.at`
+ * declares all three of its keys `required` with NO default, so its sentinel is
+ * derivable only from `maximum`. Here the two must agree, because the whole
+ * write rule rests on them being the same number:
+ *
+ *   · `maximum` = 15 makes it the TOP OF THE RANGE, which is why a clamping
+ *     control authors it by accident (`[[top-of-range-is-a-sentinel]]`);
+ *   · `default` = 15 makes it the ABSENT value, which is why OFF may clear the
+ *     key instead of writing it (aeon's `layer(… dsa: int = 15, dsb: int = 15)`
+ *     from the other side — an omitted key and a spelled 15 are one document).
+ *
+ * A contract that decoupled them would mean one of those two sentences had
+ * stopped being true without the other, and the control built on both would be
+ * half wrong in a way nothing on screen could show. It throws instead.
+ */
+export const EFFECTS_LAYER_SHIFT_NONE: number = (() => {
+  const defaults = at('$defs', 'layer', 'properties');
+  for (const field of ['dsa', 'dsb'] as const) {
+    const { max } = EFFECTS_LAYER_SHIFT_BOUNDS[field];
+    const dflt = (defaults[field] as Record<string, unknown>).default;
+    if (dflt !== max) {
+      throw new Error(
+        `effects scene schema $defs.layer.properties.${field} declares maximum ${max} but `
+        + `default ${JSON.stringify(dflt)} — the no-deform sentinel is derived from BOTH (the `
+        + 'top of the range a control must not clamp into, and the value an absent key already '
+        + 'means). Those two have just stopped being the same number; re-derive the layer '
+        + 'deform ladder and its clear rule against the amended contract.',
+      );
+    }
+  }
+  const { max } = EFFECTS_LAYER_SHIFT_BOUNDS.dsa;
+  if (max !== EFFECTS_LAYER_SHIFT_BOUNDS.dsb.max) {
+    throw new Error(
+      'effects scene schema $defs.layer.properties dsa/dsb no longer share a maximum — the '
+      + 'no-deform sentinel is per FIELD from here on; split this constant before building a '
+      + 'ladder from it.',
+    );
+  }
+  return max;
+})();
+
+/**
  * `anchor.at`'s two deform shifts — the anchor's OWN bounds, not a layer's.
  *
  * A SECOND SHIFT SPACE THAT LOOKS LIKE THE FIRST. The anchor overlay carries
