@@ -242,7 +242,21 @@ export interface EffectsChannelBand {
   lo: number;
   /** Bottommost screen line the boundary may sit on. */
   hi: number;
-  /** INCLUSIVE count of lines in [lo, hi]. A sweep of travel == lines is the widest that fits. */
+  /**
+   * INCLUSIVE count of lines in [lo, hi].
+   *
+   * ⚠ STATED ONLY IN THE REFUSAL DIRECTION, deliberately, and do not "improve"
+   * it back: travel EXCEEDING `lines` is a CERTAIN refusal; travel within
+   * `lines` is CANNOT TELL and is NEVER a clearance, because the latched line
+   * is (anchor - Camera_Y) and where the sweep sits inside [lo, hi] is
+   * camera-dependent and unknowable at author time. This comment read "a sweep
+   * of travel == lines is the widest that fits" until 2026-09-05 — the same
+   * clearance-shaped phrasing aeon removed from `how_to_use` at their
+   * `b8913cda`, left behind here because the fix travelled to where the rule is
+   * PARSED and not to where it is DESCRIBED. `AnchorBandFit` has no `fits`
+   * member at the type level, so this was prose a reader could act on and code
+   * could not.
+   */
   lines: number;
   /** Where the band is declared, in aeon's source. */
   source: string;
