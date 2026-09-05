@@ -207,7 +207,7 @@ function announceAlias(aliasName, canonicalName) {
   if (announced.has(aliasName)) return;
   announced.add(aliasName);
   process.stderr.write(
-    `suite-paths: ${aliasName} is a transitional alias — set ${canonicalName} instead `
+    `suite-paths: ${aliasName} is a transitional alias; set ${canonicalName} instead `
     + '(empyrean contract/SUITE_PATHS.md)\n',
   );
 }

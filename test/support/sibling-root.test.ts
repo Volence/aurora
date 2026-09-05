@@ -1211,7 +1211,7 @@ describe('sibling-root: AURORA_DIR: this repo\'s own checkout, OBSERVED', () => 
     const lines = out.stderr.trim().split('\n').filter(Boolean);
     expect(lines).toHaveLength(1);
     expect(lines[0]).toBe(
-      'suite-paths: AURORA_ROOT is a transitional alias — set AURORA_DIR instead '
+      'suite-paths: AURORA_ROOT is a transitional alias; set AURORA_DIR instead '
       + '(empyrean contract/SUITE_PATHS.md)',
     );
   });
@@ -1232,7 +1232,7 @@ describe('sibling-root: AURORA_DIR: this repo\'s own checkout, OBSERVED', () => 
     const here = observed();
     const out = runBoth('process.stdout.write(R.AURORA_DIR);', { AURORA_REPO: here });
     expect(out.stdout).toBe(here);
-    expect(out.stderr).toContain('AURORA_REPO is a transitional alias — set AURORA_DIR instead');
+    expect(out.stderr).toContain('AURORA_REPO is a transitional alias; set AURORA_DIR instead');
   });
 
   it('the canonical name and an alias that DISAGREE are refused BEFORE either is checked', () => {
