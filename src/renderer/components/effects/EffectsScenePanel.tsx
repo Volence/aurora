@@ -64,6 +64,7 @@ import type { FactorOption, FactorFieldOption } from '../../providers/effects-ae
 // its reader: see the deform row.
 import { advisoryLayerDeformConflicts } from '../../../core/formats/effects/scene';
 import { actReach, bandReach, bandReachClause, verticalWrapAdvisory } from '../../canvas/bg-wrap';
+import { rowRemapReachAdvisory, rowRemapSpanRestriction } from '../../canvas/row-remap-span';
 import {
   factorOptions, clampPackedField,
   factorFieldSelectValue, factorFieldFromSelect, NONE_FACTOR_VALUE,
@@ -1028,6 +1029,23 @@ export default function EffectsScenePanel(): React.ReactElement {
                 const why = planeYRefusal[i] ?? null;
                 const unbuildable = rr === null ? null : rowRemapBuildableToday(rr.height_shift);
                 const unmet = selected === null ? [] : rowRemapPreconditions(selected, i);
+                // THE ONE THING ABOUT A REMAP THAT IS A FUNCTION OF THE OPEN
+                // DOCUMENT AND NOTHING ELSE. `n = min(|p|, span/2)` in
+                // parallax.emp, so a band shorter than twice the ladder's
+                // deepest step clips the effect, and a band under two lines
+                // turns it off entirely. Both are warnings and neither refuses:
+                // aeon's generator accepts these documents today, and a control
+                // that refused what the generator accepts would be a bound
+                // Aurora invented. See canvas/row-remap-span.ts, including why
+                // the silent arm is NOT a clearance.
+                //
+                // ⚠ THE RESTRICTION RENDERS AS ITS OWN NOTE, not as silence. On
+                // an unlocked scene the span is a per-frame quantity and the
+                // check does not run; a panel that showed nothing would be
+                // telling the author the check ran and found nothing, which is
+                // the "partial coverage beats none at hiding" failure.
+                const reach = selected === null ? null : rowRemapReachAdvisory(selected, i);
+                const spanUnknown = selected === null ? null : rowRemapSpanRestriction(selected, i);
                 return (
                   <>
                     <Field label={LAYER_ROW_REMAP_ROW.label} title={LAYER_ROW_REMAP_ROW.title}>
@@ -1079,6 +1097,18 @@ export default function EffectsScenePanel(): React.ReactElement {
                         screen: a testid that asserts nothing, found by driving
                         the app rather than by reading the source. The extras
                         line below already wraps for the same reason. */}
+                    {reach !== null && (
+                      <Hint under tone="warning">
+                        <span data-testid={`layer-${i}-rowremap-reach`}>{reach}</span>
+                      </Hint>
+                    )}
+                    {spanUnknown !== null && (
+                      <Hint under>
+                        <span data-testid={`layer-${i}-rowremap-span-unknown`}>
+                          {`The band-span check did not run: ${spanUnknown}`}
+                        </span>
+                      </Hint>
+                    )}
                     {unmet.map((m) => (
                       <Hint key={m} under tone="warning">
                         <span data-testid={`layer-${i}-rowremap-precondition`}>{m}</span>
