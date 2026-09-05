@@ -113,6 +113,8 @@ adopted back. Read them there, not from this summary.)*
 written HERE as well as there, never only there.** `docs/lane-status.json`: title ≤240, ≤20 rows,
 ≤12 KB — assert the three in the script that writes it, don't read them back afterwards.
 
+**Run `npm run check:lane-status` after EVERY write to that file.** The Dominion console validates the `state` enum but NOT the exactly-one-`next` rule, so a queue with zero next rows renders as `ok` and reads to your successor as a lane with nothing to do — indistinguishable from one that is genuinely idle. That happened twice in one night on 2026-09-04/05, the second time two hours after banking a note telling myself not to; a note did not hold and this check does. It also catches duplicate queue ids (a wholesale rewrite reintroducing a row you deliberately removed), unknown states, a future `updatedAt` (which makes the reader reject the whole file), and a row marked `doing` with no agent in `inFlight` while `atBoundary` is true. Edit the FIELD, never rebuild the document — then run the check, because editing in a script is exactly when the invariant slips.
+
 **(1)** A bar that COPIED protocol text becomes a pointer — **but only lines a grep finds verbatim
 in `origin/main:docs/OVERSEER-PROTOCOL.md`.** A bar that CITED the protocol and wrote local
 precedent under it is **not** a duplicate, and the two look identical in a listing: same SHA, same
