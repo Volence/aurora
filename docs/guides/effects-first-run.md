@@ -85,7 +85,7 @@ thing in Aurora that shows what a scene's layers do. You do not have to find a
 switch first, which is what everybody had to do before.
 
 The switch is `Parallax preview` on the Effects toolbar, and the same switch is
-the `View` menu's `Compose the background in the frame (parallax)`. Three things
+the **View** menu's `Compose the background in the frame (parallax)`. Three things
 about it that are worth knowing:
 
 - **Turn it off and it stays off.** Aurora writes your answer down, and from then on
@@ -96,7 +96,7 @@ about it that are worth knowing:
   is on for `Parallax` and off for `Colour` and `Tile anim`. If you want the
   background under your raster band, press the chip on the Colour tab. That is a
   decision, and it sticks.
-- **It exists only on this tab.** No other tab draws it and no other tab's `View`
+- **It exists only on this tab.** No other tab draws it and no other tab's **View**
   menu offers it.
 
 While it is on, the **arrow keys move the camera** (1px, or 16 with Shift) instead
@@ -259,7 +259,8 @@ that includes it. Aurora used to let you click it and fail the build; it now ref
 the click and says why. If a hand-written file already carries bit 0, you can still
 click `L0` to clear it.
 
-If you do not need `variants`, leave it on `every slot keeps its hand-authored value`.
+If you do not need `variants`, leave the slot on
+`keep hand-authored value (array ends before this slot)`.
 
 ---
 
