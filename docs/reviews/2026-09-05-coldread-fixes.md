@@ -400,27 +400,42 @@ browser-selected anyway. The mouse-up is now prevented once, for the click that
 
 ## 7. Suite
 
+**Final, after merging master in (`5eacf414`):**
+
 ```
-Test Files  1 failed | 501 passed | 3 skipped (505)
-     Tests  1 failed | 7255 passed | 9 skipped (7265)
+Test Files  502 passed | 3 skipped (505)
+     Tests  7256 passed | 9 skipped (7265)   0 failed
 ```
 
-**The one failure is pre-existing and not mine.**
-`test/formats/effects-channel-bands-drift.test.ts`'s aeon-currency row: the
-vendored `effects_channel_bands.json` no longer matches aeon `origin/master`,
-which moved. The assertion says so itself ("NOT AN AURORA REGRESSION — the
-vendored aeon channel-bands sidecar is stale").
+### The one red I carried for most of this parcel, and what it turned out to be
 
-Proven rather than argued: checked out master (`46f211a6`) into a detached
-worktree and ran that file there — **1 failed / 6 passed**, identically. My branch
-changes none of the test's inputs (`git diff master HEAD` over the test, the
-vendored JSON, its provenance and `channel-bands.ts` is empty). Re-vendoring is
-its own parcel — the module throws at load if a load-bearing sentence moved, and
-the diff shows the `how_to_use` sentence has been rewritten.
+Against my merge-base (`46f211a6`) the suite ran **1 failed / 7255 passed**:
+`test/formats/effects-channel-bands-drift.test.ts`'s aeon-currency row, which
+says of itself "NOT AN AURORA REGRESSION — the vendored aeon channel-bands
+sidecar is stale".
 
-The 9th skip (vs master's 8) is `sibling-root`'s step-3 row, which skips **with a
-reason** because this run stands in a linked worktree rather than the main
-checkout. Environmental, not mine.
+I proved it pre-existing rather than arguing it: checked out `46f211a6` into a
+detached worktree and ran that file there — **1 failed / 6 passed**, identically,
+and `git diff master..HEAD` over the test, the vendored JSON, its provenance and
+`channel-bands.ts` was empty.
+
+⚠ **And that proof went stale while I held it.** `master` advanced from
+`46f211a6` to `5eacf414` during this parcel — six commits landing
+CHBAND-PROSE-REPIN step 3, including `afa3d144 vendor: aeon's fit sentence,
+restated in the refusal direction only`, which re-vendors exactly that sidecar.
+Master's new tip passes the row (7/7, verified in a detached worktree at
+`5eacf414`). So the honest statement is **not** "there is a standing red": it is
+that the red belonged to a window in master's history that another lane has since
+closed, and my branch never touched it either way.
+
+I found this only because `git diff master..HEAD` listed seven files none of my
+commits touched — the tell that the ref I had been comparing against had moved
+under me. Master is merged into this branch and the suite is green on the merged
+tree, so the controller is merging a state that has actually been run.
+
+The 9th skip (vs 8) is `sibling-root`'s step-3 row, which skips **with a reason**
+because this run stands in a linked worktree rather than the main checkout.
+Environmental, not mine.
 
 ---
 
