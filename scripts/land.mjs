@@ -53,6 +53,34 @@
 //
 // It deliberately does NOT merge, commit, or write a lane-log entry. Those are
 // judgement, and a script that did them would invite being run without reading.
+//
+// ============================================================================
+// ⚠ WHERE THE LANE-LOG ENTRY GOES NOW, AND WHY THIS PARAGRAPH EXISTS
+// ============================================================================
+//
+// This script refuses a dirty tree, so the old habit — land, then write the log
+// entry, then push — is now impossible. Good, that habit WAS the defect. But it
+// leaves a real question, and the hub raised it within the hour: the entry
+// describes a landing, and the landing has not happened yet when the entry must
+// be committed. Two orderings work and they are not equivalent.
+//
+//   CHOSEN, AND THE ONE TO KEEP: write the entry describing what is ABOUT TO BE
+//   PUSHED, commit it, then run this. One suite run, one push, and the suite
+//   certifies the tree the entry is part of. If the suite fails, nothing is
+//   pushed and the entry describing a landing that did not happen exists only in
+//   a local commit, which is trivially amended. An entry can only become public
+//   by riding a green suite, so it cannot outlive its own truth.
+//
+//   NOT CHOSEN: land the code, commit the log separately, run this a second time
+//   to push a docs-only commit. It is defensible — the entry then describes
+//   something that definitely happened — but it costs a second full suite run on
+//   a docs change and, worse, it re-establishes a window in which master carries
+//   the code and not the record of it.
+//
+// The `at` stamp is unaffected either way: check-ledger-timestamps judges an
+// entry against the COMMITTER TIME of the commit that first carries it, not
+// against when it was pushed, so writing and committing the entry as one act
+// (which is its own separate rule) still satisfies it.
 import { execFileSync } from 'node:child_process';
 
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();

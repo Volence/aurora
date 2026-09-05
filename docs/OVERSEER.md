@@ -490,6 +490,57 @@ What stays live:
 - **`.lst` listings carry a third `EQU` section**; oracle-next's parser handles it.
   Equates can never answer address lookups in either direction.
 
+## How a landing goes, and the gap it exists to close
+
+**`npm run land`** (`scripts/land.mjs`). Run it INSTEAD of `git push`.
+
+**Why there is a script rather than a habit.** On 2026-09-05 master was red for about 48
+minutes on `check-ledger-timestamps` and the red gate was the overseer's own. The sequence
+was merge, `npm test` green (quoted to the hub and the owner), commit the lane-log entry,
+push: **the tree published was never the tree tested**, and the gate that would have caught
+it runs inside the suite that had just run, one commit too early.
+
+⚠ **AND IT WAS STRUCTURAL, NOT A SLIP.** Every landing ends with a `lane-log:` commit,
+because the log describes the landing that just happened, so the log commit lands after the
+suite BY CONSTRUCTION. All four landings that day had one sitting after their `land:` commit.
+**The tested tree and the pushed tree differed on every landing**; three got away with it.
+"Run the suite before you push" is satisfied by all four and is not the rule that was needed.
+The rule is that **the suite run and the push are ONE ACT.**
+
+The same shape reached sigil from the other side the same day: it had run the constituent
+parts of its landing procedure rather than the named script for eleven parcels, and both of
+its escapes went through that gap. **A procedure that exists only as a habit is a tendency.**
+
+**The order, and it is not optional now that the script refuses a dirty tree:**
+
+1. Merge the parcel branch, no fast-forward, with the finding in the commit message.
+2. **Write the lane-log entry describing what is ABOUT TO BE PUSHED, and commit it** — the
+   append and its commit as one command, per `check-ledger-timestamps`.
+3. `npm run land`. It runs the whole suite on that exact tree and pushes that exact SHA.
+4. Delete the parcel branch and its worktree.
+
+**Step 2 is deliberately before step 3 and the alternative was considered.** Landing the code
+and pushing the log in a second `land` run is defensible, but it costs a second full suite run
+on a docs change and re-opens a window where master carries the code and not the record of it.
+With this order, an entry can only become public by riding a green suite, so it cannot outlive
+its own truth; if the suite fails, the entry lives in a local commit and is amended.
+
+**Four ways a landing could be green without the property holding, each refused by the script,
+each proven red:** a dirty tree (the suite reads the working tree, the push sends commits —
+different artifacts); a failing suite (verified by the remote having no such ref, not by the
+refusal message); HEAD moving under the run (a parallel session or the auto-commit daemon);
+and a push that does nothing and reads as success (`git push` exits 0 when already up to date,
+so the remote SHA is read before and after, and **the tested SHA is pushed BY NAME** rather
+than the branch tip so a moved tip cannot ride along).
+
+The script does not merge, commit, or write the log entry. Those are judgement, and a script
+that did them would invite being run without being read.
+
+**Ruled by the hub 2026-09-05: a pre-push hook is AVAILABLE, not mandated.** It is per-lane
+local config, so any lane may install one that runs its own landing command; whether it becomes
+the rule is for the protocol pass after W1. **So nothing forces this script to be used** — that
+is the honest limit of the fix, and it is the discipline half rather than the ordering half.
+
 ## Instruments
 
 - **CDP harnesses** (`scratchpad/*-harness.mjs`) are how anything visual or live is
