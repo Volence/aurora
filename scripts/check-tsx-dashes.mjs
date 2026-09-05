@@ -89,7 +89,7 @@ for (const rel of files()) {
 
 const n = files().length;
 if (findings.length === 0) {
-  console.log(`check-tsx-dashes: OK — ${n} component file(s), no U+2014 or U+2013 in any string, `
+  console.log(`check-tsx-dashes: OK: ${n} component file(s), no U+2014 or U+2013 in any string, `
     + 'template or JSX text (comments are out of scope and say so in this script).');
   process.exit(0);
 }

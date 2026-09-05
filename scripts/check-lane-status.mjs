@@ -19,7 +19,7 @@ let doc;
 try {
   doc = JSON.parse(readFileSync(PATH, 'utf8'));
 } catch (e) {
-  console.error(`check-lane-status: ${PATH} is not readable JSON — ${e.message}`);
+  console.error(`check-lane-status: ${PATH} is not readable JSON: ${e.message}`);
   process.exit(2);
 }
 
@@ -39,18 +39,18 @@ if (bad.length) problems.push(`unknown state(s): ${bad.map((q) => `${q.id}=${q.s
 
 const ids = queue.map((q) => q?.id);
 const dupes = [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
-if (dupes.length) problems.push(`duplicate queue id(s): ${dupes.join(', ')} — a wholesale rewrite can reintroduce a removed row`);
+if (dupes.length) problems.push(`duplicate queue id(s): ${dupes.join(', ')}, and a wholesale rewrite can reintroduce a removed row`);
 
 const doing = queue.filter((q) => q?.state === 'doing');
 const agents = (doc.inFlight ?? []).filter((f) => f?.agent).length;
 if (doing.length && agents === 0 && doc.atBoundary === true) {
-  problems.push(`${doing.length} row(s) marked "doing" with no agent in inFlight and atBoundary true — claimed activity the lane does not have`);
+  problems.push(`${doing.length} row(s) marked "doing" with no agent in inFlight and atBoundary true, claiming activity the lane does not have`);
 }
 
 if (!doc.updatedAt || Number.isNaN(Date.parse(doc.updatedAt))) {
   problems.push('updatedAt is missing or unparseable');
 } else if (Date.parse(doc.updatedAt) > Date.now() + 60_000) {
-  problems.push(`updatedAt ${doc.updatedAt} is in the FUTURE — the reader rejects the whole file, losing every true thing in it`);
+  problems.push(`updatedAt ${doc.updatedAt} is in the FUTURE, so the reader rejects the whole file, losing every true thing in it`);
 }
 
 if (problems.length) {
@@ -58,4 +58,4 @@ if (problems.length) {
   for (const p of problems) console.error(`  - ${p}`);
   process.exit(1);
 }
-console.log(`check-lane-status: OK — ${queue.length} queue rows, exactly one next (${next[0].id}), no duplicate ids, updatedAt sane.`);
+console.log(`check-lane-status: OK: ${queue.length} queue rows, exactly one next (${next[0].id}), no duplicate ids, updatedAt sane.`);
