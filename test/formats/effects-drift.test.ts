@@ -179,7 +179,7 @@ describe('drift survives the load -> save round trip', () => {
   it('survives a clone-and-edit of an unrelated field', () => {
     const scene = parseEffectsScene(GOLDEN, 'canopy_dusk');
     const edited = cloneEffectsScene(scene);
-    edited.name = 'Canopy — dawn';
+    edited.name = 'Canopy, dawn';
     edited.layers[0].world_y = 8;
 
     const out = serializeEffectsScene(edited);
@@ -188,7 +188,7 @@ describe('drift survives the load -> save round trip', () => {
 
     expect((JSON.parse(out) as EffectsScene).layers[2].drift).toEqual({ rate: 32 });
     expect((JSON.parse(out) as EffectsScene).layers[3].drift).toBe('none');
-    expect(out).toContain('"name": "Canopy — dawn"');
+    expect(out).toContain('"name": "Canopy, dawn"');
   });
 
   /**
