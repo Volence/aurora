@@ -1,5 +1,5 @@
-$ ./build.sh sonic4 -nl
-(exit 0, 3700 ms)
+$ ./build.sh sonic4
+(exit 0, 147185 ms)
 
 Assembler: sigil 756c7efda3dc (clean at capture — no uncommitted changes)
 ############################################################################
@@ -24,6 +24,143 @@ empyrean  /tmp/sec7-drop-vsplit-N5HILH/suite/empyrean
   from    EMPYREAN_DIR unset; under the suite root, from marker walk up from /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438/tools/suite_paths.py
 Generating compression self-test vectors...
 Compression self-test vectors OK -> /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438/engine/debug/generated (payload 744B, sum $92DF; plain 642B, dict 486B+256B, zx0 546B)
+Linting...
+Checking the effects budget model...
+effects_budget_check: OK — 39 code-derived rows agree; axis5 mask pricing: strip = 7 slots / 1 sprite + 8 px per line (derived) vs reservation 77 slots / 18 sprites + 288 px per line; SpriteMask adopters: 0 (census over 3 modules: Accept:2, DeclineBorrow:2)
+Running the tool-suite unit tests...
+  sweeping 82 test file(s) under tools
+...................................................................... [  2%]
+........................................................................ [  5%]
+........................................................................ [  8%]
+.................s...................................................... [ 11%]
+...............................................
+  tile_start is 12 bits -> ceiling 4096 tiles
+  _art_knux         4092 tiles  headroom     4 (128 B)  art/optimized/characters/knuckles.bin
+  _art_tails        3635 tiles  headroom   461 (14752 B)  art/optimized/characters/tails.bin
+  _art_sonic        3158 tiles  headroom   938 (30016 B)  art/optimized/characters/sonic.bin
+  _art_tail          278 tiles  headroom  3818 (122176 B)  art/optimized/characters/tails_tail.bin
+  _art_dust           88 tiles  headroom  4008 (128256 B)  games/sonic4/data/generated/dust/art_dust.bin
+  _art_insta          52 tiles  headroom  4044 (129408 B)  art/uncompressed/shields/insta_shield.bin
+......................... [ 14%]
+........................................................................ [ 17%]
+...s..s............................................ [ 19%]
+..........................................................s......................................... [ 23%]
+........................................................................ [ 26%]
+............................................................... [ 28%]
+........................................................................ [ 31%]
+........................................................................ [ 34%]
+........................................................................ [ 37%]
+........................................................................ [ 40%]
+........................................................................ [ 43%]
+................................s....................................... [ 46%]
+........................................................................ [ 48%]
+........................................................................ [ 51%]
+........................................................................ [ 54%]
+........................................................................ [ 57%]
+........................................................................ [ 60%]
+........................................................................ [ 63%]
+........................................................................ [ 66%]
+........................................................................ [ 69%]
+ss...................................................................... [ 72%]
+........................................................................ [ 74%]
+........................................................................ [ 77%]
+........................................................................ [ 80%]
+........................................................................ [ 83%]
+........................................................................ [ 86%]
+........................................................................ [ 89%]
+........................................................................ [ 92%]
+........................................................................ [ 95%]
+.....................................................................sss [ 97%]
+ssssssssss......................sssss........sssss                       [100%]
+=============================== warnings summary ===============================
+tools/test_anchor_sweep_band.py::TestAuthoredSweepsFitTheirBands::test_every_authored_sweep_leaves_headroom_at_its_seeded_position
+  /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438/tools/test_anchor_sweep_band.py:1085: UserWarning: 
+  seeded-headroom bound NOT APPLIED to 1 hand-authored sweep(s). The preset is installed by section(s) that do not include the spawn section 0, the only section SPAWN_CAMERA_Y (144) is the camera for:
+      OJZ_Preset_Sec7 channel 2 (installed by section(s) [7])
+    Band fit and channel liveness still cover them. Evaluating this bound for another section needs a per-section camera; see RASTER-HEADROOM-CAM in docs/DEFERRED_WORK.md.
+    warnings.warn(
+
+tools/test_anchor_sweep_band.py::TestTheScanCoversBothModuleSetsAndBothShapes::test_the_scan_says_what_it_did_and_did_not_cover
+  /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438/tools/test_anchor_sweep_band.py:1252: UserWarning: 
+  anchor-sweep band scan — coverage, stated because a green cannot state it:
+    hand-authored (games/*/data/effects/*.emp): 3 module(s)
+      games/sonic4/data/effects/ojz_effects.emp                   2 sweep(s) [2 array]
+      games/sonic4/data/effects/ojz_scenes.emp                    0 sweep(s) [none]
+      games/sonic4/data/effects/scene_registry.emp                0 sweep(s) [none]
+    generated (games/*/data/generated/*/*/effects_scenes.emp): 1 module(s)
+      games/sonic4/data/generated/ojz/act1/effects_scenes.emp     1 sweep(s) [1 chooser]
+    bands read from games/sonic4/data/effects/ojz_effects.emp, PER PATCHED PROGRAM (a channel is a per-program index): OJZ_TwoChannel ch 0 = 3..220 (218 lines); OJZ_TwoChannel ch 1 = 222..223 (2 lines); OJZ_WorldWater ch 2 = 3..160 (158 lines); OJZ_WorldWater ch 3 = 162..223 (62 lines)
+    sections -> presets (games/sonic4/data/levels/ojz/act1/act_descriptor.emp): 0=OJZ_Preset_Sec0, 1=OJZ_Preset_Sec1, 2=OJZ_Preset_Sec2, 3=OJZ_Preset_Sec3, 4=OJZ_Preset_Depth, 5=OJZ_Preset_Sec5, 6=OJZ_Preset_Sec6, 7=OJZ_Preset_Sec7, 8=OJZ_Preset_Plain
+    LIVE GENERATED POPULATION: 1 sweep(s). the arm has a real subject; the fixtures remain as its floor.
+    NOT CHECKED: seeded headroom for 0 of the 1 generated sweep(s) — either the anchor is not in this file's reach (a document may legally keep the section's hand-authored patch_world_ys) or the sweep is not on the spawn section 0, the only section SPAWN_CAMERA_Y (144) is the camera for. Band fit and channel liveness ARE checked for all 3 scanned sweep(s).
+    NO BAND TO FIT: 1 of the 3 scanned sweep(s) — ojz_act1_sec_patch_motion(sec: 5, ch: 0) (section 5 -> preset OJZ_Preset_Sec5 binds no `patched:` program, so there is no raster band on any channel in the section(s) that install it)
+    warnings.warn("\n" + report, UserWarning, stacklevel=1)
+
+tools/test_anchor_sweep_band.py::TestTheGeneratedArmIsProvenByItsFixtures::test_the_live_generated_population_is_not_empty
+  /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438/tools/test_anchor_sweep_band.py:1300: UserWarning: the generated arm has 1 REAL sweep(s); the fixtures below are its floor, not its only subject
+    warnings.warn("the generated arm has %d REAL sweep(s); the fixtures below are its "
+
+tools/test_vsplit_consumer_lint.py::test_quarantine_is_loud_on_every_build
+  /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438/tools/test_vsplit_consumer_lint.py:368: UserWarning: VSPLIT-NO-OP quarantine: Scene_Editor_ojz_act1_sec7_worldwater authors a `vsplit:` that reaches no ROM byte (no scene_vsplit_fires consumer). Aurora authored `vsplit: At(67)` on the world_y-162 layer; the bisect in commit df3b8810 measured the arm `vsplit removed -> byte-identical ROM`, so the attachment reaches zero ROM bytes today. Its disposition is a CONTENT decision the owner has to make and a lint may not: binding it (a scene_vsplit_fires fold plus a raster channel on section 7's preset) ADDS ROM bytes and changes what section 7 looks like, and deleting the attachment destroys a deliberate authoring act. Booked as VSPLIT-NO-OP in docs/DEFERRED_WORK.md. Remove this entry in the same change that resolves it -- the tests below force that.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+2464 passed, 30 skipped, 4 warnings, 76 subtests passed in 29.97s
+Running the expect-fail lane...
+  PASS  sentinel (2.11s): ok
+  PASS  P2a buffer cap (2.11s): ok
+  PASS  P1 OWN-1 bury (2.13s): ok
+  PASS  8b rule6 half1 (2.09s): ok
+  PASS  8b rule6 half2 (2.11s): ok
+  PASS  8c D-B (2.09s): ok
+  PASS  P1 OWN-2 no owner (2.10s): ok
+  PASS  P1 OWN-2 orphan (2.09s): ok
+  PASS  P1 OWN-2 span (2.08s): ok
+  PASS  P1 OWN-1 nested (2.10s): ok
+  PASS  P1 OWN-1 base (2.10s): ok
+  PASS  8d D-C (2.10s): ok
+  PASS  8d E-D (2.08s): ok
+  PASS  8d E-D $0A (2.10s): ok
+  PASS  8e claim6 (2.10s): ok
+  PASS  9 D-D sh0 (2.11s): ok
+  PASS  9 E-C sh1 (2.09s): ok
+  PASS  P1 capacity (2.15s): ok
+  PASS  P1 mask A/B (2.17s): ok
+  PASS  P1 proof (2.13s): ok
+  PASS  P3 T9 own caps (2.10s): ok
+  PASS  P3 T9 placement (2.08s): ok
+  PASS  P3 T9 flat own (2.16s): ok
+  PASS  P3 T10 curve+deform (2.38s): ok
+  PASS  1c late edge (2.37s): ok
+  PASS  1c early edge (2.43s): ok
+  PASS  cram 4 words (2.27s): ok
+  PASS  deep 4 words (2.08s): ok
+  PASS  P2 axis 1 (2.08s): ok
+  PASS  P3 T7 act span (2.08s): ok
+  PASS  P3 T12 lcm undeclared (2.10s): ok
+  PASS  P3 own-only table (2.10s): ok
+  PASS  P3 T12 f0 plane-A factor (2.11s): ok
+  PASS  P3 T12 f0 plane-B factor (2.13s): ok
+  PASS  P3 T12 f0 curve far end (2.10s): ok
+  PASS  P3 T12 f0 plane-A deform (2.09s): ok
+  PASS  P3 T12 f0 plane-B deform (2.13s): ok
+  PASS  drift f0 lock (2.12s): ok
+  PASS  drift Rate(0) (2.11s): ok
+  PASS  drift rate range (2.11s): ok
+  PASS  VFACTOR v_factor (2.11s): ok
+  PASS  VFACTOR v_factor_fg (2.09s): ok
+  PASS  VOFFSET v_offset low (2.08s): ok
+  PASS  VOFFSET v_offset high (2.13s): ok
+  PASS  VOFFSET v_center low (2.11s): ok
+  PASS  VOFFSET v_center high (2.09s): ok
+  PASS  BOB bob_shift (2.08s): ok
+  PASS  BOB bob_period (2.09s): ok
+  PASS  ring sparkle frames (2.08s): ok
+  PASS  eq.cross-type unit vs int (2.09s): ok
+  PASS  insta-shield frames (2.10s): ok
+  PASS  DPLC tile_start ceiling (2.12s): ok
+  PASS  VDP base residue (2.11s): ok
+emp_expect_fail: OK — 52/52 cases
 Verifying committed OJZ level tree...
 verify_level_bin: editor bake fidelity OK (9 section(s), 589824 nametable words)
 verify_level_bin: OK [act-pool+content+sidecar / local-maps / block-blobs / bininclude-targets / collision-interned / editor-bake / orphans]
@@ -92,7 +229,7 @@ plane_role_swap_gate [s4.lst, shape=release]
   got  (reg, value): [(2, '$38'), (4, '$06'), (2, '$30'), (4, '$07')]
 plane_role_swap_gate: OK — Parallax_Set_Roles_Swapped writes reg $02/$04 correctly on both arms: swapped $38/$06, normal $30/$07
 bganim_room [s4.lst]:
-  provenance: s4.lst and s4.bin both written after this build started (+2.9 s / +2.9 s)
+  provenance: s4.lst and s4.bin both written after this build started (+2.1 s / +2.2 s)
   fixture: tools/fixtures/bganim_room_excerpt.lst — 5 label rows re-found in the fresh listing with the same shape
   Art_Sonic 0x72FF6 + 101056 = 0x8BAB6; anchor 0xA8000
   ROM room 116042 B free + 8376 B the section already holds = 124418 B for ojz_bg_anim
@@ -190,6 +327,8 @@ loop_crossover_gate [s4.lst]:
   2 of them changed Sst.layer BECAUSE a byte of CrossoverTable in the ROM image was changed and nothing else was — that is the consumption claim, and the unmodified table is its control
   fixture: loop_crossover_cut.json [s4.lst] — both routines' decoded instruction streams identical (relocation normalised), CrossoverTable byte-identical, 18 equates match
   OK
+
+s4lint: no issues found
 warning: 14 warnings — module.path-mismatch 14; SIGIL_WARNINGS=full to list
 warning: 161 warnings — proc.clobber-undeclared 68, module.unreachable 56, proc.undeclared-fallthrough 20, module.path-mismatch 14, import.no-names 2, proc.out-unwritten 1; SIGIL_WARNINGS=full to list
 ROM: 800.6 KB/4.0 MB (19.5%) | object_bank: 9.1 KB/64.0 KB (14.2%) | RAM: 47.8 KB/64.0 KB (74.6%) | Free: 16.0KB before stack

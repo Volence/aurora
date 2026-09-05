@@ -384,15 +384,30 @@ function run(cmd, args, cwd, extraEnv = {}) {
 }
 
 /**
- * One aeon build. `-nl` skips the tool-suite pytest lane, which CANNOT run in a
- * `git clone`: several of its files import out-of-repo DONOR artifacts that are
- * untracked in aeon and therefore absent from any clone (measured: 31 failed /
- * 7 errors, every one a `FileNotFoundError` on a donor, in the UNMODIFIED
- * clone). That is a STAGE limit and it is reported as one - the vsplit lint
- * itself needs no donor and is run separately, on both sides.
+ * One aeon build, in one of two shapes.
+ *
+ *   FULL      everything, including the tool-suite pytest lane. That lane is
+ *             what carries aeon's vsplit-consumer lint, so it is the shape in
+ *             which the quarantine's refusal is BUILD-FATAL rather than a
+ *             separate command's opinion.
+ *   `-nl`     the source-gate lanes skipped. This is the shape the three ROM
+ *             readings are taken in, so BEFORE, the determinism CONTROL and
+ *             AFTER are all the SAME invocation and nothing but the document
+ *             differs between them. `-nl` gates only lints; the level
+ *             staleness gate, the effects drift gate and the codegen path all
+ *             still run, and the ROM it writes is the ROM the full build
+ *             writes (`[R1]` is what makes that a measurement).
+ *
+ * ⚠ AN EARLIER VERSION OF THIS FILE SAID THE FULL LANE "CANNOT RUN IN A
+ * CLONE", citing 31 failed / 7 errors on an UNMODIFIED clone. That was wrong,
+ * and wrong in the way that flatters: the failures were MY OWN under-symlinked
+ * suite root, not anything about clones. With `oracle-old`, `skdisasm` and
+ * `sonic_hack` linked in beside the others, the same unmodified clone runs
+ * `python3 -m pytest tools` at 2464 passed / 30 skipped / 0 failed. A result
+ * that blames the stage is the one most likely to be an uncleared rig.
  */
-function aeonBuild(dir, log) {
-  const r = run('./build.sh', ['sonic4', '-nl'], dir,
+function aeonBuild(dir, log, { full = false } = {}) {
+  const r = run('./build.sh', full ? ['sonic4'] : ['sonic4', '-nl'], dir,
     { SIGIL_BUILD, SIGIL_EMIT });
   writeFileSync(log, `$ ${r.cmd}\n(exit ${r.status}, ${r.ms} ms)\n\n${r.out}`);
   return r;
@@ -481,6 +496,17 @@ async function main() {
     cannotMeasure('R0', 'build the BEFORE ROM',
       'SIGIL_BUILD / SIGIL_EMIT do not both name an existing file; aeon\'s build.sh requires them');
   } else {
+    // ── [S0] THE STAGE, ASSERTED BEFORE ANYTHING IS READ OFF IT ────────
+    // A FULL build of the UNMODIFIED copy: every gate, including the pytest
+    // lane that carries the vsplit lint. If this is not green, every row below
+    // is measuring a broken stage rather than this parcel's change, and the
+    // shape that reading takes is a refusal that BLAMES THE CLONE.
+    const s0 = aeonBuild(WORK, join(LOGS, 'build-stage-full.log'), { full: true });
+    check('S0', 'STAGE: a FULL build of the UNMODIFIED copy is green, tool-suite lane and all',
+      s0.status === 0,
+      `exit ${s0.status} in ${s0.ms} ms · `
+      + `${(s0.out.match(/^\d+ passed.*$/m) ?? ['(no pytest summary)'])[0]}`);
+
     const b0 = aeonBuild(WORK, join(LOGS, 'build-before.log'));
     // ⚠ EXIT CODE FIRST. A hash read after a NON-ZERO build hashes the STALE
     // artifact and looks exactly like "nothing changed".
@@ -507,7 +533,8 @@ async function main() {
     }
   }
 
-  // ── THE VSPLIT LINT, BEFORE. Needs no donor, so it runs in a clone. ────
+  // ── THE VSPLIT LINT, BEFORE, ON ITS OWN. [S0] already ran it inside the
+  // build; this names it, so the quarantine's own warning text is in evidence.
   const lintBefore = run('python3',
     ['-m', 'pytest', 'tools/test_vsplit_consumer_lint.py', '-q', '--no-header', '-p', 'no:cacheprovider'],
     WORK);
@@ -703,7 +730,25 @@ async function main() {
       && !/vsplit/.test(empChanged[0][1] ?? ''),
       empChanged.map(([a, b]) => `- ${a.trim()}\n        + ${(b ?? '(absent)').trim()}`).join('\n        '));
 
+    // ── [L2] THE FULL BUILD, WHICH IS NOW BUILD-FATAL RED ──────────────
+    // Run BEFORE the ROM build on purpose, so the row that says "the ROM did
+    // not move" is not the last word on a tree whose canonical build refuses.
+    // [S0] proved this same shape green on the same copy minutes ago, so the
+    // delta is this parcel's change and nothing else.
+    const bFull = aeonBuild(WORK, join(LOGS, 'build-after-full.log'), { full: true });
+    // REPORTED, NOT ASSERTED GREEN. The refusal is the quarantine working: it
+    // forces its own entry to be deleted in the change that resolves the scene.
+    check('L2', 'REPORTED, NOT ASSERTED GREEN: the canonical FULL build now REFUSES, at the lane '
+      + 'that carries the vsplit lint - the quarantine is build-fatal, not advisory',
+      bFull.status !== 0 && /test_vsplit_consumer_lint/.test(bFull.out),
+      `exit ${bFull.status} · ${(bFull.out.match(/^\d+ failed.*$/m) ?? ['(no pytest summary)'])[0]}\n        `
+      + 'aeon must delete KNOWN_UNBOUND["Scene_Editor_ojz_act1_sec7_worldwater"] from '
+      + 'tools/test_vsplit_consumer_lint.py in the same change that lands this document.');
+
     // ── [R3] THE ROM AFTER ─────────────────────────────────────────────
+    // ⚠ `-nl`, the SAME invocation [R0] and [R1] used, so nothing but the
+    // document differs across the three readings. The lane it skips is the one
+    // [L2] just ran and reported; it gates lints, not codegen.
     const b2 = aeonBuild(WORK, join(LOGS, 'build-after.log'));
     check('R3a', 'AFTER: the build succeeded - checked BEFORE anything is hashed',
       b2.status === 0, `exit ${b2.status} in ${b2.ms} ms · log docs/captures/…/logs/build-after.log`);

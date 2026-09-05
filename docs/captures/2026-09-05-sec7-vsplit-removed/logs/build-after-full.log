@@ -1,0 +1,161 @@
+$ ./build.sh sonic4
+(exit 1, 28009 ms)
+
+Assembler: sigil 756c7efda3dc (clean at capture — no uncommitted changes)
+############################################################################
+## WARNING: THE ASSEMBLER MAY NOT MATCH ITS SOURCE (revision)
+##
+##   binary built from : 756c7efda3dc654116013744695fd762521b95d6
+##   /home/volence/sonic_hacks/sigil HEAD : c8b2ed72d592a3739928beb06c5ff7c4769ca9c6
+##
+##   A stale assembler emits a byte-IDENTICAL ROM whenever the source has
+##   not changed, so no CRC, pin or golden downstream of here can detect
+##   this. That is the whole reason it is checked at invocation.
+##   Rebuild:  cargo build --release --manifest-path /home/volence/sonic_hacks/sigil/Cargo.toml
+##   Set SIGIL_VERSION_STRICT=1 to make this fatal.
+############################################################################
+Emitting the native-linked resident sound blob (sigil)...
+emitted seam-1 resident blob (z80_sound_blob{,_debug}.bin) + seam-2 DAC artifacts (dac_blip_bank.bin + dac_shared_bank.bin + dac_sample_tab.bin) + seam-2 MT bank split (mt_bank_body{,_debug}.bin + mt_songtable{,_debug}.bin + mt_songpatchtable{,_debug}.bin) + seam-2 SFX bank (sfx_bank{,_debug}.bin + sfx_blob_win_tab{,_debug}.bin) + seam-2 head (seq_opcode_tab{,_debug}.bin + sound_tables_z80.bin) + pitchtable (movingtrucks_pitchtable.bin) -> engine/sound/generated
+Resolving suite paths...
+repo      /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438
+suite     /tmp/sec7-drop-vsplit-N5HILH/suite
+  from    marker walk up from /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438/tools/suite_paths.py
+empyrean  /tmp/sec7-drop-vsplit-N5HILH/suite/empyrean
+  from    EMPYREAN_DIR unset; under the suite root, from marker walk up from /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438/tools/suite_paths.py
+Generating compression self-test vectors...
+Compression self-test vectors OK -> /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438/engine/debug/generated (payload 744B, sum $92DF; plain 642B, dict 486B+256B, zx0 546B)
+Linting...
+Checking the effects budget model...
+effects_budget_check: OK — 39 code-derived rows agree; axis5 mask pricing: strip = 7 slots / 1 sprite + 8 px per line (derived) vs reservation 77 slots / 18 sprites + 288 px per line; SpriteMask adopters: 0 (census over 3 modules: Accept:2, DeclineBorrow:2)
+Running the tool-suite unit tests...
+  sweeping 82 test file(s) under tools
+...................................................................... [  2%]
+........................................................................ [  5%]
+........................................................................ [  8%]
+.................s...................................................... [ 11%]
+...............................................
+  tile_start is 12 bits -> ceiling 4096 tiles
+  _art_knux         4092 tiles  headroom     4 (128 B)  art/optimized/characters/knuckles.bin
+  _art_tails        3635 tiles  headroom   461 (14752 B)  art/optimized/characters/tails.bin
+  _art_sonic        3158 tiles  headroom   938 (30016 B)  art/optimized/characters/sonic.bin
+  _art_tail          278 tiles  headroom  3818 (122176 B)  art/optimized/characters/tails_tail.bin
+  _art_dust           88 tiles  headroom  4008 (128256 B)  games/sonic4/data/generated/dust/art_dust.bin
+  _art_insta          52 tiles  headroom  4044 (129408 B)  art/uncompressed/shields/insta_shield.bin
+......................... [ 14%]
+........................................................................ [ 17%]
+...s..s............................................ [ 19%]
+..........................................................s......................................... [ 23%]
+........................................................................ [ 26%]
+............................................................... [ 28%]
+........................................................................ [ 31%]
+........................................................................ [ 34%]
+........................................................................ [ 37%]
+........................................................................ [ 40%]
+........................................................................ [ 43%]
+................................s....................................... [ 46%]
+........................................................................ [ 48%]
+........................................................................ [ 51%]
+........................................................................ [ 54%]
+........................................................................ [ 57%]
+........................................................................ [ 60%]
+........................................................................ [ 63%]
+........................................................................ [ 66%]
+........................................................................ [ 69%]
+ss...................................................................... [ 72%]
+........................................................................ [ 74%]
+........................................................................ [ 77%]
+........................................................................ [ 80%]
+........................................................................ [ 83%]
+........................................................................ [ 86%]
+........................................................................ [ 89%]
+........................................................................ [ 92%]
+........................................................................ [ 95%]
+.....................................F.F.............................sss [ 97%]
+ssssssssss......................sssss........sssss                       [100%]
+=================================== FAILURES ===================================
+________________ test_quarantine_entries_still_author_a_vsplit _________________
+
+    def test_quarantine_entries_still_author_a_vsplit():
+        """A quarantine entry for a scene that no longer authors a vsplit is stale cover."""
+        authorings, _, _ = scan()
+        authoring_names = {a.scene for a in authorings}
+        stale = sorted(set(KNOWN_UNBOUND) - authoring_names)
+>       assert not stale, (
+            f"these KNOWN_UNBOUND entries name scenes that no longer author a "
+            f"`vsplit: SceneVSplit.At(..)`: {stale}. The quarantine is over -- delete the "
+            "entry from KNOWN_UNBOUND in this file and close the row in "
+            "docs/DEFERRED_WORK.md. A quarantine kept past its subject is exactly the stale "
+            "artifact that reads as coverage."
+        )
+E       AssertionError: these KNOWN_UNBOUND entries name scenes that no longer author a `vsplit: SceneVSplit.At(..)`: ['Scene_Editor_ojz_act1_sec7_worldwater']. The quarantine is over -- delete the entry from KNOWN_UNBOUND in this file and close the row in docs/DEFERRED_WORK.md. A quarantine kept past its subject is exactly the stale artifact that reads as coverage.
+E       assert not ['Scene_Editor_ojz_act1_sec7_worldwater']
+
+tools/test_vsplit_consumer_lint.py:332: AssertionError
+____________________ test_quarantine_is_loud_on_every_build ____________________
+
+    def test_quarantine_is_loud_on_every_build():
+        """Every quarantined scene names itself in the build log, rather than passing silently.
+    
+        build.sh runs this lane as `pytest -q --no-header`, which prints a warnings summary. A
+        quarantine nobody sees is the same silent absence this gate exists to end.
+        """
+        authorings, consumers, _ = scan()
+        still = sorted(
+            {a.scene for a in authorings} & set(KNOWN_UNBOUND) - set(consumers)
+        )
+        for name in still:
+            warnings.warn(
+                f"VSPLIT-NO-OP quarantine: {name} authors a `vsplit:` that reaches no ROM byte "
+                f"(no scene_vsplit_fires consumer). {KNOWN_UNBOUND[name]}",
+                UserWarning,
+            )
+        # The arm itself asserts the quarantine is not empty-and-forgotten in the other
+        # direction: if KNOWN_UNBOUND is non-empty, at least one entry must be live, which the
+        # two tests above already pin from both sides. Nothing to assert here beyond the warn.
+>       assert len(still) == len(KNOWN_UNBOUND), (
+            f"KNOWN_UNBOUND holds {len(KNOWN_UNBOUND)} entries but only {len(still)} of them "
+            "are live unbound-vsplit scenes right now. The other tests in this file name the "
+            "specific reason; this arm exists so the count cannot drift unnoticed."
+        )
+E       AssertionError: KNOWN_UNBOUND holds 1 entries but only 0 of them are live unbound-vsplit scenes right now. The other tests in this file name the specific reason; this arm exists so the count cannot drift unnoticed.
+E       assert 0 == 1
+E        +  where 0 = len([])
+E        +  and   1 = len({'Scene_Editor_ojz_act1_sec7_worldwater': 'Aurora authored `vsplit: At(67)` on the world_y-162 layer; the bisect in co...-NO-OP in docs/DEFERRED_WORK.md. Remove this entry in the same change that resolves it -- the tests below force that.'})
+
+tools/test_vsplit_consumer_lint.py:376: AssertionError
+=============================== warnings summary ===============================
+tools/test_anchor_sweep_band.py::TestAuthoredSweepsFitTheirBands::test_every_authored_sweep_leaves_headroom_at_its_seeded_position
+  /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438/tools/test_anchor_sweep_band.py:1085: UserWarning: 
+  seeded-headroom bound NOT APPLIED to 1 hand-authored sweep(s). The preset is installed by section(s) that do not include the spawn section 0, the only section SPAWN_CAMERA_Y (144) is the camera for:
+      OJZ_Preset_Sec7 channel 2 (installed by section(s) [7])
+    Band fit and channel liveness still cover them. Evaluating this bound for another section needs a per-section camera; see RASTER-HEADROOM-CAM in docs/DEFERRED_WORK.md.
+    warnings.warn(
+
+tools/test_anchor_sweep_band.py::TestTheScanCoversBothModuleSetsAndBothShapes::test_the_scan_says_what_it_did_and_did_not_cover
+  /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438/tools/test_anchor_sweep_band.py:1252: UserWarning: 
+  anchor-sweep band scan — coverage, stated because a green cannot state it:
+    hand-authored (games/*/data/effects/*.emp): 3 module(s)
+      games/sonic4/data/effects/ojz_effects.emp                   2 sweep(s) [2 array]
+      games/sonic4/data/effects/ojz_scenes.emp                    0 sweep(s) [none]
+      games/sonic4/data/effects/scene_registry.emp                0 sweep(s) [none]
+    generated (games/*/data/generated/*/*/effects_scenes.emp): 1 module(s)
+      games/sonic4/data/generated/ojz/act1/effects_scenes.emp     1 sweep(s) [1 chooser]
+    bands read from games/sonic4/data/effects/ojz_effects.emp, PER PATCHED PROGRAM (a channel is a per-program index): OJZ_TwoChannel ch 0 = 3..220 (218 lines); OJZ_TwoChannel ch 1 = 222..223 (2 lines); OJZ_WorldWater ch 2 = 3..160 (158 lines); OJZ_WorldWater ch 3 = 162..223 (62 lines)
+    sections -> presets (games/sonic4/data/levels/ojz/act1/act_descriptor.emp): 0=OJZ_Preset_Sec0, 1=OJZ_Preset_Sec1, 2=OJZ_Preset_Sec2, 3=OJZ_Preset_Sec3, 4=OJZ_Preset_Depth, 5=OJZ_Preset_Sec5, 6=OJZ_Preset_Sec6, 7=OJZ_Preset_Sec7, 8=OJZ_Preset_Plain
+    LIVE GENERATED POPULATION: 1 sweep(s). the arm has a real subject; the fixtures remain as its floor.
+    NOT CHECKED: seeded headroom for 0 of the 1 generated sweep(s) — either the anchor is not in this file's reach (a document may legally keep the section's hand-authored patch_world_ys) or the sweep is not on the spawn section 0, the only section SPAWN_CAMERA_Y (144) is the camera for. Band fit and channel liveness ARE checked for all 3 scanned sweep(s).
+    NO BAND TO FIT: 1 of the 3 scanned sweep(s) — ojz_act1_sec_patch_motion(sec: 5, ch: 0) (section 5 -> preset OJZ_Preset_Sec5 binds no `patched:` program, so there is no raster band on any channel in the section(s) that install it)
+    warnings.warn("\n" + report, UserWarning, stacklevel=1)
+
+tools/test_anchor_sweep_band.py::TestTheGeneratedArmIsProvenByItsFixtures::test_the_live_generated_population_is_not_empty
+  /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438/tools/test_anchor_sweep_band.py:1300: UserWarning: the generated arm has 1 REAL sweep(s); the fixtures below are its floor, not its only subject
+    warnings.warn("the generated arm has %d REAL sweep(s); the fixtures below are its "
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tools/test_vsplit_consumer_lint.py::test_quarantine_entries_still_author_a_vsplit
+FAILED tools/test_vsplit_consumer_lint.py::test_quarantine_is_loud_on_every_build
+2 failed, 2462 passed, 30 skipped, 3 warnings, 76 subtests passed in 26.11s
+Tool-suite tests failed — the build tooling is broken, not just the ROM.
+
+s4lint: no issues found

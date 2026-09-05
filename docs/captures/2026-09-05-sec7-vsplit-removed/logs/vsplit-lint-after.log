@@ -53,4 +53,4 @@ tools/test_vsplit_consumer_lint.py:376: AssertionError
 =========================== short test summary info ============================
 FAILED tools/test_vsplit_consumer_lint.py::test_quarantine_entries_still_author_a_vsplit
 FAILED tools/test_vsplit_consumer_lint.py::test_quarantine_is_loud_on_every_build
-2 failed, 5 passed in 1.57s
+2 failed, 5 passed in 1.01s

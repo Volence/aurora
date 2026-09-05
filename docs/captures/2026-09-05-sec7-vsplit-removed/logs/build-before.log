@@ -1,12 +1,12 @@
 $ ./build.sh sonic4 -nl
-(exit 0, 3738 ms)
+(exit 0, 3725 ms)
 
 Assembler: sigil 756c7efda3dc (clean at capture — no uncommitted changes)
 ############################################################################
 ## WARNING: THE ASSEMBLER MAY NOT MATCH ITS SOURCE (revision)
 ##
 ##   binary built from : 756c7efda3dc654116013744695fd762521b95d6
-##   /home/volence/sonic_hacks/sigil HEAD : 862617a4e2eb0baa79ee85a83038b94597e62fee
+##   /home/volence/sonic_hacks/sigil HEAD : c8b2ed72d592a3739928beb06c5ff7c4769ca9c6
 ##
 ##   A stale assembler emits a byte-IDENTICAL ROM whenever the source has
 ##   not changed, so no CRC, pin or golden downstream of here can detect
@@ -17,13 +17,13 @@ Assembler: sigil 756c7efda3dc (clean at capture — no uncommitted changes)
 Emitting the native-linked resident sound blob (sigil)...
 emitted seam-1 resident blob (z80_sound_blob{,_debug}.bin) + seam-2 DAC artifacts (dac_blip_bank.bin + dac_shared_bank.bin + dac_sample_tab.bin) + seam-2 MT bank split (mt_bank_body{,_debug}.bin + mt_songtable{,_debug}.bin + mt_songpatchtable{,_debug}.bin) + seam-2 SFX bank (sfx_bank{,_debug}.bin + sfx_blob_win_tab{,_debug}.bin) + seam-2 head (seq_opcode_tab{,_debug}.bin + sound_tables_z80.bin) + pitchtable (movingtrucks_pitchtable.bin) -> engine/sound/generated
 Resolving suite paths...
-repo      /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2052495
+repo      /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438
 suite     /tmp/sec7-drop-vsplit-N5HILH/suite
-  from    marker walk up from /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2052495/tools/suite_paths.py
+  from    marker walk up from /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438/tools/suite_paths.py
 empyrean  /tmp/sec7-drop-vsplit-N5HILH/suite/empyrean
-  from    EMPYREAN_DIR unset; under the suite root, from marker walk up from /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2052495/tools/suite_paths.py
+  from    EMPYREAN_DIR unset; under the suite root, from marker walk up from /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438/tools/suite_paths.py
 Generating compression self-test vectors...
-Compression self-test vectors OK -> /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2052495/engine/debug/generated (payload 744B, sum $92DF; plain 642B, dict 486B+256B, zx0 546B)
+Compression self-test vectors OK -> /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438/engine/debug/generated (payload 744B, sum $92DF; plain 642B, dict 486B+256B, zx0 546B)
 Verifying committed OJZ level tree...
 verify_level_bin: editor bake fidelity OK (9 section(s), 589824 nametable words)
 verify_level_bin: OK [act-pool+content+sidecar / local-maps / block-blobs / bininclude-targets / collision-interned / editor-bake / orphans]
