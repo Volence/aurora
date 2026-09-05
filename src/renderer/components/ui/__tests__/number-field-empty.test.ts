@@ -28,7 +28,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type React from 'react';
 import { renderHooked } from '../../../../test/render-hooked';
-import { NumberField, parseNumberFieldText } from '../fields';
+import { NumberField, parseNumberFieldText, refusalWithCommittedDrift } from '../fields';
 import { FieldRow } from '../../shared/ObjectInspector';
 import type { FieldValue, IntField, ObjectField } from '../../shared/object-inspector-model';
 import { clampStaticBase } from '../../../providers/bg-anim-aeon';
@@ -209,6 +209,122 @@ describe('NumberField — a clamp to a non-zero floor no longer rewrites the box
   });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// A REFUSAL THAT CANNOT READ AS "NOTHING CHANGED" (cold read 2026-09-05, C8)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// With `Top = 40`, typing `250` produced "Refused; Top is still 25." — literally
+// true, and it reads as "nothing changed" while the 40 the author had set is
+// gone. The commit TIMING is deliberately unchanged (the measurement is in
+// docs/reviews/2026-09-05-coldread-fixes.md; commit-on-blur lands red on the
+// four `type()`-without-`blur()` rows ABOVE and on the registered harness's
+// check 4a). What is fixed is that the field now says so.
+//
+// ⚠ THESE ROWS DRIVE THE REAL COMPONENT, like every row above. The clause is
+// built inside `NumberField`'s own `onChange`, from state only it holds, so a
+// row that called the string helper alone would prove the sentence exists and
+// not that the field ever produces it. Both are asserted, in that order.
+
+describe('a refusal after a partial commit says the value already moved', () => {
+  /** The band-edge rule the cold reader met: a screen line is 3..223. */
+  const line = (v: number): string | null =>
+    (v >= 3 && v <= 223) ? null : `${v} is not a screen line. Refused; Top is still ${v}.`;
+
+  function refusing(value: number) {
+    const reasons: (string | null)[] = [];
+    const b = box(
+      { value, refuse: (v) => (v >= 3 && v <= 223 ? null : line(v)), onRefusal: (r) => reasons.push(r) },
+      (n) => n,
+    );
+    return { b, reasons };
+  }
+
+  it('THE COLD READER\'S GESTURE — 250 over 40 names the 40 it destroyed', () => {
+    const { b, reasons } = refusing(40);
+    b.focus();
+    b.type('2');    // legal on its own — commits
+    b.type('25');   // legal on its own — commits
+    b.type('250');  // refused
+    // ANTI-VACUOUS: an intermediate commit really did happen. Without it this
+    // row would be asserting the clause on a field that never moved.
+    //
+    // ⚠ AND IT IS `[25]`, NOT `[2, 25]` — the packet's own reconstruction says
+    // "`2` → 2" and the rule says otherwise: 3..223, because lines 0-2 belong to
+    // the priming records. So the FIRST keystroke was refused too and only `25`
+    // landed. It does not soften the defect one bit: one committed prefix is all
+    // it takes to destroy the 40, and the message still said "still 25".
+    expect(b.commits).toEqual([25]);
+    const last = reasons.at(-1)!;
+    expect(last, 'the refusal still names the rule').toContain('is not a screen line');
+    expect(last, 'and it must not stop at "Top is still 25"').toContain('ALREADY MOVED');
+    expect(last).toContain('held 40 when you clicked into it');
+    expect(last).toContain('now holds 25');
+    expect(last).toContain('commits on every keystroke');
+  });
+
+  it('a SINGLE illegal keystroke over a legal value says nothing extra', () => {
+    // The other half, and the reason the clause cannot live in the provider:
+    // here "Top is still 40" is the whole truth and an added warning would be
+    // its own lie.
+    const { b, reasons } = refusing(40);
+    b.focus();
+    b.type('400');
+    expect(b.commits).toEqual([]);
+    expect(reasons.at(-1)).not.toContain('ALREADY MOVED');
+    expect(reasons.at(-1)).toContain('is not a screen line');
+  });
+
+  it('a commit that lands back on the FOCUS value says nothing extra', () => {
+    // 4 → 40 → refused 400, but the document is back at 40: nothing was lost,
+    // so the clause would be false. It compares values, not commit counts.
+    const { b, reasons } = refusing(40);
+    b.focus();
+    b.type('4');
+    b.type('40');
+    b.type('400');
+    expect(b.commits).toEqual([4, 40]);
+    expect(reasons.at(-1)).not.toContain('ALREADY MOVED');
+  });
+
+  it('a SECOND visit to the box does not inherit the first visit\'s commits', () => {
+    // The counter and the baseline reset on focus. Without that, every later
+    // refusal in the session would carry a stale "it held 40" for ever.
+    const { b, reasons } = refusing(40);
+    b.focus();
+    b.type('2');
+    b.type('25');
+    b.blur();
+    b.focus();            // a fresh gesture, on a document now holding 25
+    b.type('900');
+    expect(reasons.at(-1)).not.toContain('ALREADY MOVED');
+  });
+
+  it('a clean commit clears the refusal, as before', () => {
+    const { b, reasons } = refusing(40);
+    b.focus();
+    b.type('2');
+    b.type('25');
+    b.type('250');
+    expect(reasons.at(-1)).toContain('ALREADY MOVED');
+    b.type('25');
+    expect(reasons.at(-1), 'a legal value clears the whole message, clause and all').toBeNull();
+  });
+
+  it('the sentence itself: silent when it would be false, loud when it is true', () => {
+    // The helper, directly — the four gates, each on its own.
+    expect(refusalWithCommittedDrift('why.', 40, 25, 0), 'nothing committed').toBe('why.');
+    expect(refusalWithCommittedDrift('why.', null, 25, 2), 'never focused').toBe('why.');
+    expect(refusalWithCommittedDrift('why.', 40, 40, 2), 'landed back on the start').toBe('why.');
+    expect(refusalWithCommittedDrift('why.', NaN, 25, 2), 'no usable baseline').toBe('why.');
+    const say = refusalWithCommittedDrift('why.', 40, 25, 2);
+    expect(say.startsWith('why. '), 'the rule comes first, the clause after').toBe(true);
+    expect(say).toContain('40');
+    expect(say).toContain('25');
+    // It tells the author what to DO, which is the thing "is still 25" omits.
+    expect(say).toMatch(/Retype the whole value, or undo/);
+  });
+});
+
 // --- The call site, end to end -------------------------------------------
 
 /** A bounded int field whose min is NOT zero, so a commit of `min` and a
@@ -315,10 +431,19 @@ describe('fields.tsx wiring', () => {
     // `refuse` consulted AFTER the commit would be decoration over a value
     // already in the document.
     expect(src).toMatch(/if \(n === undefined\) return;/);
+    // ⚠ RE-SPELLED 2026-09-05, NOT WEAKENED. The commit moved inside a BLOCK
+    // (the drift counter increments beside it), so the single-line
+    // `if (why === null) onChange(n)` this row used to find no longer exists —
+    // and an `indexOf` for it returned -1, which `toBeGreaterThan(askAt)` would
+    // have read as a FAILURE rather than as "the text moved". The three
+    // positions are now asserted in order, which pins the same rule harder: ask,
+    // then guard, then commit.
     const askAt = src.indexOf('refuse?.(n)');
-    const commitAt = src.indexOf('if (why === null) onChange(n)');
-    expect(askAt).toBeGreaterThan(-1);
-    expect(commitAt).toBeGreaterThan(askAt);
+    const guardAt = src.indexOf('if (why === null)');
+    const commitAt = src.indexOf('onChange(n);');
+    expect(askAt, '`refuse` is consulted').toBeGreaterThan(-1);
+    expect(guardAt, 'and its answer guards something').toBeGreaterThan(askAt);
+    expect(commitAt, 'and the commit is behind that guard').toBeGreaterThan(guardAt);
   });
 
   it('the box SELECTS its contents on focus — the cause of `40112`', () => {
