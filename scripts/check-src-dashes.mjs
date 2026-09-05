@@ -52,7 +52,8 @@
 // identity with an upstream revision must keep upstream's punctuation, and the
 // drift gate that proves the identity is what would go red if a sweep touched
 // it. So the exclusion is a PATH RULE, derived from the presence of a sibling
-// `<name>.provenance.json`, and NOT from the observation that a given vendored
+// `<name>.provenance.<anything>` (the extension is a wildcard on purpose; see
+// the rule itself), and NOT from the observation that a given vendored
 // file happens to be dash free today. `test/fixtures/effects/ojz_act1_depth.json`
 // carries one right now, from aeon, and stripping it would be the defect.
 // (Only .ts is scanned here, so no vendored file is in the population today.
@@ -260,6 +261,6 @@ console.log(`check-src-dashes: OK: ${srcs.length} non-test .ts file(s) and ${css
   + 'stylesheet(s) under src, no U+2014 or U+2013 in any string or template, in either spelling. '
   + `Out of scope and saying so: comments (no tool shows one to a person), the test tree (held `
   + `by check-test-dashes), .tsx (held by `
-  + `check-tsx-dashes), and any file with a sibling .provenance.json (vendored, byte identity `
+  + `check-tsx-dashes), and any file with a sibling .provenance.* marker (vendored, byte identity `
   + `with upstream). ${ALLOWANCES.length} sanctioned verbatim quotation(s) of aeon's own `
   + 'messages, each still live.');

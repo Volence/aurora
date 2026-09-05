@@ -77,9 +77,16 @@
 // identity with an upstream revision must keep upstream's punctuation, and the
 // drift gate that proves the identity is what would go red if a sweep touched
 // it. So the exclusion is a PATH RULE, derived from the presence of a sibling
-// `<name>.provenance.json`, and NOT from the observation that a given vendored
-// file happens to be dash free today. `test/fixtures/effects/ojz_act1_depth.json`
-// carries one right now, from aeon, and stripping it would be the defect.
+// `<name>.provenance.<anything>`, and NOT from the observation that a given
+// vendored file happens to be dash free today.
+// `test/fixtures/effects/ojz_act1_depth.json` carries one right now, from aeon,
+// and stripping it would be the defect. THE EXTENSION WILDCARD IS LOAD-BEARING:
+// 10 of this repo's 11 markers are `.provenance.json` and the eleventh is
+// `.provenance.md`, and its subject is the fixture whose non-ASCII character an
+// assertion in THIS population exists to prove survived the writer. A
+// `.json`-only rule called that one file not-vendored. `assertVendoredRuleSees
+// EveryMarker` below refuses if any marker in the tree fails to name a subject
+// this rule recognises, and refuses too if it finds no markers at all.
 //
 // EXPECTED VALUES, VIA AN ALLOWLIST. Some strings in a test are not prose at
 // all: they are the value something else produces, quoted so the test can
