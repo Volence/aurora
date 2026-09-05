@@ -121,11 +121,11 @@ function endDocumentSession(): void {
  * is what makes this rare rather than routine.)
  */
 function openBlockedMessage(): string {
-  const base = 'Open cancelled — unsaved changes remain (save or discard them first).';
+  const base = 'Open cancelled: unsaved changes remain (save or discard them first).';
   const saveable = new Set(saveableDirtyCanvasDocIds());
   const unsavable = dirtyCanvasDocIds().filter((id) => !saveable.has(id));
   if (unsavable.length === 0) return base;
-  return `${base} ${unsavable.length} canvas(es) have no file yet, so Save cannot write them — ` +
+  return `${base} ${unsavable.length} canvas(es) have no file yet, so Save cannot write them; ` +
     'use Discard & open to drop them.';
 }
 

@@ -176,8 +176,8 @@ function assertSupported(schema: JsonSchema, where: string): void {
     if (!SUPPORTED_KEYWORDS.has(key)) {
       throw new UnsupportedSchemaError(
         `JSON Schema keyword "${key}" at ${where || '<root>'} is not implemented by ` +
-        'json-schema-subset.ts. Refusing to validate rather than ignoring it — ' +
-        'implement the keyword (and extend SUPPORTED_KEYWORDS) before the schema ships it.',
+        'json-schema-subset.ts. Refusing to validate rather than ignoring it. ' +
+        'Implement the keyword (and extend SUPPORTED_KEYWORDS) before the schema ships it.',
       );
     }
   }
@@ -591,7 +591,7 @@ export function canonicalizeBySchema(value: unknown, schema: JsonSchema, root?: 
   if (Array.isArray(schema.anyOf)
       && typeof value === 'object' && value !== null && !Array.isArray(value)) {
     throw new UnsupportedSchemaError(
-      'canonicalizeBySchema: `anyOf` over an object value is not implemented — unlike `oneOf` ' +
+      'canonicalizeBySchema: `anyOf` over an object value is not implemented; unlike `oneOf` ' +
       'there is no single branch to canonicalize against, and returning the object unchanged ' +
       'would skip the undeclared-key refusal. Implement it before the schema ships that shape.',
     );
@@ -631,7 +631,7 @@ export function canonicalizeBySchema(value: unknown, schema: JsonSchema, root?: 
     const hits = branches.filter(b => validateAgainstSchema(value, b, rootSchema).length === 0);
     if (hits.length !== 1) {
       throw new Error(
-        `canonicalizeBySchema: value matches ${hits.length} schema forms, expected exactly 1 — validate before serializing`,
+        `canonicalizeBySchema: value matches ${hits.length} schema forms, expected exactly 1; validate before serializing`,
       );
     }
     if (contributesPropertyAnnotations(hits[0])) {
@@ -655,7 +655,7 @@ export function canonicalizeBySchema(value: unknown, schema: JsonSchema, root?: 
     const leftover = Object.keys(obj).filter(k => !(k in props));
     if (leftover.length > 0) {
       throw new Error(
-        `canonicalizeBySchema: refusing to drop ${leftover.map(k => `"${k}"`).join(', ')} — ` +
+        `canonicalizeBySchema: refusing to drop ${leftover.map(k => `"${k}"`).join(', ')}; ` +
         'the schema does not declare them, so serializing would erase them silently',
       );
     }

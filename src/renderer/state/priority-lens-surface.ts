@@ -30,7 +30,7 @@ import { useToastStore } from './toastStore';
 
 /** The one message. Both surfaces say the same words about the same veil. */
 export const PRIORITY_LENS_TOAST =
-  'Priority lens on — the violet veil marks the tiles that draw in front of the player, '
+  'Priority lens on: the violet veil marks the tiles that draw in front of the player, '
   + 'so you can see the field this brush is now writing. Turn it off in View.';
 
 /**

@@ -108,7 +108,7 @@ export function reportLines(r: CommitReport, applied?: CommitCollisionApplied): 
   if (applied && applied.skippedOverhang > 0) {
     const n = applied.skippedOverhang;
     lines.push(
-      `skipped: ${n} block${n === 1 ? ' keeps' : 's keep'} no shape — `
+      `skipped: ${n} block${n === 1 ? ' keeps' : 's keep'} no shape because `
       + `${n === 1 ? 'its id is' : 'their ids are'} past the end of this zone's collision table; `
       + `in ROM those entries resolve into the adjacent zone's table, `
       + `so stamping one changes other blocks' in-game collision`,
@@ -167,7 +167,7 @@ export function refusalView(r: CommitRefusal): RefusalView {
     case 'grid-origin':
       return {
         message: `This canvas's cell grid is offset to (${r.originX}, ${r.originY}), so the guides and the unique-tile readout describe different 8×8 cells than a commit would cut.`,
-        resolution: 'Set the grid origin back to a multiple of 8 — commit always cuts from the canvas corner.',
+        resolution: 'Set the grid origin back to a multiple of 8; commit always cuts from the canvas corner.',
         offers: [],
       };
     case 'target-invalid':
@@ -185,7 +185,7 @@ export function refusalView(r: CommitRefusal): RefusalView {
     case 'palette-drift':
       return r.touchesLine0
         ? {
-          message: `This drawing recolours ${listEntries(r.entries)}, which belong to Sonic's palette — shared by every zone in the game.`,
+          message: `This drawing recolours ${listEntries(r.entries)}, which belong to Sonic's palette, shared by every zone in the game.`,
           resolution: 'Restore those entries to the act\'s colours. Line 0 is not the level\'s to change.',
           offers: [],
         }
@@ -203,14 +203,14 @@ export function refusalView(r: CommitRefusal): RefusalView {
     case 'predicates-unknown':
       return {
         message: `Replacing chunks needs the ${r.which.join(' and ')}, which could not be read for this act.`,
-        resolution: 'Reopen the project so they resolve. Appending works meanwhile — it reclaims nothing.',
+        resolution: 'Reopen the project so they resolve. Appending works meanwhile; it reclaims nothing.',
         offers: [],
       };
     case 'tiles-exhausted':
       return {
         message: `This drawing needs ${r.needed} tiles and only ${r.available} are available `
           + `(${r.free} free in the act's pool, ${r.reclaimed} reclaimed from the chunks being replaced).`,
-        resolution: 'Replace more chunks — their art is reclaimed — or simplify the drawing.',
+        resolution: 'Replace more chunks (their art is reclaimed) or simplify the drawing.',
         offers: [],
       };
     case 'blocks-exhausted':

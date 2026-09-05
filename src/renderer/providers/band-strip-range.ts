@@ -190,7 +190,7 @@ export function resolveStripDrag(input: StripDragInputs): StripDragOutcome {
     return {
       kind: 'refused',
       reason: `rows ${rows} is not a legal tile-animation height`,
-      hint: `rows is ${rows}, which does not make rows*${TILE_BYTES} an exact power of two — `
+      hint: `rows is ${rows}, which does not make rows*${TILE_BYTES} an exact power of two: `
         + 'the runtime rotates a whole pattern column by shifting it. Pick a row count from the '
         + "tile-animation form's Rows control before dragging a range.",
     };
@@ -211,7 +211,7 @@ export function resolveStripDrag(input: StripDragInputs): StripDragOutcome {
       // CAN drag to is taken, in the single message where that instruction is
       // the whole point. Derived here, and pinned by a node row that computes
       // the boundary from `firstPromotableSlot` rather than restating a literal.
-      hint: `slots ${lo}..${runEnd} are all inside the animated prefix — slots 0..`
+      hint: `slots ${lo}..${runEnd} are all inside the animated prefix: slots 0..`
         + `${firstPromotableSlot - 1} already belong to tile animations, so there is no static art under `
         + `this drag to promote. Drag a run that reaches slot ${firstPromotableSlot} or past it.`,
     };
@@ -345,7 +345,7 @@ function rangeSpan(outcome: Extract<StripDragOutcome, { kind: 'range' }>): strin
  */
 export function stripDragLabel(outcome: StripDragOutcome): string {
   if (outcome.kind === 'pick') return '';
-  if (outcome.kind === 'refused') return `no range — ${outcome.reason}`;
+  if (outcome.kind === 'refused') return `no range: ${outcome.reason}`;
   // NUMBERS AND SHAPE, NOTHING ELSE — and every word that is gone was measured
   // out, not trimmed for taste. See the block above for the box.
   return `${rangeSpan(outcome)} · ${outcome.cols}x${outcome.rows}`;

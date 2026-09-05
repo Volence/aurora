@@ -153,7 +153,7 @@ export async function loadCanvasFile(dir: string, name: string): Promise<LoadedC
   const warnings = sidecarReadError
     ? [
         ...loaded.warnings,
-        `the sidecar could not be read (${sidecarReadError}); opening the art without it — ` +
+        `the sidecar could not be read (${sidecarReadError}); opening the art without it: ` +
           'the canvas is unconstrained until this is fixed, and the sidecar file will not be overwritten on save',
       ]
     : loaded.warnings;
@@ -298,7 +298,7 @@ export async function saveCanvasFile(
     return {
       ok: false,
       kind: 'conflict',
-      error: `${result.conflicts.join(', ')} changed on disk since it was opened — nothing was written`,
+      error: `${result.conflicts.join(', ')} changed on disk since it was opened; nothing was written`,
       conflicts: result.conflicts,
     };
   }

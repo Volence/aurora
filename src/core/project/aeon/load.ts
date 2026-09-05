@@ -235,15 +235,15 @@ function summarizeUnreadable(unreadable: readonly UnreadableItem[]): Notice[] {
       severity: 'error',
       message:
         `${only.path} exists but could not be read (${only.reason}). ` +
-        'Aurora is showing empty data for it and will NOT overwrite the file — fix it by hand and reopen.',
+        'Aurora is showing empty data for it and will NOT overwrite the file; fix it by hand and reopen.',
     }];
   }
   return [{
     severity: 'error',
     message:
-      `${unreadable.length} section files exist but could not be read — ` +
+      `${unreadable.length} section files exist but could not be read: ` +
       `${nameSome(unreadable.map((u) => u.path))}. ` +
-      'Aurora is showing empty data for them and will NOT overwrite them — fix them by hand and reopen. ' +
+      'Aurora is showing empty data for them and will NOT overwrite them; fix them by hand and reopen. ' +
       'Each file and its own reason is in the developer console.',
   }];
 }
@@ -692,7 +692,7 @@ async function loadFullProject(
   // remap, so merging the atlas would only bloat the tileset with orphan tiles.
   if (chunkTiles.length > 0 && chunkLibrary.length === 0) {
     console.warn(
-      '[load] chunks_tiles.bin is non-empty but the chunk library is empty — skipping atlas migration (nothing references those tiles)',
+      '[load] chunks_tiles.bin is non-empty but the chunk library is empty: skipping atlas migration (nothing references those tiles)',
     );
   }
   // TODO(art-suite follow-up): make chunks.json self-describing (tileSpace marker) so migration is idempotent without truncation ordering.
@@ -710,7 +710,7 @@ async function loadFullProject(
       // channel where everything is amber is a channel nobody reads.
       notices.push({
         severity: 'success',
-        message: `Tile atlases unified — ${result.appended} tiles merged, ${result.remapped} entries checked`,
+        message: `Tile atlases unified: ${result.appended} tiles merged, ${result.remapped} entries checked`,
       });
       // Mark that migration ran successfully this load — the save glue uses this
       // to gate truncation of the legacy atlas (belt-and-braces with the alias

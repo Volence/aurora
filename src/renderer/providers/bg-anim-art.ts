@@ -42,14 +42,14 @@ import type { TilePickerLayer, TilePickerOrigin } from './tile-picker-source';
 /** The strip's button. A REGENERATE, not a one-time fill — the title says so. */
 export const SHIFT_BUTTON_LABEL = 'Shift';
 export const SHIFT_BUTTON_TITLE =
-  'Regenerate banks 1–7 from phase 0: bank k becomes phase 0 scrolled k px within the '
+  'Regenerate banks 1 to 7 from phase 0: bank k becomes phase 0 scrolled k px within the '
   + 'tile animation’s pattern width (the same fill as "pre-shifted (moves)"). Run it again after '
   + 'every phase-0 edit; banks you drew by hand are replaced. One undo step.';
-export const BANK_STRIP_HINT = 'banks 0–7 · click one to draw it';
+export const BANK_STRIP_HINT = 'banks 0 to 7 · click one to draw it';
 export const BANK_THUMB_TITLE = (bank: number): string =>
   bank === 0
-    ? 'Phase 0 — the picture at rest. Drawing it also writes the tile animation’s static slots.'
-    : `Bank ${bank} — the tile animation at step ${bank}. Draw it by hand, or Shift to derive it from phase 0.`;
+    ? 'Phase 0: the picture at rest. Drawing it also writes the tile animation’s static slots.'
+    : `Bank ${bank}: the tile animation at step ${bank}. Draw it by hand, or Shift to derive it from phase 0.`;
 
 // ---------------------------------------------------------------------------
 // Which palette line the override's art renders through
@@ -232,7 +232,7 @@ export function resolveStripOpen(input: StripOpenInputs): StripOpenOutcome {
       kind: 'refused',
       reason: 'not the override document',
       hint: 'The background on screen is not this act’s BG override document, so its tiles '
-        + 'are not editable here — a slot index means a position in the override’s own '
+        + 'are not editable here: a slot index means a position in the override’s own '
         + 'blob and would name different art in any other background. Bake this background into '
         + 'the override first, then double-click a tile to draw it.',
     };
@@ -284,7 +284,7 @@ export function stripOpenSpeaks(outcome: StripOpenOutcome): boolean {
  * caller must not write at all.
  */
 export function stripOpenLabel(outcome: StripOpenOutcome): string {
-  return outcome.kind === 'refused' ? `no edit — ${outcome.reason}` : '';
+  return outcome.kind === 'refused' ? `no edit: ${outcome.reason}` : '';
 }
 
 /** The same answer at length, for the readout's `title`, where a paragraph is free. */

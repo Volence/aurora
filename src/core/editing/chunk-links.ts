@@ -614,7 +614,7 @@ export function describeOutOfActChunkCopies(copies: OutOfActChunkCopies): string
   return `${n} linked ${n === 1 ? 'copy' : 'copies'} outside this act ${n === 1 ? 'was' : 'were'} `
     + `NOT updated: ${where}. Open the act and save the chunk there to update `
     + `${n === 1 ? 'it' : 'them'}`
-    + (crossZone ? ' — copies in another zone resolve tiles against that zone\'s own tileset' : '')
+    + (crossZone ? '; copies in another zone resolve tiles against that zone\'s own tileset' : '')
     + '.';
 }
 

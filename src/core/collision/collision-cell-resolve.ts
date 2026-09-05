@@ -66,7 +66,7 @@ function reportPlaneLength(source: 'edit' | 'engine', got: number, want: number)
     ? `words ${got}..${want - 1} are missing and render as air`
     : 'the tail past the addressed range is unreachable';
   console.error(
-    `[COLLISION_PLANE_LENGTH] ${source} plane has ${got} cell words; this section addresses ${want} — ${consequence}. A producer wrote a plane of the wrong size.`,
+    `[COLLISION_PLANE_LENGTH] ${source} plane has ${got} cell words; this section addresses ${want}: ${consequence}. A producer wrote a plane of the wrong size.`,
   );
 }
 

@@ -258,7 +258,7 @@ describe('a locked scene draws its guides on the plane, at world origin', () => 
   });
 
   it('captions the guide layer so the space is visible, and only when locked', () => {
-    expect(guideCaption('screen')).toBe('plane rows — fixed on the background, not on the frame');
+    expect(guideCaption('screen')).toBe('plane rows: fixed on the background, not on the frame');
     expect(guideCaption('act')).toBeNull();
   });
 

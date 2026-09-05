@@ -438,7 +438,7 @@ async function main() {
     //
     // `guideOriginWorldY` returns 0 in both spaces, so a guide's world row IS the
     // layer's own `world_y` and no v_offset enters it; the canvas even says so in
-    // its caption — "plane rows — fixed on the background, not on the frame".
+    // its caption — "plane rows: fixed on the background, not on the frame".
     // The guide correctly did not move, and the row read that as a broken drag.
     //
     // ⚠ AND NOTE HOW IT SURVIVED. The overturn (2026-08-27, `7ba5a638`) DROPPED A

@@ -56,10 +56,10 @@ export function readProjectConfig(bytes: Uint8Array | null): SidecarState {
   try {
     json = JSON.parse(new TextDecoder().decode(bytes));
   } catch {
-    return { config: {}, issues: [{ where: '$', message: 'invalid JSON — ignoring the sidecar' }] };
+    return { config: {}, issues: [{ where: '$', message: 'invalid JSON; ignoring the sidecar' }] };
   }
   if (!isPlainObject(json)) {
-    return { config: {}, issues: [{ where: '$', message: 'expected a JSON object — ignoring the sidecar' }] };
+    return { config: {}, issues: [{ where: '$', message: 'expected a JSON object; ignoring the sidecar' }] };
   }
 
   const issues: ConfigIssue[] = [];
@@ -67,18 +67,18 @@ export function readProjectConfig(bytes: Uint8Array | null): SidecarState {
 
   if ('base' in json && typeof json.base !== 'string') {
     delete out.base;
-    issues.push({ where: 'base', message: `expected a string profile id, got ${json.base === null ? 'null' : typeof json.base} — entry ignored` });
+    issues.push({ where: 'base', message: `expected a string profile id, got ${json.base === null ? 'null' : typeof json.base}; entry ignored` });
   }
 
   if ('paths' in json) {
     if (!isPlainObject(json.paths)) {
       delete out.paths;
-      issues.push({ where: 'paths', message: 'expected an object of key → path — channel ignored' });
+      issues.push({ where: 'paths', message: 'expected an object of key → path; channel ignored' });
     } else {
       const paths: Record<string, string> = {};
       for (const [k, v] of Object.entries(json.paths)) {
         if (typeof v === 'string') paths[k] = v;
-        else issues.push({ where: `paths.${k}`, message: `expected a string path, got ${v === null ? 'null' : typeof v} — entry ignored` });
+        else issues.push({ where: `paths.${k}`, message: `expected a string path, got ${v === null ? 'null' : typeof v}; entry ignored` });
       }
       out.paths = paths;
     }
@@ -87,7 +87,7 @@ export function readProjectConfig(bytes: Uint8Array | null): SidecarState {
   if ('assets' in json) {
     if (!isPlainObject(json.assets)) {
       delete out.assets;
-      issues.push({ where: 'assets', message: 'expected an object of asset-class → override — channel ignored' });
+      issues.push({ where: 'assets', message: 'expected an object of asset-class → override; channel ignored' });
     } else {
       const assets: Record<string, z.infer<typeof assetOverrideSchema>> = {};
       for (const [k, v] of Object.entries(json.assets)) {
@@ -96,7 +96,7 @@ export function readProjectConfig(bytes: Uint8Array | null): SidecarState {
         else {
           const zi = res.error.issues[0];
           const at = zi && zi.path.length > 0 ? `${zi.path.join('.')}: ` : '';
-          issues.push({ where: `assets.${k}`, message: `${at}${zi?.message ?? 'invalid override shape'} — entry ignored` });
+          issues.push({ where: `assets.${k}`, message: `${at}${zi?.message ?? 'invalid override shape'}; entry ignored` });
         }
       }
       out.assets = assets;

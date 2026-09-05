@@ -37,7 +37,7 @@ export function applyCollisionShape(shape: number): ApplyCollisionShapeResult {
 
   const point = s.collisionProbe;
   if (!point) {
-    return { ok: false, why: 'no cell has been probed yet — click a cell in the viewport first' };
+    return { ok: false, why: 'no cell has been probed yet; click a cell in the viewport first' };
   }
 
   const probe = probeCollision(s.doc, point.x, point.y);
@@ -137,7 +137,7 @@ function dispatchCollisionPlan(
       ok: false,
       refusal: { kind: 'store-disagreement', error: result.error },
       why: result.error,
-      resolution: 'This is an Aurora bug — the planner and the store command disagree.',
+      resolution: 'This is an Aurora bug: the planner and the store command disagree.',
       report: plan.report,
     };
   }

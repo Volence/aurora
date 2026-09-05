@@ -72,7 +72,7 @@ export const entrySchema = z.object({
   pal: z.number().int().min(0).max(3).describe('palette line 0-3'),
   pri: z.boolean().optional().describe(
     'VDP priority bit (this cell draws in front of sprites). OMIT to KEEP the destination cell\'s '
-    + 'existing priority — paint_region preserves what is already there, and a save_chunk cell is '
+    + 'existing priority: paint_region preserves what is already there, and a save_chunk cell is '
     + 'newly created so it has none. Pass true to set it, false to CLEAR one that is already set.'),
   hf: z.boolean().optional().describe(
     'horizontal flip; part of which picture the entry names, so omitting it means UNFLIPPED '
@@ -142,7 +142,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
       // boolean beside a plane would let a caller send the contradictory
       // `plane: "b", both: true` and expect something the tool cannot mean.
       plane: z.enum(['a', 'b', 'both'])
-        .describe('collision plane to write: "a", "b", or "both" — one stroke over BOTH planes, '
+        .describe('collision plane to write: "a", "b", or "both", which is one stroke over BOTH planes, '
           + 'as one undo step, for shared ground (ordinary floors and walls that stop the player '
           + 'whichever path he is on). Prefer "both" for ordinary geometry: painting each plane '
           + 'separately is what leaves a second plane half-finished.'),
@@ -175,12 +175,12 @@ export const EDITOR_METHODS: EditorMethod[] = [
           + 'to the other collision path, for a loop): "keep" (default, and what omitting it means) '
           + 'leaves it alone; "hand-off" marks each cell so a player on the plane being painted is '
           + 'moved to the other one; "clear" erases it. With plane:"both" this writes the correct '
-          + 'opposite value on each plane, which is a complete TWO-WAY crossover — the pair a loop '
+          + 'opposite value on each plane, which is a complete TWO-WAY crossover, the pair a loop '
           + 'needs to be traversable in both directions. With the "words" form it applies to every '
           + 'cell that is WRITTEN and to no cell whose word is null (a skipped cell keeps its own '
           + 'crossover even under "clear"). '
           + 'IF YOU ARE AUTHORING A TWO-WAY CROSSOVER (plane:"both" + "hand-off"), READ '
-          + '"crossoverSpan" BELOW FIRST — at the default width a two-way pair does NOTHING.'),
+          + '"crossoverSpan" BELOW FIRST: at the default width a two-way pair does NOTHING.'),
       // ⚠ THE ONE PARAMETER A TWO-WAY LOOP CANNOT BE AUTHORED WITHOUT.
       //
       // aeon's trigger (`Player_LoopCrossover`) fires once per 8px COLUMN
@@ -197,34 +197,34 @@ export const EDITOR_METHODS: EditorMethod[] = [
           + 'what omitting it means) marks the whole 16px cell; "left"/"right" mark ONE 8px sub-column '
           + 'of every cell in the rectangle. ⚠ A TWO-WAY CROSSOVER ONLY WORKS AT "left" OR "right". The '
           + 'engine fires the crossover once per 8px column the player enters, and a 16px cell is TWO '
-          + 'of them — so a two-way pair (plane:"both" + crossover:"hand-off") at the default width '
+          + 'of them, so a two-way pair (plane:"both" + crossover:"hand-off") at the default width '
           + 'flips the player\'s collision path twice and nets to NOTHING. Use "left" or "right" (either '
           + 'one; pick the column you want the handoff to happen at) and paint the pair one cell wide. '
-          + 'A ONE-WAY mark — "hand-off" on a single plane — is idempotent and does not need this. '
+          + 'A ONE-WAY mark ("hand-off" on a single plane) is idempotent and does not need this. '
           + 'It narrows the MARK only: the shape and solidity still fill the whole rectangle.'),
     },
     description: 'Paint a w*h CELL rectangle (16px units) of one or BOTH collision planes. '
       + 'THE FORM: pass EITHER "word" (fill the whole rectangle with that packed cell word) OR "words" '
-      + '(one word per cell, row-major, w*h long, null = leave that cell alone) — exactly one; both or '
+      + '(one word per cell, row-major, w*h long, null = leave that cell alone). Exactly one; both or '
       + 'neither is refused. "words" is get_collision_region\'s reply "words" fed straight back, so read '
       + 'then write restores a region exactly. '
       + 'THE PLANE: "a" or "b" writes one plane; "both" writes A and B in ONE undo step, each cell merged '
-      + 'against its OWN plane\'s existing word — prefer it for ordinary geometry, since painting each '
+      + 'against its OWN plane\'s existing word. Prefer it for ordinary geometry, since painting each '
       + 'plane separately is what leaves a second plane half-finished. '
       + 'THE COMBINATIONS ARE ALL LEGAL AND EACH AXIS KEEPS ITS MEANING: "words" with plane:"both" writes '
       + 'the same per-cell word into both planes, each merged against that plane\'s own cell, and a null '
       + 'cell is skipped on BOTH planes; "words" with a crossover applies that crossover to every cell it '
       + 'writes and to none it skips. '
       + 'WHAT A PAINT AUTHORS: shape/xflip/yflip/solidity from the word, plus the crossover when you ask '
-      + 'for one — and it KEEPS whatever else each destination cell held. So bits 15:14 INSIDE a "words" '
+      + 'for one, and it KEEPS whatever else each destination cell held. So bits 15:14 INSIDE a "words" '
       + 'value are IGNORED: they are the loop crossover, they are not copied from the array, and the '
       + 'destination keeps its own. Round-tripping a region OVER ITSELF is therefore exact, but copying '
-      + 'words to a DIFFERENT place carries the four picture fields only — use "crossover" to author the '
+      + 'words to a DIFFERENT place carries the four picture fields only; use "crossover" to author the '
       + 'crossover there. '
       + 'Reply: "painted" counts 8px sub-tile entries actually changed on the aimed plane (up to 4 per '
-      + 'cell) and "paintedOther" counts them on the second plane when plane is "both" — reported '
+      + 'cell) and "paintedOther" counts them on the second plane when plane is "both", reported '
       + 'separately, never summed, so "wrote one plane" and "wrote two" cannot look alike. "skipped" '
-      + 'counts null cells. The reply also carries "crossoverAudit" for the whole section — '
+      + 'counts null cells. The reply also carries "crossoverAudit" for the whole section: '
       + 'marksA/marksB/pairs/oneWay plus a severity and a note. CHECK "oneWay": a loop crossover marked '
       + 'on one plane only is legal, is invisible, and plays correctly in exactly one direction. Aeon\'s '
       + 'build does NOT check this; this reply is where it is checked.' },
@@ -237,35 +237,35 @@ export const EDITOR_METHODS: EditorMethod[] = [
       // `validateCollisionReadPlane`, which refuses 'both' in prose for any
       // road that reaches the handler without passing this schema.
       plane: z.enum(['a', 'b'])
-        .describe('collision plane to read: "a" or "b". NOT "both" — paint_collision accepts "both" '
+        .describe('collision plane to read: "a" or "b". NOT "both": paint_collision accepts "both" '
           + 'because a write can touch two planes in one undo step, but a READ of "both" has no honest '
           + 'single answer: it would have to merge the two planes into one grid (the same flattening '
           + 'this method already refuses one level down, where a cell whose four 8px sub-tiles disagree '
           + 'reports null instead of a sampled guess) or return two grids, which would make the reply '
           + 'shape depend on a parameter and leave "words" ambiguous. Call it twice; the two replies say '
           + 'it exactly.'),
-      x: z.number().int().min(0).max(127).describe('cell col (16px units, 0-127) — SAME units as paint_collision, NOT the 8px tile units get_nametable_region uses'),
+      x: z.number().int().min(0).max(127).describe('cell col (16px units, 0-127); SAME units as paint_collision, NOT the 8px tile units get_nametable_region uses'),
       y: z.number().int().min(0).max(127).describe('cell row (16px units, 0-127)'),
       w: z.number().int().min(1).max(128), h: z.number().int().min(1).max(128),
       ascii: z.boolean().optional().describe('also return a one-char-per-cell glyph grid with a legend, for a human to glance at'),
     },
     description: 'READ a w*h CELL rectangle (16px units, the same coordinates paint_collision writes) of ONE '
-      + 'collision plane ("a" or "b" — never "both"; see the plane parameter for why, and call it twice) — '
-      + 'judge a layout from data instead of a screenshot. Returns "cells" (h rows of w '
+      + 'collision plane ("a" or "b", never "both"; see the plane parameter for why, and call it twice). '
+      + 'Judge a layout from data instead of a screenshot. Returns "cells" (h rows of w '
       + 'objects: word, shape, xFlip, yFlip, solidity, known, angle, crossover) and "words" (those same raw '
-      + 'words flat, row-major, w*h long) — pass "words" back to paint_collision as its "words" to restore '
+      + 'words flat, row-major, w*h long). Pass "words" back to paint_collision as its "words" to restore '
       + 'the region. '
       + 'A 16px cell is STORED as four 8px sub-tiles: when they disagree the cell is reported honestly as '
       + '{word:null, mixed:true, sub:[tl,tr,bl,br]} with NO shape/flip/solidity, never by sampling one of the '
       + 'four, and "mixedCells" counts them (a null in "words" is what paint_collision skips). "word" is all '
-      + '16 raw bits, including bits 15:14 — the LOOP CROSSOVER, reported by name as "crossover" per cell '
+      + '16 raw bits, including bits 15:14, the LOOP CROSSOVER, reported by name as "crossover" per cell '
       + '("none" / "to-a" / "to-b", or "reserved" for the illegal value 3 (rule R1 specifies a bake hard error; as of 2026-08-29 the bake does not read this field, so NOTHING downstream refuses it), '
       + 'which is reported rather than normalised away). "crossoverCells" counts the cells carrying one and '
-      + '"cellsWithUnownedBits" counts the cells with any bit outside the four picture fields — the same '
+      + '"cellsWithUnownedBits" counts the cells with any bit outside the four picture fields: the same '
       + 'bits, counted from the encoder\'s own mask rather than from the crossover\'s. '
       + '⚠ A CROSSOVER DOES NOT TRAVEL IN "words": paint_collision masks those bits off and keeps the '
       + 'destination\'s, so writing this reply\'s "words" back over ITSELF is exact, but writing it '
-      + 'SOMEWHERE ELSE moves the picture and not the crossover — author that with paint_collision\'s '
+      + 'SOMEWHERE ELSE moves the picture and not the crossover; author that with paint_collision\'s '
       + '"crossover" parameter. '
       + '"profilesLoaded" false means no collision shape '
       + 'tables are loaded, so "known" is false and "angle" null everywhere. Max 4096 cells per call.' },
@@ -305,7 +305,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: `Write a zone-wide background (Plane B): a ${BG_WIDTH}x${BG_ROWS} tile nametable `
       + `(${BG_LAYOUT_WORDS} row-major VDP words; the legacy ${BG_WIDTH}x${BG_ROWS_LEGACY} / `
       + `${BG_LAYOUT_WORDS_LEGACY}-word shape is still accepted and the engine zero-pads it) plus its `
-      + `tile blob (max ${BG_TILE_CAPACITY} tiles — the BG VRAM region $8000..$B7FF, below the sprite `
+      + `tile blob (max ${BG_TILE_CAPACITY} tiles; the BG VRAM region $8000..$B7FF, below the sprite `
       + 'attribute table at $B800). Without "name" replaces the act-default BG (one undo step); with '
       + '"name" saves to the project BG library (additive). Tile indices are local to the BG blob.' },
   { name: 'list_bgs', kind: 'list-bgs', result: 'json', params: {},
@@ -317,7 +317,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: "List available backgrounds: the act default, every BG library entry (id, name, tile count), "
       + "and each section's current assignment (bgId null = act default; dangling true = that id is in NO "
       + "library entry, so the section is showing the act default). Also reports entries the zone's bglib "
-      + 'manifest NAMES but whose layout/tile binaries are not in this checkout — those ids cannot be '
+      + 'manifest NAMES but whose layout/tile binaries are not in this checkout; those ids cannot be '
       + 'assigned or displayed until the files arrive, and Aurora keeps their names when it saves. '
       + BG_SECTION_BINDING_LIMIT },
   { name: 'assign_section_bg', kind: 'assign-section-bg', result: 'json',
@@ -336,10 +336,10 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'List the project\'s effects scenes (parallax/raster scene definition documents under '
       + 'data/editor/effects/): each scene\'s id, name and layer count, plus which scene each section is '
       + 'assigned to (sceneRef null = the act default). Also reports scene files that exist but could NOT '
-      + 'be read — those ids are unusable and Aurora will not overwrite them.' },
+      + 'be read: those ids are unusable and Aurora will not overwrite them.' },
   { name: 'get_effects_scene', kind: 'get-effects-scene', result: 'json',
     params: { id: z.string().min(1).describe('scene id') },
-    description: 'Read one effects scene as its WHOLE document, exactly as it is on disk — including any '
+    description: 'Read one effects scene as its WHOLE document, exactly as it is on disk, including any '
       + 'field this editor does not itself expose. Feed the result straight back to set_effects_scene.' },
   { name: 'set_effects_scene', kind: 'set-effects-scene', result: 'json',
     params: {
@@ -349,7 +349,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
       // only drift from it. What the description owes an agent is the SHAPE of
       // the rule and why it differs from a background id.
       id: z.string().min(1)
-        .describe('scene id — lowercase letters, digits and underscores, starting with a letter, max 32. '
+        .describe('scene id: lowercase letters, digits and underscores, starting with a letter, max 32. '
           + 'It becomes part of generated .emp symbol names, so hyphens are NOT legal (unlike a background id).'),
       scene: z.unknown().nullable()
         .describe('the whole scene definition document (schema 1), or null to delete the scene. Its "id" '
@@ -359,7 +359,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'Create, replace or delete one effects scene. Takes the WHOLE document, not a field patch: '
       + 'read the current one with get_effects_scene, change what you want, send it back. Fields this '
       + 'editor does not expose survive because nothing enumerates them. One undo step. The document is '
-      + `validated against the contract schema on the way in — layers ${EFFECTS_LAYER_COUNT.min}..${EFFECTS_LAYER_COUNT.max}, factors from the published `
+      + `validated against the contract schema on the way in: layers ${EFFECTS_LAYER_COUNT.min}..${EFFECTS_LAYER_COUNT.max}, factors from the published `
       + 'FACTOR_* set or a packed {s1,s2,op} triple, no unknown keys.' },
   { name: 'assign_section_scene', kind: 'assign-section-scene', result: 'json',
     params: {
@@ -367,7 +367,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
       sceneId: z.string().nullable().describe('effects scene id, or null for the act default'),
     },
     description: 'Assign which effects scene a section uses (sceneRef in its meta sidecar): a scene id, or '
-      + 'null to fall back to the act default. One undo step. Refuses an id that is not a readable scene — '
+      + 'null to fall back to the act default. One undo step. Refuses an id that is not a readable scene: '
       + 'a ref the build cannot resolve is worse than no ref.' },
 
   // ---- Wave 2: raster PRESETS --------------------------------------------
@@ -399,15 +399,15 @@ export const EDITOR_METHODS: EditorMethod[] = [
   // what an MCP client actually reads, so the plural wins here.
   { name: 'list_effects_presets', kind: 'list-effects-presets', result: 'json', params: {},
     description: 'List the project\'s raster band PRESETS (documents under data/editor/effects/presets/): '
-      + 'each preset\'s id, name and band count. A preset is NOT a scene — a scene is the parallax '
+      + 'each preset\'s id, name and band count. A preset is NOT a scene: a scene is the parallax '
       + 'config under data/editor/effects/, a preset is the raster band program in the presets/ '
       + 'subdirectory, and a "bands" key in a scene file is refused. Also reports preset files that '
-      + 'exist but could NOT be read — those ids are unusable and Aurora will not overwrite them. '
+      + 'exist but could NOT be read: those ids are unusable and Aurora will not overwrite them. '
       + 'Reports the per-section rasterRef column too, and the sentence that says where such a '
       + 'binding stops.' },
   { name: 'get_effects_preset', kind: 'get-effects-preset', result: 'json',
     params: { id: z.string().min(1).describe('preset id') },
-    description: 'Read one raster preset as its WHOLE document, exactly as it is on disk — including any '
+    description: 'Read one raster preset as its WHOLE document, exactly as it is on disk, including any '
       + 'field this editor does not itself expose. Feed the result straight back to set_effects_preset.' },
   { name: 'set_effects_preset', kind: 'set-effects-preset', result: 'json',
     params: {
@@ -416,7 +416,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
       // enforces it along with the filename-stem identity rule, and a second
       // copy on this boundary could only drift from it.
       id: z.string().min(1)
-        .describe('preset id — lowercase letters, digits and underscores, starting with a letter, max 32. '
+        .describe('preset id: lowercase letters, digits and underscores, starting with a letter, max 32. '
           + 'It becomes part of the generated .emp label EditorRaster_<ACT>_<id>, so hyphens are NOT legal '
           + '(unlike a background id).'),
       preset: z.unknown().nullable()
@@ -427,11 +427,11 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'Create, replace or delete one raster band preset. Takes the WHOLE document, not a field '
       + 'patch: read the current one with get_effects_preset, change what you want, send it back. Fields '
       + 'this editor does not expose survive because nothing enumerates them. One undo step. A document is '
-      + 'at least one band, each band being {top, bot, sh, on} with EXACTLY ONE ON arm (cram or pal_region) '
-      + '— two arms would be two writes and therefore two restores, which is two bands. No numeric value is '
+      + 'at least one band, each band being {top, bot, sh, on} with EXACTLY ONE ON arm (cram or pal_region). '
+      + 'Two arms would be two writes and therefore two restores, which is two bands. No numeric value is '
       + 'range-checked or clamped on this side, on purpose: the engine refuses out-of-budget bands with the '
       + 'measurement behind the rule. ⚠ Saving does NOT install the preset: binding it to a section is a '
-      + 'separate call (assign_section_preset), and even that installs nothing yet — '
+      + 'separate call (assign_section_preset), and even that installs nothing yet: '
       + RASTER_SECTION_BINDING_LIMIT },
 
   // THE FOURTH TOOL, and it was absent on purpose until 2026-08-30: there was no
@@ -470,7 +470,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
     },
     description: 'Assign which raster band PRESET a section uses (rasterRef in its meta sidecar): a '
       + 'preset id from list_effects_presets, or null to unbind. One undo step. Refuses an id that is '
-      + 'not a READABLE preset — a ref the build cannot resolve is worse than no ref. ⚠ '
+      + 'not a READABLE preset: a ref the build cannot resolve is worse than no ref. ⚠ '
       + RASTER_SECTION_BINDING_LIMIT },
 
   // ---- Wave-1 surface 4: BgAnim bands -------------------------------------
@@ -488,7 +488,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'List the BgAnim bands of this game\'s BG override document '
       + '(data/editor_bg_override.json): each band\'s geometry, driver, rate shift and slot range, '
       + 'plus the tile-blob and band-count budgets. Also reports whether that file exists and '
-      + 'whether it could be read — an unreadable one is never overwritten, and every band '
+      + 'whether it could be read: an unreadable one is never overwritten, and every band '
       + 'operation will refuse against it.' },
   { name: 'promote_bg_anim_band', kind: 'promote-bg-anim-band', result: 'json',
     params: {
@@ -509,16 +509,16 @@ export const EDITOR_METHODS: EditorMethod[] = [
         .describe('how banks 1..7 are derived from phase 0. copy (the default here) leaves the '
           + 'band visually inert until its frames are drawn; blank breaks the picture on the '
           + 'second phase; shift makes bank k phase 0 scrolled k px ALONG THE BAND\'S AXIS within '
-          + 'its own pattern period — the contract\'s "pre-shifted art 1px apart", so the band '
+          + 'its own pattern period, the contract\'s "pre-shifted art 1px apart", so the band '
           + 'MOVES with no further authoring. Phase 0 is always read from the promoted range itself'),
       axis: z.enum(['horizontal', 'vertical']).optional()
         .describe('which way the pattern translates. Omit to leave the key out, which bakes as '
           + 'horizontal. A vertical band scrolls UP as its driver increases, takes its period from '
           + 'rows (pattern_px = rows*8) and its power-of-two rotation unit from cols. Setting it '
           + 'also switches phaseFill=shift to a VERTICAL roll and the band\'s slot order to '
-          + 'row-major — aeon refuses a vertical band whose phases are horizontal translations'),
+          + 'row-major: aeon refuses a vertical band whose phases are horizontal translations'),
       driver: z.string().optional()
-        .describe('camera_x, camera_y or timer — the SCALAR the band\'s step is read from, never '
+        .describe('camera_x, camera_y or timer; the SCALAR the band\'s step is read from, never '
           + 'an axis: camera_y does NOT mean vertical motion, and `axis` is what does. Omit to '
           + 'leave the key out so the document tracks the engine default'),
       rateShift: z.number().int().optional()
@@ -562,11 +562,11 @@ export const EDITOR_METHODS: EditorMethod[] = [
         .describe('which way the pattern translates; omit to leave the key out (bakes as '
           + 'horizontal). Vertical scrolls UP, takes its period from rows and its power-of-two '
           + 'rotation unit from cols, and orders its slots row-major'),
-      driver: z.string().optional().describe('camera_x, camera_y or timer — the scalar source, never an axis'),
+      driver: z.string().optional().describe('camera_x, camera_y or timer; the scalar source, never an axis'),
       rateShift: z.number().int().optional().describe('right shift applied to the driver scalar'),
     },
     description: 'Add a NEW BgAnim band whose art comes from outside the document. THIS GROWS THE '
-      + 'TILE BLOB by cols*rows, so it refuses on a document at capacity — use '
+      + 'TILE BLOB by cols*rows, so it refuses on a document at capacity; use '
       + 'promote_bg_anim_band there instead. The art arrives unreferenced, so nothing on screen '
       + 'changes until layout cells point at it. One undo step.' },
   { name: 'remove_bg_anim_band', kind: 'remove-bg-anim-band', result: 'json',
@@ -577,7 +577,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
           + 'Off by default: removal DESTROYS the band\'s art, and this is how you say you meant to'),
     },
     description: 'Remove a BgAnim band, deleting its slots from the tile blob. DESTRUCTIVE, unlike '
-      + 'demote_bg_anim_band — refuses by default when layout cells draw the band, naming how many, '
+      + 'demote_bg_anim_band: refuses by default when layout cells draw the band, naming how many, '
       + 'and only blanks them when blankReferencingCells says so. One undo step.' },
   // Band ART (parcel I). Kept to the two verbs the panel has: set tile pixels,
   // regenerate the shifted banks. Bank-by-bank authoring stays a human door.
@@ -592,13 +592,13 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'Write the pixels of one or more tiles of this game\'s BG override document '
       + '(data/editor_bg_override.json). A slot inside the animated prefix (list_bg_anim_bands '
       + 'reports each band\'s slot range) is a band\'s phase-0 art, and the write lands in that '
-      + 'band\'s phases[0] in the same step — the injector refuses a file where the two differ. '
+      + 'band\'s phases[0] in the same step; the injector refuses a file where the two differ. '
       + 'A slot past the prefix touches no band. One undo step.' },
   { name: 'regenerate_bg_anim_band_shift', kind: 'regenerate-bg-anim-band-shift', result: 'json',
     params: { band: z.number().int().min(0).describe('index into the band list') },
     description: 'Rebuild banks 1..7 of a BgAnim band from its CURRENT phase 0 as pre-shifted '
       + 'phases (bank k = phase 0 scrolled k px ALONG THE BAND\'S OWN AXIS, within its pattern '
-      + 'period — the same fill as phaseFill=shift, and vertical for a band that declares it). '
+      + 'period, the same fill as phaseFill=shift, and vertical for a band that declares it). '
       + 'A REGENERATE, to run after each phase-0 edit; hand-drawn banks are replaced. Phase 0 is '
       + 'untouched. One undo step.' },
 
@@ -621,7 +621,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
     params: { plane: z.enum(['fg', 'bg']), x: z.number().int().min(0), y: z.number().int().min(0), chunkIds: z.array(z.array(z.number().int().min(0).max(255))).describe('row-major 2D grid of chunk ids (S1 engine ids: 0 = air/blank, 1..N = the N chunks); placed with the top-left cell at (x,y)') },
     description: 'Stamp a rectangular region of a layout plane with a 2D grid of chunk ids (top-left at x,y). Chunk ids are 1-based (0 = air). One undo step.' },
   { name: 'edit_chunk', kind: 'classic-edit-chunk', result: 'json',
-    params: { chunkId: z.number().int().min(1).max(255).describe('S1 engine chunk id (1-based; id 1 = the first map256 chunk — 0 is air/blank and not editable)'), cells: z.array(z.object({ index: z.number().int().min(0).max(255), word: z.number().int().min(0).max(0xffff) })).describe('block-cell edits: cell index 0-255, packed S1 chunk-block word') },
+    params: { chunkId: z.number().int().min(1).max(255).describe('S1 engine chunk id (1-based; id 1 = the first map256 chunk; 0 is air/blank and not editable)'), cells: z.array(z.object({ index: z.number().int().min(0).max(255), word: z.number().int().min(0).max(0xffff) })).describe('block-cell edits: cell index 0-255, packed S1 chunk-block word') },
     description: 'Set individual 16x16 block cells of one chunk (batched). chunkId is a 1-based engine id (0 = air, not editable). One undo step.' },
   { name: 'edit_block', kind: 'classic-edit-block', result: 'json',
     params: { blockId: z.number().int().min(0), def: z.object({ cells: z.array(blockCellSchema).length(4).describe('exactly 4 tile cells, TL/TR/BL/BR') }) },
@@ -671,10 +671,10 @@ export const EDITOR_METHODS: EditorMethod[] = [
       shape: z.number().int().min(0).max(255)
         .describe(`collision-shape index (a colind value): 0 = no collision, ${FLAT_SHAPE} ($FF) = flat/fully solid. Other values index this zone's collision array and vary per zone.`),
       mode: z.enum(['link', 'isolate']).optional()
-        .describe('"link" (default) writes the shape onto the block itself, changing every use of it ZONE-wide; "isolate" clones the block first so only these cells change — at the cost of one collision-table entry per distinct block, which some zones have none of'),
+        .describe('"link" (default) writes the shape onto the block itself, changing every use of it ZONE-wide; "isolate" clones the block first so only these cells change, at the cost of one collision-table entry per distinct block, which some zones have none of'),
       dryRun: z.boolean().optional().describe('plan and report without applying'),
     },
-    description: 'Set the collision SHAPE on the block under every cell of a rectangle, in 16px FG cell units. One undo step. Does NOT set solidity — that rides the chunk cell (edit_chunk). Partial by design: cells that are air, blank block 0, a dangling block reference, outside the layout, or (link) past the end of the zone\'s collision table are skipped and counted in the reply, and the rest still applies. A refusal returns ok:false with a message and a resolution — the whole call is refused only when nothing applied and nothing already matched, or when isolate would need more collision-table entries than the zone has spare.' },
+    description: 'Set the collision SHAPE on the block under every cell of a rectangle, in 16px FG cell units. One undo step. Does NOT set solidity: that rides the chunk cell (edit_chunk). Partial by design: cells that are air, blank block 0, a dangling block reference, outside the layout, or (link) past the end of the zone\'s collision table are skipped and counted in the reply, and the rest still applies. A refusal returns ok:false with a message and a resolution; the whole call is refused only when nothing applied and nothing already matched, or when isolate would need more collision-table entries than the zone has spare.' },
   // NOTE: named `set_level_palette` (not `set_palette`) — the aeon `set_palette`
   // tool already owns that name in this flat registry, and MCP tool names must be
   // globally unique. The classic surface allows palette line 0 (a real level line,
@@ -704,7 +704,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
       collision: z.boolean().optional().describe('give the new art flat ($FF) collision in the same undo step'),
       dryRun: z.boolean().optional().describe('plan and report without applying'),
     },
-    description: 'Commit a saved canvas into the open act: cut to tiles/blocks/chunks, dedupe, reclaim, write. One undo step. Reply carries the full commit report plus the 1-based ENGINE ids of any appended chunks (pass those to set_layout_region). A refusal returns ok:false with a message, a resolution, and which paletteResolution values would unblock it. Also returns "warnings" from loading the canvas — an unreadable sidecar means the canvas was treated as unconstrained, which is worth reading before trusting the result.' },
+    description: 'Commit a saved canvas into the open act: cut to tiles/blocks/chunks, dedupe, reclaim, write. One undo step. Reply carries the full commit report plus the 1-based ENGINE ids of any appended chunks (pass those to set_layout_region). A refusal returns ok:false with a message, a resolution, and which paletteResolution values would unblock it. Also returns "warnings" from loading the canvas: an unreadable sidecar means the canvas was treated as unconstrained, which is worth reading before trusting the result.' },
   // NO `paletteResolution` HERE. The sheet is mapped onto the act's own palette
   // before it is planned, so it cannot drift, so the option could never change
   // an outcome — see the kind's own comment in shared/agent-protocol.ts.
@@ -717,7 +717,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'Is Aurora connected to a running emulator, and what can it do there? '
       + 'Reports connection state, the server, whether live palette is available and for WHICH '
       + 'engine family (`paletteKind`: aeon\'s Pal_Base pair or classic\'s v_palette_line_1..4 '
-      + 'resolved — a push only lands when it matches the open project), and the last push '
+      + 'resolved; a push only lands when it matches the open project), and the last push '
       + 'error. Read this before assuming a push or warp will land.' },
 
   { name: 'aether_connect', kind: 'aether-connect', result: 'json',
@@ -726,7 +726,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
         .describe('true (default) connects, false disconnects'),
     },
     description: 'Connect Aurora to the running emulator over the Aether bus, or disconnect. '
-      + 'Connecting is always explicit — Aurora never opens the socket on its own.' },
+      + 'Connecting is always explicit: Aurora never opens the socket on its own.' },
 
   { name: 'push_palette', kind: 'aether-push-palette', result: 'json',
     params: {
@@ -738,7 +738,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
         .describe('palette line 0-3 (on aeon, line 0 is the character palette and is refused; classic pushes all four)'),
     },
     description: 'Push a palette line of the OPEN PROJECT to the RUNNING game, so it recolours '
-      + 'without a rebuild. Writes the editor\'s current colours for that line — edit the palette '
+      + 'without a rebuild. Writes the editor\'s current colours for that line; edit the palette '
       + 'first, then push. Persistence differs by engine: on aeon a rebuild or a section crossing '
       + 'restores ROM colours; on classic (S1) the push PERSISTS until the next level transition '
       + 'or fade (only the zone\'s few palette-cycled entries keep repainting themselves).' },
@@ -749,18 +749,18 @@ export const EDITOR_METHODS: EditorMethod[] = [
       y: z.number().int().min(0).describe('destination y in act-world PIXELS'),
     },
     description: 'Warp the running game to a point in the act (play-from-cursor). '
-      + 'Reports where the player LANDED — the engine clamps to act bounds and the answer '
+      + 'Reports where the player LANDED: the engine clamps to act bounds and the answer '
       + 'may differ from the request. Aeon-only, and needs a DEBUG build: a release aeon ROM '
-      + 'has no warp mailbox, and classic (S1) has none in any flavour — both gate off on '
+      + 'has no warp mailbox, and classic (S1) has none in any flavour; both gate off on '
       + 'symbol detection with the reason in `detail`.' },
 
   { name: 'build_and_run', kind: 'aether-build-run', result: 'json', params: {},
     description: 'Save, build the OPEN project (aeon: re-bake + ./build.sh; classic: lua '
-      + 'build.lua), reload the emulator, and on aeon put the player back where they were — via '
+      + 'build.lua), reload the emulator, and on aeon put the player back where they were, via '
       + 'the engine\'s boot-position override, so the first painted frame is already the '
       + 'destination (falls back to the warp mailbox on a DEBUG ROM that predates it; '
       + '`restoredVia` says which ran, `restoredTo` is where the engine says the player LANDED '
-      + 'after clamping). Classic reloads to a clean boot — S1 has no restore mechanism, and '
+      + 'after clamping). Classic reloads to a clean boot: S1 has no restore mechanism, and '
       + '`restoredVia` is honestly absent. The one call that makes an edit real. Reports the '
       + 'build output on failure and does NOT reload a failed build.' },
 
@@ -773,5 +773,5 @@ export const EDITOR_METHODS: EditorMethod[] = [
       collision: z.boolean().optional().describe('give the new art flat ($FF) collision in the same undo step'),
       dryRun: z.boolean().optional().describe('plan and report without applying'),
     },
-    description: 'Import an indexed PNG made elsewhere, mapped onto the open act\'s palette, and commit it. No size cap (unlike a canvas). The reply is commit_canvas\'s; the refusals are a NARROWER set plus two import-only ones. Narrower: the sheet is mapped onto the act\'s palette before planning, so palette-drift, palette-unmappable and cell-clash cannot arise (and there is no paletteResolution to pass). Import-only: a colour the act does not have, and an 8x8 cell mixing colours from two palette lines — for that one, adding the missing colour to the zone palette only helps if it goes on the LINE the cell already uses.' },
+    description: 'Import an indexed PNG made elsewhere, mapped onto the open act\'s palette, and commit it. No size cap (unlike a canvas). The reply is commit_canvas\'s; the refusals are a NARROWER set plus two import-only ones. Narrower: the sheet is mapped onto the act\'s palette before planning, so palette-drift, palette-unmappable and cell-clash cannot arise (and there is no paletteResolution to pass). Import-only: a colour the act does not have, and an 8x8 cell mixing colours from two palette lines. For that one, adding the missing colour to the zone palette only helps if it goes on the LINE the cell already uses.' },
 ];

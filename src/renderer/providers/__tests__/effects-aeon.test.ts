@@ -1331,12 +1331,12 @@ describe('sceneVsplitLockAdvisory — the same rule with the SCENE as its subjec
     expect(scnParts).not.toBeNull();
     expect(lyrParts).not.toBeNull();
     expect(joinAdvisory(scnParts!)).toBe(
-      `${VSPLIT_LOCK_CLAUSES.sceneIs(4)}, and layer 1 authors a Plane B split `
-      + `— the build refuses this scene. ${VSPLIT_LOCK_CLAUSES.mechanism} `
+      `${VSPLIT_LOCK_CLAUSES.sceneIs(4)}, and layer 1 authors a Plane B split. `
+      + `The build refuses this scene. ${VSPLIT_LOCK_CLAUSES.mechanism} `
       + VSPLIT_LOCK_CLAUSES.remedies);
     expect(joinAdvisory(lyrParts!)).toBe(
-      `this layer authors a Plane B split while ${VSPLIT_LOCK_CLAUSES.sceneIs(4)} — `
-      + 'the build refuses the WHOLE SCENE, not just this layer. '
+      `this layer authors a Plane B split while ${VSPLIT_LOCK_CLAUSES.sceneIs(4)}. `
+      + 'The build refuses the WHOLE SCENE, not just this layer. '
       + `${VSPLIT_LOCK_CLAUSES.mechanism} ${VSPLIT_LOCK_CLAUSES.remedies}`);
     // And no part is joined into a doubled space or a ragged edge — the seam a
     // three-part composition is the only thing that can produce.
@@ -1500,7 +1500,7 @@ describe('guideBoundNotice — the fire bound is a MOVING wall, and it now says 
   const FIRE_IS = 'this layer authors a Plane B split, so it becomes a raster fire';
   const FIRE_LAW = `a fire must land on ${EFFECTS_FIRE_LINE_MIN}..${EFFECTS_FIRE_LINE_MAX}`
     + ` (lines 0-${EFFECTS_FIRE_LINE_MIN - 1} belong to the priming records)`;
-  const FIRE_REMEDY = `drop the split — a layer without one may sit anywhere in 0..${PLANE_LINE_SPAN - 1}`;
+  const FIRE_REMEDY = `drop the split: a layer without one may sit anywhere in 0..${PLANE_LINE_SPAN - 1}`;
 
   it('the bound MOVES with v_offset — four offsets, four different floors', () => {
     // ANTI-FIXED-WALL: if any of these coincided, the row could not tell a
@@ -1681,12 +1681,12 @@ describe('guideBoundNotice — the fire bound is a MOVING wall, and it now says 
     const y = EFFECTS_FIRE_LINE_MIN + 64;
     const line = fireScreenLineOf(locked(vo), y);
     expect(fireLineAdvisory(locked(vo), split(y))).toBe(
-      `${FIRE_IS} at screen line ${line} (top ${y} less v_offset ${vo}) — and ${FIRE_LAW}. `
+      `${FIRE_IS} at screen line ${line} (top ${y} less v_offset ${vo}), and ${FIRE_LAW}. `
       + `The build refuses it. Move the top onto the visible screen, or ${FIRE_REMEDY}.`);
     // ...and the v_offset 0 arm, which drops the parenthetical.
     const y0 = EFFECTS_FIRE_LINE_MAX + 1;
     expect(fireLineAdvisory(locked(0), split(y0))).toBe(
-      `${FIRE_IS} at screen line ${y0} — and ${FIRE_LAW}. `
+      `${FIRE_IS} at screen line ${y0}, and ${FIRE_LAW}. `
       + `The build refuses it. Move the top onto the visible screen, or ${FIRE_REMEDY}.`);
   });
 

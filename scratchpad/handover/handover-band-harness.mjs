@@ -496,7 +496,7 @@ async function main() {
         // TILE ANIMATION MOVES with no further authoring"
         // (providers/bg-anim-aeon.ts:186-187). Taken from the provider.
         && /tile animation MOVES with no further authoring/.test(noteText),
-      pickedFill === 'ok' ? (noteText.match(/banks 1–7 are phase 0[^.]*\./) || ['note not found'])[0] : pickedFill);
+      pickedFill === 'ok' ? (noteText.match(/banks 1 to 7 are phase 0[^.]*\./) || ['note not found'])[0] : pickedFill);
     check('3d', "the Driver select takes 'timer' — a timer band animates with the camera still",
       pickedDriver === 'ok', `driver=${pickedDriver}`);
 

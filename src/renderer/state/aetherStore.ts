@@ -251,10 +251,10 @@ export const useAetherStore = create<AetherState>((set, get) => ({
         : '';
       const summary = r.ok
         ? (r.reloaded
-            ? `Build succeeded (${flavour}) — emulator reloaded${r.restoredTo ? `, back at (${r.restoredTo.x}, ${r.restoredTo.y})` : ''}${timing}`
+            ? `Build succeeded (${flavour}): emulator reloaded${r.restoredTo ? `, back at (${r.restoredTo.x}, ${r.restoredTo.y})` : ''}${timing}`
             : r.reloadError
               ? `Build succeeded (${flavour}), but the emulator did not reload: ${r.reloadError}`
-              : `Build succeeded (${flavour}) — no emulator connected`)
+              : `Build succeeded (${flavour}): no emulator connected`)
         : `Build failed${r.exitCode === null ? '' : ` (exit ${r.exitCode})`}`;
       set({
         buildState: r.ok ? 'ok' : 'failed',
@@ -296,8 +296,8 @@ export const useAetherStore = create<AetherState>((set, get) => ({
       // for a debug ROM that would come back identical.
       if (r.gate === 'no-symbols') {
         return kind === 'classic'
-          ? 'Play-from-cursor needs the disassembly\'s symbols — v_player did not resolve against the running ROM. Build s1disasm and reconnect.'
-          : 'Warp needs a DEBUG build — this ROM has no warp mailbox';
+          ? 'Play-from-cursor needs the disassembly\'s symbols: v_player did not resolve against the running ROM. Build s1disasm and reconnect.'
+          : 'Warp needs a DEBUG build: this ROM has no warp mailbox';
       }
       // The disassembly, not the ROM and not the server. Its own sentence for
       // its own reason: a rebuild fixes neither of the other two conditions
@@ -322,8 +322,8 @@ export const useAetherStore = create<AetherState>((set, get) => ({
     const at = r.landed ? ` to (${r.landed.x}, ${r.landed.y})` : '';
     if (!r.clamped) return `Warped${at}`;
     return kind === 'classic'
-      ? `Warped${at} — the game moved him from (${x}, ${y})`
-      : `Warped${at} — clamped to the act bounds`;
+      ? `Warped${at}: the game moved him from (${x}, ${y})`
+      : `Warped${at}: clamped to the act bounds`;
   },
 }));
 

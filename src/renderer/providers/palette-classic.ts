@@ -180,11 +180,11 @@ export function useClassicPaletteGridPort(): PaletteGridPort {
     commit,
     drain: DRAIN_NOTHING,
     title: (line, idx) => (idx === TRANSPARENT_INDEX
-      ? 'index 0 — transparent'
+      ? 'index 0: transparent'
       : `line ${line}, index ${idx}`),
     heading: (line, idx) => `Line ${line} · Index ${idx}`,
     note: (line, idx) => (idx === TRANSPARENT_INDEX
-      ? `Line ${line} · index 0 is transparent — not editable.`
+      ? `Line ${line} · index 0 is transparent, not editable.`
       : null),
     lineLabel: (line) => String(line),
     hint: 'click a swatch to edit · line 0 index 0 = transparent',

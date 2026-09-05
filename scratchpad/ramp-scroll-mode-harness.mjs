@@ -100,7 +100,7 @@ const SCENE_VDEF = 'aurora_local_rampmode_vdef';
 const LEAD_FULL = 'FULL-SCREEN:';
 const LEAD_COLUMN = 'ONE 16-PIXEL COLUMN:';
 const LEAD_SPLIT = 'TWO DIFFERENT EFFECTS, BY SECTION:';
-const LEAD_UNBOUND = 'FULL-SCREEN OR A 16-PIXEL COLUMN — THE BINDING DECIDES:';
+const LEAD_UNBOUND = 'FULL-SCREEN OR A 16-PIXEL COLUMN, THE BINDING DECIDES:';
 const LEAD_UNKNOWN = 'NOT DECIDED BY ANY DOCUMENT AURORA CAN READ:';
 const ALL_LEADS = [LEAD_FULL, LEAD_COLUMN, LEAD_SPLIT, LEAD_UNBOUND, LEAD_UNKNOWN];
 
@@ -257,7 +257,7 @@ const SEL_SCENE_ASSIGN = "[...document.querySelectorAll('select')]"
 const SEL_RASTER_ASSIGN = "[...document.querySelectorAll('select')]"
   + ".find((s) => (s.getAttribute('title')||'').startsWith('Which raster band preset this section uses'))";
 const SEL_VDEFORM = "[...document.querySelectorAll('select')]"
-  + ".find((s) => (s.getAttribute('title')||'').startsWith('v_deform — a per-column VERTICAL table'))";
+  + ".find((s) => (s.getAttribute('title')||'').startsWith('v_deform: a per-column VERTICAL table'))";
 const SEL_RASTER_PROGRAM = String.raw`(() => {
   const row = [...document.querySelectorAll('span')]
     .filter((s) => (s.textContent || '').trim() === 'Raster' && s.parentElement)

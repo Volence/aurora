@@ -193,7 +193,7 @@ const INSTALL = String.raw`
     return e.tagName === 'BUTTON' ? !e.disabled : getComputedStyle(e).opacity === '1';
   };
 
-  // TileTab's own 16-swatch row (title 'index N' / 'index 0 — transparent',
+  // TileTab's own 16-swatch row (title 'index N' / 'index 0: transparent',
   // 22px buttons) — the color picker for artStore.selectedColor, which is a
   // CROSS-ENGINE / CROSS-TIER singleton (see ChunkTab's header): picking a
   // color on the Tile tier and then switching to Chunk/Block keeps it armed.

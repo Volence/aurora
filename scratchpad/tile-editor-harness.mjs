@@ -225,10 +225,10 @@ const INSTALL_HELPERS = String.raw`
   H.scroll = () => { const s = H.scroller(); return s ? { l: Math.round(s.scrollLeft), t: Math.round(s.scrollTop) } : null; };
   H.canvasStyle = () => { const c = H.canvas(); if (!c) return null; const cs = getComputedStyle(c); return { cursor: cs.cursor, opacity: cs.opacity }; };
 
-  // ---- swatch row (16 buttons, title "index N" / "index 0 — transparent") ----
+  // ---- swatch row (16 buttons, title "index N" / "index 0: transparent") ----
   // TileTab's own 16-swatch row: 22x22 inline-styled buttons titled "index N".
   // Scoped by SIZE because ClassicPalettePanel also emits four buttons titled
-  // "index 0 — transparent" (13x16), which a title-only filter picks up.
+  // "index 0: transparent" (13x16), which a title-only filter picks up.
   H.swatches = () => [...document.querySelectorAll('button[title]')]
     .filter((b) => /^index \d+/.test(b.title) && b.style && b.style.width === '22px');
   H.pickSwatch = (i) => { const s = H.swatches(); if (!s[i]) return false; s[i].click(); return true; };

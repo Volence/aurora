@@ -51,7 +51,7 @@ export function at(...path: (string | number)[]): Record<string, unknown> {
     node = (node as Record<string | number, unknown>)?.[seg];
     if (node === undefined || node === null) {
       throw new Error(
-        `effects scene schema has nothing at ${walked.join('.')} — a UI constraint that ` +
+        `effects scene schema has nothing at ${walked.join('.')}: a UI constraint that ` +
         'used to be derivable no longer is; re-derive it against the amended schema.',
       );
     }
@@ -243,7 +243,7 @@ function oneOfBranchWith(path: (string | number)[], key: string): (string | numb
   });
   if (index < 0) {
     throw new Error(
-      `effects scene schema ${path.join('.')}.oneOf has no branch declaring "${key}" — the ` +
+      `effects scene schema ${path.join('.')}.oneOf has no branch declaring "${key}": the ` +
       'shape a UI constraint was derived from is gone; re-derive it against the amended schema.',
     );
   }
@@ -267,7 +267,7 @@ export const EFFECTS_DEFORM_TABLE_BYTES: number = (() => {
   if (!m) {
     throw new Error(
       'effects scene schema $defs.tableRef no longer describes itself as an N-byte signed ' +
-      'table — the deform table length was derived from that sentence.',
+      'table: the deform table length was derived from that sentence.',
     );
   }
   return Number(m[1]);
@@ -317,7 +317,7 @@ export const EFFECTS_TABLE_REF_FORMS: readonly TableRefForm[] = Object.freeze(((
     if (typeof generator !== 'string') {
       throw new Error(
         `effects scene schema $defs.tableRef.oneOf[${i}] is neither a {bin} branch nor a ` +
-        'generator branch with a const name — the tableRef form list was derived from those two shapes.',
+        'generator branch with a const name: the tableRef form list was derived from those two shapes.',
       );
     }
     const params = required
@@ -530,7 +530,7 @@ export const EFFECTS_ANCHOR_NONE: string = (() => {
     .find((c) => typeof c === 'string');
   if (typeof constArm !== 'string') {
     throw new Error(
-      'effects scene schema properties.anchor declares no string `const` arm — the "no anchor '
+      'effects scene schema properties.anchor declares no string `const` arm: the "no anchor '
       + 'at all" spelling was read out of it, and it is a different state from an anchor whose '
       + 'two deform shifts are both the no-deform sentinel.',
     );
@@ -593,7 +593,7 @@ export const EFFECTS_FACTOR_ZERO: EffectsFactorName = (() => {
   const name = EFFECTS_FACTOR_NAMES.find((n) => n === 'FACTOR_0');
   if (name === undefined) {
     throw new Error(
-      'effects scene schema $defs.factor no longer publishes FACTOR_0 — the left-column '
+      'effects scene schema $defs.factor no longer publishes FACTOR_0: the left-column '
       + 'Factor0Lock precondition compares a layer\'s fb against it.',
     );
   }
@@ -666,7 +666,7 @@ export const EFFECTS_V_FACTOR_LOCK: number = EFFECTS_V_FACTOR_BOUNDS.max;
       || !new RegExp(`\\b${EFFECTS_V_FACTOR_LOCK}\\b[^.]*LOCK SENTINEL`).test(description)) {
     throw new Error(
       `effects scene schema properties.v_factor no longer names ${EFFECTS_V_FACTOR_LOCK} as its ` +
-      'LOCK SENTINEL — EFFECTS_V_FACTOR_LOCK derives the locked value from `maximum`, and that ' +
+      'LOCK SENTINEL: EFFECTS_V_FACTOR_LOCK derives the locked value from `maximum`, and that ' +
       'coupling has just been broken. Re-derive it against the amended schema.',
     );
   }
@@ -708,7 +708,7 @@ const BOB_SHIFT_ARMS: readonly Record<string, unknown>[] = (() => {
   const arms = at('properties', 'bob_shift').anyOf;
   if (!Array.isArray(arms) || arms.length !== 2) {
     throw new Error(
-      'effects scene schema properties.bob_shift no longer has exactly two `anyOf` arms — the '
+      'effects scene schema properties.bob_shift no longer has exactly two `anyOf` arms: the '
       + 'no-bob sentinel and the amplitude ladder were derived from them separately; re-derive '
       + 'them against the amended schema.',
     );
@@ -729,7 +729,7 @@ export const EFFECTS_BOB_SHIFT_LADDER: { min: number; max: number } = (() => {
   if (arm === undefined) {
     throw new Error(
       'effects scene schema properties.bob_shift has no `anyOf` arm with numeric '
-      + 'minimum/maximum — the amplitude ladder was derived from it.',
+      + 'minimum/maximum: the amplitude ladder was derived from it.',
     );
   }
   return Object.freeze({ min: arm.minimum as number, max: arm.maximum as number });
@@ -747,7 +747,7 @@ export const EFFECTS_BOB_SHIFT_NONE: number = (() => {
   const arm = BOB_SHIFT_ARMS.find(a => typeof a.const === 'number');
   if (arm === undefined) {
     throw new Error(
-      'effects scene schema properties.bob_shift has no `anyOf` arm pinning a constant — the '
+      'effects scene schema properties.bob_shift has no `anyOf` arm pinning a constant: the '
       + 'no-bob sentinel was derived from it.',
     );
   }
@@ -756,7 +756,7 @@ export const EFFECTS_BOB_SHIFT_NONE: number = (() => {
   if (node.default !== sentinel) {
     throw new Error(
       `effects scene schema properties.bob_shift's default (${JSON.stringify(node.default)}) is no `
-      + `longer its no-bob sentinel (${sentinel}) — omitting the key stops meaning "no bob", which `
+      + `longer its no-bob sentinel (${sentinel}): omitting the key stops meaning "no bob", which `
       + 'is what lets a scene without a bob round-trip byte-identically. Re-derive.',
     );
   }
@@ -765,7 +765,7 @@ export const EFFECTS_BOB_SHIFT_NONE: number = (() => {
       || !new RegExp(`\\b${sentinel}\\b[^.]*NO-BOB SENTINEL`).test(description)) {
     throw new Error(
       `effects scene schema properties.bob_shift no longer names ${sentinel} as its NO-BOB `
-      + 'SENTINEL — EFFECTS_BOB_SHIFT_NONE derives the off value from the `anyOf` constant, and '
+      + 'SENTINEL: EFFECTS_BOB_SHIFT_NONE derives the off value from the `anyOf` constant, and '
       + 'that coupling has just been broken. Re-derive it against the amended schema.',
     );
   }
@@ -806,7 +806,7 @@ export const EFFECTS_BOB_AMPLITUDE_BASE: number = (() => {
     "effects scene schema properties.bob_shift's description no longer states its amplitude in "
     + 'the shape EFFECTS_BOB_AMPLITUDE_BASE derives it from. The table amplitude is READ from the '
     + 'contract, never typed beside it; re-derive it against the amended schema rather than '
-    + 'hardcoding it. (This sentence does not name the number either — a bare literal here would '
+    + 'hardcoding it. (This sentence does not name the number either: a bare literal here would '
     + "be caught by effects-drift's own sweep, and rightly.)";
   if (typeof description !== 'string') throw new Error(`${stale} (no description at all)`);
 
@@ -823,13 +823,13 @@ export const EFFECTS_BOB_AMPLITUDE_BASE: number = (() => {
   const { min, max } = EFFECTS_BOB_SHIFT_LADDER;
   if (loShift !== min || hiShift !== max) {
     throw new Error(
-      `${stale} — the worked ends are shifts ${loShift} and ${hiShift} but the ladder is `
+      `${stale}: the worked ends are shifts ${loShift} and ${hiShift} but the ladder is `
       + `${min}..${max}.`,
     );
   }
   if ((base >> loShift) !== loPx || (base >> hiShift) !== hiPx) {
     throw new Error(
-      `${stale} — the formula says ${base} >> ${loShift} = ${base >> loShift} and `
+      `${stale}: the formula says ${base} >> ${loShift} = ${base >> loShift} and `
       + `${base} >> ${hiShift} = ${base >> hiShift}, the worked ends say ${loPx} and ${hiPx}.`,
     );
   }
@@ -876,17 +876,17 @@ const BOB_PERIOD_SCALE: { baseTicks: number; hz: number } = (() => {
 
   const { min, max } = EFFECTS_BOB_PERIOD_BOUNDS;
   if (loPeriod !== min || hiPeriod !== max) {
-    throw new Error(`${stale} — the gloss covers periods ${loPeriod} and ${hiPeriod}, the bounds are ${min}..${max}.`);
+    throw new Error(`${stale}: the gloss covers periods ${loPeriod} and ${hiPeriod}, the bounds are ${min}..${max}.`);
   }
   if (loTicks !== baseTicks << loPeriod || hiTicks !== baseTicks << hiPeriod) {
     throw new Error(
-      `${stale} — the formula gives ${baseTicks << loPeriod} and ${baseTicks << hiPeriod} ticks, `
+      `${stale}: the formula gives ${baseTicks << loPeriod} and ${baseTicks << hiPeriod} ticks, `
       + `the gloss says ${loTicks} and ${hiTicks}.`,
     );
   }
   if (hz === 0 || Math.round((loTicks / hz) * 10) / 10 !== seconds) {
     throw new Error(
-      `${stale} — ${loTicks} ticks at ${hz} Hz is ${loTicks / hz} s, the gloss says ${seconds} s.`,
+      `${stale}: ${loTicks} ticks at ${hz} Hz is ${loTicks / hz} s, the gloss says ${seconds} s.`,
     );
   }
   return Object.freeze({ baseTicks, hz });
@@ -936,7 +936,7 @@ export function bobShiftRefusal(shift: number): string | null {
       + `(${bobPeakPixels(min)} px down to ${bobPeakPixels(max)} px of peak excursion) or the `
       + `no-bob sentinel ${EFFECTS_BOB_SHIFT_NONE}. `
       + (shift < min
-        ? 'Below the ladder is NOT "less motion" — the wire byte spells no bob as 0, so shift 0 '
+        ? 'Below the ladder is NOT "less motion": the wire byte spells no bob as 0, so shift 0 '
           + 'would pack to silence and aeon refuses it. Off is '
           + `${EFFECTS_BOB_SHIFT_NONE}, never 0.`
         : `Above the ladder annihilates the ${EFFECTS_BOB_AMPLITUDE_BASE}-amplitude table, `
@@ -999,7 +999,7 @@ export function takenSceneIds(library: EffectsSceneLibrary): Set<string> {
 
 /** Why `id` cannot be used for a new scene, or null when it can. */
 export function sceneIdRefusal(id: string, library: EffectsSceneLibrary): string | null {
-  if (!isValidSceneId(id)) return `"${id}" is not a legal scene id — ${SCENE_ID_RULE}`;
+  if (!isValidSceneId(id)) return `"${id}" is not a legal scene id: ${SCENE_ID_RULE}`;
   if (takenSceneIds(library).has(id)) {
     const unreadable = library.unreadable.some(u => u.path.endsWith(`/${id}.json`));
     return unreadable
@@ -1138,7 +1138,7 @@ export const EFFECTS_DRIFT_RATE_REFUSED: number = (() => {
   if (typeof value !== 'number' || !Number.isInteger(value)) {
     throw new Error(
       `effects scene schema ${DRIFT_RATE_PATH.join('.')} no longer excludes an integer constant ` +
-      'via `not` — the rate the contract refuses was derived from it; re-derive it against the ' +
+      'via `not`: the rate the contract refuses was derived from it; re-derive it against the ' +
       'amended schema.',
     );
   }
@@ -1187,13 +1187,13 @@ export const EFFECTS_DRIFT_UNITS_PER_PIXEL: number = (() => {
 
   if (glossUnits !== EFFECTS_DRIFT_RATE_BOUNDS.max) {
     throw new Error(
-      `${stale} — the description glosses the bound as ${glossUnits} but \`maximum\` is ` +
+      `${stale}: the description glosses the bound as ${glossUnits} but \`maximum\` is ` +
       `${EFFECTS_DRIFT_RATE_BOUNDS.max}.`,
     );
   }
   if (glossPx === 0 || glossUnits / glossPx !== factor) {
     throw new Error(
-      `${stale} — the worked conversion says ${factor} units per px/frame, the bound gloss says ` +
+      `${stale}: the worked conversion says ${factor} units per px/frame, the bound gloss says ` +
       `${glossUnits}/${glossPx} = ${glossUnits / glossPx}.`,
     );
   }
@@ -1248,14 +1248,14 @@ export function driftRateRefusal(rate: number): string | null {
     return `a drift rate is a whole number of 1/256 px per frame; ${rate} is not an integer.`;
   }
   if (rate === EFFECTS_DRIFT_RATE_REFUSED) {
-    return `${rate} is not a drift rate — it is indistinguishable from no drift at all in ROM, ` +
+    return `${rate} is not a drift rate: it is indistinguishable from no drift at all in ROM, ` +
       'and aeon refuses it at build time. A layer that should not drift spells "none".';
   }
   const { min, max } = EFFECTS_DRIFT_RATE_BOUNDS;
   if (rate < min || rate > max) {
     return `${rate} (${driftRateToPxPerFrame(rate)} px/frame) is outside the contract's ` +
       `${min}..${max} (${driftRateToPxPerFrame(min)}..${driftRateToPxPerFrame(max)} px/frame). ` +
-      'That is a TASTE bound, not a correctness one — raise it in the contract rather than ' +
+      'That is a TASTE bound, not a correctness one; raise it in the contract rather than ' +
       'working around it.';
   }
   return null;
@@ -1308,7 +1308,7 @@ export const EFFECTS_DRIFT_PX_BOUNDS = Object.freeze({
  */
 export function driftPxPerFrameRefusal(pxPerFrame: number): string | null {
   if (!Number.isFinite(pxPerFrame)) {
-    return `${pxPerFrame} is not a drift rate — type a signed number of pixels per frame.`;
+    return `${pxPerFrame} is not a drift rate: type a signed number of pixels per frame.`;
   }
   const rate = driftPxPerFrameToRate(pxPerFrame);
   const why = driftRateRefusal(rate);
@@ -1407,7 +1407,7 @@ export const EFFECTS_ROW_REMAP_REFUSED_KEYS: readonly string[] = Object.freeze((
   if (refused.length === 0) {
     throw new Error(
       'effects scene schema $defs.layer.properties.rowRemap\'s payload declares no `{"not": {}}` ' +
-      'property — the reserved names Aurora refuses to offer were derived from that idiom, and ' +
+      'property: the reserved names Aurora refuses to offer were derived from that idiom, and ' +
       'the mechanism is gone. Re-derive against the amended schema rather than listing names.',
     );
   }
@@ -1500,7 +1500,7 @@ export function rowRemapHeightShiftRefusal(shift: number): string | null {
   const { min, max } = EFFECTS_ROW_REMAP_HEIGHT_SHIFT_BOUNDS;
   if (shift < min || shift > max) {
     return `${shift} is outside the contract's ${min}..${max}. THIS IS A SHIFT, NOT A LINE `
-      + `COUNT — the band is 1 << shift lines tall, so ${min} is ${rowRemapHeightLines(min)} `
+      + `COUNT: the band is 1 << shift lines tall, so ${min} is ${rowRemapHeightLines(min)} `
       + `lines and ${max} is ${rowRemapHeightLines(max)}. If you meant `
       + `${rowRemapHeightLines(max)} lines, you want ${max}.`;
   }
@@ -1684,8 +1684,8 @@ const REELS_DESCRIPTION: string = (() => {
   if (typeof d !== 'string' || d.length === 0) {
     throw new Error(
       'effects scene schema properties.reels has no string description. Four of this key\'s '
-      + 'constraints — the DEBUG tier, the screen-order map, the unit prohibition and the '
-      + 'binding rule — exist ONLY in that prose, and Aurora extracts rather than restates '
+      + 'constraints (the DEBUG tier, the screen-order map, the unit prohibition and the '
+      + 'binding rule) exist ONLY in that prose, and Aurora extracts rather than restates '
       + 'them. Re-derive against the amended schema.',
     );
   }
@@ -1954,7 +1954,7 @@ export function reelRateRefusal(rate: number): string | null {
   const { min, max } = EFFECTS_REEL_RATE_BOUNDS;
   if (rate < min || rate > max) {
     return `${rate} is outside the contract's ${min}..${max}. THE UNIT IS SIGNED WHOLE PIXELS `
-      + `PER FRAME — ${EFFECTS_REEL_NO_X256}.`;
+      + `PER FRAME: ${EFFECTS_REEL_NO_X256}.`;
   }
   return null;
 }
@@ -1973,7 +1973,7 @@ export function reelRatesRefusal(rates: readonly number[]): string | null {
   if (rates.length !== EFFECTS_REEL_BAND_COUNT) {
     return `a scene declares exactly ${EFFECTS_REEL_BAND_COUNT} reel rates and this has `
       + `${rates.length}. The count is a COPY of aeon's REEL_BAND_COUNT, which sizes a RAM `
-      + 'array and is compiled into a shift — a code shape, not a field.';
+      + 'array and is compiled into a shift, a code shape, not a field.';
   }
   for (let i = 0; i < rates.length; i++) {
     const why = reelRateRefusal(rates[i]);
@@ -1983,7 +1983,7 @@ export function reelRatesRefusal(rates: readonly number[]): string | null {
     const j = rates.indexOf(rates[i]);
     if (j !== i) {
       const zero = rates[i] === 0
-        ? ' Zero IS a legal rate — a stationary strip is a real choice — but uniqueItems caps it '
+        ? ' Zero IS a legal rate (a stationary strip is a real choice) but uniqueItems caps it '
           + 'at ONE strip.'
         : '';
       return `strips ${j} and ${i} both scroll at ${rates[i]} px/frame, and the contract requires `
@@ -2007,12 +2007,12 @@ export function reelRateGuidance(rate: number): string | null {
   if (reelRateRefusal(rate) !== null) return null;
   const g = EFFECTS_REEL_RATE_GUIDANCE;
   if (Math.abs(rate) >= g.strobe) {
-    return `${rate} px/frame is a strobe — ${reelCycleLabel(rate)}. Legal; the contract's own `
+    return `${rate} px/frame is a strobe: ${reelCycleLabel(rate)}. Legal; the contract's own `
       + `guidance is a useful range of about ${g.min}..${g.max}.`;
   }
   if (rate < g.min || rate > g.max) {
     return `${rate} px/frame is outside the contract's suggested ${g.min}..${g.max}. Legal, and `
-      + 'nothing refuses it — this is UI guidance, not a bound.';
+      + 'nothing refuses it: this is UI guidance, not a bound.';
   }
   return null;
 }

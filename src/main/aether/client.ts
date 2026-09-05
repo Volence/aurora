@@ -195,8 +195,8 @@ export class AetherClient {
         ` (deployment name ${init.serverName ?? 'unset'})` +
         ` ${init.serverVersion ?? '(no version)'}` +
         ` protocol ${init.protocolVersion ?? '(unstated)'}` +
-        ` — ${methods.length} methods served` +
-        ` — build ${describeBuild(identity.serverBuild)}`,
+        ` · ${methods.length} methods served` +
+        ` · build ${describeBuild(identity.serverBuild)}`,
       );
       if (identity.warning) log(`[aether] WARNING: ${identity.warning}`);
 

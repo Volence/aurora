@@ -158,7 +158,7 @@ export function canvasYToLayerTop(
 
 /** The one-line caption the guide layer carries so the space is visible; null when act. */
 export function guideCaption(space: LayerTopSpace): string | null {
-  return space === 'screen' ? 'plane rows — fixed on the background, not on the frame' : null;
+  return space === 'screen' ? 'plane rows: fixed on the background, not on the frame' : null;
 }
 
 /**

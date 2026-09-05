@@ -122,11 +122,11 @@ export function validateCollisionWrite(
   const hasWords = words !== undefined && words !== null;
   if (hasWord && hasWords) {
     return 'pass EITHER "word" (fill the rectangle with one cell word) OR "words" '
-      + '(one per cell, row-major) — not both';
+      + '(one per cell, row-major), not both';
   }
   if (!hasWord && !hasWords) {
     return 'pass EITHER "word" (fill the rectangle with one cell word) OR "words" '
-      + '(one per cell, row-major) — neither was given';
+      + '(one per cell, row-major), neither was given';
   }
   if (hasWord) {
     if (!Number.isInteger(word) || (word as number) < 0 || (word as number) > 0xFFFF) {
@@ -179,9 +179,9 @@ export function validateCollisionReadPlane(plane: unknown): string | null {
   if (plane === 'both') {
     return 'get_collision_region reads ONE plane: pass plane "a" or "b", not "both". '
       + 'paint_collision accepts "both" because a WRITE can touch two planes in one undo step, '
-      + 'but a read of "both" would have to merge the two planes into one grid — the same '
+      + 'but a read of "both" would have to merge the two planes into one grid (the same '
       + 'flattening this method already refuses for a cell whose four 8px sub-tiles disagree, '
-      + 'where it reports null rather than sampling one of them — or return two grids, which '
+      + 'where it reports null rather than sampling one of them) or return two grids, which '
       + 'would make the reply shape depend on a parameter and leave "words" (the array '
       + 'paint_collision takes straight back) with no single value. Call it twice.';
   }

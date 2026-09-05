@@ -276,14 +276,14 @@ export function rampSignLagDisclosure(
   return `${RAMP_SIGN_LAG_LEAD} ${list} ${one ? 'is' : 'are'} negative, and a negative 16.16 `
     + 'value is where aeon\'s ramp constructor stops: `raster_ramp_program` declares `rrp_start` '
     + 'and `rrp_step` as `u32` and forwards the signed value RAW, with no two\'s-complement '
-    + 'encode, so the assembler refuses the emission — `[emit.out-of-range] ... does not fit u32` '
-    + '— and the WHOLE ROM fails to build. The runtime honours the sign; the constructor never '
+    + 'encode, so the assembler refuses the emission (`[emit.out-of-range] ... does not fit u32`) '
+    + 'and the WHOLE ROM fails to build. The runtime honours the sign; the constructor never '
     + 'did, and nothing noticed because every step ever authored before this editor was positive. '
-    + 'A POSITIVE value in the same field builds and runs today — this is about the sign, not '
+    + 'A POSITIVE value in the same field builds and runs today: this is about the sign, not '
     + `about \`ramp\`. Measured ${RAMP_SIGN_LAG_MEASURED_ON} at aeon `
     + `${RAMP_SIGN_LAG_MEASURED_AT} by ${RAMP_SIGN_LAG_MEASUREMENT}. `
     + `Expires (${RAMP_SIGN_LAG_MEASURED_ON}): the day that row goes red because the constructor `
-    + 'ENCODES instead of forwarding — this sentence retires with the row.';
+    + 'ENCODES instead of forwarding; this sentence retires with the row.';
 }
 
 /**
@@ -317,7 +317,7 @@ export function rampSignRateCaveat(
   const list = one ? String(negatives[0]) : negatives.join(' and ');
   return ` ${RAMP_SIGN_CAVEAT_LEAD} ${list} ${one ? 'is' : 'are'} negative, and aeon's `
     + '`raster_ramp_program` declares `rrp_start`/`rrp_step` as `u32` and forwards the signed '
-    + 'value raw — no two\'s-complement encode — so the assembler refuses the emission '
+    + 'value raw, with no two\'s-complement encode, so the assembler refuses the emission '
     + '(`[emit.out-of-range] ... does not fit u32`) and the ROM does not build. '
     + `${one ? 'It is' : 'They are'} still the nearest value${one ? '' : 's'} this ENCODING can `
     + 'spell, which is what the sentence above is about; the build limitation is downstream and '

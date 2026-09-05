@@ -106,10 +106,10 @@ export function sliceGrid(image: SheetImage, spec: GridSpec): SliceResult<GridSl
   }
   if (!Number.isInteger(spec.cellWidth) || !Number.isInteger(spec.cellHeight)
     || spec.cellWidth < 1 || spec.cellHeight < 1) {
-    return refuse('bad-geometry', `cell size ${spec.cellWidth}x${spec.cellHeight} — both sides must be whole pixels, at least 1`);
+    return refuse('bad-geometry', `cell size ${spec.cellWidth}x${spec.cellHeight}: both sides must be whole pixels, at least 1`);
   }
   if (!isNonNegInt(margin) || !isNonNegInt(spacing) || !isNonNegInt(offsetX) || !isNonNegInt(offsetY)) {
-    return refuse('bad-geometry', `margin ${margin}, spacing ${spacing}, offset ${offsetX},${offsetY} — all must be whole pixels, none negative`);
+    return refuse('bad-geometry', `margin ${margin}, spacing ${spacing}, offset ${offsetX},${offsetY}: all must be whole pixels, none negative`);
   }
 
   const left = margin + offsetX;
@@ -237,7 +237,7 @@ export function sliceAutoBounds(image: SheetImage, spec: AutoBoundsSpec = {}): S
     if (!lit[p] || seen[p]) continue;
     if (regions.length >= maxRegions) {
       return refuse('too-many-regions',
-        `more than ${maxRegions} separate regions — this looks like dithered or photographic art rather than a sprite sheet; `
+        `more than ${maxRegions} separate regions: this looks like dithered or photographic art rather than a sprite sheet; `
         + 'cut it on a grid, or flatten the background first');
     }
     regions.push(growRegion(p, width, height, lit, seen, stack, connectivity));

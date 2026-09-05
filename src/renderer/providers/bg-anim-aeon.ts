@@ -137,7 +137,7 @@ export function driverOptions(): DriverOption[] {
   return BGANIM_DRIVER_NAMES.map((name) => ({
     value: name,
     label: name,
-    title: `${name} — the SCALAR the tile animation's step is read from. A driver never sets an `
+    title: `${name}: the SCALAR the tile animation's step is read from. A driver never sets an `
       + 'axis: camera_y does NOT mean vertical motion. Use the Axis control for that.',
   }));
 }
@@ -173,24 +173,24 @@ export function phaseFillOptions(): PhaseFillOption[] {
   return [
     {
       value: 'copy', label: 'copy of phase 0',
-      title: 'Banks 1–7 are copies of phase 0 — the tile animation draws the same art at every '
+      title: 'Banks 1 to 7 are copies of phase 0: the tile animation draws the same art at every '
         + 'step, so nothing moves until you author its frames. The fill that edits nothing.',
-      note: 'banks 1–7 arrive as copies of phase 0, so the tile animation is inert until you draw '
+      note: 'banks 1 to 7 arrive as copies of phase 0, so the tile animation is inert until you draw '
         + 'its frames.',
     },
     {
       value: 'shift', label: 'pre-shifted (moves)',
-      title: 'Bank k is phase 0 scrolled k px within the tile animation’s own pattern width — the '
-        + 'contract’s "pre-shifted art 1px apart" — so it scrolls as soon as it is '
+      title: 'Bank k is phase 0 scrolled k px within the tile animation’s own pattern width (the '
+        + 'contract’s "pre-shifted art 1px apart") so it scrolls as soon as it is '
         + 'saved. Phase 0, the picture at rest, is unchanged.',
-      note: 'banks 1–7 are phase 0 pre-shifted 1 px per bank, wrapping at the pattern edge, '
+      note: 'banks 1 to 7 are phase 0 pre-shifted 1 px per bank, wrapping at the pattern edge, '
         + 'so the tile animation MOVES with no further authoring. The picture at rest is unchanged.',
     },
     {
       value: 'blank', label: 'blank',
-      title: 'Banks 1–7 are blank art. The picture holds at rest but BREAKS on the tile animation’s '
-        + 'second phase until you draw the frames — a deliberate authoring start.',
-      note: 'banks 1–7 arrive blank: the picture BREAKS on the tile animation’s second phase until '
+      title: 'Banks 1 to 7 are blank art. The picture holds at rest but BREAKS on the tile animation’s '
+        + 'second phase until you draw the frames, a deliberate authoring start.',
+      note: 'banks 1 to 7 arrive blank: the picture BREAKS on the tile animation’s second phase until '
         + 'you draw the frames.',
     },
   ];
@@ -308,7 +308,7 @@ export function rateShiftNote(rateShift: number): string {
   const units = 2 ** n;
   const per = Number.isFinite(units) ? units.toLocaleString('en-US') : `2^${n}`;
   return `step = driver >> ${n}: the tile animation advances 1 px per ${per} driver `
-    + `unit${units === 1 ? '' : 's'}. HIGHER IS SLOWER — each +1 halves the speed.`;
+    + `unit${units === 1 ? '' : 's'}. HIGHER IS SLOWER: each +1 halves the speed.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -389,10 +389,10 @@ export function axisOptions(): AxisOption[] {
       label: horizontal ? 'horizontal (scrolls left)' : 'vertical (scrolls up)',
       title: horizontal
         ? 'The pattern translates along X. Its period is cols*8 px, and ROWS is the key that must '
-          + 'make rows*32 a power of two. As the driver scalar increases the art scrolls LEFT — '
+          + 'make rows*32 a power of two. As the driver scalar increases the art scrolls LEFT; '
           + 'direction is fixed by the mechanism and is not a setting.'
         : 'The pattern translates along Y. Its period is rows*8 px, and COLS is the key that must '
-          + 'make cols*32 a power of two. As the driver scalar increases the art scrolls UP — '
+          + 'make cols*32 a power of two. As the driver scalar increases the art scrolls UP; '
           + 'direction is fixed by the mechanism and is not a setting. The pre-shifted fill '
           + 'becomes a vertical roll, and the slots are ordered row-major.',
     };
@@ -558,7 +558,7 @@ export function insertUnavailableReason(
   if (n > budget.tileSlotsRemaining) {
     return `adding a tile animation puts its ${n} tile(s) INTO the blob, and the blob has `
       + `${budget.tileSlotsRemaining} free slot(s) of ${budget.tileCapacity}. `
-      + 'PROMOTE an existing static range instead — promotion moves art the document already '
+      + 'PROMOTE an existing static range instead: promotion moves art the document already '
       + 'carries, so it does not grow the blob and works on a full one.';
   }
   return null;

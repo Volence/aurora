@@ -499,7 +499,7 @@ export function writeS1Level(
     if (gapEdit) {
       errors.push({
         path: read.pristineTileFiles[0]?.path ?? '<tiles>',
-        message: 'edited tile lies outside any source art file (gap or appended tile — not writable in v1)',
+        message: 'edited tile lies outside any source art file (gap or appended tile, not writable in v1)',
       });
     }
     // Re-encode every pristine file (patched or not) — preserves the file split.

@@ -486,7 +486,7 @@ async function main() {
     // about the STORE rather than about a stylesheet.
     const controlsPresent = await c.json(
       `[...document.querySelectorAll('input[type=number], select')]
-         .filter(e => /^(cols|rows —|static base)/.test(e.title||'')).length`);
+         .filter(e => /^(cols|rows:|static base)/.test(e.title||'')).length`);
     check('3b', 'ANTI-VACUOUS for the collapsed-section call: BOTH band sections are SHUT, and '
       + 'their controls are ABSENT FROM THE DOM — so everything in 4-6 runs with the panel closed',
       sBands === 'collapsed' && sNew === 'collapsed' && controlsPresent === 0,

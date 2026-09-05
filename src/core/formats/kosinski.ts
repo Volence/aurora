@@ -51,7 +51,7 @@ export function kosinskiDecompressFrom(input: Uint8Array, startOffset = 0): { ou
   function writeByte(byte: number): void {
     if (output.length >= MAX_OUTPUT_BYTES) {
       throw new KosinskiError(
-        `Kosinski stream exceeded ${MAX_OUTPUT_BYTES} bytes without terminating — the data is not Kosinski`,
+        `Kosinski stream exceeded ${MAX_OUTPUT_BYTES} bytes without terminating: the data is not Kosinski`,
       );
     }
     output.push(byte & 0xFF);

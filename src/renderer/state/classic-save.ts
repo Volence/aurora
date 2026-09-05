@@ -174,7 +174,7 @@ export function domainsToClear(
 function notifyMidSaveEdits(withheld: (keyof DirtyDomains)[]): void {
   if (withheld.length === 0) return;
   useToastStore.getState().addToast(
-    `Saved, but edits made during the save are still unsaved (${withheld.join(', ')}) — save again`,
+    `Saved, but edits made during the save are still unsaved (${withheld.join(', ')}); save again`,
     'info',
   );
 }
@@ -258,7 +258,7 @@ export async function saveClassicProject(
           dl.gen,
         ));
         useToastStore.getState().addToast(
-          `Save incomplete — write failed at ${outcome.failed.path}; ` +
+          `Save incomplete: write failed at ${outcome.failed.path}; ` +
             `${outcome.written.length} file(s) saved, ${outcome.unwritten.length + 1} not. ` +
             `Fix the error and save again.`,
           'error',
@@ -291,7 +291,7 @@ export async function saveClassicProject(
 export function notifyConflict(conflicts: string[]): void {
   const list = conflicts.join(', ');
   useToastStore.getState().addToast(
-    `Save aborted — ${conflicts.length} file(s) changed on disk since open: ${list}. ` +
+    `Save aborted; ${conflicts.length} file(s) changed on disk since open: ${list}. ` +
       `Reload project to pick up external changes.`,
     'error',
   );

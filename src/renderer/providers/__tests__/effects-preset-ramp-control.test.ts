@@ -663,7 +663,7 @@ describe('switching the raster program is ONE undoable command', () => {
   it('the labels are per-channel, not a two-way ternary that mislabels the third', () => {
     // The defect this row exists for: the labels were
     // `c === 'ramp' ? ramp-label : bands-label`, so base_swap rendered as
-    // "bands — a sparse fire list" the moment the contract declared it.
+    // "bands: a sparse fire list" the moment the contract declared it.
     const labels = PROGRAM_ARM_OPTIONS.map((o) => o.label);
     expect(new Set(labels).size).toBe(labels.length);
     for (const o of PROGRAM_ARM_OPTIONS) expect(o.label).toContain(o.value.replace('_', ' '));

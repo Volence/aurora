@@ -392,8 +392,8 @@ export function verticalWrapAdvisory(
   if (r.wrapCamY === null) return null;
   const remedy = r.fittingVFactor === null
     ? 'No larger shift fits either, so the art has to join top to bottom for the seam to be invisible.'
-    : `Either raise v_factor to ${r.fittingVFactor} — the background moves less, and `
-      + `${PLANE_LINE_SPAN << r.fittingVFactor}px of travel fits — or make the art join top to `
+    : `Either raise v_factor to ${r.fittingVFactor} (the background moves less, and `
+      + `${PLANE_LINE_SPAN << r.fittingVFactor}px of travel fits) or make the art join top to `
       + 'bottom so the seam is invisible.';
   const capped = r.beyondCameraWord
     ? ` (this act travels past the ${CAMERA_WORD_MAX}px signed-word camera the engine works in, `

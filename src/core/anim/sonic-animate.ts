@@ -125,7 +125,7 @@ function loadFrame(aniFrame: number, body: readonly number[], label: SonicVarian
     if (first === undefined || first >= 0x80) throw new Error(`sonic-animate: ${label} body[0] is not a frame`);
     return { frame: first, aniFrame: 1 };
   }
-  throw new Error(`sonic-animate: ${label} byte $${b.toString(16)} at ${aniFrame} — special bodies hold only frames and afEnd`);
+  throw new Error(`sonic-animate: ${label} byte $${b.toString(16)} at ${aniFrame}: special bodies hold only frames and afEnd`);
 }
 
 /**

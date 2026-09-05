@@ -413,8 +413,8 @@ export function useAeonPaletteGridPort(opts?: { context?: 'sprite' }): PaletteGr
       if (idx === TRANSPARENT_INDEX) return 'transparent (index 0)';
       const word = fmtGenesisWord(lines[line]?.[idx] ?? 0);
       return standaloneMode
-        ? `sprite palette, index ${idx} — ${word}`
-        : `line ${line}, index ${idx} — ${word}`;
+        ? `sprite palette, index ${idx}: ${word}`
+        : `line ${line}, index ${idx}: ${word}`;
     },
     heading: (line, idx) => (standaloneMode
       ? `Sprite · Index ${idx}`

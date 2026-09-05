@@ -526,7 +526,7 @@ function validateBand(
       `anims[${i}].driver is ${JSON.stringify(b.driver)}; the consumer indexes DRIVERS by this ` +
       `name and raises on anything else. Legal: ${BGANIM_DRIVER_NAMES.join(' / ')} ` +
       `(default ${JSON.stringify(BAND_DEFAULTS.driver)}). A driver names the SCALAR SOURCE the ` +
-      'step is read from and never an axis — which way the band moves is the `axis` key ' +
+      'step is read from and never an axis: which way the band moves is the `axis` key ' +
       `(${BGANIM_BAND_AXES.join(' / ')}, default ${JSON.stringify(BAND_AXIS_DEFAULT)}).`,
     );
   }
@@ -567,7 +567,7 @@ function validateBand(
       `${axis === BAND_AXIS_DEFAULT ? 'columns' : 'rows'} of ${unitKey}*${TILE_BYTES} = ` +
       `${geom[unitKey]}*${TILE_BYTES} = ${unitBytes} B, and the runtime shifts by that distance ` +
       '(`col_shift` = log2 of it, and the consumer asserts `(1 << col_shift) == unit_bytes`), so ' +
-      `it must be a power of two — ${unitKey}=${geom[unitKey]} is not. The power-of-two key is ` +
+      `it must be a power of two; ${unitKey}=${geom[unitKey]} is not. The power-of-two key is ` +
       `\`${BAND_AXIS_UNIT_KEY[BAND_AXIS_DEFAULT]}\` on a ${BAND_AXIS_DEFAULT} band and ` +
       `\`${BAND_AXIS_UNIT_KEY.vertical}\` on a vertical one; this band is ${axis}.`,
     );
@@ -585,7 +585,7 @@ function validateBand(
   if (b.slot_base !== undefined && (!isInt(b.slot_base) || b.slot_base !== cursor)) {
     issues.push(
       `anims[${i}].slot_base is ${JSON.stringify(b.slot_base)} but the running cursor is ${cursor}. ` +
-      'Bands pack contiguously from slot 0 in list order — a band cannot be placed anywhere but ' +
+      'Bands pack contiguously from slot 0 in list order: a band cannot be placed anywhere but ' +
       'the front of the tile blob, so slot_base is derived and may only be spelled out to agree.',
     );
   }
@@ -598,7 +598,7 @@ function validateBand(
     if (phases.length !== BGANIM_PHASE_BANKS) {
       issues.push(
         `anims[${i}].phases has ${phases.length} banks; a band needs EXACTLY ${BGANIM_PHASE_BANKS} ` +
-        `(bganim_band.banks is [*u8; ${BGANIM_PHASE_BANKS}] — pre-shifted art 1px apart, selected by ` +
+        `(bganim_band.banks is [*u8; ${BGANIM_PHASE_BANKS}], pre-shifted art 1px apart, selected by ` +
         'step & 7).',
       );
     }
@@ -632,7 +632,7 @@ function validateBand(
           "of the static blob, so its phase-0 art IS those slots' rest state. This document's " +
           '`anims` and `tiles` came from different generations of the art: it would pass every ' +
           'other check, bake cleanly, and ship a ROM whose bands DMA stale phase art over whatever ' +
-          'the newer tiles put in those slots. `anims`, `tiles` and `layout` are ONE unit — ' +
+          'the newer tiles put in those slots. `anims`, `tiles` and `layout` are ONE unit; ' +
           'regenerate them together.',
         );
       }
@@ -705,7 +705,7 @@ export function validateBgOverride(doc: unknown): string[] {
       // ownership exists to prevent. The invariant is enforced here instead,
       // at the boundary that can actually enforce it.
       issues.push(
-        'anims is present but empty. An empty `anims` key is neither absent nor authored — the ' +
+        'anims is present but empty. An empty `anims` key is neither absent nor authored: the ' +
         'no-bands document has NO `anims` key at all (that is what the consumer\'s own gate ' +
         'asserts of the shipped file). parseBgOverride drops it on read, so a document still ' +
         'carrying it did not come through the reader.',
@@ -777,7 +777,7 @@ export function parseBgOverride(text: string): BgOverrideParseResult {
       throw new BgOverrideError(
         `${BG_OVERRIDE_CONSUMER_PATH} carries an EMPTY "anims" alongside the legacy ` +
         `"${LEGACY_ANIM_KEY}". The consumer falls back to "${LEGACY_ANIM_KEY}" only when "anims" is ` +
-        'ABSENT, and an empty array is present — so it would bake the disabled stub and your band ' +
+        'ABSENT, and an empty array is present, so it would bake the disabled stub and your band ' +
         'would be SILENTLY DROPPED. An empty `anims` alone is benign and the reader normalizes it ' +
         `away, but not here: normalizing it would mean guessing whether you meant the ` +
         `"${LEGACY_ANIM_KEY}" band or meant to have no bands. Delete whichever key is not the one ` +
@@ -797,7 +797,7 @@ export function parseBgOverride(text: string): BgOverrideParseResult {
       throw new BgOverrideError(
         `${BG_OVERRIDE_CONSUMER_PATH} carries "${LEGACY_ANIM_KEY}": ${JSON.stringify(legacy)}. The ` +
         'legacy key holds ONE band object. The consumer treats a falsy value as no-bands and bakes ' +
-        'the disabled stub, so this document does not mean what it looks like it means — delete ' +
+        'the disabled stub, so this document does not mean what it looks like it means; delete ' +
         'the key if there is no band.',
       );
     }
@@ -839,7 +839,7 @@ export function parseBgOverride(text: string): BgOverrideParseResult {
       severity: 'warning',
       message:
         `${BG_OVERRIDE_CONSUMER_PATH} carried an empty "anims" key. An empty array is neither absent ` +
-        'nor authored — the no-bands document has no "anims" key at all — so it has been read as a ' +
+        'nor authored (the no-bands document has no "anims" key at all), so it has been read as a ' +
         'document with no bands, and saving will drop the key. No band was lost: there was none.',
     });
   }

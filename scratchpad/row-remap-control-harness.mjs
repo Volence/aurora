@@ -231,7 +231,7 @@ const OPEN_SECTION = (re, proofSelector) => String.raw`
 /** The remap on/off `<select>` for one strip, by the row's own title. */
 const RR_SELECT = (layer) => String.raw`
 (() => [...document.querySelectorAll('select')]
-  .find((s) => (s.title || '').startsWith('Layer ' + ${layer} + ' rowRemap — ')) || null)()`;
+  .find((s) => (s.title || '').startsWith('Layer ' + ${layer} + ' rowRemap: ')) || null)()`;
 
 /** The plane-line box for one strip. */
 const RR_BOX = (layer) => String.raw`

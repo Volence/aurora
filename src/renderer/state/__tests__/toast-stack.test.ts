@@ -107,7 +107,7 @@ describe('toastStack — an error is never what gets hidden', () => {
     expect(s.hiddenErrorCount).toBe(s.hiddenCount);
     expect(s.hiddenErrorCount).toBe(input.length - MAX_VISIBLE_TOASTS);
     expect(overflowLabel(s)).toBe(
-      `+${input.length - MAX_VISIBLE_TOASTS} more (${input.length - MAX_VISIBLE_TOASTS} errors) — click to show all`,
+      `+${input.length - MAX_VISIBLE_TOASTS} more (${input.length - MAX_VISIBLE_TOASTS} errors): click to show all`,
     );
   });
 
@@ -130,7 +130,7 @@ describe('overflowLabel', () => {
     const s = toastStack(many('success', MAX_VISIBLE_TOASTS + 5));
     expect(s.hiddenCount).toBeGreaterThan(0); // anti-vacuous
     expect(s.hiddenErrorCount).toBe(0);
-    expect(overflowLabel(s)).toBe(`+${s.hiddenCount} more — click to show all`);
+    expect(overflowLabel(s)).toBe(`+${s.hiddenCount} more: click to show all`);
     expect(overflowLabel(s)).not.toContain('error');
   });
 

@@ -316,11 +316,11 @@ export function crossoverAuditMessage(a: CrossoverAudit): string | null {
   const parts: string[] = [];
   if (a.reserved > 0) {
     parts.push(`${a.reserved} cell${a.reserved === 1 ? '' : 's'} hold the RESERVED crossover value 3 `
-      + `(first at index ${a.reservedAt[0]}) — aeon's bake hard-errors on it (rule R1).`);
+      + `(first at index ${a.reservedAt[0]}): aeon's bake hard-errors on it (rule R1).`);
   }
   if (a.selfMarks > 0) {
     parts.push(`${a.selfMarks} SELF-MARK${a.selfMarks === 1 ? '' : 's'} `
-      + `(first at index ${a.selfMarkAt[0]}) — a plane whose word sends you to the plane you are `
+      + `(first at index ${a.selfMarkAt[0]}): a plane whose word sends you to the plane you are `
       + 'already on. It can never fire, and aeon\'s bake refuses it (rule R2).');
   }
   // ⚠ THE CANCELLING LINE COMES BEFORE THE ONE-WAY LINE, deliberately. An author
@@ -334,7 +334,7 @@ export function crossoverAuditMessage(a: CrossoverAudit): string | null {
       + 'engine triggers on, so the player is handed over and handed straight back and leaves on '
       + 'the path he arrived on. A 16px cell is TWO trigger columns, so a pair painted at the '
       + 'default mark width always does this. Set the crossover mark width to "Half (8px)" and '
-      + 'paint the pair one sub-column wide — or use two spatially separated ONE-WAY marks, which '
+      + 'paint the pair one sub-column wide, or use two spatially separated ONE-WAY marks, which '
       + 'is what the first working loop used.');
   }
   if (a.oneWay > 0) {
@@ -346,7 +346,7 @@ export function crossoverAuditMessage(a: CrossoverAudit): string | null {
     // correct, and simpler, way to build a two-way loop. So this now says what
     // a one-way mark IS rather than implying it is a mistake.
     parts.push(`${a.oneWay} ONE-WAY crossover${a.oneWay === 1 ? '' : 's'} `
-      + `(first at index ${a.oneWayAt[0]}): marked on one plane only. Legal and often correct — an `
+      + `(first at index ${a.oneWayAt[0]}): marked on one plane only. Legal and often correct: an `
       + 'entry or exit anchor looks like this, and so does a loop built from two separated one-way '
       + 'marks (each fires only when approached on the plane that carries it, and firing twice is '
       + 'the same as firing once). It is a MISTAKE only if you meant a single two-way handoff and '
@@ -355,7 +355,7 @@ export function crossoverAuditMessage(a: CrossoverAudit): string | null {
   if (!a.cancellingMeasured && (a.pairs > 0)) {
     // LOUD ON UNMEASURABLE. `cancelling: 0` beside a real pair count is the one
     // combination a reader would otherwise take as an all-clear.
-    parts.push('(The two-way cancellation check did NOT run — this audit was called without a row '
+    parts.push('(The two-way cancellation check did NOT run: this audit was called without a row '
       + 'stride, so nothing here says whether these pairs actually change the player\'s path.)');
   }
   return parts.length ? parts.join(' ') : null;

@@ -119,7 +119,7 @@ export function parseSonicAnimTable(text: string): SonicAnimParse {
     tableRows.push({ idLabel: m[1], scriptLabel: m[2] });
   }
   if (tableRows.length === 0) {
-    problems.push('no sonani table rows found — not the Sonic dialect');
+    problems.push('no sonani table rows found: not the Sonic dialect');
     return { entries: [], equates, idIndex, problems };
   }
 
@@ -200,7 +200,7 @@ export function parseSonicAnimTable(text: string): SonicAnimParse {
       if (b === 0xff) control = { kind: 'loop' };
       else if (b === 0xfe) control = { kind: 'back', count: bytes[i + 1] ?? 0 };
       else if (b === 0xfd) control = { kind: 'change', animId: bytes[i + 1] ?? 0 };
-      else problems.push(`${scriptLabel}: control byte $${b.toString(16)} — Sonic's handler implements only $FF/$FE/$FD`);
+      else problems.push(`${scriptLabel}: control byte $${b.toString(16)}; Sonic's handler implements only $FF/$FE/$FD`);
       break;
     }
     if (control === null) problems.push(`${scriptLabel}: no control terminator found`);

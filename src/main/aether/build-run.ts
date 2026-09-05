@@ -218,7 +218,7 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
       (s) => { output += s; opts.onOutput?.(s); },
     );
     if (pre.code !== 0) {
-      output += `\n${plan.prebuild.command} failed — the level data was NOT re-baked, so a build here would assemble the previous one.\n`;
+      output += `\n${plan.prebuild.command} failed: the level data was NOT re-baked, so a build here would assemble the previous one.\n`;
       return {
         ok: false, exitCode: pre.code, output: summariseBuildOutput(output),
         reloaded: false, missingEnv: plan.missingEnv, plan, debugBuild: wantsDebug,
@@ -305,7 +305,7 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
             unservedMethods: missing,
             reloadError:
               `${opts.client.server?.name ?? 'the connected Aether server'} does not serve ` +
-              `${missing.join(', ')} — the build ran, but Aurora refused to reload rather than ` +
+              `${missing.join(', ')}: the build ran, but Aurora refused to reload rather than ` +
               'guess which ROM is loaded (a wrong guess reloads a file the build never touched, ' +
               'and the game comes back byte-identical).',
           });
@@ -476,7 +476,7 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
             unservedMethods: unserved.size > 0 ? [...unserved] : undefined,
             reloadError: resumeLeftPaused
               ? `${opts.client.server?.name ?? 'the connected Aether server'} does not serve ` +
-                'emulator/resume — the ROM was reloaded but the machine was left PAUSED.'
+                'emulator/resume: the ROM was reloaded but the machine was left PAUSED.'
               : undefined,
             timings: { build: buildMs, reload: reloadMs, restore: restoreMs },
           });

@@ -168,7 +168,7 @@ function check(id, name, ok, detail) {
 // selectors in a sibling harness were caught matching nothing by end-anchoring.
 const CURVE_SEL = (i) => (PLANT === 'rot-selector'
   // THE PLANT: end-anchored, as the five real rots were. The live title is
-  // `Layer 0 curve.to — the Plane B factor at …`, so this matches NOTHING.
+  // `Layer 0 curve.to: the Plane B factor at …`, so this matches NOTHING.
   ? `/^Layer ${i} curve\\.to$/`
   : `/^Layer ${i} curve\\.to\\b/`);
 const FA_SEL = (i) => `/^Layer ${i} fa\\b/`;

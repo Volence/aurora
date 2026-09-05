@@ -137,12 +137,12 @@ export const PLANE_FACTOR_ROWS = Object.freeze({
   fa: Object.freeze({
     key: 'fa' as const,
     label: 'Plane A (fg)',
-    title: 'fa — how far Plane A, the foreground level plane, scrolls per pixel of camera movement',
+    title: 'fa: how far Plane A, the foreground level plane, scrolls per pixel of camera movement',
   }),
   fb: Object.freeze({
     key: 'fb' as const,
     label: 'Plane B (bg)',
-    title: 'fb — how far Plane B, the background, scrolls per pixel of camera movement',
+    title: 'fb: how far Plane B, the background, scrolls per pixel of camera movement',
   }),
 });
 
@@ -207,11 +207,11 @@ export const PLANE_A_GAMEPLAY_PLANE = 'Plane A is the gameplay plane';
 export function planeAFactorAdvisory(layer: Pick<EffectsLayer, 'fa'>): string | null {
   if (!isNamedFactor(layer.fa)) return null;
   if (layer.fa === 'FACTOR_1') return null;
-  return `${PLANE_A_GAMEPLAY_PLANE} — the level the player stands on — and aeon's scene_dsl.emp `
+  return `${PLANE_A_GAMEPLAY_PLANE} (the level the player stands on) and aeon's scene_dsl.emp `
     + 'says "In a side-scrolling scene fa tracks the camera (FACTOR_1)". At '
     + `${factorLabel(layer.fa)} the foreground scrolls at a rate the camera does not, so the `
     + 'geometry slides under the player while collision stays where it was. Parallax is what '
-    + 'Plane B is for. The build accepts this — aeon\'s layer() has no guard on fa — so nothing '
+    + 'Plane B is for. The build accepts this: aeon\'s layer() has no guard on fa, so nothing '
     + 'here refuses it.';
 }
 
@@ -247,7 +247,7 @@ export function planeAFactorAdvisory(layer: Pick<EffectsLayer, 'fa'>): string | 
 export const LAYER_CURVE_ROW = Object.freeze({
   key: 'curve' as const,
   label: 'B curve to',
-  title: 'curve.to — the Plane B factor at this strip\'s bottom; none keeps fb the whole way down',
+  title: 'curve.to: the Plane B factor at this strip\'s bottom; none keeps fb the whole way down',
   hint: "Plane B speed ramps from fb at this strip's top to this value at its bottom",
   none: 'none',
 });
@@ -261,7 +261,7 @@ export const LAYER_CURVE_ROW = Object.freeze({
 export const LAYER_VSPLIT_ROW = Object.freeze({
   key: 'vsplit' as const,
   label: 'B split at',
-  title: `vsplit.at — the Plane B row scrolled to from this strip down `
+  title: `vsplit.at: the Plane B row scrolled to from this strip down `
     + `(${EFFECTS_VSPLIT_AT_BOUNDS.min}..${EFFECTS_VSPLIT_AT_BOUNDS.max}); none leaves the plane alone`,
   hint: 'from this strip down, Plane B scrolls vertically as a whole',
   none: 'none',
@@ -356,9 +356,9 @@ export const EFFECTS_DRIFT_PX_STEP = driftRateToPxPerFrame(EFFECTS_DRIFT_SEED_RA
 export const LAYER_DRIFT_ROW = Object.freeze({
   key: 'drift' as const,
   label: 'Drift',
-  title: 'drift.rate — a constant horizontal speed added every frame, with or without the camera; '
+  title: 'drift.rate: a constant horizontal speed added every frame, with or without the camera; '
     + `${EFFECTS_DRIFT_PX_BOUNDS.min}..${EFFECTS_DRIFT_PX_BOUNDS.max} px/frame, negative = leftward`,
-  hint: 'moves on its own, camera or no camera — clouds; set it to none for a strip that should not',
+  hint: 'moves on its own, camera or no camera (clouds); set it to none for a strip that should not',
   none: 'none',
   on: 'px/frame',
   /** The box's own title: the unit, said where the number is typed. */
@@ -475,25 +475,25 @@ export const EFFECTS_ROW_REMAP_SEED_HEIGHT_SHIFT: number =
 export const LAYER_ROW_REMAP_ROW = Object.freeze({
   key: 'rowRemap' as const,
   label: 'Row remap',
-  title: 'rowRemap — this strip\'s Plane-B scroll words re-fetched through a perspective ladder, '
+  title: 'rowRemap: this strip\'s Plane-B scroll words re-fetched through a perspective ladder, '
     + 'so the band compresses toward a surface line as the camera moves (Hydrocity\'s waterline). '
     + 'At most ONE strip per scene may carry it',
-  hint: 'the rows of this strip are reordered toward a surface line — one strip per scene, and '
+  hint: 'the rows of this strip are reordered toward a surface line; one strip per scene, and '
     + 'the scene needs an anchor and something for the remap to vary',
   none: 'none',
   on: 'ladder',
   /** The plane-line box's own title: the coordinate space, said where the number is typed. */
-  planeYTitle: 'rowRemap.plane_y — the BG PLANE LINE where this strip\'s art paints the surface, '
+  planeYTitle: 'rowRemap.plane_y: the BG PLANE LINE where this strip\'s art paints the surface, '
     + `${EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS.min}..${EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS.max}. NOT a `
     + 'world Y and NOT a screen line (the runtime reads plane_y - Vscroll_BG); the same space as '
-    + 'a strip\'s vertical split. This range is the contract\'s ONLY enforcement — aeon checks the '
+    + 'a strip\'s vertical split. This range is the contract\'s ONLY enforcement: aeon checks the '
     + 'floor and not the ceiling',
   /** The picker's own title: the unit hazard, said where the choice is made. */
-  heightTitle: 'rowRemap.height_shift — the band height. The FILE STORES A SHIFT and this list '
+  heightTitle: 'rowRemap.height_shift: the band height. The FILE STORES A SHIFT and this list '
     + 'shows the lines it means (H = 1 << shift), because exporting a line count would land a '
     + 'band four times too tall with no build error',
   /** Suffix on the option the engine can build today; empty once the contract stops naming one. */
-  buildsSuffix: ' — builds today',
+  buildsSuffix: ' (builds today)',
 });
 
 /** One `height_shift` as the picker offers it: the value, its label, and whether it builds. */
@@ -640,7 +640,7 @@ export function rowRemapPreconditions(scene: EffectsScene, index: number): strin
       : anchorLive
         ? 'the anchor\'s dsb is live but the scene has no deform_bg table'
         : `the anchor's dsb is ${anchorOff}`);
-    out.push(`nothing for the remap to vary — ${why.join('; ')}. `
+    out.push(`nothing for the remap to vary: ${why.join('; ')}. `
       + `The contract: "${EFFECTS_ROW_REMAP_GENERATOR_REFUSALS.vary}"`);
   }
 
@@ -672,7 +672,7 @@ export function rowRemapPreconditions(scene: EffectsScene, index: number): strin
  * coverage.
  */
 export const EFFECTS_ROW_REMAP_CAPABILITY_NOTE =
-  'Aurora cannot check the fourth condition from a scene file — nothing here says which game '
+  'Aurora cannot check the fourth condition from a scene file: nothing here says which game '
   + `will bind it. The contract: "${EFFECTS_ROW_REMAP_GENERATOR_REFUSALS.capability}"`;
 
 /**
@@ -731,7 +731,7 @@ export function curveGoesNowhere(fb: EffectsFactor, to: EffectsFactor): boolean 
  * about the identical value, because they ARE the same string.
  */
 export function curveFlatReason(to: EffectsFactor): string {
-  return `curve to ${factorLabel(to)} is the same factor as Plane B — the ramp goes nowhere and the build refuses it`;
+  return `curve to ${factorLabel(to)} is the same factor as Plane B: the ramp goes nowhere and the build refuses it`;
 }
 
 /**
@@ -1051,7 +1051,7 @@ export function tableRefBinPath(t: EffectsTableRef): string | null {
 export function binPathRefusal(path: string): string | null {
   if (path === '') return null;   // an empty box is "not typed yet", not a refusal
   if (EFFECTS_TABLE_REF_BIN_PATTERN.test(path)) return null;
-  return `"${path}" is not a legal table path — ${TABLE_REF_ROW.binRule}`;
+  return `"${path}" is not a legal table path: ${TABLE_REF_ROW.binRule}`;
 }
 
 /**
@@ -1186,17 +1186,17 @@ export function tableRefAdvisory(t: EffectsTableRef): string | null {
   if ('bin' in t || !('period' in t)) return null;
   const period = t.period;
   if (EFFECTS_DEFORM_TABLE_BYTES % period === 0) return null;
-  return `period ${period} does not divide the ${EFFECTS_DEFORM_TABLE_BYTES}-byte table — `
+  return `period ${period} does not divide the ${EFFECTS_DEFORM_TABLE_BYTES}-byte table: `
     + 'the cycle would not close and the build refuses it';
 }
 
 /** The table sub-form's wording, including the path rule the refusal quotes. */
 export const TABLE_REF_ROW = Object.freeze({
   label: 'Table',
-  title: `table — the ${EFFECTS_DEFORM_TABLE_BYTES}-byte signed curve this deform samples: `
-    + 'a generator the build computes, or a raw .bin you drew',
+  title: `table: the ${EFFECTS_DEFORM_TABLE_BYTES}-byte signed curve this deform samples, `
+    + 'either a generator the build computes or a raw .bin you drew',
   binLabel: 'File',
-  binTitle: 'bin — a raw table file under data/editor/effects/',
+  binTitle: 'bin: a raw table file under data/editor/effects/',
   binRule: 'a path under data/editor/effects/ ending in .bin, with no ".." segments',
 });
 
@@ -1205,12 +1205,12 @@ export const SCENE_DEFORM_ROWS = Object.freeze({
   deform_fg: Object.freeze({
     key: 'deform_fg' as const,
     label: 'Deform fg',
-    title: 'deform_fg — one table Plane A samples on every line of the whole scene',
+    title: 'deform_fg: one table Plane A samples on every line of the whole scene',
   }),
   deform_bg: Object.freeze({
     key: 'deform_bg' as const,
     label: 'Deform bg',
-    title: 'deform_bg — one table Plane B samples on every line of the whole scene',
+    title: 'deform_bg: one table Plane B samples on every line of the whole scene',
   }),
 });
 
@@ -1226,18 +1226,18 @@ export const SCENE_DEFORM_ROW_SHARED = Object.freeze({
   none: 'none',
   on: 'shared',
   hint: 'a plane-wide horizontal wobble; each layer\'s own shifts decide how much of it it takes',
-  speedTitle: 'speed — how fast the sample point walks the table each frame; 0 holds it still',
+  speedTitle: 'speed: how fast the sample point walks the table each frame; 0 holds it still',
 });
 
 /** The per-column vertical attachment (`SceneVDeform.Columns`). */
 export const V_DEFORM_ROW = Object.freeze({
   key: 'v_deform' as const,
   label: 'V deform',
-  title: 'v_deform — a per-column VERTICAL table: each 16px column of Plane B scrolls to its own row',
+  title: 'v_deform: a per-column VERTICAL table, where each 16px column of Plane B scrolls to its own row',
   none: 'none',
   on: 'columns',
-  hint: 'per-column vertical scroll — a different VSRAM mode, not a variant of the plane rows above',
-  ampTitle: `amp_shift — right-shift applied to each sampled byte, `
+  hint: 'per-column vertical scroll: a different VSRAM mode, not a variant of the plane rows above',
+  ampTitle: `amp_shift: right-shift applied to each sampled byte, `
     + `${EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS.min}..${EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS.max}; bigger = flatter`,
 });
 
@@ -1245,17 +1245,17 @@ export const V_DEFORM_ROW = Object.freeze({
 export const LAYER_DEFORM_ROW = Object.freeze({
   key: 'deform' as const,
   label: 'Deform',
-  title: 'deform.own — this strip\'s OWN table, overriding the scene\'s for this strip only',
+  title: 'deform.own: this strip\'s OWN table, overriding the scene\'s for this strip only',
   none: 'none',
   on: 'own',
   hint: 'overrides the scene table for this strip; 15 on a shift means that plane takes none of it',
-  shiftATitle: `shift_a — Plane A amplitude as a right-shift, `
+  shiftATitle: `shift_a: Plane A amplitude as a right-shift, `
     + `${EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.min}..${EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.max}; `
     + `${EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.max} = no sample`,
-  shiftBTitle: `shift_b — Plane B amplitude as a right-shift, `
+  shiftBTitle: `shift_b: Plane B amplitude as a right-shift, `
     + `${EFFECTS_LAYER_DEFORM_BOUNDS.shift_b.min}..${EFFECTS_LAYER_DEFORM_BOUNDS.shift_b.max}; `
     + `${EFFECTS_LAYER_DEFORM_BOUNDS.shift_b.max} = no sample`,
-  phaseTitle: `phase — where in the table this strip starts, `
+  phaseTitle: `phase: where in the table this strip starts, `
     + `${EFFECTS_LAYER_DEFORM_BOUNDS.phase.min}..${EFFECTS_LAYER_DEFORM_BOUNDS.phase.max}`,
 });
 
@@ -1374,7 +1374,7 @@ export function sceneDeformAdvisories(scene: EffectsScene): string[] {
     || sceneDeformValue(scene, 'deform_bg') !== null;
   if (anyOwn && !sceneTable) {
     out.push(
-      'a strip attaches its own table but the scene attaches none on either plane — every other '
+      'a strip attaches its own table but the scene attaches none on either plane: every other '
       + 'strip with a live shift would sample from nothing, and the build refuses it. Set '
       + `${SCENE_DEFORM_ROWS.deform_fg.label} or ${SCENE_DEFORM_ROWS.deform_bg.label}.`,
     );
@@ -1395,8 +1395,8 @@ export function sceneDeformAdvisories(scene: EffectsScene): string[] {
   // card's `Advisory`, which has a hover to put it in.
   if (vDeform && vsplitLayer >= 0) {
     out.push(
-      `layer ${vsplitLayer} authors a Plane B split while ${VSPLIT_VDEFORM_CLAUSES.sceneIs} — `
-      + `the build refuses this scene. ${VSPLIT_VDEFORM_CLAUSES.remedies}`,
+      `layer ${vsplitLayer} authors a Plane B split while ${VSPLIT_VDEFORM_CLAUSES.sceneIs}. `
+      + `The build refuses this scene. ${VSPLIT_VDEFORM_CLAUSES.remedies}`,
     );
   }
   const mask = scene.left_column_mask ?? EFFECTS_LEFT_COLUMN_MASK_UNDECLARED;
@@ -1437,7 +1437,7 @@ export function sceneDeformAdvisories(scene: EffectsScene): string[] {
       'this scene declares left_column_mask "sprite_mask", which the build refuses in every '
       + 'scene: the engine\'s left-column strip emission has not landed, so the declaration '
       + 'would be accepted while the sliver stays uncovered. Declare factor0_lock or accept '
-      + `on the ${LEFT_COLUMN_MASK_ROW.label} row instead — the picker will not offer `
+      + `on the ${LEFT_COLUMN_MASK_ROW.label} row instead; the picker will not offer `
       + 'sprite_mask back.',
     );
   }
@@ -1503,7 +1503,7 @@ export function curveAnchorDeformAdvisory(scene: EffectsScene): string | null {
   if (curveLayer < 0) return null;
   return `layer ${curveLayer} authors a curve while this scene's anchor carries live deform `
     + `shifts (anchor dsa ${anchor.at.dsa} / dsb ${anchor.at.dsb}; ${offA} is the no-deform `
-    + 'sentinel) — the anchor writes those shifts into every strip below the split, including '
+    + 'sentinel). The anchor writes those shifts into every strip below the split, including '
     + 'that one, so it would be curve and deform at once and the build refuses the pair. Take '
     + `both anchor shifts to ${offA}, which composes with curves, or drop the curve.`;
 }
@@ -1575,7 +1575,7 @@ export function curveAnchorDeformAdvisory(scene: EffectsScene): string | null {
 export const LEFT_COLUMN_MASK_ROW = Object.freeze({
   key: 'left_column_mask' as const,
   label: 'Left col',
-  title: 'left_column_mask — how this scene answers for the leftmost partial column, '
+  title: 'left_column_mask: how this scene answers for the leftmost partial column, '
     + 'which per-column V scroll renders at a scroll the program never wrote',
   hint: 'per-column V scroll needs this answered; the build refuses a scene that leaves it open',
 });
@@ -1631,7 +1631,7 @@ export function factor0LockRefusal(scene: EffectsScene): string | null {
     const l = scene.layers[unlocked];
     return `layer ${unlocked}'s Plane B factor is ${factorLabel(l.fb)}, not ${EFFECTS_FACTOR_ZERO}`
       + (typeof l.fb === 'string' ? '' : ' (a custom packed factor: Aurora cannot prove it is locked)')
-      + ` — the partial column exists on every line where Plane B scrolls, so the claim is false `
+      + `. The partial column exists on every line where Plane B scrolls, so the claim is false `
       + 'as authored and the build refuses it.';
   }
   // Half two: a live plane-B amplitude WITH a table that can reach the plane.
@@ -1645,7 +1645,7 @@ export function factor0LockRefusal(scene: EffectsScene): string | null {
   if (amp && table) {
     return `${ampLayer >= 0 ? `layer ${ampLayer}` : 'the anchor'} has a live Plane B deform `
       + `amplitude (shift ${ampLayer >= 0 ? effectiveDsb(scene.layers[ampLayer]) : anchorDsb}; `
-      + `${noSentinel} is the no-sample sentinel) while a table can reach the plane — deform adds `
+      + `${noSentinel} is the no-sample sentinel) while a table can reach the plane. Deform adds `
       + 'per-line Plane B scroll on top of the locked factor, so the sliver comes back on those '
       + 'rows. The build refuses it, conservatively: table contents are invisible at build time, '
       + 'so even an all-zero table counts.';
@@ -1696,13 +1696,13 @@ export function leftColumnMaskOptions(scene: EffectsScene): LeftColumnMaskOption
     if (value === 'accept') {
       return {
         value, label: value, disabled: false,
-        title: 'ship the artifact — a real answer, and the one this game\'s Rocking and '
+        title: 'ship the artifact: a real answer, and the one this game\'s Rocking and '
           + 'Perspective families give',
       };
     }
     return {
       value, label: value, disabled: false,
-      title: 'no policy declared — legal only while this scene has no per-column V deform',
+      title: 'no policy declared: legal only while this scene has no per-column V deform',
     };
   });
 }
@@ -1805,7 +1805,7 @@ export function leftColumnMaskAdvisory(scene: EffectsScene): string | null {
 export function layerCurveDeformAdvisory(layer: EffectsLayer): string | null {
   if (curveFieldValue(layer) === 'none') return null;
   if (layerDeformValue(layer) !== null) {
-    return 'this strip authors both a curve and its own deform table — the build forbids '
+    return 'this strip authors both a curve and its own deform table: the build forbids '
       + 'curve and deform on one strip (the fill\'s curve loop has no registers left for a '
       + 'sampled channel). Move the deform to another strip, or drop the curve.';
   }
@@ -1820,7 +1820,7 @@ export function layerCurveDeformAdvisory(layer: EffectsLayer): string | null {
   const dsb = layerShiftValue(layer, 'dsb');
   if (dsa === off && dsb === off) return null;
   return `this strip authors a curve and a live deform amplitude (dsa ${dsa} / dsb ${dsb}; `
-    + `${off} is the no-deform sentinel) — the build forbids curve and deform on one strip.`;
+    + `${off} is the no-deform sentinel). The build forbids curve and deform on one strip.`;
 }
 
 /**
@@ -2152,7 +2152,7 @@ const FIRE_IS = 'this layer authors a Plane B split, so it becomes a raster fire
 const FIRE_LAW = `a fire must land on ${EFFECTS_FIRE_LINE_MIN}..${EFFECTS_FIRE_LINE_MAX} `
   + `(lines 0-${EFFECTS_FIRE_LINE_MIN - 1} belong to the priming records)`;
 /** The remedy that is about the LAYER rather than about the camera. */
-const FIRE_REMEDY = `drop the split — a layer without one may sit anywhere in `
+const FIRE_REMEDY = `drop the split: a layer without one may sit anywhere in `
   + `0..${PLANE_LINE_SPAN - 1}`;
 /**
  * THE SENTENCE THIS WHOLE PARCEL EXISTS FOR.
@@ -2171,7 +2171,7 @@ const FIRE_REMEDY = `drop the split — a layer without one may sit anywhere in 
  */
 const FIRE_FLOOR_IS_THE_BOX = (vo: number) =>
   `On a locked scene the view box's top edge IS v_offset (${vo}), so this floor `
-  + `sits ${EFFECTS_FIRE_LINE_MIN} lines under the box and moves with it — that is `
+  + `sits ${EFFECTS_FIRE_LINE_MIN} lines under the box and moves with it; that is `
   + 'why the guide looks welded to the box';
 
 /**
@@ -2202,7 +2202,7 @@ export function fireLineAdvisory(
   if (line >= EFFECTS_FIRE_LINE_MIN && line <= EFFECTS_FIRE_LINE_MAX) return null;
   const vo = scene.v_offset ?? EFFECTS_V_OFFSET_DEFAULT;
   const from = vo === 0 ? '' : ` (top ${layer.world_y} less v_offset ${vo})`;
-  return `${FIRE_IS} at screen line ${line}${from} — and ${FIRE_LAW}. `
+  return `${FIRE_IS} at screen line ${line}${from}, and ${FIRE_LAW}. `
     + `The build refuses it. Move the top onto the visible screen, or ${FIRE_REMEDY}.`;
 }
 
@@ -2324,7 +2324,7 @@ export function guideBoundNotice(
   // author is not touching. Splicing the two produced a genuine run-on in the
   // first build ("...welded to the box, so MOVING THE BOX MOVED THIS FLOOR..."),
   // which buries the one clause that assigns the cause.
-  const text = `top ${layer.world_y} is now screen line ${line} — ${FIRE_IS}, and ${FIRE_LAW}. `
+  const text = `top ${layer.world_y} is now screen line ${line}: ${FIRE_IS}, and ${FIRE_LAW}. `
     + `The build refuses it. On a locked scene the view box's top edge IS v_offset (${vo}), `
     + `so MOVING THE BOX MOVED THIS FLOOR and left the layer under it. `
     + `Drag the box back, move the top into ${bound.min}..${bound.max}, or ${FIRE_REMEDY}.`;
@@ -2373,7 +2373,7 @@ export function vsplitOrderAdvisory(
   const prevLine = fireScreenLineOf(scene, layers[prevIndex].world_y);
   if (line > prevLine) return null;
   return `this split lands on screen line ${line}, which is not BELOW layer ${prevIndex}'s `
-    + `split at line ${prevLine} — two whole-plane vertical scroll values for one row, and `
+    + `split at line ${prevLine}: two whole-plane vertical scroll values for one row, and `
     + 'the merged fire would carry both writes with the second silently winning. The build '
     + 'refuses it. Give the two layers different screen lines, or drop one split.';
 }
@@ -2482,7 +2482,7 @@ const VSPLIT_LOCK_SCENE_IS = (vf: number) =>
 const VSPLIT_LOCK_MECHANISM =
   'Two writers, one word: the parallax step recomputes Plane B\'s vertical scroll every '
   + 'VBlank and ships it at frame top, while the split writes an ABSOLUTE constant to the '
-  + 'same word mid-frame. The split cannot express what the other writer is for — it carries '
+  + 'same word mid-frame. The split cannot express what the other writer is for: it carries '
   + 'ONE baked scroll value at ONE baked fire line, and that line is derived at build time '
   + 'from the layer top, which is a screen line only while the plane\'s scroll is constant.';
 
@@ -2560,7 +2560,7 @@ const VSPLIT_VDEFORM_SCENE_IS =
  * was missing.
  */
 const VSPLIT_VDEFORM_MECHANISM =
-  'Two writers, one word — but in per-column mode that word is not the plane. VSRAM entry 1 '
+  'Two writers, one word, but in per-column mode that word is not the plane. VSRAM entry 1 '
   + 'is PLANE B OF COLUMN 0, the frame-top writer ships the whole 80-byte column buffer every '
   + 'frame, and the split\'s whole-plane write below its line would shift ONE 16-pixel column '
   + 'of forty and leave the other thirty-nine where the column buffer put them.';
@@ -2609,8 +2609,8 @@ export function vsplitVDeformAdvisoryParts(
   if (vDeformValue(scene) === null) return null;
   if (!layerEmitsFire(layer)) return null;
   return {
-    diagnosis: `this layer authors a Plane B split while ${VSPLIT_VDEFORM_SCENE_IS} `
-      + '— the build refuses this scene.',
+    diagnosis: `this layer authors a Plane B split while ${VSPLIT_VDEFORM_SCENE_IS}. `
+      + 'The build refuses this scene.',
     mechanism: VSPLIT_VDEFORM_MECHANISM,
     remedies: VSPLIT_VDEFORM_REMEDIES,
   };
@@ -2694,8 +2694,8 @@ export function vsplitLockAdvisoryParts(
   if (!layerEmitsFire(layer)) return null;
   if (layerTopSpace(scene) === 'screen') return null;
   return {
-    diagnosis: `this layer authors a Plane B split while ${VSPLIT_LOCK_SCENE_IS(scene.v_factor)} — `
-      + 'the build refuses the WHOLE SCENE, not just this layer.',
+    diagnosis: `this layer authors a Plane B split while ${VSPLIT_LOCK_SCENE_IS(scene.v_factor)}. `
+      + 'The build refuses the WHOLE SCENE, not just this layer.',
     mechanism: VSPLIT_LOCK_MECHANISM,
     remedies: VSPLIT_LOCK_REMEDIES,
   };
@@ -2737,8 +2737,8 @@ export function sceneVsplitLockAdvisoryParts(
     ? `layer ${guilty[0]} authors a Plane B split`
     : `layers ${guilty.join(', ')} author Plane B splits`;
   return {
-    diagnosis: `${VSPLIT_LOCK_SCENE_IS(scene.v_factor)}, and ${which} `
-      + '— the build refuses this scene.',
+    diagnosis: `${VSPLIT_LOCK_SCENE_IS(scene.v_factor)}, and ${which}. `
+      + 'The build refuses this scene.',
     mechanism: VSPLIT_LOCK_MECHANISM,
     remedies: VSPLIT_LOCK_REMEDIES,
   };
@@ -2879,14 +2879,14 @@ export const BOB_ROW = Object.freeze({
   label: 'Bob',
   amplitudeLabel: 'Sway',
   periodLabel: 'Period',
-  title: 'bob_shift / bob_period — a scene-level vertical sway of the background plane',
+  title: 'bob_shift / bob_period: a scene-level vertical sway of the background plane',
   off: 'none',
   on: 'sway',
-  amplitudeTitle: 'bob_shift — peak excursion of the sway, in pixels. The wire field is an '
+  amplitudeTitle: 'bob_shift: peak excursion of the sway, in pixels. The wire field is an '
     + `INVERSE right-shift (${EFFECTS_BOB_SHIFT_LADDER.min} = ${bobPeakPixels(EFFECTS_BOB_SHIFT_LADDER.min)} px, `
     + `${EFFECTS_BOB_SHIFT_LADDER.max} = ${bobPeakPixels(EFFECTS_BOB_SHIFT_LADDER.max)} px); `
     + 'this list shows the pixels.',
-  periodTitle: 'bob_period — how long one full sway takes. Also an inverse shift: '
+  periodTitle: 'bob_period: how long one full sway takes. Also an inverse shift: '
     + `${EFFECTS_BOB_PERIOD_BOUNDS.min} is the FASTEST, ${EFFECTS_BOB_PERIOD_BOUNDS.max} the slowest.`,
   hint: `off writes no key at all (the contract's default is the no-bob sentinel `
     + `${EFFECTS_BOB_SHIFT_NONE}, never 0)`,
@@ -3034,7 +3034,7 @@ export function setBobShiftCommand(
   const refusal = bobShiftRefusal(shift);
   if (refusal !== null) {
     throw new Error(
-      `setBobShiftCommand: refusing to author bob_shift ${shift} — ${refusal} `
+      `setBobShiftCommand: refusing to author bob_shift ${shift}; ${refusal} `
       + 'Aurora does not clamp this field: the contract\'s off value is '
       + `${EFFECTS_BOB_SHIFT_NONE} and the wire byte's is 0, so a clamp would silently author `
       + 'one end meaning the other. Use bobToggleCommand to turn the bob off.',
@@ -3063,7 +3063,7 @@ export function setBobPeriodCommand(
   const { min, max } = EFFECTS_BOB_PERIOD_BOUNDS;
   if (!Number.isInteger(period) || period < min || period > max) {
     throw new Error(
-      `setBobPeriodCommand: refusing to author bob_period ${period} — the contract admits `
+      `setBobPeriodCommand: refusing to author bob_period ${period}; the contract admits `
       + `${min}..${max}, where ${min} is the FASTEST sway and ${max} the slowest.`,
     );
   }
@@ -3861,13 +3861,13 @@ export {
 export const REELS_ROW = Object.freeze({
   key: 'reels' as const,
   label: 'Reels',
-  title: 'reels — five independently scrolling 64px-wide vertical strips of the BACKGROUND '
+  title: 'reels: five independently scrolling 64px-wide vertical strips of the BACKGROUND '
     + '(the slot-machine reel). DEBUG BUILDS ONLY: '
     + EFFECTS_REELS_DEBUG_NOTE.short,
   none: 'none',
   on: 'five strips',
   /** Off state: absent is absent, and there is no `"none"` spelling to write. */
-  hint: 'off writes no key at all — this key has no "none" spelling, so absent IS off',
+  hint: 'off writes no key at all: this key has no "none" spelling, so absent IS off',
   /** The unit, said where the numbers are typed. Hazard 1, on screen. */
   unitHint: 'signed WHOLE pixels per frame, one strip per row, left to right. Not drift\'s '
     + '1/256 px, and nothing on this path converts anything',
@@ -3916,7 +3916,7 @@ export const REEL_RATE_SEED: readonly number[] = Object.freeze((() => {
       `REEL_RATE_SEED ${JSON.stringify(seed)} contains ${JSON.stringify(stray)}, which is `
       + `either stationary or outside the contract's useful range ${g.min}..${g.max}. A new `
       + 'scene must not be born on a rate the contract itself calls a strobe, and must not be '
-      + 'born all-stationary — that is the one shape a drift-unit error hides in.',
+      + 'born all-stationary: that is the one shape a drift-unit error hides in.',
     );
   }
   return seed;
@@ -3942,13 +3942,13 @@ export function reelRatesValue(scene: Pick<EffectsScene, 'reels'>): readonly num
 /** `x 0–63` … `x 256–319` — the strip's own screen span, as its label. */
 export function reelStripLabel(index: number): string {
   const { min, max } = reelStripScreenX(index);
-  return `x ${min}–${max}`;
+  return `x ${min}..${max}`;
 }
 
 /** One box's title: which strip, which pixels, what the number does. */
 export function reelStripTitle(index: number, rate: number): string {
   const { min, max } = reelStripScreenX(index);
-  return `reels.rates[${index}] — screen X ${min}..${max}, ${EFFECTS_REEL_COLS_PER_BAND} `
+  return `reels.rates[${index}]: screen X ${min}..${max}, ${EFFECTS_REEL_COLS_PER_BAND} `
     + `column-pairs. SIGNED WHOLE PIXELS PER FRAME (${reelCycleLabel(rate)}); the background `
     + 'scrolls down by this much each frame and a negative rate reverses the travel, it does '
     + 'not lift the strip';
@@ -4029,7 +4029,7 @@ export function setReelRateCommand(
   const refusal = reelRateWriteRefusal(existing, index, rate);
   if (refusal !== null) {
     throw new Error(
-      `setReelRateCommand: refusing to author reels.rates[${index}] = ${rate} — ${refusal} `
+      `setReelRateCommand: refusing to author reels.rates[${index}] = ${rate}; ${refusal} `
       + 'Aurora does not clamp this field: the unit is SIGNED WHOLE PIXELS PER FRAME and the '
       + 'likeliest way to land outside the bound is drift.rate\'s x256 export conversion '
       + 'applied here by mistake, so a '
@@ -4143,18 +4143,18 @@ export function reelsBindingAdvisories(
 export const ANCHOR_ROW = Object.freeze({
   key: 'anchor' as const,
   label: 'Anchor',
-  title: 'anchor — the world-anchored band split. The engine splits the band the anchored '
+  title: 'anchor: the world-anchored band split. The engine splits the band the anchored '
     + 'line falls in and overrides BOTH deform shifts in every band from the split DOWN, '
     + 'which is how a waterline treats the plane differently below the surface than above it.',
   /** The toggle's two states. "none" is the schema's own word for the off one. */
   none: EFFECTS_ANCHOR_NONE,
   on: 'at a channel',
   /** Off state: what the absence means, and the other off it is NOT. */
-  hint: 'off writes no anchor at all — the split does not happen. An anchor that splits the '
+  hint: 'off writes no anchor at all: the split does not happen. An anchor that splits the '
     + 'bands and deforms NEITHER plane is a different thing: turn it on and leave both '
     + 'planes off.',
   channelLabel: 'Channel',
-  channelTitle: 'anchor.at.channel — WHICH patch channel carries the world line this scene '
+  channelTitle: 'anchor.at.channel: WHICH patch channel carries the world line this scene '
     + 'splits on. An ordinal, not a shift: it has no off value, and the channel\'s world Y '
     + 'and its motion are authored on the PRESET document (patch_world_ys / patch_motion), '
     + 'not here.',
@@ -4162,7 +4162,7 @@ export const ANCHOR_ROW = Object.freeze({
   planeBLabel: 'Plane B',
   /** Where the two numbers this row does NOT carry actually live. Sec7 packet §4(d). */
   bindingHint: 'the channel\'s world Y and its motion live on the preset (patch_world_ys / '
-    + 'patch_motion), bound by rasterRef — this row picks which channel, not where it sits',
+    + 'patch_motion), bound by rasterRef; this row picks which channel, not where it sits',
 });
 
 /**
@@ -4208,8 +4208,8 @@ export function anchorShiftOptions(field: AnchorShiftField): readonly AnchorShif
   const plane = ANCHOR_SHIFT_PLANE[field];
   const out: AnchorShiftOption[] = [{
     shift: max,
-    label: 'off — no deform',
-    title: `anchor.at.${field} = ${max} — the NO-DEFORM sentinel. ${plane} takes no deform `
+    label: 'off (no deform)',
+    title: `anchor.at.${field} = ${max}: the NO-DEFORM sentinel. ${plane} takes no deform `
       + 'from this anchor at all. It is the TOP of the field\'s range and it means none, '
       + 'which is why it is named here and is not a rung on the ladder below it.',
     off: true,
@@ -4221,8 +4221,8 @@ export function anchorShiftOptions(field: AnchorShiftField): readonly AnchorShif
     const divisor = 2 ** shift;
     out.push({
       shift,
-      label: shift === min ? `÷${divisor} — the whole table` : `÷${divisor}`,
-      title: `anchor.at.${field} = ${shift} — ${plane} deforms by the attached table's sample `
+      label: shift === min ? `÷${divisor} (the whole table)` : `÷${divisor}`,
+      title: `anchor.at.${field} = ${shift}: ${plane} deforms by the attached table's sample `
         + `divided by ${divisor} (the engine's asr.w, i.e. floor division by 2^${shift}). `
         + 'A SMALLER shift is MORE motion. How far that actually moves depends on the '
         + 'table\'s own amplitude, which aeon checks at build time and Aurora does not '
@@ -4264,11 +4264,11 @@ export function anchorChannelOptions(): readonly AnchorChannelOption[] {
     const band = EFFECTS_CHANNEL_BANDS.get(channel);
     out.push({
       channel,
-      label: band === undefined ? `${channel}` : `${channel} — lines ${band.lo}–${band.hi}`,
+      label: band === undefined ? `${channel}` : `${channel}: lines ${band.lo}..${band.hi}`,
       title: band === undefined
         ? `anchor.at.channel = ${channel}. ${EFFECTS_CHANNEL_BANDS_GAME} declares no screen `
           + 'band for this channel, so nothing here can say where its line may sit.'
-        : `anchor.at.channel = ${channel} — ${EFFECTS_CHANNEL_BANDS_GAME} declares its `
+        : `anchor.at.channel = ${channel}: ${EFFECTS_CHANNEL_BANDS_GAME} declares its `
           + `boundary may sit on screen lines ${band.lo}..${band.hi} (${band.lines} lines, `
           + `${band.source}).`,
     });
@@ -4364,10 +4364,10 @@ export function setAnchorChannelCommand(
   const { min, max } = EFFECTS_ANCHOR_CHANNEL_BOUNDS;
   if (!Number.isInteger(channel) || channel < min || channel > max) {
     throw new Error(
-      `setAnchorChannelCommand: refusing to author anchor.at.channel ${channel} — the contract `
+      `setAnchorChannelCommand: refusing to author anchor.at.channel ${channel}; the contract `
       + `admits ${min}..${max}. Aurora does not clamp this field: every value in that range is `
       + 'a REAL channel, so a clamp would silently point the split at a different channel\'s '
-      + 'band rather than at the one asked for. There is no "off" here — turning the anchor '
+      + 'band rather than at the one asked for. There is no "off" here: turning the anchor '
       + 'off is anchorToggleCommand.',
     );
   }
@@ -4404,7 +4404,7 @@ export function setAnchorShiftCommand(
   const { min, max } = EFFECTS_ANCHOR_SHIFT_BOUNDS[field];
   if (!Number.isInteger(shift) || shift < min || shift > max) {
     throw new Error(
-      `setAnchorShiftCommand: refusing to author anchor.at.${field} ${shift} — the contract `
+      `setAnchorShiftCommand: refusing to author anchor.at.${field} ${shift}; the contract `
       + `admits ${min}..${max}, where ${max} is the NO-DEFORM sentinel and ${min} is the `
       + 'LOUDEST setting. Aurora does not clamp this field: a clamp toward the top authors '
       + '"no deform" for a caller who asked for the most, and a clamp toward the bottom '
@@ -4452,7 +4452,7 @@ export function anchorDeformAdvisories(scene: EffectsScene): string[] {
     if (at[field] === EFFECTS_ANCHOR_SHIFT_BOUNDS[field].max) continue;
     if (anyOwn || sceneDeformValue(scene, key) !== null) continue;
     out.push(`the anchor deforms ${plane} (${field} ${at[field]}) but this scene attaches no `
-      + `table it can sample — ${label} is off and no strip attaches its own. The engine `
+      + `table it can sample: ${label} is off and no strip attaches its own. The engine `
       + 'flat-paths a live shift with no table: the build stays green and the plane does not '
       + `move. Attach ${label}, or take ${plane} to off.`);
   }
@@ -4465,7 +4465,7 @@ export function anchorLine(scene: Pick<EffectsScene, 'anchor'>): string | null {
   if (at === null) return null;
   const say = (field: AnchorShiftField): string => {
     const o = anchorShiftOptions(field).find((x) => x.shift === at[field]);
-    return o === undefined ? `${field} ${at[field]}` : o.label.replace(/ —.*$/, '');
+    return o === undefined ? `${field} ${at[field]}` : o.label.replace(/ \(.*\)$/, '');
   };
   return `channel ${at.channel} · A ${say('dsa')} · B ${say('dsb')}`;
 }

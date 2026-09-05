@@ -57,15 +57,15 @@ export function aeonObjectSchema(
   library: readonly ObjectDef[] | undefined,
   currentTypeId: string,
 ): readonly ObjectField[] {
-  const options = (library ?? []).map((d) => ({ value: d.id, label: `${d.id} — ${d.name}` }));
+  const options = (library ?? []).map((d) => ({ value: d.id, label: `${d.id} · ${d.name}` }));
   if (!options.some((o) => o.value === currentTypeId)) {
     options.push({ value: currentTypeId, label: currentTypeId });
   }
   return [
     { kind: 'select', id: 'typeId', label: 'Type', options },
     { kind: 'int', id: 'subtype', label: 'Subtype', min: 0, max: AEON_OBJECT_LIMITS.subtype, hex: true, title: 'Subtype (hex byte)' },
-    { kind: 'int', id: 'x', label: 'X', min: 0, max: AEON_OBJECT_LIMITS.x, title: 'Section-local X (0–$7FF)' },
-    { kind: 'int', id: 'y', label: 'Y', min: 0, max: AEON_OBJECT_LIMITS.y, title: 'Section-local Y (0–$7FF)' },
+    { kind: 'int', id: 'x', label: 'X', min: 0, max: AEON_OBJECT_LIMITS.x, title: 'Section-local X (0 to $7FF)' },
+    { kind: 'int', id: 'y', label: 'Y', min: 0, max: AEON_OBJECT_LIMITS.y, title: 'Section-local Y (0 to $7FF)' },
     // The exporter has always reserved OEF_XFLIP/OEF_YFLIP and never set them,
     // because ObjectPlacement had no fields to set them from. These close that
     // gap rather than inventing a feature.

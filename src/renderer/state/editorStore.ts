@@ -773,7 +773,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (useViewStore.getState().overlays.showSolidBothPlanes) return;
     useViewStore.getState().setOverlay('showSolidBothPlanes', true);
     useToastStore.getState().addToast(
-      'Both-planes lens on — the teal veil marks the cells that are solid on path A AND path B, '
+      'Both-planes lens on: the teal veil marks the cells that are solid on path A AND path B, '
       + 'so you can see the second plane this brush is now writing. Turn it off in View.',
       'info',
     );
@@ -784,7 +784,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (useViewStore.getState().overlays.showCrossover) return;
     useViewStore.getState().setOverlay('showCrossover', true);
     useToastStore.getState().addToast(
-      'Crossover lens on — the amber veil marks the cells that hand the player to the other '
+      'Crossover lens on: the amber veil marks the cells that hand the player to the other '
       + 'collision path. Nothing else on the map depicts them, and a loop painted on one plane '
       + 'only works in one direction. Turn it off in View.',
       'info',
@@ -1005,7 +1005,7 @@ export function executeAmbientCommand(command: AnyCommand, level: S4Level): void
   const docId = commandDocId(command);
   if (!docId) {
     throw new Error(
-      `executeAmbientCommand: no current act — '${command.type}' has no document to record on`,
+      `executeAmbientCommand: no current act; '${command.type}' has no document to record on`,
     );
   }
   const stack = documentHistoryHub.historyFor(docId);

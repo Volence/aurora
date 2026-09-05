@@ -942,7 +942,7 @@ async function main() {
         + 'byte-identical, and the picker\'s line says why (with the full reasoning on the title)',
         rep8.gestures === gest8 + 1 && rep8.kind === 'refused'
         && JSON.stringify(cand8) === JSON.stringify(candPre)
-        && !!label8 && label8.text.startsWith('no range — ')
+        && !!label8 && label8.text.startsWith('no range: ')
         // ⚠ THE REFUSAL'S OWN WORDS, and they moved at 023e0ed9 (2026-09-02).
         // `providers/band-strip-range.ts:206` says "already belong to TILE
         // ANIMATIONS"; this read "already belong to bands", which is the word

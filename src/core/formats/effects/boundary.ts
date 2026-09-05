@@ -140,7 +140,7 @@ function sweepTravel(
       + `and this boundary's band ${b.lo}..${b.hi} is ${band.lines} lines. A sweep wider than its `
       + 'band leaves the band on every cycle: past hi the record is DROPPED and the tint vanishes '
       + 'for those frames; below lo it is clamped up and still drawn. This is an EDITOR-SIDE '
-      + `WARNING, not the refusal — ${GENERATOR} owns it, and it is the check aeon's own note `
+      + `WARNING, not the refusal: ${GENERATOR} owns it, and it is the check aeon's own note `
       + 'says belongs beside _check_patch_context now that both numbers live in one document. '
       + 'Saving is not blocked.',
   };
@@ -175,9 +175,9 @@ function noMotion(preset: Partial<EffectsPreset>, b: EffectsPresetBoundary): Bou
   return {
     rule: 'no-motion',
     advisory: true,
-    enforced_by: 'nothing — this document is legal and builds',
+    enforced_by: 'nothing; this document is legal and builds',
     text: `this boundary follows patch channel ${b.channel}, and this document does not `
-      + `author ${missing.join(' or ')}. That is LEGAL and it BUILDS — and the boundary will `
+      + `author ${missing.join(' or ')}. That is LEGAL and it BUILDS, and the boundary will `
       + `sit still at line ${b.line}. A boundary MOVES only when the same channel index is both `
       + 'SEEDED (patch_world_ys) and SWEPT (patch_motion), in this one document. Nothing anywhere '
       + 'refuses a still boundary, so this note is the only thing that will tell you.',

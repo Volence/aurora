@@ -362,7 +362,7 @@ describe('every advisory reaches the panel carrying who enforces it', () => {
     // not all name the same enforcer, and the one that names NOTHING is the one
     // with no engine check behind it.
     const seed = boundaryAdvisoriesFor(p)[0];
-    expect(boundaryAdvisoryAttribution(seed)).toMatch(/nothing — this document is legal/);
+    expect(boundaryAdvisoryAttribution(seed)).toMatch(/nothing; this document is legal/);
   });
 
   /**

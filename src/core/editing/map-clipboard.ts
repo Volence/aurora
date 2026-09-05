@@ -119,7 +119,7 @@ export function selectionSizeLabel(col: number, row: number, w: number, h: numbe
  *  surface has room for it. Empty string when it is not. */
 export function artOnlyReason(col: number, row: number, w: number, h: number): string {
   if (isBlockAligned(col, row, w, h)) return '';
-  return 'Not block-aligned — collision is stored per 16px block, so this selection is ART ONLY.';
+  return 'Not block-aligned: collision is stored per 16px block, so this selection is ART ONLY.';
 }
 
 /** Snap a tile-coord drag rect, clamped to the section. Corners may arrive in

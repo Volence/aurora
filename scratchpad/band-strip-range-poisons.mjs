@@ -151,7 +151,7 @@ const POISONS = [
     what: 'THE DEFECT THIS HARNESS FOUND: the whole message back on the one line, which wraps '
       + 'the header row and moves the tile grid out from under the cursor',
     file: 'rule',
-    from: "  if (outcome.kind === 'refused') return `no range — ${outcome.reason}`;\n"
+    from: "  if (outcome.kind === 'refused') return `no range: ${outcome.reason}`;\n"
       + '  const end = outcome.staticBase + outcome.cols * outcome.rows;\n'
       + '  return `band ${outcome.staticBase}..${end} · ${outcome.cols}x${outcome.rows}`;',
     to: '  return stripDragHint(outcome);',
@@ -163,7 +163,7 @@ const POISONS = [
     expect: ['8a'],
     note: 'measured: [6h]/[6i] stay GREEN because the CSS half holds a long line to one row, '
       + 'and [6f] stays green because the long form still contains the slots and the geometry. '
-      + 'The row that sees it is [8a] — the refusal loses its `no range — ` lead.',
+      + 'The row that sees it is [8a] — the refusal loses its `no range: ` lead.',
   },
   {
     id: 'header-can-grow',

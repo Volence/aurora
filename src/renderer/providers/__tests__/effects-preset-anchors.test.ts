@@ -583,7 +583,7 @@ describe('a sweep against its channel\'s screen band', () => {
     // 32 px of travel (amp_shift 4) against a 2-line band.
     expect(msg).toContain('32 px of travel');
     expect(msg).toContain('channel 1');
-    expect(msg).toContain(`${band.lo}–${band.hi}`);
+    expect(msg).toContain(`${band.lo} to ${band.hi}`);
     expect(msg).toContain(`${band.lines} lines counted inclusively`);
     expect(msg).toContain(`32 > ${band.lines}`);
     // NO ±1 ANYWHERE. The numbers on screen are the document's own.

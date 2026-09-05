@@ -202,7 +202,7 @@ export function aeonPropertySections(input: AeonPropertiesInput): PropertySectio
           // is wide enough for has to be the part that matters. The id follows
           // in full, for the hover title and the open dropdown.
           ...(dangling !== null
-            ? [{ value: dangling, label: `missing — showing act default (${dangling})` }]
+            ? [{ value: dangling, label: `missing, showing act default (${dangling})` }]
             : []),
           ...input.bgLibrary.map((b) => ({ value: b.id, label: b.name })),
         ],

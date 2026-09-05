@@ -34,8 +34,8 @@ describe('statusContext — who gets to explain the tool', () => {
   const base = { tool: 'select', pasting: false } as const;
 
   it('prefers the port\'s own context over everything', () => {
-    expect(statusContext({ ...base, contextInfo: 'Chunk: 07 — Alt: art only' }))
-      .toBe('Chunk: 07 — Alt: art only');
+    expect(statusContext({ ...base, contextInfo: 'Chunk: 07 · Alt: art only' }))
+      .toBe('Chunk: 07 · Alt: art only');
     // Even when the facet has its own hint line: contextInfo is LIVE state
     // (which chunk is armed), not a restatement of what the tool does.
     expect(statusContext({ ...base, contextInfo: 'Chunk: 07', ownHintLine: true }))

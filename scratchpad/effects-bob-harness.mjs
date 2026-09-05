@@ -182,7 +182,7 @@ async function shot(c, name) {
  * THE SCENE FORM'S ROWS, read structurally.
  *
  * `column-layout`'s `Field` renders `<label-span><control>`; the Scene section is
- * the one whose header text starts "Scene —". Rows are collected with their
+ * the one whose header text starts "Scene:". Rows are collected with their
  * VISIBLE text and, for a `<select>`, its option values and texts — so a row
  * that renders but is hidden contributes nothing an author can see.
  */
@@ -196,7 +196,7 @@ const FORM_PROBE = String.raw`
   };
   const header = [...document.querySelectorAll('div')].filter(isHeader)
     .find(h => /^SCENE\s*—/i.test((h.textContent || '').trim()));
-  if (!header) return { error: 'no "Scene —" section header on screen' };
+  if (!header) return { error: 'no "Scene:" section header on screen' };
   const box = header.parentElement && header.parentElement.parentElement;
   if (!box) return { error: 'the Scene header has no section box' };
   const visible = (el) => {

@@ -123,7 +123,7 @@ export function assertBankCountIsPowerOfTwo(): void {
   if (!Number.isInteger(BGANIM_COARSE_SHIFT) || BGANIM_PHASE_BANKS <= 0) {
     throw new Error(
       `BGANIM_PHASE_BANKS is ${BGANIM_PHASE_BANKS}, which is not a power of two. The runtime ` +
-      'splits a step into fine and coarse halves with `and.w #BGANIM_BANKS-1` and `lsr.w #3` — ' +
+      'splits a step into fine and coarse halves with `and.w #BGANIM_BANKS-1` and `lsr.w #3`: ' +
       'both immediates are only the right lowering for a power-of-two bank count, so a preview ' +
       'built on them would be showing a phase the engine cannot reach.',
     );

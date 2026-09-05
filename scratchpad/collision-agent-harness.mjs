@@ -612,7 +612,7 @@ main().catch((e) => { console.error(e); process.exit(1); });
 //   CHANGE   Invert the resolution ternary in the `isolate-grows-table` refusal
 //            so it hands back the dead-end sentence:
 //                resolution: distinct.every((b) => b < colind.length)
-//                  ? 'Link cannot set every block in this rectangle either — some are past the end of the table. Paint over blocks that are within it.'
+//                  ? 'Link cannot set every block in this rectangle either: some are past the end of the table. Paint over blocks that are within it.'
 //                  : 'Use Link, accepting it changes every use of these blocks zone-wide, or paint a smaller rectangle.',
 //   EXPECT   Every other row still PASSES — nothing else reads `resolution`.
 //            Row 7 FAILS on `res7.startsWith('Use Link')` and on
