@@ -733,7 +733,7 @@ describe('curve / vsplit controls (parcel H)', () => {
   });
 
   // -------------------------------------------------------------------------
-  // EW-INERT-CONTROL-SILENCE — a control the app will not let you use must say
+  // EW-INERT-CONTROL-SILENCE - a control the app will not let you use must say
   // WHY, without being hovered.
   //
   // The cold read of 2026-09-05, finding C5: "one entry of `B curve to` is
@@ -753,7 +753,7 @@ describe('curve / vsplit controls (parcel H)', () => {
     // string it replaced was `engine refuses`, which named no cause at all.
     expect(CURVE_FLAT_MARK).not.toMatch(/engine refuses/);
     expect(CURVE_FLAT_MARK).toMatch(/Plane B/);
-    // An option the engine TAKES is untouched — a marker on every row is a
+    // An option the engine TAKES is untouched - a marker on every row is a
     // marker on none.
     const fine = curveFieldOptions({ fb: 'FACTOR_1_4' }).find((o) => o.value === 'FACTOR_3_8')!;
     expect(refusedOptionLabel(fine)).toBe('FACTOR_3_8');
@@ -788,7 +788,7 @@ describe('curve / vsplit controls (parcel H)', () => {
 
   it("the curve row's PERMANENT sentence names the refused value and why, per layer", () => {
     const hint = curveRowHint({ fb: 'FACTOR_1_4' });
-    // It still carries the row's own constant — the panel renders the
+    // It still carries the row's own constant - the panel renders the
     // derivation and the derivation renders the constant, so there is exactly
     // one copy of the base sentence in the repo.
     expect(hint.startsWith(LAYER_CURVE_ROW.hint)).toBe(true);
@@ -832,7 +832,7 @@ describe('curve / vsplit controls (parcel H)', () => {
     const hint = leftColumnMaskRowHint();
     expect(hint.startsWith(LEFT_COLUMN_MASK_ROW.hint)).toBe(true);
     expect(hint).toMatch(/sprite_mask is greyed/);
-    // The engine's cause, and the way out — both, or the author is told a dead
+    // The engine's cause, and the way out - both, or the author is told a dead
     // end with a reason attached.
     expect(hint).toMatch(/left-column strip emission/);
     expect(hint).toMatch(/factor0_lock or accept/);
@@ -1065,7 +1065,7 @@ describe('layerTopSpace — a locked scene authors screen lines, an unlocked one
     expect(layerCountLine(s)).toMatch(/Remove is off/);
     expect(layerCountLine(s)).toContain(String(EFFECTS_LAYER_COUNT.min));
 
-    // ABOVE THE FLOOR THE CLAUSE IS GONE — it costs a line only where the
+    // ABOVE THE FLOOR THE CLAUSE IS GONE - it costs a line only where the
     // buttons are actually dead, and Remove works everywhere else.
     s.layers.push({ world_y: 32, fa: 'FACTOR_1', fb: 'FACTOR_1' });
     expect(s.layers.length).toBeGreaterThan(EFFECTS_LAYER_COUNT.min);

@@ -2032,8 +2032,8 @@ function BaseSwapBandCard({ library, presetId, index, band, bands, run, lastRefu
       <Field label="Restore" title={BASE_SWAP_FIELD_TITLES.restore_line}>
         <label style={{ display: 'flex', alignItems: 'center', gap: T.s1, fontSize: T.tXs }}>
           {/* DEAD WITH A REASON BESIDE IT (EW-INERT-CONTROL-SILENCE). This box
-              went inert with NO sentence anywhere — not a title, not an aria
-              string, nothing computed — once the ON fire reached the last legal
+              went inert with NO sentence anywhere - not a title, not an aria
+              string, nothing computed - once the ON fire reached the last legal
               line. `newBaseSwapRestoreLineRefusal` is the SAME predicate the
               `disabled` flag reads, so the two cannot disagree. */}
           <input type="checkbox" checked={hasRestore}

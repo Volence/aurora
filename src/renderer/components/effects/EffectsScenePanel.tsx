@@ -1769,7 +1769,7 @@ export default function EffectsScenePanel(): React.ReactElement {
             </Field>
           )}
           {/* AND WHY `sprite_mask` IS DEAD, in the page rather than in a title
-              on a disabled <option> — the one option on this tab that is greyed
+              on a disabled <option> - the one option on this tab that is greyed
               UNCONDITIONALLY, so every author who opens this list meets it. */}
           {leftColumnMaskRowVisible(selected)
             && <Hint under>{leftColumnMaskRowHint()}</Hint>}

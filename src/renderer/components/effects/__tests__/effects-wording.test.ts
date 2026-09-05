@@ -196,7 +196,7 @@ describe('the panels render the constants rather than a second copy of the words
     // three idioms for one idea.
     // ⚠ THE MARKER SAYS WHY NOW, NOT JUST THAT (EW-INERT-CONTROL-SILENCE).
     // It read `(engine refuses)` on every disabled option on this tab, with the
-    // actual reason parked in a `title` — the cold read's C5. `refusedOptionLabel`
+    // actual reason parked in a `title` - the cold read's C5. `refusedOptionLabel`
     // puts the option's OWN short reason in its label; the three pickers share
     // it, so one card still does not carry three idioms for one idea.
     expect(factorField).toMatch(/\{refusedOptionLabel\(o\)\}/);

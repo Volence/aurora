@@ -1147,7 +1147,7 @@ describe('the two asymmetries with ramp reach the author', () => {
 });
 
 // ---------------------------------------------------------------------------
-// EW-INERT-CONTROL-SILENCE — the ONE inert control on this tab whose reason did
+// EW-INERT-CONTROL-SILENCE - the ONE inert control on this tab whose reason did
 // not exist anywhere.
 //
 // The census run for this row swept every disabled/greyed/refused control in
@@ -1158,10 +1158,10 @@ describe('the two asymmetries with ramp reach the author', () => {
 // was not in a title, not in an aria string and not computed at all. Worse than
 // silence, because the only sentence on the card describes the untickable state
 // as the intended one ("That is the shipped single-edge shape, not a missing
-// value") — so the author reads a dead control as a settled choice.
+// value") - so the author reads a dead control as a settled choice.
 // ---------------------------------------------------------------------------
 describe('the restore-line checkbox says why it is dead', () => {
-  it('null while the box is live — a sentence on a working control is noise', () => {
+  it('null while the box is live - a sentence on a working control is noise', () => {
     const band = newBaseSwapBand();
     expect(newBaseSwapRestoreLine(band), 'the seed band must have room').not.toBeNull();
     expect(newBaseSwapRestoreLineRefusal(band)).toBeNull();

@@ -828,7 +828,7 @@ export interface FactorFieldOption extends FactorOption {
   /** The engine's reason, for the option's own title. Empty for a plain value. */
   title: string;
   /**
-   * THE SHORT REASON, IN THE OPTION'S OWN LABEL — see `refusedOptionLabel`.
+   * THE SHORT REASON, IN THE OPTION'S OWN LABEL - see `refusedOptionLabel`.
    * Empty for a value the engine takes. Every disabled option MUST set it;
    * `effects-aeon.test.ts` sweeps all three producers and fails on an empty one.
    */
@@ -935,7 +935,7 @@ export const CURVE_FLAT_MARK = 'same as Plane B, so no ramp';
  *
  * DERIVED FROM THE PICKER, NOT FROM A SECOND COMPARISON. It reads
  * `curveFieldOptions` back, so the sentence under the row and the greyed
- * entries in the list cannot come to name different values — the same rule the
+ * entries in the list cannot come to name different values - the same rule the
  * advisory/option pair already follows through `curveGoesNowhere`.
  *
  * ⚠ A LIST AND NOT ONE VALUE, AND THE REASON IS AN ALIAS. `FACTOR_LOCKED` and
@@ -949,7 +949,7 @@ export const CURVE_FLAT_MARK = 'same as Plane B, so no ramp';
  * triple that no published name claims refuses nothing (there is no option to
  * grey), so there is nothing to explain and `curveRowHint` adds no line.
  * ⚠ A packed triple that DOES equal a published factor still greys that name's
- * whole alias class — the 2026-09-05 alias finding — so "packed means empty" is
+ * whole alias class - the 2026-09-05 alias finding - so "packed means empty" is
  * false and is deliberately not what this says.
  */
 export function curveRefusedFactors(layer: Pick<EffectsLayer, 'fb'>): EffectsFactor[] {
@@ -962,7 +962,7 @@ export function curveRefusedFactors(layer: Pick<EffectsLayer, 'fb'>): EffectsFac
  *
  * `LAYER_CURVE_ROW.hint` is rendered under this row on every layer already, so
  * the refusal rides in an element that costs NO new height in the common case:
- * only the characters it adds can wrap. That was the deciding constraint — the
+ * only the characters it adds can wrap. That was the deciding constraint - the
  * Layers list paints about a card and a half at the shipped geometry, and a new
  * permanent block under every control would have cost more than the silence did.
  *
@@ -975,8 +975,8 @@ export function curveRefusedFactors(layer: Pick<EffectsLayer, 'fb'>): EffectsFac
  * be shown to satisfy that. Both, therefore, and not either.
  *
  * IT NAMES THE VALUE AND IT NAMES THIS LAYER. The refused entry is a DIFFERENT
- * one on each layer — that is precisely what made the cold reader deduce the
- * rule by inspection rather than read it — so a generic sentence would have
+ * one on each layer - that is precisely what made the cold reader deduce the
+ * rule by inspection rather than read it - so a generic sentence would have
  * left the deduction in place. `factorLabel(refused)` is that layer's own `fb`.
  *
  * NOT A REPLACEMENT FOR `curveAdvisory`, which fires only once a document
@@ -1843,7 +1843,7 @@ export const SPRITE_MASK_MARK = 'the engine cannot emit this yet';
  * `sprite_mask` is the one option on this tab that is disabled UNCONDITIONALLY:
  * `leftColumnMaskOptions` greys it for every scene there is, so an author who
  * opens this list always meets a dead entry, and until this parcel its reason
- * existed only in a `title` on a disabled `<option>` — the least reachable
+ * existed only in a `title` on a disabled `<option>` - the least reachable
  * string in the DOM (see `refusedOptionLabel`).
  *
  * NO CONDITION AND NO HEIGHT ARGUMENT NEEDED, unlike the curve row: this whole

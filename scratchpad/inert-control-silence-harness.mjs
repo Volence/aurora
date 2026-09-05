@@ -52,9 +52,9 @@
 //
 //   • THE TEXT IS IN THE DOM AND NOT ON THE SCREEN. `checkVisibility()` and
 //     `getClientRects()` both go GREEN on an element scrolled thousands of
-//     pixels out of its own scroller — measured in this repo. Row [4c]
+//     pixels out of its own scroller - measured in this repo. Row [4c]
 //     therefore compares the element's rect to its NEAREST CLIPPER's box
-//     (`overflow-y` other than visible, OR a real scroll overflow — an
+//     (`overflow-y` other than visible, OR a real scroll overflow - an
 //     overflow:hidden ancestor clips without ever being scrollable, and the
 //     first cut of this walk fell straight through one) and hit-tests its
 //     integer centre with `elementFromPoint`; the trio is PRINTED as evidence
@@ -66,7 +66,7 @@
 //     reading it. Row [5a] drives `fb` to a second named factor IN THE SAME RUN
 //     and requires the sentence to follow it and to stop naming the first.
 //
-//   • THE SENTENCE IS ALWAYS THERE, INCLUDING WHERE THERE IS NOTHING TO SAY —
+//   • THE SENTENCE IS ALWAYS THERE, INCLUDING WHERE THERE IS NOTHING TO SAY -
 //     which would be the height regression this parcel was told to avoid. Row
 //     [5b] drives `fb` to a PACKED triple that NO published name claims (found
 //     by reading aeon's transcribed factor table out of this repo, never
@@ -82,7 +82,7 @@
 //
 // ⚠ NO EMULATOR, EVER. Nothing here runs a ROM and nothing presses Build & Run.
 //
-// CLEANUP IS BY PID — `spawnGuarded` + awaited `killTree`. No `pkill`.
+// CLEANUP IS BY PID - `spawnGuarded` + awaited `killTree`. No `pkill`.
 //
 // RUN:
 //   VITE_AURORA_DEBUG=1 npx electron-vite build
@@ -104,7 +104,7 @@ import { runTarget, announceRunRoot } from './lib/run-root.mjs';
 const PORT = Number(process.env.PORT ?? 9462);
 const DISPLAY_NUM = Number(process.env.DISPLAY_NUM ?? 92);
 const ROOT = AURORA_DIR;
-// WHICH BUILT TREE THIS RUNS AGAINST (O72) — a linked worktree has no dist/ of
+// WHICH BUILT TREE THIS RUNS AGAINST (O72) - a linked worktree has no dist/ of
 // its own until it is built, and `announceRunRoot` says BORROWED when the tree
 // carrying the build is not this one. A BORROWED run measures someone else's
 // code and must not be read as a verdict on this branch.
@@ -114,7 +114,7 @@ const MAIN = RUN.main;
 const AEONDIR = checkoutOverride('aeon')?.value;
 if (!AEONDIR) throw new Error('AEON_DIR must point at a WRITABLE COPY of an aeon project');
 if (AEONDIR.startsWith(siblingDefaultPathOrUnresolved('aeon'))) {
-  throw new Error('AEON_DIR points at aeon itself — never run a harness against that tree');
+  throw new Error('AEON_DIR points at aeon itself - never run a harness against that tree');
 }
 const SHOTS = `${ROOT}/scratchpad/shots-inert-control-silence`;
 mkdirSync(SHOTS, { recursive: true });
@@ -128,7 +128,7 @@ const FB_A = process.env.FB_A ?? 'FACTOR_1_4';
 const FB_B = process.env.FB_B ?? 'FACTOR_3_8';
 
 // ---------------------------------------------------------------------------
-// THE PACKED TRIPLE NO PUBLISHED NAME CLAIMS — DERIVED, NEVER TYPED.
+// THE PACKED TRIPLE NO PUBLISHED NAME CLAIMS - DERIVED, NEVER TYPED.
 //
 // A typed triple goes quietly vacuous the day aeon publishes a name for it, and
 // row [5b] would then be measuring the WRONG state while still printing PASS.
@@ -141,7 +141,7 @@ function unpublishedTriple() {
   const src = readFileSync(`${ROOT}/src/core/formats/effects/factor-decode.ts`, 'utf8');
   const rows = [...src.matchAll(/FACTOR_[A-Z0-9_]+:\s*Object\.freeze\(\{\s*s1:\s*(\d+),\s*s2:\s*(\d+),\s*op:\s*(\d+)\s*\}\)/g)];
   if (rows.length < 10) {
-    throw new Error(`factor-decode.ts yielded only ${rows.length} published triples — the parse rotted`);
+    throw new Error(`factor-decode.ts yielded only ${rows.length} published triples - the parse rotted`);
   }
   const pack = (s1, s2, op) => ((op & 1) << 8) | ((s2 & 15) << 4) | (s1 & 15);
   const published = new Set(rows.map((m) => pack(+m[1], +m[2], +m[3])));
@@ -152,7 +152,7 @@ function unpublishedTriple() {
       }
     }
   }
-  throw new Error('every 9-bit triple is a published factor — row 5b cannot be measured');
+  throw new Error('every 9-bit triple is a published factor - row 5b cannot be measured');
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -211,7 +211,7 @@ function check(id, name, ok, detail) {
   if (!ok) fails.push(`[${id}] ${name}`);
 }
 
-// `\b`, NEVER `$` — the live title carries an explanatory suffix, and five
+// `\b`, NEVER `$` - the live title carries an explanatory suffix, and five
 // selectors in a sibling harness were caught matching nothing by end-anchoring.
 const CURVE_SEL = (i) => (PLANT === 'rot-selector'
   ? `/^Layer ${i} curve\\.to$/`
@@ -266,7 +266,7 @@ const EXPAND_SECTION = (titleRe, openProbe) => String.raw`
 
 // ---------------------------------------------------------------------------
 // THE READER. It finds a LEAF element (no element children) whose own rendered
-// text matches, then measures it against its NEAREST SCROLLER — never against
+// text matches, then measures it against its NEAREST SCROLLER - never against
 // the window, because a rect inside a window is exactly what an element
 // scrolled out of its own pane still has.
 // ---------------------------------------------------------------------------
@@ -309,7 +309,7 @@ const READ_PAINTED = (re) => String.raw`
                      scrollTop: Math.round(sc.scrollTop) }
       : { top: 0, bottom: window.innerHeight, note: 'no clipper: measured against the window' },
     insideScroller, hitPoint: [cx, cy], hitIsUs,
-    // EVIDENCE, NEVER THE GATE — both of these go green on an element scrolled
+    // EVIDENCE, NEVER THE GATE - both of these go green on an element scrolled
     // thousands of pixels out of its scroller.
     evidence: { checkVisibility: typeof el.checkVisibility === 'function' ? el.checkVisibility() : null,
                 clientRects: el.getClientRects().length },
@@ -352,7 +352,7 @@ async function main() {
     const haveDbg = await waitDbg();
     check('0a', 'window.__dbg exists (this is a VITE_AURORA_DEBUG=1 build)', haveDbg,
       haveDbg ? undefined : 'rebuild with VITE_AURORA_DEBUG=1 npx electron-vite build');
-    if (!haveDbg) throw new Error('no __dbg — nothing below can be measured');
+    if (!haveDbg) throw new Error('no __dbg - nothing below can be measured');
 
     await c.evalExpr('localStorage.clear()');
     await c.send('Page.reload');
@@ -370,7 +370,7 @@ async function main() {
     }
     check('1a', 'the COPIED aeon project is open, with sections',
       !!(st && st.open && st.sections > 0), JSON.stringify(st));
-    if (!st || !st.open) throw new Error('project did not open — nothing below can be measured');
+    if (!st || !st.open) throw new Error('project did not open - nothing below can be measured');
 
     await sleep(2500);
     const clicked = await c.evalExpr(clickByText('/^Effects$/'));
@@ -429,8 +429,8 @@ async function main() {
       })()`);
     check('3a', 'the curve picker was FOUND and holds a full option list',
       curve !== null && Array.isArray(curve.options) && curve.options.length > 3,
-      curve === null ? 'NO ELEMENT MATCHED — selector rot' : `${curve.options.length} options`);
-    if (curve === null) throw new Error('curve picker not found — rows 3b..7a cannot be measured');
+      curve === null ? 'NO ELEMENT MATCHED - selector rot' : `${curve.options.length} options`);
+    if (curve === null) throw new Error('curve picker not found - rows 3b..7a cannot be measured');
 
     const dead = curve.options.filter((o) => o.disabled);
     check('3b', `exactly the layer's own fb is dead, and it is still OFFERED (never dropped)`,
@@ -457,7 +457,7 @@ async function main() {
     const painted = await c.json(READ_PAINTED(`/is greyed/`));
     check('4a', 'a sentence about the refusal is rendered in the page at all',
       painted.found === true, `matches=${painted.count} text=${JSON.stringify(painted.text ?? null)}`);
-    if (!painted.found) throw new Error('no painted sentence — rows 4b..5c cannot be measured');
+    if (!painted.found) throw new Error('no painted sentence - rows 4b..5c cannot be measured');
 
     check('4b', "it names THIS layer's refused value and gives the engine's reason",
       painted.text.includes(FB_A)
@@ -478,7 +478,7 @@ async function main() {
 
     check('4d', "it is the ROW's permanent hint, not curveAdvisory wearing its clothes",
       painted.text.startsWith("Plane B speed ramps from fb at this strip's top"),
-      `starts: ${JSON.stringify(painted.text.slice(0, 80))} — and the document still carries no curve (2c)`);
+      `starts: ${JSON.stringify(painted.text.slice(0, 80))} - and the document still carries no curve (2c)`);
 
     // ---- 5. Controls, in the SAME run. -----------------------------------
     await c.evalExpr(SET_SELECT(FB_SEL(0), FB_B));
@@ -495,7 +495,7 @@ async function main() {
 
     // A PACKED TRIPLE NO NAME CLAIMS: the picker refuses nothing there, so the
     // clause must be gone. This is the structural gate under the height
-    // argument — "it costs height only when there is something to say".
+    // argument - "it costs height only when there is something to say".
     await c.evalExpr(SET_SELECT(FB_SEL(0), '__packed__'));
     await sleep(500);
     const spun = await c.json(String.raw`

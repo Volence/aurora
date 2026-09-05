@@ -4715,7 +4715,7 @@ export function newBaseSwapRestoreLine(band: EffectsPresetBaseSwapBand): number 
  * (EW-INERT-CONTROL-SILENCE, the census row with NO reason computed at all).
  *
  * This was the only inert control found on the Effects tab whose reason did not
- * exist anywhere — not in a `title`, not in an `aria-*`, not in a Hint. The box
+ * exist anywhere - not in a `title`, not in an `aria-*`, not in a Hint. The box
  * simply stopped responding once the ON fire reached the last legal line, and
  * the only sentence on the card ("No restore line: this band runs to the bottom
  * of the display ... not a missing value") reads as a description of a CHOICE,
@@ -4724,7 +4724,7 @@ export function newBaseSwapRestoreLine(band: EffectsPresetBaseSwapBand): number 
  *
  * SAME PREDICATE AS THE COMMAND. `newBaseSwapRestoreLine` returning null is
  * what makes the box inert, and it is what this reads, so the greyed control
- * and the sentence cannot disagree — the idiom the Add and Remove buttons on
+ * and the sentence cannot disagree - the idiom the Add and Remove buttons on
  * this panel already follow.
  *
  * IT NAMES THE WAY OUT. The bound is on the OFF fire, and the only thing an
