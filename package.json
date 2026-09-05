@@ -92,6 +92,7 @@
     "harness:chunk-links": "node scratchpad/chunk-links-harness.mjs",
     "harness:chunkgrid-hint": "node scratchpad/chunkgrid-hint-harness.mjs",
     "harness:classic-playtest": "node scratchpad/classic-playtest-harness.mjs",
+    "harness:coldread-fixes": "node scratchpad/coldread-fixes-harness.mjs",
     "harness:collision-agent": "node scratchpad/collision-agent-harness.mjs",
     "harness:collision-destructive": "node scratchpad/collision-destructive-harness.mjs",
     "harness:collision-edit": "node scratchpad/collision-edit-harness.mjs",

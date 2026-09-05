@@ -1280,6 +1280,15 @@ function BandCard({
   // stale advice about a value the author has moved on from.
   const [edgeRefusal, setEdgeRefusal] =
     React.useState<{ top: string | null; bot: string | null }>({ top: null, bot: null });
+  /**
+   * Was the click now in flight the one that BROUGHT focus to `colours`?
+   *
+   * A ref and not state: it is written in `onMouseDown` and read in the
+   * `onMouseUp` of the same gesture, and a re-render between them would be a
+   * render per click for a fact nothing draws. See the `colours` input for why
+   * a text box needs this and its three number siblings do not.
+   */
+  const selectAllOnMouseUp = React.useRef(false);
 
   return (
     <Card>
@@ -1402,8 +1411,49 @@ function BandCard({
         <>
           <Field label="colours" title={armFieldTitle('cram', 'colours')}>
             <input
+              type="text"
+              title={armFieldTitle('cram', 'colours')}
               value={coloursText ?? band.on.cram.colours.join(' ')}
               placeholder="14 3584"
+              // ⚠ SELECT ON FOCUS — the other half of the cold read's C7, and
+              // the SAME defect `NumberField` already fixed for its own boxes.
+              // This is the one control in the column that is a TEXT input: it
+              // sits between three `<input type=number>` siblings, looks
+              // identical to them, and behaved differently, because a number
+              // input is browser-selected on click and this one put the caret
+              // where the pointer landed and APPENDED. Measured by the cold
+              // reader: default `0`, clicked, typed `14` -> `014`; clicked
+              // again, typed `3584` -> `0143584`. The in-app guide promises the
+              // opposite in as many words ("Clicking a number box also selects
+              // what is in it, so clicking Top and typing 40 gives 40, not
+              // 40112"), and that promise was true of Top, Bot and addr and
+              // false of exactly this box.
+              //
+              // It also carried NO `type` and NO `title` while all three
+              // siblings had both — so it was invisible to any harness looking
+              // for `input[type=text]` with a title, which is how it stayed
+              // unexamined. Both are supplied now.
+              //
+              // ⚠⚠ `onFocus={select()}` ALONE IS NOT ENOUGH ON A TEXT INPUT, and
+              // this was measured rather than reasoned about: with only that,
+              // a real `Input.dispatchMouseEvent` press/release left
+              // `selectionStart/End` at `2/2` on a value of "14" — the browser
+              // places the caret on MOUSE-UP, which happens after focus and
+              // undoes the selection. `NumberField` gets away with the same one
+              // line because a `type=number` box is browser-selected anyway.
+              // So the mouse-up is prevented, once, and only for the click that
+              // BROUGHT focus here — a second click still places a caret, so
+              // editing one token of a long list is not taken away.
+              onFocus={(e) => e.currentTarget.select()}
+              onMouseDown={(e) => {
+                selectAllOnMouseUp.current = document.activeElement !== e.currentTarget;
+              }}
+              onMouseUp={(e) => {
+                if (!selectAllOnMouseUp.current) return;
+                selectAllOnMouseUp.current = false;
+                e.preventDefault();
+                e.currentTarget.select();
+              }}
               onChange={(e) => {
                 setColoursText(e.target.value);
                 const parsed = parseColours(
