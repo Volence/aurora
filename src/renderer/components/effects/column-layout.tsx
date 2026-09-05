@@ -204,6 +204,40 @@ export function Hint({ children, under = false, tone, style }: {
     <div style={{
       ...(tone === 'warning' ? WARN : NOTE),
       marginBottom: T.s2,
+      // ⚠ A HINT MUST NOT BE ABLE TO WIDEN THE COLUMN (cold read 2026-09-05,
+      // C9). These sentences are full of `<code>` PATHS and generated symbol
+      // names, and a path has no break opportunity. Measured in the running app
+      // (`npm run harness:coldread-fixes` row 9a, 1400x872, dpr 1):
+      // `data/editor/effects/presets/aurora_ramp_witness.json` rendered 286px
+      // inside a 284px scrollport and pushed the panel's scrollWidth to 294 —
+      // TEN PIXELS of horizontal scroll on a column whose sticky section strip
+      // lives inside the same scroller. Ten pixels is enough to carry the
+      // strip's ✓/✗ off the left edge: the two glyphs the strip exists to
+      // publish, on a strip the in-app guide calls "always there, never
+      // scrolls".
+      //
+      // ⚠⚠ IT IS NOT WHAT THE COLD READ BLAMED, and the difference is worth
+      // keeping. That report attributed the 10px to the `cycles` <select>
+      // ("294px wide because its widest option is …"). The select measures
+      // 200px; the overflow is a `<code>` in the hint beneath it, found by the
+      // harness's deepest-overflowing-node scan. The remedy is the same size
+      // either way — but the width also scales with the PRESET ID, so the
+      // defect appears and disappears as you select different presets, which is
+      // how a first attempt at this fix measured itself green while doing
+      // nothing (a short-id preset was selected and there was no overflow to
+      // remove). Row 9a now selects the LONGEST id on purpose.
+      //
+      // ⚠ AND THIS FILE'S "deliberately no `overflowWrap`" RULE IS ABOUT THE
+      // LABEL, NOT THIS. See the docblock's zero-sum section: a LABEL that is
+      // too wide must overflow visibly rather than split mid-word, and
+      // `label-column-align.test.ts` pins that. A `Hint` is prose, is not in
+      // that column, and is pinned by nothing there — so wrapping it breaks no
+      // rule this file holds. `anywhere` and not `break-word`, because
+      // `break-word` still refuses to break a single unbreakable token when it
+      // is the only thing on the line, which is this case exactly; and unlike
+      // `break-all` it only breaks when a word would otherwise overflow, so
+      // ordinary prose wraps at its spaces as before.
+      overflowWrap: 'anywhere',
       ...(under ? { marginLeft: CONTROL_INSET } : {}),
       ...style,
     }}>{children}</div>

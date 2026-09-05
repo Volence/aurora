@@ -75,7 +75,8 @@ import { useEditorStore } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import {
   sectionRasterState, sectionRasterAdvisory, rasterChooserName, sectionWiringConditions,
-  threadedSections, ownPresetSections, type WiringCondition,
+  threadedSections, ownPresetSections, sectionExtraChannelsCondition, extraChannelsAdvisory,
+  type WiringCondition,
 } from '../../../core/formats/effects/section-wiring';
 
 /**
@@ -138,10 +139,25 @@ export default function SectionPicker({ children }: {
   const state = sectionRasterState(act.rasterWiring, activeSectionIndex);
   const advisory = sectionRasterAdvisory(act.rasterWiring, activeSectionIndex, chooser);
 
-  // THE TWO CONDITIONS, APART. Not one chip: which of the two a section fails
-  // decides whether the author asks for a preset split or for one line of aeon,
-  // and a single word cannot say which. See section-wiring.ts.
+  // THE THREE CONDITIONS, APART. Not one chip: which of the three a section
+  // fails decides whether the author asks for a preset split, for one line of
+  // aeon on the raster chooser, or for one line on a DIFFERENT chooser — and a
+  // single word cannot say which. See section-wiring.ts.
   const cond = sectionWiringConditions(act.rasterWiring, activeSectionIndex, chooser);
+
+  // CONDITION 3 IS ABOUT A PAIR — this section AND the document it binds today
+  // — because which choosers a section owes is a function of that document's
+  // KEYS (aeon `effects_gen.document_channels`). The cold read's D-A: section 5
+  // showed ✓✓ and the build still refused, because the preset it bound carried
+  // `cycles` and nothing threads `ojz_act1_sec_cycle(sec: 5)`.
+  const boundPreset = section?.rasterRef ?? null;
+  const boundDoc = boundPreset === null ? null
+    : (useProjectStore.getState().project?.effectsPresets.presets
+        .find((p) => p.id === boundPreset) ?? null);
+  const extra = sectionExtraChannelsCondition(
+    act.rasterWiring, activeSectionIndex, boundDoc, zoneId, act.id, boundPreset);
+  const extraAdvisory = extraChannelsAdvisory(
+    extra.gaps, activeSectionIndex, boundPreset, act.rasterWiring.bindings[activeSectionIndex]);
 
   // Derived, per act, from aeon's own files — never a list in this repository.
   // ⚠ EACH SET IS DERIVED FROM ITS OWN CONDITION. `eligibleSections` folds in
@@ -205,21 +221,36 @@ export default function SectionPicker({ children }: {
           )}
         </div>
 
-        {/* THE TWO CONDITIONS, SEPARATELY AND NEVER COLLAPSED. Both carry the
-            full advisory on `title`, so the paragraph below is context and not
-            the only place the reason exists. */}
+        {/* THE THREE CONDITIONS, SEPARATELY AND NEVER COLLAPSED. Each carries
+            its own full advisory on `title`, so the paragraphs below are context
+            and not the only place the reason exists.
+
+            ⚠ THE THIRD ROW EXISTS BECAUSE THE FIRST TWO WERE A LIE TOGETHER.
+            ✓✓ read as "you can bind a raster band here" and the build refused
+            anyway the moment the bound preset also carried `cycles` — the cold
+            read's D-A. Three rows is more surface on a panel already called
+            confusing, and that cost was weighed: a verdict that is wrong is
+            worse than a verdict that is long. */}
         <ConditionRow n={1} label="own preset" cond={cond.ownPreset}
-          title={`CONDITION 1 of 2 — a section can carry an editor-authored raster band only if it `
+          title={`CONDITION 1 of 3 — a section can carry an editor-authored raster band only if it `
             + `binds a preset record NO OTHER SECTION binds. Threading a section-keyed band into a `
             + `shared record would give every section that shares it the same band, and aeon's `
             + `build refuses that by name. Read from the act descriptor on every load.`
             + (advisory ? `\n\n${advisory}` : '')} />
         <ConditionRow n={2} label="threaded" cond={cond.threaded}
-          title={`CONDITION 2 of 2 — some preset() in the game's effects library must actually pass `
+          title={`CONDITION 2 of 3 — some preset() in the game's effects library must actually pass `
             + `${chooser}(sec: N) to its raster: channel. Without it the generator emits the binding `
             + `row and nothing reads it, which presents to the author as an assignment that did `
             + `nothing. That is one line in aeon. Read from the effects library on every load.`
             + (advisory ? `\n\n${advisory}` : '')} />
+        <ConditionRow n={3} label="its channels" cond={extra}
+          title={`CONDITION 3 of 3 — one rasterRef binds the WHOLE preset document (aeon ruling Q1), `
+            + `so every OTHER key it carries — cycles, variants, patch_world_ys, patch_motion — owes `
+            + `its OWN generated chooser at this section's preset(), beside the raster one. This row `
+            + `is about the document bound here TODAY: change the binding and it re-derives. `
+            + `Conditions 1 and 2 can both be ✓ and this one ✗, which is exactly the case that `
+            + `reached a build error after Aurora had said yes.`
+            + (extraAdvisory ? `\n\n${extraAdvisory}` : '')} />
 
         {/* THE SETS, NOT A SENTENCE ABOUT THE SETS — and the same two facts the
             two rows above state, act-wide. Which sections can carry a raster
@@ -251,6 +282,23 @@ export default function SectionPicker({ children }: {
           style={{ padding: `${T.s2} ${T.s3} 0` }}>
           <Hint tone={state === 'unknown' ? undefined : 'warning'} style={{ marginBottom: T.s2 }}>
             {advisory}
+          </Hint>
+        </div>
+      )}
+
+      {/* CONDITION 3'S REMEDY, IN ITS OWN PARAGRAPH AND NOT APPENDED TO THE ONE
+          ABOVE. The two are about different things and can both be live: the
+          first says what is wrong with the SECTION, this says what is missing
+          for the DOCUMENT bound to it, and it spells the exact `preset()`
+          argument to write — copied from aeon's own `prescription`, whose rule
+          is that a gate must never prescribe a spelling nobody can write.
+          `whiteSpace: pre-wrap` because the remedy is a bulleted list and a
+          collapsed one runs the chooser calls together. */}
+      {extraAdvisory !== null && (
+        <div data-effects-section-channel-advisory=""
+          style={{ padding: `${T.s2} ${T.s3} 0` }}>
+          <Hint tone="warning" style={{ marginBottom: T.s2, whiteSpace: 'pre-wrap' }}>
+            {extraAdvisory}
           </Hint>
         </div>
       )}

@@ -48,6 +48,66 @@ function numberFieldText(value: number): string {
 }
 
 /**
+ * A REFUSAL THAT CANNOT READ AS "NOTHING CHANGED" (cold read 2026-09-05, C8).
+ *
+ * ═══ THE DEFECT ═══
+ *
+ * With `Top = 40`, the cold reader clicked Top and typed `250`. The panel said:
+ *
+ *   > Top: 250 is not a screen line — … Refused; **Top is still 25.**
+ *
+ * Note *25*, not *40*. This field commits per keystroke, so `2` and `25` were
+ * each legal on their own and each LANDED; only `250` was refused. The sentence
+ * is literally true and reads to a human as "nothing changed" — while the value
+ * they had actually set is gone, replaced by a prefix of the number they were
+ * halfway through typing. Anyone typing a three-digit line hits it.
+ *
+ * ═══ WHY THE CLAUSE IS BUILT HERE AND NOT IN THE PROVIDER ═══
+ *
+ * ⚠ ONLY THIS COMPONENT KNOWS THE FACT. The provider's `refuse` callback is
+ * handed one number and the document; it cannot tell a refusal that follows a
+ * partial commit from one that follows no commit at all, so a provider-side
+ * sentence would have to be either always-on (and often false — a single
+ * illegal keystroke over a legal value really does change nothing) or invented.
+ * This field knows both halves: what the document held when focus arrived, and
+ * whether IT committed anything since. So the clause is added exactly when it is
+ * true, and is silent otherwise.
+ *
+ * It also lands only on `NumberField` refusals. The same `Refused; X is still N`
+ * shape is produced for `Select`-backed controls in `effects-preset.ts`, where
+ * there is no per-keystroke commit and the sentence would be a lie of its own.
+ *
+ * ═══ WHY NOT COMMIT-ON-BLUR, WHICH WOULD DELETE THE DEFECT ═══
+ *
+ * MEASURED, not assumed — see this file's `NumberField` docblock for the
+ * original argument and `docs/reviews/2026-09-05-coldread-fixes.md` for the
+ * count. 45 usages across 5 files; two of them (`BgAnimBandPanel`'s candidate
+ * fields, which tint `MapViewport` live, and `ObjectInspector`'s X/Y, which move
+ * the marker) depend on the commit landing as you type. And the registered
+ * harness `scratchpad/numberfield-empty-harness.mjs` asserts the property
+ * commit-on-blur would remove, naming it in its own words at check `4a`:
+ *
+ *   > the spinner arrow still moves the value immediately, without blurring …
+ *   > This is the behaviour commit-on-blur would have cost, and the stated
+ *   > reason the parcel did not choose it
+ *
+ * plus four `type()`-then-assert-`commits` rows in `number-field-empty.test.ts`
+ * that never blur. Commit-on-blur lands RED on all of them. A correct narrow fix
+ * beats a broad one that lands red, so the timing is unchanged and the WORDING
+ * is what is fixed.
+ */
+export function refusalWithCommittedDrift(
+  why: string, heldAtFocus: number | null, holdsNow: number, committedSinceFocus: number,
+): string {
+  if (committedSinceFocus === 0) return why;
+  if (heldAtFocus === null || !Number.isFinite(heldAtFocus)) return why;
+  if (heldAtFocus === holdsNow) return why;
+  return `${why} ⚠ AND IT HAS ALREADY MOVED: this box held ${heldAtFocus} when you clicked into `
+    + `it, and now holds ${holdsNow}. It commits on every keystroke, so a shorter number that is `
+    + 'legal on its own lands on the way to a longer one. Retype the whole value, or undo.';
+}
+
+/**
  * A number box that REFUSES an empty one instead of committing a `0` for it.
  *
  * THE CONTRACT: `onChange` fires only for text that holds a finite number. Was
@@ -134,6 +194,13 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
 }) {
   const [text, setText] = React.useState(() => numberFieldText(value));
   const [editing, setEditing] = React.useState(false);
+  // WHAT THE DOCUMENT HELD WHEN FOCUS ARRIVED, and how many values THIS BOX has
+  // landed since — the two halves of `refusalWithCommittedDrift`, and the only
+  // place in the app that can know either. A ref and not state: they are read
+  // inside the very handler that would set them, and a re-render for them would
+  // be a render per keystroke for a fact nothing draws.
+  const focusState = React.useRef<{ held: number | null; commits: number }>(
+    { held: null, commits: 0 });
 
   // Resync from the document — an undo, a drag on the canvas, a different
   // selection — but only when the author is not typing into this box.
@@ -152,17 +219,32 @@ export function NumberField({ value, onChange, min, max, step, title, width = 48
         // which is what every author expects of a small numeric field and what
         // makes the refusal below a backstop rather than a daily obstacle.
         e.currentTarget.select();
+        // The baseline for the drift clause: what the author is about to type
+        // OVER. Reset the counter with it — a second visit to the same box is a
+        // second gesture and must not inherit the first one's commits.
+        focusState.current = { held: value, commits: 0 };
         onRefusal?.(null);
       }}
-      onBlur={() => { setEditing(false); setText(numberFieldText(value)); }}
+      onBlur={() => {
+        setEditing(false);
+        // ⚠ THE COUNTER IS NOT CLEARED HERE, only on the next focus. The refusal
+        // text stays painted after the box snaps back, and it is exactly then
+        // that an author reads it — a clause deleted on blur would vanish at the
+        // moment it is needed.
+        setText(numberFieldText(value));
+      }}
       onChange={(e) => {
         const raw = e.target.value;
         setText(raw);
         const n = parseNumberFieldText(raw);
         if (n === undefined) return;
         const why = refuse?.(n) ?? null;
-        onRefusal?.(why);
-        if (why === null) onChange(n);
+        onRefusal?.(why === null ? null : refusalWithCommittedDrift(
+          why, focusState.current.held, value, focusState.current.commits));
+        if (why === null) {
+          focusState.current.commits += 1;
+          onChange(n);
+        }
       }}
       style={{ ...base, width }} />
   );

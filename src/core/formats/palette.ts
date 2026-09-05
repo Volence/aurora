@@ -107,6 +107,26 @@ export const CRAM_WORD_BYTES = 2;
 /** Lines the Genesis CRAM holds. `buildPalette` below builds exactly this many. */
 export const CRAM_LINE_COUNT = 4;
 
+/**
+ * The largest integer that IS a CRAM word — the entry's own width, derived from
+ * `CRAM_WORD_BYTES` rather than typed as `65535`.
+ *
+ * ⚠ THIS IS THE WIRE TYPE AND NOT A COLOUR RULE, and the difference is the
+ * whole reason it may be asserted anywhere. Which 16-bit words are meaningful
+ * colours is `GENESIS_WORD_MASK`'s question and this repo does not agree with
+ * itself about it (see `sameGenesisColor` below versus
+ * `core/agent/validation.ts`'s `& $F111` check). Whether a number is a word at
+ * all is not in dispute: aeon emits a raster program as `[u16; raster_words(P)]`
+ * with the colours appended into it (`engine/effects/raster_dsl.emp`,
+ * `op_words(Cram) … ++ colours`), and this repo's own existing sentence for a
+ * number that will not fit is "is not a 16-bit word" (`core/agent/validation.ts`).
+ *
+ * ADDED for the effects `colours` box, which validated `Number.isInteger` and
+ * nothing else: a cold reader committed `143584` and the swatch — which MASKS —
+ * painted a plausible green for it (2026-09-05, C7).
+ */
+export const CRAM_WORD_MAX = (1 << (CRAM_WORD_BYTES * 8)) - 1;
+
 /** Where a CRAM byte address lands. */
 export interface CramLocation {
   /** Palette line, 0-based. May be >= CRAM_LINE_COUNT for an address past CRAM. */

@@ -36,7 +36,7 @@ import { parseSectionMeta } from '../../formats/section-meta';
 import { loadEffectsSceneLibrary } from '../../formats/effects/scene';
 import {
   wiringPaths, unknownWiring, descriptorEffectsBindings, libraryRasterChooserCalls,
-  rasterChooserName, type SectionRasterWiring,
+  libraryChannelCalls, rasterChooserName, type SectionRasterWiring,
 } from '../../formats/effects/section-wiring';
 import { loadEffectsPresetLibrary } from '../../formats/effects/preset';
 import { loadBgOverride } from '../../formats/bg-override/bg-override-io';
@@ -524,6 +524,14 @@ async function loadFullProject(
           const libText = new TextDecoder().decode(await fa.read(wiringAt.library));
           const calls = libraryRasterChooserCalls(libText, chooser);
           rasterWiring.threadedBy = calls;
+          // CONDITION 3's evidence, from THIS SAME READ — the other four
+          // choosers a bound document can owe (`cycle`, `variants`, and the two
+          // patch channels). One file, one parse pass, no second I/O: they are
+          // `preset()` records in the very text `libraryRasterChooserCalls`
+          // just split. See section-wiring.ts's CONDITION 3 banner for why the
+          // required set is a function of the DOCUMENT and never a list.
+          rasterWiring.channelThreadedBy =
+            libraryChannelCalls(libText, zoneConfig.id, actConfig.id);
           // ⚠ AN EMPTY CALL MAP IS A REAL ANSWER HERE, unlike an empty binding
           // map. "No preset threads the chooser" is the state every act starts
           // in and is exactly what the advisory needs to say; only a file that

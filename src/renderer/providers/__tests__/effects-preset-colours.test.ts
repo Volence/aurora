@@ -34,7 +34,9 @@ import { join } from 'node:path';
 import {
   addrGloss, colourSwatchTitle, setColourCommand, cramSpanAdvisory,
   setColoursCommand, parseColours, newPreset, bandSubject, CRAM_LINES,
+  cramWordIsPaintable,
 } from '../effects-preset';
+import { validateGenesisColor } from '../../../core/agent/validation';
 import {
   cramLocation, CRAM_LINE_ENTRIES, CRAM_WORD_BYTES, CRAM_LINE_COUNT, fmtGenesisWord,
   decodeGenesisColor, encodeGenesisColor,
@@ -235,6 +237,90 @@ describe('setColourCommand writes ONE entry and leaves the document otherwise id
     const next = after(setColoursCommand(library(cramPreset(74, [0])), ID, 0, [14, 3584]));
     expect((next.bands![0].on as { cram: { colours: number[] } }).cram.colours)
       .toEqual([14, 3584]);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// A WORD THE WIRE CANNOT HOLD (cold read 2026-09-05, C7)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// `parseColours` validated `Number.isInteger` and nothing else, so `143584`
+// committed in silence — and the swatch, whose decode MASKS, painted a plausible
+// green for it. Wrong output that looks like it worked.
+//
+// ⚠ WHAT THE BOUND IS DERIVED FROM, and the derivation is the point of these
+// rows: `CRAM_WORD_MAX` is `(1 << (CRAM_WORD_BYTES * 8)) - 1`, and
+// `CRAM_WORD_BYTES` is the CRAM entry's own width — the same constant
+// `cramLocation` divides by. aeon emits a raster program as
+// `[u16; raster_words(P)]` with the colours appended into it. NOT a literal
+// 65535 anywhere in these rows, so a changed premise moves the assertions with it.
+
+describe('a colour must be a word the wire can hold', () => {
+  const LIMIT = (1 << (CRAM_WORD_BYTES * 8)) - 1;
+
+  it('refuses the cold reader\'s own value, and writes nothing', () => {
+    // `0143584` — reached because the box appends rather than replacing.
+    const r = parseColours('0143584', bandSubject(ID, 0, 'colours'));
+    expect(r.ok).toBe(false);
+    const reason = (r as { ok: false; reason: string }).reason;
+    expect(reason).toContain('143584');
+    expect(reason).toContain('16-bit word');
+    // NAMES WHAT THE DOCUMENT STILL HOLDS — the house rule for every refusal on
+    // this surface, and the one the cold read's C8 is about.
+    expect(reason).toMatch(/document is unchanged/);
+    // …and warns that the swatch is not a second opinion here, because it masks.
+    expect(reason).toMatch(/swatch masks/);
+  });
+
+  it('the bound is the ENTRY WIDTH, checked at both edges — no off-by-one', () => {
+    expect(parseColours(String(LIMIT))).toEqual({ ok: true, colours: [LIMIT] });
+    expect(parseColours(String(LIMIT + 1)).ok).toBe(false);
+    expect(parseColours('0').ok).toBe(true);
+    expect(parseColours('-1').ok).toBe(false);
+    // Hex spelling is the same rule, not a second one.
+    expect(parseColours('0xFFFF')).toEqual({ ok: true, colours: [LIMIT] });
+    expect(parseColours('0x10000').ok).toBe(false);
+  });
+
+  it('one bad word in a list refuses the WHOLE list — a partial write is not a fix', () => {
+    const r = parseColours('14 143584 3584');
+    expect(r.ok).toBe(false);
+    // And a legal list of the same shape still commits, so the row is not vacuous.
+    expect(parseColours('14 3584 14')).toEqual({ ok: true, colours: [14, 3584, 14] });
+  });
+
+  it('the STRICTER grid rule is deliberately NOT applied — sources disagree', () => {
+    // `core/agent/validation.ts` refuses `(word & $F111) !== 0` ("channels must
+    // be even values 0-$E"); `core/formats/palette.ts`'s `sameGenesisColor` says
+    // words differing only outside `GENESIS_WORD_MASK` are THE SAME COLOUR, and
+    // aeon's `stream_cram` bounds nothing about a colour's value at all. A grid
+    // check here would refuse documents aeon's build accepts. This row pins the
+    // CHOICE so a later reader meets the disagreement rather than a silent gap.
+    expect(parseColours('1').ok).toBe(true);       // $0001 — dead bit set
+    expect(parseColours(String(0xFFFF)).ok).toBe(true);
+    expect(validateGenesisColor(1)).not.toBeNull();  // …and the other rule refuses both
+    expect(validateGenesisColor(0xFFFF)).not.toBeNull();
+  });
+
+  it('THE SWATCH AND THE COMMIT AGREE about what is legal', () => {
+    // Two consumers of one rule. `parseColours` blocks the UI path; a document
+    // off disk or from the agent path can still carry an illegal word, and the
+    // swatch must not invent a colour for it (`decodeGenesisColor` masks).
+    expect(cramWordIsPaintable(14)).toBe(true);
+    expect(cramWordIsPaintable(LIMIT)).toBe(true);
+    expect(cramWordIsPaintable(LIMIT + 1)).toBe(false);
+    expect(cramWordIsPaintable(-1)).toBe(false);
+    expect(cramWordIsPaintable(1.5)).toBe(false);
+    // The two functions cannot drift: every value one accepts, the other paints.
+    for (const n of [0, 1, 14, 3584, LIMIT, LIMIT + 1, 143584, -1]) {
+      expect(cramWordIsPaintable(n), `word ${n}`).toBe(parseColours(String(n)).ok);
+    }
+    // …and the title NAMES the abnormal case rather than glossing it, which is
+    // `addrGloss`'s rule one field over.
+    const t = colourSwatchTitle(74, 0, 143584);
+    expect(t).toContain('NOT a CRAM word');
+    expect(t).toMatch(/No swatch is drawn/);
+    expect(t).not.toMatch(/Click to open/);
   });
 });
 
