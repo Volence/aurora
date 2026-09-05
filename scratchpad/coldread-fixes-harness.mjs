@@ -474,7 +474,7 @@ async function main() {
       'longest id');
     note('preset for C9 (longest id)', JSON.stringify(longId));
 
-    const presetOpen = await ensureOpen(String.raw`/^Preset — [a-z_0-9]+$/i`, 'the preset card');
+    const presetOpen = await ensureOpen(String.raw`/^Preset: [a-z_0-9]+$/i`, 'the preset card');
     note('preset card', JSON.stringify(presetOpen));
 
     // ───────────────────────────────────────────────────────────────────────
@@ -492,7 +492,7 @@ async function main() {
     // an ancestor whose scrollWidth exceeds its clientWidth. That walk has no
     // stopping condition when nothing overflows, so it climbed to a 1400px
     // window element and reported "overflow 0" about the wrong box entirely.
-    const cycles = await ensureOpen(String.raw`/— cycles, variants/i`, 'the cycles/variants card');
+    const cycles = await ensureOpen(String.raw`/· cycles, variants/i`, 'the cycles/variants card');
     const cyclesOpened = cycles.ok;
     note('cycles card', JSON.stringify(cycles));
     const scroll = await c.json(String.raw`
@@ -576,7 +576,7 @@ async function main() {
         `no preset in this project carries bands, so neither the colours box nor a band Top was `
         + `reachable and NOTHING below was measured: ${withBands.why}`);
     }
-    await ensureOpen(String.raw`/^Preset — [a-z_0-9]+$/i`, 'the preset card');
+    await ensureOpen(String.raw`/^Preset: [a-z_0-9]+$/i`, 'the preset card');
 
     const COLOURS_BOX = String.raw`
       [...document.querySelectorAll('input')].find((e) =>

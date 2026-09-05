@@ -397,7 +397,7 @@ async function main() {
 
     const topField = (i) =>
       `[...document.querySelectorAll('input[type=number]')].find(e => new RegExp('^Layer ${i} (world_y|Screen line)').test(e.title||''))`;
-    const voField = `[...document.querySelectorAll('input[type=number]')].find(e => /^v_offset — /.test(e.title||''))`;
+    const voField = `[...document.querySelectorAll('input[type=number]')].find(e => /^v_offset: /.test(e.title||''))`;
     const vsplitSel = (i) =>
       `[...document.querySelectorAll('select')].find(e => new RegExp('^Layer ${i} vsplit\\\\.at').test(e.title||''))`;
 
@@ -429,7 +429,7 @@ async function main() {
     const sceneForm = await c.evalExpr(String.raw`
       (() => {
         const has = () => [...document.querySelectorAll('input')]
-          .some((e) => /^v_offset — /.test(e.title || ''));
+          .some((e) => /^v_offset: /.test(e.title || ''));
         if (has()) return 'already-open';
         const hdr = [...document.querySelectorAll('div')]
           .filter((d) => d.style && d.style.cursor === 'pointer'

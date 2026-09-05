@@ -319,7 +319,7 @@ const PAGE_X = 280;
 // each surface additionally carries a SENTINEL read from the STORE — not the
 // DOM — so "is this surface even mounted" is answered by something that cannot
 // be satisfied by whatever happens to be painted.
-const T_SPRITE_ALWAYS = ['Mapping', 'Sprite', 'Open — import a sprite to edit or convert', 'Palette'];
+const T_SPRITE_ALWAYS = ['Mapping', 'Sprite', 'Open (import a sprite to edit or convert)', 'Palette'];
 const T_SPRITE_AEON = ['Export to project', 'Load engine character'];
 // `${zone.toUpperCase()} objects` is data-driven (S1ObjectSection.tsx:93) — the
 // restored act decides the zone, so this one is a matcher rather than a literal.

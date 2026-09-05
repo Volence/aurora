@@ -23,7 +23,7 @@ export default function SpriteBindingRow({
         onChange={(e) => onChange(e.target.value)}
         title="Show this object as a sprite preview on the map"
       >
-        <option value="">— none (box) —</option>
+        <option value="">-- none (box) --</option>
         {options.map((n) => <option key={n} value={n}>{n}</option>)}
       </select>
     </div>

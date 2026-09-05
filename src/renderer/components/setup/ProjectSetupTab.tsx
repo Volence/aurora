@@ -193,7 +193,7 @@ export default function ProjectSetupTab() {
       resetChecks(); // row lights fall back to the fresh report status, not stale live-check colors
       const outcome = await useClassicProjectStore.getState().openDirectory(dir);
       useToastStore.getState().addToast(
-        outcome === 'opened' ? 'Setup applied — project re-validated' : 'Setup written, but re-open failed',
+        outcome === 'opened' ? 'Setup applied: project re-validated' : 'Setup written, but re-open failed',
         outcome === 'opened' ? 'success' : 'error',
       );
     } catch (e) {
@@ -226,7 +226,7 @@ export default function ProjectSetupTab() {
               <div style={styles.issueTitle}>Sidecar issues (.aurora/project.json)</div>
               {sidecar.issues.map((i) => (
                 <div key={i.where} style={styles.issueLine}>
-                  <span style={styles.mono}>{i.where}</span> — {i.message}
+                  <span style={styles.mono}>{i.where}</span>: {i.message}
                 </div>
               ))}
             </div>

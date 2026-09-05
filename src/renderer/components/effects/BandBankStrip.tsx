@@ -84,7 +84,7 @@ export default function BandBankStrip({ doc, band, bandIndex, palette, openBank,
           ))}
           <span onClick={(e) => e.stopPropagation()} title={SHIFT_BUTTON_TITLE}>
             <IconButton icon={<span>{SHIFT_BUTTON_LABEL}</span>}
-              label={`${SHIFT_BUTTON_LABEL}: regenerate banks 1–7`}
+              label={`${SHIFT_BUTTON_LABEL}: regenerate banks 1-7`}
               onClick={onShift} />
           </span>
         </Row>

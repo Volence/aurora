@@ -104,7 +104,7 @@ export default function EffectsToolOptions(): React.ReactElement {
           ? 'Stop compositing the background in the screen frame. The same switch as '
             + 'View > Compose the background in the frame (parallax). Aurora remembers that '
             + 'you turned it off.'
-          : 'Draw the real background per parallax strip, inside the screen frame — the only '
+          : 'Draw the real background per parallax strip, inside the screen frame: the only '
             + 'thing in Aurora that shows what a scene\'s layers do. The same switch as '
             + 'View > Compose the background in the frame (parallax).'}
         onClick={() => toggleParallaxPreview()}>

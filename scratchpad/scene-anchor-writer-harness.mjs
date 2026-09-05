@@ -503,7 +503,7 @@ async function main() {
     // reading it the other way would write up this parcel's own control as
     // never having landed.
     const toggleSel = SEL_BY_TITLE(String.raw`/^anchor —/`);
-    const opened = await openSection(c, String.raw`/^Scene — /`, toggleSel, 'Scene');
+    const opened = await openSection(c, String.raw`/^Scene: /`, toggleSel, 'Scene');
     note('scene section', JSON.stringify(opened));
     await shot(c, '03-scene-section-open');
     const toggle = await c.json(OPTIONS_OF(toggleSel));

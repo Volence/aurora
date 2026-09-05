@@ -480,7 +480,7 @@ async function main() {
 
     const rowsSel = await c.json(String.raw`
       (() => {
-        const s = ${SELECT_BY_TITLE('/rows —/')};
+        const s = ${SELECT_BY_TITLE('/rows:/')};
         return s ? [...s.options].map(o => Number(o.value)) : null;
       })()`);
     // Derived from the contract's TILE_BYTES: rows*TILE_BYTES must be a power of
@@ -501,8 +501,8 @@ async function main() {
     const bands0 = await c.json('window.__dbg.aeon.bands()');
     const hash0 = await c.evalExpr('window.__dbg.aeon.bgOverrideHash()');
     // Set a real geometry through real keystrokes: 2 cols x 1 row.
-    const typedCols = await c.evalExpr(SET_INPUT(INPUT_BY_TITLE('/^cols —/'), 2));
-    const chosenRows = await c.evalExpr(SET_INPUT(SELECT_BY_TITLE('/rows —/'), 1));
+    const typedCols = await c.evalExpr(SET_INPUT(INPUT_BY_TITLE('/^cols:/'), 2));
+    const chosenRows = await c.evalExpr(SET_INPUT(SELECT_BY_TITLE('/rows:/'), 1));
     check('5a', 'the cols field and the rows picker take real input',
       typedCols === 'ok' && chosenRows === 'ok', `cols=${typedCols} rows=${chosenRows}`);
     await sleep(400);

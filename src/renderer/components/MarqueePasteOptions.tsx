@@ -173,7 +173,7 @@ export default function MarqueePasteOptions() {
     // selection under the click — say so rather than failing silently.
     if (!def) {
       useToastStore.getState().addToast(
-        `Can't save a ${m.w}×${m.h}-tile selection as a chunk — chunks are whole 16px `
+        `Can't save a ${m.w}×${m.h}-tile selection as a chunk. Chunks are whole 16px `
         + 'blocks. Select on even tile bounds, or switch the marquee to Block.', 'warning');
       return;
     }
@@ -186,7 +186,7 @@ export default function MarqueePasteOptions() {
     useEditorStore.getState().setSelectedChunkId(def.id);
     useEditorStore.getState().markDirty();
     useToastStore.getState().addToast(
-      `Added "${name}" to chunk library — Save project to keep`, 'success');
+      `Added "${name}" to chunk library. Save project to keep`, 'success');
     setNameInput('');
   }
 
@@ -205,7 +205,7 @@ export default function MarqueePasteOptions() {
             <button key={value} onClick={() => setGranularity(value)}
               title={snapInvert
                 ? `${title}  (Ctrl/Cmd is held, so a drag right now snaps to `
-                  + `${effective} — release it to go back to ${granularity}.)`
+                  + `${effective}; release it to go back to ${granularity}.)`
                 : `${title}  Hold Ctrl/Cmd while dragging to snap the other way.`}
               style={{ ...styles.planeBtn, ...(effective === value ? styles.planeSel : {}) }}>{label}</button>
           ))}
@@ -218,7 +218,7 @@ export default function MarqueePasteOptions() {
           see what he returns to on release. */}
       {!pasting && snapInvert && (
         <div style={styles.overrideLine}>
-          {`Ctrl held — snapping to ${effective === 'block' ? 'blocks (16px, carries collision)' : 'tiles (8px, art only unless it lands even)'}. `}
+          {`Ctrl held: snapping to ${effective === 'block' ? 'blocks (16px, carries collision)' : 'tiles (8px, art only unless it lands even)'}. `}
           {`Release for ${granularity}.`}
         </div>
       )}
@@ -234,7 +234,7 @@ export default function MarqueePasteOptions() {
           return (
             <button key={value} onClick={() => !dead && setPasteLayers(value)} disabled={dead}
               title={dead
-                ? 'No collision to paste — this selection is not block-aligned, and collision '
+                ? 'No collision to paste: this selection is not block-aligned, and collision '
                   + 'is stored per 16px block.'
                 : title}
               style={{
@@ -261,12 +261,12 @@ export default function MarqueePasteOptions() {
             title={flipTarget === 'clipboard'
               ? `Mirror what you are about to paste, ${what}. Shortcut: ${label[0]}`
               : flipTarget === 'selection'
-                ? `Mirror the selected region in place, ${what} — one undo step. `
+                ? `Mirror the selected region in place, ${what}. One undo step. `
                   + `Shortcut: ${label[0]}`
                 : marquee
                   ? 'Flipping a selection in place rewrites the map, so it needs the marquee '
                     + 'tool armed. Pick the marquee tool, or press Ctrl+V to paste and flip that.'
-                  : 'Nothing to flip yet — drag a selection with the marquee tool, or press '
+                  : 'Nothing to flip yet: drag a selection with the marquee tool, or press '
                     + 'Ctrl+V to start a paste and mirror that.'}
             style={{ ...styles.planeBtn, ...(flipTarget === null ? styles.planeDead : {}) }}>
             {label}
@@ -279,7 +279,7 @@ export default function MarqueePasteOptions() {
       {layersLocked && (
         <div style={styles.warnLine}>
           {pasting
-            ? 'Clipboard is art only — it was copied from a selection that is not block-aligned.'
+            ? 'Clipboard is art only: it was copied from a selection that is not block-aligned.'
             : reason}
         </div>
       )}

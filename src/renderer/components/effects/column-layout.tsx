@@ -290,7 +290,7 @@ export function Advisory({ diagnosis, mechanism, remedies, under = false }: {
       <button
         type="button"
         aria-expanded={open}
-        title={`${WHY_THIS_HAPPENS} — the mechanism behind this refusal`}
+        title={`${WHY_THIS_HAPPENS}: the mechanism behind this refusal`}
         onClick={() => setOpen((v) => !v)}
         style={WHY_BUTTON}
       >{open ? '▾' : '▸'} {WHY_THIS_HAPPENS}</button>

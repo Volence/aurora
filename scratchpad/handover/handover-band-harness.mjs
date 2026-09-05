@@ -474,19 +474,19 @@ async function main() {
       + 'is set against below)', !!printedBlob, printedBlob ?? 'no "Blob N/N tiles … free" on screen');
 
     // ── 3. the form: geometry, driver, fill, base — all by real input ──
-    const typedCols = await c.evalExpr(SET_INPUT(INPUT_BY_TITLE('/^cols —/'), COLS));
-    const chosenRows = await c.evalExpr(SET_INPUT(SELECT_BY_TITLE('/rows —/'), ROWS));
-    const typedBase = await c.evalExpr(SET_INPUT(INPUT_BY_TITLE('/^static base —/'), BASE));
+    const typedCols = await c.evalExpr(SET_INPUT(INPUT_BY_TITLE('/^cols:/'), COLS));
+    const chosenRows = await c.evalExpr(SET_INPUT(SELECT_BY_TITLE('/rows:/'), ROWS));
+    const typedBase = await c.evalExpr(SET_INPUT(INPUT_BY_TITLE('/^static base:/'), BASE));
     check('3a', `the form takes ${COLS}x${ROWS} from tile ${BASE}`,
       typedCols === 'ok' && chosenRows === 'ok' && typedBase === 'ok',
       `cols=${typedCols} rows=${chosenRows} base=${typedBase}`);
-    const fillSel = await c.json(`(() => { const el = ${SELECT_BY_TITLE('/phase fill —/')}; `
+    const fillSel = await c.json(`(() => { const el = ${SELECT_BY_TITLE('/phase fill:/')}; `
       + 'return el ? { value: el.value, options: [...el.options].map(o => o.value) } : null; })()');
     check('3b', "the Banks 1–7 selector offers copy/blank/shift and DEFAULTS to 'copy' "
       + '[the default is the INERT one — this is why the run must change it]',
       !!fillSel && fillSel.value === 'copy' && eq([...fillSel.options].sort(), ['blank', 'copy', 'shift']),
       JSON.stringify(fillSel));
-    const pickedFill = await c.evalExpr(SET_INPUT(SELECT_BY_TITLE('/phase fill —/'), 'shift'));
+    const pickedFill = await c.evalExpr(SET_INPUT(SELECT_BY_TITLE('/phase fill:/'), 'shift'));
     const pickedDriver = await c.evalExpr(SET_INPUT(SELECT_BY_TITLE('/Which scalar drives/'), 'timer'));
     await sleep(400);
     const noteText = await c.evalExpr(BODY_TEXT);

@@ -195,7 +195,7 @@ called "make a band"; you make a preset, and it comes with one.
 |---|---|---|
 | `Top` | screen line the colour turns **on** | `40` |
 | `Bot` | screen line it turns **off** again | `72` |
-| `S/H` | shadow/highlight mode | `off — two-fire band` |
+| `S/H` | shadow/highlight mode | `off (two-fire band)` |
 | `ON` | how the colour is written | `cram (raw colours)` |
 | `addr` | **byte** address in CRAM. line × 32 + entry × 2 | `74` = line 2, entry 5 |
 | `colours` | the colour word(s), **in decimal** | `14` |

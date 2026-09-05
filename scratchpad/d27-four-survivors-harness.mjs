@@ -436,7 +436,7 @@ async function main() {
     await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_ID)})`);
     await sleep(900);
     const scenesFix = await ssnap(c);
-    await c.evalExpr(OPEN_SECTION(String.raw`/^Scene — /`,
+    await c.evalExpr(OPEN_SECTION(String.raw`/^Scene: /`,
       `document.querySelector('button[aria-label^="Delete scene "]')`));
     await sleep(900);
     await c.evalExpr(INSTALL_HANDLES);
@@ -529,7 +529,7 @@ async function main() {
     await c.evalExpr(`window.__dbg.aeon.selectPreset(${JSON.stringify(PRESET_ID)})`);
     await sleep(900);
     const presetsFix = await psnap(c);
-    await c.evalExpr(OPEN_SECTION(String.raw`/^Preset — ` + PRESET_ID + String.raw`(?![-a-z0-9_ ])/`,
+    await c.evalExpr(OPEN_SECTION(String.raw`/^Preset: ` + PRESET_ID + String.raw`(?![-a-z0-9_ ])/`,
       `document.querySelector('button[aria-label^="Delete preset "]')`));
     await sleep(900);
     await c.evalExpr(INSTALL_HANDLES);

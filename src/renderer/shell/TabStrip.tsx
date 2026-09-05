@@ -30,7 +30,7 @@ function Tab({ tab, active, dirty }: { tab: TabDescriptor; active: boolean; dirt
     >
       {tab.kind === 'home' && <Icons.IconHome size={13} />}
       <span style={styles.tabTitle}>{tab.title}</span>
-      {dirty && <span style={styles.dot} title="Unsaved changes — Ctrl+S to save" />}
+      {dirty && <span style={styles.dot} title="Unsaved changes. Ctrl+S to save" />}
       {closeable && (
         <span
           onMouseDown={(e) => { e.stopPropagation(); if (e.button === 0) void requestCloseTab(tab.id); }}

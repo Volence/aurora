@@ -550,7 +550,7 @@ async function main() {
     await sleep(1400);
     await c.evalExpr(`window.__dbg.aeon.selectPreset(${JSON.stringify(PRESET_ID)})`);
     await sleep(900);
-    await c.evalExpr(OPEN_SECTION(String.raw`/^Preset — ` + PRESET_ID + String.raw`(?![-a-z0-9_ ])/`,
+    await c.evalExpr(OPEN_SECTION(String.raw`/^Preset: ` + PRESET_ID + String.raw`(?![-a-z0-9_ ])/`,
       `[...document.querySelectorAll('button')].some(b => (b.textContent||'').trim() === 'Add raster band')`));
     await sleep(900);
     await c.evalExpr(INSTALL_HANDLES);

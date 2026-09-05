@@ -108,7 +108,7 @@ export default function ClassicCollisionPanel(): React.ReactElement {
         </>
       )}
       <div style={styles.footer}>
-        The shape is editable here — solidity is still edited on the Chunk tab.
+        The shape is editable here; solidity is still edited on the Chunk tab.
         <br />
         Shading is a floor heightmap only: the Rotated array is enumerated but
         never loaded, so a hack whose Rotated data has drifted from Regular
@@ -133,7 +133,7 @@ function CellSection({ probe }: { probe: CollisionProbe }): React.ReactElement {
       {probe.loopAmbiguous && (
         <div style={styles.warn}>
           This cell loops. While the player is behind the loop, FindNearestTile
-          substitutes chunk {hex(LOOP_ALIAS.to)} for {hex(LOOP_ALIAS.from)} — a
+          substitutes chunk {hex(LOOP_ALIAS.to)} for {hex(LOOP_ALIAS.from)}, a
           runtime fact no editor can see, so the reading above is one of two
           possible answers, and {hex(LOOP_ALIAS.to)} is the other.
         </div>
@@ -147,7 +147,7 @@ function BlockSection({ probe, doc }: { probe: CollisionProbe; doc: LevelDoc }):
     return (
       <div style={styles.section}>
         <div style={styles.heading}>This block</div>
-        <div style={styles.dim}>No chunk here — no block to look up.</div>
+        <div style={styles.dim}>No chunk here: no block to look up.</div>
       </div>
     );
   }
@@ -213,7 +213,7 @@ function ShapePicker({ doc, probe }: { doc: LevelDoc; probe: CollisionProbe }): 
         <Chip
           active={collisionDiverge === 'isolate'}
           onClick={() => setCollisionDiverge('isolate')}
-          title="The new shape applies to this cell only — the block is cloned"
+          title="The new shape applies to this cell only. The block is cloned"
         >Isolate</Chip>
       </div>
       {refusal && <div style={styles.refusal}>{refusal}</div>}
@@ -244,8 +244,8 @@ function ShapeSwatch({ choice, current, onClick }: {
       title={
         `shape ${choice.index}` +
         (choice.usedInZone
-          ? ` — used by ${choice.blocks} block${choice.blocks === 1 ? '' : 's'} in this zone`
-          : ' — not used in this zone yet')
+          ? `, used by ${choice.blocks} block${choice.blocks === 1 ? '' : 's'} in this zone`
+          : ', not used in this zone yet')
       }
       style={{
         ...styles.swatch,
@@ -265,11 +265,11 @@ function ShapeSwatch({ choice, current, onClick }: {
 function reasonText(reason: NonNullable<CollisionProbe['reason']>): string {
   switch (reason) {
     case 'air':
-      return 'Does not collide — no chunk here.';
+      return 'Does not collide: no chunk here.';
     case 'block0':
-      return 'Does not collide — blank block ($00): the engine skips it before checking anything else.';
+      return 'Does not collide: blank block ($00), which the engine skips before checking anything else.';
     case 'solidity':
-      return 'Does not collide — solidity None: the shape is ignored.';
+      return 'Does not collide: solidity None, so the shape is ignored.';
     default:
       return '';
   }

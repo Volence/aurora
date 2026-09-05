@@ -133,7 +133,7 @@ export default function GuideTab({ guide, anchor }: {
         {blocks.map((b, i) => <Block key={i} block={b} />)}
         <div style={styles.footer}>
           This page is <code style={styles.code}>docs/guides/{guide.slug}.md</code> in the project
-          repository — the same file, rendered here.
+          repository: the same file, rendered here.
         </div>
       </div>
     </div>

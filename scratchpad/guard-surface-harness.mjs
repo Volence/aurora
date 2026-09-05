@@ -471,7 +471,7 @@ async function main() {
     // every control below is out of the DOM until this runs. Section state is
     // keyed by section ID, not by scene, so one open covers every scene the
     // rows select afterwards.
-    const opened = await openSection(c, 'Scene — ');
+    const opened = await openSection(c, 'Scene: ');
     note('1e setup', `the Scene form was collapsed on arrival; opening it took the page from `
       + `${opened.before} to ${opened.after} select/input controls`);
     check('2a', 'ANTI-VACUOUS: the panel is drawn for the sprite_mask scene',

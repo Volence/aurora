@@ -240,7 +240,7 @@ const SELECT_BY_TITLE = (re) => `[...document.querySelectorAll('select')].find((
 const INPUT_BY_TITLE = (re) => `[...document.querySelectorAll('input')].find((e) => ${re}.test(e.title || ''))`;
 
 // The rate control's two halves, as the DOM actually holds them.
-const RATE_SELECT = SELECT_BY_TITLE('/rate_shift — HIGHER IS SLOWER/');
+const RATE_SELECT = SELECT_BY_TITLE('/rate_shift: HIGHER IS SLOWER/');
 const RATE_BOX = INPUT_BY_TITLE('/step = driver >>/');
 
 const RATE_UI = String.raw`
@@ -395,8 +395,8 @@ async function main() {
     await shot(c, '1-rate-control-default');
 
     // Geometry small enough to promote repeatedly: 1x1.
-    await c.evalExpr(SET_INPUT(INPUT_BY_TITLE('/^cols —/'), 1));
-    await c.evalExpr(SET_INPUT(SELECT_BY_TITLE('/rows —/'), 1));
+    await c.evalExpr(SET_INPUT(INPUT_BY_TITLE('/^cols:/'), 1));
+    await c.evalExpr(SET_INPUT(SELECT_BY_TITLE('/rows:/'), 1));
     await sleep(300);
 
     const baseBands = await c.json('window.__dbg.aeon.bands()');

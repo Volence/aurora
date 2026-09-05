@@ -243,7 +243,7 @@ export default function NewCanvasDialog({ open, onClose }: { open: boolean; onCl
         </label>
         <div style={styles.hint}>
           The profile chooses which grids are offered and which rules a later
-          check will report — nothing is prevented while you draw.
+          check will report. Nothing is prevented while you draw.
         </div>
 
         {shown && <div style={styles.error}>{shown.reason}</div>}

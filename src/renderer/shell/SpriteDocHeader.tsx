@@ -73,8 +73,8 @@ export default function SpriteDocHeader({ onSave, noDestinationHint }: {
         active={saveFlash}
         disabled={!canSave && !saveFlash}
         title={
-          canSave ? 'Save this document (Ctrl+S) — Save All is Ctrl+Shift+S'
-            : activeDirty ? (noDestinationHint ?? 'This document has no save-back file — export it from the sprite editor')
+          canSave ? 'Save this document (Ctrl+S). Save All is Ctrl+Shift+S'
+            : activeDirty ? (noDestinationHint ?? 'This document has no save-back file. Export it from the sprite editor')
               : 'Nothing to save in this document'
         }
         onClick={async () => {

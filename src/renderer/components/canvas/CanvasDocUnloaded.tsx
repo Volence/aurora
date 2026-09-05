@@ -28,10 +28,10 @@ export default function CanvasDocUnloaded({ tabId, title }: { tabId: string; tit
         <div style={styles.body}>
           This canvas could not be loaded, so the tab has no document. Its files
           are {name ? <code style={styles.code}>.aurora/canvas/{name}.png</code> : 'under .aurora/canvas/'}
-          {' '}and the sidecar beside them — check they are still there and readable.
+          {' '}and the sidecar beside them. Check they are still there and readable.
         </div>
         <button style={styles.button} onClick={() => { void requestFocusTabId(tabId); }}>Retry</button>
-        <div style={styles.hint}>Closing this tab is always safe — nothing is loaded to lose.</div>
+        <div style={styles.hint}>Closing this tab is always safe: nothing is loaded to lose.</div>
       </div>
     </div>
   );

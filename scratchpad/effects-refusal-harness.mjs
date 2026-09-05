@@ -348,14 +348,14 @@ async function main() {
     const TOP_TITLE = 'Screen line the effect turns ON';
     const BOT_TITLE = 'Screen line the effect turns OFF';
     const BAND_PROOF = EDGE_BOX(TOP_TITLE);
-    // ⚠ `(?!\s—)` AND NOT `\b`. A CollapsibleSection's `right` slot runs its
+    // ⚠ `(?!\s·)` AND NOT `\b`. A CollapsibleSection's `right` slot runs its
     // label straight into the title, so this header's textContent is
-    // "Preset — authored_probeDelete" — `\b` finds no boundary between `e` and
+    // "Preset: authored_probeDelete" — `\b` finds no boundary between `e` and
     // `D` and matches nothing. The lookahead is what separates this section
-    // from its sibling "Preset — authored_probe — cycles, variants". Two runs
+    // from its sibling "Preset: authored_probe · cycles, variants". Two runs
     // were paid for exactly this in band-preset-harness; a third here.
     const opened = await c.evalExpr(OPEN_SECTION(
-      String.raw`/^Preset — ` + PRESET_ID + String.raw`(?!\s—)/`, BAND_PROOF));
+      String.raw`/^Preset: ` + PRESET_ID + String.raw`(?!\s·)/`, BAND_PROOF));
     await sleep(900);
 
     // ---- 2. THE CONTROL, AND THE STATE BEFORE ANYTHING IS TYPED. ---------

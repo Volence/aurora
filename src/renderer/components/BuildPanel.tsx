@@ -72,7 +72,7 @@ export default function BuildPanel(): React.ReactElement | null {
           // invisible in the build's own output when it runs inside a GUI app:
           // a desktop-launched Electron inherits none of a terminal's exports.
           <span style={styles.env}>
-            missing environment: {missingEnv.join(', ')} — set them in project.json under
+            missing environment: {missingEnv.join(', ')}. Set them in project.json under
             {' '}<code style={styles.code}>buildEnv</code>, or launch Aurora from a shell that exports them
           </span>
         )}

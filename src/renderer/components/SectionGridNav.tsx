@@ -178,9 +178,9 @@ export default function SectionGridNav() {
                 ...(dragOver === i ? styles.dropTarget : {}),
               }}
               title={isNull
-                ? 'Empty slot — click to add a section here · right-click to paste'
+                ? 'Empty slot · click to add a section here · right-click to paste'
                 : bgDangling
-                  ? `BG: ${bgDangling} — MISSING from the library, showing the act default · double-click to jump · drag to move · right-click for menu`
+                  ? `BG: ${bgDangling} is MISSING from the library, showing the act default · double-click to jump · drag to move · right-click for menu`
                   : bgName
                     ? `BG: ${bgName} · double-click to jump · drag to move · right-click for menu`
                     : 'Double-click to jump · drag to move · right-click for menu'}

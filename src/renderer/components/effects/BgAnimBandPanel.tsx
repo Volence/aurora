@@ -442,7 +442,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
         {state !== null && state.unreadable === null && doc === null && (
           <Hint style={{ marginBottom: 0 }}>
             This project has no <code>editor_bg_override.json</code>. Tile animations live in that
-            document, which also carries the Plane B layout and its tile blob — there is nothing to
+            document, which also carries the Plane B layout and its tile blob. There is nothing to
             animate until it exists.
           </Hint>
         )}
@@ -457,7 +457,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
           <Hint>
             No tile animations yet. A tile animation declares a contiguous range of the
             background&apos;s tile blob animated: its slots become a prefix of <code>tiles</code>
-            and the runtime shifts them along its own axis — left, or up if it is vertical.
+            and the runtime shifts them along its own axis: left, or up if it is vertical.
             Promote a static range below.
           </Hint>
         )}
@@ -474,7 +474,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
             per-band lines below it are the ones whose CONTENT differs per band:
             geometry, slots, driver, resolved rate, verdict. */}
         {doc !== null && rows.length > 0 && (
-          <Hint>lossless — Demote keeps the art, it just stops animating</Hint>
+          <Hint>lossless: Demote keeps the art, it just stops animating</Hint>
         )}
 
         {rows.map((b) => {
@@ -496,7 +496,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
             title={lit
               ? 'The map is tinting every background cell this tile animation paints. Click a card or a '
                 + 'cell to move the lens.'
-              : 'Show this tile animation on the map — every background cell its slots paint.'}
+              : 'Show this tile animation on the map: every background cell its slots paint.'}
             onClick={() => setLensTarget({ kind: 'band', index: b.index })}>
             <Field label={`Tile animation ${b.index}`}>
               <span style={{ fontSize: T.tSm, color: T.textHi }}>{b.geometry}</span>
@@ -514,18 +514,18 @@ export default function BgAnimBandPanel(): React.ReactElement {
               {b.phaseBanks} banks
             </Hint>
             <Hint under>
-              <span title="The scalar source the step is read from — never an axis. camera_y does
+              <span title="The scalar source the step is read from, never an axis. camera_y does
                             NOT mean vertical motion; the axis beside it is what says which way this
                             tile animation moves.">
                 driver <strong>{b.driver}</strong>
-                {b.driverIsExplicit ? '' : ' (default — the key is absent)'}
+                {b.driverIsExplicit ? '' : ' (default: the key is absent)'}
               </span>
               {' · '}
               <span title="Which way this tile animation's pattern translates. horizontal scrolls
                            LEFT and takes its period from cols; vertical scrolls UP and takes it
                            from rows. Direction is fixed by the mechanism, not a setting.">
                 axis <strong>{b.axis}</strong>
-                {b.axisIsExplicit ? '' : ' (default — the key is absent)'}
+                {b.axisIsExplicit ? '' : ' (default: the key is absent)'}
               </span>
               {' · '}
               rate_shift <strong>{b.rateShift}</strong>
@@ -553,7 +553,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
                 a genuine COULD-NOT-MEASURE — a background on screen that is not
                 this document's — never for a number. */}
             {lit && lens.reason !== null && (
-              <Hint under tone="warning">on the map: cannot say — {lens.reason}</Hint>
+              <Hint under tone="warning">on the map: cannot say; {lens.reason}</Hint>
             )}
             {lit && lens.coverage !== null && (
               <Hint under>
@@ -670,14 +670,14 @@ export default function BgAnimBandPanel(): React.ReactElement {
             aeon's default is rather than freezing today's into the file. */}
         <Field label="Axis" title="Which way the pattern translates. NOT the driver.">
           <Select
-            title="axis — which way this tile animation's pattern moves. horizontal scrolls LEFT
+            title="axis: which way this tile animation's pattern moves. horizontal scrolls LEFT
                    and takes its period from cols; vertical scrolls UP and takes it from rows.
                    Direction is fixed by the mechanism and is not a setting. Picking vertical also
                    makes the pre-shifted fill a VERTICAL roll and orders the slots row-major."
             value={explicitAxis ? axis : ''}
             onChange={(v) => setAxis(v === '' ? undefined : (v as BgAnimBandAxis))}
             style={{ flex: 1, minWidth: 0 }}>
-            <option value="">(default — {BAND_AXIS_DEFAULT})</option>
+            <option value="">(default: {BAND_AXIS_DEFAULT})</option>
             {axisOptions().map((o) => (
               <option key={o.value} value={o.value} title={o.title}>{o.label}</option>
             ))}
@@ -691,8 +691,8 @@ export default function BgAnimBandPanel(): React.ReactElement {
             provider derives through the codec, so neither can hold a stale list. */}
         <Field label="Cols"
           title={horizontalAxis
-            ? 'Pattern width in tiles — the PERIOD when the axis is horizontal (pattern_px = cols*8)'
-            : 'Pattern width in tiles — the ROTATION UNIT when the axis is vertical, so cols*32 '
+            ? 'Pattern width in tiles: the PERIOD when the axis is horizontal (pattern_px = cols*8)'
+            : 'Pattern width in tiles: the ROTATION UNIT when the axis is vertical, so cols*32 '
               + 'must be a power of two'}>
           {horizontalAxis ? (
             /* `|| 1` USED TO BE THE EMPTY-BOX ARM, and it was the wrong shape
@@ -701,11 +701,11 @@ export default function BgAnimBandPanel(): React.ReactElement {
                now commits nothing at all for a box with no number in it, so an
                empty "Cols" leaves the candidate's width alone. What is left
                here is the floor, for a 0 or a negative somebody really typed. */
-            <NumberField title={`cols — pattern_px will be ${patternPxFor(cols, bandRowCount, axis)}`}
+            <NumberField title={`cols: pattern_px will be ${patternPxFor(cols, bandRowCount, axis)}`}
               min={1} width={56} value={cols}
               onChange={(n) => setCols(Math.max(1, Math.round(n) || 1))} />
           ) : (
-            <Select title="cols — constrained so that cols * 32 bytes per pattern ROW is an exact
+            <Select title="cols: constrained so that cols * 32 bytes per pattern ROW is an exact
                            power of two, because a vertical band rotates a whole row by shifting it"
               value={String(cols)}
               onChange={(v) => setCols(Number(v))}
@@ -716,10 +716,10 @@ export default function BgAnimBandPanel(): React.ReactElement {
         </Field>
         <Field label="Rows"
           title={horizontalAxis
-            ? 'Rows must make rows*32 a power of two — the runtime shifts a whole column'
-            : 'Pattern height in tiles — the PERIOD when the axis is vertical (pattern_px = rows*8)'}>
+            ? 'Rows must make rows*32 a power of two, because the runtime shifts a whole column'
+            : 'Pattern height in tiles: the PERIOD when the axis is vertical (pattern_px = rows*8)'}>
           {horizontalAxis ? (
-            <Select title="rows — constrained so that rows * 32 bytes per column is an exact power of two,
+            <Select title="rows: constrained so that rows * 32 bytes per column is an exact power of two,
                            because the runtime rotates a column by shifting it"
               value={String(bandRowCount)}
               onChange={(v) => setBandRowCount(Number(v))}
@@ -727,7 +727,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
               {unitChoices.map((r) => <option key={r} value={String(r)}>{r}</option>)}
             </Select>
           ) : (
-            <NumberField title={`rows — pattern_px will be ${patternPxFor(cols, bandRowCount, axis)}`}
+            <NumberField title={`rows: pattern_px will be ${patternPxFor(cols, bandRowCount, axis)}`}
               min={1} width={56} value={bandRowCount}
               onChange={(n) => setBandRowCount(Math.max(1, Math.round(n) || 1))} />
           )}
@@ -740,7 +740,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
 
         <Field label="Driver" title="The SCALAR the step is read from. Never an axis.">
           <Select
-            title="Which scalar drives this tile animation's step. A driver never sets an axis —
+            title="Which scalar drives this tile animation's step. A driver never sets an axis:
                    camera_y does NOT mean vertical motion. The Axis field above is what does."
             value={explicitDriver ? driver : ''}
             onChange={(v) => setCandidate({ driver: v === '' ? undefined : v })}
@@ -749,7 +749,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
                 prefers: a document that does not spell `driver` tracks whatever the
                 consumer's default becomes, and writing today's default into it
                 would freeze it. */}
-            <option value="">(default — {DEFAULT_DRIVER})</option>
+            <option value="">(default: {DEFAULT_DRIVER})</option>
             {driverOptions().map((o) => (
               <option key={o.value} value={o.value} title={o.title}>{o.label}</option>
             ))}
@@ -770,9 +770,9 @@ export default function BgAnimBandPanel(): React.ReactElement {
             freezing it. The number box only appears once an author has said the
             rate is theirs. */}
         <Field label="Rate shift"
-          title="rate_shift — a RIGHT SHIFT on the driver, so HIGHER IS SLOWER.">
+          title="rate_shift: a RIGHT SHIFT on the driver, so HIGHER IS SLOWER.">
           <Select
-            title="rate_shift — HIGHER IS SLOWER. The step is the driver scalar shifted RIGHT by this
+            title="rate_shift: HIGHER IS SLOWER. The step is the driver scalar shifted RIGHT by this
                    many bits (step = driver >> rate_shift), so each +1 halves the band's speed.
                    Leave it at (default) to omit the key and track aeon's own default."
             value={explicitRateShift ? 'custom' : ''}
@@ -782,7 +782,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
             <option value=""
               title="Omit rate_shift. The tile animation moves at whatever aeon's own default is, today and
                      after any change to it.">
-              (default — {DEFAULT_RATE_SHIFT})
+              (default: {DEFAULT_RATE_SHIFT})
             </option>
             <option value="custom"
               title="Spell rate_shift out in the document. Remember: higher is SLOWER.">
@@ -804,11 +804,11 @@ export default function BgAnimBandPanel(): React.ReactElement {
           {rateShiftNote(explicitRateShift ? rateShift : DEFAULT_RATE_SHIFT)}
         </Hint>
 
-        <Field label="Banks 1–7"
+        <Field label="Banks 1-7"
           title="How banks 1-7 are filled from phase 0. Phase 0 itself is never a choice: it is
                  the art the band rests at.">
           <Select
-            title="phase fill — how banks 1-7 (the contract's pre-shifted phases, selected by
+            title="phase fill: how banks 1-7 (the contract's pre-shifted phases, selected by
                    step & 7) are derived from the band's phase 0"
             value={phaseFill}
             onChange={(v) => setCandidate({ phaseFill: v as BandPhaseFill })}
@@ -820,13 +820,13 @@ export default function BgAnimBandPanel(): React.ReactElement {
         </Field>
 
         {/* ── Source 1: art the document already carries ────────────────── */}
-        <Group label="From existing tiles" note="costs no tiles — the range moves, it is not copied">
+        <Group label="From existing tiles" note="costs no tiles: the range moves, it is not copied">
           <Field label="From tile" title="First tile of the static range this tile animation takes over">
             <NumberField
               // Both halves through `slotSpanPhrase`: FIRST..LAST, never one
               // past the end. The second sentence is the same fact the bound
               // below states, and it named the first FREE slot as taken.
-              title={`static base — the range is ${slotSpanPhrase(staticBase, tileCount)}. `
+              title={`static base: the range is ${slotSpanPhrase(staticBase, tileCount)}. `
                 + `Tile animations already own ${slotSpanPhrase(0, budget.animatedSlots)}.`}
               // THE CLAMP IS THE BOUND, and it reads the SAME expression `min`
               // does (ROADMAP item 40). Was `Math.max(0, Math.round(n) || 0)`,
@@ -854,7 +854,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
               them, and the blob is de-duplicated, so a 4-slot candidate can own
               a thousand cells. Stated neutrally: see the band card above. */}
           {lensTarget?.kind === 'candidate' && lens.reason !== null && (
-            <Hint under tone="warning">on the map: cannot say — {lens.reason}</Hint>
+            <Hint under tone="warning">on the map: cannot say; {lens.reason}</Hint>
           )}
           {lensTarget?.kind === 'candidate' && lens.coverage !== null && (
             <Hint under>
@@ -864,7 +864,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
           )}
           {lensTarget?.kind !== 'candidate' && (
             <Hint under>
-              Click a background cell on the map to point this at the art you can see — the map
+              Click a background cell on the map to point this at the art you can see. The map
               then <LensSwatch />highlights every cell the range would take over.
             </Hint>
           )}

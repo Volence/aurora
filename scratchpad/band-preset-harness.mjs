@@ -841,9 +841,9 @@ async function main() {
     // and it is a THIRD rot of this same selector. `(?![a-z0-9_])` was correct
     // when one section carried this prefix. There are now THREE:
     //
-    //     Preset — <id>Delete                     <- the bands editor
-    //     Preset — <id> — cycles, variants        <- ROADMAP row 97
-    //     Preset — <id> — moving anchors          <- ROADMAP row 95
+    //     Preset: <id>Delete                     <- the bands editor
+    //     Preset: <id> · cycles, variants        <- ROADMAP row 97
+    //     Preset: <id> · moving anchors          <- ROADMAP row 95
     //
     // …and `OPEN_SECTION` takes `.pop()`, the LAST match. So this harness had
     // been clicking the MOVING ANCHORS header open and then looking for the band
@@ -853,8 +853,8 @@ async function main() {
     // while still admitting any action label, which cannot begin with one.
     const BANDS_RE = PLANT === 'rot-section'
       // THE PLANT: the `\b` this really carried for two runs.
-      ? String.raw`/^Preset — ${PRESET_ID}\b/`
-      : String.raw`/^Preset — ${PRESET_ID}(?![a-z0-9_ ])/`;
+      ? String.raw`/^Preset: ${PRESET_ID}\b/`
+      : String.raw`/^Preset: ${PRESET_ID}(?![a-z0-9_ ])/`;
     const shutBox = await c.json(SECTION_BOX(BANDS_RE));
     check('4b0', 'the band section is SHUT and is a header only — no body in the DOM',
       shutBox !== null && shutBox.children === 1 && shutBox.height > 0,

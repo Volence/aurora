@@ -111,7 +111,7 @@ export default function ChunkLinkOptions(): React.ReactElement {
       <div style={{ display: 'flex', flexDirection: 'column', gap: T.s3 }}>
         <label
           style={{ display: 'flex', alignItems: 'center', gap: T.s2, fontSize: T.tXs, cursor: 'pointer' }}
-          title="Detach on stamp — place the chunk's tiles as plain art that will NOT follow later edits to the chunk"
+          title="Detach on stamp: place the chunk's tiles as plain art that will NOT follow later edits to the chunk"
         >
           <input
             type="checkbox"
@@ -139,7 +139,7 @@ export default function ChunkLinkOptions(): React.ReactElement {
           </span>
           <Chip
             title={hovered
-              ? `Detach placement #${hovered.id} — its tiles stay exactly as they are, but stop following the chunk`
+              ? `Detach placement #${hovered.id}: its tiles stay exactly as they are, but stop following the chunk`
               : 'Hover a stamped region on the map to name a placement'}
             onClick={hovered ? () => runDetach(hovered.id) : undefined}
             disabled={!hovered}
@@ -152,7 +152,7 @@ export default function ChunkLinkOptions(): React.ReactElement {
               + `placement${placements.length === 1 ? '' : 's'}`}
           </span>
           <Chip
-            title="Detach every placement in this section — the art is untouched, it just stops following the library"
+            title="Detach every placement in this section: the art is untouched, it just stops following the library"
             onClick={placements.length > 0 ? runDetachAll : undefined}
             disabled={placements.length === 0 || !project}
           >Detach all in section</Chip>

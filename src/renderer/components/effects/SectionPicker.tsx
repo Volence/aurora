@@ -182,8 +182,8 @@ export default function SectionPicker({ children }: {
             lines, spending ~14px of a PERMANENT strip on a word the control
             beside it already says: the option reads `Section 0`. */}
         <Field label="Editing"
-          title="Both per-section bindings on this tab — the scene, under LAYERS, and the raster
-            preset, at the bottom of RASTER BAND PRESETS — act on THIS section. It is the same
+          title="Both per-section bindings on this tab (the scene, under LAYERS, and the raster
+            preset, at the bottom of RASTER BAND PRESETS) act on THIS section. It is the same
             number the Layout tab's SECTIONS grid sets."
           style={{ marginBottom: 0 }}>
           <Select
@@ -196,7 +196,7 @@ export default function SectionPicker({ children }: {
               // grid can carry holes, and a picker that silently skipped them
               // would renumber the world for the reader.
               <option key={i} value={String(i)}>
-                {`Section ${i}${s === null ? ' — empty' : ''}`}
+                {`Section ${i}${s === null ? ' (empty)' : ''}`}
               </option>
             ))}
           </Select>
@@ -211,7 +211,7 @@ export default function SectionPicker({ children }: {
         <div style={{ fontSize: T.tXs, color: T.textBase, lineHeight: 1.45 }}
           data-effects-section-bindings="">
           {section === null ? (
-            <>This section is empty — nothing is bound to it.</>
+            <>This section is empty: nothing is bound to it.</>
           ) : (
             <>
               scene <code style={{ color: T.textHi }}>{section.sceneRef ?? 'act default'}</code>
@@ -232,20 +232,20 @@ export default function SectionPicker({ children }: {
             confusing, and that cost was weighed: a verdict that is wrong is
             worse than a verdict that is long. */}
         <ConditionRow n={1} label="own preset" cond={cond.ownPreset}
-          title={`CONDITION 1 of 3 — a section can carry an editor-authored raster band only if it `
+          title={`CONDITION 1 of 3: a section can carry an editor-authored raster band only if it `
             + `binds a preset record NO OTHER SECTION binds. Threading a section-keyed band into a `
             + `shared record would give every section that shares it the same band, and aeon's `
             + `build refuses that by name. Read from the act descriptor on every load.`
             + (advisory ? `\n\n${advisory}` : '')} />
         <ConditionRow n={2} label="threaded" cond={cond.threaded}
-          title={`CONDITION 2 of 3 — some preset() in the game's effects library must actually pass `
+          title={`CONDITION 2 of 3: some preset() in the game's effects library must actually pass `
             + `${chooser}(sec: N) to its raster: channel. Without it the generator emits the binding `
             + `row and nothing reads it, which presents to the author as an assignment that did `
             + `nothing. That is one line in aeon. Read from the effects library on every load.`
             + (advisory ? `\n\n${advisory}` : '')} />
         <ConditionRow n={3} label="its channels" cond={extra}
-          title={`CONDITION 3 of 3 — one rasterRef binds the WHOLE preset document (aeon ruling Q1), `
-            + `so every OTHER key it carries — cycles, variants, patch_world_ys, patch_motion — owes `
+          title={`CONDITION 3 of 3: one rasterRef binds the WHOLE preset document (aeon ruling Q1), `
+            + `so every OTHER key it carries (cycles, variants, patch_world_ys, patch_motion) owes `
             + `its OWN generated chooser at this section's preset(), beside the raster one. This row `
             + `is about the document bound here TODAY: change the binding and it re-derives. `
             + `Conditions 1 and 2 can both be ✓ and this one ✗, which is exactly the case that `

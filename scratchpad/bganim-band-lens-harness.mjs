@@ -739,7 +739,7 @@ async function main() {
     const colsInput = `[...document.querySelectorAll('input[type=number]')].find(e => /^cols/.test(e.title||''))`;
     const setCols = await c.evalExpr(SET_INPUT(colsInput, 4));
     await sleep(600);
-    const rowsSel = `[...document.querySelectorAll('select')].find(e => /rows — constrained/.test(e.title||''))`;
+    const rowsSel = `[...document.querySelectorAll('select')].find(e => /rows: constrained/.test(e.title||''))`;
     const setRows = await c.evalExpr(SET_INPUT(rowsSel, 2));
     await sleep(700);
     const cand7 = await c.json('window.__dbg.aeon.bandCandidate()');

@@ -198,7 +198,7 @@ const clickByText = (re, tag = 'button') => String.raw`
 })()`;
 
 const V_FACTOR_INPUT = `[...document.querySelectorAll('input[type=number]')]`
-  + `.find((e) => /^v_factor — /.test(e.title || ''))`;
+  + `.find((e) => /^v_factor: /.test(e.title || ''))`;
 
 /**
  * The advisory element, found by a phrase that is STRUCTURAL rather than

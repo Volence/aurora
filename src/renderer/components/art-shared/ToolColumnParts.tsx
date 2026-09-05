@@ -9,7 +9,9 @@ import { T } from '../ui';
  */
 
 export const MIRROR_CYCLE: Array<MirrorMode | null> = [null, 'h', 'v', 'both'];
-const MIRROR_LABEL: Record<string, string> = { off: 'M:–', h: 'M:H', v: 'M:V', both: 'M:HV' };
+// `M:off` rather than a glyph for the off state: the other three read as the
+// axes they name, and a lone dash here only ever meant "not H, not V".
+const MIRROR_LABEL: Record<string, string> = { off: 'M:off', h: 'M:H', v: 'M:V', both: 'M:HV' };
 
 export const DITHER_PATTERNS: Array<{ id: DitherPattern; label: string; title: string }> = [
   { id: 'checker', label: '▚', title: 'Checker (50%)' },

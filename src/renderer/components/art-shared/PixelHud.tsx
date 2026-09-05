@@ -14,6 +14,23 @@ export interface PixelHudHandle {
  * position:relative wrapper that does NOT scroll (a sibling of the scroll
  * container), so it stays pinned to the corner.
  */
+/**
+ * What the position field shows when the cursor is off the surface.
+ *
+ * This was a bare em dash, and it was the ONE occurrence in this sweep that was
+ * not punctuation at all: it is a placeholder GLYPH, so the repair is a chosen
+ * character, not a rewritten sentence. Two ASCII hyphens, because:
+ *   - the populated form of this field is `x, y`, and x/y can be NEGATIVE, so a
+ *     single `-` in a coordinate readout is a number the reader has to rule out;
+ *     `--` cannot be the start of one.
+ *   - the HUD is monospaced, so an ASCII pair keeps the field a fixed width and
+ *     needs no font that carries U+2014.
+ *   - `·` was rejected: this codebase already spends the middle dot as a FIELD
+ *     SEPARATOR (see the collision picker's status line), so reusing it for
+ *     "empty" would make one glyph mean two things in the same window.
+ */
+const NO_READING = '--';
+
 export const PixelHud = forwardRef<PixelHudHandle>(function PixelHud(_props, ref) {
   const posRef = useRef<HTMLSpanElement>(null);
   const zoomRef = useRef<HTMLSpanElement>(null);
@@ -29,7 +46,7 @@ export const PixelHud = forwardRef<PixelHudHandle>(function PixelHud(_props, ref
         if (swatchRef.current) swatchRef.current.style.background = info.color && info.color.a !== 0
           ? `rgb(${info.color.r},${info.color.g},${info.color.b})` : 'transparent';
       } else {
-        if (posRef.current) posRef.current.textContent = '—';
+        if (posRef.current) posRef.current.textContent = NO_READING;
         if (idxRef.current) idxRef.current.textContent = '';
         if (swatchRef.current) swatchRef.current.style.background = 'transparent';
       }
@@ -43,7 +60,7 @@ export const PixelHud = forwardRef<PixelHudHandle>(function PixelHud(_props, ref
       background: 'rgba(10,12,18,0.82)', border: `1px solid ${T.border}`, borderRadius: T.rMd,
       fontFamily: T.fontMono, fontSize: T.tXs, color: T.textBase,
     }}>
-      <span ref={posRef}>—</span>
+      <span ref={posRef}>{NO_READING}</span>
       <span ref={zoomRef} style={{ color: T.textLo }} />
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         <span ref={swatchRef} style={{ width: 10, height: 10, borderRadius: 2, border: `1px solid ${T.border}` }} />

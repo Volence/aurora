@@ -1714,7 +1714,7 @@ export default function MapViewport() {
             const label = selectionSizeLabel(marquee.col, marquee.row, marquee.w, marquee.h);
             const reason = artOnlyReason(marquee.col, marquee.row, marquee.w, marquee.h);
             useToastStore.getState().addToast(
-              reason ? `Copied ${label} — art only. ${reason}` : `Copied ${label}`,
+              reason ? `Copied ${label}, art only. ${reason}` : `Copied ${label}`,
               reason ? 'info' : 'success',
             );
           }
@@ -1760,8 +1760,8 @@ export default function MapViewport() {
             // behind his back, which is the same lie with better manners).
             if (!isBlockAligned(marquee.col, marquee.row, marquee.w, marquee.h)) {
               useToastStore.getState().addToast(
-                `Can't open a ${marquee.w}×${marquee.h}-tile selection as a chunk — `
-                + 'chunks are whole 16px blocks. Select on even tile bounds, or switch the '
+                `Can't open a ${marquee.w}×${marquee.h}-tile selection as a chunk. `
+                + 'Chunks are whole 16px blocks. Select on even tile bounds, or switch the '
                 + 'marquee to Block.', 'warning');
               e.preventDefault();
               return;
@@ -2115,8 +2115,8 @@ export default function MapViewport() {
         bgRefusalShown.current = true;
         useToastStore.getState().addToast(
           `Tile ${selectedTileIndex} is outside this background. The act's background is the ` +
-          `${doc.tiles.length}-tile blob in editor_bg_override.json — the one the ROM is built ` +
-          'from — and this pick is past its end, so there is no tile there to paint. ' +
+          `${doc.tiles.length}-tile blob in editor_bg_override.json (the one the ROM is built ` +
+          'from), and this pick is past its end, so there is no tile there to paint. ' +
           `Nothing was painted. Pick again from the Art panel, which is showing this ` +
           `background's ${doc.tiles.length} tiles.`,
           'warning',
@@ -2193,7 +2193,7 @@ export default function MapViewport() {
         bgRefusalShown.current = true;
         useToastStore.getState().addToast(
           doc === null
-            ? 'Stamp band needs the act\'s BG override — this background has no animated bands. ' +
+            ? 'Stamp band needs the act\'s BG override. This background has no animated bands. ' +
               'Nothing was stamped.'
             : 'Pick a band first: click one of the band cards in the Art panel (BG layer), ' +
               'then stamp. Nothing was stamped.',
@@ -2733,7 +2733,7 @@ export default function MapViewport() {
           // as a broken tool rather than a refused request.
           if (effectivePasteLayers(clip, layers) === null) {
             useToastStore.getState().addToast(
-              'This clipboard carries no collision — it was copied from a selection that '
+              'This clipboard carries no collision: it was copied from a selection that '
               + 'is not block-aligned. Paste art, or re-copy on even tile bounds.', 'warning');
             e.preventDefault();
             return;
@@ -3441,7 +3441,7 @@ export default function MapViewport() {
             } else if (rc.known) {
               const p = rc.profile!;
               const deg = angleDegrees(p);
-              extra = ` | Coll ${path} #${c.shape}${flips} ${p.solidity} ${deg === null ? '—' : deg + '°'} ${heightSparkline(p.heights)}`;
+              extra = ` | Coll ${path} #${c.shape}${flips} ${p.solidity} ${deg === null ? '--' : deg + '°'} ${heightSparkline(p.heights)}`;
             } else {
               extra = ` | Coll ${path} #${c.shape}${flips} (unknown)`;
             }

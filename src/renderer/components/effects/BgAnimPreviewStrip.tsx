@@ -111,7 +111,7 @@ export default function BgAnimPreviewStrip() {
           active={playing}
           onClick={() => toggleOverlay('playAnimatedArt')}
           title={'Play the tile animations in the canvas. The same switch as View > Play '
-            + 'animations — playback is view state, not a property of this panel.'}
+            + 'animations. Playback is view state, not a property of this panel.'}
         >
           {playing ? 'Playing' : 'Play tile animations'}
         </Chip>
@@ -124,7 +124,7 @@ export default function BgAnimPreviewStrip() {
         <Chip
           active={caveats}
           onClick={() => setCaveats((v) => !v)}
-          title={'This preview is approximate in four named ways — the phase arithmetic is NOT '
+          title={'This preview is approximate in four named ways. The phase arithmetic is NOT '
             + 'one of them, it is the consumer\'s own expression. Open this to read all four.'}
         >
           why approximate?
@@ -136,7 +136,7 @@ export default function BgAnimPreviewStrip() {
           fontSize: T.tXs, color: T.textLo, lineHeight: 1.5,
           marginBottom: T.s2, paddingBottom: T.s2, borderBottom: `1px solid ${T.border}`,
         }}>
-          <b>The preview is approximate</b>, in four named ways — the phase arithmetic is not one
+          <b>The preview is approximate</b>, in four named ways. The phase arithmetic is not one
           of them, it is the consumer&apos;s own expression.
           {' '}(1) The clock is the editor&apos;s wall clock, not <code>Logic_Tick</code>: a lag
           frame freezes a tile animation in game and never here.

@@ -501,7 +501,7 @@ async function main() {
     await sleep(1400);
     await c.evalExpr(`window.__dbg.aeon.selectPreset(${JSON.stringify(PRESET_ID)})`);
     await sleep(900);
-    await c.evalExpr(OPEN_SECTION(String.raw`/^Preset — ` + PRESET_ID + String.raw`(?![-a-z0-9_ ])/`,
+    await c.evalExpr(OPEN_SECTION(String.raw`/^Preset: ` + PRESET_ID + String.raw`(?![-a-z0-9_ ])/`,
       `[...document.querySelectorAll('button')].some(b => (b.textContent||'').trim() === 'Add raster band')`));
     await sleep(900);
 
@@ -809,7 +809,7 @@ async function main() {
         + 'and the row would prove nothing.');
     } else {
       const opened = await c.evalExpr(OPEN_SECTION(
-        String.raw`/^Preset — .* — moving anchors\b/`,
+        String.raw`/^Preset: .* · moving anchors\b/`,
         `${ANCHOR_CHANNEL_SEL(0)}`));
       note('[mv] opening the moving-anchors section', String(opened));
       await sleep(1200);
@@ -840,7 +840,7 @@ async function main() {
 
         // Back to the preset section to read the advisory.
         await c.evalExpr(OPEN_SECTION(
-          String.raw`/^Preset — ` + PRESET_ID + String.raw`(?![-a-z0-9_ ])/`,
+          String.raw`/^Preset: ` + PRESET_ID + String.raw`(?![-a-z0-9_ ])/`,
           `${LINE_IN}`));
         await sleep(1000);
         const stillThere = await c.json(PAINTED('this boundary follows patch channel', []));

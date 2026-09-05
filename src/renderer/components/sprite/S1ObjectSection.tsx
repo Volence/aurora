@@ -61,7 +61,7 @@ export default function S1ObjectSection({ busy, onBusy }: { busy: boolean; onBus
         const current = openRelPath !== null && g.link.artFile.split('/').pop() === openRelPath;
         const covered = g.ids.length > 1 ? groupIdsHex(g) : null;
         const title = current
-          ? `${g.label} — currently open`
+          ? `${g.label} (currently open)`
           : `Open ${g.label}'s art + mappings${covered !== null ? ` (one art set shared by ${covered})` : ''}`;
         return (
           <button
@@ -109,7 +109,7 @@ export default function S1ObjectSection({ busy, onBusy }: { busy: boolean; onBus
                   key={key}
                   onClick={() => { if (!busy) { onBusy(true); void editNamedArtDoc(key).finally(() => onBusy(false)); } }}
                   disabled={busy}
-                  title={current ? `${d.name} — currently open`
+                  title={current ? `${d.name} (currently open)`
                     : d.link.rawGrid ? `Open ${d.name}'s tile grid` : `Open ${d.name}'s art + mappings`}
                   style={{ ...styles.row, ...(current ? styles.rowCurrent : {}), ...(busy ? styles.busy : {}) }}
                 >
@@ -121,7 +121,7 @@ export default function S1ObjectSection({ busy, onBusy }: { busy: boolean; onBus
               );
             })}
           </div>
-          <div style={styles.hint}>art every zone loads — not {zone.toUpperCase()}-specific</div>
+          <div style={styles.hint}>art every zone loads, not {zone.toUpperCase()}-specific</div>
         </CollapsibleSection>
       )}
     </>

@@ -25,7 +25,7 @@ export default function ChunkPickerHeader(): React.ReactElement | null {
   return (
     <button
       onClick={() => setStampLoop(!stampLoop)}
-      title="Stamp this chunk with S1's loop flag (bit 7) — used for loop-de-loop layout cells"
+      title="Stamp this chunk with S1's loop flag (bit 7), used for loop-de-loop layout cells"
       style={{ ...styles.loopBtn, ...(stampLoop ? styles.loopBtnOn : {}) }}
     >
       ∞ Loop

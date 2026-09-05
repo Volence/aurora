@@ -100,7 +100,7 @@ function handleSave() {
   if (o.chunkId !== null) {
     existingChunk = pstate.project.chunkLibrary.find((c) => c.id === o.chunkId);
     if (!existingChunk) {
-      useToastStore.getState().addToast('Chunk no longer exists — cannot save', 'error');
+      useToastStore.getState().addToast('Chunk no longer exists. Cannot save', 'error');
       return;
     }
   }
@@ -234,8 +234,8 @@ function handleSave() {
   // shape). With no out-of-act copies the toast is byte-for-byte the old one.
   useToastStore.getState().addToast(
     o.chunkId !== null
-      ? (outOfActNote ? `Saved chunk "${saved.name}" — ${outOfActNote}` : `Saved chunk "${saved.name}"`)
-      : `Added "${saved.name}" to chunk library — Save project to keep`,
+      ? (outOfActNote ? `Saved chunk "${saved.name}": ${outOfActNote}` : `Saved chunk "${saved.name}"`)
+      : `Added "${saved.name}" to chunk library. Save project to keep`,
     outOfActNote ? 'warning' : 'success');
 }
 
@@ -258,20 +258,20 @@ function ArtCanvas() {
     if (o.liveTileIndex !== null && zone
         && o.liveTileIndex >= zone.tileset.tiles.length) {
       useArtStore.getState().closeDocument();
-      useToastStore.getState().addToast('Tile no longer exists (undone) — document closed', 'info');
+      useToastStore.getState().addToast('Tile no longer exists (undone). Document closed', 'info');
       return;
     }
     // A BG override document can lose its target the same way: an undone
     // band insert takes the bank with it; an undone add shrinks the blob.
     if (o.bgOverride && !bgArtTargetExists(state.project?.bgOverride.doc ?? null, o.bgOverride)) {
       useArtStore.getState().closeDocument();
-      useToastStore.getState().addToast('Band art no longer exists (undone) — document closed', 'info');
+      useToastStore.getState().addToast('Band art no longer exists (undone). Document closed', 'info');
       return;
     }
     if (o.chunkId !== null && state.project
         && !state.project.chunkLibrary.some((c) => c.id === o.chunkId)) {
       useArtStore.getState().closeDocument();
-      useToastStore.getState().addToast('Chunk no longer exists — document closed', 'info');
+      useToastStore.getState().addToast('Chunk no longer exists. Document closed', 'info');
     }
   }, [historyVersion, project]);
 
