@@ -1,0 +1,26 @@
+{
+  "id": "ojz_act1_sec7_worldwater",
+  "layers": [
+    {
+      "fa": "FACTOR_1",
+      "fb": "FACTOR_1_8",
+      "world_y": 0
+    },
+    {
+      "fa": "FACTOR_1",
+      "fb": "FACTOR_1_2",
+      "world_y": 40
+    },
+    {
+      "fa": "FACTOR_1",
+      "fb": "FACTOR_1_2",
+      "vsplit": {
+        "at": 67
+      },
+      "world_y": 162
+    }
+  ],
+  "schema": 1,
+  "v_factor": 15,
+  "v_offset": 288
+}
