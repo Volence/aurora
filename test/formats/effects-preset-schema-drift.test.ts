@@ -71,7 +71,7 @@ function gitBlobHash(bytes: Buffer): string {
     .digest('hex');
 }
 
-describe('raster preset schema — vendored copy drift gate', () => {
+describe('raster preset schema: vendored copy drift gate', () => {
   it('the vendored schema is byte-identical to the pinned contract blob', () => {
     const bytes = readFileSync(SCHEMA_PATH);
     // Anti-vacuous: we hashed a real schema, not an empty or missing file.
@@ -312,18 +312,18 @@ describe('raster preset schema — vendored copy drift gate', () => {
 describe('CURRENCY: is the vendored preset schema still what empyrean publishes?', () => {
   const empyrean = peerRepo('empyrean');
   const TIP = PROV.empyrean.branch_that_answers_currency;
-  const NOT_OURS = 'NOT AN AURORA REGRESSION — the vendored preset contract schema is stale.';
+  const NOT_OURS = 'NOT AN AURORA REGRESSION: the vendored preset contract schema is stale.';
 
   it(`matches ${PROV.empyrean.path} at empyrean ${TIP}`, (ctx) => {
     if (empyrean === null) {
       ctx.skip('SKIPPED, NOT PASSED: no empyrean checkout beside this repo (set '
-        + 'AURORA_EMPYREAN_REPO) — CANNOT MEASURE whether the pin '
+        + 'AURORA_EMPYREAN_REPO). CANNOT MEASURE whether the pin '
         + `${PROV.empyrean.revision} is still current`);
       return;
     }
     const tip = resolveRev(empyrean, TIP);
     if (tip === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${empyrean} — CANNOT MEASURE `
+      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${empyrean}. CANNOT MEASURE `
         + `currency of pin ${PROV.empyrean.revision}`);
       return;
     }
@@ -345,19 +345,19 @@ describe('CURRENCY: is the vendored preset schema still what empyrean publishes?
 
   it('the pinned empyrean revision is PUBLISHED, not local-only', (ctx) => {
     if (empyrean === null) {
-      ctx.skip('SKIPPED, NOT PASSED: no empyrean checkout beside this repo — CANNOT MEASURE '
+      ctx.skip('SKIPPED, NOT PASSED: no empyrean checkout beside this repo. CANNOT MEASURE '
         + `whether ${PROV.empyrean.revision} is reachable from ${TIP}`);
       return;
     }
     const tip = resolveRev(empyrean, TIP);
     if (tip === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${empyrean} — CANNOT MEASURE `
+      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${empyrean}. CANNOT MEASURE `
         + 'reachability');
       return;
     }
     expect(
       isAncestor(empyrean, PROV.empyrean.revision, tip),
-      `${PROV.empyrean.revision} is NOT reachable from empyrean ${TIP} (${tip}) — local-only, or `
+      `${PROV.empyrean.revision} is NOT reachable from empyrean ${TIP} (${tip}): local-only, or `
       + 'the branch was rewritten; a peer cannot check a pin at a SHA they cannot fetch',
     ).toBe(true);
   });
@@ -458,12 +458,12 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
   function readPage(): PageRead {
     if (aeon === null) {
       return { kind: 'skip', why: 'SKIPPED, NOT PASSED: no aeon checkout beside this repo (set '
-        + 'AURORA_AEON_REPO) — CANNOT MEASURE whether aeon\'s worked example still agrees with '
+        + 'AURORA_AEON_REPO). CANNOT MEASURE whether aeon\'s worked example still agrees with '
         + 'the schema' };
     }
     const tip = resolveRev(aeon, TIP);
     if (tip === null) {
-      return { kind: 'skip', why: `SKIPPED, NOT PASSED: ${TIP} does not resolve in ${aeon} — `
+      return { kind: 'skip', why: `SKIPPED, NOT PASSED: ${TIP} does not resolve in ${aeon}. `
         + 'CANNOT MEASURE agreement with aeon\'s page' };
     }
     const at = readAtRev(aeon, tip, PAGE);
@@ -475,8 +475,8 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
     // That is exactly the drift this row exists to catch.
     if (keys === null) {
       return { kind: 'fail', why: `${PAGE} at aeon ${tip} no longer carries its `
-        + 'KEYS-CHECKED-AGAINST-effects_gen.py block — the one part of that page that cannot '
-        + 'rot silently has been removed' };
+        + 'KEYS-CHECKED-AGAINST-effects_gen.py block, the one part of that page that cannot '
+        + 'rot silently, has been removed' };
     }
     return { kind: 'ok', tip, keys };
   }
@@ -491,7 +491,7 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
   }
 
   const SPLIT = (tip: string): string => `A SPLIT BETWEEN aeon ${PAGE} (at ${tip}) AND `
-    + `${PROV.empyrean.path} (blob ${PROV.empyrean.blob}). THE SCHEMA WINS — but report this: `
+    + `${PROV.empyrean.path} (blob ${PROV.empyrean.blob}). THE SCHEMA WINS, but report this: `
     + 'aeon asked to hear about it immediately.';
 
   // The schema's own account of its root, derived: what it requires, what it
@@ -550,7 +550,7 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
       expect(oneOfNames, 'EFFECTS_PRESET_PROGRAM_ARMS is no longer this `oneOf` read back')
         .toEqual([...EFFECTS_PRESET_PROGRAM_ARMS].sort());
       expect(EFFECTS_PRESET_PROGRAM_ARMS.length, 'the arm set and the raster-channel set have '
-        + 'collapsed back into one list — either `boundary` left the contract or the ep_patched '
+        + 'collapsed back into one list: either `boundary` left the contract or the ep_patched '
         + 'derivation in preset.ts has stopped separating them')
         .toBeGreaterThan(EFFECTS_PRESET_RASTER_CHANNELS.length);
       for (const n of oneOfNames) expect(EFFECTS_PRESET_ROOT_KEYS).toContain(n);
@@ -572,7 +572,7 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
       // pin row below is the only thing entitled to have an opinion about it.
       for (const req of schemaRequired) {
         expect(keys.preset, `${SPLIT(tip)} aeon does not accept "${req}", which the schema `
-          + 'REQUIRES — a document the schema demands would be refused').toContain(req);
+          + 'REQUIRES: a document the schema demands would be refused').toContain(req);
       }
       expect(
         keys.preset.filter((k) => !schemaRequired.includes(k) && !schemaOptional.includes(k)),
@@ -659,8 +659,8 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
         schemaVocabulary.filter((k) => !pageVocabulary.includes(k)),
         `${SPLIT(tip)} the schema knows these root keys and aeon's page does not mention them at `
         + 'all. If aeon has RENAMED one, this is the split. If instead the contract has DECLARED '
-        + 'a key aeon has not built, that is the contract leading its consumer — a lag, the state '
-        + 'this pair was in from 12aecd5 to 2026-09-02 and again on 2026-09-03 — and the fix is '
+        + 'a key aeon has not built, that is the contract leading its consumer: a lag, the state '
+        + 'this pair was in from 12aecd5 to 2026-09-02 and again on 2026-09-03. The fix is '
         + 'to name them in the premise list in src/core/formats/effects/preset-lag.ts so the '
         + 'panel discloses them, then relax this row to allow exactly those names (git log it for '
         + 'the shape it had while a lag was open).',
@@ -732,7 +732,7 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
    * rot into an unmeasured claim.
    */
   it(`the contract-leads-consumer lag at aeon ${page.kind === 'ok' ? page.tip.slice(0, 8) : TIP} is `
-     + 'EMPTY — aeon accepts every key the schema declares (retired 2026-09-04, the `boundary` '
+     + 'EMPTY: aeon accepts every key the schema declares (retired 2026-09-04, the `boundary` '
      + 'arm; red in both directions)', (ctx) => {
     onPage(ctx, ({ tip, keys }) => {
       // Anti-vacuous: this row is only meaningful because the schema declares
@@ -758,16 +758,16 @@ describe('aeon\'s worked example vs the schema (the schema wins; this reports a 
         `A LAG HAS RE-OPENED between ${PROV.empyrean.path} (blob ${PROV.empyrean.blob}) and aeon `
         + `${PAGE} at ${tip}: the schema declares ${JSON.stringify(lag)}, and aeon's page does not `
         + 'ACCEPT them. This row is red in BOTH directions and the fix differs:\n'
-        + '  • THE CONTRACT DECLARED A KEY AEON HAS NOT BUILT — not a split: it is the contract '
+        + '  • THE CONTRACT DECLARED A KEY AEON HAS NOT BUILT (not a split): it is the contract '
         + 'leading its consumer, the state this pair was in from the 12aecd5 re-vendor to '
         + '2026-09-02 and again from the d36d704 one. Aurora is authoring a key that reaches the '
         + 'file and nothing further (or, if aeon\'s page does not mention it AT ALL, one that '
         + 'fails aeon\'s build outright), with NO disclosure above the controls. FIX: put these '
-        + 'names into the premise list in src/core/formats/effects/preset-lag.ts — the '
+        + 'names into the premise list in src/core/formats/effects/preset-lag.ts (the '
         + 'panel\'s sentence is derived from it and comes back on screen in both mount sites by '
-        + 'construction — re-date it, and flip this row back to asserting that list (git log this '
+        + 'construction); re-date it, and flip this row back to asserting that list (git log this '
         + 'row for the shape it had on 2026-09-03).\n'
-        + '  • AEON HAS UN-BUILT A KEY IT USED TO LOWER — that is a REGRESSION, not a lag, and it '
+        + '  • AEON HAS UN-BUILT A KEY IT USED TO LOWER, which is a REGRESSION, not a lag, and it '
         + 'is what this row exists to catch: the vocabulary row above stays green through it, '
         + 'because the name merely moves from the page\'s `preset:` row to `preset-refused:`. '
         + 'Report it to aeon BEFORE re-filling anything here.',

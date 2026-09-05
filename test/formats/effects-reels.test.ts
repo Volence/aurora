@@ -65,7 +65,7 @@ function distinctLegalRates(n = EFFECTS_REEL_BAND_COUNT): number[] {
   return Array.from({ length: n }, (_, i) => EFFECTS_REEL_RATE_BOUNDS.min + i);
 }
 
-describe('effects scene `reels` — the constants are the schema\'s, not this file\'s', () => {
+describe('effects scene `reels`: the constants are the schema\'s, not this file\'s', () => {
   it('EFFECTS_REEL_BAND_COUNT is the length the schema enforces, both bounds', () => {
     // Not "equals 5": an array one SHORT and one LONG of the derived count are
     // both refused, and one AT it is accepted. That is the property; the number
@@ -117,7 +117,7 @@ describe('effects scene `reels` — the constants are the schema\'s, not this fi
    * A panel that applied the conversion to a scene of all-zero rates would emit
    * a legal document. Nothing catches that, here or anywhere.
    */
-  it('the schema refuses every ×256 of a legal nonzero rate — the only catch there is', () => {
+  it('the schema refuses every ×256 of a legal nonzero rate: the only catch there is', () => {
     const { min, max } = EFFECTS_REEL_RATE_BOUNDS;
     const item = RATES_NODE.items as JsonSchema;
     const legal = Array.from({ length: max - min + 1 }, (_, i) => min + i);
@@ -174,7 +174,7 @@ describe('effects scene `reels` — the constants are the schema\'s, not this fi
     expect(issues.some(i => /unknown property "cols_per_band"/.test(i.message))).toBe(true);
   });
 
-  it('requires `rates` — an empty reels object is not "no reels"', () => {
+  it('requires `rates`: an empty reels object is not "no reels"', () => {
     const scene = { ...sceneWithRates([]), reels: {} } as unknown as EffectsScene;
     expect(validateAgainstSchema(scene, EFFECTS_SCENE_SCHEMA)
       .some(i => /missing required property "rates"/.test(i.message))).toBe(true);
@@ -196,7 +196,7 @@ describe('effects scene `reels` — the constants are the schema\'s, not this fi
   });
 });
 
-describe('effects scene `reels` — the codec round-trips it verbatim', () => {
+describe('effects scene `reels`: the codec round-trips it verbatim', () => {
   /**
    * ⚠ SCREEN ORDER IS ARRAY ORDER — index i owns screen X 64i..64i+63. The
    * contract says an editor that sorts `rates`, or round-trips them through a
@@ -287,7 +287,7 @@ describe('effects scene `reels` — the codec round-trips it verbatim', () => {
   });
 });
 
-describe('effects scene `reels` — the binding warning is ADVICE and says so', () => {
+describe('effects scene `reels`: the binding warning is ADVICE and says so', () => {
   const scene = sceneWithRates(distinctLegalRates());
 
   it('warns when no section in the project names this scene by sceneRef', () => {
@@ -324,7 +324,7 @@ describe('effects scene `reels` — the binding warning is ADVICE and says so', 
    * NOTHING IN THE READ OR WRITE PATH CALLS IT. Asserted rather than promised:
    * a document the advisory would warn about still parses and still serializes.
    */
-  it('is not enforcement — the same scene parses and serializes regardless', () => {
+  it('is not enforcement: the same scene parses and serializes regardless', () => {
     expect(advisoryReelsBinding(scene, ['other_scene'])).toHaveLength(1);
     const text = serializeEffectsScene(scene);
     expect(text).toContain('"reels"');

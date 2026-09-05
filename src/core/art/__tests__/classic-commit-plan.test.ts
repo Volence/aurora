@@ -76,7 +76,7 @@ function painted(fn: (x: number, y: number) => number, w = CHUNK, h = CHUNK) {
   return b;
 }
 
-describe('planCanvasCommit — validation', () => {
+describe('planCanvasCommit: validation', () => {
   it('refuses a misaligned region', () => {
     const r = planCanvasCommit(input({ region: { x: 8, y: 0, chunksWide: 1, chunksHigh: 1 } }));
     expect(r.ok).toBe(false);
@@ -150,7 +150,7 @@ describe('planCanvasCommit — validation', () => {
   });
 });
 
-describe('planCanvasCommit — palette', () => {
+describe('planCanvasCommit: palette', () => {
   it('refuses drift and names the entries', () => {
     const doc = makeDoc();
     const pal = matchingPalette(doc);
@@ -165,7 +165,7 @@ describe('planCanvasCommit — palette', () => {
     } else { expect.fail('expected palette-drift'); }
   });
 
-  it('refuses line 0 drift even when a resolution was chosen — it is Sonic’s palette', () => {
+  it('refuses line 0 drift even when a resolution was chosen: it is Sonic’s palette', () => {
     const doc = makeDoc();
     const pal = matchingPalette(doc);
     pal[3] = 0x0eee;
@@ -259,7 +259,7 @@ describe('planCanvasCommit — palette', () => {
   });
 });
 
-describe('planCanvasCommit — the floors', () => {
+describe('planCanvasCommit: the floors', () => {
   it('maps an all-transparent canvas to tile 0 and block 0, allocating nothing', () => {
     const r = planCanvasCommit(input({ pixels: painted(() => 0) }));
     expect(r.ok).toBe(true);
@@ -303,7 +303,7 @@ describe('planCanvasCommit — the floors', () => {
   });
 });
 
-describe('planCanvasCommit — reclaim', () => {
+describe('planCanvasCommit: reclaim', () => {
   it('reclaims the replaced chunk’s tiles and blocks, and nothing else', () => {
     const r = planCanvasCommit(input({
       pixels: painted((x, y) => canvasIndex(1, ((x + y) % 15) + 1)),
@@ -406,7 +406,7 @@ describe('planCanvasCommit — reclaim', () => {
   });
 });
 
-describe('planCanvasCommit — collision', () => {
+describe('planCanvasCommit: collision', () => {
   it('inherits colind from the block each new block displaces', () => {
     const r = planCanvasCommit(input({
       pixels: painted(() => canvasIndex(1, 5)),
@@ -505,7 +505,7 @@ describe('planCanvasCommit — collision', () => {
   });
 });
 
-describe('planCanvasCommit — allocation', () => {
+describe('planCanvasCommit: allocation', () => {
   /**
    * GUARD-A3. The allocator's filter is the last thing standing between a
    * commit and a slot that is not its to take. Each of the three exclusions is
@@ -527,7 +527,7 @@ describe('planCanvasCommit — allocation', () => {
   });
 });
 
-describe('planCanvasCommit — ceilings', () => {
+describe('planCanvasCommit: ceilings', () => {
   /** GUARD-A4, the other ceiling: the block field is 10 bits. */
   it('refuses to mint a block past the 1024-block ceiling', () => {
     const doc = makeDoc();
@@ -581,7 +581,7 @@ describe('planCanvasCommit — ceilings', () => {
   });
 });
 
-describe('planCanvasCommit — reuse', () => {
+describe('planCanvasCommit: reuse', () => {
   /**
    * ART-A7. An animated-art slot is not a match candidate — but "not this one"
    * is not "no match at all". Testing it after the search threw away a perfectly
@@ -724,7 +724,7 @@ function renderChunkCell(doc: LevelDoc, cell: ChunkCell): Uint8Array {
   return out;
 }
 
-describe('planCanvasCommit — the applied plan', () => {
+describe('planCanvasCommit: the applied plan', () => {
   /**
    * R1. A partial edit is the ordinary gesture: redraw most of a chunk, leave
    * one 16x16 alone. The kept cell matches a pool block that the SAME plan is

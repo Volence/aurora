@@ -171,7 +171,7 @@ const TOOL_ARMING_SITES: Record<string, string> = {
     + 'with no CollapsibleSection above its gesture.',
   'providers/object-list-classic.ts':
     'The classic object palette arms place-object. Classic\'s columns have no '
-    + 'conditional section at all — row [3] asserts that.',
+    + 'conditional section at all: row [3] asserts that.',
   'state/classicLevelStore.ts':
     'selectChunkForStamp arms stamp-chunk when the classic chunk picker selects. '
     + 'Same reason as above: nothing conditional sits above it.',
@@ -197,7 +197,7 @@ describe('a panel column does not move under a live gesture', () => {
     const src = code(join(FACETS, 'layout-facet.tsx'));
     const conditional = LAYOUT!.sections.filter((s) => toolConditional(s, src));
     expect(conditional.map((s) => s.id),
-      'no section in the layout column reads as tool-conditional — row [2] would pass on nothing')
+      'no section in the layout column reads as tool-conditional: row [2] would pass on nothing')
       .toContain('aeon.layoutOptions');
   });
 
@@ -208,11 +208,11 @@ describe('a panel column does not move under a live gesture', () => {
     const above = LAYOUT!.sections
       .slice(0, art)
       .filter((s) => toolConditional(s, src))
-      .map((s) => `${s.id} — guard: ${s.guard.trim().replace(/\s+/g, ' ').slice(-90)}`);
+      .map((s) => `${s.id} (guard: ${s.guard.trim().replace(/\s+/g, ' ').slice(-90)})`);
     expect(above,
       'A tool-conditional section renders ABOVE the Art strip. The strip hosts a double click '
       + '(open a background slot) and a drag (aim a band range), and its own first click arms '
-      + 'paint-tile — so this section mounts BETWEEN the two halves of the gesture and the strip '
+      + 'paint-tile, so this section mounts BETWEEN the two halves of the gesture and the strip '
       + 'moves out from under the second one. Put it below aeon.art. See layout-facet.tsx and '
       + 'docs/reviews/2026-09-03-art-strip-doubleclick.md.')
       .toEqual([]);

@@ -51,7 +51,7 @@ describe('s1 object art save-back (Nemesis)', () => {
     expect(tiles[0].pixels[0]).toBe(synthTile(0).pixels[0]);
   });
 
-  it('inverts flipped pieces (xFlip / yFlip / both) byte-for-byte — CI-safe, no fixtures', () => {
+  it('inverts flipped pieces (xFlip / yFlip / both) byte-for-byte: CI-safe, no fixtures', () => {
     // Four x-adjacent 2x2-cell pieces, one per flip combination, over 16 tiles.
     // Locks the hand-mirrored forward/inverse flip coupling WITHOUT s1disasm.
     const tiles = Array.from({ length: 16 }, (_, i) => synthTile(i));

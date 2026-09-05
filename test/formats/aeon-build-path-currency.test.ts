@@ -73,7 +73,7 @@ function shellExec(text: string): string {
 const AEON_TIP = 'origin/master';
 
 /** Prefix every message with this so nobody triages it as an Aurora regression. */
-const NOT_OURS = 'NOT AN AURORA REGRESSION — aeon\'s build path moved and a guide sentence went stale with it.';
+const NOT_OURS = 'NOT AN AURORA REGRESSION: aeon\'s build path moved and a guide sentence went stale with it.';
 
 /** §7 of the shipped guide — the same bytes the app renders (guides.ts `?raw`). */
 const SAVE_AND_BUILD = (() => {
@@ -94,16 +94,16 @@ describe('CURRENCY: §7 tells the author to run what aeon actually requires', ()
    * like the author's environment is broken.
    */
   it('names tools/regenerate-level.sh, and that script exists at aeon\'s tip', (ctx) => {
-    expect(SAVE_AND_BUILD, '§7 no longer names the re-bake — see C10, the whole point')
+    expect(SAVE_AND_BUILD, '§7 no longer names the re-bake: see C10, the whole point')
       .toContain('tools/regenerate-level.sh');
     if (aeon === null) {
-      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR) — '
+      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR), so '
         + 'CANNOT MEASURE whether tools/regenerate-level.sh is still what §7 should name');
       return;
     }
     const tip = resolveRev(aeon, AEON_TIP);
     if (tip === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon} — `
+      ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon}, so `
         + 'CANNOT MEASURE the re-bake tool §7 names');
       return;
     }
@@ -125,13 +125,13 @@ describe('CURRENCY: §7 tells the author to run what aeon actually requires', ()
    */
   it('build.sh still re-bakes under FAST and refuses without it, before it assembles', (ctx) => {
     if (aeon === null) {
-      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR) — '
+      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR), so '
         + 'CANNOT MEASURE the staleness branch §7 describes');
       return;
     }
     const tip = resolveRev(aeon, AEON_TIP);
     if (tip === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon} — `
+      ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon}, so `
         + 'CANNOT MEASURE the staleness branch §7 describes');
       return;
     }
@@ -159,23 +159,23 @@ describe('CURRENCY: §7 tells the author to run what aeon actually requires', ()
     const [fastArm, canonicalArm] = ((): [string, string] => {
       const elseAt = branch.indexOf('\n    else\n');
       expect(elseAt, `${NOT_OURS}\n${where}`
-        + '  the staleness branch has no else arm — the canonical build may no longer refuse.').toBeGreaterThan(-1);
+        + '  the staleness branch has no else arm: the canonical build may no longer refuse.').toBeGreaterThan(-1);
       return [branch.slice(0, elseAt), branch.slice(elseAt)];
     })();
 
     // ARM 1 — §7: "FAST=1 ./build.sh runs the re-bake for you". Read off
     // `shellExec`: the arm must INVOKE the re-bake, not mention it.
-    expect(fastArm, 'the FAST arm was not isolated — the branch has no `FAST == "1"` test in it')
+    expect(fastArm, 'the FAST arm was not isolated: the branch has no `FAST == "1"` test in it')
       .toMatch(/if \[\[ "\$FAST" == "1" \]\]/);
     expect(shellExec(fastArm), `${NOT_OURS}\n${where}`
       + '  the FAST arm of the staleness branch no longer RUNS the re-bake (it may still name it\n'
-      + '  in a message — that is what this row refuses to accept), so §7\'s "the iteration loop —\n'
+      + '  in a message, which is what this row refuses to accept), so §7\'s "the iteration loop:\n'
       + '  re-bakes for you" is wrong and the loop needs the step spelled out.')
       .toMatch(/^\s*"?\$\{TOOLS\}\/regenerate-level\.sh/m);
 
     // ARM 2 — §7: "./build.sh refuses", and names the remedy.
     expect(canonicalArm, `${NOT_OURS}\n${where}`
-      + '  the canonical arm no longer exits non-zero — §7 tells the author the plain build\n'
+      + '  the canonical arm no longer exits non-zero: §7 tells the author the plain build\n'
       + '  REFUSES until the tree is re-baked, which would then be a false warning.')
       .toContain('exit 1');
     expect(canonicalArm, `${NOT_OURS}\n${where}`
@@ -191,7 +191,7 @@ describe('CURRENCY: §7 tells the author to run what aeon actually requires', ()
       .toBeGreaterThan(-1);
     expect(branchAt, `${NOT_OURS}\n${where}`
       + '  the staleness branch no longer precedes the assemble. §7 tells the author a stale\n'
-      + '  build stops BEFORE anything judges their bytes — that is the sentence at risk.')
+      + '  build stops BEFORE anything judges their bytes: that is the sentence at risk.')
       .toBeLessThan(assembleAt);
   });
 
@@ -210,13 +210,13 @@ describe('CURRENCY: §7 tells the author to run what aeon actually requires', ()
     expect(SAVE_AND_BUILD, '§7 no longer warns that `touch` is not a shortcut. It used to PRESCRIBE it.')
       .toMatch(/`touch` \*{0,2}is not a shortcut past this/);
     if (aeon === null) {
-      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR) — '
+      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR), so '
         + 'CANNOT MEASURE whether the content-stamp arm §7 rests on still exists');
       return;
     }
     const tip = resolveRev(aeon, AEON_TIP);
     if (tip === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon} — `
+      ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon}, so `
         + 'CANNOT MEASURE the content-stamp arm §7 rests on');
       return;
     }
@@ -228,7 +228,7 @@ describe('CURRENCY: §7 tells the author to run what aeon actually requires', ()
     // CANNOT see a delete, which is the case §7 sends the author to re-bake for.
     expect(at.text, `${NOT_OURS}\n  aeon ${AEON_TIP} is ${tip}\n`
       + '  tools/level_staleness.py no longer writes/reads an editor-source stamp. §7 tells the\n'
-      + '  author a delete or a revert is caught whatever the mtimes say — without this arm it\n'
+      + '  author a delete or a revert is caught whatever the mtimes say: without this arm it\n'
       + '  is not, and the old `touch` advice would be back on the table.').toMatch(/--stamp/);
     expect(at.text, `${NOT_OURS}\n  aeon ${AEON_TIP} is ${tip}\n`
       + '  tools/level_staleness.py no longer hashes the editor sources, so the arm §7 describes\n'

@@ -137,7 +137,7 @@ function documentOf(channel: string): EffectsPreset {
 // ---------------------------------------------------------------------------
 
 describe('a fresh base swap is legal by construction, and is the contract\'s worked example', () => {
-  it('is a LIST of minItems bands, not an object — the shape that broke', () => {
+  it('is a LIST of minItems bands, not an object: the shape that broke', () => {
     // ⚠ THE HARD BREAK, ASSERTED FROM THE SCHEMA RATHER THAN FROM THIS FILE.
     // `base_swap` was one closed {line, target} object; the single-object form
     // is REFUSED with no legacy arm, and a fresh document must be born in the
@@ -233,7 +233,7 @@ describe('a fresh base swap is legal by construction, and is the contract\'s wor
     expect(
       newBaseSwap()[0].line,
       "a fresh base_swap is not seeded with the line aeon's section-6 preset actually binds. If "
-      + 'the schema sentence names two lines, this derivation is reading the SUPERSEDED clause — '
+      + 'the schema sentence names two lines, this derivation is reading the SUPERSEDED clause: '
       + 'the historical value, which is legal, in range and refused by nothing, so every other '
       + 'row in this file stays green while new documents are born stale.',
     ).toBe(shipped.base_swap[0].line);
@@ -245,7 +245,7 @@ describe('a fresh base swap is legal by construction, and is the contract\'s wor
     // and this row would go red for the right reason.
     const was = /presets\/ojz_sec6_baseswap\.json \{line: (\d+), target: (\d+)\}/
       .exec(BASE_SWAP_TITLE);
-    expect(was, 'the schema no longer names a superseded section-6 line — if it has gone back to '
+    expect(was, 'the schema no longer names a superseded section-6 line: if it has gone back to '
       + 'stating one number, this row still holds but its hazard is gone; see BASE_SWAP_SEED_LINE')
       .toBeTruthy();
     expect(Number(was![1])).not.toBe(newBaseSwap()[0].line);
@@ -320,7 +320,7 @@ describe('a VRAM base is shown as a VRAM base', () => {
    * the derivation had simply lost its haystack, the module throws at load and
    * this file never runs at all.
    */
-  it('names every address the contract names — which is now NONE — and no other', () => {
+  it('names every address the contract names (now NONE), and no other', () => {
     // The population really is the base_swap prose, and it really no longer
     // carries an address name in the "N ($HEX, VRAM_NAME)" shape the gloss reads.
     expect(BASE_SWAP_TITLE.length).toBeGreaterThan(500);
@@ -710,7 +710,7 @@ describe('strict ascent is derived, refused early, and NAMES the real authority'
     }
   });
 
-  it('refuses descending, duplicated, overlapping and inverted — all four by name', () => {
+  it('refuses descending, duplicated, overlapping and inverted: all four by name', () => {
     expect(baseSwapOrderRefusal([bandAt(100), bandAt(50)])).toMatch(/goes BACKWARDS from/);
     expect(baseSwapOrderRefusal([bandAt(50), bandAt(50)])).toMatch(/DUPLICATES/);
     expect(baseSwapOrderRefusal([bandAt(10, { restore_line: 100 }), bandAt(50)]))
@@ -867,7 +867,7 @@ describe('bands are added and removed with reasons, never silently', () => {
     expect(addBaseSwapBandCommand(lib(swapOf(bandAt(LINE.max - 1))), ID)).not.toBeNull();
   });
 
-  it('the LAST band cannot be removed — minItems, with the schema\'s own reason', () => {
+  it('the LAST band cannot be removed: minItems, with the schema\'s own reason', () => {
     const one = swapOf(bandAt(50));
     const why = lastBaseSwapBandRefusal(one)!;
     expect(why).not.toBeNull();

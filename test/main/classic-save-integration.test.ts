@@ -46,7 +46,7 @@ function resolveVariant(v: { path: string; rev00Path?: string }): string {
     .map((p) => path.join(S1DIR, p))
     .join(' nor ');
   throw new Error(
-    `${tried} is missing — this checkout has the top-level markers but not this file, so the `
+    `${tried} is missing: this checkout has the top-level markers but not this file, so the `
     + 'row below cannot measure anything. It is an INCOMPLETE s1disasm checkout, not an Aurora '
     + 'defect.',
   );
@@ -65,7 +65,7 @@ function requireSingle(p: string): string {
   const r = resolveSingle(p);
   if (r === undefined) {
     throw new Error(
-      `${path.join(S1DIR, p)} is missing — this checkout has the top-level markers but not `
+      `${path.join(S1DIR, p)} is missing: this checkout has the top-level markers but not `
       + 'this file, so the row below cannot measure anything. It is an INCOMPLETE s1disasm '
       + 'checkout, not an Aurora defect.',
     );

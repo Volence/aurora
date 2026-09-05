@@ -310,7 +310,7 @@ describe('s1WarpTo gates', () => {
     expect(r.unservedMethod).toBe('emulator/lookup_symbol');
   });
 
-  it('an unreadable _Constants.asm is its OWN reason — not NoSymbols', async () => {
+  it('an unreadable _Constants.asm is its OWN reason: not NoSymbols', async () => {
     // The listing is fine and the server is fine; the PROJECT is what is
     // missing. Reporting this as "no symbols" would send the user to rebuild a
     // ROM that would come back exactly as unable to answer.

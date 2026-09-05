@@ -82,7 +82,7 @@ function splitPlusVDeform(): EffectsScene {
   } as Partial<EffectsScene>);
 }
 
-describe('the fixture itself — so this file cannot go vacuous', () => {
+describe('the fixture itself: so this file cannot go vacuous', () => {
   it('[z] BOTH fixtures satisfy ensure 1 (locked), so only ensure 2 is under test', () => {
     // If this ever fails, every row below is passing for the OLD arm's reason and
     // proves nothing about the new one.
@@ -93,7 +93,7 @@ describe('the fixture itself — so this file cannot go vacuous', () => {
   });
 });
 
-describe('cameraPreviewPlan — it stops drawing a document that cannot build', () => {
+describe('cameraPreviewPlan: it stops drawing a document that cannot build', () => {
   it('[p1] a locked scene with no v_deform still applies its split (the control)', () => {
     const plan = cameraPreviewPlan(splitScene(), 0, 0);
     expect(plan.bands.map((b) => b.vsplitAt)).toEqual([null, 300]);
@@ -130,7 +130,7 @@ describe('cameraPreviewPlan — it stops drawing a document that cannot build', 
   });
 });
 
-describe('splitRefusal — the second ensure, transcribed', () => {
+describe('splitRefusal: the second ensure, transcribed', () => {
   it('[s1] a locked scene with no v_deform and an in-range line refuses nothing', () => {
     const s = splitScene();
     expect(splitRefusal(s, s.layers[1])).toBeNull();
@@ -194,7 +194,7 @@ describe('splitRefusal — the second ensure, transcribed', () => {
   });
 });
 
-describe('the layer card — row 80 applied to the refusal it never reached', () => {
+describe('the layer card: row 80 applied to the refusal it never reached', () => {
   it('[l1] null on a scene with no v_deform, and null on a layer with no split', () => {
     const flat = splitScene();
     expect(vsplitVDeformAdvisoryParts(flat, flat.layers[1])).toBeNull();
@@ -214,7 +214,7 @@ describe('the layer card — row 80 applied to the refusal it never reached', ()
     expect(parts.diagnosis.length).toBeGreaterThan(40);
   });
 
-  it('[l3] BOTH advisories appear when both ensures are broken — neither suppresses the other', () => {
+  it('[l3] BOTH advisories appear when both ensures are broken: neither suppresses the other', () => {
     // The remedies differ (one moves v_factor, one moves v_deform), so choosing
     // which of two real refusals the author may see is `sceneDeformAdvisories`'
     // guard-3 mistake repeated.
@@ -235,7 +235,7 @@ describe('the layer card — row 80 applied to the refusal it never reached', ()
   });
 });
 
-describe('the scene-level list — composed, not retyped', () => {
+describe('the scene-level list: composed, not retyped', () => {
   it('[d1] the deform advisory now composes the shared clauses', () => {
     const said = sceneDeformAdvisories(splitPlusVDeform());
     const arm = said.find((a) => a.includes('authors a Plane B split'));
@@ -245,7 +245,7 @@ describe('the scene-level list — composed, not retyped', () => {
     expect(arm).toContain('layer 1');
   });
 
-  it('[d2] and it stays SHORT — the mechanism rides on the card that has a hover', () => {
+  it('[d2] and it stays SHORT: the mechanism rides on the card that has a hover', () => {
     // `column-layout.tsx`'s Advisory block records what an unsplit advisory costs
     // this column: the v_factor row's ran to 21 wrapped lines / ~460px. These
     // arms render as plain hints with no hover, so the long clause must not be

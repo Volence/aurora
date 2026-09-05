@@ -209,7 +209,7 @@ describe('reading a preset', () => {
       .toThrow(/minimum 1/);
   });
 
-  it('refuses an unknown key — the schema is CLOSED', () => {
+  it('refuses an unknown key: the schema is CLOSED', () => {
     expect(() => parseEffectsPreset(withDoc((d) => { d.wobble = 3; }), 'minimal'))
       .toThrow(/unknown property "wobble"/);
   });
@@ -237,7 +237,7 @@ describe('reading a preset', () => {
     expect(() => parseEffectsPreset(bad, 'minimal')).toThrow(/allowed forms/);
   });
 
-  it('refuses a band missing ANY of the four keys — none has a default', () => {
+  it('refuses a band missing ANY of the four keys: none has a default', () => {
     for (const key of EFFECTS_PRESET_BAND_KEYS) {
       const text = withDoc((d) => { delete (d.bands as Record<string, unknown>[])[0][key]; });
       expect(() => parseEffectsPreset(text, 'minimal'), key)
@@ -315,7 +315,7 @@ describe('writing a preset', () => {
     expect(serializeEffectsPreset(a)).toBe(serializeEffectsPreset(b));
   });
 
-  it('sorts keys alphabetically and RECURSIVELY — aeon\'s normative sort_keys=True', () => {
+  it('sorts keys alphabetically and RECURSIVELY: aeon\'s normative sort_keys=True', () => {
     const text = serializeEffectsPreset(parseEffectsPreset(AUTHORED_PROBE, 'authored_probe'));
     // The band object reads bot, on, sh, top — not the order a human types.
     expect(text.indexOf('"bot"')).toBeLessThan(text.indexOf('"on"'));
@@ -422,7 +422,7 @@ describe('the item-5 precondition: a document carrying cycles / variants parses 
     return canonicalJsonPretty({ ...(JSON.parse(MINIMAL) as Record<string, unknown>), ...extra });
   }
 
-  it('`cycles: null` — cycling OFF — parses, is NOT read as absent, and survives a save', () => {
+  it('`cycles: null` (cycling OFF) parses, is NOT read as absent, and survives a save', () => {
     const text = canonicalWith({ cycles: null });
     const p = parseEffectsPreset(text, 'minimal');
     expect('cycles' in p).toBe(true);
@@ -452,7 +452,7 @@ describe('the item-5 precondition: a document carrying cycles / variants parses 
     expect(serializeEffectsPreset(p)).toBe(text);
   });
 
-  it('an UNKNOWN root key is still refused — the root stays closed', () => {
+  it('an UNKNOWN root key is still refused: the root stays closed', () => {
     expect(() => parseEffectsPreset(canonicalWith({ wobble: 3 }), 'minimal'))
       .toThrow(/unknown property "wobble"/);
   });
@@ -571,7 +571,7 @@ describe('the item-4 authoring key: patch_world_ys / patch_motion', () => {
     expect(written.patch_motion).toHaveLength(2);
   });
 
-  it('an ABSENT key stays absent through a round trip — absent is a state, not a default', () => {
+  it('an ABSENT key stays absent through a round trip: absent is a state, not a default', () => {
     const text = MINIMAL;
     const p = parseEffectsPreset(text, 'minimal');
     expect('patch_world_ys' in p).toBe(false);
@@ -590,7 +590,7 @@ describe('the item-4 authoring key: patch_world_ys / patch_motion', () => {
 
   // ── The refusals the schema owns, each with the wording that names it ──
 
-  it('refuses the SENTINEL written as an integer — "unused" is spelled null', () => {
+  it('refuses the SENTINEL written as an integer: "unused" is spelled null', () => {
     expect(EFFECTS_PRESET_PATCH_ANCHOR_NONE).toBe(32767);
     expect(() => parseEffectsPreset(
       canonicalWith({ patch_world_ys: [EFFECTS_PRESET_PATCH_ANCHOR_NONE] }), 'minimal',
@@ -625,7 +625,7 @@ describe('the item-4 authoring key: patch_world_ys / patch_motion', () => {
       canonicalWith({ patch_world_ys: over.slice(1) }), 'minimal')).not.toThrow();
   });
 
-  it('refuses an `approach` arm — none exists and none is reserved', () => {
+  it('refuses an `approach` arm: none exists and none is reserved', () => {
     let message = '';
     try {
       parseEffectsPreset(
@@ -681,7 +681,7 @@ describe('the item-4 authoring key: patch_world_ys / patch_motion', () => {
    * 57344 is legal and stays legal (this codec clamps nothing, §E.4), it is just
    * not what the author wrote.
    */
-  it('carries a world Y 1:1 — a ×256 anywhere on this path would go red here', () => {
+  it('carries a world Y 1:1: a ×256 anywhere on this path would go red here', () => {
     expect(EFFECTS_PRESET_PATCH_SEED_UNITS_PER_PIXEL).toBe(1);
     const px = 224;
     const text = canonicalWith({ patch_world_ys: [px] });

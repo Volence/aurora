@@ -306,7 +306,7 @@ describe('the paint index (Task 12)', () => {
     expect(useCanvasStore.getState().paintIndex).toBe(63);
   });
 
-  it('neither records nor dirties — it is view state', () => {
+  it('neither records nor dirties: it is view state', () => {
     openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
     useCanvasStore.getState().setPaintIndex(canvasIndex(2, 3));
     expect(useCanvasStore.getState().isDirty(A)).toBe(false);
@@ -343,7 +343,7 @@ describe('arming the brush on the document\'s own palette (R18, BOTH doors)', ()
     expect(useCanvasStore.getState().paintIndex).toBe(canvasIndex(0, 9));
   });
 
-  it('does NOT re-arm on a plain focus change — the artist keeps their colour', () => {
+  it('does NOT re-arm on a plain focus change: the artist keeps their colour', () => {
     // Arming belongs to INSTALLING a document, not to looking at one: firing it
     // from activateCanvasDoc would reset the chosen colour on every tab switch.
     // The two palettes differ so the assertion can tell "left alone" from

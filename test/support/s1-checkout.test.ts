@@ -110,7 +110,7 @@ describe('S1_GLOBAL_REQUIRED_KEYS is measured against read(), not asserted', () 
     const evidence: Record<string, string> = {};
     for (const e of GLOBAL_ENTRIES) {
       const msg = await refusalFor([e.key]);
-      evidence[e.key] = msg === null ? '(read succeeded — not required)' : msg;
+      evidence[e.key] = msg === null ? '(read succeeded, not required)' : msg;
       if (msg !== null && msg.includes(e.variant.path)) measured.push(e.key);
     }
     // PRINTS THE ARTIFACT IT JUDGES: every global entry and what read() did.

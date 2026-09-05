@@ -179,7 +179,7 @@ describe('scene-level enumerations and bounds (schema §2.1/§2.2)', () => {
       .toThrow(new RegExp(`v_factor: ${max + 1} is above the maximum ${max}`));
   });
 
-  it('REFUSES every FACTOR_* name at v_factor — the item-35 regression', () => {
+  it('REFUSES every FACTOR_* name at v_factor: the item-35 regression', () => {
     // The defect, stated as a property: the sixteen names that are legal at a
     // LAYER's fa are all illegal at the SCENE's v_factor. Driven off the schema's
     // own enum, so it covers whatever set §2.3 publishes.

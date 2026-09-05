@@ -252,7 +252,7 @@ describe('confirmProjectOpen over a dirty canvas', () => {
     expect(useCanvasStore.getState().isDirty(CANVAS)).toBe(true);
   });
 
-  it("'discard' is what drops the documents — and it is reached only via the dialog", async () => {
+  it("'discard' is what drops the documents: it is reached only via the dialog", async () => {
     dirtyCanvas(true);
     const p = confirmProjectOpen();
     useConfirmStore.getState().answer('discard');

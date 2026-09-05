@@ -35,7 +35,7 @@ const S1_ABSENT = referenceCheckoutReason(S1_PINNED);
 const S1_PRESENT = referenceCheckout(S1_PINNED);
 if (!S1_PRESENT) {
   // eslint-disable-next-line no-console
-  console.warn('s1-object-anim.test: s1disasm not found — the real-script derivation rows are SKIPPED');
+  console.warn('s1-object-anim.test: s1disasm not found, so the real-script derivation rows are SKIPPED');
 }
 
 /** Read + parse one `_anim/*.asm` with the shipped parser; problems must be empty. */
@@ -125,7 +125,7 @@ describe('synced anims are phase-locked to the shared channel counter', () => {
     }
   });
 
-  it('two placements of one id read one strip — frame selection has no per-object state', () => {
+  it('two placements of one id read one strip: frame selection has no per-object state', () => {
     // previewStepIndexAt takes only (anim, t): two Rings at the same tick CANNOT
     // disagree. Locked via the state key: one entry per strip, not per object.
     const ring = buildSyncPreview(resolveObjectAnims(0x25)!.sync![0])!;

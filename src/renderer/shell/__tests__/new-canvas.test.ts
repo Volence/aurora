@@ -38,7 +38,7 @@ function reasonFor(input: Partial<typeof OK>, existing: string[] = []): string {
   return v.ok ? '' : v.reason;
 }
 
-describe('validateNewCanvas — names', () => {
+describe('validateNewCanvas: names', () => {
   it('accepts a plain name in an empty project', () => {
     expect(validateNewCanvas(OK, [])).toEqual({ ok: true });
   });
@@ -85,7 +85,7 @@ describe('validateNewCanvas — names', () => {
   });
 });
 
-describe('validateNewCanvas — sizes', () => {
+describe('validateNewCanvas: sizes', () => {
   it('accepts the bounds and refuses outside them, with the numbers', () => {
     expect(validateNewCanvas({ ...OK, width: CANVAS_MIN_SIDE, height: CANVAS_MAX_SIDE }, []).ok).toBe(true);
     // blankCanvasDoc CLAMPS silently, so without this the user asks for 4x4 and
@@ -188,7 +188,7 @@ describe('newCanvasPalette', () => {
 });
 
 describe('NEW_CANVAS_DEFAULTS', () => {
-  it('is a VALID input — the dialog cannot open already-invalid', () => {
+  it('is a VALID input: the dialog cannot open already-invalid', () => {
     // These are the two values contract 2 names by number, and as constants in
     // NewCanvasDialog.tsx nothing could reach them: an edit pushing the default
     // side past CANVAS_MAX_SIDE would ship a dialog whose Create button is
@@ -208,7 +208,7 @@ describe('NEW_CANVAS_DEFAULTS', () => {
    * "there is nothing to commit yet". A default has to be a size the app can
    * actually do the main thing with.
    */
-  it('opens at a size that CAN be committed — one whole chunk', () => {
+  it('opens at a size that CAN be committed: one whole chunk', () => {
     expect([NEW_CANVAS_DEFAULTS.width, NEW_CANVAS_DEFAULTS.height]).toEqual([256, 256]);
     expect(NEW_CANVAS_DEFAULTS.profileId).toBe('genesis-level-art');
     expect(commitReachNote(NEW_CANVAS_DEFAULTS.width, NEW_CANVAS_DEFAULTS.height)).toBeNull();
@@ -227,7 +227,7 @@ describe('NEW_CANVAS_DEFAULTS', () => {
   });
 });
 
-describe('parseCanvasSide — an empty field is not zero', () => {
+describe('parseCanvasSide: an empty field is not zero', () => {
   it('reads an empty or blank field as NaN', () => {
     // `Number('')` is 0, so holding the sizes as numbers turned a cleared field
     // into a literal 0 on screen — a value the user never typed, shown back to
@@ -247,7 +247,7 @@ describe('parseCanvasSide — an empty field is not zero', () => {
   });
 });
 
-describe('newCanvasFieldErrors — every field at once', () => {
+describe('newCanvasFieldErrors: every field at once', () => {
   it('reports the name AND the size together', () => {
     // The dialog marks every bad field and explains the one the user last
     // touched. With only a first-wins answer, clearing the width field showed a
@@ -263,7 +263,7 @@ describe('newCanvasFieldErrors — every field at once', () => {
     expect(newCanvasFieldErrors(OK, [])).toEqual({});
   });
 
-  it('and validateNewCanvas is that, first-in-order — name before size', () => {
+  it('and validateNewCanvas is that, first-in-order: name before size', () => {
     // The CREATE path still wants exactly one refusal, with the collision never
     // masked by a typo'd number. Both shapes, one set of rules.
     const v = validateNewCanvas({ ...OK, name: 'cliffs', width: 0 }, ['cliffs']);

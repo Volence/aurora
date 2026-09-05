@@ -38,7 +38,7 @@ function callbackDeps(src: string, name: string): string | null {
 }
 
 describe('the aeon policies', () => {
-  it('locks line 0 in the Art mount — it is the shared PLAYER palette', () => {
+  it('locks line 0 in the Art mount: it is the shared PLAYER palette', () => {
     expect(AEON_ART_PALETTE_POLICY.lockedLines).toEqual([0]);
     expect(isLineLocked(0, AEON_ART_PALETTE_POLICY)).toBe(true);
     expect(swatchClick(0, 4, AEON_ART_PALETTE_POLICY)).toEqual({ select: false, edit: false });
@@ -164,7 +164,7 @@ describe('a palette drag through this port can never be stranded', () => {
     // Both, unconditionally: at teardown time the palette mode may already have
     // flipped to the value that removed the panel, so picking an ender by the
     // current mode runs the wrong one. Each is a no-op with no snapshot out.
-    expect(SRC, 'the port lost its drain — a mid-drag unmount strands the mutation')
+    expect(SRC, 'the port lost its drain: a mid-drag unmount strands the mutation')
       .toMatch(/const drain = React\.useCallback\(\(\): void => \{\s*endZoneDrag\(\);\s*endStandaloneDrag\(\);\s*\}/);
     expect(SRC, 'drain is not on the port, so no host can call it').toMatch(/^\s*drain,$/m);
   });
@@ -233,7 +233,7 @@ describe('the aeon port watches both clocks', () => {
   it('uses the HUB-WIDE history clock, not the aeon-scoped one', () => {
     // useAeonHistoryVersion deliberately drops sprite documents, and the
     // standalone palette commits to exactly those.
-    expect(SRC, 'the port narrowed to the aeon-only history clock — the sprite palette will go stale')
+    expect(SRC, 'the port narrowed to the aeon-only history clock: the sprite palette will go stale')
       .not.toMatch(/useAeonHistoryVersion/);
   });
 });

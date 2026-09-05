@@ -41,14 +41,14 @@ describe('the two plane spans are one plane, derived two different ways', () => 
     expect(PLANE_COLUMN_SPAN).toBe(PLANE_LINE_SPAN);
   });
 
-  it('a plane span is NOT a section — the two numbers the row confused', () => {
+  it('a plane span is NOT a section: the two numbers the row confused', () => {
     // The whole point of the file, as an assertion: if these ever became equal
     // the axis trap would stop being detectable by inspection.
     expect(PLANE_COLUMN_SPAN).not.toBe(SECTION_PIXEL_SIZE);
   });
 });
 
-describe('act reach — world pixels, extent and travel are different quantities', () => {
+describe('act reach: world pixels, extent and travel are different quantities', () => {
   it('extent is grid * section, travel is extent less one screen', () => {
     const r = actReach(OJZ_ACT1);
     expect(r.extentX).toBe(OJZ_ACT1.gridWidth * SECTION_PIXEL_SIZE);
@@ -98,7 +98,7 @@ describe('the binary search rests on monotonicity, so monotonicity is asserted',
   });
 });
 
-describe('horizontal — a band repeats, and the readout says where', () => {
+describe('horizontal: a band repeats, and the readout says where', () => {
   const travelX = actReach(OJZ_ACT1).travelX;
 
   it('a half-speed band starts over after twice a plane width of camera', () => {
@@ -126,7 +126,7 @@ describe('horizontal — a band repeats, and the readout says where', () => {
     expect(bandReachClause(r, travelX)).toContain('never repeats');
   });
 
-  it('the crossings are the DECODE\'s, not the fraction\'s — every reported camX is exact', () => {
+  it('the crossings are the DECODE\'s, not the fraction\'s: every reported camX is exact', () => {
     // At each reported camX the scroll has just reached a whole plane width, and
     // one pixel earlier it had not. This is what makes the readout a statement
     // about the engine rather than about `factorRatio`.
@@ -158,7 +158,7 @@ describe('horizontal — a band repeats, and the readout says where', () => {
   });
 });
 
-describe('vertical — the advisory speaks only when the plane runs out of picture', () => {
+describe('vertical: the advisory speaks only when the plane runs out of picture', () => {
   const travelY = actReach(OJZ_ACT1).travelY;
 
   it('a LOCKED plane cannot wrap, so both shipped scenes are silent', () => {
@@ -231,7 +231,7 @@ describe('vertical — the advisory speaks only when the plane runs out of pictu
     expect(verticalReach(scene(0), widest.travelY).beyondCameraWord).toBe(false);
   });
 
-  it('LOUD, NOT SILENT, past the signed-word camera — the false negative this could have been', () => {
+  it('LOUD, NOT SILENT, past the signed-word camera: the false negative this could have been', () => {
     // `planeVscroll` folds camY to a word, so an unguarded search past $7FFF
     // reports "no wrap" for an act that wraps many times over. No legal act can
     // get here; the flag is what makes that a checkable claim rather than a

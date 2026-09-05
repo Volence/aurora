@@ -61,9 +61,9 @@ describe('Clear and Reset say that the loop crossover goes with the wipe', () =>
     // from this file cannot pass either.
     expect(SRC).toContain("import { actAndDropFocus } from './ui/act-and-drop-focus';");
     const at = HELPER_SRC.indexOf('export function actAndDropFocus');
-    expect(at, 'actAndDropFocus not found — the d-27 wiring cannot be judged').toBeGreaterThan(-1);
+    expect(at, 'actAndDropFocus not found: the d-27 wiring cannot be judged').toBeGreaterThan(-1);
     const end = HELPER_SRC.indexOf('\n}', at);
-    expect(end, 'actAndDropFocus has no closing brace — refusing to judge a partial read')
+    expect(end, 'actAndDropFocus has no closing brace: refusing to judge a partial read')
       .toBeGreaterThan(at);
     const helper = HELPER_SRC.slice(at, end);
     expect(helper).toContain('.blur()');
@@ -73,13 +73,13 @@ describe('Clear and Reset say that the loop crossover goes with the wipe', () =>
 
   it("Reset's tooltip names the loop crossover", () => {
     const title = /title=\{`Reset section \$\{activeSection\}[^`]*`\}/.exec(SRC)?.[0];
-    expect(title, 'Reset button title not found — the row cannot judge what it cannot read').toBeTruthy();
+    expect(title, 'Reset button title not found: the row cannot judge what it cannot read').toBeTruthy();
     expect(title!.toLowerCase()).toContain('loop crossover');
   });
 
   it("Clear's tooltip names the loop crossover", () => {
     const title = /title=\{`Erase ALL collision[^`]*`\}/.exec(SRC)?.[0];
-    expect(title, 'Clear button title not found — the row cannot judge what it cannot read').toBeTruthy();
+    expect(title, 'Clear button title not found: the row cannot judge what it cannot read').toBeTruthy();
     expect(title!.toLowerCase()).toContain('loop crossover');
   });
 

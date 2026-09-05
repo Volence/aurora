@@ -37,7 +37,7 @@ describe('bandSpecOf', () => {
   });
 });
 
-describe('bandVerbs — no document', () => {
+describe('bandVerbs: no document', () => {
   const v = bandVerbs(null, { staticBase: 0, cols: 1, rows: 1 });
   it('disables both with the panel\'s own reasons', () => {
     expect(v.promote.reason).toBe(promoteUnavailableReason(null));
@@ -51,7 +51,7 @@ describe('bandVerbs — no document', () => {
   });
 });
 
-describe('bandVerbs — the fixture document', () => {
+describe('bandVerbs: the fixture document', () => {
   const d = doc();
   const base = bandBudget(d).firstPromotableSlot;
   const candidate = { staticBase: base, cols: 1, rows: 1 } as const;
@@ -61,7 +61,7 @@ describe('bandVerbs — the fixture document', () => {
     expect(v.promote.label).toBe(`Promote from tile ${base}`);
     expect(v.add.label).toBe('Add blank tile animation');
   });
-  it('the label follows the candidate\'s base — it is derived, not fixed', () => {
+  it('the label follows the candidate\'s base: it is derived, not fixed', () => {
     expect(bandVerbs(d, { ...candidate, staticBase: base + 5 }).promote.label)
       .toBe(`Promote from tile ${base + 5}`);
   });
@@ -89,7 +89,7 @@ describe('bandVerbs — the fixture document', () => {
   });
 });
 
-describe('the seed follows the document — EFFECTS-W1 defect 12', () => {
+describe('the seed follows the document: EFFECTS-W1 defect 12', () => {
   // THE DEFECT, IN ONE SENTENCE: adding a tile animation grew the animated
   // prefix and the panel's seed followed it (32 -> 33); UNDO shrank the prefix
   // back and the seed did NOT, so the toolbar went on offering
@@ -105,7 +105,7 @@ describe('the seed follows the document — EFFECTS-W1 defect 12', () => {
     ...(authored === undefined ? {} : { staticBaseAuthored: authored }),
   });
 
-  it('an UNAUTHORED seed follows the prefix DOWN as well as up — the defect', () => {
+  it('an UNAUTHORED seed follows the prefix DOWN as well as up: the defect', () => {
     expect(seededStaticBase(base(32), 33)).toBe(33);
     // The half that was missing. Without it the toolbar keeps offering 33.
     expect(seededStaticBase(base(33), 32)).toBe(32);
@@ -121,7 +121,7 @@ describe('the seed follows the document — EFFECTS-W1 defect 12', () => {
     expect(seededStaticBase(base(80, true), 80)).toBe(80);
   });
 
-  it('ABSENT means unauthored — every candidate written before the flag existed', () => {
+  it('ABSENT means unauthored: every candidate written before the flag existed', () => {
     const c = { staticBase: 33, cols: 1, rows: 1 };
     expect('staticBaseAuthored' in c).toBe(false);
     expect(seededStaticBase(c, 32)).toBe(32);

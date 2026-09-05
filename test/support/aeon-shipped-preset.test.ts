@@ -95,7 +95,7 @@ describe('§1 the module refuses, and every refusal names the path', () => {
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
-  it('ABSENT — throws, and the message carries the ABSOLUTE PATH and the booking', () => {
+  it('ABSENT: throws, and the message carries the ABSOLUTE PATH and the booking', () => {
     const root = bed({});
     try {
       const path = shippedPresetPath(root);
@@ -111,7 +111,7 @@ describe('§1 the module refuses, and every refusal names the path', () => {
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
-  it('HALF-LANDED RENAME — the file moved and the `id` inside did not', () => {
+  it('HALF-LANDED RENAME: the file moved and the `id` inside did not', () => {
     const root = bed({ [AEON_SHIPPED_PRESET_FILE]: JSON.stringify({ id: 'aeon_authored_probe', bands: [] }) });
     try {
       let msg = '';
@@ -123,7 +123,7 @@ describe('§1 the module refuses, and every refusal names the path', () => {
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
-  it('NOT JSON, and NO id — both refuse naming the path', () => {
+  it('NOT JSON, and NO id: both refuse naming the path', () => {
     const bad = bed({ [AEON_SHIPPED_PRESET_FILE]: '{ this is not json' });
     const idless = bed({ [AEON_SHIPPED_PRESET_FILE]: JSON.stringify({ bands: [], name: 'x' }) });
     const arr = bed({ [AEON_SHIPPED_PRESET_FILE]: '[]' });
@@ -138,7 +138,7 @@ describe('§1 the module refuses, and every refusal names the path', () => {
     }
   });
 
-  it('refuses a root that is empty or relative — an unset AEON_DIR is not a path', () => {
+  it('refuses a root that is empty or relative: an unset AEON_DIR is not a path', () => {
     expect(() => shippedPresetPath('')).toThrow(/AEON_DIR/);
     expect(() => shippedPresetPath(undefined as unknown as string)).toThrow(/AEON_DIR/);
     expect(() => shippedPresetPath('games/sonic4')).toThrow(/ABSOLUTE/);
@@ -172,7 +172,7 @@ describe('§2 all five harnesses reach the id through the module, not through a 
   /** Source with comment lines removed — see the note above. */
   function codeLines(rel: string): string[] {
     const text = readFileSync(join(REPO, rel), 'utf8');
-    expect(text.length, `${rel} is EMPTY — this row cannot measure anything`).toBeGreaterThan(1000);
+    expect(text.length, `${rel} is EMPTY: this row cannot measure anything`).toBeGreaterThan(1000);
     return text.split('\n').filter((l) => {
       const t = l.trim();
       return t.length > 0 && !t.startsWith('//') && !t.startsWith('*') && !t.startsWith('/*');
@@ -223,12 +223,12 @@ describe('§3 aeon still ships the document these harnesses read', () => {
 
   it(`aeon ${TIP}: ${PATH} exists, and its \`id\` matches its filename`, (ctx) => {
     if (aeon === null) {
-      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR) — CANNOT '
+      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR), so CANNOT '
         + `MEASURE whether aeon still ships ${PATH}`);
       return;
     }
     if (resolveRev(aeon, TIP) === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${aeon} (unfetched? shallow?) — `
+      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${aeon} (unfetched? shallow?), so `
         + `CANNOT MEASURE whether aeon still ships ${PATH}`);
       return;
     }
@@ -249,7 +249,7 @@ describe('§3 aeon still ships the document these harnesses read', () => {
     // band-less one would make band-preset's row [1b] vacuous, and its own
     // import-time guard refuses it. Stated here too so the reason is in one place.
     expect(Array.isArray(doc.bands) && doc.bands.length >= 1,
-      `${PATH} at aeon ${TIP} carries no bands — band-preset's row [1b] would be vacuous`)
+      `${PATH} at aeon ${TIP} carries no bands: band-preset's row [1b] would be vacuous`)
       .toBe(true);
   });
 });

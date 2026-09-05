@@ -207,7 +207,7 @@ describe('[h1] paint_collision: words + plane:"both"', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('[h2] paint_collision: words + crossover', () => {
-  it('an OMITTED crossover keeps every cell\'s own — never clears it', async () => {
+  it('an OMITTED crossover keeps every cell\'s own: never clears it', async () => {
     const r = await ask({ ...base, plane: 'a', words: WORDS }) as { crossover: string };
     console.log(`[h2k] reply crossover=${r.crossover}  ${show(0, 0)}`);
     expect(r.crossover).toBe('keep');
@@ -249,7 +249,7 @@ describe('[h2] paint_collision: words + crossover', () => {
     expect(readCrossover(cellWord(planeA(), 1, 0))).toBe('to-b');
   });
 
-  it('aimed at plane B, hand-off writes B\'s legal value — never a self-mark', async () => {
+  it('aimed at plane B, hand-off writes B\'s legal value: never a self-mark', async () => {
     for (const [cc, cr] of CELLS) setCell(planeB(), cc, cr, solid(22));
     await ask({ ...base, plane: 'b', words: WORDS, crossover: 'hand-off' });
     const got = readCrossover(cellWord(planeB(), 0, 0));
@@ -335,7 +335,7 @@ describe('[h4] the refusals', () => {
     expect(Array.from(planeA())).toEqual(beforeA);         // and wrote nothing
   });
 
-  it('paint_collision still refuses NEITHER form — a crossover alone is not a paint', async () => {
+  it('paint_collision still refuses NEITHER form: a crossover alone is not a paint', async () => {
     const beforeA = Array.from(planeA());
     await expect(ask({ ...base, plane: 'both', crossover: 'hand-off' }))
       .rejects.toThrow(/neither was given/);

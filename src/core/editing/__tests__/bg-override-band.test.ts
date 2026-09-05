@@ -211,7 +211,7 @@ function fullBandlessDoc(): BgOverrideDocument {
   return { layout: GOLDEN.layout.slice(), tiles };
 }
 
-describe('set-bg-override-band — promotion and demotion', () => {
+describe('set-bg-override-band: promotion and demotion', () => {
   it('PROMOTES on a document with no free tile slots, where adding refuses outright', () => {
     // THE ACCEPTANCE ROW. The property, not the number: a full blob has nowhere
     // for an inserted band's art to go, and promotion needs none.

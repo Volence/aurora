@@ -86,7 +86,7 @@ describe('OVERLAY_KEYS_BY_ENGINE', () => {
     expect(OVERLAY_KEYS_BY_ENGINE.aeon).not.toContain('occludeSprites');
   });
 
-  it('SHARES the priority lens with aeon — the owner could not see it there', () => {
+  it('SHARES the priority lens with aeon: the owner could not see it there', () => {
     // 2026-08-28. The owner, from a play session: "No way to see what art on fg
     // is priority or not. Randomly sometimes sonic just goes behind a tile that
     // I wasn't aware was prioritised." The checkbox was not in the aeon menu at
@@ -96,7 +96,7 @@ describe('OVERLAY_KEYS_BY_ENGINE', () => {
     expect(OVERLAY_KEYS_BY_ENGINE.s1).toContain('showPriority');
   });
 
-  it('SHARES the play toggle with aeon — it drives BgAnim bands there', () => {
+  it('SHARES the play toggle with aeon: it drives BgAnim bands there', () => {
     // ROADMAP item 42. The two engines play different things off one key (the
     // OverlayOptions docblock says which), and the ruling chose this key
     // precisely because it already existed with the right default rather than
@@ -115,7 +115,7 @@ describe('OVERLAY_KEYS_BY_ENGINE', () => {
 });
 
 describe('the screen frame (triage 2026-08-26 row G)', () => {
-  it('is OFF by default — a reference the author asks for, like the lenses', () => {
+  it('is OFF by default: a reference the author asks for, like the lenses', () => {
     expect(defaults().showScreenFrame).toBe(false);
   });
   it('toggles through the same toggleOverlay the View menu uses', () => {

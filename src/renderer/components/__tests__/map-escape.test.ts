@@ -21,7 +21,7 @@ describe('resolveEscape', () => {
     )).toBe('lens');
   });
 
-  it('leaves the lens alone outside the Effects facet — that facet owns it', () => {
+  it('leaves the lens alone outside the Effects facet: that facet owns it', () => {
     expect(resolveEscape({ pasting: false, marquee: null, bandLensTarget: LIT }, false)).toBe(null);
   });
 

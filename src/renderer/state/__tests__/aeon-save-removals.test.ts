@@ -124,7 +124,7 @@ function installWindowApi(
   };
 }
 
-describe('saveAeonProject — the removal step', () => {
+describe('saveAeonProject: the removal step', () => {
   let files: Map<string, Uint8Array>;
   let ops: Op[];
   let deleteFails: Set<string>;
@@ -187,9 +187,9 @@ describe('saveAeonProject — the removal step', () => {
     await saveAeonProject();
     const lastWrite = ops.map((o) => o.kind).lastIndexOf('write');
     const firstDelete = ops.map((o) => o.kind).indexOf('delete');
-    expect(firstDelete, 'no delete happened — the ordering row has nothing to judge')
+    expect(firstDelete, 'no delete happened: the ordering row has nothing to judge')
       .toBeGreaterThan(-1);
-    expect(lastWrite, 'no write happened — the ordering row has nothing to judge')
+    expect(lastWrite, 'no write happened: the ordering row has nothing to judge')
       .toBeGreaterThan(-1);
     expect(lastWrite).toBeLessThan(firstDelete);
   });
@@ -249,7 +249,7 @@ describe('saveAeonProject — the removal step', () => {
     expect(files.has(`${SCENE_DIR}victim.json`)).toBe(false);
   });
 
-  it('treats an ALREADY-ABSENT file as a success — somebody else reached the same end state',
+  it('treats an ALREADY-ABSENT file as a success: somebody else reached the same end state',
     async () => {
       dropScene('victim');
       files.delete(`${SCENE_DIR}victim.json`);

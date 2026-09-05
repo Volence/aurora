@@ -83,7 +83,7 @@ describe('which grids get drawn', () => {
     expect(plan.underlay).toEqual([]);
   });
 
-  it('sends 256 to the underlay — the viewport has no layer for it', () => {
+  it('sends 256 to the underlay: the viewport has no layer for it', () => {
     const plan = planCanvasGrids([8, 16, 256], [256], NO_ORIGIN);
     expect(plan.layerGrids).toEqual([]);
     expect(plan.underlay).toEqual([{ pitch: 256, offsetX: 0, offsetY: 0, weight: 'chunk' }]);
@@ -174,7 +174,7 @@ describe('an offset grid looks identical to an aligned one', () => {
     expect(CANVAS_GRID_STROKE[weight]).toBe(`rgba(255,255,255,${layerAlpha(kind)})`);
   });
 
-  it('the chunk grid is distinct from both — no shared layer draws that pitch', () => {
+  it('the chunk grid is distinct from both: no shared layer draws that pitch', () => {
     expect(CANVAS_GRID_STROKE.chunk).not.toBe(CANVAS_GRID_STROKE.cell);
     expect(CANVAS_GRID_STROKE.chunk).not.toBe(CANVAS_GRID_STROKE.block);
   });

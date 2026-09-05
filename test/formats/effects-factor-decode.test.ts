@@ -37,7 +37,7 @@ function fractionFromName(name: EffectsFactorName): { num: number; den: number }
   return { num: tail[0], den: tail[1] };
 }
 
-describe('EFFECTS_FACTOR_PACKED — coverage of the published set', () => {
+describe('EFFECTS_FACTOR_PACKED: coverage of the published set', () => {
   it('has a triple for every name the schema publishes', () => {
     const missing = EFFECTS_FACTOR_NAMES.filter((n) => resolveFactor(n) === null);
     expect(missing).toEqual([]);
@@ -64,7 +64,7 @@ describe('EFFECTS_FACTOR_PACKED — coverage of the published set', () => {
   });
 });
 
-describe('AGREEMENT — the name spells the fraction the triple computes', () => {
+describe('AGREEMENT: the name spells the fraction the triple computes', () => {
   // ⚠ The one table the report prints. Every published name, its triple, the
   // ratio the triple gives, and the fraction the name spells.
   for (const name of EFFECTS_FACTOR_NAMES) {
@@ -80,7 +80,7 @@ describe('AGREEMENT — the name spells the fraction the triple computes', () =>
   }
 });
 
-describe('packFactor — the one numeric fact aeon asserts about the encoding', () => {
+describe('packFactor: the one numeric fact aeon asserts about the encoding', () => {
   it('FACTOR_LOCKED packs to $0FF', () => {
     // aeon scene_dsl.emp:72 pins this across two modules: "scene_dsl's inlined
     // locked-factor encoding ($0FF) drifted from parallax_dsl.FACTOR_0".
@@ -105,7 +105,7 @@ describe('packFactor — the one numeric fact aeon asserts about the encoding', 
   });
 });
 
-describe('THE SENTINEL — 15 is not a shift', () => {
+describe('THE SENTINEL: 15 is not a shift', () => {
   it('s1 == 15 returns 0 for every camera X, including the ones a shift would not', () => {
     // ⚠ WHERE THIS ROW BITES, said plainly. For camX in 0..32767, `camX >> 15`
     // is 0 and 0 is the identity for both + and -, so a decoder that treated
@@ -145,7 +145,7 @@ describe('THE SENTINEL — 15 is not a shift', () => {
   });
 });
 
-describe('decodeFactorScroll — the shift-add, term by term', () => {
+describe('decodeFactorScroll: the shift-add, term by term', () => {
   it('single-term factors are a plain asr', () => {
     expect(decodeFactorScroll(1000, 'FACTOR_1')).toBe(1000);
     expect(decodeFactorScroll(1000, 'FACTOR_1_2')).toBe(500);
@@ -221,7 +221,7 @@ describe('the DIFFERENTIAL property the preview rests on', () => {
     expect(half / sixteenth).toBe(8);
   });
 
-  it('a 1/16 band needs SIXTEEN camera pixels to move one — the arrow-key step', () => {
+  it('a 1/16 band needs SIXTEEN camera pixels to move one: the arrow-key step', () => {
     expect(decodeFactorScroll(15, 'FACTOR_1_16')).toBe(0);
     expect(decodeFactorScroll(16, 'FACTOR_1_16')).toBe(1);
     // and a 1/32 band needs thirty-two, which is why one step is not enough
@@ -231,7 +231,7 @@ describe('the DIFFERENTIAL property the preview rests on', () => {
   });
 });
 
-describe('hscrollWord — the engine\'s negation, kept named', () => {
+describe('hscrollWord: the engine\'s negation, kept named', () => {
   it('is the decode negated', () => {
     expect(hscrollWord(1000, 'FACTOR_1_2')).toBe(-500);
     expect(hscrollWord(1000, 'FACTOR_LOCKED')).toBe(0);

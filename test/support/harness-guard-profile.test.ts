@@ -149,7 +149,7 @@ beforeAll(async () => {
   ]);
 });
 
-describe('pinUserDataDir — the switch, and WHERE it goes', () => {
+describe('pinUserDataDir: the switch, and WHERE it goes', () => {
   /**
    * POSITION IS THE ASSERTION, not presence. The command is `xvfb-run … <bin>
    * <app.mjs>`: a switch at the front is eaten by xvfb-run and one at the back
@@ -191,7 +191,7 @@ describe('pinUserDataDir — the switch, and WHERE it goes', () => {
     expect(args.join(' '), 'and NOT both switches').not.toContain('/tmp/P');
   });
 
-  it('the switch it writes is the one it tests for — one spelling, not two', () => {
+  it('the switch it writes is the one it tests for: one spelling, not two', () => {
     // Feeding its own output back must be a no-op, which is only true if the
     // "already has one" test recognises the flag this function writes.
     const once = pinUserDataDir('/usr/bin/xvfb-run', XVFB_ARGS, '/tmp/P');
@@ -200,7 +200,7 @@ describe('pinUserDataDir — the switch, and WHERE it goes', () => {
   });
 });
 
-describe('RUN_PROFILE_DIR — stable within a run, unique across concurrent ones', () => {
+describe('RUN_PROFILE_DIR: stable within a run, unique across concurrent ones', () => {
   /**
    * ⚠ THE PROPERTY THAT IS EASY TO GET BACKWARDS. A fresh profile PER LAUNCH
    * would isolate instruments perfectly and break `canvas-cdp-harness`, which
@@ -261,7 +261,7 @@ describe('RUN_PROFILE_DIR — stable within a run, unique across concurrent ones
   });
 });
 
-describe('cleanupProfile — deletes what it made, keeps what it was handed', () => {
+describe('cleanupProfile: deletes what it made, keeps what it was handed', () => {
   /**
    * RED THEN GREEN over a real directory. The red half is the one that matters:
    * a `rmSync` over a path nothing ever created passes just as green.
@@ -282,7 +282,7 @@ describe('cleanupProfile — deletes what it made, keeps what it was handed', ()
     }
   });
 
-  it('KEEPS a profile named by the environment — this process did not create it', () => {
+  it('KEEPS a profile named by the environment: this process did not create it', () => {
     const root = mkdtempSync(join(tmpdir(), 'aurora-profile-cleanup-'));
     try {
       const dir = join(root, 'shared-by-two');
@@ -334,7 +334,7 @@ describe('cleanupProfile — deletes what it made, keeps what it was handed', ()
   });
 });
 
-describe('clearCallSiteCensus — derived, and NOT inflated by prose about itself', () => {
+describe('clearCallSiteCensus: derived, and NOT inflated by prose about itself', () => {
   /**
    * ⚠ THE ROW THIS FILE EXISTS FOR, AFTER THE PINNING. The refusal in
    * `scratchpad/canvas-cdp-harness.mjs` told operators "114 call sites" long
@@ -377,7 +377,7 @@ describe('clearCallSiteCensus — derived, and NOT inflated by prose about itsel
 
   it('reports UNREADABLE rather than zero when the directory is not there', () => {
     const c = clearCallSiteCensus('/definitely/not/here');
-    expect(c.sites, 'a directory that cannot be read must not answer 0 — that reads as "no hazard"').toBeNull();
+    expect(c.sites, 'a directory that cannot be read must not answer 0: that reads as "no hazard"').toBeNull();
     expect(c.why).toContain('could not be read');
   });
 

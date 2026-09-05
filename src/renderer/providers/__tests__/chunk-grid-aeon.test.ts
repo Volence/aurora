@@ -92,7 +92,7 @@ describe('aeon chunk-grid port', () => {
     expect([rgba![0], rgba![1], rgba![2], rgba![3]]).toEqual([200, 0, 0, 255]);
   });
 
-  it('paints colour 0 for a blank chunk — alpha included — rather than skipping it', () => {
+  it('paints colour 0 for a blank chunk (alpha included) rather than skipping it', () => {
     // Aeon and classic differ here on purpose: classic never draws colour 0,
     // aeon draws it verbatim. A blank aeon chunk is therefore not necessarily
     // transparent, which is why the grid still rasterizes it.

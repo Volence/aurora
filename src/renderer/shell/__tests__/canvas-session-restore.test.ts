@@ -30,7 +30,7 @@ const AEON = { enumerated: new Set([PROJECT_SETUP_TAB.id]), classicOpen: false, 
 const NONE = { enumerated: new Set([PROJECT_SETUP_TAB.id]), classicOpen: false, aeonOpen: false };
 
 describe('restoredTabIsValid', () => {
-  it('keeps a canvas tab in EITHER engine — a canvas has no engine', () => {
+  it('keeps a canvas tab in EITHER engine: a canvas has no engine', () => {
     expect(restoredTabIsValid(TAB.id, CLASSIC)).toBe(true);
     expect(restoredTabIsValid(TAB.id, AEON)).toBe(true);
   });
@@ -92,7 +92,7 @@ describe('activateRestoredCanvasDocTarget', () => {
     });
   });
 
-  it('says NOTHING when the file is gone — the pane carries that report instead', async () => {
+  it('says NOTHING when the file is gone: the pane carries that report instead', async () => {
     await activateRestoredCanvasDocTarget(TAB.id, async () => { throw new Error('ENOENT'); });
     expect(useToastStore.getState().toasts).toEqual([]);
     // And leaves nothing behind, so canvasPaneState renders CanvasDocUnloaded:

@@ -107,7 +107,7 @@ describe('a band command written through getActiveLevel reaches the PROJECT', ()
     expect(holderDoc()).toEqual(doc0);
   });
 
-  it('the same command on a PLAIN-FIELD level loses the edit — the instrument can see a failure',
+  it('the same command on a PLAIN-FIELD level loses the edit: the instrument can see a failure',
     () => {
       // Not a hypothetical: this IS `getActiveLevel` without the accessor, and
       // it is what the field looked like before this parcel. If this row ever

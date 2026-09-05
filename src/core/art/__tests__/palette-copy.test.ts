@@ -26,7 +26,7 @@ describe('snapColorToGenesis', () => {
     expect(snapColorToGenesis(s)).toEqual(s);
   });
 
-  it('PRESERVES alpha — it is a gamut operation, not an opacity one', () => {
+  it('PRESERVES alpha: it is a gamut operation, not an opacity one', () => {
     expect(snapColorToGenesis(c(130, 130, 130, 0)).a).toBe(0);
     expect(snapColorToGenesis(c(130, 130, 130, 255)).a).toBe(255);
   });

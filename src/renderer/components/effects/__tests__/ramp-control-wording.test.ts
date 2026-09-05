@@ -57,13 +57,13 @@ const code = panel
  */
 const rampCard = (() => {
   const at = code.indexOf('function RampCard(');
-  if (at < 0) throw new Error('RampCard is gone from BandPresetPanel.tsx — this file measures it');
+  if (at < 0) throw new Error('RampCard is gone from BandPresetPanel.tsx: this file measures it');
   const rest = code.slice(at);
   // The function's own closing brace: the first `}` in column 0 after it. Every
   // brace inside the body is indented, and this does not depend on what happens
   // to be written next in the file.
   const end = rest.indexOf('\n}\n');
-  if (end < 0) throw new Error('RampCard has no closing brace in column 0 — the slice is unbounded');
+  if (end < 0) throw new Error('RampCard has no closing brace in column 0: the slice is unbounded');
   return rest.slice(0, end + 3);
 })();
 
@@ -99,7 +99,7 @@ describe('the MUST NOT reaches the panel at both lengths', () => {
   });
 });
 
-describe('the card has exactly the ramp\'s own shape — no curve, ever', () => {
+describe('the card has exactly the ramp\'s own shape: no curve, ever', () => {
   /**
    * ⚠ FIVE KEYS, FIVE INPUTS, AND THE COUNT IS DERIVED FROM `RAMP_KEYS`.
    *
@@ -122,7 +122,7 @@ describe('the card has exactly the ramp\'s own shape — no curve, ever', () => 
     expect(rampCard).not.toMatch(/<input\b/);
   });
 
-  it('draws nothing per scanline — no loop over `lines` anywhere in the card', () => {
+  it('draws nothing per scanline: no loop over `lines` anywhere in the card', () => {
     expect(rampCard).not.toMatch(/\.lines\s*\)?\s*\.map\(/);
     expect(rampCard).not.toMatch(/Array\.from\(\s*\{\s*length:\s*[\w.]*lines/);
     expect(rampCard).not.toMatch(/for\s*\(/);

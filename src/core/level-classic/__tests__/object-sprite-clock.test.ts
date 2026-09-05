@@ -12,7 +12,7 @@ describe('objectSpriteDependsOnTiles', () => {
     expect(objectSpriteDependsOnTiles(0x1a, 'ghz', 0)).toBe(true); // Collapsing Cliff
   });
 
-  it('is false for file-backed (.nem) ids — no in-editor edit changes their art', () => {
+  it('is false for file-backed (.nem) ids: no in-editor edit changes their art', () => {
     expect(objectSpriteDependsOnTiles(0x1f, 'ghz', 0)).toBe(false); // Crabmeat
     expect(objectSpriteDependsOnTiles(0x26, 'ghz', 0)).toBe(false); // Monitor
   });

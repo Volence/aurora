@@ -71,7 +71,7 @@ describe('the discovery file is written and removed at the paths Aurora publishe
     rmSync(home, { recursive: true, force: true });
   });
 
-  it('removal is idempotent and never throws — it runs on exit paths', () => {
+  it('removal is idempotent and never throws: it runs on exit paths', () => {
     const home = mkdtempSync(join(tmpdir(), 'disc-'));
     const paths = writeDiscoveryFiles(home, '{}');
     expect(() => { removeDiscoveryFiles(paths); removeDiscoveryFiles(paths); }).not.toThrow();
@@ -149,7 +149,7 @@ describe('the abrupt-exit net', () => {
    */
   it('startMcpServer actually INSTALLS the net, and stopMcpServer takes it back off', () => {
     const src = readFileSync(join(__dirname, '..', 'mcp-server.ts'), 'utf8');
-    expect(src, 'mcp-server.ts no longer defines startMcpServer — this scan is measuring nothing')
+    expect(src, 'mcp-server.ts no longer defines startMcpServer: this scan is measuring nothing')
       .toContain('export async function startMcpServer');
     expect(src).toContain('export function stopMcpServer');
     expect(src).toContain('installDiscoveryExitNet(');

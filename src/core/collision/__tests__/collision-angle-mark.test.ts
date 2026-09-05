@@ -40,7 +40,7 @@ const RISING_FLOOR = Array.from({ length: 16 }, (_, c) => c + 1);
 /** Flat full-height ground. */
 const FLAT_FLOOR = Array.from({ length: 16 }, () => 8);
 
-describe('angleTangent — the engine convention, shared by every surface', () => {
+describe('angleTangent: the engine convention, shared by every surface', () => {
   // THE CROSS-SURFACE GUARD. This is the test that would have caught the
   // shipped defect: the aeon map overlay drew (cos a, -sin a) while classic and
   // the picker drew (cos a, +sin a), so every non-flat angle was mirrored on
@@ -63,7 +63,7 @@ describe('angleTangent — the engine convention, shared by every surface', () =
 
   // Derivation, not transcription: the y component must be +sin, so a small
   // positive angle DESCENDS to the right in screen space (y down).
-  it('is (cos a, +sin a) with y DOWN — a small angle descends to the right', () => {
+  it('is (cos a, +sin a) with y DOWN: a small angle descends to the right', () => {
     const b = 0x10;
     const r = (b / 256) * Math.PI * 2;
     const t = angleTangent(b);
@@ -74,7 +74,7 @@ describe('angleTangent — the engine convention, shared by every surface', () =
 
   // The picker used to route the angle through `angleDegrees`, which rounds.
   // At $10 that is a visible hair of disagreement with the map at the same byte.
-  it('works in bytes, not rounded degrees — no rounding drift at $10', () => {
+  it('works in bytes, not rounded degrees: no rounding drift at $10', () => {
     const b = 0x10;
     const exact = angleTangent(b);
     const viaRoundedDegrees = (() => {
@@ -88,7 +88,7 @@ describe('angleTangent — the engine convention, shared by every surface', () =
   });
 });
 
-describe('columnSurfaceY — the player-facing boundary, matching the surface line', () => {
+describe('columnSurfaceY: the player-facing boundary, matching the surface line', () => {
   it('a floor column reports the TOP of its run', () => {
     // height 5 -> run { y: 11, h: 5 }; the surface is the top, y = 11.
     expect(columnSolidRun(5)).toEqual({ y: 11, h: 5 });
@@ -104,7 +104,7 @@ describe('columnSurfaceY — the player-facing boundary, matching the surface li
   });
 });
 
-describe('surfaceAnchor — the mark sits ON the surface, not at the cell centre', () => {
+describe('surfaceAnchor: the mark sits ON the surface, not at the cell centre', () => {
   it('anchors on a real column surface, never the cell middle', () => {
     const a = surfaceAnchor(RISING_FLOOR)!;
     expect(a).not.toBeNull();
@@ -135,7 +135,7 @@ describe('surfaceAnchor — the mark sits ON the surface, not at the cell centre
   });
 });
 
-describe('outwardNormal — the barb points OUT of the solid', () => {
+describe('outwardNormal: the barb points OUT of the solid', () => {
   it('flat floor: the open side is UP', () => {
     const n = outwardNormal(0, 8);
     expect(n.nx).toBeCloseTo(0, 12);
@@ -210,7 +210,7 @@ describe('outwardNormal — the barb points OUT of the solid', () => {
   });
 });
 
-describe('angleMark — a floor and its ceiling are told apart', () => {
+describe('angleMark: a floor and its ceiling are told apart', () => {
   // THE HEADLINE REQUIREMENT: a symmetric mark cannot say which side is solid.
   // Flip a real profile through the app's OWN flip (heights AND angle, the same
   // path resolveCell uses) and the barb must reverse.
@@ -223,7 +223,7 @@ describe('angleMark — a floor and its ceiling are told apart', () => {
     expect(f.ny).toBeGreaterThan(0); // ceiling: open side down
   });
 
-  it('the mark is ASYMMETRIC — it is not its own 180° rotation', () => {
+  it('the mark is ASYMMETRIC: it is not its own 180° rotation', () => {
     const m = angleMark(profile(RISING_FLOOR, 0x20))!;
     // The old mark was a bar through the centre: rotating it 180° about its
     // anchor reproduced it exactly. The barb breaks that.
@@ -241,7 +241,7 @@ describe('angleMark — a floor and its ceiling are told apart', () => {
   });
 });
 
-describe('angleMarkFromColumns — classic gets the identical mark', () => {
+describe('angleMarkFromColumns: classic gets the identical mark', () => {
   // Classic applies chunk-cell flips per cell instead of materialising a
   // flipped profile. The two routes must not diverge: that divergence IS the
   // bug class this module was written to end.
@@ -263,7 +263,7 @@ describe('angleMarkFromColumns — classic gets the identical mark', () => {
   });
 });
 
-describe('drawAngleMark — casing under core, and the geometry that reaches canvas', () => {
+describe('drawAngleMark: casing under core, and the geometry that reaches canvas', () => {
   function recorder() {
     const ops: string[] = [];
     const strokes: { style: string; width: number }[] = [];
@@ -317,7 +317,7 @@ describe('drawAngleMark — casing under core, and the geometry that reaches can
     expect(barCasing.width).toBe(OPTS.casingWidth);
   });
 
-  it('draws a bar AND a stem at the detail tier — two subpaths, not one line', () => {
+  it('draws a bar AND a stem at the detail tier: two subpaths, not one line', () => {
     const r = recorder();
     drawAngleMark(r.ctx, 0, 0, 16, angleMark(profile(RISING_FLOOR, 0x20))!, OPTS);
     // Bar and stem are separate paths now (they carry different widths).
@@ -344,7 +344,7 @@ describe('drawAngleMark — casing under core, and the geometry that reaches can
     expect(big.pts[3].y).toBeCloseTo(ay + mark.ny * NORMAL_LEN * s, 10);
   });
 
-  it('the stem tip leaves the solid — it is on the open side of the surface', () => {
+  it('the stem tip leaves the solid: it is on the open side of the surface', () => {
     const mark = angleMark(profile(FLAT_FLOOR, 0))!;
     const tipY = mark.ay + mark.ny * NORMAL_LEN;
     expect(tipY).toBeLessThan(mark.ay); // flat floor: the tip is ABOVE the surface
@@ -391,7 +391,7 @@ describe('drawAngleMark — casing under core, and the geometry that reaches can
     expect(Math.hypot(stemDx, stemDy)).toBeGreaterThan(Math.hypot(barDx, barDy) / 2);
   });
 
-  it('the compact tier draws the stem ALONE — two strokes, no bar', () => {
+  it('the compact tier draws the stem ALONE: two strokes, no bar', () => {
     const r = recorder();
     drawAngleMark(r.ctx, 0, 0, 16, angleMark(profile(RISING_FLOOR, 0x20))!, OPTS_COMPACT);
     expect(r.ops).toEqual(['begin', 'move', 'line', 'stroke', 'begin', 'move', 'line', 'stroke']);
@@ -420,7 +420,7 @@ describe('drawAngleMark — casing under core, and the geometry that reaches can
 
   // THE WALL STAYS HONEST. Nothing in a full cell says which side is open, so
   // the mark must not present one. A double-ended stem says "one of these two".
-  it('⭐ a wall draws a DOUBLE-ENDED stem — it does not pick a side', () => {
+  it('⭐ a wall draws a DOUBLE-ENDED stem: it does not pick a side', () => {
     const wall = profile(new Array(16).fill(16), 0x40);
     const mark = angleMark(wall)!;
     expect(mark.normalKnown).toBe(false);

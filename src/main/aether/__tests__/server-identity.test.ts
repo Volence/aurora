@@ -33,7 +33,7 @@ const LIVE_BUILD = {
 
 const RS = { implementation: 'oracle-rs', serverBuild: LIVE_BUILD };
 
-describe('identifyServer — the three verdicts, each on its own', () => {
+describe('identifyServer: the three verdicts, each on its own', () => {
   it('SUPPORTED: the Rust core is driven, and nothing about it is a refusal', () => {
     const id = identifyServer(RS);
     expect(id.verdict).toBe('supported');
@@ -128,7 +128,7 @@ describe('what the identity is NOT allowed to depend on', () => {
    * every correct binary but the one it was written against, which is exactly
    * the harness pin this parcel removed. Nothing here compares it.
    */
-  it('a different serverBuild is still supported — the build id gates nothing', () => {
+  it('a different serverBuild is still supported: the build id gates nothing', () => {
     const a = identifyServer(RS);
     const b = identifyServer({
       ...RS,

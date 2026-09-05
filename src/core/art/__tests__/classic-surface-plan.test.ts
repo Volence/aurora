@@ -36,7 +36,7 @@ function makeDoc(): LevelDoc {
 /** Every tile is claimable except 0 (the transparent entry). */
 const allEditable = (t: number) => t !== 0;
 
-describe('planSurfaceEdit — the in-place case', () => {
+describe('planSurfaceEdit: the in-place case', () => {
   it('mutates the tile in place when tile and block are each used once', () => {
     const doc = makeDoc();
     const { provenance } = buildChunkSurface(doc, 0);
@@ -84,7 +84,7 @@ describe('planSurfaceEdit — the in-place case', () => {
 
 import { tileToBuffer, bufferToTileBytes } from '../classic-tile-buffer';
 
-describe('planSurfaceEdit — tile divergence', () => {
+describe('planSurfaceEdit: tile divergence', () => {
   /** Make tile 1 linked by pointing block 1's first cell at it too. */
   function docWithSharedTile1(): LevelDoc {
     const doc = makeDoc();
@@ -177,7 +177,7 @@ describe('planSurfaceEdit — tile divergence', () => {
   });
 });
 
-describe('planSurfaceEdit — a stroke that changes nothing commits nothing', () => {
+describe('planSurfaceEdit: a stroke that changes nothing commits nothing', () => {
   it('emits an empty plan in isolate mode', () => {
     const doc = makeDoc();
     const { buffer, provenance } = buildChunkSurface(doc, 0);
@@ -223,7 +223,7 @@ describe('planSurfaceEdit — a stroke that changes nothing commits nothing', ()
   });
 });
 
-describe('planSurfaceEdit — block divergence', () => {
+describe('planSurfaceEdit: block divergence', () => {
   it('clones a linked block and repoints only the painted chunk cell', () => {
     const doc = makeDoc();               // block 1 is used by both chunks
     const { provenance } = buildChunkSurface(doc, 0);
@@ -306,7 +306,7 @@ describe('planSurfaceEdit — block divergence', () => {
   });
 });
 
-describe('planSurfaceEdit — object-reserved tiles', () => {
+describe('planSurfaceEdit: object-reserved tiles', () => {
   /** Make tile 1 linked by pointing block 1's first cell at it too. */
   function docWithSharedTile1(): LevelDoc {
     const doc = makeDoc();
@@ -369,7 +369,7 @@ describe('planSurfaceEdit — object-reserved tiles', () => {
   });
 });
 
-describe('planSurfaceEdit — link mode', () => {
+describe('planSurfaceEdit: link mode', () => {
   it('mutates in place and reports every chunk that will change', () => {
     const doc = makeDoc();              // block 1 lives in chunks 0 and 1
     const { provenance } = buildChunkSurface(doc, 0);
@@ -418,7 +418,7 @@ describe('planSurfaceEdit — link mode', () => {
   });
 });
 
-describe('planSurfaceEdit — slot double-booking (regression)', () => {
+describe('planSurfaceEdit: slot double-booking (regression)', () => {
   /**
    * A shipped defect, found while extracting the pool matcher for 2C.
    *

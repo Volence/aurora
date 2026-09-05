@@ -98,7 +98,7 @@ function derivedCells(bytes: Uint8Array, widthCells: number, heightCells: number
   });
 }
 
-describe('openDiscoveredSet — raw tile grids (Parcel C)', whenS1Files('the raw tile-grid opens', [HUD_NUMBERS, LIVES_NUMBERS, LEVEL_SELECT_TEXT]), () => {
+describe('openDiscoveredSet: raw tile grids (Parcel C)', whenS1Files('the raw tile-grid opens', [HUD_NUMBERS, LIVES_NUMBERS, LEVEL_SELECT_TEXT]), () => {
   it('HUD Numbers: size÷64 frames of 8×16, each cell equal to its two consecutive tiles', async () => {
     const rel = HUD_NUMBERS;
     const bytes = fs.readFileSync(path.join(S1DIR, rel));
@@ -123,7 +123,7 @@ describe('openDiscoveredSet — raw tile grids (Parcel C)', whenS1Files('the raw
     }
   });
 
-  it('HUD Digits: read-only by design — a SPECIFIC refusal is recorded, and save surfaces it', async () => {
+  it('HUD Digits: read-only by design, a SPECIFIC refusal is recorded, and save surfaces it', async () => {
     await openDiscoveredSet(S1DIR, gridSet('HUD Digits', HUD_NUMBERS, 1, 2), 'uncompressed');
     const s = useSpriteStore.getState();
     expect(s.s1ArtSource).toBeNull();

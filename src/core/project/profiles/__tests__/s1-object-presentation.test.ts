@@ -33,7 +33,7 @@ import { resolveObjectArt, objectArtIsZoneFree } from '../s1-object-art';
 import { S1_OBJECT_LIST } from '../s1-objects';
 import { classicObjectRows } from '../../../../renderer/providers/object-list-classic';
 
-describe('s1ArtRowGroups — link-identity dedup', () => {
+describe('s1ArtRowGroups: link-identity dedup', () => {
   const ghz = s1ArtRowGroups('ghz');
 
   it('collapses the five Eggman ids sharing the one EGGMAN link into one row', () => {
@@ -54,14 +54,14 @@ describe('s1ArtRowGroups — link-identity dedup', () => {
     }
   });
 
-  it('ANTI-VACUOUS: a non-shared row does not group — $48 Wrecking Ball stays alone', () => {
+  it('ANTI-VACUOUS: a non-shared row does not group: $48 Wrecking Ball stays alone', () => {
     const ball = ghz.find((g) => g.id === 0x48);
     expect(ball).toBeDefined();
     expect(ball!.ids).toEqual([0x48]);
     expect(ball!.label).toBe('Boss Wrecking Ball');
   });
 
-  it('ANTI-VACUOUS: value-equal but SEPARATE links do not merge — $82/$85 share a file, not a link', () => {
+  it('ANTI-VACUOUS: value-equal but SEPARATE links do not merge: $82/$85 share a file, not a link', () => {
     // Same artFile+mapAsm+frame+pal, distinct objects (SBZ2 cutscene vs FZ
     // boss). Reference identity keeps them apart; a value-keyed dedup would
     // fail exactly here.
@@ -74,7 +74,7 @@ describe('s1ArtRowGroups — link-identity dedup', () => {
     expect(ghz.find((g) => g.id === 0x85)!.ids).toEqual([0x85]);
   });
 
-  it('ANTI-VACUOUS: Sonic ($01) is his own row — shares a link with nobody, merges with nobody', () => {
+  it('ANTI-VACUOUS: Sonic ($01) is his own row: shares a link with nobody, merges with nobody', () => {
     // The $01 DPLC row (Parcel A) is a fresh link object: if the grouping ever
     // merged him into another row (or another id into his), his doc — the only
     // DPLC doc — would open the wrong art set. The Eggman assertions above
@@ -105,7 +105,7 @@ describe('s1ArtRowGroups — link-identity dedup', () => {
   });
 });
 
-describe('s1ArtRowGroups — zone-free vs zonal section split', () => {
+describe('s1ArtRowGroups: zone-free vs zonal section split', () => {
   it('GHZ: bosses and Ring are zone-free; Moto Bug and Crabmeat are GHZ-scoped', () => {
     const byId = new Map(s1ArtRowGroups('ghz').map((g) => [g.id, g]));
     expect(byId.get(0x3d)!.zoneFree).toBe(true); // Eggman group — base map, no zone override
@@ -140,20 +140,20 @@ describe('mergedRowLabel', () => {
   });
 });
 
-describe('s1ObjectZoneAvailability — hand-derived PLC cases', () => {
+describe('s1ObjectZoneAvailability: hand-derived PLC cases', () => {
   it('Moto Bug ($40): available in GHZ (Nem_Motobug via PLC_GHZ), art-elsewhere in LZ', () => {
     expect(s1ObjectZoneAvailability(0x40, 'ghz')).toEqual({ kind: 'available' });
     expect(s1ObjectZoneAvailability(0x40, 'lz')).toEqual({ kind: 'art-elsewhere', zones: ['ghz'] });
   });
 
-  it('Jaws ($2C) in GHZ: art-elsewhere, naming lz and sbz — the zones whose maps link it', () => {
+  it('Jaws ($2C) in GHZ: art-elsewhere, naming lz and sbz: the zones whose maps link it', () => {
     const a = s1ObjectZoneAvailability(0x2c, 'ghz');
     expect(a.kind).toBe('art-elsewhere');
     expect((a as { zones: string[] }).zones.sort()).toEqual(['lz', 'sbz']);
     expect(s1LinkedZones(0x2c).sort()).toEqual(['lz', 'sbz']);
   });
 
-  it('Ring ($25): available in every zone — one base link via PLC_Main', () => {
+  it('Ring ($25): available in every zone: one base link via PLC_Main', () => {
     for (const z of ['ghz', 'lz', 'mz', 'slz', 'syz', 'sbz']) {
       expect(s1ObjectZoneAvailability(0x25, z)).toEqual({ kind: 'available' });
     }
@@ -163,7 +163,7 @@ describe('s1ObjectZoneAvailability — hand-derived PLC cases', () => {
     expect(s1ObjectZoneAvailability(0x72, 'ghz')).toEqual({ kind: 'invisible' });
   });
 
-  it('Ending Animals ($28): named but linked nowhere — no-art-link', () => {
+  it('Ending Animals ($28): named but linked nowhere (no-art-link)', () => {
     expect(s1ObjectZoneAvailability(0x28, 'ghz')).toEqual({ kind: 'no-art-link' });
   });
 });
@@ -205,7 +205,7 @@ describe('s1UnavailableRowNote', () => {
 });
 
 describe('placement rows are untouched by the display-side dedup', () => {
-  it('classicObjectRows offers no id past $7F — objpos bit 7 is the remember-state flag', () => {
+  it('classicObjectRows offers no id past $7F: objpos bit 7 is the remember-state flag', () => {
     const rows = classicObjectRows('ghz');
     expect(rows.length).toBeGreaterThan(0);
     for (const r of rows) expect(Number(r.key)).toBeLessThanOrEqual(0x7f);
@@ -213,7 +213,7 @@ describe('placement rows are untouched by the display-side dedup', () => {
     expect(S1_OBJECT_LIST.some((o) => o.id > 0x7f)).toBe(true);
   });
 
-  it('every per-zone boss id keeps its OWN placement row — the merge is display-only', () => {
+  it('every per-zone boss id keeps its OWN placement row: the merge is display-only', () => {
     // $3D places the GHZ boss and $73 the MZ boss; collapsing them in a
     // placement surface would remove the ability to place four of the five.
     const keys = new Set(classicObjectRows('ghz').map((r) => Number(r.key)));

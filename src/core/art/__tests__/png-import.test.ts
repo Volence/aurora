@@ -28,7 +28,7 @@ function png(
   return { width: w, height: h, indices, palette: palette.map((c) => ({ ...c })), transparentIndex } as DecodedIndexedPng;
 }
 
-describe('importPngAgainstPalette — the happy path', () => {
+describe('importPngAgainstPalette: the happy path', () => {
   it('maps a single-colour image onto the line that holds it', () => {
     const pal = actPalette([{ line: 2, entry: 5, rgb: RED }]);
     const r = importPngAgainstPalette(png(8, 8, [RED], () => 0), pal);
@@ -50,7 +50,7 @@ describe('importPngAgainstPalette — the happy path', () => {
   });
 });
 
-describe('importPngAgainstPalette — the reason this is not a lookup', () => {
+describe('importPngAgainstPalette: the reason this is not a lookup', () => {
   /**
    * The failure a per-COLOUR mapping produces. Black lives in every line of a
    * real act palette; red lives only in line 2. A first-match-wins mapping puts
@@ -108,7 +108,7 @@ describe('importPngAgainstPalette — the reason this is not a lookup', () => {
   });
 });
 
-describe('importPngAgainstPalette — refusals and tolerance', () => {
+describe('importPngAgainstPalette: refusals and tolerance', () => {
   it('refuses a colour the act does not have, naming the CRAM word', () => {
     const pal = actPalette([{ line: 0, entry: 1, rgb: RED }]);
     const r = importPngAgainstPalette(png(8, 8, [RED, PURPLE], (x) => (x < 4 ? 0 : 1)), pal);
@@ -138,7 +138,7 @@ describe('importPngAgainstPalette — refusals and tolerance', () => {
     expect(paletteEntryOf(r.result.pixels.data[0])).toBe(1);
   });
 
-  it('handles an image far larger than a canvas may be — that is the point', () => {
+  it('handles an image far larger than a canvas may be: that is the point', () => {
     const pal = actPalette([{ line: 1, entry: 1, rgb: RED }]);
     const r = importPngAgainstPalette(png(2048, 512, [RED], () => 0), pal);
     expect(r.ok).toBe(true);
@@ -159,7 +159,7 @@ describe('importPngAgainstPalette — refusals and tolerance', () => {
   });
 });
 
-describe('importPngAgainstPalette — the rules that had no test', () => {
+describe('importPngAgainstPalette: the rules that had no test', () => {
   /**
    * Entry 0 NEVER DRAWS, in any line. If a line's entry-0 slot happens to hold
    * the colour being mapped, treating it as a candidate spells an opaque pixel
@@ -205,7 +205,7 @@ describe('importPngAgainstPalette — the rules that had no test', () => {
   });
 });
 
-describe('importPngAgainstPalette — the snapped count', () => {
+describe('importPngAgainstPalette: the snapped count', () => {
   it('counts NOTHING when every colour is already an exact Genesis colour', () => {
     // Real level art is entirely exact Genesis colours. An arithmetic
     // "is this on the 3-bit grid" check compares floats (5 * 255 / 7 is

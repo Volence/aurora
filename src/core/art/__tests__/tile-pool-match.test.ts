@@ -13,7 +13,7 @@ function pool(n: number): Uint8Array {
 
 const want = (v: number) => new Uint8Array(TILE_BYTES).fill(v);
 
-describe('findPoolMatch — exact', () => {
+describe('findPoolMatch: exact', () => {
   it('finds a byte-identical tile', () => {
     const r = findPoolMatch(pool(8), want(5), emptyAvailability(), { allowFlips: false });
     expect(r).toEqual({ tileIndex: 5, xf: false, yf: false });
@@ -29,7 +29,7 @@ describe('findPoolMatch — exact', () => {
     expect(findPoolMatch(pool(8), want(5), avail, { allowFlips: false })).toBeNull();
   });
 
-  it('still matches a slot this gesture merely REUSED — its bytes are unchanged', () => {
+  it('still matches a slot this gesture merely REUSED: its bytes are unchanged', () => {
     const avail = emptyAvailability();
     avail.matched.add(5);
     const r = findPoolMatch(pool(8), want(5), avail, { allowFlips: false });
@@ -61,7 +61,7 @@ const flipX = (e: Uint8Array) => {
   return o;
 };
 
-describe('findPoolMatch — flip-aware', () => {
+describe('findPoolMatch: flip-aware', () => {
   it('matches an x-flipped tile and reports the flip', () => {
     const p = new Uint8Array(TILE_BYTES * 4);
     p.set(pack(asymmetric()), 2 * TILE_BYTES);

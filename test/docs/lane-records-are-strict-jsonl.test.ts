@@ -42,7 +42,7 @@ function entryLines(text: string): { lineNo: number; text: string }[] {
 describe.each(RECORDS)('%s is strict JSONL', (rel) => {
   const path = resolve(__dirname, '../..', rel);
 
-  it('exists — a missing record file would make every row below vacuous', () => {
+  it('exists: a missing record file would make every row below vacuous', () => {
     expect(existsSync(path), `${rel} is absent; the rows below would pass on nothing`).toBe(true);
   });
 
@@ -50,7 +50,7 @@ describe.each(RECORDS)('%s is strict JSONL', (rel) => {
     const lines = entryLines(readFileSync(path, 'utf8'));
 
     // Anti-vacuity: prove the instrument saw a real corpus, not an empty one.
-    expect(lines.length, `${rel} has no entries — nothing was checked`).toBeGreaterThan(0);
+    expect(lines.length, `${rel} has no entries: nothing was checked`).toBeGreaterThan(0);
 
     const offenders: string[] = [];
     for (const { lineNo, text } of lines) {
@@ -93,7 +93,7 @@ describe.each(RECORDS)('%s is strict JSONL', (rel) => {
     }
     expect(
       parsed.length,
-      `no parseable entries in ${rel} — this row examined nothing, so its green would mean nothing`,
+      `no parseable entries in ${rel}: this row examined nothing, so its green would mean nothing`,
     ).toBeGreaterThan(0);
 
     const missing = parsed

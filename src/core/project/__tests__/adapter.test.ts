@@ -91,7 +91,7 @@ describe('detectProject registry', () => {
     });
   });
 
-  it('honours registration order as priority — first match wins', async () => {
+  it('honours registration order as priority: first match wins', async () => {
     // Both adapters match a dir that has both fingerprint files; the one
     // registered first is returned.
     registerAdapter(stubAdapter('aeon', 'aeon.asm', 'Aeon'));

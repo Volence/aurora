@@ -124,7 +124,7 @@ describe('the column is a flex column with a height its sections can divide', ()
     // …and not below a floor, or an over-subscribed column leaves a list
     // technically present and 8px tall (measured, aeon Layout). Below the floor
     // the deficit belongs to Panel's own scrollbar.
-    expect(flat, 'a list section has no floor — it can be squeezed to nothing')
+    expect(flat, 'a list section has no floor: it can be squeezed to nothing')
       .toMatch(/minHeight:\s*SECTION_LIST_MIN_HEIGHT/);
     const floor = Number(collapsible.match(/const SECTION_LIST_MIN_HEIGHT = (\d+);/)?.[1]);
     expect(floor, 'the floor is not a number in one place').toBeGreaterThan(0);
@@ -138,7 +138,7 @@ describe('the column is a flex column with a height its sections can divide', ()
     const contentStyle = collapsible.match(/const CONTENT_SECTION[^=]*=\s*(\{[^}]*\})/)?.[1];
     expect(contentStyle, 'CollapsibleSection declares no CONTENT_SECTION style').toBeTruthy();
     expect(contentStyle!.replace(/\s+/g, ' ')).toMatch(/flexShrink:\s*0/);
-    expect(contentStyle!, 'a content section grows — a form would stretch').not.toMatch(/flex(?:Grow)?:\s*['"`]?[1-9]/);
+    expect(contentStyle!, 'a content section grows: a form would stretch').not.toMatch(/flex(?:Grow)?:\s*['"`]?[1-9]/);
   });
 
   it('the fixed cap is gone from the tree, not merely unused', () => {
@@ -264,7 +264,7 @@ describe('a variant="list" section supplies the scroller the variant promises', 
         .filter((b) => SCROLLS.test(b) && (SHRINKABLE.test(b) || CAPPED.test(b)))
         .map((b) => b.replace(/\s+/g, ' ').trim());
       expect(scrollers.length,
-        `${sectionName(section)} declares variant="list" — a share of the column — but nothing in it scrolls: `
+        `${sectionName(section)} declares variant="list", a share of the column, but nothing in it scrolls: `
         + 'its content is laid out at its natural height inside a box the column sized, so it draws over the sections beneath it')
         .toBeGreaterThan(0);
     });
@@ -305,7 +305,7 @@ describe('the panels whose item count is unbounded by nature are mounted as list
     const file = join(COMPONENTS, name);
     const shrinkable = styleBlocks(read(file)).filter((b) => SCROLLS.test(b) && SHRINKABLE.test(b));
     expect(shrinkable.length,
-      `${name} declares no scroller that may shrink into its section — its rows would push whatever is under it off the bottom`)
+      `${name} declares no scroller that may shrink into its section: its rows would push whatever is under it off the bottom`)
       .toBeGreaterThan(0);
   });
 

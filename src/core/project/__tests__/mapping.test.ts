@@ -97,7 +97,7 @@ describe('seedClassicBuildConfig', () => {
     });
   });
 
-  it('never overwrites a declared value — the seed makes the default visible, not enforced', () => {
+  it('never overwrites a declared value: the seed makes the default visible, not enforced', () => {
     const declared = { buildCommand: './wrapper.sh', base: 's1-github' };
     const { config, changed } = seedClassicBuildConfig(declared);
     expect((config as Record<string, unknown>).buildCommand).toBe('./wrapper.sh');

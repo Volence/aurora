@@ -315,7 +315,7 @@ function makeAeonChunk(seed: number, tileCount: number, w = 16, h = 16): ChunkDe
 
 // ===========================================================================
 
-describe('palette LUTs — each engine keeps its own colour representation', () => {
+describe('palette LUTs: each engine keeps its own colour representation', () => {
   it('builds a classic LUT straight from CRAM words, with index 0 fully transparent', () => {
     const words = new Uint16Array(16);
     words[0] = 0x0eee; // white, but index 0 is transparent for classic
@@ -513,7 +513,7 @@ describe('classic renderChunk through the shared rasterizer', () => {
   });
 });
 
-describe('rasterizeNametableChunk — aeon chunk thumbnails', () => {
+describe('rasterizeNametableChunk: aeon chunk thumbnails', () => {
   const CHUNK_PX = 128;
 
   it('is byte-identical to ChunkLibrary.renderChunkThumbnail on a randomized chunk', () => {
@@ -601,7 +601,7 @@ describe('rasterizeNametableChunk — aeon chunk thumbnails', () => {
     expect(firstDiff(buf, refAeonChunk(chunk, tiles, palette, destW, destH))).toBe(-1);
   });
 
-  it('word 0 paints palette colour 0 — including its RGB — rather than clearing', () => {
+  it('word 0 paints palette colour 0 (including its RGB) rather than clearing', () => {
     // The distinction that separates this from composeNametable (which skips
     // word 0) and from classic (which never reads colour 0).
     const tiles: Tile[] = [{ pixels: new Uint8Array(64) }];

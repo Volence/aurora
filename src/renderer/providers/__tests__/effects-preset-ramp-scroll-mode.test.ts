@@ -115,7 +115,7 @@ describe('the fixtures really differ in the ONE key the rule turns on', () => {
    * a plane-wide HORIZONTAL wobble — and raise no VSRAM mode bit. A derivation
    * keyed on them would call this scene the column arm.
    */
-  it('deform_fg/deform_bg do NOT narrow the ramp — only v_deform does', () => {
+  it('deform_fg/deform_bg do NOT narrow the ramp: only v_deform does', () => {
     const wobble = flatScene('w', {
       deform_fg: { shared: { table: TABLE, speed: 3 } },
       deform_bg: { shared: { table: TABLE, speed: 3 } },
@@ -306,7 +306,7 @@ describe('CASE: a bound section whose scene Aurora cannot read', () => {
 // 6. CASE FIVE — the sections DISAGREE
 // ---------------------------------------------------------------------------
 
-describe('CASE: the bound sections disagree — and the panel says so', () => {
+describe('CASE: the bound sections disagree: the panel says so', () => {
   /**
    * ⚠ NO MAJORITY, NO FIRST, NO "USUAL". Two sections say full and one says
    * column; the sentence must name all three groups. A derivation that picked
@@ -340,7 +340,7 @@ describe('CASE: the bound sections disagree — and the panel says so', () => {
     expect(short).toContain('Section 3 scrolls one');
   });
 
-  it('a THIRD group — determined and undetermined together — is also reported', () => {
+  it('a THIRD group (determined and undetermined together) is also reported', () => {
     const scenes = sceneLib([flatScene('sky'), vDeformScene('haze')]);
     const b = rampScrollBindings(
       [sec(PRESET, 'sky'), sec(PRESET, 'haze'), sec(PRESET, null)], null, scenes, PRESET,

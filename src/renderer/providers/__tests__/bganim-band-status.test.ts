@@ -22,7 +22,7 @@ import { BAND_DEFAULTS } from '../../../core/formats/bg-override/bg-override';
 
 const previewing = (cells: number) => ({ cells, refusal: null });
 
-describe('bandStatus — the resolved rate', () => {
+describe('bandStatus: the resolved rate', () => {
   it('reads a timer band in FRAMES, and prints the px/s that follows from it', () => {
     const s = bandStatus({ driver: 'timer', rateShift: 2 }, previewing(1244));
     // 2**2 = 4 frames per pixel; 60/4 = 15 px/s. Both derived, neither typed in.
@@ -56,7 +56,7 @@ describe('bandStatus — the resolved rate', () => {
     expect(s.rate).toMatch(/px\/s/);
   });
 
-  it('resolves nothing itself — the caller has already applied the contract default', () => {
+  it('resolves nothing itself: the caller has already applied the contract default', () => {
     // The card prints `rate_shift <n> (default)` from `describeBands`, which
     // resolves through BAND_DEFAULTS. This takes the RESOLVED number so the two
     // lines of one card cannot disagree about what an absent key means.
@@ -65,7 +65,7 @@ describe('bandStatus — the resolved rate', () => {
   });
 });
 
-describe('bandStatus — the verdict', () => {
+describe('bandStatus: the verdict', () => {
   it('reports a drawn, licensed band with its cell count', () => {
     const s = bandStatus({ driver: 'timer', rateShift: 2 }, previewing(1244));
     expect(s.kind).toBe('previewing');
@@ -76,7 +76,7 @@ describe('bandStatus — the verdict', () => {
     expect(s.verdict).not.toContain('Not previewing');
   });
 
-  it('separates "licensed" from "drawn" — zero cells is a real answer, not an error', () => {
+  it('separates "licensed" from "drawn": zero cells is a real answer, not an error', () => {
     const s = bandStatus({ driver: 'timer', rateShift: 2 }, { cells: 0, refusal: null });
     expect(s.kind).toBe('no-cells');
     expect(s.verdict).toMatch(/no background cell/i);
@@ -90,7 +90,7 @@ describe('bandStatus — the verdict', () => {
     expect(s.verdict).toContain('Not previewing');
   });
 
-  it('a refusal outranks a cell count — a band that cannot preview is not previewing', () => {
+  it('a refusal outranks a cell count: a band that cannot preview is not previewing', () => {
     const s = bandStatus({ driver: 'timer', rateShift: 2 }, { cells: 99, refusal: 'nope' });
     expect(s.kind).toBe('refused');
     expect(s.verdict).not.toContain('99');
@@ -121,7 +121,7 @@ describe('bandStatus — the verdict', () => {
 // drift apart. The direction word is FOREGROUND-gated behind one constant that
 // ships empty until the overseer has watched the built ROM.
 
-describe('bandMotion — the one sentence that says what a band does', () => {
+describe('bandMotion: the one sentence that says what a band does', () => {
   it.each([0, 2, 3])('derives "1px per 2^%i" from rate_shift, in the driver\'s units', (n) => {
     const units = 2 ** n;
     const timer = bandMotion({ driver: 'timer', rateShift: n }, 'band');
@@ -133,12 +133,12 @@ describe('bandMotion — the one sentence that says what a band does', () => {
     }
   });
 
-  it('leads with the verb — a band SCROLLS — and a candidate says "would scroll"', () => {
+  it('leads with the verb (a band SCROLLS) and a candidate says "would scroll"', () => {
     expect(bandMotion({ driver: 'timer', rateShift: 2 }, 'band')).toMatch(/^scrolls/);
     expect(bandMotion({ driver: 'timer', rateShift: 2 }, 'candidate')).toMatch(/^would scroll/);
   });
 
-  it('says the art scrolls LEFT — measured on the built ROM 2026-08-26, not read off the fill', () => {
+  it('says the art scrolls LEFT: measured on the built ROM 2026-08-26, not read off the fill', () => {
     // aeon master ROM (built 2026-08-26 19:06, 8x4 timer band), private oracle-aether,
     // scratchpad band-direction-probe: VRAM band image == phase 0 rolled by s, with
     // s = 50,52,53,54,55,57,58,59,60,62 across 5-frame samples — the content at each
@@ -150,7 +150,7 @@ describe('bandMotion — the one sentence that says what a band does', () => {
     expect(s).toMatch(/^scrolls left · 1px per /);
   });
 
-  it("IS the card's rate line — bandStatus prints it verbatim", () => {
+  it("IS the card's rate line: bandStatus prints it verbatim", () => {
     for (const band of [
       { driver: 'timer', rateShift: 0 }, { driver: 'timer', rateShift: 2 },
       { driver: 'camera_x', rateShift: 3 }, { driver: 'camera_y', rateShift: 5 },
@@ -160,7 +160,7 @@ describe('bandMotion — the one sentence that says what a band does', () => {
   });
 });
 
-describe('bandLensCaptionLines — the caption prints the same sentence as the card', () => {
+describe('bandLensCaptionLines: the caption prints the same sentence as the card', () => {
   const range = { base: 0, count: 32 };
   // A real-shaped empty coverage: `coverageSummary` reads `range` off it.
   const coverage = { range, cells: [], largest: null, undrawnSlots: 0, perSlot: [] } as never;
@@ -193,7 +193,7 @@ describe('bandLensCaptionLines — the caption prints the same sentence as the c
   });
 });
 
-describe('BAND_MECHANISM_HINT — what a band IS, said once at the top of the section', () => {
+describe('BAND_MECHANISM_HINT: what a band IS, said once at the top of the section', () => {
   it('names the pattern, the eight frames over the same tiles, and the shared motion', () => {
     expect(BAND_MECHANISM_HINT).toMatch(/cols\s*[x×]\s*rows/);
     expect(BAND_MECHANISM_HINT).toMatch(/\b8\b|eight/);

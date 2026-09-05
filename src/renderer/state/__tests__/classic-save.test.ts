@@ -37,7 +37,7 @@ const okResult = (written: string[], newMtimes: Record<string, number>): Guarded
 describe('saveClassicWriteResult', () => {
   it('sends files from WriteResult.files with expected mtimes, returns saved', async () => {
     const result: WriteResult = {
-      written: ['IGNORED — display metadata only'],
+      written: ['IGNORED: display metadata only'],
       skipped: [],
       errors: [],
       files: [

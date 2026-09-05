@@ -384,7 +384,7 @@ export function deriveSections(): FacetSection[] {
   // must not silently narrow it back to one directory either.
   expect(owners.length, 'no CollapsibleSection call sites found at all').toBeGreaterThan(0);
   const inFacets = owners.filter((f) => f.includes(join('workspace', 'facets') + sep));
-  expect(inFacets.length, 'no facet module declares a section — the scan has drifted').toBeGreaterThan(0);
+  expect(inFacets.length, 'no facet module declares a section: the scan has drifted').toBeGreaterThan(0);
   expect(owners.length - inFacets.length,
     'every section call site is a facet module: the scan is back to the frame item 18 was about')
     .toBeGreaterThan(0);
@@ -393,7 +393,7 @@ export function deriveSections(): FacetSection[] {
   // Loud on unmeasurable: the merge below is only sound while the wrapper really
   // does confer shrinkability, and `SectionBody` is the one every inline-bodied
   // section in this tree goes through.
-  expect(wrappers, 'no ui primitive declares minHeight: 0 — the wrapper merge would silently exempt nothing')
+  expect(wrappers, 'no ui primitive declares minHeight: 0; the wrapper merge would silently exempt nothing')
     .toContain('SectionBody');
 
   const sections: FacetSection[] = [];

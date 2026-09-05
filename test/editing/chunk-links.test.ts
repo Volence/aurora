@@ -251,7 +251,7 @@ describe('detach: the checkbox, both at stamp time and afterwards (d-18c)', () =
     expect(section.chunkLinks!.plane.every(v => v === UNLINKED)).toBe(true);
   });
 
-  it('LATER, on a stamp ALREADY PAINTED OVER BY HAND — the case d-18b called the open cost', () => {
+  it('LATER, on a stamp ALREADY PAINTED OVER BY HAND: the case d-18b called the open cost', () => {
     const section = seededSection();
     const chunk = distinctChunk('c1', 4, 4);
     run(section, buildStampCommand({
@@ -364,7 +364,7 @@ describe('propagation: editing a library chunk updates the cells that still reme
     expect(section.tileGrid.nametable[idx(120, 120)]).toBe(0);
   });
 
-  it('SKIPS a tile that was hand-painted — the whole reason the plane exists', () => {
+  it('SKIPS a tile that was hand-painted: the whole reason the plane exists', () => {
     const section = seededSection();
     const chunk = distinctChunk('c1', 4, 4);
     run(section, buildStampCommand({
@@ -424,7 +424,7 @@ describe('propagation: editing a library chunk updates the cells that still reme
     }
   });
 
-  it('a DETACHED placement is not propagated to — the checkbox actually works', () => {
+  it('a DETACHED placement is not propagated to: the checkbox actually works', () => {
     const section = seededSection();
     const chunk = distinctChunk('c1', 4, 4);
     run(section, buildStampCommand({
@@ -660,7 +660,7 @@ describe('withLinkBreaks: art written by anything but its own stamp breaks the l
     expect(danglingPlaneRefs(section.chunkLinks!)).toEqual([]);
   });
 
-  it('a COLLISION-only command is left alone — a chunk link is about art', () => {
+  it('a COLLISION-only command is left alone: a chunk link is about art', () => {
     const section = seededSection();
     run(section, buildStampCommand({
       chunk: distinctChunk('c1', 2, 2), section, sectionIndex: 0,

@@ -129,7 +129,7 @@ describe('classic:set-layout-cells', () => {
     expect(Array.from(st().doc!.fg.cells)).toEqual([0, 2, 0, 1]);
   });
 
-  it('accepts a loop-flagged byte (bit 7) and stores it raw — engine id validated masked (Task B4)', () => {
+  it('accepts a loop-flagged byte (bit 7) and stores it raw: engine id validated masked (Task B4)', () => {
     openReady(); // 2 chunks → engine ids 1,2 real
     // 0x81 = engine id 1 | loop flag: masked id 1 is in the pool, so it is accepted
     // and the RAW byte (loop flag intact) is written — survives to save byte-for-byte.
@@ -464,7 +464,7 @@ describe('classic:paint-surface', () => {
     expect(st().doc!.chunks[0].cells[5]).toEqual(blankChunkCell(0));
   });
 
-  it('refuses a plan targeting a locked tile — nothing committed', () => {
+  it('refuses a plan targeting a locked tile: nothing committed', () => {
     openReady();
     const doc = st().doc;
     const plan: SurfaceEditPlan = {
@@ -544,7 +544,7 @@ describe('classic:paint-surface', () => {
     expect(artStack().canUndo).toBe(false);
   });
 
-  it('rejects an out-of-range block id — commits nothing', () => {
+  it('rejects an out-of-range block id: commits nothing', () => {
     openReady();
     const doc = st().doc;
     const plan: SurfaceEditPlan = {
@@ -556,7 +556,7 @@ describe('classic:paint-surface', () => {
     expect(artStack().canUndo).toBe(false);
   });
 
-  it('rejects an out-of-range block cell index (0..3) — commits nothing', () => {
+  it('rejects an out-of-range block cell index (0..3): commits nothing', () => {
     openReady();
     const doc = st().doc;
     const plan: SurfaceEditPlan = {
@@ -568,7 +568,7 @@ describe('classic:paint-surface', () => {
     expect(artStack().canUndo).toBe(false);
   });
 
-  it('rejects an out-of-range chunk index — commits nothing', () => {
+  it('rejects an out-of-range chunk index: commits nothing', () => {
     openReady();
     const doc = st().doc;
     const plan: SurfaceEditPlan = {
@@ -580,7 +580,7 @@ describe('classic:paint-surface', () => {
     expect(artStack().canUndo).toBe(false);
   });
 
-  it('rejects an out-of-range chunk cell index (0..255) — commits nothing', () => {
+  it('rejects an out-of-range chunk cell index (0..255): commits nothing', () => {
     openReady();
     const doc = st().doc;
     const plan: SurfaceEditPlan = {
@@ -781,7 +781,7 @@ describe('reservedTiles (T4)', () => {
     expect(st().reservedTiles).toEqual(new Set([2, 3]));
   });
 
-  it('is null when the adapter omits reservedTiles — permissive, matching editableTileRange', async () => {
+  it('is null when the adapter omits reservedTiles: permissive, matching editableTileRange', async () => {
     useClassicProjectStore.setState({ status: 'open', dir: '/p', handle: fakeHandle() } as never);
     await useClassicLevelStore.getState().openAct(REF);
     expect(st().reservedTiles).toBeNull();
@@ -833,7 +833,7 @@ describe('tool + selectedChunkId UI state', () => {
     expect(st().selectedChunkId).toBe(0x10);
   });
 
-  it('is NOT part of an undo snapshot — undo/redo leave the selection alone', () => {
+  it('is NOT part of an undo snapshot: undo/redo leave the selection alone', () => {
     openReady();
     st().setSelectedChunkId(7);
     classicSetStart(11, 12); // records a snapshot with selection == 7
@@ -971,7 +971,7 @@ describe('collision probe point', () => {
 describe('collision shape + diverge mode', () => {
   beforeEach(() => { openReady(); });
 
-  it('defaults to no armed shape and Link — the non-destructive path spec §4.5 requires', () => {
+  it('defaults to no armed shape and Link: the non-destructive path spec §4.5 requires', () => {
     // Isolate spends a block id and can grow the colind table
     // (src/core/level-classic/collision-write.ts's overhang refusal — GHZ/SBZ
     // refuse it outright). Link only ever rewrites one
@@ -1035,7 +1035,7 @@ describe('object-tool UI state', () => {
     expect(st().selectedObjectIndex).toBe(3);
   });
 
-  it('is NOT part of an undo snapshot — undo/redo leave selection/arm alone', () => {
+  it('is NOT part of an undo snapshot: undo/redo leave selection/arm alone', () => {
     openReady();
     st().setSelectedObjectIndex(0);
     classicSetStart(11, 12); // records a snapshot
@@ -1365,21 +1365,21 @@ describe('classicCommitCanvas', () => {
     expect(st().doc!.palettes[2][0]).toBe(beforePal);
   });
 
-  it('refuses to write tile 0 — it would repaint every blank cell in the zone', () => {
+  it('refuses to write tile 0: it would repaint every blank cell in the zone', () => {
     openReady();
     const p = fullCommit();
     p.tileWrites = [{ tileIndex: 0, data: new Uint8Array(32) }];
     expect(classicCommitCanvas(p).ok).toBe(false);
   });
 
-  it('refuses to write block 0 — it is engine-blank', () => {
+  it('refuses to write block 0: it is engine-blank', () => {
     openReady();
     const p = fullCommit();
     p.blockWrites = [{ ...p.blockWrites[0], blockId: 0 }];
     expect(classicCommitCanvas(p).ok).toBe(false);
   });
 
-  it("refuses to write palette line 0 — it is Sonic's, shared game-wide", () => {
+  it("refuses to write palette line 0: it is Sonic's, shared game-wide", () => {
     openReady();
     const p = fullCommit();
     p.paletteWrites = [{ line: 0, colors: new Uint16Array(16) }];

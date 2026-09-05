@@ -131,7 +131,7 @@ def _announce(alias: str, canonical: str) -> None:
         return
     _ANNOUNCED.add(alias)
     sys.stderr.write(
-        f"suite-paths: {alias} is a transitional alias — set {canonical} instead "
+        f"suite-paths: {alias} is a transitional alias; set {canonical} instead "
         "(empyrean contract/SUITE_PATHS.md)\n")
 
 

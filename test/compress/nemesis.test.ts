@@ -24,7 +24,7 @@ describe('nemesisDecompress', () => {
   });
 });
 
-describe('nemesisDecompress — robustness (no hang on bad input)', () => {
+describe('nemesisDecompress: robustness (no hang on bad input)', () => {
   it('throws on empty input instead of hanging', () => {
     expect(() => nemesisDecompress(new Uint8Array(0))).toThrow(NemesisError);
   });

@@ -62,7 +62,7 @@ describe('parseS1ObjectOffsets', () => {
       .toEqual({ obX: 8, obY: 0xc });
   });
 
-  it('returns null when EITHER equate is missing — never a half-derived pair', () => {
+  it('returns null when EITHER equate is missing: never a half-derived pair', () => {
     expect(parseS1ObjectOffsets('obX:\tequ 8\n')).toBeNull();
     expect(parseS1ObjectOffsets('obY:\tequ $C\n')).toBeNull();
   });
@@ -97,7 +97,7 @@ const constantsPath = ((): string | null => {
 const row = constantsPath ? it : it.skip;
 const why = constantsPath
   ? ''
-  : ' — SKIPPED: no sibling s1disasm checkout found, the real equates could not be read';
+  : ' (SKIPPED: no sibling s1disasm checkout found, the real equates could not be read)';
 
 describe('parseS1ObjectOffsets against the real s1disasm _Constants.asm', () => {
   row(`parses the checkout's own ${S1_OFFSET_SOURCE.x}/${S1_OFFSET_SOURCE.y}${why}`, () => {

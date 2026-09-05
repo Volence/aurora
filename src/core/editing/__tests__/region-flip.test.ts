@@ -163,7 +163,7 @@ describe('region-flip · derived bit masks', () => {
       .toEqual({ shape: 0, xFlip: false, yFlip: true, solidity: 'none' });
   });
 
-  it('1c: THE LAYOUTS ARE NOT CROSSED — the art masks and the collision masks are at '
+  it('1c: THE LAYOUTS ARE NOT CROSSED: the art masks and the collision masks are at '
     + 'different bit positions, and this is what a crossed pair would violate', () => {
     // Grounded in the engine's own reader, aeon b76576ea
     // tools/collision_pipeline.py:50-53 (CHUNK_XFLIP_BIT 0x0400, CHUNK_YFLIP_BIT
@@ -176,7 +176,7 @@ describe('region-flip · derived bit masks', () => {
     expect(FLIP_MASKS.ntH & FLIP_MASKS.collX).toBe(0);
   });
 
-  it('1d: a flip carries every bit it does not own — palette, priority, solidity, '
+  it('1d: a flip carries every bit it does not own: palette, priority, solidity, '
     + 'and the UNOWNED bits of a collision word', () => {
     const a = art(0x123, { pal: 3, pri: true });
     for (const axis of ['h', 'v'] as const) {
@@ -206,7 +206,7 @@ describe('region-flip · derived bit masks', () => {
     expect(FLIP_MASKS.collY & COLLISION_CELL_UNOWNED_MASK).toBe(0);
   });
 
-  it('1f: A WHOLE-PLANE FLIP PRESERVES UNOWNED BITS CELL BY CELL — the property '
+  it('1f: A WHOLE-PLANE FLIP PRESERVES UNOWNED BITS CELL BY CELL: the property '
     + 'stated over the transform the app actually calls, not just the word helper', () => {
     const src = fixture();
     src.collisionA = Uint16Array.from(src.collisionA, (w, i) => (
@@ -221,7 +221,7 @@ describe('region-flip · derived bit masks', () => {
     }
   });
 
-  it('1e: AIR IS AIR — a shape-0 collision cell keeps its word rather than becoming '
+  it('1e: AIR IS AIR: a shape-0 collision cell keeps its word rather than becoming '
     + '0x400, which would still read as air and would dirty every air cell', () => {
     expect(flipCollisionWord(0, 'h')).toBe(0);
     expect(flipCollisionWord(0, 'v')).toBe(0);
@@ -233,7 +233,7 @@ describe('region-flip · derived bit masks', () => {
 // ─── 2. THE CLIPBOARD FLIP DOES BOTH HALVES ────────────────────────────────
 
 describe('region-flip · flipClipboard', () => {
-  it('2a: HORIZONTAL — every word comes from the mirrored column AND has its hFlip '
+  it('2a: HORIZONTAL: every word comes from the mirrored column AND has its hFlip '
     + 'toggled', () => {
     const src = fixture();
     const out = flipClipboard(src, 'h');
@@ -252,7 +252,7 @@ describe('region-flip · flipClipboard', () => {
     expect(corner.hFlip).toBe(true);        // toggled from false
   });
 
-  it('2b: VERTICAL — mirrored ROW, vFlip toggled, hFlip untouched', () => {
+  it('2b: VERTICAL: mirrored ROW, vFlip toggled, hFlip untouched', () => {
     const src = fixture();
     const out = flipClipboard(src, 'v');
     const { widthTiles: w, heightTiles: h } = src;
@@ -267,7 +267,7 @@ describe('region-flip · flipClipboard', () => {
     expect(corner.hFlip).toBe(false);       // untouched
   });
 
-  it('2c: PLANTED VIOLATION — reverse-only (words move, bits do not) produces a '
+  it('2c: PLANTED VIOLATION: reverse-only (words move, bits do not) produces a '
     + 'DIFFERENT result on this fixture, in both axes', () => {
     for (const axis of ['h', 'v'] as const) {
       const src = fixture();
@@ -279,7 +279,7 @@ describe('region-flip · flipClipboard', () => {
     }
   });
 
-  it('2d: PLANTED VIOLATION — toggle-only (bits toggle, words stay put) produces a '
+  it('2d: PLANTED VIOLATION: toggle-only (bits toggle, words stay put) produces a '
     + 'DIFFERENT result on this fixture, in both axes', () => {
     for (const axis of ['h', 'v'] as const) {
       const src = fixture();
@@ -289,7 +289,7 @@ describe('region-flip · flipClipboard', () => {
     }
   });
 
-  it('2e: the COLLISION plane takes the same two-part transform with ITS OWN bits — '
+  it('2e: the COLLISION plane takes the same two-part transform with ITS OWN bits: '
     + 'the cells reverse and each cell\'s xFlip/yFlip toggles', () => {
     const src = fixture();
     const h = flipClipboard(src, 'h');
@@ -308,7 +308,7 @@ describe('region-flip · flipClipboard', () => {
       .toEqual({ shape: 0x33, xFlip: false, yFlip: false, solidity: 'top' });  // yFlip toggled OFF
   });
 
-  it('2f: the ART flip and the COLLISION flip stay in step — cell k of the flipped '
+  it('2f: the ART flip and the COLLISION flip stay in step: cell k of the flipped '
     + 'plane describes the four tiles of block k of the flipped art', () => {
     const src = fixture();
     for (const axis of ['h', 'v'] as const) {
@@ -332,7 +332,7 @@ describe('region-flip · flipClipboard', () => {
     }
   });
 
-  it('2g: it returns a NEW object and does not mutate the source — the paste ghost '
+  it('2g: it returns a NEW object and does not mutate the source: the paste ghost '
     + 'caches on clipboard object identity', () => {
     const src = fixture();
     const before = [...src.nametable];
@@ -347,7 +347,7 @@ describe('region-flip · flipClipboard', () => {
 
 describe('region-flip · round trip', () => {
   it('3a: flipping twice on the same axis is the identity, on both axes and both '
-    + 'planes — NECESSARY AND NOT SUFFICIENT, see 3b', () => {
+    + 'planes: NECESSARY AND NOT SUFFICIENT, see 3b', () => {
     for (const axis of ['h', 'v'] as const) {
       const src = fixture();
       const back = flipClipboard(flipClipboard(src, axis), axis);
@@ -358,7 +358,7 @@ describe('region-flip · round trip', () => {
     }
   });
 
-  it('3b: THE ROW 3a CANNOT DO — a SINGLE flip changes the plane. A no-op flip '
+  it('3b: THE ROW 3a CANNOT DO: a SINGLE flip changes the plane. A no-op flip '
     + 'passes 3a perfectly', () => {
     for (const axis of ['h', 'v'] as const) {
       const src = fixture();
@@ -368,7 +368,7 @@ describe('region-flip · round trip', () => {
     }
   });
 
-  it('3c: h and v commute and neither is the other — flipping both is not flipping one', () => {
+  it('3c: h and v commute and neither is the other: flipping both is not flipping one', () => {
     const src = fixture();
     const hv = flipClipboard(flipClipboard(src, 'h'), 'v');
     const vh = flipClipboard(flipClipboard(src, 'v'), 'h');
@@ -388,7 +388,7 @@ describe('region-flip · odd runs', () => {
     artOnly: true,
   });
 
-  it('4a: an odd run reverses correctly and the CENTRE column stays put — but still '
+  it('4a: an odd run reverses correctly and the CENTRE column stays put, but still '
     + 'has its OWN flip bit toggled, which is the half an off-by-one drops silently', () => {
     const out = flipClipboard(odd(), 'h');
     expect(unpackNametableWord(out.nametable[0]).tileIndex).toBe(11);
@@ -397,7 +397,7 @@ describe('region-flip · odd runs', () => {
     expect(unpackNametableWord(out.nametable[2]).tileIndex).toBe(9);
   });
 
-  it('4b: ART-ONLY IS PRESERVED, NOT UPGRADED — length-0 planes come back length 0 '
+  it('4b: ART-ONLY IS PRESERVED, NOT UPGRADED: length-0 planes come back length 0 '
     + 'and artOnly stays true. A flip must not change what a selection carries', () => {
     for (const axis of ['h', 'v'] as const) {
       const out = flipClipboard(odd(), axis);
@@ -409,19 +409,19 @@ describe('region-flip · odd runs', () => {
     }
   });
 
-  it('4c: PLANTED VIOLATION — reverse-only is wrong on an odd run too (the centre '
+  it('4c: PLANTED VIOLATION: reverse-only is wrong on an odd run too (the centre '
     + 'column is where it hides)', () => {
     const src = odd();
     expect([...flipClipboard(src, 'h').nametable]).not.toEqual([...plantReverseOnly(src, 'h')]);
   });
 
-  it('4d: PLANTED VIOLATION — toggle-only is wrong on an odd run', () => {
+  it('4d: PLANTED VIOLATION: toggle-only is wrong on an odd run', () => {
     const src = odd();
     expect([...flipClipboard(src, 'h').nametable]).not.toEqual([...plantToggleOnly(src, 'h')]);
   });
 
   it('4e: a 1x1 selection has nothing to reverse, so a flip is PURELY the bit toggle '
-    + '— the case reverse-only cannot be told from doing nothing', () => {
+    + ': the case reverse-only cannot be told from doing nothing', () => {
     const one: MapClipboard = {
       widthTiles: 1, heightTiles: 1, nametable: new Uint16Array([art(7)]),
       collisionA: new Uint16Array(0), collisionB: new Uint16Array(0), artOnly: true,
@@ -461,7 +461,7 @@ describe('region-flip · flipSectionRegion', () => {
     }
   });
 
-  it('5b: THE ART AND THE COLLISION DO NOT DESYNC — flipping in place gives exactly '
+  it('5b: THE ART AND THE COLLISION DO NOT DESYNC: flipping in place gives exactly '
     + 'what a copy-flip-paste of the same rect would have written', () => {
     for (const axis of ['h', 'v'] as const) {
       const clip = fixture();
@@ -475,7 +475,7 @@ describe('region-flip · flipSectionRegion', () => {
     }
   });
 
-  it('5c: AN ART-ONLY (odd) REGION FLIPS ART ONLY — no collision child at all, and '
+  it('5c: AN ART-ONLY (odd) REGION FLIPS ART ONLY: no collision child at all, and '
     + 'the collision under it is left exactly as it was', () => {
     const clip = fixture();
     const s = sectionWith(4, 6, clip);
@@ -494,7 +494,7 @@ describe('region-flip · flipSectionRegion', () => {
     ]);
   });
 
-  it('5d: flipping the same region twice restores the section EXACTLY — art and '
+  it('5d: flipping the same region twice restores the section EXACTLY: art and '
     + 'both collision planes', () => {
     for (const axis of ['h', 'v'] as const) {
       const clip = fixture();

@@ -50,7 +50,7 @@ describe('buildBlockSurface', () => {
   });
 });
 
-describe('buildBlockSurface — the blit places pixels within a cell correctly', () => {
+describe('buildBlockSurface: the blit places pixels within a cell correctly', () => {
   /** A doc whose tile 1 is blank except for value 5 at local (1,0). */
   function docWithMarker(xf: boolean, yf: boolean): LevelDoc {
     const d = makeDoc([{ cells: [cell(1, xf, yf), cell(0), cell(0), cell(0)] }]);
@@ -59,7 +59,7 @@ describe('buildBlockSurface — the blit places pixels within a cell correctly',
     return d;
   }
 
-  it('unflipped, the marker stays at (1,0) — and NOT at (0,1)', () => {
+  it('unflipped, the marker stays at (1,0), and NOT at (0,1)', () => {
     const { buffer } = buildBlockSurface(docWithMarker(false, false), 0);
     expect(buffer.data[0 * 16 + 1]).toBe(5);
     expect(buffer.data[1 * 16 + 0]).toBe(0);   // transposition guard
@@ -86,7 +86,7 @@ function chunkWith(first: ChunkCell): ChunkDef256 {
   return { cells: Array.from({ length: 256 }, (_, i) => (i === 0 ? first : chunkCell(0))) };
 }
 
-describe('buildChunkSurface — flip composition', () => {
+describe('buildChunkSurface: flip composition', () => {
   // Block 0's four cells are tiles 1,2,3,4 (TL,TR,BL,BR), all unflipped.
   const doc = () => makeDoc([{ cells: [cell(1), cell(2), cell(3), cell(4)] }]);
 
@@ -126,7 +126,7 @@ describe('buildChunkSurface — flip composition', () => {
     expect(provenance.cells[0].xf).toBe(false);
   });
 
-  it('BOTH flips compose — the diagonal case', () => {
+  it('BOTH flips compose: the diagonal case', () => {
     const d = doc(); d.chunks = [chunkWith(chunkCell(0, true, true))];
     const { provenance } = buildChunkSurface(d, 0);
     expect(provenance.cells[0].tileIndex).toBe(4);   // BR ends up at TL

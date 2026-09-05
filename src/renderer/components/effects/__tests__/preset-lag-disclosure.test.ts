@@ -193,11 +193,11 @@ const THE_LAG_BEFORE_THAT: readonly string[] = Object.freeze(['patch_motion', 'p
  */
 const LIVE = [...PRESET_KEYS_AWAITING_AEON].sort();
 
-describe('the premise is RETIRED — and the retirement is asserted, not assumed', () => {
+describe('the premise is RETIRED: the retirement is asserted, not assumed', () => {
   it('the premise is EMPTY, and both replays are optional root keys the schema really declares', () => {
     expect(
       PRESET_KEYS_AWAITING_AEON,
-      'PRESET_KEYS_AWAITING_AEON is NON-EMPTY — a lag has re-opened. That is not a failure of '
+      'PRESET_KEYS_AWAITING_AEON is NON-EMPTY: a lag has re-opened. That is not a failure of '
       + 'this row: re-aim this file at the sentence being ON screen (git log it for the shape it '
       + 'had while armed), and see the drift test\'s lag row, which measures it.',
     ).toEqual([]);
@@ -216,7 +216,7 @@ describe('the premise is RETIRED — and the retirement is asserted, not assumed
     expect(THE_LAG_BEFORE_THAT.length).toBeGreaterThan(1);
   });
 
-  it('so there is NO sentence, and the leaf is silent — and it is the PREMISE that silenced it', () => {
+  it('so there is NO sentence, and the leaf is silent, because it is the PREMISE that silenced it', () => {
     expect(presetLagDisclosure()).toBeNull();
     // The leaf says exactly what the derivation says: nothing.
     expect(PresetLagDisclosure()).toBeNull();
@@ -226,7 +226,7 @@ describe('the premise is RETIRED — and the retirement is asserted, not assumed
     expect(presetLagDisclosure(THE_LAG_BEFORE_THAT)).not.toBeNull();
   });
 
-  it('⚠ NO SURFACE IN THE PANEL IS DISCLOSED AGAINST ANY MORE — every authored key is accepted', () => {
+  it('⚠ NO SURFACE IN THE PANEL IS DISCLOSED AGAINST ANY MORE: every authored key is accepted', () => {
     // The retirement's real subject, named as the union of what the panel's five
     // mount sites author rather than as "the list is empty" a second time. Each
     // of these is a key some card or section below has controls for, and each
@@ -247,7 +247,7 @@ describe('the premise is RETIRED — and the retirement is asserted, not assumed
         .not.toContain(k);
       expect(
         PRESET_KEYS_AWAITING_AEON,
-        `${k} is in the premise — a lag has opened on a key this panel authors, so the sentence `
+        `${k} is in the premise: a lag has opened on a key this panel authors, so the sentence `
         + 'is back on screen above its controls. Re-aim this file at the armed shape rather than '
         + 'relaxing this row.',
       ).not.toContain(k);
@@ -255,14 +255,14 @@ describe('the premise is RETIRED — and the retirement is asserted, not assumed
   });
 });
 
-describe('the wording, driven with explicit replays — what a re-opened lag would say', () => {
+describe('the wording, driven with explicit replays: what a re-opened lag would say', () => {
   // BOTH cardinality branches, because the derivation has two and a retired
   // premise leaves neither of them exercised by production.
   for (const [label, replay] of [
     ['the key that just retired (singular)', THE_LAG_THAT_WAS],
     ['the pair that retired before it (plural)', THE_LAG_BEFORE_THAT],
   ] as const) {
-    it(`says the three things, in one sentence, with a date and where to re-measure — ${label}`, () => {
+    it(`says the three things, in one sentence, with a date and where to re-measure: ${label}`, () => {
       const s = presetLagDisclosure(replay)!;
       expect(s).not.toBeNull();
       expect(s.startsWith(PRESET_LAG_LEAD)).toBe(true);
@@ -307,7 +307,7 @@ describe('the wording, driven with explicit replays — what a re-opened lag wou
       .toContain("const PAGE = 'docs/EDITOR_RASTER_PRESETS.md'");
   });
 
-  it('the leaf takes no props — no guard can be handed to it', () => {
+  it('the leaf takes no props: no guard can be handed to it', () => {
     expect(PresetLagDisclosure.length).toBe(0);
     const src = stripComments(readFileSync(join(__dirname, '..', 'PresetLagDisclosure.tsx'), 'utf8'));
     expect(src).toMatch(/export function PresetLagDisclosure\(\)/);
@@ -353,7 +353,7 @@ describe('the wording, driven with explicit replays — what a re-opened lag wou
  * would fail the `toBe(presetLagDisclosure(...))` below, and one hard-wired shut
  * fails the `not.toBeNull()`.
  */
-describe('the render gate — POISON: the premise stubbed back to NON-EMPTY', () => {
+describe('the render gate, POISON: the premise stubbed back to NON-EMPTY', () => {
   afterEach(() => {
     vi.doUnmock(LAG_MODULE);
     vi.resetModules();
@@ -374,7 +374,7 @@ describe('the render gate — POISON: the premise stubbed back to NON-EMPTY', ()
     const el = poisoned.PresetLagDisclosure();
     expect(
       el,
-      'the leaf renders NOTHING on a NON-empty premise — the gate is stuck SHUT, so a re-opened '
+      'the leaf renders NOTHING on a NON-empty premise: the gate is stuck SHUT, so a re-opened '
       + 'lag would reach an author with no disclosure at all, above controls whose output fails '
       + 'aeon\'s build. The retirement has taken the machinery with it, which is the O62/O64 '
       + 'defect wearing the opposite costume.',
@@ -386,7 +386,7 @@ describe('the render gate — POISON: the premise stubbed back to NON-EMPTY', ()
     expect((el as React.ReactElement<{ tone?: string }>).props.tone).toBe('warning');
   });
 
-  it('LOAD-BEARING TODAY: and the SAME on the plural premise — all five mount sites read this '
+  it('LOAD-BEARING TODAY: and the SAME on the plural premise, where all five mount sites read this '
      + 'one leaf', async () => {
     vi.resetModules();
     vi.doMock(LAG_MODULE, async (importOriginal) => {
@@ -436,19 +436,19 @@ describe('the render gate — POISON: the premise stubbed back to NON-EMPTY', ()
 
     expect(
       poisoned.PresetLagDisclosure(),
-      'the leaf still renders on an EMPTY premise — the gate is stuck OPEN, so this disclosure '
+      'the leaf still renders on an EMPTY premise: the gate is stuck OPEN, so this disclosure '
       + 'cannot retire. It would stay above the controls after aeon ships the key, which is the '
       + 'O62/O64 defect: a warning that outlives its reason teaches the author to ignore every '
       + 'warning the panel gives.',
     ).toBeNull();
   });
 
-  it('and unstubbed — production, today — it is SILENT again', async () => {
+  it('and unstubbed: production, today, it is SILENT again', async () => {
     vi.resetModules();
     const fresh = await import('../PresetLagDisclosure');
     expect(
       fresh.PresetLagDisclosure(),
-      'the leaf renders on an EMPTY premise — the gate is stuck OPEN and the retired sentence is '
+      'the leaf renders on an EMPTY premise: the gate is stuck OPEN and the retired sentence is '
       + 'still above five sets of controls, telling an author a document will not build when '
       + 'aeon\'s page now accepts every key those controls write',
     ).toBeNull();
@@ -480,7 +480,7 @@ describe('the render gate — POISON: the premise stubbed back to NON-EMPTY', ()
 describe('the retirement cannot outlive its measurement either', () => {
   const src = stripComments(readFileSync(DRIFT_TEST_PATH, 'utf8'));
 
-  it('the drift test no longer couples to the premise — one statement of the retirement, not two', () => {
+  it('the drift test no longer couples to the premise: one statement of the retirement, not two', () => {
     expect(PRESET_KEYS_AWAITING_AEON).toEqual([]);
     // ⚠ THE COUPLING RULE INVERTS WITH THE PREMISE, and both directions are
     // right in their own state. While the list is NON-EMPTY it is a hand-typed
@@ -489,7 +489,7 @@ describe('the retirement cannot outlive its measurement either', () => {
     // MUST name it. While the list is EMPTY, a row asserting `lag equals <the
     // empty constant>` is one claim spelled through an indirection nobody can
     // read — so the drift test must NOT name it.
-    expect(src, 'the drift test still names the premise constant while that constant is empty — '
+    expect(src, 'the drift test still names the premise constant while that constant is empty: '
       + 'the lag row was left coupled to a list with nothing in it; assert the empty lag directly')
       .not.toMatch(/PRESET_KEYS_AWAITING_AEON/);
   });
@@ -518,7 +518,7 @@ describe('the retirement cannot outlive its measurement either', () => {
       'the drift test no longer computes the lag as "every schema-declared root key aeon does not '
       + 'ACCEPT" and asserts it EMPTY. Nothing now watches whether the retirement is still true: '
       + 'aeon un-building one of these keys would leave Aurora authoring a key that reaches the '
-      + 'file and nothing further — with no sentence above the controls and no red row anywhere — '
+      + 'file and nothing further, with no sentence above the controls and no red row anywhere, '
       + 'and a contract that declared a new key aeon has not built would be equally invisible. If '
       + 'the row is still there but the LEFT SIDE has been narrowed back to preset-refused, that '
       + 'is the 2026-09-03 hole being reintroduced. Restore it.',
@@ -546,7 +546,7 @@ describe('the retirement cannot outlive its measurement either', () => {
       ...LIVE, ...THE_LAG_THAT_WAS, ...THE_LAG_BEFORE_THAT,
       'cycles', 'variants', 'ramp', 'base_swap', 'boundary',
     ]) {
-      expect(src, `the drift test hardcodes "${k}" — a key name may live in the premise list and `
+      expect(src, `the drift test hardcodes "${k}": a key name may live in the premise list and `
         + 'nowhere else').not.toContain(`'${k}'`);
     }
   });
@@ -634,7 +634,7 @@ describe('the panel mounts the leaf first in the ANCHORS section too, unconditio
     expect(code.indexOf('<AnchorChannelsBlock', leaf)).toBeGreaterThan(leaf);
   });
 
-  it('⚠ THE SENTENCE IS RETIRED FOR THIS SECTION\'S OWN KEYS — and the one it WOULD say survives', () => {
+  it('⚠ THE SENTENCE IS RETIRED FOR THIS SECTION\'S OWN KEYS: the one it WOULD say survives', () => {
     // The two keys this section authors, named here because the section's own
     // controls are what makes them load-bearing — not as a copy of the premise.
     const authored: readonly string[] = ['patch_world_ys', 'patch_motion'];
@@ -651,7 +651,7 @@ describe('the panel mounts the leaf first in the ANCHORS section too, unconditio
     for (const k of authored) {
       expect(
         PRESET_KEYS_AWAITING_AEON,
-        `${k} is back in the premise — a lag has re-opened on a key THIS section authors. `
+        `${k} is back in the premise: a lag has re-opened on a key THIS section authors. `
         + 'Re-aim this row at the sentence being about this section (this file records the shape '
         + 'it had while armed) rather than relaxing it.',
       ).not.toContain(k);
@@ -681,7 +681,7 @@ describe('the panel mounts the leaf first in the ANCHORS section too, unconditio
     // would be the partial-coverage failure this repo has been bitten by, so
     // "silent" is asserted as a statement about the count AND about each site.
     expect(code.split('<PresetLagDisclosure').length - 1,
-      'the leaf is no longer mounted in exactly five bodies — channels, anchors, the ramp card, '
+      'the leaf is no longer mounted in exactly five bodies: channels, anchors, the ramp card, '
       + 'the base-swap card and the boundary card. A lost mount site is a re-armed lag that never '
       + 'reaches that surface.',
     ).toBe(5);
@@ -760,7 +760,7 @@ describe('the panel mounts the leaf in the RAMP card too, and it stays while sil
     // the ramp mount and grew a third one anywhere earlier in the file.
     const between = code.slice(nearest, card);
     expect(between, 'the nearest mount above the ramp controls belongs to a COLLAPSIBLE SECTION, '
-      + 'not to the ramp card — the ramp card\'s own mount has been removed')
+      + 'not to the ramp card: the ramp card\'s own mount has been removed')
       .not.toMatch(/<CollapsibleSection|id="aeon\.effects\.preset\./);
     // ...and it really is the THIRD of the four, so the two section rows above
     // and this row are talking about three distinct mounts.
@@ -788,14 +788,14 @@ describe('the panel mounts the leaf in the RAMP card too, and it stays while sil
     expect(mountLine).not.toMatch(/&&|\?|selected\.|section/);
   });
 
-  it('⚠ THE SENTENCE IS RETIRED FOR THIS CARD\'S OWN KEY — and the one it WOULD say survives', () => {
+  it('⚠ THE SENTENCE IS RETIRED FOR THIS CARD\'S OWN KEY: the one it WOULD say survives', () => {
     // The key this card authors. Named here because the card's controls are
     // what makes it load-bearing — not as a copy of the premise, which is empty.
     const authored: readonly string[] = ['ramp'];
     for (const k of authored) {
       expect(
         PRESET_KEYS_AWAITING_AEON,
-        `${k} is back in the premise — a lag has re-opened on the key THIS card authors. `
+        `${k} is back in the premise: a lag has re-opened on the key THIS card authors. `
         + 'Re-aim this row at the sentence being about this card rather than relaxing it.',
       ).not.toContain(k);
       expect(EFFECTS_PRESET_ROOT_KEYS, `${k} is not a root key of the schema`).toContain(k);
@@ -865,7 +865,7 @@ describe('the panel mounts the leaf in the BASE-SWAP card too, and it stays whil
     // card. Without this clause the row would pass on a panel that deleted the
     // base-swap mount entirely.
     expect(code.slice(nearest, card),
-      'the nearest mount above the base-swap controls belongs to another card or section — the '
+      'the nearest mount above the base-swap controls belongs to another card or section: the '
       + 'base-swap card\'s own mount has been removed')
       .not.toMatch(/<CollapsibleSection|setRampSpanCommand\(|id="aeon\.effects\.preset\./);
     // ⚠ IT WAS "THE LAST OF THE FOUR" UNTIL EW-BOUNDARY-PANEL, and that
@@ -874,7 +874,7 @@ describe('the panel mounts the leaf in the BASE-SWAP card too, and it stays whil
     // DISTINCT from the ramp's (the clause above) and that the next one along
     // belongs to the card that comes after, not to this one counted twice.
     const after = mounts.filter((i) => i > nearest);
-    expect(after, 'the base-swap card is the last mount site again — the boundary card\'s mount '
+    expect(after, 'the base-swap card is the last mount site again: the boundary card\'s mount '
       + 'has been removed').toHaveLength(1);
     expect(code.slice(nearest, after[0]),
       'the mount after the base-swap card\'s does not sit before the boundary card\'s own '
@@ -886,12 +886,12 @@ describe('the panel mounts the leaf in the BASE-SWAP card too, and it stays whil
     expect(mountLine).not.toMatch(/&&|\?|selected\.|section/);
   });
 
-  it('⚠ THE KEY THIS CARD AUTHORS WAS NEVER IN THE PREMISE — and the sentence it WOULD say survives', () => {
+  it('⚠ THE KEY THIS CARD AUTHORS WAS NEVER IN THE PREMISE: the sentence it WOULD say survives', () => {
     const authored: readonly string[] = ['base_swap'];
     for (const k of authored) {
       expect(
         PRESET_KEYS_AWAITING_AEON,
-        `${k} is in the premise — a lag has OPENED on the key this card authors, which would be a `
+        `${k} is in the premise: a lag has OPENED on the key this card authors, which would be a `
         + 'first: aeon shipped this key ahead of the contract. Re-aim this row rather than '
         + 'relaxing it.',
       ).not.toContain(k);
@@ -957,7 +957,7 @@ describe('the panel mounts the leaf in the BOUNDARY card, and it stays while sil
     // card. Without this clause the row would pass on a panel that deleted the
     // boundary mount entirely.
     expect(code.slice(nearest, card),
-      'the nearest mount above the boundary controls belongs to another card or section — the '
+      'the nearest mount above the boundary controls belongs to another card or section: the '
       + 'boundary card\'s own mount has been removed')
       .not.toMatch(/<CollapsibleSection|setBaseSwapLineCommand\(|id="aeon\.effects\.preset\./);
     // No guard on the mount line itself.
@@ -982,14 +982,14 @@ describe('the panel mounts the leaf in the BOUNDARY card, and it stays while sil
    * silence is the premise's doing and not a card that quietly stopped
    * rendering.
    */
-  it('⚠ THE SENTENCE IS RETIRED FOR THIS CARD\'S OWN KEY — and the one it WOULD say survives', () => {
+  it('⚠ THE SENTENCE IS RETIRED FOR THIS CARD\'S OWN KEY: the one it WOULD say survives', () => {
     // The key this card authors. Named here because the card's controls are what
     // make it load-bearing — not as a copy of the premise, which is empty.
     const authored: readonly string[] = ['boundary'];
     for (const k of authored) {
       expect(
         PRESET_KEYS_AWAITING_AEON,
-        `${k} is back in the premise — a lag has re-opened on the key THIS card authors, so the `
+        `${k} is back in the premise: a lag has re-opened on the key THIS card authors, so the `
         + 'sentence is on screen here again. Re-aim this row at the sentence being about this '
         + 'card (git log it for the shape it had while armed) rather than relaxing it.',
       ).not.toContain(k);

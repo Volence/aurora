@@ -95,13 +95,13 @@ function readConstructor(): Read {
   const aeon = peerRepo('aeon');
   if (aeon === null) {
     return { kind: 'skip', why: 'SKIPPED, NOT PASSED: no aeon checkout beside this repo (set '
-      + 'AEON_DIR) — CANNOT MEASURE whether raster_ramp_program still forwards a signed value '
+      + 'AEON_DIR): CANNOT MEASURE whether raster_ramp_program still forwards a signed value '
       + 'into a u32 field, so the negative-value disclosure cannot be retired OR confirmed here' };
   }
   const tip = resolveRev(aeon, TIP);
   if (tip === null) {
     return { kind: 'skip', why: `SKIPPED, NOT PASSED: ${TIP} does not resolve in ${aeon} `
-      + '(unfetched? shallow?) — CANNOT MEASURE the ramp constructor' };
+      + '(unfetched? shallow?): CANNOT MEASURE the ramp constructor' };
   }
   const at = readAtRev(aeon, tip, AEON_PATH);
   // Not a skip: the revision resolved, so this WAS measured, and the engine
@@ -110,7 +110,7 @@ function readConstructor(): Read {
   const literal = returnedLiteral(at.text);
   if (literal === null) {
     return { kind: 'fail', why: `${AEON_PATH} at aeon ${tip} no longer carries a `
-      + '`pub comptime fn raster_ramp_program` returning a `RasterRampProgram{` literal — the '
+      + '`pub comptime fn raster_ramp_program` returning a `RasterRampProgram{` literal: the '
       + 'shape this row reads has moved, so the negative-value premise is UNMEASURED and the '
       + 'disclosure in src/core/formats/effects/ramp-sign-lag.ts must be re-derived by hand' };
   }
@@ -126,8 +126,8 @@ function onAeon(ctx: { skip: (why: string) => void }, body: (r: Read & { kind: '
   body(READ);
 }
 
-describe(`the negative ramp value — measured at aeon ${AEON_PATH} @ ${TIP}`, () => {
-  it('the two fields are still `u32` — the half of the defect that is a TYPE', (ctx) => {
+describe(`the negative ramp value: measured at aeon ${AEON_PATH} @ ${TIP}`, () => {
+  it('the two fields are still `u32`: the half of the defect that is a TYPE', (ctx) => {
     onAeon(ctx, ({ tip, decl }) => {
       // Anti-vacuous: we read a real struct, not an empty string.
       expect(decl.length, `${AEON_PATH} at aeon ${tip} is suspiciously short`)
@@ -137,7 +137,7 @@ describe(`the negative ramp value — measured at aeon ${AEON_PATH} @ ${TIP}`, (
           new RegExp(`\\n\\s*${field}:\\s+u32`).test(decl),
           `${field} is no longer declared \`u32\` in ${AEON_PATH} at aeon ${tip}. If it is now a `
           + 'SIGNED type the negative-value defect may be gone by a different route than an '
-          + 'encode — re-derive the premise by hand and, if it has cleared, EMPTY '
+          + 'encode: re-derive the premise by hand and, if it has cleared, EMPTY '
           + '`RAMP_SIGN_FIELDS_AWAITING_AEON` in src/core/formats/effects/ramp-sign-lag.ts.',
         ).toBe(true);
       }
@@ -164,15 +164,15 @@ describe(`the negative ramp value — measured at aeon ${AEON_PATH} @ ${TIP}`, (
         if (RAMP_SIGN_FIELDS_AWAITING_AEON.length > 0) {
           expect(
             forwarded.map((w) => w.param).sort(),
-            'THE PREMISE HAS CLEARED — and the disclosure has not. `raster_ramp_program` at aeon '
+            'THE PREMISE HAS CLEARED, and the disclosure has not. `raster_ramp_program` at aeon '
             + `${tip} (${AEON_PATH}, blob ${blob}) no longer forwards both parameters raw; it now `
             + `spells them \`${spelled}\`. A negative ramp value may build today, so the sentence `
-            + 'on the ramp card and the caveat inside the rate refusal are a FALSE WARNING — '
+            + 'on the ramp card and the caveat inside the rate refusal are a FALSE WARNING, '
             + 'which is the very defect they were written against, wearing the other hat. '
             + 'FIX: re-read the constructor, confirm the encode is a two\'s-complement of the '
             + 'signed value, and EMPTY `RAMP_SIGN_FIELDS_AWAITING_AEON` in '
             + 'src/core/formats/effects/ramp-sign-lag.ts (that one edit retires both surfaces). '
-            + 'DO NOT empty it on a merge announcement — this row reads TIP, and only this row '
+            + 'DO NOT empty it on a merge announcement: this row reads TIP, and only this row '
             + 'may retire the sentence.',
           ).toEqual([...RAMP_SIGN_FIELDS].sort());
         } else {
@@ -195,7 +195,7 @@ describe(`the negative ramp value — measured at aeon ${AEON_PATH} @ ${TIP}`, (
    * on a synthetic literal of the shape their fix will have, plus the shape it
    * has today. Both directions, on the same parser the row above uses.
    */
-  it('⚠ the reader can DISTINGUISH a forward from an encode — proved on both shapes', () => {
+  it('⚠ the reader can DISTINGUISH a forward from an encode: proved on both shapes', () => {
     const shell = (starts: string, steps: string) => `x
 pub comptime fn raster_ramp_program(top: int, lines: int, cmd: int,
                                     start: int, step: int) -> RasterRampProgram {
@@ -252,8 +252,8 @@ pub comptime fn raster_ramp_program(top: int, lines: int, cmd: int,
     onAeon(ctx, () => {
       const aeon = peerRepo('aeon')!;
       const rec = resolveRev(aeon, RAMP_SIGN_LAG_MEASURED_AT);
-      expect(rec, `the recorded revision ${RAMP_SIGN_LAG_MEASURED_AT} does not resolve in ${aeon} `
-        + '— the sentence cites evidence a reader cannot open').not.toBeNull();
+      expect(rec, `the recorded revision ${RAMP_SIGN_LAG_MEASURED_AT} does not resolve in ${aeon}`
+        + ': the sentence cites evidence a reader cannot open').not.toBeNull();
       const at = readAtRev(aeon, rec!, AEON_PATH);
       expect(at.ok, at.ok ? '' : `aeon ${rec}: ${at.why}`).toBe(true);
       if (!at.ok) return;
@@ -265,14 +265,14 @@ pub comptime fn raster_ramp_program(top: int, lines: int, cmd: int,
         expect(
           WIRE.filter(({ field, param }) => assignedTo(literal, field) === param),
           `ramp-sign-lag.ts records the premise as CLEARED at aeon ${RAMP_SIGN_LAG_MEASURED_AT}, `
-          + `but at that revision the constructor spells \`${spelled}\` — a bare forward. The `
+          + `but at that revision the constructor spells \`${spelled}\`: a bare forward. The `
           + 'retirement is dated to a revision that does not support it. Re-measure and re-date.',
         ).toEqual([]);
       } else {
         expect(
           WIRE.filter(({ field, param }) => assignedTo(literal, field) === param).map((w) => w.param),
           `ramp-sign-lag.ts records the premise as OPEN at aeon ${RAMP_SIGN_LAG_MEASURED_AT}, but `
-          + `at that revision the constructor spells \`${spelled}\` — it already encodes.`,
+          + `at that revision the constructor spells \`${spelled}\`: it already encodes.`,
         ).toEqual([...RAMP_SIGN_FIELDS].sort());
       }
     });

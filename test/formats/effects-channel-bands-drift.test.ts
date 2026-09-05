@@ -54,9 +54,9 @@ const PROV = JSON.parse(readFileSync(PROVENANCE_PATH, 'utf8')) as {
 const BYTES = readFileSync(BANDS_PATH, 'utf8');
 
 /** Prefix every cross-repo message with this so nobody triages it as ours. */
-const NOT_OURS = 'NOT AN AURORA REGRESSION — the vendored aeon channel-bands sidecar is stale.';
+const NOT_OURS = 'NOT AN AURORA REGRESSION: the vendored aeon channel-bands sidecar is stale.';
 
-describe('aeon channel bands — vendored copy drift gate', () => {
+describe('aeon channel bands: vendored copy drift gate', () => {
   it('the vendored sidecar is byte-identical to the pinned aeon blob', () => {
     // Anti-vacuous: we hashed a real document, not an empty or missing file, and
     // one that carries the two things the feature is computed from.
@@ -150,14 +150,14 @@ describe('CURRENCY: is the vendored channel-bands sidecar still what aeon publis
 
   it(`matches ${PROV.aeon.path} at aeon ${TIP}`, (ctx) => {
     if (aeon === null) {
-      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR) — '
+      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR): '
         + `CANNOT MEASURE whether the pin ${PROV.aeon.revision} for `
         + 'src/core/formats/effects/aeon-effects-channel-bands.json is still current');
       return;
     }
     const tip = resolveRev(aeon, TIP);
     if (tip === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${aeon} — CANNOT MEASURE `
+      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${aeon}: CANNOT MEASURE `
         + `currency of pin ${PROV.aeon.revision}`);
       return;
     }
@@ -182,31 +182,31 @@ describe('CURRENCY: is the vendored channel-bands sidecar still what aeon publis
       + `  the bytes vendored here hash to ${onDisk}\n`
       + `  ${onDisk === PROV.aeon.blob
         ? `${PROV.aeon.path} changed in aeon between those two revisions.`
-        : 'THE VENDORED COPY HERE has been edited away from the pin — that is an Aurora-side '
+        : 'THE VENDORED COPY HERE has been edited away from the pin: that is an Aurora-side '
           + 'change, not aeon drift; see the byte-identity row above.'}\n`
       + `  Re-vendor:  git -C ${aeon} show ${tip}:${PROV.aeon.path} > ${PROV.vendored.path}\n`
       + '  then update the provenance sidecar (revision, revision_subject, blob, bytes,\n'
       + '  git_blob, pin_history_current_last). channel-bands.ts throws at load if a\n'
-      + '  load-bearing sentence moved, so the module will tell you what else changed —\n'
+      + '  load-bearing sentence moved, so the module will tell you what else changed:\n'
       + '  in particular whether the fit is still ONE-DIRECTIONAL and still peak-to-peak.',
     ).toBe(BYTES);
   });
 
   it('the pinned aeon revision is PUBLISHED, not local-only', (ctx) => {
     if (aeon === null) {
-      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR) — '
+      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR): '
         + `CANNOT MEASURE whether ${PROV.aeon.revision} is reachable from ${TIP}`);
       return;
     }
     const tip = resolveRev(aeon, TIP);
     if (tip === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${aeon} — CANNOT MEASURE `
+      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${aeon}: CANNOT MEASURE `
         + `reachability of ${PROV.aeon.revision}`);
       return;
     }
     expect(
       isAncestor(aeon, PROV.aeon.revision, tip),
-      `${NOT_OURS}\n  ${PROV.aeon.revision} is NOT reachable from aeon ${TIP} (${tip}) — `
+      `${NOT_OURS}\n  ${PROV.aeon.revision} is NOT reachable from aeon ${TIP} (${tip}): `
       + 'local-only, or the branch was rewritten; a peer cannot check a pin at a SHA they '
       + 'cannot fetch',
     ).toBe(true);

@@ -34,7 +34,7 @@ describe('collision cell word (shape + flip + per-plane 2-bit solidity)', () => 
       })).toBe(AIR_CELL);
     });
 
-    it('a nonzero shape composes effectiveXFlip(entryFlipX, userXFlip) — entry flip XOR user flip', () => {
+    it('a nonzero shape composes effectiveXFlip(entryFlipX, userXFlip): entry flip XOR user flip', () => {
       // entryFlipX=true + userXFlip=true cancel out: no xflip bit in the packed word.
       const word = selectedCollisionWord({
         shape: 5, entryFlipX: true, userXFlip: true, yFlip: false, solidity: 'top',

@@ -41,7 +41,7 @@ describe('level tab helpers', () => {
 });
 
 describe('the untitled ("New Sprite…") tab', () => {
-  it('IS the spriteStore untitled document — one id, no mapping layer', () => {
+  it('IS the spriteStore untitled document: one id, no mapping layer', () => {
     // If these ever diverged, the tab would host one document while undo, the
     // dirty dot and the close confirm all addressed another.
     expect(UNTITLED_SPRITE_TAB_ID).toBe(UNTITLED_SPRITE_DOC_ID);

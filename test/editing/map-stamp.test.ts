@@ -194,7 +194,7 @@ describe('buildStampCommand', () => {
    * The half of the original property that still holds is asserted directly:
    * the batch carries NO art and NO collision child. Only identity changed.
    */
-  it('(f) an identical stamp writes no art and no collision — but IS still a recorded placement', () => {
+  it('(f) an identical stamp writes no art and no collision, but IS still a recorded placement', () => {
     const section = seededSection();
     const chunk = createChunkDef('c1', 'Chunk', 4, 4); // all-zero nametable + all-air planes, matches fresh section
 

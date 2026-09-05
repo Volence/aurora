@@ -129,7 +129,7 @@ describe('paint-region breaks the chunk link of every tile it rewrites (d-18c)',
     expect(originAt(2, 2)).toBeNull();
   });
 
-  it('the link break is UNDOABLE with the paint it belongs to — one step, both halves', async () => {
+  it('the link break is UNDOABLE with the paint it belongs to: one step, both halves', async () => {
     const id = await stampAtOrigin();
     await handleAgentRequest({
       kind: 'paint-region', section: 0, x: 1, y: 1, w: 1, h: 1,

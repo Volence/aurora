@@ -51,7 +51,7 @@ const FILE = referencePath('s4_engine', 'data/animations/sonic_anims.asm');
 describe('real sonic_anims.asm', () => {
   it('parses all 11 named animations with sane frame indices', (ctx) => {
     if (!existsSync(FILE)) {
-      ctx.skip(`SKIPPED, NOT PASSED: ${FILE} is absent — the s4_engine tree is gone from this `
+      ctx.skip(`SKIPPED, NOT PASSED: ${FILE} is absent: the s4_engine tree is gone from this `
         + 'machine, so this row measures nothing at all and has not for some time');
       return;
     }

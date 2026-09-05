@@ -115,7 +115,7 @@ describe('swatchState', () => {
     expect(swatchState(2, 5, UNLOCKED, sel).paintSelected).toBe(false);
   });
 
-  it('carries the two selections independently — they are different things', () => {
+  it('carries the two selections independently: they are different things', () => {
     // The edit selection is the grid's own; the paint selection is the engine's.
     // One swatch can be both, and classic has no paint selection at all.
     const both = { edit: { line: 1, idx: 2 }, paint: { line: 1, idx: 2 } };

@@ -224,7 +224,7 @@ describe('the golden round-trips', () => {
     expect(serializeBgOverride(shuffled)).toBe(serializeBgOverride(decorated()));
   });
 
-  it('is idempotent — a second write of the same document is byte-identical', () => {
+  it('is idempotent: a second write of the same document is byte-identical', () => {
     const once = serializeBgOverride(golden());
     const twice = serializeBgOverride(parseBgOverride(once).doc);
     expect(twice).toBe(once);
@@ -244,7 +244,7 @@ describe('the golden round-trips', () => {
  * that validates nothing also does. These mirror aeon's own
  * TestBgAnimBandCoherence poisons, on the same fixture.
  */
-describe('poisons — the corruptions this codec exists to stop, on real data', () => {
+describe('poisons: the corruptions this codec exists to stop, on real data', () => {
   it('rejects a regenerate-the-art-only edit (the merge that would bake cleanly)', () => {
     const doc = golden();
     doc.tiles[0] = doc.tiles[0].map(v => (v + 1) % 16);

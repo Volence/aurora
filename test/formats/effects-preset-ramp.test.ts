@@ -129,17 +129,17 @@ describe('the top-level oneOf: exactly one raster program per document', () => {
     expect(validateAgainstSchema({ ...base, bands: [BAND] }, S)).toEqual([]);
   });
 
-  it('ramp ALONE is accepted — the shape that did not exist before 9233883', () => {
+  it('ramp ALONE is accepted: the shape that did not exist before 9233883', () => {
     expect(validateAgainstSchema({ ...base, ramp: RAMP }, S)).toEqual([]);
   });
 
-  it('BOTH is REFUSED — the failure mode that would author an unbuildable preset', () => {
+  it('BOTH is REFUSED: the failure mode that would author an unbuildable preset', () => {
     const issues = validateAgainstSchema({ ...base, bands: [BAND], ramp: RAMP }, S);
     expect(
       issues,
       'a document carrying BOTH raster programs was ACCEPTED. Both lower into the one `raster:` '
       + 'slot and the engine has no combinator that mixes a sparse fire list with a dense run, so '
-      + 'this preset fails aeon\'s build — and the editor just said it was fine.',
+      + 'this preset fails aeon\'s build, and the editor just said it was fine.',
     ).not.toEqual([]);
     // The refusal is the exactly-one rule's, not a coincidence from some other
     // keyword: the evaluator says it matched TWO forms.
@@ -148,7 +148,7 @@ describe('the top-level oneOf: exactly one raster program per document', () => {
     expect(issues.map((i) => i.path)).toContain('');
   });
 
-  it('NEITHER is REFUSED — a preset document must carry one raster program', () => {
+  it('NEITHER is REFUSED: a preset document must carry one raster program', () => {
     const issues = validateAgainstSchema({ ...base }, S);
     expect(issues, 'a document carrying NO raster program was accepted').not.toEqual([]);
     expect(issues.map((i) => i.message).join(' '))
@@ -201,7 +201,7 @@ describe('the top-level oneOf: exactly one raster program per document', () => {
       () => canonicalizeBySchema({ ...base, bands: [BAND], bogus_key: 7 }, S),
       'canonicalizeBySchema returned a document carrying an undeclared root key instead of '
       + 'throwing. The root `oneOf` branch was taken and the sibling `properties` discarded, so '
-      + 'the undeclared-key refusal — the only reason this function still exists — is silently '
+      + 'the undeclared-key refusal (the only reason this function still exists) is silently '
       + 'skipped for the WHOLE DOCUMENT.',
     ).toThrow(/refusing to drop/);
   });
@@ -241,7 +241,7 @@ describe('fp16: frac256 is a MAGNITUDE and the sign is whole\'s', () => {
     expect(
       presetFp16ToNumber(EFFECTS_PRESET_FP16_SIGNED_EXAMPLE.fp),
       'the fp16 conversion used the naive `whole + frac256/256`. That yields -0.5 for the '
-      + 'schema\'s own worked example, which is -1.5 — a WHOLE PIXEL out, with both numbers still '
+      + 'schema\'s own worked example, which is -1.5: a WHOLE PIXEL out, with both numbers still '
       + 'inside their declared ranges, so no schema and no contract vector can catch it. The sign '
       + 'is `whole`\'s alone and applies to the whole value.',
     ).toBe(EFFECTS_PRESET_FP16_SIGNED_EXAMPLE.value);
@@ -335,7 +335,7 @@ describe('ramp bounds, derived from the schema and never typed beside it', () =>
     expect(EFFECTS_PRESET_RAMP_VSRAM_ADDR_RANGE).toEqual({ min: 0, max: 78 });
   });
 
-  it('⚠ THE PER-FIELD MAXIMA ARE NOT THE CONTRACT — the SUM is, and it is 223', () => {
+  it('⚠ THE PER-FIELD MAXIMA ARE NOT THE CONTRACT: the SUM is, and it is 223', () => {
     expect(EFFECTS_PRESET_RAMP_SPAN_MAX).toBe(223);
     // The trap, stated as a row: both maxima together satisfy every keyword in
     // the schema and are refused by the engine's frame-rewind interlock. A
@@ -344,7 +344,7 @@ describe('ramp bounds, derived from the schema and never typed beside it', () =>
     expect(bothMaxima).toBeGreaterThan(EFFECTS_PRESET_RAMP_SPAN_MAX);
     expect(validateAgainstSchema(
       { ...base, ramp: { ...RAMP, top: 222, lines: 220 } }, S,
-    ), 'the schema is expected NOT to catch the span — JSON Schema cannot express a constraint '
+    ), 'the schema is expected NOT to catch the span: JSON Schema cannot express a constraint '
       + 'over two fields, which is exactly why EFFECTS_PRESET_RAMP_SPAN_MAX exists')
       .toEqual([]);
     // Each maximum is the loosest the sum admits with the other at its floor.
@@ -364,7 +364,7 @@ describe('ramp bounds, derived from the schema and never typed beside it', () =>
    * codec's, so it is a second reading of the contract rather than a restatement
    * of the module's parse. Neither number is typed into an expectation.
    */
-  it('⚠ THE DISPLAY GEOMETRY IS TWO NUMBERS — per-index lag, and first-line offset', () => {
+  it('⚠ THE DISPLAY GEOMETRY IS TWO NUMBERS: per-index lag, and first-line offset', () => {
     // ⚠ THE TWO SENTENCES LIVE IN TWO DIFFERENT NODES. The per-index rule is in
     // the KEY's paragraph (`properties.ramp`); the first-line rule is on the
     // FIELD (`$defs.ramp.properties.top`). Reading either from the other's node
@@ -440,7 +440,7 @@ describe('ramp bounds, derived from the schema and never typed beside it', () =>
 describe('a ramp document round-trips, and the writer adds nothing of its own', () => {
   const MINIMAL = { schema: 1, id: ID, ramp: RAMP };
 
-  it('parses to exactly what JSON.parse produced — no key gained, none lost', () => {
+  it('parses to exactly what JSON.parse produced: no key gained, none lost', () => {
     const preset = parseEffectsPreset(JSON.stringify(MINIMAL, null, 2) + '\n', ID);
     expect(preset).toEqual(MINIMAL);
     // Specifically: the OTHER channel did not appear. A codec that normalised
@@ -539,7 +539,7 @@ describe('a ramp document round-trips, and the writer adds nothing of its own', 
 // would write a document the engine cannot honour. The schema refuses it by
 // CLOSURE — the object is closed and the key does not exist — which is a
 // refusal that only holds as long as nobody widens the object.
-describe('THE MUST NOT — a per-line curve is not authorable, and must not become so', () => {
+describe('THE MUST NOT: a per-line curve is not authorable, and must not become so', () => {
   it('a `curve` key is refused, by the ramp object being CLOSED', () => {
     const withCurve = { ...base, ramp: { ...RAMP, curve: [0, 1, 2, 3] } };
     const issues = validateAgainstSchema(withCurve, S);
@@ -553,7 +553,7 @@ describe('THE MUST NOT — a per-line curve is not authorable, and must not beco
     expect(() => parseEffectsPreset(JSON.stringify(withCurve), ID)).toThrow(EffectsPresetError);
   });
 
-  it('the ramp object really IS closed — the refusal is not coming from elsewhere', () => {
+  it('the ramp object really IS closed: the refusal is not coming from elsewhere', () => {
     const ramp = (EFFECTS_PRESET_SCHEMA as unknown as Record<string, Record<string, JsonSchema>>)
       .$defs.ramp;
     expect(ramp.unevaluatedProperties, 'the ramp object is no longer closed, so the per-line-curve '

@@ -77,37 +77,37 @@ function words(u8: Uint8Array): number[] {
 const TERM = '1111111';
 
 describe('enigma decoder byte vectors (CI-safe, no fixtures)', () => {
-  it('action 0 — incremental copy (word++ from header inc-word)', () => {
+  it('action 0: incremental copy (word++ from header inc-word)', () => {
     // header inc-word = 0x0100; action "00", count-1 = 2 (count 3).
     const stream = streamFromBits([11, 0, 0x01, 0x00, 0x00, 0x00], `00 0010 ${TERM}`);
     expect(words(enigmaDecompress(stream))).toEqual([0x0100, 0x0101, 0x0102]);
   });
 
-  it('action 1 — literal copy (repeat header lit-word)', () => {
+  it('action 1: literal copy (repeat header lit-word)', () => {
     // header lit-word = 0xABCD; action "01", count-1 = 1 (count 2).
     const stream = streamFromBits([11, 0, 0x00, 0x00, 0xab, 0xcd], `01 0001 ${TERM}`);
     expect(words(enigmaDecompress(stream))).toEqual([0xabcd, 0xabcd]);
   });
 
-  it('action 2 — inline same (one value repeated)', () => {
+  it('action 2: inline same (one value repeated)', () => {
     // action "1"+"00"; count-1 = 2 (count 3); inline 0x123 as 11 bits = 00100100011.
     const stream = streamFromBits([11, 0, 0, 0, 0, 0], `100 0010 00100100011 ${TERM}`);
     expect(words(enigmaDecompress(stream))).toEqual([0x123, 0x123, 0x123]);
   });
 
-  it('action 3 — inline increment', () => {
+  it('action 3: inline increment', () => {
     // action "1"+"01"; count-1 = 3 (count 4); inline 0x00F as 11 bits = 00000001111.
     const stream = streamFromBits([11, 0, 0, 0, 0, 0], `101 0011 00000001111 ${TERM}`);
     expect(words(enigmaDecompress(stream))).toEqual([0x000f, 0x0010, 0x0011, 0x0012]);
   });
 
-  it('action 4 — inline decrement', () => {
+  it('action 4: inline decrement', () => {
     // action "1"+"10"; count-1 = 2 (count 3); inline 0x014 as 11 bits = 00000010100.
     const stream = streamFromBits([11, 0, 0, 0, 0, 0], `110 0010 00000010100 ${TERM}`);
     expect(words(enigmaDecompress(stream))).toEqual([0x0014, 0x0013, 0x0012]);
   });
 
-  it('action 5 — raw copy of distinct inline values', () => {
+  it('action 5: raw copy of distinct inline values', () => {
     // action "1"+"11"; count-1 = 1 (count 2); two inline values 0x0AA, 0x055.
     const stream = streamFromBits([11, 0, 0, 0, 0, 0], `111 0001 00010101010 00001010101 ${TERM}`);
     expect(words(enigmaDecompress(stream))).toEqual([0x00aa, 0x0055]);
@@ -127,7 +127,7 @@ describe('enigma against s1disasm goldens', { skip: !referenceCheckout(S1_PINNED
     ? fs.readdirSync(map16Dir).filter((f) => f.toLowerCase().endsWith('.eni'))
     : [];
 
-  it('decodes GHZ.eni to a non-empty block table (length divisible by 8)', { skip: !fs.existsSync(`${map16Dir}/GHZ.eni`), meta: { skipReason: `${map16Dir}/GHZ.eni is absent — this machine has no s1disasm checkout` } }, () => {
+  it('decodes GHZ.eni to a non-empty block table (length divisible by 8)', { skip: !fs.existsSync(`${map16Dir}/GHZ.eni`), meta: { skipReason: `${map16Dir}/GHZ.eni is absent: this machine has no s1disasm checkout` } }, () => {
     const decoded = enigmaDecompress(new Uint8Array(fs.readFileSync(`${map16Dir}/GHZ.eni`)));
     expect(decoded.length).toBeGreaterThan(0);
     expect(decoded.length % 8).toBe(0);

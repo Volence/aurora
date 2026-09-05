@@ -82,7 +82,7 @@ describe('buildReservedTileSet', () => {
   });
 });
 
-describe('levelArtReservationRequests — real S1 zone table', () => {
+describe('levelArtReservationRequests: real S1 zone table', () => {
   // Pinned against s1-object-art.ts (verified by reading the real table, not
   // transcribed blind): every `lvl(...)` link in each zone's map, plus the ONE
   // remaining supplemental engine-truth entry the id->art table cannot express
@@ -170,7 +170,7 @@ describe('levelArtReservationRequests — real S1 zone table', () => {
 // that adding a subtype rule which breaks it fails loudly here rather than
 // being discovered later as another silent object-art corruption bug.
 // ---------------------------------------------------------------------------
-describe('T6 — every subtype rule keeps the reservation set zone-static', () => {
+describe('T6: every subtype rule keeps the reservation set zone-static', () => {
   const ZONES = s1Profile.zones.map((z) => z.id);
 
   it('no rule changes a levelArt object\'s artSource, and every levelArt effective link is one of the zone\'s reservation requests at zero offset', () => {

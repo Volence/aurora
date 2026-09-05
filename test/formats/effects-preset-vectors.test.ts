@@ -60,7 +60,7 @@ const CASES = FILE.cases;
 const ACCEPT = CASES.filter((c) => c.expect === 'pass');
 const REJECT = CASES.filter((c) => c.expect === 'fail');
 
-describe('contract preset vectors — vendored copy drift gate', () => {
+describe('contract preset vectors: vendored copy drift gate', () => {
   it('the vendored vectors are byte-identical to the pinned contract blob', () => {
     // Anti-vacuous: we hashed a real vector file, not an empty or missing one.
     expect(BYTES.length).toBeGreaterThan(1000);
@@ -170,17 +170,17 @@ describe('every REJECT vector is refused by the SCHEMA, not by the id rule', () 
 describe('CURRENCY: are the vendored vectors still what empyrean publishes?', () => {
   const empyrean = peerRepo('empyrean');
   const TIP = PROV.empyrean.branch_that_answers_currency;
-  const NOT_OURS = 'NOT AN AURORA REGRESSION — the vendored preset vectors are stale.';
+  const NOT_OURS = 'NOT AN AURORA REGRESSION: the vendored preset vectors are stale.';
 
   it(`matches ${PROV.empyrean.path} at empyrean ${TIP}`, (ctx) => {
     if (empyrean === null) {
       ctx.skip('SKIPPED, NOT PASSED: no empyrean checkout beside this repo (set '
-        + `AURORA_EMPYREAN_REPO) — CANNOT MEASURE whether the pin ${PROV.empyrean.revision} is still current`);
+        + `AURORA_EMPYREAN_REPO). CANNOT MEASURE whether the pin ${PROV.empyrean.revision} is still current`);
       return;
     }
     const tip = resolveRev(empyrean, TIP);
     if (tip === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${empyrean} — CANNOT MEASURE `
+      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${empyrean}. CANNOT MEASURE `
         + `currency of pin ${PROV.empyrean.revision}`);
       return;
     }
@@ -200,13 +200,13 @@ describe('CURRENCY: are the vendored vectors still what empyrean publishes?', ()
 
   it('the pinned empyrean revision is PUBLISHED, not local-only', (ctx) => {
     if (empyrean === null) {
-      ctx.skip('SKIPPED, NOT PASSED: no empyrean checkout beside this repo — CANNOT MEASURE '
+      ctx.skip('SKIPPED, NOT PASSED: no empyrean checkout beside this repo. CANNOT MEASURE '
         + `whether ${PROV.empyrean.revision} is reachable from ${TIP}`);
       return;
     }
     const tip = resolveRev(empyrean, TIP);
     if (tip === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${empyrean} — CANNOT MEASURE reachability`);
+      ctx.skip(`SKIPPED, NOT PASSED: ${TIP} does not resolve in ${empyrean}. CANNOT MEASURE reachability`);
       return;
     }
     expect(

@@ -47,7 +47,7 @@ describe('screenFrameEdgeAt', () => {
     expect(screenFrameEdgeAt(200, 100 + SCREEN_HEIGHT, a, v)).toBe(true);       // bottom
     expect(screenFrameEdgeAt(100 + SCREEN_FRAME_GRAB_PX, 150, a, v)).toBe(true);
   });
-  it('does NOT hit the interior — a click inside the frame belongs to the tool', () => {
+  it('does NOT hit the interior: a click inside the frame belongs to the tool', () => {
     expect(screenFrameEdgeAt(100 + SCREEN_WIDTH / 2, 100 + SCREEN_HEIGHT / 2, a, v)).toBe(false);
     expect(screenFrameEdgeAt(100 + SCREEN_FRAME_GRAB_PX + 1, 150, a, v)).toBe(false);
   });
@@ -68,7 +68,7 @@ describe('dragScreenFrame', () => {
     const next = dragScreenFrame({ x: 100, y: 100 }, { x: 10, y: 20 }, { x: 43, y: 27 });
     expect(next).toEqual({ x: 133, y: 107 });
   });
-  it('rounds to whole world pixels — the camera never sits between two', () => {
+  it('rounds to whole world pixels: the camera never sits between two', () => {
     const next = dragScreenFrame({ x: 100, y: 100 }, { x: 0, y: 0 }, { x: 0.4, y: 0.6 });
     expect(next).toEqual({ x: 100, y: 101 });
   });

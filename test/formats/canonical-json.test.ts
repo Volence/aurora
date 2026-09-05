@@ -29,13 +29,13 @@ import {
  * insertion-order gates are the ones that do.
  */
 
-describe('canonicalKeyOrder — the determinism half, which binds universally', () => {
+describe('canonicalKeyOrder: the determinism half, which binds universally', () => {
   it('sorts top-level keys alphabetically', () => {
     const out = canonicalKeyOrder({ zeta: 1, alpha: 2, mid: 3 });
     expect(Object.keys(out)).toEqual(['alpha', 'mid', 'zeta']);
   });
 
-  it('sorts RECURSIVELY — nested objects, and objects inside arrays', () => {
+  it('sorts RECURSIVELY: nested objects, and objects inside arrays', () => {
     // The half a top-level-only implementation gets wrong, and the half §5
     // spells out because Python's sort_keys does it silently. A band object
     // inside `anims` and a layer object inside `layers` are both this shape.
@@ -51,7 +51,7 @@ describe('canonicalKeyOrder — the determinism half, which binds universally', 
     expect(Object.keys(arr[1])).toEqual(['c', 'd']);
   });
 
-  it('leaves ARRAY order alone — an array is a sequence, not a key set', () => {
+  it('leaves ARRAY order alone: an array is a sequence, not a key set', () => {
     // `layout`, `tiles`, `phases` and `layers` all mean something positional.
     // Sorting them would not be canonicalization, it would be corruption.
     const out = canonicalKeyOrder({ xs: [3, 1, 2], ys: ['c', 'a', 'b'] }) as Record<string, unknown[]>;
@@ -123,7 +123,7 @@ describe('the two document classes render as §5 says', () => {
  * THE POINT OF THE WHOLE CLAUSE. Nothing here compares against a literal: the
  * expectation is that two renderings agree with each other.
  */
-describe('determinism — the property §5 exists to buy', () => {
+describe('determinism: the property §5 exists to buy', () => {
   /** The same content, built by two writers who happened to insert differently. */
   function twoInsertionOrders(): [Record<string, unknown>, Record<string, unknown>] {
     const first: Record<string, unknown> = {};
@@ -162,7 +162,7 @@ describe('determinism — the property §5 exists to buy', () => {
     expect(canonicalJsonPretty(a)).toBe(canonicalJsonPretty(a));
   });
 
-  it('is a FIXED POINT — reading back what we wrote and rewriting it changes nothing', () => {
+  it('is a FIXED POINT: reading back what we wrote and rewriting it changes nothing', () => {
     const [a] = twoInsertionOrders();
     const once = canonicalJsonMinified(a);
     expect(canonicalJsonMinified(JSON.parse(once))).toBe(once);

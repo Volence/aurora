@@ -766,7 +766,7 @@ describe('runBuild on a classic (S1) project', () => {
   // window was measured to be discarded silently). No point in this sequence
   // has such a machine. The absent `restoredVia` is a truthful report, not a
   // gap left unfilled.
-  it('attempts NO position restore — a reload resets S1 to the SEGA screen', async () => {
+  it('attempts NO position restore: a reload resets S1 to the SEGA screen', async () => {
     const dir = classicDir('print("ok")');
     const client = recordingClient({ romPath: join(dir, 's1built.bin') });
     try {

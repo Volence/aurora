@@ -94,7 +94,7 @@ describe('d-29: the sprite size chips ask before replacing a DIRTY document', ()
     await expect(done).resolves.toBe(false);
   });
 
-  it('CANCEL really keeps the work — pixels, size and the dirty flag all survive', async () => {
+  it('CANCEL really keeps the work: pixels, size and the dirty flag all survive', async () => {
     paint(7);
     const done = newSpriteGuarded(48, 48);
     await tick();
@@ -134,7 +134,7 @@ describe('d-29: the sprite size chips ask before replacing a DIRTY document', ()
     expect(s.unsavedEdits).toBe(false);
   });
 
-  it('the store action itself is UNGUARDED — a new call site must use the guard', () => {
+  it('the store action itself is UNGUARDED: a new call site must use the guard', () => {
     paint(7);
     useSpriteStore.getState().newSprite(48, 48);
     // Not a wish: it is the reason `new-sprite-guard.ts` exists as a module and
@@ -189,7 +189,7 @@ describe('d-30: Clear in the Chunks section asks before emptying the library', (
     expect(useProjectStore.getState().project?.chunkLibrary.length).toBe(0);
   });
 
-  it('an ALREADY-EMPTY library asks nothing — the same rule as d-29\'s clean document', async () => {
+  it('an ALREADY-EMPTY library asks nothing: the same rule as d-29\'s clean document', async () => {
     withChunks(0);
     const done = clearChunkLibrary();
     expect(useConfirmStore.getState().request).toBeNull();
@@ -197,7 +197,7 @@ describe('d-30: Clear in the Chunks section asks before emptying the library', (
     expect(useConfirmStore.getState().request).toBeNull();
   });
 
-  it('is NOT undoable, and that was chosen — `make_it_undoable` was rejected', async () => {
+  it('is NOT undoable, and that was chosen: `make_it_undoable` was rejected', async () => {
     const done = clearChunkLibrary();
     await tick();
     useConfirmStore.getState().answer('clear');

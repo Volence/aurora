@@ -26,7 +26,7 @@ import { bandBudget, clampStaticBase, promoteBandCommand } from '../../../provid
 const FIXTURE = 'test/fixtures/bg-override/editor_bg_override.b0e5a661.json';
 const doc = (): BgOverrideDocument => parseBgOverride(readFileSync(FIXTURE, 'utf8')).doc;
 
-describe('clampStaticBase — the promotion base the form is allowed to hold', () => {
+describe('clampStaticBase: the promotion base the form is allowed to hold', () => {
   const first = bandBudget(doc()).firstPromotableSlot;
 
   it('has a floor worth enforcing on the document it will be used against', () => {
@@ -101,7 +101,7 @@ const fromTileEl = (src: string): string => {
   return els[0];
 };
 
-describe('BgAnimBandPanel wiring — "From tile"', () => {
+describe('BgAnimBandPanel wiring: "From tile"', () => {
   it('enforces the same expression it displays', () => {
     const el = fromTileEl(strip(RAW()));
     // Both bounds, character for character the same expression. Not two

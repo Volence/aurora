@@ -330,7 +330,7 @@ describe('classicProjectStore integration (real s1disasm)', { skip: !S1_PRESENT,
     expect(
       s.report!.resolved,
       `${unresolved.length} of ${s.report!.total} profile entries did not resolve under `
-      + `${S1DIR} — that is an INCOMPLETE s1disasm checkout, not a store defect:\n`
+      + `${S1DIR}; that is an INCOMPLETE s1disasm checkout, not a store defect:\n`
       + `${unresolved.map((e) => `${e.key} -> ${e.path}`).join('\n')}`,
     ).toBe(s.report!.total);
     // 6 zones x 3 acts, every one available.

@@ -88,7 +88,7 @@ const tileChildren = (cmd: { commands: AnyCommand[] } | null) =>
   children(cmd).filter((c): c is SetTilesCommand => c.type === 'set-tiles');
 
 describe('1. the engine constraint every rule below is derived from', () => {
-  it('one 16px collision cell IS four 8px tiles — so a tile has no collision of its own', () => {
+  it('one 16px collision cell IS four 8px tiles, so a tile has no collision of its own', () => {
     // Not a restatement: this is the collision module's own answer, and if it
     // ever became 1:1 every rule in this file should be deleted, not adjusted.
     const indices = cellTileIndices(3, 5, SECTION_TILES_WIDE);
@@ -128,7 +128,7 @@ describe('2. snapMarquee at tile granularity', () => {
       .toEqual({ col: lastCol - 2, row: lastRow - 2, w: 3, h: 3 });
   });
 
-  it('2e. DEFAULTS to block granularity — every pre-existing caller is unchanged', () => {
+  it('2e. DEFAULTS to block granularity: every pre-existing caller is unchanged', () => {
     expect(snapMarquee(3, 5, 8, 9)).toEqual(snapMarquee(3, 5, 8, 9, 'block'));
     // The shipped block contract, restated so a regression in it is visible
     // here and not only in the app: rounds OUT to cover what was dragged.
@@ -141,7 +141,7 @@ describe('2M. the Ctrl/Cmd modifier INVERTS the armed granularity', () => {
   // forces to draw collision size" — Ctrl = block. These rows pin why that was
   // built as an inversion instead of a constant: read literally it is a no-op in
   // the state every author starts in.
-  it('2M-a. held: block becomes tile, and tile becomes block — symmetric', () => {
+  it('2M-a. held: block becomes tile, and tile becomes block, which is symmetric', () => {
     expect(effectiveGranularity('block', true)).toBe('tile');
     expect(effectiveGranularity('tile', true)).toBe('block');
   });
@@ -161,7 +161,7 @@ describe('2M. the Ctrl/Cmd modifier INVERTS the armed granularity', () => {
   });
 
   it('2M-d. THE HALF THE OWNER ASKED FOR: in Tile mode, holding it snaps to '
-    + 'collision size — the same rect a plain Block drag would give', () => {
+    + 'collision size: the same rect a plain Block drag would give', () => {
     // Derived end to end through `snapMarquee`, not asserted on the string: the
     // claim is about the RECT, and the rect is what the author sees.
     const drag = [3, 5, 8, 9] as const;
@@ -172,7 +172,7 @@ describe('2M. the Ctrl/Cmd modifier INVERTS the armed granularity', () => {
   });
 
   it('2M-e. THE DISCRIMINATING PAIR: in Block mode, holding it gives the EXACT '
-    + 'dragged tiles — the one combination no setting alone can produce', () => {
+    + 'dragged tiles: the one combination no setting alone can produce', () => {
     const drag = [3, 5, 8, 9] as const;   // odd origin, odd size: block can never make it
     const blockHeld = snapMarquee(...drag, effectiveGranularity('block', true));
     expect(blockHeld).toEqual({ col: 3, row: 5, w: 6, h: 5 });
@@ -181,7 +181,7 @@ describe('2M. the Ctrl/Cmd modifier INVERTS the armed granularity', () => {
     expect(isBlockAligned(blockHeld.col, blockHeld.row, blockHeld.w, blockHeld.h)).toBe(false);
   });
 
-  it('2M-f. two of the four combinations are INDISTINGUISHABLE by their output — '
+  it('2M-f. two of the four combinations are INDISTINGUISHABLE by their output, '
     + 'so a test that only checks alignment cannot see the modifier at all', () => {
     // This row exists to name the harness's own exposure. Block+plain and
     // Tile+held produce byte-identical rects, so any row asserting only
@@ -247,7 +247,7 @@ describe('4. copyFromSection carries collision iff the rect is block-aligned', (
     expect(clip.collisionB.length).toBe(0);
   });
 
-  it('4c. EMPTY, not zero-filled — a zero-filled plane of the right length would '
+  it('4c. EMPTY, not zero-filled: a zero-filled plane of the right length would '
     + 'be indistinguishable from "all air" and would ERASE on paste', () => {
     const clip = copyFromSection(seedSection(0, 0, 8, 8), 1, 1, 4, 4);
     const cells = (4 >> 1) * (4 >> 1);
@@ -277,7 +277,7 @@ describe('5. THE DATA-LOSS GATE: an art-only clipboard can never write collision
   });
 
   it('5a-control. ANTI-VACUOUS: an ALIGNED clipboard through the same call DOES '
-    + 'emit collision children — so 5a cannot be green because collision writing is broken', () => {
+    + 'emit collision children, so 5a cannot be green because collision writing is broken', () => {
     const src = seedSection(0, 0, 16, 16);
     const clip = copyFromSection(src, 0, 0, 4, 4);
     expect(clip.artOnly).toBe(false);
@@ -292,7 +292,7 @@ describe('5. THE DATA-LOSS GATE: an art-only clipboard can never write collision
     expect(collisionChildren(cmd).length).toBeGreaterThan(0);
   });
 
-  it('5b. the REGION WRITER refuses it too, independently of buildPasteCommand — '
+  it('5b. the REGION WRITER refuses it too, independently of buildPasteCommand: '
     + 'a future call site that forgets the layer rule is a no-op, not data loss', () => {
     const section = seedSection(0, 0, 16, 16);
     const clip = artOnlyClip();
@@ -304,7 +304,7 @@ describe('5. THE DATA-LOSS GATE: an art-only clipboard can never write collision
     expect(cmd).toBeNull();
   });
 
-  it('5c. an ODD paste base refuses collision even for a WELL-FORMED source — '
+  it('5c. an ODD paste base refuses collision even for a WELL-FORMED source: '
     + '`baseCol >> 1` floors, so the art would land a tile out of step with it', () => {
     const src = seedSection(0, 0, 16, 16);
     const clip = copyFromSection(src, 0, 0, 4, 4);       // aligned, planes present
@@ -373,7 +373,7 @@ describe('7. saving as a chunk is refused rather than made lossy', () => {
     expect(def!.collisionA.length).toBe(4);
   });
 
-  it('7b. an ODD-sized library chunk reaches the clipboard as ART ONLY — its own '
+  it('7b. an ODD-sized library chunk reaches the clipboard as ART ONLY: its own '
     + 'collision planes are already short of its footprint (chunkCellCount floors)', () => {
     const odd = createChunkDef('c', 'c', 5, 3);
     expect(odd.collisionA.length).toBe((5 >> 1) * (3 >> 1));   // 2, for a 5x3 footprint

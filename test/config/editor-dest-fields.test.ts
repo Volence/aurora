@@ -239,7 +239,7 @@ describe('project.json trailing newline (the §8 canonical form supersedes the c
   });
 });
 
-describe('editor destinations absent — Aurora owns the path (unchanged behaviour)', () => {
+describe('editor destinations absent: Aurora owns the path (unchanged behaviour)', () => {
   it('plans exactly the captured writes, in order, at the captured sizes', async () => {
     const p = await plan(fixtureFiles());
     expect(p.files.map(f => [f.path, f.bytes.length])).toEqual(BASELINE_PLAN);
@@ -252,7 +252,7 @@ describe('editor destinations absent — Aurora owns the path (unchanged behavio
   });
 });
 
-describe('editor destinations declared — the repo owns the path', () => {
+describe('editor destinations declared: the repo owns the path', () => {
   it('writes tile bytes to editorTilesetPath and leaves the tileset pointer alone', async () => {
     const p = await plan(fixtureFiles({
       edit: (proj) => { proj.zones[0].editorTilesetPath = 'games/sonic4/data/editor/repo_owned_tiles.bin'; },
@@ -400,7 +400,7 @@ async function loadedAct(files: Map<string, Uint8Array>) {
   return act;
 }
 
-describe('act-level sceneRef — the reader (schema §4)', () => {
+describe('act-level sceneRef: the reader (schema §4)', () => {
   it('reads the act entry sceneRef into Act.sceneRef', async () => {
     expect((await loadedAct(sceneRefFixture('canopy_dusk'))).sceneRef).toBe('canopy_dusk');
   });
@@ -429,7 +429,7 @@ describe('act-level sceneRef — the reader (schema §4)', () => {
   });
 });
 
-describe('act-level sceneRef — the save round-trip (raw re-serialisation)', () => {
+describe('act-level sceneRef: the save round-trip (raw re-serialisation)', () => {
   /** The act keys buildAeonSavePlan is documented to OWN and may rewrite. */
   const SAVE_OWNED_ACT_KEYS = ['bgLayout', 'bgTiles'];
 

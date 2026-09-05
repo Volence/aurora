@@ -70,7 +70,7 @@ const HELPER_REL = 'components/ui/act-and-drop-focus.ts';
 const SITES: Array<{ rel: string; importFrom: string; writer: string; calls: string[] }> = [
   {
     rel: 'components/CollisionPalette.tsx', importFrom: './ui/act-and-drop-focus',
-    writer: 'resetToEngine / clearSection — the two wholesale collision wipes d-27 was ruled on',
+    writer: 'resetToEngine / clearSection: the two wholesale collision wipes d-27 was ruled on',
     calls: ['actAndDropFocus(e, resetToEngine)', 'actAndDropFocus(e, clearSection)'],
   },
   {
@@ -84,7 +84,7 @@ const SITES: Array<{ rel: string; importFrom: string; writer: string; calls: str
     // would restore the d-29 defect while leaving the d-27 blur in place, and
     // this line is what makes that revert visible to `npm test`.
     rel: 'shell/SpriteToolOptions.tsx', importFrom: '../components/ui/act-and-drop-focus',
-    writer: 'newSpriteGuarded — replaces the whole document AND clears its history, so NOT one '
+    writer: 'newSpriteGuarded: replaces the whole document AND clears its history, so NOT one '
       + 'Ctrl+Z away; d-29 put a confirm in front of it for a dirty document',
     calls: [
       'actAndDropFocus(e, () => { void newSpriteGuarded(s, s); })',
@@ -95,18 +95,18 @@ const SITES: Array<{ rel: string; importFrom: string; writer: string; calls: str
     // See the ⚠ note above SITES: listed as of d-30, when the confirm made this
     // button survive its own press.
     rel: 'components/AeonChunkActions.tsx', importFrom: './ui/act-and-drop-focus',
-    writer: 'clearChunkLibrary — empties the whole chunk library, and `clearChunks` is a bare store '
+    writer: 'clearChunkLibrary: empties the whole chunk library, and `clearChunks` is a bare store '
       + 'write that never enters the undo machinery, so Ctrl+Z does not bring it back',
     calls: ['actAndDropFocus(e, () => { void clearChunkLibrary(); })'],
   },
   {
     rel: 'components/sprite/FrameGrid.tsx', importFrom: '../ui/act-and-drop-focus',
-    writer: 'deleteFrame — the survey\'s cleanest no-op case (`frames.length <= 1` early return)',
+    writer: 'deleteFrame: the survey\'s cleanest no-op case (`frames.length <= 1` early return)',
     calls: ['actAndDropFocus(e, () => useSpriteStore.getState().deleteFrame())'],
   },
   {
     rel: 'components/sprite/SpritePaletteHeader.tsx', importFrom: '../ui/act-and-drop-focus',
-    writer: 'clearPalette / clearCanvas — two dispatch lines four lines apart',
+    writer: 'clearPalette / clearCanvas: two dispatch lines four lines apart',
     calls: [
       'actAndDropFocus(e, () => st().clearPalette())',
       'actAndDropFocus(e, () => st().clearCanvas())',
@@ -114,7 +114,7 @@ const SITES: Array<{ rel: string; importFrom: string; writer: string; calls: str
   },
   {
     rel: 'components/sprite/Timeline.tsx', importFrom: '../ui/act-and-drop-focus',
-    writer: 'removeStep — the key={i} list-removal family: a repeat press RETARGETS at the neighbour',
+    writer: 'removeStep: the key={i} list-removal family, where a repeat press RETARGETS at the neighbour',
     calls: ['actAndDropFocus(e, () => useSpriteStore.getState().removeStep(i))'],
   },
   {
@@ -129,9 +129,9 @@ const SITES: Array<{ rel: string; importFrom: string; writer: string; calls: str
     // destruction while leaving the d-27 blur in place, and this line is what makes
     // that revert visible to `npm test`.
     rel: 'components/effects/EffectsScenePanel.tsx', importFrom: '../ui/act-and-drop-focus',
-    writer: 'removeLayerCommand — key={i} list removal, same retarget shape; AND '
-      + 'deleteSceneGuarded, which deletes a WHOLE DOCUMENT — and its FILE, since the save '
-      + 'gained a removal step — and, measured, left the same button focused and renamed at '
+    writer: 'removeLayerCommand: key={i} list removal, same retarget shape; AND '
+      + 'deleteSceneGuarded, which deletes a WHOLE DOCUMENT (and its FILE, since the save '
+      + 'gained a removal step), and, measured, left the same button focused and renamed at '
       + 'another scene',
     calls: [
       'actAndDropFocus(e, () => run(removeLayerCommand(library, selected.id, i)))',
@@ -140,7 +140,7 @@ const SITES: Array<{ rel: string; importFrom: string; writer: string; calls: str
   },
   {
     rel: 'components/effects/BandPresetPanel.tsx', importFrom: '../ui/act-and-drop-focus',
-    writer: 'removeBandCommand / removeCycleChannelCommand — the purest instance of the shape: the '
+    writer: 'removeBandCommand / removeCycleChannelCommand: the purest instance of the shape, where the '
       + 'channel Remove has no disabled predicate, no refusal and no confirmation at any count; AND '
       + 'deletePresetGuarded, whose `disabled` refusal is re-derived for the NEW target after the delete',
     calls: [
@@ -157,7 +157,7 @@ const SITES: Array<{ rel: string; importFrom: string; writer: string; calls: str
     // Remove one is pinned by SLICE below rather than by a fragment, because
     // comments sit between its `actAndDropFocus(` and its writer.
     rel: 'components/effects/BgAnimBandPanel.tsx', importFrom: '../ui/act-and-drop-focus',
-    writer: 'demoteBandCommand — key={b.index} band cards, so card 0 is re-used by the successor '
+    writer: 'demoteBandCommand: key={b.index} band cards, so card 0 is re-used by the successor '
       + 'band; and removeBandCommand, whose FIRST press REFUSES and writes nothing at all',
     calls: [
       'actAndDropFocus(e, () => { setPendingRemoval(null); apply(demoteBandCommand(doc, b.index)); })',
@@ -167,13 +167,13 @@ const SITES: Array<{ rel: string; importFrom: string; writer: string; calls: str
 
 describe('d-27: every surveyed control that stays mounted goes through actAndDropFocus', () => {
   for (const site of SITES) {
-    it(`${site.rel} — ${site.writer}`, () => {
+    it(`${site.rel}: ${site.writer}`, () => {
       const src = read(site.rel);
       // ANTI-VACUOUS, and it is the half that actually earns its keep: a file
       // that no longer contains the button at all would satisfy a "contains
       // actAndDropFocus" assertion trivially if the import line were the only
       // thing checked. Both halves are asserted.
-      expect(src, `${site.rel} does not import the helper — the d-27 wiring cannot be judged`)
+      expect(src, `${site.rel} does not import the helper: the d-27 wiring cannot be judged`)
         .toContain(`import { actAndDropFocus } from '${site.importFrom}';`);
       for (const call of site.calls) {
         expect(norm(src), `${site.rel} lost the wiring at: ${call}`).toContain(norm(call));
@@ -190,24 +190,24 @@ describe('d-27: every surveyed control that stays mounted goes through actAndDro
   // exactly the failure mode of a near-identical pair in one `Row`. The slice
   // runs from this button's own `aria-label` to the writer, and asserts the blur
   // is inside it.
-  it('components/effects/BgAnimBandPanel.tsx — the Remove button\'s REFUSING press goes through the '
+  it('components/effects/BgAnimBandPanel.tsx: the Remove button\'s REFUSING press goes through the '
     + 'helper too, and the blur wraps the whole handler rather than sitting after the refusal', () => {
     const src = read('components/effects/BgAnimBandPanel.tsx');
     const at = src.indexOf('label={`Remove tile animation ${b.index}`}');
-    expect(at, 'the Remove button is not in this file under the label the harness aims at — the '
+    expect(at, 'the Remove button is not in this file under the label the harness aims at: the '
       + 'wiring cannot be judged, and `npm run harness:d27-four-survivors` aims by that same '
       + 'aria-label').toBeGreaterThan(-1);
     const writer = src.indexOf('removeBandCommand(doc, b.index, false)', at);
     expect(writer, 'the Remove handler no longer asks the command for a refusal first')
       .toBeGreaterThan(at);
     const handler = src.slice(at, writer);
-    expect(handler, 'Remove\'s onClick does not go through actAndDropFocus — its FIRST press writes '
+    expect(handler, 'Remove\'s onClick does not go through actAndDropFocus: its FIRST press writes '
       + 'nothing and keeps focus, which is the [k7] case d-27 rests on')
       .toContain('onClick={(e) => actAndDropFocus(e,');
     // And the Demote beside it is a DIFFERENT button: the slice must not have
     // swallowed it, or this row would be pinning the neighbour's wiring.
     expect(handler, 'the slice from the Remove label to removeBandCommand contains the Demote '
-      + 'writer — the two buttons have been reordered and this row is judging the wrong one')
+      + 'writer: the two buttons have been reordered and this row is judging the wrong one')
       .not.toContain('demoteBandCommand');
   });
 
@@ -219,10 +219,10 @@ describe('d-27: every surveyed control that stays mounted goes through actAndDro
     // written first and its red is why this is a slice.
     const src = read(HELPER_REL);
     const at = src.indexOf('export function actAndDropFocus');
-    expect(at, 'actAndDropFocus not found — every row above is asserting a call to nothing')
+    expect(at, 'actAndDropFocus not found: every row above is asserting a call to nothing')
       .toBeGreaterThan(-1);
     const end = src.indexOf('\n}', at);
-    expect(end, 'actAndDropFocus has no closing brace — refusing to judge a partial read')
+    expect(end, 'actAndDropFocus has no closing brace: refusing to judge a partial read')
       .toBeGreaterThan(at);
     const helper = src.slice(at, end);
     expect(helper).toContain('.blur()');
@@ -244,7 +244,7 @@ describe('d-27: every surveyed control that stays mounted goes through actAndDro
     const src = read('components/ui/primitives.tsx');
     const forwards = src.match(/onClick\??: \(e: React\.MouseEvent<HTMLButtonElement>\) => void/g) ?? [];
     expect(forwards.length,
-      'Chip and IconButton must both take the click event — found ' + forwards.length + ' of 2')
+      'Chip and IconButton must both take the click event: found ' + forwards.length + ' of 2')
       .toBe(2);
   });
 });

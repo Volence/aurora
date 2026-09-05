@@ -88,9 +88,9 @@ function walk(dir: string, rel = '', acc: string[] = []): string[] {
 }
 
 describe('the vendored s1disasm pin', () => {
-  it('is present and is a checkout — the markers other rows guard on', () => {
-    expect(existsSync(ROOT), `${ROOT} is absent — run \`node scripts/vendor-s1-fixtures.mjs\``).toBe(true);
-    expect(existsSync(SIDECAR), `${SIDECAR} is absent — a pin with no provenance is not a pin`).toBe(true);
+  it('is present and is a checkout: the markers other rows guard on', () => {
+    expect(existsSync(ROOT), `${ROOT} is absent: run \`node scripts/vendor-s1-fixtures.mjs\``).toBe(true);
+    expect(existsSync(SIDECAR), `${SIDECAR} is absent: a pin with no provenance is not a pin`).toBe(true);
     // The same predicate `whenS1Files` and friends use, asserted ONCE here as a
     // failure. Those guards can no longer fire on a machine that has this repo,
     // so the property they used to carry has to live somewhere that goes red.
@@ -105,15 +105,15 @@ describe('the vendored s1disasm pin', () => {
     const recorded = Object.keys(prov.files).sort();
 
     // Anti-vacuous: an empty manifest would make every comparison below pass.
-    expect(recorded.length, 'the provenance records NO files — nothing would be checked').toBeGreaterThan(400);
+    expect(recorded.length, 'the provenance records NO files: nothing would be checked').toBeGreaterThan(400);
     expect(prov.fixture.files, 'provenance file count disagrees with its own manifest')
       .toBe(recorded.length);
 
     const extra = onDisk.filter((f) => !(f in prov.files));
     const gone = recorded.filter((f) => !onDisk.includes(f));
-    expect(extra, `these files are in ${relative(AURORA_DIR, ROOT)} but NOT in its provenance — `
+    expect(extra, `these files are in ${relative(AURORA_DIR, ROOT)} but NOT in its provenance: `
       + 'something was added to the pin without recording where it came from').toEqual([]);
-    expect(gone, `these files are in the provenance but NOT on disk — the pin is incomplete; `
+    expect(gone, `these files are in the provenance but NOT on disk: the pin is incomplete; `
       + `re-run \`${prov.re_vendor}\``).toEqual([]);
 
     // The bytes. Compared against s1disasm's OWN object ids, recomputed here.
@@ -132,7 +132,7 @@ describe('the vendored s1disasm pin', () => {
       + `${drifted.length} drifted; subtrees: ${prov.s1disasm.subtrees.join(' ')}\n`,
     );
     expect(drifted, 'these vendored files no longer hash to the s1disasm blob ids recorded for '
-      + 'them — the pin has been edited in place, which silently changes what every row asserting '
+      + 'them: the pin has been edited in place, which silently changes what every row asserting '
       + `on it is measuring. Restore with \`${prov.re_vendor}\``).toEqual([]);
     expect(bytes, 'provenance byte total disagrees with the bytes on disk').toBe(prov.fixture.bytes);
   });
@@ -147,7 +147,7 @@ describe('the vendored s1disasm pin', () => {
     expect(existsSync(resolve(ROOT, '_incObj')),
       '_incObj HAS BEEN VENDORED. It must not be: the two rows that read it ask whether the '
       + "disassembly still holds exactly four SynchroAnimate consumers, and a pinned copy holds "
-      + 'four by construction — the row would pass forever and detect nothing. See '
+      + 'four by construction: the row would pass forever and detect nothing. See '
       + 'src/core/project/profiles/__tests__/s1-sync-anims.test.ts.').toBe(false);
   });
 });

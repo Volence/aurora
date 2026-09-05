@@ -64,7 +64,7 @@ describe('labelBudget', () => {
   });
 });
 
-describe('fitLabel — the three outcomes and nothing else', () => {
+describe('fitLabel: the three outcomes and nothing else', () => {
   const measure = at(8);
 
   it('returns the whole string when it fits, unelided', () => {
@@ -223,7 +223,7 @@ describe('the aeon object marker (OverlayRenderer.drawObjects)', () => {
     expect(fit.width).toBeLessThanOrEqual(budget);
   });
 
-  it('at zoom 2 the whole id reads — which is the point of a screen-sized font', () => {
+  it('at zoom 2 the whole id reads: which is the point of a screen-sized font', () => {
     // The box doubles on screen while the glyphs do not: cells go 3 -> 7.
     expect(Math.floor(budget / cell(worldFont(2)))).toBe(7);
     expect(fitLabel('solid', budget, at(worldFont(2)))).toEqual({
@@ -282,7 +282,7 @@ describe('the classic hex fallback marker', () => {
     HEX_MARKER_SIZE, MARKER_STROKE_PX / zoom);
   const worldFont = (zoom: number) => 8 / zoom;
 
-  it('two hex digits fit unchanged at zoom 1 — this fix costs the common case nothing', () => {
+  it('two hex digits fit unchanged at zoom 1: this fix costs the common case nothing', () => {
     expect(fitLabel('0E', budget(1), at(worldFont(1)))).toEqual({
       text: '0E', width: monoWidth('0E', 8), elided: false,
     });

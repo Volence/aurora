@@ -145,7 +145,7 @@ function fakeEngine(opts: FakeOpts = {}) {
 
 const hexAddr = (n: number) => '0x' + (n >>> 0).toString(16).toUpperCase();
 
-describe('bootRestoreTo — the supported sequence', () => {
+describe('bootRestoreTo: the supported sequence', () => {
   it('restores: run_to the init FIRST, then X, then Y, then the flag LAST, then continue', async () => {
     const { client, log } = fakeEngine();
     const r = await bootRestoreTo(client as never, 0x0123, 0x0456, { wasRunning: true });
@@ -192,7 +192,7 @@ describe('bootRestoreTo — the supported sequence', () => {
     expect(isPaused()).toBe(true);
   });
 
-  it('gates off with no-symbols — and WITHOUT advancing the machine — on a ROM that lacks the mailbox', async () => {
+  it('gates off with no-symbols (and WITHOUT advancing the machine) on a ROM that lacks the mailbox', async () => {
     // An older DEBUG ROM: warp symbols exist, boot symbols do not. The gate
     // must fire before run_to so the caller's fallback starts from reset too.
     const { client, log } = fakeEngine({ symbols: { [BOOT_INIT_SYMBOL]: SYMS[BOOT_INIT_SYMBOL] } });
@@ -262,7 +262,7 @@ describe('the model actually bites (anti-vacuous check on the fake itself)', () 
  * down a second path that cannot work either, for a reason nobody was told.
  */
 describe('bootRestoreTo and a server that does not serve what it needs', () => {
-  it('gates UnservedMethod, not NoSymbols, when run_to is missing — and does not advance', async () => {
+  it('gates UnservedMethod, not NoSymbols, when run_to is missing, and does not advance', async () => {
     const f = fakeEngine({ unserved: ['emulator/run_to'] });
     const r = await bootRestoreTo(f.client as never, 0x100, 0x100, { wasRunning: true });
 

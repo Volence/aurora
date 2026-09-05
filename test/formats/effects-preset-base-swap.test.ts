@@ -183,13 +183,13 @@ describe('the top-level oneOf with THREE arms: exactly one raster program', () =
   });
 
   for (const [name, doc] of combos) {
-    it(`${name} is REFUSED — it would author a preset aeon's build cannot lower`, () => {
+    it(`${name} is REFUSED: it would author a preset aeon's build cannot lower`, () => {
       const issues = validateAgainstSchema({ ...base, ...doc }, S);
       expect(
         issues,
         `a document carrying ${name} was ACCEPTED. They all lower into the one `
         + '`raster:` slot (EffectsPreset.ep_raster) and no combinator exists, so this preset '
-        + "fails aeon's build — and the editor just said it was fine.",
+        + "fails aeon's build, and the editor just said it was fine.",
       ).not.toEqual([]);
       // The refusal is the exactly-one rule's, not a coincidence off some other
       // keyword: the evaluator names how many of the arms matched, and the arm
@@ -207,7 +207,7 @@ describe('the top-level oneOf with THREE arms: exactly one raster program', () =
     });
   }
 
-  it('NONE is REFUSED — a preset document must carry one raster program', () => {
+  it('NONE is REFUSED: a preset document must carry one raster program', () => {
     const issues = validateAgainstSchema({ ...base }, S);
     expect(issues, 'a document carrying NO raster program was accepted').not.toEqual([]);
     expect(issues.map((i) => i.message).join(' '))
@@ -275,7 +275,7 @@ describe('base_swap bounds are the schema\'s, not retyped beside it', () => {
     const def = (EFFECTS_PRESET_SCHEMA.$defs as Record<string, JsonSchema>).base_swap;
     expect(def.type).toBe('array');
     expect(def.minItems).toBe(EFFECTS_PRESET_BASE_SWAP_MIN_BANDS);
-    expect(def.required, 'the LIST node carries a `required` — the band fields have not moved '
+    expect(def.required, 'the LIST node carries a `required`: the band fields have not moved '
       + 'under `items` and every derivation in preset.ts is reading the wrong node').toBeUndefined();
 
     const band = def.items as JsonSchema;
@@ -307,7 +307,7 @@ describe('base_swap bounds are the schema\'s, not retyped beside it', () => {
     expect(span / EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE).toBe(8);
   });
 
-  it('WHAT 57344 MEANS: $E000, seven granules up — and the contract no longer NAMES it', () => {
+  it('WHAT 57344 MEANS: $E000, seven granules up, and the contract no longer NAMES it', () => {
     // The comment that makes the key legible, asserted so it cannot rot: the
     // contract's worked target is seven granules up and granule-aligned.
     expect(BASE_SWAP[0].target).toBe(0xE000);
@@ -395,7 +395,7 @@ describe('base_swap is neither capability-gated nor DEBUG-gated', () => {
     ((EFFECTS_PRESET_SCHEMA.properties as Record<string, JsonSchema>).base_swap).description ?? '',
   );
 
-  it('the schema says NO capability bit gates it — unlike ramp\'s CAP_DENSE_TIER', () => {
+  it('the schema says NO capability bit gates it: unlike ramp\'s CAP_DENSE_TIER', () => {
     // Read, not restated. If aeon ever DOES gate it, this sentence moves and the
     // row goes red rather than the codec's comment quietly lying.
     expect(desc).toMatch(/NO capability bit gates it/);
@@ -556,7 +556,7 @@ describe('the shipped section-6 document opens', () => {
     );
   });
 
-  it('is what section 6 is BOUND to — the reason the editor had to open it', () => {
+  it('is what section 6 is BOUND to: the reason the editor had to open it', () => {
     // A claim about the vendored PAIR, both pinned at the same aeon revision:
     // the section's rasterRef names the id the codec parsed out of the preset
     // beside it. It fails if one of the two is ever re-vendored alone.

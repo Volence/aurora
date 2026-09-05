@@ -24,7 +24,7 @@ describe('actBindsBgOverride', () => {
     expect(actBindsBgOverride({ stripPath: OUT })).toBe(true);
   });
 
-  it('binds it through a trailing slash — project.json writes one, os.path.join does not', () => {
+  it('binds it through a trailing slash: project.json writes one, os.path.join does not', () => {
     expect(actBindsBgOverride({ stripPath: `${OUT}/` })).toBe(true);
     expect(actBindsBgOverride({ stripPath: `${OUT}//` })).toBe(true);
   });
@@ -89,7 +89,7 @@ describe('actBindsBgOverride', () => {
     if (raw === null) {
       // ctx.skip, not it.skip: the reason has to reach the reader. A silent
       // skip and a pass look identical in a suite total.
-      ctx.skip('SKIPPED, NOT PASSED: CANNOT MEASURE the aeon join — '
+      ctx.skip('SKIPPED, NOT PASSED: CANNOT MEASURE the aeon join: '
         + (aeon === null ? 'no aeon checkout beside this repo (set AURORA_AEON_REPO)'
           : tip === null ? `${AEON_TIP} does not resolve in ${aeon} (unfetched? shallow?)`
             : 'unknown reason'));

@@ -56,7 +56,7 @@ function stubReadMany(): () => void {
 
 afterEach(() => __resetObjectSpriteArtForTest());
 
-describe('refreshClassicObjectSprites — lifecycle guards', () => {
+describe('refreshClassicObjectSprites: lifecycle guards', () => {
   it('drops a STALE publish when a newer-epoch refresh resolves first', async () => {
     const builds: ReturnType<typeof deferred<ObjectSprite | null>>[] = [];
     __setObjectSpriteBuilderForTest(() => {

@@ -72,7 +72,7 @@ describe('setLayerFieldCommand: curve and vsplit, set and cleared', () => {
     expect(roundTrip(c3!.newScene!).layers[0].curve).toEqual({ to: { s1: 2, s2: 4, op: 1 } });
   });
 
-  it('clearing DELETES the key — absence is the schema default, so no "none" is written', () => {
+  it('clearing DELETES the key: absence is the schema default, so no "none" is written', () => {
     const set = setLayerFieldCommand(library([scene()]), 'ramp', 0, 'curve', { to: 'FACTOR_1' })!;
     const cleared = setLayerFieldCommand(library([set.newScene!]), 'ramp', 0, 'curve', undefined);
     expect(cleared).not.toBeNull();
@@ -87,13 +87,13 @@ describe('setLayerFieldCommand: curve and vsplit, set and cleared', () => {
     expect(JSON.parse(serializeEffectsScene(clearedV.newScene!)).layers[0]).not.toHaveProperty('vsplit');
   });
 
-  it('clearing a layer that never had the key is a no-op — no undo slot', () => {
+  it('clearing a layer that never had the key is a no-op: no undo slot', () => {
     const lib = library([scene()]);
     expect(setLayerFieldCommand(lib, 'ramp', 0, 'curve', undefined)).toBeNull();
     expect(setLayerFieldCommand(lib, 'ramp', 0, 'vsplit', undefined)).toBeNull();
   });
 
-  it('clearing a layer spelled with an explicit "none" is ALSO a no-op — the spelling on disk is kept', () => {
+  it('clearing a layer spelled with an explicit "none" is ALSO a no-op: the spelling on disk is kept', () => {
     const lib = library([scene()]);
     expect(setLayerFieldCommand(lib, 'ramp', 1, 'curve', undefined)).toBeNull();
     expect(setLayerFieldCommand(lib, 'ramp', 1, 'vsplit', undefined)).toBeNull();

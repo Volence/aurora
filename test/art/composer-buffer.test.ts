@@ -126,7 +126,7 @@ describe('stampTile', () => {
     expect(cellAt(doc, 0, 0).pri).toBe(false);
   });
 
-  it('"off" CLEARS a set bit and "on" sets a clear one — keep stays honest', () => {
+  it('"off" CLEARS a set bit and "on" sets a clear one: keep stays honest', () => {
     const doc = createDoc(2, 2);
     doc.cells[0] = { atlasTile: 1, localId: null, pal: 2, hf: false, vf: false, pri: true };
     stampTile(doc, 0, 0, { tile: 2, pal: 1, hf: false, vf: false, pri: 'off' });

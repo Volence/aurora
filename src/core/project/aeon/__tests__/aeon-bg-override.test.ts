@@ -247,7 +247,7 @@ describe('the BG override document through buildAeonSavePlan', () => {
 describe('saveFileFor refuses for three separate reasons', () => {
   const doc = () => parseBgOverride(FIXTURE_TEXT).doc;
 
-  it('no document — nothing to write', () => {
+  it('no document: nothing to write', () => {
     expect(saveFileFor({
       path: OVERRIDE_PATH, doc: null, unreadable: null, loadedText: null, notices: [],
     })).toBeNull();

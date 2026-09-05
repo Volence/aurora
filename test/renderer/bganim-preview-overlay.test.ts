@@ -91,7 +91,7 @@ describe('composeBandOverlay', () => {
   });
 });
 
-describe('BgAnimPreviewRenderer.prepare — the licence check and the cell scan', () => {
+describe('BgAnimPreviewRenderer.prepare: the licence check and the cell scan', () => {
   const b = band();
   const n = b.cols * b.rows;
   /** A blob whose first `n` tiles ARE the band's rest art — the licensed case. */
@@ -119,7 +119,7 @@ describe('BgAnimPreviewRenderer.prepare — the licence check and the cell scan'
     ]);
   });
 
-  it('REFUSES a band whose rest art is not the art on screen — the divergence guard', () => {
+  it('REFUSES a band whose rest art is not the art on screen: the divergence guard', () => {
     const r = new BgAnimPreviewRenderer();
     r.prepare({
       bands: [b], nametable: nametable([0, 1, 2, 3, 4, 5, 6, 7]),

@@ -57,7 +57,10 @@ describe('the classic play-from-cursor message', () => {
     serve({ warped: true, landed: { x: 568, y: 1092 }, clamped: true });
     const msg = await useAetherStore.getState().warp(592, 1084, 'classic');
     expect(msg).toContain('(568, 1092)');
-    expect(msg).not.toContain('(592, 1084)—');            // never as the destination
+    // The ask must never be reported as the DESTINATION. Probed against the
+    // whole prefix, not a punctuation mark: the mark this row used to look for
+    // could not appear in either the correct message or the broken one.
+    expect(msg).not.toContain('Warped to (592, 1084)');
     expect(msg).toMatch(/^Warped/);                        // the toast reads it as success
   });
 
@@ -79,7 +82,7 @@ describe('the classic play-from-cursor message', () => {
       warped: false,
       landed: { x: 80, y: 1084 },
       from: { x: 80, y: 1084 },
-      error: 'the poke did not take — the player is back at (80, 1084), where he started.',
+      error: 'the poke did not take: the player is back at (80, 1084), where he started.',
     });
     const msg = await useAetherStore.getState().warp(592, 1084, 'classic');
     expect(msg).not.toMatch(/^Warp failed/);

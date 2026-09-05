@@ -51,7 +51,7 @@ function style(source: string, name: string): string {
   // failure. Same flattening, same reason, as panel-scrollers.test.ts.
   const flat = source.replace(/\$\{[^{}]*\}/g, 'X');
   const m = new RegExp(`\\b${name}:\\s*\\{([^{}]*)\\}`).exec(flat);
-  expect(m, `no style entry named '${name}' — the composer's style object was renamed or restructured`).not.toBeNull();
+  expect(m, `no style entry named '${name}': the composer's style object was renamed or restructured`).not.toBeNull();
   return m![1].replace(/\s+/g, ' ').trim();
 }
 
@@ -69,7 +69,7 @@ describe('the tab body fills the dock content box', () => {
 
   it('tabBody stretches its columns and grows into the slot', () => {
     const s = style(SHARED, 'tabBody');
-    expect(s, "tabBody is top-anchored again — this IS the defect (`alignItems: 'flex-start'`)")
+    expect(s, "tabBody is top-anchored again: this IS the defect (`alignItems: 'flex-start'`)")
       .not.toMatch(/alignItems:\s*'flex-start'/);
     expect(s, 'tabBody does not stretch its columns, so the height stops at the body')
       .toMatch(/alignItems:\s*'stretch'/);
@@ -85,7 +85,7 @@ describe('the tab body fills the dock content box', () => {
     // that bug: `auto`, `content`, `max-content`, a px number.
     const s = style(SHARED, 'tabBody');
     const basis = /flex:\s*'\s*\d+\s+\d+\s+([^']+)'/.exec(s);
-    expect(basis, 'tabBody no longer declares a three-part flex — check what its basis is now').not.toBeNull();
+    expect(basis, 'tabBody no longer declares a three-part flex: check what its basis is now').not.toBeNull();
     expect(basis![1].trim(), 'tabBody sizes itself from its content, which the browse strips make unbounded').toBe('0');
     expect(s, 'tabBody declares a fixed height').not.toMatch(/\bheight:/);
   });
@@ -95,7 +95,7 @@ describe('the tab body fills the dock content box', () => {
     // of thumbnails scrolling 2553px of tiles inside a 719px column. A number
     // cannot know how tall the column is; the column can.
     const s = style(SHARED, 'paletteStrip');
-    expect(s, 'the browse strip capped itself again — a fixed cap cannot know the column height')
+    expect(s, 'the browse strip capped itself again: a fixed cap cannot know the column height')
       .not.toMatch(/maxHeight:/);
     expect(s, 'the browse strip does not grow into its column').toMatch(/flex:\s*'1 1 0'/);
     expect(s, 'the browse strip cannot shrink below its content, so it would push the column')
@@ -120,12 +120,12 @@ describe('the Chunk and Block canvases resize by CELL, never by CSS box', () => 
 
   it('the fit box centres its canvas rather than stretching it', () => {
     const s = style(SHARED, 'fitBox');
-    expect(s, 'the fit box no longer centres — a canvas child would be align-stretched')
+    expect(s, 'the fit box no longer centres: a canvas child would be align-stretched')
       .toMatch(/alignItems:\s*'center'/);
     expect(s, 'the fit box no longer centres horizontally').toMatch(/justifyContent:\s*'center'/);
     expect(s, 'the fit box would be pushed by the canvas it sizes (measurement feedback loop)')
       .toMatch(/overflow:\s*'hidden'/);
-    expect(s, 'the fit box declares a size of its own — it must take one from the column')
+    expect(s, 'the fit box declares a size of its own: it must take one from the column')
       .not.toMatch(/(?:^|[^n])\b(?:width|height):/);
   });
 
@@ -168,13 +168,13 @@ describe('the Chunk and Block canvases resize by CELL, never by CSS box', () => 
 describe('the Tile tier takes the room and spends it on zoom', () => {
   it('its viewport box is sized by the layout, not by a constant', () => {
     const m = /const TILE_SCROLLER:[^=]*=\s*\{([^{}]*)\}/.exec(TILE);
-    expect(m, 'TILE_SCROLLER is gone — what is the pan/zoom hooks\' scroll container now?').not.toBeNull();
+    expect(m, 'TILE_SCROLLER is gone. What is the pan/zoom hooks\' scroll container now?').not.toBeNull();
     const s = m![1].replace(/\s+/g, ' ');
-    expect(s, 'the tile viewport is a fixed box again — the tier had 325px of dead slot under it')
+    expect(s, 'the tile viewport is a fixed box again: the tier had 325px of dead slot under it')
       .not.toMatch(/(?:^|[^n])\b(?:width|height):/);
     expect(s, 'the tile viewport does not grow into the column').toMatch(/flex:\s*'1 1 0'/);
     expect(s, 'the tile viewport lost its floor').toMatch(/minHeight:\s*TILE_VIEW_PX/);
-    expect(s, 'the tile viewport stopped being a scroller — pan and zoom drive its scroll offsets')
+    expect(s, 'the tile viewport stopped being a scroller: pan and zoom drive its scroll offsets')
       .toMatch(/overflow:\s*'auto'/);
   });
 

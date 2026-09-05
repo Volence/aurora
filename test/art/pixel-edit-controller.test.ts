@@ -8,7 +8,7 @@ const cfg = (over: Partial<ToolConfig> = {}): ToolConfig => ({
 });
 function buf(w: number, h: number, fill = 0) { const b = createBuffer(w, h); b.data.fill(fill); return b; }
 
-describe('PixelEditController — instantaneous tools', () => {
+describe('PixelEditController: instantaneous tools', () => {
   it('eyedropper begin() returns the pixel under the cursor as pick, no gesture', () => {
     const b = buf(4, 4); b.data[2 * 4 + 1] = 9;
     const c = new PixelEditController(cfg({ tool: 'eyedropper' }));
@@ -26,7 +26,7 @@ describe('PixelEditController — instantaneous tools', () => {
   });
 });
 
-describe('PixelEditController — gesture start (for host commit routing)', () => {
+describe('PixelEditController: gesture start (for host commit routing)', () => {
   it('eyedropper/fill report the click position as result.start', () => {
     const e = new PixelEditController(cfg({ tool: 'eyedropper' }));
     expect(e.begin(buf(8, 8), 3, 5, null)!.start).toEqual({ x: 3, y: 5 });
@@ -45,7 +45,7 @@ describe('PixelEditController — gesture start (for host commit routing)', () =
   });
 });
 
-describe('PixelEditController — strokes', () => {
+describe('PixelEditController: strokes', () => {
   it('pencil single point sets the pixel', () => {
     const c = new PixelEditController(cfg({ tool: 'pencil', color: 3 }));
     expect(c.begin(buf(4, 4), 1, 1, null)).toBeNull();
@@ -92,7 +92,7 @@ describe('PixelEditController — strokes', () => {
   });
 });
 
-describe('PixelEditController — shapes', () => {
+describe('PixelEditController: shapes', () => {
   it('line draws between endpoints on end()', () => {
     const c = new PixelEditController(cfg({ tool: 'line', color: 7 }));
     c.begin(buf(5, 5), 0, 0, null); c.move(4, 0); const r = c.end(4, 0);
@@ -118,7 +118,7 @@ describe('PixelEditController — shapes', () => {
   });
 });
 
-describe('PixelEditController — select + move', () => {
+describe('PixelEditController: select + move', () => {
   it('marquee outside any selection returns a normalized selection', () => {
     const c = new PixelEditController(cfg({ tool: 'select' }));
     c.begin(buf(8, 8), 1, 1, null); c.move(4, 3); const r = c.end(4, 3);

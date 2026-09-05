@@ -18,7 +18,7 @@ function canvas(wChunks: number, hChunks: number, fn: (x: number, y: number) => 
 
 const whole = (wChunks = 1, hChunks = 1) => ({ x: 0, y: 0, chunksWide: wChunks, chunksHigh: hChunks });
 
-describe('resolveCanvasRegion — shape', () => {
+describe('resolveCanvasRegion: shape', () => {
   it('yields one chunk of 256 cells per 256x256 region cell', () => {
     const r = resolveCanvasRegion(canvas(1, 1, () => 0), whole());
     expect(r.chunks).toHaveLength(1);
@@ -38,7 +38,7 @@ describe('resolveCanvasRegion — shape', () => {
   });
 });
 
-describe('resolveCanvasRegion — tile interning', () => {
+describe('resolveCanvasRegion: tile interning', () => {
   it('interns two identical cells as one tile', () => {
     // Every 8x8 cell painted the same way -> exactly one tile.
     const px = canvas(1, 1, (x, y) => canvasIndex(0, ((x % 8) + (y % 8)) % 15 + 1));
@@ -83,7 +83,7 @@ describe('resolveCanvasRegion — tile interning', () => {
   });
 });
 
-describe('resolveCanvasRegion — block dedup', () => {
+describe('resolveCanvasRegion: block dedup', () => {
   it('interns identical blocks once', () => {
     const px = canvas(1, 1, (x, y) => canvasIndex(0, ((x % 16) + (y % 16)) % 15 + 1));
     const r = resolveCanvasRegion(px, whole());
@@ -136,11 +136,11 @@ describe('mirrorBlock', () => {
     expect(m.cells[2].yf).toBe(true);
   });
 
-  it('is an involution — the property the planner relies on', () => {
+  it('is an involution: the property the planner relies on', () => {
     expect(mirrorBlock(mirrorBlock(b, true, true), true, true)).toEqual(b);
   });
 
-  it('carries palLine unchanged — a mirror moves cells, it does not recolour them', () => {
+  it('carries palLine unchanged: a mirror moves cells, it does not recolour them', () => {
     const m = mirrorBlock(b, true, true);
     expect(m.cells.map((c) => c.palLine)).toEqual([2, 2, 2, 2]);
   });

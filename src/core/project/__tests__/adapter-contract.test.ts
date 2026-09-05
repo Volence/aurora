@@ -27,7 +27,7 @@ describe('adapter contract additions (stage 3)', () => {
     expect(h.aeon).toBeUndefined();
   });
 
-  it('ClassicLevelAccess.reservedTiles is optional — a minimal fake omitting it still satisfies the interface', () => {
+  it('ClassicLevelAccess.reservedTiles is optional: a minimal fake omitting it still satisfies the interface', () => {
     // Type-only shape check, same pattern as editableTileRange: an adapter (or
     // test fake) that never heard of object-art reservations still compiles.
     const minimal: ClassicLevelAccess = {

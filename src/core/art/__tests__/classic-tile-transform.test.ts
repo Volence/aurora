@@ -32,7 +32,7 @@ function pixelsAfter(
 
 const at = (px: number[], x: number, y: number) => px[y * 8 + x];
 
-describe('resolveTileTransform — each action on a known tile', () => {
+describe('resolveTileTransform: each action on a known tile', () => {
   // A tile with a unique value in each corner and nothing else, so every one of
   // the seven actions has a DIFFERENT expected answer. (A symmetric fixture would
   // let flip-h and flip-v pass each other's assertions.)
@@ -107,7 +107,7 @@ describe('resolveTileTransform — each action on a known tile', () => {
   });
 });
 
-describe('resolveTileTransform — a marquee scopes the transform', () => {
+describe('resolveTileTransform: a marquee scopes the transform', () => {
   // Distinct value per pixel (1..15 repeating, never 0) so ANY stray write shows.
   const gradient = buf8((x, y) => ((y * 8 + x) % 15) + 1);
 
@@ -165,10 +165,10 @@ describe('resolveTileTransform — a marquee scopes the transform', () => {
   });
 });
 
-describe('resolveTileTransform — rotate-90 on a NON-SQUARE marquee', () => {
+describe('resolveTileTransform: rotate-90 on a NON-SQUARE marquee', () => {
   const gradient = buf8((x, y) => ((y * 8 + x) % 15) + 1);
 
-  it('refuses, with a reason the host can show — it does not throw and does not write', () => {
+  it('refuses, with a reason the host can show: it does not throw and does not write', () => {
     const out = resolveTileTransform(gradient, 'rotate-90', { x: 0, y: 0, w: 4, h: 2 }, false);
     expect(out.bytes).toBeNull();
     expect(out.refusal).toMatch(/square/i);
@@ -189,7 +189,7 @@ describe('resolveTileTransform — rotate-90 on a NON-SQUARE marquee', () => {
   });
 });
 
-describe('resolveTileTransform — a locked tile writes nothing', () => {
+describe('resolveTileTransform: a locked tile writes nothing', () => {
   const gradient = buf8((x, y) => ((y * 8 + x) % 15) + 1);
   const ALL: TileTransform[] = [
     'flip-h', 'flip-v', 'rotate-90', 'shift-up', 'shift-down', 'shift-left', 'shift-right',
@@ -213,7 +213,7 @@ describe('resolveTileTransform — a locked tile writes nothing', () => {
   });
 });
 
-describe('resolveTileTransform — nothing to say, nothing to commit', () => {
+describe('resolveTileTransform: nothing to say, nothing to commit', () => {
   it('commits nothing when the transform is a no-op (one undo entry per real change)', () => {
     const flat = buf8(() => 7);                    // uniform: every action is identity
     for (const a of ['flip-h', 'flip-v', 'rotate-90', 'shift-left', 'shift-down'] as TileTransform[]) {

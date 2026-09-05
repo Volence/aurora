@@ -55,7 +55,7 @@ describe('one grid, mounted by both engines', () => {
   it.each(HOSTS)('%s draws no swatch grid of its own', (name, src) => {
     // The duplication this task removed: two 4x16 grids, two selection states,
     // two draft words. A host that grows one back has forked the panel again.
-    expect(src, `${name} renders the sliders directly — it has a second selection state`)
+    expect(src, `${name} renders the sliders directly: it has a second selection state`)
       .not.toMatch(/<GenesisColorSliders\b/);
     expect(src, `${name} declares a swatch style again`).not.toMatch(/^\s*swatch:/m);
     expect(src, `${name} declares its own edit selection again`).not.toMatch(/\bsetSel\b/);
@@ -98,7 +98,7 @@ describe('the shared grid stays engine-neutral', () => {
     // not aeon, so a store or command import here would hard-crash classic on the
     // first click rather than degrade. And the engines repaint off different
     // clocks, so a subscription could only ever be right for one of them.
-    expect(GRID, 'PaletteGrid imports a store — it can only be correct for one engine')
+    expect(GRID, 'PaletteGrid imports a store: it can only be correct for one engine')
       .not.toMatch(STATE_IMPORT);
   });
 
@@ -115,7 +115,7 @@ describe('the shared grid stays engine-neutral', () => {
     // `rootProps` is how the claim reaches a root element the shared file owns.
     // Spread FIRST, so a port contributes behaviour and can never override the
     // grid's own layout.
-    expect(GRID, 'the grid drops port.rootProps — classic Ctrl+Z will hit the layout document')
+    expect(GRID, 'the grid drops port.rootProps: classic Ctrl+Z will hit the layout document')
       .toMatch(/<div \{\.\.\.port\.rootProps\} style=/);
   });
 
@@ -124,14 +124,14 @@ describe('the shared grid stays engine-neutral', () => {
     // classic has no version of either. They reach the swatches as render props.
     for (const marker of ['PaletteCopyMenu', 'dragPayload', 'copySwatchInto', 'copyLineInto']) {
       expect(GRID, `${marker} moved into art-shared/`).not.toContain(marker);
-      expect(EDITOR, `${marker} left PaletteEditor — the copy bridge is gone`).toContain(marker);
+      expect(EDITOR, `${marker} left PaletteEditor: the copy bridge is gone`).toContain(marker);
     }
     // …and the shape they arrive through is still declared.
     expect(GRID, 'the shell render props are gone, so aeon has nowhere to put its grips')
       .toMatch(/renderLineGrip\?\(/);
     expect(GRID, 'the per-swatch prop hook is gone').toMatch(/swatchProps\?\(/);
     expect(EDITOR, 'PaletteEditor no longer supplies a shell').toMatch(/shell=\{shell\}/);
-    expect(CLASSIC, 'classic grew a shell — it has no decoration to add').not.toMatch(/shell=/);
+    expect(CLASSIC, 'classic grew a shell: it has no decoration to add').not.toMatch(/shell=/);
   });
 
   it('declares no scroller at all', () => {
@@ -155,7 +155,7 @@ describe('the shared slider control, still the only one', () => {
     // Each of these was a verbatim duplicate inside PaletteEditor. A range input
     // is the tell that an inlined panel came back; the rest are what it needed.
     for (const [name, src] of [...HOSTS, ['PaletteGrid', GRID] as const]) {
-      expect(src, `${name} renders a raw range input — an inlined slider panel is back`)
+      expect(src, `${name} renders a raw range input: an inlined slider panel is back`)
         .not.toMatch(/type="range"/);
       expect(src, `${name} declares its own channel table`).not.toMatch(/\bCHANNELS\b|\bCHANNEL_COLORS\b/);
       expect(src, `${name} declares its own 8-bit→3-bit helper`).not.toMatch(/function to3\b/);
@@ -171,7 +171,7 @@ describe('the shared slider control, still the only one', () => {
     // impossible, and it was only ever there to dodge an undo guard that blocked
     // focused inputs.
     expect(SLIDERS, 'the shared control blurs the slider on commit').not.toMatch(/\.blur\?\.\(\)|\.blur\(\)/);
-    expect(GRID, 'the grid blurs the slider — re-read why that was removed')
+    expect(GRID, 'the grid blurs the slider: re-read why that was removed')
       .not.toMatch(/\.blur\?\.\(\)|\.blur\(\)/);
   });
 
@@ -181,7 +181,7 @@ describe('the shared slider control, still the only one', () => {
     // fix would be to restore the exemption, NOT to re-add blur().
     expect(WORKSPACE, 'LevelWorkspace stopped routing its guard through isTypingTarget')
       .toMatch(/isTypingTarget\(/);
-    expect(TYPING_TARGET, "isTypingTarget no longer exempts range — a focused palette slider now blocks undo")
+    expect(TYPING_TARGET, "isTypingTarget no longer exempts range: a focused palette slider now blocks undo")
       .toMatch(/'range'/);
     expect(COMPOSER_SHARED, 'composer-shared stopped sharing the one rule')
       .toMatch(/from '\.\.\/\.\.\/shell\/typing-target'/);
@@ -195,7 +195,7 @@ describe('the shared slider control, still the only one', () => {
   });
 });
 
-describe('a palette drag can never be stranded — the grid half', () => {
+describe('a palette drag can never be stranded: the grid half', () => {
   // THE BUG, now routed through the port: aeon's preview writes the open document
   // in place so the composer repaints per tick, and only a drag END turns that
   // into an undoable, dirty-marking step. Chrome does not fire `blur` when a
@@ -209,7 +209,7 @@ describe('a palette drag can never be stranded — the grid half', () => {
   const DRAIN_EFFECT = /useEffect\(\(\) => \(\) => \{ drainRef\.current\(\); \}, (\[[^\]]*\])\);/;
 
   it('has an effect whose CLEANUP ends the drag', () => {
-    expect(GRID, 'the drain effect is gone — a mid-drag unmount strands the palette mutation')
+    expect(GRID, 'the drain effect is gone: a mid-drag unmount strands the palette mutation')
       .toMatch(DRAIN_EFFECT);
   });
 
@@ -219,7 +219,7 @@ describe('a palette drag can never be stranded — the grid half', () => {
     // which a click on a non-editable swatch takes).
     const deps = DRAIN_EFFECT.exec(GRID)?.[1];
     expect(deps, 'the drain effect is gone').toBeTruthy();
-    expect(deps, 'the drain effect fires on unmount only — an in-place drag end is stranded')
+    expect(deps, 'the drain effect fires on unmount only: an in-place drag end is stranded')
       .not.toBe('[]');
     expect(deps, 'the drain effect no longer keys on the open swatch').toBe('[openKey]');
     // …and that key is derived from the open swatch itself, not from something
@@ -234,7 +234,7 @@ describe('a palette drag can never be stranded — the grid half', () => {
     // clock tick.
     expect(GRID, 'the drain is captured instead of read through a ref')
       .toMatch(/const drainRef = React\.useRef\(port\.drain\);/);
-    expect(GRID, 'the drain ref is never refreshed — it holds the first render\'s drain forever')
+    expect(GRID, 'the drain ref is never refreshed: it holds the first render\'s drain forever')
       .toMatch(/drainRef\.current = port\.drain;/);
   });
 

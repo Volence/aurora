@@ -123,7 +123,7 @@ describe('list_bg_anim_bands', () => {
     expect(r.bands).toEqual([]);
   });
 
-  it('names an UNREADABLE file — a document nothing may be written to', async () => {
+  it('names an UNREADABLE file: a document nothing may be written to', async () => {
     open(state(null, { path: 'data/editor_bg_override.json', reason: 'not valid JSON' }));
     const r = await ask({ kind: 'list-bg-anim-bands' }) as Record<string, never>;
     expect(r.present).toBe(false);
@@ -153,7 +153,7 @@ describe('promote_bg_anim_band', () => {
     expect(actHistory().canUndo).toBe(false);   // ONE step, not two
   });
 
-  it('does not grow the tile blob — that is what makes it work on a full document', async () => {
+  it('does not grow the tile blob: that is what makes it work on a full document', async () => {
     const tilesBefore = held()!.tiles.length;
     await ask({ kind: 'promote-bg-anim-band', cols: 2, rows: 1, staticBase: 192 });
     expect(held()!.tiles).toHaveLength(tilesBefore);
@@ -218,7 +218,7 @@ describe('add_bg_anim_band', () => {
     expect(held()!.tiles).toHaveLength(tilesBefore + 2);
   });
 
-  it('REFUSES at capacity, naming the ceiling — the reason promote exists', async () => {
+  it('REFUSES at capacity, naming the ceiling: the reason promote exists', async () => {
     open(state(fullDoc()));
     // MATCHED ON THE INSERTION RULE'S OWN WORDS, not on "over the BG tile
     // capacity" — which the codec's document-level `tiles.length` validator ALSO

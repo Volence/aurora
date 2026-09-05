@@ -97,7 +97,7 @@ describe('⚠ THE DEFAULT DOES NOT LEAVE THE EFFECTS FACET', () => {
 });
 
 describe('⚠ AN EXPLICIT CHOICE WINS, AND KEEPS WINNING', () => {
-  it('OFF on the Parallax tab stays off — the default never speaks again', () => {
+  it('OFF on the Parallax tab stays off: the default never speaks again', () => {
     stand(EFFECTS_FACET, PREVIEW_DEFAULT_TAB, null);
     expect(parallaxPreviewOn()).toBe(true);
     expect(toggleParallaxPreview()).toBe(false);
@@ -187,7 +187,7 @@ describe('ONE derivation, not two', () => {
     }
   });
 
-  it('and BOTH switches\' reader — the hook — concludes from that same rule', () => {
+  it('and BOTH switches\' reader (the hook) concludes from that same rule', () => {
     const src = readFileSync(join(SRC, 'providers', 'parallax-preview.ts'), 'utf8');
     const hook = src.slice(src.indexOf('export function useParallaxPreviewOn'));
     // The hook's body ends in the shared rule and states nothing of its own: no

@@ -131,7 +131,7 @@ describe('buildCommands', () => {
       .some((c) => c.id === 'new-sprite')).toBe(false);
   });
 
-  it('offers "New Canvas…" in EITHER engine — a canvas has no engine', () => {
+  it('offers "New Canvas…" in EITHER engine: a canvas has no engine', () => {
     // The difference from New Sprite above, and the one thing about this command
     // that is easy to get wrong by copying it: an origination canvas is a
     // free-size indexed image, not an object's art. Gating it on aeon would hide
@@ -168,7 +168,7 @@ describe('Import Art Sheet', () => {
     expect(cmds.some((c) => c.id === 'import-sheet')).toBe(true);
   });
 
-  it('is NOT offered for aeon — the tile/block/chunk ladder it commits into is classic', () => {
+  it('is NOT offered for aeon: the tile/block/chunk ladder it commits into is classic', () => {
     const cmds = buildCommands({ ...emptySnapshot, engine: 'aeon' }, actions());
     expect(cmds.some((c) => c.id === 'import-sheet')).toBe(false);
   });

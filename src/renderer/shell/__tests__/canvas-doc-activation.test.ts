@@ -161,7 +161,7 @@ describe('activateCanvasDocTarget', () => {
     expect(useCanvasStore.getState().activeDocId).toBe(OTHER.id);
   });
 
-  it('LOADS THEN ACTIVATES — the store is untouched while the read is in flight', async () => {
+  it('LOADS THEN ACTIVATES: the store is untouched while the read is in flight', async () => {
     // R14: opening a document first and filling it in afterwards is what put the
     // pane on document X under tab Y. Nothing may exist for this tab until the
     // bytes are in hand.

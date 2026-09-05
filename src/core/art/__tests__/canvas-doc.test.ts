@@ -77,7 +77,7 @@ describe('canvas pixel encoding', () => {
     expect(doc.pixels.height).toBe(8);
   });
 
-  it('a blank doc clamps an oversize request too — snapshot cost, not the art, sets the ceiling', () => {
+  it('a blank doc clamps an oversize request too: snapshot cost, not the art, sets the ceiling', () => {
     const doc = blankCanvasDoc({ name: 'T', width: 5000, height: 5000, profileId: 'none' });
     expect(doc.pixels.width).toBe(1024);
     expect(doc.pixels.height).toBe(1024);

@@ -71,7 +71,7 @@ function stamp(section: Section, chunk: ChunkDef, col: number, row: number, id: 
     placement: { id, chunkId: chunk.id, baseCol: col, baseRow: row, collision: false },
     description: 'stamp',
   });
-  if (!child) throw new Error('fixture stamp recorded no link — the fixture is broken');
+  if (!child) throw new Error('fixture stamp recorded no link: the fixture is broken');
   // Apply the link child by hand; the fixture has no history to run it through.
   for (const e of child.entries) links.plane[e.index] = e.newRef;
   for (const p of child.addedPlacements ?? []) links.placements.push({ ...p });
@@ -159,7 +159,7 @@ describe('cross-act chunk copies', () => {
     expect(f.ghzAct1).not.toBe(f.ojzAct1);
   });
 
-  it('act-scoped propagation leaves the OTHER acts stale — the defect, stated', () => {
+  it('act-scoped propagation leaves the OTHER acts stale: the defect, stated', () => {
     const f = fixture();
     const edited = editedCopy(f.chunkA);
 
@@ -230,7 +230,7 @@ describe('cross-act chunk copies', () => {
     expect(b.locations.map((l) => l.actId)).toEqual(['act2']);
   });
 
-  it('a chunk stamped only in the edited act reports nothing — and says so', () => {
+  it('a chunk stamped only in the edited act reports nothing, and says so', () => {
     const f = fixture();
     // chunk-b lives only in ojz/act2, so edit FROM there: no out-of-act copies.
     const copies = findOutOfActChunkCopies({ chunkId: 'chunk-b', zones: f.zones, currentAct: f.ojzAct2 });

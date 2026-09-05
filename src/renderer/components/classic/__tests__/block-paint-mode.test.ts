@@ -18,27 +18,27 @@ const strip = (src: string) => src
 
 const BLOCK_TAB = strip(read('BlockTab.tsx'));
 
-describe('BlockTab paint mode — the composed write path', () => {
+describe('BlockTab paint mode: the composed write path', () => {
   it('imports planSurfaceEdit and classicPaintSurface from the real modules', () => {
     expect(BLOCK_TAB).toMatch(/import\s*\{\s*planSurfaceEdit[^}]*\}\s*from\s*'\.\.\/\.\.\/\.\.\/core\/art\/classic-surface-plan'/);
     expect(BLOCK_TAB, 'BlockTab does not import classicPaintSurface from the level store')
       .toMatch(/import\s*\{[^}]*\bclassicPaintSurface\b[^}]*\}\s*from\s*'\.\.\/\.\.\/state\/classicLevelStore'/);
   });
 
-  it('calls planSurfaceEdit BEFORE classicPaintSurface — a plan is built, then applied', () => {
+  it('calls planSurfaceEdit BEFORE classicPaintSurface: a plan is built, then applied', () => {
     const planCall = BLOCK_TAB.indexOf('planSurfaceEdit(');
     const applyCall = BLOCK_TAB.indexOf('classicPaintSurface(');
     expect(planCall, 'planSurfaceEdit( is never called').toBeGreaterThan(-1);
     expect(applyCall, 'classicPaintSurface( is never called').toBeGreaterThan(-1);
-    expect(planCall, 'classicPaintSurface is called before planSurfaceEdit — the plan must exist first')
+    expect(planCall, 'classicPaintSurface is called before planSurfaceEdit: the plan must exist first')
       .toBeLessThan(applyCall);
   });
 
-  it('NEVER calls classicEditTiles — that command has no divergence and no reserved-tile guard', () => {
+  it('NEVER calls classicEditTiles: that command has no divergence and no reserved-tile guard', () => {
     expect(BLOCK_TAB).not.toMatch(/\bclassicEditTiles\b/);
   });
 
-  it('diffWrites feeds planSurfaceEdit\'s writes — the gesture result is diffed, not resent whole', () => {
+  it('diffWrites feeds planSurfaceEdit\'s writes: the gesture result is diffed, not resent whole', () => {
     expect(BLOCK_TAB).toMatch(/\bdiffWrites\(/);
     const planArgs = /planSurfaceEdit\(\{([\s\S]*?)\}\);/.exec(BLOCK_TAB);
     expect(planArgs, 'could not find the planSurfaceEdit({...}) call to inspect its args').not.toBeNull();
@@ -65,24 +65,24 @@ describe('BlockTab paint mode — the composed write path', () => {
     expect(BLOCK_TAB).toMatch(/controller=\{paintControllerRef\.current\}/);
   });
 
-  it('on a refused plan, toasts `reason` VERBATIM — the message names the Link-mode escape', () => {
+  it('on a refused plan, toasts `reason` VERBATIM: the message names the Link-mode escape', () => {
     expect(BLOCK_TAB).toMatch(/addToast\(planResult\.reason,\s*'error'\)/);
   });
 });
 
-describe('BlockTab — Assign | Paint toggle (Task 11, "decided")', () => {
+describe('BlockTab: Assign | Paint toggle (Task 11, "decided")', () => {
   it('defaults to assign and offers both values through the store', () => {
     expect(BLOCK_TAB).toMatch(/useClassicLevelStore\(\(s\)\s*=>\s*s\.blockPaintMode\)/);
     expect(BLOCK_TAB).toMatch(/setBlockPaintMode\('assign'\)/);
     expect(BLOCK_TAB).toMatch(/setBlockPaintMode\('paint'\)/);
   });
 
-  it('the assignment grid (classicEditBlock) is still reachable — Paint does not replace it', () => {
+  it('the assignment grid (classicEditBlock) is still reachable: Paint does not replace it', () => {
     expect(BLOCK_TAB).toMatch(/\bclassicEditBlock\(/);
   });
 });
 
-describe('BlockTab — Link | Isolate + limits readout', () => {
+describe('BlockTab: Link | Isolate + limits readout', () => {
   it('offers both Link and Isolate through the shared store field', () => {
     expect(BLOCK_TAB).toMatch(/useClassicLevelStore\(\(s\)\s*=>\s*s\.paintDivergeMode\)/);
     expect(BLOCK_TAB).toMatch(/setPaintDivergeMode\('isolate'\)/);
@@ -92,12 +92,12 @@ describe('BlockTab — Link | Isolate + limits readout', () => {
   it('the limits readout says "limit" vocabulary and never "budget"', () => {
     expect(BLOCK_TAB, 'no limits readout string found (expected "blocks N/N" and "tiles N/N")')
       .toMatch(/blocks \$\{[^}]+\}\/\$\{[^}]+\}.*tiles \$\{[^}]+\}\/\$\{[^}]+\}/);
-    expect(BLOCK_TAB, 'BlockTab says "budget" — no surveyed tool uses that word; say "limit"')
+    expect(BLOCK_TAB, 'BlockTab says "budget": no surveyed tool uses that word; say "limit"')
       .not.toMatch(/budget/i);
   });
 });
 
-describe('BlockTab — the discovery breadcrumb', () => {
+describe('BlockTab: the discovery breadcrumb', () => {
   it("its linkage banner points at the Chunk tab's Isolate mode for a single-place change", () => {
     const call = /<SharedBanner[\s\S]*?\/>/.exec(BLOCK_TAB);
     expect(call, 'BlockTab has no <SharedBanner> call at all').not.toBeNull();

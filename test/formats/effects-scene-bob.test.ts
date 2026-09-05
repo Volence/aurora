@@ -128,7 +128,7 @@ describe('the bob is READ OUT of the schema, not restated beside it', () => {
   });
 });
 
-describe('TRAP 1 — both fields are INVERSE, and the control shows the quantity', () => {
+describe('TRAP 1: both fields are INVERSE, and the control shows the quantity', () => {
   it('the amplitude ladder runs from the LARGEST sway at the SMALLEST shift', () => {
     const { min, max } = LADDER;
     expect(min).toBeLessThan(max);
@@ -170,7 +170,7 @@ describe('TRAP 1 — both fields are INVERSE, and the control shows the quantity
   });
 });
 
-describe('TRAP 2 — the discontinuity is UNREACHABLE through the UI', () => {
+describe('TRAP 2: the discontinuity is UNREACHABLE through the UI', () => {
   it('the schema really does have a hole, in two runs, containing 0', () => {
     // Anti-vacuous for every row below: if this were empty they would all pass
     // by having nothing to check.
@@ -258,7 +258,7 @@ describe('TRAP 2 — the discontinuity is UNREACHABLE through the UI', () => {
   });
 });
 
-describe('TRAP 3 — the document\'s off is the sentinel, and the wire\'s off is 0', () => {
+describe('TRAP 3: the document\'s off is the sentinel, and the wire\'s off is 0', () => {
   it('the sentinel is ABOVE the ladder, not below it', () => {
     // The single fact that makes "clamp toward 0" the wrong instinct.
     expect(SENTINEL).toBeGreaterThan(LADDER.max);
@@ -291,7 +291,7 @@ describe('TRAP 3 — the document\'s off is the sentinel, and the wire\'s off is
     expect(HOLE).toContain(0);
   });
 
-  it('turning the bob OFF writes no key at all — never 0, never 15', () => {
+  it('turning the bob OFF writes no key at all: never 0, never 15', () => {
     const lib = library([bobbing()]);
     const off = applied(bobToggleCommand(lib, 'probe', false));
     expect('bob_shift' in off).toBe(false);
@@ -363,7 +363,7 @@ describe('a scene with no bob round-trips BYTE-IDENTICALLY', () => {
   const SHIPPED_PATH = resolve(__dirname, '../fixtures/effects/ojz_act1_depth.json');
   const SHIPPED = readFileSync(SHIPPED_PATH, 'utf8');
 
-  it('aeon\'s shipped scene carries NEITHER key — the anti-vacuous half', () => {
+  it('aeon\'s shipped scene carries NEITHER key: the anti-vacuous half', () => {
     const doc = JSON.parse(SHIPPED) as Record<string, unknown>;
     expect('bob_shift' in doc).toBe(false);
     expect('bob_period' in doc).toBe(false);
@@ -399,7 +399,7 @@ describe('a scene with no bob round-trips BYTE-IDENTICALLY', () => {
 });
 
 describe('the form\'s displayed state', () => {
-  it('seeds a MIDPOINT amplitude — neither end of the ladder', () => {
+  it('seeds a MIDPOINT amplitude: neither end of the ladder', () => {
     expect(BOB_SHIFT_SEED).toBeGreaterThan(LADDER.min);
     expect(BOB_SHIFT_SEED).toBeLessThan(LADDER.max);
     expect(bobShiftRefusal(BOB_SHIFT_SEED)).toBeNull();

@@ -48,7 +48,7 @@ describe('facet visibility (registered descriptors ∩ granted ∩ has module fo
     expect(facetsFor(['layout']).filter((f) => moduleFor('aeon', f.id))).toEqual([]);
   });
 
-  it('every facet the REAL s1 manifest grants has a module — no pill leads nowhere', () => {
+  it('every facet the REAL s1 manifest grants has a module: no pill leads nowhere', () => {
     // The cross-check the old literal could not make: this reads the profile
     // (core/project/s1/index.ts) on one side and the renderer's registration on
     // the other, so granting a facet nobody built fails HERE rather than at
@@ -196,7 +196,7 @@ describe('the header offers the plane control on every facet whose canvas is pla
       expect(chromeWithAct(facet).planeChips).toBe(true);
     });
 
-  it('and `art` does NOT — its canvas is a composer that reads no plane', () => {
+  it('and `art` does NOT: its canvas is a composer that reads no plane', () => {
     // The other half of the rule. Without it this guard only ever grows, and a
     // chip over the art facet would write editorStore for a canvas that ignores
     // it — the dead chrome the list exists to prevent.

@@ -353,7 +353,7 @@ function treeHashes(rootDir: string): Map<string, string> {
 const ask = (req: AgentRequest) => handleAgentRequest(req as never);
 
 describeRequiringFixture(
-  'OJZ section 5 showcase — authored through Aurora\'s writer',
+  'OJZ section 5 showcase: authored through Aurora\'s writer',
   AEON,
   'the aeon checkout (git archive of its object store; its working tree is never read)',
   () => {
@@ -443,13 +443,13 @@ describeRequiringFixture(
      * open, if the library was empty, or if section 5 was already bound — so
      * this row asserts the instrument saw the world before it changed it.
      */
-    it('the floor — the act opened, aeon\'s own preset is in the library, section 5 is unbound', () => {
+    it('the floor: the act opened, aeon\'s own preset is in the library, section 5 is unbound', () => {
       expect(sha, 'no aeon revision resolved').toMatch(/^[0-9a-f]{40}$/);
       expect(sectionsBefore.length, 'the act did not open with its nine sections').toBe(9);
-      expect(sectionsBefore[SECTION], 'section 5 is an empty slot — nothing to bind').not.toBeNull();
+      expect(sectionsBefore[SECTION], 'section 5 is an empty slot: nothing to bind').not.toBeNull();
       expect(presetIdsBefore, 'the preset library was empty; every row below would be vacuous')
         .toContain('authored_probe');
-      expect(presetIdsBefore, 'this id already existed upstream — the parcel is not authoring it')
+      expect(presetIdsBefore, 'this id already existed upstream: the parcel is not authoring it')
         .not.toContain(PRESET_ID);
       expect(sectionsBefore[SECTION]!.rasterRef, 'section 5 arrived already bound').toBeNull();
       expect(metaExistedBefore, 'section_5.meta.json already exists upstream').toBe(false);
@@ -474,7 +474,7 @@ describeRequiringFixture(
       const s = sectionsAfter[SECTION]!;
       expect(typeof s.rasterRef, 'the ref came back as something other than a string').toBe('string');
       expect(s.rasterRef).toBe(PRESET_ID);
-      expect(Object.keys(s), 'the writer invented an effectsRef — the reserved name is spent')
+      expect(Object.keys(s), 'the writer invented an effectsRef: the reserved name is spent')
         .not.toContain('effectsRef');
       expect(s.sceneRef, 'wrote the scene binding instead of the raster one').toBeNull();
       expect(s.bgLayoutRef).toBeNull();
@@ -524,7 +524,7 @@ describeRequiringFixture(
 
       // THE ONE THAT WOULD BE A DEFECT.
       expect(changed.filter((k) => !k.endsWith('.json')),
-        'a non-JSON file re-encoded differently — level data moved').toEqual([]);
+        'a non-JSON file re-encoded differently: level data moved').toEqual([]);
 
       // Every JSON rewrite is either a pure trailing-newline addition or the
       // rasterRef widening, and NOTHING ELSE. Classified per file rather than
@@ -560,7 +560,7 @@ describeRequiringFixture(
       expect(addr).toBe(cramAddr(PAL_LINE, ENTRY));
       expect(addr >> 5, 'addr does not name palette line 2').toBe(PAL_LINE);
       expect((addr >> 1) & 15, 'addr does not name entry 8').toBe(ENTRY);
-      expect(addr % 2, 'an odd CRAM address — colours are words').toBe(0);
+      expect(addr % 2, 'an odd CRAM address: colours are words').toBe(0);
       expect(addr >> 5, 'palette line 0 is the character line and is refused').not.toBe(0);
       expect(addr, 'outside the 128-byte CRAM the engine bounds at 126').toBeLessThanOrEqual(126);
     });

@@ -119,7 +119,7 @@ describe('a fresh boundary is aeon\'s shipped moving water, not a number this ed
    * sentence it may earn is `no-motion`, which is deliberate: a fresh boundary
    * IS still, and that is how an author finds out.
    */
-  it('is legal by construction, and earns exactly one advisory — the deliberate one', () => {
+  it('is legal by construction, and earns exactly one advisory: the deliberate one', () => {
     const p = boundaryDoc();
     expect(() => serializeEffectsPreset(p)).not.toThrow();
     expect(parseEffectsPreset(serializeEffectsPreset(p), ID).boundary).toEqual(newBoundary());
@@ -230,12 +230,12 @@ describe('the four bounded fields refuse out of range and accept inside it', () 
    * diligence and would be refusing a document the contract accepts — and every
    * other row in this file would stay green through it.
    */
-  it('does NOT refuse the two cross-field rules — it warns, and the document still saves', () => {
+  it('does NOT refuse the two cross-field rules: it warns, and the document still saves', () => {
     const p = boundaryDoc();
     const r = EFFECTS_PRESET_BOUNDARY_LO_RANGE;
     // An inverted band: lo above hi. Written through the real command.
     const inverted = setBoundaryFieldCommand(lib(p), ID, 'lo', r.max)!;
-    expect(inverted, 'the control refused lo > hi — Aurora has become the enforcer of a rule the '
+    expect(inverted, 'the control refused lo > hi: Aurora has become the enforcer of a rule the '
       + 'contract assigns to the generator, and is now refusing documents the contract accepts')
       .not.toBeNull();
     const bad = inverted.newPreset!;
@@ -277,7 +277,7 @@ describe('the tint region\'s four members have no range, and the panel does not 
     for (const f of EFFECTS_PRESET_TINT_REGION_KEYS) {
       expect(boundaryTintRefusal(regionOf(boundaryOf(p)) as unknown as never, ID, f, 4242)).toBeNull();
       const cmd = setBoundaryTintCommand(lib(p), ID, f, 4242);
-      expect(cmd, `${f} = 4242 produced no command — something here has invented a range`)
+      expect(cmd, `${f} = 4242 produced no command: something here has invented a range`)
         .not.toBeNull();
       expect(regionOf(boundaryOf(cmd!.newPreset!))[f]).toBe(4242);
     }
@@ -376,8 +376,8 @@ describe('every advisory reaches the panel carrying who enforces it', () => {
     p.patch_world_ys = [null, 100];
     p.patch_motion = [null, { sweep: { amp_shift: 5, period_shift: 5, phase: 0 } }] as never;
     const still = boundaryAdvisoriesFor(p).find((a) => a.rule === 'no-motion');
-    expect(still, 'the document authors both positional keys — at index 1, while the boundary '
-      + 'follows channel 0 — and nothing warned').toBeDefined();
+    expect(still, 'the document authors both positional keys, at index 1, while the boundary '
+      + 'follows channel 0, and nothing warned').toBeDefined();
     expect(still!.text).toContain('patch_world_ys[0]');
     expect(still!.text).toContain('patch_motion[0]');
 

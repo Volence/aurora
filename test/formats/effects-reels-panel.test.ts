@@ -171,7 +171,7 @@ describe('§2.7 the panel\'s facts are EXTRACTED from the contract, never typed'
   });
 });
 
-describe('§2.7 GUIDANCE IS NOT A BOUND — the contract says so in as many words', () => {
+describe('§2.7 GUIDANCE IS NOT A BOUND: the contract says so in as many words', () => {
   it('the useful range sits strictly inside the legal span and never refuses', () => {
     const g = EFFECTS_REEL_RATE_GUIDANCE;
     const b = EFFECTS_REEL_RATE_BOUNDS;
@@ -202,7 +202,7 @@ describe('§2.7 GUIDANCE IS NOT A BOUND — the contract says so in as many word
   });
 });
 
-describe('HAZARD 1 — the unit collision, and the hole the codec packet left open', () => {
+describe('HAZARD 1: the unit collision, and the hole the codec packet left open', () => {
   it('every ×256 of a legal NONZERO rate is refused', () => {
     const { min, max } = EFFECTS_REEL_RATE_BOUNDS;
     let checked = 0;
@@ -312,8 +312,8 @@ describe('HAZARD 1 — the unit collision, and the hole the codec packet left op
   });
 });
 
-describe('HAZARD 2 — zero is a value, and the two keys rule on it oppositely', () => {
-  it('reels accepts 0 where drift refuses it — asserted as a CONTRAST', () => {
+describe('HAZARD 2: zero is a value, and the two keys rule on it oppositely', () => {
+  it('reels accepts 0 where drift refuses it: asserted as a CONTRAST', () => {
     // A row that only checked reels would pass if someone gave both keys the
     // same ruling. The contrast is the claim.
     expect(reelRateRefusal(0)).toBeNull();
@@ -353,7 +353,7 @@ describe('HAZARD 2 — zero is a value, and the two keys rule on it oppositely',
   });
 });
 
-describe('HAZARD 3 — screen order is array order, and nothing here reorders', () => {
+describe('HAZARD 3: screen order is array order, and nothing here reorders', () => {
   it('the strips tile the screen contiguously, in index order', () => {
     const spans = Array.from({ length: EFFECTS_REEL_BAND_COUNT }, (_, i) => reelStripScreenX(i));
     expect(spans[0].min).toBe(0);
@@ -426,7 +426,7 @@ describe('HAZARD 3 — screen order is array order, and nothing here reorders', 
   });
 });
 
-describe('HAZARD 4 — DEBUG tier, and the panel is required to say so', () => {
+describe('HAZARD 4: DEBUG tier, and the panel is required to say so', () => {
   it('the panel renders the DERIVED sentence and carries no typed copy of it', () => {
     expect(PANEL_SRC).toContain('REELS_ROW.debug.short');
     expect(PANEL_SRC).toContain('REELS_ROW.debug.full');
@@ -441,7 +441,7 @@ describe('HAZARD 4 — DEBUG tier, and the panel is required to say so', () => {
     expect(REELS_ROW.title).toContain(EFFECTS_REELS_DEBUG_NOTE.short);
   });
 
-  it('NO capability check is added — there is no CAP_ bit for reels', () => {
+  it('NO capability check is added: there is no CAP_ bit for reels', () => {
     // The contract: "a generator arm must not emit a check that does not exist".
     // Row-remap's note is a real capability; this key has none, and inventing
     // one would be Aurora adding a gate.
@@ -455,7 +455,7 @@ describe('HAZARD 4 — DEBUG tier, and the panel is required to say so', () => {
   });
 });
 
-describe('ABSENT IS ABSENT — there is no "none" spelling for reels', () => {
+describe('ABSENT IS ABSENT: there is no "none" spelling for reels', () => {
   it('off DELETES the key, and the writer never materialises it', () => {
     const on = scene({ rates: descendingRates() });
     const off = applied(reelsToggleCommand(library([on]), on.id, false));
@@ -512,7 +512,7 @@ describe('the binding advisory is surfaced WITHOUT being turned into a clearance
     expect(msgs[0]).toMatch(/silence is not a clearance/);
   });
 
-  it('says NOTHING in the positive case — and there is no "looks fine" value', () => {
+  it('says NOTHING in the positive case, and there is no "looks fine" value', () => {
     const s = scene({ rates: descendingRates() });
     expect(reelsBindingAdvisories(s, [{ sceneRef: s.id }])).toEqual([]);
     // The type is string[]; the positive case is an EMPTY one, not a pass

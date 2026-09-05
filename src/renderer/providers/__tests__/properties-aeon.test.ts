@@ -43,7 +43,7 @@ function section(i: AeonPropertiesInput, title: string) {
 const rows = (i: AeonPropertiesInput, title: string): [string, string][] =>
   section(i, title).rows.map((r) => [r.label, r.value]);
 
-describe('aeonPropertySections — the always-on sections', () => {
+describe('aeonPropertySections: the always-on sections', () => {
   it('reports project, active section, art and viewport, in that order', () => {
     expect(titles(input())).toEqual(['Project', 'Active Section', 'Art', 'Viewport']);
   });
@@ -91,7 +91,7 @@ describe('aeonPropertySections — the always-on sections', () => {
   });
 });
 
-describe('aeonPropertySections — the background select', () => {
+describe('aeonPropertySections: the background select', () => {
   const LIB = [{ id: 'bg-city', name: 'City' }, { id: 'bg-sky', name: 'Sky' }];
 
   it('offers the act default plus every library entry', () => {
@@ -151,7 +151,7 @@ describe('aeonPropertySections — the background select', () => {
     expect(section(input({ bgLibrary: LIB }), 'Active Section').select?.options).toHaveLength(3);
   });
 
-  it('a missing entry does not block the author — every real option still works', () => {
+  it('a missing entry does not block the author: every real option still works', () => {
     const onBackgroundChange = vi.fn();
     const sel = section(
       input({ bgLibrary: LIB, section: DANGLING, onBackgroundChange }), 'Active Section').select;
@@ -159,7 +159,7 @@ describe('aeonPropertySections — the background select', () => {
     expect(onBackgroundChange).toHaveBeenCalledWith('bg-city');
   });
 
-  it('forwards the raw select value — the null-for-empty rule is aeonBackgroundCommand’s', () => {
+  it('forwards the raw select value: the null-for-empty rule is aeonBackgroundCommand’s', () => {
     // The panel must not decide what '' MEANS. Only the aeon port knows that the
     // empty option is `bgLayoutRef: null`, and only it may issue the command.
     const onBackgroundChange = vi.fn();
@@ -202,7 +202,7 @@ describe('aeonBackgroundCommand', () => {
   });
 });
 
-describe('aeonPropertySections — the selection readouts', () => {
+describe('aeonPropertySections: the selection readouts', () => {
   it('shows a selected ring whether or not object selection is on', () => {
     const i = (showObjectSelection: boolean): AeonPropertiesInput => input({
       showObjectSelection,
@@ -246,7 +246,7 @@ describe('aeonPropertySections — the selection readouts', () => {
   });
 });
 
-describe('aeonPropertySections — the paint tool readout', () => {
+describe('aeonPropertySections: the paint tool readout', () => {
   it('appears for the two paint tools only', () => {
     const shown = { selectedTileIndex: 7, selectedPaletteLine: 2 };
     expect(titles(input({ ...shown, tool: 'paint-tile' }))[0]).toBe('Paint Tool');

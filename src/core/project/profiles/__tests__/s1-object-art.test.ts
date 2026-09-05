@@ -335,7 +335,7 @@ describe('objectArtIsZoneFree', () => {
     expect(objectArtIsZoneFree(0x0d)).toBe(true);
   });
 
-  it('zone-scoped ids are NOT zone-free — Moto Bug ($40, ghz-only) and the per-zone $1c/$53', () => {
+  it('zone-scoped ids are NOT zone-free: Moto Bug ($40, ghz-only) and the per-zone $1c/$53', () => {
     expect(objectArtIsZoneFree(0x40)).toBe(false);
     expect(objectArtIsZoneFree(0x1c)).toBe(false); // GHZ Bridge stump vs SLZ Fireball Thrower
     expect(objectArtIsZoneFree(0x53)).toBe(false); // different art in MZ/SLZ/SBZ

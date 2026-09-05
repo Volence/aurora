@@ -70,7 +70,7 @@ const viewport = { x: 0, y: 0, width: 800, height: 600, zoom: 1 };
 /** The lens's own fillRects, told apart from any other overlay's by colour. */
 const veils = (fills: { style: string }[]) => fills.filter((f) => f.style === PRIORITY_FILL);
 
-describe('OverlayRenderer.render — the priority lens gate', () => {
+describe('OverlayRenderer.render: the priority lens gate', () => {
   it('draws NOTHING with the toggle off, even though the section HAS a high tile', () => {
     const { ctx, fills } = recCtx();
     const lens = new OverlayRenderer().render(
@@ -112,7 +112,7 @@ describe('OverlayRenderer.render — the priority lens gate', () => {
     expect(lens.priority).toEqual({ veils: 2, segments: 8 });
   });
 
-  it('reports zeroes — not silence — for a section with no high tile', () => {
+  it('reports zeroes, not silence, for a section with no high tile', () => {
     const nametable = new Uint16Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);
     const section = {
       tileGrid: { width: SECTION_TILES_WIDE, height: SECTION_TILES_HIGH, nametable },

@@ -115,7 +115,7 @@ describe('summariseBuildOutput', () => {
 });
 
 describe('buildPlanFor and the FAST shape', () => {
-  it('defaults to FAST — this is the iteration loop', () => {
+  it('defaults to FAST: this is the iteration loop', () => {
     const p = buildPlanFor(base);
     expect(p.fast).toBe(true);
     expect(p.envOverrides.FAST).toBe('1');
@@ -150,7 +150,7 @@ describe('buildPlanFor for a classic project', () => {
     expect(p.projectType).toBe('classic');
   });
 
-  it('requires NO environment — lua build.lua reads none', () => {
+  it('requires NO environment: lua build.lua reads none', () => {
     // The aeon plan under the same empty env names both SIGIL_* variables as
     // missing (asserted above); the classic plan must name neither, because
     // build.lua invokes its bundled native asl/p2bin directly (common.lua
@@ -159,7 +159,7 @@ describe('buildPlanFor for a classic project', () => {
     expect(p.missingEnv).toEqual([]);
   });
 
-  it('never claims the FAST shape — build.lua has no such switch', () => {
+  it('never claims the FAST shape: build.lua has no such switch', () => {
     // `fast` drives a "not a ship artifact" caveat downstream; for classic that
     // claim would be false, so even an explicit buildFast:true must not set it.
     for (const raw of [undefined, { buildFast: true }, { buildFast: false }]) {
@@ -169,7 +169,7 @@ describe('buildPlanFor for a classic project', () => {
     }
   });
 
-  it('plans no phantom pre-build — a classic save writes the assembler inputs in place', () => {
+  it('plans no phantom pre-build: a classic save writes the assembler inputs in place', () => {
     // aeon's default pre-build (tools/regenerate-level.sh) exists only in the
     // aeon tree; `exists` returning true for it must not summon it here.
     const p = buildPlanFor({ ...classic, exists: () => true });

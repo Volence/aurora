@@ -370,7 +370,7 @@ describe('loadAeonProject', () => {
  * catch at all, because parseCollAttr does no length checking — it returns a
  * SHORT plane, which serializeCollAttr then writes back short.
  */
-describe('loadAeonProject — editable collision planes', () => {
+describe('loadAeonProject: editable collision planes', () => {
   async function loadSection(fa: FileAccess) {
     const r = await loadAeonProject(fa, '/proj');
     return { r, section: r.project.zones[0].acts[0].sections[0]! };

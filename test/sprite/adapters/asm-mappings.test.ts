@@ -7,7 +7,7 @@ import { s2Adapter } from '../../../src/core/formats/games/s2';
 const txt = (n: string) => readFileSync(new URL(`../../fixtures/mappings/src/${n}`, import.meta.url), 'utf8');
 const bin = (n: string) => new Uint8Array(readFileSync(new URL(`../../fixtures/mappings/${n}`, import.meta.url)));
 
-describe('parseAsmMappings — text parse == assembled-binary read', () => {
+describe('parseAsmMappings: text parse == assembled-binary read', () => {
   it('S2 obj0B.asm decodes to the same logical frames as the s2 binary', () => {
     expect(parseAsmMappings(txt('obj0B.asm'))).toEqual(s2Adapter.readMappings(bin('s2_obj0B_map.bin')));
   });
@@ -28,7 +28,7 @@ describe('parseAsmMappings — text parse == assembled-binary read', () => {
   });
 });
 
-describe('parseAsmDPLC — text parse == assembled-binary read', () => {
+describe('parseAsmDPLC: text parse == assembled-binary read', () => {
   it('S2 obj08 DPLC .asm == s2 binary read, honoring duplicate table entries (22 frames)', () => {
     expect(parseAsmDPLC(txt('obj08_dplc.asm'))).toEqual(s2Adapter.readDPLC!(bin('s2_obj08_dplc.bin')));
   });

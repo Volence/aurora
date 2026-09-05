@@ -26,7 +26,7 @@ const bar = readFileSync(join(__dirname, '..', 'EffectsToolOptions.tsx'), 'utf8'
 const sec = (rasterRef: string | null) => ({ rasterRef });
 
 describe('a preset nothing binds deletes exactly as before', () => {
-  it('no binding, no refusal — this is a guard, not a wall', () => {
+  it('no binding, no refusal: this is a guard, not a wall', () => {
     // ANTI-VACUOUS for every row below: a predicate that refused everything
     // would satisfy them all and make Delete useless.
     expect(deletePresetRefusal([sec(null), sec('other')], 'mine')).toBeNull();

@@ -40,7 +40,7 @@ function spec4(marks: string[], over: Partial<TileLensSpec> = {}): TileLensSpec 
   };
 }
 
-describe('drawTileLens — the veil', () => {
+describe('drawTileLens: the veil', () => {
   it('veils exactly the marked tile, at its world position', () => {
     const { ctx, rects } = recCtx();
     const drawn = drawTileLens(ctx, spec4(['1,2']));
@@ -83,7 +83,7 @@ describe('drawTileLens — the veil', () => {
   });
 });
 
-describe('drawTileLens — the boundary strokes', () => {
+describe('drawTileLens: the boundary strokes', () => {
   it('outlines a lone interior tile on all four sides', () => {
     const { ctx, pts } = recCtx();
     const drawn = drawTileLens(ctx, spec4(['1,1']));
@@ -103,7 +103,7 @@ describe('drawTileLens — the boundary strokes', () => {
     expect(drawn.segments).toBe(6);
   });
 
-  it('SKIPS the grid perimeter — an unknown neighbour is not an unmarked one', () => {
+  it('SKIPS the grid perimeter: an unknown neighbour is not an unmarked one', () => {
     const { ctx, pts } = recCtx();
     // Tile (0,0): its left and top sides are on the grid perimeter.
     const drawn = drawTileLens(ctx, spec4(['0,0']));
@@ -116,7 +116,7 @@ describe('drawTileLens — the boundary strokes', () => {
   });
 });
 
-describe('drawTileLens — the window', () => {
+describe('drawTileLens: the window', () => {
   it('iterates ONLY the window: a marked tile outside it is not veiled', () => {
     const { ctx, rects } = recCtx();
     drawTileLens(ctx, spec4(['0,0', '3,3'], { colStart: 2, colEnd: 4, rowStart: 2, rowEnd: 4 }));

@@ -120,7 +120,7 @@ describe('set_bg tile ceiling', () => {
     expect(act().bgTiles).toHaveLength(4);            // and the act is untouched
   });
 
-  it('refuses for the RIGHT REASON — the hardware region, named', async () => {
+  it('refuses for the RIGHT REASON: the hardware region, named', async () => {
     // (c): the row above proves it fires; this one proves the guard that fired
     // is the VRAM-capacity guard and not some other arity check that happens to
     // mention a count. $8000..$B7FF appears in no other refusal on this path.
@@ -129,7 +129,7 @@ describe('set_bg tile ceiling', () => {
     })).rejects.toThrow(/\$8000\.\.\$B7FF/);
   });
 
-  it('measures TILE COUNT, not pixels — 512 tiles is the old ceiling and must now refuse', async () => {
+  it('measures TILE COUNT, not pixels: 512 tiles is the old ceiling and must now refuse', async () => {
     // The literal the surface used to carry. If this passes, the old constant
     // is still in force somewhere on the path.
     await expect(ask({
@@ -160,7 +160,7 @@ describe('set_bg layout height', () => {
     expect(act().bgLayout).toHaveLength(BG_LAYOUT_WORDS);           // and grew
   });
 
-  it('ACCEPTS the legacy BG_LAYOUT_WORDS_LEGACY layout unchanged — the engine zero-pads it', async () => {
+  it('ACCEPTS the legacy BG_LAYOUT_WORDS_LEGACY layout unchanged: the engine zero-pads it', async () => {
     await ask({ kind: 'set-bg', layout: wireLayout(BG_LAYOUT_WORDS_LEGACY), tiles: wireTiles(2) });
     // NOT re-lengthened here: the pad is the consumer's business, and silently
     // rewriting an author's layout is the unrequested edit this arc exists over.
@@ -201,7 +201,7 @@ describe('get_bg height', () => {
     expect(r.height).toBe(BG_ROWS);
   });
 
-  it('reports the LEGACY height for a legacy act — the same code, a different act', async () => {
+  it('reports the LEGACY height for a legacy act: the same code, a different act', async () => {
     open(Uint16Array.from(wireLayout(BG_LAYOUT_WORDS_LEGACY)), actTiles(4));
     const r = await ask({ kind: 'get-bg' }) as { height: number | null; layout: number[] | null };
     expect(r.layout).toHaveLength(BG_LAYOUT_WORDS_LEGACY);
@@ -270,7 +270,7 @@ describe('set_bg MCP schema', () => {
     expect(r.error!.issues.some((i) => i.path[0] === 'layout')).toBe(true);
   });
 
-  it('PUBLISHES the derived ceilings — the description is the whole spec an agent sees', () => {
+  it('PUBLISHES the derived ceilings: the description is the whole spec an agent sees', () => {
     const set = method().description;
     const get = EDITOR_METHODS.find((m) => m.name === 'get_bg')!.description;
     for (const d of [set, get]) {

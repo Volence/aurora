@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { nextTrapIndex, FOCUSABLE_SELECTOR } from '../focus-trap';
 
 describe('nextTrapIndex', () => {
-  it('advances, and WRAPS at the last control — the trap itself', () => {
+  it('advances, and WRAPS at the last control: the trap itself', () => {
     expect(nextTrapIndex(4, 0, false)).toBe(1);
     expect(nextTrapIndex(4, 2, false)).toBe(3);
     // Without this the browser moves focus to the page behind the modal and the

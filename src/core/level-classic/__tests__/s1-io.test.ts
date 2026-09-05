@@ -92,7 +92,7 @@ function requireSingle(p: string): string {
   const r = resolveSingle(p);
   if (r === undefined) {
     throw new Error(
-      `${path.join(S1DIR, p)} is missing — this checkout has the top-level markers but not `
+      `${path.join(S1DIR, p)} is missing: this checkout has the top-level markers but not `
       + 'this file, so the row below cannot measure anything. It is an INCOMPLETE s1disasm '
       + 'checkout, not an Aurora defect.',
     );
@@ -342,7 +342,7 @@ describe('s1-io (c) zero-edit round-trip (all 18 acts)', () => {
   // tests in declaration order). Splitting a loop into N cases can silently
   // drop acts — a case list built wrong registers fewer tests and the suite
   // still reads green. This counts the bodies that actually ran.
-  it('exercised every act in the profile — none silently dropped', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, () => {
+  it('exercised every act in the profile, none silently dropped', { skip: !S1_PRESENT, meta: { skipReason: S1_ABSENT } }, () => {
     const declared = s1Profile.zones.reduce((n, z) => n + z.acts.length, 0);
     expect(roundTripCases.length).toBe(declared);
     expect(actsExercised).toBe(declared);

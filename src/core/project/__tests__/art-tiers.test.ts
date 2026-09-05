@@ -79,7 +79,7 @@ describe('classic art tier ladder', () => {
     expect(s1Tiers.map((t) => t.pixelSize)).toEqual([256, 16, 8]);
   });
 
-  it('is shared at every tier — layout cells hold ids, so edits propagate', () => {
+  it('is shared at every tier: layout cells hold ids, so edits propagate', () => {
     expect(s1Tiers.every((t) => t.shared)).toBe(true);
   });
 });
@@ -94,11 +94,11 @@ describe('aeon art tier ladder', () => {
     expect(aeonTiers.find((t) => t.id === 'chunk')!.pixelSize).toBeNull();
   });
 
-  it('marks the chunk tier unshared — stamping flattens a copy (spec §3.0.2)', () => {
+  it('marks the chunk tier unshared: stamping flattens a copy (spec §3.0.2)', () => {
     expect(aeonTiers.find((t) => t.id === 'chunk')!.shared).toBe(false);
   });
 
-  it('marks the tile tier shared — the tileset is referenced by index', () => {
+  it('marks the tile tier shared: the tileset is referenced by index', () => {
     expect(aeonTiers.find((t) => t.id === 'tile')!.shared).toBe(true);
   });
 });

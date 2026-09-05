@@ -72,7 +72,7 @@ describe('session persistence', () => {
     expect(restoreWorkspace(json)).toEqual({ ok: { facet: 'layout' } });
   });
 
-  it('round-trips a sprite tab\'s S1ZoneKey — the identity a restored checkout re-runs from', () => {
+  it('round-trips a sprite tab\'s S1ZoneKey: the identity a restored checkout re-runs from', () => {
     const s = openTab(initialSession(), { id: 'doc:sprite:s1:64', kind: 'sprite-doc', title: 'Moto Bug' });
     const ws = { 'doc:sprite:s1:64': { s1Zone: { zone: 'ghz', act: 1 } } } as const;
     const json = serializeSession(s, ws);

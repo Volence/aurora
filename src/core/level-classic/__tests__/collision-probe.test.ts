@@ -60,7 +60,7 @@ describe('probeCollision', () => {
     expect(probeCollision(doc(), 99999, 0)).toBeNull();
   });
 
-  it('counts how much shares what — the numbers the panel warns with', () => {
+  it('counts how much shares what: the numbers the panel warns with', () => {
     const p = probeCollision(doc(), 0, 0)!;
     // Chunk id 1 appears once in fg.cells. Block 1 is named by exactly TWO
     // chunk-definition cells (indices 0 and 1); every other cell names block 0.
@@ -128,7 +128,7 @@ describe('locateCell', () => {
     expect(at!.chunkIndex).toBeNull();
   });
 
-  it('is what probeCollision addresses through — every addressing field, for every layout byte', () => {
+  it('is what probeCollision addresses through: every addressing field, for every layout byte', () => {
     // The guard against a SECOND copy of the addressing math. If probeCollision
     // stops delegating, these two drift silently and the rectangle tool writes
     // to different cells than the panel does.

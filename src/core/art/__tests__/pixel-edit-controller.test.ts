@@ -13,7 +13,7 @@ import type { PixelBuffer } from '../pixel-ops';
 
 const buf = (w: number, h: number): PixelBuffer => ({ width: w, height: h, data: new Uint8Array(w * h) });
 
-describe('PixelEditController — colour values above the 4bpp range', () => {
+describe('PixelEditController: colour values above the 4bpp range', () => {
   it('a pencil stroke with a canvas-range colour (>15) survives untouched', () => {
     const cfg: ToolConfig = {
       tool: 'pencil', color: 47, mirror: null,

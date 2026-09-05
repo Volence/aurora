@@ -41,7 +41,7 @@ const guarded = (name: string, fn: () => void): void => {
   describeRequiringFixture(name, SONIC_ASM, 'the real _anim/Sonic.asm sonani table', fn);
 };
 
-guarded('parseSonicAnimTable — round-trip against the real file', () => {
+guarded('parseSonicAnimTable: round-trip against the real file', () => {
   const text = readFileSync(SONIC_ASM, 'utf8');
   const parse = parseSonicAnimTable(text);
 

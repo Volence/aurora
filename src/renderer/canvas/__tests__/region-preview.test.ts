@@ -104,7 +104,7 @@ describe('regionPreviewRgba', () => {
     }
   });
 
-  it('4. ANTI-VACUOUS: the buffer holds the REGION\'S ART, not zeroes — a stub '
+  it('4. ANTI-VACUOUS: the buffer holds the REGION\'S ART, not zeroes: a stub '
     + 'returning a correctly-sized empty array would pass rows 1 and 2', () => {
     const rgba = regionPreviewRgba(region(5, 3), tiles, palette)!;
     // Every pixel is tile 1 -> palette colour 1 -> (200,40,90,255).

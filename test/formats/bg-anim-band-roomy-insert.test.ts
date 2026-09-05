@@ -86,7 +86,7 @@ const OVER = { cols: Math.floor(FREE / ROWS) + 1, rows: ROWS };
 const SMALL = { cols: Math.max(1, Math.floor(FREE / ROWS / 4)), rows: ROWS };
 
 describe('the ROOMY fixture is what its provenance says', () => {
-  it('is bandless, layout+tiles only, and has free room — the anti-vacuous floor', () => {
+  it('is bandless, layout+tiles only, and has free room: the anti-vacuous floor', () => {
     expect(Object.keys(ROOMY).sort()).toEqual(['layout', 'tiles']);
     expect(documentBands(ROOMY)).toHaveLength(0);
     expect(ROOMY.tiles.length).toBe(PROVENANCE.fixture.tiles);
@@ -133,7 +133,7 @@ describe('INSERTING a brand-new band on the roomy document', () => {
     expect(documentBands(after)[0].phases[0][0]).toHaveLength(TILE_PIXELS);
   });
 
-  it('changes not one drawn cell — resolved through aeon\'s nametable loop — while every word moved', () => {
+  it('changes not one drawn cell (resolved through aeon\'s nametable loop) while every word moved', () => {
     const l = level(cloneBgOverride(ROOMY));
     const band = createBand(SMALL);
     new EditHistory().execute(makeAddBandCommand(l.bgOverride!, band), l);
@@ -184,7 +184,7 @@ describe('INSERTING a brand-new band on the roomy document', () => {
   });
 });
 
-describe('CONTROL — the same insert on a document padded to BG_TILE_CAPACITY', () => {
+describe('CONTROL: the same insert on a document padded to BG_TILE_CAPACITY', () => {
   /** Item 27's pattern: the property is "no free slots", not "448". */
   function fullBandlessDoc(): BgOverrideDocument {
     const tiles = cloneBgOverride(ROOMY.tiles);

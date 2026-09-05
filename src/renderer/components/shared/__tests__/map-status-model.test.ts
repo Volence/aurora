@@ -30,7 +30,7 @@ describe('statusLabel', () => {
   });
 });
 
-describe('statusContext — who gets to explain the tool', () => {
+describe('statusContext: who gets to explain the tool', () => {
   const base = { tool: 'select', pasting: false } as const;
 
   it('prefers the port\'s own context over everything', () => {

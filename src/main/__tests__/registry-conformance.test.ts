@@ -53,12 +53,12 @@ describe('registry conformance', () => {
     }
   });
 
-  it('has globally unique tool names — MCP registration requires it', () => {
+  it('has globally unique tool names: MCP registration requires it', () => {
     const names = EDITOR_METHODS.map((m) => m.name);
     expect(new Set(names).size, `duplicate tool name in ${names.join(', ')}`).toBe(names.length);
   });
 
-  it('has globally unique kinds — two tools sharing one would silently dispatch alike', () => {
+  it('has globally unique kinds: two tools sharing one would silently dispatch alike', () => {
     // The copy-paste failure the name check cannot see: clone an entry, rename
     // it and its params, forget the `kind`. Both tools type-check, both are
     // advertised, and the new one runs the old one's handler on params it never
@@ -75,7 +75,7 @@ describe('registry conformance', () => {
     // Loud rather than green: if agent-handler.ts stops being a switch (a
     // dispatch table, say) this regex reads nothing and every assertion below
     // would pass by measuring an empty set.
-    expect(cases.size, `read no case labels out of ${HANDLER} — this guard is blind`).toBeGreaterThan(20);
+    expect(cases.size, `read no case labels out of ${HANDLER}: this guard is blind`).toBeGreaterThan(20);
     for (const m of EDITOR_METHODS) {
       expect(cases.has(m.kind), `agent-handler.ts has no case for '${m.kind}'`).toBe(true);
     }
@@ -99,7 +99,7 @@ describe('registry conformance', () => {
     }
   });
 
-  it('gives every method a description — an agent has nothing else to go on', () => {
+  it('gives every method a description: an agent has nothing else to go on', () => {
     // The description is the ENTIRE spec an agent sees: it picks the tool and
     // shapes the call from this string. An empty one ships an invisible tool.
     for (const m of EDITOR_METHODS) {
@@ -119,7 +119,7 @@ describe('registry conformance', () => {
     }
   });
 
-  it('never names a param `kind` — it would hijack its own dispatch', () => {
+  it('never names a param `kind`: it would hijack its own dispatch', () => {
     // BOTH consumers spread the params AFTER the discriminant:
     //   adapter.ts:73   forward({ kind: m.kind, ...parsed.data } as AgentRequest)
     //   mcp-server.ts:38 forward({ kind: m.kind, ...args }       as AgentRequest)

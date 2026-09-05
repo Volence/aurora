@@ -20,7 +20,7 @@ const LOADED = packNametableWord(0x123, 2, true, true, true);
 /** …and its opposite, so "always sets the bit" cannot pass as "preserves". */
 const BARE = packNametableWord(0x123, 2, false, false, false);
 
-describe('brushNametableWord — the destination is not a zero cell', () => {
+describe('brushNametableWord: the destination is not a zero cell', () => {
   it('the fixtures really carry / really lack the bits (guards every claim below)', () => {
     const loaded = unpackNametableWord(LOADED);
     expect(loaded.priority).toBe(true);
@@ -33,13 +33,13 @@ describe('brushNametableWord — the destination is not a zero cell', () => {
   });
 });
 
-describe('brushNametableWord — priority', () => {
+describe('brushNametableWord: priority', () => {
   it('"keep" preserves a SET priority bit (the reported data loss)', () => {
     const out = brushNametableWord(0x055, LOADED, brush());
     expect(unpackNametableWord(out).priority).toBe(true);
   });
 
-  it('"keep" preserves a CLEAR priority bit — it does not invent one', () => {
+  it('"keep" preserves a CLEAR priority bit: it does not invent one', () => {
     const out = brushNametableWord(0x055, BARE, brush());
     expect(unpackNametableWord(out).priority).toBe(false);
   });
@@ -49,7 +49,7 @@ describe('brushNametableWord — priority', () => {
     expect(unpackNametableWord(out).priority).toBe(true);
   });
 
-  it('"off" clears it on a cell that had it — the discriminator for "keep"', () => {
+  it('"off" clears it on a cell that had it: the discriminator for "keep"', () => {
     const out = brushNametableWord(0x055, LOADED, brush({ priority: 'off' }));
     expect(unpackNametableWord(out).priority).toBe(false);
   });
@@ -66,7 +66,7 @@ describe('brushNametableWord — priority', () => {
   });
 });
 
-describe('brushNametableWord — the flips belong to the picture, not the cell', () => {
+describe('brushNametableWord: the flips belong to the picture, not the cell', () => {
   it('an unflipped brush UN-flips a flipped destination (WYSIWYG with the picker)', () => {
     const out = brushNametableWord(0x055, LOADED, brush());
     const e = unpackNametableWord(out);
@@ -88,14 +88,14 @@ describe('brushNametableWord — the flips belong to the picture, not the cell',
   });
 });
 
-describe('brushNametableWord — the fields the brush always owned', () => {
+describe('brushNametableWord: the fields the brush always owned', () => {
   it('writes the armed tile index and palette line, whatever the destination held', () => {
     const e = unpackNametableWord(brushNametableWord(0x321, LOADED, brush({ paletteLine: 1 })));
     expect(e.tileIndex).toBe(0x321);
     expect(e.palette).toBe(1);
   });
 
-  it('is exactly packNametableWord for every field — no private encoding', () => {
+  it('is exactly packNametableWord for every field: no private encoding', () => {
     const b = brush({ paletteLine: 3, hFlip: true, vFlip: false, priority: 'on' });
     expect(brushNametableWord(0x2ff, BARE, b))
       .toBe(packNametableWord(0x2ff, 3, true, false, true));
@@ -109,7 +109,7 @@ describe('brushNametableWord — the fields the brush always owned', () => {
   });
 });
 
-describe('brushNametableWord — the only field it may ever change is one the brush named', () => {
+describe('brushNametableWord: the only field it may ever change is one the brush named', () => {
   // The property, stated as a property: with a "keep" brush that matches the
   // destination's picture, the word must come back BYTE-IDENTICAL. Anything the
   // function quietly rewrites shows up here without the test having to guess
@@ -129,7 +129,7 @@ describe('brushNametableWord — the only field it may ever change is one the br
   });
 });
 
-describe('brushAuthorsPriority — the lens-surfacing condition', () => {
+describe('brushAuthorsPriority: the lens-surfacing condition', () => {
   it('is false only at the "keep" default', () => {
     expect(brushAuthorsPriority(brush())).toBe(false);
     expect(brushAuthorsPriority(brush({ priority: 'on' }))).toBe(true);
@@ -147,8 +147,8 @@ describe('brushAuthorsPriority — the lens-surfacing condition', () => {
 // `NametableEntrySpec.pri` is OPTIONAL on the wire, so it carries three states
 // already — present-true, present-false, ABSENT — and `!!spec.pri` collapsed the
 // third into the second. These rows pin the translation that un-collapses it.
-describe('brushPriorityFromOptional — the agent\'s optional field is the tri-state', () => {
-  it('an OMITTED pri is "keep" — the defect this closes', () => {
+describe('brushPriorityFromOptional: the agent\'s optional field is the tri-state', () => {
+  it('an OMITTED pri is "keep": the defect this closes', () => {
     expect(brushPriorityFromOptional(undefined)).toBe('keep');
   });
 
@@ -157,7 +157,7 @@ describe('brushPriorityFromOptional — the agent\'s optional field is the tri-s
     expect(brushPriorityFromOptional(false)).toBe('off');
   });
 
-  it('omitted is NOT the same as false — the whole point', () => {
+  it('omitted is NOT the same as false: the whole point', () => {
     expect(brushPriorityFromOptional(undefined)).not.toBe(brushPriorityFromOptional(false));
   });
 
@@ -205,7 +205,7 @@ describe('brushPriorityFromOptional — the agent\'s optional field is the tri-s
 // The Art composer's tile stamp replaces a whole `ComposerCell` and never packs
 // a word, so it cannot call `brushNametableWord`. It calls this instead. These
 // rows exist so the two roads cannot come to disagree about what "keep" means.
-describe('resolveBrushPriority — what "keep" means, said once for every road', () => {
+describe('resolveBrushPriority: what "keep" means, said once for every road', () => {
   it('"keep" returns the destination, in both directions', () => {
     expect(resolveBrushPriority('keep', true)).toBe(true);
     expect(resolveBrushPriority('keep', false)).toBe(false);

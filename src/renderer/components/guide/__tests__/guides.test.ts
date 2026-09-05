@@ -19,7 +19,7 @@ import { planFileNeedsWrite } from '../../../../core/project/aeon/save-skip';
 const effects = guideBySlug(EFFECTS_GUIDE_SLUG)!;
 
 describe('the guide reaches the app as text', () => {
-  it('the markdown file really imported — this is not an empty string', () => {
+  it('the markdown file really imported: this is not an empty string', () => {
     expect(effects).not.toBeNull();
     // ANTI-VACUOUS FLOOR. A `?raw` import that silently resolved to '' would
     // make every row below true of nothing: `parseGuide('')` is `[]`, and `[]`
@@ -62,7 +62,7 @@ describe('the deep links the app wires resolve to real headings', () => {
     expect(numbers.some(Number.isNaN)).toBe(false);
   });
 
-  it('an anchor survives its section being RENUMBERED — the slug carries no number', () => {
+  it('an anchor survives its section being RENUMBERED: the slug carries no number', () => {
     // The property `slugify` exists for, asserted directly rather than left to
     // be inferred from the row above.
     expect(slugify('3. Make a raster band (a coloured stripe)'))
@@ -76,7 +76,7 @@ describe('the parser handles everything the shipped guide actually uses', () => 
   it('produces every block kind the document contains, and no unknown one', () => {
     const kinds = new Set(blocks.map((b) => b.kind));
     for (const k of ['heading', 'para', 'list', 'code', 'table', 'rule', 'quote']) {
-      expect(kinds.has(k as never), `the guide has no ${k} block — either the document `
+      expect(kinds.has(k as never), `the guide has no ${k} block: either the document `
         + 'dropped that construct or the parser stopped recognising it').toBe(true);
     }
   });
@@ -119,7 +119,7 @@ describe('the parser handles everything the shipped guide actually uses', () => 
       if (n === 0) missing.push(w);
       else have.set(w, n - 1);
     }
-    expect(missing, `${missing.length} source word(s) never reached a block — the parser `
+    expect(missing, `${missing.length} source word(s) never reached a block; the parser `
       + `swallowed them: ${missing.slice(0, 30).join(' ')}`).toEqual([]);
   });
 
@@ -170,7 +170,7 @@ describe("§7's save claim is the save path's actual rule", () => {
     expect(planFileNeedsWrite('json', onDisk, planned)).toBe(false);
   });
 
-  it('a document whose meaning DID move is still written — the floor', () => {
+  it('a document whose meaning DID move is still written: the floor', () => {
     // Without this row the one above is satisfied by a predicate that returns
     // false for everything, which would make the guide's sentence true and the
     // editor useless.
@@ -180,7 +180,7 @@ describe("§7's save claim is the save path's actual rule", () => {
   });
 
   it('§7 states that rule, and no longer promises a large git status', () => {
-    expect(saveSection, 'the retracted over-warning is back in §7 — see C6')
+    expect(saveSection, 'the retracted over-warning is back in §7 (see C6)')
       .not.toMatch(/large `git status`/);
     expect(saveSection, '§7 no longer tells the author what a save writes')
       .toMatch(/only when that file's\s+meaning changed/);

@@ -153,7 +153,7 @@ describe('assign_section_preset writes the binding', () => {
    * this file. Asserted on the OBJECT rather than on the source text, so a
    * rename or an indirection cannot hide it.
    */
-  it('writes rasterRef and touches no other ref — effectsRef stays unspent', async () => {
+  it('writes rasterRef and touches no other ref: effectsRef stays unspent', async () => {
     await ask({ kind: 'assign-section-preset', section: 0, presetId: 'dusk' });
     const s = sections()[0];
     expect(s.rasterRef).toBe('dusk');
@@ -168,9 +168,9 @@ describe('assign_section_preset writes the binding', () => {
    * the SAME state for `rasterRef`, exactly as for `sceneRef`, so a tool that
    * could bind but not clear would leave an author's mistake permanent.
    */
-  it('null unbinds — absent and explicit-null are one state', async () => {
+  it('null unbinds: absent and explicit-null are one state', async () => {
     await ask({ kind: 'assign-section-preset', section: 0, presetId: 'glare' });
-    expect(sections()[0].rasterRef, 'nothing to unbind — this row would be vacuous').toBe('glare');
+    expect(sections()[0].rasterRef, 'nothing to unbind: this row would be vacuous').toBe('glare');
 
     const r = await ask({ kind: 'assign-section-preset', section: 0, presetId: null }) as Record<string, unknown>;
     expect(r.changed).toBe(true);
@@ -265,7 +265,7 @@ describe('the reply says where the binding stops', () => {
     expect(r.binding).toBe(RASTER_SECTION_BINDING_LIMIT);
   });
 
-  it('and on the no-op reply too — the same conclusion either way', async () => {
+  it('and on the no-op reply too: the same conclusion either way', async () => {
     await ask({ kind: 'assign-section-preset', section: 0, presetId: 'glare' });
     const r = await ask({ kind: 'assign-section-preset', section: 0, presetId: 'glare' }) as Record<string, unknown>;
     expect(r.changed).toBe(false);
@@ -427,7 +427,7 @@ describe('the agent path and the human path share one function', () => {
     const start = src.indexOf("case 'assign-section-preset': {");
     // Loud rather than green: if the case is renamed or the switch is replaced,
     // this guard must fail rather than measure an empty string.
-    expect(start, 'no assign-section-preset case found — this guard is blind').toBeGreaterThan(0);
+    expect(start, 'no assign-section-preset case found: this guard is blind').toBeGreaterThan(0);
     const body = src.slice(start, src.indexOf("\n    case '", start + 1));
     expect(body.length, 'read an empty case body').toBeGreaterThan(200);
     expect(body).toMatch(/sectionPresetCommand\(/);
@@ -466,7 +466,7 @@ function disclosureClause(): string {
   const start = RASTER_SECTION_BINDING_LIMIT.indexOf(DISCLOSURE_HEAD);
   expect(start, 'the constant carries no build-refusal disclosure at all').toBeGreaterThan(0);
   const end = RASTER_SECTION_BINDING_LIMIT.indexOf(DISCLOSURE_TAIL, start);
-  expect(end, 'the disclosure clause has no end — the split clause moved').toBeGreaterThan(start);
+  expect(end, 'the disclosure clause has no end: the split clause moved').toBeGreaterThan(start);
   const clause = RASTER_SECTION_BINDING_LIMIT.slice(start, end);
   expect(clause.length, 'the disclosure clause is too short to say what it must').toBeGreaterThan(600);
   return clause;
@@ -528,7 +528,7 @@ describe('the reply discloses that aeon\'s full build will refuse the resulting 
   it('the unbind reply (null on a bound section) carries the disclosure verbatim', async () => {
     await ask({ kind: 'assign-section-preset', section: 0, presetId: 'glare' });
     const r = await ask({ kind: 'assign-section-preset', section: 0, presetId: null }) as Record<string, unknown>;
-    expect(r.changed, 'the unbind was a no-op — the row measured nothing').toBe(true);
+    expect(r.changed, 'the unbind was a no-op: the row measured nothing').toBe(true);
     expect(sections()[0].rasterRef).toBeNull();
     const clause = disclosureClause();
     expect(String(r.binding)).toContain(clause);
@@ -560,7 +560,7 @@ describe('the reply discloses that aeon\'s full build will refuse the resulting 
   it('editor-methods.ts carries the disclosure by reference to the constant, not as a copy', () => {
     const src = readFileSync(join(__dirname, '..', '..', '..', 'main', 'editor-methods.ts'), 'utf8');
     const start = src.indexOf("name: 'assign_section_preset'");
-    expect(start, 'no assign_section_preset registry entry found — this guard is blind').toBeGreaterThan(0);
+    expect(start, 'no assign_section_preset registry entry found: this guard is blind').toBeGreaterThan(0);
     const end = src.indexOf('{ name:', start + 1);
     const entry = src.slice(start, end > start ? end : undefined);
     expect(entry.length, 'read an empty registry entry').toBeGreaterThan(200);

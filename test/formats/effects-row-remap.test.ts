@@ -169,7 +169,7 @@ describe('rowRemap survives the load -> save round trip', () => {
   /** An unrelated edit must not cost the remap (`cloneEffectsScene` is structuredClone). */
   it('survives a clone-and-edit of an unrelated field', () => {
     const edited = cloneEffectsScene(parseEffectsScene(GOLDEN, 'canopy_dusk'));
-    edited.name = 'Canopy — dawn';
+    edited.name = 'Canopy, dawn';
     edited.layers[0].world_y = 8;
     const back = JSON.parse(serializeEffectsScene(edited)) as EffectsScene;
     expect(back.layers[1].rowRemap).toEqual({ plane_y: 101, height_shift: 4 });
@@ -214,7 +214,7 @@ describe('the payload the schema accepts', () => {
     }
   });
 
-  it('requires BOTH fields — neither alone is a payload', () => {
+  it('requires BOTH fields: neither alone is a payload', () => {
     expect(issues(withRemap({ plane_y: 101 })).join(' ')).toMatch(/height_shift/);
     expect(issues(withRemap({ height_shift: 4 })).join(' ')).toMatch(/plane_y/);
   });
@@ -394,7 +394,7 @@ describe('the four legal shifts that do not build yet', () => {
     expect(buildable[0].label).toContain('builds');
   });
 
-  it('offers every legal shift anyway — none is hidden', () => {
+  it('offers every legal shift anyway: none is hidden', () => {
     expect(ROW_REMAP_HEIGHT_OPTIONS.map((o) => o.shift))
       .toEqual([...EFFECTS_ROW_REMAP_HEIGHT_SHIFTS]);
   });

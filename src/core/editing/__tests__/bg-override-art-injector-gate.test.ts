@@ -57,7 +57,7 @@ const FIXTURE = join(REPO, 'test/fixtures/bg-override/editor_bg_override.b0e5a66
 
 const toolPresent = existsSync(TOOL);
 /** Why the tool rows skip when they skip — read by scripts/skip-report-reporter.mjs. */
-const TOOL_ABSENT = `${TOOL} is absent — no sibling aeon checkout on this machine, so aeon's own `
+const TOOL_ABSENT = `${TOOL} is absent: no sibling aeon checkout on this machine, so aeon's own `
   + 'validator never ran and these rows measured nothing';
 if (!toolPresent) {
   // Loud, and skipped — see the header.
@@ -100,7 +100,7 @@ describe('aeon inject_editor_bg.validate_band_coherence over Aurora-saved files'
   skip: !toolPresent,
   meta: { skipReason: TOOL_ABSENT },
 }, () => {
-  it('REFUSES a planted violation (phases[0] != prefix tiles), naming band 0 — the gate discriminates', () => {
+  it('REFUSES a planted violation (phases[0] != prefix tiles), naming band 0: the gate discriminates', () => {
     // Raw JSON on purpose: Aurora's serializer refuses to write this document,
     // which is a second gate and not the one under test.
     const d = golden();
@@ -171,7 +171,7 @@ const FG_FILE = process.env.AURORA_FG_GATE_FILE ?? '';
 const fgReady = toolPresent && FG_FILE !== '' && existsSync(FG_FILE);
 if (FG_FILE !== '' && !fgReady) {
   console.warn(`[injector gate] AURORA_FG_GATE_FILE=${FG_FILE}: `
-    + `${toolPresent ? 'file missing' : 'aeon tool absent'} — the foreground rows are SKIPPED`);
+    + `${toolPresent ? 'file missing' : 'aeon tool absent'}; the foreground rows are SKIPPED`);
 }
 
 /**
@@ -183,7 +183,7 @@ if (FG_FILE !== '' && !fgReady) {
  */
 const FG_ABSENT = [
   !toolPresent ? TOOL_ABSENT : '',
-  FG_FILE === '' ? 'AURORA_FG_GATE_FILE is not set — these rows only run when '
+  FG_FILE === '' ? 'AURORA_FG_GATE_FILE is not set: these rows only run when '
     + 'scratchpad/band-art-foreground-harness.mjs drives the real app and hands back what it saved' : '',
   FG_FILE !== '' && !existsSync(FG_FILE) ? `AURORA_FG_GATE_FILE=${FG_FILE} does not exist` : '',
 ].filter(Boolean).join('; ');
@@ -200,7 +200,7 @@ describe('the file the REAL APP saved after a band-art stroke', {
     + 'coherence assert has something to check', () => {
     const d = parsed();
     const anims = d.anims ?? [];
-    expect(anims.length, `${FG_FILE} has no anims — validate_band_coherence would pass trivially`)
+    expect(anims.length, `${FG_FILE} has no anims: validate_band_coherence would pass trivially`)
       .toBeGreaterThan(0);
     const n = anims.reduce((acc, a) => acc + a.cols * a.rows, 0);
     expect(n, 'the animated prefix is empty').toBeGreaterThan(0);

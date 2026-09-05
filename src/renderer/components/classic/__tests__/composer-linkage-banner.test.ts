@@ -29,7 +29,7 @@ const TILE_TAB = strip(read('TileTab.tsx'));
 const BLOCK_TAB = strip(read('BlockTab.tsx'));
 const CHUNK_TAB = strip(read('ChunkTab.tsx'));
 
-describe('SharedBanner styling — neutral, not a warning', () => {
+describe('SharedBanner styling: neutral, not a warning', () => {
   it('draws no ⚠ glyph', () => {
     expect(SHARED, 'SharedBanner still prefixes its text with the warning glyph').not.toMatch(/⚠/);
   });
@@ -58,14 +58,14 @@ describe('SharedBanner styling — neutral, not a warning', () => {
   });
 });
 
-describe('the locked-tile banner is untouched — a genuine refusal keeps its hazard styling', () => {
+describe('the locked-tile banner is untouched: a genuine refusal keeps its hazard styling', () => {
   it('is not a SharedBanner call', () => {
     // It must remain the separate inline <div> that spreads styles.banner and
     // then overrides color back to red — restyling SharedBanner's DEFAULT must
     // not have been able to touch it, and it did not go through the shared
     // component at all.
     const lockedBlock = /\{locked && \(([\s\S]*?)\)\}/.exec(TILE_TAB);
-    expect(lockedBlock, 'the locked-tile conditional block is gone — where did it move?').not.toBeNull();
+    expect(lockedBlock, 'the locked-tile conditional block is gone. Where did it move?').not.toBeNull();
     expect(lockedBlock![1], 'the locked banner now renders through SharedBanner').not.toMatch(/<SharedBanner/);
     expect(lockedBlock![1], 'the locked banner lost its lock glyph').toMatch(/🔒/);
   });
@@ -76,18 +76,18 @@ describe('the locked-tile banner is untouched — a genuine refusal keeps its ha
   });
 });
 
-describe('linkage copy — linked/unique vocabulary, real usage numbers, no shared/forked/"Make unique"', () => {
+describe('linkage copy: linked/unique vocabulary, real usage numbers, no shared/forked/"Make unique"', () => {
   for (const [name, src] of [['TileTab', TILE_TAB], ['BlockTab', BLOCK_TAB], ['ChunkTab', CHUNK_TAB]] as const) {
     it(`${name} never says "shared" or "forked" in its banner copy`, () => {
       const call = /<SharedBanner[\s\S]*?\/>/.exec(src) ?? /<SharedBanner[\s\S]*?<\/SharedBanner>/.exec(src);
       expect(call, `${name} has no <SharedBanner> call at all`).not.toBeNull();
-      expect(call![0], `${name}'s banner text uses "shared" — spec says linked/unique only`).not.toMatch(/\bshared\b/i);
-      expect(call![0], `${name}'s banner text uses "forked" — spec says linked/unique only`).not.toMatch(/\bforked\b/i);
+      expect(call![0], `${name}'s banner text uses "shared": spec says linked/unique only`).not.toMatch(/\bshared\b/i);
+      expect(call![0], `${name}'s banner text uses "forked": spec says linked/unique only`).not.toMatch(/\bforked\b/i);
     });
 
     it(`${name} says "Linked" and states the mechanism, not a warning`, () => {
       const call = /<SharedBanner[\s\S]*?text=\{`([^`]*)`\}/.exec(src);
-      expect(call, `${name}'s banner text is not a template literal — cannot check its content`).not.toBeNull();
+      expect(call, `${name}'s banner text is not a template literal: cannot check its content`).not.toBeNull();
       expect(call![1], `${name}'s banner does not open with "Linked:"`).toMatch(/^Linked: /);
       expect(call![1], `${name}'s banner does not say edits propagate`).toMatch(/Edits appear in/);
     });
@@ -102,14 +102,14 @@ describe('linkage copy — linked/unique vocabulary, real usage numbers, no shar
     // headline count (e.g. the plan sketch's illustrative "14"/"31") would
     // show up as a literal number OUTSIDE a `? '' : 's'`-style ternary.
     const withoutPluralTernaries = call![1].replace(/=== 1 \? '' : 's'/g, '');
-    expect(withoutPluralTernaries, 'TileTab banner has a literal digit — numbers must come from tileUse')
+    expect(withoutPluralTernaries, 'TileTab banner has a literal digit: numbers must come from tileUse')
       .not.toMatch(/[0-9]/);
   });
 
-  it('TileTab passes no onDuplicate — this banner has no button', () => {
+  it('TileTab passes no onDuplicate: this banner has no button', () => {
     const call = /<SharedBanner[\s\S]*?\/>/.exec(TILE_TAB);
     expect(call).not.toBeNull();
-    expect(call![0], 'TileTab banner grew an onDuplicate — spec says no button here').not.toMatch(/onDuplicate/);
+    expect(call![0], 'TileTab banner grew an onDuplicate: spec says no button here').not.toMatch(/onDuplicate/);
   });
 
   it('BlockTab interpolates the real containers/cells counts and keeps "Duplicate block"', () => {
@@ -129,10 +129,10 @@ describe('linkage copy — linked/unique vocabulary, real usage numbers, no shar
     expect(call![0], 'ChunkTab renamed its Duplicate button label').toMatch(/dupLabel="Duplicate chunk"/);
   });
 
-  it('no tab wires a "Make unique" command — A8 explicitly descoped it', () => {
+  it('no tab wires a "Make unique" command: A8 explicitly descoped it', () => {
     for (const [name, src] of [['TileTab', TILE_TAB], ['BlockTab', BLOCK_TAB], ['ChunkTab', CHUNK_TAB]] as const) {
-      expect(src, `${name} references planMakeUnique — A8 descoped this`).not.toMatch(/planMakeUnique/i);
-      expect(src, `${name} has a "Make unique" control — A8 descoped this`).not.toMatch(/make unique/i);
+      expect(src, `${name} references planMakeUnique: A8 descoped this`).not.toMatch(/planMakeUnique/i);
+      expect(src, `${name} has a "Make unique" control: A8 descoped this`).not.toMatch(/make unique/i);
     }
   });
 });

@@ -72,7 +72,7 @@ const VENDORED: Vendored[] = [
 const AEON_TIP = 'origin/master';
 
 /** Prefix every message with this so nobody triages it as an Aurora regression. */
-const NOT_OURS = 'NOT AN AURORA REGRESSION — a vendored aeon fixture is stale.';
+const NOT_OURS = 'NOT AN AURORA REGRESSION: a vendored aeon fixture is stale.';
 
 describe('the vendored aeon fixtures and their provenance cannot drift apart', () => {
   /**
@@ -126,12 +126,12 @@ describe('the vendored aeon fixtures and their provenance cannot drift apart', (
     };
     walk(root);
     // Anti-vacuous: an empty sweep has measured nothing.
-    expect(found.length, 'no sidecar on disk claims a verbatim aeon blob — the sweep measured nothing').toBeGreaterThan(0);
+    expect(found.length, 'no sidecar on disk claims a verbatim aeon blob: the sweep measured nothing').toBeGreaterThan(0);
     const covered = VENDORED.map((v) => v.prov.fixture.path).sort();
     expect(
       found.sort(),
       'a sidecar claims to hold a verbatim aeon blob but its fixture is not in VENDORED, so it gets NO'
-      + ' currency check — add it to the list at the top of this file',
+      + ' currency check: add it to the list at the top of this file',
     ).toEqual(covered);
   });
 });
@@ -142,13 +142,13 @@ describe('CURRENCY: are the vendored aeon fixtures still what aeon ships?', () =
   for (const v of VENDORED) {
     it(`${v.name} matches ${v.prov.aeon.path} at aeon ${AEON_TIP}`, (ctx) => {
       if (aeon === null) {
-        ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR) — '
+        ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR); '
           + `CANNOT MEASURE whether the pin ${v.prov.aeon.revision} for ${v.name} is still current`);
         return;
       }
       const tip = resolveRev(aeon, AEON_TIP);
       if (tip === null) {
-        ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon} — `
+        ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon}; `
           + `CANNOT MEASURE currency of pin ${v.prov.aeon.revision} for ${v.name}`);
         return;
       }
@@ -249,11 +249,11 @@ describe('CURRENCY: are the vendored aeon fixtures still what aeon ships?', () =
     expect(
       orphaned,
       `these recorded revisions sit outside any repo block this sweep knows (${Object.keys(KNOWN_REPOS).join(', ')})`
-      + ' — they were NOT checked against anything; name the repo as a top-level block',
+      + ': they were NOT checked against anything; name the repo as a top-level block',
     ).toEqual([]);
     expect(
       unpublished,
-      'these pinned revisions are NOT reachable from their repo\'s published branch — local-only, or the'
+      'these pinned revisions are NOT reachable from their repo\'s published branch: local-only, or the'
       + ' branch was rewritten; a peer cannot check a check pinned to a SHA they cannot fetch',
     ).toEqual([]);
     if (unmeasurable.length > 0) {

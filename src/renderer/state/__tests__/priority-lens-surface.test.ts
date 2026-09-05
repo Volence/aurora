@@ -21,7 +21,7 @@ function reset() {
   useToastStore.setState({ toasts: [] });
 }
 
-describe('surfacePriorityLens — the rule', () => {
+describe('surfacePriorityLens: the rule', () => {
   beforeEach(reset);
 
   it('does NOTHING while the brush is `keep`', () => {
@@ -36,7 +36,7 @@ describe('surfacePriorityLens — the rule', () => {
     expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual([PRIORITY_LENS_TOAST]);
   });
 
-  it('`off` authors too — it CLEARS the bit, which is just as invisible', () => {
+  it('`off` authors too: it CLEARS the bit, which is just as invisible', () => {
     expect(surfacePriorityLens('off')).toBe(true);
     expect(useViewStore.getState().overlays.showPriority).toBe(true);
   });
@@ -47,7 +47,7 @@ describe('surfacePriorityLens — the rule', () => {
     expect(useToastStore.getState().toasts).toHaveLength(0);
   });
 
-  it('NEVER lowers the lens — returning to `keep` leaves the veil alone', () => {
+  it('NEVER lowers the lens: returning to `keep` leaves the veil alone', () => {
     surfacePriorityLens('on');
     surfacePriorityLens('keep');
     expect(useViewStore.getState().overlays.showPriority).toBe(true);
@@ -70,7 +70,7 @@ describe('both brushes are wired to it', () => {
     expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual([PRIORITY_LENS_TOAST]);
   });
 
-  it('the two brushes are SEPARATE — arming one does not arm the other', () => {
+  it('the two brushes are SEPARATE: arming one does not arm the other', () => {
     // Deliberate: different facet, different tile, different flips. What they
     // share is the rule above, not the state.
     useArtStore.getState().setStampPriority('off');

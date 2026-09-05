@@ -63,7 +63,7 @@ describe('facet tool sets', () => {
 // distinguishes replace from intersect on its own. The SYNTHETIC guard below is
 // what holds the rule, and the churn above is why it is not hung on a shipping
 // profile.
-describe('toolsForFacet — profile declaration over shell default', () => {
+describe('toolsForFacet: profile declaration over shell default', () => {
   afterEach(closeProjects);
 
   it('falls back to the shell default when no project is open', () => {
@@ -170,7 +170,7 @@ describe('dockOrder', () => {
     expect([...dockOrder(set)].sort()).toEqual([...set].sort());
   });
 
-  it('leaves the facet DEFAULT alone — that is toolsForFacet\'s first entry', () => {
+  it('leaves the facet DEFAULT alone: that is toolsForFacet\'s first entry', () => {
     // The two orders are decoupled on purpose: sorting the buttons must not
     // change what a facet arms when you switch to it.
     expect(toolForFacet('objects', 'stamp-chunk')).toBe('place-object');
@@ -186,7 +186,7 @@ describe('dockOrder', () => {
 // tool, and that made every pan-click a band gesture. The mark is a tool now;
 // View leads (pure pan) and `mark-band` sits beside it.
 describe('effects facet tools', () => {
-  it('offers View first and Mark band second — nothing else', () => {
+  it('offers View first and Mark band second, nothing else', () => {
     expect(FACET_TOOLS.parallax).toEqual(['view', 'mark-band']);
   });
   it('mark-band is offered by NO other facet', () => {

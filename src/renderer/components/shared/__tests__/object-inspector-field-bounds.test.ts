@@ -58,7 +58,7 @@ function find(node: unknown): React.ReactElement<Record<string, unknown>> | null
   return el.props ? find((el.props as { children?: unknown }).children) : null;
 }
 
-describe('ObjectInspector number field — the displayed bound is the enforced one', () => {
+describe('ObjectInspector number field: the displayed bound is the enforced one', () => {
   it('is really rendering a NumberField whose advertised bounds are the field def', () => {
     // Anti-vacuous guard for the rows below: if the finder silently matched
     // nothing, or matched some other control, every clamp row would be testing

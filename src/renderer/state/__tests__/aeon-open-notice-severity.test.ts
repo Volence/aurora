@@ -60,7 +60,7 @@ beforeEach(() => {
 describe('openAeonProject routes each notice on its own channel', () => {
   it('an error notice does NOT arrive green', async () => {
     openMock.mockResolvedValue(handleWith([
-      { severity: 'error', message: 'x.json exists but could not be read — fix it by hand and reopen.' },
+      { severity: 'error', message: 'x.json exists but could not be read. Fix it by hand and reopen.' },
     ]));
     expect(await openAeonProject('/p')).toBe(true);
 

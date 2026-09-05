@@ -84,7 +84,7 @@ function synthetic(): SectionRasterWiring {
   };
 }
 
-describe('the parse has no window — the defect that produced a wrong answer', () => {
+describe('the parse has no window: the defect that produced a wrong answer', () => {
   it('finds an `effects:` field 900+ characters after its `sec: N` marker', () => {
     // THE REGRESSION ROW FOR AEON'S OWN MISTAKE. Their ad-hoc parse windowed to
     // the first 800 characters after each `sec: N`; section 0's field sits at
@@ -147,7 +147,7 @@ describe('the four author-facing states', () => {
    * `OJZ_Preset_Sec0` and is fully authorable. A row asserting it fires on
    * section 0 would be asserting today's wrong answer.
    */
-  it('a section binding no preset at all is named as such (SYNTHETIC — no real one exists)', () => {
+  it('a section binding no preset at all is named as such (SYNTHETIC: no real one exists)', () => {
     expect(sectionRasterState(w, 3)).toBe('unbound');
     expect(sectionRasterAdvisory(w, 3, 'zzz_act1_sec_raster'))
       .toMatch(/binds no preset record in the act descriptor/);
@@ -197,7 +197,7 @@ describe('the two wiring conditions, stated apart', () => {
     expect(c.threaded.detail).toContain('zzz_act1_sec_raster(sec: 0)');
   });
 
-  it('condition 1 fails and condition 2 IS STILL ASKED — no short-circuit', () => {
+  it('condition 1 fails and condition 2 IS STILL ASKED: no short-circuit', () => {
     // Section 1 shares its record with 2, and nothing threads sec 1. An author
     // whose strip stopped at the first failure could not tell whether fixing
     // the share would be enough.
@@ -215,7 +215,7 @@ describe('the two wiring conditions, stated apart', () => {
     expect(c.ownPreset.detail).toBe('binds no preset record');
   });
 
-  it('the THIRD fact — threaded by a record the section does not bind — is in the detail', () => {
+  it('the THIRD fact (threaded by a record the section does not bind) is in the detail', () => {
     // SYNTHETIC, and unreachable in ojz/act1 today. A preset that threads sec 2
     // while section 2 binds a different record satisfies condition 2 as aeon's
     // gate words it ("no preset threads …") and still would not reach the
@@ -228,7 +228,7 @@ describe('the two wiring conditions, stated apart', () => {
     expect(sectionRasterState(w2, 2)).not.toBe('wired');
   });
 
-  it('an unreadable file is `unknown` PER CONDITION — and never `no`', () => {
+  it('an unreadable file is `unknown` PER CONDITION, and never `no`', () => {
     const noDesc = unknownWiring('a/act_descriptor.emp', 'b/zzz_effects.emp', 'ENOENT');
     const c1 = sectionWiringConditions(noDesc, 0, CH);
     expect(c1.ownPreset.verdict).toBe('unknown');
@@ -300,7 +300,7 @@ describe('the two wiring conditions, stated apart', () => {
 // under test is the KEY PREDICATE — including the three-state absent/null/value
 // distinction, which a fully-typed fixture makes harder to spell, not easier.
 
-describe('condition 3 — every OTHER chooser a bound document owes', () => {
+describe('condition 3: every OTHER chooser a bound document owes', () => {
   const w = synthetic();
 
   it('the parse finds a chooser call inside an ARRAY LITERAL, not just the first', () => {
@@ -329,7 +329,7 @@ describe('condition 3 — every OTHER chooser a bound document owes', () => {
     expect(channelChooserName('ojz', 'act1', 'raster')).toBe(rasterChooserName('ojz', 'act1'));
   });
 
-  it('THE COLD READ\'S CASE — a document carrying `cycles` on a section that threads no cycle', () => {
+  it('THE COLD READ\'S CASE: a document carrying `cycles` on a section that threads no cycle', () => {
     // Section 1 binds ZZZ_Preset_Shared, which threads nothing at all.
     const c = sectionExtraChannelsCondition(w, 1, { cycles: [{ line: 2 }] }, 'zzz', 'act1', 'mine');
     expect(c.verdict).toBe('no');
@@ -346,7 +346,7 @@ describe('condition 3 — every OTHER chooser a bound document owes', () => {
     expect(both.gaps.map((g) => g.channel.key)).toEqual(['patch_motion']);
   });
 
-  it('`cycles: null` STILL owes the chooser — absent/null/value is three states', () => {
+  it('`cycles: null` STILL owes the chooser: absent/null/value is three states', () => {
     // aeon's `owed` is `"cycles" in d`, so cycling OFF still emits a row.
     expect(sectionExtraChannelsCondition(w, 1, { cycles: null }, 'zzz', 'act1').verdict)
       .toBe('no');
@@ -356,7 +356,7 @@ describe('condition 3 — every OTHER chooser a bound document owes', () => {
       .toBe('yes');
   });
 
-  it('`variants: null` owes NOTHING — the one channel where aeon\'s predicate differs', () => {
+  it('`variants: null` owes NOTHING: the one channel where aeon\'s predicate differs', () => {
     // aeon: `d.get("variants") is not None`, NOT `in d`. `variants` has no
     // key-level null state, so a null there is not an authored channel.
     expect(sectionExtraChannelsCondition(w, 1, { variants: null }, 'zzz', 'act1').verdict)
@@ -365,7 +365,7 @@ describe('condition 3 — every OTHER chooser a bound document owes', () => {
       .toBe('no');
   });
 
-  it('PARTIAL threading is its own answer, not a pass — a row per index', () => {
+  it('PARTIAL threading is its own answer, not a pass: a row per index', () => {
     // ZZZ_Preset_Sec0 threads the variant chooser at slot 0 only. A document
     // authoring two slots emits two rows and one of them would go unread.
     const c = sectionExtraChannelsCondition(w, 0, { variants: [{}, {}] }, 'zzz', 'act1', 'mine');
@@ -384,7 +384,7 @@ describe('condition 3 — every OTHER chooser a bound document owes', () => {
     expect(c.detail).toBe('cycle threaded');
   });
 
-  it('an UNREADABLE library is `unknown`, never `no` — the standing refusal', () => {
+  it('an UNREADABLE library is `unknown`, never `no`: the standing refusal', () => {
     const noLib: SectionRasterWiring = {
       ...w, library: { path: 'b/zzz_effects.emp', parsed: false, reason: 'ENOENT' },
     };
@@ -435,13 +435,13 @@ describe('the two paths are derived from dataPath, never written down', () => {
     });
   });
 
-  it('a dataPath outside data/editor/ yields null — "could not locate", not "not eligible"', () => {
+  it('a dataPath outside data/editor/ yields null: "could not locate", not "not eligible"', () => {
     expect(wiringPaths('some/other/place/', 'ojz')).toBeNull();
     expect(wiringPaths('games/sonic4/data/editor/', 'ojz')).toBeNull();
   });
 });
 
-describe('against aeon\'s real ojz/act1 — the numbers as they stand today', () => {
+describe('against aeon\'s real ojz/act1: the numbers as they stand today', () => {
   const desc = haveTree ? readFileSync(DESC, 'utf8') : '';
   const lib = haveTree ? readFileSync(LIB, 'utf8') : '';
   // ⚠ SKIPPED WITH A REASON, NEVER QUIETLY. A row that cannot reach aeon's tree
@@ -449,7 +449,7 @@ describe('against aeon\'s real ojz/act1 — the numbers as they stand today', ()
   // silent zero this whole derivation exists to prevent.
   const need = (ctx: { skip: (reason: string) => void }): boolean => {
     if (haveTree) return true;
-    ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout at ${AEON} — this row reads their real `
+    ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout at ${AEON}: this row reads their real `
       + 'act_descriptor.emp and ojz_effects.emp and could not. The synthetic rows above still '
       + 'ran and cover the parser\'s shapes; what is unmeasured here is whether aeon\'s CURRENT '
       + 'files still parse the way this module expects.');
@@ -482,7 +482,7 @@ describe('against aeon\'s real ojz/act1 — the numbers as they stand today', ()
     expect(b[8]).toBe('OJZ_Preset_Plain');
   });
 
-  it('ALL NINE sections now own their preset — nothing is shared any more', (ctx) => {
+  it('ALL NINE sections now own their preset: nothing is shared any more', (ctx) => {
     if (!need(ctx)) return;
     const w: SectionRasterWiring = {
       bindings: descriptorEffectsBindings(desc, 'ojz'),
@@ -512,7 +512,7 @@ describe('against aeon\'s real ojz/act1 — the numbers as they stand today', ()
       expect(sectionSharers(w, s), `section ${s}`).toEqual([s]);
     }
     expect(shared,
-      'aeon ships a SHARED preset record again — re-pin this row and the one above, and note '
+      'aeon ships a SHARED preset record again: re-pin this row and the one above, and note '
       + 'which sections share it; the shared state is reachable against the real tree once more')
       .toEqual([]);
     // Anti-vacuous: nine sections really were examined, and they really do bind
@@ -522,7 +522,7 @@ describe('against aeon\'s real ojz/act1 — the numbers as they stand today', ()
     expect(new Set(Object.values(w.bindings)).size).toBe(9);
   });
 
-  it('exactly TWO sections are threaded today — and it is not the same fact as eligible', (ctx) => {
+  it('exactly TWO sections are threaded today, and it is not the same fact as eligible', (ctx) => {
     if (!need(ctx)) return;
     // ⚠ THE TWO FACTS ARE DIFFERENT AND BOTH MATTER. "Section 0 may have a
     // band" (its preset is its own) and "section 0 has one wired" (a preset
@@ -548,7 +548,7 @@ describe('against aeon\'s real ojz/act1 — the numbers as they stand today', ()
     expect(eligibleSections(w, 9)).not.toEqual(wiredSections(w, 9));
   });
 
-  it('THE COLD READ REPRODUCED — section 5 is ✓ ✓ ✗ against aeon\'s real tree', (ctx) => {
+  it('THE COLD READ REPRODUCED: section 5 is ✓ ✓ ✗ against aeon\'s real tree', (ctx) => {
     if (!need(ctx)) return;
     // ⚠ THIS IS THE ROW THE WHOLE PARCEL IS FOR. The cold reader bound a preset
     // carrying `cycles` to section 5 — the ONE section Aurora's own strip marked
@@ -603,24 +603,24 @@ describe('against aeon\'s real ojz/act1 — the numbers as they stand today', ()
     if (!existsSync(gen)) {
       ctx.skip(`SKIPPED, NOT PASSED: no aeon checkout at ${AEON}, so EXTRA_SECTION_CHANNELS was `
         + 'compared against nothing. What is unmeasured is whether aeon has added a chooser '
-        + 'channel this table does not carry — the exact hole aeon\'s own channel_faults exists '
+        + 'channel this table does not carry: the exact hole aeon\'s own channel_faults exists '
         + 'to close, one repo over.');
       return;
     }
     const src = readFileSync(gen, 'utf8');
     const table = /SECTION_CHANNELS\s*=\s*\(([\s\S]*?)\n\)/.exec(src);
-    expect(table, 'aeon\'s SECTION_CHANNELS table could not be located in tools/effects_gen.py — '
+    expect(table, 'aeon\'s SECTION_CHANNELS table could not be located in tools/effects_gen.py: '
       + 'the shape changed; re-read it rather than deleting this row').not.toBeNull();
     const arms = /ARM_CHANNELS\s*=\s*\(([^)]*)\)/.exec(src);
     expect(arms, 'aeon\'s ARM_CHANNELS could not be located').not.toBeNull();
     const armNames = [...arms![1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
     // The first string of each `SectionChannel(...)` row is its channel name.
     const allChannels = [...table![1].matchAll(/SectionChannel\(\s*"([^"]+)"/g)].map((m) => m[1]);
-    expect(allChannels.length, 'aeon\'s table parsed as empty — the regex, not the table')
+    expect(allChannels.length, 'aeon\'s table parsed as empty: the regex, not the table')
       .toBeGreaterThan(2);
     const nonArm = allChannels.filter((c) => !armNames.includes(c));
     expect(EXTRA_SECTION_CHANNELS.map((c) => c.channel),
-      `aeon's non-arm channels are now [${nonArm.join(', ')}] — transcribe the new row into `
+      `aeon's non-arm channels are now [${nonArm.join(', ')}]: transcribe the new row into `
       + 'EXTRA_SECTION_CHANNELS (key, param, chooser suffix, index param, owed, indices, hand) '
       + 'from tools/effects_gen.py, and check tools/effects_seam_gate.py::channel_faults for '
       + 'whether it changed shape too').toEqual(nonArm);

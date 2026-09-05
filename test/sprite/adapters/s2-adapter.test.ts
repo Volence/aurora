@@ -6,7 +6,7 @@ const fx = (n: string) => new Uint8Array(readFileSync(new URL(`../../fixtures/ma
 const map = fx('s2_obj0B_map.bin');
 const dplc = fx('s2_obj08_dplc.bin');
 
-describe('s2 adapter — readMappings vs real assembled s2disasm fixture', () => {
+describe('s2 adapter: readMappings vs real assembled s2disasm fixture', () => {
   const frames = s2Adapter.readMappings(map);
 
   it('recovers all 5 frames', () => {
@@ -38,14 +38,14 @@ describe('s2 adapter — readMappings vs real assembled s2disasm fixture', () =>
   });
 });
 
-describe('s2 adapter — writeMappings reproduces the real fixture byte-for-byte', () => {
+describe('s2 adapter: writeMappings reproduces the real fixture byte-for-byte', () => {
   it('write ∘ read is identity on the real Sega-format bytes (incl. derived 2P word)', () => {
     const frames = s2Adapter.readMappings(map);
     expect(Array.from(s2Adapter.writeMappings(frames))).toEqual(Array.from(map));
   });
 });
 
-describe('s2 adapter — DPLC vs real assembled fixture', () => {
+describe('s2 adapter: DPLC vs real assembled fixture', () => {
   const perFrame = s2Adapter.readDPLC!(dplc);
 
   it('recovers 22 frames', () => {

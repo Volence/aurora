@@ -56,7 +56,7 @@ const S1_TIP = 'origin/AS';
 const S1DISASM = peerRepo('s1disasm');
 
 /** Prefix, so nobody triages a drifted disassembly as an Aurora regression. */
-const NOT_OURS = 'NOT AN AURORA REGRESSION — the s1disasm source moved under this table.';
+const NOT_OURS = 'NOT AN AURORA REGRESSION: the s1disasm source moved under this table.';
 
 /** Resolve the tip once, or the reason it could not be resolved. */
 function tipOrSkipReason(): { rev: string } | { why: string } {
@@ -78,10 +78,10 @@ function tipOrSkipReason(): { rev: string } | { why: string } {
 const currency = (
   name: string,
   fn: (rev: string, repo: string) => void,
-): void => it(`${name} — at s1disasm ${S1_TIP}`, (ctx) => {
+): void => it(`${name}: at s1disasm ${S1_TIP}`, (ctx) => {
   const t = tipOrSkipReason();
   if ('why' in t) {
-    ctx.skip(`SKIPPED, NOT PASSED: ${t.why} — CANNOT MEASURE whether the S1 sync animation `
+    ctx.skip(`SKIPPED, NOT PASSED: ${t.why}: CANNOT MEASURE whether the S1 sync animation `
       + `table still matches the disassembly. This row reads the peer at a COMMITTED revision `
       + 'on purpose: it asks whether the SOURCE has moved, which no vendored copy of the source '
       + 'could ever answer (test/fixtures/s1disasm is a pin, and a pin equals itself).');
@@ -94,7 +94,7 @@ const currency = (
 const allSyncRows: { id: number; entry: SyncAnimEntry }[] = Object.entries(S1_OBJECT_ANIMS)
   .flatMap(([id, link]) => (link.sync ?? []).map((entry) => ({ id: Number(id), entry })));
 
-describe('S1 sync animation table — hand-derived values', () => {
+describe('S1 sync animation table: hand-derived values', () => {
   it('has exactly the four transcribed consumers (17, 25, 37, 4B)', () => {
     // SynchroAnimate has four channels; grepping v_ani*_frame across _incObj
     // found exactly four level-mode consumers (channel 2 is "Used for
@@ -135,7 +135,7 @@ describe('S1 sync animation table — hand-derived values', () => {
     expect(rot?.note).toMatch(/helix_frame/);
   });
 
-  it('Scattered rings (37): channel 3 accumulator — average 4, flagged approximate', () => {
+  it('Scattered rings (37): channel 3 accumulator (average 4, flagged approximate)', () => {
     const spin = resolveObjectAnims(0x37)?.sync?.[0];
     expect(spin).toMatchObject({ channel: 3, framesPerStep: 4, approximate: true });
     expect(spin?.frames).toEqual([0, 1, 2, 3]);
@@ -188,7 +188,7 @@ describe('S1 sync animation table — hand-derived values', () => {
   });
 });
 
-describe('S1 sync animation table — CURRENCY cross-check (s1disasm at a committed revision)', () => {
+describe('S1 sync animation table: CURRENCY cross-check (s1disasm at a committed revision)', () => {
   currency('rates and moduli match SynchroAnimate in sonic.asm, not a copied constant', (rev, repo) => {
     const at = readAtRev(repo, rev, 'sonic.asm');
     expect(at.ok, at.ok ? '' : `${NOT_OURS} ${at.why}`).toBe(true);
@@ -312,7 +312,7 @@ describe('S1 sync animation table — CURRENCY cross-check (s1disasm at a commit
   });
 });
 
-describe('S1 sync animation table — per-row citations', () => {
+describe('S1 sync animation table: per-row citations', () => {
   const profileSrc = readFileSync(fileURLToPath(new URL('../s1-object-anims.ts', import.meta.url)), 'utf8');
 
   it('every channel row carries a SyncN + sonic.asm line citation', () => {

@@ -165,7 +165,7 @@ const REASON_SHOWS = 4;
 export function incompleteCheckoutReason(what: string, missing: readonly string[]): string {
   const shown = missing.slice(0, REASON_SHOWS).join(', ');
   const more = missing.length > REASON_SHOWS ? ` (+${missing.length - REASON_SHOWS} more)` : '';
-  return `SKIPPED, NOT PASSED: cannot measure ${what} — the VENDORED s1disasm tree at `
+  return `SKIPPED, NOT PASSED: cannot measure ${what}: the VENDORED s1disasm tree at `
     + `${S1_ROOT} is INCOMPLETE: ${missing.length} required file(s) absent: ${shown}${more}. `
     + 'It has the top-level markers but not this data. That tree is COMMITTED TO THIS REPO, so '
     + 'this is an Aurora defect (a deleted or half-merged fixture), not a machine without a '
@@ -187,7 +187,7 @@ export function whenS1Files(what: string, rels: readonly string[]): {
     return {
       skip: true,
       meta: {
-        skipReason: `SKIPPED, NOT PASSED: cannot measure ${what} — the VENDORED s1disasm `
+        skipReason: `SKIPPED, NOT PASSED: cannot measure ${what}: the VENDORED s1disasm `
           + `tree at ${S1_ROOT} is not there. It is committed to THIS repo, so this is an Aurora `
           + 'defect, not a machine without a disassembly; rebuild it with '
           + '`node scripts/vendor-s1-fixtures.mjs`',
@@ -211,7 +211,7 @@ export function whenS1Act(zone: string, act: number): {
     return {
       skip: true,
       meta: {
-        skipReason: `SKIPPED, NOT PASSED: cannot measure ${what} — the VENDORED s1disasm `
+        skipReason: `SKIPPED, NOT PASSED: cannot measure ${what}: the VENDORED s1disasm `
           + `tree at ${S1_ROOT} is not there. It is committed to THIS repo, so this is an Aurora `
           + 'defect, not a machine without a disassembly; rebuild it with '
           + '`node scripts/vendor-s1-fixtures.mjs`',
@@ -312,7 +312,7 @@ export function whenS1Glob(dir: string, describeGlob: string, matches: readonly 
     return {
       skip: true,
       meta: {
-        skipReason: `SKIPPED, NOT PASSED: cannot measure ${describeGlob} — the VENDORED `
+        skipReason: `SKIPPED, NOT PASSED: cannot measure ${describeGlob}: the VENDORED `
           + `s1disasm tree at ${S1_ROOT} is not there. It is committed to THIS repo, so this is `
           + 'an Aurora defect; rebuild it with `node scripts/vendor-s1-fixtures.mjs`',
       },
@@ -328,7 +328,7 @@ export function whenS1Glob(dir: string, describeGlob: string, matches: readonly 
     return {
       skip: true,
       meta: {
-        skipReason: `SKIPPED, NOT PASSED: cannot measure ${describeGlob} — ${abs} EXISTS but `
+        skipReason: `SKIPPED, NOT PASSED: cannot measure ${describeGlob}: ${abs} EXISTS but `
           + 'holds no file matching that pattern, so this row has nothing to read and measures '
           + 'nothing. That directory is VENDORED into this repo, so this is an Aurora defect.',
       },

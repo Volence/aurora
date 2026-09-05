@@ -65,7 +65,7 @@ describe('the lens SHOWS priority', () => {
     expect(CANVAS).toMatch(/overlays\.showPriority/);
   });
 
-  it('draws BEFORE the tool gate — depth is not a property of the armed tool', () => {
+  it('draws BEFORE the tool gate: depth is not a property of the armed tool', () => {
     // The CALL, not the import — the import line is always above everything and
     // an ordering row anchored on it can only ever pass.
     const lensAt = CANVAS.indexOf('drawComposerPriority(ctx');
@@ -76,7 +76,7 @@ describe('the lens SHOWS priority', () => {
       .toBeLessThan(gateAt);
   });
 
-  it('the option bar carries the toggle — the Art facet has NO View menu', () => {
+  it('the option bar carries the toggle: the Art facet has NO View menu', () => {
     // facet-chrome.ts gates the View menu on `mapOverlays`, which the composer
     // does not claim (it paints one of aeon's thirteen overlay keys). Without a
     // chip here the auto-surface would raise a veil this facet cannot lower.
@@ -119,7 +119,7 @@ describe('one vocabulary, two mounts', () => {
 });
 
 describe('the capability is a claim about the host', () => {
-  it('classic does not get the chips — its Block tab already authors the bit', () => {
+  it('classic does not get the chips: its Block tab already authors the bit', () => {
     // components/classic/BlockTab.tsx renders a per-cell `Priority` chip beside
     // that cell's flips. Turning the cap on for classic would put two controls
     // on one field.
@@ -128,7 +128,7 @@ describe('the capability is a claim about the host', () => {
       .toMatch(/editCell\(\{ pri: !cell\.pri \}\)/);
   });
 
-  it('aeon does — FULL_CAPS claims both halves', () => {
+  it('aeon does: FULL_CAPS claims both halves', () => {
     expect(BAR).toMatch(/FULL_CAPS[\s\S]{0,200}stampPriority: true/);
   });
 });

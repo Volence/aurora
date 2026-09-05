@@ -31,7 +31,7 @@ describe('classicObjectRows', () => {
     }
   });
 
-  it('resolves zone art overrides — a zone can link an id the base does not', () => {
+  it('resolves zone art overrides: a zone can link an id the base does not', () => {
     // Guards against the provider dropping the `zone` argument: if any id gains
     // art in a zone, the zoned row set must be a strict superset of the base one.
     const base = classicObjectRows('').filter((r) => r.hasArt).map((r) => r.key);

@@ -282,13 +282,13 @@ describe('noProjectExplorerGroups', () => {
   });
 });
 
-describe('canvasExplorerGroup — the import entry', () => {
+describe('canvasExplorerGroup: the import entry', () => {
   it('offers Import Art Sheet beside New Canvas for a classic project', () => {
     const g = canvasExplorerGroup({ names: [], skipped: [] }, { classic: true });
     expect(g.items.map((i) => i.id)).toEqual([NEW_CANVAS_ITEM_ID, IMPORT_SHEET_ITEM_ID]);
   });
 
-  it('omits it for aeon — the tile/block/chunk ladder it commits into is classic', () => {
+  it('omits it for aeon: the tile/block/chunk ladder it commits into is classic', () => {
     const g = canvasExplorerGroup({ names: [], skipped: [] });
     expect(g.items.some((i) => i.id === IMPORT_SHEET_ITEM_ID)).toBe(false);
   });
@@ -312,7 +312,7 @@ describe('group counts report things, not actions', () => {
     expect(countableItems(g)).toBe(1);
   });
 
-  it('counts a badly-named file — it IS a canvas, just an unopenable one', () => {
+  it('counts a badly-named file: it IS a canvas, just an unopenable one', () => {
     const g = canvasExplorerGroup({ names: ['sky'], skipped: ['9 bad name.png'] });
     expect(countableItems(g)).toBe(2);
   });

@@ -52,7 +52,7 @@ describe('suggestPaletteLine', () => {
     expect(SUGGESTABLE_COLOURS).toBe(CANVAS_LINE_LENGTH - 1);
   });
 
-  it('every suggested word is a legal Genesis colour — no dead bits set', () => {
+  it('every suggested word is a legal Genesis colour: no dead bits set', () => {
     const s = suggestPaletteLine(imageOf(distinctLevels(200)));
     expect(s.colours).toBeGreaterThan(0);
     for (const w of s.line) {
@@ -168,7 +168,7 @@ describe('suggestPaletteLine', () => {
     expect(s.line).toEqual(new Array(CANVAS_LINE_LENGTH).fill(0));
   });
 
-  it('is a function of the image alone — same pixels, same line', () => {
+  it('is a function of the image alone: same pixels, same line', () => {
     const colours = distinctLevels(120);
     const a = suggestPaletteLine(imageOf(colours));
     const b = suggestPaletteLine(imageOf(colours));

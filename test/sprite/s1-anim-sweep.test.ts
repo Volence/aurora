@@ -76,13 +76,13 @@ describe('s1disasm _anim sweep (all 48 non-Sonic files)', () => {
     const { anims, problems } = parseS1DisasmAnimScript(text);
     expect(problems, `${f}: parser reported problems`).toEqual([]);
     expect(anims.length, `${f}: anim count != its own dc.w table length`).toBe(expected);
-    expect(anims.length, `${f}: zero animations parsed — the shipped bug`).toBeGreaterThanOrEqual(1);
+    expect(anims.length, `${f}: zero animations parsed: the shipped bug`).toBeGreaterThanOrEqual(1);
 
     for (const a of anims) {
       // Every real script terminates in a control byte (afEnd overwhelmingly;
       // afBack/afChange/afRoutine/af2ndRoutine elsewhere). A null control means
       // a symbolic byte was swallowed — the exact silent-drop failure mode.
-      expect(a.control, `${f}/${a.name}: no control terminator — symbolic byte swallowed?`).not.toBeNull();
+      expect(a.control, `${f}/${a.name}: no control terminator: symbolic byte swallowed?`).not.toBeNull();
       // Frame bytes decode to bits 0-4 (< $20) + flips; durations are positive holds.
       expect(a.duration, `${f}/${a.name}: duration`).toBeGreaterThanOrEqual(0);
       expect(a.duration, `${f}/${a.name}: negative duration is Sonic-dialect only`).toBeLessThan(0x80);

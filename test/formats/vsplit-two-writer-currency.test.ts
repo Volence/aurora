@@ -78,7 +78,7 @@ describe('the two-writer advisory is a transcription of an ensure that still exi
 
   const load = (rev: string): { text: string } | { why: string } => {
     if (aeon === null) {
-      return { why: `no aeon checkout beside this repo (set AURORA_AEON_REPO) — CANNOT MEASURE ${rev}` };
+      return { why: `no aeon checkout beside this repo (set AURORA_AEON_REPO): CANNOT MEASURE ${rev}` };
     }
     const r = readAtRev(aeon, rev, PATH);
     return r.ok ? { text: r.text } : { why: r.why };
@@ -100,7 +100,7 @@ describe('the two-writer advisory is a transcription of an ensure that still exi
     expect(backstop).toContain('An authored scene cannot reach this');
   });
 
-  it('AURORA\'S CLAUSES SAY WHAT THE ENGINE SAYS — both writers, and BOTH remedies', (ctx) => {
+  it('AURORA\'S CLAUSES SAY WHAT THE ENGINE SAYS: both writers, and BOTH remedies', (ctx) => {
     const got = load(PIN);
     if ('why' in got) { ctx.skip(`SKIPPED, NOT PASSED: ${got.why}`); return; }
     const msg = sceneEnsureAt(got.text, SCENE_ENSURE_COND) ?? '';
@@ -147,28 +147,28 @@ describe('the two-writer advisory is a transcription of an ensure that still exi
     // remote-tracking ref WITHOUT fetching, so it is as fresh as the last fetch
     // in that checkout — the protocol's own trade, offline-safe and committed.
     if (aeon === null) {
-      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AURORA_AEON_REPO) — '
+      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AURORA_AEON_REPO): '
         + `CANNOT MEASURE whether the pin ${PIN} is still current`);
       return;
     }
     const tip = resolveRev(aeon, AEON_TIP);
     if (tip === null) {
-      ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon} — `
+      ctx.skip(`SKIPPED, NOT PASSED: ${AEON_TIP} does not resolve in ${aeon}: `
         + `CANNOT MEASURE currency of pin ${PIN}`);
       return;
     }
     if (!isAncestor(aeon, PIN, tip)) {
-      ctx.skip(`SKIPPED, NOT PASSED: pin ${PIN} is not an ancestor of ${AEON_TIP} (${tip}) — `
+      ctx.skip(`SKIPPED, NOT PASSED: pin ${PIN} is not an ancestor of ${AEON_TIP} (${tip}): `
         + 'the pin is unpublished or the branch was rewritten; re-derive the clauses');
       return;
     }
     const got = load(tip);
     if ('why' in got) { ctx.skip(`SKIPPED, NOT PASSED: ${got.why}`); return; }
     const msg = sceneEnsureAt(got.text, SCENE_ENSURE_COND);
-    expect(msg, `${PATH} at ${AEON_TIP} (${tip}) no longer has an ensure on \`${SCENE_ENSURE_COND}\` — `
+    expect(msg, `${PATH} at ${AEON_TIP} (${tip}) no longer has an ensure on \`${SCENE_ENSURE_COND}\`: `
       + 'the two-writer ruling moved; re-derive VSPLIT_LOCK_CLAUSES from its new home').not.toBeNull();
     for (const [name, phrase] of Object.entries(ENGINE_CLAIMS)) {
-      expect(msg, `at ${AEON_TIP} (${tip}) the engine message no longer makes the "${name}" claim — `
+      expect(msg, `at ${AEON_TIP} (${tip}) the engine message no longer makes the "${name}" claim: `
         + 'Aurora\'s advisory is stale, not wrong; re-derive it').toContain(phrase);
     }
   });

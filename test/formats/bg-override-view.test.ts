@@ -41,7 +41,7 @@ describe('bgOverrideDisplay', () => {
     expect([...view.tiles[2].pixels]).toEqual(d.tiles[2]);
   });
 
-  it('measures the plane height from the document — it does not assume 64 rows', () => {
+  it('measures the plane height from the document: it does not assume 64 rows', () => {
     // The legacy 64x32 shape is legal input the consumer zero-pads; a converter
     // that assumed either length would either truncate or invent rows.
     const legacy = doc();
@@ -49,7 +49,7 @@ describe('bgOverrideDisplay', () => {
     expect(bgOverrideDisplay(legacy).layout.length).toBe(BG_LAYOUT_WORDS / 2);
   });
 
-  it('returns THE SAME Uint16Array for the same document — the renderer holds it', () => {
+  it('returns THE SAME Uint16Array for the same document: the renderer holds it', () => {
     const d = doc();
     expect(bgOverrideDisplay(d).layout).toBe(bgOverrideDisplay(d).layout);
   });
@@ -67,7 +67,7 @@ describe('bgOverrideDisplay', () => {
     expect([...after[0].pixels]).toEqual(d.tiles[0]);
   });
 
-  it('does not alias the document\'s tile arrays — a Tile is a copy', () => {
+  it('does not alias the document\'s tile arrays: a Tile is a copy', () => {
     const d = doc();
     const view = bgOverrideDisplay(d);
     d.tiles[0][0] = 0xF;

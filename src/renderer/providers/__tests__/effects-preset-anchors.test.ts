@@ -106,7 +106,7 @@ describe('the shift controls offer the ladder and nothing between', () => {
     }
   });
 
-  it('⚠ AN OFF-LADDER SHIFT IS REFUSED, NOT ROUNDED — on both ladders, both ends', () => {
+  it('⚠ AN OFF-LADDER SHIFT IS REFUSED, NOT ROUNDED: on both ladders, both ends', () => {
     const p = { ...base(), patch_motion: [{ sweep: newAnchorSweep() }] };
     const lib = library(p);
     const ampLo = ANCHOR_AMP_RUNGS[0].amp_shift;
@@ -159,7 +159,7 @@ describe('the seed key keeps three states apart', () => {
     expect(anchorSeedState(base(), 0)).toBe('unreached');
   });
 
-  it('⚠ 0 IS A REAL WORLD Y — it reads as authored, not as empty', () => {
+  it('⚠ 0 IS A REAL WORLD Y: it reads as authored, not as empty', () => {
     const p = withSeeds(0);
     expect(anchorSeedState(p, 0)).toBe('authored');
     expect(anchorSeedValue(p, 0)).toBe(0);
@@ -247,7 +247,7 @@ describe('the positional arrays are neither padded nor holed', () => {
     expect(anchorExtendRefusal(p, 'motion', 1)).not.toBeNull();
   });
 
-  it('and the command refuses the same index the sentence refuses — no hole is opened', () => {
+  it('and the command refuses the same index the sentence refuses: no hole is opened', () => {
     const p = withSeeds(100);
     expect(setAnchorSeedStateCommand(library(p), ID, 2, 'authored')).toBeNull();
     expect(setAnchorMotionStateCommand(library(p), ID, 1, 'sweep')).toBeNull();
@@ -286,7 +286,7 @@ describe('the positional arrays are neither padded nor holed', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('the seed is whole pixels, 1:1, and nothing on this path multiplies', () => {
-  it('⚠ THE WRITTEN VALUE IS THE TYPED VALUE — no scale anywhere on the path', () => {
+  it('⚠ THE WRITTEN VALUE IS THE TYPED VALUE: no scale anywhere on the path', () => {
     expect(EFFECTS_PRESET_PATCH_SEED_UNITS_PER_PIXEL).toBe(1);
     const p = withSeeds(0);
     for (const px of [1, 17, 224, 1000]) {
@@ -362,7 +362,7 @@ describe('a motion on a channel with no seed is called out', () => {
     expect(anchorMotionWithoutSeedAdvisory(nulled, 0)).toBe(ANCHOR_MOTION_WITHOUT_SEED);
   });
 
-  it('and is SILENT when the channel has a seed, or has no sweep — including on 0', () => {
+  it('and is SILENT when the channel has a seed, or has no sweep: including on 0', () => {
     const ok: EffectsPreset = {
       ...base(), patch_world_ys: [100], patch_motion: [{ sweep: newAnchorSweep() }],
     };
@@ -394,7 +394,7 @@ describe('the sweep the preview draws is the sweep the file describes', () => {
     }
   });
 
-  it('the period rung is what sets the cycle length — a different rung, a different curve', () => {
+  it('the period rung is what sets the cycle length: a different rung, a different curve', () => {
     const a = { amp_shift: 4, period_shift: ANCHOR_PERIOD_RUNGS[0].period_shift };
     const b = { amp_shift: 4, period_shift: ANCHOR_PERIOD_RUNGS[1].period_shift };
     const quarterOfA = ANCHOR_PERIOD_RUNGS[0].ticks / 4;
@@ -476,7 +476,7 @@ describe('everything this surface authors survives to the bytes', () => {
     expect(round.patch_world_ys!.length).not.toBe(round.patch_motion!.length);
   });
 
-  it('and the document the panel produces VALIDATES — the refusal is real', () => {
+  it('and the document the panel produces VALIDATES: the refusal is real', () => {
     // ANTI-VACUOUS COMPANION: the same shape with a hand-written sentinel is
     // REFUSED, so the row above is not green on a parser that accepts anything.
     const good = serializeEffectsPreset(
@@ -550,7 +550,7 @@ describe('a sweep against its channel\'s screen band', () => {
     }
   });
 
-  it('[6b] the refusal is REACHABLE on channel 1 and UNREACHABLE on channel 0 — measured', () => {
+  it('[6b] the refusal is REACHABLE on channel 1 and UNREACHABLE on channel 0: measured', () => {
     const ch0 = EFFECTS_CHANNEL_BANDS.get(0);
     const ch1 = EFFECTS_CHANNEL_BANDS.get(1);
     expect(ch0, 'aeon declares no band for channel 0').toBeDefined();
@@ -576,7 +576,7 @@ describe('a sweep against its channel\'s screen band', () => {
     expect(anchorBandFit(1, ch1!.lines + 1).verdict).toBe('cannot-fit');
   });
 
-  it('[6c] the sentence names the travel, the band and the count — from the document', () => {
+  it('[6c] the sentence names the travel, the band and the count: from the document', () => {
     const band = EFFECTS_CHANNEL_BANDS.get(1)!;
     const msg = anchorSweepBandRefusal(sweepAt(4), 1);
     expect(msg).not.toBeNull();
@@ -591,7 +591,7 @@ describe('a sweep against its channel\'s screen band', () => {
     expect(msg).not.toContain(String(band.lo - 1));
   });
 
-  it('[6d] a legal sweep gets NO CLEARANCE — silence, and the verdict says why', () => {
+  it('[6d] a legal sweep gets NO CLEARANCE: silence, and the verdict says why', () => {
     // travel == lines: the widest that fits, and still not a pass.
     const s = sweepAt(ANCHOR_AMP_RUNGS[ANCHOR_AMP_RUNGS.length - 1].amp_shift);
     expect(anchorSweepBandRefusal(s, 1)).toBeNull();
@@ -645,7 +645,7 @@ describe('a sweep against its channel\'s screen band', () => {
     throw new Error('no undeclared channel index exists to exercise the `no-band` arm');
   })();
 
-  it('[6e0] EVERY panel-addressable channel is declared — so `no-band` is out of an author\'s reach', () => {
+  it('[6e0] EVERY panel-addressable channel is declared: `no-band` is out of an author\'s reach', () => {
     // The data fact the four rows below are shaped around, asserted rather than
     // commented. If aeon retires a `patchable()` (or Aurora grows a channel past
     // what aeon declares) this goes red, and the rows below should go back to
@@ -727,7 +727,7 @@ describe('a sweep against its channel\'s screen band', () => {
   // channel where a REFUSAL CAN NEVER APPEAR, so it never occupies the slot
   // whose emptiness is what makes a refusal legible by showing up at all.
 
-  it('[6h] a channel aeon declares NO band for SAYS SO — it is not left blank', () => {
+  it('[6h] a channel aeon declares NO band for SAYS SO: it is not left blank', () => {
     // Driven on the SYNTHETIC undeclared channel: see the block above [6e0].
     // The real gap this row was written against is closed, and [6e0] is what
     // asserts that rather than this row quietly passing over an empty loop.
@@ -775,7 +775,7 @@ describe('a sweep against its channel\'s screen band', () => {
     expect(anchorSweepNoBandAdvisory(off, undeclared[0])).toBeNull();
   });
 
-  it('[6i] the advisory NEVER lands in the slot a refusal can use — the reason cannot-tell stays silent', () => {
+  it('[6i] the advisory NEVER lands in the slot a refusal can use: the reason cannot-tell stays silent', () => {
     // THE STRUCTURAL PROPERTY, asserted rather than trusted. Both hints render
     // in the same position under `Travel`. Leaving that position empty on a
     // healthy sweep is what makes a refusal legible by APPEARING, so a

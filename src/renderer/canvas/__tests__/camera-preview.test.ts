@@ -40,7 +40,7 @@ function fourBands(): EffectsScene {
   ]);
 }
 
-describe('planeVscroll — Parallax_Step5_Vscroll', () => {
+describe('planeVscroll: Parallax_Step5_Vscroll', () => {
   it('LOCKED: the answer is v_offset and the camera is not consulted', () => {
     const s = scene([layer(0, 'FACTOR_1')], { v_factor: LOCK, v_offset: 24, v_center: 100 });
     for (const camY of [0, 99, 100, 500, 4000]) {
@@ -68,7 +68,7 @@ describe('planeVscroll — Parallax_Step5_Vscroll', () => {
   });
 });
 
-describe('rebasePlaneTopsToScreen — Step 4a', () => {
+describe('rebasePlaneTopsToScreen: Step 4a', () => {
   it('at vs = 0 it is the identity: band 0 at the top, the rest at their own lines', () => {
     expect(rebasePlaneTopsToScreen([0, 32, 112, 160], 0)).toEqual([
       { source: 0, screenTop: 0 }, { source: 1, screenTop: 32 },
@@ -104,7 +104,7 @@ describe('rebasePlaneTopsToScreen — Step 4a', () => {
   });
 });
 
-describe('bandScrollsX — the dormant-band inheritance', () => {
+describe('bandScrollsX: the dormant-band inheritance', () => {
   it('a dormant band shows the band ABOVE it, not its own factor and not nothing', () => {
     const layers = [
       layer(0, 'FACTOR_1_2'),
@@ -123,7 +123,7 @@ describe('bandScrollsX — the dormant-band inheritance', () => {
   });
 });
 
-describe('cameraPreviewPlan — the strips', () => {
+describe('cameraPreviewPlan: the strips', () => {
   it('divides the 224 rows with no gap and no overlap', () => {
     const plan = cameraPreviewPlan(fourBands(), 0, 0);
     expect(plan.bands.map((b) => [b.screenTop, b.screenBottom])).toEqual([
@@ -157,7 +157,7 @@ describe('cameraPreviewPlan — the strips', () => {
     expect(cameraPreviewPlan(s, 0, 0).bands.map((b) => b.vscroll)).toEqual([0, 300, 400]);
   });
 
-  it('a vsplit on an UNLOCKED scene is NOT applied — the build refuses it, so there is nothing to imitate', () => {
+  it('a vsplit on an UNLOCKED scene is NOT applied: the build refuses it, so there is nothing to imitate', () => {
     const s = scene([
       layer(0, 'FACTOR_LOCKED'),
       layer(64, 'FACTOR_1_8', { vsplit: { at: 300 } }),
@@ -178,7 +178,7 @@ describe('cameraPreviewPlan — the strips', () => {
   });
 });
 
-describe('THE HORIZONTAL DIFFERENTIAL — the catcher', () => {
+describe('THE HORIZONTAL DIFFERENTIAL: the catcher', () => {
   // A static plan cannot fail this way. Move the camera and compare the bands
   // AGAINST EACH OTHER, at the ratio the decoder derives.
   const move = 320;
@@ -222,8 +222,8 @@ describe('THE HORIZONTAL DIFFERENTIAL — the catcher', () => {
   });
 });
 
-describe('THE VERTICAL DIFFERENTIAL — the other catcher', () => {
-  it('moving the camera DOWN on a LOCKED scene moves nothing — the guides included', () => {
+describe('THE VERTICAL DIFFERENTIAL: the other catcher', () => {
+  it('moving the camera DOWN on a LOCKED scene moves nothing: the guides included', () => {
     const a = cameraPreviewPlan(fourBands(), 0, 0);
     const b = cameraPreviewPlan(fourBands(), 0, 224);
     expect(b.vscrollBase).toBe(a.vscrollBase);
@@ -262,12 +262,12 @@ describe('THE VERTICAL DIFFERENTIAL — the other catcher', () => {
   });
 });
 
-describe('the absence list — what the preview says it is NOT showing', () => {
+describe('the absence list: what the preview says it is NOT showing', () => {
   it('always names the foreground, because the frame always contains one', () => {
     expect(cameraPreviewAbsences(fourBands()).join('|')).toContain('foreground factors');
   });
 
-  it('NEVER names curve ramps — they are drawn now, and a stale absence lies', () => {
+  it('NEVER names curve ramps: they are drawn now, and a stale absence lies', () => {
     // THE ROW THIS PARCEL INVERTED. It used to assert the opposite, which is
     // what a booked gap looks like when it is honest. The composite ramps, so
     // the line has to go; leaving it would tell the author the strip on screen
@@ -335,14 +335,14 @@ function scrollAtLine(runs: readonly CurveRun[], line: number): number {
   throw new Error(`line ${line} is in no run`);
 }
 
-describe('curveRampRuns — the per-line ramp', () => {
+describe('curveRampRuns: the per-line ramp', () => {
   it('a flat band has no ramp at all, and a curved one does', () => {
     expect(cameraPreviewPlan(fourBands(), 320, 0).bands.every((b) => b.ramp === null)).toBe(true);
     expect(cameraPreviewPlan(oneCurved('FACTOR_1_4', 'FACTOR_1_2'), 320, 0).bands[0].ramp)
       .not.toBeNull();
   });
 
-  it('THE CATCHER: the strip is not flat — its first and last rows differ', () => {
+  it('THE CATCHER: the strip is not flat; its first and last rows differ', () => {
     // camX 320, fb FACTOR_1_4 -> 320>>2 = 80; to FACTOR_1_2 -> 320>>1 = 160.
     // The strip must SHOW that spread across its rows. A preview that ignored
     // `curve` gives 80 at both ends, which is the state this parcel replaced.
@@ -373,7 +373,7 @@ describe('curveRampRuns — the per-line ramp', () => {
     expect(scrollAtLine(ramp, 6)).toBe(83);   // ceil(480/224) = 3
   });
 
-  it('the runs partition the band exactly — every row once, none twice', () => {
+  it('the runs partition the band exactly: every row once, none twice', () => {
     const band = cameraPreviewPlan(oneCurved('FACTOR_1_4', 'FACTOR_1_2'), 320, 0).bands[0];
     const runs = band.ramp!;
     let next = band.screenTop;

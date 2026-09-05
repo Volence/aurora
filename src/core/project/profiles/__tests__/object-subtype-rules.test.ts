@@ -144,7 +144,7 @@ describe('object-subtype-rules', () => {
       // platform at 8 + 16*length = 56.
       expect(set.pieces[4]).toMatchObject({ frame: 0, dx: 0, dy: 56 });
     });
-    it('length = subtype & 0xF (max 15, no clamp — matches engine andi.w #$F,d1)', () => {
+    it('length = subtype & 0xF (max 15, no clamp: matches engine andi.w #$F,d1)', () => {
       // 15 chain links + anchor + platform = 17 pieces.
       const set = resolveObjectPieces(0x15, 'ghz', 0x0f)!;
       expect(set.pieces).toHaveLength(1 + 15 + 1);
@@ -172,7 +172,7 @@ describe('object-subtype-rules', () => {
     });
   });
 
-  describe('Newtron $42 (GHZ/Newtron.xml) — frame + palette per subtype', () => {
+  describe('Newtron $42 (GHZ/Newtron.xml): frame + palette per subtype', () => {
     it('subtype 0 → frame 3 pal 0; subtype 1 → frame 1 pal 1', () => {
       const g = resolveObjectPieces(0x42, 'ghz', 0)!;
       expect(g.pieces[0].frame).toBe(3);
@@ -242,7 +242,7 @@ describe('object-subtype-rules', () => {
     });
   });
 
-  describe('resolveEffectiveObjectArt (rule LINK overrides — the app render path)', () => {
+  describe('resolveEffectiveObjectArt (rule LINK overrides, the app render path)', () => {
     it('a static id returns the base link, no pieces', () => {
       const base = resolveObjectArt(0x1f, 'ghz')!; // Crabmeat
       const eff = resolveEffectiveObjectArt(0x1f, 'ghz', 0, base);
