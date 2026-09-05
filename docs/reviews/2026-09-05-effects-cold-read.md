@@ -304,7 +304,405 @@ step. A destructive control that says so at the control.
 
 **Task B authored.**
 
+### 1.6 Task C — the palette cycle — `24` … `26`
+
+Following §4, still inside `PRESET — COLDREAD_WATER_TINT — CYCLES, VARIANTS`.
+
+`WORKED` — **this was one gesture.** Setting `cycles` to `authored script (array of
+channels)` produced a `Channel 0` pre-filled with **exactly the guide's suggested
+values** — `line 2`, `first 8`, `count 4`, `period 8`, `dir absent — set`. I typed
+nothing. `25-cycles-authored.png`.
+
+`WORKED` — the three `cycles` states are spelled as what they *write*, not as
+moods: *keep the section's hand-authored cycle (key absent)* / *off (null)* /
+*authored script (array of channels)*, with `Saved to
+data/editor/effects/presets/coldread_water_tint.json as cycles and variants. An
+absent key is not written.` underneath. Absent-versus-null is the exact
+distinction that is normally left to a reader to guess.
+
+**`CONFUSION` C9 — opening this card scrolls the "pinned" strip sideways and clips
+the ✓/✗ glyphs off it.** *Slowed me down; it removed the panel's own verdict from
+the screen.* Measured, not eyeballed (`26-strip-clipped-by-hscroll.png`, dpr 1):
+
+```
+the right-panel scroller:  scrollWidth 294   clientWidth 284   scrollLeft 10
+```
+
+The `cycles` `<select>` is 294px wide because its widest option is *"keep the
+section's hand-authored cycle (key absent)"*. The panel is **one** scroller and the
+section strip is inside it, so those 10px of horizontal overflow scroll the strip
+too. The guide's §1 draws the strip and annotates it *"the strip: always there,
+never scrolls"*; after this it reads `diting`, `cene coldread_drift`, and the ✓ and
+✗ before `own preset` / `threaded` are gone — the two rows the guide spends a whole
+section teaching you to read. It does not scroll back on its own.
+
+`WORKED` — after Ctrl+S the preset carried both, and `variants` correctly wrote
+nothing:
+
+```json
+{ "bands": [ { "bot": 72, "on": { "cram": { "addr": 74, "colours": [14] } },
+               "sh": false, "top": 40 } ],
+  "cycles": [ { "count": 4, "first": 8, "line": 2, "period": 8 } ],
+  "id": "coldread_water_tint", "schema": 1 }
+```
+
+**Task C authored. All three artifacts exist.**
+
+### 1.7 Binding the raster preset, and Build & Run — `27` … `30`
+
+Bound `coldread_water_tint` to **Section 0** from the `Section 0` dropdown at the
+bottom of RASTER BAND PRESETS. `WORKED` — the pinned strip rewrote itself to
+`scene coldread_drift · raster coldread_water_tint`, and a **new** paragraph
+appeared under the preset card:
+
+> Section 0 binds "coldread_water_tint". Deleting it would leave that binding
+> naming a document that does not exist, and aeon's build refuses that by name.
+> Set the raster binding back to "Hand-authored raster" on that section first —
+> the Section dropdown above.
+
+A delete guard that names the blocker *and* the control that clears it.
+
+**`DEAD END` D1 — there is no Build & Run anywhere you can see.** I searched the
+Effects toolbar, the `View ▾` menu, the whole Home tab (`29-home-tab.png` — it
+offers only Levels, Project Setup, the Guides card and Open project…) and a
+full-text scan of the level tab for `build|run|rom|regenerate`; the only hits were
+prose inside the panel's own warnings. It exists **only in `Ctrl+K`**, as
+`Build & Run` / `Ctrl+Shift+B` (`30-cmdk-build.png`).
+
+**I would have pressed it here and I was forbidden to.** I dismissed the palette
+with Escape without activating the entry, and verified it closed. Everything below
+was built from a shell instead. Note that the guide's §6 sends you to a shell too
+and never mentions the command exists — so a first-time author never learns Aurora
+can do this at all.
+
 ---
 
-*(Task C, the section binding, the build, and the defect list follow in the next
-commits on this branch.)*
+## 2. The build
+
+Four `BUILD ERROR`s, in the order they fired, against the throwaway clone with
+`SIGIL_BUILD` / `SIGIL_EMIT` set as the brief specifies. Wall-clock UTC beside each.
+
+### B1 — `suite_paths: REFUSED` (10:47:33Z → 10:47:39Z, exit 1)
+
+```
+Resolving suite paths...
+repo      /tmp/coldread-aeon-x3fBQG/aeon
+suite_paths: REFUSED — no suite root above /tmp/coldread-aeon-x3fBQG/aeon/tools/suite_paths.py
+  — no ancestor holds all of aeon/, empyrean/. Set EMPYREAN_SUITE_ROOT to the
+  directory containing the Empyrean repos.
+```
+
+**Environmental, and it named its own remedy in the same sentence.** A clone in
+`/tmp` has no suite root above it; fixed with
+`EMPYREAN_SUITE_ROOT=/home/volence/sonic_hacks`. *Not a verdict on anything I
+authored.* Not a defect — but worth recording that following the brief's own
+clone-to-`/tmp` recipe produces it, and that it costs 7 unrelated tool-suite
+failures for the rest of the run (see the isolation below).
+
+### B2 — the staleness gate (10:47:48Z, exit 1)
+
+```
+level staleness: STALE (mtime) — editor source is newer than the generated tree.
+    newest editor source : games/sonic4/data/editor/ojz/act1/section_0.meta.json  (2026-09-05 06:46:51)
+    newest generated file: games/sonic4/data/generated/effects_channel_bands.json  (2026-09-05 06:30:18)
+level staleness: STALE (stamp) — the editor sources are not the ones the last re-bake read
+    added since the bake (2): games/sonic4/data/editor/effects/coldread_drift.json,
+                              games/sonic4/data/editor/effects/presets/coldread_water_tint.json
+    changed since the bake (1): games/sonic4/data/editor/ojz/act1/section_0.meta.json
+    NOTE: a REMOVED file is invisible to a timestamp compare — deleting a file lowers
+    no mtime — so `touch` is not the fix and never was. Re-bake.
+
+ERROR: the committed level tree is STALE — it was not baked from the editor
+  sources that are here now. ...
+  REMEDY:  tools/regenerate-level.sh
+           FAST=1 ./build.sh sonic4
+  NOT a remedy: `touch`. ...
+```
+
+`WORKED` — **this is the best error message I saw all day.** It fires at the
+staleness stage and says so, names the arm that fired, names my three files
+individually, gives the remedy, and pre-empts the wrong fix.
+
+**The brief asked me to record verbatim whether I had to work this out myself or
+whether the app told me. The app did not tell me. The BUILD told me.** Aurora says
+nothing about `tools/regenerate-level.sh` anywhere in its UI, and the in-app
+guide's §6 "Save, and build" gives the whole happy path as
+
+> Ctrl+S. … Then, in your aeon checkout:
+> `FAST=1 ./build.sh` … `./build.sh` — the real one
+
+with no re-bake step. `tools/regenerate-level.sh` appears in the guide **only**
+under the troubleshooting heading *"If the build says the re-bake failed and
+mentions donors"* — a different symptom from the one you actually get. So the
+documented happy path stops at a red build every time and the recovery comes from
+aeon's output rather than from Aurora. **`CONFUSION` C10, and it is the guide's,
+not the panel's.** *Slowed me down ~1 minute, only because the build's message was
+so good.*
+
+`tools/regenerate-level.sh` then ran clean (10:47:59Z → 10:48:02Z, exit 0).
+
+### B3 — binding on an un-threaded section (10:48:07Z → 10:48:38Z, exit 1)
+
+18 failed / 2453 passed. The load-bearing rows:
+
+> `section 0's sidecar names rasterRef 'coldread_water_tint', but no preset threads
+> ojz_act1_sec_raster(sec: 0) — the generator would emit the binding row and nothing
+> would read it, which presents to the author as an assignment that did nothing.`
+
+> `AssertionError: Lists differ: [0, 5, 6] != [5, 6] : the bound sections are
+> [0, 5, 6], not [5, 6]`
+
+`WORKED` — **the loop closes.** Aurora warned at the control, in orange, before I
+bound it; aeon then refused by name, quoting the same symbol. Two independent
+statements of one rule that agree. This is the outcome the surface predicted, so it
+is not a defect — it is the surface being right.
+
+### B4 — binding on a section that passes BOTH of Aurora's conditions (10:50:41Z → 10:51:06Z, exit 1)
+
+I moved the binding to **Section 5**, the section Aurora's own strip marks
+`✓ own preset` **and** `✓ threaded` (`31-section5.png`: *"OJZ_Preset_Sec5 threads
+ojz_act1_sec_raster(sec: 5)"*), saved, re-baked and rebuilt. **It still refuses**,
+for a condition Aurora never mentions:
+
+> `section 5's sidecar names rasterRef 'coldread_water_tint', whose document carries
+> cycles — so the generator emits 1 cycle binding row(s) for sec 5 into
+> ojz_act1_sec_cycle. But OJZ_Preset_Sec5, the preset section 5 binds … threads
+> ojz_act1_sec_cycle for sec 5 NOWHERE. One rasterRef binds the WHOLE document
+> (ruling Q1), so every key it carries owes its own chooser at that section's
+> preset() — a row nothing calls is a row nothing reads, which presents to the
+> author as an assignment that did nothing, and this is what made the whole binding
+> green and byte-identical (Aurora, 2026-09-04). Write, inside that preset():
+>       cycle: ojz_act1_sec_cycle(sec: 5, hand: Pal_Cycle_None)`
+
+**This is the headline finding — §3, D-A.**
+
+### The isolation, and the definitive table
+
+The `/tmp` clone is not a clean baseline (B1's environment alone costs 7 unrelated
+failures), so no failure count taken there means anything on its own. I therefore
+did two things: (a) cloned a **pristine control** at the same commit into `/tmp` and
+set-differenced the failure lists, and (b) re-ran everything in a clone placed
+**inside the suite root**, where the baseline is genuinely green. The two agree.
+The suite-root numbers are below; that clone was deleted afterwards (§6).
+
+| what was authored | `./build.sh` | tool suite | `s4.bin` |
+|---|---|---|---|
+| nothing — pristine `9e3d2861` | **exit 0** | 2471 passed, 0 failed | built, md5 `310c4894…` |
+| **Task A only** — drift layer + section 0 scene binding | **exit 0** | 2471 passed, 0 failed | built, md5 `89ca14e7…` |
+| **+ Task B** — raster band on section 5, no cycles | exit 1 | **2 failed**, 2469 passed | not reached |
+| **+ Task C** — palette cycle in the same preset | exit 1 | **11 failed**, 2460 passed | not reached |
+
+`WORKED` — Task A's ROM is **not** byte-identical to the baseline (`89ca14e7…` vs
+`310c4894…`, both 819,775 bytes). The parallax layer I authored in the UI reached
+the ROM.
+
+The `/tmp` set-difference produced exactly the same 11 rows, so the two methods
+corroborate.
+
+**`BLOCKED` — I never got a ROM out of any run carrying Task B or C**, because the
+tool-suite gate runs before assembly. "Does the raster band assemble correctly?" is
+**unmeasured** — not green and not red. I cannot answer it without either a change
+to aeon or a threaded section that is free, and neither is in my parcel.
+
+---
+
+## 3. Defects, sorted by whether they STOPPED me
+
+### STOPPED me
+
+**D-A — Aurora's two-condition verdict is missing a third condition, and authoring
+a palette cycle is what makes it wrong.** *The one I would fix first.*
+
+The pinned strip publishes exactly two rows, `own preset` and `threaded`, and the
+guide's §5 is emphatic that they are kept separate because "a single verdict cannot
+tell you which". Section 5 shows **✓ ✓**. Aurora is therefore stating, in its own
+derived words, *this section can carry an editor-authored raster band*. It cannot,
+once the preset also carries a `cycles` key: the build refuses because
+`ojz_act1_sec_cycle` is threaded nowhere for that section, and **Aurora publishes no
+row for the cycle chooser at all**.
+
+That is exactly the intersection of two of the three things this parcel asked for.
+Task B alone on section 5 costs 2 failures; Task B **plus** Task C costs 11. The
+seam gate's own message says this shape *"is what made the whole binding green and
+byte-identical (Aurora, 2026-09-04)"*, so it is a known failure mode the strip still
+does not report. **It stopped me: there is no arrangement reachable from the UI in
+which all three artifacts build.**
+
+**D-B — there is no free section to bind a new raster preset to, and nothing says
+so.** Only 5 and 6 are threaded, and both already carry a preset
+(`ojz_sec5_showcase`, `ojz_sec6_baseswap`). Binding mine to either **orphans** the
+incumbent, and a lint refuses that by name:
+
+> `these preset documents … are reachable by NOTHING: ['ojz_sec5_showcase'].`
+
+So the act's only two legal homes for an editor-authored raster band are both
+occupied, and taking one is a regression. The strip prints `threaded 5,6` as though
+those were available. **It stopped me getting a green build with a raster band in
+it by any route the UI offers.**
+
+### SLOWED me down
+
+| id | what | where | why it matters |
+|---|---|---|---|
+| **C7** | `colours` is `<input type=text>` among three identical-looking `<input type=number>` siblings, so it does not select-on-click and **appends**; `0143584` is accepted with no warning and a cheerful green swatch | Colour → PRESET — `<id>` → `colours` | the guide *explicitly promises the opposite*, and this is the only value on the card with no range check |
+| **C8** | the Top/Bot guard runs per keystroke, so typing `250` over a `40` leaves **25** committed while the message ends "Refused; Top is still 25" | same card, `Top` / `Bot` | anyone typing a 3-digit line number hits it, and the refusal reads as "nothing changed" |
+| **C9** | the `cycles` select is 10px wider than the panel, so opening the CYCLES card scrolls the **pinned strip** sideways and clips its ✓/✗ | Colour → CYCLES, VARIANTS | it hides the exact two glyphs D-A is about, on the strip the guide calls "never scrolls" |
+| **C2** | "Editing Section 0" sits directly above a form for a scene section 0 is not bound to | Parallax | the most disorienting thing on the tab for a newcomer |
+| **C3** | the one sentence that says what a factor *does* is a hover tooltip; the permanent sentence under the same control is much weaker | Parallax → Plane B | the guide has to spend a paragraph telling you to hover a dropdown |
+| **C4** | a new scene has no name and shows its raw id; `Name` is inside the card that "arrives shut", and the guide's list of reasons to open that card omits Name | Parallax → SCENE — `<id>` | every stock scene has a title, so yours looking different reads as broken |
+| **C1** | a red ✗ greets you on an untouched project | the strip | reads as "you broke it" before the paragraph beside it is read |
+| **C5** | one entry of `B curve to` is marked "(engine refuses)" — a different one on each layer — and nothing says why | Parallax → layer card | it is the only control on that card with no explanation |
+| **C6** | the guide warns Ctrl+S produces "a large git status"; mine produced **two** files | guide §6 | an over-warning teaches you to discount the next one |
+| **C10** | the guide's happy path (`Ctrl+S` → `./build.sh`) always fails; `tools/regenerate-level.sh` is mentioned only under a different symptom, and the app never mentions it | guide §6 | the recovery came from aeon's output, not Aurora's |
+| **D1** | `Build & Run` exists only in `Ctrl+K`; no button anywhere, and the guide never says it exists | global | first-time authors are sent to a shell for something the app can do |
+
+### `REPEAT`
+
+- **R1** — the layer's vertical position is `Screen line` in the form, `L0 y=0` on
+  the map overlay, and `world_y` in the file Aurora writes. Three spellings; the
+  guide reconciles two of them.
+- **R2** — the preset list's right-hand column is unlabelled and mixes two kinds of
+  value: `2 bands`, `1 band`, `3 bands` (counts) sitting next to `ramp` and
+  `base swap` (program names). One column, two meanings, no header.
+
+I looked for, and did **not** find, the repeat this surface is said to have had:
+"band" now means raster band only, tile animations live on their own sub-tab with
+their own vocabulary, and §7 of the guide states that split deliberately. It holds
+on the screen.
+
+### `TASTE` — recorded, not defects
+
+- **T1** — `RASTER BAND PRESETS` opens onto ~150 words of caveats (five stacked
+  paragraphs) before the first control; on a 742px panel that is the whole viewport.
+  Every sentence is true; together they are a wall in front of the door.
+- **T2** — the guide is ~3,400 words. The §1 table and §8 index carry most of the
+  value; the middle is reference material.
+- **T3** — the ✓/✗ glyphs duplicate work the sentences beside them do better, and
+  they are the part that gets clipped (C9).
+- **T4** — the three-sub-tab layout is settled and I am not arguing with it. For the
+  record it read clearly: I never once looked for a control on the wrong sub-tab.
+
+---
+
+## 4. The ratio
+
+Because a log of only complaints is not a measurement:
+
+| | count |
+|---|---|
+| `WORKED` — obvious, and did what I expected | **21** |
+| `CONFUSION` — could not act with confidence | **10** |
+| `BUILD ERROR` | **4** (1 environmental, 1 procedural, 2 substantive) |
+| `REPEAT` | **2** |
+| `DEAD END` | **1** |
+| `TASTE` | **4** |
+| artifacts authored | **3 of 3** |
+| artifacts that reach a green build | **1 of 3** |
+
+Ten confusions on a surface this dense is a good number, and **none of the ten
+stopped me authoring**. What stopped me was downstream of the panel: both entries
+under "STOPPED me" are about a *verdict Aurora publishes being incomplete*, not
+about a control being unusable.
+
+The most striking thing about this surface is how much of its usability is carried
+by **prose written at the control** — the inline sentence under every layer field,
+the self-rewriting factor tooltip, the live `addr` decode, the delete guard that
+names the control that clears it, the destructive-switch warning on `Program`.
+Where those sentences exist, I was never lost. **Every one of my ten confusions is
+somewhere a sentence is missing, wrong, or hidden** — C3 hidden, C5 missing, C6 and
+C10 wrong, C9 clipped. That is consistent enough to be one design rule rather than
+eleven separate fixes.
+
+---
+
+## 5. What I did not manage to test — stated plainly
+
+- **Whether the raster band or the palette cycle is correct in the ROM.** No run
+  carrying either produced an `s4.bin`; the tool-suite gate precedes assembly.
+  Unmeasured — not green.
+- **What the band or the cycle looks like.** The panel says twice that Aurora draws
+  no preview of either. I could not run the ROM (D1) and did not try.
+- **What the screen teaches without the guide.** I read the guide first, as the
+  brief directs. Everything above survives a full read of it.
+- **`variants`, `MOVING ANCHORS`, `B split at`, `Deform`, `Row remap`, `Bob`,
+  `Reels`, `Transition`, the `Program` switch, and the whole `Tile anim` sub-tab.**
+  Out of scope for three artifacts; untouched.
+- **The layer-line drag gesture** the guide describes at length (grab a line on the
+  map, drag it, one undo). I typed screen lines instead and never exercised it.
+- **`FAST=1 ./build.sh`.** Only the plain build was run, which is what the guide
+  says to trust.
+- **Section 6.** I reasoned that binding there orphans `ojz_sec6_baseswap` exactly as
+  section 5 orphaned `ojz_sec5_showcase`, from the lint's own wording. I did not run
+  it. **That half of D-B is reasoned, not measured.**
+- **Undo.** Several controls advertise "it is one undo step". I never pressed Ctrl+Z,
+  so every one of those claims is unverified here.
+
+---
+
+## 6. Proof I did not touch the owner's aeon
+
+`/home/volence/sonic_hacks/aeon` was never written. Both snapshots:
+
+```
+AT START (before launch)                                    AT END
+ M docs/lane-status.json                                     M docs/lane-status.json
+ M games/sonic4/data/generated/effects_channel_bands.json
+ M games/sonic4/data/generated/ojz/act1/DONOR_PROVENANCE.json
+?? docs/loop-rollmarks-restore-section0.json
+?? waterline_art_witness.json
+HEAD 85fc9082                                               HEAD 722d1cf2
+```
+
+They are **not identical, and neither difference is mine**: `HEAD` advanced because
+another lane committed during my run, which is what removed four of the five
+entries. The positive check is the one that matters — none of my files exist there
+and neither binding moved:
+
+```
+$ ls .../aeon/.../effects/coldread_drift.json                 No such file or directory
+$ ls .../aeon/.../effects/presets/coldread_water_tint.json    No such file or directory
+$ grep Ref .../aeon/.../section_0.meta.json    "sceneRef": "ojz_act1_start"  (no rasterRef key)
+$ grep Ref .../aeon/.../section_5.meta.json    "rasterRef": "ojz_sec5_showcase"
+```
+
+All authoring went to `/tmp/coldread-aeon-x3fBQG/aeon`. The green-baseline builds
+used a second clone at `/home/volence/sonic_hacks/coldread-aeon-scratch`, created
+only because `suite_paths` refuses a repo outside the suite root (B1); it was a
+fresh `git clone` of the same commit, it is **deleted**, and it was never the
+owner's tree.
+
+**No emulator MCP tool was called. `Build & Run` was never pressed.**
+
+---
+
+## 7. The rig, and one defect that was mine
+
+`scratchpad/effects-cold-read-harness.mjs`, registered as
+`npm run harness:effects-cold-read` in the same commit. It is an interactive control
+port rather than a fixed script — a cold read has no gesture sequence to assert
+about — but its boot preconditions are real `PASS`/`FAIL` rows and it **refuses to
+hand over the port** if any is red, because a reading taken through a broken rig is
+worse than no reading.
+
+The three named rig traps, and what each cost:
+
+- **`.click()` is not a click.** Every gesture went through
+  `Input.dispatchMouseEvent` press/release, hit-tested with `elementFromPoint`
+  first, and the aim **refuses** rather than clicking whatever is underneath. It
+  refused once, correctly, when a stale element index resolved to (0,0).
+- **`devicePixelRatio`.** Read as **1** on every aim in this run and printed beside
+  each. No positional finding here rests on a fractional rect.
+- **`checkVisibility()` lies.** Not used. C9's visibility claim is made by comparing
+  `scrollWidth` / `clientWidth` / `scrollLeft` on the scroller and printing all
+  three.
+
+**And one defect that was mine, caught before it became a finding.** My first
+`/type` implementation sent a CDP `keyDown` *with* `text` **and** a separate `char`
+event. Blink synthesises the keypress from the `keyDown` alone, so every character
+was typed twice: `coldread_drift` arrived as `ccoollddrreeaadd__ddrriifftt`. Had I
+not read the field's value back after typing, I would have filed "the Scene id box
+duplicates input" as a product defect. Fixed in the harness, not the app, and the
+run restarted. C7 was then established the same way — by proving the gesture landed
+(`selectionStart` / `selectionEnd` after a real click, `3,3` on `colours` versus
+`null,null` on `Top`) before calling it a product defect.
+
