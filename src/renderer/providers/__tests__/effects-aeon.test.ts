@@ -25,7 +25,7 @@ import {
   LAYER_CURVE_ROW, LAYER_VSPLIT_ROW, NONE_FACTOR_VALUE,
   factorFieldSelectValue, factorFieldFromSelect, curveFieldValue, curveFromField,
   vsplitFieldValue, vsplitFromToggle, curveAdvisory, clampVSplitAt,
-  curveGoesNowhere, curveFlatReason, curveFieldOptions,
+  curveGoesNowhere, curveFlatReason, curveFieldOptions, curveDescendingAdvisory,
   // wave 2 — deform authoring
   tableRefLabel, tableRefFormOptions, tableRefFormOf, tableRefFromForm, tableRefParams,
   tableParamLabel, tableRefParamValue, setTableRefParam, clampTableRefParam,
@@ -47,10 +47,16 @@ import {
   EFFECTS_WORLD_Y_BOUNDS, EFFECTS_V_FACTOR_LOCK, newEffectsScene,
   EFFECTS_ANCHOR_SHIFT_BOUNDS,
 } from '../../../core/formats/effects/scene-ui';
+import {
+  EFFECTS_FACTOR_PACKED, packFactor, factorRatio,
+} from '../../../core/formats/effects/factor-decode';
 import { BG_LAYOUT_WORDS, TILE_WIDTH_PX } from '../../../core/formats/bg-override/bg-override';
 import { BG_WIDTH } from '../../../core/formats/bg-tiles';
 import { serializeEffectsScene, type EffectsScene, type EffectsSceneLibrary } from '../../../core/formats/effects/scene';
 import { EFFECTS_LAYER_DEFAULTS, parseEffectsScene, type EffectsLayer } from '../../../core/formats/effects/scene';
+import type {
+  EffectsFactor, EffectsFactorName, EffectsPackedFactor,
+} from '../../../core/formats/effects/scene';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { EditHistory } from '../../../core/editing/history';
@@ -618,12 +624,96 @@ describe('curve / vsplit controls (parcel H)', () => {
     expect(opts.map((o) => o.value)).toEqual(factorOptions().map((o) => o.value));
   });
 
-  it('curveFieldOptions disables NOTHING when fb is packed — no named factor equals a triple', () => {
-    // The packed collision is reachable only through the s1/s2/op spinners,
-    // where there is no option to grey. `curveAdvisory` is what covers it, and
-    // the row above proves it still does.
-    const opts = curveFieldOptions({ fb: { s1: 2, s2: 4, op: 1 } });
-    expect(opts.filter((o) => o.disabled)).toEqual([]);
+  // ⚠ THIS ROW USED TO READ "disables NOTHING when fb is packed - no named
+  // factor equals a triple", and that generalisation was FALSE. Every named
+  // factor equals its own triple by value, and the s1/s2/op spinners can spell
+  // any of them. The row passed only because the ONE triple it happened to try
+  // is not a published factor. It now says what is actually true and tries both
+  // kinds of triple, each DERIVED from the table rather than typed.
+  it('curveFieldOptions greys a packed fb\'s own NAME, and nothing when the triple is unpublished', () => {
+    // (a) a triple that IS a published factor - taken FROM the table, so this
+    //     cannot drift into naming a value the table stopped holding.
+    const named: EffectsFactorName = 'FACTOR_1_8';
+    const asTriple = EFFECTS_FACTOR_PACKED[named];
+    const greyed = curveFieldOptions({ fb: asTriple })
+      .filter((o) => o.disabled).map((o) => o.value);
+    expect(greyed, `fb spelled as ${named}'s own triple must grey ${named}`).toContain(named);
+    // Exactly its alias class and no more.
+    expect(new Set(greyed)).toEqual(new Set(
+      EFFECTS_FACTOR_NAMES.filter(
+        (n) => packFactor(EFFECTS_FACTOR_PACKED[n]) === packFactor(asTriple),
+      ),
+    ));
+    // (b) a triple no published name holds. Found by SEARCH over the encoding,
+    //     not chosen: a row that typed one would go quietly vacuous the day it
+    //     became a published factor.
+    const published = new Set(
+      EFFECTS_FACTOR_NAMES.map((n) => packFactor(EFFECTS_FACTOR_PACKED[n])),
+    );
+    let unpublished: EffectsPackedFactor | null = null;
+    for (let s1 = 0; s1 <= 15 && unpublished === null; s1++) {
+      for (let s2 = 0; s2 <= 15 && unpublished === null; s2++) {
+        for (const op of [0, 1]) {
+          const cand = { s1, s2, op } as EffectsPackedFactor;
+          if (!published.has(packFactor(cand))) { unpublished = cand; break; }
+        }
+      }
+    }
+    expect(unpublished, 'the 9-bit encoding must hold a value no name claims').not.toBeNull();
+    expect(curveFieldOptions({ fb: unpublished! }).filter((o) => o.disabled)).toEqual([]);
+  });
+
+  // ═══ THE ALIAS, FOUND BY A BUILD REFUSING (2026-09-05) ═══
+  //
+  // `FACTOR_LOCKED` and `FACTOR_0` are ONE VALUE with two spellings - aeon's
+  // `parallax_dsl.emp` declares `FACTOR_0 = FACTOR_LOCKED`, both $0FF, and
+  // `factor-decode.ts`'s table records it. `curveGoesNowhere` compared
+  // SPELLINGS, so Aurora saw two factors where aeon's `curve_to != fb` saw one:
+  //
+  //   fb: FACTOR_0, curve: To(FACTOR_LOCKED)   authored through both controls
+  //   -> error: layer(): curve: To(255) is the same factor as this layer's fb
+  //
+  // The build wrote no ROM. Nothing in Aurora had greyed the option or said a
+  // word. These rows are that pair, both spellings and both directions.
+  it('treats FACTOR_LOCKED and FACTOR_0 as ONE factor - the pair a build refused', () => {
+    // The premise, asserted rather than assumed: the two names really do carry
+    // one packed value. If aeon ever splits them this row says so first.
+    expect(packFactor(EFFECTS_FACTOR_PACKED.FACTOR_LOCKED))
+      .toBe(packFactor(EFFECTS_FACTOR_PACKED.FACTOR_0));
+
+    expect(curveGoesNowhere('FACTOR_0', 'FACTOR_LOCKED')).toBe(true);
+    expect(curveGoesNowhere('FACTOR_LOCKED', 'FACTOR_0')).toBe(true);
+    expect(curveAdvisory({ ...baseLayer(), fb: 'FACTOR_0', curve: { to: 'FACTOR_LOCKED' } }))
+      .toMatch(/same factor/i);
+    // …and the picker greys BOTH spellings, under either one.
+    for (const fb of ['FACTOR_0', 'FACTOR_LOCKED'] as const) {
+      const greyed = curveFieldOptions({ fb }).filter((o) => o.disabled).map((o) => o.value);
+      expect(new Set(greyed), `under fb ${fb}`).toEqual(new Set(['FACTOR_0', 'FACTOR_LOCKED']));
+    }
+  });
+
+  // ANTI-VACUOUS TWIN. A predicate that answered `true` for everything would
+  // satisfy the row above, so this one names two factors that are genuinely
+  // different and must stay so - including a pair with the SAME RATIO and
+  // different packed values, which is the case a fraction comparison would
+  // wrongly fold together. aeon compares the packed word, and so does this.
+  it('does NOT fold two factors that merely look alike', () => {
+    expect(curveGoesNowhere('FACTOR_1_8', 'FACTOR_1_4')).toBe(false);
+    // 1/8 + 1/16 and 1/4 - 1/16 are both 3/16 as fractions and are DIFFERENT
+    // packed values, so they are different factors to the engine.
+    const a = EFFECTS_FACTOR_PACKED.FACTOR_3_16;
+    const b = { s1: 2, s2: 4, op: 1 } as EffectsPackedFactor;
+    expect(factorRatio(a)).toEqual(factorRatio(b));
+    expect(packFactor(a)).not.toBe(packFactor(b));
+    expect(curveGoesNowhere(a, b)).toBe(false);
+  });
+
+  it('a named factor and its own triple are the SAME factor, both directions', () => {
+    for (const name of EFFECTS_FACTOR_NAMES) {
+      const triple = EFFECTS_FACTOR_PACKED[name];
+      expect(curveGoesNowhere(name, triple), `${name} vs its own triple`).toBe(true);
+      expect(curveGoesNowhere(triple, name), `${name}'s triple vs the name`).toBe(true);
+    }
   });
 
   it('the custom (packed) escape hatch is never disabled — it is a sentinel, not a value', () => {
@@ -656,10 +746,115 @@ describe('curve / vsplit controls (parcel H)', () => {
         if (optDisabled) sawDisabled++; else sawEnabled++;
       }
     }
-    // One refusal per fb (the diagonal), and a real list of survivors.
-    expect(sawDisabled).toBe(EFFECTS_FACTOR_NAMES.length);
-    expect(sawEnabled).toBe(EFFECTS_FACTOR_NAMES.length * (EFFECTS_FACTOR_NAMES.length - 1));
+    // ⚠ NOT ONE REFUSAL PER fb. This row used to assert `sawDisabled ===
+    // EFFECTS_FACTOR_NAMES.length` - "one refusal per fb (the diagonal)" - and
+    // that WAS the defect, written down as an expectation: the diagonal is only
+    // the whole answer if every name is its own factor, and `FACTOR_LOCKED` and
+    // `FACTOR_0` are two names for one. The row went red on the fix, which is
+    // what a gate is for.
+    //
+    // The count is DERIVED from the table, never typed: each fb greys its whole
+    // ALIAS CLASS, so the total is the sum of the squares of the class sizes.
+    // Sixteen singletons would give the old number back, so this expression
+    // still says "the diagonal" wherever aliasing does not happen.
+    const classSize = new Map<number, number>();
+    for (const n of EFFECTS_FACTOR_NAMES) {
+      const key = packFactor(EFFECTS_FACTOR_PACKED[n]);
+      classSize.set(key, (classSize.get(key) ?? 0) + 1);
+    }
+    const expectedDisabled = [...classSize.values()].reduce((s, k) => s + k * k, 0);
+    expect(sawDisabled).toBe(expectedDisabled);
+    expect(sawEnabled).toBe(EFFECTS_FACTOR_NAMES.length ** 2 - expectedDisabled);
     expect(sawEnabled).toBeGreaterThan(0);
+    // ANTI-VACUOUS, and it is the row's whole point now: at least one class has
+    // more than one name in it, so `expectedDisabled` is really doing work and
+    // is not just the old constant wearing a formula.
+    expect(expectedDisabled).toBeGreaterThan(EFFECTS_FACTOR_NAMES.length);
+  });
+
+  // -------------------------------------------------------------------------
+  // ⚠ THE DIRECTION OF THE RAMP - the one thing about a curve that reaches a
+  // ROM green and wrong.
+  //
+  // aeon bisected it on a live machine on 2026-09-05 (`df3b8810`): "a
+  // DESCENDING parallax curve garbles the background and an ascending one does
+  // not." `layer()` refuses only the DEGENERATE case, so no build says a word,
+  // and route (c) of the row remap's precondition 1 - the only route needing no
+  // deform table - is exactly "a `curve:` on that layer".
+  //
+  // ADVICE, NOT PREVENTION: the mechanism is UNESTABLISHED and the format
+  // admits the value, so `curveFieldOptions` is deliberately unchanged. The row
+  // below asserts that, because a later parcel greying these options would be
+  // Aurora inventing a rule nobody has established.
+  // -------------------------------------------------------------------------
+
+  it('warns when Plane B ramps DOWNWARD, and stays quiet when it ramps up', () => {
+    const at = (fb: EffectsFactor, to: EffectsFactor) =>
+      curveDescendingAdvisory({ ...baseLayer(), fb, curve: { to } });
+    expect(at('FACTOR_1_8', 'FACTOR_1_16')).toMatch(/DOWNWARD/);
+    expect(at('FACTOR_1_8', 'FACTOR_1_2')).toBeNull();
+    // No curve at all is not a direction.
+    expect(curveDescendingAdvisory(baseLayer())).toBeNull();
+    // Equal ends belong to `curveAdvisory`, which reports a refusal the build
+    // really makes. Two sentences about one strip would let the reader carry
+    // that one's authority onto this one.
+    expect(at('FACTOR_1_8', 'FACTOR_1_8')).toBeNull();
+    expect(curveAdvisory({ ...baseLayer(), fb: 'FACTOR_1_8', curve: { to: 'FACTOR_1_8' } }))
+      .not.toBeNull();
+  });
+
+  // A CENSUS, NOT TWO EXAMPLES. Every ordered pair of named factors, with the
+  // verdict derived from `factorRatio` independently of the function under
+  // test, so a predicate that got the SIGN backwards fails on half the space
+  // rather than on whichever example happened to be written down.
+  it('agrees with the factor ordering on EVERY named pair, and both states occur', () => {
+    let down = 0;
+    let notDown = 0;
+    for (const fb of EFFECTS_FACTOR_NAMES) {
+      for (const to of EFFECTS_FACTOR_NAMES) {
+        const f = factorRatio(fb);
+        const t = factorRatio(to);
+        const descends = t.num * f.den < f.num * t.den;
+        const said = curveDescendingAdvisory({ ...baseLayer(), fb, curve: { to } }) !== null;
+        expect(said, `fb ${fb} -> to ${to}`).toBe(descends);
+        if (said) down++; else notDown++;
+      }
+    }
+    expect(down).toBeGreaterThan(0);
+    expect(notDown).toBeGreaterThan(0);
+    expect(down + notDown).toBe(EFFECTS_FACTOR_NAMES.length ** 2);
+  });
+
+  // ⚠ THE BOTTOM OF THE RANGE IS A REAL FACTOR, NOT A SENTINEL TO SKIP.
+  // `FACTOR_LOCKED`/`FACTOR_0` is zero scroll, which is an ORDINARY smallest
+  // value here: ramping FROM it can never descend and ramping TO it always
+  // does, from anything that moves. Stated because this repo's other
+  // top-of-range field means OFF, and a reader arriving from that one would
+  // expect this end to be excluded.
+  it('treats locked as the SMALLEST factor, not as an off switch', () => {
+    for (const other of EFFECTS_FACTOR_NAMES) {
+      const isLocked = packFactor(EFFECTS_FACTOR_PACKED[other])
+        === packFactor(EFFECTS_FACTOR_PACKED.FACTOR_LOCKED);
+      expect(
+        curveDescendingAdvisory({ ...baseLayer(), fb: 'FACTOR_LOCKED', curve: { to: other } }),
+        `locked -> ${other} can never descend`,
+      ).toBeNull();
+      expect(
+        curveDescendingAdvisory({ ...baseLayer(), fb: other, curve: { to: 'FACTOR_LOCKED' } })
+          !== null,
+        `${other} -> locked descends unless ${other} IS locked`,
+      ).toBe(!isLocked);
+    }
+  });
+
+  it('does NOT grey a descending option - the engine permits it and the mechanism is unknown', () => {
+    const opts = curveFieldOptions({ fb: 'FACTOR_1_8' });
+    const below = opts.find((o) => o.value === 'FACTOR_1_16')!;
+    expect(below.disabled).toBe(false);
+    // And the advisory really does fire on that same pair, so this row is about
+    // a deliberate non-refusal rather than about a predicate that never fires.
+    expect(curveDescendingAdvisory({ ...baseLayer(), fb: 'FACTOR_1_8', curve: { to: 'FACTOR_1_16' } }))
+      .not.toBeNull();
   });
 });
 
