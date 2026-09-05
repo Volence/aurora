@@ -68,7 +68,8 @@ import { rowRemapReachAdvisory, rowRemapSpanRestriction } from '../../canvas/row
 import {
   factorOptions, clampPackedField,
   factorFieldSelectValue, factorFieldFromSelect, NONE_FACTOR_VALUE,
-  curveFieldValue, curveFromField, curveFieldOptions,
+  curveFieldValue, curveFromField, curveFieldOptions, curveRowHint, refusedOptionLabel,
+  leftColumnMaskRowHint,
   vsplitFieldValue, vsplitFromToggle, curveAdvisory, curveDescendingAdvisory, clampVSplitAt,
   LAYER_CURVE_ROW, LAYER_VSPLIT_ROW, EFFECTS_VSPLIT_AT_BOUNDS,
   clampVFactor, clampVCenter, clampVOffset,
@@ -242,7 +243,7 @@ function FactorField<N extends string | undefined = undefined>({ value, onChange
 }) {
   type V = N extends string ? EffectsLayer['fa'] | 'none' : EffectsLayer['fa'];
   const selected = factorFieldSelectValue(value);
-  const opts: readonly (FactorOption & { disabled?: boolean; title?: string })[]
+  const opts: readonly (FactorOption & { disabled?: boolean; title?: string; mark?: string })[]
     = options ?? factorOptions();
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: T.s2, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
@@ -251,7 +252,7 @@ function FactorField<N extends string | undefined = undefined>({ value, onChange
         {noneLabel !== undefined && <option value={NONE_FACTOR_VALUE}>{noneLabel}</option>}
         {opts.map((o) => (
           <option key={o.value} value={o.value} disabled={o.disabled} title={o.title}>
-            {o.label}{o.disabled ? ' (engine refuses)' : ''}
+            {refusedOptionLabel(o)}
           </option>
         ))}
       </Select>
@@ -346,7 +347,7 @@ function TableRefField({ table, onChange, titlePrefix }: {
                 style={{ width: 88 }}>
                 {options.map((o) => (
                   <option key={o.value} value={o.value} disabled={o.disabled} title={o.title}>
-                    {o.label}{o.disabled ? ' (engine refuses)' : ''}
+                    {refusedOptionLabel(o)}
                   </option>
                 ))}
               </Select>
@@ -695,7 +696,23 @@ export default function EffectsScenePanel(): React.ReactElement {
                   onChange={(f) => run(setLayerFieldCommand(
                     library, selected.id, i, 'curve', curveFromField(f)))} />
               </Field>
-              <Hint under style={{ marginBottom: 0 }}>{LAYER_CURVE_ROW.hint}</Hint>
+              {/* ═══ THE GREYED ENTRY'S REASON, IN THE PAGE (EW-INERT-CONTROL-SILENCE) ═══
+
+                  This line was already here and already permanent, which is
+                  exactly why the refusal rides in it: the Layers list paints
+                  about a card and a half at the shipped geometry, and a NEW
+                  block under this control would have cost more height than the
+                  silence cost the cold reader. `curveRowHint` appends the
+                  clause only when a named factor is actually refused (null on a
+                  PACKED `fb`), so it costs nothing on a layer with nothing to
+                  say. It names THIS layer's own value: the dead entry is a
+                  different one on each card, which is what made the cold reader
+                  deduce the rule instead of reading it (C5).
+
+                  DERIVED, NOT COPIED: `curveRowHint` reads `curveFieldOptions`
+                  back, so the sentence and the greyed option cannot name
+                  different values. */}
+              <Hint under style={{ marginBottom: 0 }}>{curveRowHint(layer)}</Hint>
               {(() => {
                 const advice = curveAdvisory(layer);
                 return advice === null ? null : <Hint under tone="warning">{advice}</Hint>;
@@ -1745,14 +1762,17 @@ export default function EffectsScenePanel(): React.ReactElement {
                 style={{ flex: 1, minWidth: 0 }}>
                 {leftColumnMaskOptions(selected).map((o) => (
                   <option key={o.value} value={o.value} disabled={o.disabled} title={o.title}>
-                    {o.label}{o.disabled ? ' (engine refuses)' : ''}
+                    {refusedOptionLabel(o)}
                   </option>
                 ))}
               </Select>
             </Field>
           )}
+          {/* AND WHY `sprite_mask` IS DEAD, in the page rather than in a title
+              on a disabled <option> - the one option on this tab that is greyed
+              UNCONDITIONALLY, so every author who opens this list meets it. */}
           {leftColumnMaskRowVisible(selected)
-            && <Hint under>{LEFT_COLUMN_MASK_ROW.hint}</Hint>}
+            && <Hint under>{leftColumnMaskRowHint()}</Hint>}
           {/* WHAT THE BUILD WOULD REFUSE, said before the build says it. Four of
               aeon's five comptime deform guards are CROSS-FIELD — a table with
               no plane to sample from, a per-column scene colliding with a

@@ -827,6 +827,45 @@ export interface FactorFieldOption extends FactorOption {
   disabled: boolean;
   /** The engine's reason, for the option's own title. Empty for a plain value. */
   title: string;
+  /**
+   * THE SHORT REASON, IN THE OPTION'S OWN LABEL - see `refusedOptionLabel`.
+   * Empty for a value the engine takes. Every disabled option MUST set it;
+   * `effects-aeon.test.ts` sweeps all three producers and fails on an empty one.
+   */
+  mark: string;
+}
+
+/**
+ * ═══ WHY A REFUSED OPTION CARRIES ITS REASON IN ITS OWN LABEL (EW-INERT-CONTROL-SILENCE) ═══
+ *
+ * Every disabled `<option>` on this tab used to render the SAME six words,
+ * `(engine refuses)`, with the actual reason parked in a `title` attribute. The
+ * cold read of 2026-09-05 (finding C5) met that on the curve picker and wrote:
+ * "one entry of `B curve to` is marked (engine refuses) ... and nothing says
+ * why. It is the only control on that card with no explanation." The reason was
+ * computed, correct, and thrown away at the UI boundary.
+ *
+ * ⚠ AND A `title` ON A DISABLED `<option>` IS THE WORST PLACE IN THE DOM TO PUT
+ * A SENTENCE. Chromium draws a `<select>` popup as a NATIVE widget outside the
+ * page (measured, and written down in `curve-option-disabled-harness`'s banner:
+ * `Page.captureScreenshot` cannot see one), so the string is unreachable by a
+ * screenshot, by a keyboard user who never lands on a disabled option, and by
+ * anyone who does not think to hover a dead row. The LABEL is the one part of a
+ * disabled option a person is certain to read, because it is the thing they are
+ * looking at when they wonder why it is grey.
+ *
+ * SHORT HERE, LONG IN THE PAGE. This is the marker, not the explanation: the
+ * full sentence still goes in a Hint under the row (`curveRowHint`,
+ * `leftColumnMaskRowHint`), which is the half a person can read without hovering
+ * anything and the half a screenshot can prove. A label long enough to hold the
+ * whole reason would widen a 300px column that has already been measured twice.
+ */
+export function refusedOptionLabel(o: { label: string; disabled?: boolean; mark?: string }): string {
+  if (o.disabled !== true) return o.label;
+  // The fallback is the pre-parcel string and exists so a NEW refused option
+  // cannot render `(undefined)` on screen. It is not a licence to skip `mark`:
+  // the sweep test in effects-aeon.test.ts fails on any producer that does.
+  return `${o.label} (${o.mark !== undefined && o.mark !== '' ? o.mark : 'engine refuses'})`;
 }
 
 /**
@@ -875,7 +914,7 @@ export interface FactorFieldOption extends FactorOption {
 export function curveFieldOptions(layer: Pick<EffectsLayer, 'fb'>): FactorFieldOption[] {
   return factorOptions().map((o) => {
     if (o.value === CUSTOM_FACTOR_VALUE) {
-      return { ...o, disabled: false, title: 'a packed shift-add factor, spelled by hand' };
+      return { ...o, disabled: false, title: 'a packed shift-add factor, spelled by hand', mark: '' };
     }
     const to = o.value as EffectsFactor;
     const refused = curveGoesNowhere(layer.fb, to);
@@ -883,8 +922,87 @@ export function curveFieldOptions(layer: Pick<EffectsLayer, 'fb'>): FactorFieldO
       ...o,
       disabled: refused,
       title: refused ? curveFlatReason(to) : `Plane B ramps to ${factorLabel(to)} at this strip's bottom`,
+      mark: refused ? CURVE_FLAT_MARK : '',
     };
   });
+}
+
+/** The short reason in the greyed curve option's own label. See `refusedOptionLabel`. */
+export const CURVE_FLAT_MARK = 'same as Plane B, so no ramp';
+
+/**
+ * EVERY named factor this layer's curve picker refuses, in the picker's order.
+ *
+ * DERIVED FROM THE PICKER, NOT FROM A SECOND COMPARISON. It reads
+ * `curveFieldOptions` back, so the sentence under the row and the greyed
+ * entries in the list cannot come to name different values - the same rule the
+ * advisory/option pair already follows through `curveGoesNowhere`.
+ *
+ * ⚠ A LIST AND NOT ONE VALUE, AND THE REASON IS AN ALIAS. `FACTOR_LOCKED` and
+ * `FACTOR_0` are ONE value with two spellings (aeon's `parallax_dsl.emp`
+ * declares `FACTOR_0 = FACTOR_LOCKED`, both $0FF; `curveFieldOptions`' own
+ * alias test pins it), so a layer with either as `fb` greys TWO rows. A
+ * sentence that named the first would describe one grey row while the author
+ * looked at two, which is C5 with a smaller radius rather than C5 fixed.
+ *
+ * EMPTY IS A REAL STATE AND IT IS THE HEIGHT ARGUMENT. `fb` spelled as a PACKED
+ * triple that no published name claims refuses nothing (there is no option to
+ * grey), so there is nothing to explain and `curveRowHint` adds no line.
+ * ⚠ A packed triple that DOES equal a published factor still greys that name's
+ * whole alias class - the 2026-09-05 alias finding - so "packed means empty" is
+ * false and is deliberately not what this says.
+ */
+export function curveRefusedFactors(layer: Pick<EffectsLayer, 'fb'>): EffectsFactor[] {
+  return curveFieldOptions(layer).filter((o) => o.disabled).map((o) => o.value as EffectsFactor);
+}
+
+/**
+ * ═══ THE CURVE ROW'S PERMANENT SENTENCE, WHICH NOW SAYS WHY THE DEAD ENTRY IS
+ * DEAD (EW-INERT-CONTROL-SILENCE, cold read C5) ═══
+ *
+ * `LAYER_CURVE_ROW.hint` is rendered under this row on every layer already, so
+ * the refusal rides in an element that costs NO new height in the common case:
+ * only the characters it adds can wrap. That was the deciding constraint - the
+ * Layers list paints about a card and a half at the shipped geometry, and a new
+ * permanent block under every control would have cost more than the silence did.
+ *
+ * WHY NOT LEAVE IT TO THE OPTION'S LABEL. The label is fixed too
+ * (`refusedOptionLabel`) and it is where a person looking at the grey row will
+ * read it. But it lives inside a `<select>` popup Chromium draws OUTSIDE the
+ * page: it is invisible until the list is opened and no screenshot can prove
+ * it. The property this parcel was given is "a control the app will not let you
+ * use must say why, WITHOUT BEING HOVERED", and only a sentence in the page can
+ * be shown to satisfy that. Both, therefore, and not either.
+ *
+ * IT NAMES THE VALUE AND IT NAMES THIS LAYER. The refused entry is a DIFFERENT
+ * one on each layer - that is precisely what made the cold reader deduce the
+ * rule by inspection rather than read it - so a generic sentence would have
+ * left the deduction in place. `factorLabel(refused)` is that layer's own `fb`.
+ *
+ * NOT A REPLACEMENT FOR `curveAdvisory`, which fires only once a document
+ * ALREADY carries the refused value (a hand-edited file, an MCP write, the
+ * packed path). This one fires while the document is still LEGAL and the author
+ * is choosing. The two never speak at the same time about the same thing: read
+ * `curveAdvisory`'s docblock for the two-paths split neither half may collapse.
+ */
+export function curveRowHint(layer: Pick<EffectsLayer, 'fb'>): string {
+  const refused = curveRefusedFactors(layer);
+  if (refused.length === 0) return LAYER_CURVE_ROW.hint;
+  // ⚠ MERGED INTO THE BASE SENTENCE, NOT APPENDED TO IT, AND THE REASON IS A
+  // MEASUREMENT. The first cut appended a second sentence and the harness's
+  // `[5c]` measured the row's hint growing from 33px to 99px: SIX lines where
+  // there had been two, on every layer card, permanently. At 16 layers that is
+  // more height than the whole Layers list paints. The refusal follows FROM the
+  // mechanism the base sentence already states ("ramps from fb ... to this
+  // value"), so saying it as a consequence rather than as a second fact costs
+  // two lines instead of four and reads better: re-measured at 66px, +33px.
+  // ⚠ IF YOU LENGTHEN THIS STRING, RE-RUN `[5c]` AND QUOTE THE NEW NUMBER.
+  //
+  // "fb itself" covers the alias pair without a plural verb: FACTOR_LOCKED and
+  // FACTOR_0 are one value with two spellings and BOTH rows go grey, so both
+  // are named inside the parenthesis.
+  return `${LAYER_CURVE_ROW.hint}, so fb itself (${refused.map(factorLabel).join(' and ')}) is `
+    + 'greyed: a ramp with equal ends is refused by the build.';
 }
 
 // ---------------------------------------------------------------------------
@@ -1087,6 +1205,8 @@ export interface TableParamOption {
   /** True for a value the ENGINE refuses; rendered so a file's value shows, unpickable. */
   disabled: boolean;
   title: string;
+  /** The short reason, in the option's own label. See `refusedOptionLabel`. */
+  mark: string;
 }
 
 /**
@@ -1149,6 +1269,7 @@ export function tableRefParamOptions(
     value: v,
     label: String(v),
     disabled: false,
+    mark: '',
     title: v === EFFECTS_DEFORM_TABLE_BYTES
       ? `one cycle over the whole ${EFFECTS_DEFORM_TABLE_BYTES}-byte table`
       : `${EFFECTS_DEFORM_TABLE_BYTES / v} cycles over the ${EFFECTS_DEFORM_TABLE_BYTES}-byte table`,
@@ -1161,6 +1282,7 @@ export function tableRefParamOptions(
       value: current,
       label: String(current),
       disabled: true,
+      mark: `does not divide ${EFFECTS_DEFORM_TABLE_BYTES}`,
       title: `the build refuses it: ${current} does not divide `
         + `${EFFECTS_DEFORM_TABLE_BYTES}, so the cycle would not close`,
     });
@@ -1660,6 +1782,8 @@ export interface LeftColumnMaskOption {
   disabled: boolean;
   /** The engine's reason, for the option's own title. Empty for a plain value. */
   title: string;
+  /** The short reason, in the option's own label. See `refusedOptionLabel`. */
+  mark: string;
 }
 
 /**
@@ -1677,6 +1801,7 @@ export function leftColumnMaskOptions(scene: EffectsScene): LeftColumnMaskOption
         value,
         label: value,
         disabled: true,
+        mark: SPRITE_MASK_MARK,
         title: 'refused by the engine: the left-column strip emission has not landed, so the '
           + 'declaration would be accepted while the sliver stays uncovered. Declare '
           + 'factor0_lock or accept.',
@@ -1688,6 +1813,7 @@ export function leftColumnMaskOptions(scene: EffectsScene): LeftColumnMaskOption
         label: value,
         // NOT disabled on a failed precondition — see the section banner.
         disabled: false,
+        mark: '',
         title: f0 === null
           ? 'Plane B provably never H-scrolls, so the partial column cannot exist'
           : `this scene cannot make that claim: ${f0}`,
@@ -1695,16 +1821,39 @@ export function leftColumnMaskOptions(scene: EffectsScene): LeftColumnMaskOption
     }
     if (value === 'accept') {
       return {
-        value, label: value, disabled: false,
+        value, label: value, disabled: false, mark: '',
         title: 'ship the artifact: a real answer, and the one this game\'s Rocking and '
           + 'Perspective families give',
       };
     }
     return {
-      value, label: value, disabled: false,
+      value, label: value, disabled: false, mark: '',
       title: 'no policy declared: legal only while this scene has no per-column V deform',
     };
   });
+}
+
+/** The short reason in `sprite_mask`'s own label. See `refusedOptionLabel`. */
+export const SPRITE_MASK_MARK = 'the engine cannot emit this yet';
+
+/**
+ * The policy row's permanent sentence, which now also says why `sprite_mask`
+ * is dead (EW-INERT-CONTROL-SILENCE, the census row beside cold read C5).
+ *
+ * `sprite_mask` is the one option on this tab that is disabled UNCONDITIONALLY:
+ * `leftColumnMaskOptions` greys it for every scene there is, so an author who
+ * opens this list always meets a dead entry, and until this parcel its reason
+ * existed only in a `title` on a disabled `<option>` - the least reachable
+ * string in the DOM (see `refusedOptionLabel`).
+ *
+ * NO CONDITION AND NO HEIGHT ARGUMENT NEEDED, unlike the curve row: this whole
+ * row is already conditional (`leftColumnMaskRowVisible`), so the sentence is on
+ * screen only for the scenes that have a policy to answer for.
+ */
+export function leftColumnMaskRowHint(): string {
+  return `${LEFT_COLUMN_MASK_ROW.hint}. sprite_mask is greyed: aeon has not landed the `
+    + 'left-column strip emission, so declaring it would be accepted while the sliver stays '
+    + 'uncovered. Answer with factor0_lock or accept.';
 }
 
 /** The policy this scene declares — absent reads as the schema's own default. */
@@ -2762,8 +2911,18 @@ export function sceneVsplitLockAdvisory(
  * always derived, so only the sentence describing it was ever wrong.
  */
 export function layerCountLine(scene: Pick<EffectsScene, 'layers'>): string {
-  return `${scene.layers.length} of ${EFFECTS_LAYER_COUNT.max} layers `
+  const base = `${scene.layers.length} of ${EFFECTS_LAYER_COUNT.max} layers `
     + '(per scene; scenes are assigned per section)';
+  // AND WHY EVERY `Remove layer` BUTTON IS DEAD, WHEN THEY ARE
+  // (EW-INERT-CONTROL-SILENCE, the census row beside cold read C5). At the floor
+  // the buttons grey with no sentence anywhere, and the state is not rare: a
+  // NEW SCENE ARRIVES AT EXACTLY ONE LAYER, so it is the first thing an author
+  // meets. It rides in the count line, which is already rendered, and it says
+  // the number rather than the word "minimum" because the schema's `minItems`
+  // is what decides.
+  if (scene.layers.length > EFFECTS_LAYER_COUNT.min) return base;
+  return `${base}. Remove is off: the schema keeps at least `
+    + `${EFFECTS_LAYER_COUNT.min}, so this one cannot go.`;
 }
 
 /**

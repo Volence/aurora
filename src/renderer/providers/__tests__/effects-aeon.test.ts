@@ -26,6 +26,8 @@ import {
   factorFieldSelectValue, factorFieldFromSelect, curveFieldValue, curveFromField,
   vsplitFieldValue, vsplitFromToggle, curveAdvisory, clampVSplitAt,
   curveGoesNowhere, curveFlatReason, curveFieldOptions, curveDescendingAdvisory,
+  curveRefusedFactors, curveRowHint, refusedOptionLabel, CURVE_FLAT_MARK,
+  leftColumnMaskRowHint, SPRITE_MASK_MARK,
   // wave 2 — deform authoring
   tableRefLabel, tableRefFormOptions, tableRefFormOf, tableRefFromForm, tableRefParams,
   tableParamLabel, tableRefParamValue, setTableRefParam, clampTableRefParam,
@@ -730,6 +732,117 @@ describe('curve / vsplit controls (parcel H)', () => {
     }
   });
 
+  // -------------------------------------------------------------------------
+  // EW-INERT-CONTROL-SILENCE - a control the app will not let you use must say
+  // WHY, without being hovered.
+  //
+  // The cold read of 2026-09-05, finding C5: "one entry of `B curve to` is
+  // marked (engine refuses) ... and nothing says why. It is the only control on
+  // that card with no explanation." The reason was computed by `curveFlatReason`
+  // and thrown away at the UI boundary, into a `title` on a disabled `<option>`.
+  //
+  // ⚠ THESE ROWS ARE ABOUT THE STRINGS ONLY. Whether a person can READ them is
+  // a painted claim no node suite can make: see `inert-control-silence-harness`.
+  // -------------------------------------------------------------------------
+
+  it('the refused curve option carries its reason in its own LABEL, not only in a title', () => {
+    const refused = curveFieldOptions({ fb: 'FACTOR_1_4' }).find((o) => o.disabled)!;
+    // The label a person actually reads on the grey row.
+    expect(refusedOptionLabel(refused)).toBe(`FACTOR_1_4 (${CURVE_FLAT_MARK})`);
+    // ANTI-VACUOUS: the mark has to SAY something, not just be non-empty. The
+    // string it replaced was `engine refuses`, which named no cause at all.
+    expect(CURVE_FLAT_MARK).not.toMatch(/engine refuses/);
+    expect(CURVE_FLAT_MARK).toMatch(/Plane B/);
+    // An option the engine TAKES is untouched - a marker on every row is a
+    // marker on none.
+    const fine = curveFieldOptions({ fb: 'FACTOR_1_4' }).find((o) => o.value === 'FACTOR_3_8')!;
+    expect(refusedOptionLabel(fine)).toBe('FACTOR_3_8');
+  });
+
+  it('EVERY disabled option this tab can produce carries a mark (the sweep, not one case)', () => {
+    // THE HOLE THIS CLOSES: `refusedOptionLabel` falls back to the old
+    // `(engine refuses)` when `mark` is empty, so a new refused option could be
+    // added and quietly regress to the string this parcel removed. There is no
+    // type that can catch it (`mark` is a string, and '' is a string), so the
+    // producers are swept instead.
+    const seen: string[] = [];
+    const sweep = (o: { label: string; disabled: boolean; mark: string }): void => {
+      if (!o.disabled) return;
+      seen.push(o.label);
+      expect(o.mark, `disabled option "${o.label}" ships with no mark`).not.toBe('');
+      expect(refusedOptionLabel(o)).not.toMatch(/\(engine refuses\)/);
+    };
+    for (const fb of EFFECTS_FACTOR_NAMES) curveFieldOptions({ fb }).forEach(sweep);
+    leftColumnMaskOptions(newEffectsScene('mark-sweep')).forEach(sweep);
+    // `period` only produces a disabled option when the FILE carries a
+    // non-divisor, so one is put in rather than hoped for.
+    const badPeriod = tableRefParamOptions('sine', 'period', 7);
+    expect(badPeriod, 'the period picker must exist for this sweep to mean anything').not.toBeNull();
+    badPeriod!.forEach(sweep);
+    // NOT AN EXCLUSION DERIVED FROM A ZERO: all three producers must have been
+    // observed refusing something, or the sweep proved nothing about any of them.
+    expect(seen).toContain('sprite_mask');
+    expect(seen).toContain('7');
+    expect(seen.filter((l) => l.startsWith('FACTOR_')).length).toBeGreaterThan(0);
+  });
+
+  it("the curve row's PERMANENT sentence names the refused value and why, per layer", () => {
+    const hint = curveRowHint({ fb: 'FACTOR_1_4' });
+    // It still carries the row's own constant - the panel renders the
+    // derivation and the derivation renders the constant, so there is exactly
+    // one copy of the base sentence in the repo.
+    expect(hint.startsWith(LAYER_CURVE_ROW.hint)).toBe(true);
+    expect(hint).toMatch(/fb itself \(FACTOR_1_4\) is greyed/);
+    expect(hint).toMatch(/a ramp with equal ends is refused by the build/);
+    // PER LAYER, which is the half a generic sentence would have missed: the
+    // dead entry is a DIFFERENT one on each card.
+    expect(curveRowHint({ fb: 'FACTOR_3_8' })).toMatch(/fb itself \(FACTOR_3_8\) is greyed/);
+    expect(curveRowHint({ fb: 'FACTOR_3_8' })).not.toMatch(/FACTOR_1_4/);
+  });
+
+  it('the curve hint names BOTH spellings when fb is an alias, and adds NO line when nothing is refused', () => {
+    // FACTOR_LOCKED and FACTOR_0 are one value: two rows go grey, so both are
+    // named. A sentence about one of them describes half the screen.
+    const aliases = curveRefusedFactors({ fb: 'FACTOR_LOCKED' });
+    expect(aliases.length, 'the alias class must really be more than one name').toBeGreaterThan(1);
+    const hint = curveRowHint({ fb: 'FACTOR_LOCKED' });
+    for (const a of aliases) expect(hint, `${String(a)} must be named`).toContain(String(a));
+    expect(hint).toMatch(/fb itself \(FACTOR_LOCKED and FACTOR_0\) is greyed/);
+
+    // AND THE HEIGHT GATE IS STRUCTURAL, not a count that happens to be zero:
+    // a packed triple no published name claims refuses nothing, so the hint is
+    // the bare constant and costs no extra line. The triple is FOUND by search
+    // over the encoding for the reason the sibling row states.
+    const published = new Set(EFFECTS_FACTOR_NAMES.map((n) => packFactor(EFFECTS_FACTOR_PACKED[n])));
+    let unpublished: EffectsPackedFactor | null = null;
+    for (let s1 = 0; s1 <= 15 && unpublished === null; s1++) {
+      for (let s2 = 0; s2 <= 15 && unpublished === null; s2++) {
+        for (const op of [0, 1]) {
+          const cand = { s1, s2, op } as EffectsPackedFactor;
+          if (!published.has(packFactor(cand))) { unpublished = cand; break; }
+        }
+      }
+    }
+    expect(unpublished).not.toBeNull();
+    expect(curveRefusedFactors({ fb: unpublished! })).toEqual([]);
+    expect(curveRowHint({ fb: unpublished! })).toBe(LAYER_CURVE_ROW.hint);
+  });
+
+  it('the policy row says why sprite_mask is dead, in the page and not in a title', () => {
+    const hint = leftColumnMaskRowHint();
+    expect(hint.startsWith(LEFT_COLUMN_MASK_ROW.hint)).toBe(true);
+    expect(hint).toMatch(/sprite_mask is greyed/);
+    // The engine's cause, and the way out - both, or the author is told a dead
+    // end with a reason attached.
+    expect(hint).toMatch(/left-column strip emission/);
+    expect(hint).toMatch(/factor0_lock or accept/);
+    // ANTI-VACUOUS: sprite_mask really is the option this is about, and it
+    // really is unconditionally disabled.
+    const opt = leftColumnMaskOptions(newEffectsScene('policy')).find((o) => o.value === 'sprite_mask')!;
+    expect(opt.disabled).toBe(true);
+    expect(opt.mark).toBe(SPRITE_MASK_MARK);
+  });
+
   // ═══ THE ANTI-DRIFT GATE ═══
   //
   // The whole point of `curveGoesNowhere` is that the greyed option and the
@@ -940,10 +1053,24 @@ describe('layerTopSpace — a locked scene authors screen lines, an unlocked one
 
   it('layerCountLine states the cap and its scope where the owner reads it', () => {
     const s = locked();
+    const base = `${EFFECTS_LAYER_COUNT.min} of ${EFFECTS_LAYER_COUNT.max} layers `
+      + '(per scene; scenes are assigned per section)';
+    // ⚠ THE FIXTURE SITS AT THE FLOOR, which is why this row is where the new
+    // clause showed up. That is not an accident of the fixture: a NEW SCENE
+    // arrives at exactly `min` layers, so the floor is the first state an
+    // author sees and the `Remove layer` buttons are dead in it
+    // (EW-INERT-CONTROL-SILENCE).
+    expect(s.layers.length).toBe(EFFECTS_LAYER_COUNT.min);
+    expect(layerCountLine(s).startsWith(base)).toBe(true);
+    expect(layerCountLine(s)).toMatch(/Remove is off/);
+    expect(layerCountLine(s)).toContain(String(EFFECTS_LAYER_COUNT.min));
+
+    // ABOVE THE FLOOR THE CLAUSE IS GONE - it costs a line only where the
+    // buttons are actually dead, and Remove works everywhere else.
+    s.layers.push({ world_y: 32, fa: 'FACTOR_1', fb: 'FACTOR_1' });
+    expect(s.layers.length).toBeGreaterThan(EFFECTS_LAYER_COUNT.min);
     expect(layerCountLine(s))
       .toBe(`${s.layers.length} of ${EFFECTS_LAYER_COUNT.max} layers (per scene; scenes are assigned per section)`);
-    s.layers.push({ world_y: 32, fa: 'FACTOR_1', fb: 'FACTOR_1' });
-    expect(layerCountLine(s).startsWith(`${s.layers.length} of ${EFFECTS_LAYER_COUNT.max} layers`)).toBe(true);
   });
 
   it('vFactorHint says what the sentinel means inline, from the constant', () => {

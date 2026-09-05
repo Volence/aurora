@@ -87,6 +87,7 @@ import {
   baseSwapTargetGloss, baseSwapSummary, baseSwapBandSummary, baseSwapInsideRowsText,
   baseSwapOrderAdvisory, addBaseSwapBandRefusal, lastBaseSwapBandRefusal,
   baseSwapLineRefusal, baseSwapRestoreLineRefusal, baseSwapPlaneRefusal,
+  newBaseSwapRestoreLine, newBaseSwapRestoreLineRefusal,
   baseSwapTargetRefusal, baseSwapTargetNeighbours,
   setBaseSwapLineCommand, setBaseSwapTargetCommand, setBaseSwapPlaneCommand,
   setBaseSwapRestoreLineCommand, addBaseSwapBandCommand, removeBaseSwapBandCommand,
@@ -1142,5 +1143,49 @@ describe('the two asymmetries with ramp reach the author', () => {
     expect(BASE_SWAP_TITLE).toContain(BASE_SWAP_WHAT_YOU_SEE);
     expect(BASE_SWAP_WHAT_YOU_SEE).toMatch(/self-restoring/);
     expect(BASE_SWAP_WHAT_YOU_SEE).toMatch(/down/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// EW-INERT-CONTROL-SILENCE - the ONE inert control on this tab whose reason did
+// not exist anywhere.
+//
+// The census run for this row swept every disabled/greyed/refused control in
+// the Effects tab. Almost all of them already had their sentence rendered in
+// the page beside them (the "DEAD CONTROL, WITH ITS REASON BESIDE IT" idiom
+// this panel wrote). The "ends at a line" checkbox was the exception: it goes
+// inert when the ON fire is on the last line `fire()` accepts, and the reason
+// was not in a title, not in an aria string and not computed at all. Worse than
+// silence, because the only sentence on the card describes the untickable state
+// as the intended one ("That is the shipped single-edge shape, not a missing
+// value") - so the author reads a dead control as a settled choice.
+// ---------------------------------------------------------------------------
+describe('the restore-line checkbox says why it is dead', () => {
+  it('null while the box is live - a sentence on a working control is noise', () => {
+    const band = newBaseSwapBand();
+    expect(newBaseSwapRestoreLine(band), 'the seed band must have room').not.toBeNull();
+    expect(newBaseSwapRestoreLineRefusal(band)).toBeNull();
+  });
+
+  it('at the top of the range it names the line, the bound, and the way out', () => {
+    // THE BOUND IS READ FROM THE CONTRACT, not typed: the same constant the
+    // command's own arithmetic uses, so this cannot pass on a stale number.
+    const band = { ...newBaseSwapBand(), line: RESTORE.max };
+    expect(newBaseSwapRestoreLine(band), 'the control really is inert here').toBeNull();
+    const why = newBaseSwapRestoreLineRefusal(band);
+    expect(why).not.toBeNull();
+    expect(why!).toContain(String(RESTORE.max));
+    expect(why!).toMatch(/no line below it/);
+    // A refusal with no remedy is a dead end with a reason attached.
+    expect(why!).toMatch(/Move the ON fire up/);
+  });
+
+  it('the boundary is exactly where the control dies, not one line either side', () => {
+    // EXTREMES HIDE WHAT THEY CLIP: both sides of the edge are checked, so an
+    // off-by-one in either direction fails rather than reading as correct.
+    const at = { ...newBaseSwapBand(), line: RESTORE.max };
+    const below = { ...newBaseSwapBand(), line: RESTORE.max - 1 };
+    expect(newBaseSwapRestoreLineRefusal(below)).toBeNull();
+    expect(newBaseSwapRestoreLineRefusal(at)).not.toBeNull();
   });
 });

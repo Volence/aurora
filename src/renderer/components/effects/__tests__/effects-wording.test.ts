@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   PLANE_FACTOR_ROWS, PLANE_FACTOR_HINT, LAYER_CURVE_ROW, LAYER_VSPLIT_ROW,
+  curveRowHint, leftColumnMaskRowHint, CURVE_FLAT_MARK, SPRITE_MASK_MARK,
   SCENE_DEFORM_ROWS, SCENE_DEFORM_ROW_SHARED, V_DEFORM_ROW, LAYER_DEFORM_ROW, TABLE_REF_ROW,
   LEFT_COLUMN_MASK_ROW, leftColumnMaskOptions,
 } from '../../../providers/effects-aeon';
@@ -67,6 +68,12 @@ const newStrings = [
   LAYER_CURVE_ROW.hint, LAYER_VSPLIT_ROW.hint, LAYER_CURVE_ROW.none,
   SCENE_DEFORM_ROW_SHARED.hint, V_DEFORM_ROW.hint, LAYER_DEFORM_ROW.hint,
   LEFT_COLUMN_MASK_ROW.hint,
+  // EW-INERT-CONTROL-SILENCE: the two row hints that now also carry a refused
+  // option's reason, and the two short marks that ride in an option's own
+  // label. They occupy the same 300px column as everything above, so they meet
+  // the same bar rather than being exempted from it.
+  curveRowHint({ fb: 'FACTOR_1_4' }),
+  leftColumnMaskRowHint(), CURVE_FLAT_MARK, SPRITE_MASK_MARK,
   SHIFT_BUTTON_TITLE, BANK_STRIP_HINT, BANK_THUMB_TITLE(0), BANK_THUMB_TITLE(7),
   ...[0, 2, 3].flatMap((n) => [
     bandMotion({ driver: 'timer', rateShift: n }, 'band'),
@@ -137,10 +144,20 @@ describe('the panels render the constants rather than a second copy of the words
     expect(scenePanel).not.toMatch(/Plane [AB] packed scroll factor/);
   });
   it('EffectsScenePanel renders LAYER_CURVE_ROW / LAYER_VSPLIT_ROW and writes both keys through setLayerFieldCommand', () => {
-    for (const k of ['label', 'title', 'hint'] as const) {
+    for (const k of ['label', 'title'] as const) {
       expect(scenePanel).toMatch(new RegExp(`LAYER_CURVE_ROW\\.${k}`));
       expect(scenePanel).toMatch(new RegExp(`LAYER_VSPLIT_ROW\\.${k}`));
     }
+    expect(scenePanel).toMatch(/LAYER_VSPLIT_ROW\.hint/);
+    // ⚠ THE CURVE ROW'S HINT IS NO LONGER A CONSTANT, and this is the rule the
+    // parcel changed rather than dropped (EW-INERT-CONTROL-SILENCE). It has to
+    // name a value that differs PER LAYER, so the panel renders the derivation
+    // and the derivation renders the constant. Both halves are pinned: the
+    // panel must call `curveRowHint(layer)`, and `curveRowHint` must still be
+    // built out of `LAYER_CURVE_ROW.hint` (asserted in effects-aeon.test.ts),
+    // so a component that forked its own sentence still fails.
+    expect(scenePanel).toMatch(/<Hint under style=\{\{ marginBottom: 0 \}\}>\{curveRowHint\(layer\)\}<\/Hint>/);
+    expect(scenePanel).not.toMatch(/LAYER_CURVE_ROW\.hint/);
     expect(scenePanel).toMatch(/setLayerFieldCommand\(\s*library,\s*selected\.id,\s*i,\s*'curve'/);
     expect(scenePanel).toMatch(/setLayerFieldCommand\(\s*library,\s*selected\.id,\s*i,\s*'vsplit'/);
     // The read-only extras line no longer says "no control yet" for these two.
@@ -177,7 +194,13 @@ describe('the panels render the constants rather than a second copy of the words
     // Said in the list, not only in a tooltip — the same suffix the
     // `left_column_mask` and `period` pickers use, so one card does not carry
     // three idioms for one idea.
-    expect(factorField).toMatch(/o\.disabled \? ' \(engine refuses\)' : ''/);
+    // ⚠ THE MARKER SAYS WHY NOW, NOT JUST THAT (EW-INERT-CONTROL-SILENCE).
+    // It read `(engine refuses)` on every disabled option on this tab, with the
+    // actual reason parked in a `title` - the cold read's C5. `refusedOptionLabel`
+    // puts the option's OWN short reason in its label; the three pickers share
+    // it, so one card still does not carry three idioms for one idea.
+    expect(factorField).toMatch(/\{refusedOptionLabel\(o\)\}/);
+    expect(factorField).not.toMatch(/\(engine refuses\)/);
 
     // DERIVED, NEVER COPIED. The comparison lives in `curveGoesNowhere` alone;
     // a component that re-derived "to equals fb" could drift from the advisory

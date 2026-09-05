@@ -4710,6 +4710,35 @@ export function newBaseSwapRestoreLine(band: EffectsPresetBaseSwapBand): number 
   return next > EFFECTS_PRESET_BASE_SWAP_RESTORE_LINE_RANGE.max ? null : next;
 }
 
+/**
+ * WHY THE "ends at a line" CHECKBOX IS DEAD, or null when it is live
+ * (EW-INERT-CONTROL-SILENCE, the census row with NO reason computed at all).
+ *
+ * This was the only inert control found on the Effects tab whose reason did not
+ * exist anywhere - not in a `title`, not in an `aria-*`, not in a Hint. The box
+ * simply stopped responding once the ON fire reached the last legal line, and
+ * the only sentence on the card ("No restore line: this band runs to the bottom
+ * of the display ... not a missing value") reads as a description of a CHOICE,
+ * which makes it worse than silence: an author who cannot tick the box is told
+ * the untickable state is the intended one.
+ *
+ * SAME PREDICATE AS THE COMMAND. `newBaseSwapRestoreLine` returning null is
+ * what makes the box inert, and it is what this reads, so the greyed control
+ * and the sentence cannot disagree - the idiom the Add and Remove buttons on
+ * this panel already follow.
+ *
+ * IT NAMES THE WAY OUT. The bound is on the OFF fire, and the only thing an
+ * author can do about it is move the ON fire up, which is the spinner one row
+ * above. A refusal that does not say that is a dead end with a reason attached.
+ */
+export function newBaseSwapRestoreLineRefusal(band: EffectsPresetBaseSwapBand): string | null {
+  if (newBaseSwapRestoreLine(band) !== null) return null;
+  const r = EFFECTS_PRESET_BASE_SWAP_RESTORE_LINE_RANGE;
+  return `this band's ON fire is on line ${band.line}, the last line fire() accepts `
+    + `(${r.min}..${r.max}), so there is no line below it for an OFF fire to sit on. `
+    + 'Move the ON fire up first, then the band can end at a line.';
+}
+
 /** Set the VRAM base a band re-points its plane at. Null when refused or nothing moved. */
 export function setBaseSwapTargetCommand(
   library: EffectsPresetLibrary, id: string, index: number, value: number,
