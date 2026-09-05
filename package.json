@@ -128,6 +128,7 @@
     "harness:effects-deform": "node scratchpad/effects-deform-harness.mjs",
     "harness:effects-drift": "node scratchpad/effects-drift-harness.mjs",
     "harness:effects-guide": "node scratchpad/effects-guide-harness.mjs",
+    "harness:guide-section6": "node scratchpad/guide-section6-capture.mjs",
     "harness:effects-guides": "node scratchpad/effects-guides-harness.mjs",
     "harness:effects-preview-default": "node scratchpad/effects-preview-default-harness.mjs",
     "harness:effects-refusal": "node scratchpad/effects-refusal-harness.mjs",

@@ -330,44 +330,72 @@ Scenes have no such restriction — bind a scene to any section.
 ## 6. Save, and build
 
 **Ctrl+S.** There is no Save button on a level tab; the dot on the tab title is the
-only sign you have unsaved work. Saving rewrites every editor file in the act, not
-just the ones you touched, so expect a large `git status` — most of it is
-re-serialisation, not change.
+only sign you have unsaved work. **A save writes a file only when that file's
+meaning changed.** Every JSON document Aurora writes is compared against the one
+already on disk as a parsed value, so indentation, key order and the trailing
+newline do not count as a change, and a document you did not touch is left alone.
+So read your `git status` after a save — it is the work you actually did, and a
+file in it you never opened is worth opening rather than scrolling past.
 
-Then, in your aeon checkout:
+One thing that is bigger than you expect, and it is the diff and not the file
+count: a document whose meaning has changed is rewritten in full canonical form,
+so it can pick up formatting aeon's own writers do not emit.
 
-```
-FAST=1 ./build.sh        # fast iteration
-./build.sh               # the real one — run this before you land anything
-```
-
-**`FAST=1` does not check what you just authored.** It skips the effects seam gate
-and the whole test lane, so a section binding the real build refuses builds green
-under `FAST=1`. Run the plain `./build.sh` before you believe it.
-
-### If a build error will not go away
-
-**If you deleted or reverted a file and the same error keeps coming back, it is not
-you.** `FAST=1` decides whether to regenerate by comparing file timestamps, and
-deleting a file does not change any timestamp — so it keeps assembling the old
-generated data. The fix:
+Then, in your aeon checkout. **The re-bake is a step of this path, not a recovery
+from an error:**
 
 ```
-touch games/sonic4/data/editor/effects/*.json
-FAST=1 ./build.sh
+tools/regenerate-level.sh   # re-bake the level tree from what you just saved
+./build.sh                  # the real one — run this before you land anything
+
+FAST=1 ./build.sh           # the iteration loop — re-bakes for you, skips the gates
 ```
 
-### If the build says the re-bake failed and mentions donors
+**Why a save on its own is not enough.** aeon's generated level tree is a
+committed artifact — `games/<game>/prebuild.sh` is a documented no-op — so nothing
+rebuilds it just because you saved. Both builds ask `tools/level_staleness.py`
+whether the committed tree was baked from the editor sources that are there now, and
+after any save the answer is no. What happens next is the only difference between
+the two commands:
 
-```
-ERROR: the FAST re-bake failed. Run tools/regenerate-level.sh directly to see why
-  (it needs the out-of-repo donors: sonic_hack + skdisasm/...)
-```
+- **`./build.sh` refuses, and it refuses before it assembles anything.** So a red
+  build here is not a verdict on what you authored — nothing downstream has looked
+  at it yet. The message names which check fired, lists your files by name, and
+  gives `tools/regenerate-level.sh` as the remedy. Re-bake and run it again.
+- **`FAST=1 ./build.sh` runs the re-bake for you** and prints how long it took. That
+  is the loop's whole point, and it is why the fast path needs no separate step.
 
-That message is usually wrong about the cause. Do what it says — run
-`tools/regenerate-level.sh` by hand — and read the last line. It is often something
-precise like *"rasterRef 'x' names no preset document … Known ids: …"*, which
-happens when you delete a preset a section still points at.
+**What `FAST=1` still will not tell you.** It skips the whole test lane and every
+gate that has to read the listing the build just emitted, so a green FAST run is not
+a landing. It does run one check first — the editor-scene binding seam, read out of
+the source — so binding a preset to a section nothing threads now fails in the loop
+instead of at landing. What it cannot answer is whether your effect actually
+reached the ROM: the reachability evidence is minted by the build it runs before.
+Run the plain `./build.sh` before you believe it.
+
+**`touch` is not a shortcut past this.** The gate has a second arm that reads no
+timestamps at all — it compares a content stamp of your editor sources against the
+one the last re-bake wrote — so a delete, a rename or a revert moves the answer
+whatever the mtimes say. Touching a file silences only the timestamp arm, and it
+lights that arm again in the process; the tree stays stale and the same error comes
+back. Re-bake.
+
+### If a build error will not go away after you reverted
+
+**Re-bake — it is the reverting case, not a stuck build.** Removing a document the
+way a person reverts (`rm`) is exactly what the content-stamp arm exists for: an
+added, removed, renamed or modified editor source all move the answer, so
+`tools/regenerate-level.sh` clears the generated module that still carries the
+deleted document's data. There is nothing to touch and nothing to force.
+
+### If the re-bake itself fails
+
+**Read the re-bake's own output — the build prints it in full, and it is the part
+that names your file.** The failing line is usually precise: *"rasterRef 'x' names
+no preset document … Known ids: …"*, which is what you get when you delete a preset
+a section still points at. Missing out-of-repo donors is the other cause, and the
+build says so as a footnote, after its output — suspect it only when nothing above
+names a file or an id.
 
 ---
 
