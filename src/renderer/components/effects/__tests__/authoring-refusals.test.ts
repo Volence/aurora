@@ -232,12 +232,24 @@ describe('the number box itself', () => {
     // The contract, read out of the source in order: parse, ask, report, and
     // only then commit. A `refuse` that ran AFTER `onChange` would be a
     // decoration over a value already in the document.
-    const body = /onChange=\{\(e\) => \{[\s\S]*?\}\}/.exec(fields)?.[0] ?? '';
+    const body = /onChange=\{\(e\) => \{[\s\S]*?\n      \}\}/.exec(fields)?.[0] ?? '';
     expect(body).not.toBe('');
+    // ⚠ RE-SPELLED 2026-09-05, NOT WEAKENED — and this is the SECOND copy of
+    // this gate: `ui/__tests__/number-field-empty.test.ts` carries the same
+    // three-position check over the same handler. Both went red together when
+    // the commit moved inside a block (the drift counter increments beside it),
+    // which is the only reason the duplication was discovered. ⚠⚠ AND BOTH HAD
+    // THE SAME LATENT DEFECT: an `indexOf` for a literal that no longer exists
+    // returns -1, and `toBeGreaterThan(askAt)` reads that as "the commit is in
+    // the wrong place" rather than "the text moved" — a gate that reports a
+    // refactor as a contract violation. The three positions are now asserted in
+    // order, which pins the same rule harder: ask, then guard, then commit.
     const askAt = body.indexOf('refuse?.(n)');
-    const commitAt = body.indexOf('if (why === null) onChange(n)');
-    expect(askAt).toBeGreaterThan(-1);
-    expect(commitAt).toBeGreaterThan(askAt);
+    const guardAt = body.indexOf('if (why === null)');
+    const commitAt = body.indexOf('onChange(n);');
+    expect(askAt, '`refuse` is consulted').toBeGreaterThan(-1);
+    expect(guardAt, 'and its answer guards something').toBeGreaterThan(askAt);
+    expect(commitAt, 'and the commit is behind that guard').toBeGreaterThan(guardAt);
   });
 
   it('a field with NO `refuse` behaves exactly as before — this is additive', () => {
