@@ -103,7 +103,7 @@ export default function CollisionLegend() {
       // element the mark no longer leads with; the arrow IS the open side now,
       // and a key that describes a mark the overlay stopped drawing is exactly
       // the drift routing this swatch through the real code was meant to end.
-      label: marksHidden ? 'Angle — zoom in to show' : 'Angle · arrow points to the open side',
+      label: marksHidden ? 'Angle · zoom in to show' : 'Angle · arrow points to the open side',
     });
   }
   if (o.showCollision && o.showCollisionPathB) rows.push({ kind: 'outline', color: COLLISION_DIFF, label: 'Path A / B differ' });

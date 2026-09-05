@@ -225,7 +225,7 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
     const { entries, discardedUnownedCells } = resetToEngineEntries(ce, engineWords);
     if (!entries.length) return;
     const discardNote = discardedUnownedCells > 0
-      ? ` — discards reserved bits on ${discardedUnownedCells} cell${discardedUnownedCells === 1 ? '' : 's'}`
+      ? `; discards reserved bits on ${discardedUnownedCells} cell${discardedUnownedCells === 1 ? '' : 's'}`
       : '';
     if (discardedUnownedCells > 0) {
       useToastStore.getState().addToast(
@@ -306,7 +306,7 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
   const auditNote = audit ? crossoverAuditMessage(audit) : null;
   const auditSeverity = audit ? crossoverAuditSeverity(audit) : 'ok';
 
-  if (!profiles) return <div style={styles.note}>Collision tables not found — open a project with collision data.</div>;
+  if (!profiles) return <div style={styles.note}>Collision tables not found. Open a project with collision data.</div>;
 
   const selProfile = selected > 0 && selected < profiles.solidCount ? profiles.profiles[selected] : null;
   // The big preview shows what actually gets painted + baked: the base shape with
@@ -342,7 +342,7 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
         {variant === 'map' && (
           <button onClick={() => setBothPlanes(!bothPlanes)}
             title={'Solid on BOTH paths: one stroke writes path A and path B together, as one undo step. '
-              + 'Shared ground (ordinary floors and walls) belongs on both — painting it twice by hand is '
+              + 'Shared ground (ordinary floors and walls) belongs on both. Painting it twice by hand is '
               + 'what leaves a half-finished second plane. Turns on the "Solid on both paths" lens so you '
               + 'can see the plane you are not looking at.'}
             style={{ ...styles.planeBtn, ...(bothPlanes ? styles.planeSel : {}) }}>{BOTH_PLANES_LABEL}</button>
@@ -379,9 +379,9 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
           {/* Both of these ACT AND THEN DROP FOCUS (d-27) — see actAndDropFocus.
               A bare Space used to re-fire the wipe on the button the last click
               left focused; it no longer reaches either writer. */}
-          <button onClick={(e) => actAndDropFocus(e, resetToEngine)} title={`Reset section ${activeSection} collision (this plane) to the engine baseline, including any loop crossover — undoable`}
+          <button onClick={(e) => actAndDropFocus(e, resetToEngine)} title={`Reset section ${activeSection} collision (this plane) to the engine baseline, including any loop crossover. Undoable.`}
             style={styles.subtleBtn}>Reset</button>
-          <button onClick={(e) => actAndDropFocus(e, clearSection)} title={`Erase ALL collision in section ${activeSection} (this plane), including any loop crossover — undoable`}
+          <button onClick={(e) => actAndDropFocus(e, clearSection)} title={`Erase ALL collision in section ${activeSection} (this plane), including any loop crossover. Undoable.`}
             style={styles.subtleBtn}>Clear</button>
         </div>
       )}
@@ -402,7 +402,7 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
           <span style={styles.planeLabel}>Loop</span>
           {([
             ['keep', 'Keep', 'Leave each cell\u2019s crossover exactly as it is (the default). An ordinary shape stroke says nothing about which path the player is on.'],
-            ['hand-off', plane === 'a' ? 'Hand \u2192 B' : 'Hand \u2192 A', `Mark each painted cell so that a player standing on it while on path ${plane.toUpperCase()} is handed to path ${plane === 'a' ? 'B' : 'A'}. Paint the SAME cells on the other plane to make the crossover two-way \u2014 with "A+B" on, one stroke does both.`],
+            ['hand-off', plane === 'a' ? 'Hand \u2192 B' : 'Hand \u2192 A', `Mark each painted cell so that a player standing on it while on path ${plane.toUpperCase()} is handed to path ${plane === 'a' ? 'B' : 'A'}. Paint the SAME cells on the other plane to make the crossover two-way. With "A+B" on, one stroke does both.`],
             ['clear', 'None', 'Erase the crossover from each painted cell (write "no handoff").'],
           ] as const).map(([value, label, title]) => (
             <button key={value} onClick={() => setCrossover(value)} title={title}
@@ -435,8 +435,8 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
           <div style={styles.planes}>
             <span style={styles.planeLabel}>Mark</span>
             {([
-              ['cell', 'Cell (16px)', 'Mark the WHOLE 16px cell (the default). Right for a ONE-WAY mark — an entry or exit anchor, or either half of a loop built from two separated one-way marks — because a one-way mark fires idempotently and its width does not matter.'],
-              ['half', 'Half (8px)', 'Mark only the 8px half-cell UNDER THE CURSOR. This is the only width at which a TWO-WAY crossover works: the engine fires the crossover once per 8px column the player enters, a 16px cell is two of them, and a pair marked across both hands the player over and straight back. The shape and solidity still fill the whole cell — only the crossover narrows.'],
+              ['cell', 'Cell (16px)', 'Mark the WHOLE 16px cell (the default). Right for a ONE-WAY mark (an entry or exit anchor, or either half of a loop built from two separated one-way marks), because a one-way mark fires idempotently and its width does not matter.'],
+              ['half', 'Half (8px)', 'Mark only the 8px half-cell UNDER THE CURSOR. This is the only width at which a TWO-WAY crossover works: the engine fires the crossover once per 8px column the player enters, a 16px cell is two of them, and a pair marked across both hands the player over and straight back. The shape and solidity still fill the whole cell; only the crossover narrows.'],
             ] as const).map(([value, label, title]) => (
               <button key={value} onClick={() => setSpanMode(value)} title={title}
                 style={{ ...styles.planeBtn, ...(spanMode === value ? styles.planeSel : {}) }}>{label}</button>
@@ -448,7 +448,7 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
                 + 'planes at the same half, or with "A+B" on) flips the player\u2019s path here. At '
                 + '"Cell" width it would flip twice and net to nothing.'
               : 'Marking the whole 16px cell. Fine for a ONE-WAY mark. ⚠ A TWO-WAY pair at this '
-                + 'width does NOTHING — the engine triggers every 8px and a cell is two of them, '
+                + 'width does NOTHING: the engine triggers every 8px and a cell is two of them, '
                 + 'so the player is handed over and handed straight back. Switch to "Half (8px)" '
                 + 'for a two-way handoff.'}
           </div>
@@ -493,7 +493,7 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
         </div>
       ) : (
         <div style={styles.hint}>
-          Ordinary ground — floors and walls the player meets on either path — belongs on
+          Ordinary ground (floors and walls the player meets on either path) belongs on
           both planes. <strong>{BOTH_PLANES_LABEL}</strong> above paints plane A and plane B with one stroke,
           so shared ground is drawn once instead of twice.
         </div>
@@ -524,7 +524,7 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
         <div style={styles.previewText}>
           {selected === 0 || !previewProfile
             ? 'Erase (air)'
-            : `#${selected}${xFlip ? ' ⇄' : ''}${yFlip ? ' ⇅' : ''} · ${classifyProfile(previewProfile)} · ${selDeg ?? '—'}° · ${FLOOR_LABEL[solidity]}`}
+            : `#${selected}${xFlip ? ' ⇄' : ''}${yFlip ? ' ⇅' : ''} · ${classifyProfile(previewProfile)} · ${selDeg === null ? 'no angle' : `${selDeg}°`} · ${FLOOR_LABEL[solidity]}`}
         </div>
       </div>
 
@@ -541,7 +541,7 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
               title={`#${e.shape}${e.mirrorX ? ' (mirrored to face left)' : ''} · ${classifyProfile(e.profile)} · ${e.profile.solidity}`}
               onClick={() => pick(e.shape, e.mirrorX)} style={{ ...styles.cellWrap, ...(isSel ? styles.sel : {}) }}>
               <ShapeCanvas profile={e.profile} box={PX + MARK_PAD * 2} bleed={MARK_PAD} />
-              <span style={styles.degLabel}>{deg === null ? '—' : `${deg}°`}</span>
+              <span style={styles.degLabel}>{deg === null ? '--' : `${deg}°`}</span>
             </button>
           );
         })}
