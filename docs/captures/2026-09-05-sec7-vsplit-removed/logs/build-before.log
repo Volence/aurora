@@ -1,0 +1,197 @@
+$ ./build.sh sonic4 -nl
+(exit 0, 3725 ms)
+
+Assembler: sigil 756c7efda3dc (clean at capture — no uncommitted changes)
+############################################################################
+## WARNING: THE ASSEMBLER MAY NOT MATCH ITS SOURCE (revision)
+##
+##   binary built from : 756c7efda3dc654116013744695fd762521b95d6
+##   /home/volence/sonic_hacks/sigil HEAD : c8b2ed72d592a3739928beb06c5ff7c4769ca9c6
+##
+##   A stale assembler emits a byte-IDENTICAL ROM whenever the source has
+##   not changed, so no CRC, pin or golden downstream of here can detect
+##   this. That is the whole reason it is checked at invocation.
+##   Rebuild:  cargo build --release --manifest-path /home/volence/sonic_hacks/sigil/Cargo.toml
+##   Set SIGIL_VERSION_STRICT=1 to make this fatal.
+############################################################################
+Emitting the native-linked resident sound blob (sigil)...
+emitted seam-1 resident blob (z80_sound_blob{,_debug}.bin) + seam-2 DAC artifacts (dac_blip_bank.bin + dac_shared_bank.bin + dac_sample_tab.bin) + seam-2 MT bank split (mt_bank_body{,_debug}.bin + mt_songtable{,_debug}.bin + mt_songpatchtable{,_debug}.bin) + seam-2 SFX bank (sfx_bank{,_debug}.bin + sfx_blob_win_tab{,_debug}.bin) + seam-2 head (seq_opcode_tab{,_debug}.bin + sound_tables_z80.bin) + pitchtable (movingtrucks_pitchtable.bin) -> engine/sound/generated
+Resolving suite paths...
+repo      /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438
+suite     /tmp/sec7-drop-vsplit-N5HILH/suite
+  from    marker walk up from /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438/tools/suite_paths.py
+empyrean  /tmp/sec7-drop-vsplit-N5HILH/suite/empyrean
+  from    EMPYREAN_DIR unset; under the suite root, from marker walk up from /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438/tools/suite_paths.py
+Generating compression self-test vectors...
+Compression self-test vectors OK -> /tmp/sec7-drop-vsplit-N5HILH/suite/sec7-drop-run-2160438/engine/debug/generated (payload 744B, sum $92DF; plain 642B, dict 486B+256B, zx0 546B)
+Verifying committed OJZ level tree...
+verify_level_bin: editor bake fidelity OK (9 section(s), 589824 nametable words)
+verify_level_bin: OK [act-pool+content+sidecar / local-maps / block-blobs / bininclude-targets / collision-interned / editor-bake / orphans]
+effects_gen: OK — generated effects module matches its inputs
+effects_gen: OK — channel-band sidecar matches the effects library (4 banded channel(s))
+Collision consistency: 9 section(s) x 2 planes, 589824 cells (2080 non-air); RULE A examined 42 floor-exposed full runs (1018 cells), RULE B examined 58 rows carrying floor (16453 floor px).
+Collision consistency: OK (rule A: 0 new violations, rule B: 0 new violations)
+Art-pool ROM budget:
+  OJZ_ACT1: 10 pages, raw 19.1 KB -> stored 14.9 KB (78.0%) [incl. local maps 3.2 KB + manifest 80 B]
+      zx0: 10 pages, 11.7 KB stored (61.1%)
+      budget: soft 24 KB / hard 64 KB  -> ok
+Building games/sonic4/game_root.asm (sigil)...
+built: sonic4 plain native ROM — crc=c8448ba1 len=819851
+Build complete: s4.bin — 819851 bytes (800.6 KB, 19.5% of 4MB)
+row_remap_gate: sonic4 SCANLINE_CAPS $0FDE, CAP_ROW_REMAP $0800 -> declared=True; BAND_REMAP_N=1, br_remap at record offset 24, sizeof(band_record)=32, header 30 B, pcfg_anchor_ch at 11
+  ladders in the image:
+    RowRemapLadder_Waterline16 @ $0135DA: 17 rows x 16 bytes = 272 B
+      rows differing from the identity: 15 of 16 (row 16 is the identity by construction and is exempt)
+      row 0 (max |p|) tail : [12, 14, 16, 19, 21, 24, 27, 30]  (identity would be [8, 9, 10, 11, 12, 13, 14, 15])
+      row 16 (|p| = 0): [8, 9, 10, 11, 12, 13, 14, 15]  (the identity, by construction)
+      agrees byte-for-byte with tools/row_remap_ladder_gen.py at H=16 (272 B re-derived, not pinned)
+  remapped bands, and WHERE THEY ARE BOUND (design §9.2 step 3, informational):
+    ParallaxConfig_OJZ_Underwater band 1: ladder RowRemapLadder_Waterline16, surface plane line 101, H=16, anchor ch 0
+      plane-B travel across these lines: 16 px peak to peak (table $0127DE at shift 0 — the config's pcfg_anchor_dsb (the overlay writes it into every band from the split down, and the remapped band IS the split's lower half)); floor 8 px
+    visibility self-test on ParallaxConfig_OJZ_Underwater band 1 (bc_flags at record offset 12, bit 1): NULL+curve VARIES · NULL+no-curve DOES NOT · unmutated VARIES — 3/3
+    NOT GATED, and it cannot be: whether the bound section lets the camera cross the anchor line VERTICALLY decides whether a human ever sees this. In a horizontally-crossed section the effect is a still picture. Read the list above against the act's camera paths (design §9.1 precondition 4).
+row_remap_gate: OK — 1 ladder(s), 1 remapped band(s), all three invariants hold on the emitted bytes, and each table agrees with tools/row_remap_ladder_gen.py re-derived at its own declared H
+waterline_art_gate: sonic4 SCANLINE_CAPS $0FDE, CAP_ROW_REMAP $0800 -> DECLARED
+  geometry from engine/level/parallax_dsl.emp: H = 16, source 512 B, DMA 256 B, 8 VRAM tiles
+  arm 1  WaterlineStripArt $136EA, 512 B — byte-identical to tools/waterline_art_gen.py at H = 16
+  arm 2  no duplicate source row inside the ladder's 16-row reach and no nibble 0; 64 of 64 rows globally distinct (reported, not required)
+  arm 3  Waterline_Art_Update $80DE-$8134 (86 B): all 5 geometry immediates match the derivation (col 64, strip 256, lines 16, strips 2, dma 256)
+  arm 4  DMA $B200 + 256 B inside waterline_strips (slot 1424, 48 tiles; 8 used, 40 spare) and clear of sprite_table at $B800
+  arm 5  the pass publishes the ladder row at $6D3E (move.l a3,$BA84.w)
+  OK — 0 problem(s)
+effects_seam_gate: OK — binding seam reached (EditorScenes_OJZ_Act1_Count=4, EditorScenes_OJZ_Act1_Bindings=4, EditorRaster_OJZ_Act1_Bindings=2, EditorCycle_OJZ_Act1_Bindings=0, EditorVariant_OJZ_Act1_Bindings=0, EditorPatch_OJZ_Act1_Bindings=1, 9 section call site(s), 743 equates parsed from s4.lst)
+effects_seam_gate: OK — preset seam threaded in games/sonic4/data/effects/ojz_effects.emp [raster OJZ_Preset_Sec5(sec: 5), raster OJZ_Preset_Sec6(sec: 6)]; 2 sidecar rasterRef(s), 0 of them on the patched arm — the PATCHED half of the arm partition is VACUOUS today (no bound document carries `boundary`) and says so rather than reading green; non-arm channel threadings required and found: sec 5 patch motion, sec 5 patch world-Y
+editor_palette_golden: OK — 17 field/span comparison(s) over 1 authored document(s) in s4.bin; twins checked: ojz_sec3_shimmer
+band_drift_golden [s4.lst]
+  Scene_OJZ_Default: 4 band(s), authored rates [-32, -32, -32, -32] (1/256 px per frame)
+  derived: sizeof(parallax_config) 30 (two independent pairs agree), band_record stride 32, drift tail at +20
+  ParallaxConfig_OJZ_Default at $012564
+  band 0  $012596  FFFFE000  want FFFFE000  OK   -0.1250 px/frame
+  band 1  $0125B6  FFFFE000  want FFFFE000  OK   -0.1250 px/frame
+  band 2  $0125D6  FFFFE000  want FFFFE000  OK   -0.1250 px/frame
+  band 3  $0125F6  FFFFE000  want FFFFE000  OK   -0.1250 px/frame
+band_drift_golden: OK — all 4 band(s) carry the authored rate
+plane_base_swap_gate [s4.lst, shape=release]
+  derived: Plane A $C000 (FOREGROUND layer, reg $02, shift 10)   Plane B $E000 (BACKGROUND layer, reg $04, shift 13)
+  derived: OP_SET_REG 0, arm park $8AFF, ops end $FFFF, last fire line 223
+  derived: TOP    band screen lines 3..64 (61 wide) — reg $04 <- $8406 then home $8407: the FOREGROUND's map in the BACKGROUND layer
+  derived: BOTTOM band screen lines 159..220 (61 wide) — reg $02 <- $8238 then home $8230: the BACKGROUND's map in the FOREGROUND layer
+  derived: MIDDLE (neither band) screen lines 65..158, 94 row(s); the bottom band is the top band reflected through line 223
+  OJZ_BaseSwap at $013CF0, OJZ_TestPal at $013CF0 — 0 byte(s) between
+plane_base_swap_gate: OK — `OJZ_BaseSwap` emits no bytes in the release shape, as its DEBUG-only installer requires
+reels_gate [s4.lst, shape=release]
+  derived: REEL_BAND_COUNT 5, OJZ_REEL_SPEEDS [3, -5, 2, -4, 6]
+  OJZ_Reel_Speed at $01435A, OJZ_Reels_Fill at $01435A — 0 byte(s) between (the table)
+  OJZ_Reels_Fill at $01435A, ObjDef_Static at $01435A — 0 byte(s) between (the proc)
+  [games/sonic4/data/generated/ojz/act1/effects_scenes.emp] cap=OJZ_Act1, 1 authored table(s), 1 binding(s); `EditorReelBindings_OJZ_Act1` at $013B62, next declared `EditorRaster_OJZ_Act1_aurora_ramp_witness` at $013B62 — 0 byte(s) between
+reels_gate: OK — `OJZ_Reel_Speed`, `OJZ_Reels_Fill` and every authored reel table + association table emit no bytes in the release shape, as their DEBUG-only reason requires
+plane_role_swap_gate [s4.lst, shape=release]
+  derived: Plane A $C000, Plane B $E000, vdp_base_shift(PlaneA)=10 vdp_base_shift(PlaneB)=13
+  want (reg, value): [(2, '$38'), (4, '$06'), (2, '$30'), (4, '$07')]
+  Parallax_Set_Roles_Swapped at $00640E, $engine.parallax$Parallax_Set_Roles_Swapped$normal at $00642E, Parallax_Update at $006446
+  got  (reg, value): [(2, '$38'), (4, '$06'), (2, '$30'), (4, '$07')]
+plane_role_swap_gate: OK — Parallax_Set_Roles_Swapped writes reg $02/$04 correctly on both arms: swapped $38/$06, normal $30/$07
+bganim_room [s4.lst]:
+  provenance: s4.lst and s4.bin both written after this build started (+2.9 s / +2.9 s)
+  fixture: tools/fixtures/bganim_room_excerpt.lst — 5 label rows re-found in the fresh listing with the same shape
+  Art_Sonic 0x72FF6 + 101056 = 0x8BAB6; anchor 0xA8000
+  ROM room 116042 B free + 8376 B the section already holds = 124418 B for ojz_bg_anim
+  ruled authoring ceiling BGANIM_SECTION_CEILINGS['s4.lst'] = 20480 B (the generator accepts the minimum across shapes, BGANIM_SECTION_CEILING = 20480 B)
+  bank placement rule: packed end 0x8BAB6 + reserve 49152 B + grace 32768 B -> dac_banks >= 0xA0000; declared 0xA8000 (0x8000 of slack above this shape's rule value — another sound-on shape binds, or the rule moved)
+  growth before this gate fires again: 66890 B (the room above the reserve; guaranteed >= grace 32768 B by the rule)
+  binding limit: the ruled ceiling (20480 B) — it sits 103938 B inside the ROM room; placement no longer bounds a data section (sigil b0363140)
+dplc_straddle [s4.lst]
+  derived: TILE_SIZE=32  DMA_IMPORTANT_SLOTS=12  DPLC_ENTRY_RESERVE=2  DMA source boundary=0x20000
+  the wall the ratchet aims at: 12 - 2 = 10 slots
+  reachability walked out of s4.bin
+    derived: tails_tail: appendage bank: id 2, banks 0/4/8/12
+    derived: sonic: tilt: ids 0/1, 4 blocks, strides 1<<3/1<<2
+    derived: tails: tilt: ids 0/1, 4 blocks, strides 1<<3/1<<2
+    derived: knuckles: tilt: ids 0/1, 4 blocks, strides 1<<3/1<<2
+
+  sonic: Art_Sonic 0x72FF6 + 101056 B = 0x8BAB6   (Important queue, 224 frames)
+    art spans 1 boundary(ies): 0x80000
+    peak ENTRIES 10 at frame(s) $1E, $8B, $90, $C2, $C7, $DF
+    peak SLOTS   10 at frame(s) $1E, $8B, $90, $C2, $C7, $DF
+    straddling entries: 1 across 1 frame(s): $6A
+    reachable frames: 83 of 224 (anim table Ani_Sonic, kind player)
+    straddling REACHABLE:   0 — none
+    straddling unreachable: 1: $6A
+    peak SLOTS over REACHABLE frames: 10 at $1E, $8B   (worst reachable frame splits into 0 extra entry(ies))
+
+  tails: Art_Tails 0x2D3F6 + 116320 B = 0x49A56   (Important queue, 251 frames)
+    art spans 1 boundary(ies): 0x40000
+    peak ENTRIES 2 at frame(s) $01, $02, $03, $04, $05, $06, $07, $08 ...
+    peak SLOTS   2 at frame(s) $01, $02, $03, $04, $05, $06, $07, $08 ...
+    straddling entries: 1 across 1 frame(s): $A4
+    reachable frames: 76 of 251 (anim table Ani_Tails, kind player)
+    straddling REACHABLE:   1: $A4
+    straddling unreachable: 0 — none
+    peak SLOTS over REACHABLE frames: 2 at $01, $02, $03, $04, $05, $06, $07, $08 ...   (worst reachable frame splits into 1 extra entry(ies))
+
+  tails_tail: Art_TailsAppendage 0x49E2A + 8896 B = 0x4C0EA   (Important queue, 45 frames)
+    art spans 0 boundary(ies): none
+    peak ENTRIES 1 at frame(s) $01, $02, $03, $04, $05, $06, $07, $08 ...
+    peak SLOTS   1 at frame(s) $01, $02, $03, $04, $05, $06, $07, $08 ...
+    straddling entries: 0 across 0 frame(s)
+    reachable frames: 36 of 45 (anim table Ani_TailsAppendage, kind appendage)
+    straddling REACHABLE:   0 — none
+    straddling unreachable: 0 — none
+    peak SLOTS over REACHABLE frames: 1 at $01, $02, $03, $04, $05, $06, $07, $08 ...   (worst reachable frame splits into 0 extra entry(ies))
+
+  knuckles: Art_Knuckles 0x4E7F2 + 130944 B = 0x6E772   (Important queue, 251 frames)
+    art spans 1 boundary(ies): 0x60000
+    peak ENTRIES 5 at frame(s) $D0, $D9
+    peak SLOTS   5 at frame(s) $D0, $D9
+    straddling entries: 1 across 1 frame(s): $8B
+    reachable frames: 113 of 251 (anim table Ani_Knuckles, kind player)
+    straddling REACHABLE:   1: $8B
+    straddling unreachable: 0 — none
+    peak SLOTS over REACHABLE frames: 5 at $D0, $D9   (worst reachable frame splits into 1 extra entry(ies))
+
+  CONCURRENT demand on the reserve: 3 sprite set(s) resident at once (NUM_PLAYERS=2 + 1 appendage), worst case knuckles 1 + tails 1 + sonic 0 = 2 split(s) against a 2-slot reserve
+
+  worst peak SLOT cost over all subjects: 10
+  the committed bar is 10 — from the real budget assert in collision_data.emp, so the bar is DMA_IMPORTANT_SLOTS - DPLC_ENTRY_RESERVE = 12 - 2
+  worst peak SLOT cost over REACHABLE frames: 10
+  worst REACHABLE frame split: 1 extra entry(ies) against a 2-slot DPLC_ENTRY_RESERVE
+
+dplc_straddle: OK — no frame's SLOT cost exceeds the bar 10, no REACHABLE frame splits past the 2-slot reserve, and the concurrent reachable demand is 2 of 2 (worst reachable peak 10 slots, worst reachable split 1)
+sprite_tilt_gate [s4.lst]:
+  Player_ApplyTilt $010280-$0102ED (110 bytes, 37 instructions)
+  4994 ROM executions compared against the S3K model (Animate_Sonic loc_126A4)
+  distinct mapping frames the sweep selected: 48  ($01-$30)
+  fixture: sprite_tilt_cut.json — routine's decoded instruction stream identical (relocation normalised), all three script slabs byte-identical
+  OK
+instashield_gate [s4.lst]:
+  Ability_InstaShield $0116FA-$011739 (64 bytes, 19 instructions), PlayerV overlay 27 B
+  6912 executions compared against the S3K model (Sonic_JumpHeight :23369 -> Sonic_ShieldMoves :23401)
+  states that fired: PSTATE_JUMP, PSTATE_ROLLJUMP
+  the model's allowed set is S3K's `jumping`: PSTATE_JUMP $08, PSTATE_ROLLJUMP $0A
+  fixture: instashield_cut.json [s4.lst] — the committed cut is this build's Ability_InstaShield: decoded instruction stream identical, every transfer reaching the same named symbol (relocation normalised)
+    note: the routine MOVED (not edited): cut $011666..$0116A6, this build $0116FA..$01173A (+148 bytes, length 64 -> 64)
+    note: symbol(s) it references MOVED (not renamed, not edited): Sound_PlaySFX $0081A8 -> $00825A; Player_SetState $01042C -> $0104B8; InstaShield_Spawn $0116A6 -> $01173A
+  OK
+  Ability_TailsFlight $0110BC-$0110E9 (46 bytes, 13 instructions)
+  5888 executions compared against the S3K model (Tails_JumpHeight :28596 -> Tails_Test_For_Flight :28627)
+  states that engaged flight: PSTATE_JUMP, PSTATE_ROLLJUMP
+  the model's allowed set is S3K's `jumping`: PSTATE_JUMP $08, PSTATE_ROLLJUMP $0A; release cap swept over -1024, -512, 0
+  fixture: tailsflight_cut.json [s4.lst] — the committed cut is this build's Ability_TailsFlight: decoded instruction stream identical, every transfer reaching the same named symbol (relocation normalised)
+    note: the routine MOVED (not edited): cut $011030..$01105E, this build $0110BC..$0110EA (+140 bytes, length 46 -> 46)
+    note: symbol(s) it references MOVED (not renamed, not edited): Player_SetState $01042C -> $0104B8
+  OK
+loop_crossover_gate [s4.lst]:
+  Player_LoopCrossover $0100DE-$0101A9 (204 B) + Collision_GetType $00572E-$005795 (104 B), both EXECUTED
+  shipped CrossoverTable: 256 slots, 3 marked, 0 holding the reserved value 3
+  step-over sweep: 231 cases from the build's own caps (X +/-16 px, Y -16/-15/-1/0/1/15/16 px) against a 8x16 cell; 63 of them cross more than one cell on some axis and are the only ones that can tunnel
+  step-over write-order: 2-cell steps (k=2..2) in ONE frame, both directions, each requiring the fire to precede a later cursor advance (16 px/frame cap over a 8 px cell)
+  direction rule: 8 rows (both planes x both travel directions x {two-way pair, single mark}); the model fires on 3 of them
+  405 executions: 18 consumption, 4 plane-select, 138 edge-trigger, 2 off-cache, 231 step-over, 4 step-over write-order, 8 direction
+  2 of them changed Sst.layer BECAUSE a byte of CrossoverTable in the ROM image was changed and nothing else was — that is the consumption claim, and the unmodified table is its control
+  fixture: loop_crossover_cut.json [s4.lst] — both routines' decoded instruction streams identical (relocation normalised), CrossoverTable byte-identical, 18 equates match
+  OK
+warning: 14 warnings — module.path-mismatch 14; SIGIL_WARNINGS=full to list
+warning: 161 warnings — proc.clobber-undeclared 68, module.unreachable 56, proc.undeclared-fallthrough 20, module.path-mismatch 14, import.no-names 2, proc.out-unwritten 1; SIGIL_WARNINGS=full to list
+ROM: 800.6 KB/4.0 MB (19.5%) | object_bank: 9.1 KB/64.0 KB (14.2%) | RAM: 47.8 KB/64.0 KB (74.6%) | Free: 16.0KB before stack
+ctags: Warning: Enabling Cargo subparser may enable TOML parser.
+ctags: Warning: The current implementation of the TOML parser is broken.

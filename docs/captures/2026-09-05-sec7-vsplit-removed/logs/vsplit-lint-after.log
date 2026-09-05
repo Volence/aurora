@@ -1,0 +1,56 @@
+..F.F..                                                                  [100%]
+=================================== FAILURES ===================================
+________________ test_quarantine_entries_still_author_a_vsplit _________________
+
+    def test_quarantine_entries_still_author_a_vsplit():
+        """A quarantine entry for a scene that no longer authors a vsplit is stale cover."""
+        authorings, _, _ = scan()
+        authoring_names = {a.scene for a in authorings}
+        stale = sorted(set(KNOWN_UNBOUND) - authoring_names)
+>       assert not stale, (
+            f"these KNOWN_UNBOUND entries name scenes that no longer author a "
+            f"`vsplit: SceneVSplit.At(..)`: {stale}. The quarantine is over -- delete the "
+            "entry from KNOWN_UNBOUND in this file and close the row in "
+            "docs/DEFERRED_WORK.md. A quarantine kept past its subject is exactly the stale "
+            "artifact that reads as coverage."
+        )
+E       AssertionError: these KNOWN_UNBOUND entries name scenes that no longer author a `vsplit: SceneVSplit.At(..)`: ['Scene_Editor_ojz_act1_sec7_worldwater']. The quarantine is over -- delete the entry from KNOWN_UNBOUND in this file and close the row in docs/DEFERRED_WORK.md. A quarantine kept past its subject is exactly the stale artifact that reads as coverage.
+E       assert not ['Scene_Editor_ojz_act1_sec7_worldwater']
+
+tools/test_vsplit_consumer_lint.py:332: AssertionError
+____________________ test_quarantine_is_loud_on_every_build ____________________
+
+    def test_quarantine_is_loud_on_every_build():
+        """Every quarantined scene names itself in the build log, rather than passing silently.
+    
+        build.sh runs this lane as `pytest -q --no-header`, which prints a warnings summary. A
+        quarantine nobody sees is the same silent absence this gate exists to end.
+        """
+        authorings, consumers, _ = scan()
+        still = sorted(
+            {a.scene for a in authorings} & set(KNOWN_UNBOUND) - set(consumers)
+        )
+        for name in still:
+            warnings.warn(
+                f"VSPLIT-NO-OP quarantine: {name} authors a `vsplit:` that reaches no ROM byte "
+                f"(no scene_vsplit_fires consumer). {KNOWN_UNBOUND[name]}",
+                UserWarning,
+            )
+        # The arm itself asserts the quarantine is not empty-and-forgotten in the other
+        # direction: if KNOWN_UNBOUND is non-empty, at least one entry must be live, which the
+        # two tests above already pin from both sides. Nothing to assert here beyond the warn.
+>       assert len(still) == len(KNOWN_UNBOUND), (
+            f"KNOWN_UNBOUND holds {len(KNOWN_UNBOUND)} entries but only {len(still)} of them "
+            "are live unbound-vsplit scenes right now. The other tests in this file name the "
+            "specific reason; this arm exists so the count cannot drift unnoticed."
+        )
+E       AssertionError: KNOWN_UNBOUND holds 1 entries but only 0 of them are live unbound-vsplit scenes right now. The other tests in this file name the specific reason; this arm exists so the count cannot drift unnoticed.
+E       assert 0 == 1
+E        +  where 0 = len([])
+E        +  and   1 = len({'Scene_Editor_ojz_act1_sec7_worldwater': 'Aurora authored `vsplit: At(67)` on the world_y-162 layer; the bisect in co...-NO-OP in docs/DEFERRED_WORK.md. Remove this entry in the same change that resolves it -- the tests below force that.'})
+
+tools/test_vsplit_consumer_lint.py:376: AssertionError
+=========================== short test summary info ============================
+FAILED tools/test_vsplit_consumer_lint.py::test_quarantine_entries_still_author_a_vsplit
+FAILED tools/test_vsplit_consumer_lint.py::test_quarantine_is_loud_on_every_build
+2 failed, 5 passed in 1.01s
