@@ -201,8 +201,14 @@ describe('CURRENCY: §6 tells the author to run what aeon actually requires', ()
    * prescribed `touch` as the fix; the rewrite rests entirely on arm B existing.
    */
   it('the staleness gate still has a content-stamp arm, which is why touch is not a fix', (ctx) => {
-    expect(SAVE_AND_BUILD, '§6 no longer warns that `touch` is not a shortcut — it used to PRESCRIBE it')
-      .toContain('`touch` is not a shortcut past this');
+    // A REGEX, NOT A LITERAL SUBSTRING, and the emphasis markers are why.
+    // `markdown-lite` does not combine marks, so `**`touch` is not ...**` paints
+    // its backticks on screen; the bold had to move off the code span and the
+    // literal this line used to hold did not survive that. The SENTENCE is what
+    // is under test, so the assertion tolerates where the `**` sits and nothing
+    // else. See scripts/check-guide-text.mjs, check A.
+    expect(SAVE_AND_BUILD, '§6 no longer warns that `touch` is not a shortcut. It used to PRESCRIBE it.')
+      .toMatch(/`touch` \*{0,2}is not a shortcut past this/);
     if (aeon === null) {
       ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR) — '
         + 'CANNOT MEASURE whether the content-stamp arm §6 rests on still exists');
