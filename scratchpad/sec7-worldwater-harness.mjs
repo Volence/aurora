@@ -54,9 +54,11 @@
 //
 // Never against the live aeon checkout: this harness SAVES.
 
-import { AURORA_DIR } from '../test/support/sibling-root.mjs';
+import {
+  AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved,
+} from '../test/support/sibling-root.mjs';
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot, assertFreshBuild } from './lib/run-root.mjs';
@@ -67,7 +69,12 @@ const RUN = announceRunRoot(runTarget(ROOT));
 const ELECTRON = RUN.electron;
 const MAIN = RUN.main;
 
-const AEONDIR = process.env.AEON_DIR ?? '';
+// ⚠ THE OVERRIDE IS READ THROUGH THE RESOLVER, NEVER OFF `process.env`.
+// This harness SAVES, so it genuinely REQUIRES an explicit override — which is
+// exactly the case `checkoutOverride` exists for. Reading `process.env.AEON_DIR`
+// by hand sees ONE spelling and silently misses the aliases, the disagreement
+// refusal when two spellings disagree, and the set-but-names-nothing error.
+const AEONDIR = checkoutOverride('aeon')?.value ?? '';
 const SHOTS = join(ROOT, 'docs/captures/2026-09-05-sec7-scene');
 
 /** Long and unmistakably this parcel's, so it cannot collide with aeon's own. */
@@ -391,8 +398,23 @@ async function main() {
     throw new Error('AEON_DIR must name a WRITABLE aeon clone — this harness SAVES. '
       + 'Never point it at the live checkout.');
   }
-  if (AEONDIR.replace(/\/+$/, '') === '/home/volence/sonic_hacks/aeon') {
-    throw new Error('AEON_DIR is the LIVE aeon checkout. Refusing: another lane is editing it.');
+  // ⚠ THE DEFAULT-LOCATION FORM, AND THE CHOICE IS LOAD-BEARING.
+  //
+  // What this guard defends is the live lane checkout at aeon's DEFAULT
+  // location. `siblingDefaultPath` passes `allowCheckoutEnv: false` on purpose,
+  // and that is the form to compare against.
+  //
+  // Through the override-aware `siblingPath` the guard breaks BOTH WAYS, because
+  // this harness is always run with AEON_DIR naming a throwaway clone:
+  //   - it would refuse a legitimate AEONDIR=<that clone>, comparing the value
+  //     against itself; and, worse,
+  //   - in that same state AEONDIR=<the real tree> would PASS, because the real
+  //     tree is no longer what `siblingPath` names.
+  // That is failing OPEN on precisely the case the guard exists for.
+  const liveAeon = siblingDefaultPathOrUnresolved('aeon');
+  if (resolve(AEONDIR) === resolve(liveAeon)) {
+    throw new Error(`Refusing: the override names aeon's DEFAULT checkout (${liveAeon}), which is `
+      + 'a live lane tree another agent may be editing. This harness SAVES — point it at a clone.');
   }
   const SCENE_PATH = join(AEONDIR, 'games/sonic4/data/editor/effects', `${SCENE_ID}.json`);
   const META_PATH = join(AEONDIR, 'games/sonic4/data/editor/ojz/act1', `section_${SECTION}.meta.json`);
