@@ -604,19 +604,82 @@ describe('a sweep against its channel\'s screen band', () => {
     }
   });
 
-  it('[6e] a channel with no declared band is CANNOT TELL, never a warning', () => {
-    // `patch_world_ys` reaches 4 channels; aeon declares bands for 0 and 1.
-    // 2 and 3 must be silent for a DIFFERENT reason from [6d], and the verdict
-    // is what separates them — a row asserting only "no message" could not.
-    for (let c = EFFECTS_CHANNEL_BANDS.size; c < EFFECTS_PRESET_MAX_PATCH; c++) {
-      expect(EFFECTS_CHANNEL_BANDS.has(c)).toBe(false);
-      for (const r of ANCHOR_AMP_RUNGS) {
-        expect(anchorSweepBandRefusal(sweepAt(r.amp_shift), c)).toBeNull();
-        expect(anchorSweepBandFit(sweepAt(r.amp_shift), c)!.verdict).toBe('no-band');
-      }
+  // ═══════════════════════════════════════════════════════════════════════
+  // ⚠ THE COVERAGE GAP THESE `no-band` ROWS WERE WRITTEN AGAINST IS CLOSED.
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // Until the 2026-09-05 re-vendor (aeon ddd8881a) aeon declared bands for
+  // channels 0 and 1 only, so 2 and 3 were REAL undeclared channels an author
+  // could reach, and these rows drove `no-band` through the panel's own API on
+  // them. aeon's section-7 `OJZ_WorldWater` pair added 2 (3..160) and 3
+  // (162..223), and `EFFECTS_PRESET_MAX_PATCH` is 4 — so every channel the
+  // panel can address is now declared and **`no-band` is unreachable through
+  // the panel for sonic4**.
+  //
+  // FOUR ROWS WENT RED ON THAT RE-VENDOR AND EVERY ONE OF THEM WAS RIGHT TO.
+  // They were anti-vacuity guards, and [6h]'s said in as many words: "delete it
+  // or point it at a real gap". Neither deleting them nor letting them pass
+  // over an empty loop is acceptable — `anchorSweepNoBandAdvisory` is still
+  // live code, and the gap it discloses returns the moment aeon retires a
+  // `patchable()` or Aurora grows a fifth channel. So they are pointed at a
+  // SYNTHETIC undeclared channel (`UNDECLARED_CHANNEL`), and the fact that the
+  // real gap is closed is asserted by `[6e0]` rather than assumed — that row
+  // goes red if a real gap ever reopens, which is when these rows should go
+  // back to driving it through channels an author can actually reach.
+  //
+  // The synthetic channel is honest about what it does and does not prove: it
+  // exercises the ARM, not the panel path, and `[6e0]` is what keeps the
+  // difference visible instead of letting a green suite imply the gap is
+  // still being measured where authors live.
+
+  /**
+   * A channel index aeon declares no band for, chosen so the `no-band` arm can
+   * still be exercised now that every panel-addressable channel is declared.
+   * Derived, never typed: the first index at or above `EFFECTS_PRESET_MAX_PATCH`
+   * that the vendored map does not carry.
+   */
+  const UNDECLARED_CHANNEL = (() => {
+    for (let c = EFFECTS_PRESET_MAX_PATCH; c < EFFECTS_PRESET_MAX_PATCH + 64; c++) {
+      if (!EFFECTS_CHANNEL_BANDS.has(c)) return c;
     }
-    // Anti-vacuous: the loop above really ran over undeclared channels.
-    expect(EFFECTS_PRESET_MAX_PATCH).toBeGreaterThan(EFFECTS_CHANNEL_BANDS.size);
+    throw new Error('no undeclared channel index exists to exercise the `no-band` arm');
+  })();
+
+  it('[6e0] EVERY panel-addressable channel is declared — so `no-band` is out of an author\'s reach', () => {
+    // The data fact the four rows below are shaped around, asserted rather than
+    // commented. If aeon retires a `patchable()` (or Aurora grows a channel past
+    // what aeon declares) this goes red, and the rows below should go back to
+    // driving `no-band` through a channel an author can actually select.
+    const undeclared: number[] = [];
+    for (let c = 0; c < EFFECTS_PRESET_MAX_PATCH; c++) {
+      if (!EFFECTS_CHANNEL_BANDS.has(c)) undeclared.push(c);
+    }
+    expect(undeclared,
+      'a REAL coverage gap has reopened: aeon no longer declares a band for every channel the '
+      + 'panel can address. `anchorSweepNoBandAdvisory` is reachable by an author again, so the '
+      + 'no-band rows below should drive it through these channels instead of UNDECLARED_CHANNEL')
+      .toEqual([]);
+    // Anti-vacuous: there really are channels, and the map really covers them.
+    expect(EFFECTS_PRESET_MAX_PATCH).toBeGreaterThan(0);
+    expect(EFFECTS_CHANNEL_BANDS.size).toBeGreaterThanOrEqual(EFFECTS_PRESET_MAX_PATCH);
+    // ...and the synthetic index really is outside the map, or the rows below
+    // would be testing a declared channel while claiming otherwise.
+    expect(EFFECTS_CHANNEL_BANDS.has(UNDECLARED_CHANNEL)).toBe(false);
+    expect(UNDECLARED_CHANNEL).toBeGreaterThanOrEqual(EFFECTS_PRESET_MAX_PATCH);
+  });
+
+  it('[6e] a channel with no declared band is CANNOT TELL, never a warning', () => {
+    // Silence for a DIFFERENT reason from [6d], and the verdict is what
+    // separates them — a row asserting only "no message" could not.
+    expect(EFFECTS_CHANNEL_BANDS.has(UNDECLARED_CHANNEL)).toBe(false);
+    for (const r of ANCHOR_AMP_RUNGS) {
+      expect(anchorSweepBandRefusal(sweepAt(r.amp_shift), UNDECLARED_CHANNEL)).toBeNull();
+      expect(anchorSweepBandFit(sweepAt(r.amp_shift), UNDECLARED_CHANNEL)!.verdict)
+        .toBe('no-band');
+    }
+    // Anti-vacuous: the ladder really has rungs, so the loop above compared
+    // something.
+    expect(ANCHOR_AMP_RUNGS.length).toBeGreaterThan(0);
   });
 
   it('[6f] the sentence describes BOTH edges, and does not call either one "clipped"', () => {
@@ -665,27 +728,24 @@ describe('a sweep against its channel\'s screen band', () => {
   // whose emptiness is what makes a refusal legible by showing up at all.
 
   it('[6h] a channel aeon declares NO band for SAYS SO — it is not left blank', () => {
-    const undeclared: number[] = [];
-    for (let c = 0; c < EFFECTS_PRESET_MAX_PATCH; c++) {
-      if (!EFFECTS_CHANNEL_BANDS.has(c)) undeclared.push(c);
-    }
-    // Anti-vacuous, and LOUD if the data ever closes the gap: with every
-    // channel declared this row has nothing to measure and must say so rather
-    // than pass.
-    expect(undeclared.length,
-      'aeon now declares a band for EVERY channel — this row CANNOT MEASURE the no-band '
-      + 'advisory any more and is not a pass; delete it or point it at a real gap')
-      .toBeGreaterThan(0);
+    // Driven on the SYNTHETIC undeclared channel: see the block above [6e0].
+    // The real gap this row was written against is closed, and [6e0] is what
+    // asserts that rather than this row quietly passing over an empty loop.
+    const undeclared = [UNDECLARED_CHANNEL];
+    expect(EFFECTS_CHANNEL_BANDS.has(UNDECLARED_CHANNEL)).toBe(false);
 
     // The declared list the sentence quotes, rebuilt here from the data rather
-    // than copied off the screen.
+    // than copied off the screen — and it must be able to spell a list of ANY
+    // length, since aeon went from two declared channels to four in one
+    // re-vendor and a builder capped at two turned that into a red row about
+    // phrasing rather than about the advisory.
     expect(EFFECTS_CHANNEL_BANDS_DECLARED.length,
-      'CANNOT MEASURE the declared-channel phrasing: this row only knows how to spell a list '
-      + 'of one or two, and aeon now declares more')
-      .toBeLessThanOrEqual(2);
-    const declaredPhrase = EFFECTS_CHANNEL_BANDS_DECLARED.length === 1
-      ? `channel ${EFFECTS_CHANNEL_BANDS_DECLARED[0]}`
-      : `channels ${EFFECTS_CHANNEL_BANDS_DECLARED[0]} and ${EFFECTS_CHANNEL_BANDS_DECLARED[1]}`;
+      'CANNOT MEASURE the declared-channel phrasing: aeon declares no channels at all')
+      .toBeGreaterThan(0);
+    const ds = EFFECTS_CHANNEL_BANDS_DECLARED;
+    const declaredPhrase = ds.length === 1
+      ? `channel ${ds[0]}`
+      : `channels ${ds.slice(0, -1).join(', ')} and ${ds[ds.length - 1]}`;
 
     for (const c of undeclared) {
       for (const r of ANCHOR_AMP_RUNGS) {
@@ -721,7 +781,12 @@ describe('a sweep against its channel\'s screen band', () => {
     // healthy sweep is what makes a refusal legible by APPEARING, so a
     // permanent note there would cost the refusal its loudest signal — but only
     // on a channel where a refusal can appear at all.
-    for (let c = 0; c < EFFECTS_PRESET_MAX_PATCH; c++) {
+    // Every panel-addressable channel PLUS the synthetic undeclared one, so the
+    // property is checked on both kinds of channel. Sweeping 0..MAX_PATCH alone
+    // would now only ever see declared channels and could not tell you that the
+    // advisory stays out of the refusal's slot, because it would never fire.
+    const channels = [...Array(EFFECTS_PRESET_MAX_PATCH).keys(), UNDECLARED_CHANNEL];
+    for (const c of channels) {
       const refusable = ANCHOR_AMP_RUNGS
         .filter((r) => anchorSweepBandRefusal(sweepAt(r.amp_shift), c) !== null);
       const advised = ANCHOR_AMP_RUNGS
@@ -736,10 +801,16 @@ describe('a sweep against its channel\'s screen band', () => {
       // And it appears on exactly the channels aeon does not declare.
       expect(advised.length > 0).toBe(!EFFECTS_CHANNEL_BANDS.has(c));
     }
-    // Anti-vacuous: this repo really does have both kinds of channel today, so
-    // the loop above compared something.
+    // Anti-vacuous: the loop above really saw BOTH kinds of channel, and really
+    // saw a refusal — a sweep over declared channels alone, or over channels on
+    // which nothing is ever refused, would satisfy the property vacuously.
     expect(EFFECTS_CHANNEL_BANDS.size).toBeGreaterThan(0);
-    expect(EFFECTS_PRESET_MAX_PATCH).toBeGreaterThan(EFFECTS_CHANNEL_BANDS.size);
+    expect(channels.some((c) => EFFECTS_CHANNEL_BANDS.has(c))).toBe(true);
+    expect(channels.some((c) => !EFFECTS_CHANNEL_BANDS.has(c))).toBe(true);
+    expect(channels.some((c) => ANCHOR_AMP_RUNGS
+      .some((r) => anchorSweepBandRefusal(sweepAt(r.amp_shift), c) !== null)),
+    'no channel in this sweep can produce a refusal at all, so "never both" is vacuous')
+      .toBe(true);
   });
 
   it('[6j] CENSUS: every channel × rung, one verdict, and the sentences it is allowed', () => {
@@ -749,7 +820,11 @@ describe('a sweep against its channel\'s screen band', () => {
     // not about the two this suite happens to name.
     const seen: Record<string, number> = { 'no-band': 0, 'cannot-tell': 0, 'cannot-fit': 0 };
     let cells = 0;
-    for (let c = 0; c < EFFECTS_PRESET_MAX_PATCH; c++) {
+    // The census spans every panel-addressable channel PLUS the synthetic
+    // undeclared one, so all three arms are still reached now that aeon
+    // declares a band for all four real channels. See the block above [6e0].
+    const channels = [...Array(EFFECTS_PRESET_MAX_PATCH).keys(), UNDECLARED_CHANNEL];
+    for (const c of channels) {
       for (const r of ANCHOR_AMP_RUNGS) {
         const s = sweepAt(r.amp_shift);
         const fit = anchorSweepBandFit(s, c)!;
@@ -776,7 +851,7 @@ describe('a sweep against its channel\'s screen band', () => {
         }
       }
     }
-    expect(cells).toBe(EFFECTS_PRESET_MAX_PATCH * ANCHOR_AMP_RUNGS.length);
+    expect(cells).toBe(channels.length * ANCHOR_AMP_RUNGS.length);
     expect(seen['no-band'] + seen['cannot-tell'] + seen['cannot-fit']).toBe(cells);
     // All three arms are actually exercised — a census over a sample that only
     // reached one verdict would prove nothing about the other two.

@@ -2396,8 +2396,10 @@ export function anchorSweepSummary(sweep: EffectsPresetAnchorSweep): string | nu
  *     told it fits stops looking, and Aurora cannot honour that. The only true
  *     sentence would be "we cannot tell", which is what an empty hint already
  *     means everywhere else on this panel.
- *   • `no-band` (channels 2 and 3 today — `patch_world_ys` reaches 4, aeon
- *     declares bands for 0 and 1). Nothing is known — and THAT IS NOW SAID OUT
+ *   • `no-band` — NO channel in sonic4 as of the 2026-09-05 re-vendor, which
+ *     declares bands for all four of 0..3. Until then aeon declared 0 and 1
+ *     only and `patch_world_ys` reached 4, so 2 and 3 landed here. Nothing is
+ *     known — and THAT IS NOW SAID OUT
  *     LOUD by `anchorSweepNoBandAdvisory`, in a neutral hint, because an empty
  *     space cannot tell an author "we checked and found nothing certain" apart
  *     from "this feature does not reach your channel". This is NOT the same
@@ -2463,9 +2465,12 @@ function channelList(cs: readonly number[]): string {
  * space is indistinguishable from a clean result.
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * `EFFECTS_PRESET_MAX_PATCH` is 4; aeon's bands sidecar declares 0 and 1. An
- * author who reaches channel 2 gets `no-band`, and before this helper the panel
- * rendered NOTHING there — the same nothing a well-fitting sweep on channel 1
+ * `EFFECTS_PRESET_MAX_PATCH` is 4. aeon's bands sidecar declared 0 and 1 only
+ * until the 2026-09-05 re-vendor and now declares all four, so THIS HELPER
+ * CANNOT FIRE FOR sonic4 TODAY — it is kept because the gap is aeon's data to
+ * reopen, not a state Aurora has designed away; see `channel-bands.ts`'s header.
+ * When it could fire, an author who reached channel 2 got `no-band` and the
+ * panel rendered NOTHING there — the same nothing a well-fitting sweep on channel 1
  * gets. Nothing reads as "we looked and it is fine", which is precisely the
  * reassurance the whole feature exists to withhold, one layer up: the fit
  * machinery never ran at all on this channel, and saying so is not optional.
@@ -2473,9 +2478,9 @@ function channelList(cs: readonly number[]): string {
  * ═══ WHY THIS ARM SPEAKS AND `cannot-tell` DOES NOT — READ BEFORE "FIXING" ═══
  *
  * The asymmetry is deliberate. Someone will one day notice that `cannot-tell` is
- * ALSO permanently silent — channel 0 is 218 lines against a widest sweep of 128
- * px, so nothing an author can pick is ever refused there — and conclude the two
- * should match. They should not, for three reasons, and only the third is taste:
+ * ALSO permanently silent on some channels — 0 is 218 lines and 2 is 158,
+ * against a widest sweep of 128 px, so nothing an author can pick is ever
+ * refused on either — and conclude the two should match. They should not, for three reasons, and only the third is taste:
  *
  *  1. THEY ARE DIFFERENT KINDS OF FACT. `cannot-tell` is a state aeon's contract
  *     NAMES and defines: the check ran, compared travel against lines, and the
