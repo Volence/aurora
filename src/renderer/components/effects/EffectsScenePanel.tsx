@@ -79,7 +79,7 @@ import {
   layerExtrasLine,
   SCENE_FORM_CHOICES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS,
   EFFECTS_V_FACTOR_BOUNDS, EFFECTS_V_CENTER_BOUNDS, EFFECTS_V_OFFSET_BOUNDS,
-  PLANE_FACTOR_ROWS, PLANE_FACTOR_HINT,
+  PLANE_FACTOR_ROWS, PLANE_FACTOR_HINT, planeAFactorAdvisory,
   TABLE_REF_ROW, SCENE_DEFORM_ROWS, SCENE_DEFORM_ROW_SHARED, V_DEFORM_ROW, LAYER_DEFORM_ROW,
   tableRefFormOptions, tableRefFormOf, tableRefFromForm, tableRefParams, tableParamLabel,
   tableRefParamValue, setTableRefParam, tableRefBinPath, binPathRefusal, tableRefAdvisory,
@@ -629,6 +629,19 @@ export default function EffectsScenePanel(): React.ReactElement {
                 <FactorField title={`Layer ${i} ${PLANE_FACTOR_ROWS.fa.title}`} value={layer.fa}
                   onChange={(f) => run(setLayerFieldCommand(library, selected.id, i, 'fa', f))} />
               </Field>
+              {/* THE PLANE A ADVISORY (2026-09-05). Under the control that sets
+                  it, the same shape as the fire-line and curve hints, because
+                  `ojz_act1_sec7_worldwater` set fa below FACTOR_1 on two layers
+                  from this exact picker and the panel said nothing — the owner
+                  read it off the running game as "the fg loading wrong".
+                  ADVICE, NOT A REFUSAL: aeon's layer() has no guard on fa, so
+                  the option list is untouched and the scene still saves. The
+                  derivation and both engine quotes live over
+                  `planeAFactorAdvisory`; nothing is restated here. */}
+              {(() => {
+                const planeA = planeAFactorAdvisory(layer);
+                return planeA === null ? null : <Hint under tone="warning">{planeA}</Hint>;
+              })()}
               {/* WHERE THIS BAND'S PICTURE STARTS OVER, IN THE TOOLTIP AND NOT
                   ON THE ROW (ROADMAP O21). Plane B is 512 px wide and wraps, so
                   a band with any live factor repeats across an act — that is the

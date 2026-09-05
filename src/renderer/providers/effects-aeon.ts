@@ -144,6 +144,71 @@ export const PLANE_FACTOR_HINT =
   'A = foreground, B = background; fraction of camera movement this strip scrolls; 1 = with the camera';
 
 // ---------------------------------------------------------------------------
+// THE PLANE A ADVISORY — 2026-09-05, after `ojz_act1_sec7_worldwater`
+// ---------------------------------------------------------------------------
+//
+// THE INCIDENT. A scene authored in this very panel shipped with `fa`
+// `FACTOR_1_8` on layer 0 and `FACTOR_3_4` on layer 2, and the owner's report
+// off the running game was "only thing I see in section 7 is the fg loading
+// wrong?". The picker offered those values, took them, and said nothing.
+//
+// WHY THAT IS WRONG, IN AEON'S WORDS AND NOT IN OURS. Two sentences from the
+// engine, both read at aeon 044573da0278b1f1121bbea31ef21aef3785237c:
+//
+//   engine/level/parallax.emp:2505
+//     "Plane A is the gameplay plane"
+//
+//   engine/level/scene_dsl.emp:2105 (scene()'s left_column_mask guard)
+//     "In a side-scrolling scene fa tracks the camera (FACTOR_1)"
+//
+// So `fa` is not the parallax dial — `fb` is. `fa` is the rate at which the
+// surface the player physically stands on moves past the camera, and any value
+// but `FACTOR_1` means the picture and the collision disagree.
+//
+// ⚠ ADVICE, NEVER A REFUSAL, AND THE RULE IS RULED RATHER THAN PREFERRED.
+// `parseColours`' docblock in effects-preset.ts and `boundary.ts`'s header both
+// carry it: "a control that refuses what the generator accepts LOOKS LIKE
+// DILIGENCE and is a bound we invented". aeon's `layer()` HAS NO GUARD ON `fa`
+// AT ALL — its twelve `ensure`s cover `world_y`, the own()/deform pairing, the
+// deform shifts, phase, speed, and the five curve rules, and not one of them
+// mentions `fa` (scene_dsl.emp, the `layer()` body). A document carrying a
+// non-`FACTOR_1` `fa` builds. Refusing it here would reject what aeon accepts.
+//
+// ⚠ AND IT SAYS NO NUMBER IT DID NOT DERIVE. The tempting sentence — "every
+// shipped scene pins fa at FACTOR_1" — is a census, so it was taken rather than
+// asserted, and it is deliberately NOT in the string: the count lives in the
+// packet (docs/reviews/2026-09-05-sec7-fa-fix.md), where it can carry the
+// revision it was taken at. A string in the app cannot, and would rot silently.
+//
+// PACKED FACTORS SAY NOTHING. `{s1,s2,op}` is the escape hatch and a packed
+// triple can perfectly well encode 1:1; deciding that from here would need the
+// engine's decoder, and guessing would put a false sentence in front of an
+// author who did the harder thing correctly. `isNamedFactor` is the gate, the
+// same split `curveFieldOptions` keeps for the same reason.
+
+/** The engine sentence this advisory is derived from, quoted once. */
+export const PLANE_A_GAMEPLAY_PLANE = 'Plane A is the gameplay plane';
+
+/**
+ * The sentence for a layer whose Plane A factor does not track the camera, or
+ * null. Null for `FACTOR_1` (the tracking value) and for every packed factor
+ * (unreadable as a fraction from here — see the block above).
+ *
+ * Nothing here refuses a write: the picker keeps every option and the scene
+ * still saves. See the block above for the ruling that makes that mandatory.
+ */
+export function planeAFactorAdvisory(layer: Pick<EffectsLayer, 'fa'>): string | null {
+  if (!isNamedFactor(layer.fa)) return null;
+  if (layer.fa === 'FACTOR_1') return null;
+  return `${PLANE_A_GAMEPLAY_PLANE} — the level the player stands on — and aeon's scene_dsl.emp `
+    + 'says "In a side-scrolling scene fa tracks the camera (FACTOR_1)". At '
+    + `${factorLabel(layer.fa)} the foreground scrolls at a rate the camera does not, so the `
+    + 'geometry slides under the player while collision stays where it was. Parallax is what '
+    + 'Plane B is for. The build accepts this — aeon\'s layer() has no guard on fa — so nothing '
+    + 'here refuses it.';
+}
+
+// ---------------------------------------------------------------------------
 // curve.to and vsplit.at — parcel H (triage 2026-08-26 §A.7, §B row H)
 // ---------------------------------------------------------------------------
 //
