@@ -792,12 +792,11 @@ describe('curve / vsplit controls (parcel H)', () => {
     // derivation and the derivation renders the constant, so there is exactly
     // one copy of the base sentence in the repo.
     expect(hint.startsWith(LAYER_CURVE_ROW.hint)).toBe(true);
-    expect(hint).toMatch(/FACTOR_1_4 is greyed/);
-    expect(hint).toMatch(/this layer's own fb/);
-    expect(hint).toMatch(/goes nowhere and the build refuses it/);
+    expect(hint).toMatch(/fb itself \(FACTOR_1_4\) is greyed/);
+    expect(hint).toMatch(/a ramp with equal ends is refused by the build/);
     // PER LAYER, which is the half a generic sentence would have missed: the
     // dead entry is a DIFFERENT one on each card.
-    expect(curveRowHint({ fb: 'FACTOR_3_8' })).toMatch(/FACTOR_3_8 is greyed/);
+    expect(curveRowHint({ fb: 'FACTOR_3_8' })).toMatch(/fb itself \(FACTOR_3_8\) is greyed/);
     expect(curveRowHint({ fb: 'FACTOR_3_8' })).not.toMatch(/FACTOR_1_4/);
   });
 
@@ -808,7 +807,7 @@ describe('curve / vsplit controls (parcel H)', () => {
     expect(aliases.length, 'the alias class must really be more than one name').toBeGreaterThan(1);
     const hint = curveRowHint({ fb: 'FACTOR_LOCKED' });
     for (const a of aliases) expect(hint, `${String(a)} must be named`).toContain(String(a));
-    expect(hint).toMatch(/are greyed in the list/);
+    expect(hint).toMatch(/fb itself \(FACTOR_LOCKED and FACTOR_0\) is greyed/);
 
     // AND THE HEIGHT GATE IS STRUCTURAL, not a count that happens to be zero:
     // a packed triple no published name claims refuses nothing, so the hint is

@@ -988,13 +988,21 @@ export function curveRefusedFactors(layer: Pick<EffectsLayer, 'fb'>): EffectsFac
 export function curveRowHint(layer: Pick<EffectsLayer, 'fb'>): string {
   const refused = curveRefusedFactors(layer);
   if (refused.length === 0) return LAYER_CURVE_ROW.hint;
-  const names = refused.map(factorLabel);
-  const subject = names.length === 1
-    ? `${names[0]} is greyed in the list because it is`
-    : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} are greyed in the list `
-      + 'because they are';
-  return `${LAYER_CURVE_ROW.hint}. ${subject} this layer's own fb: a ramp with equal ends goes `
-    + 'nowhere and the build refuses it.';
+  // ⚠ MERGED INTO THE BASE SENTENCE, NOT APPENDED TO IT, AND THE REASON IS A
+  // MEASUREMENT. The first cut appended a second sentence and the harness's
+  // `[5c]` measured the row's hint growing from 33px to 99px: SIX lines where
+  // there had been two, on every layer card, permanently. At 16 layers that is
+  // more height than the whole Layers list paints. The refusal follows FROM the
+  // mechanism the base sentence already states ("ramps from fb ... to this
+  // value"), so saying it as a consequence rather than as a second fact costs
+  // two lines instead of four and reads better: re-measured at 66px, +33px.
+  // ⚠ IF YOU LENGTHEN THIS STRING, RE-RUN `[5c]` AND QUOTE THE NEW NUMBER.
+  //
+  // "fb itself" covers the alias pair without a plural verb: FACTOR_LOCKED and
+  // FACTOR_0 are one value with two spellings and BOTH rows go grey, so both
+  // are named inside the parenthesis.
+  return `${LAYER_CURVE_ROW.hint}, so fb itself (${refused.map(factorLabel).join(' and ')}) is `
+    + 'greyed: a ramp with equal ends is refused by the build.';
 }
 
 // ---------------------------------------------------------------------------

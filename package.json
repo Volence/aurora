@@ -145,6 +145,7 @@
     "harness:guard-surface": "node scratchpad/guard-surface-harness.mjs",
     "harness:handover-band": "node scratchpad/handover/handover-band-harness.mjs",
     "harness:import-cdp": "node scratchpad/import-cdp-harness.mjs",
+    "harness:inert-control-silence": "node scratchpad/inert-control-silence-harness.mjs",
     "harness:lag-retire": "node scratchpad/lag-retire-harness.mjs",
     "harness:layer-bound": "node scratchpad/layer-bound-harness.mjs",
     "harness:layer-dsa-dsb": "node scratchpad/layer-dsa-dsb-harness.mjs",
