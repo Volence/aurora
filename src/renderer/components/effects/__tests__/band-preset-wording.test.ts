@@ -556,9 +556,9 @@ describe('the three limits say the words that carry them', () => {
     it('carries a dated EXPIRES list with an owner per half', () => {
       expect(NO_PREVIEW).toMatch(/Expires \(2026-08-30\):/);
       expect(NO_PREVIEW).toMatch(/when that directory leaves aeon's tree or its README stops saying so/);
-      expect(NO_PREVIEW).toMatch(/a second section or camera position is measured — aeon's lane/);
+      expect(NO_PREVIEW).toMatch(/a second section or camera position is measured \(aeon's lane\)/);
       // Content, not position: the drift loop below owns "nothing after it".
-      expect(NO_PREVIEW).toMatch(/when this editor draws a band — Aurora's\./);
+      expect(NO_PREVIEW).toMatch(/when this editor draws a band \(Aurora's\)\./);
     });
 
     /**

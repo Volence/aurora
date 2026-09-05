@@ -342,7 +342,7 @@ export const PRESET_LIMITS: readonly PresetLimit[] = Object.freeze([
     // row would go add one they do not need.
     body:
       'aeon steps a band-demo table with START held + UP to install the next program and ' +
-      'START + DOWN to remove it. That table is a hand-typed dc.l list — this document ' +
+      'START + DOWN to remove it. That table is a hand-typed dc.l list, and this document ' +
       'does not add itself to it. aeon\'s build fails loudly when a preset document is ' +
       'reached by neither a table row nor a section binding (aeon 4aa2abc0), so the ' +
       'omission is not silent, but adding the row is a programmer\'s edit.',
@@ -353,7 +353,7 @@ export const PRESET_LIMITS: readonly PresetLimit[] = Object.freeze([
     body:
       'A perfectly legal band over an unused palette entry, or one whose colour matches ' +
       'the base it repaints, builds green and shows nothing. No check anywhere in the ' +
-      'pipeline catches that — not this panel, not the schema, not the build.',
+      'pipeline catches that: not this panel, not the schema, not the build.',
   }),
 ]);
 
@@ -460,20 +460,20 @@ export function presetLimitsShort(): readonly PresetLimitShort[] {
  * `NO_PREVIEW` itself is unchanged and is what the element's `title` carries.
  */
 export const NO_PREVIEW_SHORT =
-  'No preview. Aurora draws no raster band — there is nothing here to check one against, and a '
+  'No preview. Aurora draws no raster band: there is nothing here to check one against, and a '
   + 'wrong preview would be worse than none. You see it when the ROM runs.';
 
 export const NO_PREVIEW =
   'No preview. This editor draws no band: the viewport composites no rasterRef, and ' +
   'nothing in Aurora has sampled CRAM, so there is nothing to draw a faithful preview ' +
-  'from — and an unfaithful one would be worse than none. There is now ONE measured ' +
+  'from, and an unfaithful one would be worse than none. There is now ONE measured ' +
   'frame, in aeon\'s tree and not in this one: aeon 4a4d3474 (2026-08-30), ' +
   'docs/research/reference_captures/2026-08-30-sec5-band/, section 5 at one camera ' +
   'position in aeon\'s emulator, CRAM line 2 entry 8 reading $0EA4 inside the band and ' +
   '$0000 outside it and on the control. A preview here could at most be checked against ' +
   'that one frame; none is built. Expires (2026-08-30): when that directory leaves ' +
   'aeon\'s tree or its README stops saying so, or a second section or camera position is ' +
-  'measured — aeon\'s lane; or when this editor draws a band — Aurora\'s.';
+  'measured (aeon\'s lane); or when this editor draws a band (Aurora\'s).';
 
 // ---------------------------------------------------------------------------
 // Field wording, read out of the schema rather than retyped beside it
@@ -701,7 +701,7 @@ export function presetIdRefusal(id: string, library: EffectsPresetLibrary): stri
   if (id === '') return 'Enter an id.';
   if (!EFFECTS_PRESET_ID_PATTERN.test(id)) {
     return `"${id}" is not a legal preset id. It must match ` +
-      `${EFFECTS_PRESET_ID_PATTERN.source} — lower case, starting with a letter, up to 32 ` +
+      `${EFFECTS_PRESET_ID_PATTERN.source}: lower case, starting with a letter, up to 32 ` +
       'characters. The id becomes part of a generated .emp symbol, which is why hyphens ' +
       'and capitals are out.';
   }
@@ -711,7 +711,7 @@ export function presetIdRefusal(id: string, library: EffectsPresetLibrary): stri
   const taken = library.unreadable.find((u) => u.path.endsWith(`/${id}.json`));
   if (taken) {
     return `"${id}" is taken by ${taken.path}, which exists but could not be read. Saving ` +
-      'over it would destroy it — fix or remove that file by hand, or pick another id.';
+      'over it would destroy it. Fix or remove that file by hand, or pick another id.';
   }
   return null;
 }
@@ -836,7 +836,7 @@ export function deletePresetRefusal(
     + `${bound.length === 1 ? 'that binding' : 'those bindings'} naming a document that does not `
     + 'exist, and aeon\'s build refuses that by name. Set the raster binding back to '
     + `"${RASTER_REF_ROW.unbound}" on ${bound.length === 1 ? 'that section' : 'those sections'} `
-    + 'first — the Section dropdown above.';
+    + 'first, in the Section dropdown above.';
 }
 
 /**
@@ -1092,7 +1092,7 @@ export function lastBandRefusal(preset: EffectsPreset): string | null {
   if (channel !== null) return channel;
   if ((preset.bands ?? []).length > 1) return null;
   return `preset "${preset.id}": this is its only raster band, and a preset must have at least `
-    + 'one — the schema refuses an empty bands list, because a document that emits a zero-band '
+    + 'one: the schema refuses an empty bands list, because a document that emits a zero-band '
     + 'program is a document that should not exist. Delete the preset instead.';
 }
 
@@ -1243,7 +1243,7 @@ export function parseColours(
   if (tokens.length === 0) {
     return {
       ok: false,
-      reason: `${where}enter at least one colour word. An empty list is refused by the engine — `
+      reason: `${where}enter at least one colour word. An empty list is refused by the engine: `
         + 'the ON op would write nothing and the derived restore would have no span.',
     };
   }
@@ -1251,7 +1251,7 @@ export function parseColours(
   for (const t of tokens) {
     const n = /^0[xX][0-9a-fA-F]+$/.test(t) ? Number.parseInt(t, 16) : Number(t);
     if (!Number.isInteger(n)) {
-      return { ok: false, reason: `${where}"${t}" is not an integer. Colours are CRAM words — `
+      return { ok: false, reason: `${where}"${t}" is not an integer. Colours are CRAM words: `
         + 'decimal, or 0x-prefixed hex.' };
     }
     if (n < 0 || n > CRAM_WORD_MAX) {
@@ -1259,7 +1259,7 @@ export function parseColours(
       // — and says the swatch is not to be trusted here, because it masks and
       // will happily paint an out-of-range word as a legal colour.
       return { ok: false, reason: `${where}"${t}" is not a CRAM word. A colour is ONE 16-bit `
-        + `word (0..${CRAM_WORD_MAX}, or $0000..$FFFF) — it is emitted into the raster `
+        + `word (0..${CRAM_WORD_MAX}, or $0000..$FFFF). It is emitted into the raster `
         + 'program\'s [u16; …] array, so a wider number names no colour at all. Refused; the '
         + 'colour list in the document is unchanged. (The swatch masks, so it would have shown '
         + 'you a plausible colour for this.)' };
@@ -1319,8 +1319,8 @@ export function addrGloss(addr: number): string {
   const at = cramLocation(addr);
   if (at === null) return 'not a CRAM address';
   const where = `line ${at.line} · entry ${at.entry}`;
-  if (!at.inCram) return `${where} — past CRAM's ${CRAM_LINE_COUNT} lines`;
-  if (!at.aligned) return `${where} — odd byte, not a word boundary`;
+  if (!at.inCram) return `${where}: past CRAM's ${CRAM_LINE_COUNT} lines`;
+  if (!at.aligned) return `${where}: odd byte, not a word boundary`;
   return where;
 }
 
@@ -1346,11 +1346,11 @@ export function colourSwatchTitle(addr: number, i: number, word: number): string
   // plausible colour for it. `addrGloss`'s rule, one field over: name the
   // abnormal case rather than rendering a confident answer for it.
   if (!cramWordIsPaintable(word)) {
-    return `Colour ${i} → ${where} — ${word} is NOT a CRAM word (a colour is one 16-bit word, `
+    return `Colour ${i} → ${where}: ${word} is NOT a CRAM word (a colour is one 16-bit word, `
       + `0..${CRAM_WORD_MAX}). No swatch is drawn for it: the decode masks, so any colour shown `
       + 'here would be invented. Retype the list to replace it.';
   }
-  return `Colour ${i} → ${where} — ${word} (${fmtGenesisWord(word)}). `
+  return `Colour ${i} → ${where}: ${word} (${fmtGenesisWord(word)}). `
     + 'Click to open the R/G/B sliders. The list beside it stays the wire value.';
 }
 
@@ -1418,7 +1418,7 @@ export function cramSpanAdvisory(
   const end = at.entry + colours.length;
   if (end <= CRAM_LINE_ENTRIES) return null;
   return `${bandSubject(presetId, index)}: ${colours.length} colours from entry ${at.entry} `
-    + `run to entry ${end - 1}, past the end of line ${at.line} — a CRAM line holds `
+    + `run to entry ${end - 1}, past the end of line ${at.line}; a CRAM line holds `
     + `${CRAM_LINE_ENTRIES}. stream_cram requires the span to stay within the line, so this `
     + 'builds red. Lower the address or shorten the list.';
 }
@@ -1582,7 +1582,7 @@ export const EMPTY_CYCLES_ADVISORY: string = (() => {
   const m = /An EMPTY array is legal JSON here[^.]*\.[^.]*\./.exec(CYCLES_TITLE);
   if (!m) {
     throw new Error('the schema\'s `cycles` description no longer carries its "An EMPTY array is '
-      + 'legal JSON here" sentence — re-read the contract before advising on an empty script');
+      + 'legal JSON here" sentence. Re-read the contract before advising on an empty script');
   }
   return m[0];
 })();
@@ -1601,7 +1601,7 @@ export function variantsState(preset: EffectsPreset): VariantsState {
 
 export const VARIANTS_STATE_OPTIONS: readonly { value: VariantsState; label: string }[] = Object.freeze([
   { value: 'absent', label: 'every slot keeps its hand-authored value (key absent)' },
-  { value: 'present', label: 'array — slot by slot below' },
+  { value: 'present', label: 'array: slot by slot below' },
 ]);
 
 /**
@@ -1964,7 +1964,7 @@ export const BAND_EDGE_LAW =
 
 /** Rule 2, as a sentence. */
 export const BAND_ORDER_LAW =
-  'a band covers top..bot-1, so top must stay above bot — the engine refuses top >= bot';
+  'a band covers top..bot-1, so top must stay above bot: the engine refuses top >= bot';
 
 /**
  * Rule 3, as a sentence. The one a split is shaped by.
@@ -1979,13 +1979,13 @@ export const BAND_ORDER_LAW =
  */
 export const BAND_GAP_LAW =
   'two bands cannot fire on one screen line: compose merges same-line fires into ONE record, and '
-  + "the restore's fire carries the restore ALONE — a second stream op cannot be placed in the same "
+  + "the restore's fire carries the restore ALONE: a second stream op cannot be placed in the same "
   + 'blanking window. Two records on one fire line also store an arm gap of -1, whose byte is the '
   + 'PARK word, which kills every later fire in the frame silently';
 
 /** Rule 4, as a sentence. */
 export const BAND_OVERLAP_LAW =
-  'two bands may share CRAM colours only if they do not overlap vertically — whichever restore '
+  'two bands may share CRAM colours only if they do not overlap vertically: whichever restore '
   + "comes first writes this frame's BASE palette over the whole span, so the outer band's tint "
   + "ends at the inner band's bottom edge";
 
@@ -2071,10 +2071,10 @@ export function bandEdgeRefusal(
   const holds = `${label} is still ${band[edge]}.`;
   if (outsideFire) {
     return `${bandSubject(presetId, index, label)}: ${value} is not a `
-      + `screen line — ${BAND_EDGE_LAW}. Refused; ${holds}`;
+      + `screen line: ${BAND_EDGE_LAW}. Refused; ${holds}`;
   }
   return `${bandSubject(presetId, index, label)}: ${value} would put Top `
-    + `at or below Bot (${edge === 'top' ? `Bot is ${other}` : `Top is ${other}`}) — `
+    + `at or below Bot (${edge === 'top' ? `Bot is ${other}` : `Top is ${other}`}): `
     + `${BAND_ORDER_LAW}. Move the other edge first to make room. Refused; ${holds}`;
 }
 
@@ -2105,7 +2105,7 @@ export function variantLineRefusal(
 
 /** The line-0 rule, in the schema's own words, read out of the contract. */
 export const VARIANT_LINE_0_LAW: string =
-  'Line 0 is the character\'s palette line and the mask\'s bit for it must be clear — aeon\'s '
+  'Line 0 is the character\'s palette line and the mask\'s bit for it must be clear. aeon\'s '
   + 'build refuses the program with "variant: lines mask N selects line 0 (the character\'s) — '
   + 'use bits 1-3".';
 
@@ -2380,7 +2380,7 @@ export const ANCHOR_MOTION_WITHOUT_SEED: string = (() => {
   const m = /A seed without a motion is legal and stationary;[^.]*\./.exec(ANCHOR_SEED_TITLE);
   if (!m) {
     throw new Error('the schema\'s `patch_world_ys` description no longer carries its "A seed '
-      + 'without a motion is legal and stationary" sentence — re-read the contract before '
+      + 'without a motion is legal and stationary" sentence. Re-read the contract before '
       + 'advising an author about a motion with no seed');
   }
   return m[0];
@@ -2402,7 +2402,7 @@ export function newAnchorSweep(): EffectsPresetAnchorSweep {
   if (!m) {
     throw new Error('the schema\'s `anchor_sweep` description no longer names its shipped '
       + 'hand-authored precedent in the shape anchor_sweep(amp_shift: N, period_shift: N) that a '
-      + 'new sweep is seeded from — do NOT hardcode a rung pair: read the contract and re-derive');
+      + 'new sweep is seeded from. Do NOT hardcode a rung pair: read the contract and re-derive');
   }
   return { amp_shift: Number(m[1]), period_shift: Number(m[2]) };
 }
@@ -2481,7 +2481,7 @@ export function anchorSweepSummary(sweep: EffectsPresetAnchorSweep): string | nu
   const steps = ANCHOR_PHASE_RANGE.max + 1;
   const pct = Math.round(((sweep.phase ?? 0) / steps) * 100);
   return `${amp.peak_to_peak_px} px of travel, up and down, once every `
-    + `${period.seconds.toFixed(2)} s — starting ${pct}% into the cycle`;
+    + `${period.seconds.toFixed(2)} s, starting ${pct}% into the cycle`;
 }
 
 /**
@@ -2547,10 +2547,10 @@ export function anchorSweepBandRefusal(
   if (fit === null || fit.verdict !== 'cannot-fit') return null;
   const { travelPx, band } = fit;
   return `${travelPx} px of travel cannot fit channel ${index}: the engine confines this `
-    + `channel's boundary to screen lines ${band.lo}–${band.hi}, which is ${band.lines} `
+    + `channel's boundary to screen lines ${band.lo} to ${band.hi}, which is ${band.lines} `
     + `line${band.lines === 1 ? '' : 's'} counted inclusively, and ${travelPx} > ${band.lines}. `
     + 'The camera decides where the sweep sits in that band, so both ends are reachable and they '
-    + `do not behave alike: past line ${band.hi} the record is not emitted at all — no boundary is `
+    + `do not behave alike: past line ${band.hi} the record is not emitted at all: no boundary is `
     + `drawn anywhere and the band vanishes for that frame, it does not pin to ${band.hi}; below `
     + `line ${band.lo} it is still emitted, clamped up to ${band.lo}, so the boundary pins at the `
     + 'top of the band and stays visible. Pick a smaller Travel.';
@@ -2748,7 +2748,7 @@ export const ANCHOR_MOTION_OPTIONS: readonly { value: AnchorMotionState; label: 
  */
 export function anchorSeedRefusal(worldY: number): string | null {
   if (!Number.isInteger(worldY)) {
-    return 'A world Y is a whole pixel of absolute level space — there is no sub-pixel here.';
+    return 'A world Y is a whole pixel of absolute level space; there is no sub-pixel here.';
   }
   if (worldY < EFFECTS_PRESET_WORLD_Y_RANGE.min || worldY > EFFECTS_PRESET_WORLD_Y_RANGE.max) {
     return `The engine field is a u16, so a world Y is ${EFFECTS_PRESET_WORLD_Y_RANGE.min} to `
@@ -2794,7 +2794,7 @@ export function anchorExtendRefusal(
   if (index <= len) return null;
   const what = key === 'seed' ? 'anchor' : 'motion';
   return `Channel ${len}'s ${what} is not spelled yet, and a positional array cannot have a hole. `
-    + `Spell channel ${len} first — anything but "array ends here" will do.`;
+    + `Spell channel ${len} first. Anything but "array ends here" will do.`;
 }
 
 /**
@@ -3027,7 +3027,7 @@ export const RAMP_MUST_NOT: string = (() => {
     throw new Error(
       'aurora-effects-preset.schema.json no longer states the per-line-curve MUST NOT in its ' +
       '`ramp` property description, which is the only contract-side statement of it and the reason ' +
-      'this panel offers one rate and one start rather than a per-line table. Re-read the schema — ' +
+      'this panel offers one rate and one start rather than a per-line table. Re-read the schema; ' +
       'do NOT retype the sentence here.',
     );
   }
@@ -3226,9 +3226,9 @@ export function rampRateRefusal(
   if (problem === 'sign-hole') {
     return `${subject}: ${px} ${units} HAS NO SPELLING in this encoding. frac256 is a MAGNITUDE `
       + 'and the sign lives on whole alone, so a negative value needs a negative whole and there is '
-      + 'none between -1 and 0 — {whole: 0, frac256: 128} is +0.5, not -0.5. The whole interval '
+      + 'none between -1 and 0: {whole: 0, frac256: 128} is +0.5, not -0.5. The whole interval '
       + `between -1 and 0 is unreachable. The nearest rates you CAN have are ${pair}. Refused, and `
-      + `not rounded to either — ${holds}${caveat([n.below, n.above])}`;
+      + `not rounded to either; ${holds}${caveat([n.below, n.above])}`;
   }
   if (problem === 'above-range' || problem === 'below-range') {
     const end = problem === 'above-range'
@@ -3237,14 +3237,14 @@ export function rampRateRefusal(
     return `${subject}: ${px} ${units} is outside the AUTHORED range. fp16's whole part is `
       + `${EFFECTS_PRESET_FP16_WHOLE_RANGE.min}..${EFFECTS_PRESET_FP16_WHOLE_RANGE.max} and its `
       + `fraction 0..${EFFECTS_PRESET_FP16_FRAC_RANGE.max}/${RAMP_RATE_UNITS_PER_PX}, so ${end}. `
-      + 'The engine\'s STORAGE is wider — signed 16.16, about 64 times this — and a control built '
+      + 'The engine\'s STORAGE is wider (signed 16.16, about 64 times this) and a control built '
       + 'on the storage width would offer you values the build refuses. '
       + `Refused; ${holds}`
       + caveat([problem === 'above-range' ? RAMP_RATE_MAX : RAMP_RATE_MIN]);
   }
   return `${subject}: ${px} ${units} is not a whole number of 1/${RAMP_RATE_UNITS_PER_PX} px, `
     + `which is the finest rate fp16(whole, frac256) can spell. The nearest it has are ${pair}. `
-    + `Refused, and not rounded to either — ${holds}${caveat([n.below, n.above])}`;
+    + `Refused, and not rounded to either; ${holds}${caveat([n.below, n.above])}`;
 }
 
 // ── the span, and the pair the per-field maxima do not describe ─────────────
@@ -3279,7 +3279,7 @@ export function rampSpanRefusal(
   const range = field === 'top' ? EFFECTS_PRESET_RAMP_TOP_RANGE : EFFECTS_PRESET_RAMP_LINES_RANGE;
   if (value < range.min || value > range.max) {
     return `${subject}: ${value} is outside ${range.min}..${range.max}, which is what the schema `
-      + `declares for ${field} — and even inside it the PAIR is bounded: top + lines must be at `
+      + `declares for ${field}, and even inside it the PAIR is bounded: top + lines must be at `
       + `most ${EFFECTS_PRESET_RAMP_SPAN_MAX}. Refused; ${holds}`;
   }
   const otherField: RampSpanField = field === 'top' ? 'lines' : 'top';
@@ -3290,14 +3290,14 @@ export function rampSpanRefusal(
     const otherRange = otherField === 'top'
       ? EFFECTS_PRESET_RAMP_TOP_RANGE : EFFECTS_PRESET_RAMP_LINES_RANGE;
     const largest = room < otherRange.min
-      ? `${room}, which is below ${otherField}'s own floor of ${otherRange.min} — move `
+      ? `${room}, which is below ${otherField}'s own floor of ${otherRange.min}; move `
         + `${otherField} down first`
       : String(room);
     return `${subject}: ${value} with ${otherField} ${other} spans to ${sum}, and top + lines must `
-      + `be at most ${EFFECTS_PRESET_RAMP_SPAN_MAX} — the frame-rewind interlock. ⚠ THE PER-FIELD `
+      + `be at most ${EFFECTS_PRESET_RAMP_SPAN_MAX}, the frame-rewind interlock. ⚠ THE PER-FIELD `
       + `MAXIMA ARE NOT THE PAIR'S CONTRACT: top ${EFFECTS_PRESET_RAMP_TOP_RANGE.max} and lines `
       + `${EFFECTS_PRESET_RAMP_LINES_RANGE.max} each satisfy the schema and the pair is still `
-      + 'refused, by aeon\'s generator and by the engine rather than by the schema — which is why '
+      + 'refused, by aeon\'s generator and by the engine rather than by the schema, which is why '
       + `you meet it here and not at somebody else's build. With ${field} ${value} the largest `
       + `${otherField} is ${largest}. Refused; ${holds}`;
   }
@@ -3473,7 +3473,7 @@ export const RAMP_DISPLAY_INSTRUMENT: Readonly<{ verdict: string; attribution: s
       'aurora-effects-preset.schema.json no longer states, in its `ramp` property description, ' +
       `that the display line is an INSTRUMENT'S READING rather than a hardware fact (looked for ` +
       `${VERDICT_RE}). That sentence is the only contract-side statement of it, and this module ` +
-      'PAINTS it to an author. Re-read the schema and re-derive — do NOT retype the sentence, ' +
+      'PAINTS it to an author. Re-read the schema and re-derive; do NOT retype the sentence, ' +
       'and do NOT drop it: dropping it silently restores the flat over-attribution this whole ' +
       'derivation exists to end.',
     );
@@ -3483,7 +3483,7 @@ export const RAMP_DISPLAY_INSTRUMENT: Readonly<{ verdict: string; attribution: s
       `aurora-effects-preset.schema.json's ramp attribution names top+${v[2]} while its \`top\` ` +
       `field sentence yields ${EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET}. Two nodes of one ` +
       'contract disagree about one quantity; painting either would ship a number the contract ' +
-      'does not agree with itself about. Re-read BOTH sentences — do NOT reconcile them here.',
+      'does not agree with itself about. Re-read BOTH sentences; do NOT reconcile them here.',
     );
   }
 
@@ -3501,15 +3501,15 @@ export const RAMP_DISPLAY_INSTRUMENT: Readonly<{ verdict: string; attribution: s
       `read on, in $defs.ramp.properties.top's description (looked for ${ATTRIBUTION_RE}). This ` +
       'module paints that attribution beside the number; without it the readout asserts an ' +
       'instrument reading as settled machine behaviour, which is the defect this constant ' +
-      'closes. Re-read the schema — do NOT retype the clause.',
+      'closes. Re-read the schema; do NOT retype the clause.',
     );
   }
   const caveats = a[2].replace(/,\s*see the ramp description$/, '');
   for (const owed of [/no hardware referee/i, /unpinned/i, /legacy core/i]) {
     if (!owed.test(caveats)) {
       throw new Error(
-        `the ramp instrument clause in aurora-effects-preset.schema.json no longer states ${owed} ` +
-        `— it now reads "${caveats}". The note this feeds promises an author three specific ` +
+        `the ramp instrument clause in aurora-effects-preset.schema.json no longer states ${owed}; ` +
+        `it now reads "${caveats}". The note this feeds promises an author three specific ` +
         'facts (a disqualified second core, an unpinned landing line, and no hardware referee); a ' +
         'clause missing one of them would paint a hollow caveat that LOOKS like an attribution. ' +
         'Re-read the contract and re-derive what it actually says now.',
@@ -3538,7 +3538,7 @@ export const RAMP_DISPLAY_INSTRUMENT: Readonly<{ verdict: string; attribution: s
  */
 export const RAMP_DISPLAY_LAG_NOTE: string =
   'A VSRAM run\'s value for index j DISPLAYS on screen line top + j + '
-  + `${EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG} — the N+1 VSRAM latency (raster.emp:602-609). `
+  + `${EFFECTS_PRESET_RAMP_VSRAM_INDEX_LAG}, the N+1 VSRAM latency (raster.emp:602-609). `
   + 'AND j STARTS AT 1: the interpreter adds the step before it writes, so `start` itself is never '
   + `emitted and the FIRST value an author sees lands on top + `
   + `${EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET}, not top + `
@@ -3548,9 +3548,9 @@ export const RAMP_DISPLAY_LAG_NOTE: string =
   + `bottom (top + lines = ${EFFECTS_PRESET_RAMP_SPAN_MAX}) puts its last value on line `
   + `${EFFECTS_PRESET_RAMP_SPAN_MAX + EFFECTS_PRESET_RAMP_VSRAM_FIRST_LINE_OFFSET - 1}, where it `
   + 'can never be seen. '
-  + `WHOSE NUMBERS THESE ARE: ${RAMP_DISPLAY_INSTRUMENT.verdict} — `
+  + `WHOSE NUMBERS THESE ARE: ${RAMP_DISPLAY_INSTRUMENT.verdict}; `
   + `${RAMP_DISPLAY_INSTRUMENT.attribution}. `
-  + 'NO STAGE OF THE ENGINE PATH compensates for any of it — not the constructor, not the generator '
+  + 'NO STAGE OF THE ENGINE PATH compensates for any of it: not the constructor, not the generator '
   + '(measured by the engine lane, 2026-09-03). The Top field above is the ENGINE\'s top and is '
   + 'written to the file verbatim; the lag is a DISPLAY fact, so it is applied to this readout and '
   + 'to nothing else. Correcting it in the document instead would change what the engine runs in '
@@ -3928,7 +3928,7 @@ export const BASE_SWAP_ASYMMETRIES: string = (() => {
       'aurora-effects-preset.schema.json no longer states base_swap\'s two asymmetries with ramp '
       + '(no capability gate, not DEBUG-gated) in its `base_swap` property description. Those are '
       + 'the two properties a reader carries across from ramp and gets wrong, and this panel paints '
-      + 'the contract\'s own statement of them. Re-read the schema — do NOT retype the sentences.',
+      + 'the contract\'s own statement of them. Re-read the schema; do NOT retype the sentences.',
     );
   }
   return m[1];
@@ -3968,7 +3968,7 @@ export const BASE_SWAP_WHAT_YOU_SEE: string = (() => {
       'aurora-effects-preset.schema.json no longer states what an author sees (the swap line down, '
       + 'the untouched frame top, the self-restore) in its `base_swap` property description. This '
       + 'panel QUOTES that rather than asserting it, because Aurora draws no raster program and '
-      + 'has not measured one. Re-read the schema — do NOT retype the sentence.',
+      + 'has not measured one. Re-read the schema; do NOT retype the sentence.',
     );
   }
   return m[1].trim();
@@ -4079,16 +4079,16 @@ const BASE_SWAP_NO_NAMES =
  */
 export function baseSwapTargetGloss(target: number): string {
   const named = BASE_SWAP_NAMED_TARGETS.get(target);
-  if (named !== undefined) return `${fmtVramBase(target)} — ${named}`;
+  if (named !== undefined) return `${fmtVramBase(target)}: ${named}`;
   if (!isBaseSwapTargetAligned(target)) {
-    return `${fmtVramBase(target)} — NOT on the $${EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE
+    return `${fmtVramBase(target)}: NOT on the $${EFFECTS_PRESET_BASE_SWAP_TARGET_GRANULE
       .toString(16).toUpperCase()} granule`;
   }
   if (BASE_SWAP_NAMED_TARGETS.size === 0) {
-    return `${fmtVramBase(target)} — on the granule; ${BASE_SWAP_NO_NAMES}`;
+    return `${fmtVramBase(target)}: on the granule; ${BASE_SWAP_NO_NAMES}`;
   }
   const only = [...BASE_SWAP_NAMED_TARGETS].map(([a, n]) => `${fmtVramBase(a)} (${n})`).join(', ');
-  return `${fmtVramBase(target)} — on the granule; the contract names only ${only}`;
+  return `${fmtVramBase(target)}: on the granule; the contract names only ${only}`;
 }
 
 /**
@@ -4111,7 +4111,7 @@ export function baseSwapInsideRowsText(band: EffectsPresetBaseSwapBand): string 
   const rows = baseSwapInsideRows(band);
   if (rows.toBottom) {
     return `Fully swapped from row ${rows.first} to the bottom of the display (no restore_line, `
-      + `so the frame-top flush ends it). Row ${band.line} is the fire line itself — half one `
+      + `so the frame-top flush ends it). Row ${band.line} is the fire line itself: half one `
       + 'picture and half the other.';
   }
   if (rows.empty) {
@@ -4136,7 +4136,7 @@ export function baseSwapBandSummary(band: EffectsPresetBaseSwapBand): string {
   const named = BASE_SWAP_NAMED_TARGETS.get(band.target);
   const what = named === undefined
     ? `the nametable at ${fmtVramBaseBoth(band.target)}`
-    : `${fmtVramBaseBoth(band.target)} — ${named}`;
+    : `${fmtVramBaseBoth(band.target)}: ${named}`;
   const off = band.restore_line === undefined
     ? 'There is no OFF fire: it runs to the bottom of the display.'
     : `A second fire on line ${band.restore_line} puts that plane back on its own home base.`;
@@ -4193,7 +4193,7 @@ const BASE_SWAP_SEED_PLANE: string = (() => {
       + '`vdp_base_reg(VdpBase.<variant>, target)` in its `base_swap` property description, which '
       + 'is where a fresh band\'s plane is read from. ⚠ DO NOT SUBSTITUTE THE FIRST ENUM MEMBER: '
       + 'the enum is a set of legal spellings and says nothing about which one the contract '
-      + 'writes. Re-read the schema — do NOT type a plane name here.',
+      + 'writes. Re-read the schema; do NOT type a plane name here.',
     );
   }
   if (!EFFECTS_PRESET_BASE_SWAP_PLANES.includes(m[1])) {
@@ -4242,7 +4242,7 @@ const BASE_SWAP_SEED_LINE: number = (() => {
       + 'since aeon <rev>", which is where a fresh band\'s seed line is read from. ⚠ DO NOT REPAIR '
       + 'THIS BY MATCHING THE OTHER HALF OF THE SENTENCE: that clause states the line the preset '
       + 'was bound to at an EARLIER aeon revision and the paragraph says so in as many words. '
-      + 'Re-read the schema — and do NOT type a line number here.',
+      + 'Re-read the schema, and do NOT type a line number here.',
     );
   }
   const was = /presets\/ojz_sec6_baseswap\.json \{line: (\d+), target: (\d+)\}/.exec(sentence);
@@ -4301,7 +4301,7 @@ const BASE_SWAP_SEED_TARGET: number = (() => {
       'aurora-effects-preset.schema.json no longer states the shipped section-6 target in its '
       + '`base_swap` property description, in the shape "{line: N, target: M}", which is the only '
       + 'VRAM base address the contract still writes down and where a fresh band\'s seed target is '
-      + 'read from. Re-read the schema — do NOT type an address here.',
+      + 'read from. Re-read the schema; do NOT type an address here.',
     );
   }
   const disclaimed = /so (\d+) is the value AT [0-9a-f]{6,} and not the current binding/
@@ -4319,7 +4319,7 @@ const BASE_SWAP_SEED_TARGET: number = (() => {
     throw new Error(
       `aurora-effects-preset.schema.json now disclaims the section-6 TARGET (${m[2]}) as "not the `
       + 'current binding", so it may no longer be used as a seed. Re-read the schema for a '
-      + 'current worked address — do NOT seed from a value the contract has just called stale.',
+      + 'current worked address; do NOT seed from a value the contract has just called stale.',
     );
   }
   const target = Number(m[2]);
@@ -4351,7 +4351,7 @@ const BASE_SWAP_SINGLE_EDGE_IS_SHIPPED: boolean = (() => {
     throw new Error(
       'aurora-effects-preset.schema.json no longer describes an ABSENT restore_line as "the '
       + 'shipped single-edge shape" at $defs.base_swap.items.properties.restore_line. A fresh '
-      + 'band omits restore_line on the strength of that sentence — if absence has stopped being '
+      + 'band omits restore_line on the strength of that sentence. If absence has stopped being '
       + 'the shipped shape, re-read the schema before seeding one.',
     );
   }
@@ -4444,7 +4444,7 @@ export function baseSwapPlaneRefusal(
   return `preset "${presetId}" base_swap band ${index} plane: ${JSON.stringify(value)} is not one `
     + `of ${EFFECTS_PRESET_BASE_SWAP_PLANES.join(' or ')}. The key is CLOSED to those two: `
     + 'VdpBase has five variants and three of them name the window, the sprite table and hscroll, '
-    + 'and a forwarded SpriteTable would re-point the sprite table mid-frame — sigil cannot refuse '
+    + 'and a forwarded SpriteTable would re-point the sprite table mid-frame; sigil cannot refuse '
     + `a legal call, so the refusal has to be here. Refused; plane is still ${band.plane}.`;
 }
 
@@ -4463,7 +4463,7 @@ export function baseSwapLineRefusal(
   const r = EFFECTS_PRESET_BASE_SWAP_LINE_RANGE;
   if (value < r.min || value > r.max) {
     return `${subject}: ${value} is outside ${r.min}..${r.max}, which is the engine's own ensure `
-      + `for a raster fire — lines below ${r.min} belong to the priming records and ${r.max} is the `
+      + `for a raster fire: lines below ${r.min} belong to the priming records and ${r.max} is the `
       + 'frame-rewind interlock. ⚠ THIS IS NOT THE RAMP\'S RANGE even though both are screen '
       + `lines: a ramp's top stops at ${EFFECTS_PRESET_RAMP_TOP_RANGE.max} because a run needs a `
       + `line after it, and a swap is a single fire that reaches ${r.max}. Refused; ${holds}`;
@@ -4576,7 +4576,7 @@ export function baseSwapTargetRefusal(
       + 'the address bits ABOVE the granule and DROPS the rest SILENTLY, so an '
       + 'unaligned base is a DIFFERENT ADDRESS than every VRAM_* consumer reads and writes, with '
       + `nothing else visibly wrong. The nearest legal bases are ${pair}. Refused, and NOT snapped `
-      + 'to either — snapping would point that plane at another picture without telling you. '
+      + 'to either: snapping would point that plane at another picture without telling you. '
       + `${holds}`;
   }
   return null;
@@ -4616,8 +4616,8 @@ export function addBaseSwapBandRefusal(preset: EffectsPreset): string | null {
   const r = EFFECTS_PRESET_BASE_SWAP_LINE_RANGE;
   const a = EFFECTS_PRESET_BASE_SWAP_ORDER_AUTHORITY;
   return `preset "${preset.id}": there is nowhere to put another band. Bands flatten into ONE `
-    + `raster program in document order, so a new one has to fire ABOVE the last fire in the list `
-    + `— and that is already on line ${r.max}, the last line \`fire()\` admits. `
+    + `raster program in document order, so a new one has to fire ABOVE the last fire in the list, `
+    + `and that is already on line ${r.max}, the last line \`fire()\` admits. `
     + `\`${a.symbol}\` (aeon ${a.file}) refuses a repeated or descending line at build time. Move `
     + 'an existing band up first.';
 }
@@ -4638,7 +4638,7 @@ export function lastBaseSwapBandRefusal(preset: EffectsPreset): string | null {
   }
   if (bands.length > EFFECTS_PRESET_BASE_SWAP_MIN_BANDS) return null;
   return `preset "${preset.id}": this is its only base-swap band, and the schema refuses a list `
-    + `shorter than ${EFFECTS_PRESET_BASE_SWAP_MIN_BANDS} — a document that emits a zero-fire `
+    + `shorter than ${EFFECTS_PRESET_BASE_SWAP_MIN_BANDS}: a document that emits a zero-fire `
     + 'raster program is a document that should not exist. Delete the preset instead.';
 }
 
@@ -4839,7 +4839,7 @@ export const BOUNDARY_WHAT_YOU_SEE: string = (() => {
       'aurora-effects-preset.schema.json no longer states what an author sees for `boundary` (the '
       + 'boundary line down, the staged variant\'s colours, the line following the world anchor) in '
       + 'its `boundary` property description. This panel QUOTES that rather than claiming it, '
-      + 'because nothing in Aurora has drawn a raster program. Re-read the schema — do NOT retype '
+      + 'because nothing in Aurora has drawn a raster program. Re-read the schema; do NOT retype '
       + 'the sentence.',
     );
   }
@@ -5048,7 +5048,7 @@ export const BOUNDARY_SEED_ADVISORY: string = (() => {
   if (rules.join(',') !== 'no-motion') {
     throw new Error(
       `a fresh boundary earns the advisories ${JSON.stringify(rules)}, and the only one it may `
-      + 'earn is "no-motion" — the deliberate one, which says a boundary with no seeded AND swept '
+      + 'earn is "no-motion", the deliberate one, which says a boundary with no seeded AND swept '
       + 'channel sits still. Any other means the schema\'s own shipped-water numbers are now '
       + 'self-contradictory (lo > hi, or a default line outside the band), and a New button that '
       + 'authors a warning is worse than no New button. Re-read the schema.',
@@ -5102,9 +5102,9 @@ export type BoundaryNumberField = 'line' | 'channel' | 'lo' | 'hi';
  */
 export const BOUNDARY_FIELD_GLOSS: Readonly<Record<BoundaryNumberField, string>> = Object.freeze({
   line: 'screen line, before any patch',
-  channel: 'patch channel — seed and sweep it under “moving anchors”',
-  lo: 'lowest screen line — below it the engine clamps up and still draws',
-  hi: 'highest screen line — past it the engine drops the record',
+  channel: 'patch channel: seed and sweep it under “moving anchors”',
+  lo: 'lowest screen line: below it the engine clamps up and still draws',
+  hi: 'highest screen line: past it the engine drops the record',
 });
 
 /**
@@ -5131,8 +5131,8 @@ export function boundaryFieldRefusal(
   if (value < r.min || value > r.max) {
     return `${subject}: ${value} is outside ${r.min}..${r.max}, which is the range the contract `
       + `declares for it. ${field === 'channel'
-        ? 'That is RASTER_MAX_PATCH, the same index space patch_world_ys and patch_motion reach — '
-          + 'a channel outside it is a boundary that could never be seeded or swept.'
+        ? 'That is RASTER_MAX_PATCH, the same index space patch_world_ys and patch_motion reach. '
+          + 'A channel outside it is a boundary that could never be seeded or swept.'
         : 'These are SCREEN lines, not fire lines: the engine converts once and an editor that '
           + 'subtracted 1 would be the class of bug the contract forbids by name.'} `
       + `Refused; ${holds}`;
@@ -5162,8 +5162,8 @@ export function boundaryTintRefusal(
   const held = (region as unknown as Record<string, number>)[field];
   return `preset "${presetId}" boundary ${BOUNDARY_ON_ARM}.${field}: ${value} is not a whole `
     + 'number, and every member of a tint region is an integer. ⚠ THAT IS THE ONLY THING REFUSED '
-    + 'HERE: the contract declares NO range for this field on purpose (§7.1\'s shape-only posture '
-    + '— the ranges are stream_pal_region\'s own ensures and the engine\'s message carries the '
+    + 'HERE: the contract declares NO range for this field on purpose (§7.1\'s shape-only posture: '
+    + 'the ranges are stream_pal_region\'s own ensures and the engine\'s message carries the '
     + `measurement), so a maximum invented in this editor would stand between you and a legal `
     + `document. Refused; ${field} is still ${held}.`;
 }
@@ -5230,9 +5230,9 @@ export function boundaryOffscreenShipState(b: EffectsPresetBoundary): BoundaryOf
 
 export const BOUNDARY_OFFSCREEN_SHIP_OPTIONS:
 readonly { value: BoundaryOffscreenShipState; label: string }[] = Object.freeze([
-  Object.freeze({ value: 'absent' as const, label: 'not written — patchable\'s default (off)' }),
-  Object.freeze({ value: 'off' as const, label: 'off — written explicitly' }),
-  Object.freeze({ value: 'on' as const, label: 'on — re-ship at the frame top (the shipped water)' }),
+  Object.freeze({ value: 'absent' as const, label: 'not written: patchable\'s default (off)' }),
+  Object.freeze({ value: 'off' as const, label: 'off: written explicitly' }),
+  Object.freeze({ value: 'on' as const, label: 'on: re-ship at the frame top (the shipped water)' }),
 ]);
 
 export function setBoundaryOffscreenShipCommand(
@@ -5287,7 +5287,7 @@ export function boundarySummary(b: EffectsPresetBoundary): string {
   const lines = Number.isInteger(b.lo) && Number.isInteger(b.hi) && b.hi >= b.lo
     ? `${b.hi - b.lo + 1} lines` : 'an empty band';
   return `Sits at screen line ${b.line} before any patch, follows patch channel ${b.channel}, and `
-    + `is confined to lines ${b.lo}..${b.hi} — ${lines}. Past hi the record is DROPPED for that `
+    + `is confined to lines ${b.lo}..${b.hi}, ${lines}. Past hi the record is DROPPED for that `
     + 'frame and the tint vanishes; below lo it is CLAMPED UP and still drawn.';
 }
 
@@ -5377,10 +5377,10 @@ export function bandControlsRefusal(preset: EffectsPreset): string | null {
   const convertible = programArmSeedRefusal('bands') === null;
   return `preset "${preset.id}" carries a ${noun}, not bands. A preset holds EXACTLY ONE `
     + 'program: the schema\'s top-level oneOf refuses a document carrying two, and the engine '
-    + 'has no combinator that mixes them — which means the band controls cannot write here at '
+    + 'has no combinator that mixes them, which means the band controls cannot write here at '
     + `all. ${EFFECTS_PRESET_RASTER_CHANNELS.includes(arm)
-      ? '' : `A ${noun} is not a raster program at all — it installs into the patched channel, `
-        + 'the sibling field — and it is refused alongside the raster programs because a record '
+      ? '' : `A ${noun} is not a raster program at all: it installs into the patched channel, `
+        + 'the sibling field, and it is refused alongside the raster programs because a record '
         + 'carrying both loses one of them destructively. '}`
     + `${convertible
       ? 'Set the Program row above back to bands to author bands; that discards the '
@@ -5461,7 +5461,7 @@ for (const c of EFFECTS_PRESET_PROGRAM_ARMS) {
     throw new Error(
       `program arm "${c}" is declared by aurora-effects-preset.schema.json's top-level oneOf `
       + 'but has no noun in PROGRAM_ARM_NOUNS, so every sentence that names what a document '
-      + 'carries would say "undefined". Add the noun — and decide whether the panel can seed it '
+      + 'carries would say "undefined". Add the noun, and decide whether the panel can seed it '
       + '(PROGRAM_ARM_SEEDS) and whether it has an editor (PROGRAM_ARM_EDITORS) rather than '
       + 'letting either default.',
     );
@@ -5497,7 +5497,7 @@ for (const c of PROGRAM_ARM_SEEDABLE) {
   PROGRAM_ARM_SEEDS[c](probe);
   if (presetProgramArm(probe) !== c) {
     throw new Error(
-      `PROGRAM_ARM_SEEDS["${c}"] does not write the "${c}" key — it produced a `
+      `PROGRAM_ARM_SEEDS["${c}"] does not write the "${c}" key: it produced a `
       + `${presetProgramArm(probe) ?? 'program-less'} document. Every switch into that arm `
       + 'would author a different program than the one the author picked.',
     );
@@ -5552,7 +5552,7 @@ export function programArmEditorGapFor(channel: string | null, presetId: string)
   if (channel === null || PROGRAM_ARM_EDITORS.includes(channel)) return null;
   const noun = PROGRAM_ARM_NOUNS[channel] ?? channel;
   return `preset "${presetId}" carries a ${noun}, and this panel has no editor for it yet. The `
-    + 'document opens, reads and saves correctly and nothing here has changed it — but its fields '
+    + 'document opens, reads and saves correctly and nothing here has changed it, but its fields '
     + 'cannot be edited from this panel, so edit the JSON directly until this arm has a card. '
     + 'Switching the Program row above would DISCARD it.';
 }
@@ -5594,14 +5594,14 @@ export function programArmEditorGap(preset: EffectsPreset): string | null {
  * the day `base_swap` arrived it rendered as "bands — a sparse fire list".
  */
 const PROGRAM_ARM_LABELS: Record<string, string> = {
-  bands: 'bands — a sparse fire list',
-  ramp: 'ramp — one dense per-line run',
-  base_swap: 'base swap — one mid-frame plane A base change',
+  bands: 'bands: a sparse fire list',
+  ramp: 'ramp: one dense per-line run',
+  base_swap: 'base swap: one mid-frame plane A base change',
   // ⚠ THE LABEL SAYS IT IS NOT A RASTER PROGRAM, because the row it sits in is
   // full of raster programs and the difference is not cosmetic: this one lowers
   // into `ep_patched`, the sibling field, which is WHY it is exclusive with the
   // other three rather than being combinable with them.
-  boundary: 'boundary — one patchable palette line (patched, not raster)',
+  boundary: 'boundary: one patchable palette line (patched, not raster)',
 };
 
 /**
@@ -5642,8 +5642,8 @@ export const PROGRAM_ARM_OPTIONS: readonly { value: string; label: string }[] =
         `PROGRAM_ARM_LABELS["${c}"] ${saysPatched ? 'says' : 'does not say'} `
         + `"${PROGRAM_ARM_PATCHED_TAG}", but the schema's own arm description ${isPatched
           ? 'DOES' : 'does NOT'} say this arm lowers into EffectsPreset.ep_patched. These are two `
-        + 'independent statements of one fact — a hand-written dropdown label and a derivation off '
-        + 'the contract — and they have stopped agreeing. If the CONTRACT moved, re-read it and '
+        + 'independent statements of one fact (a hand-written dropdown label and a derivation off '
+        + 'the contract) and they have stopped agreeing. If the CONTRACT moved, re-read it and '
         + 'fix the label; if the DERIVATION has quietly collapsed (an ep_patched sentence that no '
         + 'longer matches yields an EMPTY patched set, which is indistinguishable from a contract '
         + 'with no patched arms), fix that. Do NOT delete this guard: it is the only thing on this '
@@ -5716,9 +5716,9 @@ export function programArmSwapAdvisory(preset: EffectsPreset): string {
   // and whichever installs last wins destructively.
   return `A preset holds exactly one program, so switching DISCARDS ${discards} and seeds a `
     + 'fresh one of whichever program you pick. bands, ramp and base_swap are exclusive because '
-    + 'they share the raster slot; boundary is exclusive with all three for a different reason — '
+    + 'they share the raster slot; boundary is exclusive with all three for a different reason: '
     + 'it installs into the patched channel, the sibling field, and a record carrying both is '
-    + 'refused because whichever installs last wins destructively. It is ONE undo step — Ctrl+Z '
+    + 'refused because whichever installs last wins destructively. It is ONE undo step: Ctrl+Z '
     + 'puts back exactly what was here.';
 }
 
