@@ -53,6 +53,7 @@ import React from 'react';
 import { T, SectionBody, CollapsibleSection, Select, NumberField, Chip, IconButton } from '../ui';
 import { Field, Hint, Card, CONTROL_INSET } from './column-layout';
 import { actAndDropFocus } from '../ui/act-and-drop-focus';
+import { deletePresetGuarded } from '../../shell/effects-delete-guard';
 // THE APP'S OWN SWATCH AND THE APP'S OWN PICKER. `GenesisColorSliders` is the
 // R/G/B control both palette panels mount, and `swatchCss` is the one CRAM-word
 // → CSS conversion in this tree. Neither is re-derived here: a second `>> 9 & 7`
@@ -168,7 +169,7 @@ import {
   programArmEditorGap, programArmRowTitle,
   bandControlsRefusal,
   RASTER_REF_ROW, presetRefOptions, unassignablePresetRef, sectionPresetCommand,
-  createPresetCommand, deletePresetCommand,
+  createPresetCommand,
   addBandCommand, removeBandCommand, lastBandRefusal, deletePresetRefusal,
   setBandFieldCommand, setBandArmCommand, setArmFieldCommand,
   parseColours, setColoursCommand, setPresetNameCommand,
@@ -203,12 +204,12 @@ import { EFFECTS_GUIDE_SLUG, GUIDE_ANCHORS } from '../guide/guides';
 import { PresetLagDisclosure } from './PresetLagDisclosure';
 import { RampSignLagDisclosure } from './RampSignLagDisclosure';
 
-const EMPTY_LIBRARY: EffectsPresetLibrary = { presets: [], unreadable: [], notices: [] };
+const EMPTY_LIBRARY: EffectsPresetLibrary = { presets: [], unreadable: [], notices: [], loadedPaths: [] };
 // THE SCENE LIBRARY, FOR ONE QUESTION ONLY: does the scene bound to the section
 // bound to this preset carry a `v_deform`? That bit decides whether a VSRAM
 // `ramp` is a full-screen scroll or a 16-pixel sliver, and it lives in a
 // DIFFERENT DOCUMENT — see `rampScrollModeAdvisory`. This panel writes no scene.
-const EMPTY_SCENES: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [] };
+const EMPTY_SCENES: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [], loadedPaths: [] };
 
 const textInput: React.CSSProperties = {
   flex: 1, minWidth: 0, background: T.raised, color: T.textHi,
@@ -523,7 +524,12 @@ export default function BandPresetPanel(): React.ReactElement | null {
               // stray Space: it is derived for the SELECTED preset, so after
               // the delete it is re-derived for the new target and the author
               // gets no signal that the button under their finger changed file.
-              onClick={(e) => actAndDropFocus(e, () => run(deletePresetCommand(library, selected.id)))} />
+              // GUARDED (deleted-scene-returns), on top of the `disabled`
+              // refusal above: that one stops a delete that would DANGLE a
+              // binding, this one stops a delete the author did not mean, now
+              // that a save actually unlinks the file. Blur is still first and
+              // still unconditional; the confirm happens inside `act()`.
+              onClick={(e) => actAndDropFocus(e, () => { void deletePresetGuarded(library, selected.id, run); })} />
           }>
           <SectionBody>
             {deleteRefusal !== null && <Hint tone="warning">{deleteRefusal}</Hint>}

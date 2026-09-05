@@ -133,7 +133,7 @@ describe('every ACCEPT vector survives a band edit in the renderer with its item
   for (const c of carrying) {
     it(`keeps cycles/variants across "add band": ${c.name}`, () => {
       const preset = parseEffectsPreset(JSON.stringify(c.doc, null, 2) + '\n', c.doc.id);
-      const library: EffectsPresetLibrary = { presets: [preset], unreadable: [], notices: [] };
+      const library: EffectsPresetLibrary = { presets: [preset], unreadable: [], notices: [], loadedPaths: [] };
       const cmd = addBandCommand(library, c.doc.id);
       expect(cmd, 'the edit path refused a contract-accepted document').not.toBeNull();
       const after = cmd!.newPreset!;

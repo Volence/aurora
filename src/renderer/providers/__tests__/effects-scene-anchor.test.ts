@@ -38,7 +38,7 @@ const S = rawSchema as unknown as Record<string, any>;
 const SHIFT_FIELDS: readonly AnchorShiftField[] = ['dsa', 'dsb'];
 
 function library(scenes: EffectsScene[]): EffectsSceneLibrary {
-  return { scenes, unreadable: [], notices: [] };
+  return { scenes, unreadable: [], notices: [], loadedPaths: [] };
 }
 
 /** The document a command would land — what the store writes to disk. */

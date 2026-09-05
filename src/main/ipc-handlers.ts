@@ -2,7 +2,7 @@ import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { writeFileSync } from 'fs';
 import { IPC_CHANNELS } from '../shared/ipc-types';
 import type { GuardedWriteFile } from '../shared/ipc-types';
-import { readBinaryFile, readManyFiles, listProjectFiles, pathExists, listDir, fileMtime } from './file-io';
+import { readBinaryFile, readManyFiles, listProjectFiles, pathExists, listDir, fileMtime, deleteProjectFile } from './file-io';
 import { performGuardedWrite } from './guarded-write';
 import { getRecentProjects, addRecentProject, removeRecentProject } from './recent-projects';
 import { isRelPathSafe } from '../shared/rel-path';
@@ -46,6 +46,13 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.READ_MANY, async (_event, basePath: string, relativePaths: string[]) => {
     return readManyFiles(basePath, relativePaths);
+  });
+
+  // The one deleting channel — see DELETE_FILE in shared/ipc-types.ts and
+  // deleteProjectFile in file-io.ts, which own the guard and the outcome shape.
+  // Nothing is decided here; this is the seam.
+  ipcMain.handle(IPC_CHANNELS.DELETE_FILE, async (_event, basePath: string, relativePath: string) => {
+    return deleteProjectFile(basePath, relativePath);
   });
 
   // Atomic, mtime-guarded classic save (Task 10). The pure cycle lives in

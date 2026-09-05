@@ -61,7 +61,7 @@ const canopy = (): EffectsScene => ({
   budget_class: 'heavy',
 });
 
-const emptyLibrary = (): EffectsSceneLibrary => ({ scenes: [], unreadable: [], notices: [] });
+const emptyLibrary = (): EffectsSceneLibrary => ({ scenes: [], unreadable: [], notices: [], loadedPaths: [] });
 
 const lib = () => useProjectStore.getState().project!.effectsScenes;
 const ask = (req: AgentRequest) => handleAgentRequest(req as never);
@@ -91,7 +91,7 @@ describe('list_effects_scenes', () => {
     open({
       scenes: [canopy()],
       unreadable: [{ path: 'data/editor/effects/broken.json', reason: 'not valid JSON' }],
-      notices: [],
+      notices: [], loadedPaths: [],
     });
     const r = await ask({ kind: 'list-effects-scenes' }) as Record<string, unknown>;
     expect(r.scenes).toEqual([{ id: 'canopy', name: 'Canopy', layers: 2 }]);
@@ -102,7 +102,7 @@ describe('list_effects_scenes', () => {
 });
 
 describe('get_effects_scene', () => {
-  beforeEach(() => open({ scenes: [canopy()], unreadable: [], notices: [] }));
+  beforeEach(() => open({ scenes: [canopy()], unreadable: [], notices: [], loadedPaths: [] }));
 
   it('returns the WHOLE document, including fields no form exposes', async () => {
     const r = await ask({ kind: 'get-effects-scene', id: 'canopy' }) as { scene: EffectsScene };
@@ -114,7 +114,7 @@ describe('get_effects_scene', () => {
   it('distinguishes "no such scene" from "that file would not parse"', async () => {
     await expect(ask({ kind: 'get-effects-scene', id: 'nope' })).rejects.toThrow(/not found/);
     open({
-      scenes: [], notices: [],
+      scenes: [], notices: [], loadedPaths: [],
       unreadable: [{ path: 'data/editor/effects/broken.json', reason: 'not valid JSON' }],
     });
     await expect(ask({ kind: 'get-effects-scene', id: 'broken' }))
@@ -161,7 +161,7 @@ describe('set_effects_scene', () => {
 
   it('refuses a CREATE whose id collides with an unreadable file', async () => {
     open({
-      scenes: [], notices: [],
+      scenes: [], notices: [], loadedPaths: [],
       unreadable: [{ path: 'data/editor/effects/broken.json', reason: 'x' }],
     });
     await expect(ask({
@@ -171,7 +171,7 @@ describe('set_effects_scene', () => {
   });
 
   it('replaces an existing scene, and a re-send of the SAME document is not an undo step', async () => {
-    open({ scenes: [canopy()], unreadable: [], notices: [] });
+    open({ scenes: [canopy()], unreadable: [], notices: [], loadedPaths: [] });
 
     const unchanged = await ask({ kind: 'set-effects-scene', id: 'canopy', scene: canopy() });
     expect(unchanged).toEqual({ id: 'canopy', changed: false });
@@ -185,7 +185,7 @@ describe('set_effects_scene', () => {
   });
 
   it('deletes with scene: null, and reports honestly when there was nothing there', async () => {
-    open({ scenes: [canopy()], unreadable: [], notices: [] });
+    open({ scenes: [canopy()], unreadable: [], notices: [], loadedPaths: [] });
     expect(await ask({ kind: 'set-effects-scene', id: 'canopy', scene: null }))
       .toEqual({ id: 'canopy', deleted: true });
     expect(lib().scenes).toEqual([]);
@@ -195,7 +195,7 @@ describe('set_effects_scene', () => {
 });
 
 describe('assign_section_scene', () => {
-  beforeEach(() => open({ scenes: [canopy()], unreadable: [], notices: [] }));
+  beforeEach(() => open({ scenes: [canopy()], unreadable: [], notices: [], loadedPaths: [] }));
 
   const sceneRefOf = (i: number) =>
     useProjectStore.getState().project!.zones[0].acts[0].sections[i]!.sceneRef;
@@ -227,7 +227,7 @@ describe('assign_section_scene', () => {
     await expect(ask({ kind: 'assign-section-scene', section: 0, sceneId: 'nope' }))
       .rejects.toThrow(/not a readable scene/);
     open({
-      scenes: [], notices: [],
+      scenes: [], notices: [], loadedPaths: [],
       unreadable: [{ path: 'data/editor/effects/broken.json', reason: 'x' }],
     });
     // An unreadable file is NOT assignable: the ref would name something the

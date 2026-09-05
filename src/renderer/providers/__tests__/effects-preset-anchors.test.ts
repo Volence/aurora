@@ -58,7 +58,7 @@ import {
 import type { SetEffectsPresetCommand } from '../../../core/editing/commands';
 
 function library(p: EffectsPreset): EffectsPresetLibrary {
-  return { presets: [p], unreadable: [], notices: [] };
+  return { presets: [p], unreadable: [], notices: [], loadedPaths: [] };
 }
 
 /** Apply a command's `newPreset`, or throw loudly — a null here is a no-op the row did not ask for. */

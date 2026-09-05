@@ -650,6 +650,50 @@ export interface EffectsSceneLibrary {
    */
   unreadable: UnreadableScene[];
   notices: Notice[];
+  /**
+   * THE ONLY PATHS A SAVE IS ALLOWED TO REMOVE — the project-relative paths
+   * this session has actually SEEN hold a scene: read successfully at load, and
+   * (through `noteEffectsScenesPersisted`) written successfully by a save since.
+   *
+   * ⚠ IT IS NOT "what is in the directory", and that distinction is the whole
+   * safety argument for removals. `buildAeonSavePlan` removes a path only when
+   * it is in HERE and no scene in `scenes` claims it any more; a file the editor
+   * never loaded — a hand-written document in a checkout Aurora has not opened
+   * yet, a `.json` the parser refused, a file that is not a scene at all — is
+   * absent from this list and is therefore untouchable. Deriving the removable
+   * set from a directory LISTING instead would turn "open a project and press
+   * Ctrl+S" into a scythe over every file the editor did not understand.
+   *
+   * ⚠ AND IT DELIBERATELY EXCLUDES `unreadable`. Those paths exist and hold
+   * SOMETHING; the loader refuses to overwrite them and this refuses to delete
+   * them, for the same reason — Aurora does not destroy bytes it could not read.
+   *
+   * Required, not optional: a construction site that forgets it fails to
+   * compile, and the value it is then forced to supply (`[]`) means "remove
+   * nothing", which is the safe direction.
+   */
+  loadedPaths: string[];
+}
+
+/**
+ * Record that a save has just PERSISTED exactly `paths` — the ledger update
+ * that closes the create-save-delete hole.
+ *
+ * A scene created in this session was never LOADED, so it is not in
+ * `loadedPaths`; after a save writes its file, the editor knows that file is
+ * there, and a later delete must be able to remove it. Without this, "new
+ * scene, Ctrl+S, changed my mind, delete, Ctrl+S" leaves a file behind for
+ * ever, which is the reported defect wearing a different hat.
+ *
+ * CALLED AFTER THE WRITES, NEVER BEFORE. The argument is what is on disk NOW,
+ * so a caller that could not complete a removal must keep that path in the list
+ * (see `state/aeon-save.ts`, which folds its failed removals back in) or the
+ * next save will not retry it.
+ */
+export function noteEffectsScenesPersisted(
+  library: EffectsSceneLibrary, paths: readonly string[],
+): void {
+  library.loadedPaths = [...new Set(paths)].sort();
 }
 
 /**
@@ -670,10 +714,15 @@ export async function loadEffectsSceneLibrary(
   const scenes: EffectsScene[] = [];
   const unreadable: UnreadableScene[] = [];
   const notices: Notice[] = [];
+  // See `loadedPaths` on the interface: only a file this loop actually READ AS
+  // A SCENE lands here. The `continue` above it (not a .json) and the catch
+  // below it (would not parse) both leave the path out, which is what makes a
+  // removal derived from this list unable to reach a file Aurora never opened.
+  const loadedPaths: string[] = [];
 
   let present = false;
   try { present = await fa.exists(dir); } catch { present = false; }
-  if (!present) return { scenes, unreadable, notices };
+  if (!present) return { scenes, unreadable, notices, loadedPaths };
 
   const entries = (await fa.list(dir)).slice().sort();
   for (const entry of entries) {
@@ -682,6 +731,7 @@ export async function loadEffectsSceneLibrary(
     const path = `${dir}${entry}`;
     try {
       scenes.push(parseEffectsScene(new TextDecoder().decode(await fa.read(path)), stem));
+      loadedPaths.push(path);
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);
       unreadable.push({ path, reason });
@@ -717,7 +767,7 @@ export async function loadEffectsSceneLibrary(
     });
   }
 
-  return { scenes, unreadable, notices };
+  return { scenes, unreadable, notices, loadedPaths };
 }
 
 // ---------------------------------------------------------------------------

@@ -87,7 +87,7 @@ const dusk = (): EffectsPreset => ({
 const library = (): EffectsPresetLibrary => ({
   presets: [glare(), dusk()],
   unreadable: [{ path: 'data/editor/effects/presets/broken.json', reason: 'not valid JSON' }],
-  notices: [],
+  notices: [], loadedPaths: [],
 });
 
 function fakeProject(presets: EffectsPresetLibrary): never {
@@ -104,7 +104,7 @@ function fakeProject(presets: EffectsPresetLibrary): never {
     chunkLibrary: [],
     bgLibrary: [],
     bgLibraryUnresolved: [],
-    effectsScenes: { scenes: [], unreadable: [], notices: [] },
+    effectsScenes: { scenes: [], unreadable: [], notices: [], loadedPaths: [] },
     effectsPresets: presets,
   } as never;
 }

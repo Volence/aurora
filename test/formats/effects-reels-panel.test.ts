@@ -75,7 +75,7 @@ const PANEL_SRC = readFileSync(
   resolve(__dirname, '../../src/renderer/components/effects/EffectsScenePanel.tsx'), 'utf8');
 
 function library(scenes: EffectsScene[]): EffectsSceneLibrary {
-  return { scenes, unreadable: [], notices: [] };
+  return { scenes, unreadable: [], notices: [], loadedPaths: [] };
 }
 
 function scene(reels?: { rates: number[] }): EffectsScene {

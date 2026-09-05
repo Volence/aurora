@@ -12,8 +12,11 @@
 // edits were gone. Multi-act is a designed configuration, so the loop is the
 // fix rather than a note to remember later.
 
-import { buildAeonSavePlan } from '../../core/project/aeon/save';
+import { buildAeonSavePlan, type AeonSaveRemoval } from '../../core/project/aeon/save';
 import { planFileNeedsWrite } from '../../core/project/aeon/save-skip';
+import { noteEffectsScenesPersisted } from '../../core/formats/effects/scene';
+import { noteEffectsPresetsPersisted } from '../../core/formats/effects/preset';
+import { nameSome } from '../../core/project/notice';
 import { createIpcFileAccess } from './classic-file-access';
 import { useProjectStore } from './projectStore';
 import { useEditorStore } from './editorStore';
@@ -48,6 +51,12 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
     s.setLoading(true);
     const fa = createIpcFileAccess(config.basePath);
     const written: string[] = [];
+    // Removals are collected across every act's plan and applied AFTER all of
+    // them — see the ordering argument on `removalsFor` in core. The effects
+    // libraries are per-PROJECT while a plan is per-ACT, so the same removal
+    // appears in every act's plan; dedupe by path.
+    const pendingRemovals = new Map<string, AeonSaveRemoval>();
+    let ledgers: { scenePaths: string[]; presetPaths: string[] } | null = null;
 
     for (const key of targets) {
       const ref = splitActKey(key);
@@ -90,7 +99,65 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
         await window.api.writeBinaryFile(config.basePath, f.path,
           f.bytes.buffer.slice(f.bytes.byteOffset, f.bytes.byteOffset + f.bytes.byteLength) as ArrayBuffer);
       }
+      for (const r of plan.removals) pendingRemovals.set(r.path, r);
+      ledgers = plan.ledgers;
       written.push(key);
+    }
+
+    // ═══ THE REMOVAL STEP ═════════════════════════════════════════════════
+    //
+    // WHY IT EXISTS: without it, `Delete scene` removed the scene from the
+    // session and left its file on disk, so the author's deletion was silently
+    // undone on the next open (measured — `npm run harness:deleted-scene-returns`
+    // rows [1e]/[1h], and the same for raster presets at [2d]/[2f]).
+    //
+    // WHY IT IS LAST: a crash between the writes and here leaves the new state
+    // written and the deleted documents still present — i.e. exactly the old
+    // behaviour, recoverable by deleting again. The other order could take a
+    // file away while the sidecar that stopped pointing at it never landed.
+    //
+    // WHAT IT MAY TOUCH is not decided here. `core/project/aeon/save.ts`
+    // derives it from each library's `loadedPaths` ledger; a file this session
+    // never read as a document of that kind is in no such list and is
+    // unreachable from this loop.
+    const removed: string[] = [];
+    const failedRemovals = new Set<string>();
+    for (const r of pendingRemovals.values()) {
+      let outcome;
+      try {
+        outcome = await window.api.deleteFile?.(config.basePath, r.path);
+      } catch (e) {
+        outcome = { ok: false as const, reason: e instanceof Error ? e.message : String(e) };
+      }
+      if (outcome && outcome.ok) {
+        removed.push(r.what);
+        // Every removal is named individually in the console — the summary
+        // below counts and samples, and a count that lost WHICH document went
+        // would make the author's next step impossible (the rule
+        // state/save-outcome-report.ts states for its own fold).
+        console.warn(`[aeon-save] removed ${r.what} — ${r.path}`
+          + (outcome.deleted ? '' : ' (it was already gone)'));
+      } else {
+        // KEPT IN THE LEDGER. A path this save could not remove must still be
+        // removable by the next one; dropping it here would make one EPERM
+        // permanent.
+        failedRemovals.add(r.path);
+        console.warn(`[aeon-save] could NOT remove ${r.what} — ${r.path}: `
+          + `${outcome ? outcome.reason : 'no delete channel on window.api'}`);
+      }
+    }
+
+    // ═══ THE LEDGER, UPDATED ONLY BY WHAT ACTUALLY HAPPENED ═══════════════
+    //
+    // After this save, the editor knows these paths hold a document: the ones
+    // the plan wrote, PLUS any it meant to remove and could not. The first half
+    // is what closes "create a scene, save, delete it, save" — its file was
+    // never LOADED, so a ledger seeded only at load could never reach it.
+    if (ledgers && project) {
+      const keptScenes = project.effectsScenes.loadedPaths.filter((p) => failedRemovals.has(p));
+      const keptPresets = project.effectsPresets.loadedPaths.filter((p) => failedRemovals.has(p));
+      noteEffectsScenesPersisted(project.effectsScenes, [...ledgers.scenePaths, ...keptScenes]);
+      noteEffectsPresetsPersisted(project.effectsPresets, [...ledgers.presetPaths, ...keptPresets]);
     }
 
     // Clear exactly what was written, and only where the act has not moved
@@ -102,13 +169,36 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
     // The export step, and with it the R8 branch that reported its failure, was
     // retired 2026-08-19 (ROADMAP §4.2). A save now writes editor files only,
     // so there is no second half that can fail quietly behind "Project saved".
+    // A DELETION IS THE PART OF A SAVE AN AUTHOR MOST WANTS TO SEE, so it is
+    // named on the same line that says the save happened rather than left to
+    // the console alone. Counted and sampled through `nameSome`, the idiom the
+    // effects loaders and the Save-All fold already use, so a long list can
+    // never render "I could not tell" as silence.
+    const removedNote = removed.length === 1
+      ? ` · removed ${removed[0]}`
+      : removed.length > 1
+        ? ` · removed ${removed.length} files — ${nameSome(removed)}`
+        : '';
     if (withheld.length) {
       useToastStore.getState().addToast(
-        'Project saved, but edits made during the save are still unsaved — save again',
+        `Project saved, but edits made during the save are still unsaved — save again${removedNote}`,
         'info',
       );
     } else {
-      useToastStore.getState().addToast('Project saved', 'success');
+      useToastStore.getState().addToast(`Project saved${removedNote}`, 'success');
+    }
+    // A failed removal is its own channel and its own colour: the save DID
+    // happen, and folding this into the green line would be the same defect
+    // wearing the other one (core/project/notice.ts — coalescing changes the
+    // count, never the channel).
+    if (failedRemovals.size > 0) {
+      useToastStore.getState().addToast(
+        `Project saved, but ${failedRemovals.size} deleted document`
+        + `${failedRemovals.size === 1 ? '' : 's'} could not be removed from disk — `
+        + `${nameSome([...failedRemovals])}. They will be retried on the next save; `
+        + 'each reason is in the developer console.',
+        'error',
+      );
     }
     return { kind: 'saved' };
   } catch (err) {

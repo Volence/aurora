@@ -2172,6 +2172,27 @@ export interface EffectsPresetLibrary {
    */
   unreadable: UnreadablePreset[];
   notices: Notice[];
+  /**
+   * THE ONLY PATHS A SAVE IS ALLOWED TO REMOVE, on exactly the terms
+   * `EffectsSceneLibrary.loadedPaths` states one file over — read that comment,
+   * because the safety argument for removals lives there and there is one
+   * argument, not two. In short: the paths this session has SEEN hold a preset
+   * (parsed at load, or written by a save since, via
+   * `noteEffectsPresetsPersisted`); never a directory listing; never an
+   * `unreadable` path.
+   */
+  loadedPaths: string[];
+}
+
+/**
+ * Record that a save has just PERSISTED exactly `paths`. The preset twin of
+ * `noteEffectsScenesPersisted` — same contract, same "after the writes, never
+ * before" rule.
+ */
+export function noteEffectsPresetsPersisted(
+  library: EffectsPresetLibrary, paths: readonly string[],
+): void {
+  library.loadedPaths = [...new Set(paths)].sort();
 }
 
 /**
@@ -2191,10 +2212,12 @@ export async function loadEffectsPresetLibrary(
   const presets: EffectsPreset[] = [];
   const unreadable: UnreadablePreset[] = [];
   const notices: Notice[] = [];
+  // Only a file this loop READ AS A PRESET — see the scene loader's note.
+  const loadedPaths: string[] = [];
 
   let present = false;
   try { present = await fa.exists(dir); } catch { present = false; }
-  if (!present) return { presets, unreadable, notices };
+  if (!present) return { presets, unreadable, notices, loadedPaths };
 
   const entries = (await fa.list(dir)).slice().sort();
   for (const entry of entries) {
@@ -2203,6 +2226,7 @@ export async function loadEffectsPresetLibrary(
     const path = `${dir}${entry}`;
     try {
       presets.push(parseEffectsPreset(new TextDecoder().decode(await fa.read(path)), stem));
+      loadedPaths.push(path);
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);
       unreadable.push({ path, reason });
@@ -2233,5 +2257,5 @@ export async function loadEffectsPresetLibrary(
     });
   }
 
-  return { presets, unreadable, notices };
+  return { presets, unreadable, notices, loadedPaths };
 }

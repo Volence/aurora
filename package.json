@@ -121,6 +121,7 @@
     "harness:d27-effects-focus": "node scratchpad/d27-effects-focus-harness.mjs",
     "harness:d27-four-survivors": "node scratchpad/d27-four-survivors-harness.mjs",
     "harness:d27-sprite-focus": "node scratchpad/d27-sprite-focus-harness.mjs",
+    "harness:deleted-scene-returns": "node scratchpad/deleted-scene-returns-harness.mjs",
     "harness:discovery-exit-net": "node scratchpad/discovery-exit-net-proof.mjs",
     "harness:effects-bob": "node scratchpad/effects-bob-harness.mjs",
     "harness:effects-cold-read": "node scratchpad/effects-cold-read-harness.mjs",

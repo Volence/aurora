@@ -49,6 +49,7 @@ import React from 'react';
 import { T, Panel, SectionBody, CollapsibleSection, Select, NumberField, Chip, IconButton } from '../ui';
 import { Field, Hint, Card, Advisory } from './column-layout';
 import { actAndDropFocus } from '../ui/act-and-drop-focus';
+import { deleteSceneGuarded } from '../../shell/effects-delete-guard';
 import { useProjectStore, getActiveLevel } from '../../state/projectStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
@@ -74,7 +75,7 @@ import {
   vsplitLockAdvisoryParts, sceneVsplitLockAdvisoryParts,
   layerCountLine, vFactorHint,
   sceneListEntries, resolveSelectedScene, sceneRefOptions, unassignableSceneRef,
-  sectionSceneCommand, createSceneCommand, deleteSceneCommand,
+  sectionSceneCommand, createSceneCommand,
   addLayerCommand, removeLayerCommand, setLayerFieldCommand, setSceneFieldCommand,
   layerExtrasLine,
   SCENE_FORM_CHOICES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS,
@@ -124,9 +125,9 @@ import {
 } from '../../../core/formats/effects/scene-ui';
 import type { EffectsPresetLibrary } from '../../../core/formats/effects/preset';
 
-const EMPTY_LIBRARY: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [] };
+const EMPTY_LIBRARY: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [], loadedPaths: [] };
 /** `BandPresetPanel`'s idiom — an absent library is an empty one, never a null check at the call. */
-const EMPTY_PRESETS: EffectsPresetLibrary = { presets: [], unreadable: [], notices: [] };
+const EMPTY_PRESETS: EffectsPresetLibrary = { presets: [], unreadable: [], notices: [], loadedPaths: [] };
 
 const textInput: React.CSSProperties = {
   flex: 1, minWidth: 0, background: T.raised, color: T.textHi,
@@ -1050,7 +1051,14 @@ export default function EffectsScenePanel(): React.ReactElement {
             // so its label silently becomes another file's, and it KEEPS
             // KEYBOARD FOCUS. A bare Space then does not re-delete the document
             // that is gone — it deletes a DIFFERENT one.
-            onClick={(e) => actAndDropFocus(e, () => run(deleteSceneCommand(library, selected.id)))} />}>
+            // GUARDED (deleted-scene-returns). A save now UNLINKS the file, so
+            // this button destroys an author's document rather than merely
+            // dropping it from the session; `deleteSceneGuarded` asks first when
+            // there is a file to lose and calls the command unchanged when there
+            // is not. The blur is still first and still unconditional —
+            // `actAndDropFocus` blurs before `act()`, and the confirm happens
+            // inside `act()` — so d-27's subject is untouched.
+            onClick={(e) => actAndDropFocus(e, () => { void deleteSceneGuarded(library, selected.id, run); })} />}>
          <SectionBody>
           <Field label="Name">
             <input value={typeof selected.name === 'string' ? selected.name : ''}
