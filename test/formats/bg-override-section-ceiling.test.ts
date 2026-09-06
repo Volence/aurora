@@ -29,6 +29,7 @@ import {
   BGANIM_VIEW_COUNT,
   BGANIM_VIEW_DERIVED_PERIOD_PX,
   BGANIM_PHASE_BANKS,
+  BGANIM_MAX_BANDS,
   BG_TILE_CAPACITY,
   BG_LAYOUT_WORDS,
   TILE_PIXELS,
@@ -413,6 +414,75 @@ describe('the act that used to have NO section size now has one, and it is small
     const r = bganimSectionSlotsAllowed(twoSilenced);
     expect(r.ok).toBe(true);
     expect(r.ok && r.value).toBeGreaterThan(0);
+  });
+
+  /**
+   * ⚠ THE CENSUS BEHIND "UNREACHABLE", so the word is a measurement rather than
+   * a recollection of a report.
+   *
+   * The two rows above show two acts that no longer refuse. That is not the
+   * claim `BgAnimSizeResult`'s docblock makes, and the difference matters to
+   * anyone deciding whether the `!ok` branches can be deleted: the claim is that
+   * NO input refuses, because `viewsEmitted` — the codec's only producer of a
+   * refused size — has no failing arm left at all.
+   *
+   * WHAT THIS SWEEPS is every input `viewsEmitted` can distinguish: the band
+   * COUNT across and past the ceiling (its per-act arm), `default_off`
+   * true/false/absent on every band independently (its truthiness read), and
+   * `pattern_px` at the derived period, off it, and missing (its per-band arm) —
+   * the full cross product of all three. Nothing else in the function is read.
+   *
+   * WHAT IT DOES NOT SWEEP, stated rather than implied: non-boolean truthy
+   * values for `default_off` (the coercion the codec deliberately mirrors) get
+   * two explicit checks below instead of a place in the product, and the
+   * geometry keys are fixed at 1x1 because `viewsEmitted` never reads them.
+   *
+   * ⚠ AND WHEN THIS ROW GOES RED IT IS NOT NECESSARILY A DEFECT. A future aeon
+   * revision may make a size refuse again — that is what the `!ok` arm is FOR.
+   * The failure means the docblock's "no producer today" has expired and the
+   * dead-branch labels pointing at it have to come down, not that the new
+   * refusal is wrong.
+   */
+  it('NO input refuses a size: the census behind the unreachable !ok arm', () => {
+    const periods = [BGANIM_VIEW_DERIVED_PERIOD_PX, BGANIM_VIEW_DERIVED_PERIOD_PX + 1, undefined];
+    const offs: unknown[] = [undefined, true, false];
+    let checked = 0;
+    for (let count = 0; count <= BGANIM_MAX_BANDS + 1; count++) {
+      // Every assignment of (default_off, pattern_px) to the `count` bands.
+      const combos = offs.length * periods.length;
+      for (let mask = 0; mask < combos ** count; mask++) {
+        let m = mask;
+        const bands = Array.from({ length: count }, (): BgOverrideBand => {
+          const off = offs[m % offs.length];
+          const px = periods[Math.floor(m / offs.length) % periods.length];
+          m = Math.floor(m / combos);
+          return {
+            cols: 1, rows: 1,
+            ...(px !== undefined ? { pattern_px: px } : {}),
+            ...(off !== undefined ? { default_off: off } : {}),
+          } as unknown as BgOverrideBand;
+        });
+        expect(viewsEmitted(bands).ok).toBe(true);
+        expect(bganimSectionBytes(bands).ok).toBe(true);
+        expect(bganimSectionSlotsAllowed(bands).ok).toBe(true);
+        checked++;
+      }
+    }
+    // The coercion arm, kept out of the product so the product stays small.
+    for (const off of [1, 'yes', {}]) {
+      const b = [{ cols: 1, rows: 1, pattern_px: BGANIM_VIEW_DERIVED_PERIOD_PX,
+        default_off: off }] as unknown as BgOverrideBand[];
+      expect(viewsEmitted(b)).toEqual({ ok: true, value: BGANIM_VIEW_COUNT });
+      expect(bganimSectionBytes(b).ok).toBe(true);
+    }
+    // The sweep is not vacuous, and it really did reach both of viewsEmitted's
+    // arms: an act that emits twins, and an act that declines them.
+    expect(checked).toBeGreaterThan(0);
+    expect(viewsEmitted([{ cols: 1, rows: 1, pattern_px: BGANIM_VIEW_DERIVED_PERIOD_PX,
+      default_off: true } as unknown as BgOverrideBand]))
+      .toEqual({ ok: true, value: BGANIM_VIEW_COUNT });
+    expect(viewsEmitted([{ cols: 1, rows: 1 } as unknown as BgOverrideBand]))
+      .toEqual({ ok: true, value: 0 });
   });
 });
 
