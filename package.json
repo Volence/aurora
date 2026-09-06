@@ -140,6 +140,7 @@
     "harness:effects-preview-default": "node scratchpad/effects-preview-default-harness.mjs",
     "harness:effects-refusal": "node scratchpad/effects-refusal-harness.mjs",
     "harness:effects-scene": "node scratchpad/effects-scene-harness.mjs",
+    "harness:effects-scene-selection": "node scratchpad/effects-scene-selection-harness.mjs",
     "harness:effects-section-picker": "node scratchpad/effects-section-picker-harness.mjs",
     "harness:effects-section-strip": "node scratchpad/effects-section-strip-harness.mjs",
     "harness:effects-sub-tabs": "node scratchpad/effects-sub-tabs-harness.mjs",

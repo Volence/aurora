@@ -506,7 +506,13 @@ describe('sceneSelectionRelation: which document do my keystrokes land in', () =
 
   it('carries no en dash or em dash: the UI string gates', () => {
     const r = sceneSelectionRelation([sec('canopy')], 0, 'canyon');
-    expect(r.text).not.toMatch(/[–—]/);
+    // CODE POINTS, NOT A PATTERN. check-test-dashes reads the SOURCE and
+    // catches both spellings, the escape included, so the two characters this
+    // row is about cannot appear here in any form. Naming them by number is the
+    // only way to assert their absence without writing one.
+    const codes = [...String(r.text)].map((ch) => ch.codePointAt(0));
+    expect(codes).not.toContain(0x2013);
+    expect(codes).not.toContain(0x2014);
   });
 });
 
