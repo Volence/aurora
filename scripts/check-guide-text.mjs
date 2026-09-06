@@ -136,6 +136,11 @@ const RENDERED = [
   { text: '☐', file: `${EFFECTS}/SectionPicker.tsx` },
   { text: 'own preset', file: `${EFFECTS}/SectionPicker.tsx` },
   { text: 'threaded', file: `${EFFECTS}/SectionPicker.tsx` },
+  // The act-wide line's own label and its third set (cold read D-B). `act:` is
+  // the line's prefix; `bound` is the sections whose sidecar already names a
+  // preset, which is the fact `threaded 5,6` was read as ruling out.
+  { text: 'act:', file: `${EFFECTS}/SectionPicker.tsx`, prefix: true },
+  { text: 'bound', file: `${EFFECTS}/SectionPicker.tsx`, prefix: true },
   { text: 'its channels', file: `${EFFECTS}/SectionPicker.tsx` },
   { text: 'Editing', file: `${EFFECTS}/SectionPicker.tsx` },
   { text: 'scene <id> · raster <id>', file: `${EFFECTS}/SectionPicker.tsx` },
@@ -291,7 +296,6 @@ const NOT_A_LABEL = [
   { text: 'preset()', kind: 'aeon identifier' },
   { text: 'Sec.sec_effects', kind: 'aeon identifier' },
   { text: 'ojz_act1_sec_raster(sec: N)', kind: 'aeon build message, quoted' },
-  { text: 'ojz act1', kind: 'project data: an act' },
   { text: 'ojz_water_tint', kind: 'project data: an id the reader invents' },
   { text: 'OJZ_Preset_Plain', kind: 'project data: an aeon preset record' },
   { text: 'Authored probe (red / blue)', kind: 'project data: a shipped preset document' },

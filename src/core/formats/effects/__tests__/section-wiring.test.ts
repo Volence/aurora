@@ -29,7 +29,7 @@ import {
   descriptorEffectsBindings, libraryRasterChooserCalls, rasterChooserName, wiringPaths,
   unknownWiring, sectionRasterState, sectionRasterAdvisory, sectionSharers,
   wiredSections, eligibleSections, sectionWiringConditions, threadedSections,
-  ownPresetSections, sectionConditionsAgreeWithState, libraryChannelCalls,
+  ownPresetSections, boundSections, sectionConditionsAgreeWithState, libraryChannelCalls,
   libraryChannelChooserCalls, channelChooserName, sectionExtraChannelsCondition,
   extraChannelsAdvisory, EXTRA_SECTION_CHANNELS, type SectionRasterWiring,
 } from '../section-wiring';
@@ -282,6 +282,30 @@ describe('the two wiring conditions, stated apart', () => {
     const w2: SectionRasterWiring = { ...w, threadedBy: { ...w.threadedBy, ZZZ_Preset_Other: 2 } };
     expect(threadedSections(w2, 4)).toEqual([0, 2]);
     expect(wiredSections(w2, 4)).toEqual([0]);
+  });
+
+  it('`boundSections` is OCCUPANCY, and it is not in aeon\'s files at all', () => {
+    // THE COLD READ'S D-B. `threaded 5,6` was read as "5 and 6 are available";
+    // both already carried a preset. This is the set that says so, and it is
+    // the one set on that line derived from AURORA's own sidecars.
+    const s = (rasterRef: string | null) => ({ rasterRef });
+    expect(boundSections([s(null), s('a'), null, s('b')])).toEqual([1, 3]);
+    expect(boundSections([s(null), null])).toEqual([]);
+    expect(boundSections([])).toEqual([]);
+
+    // ⚠ AN EMPTY SECTION IS NOT A BOUND ONE, and a `null` hole must not shift
+    // the indices of the sections after it: the act line prints these numbers
+    // beside two sets that are indexed the same way.
+    expect(boundSections([null, null, s('x')])).toEqual([2]);
+
+    // ⚠ IT DOES NOT DEGRADE WITH AEON'S FILES, which is the whole reason it
+    // takes the sections rather than a `SectionRasterWiring`. `ownPresetSections`
+    // has a whole row above about the contradiction folding a set through an
+    // aeon read produced; occupancy cannot have that defect because no aeon
+    // read is in it.
+    const sections = [s('a'), s(null)];
+    expect(boundSections(sections)).toEqual(boundSections(sections.slice()));
+    expect(boundSections(sections)).toEqual([0]);
   });
 });
 

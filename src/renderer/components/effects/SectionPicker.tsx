@@ -75,8 +75,8 @@ import { useEditorStore } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import {
   sectionRasterState, sectionRasterAdvisory, rasterChooserName, sectionWiringConditions,
-  threadedSections, ownPresetSections, sectionExtraChannelsCondition, extraChannelsAdvisory,
-  type WiringCondition,
+  threadedSections, ownPresetSections, boundSections, sectionExtraChannelsCondition,
+  extraChannelsAdvisory, type WiringCondition,
 } from '../../../core/formats/effects/section-wiring';
 
 /**
@@ -259,6 +259,13 @@ export default function SectionPicker({ children }: {
   // reading `✓ own preset OJZ_Preset_Sec0` — see ownPresetSections' docblock.
   const threaded = threadedSections(act.rasterWiring, act.sections.length);
   const own = ownPresetSections(act.rasterWiring, act.sections.length, chooser);
+  // THE COLD READ'S D-B. `threaded 5,6` was read as "5 and 6 are available";
+  // both already carried a preset, so every home the strip named was occupied.
+  // This set is Aurora's OWN files (`section.rasterRef`) and not aeon's, which
+  // is why it takes the sections and never the wiring parse — see
+  // `boundSections`' docblock for that, and for why it is a set on this line
+  // rather than a fourth condition row.
+  const bound = boundSections(act.sections);
 
   return (
     <>
@@ -346,18 +353,55 @@ export default function SectionPicker({ children }: {
             + `reached a build error after Aurora had said yes.`
             + (extraAdvisory ? `\n\n${extraAdvisory}` : '')} />
 
-        {/* THE SETS, NOT A SENTENCE ABOUT THE SETS — and the same two facts the
-            two rows above state, act-wide. Which sections can carry a raster
-            band is a property of the LEVEL DATA and is re-derived on every load;
-            printing it here means an author can see the answer change when aeon
-            changes the level, instead of reading a number somebody wrote down. */}
+        {/* THE SETS, NOT A SENTENCE ABOUT THE SETS. Which sections can carry a
+            raster band is a property of the LEVEL DATA and is re-derived on
+            every load; printing it here means an author can see the answer
+            change when aeon changes the level, instead of reading a number
+            somebody wrote down.
+
+            ⚠ THE THIRD SET IS NOT A THIRD CONDITION. `own preset` and
+            `threaded` are conditions 1 and 2 act-wide, out of aeon's two files;
+            `bound` is out of Aurora's OWN sidecars and answers a different
+            question — not "can a band go here" but "is something already
+            here". It is here because the cold read's D-B is exactly the gap
+            between those two questions: `threaded 5,6` was read as "5 and 6 are
+            available" while both were occupied, and the reader had no route to
+            a green build. A set in this line's own grammar costs no row; the
+            CONSEQUENCE of taking an occupied section is stated at the control
+            that takes it (`rebindOrphanNotice`, under the Section dropdown in
+            RASTER BAND PRESETS), because that is where it is charged.
+
+            ⚠ THE LINE IS STILL GATED ON THE DESCRIPTOR, deliberately: with it
+            unreadable the two aeon sets are not printed at all, so there is no
+            false impression to correct, and `bound` alone under an `act:` label
+            would read as a statement about wiring. Nothing is lost — the
+            rebind notice reads no aeon file and is unaffected. */}
         {act.rasterWiring.descriptor.parsed && (
           <div style={{ fontSize: T.t2xs, color: T.textFaint, fontFamily: T.fontMono }}
-            data-effects-act-sets="">
+            data-effects-act-sets=""
+            title={'Three act-wide sets, each derived from its own question.\n\n'
+              + 'own preset: the sections whose aeon preset RECORD no other section shares '
+              + '(condition 1).\n'
+              + `threaded: the sections some preset() passes ${chooser}(sec: N) to (condition 2).\n`
+              + 'bound: the sections whose sidecar ALREADY NAMES a raster preset document. '
+              + 'This one is Aurora\'s own file, not aeon\'s, and it is here because the first '
+              + 'two sets say where a band CAN go and say nothing about what is already '
+              + 'there. A section in all three is occupied: binding here replaces its '
+              + 'incumbent, and if nothing else names that document aeon refuses the build '
+              + 'for it. The paragraph at the Section dropdown, under RASTER BAND PRESETS, '
+              + 'says so at the control.'}>
             {`act: own preset ${own.length === 0 ? 'none' : own.join(',')}`}
             {act.rasterWiring.library.parsed
               ? ` · threaded ${threaded.length === 0 ? 'none' : threaded.join(',')}`
               : ' · threaded ?'}
+            {/* THE SEPARATOR IS ITS OWN NODE so the set's own string BEGINS
+                with its label. `scripts/check-guide-text.mjs` verifies a label
+                the guide quotes against a leading chunk of the string that
+                renders it, and ` · bound ` leads with punctuation, which is
+                unverifiable by construction. The two sets above are held by
+                their ConditionRow labels instead; this one has no row. */}
+            {' · '}
+            {`bound ${bound.length === 0 ? 'none' : bound.join(',')}`}
           </div>
         )}
 
