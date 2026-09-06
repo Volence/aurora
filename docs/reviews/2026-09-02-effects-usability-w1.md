@@ -176,6 +176,12 @@ the fourteen defects" is `SectionPicker`: first in the column, never collapsible
 naming the section, printing `scene … · raster …`, and carrying the derived wiring.
 A screenshot of the built strip is parked at
 `scratchpad/shots-effects-section-picker/effects-section-picker.png`.
+**EVIDENCE NOT RETAINED:** that file was destroyed by an agent worktree prune on
+2026-09-05 and no commit ever touched it, because `.gitignore:10` has matched
+that path since 2026-08-15. **What a reader can act on:**
+`npm run harness:effects-section-picker` drives the tracked instrument that made
+it, so the shot can be taken again; new evidence goes in `docs/captures/`,
+tracked.
 
 **Two clauses of the ruling this parcel does NOT cover**, and they are follow-on
 work, not omissions:

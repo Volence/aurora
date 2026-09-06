@@ -671,7 +671,13 @@ const EVIDENCE_LOST = 'the sentence records evidence that was DESTROYED (a workt
   + 'record of what was lost, which is the opposite of the repair. It is not a licence: '
   + 'docs/captures/ is where evidence goes.';
 
-const EXEMPT = [];
+const EXEMPT = [
+  { file: 'docs/reviews/2026-08-30-o31-dangling-bg-refs.md', token: 'scratchpad/shots-bg-dangling', why: EVIDENCE_LOST },
+  { file: 'docs/reviews/2026-08-30-o21-bg-wrap-visibility.md', token: 'scratchpad/shots-bg-wrap', why: EVIDENCE_LOST },
+  { file: 'docs/reviews/2026-09-02-effects-usability-w1.md', token: 'scratchpad/shots-effects-section-picker/effects-section-picker.png', why: EVIDENCE_LOST },
+  { file: 'docs/reviews/2026-09-03-o56-loop-authoring-door.md', token: 'scratchpad/shots-o56-loop-authoring-door/collision-facet-arrival.png', why: EVIDENCE_LOST },
+  { file: 'docs/reviews/2026-09-03-o56-loop-authoring-door.md', token: 'scratchpad/shots-o56-loop-authoring-door/collision-facet-armed.png', why: EVIDENCE_LOST },
+];
 
 // ---------------------------------------------------------------------------
 // THE REAL RUN.

@@ -78,6 +78,16 @@
 //      distinct rooted paths in this repo's markdown do not resolve, nearly all
 //      of that shape.) The rule this gate enforces is for LIVE instructions to
 //      a maintainer, which is what a source comment is.
+//      ⚠ THIS HOLE IS NO LONGER OPEN, AND THIS PARAGRAPH IS NO LONGER THE WHOLE
+//      STORY. `scripts/check-doc-citations.mjs` (2026-09-06, row CITED-PATHS-DOCS)
+//      reads the markdown under `docs/` with its own population, its own
+//      fence-aware extractor, and a RATCHET keyed on the committer time git
+//      blames each line to, so a dated record stays accurate about its own
+//      moment and only a line written from now on is bound. It also INVERTS
+//      exclusion 8 deliberately: a git-ignored citation is the defect there
+//      rather than the excuse, because `scratchpad/shots*/` is ignored and four
+//      reviews cited it as evidence that no longer exists. Read that file's
+//      header before assuming anything here still describes the markdown case.
 //   4. ONLY WHOLE-LINE COMMENTS ARE READ — a line whose first non-blank
 //      characters are `//`, `/*`, `*`, `*/` (or `#` in `.py`/`.sh`). A trailing
 //      comment after code on the same line is NOT read. That is a real loss,
