@@ -2,7 +2,17 @@
 
 **Date** 2026-08-30 · **Queue** O21 · **Branch** `fix/bg-wrap-visibility` ·
 **Instrument** `scratchpad/bg-wrap-harness.mjs` (`npm run harness:bg-wrap`) ·
-**Captures** `scratchpad/shots-bg-wrap/` (not committed)
+**Captures** `scratchpad/shots-bg-wrap/` **EVIDENCE NOT RETAINED**
+
+> **The captures cited above are gone and cannot be recovered.** An agent
+> worktree prune on 2026-09-05 removed the directory, and no commit ever touched
+> it: `.gitignore:10` has matched that path since 2026-08-15, so it was never
+> committable in the first place and the "(not committed)" this line used to
+> carry was a disclosed dangling reference, not an excused one. **What a reader
+> can act on:** the instrument named above is tracked, so re-running
+> `npm run harness:bg-wrap` produces the captures again. New evidence goes in
+> `docs/captures/`, tracked, which is where the other half of this convention
+> has always been.
 
 ---
 
