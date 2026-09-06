@@ -75,7 +75,7 @@ const EXEMPT = [
     file: 'src/renderer/providers/effects-preset.ts', value: 16,
     match: /is not a CRAM word/,
     why: '"ONE 16-bit word" is a WIDTH IN BITS, not CRAM_LINE_ENTRIES (entries per palette line, '
-      + 'also 16). Two different quantities that happen to share a value — and the sentence '
+      + 'also 16). Two different quantities that happen to share a value, and the sentence '
       + 'already derives the figure that IS its bound, `${CRAM_WORD_MAX}`.',
   },
   {
@@ -105,7 +105,7 @@ const EXEMPT = [
   {
     file: 'src/main/editor-methods.ts', value: 4096,
     match: /Max 4096 cells per call/,
-    why: 'NOT BG_LAYOUT_WORDS — nothing in this module enforces 4096 cells, so this figure has '
+    why: 'NOT BG_LAYOUT_WORDS. Nothing in this module enforces 4096 cells, so this figure has '
       + 'no code-side author at all to derive from. Interpolating BG_LAYOUT_WORDS would invent a '
       + 'coupling and make a coincidence look like a derivation. Recorded as an open item in '
       + 'docs/reviews/2026-09-06-numbers-in-prose.md: a documented cap with no enforcement.',
@@ -122,7 +122,7 @@ const EXEMPT = [
     file: 'src/main/editor-methods.ts', value: 64,
     match: /Each tile is 64 pixel values/,
     why: 'Same classic-path lineage as get_tiles above. Note the enforcement beside it is the zod '
-      + '`.length(64)`/`.max(15)`, itself typed — deriving only the PROSE from the aeon contract '
+      + '`.length(64)`/`.max(15)`, itself typed, so deriving only the PROSE from the aeon contract '
       + 'would create a fresh two-author split rather than close one.',
   },
   {
@@ -130,7 +130,7 @@ const EXEMPT = [
     match: /Each tile is 64 pixel values 0-15/,
     why: 'Companion to the row above: 0-15 is the classic 4bpp pixel range, enforced two lines up '
       + 'by a typed `.max(15)`. Closing this properly means giving the classic tile format its own '
-      + 'named bound and pointing both at it — a change to enforcement, out of this parcel.',
+      + 'named bound and pointing both at it: a change to enforcement, out of this parcel.',
   },
 ];
 
@@ -307,8 +307,8 @@ const files = execFileSync('git', ['ls-files', '--', 'src'], { cwd: ROOT, encodi
 
 const contract = contractValues();
 if (contract.size === 0) {
-  console.error('check-prose-constants: the vendored bganim contract yielded no constants — '
-    + 'the gate cannot run, and an empty run is NOT a pass.');
+  console.error('check-prose-constants: the vendored bganim contract yielded no constants, so '
+    + 'the gate cannot run. An empty run is NOT a pass.');
   process.exit(2);
 }
 const exported = exportedNumbers(files, contract);
@@ -363,7 +363,7 @@ for (const r of rows) {
 }
 for (const [e] of staleExemptions) {
   console.error(`STALE EXEMPTION: ${e.file} ${e.value} ${e.match} matches nothing. `
-    + 'A permission with no live subject has outlived its reason — delete the row.');
+    + 'A permission with no live subject has outlived its reason; delete the row.');
 }
 console.error(`check-prose-constants FAILED: ${rows.length} re-typed constant(s) in author-facing prose`
   + `${staleExemptions.length ? `, ${staleExemptions.length} stale exemption(s)` : ''}.`);

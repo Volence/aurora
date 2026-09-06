@@ -719,7 +719,8 @@ export default function BgAnimBandPanel(): React.ReactElement {
               onChange={(n) => setCols(Math.max(1, Math.round(n) || 1))} />
           ) : (
             <Select title={`cols: constrained so that cols * ${TILE_BYTES} bytes per pattern ROW `
-              + 'is an exact power of two, because a vertical band rotates a whole row by shifting it'}
+              + 'is an exact power of two, because a vertical tile animation rotates a whole row '
+              + 'by shifting it'}
               value={String(cols)}
               onChange={(v) => setCols(Number(v))}
               style={{ width: 80 }}>
@@ -786,7 +787,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
           title="rate_shift: a RIGHT SHIFT on the driver, so HIGHER IS SLOWER.">
           <Select
             title="rate_shift: HIGHER IS SLOWER. The step is the driver scalar shifted RIGHT by this
-                   many bits (step = driver >> rate_shift), so each +1 halves the band's speed.
+                   many bits (step = driver >> rate_shift), so each +1 halves the tile animation's speed.
                    Leave it at (default) to omit the key and track aeon's own default."
             value={explicitRateShift ? 'custom' : ''}
             onChange={(v) => setCandidate({ rateShift: v === 'custom' ? DEFAULT_RATE_SHIFT : undefined })}
@@ -819,10 +820,10 @@ export default function BgAnimBandPanel(): React.ReactElement {
 
         <Field label={`Banks 1-${LAST_PHASE_BANK}`}
           title={`How banks 1-${LAST_PHASE_BANK} are filled from phase 0. Phase 0 itself is never `
-            + 'a choice: it is the art the band rests at.'}>
+            + 'a choice: it is the art the tile animation rests at.'}>
           <Select
             title={`phase fill: how banks 1-${LAST_PHASE_BANK} (the contract's pre-shifted phases, `
-              + `selected by step & ${LAST_PHASE_BANK}) are derived from the band's phase 0`}
+              + `selected by step & ${LAST_PHASE_BANK}) are derived from the tile animation's phase 0`}
             value={phaseFill}
             onChange={(v) => setCandidate({ phaseFill: v as BandPhaseFill })}
             style={{ flex: 1, minWidth: 0 }}>
