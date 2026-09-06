@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  bandBudget,
   shipSilentSwitch,
   twinCouplingApplies,
   promoteUnavailableReason,
@@ -130,12 +131,17 @@ describe('shipSilentSwitch', () => {
   });
 
   /**
-   * ⚠ THE DISCRIMINATING ROW AT THE PANEL'S OWN LAYER. Both bands of a two-band
-   * act are refused, including the one whose silencing would make the act
-   * CONSISTENT. A switch built on "are they consistent?" would light up for at
-   * least one of these.
+   * BOTH BANDS OF A TWO-BAND ACT ARE REFUSED, including the one whose silencing
+   * would make the act CONSISTENT.
+   *
+   * ⚠ AND THIS IS NOT THE DISCRIMINATING ROW, measured rather than assumed:
+   * with the per-key validator planted in `viewsEmitted` this row stays GREEN,
+   * because every state it visits is inconsistent and the wrong validator
+   * refuses those too. The discriminating row at this layer is the budget one
+   * at the bottom of this file. Kept because "the greyed option and the failed
+   * click say the same sentence" is its own property and this is where it lives.
    */
-  it('DISCRIMINATING: refuses BOTH bands of a two-band act, on the COUNT', () => {
+  it('refuses BOTH bands of a two-band act, on the COUNT and in one sentence', () => {
     const d = doc([PERIOD_TILES, PERIOD_TILES]);
     for (const index of [0, 1]) {
       const s = shipSilentSwitch(d, index)!;
@@ -172,6 +178,29 @@ describe('twinCouplingApplies: the disclosure fires exactly when the build refus
   });
 
   /**
+   * ⚠ THE QUANTIFIER ROW FOR THE DISCLOSURE ITSELF, and it was ADDED BECAUSE A
+   * PLANT WENT GREEN WITHOUT IT. Swapping `some` for `every` in
+   * `twinCouplingApplies` passed every other row in this file: a one-band
+   * silenced act satisfies both, and an act with none satisfies neither. The
+   * MIXED act is the only shape that tells them apart, and it is exactly the
+   * shape the disclosure exists for — a document where one tile animation is
+   * silenced and another is not, which is a document the build already refuses
+   * and which an author can arrive holding.
+   *
+   * `every` is the plausible mistake, not a strawman: "the act boots silent"
+   * sounds like a property of all its bands. It is not. ANY silenced band arms
+   * aeon's rule.
+   */
+  it('QUANTIFIER: is true for a MIXED act, where only one tile animation is silenced', () => {
+    const d = doc([PERIOD_TILES, PERIOD_TILES], [{ default_off: true }, {}]);
+    expect(documentBands(d).map(b => Boolean(b.default_off))).toEqual([true, false]);
+    expect(twinCouplingApplies(d)).toBe(true);
+    // And it is a document the build refuses, so the disclosure is telling the
+    // truth about why the doors below it are off.
+    expect(promoteUnavailableReason(d, 1, 1)).toMatch(/EXACTLY ONE tile animation/);
+  });
+
+  /**
    * THE POINT OF THE DISCLOSURE, PINNED. On a document in this state BOTH
    * creation doors already refuse, with aeon's own reason. The disclosure is
    * not a substitute for those refusals; it is the sentence that reaches an
@@ -198,6 +227,45 @@ describe('twinCouplingApplies: the disclosure fires exactly when the build refus
     expect(twinCouplingApplies(d)).toBe(false);
     // Anti-vacuous the other way: this act really can take another door.
     expect(promoteUnavailableReason(d, 1, 1)).toBeNull();
+  });
+});
+
+// ── The read model on a document the build refuses ─────────────────────────
+
+describe('an act the build refuses is LOUD in the panel, never priced', () => {
+  /**
+   * ⚠ THE DISCRIMINATING ROW AT THIS LAYER, and it earns the name: planted the
+   * per-key validator (`off.length !== bands.length` in `viewsEmitted`) and
+   * this row goes RED while every switch row above stays green.
+   *
+   * A two-band act in which BOTH bands carry the key is CONSISTENT, so the
+   * wrong validator prices it: `byteSlotsRemaining` becomes a number, `binding`
+   * becomes a budget, and the panel prints a ROM-section line and an offer of
+   * free slots for an act that cannot bake. What must happen instead is the
+   * unmeasurable direction: no number, `slotsRemaining` collapsed to ZERO, and
+   * a sentence saying why. THE DIRECTION IS THE PROPERTY — falling through to
+   * the looser tile figure is the exact defect the section-ceiling parcel
+   * landed against, one budget over.
+   */
+  it('DISCRIMINATING: a CONSISTENT two-band silenced act is unmeasurable, not priced', () => {
+    const d = doc([PERIOD_TILES, PERIOD_TILES], [{ default_off: true }, { default_off: true }]);
+    // Anti-vacuous: the shape really is the consistent one.
+    expect(documentBands(d).every(b => b.default_off)).toBe(true);
+    const b = bandBudget(d);
+    expect(b.sectionBytes).toBeNull();
+    expect(b.byteSlotsRemaining).toBeNull();
+    expect(b.binding).toBe('unmeasurable');
+    // And the offer collapses to zero rather than to the tile figure, which is
+    // plainly non-zero on this fixture.
+    expect(b.tileSlotsRemaining).toBeGreaterThan(0);
+    expect(b.slotsRemaining).toBe(0);
+    expect(b.unmeasurable).toMatch(/not on whether they agree/);
+  });
+
+  it('and both creation doors refuse it too, rather than offering the tile budget', () => {
+    const d = doc([PERIOD_TILES, PERIOD_TILES], [{ default_off: true }, { default_off: true }]);
+    expect(promoteUnavailableReason(d, 1, 1)).toMatch(/EXACTLY ONE tile animation/);
+    expect(insertUnavailableReason(d, 1, 1)).toMatch(/EXACTLY ONE tile animation/);
   });
 });
 

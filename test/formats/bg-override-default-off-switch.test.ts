@@ -214,17 +214,22 @@ describe('PER ACT: the constraint is the band COUNT, never agreement', () => {
   });
 
   /**
-   * ⚠ THE DISCRIMINATING ROW. A per-key validator asks "do the tile animations
-   * agree about `default_off`?" and would have to ALLOW this one, because it is
-   * the step that MAKES them agree. The build refuses it, because the rule is on
-   * the act's band count and a two-band act never satisfies it however
-   * consistent it is.
+   * REACHABILITY, AND IT IS NOT THE DISCRIMINATING ROW — measured, not assumed.
+   *
+   * This row says a consistent two-band silenced act cannot be BUILT through
+   * the command: both first steps are refused, so there is no second step. That
+   * is worth holding, and it is worth being honest that it does NOT tell the
+   * two validators apart. Planted the per-key validator (`off.length !==
+   * bands.length` in `viewsEmitted`) and this row STAYED GREEN, because every
+   * intermediate state is inconsistent and the wrong validator refuses those
+   * too. The rows that went red are the two marked DISCRIMINATING below and in
+   * `bg-anim-aeon.ship-silent.test.ts`, which build the consistent act directly
+   * rather than trying to reach it.
    *
    * Both bands are checked, not one: a validator keyed on the FIRST band, or on
-   * "the band already carrying it", would pass one of the two and this row would
-   * not be able to tell.
+   * "the band already carrying it", would pass one of the two.
    */
-  it('DISCRIMINATING: refuses the step that would make a two-band act CONSISTENT', () => {
+  it('a consistent two-band silenced act is UNREACHABLE: both first steps refuse', () => {
     const d = doc([PERIOD_TILES, PERIOD_TILES]);
     for (const index of [0, 1]) {
       let message = '';
@@ -246,12 +251,22 @@ describe('PER ACT: the constraint is the band COUNT, never agreement', () => {
   });
 
   /**
-   * THE OTHER HALF OF THE SAME QUANTIFIER, and the reason the codec models this
-   * as a REFUSAL rather than "no twins": a two-band act in which BOTH bands
-   * carry the key has no computable section size at all. This row builds that
-   * document directly — the command cannot produce it, which is the row above.
+   * ⚠ THE DISCRIMINATING ROW, and it earns the name: planted the per-key
+   * validator (`off.length !== bands.length` in `viewsEmitted`) and this row
+   * went RED while every reachability row above stayed green.
+   *
+   * A validator asking "do the tile animations AGREE about `default_off`?"
+   * answers YES here and computes a section size for a document the build
+   * refuses outright. The act is built DIRECTLY because that is the only way to
+   * hold this shape: the command cannot produce it (the row above), but a
+   * document arriving from disk, a hand edit or a future aeon can, and Aurora
+   * would then price and offer work on an act that will not bake.
+   *
+   * It is also why the codec answers `{ ok: false }` rather than "no twins":
+   * a refusal is not a smaller section, and a caller that read it as one would
+   * print a LARGER budget for the worst document there is.
    */
-  it('a CONSISTENT two-band silenced act has no computable section size', () => {
+  it('DISCRIMINATING: a CONSISTENT two-band silenced act has no computable size', () => {
     const d = doc([PERIOD_TILES, PERIOD_TILES], [{ default_off: true }, { default_off: true }]);
     const size = bganimSectionBytes(documentBands(d));
     expect(size.ok).toBe(false);
