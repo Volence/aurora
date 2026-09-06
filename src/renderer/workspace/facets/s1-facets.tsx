@@ -318,7 +318,7 @@ function ClassicComposerCanvas(): React.ReactElement {
  */
 function ClassicLayoutPanels(): React.ReactElement {
   return (
-    <Panel width={260} scroll>
+    <Panel width={260} scroll column="s1-layout">
       <CollapsibleSection id="classic.chunks" title="Chunks" variant="list">
         <ChunkPicker pick="stamp" />
       </CollapsibleSection>
@@ -343,7 +343,7 @@ function ClassicLayoutPanels(): React.ReactElement {
  */
 function ClassicObjectsPanels(): React.ReactElement {
   return (
-    <Panel width={260} scroll>
+    <Panel width={260} scroll column="s1-objects">
       <CollapsibleSection id="classic.object" title="Selected Object">
         <ClassicObjectInspector />
       </CollapsibleSection>
@@ -367,7 +367,7 @@ function ClassicObjectsPanels(): React.ReactElement {
  */
 function ClassicPalettePanels(): React.ReactElement {
   return (
-    <Panel width={260} scroll>
+    <Panel width={260} scroll column="s1-palette">
       <CollapsibleSection id="classic.mapPalette" title="Palette">
         <ClassicPalettePanel />
       </CollapsibleSection>
@@ -384,7 +384,7 @@ function ClassicPalettePanels(): React.ReactElement {
  */
 function ClassicCollisionPanels(): React.ReactElement {
   return (
-    <Panel width={260} scroll>
+    <Panel width={260} scroll column="s1-collision">
       <CollapsibleSection id="classic.collision" title="Collision">
         <ClassicCollisionPanel />
       </CollapsibleSection>
@@ -425,7 +425,7 @@ function ClassicCollisionPanels(): React.ReactElement {
  */
 function ClassicArtPanels(): React.ReactElement {
   return (
-    <Panel width={260} scroll>
+    <Panel width={260} scroll column="s1-art">
       <CollapsibleSection id="classic.artChunks" title="Chunks" variant="list">
         <ChunkPicker pick="edit" />
       </CollapsibleSection>

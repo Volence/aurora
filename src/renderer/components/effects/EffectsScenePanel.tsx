@@ -1912,5 +1912,5 @@ export default function EffectsScenePanel(): React.ReactElement {
 }
 
 export function EffectsPanels(): React.ReactElement {
-  return <Panel width={300} scroll><EffectsScenePanel /></Panel>;
+  return <Panel width={300} scroll column="effects-scene-standalone"><EffectsScenePanel /></Panel>;
 }

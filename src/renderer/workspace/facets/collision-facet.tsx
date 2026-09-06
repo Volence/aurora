@@ -29,7 +29,7 @@ import { mapFacet, type FacetModule } from '../facet-registry';
 
 function CollisionPanels() {
   return (
-    <Panel width={240} scroll>
+    <Panel width={240} scroll column="aeon-collision">
       <CollapsibleSection id="aeon.collision" title="Collision">
         <CollisionPalette variant="map" />
       </CollapsibleSection>

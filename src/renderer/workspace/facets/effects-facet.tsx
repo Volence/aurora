@@ -125,7 +125,7 @@ function EffectsSubTabBody(): React.ReactElement {
 
 function EffectsPanels() {
   return (
-    <Panel width={300} scroll>
+    <Panel width={300} scroll column="aeon-effects">
       {/* WHICH SECTION AM I EDITING, AND WHICH JOB AM I DOING — FIRST, STICKY,
           AND NEVER COLLAPSIBLE. (EFFECTS-W1 defect 4; EW-SHAPE-STRIP.) The two
           per-section bindings this facet carries act on one store value that

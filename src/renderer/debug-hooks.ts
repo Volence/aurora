@@ -74,6 +74,10 @@ import { buildUsageIndex } from '../core/level-classic/usage-index';
 import { buildChunkSurface } from '../core/art/classic-surface-buffer';
 import { tileLockReason } from '../core/project/editable-tiles';
 import { SECTION_TILES_WIDE } from '../core/model/s4-types';
+import {
+  PANEL_COLUMNS, PANEL_COLUMN_IDS, PANEL_COLUMN_ATTR,
+} from './components/ui/panel-columns';
+import { revealPanel } from './shell/panel-state';
 
 /**
  * Paint-through (Task 12) read-only query surface. Every function here reads
@@ -1746,6 +1750,135 @@ interface DebugApi {
    * exceed the cap on demand.
    */
   pushToasts(items: { message: string; type: ToastType }[]): void;
+  /**
+   * EVERY SCROLLING COLUMN THIS SHELL HAS, AND WHICH OF THEM IS ON SCREEN.
+   *
+   * `Panel` closes its inline axis twice over (see its docblock: 89px of sticky
+   * strip on a wheel, 511px on a `Tab` focus jump), and the cost of closing it
+   * is that a child wider than its column now goes SILENTLY INVISIBLE. Before
+   * 2026-09-06 exactly one column was watched for that — `[9a]` of
+   * scratchpad/coldread-fixes-harness.mjs, which measures Effects.
+   *
+   * ⚠ `census` IS NOT DERIVED FROM THE DOM, AND THAT IS THE WHOLE POINT. It is
+   * components/ui/panel-columns.ts, checked against the call sites by
+   * components/__tests__/panel-columns.test.ts. A sweep that listed only what it
+   * found mounted would report a clean zero for a run that opened no project,
+   * which is the exact shape of "could not look" wearing "looked and found
+   * nothing"'s clothes. The caller subtracts `mounted` from `census` and owes a
+   * reason for every remainder.
+   *
+   * Read-only, and it measures rather than judges: no threshold lives here, so
+   * the harness's rule and this probe cannot disagree about what counts.
+   */
+  panels(): PanelSweep;
+  /**
+   * OPEN EVERY SHUT CARD IN EVERY MOUNTED COLUMN, through the app's own
+   * `revealPanel` — the same write the header click performs, and the same
+   * "deterministic seam under the gesture" rationale `spritePaint` has under
+   * the canvas. A synthetic click on each header would have to find the header
+   * by its chevron's rotation and would break on the next icon change.
+   *
+   * ONE ROUND. React re-renders after this returns, so the DOM still shows the
+   * old state when it does: the caller reveals, waits, reads `panels()` again,
+   * and repeats until nothing is collapsed. Returns the ids it wrote, so a
+   * caller that keeps getting the same list knows the write is not taking
+   * rather than seeing an empty result it might read as success.
+   */
+  revealSections(): { revealed: string[] };
+}
+
+/** One scrolling column as the DOM currently has it. */
+interface PanelMeasurement {
+  id: string;
+  /** The column's own fixed width, as laid out. */
+  clientWidth: number;
+  scrollWidth: number;
+  /** `scrollWidth - clientWidth`: positive means a child is being clipped. */
+  overflow: number;
+  /** Always 0 unless Panel's snap handler has stopped working. */
+  scrollLeft: number;
+  /**
+   * THE COLUMN'S CARDS, AND WHETHER THEY ARE SHUT.
+   *
+   * A collapsed CollapsibleSection renders NO CHILDREN, so a column with its
+   * cards shut can hold a child twice its width and measure 0px of overflow.
+   * Several sections in this shell are `defaultCollapsed`. Without this a sweep
+   * would report CLEAN for a screen it never opened, which is the same defect
+   * as measuring one column and reporting on fifteen.
+   */
+  sections: { id: string; collapsed: boolean }[];
+  /**
+   * The DEEPEST nodes sticking out past the content edge. An overflowing child
+   * makes every ancestor overflow too, so the ancestors are noise and a report
+   * full of them names no culprit.
+   */
+  offenders: { tag: string; over: number; width: number; cls: string; text: string }[];
+}
+
+interface PanelSweep {
+  /** Source of truth, from panel-columns.ts. Present whatever is on screen. */
+  census: { id: string; label: string; owner: string; reach: string }[];
+  mounted: PanelMeasurement[];
+  /** Ids on screen that the census does not carry. Should always be empty. */
+  strays: string[];
+  /** Ids mounted more than once, which would make one row shadow another. */
+  duplicates: string[];
+}
+
+/**
+ * The measurement, split out so the probe body stays readable. Runs against the
+ * live DOM; returns [] outside a browser.
+ */
+function measurePanelColumns(): PanelMeasurement[] {
+  const out: PanelMeasurement[] = [];
+  if (typeof document === 'undefined') return out;
+  for (const el of Array.from(document.querySelectorAll(`[${PANEL_COLUMN_ATTR}]`))) {
+    const s = el as HTMLElement;
+    const id = s.getAttribute(PANEL_COLUMN_ATTR) ?? '(unnamed)';
+    // The CONTENT box's right edge: `left` is the border box, and Panel draws a
+    // 1px left border, so `clientLeft` is what makes these two commensurable.
+    const right = s.getBoundingClientRect().left + s.clientLeft + s.clientWidth;
+    const offenders: PanelMeasurement['offenders'] = [];
+    for (const child of Array.from(s.querySelectorAll('*'))) {
+      if (child.querySelector('*')) continue;          // ancestors are noise
+      const r = child.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) continue;   // display:none leaves a 0 rect at 0,0
+      // TWO WAYS TO BE THE CULPRIT, and the first cut only had one.
+      //
+      //   1. the element's own BOX sticks out past the content edge;
+      //   2. the box fits and its CONTENT does not.
+      //
+      // (2) is not a corner case, it is the common one in this shell: every
+      // section is `display: flex; flexDirection: column`, so a child of one is
+      // a flex item stretched to the column's width. A 374px unbreakable token
+      // in a 239px column leaves an element whose rect ends exactly at the edge
+      // and whose text runs 203px past it. Measured: a plant in the aeon
+      // Objects column reported `overflow 203px` with NO offender named, which
+      // is a report that says a column is broken and refuses to say where.
+      const boxOver = r.right - right;
+      const inkOver = child.scrollWidth - child.clientWidth;
+      const over = Math.max(boxOver, inkOver);
+      if (over <= 0.5) continue;
+      offenders.push({
+        tag: child.tagName,
+        over: Math.round(over * 10) / 10,
+        width: Math.round(Math.max(r.width, child.scrollWidth)),
+        cls: String((child as HTMLElement).className ?? '').slice(0, 40),
+        text: (child.textContent ?? '').trim().slice(0, 60),
+      });
+    }
+    offenders.sort((a, b) => b.over - a.over);
+    out.push({
+      id, clientWidth: s.clientWidth, scrollWidth: s.scrollWidth,
+      overflow: s.scrollWidth - s.clientWidth, scrollLeft: s.scrollLeft,
+      sections: Array.from(s.querySelectorAll('[data-section]')).map((e) => ({
+        id: e.getAttribute('data-section') ?? '(unnamed)',
+        collapsed: e.getAttribute('data-section-collapsed') === 'true',
+      })),
+      offenders: offenders.slice(0, 8),
+    });
+  }
+  return out;
 }
 
 /** The file's fnv1a as 8 hex digits — the frameHashes encoding. Mirrored in
@@ -1897,6 +2030,41 @@ export function installDebugHooks(): void {
     toasts: () => useToastStore.getState().toasts.map((t) => ({ message: t.message, type: t.type })),
     pushToasts: (items) => {
       for (const it of items) useToastStore.getState().addToast(it.message, it.type);
+    },
+    panels: () => {
+      const mounted = measurePanelColumns();
+      const known = new Set<string>(PANEL_COLUMN_IDS);
+      const seen = new Map<string, number>();
+      for (const m of mounted) seen.set(m.id, (seen.get(m.id) ?? 0) + 1);
+      return {
+        census: PANEL_COLUMN_IDS.map((id) => {
+          const e = PANEL_COLUMNS[id];
+          const r = e.reach;
+          return {
+            id, label: e.label, owner: e.owner,
+            reach: r.kind === 'unmounted'
+              ? `unmounted: ${r.why}`
+              : r.kind === 'mode' ? `mode: ${r.mode}` : `${r.kind}: ${r.facet}`,
+          };
+        }),
+        mounted,
+        strays: [...seen.keys()].filter((id) => !known.has(id)),
+        duplicates: [...seen].filter(([, n]) => n > 1).map(([id]) => id),
+      };
+    },
+    revealSections: () => {
+      const revealed: string[] = [];
+      if (typeof document === 'undefined') return { revealed };
+      const shut = document.querySelectorAll(
+        `[${PANEL_COLUMN_ATTR}] [data-section][data-section-collapsed="true"]`,
+      );
+      for (const e of Array.from(shut)) {
+        const id = e.getAttribute('data-section');
+        if (!id) continue;
+        revealPanel(id);
+        revealed.push(id);
+      }
+      return { revealed };
     },
   };
   (window as unknown as { __dbg: DebugApi }).__dbg = dbg;

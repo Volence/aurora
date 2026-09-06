@@ -62,7 +62,7 @@ import { mapFacet, type FacetModule } from '../facet-registry';
 
 function PalettePanels() {
   return (
-    <Panel width={280} scroll>
+    <Panel width={280} scroll column="aeon-palette">
       <CollapsibleSection id="palette.editor" title="Palette">
         <PaletteEditor />
       </CollapsibleSection>

@@ -195,7 +195,7 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
       toolDock={<SpriteToolDock />}
       toolOptions={<SpriteToolOptions newSize={newSize} onNewSize={setNewSize} onFit={fitToView} />}
       panels={
-        <Panel width={240} scroll>
+        <Panel width={240} scroll column="sprite-mode">
           {/* Sprite editing runs in its own sprite-doc tab; tabs + explorer + ⌘K
               provide the way back to the classic level (the old sticky "← Back"
               bar was removed on user feedback). The disasm context (object list +
