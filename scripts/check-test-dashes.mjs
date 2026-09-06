@@ -69,6 +69,17 @@
 // run; that one is run by hand, one harness at a time. When it is swept, widen
 // DIRS below and rewrite this paragraph.
 //
+// BEFORE SWEEPING `scratchpad/`, READ THE COUPLED SET IN
+// `scripts/check-scripts-dashes.mjs`. `scripts/check-ledger-timestamps.mjs`
+// asserts on the OUTPUT TEXT of `scratchpad/ledger-timestamp-audit.py`, across
+// a language boundary, and 16 of that producer's dashes sit on 15 lines of
+// which FIVE also carry one of the 24 coupled assertion strings. The `absent`
+// arm of those canaries is a NEGATIVE assertion: change a message it names and
+// that arm passes vacuously forever, exactly the way this parcel's own
+// `not.toContain` did. That gate re-derives the pairing from both files on
+// every run and refuses if a coupled string acquires a dash, so it is the
+// instrument to watch while sweeping, not a paragraph to take on trust.
+//
 // THE .tsx COMPONENTS. Held by `scripts/check-tsx-dashes.mjs`, whose glob is
 // all of `src/**/*.tsx` and therefore already covers any component test. The
 // non-test `src/**/*.ts` is held by `scripts/check-src-dashes.mjs`.
