@@ -37,6 +37,24 @@
 // the SAME section, one real gesture apart, must move from one named tier to
 // another. A predicate that cannot see that move fails 2a.
 //
+// ── MEASURED ON BOTH BUILDS, WHICH IS THE ONLY WAY A ROW EARNS TRUST ─────
+//
+// A row that cannot tell the fixture from the fix ships green and says nothing.
+// Same harness, same clone, same screen size (1680x1050, dpr 1), one file apart:
+//
+//   a build of MASTER's sources   14 passed, 4 failed
+//     [1b]  a mark IS in the alarm tier: "✗" warning
+//     [1b2] and it IS the cross
+//     [1d]  and the paragraph is in the alarm tier too, 107px of it
+//     [2c]  unbinding does NOT put it back, because on master the alarm was
+//           never conditional on anything: it is the same "✗" warning either way
+//   this branch                   18 passed, 0 failed
+//
+// The other fourteen pass on BOTH, on purpose. 2a/2a2/2b are the escalation and
+// 3a/3a2 the unreadable case: they are what says the distinctions survived
+// rather than being softened away, and a parcel that broke them would go red
+// here while [1b] still went green.
+//
 // ── RUN ──────────────────────────────────────────────────────────────────
 //
 //   VITE_AURORA_DEBUG=1 npx electron-vite build
@@ -316,6 +334,33 @@ function findEffectsLibrary(root) {
   return null;
 }
 
+/**
+ * Open the project and land on the Effects tab, WAITING for the tab rather than
+ * sleeping at it.
+ *
+ * ⚠ A FIXED SLEEP AFTER `open()` IS A COIN FLIP. Measured here: the same clone,
+ * the same build, opened inside 2.5s on three runs and not on the fourth, and
+ * the failure surfaced as "no rect for Effects tab" — which reads as a missing
+ * control rather than as the harness being early. It polls, and only refuses
+ * after the wait it actually spent.
+ */
+async function openOnEffects(c, dir) {
+  await c.evalExpr(`window.__dbg.aeon.open(${JSON.stringify(dir)})`);
+  const EFFECTS_TAB = `[...document.querySelectorAll('button')]`
+    + `.find((e) => /^Effects\\b/.test((e.textContent||'').trim()))`;
+  for (let i = 0; i < 40; i++) {
+    const r = await c.json(RECT(EFFECTS_TAB));
+    if (r && r.w >= 1 && r.h >= 1) {
+      await clickRect(c, r, 'Effects tab');
+      await sleep(1200);
+      return r;
+    }
+    await sleep(500);
+  }
+  throw new Error(`the Effects tab never appeared after 20s of waiting on ${dir}. The project did `
+    + 'not open, so every row below would read off a screen this harness never made.');
+}
+
 async function main() {
   mkdirSync(SHOTS, { recursive: true });
 
@@ -374,13 +419,7 @@ async function main() {
     const dpr = await c.evalExpr('window.devicePixelRatio');
     note('dpr', `devicePixelRatio = ${dpr} (printed beside every positional reading below)`);
 
-    await c.evalExpr(`window.__dbg.aeon.open(${JSON.stringify(AEON)})`);
-    await sleep(2500);
-
-    const fx = await c.json(RECT(
-      `[...document.querySelectorAll('button')].find((e) => /^Effects\\b/.test((e.textContent||'').trim()))`));
-    await clickRect(c, fx, 'Effects tab');
-    await sleep(1200);
+    await openOnEffects(c, AEON);
 
     const tiers = await c.json(TIERS);
     note('the named tiers, resolved in the running app', JSON.stringify(tiers));
@@ -558,12 +597,7 @@ async function main() {
       movedLibrary = `${lib}.coldread-c1-moved`;
       renameSync(lib, movedLibrary);
       note('row 3a fixture', `moved ${lib} aside`);
-      await c.evalExpr(`window.__dbg.aeon.open(${JSON.stringify(AEON)})`);
-      await sleep(2500);
-      const fx2 = await c.json(RECT(
-        `[...document.querySelectorAll('button')].find((e) => /^Effects\\b/.test((e.textContent||'').trim()))`));
-      if (fx2) await clickRect(c, fx2, 'Effects tab');
-      await sleep(1200);
+      await openOnEffects(c, AEON);
       const rows2 = await c.json(CONDITIONS);
       note('with the effects library taken away', rows2.map((r) =>
         `[${r.n}] "${r.mark}" ${tierOf(r.markColour, tiers)} ${r.label} :: ${r.detail}`).join('\n        '));
