@@ -75,6 +75,7 @@ const CONTRACT_PATH = resolve(
 );
 const CONTRACT = JSON.parse(readFileSync(CONTRACT_PATH, 'utf8')) as {
   constants: Record<string, { value: number }>;
+  notVendored: Record<string, { aeonSymbol?: string }>;
 };
 
 /** The branch whose tip answers "what does aeon ship TODAY". Committed, named. */
@@ -289,6 +290,52 @@ describe('CURRENCY: are the vendored contract constants still what aeon declares
       'a constant is vendored with no way to ask aeon whether it is still current:'
       + ' add it to EXTRACTORS at the top of this file',
     ).toEqual(declared);
+  });
+
+  /**
+   * THE DISCLOSURE BLOCK IS A CLAIM ABOUT AEON, SO IT CAN GO STALE TOO.
+   *
+   * `notVendored` records what aeon publishes and Aurora deliberately does not
+   * carry - the population a walk of our own file structurally cannot see, and
+   * the one that produced the 2026-09-06 finding. A disclosure naming a symbol
+   * aeon has since renamed or deleted is worse than no disclosure: it reads as
+   * a live decision and is a fossil. So every symbol named there must still be
+   * findable in the aeon file the entry cites.
+   *
+   * NARROW ON PURPOSE. This checks EXISTENCE, not the recorded `aeonValue` -
+   * these are values Aurora does not consume, and pinning them here would
+   * manufacture red rows for numbers nothing in this repo reads.
+   */
+  it('every symbol the contract discloses as NOT vendored still exists at aeon', (ctx) => {
+    if (aeon === null || tip === null) {
+      ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR),'
+        + ` or ${AEON_TIP} does not resolve; CANNOT MEASURE whether the notVendored`
+        + ' disclosures still name symbols aeon has');
+      return;
+    }
+    const entries = Object.entries(CONTRACT.notVendored)
+      .filter(([k, v]) => !k.startsWith('$') && typeof v.aeonSymbol === 'string');
+    // Anti-vacuous: an empty block has disclosed nothing and measured nothing.
+    expect(entries.length, 'notVendored discloses nothing').toBeGreaterThan(0);
+
+    const stale: string[] = [];
+    for (const [name, entry] of entries) {
+      // Each `aeonSymbol` opens with the aeon path, then an em dash, then prose.
+      const path = /^([\w./-]+)/.exec(entry.aeonSymbol!)?.[1];
+      if (path === undefined) { stale.push(`${name}: aeonSymbol names no aeon path`); continue; }
+      const at = readAtRev(aeon, tip, path);
+      if (!at.ok) { stale.push(`${name}: ${path} is gone at ${tip} (${at.why})`); continue; }
+      // The disclosure's KEY is the symbol; `default_off` is a document key and
+      // the rest are constants, and both are findable as plain text in the file.
+      if (!at.text.includes(name)) stale.push(`${name}: not found anywhere in ${path} at ${tip}`);
+    }
+    expect(
+      stale,
+      `${NOT_OURS}\n`
+      + `  A notVendored disclosure names something aeon no longer has, at ${tip}.\n`
+      + '  Re-read the entry: either the symbol moved (repair the citation) or the\n'
+      + '  thing was retired (delete the disclosure and say so in `amendments`).',
+    ).toEqual([]);
   });
 
   for (const [name, extractors] of Object.entries(EXTRACTORS)) {
