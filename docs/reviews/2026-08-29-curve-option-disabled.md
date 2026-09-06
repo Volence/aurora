@@ -154,14 +154,14 @@ Nothing here is stitched from two runs.
 
 ### Screenshots
 
-* `scratchpad/shots-curve-option-disabled/3-option-list-refused-value-greyed.png`
+* `docs/captures/2026-08-29-curve-option-disabled/3-option-list-refused-value-greyed.png`
   — **the deliverable.** The option list with `FACTOR_1_4 (engine refuses)`
   greyed and unpickable, every other factor live, `none` live, `Custom…` live.
-* `scratchpad/shots-curve-option-disabled/2-refused-value-displayed-with-reason.png`
+* `docs/captures/2026-08-29-curve-option-disabled/2-refused-value-displayed-with-reason.png`
   — a document that *already carries* `to == fb`: the control still displays its
   own value, labelled `(engine refuses)`, with the full reason rendered in amber
   underneath.
-* `scratchpad/shots-curve-option-disabled/1-effects-panel.png` — full panel.
+* `docs/captures/2026-08-29-curve-option-disabled/1-effects-panel.png` — full panel.
 
 **Why the list shot is not an open native popup.** Chromium draws a `<select>`
 menulist as a native widget outside the page, so `Page.captureScreenshot` cannot

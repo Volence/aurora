@@ -276,7 +276,7 @@ covered canvas.
 
 ## 6. Screenshot
 
-`scratchpad/shots-raster-timeline/04-for-the-owner.png` — three bands labelled, two split
+`docs/captures/2026-08-28-raster-timeline/04-for-the-owner.png` — three bands labelled, two split
 markers at lines 120 and 176 with their payloads (`B row 300`, `B row 44`), the footer
 complete, and the strip agreeing with the map's own layer guides (`L1 y=120`, `L2 y=176`)
 beside it.

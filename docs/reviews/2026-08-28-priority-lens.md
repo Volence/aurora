@@ -78,7 +78,7 @@ far rarer here (2048px vs 256px).
 **Can the aeon viewport show a per-tile veil at the zooms he uses?** Yes. The lens draws
 onto the map context *after* `sectionRenderer.render`, inside the transform
 `scale(zoom); translate(-vpX,-vpY)`, so a tile veil is `zoom × 8` screen px. Verified at
-zoom 4 by pixel sampling (§4) and visually in `scratchpad/shots-priority-lens/2-lens-on.png`.
+zoom 4 by pixel sampling (§4) and visually in `docs/captures/2026-08-28-priority-lens/2-lens-on.png`.
 
 **Does the section renderer cache painted output in a way that makes the overlay stale?**
 It caches section canvases — but **the lens is never drawn into them.** It is painted over

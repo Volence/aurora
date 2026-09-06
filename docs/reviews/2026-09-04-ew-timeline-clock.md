@@ -229,7 +229,8 @@ worktree (`node_modules/` is gitignored), after which the banner reads `in-tree`
 retirement note records the same class with `AURORA_BUILT_TREE`; this is a second instance
 and the banner is the instrument — read it before believing any harness row.
 
-Screenshot: `scratchpad/shots-anchor-authoring/anchors-section-open.png` (gitignored),
+Screenshot: `docs/captures/2026-09-04-anchor-authoring/anchors-section-open.png`
+(promoted 2026-09-06 out of the gitignored `scratchpad/shots*/`),
 captured with channel 1 back on the violating rung so the new sentence is in frame.
 
 ---

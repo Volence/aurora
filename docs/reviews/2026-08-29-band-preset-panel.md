@@ -287,11 +287,11 @@ What it establishes that the node suite cannot:
 
 **Screenshots** (gitignored by repo convention, parked on disk):
 
-- `scratchpad/shots-band-preset/2-band-preset-panel-limits.png` — the authoring surface with
+- `docs/captures/2026-09-03-band-preset/2-band-preset-panel-limits.png` — the authoring surface with
   all three limits. dpr `1.35`, viewport `1400x1600`, clip `{x:1092, y:489, w:298, h:572}`.
-- `scratchpad/shots-band-preset/3-band-card.png` — the band card, including the disabled
+- `docs/captures/2026-09-03-band-preset/3-band-card.png` — the band card, including the disabled
   Remove button with its reason. clip `{x:1100, y:1106, w:285, h:424}`.
-- `scratchpad/shots-band-preset/1-effects-column.png` — the whole column.
+- `docs/captures/2026-09-03-band-preset/1-effects-column.png` — the whole column.
 
 ---
 

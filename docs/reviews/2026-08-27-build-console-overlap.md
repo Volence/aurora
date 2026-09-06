@@ -148,7 +148,7 @@ FAIL [5b] {"total":126,"unreachable":94,"worst":[…"hit":"div text=\"Build fail
 open.** The right column's box was `height: 742` in *both* states — the number
 that says the layout never learned the console existed.
 
-`scratchpad/shots-build-console/02-console-open.png` from that run is the
+`docs/captures/2026-08-27-build-console/02-console-open.png` from that run is the
 owner's screenshot: `LAYERS (16/16 PER SCENE)` with the section chopped
 mid-sentence.
 

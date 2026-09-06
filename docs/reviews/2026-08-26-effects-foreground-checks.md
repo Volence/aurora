@@ -27,7 +27,7 @@ today — every aim was still integer and every expectation derived from the del
 | 2 | `bganim-band-lens` | **new `[13b]`** Escape clears | **PASS** | zoom 1, cell 2 lit `{27,15,29}`, lens-off reference (via the `setBandLensTarget(null)` door) `{8,9,14}`; after a real Escape keypress `bandLensTarget === null` and pixel `{8,9,14}` — byte-identical |
 | 2 | `bganim-band-lens` | **new `[13c]`** Hide chip clears | **PASS** | re-lit `{27,15,29}`; `Hide` chip clicked; target `null`, pixel `{8,9,14}` |
 | 3 | `effects-guides` | re-aimed through `space` | **PASS** | **31/31** (runs 4 and 5), after re-aim. Space reported `"screen"` for the harness's own new scene (a new scene arrives locked, v_factor 15) |
-| 3 | `effects-guides` | `[4f]` caption | **PASS** | `screen lines — locked scene` painted bottom-right of `#map-canvas`: 250 text-shaped px in the 13px strip (rows 729–734 of 742), 0 in the control strip 40px up; the app's own `toDataURL` dump `scratchpad/shots-effects-guides/4f-map-canvas.png` shows it |
+| 3 | `effects-guides` | `[4f]` caption | **PASS** | `screen lines — locked scene` painted bottom-right of `#map-canvas`: 250 text-shaped px in the 13px strip (rows 729–734 of 742), 0 in the control strip 40px up; the app's own `toDataURL` dump `docs/captures/2026-09-02-effects-guides/4f-map-canvas.png` shows it |
 | 4 | `effects-foreground` | `[SF0]`/`[SF1]`/`[SF5]` View-menu toggle | **PASS** | arrival `active:false`; View → `Screen frame (320x224)` checkbox `false→true` → `active:true, anchor {0,0}, rect {0,0,320x224}`; again `true→false` → `active:false` (both sizes, ×2 runs) |
 | 4 | `effects-foreground` | `[SF2.z1]` edge drag zoom 1 | **PASS** | bottom edge aimed at client (444,330) [canvas-local (160,224)], dragged (+40,+30) px → anchor `{0,0}` → `{40,30}` = expected; view unchanged |
 | 4 | `effects-foreground` | `[SF2.z2]` edge drag zoom 2 | **PASS** | aimed (684,614) [canvas-local (400,508)], dragged (+40,+30) px → anchor `{40,30}` → `{60,45}` = expected world delta (20,15); view unchanged |
@@ -56,7 +56,7 @@ Same numbers at 1280x800 and 1680x1050, in two runs each (`run-column-1280.log`,
 i.e. the label is **not** wrapped or truncated — the premise in the dispatch ("wraps inside
 its 64px gutter") is not what renders: `minWidth: 68` is a floor, so the 111px label pushes
 its own `<select>` right and the FACTOR selects of the layer card no longer line up with the
-`Screen line` spinner above them. Visible in `scratchpad/shots-effects-column/
+`Screen line` spinner above them. Visible in `docs/captures/2026-08-26-effects-column/
 column-after-1280x800.png` (right column crop: `column-crop-1280.png`). Column overflow is
 unaffected (0px at both frames), so parcel D's own stated acceptance (`[H1]`) holds; the
 regression is in row 41's `[L1]`, which the parcel did not re-run.

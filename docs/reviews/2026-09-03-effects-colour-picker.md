@@ -31,7 +31,7 @@ still there and still typeable. That is ROADMAP row 97's precedent applied a
 second time — *one toggle flips one bit, the readout prints the integer*.
 
 The band card as it now draws, from this run's own capture
-(`scratchpad/shots-band-preset/3-band-card.png`):
+(`docs/captures/2026-09-03-band-preset/3-band-card.png`):
 
 ```
     addr    [ 74 ]   line 2 · entry 5
