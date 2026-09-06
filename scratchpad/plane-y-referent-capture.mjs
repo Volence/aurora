@@ -390,9 +390,20 @@ async function main() {
           '[data-testid="layer-${LAYER}-rowremap-precondition"]')]
           .map((p) => ({ h: p.getBoundingClientRect().height,
                          chars: (p.textContent || '').length }));
+        // THE BAR, READ OFF THE SHELL RATHER THAN OFF THIS WINDOW. The scroller's
+        // parent is the list section; its computed min-height is the floor the
+        // column may squeeze it to, and the difference between the two is the
+        // section header. Null rather than a guess if the shape is not what this
+        // expects, so an unmeasurable run cannot render as a green one.
+        const section = sc ? sc.parentElement : null;
+        const secH = section ? section.getBoundingClientRect().height : null;
+        const floor = section ? parseFloat(getComputedStyle(section).minHeight) : NaN;
+        const header = secH === null ? null : secH - s.height;
+        const floorBox = (header === null || !Number.isFinite(floor)) ? null : floor - header;
         return { found: true, top: r.top, bottom: r.bottom, height: r.height,
                  chars: (el.textContent || '').length,
                  scTop: s.top, scBottom: s.bottom, scHeight: s.height,
+                 sectionFloor: Number.isFinite(floor) ? floor : null, header, floorBox,
                  peers,
                  inside: r.top >= s.top - 1 && r.bottom <= s.bottom + 1 };
       })()`);
@@ -405,19 +416,44 @@ async function main() {
     note('the sentence in its box', JSON.stringify(placed));
     // ⚠ THE BAR IS A COMPARISON, NOT AN ABSOLUTE, AND THE FIRST DRAFT OF THIS ROW
     // HAD IT WRONG. "Fits the scroller" is a bar the panel's EXISTING advisories
-    // already fail: the layer cards sit in a ~150px box (column-layout's LIST
-    // floor) and a precondition hint is measured here at the same height as this
-    // sentence. Holding a new sentence to a bar its neighbours miss would have
-    // reported a panel-wide layout property as this parcel's defect. So the row
-    // asserts this sentence is NO TALLER THAN THE ONES ALREADY THERE, and the
-    // box being too small for either is recorded as a finding rather than
-    // silently absorbed.
+    // already fail: the layer cards sit in a ~150px box and a precondition hint
+    // is measured here at the same height as this sentence. Holding a new
+    // sentence to a bar its neighbours miss would have reported a panel-wide
+    // layout property as this parcel's defect. So the row asserts this sentence
+    // is NO TALLER THAN THE ONES ALREADY THERE, and the box being too small for
+    // either is recorded as a finding rather than silently absorbed.
+    //
+    // ⚠ TWO CORRECTIONS FROM EW-LAYER-CARD-SCROLLER, 2026-09-05.
+    //
+    // (a) THE PARENTHETICAL HERE SAID "(column-layout's LIST floor)" AND THERE
+    //     IS NO SUCH FLOOR. column-layout declares none; its only 154 is a WIDTH
+    //     in a comment about a select. The box is the body of the
+    //     `aeon.effects.layers` section and its height comes from LIST_SECTION
+    //     in ui/CollapsibleSection.tsx (`flex: 1 1 0`, `minHeight:
+    //     SECTION_LIST_MIN_HEIGHT`). `maxHeight: 154` on SCENE_LIST/PRESET_LIST
+    //     is not it either: those are the scene picker and the preset picker.
+    //
+    // (b) THE COMPARISON HAS OUTLIVED ITS REASON, so it is replaced rather than
+    //     re-tuned. It was a comparison because no honest ABSOLUTE existed: the
+    //     box on screen is `flex: 1 1 0`, so its height is a fact about one
+    //     window, and holding a sentence to it would pass on a tall screen and
+    //     fail on a short one. There is one now. The list section's own computed
+    //     `min-height` is the shell's promise about the least it may ever be
+    //     squeezed to, so THAT minus the section's header is the smallest box
+    //     this list can hand any block — and a block taller than it is one no
+    //     scroll position can show whole. Both peers now fit (165px -> 86.5px)
+    //     and this sentence measures 119.5px, so the old peer bar would fail on
+    //     a sentence that is fine. Read off the DOM, not from source, so it
+    //     follows the shell if the number moves.
     const tallestPeer = placed.peers.length === 0
       ? null : Math.max(...placed.peers.map((p) => p.h));
-    check('6d', 'the sentence is no taller than the advisories already on this row',
-      placed.found === true && tallestPeer !== null && placed.height <= tallestPeer + 1,
-      `sentence ${placed.height}px / ${placed.chars} chars; `
-      + `precondition hints ${JSON.stringify(placed.peers)}; scroller ${placed.scHeight}px`);
+    check('6d', 'the sentence fits the SMALLEST box this list can ever be given, which is its '
+      + 'section\'s own floor minus its header',
+      placed.found === true && placed.floorBox !== null && placed.height <= placed.floorBox + 1
+      && tallestPeer !== null,
+      `sentence ${placed.height}px / ${placed.chars} chars; bar ${placed.floorBox}px `
+      + `(floor ${placed.sectionFloor}px minus a ${placed.header}px header); `
+      + `box on screen ${placed.scHeight}px; precondition hints ${JSON.stringify(placed.peers)}`);
     check('6e', 'and scrollIntoView brings its TOP into that box, so it is reachable',
       placed.found === true && placed.top >= placed.scTop - 1 && placed.top < placed.scBottom,
       `top ${placed.top}, box [${placed.scTop}, ${placed.scBottom}]`);
