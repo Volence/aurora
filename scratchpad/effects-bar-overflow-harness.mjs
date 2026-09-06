@@ -42,7 +42,8 @@
 // measurement depend on a sub-tab label that has moved once already.
 
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 import { runTarget, announceRunRoot } from './lib/run-root.mjs';
@@ -56,6 +57,23 @@ const AEONDIR = siblingPathOrUnresolved('aeon');
 const TAG = process.env.SHOT_TAG ?? 'run';
 const SHOTS = `${ROOT}/scratchpad/shots-effects-bar-overflow`;
 mkdirSync(SHOTS, { recursive: true });
+
+// ⚠ EVERY NUMBER THIS FILE COMPARES AGAINST IS DERIVED FROM THE VENDORED
+// CONTRACT, never typed. `scripts/check-prose-constants.mjs` is in `npm test`
+// because this repo landed a whole parcel on figures typed beside the code that
+// holds them, and a harness asserting `138` would be the same defect one tree
+// over.
+const CONTRACT = JSON.parse(readFileSync(
+  `${ROOT}/src/core/formats/bg-override/bganim-consumer-contract.json`, 'utf8'));
+const VIEW_COUNT = CONTRACT.constants.BGANIM_VIEW_COUNT.value;
+const COUNT_BYTES = CONTRACT.constants.BGANIM_COUNT_BYTES.value;
+const RECORD_BYTES = CONTRACT.constants.BGANIM_RECORD_BYTES.value;
+/** What the twins cost a SINGLE-BAND act: the only shape that gets them. */
+const TWIN_BYTES = VIEW_COUNT * (COUNT_BYTES + RECORD_BYTES);
+
+const OVERRIDE_FILE = `${AEONDIR}/games/sonic4/data/editor_bg_override.json`;
+const fileHash = () => (existsSync(OVERRIDE_FILE)
+  ? createHash('sha256').update(readFileSync(OVERRIDE_FILE)).digest('hex') : 'absent');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(path, timeoutMs = 1500) {
@@ -240,6 +258,87 @@ const MEASURE = String.raw`
   };
 })()`;
 
+// ═══ OPENING A COLLAPSED SECTION, BY THE TITLE IT HAS TODAY ═══
+// A collapsed CollapsibleSection renders NO children, so every control below it
+// comes back null and reads as "the control is missing". The prefix match is
+// LOUD on a miss and every call site checks the answer.
+const OPEN_SECTION = (re) => String.raw`
+(() => {
+  const isHeader = (el) => {
+    if (el.tagName !== 'DIV') return false;
+    const cs = getComputedStyle(el);
+    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
+      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN';
+  };
+  const hdr = [...document.querySelectorAll('div')].filter(isHeader)
+    .find((h) => ${re}.test((h.firstElementChild.textContent || '').trim()));
+  if (!hdr) return 'no-section';
+  if (hdr.parentElement.parentElement.children.length > 1) return 'already-open';
+  hdr.click();
+  return 'clicked';
+})()`;
+
+/** Every section header on screen, so a 'no-section' can say what WAS there. */
+const HEADERS = String.raw`
+(() => {
+  const isHeader = (el) => {
+    if (el.tagName !== 'DIV') return false;
+    const cs = getComputedStyle(el);
+    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
+      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN';
+  };
+  return [...document.querySelectorAll('div')].filter(isHeader)
+    .map((h) => (h.firstElementChild.textContent || '').trim());
+})()`;
+
+// ═══ HALF B: THE BYTE FIGURE, AND WHETHER IT SAYS WHICH SHAPE IT IS FOR ═══
+//
+// The panel prints a line of the form "ROM section N/M bytes ...". The
+// arithmetic was always right and shape-aware; the SENTENCE did not say which
+// shape, so it could not be reconciled against aeon own bganim_section_bytes(),
+// whose n_views parameter defaults to 0 and answers for the release shape.
+//
+// This reads the rendered line and its tooltip off the screen. It asserts a
+// SHAPE CLAUSE is present, and reports the whole sentence so a reader can judge
+// the wording rather than trust a regex. NO BACKTICKS IN THIS COMMENT: it lives
+// inside a String.raw template.
+const READ_BUDGET_LINE = String.raw`
+(() => {
+  const nodes = [...document.querySelectorAll('span')];
+  const el = nodes.find((n) => /^ROM section /.test((n.textContent || '').trim())
+    && ![...n.children].some((c) => /^ROM section /.test((c.textContent || '').trim())));
+  if (!el) {
+    const any = nodes.filter((n) => /ROM section/.test(n.textContent || ''))
+      .map((n) => (n.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200));
+    return { found: false, candidates: any.slice(0, 4) };
+  }
+  // The whole hint, not just the span: the slots clause and the binding clause
+  // live in siblings and a reader sees one sentence.
+  let hint = el;
+  for (let i = 0; i < 4 && hint.parentElement; i++) {
+    hint = hint.parentElement;
+    if (/more animated slot/.test(hint.textContent || '')) break;
+  }
+  return {
+    found: true,
+    figure: (el.textContent || '').replace(/\s+/g, ' ').trim(),
+    sentence: (hint.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 400),
+    title: (el.title || '').replace(/\s+/g, ' ').trim(),
+  };
+})()`;
+
+const SET_SELECT = (value) => String.raw`
+(() => {
+  const el = [...document.querySelectorAll('select')]
+    .find((s) => [...s.options].some((o) => /ships silent/.test(o.textContent || '')));
+  if (!el) return 'no-element';
+  Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set
+    .call(el, ${JSON.stringify(String(value))});
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  return 'ok';
+})()`;
+
 const results = [];
 const fails = [];
 function check(id, name, ok, detail) {
@@ -255,6 +354,10 @@ async function shot(c, name) {
 }
 
 async function main() {
+  console.log(`\nDERIVED FROM THE VENDORED CONTRACT (${CONTRACT.source.repo}@`
+    + `${CONTRACT.source.commit.slice(0, 7)}): the debug view twins cost a single-band act `
+    + `${VIEW_COUNT} * (${COUNT_BYTES} + ${RECORD_BYTES}) = ${TWIN_BYTES} bytes.\n`);
+  const hashBefore = fileHash();
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
@@ -358,6 +461,84 @@ async function main() {
       + `client=${m.spanClientWidth}x${m.spanClientHeight}`);
 
     await shot(c, `${TAG}-effects-bar`);
+
+    // ── HALF B: the byte figure names its shape ─────────────────────────
+    //
+    // ⚠ TWO CLICKS DEEPER, AND EACH IS CHECKED. The tile-animation editor is on
+    // its own sub-tab and its section arrives COLLAPSED; a collapsed
+    // CollapsibleSection renders no children at all, so an unchecked open makes
+    // every row below read "the control is missing". The titles are the ones the
+    // vocabulary sweep left behind (`Tile anim`, `Tile animations (n/m)`) — the
+    // exact failure the harness next door reports about itself and swallows.
+    const tabbed = await c.evalExpr(clickByText('/^Tile anim$/'));
+    check('4a', 'the Effects facet offers a `Tile anim` sub-tab [instrument check]',
+      tabbed === true, `clicked=${JSON.stringify(tabbed)}`);
+    await sleep(1200);
+    const opened = await c.evalExpr(OPEN_SECTION('/^Tile animations/'));
+    const headers = await c.json(HEADERS);
+    check('4b', 'the `Tile animations` section is on screen and open [instrument check]',
+      opened === 'clicked' || opened === 'already-open',
+      `open=${opened}; headers on screen: ${JSON.stringify(headers)}`);
+    await sleep(700);
+
+    const bud = await c.json(READ_BUDGET_LINE);
+    check('4c', 'the ROM-section line is on screen [instrument check]', bud.found === true,
+      JSON.stringify(bud).slice(0, 500));
+    if (bud.found) {
+      console.log(`\n        FIGURE:   ${bud.figure}`);
+      console.log(`        SENTENCE: ${bud.sentence}`);
+      console.log(`        TOOLTIP:  ${bud.title}\n`);
+      // THE ROW HALF B IS FOR. Not "does it contain a number" — it always did —
+      // but "does a reader learn which of the two shapes the number is for".
+      const named = /in the debug shape|in every ROM shape/.test(bud.figure);
+      check('4d', 'THE VERDICT: the byte figure NAMES THE SHAPE it is for',
+        named, `figure = ${JSON.stringify(bud.figure)}`);
+      // And the tooltip carries the reconciliation an author would otherwise
+      // have to do by hand against aeon's own helper.
+      check('4e', 'and the tooltip reconciles it with aeon\'s bganim_section_bytes()',
+        /bganim_section_bytes\(\)/.test(bud.title) || /no debug\/release/.test(bud.title),
+        `title = ${JSON.stringify(bud.title).slice(0, 400)}`);
+      await shot(c, `${TAG}-rom-section-line`);
+
+      // ── 4f: THE ROW A STUB CANNOT PASS ──────────────────────────────
+      //
+      // Rows 4d/4e ask whether a shape is NAMED. A panel hard-coding one clause
+      // passes both. So the document is DRIVEN across the boundary instead: the
+      // band card's In-the-ROM picker is set back to "ships animating", which
+      // clears `default_off`, which is exactly the condition the DEBUG view
+      // twins hang on. The figure must FALL by the twins' own cost and the
+      // clause must flip with it — two things moving together, from one edit a
+      // person can make.
+      //
+      // ⚠ NOTHING IS WRITTEN TO DISK. No Ctrl+S, no save; the store is dirtied
+      // and the edit is undone at the end, and the document is hashed either
+      // side to say so.
+      const before = Number((bud.figure.match(/ROM section (\d+)\//) || [])[1]);
+      const set = await c.evalExpr(SET_SELECT('animating'));
+      check('4f1', 'the band card offers the In-the-ROM picker [instrument check]',
+        set === 'ok', `set=${JSON.stringify(set)}`);
+      await sleep(900);
+      const after = await c.json(READ_BUDGET_LINE);
+      const now = after.found ? Number((after.figure.match(/ROM section (\d+)\//) || [])[1]) : NaN;
+      check('4f2', 'clearing the silence drops the figure by exactly the twins\' cost, '
+        + 'and the clause flips with it',
+        Number.isFinite(before) && Number.isFinite(now)
+          && before - now === TWIN_BYTES
+          && /in the debug shape/.test(bud.figure)
+          && /in every ROM shape/.test(after.figure || ''),
+        `TWIN_BYTES = ${VIEW_COUNT} * (${COUNT_BYTES} + ${RECORD_BYTES}) = ${TWIN_BYTES} `
+        + `(derived from the vendored contract)\n`
+        + `        before: ${JSON.stringify(bud.figure)}\n`
+        + `        after:  ${JSON.stringify(after.figure)}\n`
+        + `        delta:  ${before - now}`);
+      await shot(c, `${TAG}-rom-section-line-animating`);
+
+      // Undo, so the run leaves the store as it found it.
+      await c.evalExpr(SET_SELECT('silent'));
+      await sleep(600);
+      check('4g', 'the aeon document on disk is UNTOUCHED by this run',
+        fileHash() === hashBefore, `${hashBefore.slice(0, 12)} -> ${fileHash().slice(0, 12)}`);
+    }
   } finally {
     try { c && c.close(); } catch { /* */ }
     await killTree(child);
