@@ -44,10 +44,37 @@ import { AURORA_DIR, siblingRoot, siblingPath } from './sibling-root.mjs';
  */
 export { AURORA_DIR, siblingRoot };
 
+/**
+ * ⚠ `maxBuffer` IS LOAD-BEARING AND WAS MISSING, WHICH MADE THIS HELPER LIE.
+ *
+ * Node's default is 1 MiB. `execFileSync` does not truncate past it — it THROWS
+ * `ENOBUFS` — and this function's `catch` turned that into `null`, which
+ * `readAtRev` reports as `"MEASURED: <path> is ABSENT at <rev>: deleted or
+ * renamed"`. So every peer file over a megabyte read as DELETED, with a message
+ * asserting the read succeeded. aeon's `docs/DEFERRED_WORK.md` is 2.1 MB and hit
+ * it the first time a row read that file (2026-09-06, `parcel/curve-onset`).
+ *
+ * TWO CHANGES, because the size alone would only move the cliff:
+ *   • 64 MiB, matching `grepAtRev`, which had always passed one;
+ *   • ENOBUFS is RETHROWN rather than swallowed. A buffer overrun is not "git
+ *     said no", and the whole value of this module is that "could not measure"
+ *     and "measured, and it is not there" stay different answers.
+ */
+const GIT_MAX_BUFFER = 64 * 1024 * 1024;
+
 function git(cwd: string, args: string[]): string | null {
   try {
-    return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  } catch {
+    return execFileSync('git', args, {
+      cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: GIT_MAX_BUFFER,
+    });
+  } catch (e) {
+    if ((e as { code?: string }).code === 'ENOBUFS') {
+      throw new Error(
+        `peer-repo: git ${args.join(' ')} in ${cwd} exceeded the ${GIT_MAX_BUFFER}-byte read `
+        + 'buffer. This is NOT an absent path. Raise GIT_MAX_BUFFER rather than letting the '
+        + 'caller report a deletion.',
+      );
+    }
     return null;
   }
 }

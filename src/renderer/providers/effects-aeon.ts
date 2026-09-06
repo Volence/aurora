@@ -75,10 +75,18 @@ import {
 } from '../../core/formats/effects/scene-ui';
 // aeon's named-factor table and its 9-bit packing, transcribed there from
 // `engine/level/parallax_dsl.emp` and gated by
-// `test/formats/effects-factor-decode.test.ts`. `curveGoesNowhere` and
-// `curveDescendingAdvisory` both need a factor's VALUE rather than its
-// spelling, and this is where the repo already keeps it.
-import { packFactor, resolveFactor, factorRatio } from '../../core/formats/effects/factor-decode';
+// `test/formats/effects-factor-decode.test.ts`. `curveGoesNowhere` needs a
+// factor's VALUE rather than its spelling, and this is where the repo already
+// keeps it. (`factorRatio` moved out of this file with the curve advisory: the
+// re-pointed one compares a SCROLL, so it calls the decode instead.)
+import { packFactor, resolveFactor } from '../../core/formats/effects/factor-decode';
+// The re-pointed curve advisory's arithmetic and its ONE transcribed pair of
+// aeon measurements. Kept out of this file so the drift gate that re-reads aeon
+// has a single small module to point at — see `curveRateAdvisoryParts`.
+import {
+  CURVE_RATE_GARBLED_MIN, curveShearRate, curveExcursionPx,
+  curveRateOnsetCamX, curveRateOnsetEstimate,
+} from '../../core/formats/effects/curve-rate';
 import { BG_LAYOUT_WORDS, TILE_WIDTH_PX } from '../../core/formats/bg-override/bg-override';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
 
@@ -805,70 +813,189 @@ export function curveAdvisory(layer: Pick<EffectsLayer, 'fb' | 'curve'>): string
 }
 
 /**
- * ⚠ A CURVE THAT RAMPS DOWNWARD GARBLES THE BACKGROUND, AND NOTHING ELSE
- * BETWEEN THE PICKER AND THE ROM SAYS SO.
+ * ⚠ THIS REPLACED A ROW THAT NAMED THE WRONG VARIABLE, AND THE REPLACEMENT IS
+ * THE POINT.
+ *
+ * Until 2026-09-06 this file shipped `curveDescendingAdvisory`, which told an
+ * author that a DESCENDING Plane-B curve garbles the background. **aeon refuted
+ * the direction** — `92663a53`, an ancestor of aeon `origin/master`: "there is
+ * no engine defect, and the DIRECTION in the row's own name is refuted." An
+ * ascending mirror of the same span and spread garbles; a small descending
+ * curve is clean (`docs/witness/curve-desc-2026-09-06.md` §4). That witness's
+ * §7 item 5 asks Aurora by name for a RE-POINTING rather than a deletion, and
+ * this is it.
  *
  * `fb` is Plane B's factor at the strip's TOP and `curve.to` is its factor at
- * the strip's BOTTOM (aeon `engine/level/scene_dsl.emp:441`). aeon bisected the
- * defect on a live machine on 2026-09-05 and states the correlation flatly
- * (`df3b8810`): "a DESCENDING parallax curve garbles the background and an
- * ascending one does not. Every curve shipped in this tree ramps upward, so
- * nothing had ever exercised the other direction." It removed both descending
- * curves from the shipped section-7 scene and `05b8ad10` confirmed on a rebuilt
- * ROM that the reported garbage was gone.
+ * the strip's BOTTOM (aeon `engine/level/scene_dsl.emp`, `scene_band`). What
+ * this compares is the PER-SCANLINE SHEAR RATE that pair implies over the
+ * band's own height — see `core/formats/effects/curve-rate.ts`, which holds the
+ * two transcribed arms, derives the bar from them, and carries the full reading
+ * of aeon's two open accounts.
  *
- * WHY AURORA IS THE ONLY PLACE THIS CAN BE SAID. `layer()`'s guard 4 refuses
- * only the DEGENERATE case, where the two ends are equal - the case
- * `curveAdvisory` above covers. There is no engine guard on direction, the
- * generator does not look, and `row_remap_gate` prints a curve-only band's
- * plane line without gating its magnitude. So a descending curve builds green
- * in all four shapes and the author finds out by looking at the screen.
+ * ⚠ THE HEDGE IS A SHAPE, NOT A SHRUG, and both ends of it are load-bearing.
+ * Rate is the BETTER-SUPPORTED account — severity tracks it monotonically
+ * against a curve-free control at fixed art (`depth-onset-2026-09-06.md` §5) —
+ * and it is NOT SEPARATED from aeon's other reading, the band's total travel
+ * against Plane B's wrap margin, because every band anyone has driven holds its
+ * span nearly fixed and the two quantities move together. "The mechanism is
+ * unestablished" understates the first half; "aeon measured that rate is the
+ * cause" overstates the second. The sentence says both.
  *
- * AND IT IS ON THE ROW REMAP'S CRITICAL PATH. aeon's precondition 1 gives three
- * ways to make a `rowRemap` vary, and route (c) - "a `curve:` on that layer" -
- * is the only one that needs no deform table. Every remap authored that way
- * runs through this picker.
+ * ⚠ ADVICE, NEVER PREVENTION, and now for a stronger reason than before: aeon
+ * states there is NO ENGINE DEFECT and the walker's ramp is arithmetically
+ * exact in both directions (0 of 224 lines differing, max delta 0, on all five
+ * arms and at 21 further camera positions). Greying an option on a rate would
+ * be Aurora inventing a bound on top of a rule that has changed twice in one
+ * day. `curveFieldOptions` is deliberately NOT changed by this — the same
+ * posture `rowRemapPreconditions` and `fireLineAdvisory` take.
  *
- * ⚠ ADVICE, NEVER PREVENTION, AND THE REASON IS NOT TASTE. The mechanism is
- * UNESTABLISHED - aeon booked it that way on purpose, recording that its own
- * sign derivation was a lead the code then refuted ("the positive-spread path
- * already takes correct floor division, so the correlation survives and its
- * cause does not"). A repo that greyed these options would be encoding a rule
- * nobody has established, on a value the format admits and the engine accepts,
- * and an author who opened a hand-authored descending curve could not see their
- * own file in the list. That is the same posture `rowRemapPreconditions` takes,
- * for the same stated reason: Aurora is not a fourth party inventing a rule.
- * `curveFieldOptions` is deliberately NOT changed by this.
- *
- * THE COMPARISON IS THE RATIO, NOT THE SCROLL. `factorRatio`'s own docblock
- * says it is a fraction "for LABELS and for the agreement test", because
- * `decodeFactorScroll` is the real function of `camX` and rounds per term. That
- * caution is about using the fraction AS a scroll value; the question here is
- * only which end of the ramp is the larger factor, which is an ordering of the
- * two operands and not an evaluation of either. `factorRatio` reads the packed
- * triple (`2^-s1 ± 2^-s2`), so it answers for the locked sentinel (0) and for a
- * hand-spelled packed triple as well as for a name.
+ * ⚠ AND IT IS ON THE ROW REMAP'S CRITICAL PATH, which is why it is worth
+ * carrying at all: route (c) of aeon's precondition 1 — "a `curve:` on that
+ * layer" — is the only way to make a `rowRemap` vary without a deform table, so
+ * every remap authored that way comes through this picker.
  *
  * NOT AN EQUALITY CASE. Equal ends are `curveAdvisory`'s, which the engine
- * really does refuse, so this returns null there rather than saying two things
+ * really does refuse, so this stays silent there rather than saying two things
  * about one strip.
  */
-export function curveDescendingAdvisory(layer: Pick<EffectsLayer, 'fb' | 'curve'>): string | null {
+export interface CurveRateParts {
+  /** What is wrong, or what could not be measured. Never behind a disclosure. */
+  diagnosis: string;
+  /** Why, in aeon's terms, including what aeon has NOT closed. */
+  mechanism?: string;
+  /** What to do next. Never optional. */
+  remedies: string;
+}
+
+/** The band geometry this advisory needs, as `rowRemapBandSpan` reports it. */
+export interface CurveRateBand {
+  /** The band's screen-line span, or null when the document cannot say. */
+  spanLines: number | null;
+  /** Why `spanLines` is null. Null when it is not. */
+  restriction: string | null;
+}
+
+/**
+ * How far the camera can travel, as `actReach().travelX` reports it.
+ *
+ * ⚠ THE ACT'S CLAMP, NOT THE BOUND SECTION'S, AND THAT IS A DELIBERATE
+ * LOOSENING. aeon's own probe warns that "a section-to-camera-x mapping is
+ * exactly the kind of thing that reads obvious and is wrong"
+ * (`tools/depth_onset_probe.py`) and MEASURED section 4's range rather than
+ * deriving it. Aurora has no such measurement and a scene may be bound to
+ * several sections at once, so this uses the range aeon does state — the
+ * camera clamp `[0, level_width - SCREEN_WIDTH]`. That can warn about a camera
+ * x the bound section never reaches, which is the LOOSE direction and the right
+ * one for an advisory: over-warning is noise, under-warning is the defect this
+ * replaced.
+ */
+export interface CurveRateCamera {
+  /** The largest `Camera_X` this act allows, or null when no act is open. */
+  maxCamX: number | null;
+}
+
+/**
+ * The advisory's three jobs, separately addressable — the O15 shape
+ * (`docs/reviews/2026-08-30-o15-advisory-shape.md`): DIAGNOSIS and REMEDIES are
+ * always on screen, MECHANISM is the only half a disclosure may hold.
+ *
+ * FOUR ARMS, AND TWO OF THEM ARE "I CANNOT TELL" ON PURPOSE:
+ *
+ *   • the band's span is not an author-time quantity (an unlocked scene) — say
+ *     so, carrying the restriction verbatim, rather than going quiet;
+ *   • no act is open, so no camera range — say so, and give the ESTIMATED onset
+ *     rather than assuming the range is unbounded (which would fire always) or
+ *     zero (which would fire never);
+ *   • the rate at the top of the camera range reaches aeon's bar — warn;
+ *   • it does not — SILENCE, which is not a clearance. See
+ *     `CURVE_RATE_GARBLED_MIN`'s docblock for the list this comparison is one
+ *     item of.
+ */
+export function curveRateAdvisoryParts(
+  layer: Pick<EffectsLayer, 'fb' | 'curve'>,
+  band: CurveRateBand,
+  camera: CurveRateCamera,
+): CurveRateParts | null {
   const to = curveFieldValue(layer);
   if (to === 'none') return null;
-  const from = factorRatio(layer.fb);
-  const dest = factorRatio(to);
-  // Cross-multiplied, so two fractions with different denominators compare
-  // without a division. Both denominators are positive powers of two.
-  const descends = dest.num * from.den < from.num * dest.den;
-  if (!descends) return null;
-  return `this strip's Plane B ramps DOWNWARD, from ${factorLabel(layer.fb)} at its top to `
-    + `${factorLabel(to)} at its bottom. aeon bisected a descending parallax curve as the cause `
-    + 'of a garbled background on a live machine (2026-09-05): "a DESCENDING parallax curve '
-    + 'garbles the background and an ascending one does not". The mechanism is UNESTABLISHED '
-    + 'and no build refuses this, so it is advice and not a refusal: every curve shipped in '
-    + 'aeon\'s tree ramps upward. Ramp to a factor above '
-    + `${factorLabel(layer.fb)}, or take the curve off.`;
+  // The degenerate pair is a REFUSAL the build makes, and it is `curveAdvisory`'s.
+  if (curveGoesNowhere(layer.fb, to)) return null;
+
+  const ends = `${factorLabel(layer.fb)} at its top to ${factorLabel(to)} at its bottom`;
+  const bar = CURVE_RATE_GARBLED_MIN.toFixed(2);
+  const mechanism =
+    'aeon drove this on a live machine (2026-09-06) and refuted the DIRECTION Aurora used to '
+    + 'warn about: an ascending curve of the same spread garbles, and a small descending one '
+    + 'does not. What severity tracks, against a curve-free control at fixed art, is the '
+    + 'per-line rate. That is the better-supported account and it is NOT settled: aeon\'s other '
+    + 'reading, the band\'s total travel against Plane B\'s wrap margin, has not been separated '
+    + 'from it, and the fixture that would separate them is unbuilt. There is no engine defect '
+    + 'and no build refuses this.';
+
+  if (band.spanLines === null) {
+    return {
+      diagnosis: `this strip's Plane B ramps from ${ends}, and Aurora cannot measure its `
+        + `per-line shear rate here: ${band.restriction ?? 'this scene does not give the band an '
+        + 'author-time span.'}`,
+      mechanism,
+      remedies: 'aeon measures this by driving the ROM, not from the document. Treat this curve '
+        + 'as UNCHECKED rather than clear.',
+    };
+  }
+  // A band with no adjacent line pair cannot shear between lines at all, which
+  // is aeon's own answer (`band_stats` returns None below two samples).
+  if (band.spanLines < 2) return null;
+  const span = `${band.spanLines} screen line${band.spanLines === 1 ? '' : 's'} tall`;
+
+  if (camera.maxCamX === null) {
+    const est = curveRateOnsetEstimate(layer.fb, to, band.spanLines, CURVE_RATE_GARBLED_MIN);
+    return {
+      diagnosis: `this strip's Plane B ramps from ${ends} over a band ${span}, and NO ACT IS `
+        + 'OPEN, so Aurora cannot say how far this camera travels. Its per-line shear rate '
+        + `reaches ${bar} px per scanline (the lowest rate aeon has measured garbling a `
+        + `background) at roughly camera x ${est ?? '?'}, an estimate from the factor ratio `
+        + 'rather than the engine\'s own decode.',
+      mechanism,
+      remedies: 'Open the act to get the exact figure. Until then this is neither a warning nor '
+        + 'a clearance.',
+    };
+  }
+
+  const rateAtMax = curveShearRate(
+    curveExcursionPx(layer.fb, to, camera.maxCamX), band.spanLines,
+  );
+  if (rateAtMax === null || rateAtMax < CURVE_RATE_GARBLED_MIN) return null;
+
+  const onset = curveRateOnsetCamX(
+    layer.fb, to, band.spanLines, CURVE_RATE_GARBLED_MIN, camera.maxCamX,
+  );
+  return {
+    diagnosis: `this strip's Plane B ramps from ${ends} over a band ${span}, which shears it by `
+      + `${rateAtMax.toFixed(2)} px per scanline at this act's furthest camera x `
+      + `${camera.maxCamX}. aeon's lowest per-line rate ever measured GARBLING a background is `
+      + `${bar}, and this band reaches that at camera x ${onset ?? camera.maxCamX}, inside the `
+      + 'range this act\'s camera covers.',
+    mechanism,
+    remedies: `Spread the same ramp over a taller band, or move ${factorLabel(to)} closer to `
+      + `${factorLabel(layer.fb)}. Neither the direction of the ramp nor its presence is the `
+      + 'problem, and nothing here refuses the value.',
+  };
+}
+
+/**
+ * The same advisory as the one sentence a Hint renders, or null.
+ *
+ * Null means this comparison did not fire, NOT that the curve is safe.
+ */
+export function curveRateAdvisory(
+  layer: Pick<EffectsLayer, 'fb' | 'curve'>,
+  band: CurveRateBand,
+  camera: CurveRateCamera,
+): string | null {
+  const parts = curveRateAdvisoryParts(layer, band, camera);
+  if (parts === null) return null;
+  return [parts.diagnosis, parts.mechanism, parts.remedies]
+    .filter((p): p is string => p !== undefined).join(' ');
 }
 
 /** A factor `<select>` option that can carry the engine's refusal of itself. */

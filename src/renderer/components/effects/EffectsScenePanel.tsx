@@ -64,13 +64,15 @@ import type { FactorOption, FactorFieldOption } from '../../providers/effects-ae
 // its reader: see the deform row.
 import { advisoryLayerDeformConflicts } from '../../../core/formats/effects/scene';
 import { actReach, bandReach, bandReachClause, verticalWrapAdvisory } from '../../canvas/bg-wrap';
-import { rowRemapReachAdvisoryParts, rowRemapSpanRestriction } from '../../canvas/row-remap-span';
+import {
+  rowRemapReachAdvisoryParts, rowRemapSpanRestriction, rowRemapBandSpan,
+} from '../../canvas/row-remap-span';
 import {
   factorOptions, clampPackedField,
   factorFieldSelectValue, factorFieldFromSelect, NONE_FACTOR_VALUE,
   curveFieldValue, curveFromField, curveFieldOptions, curveRowHint, refusedOptionLabel,
   leftColumnMaskRowHint,
-  vsplitFieldValue, vsplitFromToggle, curveAdvisory, curveDescendingAdvisory, clampVSplitAt,
+  vsplitFieldValue, vsplitFromToggle, curveAdvisory, curveRateAdvisory, clampVSplitAt,
   LAYER_CURVE_ROW, LAYER_VSPLIT_ROW, EFFECTS_VSPLIT_AT_BOUNDS,
   clampVFactor, clampVCenter, clampVOffset,
   layerTopBounds, clampLayerTop, planeLineOf, fireLineAdvisory, vsplitOrderAdvisory,
@@ -788,27 +790,39 @@ export default function EffectsScenePanel(): React.ReactElement {
                 const advice = curveAdvisory(layer);
                 return advice === null ? null : <Hint under tone="warning">{advice}</Hint>;
               })()}
-              {/* ⚠ THE DIRECTION OF THE RAMP, which no build checks. `fb` is
-                  Plane B at the strip's TOP and `curve.to` at its BOTTOM, and a
-                  DESCENDING curve garbles the background - bisected on a live
-                  machine 2026-09-05 (aeon df3b8810), mechanism unestablished.
-                  `layer()` refuses only the DEGENERATE case above, so this is
-                  the one thing about a curve that reaches a ROM green and wrong.
-                  It matters most here because route (c) of the row remap's
-                  precondition 1 - the only route needing no deform table - is
-                  "a `curve:` on that layer", so every remap authored that way
-                  comes through this picker.
+              {/* ⚠ THE RAMP'S PER-LINE SHEAR RATE, which no build checks. `fb`
+                  is Plane B at the strip's TOP and `curve.to` at its BOTTOM.
+                  THIS ROW USED TO WARN ABOUT THE RAMP'S DIRECTION and aeon
+                  refuted that on 2026-09-06 (92663a53); `curveRateAdvisory`'s
+                  docblock carries the re-pointing and the two accounts aeon has
+                  not separated. `layer()` refuses only the DEGENERATE case
+                  above, so this is still the one thing about a curve that
+                  reaches a ROM green and wrong. It matters most here because
+                  route (c) of the row remap's precondition 1 - the only route
+                  needing no deform table - is "a `curve:` on that layer", so
+                  every remap authored that way comes through this picker.
+
+                  THE TWO INPUTS IT CANNOT DERIVE ITSELF, both passed rather
+                  than re-derived: the band's screen span (`rowRemapBandSpan`,
+                  which is a band fact and not a row-remap one despite its name)
+                  and the camera's reach (`reach`, already computed above for
+                  the wrap readout). Either can be UNKNOWN, and the advisory
+                  says so out loud instead of going quiet.
 
                   A SECOND HINT AND NOT A LONGER FIRST ONE: the two say
                   different kinds of thing. `curveAdvisory` reports a refusal
-                  the build will make; this reports a correlation nothing
+                  the build will make; this reports a measurement nothing
                   enforces. Folding them would let a reader carry the first
                   one's authority onto the second. And the option is NOT greyed
-                  - see `curveDescendingAdvisory` for why prevention would be
-                  Aurora inventing a rule. */}
+                  - see `curveRateAdvisory` for why prevention would be Aurora
+                  inventing a rule. */}
               {(() => {
-                const down = curveDescendingAdvisory(layer);
-                return down === null ? null : <Hint under tone="warning">{down}</Hint>;
+                const shear = curveRateAdvisory(
+                  layer,
+                  rowRemapBandSpan(selected, i),
+                  { maxCamX: reach === null ? null : reach.travelX },
+                );
+                return shear === null ? null : <Hint under tone="warning">{shear}</Hint>;
               })()}
               {/* THE SPLIT (parcel H). none / row, and the row spinner only when
                   set. `clampVSplitAt` is the bound — NumberField's min/max only

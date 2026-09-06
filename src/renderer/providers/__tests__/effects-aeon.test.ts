@@ -26,7 +26,7 @@ import {
   LAYER_CURVE_ROW, LAYER_VSPLIT_ROW, NONE_FACTOR_VALUE,
   factorFieldSelectValue, factorFieldFromSelect, curveFieldValue, curveFromField,
   vsplitFieldValue, vsplitFromToggle, curveAdvisory, clampVSplitAt,
-  curveGoesNowhere, curveFlatReason, curveFieldOptions, curveDescendingAdvisory,
+  curveGoesNowhere, curveFlatReason, curveFieldOptions, curveRateAdvisory, curveRateAdvisoryParts,
   curveRefusedFactors, curveRowHint, refusedOptionLabel, CURVE_FLAT_MARK,
   leftColumnMaskRowHint, SPRITE_MASK_MARK,
   // wave 2 — deform authoring
@@ -53,6 +53,9 @@ import {
 import {
   EFFECTS_FACTOR_PACKED, packFactor, factorRatio,
 } from '../../../core/formats/effects/factor-decode';
+import {
+  CURVE_RATE_ARM_SPAN_LINES, CURVE_RATE_GARBLED_MIN, curveRateOnsetEstimate,
+} from '../../../core/formats/effects/curve-rate';
 import { BG_LAYOUT_WORDS, TILE_WIDTH_PX } from '../../../core/formats/bg-override/bg-override';
 import { BG_WIDTH } from '../../../core/formats/bg-tiles';
 import { serializeEffectsScene, type EffectsScene, type EffectsSceneLibrary } from '../../../core/formats/effects/scene';
@@ -1015,88 +1018,177 @@ describe('curve / vsplit controls (parcel H)', () => {
   });
 
   // -------------------------------------------------------------------------
-  // ⚠ THE DIRECTION OF THE RAMP - the one thing about a curve that reaches a
-  // ROM green and wrong.
+  // ⚠ THE RE-POINTING. This block used to test `curveDescendingAdvisory`, which
+  // told an author a DESCENDING curve garbles the background. aeon REFUTED the
+  // direction on 2026-09-06 (`92663a53`, an ancestor of their origin/master:
+  // "there is no engine defect, and the DIRECTION in the row's own name is
+  // refuted") and asked Aurora by name to RE-POINT rather than delete.
   //
-  // aeon bisected it on a live machine on 2026-09-05 (`df3b8810`): "a
-  // DESCENDING parallax curve garbles the background and an ascending one does
-  // not." `layer()` refuses only the DEGENERATE case, so no build says a word,
-  // and route (c) of the row remap's precondition 1 - the only route needing no
-  // deform table - is exactly "a `curve:` on that layer".
-  //
-  // ADVICE, NOT PREVENTION: the mechanism is UNESTABLISHED and the format
-  // admits the value, so `curveFieldOptions` is deliberately unchanged. The row
-  // below asserts that, because a later parcel greying these options would be
-  // Aurora inventing a rule nobody has established.
+  // ⚠ THE ROWS THAT MATTER ARE THE ONES THE OLD RULE GOT WRONG, and they are
+  // marked THE DISCRIMINATOR below. A suite that only exercised
+  // descending-and-past-the-onset would pass identically before and after this
+  // parcel and would prove nothing about the change.
   // -------------------------------------------------------------------------
 
-  it('warns when Plane B ramps DOWNWARD, and stays quiet when it ramps up', () => {
-    const at = (fb: EffectsFactor, to: EffectsFactor) =>
-      curveDescendingAdvisory({ ...baseLayer(), fb, curve: { to } });
-    expect(at('FACTOR_1_8', 'FACTOR_1_16')).toMatch(/DOWNWARD/);
-    expect(at('FACTOR_1_8', 'FACTOR_1_2')).toBeNull();
-    // No curve at all is not a direction.
-    expect(curveDescendingAdvisory(baseLayer())).toBeNull();
-    // Equal ends belong to `curveAdvisory`, which reports a refusal the build
-    // really makes. Two sentences about one strip would let the reader carry
-    // that one's authority onto this one.
-    expect(at('FACTOR_1_8', 'FACTOR_1_8')).toBeNull();
+  /**
+   * THE RETRACTED PREDICATE, restated here and NOWHERE ELSE in the repo.
+   *
+   * It exists so the two discriminating rows can assert what the old rule would
+   * have said, independently of any surviving code — the old function is gone,
+   * so a row claiming "the old rule was silent here" would otherwise be a claim
+   * nothing checks.
+   */
+  const oldDirectionRuleWouldFire = (fb: EffectsFactor, to: EffectsFactor): boolean => {
+    const f = factorRatio(fb);
+    const t = factorRatio(to);
+    return t.num * f.den < f.num * t.den;
+  };
+
+  /** A band covering the screen, which is the span every sec7 arm was measured over. */
+  const wholeScreen = { spanLines: CURVE_RATE_ARM_SPAN_LINES, restriction: null };
+
+  const say = (
+    fb: EffectsFactor, to: EffectsFactor, maxCamX: number | null,
+    band: { spanLines: number | null; restriction: string | null } = wholeScreen,
+  ) => curveRateAdvisory({ ...baseLayer(), fb, curve: { to } }, band, { maxCamX });
+
+  /** The onset for a pair over the screen-tall band, derived rather than typed. */
+  const onsetOf = (fb: EffectsFactor, to: EffectsFactor) =>
+    curveRateOnsetEstimate(fb, to, CURVE_RATE_ARM_SPAN_LINES, CURVE_RATE_GARBLED_MIN)!;
+
+  it('THE DISCRIMINATOR 1: an ASCENDING curve past its onset now warns, and the old rule was SILENT', () => {
+    const fb: EffectsFactor = 'FACTOR_1_8';
+    const to: EffectsFactor = 'FACTOR_1_2';
+    expect(oldDirectionRuleWouldFire(fb, to), 'this pair ASCENDS').toBe(false);
+    const onset = onsetOf(fb, to);
+    const said = say(fb, to, onset * 2);
+    expect(said).not.toBeNull();
+    // Pinned on wording UNIQUE TO THE NEW RULE. The old sentence carried none of
+    // these words, so a row matching it cannot pass against this string.
+    expect(said!).toMatch(/px per scanline/);
+    expect(said!).toMatch(/lowest per-line rate ever measured GARBLING/);
+  });
+
+  it('THE DISCRIMINATOR 2: a DESCENDING curve the camera never reaches is now SILENT, and the old rule WARNED', () => {
+    const fb: EffectsFactor = 'FACTOR_1_2';
+    const to: EffectsFactor = 'FACTOR_7_16';
+    expect(oldDirectionRuleWouldFire(fb, to), 'this pair DESCENDS').toBe(true);
+    const onset = onsetOf(fb, to);
+    expect(say(fb, to, Math.floor(onset / 2))).toBeNull();
+    // ANTI-VACUOUS: the same pair DOES warn once the camera can reach it, so the
+    // silence above is about the camera range and not about a dead predicate.
+    expect(say(fb, to, onset * 2)).not.toBeNull();
+  });
+
+  it('says the SAME thing about a curve and its mirror: direction is refuted, as a property', () => {
+    const camX = 4000;
+    let spoke = 0;
+    for (const fb of EFFECTS_FACTOR_NAMES) {
+      for (const to of EFFECTS_FACTOR_NAMES) {
+        const up = say(fb, to, camX) !== null;
+        const down = say(to, fb, camX) !== null;
+        expect(up, `${fb} -> ${to} vs its mirror`).toBe(down);
+        if (up) spoke++;
+      }
+    }
+    expect(spoke).toBeGreaterThan(0);
+  });
+
+  it('carries none of the retracted claims in its own words', () => {
+    const said = say('FACTOR_1_8', 'FACTOR_1_16', 20000)!;
+    expect(said).not.toBeNull();
+    expect(said).not.toMatch(/DOWNWARD/);
+    expect(said).not.toMatch(/mechanism is UNESTABLISHED/i);
+    expect(said).not.toMatch(/descending parallax curve garbles/i);
+    // ...and it does carry the hedge in the shape the ruling asked for: rate is
+    // better supported, and the two accounts are NOT separated.
+    expect(said).toMatch(/better-supported account/);
+    expect(said).toMatch(/has not been separated/);
+    expect(said).toMatch(/no engine defect/);
+  });
+
+  it('is SILENT on no curve, and leaves equal ends to `curveAdvisory`', () => {
+    expect(curveRateAdvisory(baseLayer(), wholeScreen, { maxCamX: 20000 })).toBeNull();
+    expect(say('FACTOR_1_8', 'FACTOR_1_8', 20000)).toBeNull();
     expect(curveAdvisory({ ...baseLayer(), fb: 'FACTOR_1_8', curve: { to: 'FACTOR_1_8' } }))
       .not.toBeNull();
   });
 
-  // A CENSUS, NOT TWO EXAMPLES. Every ordered pair of named factors, with the
-  // verdict derived from `factorRatio` independently of the function under
-  // test, so a predicate that got the SIGN backwards fails on half the space
-  // rather than on whichever example happened to be written down.
-  it('agrees with the factor ordering on EVERY named pair, and both states occur', () => {
-    let down = 0;
-    let notDown = 0;
-    for (const fb of EFFECTS_FACTOR_NAMES) {
-      for (const to of EFFECTS_FACTOR_NAMES) {
-        const f = factorRatio(fb);
-        const t = factorRatio(to);
-        const descends = t.num * f.den < f.num * t.den;
-        const said = curveDescendingAdvisory({ ...baseLayer(), fb, curve: { to } }) !== null;
-        expect(said, `fb ${fb} -> to ${to}`).toBe(descends);
-        if (said) down++; else notDown++;
-      }
-    }
-    expect(down).toBeGreaterThan(0);
-    expect(notDown).toBeGreaterThan(0);
-    expect(down + notDown).toBe(EFFECTS_FACTOR_NAMES.length ** 2);
+  it('is LOUD, not silent, when the band has no author-time span', () => {
+    const why = 'this scene\'s background tracks the camera vertically.';
+    const said = say('FACTOR_1_2', 'FACTOR_7_16', 10, { spanLines: null, restriction: why });
+    expect(said).not.toBeNull();
+    // The restriction is carried VERBATIM, so the reason a check did not run is
+    // the reason the panel shows.
+    expect(said!).toContain(why);
+    expect(said!).toMatch(/UNCHECKED rather than clear/);
   });
 
-  // ⚠ THE BOTTOM OF THE RANGE IS A REAL FACTOR, NOT A SENTINEL TO SKIP.
-  // `FACTOR_LOCKED`/`FACTOR_0` is zero scroll, which is an ORDINARY smallest
-  // value here: ramping FROM it can never descend and ramping TO it always
-  // does, from anything that moves. Stated because this repo's other
-  // top-of-range field means OFF, and a reader arriving from that one would
-  // expect this end to be excluded.
-  it('treats locked as the SMALLEST factor, not as an off switch', () => {
-    for (const other of EFFECTS_FACTOR_NAMES) {
-      const isLocked = packFactor(EFFECTS_FACTOR_PACKED[other])
-        === packFactor(EFFECTS_FACTOR_PACKED.FACTOR_LOCKED);
-      expect(
-        curveDescendingAdvisory({ ...baseLayer(), fb: 'FACTOR_LOCKED', curve: { to: other } }),
-        `locked -> ${other} can never descend`,
-      ).toBeNull();
-      expect(
-        curveDescendingAdvisory({ ...baseLayer(), fb: other, curve: { to: 'FACTOR_LOCKED' } })
-          !== null,
-        `${other} -> locked descends unless ${other} IS locked`,
-      ).toBe(!isLocked);
-    }
+  it('is LOUD, not silent, when no act is open: it neither assumes unbounded nor zero', () => {
+    const fb: EffectsFactor = 'FACTOR_1_2';
+    const to: EffectsFactor = 'FACTOR_7_16';
+    const said = say(fb, to, null);
+    expect(said).not.toBeNull();
+    expect(said!).toMatch(/NO ACT IS OPEN/);
+    // The estimate it prints is the derived one, not a guess and not a verdict.
+    expect(said!).toContain(String(onsetOf(fb, to)));
+    expect(said!).toMatch(/neither a warning nor a clearance/);
+    // ⚠ AND IT IS NOT THE UNBOUNDED ARM WEARING A HAT: with a real camera range
+    // below the onset the SAME pair goes silent, so the no-act arm is a third
+    // state rather than "warn always".
+    expect(say(fb, to, Math.floor(onsetOf(fb, to) / 2))).toBeNull();
   });
 
-  it('does NOT grey a descending option - the engine permits it and the mechanism is unknown', () => {
+  it('has nothing to say about a band with no adjacent line pair', () => {
+    expect(say('FACTOR_0', 'FACTOR_1', 20000, { spanLines: 1, restriction: null })).toBeNull();
+    expect(say('FACTOR_0', 'FACTOR_1', 20000, { spanLines: 0, restriction: null })).toBeNull();
+  });
+
+  it('warns HARDER on a shorter band at the same ends, because the rate is per LINE', () => {
+    const fb: EffectsFactor = 'FACTOR_1_4';
+    const to: EffectsFactor = 'FACTOR_3_8';
+    // Same ends, same camera; only the span moves. The tall band's onset is
+    // further out, so there is a camera range where only the short one speaks.
+    const shortOnset = curveRateOnsetEstimate(fb, to, 8, CURVE_RATE_GARBLED_MIN)!;
+    const tallOnset = onsetOf(fb, to);
+    expect(shortOnset).toBeLessThan(tallOnset);
+    const between = Math.floor((shortOnset + tallOnset) / 2);
+    expect(say(fb, to, between, { spanLines: 8, restriction: null })).not.toBeNull();
+    expect(say(fb, to, between)).toBeNull();
+  });
+
+  // ⚠ THE THREE-PART SHAPE, because the panel may hold the mechanism behind a
+  // disclosure and a downstream `slice()` cannot be told which half is the one
+  // an author acts on (the O15 ruling).
+  it('returns diagnosis and remedies on every arm, and the join is the sentence', () => {
+    const arms = [
+      say('FACTOR_1_8', 'FACTOR_1_2', 20000),
+      say('FACTOR_1_2', 'FACTOR_7_16', null),
+      say('FACTOR_1_2', 'FACTOR_7_16', 10, { spanLines: null, restriction: 'because.' }),
+    ];
+    for (const a of arms) expect(a).not.toBeNull();
+    const parts = curveRateAdvisoryParts(
+      { ...baseLayer(), fb: 'FACTOR_1_8', curve: { to: 'FACTOR_1_2' } },
+      wholeScreen, { maxCamX: 20000 },
+    )!;
+    expect(parts.diagnosis.length).toBeGreaterThan(0);
+    expect(parts.remedies.length).toBeGreaterThan(0);
+    expect(parts.mechanism).toBeDefined();
+    expect([parts.diagnosis, parts.mechanism, parts.remedies].join(' '))
+      .toBe(say('FACTOR_1_8', 'FACTOR_1_2', 20000));
+  });
+
+  it('does NOT grey any curve option, because aeon says there is no engine defect', () => {
     const opts = curveFieldOptions({ fb: 'FACTOR_1_8' });
     const below = opts.find((o) => o.value === 'FACTOR_1_16')!;
+    const above = opts.find((o) => o.value === 'FACTOR_1_2')!;
     expect(below.disabled).toBe(false);
-    // And the advisory really does fire on that same pair, so this row is about
-    // a deliberate non-refusal rather than about a predicate that never fires.
-    expect(curveDescendingAdvisory({ ...baseLayer(), fb: 'FACTOR_1_8', curve: { to: 'FACTOR_1_16' } }))
-      .not.toBeNull();
+    expect(above.disabled).toBe(false);
+    // And the advisory really does fire on BOTH of those pairs at a far enough
+    // camera, so this row is about a deliberate non-refusal rather than about a
+    // predicate that never fires.
+    expect(say('FACTOR_1_8', 'FACTOR_1_16', 20000)).not.toBeNull();
+    expect(say('FACTOR_1_8', 'FACTOR_1_2', 20000)).not.toBeNull();
   });
 });
 
