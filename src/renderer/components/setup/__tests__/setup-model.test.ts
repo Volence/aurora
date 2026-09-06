@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { buildSetupRows, applyPathEdits, pendingEditCount } from '../setup-model';
+import { buildSetupRows, applyPathEdits, pendingEditCount, planSetupSidecarWrite } from '../setup-model';
 import { buildReport } from '../../../../core/project/report';
+import { readProjectConfig } from '../../../../core/project/mapping';
 import type { ProjectConfig } from '../../../../core/project/mapping';
 
 const report = buildReport([
@@ -81,5 +82,99 @@ describe('pendingEditCount', () => {
   it('counts a genuine new edit', () => {
     const config: ProjectConfig = { paths: { a: 'orig.bin' } };
     expect(pendingEditCount(config, { a: 'new.bin', b: 'new2.bin' })).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// planSetupSidecarWrite — WRITER 2 of `.aurora/project.json`
+//
+// Setup -> Apply reaches the same file the open-time seed does, by a different
+// door and with the same flaw: `applyPathEdits(sidecar.config, editMap)` over a
+// `{}` that means UNREADABLE serializes a config containing only the user's
+// newest edit, and writes it over everything they had.
+//
+// This is the same destruction as the seed's, and WORSE in one respect: the
+// seed at least writes three known-good defaults, while Apply writes a document
+// holding one path override and nothing else.
+//
+// The rows assert on the PLAN, not on a mocked writeBinaryFile: a mock that
+// returns a hardcoded `true` cannot express a refusal (see
+// state/__tests__/aeon-save.test.ts:78-82), so "no bytes were produced" is a
+// stronger claim than "the write reported success".
+// ---------------------------------------------------------------------------
+
+describe('planSetupSidecarWrite refuses an unreadable sidecar', () => {
+  const EDIT = { 'ghz.act1.fgLayout': 'my/layout.bin' };
+  const enc = (t: string) => new TextEncoder().encode(t);
+  const decode = (bytes: Uint8Array): unknown => JSON.parse(new TextDecoder().decode(bytes));
+
+  it('unreadable => refused, and NO bytes are produced', () => {
+    const plan = planSetupSidecarWrite(
+      { config: {}, issues: [{ where: '$', message: 'sidecar unreadable; ignoring it' }], read: 'unreadable' },
+      EDIT,
+    );
+    expect(plan.kind).toBe('refused');
+    expect(plan).not.toHaveProperty('bytes');
+  });
+
+  it('invalid JSON => refused', () => {
+    expect(planSetupSidecarWrite(readProjectConfig(enc('{"base":"s1-github",}')), EDIT).kind).toBe('refused');
+  });
+
+  it('a non-object JSON root => refused', () => {
+    expect(planSetupSidecarWrite(readProjectConfig(enc('[1,2]')), EDIT).kind).toBe('refused');
+  });
+
+  // Assert on "left it alone" — the phrase only the sidecar REFUSAL emits.
+  // Matching "could not be read" alone would also match mapping.ts's wording
+  // for a merely malformed ENTRY, a different rule with a permissive outcome.
+  it('the refusal says what happened, names the file, and says what to do', () => {
+    const plan = planSetupSidecarWrite({ config: {}, issues: [], read: 'unreadable' }, EDIT);
+    if (plan.kind !== 'refused') throw new Error('expected a refusal');
+    expect(plan.reason).toMatch(/left it alone/);
+    expect(plan.reason).toMatch(/\.aurora\/project\.json/);
+    expect(plan.reason).toMatch(/reopen the project/);
+  });
+
+  // NON-REGRESSION. Apply is the tab's whole purpose; "refuse everything"
+  // satisfies every row above and breaks the feature.
+  it('readable => writes, merging the edit onto everything already there', () => {
+    const plan = planSetupSidecarWrite(
+      {
+        config: { base: 's1-github', paths: { 'ghz.act1.tiles.0': 'my/tiles.bin' }, buildCommand: 'lua build.lua' },
+        issues: [],
+        read: 'read',
+      },
+      EDIT,
+    );
+    if (plan.kind !== 'write') throw new Error('expected a write');
+    expect(decode(plan.bytes)).toEqual({
+      base: 's1-github',
+      buildCommand: 'lua build.lua',
+      paths: { 'ghz.act1.tiles.0': 'my/tiles.bin', 'ghz.act1.fgLayout': 'my/layout.bin' },
+    });
+  });
+
+  it('absent => writes (Apply on a project with no sidecar yet creates one)', () => {
+    const plan = planSetupSidecarWrite(readProjectConfig(null), EDIT);
+    if (plan.kind !== 'write') throw new Error('expected a write');
+    expect(decode(plan.bytes)).toEqual({ paths: EDIT });
+  });
+
+  it('readable WITH per-entry issues => still writes', () => {
+    const plan = planSetupSidecarWrite(
+      readProjectConfig(enc(JSON.stringify({ base: 42, paths: { a: 'b' } }))),
+      EDIT,
+    );
+    expect(plan.kind).toBe('write');
+  });
+
+  it("clearing an override still works ('' means back to stock)", () => {
+    const plan = planSetupSidecarWrite(
+      { config: { base: 's1-github', paths: { 'ghz.act1.fgLayout': 'my/layout.bin' } }, issues: [], read: 'read' },
+      { 'ghz.act1.fgLayout': '' },
+    );
+    if (plan.kind !== 'write') throw new Error('expected a write');
+    expect(decode(plan.bytes)).toEqual({ base: 's1-github' });
   });
 });

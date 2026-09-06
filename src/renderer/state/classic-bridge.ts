@@ -9,6 +9,7 @@ import { createIpcFileAccess } from './classic-file-access';
 import { detectProject, openProject, registerAdapter, type ProjectHandle } from '../../core/project/adapter';
 import { s1Adapter } from '../../core/project/s1';
 import { aeonAdapter, explainAeonReject } from '../../core/project/aeon';
+import { SIDECAR_REL_PATH } from '../../core/project/mapping';
 
 // -- Adapter registration (exactly once) ------------------------------------
 // The registry lives in core (adapter.ts). registerAdapter throws on a
@@ -59,7 +60,20 @@ export interface ClassicBridge {
 /** The real bridge: FileAccess over IPC → core openProject in the renderer. */
 export const ipcClassicBridge: ClassicBridge = {
   async writeSidecar(dir: string, bytes: Uint8Array): Promise<void> {
-    await window.api.writeBinaryFile(dir, '.aurora/project.json', bytes.buffer as ArrayBuffer);
+    // `writeBinaryFile` returns Promise<boolean> and ANSWERS `false` when the
+    // main process refuses the path; its own contract is that the renderer
+    // treats false as a failed write and reports it. This call site ignored
+    // that answer, so a refused write was indistinguishable from a successful
+    // one. Throwing is the reporting channel the caller already has: the
+    // store's seed wraps this in a try/catch that falls back to planner
+    // defaults, which is the correct outcome for a write that did not land.
+    //
+    // This is ONE of ten call sites with the same gap; the other nine are
+    // booked separately as REFUSED-WRITE-REPORTED-SAVED and are NOT fixed here.
+    const wrote = await window.api.writeBinaryFile(dir, SIDECAR_REL_PATH, bytes.buffer as ArrayBuffer);
+    if (wrote === false) {
+      throw new Error(`${SIDECAR_REL_PATH} was refused by the main process; nothing was written`);
+    }
   },
   async open(dir: string): Promise<ClassicOpenResult> {
     ensureAdaptersRegistered();

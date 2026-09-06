@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { readProjectConfig, serializeProjectConfig, seedClassicBuildConfig, type ProjectConfig } from '../mapping';
+import {
+  readProjectConfig,
+  serializeProjectConfig,
+  seedClassicBuildConfig,
+  sidecarMayBeOverwritten,
+  sidecarRefusalMessage,
+  type ProjectConfig,
+} from '../mapping';
 
 const enc = (s: string) => new TextEncoder().encode(s);
 
@@ -18,8 +25,8 @@ describe('project mapping config', () => {
     expect(config.assets!['level-art'].compression).toBe('zx0');
   });
 
-  it('null bytes (no sidecar file) → empty config, no issues', () => {
-    expect(readProjectConfig(null)).toEqual({ config: {}, issues: [] });
+  it('null bytes (no sidecar file) → empty config, no issues, read: absent', () => {
+    expect(readProjectConfig(null)).toEqual({ config: {}, issues: [], read: 'absent' });
   });
 
   it('malformed JSON → empty config + a root issue', () => {
@@ -130,5 +137,77 @@ describe('seedClassicBuildConfig', () => {
   it('treats an empty-string declaration as absent rather than spawning an empty command', () => {
     const { config } = seedClassicBuildConfig({ buildCommand: '' } as never);
     expect((config as Record<string, unknown>).buildCommand).toBe('lua build.lua');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ABSENT vs UNREADABLE vs READ — the distinction the writers depend on.
+//
+// Every row below has the SAME `config: {}`. That is the whole point: the
+// config cannot tell these three apart, three different callers folded them
+// together, and a hand-written .aurora/project.json got overwritten at open as
+// a result. `read` is the only channel that separates them, so it is the only
+// thing worth asserting here.
+// ---------------------------------------------------------------------------
+
+describe('SidecarState.read', () => {
+  it('absent: no file at all', () => {
+    expect(readProjectConfig(null).read).toBe('absent');
+  });
+
+  it('unreadable: invalid JSON, including the trailing comma that reproduces this by hand', () => {
+    expect(readProjectConfig(enc('not json')).read).toBe('unreadable');
+    expect(readProjectConfig(enc('{"base":"s1-github",}')).read).toBe('unreadable');
+    expect(readProjectConfig(enc('')).read).toBe('unreadable');
+  });
+
+  it('unreadable: a JSON root that is not an object', () => {
+    expect(readProjectConfig(enc('[1,2]')).read).toBe('unreadable');
+    expect(readProjectConfig(enc('"hi"')).read).toBe('unreadable');
+    expect(readProjectConfig(enc('null')).read).toBe('unreadable');
+    expect(readProjectConfig(enc('42')).read).toBe('unreadable');
+  });
+
+  it('read: a valid but EMPTY object is read, not absent and not unreadable', () => {
+    const s = readProjectConfig(enc('{}'));
+    expect(s.read).toBe('read');
+    expect(s.config).toEqual({});   // identical to both cases above
+    expect(s.issues).toEqual([]);   // and so are the issues, for the absent one
+  });
+
+  it('read: a file with per-entry issues still READ. Issues are not unreadability', () => {
+    const s = readProjectConfig(enc(JSON.stringify({ base: 42, paths: { a: 'b' } })));
+    expect(s.read).toBe('read');
+    expect(s.issues.length).toBeGreaterThan(0);
+  });
+});
+
+describe('sidecarMayBeOverwritten: the gate every writer must pass', () => {
+  it('refuses ONLY unreadable', () => {
+    expect(sidecarMayBeOverwritten(readProjectConfig(enc('{"base":"s1-github",}')))).toBe(false);
+    expect(sidecarMayBeOverwritten(readProjectConfig(enc('[1,2]')))).toBe(false);
+    expect(sidecarMayBeOverwritten({ config: {}, issues: [], read: 'unreadable' })).toBe(false);
+  });
+
+  it('permits absent. The seed EXISTS to create a missing file', () => {
+    expect(sidecarMayBeOverwritten(readProjectConfig(null))).toBe(true);
+  });
+
+  it('permits a readable file that carries per-entry issues', () => {
+    // Gating on `issues.length` instead would strand every project with one
+    // typo'd override: it could never be seeded and Apply could never write.
+    const s = readProjectConfig(enc(JSON.stringify({ base: 42, paths: { a: 'b' } })));
+    expect(s.issues.length).toBeGreaterThan(0);
+    expect(sidecarMayBeOverwritten(s)).toBe(true);
+  });
+});
+
+describe('sidecarRefusalMessage', () => {
+  it('names the file, says Aurora left it alone, and says what to do', () => {
+    const m = sidecarRefusalMessage('the Build & Run settings');
+    expect(m).toMatch(/\.aurora\/project\.json/);
+    expect(m).toMatch(/left it alone/);
+    expect(m).toMatch(/the Build & Run settings were NOT written/);
+    expect(m).toMatch(/reopen the project/);
   });
 });

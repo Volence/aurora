@@ -26,7 +26,13 @@ import type {
   SidecarState,
 } from '../../core/project/adapter';
 import type { ResolutionReport } from '../../core/project/report';
-import { seedClassicBuildConfig, serializeProjectConfig } from '../../core/project/mapping';
+import {
+  seedClassicBuildConfig,
+  serializeProjectConfig,
+  sidecarMayBeOverwritten,
+  sidecarRefusalMessage,
+} from '../../core/project/mapping';
+import { useToastStore } from './toastStore';
 import { ipcClassicBridge, type ClassicBridge } from './classic-bridge';
 // classicLevelStore.ts imports useClassicProjectStore back from this module —
 // an intentional lazy (function-body-only) circular reference: both stores
@@ -111,8 +117,28 @@ export const useClassicProjectStore = create<ClassicProjectState>((set) => ({
         // failed write is non-fatal — the build planner carries the same
         // values as defaults — but the seeded config still feeds this session
         // so the plan and the file cannot disagree.
+        //
+        // `sidecarMayBeOverwritten` is not decoration. This write runs at OPEN,
+        // with no gesture behind it and before any UI renders, over a file the
+        // user writes by hand. `sidecar &&` was never the guard it looked like:
+        // an unreadable sidecar arrives here as a truthy object carrying
+        // `issues` and an EMPTY config, seedClassicBuildConfig fills all three
+        // keys, and the user's overrides are replaced by a 3-key document. A
+        // trailing comma in their JSON was enough. Aurora has not read this
+        // file, so it does not know what it would be destroying, so it does not
+        // write — the canvas path's rule (canvas-save.ts:72), reached here
+        // through the project sidecar's own door.
         let sidecar = h.sidecar ?? null;
-        if (sidecar && bridge.writeSidecar) {
+        if (sidecar && !sidecarMayBeOverwritten(sidecar)) {
+          // TOLD, not merely spared. `sidecar.issues` renders only on the
+          // Project Setup tab, which the person opening a project need never
+          // visit; refusing in silence would leave them with a file they think
+          // is live and a Build & Run quietly running planner defaults.
+          useToastStore.getState().addToast(
+            sidecarRefusalMessage('the Build & Run settings'),
+            'error',
+          );
+        } else if (sidecar && bridge.writeSidecar) {
           const seeded = seedClassicBuildConfig(sidecar.config);
           if (seeded.changed) {
             sidecar = { ...sidecar, config: seeded.config };
