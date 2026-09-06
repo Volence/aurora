@@ -48,6 +48,50 @@ over values, because it is not a value"). Recorded in the vendored entry's
 `notInAeonProse` field so a later reader does not conclude from the contract
 doc's silence that no such rule exists. **Worth raising with aeon.**
 
+> ### ⚠ CORRECTION, 2026-09-06 (later the same day) — the paragraph above is HISTORY, not the present
+>
+> **"Worth raising with aeon" is DONE, by aeon, because of this packet.** The
+> raise landed at aeon
+> **`fe4fabf88c98e9741990df02bb88574d2abd5441`**, 08:55-0400, *"contract(section
+> budget): six constants whose only authority was our own tool's source"* — an
+> ancestor of aeon `origin/master` (`3d414618`), checked with
+> `git merge-base --is-ancestor`, not relayed. It adds
+> `#### THE SECTION BUDGET` to `tools/EFFECTS_CONSUMER_CONTRACT.md` §1.2, a
+> six-row table at `:99-104` naming every constant in the table above at the
+> values above. aeon's commit message records that they verified all six against
+> their live module, that all six of our values matched, that our cited line
+> numbers all still resolved, and that they confirmed the 79-slot allowance at
+> every band count from 1 to 4 rather than deriving it once.
+>
+> So **the section budget now has TWO authorities**, and the sentence *"every
+> constant above has exactly ONE authority"* is true only of the day it was
+> written. `tools/inject_editor_bg.py` is still THE authority — aeon's own third
+> column names it for all six rows — but the table is a second place to read the
+> figures, and therefore a second place for them to go stale.
+>
+> The correction is **added rather than substituted**: the finding above was
+> measured and correct at `78c99423`, and a packet that silently becomes right is
+> a worse artifact than one carrying its own correction. What has been corrected
+> IN PLACE, because those are present-tense claims a reader acts on:
+>
+> * `bganim-consumer-contract.json` — the field is renamed `aeonProse` and says
+>   the row exists (the old NAME was half the false claim), the `section-ceiling`
+>   amendment's `notALL` carries a supersession pointer, and a new
+>   `section-budget-in-prose` amendment records the second authority.
+> * `test/formats/bg-override-contract-currency.test.ts` — its comment had
+>   concluded *"there is nothing to corroborate against, so a second row here
+>   would be decoration"*. Premise false, conclusion re-opened, ruled the other
+>   way: all six constants gained a doc row.
+>
+> ⚠ **AND A TRAP AEON'S TABLE FLAGS IN ITSELF.** Two of the six cells print a
+> DERIVED value as a literal: `BGANIM_SECTION_CEILING` shows `20480` in a cell
+> whose own words are *"an expression, not a literal"* (the source is
+> `min(BGANIM_SECTION_CEILINGS.values())`, correct only while every shape's row
+> names the ruled figure), and `BGANIM_BYTES_PER_SLOT` shows `256` for the
+> PRODUCT `BGANIM_PHASES * BGANIM_TILE_BYTES`. **Never re-vendor off the table.**
+>
+> Full record: `docs/reviews/2026-09-06-ceiling-prose-retire.md`.
+
 `BGANIM_SECTION_CEILING` is an **owner ruling, not a measurement**: a budget
 INSIDE the ROM room, which `tools/bganim_room.py` measures independently and
 which fails aeon's build if the ceiling ever exceeds it. It has moved twice
