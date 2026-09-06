@@ -176,8 +176,8 @@ describe('aeon curve-rate premise: the record the advisory quotes', () => {
     expect(
       /discriminator still does not close/i.test(doc.text),
       `${NOT_OURS} aeon no longer says the span-versus-rate discriminator is open. If they `
-      + 'CLOSED it, the advisory\'s "has not been separated" clause is now understating what '
-      + 'is known and must be strengthened rather than deleted.',
+      + 'CLOSED it, the advisory\'s "still not separated from the rate" clause is now '
+      + 'understating what is known and must be strengthened rather than deleted.',
     ).toBe(true);
     expect(
       /[Ss]everity instead tracks rate monotonically/.test(doc.text),
