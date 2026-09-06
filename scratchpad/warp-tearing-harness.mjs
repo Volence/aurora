@@ -24,6 +24,35 @@
 // Row 0 is the anti-vacuous control: Path B against itself must diff to ZERO,
 // or the comparison is measuring nondeterminism rather than tearing.
 //
+// THE WINDOW THIS COMPARES IS NOW DERIVED, NOT TYPED (rows R0 to R6).
+//
+// Until 2026-09-05 the plane A base was the literal `0xC000` with a comment
+// saying "the absolute address does not matter to the comparison, only that
+// both paths read the same window". That sentence was an ASSUMPTION and there
+// was no route to check it: `emulator/read_vdp_registers` sat in the schema's
+// BLOCKED set, which is what aurora filed as GN-1 in its 2026-08-22
+// instrument-gaps review and what empyrean adopted as contract section 11.41
+// (CR-R). With the method served, the address comes from register `$02` and the
+// plane geometry from register `$10`, so:
+//
+//   - Rows R1 to R4 assert every derived value EQUALS the literal it replaces
+//     for this ROM. That is what makes the change measurement neutral rather
+//     than a silent adoption of a new number.
+//   - Row R6 reads the registers at EVERY plane sample on BOTH paths and
+//     asserts they agree. THIS WAS PREVIOUSLY UNFALSIFIABLE. If a warp had
+//     moved plane A's base or resized the plane, the old code would have
+//     compared two DIFFERENT windows of VRAM and reported the difference as
+//     tearing, and nothing in this harness or anywhere else could have caught
+//     it. The comparison's central premise is now a row.
+//   - Row R0 records why the read happens after the 600 frame boot and not
+//     before it: the register file is game state, and before the game writes
+//     it every register reads `0x00`, which decodes plane A to `0x0000`.
+//
+// The peek does not perturb what is measured: contract section 8 item 29 makes
+// `read_vdp_registers` a peek that must not move the machine, and row 0's
+// self-diff staying at zero with a register read now inside every sample is
+// this harness's own evidence of that.
+//
 // Usage: node scratchpad/warp-tearing-harness.mjs   (VERBOSE=1 for server log)
 
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
@@ -62,6 +91,68 @@ async function loadClient(outDir) {
 }
 
 const hx = (n) => '0x' + (n >>> 0).toString(16).toUpperCase();
+const hx8 = (n) => '0x' + (n & 0xff).toString(16).toUpperCase().padStart(2, '0');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DECODING THE VDP GEOMETRY REGISTERS
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// WHERE THIS LAYOUT COMES FROM. Not from memory and not from a web search: a
+// wrong shift here silently moves the window this harness compares, and a
+// harness that reads the wrong 4 KiB reports a clean plane forever.
+//
+// PRIMARY SOURCE: oracle's render recon RR3, "Plane / window nametable bases +
+// plane size", in oracle's `docs/2026-07-16-vdp-render-recon.md`. Its own
+// stated evidence is Plutiedev's VDP register reference, and it is the same
+// expression oracle's renderer FETCHES THROUGH, in
+// `crates/oracle-core/src/render.rs` (`plane_a_base`, `plane_size`,
+// `render_h40`). That last point is what makes it the right citation rather
+// than merely a correct one: the address this harness hands to
+// `emulator/read_vram` has to be the address the machine under measurement is
+// actually drawing from, and oracle IS that machine.
+//
+// CROSS-CHECKED against two independent producers of the same numbers, so the
+// decode does not rest on one document:
+//   - aeon's own boot register table, `engine/system/boot_data.emp`
+//     (`BootData_VDPRegs`), writes reg $10 = $11 and comments it "64x64 scroll
+//     planes"; it also places plane B at $E000 and notes that plane B then
+//     "spans $E000-$FFFF", which is 8 KiB and fits only a 64x64 plane.
+//   - stock Sonic 2, `s2disasm/s2.asm`, sets reg $02 as
+//     `$8200|(VRAM_Plane_A_Name_Table/$400)`, i.e. the register value is
+//     base / $400. For $C000 that is $30, which is the value this ROM produces.
+//
+// THE BIT LAYOUTS USED BELOW, register by register:
+//
+//   $01 bit 3 (M2)       1 = V30 (30 cells tall), 0 = V28 (28 cells tall)
+//   $02 bits 5..3        SA15..SA13: plane A nametable base, bits 15..13
+//   $0C bit 0 (RS0)      both RS0 and RS1 set = H40 (40 cells wide),
+//   $0C bit 7 (RS1)        otherwise H32 (32 cells wide)
+//   $10 bits 1..0 (HSZ)  plane width in cells:  0 -> 32, 1 -> 64, 3 -> 128
+//   $10 bits 5..4 (VSZ)  plane height in cells: 0 -> 32, 1 -> 64, 3 -> 128
+//
+// Size code 2 (`0b10`) is in no permitted source. oracle's core clamps it to 64
+// deterministically and flags the clamp; this harness does NOT clamp, because a
+// clamped guess here would report a plane geometry no document backs and the
+// row consuming it would go green on an invention. It returns null and the row
+// fails loudly instead.
+const planeSizeCells = (bits) => ({ 0: 32, 1: 64, 3: 128 })[bits & 0x03] ?? null;
+
+function decodeGeometry(regs) {
+  const r01 = regs[0x01], r02 = regs[0x02], r0C = regs[0x0c], r10 = regs[0x10];
+  return {
+    planeA: (r02 & 0x38) << 10,
+    planeW: planeSizeCells(r10),
+    planeH: planeSizeCells(r10 >> 4),
+    h40: (r0C & 0x81) === 0x81,
+    v30: (r01 & 0x08) !== 0,
+    raw: { r01, r02, r0C, r10 },
+  };
+}
+
+/** Everything row R6 compares. Two samples with equal keys read the same window. */
+const geomKey = (g) =>
+  `planeA=${hx(g.planeA)} plane=${g.planeW}x${g.planeH}cells h40=${g.h40} v30=${g.v30} ` +
+  `[regs $01=${hx8(g.raw.r01)} $02=${hx8(g.raw.r02)} $0C=${hx8(g.raw.r0C)} $10=${hx8(g.raw.r10)}]`;
 
 async function main() {
   const workDir = mkdtempSync(join(tmpdir(), 'aurora-warp-'));
@@ -97,7 +188,40 @@ async function main() {
     const prevCamX = await client.resolve('Cache_Prev_Cam_X');
     const prevCamRow = await client.resolve('Cache_Prev_Cam_Row');
 
+    /**
+     * The VDP register file, as 24 numbers. LOUD ON UNMEASURABLE: every shape
+     * violation throws rather than falling back to a literal, because a
+     * harness that quietly reverts to `0xC000` when the method is missing is
+     * exactly the instrument this row exists to replace.
+     */
+    const readVdpRegs = async () => {
+      const r = await call('emulator/read_vdp_registers', {});
+      const raw = r?.raw;
+      if (!Array.isArray(raw) || raw.length !== 24) {
+        throw new Error(
+          `emulator/read_vdp_registers must return exactly 24 index ordered entries ` +
+          `(contract section 6, amended by 11.41); got ${JSON.stringify(raw)}`);
+      }
+      return raw.map((s, i) => {
+        if (typeof s !== 'string' || !/^0x[0-9a-f]{2}$/i.test(s)) {
+          throw new Error(`register $${i.toString(16).padStart(2, '0')} is not a two hex digit ` +
+            `0x.. string: ${JSON.stringify(s)}`);
+        }
+        return parseInt(s, 16);
+      });
+    };
+
     await call('emulator/pause', {});
+    // BEFORE the boot, on purpose: row R0 needs the untouched register file.
+    let coldGeom = null;
+    try {
+      coldGeom = decodeGeometry(await readVdpRegs());
+    } catch (e) {
+      check('R0', 'the VDP register file is readable at all', false,
+        `emulator/read_vdp_registers did not answer usably, so nothing below can be derived ` +
+        `from it: ${e?.message ?? e}`);
+      throw e;
+    }
     await call('emulator/run_frames', { frames: 600 });   // boot into a level
 
     const startX = u16(await rd(camX, 2));
@@ -108,11 +232,106 @@ async function main() {
     const cp = (await call('emulator/checkpoint', { label: 'pre-warp' })).id;
     note('checkpoint', `id=${cp} — both paths start from exactly this machine`);
 
-    // Plane A nametable. VRAM $C000 is aeon's plane A base for this build; the
-    // absolute address does not matter to the comparison, only that both paths
-    // read the same window.
-    const PLANE_A = 0xC000, PLANE_LEN = 0x1000;
-    const plane = async () => {
+    // ── PLANE A, DERIVED FROM THE REGISTERS ────────────────────────────────
+    //
+    // Read AFTER the 600 frame boot, because the registers are game state: the
+    // game writes them out of its own table on the way into a level, and a read
+    // before that decodes a plane A base of 0x0000. Row R0 asserts exactly that
+    // difference so the ordering requirement has an artifact rather than a
+    // comment.
+    const bootRegs = await readVdpRegs();
+    const geom = decodeGeometry(bootRegs);
+    note('VDP registers after boot, raw, index ordered $00 to $17',
+      `${bootRegs.map((v) => hx8(v)).join(' ')}\n        ${geomKey(geom)}`);
+
+    check('R0', 'the register file is GAME state, so the derivation reads it after the boot',
+      coldGeom.planeA !== geom.planeA,
+      `before the 600 boot frames plane A decoded to ${hx(coldGeom.planeA)} ` +
+      `(reg $02=${hx8(coldGeom.raw.r02)}); after them it decodes to ${hx(geom.planeA)} ` +
+      `(reg $02=${hx8(geom.raw.r02)}). Reading before the boot would have aimed this harness ` +
+      `at VRAM ${hx(coldGeom.planeA)}.`);
+
+    // The literals these four rows replace, kept by name so the equality being
+    // asserted is legible rather than inlined into the message.
+    const WAS_PLANE_A = 0xC000, WAS_PLANE_W = 64, WAS_VIEW_W = 40, WAS_VIEW_H = 28;
+
+    const PLANE_A = geom.planeA;
+    check('R1', 'plane A base derived from register $02 equals the address this harness read',
+      PLANE_A === WAS_PLANE_A,
+      `reg $02=${hx8(geom.raw.r02)}, so (r02 & 0x38) << 10 = ${hx(PLANE_A)}; ` +
+      `the literal it replaces was ${hx(WAS_PLANE_A)}` +
+      (PLANE_A === WAS_PLANE_A ? '' : '. THEY DIFFER: this harness has not been reading plane A.'));
+
+    const PLANE_W = geom.planeW;
+    check('R2', 'plane width in cells derived from register $10 equals the row stride used here',
+      PLANE_W === WAS_PLANE_W,
+      geom.planeW === null
+        ? `reg $10=${hx8(geom.raw.r10)} has HSZ code 2, which is in no permitted source; ` +
+          `no width is derivable and none is guessed`
+        : `reg $10=${hx8(geom.raw.r10)}, so HSZ=${geom.raw.r10 & 3} -> ${PLANE_W} cells wide ` +
+          `and VSZ=${(geom.raw.r10 >> 4) & 3} -> ${geom.planeH} cells tall; ` +
+          `the stride literal it replaces was ${WAS_PLANE_W}`);
+
+    const VIEW_W = geom.h40 ? 40 : 32;
+    check('R3', 'view width in cells derived from register $0C equals the sample window width',
+      VIEW_W === WAS_VIEW_W,
+      `reg $0C=${hx8(geom.raw.r0C)}, RS0 and RS1 ${geom.h40 ? 'both set, so H40' : 'not both set, so H32'} ` +
+      `-> ${VIEW_W} cells; the literal it replaces was ${WAS_VIEW_W}`);
+
+    // V28 vs V30 is derived and then CHECKED AGAINST THE RENDERER, not merely
+    // decoded. oracle's core renders 224 lines unconditionally and says so
+    // (`crates/oracle-core/src/render.rs`, `active_display`: "Height is 224
+    // unconditionally, which is a statement about this core rather than about
+    // the chip"). So on a machine with M2 set, the register and the renderer
+    // would disagree and there would be no honest number to sample with. That
+    // is a red row, never a silently adopted 30.
+    const VIEW_H = geom.v30 ? 30 : 28;
+    check('R4', 'view height derived from register $01 equals the sample window height',
+      VIEW_H === WAS_VIEW_H && !geom.v30,
+      `reg $01=${hx8(geom.raw.r01)}, M2 (bit 3) ${geom.v30 ? 'SET, so V30' : 'clear, so V28'} ` +
+      `-> ${VIEW_H} cells; the literal it replaces was ${WAS_VIEW_H}` +
+      (geom.v30
+        ? '. M2 is set, but oracle renders 224 lines unconditionally, so the register and the ' +
+          'renderer disagree and no sample height here is trustworthy.'
+        : ''));
+
+    // ── THE READ WINDOW, AND WHAT IT DOES NOT COVER ────────────────────────
+    //
+    // PLANE_LEN is NOT derived, and that is a finding rather than an omission.
+    // The derived plane is planeW x planeH cells = planeW*planeH*2 bytes, which
+    // for this ROM is 0x2000. `emulator/read_vram` caps `len` at 4096 (contract
+    // section 6), so one call can never return more than 0x1000: HALF of a
+    // 64x64 plane. The literal was at the method's ceiling all along.
+    //
+    // Widening it to two calls would CHANGE what `diffAll` and row 7 measure,
+    // so it is not done here. What is done is saying so, everywhere the number
+    // is printed.
+    const PLANE_LEN = 0x1000;
+    const PLANE_BYTES = geom.planeW !== null && geom.planeH !== null
+      ? geom.planeW * geom.planeH * 2 : null;
+    const ROWS_READ = geom.planeW !== null ? PLANE_LEN / (geom.planeW * 2) : null;
+    note('read window coverage, which is NOT the whole plane',
+      `the derived plane is ${geom.planeW}x${geom.planeH} cells = ${hx(PLANE_BYTES)} bytes, but one ` +
+      `emulator/read_vram is capped at 4096 bytes, so this harness reads ${hx(PLANE_LEN)} from ` +
+      `${hx(PLANE_A)}: plane rows 0 to ${ROWS_READ - 1} of ${geom.planeH}. The metric this file ` +
+      `calls "whole-plane" therefore covers ${ROWS_READ} of ${geom.planeH} rows.`);
+
+    check('R5', 'the read window starts at the plane base and covers the whole sampled view',
+      PLANE_LEN % (PLANE_W * 2) === 0 && ROWS_READ >= VIEW_H,
+      `${hx(PLANE_LEN)} bytes is ${ROWS_READ} whole plane rows of ${PLANE_W} cells, and the window ` +
+      `metric samples ${VIEW_H} rows` +
+      (ROWS_READ >= VIEW_H
+        ? ''
+        : `. The read is SHORTER than the view, so diffWords has been silently skipping rows.`));
+
+    /**
+     * Every plane sample is STAMPED with the geometry it was read under, and
+     * row R6 asserts every stamp agrees. `tag` names the path and the sample
+     * point, so a divergence says WHICH one moved.
+     */
+    const geomStamps = [];
+    const plane = async (tag) => {
+      geomStamps.push({ tag, key: geomKey(decodeGeometry(await readVdpRegs())) });
       const r = await call('emulator/read_vram', { addr: hx(PLANE_A), len: PLANE_LEN });
       return Buffer.from(r.bytes.replace(/^0x/i, ''), 'hex');
     };
@@ -124,8 +343,9 @@ async function main() {
     // (the tearing dwarfs it) and fatal for "is it clean?", which is exactly
     // what this run has to answer about the mailbox.
     //
-    // Plane is 64 cells wide; the visible window is 40x28 cells at the origin.
-    const PLANE_W = 64, VIEW_W = 40, VIEW_H = 28;
+    // Plane width and the visible window are derived above from registers $10,
+    // $0C and $01, and rows R2 to R4 assert they equal the 64 / 40 / 28 that
+    // used to be typed here.
     const diffWords = (a, b) => {
       let n = 0;
       for (let row = 0; row < VIEW_H; row++) {
@@ -207,7 +427,7 @@ async function main() {
         await call('emulator/run_frames', { frames: 2 });
       }
       await call('emulator/run_frames', { frames: SETTLE });
-      return plane();
+      return plane('pathB:settle');
     };
     /** The reference at the EARLY sample point, walked the safe way. */
     const runPathBEarly = async () => {
@@ -217,7 +437,7 @@ async function main() {
         await call('emulator/run_frames', { frames: 2 });
       }
       await call('emulator/run_frames', { frames: EARLY });
-      return plane();
+      return plane('pathB:early');
     };
 
     const b1 = await runPathB();
@@ -240,7 +460,7 @@ async function main() {
       `Still ${postCacheX} immediately after the poke — the latch input for the next frame.`);
 
     await call('emulator/run_frames', { frames: EARLY });
-    const aEarly = await plane();
+    const aEarly = await plane('pathA:early');
     const bEarly = await runPathBEarly();
     const tornEarly = diffWords(aEarly, bEarly);
     const tornEarlyAll = diffAll(aEarly, bEarly);
@@ -250,7 +470,7 @@ async function main() {
     await call('emulator/restore', { id: cp });
     await poke(destX, destY);
     await call('emulator/run_frames', { frames: SETTLE });
-    const a1 = await plane();
+    const a1 = await plane('pathA:settle');
     await shot('pathA-one-big-poke');
 
     const torn = tornEarly;
@@ -271,7 +491,7 @@ async function main() {
     for (const step of [30, 30, 60, 60, 120, 120, 180, 180]) {
       await call('emulator/run_frames', { frames: step });
       elapsed += step;
-      const d = diffWords(await plane(), b1);
+      const d = diffWords(await plane(`pathA:recovery+${elapsed}f`), b1);
       console.log(`        +${String(elapsed).padStart(4)} frames -> ${String(d).padStart(4)} differing words`);
       if (d === 0) { recoveredAt = elapsed; break; }
     }
@@ -288,7 +508,7 @@ async function main() {
       await call('emulator/restore', { id: cp });
       await poke(startX + dist, startY);
       await call('emulator/run_frames', { frames: SETTLE });
-      const jumped = await plane();
+      const jumped = await plane(`pathA:jump${dist}`);
 
       await call('emulator/restore', { id: cp });
       for (let x = startX + STEP; x <= startX + dist; x += STEP) {
@@ -296,7 +516,7 @@ async function main() {
         await call('emulator/run_frames', { frames: 2 });
       }
       await call('emulator/run_frames', { frames: SETTLE });
-      const walked = await plane();
+      const walked = await plane(`pathB:walk${dist}`);
 
       const d = diffWords(jumped, walked);
       rows.push({ dist, d });
@@ -344,7 +564,7 @@ async function main() {
       // EARLY rather than adding EARLY on top.
       const topUp = Math.max(0, EARLY - (ackFrames ?? 0));
       if (topUp) await call('emulator/run_frames', { frames: topUp });
-      const viaMailbox = await plane();
+      const viaMailbox = await plane('mailbox:early');
       const mailboxDiff = diffWords(viaMailbox, bEarly);
       const mailboxDiffAll = diffAll(viaMailbox, bEarly);
       check('6', 'the mailbox lands CLEAN at the distance and frame where the bare poke tears',
@@ -493,9 +713,37 @@ async function main() {
       check('7', 'the mailbox whole-plane diff is inside the known off-view floor',
         mailboxDiffAll <= OFF_VIEW_FLOOR,
         `${mailboxDiffAll} of ${ALL_WORDS} whole-plane words (floor ${OFF_VIEW_FLOOR}; ` +
-        `bare poke ${tornEarlyAll})`);
+        `bare poke ${tornEarlyAll}). COVERAGE: those ${ALL_WORDS} words are plane rows 0 to ` +
+        `${ROWS_READ - 1} of ${geom.planeH}, not the whole ring. See the coverage NOTE above.`);
       await shot('mailbox-warp');
     }
+
+    // ── ROW R6: DO BOTH PATHS READ THE SAME WINDOW? ────────────────────────
+    //
+    // The premise every diff above rests on. Each plane sample stamped the
+    // decoded geometry it was read under, so this compares the actual windows
+    // rather than trusting the comment that used to assert them equal. A warp
+    // that moved plane A's base or resized the plane would have made the two
+    // paths diff two different regions of VRAM, and the number would have come
+    // out as tearing with nothing able to tell the difference.
+    //
+    // Anti-vacuous first: a run that collected no stamps, or stamps from only
+    // one path, would pass this trivially, so the sample set is asserted too.
+    const stampPaths = new Set(geomStamps.map((s) => s.tag.split(':')[0]));
+    const bootKey = geomKey(geom);
+    const divergent = geomStamps.filter((s) => s.key !== bootKey);
+    const bothPaths = stampPaths.has('pathA') && stampPaths.has('pathB');
+    check('R6', 'both paths read the SAME window: the plane geometry is identical at every sample',
+      divergent.length === 0 && geomStamps.length >= 2 && bothPaths,
+      !bothPaths || geomStamps.length < 2
+        ? `VACUOUS: ${geomStamps.length} samples from paths {${[...stampPaths].join(', ')}}; ` +
+          `this row needs at least one from pathA and one from pathB`
+        : divergent.length === 0
+          ? `${geomStamps.length} samples across {${[...stampPaths].join(', ')}} all read ` +
+            `${bootKey}`
+          : `${divergent.length} of ${geomStamps.length} samples read a DIFFERENT window. ` +
+            `First: ${divergent[0].tag} read ${divergent[0].key}, against boot ${bootKey}. ` +
+            `Every diff in this run compared two different regions of VRAM.`);
   } finally {
     try { client?.disconnect(); } catch { /* */ }
     if (child) {
