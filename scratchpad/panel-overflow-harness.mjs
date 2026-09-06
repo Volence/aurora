@@ -318,9 +318,31 @@ async function sweepCanvas(c) {
       + 'exists and CanvasMode cannot mount. Shot: shots-panel-overflow/canvas-no-dialog.png');
     return;
   }
-  // Accept the dialog's own defaults: this sweep is about the column's width,
-  // not about the form. The primary button is found by its text, the way a
-  // person finds it.
+  // ⚠ THE NAME IS NOT OPTIONAL, and the first cut of this phase did not type
+  // one. The field renders its suggestion as a PLACEHOLDER (grey
+  // `green-hill-cliffs`), which looks filled in a screenshot and is an empty
+  // value to the form: Create was clicked at the right pixel, the dialog stayed
+  // open, and the row reported "the Create click left no canvas document" for a
+  // gesture that was never accepted. Typed through a real focus and
+  // `Input.insertText`, the way the canvas harness types into it.
+  await c.evalExpr(String.raw`
+    (() => {
+      const d = document.querySelector('[role="dialog"][aria-label="New Canvas"]');
+      const i = d && d.querySelector('input');
+      if (i) i.focus();
+      return !!i;
+    })()`);
+  await sleep(200);
+  await c.send('Input.insertText', { text: 'panel-sweep-probe' });
+  await sleep(400);
+  const named = await c.evalExpr(String.raw`
+    (() => { const d = document.querySelector('[role="dialog"][aria-label="New Canvas"]');
+      const i = d && d.querySelector('input'); return i ? i.value : null; })()`);
+  // ANTI VACUOUS: without this, an empty name and a broken click are the same
+  // UNMEASURABLE line, and the second reads as the first.
+  note('canvas name typed', JSON.stringify(named));
+
+  // The primary button is found by its text, the way a person finds it.
   const aim = await c.json(String.raw`
     (() => {
       const d = document.querySelector('[role="dialog"][aria-label="New Canvas"]');
@@ -348,8 +370,10 @@ async function sweepCanvas(c) {
   const docs = await c.json('window.__dbg.canvas.docIds()').catch(() => []);
   if (!docs.length) {
     await shot(c, 'canvas-no-doc');
+    const stillOpen = await c.evalExpr(dlgOpen);
     setRow('canvas-mode', 'UNMEASURABLE',
-      'the Create click left no canvas document in the store, so CanvasMode still returns null. '
+      'the Create click left no canvas document in the store, so CanvasMode still returns null '
+      + `(name field held ${JSON.stringify(named)}, dialog still open: ${stillOpen}). `
       + 'Shot: shots-panel-overflow/canvas-no-doc.png');
     return;
   }
