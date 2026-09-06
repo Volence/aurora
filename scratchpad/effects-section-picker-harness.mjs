@@ -53,7 +53,7 @@
 //                      catch it and the run must ABORT.
 
 import { AURORA_DIR, checkoutOverride, siblingDefaultPathOrUnresolved } from '../test/support/sibling-root.mjs';
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import * as http from 'node:http';
 import * as os from 'node:os';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
@@ -79,6 +79,7 @@ const PLANT = process.env.PLANT ?? '';
 // aeon's `descriptor_effects_bindings` / `raster_call_sites` approach.
 const DESC = `${AEONDIR}/games/sonic4/data/levels/ojz/act1/act_descriptor.emp`;
 const LIB = `${AEONDIR}/games/sonic4/data/effects/ojz_effects.emp`;
+const SIDECARS = `${AEONDIR}/games/sonic4/data/editor/ojz/act1`;
 function independentDerivation() {
   const desc = readFileSync(DESC, 'utf8');
   const lib = readFileSync(LIB, 'utf8');
@@ -96,7 +97,18 @@ function independentDerivation() {
   let m;
   while ((m = call.exec(lib)) !== null) threaded.push(Number(m[1]));
   threaded.sort((a, b) => a - b);
-  return { bind, own, threaded, wired: own.filter((s) => threaded.includes(s)).sort((a, b) => a - b) };
+  // THE THIRD SET (cold read D-B): the sections whose SIDECAR already names a
+  // preset document. It is not in either aeon file — it is Aurora's own key —
+  // so it is parsed here from the same tree, independently of the app.
+  const bound = readdirSync(SIDECARS)
+    .filter((f) => /^section_\d+\.meta\.json$/.test(f))
+    .map((f) => [Number(/^section_(\d+)\./.exec(f)[1]),
+                 JSON.parse(readFileSync(`${SIDECARS}/${f}`, 'utf8')).rasterRef ?? null])
+    .filter(([, ref]) => ref !== null)
+    .map(([i]) => i)
+    .sort((a, b) => a - b);
+  return { bind, own, threaded, bound,
+           wired: own.filter((s) => threaded.includes(s)).sort((a, b) => a - b) };
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -429,6 +441,13 @@ async function main() {
     // prints are now the two independent ones — `own preset` and `threaded` —
     // and `truth.threaded` (every `sec: N` in a chooser call) is a different
     // derivation from `truth.wired` (own ∩ threaded), asserted separately below.
+    //
+    // ⚠ AND A THIRD SET SINCE 2026-09-06 (cold read D-B): `bound`, the sections
+    // whose sidecar already names a preset document. `threaded 5,6` was read as
+    // "5 and 6 are available" while both were occupied, so the line now says
+    // which are taken. It is Aurora's own key rather than aeon's, and
+    // `independentDerivation` reads it from the sidecars for the same reason it
+    // reparses the other two: an expectation the app computed is no check.
     const chipText = await c.json(String.raw`(() => {
       const el = document.querySelector('[data-effects-act-sets]');
       if (!el) return { found: false };
@@ -436,8 +455,9 @@ async function main() {
                rects: el.getClientRects().length,
                visible: typeof el.checkVisibility === 'function' ? el.checkVisibility() : null };
     })()`);
-    const expectSets = `act: own preset ${truth.own.join(',')} · threaded ${truth.threaded.join(',')}`;
-    check('4d', 'the strip PRINTS both derived sets, and they equal this process\'s own parse',
+    const expectSets = `act: own preset ${truth.own.join(',')} · threaded ${truth.threaded.join(',')}`
+      + ` · bound ${truth.bound.length === 0 ? 'none' : truth.bound.join(',')}`;
+    check('4d', 'the strip PRINTS all THREE derived sets, and they equal this process\'s own parse',
       chipText.found === true && chipText.rects > 0 && chipText.visible !== false
       && chipText.text === expectSets,
       `app: ${JSON.stringify(chipText.text)}\n        independent: ${JSON.stringify(expectSets)}`);
@@ -492,9 +512,25 @@ async function main() {
         labels: [...document.querySelectorAll('button')]
           .map((e) => e.getAttribute('aria-label')).filter(Boolean).slice(0, 25) };
       b.scrollIntoView({ block: 'center' });
+      // TWO SENTENCES ON THIS CARD NOW OPEN THE SAME WAY. The cold read's D-B
+      // fix (2026-09-06) added a rebind notice under the Section select that
+      // also begins 'Section 5 binds "ojz_sec5_showcase"': it is about what
+      // REBINDING costs, where this one is about what DELETING costs, and it
+      // sits EARLIER in the DOM, so leaves[0] silently became the wrong
+      // sentence and this row failed on text that was perfectly correct for
+      // the other control. The delete refusal is the one that names the escape
+      // ('Deleting it would leave'), so the finder asks for THAT phrase rather
+      // than trusting document order. 'Hand-authored raster' will not do: it is
+      // also in the LimitBlock prose and in every option of the select, so a
+      // leaf-ness test built on it resolves to a container holding the whole
+      // card.
+      // (No backticks in this comment: it lives inside a String.raw template,
+      // and the first draft of it terminated the literal.)
+      const IS_DELETE_REFUSAL = (t) => /binds "ojz_sec5_showcase"/.test(t)
+        && /Deleting it would leave/.test(t);
       const leaves = [...document.querySelectorAll('div')]
-        .filter((d) => /binds "ojz_sec5_showcase"/.test(d.innerText || '')
-                    && ![...d.children].some((k) => /binds "ojz_sec5_showcase"/.test(k.innerText || '')));
+        .filter((d) => IS_DELETE_REFUSAL(d.innerText || '')
+                    && ![...d.children].some((k) => IS_DELETE_REFUSAL(k.innerText || '')));
       const leaf = leaves[0] || null;
       let paint = null;
       if (leaf) {
