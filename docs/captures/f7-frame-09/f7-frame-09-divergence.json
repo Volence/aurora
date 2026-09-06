@@ -1,0 +1,132 @@
+{
+  "schema": "empyrean.divergence/1",
+  "id": "f7-frame-09-sonic-art",
+  "subject": "sonic character sheet, mapping frame $09 (walk pose 2, tilt block 1)",
+  "frame": 9,
+  "decided": "2026-09-06",
+  "decided_by": "aurora, row F7-FRAME-09-MAPPING",
+  "one_line": "The donor's art for Sonic mapping frame $09 was overwritten in the donor itself by the art of the donor's own custom frames $C8/$C9; we ship 19 reconstructed tiles appended to the sheet plus a re-pointed DPLC frame, and we do NOT change the mapping, which is faithful.",
+
+  "donor_claims": "art/uncompressed/Sonic's art.bin tiles 168..186 do not hold Sonic 3 and Knuckles frame 9's art at all; they hold the donor author's own standing-pose art, of which frame $C8 loads tile 170 and frame $C9 loads 171..186 (168 and 169 are loaded by no frame but $09). Mapping frame $09 and DPLC frame $09 are faithful Sonic 3 and Knuckles data that name those same 19 tiles, so frame $09 draws another pose's tiles and renders as scrambled body parts.",
+  "we_ship_instead": "The same mapping frame, byte for byte. DPLC frame $09 re-pointed at 25 tiles appended to the tail of both art sheets; 19 of those are Sonic 3 and Knuckles art tiles 175..193 recoloured through the palette permutation this sheet uses everywhere else, and 6 are byte copies of the donor's own surviving tiles (uncompressed 187..192, which still match skdisasm 194..199 by shape mask).",
+  "why": "The mapping is innocent and there is no piece list over the donor's tiles that draws this pose, so a mapping repair could only have been fitted to the picture. 10 of the 19 lost tiles occur nowhere in the donor's 3,425 tile sheet under shape-mask equality, so re-pointing alone cannot recover the frame.",
+
+  "base": {
+    "repo": "aeon",
+    "revision": "b3aef93c8ec41402383806c01086be4f15f80533",
+    "note": "Every base blob below is read with `git show <revision>:<path>`. A path read would compare against whatever another lane has in its working tree."
+  },
+
+  "blobs": {
+    "mappings": {
+      "path": "games/sonic4/data/mappings/sonic.bin",
+      "capture": "mappings-sonic.bin",
+      "base_blob": "0b8e3511ea7092c1b55b25c6da54c8c8bc01ad5c",
+      "shipped_blob": "0b8e3511ea7092c1b55b25c6da54c8c8bc01ad5c",
+      "changed": false,
+      "note": "UNCHANGED. The row was booked as a mapping defect; frame $09's four pieces are field-identical to skdisasm's own table entry 9."
+    },
+    "dplc": {
+      "path": "games/sonic4/data/dplc/sonic.bin",
+      "capture": "dplc-sonic.bin",
+      "base_blob": "a3a1eeaac2c3ffba06fbb69b113af7f6e8cf7a12",
+      "shipped_blob": "3c418ab0792b200c947455545aeadc004aa9aa1e",
+      "changed": true,
+      "bytes": 2272,
+      "note": "Frame $09's four entries re-pointed in place: (12,168)(8,180)(1,188)(4,189) -> (12,3425)(8,3437)(1,3445)(4,3446). Entry count, entry shape and file length are unchanged, so no other frame's offset moves."
+    },
+    "dplc_opt": {
+      "path": "games/sonic4/data/dplc/optimized/sonic.bin",
+      "capture": "dplc-optimized-sonic.bin",
+      "base_blob": "110f6582d22440d2878204ce4c4b9233e0376667",
+      "shipped_blob": "cbf04514a2a4d746d6d55629d34d3f0d70efb135",
+      "changed": true,
+      "bytes": 2244,
+      "note": "Frame $09's two entries re-pointed in place: (16,143)(9,159) -> (16,3158)(9,3174)."
+    },
+    "art": {
+      "path": "art/uncompressed/characters/sonic.bin",
+      "capture": "art-uncompressed-sonic.bin",
+      "base_blob": "b0cb087470ec7e50c805fc0488cabcb9bb1ea378",
+      "shipped_blob": "f7c7de1870fa1b067f8a8f7c1a99660cadbbfc46",
+      "changed": true,
+      "bytes": 110400,
+      "note": "25 tiles appended at indices 3425..3449 (+800 B). Tiles 0..3424 are untouched."
+    },
+    "art_opt": {
+      "path": "art/optimized/characters/sonic.bin",
+      "capture": "art-optimized-sonic.bin",
+      "base_blob": "645f2f06a182274c43be18f8695271a671b8904a",
+      "shipped_blob": "1e2c37a037a130d8a758962e118bdcaad869a293",
+      "changed": true,
+      "bytes": 101856,
+      "note": "The same 25 tiles appended at indices 3158..3182 (+800 B). Tiles 0..3157 are untouched, so frames $C8 and $C9 still load the donor art at 143..161 and render exactly as before."
+    }
+  },
+
+  "donor": {
+    "repo": "sonic_hack",
+    "note": "The pins below are what makes this record falsifiable. If a donor blob still hashes to its pin, the divergence stands and this file is a lookup. If one does not, the donor changed and this record is STALE and must be re-decided, not obeyed.",
+    "mappings": {
+      "path": "mappings/sprite/Sonic.bin",
+      "blob": "17f14e5ba67a727249db7d13dff2dba7266f03b2",
+      "bytes": 6400
+    },
+    "dplc": {
+      "path": "mappings/spriteDPLC/Sonic.bin",
+      "blob": "a3a1eeaac2c3ffba06fbb69b113af7f6e8cf7a12",
+      "bytes": 2272
+    },
+    "art": {
+      "path": "art/uncompressed/Sonic's art.bin",
+      "blob": "b0cb087470ec7e50c805fc0488cabcb9bb1ea378",
+      "bytes": 109600
+    }
+  },
+
+  "upstream": {
+    "repo": "skdisasm",
+    "note": "The reconstruction's source. Frame $09's mapping and DPLC are faithful copies of these, which is what proved the mapping innocent.",
+    "mappings": {
+      "path": "General/Sprites/Sonic/Map - Sonic.asm",
+      "blob": "e674bf69461582e734162a042c7f55dca88d874b",
+      "entry": 9
+    },
+    "dplc": {
+      "path": "General/Sprites/Sonic/DPLC - Sonic.asm",
+      "blob": "08c1b7309537c7e457c3fdbf07854274362de3f5",
+      "entry": 9,
+      "tile_shift": -7
+    },
+    "art": {
+      "path": "General/Sprites/Sonic/Art/Sonic.bin",
+      "blob": "3e4f75516dd9d5f49dfdcd743c5f24d31d1f38e3",
+      "tiles_rebuilt": [175, 193],
+      "tiles_copied_from_donor": [194, 199],
+      "reconstruction_caveat": "The palette permutation is derived from 2,688 aligned tile pairs and its weakest index agrees 97.0%; the residue is the donor author's own per-tile shading touch-ups, which cannot be reproduced for tiles that no longer exist. These 19 tiles are therefore skdisasm's shapes under this sheet's palette, not provably the pixels the donor author would have drawn. That is the one judgement in this repair and it is confined to those 19 tiles."
+    }
+  },
+
+  "converter_action": {
+    "on_regenerating_the_mappings": "Regenerate freely. The mapping frame is faithful to the donor and to skdisasm; this record asserts no divergence there and a re-conversion is correct.",
+    "on_regenerating_the_dplc_or_the_art": "STOP and re-apply this divergence. A plain re-conversion from the donor reinstates the bug and it will read as a fresh regression, because the donor's own bytes are what is wrong. Re-apply by appending the 25 tiles named above to the tail of the sheet and re-pointing frame $09's entries in place, then re-run the gate.",
+    "gate": "aurora: npm run harness:f7-frame-09  (and `-- --perturb 0x0A` to see it fail)",
+    "checker_fields": [
+      "blobs.<role>.base_blob   the pre-repair bytes, for `did someone re-convert?`",
+      "blobs.<role>.shipped_blob the bytes we ship, for `are these still ours?`",
+      "donor.<role>.blob        the donor bytes decided against, for `is this record stale?`",
+      "base.revision           the revision the base blobs are read at, never a path"
+    ]
+  },
+
+  "applicability": {
+    "generated": false,
+    "scope_condition": "This instrument is correct because NOTHING regenerates these blobs. A record filed beside the bytes is only safe when the bytes are the source. Tails and Knuckles are the opposite case: games/sonic4/data/characters_staging/gen_characters.py derives and overwrites their mappings on every run and reports the overwrite as a normal outcome, so a divergence recorded beside THEIR blobs would be destroyed silently by the same routine that destroys the fix. If those characters carry the same lineage defect, record it where the generator reads, or in the generator.",
+    "do_not_copy_verbatim": "This file is the pattern for a blob with no generator, not the pattern for a mapping divergence."
+  },
+
+  "unmeasured_here": [
+    "DMA straddle (F1 of aeon docs/2026-08-30-dplc-append-disturbance.md). Appending 800 B to Art_Sonic moves ROM addresses, and whether a DPLC entry's source straddles a $20000 boundary is a function of where the art landed. This lane is forbidden to build a ROM, so tools/dplc_straddle.py must be run on the engine side before this ships.",
+    "Peak DPLC entries per frame is unchanged by construction (frame $09 keeps 4 unoptimized and 2 optimized entries), and the 12-bit tile_start field is checked in the builder: 3182 of 4095 used."
+  ]
+}
