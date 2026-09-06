@@ -515,6 +515,11 @@ interface AeonProbeApi {
    * word actually stored, or null when the section/index is out of range —
    * never a silent no-op, because a fixture that did not land would make every
    * row that depends on it vacuous.
+   *
+   * BUMPS `editorStore.liveEditVersion`, the same clock the real collision road
+   * bumps, so the write is visible to the lenses without a second gesture. It
+   * does NOT mark the document dirty — see the implementation for why that half
+   * is deliberate.
    */
   collisionPoke(sectionIndex: number, plane: 'a' | 'b', index: number, word: number): number | null;
   /**
@@ -1194,6 +1199,28 @@ function installAeonProbe(): AeonProbeApi {
       const plane = planeId === 'b' ? section.collisionEditB : section.collisionEdit;
       if (!plane || index < 0 || index >= plane.length) return null;
       plane[index] = word & 0xFFFF;
+      // ⚠ THE POKE HAS TO RING THE SAME BELL A STROKE RINGS. The real collision
+      // road (`MapViewport.recordPaint`) writes the plane word and then calls
+      // `markDirty()` + `bumpLiveEdit()`; `liveEditVersion` is the app's
+      // "something changed" clock and the ONLY dependency the collision lenses
+      // have on a cell word — `CollisionPalette`'s audit memo subscribes to it,
+      // and MapViewport's redraw effect lists it. Without this line a poked
+      // defect sat in the document with every lens still showing the previous
+      // frame, so a harness row asserting a lens SAW the defect was red until
+      // some unrelated store tick happened to repaint. (LOOPS-AUDIT-COORDS
+      // §8 row 1; its `[n1]`/`[n4]` are the rows that were red for this alone.)
+      //
+      // `markDirty()` is DELIBERATELY NOT CALLED, and that is the one place
+      // this door does less than the real one. `dirty` is the SAVE flag, not a
+      // repaint signal: it drives the tab dot, Ctrl+S's early return and the
+      // close/project-switch guard. Every harness that pokes states in its own
+      // header that nothing it does can reach disk, and `audit-coords` refuses
+      // to run against the live aeon checkout precisely because "a poke plus a
+      // stray Ctrl+S is one keystroke from writing the live tree" — dirtying
+      // the document on a fixture write would remove the last thing standing
+      // between that keystroke and the write. A fixture is not an edit the
+      // author made; it has no undo entry either, for the same reason.
+      useEditorStore.getState().bumpLiveEdit();
       return plane[index] ?? null;
     },
     collisionBaseline: (sectionIndex, planeId) => {
