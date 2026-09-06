@@ -9,7 +9,7 @@
 // gap this file closes: the premise is now READ, at a committed revision, on
 // every run.
 //
-// FOUR SEPARATE QUESTIONS, and they stay separate:
+// FIVE SEPARATE QUESTIONS, and they stay separate:
 //
 //   1. Is the refutation still in aeon's published history?  (the direction rule
 //      must not come back without this row going red)
@@ -18,6 +18,10 @@
 //      out of aeon's table rather than out of a fixture here?
 //   4. Is the HEDGE still current — does aeon still say the span-versus-rate
 //      discriminator is open, and that severity tracks rate?
+//   5. Does the artifact Aurora CITES for that hedge still resolve, is it still
+//      published, and does it still hold the numbers and the caveat together?
+//      (`CURVE_RATE_WITNESS`, read at a pinned revision — see that row's own
+//      docblock for why it is not a second copy of (4).)
 //
 // (4) is the one that would go red on GOOD news: if aeon builds the fixture and
 // closes the confound, this row fails and tells the next reader to STRENGTHEN
@@ -35,7 +39,7 @@ import { resolve } from 'node:path';
 
 import { peerRepo, resolveRev, readAtRev, isAncestor } from '../support/peer-repo';
 import {
-  CURVE_RATE_ARMS, CURVE_RATE_ARM_SPAN_LINES, curveShearRate,
+  CURVE_RATE_ARMS, CURVE_RATE_ARM_SPAN_LINES, CURVE_RATE_WITNESS, curveShearRate,
 } from '../../src/core/formats/effects/curve-rate';
 
 const TIP = 'origin/master';
@@ -180,6 +184,62 @@ describe('aeon curve-rate premise: the record the advisory quotes', () => {
       `${NOT_OURS} aeon no longer states the monotone rate ladder, which is the whole reason `
       + 'this advisory compares a RATE.',
     ).toBe(true);
+  });
+
+  /**
+   * (5) THE CITATION'S LIFETIME. `CURVE_RATE_WITNESS` is a claim that a named
+   * revision of a named aeon file holds the measures and the caveat TOGETHER.
+   * A pointer with nothing checking it rots silently, which is the defect class
+   * the pin was added to close, so it does not get to be prose.
+   *
+   * ⚠ NOTHING HERE DUPLICATES (4), AND THE SPLIT IS DELIBERATE. (4) asks
+   * whether aeon STILL holds the hedge, so it reads `DEFERRED_WORK` at the TIP
+   * and is allowed to go red on good news. This row reads a DATED WITNESS at a
+   * PINNED revision, where the blob is immutable: it therefore cannot report on
+   * aeon's current position at all, and does not try to. What it can fail on is
+   * ours going wrong — a rev or path edited into something that does not
+   * resolve, or a pin moved to a revision where the caveat is not in the file
+   * with the numbers — plus aeon rewriting the commit out of published history,
+   * after which the object can be collected and no fresh clone can read it.
+   * `check-cited-paths` cannot cover this: peer paths are its exclusion 1, on
+   * the sound ground that an agent worktree usually has no peer checkout.
+   */
+  it.skipIf(AEON === null)('the cited witness resolves, is published, and holds numbers WITH caveat', () => {
+    const sha = resolveRev(AEON!, CURVE_RATE_WITNESS.rev);
+    expect(
+      sha,
+      `${NOT_OURS} the cited witness revision ${CURVE_RATE_WITNESS.rev} does not resolve in aeon, `
+      + 'so CURVE_RATE_WITNESS is a dead pointer.',
+    ).not.toBeNull();
+    const tip = resolveRev(AEON!, TIP);
+    expect(tip, `aeon has no ${TIP}`).not.toBeNull();
+    expect(
+      isAncestor(AEON!, sha!, tip!),
+      `${NOT_OURS} the cited witness revision ${CURVE_RATE_WITNESS.rev} is no longer an ancestor `
+      + `of aeon ${TIP}. A commit outside published history can be collected, after which nobody `
+      + 'cloning aeon can read the artifact Aurora points at.',
+    ).toBe(true);
+
+    const doc = readAtRev(AEON!, CURVE_RATE_WITNESS.rev, CURVE_RATE_WITNESS.path);
+    expect(doc.ok, doc.ok ? '' : `${NOT_OURS} ${doc.why}`).toBe(true);
+    if (!doc.ok) return;
+
+    // THE CO-LOCATION ITSELF, which is the entire property the pin claims.
+    // Pinned on the caveat's own sentence: it is unique to that file and shares
+    // no prefix with the DEFERRED_WORK wording matched above, so a new line
+    // beginning with a familiar label cannot satisfy it.
+    expect(
+      /DOES NOT SEPARATE SPAN FROM RATE/.test(doc.text),
+      `${NOT_OURS} ${CURVE_RATE_WITNESS.path} at ${CURVE_RATE_WITNESS.rev} does not carry the `
+      + 'caveat, so the pin points at figures with no hedge beside them. That is the exact '
+      + 'shape it exists to prevent: re-point it, or move the pin back.',
+    ).toBe(true);
+    const measures = doc.text.split('\n').filter((l) => l.startsWith('|') && /\bpx\b/.test(l));
+    expect(
+      measures.length,
+      `${NOT_OURS} ${CURVE_RATE_WITNESS.path} at ${CURVE_RATE_WITNESS.rev} states no pixel `
+      + 'measures, so it is not the numbers-and-caveat artifact this pin claims it is.',
+    ).toBeGreaterThan(0);
   });
 });
 
