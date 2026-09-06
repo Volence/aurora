@@ -185,9 +185,38 @@
 //     writes `…/scratchpad/shots-final/NOTES.md` where the ellipsis is decorative
 //     and the path IS repo-relative. That line already carries its own marking,
 //     EVIDENCE NOT RETAINED AND NO INSTRUMENT REBUILDS IT, so the record is
-//     correct on a line this gate never judged. Whether the narrow sub-case of an
-//     ellipsis path whose remainder is TRACKED should be judged is a separate
-//     question and deliberately not settled here.
+//     correct on a line this gate never judged.
+//     ─ THE NARROW SUB-CASE, RAISED WITH THIS DECLINE AND NOW SETTLED AGAINST
+//     IT: judge only an ellipsis path whose remainder resolves to a TRACKED
+//     file. Declined, because IT CANNOT PRODUCE A FINDING. Tracked is this
+//     gate's single rule AND its passing condition, so a rule gated on tracked
+//     judges exactly the set that passes and yields zero by construction.
+//     Measured 2026-09-06 in this tree: 12 of the 17 occurrences resolve to a
+//     tracked path, all 12 would pass, and all 12 are fenced besides, so under
+//     N1 the sub-case would not judge 12 paths and find nothing, it would judge
+//     none at all.
+//     ⚠ THE ARGUMENT THAT CAME WITH THAT DECLINE IS ONE CASE TOO STRONG, and
+//     the correction is the part worth keeping. It continues: the rule only
+//     bites the inverse case, an ellipsis path whose remainder is ABSENT, and
+//     that is precisely the four false positives. IT IS NOT PRECISELY THOSE
+//     FOUR. Five remainders here are absent, not four: the four that elide an
+//     absolute prefix, plus the genuine case named above, which is
+//     repo-relative and on which an inverse rule would raise a TRUE finding.
+//     So the inverse rule is 4 false to 1 true, and 3 to 1 in prose, because
+//     one of the four (`docs/reviews/2026-08-27-guard-transcription.md:58`) is
+//     fenced and N1 takes it first.
+//     AND THE RATCHET INVERTS EVEN THAT, which is the reason the sub-case is
+//     declined rather than refuted. `git blame` dates all four absolute-prefix
+//     lines to 2026-08-27, before IN_FORCE, so they are grandfathered and print
+//     nothing; the genuine line is dated 2026-09-06T02:05:52Z, after it, so it
+//     is BOUND. An inverse rule shipped today would print exactly one finding
+//     and it would be the true one, costing one EXEMPT row rather than a wave
+//     of noise. THAT IS AN ARGUMENT FOR THE INVERSE RULE AND IT IS NOT THIS
+//     ONE. It is a different rule from the tracked-gated sub-case; its
+//     precision today rests entirely on a cutoff that every absolute-prefix
+//     citation written from now on walks straight past; and widening a declared
+//     decline into a rule needs its own row and its own canary, not a footnote
+//     under the decline it replaces.
 //  N6 A BARE BACKTICKED FILENAME, `sibling-root.mjs`, with no directory in it.
 //     A filename in prose names no location. `App.tsx` is not a path; this repo
 //     has several files by names like it, and a reader who follows the citation
