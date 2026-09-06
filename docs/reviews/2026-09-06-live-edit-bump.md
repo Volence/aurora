@@ -170,7 +170,7 @@ rows stitched out of two runs.
 
 | harness | after (run 1 / 2 / 3) | vs before |
 |---|---|---|
-| `audit-coords` | **9/9 · 9/9 · 9/9** (and 9/9 on a 4th, after the dpr note) | same |
+| `audit-coords` | **9/9 · 9/9 · 9/9**, and **9/9 · 9/9 · 9/9** again on the final committed tree once the dpr note was added | same |
 | `collision-preservation` | **11/12 · 11/12 · 11/12** | same |
 | `collision-read` | **32/32 · 32/32 · 32/32** | same |
 | `collision-destructive` | **28/30 · 28/30 · 28/30** | same |
@@ -187,6 +187,20 @@ details.
 `audit-coords` is 9/9 both before and after, but it is **not** the same 9/9: the
 before run had `forceRepaint` compensating for the missing bump, and the after
 run has neither. That is the point of §6.
+
+**⚠ AND TWO OF THOSE RUNS WERE REFUSED BEFORE THEY WERE GREEN, WHICH IS WORTH
+SAYING RATHER THAN QUIETLY RETRYING.** Runs 5 and 6 exited **2** with
+`port 9437 already serving a CDP target - kill it first`. **The port was not
+mine.** The listener was `loops-hover-half-harness-2162113`, the concurrent
+loops lane's own run, live at that moment. Every harness in this repo defaults
+to `PORT ?? 9437`, so two agents running harnesses at the same time contend for
+one number — and the failure is the good one: both harnesses probe the port and
+**refuse** rather than attach, so neither can silently drive the other's app and
+read its screen back as a measurement. The fix on this side was `PORT=9537`, not
+a kill: **no process this parcel did not start was signalled**, and the peer's
+run was left alone. Every run reported in this packet ends with
+`cleanup: SIGKILLed 0; survivors after kill: none`, and nothing of this parcel's
+was holding a port or a display at exit.
 
 ## 6. The plant
 
@@ -264,3 +278,4 @@ next to the rows that quote pixels.
 | 1 | **Seven rows across three harnesses assert a vacuity premise that is no longer true**: `collision-preservation [f0]`, `collision-destructive [f0]`+`[r3]`, `loop-paint [fx0]`/`[o0]`/`[o2]`/`[r2]`. The act carries 16 words with bits 15:14 set, and it did at `290f4aa8` too. | Measured in §4, red before this parcel and red after it. Each red is a row saying "so the rows below must author their own destination" — which they still do, so the harnesses are conservative rather than wrong; but a permanently-red row stops being read. `loop-paint`'s four belong to the concurrent loops lane. |
 | 2 | Nothing in `npm test` covers `collisionPoke`'s bump. | §7 item 2. Closing it means either a vitest row that can mount the renderer store graph, or accepting that `harness:audit-coords` is the gate and saying so in a runbook. |
 | 3 | Whether a fixture write should ever be savable (`markDirty`). | §2. Not needed by any consumer today; the shape if it is ever wanted is a second hook, not a widened one. |
+| 4 | **Every CDP harness in this repo defaults to the same `PORT ?? 9437`**, so two agents running harnesses concurrently block each other. | §5. The refusal is correct and is what stops one agent measuring another's app, but it means "run a final number more than twice" can fail for a reason that has nothing to do with the code under test. A per-run default derived from the pid (the way the private profile directory already is) would remove the contention without weakening the probe. |
