@@ -841,6 +841,15 @@ export function curveAdvisory(layer: Pick<EffectsLayer, 'fb' | 'curve'>): string
  * unestablished" understates the first half; "aeon measured that rate is the
  * cause" overstates the second. The sentence says both.
  *
+ * ⚠ AND THE HEDGE IS NOW CHECKABLE AT SOURCE RATHER THAN ONLY HERE. aeon
+ * committed the measures and the caveat in ONE file on 2026-09-06, so a summary
+ * cannot carry the numbers without the qualification; `CURVE_RATE_WITNESS` in
+ * `core/formats/effects/curve-rate.ts` pins it, at a revision. The revision
+ * stays out of the rendered string on this file's own Plane-A ruling above — a
+ * string in the app cannot carry the revision it was taken at and would rot
+ * silently — so what an author reads is the hedge's substance and what a
+ * maintainer follows is the pin.
+ *
  * ⚠ ADVICE, NEVER PREVENTION, and now for a stronger reason than before: aeon
  * states there is NO ENGINE DEFECT and the walker's ramp is arithmetically
  * exact in both directions (0 of 224 lines differing, max delta 0, on all five

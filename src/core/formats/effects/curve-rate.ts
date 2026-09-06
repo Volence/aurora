@@ -52,6 +52,32 @@
 // position, and `test/formats/aeon-curve-rate-drift.test.ts` reddens if aeon's
 // artifact stops saying it.
 //
+// ═══ AND THE HEDGE NOW HAS AN ARTIFACT, NOT ONLY A SENTENCE ═══
+//
+// Everything above is Aurora's PARAPHRASE of aeon's documents, and a paraphrase
+// is where a hedge dies. This lane watched its own position — "evidence that
+// rate is the better account, not a separation of the two" — become "the
+// confound is resolved" one relay out, and it nearly reached author-facing text
+// as "aeon measured that rate is the cause". Nobody misquoted anything. A hedge
+// is simply the first thing a summary drops, because it reads as
+// throat-clearing where a number reads as payload.
+//
+// aeon's fix is better than any rule about relaying: on 2026-09-06 they
+// committed the measures and the caveat IN THE SAME FILE, so a summary cannot
+// carry one without the other. `CURVE_RATE_WITNESS` below is that file. It is
+// where a reader checks HOW STRONGLY this module holds its cause, exactly as
+// `CURVE_RATE_ARMS` is where they check the figures — the confidence level
+// stops resting on the prose you are currently reading.
+//
+// ⚠ THE CITATION DOES NOT GO IN THE ADVISORY'S SENTENCE, and that is this
+// repo's own prior ruling rather than a taste call. From the Plane-A header in
+// `src/renderer/providers/effects-aeon.ts`, on a census deliberately kept out
+// of a shipped string: it "lives in the packet, where it can carry the revision
+// it was taken at. A string in the app cannot, and would rot silently." A
+// revision is noise to an author and gold to a maintainer, and the maintainer
+// reads THIS file. The author gets the hedge's substance, which the advisory
+// string already carries in full.
+
 // ═══ NOTHING HERE IS A PREVENTION ═══
 //
 // aeon states outright that there is no engine defect (`92663a53`: "Zero engine
@@ -64,6 +90,36 @@
 import { decodeFactorScroll, factorRatio } from './factor-decode';
 import type { EffectsFactor } from './scene';
 import { SCREEN_HEIGHT } from '../../model/screen';
+
+/**
+ * WHERE AEON PUTS THE NUMBERS AND THE CAVEAT TOGETHER — named once, so this
+ * module's header and the drift gate cannot end up citing two different things.
+ *
+ * aeon `f62a3d5c`, subject "witness(depth): commit the A/B figures that
+ * travelled in mail with no revision behind them"; an ancestor of aeon
+ * `origin/master` when this was written, and checked to still be one on every
+ * run. The file records a ONE-VALUE A/B — a single layer's `curve.to` changed,
+ * same camera, both ROMs built canonically, each build's crc32 printed — whose
+ * rate columns separate the two builds decisively while the travel column does
+ * not; and directly under that table, in the same file, the sentence that it
+ * does NOT separate span from rate and that the discriminating fixture is
+ * still unbuilt.
+ *
+ * ⚠ IT IS A DATED RECORD, NOT AEON'S LIVE POSITION, and conflating the two
+ * would break the one row here that is allowed to go red on GOOD news. A
+ * witness file states what was true the day it was written and is not rewritten
+ * when the position moves; `docs/DEFERRED_WORK.md` is the index that moves. So
+ * the CURRENCY of the hedge is checked against DEFERRED_WORK at aeon's tip
+ * (`test/formats/aeon-curve-rate-drift.test.ts`), and this pin is checked only
+ * for what a pin can promise: that it still resolves, is still published, and
+ * still names an artifact holding the measures and the caveat together.
+ */
+export const CURVE_RATE_WITNESS = Object.freeze({
+  /** The revision the file is READ AT. A citation names a revision, never a tree. */
+  rev: 'f62a3d5c',
+  /** Repo-relative inside aeon; resolved through the peer resolver, never a typed root. */
+  path: 'docs/witness/depth-curve-rate-2026-09-06.md',
+});
 
 /**
  * One arm of aeon's sec7 bisect: an authored curve, and what the machine did.
