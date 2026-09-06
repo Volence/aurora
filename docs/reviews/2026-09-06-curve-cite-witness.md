@@ -94,6 +94,15 @@ question. Our own module header already carries the equation.
 
 ### The one asymmetry, stated rather than smoothed over
 
+> ⚠ **THIS SECTION'S CONCLUSION WAS ACTED ON LATER THE SAME DAY AND IS NO LONGER THE PRESENT
+> STATE.** Its last line, "I record the option rather than taking it", was true when written and
+> is now a historical record. `parcel/curve-string-vs-source` took the option: the shipped clause
+> is **"no longer accounts for the visible break but is still not separated from the rate"** —
+> not the wording illustrated below, and that packet says why. Everything else in this section
+> still stands as the analysis that found the gap. See
+> `docs/reviews/2026-09-06-curve-string-vs-source.md`. The section is banner'd rather than
+> rewritten: it is a dated record.
+
 The witness says travel is **SUPERSEDED** as the account. Our shipped sentence says only
 that rate is "the better-supported account" and that travel "has not been separated from
 it" — which ranks them, but a fast reader could take it as granting travel equal standing.

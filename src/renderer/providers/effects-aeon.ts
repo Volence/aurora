@@ -932,14 +932,36 @@ export function curveRateAdvisoryParts(
 
   const ends = `${factorLabel(layer.fb)} at its top to ${factorLabel(to)} at its bottom`;
   const bar = CURVE_RATE_GARBLED_MIN.toFixed(2);
+  // ⚠ THE TRAVEL CLAUSE SAYS "SUPERSEDED", AND IT USED NOT TO. Until
+  // 2026-09-06 this string said only that travel "has not been separated" from
+  // the rate, which ranks the two but reads to a fast author as equal standing.
+  // Aurora's OWN source already said more — `curve-rate.ts`'s header: "the
+  // excursion threshold no longer accounts for the visible break even though it
+  // remains true as geometry" — so the gap being closed here was between our
+  // two texts, not between Aurora and aeon. aeon's witness at
+  // `CURVE_RATE_WITNESS` states both halves in one file: "The travel-vs-192
+  // model is SUPERSEDED as the account of the visible break", AND "IT DOES NOT
+  // SEPARATE SPAN FROM RATE AND MUST NOT BE READ AS DOING SO." Both halves are
+  // therefore in the sentence, joined by "but" so the concession is visible: it
+  // lost as the explanation, and the confound is still open.
+  //
+  // WHY NOT AEON'S WORD "SUPERSEDED" IN THE STRING. This is author-facing; the
+  // maintainer-facing texts (that header, and this comment) carry aeon's own
+  // spelling. "No longer accounts for the visible break" is the header's own
+  // phrasing verbatim, so the two Aurora texts now read the same, and it costs
+  // a reader no vocabulary. Length is a cost here too — the O15 ruling puts
+  // `mechanism` behind a disclosure precisely because of it — so "remains true
+  // as geometry" stays in the header and out of the string: an author has no
+  // remedy that turns on it, and "still not separated from the rate" already
+  // stops the sentence reading as "travel is irrelevant".
   const mechanism =
     'aeon drove this on a live machine (2026-09-06) and refuted the DIRECTION Aurora used to '
     + 'warn about: an ascending curve of the same spread garbles, and a small descending one '
     + 'does not. What severity tracks, against a curve-free control at fixed art, is the '
     + 'per-line rate. That is the better-supported account and it is NOT settled: aeon\'s other '
-    + 'reading, the band\'s total travel against Plane B\'s wrap margin, has not been separated '
-    + 'from it, and the fixture that would separate them is unbuilt. There is no engine defect '
-    + 'and no build refuses this.';
+    + 'reading, the band\'s total travel against Plane B\'s wrap margin, no longer accounts for '
+    + 'the visible break but is still not separated from the rate, and the fixture that would '
+    + 'separate them is unbuilt. There is no engine defect and no build refuses this.';
 
   if (band.spanLines === null) {
     return {

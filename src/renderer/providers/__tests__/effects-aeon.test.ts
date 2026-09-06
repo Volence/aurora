@@ -1100,10 +1100,24 @@ describe('curve / vsplit controls (parcel H)', () => {
     expect(said).not.toMatch(/DOWNWARD/);
     expect(said).not.toMatch(/mechanism is UNESTABLISHED/i);
     expect(said).not.toMatch(/descending parallax curve garbles/i);
-    // ...and it does carry the hedge in the shape the ruling asked for: rate is
-    // better supported, and the two accounts are NOT separated.
+    // ...and it does carry the hedge in the shape the ruling asked for, now in
+    // THREE parts rather than two, because aeon's witness states three things
+    // and the string used to carry only the first and the third:
+    //   1. rate is the better-supported account;
+    //   2. travel is SUPERSEDED as the account of the visible break — the half
+    //      Aurora's own `curve-rate.ts` header carried while this string did
+    //      not, which is the gap the 2026-09-06 clause change closed;
+    //   3. the two are still NOT separated, so the confound is open.
+    // Pinned as three phrases and not one long one so a later edit that drops
+    // exactly one of them cannot pass; each phrase occurs nowhere else in the
+    // joined sentence, so none of them can be satisfied by the diagnosis or the
+    // remedies half.
     expect(said).toMatch(/better-supported account/);
-    expect(said).toMatch(/has not been separated/);
+    expect(said).toMatch(/no longer accounts for the visible break/);
+    expect(said).toMatch(/still not separated from the rate/);
+    // The retracted shape of (3): it must NOT read as travel merely awaiting a
+    // verdict, which is what the pre-2026-09-06 clause said.
+    expect(said).not.toMatch(/has not been separated/);
     expect(said).toMatch(/no engine defect/);
   });
 
