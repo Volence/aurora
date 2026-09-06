@@ -228,7 +228,7 @@ function runSuite(label, s1dir, outDir) {
   }
   const wall = ((Date.now() - started) / 1000).toFixed(1);
   if (!existsSync(outFile)) {
-    throw new Error(`run ${label} produced no report at ${outFile} — it did not get far enough to write one`);
+    throw new Error(`run ${label} produced no report at ${outFile}, so it did not get far enough to write one`);
   }
   const report = JSON.parse(readFileSync(outFile, 'utf8'));
   const rows = new Map();
@@ -237,7 +237,7 @@ function runSuite(label, s1dir, outDir) {
     if ((file.assertionResults ?? []).length === 0) {
       // A file that threw during collection reports no rows at all. That is a
       // real, and severe, colour change; it must not read as "unchanged".
-      rows.set(`${rel} :: <WHOLE FILE — no rows collected>`, file.status ?? 'failed');
+      rows.set(`${rel} :: <WHOLE FILE, no rows collected>`, file.status ?? 'failed');
       continue;
     }
     for (const a of file.assertionResults) {
@@ -305,7 +305,7 @@ function main() {
     canaryProof.push(
       `${rel}: live ${live.length}B sha1 ${createHash('sha1').update(live).digest('hex').slice(0, 12)}`
       + ` -> committed ${committed.length}B sha1 ${createHash('sha1').update(committed).digest('hex').slice(0, 12)}`
-      + `  ${live.equals(committed) ? '*** IDENTICAL — THIS RUN PERTURBS NOTHING ***' : 'DIFFER'}`,
+      + `  ${live.equals(committed) ? '*** IDENTICAL: THIS RUN PERTURBS NOTHING ***' : 'DIFFER'}`,
     );
   }
   // `canary-plus`: the same two paths, given each other's content. The positive
@@ -367,7 +367,7 @@ function main() {
   const p = (s = '') => L.push(s);
 
   p('='.repeat(100));
-  p('ROW 78 — DO AURORA\'S TESTS READ s1disasm\'s LIVE WORKING TREE?');
+  p('ROW 78: DO AURORA\'S TESTS READ s1disasm\'s LIVE WORKING TREE?');
   p('='.repeat(100));
   p(`peer checkout       ${peer}`);
   p(`peer HEAD           ${peerHead}`);
@@ -375,8 +375,8 @@ function main() {
   p(`modified & reverted for the canary run: ${modified.length ? modified.join(', ') : '(none)'}`);
   p(`population          ${population().length} file(s) under src/+test/ name the peer; ${tests.length} of them are test files`);
   p();
-  p(`CONTROL (base run twice): ${controlOk ? 'IDENTICAL — deltas below are real'
-    : `*** ${drift.size} FILE(S) DRIFTED BETWEEN TWO IDENTICAL RUNS — EVERY DELTA BELOW IS UNSAFE ***`}`);
+  p(`CONTROL (base run twice): ${controlOk ? 'IDENTICAL: deltas below are real'
+    : `*** ${drift.size} FILE(S) DRIFTED BETWEEN TWO IDENTICAL RUNS: EVERY DELTA BELOW IS UNSAFE ***`}`);
   if (!controlOk) for (const [f, rows] of drift) p(`   ${f}: ${rows.length} row(s)`);
   p();
   p('CLASSES  A = moves under a REALISTIC same-format content swap (reads peer bytes AND asserts on them)');
@@ -393,7 +393,7 @@ function main() {
   for (const cls of ['A', 'C', 'B', 'D']) {
     const list = tests.filter((f) => classOf(f) === cls);
     p('-'.repeat(100));
-    p(`CLASS ${cls} — ${list.length} file(s)`);
+    p(`CLASS ${cls}: ${list.length} file(s)`);
     p('-'.repeat(100));
     for (const f of list) {
       const s = movedSwap.get(f)?.length ?? 0;
@@ -413,33 +413,33 @@ function main() {
   }
 
   p('='.repeat(100));
-  p('THE LIVE CANARY — rows decidable RIGHT NOW by the peer lane\'s uncommitted work');
+  p('THE LIVE CANARY: rows decidable RIGHT NOW by the peer lane\'s uncommitted work');
   p('='.repeat(100));
-  p('THE PERTURBATION WAS REAL — the bytes, before believing any zero:');
+  p('THE PERTURBATION WAS REAL. The bytes, before believing any zero:');
   for (const line of canaryProof) p(`  ${line}`);
   p();
   p(`Reverting ONLY ${modified.join(' and ')} to their committed content moved:`);
   if (movedCanary.size === 0) {
-    p('  NOTHING — no row changed colour.');
+    p('  NOTHING: no row changed colour.');
   } else {
     for (const [f, rows] of movedCanary) {
-      p(`  ${f} — ${rows.length} row(s)`);
+      p(`  ${f}: ${rows.length} row(s)`);
       for (const [row, from, to] of rows) p(`      ${from} -> ${to}   ${row.split(' :: ')[1]}`);
     }
   }
   p();
-  p('POSITIVE CONTROL ON THAT CHANNEL — the same two paths given EACH OTHER\'s content');
+  p('POSITIVE CONTROL ON THAT CHANNEL: the same two paths given EACH OTHER\'s content');
   p('(a same-format, size-changing edit of exactly the shape the peer actually made):');
   if (movedCanaryPlus.size === 0) {
-    p('  NOTHING moved here either. So the zero above is a property of THESE TWO FILES — no row in');
-    p('  this suite asserts on their content at all — rather than a differential that never ran.');
+    p('  NOTHING moved here either. So the zero above is a property of THESE TWO FILES, that no row in');
+    p('  this suite asserts on their content at all, rather than a differential that never ran.');
   } else {
     for (const [f, rows] of movedCanaryPlus) {
-      p(`  ${f} — ${rows.length} row(s)`);
+      p(`  ${f}: ${rows.length} row(s)`);
       for (const [row, from, to] of rows) p(`      ${from} -> ${to}   ${row.split(' :: ')[1]}`);
     }
     p('  So the canary channel DOES carry signal, and the zero above says only that the peer\'s');
-    p('  PARTICULAR current edits happen not to move a row — not that these files are safe.');
+    p('  PARTICULAR current edits happen not to move a row, not that these files are safe.');
   }
   p();
   p(`INSTRUMENT BLIND SPOT: ${unswappable.length} file(s) are the only file with their extension, so`);
@@ -461,7 +461,7 @@ function main() {
     .split('\n').filter((l) => l.length > 0);
   const headAfter = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: peer, encoding: 'utf8' }).trim();
   if (after.join('\n') !== peerDirty.join('\n') || headAfter !== peerHead) {
-    process.stderr.write('*** THE PEER CHECKOUT CHANGED DURING THIS RUN — the deltas above are not trustworthy ***\n');
+    process.stderr.write('*** THE PEER CHECKOUT CHANGED DURING THIS RUN: the deltas above are not trustworthy ***\n');
     process.exitCode = 1;
     return;
   }

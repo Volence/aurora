@@ -89,7 +89,12 @@ const ROOT = path.resolve(HERE, '..');
 const require = createRequire(path.join(ROOT, 'package.json'));
 const ts = require('typescript');
 
-const DASH = /[—–]|\\u201[34]/g;
+// Built from character codes, never typed, and the same object with the same
+// `/g` semantics the literal had. This file is inside `scripts/`, which
+// `scripts/check-scripts-dashes.mjs` holds to the same rule this one enforces;
+// a regex literal is neither a comment nor a string, so a dash spelled here was
+// invisible to every dash gate until 2026-09-05 and is now a finding.
+const DASH = new RegExp(`[${String.fromCharCode(0x2014)}${String.fromCharCode(0x2013)}]|\\\\u201[34]`, 'g');
 
 /**
  * The verbatim quotations of another tool's output that this repo is allowed to

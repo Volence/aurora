@@ -1,7 +1,7 @@
 {
   "name": "aurora",
   "version": "0.1.0",
-  "description": "Aurora \u2014 visual authoring (level art, sprites, animation, menus) for the Empyrean Sega Genesis suite",
+  "description": "Aurora: visual authoring (level art, sprites, animation, menus) for the Empyrean Sega Genesis suite",
   "main": "dist/main/index.mjs",
   "scripts": {
     "//test": [
@@ -43,6 +43,7 @@
     "check:peer-path-literals": "node scripts/check-peer-path-literals.mjs",
     "check:pseudo-skip": "node scripts/check-pseudo-skip.mjs",
     "check:python-resolver": "node scripts/check-python-resolver.mjs",
+    "check:scripts-dashes": "node scripts/check-scripts-dashes.mjs",
     "check:src-dashes": "node scripts/check-src-dashes.mjs",
     "check:test-dashes": "node scripts/check-test-dashes.mjs",
     "check:guide-text": "node scripts/check-guide-text.mjs",
@@ -227,7 +228,7 @@
     "poisons:rasterref": "node scratchpad/rasterref-partial-extension-poisons.mjs",
     "poisons:timeline-edit": "node scratchpad/timeline-edit-poisons.mjs",
     "preview": "electron-vite preview",
-    "test": "node scripts/check-test-collection.mjs && node scripts/check-pseudo-skip.mjs && node scripts/check-peer-path-literals.mjs && node scripts/check-cited-paths.mjs && node scripts/check-doc-citations.mjs && node scripts/check-object-stringify.mjs && node scripts/check-tsx-dashes.mjs && node scripts/check-src-dashes.mjs && node scripts/check-test-dashes.mjs && node scripts/check-guide-text.mjs && node scripts/check-ledger-timestamps.mjs && node scripts/check-python-resolver.mjs && node scratchpad/check-harness-guards.mjs && npm run typecheck && vitest run",
+    "test": "node scripts/check-test-collection.mjs && node scripts/check-pseudo-skip.mjs && node scripts/check-peer-path-literals.mjs && node scripts/check-cited-paths.mjs && node scripts/check-doc-citations.mjs && node scripts/check-object-stringify.mjs && node scripts/check-tsx-dashes.mjs && node scripts/check-src-dashes.mjs && node scripts/check-test-dashes.mjs && node scripts/check-guide-text.mjs && node scripts/check-scripts-dashes.mjs && node scripts/check-ledger-timestamps.mjs && node scripts/check-python-resolver.mjs && node scratchpad/check-harness-guards.mjs && npm run typecheck && vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lane-log": "node scripts/append-lane-log.mjs",

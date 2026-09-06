@@ -184,7 +184,7 @@ const AUDIT = 'scratchpad/ledger-timestamp-audit.py';
 const LEDGERS = ['docs/lane-log.jsonl', 'docs/decisions.jsonl'];
 
 function die(msg) {
-  console.error(`${PREFIX}: COULD NOT MEASURE — ${msg}`);
+  console.error(`${PREFIX}: COULD NOT MEASURE: ${msg}`);
   process.exit(2);
 }
 
@@ -317,7 +317,7 @@ const TWIN = line(SHARED_AT, 'twin');
 
 const CASES = [
   {
-    name: 'K1 old bad entry, committed before the cutoff — GRANDFATHERED, not a failure',
+    name: 'K1 old bad entry, committed before the cutoff: GRANDFATHERED, not a failure',
     commits: [OLD_BAD],
     args: gateArgs(CANARY_SINCE),
     status: 0,
@@ -326,7 +326,7 @@ const CASES = [
     fires: [],
   },
   {
-    name: 'K2 an honest entry after the cutoff — judged, and passes',
+    name: 'K2 an honest entry after the cutoff: judged, and passes',
     commits: [OLD_BAD, NEW_GOOD],
     args: gateArgs(CANARY_SINCE),
     status: 0,
@@ -335,7 +335,7 @@ const CASES = [
     fires: [],
   },
   {
-    name: 'K3a an entry 5s AHEAD of its commit, in scope, WITHOUT --strict-ahead — exit 0',
+    name: 'K3a an entry 5s AHEAD of its commit, in scope, WITHOUT --strict-ahead: exit 0',
     commits: [OLD_BAD, NEW_AHEAD],
     args: gateArgs(CANARY_SINCE, ['--strict-ahead']),
     status: 0,
@@ -344,7 +344,7 @@ const CASES = [
     fires: [],
   },
   {
-    name: 'K3b the same entry WITH --strict-ahead — exit 1',
+    name: 'K3b the same entry WITH --strict-ahead: exit 1',
     commits: [OLD_BAD, NEW_AHEAD],
     args: gateArgs(CANARY_SINCE),
     status: 1,
@@ -353,7 +353,7 @@ const CASES = [
     fires: ['strict-ahead'],
   },
   {
-    name: 'K4 a bad entry committed after the cutoff — exit 1, naming it',
+    name: 'K4 a bad entry committed after the cutoff: exit 1, naming it',
     commits: [OLD_BAD, NEW_BAD],
     args: gateArgs(CANARY_SINCE),
     status: 1,
@@ -362,7 +362,7 @@ const CASES = [
     fires: ['over-threshold'],
   },
   {
-    name: 'K4b an entry BACKFILLED after the cutoff with an old `at` — exit 1, IN SCOPE',
+    name: 'K4b an entry BACKFILLED after the cutoff with an old `at`: exit 1, IN SCOPE',
     commits: [OLD_BAD, BACKFILLED],
     args: gateArgs(CANARY_SINCE),
     status: 1,
@@ -373,7 +373,7 @@ const CASES = [
     fires: ['backfill-in-scope', 'over-threshold'],
   },
   {
-    name: 'K5 an unparseable line committed after the cutoff — exit 1, not a silent skip',
+    name: 'K5 an unparseable line committed after the cutoff: exit 1, not a silent skip',
     commits: [OLD_BAD, { at: T(3, 9, 0), lines: ['this line is not json'] }],
     args: gateArgs(CANARY_SINCE),
     status: 1,
@@ -382,7 +382,7 @@ const CASES = [
     fires: ['unparseable'],
   },
   {
-    name: 'K6 two NEW entries sharing one stamp — exit 1, the second went unjudged',
+    name: 'K6 two NEW entries sharing one stamp: exit 1, the second went unjudged',
     commits: [OLD_BAD, NEW_GOOD, { at: T(4, 9, 0), lines: [line(T(3, 9, 0), 'collides')] }],
     args: gateArgs(CANARY_SINCE),
     status: 1,
@@ -394,7 +394,7 @@ const CASES = [
     // THE REMEDY, and the gate has none without it. Commit 2 rewrites the same entry
     // with a stamp read at its own commit; commit 1's bad stamp is still in the diff
     // forever, so without --only-present this repo is red with no move left to make.
-    name: 'K6b a bad entry CORRECTED by a later commit — exit 0, and the correction counted',
+    name: 'K6b a bad entry CORRECTED by a later commit: exit 0, and the correction counted',
     commits: [
       OLD_BAD,
       { at: T(5, 9, 0), lines: [line(T(5, 8, 40), 'to-be-corrected')] },
@@ -409,7 +409,7 @@ const CASES = [
   {
     // …and the correction must not become a way to launder a bad stamp: the REPLACEMENT
     // is judged at ITS commit, so a correction that is itself remembered still fails.
-    name: 'K6c a correction that is itself remembered — exit 1, judged at its own commit',
+    name: 'K6c a correction that is itself remembered: exit 1, judged at its own commit',
     commits: [
       OLD_BAD,
       { at: T(5, 9, 0), lines: [line(T(5, 8, 40), 'to-be-corrected')] },
@@ -425,7 +425,7 @@ const CASES = [
     // THE REMEDY, REACHED, for the one failure it could not reach. Correcting the LATER
     // appearance — the entry that actually went unjudged — clears the run, because the
     // collision is now asked about its OWN LINE and that line is gone from HEAD.
-    name: 'K6d two NEW entries share a stamp, THE SECOND corrected — exit 0, and counted',
+    name: 'K6d two NEW entries share a stamp, THE SECOND corrected: exit 0, and counted',
     commits: [...COLLIDE,
       { at: T(5, 9, 0), body: [OLD_BAD_LINE, PAIR_A, line(T(5, 9, 0), 'second-of-pair')] }],
     args: gateArgs(CANARY_SINCE),
@@ -442,7 +442,7 @@ const CASES = [
     // the later appearance is the one that went unjudged, so correcting the FIRST leaves
     // an entry in the file carrying a stamp nothing ever checked. A fix that made this
     // case pass too would have reopened K6's hole while looking like a remedy.
-    name: 'K6e the same collision, THE FIRST corrected instead — still exit 1',
+    name: 'K6e the same collision, THE FIRST corrected instead: still exit 1',
     commits: [...COLLIDE,
       { at: T(5, 9, 0), body: [OLD_BAD_LINE, line(T(5, 9, 0), 'first-of-pair'), PAIR_B] }],
     args: gateArgs(CANARY_SINCE),
@@ -456,7 +456,7 @@ const CASES = [
     // The replacement line is a first appearance judged at ITS OWN commit, so a correction
     // that is itself remembered still fails — as an over-threshold entry, which is the
     // honest reason, rather than going on failing as a collision it no longer is.
-    name: 'K6f the collision remedy is itself remembered — exit 1, judged at its own commit',
+    name: 'K6f the collision remedy is itself remembered: exit 1, judged at its own commit',
     commits: [...COLLIDE,
       { at: T(5, 9, 0), body: [OLD_BAD_LINE, PAIR_A, line(T(5, 8, 40), 'second-of-pair')] }],
     args: gateArgs(CANARY_SINCE),
@@ -471,7 +471,7 @@ const CASES = [
     // duplicate in scope whose FIRST appearance is grandfathered, so `dup_fail`'s
     // `first_ctime >= since` clause spares it. K1's repo alone never exercised this — it
     // has one commit and no re-add — so the claim was asserted and not measured.
-    name: 'K6g a repair commit re-adding a GRANDFATHERED line — exit 0, reported not failed',
+    name: 'K6g a repair commit re-adding a GRANDFATHERED line: exit 0, reported not failed',
     commits: [OLD_BAD, { at: T(3, 9, 0), lines: [OLD_BAD_LINE] }],
     args: gateArgs(CANARY_SINCE),
     status: 0,
@@ -491,7 +491,7 @@ const CASES = [
     // The count is (2), and it is derived rather than copied from K6e: the re-add is a
     // second addition of that line, so `collect()` books a SECOND duplicate record
     // against the same stamp. Both are in scope and both are still at HEAD.
-    name: 'K6h the colliding line REMOVED then RESTORED verbatim, uncorrected — still exit 1',
+    name: 'K6h the colliding line REMOVED then RESTORED verbatim, uncorrected: still exit 1',
     commits: [...COLLIDE,
       { at: T(5, 9, 0), body: [OLD_BAD_LINE, PAIR_A] },
       { at: T(6, 9, 0), body: [OLD_BAD_LINE, PAIR_A, PAIR_B] }],
@@ -508,7 +508,7 @@ const CASES = [
     // stays red with no move left. It errs RED, never green, and the way out is to make
     // the entry's own text distinct. Written down in the audit's LIMITS section; asserted
     // here so nobody reads K6d as covering a case it does not.
-    name: 'K6i the LIMIT — two BYTE-IDENTICAL appearances, the second corrected — still exit 1',
+    name: 'K6i the LIMIT: two BYTE-IDENTICAL appearances, the second corrected, still exit 1',
     commits: [
       OLD_BAD,
       { at: T(3, 9, 0), lines: [TWIN] },
@@ -522,7 +522,7 @@ const CASES = [
     fires: ['duplicate-in-scope'],
   },
   {
-    name: 'K7 a ledger git does not track — exit 2, which this gate treats as FAILURE',
+    name: 'K7 a ledger git does not track: exit 2, which this gate treats as FAILURE',
     commits: [OLD_BAD],
     ledger: 'docs/not-tracked.jsonl',
     args: gateArgs(CANARY_SINCE),
@@ -560,7 +560,7 @@ function runCanaries() {
       for (const a of c.absent) if (out.includes(a)) problems.push(`must not contain ${JSON.stringify(a)}`);
       if (problems.length) {
         die(`canary "${c.name}" did not behave: ${problems.join('; ')}.\n`
-          + '  A clean result from this run would be evidence of NOTHING — the gate is not\n'
+          + '  A clean result from this run would be evidence of NOTHING: the gate is not\n'
           + '  measuring what it claims. Fix the gate before trusting its answer.\n'
           + `  --- audit output in ${dir} ---\n${out.split('\n').map((l) => `  | ${l}`).join('\n')}`);
       }
@@ -641,14 +641,14 @@ for (const ledger of LEDGERS) {
 }
 
 console.log(
-  `${PREFIX}: ${LEDGERS.length} ledger(s) — ${LEDGERS.join(', ')} — judged against the `
+  `${PREFIX}: ${LEDGERS.length} ledger(s), ${LEDGERS.join(', ')}, judged against the `
   + `measurement in ${AUDIT}.\n`
   + `${PREFIX}: RATCHET in force from ${IN_FORCE}, on the COMMITTER TIME of the commit that `
   + 'first introduced each entry, NOT on the entry\'s own `at` (a cutoff on `at` would let '
   + 'an entry backfilled today with an old `at` pass unjudged).\n'
   + `${PREFIX}: that instant is at or before ${addedAt}, the commit that added ${SELF}, so `
   + 'the gate binds its own landing and everything after it.\n'
-  + `${PREFIX}: aurora ${AURORA_DIR} — ${auroraDirSource()}\n`
+  + `${PREFIX}: aurora ${AURORA_DIR}, ${auroraDirSource()}\n`
   + `${PREFIX}: ${canaries} canary case(s) ran first, on throwaway git repositories, `
   + `covering ${RULES_EXERCISED.length} failure rule(s) and BOTH directions of the ratchet `
   + '(an old bad entry does not fail; a new bad one does).',
@@ -657,7 +657,7 @@ for (const r of results) console.log(`\n${r.out.trimEnd()}`);
 
 const bad = results.filter((r) => r.status !== 0);
 if (bad.length === 0) {
-  console.log(`\n${PREFIX}: OK — every ledger entry introduced since ${IN_FORCE} carries a `
+  console.log(`\n${PREFIX}: OK: every ledger entry introduced since ${IN_FORCE} carries a `
     + 'stamp consistent with having been read off a clock. Grandfathered counts are on the '
     + 'RATCHET line of each ledger above.');
   process.exit(0);
@@ -670,11 +670,11 @@ if (bad.length === 0) {
 // this; until the exit-2 proof was run, the code did not do it.
 const unmeasurable = bad.filter((r) => r.status === 2);
 console.error(
-  `\n${PREFIX}: FAIL — ${bad.length} of ${LEDGERS.length} ledger(s) did not pass:\n`
+  `\n${PREFIX}: FAIL: ${bad.length} of ${LEDGERS.length} ledger(s) did not pass:\n`
   + bad.map((r) => `  ${r.ledger}: exit ${r.status}`
     + (r.status === 2
-      ? ' — COULD NOT MEASURE, which is a FAILURE here and not a pass. A gate that cannot see is not a gate that passed.'
-      : ' — see the sections above.')).join('\n')
+      ? ': COULD NOT MEASURE, which is a FAILURE here and not a pass. A gate that cannot see is not a gate that passed.'
+      : ': see the sections above.')).join('\n')
   + '\n\n'
   + (unmeasurable.length < bad.length
     ? '  An `at` is required to come from `date -u +%Y-%m-%dT%H:%M:%SZ` read at the moment\n'
@@ -684,11 +684,11 @@ console.error(
       + '  FIX THE NEW ENTRY, DO NOT MOVE THE CUTOFF. These ledgers are append-only and are\n'
       + '  not rewritten; the entries this gate grandfathers stay exactly as they are, and\n'
       + '  IN_FORCE exists so that nothing NEW joins them. If the bad stamp is already\n'
-      + '  pushed, correct the entry in a follow-up commit — the run then reports the old\n'
+      + '  pushed, correct the entry in a follow-up commit, and the run then reports the old\n'
       + '  stamp as no longer in the file and stops judging it.\n'
       + '\n'
       + '  IF THE FAILURE IS "TWO IN-SCOPE ENTRIES SHARE ONE STAMP", correct THE LATER\n'
-      + '  APPEARANCE — the second one listed, which is the entry that went unjudged.\n'
+      + '  APPEARANCE, the second one listed, which is the entry that went unjudged.\n'
       + '  Correcting the FIRST does not clear it and must not: the later entry would\n'
       + '  still be in the file, still carrying a stamp nothing ever checked. You do NOT\n'
       + '  need to change both. (Until 2026-09-03 you did, because the collision was keyed\n'

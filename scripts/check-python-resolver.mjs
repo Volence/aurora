@@ -113,7 +113,7 @@ const REQUIRED_ROWS = [
 ];
 
 function die(msg) {
-  console.error(`${PREFIX}: COULD NOT MEASURE — ${msg}`);
+  console.error(`${PREFIX}: COULD NOT MEASURE: ${msg}`);
   process.exit(2);
 }
 
@@ -199,7 +199,7 @@ if (compiled === 0) {
     + 'cannot show it executed the files on disk rather than a cache some earlier run left '
     + "behind. Python invalidates its cache on (mtime, size), so a same-size edit with the "
     + 'mtime restored runs as its old self and reports green. Whatever the rows printed '
-    + 'above — including a passing `OK` — they were not shown to be about the current '
+    + 'above, including a passing `OK`, they were not shown to be about the current '
     + 'source.');
 }
 
@@ -233,13 +233,13 @@ console.log(
   + `scratchpad/lib/suite_paths.py; all ${REQUIRED_ROWS.length} required row(s) present; `
   + `${skipped} skipped (reasons above, each naming what it did NOT measure).`);
 console.log(
-  `${PREFIX}: compiled from source — ${compiled} bytecode file(s) were written under the `
+  `${PREFIX}: compiled from source: ${compiled} bytecode file(s) were written under the `
   + `fresh, empty per-run prefix ${cacheRoot}, which is the child's own evidence that it `
   + 'compiled there and could reach no earlier cache. A same-size, same-mtime edit is '
   + "invisible to Python's cache and would otherwise have run as its old self.");
 
 if (run.status !== 0) {
-  console.error(`${PREFIX}: FAILED — see the report above.`);
+  console.error(`${PREFIX}: FAILED. See the report above.`);
   process.exit(1);
 }
 process.exit(0);

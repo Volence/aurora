@@ -99,12 +99,12 @@ const GUARDED = [
       'Notice was `string` until merge 68fc5c84 and is now { severity, message }. ' +
       'Nine call sites survived that widening because their sinks accept anything, ' +
       'and rendered `[object Object]` to users.',
-    fix: 'Reach for the field you meant — `.message` — e.g. `notices.map((n) => n.message).join(\'\\n\')`.',
+    fix: 'Reach for the field you meant, `.message`, e.g. `notices.map((n) => n.message).join(\'\\n\')`.',
   },
 ];
 
 function fail(message) {
-  console.error(`check-object-stringify: COULD NOT MEASURE — ${message}`);
+  console.error(`check-object-stringify: COULD NOT MEASURE: ${message}`);
   process.exit(2);
 }
 
@@ -235,12 +235,12 @@ const summary =
   `across ${scanned} source file(s)`;
 
 if (violations.length === 0) {
-  console.log(`check-object-stringify: OK — ${summary}; none reaches a stringification sink.`);
+  console.log(`check-object-stringify: OK: ${summary}; none reaches a stringification sink.`);
   process.exit(0);
 }
 
 console.error(
-  `\ncheck-object-stringify: FAIL — ${violations.length} site(s) render a guarded type via an ` +
+  `\ncheck-object-stringify: FAIL: ${violations.length} site(s) render a guarded type via an ` +
     `implicit toString().\n  Checked ${summary}.\n`,
 );
 for (const v of violations) {
@@ -252,6 +252,6 @@ for (const v of violations) {
 console.error(
   '  These do NOT fail `tsc`. The sinks above accept every type and call toString()\n' +
     '  on it, so a widened type reaches them unchanged and renders `[object Object]`\n' +
-    '  at runtime. That is the whole reason this gate exists — see the file header.\n',
+    '  at runtime. That is the whole reason this gate exists; see the file header.\n',
 );
 process.exit(1);

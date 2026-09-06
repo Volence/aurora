@@ -104,7 +104,8 @@ const NOT_VENDORED = {
     + "the peer's source still holds exactly four SynchroAnimate consumers. A vendored copy "
     + 'holds four by construction, so those rows would pass forever and could never detect a '
     + 'fifth. They read ../s1disasm at a committed revision instead, and skip loudly when they '
-    + 'cannot. 136 files, 1.32 MB — also 62% of the bytes this pin would otherwise carry.',
+    + 'cannot. 136 files and 1.32 MB, which is also 62% of the bytes this pin would '
+    + 'otherwise carry.',
 };
 
 function git(cwd, args, encoding = 'utf8') {
@@ -131,7 +132,7 @@ function listBlobs(peer, rev) {
     const meta = rec.slice(0, tab).trim().split(/\s+/);
     const [mode, type, sha, size] = meta;
     if (type !== 'blob') {
-      throw new Error(`${rec.slice(tab + 1)} is a ${type}, not a blob — this script only vendors blobs`);
+      throw new Error(`${rec.slice(tab + 1)} is a ${type}, not a blob; this script only vendors blobs`);
     }
     if (mode === '120000') {
       throw new Error(`${rec.slice(tab + 1)} is a SYMLINK; vendoring it would copy the link text, not the data`);
@@ -177,7 +178,7 @@ function main() {
     git(peer, ['merge-base', '--is-ancestor', commit, originHead]);
   } catch {
     throw new Error(
-      `${rev} (${commit}) is NOT reachable from origin/HEAD (${originHead}) in ${peer} — `
+      `${rev} (${commit}) is NOT reachable from origin/HEAD (${originHead}) in ${peer}: `
       + 'it is local-only, and a pin nobody else can fetch is not a pin',
     );
   }
@@ -188,7 +189,7 @@ function main() {
   process.stderr.write(`revision  ${rev} -> ${commit}\n`);
   process.stderr.write(`subtrees  ${SUBTREES.join(' ')}\n`);
   process.stderr.write(`blobs     ${blobs.length} file(s), ${(bytes / 1048576).toFixed(3)} MB\n`);
-  if (blobs.length === 0) throw new Error('the subtree list matched NOTHING — refusing to write an empty pin');
+  if (blobs.length === 0) throw new Error('the subtree list matched NOTHING, so this refuses to write an empty pin');
 
   if (checkOnly) {
     const prov = JSON.parse(readFileSync(sidecar, 'utf8'));
@@ -204,8 +205,8 @@ function main() {
       if (!onDisk.includes(rel)) bad.push(`${rel}: in the sidecar but NOT on disk`);
     }
     process.stdout.write(bad.length === 0
-      ? `OK — ${onDisk.length} vendored file(s) hash to the blob ids in ${relative(AURORA_DIR, sidecar)}\n`
-      : `DRIFT — ${bad.length} problem(s):\n  ${bad.join('\n  ')}\n`);
+      ? `OK: ${onDisk.length} vendored file(s) hash to the blob ids in ${relative(AURORA_DIR, sidecar)}\n`
+      : `DRIFT: ${bad.length} problem(s):\n  ${bad.join('\n  ')}\n`);
     process.exitCode = bad.length === 0 ? 0 : 1;
     return;
   }
@@ -233,7 +234,7 @@ function main() {
   // wrong on a machine with `core.autocrlf` set, and the integrity row would
   // fail for a reason that has nothing to do with the data.
   writeFileSync(join(out, '.gitattributes'),
-    '# The vendored bytes ARE the pin — never normalise them (see .provenance.json).\n* -text\n');
+    '# The vendored bytes ARE the pin; never normalise them (see .provenance.json).\n* -text\n');
 
   const provenance = {
     what: 'Sonic 1 disassembly data VENDORED into this repo so the rows that assert on it '
@@ -251,7 +252,7 @@ function main() {
     fixture: {
       files: blobs.length,
       bytes,
-      extracted_via: 'git -C <s1disasm> cat-file blob <object id> — OBJECTS, never the working tree',
+      extracted_via: 'git -C <s1disasm> cat-file blob <object id>, reading OBJECTS and never the working tree',
     },
     re_vendor: `node scripts/vendor-s1-fixtures.mjs --rev ${rev}`,
     verify: 'node scripts/vendor-s1-fixtures.mjs --check',
@@ -273,7 +274,7 @@ function main() {
   const dirty = git(peer, ['status', '--porcelain']).split('\n').filter((l) => l.length > 0);
   process.stderr.write(`peer after: HEAD ${git(peer, ['rev-parse', 'HEAD']).trim()}, `
     + `${dirty.length} porcelain entr(y/ies)\n`);
-  if (!existsSync(join(out, 'sonic.asm'))) throw new Error('sonic.asm did not land — the tree is not a checkout');
+  if (!existsSync(join(out, 'sonic.asm'))) throw new Error('sonic.asm did not land, so the tree is not a checkout');
 }
 
 main();

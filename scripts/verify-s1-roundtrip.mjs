@@ -141,7 +141,7 @@ async function main() {
     baseline = buildRom(WORK);
   } catch (e) {
     fail(
-      'baseline build failed — the s1disasm toolchain did not run here.\n' +
+      'baseline build failed, so the s1disasm toolchain did not run here.\n' +
         `  command: lua build.lua (cwd ${WORK})\n  error: ${e.message}\n` +
         (e.stdout ? `  stdout tail:\n${String(e.stdout).slice(-1200)}\n` : '') +
         (e.stderr ? `  stderr tail:\n${String(e.stderr).slice(-1200)}\n` : '') +
@@ -252,7 +252,7 @@ async function main() {
     if (s >= CHECKSUM_OFF && en < CHECKSUM_OFF + 2) tag = 'checksum';
     else if (s >= ROMEND_OFF && en < ROMEND_OFF + 4) tag = 'end-of-ROM';
     else if (s >= layoutOff && en < layoutOff + origLayout.length) tag = 'GHZ1 layout';
-    log(`      0x${s.toString(16)}..0x${en.toString(16)} (${en - s + 1} byte(s)) — ${tag}`);
+    log(`      0x${s.toString(16)}..0x${en.toString(16)} (${en - s + 1} byte(s)): ${tag}`);
   }
 
   // Every differing byte must be in the layout region OR the checksum word. The
@@ -271,7 +271,7 @@ async function main() {
   }
 
   const layoutDiffs = offsets.filter((o) => o >= layoutStart && o < layoutEnd);
-  if (layoutDiffs.length === 0) fail('no layout bytes changed in the ROM — the edit did not take');
+  if (layoutDiffs.length === 0) fail('no layout bytes changed in the ROM, so the edit did not take');
 
   log('\n=== PASS ===');
   log(`  • Edit driven through s1Adapter.open + levels.write + performGuardedWrite (the app's own path)`);

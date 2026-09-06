@@ -141,7 +141,7 @@ export default class SkipReportReporter {
 
     if (!Array.isArray(testModules) || testModules.length === 0) {
       console.error(
-        `${PREFIX}: COULD NOT MEASURE — the run reported no test modules at all.\n` +
+        `${PREFIX}: COULD NOT MEASURE: the run reported no test modules at all.\n` +
         '  This run says nothing about whether any test skipped silently; it is NOT\n' +
         '  evidence that none did.',
       );
@@ -184,7 +184,7 @@ export default class SkipReportReporter {
     }
 
     log('');
-    log(`${PREFIX}: ${skipped} SKIPPED test(s) in ${byModule.size} file(s). A SKIP IS NOT A PASS —`);
+    log(`${PREFIX}: ${skipped} SKIPPED test(s) in ${byModule.size} file(s). A SKIP IS NOT A PASS:`);
     log('  each of these contributed zero to the totals above.');
     for (const [id, rows] of [...byModule.entries()].sort()) {
       log('');
@@ -192,7 +192,7 @@ export default class SkipReportReporter {
       for (const row of rows) {
         log(`    ↓ ${row.name}`);
         if (row.todo && row.channel === null) {
-          log('        todo — declared unwritten');
+          log('        todo: declared unwritten');
         } else if (row.channel === null) {
           log('        (NO REASON GIVEN)');
         } else {
@@ -203,12 +203,12 @@ export default class SkipReportReporter {
     if (todos > 0) log(`\n  (${todos} of the above ${todos === 1 ? 'is a' : 'are'} todo.)`);
 
     if (unexplained === 0) {
-      log(`\n${PREFIX}: OK — every skip named its reason.`);
+      log(`\n${PREFIX}: OK. Every skip named its reason.`);
       return;
     }
 
     console.error(
-      `\n${PREFIX}: FAIL — ${unexplained} skipped test(s) above give NO REASON.\n` +
+      `\n${PREFIX}: FAIL. ${unexplained} skipped test(s) above give NO REASON.\n` +
       '\n' +
       '  A skip that does not say why is indistinguishable from a pass to anyone\n' +
       '  reading a total, which is how two blocks pinned to the deleted `s4_engine`\n' +
@@ -216,7 +216,7 @@ export default class SkipReportReporter {
       '\n' +
       '  SKIPPING IS NOT THE PROBLEM and this gate does not object to it: a test\n' +
       '  that refuses to run without an absent fixture is behaving correctly. Do\n' +
-      '  NOT un-skip or delete a row to clear this. Say why instead — preferred\n' +
+      '  NOT un-skip or delete a row to clear this. Say why instead. The preferred\n' +
       '  shape, which works on `describe` (covering every test inside it) and on\n' +
       '  `it` alike:\n' +
       '\n' +
