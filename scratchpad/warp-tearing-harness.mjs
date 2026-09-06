@@ -53,6 +53,50 @@
 // self-diff staying at zero with a register read now inside every sample is
 // this harness's own evidence of that.
 //
+// "WHOLE-PLANE" NOW MEANS THE WHOLE PLANE (rows R5 and R7), AND THE OFF-VIEW
+// FLOOR IS MEASURED, NOT CITED (rows F1 and F2).
+//
+// Two things changed on 2026-09-05, both because a number in here could not be
+// traced to anything:
+//
+//   - The plane read was one 0x1000 byte call against a plane the registers
+//     say is 0x2000 bytes, so the metric named "whole-plane" covered plane rows
+//     0 to 31 of 64. The literal sat exactly on `emulator/read_vram`'s 4096
+//     byte ceiling. It is now as many calls as the plane needs, with the count
+//     derived from the decoded plane size and from `initialize.limits`
+//     `maxReadLen` off the wire. Row R5 asserts the read length equals the
+//     derived plane; row R7 asserts the chunks tile it exactly once, checked
+//     against the addresses the SERVER echoed.
+//   - `OFF_VIEW_FLOOR` was the constant 26 under a comment claiming it had been
+//     stated before the run. No one could produce that statement. It is now
+//     measured in every run from two correct walks, with row F1 asserting those
+//     walks are correct and row F2 asserting the floor is clear of the tear.
+//
+// Doubling the read changes what `diffAll`, row 6 and row 7 report, on purpose.
+//
+// RED FIRST, PER CLAUSE, all against commit 451db006 (2026-09-05). The two
+// clauses are independent instruments and each poison leaves the other green,
+// which is what stops "everything went red" from being mistaken for proof that
+// the clause under test is live:
+//
+//   P1, poisoning the READ (`PLANE_BYTES` halved, the old defect restored):
+//     R5 RED. R7 stayed GREEN and correctly so, because one chunk does tile
+//     4096 bytes exactly once - R7 checks the walk, R5 checks the coverage, and
+//     they are different questions. Every walk row (0, 1, 2, 3, F1, F2) green.
+//   P2, poisoning the WALK (the alternate routes made far POKES instead of
+//     walks): F1 RED naming all five routes as torn on screen, F2 RED with no
+//     floor left to measure, row 7 REFUSED rather than passed. R5 and R7 green.
+//
+// AND THE HARDCODE THAT WOULD LOOK RIGHT STILL FAILS. Note first that at this
+// file's own settings a frozen `OFF_VIEW_FLOOR = 26` passes row 7 by a margin
+// of exactly zero: the mailbox's whole-plane diff is 26. So the canary gives
+// the derivation an input whose true answer differs from this repo's - the
+// reference route changed from 64px steps to 128px, which rows 0, 1, 6 and F1
+// all confirm is still a CORRECT walk with a clean mailbox. The derived floor
+// moves to 250 and row 7 passes on a mailbox diff of 245. Frozen at 26, the
+// same run turns row 7 RED on a mailbox every other row calls clean. A floor
+// that cannot move cannot be right for more than one pair of routes.
+//
 // Usage: node scratchpad/warp-tearing-harness.mjs   (VERBOSE=1 for server log)
 
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
@@ -295,31 +339,64 @@ async function main() {
           'renderer disagree and no sample height here is trustworthy.'
         : ''));
 
-    // ── THE READ WINDOW, AND WHAT IT DOES NOT COVER ────────────────────────
+    // ── THE READ WINDOW, WHICH IS NOW THE WHOLE PLANE ──────────────────────
     //
-    // PLANE_LEN is NOT derived, and that is a finding rather than an omission.
-    // The derived plane is planeW x planeH cells = planeW*planeH*2 bytes, which
-    // for this ROM is 0x2000. `emulator/read_vram` caps `len` at 4096 (contract
-    // section 6), so one call can never return more than 0x1000: HALF of a
-    // 64x64 plane. The literal was at the method's ceiling all along.
+    // Until 2026-09-05 this was `const PLANE_LEN = 0x1000`, and the metric
+    // built on it was called "whole-plane". The derived plane is
+    // planeW x planeH cells = planeW*planeH*2 bytes, which for this ROM is
+    // 0x2000 — so the name covered HALF of it, plane rows 0 to 31 of 64.
     //
-    // Widening it to two calls would CHANGE what `diffAll` and row 7 measure,
-    // so it is not done here. What is done is saying so, everywhere the number
-    // is printed.
-    const PLANE_LEN = 0x1000;
-    const PLANE_BYTES = geom.planeW !== null && geom.planeH !== null
-      ? geom.planeW * geom.planeH * 2 : null;
-    const ROWS_READ = geom.planeW !== null ? PLANE_LEN / (geom.planeW * 2) : null;
-    note('read window coverage, which is NOT the whole plane',
-      `the derived plane is ${geom.planeW}x${geom.planeH} cells = ${hx(PLANE_BYTES)} bytes, but one ` +
-      `emulator/read_vram is capped at 4096 bytes, so this harness reads ${hx(PLANE_LEN)} from ` +
-      `${hx(PLANE_A)}: plane rows 0 to ${ROWS_READ - 1} of ${geom.planeH}. The metric this file ` +
-      `calls "whole-plane" therefore covers ${ROWS_READ} of ${geom.planeH} rows.`);
+    // That literal was not a typo. It sat exactly on the read ceiling:
+    // `emulator/read_vram` and its non-deprecated successor `emulator/read`
+    // both cap `len` at 4096 (protocol.md section 6, the VRAM/CRAM table and
+    // the memory table respectively). One call can never return more.
+    //
+    // The fix is to issue as many calls as the plane needs, and the CALL COUNT
+    // IS DERIVED — from the plane size decoded above and from the ceiling this
+    // server advertises, never from an arithmetic constant typed here. A plane
+    // of a different size, or a server with a different ceiling, therefore
+    // needs no edit.
+    //
+    // THE CEILING IS A MACHINE-READABLE FACT, so it is read rather than
+    // retyped. protocol.md section 2.1 makes `limits` a REQUIRED top-level key
+    // of the `initialize` result (registered 2026-08-15, section 11.5), and
+    // `limits.maxReadLen` is defined there as "the largest `len` this server
+    // will accept on a read-shaped op". The contract's own stated reason for
+    // registering it is exactly this trap: section 6's parenthetical ceilings
+    // "describe the catalog, not this server", and "a client has no other way
+    // to discover that number, and discovering it by being refused is
+    // discovering it too late". So the number below comes off the wire.
+    //
+    // LOUD ON UNMEASURABLE. A server that does not advertise it throws here
+    // rather than falling back to 4096, because a silent fallback is how the
+    // number got typed into this file in the first place.
+    const advertised = client.handshake?.limits;
+    const MAX_READ_LEN = advertised?.maxReadLen;
+    if (!Number.isInteger(MAX_READ_LEN) || MAX_READ_LEN <= 0) {
+      throw new Error(
+        `initialize.limits.maxReadLen is REQUIRED (protocol.md section 2.1, registered 11.5) and is ` +
+        `what the plane read's call count is derived from; this server advertised ` +
+        `limits=${JSON.stringify(advertised)}. No ceiling is assumed and 4096 is not retyped.`);
+    }
+    if (geom.planeW === null || geom.planeH === null) {
+      throw new Error(
+        `plane geometry is not derivable from reg $10=${hx8(geom.raw.r10)}, so the plane's byte ` +
+        `length cannot be derived and no read length is guessed. See row R2.`);
+    }
+    const PLANE_BYTES = geom.planeW * geom.planeH * 2;
+    const PLANE_LEN = PLANE_BYTES;                       // the read IS the plane now
+    const READ_CALLS = Math.ceil(PLANE_BYTES / MAX_READ_LEN);
+    const ROWS_READ = PLANE_LEN / (geom.planeW * 2);
+    note('read window coverage, which IS the whole plane',
+      `the derived plane is ${geom.planeW}x${geom.planeH} cells = ${hx(PLANE_BYTES)} bytes; this ` +
+      `server advertises limits.maxReadLen=${MAX_READ_LEN}, so each sample is ` +
+      `ceil(${PLANE_BYTES}/${MAX_READ_LEN}) = ${READ_CALLS} calls from ${hx(PLANE_A)}: plane rows 0 ` +
+      `to ${ROWS_READ - 1} of ${geom.planeH}. Both numbers are read, not typed.`);
 
-    check('R5', 'the read window starts at the plane base and covers the whole sampled view',
-      PLANE_LEN % (PLANE_W * 2) === 0 && ROWS_READ >= VIEW_H,
-      `${hx(PLANE_LEN)} bytes is ${ROWS_READ} whole plane rows of ${PLANE_W} cells, and the window ` +
-      `metric samples ${VIEW_H} rows` +
+    check('R5', 'the read covers the WHOLE plane, not a prefix of it',
+      PLANE_LEN === PLANE_BYTES && ROWS_READ === geom.planeH && ROWS_READ >= VIEW_H,
+      `${hx(PLANE_LEN)} bytes is ${ROWS_READ} whole plane rows of ${PLANE_W} cells against a derived ` +
+      `plane of ${geom.planeH} rows, and the window metric samples ${VIEW_H} rows` +
       (ROWS_READ >= VIEW_H
         ? ''
         : `. The read is SHORTER than the view, so diffWords has been silently skipping rows.`));
@@ -328,20 +405,51 @@ async function main() {
      * Every plane sample is STAMPED with the geometry it was read under, and
      * row R6 asserts every stamp agrees. `tag` names the path and the sample
      * point, so a divergence says WHICH one moved.
+     *
+     * The sample is assembled from `READ_CALLS` chunks. Each chunk's REQUESTED
+     * address is recorded, and so is the address the server ECHOED back, so row
+     * R7 can check the walk over the plane against the server's own account of
+     * where it read rather than against this loop's belief about itself. A
+     * chunk loop that failed to advance its address would return a plausible
+     * buffer of exactly the right length, and every diff built on it would be
+     * comparing the first half of the plane with itself.
      */
     const geomStamps = [];
+    let lastChunks = null;
     const plane = async (tag) => {
       geomStamps.push({ tag, key: geomKey(decodeGeometry(await readVdpRegs())) });
-      const r = await call('emulator/read_vram', { addr: hx(PLANE_A), len: PLANE_LEN });
-      return Buffer.from(r.bytes.replace(/^0x/i, ''), 'hex');
+      const chunks = [];
+      const parts = [];
+      for (let off = 0; off < PLANE_BYTES; off += MAX_READ_LEN) {
+        const want = Math.min(MAX_READ_LEN, PLANE_BYTES - off);
+        const at = PLANE_A + off;
+        const r = await call('emulator/read_vram', { addr: hx(at), len: want });
+        const buf = Buffer.from(String(r.bytes).replace(/^0x/i, ''), 'hex');
+        if (buf.length !== want) {
+          throw new Error(
+            `emulator/read_vram at ${hx(at)} asked for ${want} bytes and returned ${buf.length}; ` +
+            `a short chunk would make this sample a differently sized buffer than its peers and ` +
+            `every diff against it silently shorter.`);
+        }
+        const echoed = typeof r.addr === 'string' ? parseInt(r.addr, 16) : r.addr;
+        chunks.push({ want, at, echoed, len: r.len });
+        parts.push(buf);
+      }
+      const out = Buffer.concat(parts);
+      if (out.length !== PLANE_BYTES) {
+        throw new Error(`assembled ${out.length} bytes for a ${PLANE_BYTES} byte plane`);
+      }
+      lastChunks = chunks;
+      return out;
     };
 
-    // VISIBLE WINDOW ONLY, adopted from aeon's gate after they measured that the
-    // full 64x64 ring is legitimately path-dependent OUTSIDE the view — two
-    // CORRECT walks disagreed by 26 words out there. A whole-plane diff
-    // therefore has a false-positive floor, which is fine for "is it torn?"
-    // (the tearing dwarfs it) and fatal for "is it clean?", which is exactly
-    // what this run has to answer about the mailbox.
+    // VISIBLE WINDOW ONLY, adopted from aeon's gate, whose stated reason is
+    // that the full streaming ring is legitimately path-dependent OUTSIDE the
+    // view. A whole-plane diff therefore has a false-positive floor, which is
+    // fine for "is it torn?" (the tearing dwarfs it) and fatal for "is it
+    // clean?", which is exactly what this run has to answer about the mailbox.
+    // That floor is MEASURED further down (rows F1 and F2) rather than carried
+    // as a number, and row 7 compares against what this run measured.
     //
     // Plane width and the visible window are derived above from registers $10,
     // $0C and $01, and rows R2 to R4 assert they equal the 64 / 40 / 28 that
@@ -360,8 +468,8 @@ async function main() {
     const VIEW_WORDS = VIEW_W * VIEW_H;
 
     /**
-     * The whole 64x64 ring, reported ALONGSIDE the window rather than instead
-     * of it.
+     * The whole plane, as derived from the registers, reported ALONGSIDE the
+     * window rather than instead of it.
      *
      * CAVEAT ON THE WINDOW METRIC, stated because it changes how much a zero is
      * worth: `diffWords` samples the nametable's first 40x28 cells, which is
@@ -420,27 +528,52 @@ async function main() {
     const STEP = 64;
     const destX = startX + DIST, destY = startY;
 
-    const runPathB = async () => {
+    /**
+     * A CORRECT WALK to `destX`: from the checkpoint, in `step` sized moves,
+     * two frames apart, then `settle` frames. No warp and no far poke — every
+     * move is inside the regime aeon says the cache handles and row 3 measures
+     * as clean. `step` is the walk's one degree of freedom, and varying it is
+     * what makes two runs of this two DIFFERENT legitimate routes to the same
+     * place rather than a repeat of one.
+     */
+    const walkTo = async (step, settle, tag) => {
       await call('emulator/restore', { id: cp });
-      for (let x = startX + STEP; x <= destX; x += STEP) {
+      for (let x = startX + step; x <= destX; x += step) {
         await poke(x, destY);
         await call('emulator/run_frames', { frames: 2 });
       }
-      await call('emulator/run_frames', { frames: SETTLE });
-      return plane('pathB:settle');
+      await call('emulator/run_frames', { frames: settle });
+      return plane(tag);
     };
+    const runPathB = () => walkTo(STEP, SETTLE, 'pathB:settle');
     /** The reference at the EARLY sample point, walked the safe way. */
-    const runPathBEarly = async () => {
-      await call('emulator/restore', { id: cp });
-      for (let x = startX + STEP; x <= destX; x += STEP) {
-        await poke(x, destY);
-        await call('emulator/run_frames', { frames: 2 });
-      }
-      await call('emulator/run_frames', { frames: EARLY });
-      return plane('pathB:early');
-    };
+    const runPathBEarly = () => walkTo(STEP, EARLY, 'pathB:early');
 
     const b1 = await runPathB();
+
+    // ── ROW R7: DID THE CHUNKED READ ACTUALLY WALK THE PLANE? ──────────────
+    //
+    // The one way a multi-call read fails invisibly: the loop returns a buffer
+    // of exactly the right length that is the same region read twice. Length
+    // cannot catch it and neither can any diff built on it. So this checks the
+    // chunk addresses the server ECHOED — not the ones this file asked for —
+    // and asserts they tile [PLANE_A, PLANE_A + PLANE_BYTES) exactly once,
+    // contiguously, in order, with the lengths summing to the derived plane.
+    // A server that echoes no `addr` fails this row rather than passing it by
+    // omission: protocol.md section 6 lists `addr` in read_vram's result.
+    const walk = lastChunks ?? [];
+    const contiguous = walk.length === READ_CALLS && walk.every(
+      (c, i) => c.echoed === c.at && c.at === PLANE_A + (i === 0 ? 0 : walk.slice(0, i).reduce((s, p) => s + p.want, 0)));
+    const spanned = walk.reduce((s, c) => s + c.want, 0);
+    check('R7', 'the plane sample is assembled from chunks that tile the plane exactly once',
+      contiguous && spanned === PLANE_BYTES,
+      `${walk.length} of ${READ_CALLS} expected chunks, spanning ${spanned} of ${PLANE_BYTES} bytes: ` +
+      `${walk.map((c) => `${hx(c.at)}${c.echoed === c.at ? '' : ` (server echoed ${c.echoed === undefined ? 'NOTHING' : hx(c.echoed)})`}+${c.want}`).join(' ')}` +
+      (contiguous && spanned === PLANE_BYTES
+        ? ''
+        : '. The chunks do not tile the plane, so this sample is not the plane and every diff below ' +
+          'is comparing something else.'));
+
     await shot('pathB-small-steps');
 
     // ROW 0 — ANTI-VACUOUS. Same path twice must agree exactly, or every
@@ -465,6 +598,104 @@ async function main() {
     const tornEarly = diffWords(aEarly, bEarly);
     const tornEarlyAll = diffAll(aEarly, bEarly);
     console.log(`        at +${EARLY}f: ${tornEarly}/${VIEW_WORDS} window words, ${tornEarlyAll}/${ALL_WORDS} whole-plane words disagree`);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // THE OFF-VIEW FLOOR, MEASURED IN THIS RUN
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // WHY A FLOOR EXISTS AT ALL. `diffWords` samples the visible window;
+    // `diffAll` samples the whole plane, and the plane outside the window is
+    // the streaming ring, whose contents are legitimately route-dependent. Two
+    // CORRECT walks to the same destination can therefore disagree out there
+    // while agreeing exactly on screen. Row 7 asks "is the mailbox clean over
+    // the whole plane?", and without a floor it is really asking "is the ring
+    // identical?", which is not a property the engine promises.
+    //
+    // WHY IT IS MEASURED HERE RATHER THAN CITED. Until 2026-09-05 this file
+    // carried `const OFF_VIEW_FLOOR = 26` under a comment saying the number had
+    // been stated before the run, "so comparing against it is a citation rather
+    // than a number chosen to make a red row green". Nobody could produce that
+    // citation: not aeon, not the hub, and not aurora, where the number
+    // appeared only inside this file. A sentence defending a constant against
+    // having been fitted is worse than a bare constant when the sentence cannot
+    // itself be checked, because the bare constant at least invites the
+    // question. So the number is now DERIVED FROM THIS RUN and the claim about
+    // who measured the old one is deleted.
+    //
+    // AND 26 DID NOT DESCRIBE THE HALF THE OLD CODE READ EITHER. Poison run P1
+    // put the read back to one 0x1000 call and left this derivation alone: over
+    // plane rows 0 to 31 all five alternate correct walks agreed EXACTLY, so
+    // the off-view floor in the region the old harness actually sampled is 0,
+    // not 26. Whatever 26 was a measurement of, it was not this instrument's
+    // window, and the constant was never checkable against what this file read.
+    //
+    // THE CONSTRUCTION. Same checkpoint, same destination, same sample frame,
+    // no warp and no far poke — only the step size differs, which is the walk's
+    // one legitimate degree of freedom (and it moves the arrival's frame count
+    // too, the way the mailbox's ack does). Each is compared against `bEarly`,
+    // the step-64 walk that row 7's reference already is.
+    //
+    // WHY MORE THAN ONE ALTERNATE ROUTE. Because the number turned out to be a
+    // property of the ROUTE PAIR rather than of the engine, and one pair cannot
+    // show that. Measured here on 2026-09-05, against the 64px reference: 16px
+    // steps agreed EXACTLY over the whole plane, while 128px steps disagreed by
+    // two hundred odd words, with 32, 48 and 96 in between. So "the off-view
+    // floor" is not a constant of the machine — it is how far apart the two
+    // routes being compared are. The set below is what makes that visible in
+    // every run's log rather than something a reader has to take on trust.
+    const FLOOR_STEPS = [16, 32, 48, 96, 128];
+    const floorSamples = [];
+    for (const step of FLOOR_STEPS) {
+      const w = await walkTo(step, EARLY, `pathB:floor${step}`);
+      floorSamples.push({ step, view: diffWords(w, bEarly), all: diffAll(w, bEarly) });
+    }
+    for (const s of floorSamples) {
+      console.log(`        alternate walk, ${String(s.step).padStart(3)}px steps vs ${STEP}px steps ` +
+        `-> window ${s.view}/${VIEW_WORDS}, whole-plane ${s.all}/${ALL_WORDS}` +
+        (s.view === 0 ? '' : '   NOT A CORRECT WALK: it tore on screen'));
+    }
+
+    // ONLY THE CORRECT WALKS SET THE FLOOR. This is not a formality. The first
+    // version of this block took the max over EVERY sample, and a probe that
+    // widened the step set to 256 and 512 px showed exactly what that costs:
+    // both of those tore ON SCREEN, F1 went red as it should, and the floor
+    // they inflated to still let row 7 pass — a torn route quietly raising the
+    // bar until the defect fits under it, with the row that noticed shouting
+    // into a number nothing consumed. A route that fails the correctness
+    // premise contributes nothing to the floor now, and if none is left there
+    // is no floor and row 7 is refused rather than passed.
+    const correctWalks = floorSamples.filter((s) => s.view === 0);
+    const OFF_VIEW_FLOOR = correctWalks.length ? Math.max(...correctWalks.map((s) => s.all)) : null;
+
+    // PREMISE OF THE FLOOR, asserted rather than assumed. These walks are only
+    // usable as a floor if they are CORRECT, and the evidence for that is that
+    // they agree in the VIEW.
+    const viewClean = correctWalks.length === floorSamples.length;
+    check('F1', 'the walks the floor is measured from are CORRECT: they agree in the view',
+      floorSamples.length === FLOOR_STEPS.length && viewClean,
+      `${floorSamples.map((s) => `${s.step}px -> ${s.view} window words`).join(', ')} against the ` +
+      `${STEP}px reference` +
+      (viewClean
+        ? `. Off view they disagree by ${floorSamples.map((s) => s.all).join(', ')} whole-plane ` +
+          `words respectively, so the floor measured in this run is ${OFF_VIEW_FLOOR} of ${ALL_WORDS}. ` +
+          `That spread is the finding: the number is a property of which two correct routes are ` +
+          `compared, not a constant of the machine.`
+        : `. ${floorSamples.length - correctWalks.length} route(s) tore ON SCREEN, so their off-view ` +
+          `numbers are defects and not floors. They are excluded from the floor, which is now ` +
+          `${OFF_VIEW_FLOOR === null ? 'UNMEASURABLE' : OFF_VIEW_FLOOR} from ${correctWalks.length} ` +
+          `surviving walk(s).`));
+
+    // DISCRIMINATION, which is what stops a floor from being a licence. A floor
+    // at or above the bare poke's whole-plane number would pass row 7 for any
+    // outcome at all, including the tear this harness exists to measure.
+    check('F2', 'the measured floor is well under the tear it has to stay clear of',
+      OFF_VIEW_FLOOR !== null && OFF_VIEW_FLOOR < tornEarlyAll,
+      OFF_VIEW_FLOOR === null
+        ? `no correct walk survived F1, so there is no floor to compare anything against`
+        : `floor ${OFF_VIEW_FLOOR}, bare poke ${tornEarlyAll}, both of ${ALL_WORDS} whole-plane words` +
+          (OFF_VIEW_FLOOR < tornEarlyAll
+            ? ` (${(OFF_VIEW_FLOOR / Math.max(1, tornEarlyAll) * 100).toFixed(0)}% of the tear)`
+            : `. The floor swallows the tear, so row 7 would pass on a torn plane and proves nothing.`));
 
     // Back to path A for the settle sample.
     await call('emulator/restore', { id: cp });
@@ -572,14 +803,6 @@ async function main() {
         `window ${mailboxDiff}/${VIEW_WORDS} and whole-plane ${mailboxDiffAll}/${ALL_WORDS} words disagree ` +
         `at ${DIST}px, +${EARLY}f (bare poke at the same point: ${tornEarly} window, ${tornEarlyAll} whole-plane) ` +
         `— landed at (${u16(await rd(wx, 2))},${u16(await rd(wy, 2))})`);
-      // OFF-VIEW FLOOR, not a tuned threshold. aeon measured that two CORRECT
-      // walks disagree by up to 26 whole-plane words outside the view, because
-      // the ring outside the window is legitimately path-dependent — which is
-      // why they restricted their own gate to the view. That floor was stated
-      // before this run, so comparing against it is a citation rather than a
-      // number chosen to make a red row green. What this asserts is the useful
-      // thing: the mailbox is inside the noise, and the bare poke is not.
-      const OFF_VIEW_FLOOR = 26;
       // ---- Row 8: do the EDITOR's world pixels mean the same thing as the
       // ENGINE's? Aurora's warp-math assumes they do (an aeon act is flat world
       // coordinates end to end, and the editor lays sections out on the same
@@ -710,11 +933,22 @@ async function main() {
           : 'y NEVER changes — the player is not being simulated here, so row 10 cannot ' +
             'distinguish terrain snap from a shift and its conclusion must not be trusted');
 
-      check('7', 'the mailbox whole-plane diff is inside the known off-view floor',
-        mailboxDiffAll <= OFF_VIEW_FLOOR,
-        `${mailboxDiffAll} of ${ALL_WORDS} whole-plane words (floor ${OFF_VIEW_FLOOR}; ` +
-        `bare poke ${tornEarlyAll}). COVERAGE: those ${ALL_WORDS} words are plane rows 0 to ` +
-        `${ROWS_READ - 1} of ${geom.planeH}, not the whole ring. See the coverage NOTE above.`);
+      // The floor is the one MEASURED above by rows F1 and F2, in this run, on
+      // this machine. It is not a stated prior and it is not a threshold picked
+      // to make this row green: F1 asserts the walks it comes from are correct
+      // and F2 asserts it is well clear of the tear, so a floor inflated by a
+      // torn route reddens F1 or F2 before it can rescue this row.
+      check('7', 'the mailbox whole-plane diff is inside the floor measured in this run',
+        OFF_VIEW_FLOOR !== null && mailboxDiffAll <= OFF_VIEW_FLOOR,
+        OFF_VIEW_FLOOR === null
+          ? `${mailboxDiffAll} of ${ALL_WORDS} whole-plane words, and NO FLOOR WAS MEASURABLE: every ` +
+            `alternate walk failed F1's correctness premise. This row is refused rather than passed ` +
+            `on a floor built out of torn routes.`
+          : `${mailboxDiffAll} of ${ALL_WORDS} whole-plane words (floor ${OFF_VIEW_FLOOR}, measured by ` +
+            `rows F1 and F2 from ${correctWalks.length} correct walks in this run; bare poke ` +
+            `${tornEarlyAll}). COVERAGE: those ${ALL_WORDS} words are plane rows 0 to ` +
+            `${ROWS_READ - 1} of ${geom.planeH}, which is the whole plane, read in ${READ_CALLS} ` +
+            `calls of at most ${MAX_READ_LEN} bytes.`);
       await shot('mailbox-warp');
     }
 
