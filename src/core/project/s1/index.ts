@@ -286,13 +286,23 @@ function mk(source: ProfileEntry, path: string, status: EntryStatus, detail?: st
  * Read `.aurora/project.json` through the shared mapping parser (spec §7).
  * Never fails an open: a missing file is an empty config; malformed content
  * degrades per entry, with the drops reported as issues on the handle.
+ *
+ * The catch below is the THIRD door to the same empty config (readProjectConfig
+ * owns the other two), and the reason `SidecarState.read` exists: a file that
+ * exists and would not read leaves `config: {}` holding none of the user's
+ * overrides, and a writer that cannot tell that from 'absent' overwrites them.
+ * Exactly the split `readMapText` makes below, for exactly the same reason.
  */
 async function readSidecarState(fa: FileAccess): Promise<SidecarState> {
   let bytes: Uint8Array | null;
   try {
     bytes = (await fa.exists(SIDECAR)) ? await fa.read(SIDECAR) : null;
   } catch {
-    return { config: {}, issues: [{ where: '$', message: 'sidecar unreadable; ignoring it' }] };
+    return {
+      config: {},
+      issues: [{ where: '$', message: 'sidecar unreadable; ignoring it' }],
+      read: 'unreadable',
+    };
   }
   return readProjectConfig(bytes);
 }

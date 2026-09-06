@@ -269,7 +269,7 @@ export interface ProjectAdapter {
 export type { LevelDoc } from '../level-classic/model';
 import type { LevelDoc } from '../level-classic/model';
 
-export type { SidecarState, ConfigIssue, ProjectConfig } from './mapping';
+export type { SidecarState, SidecarRead, ConfigIssue, ProjectConfig } from './mapping';
 
 export interface ZoneActRef {
   zone: string;
