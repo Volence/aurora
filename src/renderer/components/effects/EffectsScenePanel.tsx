@@ -264,11 +264,16 @@ function FactorField<N extends string | undefined = undefined>({ value, onChange
         const packed = value as EffectsPackedFactor;
         return (
         <div style={{ display: 'flex', alignItems: 'center', gap: T.s1 }}>
-          <NumberField title="s1: first shift (15 = term zero / locked)" width={44}
+          {/* THE SENTINEL IS THE TOP OF THE RANGE, so the tooltip READS it off the
+              same bound the spinner clamps to rather than restating today's 15.
+              A restated number and an enforced one have two authors and no
+              arbiter; when the encoding widens, the spinner moves and a typed
+              sentence stays behind, wrong in the one place a person reads it. */}
+          <NumberField title={`s1: first shift (${EFFECTS_PACKED_FACTOR_BOUNDS.s1.max} = term zero / locked)`} width={44}
             min={EFFECTS_PACKED_FACTOR_BOUNDS.s1.min} max={EFFECTS_PACKED_FACTOR_BOUNDS.s1.max}
             value={packed.s1}
             onChange={(n) => onChange({ ...packed, s1: clampPackedField('s1', n) } as V)} />
-          <NumberField title="s2: second shift (15 = single term)" width={44}
+          <NumberField title={`s2: second shift (${EFFECTS_PACKED_FACTOR_BOUNDS.s2.max} = single term)`} width={44}
             min={EFFECTS_PACKED_FACTOR_BOUNDS.s2.min} max={EFFECTS_PACKED_FACTOR_BOUNDS.s2.max}
             value={packed.s2}
             onChange={(n) => onChange({ ...packed, s2: clampPackedField('s2', n) } as V)} />

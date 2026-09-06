@@ -206,7 +206,18 @@ const MAX_CHUNKS = 256; // chunk ids are one byte → at most 256 entries
  * and 2C's commit planner refuses an append past it.
  */
 export const MAX_ADDRESSABLE_CHUNKS = 0x7f;
-const MAX_BLOCK_REF = 0x3ff; // chunk cell block field width
+/**
+ * Chunk cell's block field width — the value `inRange` below enforces.
+ *
+ * EXPORTED because four modules had typed `0x3ff` privately and TWO OF THEM
+ * PRINT IT AT A PERSON: BlockTab and ChunkTab render `blocks N/${MAX_BLOCK_REF
+ * + 1}` into the Paint-mode limits readout, and `classic-surface-plan` names the
+ * ordinal in its refusal. ChunkTab's docblock justified the duplication by
+ * saying "neither source exports it" — a reason that was true and is now not,
+ * so the copies point here instead. One field width, one author, and the
+ * sentence a blocked author reads moves with the enforcement.
+ */
+export const MAX_BLOCK_REF = 0x3ff;
 export const MAX_LAYOUT_W = 64; // INI levelwidthmax; applies to fg and bg (all real bg fit)
 export const MAX_LAYOUT_H = 8; // INI levelheightmax
 /**

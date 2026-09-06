@@ -7,6 +7,7 @@ import { useArtStore, selectArtZoom } from '../../state/artStore';
 import { useToastStore } from '../../state/toastStore';
 import { renderBlock } from '../../../core/level-classic/render';
 import type { LevelDoc, BlockDef } from '../../../core/level-classic/model';
+import { MAX_BLOCK_REF } from '../../../core/level-classic/model';
 import type { UsageIndex } from '../../../core/level-classic/usage-index';
 import { decodeGenesisColor } from '../../../core/formats/palette';
 import { isTileEditable } from '../../../core/project/editable-tiles';
@@ -62,9 +63,10 @@ import { levelKeysEnabled } from '../../workspace/level-keys';
 const BLOCK_MIN_CELL = 64;
 const BLOCK_MAX_CELL = 192;
 
-/** Chunk cell's block field is 10 bits — see ChunkTab's identical constant and
- *  its docblock for why this is duplicated rather than imported. */
-const MAX_BLOCK_REF = 0x3ff;
+/* Chunk cell's block field is 10 bits. The private `0x3ff` that used to sit
+   here now comes from model.ts, which is what enforces it — this tab PRINTS the
+   ceiling in its limits readout, so a copy here was a second author for a
+   number a person reads. */
 
 /** The floor on Paint mode's viewport box, in CSS px — see TileTab's identical
  *  `TILE_VIEW_PX` / ChunkTab's `PAINT_VIEW_PX`. */

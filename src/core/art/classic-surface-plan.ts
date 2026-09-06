@@ -13,6 +13,7 @@
 // restating the rule.
 
 import type { LevelDoc, BlockDef, BlockCell, ChunkCell } from '../level-classic/model';
+import { MAX_BLOCK_REF } from '../level-classic/model';
 import type { UsageIndex } from '../level-classic/usage-index';
 import type { PixelBuffer } from './pixel-ops';
 import type { SurfaceCell, SurfaceProvenance } from './classic-surface-buffer';
@@ -83,9 +84,10 @@ export interface PlanInput {
   reservedTiles?: ReadonlySet<number>;
 }
 
-// Chunk cell's block field is 10 bits (see model.ts MAX_BLOCK_REF) — a clone
-// that would need id 0x400 or higher can never be encoded, so refuse instead.
-const MAX_BLOCK_REF = 0x3ff;
+// Chunk cell's block field is 10 bits — a clone that would need id 0x400 or
+// higher can never be encoded, so refuse instead. IMPORTED from the validator
+// that enforces it rather than re-typed here; it was a private `0x3ff` in four
+// modules, and the refusal below prints the number at the author.
 
 /**
  * A pool slot that is unreferenced, writable, and not object-reserved.
@@ -237,7 +239,13 @@ export function planSurfaceEdit(input: PlanInput): PlanResult {
         if (id > MAX_BLOCK_REF) {
           return {
             ok: false,
-            reason: 'block limit reached: the pool cannot hold a 1025th block (10-bit chunk-cell field). Switch to Link mode to edit every place at once.',
+            // THE ORDINAL IS THE GUARD'S OWN. `id > MAX_BLOCK_REF` refuses the
+            // first id past the field, so the block that cannot fit is the
+            // (MAX_BLOCK_REF + 2)th — ids are 0-based. Typing "1025" here gave
+            // the number a second author who would not hear about a widened
+            // field, in the one sentence a blocked author reads.
+            reason: `block limit reached: the pool cannot hold a ${MAX_BLOCK_REF + 2}th block `
+              + '(10-bit chunk-cell field). Switch to Link mode to edit every place at once.',
           };
         }
         const srcBlock = doc.blocks[c.blockId];

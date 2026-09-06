@@ -231,6 +231,11 @@ import {
   bandRows, clampRateShift, clampStaticBase, demoteBandCommand, driverOptions, axisOptions,
   patternPxFor, phaseFillOptions,
   rateShiftNote, removeBandCommand, rotationUnitChoices, slotSpanPhrase,
+  // Vendored from aeon's consumer contract (via the codec, which the provider
+  // re-exports). The four geometry tooltips below READ these rather than
+  // spelling 32 and 8, so the sentence a person reads cannot outlive the
+  // contract the pickers are built from.
+  TILE_BYTES, TILE_WIDTH_PX, LAST_PHASE_BANK,
   type BandCommandResult, type BandPhaseFill, type BgAnimBandAxis,
 } from '../../providers/bg-anim-aeon';
 // The two creation verbs — label, disabled reason, command — derived ONCE and
@@ -699,8 +704,8 @@ export default function BgAnimBandPanel(): React.ReactElement {
             provider derives through the codec, so neither can hold a stale list. */}
         <Field label="Cols"
           title={horizontalAxis
-            ? 'Pattern width in tiles: the PERIOD when the axis is horizontal (pattern_px = cols*8)'
-            : 'Pattern width in tiles: the ROTATION UNIT when the axis is vertical, so cols*32 '
+            ? `Pattern width in tiles: the PERIOD when the axis is horizontal (pattern_px = cols*${TILE_WIDTH_PX})`
+            : `Pattern width in tiles: the ROTATION UNIT when the axis is vertical, so cols*${TILE_BYTES} `
               + 'must be a power of two'}>
           {horizontalAxis ? (
             /* `|| 1` USED TO BE THE EMPTY-BOX ARM, and it was the wrong shape
@@ -713,8 +718,8 @@ export default function BgAnimBandPanel(): React.ReactElement {
               min={1} width={56} value={cols}
               onChange={(n) => setCols(Math.max(1, Math.round(n) || 1))} />
           ) : (
-            <Select title="cols: constrained so that cols * 32 bytes per pattern ROW is an exact
-                           power of two, because a vertical band rotates a whole row by shifting it"
+            <Select title={`cols: constrained so that cols * ${TILE_BYTES} bytes per pattern ROW `
+              + 'is an exact power of two, because a vertical band rotates a whole row by shifting it'}
               value={String(cols)}
               onChange={(v) => setCols(Number(v))}
               style={{ width: 80 }}>
@@ -724,11 +729,11 @@ export default function BgAnimBandPanel(): React.ReactElement {
         </Field>
         <Field label="Rows"
           title={horizontalAxis
-            ? 'Rows must make rows*32 a power of two, because the runtime shifts a whole column'
-            : 'Pattern height in tiles: the PERIOD when the axis is vertical (pattern_px = rows*8)'}>
+            ? `Rows must make rows*${TILE_BYTES} a power of two, because the runtime shifts a whole column`
+            : `Pattern height in tiles: the PERIOD when the axis is vertical (pattern_px = rows*${TILE_WIDTH_PX})`}>
           {horizontalAxis ? (
-            <Select title="rows: constrained so that rows * 32 bytes per column is an exact power of two,
-                           because the runtime rotates a column by shifting it"
+            <Select title={`rows: constrained so that rows * ${TILE_BYTES} bytes per column is an `
+              + 'exact power of two, because the runtime rotates a column by shifting it'}
               value={String(bandRowCount)}
               onChange={(v) => setBandRowCount(Number(v))}
               style={{ width: 80 }}>
@@ -812,12 +817,12 @@ export default function BgAnimBandPanel(): React.ReactElement {
           {rateShiftNote(explicitRateShift ? rateShift : DEFAULT_RATE_SHIFT)}
         </Hint>
 
-        <Field label="Banks 1-7"
-          title="How banks 1-7 are filled from phase 0. Phase 0 itself is never a choice: it is
-                 the art the band rests at.">
+        <Field label={`Banks 1-${LAST_PHASE_BANK}`}
+          title={`How banks 1-${LAST_PHASE_BANK} are filled from phase 0. Phase 0 itself is never `
+            + 'a choice: it is the art the band rests at.'}>
           <Select
-            title="phase fill: how banks 1-7 (the contract's pre-shifted phases, selected by
-                   step & 7) are derived from the band's phase 0"
+            title={`phase fill: how banks 1-${LAST_PHASE_BANK} (the contract's pre-shifted phases, `
+              + `selected by step & ${LAST_PHASE_BANK}) are derived from the band's phase 0`}
             value={phaseFill}
             onChange={(v) => setCandidate({ phaseFill: v as BandPhaseFill })}
             style={{ flex: 1, minWidth: 0 }}>

@@ -6,7 +6,9 @@ import {
 import { useArtStore, selectArtZoom } from '../../state/artStore';
 import { useToastStore } from '../../state/toastStore';
 import { renderChunk, renderBlock } from '../../../core/level-classic/render';
-import { chunkIndexForId, packChunkCell, type LevelDoc } from '../../../core/level-classic/model';
+import {
+  chunkIndexForId, packChunkCell, MAX_BLOCK_REF, type LevelDoc,
+} from '../../../core/level-classic/model';
 import type { UsageIndex } from '../../../core/level-classic/usage-index';
 import { decodeGenesisColor } from '../../../core/formats/palette';
 import { isTileEditable } from '../../../core/project/editable-tiles';
@@ -60,12 +62,16 @@ import { levelKeysEnabled } from '../../workspace/level-keys';
 const CHUNK_MIN_CELL = 20;
 const CHUNK_MAX_CELL = 48;
 
-/** Chunk cell's block field is 10 bits (model.ts / classic-surface-plan.ts's own
- *  MAX_BLOCK_REF) — the block-pool ceiling the Paint-mode limits readout reports
- *  against. Duplicated rather than imported: neither source exports it (each
- *  treats it as a private implementation constant), so this is the third literal
- *  '0x3ff' in the codebase rather than a fourth import edge for one number. */
-const MAX_BLOCK_REF = 0x3ff;
+/* Chunk cell's block field is 10 bits — the block-pool ceiling the Paint-mode
+   limits readout reports against, so it is a number a person reads.
+
+   THE DUPLICATION'S REASON EXPIRED. This docblock used to argue "duplicated
+   rather than imported: neither source exports it (each treats it as a private
+   implementation constant)". That was true of a tree in which model.ts kept it
+   private; it stopped being true the moment model.ts exported it, and a
+   justification resting on someone else's omission cannot notice when the
+   omission ends. The literal is now one import from the validator that
+   enforces it. */
 
 /** The floor on Paint mode's viewport box, in CSS px — see TileTab's identical
  *  `TILE_VIEW_PX` for why this is a layout floor, not a fixed size, and why it
