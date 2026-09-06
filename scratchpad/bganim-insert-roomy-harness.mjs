@@ -16,7 +16,9 @@
 //            must be enabled, the click must land IN THE MODEL, Ctrl+S must
 //            change bytes on disk, and the saved file must carry one band,
 //            a blob grown by exactly cols*rows, and an unchanged picture.
-//   LIVE   — aeon's own document at the pinned revision (448/448, no bands).
+//   LIVE   — aeon's own document at the pinned revision (448/448, no bands;
+//            a RECORD of that revision, not of aeon today, whose document is
+//            320 tiles against a ceiling that has since moved to 400).
 //            "Add band" must be DISABLED with the provider's refusal on screen,
 //            and "Promote" must be enabled — the peer gesture still works.
 //

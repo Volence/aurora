@@ -23,14 +23,23 @@
 //    treats them symmetrically — same result type, same refusal discipline, an
 //    availability answer for each.
 //
-//    THE CAPACITY CEILING IS REAL AND THE SATURATION IS NOT. 448 is
-//    `(0xB800-0x8000)/32`, the BG tile region below the sprite attribute table,
-//    and it does not move. aeon's live document happening to sit at 448/448
-//    today is one generator run's property — the owner has ruled that background
-//    a non-final experiment and the aeon lane is adding a band-tile reserve — so
-//    an interface shaped around "insertion never works" would be shaped around a
+//    THE CAPACITY CEILING IS REAL AND THE SATURATION IS NOT. `BG_TILE_CAPACITY`
+//    is what aeon's VRAM map declares the BG arena owns; a blob past it is
+//    refused by aeon's own injector, so the ceiling binds. A document sitting AT
+//    it on any given day does not: that is one generator run's property, so an
+//    interface shaped around "insertion never works" would be shaped around a
 //    transient. An earlier revision of this file said exactly that; it is
 //    corrected here rather than quietly rewritten.
+//
+//    ⚠ AND THE CEILING ITSELF MOVES, which two earlier revisions of this comment
+//    denied in as many words ("448 is `(0xB800-0x8000)/32` ... and it does not
+//    move"). It went 448 -> 400 at aeon EFFECTS-W1 item 9d, when 48 slots were
+//    reassigned to the `waterline_strips` region; Aurora went on telling authors
+//    that 401..448 tiles fit until 2026-09-06. It is a DECLARED ALLOCATION in
+//    games/sonic4/vram.toml, not the hardware edge under the sprite attribute
+//    table, and the two are different numbers. Never name it in prose, a test or
+//    a label: read it from the vendored contract, which every consumer in this
+//    file already does.
 //
 //    What the ceiling DOES earn is the readout. `bandBudget` exists so
 //    `tileSlotsRemaining` and `bandsRemaining` can sit beside the controls that

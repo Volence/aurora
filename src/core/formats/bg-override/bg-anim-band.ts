@@ -738,9 +738,20 @@ export function planBandRemoval(
 // Promotion and demotion — the pair that does not change `tiles.length`
 //
 // WHY THIS EXISTS. `insertBand` GROWS the blob, because a band's phase-0 art
-// arrives from outside it. aeon's live document is at BG_TILE_CAPACITY exactly
-// (448/448 at aeon 9b3f11f6), so insertion refuses there for every band size
-// including 1x1 and BgAnim authoring is impossible on the file that ships.
+// arrives from outside it. When this was written aeon's live document sat at
+// BG_TILE_CAPACITY exactly (448/448 at aeon 9b3f11f6), so insertion refused
+// there for every band size including 1x1 and BgAnim authoring was impossible
+// on the file that ships.
+//
+// ⚠ BOTH HALVES OF THAT SENTENCE HAVE SINCE MOVED, in opposite directions, and
+// they cancelled to something that still reads plausible. aeon regenerated the
+// background from a simplified source (320 tiles, one band) AND the ceiling
+// shrank 448 -> 400 when EFFECTS-W1 item 9d reassigned 48 slots to
+// `waterline_strips`. So the live document has 80 free slots, not 0 and not the
+// 128 Aurora reported while its vendored ceiling still said 448 - which is
+// exactly the range an author could have been told would fit and would not.
+// Insertion works on the shipped file today; promotion is no longer the only
+// door, only the one that works at ANY occupancy.
 //
 // Promotion is the other entry point on the same machinery: take a range of
 // tiles the blob ALREADY carries and declare it animated. The band's phase 0 IS

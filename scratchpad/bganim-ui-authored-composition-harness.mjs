@@ -50,7 +50,8 @@
 // accepts because the band never got written would pass that sentence while
 // proving the opposite of what it claims. So the run REFUSES to reach its
 // comparison unless it has first established, on screen and in the model:
-//   * the document loaded and is at capacity (448/448, 0 free)
+//   * the document loaded and is at capacity (0 free; the capacity itself is
+//     read from the contract, and has been 448 and is now 400)
 //   * zero bands existed before the click
 //   * the Promote control was enabled
 //   * the click created a band IN THE MODEL, with the geometry the form asked

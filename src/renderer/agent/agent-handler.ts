@@ -100,11 +100,22 @@ let registered = false;
 //     already holds at that size. The legacy 64x32 shape stays legal: the
 //     consumer ZERO-PADS it rather than refusing (BG_LAYOUT_WORDS_LEGACY), so
 //     refusing it here would reject a file aeon bakes fine.
-//   • too LOOSE on tiles — the BG tile region is $8000..$B7FF, i.e.
-//     BG_TILE_CAPACITY tiles, because the sprite attribute table sits at
-//     $B800. 512 accepted blobs the hardware cannot hold; the surplus sprays
-//     into the SAT. A loose ceiling is the dangerous half: it takes documents
-//     the engine's own injector asserts against.
+//   • too LOOSE on tiles — the BG arena starts at $8000 and owns
+//     BG_TILE_CAPACITY tiles, and the runs above it are somebody else's. 512
+//     accepted blobs that do not fit; the surplus sprays into a neighbour. A
+//     loose ceiling is the dangerous half: it takes documents the engine's own
+//     injector asserts against.
+//
+//     ⚠ THE CEILING IS A DECLARED ALLOCATION, NOT A HARDWARE EDGE, AND IT HAS
+//     MOVED. Until 2026-09-06 the vendored contract said 448 and this comment
+//     said "$8000..$B7FF, because the sprite attribute table sits at $B800" —
+//     both wrong in the same way. $8000..$B7FF (448 slots) is the PHYSICAL run
+//     under the SAT; the CAPACITY is what aeon's games/sonic4/vram.toml
+//     declares `bg_region` owns inside it, and EFFECTS-W1 item 9d reassigned
+//     the top 48 slots to the `waterline_strips` region. Aurora spent that
+//     window accepting 401..448 tiles that aeon's injector then refused. Read
+//     BG_TILE_CAPACITY; do not name a number or an address range here, because
+//     the next reassignment will make either one false again.
 const BG_ROWS = BG_LAYOUT_WORDS / BG_WIDTH;
 const BG_ROWS_LEGACY = BG_LAYOUT_WORDS_LEGACY / BG_WIDTH;
 
@@ -714,8 +725,12 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         throw new Error(
           `the BG tile blob holds 1-${BG_TILE_CAPACITY} tiles, got `
           + `${Array.isArray(req.tiles) ? req.tiles.length : typeof req.tiles}. `
-          + `${BG_TILE_CAPACITY} is the BG VRAM region $8000..$B7FF, not a policy: the sprite `
-          + `attribute table sits at $B800, so tile ${BG_TILE_CAPACITY} would spray into it.`,
+          + `${BG_TILE_CAPACITY} is not a policy of this editor: it is what aeon's VRAM map `
+          + `declares the BG arena owns (games/sonic4/vram.toml, region "bg_region"), starting `
+          + `at $8000. The tiles directly above it belong to other runs, so tile `
+          + `${BG_TILE_CAPACITY} would spray into somebody else's. That ceiling is an `
+          + 'allocation and it has moved before, so it is read from the vendored aeon contract '
+          + 'rather than written here.',
         );
       }
       const newTiles: Tile[] = [];

@@ -115,8 +115,10 @@ describe('the golden validates under the codec', () => {
   it('shows animated slots are a PREFIX of tiles, not an addition to them', () => {
     // empyrean §5.1's corrected budget rule, on real numbers: 192 animated
     // slots sit INSIDE a 340-entry array, and the only capacity relation is
-    // len(tiles) <= 448. The superseded `tiles + animated <= 448` rule would
-    // have scored this document at 532 and called it over budget.
+    // len(tiles) <= BG_TILE_CAPACITY. The superseded `tiles + animated <=
+    // capacity` rule would have scored this document at 532 and called it over
+    // budget - over TODAY'S 400 and over the 448 that was in force when the
+    // correction was written, which is why the rows below name neither.
     const doc = JSON.parse(GOLDEN) as BgOverrideDocument;
     const animated = animatedSlotCount(doc.anims!);
     expect(animated).toBe(192);
@@ -271,6 +273,10 @@ describe('poisons: the corruptions this codec exists to stop, on real data', () 
 
   it('rejects the blob GROWTH that actually happened, when bands are retained', () => {
     // The real shape of the loss at dd93a840: the tile count moved 340 -> 448,
+    // a size that is itself now over BG_TILE_CAPACITY (400 since aeon EFFECTS-W1
+    // item 9d), so this constructed document also trips the capacity rule today.
+    // That is incidental: the two assertions below name the PREFIX-IDENTITY
+    // failures, which is the loss being reproduced.
     // so a merge preserving `anims` would not have produced subtly-stale art —
     // the prefix the bands index is not the same object at all. Simulated by
     // re-importing a different leading blob under the same bands.

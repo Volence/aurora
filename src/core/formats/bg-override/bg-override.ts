@@ -876,8 +876,9 @@ export function parseBgOverride(text: string): BgOverrideParseResult {
  * validator and the drift gate use them for.
  *
  * MINIFIED, deliberately, and that half did not change. §5 splits compactness
- * per document class: this is the tile-array class — `tiles` alone is up to 448
- * arrays of 64 numbers and one band adds 8 banks x cols*rows x 64 more, so at
+ * per document class: this is the tile-array class — `tiles` alone is up to
+ * `BG_TILE_CAPACITY` arrays of 64 numbers (400 today, and it has been other
+ * numbers) and one band adds 8 banks x cols*rows x 64 more, so at
  * indent 2 the file becomes tens of megabytes and hundreds of thousands of
  * lines. (Scene files are the scalar class and DO pretty-print.) Byte-identity
  * with a Python-written file is now a REACHABLE goal rather than an abandoned

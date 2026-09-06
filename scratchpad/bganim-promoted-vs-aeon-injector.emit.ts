@@ -69,10 +69,11 @@ if (INSERT) {
 
   // ─── THE ANTI-VACUOUS GUARD, RE-POINTED ────────────────────────────────
   // It used to read `if (free !== 0) throw 'this document is not full'`, and
-  // that was CORRECT while full was the only case: at 448/448 `insertBand`
+  // that was CORRECT while full was the only case: at capacity `insertBand`
   // refuses at every band size, so promotion was the ONLY door and a roomy
   // document meant the run was testing the easy path by accident. aeon's live
-  // document was regenerated from a simplified source and is now 320/448, so
+  // document was regenerated from a simplified source and is now 320 tiles of
+  // BG_TILE_CAPACITY (which itself went 448 -> 400 on 2026-09-06), so
   // that guard refuses the real file and, worse, asserts nothing about what
   // makes a promotion worth running.
   //

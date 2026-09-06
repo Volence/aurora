@@ -5,6 +5,7 @@
     "resolved_by": "git ls-remote origin refs/heads/master, read via git archive — never the sibling working tree",
     "generator": "tools/png_to_bg_override.py (lock mode, --lines 2,3 default, gate INTACT)",
     "budget_source": "tools/vram_map.py: BG_TILE_CAPACITY 448, BG_BAND_RESERVE 128, BG_STATIC_TILE_BUDGET 320",
+  "budget_source_since": "A RECORD OF THAT REVISION, NOT OF AEON TODAY. At aeon origin/master f14b21a89fd755b011419a2a30822f06032a8dbe (read 2026-09-06) the same generated block says BG_TILE_CAPACITY 400 and BG_BAND_RESERVE 80: EFFECTS-W1 item 9d reassigned 48 slots to the waterline_strips region and took them out of the RESERVE, so BG_STATIC_TILE_BUDGET is UNCHANGED at 320. This fixture is therefore still exactly a full static budget, and still has the whole band reserve free - the free-slot COUNT it exhibits moved 128 -> 80, which is why every row that reads it derives that count instead of naming it.",
     "palette": "games/sonic4/data/generated/ojz/act1/ojz_palette.bin at the same revision"
   },
   "source_png": {

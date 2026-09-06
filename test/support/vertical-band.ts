@@ -18,7 +18,8 @@ import {
  *
  * WHY PROMOTION AND NOT A HAND-BUILT BAND. The bake proof is only worth
  * anything if the bytes are the ones the product actually writes. `roomy` is
- * the generator's own output with room to spare (320 tiles of 448, no bands),
+ * the generator's own output with room to spare (320 tiles, no bands, and so
+ * BG_TILE_CAPACITY - 320 free whatever the ceiling currently is),
  * so a promotion there is the same call the panel's `Promote` button and the
  * agent's `promote_bg_anim_band` make.
  *

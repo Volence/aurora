@@ -601,9 +601,10 @@ describe('the sole-writer round-trip survives the command', () => {
 // art stays in `tiles`, so the picture survives in BOTH directions.
 //
 // The zero-headroom subject is built by PADDING the real fixture to the
-// contract's own capacity rather than by pinning aeon's 448, so what is under
-// test is "a document with no free tile slots" — which stays true when their
-// number moves.
+// contract's own capacity rather than by pinning aeon's ceiling, so what is
+// under test is "a document with no free tile slots" — which stays true when
+// their number moves. IT DID MOVE: 448 -> 400 on 2026-09-06 (aeon EFFECTS-W1
+// item 9d), and this file needed no edit, which is the property being claimed.
 // ===========================================================================
 
 /** Tiles as comparable values, for proving the blob was permuted and not rewritten. */

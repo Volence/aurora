@@ -26,13 +26,21 @@
 //
 // NEITHER IS THE FALLBACK. An earlier revision of this panel put insertion in a
 // collapsed section titled "(needs free tiles)", on the reading that aeon's
-// live document ships at 448/448 and therefore insertion never works on real
-// content. THE CEILING IS REAL — 448 is `(0xB800-0x8000)/32`, the BG tile region
-// below the sprite attribute table — BUT THE SATURATION IS NOT: the owner has
-// ruled that background a non-final generator experiment, and the aeon lane is
-// adding a band-tile reserve to the generator precisely so this art can carry
-// parallax and animation. A document being full today is one import run's
-// property, not a fact to shape an interface around.
+// live document ships full and therefore insertion never works on real content.
+// THE CEILING IS REAL — `BG_TILE_CAPACITY` is what aeon's VRAM map declares the
+// BG arena owns, and aeon's injector refuses a blob past it — BUT THE SATURATION
+// IS NOT: the owner has ruled that background a non-final generator experiment,
+// and the aeon lane added a band-tile reserve to the generator precisely so this
+// art can carry parallax and animation. A document being full today is one
+// import run's property, not a fact to shape an interface around.
+//
+// ⚠ NOR IS THE CEILING A FIXED NUMBER, which an earlier revision of this comment
+// asserted as `(0xB800-0x8000)/32` = 448. That is the PHYSICAL run under the
+// sprite attribute table; the capacity is a DECLARED ALLOCATION inside it
+// (games/sonic4/vram.toml, region `bg_region`) and it went 448 -> 400 when
+// EFFECTS-W1 item 9d reassigned 48 slots to `waterline_strips`. The readout
+// below has always rendered `budget.tileCapacity` rather than a literal, which
+// is the only reason this panel did not ship the wrong number too.
 //
 // WHAT THAT DOES NOT CHANGE is the capacity readout. `tileSlotsRemaining` and
 // `bandsRemaining` stay on screen beside both actions, and a refused control
