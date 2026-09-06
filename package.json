@@ -78,6 +78,7 @@
     "harness:boot-override": "node scratchpad/boot-override-harness.mjs",
     "harness:build-console-overlap": "node scratchpad/build-console-overlap-harness.mjs",
     "harness:camera": "node scratchpad/camera-harness.mjs",
+    "harness:f7-frame-09": "node scratchpad/f7-frame-09-harness.mjs",
     "harness:camera-preview": "node scratchpad/camera-preview-harness.mjs",
     "//harness-canvas-writers": [
       "FIVE HARNESSES DELETE INSIDE THE OPENED PROJECT'S `.aurora/canvas`, and they REQUIRE",
