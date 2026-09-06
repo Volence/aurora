@@ -171,21 +171,30 @@ export type EffectsDrift = 'none' | { rate: number };
  *
  * `height_shift` IS A SHIFT, NOT A LINE COUNT — `H = 1 << height_shift`. The
  * contract's own words: "an editor may DISPLAY `1 << height_shift` beside the
- * control and MUST EXPORT the shift", because every value 3..7 is legal, so a
- * conversion bug lands as a band four times too tall rather than as a refusal.
- * Aurora's control shows the line count and writes the shift; the conversion
- * lives once, in `rowRemapHeightLines` (scene-ui.ts), and nothing else in this
- * repo computes it.
+ * control and MUST EXPORT the shift", so a conversion bug lands as a band four
+ * times too tall rather than as a refusal. Aurora's control shows the line count
+ * and writes the shift; the conversion lives once, in `rowRemapHeightLines`
+ * (scene-ui.ts), and nothing else in this repo computes it.
+ *
+ * ⚠ THE SET OF LEGAL SHIFTS IS NOT A CONSTANT AND IS NEVER TYPED HERE. It was
+ * `minimum 3 / maximum 7`; it is `enum [4]` at empyrean `2e5046e`, the enum being
+ * the set of rungs aeon can generate a ladder for, and it widens by amendment as
+ * ladders land. Every consumer reads it through
+ * `EFFECTS_ROW_REMAP_HEIGHT_SHIFTS`, which serves an `enum`, a `const` and a
+ * `minimum`/`maximum` range alike, so the picker grows with no edit in this repo.
  *
  * `plane_y` IS A PLANE-B LINE, 0..511 — the `vsplit.at` coordinate space. NOT a
  * world Y and NOT a screen line: the runtime's only use of it is
  * `plane_y - Vscroll_BG`, whose second term is a per-frame runtime quantity, so
- * there is no editor arithmetic that could improve it. ⚠ THIS SCHEMA IS THE
- * ONLY ENFORCEMENT OF THE 511 CEILING anywhere in the pipeline: aeon's ensure
- * (`scene_dsl.emp:1008`) tests `>= 0` only and `brm_plane_y` is `u16`, so
- * 512..65535 would emit a silently-wrong window (aeon's own booked row
- * `ROWREMAP-PLANEY-CEILING`). The usual "the engine already refuses it"
- * argument is inverted for this field.
+ * there is no editor arithmetic that could improve it. ⚠ THIS SCHEMA IS ONE OF
+ * TWO ENFORCEMENTS OF THE 511 CEILING — itself and the engine-side `< 512` guard
+ * aeon landed at `d593070a` — and the contract asks that BOTH be kept, because a
+ * reader trimming aeon's `ensure` on this schema's authority would delete the
+ * only build-time guard a HAND-AUTHORED scene has. Before `d593070a` aeon's
+ * ensure (`scene_dsl.emp:1008`) tested `>= 0` only and `brm_plane_y` is `u16`, so
+ * 512..65535 emitted a silently-wrong window (aeon's own booked row
+ * `ROWREMAP-PLANEY-CEILING`). Aurora's bound is not redundant with aeon's: the
+ * document Aurora writes is refused here before a build is ever run.
  *
  * `ladder` and `table` are RESERVED and REFUSED BY NAME by the schema (the
  * `"not": {}` idiom) — the ladder is derived from `height_shift`, one number

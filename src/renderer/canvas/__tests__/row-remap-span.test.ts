@@ -201,7 +201,14 @@ describe('advice, not prevention, and no clearance', () => {
     // would be a bound Aurora invented, and an author who opened a hand-authored
     // scene could not see their own file in the list. Asserted on the SAME scene
     // the advisory fires on, so "enabled" is measured where it matters.
-    const short = locked([layer(0, remap(0, 7)), layer(8)]);
+    // THE TALLEST BAND THE CONTRACT ADMITS, derived. This was a typed 7 while
+    // height_shift ran 3..7; at empyrean 2e5046e the enum is [4] and a scene
+    // carrying 7 is one the codec refuses, so the literal had quietly become a
+    // document this repo could not save. The property wanted here is "a band
+    // whose reach warning fires", which the widest admitted shift on a short
+    // span gives at any enum.
+    const tallest = EFFECTS_ROW_REMAP_HEIGHT_SHIFTS[EFFECTS_ROW_REMAP_HEIGHT_SHIFTS.length - 1];
+    const short = locked([layer(0, remap(0, tallest)), layer(8)]);
     expect(rowRemapReachAdvisory(short, 0)).not.toBeNull();
     expect(ROW_REMAP_HEIGHT_OPTIONS.map((o) => o.shift))
       .toEqual([...EFFECTS_ROW_REMAP_HEIGHT_SHIFTS]);

@@ -12,7 +12,7 @@
 // conditions. It cannot prove any of this:
 //
 //        AN AUTHOR TURNS A STRIP'S `Row remap` ROW ON, PICKS THE OPTION THAT
-//        READS "64 lines", AND THE DOCUMENT HOLDS `"height_shift": 6` — NOT 64
+//        READS ITS LINE COUNT, AND THE DOCUMENT HOLDS THE SHIFT — NOT THE LINES
 //        — WHILE A SENTENCE UNDER THAT ROW SAYS IT WILL NOT BUILD YET, AND THE
 //        SENTENCE IS WHERE THE AUTHOR WOULD READ IT.
 //
@@ -129,8 +129,26 @@ const RR_NODE = SCHEMA.$defs.layer.properties.rowRemap;
 const RR_PAYLOAD = RR_NODE.oneOf.find((b) => b.properties?.plane_y).properties;
 const PLANE_Y = RR_PAYLOAD.plane_y;
 const HEIGHT = RR_PAYLOAD.height_shift;
-const SHIFTS = [];
-for (let s = HEIGHT.minimum; s <= HEIGHT.maximum; s++) SHIFTS.push(s);
+// EVERY SHIFT THE CONTRACT ADMITS, read from whichever shape it uses. This node
+// was `minimum 3 / maximum 7` through empyrean 60d9f6a and is `enum [4]` at
+// 2e5046e; the min/max loop this replaced computed `undefined..undefined` = []
+// against the amended contract, which is a FALSE ZERO wearing a working loop's
+// clothes — the banner below would have printed a blank contract line under the
+// words "ALL READ FROM THE VENDORED SCHEMA". Still not imported from
+// `scene-ui.ts`, for the reason stated above: the app must not be asked what the
+// contract says.
+const SHIFTS = (() => {
+  if (Array.isArray(HEIGHT.enum)) return [...HEIGHT.enum].sort((x, y) => x - y);
+  if (HEIGHT.const !== undefined) return [HEIGHT.const];
+  if (typeof HEIGHT.minimum === 'number' && typeof HEIGHT.maximum === 'number') {
+    const out = [];
+    for (let s = HEIGHT.minimum; s <= HEIGHT.maximum; s++) out.push(s);
+    return out;
+  }
+  throw new Error('the vendored contract admits no derivable height_shift set: it carries '
+    + 'neither an enum, nor a const, nor a numeric minimum/maximum pair. This harness cannot '
+    + 'report on a picker whose legal values it cannot name.');
+})();
 /** `H = 1 << shift`, spelled here rather than imported — the whole hazard. */
 const linesFor = (shift) => 1 << shift;
 /** The reserved names, found by the `{"not": {}}` idiom, not listed. */
@@ -142,8 +160,20 @@ const BUILDABLE = (() => {
   const m = /TODAY ONLY (\d+) BUILDS/.exec(String(HEIGHT.description));
   return m ? Number(m[1]) : null;
 })();
-/** A shift that is legal and does NOT build — the one row [4a] picks. */
-const UNBUILDABLE = SHIFTS.find((s) => s !== BUILDABLE);
+/**
+ * A shift that is legal and does NOT build — the one row [4a] picks, or
+ * `undefined` when the contract admits no such shift.
+ *
+ * ⚠ THE `BUILDABLE === null` ARM IS NOT DECORATION. `SHIFTS.find((s) => s !==
+ * BUILDABLE)` alone returns the FIRST admitted shift when `BUILDABLE` is null,
+ * because every number differs from null — so "a shift that does not build"
+ * would silently mean "the shift that does", and [4a] would pick the value
+ * already seeded and pass on a no-op. Found while re-deriving this file against
+ * empyrean 2e5046e, where `BUILDABLE` reads null for the first time.
+ */
+const UNBUILDABLE = BUILDABLE === null
+  ? undefined
+  : SHIFTS.find((s) => s !== BUILDABLE);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(path, timeoutMs = 1500) {
@@ -297,12 +327,26 @@ async function main() {
   console.log(`    AEON_DIR    : ${AEONDIR}`);
   console.log(`    DISPLAY     : :${DISPLAY_NUM}`);
   console.log(`    contract    : plane_y ${PLANE_Y.minimum}..${PLANE_Y.maximum}; `
-    + `height_shift ${HEIGHT.minimum}..${HEIGHT.maximum} = `
+    + `height_shift admits {${SHIFTS.join(', ')}} = `
     + `${SHIFTS.map((s) => `${s}→${linesFor(s)}ln`).join(' ')}; `
     + `reserved ${JSON.stringify(RESERVED)}; builds today: ${BUILDABLE}`
     + ' — ALL READ FROM THE VENDORED SCHEMA IN THIS PROCESS');
   if (UNBUILDABLE === undefined) {
-    throw new Error('the contract names no legal-but-unbuildable shift — row [4a] cannot run');
+    // NOT A DEFECT AND NOT A PASS. Through empyrean 60d9f6a `height_shift` was a
+    // 3..7 range of which four rungs were legal and unbuildable, so [4a] had a
+    // value to pick that the app should still write and [4b] had a warning to
+    // find painted. At 2e5046e the key is `enum [4]`: the enum IS the buildable
+    // set, so that population is EMPTY BY CONSTRUCTION. Rows [4a] and [4b]
+    // measure nothing and must not be rendered as green — that is the whole
+    // "loud on unmeasurable" rule this file is built on. They return the moment
+    // the contract admits a second rung.
+    console.log(`\n  ⚠ [4a] NOT RUN, NOT PASSED ([4b] runs its retirement arm instead): `
+      + `the contract admits `
+      + `{${SHIFTS.join(', ')}} and names `
+      + `${BUILDABLE === null ? 'no shift as the one that builds' : `${BUILDABLE} as buildable`}, `
+      + 'so there is NO legal-but-unbuildable shift to pick. The unit row [4a] has an empty '
+      + 'population and measures nothing in this run; [4b] runs as [4b-retired] instead, which '
+      + 'asserts the warning is painted for nobody.\n');
   }
 
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
@@ -506,27 +550,40 @@ async function main() {
     // label's number for a picker labelled differently, or that wrote the
     // OPTION INDEX, lands a legal shift that is not the one picked. Both are
     // caught by asserting the exact value.
-    const wantLines = linesFor(UNBUILDABLE);
-    await setSelect(RR_HEIGHT(CURVED), UNBUILDABLE);
-    await sleep(800);
-    const afterPick = PLANT === 'lines-not-shift'
-      ? { height_shift: wantLines }
-      : (await layerN(CURVED))?.rowRemap;
-    check('4a', `picking the "${wantLines} lines" option writes the SHIFT ${UNBUILDABLE}, not `
-      + `${wantLines}`,
-      afterPick?.height_shift === UNBUILDABLE,
-      `document holds ${JSON.stringify(afterPick)}. A picker that exported the LINE COUNT `
-      + `would hold ${wantLines}; every value ${HEIGHT.minimum}..${HEIGHT.maximum} is legal, `
-      + 'so the wrong wiring is a band four times too tall WITH A GREEN BUILD');
+    if (UNBUILDABLE !== undefined) {
+      const wantLines = linesFor(UNBUILDABLE);
+      await setSelect(RR_HEIGHT(CURVED), UNBUILDABLE);
+      await sleep(800);
+      const afterPick = PLANT === 'lines-not-shift'
+        ? { height_shift: wantLines }
+        : (await layerN(CURVED))?.rowRemap;
+      check('4a', `picking the "${wantLines} lines" option writes the SHIFT ${UNBUILDABLE}, not `
+        + `${wantLines}`,
+        afterPick?.height_shift === UNBUILDABLE,
+        `document holds ${JSON.stringify(afterPick)}. A picker that exported the LINE COUNT `
+        + `would hold ${wantLines}; the contract admits {${SHIFTS.join(', ')}}, so the wrong `
+        + 'wiring can land a band four times too tall rather than a refusal');
 
-    const notBuilt = await c.json(PAINTED_LEAF('does NOT BUILD', RR_HEIGHT(CURVED)));
-    check('4b', 'and a PAINTED sentence says that shift does not build yet, and names what does',
-      BUILDABLE === null
-        ? notBuilt.leaf === false
-        : notBuilt.leaf === true && notBuilt.insideScroller === true
-          && notBuilt.hitInside === true && notBuilt.afterControl === true
-          && notBuilt.text.includes(String(linesFor(BUILDABLE))),
-      JSON.stringify(notBuilt));
+      const notBuilt = await c.json(PAINTED_LEAF('does NOT BUILD', RR_HEIGHT(CURVED)));
+      check('4b', 'and a PAINTED sentence says that shift does not build yet, and names what does',
+        BUILDABLE === null
+          ? notBuilt.leaf === false
+          : notBuilt.leaf === true && notBuilt.insideScroller === true
+            && notBuilt.hitInside === true && notBuilt.afterControl === true
+            && notBuilt.text.includes(String(linesFor(BUILDABLE))),
+        JSON.stringify(notBuilt));
+    } else {
+      // THE RETIREMENT, MEASURED ON SCREEN. [4a] has no value to pick, but the
+      // claim that the buildability warning went quiet is checkable exactly
+      // here: with the row on and the seed picked, no "does NOT BUILD" sentence
+      // may be painted anywhere on it. This is the half of [4b] that survives an
+      // empty population, and rendering the whole section as a skip would have
+      // thrown it away.
+      const noneBuilt = await c.json(PAINTED_LEAF('does NOT BUILD', RR_HEIGHT(CURVED)));
+      check('4b-retired', 'the contract admits only buildable shifts, so NO "does NOT BUILD" '
+        + 'sentence is painted on the row',
+        noneBuilt.leaf === false, JSON.stringify(noneBuilt));
+    }
 
     await setSelect(RR_HEIGHT(CURVED), BUILDABLE ?? SHIFTS[0]);
     await sleep(700);
@@ -639,9 +696,12 @@ async function main() {
       (await c.json(`!!${RR_BOX(PLAIN)}`)) === false
       && (await c.json(`!!${RR_HEIGHT(PLAIN)}`)) === false);
 
-    // A shot with the row ON, an unbuildable shift picked and the preconditions
-    // painted — what the owner has not seen.
-    await setSelect(RR_HEIGHT(CURVED), UNBUILDABLE);
+    // A shot with the row ON, the preconditions painted, and an unbuildable shift
+    // picked WHERE ONE EXISTS — what the owner has not seen. Under a contract
+    // whose admitted set is exactly its buildable set there is no such shift, so
+    // the shot frames the buildable one rather than sending `undefined` into the
+    // picker and photographing whatever that leaves behind.
+    await setSelect(RR_HEIGHT(CURVED), UNBUILDABLE ?? BUILDABLE ?? SHIFTS[0]);
     await sleep(800);
     const framed = await c.json(String.raw`(() => {
       const el = ${RR_SELECT(CURVED)};

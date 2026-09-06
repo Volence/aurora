@@ -1093,28 +1093,31 @@ export default function EffectsScenePanel(): React.ReactElement {
 
                   ═══ THE PICKER SHOWS LINES AND THE FILE STORES A SHIFT ═══
 
-                  `height_shift` is a SHIFT — H = 1 << shift — and EVERY value
-                  3..7 is legal, so an editor that exported the line count would
-                  land a band four times too tall and the build would be GREEN.
+                  `height_shift` is a SHIFT — H = 1 << shift — so an editor that
+                  exported the line count would land a band four times too tall.
                   aeon's own ensure names the trap ("If you meant 64 LINES, you
                   want 6"), and the contract asks an editor to DISPLAY 1 << shift
                   and EXPORT the shift. The option labels come from
                   ROW_REMAP_HEIGHT_OPTIONS (the one `<<` on this key in the repo)
                   and `rowRemapWithHeightShift` writes `o.shift`.
 
-                  ═══ FOUR OF THE FIVE DO NOT BUILD, AND THE ROW SAYS SO ═══
+                  ═══ THE LIST IS THE CONTRACT'S ENUM, AND IT WENT QUIET ═══
 
-                  Only the shift with a generated ladder builds today; aeon
-                  refuses the rest BY NAME until its generator half lands. The
-                  buildable option carries a suffix in the list and a warning
-                  appears under the row for any other — the owner's recorded
-                  complaint about this tooling is precisely a build that fails
-                  after the fact ("errors during build time that I would have to
-                  stop and revert"). The options are NOT filtered: the values are
-                  legal, and an author who opened a hand-authored shift 6 must
-                  see their own file in the list. Nothing here says "only 4":
-                  `rowRemapBuildableToday` reads the state out of the contract and
-                  goes quiet on its own when 9b lands.
+                  `height_shift` was a 3..7 range of which only one rung had a
+                  generated ladder, so the row marked the buildable option and
+                  warned under itself for any other. At empyrean 2e5046e the key
+                  became `enum [4]` — the enum IS the buildable set — and the
+                  contract dropped the "TODAY ONLY n BUILDS" clause the warning
+                  was read from. So `rowRemapBuildableToday` now returns null for
+                  every option, the suffix and the warning render for nobody, and
+                  NOT ONE LINE HERE CHANGED to make that happen. That is the
+                  point: the state was always read out of the contract, so it
+                  retires itself, and it comes back the same way if the enum ever
+                  widens ahead of aeon's generator. The options are still NOT
+                  filtered and still not typed — the list is the enum, so it grows
+                  a row on its own the day a second ladder lands. The owner's
+                  recorded complaint is the failure all of it exists for ("errors
+                  during build time that I would have to stop and revert").
 
                   ═══ THE THREE PRECONDITIONS, MET HERE OR IN A BUILD LOG ═══
 
