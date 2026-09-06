@@ -201,7 +201,9 @@ describe('set-bg-override-band', () => {
  * A document at BG_TILE_CAPACITY exactly and carrying no bands — aeon's live
  * shape, and the one `makeAddBandCommand` provably cannot touch. Padded from the
  * real fixture rather than pinned to their tile count, so the subject is "a
- * document with no free slots" rather than "448".
+ * document with no free slots" rather than a number. (The number in question
+ * has since moved twice: aeon regenerated the document to 320 tiles and the
+ * ceiling itself went 448 -> 400. Both rows here were untouched by either.)
  */
 function fullBandlessDoc(): BgOverrideDocument {
   const tiles = cloneBgOverride(GOLDEN.tiles);

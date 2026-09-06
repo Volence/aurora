@@ -15,19 +15,28 @@
 //     command's actual behaviour. The rows below pin them TO the command: if
 //     availability says yes, the command must not refuse, and vice versa.
 //
-// TWO DOCUMENTS, AND BOTH ARE ORDINARY. `b0e5a661` (340 tiles, 108 free) is a
-// document with room: BOTH doors work there, and the rows say so. `FULL` is the
-// same document padded to BG_TILE_CAPACITY — the state aeon's live file happens
-// to sit in today — where insertion refuses at every size and promotion still
-// works.
+// TWO DOCUMENTS, AND BOTH ARE ORDINARY. `b0e5a661` (340 tiles) is a document
+// with room: BOTH doors work there, and the rows say so. `FULL` is the same
+// document padded to BG_TILE_CAPACITY — the state aeon's live file was in when
+// these rows were written — where insertion refuses at every size and promotion
+// still works.
 //
-// NEITHER IS THE "REAL" CASE. The 448 ceiling is real and immovable
-// ((0xB800-0x8000)/32, the BG region below the sprite attribute table); the
-// SATURATION is a transient property of one generator run, and the aeon lane is
-// adding a band-tile reserve. So a suite that only exercised the full document
+// NEITHER IS THE "REAL" CASE. The ceiling is real: aeon's injector asserts
+// `len(tiles) <= BG_TILE_CAPACITY` and refuses a blob past it. The SATURATION is
+// a transient property of one generator run, and the aeon lane did add a
+// band-tile reserve. So a suite that only exercised the full document
 // would certify an interface shaped around a passing fact, and one that only
 // exercised the roomy document would miss the refusal an author meets while the
 // budget is tight. Both, as peers.
+//
+// ⚠ THE CEILING IS NOT IMMOVABLE, WHICH THIS HEADER ASSERTED IN THOSE WORDS
+// until 2026-09-06 ("The 448 ceiling is real and immovable"). It is a DECLARED
+// ALLOCATION in aeon's games/sonic4/vram.toml, not the hardware edge under the
+// sprite attribute table, and it went 448 -> 400 when EFFECTS-W1 item 9d
+// reassigned 48 slots to `waterline_strips`. The rows below all read
+// BG_TILE_CAPACITY, so they were right through the change and kept passing; the
+// PROSE was the only thing that shipped the wrong fact. That is the argument for
+// deriving, made from the one direction that usually goes unrecorded.
 
 import { describe, it, expect } from 'vitest';
 import type { AnyCommand } from '../../../core/editing/commands';
@@ -56,7 +65,7 @@ const doc = (): BgOverrideDocument => parseBgOverride(readFileSync(FIXTURE, 'utf
  * The fixture padded to capacity — the shape the LIVE document ships in.
  *
  * Derived: it appends blank tiles until `tiles.length === BG_TILE_CAPACITY`,
- * reading the ceiling from the contract rather than counting to 448 here. The
+ * reading the ceiling from the contract rather than naming it here. The
  * padding is unreferenced by any layout word, so the document stays valid.
  */
 function fullDoc(): BgOverrideDocument {
@@ -153,7 +162,8 @@ describe('the budget the panel puts on screen', () => {
     expect(b.bands).toBe(0);
     expect(b.tiles).toBe(0);
     // Nothing is "remaining" in a document that does not exist — a panel that
-    // showed 448 free slots there would offer an operation with no target.
+    // showed a whole blob's worth of free slots there would offer an operation
+    // with no target.
     expect(b.tileSlotsRemaining).toBe(0);
     expect(b.bandsRemaining).toBe(0);
     expect(bandRows(null)).toEqual([]);

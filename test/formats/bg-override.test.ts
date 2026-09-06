@@ -642,8 +642,8 @@ describe('document invariants', () => {
   });
 
   it('does NOT add animated slots to the capacity: they are a prefix of tiles', () => {
-    // empyrean §5.1's correction, as a behaviour: a full 448-tile blob with a
-    // band over its front is legal. Under the old `tiles + animated <= 448`
+    // empyrean §5.1's correction, as a behaviour: a blob AT capacity with a
+    // band over its front is legal. Under the old `tiles + animated <= capacity`
     // rule this document would have been refused, which is what would have told
     // Aurora the flagship act cannot carry any band at all.
     const doc = minimal();

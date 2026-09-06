@@ -3,7 +3,8 @@
  * generator wrote with free tile slots, and the editor's insert door takes it.
  *
  * Every earlier insertion row ran against the b0e5a661 fixture (a historical
- * document that already carried bands) or refused on the live 448/448 one. This
+ * document that already carried bands) or refused on a live document that was
+ * saturated at the time. This
  * file's subject is `editor_bg_override.roomy.json`: the generator's OUTPUT at
  * the pinned aeon revision, from a source PNG simplified until the generator
  * itself printed `unique tiles: 320/320` — see the `.provenance.json` beside it.
@@ -185,7 +186,7 @@ describe('INSERTING a brand-new band on the roomy document', () => {
 });
 
 describe('CONTROL: the same insert on a document padded to BG_TILE_CAPACITY', () => {
-  /** Item 27's pattern: the property is "no free slots", not "448". */
+  /** Item 27's pattern: the property is "no free slots", not a tile count. */
   function fullBandlessDoc(): BgOverrideDocument {
     const tiles = cloneBgOverride(ROOMY.tiles);
     while (tiles.length < BG_TILE_CAPACITY) {

@@ -308,8 +308,9 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: `Write a zone-wide background (Plane B): a ${BG_WIDTH}x${BG_ROWS} tile nametable `
       + `(${BG_LAYOUT_WORDS} row-major VDP words; the legacy ${BG_WIDTH}x${BG_ROWS_LEGACY} / `
       + `${BG_LAYOUT_WORDS_LEGACY}-word shape is still accepted and the engine zero-pads it) plus its `
-      + `tile blob (max ${BG_TILE_CAPACITY} tiles; the BG VRAM region $8000..$B7FF, below the sprite `
-      + 'attribute table at $B800). Without "name" replaces the act-default BG (one undo step); with '
+      + `tile blob (max ${BG_TILE_CAPACITY} tiles, which is what aeon's VRAM map declares the BG `
+      + 'arena owns at $8000; the runs above it belong to other regions). Without "name" replaces '
+      + 'the act-default BG (one undo step); with '
       + '"name" saves to the project BG library (additive). Tile indices are local to the BG blob.' },
   { name: 'list_bgs', kind: 'list-bgs', result: 'json', params: {},
     // The "could not be opened" clause is the same promise `list_effects_scenes`

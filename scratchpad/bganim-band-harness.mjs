@@ -28,10 +28,17 @@
 // 3. A DEAD BUTTON WITH NO EXPLANATION, and an interface shaped around a
 //    passing fact. A band's art has two sources and they are PEERS: promotion
 //    MOVES a range the blob already holds (costs no slots at any capacity) and
-//    insertion ADDS new art (costs cols*rows slots). aeon's live document sits
-//    at 448/448 today, so insertion refuses there — but the ceiling is what is
-//    permanent ((0xB800-0x8000)/32, the BG region under the sprite attribute
-//    table), not the saturation, which is one generator run's property.
+//    insertion ADDS new art (costs cols*rows slots). aeon's live document was
+//    at capacity when this was written, so insertion refused there — but the
+//    ceiling is what BINDS (aeon's injector asserts against it), not the
+//    saturation, which is one generator run's property.
+//
+//    NEITHER NUMBER SURVIVED. The document was regenerated to 320 tiles, and
+//    the ceiling itself went 448 -> 400 (aeon EFFECTS-W1 item 9d). An earlier
+//    revision of this comment called the ceiling "permanent" and spelled it
+//    `(0xB800-0x8000)/32`; that is the PHYSICAL run under the sprite attribute
+//    table, not the arena aeon's vram.toml declares inside it. Every check
+//    below reads TILE_CAPACITY from the vendored contract and was unaffected.
 //
 //    So section 6 exercises BOTH doors on BOTH document states, and reaches the
 //    second state through the app's own gestures rather than a second fixture:
@@ -566,8 +573,9 @@ async function main() {
       //
       // The two ways a band gets its art are PEERS: promotion moves a range the
       // blob already holds (costs no slots, works at any capacity); insertion adds
-      // new art (costs cols*rows slots). The live document happens to sit at
-      // 448/448 today, which is a generator run's property and not a fact to shape
+      // new art (costs cols*rows slots). The live document happened to sit at
+      // capacity when this was written, which is a generator run's property and
+      // not a fact to shape
       // an interface around — so this section exercises insertion on BOTH states,
       // and reaches the second one THROUGH THE APP'S OWN GESTURES rather than by
       // opening a different fixture: promote (no change to the blob) → remove the

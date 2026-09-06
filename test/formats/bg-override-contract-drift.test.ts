@@ -42,13 +42,23 @@ import { BG_TILE_BASE_SLOT as LOADER_BG_TILE_BASE_SLOT } from '../../src/core/fo
  *           without the pin failing; and every constant the codec exports is
  *           READ from that copy rather than typed beside it.
  *
- *   DOES NOT PROVE anything about aeon. Nothing inside this repo can observe
- *           aeon changing, and that is deliberate: a sibling-repo path probe is
+ *   DOES NOT PROVE anything about aeon. Nothing in THIS file can observe aeon
+ *           changing, and that is deliberate: a sibling-repo path probe is
  *           wrong from a worktree, wrong from a lone clone, and absent from a
  *           packaged build, and it would degrade to "not found -> skip", which
- *           renders "could not measure" as green. Re-reconciling by hand when a
- *           wave parcel is cut is the same overseer ritual the effects schema
- *           pin established (aurora ROADMAP item 12).
+ *           renders "could not measure" as green.
+ *
+ *           ⚠ THAT GAP HAD A COST AND IS NOW PARTLY CLOSED. Re-reconciling by
+ *           hand did not happen: `BG_TILE_CAPACITY` sat here at 448 after aeon
+ *           took the BG arena to 400 (EFFECTS-W1 item 9d), so Aurora accepted
+ *           documents of 401..448 tiles that aeon's injector refused, and the
+ *           stale entry's own citation named a line number that had also moved.
+ *           `test/formats/bg-override-contract-currency.test.ts` now reads
+ *           aeon's authorities at a COMMITTED revision (`git show`, never the
+ *           working tree) and skips LOUDLY when aeon is absent, which is the
+ *           shape `aeon-fixture-currency.test.ts` had already established for
+ *           the vendored fixtures. It covers the VALUES only; the line numbers
+ *           in `authorities` are still checked by nothing.
  *
  * Last reconciled 2026-08-22 against aeon
  * 1ee8f8e68d826b18023639ab32a8f7c82f238e62 (origin/master), reading
@@ -81,7 +91,7 @@ const CONTRACT_PATH = resolve(
   __dirname, '../../src/core/formats/bg-override/bganim-consumer-contract.json',
 );
 const CONTRACT_TEXT = readFileSync(CONTRACT_PATH, 'utf8');
-const CONTRACT_SHA256 = 'a8e385e2e70f464d9869f7ecca6cb459308f5bee591ce045d0b5574e9a3d77d7';
+const CONTRACT_SHA256 = 'b7c688641d16d85fa91893e1bcda3543039511c1b1e1f78cf107201fddc1c0da';
 
 describe('the vendored contract is the one we pinned', () => {
   it('matches the pinned content hash', () => {

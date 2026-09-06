@@ -6,11 +6,21 @@
 // exactly two files, both implementations: the validation here was completely
 // unguarded. And it was wrong in BOTH directions at once (ROADMAP item 8):
 //
-//   • `BG_MAX_TILES = 512` accepted blobs the hardware cannot hold. The BG tile
-//     region is VRAM $8000..$B7FF — `BG_TILE_CAPACITY` tiles — because the
-//     sprite attribute table sits at $B800. This is the dangerous half: a loose
-//     ceiling takes a document aeon's own injector asserts against, so the
-//     refusal arrives at bake time or, worse, as art in the SAT.
+//   • `BG_MAX_TILES = 512` accepted blobs that do not fit. The BG arena starts
+//     at VRAM $8000 and owns `BG_TILE_CAPACITY` tiles, because aeon's
+//     games/sonic4/vram.toml declares it that size; the runs above it belong to
+//     other regions. This is the dangerous half: a loose ceiling takes a
+//     document aeon's own injector asserts against, so the refusal arrives at
+//     bake time or, worse, as art on top of somebody else's tiles.
+//
+//     ⚠ AND "LOOSE" IS NOT A ONE-TIME CONDITION. The ceiling is a DECLARED
+//     ALLOCATION, not a hardware edge, and it shrank 448 -> 400 on the aeon side
+//     while this repo's vendored copy still said 448 - so Aurora spent that
+//     window accepting 401..448 tiles for exactly the reason this file exists.
+//     Nothing here could have caught it: every row below derives from the
+//     contract, and a contract that is wrong is wrong in the test too. The
+//     currency question has its own instrument:
+//     test/formats/bg-override-contract-currency.test.ts.
 //   • `BG_TILES_HIGH = 32` made the engine's full-height nametable
 //     (`BG_LAYOUT_WORDS`, 64x64) literally unrepresentable, while `get_bg`
 //     announced `height: 32` for every act regardless of what it held.
@@ -18,11 +28,11 @@
 // EVERY EXPECTATION BELOW IS DERIVED. The ceilings come from
 // `core/formats/bg-override/bg-override.ts`, which reads them out of the
 // vendored `bganim-consumer-contract.json` — the same import the validator
-// uses. A typed-in `448` would let the test and the validator drift to
+// uses. A typed-in ceiling would let the test and the validator drift to
 // different numbers and still agree with each other's prose.
 //
 // BOUNDARY ROWS RUN BOTH WAYS. At the ceiling must pass; one over must refuse.
-// A row that only feeds 10000 tiles cannot tell 448 from 512.
+// A row that only feeds 10000 tiles cannot tell one ceiling from another.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { z } from 'zod';
@@ -120,13 +130,20 @@ describe('set_bg tile ceiling', () => {
     expect(act().bgTiles).toHaveLength(4);            // and the act is untouched
   });
 
-  it('refuses for the RIGHT REASON: the hardware region, named', async () => {
+  it('refuses for the RIGHT REASON: the declaring authority, named', async () => {
     // (c): the row above proves it fires; this one proves the guard that fired
     // is the VRAM-capacity guard and not some other arity check that happens to
-    // mention a count. $8000..$B7FF appears in no other refusal on this path.
+    // mention a count. `vram.toml` appears in no other refusal on this path.
+    //
+    // THE DISCRIMINATOR USED TO BE `$8000..$B7FF` AND THAT WAS A MISTAKE OF THE
+    // SAME KIND THE FILE HEADER WARNS ABOUT. An address RANGE is as perishable
+    // as a tile count: $B7FF was the top of the BG arena until EFFECTS-W1 item
+    // 9d gave the top 48 slots to `waterline_strips`, after which the refusal
+    // could no longer honestly print it. The region's DECLARING FILE is the
+    // stable half, so that is what both the message and this row name now.
     await expect(ask({
       kind: 'set-bg', layout: wireLayout(BG_LAYOUT_WORDS), tiles: wireTiles(BG_TILE_CAPACITY + 1),
-    })).rejects.toThrow(/\$8000\.\.\$B7FF/);
+    })).rejects.toThrow(/vram\.toml/);
   });
 
   it('measures TILE COUNT, not pixels: 512 tiles is the old ceiling and must now refuse', async () => {

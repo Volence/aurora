@@ -794,7 +794,8 @@ async function main() {
     //
     // [6l] alone is the vacuous shape [6g3] exists to prevent one row further
     // up: it measures `b0 · 0..31`, a single-digit band index over two-digit
-    // slots, and a label tuned to that is green here while a 448-slot document
+    // slots, and a label tuned to that is green here while a full-capacity
+    // document
     // ellipsises the moment its second band starts past slot 99.
     //
     // DERIVED FROM THE VENDORED CONTRACT, NEVER TYPED: `BGANIM_MAX_BANDS`
