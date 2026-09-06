@@ -280,12 +280,14 @@ and the VISUAL DETAIL as unratified."* One shot per tab, from a clean arrival, a
 1680×1050:
 
 ```
-scratchpad/shots-effects-sub-tabs/effects-sub-tab-parallax.png
-scratchpad/shots-effects-sub-tabs/effects-sub-tab-colour.png
-scratchpad/shots-effects-sub-tabs/effects-sub-tab-tileAnim.png
+docs/captures/2026-09-05-effects-shape/effects-sub-tab-parallax.png
+docs/captures/2026-09-05-effects-shape/effects-sub-tab-colour.png
+docs/captures/2026-09-05-effects-shape/effects-sub-tab-tileAnim.png
 ```
 
-(`scratchpad/shots*/` is gitignored, as the strip's and wave 1's captures were.)
+(`scratchpad/shots*/` is gitignored, as the strip's and wave 1's captures were; these
+three were committed on 2026-09-05 for the owner's approval and the paths above are
+those tracked copies, byte-identical.)
 
 **Granular calls made without asking, each reversible in one line:**
 

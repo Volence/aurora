@@ -384,7 +384,13 @@ Both are small; both would have cost someone time.
    `anchor-authoring-harness` row `[9a]` on every run, which is how I read it —
    but a reviewer told it was committed would have gone looking for an artifact
    that cannot exist. A fresh capture is at that path now, produced by the final
-   green run.
+   green run. **Since 2026-09-06 that capture is also TRACKED**, at
+   `docs/captures/2026-09-04-anchor-authoring/anchors-section-open.png`, so the
+   artifact a reviewer would have gone looking for does now exist. The finding
+   above is about what the brief claimed at the time and is left exactly as it
+   was written: the scratchpad path it names was never committed and never will
+   be, and repointing it would have destroyed the finding rather than repaired
+   a citation.
 
 2. **The anchors column is 300px, not 280px.** Measured `[i3]` /
    `[W0]`. The select inside it is 190px, which is the number the wording is

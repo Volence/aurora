@@ -22,7 +22,7 @@ modifier (`4f36936`) and once over collision-word preservation (`370168c`).
 
 ## 0. THE PICTURE
 
-`scratchpad/shots-marquee-flip/4-mirror-closeup.png` — a jungle canopy slope, copied
+`docs/captures/2026-08-28-marquee-flip/4-mirror-closeup.png` — a jungle canopy slope, copied
 once, pasted twice (once flipped) into blank ground, 8× nearest-neighbour off the map
 canvas in the same session that measured it:
 

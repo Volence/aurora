@@ -245,7 +245,7 @@ six days in plain sight.
 
 ## 7. Screenshot
 
-`scratchpad/shots-effects-guides/5-dragged-past-neighbour.png` — captured **mid-drag,
+`docs/captures/2026-09-02-effects-guides/5-dragged-past-neighbour.png` — captured **mid-drag,
 button still down**, `L0` dragged to 180 past `L1` at 150. Both guides visible, `L1`
 red, and the plate reading:
 

@@ -5,7 +5,22 @@
 disclosure + tests), `effd72a5` (harness), plus the docs commit that carries this file ·
 **Instrument** `scratchpad/variant-cycle-harness.mjs`
 (`AEON_DIR=<copy> [SCREEN=1920x1080] npm run harness:variant-cycle`) ·
-**Captures** `scratchpad/shots-variant-cycle/disclosure.png`, `…/authored.png`
+**Captures** `docs/captures/2026-09-03-variant-cycle/authored.png` ·
+`scratchpad/shots-variant-cycle/disclosure.png` **EVIDENCE NOT RETAINED**
+
+> **The disclosure capture cited above is gone, and unlike the other losses
+> marked in this tree it CANNOT BE RETAKEN.** The file is absent from every
+> checkout reachable here and no commit ever touched it, because
+> `.gitignore:10` has matched that path since 2026-08-15. The instrument does
+> survive: `scratchpad/variant-cycle-harness.mjs` is tracked. But re-running it
+> does not reproduce this picture. That harness writes `disclosure.png` only
+> while the disclosure is still live and `disclosure-retired.png` once it is
+> not, and `docs/reviews/2026-09-03-retire-preset-lag-item4.md` retired it. The
+> state this shot was of no longer exists to be photographed. **What a reader
+> can act on:** `npm run harness:variant-cycle` produces
+> `disclosure-retired.png`, the picture of what replaced it, and that review
+> quotes the harness row proving the retirement. The sibling capture is
+> repointed above and tracked; new evidence goes in `docs/captures/`, tracked.
 
 ---
 

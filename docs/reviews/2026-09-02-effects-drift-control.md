@@ -220,7 +220,7 @@ earned its keep on the first run: [5e]'s `insideScroller: false` with
 
 ### Screenshot
 
-`scratchpad/shots-effects-drift/effects-drift.png` — the row set to `px/frame`, a
+`docs/captures/2026-09-02-effects-drift/effects-drift.png` — the row set to `px/frame`, a
 typed `0` in the box, and the amber refusal painted beneath it.
 
 ---

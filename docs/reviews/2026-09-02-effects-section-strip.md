@@ -185,10 +185,11 @@ harness), because a shot at `scrollTop 0` would show him the one state that was
 never in question:
 
 ```
-scratchpad/shots-effects-section-strip/effects-section-strip-scrolled.png
+docs/captures/2026-09-02-effects-section-strip/effects-section-strip-scrolled.png
 ```
 
-(`scratchpad/shots*/` is gitignored, as wave 1's capture was.)
+(`scratchpad/shots*/` is gitignored, as wave 1's capture was; this shot was promoted
+to the tracked path above on 2026-09-06.)
 
 Granular calls made without asking, each reversible in one line: `Editing` rather
 than `Editing section` as the label (the shared 64px label column wraps the

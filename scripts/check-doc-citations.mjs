@@ -671,12 +671,32 @@ const EVIDENCE_LOST = 'the sentence records evidence that was DESTROYED (a workt
   + 'record of what was lost, which is the opposite of the repair. It is not a licence: '
   + 'docs/captures/ is where evidence goes.';
 
+// A SECOND REASON, because the first one names a CAUSE I cannot verify for these.
+// The 2026-09-05 prune is a known event with a known blast radius; the three below
+// are simply absent from every checkout reachable from here, and I did not find out
+// what removed them. Saying "a prune took it" about a file I did not watch die would
+// be a remedy written rather than measured, which is this row's own defect.
+const EVIDENCE_GONE = 'the sentence records evidence that is ABSENT from every checkout reachable '
+  + 'here and that no commit ever touched (.gitignore:10 has matched scratchpad/shots*/ since '
+  + '2026-08-15), marked in place with what a reader can do instead. What removed it is NOT '
+  + 'known and the marking does not claim to know. Deleting the path would erase the record of '
+  + 'what was lost. It is not a licence: docs/captures/ is where evidence goes.';
+
 const EXEMPT = [
   { file: 'docs/reviews/2026-08-30-o31-dangling-bg-refs.md', token: 'scratchpad/shots-bg-dangling', why: EVIDENCE_LOST },
   { file: 'docs/reviews/2026-08-30-o21-bg-wrap-visibility.md', token: 'scratchpad/shots-bg-wrap', why: EVIDENCE_LOST },
   { file: 'docs/reviews/2026-09-02-effects-usability-w1.md', token: 'scratchpad/shots-effects-section-picker/effects-section-picker.png', why: EVIDENCE_LOST },
   { file: 'docs/reviews/2026-09-03-o56-loop-authoring-door.md', token: 'scratchpad/shots-o56-loop-authoring-door/collision-facet-arrival.png', why: EVIDENCE_LOST },
   { file: 'docs/reviews/2026-09-03-o56-loop-authoring-door.md', token: 'scratchpad/shots-o56-loop-authoring-door/collision-facet-armed.png', why: EVIDENCE_LOST },
+
+  // Marked by row DOCS-SHOTS-RETRO on 2026-09-06. The first is the sharpest case
+  // in this list: the instrument that took it is TRACKED AND STILL RUNS, and it
+  // still cannot reproduce the shot, because the harness writes that filename only
+  // while the disclosure is live and the disclosure was retired. A remedy of
+  // "re-run the harness" would have been wrong in a way that reads as right.
+  { file: 'docs/reviews/2026-09-02-variant-cycle-controls.md', token: 'scratchpad/shots-variant-cycle/disclosure.png', why: EVIDENCE_GONE },
+  { file: 'docs/reviews/2026-09-03-o51-artmode-defects.md', token: 'scratchpad/shots-canvas/repro-assign.png', why: EVIDENCE_GONE },
+  { file: 'docs/superpowers/plans/2026-08-15-paint-through-cdp-report.md', token: 'scratchpad/shots-paint', why: EVIDENCE_GONE },
 ];
 
 // ---------------------------------------------------------------------------

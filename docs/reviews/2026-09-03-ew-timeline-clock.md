@@ -314,8 +314,9 @@ the run **ABORTS** — `6/7 rows had run — this is NOT a pass over the rows th
 
 ## 6. For the owner — the LOOK is unratified
 
-`scratchpad/shots-anchor-authoring/anchors-section-open.png` (gitignored, as this facet's captures
-are): the section open, one channel authored, a sweep running, at 1680×1050.
+`docs/captures/2026-09-04-anchor-authoring/anchors-section-open.png` (tracked since
+2026-09-06; the harness still writes to the gitignored `scratchpad/shots*/`, as this
+facet's captures did): the section open, one channel authored, a sweep running, at 1680×1050.
 
 ⚠ **The first version of that capture shot the arrival scroll position, with the section it is about
 764px below the frame.** It would have been handed over as "the look". The harness scrolls to the

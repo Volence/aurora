@@ -234,8 +234,9 @@ the unmodified files against a build of the baseline commit in this worktree:
 
 ## 7. For the owner — one capture, and one granular call
 
-`scratchpad/shots-effects-preview-default/effects-parallax-preview-default.png`
-(gitignored, like every other `scratchpad/shots*/`). A **cold arrival**: storage
+`docs/captures/2026-09-02-effects-preview-default/effects-parallax-preview-default.png`
+(promoted 2026-09-06 out of the gitignored `scratchpad/shots*/` the harness writes
+to, like every other capture of that run). A **cold arrival**: storage
 cleared, reloaded, project opened, `Effects` clicked, nothing else. `[6a]` asserts
 the shot is of that state and not of a stale stored choice — `on: true, choice:
 null, active: true, blits: 5`.
