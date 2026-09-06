@@ -165,6 +165,48 @@
 //     same reason as check-cited-paths rule 1.
 //  N4 A PLACEHOLDER: a token containing, or immediately followed by, `<`, `>`,
 //     `*`, `?`, `…` or `...`, and a token hyphen-wrapped at end of line.
+//  N5 AN ELLIPSIS-PREFIXED ROOTED PATH, `…/scratchpad/x` or `.../src/x.ts`. The
+//     lookbehind already refuses these, because the character before the root is
+//     a `/`. That refusal was read as a HOLE once (a row was opened on it, with
+//     a planted positive proving the gate exits 0 on the shape), so it is now
+//     declared and counted rather than left to be rediscovered.
+//     ⚠ IT IS NOT A HOLE, and the measurement is the argument. 17 occurrences
+//     here; 13 sit inside a fenced stack trace and are N1 anyway; 5 name
+//     something absent. In 4 of those 5 the ellipsis elides an ABSOLUTE prefix,
+//     not a repo-relative one: `docs/reviews/2026-08-27-guard-surface-gaps.md:76`
+//     says a throwaway clone "was placed at `…/scratchpad/aeonwork/aeon`", which
+//     is a path under a session temp directory and was never a path in this
+//     repository. Resolving the remainder against the repo root would report
+//     four findings that are not findings, out of five. The ellipsis is a
+//     deliberate statement that the prefix has been withheld, so the gate cannot
+//     know what the remainder is relative to, and declines to guess.
+//     THE ONE GENUINE CASE, named because a decline with no cost is a decline
+//     nobody checked: `docs/superpowers/plans/2026-08-14-plan5-overnight-report.md:142`
+//     writes `…/scratchpad/shots-final/NOTES.md` where the ellipsis is decorative
+//     and the path IS repo-relative. That line already carries its own marking,
+//     EVIDENCE NOT RETAINED AND NO INSTRUMENT REBUILDS IT, so the record is
+//     correct on a line this gate never judged. Whether the narrow sub-case of an
+//     ellipsis path whose remainder is TRACKED should be judged is a separate
+//     question and deliberately not settled here.
+//  N6 A BARE BACKTICKED FILENAME, `sibling-root.mjs`, with no directory in it.
+//     A filename in prose names no location. `App.tsx` is not a path; this repo
+//     has several files by names like it, and a reader who follows the citation
+//     is guessing which tree and which directory the sentence meant.
+//     ⚠ MEASURED COST OF NOT GATING THEM, and it is the reason: 3,045 of them
+//     outside a fenced block, 1,063 distinct. 835 match no basename this
+//     repository tracks ANYWHERE, and most of those name a suite peer's file, a
+//     Genesis ROM artefact, or a file that has since been renamed. Judging the
+//     shape would put a four-figure number of findings into a gate whose whole
+//     design is that its red is worth reading. The count is derived every run,
+//     so the day someone starts writing rooted paths instead, it moves.
+//     The extension set is derived too, from the extensions this repository
+//     actually tracks, so `v1.2` in prose is not counted as a file.
+//
+// N5 AND N6 ARE PRINTED ON EVERY RUN. `scratchpad/check-harness-guards.mjs`
+// states the principle they follow: an exemption nobody sees is a hole. A reader
+// who cannot tell a declared limit from an undiscovered one will open a row on
+// it, measure it, and find out it was correct behaviour all along. That is what
+// happened, and it cost a cycle.
 //
 // ─── WHAT IT STILL CANNOT SEE ──────────────────────────────────────────────
 //
@@ -244,6 +286,37 @@ const TOKEN_RE = new RegExp(`${BEFORE}((?:${ROOTS.join('|')})/[\\w./@\\-]*[\\w])
  */
 const PLACEHOLDER_IN = /[<>*?…]|\.\.\./;
 const PLACEHOLDER_AFTER = /^-?[<>*?…]/;
+
+/**
+ * N5. A rooted path wearing an elided prefix. This is deliberately a SEPARATE
+ * regex from TOKEN_RE rather than a relaxation of it: TOKEN_RE must go on
+ * refusing the shape, and this one only counts what it refused. If the two ever
+ * merge, the decline stops being a decline.
+ */
+const ELLIPSIS_RE = new RegExp(`(?:…|\\.\\.\\.)/(?:${ROOTS.join('|')})/[\\w./@\\-]*[\\w]`, 'g');
+
+/**
+ * N6. Inline-code spans, with their CONTENT captured. Same pattern as
+ * `codeSpans` above, which reports only offsets.
+ */
+const CODE_SPAN_TEXT_RE = /(`+)((?:[^`]|[^`][\s\S]*?))\1/g;
+
+/** A filename with no directory in it: one dot-extension, no slash. */
+const BARE_FILE_RE = /^[\w][\w.@\-]*\.([A-Za-z0-9]+)$/;
+
+/**
+ * Every bare backticked filename on a line (N6). `extOk` is supplied by the
+ * caller from the extensions this repository actually tracks, so a version
+ * number in prose is not counted as a file.
+ */
+function bareFilenames(line, extOk) {
+  const out = [];
+  for (const m of line.matchAll(CODE_SPAN_TEXT_RE)) {
+    const b = m[2].match(BARE_FILE_RE);
+    if (b && extOk(b[1].toLowerCase())) out.push(m[2]);
+  }
+  return out;
+}
 
 /** Can this token be asked about at all, or does it leave the repository (N3)? */
 function judgeable(token) {
@@ -376,7 +449,27 @@ function analyze(root, inForce) {
   };
   const onDisk = (tok) => existsSync(join(root, tok)) || MODULE_EXTS.some((x) => existsSync(join(root, tok + x)));
 
-  const stat = { tokens: 0, marked: 0, fenced: 0, peer: 0, escaping: 0 };
+  // N6's two derived inputs. The extension set decides what SHAPE counts as a
+  // filename at all; the basename set is the only resolvability question a bare
+  // filename can be asked, and it is a weak one, which is the point.
+  const basenames = new Set();
+  const trackedExts = new Set();
+  for (const f of trackedList) {
+    const base = f.slice(f.lastIndexOf('/') + 1);
+    basenames.add(base);
+    const dot = base.lastIndexOf('.');
+    if (dot > 0) trackedExts.add(base.slice(dot + 1).toLowerCase());
+  }
+  if (trackedExts.size === 0) {
+    die(`git lists ${trackedList.length} tracked path(s) and not one has an extension. N6's counter `
+      + 'would silently report zero bare filenames, which is indistinguishable from a corpus that has none.');
+  }
+  const extOk = (x) => trackedExts.has(x);
+
+  const stat = {
+    tokens: 0, marked: 0, fenced: 0, peer: 0, escaping: 0,
+    ellipsis: 0, ellipsisFenced: 0, bareFile: 0, bareFileUnknown: 0,
+  };
   const findings = [];
   const perFile = new Map();
 
@@ -385,6 +478,19 @@ function analyze(root, inForce) {
     try { text = readFileSync(join(root, rel), 'utf8'); } catch (e) { die(`cannot read ${rel}: ${e.message}`); }
     tagLines(text).forEach((L, i) => {
       if (L.marker) return;
+
+      // N5 and N6, counted BEFORE the judged population is touched. These two
+      // shapes never become findings; the run only has to be able to say how
+      // much it declined and why.
+      const ell = L.raw.match(ELLIPSIS_RE);
+      if (ell) { stat.ellipsis += ell.length; if (L.fenced) stat.ellipsisFenced += ell.length; }
+      if (!L.fenced) {
+        for (const name of bareFilenames(L.raw, extOk)) {
+          stat.bareFile++;
+          if (!basenames.has(name)) stat.bareFileUnknown++;
+        }
+      }
+
       const cs = citations(L.raw);
       if (cs.length === 0) return;
       if (L.fenced) { stat.fenced += cs.length; return; }
@@ -446,7 +552,14 @@ const FIXTURE = [
   'Shots in `scratchpad/shots-*/`.',                              // 11 glob placeholder
   'Also `src/renderer/x-<mode>.ts` here.',                        // 12 angle placeholder
   'Ported from `src/../../aeon/x.ts` upstream.',                  // 13 escaping
+  'Trace at …/scratchpad/harness.mjs:12 in the log.',             // 14 N5 ellipsis
+  'The helper `sibling-root.mjs` does the work.',                 // 15 N6 bare filename
+  'Bumped to `v1.2` and then `1.5` last week.',                   // 16 not filenames
 ].join('\n');
+
+/** The extension set the FIXTURE is judged against. The real run derives its own. */
+const FIXTURE_EXTS = new Set(['ts', 'tsx', 'mjs', 'png', 'md']);
+const fixtureExtOk = (x) => FIXTURE_EXTS.has(x);
 
 function proveExtractor() {
   const L = tagLines(FIXTURE);
@@ -471,7 +584,22 @@ function proveExtractor() {
   if (c(13).length !== 1 || c(13)[0].escaping !== true) bad('a path that climbs out of the repo is not flagged escaping');
   if (!PEER_RE.test(L[13].raw)) bad('the peer detector does not see a peer name on a line');
   if (PEER_RE.test(L[0].raw)) bad('the peer detector fires on a line naming no peer');
-  return 14;
+
+  // N5. Both halves, because a counter that fires everywhere reports nothing and
+  // a judged ellipsis path would mean the decline had quietly become a rule.
+  const ellCount = (i) => (L[i].raw.match(ELLIPSIS_RE) ?? []).length;
+  if (ellCount(14) !== 1) bad(`the N5 detector saw ${ellCount(14)} ellipsis path(s) on a line with exactly one`);
+  if (ellCount(0) !== 0) bad('the N5 detector fires on a plain rooted path, so its count would be meaningless');
+  if (c(14).length !== 0) bad('an ellipsis-prefixed path became a JUDGED citation. N5 declares a decline, not a rule');
+
+  // N6. The extension gate is what stops a version number being counted as a file.
+  const bare = (i) => bareFilenames(L[i].raw, fixtureExtOk);
+  if (bare(15).length !== 1 || bare(15)[0] !== 'sibling-root.mjs') bad(`the N6 detector read ${JSON.stringify(bare(15))} where one bare filename sits`);
+  if (bare(16).length !== 0) bad(`a version number was counted as a bare filename: ${JSON.stringify(bare(16))}`);
+  if (bare(1).length !== 0) bad('a path WITH a directory was counted as a bare filename, so N6 double-counts the judged population');
+  if (c(15).length !== 0) bad('a bare filename became a judged citation, so N6 is not a decline at all');
+
+  return 17;
 }
 const FIXTURE_LINES = proveExtractor();
 
@@ -536,6 +664,11 @@ function proveRatchet() {
     if (r.inScope.length !== 0) fail(`G1: expected nothing in scope, got ${JSON.stringify(r.inScope.map((f) => f.token))}`);
     if (!has(r, 'src/real.ts') === false) { /* a tracked path must not be a finding at all */ }
     if (r.findings.some((f) => f.token === 'src/real.ts')) fail('G1: a TRACKED path was reported as a finding');
+    // The negative control for G8. A count that is never zero measures nothing.
+    if (r.stat.ellipsis !== 0 || r.stat.bareFile !== 0) {
+      fail(`G1: the N5/N6 counters report ${r.stat.ellipsis}/${r.stat.bareFile} on a corpus containing `
+        + 'neither shape, so a nonzero count in G8 would prove nothing');
+    }
   }
 
   // G2  THE SAME LINE, edited after the cutoff, is IN SCOPE. Per-line binding:
@@ -621,7 +754,42 @@ function proveRatchet() {
     if (r.stat.tokens !== 2) fail(`G7: expected 2 judged tokens, saw ${r.stat.tokens}`);
   }
 
-  const summary = { G1: 'grandfathered', G2: 'per-line', G3: 'untracked-new', G4: 'ignored-still-fails', G5: 'backdating', G6: 'declines', G7: 'tracked-passes' };
+  // G8  N5 AND N6 ARE COUNTED, AND STILL DECLINED. The two shapes this gate
+  //     declares it does not judge. A declaration whose number cannot move is
+  //     the defect being fixed, so this plants one of each and reads the
+  //     counters back; G1 above is the zero control on the same counters.
+  {
+    const d = mkRepo(); dirs.push(d);
+    writeDoc(d, 'scratchpad/known-harness.mjs', '// tracked\n');
+    writeDoc(d, 'docs/reviews/shapes.md', [
+      'Threw at …/scratchpad/known-harness.mjs:12 during the run.',
+      'The clone sat at `…/scratchpad/gone-forever/` when it broke.',
+      '',
+      '```',
+      'at .../src/renderer/App.tsx:3:1',
+      '```',
+      '',
+      'The helper `known-harness.mjs` is the instrument.',
+      'Nothing tracks `never-existed.mjs` anywhere.',
+      'Bumped to `v1.2` in the same commit.',
+      '',
+      'And a plain `scratchpad/shots-shapes/` beside them.',
+      '',
+    ].join('\n'));
+    commitAt(d, NEW, 'a new review carrying both declared shapes');
+    const r = analyze(d, CUT);
+    if (r.stat.ellipsis !== 3) fail(`G8: the N5 counter says ${r.stat.ellipsis}, not 3, so it cannot report what it declined`);
+    if (r.stat.ellipsisFenced !== 1) fail(`G8: the N5 fence split says ${r.stat.ellipsisFenced}, not 1`);
+    if (r.findings.some((f) => f.token.includes('gone-forever'))) fail('G8: an ellipsis-prefixed path became a FINDING. N5 declares a decline, and widening it is a separate row');
+    if (r.stat.bareFile !== 2) fail(`G8: the N6 counter says ${r.stat.bareFile}, not 2 (a version number is not a filename, and a rooted path is not a bare one)`);
+    if (r.stat.bareFileUnknown !== 1) fail(`G8: the N6 unknown-basename counter says ${r.stat.bareFileUnknown}, not 1`);
+    if (!scoped(r, 'scratchpad/shots-shapes')) fail('G8: the ordinary citation beside them was lost, so the two new declines are eating real findings');
+  }
+
+  const summary = {
+    G1: 'grandfathered', G2: 'per-line', G3: 'untracked-new', G4: 'ignored-still-fails',
+    G5: 'backdating', G6: 'declines', G7: 'tracked-passes', G8: 'shapes-counted-not-judged',
+  };
   for (const d of dirs) rmSync(d, { recursive: true, force: true });
   return summary;
 }
@@ -747,6 +915,17 @@ console.log(
   + `commands and quoted listings); ${run.stat.peer} on a line that names a suite peer `
   + `(${SUITE_PEERS.join('/')}), which this gate cannot resolve to a tree; ${run.stat.escaping} `
   + 'naming a path that leaves this repository.\n'
+  + `${PREFIX}: NOT JUDGED, TWO DECLARED SHAPES, counted here because an exclusion nobody sees `
+  + `reads as a hole. ${run.stat.ellipsis} ellipsis-prefixed path(s) of the form `
+  + '`…/scratchpad/x`' + ` (${run.stat.ellipsisFenced} of them inside a fenced stack `
+  + 'trace): the ellipsis says the prefix has been WITHHELD, and here it elides an absolute path '
+  + 'far more often than a repo-relative one, so resolving the remainder against the repo root '
+  + `would invent findings out of paths that were never in this tree. ${run.stat.bareFile} bare `
+  + 'backticked filename(s) with no directory in them, judged against the extensions this repo '
+  + `actually tracks, of which ${run.stat.bareFileUnknown} match no tracked basename anywhere: a `
+  + 'filename in prose names no location, and gating the shape would bury this run under a '
+  + 'four-figure count. Both numbers are derived every run, so either one moves the day the '
+  + 'corpus does. Widening the gate to either shape is a separate row, not a footnote.\n'
   + `${PREFIX}: ${run.stat.marked} of ${run.stat.tokens} judged citation(s) `
   + `(${pct(run.stat.marked, run.stat.tokens)}%) sit in an inline-code span or a link target. `
   + 'Backticks are NOT required, measured rather than assumed: the eight bare dangling ones are all '
