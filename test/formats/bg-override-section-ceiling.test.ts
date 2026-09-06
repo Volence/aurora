@@ -1,6 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { createBand } from '../../src/core/formats/bg-override/bg-anim-band';
 import {
+  bandFromStaticTiles,
+  createBand,
+  documentBands,
+  insertBand,
+  planBandInsertion,
+} from '../../src/core/formats/bg-override/bg-anim-band';
+import {
+  makeAddBandCommand,
+  makeDemoteBandCommand,
+  makePromoteBandCommand,
+  makeRemoveBandCommand,
+} from '../../src/core/editing/bg-override-band';
+import { b0e5a661Doc, sectionRoomyDoc } from '../support/bg-override-fixtures';
+import {
+  animatedSlotCount,
   validateBgOverride,
   bgOverrideSectionIssues,
   bganimSectionBytes,
@@ -104,6 +118,11 @@ function oneBandDoc(cols: number): BgOverrideDocument {
 function expectedBytes(bands: number, slots: number, views: number): number {
   const table = BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES * bands;
   return table + views * table + slots * BGANIM_BYTES_PER_SLOT;
+}
+
+/** Apply an add command's result the way the command layer would, for a chain. */
+function applyAdd(doc: BgOverrideDocument, cmd: { band: BgOverrideBand }): BgOverrideDocument {
+  return insertBand(doc, planBandInsertion(doc, cmd.band), cmd.band);
 }
 
 /** Slots the ceiling admits for an act of `bands` bands emitting `views` twins. */
@@ -337,5 +356,92 @@ describe('an act the build refuses has NO section size, and never a generous one
     const r = bganimSectionSlotsAllowed(refused);
     expect(r.ok).toBe(false);
     expect(r).not.toHaveProperty('value');
+  });
+});
+
+// -- DO NO HARM: the door refuses GROWTH, never the repair -------------------
+
+describe('an act already over the ceiling: growth refused, shrinking allowed', () => {
+  /**
+   * THE FIXTURE ITSELF IS THE SUBJECT HERE, over-budget and all.
+   *
+   * `editor_bg_override.b0e5a661.json` is aeon's historical two-band act, and
+   * its emitted section is multiples of the ceiling. An author can have such a
+   * document: it exists on disk in this repo. What Aurora must never do is make
+   * it worse, and what it must never do EITHER is refuse to make it better -
+   * a rule stated as "the result must fit" would kill demote and remove and
+   * leave hand-edited JSON as the only way out.
+   */
+  const over = b0e5a661Doc();
+
+  it('the fixture really is over, so nothing below is vacuous', () => {
+    expect(bgOverrideSectionIssues(over)).toHaveLength(1);
+    expect(documentBands(over).length).toBeGreaterThan(1);
+  });
+
+  it('REFUSES an add, however small', () => {
+    // One slot. The refusal is about the ACT, not about what this edit costs.
+    expect(() => makeAddBandCommand(over, createBand({ cols: 1, rows: 1 })))
+      .toThrow(/ROM section ceiling/);
+  });
+
+  it('REFUSES a promotion, for the same reason', () => {
+    const base = animatedSlotCount(documentBands(over));
+    expect(() => makePromoteBandCommand(
+      over, bandFromStaticTiles(over, base, { cols: 1, rows: 1 }), base))
+      .toThrow(/ROM section ceiling/);
+  });
+
+  it('ALLOWS a demotion: the repair path, which a fits-or-refuse rule would kill', () => {
+    expect(() => makeDemoteBandCommand(over, 0)).not.toThrow();
+  });
+
+  it('ALLOWS a removal too', () => {
+    expect(() => makeRemoveBandCommand(over, 0, { blankReferencingCells: true })).not.toThrow();
+  });
+});
+
+describe('an act that FITS: the door refuses the edit that would take it over', () => {
+  /**
+   * A NEARLY EMPTY DOCUMENT, and the reason is the other budget.
+   *
+   * The real fixture carries 340 tiles, so the TILE ceiling binds long before
+   * the section one does on it - an insert of the section's whole allowance
+   * would be refused for having nowhere to put the art, and the rows below
+   * would be measuring the wrong budget while saying "section". A one-tile blob
+   * leaves the tile budget out of the way so the refusals here can only be the
+   * section talking; the fixture's own over-budget state is exercised in the
+   * block above, where it is the point.
+   */
+  const roomy = (): BgOverrideDocument => ({
+    layout: Array.from({ length: BG_LAYOUT_WORDS }, () => 0),
+    tiles: tiles(1),
+  });
+
+  it('the starting document fits and has tile room, so nothing below is the other budget', () => {
+    expect(bgOverrideSectionIssues(roomy())).toEqual([]);
+    expect(BG_TILE_CAPACITY - roomy().tiles.length).toBeGreaterThan(slotsAllowed(1, 0) * 2);
+  });
+
+  it('accepts the largest band the section admits, and refuses one slot more', () => {
+    const room = slotsAllowed(1, 0);
+    expect(() => makeAddBandCommand(roomy(), createBand({ cols: room, rows: 1 }))).not.toThrow();
+    // One slot over, and it is `createBand` that says so first - a band this
+    // size cannot exist in any act at all.
+    expect(() => createBand({ cols: room + 1, rows: 1 })).toThrow(/ROM section ceiling/);
+  });
+
+  it('and refuses a SECOND band whose own size is legal but whose SUM is not', () => {
+    // THE CASE A PER-BAND CAP MISSES, which is aeon's own recorded error. Each
+    // band is under the ceiling; together they are not, and only the act-level
+    // comparison can see it.
+    const half = Math.ceil(slotsAllowed(2, 0) / 2) + 1;
+    expect(() => createBand({ cols: half, rows: 1 })).not.toThrow();   // legal alone
+    const start = roomy();
+    const one = makeAddBandCommand(start, createBand({ cols: half, rows: 1 }));
+    const after = applyAdd(start, one);
+    expect(bgOverrideSectionIssues(after)).toEqual([]);                // still fits
+    expect(() => makeAddBandCommand(after, createBand({ cols: half, rows: 1 })))
+      .toThrow(/ROM section ceiling/);
   });
 });
