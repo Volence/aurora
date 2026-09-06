@@ -152,6 +152,47 @@
 // same run turns row 7 RED on a mailbox every other row calls clean. A floor
 // that cannot move cannot be right for more than one pair of routes.
 //
+// THE ROW THAT WAS RED FOR A CORRECT ENGINE, AND THE ROW THAT PASSED WITHOUT
+// ITS PRECONDITION (rows 10 and 11, rewritten 2026-09-06).
+//
+// Row 11 asserted the player is being SIMULATED after a warp and had been red
+// since it landed. It was not a harness defect. aeon 1b71bcea's DEBUG shape
+// arms CHEAT_DEBUG_FLY at level init, Player_Init tail-calls Player_DebugEnter
+// on that bit, and Player_Main's `tst.b PlayerV.debug_flag / bne
+// Player_DebugMove` escape hatch then skips physics, dispatch and the display
+// tail for as long as it is set. The mailbox this harness measures exists ONLY
+// in the DEBUG shape, so every state reachable here is downstream of that. The
+// full four-link citation is at the rewritten rows.
+//
+// Row 10 sat on top of that failed precondition and read PASS anyway. Its own
+// detail string said READ ROW 11 BEFORE CONCLUDING ANYTHING FROM THIS, which
+// is the right warning in the wrong instrument: the verdict is the word a
+// reader takes away. Three things changed, and the first is the general one:
+//
+//   - A THIRD VERDICT, REFUSED, which is neither pass nor fail and still exits
+//     non-zero. Row 7 had been printing the word in its prose and PASS/FAIL in
+//     its verdict since the floor became measured; now the verdict carries it,
+//     and row 10 is refused whenever row 11 cannot name the regime. See the
+//     block at `REFUSED`.
+//   - ROW 10 RETIRED AND REPLACED. Its snap-vs-shift sweep was not a
+//     discriminator between two accounts of the placement: it is trivially
+//     "tracks the request" while the player is frozen and trivially "one
+//     resting y" once physics runs (measured here: requests at y=64 and y=320,
+//     same x, both come to rest at 557 — gravity, not the warp). It now
+//     measures the property that IS measurable in both regimes and that Aurora
+//     depends on: the placement is VERBATIM at the ack. That row has a
+//     production failure which has actually happened — aeon's booked and fixed
+//     -11 / -5 regime-dependent lift (b3169c26).
+//   - ROW 11 REPLACED BY A TWO-REGIME ROW WITH ITS OWN CONTROL: the player is
+//     frozen as booted, and simulates after one B press through the engine's
+//     own debug-fly toggle. Green means the machine matches what aeon's source
+//     says, in both directions.
+//
+// NO OTHER ROW'S NUMBER MOVES. Rows 10 and 11 take no plane samples and the
+// two they replace took none either, so `diffAll`, the floor, the mailbox
+// numbers and R6's stamp set are untouched; rows 8 and 9 keep their own
+// 240-frame settle path verbatim.
+//
 // Usage: node scratchpad/warp-tearing-harness.mjs   (VERBOSE=1 for server log)
 
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
@@ -173,10 +214,50 @@ mkdirSync(SHOTS, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = [];
 const fails = [];
+const refusals = [];
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REFUSED — THE THIRD VERDICT, AND WHY IT IS NOT A SECOND KIND OF PASS
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Until 2026-09-06 this file had two verdicts, and one row had already
+// outgrown them: row 7 printed PASS/FAIL while its own detail string said
+// "This row is refused rather than passed". The word was in the prose and
+// nowhere in the tally.
+//
+// The row that forced the issue is row 10. Row 10's premise is row 11 — the
+// player has to be SIMULATED for row 10's sweep to be comparing physics
+// outcomes — and until today row 10 read PASS in every run where row 11 read
+// FAIL. Its detail string shouted READ ROW 11 BEFORE CONCLUDING ANYTHING FROM
+// THIS, which is honest and is also the wrong instrument: a reader forms the
+// verdict from the word at the start of the line and reads the detail after,
+// if at all. A row whose precondition has failed must not read as passed.
+//
+// SO WHY NOT JUST FAIL IT. Because a failure and a refusal say different
+// things and the difference is worth a word:
+//
+//   FAIL     the property was measured and is FALSE.
+//   REFUSED  the property was NOT measured. The run could not establish the
+//            premise the measurement needs, so there is no number here to
+//            believe or disbelieve.
+//
+// A reader who cannot tell those apart will go looking for a defect that does
+// not exist, or will read "23/24" as "one thing is broken" when the truth is
+// "one thing is broken and one thing was never checked".
+//
+// AND WHY IT STILL EXITS NON-ZERO. Because the two verdicts differ in what
+// they REPORT and are identical in what they LICENSE: neither one licenses
+// believing the property. The exit code is the license, so a refusal spends it
+// exactly like a failure. A refusal that exited 0 would be the same trap in a
+// new costume — a green run that has not checked what it claims to check.
+const REFUSED = Symbol('refused');
 function check(id, name, ok, detail) {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  [${id}] ${name}${detail !== undefined ? `\n        ${detail}` : ''}`);
-  results.push({ id, ok });
-  if (!ok) fails.push(id);
+  const refused = ok === REFUSED;
+  const verdict = refused ? 'REFUSE' : ok ? 'PASS' : 'FAIL';
+  console.log(`${verdict}  [${id}] ${name}${detail !== undefined ? `\n        ${detail}` : ''}`);
+  results.push({ id, ok: ok === true, refused });
+  if (refused) refusals.push(id);
+  else if (!ok) fails.push(id);
 }
 function note(label, detail) { console.log(`NOTE  ${label}\n        ${detail}`); }
 
@@ -1073,87 +1154,270 @@ async function main() {
             `(feet vs origin) is aeon's to define.`
           : 'Terrain-dependent — Y cannot be predicted client-side.'));
 
-      // ---- Row 10: terrain snap, or a constant shift? aeon's discriminator.
+      // ═══════════════════════════════════════════════════════════════════
+      // WHY THE PLAYER DOES NOT MOVE, AND WHAT THAT COSTS THE OLD ROW 10
+      // ═══════════════════════════════════════════════════════════════════
       //
-      // If the engine grounds the player, every request in clear air above the
-      // SAME x must settle to the SAME resting y (surface - radius), ignoring
-      // the requested height. If instead resting y tracks the request, then
-      // something is applying a constant shift and the terrain-snap account is
-      // falsified.
+      // ANSWERED IN AEON'S SOURCE, at revision 1b71bcea. It is an ENGINE FACT
+      // about the shape this harness is obliged to run, not a defect in the
+      // harness's state setup, and it is a four-link chain each link of which
+      // is a line somebody wrote on purpose:
       //
-      // Note all of these share one x, so they share one terrain column — which
-      // is what makes the sweep discriminating rather than a survey of spots.
-      const sweep = [];
-      for (const ay of [64, 128, 192, 256, 320, 384]) {
-        const r = await warpAndRead(askX, ay);
-        sweep.push({ ask: ay, rest: r.y, delta: r.y - ay });
-      }
-      for (const s of sweep) {
-        console.log(`        ask y=${String(s.ask).padStart(3)} -> rest ${String(s.rest).padStart(3)} (delta ${s.delta})`);
-      }
-      const restingYs = new Set(sweep.map((s) => s.rest));
-      const deltas = new Set(sweep.map((s) => s.delta));
-      const snapped = restingYs.size === 1;
-      const shifted = deltas.size === 1;
-      // NOTE THE WORDING. This row reports WHAT the sweep shows; it deliberately
-      // does not conclude anything about the engine's intent, because row 11
-      // below establishes whether the player is being simulated at all — and if
-      // it is not, "no terrain snap" is trivially true and means nothing.
-      // An earlier version of this row announced terrain snap FALSIFIED on this
-      // evidence alone. It was not entitled to.
-      check('10', 'the sweep resolves to one regime, whatever that regime means',
-        snapped || shifted,
-        snapped
-          ? `all six settle at y=${[...restingYs][0]} regardless of the request (consistent with terrain snap)`
-          : shifted
-            ? `resting y tracks the request at a constant ${[...deltas][0]}px across all six, ` +
-              `same x throughout — READ ROW 11 BEFORE CONCLUDING ANYTHING FROM THIS`
-            : `neither: resting ${[...restingYs].join(',')} deltas ${[...deltas].join(',')}`);
+      //   1. games/sonic4/test/ojz_scroll_test.emp:581 — the level state's init
+      //      writes `move.b #CHEAT_DEBUG_FLY, Cheat_Flags` in the DEBUG shape
+      //      and only there.
+      //   2. games/sonic4/player/player_common.emp, Player_Init's tail — with
+      //      that bit armed it tail-calls Player_DebugEnter. Its own header:
+      //      "Boots into DEBUG-FLY when CHEAT_DEBUG_FLY is armed — the debug
+      //      shape arms it at game init".
+      //   3. Player_DebugEnter sets `PlayerV.debug_flag`.
+      //   4. Player_Main's first act after the B poll: `tst.b
+      //      PlayerV.debug_flag(a0) / bne Player_DebugMove` — the obj_control
+      //      escape hatch, which "skips physics, dispatch and the display
+      //      tail". Player_DebugMove moves x/y ONLY under held D-pad. This
+      //      harness holds nothing, so y is constant by construction.
+      //
+      // AND THE HARNESS CANNOT AVOID THAT SHAPE. `Warp_Req_*` exist only in the
+      // DEBUG shape (row 4 is why this file loads s4.debug.bin), so every state
+      // this instrument can reach through the mailbox is downstream of link 1.
+      //
+      // WHAT IT COSTS THE OLD ROW 10. That row swept six requested y values at
+      // one x and asked whether the resting y was CONSTANT (terrain snap) or
+      // TRACKED THE REQUEST (a shift). Measured on this machine, both branches
+      // are answers to a different question than the one the row's name asks:
+      //
+      //   - frozen (the state above): nothing can move the player, so resting y
+      //     is the placement and "tracks the request" is trivially true.
+      //   - simulated (one B press, below): the player is placed in AIR with
+      //     cleared velocities and FALLS. Measured here: a request at y=64 and
+      //     a request at y=320, same x, both come to rest at y=557. So resting
+      //     y is constant and "consistent with terrain snap" is trivially true
+      //     — of GRAVITY, not of the warp.
+      //
+      // So the old row 10 could report either regime and neither reading was
+      // about the warp. It was not a discriminator between two accounts of the
+      // placement; it was a detector of WHICH SIMULATION REGIME THE MACHINE WAS
+      // IN, wearing the name of the placement question. It is retired here
+      // rather than refused, because refusing it every run would imply a future
+      // in which it becomes measurable and there is none: both regimes answer
+      // it trivially, in opposite directions.
+      //
+      // AND THE PLACEMENT QUESTION ITSELF IS SETTLED IN AEON'S SOURCE, which is
+      // the other reason a runtime discriminator has nothing to add.
+      // Debug_Warp_Consume clamps the request into the act and then writes
+      // `Sst.x_pos` / `Sst.y_pos` VERBATIM, deliberately AFTER Player_SetState
+      // so that PHook_EnsureStanding's feet-planted lift lands on the pre-warp
+      // position and is overwritten. Its own words: "the destination is VERBATIM
+      // in every regime — which is what §4.12 promises a client and the only
+      // semantics a placement tool can reason about". No terrain query happens
+      // anywhere in that proc.
+      //
+      // ---- Row 10, REPLACED: is the placement actually verbatim, at the ack?
+      //
+      // That IS measurable, in BOTH regimes, and it is the property Aurora's
+      // play-from-cursor depends on. Read at the ACK rather than after a settle:
+      // the ack is the last thing Debug_Warp_Consume writes, so the position
+      // read there is the warp's own output with at most one frame of whatever
+      // else the machine does afterwards on top of it.
+      //
+      // IT HAS A PRODUCTION FAILURE AND THE FAILURE ALREADY HAPPENED. Written
+      // the other way round — placement BEFORE the state transition — the same
+      // request landed 11px high out of debug-fly ((39-16)>>1 for Sonic) and 5px
+      // high out of a curl, i.e. the destination depended on what the player
+      // happened to be doing. aeon measured that, booked it (b3169c26) and fixed
+      // it by moving the two `move.l`s below the call. This row is what notices
+      // if it ever moves back, and it is the row that would have been RED
+      // against the ROM of a few days ago and is GREEN against this one.
+      const PLAYERV_DEBUG_FLAG = 0x3C;
+      const CHEAT_DEBUG_FLY = 1;
+      // WHERE 0x3C COMES FROM, and what actually pins it. aeon's PlayerV is
+      // `pub vars PlayerV: Sst.sst_custom` (player_common.emp) and sst_custom is
+      // at $30; debug_flag is the thirteenth byte of the overlay
+      // (ground_speed:i16, player_state, status_secondary, move_lock:u16,
+      // spindash_charge:u16, flip_angle, air_left, invuln_time, stick_convex,
+      // then debug_flag) = +$0C, so $30 + $0C = $3C.
+      //
+      // THAT DERIVATION IS NOT WHAT THE ROW RESTS ON, because a struct offset
+      // retyped in another repo is exactly the kind of number that goes stale
+      // silently — and aeon's one link-exported overlay offset, `_pl_state`,
+      // does NOT resolve off this ROM's listing (checked: "no symbol named or
+      // prefixed _pl_state", against a listing the server re-parsed to its full
+      // 3071 rows, so that is an absence and not a stale table). What pins it is
+      // BEHAVIOUR: row 11 requires this byte to read nonzero at the checkpoint,
+      // to read zero after one B press, and — in both directions — to PREDICT
+      // whether y moves over 240 frames. No wrong offset does all three.
+      const debugFlag = async () => (await rd(playerAddr + PLAYERV_DEBUG_FLAG, 1))[0];
+      // Cheat_Flags is a resolved SYMBOL, not an offset, so it is the one piece
+      // of row 11's evidence that cannot be wrong about where it is looking.
+      // LOUD ON UNMEASURABLE: without it there is no symbol-backed check on link
+      // 1 of the chain above, so rows 10 and 11 are REFUSED rather than passed
+      // on the offset alone.
+      const cheatAddr = await client.resolve('Cheat_Flags').catch(() => null);
 
-      // RESOLVED ENGINE-SIDE (aeon b3169c26), recorded so nobody re-opens it:
-      // the placement is VERBATIM, and the -11 is DESTINATION-DEPENDENT — an
-      // engine raw probe at this same x got delta 0 for a request in clear air
-      // and -11 for one intersecting terrain. Prime suspect is a one-shot
-      // terrain resolve inside the ack window that runs once and then never
-      // ticks again in this state. So all six of the sweep's points sat in
-      // terrain. Aurora still does NOT compensate: doing so would break the
-      // clear-air case, which is the common one.
-      //
-      // ---- Row 11: is the player's PHYSICS even running in this state?
-      //
-      // Row 10's conclusion only means something if the player is being
-      // simulated. If gameplay is not advancing, "no terrain snap" is trivially
-      // true and says nothing about the engine's intent — so trace y frame by
-      // frame after a warp into clear air instead of assuming.
-      await call('emulator/restore', { id: cp });
-      await wr(wx, be16(askX));
-      await wr(wy, be16(64));
-      await wr(wf, Uint8Array.of(1));
-      for (let f = 0; f < 120; f++) {
-        await call('emulator/run_frames', { frames: 1 });
-        if ((await rd(wf, 1))[0] === 0) break;
+      /** One B press: the engine's OWN debug-fly toggle (Player_Main, behind
+       *  the CHEAT_DEBUG_FLY gate). Not a poke at debug_flag — going through
+       *  the toggle runs Player_DebugExit, which restores the character's art
+       *  and box and enters PSTATE_AIR, so the player is left in a state the
+       *  game can actually produce. `frames: 2` because Ctrl_1_Press is an
+       *  EDGE: the press has to be held across a frame boundary the game
+       *  reads. */
+      const leaveDebugFly = async () => {
+        await call('emulator/press', { buttons: ['b'], frames: 2 });
+        await call('emulator/release_all', {});
+      };
+
+      /**
+       * Restore, optionally leave debug-fly, warp, and read the player AT THE
+       * ACK. Returns the machine's own account of the regime it was in
+       * alongside the placement, so no caller has to assume one.
+       */
+      const warpAtAck = async (ax, ay, exitFly) => {
+        await call('emulator/restore', { id: cp });
+        const cheat = cheatAddr === null ? null : (await rd(cheatAddr, 1))[0];
+        const flagAtCheckpoint = await debugFlag();
+        if (exitFly) await leaveDebugFly();
+        const flag = await debugFlag();
+        await wr(wx, be16(ax));
+        await wr(wy, be16(ay));
+        await wr(wf, Uint8Array.of(1));
+        let ackFrames = null;
+        for (let f = 0; f < 120; f++) {
+          await call('emulator/run_frames', { frames: 1 });
+          if ((await rd(wf, 1))[0] === 0) { ackFrames = f + 1; break; }
+        }
+        return {
+          ask: { x: ax, y: ay }, exitFly, cheat, flagAtCheckpoint, flag, ackFrames,
+          x: (await rd(playerAddr + 0x02, 4)).readUInt32BE(0) >>> 16,
+          y: (await rd(playerAddr + 0x06, 4)).readUInt32BE(0) >>> 16,
+        };
+      };
+
+      /** y sampled at the same offsets the old row 11 used, so the frozen
+       *  trace this run prints is comparable line for line with every run
+       *  before it. */
+      const TRACE_STEPS = [0, 1, 4, 15, 40, 120, 240];
+      const traceY = async () => {
+        const t = [];
+        let at = 0;
+        for (const step of TRACE_STEPS) {
+          if (step) { await call('emulator/run_frames', { frames: step - at }); at = step; }
+          t.push({ f: step, y: (await rd(playerAddr + 0x06, 4)).readUInt32BE(0) >>> 16 });
+        }
+        return t;
+      };
+
+      // ---- Row 11's two regimes, measured FIRST because row 10 consumes them.
+      const frozen = await warpAtAck(askX, 64, false);
+      const frozenTrace = await traceY();
+      const live = await warpAtAck(askX, 64, true);
+      const liveTrace = await traceY();
+      const fmt = (t) => t.map((s) => `+${s.f}f=${s.y}`).join('  ');
+      console.log(`        debug-fly ON  (as booted): debug_flag=${frozen.flag} y after ack: ${fmt(frozenTrace)}`);
+      console.log(`        debug-fly OFF (one B press): debug_flag=${live.flag} y after ack: ${fmt(liveTrace)}`);
+      const frozenMoved = new Set(frozenTrace.map((s) => s.y)).size > 1;
+      const liveMoved = new Set(liveTrace.map((s) => s.y)).size > 1;
+      const cheatArmed = frozen.cheat !== null && (frozen.cheat & CHEAT_DEBUG_FLY) !== 0;
+      const regimesKnown = cheatAddr !== null && cheatArmed &&
+        frozen.flag !== 0 && !frozenMoved && live.flag === 0 && liveMoved;
+
+      // ---- Row 10: the placement, swept across six heights in BOTH regimes.
+      const placements = [];
+      for (const ay of [64, 128, 192, 256, 320, 384]) {
+        for (const exitFly of [false, true]) {
+          placements.push(await warpAtAck(askX, ay, exitFly));
+        }
       }
-      const trace = [];
-      for (const step of [0, 1, 4, 15, 40, 120, 240]) {
-        if (step) await call('emulator/run_frames', { frames: step - (trace.at(-1)?.f ?? 0) });
-        trace.push({ f: step, y: (await rd(playerAddr + 0x06, 4)).readUInt32BE(0) >>> 16 });
+      for (const p of placements) {
+        console.log(`        ${p.exitFly ? 'physics ' : 'frozen  '} ask (${p.ask.x},${String(p.ask.y).padStart(3)}) ` +
+          `-> at ack (${p.x},${String(p.y).padStart(3)}) delta (${p.x - p.ask.x},${p.y - p.ask.y}) ` +
+          `after ${p.ackFrames} ack frames`);
       }
-      console.log(`        y after ack: ${trace.map((s) => `+${s.f}f=${s.y}`).join('  ')}`);
-      const moved = new Set(trace.map((s) => s.y)).size > 1;
-      check('11', 'the player is actually being simulated (y moves after the warp)',
-        moved,
-        moved
-          ? 'y changes over time, so row 10 compares real physics outcomes'
-          : 'y NEVER changes — the player is not being simulated here, so row 10 cannot ' +
-            'distinguish terrain snap from a shift and its conclusion must not be trusted');
+      const offBy = placements.filter((p) => p.x !== p.ask.x || p.y !== p.ask.y);
+      const bothRegimes = new Set(placements.map((p) => p.exitFly)).size === 2;
+      // THE PRECONDITION IS IN THE VERDICT, WHICH IS THE WHOLE POINT OF THE
+      // REFUSED STATE. This row's name says BOTH REGIMES. Row 11 is what
+      // establishes that the two halves of this sweep were taken in two
+      // different, identified regimes; without that, half these samples were
+      // taken in a state nothing here can name, and "verbatim in both regimes"
+      // is a sentence this run did not measure. It is refused, not passed on
+      // the half that still worked.
+      check('10', 'the warp places the player at the REQUESTED point verbatim, at the ack, in both regimes',
+        !regimesKnown ? REFUSED : (placements.length > 0 && bothRegimes && offBy.length === 0),
+        !regimesKnown
+          ? `NOT MEASURED: row 11 could not establish the two regimes (see it below), so this ` +
+            `sweep's ${placements.length} samples were taken in a state this run cannot name. ` +
+            `The placements themselves were ` +
+            `${offBy.length === 0 ? 'all verbatim' : `off by ${offBy.map((p) => `(${p.x - p.ask.x},${p.y - p.ask.y})`).join(' ')}`}, ` +
+            `which is a reading, not a result.`
+          : `${placements.length} warps to x=${askX}, six heights x {debug-fly, physics}, each read at ` +
+            `the ack: ${offBy.length === 0 ? 'every one landed EXACTLY on the request' : ''}` +
+            (offBy.length === 0
+              ? `. That is aeon's §4.12 promise (Debug_Warp_Consume writes Sst.x_pos/y_pos after ` +
+                `Player_SetState precisely so the standing-box lift cannot reach the destination), ` +
+                `and it holds independently of whether the player's physics is running.`
+              : `${offBy.length} of ${placements.length} did NOT land on the request: ` +
+                `${offBy.map((p) => `ask (${p.ask.x},${p.ask.y}) ${p.exitFly ? 'physics' : 'frozen'} -> ` +
+                  `(${p.x},${p.y})`).join('; ')}. A destination that depends on the regime is the ` +
+                `pre-b3169c26 shape returning: the placement is landing before the state ` +
+                `transition and wearing PHook_EnsureStanding's lift.`));
+
+      // ---- Row 11, REPLACED: the regime itself, with its own control.
+      //
+      // The old row asserted the player MOVES. On the only shape this harness
+      // can run, aeon guarantees it does not (the four-link chain above), so
+      // that row was a standing red reporting a correct engine behaviour as a
+      // defect — and, worse, it was the precondition of a row that passed
+      // anyway.
+      //
+      // This row asserts the thing that is actually true and actually worth
+      // knowing: the suspension is EXPLAINED and it is REVERSIBLE. Both halves
+      // are in one row on purpose. The frozen half alone would pass on a
+      // machine where nothing at all runs; the live half alone would pass
+      // without ever showing that the harness's own checkpoint state is the
+      // suspended one. Together they are a measurement with its own control.
+      //
+      // FIVE CONJUNCTS, EACH WITH A PRODUCTION FAILURE THAT NEEDS NO EDIT HERE:
+      //   Cheat_Flags armed   — aeon stops arming CHEAT_DEBUG_FLY at level init
+      //                         (link 1), or the cheat moves.
+      //   flag set at the cp  — Player_Init stops tail-calling Player_DebugEnter
+      //                         (link 2), or PlayerV's layout moves debug_flag.
+      //   frozen y constant   — the escape hatch goes (link 4), or something
+      //                         else starts writing the player's position.
+      //   flag clear after B  — the B toggle regresses, or the cheat gate on it
+      //                         diverges from the gate on the boot entry.
+      //   live y moves        — physics stops running: the player despawns,
+      //                         RunObjects is not reached, or the warp leaves
+      //                         the slot half-transitioned.
+      check('11', 'the player is FROZEN because this shape boots into debug-fly, and simulates once it is toggled off',
+        regimesKnown,
+        cheatAddr === null
+          ? `Cheat_Flags did not resolve, so link 1 of the chain has no symbol-backed check and ` +
+            `the regime rests on a typed struct offset alone. Nothing below is trusted.`
+          : `Cheat_Flags=${frozen.cheat} (CHEAT_DEBUG_FLY ${cheatArmed ? 'ARMED' : 'CLEAR'}), ` +
+            `debug_flag at Player_1+${hx(PLAYERV_DEBUG_FLAG)} = ${frozen.flag} at the checkpoint and ` +
+            `${live.flag} after one B press. Frozen: y ${frozenMoved ? 'MOVED' : 'constant'} at ` +
+            `${frozenTrace[0].y} over ${TRACE_STEPS.at(-1)} frames. Physics: y ` +
+            `${liveMoved ? `${liveTrace[0].y} -> ${liveTrace.at(-1).y}` : 'NEVER CHANGED'} over the same ` +
+            `frames.` +
+            (regimesKnown
+              ? ` Both regimes behave as aeon's source says they must, so the suspension is the ` +
+                `engine's DEBUG boot and not a stalled machine, and the player's physics is ` +
+                `reachable from here, which is what makes the live half of row 10 a real sample.`
+              : ` The machine does NOT behave as aeon 1b71bcea's source says it must; the regime ` +
+                `this harness measures in is not identified, and row 10 is refused above.`));
 
       // The floor is the one MEASURED above by rows F1 and F2, in this run, on
       // this machine. It is not a stated prior and it is not a threshold picked
       // to make this row green: F1 asserts the walks it comes from are correct
       // and F2 asserts it is well clear of the tear, so a floor inflated by a
       // torn route reddens F1 or F2 before it can rescue this row.
+      // REFUSED, NOT FAILED, when no floor survived F1. That word was already in
+      // this row's detail string before the verdict could carry it (see the
+      // REFUSED block at the top): with every alternate walk torn there is no
+      // floor, so there is no comparison, so there is nothing here that was
+      // measured and found false. It still exits non-zero.
       check('7', 'the mailbox whole-plane diff is inside the floor measured in this run',
-        OFF_VIEW_FLOOR !== null && mailboxDiffAll <= OFF_VIEW_FLOOR,
+        OFF_VIEW_FLOOR === null ? REFUSED : mailboxDiffAll <= OFF_VIEW_FLOOR,
         OFF_VIEW_FLOOR === null
           ? `${mailboxDiffAll} of ${ALL_WORDS} whole-plane words, and NO FLOOR WAS MEASURABLE: every ` +
             `alternate walk failed F1's correctness premise. This row is refused rather than passed ` +
@@ -1203,8 +1467,13 @@ async function main() {
     try { rmSync(workDir, { recursive: true, force: true }); } catch { /* */ }
   }
   const passed = results.filter((r) => r.ok).length;
-  console.log(`\n${passed}/${results.length} rows passed`);
-  if (fails.length) process.exit(1);
+  console.log(`\n${passed}/${results.length} rows passed` +
+    (fails.length ? `, ${fails.length} FAILED (${fails.join(', ')})` : '') +
+    (refusals.length
+      ? `, ${refusals.length} REFUSED (${refusals.join(', ')}): not measured, which is not the ` +
+        `same as measured and false, and licenses no more than a failure does`
+      : ''));
+  if (fails.length || refusals.length) process.exit(1);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
