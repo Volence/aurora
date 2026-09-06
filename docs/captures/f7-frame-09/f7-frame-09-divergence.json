@@ -7,9 +7,9 @@
   "decided_by": "aurora, row F7-FRAME-09-MAPPING",
   "one_line": "The donor's art for Sonic mapping frame $09 was overwritten in the donor itself by the art of the donor's own custom frames $C8/$C9; we ship 19 reconstructed tiles appended to the sheet plus a re-pointed DPLC frame, and we do NOT change the mapping, which is faithful.",
 
-  "donor_claims": "art/uncompressed/Sonic's art.bin tiles 168..186 hold the custom standing-pose art that frames $C8 and $C9 load; mapping frame $09 and DPLC frame $09 are faithful Sonic 3 and Knuckles data that name those same 19 tiles, so frame $09 draws another pose's tiles and renders as scrambled body parts.",
-  "we_ship_instead": "The same mapping frame, byte for byte. DPLC frame $09 re-pointed at 25 tiles appended to the tail of both art sheets; 19 of those are Sonic 3 and Knuckles art tiles 175..193 recoloured through the palette permutation this sheet uses everywhere else, and 6 are byte copies of the donor's own surviving tiles (uncompressed 187..192).",
-  "why": "The mapping is innocent and there is no piece list over the donor's tiles that draws this pose, so a mapping repair could only have been fitted to the picture. The lost pixels exist nowhere in the donor sheet, so re-pointing alone cannot recover them.",
+  "donor_claims": "art/uncompressed/Sonic's art.bin tiles 168..186 do not hold Sonic 3 and Knuckles frame 9's art at all; they hold the donor author's own standing-pose art, of which frame $C8 loads tile 170 and frame $C9 loads 171..186 (168 and 169 are loaded by no frame but $09). Mapping frame $09 and DPLC frame $09 are faithful Sonic 3 and Knuckles data that name those same 19 tiles, so frame $09 draws another pose's tiles and renders as scrambled body parts.",
+  "we_ship_instead": "The same mapping frame, byte for byte. DPLC frame $09 re-pointed at 25 tiles appended to the tail of both art sheets; 19 of those are Sonic 3 and Knuckles art tiles 175..193 recoloured through the palette permutation this sheet uses everywhere else, and 6 are byte copies of the donor's own surviving tiles (uncompressed 187..192, which still match skdisasm 194..199 by shape mask).",
+  "why": "The mapping is innocent and there is no piece list over the donor's tiles that draws this pose, so a mapping repair could only have been fitted to the picture. 10 of the 19 lost tiles occur nowhere in the donor's 3,425 tile sheet under shape-mask equality, so re-pointing alone cannot recover the frame.",
 
   "base": {
     "repo": "aeon",
@@ -102,7 +102,8 @@
       "path": "General/Sprites/Sonic/Art/Sonic.bin",
       "blob": "3e4f75516dd9d5f49dfdcd743c5f24d31d1f38e3",
       "tiles_rebuilt": [175, 193],
-      "tiles_copied_from_donor": [194, 199]
+      "tiles_copied_from_donor": [194, 199],
+      "reconstruction_caveat": "The palette permutation is derived from 2,688 aligned tile pairs and its weakest index agrees 97.0%; the residue is the donor author's own per-tile shading touch-ups, which cannot be reproduced for tiles that no longer exist. These 19 tiles are therefore skdisasm's shapes under this sheet's palette, not provably the pixels the donor author would have drawn. That is the one judgement in this repair and it is confined to those 19 tiles."
     }
   },
 
