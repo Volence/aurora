@@ -15,6 +15,7 @@ import {
   EFFECTS_ROW_REMAP_REFUSED_KEYS,
   EFFECTS_ROW_REMAP_BUILDABLE_SHIFT,
   EFFECTS_ROW_REMAP_GENERATOR_REFUSALS,
+  admittedIntegers,
   rowRemapHeightLines,
   rowRemapPlaneYRefusal,
   rowRemapHeightShiftRefusal,
@@ -420,6 +421,108 @@ describe('plane_y, whose ceiling this schema is one of two enforcements of', () 
 // ---------------------------------------------------------------------------
 // SCHEMA-LEGAL IS NOT BUILDABLE
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// THE DERIVATION ITSELF: three node shapes, and the property that it GROWS
+// ---------------------------------------------------------------------------
+
+describe('the height picker derives from whatever shape the contract uses', () => {
+  /**
+   * ⚠ THIS IS THE ROW THE PARCEL EXISTS FOR, AND IT IS NOT ABOUT TODAY.
+   *
+   * `height_shift` was `minimum 3 / maximum 7` (empyrean 60d9f6a), was announced
+   * as `const 4` (83f5290, superseded within the hour, never vendored here), and
+   * is `enum [4]` (2e5046e). Three spellings of one key inside a week. A
+   * derivation that reads only the shape in front of it passes every other row in
+   * this file today and under-serves the format the moment the hub widens the
+   * node — the failure nothing else here can see, because today's enum has ONE
+   * entry and a great many wrong answers have that same size.
+   *
+   * So these rows drive `admittedIntegers` DIRECTLY over nodes the live schema
+   * has not given it, including the widened enum the hub has already said is
+   * coming ("a wider range returns by amendment the day a second ladder lands").
+   */
+  it('reads an enum, a const and a minimum/maximum range, and sorts what it reads', () => {
+    expect(admittedIntegers({ type: 'integer', enum: [4] }, 'enum-1')).toEqual([4]);
+    expect(admittedIntegers({ type: 'integer', enum: [6, 4, 7] }, 'enum-3')).toEqual([4, 6, 7]);
+    expect(admittedIntegers({ type: 'integer', const: 4 }, 'const')).toEqual([4]);
+    expect(admittedIntegers({ type: 'integer', minimum: 3, maximum: 7 }, 'range'))
+      .toEqual([3, 4, 5, 6, 7]);
+    // THE RANGE ARM IS NOT VESTIGIAL: this schema still spells a dozen keys that
+    // way and spelled THIS key that way until 2e5046e, so it is exercised against
+    // a real node from the live contract and not only against a made-up one.
+    const planeY = rowRemapPayloadProps().plane_y as unknown as Record<string, unknown>;
+    expect(admittedIntegers(planeY, 'plane_y').length)
+      .toBe((planeY.maximum as number) - (planeY.minimum as number) + 1);
+  });
+
+  it('refuses a node carrying none of the three, and never answers an empty list', () => {
+    // LOUD ON UNMEASURABLE. An empty picker on screen is indistinguishable from a
+    // UI that has not finished loading, so "I cannot tell" must never render as
+    // "no options". Each planted node names the label it was given, so a throw
+    // from somewhere else cannot be mistaken for this one.
+    for (const bad of [
+      { type: 'integer' },
+      { type: 'integer', minimum: 3 },
+      { type: 'integer', maximum: 7 },
+      { type: 'integer', enum: [] },
+      { type: 'integer', enum: ['4'] },
+      { type: 'integer', enum: [4.5] },
+      { type: 'integer', minimum: 7, maximum: 3 },
+    ]) {
+      expect(() => admittedIntegers(bad, 'planted'), JSON.stringify(bad)).toThrow(/planted/);
+    }
+  });
+
+  it('GROWS: a widened copy of the contract own node yields the wider list, no edit here', () => {
+    // Built from the LIVE node rather than from a literal, so this is a statement
+    // about the derivation applied to the contract, not about two objects the
+    // test invented and then compared with each other.
+    const live = rowRemapPayloadProps().height_shift as unknown as Record<string, unknown>;
+    expect(admittedIntegers(live, 'live')).toEqual([...EFFECTS_ROW_REMAP_HEIGHT_SHIFTS]);
+
+    const widened = { ...live, enum: [4, 6] };
+    expect(admittedIntegers(widened, 'widened')).toEqual([4, 6]);
+    console.log('--- the picker if the hub amends the enum to [4, 6] ---\n'
+      + admittedIntegers(widened, 'widened')
+        .map((sh) => `${1 << sh} lines (shift ${sh})`).join('\n'));
+
+    // And the OTHER direction the contract has actually used: back to a range.
+    const noEnum = { ...live };
+    delete noEnum.enum;
+    expect(admittedIntegers({ ...noEnum, minimum: 3, maximum: 7 }, 'range'))
+      .toEqual([3, 4, 5, 6, 7]);
+  });
+
+  /**
+   * MEMBERSHIP, NOT THE TWO ENDS, and the difference is invisible at today's
+   * singleton enum — which is why it is asserted as a SWEEP over a window around
+   * the admitted set rather than at its edges. Under a sparse `[4, 7]` a range
+   * test blesses 5 and 6, the codec refuses them, and the control disagrees with
+   * the format about a document Aurora itself wrote.
+   *
+   * BOTH HALVES ARE SWEPT TOGETHER on purpose: a row that checked only the
+   * refusal function would pass on a control that had quietly stopped agreeing
+   * with the codec it writes for.
+   */
+  it('refuses every integer the contract does not admit, and the codec agrees', () => {
+    const shifts = EFFECTS_ROW_REMAP_HEIGHT_SHIFTS;
+    const lo = shifts[0] - 3;
+    const hi = shifts[shifts.length - 1] + 3;
+    const disagreed: string[] = [];
+    for (let sh = lo; sh <= hi; sh++) {
+      const admitted = shifts.includes(sh);
+      const controlOk = rowRemapHeightShiftRefusal(sh) === null;
+      const codecOk = issues(withRemap({ plane_y: 101, height_shift: sh })).length === 0;
+      expect(controlOk, `control, shift ${sh}`).toBe(admitted);
+      expect(codecOk, `codec, shift ${sh}`).toBe(admitted);
+      if (controlOk !== codecOk) disagreed.push(String(sh));
+    }
+    expect(disagreed, 'the control and the codec refuse different sets').toEqual([]);
+    console.log(`--- swept ${lo}..${hi}; contract admits ${shifts.join(', ')}; `
+      + 'control and codec agree on every one ---');
+  });
+});
 
 describe('schema-legal is not buildable, and today the contract makes them the same set', () => {
   it('marks exactly one option buildable while the contract names one', () => {
