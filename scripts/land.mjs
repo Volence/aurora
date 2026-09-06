@@ -82,6 +82,7 @@
 // against when it was pushed, so writing and committing the entry as one act
 // (which is its own separate rule) still satisfies it.
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 const say = (s) => console.log(`land: ${s}`);
@@ -132,3 +133,58 @@ if (remoteAfter !== before) {
     + `  the ${before.slice(0, 8)} that was tested. Do not trust the push's own output.`);
 }
 say(`origin/${branch} ${remoteBefore.slice(0, 8)} to ${remoteAfter.slice(0, 8)}, and it is the tree the suite ran on`);
+
+// ============================================================================
+// THE LANDING LINE, PRINTED BECAUSE IT IS THE ONLY UNGATED STEP
+// ============================================================================
+//
+// Every step above self-enforces: a dirty tree refuses, a red suite refuses, a
+// moved HEAD refuses, a push that did not take refuses. Telling the peer lane
+// what landed is the one step nothing checks, and it sits at the END of that
+// chain, which is exactly where a habit decays: the automation carries you to
+// the boundary and stops, and nothing marks the last step undone. I missed it
+// twice in one night and named the mechanism after the first miss without
+// acting on it, which is what made the second worse.
+//
+// So the line is assembled here rather than recalled. It is not new
+// information: the lane-log entry is written IMMEDIATELY BEFORE landing and
+// already carries the headline and the consequence in the register the owner
+// reads. This prints that beside the SHA, so sending it is a COPY of the
+// command's own last output rather than a reconstruction.
+//
+// ⚠ AND IT FAILS VISIBLY RATHER THAN SILENTLY. If the log's newest entry is not
+// the one this landing wrote, the printed line says so. The old failure mode was
+// an ABSENT message, which nobody notices; this one is a WRONG message, which
+// the sender reads before sending.
+const LOG = 'docs/lane-log.jsonl';
+let entry = null, logWhy = '';
+try {
+  const lines = readFileSync(LOG, 'utf8').trimEnd().split('\n');
+  entry = JSON.parse(lines[lines.length - 1]);
+} catch (e) { logWhy = `could not read the newest ${LOG} entry: ${e.message}`; }
+
+// The entry belongs to THIS landing only if the commit that introduced it is in
+// what was just pushed. Committer time is the cheap proxy: an entry older than
+// the tip's own commit was written for a previous landing.
+let stale = '';
+if (entry) {
+  const tipTime = Number(git('show', '-s', '--format=%ct', before)) * 1000;
+  const at = Date.parse(entry.at || '');
+  if (!Number.isFinite(at)) stale = 'the newest entry has no readable `at`';
+  else if (tipTime - at > 30 * 60 * 1000) {
+    stale = `the newest entry is ${Math.round((tipTime - at) / 60000)} min older than this tip, `
+      + 'so it probably belongs to an earlier landing';
+  }
+}
+
+process.stdout.write('\n' + '='.repeat(72) + '\n');
+if (!entry || stale || logWhy) {
+  process.stdout.write(`LANDING LINE UNAVAILABLE: ${logWhy || stale}.\n`
+    + 'Say what landed in your own words, and check whether the lane log is missing an entry.\n');
+} else {
+  process.stdout.write('THE LANDING LINE, to send as it stands:\n\n'
+    + `  ${entry.headline}\n\n`
+    + `  ${entry.matters}\n\n`
+    + `  master ${before.slice(0, 8)}\n`);
+}
+process.stdout.write('='.repeat(72) + '\n');
