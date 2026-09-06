@@ -142,19 +142,31 @@ const MEASURE = String.raw`
     top: Math.round(r.top * 100) / 100, bottom: Math.round(r.bottom * 100) / 100,
     left: Math.round(r.left * 100) / 100, right: Math.round(r.right * 100) / 100,
   });
+  // NO BACKTICKS IN THIS COMMENT ON PURPOSE - it lives inside a String.raw
+  // template, and the first draft of it ended the template mid-sentence.
+  //
+  // THE FIRST VERSION OF THIS PREDICATE MATCHED height === 32px AND SO INHERITED
+  // THE DEFECT IT MEASURES. The repair under test lets the bar GROW, so the
+  // finder stopped finding it and the run reported "the Effects tool-options bar
+  // was found: no" for a bar that was on screen and correct. A gate written
+  // inside the change it verifies takes that change's blind spot with it. The
+  // height is READ here, never matched on.
   const isBar = (el) => {
     if (el.tagName !== 'DIV') return false;
     const cs = getComputedStyle(el);
     if (cs.display !== 'flex' || cs.alignItems !== 'center') return false;
-    if (cs.height !== '32px') return false;
+    // A chrome strip, not a page column: bordered below, and never tall.
+    if (el.getBoundingClientRect().height < 24) return false;
+    if (el.getBoundingClientRect().height > 200) return false;
+    if (cs.borderBottomWidth === '0px') return false;
     const last = el.lastElementChild;
     return !!last && last.tagName === 'SPAN' && (last.textContent || '').trim().length > 0;
   };
   const bars = [...document.querySelectorAll('div')].filter(isBar);
-  // Disambiguate: the Effects bar is the one whose subtree holds the two band
-  // verbs' host, i.e. the topmost such bar in the main content column. Prefer
-  // the one holding a chip labelled with a lone question mark + word, else the
-  // first by document order.
+  // Disambiguate: the Effects bar is the one carrying a chip labelled with a
+  // lone question mark + word (? Guide, since 6c3e3e5a). Falls back to the
+  // first bar by document order, and the finder that fired is REPORTED, so a row
+  // can never be read as measuring a bar it did not find.
   const guideBar = bars.find((b) => [...b.querySelectorAll('button')]
     .some((x) => /^\?\s/.test((x.textContent || '').trim())));
   const bar = guideBar || bars[0] || null;
