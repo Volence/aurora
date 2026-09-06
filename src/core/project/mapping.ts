@@ -100,7 +100,7 @@ export function sidecarMayBeOverwritten(state: SidecarState): boolean {
  */
 export function sidecarRefusalMessage(what: string): string {
   return (
-    `${SIDECAR_REL_PATH} could not be read, so Aurora left it alone instead of overwriting it — ` +
+    `${SIDECAR_REL_PATH} could not be read, so Aurora left it alone instead of overwriting it. ` +
     `${what} were NOT written. Fix that file by hand (it must be a valid JSON object) ` +
     'and reopen the project.'
   );
