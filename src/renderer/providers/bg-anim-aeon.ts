@@ -77,10 +77,13 @@ import {
   BGANIM_MAX_BANDS,
   BGANIM_PHASE_BANKS,
   BGANIM_SECTION_CEILING,
+  BGANIM_VIEW_COUNT,
+  BGANIM_VIEW_DERIVED_PERIOD_PX,
   BG_TILE_CAPACITY,
   TILE_BYTES,
   TILE_WIDTH_PX,
   animatedSlotCount,
+  bandIsDefaultOff,
   bganimSectionBytes,
   bganimSectionSlotsAllowed,
   bandColumnBytes,
@@ -108,6 +111,7 @@ import {
   makeDemoteBandCommand,
   makePromoteBandCommand,
   makeRemoveBandCommand,
+  makeSetBandDefaultOffCommand,
 } from '../../core/editing/bg-override-band';
 
 // ---------------------------------------------------------------------------
@@ -847,6 +851,168 @@ export function removeBandCommand(
   } catch (e) {
     return refusal(e);
   }
+}
+
+// ---------------------------------------------------------------------------
+// `default_off` — the ship-silent switch, and the twin-coupling disclosure
+// ---------------------------------------------------------------------------
+
+/**
+ * THE ORDER OF THESE SENTENCES IS THE CONTRACT'S ORDER, DELIBERATELY.
+ *
+ * aeon `tools/EFFECTS_CONSUMER_CONTRACT.md` §1.2 puts it in as many words:
+ * "READ THIS FIRST, ahead of either obligation, and put it in author-facing
+ * copy before either: `default_off` changes what SHIPS." The two writer
+ * obligations come after, because an author who reads the obligations first
+ * has already been told this is a thing with rules and not a thing with
+ * consequences.
+ *
+ * ⚠ AND IT IS THE HALF THAT IS EASIEST TO GET WRONG. The owner's own words for
+ * the feature this key came out of were "maybe have one view for horizontal and
+ * one for vertical" — which is exactly the sentence an editor renders as a
+ * preview toggle. It is not one. There is no runtime flag and no engine gate:
+ * the emitter writes `BgAnim_Table: u16 = 0` and `BgAnim_Update` walks a
+ * zero-count table and returns, in every ROM shape including release.
+ */
+export const SHIP_SILENT_LEAD =
+  'Changes what SHIPS, not what you see here. A silenced tile animation is not counted into the '
+  + 'act’s table, so the act boots with BG animation OFF in every ROM, RELEASE INCLUDED. '
+  + 'Nothing in this editor looks different either way.';
+
+/** The two build rules, in aeon's order, with the quantifier of each spelled out. */
+export const SHIP_SILENT_OBLIGATIONS =
+  `The build then enforces two things. PER ACT: the act must have exactly ONE tile animation `
+  + `(the rule is on the COUNT, not on whether the tile animations agree). PER TILE ANIMATION: `
+  + `this one’s pattern must be ${BGANIM_VIEW_DERIVED_PERIOD_PX}px. Either one refuses the `
+  + `build outright.`;
+
+/** What the debug ROM gets in exchange, which is the reason the key is not just a delete. */
+export const SHIP_SILENT_EXCHANGE =
+  `In exchange the DEBUG ROM gets ${BGANIM_VIEW_COUNT} view twins over the same art `
+  + '(horizontal, vertical, timer) so perspective and timer can be compared. They exist only in '
+  + 'the debug ROM, so they are not a way to see this animation in the game as played.';
+
+/**
+ * THE DISCLOSURE — one constant, one predicate, one render site.
+ *
+ * ⚠ WHAT RETIRES THIS, AND IT IS EXPECTED TO: aeon is building a DECOUPLING FIX
+ * (ruled 2026-09-06) that separates the DEBUG view twins from the act's band
+ * count, after which a second tile animation is legal beside a silenced one.
+ * aeon SEQUENCED that fix behind other work on the understanding that this
+ * sentence covers the gap in the meantime, so it is not optional and it is not
+ * permanent.
+ *
+ * HOW TO RETIRE IT, in one commit and no archaeology:
+ *
+ *   1. Re-read aeon's `views_emitted` (tools/inject_editor_bg.py) and
+ *      `EFFECTS_CONSUMER_CONTRACT.md` §1.2. If the band-count `AssertionError`
+ *      is gone, the codec's `viewsEmitted` per-act refusal goes with it and
+ *      that is the real change.
+ *   2. DELETE this constant and `twinCouplingApplies` below, and the one
+ *      `Hint` in BgAnimBandPanel.tsx that renders them. `grep -rn
+ *      TWIN_COUPLING_DISCLOSURE src/` finds every site; there are three and
+ *      they are all in those two files.
+ *   3. Amend `bandKeys.default_off.writerObligations[0]` in the vendored
+ *      contract and add an `amendments` entry naming aeon's revision.
+ *
+ * WHY IT IS NOT ENOUGH TO LET THE CHIP REFUSE. The chips ARE already disabled
+ * with the codec's reason when the act is in this state, and that was true
+ * before this parcel. What the refusal cannot do is reach an author who has not
+ * yet aimed a range and reached for the chip; and until the switch above
+ * existed the refusal's own advice ("clear the key") named a thing no Aurora
+ * author could do. This sentence sits above BOTH creation doors, states the
+ * coupling before the form is filled in, and names the control that resolves
+ * it.
+ *
+ * ONE SENTENCE FOR BOTH DOORS BECAUSE IT IS ONE FACT, MEASURED: on aeon's live
+ * document `promoteUnavailableReason` and `insertUnavailableReason` return the
+ * SAME refusal, because both project a second band and both size the result.
+ * Rendering it per door would be the repeated-per-row shape the panel's own
+ * docblock argues against.
+ */
+export const TWIN_COUPLING_DISCLOSURE =
+  'This act has a tile animation SILENCED IN THE ROM, and while it does, the build refuses a '
+  + 'SECOND one: the debug view twins are emitted only for an act with exactly one. Both doors '
+  + 'below are off for that reason, not because of a budget. To add another, set the existing '
+  + 'one back to "ships animating" first, and read what that changes before you do.';
+
+/**
+ * PER ACT: is any tile animation silenced in the ROM, so the twin coupling
+ * binds this document?
+ *
+ * ⚠ THE QUANTIFIER IS THE WHOLE POINT AND IT IS NOT THE OBVIOUS ONE. This asks
+ * whether ANY band carries the key, because that is what arms aeon's rule; the
+ * rule itself is then about the ACT'S BAND COUNT. A predicate asking "do the
+ * bands agree about `default_off`?" is the trap aeon's contract names by name,
+ * and it would answer `false` for a two-band act where both carry the key,
+ * which is a document this build refuses.
+ */
+export function twinCouplingApplies(doc: BgOverrideDocument | null): boolean {
+  if (!doc) return false;
+  return documentBands(doc).some(bandIsDefaultOff);
+}
+
+/** The ship-silent switch for one tile animation, as the panel renders it. */
+export interface ShipSilentSwitch {
+  /** PER BAND: does THIS tile animation carry `default_off` today? */
+  silent: boolean;
+  /**
+   * PER ACT: would the act boot with BG animation off? Today this is the same
+   * question as `silent` for the only shape aeon accepts (a silenced band
+   * forces a single-band act), and it is asked separately anyway because the
+   * two are different quantifiers and the decoupling fix will pull them apart.
+   */
+  actBootsSilent: boolean;
+  /**
+   * Why the switch cannot be moved to the OTHER state, or null when it can.
+   * Composed by the command factory, not here: this builds the command and
+   * keeps its refusal, so the greyed control and the failed click cannot give
+   * an author two different sentences.
+   */
+  reason: string | null;
+  /** Flip it. The command, or the same refusal `reason` carries. */
+  run(): BandCommandResult;
+}
+
+/**
+ * The switch for the band at `bandIndex`, or null when there is no such band.
+ *
+ * ⚠ IT ASKS THE COMMAND FACTORY RATHER THAN RESTATING THE RULES, which is the
+ * opposite of what `promoteUnavailableReason` and `insertUnavailableReason` do
+ * one section up — and the difference is deliberate. Those two are asked about
+ * a band that does not exist yet, per keystroke, on a form the author is still
+ * filling in; this is asked about a band the document already has, so building
+ * the command IS the check and there is nothing cheaper to ask. Building it
+ * costs one shallow projection and one validation, the same as the click would,
+ * and it means the panel cannot ever grey a control for a reason the command
+ * would not give.
+ *
+ * BOTH REFUSALS THEREFORE ARRIVE FROM `viewsEmitted` THROUGH THE PROJECTION,
+ * with their quantifiers intact: the band-count rule is PER ACT and the period
+ * rule is PER BAND. Neither is spelled here, so neither can drift.
+ */
+export function shipSilentSwitch(
+  doc: BgOverrideDocument | null, bandIndex: number,
+): ShipSilentSwitch | null {
+  if (!doc) return null;
+  const bands = documentBands(doc);
+  const band = bands[bandIndex];
+  if (band === undefined) return null;
+  const silent = bandIsDefaultOff(band);
+  const build = (): BandCommandResult => {
+    try {
+      return { ok: true, command: makeSetBandDefaultOffCommand(doc, bandIndex, !silent) };
+    } catch (e) {
+      return refusal(e);
+    }
+  };
+  const probe = build();
+  return {
+    silent,
+    actBootsSilent: bands.some(bandIsDefaultOff),
+    reason: probe.ok ? null : probe.reason,
+    run: build,
+  };
 }
 
 // ---------------------------------------------------------------------------

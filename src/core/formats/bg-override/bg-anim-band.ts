@@ -1180,5 +1180,47 @@ export function demoteBand(doc: BgOverrideDocument, plan: BandSlotPlan): BgOverr
   return applyWithoutBand(doc, plan);
 }
 
+// ---------------------------------------------------------------------------
+// `default_off` — the one writer
+// ---------------------------------------------------------------------------
+
+/**
+ * Set or CLEAR `default_off` on one band, in place.
+ *
+ * ⚠ THIS CHANGES WHAT SHIPS, NOT WHAT ANYBODY SEES IN THE EDITOR. A band
+ * carrying the key is not counted into the act's own `BgAnim_Table`, so a
+ * single-band act emits a count of zero and BG animation is off at boot in
+ * EVERY shape, release included. See `bandIsDefaultOff` in the codec and
+ * `bandKeys.default_off` in the vendored contract, which lead with that fact
+ * because every surface offering this key must lead with it too.
+ *
+ * `undefined` DELETES THE KEY rather than writing `false`. Absent is the
+ * contract's own default (`bandKeys.default_off.default`), and it is the state
+ * every other optional band key uses for "the document tracks aeon's default" —
+ * a written `false` would be Aurora freezing today's default into a file that
+ * did not ask for it. Undo therefore has to be able to restore ABSENCE, which
+ * is why the command records `boolean | undefined` on both sides rather than a
+ * bare boolean.
+ *
+ * IT REFUSES NOTHING. Both aeon obligations are quantified over the ACT (see
+ * `viewsEmitted`), so a per-band writer cannot evaluate either one; the refusal
+ * belongs to the command layer, which holds the whole document and projects the
+ * result before it exists. A writer that half-checked here would be the
+ * partial-coverage shape: green on the band, silent on the act.
+ */
+export function writeBandDefaultOff(
+  doc: BgOverrideDocument, bandIndex: number, value: boolean | undefined,
+): void {
+  const band = documentBands(doc)[bandIndex];
+  if (band === undefined) {
+    throw new BgOverrideError(
+      `cannot set default_off: band ${bandIndex} does not exist ` +
+      `(the document has ${documentBands(doc).length})`,
+    );
+  }
+  if (value === undefined) delete band.default_off;
+  else band.default_off = value;
+}
+
 /** Re-exported so callers of this module do not need two imports to name a driver. */
 export { BGANIM_DRIVERS };

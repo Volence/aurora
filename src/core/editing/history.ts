@@ -1,7 +1,9 @@
 import type { AnyCommand, S4Level } from './commands';
 import type { EffectsScene, EffectsSceneLibrary } from '../formats/effects/scene';
 import type { EffectsPreset, EffectsPresetLibrary } from '../formats/effects/preset';
-import { applyWithBand, applyWithoutBand } from '../formats/bg-override/bg-anim-band';
+import {
+  applyWithBand, applyWithoutBand, writeBandDefaultOff,
+} from '../formats/bg-override/bg-anim-band';
 import {
   writeBgOverrideLayoutWord, writeBgOverrideTile, writeBgOverridePhaseBank,
 } from '../formats/bg-override/bg-override-view';
@@ -216,6 +218,16 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
     for (const b of cmd.banks) writeBgOverridePhaseBank(level.bgOverride, cmd.bandIndex, b.bank, b.newTiles);
     return;
   }
+  if (cmd.type === 'set-bg-override-default-off') {
+    // No mirror to follow: this key changes what the emitted ROM does and
+    // nothing the canvas draws, so there is no display copy that could go out
+    // of step. The SAME writer serves apply and undo, with the other side of
+    // the pair — the rule the two writers above follow, and the reason undo can
+    // restore an ABSENT key rather than a written `false`.
+    if (!level.bgOverride) throw new Error('set-bg-override-default-off requires level.bgOverride');
+    writeBandDefaultOff(level.bgOverride, cmd.bandIndex, cmd.newValue);
+    return;
+  }
   if (cmd.type === 'set-sections') {
     if (!level.act) throw new Error('set-sections requires level.act');
     level.act.gridWidth = cmd.newGridWidth;
@@ -413,6 +425,14 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
   if (cmd.type === 'set-bg-override-phases') {
     if (!level.bgOverride) throw new Error('set-bg-override-phases requires level.bgOverride');
     for (const b of cmd.banks) writeBgOverridePhaseBank(level.bgOverride, cmd.bandIndex, b.bank, b.oldTiles);
+    return;
+  }
+  if (cmd.type === 'set-bg-override-default-off') {
+    // The SAME writer as apply, with the other half of the pair. `oldValue` is
+    // `undefined` whenever the document had no key, so this DELETES it back out
+    // rather than leaving a `false` the author never wrote.
+    if (!level.bgOverride) throw new Error('set-bg-override-default-off requires level.bgOverride');
+    writeBandDefaultOff(level.bgOverride, cmd.bandIndex, cmd.oldValue);
     return;
   }
   if (cmd.type === 'set-sections') {

@@ -336,6 +336,16 @@ export interface BgOverrideBand {
   driver?: BgAnimDriver;
   rate_shift?: number;
   slot_base?: number;
+  /**
+   * ⚠ A SHIPPED-BEHAVIOUR KEY, NOT A PREVIEW ONE. Truthy means the band is not
+   * counted into the act's `BgAnim_Table`, so a single-band act boots with BG
+   * animation off in EVERY ROM shape, release included. Absent is the default;
+   * `writeBandDefaultOff` deletes rather than writing `false` for the same
+   * reason every other optional key here is left out when it is not meant.
+   * Both of aeon's obligations for it are quantified over the ACT — see
+   * `viewsEmitted`.
+   */
+  default_off?: boolean;
   phases: number[][][];
   [key: string]: unknown;
 }

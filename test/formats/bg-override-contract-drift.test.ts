@@ -97,7 +97,11 @@ const CONTRACT_PATH = resolve(
   __dirname, '../../src/core/formats/bg-override/bganim-consumer-contract.json',
 );
 const CONTRACT_TEXT = readFileSync(CONTRACT_PATH, 'utf8');
-const CONTRACT_SHA256 = '5c2645a046bb4738b016a7be23efb504d3a746ab16c7e6decedcf2187a5610e5';
+// Re-pinned 2026-09-06 by the `default-off-switch` amendment, which added
+// `bandKeys.default_off.auroraStatusNow` and the amendment entry beside it. NO
+// CONSTANT MOVED: the rows below compare the module's exports to this file's
+// own values, and every one of them is unchanged.
+const CONTRACT_SHA256 = 'aac3c364b524af73a2f20633255187a9dad779161a80c7354a5ea6f1fa7e0629';
 
 describe('the vendored contract is the one we pinned', () => {
   it('matches the pinned content hash', () => {
