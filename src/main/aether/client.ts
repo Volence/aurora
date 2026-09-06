@@ -54,6 +54,8 @@ interface InitializeResult {
   implementation?: unknown;
   /** §2.1's build identity. Recorded as provenance; never compared. */
   serverBuild?: unknown;
+  /** §2.1's REQUIRED ceilings object (§11.5). Recorded raw; see `AetherHandshake.limits`. */
+  limits?: Record<string, unknown>;
 }
 
 /**
@@ -93,6 +95,22 @@ export interface AetherHandshake {
   methodCount: number;
   /** The raw `capabilities` object, when the server sent one. */
   capabilities?: Record<string, unknown>;
+  /**
+   * The raw `limits` object, when the server sent one.
+   *
+   * protocol.md §2.1 makes `limits` REQUIRED and top-level (registered
+   * 2026-08-15, §11.5) precisely because a ceiling is not something a server
+   * may or may not "support": `maxReadLen` is "the largest `len` this server
+   * will accept on a read-shaped op", and the contract's own reason for
+   * registering it is that §6's parenthetical `(≤4096)` describes THE CATALOG,
+   * not this server. Aurora used to drop the object on the floor, so every
+   * consumer that needed the ceiling had to retype 4096 out of §6 — which is
+   * how `scratchpad/warp-tearing-harness.mjs` came to read half a plane and
+   * call it "whole-plane". Kept raw and unvalidated here, like `capabilities`:
+   * this is a record of what arrived, and the consumer that needs a field is
+   * the one that knows what shape it needs.
+   */
+  limits?: Record<string, unknown>;
   /** When this handshake completed (ms since epoch). */
   at: number;
 }
@@ -183,6 +201,7 @@ export class AetherClient {
         methods: [...methods],
         methodCount: methods.length,
         capabilities: init.capabilities,
+        limits: init.limits,
         at: Date.now(),
       };
       // ONCE, AT THE HANDSHAKE, because this is the only moment the answer is
