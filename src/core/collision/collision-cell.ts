@@ -16,7 +16,8 @@
 // `cellCrossoverIndices` exists: see layer-transition.ts's CrossoverSpan block
 // for the parity argument and docs/reviews/2026-09-04-loops-two-way-mark.md.
 
-import type { CrossoverSpan } from './layer-transition';
+import { crossoverSpanIsHalf } from './layer-transition';
+import type { CrossoverSpan, CrossoverSpanMode } from './layer-transition';
 
 /** 8px sub-tile columns per 16px collision cell. Named once and USED by
  *  `cellTileIndices` below, so the expansion and anything that reasons about
@@ -77,4 +78,39 @@ export function cellCrossoverIndices(
  *  return is assignable to one. */
 export function spanForTileCol(tileCol: number): Exclude<CrossoverSpan, 'cell'> {
   return tileCol % CELL_SUBTILE_COLS === 0 ? 'left' : 'right';
+}
+
+/**
+ * THE SPAN A GESTURE AT `tileCol` AUTHORS UNDER MARK-WIDTH `mode`. ONE RULE.
+ *
+ * ⚠ THIS EXISTS SO THE HOVER PREVIEW AND THE COMMIT PATH CANNOT DRIFT. Both
+ * ask the same question — "if the author clicked HERE, right now, which
+ * sub-columns get the mark?" — and before 2026-09-06 only the commit path
+ * could answer it, so the preview depicted no mark at all and a half-width
+ * stroke looked exactly like a cell-wide one under the cursor
+ * (docs/reviews/2026-09-04-loops-two-way-mark.md §8 row 2).
+ *
+ * A preview that re-derived the parity beside the brush would be RIGHT TODAY
+ * and wrong the first time this rule moves — and it would look correct in
+ * every screenshot, which is why the rule is a call and not a comment.
+ */
+export function crossoverSpanForCursor(mode: CrossoverSpanMode, tileCol: number): CrossoverSpan {
+  return crossoverSpanIsHalf(mode) ? spanForTileCol(tileCol) : 'cell';
+}
+
+/**
+ * Every sub-tile index a stroke over `targets` would MARK at `span`.
+ *
+ * The commit path's mark set and the hover preview's footprint are THIS, so
+ * "what the preview draws" and "what the click writes" are one array built
+ * once rather than two loops that agree by inspection. `cell` is included: the
+ * caller that needs "the default write, not a set that happens to be complete"
+ * distinguishes the span itself (see MapViewport's `crossoverAt`).
+ */
+export function crossoverMarkIndices(
+  targets: Iterable<{ cellCol: number; cellRow: number }>, width: number, span: CrossoverSpan,
+): number[] {
+  const out: number[] = [];
+  for (const t of targets) out.push(...cellCrossoverIndices(t.cellCol, t.cellRow, width, span));
+  return out;
 }
