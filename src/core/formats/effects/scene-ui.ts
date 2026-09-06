@@ -1669,17 +1669,23 @@ export function rowRemapHeightShiftRefusal(shift: number): string | null {
 /**
  * Why a legal shift will still fail aeon's build TODAY, or null when it will not.
  *
- * SEPARATE FROM THE REFUSAL ABOVE, deliberately, and the separation is the whole
- * point: `height_shift: 6` is a correct document that this schema accepts and
- * aeon's generator refuses by name, because only one ladder exists so far. A
- * control that folded the two together would either refuse a legal value
- * forever, or offer five options of which four break the build in silence.
- * Aurora says which is which and lets the author choose.
+ * IT RETURNS `null` FOR EVERY SHIFT TODAY, and the reason is the contract, not
+ * this function. Through empyrean `60d9f6a`, `height_shift: 6` was a correct
+ * document that the schema accepted and aeon's generator refused by name, so
+ * SCHEMA-LEGAL and BUILDABLE were different sets and Aurora owed the author the
+ * difference. At `2e5046e` the schema's `enum` IS the buildable set: 6 is no
+ * longer a document this codec accepts, the two sets coincide, and the warning
+ * has nobody to warn. `EFFECTS_ROW_REMAP_BUILDABLE_SHIFT` reads `null` and this
+ * returns `null` — the self-retirement described there, firing.
+ *
+ * IT STAYS SEPARATE FROM `rowRemapHeightShiftRefusal` ANYWAY, because the two
+ * sets coinciding is a fact about one contract revision and not about the
+ * format. Fold them together and the day the enum widens ahead of aeon's
+ * generator, Aurora either refuses a legal value or offers rungs that break the
+ * build in silence. Kept apart, that day needs no edit here.
  *
  * SPELLED AS THE CURRENT STATE WITH ITS REASON, never as "only 4 works": the
- * sentence names what unblocks it, so it retires itself when 9b lands and the
- * contract drops the clause (`EFFECTS_ROW_REMAP_BUILDABLE_SHIFT` then reads
- * `null` and this returns `null` for every shift).
+ * sentence names what unblocks it, so it can never outlive its cause.
  */
 export function rowRemapBuildableToday(shift: number): string | null {
   const only = EFFECTS_ROW_REMAP_BUILDABLE_SHIFT;

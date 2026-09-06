@@ -710,6 +710,17 @@ describe('the row reads and writes what it says it does', () => {
     expect(rowRemapFieldValue({ rowRemap: 'none' })).toBeNull();
   });
 
+  /**
+   * ⚠ THE SHIFTS HERE (6 AND 3) ARE VALUES THE CONTRACT NO LONGER ADMITS, AND
+   * THAT IS DELIBERATE. `rowRemapWithPlaneY` and `rowRemapWithHeightShift` are
+   * field-preserving builders on a plain object; nothing validates here, and the
+   * property under test is that editing one field LEAVES THE OTHER ALONE — a
+   * writer that clamped, filtered or defaulted the untouched field would pass a
+   * row that only ever fed it admitted values. Changing these to 4 would delete
+   * the only rows that could see that. They are not documents and never reach the
+   * codec; the codec's own view of 6 and 3 is asserted in the membership sweep
+   * above, which requires them REFUSED.
+   */
   it('keeps the other field when one is edited', () => {
     expect(rowRemapWithPlaneY({ plane_y: 101, height_shift: 6 }, 12))
       .toEqual({ plane_y: 12, height_shift: 6 });
