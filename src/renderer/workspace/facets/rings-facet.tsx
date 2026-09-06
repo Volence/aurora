@@ -15,7 +15,7 @@ function RingsPanels() {
   // stays in sync with selection changes made elsewhere.
   const selectedRingPattern = useEditorStore((s) => s.selectedRingPattern);
   return (
-    <Panel width={240} scroll>
+    <Panel width={240} scroll column="aeon-rings">
       <CollapsibleSection id="aeon.ringPatterns" title="Ring Patterns" variant="list">
         <RingPatternPalette
           selectedIndex={selectedRingPattern}

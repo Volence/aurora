@@ -388,7 +388,7 @@ function ArtPanels() {
   const showCollisionPanel = tool === 'collision' && open !== null && open.liveTileIndex === null
     && !open.bgOverride;
   return (
-    <Panel width={240} scroll>
+    <Panel width={240} scroll column="aeon-art">
       {showCollisionPanel && (
         <CollapsibleSection id="art.collision" title="Collision">
           <CollisionPalette variant="art" />

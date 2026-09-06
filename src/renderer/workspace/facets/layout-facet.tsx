@@ -74,7 +74,7 @@ function LayoutPanels() {
   const tool = useEditorStore((s) => s.tool);
   const pasting = useEditorStore((s) => s.pasting);
   return (
-    <Panel width={240} scroll>
+    <Panel width={240} scroll column="aeon-layout">
       <CollapsibleSection id="aeon.sections" title="Sections" variant="list"><SectionGridNav /></CollapsibleSection>
       {/* THE GESTURE HOST, AND IT GOES ABOVE THE TOOL-CONDITIONAL SLOT — see
           this component's docblock. Its only neighbour above is unconditional,

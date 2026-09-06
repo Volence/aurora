@@ -1,6 +1,21 @@
 // src/renderer/components/ui/primitives.tsx
 import React from 'react';
 import { T } from './theme';
+import { PANEL_COLUMN_ATTR, type PanelColumnId } from './panel-columns';
+
+/**
+ * `column` IS REQUIRED EXACTLY WHEN `scroll` IS — see Panel's docblock.
+ *
+ * A discriminated union rather than an optional prop, because an optional one
+ * makes the fifteen call sites a convention instead of a rule, and the whole
+ * point of this parcel is that a convention covered one of them. A Panel with
+ * no `scroll` clips nothing, so it is asked for nothing.
+ */
+export type PanelProps = {
+  children: React.ReactNode; width?: number; style?: React.CSSProperties;
+} & (
+  { scroll: true; column: PanelColumnId } | { scroll?: false; column?: never }
+);
 
 /**
  * A facet's right-hand column: A FULL-HEIGHT FLEX COLUMN THAT ITS SECTIONS
@@ -79,14 +94,36 @@ import { T } from './theme';
  * even when `[9a]`'s condition is violated.
  *
  * ⚠ CLIPPING IS QUIETER THAN SCROLLING, so the over-wide child must be caught
- * somewhere else: `[9a]` fails on any horizontal overflow in the Effects column
- * with its cards open, and it is the only instrument that sees one now.
+ * somewhere else.
+ *
+ * ═══ AND IT IS CAUGHT IN EVERY COLUMN NOW, NOT ONLY EFFECTS ═══
+ * (CLIP-UNWATCHED-COLUMNS, 2026-09-06.)
+ *
+ * The sentence that stood here said `[9a]` of
+ * `scratchpad/coldread-fixes-harness.mjs` was "the only instrument that sees
+ * one now", and it was true: `[9a]` measures the EFFECTS column and there are
+ * fifteen scrolling `Panel` call sites. Fourteen of them clipped with nothing
+ * looking. A check covering one column reads, in a report, exactly like a check
+ * covering the shell.
+ *
+ * So a scrolling Panel now NAMES ITSELF. `column` is required whenever `scroll`
+ * is set (`ui/panel-columns.ts` holds the census and the id union, so a
+ * sixteenth column that names nothing does not compile), and the id is stamped
+ * on the scroller as `data-panel-column`. That attribute is the whole runtime
+ * cost in a normal build: one string, no effect, no registry, no debug branch.
+ *
+ * `__dbg.panels()` reads it back (debug builds only) and
+ * `scratchpad/panel-overflow-harness.mjs` sweeps the app with it, printing ALL
+ * FIFTEEN by name in one of three states — measured clean, measured
+ * overflowing, or UNMEASURABLE with the reason it could not be reached. The
+ * third state is the reason this is not just a wider `[9a]`: most of these
+ * columns need a project or a document open first, and a sweep that silently
+ * skipped them would go green by looking at nothing.
  */
-export function Panel({ children, width, scroll = false, style }: {
-  children: React.ReactNode; width?: number; scroll?: boolean; style?: React.CSSProperties;
-}) {
+export function Panel({ children, width, scroll = false, column, style }: PanelProps) {
   return (
     <div
+      {...(scroll ? { [PANEL_COLUMN_ATTR]: column } : {})}
       onScroll={scroll ? (e): void => {
         // See "AND `hidden` IS NOT ENOUGH" above. Cheap by construction: in the
         // ordinary case scrollLeft is already 0 and this compares two numbers.

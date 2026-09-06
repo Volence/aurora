@@ -152,7 +152,7 @@ export default function CanvasMode({ docId, appBar }: { docId: string; appBar: R
       toolDock={<CanvasToolDock />}
       toolOptions={<CanvasToolOptions docId={docId} onFit={fitToView} />}
       panels={
-        <Panel width={240} scroll>
+        <Panel width={240} scroll column="canvas-mode">
           <CollapsibleSection id="canvas.doc" title="Canvas">
             <CanvasDocSection docId={docId} />
           </CollapsibleSection>

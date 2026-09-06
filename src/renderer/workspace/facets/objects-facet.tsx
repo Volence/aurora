@@ -24,7 +24,7 @@ function ObjectsPanels() {
   // liveEditVersion, so calling it here would re-render this whole column on
   // every mousemove of an object drag.
   return (
-    <Panel width={240} scroll>
+    <Panel width={240} scroll column="aeon-objects">
       <CollapsibleSection id="aeon.objects" title="Objects" variant="list">
         <ObjectList port={objectListPort} label="Object palette" />
       </CollapsibleSection>
