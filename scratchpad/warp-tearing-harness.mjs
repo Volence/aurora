@@ -38,6 +38,13 @@
 //   - Rows R1 to R4 assert every derived value EQUALS the literal it replaces
 //     for this ROM. That is what makes the change measurement neutral rather
 //     than a silent adoption of a new number.
+//   - Row R2H does the same for plane HEIGHT, which had no such row until
+//     2026-09-06 and is the one axis of the geometry nothing asserted. It was
+//     missed because it never was a literal here: it arrived already derived,
+//     inside the byte count. A machine decoding 64x32 passed R1, R2, R3, R4,
+//     R5 and R7 green over a read covering half the plane, which is this arc's
+//     own defect coming back through the unwatched axis. See the block at
+//     `WAS_PLANE_H`.
 //   - Row R6 reads the registers at EVERY plane sample on BOTH paths and
 //     asserts they agree. THIS WAS PREVIOUSLY UNFALSIFIABLE. If a warp had
 //     moved plane A's base or resized the plane, the old code would have
@@ -307,9 +314,20 @@ async function main() {
       `(reg $02=${hx8(geom.raw.r02)}). Reading before the boot would have aimed this harness ` +
       `at VRAM ${hx(coldGeom.planeA)}.`);
 
-    // The literals these four rows replace, kept by name so the equality being
+    // The literals these rows replace, kept by name so the equality being
     // asserted is legible rather than inlined into the message.
-    const WAS_PLANE_A = 0xC000, WAS_PLANE_W = 64, WAS_VIEW_W = 40, WAS_VIEW_H = 28;
+    //
+    // WAS_PLANE_H IS NOT LIKE ITS FOUR SIBLINGS AND THE NAME SHOULD NOT HIDE
+    // THAT. The other four each pin a value that used to be a literal in this
+    // file. Plane HEIGHT never was one: it arrived on 2026-09-05 already
+    // derived, inside `PLANE_BYTES = planeW * planeH * 2`, and NOTHING
+    // ASSERTED IT. That gap is this arc's own defect with the axis swapped. A
+    // machine whose reg $10 decoded 64x32 would give PLANE_BYTES = 4096 and
+    // 32 rows, and R1, R2, R3, R4, R5 and R7 would every one of them pass over
+    // a read covering HALF the plane, which is exactly the state this arc
+    // existed to end. So 64 is pinned here the way the stride is, and R2H is
+    // the row that pins it.
+    const WAS_PLANE_A = 0xC000, WAS_PLANE_W = 64, WAS_PLANE_H = 64, WAS_VIEW_W = 40, WAS_VIEW_H = 28;
 
     const PLANE_A = geom.planeA;
     check('R1', 'plane A base derived from register $02 equals the address this harness read',
@@ -327,6 +345,29 @@ async function main() {
         : `reg $10=${hx8(geom.raw.r10)}, so HSZ=${geom.raw.r10 & 3} -> ${PLANE_W} cells wide ` +
           `and VSZ=${(geom.raw.r10 >> 4) & 3} -> ${geom.planeH} cells tall; ` +
           `the stride literal it replaces was ${WAS_PLANE_W}`);
+
+    // R2H is a NEUTRALITY row, the same kind as R1 to R4: it says the value
+    // this run derived is the value this ROM has always had, so nothing about
+    // what the harness measures moved when the derivation replaced the typing.
+    // It is NOT a production-detection row and cannot be made into one, because
+    // there is no second, independent producer of the plane height to check the
+    // registers against. Its only route to red is a machine that really does
+    // decode a different height, or a mutation of the decode. That is the
+    // point: the previous state of this file was that such a machine reddened
+    // NOTHING and quietly halved the plane.
+    const PLANE_H = geom.planeH;
+    check('R2H', 'plane height in cells derived from register $10 equals the plane depth read here',
+      PLANE_H === WAS_PLANE_H,
+      geom.planeH === null
+        ? `reg $10=${hx8(geom.raw.r10)} has VSZ code 2, which is in no permitted source; ` +
+          `no height is derivable and none is guessed`
+        : `reg $10=${hx8(geom.raw.r10)}, so VSZ=${(geom.raw.r10 >> 4) & 3} -> ${PLANE_H} cells tall; ` +
+          `the pinned height for this ROM is ${WAS_PLANE_H}, and the whole plane read below is ` +
+          `${geom.planeW} x ${PLANE_H} x 2 bytes` +
+          (PLANE_H === WAS_PLANE_H
+            ? ''
+            : `. THEY DIFFER: every byte count below is derived from this height, so the read ` +
+              `this harness calls the whole plane covers ${PLANE_H} rows, not ${WAS_PLANE_H}.`));
 
     const VIEW_W = geom.h40 ? 40 : 32;
     check('R3', 'view width in cells derived from register $0C equals the sample window width',
