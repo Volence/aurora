@@ -185,7 +185,7 @@ function dialect(file) {
 }
 
 function die(msg) {
-  console.error(`${PREFIX}: COULD NOT MEASURE — ${msg}`);
+  console.error(`${PREFIX}: COULD NOT MEASURE: ${msg}`);
   process.exit(2);
 }
 
@@ -882,7 +882,7 @@ const CANARIES = [
   {
     kind: 'c',
     src: [
-      `// a record quoting ${CANARY_ROOT}/peer — a comment opens no file, so this is exempt`,
+      `// a record quoting ${CANARY_ROOT}/peer, and a comment opens no file, so this is exempt`,
       `/* also exempt: ${CANARY_ROOT}/peer, ${CANARY_SESSION}, process.env.${CANARY_ENV} */`,
       `const DIR = '${CANARY_ROOT}/peer';`,
       `const SHOTS = '${CANARY_SESSION}';`,
@@ -985,7 +985,7 @@ const CANARIES = [
   {
     kind: 'hash',
     src: [
-      `# a record quoting ${CANARY_ROOT}/peer — a comment opens no file, so this is exempt`,
+      `# a record quoting ${CANARY_ROOT}/peer, and a comment opens no file, so this is exempt`,
       `AEON="${CANARY_ROOT}/peer"  # trailing record, also ${CANARY_ROOT}/peer, also exempt`,
       "echo don't stop here",
       `# and one more record, ${CANARY_ROOT}/peer, still exempt after that apostrophe`,
@@ -1012,7 +1012,7 @@ const CANARIES = [
 // hash half stops being used at all while both canaries go on passing.
 for (const [file, want] of [['a.py', 'hash'], ['a.sh', 'hash'], ['a.mjs', 'c'], ['a.ts', 'c'], ['a.mts', 'c'], ['a.tsx', 'c']]) {
   if (dialect(file) !== want) {
-    die(`dialect(${file}) is ${dialect(file)}, expected ${want} — files are being read with the `
+    die(`dialect(${file}) is ${dialect(file)}, expected ${want}: files are being read with the `
       + 'wrong comment syntax, so what this run examined is not what it says it examined.');
   }
 }
@@ -1054,7 +1054,7 @@ for (const rel of [...RESOLVER_FILES, ...BUILD_RULE_EXEMPT, ...WRITE_RULE_EXEMPT
     if (!statSync(join(ROOT, rel)).isFile()) throw new Error('not a file');
   } catch (e) {
     die(`the exemption list names ${rel}, which is not a readable file here (${e.message}). `
-      + 'Either it moved — in which case update RESOLVER_FILES — or this gate is about to '
+      + 'Either it moved, in which case update RESOLVER_FILES, or this gate is about to '
       + 'report the resolver as violating the rule the resolver implements.');
   }
 }
@@ -1074,7 +1074,7 @@ if (!SIBLING) {
     '\n' +
     '  ⚠ This used to be a confident PASS. The gate carried its own copy of the derivation\n' +
     '  which ignored AURORA_PEER_ROOT, so under an override it went on forbidding the DEFAULT\n' +
-    '  sibling root — the one string no test could then be using — and printed OK.',
+    '  sibling root, the one string no test could then be using, and printed OK.',
   );
 }
 
@@ -1135,7 +1135,7 @@ try {
   for (let i = files.length - 1; i >= 0; i--) if (drop.has(files[i])) files.splice(i, 1);
 } catch (e) {
   // Exit 1 means "nothing matched", which is the ordinary clean-tree answer.
-  if (e.status !== 1) die(`git check-ignore failed (${e.message}) — cannot tell generated output from source, so this run judges an unknown set of files`);
+  if (e.status !== 1) die(`git check-ignore failed (${e.message}), so this cannot tell generated output from source, so this run judges an unknown set of files`);
 }
 if (files.length === 0) {
   die(`every ${EXTS.join('/')} file under ${ROOTS.join(', ')} is git-ignored. Nothing was examined.`);
@@ -1155,16 +1155,16 @@ for (const f of files.sort()) {
 // run that consulted an override from one that derived its own answer.
 console.log(
   `${PREFIX}: scanned ${files.length} ${EXTS.join('/')} file(s) under ${ROOTS.join(', ')} ` +
-  `against ${RULES.length} rule(s) — ${RULES.map((r) => r.id).join(', ')} ` +
+  `against ${RULES.length} rule(s): ${RULES.map((r) => r.id).join(', ')} ` +
   `(all ${RULES.length} fired on the canaries, both dialects; ` +
   `${ignored} git-ignored file(s) excluded, nothing else).\n` +
-  `${PREFIX}: sibling root ${SIBLING} — ${SIBLING_SOURCE}\n` +
+  `${PREFIX}: sibling root ${SIBLING}, ${SIBLING_SOURCE}\n` +
   `${PREFIX}: aurora ${AURORA_DIR}; ${OWNED_ENV.length} suite variable(s) policed, ` +
   `read only by ${RESOLVER_FILES.join(' and ')}`,
 );
 
 if (violations.length === 0) {
-  console.log(`${PREFIX}: OK — no executable line names a sibling checkout by absolute path, `
+  console.log(`${PREFIX}: OK: no executable line names a sibling checkout by absolute path, `
     + 'names a session scratchpad, reads a suite path variable outside the resolver, '
     + `composes a build path out of ${CHECKOUT_IDENT}, or writes to a peer path the `
     + 'resolver defaulted.');
@@ -1175,10 +1175,10 @@ const byRule = new Map(RULES.map((r) => [r.id, []]));
 for (const v of violations) byRule.get(v.rule).push(v);
 
 console.error(
-  `\n${PREFIX}: FAIL — ${violations.length} executable line(s) across ` +
+  `\n${PREFIX}: FAIL: ${violations.length} executable line(s) across ` +
   `${[...byRule.values()].filter((v) => v.length).length} rule(s):\n` +
   RULES.filter((r) => byRule.get(r.id).length).map((r) =>
-    `\n  [${r.id}] ${byRule.get(r.id).length} line(s) — ${r.what}:\n` +
+    `\n  [${r.id}] ${byRule.get(r.id).length} line(s), ${r.what}:\n` +
     byRule.get(r.id).map((v) => `    ${v.file}:${v.line}\n        ${v.text}`).join('\n'),
   ).join('\n') +
   '\n\n' +
@@ -1192,11 +1192,11 @@ console.error(
   '  [unratified-env] Going to the environment for a <PEER>_DIR yourself reads ONE\n' +
   '  spelling and nothing else:\n' +
   '  no transitional aliases, no refusal when two spellings disagree, no error\n' +
-  '  when the variable is set but names nothing. Go through the resolver —\n' +
+  '  when the variable is set but names nothing. Go through the resolver,\n' +
   '  `siblingPathOrUnresolved(name)` to resolve, `checkoutOverride(name)` when an\n' +
   '  override is REQUIRED, `AURORA_DIR` for this repo\'s own tree.\n' +
   '\n' +
-  '  [checkout-as-build-tree] AURORA_DIR answers "which checkout am I" — observed\n' +
+  '  [checkout-as-build-tree] AURORA_DIR answers "which checkout am I", observed\n' +
   '  from the resolver\'s own file location. The tree carrying node_modules/.bin/\n' +
   '  electron and dist/main/index.mjs is a DIFFERENT question, and in a linked git\n' +
   '  worktree it is a different directory: a worktree has neither, so a path\n' +
@@ -1213,7 +1213,7 @@ console.error(
   '  `runTarget` walks up for a tree carrying BOTH artifacts, honours\n' +
   '  AURORA_BUILT_TREE when an operator pins one, and `announceRunRoot` prints the\n' +
   '  tree it chose and marks it BORROWED when that is not the tree the script lives\n' +
-  '  in — the announcement the artifacts carve-out owes (empyrean\n' +
+  '  in, the announcement the artifacts carve-out owes (empyrean\n' +
   '  contract/SUITE_PATHS.md @ c9bc05f).\n' +
   '\n' +
   '  AURORA_DIR stays right for everything that is NOT a build artifact: reading\n' +
@@ -1221,7 +1221,7 @@ console.error(
   '  you edited, and they are not what this rule flags.\n' +
   '\n' +
   '  [sibling-literal] That literal is one machine\'s home directory. Every row\n' +
-  '  behind it can only ever SKIP on another checkout — unrunnable by\n' +
+  '  behind it can only ever SKIP on another checkout, unrunnable by\n' +
   '  construction, and silently so.\n' +
   '\n' +
   '  Derive it instead. From TypeScript under src/ or test/:\n' +
@@ -1231,7 +1231,7 @@ console.error(
   "      const FILE  = referencePath('s1disasm', '_anim/Sonic.asm');\n" +
   '\n' +
   '  From a plain-Node script under scripts/ or scratchpad/, which cannot import\n' +
-  '  a .ts — the SAME derivation, one module lower down:\n' +
+  '  a .ts, the SAME derivation, one module lower down:\n' +
   '\n' +
   "      import { siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';\n" +
   "      const S1DIR = siblingPathOrUnresolved('s1disasm');\n" +
@@ -1239,7 +1239,7 @@ console.error(
   '\n' +
   '  Three shapes a scratchpad/ instrument needs and a naive substitution gets wrong:\n' +
   '\n' +
-  '    · THIS repo\'s own root is AURORA_DIR from the same module — never a\n' +
+  '    · THIS repo\'s own root is AURORA_DIR from the same module, never a\n' +
   '      literal, and never `.claude/worktrees/<name>`, which names a tree that no\n' +
   '      longer exists.\n' +
   '    · The electron binary is `process.env.ELECTRON_BIN ?? resolve(AURORA_DIR,\n' +
@@ -1250,12 +1250,12 @@ console.error(
   '      itself, so the guard would compare the value against itself.\n' +
   '\n' +
   '  From Python or sh, which cannot import it at all: spell the same four steps\n' +
-  '  in-file — <NAME>_DIR, then EMPYREAN_SUITE_ROOT/<name>, then a derivation, then\n' +
+  '  in-file: <NAME>_DIR, then EMPYREAN_SUITE_ROOT/<name>, then a derivation, then\n' +
   '  die naming the variables. `scratchpad/handover/aeon-banks-move.py` and\n' +
   '  `scratchpad/handover/run-handover.sh` are the worked examples.\n' +
   '\n' +
-  '  Guard it exactly as before — `referencePath` resolves to the same directory\n' +
-  '  on this machine, so no existsSync/skip needs to change — and the row becomes\n' +
+  '  Guard it exactly as before: `referencePath` resolves to the same directory\n' +
+  '  on this machine, so no existsSync/skip needs to change, and the row becomes\n' +
   '  redirectable with <NAME>_DIR / EMPYREAN_SUITE_ROOT (empyrean contract/SUITE_PATHS.md).\n' +
   '\n' +
   '  A COMMENT quoting such a path is exempt and is not what this found: records\n' +

@@ -154,7 +154,7 @@ const MODULE_EXTS = ['.ts', '.tsx', '.mjs', '.mts', '.js', '.py', '.sh'];
 const BARE_EXTS = ['ts', 'tsx', 'mjs', 'mts'];
 
 function die(msg) {
-  console.error(`${PREFIX}: COULD NOT MEASURE — ${msg}`);
+  console.error(`${PREFIX}: COULD NOT MEASURE: ${msg}`);
   process.exit(2);
 }
 
@@ -312,7 +312,7 @@ const EXEMPT = [
   {
     file: 'scripts/check-peer-path-literals.mjs',
     token: 'test/support/sibling-root-RENAMED.mjs',
-    why: 'the sentence\'s own subject is a file that is deliberately NOT readable — '
+    why: 'the sentence\'s own subject is a file that is deliberately NOT readable, '
       + 'it is the worked example of what that gate does when its resolver is renamed',
   },
   {
@@ -605,7 +605,7 @@ function ignoredSet(paths) {
   // line is the 128 — so this cannot be left to the fallback, and it is an
   // internal fault rather than anything about the tree.
   if (paths.some((p) => p === '')) {
-    die('an empty path reached the ignore query — that is an internal fault in this '
+    die('an empty path reached the ignore query, which is an internal fault in this '
       + "gate's own token extraction, not a problem with the tree");
   }
   // Recognised-unsendable, dropped before git sees them. A path outside the
@@ -626,7 +626,7 @@ function ignoredSet(paths) {
   if (refused.length === sendable.length && sendable.length > 1) {
     die(`the ignore query failed for EVERY one of ${sendable.length} paths (status `
       + `${JSON.stringify(whole.status)})`
-      + `${whole.why ? `\n  git said: ${whole.why}` : ' — git said nothing on stderr'}`
+      + `${whole.why ? `\n  git said: ${whole.why}` : ', and git said nothing on stderr'}`
       + '\n  That is not one bad path, it is a query this run cannot make, so it judges an '
       + 'unknown set of files.');
   }
@@ -675,8 +675,8 @@ function proveIgnoredSet() {
   const lit = literalIgnorePattern();
   if (!lit) {
     die('.gitignore holds no literal (glob-free, un-negated) pattern, so the 0-arm of the '
-      + 'ignore query cannot be proven. Hole 8 — "a cited path git ignores passes unchecked" '
-      + '— would then be an unverified exclusion, which is the shape this gate refuses.');
+      + 'ignore query cannot be proven. Hole 8, "a cited path git ignores passes unchecked", '
+      + 'would then be an unverified exclusion, which is the shape this gate refuses.');
   }
   const dirty = lit.dir ? join(lit.body, '__check-cited-paths-ignore-probe__') : lit.body;
 
@@ -751,16 +751,16 @@ if (!presentPath || !presentBase) die('found no present .ts path/name to build a
 const canaryRun = scan(canarySources(presentPath, presentBase), pathResolves, (b) => presentBases.has(b));
 const canaryFired = new Set(canaryRun.hits.map((h) => h.rule));
 for (const id of ['cited-path-missing', 'cited-file-missing']) {
-  if (!canaryFired.has(id)) die(`rule \`${id}\` did not fire on its canary — it matches nothing any more, `
+  if (!canaryFired.has(id)) die(`rule \`${id}\` did not fire on its canary, so it matches nothing any more, `
     + 'so a green run below would be evidence of nothing');
 }
 const falsePositives = canaryRun.hits.filter((h) => h.file.startsWith('canary/negative'));
 if (falsePositives.length) {
-  die(`${falsePositives.length} negative canary/canaries fired — this gate would now fail correct comments:\n`
+  die(`${falsePositives.length} negative canary/canaries fired, so this gate would now fail correct comments:\n`
     + falsePositives.map((h) => `      ${h.file}:${h.line} ${h.rule} ${h.token}`).join('\n'));
 }
 if (canaryRun.notJudged !== 2) {
-  die(`the not-judged counter saw ${canaryRun.notJudged} of the 2 peer/docs canary lines — `
+  die(`the not-judged counter saw ${canaryRun.notJudged} of the 2 peer/docs canary lines: `
     + 'the summary line\'s coverage figure cannot be trusted');
 }
 
@@ -795,26 +795,26 @@ const deadExemptions = EXEMPT.filter((e) => !usedExemptions.has(e));
 
 console.log(
   `${PREFIX}: read the whole-line comments of ${sources.length} ${EXTS.join('/')} file(s) under `
-  + `${ROOTS.join(', ')} — the population git reports (\`ls-files --cached --others `
+  + `${ROOTS.join(', ')}, the population git reports (\`ls-files --cached --others `
   + '--exclude-standard`), not a filesystem walk, so ignored output is absent by '
-  + `construction rather than filtered back out — and found `
-  + `${run.tokens} in-repo citation(s) against 2 rule(s) — cited-path-missing, cited-file-missing `
+  + `construction rather than filtered back out, and found `
+  + `${run.tokens} in-repo citation(s) against 2 rule(s): cited-path-missing, cited-file-missing `
   + '(both fired on their canaries; 8 negative canaries silent).\n'
   + `${PREFIX}: aurora ${ROOT}\n`
-  + `${PREFIX}: NOT JUDGED — ${run.notJudged} comment line(s) cite a peer checkout `
+  + `${PREFIX}: NOT JUDGED: ${run.notJudged} comment line(s) cite a peer checkout `
   + `(${SUITE_PEERS.join('/')}) or a bare docs/ path, which this gate cannot resolve and never `
   + `fails on; ${generated.length} citation(s) resolved to git-ignored output; `
   + `${run.declared} citation(s) sat on a line declaring its own absence `
   + `(${ABSENCE_MARKERS.map((m) => `"${m.trim()}"`).join(', ')}); `
   + `${EXEMPT.length} written exemption(s) applied.\n`
   + `${PREFIX}: ${run.escaping} citation(s) named a path that LEAVES this repo (a \`../\` `
-  + 'traversal or an absolute) — unjudgeable by rule 1, and never sent to the ignore query, '
+  + 'traversal or an absolute), unjudgeable by rule 1, and never sent to the ignore query, '
   + 'which exits 128 on one and loses the whole batch with it.\n'
   + `${PREFIX}: ${UNQUERYABLE.length} cited path(s) git could not answer for`
-  + `${UNQUERYABLE.length ? ` — ${UNQUERYABLE.map((u) => `${u.path} (${u.why})`).join('; ')}` : ''}`
+  + `${UNQUERYABLE.length ? `: ${UNQUERYABLE.map((u) => `${u.path} (${u.why})`).join('; ')}` : ''}`
   + '; each is treated as NOT ignored, so it stays a violation rather than passing quietly, '
   + 'and no single one of them can take the query down.\n'
-  + `${PREFIX}: all four arms of the ignore query proven this run — "nothing ignored" `
+  + `${PREFIX}: all four arms of the ignore query proven this run, so "nothing ignored" `
   + '(exit 1, the ordinary answer, NOT a failure), "something ignored" (exit 0, against '
   + `.gitignore's own \`${IGNORE_ARMS.pattern}\`), and "an escaping path does not take down `
   + `the batch it travels in" (${IGNORE_ARMS.escaping.length} probes: `
@@ -823,24 +823,24 @@ console.log(
 );
 
 if (deadExemptions.length) {
-  console.error(`\n${PREFIX}: FAIL — ${deadExemptions.length} exemption(s) no longer describe any `
+  console.error(`\n${PREFIX}: FAIL: ${deadExemptions.length} exemption(s) no longer describe any `
     + 'citation in the tree. A stale exemption is the artifact this gate exists to stop; delete '
     + `the entry from EXEMPT in ${relative(ROOT, new URL(import.meta.url).pathname)}:\n`
     + deadExemptions.map((e) => `    ${e.file}  →  ${e.token}`).join('\n'));
 }
 
 if (violations.length === 0 && deadExemptions.length === 0) {
-  console.log(`${PREFIX}: OK — every in-repo path and source filename named in a comment is on disk.`);
+  console.log(`${PREFIX}: OK: every in-repo path and source filename named in a comment is on disk.`);
   process.exit(0);
 }
 
 if (violations.length) {
   console.error(
-    `\n${PREFIX}: FAIL — ${violations.length} comment(s) cite something that is not there:\n`
+    `\n${PREFIX}: FAIL: ${violations.length} comment(s) cite something that is not there:\n`
     + violations.map((v) => `    ${v.file}:${v.line}  [${v.rule}]  ${v.token}\n        ${v.text}`).join('\n')
-    + '\n\n  Each is a promise a reader cannot keep. Repair the name against the tree, or — if the\n'
+    + '\n\n  Each is a promise a reader cannot keep. Repair the name against the tree, or, if the\n'
     + '  comment is RIGHT to name something absent (a worked example, a counterfactual, a quoted\n'
-    + `  red run, a provenance record) — add a row to EXEMPT with the reason.`,
+    + `  red run, a provenance record), add a row to EXEMPT with the reason.`,
   );
 }
 process.exit(1);
