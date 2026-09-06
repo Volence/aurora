@@ -69,8 +69,13 @@
 //     against the addresses the SERVER echoed.
 //   - `OFF_VIEW_FLOOR` was the constant 26 under a comment claiming it had been
 //     stated before the run. No one could produce that statement. It is now
-//     measured in every run from two correct walks, with row F1 asserting those
-//     walks are correct and row F2 asserting the floor is clear of the tear.
+//     measured in every run as the largest whole-plane disagreement between the
+//     reference walk and the five alternate walks in `FLOOR_STEPS`, counting
+//     only the ones that pass F1's correctness premise, with row F1 asserting
+//     those walks are correct and row F2 asserting the floor is clear of the
+//     tear. (This said "from two correct walks", which was the phrasing of the
+//     deleted aeon citation and never described the code: `FLOOR_STEPS` has had
+//     five entries since this block landed.)
 //
 // Doubling the read changes what `diffAll`, row 6 and row 7 report, on purpose.
 //
@@ -143,7 +148,14 @@ const hx8 = (n) => '0x' + (n & 0xff).toString(16).toUpperCase().padStart(2, '0')
 //
 // WHERE THIS LAYOUT COMES FROM. Not from memory and not from a web search: a
 // wrong shift here silently moves the window this harness compares, and a
-// harness that reads the wrong 4 KiB reports a clean plane forever.
+// harness that reads the wrong REGION reports a clean plane forever. (This
+// sentence said "the wrong 4 KiB" until 2026-09-05, when the read grew from
+// one 0x1000 call to the whole plane. The geometry the cross-check below
+// records for this ROM, reg $10 = $11, is HSZ 1 and VSZ 1 by the table under
+// it, so 64x64 cells = 0x2000 bytes, which that same cross-check calls 8 KiB:
+// the size in this sentence had become half the region it names and disagreed
+// with its own file. The hazard never depended on the size, so the size is
+// dropped rather than doubled.)
 //
 // PRIMARY SOURCE: oracle's render recon RR3, "Plane / window nametable bases +
 // plane size", in oracle's `docs/2026-07-16-vdp-render-recon.md`. Its own
@@ -355,7 +367,11 @@ async function main() {
     // IS DERIVED — from the plane size decoded above and from the ceiling this
     // server advertises, never from an arithmetic constant typed here. A plane
     // of a different size, or a server with a different ceiling, therefore
-    // needs no edit.
+    // changes the call count with no edit TO THIS READ. Not to this file: R1 to
+    // R4 assert the derived values equal the WAS_ literals of this ROM, so a
+    // genuinely different plane reddens R2 and those four rows have to be
+    // retired deliberately. That is the intended behaviour, not a portability
+    // claim, and this sentence used to promise the wider one.
     //
     // THE CEILING IS A MACHINE-READABLE FACT, so it is read rather than
     // retyped. protocol.md section 2.1 makes `limits` a REQUIRED top-level key
