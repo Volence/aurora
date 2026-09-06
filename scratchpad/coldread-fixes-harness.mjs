@@ -656,9 +656,29 @@ async function main() {
       if (Math.abs(afterWheel.shift) > 1) await shot(c, '03b-strip-dragged-by-wheel');
 
       // The other path a person has, and the one `overflow: hidden` does NOT
-      // close on its own: focus. The browser scrolls a focused control into
-      // view on a `hidden` box exactly as it does on an `auto` one, so this is
-      // a SEPARATE question from 9c and not a restatement of it.
+      // close on its own: focus. A `hidden` box still scrolls programmatically,
+      // so this is a SEPARATE question from 9c and not a restatement of it.
+      //
+      // ⚠ BUT AS WRITTEN THIS ROW DOES NOT DISCRIMINATE, and the sentence
+      // that used to sit here claimed it did: it said the browser scrolls a
+      // focused control into view on a `hidden` box "exactly as it does on an
+      // `auto` one". Measured at the landing of this parcel (2026-09-06,
+      // overseer, twice): with the primitive reverted to `overflow: auto` —
+      // the world where the claim says focus MUST drag the strip — [9c] went
+      // red at 89px and [9d] stayed GREEN. So in this engine, under this
+      // setup, focusing the appended button moves nothing on either side of
+      // the fix, and a row that passes in both worlds cannot witness the
+      // property it names.
+      //
+      // The row is kept, not deleted: the property is the one we want, and a
+      // green row is the correct result for it. What is NOT established is
+      // that it would go red if the property broke. WHY it does not fire is
+      // open — candidates are that `p` (the strip's nearest scrollable
+      // ancestor) is not the box GEOM measures, that Chromium declines the
+      // inline scroll-into-view here, or that the appended button never lands
+      // past the scrollport edge. Booked as COLDREAD-9D-NONDISCRIMINATING.
+      // Do not read this row's green as coverage of the focus path until a
+      // plant takes it red.
       await c.evalExpr(String.raw`
         (() => { const s = document.querySelector('[data-effects-section-strip]');
           let p = s && s.parentElement;
