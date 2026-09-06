@@ -317,10 +317,24 @@ const SLOWEST_PRINTABLE_PX_PER_SEC = 0.01;
  *
  *   horizontal  CONFIRMED on the built ROM 2026-08-26, on the act's LIVE band —
  *               plane-cell-referenced art (bganim-band-status.test.ts).
- *   vertical    CONFIRMED in VRAM by aeon `bganim_vprobe_witness.py` at aeon
- *               f0aebbd3, in the band's OWN row order, on a probe band that no
- *               plane cell references. The block above names the hop that
- *               leaves open and who closes it.
+ *   vertical    CONFIRMED ON SCREEN 2026-09-06 — the hop the block above names
+ *               is CLOSED. Two confirmations, and the second is what this word
+ *               actually claims:
+ *                 (a) in VRAM, in the band's own row order, by aeon
+ *                     `bganim_vprobe_witness.py` at aeon f0aebbd3, on a probe
+ *                     band NO plane cell references;
+ *                 (b) THROUGH PLANE CELLS to a screen row, by the overseer's
+ *                     foreground pass on a rig that paints the band's slots
+ *                     (docs/reviews/2026-09-06-vertical-watched.md). Private
+ *                     headless instance, four captures at steps 16/26/35/45,
+ *                     64 of 64 slots matching the UP prediction and 0 of 64
+ *                     matching DOWN at every capture, control slots byte-stable
+ *                     across all four.
+ *               ⚠ TWO of the four captures were NON-SEPARATING and the rig said
+ *               so rather than counting them: at a step that is its own mirror
+ *               under the coarse rotation, UP and DOWN produce the SAME bytes.
+ *               A run containing only those is refused. "UP is not DOWN" was
+ *               never a sufficient sampling bar.
  *
  * `''` on either arm drops the word, which is the shape the horizontal one
  * shipped in before it was confirmed.
