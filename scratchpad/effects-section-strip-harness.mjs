@@ -394,6 +394,12 @@ async function main() {
     };
     if (!(await waitDbg())) throw new Error('no __dbg — rebuild with VITE_AURORA_DEBUG=1');
     check('0a', 'window.__dbg exists (this is a VITE_AURORA_DEBUG=1 build)', true);
+    // ⚠ PRINTED BESIDE EVERY GEOMETRIC READING BELOW. `devicePixelRatio` has
+    // been observed at both 1 and 1.35 on this machine hours apart, and rows
+    // [2a]-[2c] compare CSS-pixel rects against a scroller's box; a number
+    // quoted without it cannot be compared with another run's.
+    console.log(`    viewport    : ${JSON.stringify(await c.json(
+      '({ dpr: devicePixelRatio, w: innerWidth, h: innerHeight })'))}`);
 
     await c.evalExpr('localStorage.clear()');
     await c.send('Page.reload');
