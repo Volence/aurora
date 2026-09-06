@@ -155,7 +155,7 @@ describe('SidecarState.read', () => {
     expect(readProjectConfig(null).read).toBe('absent');
   });
 
-  it('unreadable: invalid JSON — including the trailing comma that reproduces this by hand', () => {
+  it('unreadable: invalid JSON, including the trailing comma that reproduces this by hand', () => {
     expect(readProjectConfig(enc('not json')).read).toBe('unreadable');
     expect(readProjectConfig(enc('{"base":"s1-github",}')).read).toBe('unreadable');
     expect(readProjectConfig(enc('')).read).toBe('unreadable');
@@ -175,21 +175,21 @@ describe('SidecarState.read', () => {
     expect(s.issues).toEqual([]);   // and so are the issues, for the absent one
   });
 
-  it('read: a file with per-entry issues still READ — issues are not unreadability', () => {
+  it('read: a file with per-entry issues still READ. Issues are not unreadability', () => {
     const s = readProjectConfig(enc(JSON.stringify({ base: 42, paths: { a: 'b' } })));
     expect(s.read).toBe('read');
     expect(s.issues.length).toBeGreaterThan(0);
   });
 });
 
-describe('sidecarMayBeOverwritten — the gate every writer must pass', () => {
+describe('sidecarMayBeOverwritten: the gate every writer must pass', () => {
   it('refuses ONLY unreadable', () => {
     expect(sidecarMayBeOverwritten(readProjectConfig(enc('{"base":"s1-github",}')))).toBe(false);
     expect(sidecarMayBeOverwritten(readProjectConfig(enc('[1,2]')))).toBe(false);
     expect(sidecarMayBeOverwritten({ config: {}, issues: [], read: 'unreadable' })).toBe(false);
   });
 
-  it('permits absent — the seed EXISTS to create a missing file', () => {
+  it('permits absent. The seed EXISTS to create a missing file', () => {
     expect(sidecarMayBeOverwritten(readProjectConfig(null))).toBe(true);
   });
 
