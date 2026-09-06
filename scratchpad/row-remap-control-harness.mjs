@@ -26,10 +26,18 @@
 //      (docs/superpowers/.../seam-has-no-author.)
 //   2. THE PLANE-LINE REFUSAL IS A WIRING FACT. `refuse` on `NumberField` is
 //      what withholds the commit; `min`/`max` on an `<input type="number">` look
-//      identical in source and stop no typed value. And this bound is the ONLY
-//      enforcement of `plane_y`'s ceiling anywhere in the pipeline — aeon's own
-//      ensure tests `>= 0` alone — so a source-level assertion about it is the
-//      shape of the bug, not a check on it.
+//      identical in source and stop no typed value — so a source-level assertion
+//      about the bound is the shape of the bug, not a check on it.
+//
+//      ⚠ THIS PARAGRAPH USED TO SAY the bound was the ONLY enforcement of
+//      `plane_y`'s ceiling anywhere in the pipeline, "aeon's own ensure tests
+//      `>= 0` alone". THAT IS NO LONGER TRUE and row [5b] asserted it as a
+//      requirement on the app for a day after it stopped being true: aeon landed
+//      an engine-side `< 512` guard (aeon d593070a) the same night, and the
+//      vendored contract now calls this schema ONE OF TWO ENFORCEMENTS of the
+//      511 ceiling. [5b] derives that phrase, and the OTHER enforcer's identity,
+//      FROM THE CONTRACT'S OWN DESCRIPTION rather than typing either, so the
+//      next amendment moves the row instead of aging it into a false demand.
 //   3. A WARNING THAT IS NOT PAINTED IS NOT A WARNING. The three `scene()`
 //      preconditions are the whole point of the parcel: they are refused by
 //      aeon's GENERATOR, so an author who does not read them here reads them in
@@ -175,6 +183,103 @@ const UNBUILDABLE = BUILDABLE === null
   ? undefined
   : SHIFTS.find((s) => s !== BUILDABLE);
 
+/**
+ * HOW MANY THINGS ENFORCE THE PLANE-LINE CEILING, AND WHICH — read from the
+ * contract, never typed. THIS IS WHY THE ROW EXISTS IN THIS SHAPE.
+ *
+ * [5b] used to demand the painted sentence call Aurora's bound the
+ * `ONLY ENFORCEMENT` of the ceiling. That was a TYPED LITERAL of a fact, and the
+ * fact changed under it: aeon landed an engine-side `< 512` guard and aurora
+ * correctly retired the claim, so the row went red asking the app to put a
+ * FALSEHOOD back in front of an author. A row may never be relaxed to pass, but
+ * a row asserting something untrue must be rewritten to the truth — and written
+ * so the NEXT amendment moves it too, which a literal cannot be.
+ *
+ * So both halves come out of `plane_y`'s own description:
+ *   • the phrase `ONE OF <n> ENFORCEMENTS` — if a third enforcer lands and the
+ *     contract says THREE, this needle says THREE and the row stays red until
+ *     the app's sentence says three as well;
+ *   • the OTHER enforcer, as the contract identifies it: the possessive names
+ *     WHOSE it is (`aeon`) and the hyphenated qualifier names WHERE it lives
+ *     (`engine-side`). Reword the contract to, say, a link-time check in sigil
+ *     and both needles move with it.
+ *
+ * Each derivation THROWS rather than degrading to no check. A regex that stops
+ * matching must not quietly hand back `undefined` and leave a green row testing
+ * nothing — the exact false-zero the `SHIFTS` loop above was rebuilt to avoid.
+ */
+const PLANE_Y_DESC = String(PLANE_Y.description ?? '');
+const CEILING_ENFORCEMENTS = (() => {
+  const m = /ONE OF (\w+) ENFORCEMENTS?/i.exec(PLANE_Y_DESC);
+  if (!m) {
+    throw new Error('the vendored contract\'s plane_y description no longer carries an '
+      + '"ONE OF <n> ENFORCEMENTS" phrase. Row [5b] reads how many things enforce this ceiling '
+      + 'from that phrase and asserts the app says the same; re-derive it against the amended '
+      + 'contract rather than typing whatever it says today.');
+  }
+  return m[0];
+})();
+/** Who owns the enforcement that is NOT this schema, and where it lives. */
+const OTHER_ENFORCER = (() => {
+  const paren = /ONE OF \w+ ENFORCEMENTS?[^(]*\(([^)]*)\)/i.exec(PLANE_Y_DESC);
+  if (!paren) {
+    throw new Error(`the contract says "${CEILING_ENFORCEMENTS}" but no longer lists them in a `
+      + 'parenthetical, so the OTHER enforcer cannot be named. Row [5b] requires the app to name '
+      + 'it; re-derive against the amended contract.');
+  }
+  // The list runs to the first `;`; what follows is the keep-both warning, not a
+  // member of it. "this schema" is the enforcement the app IS — the other is the
+  // one the app must tell the author about.
+  const members = paren[1].split(';')[0].split(/,\s*and\s+/).map((s) => s.trim());
+  const other = members[members.length - 1];
+  const actor = /([A-Za-z]+)'s\b/.exec(other);
+  const qualifier = /\b[a-z]+-[a-z]+\b/.exec(other);
+  if (members.length < 2 || !actor || !qualifier) {
+    throw new Error(`the contract's enforcement list ${JSON.stringify(paren[1].split(';')[0])} `
+      + 'no longer names a second enforcer with a possessive owner and a hyphenated qualifier. '
+      + 'Row [5b] derives both from it rather than typing "aeon" and "engine-side"; re-derive.');
+  }
+  return { clause: other, actor: actor[1], qualifier: qualifier[0] };
+})();
+
+/**
+ * THE FOUR REFUSALS AEON'S GENERATOR OWNS, in the contract's own words.
+ *
+ * Re-derived here from the vendored bytes, NOT imported from `scene-ui.ts`,
+ * for this file's standing reason: the property under test is that the app
+ * paints the CONTRACT'S clause under the row, and asking the module under test
+ * what the clause says would make [6a]/[6b] agree with it by construction.
+ * Rows [6a] and [6b] typed `MUST declare anchor` and `at most ONE layer` as
+ * literals; they now assert the whole clause, and an amendment to its wording
+ * moves the harness and the app together instead of aging one against the other.
+ */
+const GENERATOR_REFUSALS = (() => {
+  const head = /REFUSALS THIS SCHEMA DOES NOT ENCODE[^:]*:([\s\S]*?)(?:\.\s|\.$)/
+    .exec(String(RR_NODE.description ?? ''));
+  if (!head) {
+    throw new Error('the vendored contract no longer carries a "REFUSALS THIS SCHEMA DOES NOT '
+      + 'ENCODE ...:" clause. Rows [6a] and [6b] read the sentences the app must paint from that '
+      + 'clause; re-derive against the amended contract.');
+  }
+  // A clause is what follows the last `): ` in its own text — the first one comes
+  // back carrying the tail of aeon's `file:line` citation otherwise.
+  const clauses = head[1].split(';')
+    .map((c) => c.replace(/^[\s\S]*?\):\s*/, '').trim())
+    .filter((c) => c.length > 0);
+  const find = (what, needle) => {
+    const hit = clauses.find((c) => needle.test(c));
+    if (hit === undefined) {
+      throw new Error(`the contract's refusal clause no longer states the "${what}" condition `
+        + `(looked for ${needle}). It has ${clauses.length} clause(s): ${JSON.stringify(clauses)}.`);
+    }
+    return hit;
+  };
+  return {
+    anchor: find('no anchor declared', /declare anchor/),
+    single: find('more than one remapped layer', /at most ONE layer/),
+  };
+})();
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(path, timeoutMs = 1500) {
   return new Promise((resolve, reject) => {
@@ -280,16 +385,24 @@ const RR_HEIGHT = (layer) => String.raw`
  * recorded because they are the two that do NOT discriminate — both go green on
  * an element scrolled thousands of pixels out of its own scroller.
  */
-const PAINTED_LEAF = (needle, afterSelector) => String.raw`
+const PAINTED_LEAF = (needle, afterSelector, { ci = false } = {}) => String.raw`
 (() => {
   const anchor = ${afterSelector};
+  // ci: fold case before comparing. Used ONLY by [5b], whose needle is derived
+  // from the contract's own SHOUTED phrase. The claim there is the FACT — how
+  // many things enforce the ceiling — and a row that reddens because the app
+  // sentence-cased a phrase is a row the next reader relaxes. Every other needle
+  // stays exact, because it names a specific string the app either paints or
+  // does not.
+  const fold = (s) => (${ci} ? String(s).toLowerCase() : String(s));
+  const NEEDLE = fold(${JSON.stringify(needle)});
   // 'div,span', NOT 'div'. MEASURED: the precondition sentences are wrapped in a
   // <span> (the testid Hint drops), so the Hint <div> HAS a child carrying the
   // needle and the leaf rule excluded it while the sentence was plainly on
   // screen — a paint row that goes red for a reason that is not about paint.
   const leaves = [...document.querySelectorAll('div,span')]
-    .filter((d) => (d.innerText || '').includes(${JSON.stringify(needle)})
-                && ![...d.children].some((k) => (k.innerText || '').includes(${JSON.stringify(needle)})));
+    .filter((d) => fold(d.innerText || '').includes(NEEDLE)
+                && ![...d.children].some((k) => fold(k.innerText || '').includes(NEEDLE)));
   const leaf = leaves[0] || null;
   if (!leaf) return { leaf: false, candidates: leaves.length };
   leaf.scrollIntoView({ block: 'center' });
@@ -304,6 +417,23 @@ const PAINTED_LEAF = (needle, afterSelector) => String.raw`
     rect: { top: Math.round(b.top), bottom: Math.round(b.bottom) },
     scroller: cb ? { top: Math.round(cb.top), bottom: Math.round(cb.bottom) } : null,
     insideScroller: !!(cb && b.top >= cb.top - 1 && b.bottom <= cb.bottom + 1),
+    // ⚠ TWO DIFFERENT QUESTIONS, AND STRICT CONTAINMENT ANSWERS BOTH AT ONCE.
+    // "is this sentence on screen" and "does this sentence FIT IN ITS BOX" are
+    // separate properties, and a block TALLER than its scroller fails
+    // containment at every scroll position while being plainly readable. That is
+    // a real finding about the BLOCK, but it is not evidence about the
+    // sentence's WORDS, and a row asserting the words must not inherit it — see
+    // rows [5b] and [5b2], which were one row until it went red for both reasons
+    // at once and neither could be told from the other.
+    //
+    // The on-screen half is: the leaf's own CENTRE lies in the scroller's box,
+    // AND elementFromPoint at that centre hits the leaf. Together those defeat
+    // the hazard containment was added for (an element 2,635px outside its
+    // scroller, where checkVisibility and getClientRects both go green) at any
+    // block height, because a block scrolled that far has its centre outside too.
+    centreInScroller: !!(cb && (b.top + b.bottom) / 2 >= cb.top
+                            && (b.top + b.bottom) / 2 <= cb.bottom),
+    tallerThanScroller: !!(cb && (b.bottom - b.top) > (cb.bottom - cb.top)),
     hitInside: !!(hit && (hit === leaf || leaf.contains(hit) || hit.contains(leaf))),
     afterControl: anchor ? (anchor.compareDocumentPosition(leaf) & 4) === 4 : null,
     visible: typeof leaf.checkVisibility === 'function' ? leaf.checkVisibility() : null,
@@ -311,12 +441,73 @@ const PAINTED_LEAF = (needle, afterSelector) => String.raw`
   };
 })()`;
 
-/** How many precondition hints one strip's card is painting, with their text. */
+/**
+ * How many precondition hints one strip's card is painting, with their text.
+ *
+ * ⚠ `innerText`, NEVER `textContent`, AND THAT IS THE WHOLE GATE. The mechanism
+ * half of each advisory is in the DOM while collapsed (`display: none`, not
+ * unmounted — `Advisory`'s docblock says so and says why: find-in-page must
+ * still reach it). `textContent` therefore returns the folded sentence whether
+ * the disclosure works, is stuck shut, or was never wired at all, and a row
+ * reading it would pass on a permanently hidden paragraph. `innerText` on a
+ * RENDERED node reports only what is laid out, so a row that reads it after
+ * clicking is reporting on the click.
+ */
 const PRECONDITIONS = (layer) => String.raw`
 (() => {
   const nodes = [...document.querySelectorAll(
     '[data-testid="layer-' + ${layer} + '-rowremap-precondition"]')];
   return nodes.map((n) => (n.innerText || '').trim());
+})()`;
+
+/**
+ * OPEN EVERY "Why this happens" ON ONE STRIP'S PRECONDITIONS, and report what
+ * the click did — never whether a container exists.
+ *
+ * The contract quotes moved behind this disclosure at `73fc44bf`, and rows [6a]
+ * and [6b] were written before it. RULED HOUSE STYLE, NOT A DEGRADATION, and the
+ * ruling is a measurement rather than a preference — see the packet
+ * `docs/reviews/2026-09-06-rowremap-three-red.md` §2. In one line: the
+ * PRECONDITION itself (the diagnosis, naming the missing input and the guilty
+ * strips) is on screen with nothing clicked, which [6a] measures below; only
+ * aeon's VERBATIM WORDING is folded, and unfolding it puts back a block measured
+ * at 165px in a box whose floor is 129px — a paragraph no scroll position shows
+ * whole. So the rows learn to click.
+ *
+ * ⚠ THE CLICK AND THE READ-BACK ARE TWO EVALUATIONS, NOT ONE, AND THAT COST A
+ * RUN. Reading `aria-expanded` in the same synchronous pass that clicked reports
+ * the state BEFORE React re-renders — every button came back "false" while the
+ * folded sentence was demonstrably painted in the very next measurement. A
+ * disclosure gate that reads its own attribute too early is a gate that fails on
+ * a working app, which is the shape this whole file exists to refuse.
+ *
+ * `WHY_STATE` is the read-back, and a row must never be satisfied by either of
+ * these returning a button count: they say whether the click LANDED, so a red
+ * row that never opened can be told from a red row whose sentence is gone.
+ */
+const EXPAND_WHYS = (layer) => String.raw`
+(() => {
+  const cards = [...document.querySelectorAll(
+    '[data-testid="layer-' + ${layer} + '-rowremap-precondition"]')];
+  const buttons = cards.flatMap((c) => [...c.querySelectorAll('button[aria-expanded]')]);
+  let clicked = 0;
+  for (const b of buttons) {
+    if (b.getAttribute('aria-expanded') !== 'true') { b.click(); clicked++; }
+  }
+  return { cards: cards.length, buttons: buttons.length, clicked };
+})()`;
+
+/** What the disclosures on one strip's preconditions say AFTER the re-render. */
+const WHY_STATE = (layer) => String.raw`
+(() => {
+  const buttons = [...document.querySelectorAll(
+    '[data-testid="layer-' + ${layer} + '-rowremap-precondition"]')]
+    .flatMap((c) => [...c.querySelectorAll('button[aria-expanded]')]);
+  return {
+    buttons: buttons.length,
+    expanded: buttons.map((b) => b.getAttribute('aria-expanded')),
+    allOpen: buttons.length > 0 && buttons.every((b) => b.getAttribute('aria-expanded') === 'true'),
+  };
 })()`;
 
 async function main() {
@@ -331,6 +522,12 @@ async function main() {
     + `${SHIFTS.map((s) => `${s}→${linesFor(s)}ln`).join(' ')}; `
     + `reserved ${JSON.stringify(RESERVED)}; builds today: ${BUILDABLE}`
     + ' — ALL READ FROM THE VENDORED SCHEMA IN THIS PROCESS');
+  console.log(`    ceiling     : ${CEILING_ENFORCEMENTS} — this schema, and `
+    + `${OTHER_ENFORCER.actor}'s ${OTHER_ENFORCER.qualifier} guard `
+    + `("${OTHER_ENFORCER.clause}"). Row [5b] requires the app to say so.`);
+  console.log(`    refusals    : anchor "${GENERATOR_REFUSALS.anchor}"; `
+    + `single "${GENERATOR_REFUSALS.single}" — rows [6a]/[6b] require these words, not a `
+    + 'paraphrase, behind the "Why this happens" disclosure they were folded into.');
   if (UNBUILDABLE === undefined) {
     // NOT A DEFECT AND NOT A PASS. Through empyrean 60d9f6a `height_shift` was a
     // 3..7 range of which four rungs were legal and unbuildable, so [4a] had a
@@ -684,8 +881,10 @@ async function main() {
       && afterOver?.plane_y !== Number(over)
       && afterOver?.plane_y >= PLANE_Y.minimum && afterOver?.plane_y <= PLANE_Y.maximum,
       `box shows ${JSON.stringify(overBox.shown)} (the keys LANDED); document holds `
-      + `${JSON.stringify(afterOver)} — never ${over}. aeon would NOT catch ${over}: its `
-      + `ensure tests >= 0 only.`
+      + `${JSON.stringify(afterOver)} — never ${over}. This line USED TO SAY aeon would not `
+      + `catch ${over} either; it would now — the contract lists ${CEILING_ENFORCEMENTS} of this `
+      + `ceiling and the second is "${OTHER_ENFORCER.clause}". Aurora's is still the one an `
+      + 'author meets, and the only one that acts before a build.'
       + (prefixCommitted
         ? `\n        ⚠ PREFIX COMMIT (pre-existing NumberField behaviour, not this row's `
           + `subject): the document moved ${held} -> ${afterOver?.plane_y} on the way, because `
@@ -693,12 +892,63 @@ async function main() {
           + 'keystroke. The box and the document now DISAGREE until the next commit.'
         : ''));
 
-    const overWhy = await c.json(PAINTED_LEAF('ONLY ENFORCEMENT', RR_BOX(CURVED)));
-    check('5b', 'and the PAINTED reason says this bound is the only one in the pipeline',
-      overWhy.leaf === true && overWhy.insideScroller === true && overWhy.hitInside === true
+    // ⚠ THIS ROW WAS REWRITTEN, NOT RELAXED. It required the sentence to call
+    // this bound the `ONLY ENFORCEMENT` of the ceiling. Aurora retired that claim
+    // because it became FALSE (aeon d593070a landed an engine-side `< 512`
+    // guard), so the row was demanding a falsehood in front of an author — the
+    // one repair a red row must never get is the app being changed to satisfy it.
+    // The expectation now states the TRUE fact, and both halves of it are read
+    // out of the contract (see CEILING_ENFORCEMENTS / OTHER_ENFORCER): the count,
+    // and the other enforcer's owner and where it lives. It is STRICTLY MORE than
+    // the old row asked — the sentence must still carry the ceiling, and must now
+    // also name the second enforcer, so an app that quietly drops the second
+    // enforcer from the sentence reddens this row.
+    const overWhy = await c.json(PAINTED_LEAF(CEILING_ENFORCEMENTS, RR_BOX(CURVED), { ci: true }));
+    const overWhyText = (overWhy.text ?? '').toLowerCase();
+    check('5b', `and the PAINTED reason says this bound is ${CEILING_ENFORCEMENTS} of the ceiling, `
+      + `naming ${OTHER_ENFORCER.actor}'s ${OTHER_ENFORCER.qualifier} guard as the other`,
+      overWhy.leaf === true && overWhy.centreInScroller === true && overWhy.hitInside === true
       && overWhy.afterControl === true
-      && overWhy.text.includes(String(PLANE_Y.maximum)),
-      JSON.stringify(overWhy));
+      && overWhy.text.includes(String(PLANE_Y.maximum))
+      && overWhyText.includes(OTHER_ENFORCER.actor.toLowerCase())
+      && overWhyText.includes(OTHER_ENFORCER.qualifier.toLowerCase()),
+      `${JSON.stringify(overWhy)}\n        wanted, ALL DERIVED FROM THE VENDORED CONTRACT: the `
+      + `phrase "${CEILING_ENFORCEMENTS}", the ceiling ${PLANE_Y.maximum}, and the other `
+      + `enforcer named by owner ("${OTHER_ENFORCER.actor}") and place `
+      + `("${OTHER_ENFORCER.qualifier}") — the contract's own second member is `
+      + `"${OTHER_ENFORCER.clause}"`);
+
+    // ⚠ THE OTHER HALF [5b] USED TO CARRY SILENTLY, NOW A ROW OF ITS OWN — AND
+    // IT IS AN APP FINDING, LEFT RED ON PURPOSE.
+    //
+    // Strict containment was one clause among five in [5b], so when this block
+    // grew taller than its own box the row went red beside four green clauses
+    // and read as "the sentence is wrong". It is not: the words are right (the
+    // row above measures them). The BLOCK does not fit. Recorded once before, at
+    // f872db04, as a rect 504..735 in a scroller 545..694 and never booked;
+    // measured again here, and the numbers this row prints are its evidence.
+    //
+    // It is over the app's OWN bar. `Advisory`'s docblock (EW-LAYER-CARD-SCROLLER)
+    // rules that a prose block in a layer card taller than the section's floor —
+    // 129px, floor minus header, the smallest box the shell may ever give it — is
+    // "a paragraph no scroll position shows whole", and converted the two blocks
+    // it measured at 165px. This one is not a standing block so a static census
+    // would not have seen it: it is composed at refusal time by `NumberField`,
+    // which appends the ALREADY-MOVED warning to the provider's refusal — and
+    // EVERY refusal here carries that tail, because every prefix of a number past
+    // the ceiling is itself a legal plane line and commits on the way.
+    //
+    // ⚠ FIXING IT IS AN APP CHANGE AND IS OUT OF THIS PARCEL. Booked, not
+    // quietly satisfied: the row stays red and says what it is.
+    check('5b2', 'APP FINDING, LEFT RED: and that reason FITS IN THE BOX it is painted in',
+      overWhy.insideScroller === true && overWhy.tallerThanScroller === false,
+      `leaf ${overWhy.rect ? overWhy.rect.bottom - overWhy.rect.top : '?'}px in a scroller `
+      + `${overWhy.scroller ? overWhy.scroller.bottom - overWhy.scroller.top : '?'}px tall `
+      + `(${JSON.stringify(overWhy.rect)} vs ${JSON.stringify(overWhy.scroller)}). NOT a defect `
+      + 'in the sentence — [5b] above measures its words and is green. This is the block being '
+      + 'taller than the smallest box the shell may give it, which is the bar Advisory\'s own '
+      + 'docblock sets (EW-LAYER-CARD-SCROLLER) and the two 165px row-remap blocks were '
+      + 'converted for. An APP change, out of this parcel\'s scope.');
 
     // ANTI-VACUOUS FLOOR: without this every refusal row above is satisfied by
     // a box that accepts nothing at all.
@@ -714,25 +964,86 @@ async function main() {
       + 'SELECT-ON-FOCUS: without it the digits would append to what the box held');
 
     // ---- 6. THE THREE PRECONDITIONS, ON SCREEN ---------------------------
+    // ⚠ ONE ROW, THREE MEASUREMENTS, READ AS A DISCRIMINATING PAIR ACROSS A
+    // CLICK. `73fc44bf` split each precondition into a DIAGNOSIS that is always
+    // on screen and a MECHANISM — the contract's verbatim clause — behind a
+    // collapsed "Why this happens". This row was written before that and read
+    // only the visible half, so it asked for the contract's words where the
+    // contract's words no longer are. RULED HOUSE STYLE (packet §2): the
+    // precondition an author must act on is painted with nothing clicked, which
+    // is measurement (1) below and is the half that must NEVER move behind a
+    // disclosure. So the row learns to click — and proves the click did it:
+    //
+    //   (1) the DIAGNOSIS is painted under the control, unclicked;
+    //   (2) the CONTRACT'S CLAUSE is NOT painted while the disclosure is shut —
+    //       ⚠ and this is exactly why the gate is `hitInside`, not `leaf`.
+    //       `innerText` on a `display:none` node FALLS BACK TO textContent per
+    //       spec, so the folded sentence IS findable by text while invisible.
+    //       The rect-against-scroller and elementFromPoint pair is what tells
+    //       the two apart, which is what `Advisory`'s own docblock demands;
+    //   (3) after the click it IS painted, in the contract's words.
+    //
+    // Read together these cannot be satisfied by finding the container: (2)
+    // fails if the sentence was already on screen, (3) fails if it never
+    // arrives, and both quote the clause DERIVED from the vendored schema.
     const anchorWhy = await c.json(PAINTED_LEAF('declares no anchor', RR_SELECT(CURVED)));
-    check('6a', 'the NO-ANCHOR precondition is painted under the row, in the contract\'s words',
+    const anchorQuoteShut = await c.json(
+      PAINTED_LEAF(GENERATOR_REFUSALS.anchor, RR_SELECT(CURVED)));
+    const clickedCurved = await c.json(EXPAND_WHYS(CURVED));
+    await sleep(350);
+    const openedCurved = { ...clickedCurved, ...(await c.json(WHY_STATE(CURVED))) };
+    const anchorQuote = await c.json(PAINTED_LEAF(GENERATOR_REFUSALS.anchor, RR_SELECT(CURVED)));
+    check('6a', 'the NO-ANCHOR precondition is painted under the row unclicked, and the '
+      + 'contract\'s own clause is behind its disclosure — shut, then open',
       anchorWhy.leaf === true && anchorWhy.insideScroller === true
       && anchorWhy.hitInside === true && anchorWhy.afterControl === true
-      && anchorWhy.text.includes('MUST declare anchor'),
-      JSON.stringify(anchorWhy));
+      && anchorQuoteShut.hitInside === false
+      && openedCurved.allOpen === true
+      && anchorQuote.leaf === true && anchorQuote.insideScroller === true
+      && anchorQuote.hitInside === true && anchorQuote.afterControl === true,
+      `(1) diagnosis, unclicked: ${JSON.stringify(anchorWhy)}`
+      + `\n        (2) clause SHUT (findable by text, NOT painted): ${JSON.stringify(anchorQuoteShut)}`
+      + `\n        (3) disclosure: ${JSON.stringify(openedCurved)}`
+      + `\n            clause OPEN: ${JSON.stringify(anchorQuote)}`
+      + `\n        the clause, derived from the vendored contract: "${GENERATOR_REFUSALS.anchor}"`);
 
     // Turn a SECOND strip on: both cards must now say so, and each must name the
     // OTHER strip's index rather than its own.
     await setSelect(RR_SELECT(PLAIN), 'ladder');
     await sleep(900);
+    // Turning the second strip on adds a NEW advisory to the curved card, which
+    // mounts collapsed like any other — so both cards are read shut, then opened
+    // again here rather than relying on [6a]'s click.
+    const shutCurved = await c.json(PRECONDITIONS(CURVED));
+    const shutPlain = await c.json(PRECONDITIONS(PLAIN));
+    const clickedC = await c.json(EXPAND_WHYS(CURVED));
+    const clickedP = await c.json(EXPAND_WHYS(PLAIN));
+    await sleep(350);
+    const openedC = { ...clickedC, ...(await c.json(WHY_STATE(CURVED))) };
+    const openedP = { ...clickedP, ...(await c.json(WHY_STATE(PLAIN))) };
     const onCurved = await c.json(PRECONDITIONS(CURVED));
     const onPlain = await c.json(PRECONDITIONS(PLAIN));
     console.log(`        strip ${CURVED} says:\n${onCurved.map((t) => '          ' + t).join('\n')}`);
     console.log(`        strip ${PLAIN} says:\n${onPlain.map((t) => '          ' + t).join('\n')}`);
-    check('6b', 'a SECOND remapped strip is reported on BOTH cards, each naming the other',
-      onCurved.some((t) => /at most ONE layer/.test(t) && t.includes(String(PLAIN)))
-      && onPlain.some((t) => /at most ONE layer/.test(t) && t.includes(String(CURVED))),
-      JSON.stringify({ onCurved, onPlain }));
+    // Same shape as [6a], on the clause the OTHER strip's existence raises. The
+    // shut half is what stops this from becoming "the row found a disclosure":
+    // the clause must be absent from the laid-out text before the click and
+    // present after it, and the node carrying it must name the OTHER strip's
+    // index — the fact only this surface can state, and the one the contract
+    // cannot. `PRECONDITIONS` reads `innerText` on a RENDERED node, so a folded
+    // paragraph is excluded from both reads; see its docblock.
+    const namesOther = (texts, other) => texts.some(
+      (t) => t.includes(GENERATOR_REFUSALS.single) && t.includes(String(other)));
+    check('6b', 'a SECOND remapped strip is reported on BOTH cards, each naming the other — the '
+      + 'strip in the diagnosis, the contract\'s clause behind the disclosure',
+      !shutCurved.some((t) => t.includes(GENERATOR_REFUSALS.single))
+      && !shutPlain.some((t) => t.includes(GENERATOR_REFUSALS.single))
+      && openedC.allOpen === true && openedP.allOpen === true
+      && namesOther(onCurved, PLAIN) && namesOther(onPlain, CURVED),
+      `SHUT, the clause is not laid out: ${JSON.stringify({ shutCurved, shutPlain })}`
+      + `\n        disclosures: ${JSON.stringify({ curved: openedC, plain: openedP })}`
+      + `\n        OPEN: ${JSON.stringify({ onCurved, onPlain })}`
+      + `\n        the clause, derived from the vendored contract: "${GENERATOR_REFUSALS.single}"`);
 
     // THE DISCRIMINATING PAIR. "Nothing to vary" must appear on the strip with
     // no curve and must NOT appear on the strip that has one — read together, so
