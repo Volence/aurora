@@ -363,15 +363,50 @@ describe('author a VERTICAL band that plane cells actually draw', () => {
           'wrapped DMA of bank ' + (s & 7))
           .toEqual(banks[s & 7][(j + (s >> 3) * cols) % n]);
 
+    // ── AND THE SUB-HYPOTHESES, WHICH THE COMPOSITE ALONE HIDES ──────────────
+    // FOUND BY EXERCISING THE VERDICT SCRIPT AGAINST A SYNTHETIC BROKEN MACHINE, not
+    // by reasoning: a machine whose COARSE rotation runs the wrong way is byte-identical
+    // to an honest one at coarse 0 and coarse rows/2, because c ≡ -c there. The same
+    // fixed-point argument applies to the bank index. A capture at such a step reads
+    // "UP" off a machine that is broken, which is the exact failure a rig is supposed
+    // not to have.
+    //
+    // So each step also carries whether it separates the two halves SEPARATELY, and
+    // both flags are DERIVED BY COMPARING BYTES rather than from the `c ∉ {0, rows/2}`
+    // arithmetic — the arithmetic is right, but a flag computed from it could not catch
+    // art that made two different rotations produce the same picture.
+    const composite = (s: number, j: number, coarseSign: number, bankSign: number) => {
+      const f = ((bankSign * (s & 7)) % BGANIM_PHASE_BANKS + BGANIM_PHASE_BANKS)
+        % BGANIM_PHASE_BANKS;
+      const t = ((j + coarseSign * (s >> 3) * cols) % n + n) % n;
+      return banks[f][t];
+    };
     const steps = Array.from({ length: H }, (_, s) => {
       const up = Array.from({ length: n }, (_, j) => packTile(upAt(s, j)));
       const down = Array.from({ length: n }, (_, j) => packTile(downAt(s, j)));
       const differing = up.map((v, j) => (v === down[j] ? -1 : j)).filter((j) => j >= 0);
+      const differsFrom = (cs: number, bs: number) =>
+        up.some((v, j) => v !== packTile(composite(s, j, cs, bs)));
+      const separatesCoarseSign = differsFrom(-1, 1);
+      const separatesBankIndex = differsFrom(1, -1);
       return {
         step: s, coarse: s >> 3, bank: s & 7,
-        discriminating: differing.length > 0, slotsThatDiffer: differing, up, down,
+        discriminating: differing.length > 0, slotsThatDiffer: differing,
+        separatesCoarseSign, separatesBankIndex,
+        fullySeparating: differing.length > 0 && separatesCoarseSign && separatesBankIndex,
+        up, down,
       };
     });
+    // The flags must agree with the fixed-point argument they were NOT computed from.
+    for (const st of steps) {
+      expect(st.separatesCoarseSign, `step ${st.step}: coarse ${st.coarse}`)
+        .toBe((2 * st.coarse) % rows !== 0);
+      expect(st.separatesBankIndex, `step ${st.step}: bank ${st.bank}`)
+        .toBe((2 * st.bank) % BGANIM_PHASE_BANKS !== 0);
+    }
+    const fully = steps.filter((s) => s.fullySeparating).map((s) => s.step);
+    expect(fully.length, 'the rig needs steps that separate BOTH halves, or a broken ' +
+      'machine reads as UP').toBeGreaterThan(0);
     const discriminating = steps.filter((s) => s.discriminating).map((s) => s.step);
     expect(discriminating, 'exactly the steps with 2s !== 0 (mod H) separate UP from DOWN')
       .toEqual(Array.from({ length: H }, (_, s) => s).filter((s) => (2 * s) % H !== 0));
@@ -442,6 +477,14 @@ describe('author a VERTICAL band that plane cells actually draw', () => {
           ((BG_TILE_BASE_SLOT + Math.min(...controlSlots)) * TILE_BYTES).toString(16),
         onScreenControlSlot: Math.min(...controlSlots),
       },
+      sampling: {
+        nonDiscriminating: steps.filter((s) => !s.discriminating).map((s) => s.step),
+        fullySeparating: fully,
+        why: 'A capture at a step whose coarse part is 0 or rows/2 is byte-identical on a ' +
+          'machine whose coarse rotation runs the WRONG WAY (c = -c there), and the same ' +
+          'fixed-point argument applies to the bank index. Such a capture reads "UP" off ' +
+          'a broken machine. Sample at least one FULLY SEPARATING step.',
+      },
       phase0RowsHex: p0.map((r) => r.map((v) => v.toString(16)).join('')),
       steps,
     }, null, 1));
@@ -456,6 +499,8 @@ describe('author a VERTICAL band that plane cells actually draw', () => {
       `  tiles ${doc0.tiles!.length} -> ${back.tiles!.length} (cap ${BG_TILE_CAPACITY}); ` +
       `painted ${painted.length} of ${BG_LAYOUT_WORDS} cells; ${controlCells.length} control cells\n` +
       `  discriminating steps (UP != DOWN): ${discriminating.length} of ${H} — all but ` +
-      `${steps.filter((s) => !s.discriminating).map((s) => s.step).join(' and ')}`);
+      `${steps.filter((s) => !s.discriminating).map((s) => s.step).join(' and ')}\n` +
+      `  FULLY separating (also pins the coarse sign and the bank index): ` +
+      `${fully.length} of ${H}; sample one of ${fully.slice(0, 8).join(', ')}, …`);
   });
 });
