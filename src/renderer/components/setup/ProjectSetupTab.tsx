@@ -14,8 +14,8 @@ import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { useProjectStore } from '../../state/projectStore';
 import { useConfirmStore } from '../../state/confirmStore';
 import { useToastStore } from '../../state/toastStore';
-import { buildSetupRows, applyPathEdits, pendingEditCount, type SetupRow } from './setup-model';
-import { serializeProjectConfig } from '../../../core/project/mapping';
+import { buildSetupRows, pendingEditCount, planSetupSidecarWrite, type SetupRow } from './setup-model';
+import { SIDECAR_REL_PATH } from '../../../core/project/mapping';
 import { joinPath } from '../../../core/project/join-path';
 import type { EntryStatus } from '../../../core/project/report';
 
@@ -184,11 +184,12 @@ export default function ProjectSetupTab() {
     }
     setApplying(true);
     try {
-      const editMap: Record<string, string | null> = {};
-      for (const [k, v] of Object.entries(edits)) editMap[k] = v === '' ? null : v;
-      const next = applyPathEdits(sidecar.config, editMap);
-      const bytes = serializeProjectConfig(next);
-      await window.api.writeBinaryFile(dir, '.aurora/project.json', bytes.buffer as ArrayBuffer);
+      const plan = planSetupSidecarWrite(sidecar, edits);
+      if (plan.kind === 'refused') {
+        useToastStore.getState().addToast(plan.reason, 'error');
+        return;
+      }
+      await window.api.writeBinaryFile(dir, SIDECAR_REL_PATH, plan.bytes.buffer as ArrayBuffer);
       setEdits({});
       resetChecks(); // row lights fall back to the fresh report status, not stale live-check colors
       const outcome = await useClassicProjectStore.getState().openDirectory(dir);

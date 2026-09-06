@@ -6,7 +6,8 @@
 // Zone grouping reuses the classic report-grouping helper (same key scheme).
 
 import type { ResolutionReport, EntryStatus } from '../../../core/project/report';
-import type { ProjectConfig } from '../../../core/project/mapping';
+import type { ProjectConfig, SidecarState } from '../../../core/project/mapping';
+import { serializeProjectConfig } from '../../../core/project/mapping';
 import { groupEntriesByZone } from '../classic/report-grouping';
 
 export interface SetupRow {
@@ -78,4 +79,33 @@ export function applyPathEdits(
   if (Object.keys(paths).length > 0) next.paths = paths;
   else delete next.paths;
   return next;
+}
+
+// ---------------------------------------------------------------------------
+// Apply — the second writer of `.aurora/project.json`
+// ---------------------------------------------------------------------------
+
+/**
+ * What Apply should do with the user's edits. Extracted out of ProjectSetupTab
+ * because the decision is the part worth testing and a React component is the
+ * part this repo cannot render in a test (there is no @testing-library/react
+ * here) — a writer with no reachable test is how the open-time seed destroyed
+ * files for as long as it did.
+ */
+export type SetupWritePlan =
+  | { kind: 'write'; config: ProjectConfig; bytes: Uint8Array }
+  | { kind: 'refused'; reason: string };
+
+/**
+ * Merge the tab's edits onto the sidecar and produce the bytes Apply writes.
+ * `''` clears an override (the tab's spelling for "back to stock").
+ */
+export function planSetupSidecarWrite(
+  sidecar: SidecarState,
+  edits: Record<string, string>,
+): SetupWritePlan {
+  const editMap: Record<string, string | null> = {};
+  for (const [k, v] of Object.entries(edits)) editMap[k] = v === '' ? null : v;
+  const config = applyPathEdits(sidecar.config, editMap);
+  return { kind: 'write', config, bytes: serializeProjectConfig(config) };
 }
