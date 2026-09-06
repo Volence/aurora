@@ -96,7 +96,7 @@ describe('curveExcursionPx: the decode, not the ratio', () => {
         - decodeFactorScroll(camX, 'FACTOR_1_2')));
   });
 
-  it('is SYMMETRIC in the two ends — which is the direction refutation, as arithmetic', () => {
+  it('is SYMMETRIC in the two ends, which is the direction refutation as arithmetic', () => {
     for (const a of EFFECTS_FACTOR_NAMES) {
       for (const b of EFFECTS_FACTOR_NAMES) {
         for (const camX of [0, 1, 97, 1000, 5824]) {

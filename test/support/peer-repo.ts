@@ -71,7 +71,7 @@ function git(cwd: string, args: string[]): string | null {
     if ((e as { code?: string }).code === 'ENOBUFS') {
       throw new Error(
         `peer-repo: git ${args.join(' ')} in ${cwd} exceeded the ${GIT_MAX_BUFFER}-byte read `
-        + 'buffer. This is NOT an absent path — raise GIT_MAX_BUFFER rather than letting the '
+        + 'buffer. This is NOT an absent path. Raise GIT_MAX_BUFFER rather than letting the '
         + 'caller report a deletion.',
       );
     }

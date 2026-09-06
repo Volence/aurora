@@ -952,8 +952,8 @@ export function curveRateAdvisoryParts(
     return {
       diagnosis: `this strip's Plane B ramps from ${ends} over a band ${span}, and NO ACT IS `
         + 'OPEN, so Aurora cannot say how far this camera travels. Its per-line shear rate '
-        + `reaches ${bar} px per scanline — the lowest rate aeon has measured garbling a `
-        + `background — at roughly camera x ${est ?? '?'}, an estimate from the factor ratio `
+        + `reaches ${bar} px per scanline (the lowest rate aeon has measured garbling a `
+        + `background) at roughly camera x ${est ?? '?'}, an estimate from the factor ratio `
         + 'rather than the engine\'s own decode.',
       mechanism,
       remedies: 'Open the act to get the exact figure. Until then this is neither a warning nor '
@@ -973,7 +973,7 @@ export function curveRateAdvisoryParts(
     diagnosis: `this strip's Plane B ramps from ${ends} over a band ${span}, which shears it by `
       + `${rateAtMax.toFixed(2)} px per scanline at this act's furthest camera x `
       + `${camera.maxCamX}. aeon's lowest per-line rate ever measured GARBLING a background is `
-      + `${bar}, and this band reaches that at camera x ${onset ?? camera.maxCamX} — inside the `
+      + `${bar}, and this band reaches that at camera x ${onset ?? camera.maxCamX}, inside the `
       + 'range this act\'s camera covers.',
     mechanism,
     remedies: `Spread the same ramp over a taller band, or move ${factorLabel(to)} closer to `

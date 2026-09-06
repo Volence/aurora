@@ -1056,7 +1056,7 @@ describe('curve / vsplit controls (parcel H)', () => {
   const onsetOf = (fb: EffectsFactor, to: EffectsFactor) =>
     curveRateOnsetEstimate(fb, to, CURVE_RATE_ARM_SPAN_LINES, CURVE_RATE_GARBLED_MIN)!;
 
-  it('THE DISCRIMINATOR 1 — an ASCENDING curve past its onset now warns, and the old rule was SILENT', () => {
+  it('THE DISCRIMINATOR 1: an ASCENDING curve past its onset now warns, and the old rule was SILENT', () => {
     const fb: EffectsFactor = 'FACTOR_1_8';
     const to: EffectsFactor = 'FACTOR_1_2';
     expect(oldDirectionRuleWouldFire(fb, to), 'this pair ASCENDS').toBe(false);
@@ -1069,7 +1069,7 @@ describe('curve / vsplit controls (parcel H)', () => {
     expect(said!).toMatch(/lowest per-line rate ever measured GARBLING/);
   });
 
-  it('THE DISCRIMINATOR 2 — a DESCENDING curve the camera never reaches is now SILENT, and the old rule WARNED', () => {
+  it('THE DISCRIMINATOR 2: a DESCENDING curve the camera never reaches is now SILENT, and the old rule WARNED', () => {
     const fb: EffectsFactor = 'FACTOR_1_2';
     const to: EffectsFactor = 'FACTOR_7_16';
     expect(oldDirectionRuleWouldFire(fb, to), 'this pair DESCENDS').toBe(true);
@@ -1080,7 +1080,7 @@ describe('curve / vsplit controls (parcel H)', () => {
     expect(say(fb, to, onset * 2)).not.toBeNull();
   });
 
-  it('says the SAME thing about a curve and its mirror — direction is refuted, as a property', () => {
+  it('says the SAME thing about a curve and its mirror: direction is refuted, as a property', () => {
     const camX = 4000;
     let spoke = 0;
     for (const fb of EFFECTS_FACTOR_NAMES) {
@@ -1124,7 +1124,7 @@ describe('curve / vsplit controls (parcel H)', () => {
     expect(said!).toMatch(/UNCHECKED rather than clear/);
   });
 
-  it('is LOUD, not silent, when no act is open — it neither assumes unbounded nor zero', () => {
+  it('is LOUD, not silent, when no act is open: it neither assumes unbounded nor zero', () => {
     const fb: EffectsFactor = 'FACTOR_1_2';
     const to: EffectsFactor = 'FACTOR_7_16';
     const said = say(fb, to, null);
@@ -1144,7 +1144,7 @@ describe('curve / vsplit controls (parcel H)', () => {
     expect(say('FACTOR_0', 'FACTOR_1', 20000, { spanLines: 0, restriction: null })).toBeNull();
   });
 
-  it('warns HARDER on a shorter band at the same ends — the rate is per LINE', () => {
+  it('warns HARDER on a shorter band at the same ends, because the rate is per LINE', () => {
     const fb: EffectsFactor = 'FACTOR_1_4';
     const to: EffectsFactor = 'FACTOR_3_8';
     // Same ends, same camera; only the span moves. The tall band's onset is
@@ -1178,7 +1178,7 @@ describe('curve / vsplit controls (parcel H)', () => {
       .toBe(say('FACTOR_1_8', 'FACTOR_1_2', 20000));
   });
 
-  it('does NOT grey any curve option — aeon says there is no engine defect', () => {
+  it('does NOT grey any curve option, because aeon says there is no engine defect', () => {
     const opts = curveFieldOptions({ fb: 'FACTOR_1_8' });
     const below = opts.find((o) => o.value === 'FACTOR_1_16')!;
     const above = opts.find((o) => o.value === 'FACTOR_1_2')!;

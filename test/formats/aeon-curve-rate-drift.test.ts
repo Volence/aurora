@@ -86,7 +86,7 @@ describe('aeon curve-rate premise: the record the advisory quotes', () => {
     expect(tip, `aeon has no ${TIP}`).not.toBeNull();
     expect(
       isAncestor(AEON!, sha!, tip!),
-      `${NOT_OURS} ${REFUTATION} is no longer an ancestor of aeon ${TIP} — the refutation `
+      `${NOT_OURS} ${REFUTATION} is no longer an ancestor of aeon ${TIP}. The refutation `
       + 'Aurora rests on may have been rewritten out of history.',
     ).toBe(true);
   });
@@ -145,7 +145,7 @@ describe('aeon curve-rate premise: the record the advisory quotes', () => {
 
     expect(
       narrow.length,
-      `${NOT_OURS} no per-band rows found in ${DEFERRED} — the divisor is now unchecked`,
+      `${NOT_OURS} no per-band rows found in ${DEFERRED}, so the divisor is now unchecked`,
     ).toBeGreaterThan(0);
     // ANTI-VACUOUS: at least one band must be narrower than the screen, or the
     // rows cannot separate `/span` from `/(span-1)` and this check is theatre.
