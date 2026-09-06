@@ -257,20 +257,70 @@ const SLOWEST_PRINTABLE_PX_PER_SEC = 0.01;
 // worse than one that states none. So the sentence shipped as `scrolls · …`
 // until the overseer flipped ONE constant after watching the built ROM.
 //
-// THE VERTICAL WORD IS NOT YET WATCHED. aeon's axis block states it from the
-// mechanism — "bank k is phase 0 translated k px toward DECREASING coordinate …
-// so an increasing driver scrolls a horizontal band LEFT and a vertical band
-// UP" — and the LEFT half of that same sentence is the one already confirmed on
-// the ROM, which is why `up` ships rather than an empty word: the two halves are
-// one mechanism with one sign, and confirming one confirmed the sign. It is
-// recorded here as DERIVED-FROM-A-CONFIRMED-MECHANISM, not as watched, so that a
-// foreground run that contradicts it edits one constant and not a paragraph.
+// THE VERTICAL WORD IS NOW WATCHED IN VRAM, AND THE TWO AXES REST ON DIFFERENT
+// EVIDENCE — which is the part this block used to leave unsaid. Until aeon
+// f0aebbd3 the vertical word was recorded here as derived from the horizontal
+// sign and never observed. That is understated now, and the upgrade is not to
+// "confirmed" flat: it is to confirmed IN ONE FRAME OF REFERENCE.
+//
+// WHAT AEON MEASURED. `tools/bganim_vprobe_witness.py` (aeon, read at commit
+// f0aebbd3, an ancestor of their origin/master) installs a purpose-built
+// vertical band, samples the bytes at its VRAM destination at sixteen settled
+// step plateaux, and requires each read to equal the prediction its `Band.
+// predict` derives from the record IN THE ROM and — this is the arm carrying
+// the direction — to decode, slots in ROW-MAJOR order, to phase 0 rolled toward
+// DECREASING row index by exactly the engine's own committed step. Both are
+// verdict gates and not printed niceties: `run` accumulates failures naming the
+// offending steps and `main` exits non-zero on any. A matched HORIZONTAL control
+// over the same art, driver, rate and destination, differing only in the two
+// axis fields, must FAIL that same predicate, and the run refuses as
+// UNMEASURABLE rather than passing if the two predictions never diverged.
+//
+// WHY THAT DISCRIMINATES UP FROM DOWN INSTEAD OF MERELY DETECTING MOTION.
+// `tools/bganim_vprobe_gen.py` fixes the probe at COLS 2 / ROWS 4, so the
+// vertical period is 32 px and a DOWNWARD roll of s is pixel-identical to an
+// upward roll of 32 - s. Those coincide only where 2s is 0 modulo 32, i.e.
+// s = 0 or s = 16 — and only because that generator's `check_art` refuses art
+// whose 32 pixel rows are not all distinct, which is the assumption the
+// arithmetic silently needs. A separate gate then requires the samples to visit
+// all four coarse rotate positions; coarse 1 is steps 8..15 and coarse 3 is
+// steps 24..31, neither containing 0 or 16, so a run that passes AT ALL has
+// necessarily asked the direction question at least twice.
+//
+// AND OUR OWN PRODUCER USES THE SAME SIGN. `shiftedPhaseBanks`
+// (core/formats/bg-override/bg-anim-band.ts) derives a vertical band's bank k
+// with the source row at `(y + k) mod pattern_px`, which is the sign of the
+// probe generator's own `bank`. So for a band THIS app authored with
+// `phaseFill: 'shift'` the fine-phase direction is not an author's unknown; it
+// is ours, and it is the one that was measured.
+//
+// ═══ THE ONE HOP THAT IS STILL UNDERIVED, AND IT IS NOT THE SAME ON BOTH ═══
+//
+// aeon's probe aims at the BG region's band reserve (`band_reserve` in aeon
+// `games/sonic4/vram.toml`) precisely so nothing else writes it — and nothing
+// DRAWS it either. So "up" is established in the band art's own row order and
+// not on a viewer's retina. `BAND_MECHANISM_HINT` below ends "Every cell that
+// points at it moves the same way", which is a claim about what is drawn, so
+// the link a future measurement must close is: BAND ROW ORDER -> WHAT A VIEWER
+// SEES. The horizontal word has no such gap only because the 2026-08-26 run was
+// on the act's LIVE band, whose slots the act's own plane cells do reference.
+// Closing the vertical one needs plane cells laid out row-major over a vertical
+// band's slots — an authoring change to the act's document, booked as aeon
+// EFFECTS-W1 item 8's on-screen half. It is not a reading of any source and it
+// is deliberately not this file's to make.
+//
+// The shape is unchanged: one constant per axis, so a foreground run that
+// contradicts either edits a word and not a paragraph.
 
 /**
  * The direction word each axis's motion sentence carries.
  *
- *   horizontal  CONFIRMED on the built ROM 2026-08-26 (bganim-band-status.test.ts).
- *   vertical    DERIVED from the same sign, aeon 3a4712fa; not yet watched.
+ *   horizontal  CONFIRMED on the built ROM 2026-08-26, on the act's LIVE band —
+ *               plane-cell-referenced art (bganim-band-status.test.ts).
+ *   vertical    CONFIRMED in VRAM by aeon `bganim_vprobe_witness.py` at aeon
+ *               f0aebbd3, in the band's OWN row order, on a probe band that no
+ *               plane cell references. The block above names the hop that
+ *               leaves open and who closes it.
  *
  * `''` on either arm drops the word, which is the shape the horizontal one
  * shipped in before it was confirmed.

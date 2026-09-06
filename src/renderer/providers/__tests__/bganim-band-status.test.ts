@@ -16,7 +16,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   GAME_FRAMES_PER_SECOND, bandStatus,
-  BAND_SCROLL_DIRECTION, bandMotion, bandLensCaptionLines, BAND_MECHANISM_HINT,
+  BAND_SCROLL_DIRECTION, BAND_SCROLL_DIRECTIONS, bandMotion, bandLensCaptionLines,
+  BAND_MECHANISM_HINT,
 } from '../bganim-preview-aeon';
 import { BAND_DEFAULTS } from '../../../core/formats/bg-override/bg-override';
 
@@ -118,8 +119,10 @@ describe('bandStatus: the verdict', () => {
 // right? rotate?". The caption said WHICH cells and the card said `driver timer
 // · rate_shift 2`; nothing said the band SCROLLS. One sentence, one provider,
 // printed verbatim on the canvas caption and on the card, so the two cannot
-// drift apart. The direction word is FOREGROUND-gated behind one constant that
-// ships empty until the overseer has watched the built ROM.
+// drift apart. The direction word is FOREGROUND-gated behind one constant per
+// axis that ships empty until the direction has been watched. Both arms are now
+// non-empty and the two rows below record what each one rests on — they are NOT
+// the same evidence, and the provider's block says which link is still open.
 
 describe('bandMotion: the one sentence that says what a band does', () => {
   it.each([0, 2, 3])('derives "1px per 2^%i" from rate_shift, in the driver\'s units', (n) => {
@@ -148,6 +151,39 @@ describe('bandMotion: the one sentence that says what a band does', () => {
     expect(BAND_SCROLL_DIRECTION).toBe('left');
     const s = bandMotion({ driver: 'timer', rateShift: 2 }, 'band');
     expect(s).toMatch(/^scrolls left · 1px per /);
+  });
+
+  it("says a vertical band scrolls UP: measured in VRAM by aeon, in the band's own row order", () => {
+    // aeon tools/bganim_vprobe_witness.py, read at aeon f0aebbd3 (verified an
+    // ancestor of their origin/master). A purpose-built 2x4 probe band's VRAM
+    // bytes, sampled at 16 settled step plateaux covering all four coarse
+    // rotate positions, decode ROW-MAJOR to phase 0 rolled toward DECREASING
+    // row index by exactly the engine's committed step — a hard verdict gate,
+    // and a matched horizontal control over the same art fails the same
+    // predicate. DOWN is excluded because a downward roll of s is the same
+    // image as an upward roll of 32-s only at s in {0, 16}, and the run's own
+    // coarse-coverage gate forces samples in steps 8..15 and 24..31.
+    //
+    // STILL UNDERIVED, and it is why the two axes are not symmetric: the probe
+    // sits in aeon's `band_reserve` run, which no plane cell references, so
+    // "up" is the band's row order and not a viewer's screen. The horizontal
+    // word was measured on the act's live, plane-cell-referenced band. See the
+    // provider's block for the hop and who closes it.
+    expect(BAND_SCROLL_DIRECTIONS.vertical).toBe('up');
+    const s = bandMotion({ driver: 'timer', rateShift: 2, axis: 'vertical' }, 'band');
+    expect(s).toMatch(/^scrolls up · 1px per /);
+  });
+
+  it('an axis with no measured word drops it, which is what keeps the fix one constant', () => {
+    // The provider promises "a foreground run that contradicts either edits a
+    // word and not a paragraph". That holds only while the direction word is
+    // the SOLE thing an axis arm contributes to the sentence, so pin exactly
+    // that: an axis absent from the table composes the identical sentence with
+    // the word and its one space removed, and nothing else moves.
+    const vertical = bandMotion({ driver: 'timer', rateShift: 2, axis: 'vertical' }, 'band');
+    const unmeasured = bandMotion({ driver: 'timer', rateShift: 2, axis: 'no-such-axis' }, 'band');
+    expect(BAND_SCROLL_DIRECTIONS['no-such-axis']).toBeUndefined();
+    expect(vertical).toBe(unmeasured.replace('scrolls', 'scrolls up'));
   });
 
   it("IS the card's rate line: bandStatus prints it verbatim", () => {
