@@ -53,7 +53,7 @@ function extentX(rects: { x: number; w: number }[]): { left: number; width: numb
   return { left, width: right - left };
 }
 
-describe('crossoverPreviewRects — the footprint under the cursor', () => {
+describe('crossoverPreviewRects: the footprint under the cursor', () => {
   it('⚠ a HALF mark is drawn one sub-column wide, NOT a whole cell', () => {
     // THE ROW. A preview that draws a cell regardless passes nothing here: the
     // cell-mode extent is the control and it is CELL_SUBTILE_COLS times wider.
