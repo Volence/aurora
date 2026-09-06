@@ -421,26 +421,35 @@ export function driftFromPxPerFrame(pxPerFrame: number): EffectsDrift {
 // ═══ WHAT THIS ROW HAS TO SAY THAT NO OTHER ROW ON THE CARD DOES ═══
 //
 // 1. THE PICKER SHOWS LINES AND WRITES A SHIFT. `height_shift` is a SHIFT
-//    (`H = 1 << shift`), every value 3..7 is legal, and an editor that exported
-//    a line count would land a band four times too tall WITH A GREEN BUILD. The
-//    option labels are built by `rowRemapHeightLines`, the only `<<` on this key
-//    in the repo; `rowRemapWithHeightShift` writes the shift and never touches
-//    it. Each label spells the shift beside the line count, so an author reading
-//    the file afterwards recognises what they picked.
+//    (`H = 1 << shift`), and an editor that exported a line count would land a
+//    band four times too tall. The option labels are built by
+//    `rowRemapHeightLines`, the only `<<` on this key in the repo;
+//    `rowRemapWithHeightShift` writes the shift and never touches it. Each label
+//    spells the shift beside the line count, so an author reading the file
+//    afterwards recognises what they picked.
 //
-// 2. FOUR OF THE FIVE LEGAL OPTIONS DO NOT BUILD TODAY, and saying so is not
-//    optional. Only `height_shift: 4` has a ladder (`row_remap_ladder16()`);
-//    aeon refuses the other four BY NAME until 9b's generator lands. The owner's
-//    recorded complaint about this tooling is exactly this failure — "it kept
+// 2. THE OPTION LIST IS THE CONTRACT'S ENUM, AND IT IS ONE ENTRY LONG TODAY.
+//    `height_shift` was `minimum 3 / maximum 7` and is `enum [4]` at empyrean
+//    `2e5046e`: the enum IS the set of rungs aeon can generate a ladder for
+//    (`row_remap_ladder16()` is the only one), so schema-legal and buildable are
+//    the same set and no option needs marking or warning about. That is the
+//    warning apparatus RETIRING ITSELF, not being removed:
+//    `EFFECTS_ROW_REMAP_BUILDABLE_SHIFT` reads `null` because the contract
+//    stopped carrying its "TODAY ONLY n BUILDS" clause, `rowRemapBuildableToday`
+//    returns `null` for every option, the `buildsSuffix` goes unused, and not one
+//    line of this file was edited to make that happen. The owner's recorded
+//    complaint about this tooling is the failure all of it exists for — "it kept
 //    giving errors during build time that I would have to stop and revert the
-//    changes" — so the picker MARKS the buildable option, warns under the row
-//    when a non-buildable one is selected, and still LETS THE AUTHOR PICK IT: a
-//    control that hid four legal values would disagree with the format, and an
-//    author who opened a hand-authored `height_shift: 6` would be looking at a
-//    list that cannot represent their own file. Nothing here hardcodes "only 4
-//    works": the state and its reason are read from the contract
-//    (`EFFECTS_ROW_REMAP_BUILDABLE_SHIFT`), so when 9b lands and the clause goes,
-//    every warning here goes with it and no Aurora edit is needed.
+//    changes" — and the mechanism is still wired, so if the enum ever widens
+//    ahead of the generator and the clause returns, the marks and warnings return
+//    with it, again with no edit here.
+//
+//    ⚠ NOTHING IS FILTERED AND NOTHING IS TYPED. `ROW_REMAP_HEIGHT_OPTIONS` is
+//    `EFFECTS_ROW_REMAP_HEIGHT_SHIFTS` mapped one-to-one, and that constant reads
+//    an `enum`, a `const` or a `minimum`/`maximum` range alike, so the day a
+//    second ladder lands and the enum becomes `[4, 6]` this picker grows a row on
+//    its own. A list this file typed would pass today and under-serve the format
+//    the moment it widened.
 //
 // 3. THE THREE `scene()` PRECONDITIONS ARE CHECKABLE HERE AND NOWHERE ELSE THE
 //    AUTHOR CAN SEE. §2.6 ruling (3) keeps them OUT of the schema on purpose —
@@ -494,8 +503,8 @@ export const LAYER_ROW_REMAP_ROW = Object.freeze({
   planeYTitle: 'rowRemap.plane_y: the BG PLANE LINE where this strip\'s art paints the surface, '
     + `${EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS.min}..${EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS.max}. NOT a `
     + 'world Y and NOT a screen line (the runtime reads plane_y - Vscroll_BG); the same space as '
-    + 'a strip\'s vertical split. This range is the contract\'s ONLY enforcement: aeon checks the '
-    + 'floor and not the ceiling',
+    + 'a strip\'s vertical split. This range is ONE OF TWO enforcements of the ceiling, the '
+    + 'other being the engine-side guard aeon landed beside it; keep both',
   /** The picker's own title: the unit hazard, said where the choice is made. */
   heightTitle: 'rowRemap.height_shift: the band height. The FILE STORES A SHIFT and this list '
     + 'shows the lines it means (H = 1 << shift), because exporting a line count would land a '

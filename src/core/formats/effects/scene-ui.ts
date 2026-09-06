@@ -79,6 +79,92 @@ function boundsAt(...path: (string | number)[]): { min: number; max: number } {
   return Object.freeze({ min: minimum, max: maximum });
 }
 
+/**
+ * Every integer a node ADMITS, ascending — the SET a picker may offer, as
+ * opposed to `boundsAt`'s two ENDS.
+ *
+ * ═══ THREE NODE SHAPES, ONE ANSWER, AND THE PLURALITY IS THE POINT ═══
+ *
+ * A contract bounds an integer key in whichever way states the truth best, and
+ * this contract has used more than one shape on the SAME key inside a week:
+ * `rowRemap.height_shift` was `minimum 3 / maximum 7` (empyrean `60d9f6a`), then
+ * `const 4` (`83f5290`, announced and superseded within the hour, never
+ * vendored here), and is `enum [4]` today (`2e5046e`). A derivation that reads
+ * only one of those shapes pins a MOMENT rather than the format, so the day the
+ * hub widens the node the picker silently under-serves it — which is the whole
+ * failure this helper exists to make impossible:
+ *
+ *   `enum`               the admitted values, LISTED. What a BUILDABLE SET looks
+ *                        like: it grows by amendment one entry at a time and it
+ *                        need not be contiguous. The primary shape on this key
+ *                        now, and the hub's stated reason for choosing it over
+ *                        `const` was exactly that a consumer grows from it with
+ *                        no edit.
+ *   `const`              the singleton case of `enum`, folded into it here so a
+ *                        contract that prefers the terser spelling reads the
+ *                        same. Same refusal set, same derived list.
+ *   `minimum`/`maximum`  the inclusive RANGE. What a true numeric bound looks
+ *                        like; this schema still spells `plane_y`, `world_y`,
+ *                        `bob_period` and a dozen others this way and may spell
+ *                        this key this way again. KEPT DELIBERATELY, not left
+ *                        behind: the contract has used it here and may return.
+ *
+ * ⚠ THIS IS FOR ENUMERABLE PICKER SETS, NOT FOR WIDE NUMERIC BOUNDS. A range
+ * node is materialised element by element, so `boundsAt` remains the right read
+ * for a key like `plane_y` whose 0..511 is a bound an author types into, not a
+ * list an author chooses from.
+ *
+ * LOUD WHEN IT CANNOT ANSWER. A node carrying none of the three throws with its
+ * path rather than returning `[]`, because an empty picker on screen is
+ * indistinguishable from a UI that has not finished loading. That failure mode
+ * is not hypothetical: the `const 4` cut took 71 test files down at import here,
+ * every one of them at `boundsAt`'s throw, which is why this repo could re-derive
+ * against the amendment instead of shipping a silently narrowed control.
+ */
+export function admittedIntegers(
+  node: Record<string, unknown>, label: string,
+): readonly number[] {
+  const { enum: listed, const: only, minimum, maximum } = node as {
+    enum?: unknown; const?: unknown; minimum?: unknown; maximum?: unknown;
+  };
+  const values = listed !== undefined ? listed : only !== undefined ? [only] : null;
+
+  if (values !== null) {
+    if (!Array.isArray(values) || values.length === 0
+      || !values.every((v) => typeof v === 'number' && Number.isInteger(v))) {
+      throw new Error(
+        `effects scene schema ${label} declares an enum/const that is not a non-empty list of `
+        + `integers (${JSON.stringify(values)}). A picker built from it would offer values this `
+        + 'repo invented; re-derive against the amended schema.',
+      );
+    }
+    return Object.freeze([...(values as number[])].sort((a, b) => a - b));
+  }
+
+  if (typeof minimum === 'number' && typeof maximum === 'number') {
+    if (!Number.isInteger(minimum) || !Number.isInteger(maximum) || maximum < minimum) {
+      throw new Error(
+        `effects scene schema ${label} has a minimum/maximum pair that is not a non-empty `
+        + `integer range (${minimum}..${maximum}).`,
+      );
+    }
+    const out: number[] = [];
+    for (let v = minimum; v <= maximum; v++) out.push(v);
+    return Object.freeze(out);
+  }
+
+  throw new Error(
+    `effects scene schema ${label} admits no derivable integer set: it carries neither an `
+    + 'enum, nor a const, nor a numeric minimum/maximum pair. A control offering a list here '
+    + 'would be offering one this repo invented; re-derive against the amended schema.',
+  );
+}
+
+/** `admittedIntegers` at a path in the committed schema. */
+export function admittedIntegersAt(...path: (string | number)[]): readonly number[] {
+  return admittedIntegers(at(...path), path.join('.'));
+}
+
 // ---------------------------------------------------------------------------
 // §2.3 — the representable factor set
 // ---------------------------------------------------------------------------
@@ -1337,12 +1423,19 @@ export function driftPxPerFrameRefusal(pxPerFrame: number): string | null {
 //
 // 1. `height_shift` IS A SHIFT, NOT A LINE COUNT. `H = 1 << height_shift`, and
 //    the contract says in its own words that an editor "may DISPLAY
-//    `1 << height_shift` beside the control and MUST EXPORT the shift". EVERY
-//    value 3..7 is legal, so an editor that exported the line count would land a
-//    band FOUR TIMES TOO TALL rather than a refusal — aeon's own ensure names the
-//    trap ("If you meant 64 LINES, you want 6"). The `<<` therefore exists in
-//    exactly one place in this repo, `rowRemapHeightLines`, and the control's
-//    write path never calls it.
+//    `1 << height_shift` beside the control and MUST EXPORT the shift" — aeon's
+//    own ensure names the trap ("If you meant 64 LINES, you want 6"). The `<<`
+//    therefore exists in exactly one place in this repo, `rowRemapHeightLines`,
+//    and the control's write path never calls it.
+//
+//    ⚠ THE UNIT HAZARD SURVIVED THE NARROWING, WITH LESS OF ITS BLAST RADIUS.
+//    Until empyrean `2e5046e` the key was `minimum 3 / maximum 7`, so exporting
+//    a line count for shift 3 wrote 8 — legal, and a band FOUR TIMES TOO TALL
+//    with a GREEN BUILD. Under `enum [4]` every line count (16) is refused by the
+//    codec, so today the same bug lands as a refusal instead. That is a property
+//    of the CURRENT enum and not of the format: an enum containing both a shift
+//    and some other shift's line count restores the silent version, so nothing
+//    here relaxes on it.
 //
 // 2. `plane_y` IS A PLANE-B LINE, 0..511 — the `vsplit.at` coordinate space, and
 //    a THIRD space on a surface that already reconciles world pixels and screen
@@ -1364,22 +1457,40 @@ const ROW_REMAP_OBJECT_PATH: (string | number)[] =
 export const EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS =
   boundsAt(...ROW_REMAP_OBJECT_PATH, 'properties', 'plane_y');
 
-/** `height_shift`'s bounds — SHIFTS, not line counts. */
-export const EFFECTS_ROW_REMAP_HEIGHT_SHIFT_BOUNDS =
-  boundsAt(...ROW_REMAP_OBJECT_PATH, 'properties', 'height_shift');
-
 /**
  * Every shift the schema admits, low to high — the ladder a picker may offer.
  *
- * Enumerated FROM THE BOUNDS rather than typed, so a contract that widens the
- * range grows the picker with no edit here and one that narrows it shrinks it.
+ * THE PRIMARY DERIVATION ON THIS KEY. It used to be enumerated from the bounds;
+ * the bounds are now derived from IT, and the inversion is the parcel. Read
+ * `admittedIntegersAt` for why three node shapes are served: `enum` (today,
+ * `[4]`), `const`, and a `minimum`/`maximum` range (what this key carried until
+ * empyrean `2e5046e`, and may carry again).
+ *
+ * SO THE PICKER STILL GROWS WITH NO EDIT HERE. The day a second ladder lands and
+ * the hub amends the enum to `[4, 6]`, this list becomes `[4, 6]`,
+ * `ROW_REMAP_HEIGHT_OPTIONS` gains its row, and nothing in Aurora is touched —
+ * which was the hub's own stated ground for spelling it `enum` rather than
+ * `const`, and is the property this constant is now shaped to keep.
  */
-export const EFFECTS_ROW_REMAP_HEIGHT_SHIFTS: readonly number[] = Object.freeze((() => {
-  const { min, max } = EFFECTS_ROW_REMAP_HEIGHT_SHIFT_BOUNDS;
-  const out: number[] = [];
-  for (let s = min; s <= max; s++) out.push(s);
-  return out;
-})());
+export const EFFECTS_ROW_REMAP_HEIGHT_SHIFTS: readonly number[] =
+  admittedIntegersAt(...ROW_REMAP_OBJECT_PATH, 'properties', 'height_shift');
+
+/**
+ * `height_shift`'s ENDS — SHIFTS, not line counts.
+ *
+ * ⚠ THE ENDS, NOT THE SET, and under an `enum` those stopped being the same
+ * thing. `boundsAt` cannot read this node any more (it carries no
+ * `minimum`/`maximum`), so the ends are taken off the admitted list — and a
+ * SPARSE enum such as `[4, 7]` would make `min..max` admit a 5 and a 6 the
+ * schema refuses. Nothing may test membership through this constant; that is
+ * `EFFECTS_ROW_REMAP_HEIGHT_SHIFTS.includes(...)`, and `rowRemapHeightShiftRefusal`
+ * below was moved onto it for exactly this reason. What the ends are still good
+ * for is a SENTENCE: the widest band the format admits, named to an author.
+ */
+export const EFFECTS_ROW_REMAP_HEIGHT_SHIFT_BOUNDS: { min: number; max: number } = Object.freeze({
+  min: EFFECTS_ROW_REMAP_HEIGHT_SHIFTS[0],
+  max: EFFECTS_ROW_REMAP_HEIGHT_SHIFTS[EFFECTS_ROW_REMAP_HEIGHT_SHIFTS.length - 1],
+});
 
 /**
  * The names the contract RESERVES and refuses inside the payload — `ladder` and
@@ -1415,23 +1526,51 @@ export const EFFECTS_ROW_REMAP_REFUSED_KEYS: readonly string[] = Object.freeze((
 })());
 
 /**
- * The one `height_shift` that BUILDS today — 4, and read out of the contract
- * rather than typed, because it is a statement about aeon's generator on a date
- * and not a property of the format.
+ * The one `height_shift` that BUILDS today when the contract still names one, or
+ * `null` when it does not — read out of the contract, never typed, because it is
+ * a statement about aeon's generator on a date and not a property of the format.
  *
- * DERIVED TWICE FROM TWO INDEPENDENT SENTENCES of the same description, the
- * `EFFECTS_DRIFT_UNITS_PER_PIXEL` pattern: the "TODAY ONLY n BUILDS" clause gives
- * the shift, and the ladder function aeon names (`row_remap_ladder16()`) gives
- * the LINE COUNT. They are cross-checked through `1 << shift`, so a contract that
- * moved one and not the other fails this module's import instead of letting the
- * control bless an unbuildable value — which is the exact failure the owner has
- * already paid for once ("it kept giving errors during build time that I would
- * have to stop and revert the changes").
+ * ═══ IT READS `null` TODAY, AND THAT IS THE MECHANISM FIRING, NOT BREAKING ═══
  *
- * `null` IS A LEGITIMATE ANSWER and the reason the type is nullable: when 9b's
- * generator lands, the contract drops the clause, this reads `null`, and every
- * consumer below stops warning — no Aurora edit, no stale caution left behind.
- * A caution with no expiry is a false negative wearing caution's costume.
+ * Through empyrean `60d9f6a` (the pin Aurora carried until this parcel) the
+ * description carried a "TODAY ONLY 4 BUILDS" clause, because `height_shift` was
+ * `minimum 3 / maximum 7` and four of the five
+ * legal values had no generated ladder: the document was legal and the build was
+ * not, so Aurora owed the author a warning. At `2e5046e` the key became
+ * `enum [4]` — THE ENUM IS NOW THE BUILDABLE SET — and the hub dropped the clause
+ * with it. Schema-legal and buildable coincide, there is no value left to warn
+ * about, and every consumer below goes quiet with no Aurora edit. A caution with
+ * no expiry is a false negative wearing caution's costume; this one had an expiry
+ * and it arrived.
+ *
+ * ═══ WHY THE PARSE AND ITS CROSS-CHECK STAY, DORMANT ═══
+ *
+ * The guard reads the clause and cross-checks it against the ladder function the
+ * description names (`row_remap_ladder16()`) through `1 << shift`, so a contract
+ * that moved one statement and not the other fails this module's import rather
+ * than letting a control bless an unbuildable value. That is the failure the
+ * owner has already paid for once ("it kept giving errors during build time that
+ * I would have to stop and revert the changes").
+ *
+ * ITS PREMISE IS DORMANT, NOT ENDED, so deleting it would be the same mistake in
+ * the other direction. The clause returns the moment the enum widens AHEAD of
+ * aeon's generator — an `enum [4, 6]` of which only 4 has a ladder is a state the
+ * hub has explicitly reserved ("a wider range returns by amendment the day a
+ * second ladder lands"), and it is precisely when the warning is owed again. Left
+ * in place, it arrives with no Aurora edit; deleted, it needs this file reopened
+ * on the day the picker was supposed to grow untouched.
+ *
+ * ═══ WHAT NOTHING HERE CATCHES, SAID PLAINLY ═══
+ *
+ * If the enum gains a rung aeon cannot build AND the clause does not come back
+ * with it, the two statements agree with each other and both are wrong: the
+ * picker offers the rung unmarked and the author learns it from a red build. That
+ * hazard is real, it is NOT covered here, and it is not coverable from this
+ * schema — the ladder set lives in aeon (`tools/effects_gen.py`'s
+ * `ROW_REMAP_LADDERS`, `parallax_dsl.emp`'s `row_remap_ladder16()`), which Aurora
+ * does not read. Aurora's protection against it is the contract keeping the enum
+ * and the buildable set the same thing, which is the hub's stated rule for this
+ * key and not something this module can verify.
  */
 export const EFFECTS_ROW_REMAP_BUILDABLE_SHIFT: number | null = (() => {
   const path = [...ROW_REMAP_OBJECT_PATH, 'properties', 'height_shift'];
@@ -1459,11 +1598,14 @@ export const EFFECTS_ROW_REMAP_BUILDABLE_SHIFT: number | null = (() => {
       `${lines}. Two statements of one quantity disagree; re-read the contract.`,
     );
   }
-  const { min, max } = EFFECTS_ROW_REMAP_HEIGHT_SHIFT_BOUNDS;
-  if (shift < min || shift > max) {
+  // MEMBERSHIP, not the two ends: under a sparse `enum` a shift can sit between
+  // min and max and still be a value the schema refuses, so a range test here
+  // would bless a buildable-shift claim the contract's own type rejects.
+  if (!EFFECTS_ROW_REMAP_HEIGHT_SHIFTS.includes(shift)) {
     throw new Error(
       `effects scene schema ${path.join('.')} names ${shift} as the buildable shift, which is ` +
-      `outside its own ${min}..${max} range.`,
+      `not one of the shifts it admits (${EFFECTS_ROW_REMAP_HEIGHT_SHIFTS.join(', ')}). The ` +
+      'contract cannot both refuse a value and call it the one that builds.',
     );
   }
   return shift;
@@ -1485,26 +1627,43 @@ export function rowRemapPlaneYRefusal(planeY: number): string | null {
   }
   const { min, max } = EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS;
   if (planeY < min || planeY > max) {
-    return `${planeY} is outside the Plane-B line range ${min}..${max}. This bound is the `
-      + 'CONTRACT\'S ONLY ENFORCEMENT: aeon checks the floor and not the ceiling, so a larger '
-      + 'value would build clean and emit a window pointing nowhere.';
+    return `${planeY} is outside the Plane-B line range ${min}..${max}. This bound is ONE OF TWO `
+      + 'ENFORCEMENTS of the ceiling, with the engine-side guard aeon landed alongside it; '
+      + 'before that guard existed aeon checked the floor and not the ceiling, and a larger '
+      + 'value built clean and emitted a window pointing nowhere.';
   }
   return null;
 }
 
-/** Why `height_shift` is not a legal shift, or null when it is. */
+/**
+ * Why `height_shift` is not a legal shift, or null when it is.
+ *
+ * ⚠ MEMBERSHIP OF THE ADMITTED SET, NOT A RANGE TEST. Under the `minimum`/
+ * `maximum` node this key used to carry the two were the same question; under an
+ * `enum` they are not, and a sparse `[4, 7]` would have this function bless a 5
+ * and a 6 that the codec then refuses — a control disagreeing with the format it
+ * writes. The SENTENCE still speaks in ends where it can, because "3..7" reads
+ * better to an author than a list, but only when the set really is contiguous.
+ */
 export function rowRemapHeightShiftRefusal(shift: number): string | null {
   if (!Number.isInteger(shift)) {
     return `a height shift is a whole number; ${shift} is not an integer.`;
   }
+  const shifts = EFFECTS_ROW_REMAP_HEIGHT_SHIFTS;
+  if (shifts.includes(shift)) return null;
+
   const { min, max } = EFFECTS_ROW_REMAP_HEIGHT_SHIFT_BOUNDS;
-  if (shift < min || shift > max) {
-    return `${shift} is outside the contract's ${min}..${max}. THIS IS A SHIFT, NOT A LINE `
-      + `COUNT: the band is 1 << shift lines tall, so ${min} is ${rowRemapHeightLines(min)} `
-      + `lines and ${max} is ${rowRemapHeightLines(max)}. If you meant `
-      + `${rowRemapHeightLines(max)} lines, you want ${max}.`;
-  }
-  return null;
+  const admitted = shifts.length === 1
+    ? `the contract's one legal shift, ${min}`
+    : shifts.length === max - min + 1
+      ? `the contract's ${min}..${max}`
+      : `the contract's legal shifts (${shifts.join(', ')})`;
+  const worked = shifts.length === 1
+    ? `${min} is ${rowRemapHeightLines(min)} lines`
+    : `${min} is ${rowRemapHeightLines(min)} lines and ${max} is ${rowRemapHeightLines(max)}`;
+  return `${shift} is not ${admitted}. THIS IS A SHIFT, NOT A LINE COUNT: the band is `
+    + `1 << shift lines tall, so ${worked}. If you meant ${rowRemapHeightLines(max)} lines, `
+    + `you want ${max}.`;
 }
 
 /**

@@ -40,10 +40,12 @@ import {
  * `layer.rowRemap` — the codec, the SHIFT/line-count hazard, the reserved names,
  * and the three `scene()` preconditions Aurora can answer from the open document.
  *
- * CONTRACT: empyrean `3992d16`, `contract/schema/aurora-effects-scene.schema.json`
- * §2.6, vendored at `src/core/formats/effects/aurora-effects-scene.schema.json`
- * (blob `b3e0ab31`, pinned by the sidecar and hashed by
- * `effects-schema-drift.test.ts`). Engine: aeon key-shape artifact `3d917657`
+ * CONTRACT: `contract/schema/aurora-effects-scene.schema.json` §2.6, which
+ * arrived at empyrean `3992d16` and is vendored at
+ * `src/core/formats/effects/aurora-effects-scene.schema.json`. THE PIN OF RECORD
+ * IS THE SIDECAR, not this sentence: a blob quoted in prose here has gone stale
+ * three re-pins running before, because nothing hashes a comment.
+ * `effects-schema-drift.test.ts` reads the sidecar and hashes the bytes. Engine: aeon key-shape artifact `3d917657`
  * against the landed `SceneRemap.Ladder(t, y, h)` at aeon `d8baf84f`.
  *
  * ⚠ HOW THE EXPECTATIONS BELOW ARE OBTAINED. Where a row could be written either
@@ -93,6 +95,41 @@ function layersOf(doc: Record<string, unknown>): Record<string, unknown>[] {
 function issues(doc: unknown): string[] {
   return validateAgainstSchema(doc, EFFECTS_SCENE_SCHEMA)
     .map((i) => `${i.path || '<document>'}: ${i.message}`);
+}
+
+/** One declared property of the `rowRemap` payload branch, as the file spells it. */
+interface SchemaLeaf {
+  description?: string;
+  enum?: unknown[];
+  const?: unknown;
+  minimum?: number;
+  maximum?: number;
+}
+
+/**
+ * The `rowRemap` payload branch's `properties`, read off the COMMITTED SCHEMA
+ * FILE and not off a constant derived from it.
+ *
+ * WHY THE FILE AND NOT `EFFECTS_SCENE_SCHEMA`: the rows that use this check
+ * Aurora's own derived values and Aurora's own author-facing sentences against
+ * the contract. Reading the contract through the same import the derivation
+ * reads it through would make some of those rows compare a thing with itself.
+ * The branch is LOCATED by the key it declares rather than by index, so a
+ * reordered `oneOf` fails loudly instead of silently reading the other branch.
+ */
+function rowRemapPayloadProps(): Record<string, SchemaLeaf> {
+  const doc = JSON.parse(readFileSync(
+    resolve(__dirname, '../../src/core/formats/effects/aurora-effects-scene.schema.json'),
+    'utf8',
+  )) as { $defs: { layer: { properties: { rowRemap: { oneOf: Record<string, unknown>[] } } } } };
+  const props = doc.$defs.layer.properties.rowRemap.oneOf
+    .map((b) => b.properties as Record<string, SchemaLeaf> | undefined)
+    .find((p) => p?.height_shift !== undefined);
+  if (props === undefined) {
+    throw new Error('the committed schema declares no rowRemap payload branch carrying '
+      + 'height_shift: the rows that read the contract cannot run.');
+  }
+  return props;
 }
 
 /** A document whose layer 1 carries `value` as its `rowRemap`. */
@@ -271,17 +308,7 @@ describe('height_shift is a shift and the editor must export the shift', () => {
    * against `1 << shift` spelled a second time by this file.
    */
   it('agrees with every worked shift/line pair the contract writes down', () => {
-    const description = (EFFECTS_SCENE_SCHEMA as unknown as Record<string, never>)
-      && (JSON.parse(readFileSync(
-        resolve(__dirname, '../../src/core/formats/effects/aurora-effects-scene.schema.json'),
-        'utf8',
-      )) as Record<string, never>);
-    const node = (description as unknown as {
-      $defs: { layer: { properties: { rowRemap: { oneOf: Record<string, unknown>[] } } } };
-    }).$defs.layer.properties.rowRemap.oneOf
-      .map((b) => (b.properties as Record<string, { description?: string }> | undefined))
-      .find((props) => props?.height_shift !== undefined)?.height_shift;
-    const text = node?.description ?? '';
+    const text = rowRemapPayloadProps().height_shift.description ?? '';
     expect(text.length, 'the contract carries no height_shift description').toBeGreaterThan(0);
 
     const pairs = [...text.matchAll(/(\d+) is (?:a )?(\d[\d,]*)[ -]lines?/g)]
@@ -299,9 +326,12 @@ describe('height_shift is a shift and the editor must export the shift', () => {
   /**
    * THE POISON THIS PARCEL EXISTS FOR. Every option the picker offers has a LINE
    * COUNT that differs from its SHIFT, and the writer must emit the shift. An
-   * editor that exported the line count would be schema-legal for shift 4
-   * (16 is outside 3..7, so that one WOULD be caught) but the row asserts the
-   * value written equals `o.shift` and NOT `o.lines`, on every option.
+   * editor that exported the line count would write a value the codec refuses
+   * under today's `enum [4]` (16 is not 4) — but that is a property of the
+   * CURRENT enum, not of the format: a widened enum containing both a shift and
+   * another shift's line count restores the silent version. So the row does not
+   * lean on the codec at all; it asserts the value written equals `o.shift` and
+   * NOT `o.lines`, on every option.
    */
   it('writes the SHIFT for every option the picker offers, never the line count', () => {
     expect(ROW_REMAP_HEIGHT_OPTIONS.length).toBe(EFFECTS_ROW_REMAP_HEIGHT_SHIFTS.length);
@@ -316,7 +346,7 @@ describe('height_shift is a shift and the editor must export the shift', () => {
     }
   });
 
-  it('refuses a shift outside the contract range and says which unit it is', () => {
+  it('refuses a shift the contract does not admit and says which unit it is', () => {
     const { min, max } = EFFECTS_ROW_REMAP_HEIGHT_SHIFT_BOUNDS;
     const why = rowRemapHeightShiftRefusal(rowRemapHeightLines(max));
     expect(why, `${rowRemapHeightLines(max)} is a line count, not a shift`).not.toBeNull();
@@ -333,7 +363,7 @@ describe('height_shift is a shift and the editor must export the shift', () => {
 // plane_y — the bound with no other enforcement
 // ---------------------------------------------------------------------------
 
-describe('plane_y, whose ceiling this schema alone enforces', () => {
+describe('plane_y, whose ceiling this schema is one of two enforcements of', () => {
   it('refuses past the ceiling and says the engine will not catch it', () => {
     const { min, max } = EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS;
     expect(rowRemapPlaneYRefusal(min)).toBeNull();
@@ -341,7 +371,19 @@ describe('plane_y, whose ceiling this schema alone enforces', () => {
     const why = rowRemapPlaneYRefusal(max + 1);
     expect(why).not.toBeNull();
     console.log('--- one past the ceiling ---\n' + why);
-    expect(why).toContain('ONLY ENFORCEMENT');
+    // HOW MANY ENFORCEMENTS THE SENTENCE MAY CLAIM IS THE CONTRACT'S TO SAY, so
+    // the phrase is derived from the contract's own plane_y description rather
+    // than typed here. Through empyrean 60d9f6a that description read "THIS
+    // SCHEMA IS THE ONLY ENFORCEMENT"; at 2e5046e it reads "THE ONE OF TWO
+    // ENFORCEMENTS", aeon having landed an engine-side < 512 guard beside it. An
+    // Aurora sentence still claiming sole authority would be telling an author
+    // the engine will not catch something the engine now catches, and a reader
+    // could trim the aeon guard on Aurora's word. This row moves with the
+    // contract in BOTH directions and needs no edit either way.
+    const planeYDesc = rowRemapPayloadProps().plane_y.description ?? '';
+    expect(planeYDesc.length, 'the contract carries no plane_y description').toBeGreaterThan(0);
+    const sole = /THE ONLY ENFORCEMENT/.test(planeYDesc);
+    expect(why).toContain(sole ? 'ONLY ENFORCEMENT' : 'ONE OF TWO ENFORCEMENTS');
     expect(rowRemapPlaneYRefusal(min - 1)).not.toBeNull();
     expect(rowRemapPlaneYRefusal(1.5)).not.toBeNull();
   });
@@ -379,7 +421,7 @@ describe('plane_y, whose ceiling this schema alone enforces', () => {
 // SCHEMA-LEGAL IS NOT BUILDABLE
 // ---------------------------------------------------------------------------
 
-describe('the four legal shifts that do not build yet', () => {
+describe('schema-legal is not buildable, and today the contract makes them the same set', () => {
   it('marks exactly one option buildable while the contract names one', () => {
     const buildable = ROW_REMAP_HEIGHT_OPTIONS.filter((o) => o.buildsToday);
     console.log('--- the height picker as an author sees it ---\n'
