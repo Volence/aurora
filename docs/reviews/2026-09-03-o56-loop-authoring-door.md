@@ -257,6 +257,14 @@ the three recommendations above are presentation changes inside the existing pan
 
 ## Screenshots
 
+**EVIDENCE NOT RETAINED.** Both files below were destroyed by an agent worktree
+prune on 2026-09-05, and no commit ever touched either one, because
+`.gitignore:10` has matched that path since 2026-08-15. The sentences are kept so
+the record says what was lost rather than quietly stopping mentioning it. **What
+a reader can act on:** the probe named in this document's header is tracked, so
+`npm run harness:o56-loop-authoring-door` reaches the same two screens again; new
+evidence goes in `docs/captures/`, tracked.
+
 - `scratchpad/shots-o56-loop-authoring-door/collision-facet-arrival.png` — one click
   from arrival, nothing armed. This is the screen the finding above is about.
 - `scratchpad/shots-o56-loop-authoring-door/collision-facet-armed.png` — after

@@ -225,7 +225,12 @@ clean-clone state from the live aeon tree (hardlinked `cp -al`, every
 `ojz_bg_*.bin` **unlinked** so the hardlink breaks rather than aeon being
 written, manifest left byte-identical), opens it in the real Electron app over
 CDP, and reads the DOM, the toast store, computed styles, and canvas text
-metrics. Shots in `scratchpad/shots-bg-dangling/`.
+metrics. Shots in `scratchpad/shots-bg-dangling/`. **EVIDENCE NOT RETAINED:**
+that directory was destroyed by an agent worktree prune on 2026-09-05 and no
+commit ever touched it, because `.gitignore:10` has matched that path since
+2026-08-15. **What a reader can act on:** the harness named above is tracked, so
+`npm run harness:bg-dangling-ref` produces the shots again, and new evidence goes
+in `docs/captures/`, tracked.
 
 Its red controls run in place, without a second build:
 
