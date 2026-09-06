@@ -1287,6 +1287,16 @@ async function main() {
         }
         return {
           ask: { x: ax, y: ay }, exitFly, cheat, flagAtCheckpoint, flag, ackFrames,
+          // WHERE THE ENGINE SAYS IT DECIDED TO PUT YOU. Debug_Warp_Consume's
+          // step 1 runs `clamp_and_publish`, which clamps the request into the
+          // act and WRITES THE CLAMPED PAIR BACK into the mailbox "so the client
+          // can read back where it landed". Reading it is what lets the row
+          // below tell a CLAMP (the engine moved the destination and said so)
+          // apart from a DRIFT (the engine placed the player somewhere other
+          // than the destination it published). Those are different defects with
+          // different owners and a single asked-versus-landed comparison cannot
+          // separate them.
+          pub: { x: u16(await rd(wx, 2)), y: u16(await rd(wy, 2)) },
           x: (await rd(playerAddr + 0x02, 4)).readUInt32BE(0) >>> 16,
           y: (await rd(playerAddr + 0x06, 4)).readUInt32BE(0) >>> 16,
         };
@@ -1328,11 +1338,21 @@ async function main() {
         }
       }
       for (const p of placements) {
-        console.log(`        ${p.exitFly ? 'physics ' : 'frozen  '} ask (${p.ask.x},${String(p.ask.y).padStart(3)}) ` +
-          `-> at ack (${p.x},${String(p.y).padStart(3)}) delta (${p.x - p.ask.x},${p.y - p.ask.y}) ` +
-          `after ${p.ackFrames} ack frames`);
+        console.log(`        ${p.exitFly ? 'physics ' : 'frozen  '} ask (${p.ask.x},${String(p.ask.y).padStart(5)}) ` +
+          `-> published (${p.pub.x},${String(p.pub.y).padStart(5)}) -> at ack (${p.x},${String(p.y).padStart(5)}) ` +
+          `drift (${p.x - p.pub.x},${p.y - p.pub.y}) after ${p.ackFrames} ack frames`);
       }
-      const offBy = placements.filter((p) => p.x !== p.ask.x || p.y !== p.ask.y);
+      // TWO DIFFERENT FAILURES, SEPARATED, because one message for both would
+      // hand the next reader the wrong diagnosis. DRIFT is the placement not
+      // matching the destination the engine itself published: that is the
+      // pre-b3169c26 lift and it is aeon's defect. CLAMPED is the engine moving
+      // the destination into the act and saying so: legitimate engine
+      // behaviour, and a signal that this sweep's points are not where it
+      // thinks they are. The row needs both to be clear to be green, and names
+      // whichever one broke.
+      const drifted = placements.filter((p) => p.x !== p.pub.x || p.y !== p.pub.y);
+      const clamped = placements.filter((p) => p.pub.x !== p.ask.x || p.pub.y !== p.ask.y);
+      const offBy = [...new Set([...drifted, ...clamped])];
       const bothRegimes = new Set(placements.map((p) => p.exitFly)).size === 2;
       // THE PRECONDITION IS IN THE VERDICT, WHICH IS THE WHOLE POINT OF THE
       // REFUSED STATE. This row's name says BOTH REGIMES. Row 11 is what
@@ -1347,19 +1367,32 @@ async function main() {
           ? `NOT MEASURED: row 11 could not establish the two regimes (see it below), so this ` +
             `sweep's ${placements.length} samples were taken in a state this run cannot name. ` +
             `The placements themselves were ` +
-            `${offBy.length === 0 ? 'all verbatim' : `off by ${offBy.map((p) => `(${p.x - p.ask.x},${p.y - p.ask.y})`).join(' ')}`}, ` +
+            `${offBy.length === 0 ? 'all verbatim' : `off by ${offBy.map((p) => `(${p.x - p.pub.x},${p.y - p.pub.y})`).join(' ')}`}, ` +
             `which is a reading, not a result.`
-          : `${placements.length} warps to x=${askX}, six heights x {debug-fly, physics}, each read at ` +
-            `the ack: ${offBy.length === 0 ? 'every one landed EXACTLY on the request' : ''}` +
-            (offBy.length === 0
-              ? `. That is aeon's §4.12 promise (Debug_Warp_Consume writes Sst.x_pos/y_pos after ` +
-                `Player_SetState precisely so the standing-box lift cannot reach the destination), ` +
-                `and it holds independently of whether the player's physics is running.`
-              : `${offBy.length} of ${placements.length} did NOT land on the request: ` +
-                `${offBy.map((p) => `ask (${p.ask.x},${p.ask.y}) ${p.exitFly ? 'physics' : 'frozen'} -> ` +
-                  `(${p.x},${p.y})`).join('; ')}. A destination that depends on the regime is the ` +
-                `pre-b3169c26 shape returning: the placement is landing before the state ` +
-                `transition and wearing PHook_EnsureStanding's lift.`));
+          : offBy.length === 0
+            ? `${placements.length} warps to x=${askX}, six heights x {debug-fly, physics}, each read ` +
+              `at the ack: every one landed EXACTLY on the request, and the destination the engine ` +
+              `published back into the mailbox was the request every time, so no clamp fired and no ` +
+              `placement drifted off it. That is aeon's §4.12 promise (Debug_Warp_Consume writes ` +
+              `Sst.x_pos/y_pos AFTER Player_SetState precisely so the standing-box lift cannot reach ` +
+              `the destination), and it holds independently of whether the player's physics is running.`
+            : (drifted.length
+                ? `DRIFT, which is the placement defect: ${drifted.length} of ${placements.length} ` +
+                  `landed somewhere other than the destination the engine PUBLISHED. ` +
+                  `${drifted.map((p) => `${p.exitFly ? 'physics' : 'frozen'} published (${p.pub.x},${p.pub.y}) ` +
+                    `-> landed (${p.x},${p.y})`).join('; ')}. If the drift differs between the two ` +
+                  `regimes it is the pre-b3169c26 shape returning: the placement is landing BEFORE ` +
+                  `the state transition and wearing PHook_EnsureStanding's lift, which is 11px out ` +
+                  `of debug-fly and 5px out of a curl. `
+                : '') +
+              (clamped.length
+                ? `CLAMPED, which is legitimate engine behaviour and not a defect: ${clamped.length} ` +
+                  `of ${placements.length} requests were outside the act, so clamp_and_publish moved ` +
+                  `the destination and said so in the mailbox. ` +
+                  `${clamped.map((p) => `asked (${p.ask.x},${p.ask.y}) -> published (${p.pub.x},${p.pub.y})`).join('; ')}. ` +
+                  `This row still goes red on it, because a sweep whose points are not where it ` +
+                  `thinks they are is not measuring the placement it names.`
+                : ''));
 
       // ---- Row 11, REPLACED: the regime itself, with its own control.
       //
