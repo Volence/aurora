@@ -288,10 +288,41 @@ export function Divider() {
   return <span style={{ width: 1, height: 16, background: T.borderStrong, flexShrink: 0 }} />;
 }
 
+/**
+ * The tool-options strip: chips on the left, a sentence about the armed tool on
+ * the right. Five facets mount one (Effects, classic map, canvas, art, sprite).
+ *
+ * ⚠ IT WAS `height: 32` AND THAT MADE IT PAINT OUTSIDE ITSELF. A flex row with
+ * a fixed height and `align-items: center` does not clip and does not grow: a
+ * trailing text item longer than the free width WRAPS, the wrapped box is
+ * centred on the 32px line, and every line past the first is drawn OVER the
+ * facet pills above and the canvas below. Measured on aeon's shipped document at
+ * 1680x1050 (dpr 1, window 1400x872): bar 74..106, span 67..112 — 45px of text
+ * in a 32px box, 7px out of the top and 6px out of the bottom.
+ *
+ * `min-height` is the whole repair, and it is the repair BECAUSE OF WHAT IT DOES
+ * NOT DO. The alternatives all work by hiding some of the sentence — `nowrap`
+ * plus `text-overflow: ellipsis`, `overflow: hidden`, a clamped line count —
+ * and the sentences that reach this bar are REFUSALS explaining why a control an
+ * author just aimed at is off. A repair that truncates one re-creates the defect
+ * the sentence was written to close, while looking like a success. Nothing is
+ * hidden here: the bar grows to whatever its content needs, and the layout below
+ * it moves down.
+ *
+ * `box-sizing: border-box` and the 1px vertical padding are what keep the
+ * ORDINARY bar at exactly 32px, so no harness's pinned geometry moves: chips are
+ * 11px text on a 1-unit pad and sit well inside 30px of content box. The growth
+ * only happens on the long-sentence case that used to overflow.
+ *
+ * `align-items: center` STAYS. It is right for the resting bar (chips of unequal
+ * height on one line), and once the bar grows to fit there is nothing left to
+ * centre outside of.
+ */
 export function OptionBar({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: T.s4, height: 32, padding: `0 ${T.s4}`,
+      display: 'flex', alignItems: 'center', gap: T.s4, minHeight: 32,
+      boxSizing: 'border-box', padding: `1px ${T.s4}`,
       background: T.surface, borderBottom: `1px solid ${T.border}`, color: T.textLo,
       fontSize: T.tXs, flexShrink: 0,
     }}>{children}</div>

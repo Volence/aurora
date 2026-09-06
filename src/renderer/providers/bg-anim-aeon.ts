@@ -86,6 +86,7 @@ import {
   bandIsDefaultOff,
   bganimSectionBytes,
   bganimSectionSlotsAllowed,
+  bganimViewTwinBytes,
   bandColumnBytes,
   bandPatternPx,
   bandRotationUnitBytes,
@@ -498,6 +499,34 @@ export interface BandBudget {
   binding: 'tiles' | 'bytes' | 'unmeasurable';
   /** Why the section size has no value, or null when it has one. */
   unmeasurable: string | null;
+
+  // ── WHICH SHAPE `sectionBytes` IS FOR ───────────────────────────────────
+  //
+  // ⚠ "THE SECTION SIZE" IS TWO DIFFERENT NUMBERS AND THE ARITHMETIC WAS NEVER
+  // THE PROBLEM. `bganimSectionBytes` models whether the DEBUG view twins are
+  // emitted, so its figure is right for the shape the document is actually in —
+  // but a sentence printing that figure with no shape named cannot be reconciled
+  // with aeon's own `bganim_section_bytes()`, whose `n_views` parameter DEFAULTS
+  // TO 0 and therefore answers for the RELEASE shape. On the shipped act the two
+  // disagree by `viewTwinBytes` and aeon had to work out by hand which side was
+  // wrong. Neither was. aeon's contract §1.2 draws the conclusion: **"Say which
+  // shape any figure is for."** These two fields are how this panel says it.
+
+  /**
+   * Does `sectionBytes` include the DEBUG view twins?
+   *
+   * `false` is the interesting case and it is NOT "release": an act the twins
+   * decline for (two bands, or a period they were not derived against) emits
+   * none in ANY shape, so its figure is the size in every ROM. `true` means the
+   * figure is the DEBUG shape's and the release ROM's section is
+   * `viewTwinBytes` smaller.
+   */
+  twinsEmitted: boolean;
+  /**
+   * What the twins cost, from the codec's `bganimViewTwinBytes` — 0 when they
+   * decline. DERIVED, so no sentence quoting it holds a typed number.
+   */
+  viewTwinBytes: number;
 }
 
 /**
@@ -518,6 +547,7 @@ export function bandBudget(doc: BgOverrideDocument | null): BandBudget {
       sectionBytes: null, sectionCeiling: BGANIM_SECTION_CEILING,
       byteSlotsRemaining: null, slotsRemaining: 0, binding: 'unmeasurable',
       unmeasurable: 'this project has no editor_bg_override.json, so there is no section to size.',
+      twinsEmitted: false, viewTwinBytes: 0,
     };
   }
   const bands = documentBands(doc);
@@ -525,6 +555,7 @@ export function bandBudget(doc: BgOverrideDocument | null): BandBudget {
   const tileSlots = tileSlotsRemaining(doc);
   const bytes = bganimSectionBytes(bands);
   const allowed = bganimSectionSlotsAllowed(bands);
+  const twinBytes = bganimViewTwinBytes(bands);
   // BOTH ARMS COME FROM THE SAME REFUSAL, so they cannot disagree; asking twice
   // is how a readout ends up saying "unmeasurable" beside a number.
   const byteSlots = allowed.ok ? Math.max(0, allowed.value - animated) : null;
@@ -547,6 +578,11 @@ export function bandBudget(doc: BgOverrideDocument | null): BandBudget {
     slotsRemaining: byteSlots === null ? 0 : Math.min(tileSlots, byteSlots),
     binding: byteSlots === null ? 'unmeasurable' : (byteSlots < tileSlots ? 'bytes' : 'tiles'),
     unmeasurable: bytes.ok ? null : bytes.reason,
+    // WHICH SHAPE THE FIGURE ABOVE IS FOR — both read from the SAME codec
+    // derivation the figure itself came from, so a readout cannot name one shape
+    // and print the other's arithmetic.
+    twinsEmitted: twinBytes > 0,
+    viewTwinBytes: twinBytes,
   };
 }
 
@@ -879,12 +915,27 @@ export const SHIP_SILENT_LEAD =
   + 'act’s table, so the act boots with BG animation OFF in every ROM, RELEASE INCLUDED. '
   + 'Nothing in this editor looks different either way.';
 
-/** The two build rules, in aeon's order, with the quantifier of each spelled out. */
+/**
+ * The two conditions, in aeon's order, with the quantifier of each spelled out.
+ *
+ * ⚠ THEY ARE NO LONGER OBLIGATIONS AND THIS SENTENCE SAID THEY WERE. Until
+ * aeon's decouple (`364b7bce`, an ancestor of `origin/master` `d070d6d7`) both
+ * were `AssertionError`s and this copy ended *"Either one refuses the build
+ * outright."* Neither raises any more — the same two conditions now decide
+ * whether the DEBUG view twins are EMITTED, and an act that fails them builds
+ * fine without them. The condition is unchanged; only its consequence is, which
+ * is why the two clauses below are word-for-word what they were.
+ *
+ * The name is kept: `EFFECTS_CONSUMER_CONTRACT.md` §1.2 still calls its own
+ * numbered list the writer obligations, and renaming the constant would break
+ * the only thread back to it.
+ */
 export const SHIP_SILENT_OBLIGATIONS =
-  `The build then enforces two things. PER ACT: the act must have exactly ONE tile animation `
-  + `(the rule is on the COUNT, not on whether the tile animations agree). PER TILE ANIMATION: `
-  + `this one’s pattern must be ${BGANIM_VIEW_DERIVED_PERIOD_PX}px. Either one refuses the `
-  + `build outright.`;
+  `Two conditions then decide whether the debug view twins are emitted. They no longer refuse `
+  + `the build. PER ACT: the act must have exactly ONE tile animation (the rule is on the COUNT, `
+  + `not on whether the tile animations agree). PER TILE ANIMATION: this one’s pattern must be `
+  + `${BGANIM_VIEW_DERIVED_PERIOD_PX}px. Fail either and the act builds with no twins, which `
+  + `aeon announces as it builds.`;
 
 /** What the debug ROM gets in exchange, which is the reason the key is not just a delete. */
 export const SHIP_SILENT_EXCHANGE =
@@ -892,65 +943,31 @@ export const SHIP_SILENT_EXCHANGE =
   + '(horizontal, vertical, timer) so perspective and timer can be compared. They exist only in '
   + 'the debug ROM, so they are not a way to see this animation in the game as played.';
 
-/**
- * THE DISCLOSURE — one constant, one predicate, one render site.
- *
- * ⚠ WHAT RETIRES THIS, AND IT IS EXPECTED TO: aeon is building a DECOUPLING FIX
- * (ruled 2026-09-06) that separates the DEBUG view twins from the act's band
- * count, after which a second tile animation is legal beside a silenced one.
- * aeon SEQUENCED that fix behind other work on the understanding that this
- * sentence covers the gap in the meantime, so it is not optional and it is not
- * permanent.
- *
- * HOW TO RETIRE IT, in one commit and no archaeology:
- *
- *   1. Re-read aeon's `views_emitted` (tools/inject_editor_bg.py) and
- *      `EFFECTS_CONSUMER_CONTRACT.md` §1.2. If the band-count `AssertionError`
- *      is gone, the codec's `viewsEmitted` per-act refusal goes with it and
- *      that is the real change.
- *   2. DELETE this constant and `twinCouplingApplies` below, and the one
- *      `Hint` in BgAnimBandPanel.tsx that renders them. `grep -rn
- *      TWIN_COUPLING_DISCLOSURE src/` finds every site; there are three and
- *      they are all in those two files.
- *   3. Amend `bandKeys.default_off.writerObligations[0]` in the vendored
- *      contract and add an `amendments` entry naming aeon's revision.
- *
- * WHY IT IS NOT ENOUGH TO LET THE CHIP REFUSE. The chips ARE already disabled
- * with the codec's reason when the act is in this state, and that was true
- * before this parcel. What the refusal cannot do is reach an author who has not
- * yet aimed a range and reached for the chip; and until the switch above
- * existed the refusal's own advice ("clear the key") named a thing no Aurora
- * author could do. This sentence sits above BOTH creation doors, states the
- * coupling before the form is filled in, and names the control that resolves
- * it.
- *
- * ONE SENTENCE FOR BOTH DOORS BECAUSE IT IS ONE FACT, MEASURED: on aeon's live
- * document `promoteUnavailableReason` and `insertUnavailableReason` return the
- * SAME refusal, because both project a second band and both size the result.
- * Rendering it per door would be the repeated-per-row shape the panel's own
- * docblock argues against.
- */
-export const TWIN_COUPLING_DISCLOSURE =
-  'This act has a tile animation SILENCED IN THE ROM, and while it does, the build refuses a '
-  + 'SECOND one: the debug view twins are emitted only for an act with exactly one. Both doors '
-  + 'below are off for that reason, not because of a budget. To add another, set the existing '
-  + 'one back to "ships animating" first, and read what that changes before you do.';
-
-/**
- * PER ACT: is any tile animation silenced in the ROM, so the twin coupling
- * binds this document?
- *
- * ⚠ THE QUANTIFIER IS THE WHOLE POINT AND IT IS NOT THE OBVIOUS ONE. This asks
- * whether ANY band carries the key, because that is what arms aeon's rule; the
- * rule itself is then about the ACT'S BAND COUNT. A predicate asking "do the
- * bands agree about `default_off`?" is the trap aeon's contract names by name,
- * and it would answer `false` for a two-band act where both carry the key,
- * which is a document this build refuses.
- */
-export function twinCouplingApplies(doc: BgOverrideDocument | null): boolean {
-  if (!doc) return false;
-  return documentBands(doc).some(bandIsDefaultOff);
-}
+// ═══ THE TWIN-COUPLING DISCLOSURE LIVED HERE AND IS RETIRED ═══
+//
+// `TWIN_COUPLING_DISCLOSURE` and `twinCouplingApplies` are DELETED. The sentence
+// told an author *"this act has a tile animation SILENCED IN THE ROM, and while
+// it does, the build refuses a SECOND one"*, and as of aeon's decouple the build
+// does not. It was built to come down: its own docblock carried the three-step
+// retirement, aeon SEQUENCED the fix behind other work on the understanding that
+// it covered the gap meanwhile, and aeon's contract §1.2 now says in its own
+// words that *"the disclosure at `Promote` that was covering authors until this
+// landed is retired — there is no longer a wall to announce."*
+//
+// ⚠ A RETIRED DISCLOSURE IS NOT A SILENCE. What the sentence was FOR — an
+// author meeting a dead control with no explanation — is now answered by the
+// controls being ALIVE: `viewsEmitted` stopped refusing, so `Promote` and `Add`
+// on a silenced act are gated by the byte budget alone, and the budget line names
+// its own shape (`bandBudget.twinsEmitted`) so the 138-byte step a promotion
+// takes out of the section is visible rather than mysterious.
+//
+// The three steps are DONE and recorded here rather than deleted, because the
+// next reader's question is "was the contract amended too": (1) aeon's
+// `views_emitted` no longer raises, read at `origin/master` — so the codec's
+// `viewsEmitted` per-act refusal went with it, which was the real change;
+// (2) this constant, the predicate, and the one `Hint` in BgAnimBandPanel are
+// gone; (3) `bandKeys.default_off.writerObligations` in the vendored contract is
+// amended and an `amendments` entry names aeon's revision.
 
 /** The ship-silent switch for one tile animation, as the panel renders it. */
 export interface ShipSilentSwitch {

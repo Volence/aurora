@@ -543,47 +543,79 @@ export type BgAnimSizeResult =
 /**
  * How many DEBUG view twins this act emits: zero, or `BGANIM_VIEW_COUNT`.
  *
- * ⚠ BOTH REFUSALS ARE QUANTIFIED OVER THE ACT, NOT OVER THE BANDS THAT CARRY
- * THE KEY, and that is the trap aeon's contract names by name. The natural
- * validator asks "is `default_off` consistent across the bands?" and passes a
- * two-band act in which BOTH bands carry it — which aeon refuses, because the
- * twins exist for a lab that drives ONE band and a multi-band act would need a
- * view table per band plus a selector naming both. The constraint is on
- * `bands.length`, so that is what this reads.
+ * ⚠ THIS USED TO REFUSE, AND SINCE aeon's DECOUPLE IT DOES NOT — THE TWINS
+ * DECLINE INSTEAD. Both arms were `AssertionError`s in `inject_editor_bg.py`
+ * and neither raises any more (aeon `364b7bce`, verified an ancestor of
+ * `origin/master` `d070d6d7`; read at that revision in
+ * `tools/inject_editor_bg.py::view_emission` and
+ * `tools/EFFECTS_CONSUMER_CONTRACT.md` §1.2). The contract states the reading
+ * this function now implements in as many words: *"Read each item as 'if this
+ * does not hold, `views_emitted()` returns 0', never as 'the build refuses'."*
  *
- * A REFUSAL IS NOT ZERO TWINS. aeon raises rather than emitting none, so the
- * section size is UNDEFINED for such an act rather than smaller. Returning
- * `{ ok: false }` is what keeps a caller from rendering "could not compute" as
- * a larger budget.
+ * WHY IT CHANGED, AND OUR OWN CONTROL IS WHY. The shipped act is one band
+ * carrying `default_off` and Aurora's `Promote` APPENDS a band, so an author
+ * doing the one thing the editor invites got a build failure about DEBUG view
+ * twins they had never heard of. The refusal was correct when it was written —
+ * the only writer was a hand-edited file — and our control changed the
+ * population of writers while the refusal did not.
+ *
+ * ⚠ THE CONDITION IS UNCHANGED; ONLY ITS CONSEQUENCE IS. Both arms are still
+ * QUANTIFIED OVER THE ACT, not over the bands that carry the key, and that is
+ * still the trap aeon's contract names by name: the natural validator asks "is
+ * `default_off` consistent across the bands?" and gets the wrong answer on a
+ * two-band act where both carry it. What that mistake now costs is a SIZE error
+ * rather than a surprise build failure — predict twins where there are none and
+ * the section figure is `bganimViewTwinBytes` too large.
+ *
+ * ⚠ AND SILENCE IS NOT WHAT REPLACED THE REFUSAL, at aeon's end: it prints the
+ * decline on stdout as the build step runs and writes it as a comment block into
+ * the generated `bg_anim.emp`, so the twins never vanish unannounced. Aurora
+ * does not restate that note. What an author reads HERE is the byte figure with
+ * its SHAPE NAMED (`bandBudget` → `BgAnimBandPanel`), which is the same fact in
+ * the place they are already looking.
+ *
+ * THE RESULT TYPE IS KEPT DELIBERATELY, and no input can now make it refuse.
+ * `BgAnimSizeResult` is what every sizing caller already handles in the safe
+ * direction — unmeasurable collapses to zero, never to the looser tile budget
+ * (see `bandBudget`) — and collapsing it to a plain `number` would delete that
+ * machinery across six call sites to no author-visible end. Said out loud rather
+ * than left for a reader to find: the `ok: false` arm is UNREACHABLE today. It
+ * is somewhere for the next real refusal to land, not a claim that one exists.
  */
 export function viewsEmitted(bands: readonly BgAnimBandSize[]): BgAnimSizeResult {
-  const off = bands.filter(bandIsDefaultOff);
-  if (off.length === 0) return { ok: true, value: 0 };
-  if (bands.length !== 1) {
-    return {
-      ok: false,
-      reason:
-        `"default_off" is set on ${off.length} of ${bands.length} tile animations, and the ` +
-        'build refuses that: the debug view twins are emitted only for an act with EXACTLY ONE ' +
-        'tile animation, because the effects lab drives one. The rule is on how many tile ' +
-        'animations the ACT has, not on whether they agree, so making them all default_off does ' +
-        'not satisfy it. Clear "default_off", or keep the act to one tile animation.',
-    };
-  }
-  const period = bands[0]?.pattern_px;
-  if (period !== BGANIM_VIEW_DERIVED_PERIOD_PX) {
-    return {
-      ok: false,
-      reason:
-        `a "default_off" tile animation must have a pattern period of ` +
-        `${BGANIM_VIEW_DERIVED_PERIOD_PX} px, and this one has ` +
-        `${period === undefined ? 'none' : String(period)}. The vertical view twin's rate was ` +
-        `derived against that period; at any other one the build refuses rather than silently ` +
-        'running the twin at a different speed. Re-deriving it is an engine decision, not a ' +
-        'writer one.',
-    };
-  }
+  // Not this feature's business — the act never asked for twins, and aeon says
+  // nothing in this case either.
+  if (!bands.some(bandIsDefaultOff)) return { ok: true, value: 0 };
+  // PER ACT: the twins exist for a lab that drives ONE band.
+  if (bands.length !== 1) return { ok: true, value: 0 };
+  // PER BAND (the one band the act is then allowed): the V twin's rate shift was
+  // derived against this period, and at any other one the twins decline rather
+  // than run at a cadence nobody computed.
+  if (bands[0]?.pattern_px !== BGANIM_VIEW_DERIVED_PERIOD_PX) return { ok: true, value: 0 };
   return { ok: true, value: BGANIM_VIEW_COUNT };
+}
+
+/**
+ * What the DEBUG view twins cost this act in section bytes — 0 when they
+ * decline, and the amount the RELEASE ROM's section is smaller by when they do
+ * not.
+ *
+ * ONE DERIVATION, SO NO SURFACE RESTATES IT. Each twin is a whole copy of the
+ * act's own table (`BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES` per band) over a
+ * SHARED bank blob, which is why the twins are cheap and the slots are not. On
+ * the shipped single-band act that is `BGANIM_VIEW_COUNT * (BGANIM_COUNT_BYTES +
+ * BGANIM_RECORD_BYTES)`, and it is exactly the gap aeon's contract names between
+ * a shape-aware consumer and a bare `bganim_section_bytes()` call — whose
+ * `n_views` parameter defaults to 0, so it answers for the RELEASE shape.
+ *
+ * DERIVED, NEVER TYPED. `scripts/check-prose-constants.mjs` is in `npm test` and
+ * this repo landed a whole parcel on numbers typed into prose beside the code
+ * that holds them; every sentence that quotes this figure calls this.
+ */
+export function bganimViewTwinBytes(bands: readonly BgAnimBandSize[]): number {
+  const views = viewsEmitted(bands);
+  if (!views.ok) return 0;
+  return views.value * (BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES * bands.length);
 }
 
 /**

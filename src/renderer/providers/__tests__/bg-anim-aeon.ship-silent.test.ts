@@ -2,19 +2,21 @@ import { describe, it, expect } from 'vitest';
 import {
   bandBudget,
   shipSilentSwitch,
-  twinCouplingApplies,
   promoteUnavailableReason,
   insertUnavailableReason,
   SHIP_SILENT_LEAD,
   SHIP_SILENT_OBLIGATIONS,
   SHIP_SILENT_EXCHANGE,
-  TWIN_COUPLING_DISCLOSURE,
 } from '../bg-anim-aeon';
 import { documentBands } from '../../../core/formats/bg-override/bg-anim-band';
 import {
   BGANIM_PHASE_BANKS,
   BGANIM_VIEW_COUNT,
   BGANIM_VIEW_DERIVED_PERIOD_PX,
+  BGANIM_COUNT_BYTES,
+  BGANIM_RECORD_BYTES,
+  bganimViewTwinBytes,
+  viewsEmitted,
   BG_LAYOUT_WORDS,
   TILE_PIXELS,
   TILE_PIXEL_MAX,
@@ -25,8 +27,18 @@ import {
 } from '../../../core/formats/bg-override/bg-override';
 
 /**
- * THE SHIP-SILENT SWITCH AS THE PANEL SEES IT — plus the disclosure that covers
- * the gap until aeon decouples the debug view twins from the act's band count.
+ * THE SHIP-SILENT SWITCH AS THE PANEL SEES IT, AFTER aeon's DECOUPLE.
+ *
+ * ⚠ THIS FILE USED TO PIN A WALL THAT NO LONGER EXISTS. It was written while
+ * `default_off` was coupled to the DEBUG view twins by two `AssertionError`s in
+ * `tools/inject_editor_bg.py`, and it held Aurora's refusals against them.
+ * Neither raises since aeon `364b7bce` (verified an ancestor of `origin/master`
+ * `d070d6d7`): the same two conditions now decide whether the twins are EMITTED,
+ * and an act that fails them builds without them. So every row that asserted a
+ * REFUSAL here now asserts the ABSENCE of one — and, because "no refusal" is
+ * what a broken predicate also produces, each of those rows carries a positive
+ * consequence beside it (the command runs, the act is PRICED, the byte figure
+ * moves by `bganimViewTwinBytes`) rather than a bare `toBeNull()`.
  *
  * ═══ WHAT IS BEING CHECKED, AND AT WHICH QUANTIFIER ═══
  *
@@ -38,7 +50,9 @@ import {
  *                                      provider: it builds the command and
  *                                      keeps its refusal, so a greyed control
  *                                      and a failed click cannot disagree.
- *   `twinCouplingApplies(...)`         PER ACT  — does ANY band carry the key
+ *   `viewsEmitted(...)`                PER ACT for the count, PER BAND for the
+ *                                      period — and it now returns 0 twins
+ *                                      instead of refusing.
  *
  * ═══ THE COPY IS PART OF THE CONTRACT, SO IT IS CHECKED ═══
  *
@@ -131,141 +145,140 @@ describe('shipSilentSwitch', () => {
   });
 
   /**
-   * BOTH BANDS OF A TWO-BAND ACT ARE REFUSED, including the one whose silencing
-   * would make the act CONSISTENT.
+   * BOTH BANDS OF A TWO-BAND ACT ARE OFFERED — this row asserted the opposite
+   * until aeon's decouple, and the inversion is the parcel.
    *
-   * ⚠ AND THIS IS NOT THE DISCRIMINATING ROW, measured rather than assumed:
-   * with the per-key validator planted in `viewsEmitted` this row stays GREEN,
-   * because every state it visits is inconsistent and the wrong validator
-   * refuses those too. The discriminating row at this layer is the budget one
-   * at the bottom of this file. Kept because "the greyed option and the failed
-   * click say the same sentence" is its own property and this is where it lives.
+   * ⚠ "NO REFUSAL" IS ALSO WHAT A BROKEN PREDICATE PRODUCES, so the row does not
+   * stop at `reason === null`: the command is RUN, and the act is priced
+   * afterwards. A `shipSilentSwitch` that returned a null reason and a dead
+   * `run` would pass a bare null check and fail this one.
    */
-  it('refuses BOTH bands of a two-band act, on the COUNT and in one sentence', () => {
+  it('OFFERS both bands of a two-band act, and the twins simply decline', () => {
     const d = doc([PERIOD_TILES, PERIOD_TILES]);
     for (const index of [0, 1]) {
       const s = shipSilentSwitch(d, index)!;
       expect(s.silent, `band ${index} starts loud`).toBe(false);
-      expect(s.reason, `band ${index} must be refused`).not.toBeNull();
-      expect(s.reason!, `band ${index}`).toMatch(/EXACTLY ONE tile animation/);
-      expect(s.reason!, `band ${index}`).toMatch(/not on whether they agree/);
-      // And the refusal a click gives is the SAME sentence the greyed option
-      // carries. This is the property the provider builds the command for.
+      expect(s.reason, `band ${index} is a legal ship decision now`).toBeNull();
       const r = s.run();
-      expect(r.ok).toBe(false);
-      expect(r.ok ? '' : r.reason).toBe(s.reason);
+      expect(r.ok, `band ${index} run`).toBe(true);
     }
+    // The condition is UNCHANGED, only its consequence: a two-band act gets no
+    // twins, and says so as a number rather than as a refusal.
+    const bands = documentBands(doc([PERIOD_TILES, PERIOD_TILES],
+      [{ default_off: true }, {}]));
+    expect(viewsEmitted(bands)).toEqual({ ok: true, value: 0 });
+    expect(bganimViewTwinBytes(bands)).toBe(0);
   });
 
-  it('refuses a band at the wrong period, naming the one period there is', () => {
+  it('OFFERS a band at the wrong period too: the twins decline, the build does not', () => {
     const s = shipSilentSwitch(doc([PERIOD_TILES / 2]), 0)!;
-    expect(s.reason).not.toBeNull();
-    expect(s.reason!).toContain(String(BGANIM_VIEW_DERIVED_PERIOD_PX));
+    expect(s.reason).toBeNull();
+    expect(s.run().ok).toBe(true);
+    const bands = documentBands(doc([PERIOD_TILES / 2], [{ default_off: true }]));
+    // Anti-vacuous: this really is a period the twins were not derived against.
+    expect(bands[0]!.pattern_px).not.toBe(BGANIM_VIEW_DERIVED_PERIOD_PX);
+    expect(viewsEmitted(bands)).toEqual({ ok: true, value: 0 });
   });
 });
 
-// ── The disclosure, and the gap it covers ───────────────────────────────────
+// ── The wall that is gone, and the pricing that replaced it ────────────
 
-describe('twinCouplingApplies: the disclosure fires exactly when the build refuses', () => {
-  it('is false for an act with no silenced tile animation', () => {
-    expect(twinCouplingApplies(null)).toBe(false);
-    expect(twinCouplingApplies(doc([PERIOD_TILES]))).toBe(false);
-    expect(twinCouplingApplies(doc([PERIOD_TILES, PERIOD_TILES]))).toBe(false);
-  });
-
-  it('is true for aeon\'s own shipped shape', () => {
-    expect(twinCouplingApplies(aeonShapedDoc())).toBe(true);
+/**
+ * ⚠ EVERY ROW BELOW WAS ONCE A REFUSAL ROW. `twinCouplingApplies` and
+ * `TWIN_COUPLING_DISCLOSURE` are DELETED — there is no longer a wall to
+ * announce — and what the disclosure existed to prevent (an author meeting the
+ * engine's refusal instead of ours) is now prevented by there being no refusal.
+ *
+ * THE HAZARD THIS DESCRIBE IS BUILT AGAINST: a suite that only checks refusals
+ * are gone passes on a codec that has stopped computing anything at all. So each
+ * row pairs the absence with the number that must appear in its place, and the
+ * last one is the arithmetic — the twins' cost has to be the act's own table
+ * three times over, which nothing but a working emitter model produces.
+ */
+describe('the twin coupling is RETIRED: the doors open and the act is priced', () => {
+  it('aeon\'s own shipped shape still gets its twins, so the decouple changed nothing there', () => {
+    const bands = documentBands(aeonShapedDoc());
+    expect(bands).toHaveLength(1);
+    expect(viewsEmitted(bands)).toEqual({ ok: true, value: BGANIM_VIEW_COUNT });
+    // DERIVED, never typed: BGANIM_VIEW_COUNT * (COUNT_BYTES + RECORD_BYTES).
+    expect(bganimViewTwinBytes(bands))
+      .toBe(BGANIM_VIEW_COUNT * (BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES));
   });
 
   /**
-   * ⚠ THE QUANTIFIER ROW FOR THE DISCLOSURE ITSELF, and it was ADDED BECAUSE A
-   * PLANT WENT GREEN WITHOUT IT. Swapping `some` for `every` in
-   * `twinCouplingApplies` passed every other row in this file: a one-band
-   * silenced act satisfies both, and an act with none satisfies neither. The
-   * MIXED act is the only shape that tells them apart, and it is exactly the
-   * shape the disclosure exists for — a document where one tile animation is
-   * silenced and another is not, which is a document the build already refuses
-   * and which an author can arrive holding.
+   * THE ROW THE WHOLE PARCEL IS FOR. On aeon's shipped document both creation
+   * doors used to return the twin refusal, byte-identical, and the Effects
+   * tool-options bar printed it across the top of the window. They must now be
+   * OPEN.
    *
-   * `every` is the plausible mistake, not a strawman: "the act boots silent"
-   * sounds like a property of all its bands. It is not. ANY silenced band arms
-   * aeon's rule.
+   * Anti-vacuous in both directions: the doors are open AND the act is still
+   * priced with room left, so a `promoteUnavailableReason` that had simply
+   * stopped working would not pass.
    */
-  it('QUANTIFIER: is true for a MIXED act, where only one tile animation is silenced', () => {
-    const d = doc([PERIOD_TILES, PERIOD_TILES], [{ default_off: true }, {}]);
-    expect(documentBands(d).map(b => Boolean(b.default_off))).toEqual([true, false]);
-    expect(twinCouplingApplies(d)).toBe(true);
-    // And it is a document the build refuses, so the disclosure is telling the
-    // truth about why the doors below it are off.
-    expect(promoteUnavailableReason(d, 1, 1)).toMatch(/EXACTLY ONE tile animation/);
-  });
-
-  /**
-   * THE POINT OF THE DISCLOSURE, PINNED. On a document in this state BOTH
-   * creation doors already refuse, with aeon's own reason. The disclosure is
-   * not a substitute for those refusals; it is the sentence that reaches an
-   * author BEFORE they aim a range, and it names the control that resolves it.
-   * This row is what makes "the doors are off for that reason, not because of a
-   * budget" a measured claim rather than a hopeful one.
-   */
-  it('is true exactly when both creation doors refuse for the twin reason', () => {
+  it('both creation doors are OPEN on the shipped shape, where they used to refuse', () => {
     const d = aeonShapedDoc();
-    const promote = promoteUnavailableReason(d, 1, 1);
-    const insert = insertUnavailableReason(d, 1, 1);
-    expect(promote).not.toBeNull();
-    expect(insert).not.toBeNull();
-    expect(promote).toMatch(/EXACTLY ONE tile animation/);
-    // ONE SENTENCE FOR BOTH DOORS, because it is one fact: measured, the two
-    // refusals are identical, which is why the disclosure is rendered once
-    // above both rather than per door.
-    expect(insert).toBe(promote);
-    expect(twinCouplingApplies(d)).toBe(true);
-  });
-
-  it('a legal two-band act is NOT disclosed, so the sentence is not noise', () => {
-    const d = doc([PERIOD_TILES, PERIOD_TILES]);
-    expect(twinCouplingApplies(d)).toBe(false);
-    // Anti-vacuous the other way: this act really can take another door.
     expect(promoteUnavailableReason(d, 1, 1)).toBeNull();
+    expect(insertUnavailableReason(d, 1, 1)).toBeNull();
+    const b = bandBudget(d);
+    expect(b.binding).not.toBe('unmeasurable');
+    expect(b.slotsRemaining).toBeGreaterThan(0);
   });
-});
 
-// ── The read model on a document the build refuses ─────────────────────────
+  it('a MIXED act (one silenced tile animation, one not) is legal and priced', () => {
+    const d = doc([PERIOD_TILES, PERIOD_TILES], [{ default_off: true }, {}]);
+    // Anti-vacuous: the shape really is the mixed one.
+    expect(documentBands(d).map(b => Boolean(b.default_off))).toEqual([true, false]);
+    expect(promoteUnavailableReason(d, 1, 1)).toBeNull();
+    const b = bandBudget(d);
+    expect(b.sectionBytes).not.toBeNull();
+    expect(b.binding).not.toBe('unmeasurable');
+  });
 
-describe('an act the build refuses is LOUD in the panel, never priced', () => {
   /**
-   * ⚠ THE DISCRIMINATING ROW AT THIS LAYER, and it earns the name: planted the
-   * per-key validator (`off.length !== bands.length` in `viewsEmitted`) and
-   * this row goes RED while every switch row above stays green.
+   * ⚠ THE ROW THAT WAS CALLED "DISCRIMINATING" AND HAS CHANGED SIDES. A
+   * CONSISTENT two-band silenced act used to be the one shape that told a correct
+   * `viewsEmitted` from the plausible per-key one (`off.length !== bands.length`),
+   * because the wrong validator PRICED it while the right one refused. Pricing is
+   * now correct for both, so that discrimination went with the refusal — said out
+   * loud rather than left as a row still wearing the word.
    *
-   * A two-band act in which BOTH bands carry the key is CONSISTENT, so the
-   * wrong validator prices it: `byteSlotsRemaining` becomes a number, `binding`
-   * becomes a budget, and the panel prints a ROM-section line and an offer of
-   * free slots for an act that cannot bake. What must happen instead is the
-   * unmeasurable direction: no number, `slotsRemaining` collapsed to ZERO, and
-   * a sentence saying why. THE DIRECTION IS THE PROPERTY — falling through to
-   * the looser tile figure is the exact defect the section-ceiling parcel
-   * landed against, one budget over.
+   * WHAT STILL DISCRIMINATES IS THE SIZE, and it is the row below this one.
    */
-  it('DISCRIMINATING: a CONSISTENT two-band silenced act is unmeasurable, not priced', () => {
+  it('a CONSISTENT two-band silenced act is PRICED, not refused', () => {
     const d = doc([PERIOD_TILES, PERIOD_TILES], [{ default_off: true }, { default_off: true }]);
-    // Anti-vacuous: the shape really is the consistent one.
     expect(documentBands(d).every(b => b.default_off)).toBe(true);
     const b = bandBudget(d);
-    expect(b.sectionBytes).toBeNull();
-    expect(b.byteSlotsRemaining).toBeNull();
-    expect(b.binding).toBe('unmeasurable');
-    // And the offer collapses to zero rather than to the tile figure, which is
-    // plainly non-zero on this fixture.
-    expect(b.tileSlotsRemaining).toBeGreaterThan(0);
-    expect(b.slotsRemaining).toBe(0);
-    expect(b.unmeasurable).toMatch(/not on whether they agree/);
+    expect(b.sectionBytes).not.toBeNull();
+    expect(b.byteSlotsRemaining).not.toBeNull();
+    expect(b.binding).not.toBe('unmeasurable');
+    expect(b.unmeasurable).toBeNull();
+    expect(b.slotsRemaining).toBeGreaterThan(0);
   });
 
-  it('and both creation doors refuse it too, rather than offering the tile budget', () => {
-    const d = doc([PERIOD_TILES, PERIOD_TILES], [{ default_off: true }, { default_off: true }]);
-    expect(promoteUnavailableReason(d, 1, 1)).toMatch(/EXACTLY ONE tile animation/);
-    expect(insertUnavailableReason(d, 1, 1)).toMatch(/EXACTLY ONE tile animation/);
+  /**
+   * SIZE, NOT SILENCE — the quantifier row, re-pointed at the consequence the
+   * decouple left behind. aeon's contract states the cost of getting it wrong in
+   * these words: *"predict twins where there are none and your section figure is
+   * `3 * (2 + 44)` = 138 B too large."* Both operands are derived here.
+   */
+  it('QUANTIFIER: the twins are on the ACT\'S BAND COUNT, and a wrong one is a SIZE error', () => {
+    const one = documentBands(aeonShapedDoc());
+    const two = documentBands(
+      doc([PERIOD_TILES, PERIOD_TILES], [{ default_off: true }, { default_off: true }]));
+    // The consistent two-band act is exactly the shape a per-key validator gets
+    // wrong: every band agrees, so "are they consistent?" answers yes.
+    expect(two.every(b => b.default_off)).toBe(true);
+    expect(bganimViewTwinBytes(two)).toBe(0);
+    expect(bganimViewTwinBytes(one)).toBeGreaterThan(0);
+    expect(bganimViewTwinBytes(one))
+      .toBe(BGANIM_VIEW_COUNT * (BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES));
+  });
+
+  it('an act with no silenced tile animation is untouched by any of this', () => {
+    const d = doc([PERIOD_TILES, PERIOD_TILES]);
+    expect(viewsEmitted(documentBands(d))).toEqual({ ok: true, value: 0 });
+    expect(bganimViewTwinBytes(documentBands(d))).toBe(0);
+    expect(promoteUnavailableReason(d, 1, 1)).toBeNull();
   });
 });
 
@@ -301,11 +314,18 @@ describe('the author-facing copy says the shipped-behaviour fact FIRST', () => {
     expect(SHIP_SILENT_EXCHANGE).toMatch(/not a way to see this animation in the game/i);
   });
 
-  it('the disclosure names the remedy in AURORA\'s words, not the JSON key', () => {
-    expect(TWIN_COUPLING_DISCLOSURE).toMatch(/ships animating/);
-    expect(TWIN_COUPLING_DISCLOSURE).toMatch(/SECOND/);
-    // It must not blame a budget: that is the wrong diagnosis an author would
-    // otherwise reach, with the two budget lines right above the control.
-    expect(TWIN_COUPLING_DISCLOSURE).toMatch(/not because of a budget/);
+  /**
+   * ⚠ THE SENTENCE THAT WENT FALSE. `SHIP_SILENT_OBLIGATIONS` ended *"Either one
+   * refuses the build outright"* and the build stopped refusing. This row is not
+   * a paraphrase check: it names the two claims the copy may no longer make, so a
+   * future edit restoring either argues with a test rather than with a reader's
+   * memory.
+   */
+  it('the obligations sentence no longer claims the build refuses', () => {
+    expect(SHIP_SILENT_OBLIGATIONS).not.toMatch(/refuses the\s+build/i);
+    expect(SHIP_SILENT_OBLIGATIONS).not.toMatch(/build outright/i);
+    // And it says what the two conditions DO decide, which is the only reason to
+    // go on stating them at all.
+    expect(SHIP_SILENT_OBLIGATIONS).toMatch(/twins are emitted/i);
   });
 });
