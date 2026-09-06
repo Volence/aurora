@@ -265,6 +265,11 @@ async function main() {
     await c.evalExpr("window.__dbg.aeon.setLayer('fg')");
     const facet = await c.json("window.__dbg.aeon.setFacet('collision')");
     note('facet', JSON.stringify(facet));
+    // [n2] quotes a rect, and `devicePixelRatio` is not constant on this
+    // machine (1 and 1.35 both observed in one session), so the number that
+    // scales it belongs in the same run's output as the rect itself.
+    note('dpr', await c.evalExpr('String(window.devicePixelRatio) + " @ " '
+      + '+ window.innerWidth + "x" + window.innerHeight'));
 
     const poke = (s, p, i, w) => c.evalExpr(`window.__dbg.aeon.collisionPoke(${s}, '${p}', ${i}, ${w})`);
     const collAt = (s, p, i) => c.evalExpr(`window.__dbg.aeon.collisionAt(${s}, '${p}', ${i})`);
