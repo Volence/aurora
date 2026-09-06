@@ -383,7 +383,17 @@ export default function SectionPicker({ children }: {
               + 'own preset: the sections whose aeon preset RECORD no other section shares '
               + '(condition 1).\n'
               + `threaded: the sections some preset() passes ${chooser}(sec: N) to (condition 2).\n`
-              + 'bound: the sections whose sidecar ALREADY NAMES a raster preset document. '
+              // ⚠ THIS LINE MUST NOT BEGIN WITH THE WORD `bound`, and the
+              // reason is a gate that went green on a mutation. `bound` is a
+              // RENDERED row in scripts/check-guide-text.mjs with `prefix:
+              // true`, which asks whether ANY string in this file BEGINS with
+              // it — so while this tooltip led with `bound:`, renaming the
+              // rendered label to `taken` left the gate satisfied by the
+              // tooltip and the guide quoting a label the app no longer drew.
+              // Measured, then fixed here rather than in the gate: the gate is
+              // asking the right question and this file was answering it twice.
+              + 'the third set, bound, is the sections whose sidecar ALREADY NAMES a raster '
+              + 'preset document. '
               + 'This one is Aurora\'s own file, not aeon\'s, and it is here because the first '
               + 'two sets say where a band CAN go and say nothing about what is already '
               + 'there. A section in all three is occupied: binding here replaces its '
