@@ -26,7 +26,7 @@ import {
   __setClassicBridgeForTest,
   __resetClassicBridgeForTest,
 } from '../classicProjectStore';
-import type { ClassicBridge } from '../classic-bridge';
+import { ipcClassicBridge, type ClassicBridge } from '../classic-bridge';
 import type { ProjectHandle, SidecarState } from '../../../core/project/adapter';
 import type { ResolutionReport } from '../../../core/project/report';
 import { CLASSIC_BUILD_SIDECAR } from '../../../core/project/mapping';
@@ -213,5 +213,40 @@ describe('the open-time build-field seed still writes when it should', () => {
 
     await useClassicProjectStore.getState().openDirectory('/proj/s1');
     expect(writeSidecar).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The REAL bridge's write, not the fake one above.
+//
+// `window.api.writeBinaryFile` returns Promise<boolean> and answers `false`
+// when the main process refuses the path — its own contract says the renderer
+// treats that as a failed write and reports it. ipcClassicBridge.writeSidecar
+// assigned the result nowhere, so a refused write was indistinguishable from a
+// landed one and the seed's try/catch never fired.
+//
+// Booked for the other nine call sites as REFUSED-WRITE-REPORTED-SAVED; this
+// row covers the one on the path being fixed here.
+// ---------------------------------------------------------------------------
+
+describe('ipcClassicBridge.writeSidecar reads the answer the write gives', () => {
+  afterEach(() => { delete (globalThis as unknown as { window?: unknown }).window; });
+
+  it('a refused write (false) is reported, not swallowed', async () => {
+    (globalThis as unknown as { window: unknown }).window = {
+      api: { writeBinaryFile: async () => false },
+    };
+    await expect(
+      ipcClassicBridge.writeSidecar!('/proj/s1', new Uint8Array([1, 2, 3])),
+    ).rejects.toThrow(/refused by the main process/);
+  });
+
+  it('an accepted write (true) resolves', async () => {
+    (globalThis as unknown as { window: unknown }).window = {
+      api: { writeBinaryFile: async () => true },
+    };
+    await expect(
+      ipcClassicBridge.writeSidecar!('/proj/s1', new Uint8Array([1, 2, 3])),
+    ).resolves.toBeUndefined();
   });
 });

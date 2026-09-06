@@ -7,7 +7,7 @@
 
 import type { ResolutionReport, EntryStatus } from '../../../core/project/report';
 import type { ProjectConfig, SidecarState } from '../../../core/project/mapping';
-import { serializeProjectConfig } from '../../../core/project/mapping';
+import { serializeProjectConfig, sidecarMayBeOverwritten, sidecarRefusalMessage } from '../../../core/project/mapping';
 import { groupEntriesByZone } from '../classic/report-grouping';
 
 export interface SetupRow {
@@ -99,11 +99,27 @@ export type SetupWritePlan =
 /**
  * Merge the tab's edits onto the sidecar and produce the bytes Apply writes.
  * `''` clears an override (the tab's spelling for "back to stock").
+ *
+ * REFUSES an unreadable sidecar, the same gate the open-time seed passes
+ * (classicProjectStore) and for the same reason. `sidecar.config` is `{}` in
+ * that case — not because the file is empty but because Aurora could not read
+ * it — so `applyPathEdits` merges the user's one edit onto NOTHING and this
+ * function would hand the tab a complete document containing only that edit.
+ * Apply then writes it over a file still holding every other override.
+ *
+ * The gate lives HERE, in the planner, rather than only as a disabled button:
+ * a guard each surface writes for itself passes whenever both are wrong
+ * together, and the button is the surface most likely to be bypassed by a
+ * future caller. The tab disables Apply as well, so the user is told before
+ * clicking rather than after.
  */
 export function planSetupSidecarWrite(
   sidecar: SidecarState,
   edits: Record<string, string>,
 ): SetupWritePlan {
+  if (!sidecarMayBeOverwritten(sidecar)) {
+    return { kind: 'refused', reason: sidecarRefusalMessage('your path overrides') };
+  }
   const editMap: Record<string, string | null> = {};
   for (const [k, v] of Object.entries(edits)) editMap[k] = v === '' ? null : v;
   const config = applyPathEdits(sidecar.config, editMap);
