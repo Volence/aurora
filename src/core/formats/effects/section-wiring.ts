@@ -468,6 +468,56 @@ export function eligibleSections(w: SectionRasterWiring, sectionCount: number): 
   return out;
 }
 
+/**
+ * The sections that ALREADY NAME a preset document — `rasterRef` is set.
+ *
+ * ═══ THE COLD READ'S D-B: `threaded 5,6` READ AS "5 AND 6 ARE AVAILABLE" ═══
+ *
+ * `docs/reviews/2026-09-05-effects-cold-read.md`, D-B, one of the two findings
+ * that STOPPED that reader. The act line published `threaded 5,6` — honestly
+ * derived, and true — beside a set the reader then had to guess at: both of
+ * those sections were already carrying a preset (`ojz_sec5_showcase`,
+ * `ojz_sec6_baseswap`), so every section the strip named was occupied and there
+ * was no route through the UI to a green build with a new band in it.
+ *
+ * ⚠ IT IS A DISCLOSURE, NOT A GATE, and the set is deliberately NOT "the free
+ * ones". Hiding an occupied section would renumber the world for the reader —
+ * the same rule `SectionPicker`'s own section `<select>` states about an empty
+ * section ("offered and labelled, not hidden") — and it would be a PROHIBITION,
+ * which `core/formats/raster-binding.ts`'s standing refusal forbids Aurora from
+ * publishing. Rebinding an occupied section is a legal act with a cost. The set
+ * says which sections have an incumbent; the cost is stated at the control that
+ * charges it (`effects-preset.ts`'s `rebindOrphanNotice`).
+ *
+ * ⚠ AND IT IS NOT A FOURTH CONDITION ROW. Conditions 1-3 answer one question —
+ * *can this section carry an editor-authored raster band?* — and every one of
+ * them is a fact about aeon's level data with a remedy a programmer performs.
+ * Occupancy answers a DIFFERENT question (*what does binding here cost?*), it
+ * is a fact about Aurora's own editor files, its remedy is the author's own
+ * next click, and the answer would be `✓` on a section where binding is refused
+ * outright. A row that shares a column, a mark vocabulary and an "N of 3"
+ * caption with three rows it does not belong to would be read as a fourth
+ * condition on the same question. It goes on the ACT LINE, in that line's own
+ * grammar — a third derived set beside the two already there — which is exactly
+ * where the reader formed the false impression, and costs no new row on a strip
+ * the owner already calls confusing.
+ *
+ * ⚠ DERIVED FROM ITS OWN CONDITION, which is why it takes the SECTIONS and not
+ * a `SectionRasterWiring`: this is the one of the three sets that is not in
+ * aeon's two files at all. It is `section.rasterRef`, the key Aurora itself
+ * writes to `section_N.meta.json`. Folding it through the wiring parse would
+ * make it answer `none` whenever a file aeon owns was unreadable — the
+ * self-contradiction `ownPresetSections`' docblock records the strip shipping
+ * for one harness run.
+ */
+export function boundSections(
+  sections: readonly ({ rasterRef: string | null } | null)[],
+): number[] {
+  const out: number[] = [];
+  sections.forEach((s, i) => { if (s !== null && s.rasterRef !== null) out.push(i); });
+  return out;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // CONDITION 3 — THE OTHER CHANNELS ONE `rasterRef` BINDS
 // ═══════════════════════════════════════════════════════════════════════════

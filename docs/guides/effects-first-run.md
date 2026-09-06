@@ -33,6 +33,7 @@ and the other two are not rendered at all.
 Editing   [ Section 0            ▾ ]        ← the strip: always there, never scrolls
 scene ojz_act1_start · raster hand-authored
 ✓ own preset  ☐ threaded  ✓ its channels    ← can this section carry a band? §6
+act: own preset … · threaded … · bound …    ← the same, act-wide; bound = taken §6
 [ Parallax ][  Colour  ][ Tile anim ]       ← the three jobs
 
   Parallax                        Colour                            Tile anim
@@ -435,10 +436,12 @@ band to **both** of them, so aeon's build refuses it.
 
 > A section can carry an editor-authored raster band **only if it binds a preset that no other section binds.**
 
-In `ojz act1` today that is sections **0 to 5**: each has its own preset. Sections
-**6, 7 and 8 all share** `OJZ_Preset_Plain`, so none of the three can have one until
-a programmer splits that record. Aurora says so at the control, naming the
-sections that share and what would happen.
+Which sections those are **changes when aeon changes the level**, so the answer is
+printed by the strip rather than written down here: the `act:` line under the
+condition rows names the set. Sections that **share** one record (`OJZ_Preset_Plain`
+has been shared by three at a time) can none of them have a band until a programmer
+splits that record. Aurora says so at the control, naming the sections that share and
+what would happen.
 
 There are two further steps behind that one, and Aurora keeps all three apart
 because conflating them is how the wrong answer got published twice in one day:
@@ -450,9 +453,9 @@ because conflating them is how the wrong answer got published twice in one day:
 | **3**, `its channels` | the preset bound here today owes a generated chooser for every **other** key it carries (`cycles`, `variants`, the moving anchors of §5), and has one | **one line of aeon**, on a different chooser |
 
 The strip prints these as **three rows**, each with its own mark, because which one
-you fail decides what you do next, and a single verdict cannot tell you which. In
-`ojz act1` today, condition 1 holds for sections 0 to 5 and condition 2 for
-section 5.
+you fail decides what you do next, and a single verdict cannot tell you which. Which
+sections pass which condition is on the `act:` line under the rows, re-derived on
+every load; no number in this guide would survive aeon's next landing.
 
 **The four marks, and what each one is telling you.** A mark on this strip is a
 statement about the level data, not a report on anything you did.
@@ -481,7 +484,7 @@ and aeon's canonical build refuses it by name ("no preset threads
 `ojz_act1_sec_raster(sec: N)`") until that line is added.
 
 **Aurora derives these facts from aeon's own files on every load**: the act
-descriptor and the effects library. It prints the first two sets act-wide, on the
+descriptor and the effects library. It prints those two sets act-wide, on the
 line under the rows. The two files are read separately and degrade independently:
 if only one is unreadable, that condition draws `?` and says
 `could not read <file>`, and the others still answer.
@@ -490,6 +493,23 @@ aeon changes the level. It does **not** stop you binding: whether a section is
 wired is aeon's fact to change, and a lock built on a snapshot would be wrong the
 day they change it. If Aurora cannot read those files it says so, and still lets
 you bind.
+
+**A section that passes all three can still be taken.** The `act:` line carries a
+third set beside those two: `bound`, the sections whose sidecar **already names** a
+raster preset. It comes from Aurora's own files rather than aeon's, and it is there
+because "where can a band go" and "is something already there" are different
+questions. A section that is in `threaded` and in `bound` is a home with an occupant.
+
+Binding over an occupant is allowed, and it does not delete anything: it replaces that
+section's `rasterRef`, and choosing the old value again puts it back in one undo step.
+What it can cost is the **incumbent document**. A preset document reaches the running
+game through exactly two installers: a `rasterRef` in some section's sidecar, or a row
+in aeon's DEBUG raster table. A document in neither is refused by name ("reachable by
+NOTHING"). So if this section is the only one naming that document, and aeon's lab
+table does not name it either, taking the section turns a green build red **on the
+document you displaced**, not on the one you just authored. Aurora does not read that
+table, so it states the condition instead of promising the refusal: the note under the
+section dropdown in RASTER BAND PRESETS says it at the control, naming the document.
 
 Scenes have no such restriction: bind a scene to any section.
 

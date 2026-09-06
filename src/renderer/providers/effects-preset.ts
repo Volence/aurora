@@ -840,6 +840,76 @@ export function deletePresetRefusal(
 }
 
 /**
+ * What REBINDING this section costs the document it carries today, or null.
+ *
+ * ═══ THE COLD READ'S D-B — THE OTHER HALF, AT THE CONTROL THAT CHARGES IT ═══
+ *
+ * `docs/reviews/2026-09-05-effects-cold-read.md`, D-B. The strip published
+ * `threaded 5,6`; both of those sections already carried a preset, so the only
+ * two homes an editor-authored band had were occupied and taking one was a
+ * regression the reader met as a build failure. The act line now says WHICH
+ * sections are occupied (`section-wiring.ts`'s `boundSections`). This says what
+ * happens if you take one, and it says it here because this select is where the
+ * incumbent is displaced.
+ *
+ * ═══ THE RULE, READ IN AEON'S SOURCE AND NOT IN THE REPORT ═══
+ *
+ * aeon `tools/test_raster_cycle_table_lint.py` at
+ * `179e94b28a362bb3b0ffe59d2ddd68189d18bd00`:
+ * `test_every_preset_document_is_REACHABLE` asserts `unreachable_presets` is
+ * empty, and that is a pure set difference over exactly TWO installers:
+ *
+ *     set(preset_ids) - set(row_ids) - set(bound_ids)
+ *
+ * `row_ids` are the `dc.l` rows of the `.raster_table` inside
+ * `games/sonic4/test/ojz_scroll_test.emp`'s DEBUG block — the effects-lab
+ * hotkey. `bound_ids` are `effects_gen.load_section_raster_refs`, every
+ * `rasterRef` in every section sidecar. A document in NEITHER is refused by
+ * name: *"these preset documents … are reachable by NOTHING"*. The lint's own
+ * banner records why the arm is a disjunction rather than the hard equality it
+ * used to be — a second installer (this very binding) was added on 2026-08-30
+ * and the equality would have falsified its own feature's headline claim.
+ *
+ * ⚠ SO THE ORPHAN IS THE INCUMBENT, NOT THE SECTION. Nothing is wrong with
+ * rebinding a section as such; what aeon refuses is a preset DOCUMENT that ends
+ * up in neither installer. If two sections bind the same document, rebinding one
+ * leaves the other and there is no orphan — which is why this returns null in
+ * that case rather than warning on every occupied section.
+ *
+ * ⚠ AND IT SAYS WHAT IT CANNOT SEE, LOUDLY. Aurora reads neither installer's
+ * other arm: the `.raster_table` lives in a game-specific DEBUG source Aurora
+ * does not open, and the sidecars Aurora can see are THIS ACT's, while aeon's
+ * loader walks the whole game. So the sentence is conditional in both places
+ * rather than promising a refusal it cannot prove. A confident "this will break
+ * the build" would be wrong for exactly the documents that have a lab row —
+ * `aurora_ramp_witness`, `authored_probe`, `ojz_sec3_shimmer` and `ramp_probe`
+ * all have one at that revision, and `ojz_sec5_showcase` and `ojz_sec6_baseswap`
+ * do not, which is why it was those two the cold read ran into.
+ *
+ * ⚠ NOT THE ALARM TIER. Nothing is refused right now — the build is green with
+ * this binding in place — and C1 of the same cold read is what drawing a
+ * not-yet-a-problem in the damage vocabulary costs. It is a note about the price
+ * of the next click, so it renders as one.
+ */
+export function rebindOrphanNotice(
+  sections: readonly ({ rasterRef: string | null } | null)[], sectionIndex: number,
+): string | null {
+  const here = sections[sectionIndex] ?? null;
+  if (here === null || here.rasterRef === null) return null;
+  const id = here.rasterRef;
+  // The same derivation the delete guard reads, and it has to be: "who else
+  // names this document" is one question and two answers to it would drift.
+  if (sectionsBindingPreset(sections, id).length !== 1) return null;
+  return `Section ${sectionIndex} binds "${id}", and no other section in this act does. `
+    + 'Binding something else here leaves that document named by nothing, and aeon\'s build '
+    + 'refuses a preset document that no section\'s rasterRef names and no DEBUG raster-table '
+    + 'row names, by '
+    + `name ("reachable by NOTHING"). Aurora does not read that table, so it cannot tell you `
+    + `whether "${id}" has a row there. The document itself is not deleted: choosing it again `
+    + 'restores the binding, in one undo step.';
+}
+
+/**
  * Put a WHOLE preset document at `id`, creating or replacing.
  *
  * THE AGENT SURFACE'S SHAPE rather than the panel's, and the one operation this

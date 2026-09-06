@@ -546,7 +546,11 @@ async function main() {
       // strip printed `own preset none` here while the condition row two lines
       // up read `✓ own preset OJZ_Preset_Sec0` — `eligibleSections` folds in
       // library-readability. This clause is that defect's gate on the screen.
-      && noLib.actSets !== null && / · threaded \?$/.test(noLib.actSets)
+      // ⚠ NOT END-ANCHORED. The act line grew a third set on 2026-09-06
+      // (cold read D-B: `· bound N,N`), and an end-anchored pattern on a
+      // line another parcel may extend silently matches nothing, which
+      // reads exactly like the property having broken.
+      && noLib.actSets !== null && / · threaded \?(?: ·|$)/.test(noLib.actSets)
       && noLib.actSets.startsWith(`act: own preset ${truth.own.join(',')} ·`),
       `${JSON.stringify(noLib.conds.rows.map((r) => `${r.mark} ${r.label} ${r.detail}`))}`
       + `\n        raster select disabled = ${noLib.rasterDisabled}; act-sets line = `

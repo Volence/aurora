@@ -170,7 +170,7 @@ import {
   bandControlsRefusal,
   RASTER_REF_ROW, presetRefOptions, unassignablePresetRef, sectionPresetCommand,
   createPresetCommand,
-  addBandCommand, removeBandCommand, lastBandRefusal, deletePresetRefusal,
+  addBandCommand, removeBandCommand, lastBandRefusal, deletePresetRefusal, rebindOrphanNotice,
   setBandFieldCommand, setBandArmCommand, setArmFieldCommand,
   parseColours, setColoursCommand, setPresetNameCommand,
   // EW-COLOUR-PICKER — defect 13's colour half. Every one of these is a
@@ -304,6 +304,12 @@ export default function BandPresetPanel(): React.ReactElement | null {
     : deletePresetRefusal(act.sections, selected.id);
   const wiringAdvisory = act === null ? null : sectionRasterAdvisory(
     act.rasterWiring, activeSectionIndex, rasterChooserName(zoneId, act.id));
+  // ⚠ NO aeon FILE IN THIS ONE. The two sentences above degrade with
+  // act_descriptor.emp and <zone>_effects.emp; this reads only the sidecars
+  // Aurora itself writes, so it survives an unreadable aeon tree and it is the
+  // half of the cold read's D-B that is always available. See its docblock.
+  const rebindNotice = act === null ? null
+    : rebindOrphanNotice(act.sections, activeSectionIndex);
   // ⚠ THE SUBJECT IS THE WHOLE ACT, NOT `activeSectionIndex`. Every other
   // per-section reading on this surface is about the section the author is
   // looking at; this one is about every section that BINDS the document they are
@@ -492,6 +498,26 @@ export default function BandPresetPanel(): React.ReactElement | null {
                   programmer for. "You cannot do that" does not. */}
               {wiringAdvisory !== null && (
                 <Hint under tone="warning">{wiringAdvisory}</Hint>
+              )}
+              {/* ═══ WHAT REBINDING COSTS THE INCUMBENT (cold read D-B) ═══
+
+                  The strip says WHICH sections are already occupied; this says
+                  what taking one of them does. It is here and not on the strip
+                  because this select is the control that displaces the
+                  document, and the delete guard four rows down is the same
+                  shape pointed the other way: `deletePresetRefusal` names the
+                  bindings a delete would dangle, this names the document a
+                  rebind would orphan. Both quote aeon's own refusal.
+
+                  ⚠ A NOTE, NOT A WARNING, AND NOT A REFUSAL. Nothing is wrong
+                  while the binding stands: the build is green. The alarm tier
+                  here would be C1 of the same cold read all over again, a red
+                  mark on a document nobody has damaged. And it does not disable
+                  the select or confirm the change, on raster-binding.ts's
+                  standing refusal: rebinding is legal, it has a price, and the
+                  author is the one who gets to weigh it. */}
+              {rebindNotice !== null && (
+                <Hint under testid="effects-rebind-notice">{rebindNotice}</Hint>
               )}
               <Hint under style={{ marginBottom: 0 }}>
                 Saved to <code>section_{activeSectionIndex}.meta.json</code> as
