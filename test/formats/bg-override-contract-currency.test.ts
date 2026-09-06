@@ -41,6 +41,14 @@
  * importing aeon's Python, or parsing `.emp` - would make this suite depend on
  * a toolchain it does not have, for a question that is one integer wide.
  *
+ * ONE OF THE FILES READ IS PROSE, and it is the only one. aeon's
+ * `tools/EFFECTS_CONSUMER_CONTRACT.md` gained a section-budget TABLE on
+ * 2026-09-06 (fe4fabf8), so six constants that had one authority now have two.
+ * Those doc rows are matched as a whole table, never by finding a name anywhere
+ * in the page, and they exist to catch aeon's copy drifting from aeon's source.
+ * The reasoning, the arguments against it, and what would overturn it are
+ * written at THE SECOND BUDGET below rather than here.
+ *
  * THE FAILURE MODES ARE SPLIT ON PURPOSE, because they are different findings:
  *
  *   · aeon absent, or its `origin/master` unresolvable  -> LOUD SKIP. Nothing
@@ -106,6 +114,61 @@ type Extractor = {
   /** Printed in the failure so a reader knows what was looked at. */
   quote: string;
 };
+
+/** aeon's writer-facing contract page. A COPY of the source, never the source. */
+const AEON_CONTRACT_DOC = 'tools/EFFECTS_CONSUMER_CONTRACT.md';
+
+/**
+ * THE SECTION-BUDGET TABLE inside that page, matched as a BLOCK rather than by
+ * hunting a constant's name anywhere in the file.
+ *
+ * The header row `| Constant | Value | Authority |` occurs exactly once in the
+ * document (checked at aeon fe4fabf8 and at origin/master 3d414618), and the
+ * names also appear in ordinary prose elsewhere - `BGANIM_VIEW_DERIVED_PERIOD_PX`
+ * is quoted in a numbered list two hundred lines further down. Anchoring the
+ * whole table is what stops a prose mention answering for a table row.
+ *
+ * IT IS THE STABLE PART OF A CHURNING PAGE, and that is measured, not hoped:
+ * between fe4fabf8 and origin/master aeon rewrote the `default_off` row, the
+ * shape-distinction paragraph and the entire two-obligations subsection around
+ * this table, and did not touch one of its six rows.
+ */
+const SECTION_BUDGET_TABLE = /^\| Constant \| Value \| Authority \|\r?\n\|[\s|:-]+\|\r?\n((?:\|.*\r?\n)+)/m;
+
+/**
+ * One doc row for one constant. See THE SECOND AUTHORITY below for why these
+ * exist at all and what they are and are not allowed to be believed about.
+ */
+function aeonContractRow(name: string): Extractor {
+  return {
+    path: AEON_CONTRACT_DOC,
+    pattern: SECTION_BUDGET_TABLE,
+    read: (rows) => {
+      // Anti-vacuous: a one-row block would let a gutted table satisfy any
+      // single lookup below, and a table aeon emptied is drift, not silence.
+      const all = [...rows.matchAll(/^\|\s*`([A-Z0-9_]+)`\s*\|/gm)].map((r) => r[1]);
+      if (all.length < 6) {
+        throw new Error(
+          `aeon's section-budget table has ${all.length} constant row(s) at this revision,`
+          + ` not the six it was added with (found: ${all.join(', ') || 'none'}).`
+          + ' Re-read the table: aeon either split it or dropped rows from it.',
+        );
+      }
+      const row = new RegExp(String.raw`^\|\s*\`${name}\`\s*\|\s*([\d,]+)\s*\|`, 'm').exec(rows);
+      if (row === null) {
+        throw new Error(
+          `${name} has no row in aeon's section-budget table at this revision, or its Value`
+          + ` cell is no longer a plain number. The table names: ${all.join(', ')}.`
+          + ' This is NOT "nothing to check": the table matched, so it WAS measured, and a'
+          + ' constant that left it is aeon retracting a published figure.',
+        );
+      }
+      return Number(row[1].replace(/,/g, ''));
+    },
+    quote: `the section-budget table's row for \`${name}\`, its Value cell`
+      + ' (aeon\'s own prose copy, whose Authority cell points back at inject_editor_bg.py)',
+  };
+}
 
 /**
  * THE AUTHORITY LADDER, WRITTEN DOWN RATHER THAN ASSUMED.
@@ -280,15 +343,72 @@ const EXTRACTORS: Record<string, Extractor[]> = {
     },
   ],
 
-  // ── THE SECOND BUDGET ────────────────────────────────────────────────────
+  // ── THE SECOND BUDGET, AND ITS SECOND AUTHORITY ──────────────────────────
   //
-  // ⚠ EVERY ROW BELOW READS ONE FILE, AND THAT IS NOT A SHORTCUT — it is the
-  // whole population. `tools/inject_editor_bg.py` is the ONLY authority for any
-  // of these: unlike BG_TILE_CAPACITY (a VRAM allocation with a toml authority
-  // and two generated mirrors), the section budget has no row in aeon's own
-  // EFFECTS_CONSUMER_CONTRACT.md and no `.emp` declaration. There is nothing to
-  // corroborate against, so a second row here would be decoration. The vendored
-  // constant's `notInAeonProse` field records the same fact for a reader.
+  // ⚠ THE COMMENT THAT USED TO STAND HERE SAID EVERY ROW BELOW READS ONE FILE
+  // AND THAT THIS WAS "the whole population" — that `tools/inject_editor_bg.py`
+  // is the ONLY authority for any of these, that the section budget "has no row
+  // in aeon's own EFFECTS_CONSUMER_CONTRACT.md", and therefore that "there is
+  // nothing to corroborate against, so a second row here would be decoration".
+  //
+  // THE PREMISE WAS TRUE FOR ONE MORNING. aeon added a six-row table under
+  // "#### THE SECTION BUDGET" in `tools/EFFECTS_CONSUMER_CONTRACT.md` §1.2 at
+  // fe4fabf88c98e9741990df02bb88574d2abd5441 (2026-09-06 08:55-0400), in answer
+  // to the finding that produced the old comment. The premise being false, the
+  // conclusion is re-opened here rather than inherited, and it comes out the
+  // other way: EVERY CONSTANT IN THIS BLOCK NOW HAS A DOC ROW BESIDE ITS SOURCE
+  // ROW.
+  //
+  // WHAT THE SECOND ROW BUYS, AND IT IS NOT A SECOND OPINION ABOUT THE VALUE.
+  // The source row already answers "did aeon move the number". The doc row
+  // answers a DIFFERENT question this file could not ask before: HAS AEON'S OWN
+  // PROSE DRIFTED FROM AEON'S OWN CODE. That is a live failure class in this
+  // suite rather than a hypothetical - the header of this very file records
+  // aeon shipping a refusal that told a blocked author "the limit is 12 KiB"
+  // for two days after the ceiling was raised to 20480 - and a single-authority
+  // check is structurally blind to it, because the copy and the source are only
+  // ever compared through a person.
+  //
+  // AND THE DOC IS THE COPY MOST LIKELY TO ROT, measured rather than assumed:
+  // aeon's table has no generator and no aeon-side gate (unlike vram.toml,
+  // whose mirrors `test_generated_artifacts_are_in_sync` holds together), its
+  // own third column names inject_editor_bg.py as the authority for all six
+  // rows, and TWO OF THE SIX VENDOR A DERIVED VALUE AS A LITERAL - the cell for
+  // BGANIM_SECTION_CEILING says "an expression, not a literal" while printing
+  // 20480, and BGANIM_BYTES_PER_SLOT prints 256 for a PRODUCT. A doc row is
+  // exactly where an expression silently becomes a stale number.
+  //
+  // THE THREE ARGUMENTS AGAINST, WEIGHED RATHER THAN WAVED AT:
+  //
+  //   1. "Prose is unstable to pattern-match." Answered by anchoring the whole
+  //      TABLE (see SECTION_BUDGET_TABLE above) instead of a constant's name,
+  //      and by the measurement beside it: aeon rewrote three passages AROUND
+  //      this table between fe4fabf8 and origin/master and touched no row of
+  //      it. If they do reshape it, this fails loudly with the row names it
+  //      could find, which is the correct answer and not noise.
+  //   2. "A red because a PEER'S DOCUMENTATION drifted is noise." It is not, in
+  //      this repo: aeon's contract page is the document Aurora is told to
+  //      consume, so a wrong figure in it is a wrong figure handed to the next
+  //      Aurora lane. Every failure here already opens with NOT AN AURORA
+  //      REGRESSION and names the revision, which is the whole triage.
+  //   3. "A consumer looser than the producer ends up blaming the producer."
+  //      That standing finding cuts the OTHER way here. Looser is the danger;
+  //      this is strictly tighter, and it is tighter about aeon's INTERNAL
+  //      agreement rather than about what Aurora will accept. No document
+  //      Aurora writes becomes legal or illegal because of these six rows.
+  //
+  // ⚠ WHAT A DOC ROW MAY NEVER BECOME: the thing a value is re-vendored FROM.
+  // The source rows below still re-derive both expressions from aeon's own
+  // operands; the doc's literals are corroboration only. Re-vendoring off the
+  // table would import exactly the staleness the table is watched for.
+  //
+  // WHAT WOULD OVERTURN THIS: aeon adopting a generator or a gate that ties the
+  // table to `inject_editor_bg.py` (the drift becomes unrepresentable and these
+  // rows become decoration), or aeon deleting the table (then it is one
+  // authority again and this whole block reverts to the old comment's shape).
+  // A run of reds caused by aeon REFORMATTING rather than mis-stating would not
+  // overturn it on its own, but would be the argument for matching the table
+  // more loosely - never for dropping the rows.
   BGANIM_SECTION_CEILING: [
     {
       path: 'tools/inject_editor_bg.py',
@@ -331,6 +451,12 @@ const EXTRACTORS: Record<string, Extractor[]> = {
         + ' whose rows must all name BGANIM_SECTION_CEILING_RULED for the ruled figure to be'
         + ' the enforced one',
     },
+    // AND THE PROSE COPY. aeon's table prints the ruled figure as a LITERAL in
+    // a cell whose own words are "an expression, not a literal", which is the
+    // single most drift-prone number on this page: the day any shape's row
+    // stops naming BGANIM_SECTION_CEILING_RULED, the source rows above go red
+    // by re-derivation and this one goes red by staleness. Both are correct.
+    aeonContractRow('BGANIM_SECTION_CEILING'),
   ],
   BGANIM_COUNT_BYTES: [
     {
@@ -339,6 +465,7 @@ const EXTRACTORS: Record<string, Extractor[]> = {
       read: Number,
       quote: 'the section-layout block: `BGANIM_COUNT_BYTES = N`',
     },
+    aeonContractRow('BGANIM_COUNT_BYTES'),
   ],
   BGANIM_RECORD_BYTES: [
     {
@@ -347,6 +474,7 @@ const EXTRACTORS: Record<string, Extractor[]> = {
       read: Number,
       quote: 'the section-layout block: `BGANIM_RECORD_BYTES = N`',
     },
+    aeonContractRow('BGANIM_RECORD_BYTES'),
   ],
   BGANIM_BYTES_PER_SLOT: [
     {
@@ -367,6 +495,11 @@ const EXTRACTORS: Record<string, Extractor[]> = {
       quote: '`BGANIM_BYTES_PER_SLOT = BGANIM_PHASES * BGANIM_TILE_BYTES`, re-derived from those'
         + ' two literals rather than from the comment beside the product',
     },
+    // THE SECOND PRODUCT-AS-LITERAL. aeon's cell says so itself: "a PRODUCT
+    // (BGANIM_PHASES * BGANIM_TILE_BYTES), not the 256 in the comment beside
+    // it" - and then prints 256. A phase-count change reds the source row by
+    // re-derivation and leaves the doc saying 256 until somebody edits it.
+    aeonContractRow('BGANIM_BYTES_PER_SLOT'),
   ],
   BGANIM_VIEW_COUNT: [
     {
@@ -375,6 +508,7 @@ const EXTRACTORS: Record<string, Extractor[]> = {
       read: Number,
       quote: '`BGANIM_VIEW_COUNT = N`, the twins a qualifying act emits',
     },
+    aeonContractRow('BGANIM_VIEW_COUNT'),
   ],
   BGANIM_VIEW_DERIVED_PERIOD_PX: [
     {
@@ -383,6 +517,7 @@ const EXTRACTORS: Record<string, Extractor[]> = {
       read: Number,
       quote: '`BGANIM_VIEW_DERIVED_PERIOD_PX = N`, the only period a default_off band may have',
     },
+    aeonContractRow('BGANIM_VIEW_DERIVED_PERIOD_PX'),
   ],
 };
 
