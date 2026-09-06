@@ -3338,6 +3338,121 @@ export function resolveSelectedScene(
 }
 
 /**
+ * THE SCENE THE SELECTION SHOULD FOLLOW TO when the active section changes, or
+ * `null` when there is nothing to follow to. (Cold read 2026-09-05 C2, "the
+ * most disorienting thing on the tab for a newcomer".)
+ *
+ * ═══ WHAT WAS WRONG, AND WHY IT IS NOT A CAPTION PROBLEM ═══
+ *
+ * The sticky strip says `Editing Section 0` and, one line down, `scene
+ * ojz_act1_start` read from THE SECTION. Directly beneath it the Scenes list
+ * highlights whatever `selectedEffectsSceneId` holds and the forms below edit
+ * THAT — and `resolveSelectedScene` above is wholly independent of
+ * `activeSectionIndex`, falling back to `scenes[0]`. So on arrival, in a
+ * project with more than one scene, the panel routinely showed the FIRST scene
+ * in the library under a strip naming a section bound to a different one. The
+ * cold reader spent three minutes unable to tell which document his keystrokes
+ * would land in, and an earlier reader spent eight.
+ *
+ * ⚠ THE STRIP ALREADY STATED THE BINDING AND IT WAS NOT ENOUGH. Both cold
+ * reads happened with `scene <ref>` printed at the top of the column. A second
+ * sentence explaining that the two selections are unrelated would document the
+ * confusion; making the newcomer's inference TRUE removes it. That is what
+ * this function is for: pick a section and the panel below is that section's
+ * scene, so "Editing Section 0" is a true claim about the form under it.
+ *
+ * ═══ WHY IT CAN RETURN NULL RATHER THAN FORCING SOMETHING ═══
+ *
+ * Scenes are free-standing documents (`sceneRef: null` means the act default,
+ * and a section can point at a file Aurora could not read). There is no scene
+ * to move to in either case, and inventing one — falling back to `scenes[0]`,
+ * say — would recreate the exact defect this removes, silently. The caller
+ * leaves the selection alone and `sceneSelectionRelation` below says so out
+ * loud.
+ *
+ * It does NOT read the current selection. Following is about where the section
+ * points; whether that is a move is the caller's business.
+ */
+export function sceneSelectionFollow(
+  library: EffectsSceneLibrary, section: { sceneRef: string | null } | null,
+): string | null {
+  const ref = section?.sceneRef ?? null;
+  if (ref === null) return null;
+  return library.scenes.some((s) => s.id === ref) ? ref : null;
+}
+
+/**
+ * WHAT THE SELECTED SCENE HAS TO DO WITH THE ACTIVE SECTION, in one sentence,
+ * or `null` when the answer is "it is that section's scene".
+ *
+ * ⚠ NULL WHEN THEY AGREE, AND THAT IS THE HEIGHT DECISION. With
+ * `sceneSelectionFollow` wired, agreement is the state the panel arrives in and
+ * stays in, so a sentence rendered in that state would be permanent furniture
+ * in a CONTENT section, taken directly out of the LAYERS list's share (the
+ * panel docblock's budget). Agreement is also already stated four times on this
+ * screen — the strip's `scene <ref>`, the highlighted row, the `Scene: <id>`
+ * form title, and SECTION ASSIGNMENT. A fifth statement of it costs the list
+ * height and teaches nothing.
+ *
+ * Divergence is not furniture: it can only arise from an act the author took
+ * (clicking another scene, creating one) or from a section that binds nothing,
+ * and in both cases the sentence is the only thing on screen that says which
+ * document the keystrokes land in.
+ *
+ * ═══ IDS, NOT NAMES ═══
+ *
+ * A scene's `name` is prose ("OJZ act 1 depth — curved horizon over a split
+ * canopy") and is ellipsised in the list. Every OTHER statement of this fact on
+ * the column — the strip's binding line, the scene form's title — spells the
+ * ID, so this one does too; a sentence naming `OJZ act 1 depth` beside a strip
+ * naming `ojz_act1_start` would be one more pair the reader has to relate.
+ */
+export interface SceneSelectionRelation {
+  /** Sections whose `sceneRef` names the selected scene, ascending. */
+  users: number[];
+  /** The sentence to paint. `null` iff the selected scene IS this section's. */
+  text: string | null;
+}
+
+export function sceneSelectionRelation(
+  sections: readonly ({ sceneRef: string | null } | null)[],
+  activeSectionIndex: number,
+  selectedSceneId: string | null,
+): SceneSelectionRelation {
+  const users: number[] = [];
+  if (selectedSceneId !== null) {
+    sections.forEach((s, i) => { if (s !== null && s.sceneRef === selectedSceneId) users.push(i); });
+  }
+  const section = sections[activeSectionIndex] ?? null;
+  if (selectedSceneId === null) return { users, text: null };
+  if (section !== null && section.sceneRef === selectedSceneId) return { users, text: null };
+
+  // CLAUSE 1 — what the ACTIVE section uses, in the strip's own words.
+  const uses = section === null
+    ? `Section ${activeSectionIndex} is empty and binds no scene.`
+    : section.sceneRef === null
+      ? `Section ${activeSectionIndex} uses the act default scene.`
+      : `Section ${activeSectionIndex} uses ${section.sceneRef}.`;
+
+  // CLAUSE 2 — what editing HERE reaches, which is the question the cold reader
+  // could not answer. `no section uses yet` is the new-scene case and points at
+  // the one control that fixes it.
+  // ⚠ NO `filter(i !== activeSectionIndex)` HERE, and that is a proof rather
+  // than an oversight: both early returns above fire exactly when the active
+  // section's `sceneRef` IS `selectedSceneId`, which is the only way the active
+  // index can land in `users`. A filter would be dead code — it was written,
+  // and the canary that deleted it failed nothing, which is how it was caught.
+  const others = users;
+  const reach = others.length === 0
+    ? `${selectedSceneId}, which no section uses yet: bind it under SECTION ASSIGNMENT.`
+    : others.length === 1
+      ? `${selectedSceneId}, which section ${others[0]} uses.`
+      : `${selectedSceneId}, which sections ${others.join(', ')} use.`;
+
+  return { users, text: `${uses} Edits below change ${reach}` };
+}
+
+/**
  * The `sceneRef` dropdown for one section: the act default plus every LOADED
  * scene.
  *
