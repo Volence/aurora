@@ -98,8 +98,13 @@
 // adding the refusal at its end. A control in Aurora that REFUSED what the
 // generator accepts would be a bound this repo invented, and an author who
 // opened a hand-authored scene could not see their own file. Same posture, same
-// reason, as `rowRemapPreconditions`, `curveDescendingAdvisory` and the layer
+// reason, as `rowRemapPreconditions`, `curveRateAdvisory` and the layer
 // top's `fireLineAdvisory`: a sentence, and the document still saves.
+//
+// (`curveRateAdvisory` is the 2026-09-06 re-pointing of what this comment used
+// to call `curveDescendingAdvisory`. It is still an ADVISORY and not a refusal,
+// which is why it is still in this list — but its premise changed, and it now
+// consumes `rowRemapBandSpan` below. See its own docblock.)
 //
 // ⚠ AND NO CLEARANCE IS STATED, EVER. `floor(span/2) >= H-1` does not mean the
 // remap is right. It means this ONE failure is absent, out of a list that
@@ -284,8 +289,10 @@ export function rowRemapReachAdvisoryParts(
   //
   // FINDING A subsumes finding B arithmetically, and they are still ONE advisory
   // rather than two hints, because they are one inequality at two magnitudes,
-  // unlike `curveAdvisory` and `curveDescendingAdvisory` (a refusal and a
-  // correlation, which are different KINDS of claim). Stacking "does nothing"
+  // unlike `curveAdvisory` and `curveRateAdvisory` (a refusal and a
+  // measurement, which are different KINDS of claim — the second used to be a
+  // bare CORRELATION about the ramp's direction, and aeon refuted the direction
+  // on 2026-09-06). Stacking "does nothing"
   // under "does less than asked" would be two paragraphs of one rule — and
   // folding the mechanism is precisely how the height came down without doing
   // that: one warning, one diagnosis, one remedy, and the engine's arithmetic
