@@ -114,11 +114,20 @@ export type PanelProps = {
  *
  * `__dbg.panels()` reads it back (debug builds only) and
  * `scratchpad/panel-overflow-harness.mjs` sweeps the app with it, printing ALL
- * FIFTEEN by name in one of three states — measured clean, measured
- * overflowing, or UNMEASURABLE with the reason it could not be reached. The
- * third state is the reason this is not just a wider `[9a]`: most of these
- * columns need a project or a document open first, and a sweep that silently
- * skipped them would go green by looking at nothing.
+ * FIFTEEN by name in one of four states — CLEAN, OVERFLOW, UNMEASURABLE with
+ * the reason it could not be reached, and DEAD for the one call site nothing
+ * mounts (`EffectsScenePanel.tsx`'s exported `EffectsPanels`, which the Effects
+ * facet shadows with a local component of the same name; a test holds that
+ * claim). UNMEASURABLE is the reason this is not just a wider `[9a]`: most of
+ * these columns need a project or a document open first, and a sweep that
+ * silently skipped them would go green by looking at nothing.
+ *
+ * ⚠ AND THE SWEEP OPENS EVERY CARD BEFORE IT BELIEVES A READING. A collapsed
+ * `CollapsibleSection` renders NO CHILDREN, so a column with its cards shut
+ * measures 0px however wide its content is, and several sections here are
+ * `defaultCollapsed`. A column with a card that would not open is UNMEASURABLE,
+ * not clean. Found the only way it could be: a plant went in and the sweep
+ * stayed green.
  */
 export function Panel({ children, width, scroll = false, column, style }: PanelProps) {
   return (
