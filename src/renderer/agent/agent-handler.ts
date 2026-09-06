@@ -521,7 +521,8 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       // check it either (anchor §8.2 assigns the loop-shaped check to Aurora).
       // So the number that says "this loop works in one direction" is returned
       // beside the paint that could have caused it.
-      const audit = auditCrossovers(section.collisionEdit, section.collisionEditB, SECTION_TILES_WIDE);
+      const audit = auditCrossovers(section.collisionEdit, section.collisionEditB,
+        SECTION_TILES_WIDE, req.section);
       return {
         painted: entries.length, paintedOther: otherPlaneEntries.length, bothPlanes,
         skipped: plan.skipped,

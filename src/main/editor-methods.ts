@@ -225,7 +225,10 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + 'cell) and "paintedOther" counts them on the second plane when plane is "both", reported '
       + 'separately, never summed, so "wrote one plane" and "wrote two" cannot look alike. "skipped" '
       + 'counts null cells. The reply also carries "crossoverAudit" for the whole section: '
-      + 'marksA/marksB/pairs/oneWay plus a severity and a note. CHECK "oneWay": a loop crossover marked '
+      + 'marksA/marksB/pairs/oneWay plus a severity and a note. THE NOTE NAMES A PLACE for the first '
+      + 'offender of each class ("section 3, cell (col 12, row 40), left half"), in the same 16px '
+      + 'cell coordinates this method\'s x/y take, so you can paint the fix without decoding an '
+      + 'index. CHECK "oneWay": a loop crossover marked '
       + 'on one plane only is legal, is invisible, and plays correctly in exactly one direction. Aeon\'s '
       + 'build does NOT check this; this reply is where it is checked.' },
   { name: 'get_collision_region', kind: 'get-collision-region', result: 'json',

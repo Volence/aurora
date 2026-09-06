@@ -50,14 +50,135 @@
 
 import {
   readCrossover, crossoverTarget,
-  type CrossoverRead, type Crossover, type CollisionPlaneId,
+  type CrossoverRead, type Crossover, type CollisionPlaneId, type CrossoverSpan,
 } from './layer-transition';
 import { isSolidCell } from './both-planes-paint';
-import { CELL_SUBTILE_ROWS } from './collision-cell';
+import { CELL_SUBTILE_COLS, CELL_SUBTILE_ROWS, spanForTileCol } from './collision-cell';
 
 /** How many offending indices each list keeps. A cap, because a corrupt import
  *  could name every cell and the report is meant to be read. */
 export const AUDIT_SAMPLE_CAP = 16;
+
+/**
+ * WHERE A SAMPLE INDEX IS, when that is knowable at all.
+ *
+ * Every list in `CrossoverAudit` names FLAT SUB-TILE INDICES, and an index is
+ * not a place. "first at index 1417" is true, unactionable, and was the audit's
+ * whole reporting vocabulary until 2026-09-06
+ * (docs/reviews/2026-09-04-loops-two-way-mark.md §8 row 4).
+ *
+ * ═══ EVERY FIELD, AND WHAT IT IS DERIVED FROM ═══
+ *
+ * The decomposition is the INVERSE of `cellTileIndices`, which is the one place
+ * the forward direction is spelled:
+ *
+ *     index = (cellRow * CELL_SUBTILE_ROWS + r) * stride
+ *           + (cellCol * CELL_SUBTILE_COLS + c)
+ *
+ * so `subRow = index / stride`, `subCol = index % stride`, and the cell is those
+ * two divided by the SAME two constants the expander multiplies by. Nothing here
+ * types a 2 or a 4: `collision-cell.ts` names the ratio once and both directions
+ * read it, so a change there reddens this rather than silently shearing the
+ * coordinate off the data.
+ *
+ * `half` is `spanForTileCol(subCol)` LITERALLY, not a reimplementation of it.
+ * That function is how the map brush turns the 8px column under the cursor into
+ * a mark width, so the half this reports and the half an author aims at cannot
+ * drift apart.
+ */
+export interface CrossoverLocus {
+  /** The flat sub-tile index this decodes. Carried so a report can name both and
+   *  a harness can go straight back to the plane word. */
+  index: number;
+  /** 8px sub-tile column inside the section. This is aeon's own `col` in the
+   *  bake's rule-R2 error text (`tools/ojz_strip_gen.py`
+   *  `apply_editor_collision_overlay` at aeon origin/master 290f4aa8:
+   *  `sec {sec_id} plane {plane_name} col {col} row {cr}`), so an author who
+   *  gets both messages can line them up. */
+  subCol: number;
+  /** 8px sub-tile row inside the section. */
+  subRow: number;
+  /** The 16px Aurora collision CELL the sub-tile belongs to. `cellRow` is also
+   *  aeon's `cr` in that same error text, because its rows are 16px. */
+  cellCol: number;
+  cellRow: number;
+  /** WHICH 8px engine trigger column of that cell, in the vocabulary of the
+   *  map brush's mark-width control. */
+  half: Exclude<CrossoverSpan, 'cell'>;
+  /** Which sub-tile row of the 16px cell. ⚠ `bottom` MATTERS: aeon's overlay
+   *  pass reads `o = (cr * 2) * W + col` (same function, same revision), the
+   *  cell's TOP sub-tile row only, so a mark sitting alone on a bottom row is
+   *  authored, audited, and never baked. Aurora's own writers fill all four
+   *  sub-tiles (`cellTileIndices`), so a bottom-only mark means the data came
+   *  from a paste, an import, an agent call or a poke. */
+  rowHalf: 'top' | 'bottom';
+  /** Which section these planes are, or null when the caller did not say.
+   *  ⚠ NEVER INVENTED. It is not in the arrays and cannot be derived from them;
+   *  a locus with `section: null` names a cell inside whatever section it was
+   *  handed, which is a smaller true statement rather than a bigger guess. */
+  section: number | null;
+}
+
+/**
+ * The locus of `index`, or NULL when the geometry to place it was not supplied.
+ *
+ * ⚠ THE REFUSAL IS THE POINT AND IT IS A NULL, NOT A FLAG. The audit already
+ * carries one `…Measured: false` boolean (`cancellingMeasured`) and the obvious
+ * move was a second. It was rejected: a `locationMeasured` boolean would be
+ * `stride !== null` spelled a second time, two things to keep in step for one
+ * fact, and a flag is IGNORABLE. A null is not: every caller in TypeScript has
+ * to answer for it, and the one formatter that renders it says in words what is
+ * missing. `stride` on the record is the same fact in its useful form.
+ *
+ * A cell coordinate needs the row stride for exactly the reason the cancellation
+ * scan does: a flat index carries no adjacency. Returning cell (0,0) when no
+ * stride was passed would paint a confidently wrong location next to a real
+ * defect, which is strictly worse than the index it replaced - an index at least
+ * looks like an index.
+ */
+export function crossoverLocus(
+  index: number,
+  stride: number | null | undefined,
+  section?: number | null,
+): CrossoverLocus | null {
+  if (!Number.isInteger(index) || index < 0) return null;
+  if (typeof stride !== 'number' || !Number.isInteger(stride) || stride <= 0) return null;
+  const subCol = index % stride;
+  const subRow = Math.floor(index / stride);
+  return {
+    index, subCol, subRow,
+    cellCol: Math.floor(subCol / CELL_SUBTILE_COLS),
+    cellRow: Math.floor(subRow / CELL_SUBTILE_ROWS),
+    half: spanForTileCol(subCol),
+    rowHalf: subRow % CELL_SUBTILE_ROWS === 0 ? 'top' : 'bottom',
+    section: section ?? null,
+  };
+}
+
+/** The locus of one of an audit's own sample indices. Reads the stride and the
+ *  section OFF THE AUDIT, so a caller cannot pair an index with a stride the
+ *  audit did not run on. */
+export function crossoverLocusAt(a: CrossoverAudit, index: number): CrossoverLocus | null {
+  return crossoverLocus(index, a.stride, a.section);
+}
+
+/**
+ * A locus as the fragment a message drops into a sentence, and the REFUSAL when
+ * there is no locus.
+ *
+ * The index survives in both branches. It is what the debug hooks, the harnesses
+ * and this repo's landed packets already quote, and a coordinate that silently
+ * replaced it would break every one of those readers to say less.
+ */
+export function formatCrossoverLocus(locus: CrossoverLocus | null, index: number): string {
+  if (!locus) return `index ${index}, NO CELL COORDINATE`;
+  const where = locus.section === null ? '' : `section ${locus.section}, `;
+  const row = locus.rowHalf === 'bottom'
+    ? ', and on the cell\'s BOTTOM sub-tile row, which aeon\'s bake never reads'
+    : '';
+  return `${where}cell (col ${locus.cellCol}, row ${locus.cellRow}), `
+    + `${locus.half} half (8px column ${locus.subCol}, index ${index})${row}`;
+}
 
 export interface CrossoverAudit {
   /** Cells examined (the shorter of the two planes' lengths). */
@@ -111,6 +232,18 @@ export interface CrossoverAudit {
   selfMarkAt: number[];
   reservedAt: number[];
   oneWayAt: number[];
+  /** The row stride this audit ran with, or NULL when the caller passed none.
+   *  Carried on the record so `crossoverLocusAt` can place a sample index, and
+   *  so a reader of the raw record (the debug hooks return it to harnesses as
+   *  JSON) can tell a real coordinate from an absent one. Null is the ONLY
+   *  reason a sample has no cell coordinate. */
+  stride: number | null;
+  /** Which section these two planes are, or NULL when the caller did not say.
+   *  ⚠ NOT DERIVABLE FROM THE ARRAYS - they are two flat word arrays and carry
+   *  no identity. Every call site in Aurora knows its section index, so all
+   *  three pass it; a caller that does not gets messages that name a cell and
+   *  no section rather than a section number this file made up. */
+  section: number | null;
 }
 
 /** One maximal run of horizontally adjacent marked columns, and what a player
@@ -162,14 +295,23 @@ export function auditCrossovers(
   planeA: ArrayLike<number> | null | undefined,
   planeB: ArrayLike<number> | null | undefined,
   /** Sub-tile columns per row (SECTION_TILES_WIDE for an aeon section). Without
-   *  it the cancellation scan cannot run. */
+   *  it the cancellation scan cannot run AND no sample index can be turned into
+   *  a cell coordinate: both questions are about where an index sits in the
+   *  grid, and a flat array does not answer either. */
   stride?: number,
+  /** Which section these planes belong to. Optional because it changes no
+   *  count - it only lets a message name a section instead of leaving one out.
+   *  Absent is honest; a default of 0 would not be. */
+  section?: number | null,
 ): CrossoverAudit {
+  const usableStride = typeof stride === 'number' && Number.isInteger(stride) && stride > 0;
   const out: CrossoverAudit = {
     cells: 0, marksA: 0, marksB: 0, pairs: 0, oneWay: 0,
     selfMarks: 0, reserved: 0, divergent: 0, solidBoth: 0,
     cancelling: 0, cancellingMeasured: false, cancellingAt: [],
     selfMarkAt: [], reservedAt: [], oneWayAt: [],
+    stride: usableStride ? stride : null,
+    section: section ?? null,
   };
   if (!planeA || !planeB) return out;
   const n = Math.min(planeA.length, planeB.length);
@@ -204,9 +346,15 @@ export function auditCrossovers(
   // folded into the index-wise loop above, because it is a different KIND of
   // check — a traversal, not a per-cell classification — and burying it in the
   // same loop would make both harder to read and the `stride` refusal invisible.
-  if (stride && stride > 0) {
+  //
+  // ⚠ IT GATES ON `out.stride`, NOT ON THE PARAMETER, so the traversal and the
+  // coordinate agree by construction about what a usable stride is. Before
+  // 2026-09-06 this read `stride && stride > 0`, which admits a FRACTIONAL
+  // stride: the scan would then walk rows that are not rows, and a locus
+  // computed from the same number would name a cell that does not exist.
+  if (out.stride !== null) {
     out.cancellingMeasured = true;
-    for (const run of scanCancellingRuns(planeA, planeB, n, stride)) {
+    for (const run of scanCancellingRuns(planeA, planeB, n, out.stride)) {
       push(out.cancellingAt, run.index, out.cancelling++);
     }
   }
@@ -314,13 +462,22 @@ function push(list: number[], index: number, countBefore: number): void {
  */
 export function crossoverAuditMessage(a: CrossoverAudit): string | null {
   const parts: string[] = [];
+  // ONE PLACE TURNS A SAMPLE INDEX INTO A PLACE, for every class at once. The
+  // follow-up that booked this (docs/reviews/2026-09-04-loops-two-way-mark.md
+  // §8 row 4) asked for exactly that rather than one class at a time, and this
+  // is why: four sentences composing their own coordinate is four chances to
+  // spell it differently, and the message that refuses to name one has to be
+  // the SAME refusal in all four or a reader learns to skim it.
+  const at = (index: number | undefined): string =>
+    (index === undefined ? 'nowhere (the sample list is empty, which is a bug in this audit)'
+      : formatCrossoverLocus(crossoverLocusAt(a, index), index));
   if (a.reserved > 0) {
     parts.push(`${a.reserved} cell${a.reserved === 1 ? '' : 's'} hold the RESERVED crossover value 3 `
-      + `(first at index ${a.reservedAt[0]}): aeon's bake hard-errors on it (rule R1).`);
+      + `(first at ${at(a.reservedAt[0])}): aeon's bake hard-errors on it (rule R1).`);
   }
   if (a.selfMarks > 0) {
     parts.push(`${a.selfMarks} SELF-MARK${a.selfMarks === 1 ? '' : 's'} `
-      + `(first at index ${a.selfMarkAt[0]}): a plane whose word sends you to the plane you are `
+      + `(first at ${at(a.selfMarkAt[0])}): a plane whose word sends you to the plane you are `
       + 'already on. It can never fire, and aeon\'s bake refuses it (rule R2).');
   }
   // ⚠ THE CANCELLING LINE COMES BEFORE THE ONE-WAY LINE, deliberately. An author
@@ -329,7 +486,7 @@ export function crossoverAuditMessage(a: CrossoverAudit): string | null {
   // not be underneath the one that asked for it.
   if (a.cancelling > 0) {
     parts.push(`${a.cancelling} TWO-WAY crossover${a.cancelling === 1 ? '' : 's'} that `
-      + `NET${a.cancelling === 1 ? 'S' : ''} TO NOTHING (first at index ${a.cancellingAt[0]}): `
+      + `NET${a.cancelling === 1 ? 'S' : ''} TO NOTHING (first at ${at(a.cancellingAt[0])}): `
       + 'the pair is there on both planes, but it spans an even number of the 8px columns the '
       + 'engine triggers on, so the player is handed over and handed straight back and leaves on '
       + 'the path he arrived on. A 16px cell is TWO trigger columns, so a pair painted at the '
@@ -346,11 +503,20 @@ export function crossoverAuditMessage(a: CrossoverAudit): string | null {
     // correct, and simpler, way to build a two-way loop. So this now says what
     // a one-way mark IS rather than implying it is a mistake.
     parts.push(`${a.oneWay} ONE-WAY crossover${a.oneWay === 1 ? '' : 's'} `
-      + `(first at index ${a.oneWayAt[0]}): marked on one plane only. Legal and often correct: an `
+      + `(first at ${at(a.oneWayAt[0])}): marked on one plane only. Legal and often correct: an `
       + 'entry or exit anchor looks like this, and so does a loop built from two separated one-way '
       + 'marks (each fires only when approached on the plane that carries it, and firing twice is '
       + 'the same as firing once). It is a MISTAKE only if you meant a single two-way handoff and '
       + 'marked one plane; then mark the other plane at the same place, at "Half (8px)" mark width.');
+  }
+  // THE OTHER HALF OF THE SAME REFUSAL, and it fires on the classes above
+  // rather than on `pairs`: without a stride every "first at" line degraded to
+  // a bare index, and a bare index beside a real defect is exactly the thing
+  // this parcel exists to stop being silent about.
+  if (a.stride === null && (a.reserved > 0 || a.selfMarks > 0 || a.oneWay > 0)) {
+    parts.push('(No cell coordinates above: this audit was called without a row stride, so a flat '
+      + 'sub-tile index cannot be turned into a cell. The numbers are indices into the plane '
+      + 'arrays, counting across each row of 8px sub-tiles.)');
   }
   if (!a.cancellingMeasured && (a.pairs > 0)) {
     // LOUD ON UNMEASURABLE. `cancelling: 0` beside a real pair count is the one
