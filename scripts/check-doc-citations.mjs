@@ -997,7 +997,9 @@ console.log(
   + `actually tracks, of which ${run.stat.bareFileUnknown} match no tracked basename anywhere: a `
   + 'filename in prose names no location, and gating the shape would bury this run under a '
   + 'four-figure count. Both numbers are derived every run, so either one moves the day the '
-  + 'corpus does. Widening the gate to either shape is a separate row, not a footnote.\n'
+  + 'corpus does. THE ELLIPSIS HALF IS SETTLED, not pending: a rule that judged it would be '
+  + 'undecidable from the text, and N5 in this file carries the measurement. Widening the gate '
+  + 'to bare filenames is still a separate row.\n'
   + `${PREFIX}: ${run.stat.marked} of ${run.stat.tokens} judged citation(s) `
   + `(${pct(run.stat.marked, run.stat.tokens)}%) sit in an inline-code span or a link target. `
   + 'Backticks are NOT required, measured rather than assumed: the eight bare dangling ones are all '
