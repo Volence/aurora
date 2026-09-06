@@ -1,7 +1,12 @@
 import socket, json, sys, itertools, subprocess, os, time, tempfile
-ROM="/home/volence/sonic_hacks/aeon-vrig-onscreen/s4.debug.bin"
-BIN="/home/volence/sonic_hacks/oracle/target/release/oracle-aether"
-OUT=sys.argv[1]
+# PATHS ARE ARGUMENTS, NOT LITERALS. The rig ROM lives in a THROWAWAY copy that is
+# deleted when the measurement is done, so a committed literal would point at
+# something that does not exist; and a sibling path in an executable line is what
+# `check-peer-path-literals.mjs` refuses. The paths this run actually used are
+# recorded as provenance in docs/reviews/2026-09-06-vertical-watched.md, which is
+# a comment-tier record the gate exempts for exactly that reason.
+#   usage: vertical-watched-drive.py <out.json> <rom> <oracle-aether binary>
+OUT, ROM, BIN = sys.argv[1], sys.argv[2], sys.argv[3]
 d=tempfile.mkdtemp(prefix="/tmp/vrig-")           # short path: SUN_LEN
 sock=os.path.join(d,"o.sock")
 p=subprocess.Popen([BIN,ROM,"--socket",sock],stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)

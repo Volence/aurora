@@ -32,8 +32,15 @@ spawned `oracle-aether` directly on a private socket and spoke JSON-RPC to it.
 - Server identity read from the handshake, not assumed: `implementation: oracle-rs`,
   `serverBuild.id 0d6180c1…+profile=release`, `dirty: false`, **61 methods**.
 - `romPath` read back as the rig ROM, so the machine under test is the one intended.
-- Driver committed at `scratchpad/vertical-watched-drive.py`; raw captures at
-  `docs/captures/2026-09-06-vertical-watched/captures.json`.
+- Driver committed at `scratchpad/vertical-watched-drive.py`, **taking its paths as
+  arguments rather than literals** — the rig ROM lives in a throwaway copy that gets
+  deleted, so a committed literal would point at nothing, and a sibling path in an
+  executable line is refused by `check-peer-path-literals.mjs`. **That gate refused this
+  parcel's first push and was right to**; the paths this run used are provenance and
+  belong here, which is the comment tier the gate exempts:
+  ROM `<suite root>/aeon-vrig-onscreen/s4.debug.bin`, server
+  `<suite root>/oracle/target/release/oracle-aether`.
+- Raw captures at `docs/captures/2026-09-06-vertical-watched/captures.json`.
 
 ⚠ **The 68000 bus is 24 bits and the first run failed on that**, not on anything
 about the subject: `0xFFFFA730` was refused with `the 68000 bus is 24 bits wide`.
