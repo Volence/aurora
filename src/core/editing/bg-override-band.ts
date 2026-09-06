@@ -43,7 +43,7 @@ import {
   type BandSlotPlan,
   type RemoveBandOptions,
 } from '../formats/bg-override/bg-anim-band';
-import type { SetBgOverrideBandCommand } from './commands';
+import type { SetBgOverrideBandCommand, SetBgOverrideDefaultOffCommand } from './commands';
 
 /**
  * Refuse against the PROJECTED document, while the caller's is still untouched.
@@ -202,4 +202,97 @@ export function makeDemoteBandCommand(
   const band = (doc.anims ?? [])[bandIndex];
   refuseIfResultInvalid(doc, demoteBand(doc, plan), 'demote a tile animation to static tiles');
   return command(false, band, plan, 'Demote tile animation to static tiles');
+}
+
+// ---------------------------------------------------------------------------
+// `default_off` — the ship-silent switch
+// ---------------------------------------------------------------------------
+
+/**
+ * The command that SETS or CLEARS `default_off` on the band at `bandIndex`.
+ *
+ * ⚠ WHAT IT CHANGES IS THE RELEASE ROM. A band carrying the key is not counted
+ * into the act's own `BgAnim_Table`, so a single-band act emits a count of zero
+ * and BG animation is off at boot in EVERY shape, release included. It moves no
+ * art, no slot and no pixel, so nothing in the editor looks different after it
+ * runs.
+ *
+ * ═══ BOTH REFUSALS ARE THE ACT'S, AND THEY ARRIVE THROUGH THE PROJECTION ═══
+ *
+ * `refuseIfResultInvalid` sizes the RESULTING document, and sizing it runs
+ * `viewsEmitted`, which is where aeon's two `AssertionError`s are modelled. So
+ * this function does not restate either rule and CANNOT drift from them:
+ *
+ *   · PER ACT — setting the key on a band of a multi-band act produces a
+ *     document with no computable section size, and `sectionHarm` refuses that
+ *     outright. ⚠ THE QUANTIFIER IS THE TRAP aeon's contract names: the rule is
+ *     on the ACT'S BAND COUNT, not on whether the bands AGREE. Setting the key
+ *     on the second band of a two-band act whose first band already carries it
+ *     makes them consistent and is still refused, which is the row a per-key
+ *     "are they consistent?" validator passes.
+ *   · PER BAND — the band the key lands on must have
+ *     `pattern_px == BGANIM_VIEW_DERIVED_PERIOD_PX`. Same path, same refusal.
+ *   · PER ACT, AND EASY TO MISS — setting the key ADDS the three DEBUG view
+ *     twins to the emitted section, so it GROWS the act by
+ *     `BGANIM_VIEW_COUNT * (count word + one record per band)`. On an act near
+ *     the ceiling that is a step backwards and `sectionHarm` refuses it, in the
+ *     codec's own words. Clearing the key always shrinks, so it is always
+ *     allowed, which is what keeps the repair path open.
+ *
+ * A NO-OP IS REFUSED rather than recorded, the rule
+ * `makeSetBgOverrideTilesCommand` states one file over: an undo slot that
+ * changes nothing is a lie in the history.
+ */
+export function makeSetBandDefaultOffCommand(
+  doc: BgOverrideDocument, bandIndex: number, next: boolean,
+): SetBgOverrideDefaultOffCommand {
+  const bands = Array.isArray(doc.anims) ? doc.anims : [];
+  const band = bands[bandIndex];
+  if (!Number.isInteger(bandIndex) || band === undefined) {
+    throw new BgOverrideError(
+      `tile animation ${bandIndex} does not exist (the document has ${bands.length})`,
+    );
+  }
+  const oldValue = band.default_off;
+  // ABSENT IS THE CLEARED STATE. `undefined` on the new side deletes the key;
+  // see `writeBandDefaultOff` for why a written `false` would be wrong.
+  const newValue = next ? true : undefined;
+  if (Boolean(oldValue) === next) {
+    throw new BgOverrideError(
+      `tile animation ${bandIndex} is already ` +
+      (next ? 'silenced in the ROM' : 'shipping animated') +
+      '; refusing to record an undo step that changes nothing',
+    );
+  }
+  // A SHALLOW PROJECTION, not `cloneBgOverride`. Only one band's keys move, so
+  // the phase banks and the tile blob are SHARED with the caller's document
+  // rather than deep-copied — the same reason the band-structure commands
+  // project instead of cloning, and on a ~400 KB document it is the difference
+  // between a key flip and a full copy per keystroke.
+  const projected: BgOverrideDocument = {
+    ...doc,
+    anims: bands.map((b, i) => {
+      if (i !== bandIndex) return b;
+      const copy = { ...b };
+      if (newValue === undefined) delete copy.default_off;
+      else copy.default_off = newValue;
+      return copy;
+    }),
+  };
+  refuseIfResultInvalid(
+    doc, projected,
+    next
+      ? 'silence this tile animation in the ROM'
+      : 'let this tile animation ship animating',
+  );
+  return {
+    type: 'set-bg-override-default-off',
+    description: next
+      ? `Silence tile animation ${bandIndex} in the ROM`
+      : `Ship tile animation ${bandIndex} animating`,
+    sectionIndex: -1,
+    bandIndex,
+    oldValue,
+    newValue,
+  };
 }

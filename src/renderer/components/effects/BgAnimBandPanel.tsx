@@ -216,6 +216,14 @@ function HideLensChip({ onHide }: { onHide: () => void }): React.ReactElement {
   );
 }
 
+/**
+ * The `<option>` value for the silenced state. A DOM string and nothing else —
+ * the document's key is a boolean, the provider owns the flip, and this exists
+ * only because a `<select>` option needs some value that is not the empty one
+ * the "absent key" option already uses.
+ */
+const SHIP_SILENT_VALUE = 'silent';
+
 function LensSwatch(): React.ReactElement {
   return (
     <span aria-hidden style={{
@@ -236,6 +244,11 @@ import {
   // spelling 32 and 8, so the sentence a person reads cannot outlive the
   // contract the pickers are built from.
   TILE_BYTES, TILE_WIDTH_PX, LAST_PHASE_BANK,
+  // `default_off`, exposed as a SHIPPED-BEHAVIOUR switch. Every sentence comes
+  // from the provider, in aeon's own order (release-shape fact, then the two
+  // obligations, then what the debug ROM gets); nothing about it is worded here.
+  shipSilentSwitch, twinCouplingApplies,
+  SHIP_SILENT_LEAD, SHIP_SILENT_OBLIGATIONS, SHIP_SILENT_EXCHANGE, TWIN_COUPLING_DISCLOSURE,
   type BandCommandResult, type BandPhaseFill, type BgAnimBandAxis,
 } from '../../providers/bg-anim-aeon';
 // The two creation verbs — label, disabled reason, command — derived ONCE and
@@ -495,6 +508,10 @@ export default function BgAnimBandPanel(): React.ReactElement {
           // by a provider, never here: what `rate_shift` means in the units this
           // band's driver reads, and whether the blob on screen lets it preview.
           const status = bandStatus(b, preview.verdicts[b.index]);
+          // THE SHIP-SILENT STATE AND ITS REFUSAL, from the provider — which
+          // builds the command to answer, so the greyed option and the failed
+          // click cannot give an author two different sentences.
+          const shipSilent = shipSilentSwitch(doc, b.index);
           // THE CARD IS THE LENS'S OTHER END. Clicking an ANIMATED cell on the
           // map selects this card; clicking this card lights those same cells.
           // One target, two doors — which is what makes the map band NAVIGATION
@@ -572,6 +589,88 @@ export default function BgAnimBandPanel(): React.ReactElement {
               <Hint under>
                 <LensSwatch />highlighted on the map · {coverageSummary(lens.coverage)}
                 {' '}<HideLensChip onHide={() => setLensTarget(null)} />
+              </Hint>
+            )}
+            {/* ── THE SHIP-SILENT SWITCH (`default_off`) ───────────────────
+                ⚠ IT IS NOT A VIEW CONTROL AND MUST NOT READ AS ONE, and the
+                placement is the argument, not the wording.
+
+                THE PREVIEW CONTROLS ARE ELSEWHERE, ON PURPOSE. Everything an
+                author can flip that changes only what they SEE lives in
+                `BgAnimPreviewStrip`, above this list: the playback chip, the
+                honesty label, the two column-wide warnings. This sits INSIDE
+                the band card, in the block that ends with Demote and Remove
+                — the three controls that change the DOCUMENT and therefore
+                the ROM. A reader who has understood that Demote rewrites the
+                file has already been told what kind of control this is.
+
+                IT IS A `Select` AND NOT A CHIP for the same reason. A chip
+                that lights up is the shape this panel uses for a lens and for
+                playback; a two-option picker in a labelled Field is the shape
+                it uses for `driver`, `axis` and `rate_shift`, which are the
+                document's own keys. Same shape, same kind of thing.
+
+                AND THE LABEL NAMES THE ROM. "In the ROM" cannot be read as a
+                statement about the editor's canvas; "Preview", "Show" or
+                "Enabled" all can, and the owner's own phrasing for the ask
+                behind this key ("one view for horizontal and one for
+                vertical") is exactly the sentence that would have produced
+                one of those.
+
+                THE LEAD SENTENCE IS aeon's, IN aeon's ORDER: the release-shape
+                fact first, then the two obligations, then what the debug ROM
+                gets in exchange. See `SHIP_SILENT_LEAD` in the provider. */}
+            {shipSilent !== null && (
+              <Field label="In the ROM"
+                title="What this tile animation does in the BUILT ROM. Not a preview setting: it
+                       changes what ships and changes nothing you can see in this editor.">
+                <Select
+                  title={`${SHIP_SILENT_LEAD} ${SHIP_SILENT_OBLIGATIONS}`}
+                  value={shipSilent.silent ? SHIP_SILENT_VALUE : ''}
+                  onChange={(v) => {
+                    setPendingRemoval(null);
+                    apply(shipSilent.run());
+                    // The value is IGNORED. There are exactly two states and
+                    // the control is the flip between them, so which option
+                    // the browser reports back cannot disagree with the band.
+                    void v;
+                  }}
+                  style={{ flex: 1, minWidth: 0 }}>
+                  {/* EXACTLY ONE OF THESE IS EVER DISABLED: the one the band
+                      is NOT in, and only when the switch refuses to move
+                      there. The band's own state is never unpickable, so a
+                      `<select>` can always report the value it is showing. */}
+                  <option value="" disabled={shipSilent.silent && shipSilent.reason !== null}
+                    title="The tile animation is counted into the act's table and RUNS in every
+                           ROM, release included. This is the state of a tile animation whose
+                           default_off key is absent.">
+                    ships animating (default: the key is absent)
+                  </option>
+                  <option value={SHIP_SILENT_VALUE}
+                    disabled={!shipSilent.silent && shipSilent.reason !== null}
+                    title={shipSilent.reason ?? SHIP_SILENT_LEAD}>
+                    ships silent (the act boots with BG animation off)
+                  </option>
+                </Select>
+              </Field>
+            )}
+            {shipSilent !== null && (
+              <Hint under tone={shipSilent.silent ? 'warning' : undefined}>
+                {shipSilent.silent
+                  ? `${SHIP_SILENT_LEAD} ${SHIP_SILENT_EXCHANGE}`
+                  : SHIP_SILENT_LEAD}
+              </Hint>
+            )}
+            {/* THE REFUSAL, IN THE CODEC'S OWN WORDS. A disabled option with no
+                sentence beside it is the dead button this panel's docblock
+                argues against, and this refusal is the one an author is most
+                likely to meet without having touched the thing it is about. */}
+            {shipSilent !== null && shipSilent.reason !== null && (
+              <Hint under tone="warning">
+                {shipSilent.silent
+                  ? 'cannot let this one ship animating: '
+                  : 'cannot silence this one: '}
+                {shipSilent.reason}
               </Hint>
             )}
             {/* ⚠ BOTH OF THESE GO THROUGH d-27's HELPER, AND THEY ARE A
@@ -699,6 +798,27 @@ export default function BgAnimBandPanel(): React.ReactElement {
           See the file docblock; the four CDP harnesses that drive it open it. */}
       <CollapsibleSection id="aeon.bganim.new" title="New tile animation" defaultCollapsed>
        <SectionBody>
+        {/* ── THE TWIN COUPLING, DISCLOSED ONCE, ABOVE BOTH DOORS ──────────
+            AURORA IS THE PERMISSIVE SIDE OF A BOUND AEON'S BUILD ENFORCES,
+            and this is the sentence that stops an author meeting the engine's
+            refusal instead of ours and concluding the engine is broken.
+
+            IT GOVERNS BOTH DOORS, SO IT SITS ABOVE BOTH. Measured on aeon's
+            live document: `promoteUnavailableReason` and
+            `insertUnavailableReason` return the SAME refusal, because both
+            project a second tile animation and both size the result. One fact,
+            one sentence, one site — the rule this panel already follows for
+            the Demote line and the preview strip.
+
+            ⚠ IT IS BUILT TO COME DOWN. aeon is decoupling the debug view twins
+            from the act's band count; when that lands, DELETE
+            `TWIN_COUPLING_DISCLOSURE` and `twinCouplingApplies` in
+            providers/bg-anim-aeon and this block. The provider's docblock
+            carries the three-step retirement and the grep that finds every
+            site. */}
+        {twinCouplingApplies(doc) && (
+          <Hint tone="warning">{TWIN_COUPLING_DISCLOSURE}</Hint>
+        )}
         {/* ONE GEOMETRY, TWO SOURCES. Cols, rows and driver describe the band
             itself and mean the same thing whichever way its art arrives, so
             they are asked once, above both actions. Duplicating them into two

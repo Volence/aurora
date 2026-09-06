@@ -316,7 +316,11 @@ describe('default_off: the twins are decided PER ACT, not per band', () => {
 
   it('validateBgOverride refuses a non-boolean default_off', () => {
     const doc = oneBandDoc(4);
-    (doc.anims as BgOverrideBand[])[0].default_off = 'yes';
+    // THROUGH A CAST, because `default_off` is typed `boolean | undefined` on
+    // BgOverrideBand now that Aurora authors it. The poison is deliberate and
+    // the cast says so: a document that reached us from somewhere else can
+    // carry any JSON value here, which is the case this row is about.
+    (doc.anims as BgOverrideBand[])[0].default_off = 'yes' as unknown as boolean;
     expect(validateBgOverride(doc).join('\n')).toContain('must be true or false');
   });
 

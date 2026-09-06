@@ -69,6 +69,7 @@
     "harness:bg-tile-picker": "node scratchpad/bg-tile-picker-harness.mjs",
     "harness:bg-wrap": "node scratchpad/bg-wrap-harness.mjs",
     "harness:bganim-band": "node scratchpad/bganim-band-harness.mjs",
+    "harness:bganim-ship-silent": "node scratchpad/bganim-ship-silent-harness.mjs",
     "harness:bganim-band-lens": "node scratchpad/bganim-band-lens-harness.mjs",
     "harness:bganim-insert-roomy": "node scratchpad/bganim-insert-roomy-harness.mjs",
     "harness:bganim-motion": "node scratchpad/bganim-motion-harness.mjs",

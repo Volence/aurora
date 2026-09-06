@@ -422,6 +422,32 @@ export interface SetBgOverridePhasesCommand extends EditCommand {
   banks: Array<{ bank: number; oldTiles: number[][]; newTiles: number[][] }>;
 }
 
+/**
+ * Set or clear `default_off` on one BgAnim band.
+ *
+ * ⚠ THE ONLY COMMAND IN THIS FILE THAT CHANGES WHAT THE RELEASE ROM DOES AND
+ * NOTHING ELSE. Every other override command moves art, slots or pixels, and
+ * an author can see the result. This one moves a key the emitter reads: a band
+ * carrying it is not counted into the act's own `BgAnim_Table`, so a
+ * single-band act emits a count of zero and BG animation is off at boot in
+ * every shape, release included. Nothing on screen changes, which is exactly
+ * why the surface that offers it has to say what does.
+ *
+ * BOTH VALUES ARE `boolean | undefined` AND THE `undefined` IS LOAD-BEARING:
+ * absent is the contract's default, so clearing DELETES the key and undo of a
+ * set has to restore absence rather than write `false`. A `boolean` pair would
+ * quietly convert every clear into a written `false`, which is Aurora freezing
+ * aeon's default into a document that never spelled it.
+ *
+ * `sectionIndex` is -1 — act-ambient, like every override command.
+ */
+export interface SetBgOverrideDefaultOffCommand extends EditCommand {
+  type: 'set-bg-override-default-off';
+  bandIndex: number;
+  oldValue: boolean | undefined;
+  newValue: boolean | undefined;
+}
+
 export interface SetSectionsCommand extends EditCommand {
   type: 'set-sections';
   // Whole-act snapshot of the section grid: width/height plus the flat
@@ -472,4 +498,5 @@ export type AnyCommand =
   | SetBgOverrideBandCommand
   | SetBgOverrideTilesCommand
   | SetBgOverridePhasesCommand
+  | SetBgOverrideDefaultOffCommand
   | SetSectionsCommand;
