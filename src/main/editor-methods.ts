@@ -12,7 +12,7 @@ import { FLAT_SHAPE } from '../core/art/commit-collision';
 // Pure-TS format facts (model.ts imports only two `import type`s, so nothing
 // runtime-heavy follows it into the main process). The collision tool's schema
 // bounds are DERIVED from them rather than restated.
-import { MAX_FG_CELLS_W, MAX_FG_CELLS_H } from '../core/level-classic/model';
+import { MAX_FG_CELLS_W, MAX_FG_CELLS_H, MAX_BLOCK_REF } from '../core/level-classic/model';
 // The BG plane's real engine bounds. `bg-override.ts` is the ONE module that
 // reads the vendored aeon contract (bganim-consumer-contract.json); every
 // number below therefore has a single definition, and get_bg/set_bg cannot
@@ -21,10 +21,14 @@ import { MAX_FG_CELLS_W, MAX_FG_CELLS_H } from '../core/level-classic/model';
 // the first made the engine's full-height nametable unrepresentable, the second
 // took blobs that overrun the sprite attribute table. ROADMAP item 8.
 import {
-  BG_LAYOUT_WORDS, BG_LAYOUT_WORDS_LEGACY, BG_TILE_CAPACITY,
-  LAYOUT_WORD_MAX, TILE_PIXELS, TILE_PIXEL_MAX,
+  BG_LAYOUT_WORDS, BG_LAYOUT_WORDS_LEGACY, BG_TILE_CAPACITY, BGANIM_PHASE_BANKS,
+  LAYOUT_WORD_MAX, TILE_PIXELS, TILE_PIXEL_MAX, TILE_BYTES, TILE_WIDTH_PX,
 } from '../core/formats/bg-override/bg-override';
 import { BG_WIDTH } from '../core/formats/bg-tiles';
+// `check_budget`'s reply carries `limit: FG_TILE_LIMIT`, so its DESCRIPTION —
+// the only place an agent learns the number before it spends the pool — reads
+// the same constant instead of restating it.
+import { FG_TILE_LIMIT } from '../core/export/vram-coloring';
 import { BG_SECTION_BINDING_LIMIT } from '../core/formats/bg-binding';
 import { RASTER_SECTION_BINDING_LIMIT } from '../core/formats/raster-binding';
 // The layer bound an agent is TOLD about, read from the same vendored schema
@@ -122,7 +126,8 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'Decoded nametable entries (tileIndex, palette, flips, priority) for a tile-coordinate rectangle of a section.' },
   { name: 'check_budget', kind: 'check-budget', result: 'json',
     params: { section: z.number().int().min(0).optional() },
-    description: 'Flip-aware unique-tile counts per section and per VRAM color group vs the 1024-tile FG pool. fits=false means export will fail.' },
+    description: `Flip-aware unique-tile counts per section and per VRAM color group vs the `
+      + `${FG_TILE_LIMIT}-tile FG pool. fits=false means export will fail.` },
   { name: 'set_palette', kind: 'set-palette', result: 'json',
     params: { line: z.number().int().min(1).max(3), colors: z.array(z.number().int()).length(16) },
     description: 'Write one palette line (1-3) as 16 Genesis CRAM words (0000BBB0GGG0RRR0, even channel values only). One undo step.' },
@@ -497,20 +502,25 @@ export const EDITOR_METHODS: EditorMethod[] = [
   { name: 'promote_bg_anim_band', kind: 'promote-bg-anim-band', result: 'json',
     params: {
       cols: z.number().int().min(1)
+        // The geometry rule an agent reads before it picks a size, with both
+        // factors READ from the vendored contract. The sibling `description`
+        // keys in this file already derive theirs; these two `describe()` calls
+        // spelled `8` and `32` out by hand, in the surface's own parameter docs.
         .describe('pattern width in tiles. On a HORIZONTAL band it sets the period '
-          + '(pattern_px = cols*8); on a VERTICAL band it is the rotation unit and cols*32 must be '
-          + 'an exact power of two'),
+          + `(pattern_px = cols*${TILE_WIDTH_PX}); on a VERTICAL band it is the rotation unit and `
+          + `cols*${TILE_BYTES} must be an exact power of two`),
       rows: z.number().int().min(1)
-        .describe('pattern height in tiles. On a HORIZONTAL band rows*32 (the bytes in one pattern '
-          + 'column) must be an exact power of two, because the runtime rotates a column by '
-          + 'shifting it; on a VERTICAL band that rule moves to cols*32 and rows sets the period '
-          + 'instead (pattern_px = rows*8)'),
+        .describe('pattern height in tiles. On a HORIZONTAL band '
+          + `rows*${TILE_BYTES} (the bytes in one pattern column) must be an exact power of two, `
+          + 'because the runtime rotates a column by shifting it; on a VERTICAL band that rule '
+          + `moves to cols*${TILE_BYTES} and rows sets the period instead `
+          + `(pattern_px = rows*${TILE_WIDTH_PX})`),
       staticBase: z.number().int().min(0)
         .describe('first tile of the existing static range to declare animated. It must lie at or '
           + 'after the end of the current animated prefix (list_bg_anim_bands reports it as '
           + 'budget.firstPromotableSlot) and the whole cols*rows range must already be in the blob'),
       phaseFill: z.enum(['copy', 'blank', 'shift']).optional()
-        .describe('how banks 1..7 are derived from phase 0. copy (the default here) leaves the '
+        .describe(`how banks 1..${BGANIM_PHASE_BANKS - 1} are derived from phase 0. copy (the default here) leaves the `
           + 'band visually inert until its frames are drawn; blank breaks the picture on the '
           + 'second phase; shift makes bank k phase 0 scrolled k px ALONG THE BAND\'S AXIS within '
           + 'its own pattern period, the contract\'s "pre-shifted art 1px apart", so the band '
@@ -518,7 +528,8 @@ export const EDITOR_METHODS: EditorMethod[] = [
       axis: z.enum(['horizontal', 'vertical']).optional()
         .describe('which way the pattern translates. Omit to leave the key out, which bakes as '
           + 'horizontal. A vertical band scrolls UP as its driver increases, takes its period from '
-          + 'rows (pattern_px = rows*8) and its power-of-two rotation unit from cols. Setting it '
+          + `rows (pattern_px = rows*${TILE_WIDTH_PX}) and its power-of-two rotation unit from `
+          + 'cols. Setting it '
           + 'also switches phaseFill=shift to a VERTICAL roll and the band\'s slot order to '
           + 'row-major: aeon refuses a vertical band whose phases are horizontal translations'),
       driver: z.string().optional()
@@ -531,8 +542,9 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'Promote an existing static tile range into a new BgAnim band. THE PRIMARY WAY TO '
       + 'AUTHOR A BAND: the range MOVES to the front of the blob rather than being added to it, so '
       + 'tiles.length is unchanged and this works on a document that has spent its whole tile '
-      + 'budget (which the shipping one has). Phase 0 is READ from the blob; by default banks 1-7 '
-      + 'arrive as copies of it (the band is inert until its frames are drawn), and '
+      + 'budget (which the shipping one has). Phase 0 is READ from the blob; by default banks '
+      + `1-${BGANIM_PHASE_BANKS - 1} arrive as copies of it (the band is inert until its frames `
+      + 'are drawn), and '
       + 'phaseFill=shift derives them as pre-shifted phases so the band scrolls immediately. The '
       + 'rendered picture at rest is identical before and after either way. One undo step.' },
   { name: 'demote_bg_anim_band', kind: 'demote-bg-anim-band', result: 'json',
@@ -549,16 +561,24 @@ export const EDITOR_METHODS: EditorMethod[] = [
   { name: 'add_bg_anim_band', kind: 'add-bg-anim-band', result: 'json',
     params: {
       cols: z.number().int().min(1)
-        .describe('pattern width in tiles. Horizontal band: the period (pattern_px = cols*8). '
-          + 'Vertical band: the rotation unit, so cols*32 must be a power of two'),
+        .describe('pattern width in tiles. Horizontal band: the period '
+          + `(pattern_px = cols*${TILE_WIDTH_PX}). Vertical band: the rotation unit, so `
+          + `cols*${TILE_BYTES} must be a power of two`),
       rows: z.number().int().min(1)
-        .describe('pattern height in tiles. Horizontal band: the rotation unit, so rows*32 must be '
-          + 'a power of two. Vertical band: the period (pattern_px = rows*8)'),
-      phases: z.array(z.array(z.array(z.number().int().min(0).max(15)).length(64))).optional()
-        .describe('the band art: exactly 8 banks, each of cols*rows tiles, each tile 64 pixel '
-          + 'values 0-15 row-major. Omit for a blank band'),
+        .describe('pattern height in tiles. Horizontal band: the rotation unit, so '
+          + `rows*${TILE_BYTES} must be a power of two. Vertical band: the period `
+          + `(pattern_px = rows*${TILE_WIDTH_PX})`),
+      phases: z.array(z.array(z.array(z.number().int().min(0).max(TILE_PIXEL_MAX))
+        .length(TILE_PIXELS))).optional()
+        // BOTH THE SCHEMA AND THE SENTENCE now read the contract. The zod bounds
+        // beside this used to be a typed `.max(15).length(64)` while the words
+        // said "64 pixel values 0-15" — two authors for each of two numbers, on
+        // the surface an agent reads before it sends art it cannot take back.
+        .describe(`the band art: exactly ${BGANIM_PHASE_BANKS} banks, each of cols*rows tiles, `
+          + `each tile ${TILE_PIXELS} pixel values 0-${TILE_PIXEL_MAX} row-major. `
+          + 'Omit for a blank band'),
       phaseFill: z.enum(['copy', 'blank', 'shift']).optional()
-        .describe('how banks 1..7 are derived from phase 0 when `phases` is omitted (a new band\'s '
+        .describe(`how banks 1..${BGANIM_PHASE_BANKS - 1} are derived from phase 0 when \`phases\` is omitted (a new band's `
           + 'phase 0 is blank art, so all three agree today; the option is the same one '
           + 'promote_bg_anim_band takes). Refused together with `phases`, which already spells '
           + 'every bank'),
@@ -589,8 +609,8 @@ export const EDITOR_METHODS: EditorMethod[] = [
     params: {
       tiles: z.array(z.object({
         index: z.number().int().min(0).describe('slot in the BG override tile blob'),
-        pixels: z.array(z.number().int().min(0).max(15)).length(64)
-          .describe('64 palette indices, row-major 8x8'),
+        pixels: z.array(z.number().int().min(0).max(TILE_PIXEL_MAX)).length(TILE_PIXELS)
+          .describe(`${TILE_PIXELS} palette indices, row-major 8x8`),
       })).min(1),
     },
     description: 'Write the pixels of one or more tiles of this game\'s BG override document '
@@ -600,7 +620,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + 'A slot past the prefix touches no band. One undo step.' },
   { name: 'regenerate_bg_anim_band_shift', kind: 'regenerate-bg-anim-band-shift', result: 'json',
     params: { band: z.number().int().min(0).describe('index into the band list') },
-    description: 'Rebuild banks 1..7 of a BgAnim band from its CURRENT phase 0 as pre-shifted '
+    description: `Rebuild banks 1..${BGANIM_PHASE_BANKS - 1} of a BgAnim band from its CURRENT phase 0 as pre-shifted `
       + 'phases (bank k = phase 0 scrolled k px ALONG THE BAND\'S OWN AXIS, within its pattern '
       + 'period, the same fill as phaseFill=shift, and vertical for a band that declares it). '
       + 'A REGENERATE, to run after each phase-0 edit; hand-drawn banks are replaced. Phase 0 is '
@@ -635,7 +655,8 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'Append a NEW 256-cell chunk to the pool (grows it). Reply includes the new 1-based ENGINE id. Refuses at the 127-chunk cap (engine ids 1..$7F; the layout loop bit makes $80+ unaddressable). One undo step.' },
   { name: 'add_block', kind: 'classic-add-block', result: 'json',
     params: { def: z.object({ cells: z.array(blockCellSchema).length(4).describe('exactly 4 tile cells, TL/TR/BL/BR') }).optional().describe('optional seed definition; omit for four blank tile-0 cells') },
-    description: 'Append a NEW 16x16 block to the pool (grows it). Reply includes the new 0-based block id. Refuses at the 1024-block cap (10-bit block refs). One undo step.' },
+    description: 'Append a NEW 16x16 block to the pool (grows it). Reply includes the new 0-based '
+      + `block id. Refuses at the ${MAX_BLOCK_REF + 1}-block cap (10-bit block refs). One undo step.` },
   { name: 'place_object', kind: 'classic-place-object', result: 'json',
     params: { entry: s1ObjectSchema },
     description: 'Append one object placement to the open act. One undo step; reply includes the new object index.' },

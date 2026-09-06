@@ -74,6 +74,7 @@ import {
   BAND_DEFAULTS,
   BGANIM_DRIVER_NAMES,
   BGANIM_MAX_BANDS,
+  BGANIM_PHASE_BANKS,
   BG_TILE_CAPACITY,
   TILE_BYTES,
   TILE_WIDTH_PX,
@@ -173,6 +174,31 @@ export interface PhaseFillOption {
 export const DEFAULT_PHASE_FILL: BandPhaseFill = 'copy';
 
 /**
+ * The highest phase-bank index — `BGANIM_PHASE_BANKS - 1`, derived once.
+ *
+ * NINE AUTHOR-FACING SENTENCES SAID "7". The contract carries exactly
+ * `BGANIM_PHASE_BANKS` banks (not at most), so "banks 1 to 7" is that count
+ * minus the resting phase 0 — a number with one author in the vendored contract
+ * and nine more in prose the pickers, the strip and the agent surface print. A
+ * contract that carried more banks would move every picker and leave all nine
+ * sentences behind, each wrong in the moment an author reads it.
+ *
+ * IT IS ALSO THE MASK. The driver selects a bank with `step & 7`, and that mask
+ * equals the last index only because the bank count is a power of two — which
+ * the contract's own value is. Asserted at module load rather than assumed, so a
+ * contract amendment to a non-power-of-two count fails loudly here instead of
+ * printing a mask that silently selects the wrong bank.
+ */
+export const LAST_PHASE_BANK = BGANIM_PHASE_BANKS - 1;
+if ((BGANIM_PHASE_BANKS & LAST_PHASE_BANK) !== 0) {
+  throw new Error(
+    `bganim contract BGANIM_PHASE_BANKS is ${BGANIM_PHASE_BANKS}, which is not a power of two: `
+    + '`step & (BGANIM_PHASE_BANKS - 1)` is no longer the driver\'s bank selector, and the '
+    + 'sentences that print it as a mask are now wrong. Re-derive them against the amended contract.',
+  );
+}
+
+/**
  * What the banks-1..7 selector offers, with the consequence of each mode spelled
  * out where the panel can print it. In the provider rather than the component
  * for the file-header reason: which sentence goes with which mode is a decision,
@@ -182,25 +208,27 @@ export function phaseFillOptions(): PhaseFillOption[] {
   return [
     {
       value: 'copy', label: 'copy of phase 0',
-      title: 'Banks 1 to 7 are copies of phase 0: the tile animation draws the same art at every '
-        + 'step, so nothing moves until you author its frames. The fill that edits nothing.',
-      note: 'banks 1 to 7 arrive as copies of phase 0, so the tile animation is inert until you draw '
-        + 'its frames.',
+      title: `Banks 1 to ${LAST_PHASE_BANK} are copies of phase 0: the tile animation draws the `
+        + 'same art at every step, so nothing moves until you author its frames. The fill that '
+        + 'edits nothing.',
+      note: `banks 1 to ${LAST_PHASE_BANK} arrive as copies of phase 0, so the tile animation is `
+        + 'inert until you draw its frames.',
     },
     {
       value: 'shift', label: 'pre-shifted (moves)',
       title: 'Bank k is phase 0 scrolled k px within the tile animation’s own pattern width (the '
         + 'contract’s "pre-shifted art 1px apart") so it scrolls as soon as it is '
         + 'saved. Phase 0, the picture at rest, is unchanged.',
-      note: 'banks 1 to 7 are phase 0 pre-shifted 1 px per bank, wrapping at the pattern edge, '
-        + 'so the tile animation MOVES with no further authoring. The picture at rest is unchanged.',
+      note: `banks 1 to ${LAST_PHASE_BANK} are phase 0 pre-shifted 1 px per bank, wrapping at the `
+        + 'pattern edge, so the tile animation MOVES with no further authoring. The picture at '
+        + 'rest is unchanged.',
     },
     {
       value: 'blank', label: 'blank',
-      title: 'Banks 1 to 7 are blank art. The picture holds at rest but BREAKS on the tile animation’s '
-        + 'second phase until you draw the frames, a deliberate authoring start.',
-      note: 'banks 1 to 7 arrive blank: the picture BREAKS on the tile animation’s second phase until '
-        + 'you draw the frames.',
+      title: `Banks 1 to ${LAST_PHASE_BANK} are blank art. The picture holds at rest but BREAKS on `
+        + 'the tile animation’s second phase until you draw the frames, a deliberate authoring start.',
+      note: `banks 1 to ${LAST_PHASE_BANK} arrive blank: the picture BREAKS on the tile animation’s `
+        + 'second phase until you draw the frames.',
     },
   ];
 }
@@ -396,14 +424,21 @@ export function axisOptions(): AxisOption[] {
     return {
       value: axis,
       label: horizontal ? 'horizontal (scrolls left)' : 'vertical (scrolls up)',
+      // BOTH FIGURES ARE READ, NOT TYPED. `rowChoices` and `patternPxFor` above
+      // go out of their way to evaluate the rule through the codec rather than
+      // restate it one derivation step away — and then this sentence, the only
+      // part of the pair a PERSON reads, used to spell `cols*8` and `rows*32` by
+      // hand. Both are vendored from aeon's consumer contract, so a contract
+      // amendment moved the pickers and left the tooltip behind.
       title: horizontal
-        ? 'The pattern translates along X. Its period is cols*8 px, and ROWS is the key that must '
-          + 'make rows*32 a power of two. As the driver scalar increases the art scrolls LEFT; '
-          + 'direction is fixed by the mechanism and is not a setting.'
-        : 'The pattern translates along Y. Its period is rows*8 px, and COLS is the key that must '
-          + 'make cols*32 a power of two. As the driver scalar increases the art scrolls UP; '
-          + 'direction is fixed by the mechanism and is not a setting. The pre-shifted fill '
-          + 'becomes a vertical roll, and the slots are ordered row-major.',
+        ? `The pattern translates along X. Its period is cols*${TILE_WIDTH_PX} px, and ROWS is `
+          + `the key that must make rows*${TILE_BYTES} a power of two. As the driver scalar `
+          + 'increases the art scrolls LEFT; direction is fixed by the mechanism and is not a setting.'
+        : `The pattern translates along Y. Its period is rows*${TILE_WIDTH_PX} px, and COLS is `
+          + `the key that must make cols*${TILE_BYTES} a power of two. As the driver scalar `
+          + 'increases the art scrolls UP; direction is fixed by the mechanism and is not a '
+          + 'setting. The pre-shifted fill becomes a vertical roll, and the slots are ordered '
+          + 'row-major.',
     };
   });
 }
@@ -716,6 +751,6 @@ export function removeBandCommand(
 // Constants the panel renders, re-exported so the component imports one module
 // ---------------------------------------------------------------------------
 
-export { BGANIM_MAX_BANDS, BG_TILE_CAPACITY, TILE_BYTES, TILE_WIDTH_PX, BAND_AXIS_DEFAULT,
-  BGANIM_BAND_AXES };
+export { BGANIM_MAX_BANDS, BGANIM_PHASE_BANKS, BG_TILE_CAPACITY, TILE_BYTES, TILE_WIDTH_PX,
+  BAND_AXIS_DEFAULT, BGANIM_BAND_AXES };
 export type { BandPhaseFill, BgAnimBandAxis };

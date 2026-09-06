@@ -122,9 +122,26 @@ function stripComments(src: string): string {
  * enforce. Emptying the holes also collapses `aeon-band-card-${index}` to a
  * whitespace-free id, which `isProse` then lets through as the DOM name it is.
  */
+/*
+ * ⚠ THE QUOTE ARMS SPAN NEWLINES, AND THAT IS THE POINT (2026-09-06).
+ *
+ * They used to read `[^'\\\n]` / `[^"\\\n]`, excluding the newline the way a
+ * line-oriented scanner has to. A multi-line JSX attribute — `title="rate_shift:
+ * … halves the band's speed. Leave it at …"`, wrapped across three source lines,
+ * which is how EVERY long tooltip in these files is written — matched NEITHER
+ * arm and was therefore invisible to this row. Four sentences on the tile
+ * animation panel said "band" to a person while this gate reported green.
+ *
+ * Measured, not assumed: lifting the exclusion over the twelve enumerated files
+ * returns exactly those four and nothing else. This is the same defect the
+ * numbers-in-prose parcel was chartered for — a predicate that cannot see the
+ * dominant shape of the prose it judges — landing inside a gate rather than
+ * inside a message. `\n` is left out of the classes; `\\.` still consumes an
+ * escaped quote, so the arms cannot run away past their closing quote.
+ */
 function literals(src: string): string[] {
   const out: string[] = [];
-  const re = /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g;
+  const re = /'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(src)) !== null) {
     out.push((m[1] ?? m[2] ?? m[3] ?? '').replace(/\$\{[^}]*\}/g, ''));

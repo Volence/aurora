@@ -1420,7 +1420,11 @@ export const LAYER_DEFORM_ROW = Object.freeze({
   title: 'deform.own: this strip\'s OWN table, overriding the scene\'s for this strip only',
   none: 'none',
   on: 'own',
-  hint: 'overrides the scene table for this strip; 15 on a shift means that plane takes none of it',
+  // The three titles below already read their figures off the bounds. This hint
+  // was the one line in the row that still TYPED the sentinel — the same number,
+  // with a second author, sitting between three derived siblings.
+  hint: `overrides the scene table for this strip; ${EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.max} `
+    + 'on a shift means that plane takes none of it',
   shiftATitle: `shift_a: Plane A amplitude as a right-shift, `
     + `${EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.min}..${EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.max}; `
     + `${EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.max} = no sample`,
