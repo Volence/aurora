@@ -942,13 +942,16 @@ async function main() {
     // quietly satisfied: the row stays red and says what it is.
     check('5b2', 'APP FINDING, LEFT RED: and that reason FITS IN THE BOX it is painted in',
       overWhy.insideScroller === true && overWhy.tallerThanScroller === false,
-      `leaf ${overWhy.rect ? overWhy.rect.bottom - overWhy.rect.top : '?'}px in a scroller `
-      + `${overWhy.scroller ? overWhy.scroller.bottom - overWhy.scroller.top : '?'}px tall `
-      + `(${JSON.stringify(overWhy.rect)} vs ${JSON.stringify(overWhy.scroller)}). NOT a defect `
-      + 'in the sentence — [5b] above measures its words and is green. This is the block being '
-      + 'taller than the smallest box the shell may give it, which is the bar Advisory\'s own '
-      + 'docblock sets (EW-LAYER-CARD-SCROLLER) and the two 165px row-remap blocks were '
-      + 'converted for. An APP change, out of this parcel\'s scope.');
+      (overWhy.leaf !== true
+        ? 'NO LEAF — the sentence was not found at all, so this row is reporting [5b]\'s subject '
+          + 'and not its own. Read [5b] first: a missing sentence is not a shape defect.'
+        : `leaf ${overWhy.rect.bottom - overWhy.rect.top}px in a scroller `
+          + `${overWhy.scroller ? overWhy.scroller.bottom - overWhy.scroller.top : '?'}px tall `
+          + `(${JSON.stringify(overWhy.rect)} vs ${JSON.stringify(overWhy.scroller)}). This says `
+          + 'NOTHING about the sentence\'s words — [5b] is the row that measures those, and this '
+          + 'one is about the BLOCK being taller than the smallest box the shell may give it. '
+          + 'That is the bar Advisory\'s own docblock sets (EW-LAYER-CARD-SCROLLER) and the two '
+          + '165px row-remap blocks were converted for. An APP change, out of this parcel.'));
 
     // ANTI-VACUOUS FLOOR: without this every refusal row above is satisfied by
     // a box that accepts nothing at all.
