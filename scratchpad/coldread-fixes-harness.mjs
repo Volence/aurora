@@ -562,6 +562,138 @@ async function main() {
     await shot(c, '03-colour-tab-cycles-open');
 
     // ───────────────────────────────────────────────────────────────────────
+    // C9, THE CLASS — IS THE STRIP IMMUNE, OR IS ONE CAUSE MERELY GONE?
+    // ───────────────────────────────────────────────────────────────────────
+    //
+    // ⚠ ROWS 9a/9b ARE ABOUT ONE CHILD, AND THE GUIDE'S SENTENCE IS ABOUT THE
+    // STRIP. `docs/guides/effects-first-run.md` §1 annotates the strip "always
+    // there, never scrolls". The first fix removed the `<code>` that overflowed
+    // on 2026-09-05 and 9a has measured 0px ever since — but "no child is too
+    // wide today" is not "the strip cannot be dragged sideways", and the next
+    // long generated path, symbol name or option label re-opens it. So these
+    // rows PLANT the condition instead of waiting for it, and then apply the
+    // two gestures a person actually has.
+    //
+    // THE PLANT RESEMBLES THE REAL DEFECT rather than deleting or bloating
+    // something: one unbreakable path token in a block inside the scroller,
+    // which is exactly the node the cold read's 10px came from. A bare
+    // `width: 900px` box would have proved a scroller scrolls, which nobody
+    // doubted.
+    //
+    // ⚠ AND THE GESTURE IS A REAL WHEEL, NOT `scrollLeft = n`. Assigning
+    // scrollLeft scrolls a box whose overflow is `hidden` just as happily as
+    // one whose overflow is `auto`, so a row written that way cannot tell the
+    // fix from its absence — it would have been red on both builds and read as
+    // "the fix does not work".
+    const PLANT = String.raw`
+      (() => {
+        const strip = document.querySelector('[data-effects-section-strip]');
+        if (!strip) return null;
+        let s = strip.parentElement;
+        while (s && s !== document.body) {
+          const o = getComputedStyle(s);
+          if (/auto|scroll|hidden/.test(o.overflowY) || /auto|scroll|hidden/.test(o.overflowX)) break;
+          s = s.parentElement;
+        }
+        if (!s || s === document.body) return null;
+        document.getElementById('c9-plant')?.remove();
+        const d = document.createElement('div');
+        d.id = 'c9-plant';
+        d.style.fontSize = '11px';
+        const code = document.createElement('code');
+        code.textContent = 'data/editor/effects/presets/a_preset_id_nobody_has_authored_yet.json';
+        d.appendChild(code);
+        s.appendChild(d);
+        const o = getComputedStyle(s);
+        return { overflowX: o.overflowX, overflowY: o.overflowY,
+                 scrollWidth: s.scrollWidth, clientWidth: s.clientWidth,
+                 overflow: s.scrollWidth - s.clientWidth };
+      })()`;
+    const GEOM = String.raw`
+      (() => {
+        const strip = document.querySelector('[data-effects-section-strip]');
+        let s = strip && strip.parentElement;
+        while (s && s !== document.body) {
+          const o = getComputedStyle(s);
+          if (/auto|scroll|hidden/.test(o.overflowY) || /auto|scroll|hidden/.test(o.overflowX)) break;
+          s = s.parentElement;
+        }
+        if (!s || s === document.body) return null;
+        const sr = s.getBoundingClientRect(), br = strip.getBoundingClientRect();
+        return { scrollLeft: s.scrollLeft, stripLeft: Math.round(br.x), scrollerLeft: Math.round(sr.x),
+                 shift: Math.round(sr.x - br.x), scrollerCx: Math.round(sr.x + s.clientWidth / 2),
+                 scrollerCy: Math.round(sr.y + Math.min(s.clientHeight, 400) / 2) };
+      })()`;
+    const planted = await c.json(PLANT);
+    note('C9 class — planted one unbreakable path token in the scroller',
+      JSON.stringify(planted));
+    if (planted === null || planted.overflow <= 0) {
+      cannotMeasure('9c', 'C9 class: a real sideways wheel cannot drag the pinned strip',
+        `the PLANT did not reproduce the condition (${JSON.stringify(planted)}), so a green below `
+        + 'would mean "nothing overflowed", not "the strip is immune" — the exact false pass '
+        + 'that made the first cut of 9a report PASS with every card shut.');
+      cannotMeasure('9d', 'C9 class: and focusing an off-edge control cannot drag it either',
+        'not measured: the plant above did not overflow.');
+    } else {
+      const before = await c.json(GEOM);
+      // A REAL horizontal wheel over the panel — what a trackpad swipe or a
+      // shift-wheel sends. Three of them, because one is a small delta.
+      for (let i = 0; i < 3; i++) {
+        await c.send('Input.dispatchMouseEvent', {
+          type: 'mouseWheel', x: before.scrollerCx, y: before.scrollerCy,
+          deltaX: 120, deltaY: 0, button: 'none', buttons: 0 });
+        await sleep(120);
+      }
+      await sleep(250);
+      const afterWheel = await c.json(GEOM);
+      note('C9 class — after 3 sideways wheels',
+        `${JSON.stringify(before)} → ${JSON.stringify(afterWheel)}`);
+      check('9c', 'C9 class: a real sideways wheel cannot drag the pinned strip',
+        Math.abs(afterWheel.shift) <= 1,
+        `with ${planted.overflow}px of planted overflow and overflowX ${planted.overflow > 0 ? planted.overflowX : '?'}: `
+        + `the strip's left edge is ${afterWheel.shift}px inside the scrollport's `
+        + `(scrollLeft ${afterWheel.scrollLeft}) — every px of that clips the ✓/✗ the strip exists to publish`);
+      if (Math.abs(afterWheel.shift) > 1) await shot(c, '03b-strip-dragged-by-wheel');
+
+      // The other path a person has, and the one `overflow: hidden` does NOT
+      // close on its own: focus. The browser scrolls a focused control into
+      // view on a `hidden` box exactly as it does on an `auto` one, so this is
+      // a SEPARATE question from 9c and not a restatement of it.
+      await c.evalExpr(String.raw`
+        (() => { const s = document.querySelector('[data-effects-section-strip]');
+          let p = s && s.parentElement;
+          while (p && p !== document.body) {
+            const o = getComputedStyle(p);
+            if (/auto|scroll|hidden/.test(o.overflowY) || /auto|scroll|hidden/.test(o.overflowX)) break;
+            p = p.parentElement;
+          }
+          if (p) p.scrollLeft = 0; return true; })()`);
+      await sleep(200);
+      const focused = await c.evalExpr(String.raw`
+        (() => {
+          const plant = document.getElementById('c9-plant');
+          if (!plant) return 'no-plant';
+          const b = document.createElement('button');
+          b.id = 'c9-plant-focus';
+          b.textContent = 'focus me';
+          b.style.marginLeft = '260px';
+          plant.appendChild(b);
+          b.focus();
+          return document.activeElement === b ? 'ok' : 'not-focused';
+        })()`);
+      await sleep(300);
+      const afterFocus = await c.json(GEOM);
+      note('C9 class — after focusing a control past the right edge',
+        `${focused} → ${JSON.stringify(afterFocus)}`);
+      check('9d', 'C9 class: and focusing an off-edge control cannot drag it either',
+        focused === 'ok' && Math.abs(afterFocus.shift) <= 1,
+        `focus=${focused}, strip ${afterFocus.shift}px inside the scrollport `
+        + `(scrollLeft ${afterFocus.scrollLeft})`);
+    }
+    await c.evalExpr(`(() => { document.getElementById('c9-plant')?.remove(); return true; })()`);
+    await sleep(200);
+
+    // ───────────────────────────────────────────────────────────────────────
     // C7 — AN OUT-OF-RANGE COLOUR WORD IS REFUSED, AND NO SWATCH IS INVENTED
     // ───────────────────────────────────────────────────────────────────────
 

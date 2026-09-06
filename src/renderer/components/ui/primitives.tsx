@@ -27,6 +27,45 @@ import { T } from './theme';
  * CONTENT sections alone over-subscribe it (SpriteMode mounts six) has nothing
  * left to divide, and scrolling the column is the correct degradation. When the
  * sections fit, nothing overflows and the scrollbar never appears.
+ *
+ * ═══ `scroll` IS VERTICAL. THE SIDEWAYS AXIS IS CLOSED ON PURPOSE ═══
+ * (COLDREAD-C9-SELECT-WIDER, cold read 2026-09-05 C9.)
+ *
+ * It was `overflow: auto`, which is BOTH axes, and the horizontal half was
+ * never anybody's design: a `Panel` sets a fixed `width` and is `flexShrink: 0`,
+ * so its column has one width forever and everything in it is authored to fit
+ * that width. A horizontal scrollbar here is always somebody's overflow bug.
+ *
+ * ⚠ AND IT DOES NOT MERELY LOOK WRONG — IT MOVES THE STICKY BOXES. A
+ * `position: sticky; top: 0` child pins on the BLOCK axis only; on the inline
+ * axis it rides the scroll like anything else, and its sticky-constraint
+ * rectangle is its containing block, which in a scroll container is the CONTENT
+ * box (`clientWidth`), so adding `left: 0` buys it no travel and cannot save it.
+ * Measured in the running app (`npm run harness:coldread-fixes` `[9c]`,
+ * 1680x1050, dpr 1): with 90px of overflow planted in the Effects column, three
+ * sideways wheel notches carried the facet's pinned section strip 89px off the
+ * left edge of its own scrollport — the strip the in-app guide annotates
+ * "always there, never scrolls", taking the two condition glyphs with it. That
+ * is the same mechanism the cold read hit at 10px; the guide's sentence is a
+ * claim about the STRIP, so removing one over-wide child (the `<code>` path in
+ * `column-layout.tsx`'s `Hint`) left the next one free to do it again.
+ *
+ * `hidden`, not `clip`: CSS Overflow 3 computes `clip` to `hidden` the moment
+ * the other axis is `auto`, so the two spell the same used value here and
+ * `hidden` says so plainly.
+ *
+ * ⚠ WHAT THIS DOES NOT CLOSE, stated so a silence is not read as coverage. A
+ * `hidden` box still scrolls PROGRAMMATICALLY — `scrollLeft = n` and the inline
+ * half of `scrollIntoView()` both still move it (`BgAnimBandPanel.tsx` calls
+ * one, `block: 'nearest'`, whose inline default is also `nearest`). That path
+ * needs TWO defects at once — a child wider than the column AND a scroll
+ * targeted past its edge — and row `[9d]` measures the focus half of it. What
+ * is closed is every gesture a person has: the scrollbar is gone and a wheel,
+ * a trackpad swipe and a drag do nothing.
+ *
+ * ⚠ CLIPPING IS QUIETER THAN SCROLLING, so the over-wide child must be caught
+ * somewhere else: `[9a]` fails on any horizontal overflow in the Effects column
+ * with its cards open, and it is the only instrument that sees one now.
  */
 export function Panel({ children, width, scroll = false, style }: {
   children: React.ReactNode; width?: number; scroll?: boolean; style?: React.CSSProperties;
@@ -35,7 +74,9 @@ export function Panel({ children, width, scroll = false, style }: {
     <div style={{
       display: 'flex', flexDirection: 'column', minHeight: 0, background: T.void,
       borderLeft: `1px solid ${T.border}`, flexShrink: 0,
-      ...(width ? { width } : {}), ...(scroll ? { overflow: 'auto' } : {}), ...style,
+      ...(width ? { width } : {}),
+      ...(scroll ? { overflowY: 'auto' as const, overflowX: 'hidden' as const } : {}),
+      ...style,
     }}>{children}</div>
   );
 }
