@@ -794,3 +794,147 @@ describe('run-root: build freshness names ONE tree, and discriminates', () => {
     expect(offenders, 'these still hand-roll the two-tree staleness gate').toEqual([]);
   });
 });
+
+/**
+ * EW-WORKTREE-MOUNT — A BORROWED RUN THAT CANNOT BE SHOWN TO MEASURE THIS
+ * CHECKOUT'S CODE IS NOW REFUSED, AND THE ONE THAT CAN IS NOT.
+ *
+ * `assertFreshBuild` threw on `stale` and `unmeasurable` and NARRATED two other
+ * conditions whose own text said the rows were invalid: a drifted borrow ("THE
+ * ROWS BELOW DO NOT MEASURE THOSE EDITS") and a drift check that could not run
+ * ("This run does not establish that this checkout's sources are in that
+ * bundle"). Both are refusals now, on the function's own stated principle.
+ *
+ * ⚠ THE PROPERTY IS DISCRIMINATION, NOT REFUSAL. A guard that refuses every
+ * borrowed run would pass a "does it throw?" row trivially and would make every
+ * worktree unable to measure anything. So the rows below hold the built tree
+ * FIXED and vary ONLY the caller's source bytes: byte-identical must return,
+ * one differing file must throw. The pair is the assertion; neither half alone
+ * is worth anything.
+ */
+describe('run-root: a borrowed run refuses when it cannot be shown to carry these sources', () => {
+  /** Same shape the block above uses, so the bed cannot drift from it. */
+  function makeTreeWithSource(label: string, distS: number, srcS: number): string {
+    const dir = makeBuiltTree(label);
+    mkdirSync(resolve(dir, 'src/renderer'), { recursive: true });
+    writeFileSync(resolve(dir, 'src/main.ts'), '// source\n', 'utf8');
+    writeFileSync(resolve(dir, 'src/renderer/App.tsx'), '// source\n', 'utf8');
+    utimesSync(resolve(dir, 'src/main.ts'), srcS, srcS);
+    utimesSync(resolve(dir, 'src/renderer/App.tsx'), srcS, srcS);
+    utimesSync(resolve(dir, 'dist/main/index.mjs'), distS, distS);
+    return dir;
+  }
+
+  const T = 1_700_000_000;
+
+  /** Drive the production entry point, capturing what it printed either way. */
+  const CALL = (root: string) => `const call = (here) => {\n`
+    + '  let printed = "";\n'
+    + '  try {\n'
+    + `    S.assertFreshBuild({ root: ${JSON.stringify(root)}, here, borrowed: true }, (s) => { printed += s; });\n`
+    + '    return { threw: null, printed };\n'
+    + '  } catch (e) { return { threw: e.message, printed }; }\n'
+    + '};\n';
+
+  it('REFUSES a drifted borrow and PASSES a byte-identical one, same built tree', () => {
+    const root = makeTreeWithSource('ew-root', T + 100, T);
+    const same = makeTreeWithSource('ew-same', T + 100, T);
+    const other = makeTreeWithSource('ew-other', T + 100, T);
+    // ONE file differs. Everything else about the two callers is identical, so
+    // the opposite verdicts can only have come from the bytes.
+    writeFileSync(resolve(other, 'src/main.ts'), '// EDITED in the caller only\n', 'utf8');
+    try {
+      const out = run(
+        CALL(root)
+        + `process.stdout.write(JSON.stringify({ same: call(${JSON.stringify(same)}), other: call(${JSON.stringify(other)}) }));`,
+      );
+      expect(out.status, `stderr:\n${out.stderr}`).toBe(0);
+      const r = JSON.parse(out.stdout) as Record<string, { threw: string | null; printed: string }>;
+
+      // The safe case: borrowed, not drifted. It must still work, and it must
+      // still SAY it borrowed rather than going quiet.
+      expect(r.same.threw, 'a byte-identical borrow must NOT be refused').toBe(null);
+      expect(r.same.printed).toContain('BORROWED but NOT DRIFTED');
+      expect(r.same.printed).toContain('byte-identical');
+
+      // The invalidating case.
+      expect(r.other.threw, 'a drifted borrow must be REFUSED, not narrated').not.toBe(null);
+      expect(r.other.threw).toContain('BORROWED AND DRIFTED');
+      expect(r.other.threw, 'the refusal must name the file that drifted').toContain('main.ts');
+      expect(r.other.threw, 'and both trees, so the reader knows which is which').toContain(root);
+      expect(r.other.threw).toContain(other);
+      expect(r.other.threw, 'and what to do about it').toContain('npm run build');
+      // It THREW rather than printing the old warning: nothing reached the writer.
+      expect(r.other.printed, 'a refusal must not also print the fresh line').toBe('');
+    } finally {
+      for (const d of [root, same, other]) rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * THE "COULD NOT RUN" CASE. Reachable only when the caller's own tree has no
+   * readable `src/`; the built tree's absent `src/` is `unmeasurable` and throws
+   * one branch earlier. No legitimate cause was found for it across the live
+   * call sites, so it refuses on the same ground an unmeasurable bundle does.
+   */
+  it('REFUSES when the drift check itself cannot run', () => {
+    const root = makeTreeWithSource('ew-nc-root', T + 100, T);
+    const bare = mkdtempSync(resolve(tmpdir(), 'aurora-ew-nosrc-'));
+    try {
+      const out = run(
+        CALL(root) + `process.stdout.write(JSON.stringify(call(${JSON.stringify(bare)})));`,
+      );
+      expect(out.status, `stderr:\n${out.stderr}`).toBe(0);
+      const r = JSON.parse(out.stdout) as { threw: string | null; printed: string };
+      expect(r.threw, 'an unanswerable drift question must not become a pass').not.toBe(null);
+      expect(r.threw).toContain('DRIFT CHECK COULD NOT RUN');
+      expect(r.threw).toContain(resolve(bare, 'src'));
+      expect(r.printed).toBe('');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(bare, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * THE UNTOUCHED CASE, asserted so a later change cannot quietly widen the
+   * refusal to every run. An in-tree run never consults drift at all.
+   */
+  it('leaves the in-tree case exactly as it was', () => {
+    const root = makeTreeWithSource('ew-intree', T + 100, T);
+    try {
+      const out = run(
+        'let printed = "", threw = null;\n'
+        + `try { S.assertFreshBuild({ root: ${JSON.stringify(root)}, here: ${JSON.stringify(root)}, borrowed: false }, (s) => { printed += s; }); }\n`
+        + 'catch (e) { threw = e.message; }\n'
+        + 'process.stdout.write(JSON.stringify({ printed, threw }));',
+      );
+      expect(out.status, `stderr:\n${out.stderr}`).toBe(0);
+      const r = JSON.parse(out.stdout) as { printed: string; threw: string | null };
+      expect(r.threw, 'an in-tree fresh build must still just run').toBe(null);
+      expect(r.printed).toContain('build: FRESH');
+      expect(r.printed, 'and must not acquire a borrowed line it never had').not.toContain('BORROWED');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * THE ARGUED EXEMPTION IS AT THE CALL SITE, AND MUST STAY THERE.
+   *
+   * `profile-isolation-proof.mjs` declines this gate deliberately: no row it
+   * judges reads anything the app renders. That opt-out is visible to a reader
+   * of THAT file. If someone later "fixes" it by adding the call, this parcel's
+   * refusal would start firing on a rig whose measurements do not depend on the
+   * bundle at all, and the argument would be lost with no event to surface it.
+   */
+  it('the one instrument that declines this gate still declines it, at its own call site', () => {
+    const src = readFileSync(resolve(__dirname, '../../scratchpad/profile-isolation-proof.mjs'), 'utf8');
+    const code = stripComments(src);
+    expect(code, 'the opt-out is not calling it; a call here would make it refusable')
+      .not.toContain('assertFreshBuild(');
+    expect(code, 'and it still PRINTS the verdict rather than skipping the question')
+      .toContain('buildFreshness(');
+    expect(code).toContain('borrowedSourceDrift(');
+  });
+});
