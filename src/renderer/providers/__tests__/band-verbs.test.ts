@@ -40,7 +40,7 @@ describe('bandSpecOf', () => {
 describe('bandVerbs: no document', () => {
   const v = bandVerbs(null, { staticBase: 0, cols: 1, rows: 1 });
   it('disables both with the panel\'s own reasons', () => {
-    expect(v.promote.reason).toBe(promoteUnavailableReason(null));
+    expect(v.promote.reason).toBe(promoteUnavailableReason(null, 1, 1));
     expect(v.add.reason).toBe(insertUnavailableReason(null, 1, 1));
     expect(v.promote.reason).not.toBeNull();
     expect(v.add.reason).not.toBeNull();
@@ -66,7 +66,7 @@ describe('bandVerbs: the fixture document', () => {
       .toBe(`Promote from tile ${base + 5}`);
   });
   it('reasons are the panel\'s predicates, verbatim', () => {
-    expect(v.promote.reason).toBe(promoteUnavailableReason(d));
+    expect(v.promote.reason).toBe(promoteUnavailableReason(d, candidate.cols, candidate.rows));
     expect(v.add.reason).toBe(insertUnavailableReason(d, 1, 1));
   });
   it('both are enabled here (anti-vacuous)', () => {
@@ -84,8 +84,12 @@ describe('bandVerbs: the fixture document', () => {
     const w = bandVerbs(d, huge);
     expect(w.add.reason).toBe(insertUnavailableReason(d, 10_000, 1));
     expect(w.add.reason).not.toBeNull();
-    // Promote is a different predicate and does not read cols — still open.
-    expect(w.promote.reason).toBe(promoteUnavailableReason(d));
+    // Promote is a different predicate, but it DOES read the geometry now: a
+    // promoted slot becomes an animated one, and an animated slot costs a whole
+    // phase bank per phase of ROM. `huge` is over the section ceiling, so this
+    // door is shut too, and by that budget rather than by the tile blob.
+    expect(w.promote.reason).toBe(promoteUnavailableReason(d, huge.cols, huge.rows));
+    expect(w.promote.reason).not.toBeNull();
   });
 });
 

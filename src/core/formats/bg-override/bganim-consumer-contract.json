@@ -123,6 +123,59 @@
       "authorities": [
         "aeon tools/inject_editor_bg.py:1036 — the nametable loop: `if word != 0: idx = word & 0x7FF; word = (word & ~0x7FF) | ((idx + BG_TILE_BASE_SLOT) & 0x7FF)`"
       ]
+    },
+    "BGANIM_SECTION_CEILING": {
+      "value": 20480,
+      "why": "THE SECOND BUDGET, AND ON EVERY DOCUMENT MEASURED SO FAR THE TIGHTER ONE. `BG_TILE_CAPACITY` bounds the blob in VRAM TILES; this bounds the EMITTED `ojz_bg_anim` SECTION in ROM BYTES, and the two are independent. `check_bganim_section_fits` raises SystemExit when `BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES*bands + views*(BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES*bands) + total_slots*BGANIM_BYTES_PER_SLOT` exceeds it. At BGANIM_BYTES_PER_SLOT per animated slot the whole act gets at most ~79 slots at ANY band count, against a tile capacity of 400 — so the tile readout alone overstates what an author may spend by a factor of five. IT IS AN OWNER RULING, NOT A MEASUREMENT: `BGANIM_SECTION_CEILING_RULED` is a budget INSIDE the ROM room (aeon tools/bganim_room.py measures the room and fails aeon's build if the ruled number ever exceeds it), so it moves by decision and not by re-deriving anything here. It has already moved twice: 9,394 -> 12,288 (2026-08-26) -> 20,480 (2026-09-04). NEVER RESTATE THE NUMBER IN PROSE OR A TEST — aeon shipped a refusal telling a blocked author 'the limit is 12 KiB' for two days after the raise, which is this file's own lesson one repo over.",
+      "authorities": [
+        "aeon tools/inject_editor_bg.py:207 — `BGANIM_SECTION_CEILING = min(BGANIM_SECTION_CEILINGS.values())`, the value the GENERATOR enforces; the MINIMUM across listing shapes on purpose, so a section can never pass the emitter and then fail one shape's room gate",
+        "aeon tools/inject_editor_bg.py:202 — `BGANIM_SECTION_CEILING_RULED = 20480`, the owner's ruled authoring budget (decision d-9, raised 2026-09-04), which every row of `BGANIM_SECTION_CEILINGS` names",
+        "aeon tools/inject_editor_bg.py:382 — `check_bganim_section_fits`, the refusal (SystemExit, a build failure with a sentence rather than a traceback)"
+      ],
+      "notInAeonProse": "UNLIKE EVERY OTHER CONSTANT HERE, THIS ONE HAS NO ROW IN aeon tools/EFFECTS_CONSUMER_CONTRACT.md. It lives only in the consumer's source, which is exactly the class aeon's own `default_off` subsection names: 'a constraint that was never in the copy at all ... invisible to a per-line check of the consumer's file (which cannot find what is absent) and to a currency gate over values (because it is not a value)'. Recorded here so the next reader does not conclude from the contract doc's silence that no such rule exists."
+    },
+    "BGANIM_COUNT_BYTES": {
+      "value": 2,
+      "why": "The section opens with a u16 band count. Also the WHOLE SIZE of the disabled stub (`BgAnim_Table: u16 = 0` plus an empty `BgAnim_Banks`), and it is paid again per DEBUG view twin, each of which gets its own count word.",
+      "authorities": [
+        "aeon tools/inject_editor_bg.py:214 — `BGANIM_COUNT_BYTES = 2`, under the comment 'Section layout, stated once so every size in this file derives from ONE place'",
+        "aeon tools/inject_editor_bg.py:362 — `bganim_section_bytes`, the one authority for the section's size"
+      ]
+    },
+    "BGANIM_RECORD_BYTES": {
+      "value": 44,
+      "why": "One `bganim_band` record: 6 u16 header fields plus an 8-entry `[*u8; 8]` pointer array. Paid once per band in the act's own table AND once per band in EACH view twin — a record is a contiguous image the engine walks with `(a3)+`, so it cannot be shared even though the twins differ from the authored record only in `driver` and `rate_shift`. LOCKSTEP with engine/level/bg_anim.emp's `struct bganim_band`; a field added there without moving this number makes the ceiling gate nothing, which is why aeon asserts the predicted size against the emitted one.",
+      "authorities": [
+        "aeon tools/inject_editor_bg.py:215 — `BGANIM_RECORD_BYTES = 44`",
+        "aeon tools/inject_editor_bg.py:1007 — `assert section_bytes == bganim_section_bytes(...)`, which fails if the formula and the emitter diverge"
+      ]
+    },
+    "BGANIM_BYTES_PER_SLOT": {
+      "value": 256,
+      "why": "What one ANIMATED slot costs in the bank blob: every phase bank carries the whole slot, so it is BGANIM_PHASE_BANKS banks of TILE_BYTES each. THIS IS THE EXPENSIVE TERM and the only one that scales with authoring — the bank blob is shared across the view twins, which is why the twins are cheap and a slot is not. It is also why the two budgets diverge so far: a slot costs ONE entry against BG_TILE_CAPACITY and 256 bytes against BGANIM_SECTION_CEILING.",
+      "authorities": [
+        "aeon tools/inject_editor_bg.py:218 — `BGANIM_BYTES_PER_SLOT = BGANIM_PHASES * BGANIM_TILE_BYTES`, whose two operands are this file's own BGANIM_PHASE_BANKS and TILE_BYTES under the names the emitter uses",
+        "aeon tools/inject_editor_bg.py:216 — `BGANIM_PHASES = 8`",
+        "aeon tools/inject_editor_bg.py:217 — `BGANIM_TILE_BYTES = 32`"
+      ]
+    },
+    "BGANIM_VIEW_COUNT": {
+      "value": 3,
+      "why": "How many DEBUG view twins a qualifying act's table gets: `BgAnim_View_H` (the authored band), `BgAnim_View_V` (re-driven off Camera_Y) and `BgAnim_View_T` (off Logic_Tick). THEY COST SECTION BYTES, so a writer that ignores them under-counts the section — each twin is its own count word plus its own record per band. WHETHER THEY ARE EMITTED IS A PER-ACT QUESTION, not a per-band one: see the `default_off` band key.",
+      "authorities": [
+        "aeon tools/inject_editor_bg.py:323 — `BGANIM_VIEW_COUNT = 3`",
+        "aeon tools/inject_editor_bg.py:326 — `views_emitted(anims)`, which returns 0 or exactly this many",
+        "aeon tools/EFFECTS_CONSUMER_CONTRACT.md §1.2, the `default_off` subsection"
+      ]
+    },
+    "BGANIM_VIEW_DERIVED_PERIOD_PX": {
+      "value": 64,
+      "why": "The pattern period, in px, that the V twin's rate shift was DERIVED against (one full cycle is about one screen height of vertical camera travel). A `default_off` band with any other `pattern_px` is REFUSED rather than silently given a different cadence — writer obligation 2 of the `default_off` pair. Re-deriving the rung for another period is an engine-side decision, not a writer's.",
+      "authorities": [
+        "aeon tools/inject_editor_bg.py:287 — `BGANIM_VIEW_DERIVED_PERIOD_PX = 64`",
+        "aeon tools/inject_editor_bg.py:350 — the refusal in `views_emitted`: `if period != BGANIM_VIEW_DERIVED_PERIOD_PX: raise AssertionError(...)`",
+        "aeon tools/EFFECTS_CONSUMER_CONTRACT.md §1.2, the `default_off` subsection, obligation 2"
+      ]
     }
   },
 
@@ -229,18 +282,26 @@
       "required": true,
       "kind": "phaseBanks",
       "cite": "inject_editor_bg.py — `for bank in a['phases']: assert len(bank) == n`, and validate_band_coherence's `phases[0] == tiles[base:base+n]`"
+    },
+    "default_off": {
+      "required": false,
+      "kind": "bool",
+      "default": false,
+      "cite": "inject_editor_bg.py — `'default_off': bool(a.get('default_off', False))`, and `views_emitted(anims)` which reads it to decide whether the DEBUG view twins are emitted at all",
+      "why": "⚠ NOT A PREVIEW TOGGLE. IT CHANGES WHAT SHIPS. A band carrying it is not counted into the act's own `BgAnim_Table`, so a single-band act emits `count = 0` and BG animation is off at boot IN EVERY SHAPE, RELEASE INCLUDED — no runtime flag, no engine gate, no cost. An author flipping this in an editor is changing shipped behaviour while believing they are changing what they see, and any author-facing copy must say so BEFORE it says anything else. It is currently the only mechanism that stops these tiles animating in the game as played: the three view twins are all `if DEBUG == 1` and `BgAnim_SetTable` is DEBUG-only, so the plain shape has no selector and permanently walks `BgAnim_Table`.",
+      "aeonValueForAurora": "IT IS ALSO AN OPERAND OF THE SECTION BUDGET, which is why this codec now models it rather than merely round-tripping it: `views_emitted` decides whether BGANIM_VIEW_COUNT twins are added to the emitted section, and each twin costs BGANIM_COUNT_BYTES plus BGANIM_RECORD_BYTES per band. A writer that cannot answer 'are the twins emitted' cannot compute the section size at all.",
+      "writerObligations": [
+        "1. THE ACT MUST HAVE EXACTLY ONE BAND — not 'all bands agree'. If ANY band carries `default_off` and `len(anims) != 1`, the emitter raises. ⚠ THE QUANTIFIER IS THE TRAP: the constraint is on the ACT'S BAND COUNT, not on how many bands carry the key, so the natural per-key validator ('is default_off consistent across the bands?') PASSES A TWO-BAND ACT THIS BUILD REFUSES. Model it against the band count, or not at all.",
+        "2. `pattern_px` MUST EQUAL BGANIM_VIEW_DERIVED_PERIOD_PX. The V twin's rate shift was derived against that period; any other one refuses rather than silently running at a different cadence.",
+        "3. NOT REACHABLE THROUGH OBLIGATION 1, AND RECORDED ANYWAY: `default_off` bands must be the TAIL of the band list, because the count word says how many of the records that FOLLOW IT the engine walks. Obligation 1 already forces a single-band act on every path that emits, so this fires only if aeon ever relaxes the first one."
+      ],
+      "auroraStatusBefore": "ROUND-TRIPPED, NOT VALIDATED, until 2026-09-06. The reader did not refuse the unknown key and the writer did not drop it, so aeon's shipped document survived a load/save unchanged — which is preservation, not safety, and held only because no Aurora author could create or change the key. aeon's own contract subsection says so in those words: 'The day a writer exposes it, that writer can emit a document this build refuses — the permissive-guard direction, failing by blaming the build.'",
+      "aeonProse": "aeon tools/EFFECTS_CONSUMER_CONTRACT.md §1.2, the subsection '`default_off` — a SHIPPED-BEHAVIOUR switch that reads like a preview setting', added 2026-09-06 in answer to this repo's disclosure that the key was in the shipped document with no rule anywhere a consumer could read"
     }
   },
 
   "notVendored": {
     "$comment": "WHAT AEON PUBLISHES THAT AURORA DOES NOT CARRY — the population a walk of THIS file can never see. Added 2026-09-06 at aeon f14b21a89fd755b011419a2a30822f06032a8dbe. THE REASON THIS BLOCK EXISTS: `constants` above is a list of things we already knew about, so auditing it answers only 'are our values right'. It cannot answer 'has aeon added something', because an absence and a pass produce the same output. The enumeration was therefore done from AEON'S SIDE — every module-level symbol in tools/vram_map.py, engine/system/constants.emp's BG block and tools/inject_editor_bg.py, diffed between the 2026-08-22 vendoring pin 1ee8f8e6 and origin/master — and everything that turned up and is NOT above is listed here WITH A VERDICT. An entry here is a decision, not an oversight; test/formats/bg-override-contract-currency.test.ts asserts each named symbol still exists at aeon's tip, so a disclosure cannot outlive the thing it discloses.",
-    "BGANIM_SECTION_CEILING": {
-      "aeonValue": 20480,
-      "aeonSymbol": "tools/inject_editor_bg.py — `BGANIM_SECTION_CEILING = min(BGANIM_SECTION_CEILINGS.values())`, ruled by `BGANIM_SECTION_CEILING_RULED = 20480` (owner ruling amending decision d-9, 2026-09-04)",
-      "newSince": "the 2026-08-22 pin",
-      "auroraNeedsIt": "YES, AND ITS ABSENCE IS A LIVE DEFECT OF THE SAME SHAPE AS THE ONE THIS AMENDMENT FIXED. It is a SECOND, INDEPENDENT and usually TIGHTER ceiling, in ROM BYTES rather than VRAM tiles, on a quantity Aurora does not model at all: `check_bganim_section_fits` raises SystemExit when `BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES*bands + views*(count+records) + total_animated_slots*BGANIM_BYTES_PER_SLOT` exceeds it. At 256 B per animated slot that is at most 79 animated slots for the whole act, at ANY band count. MEASURED on aeon's live document (1 band, 8x4 = 32 slots, `default_off` so 3 debug view twins, 8376 B of 20480): Aurora's `tileSlotsRemaining` reports 80 free tile slots, and the ROM section admits 47 more animated slots. A band between 48 and 80 slots is therefore OFFERED by Aurora's panel and REFUSED by aeon's build - the same permissive-validator failure, one budget over.",
-      "notFixedHere": "Modelling a second budget dimension is a feature, not a re-vendor: it needs a `bandBudget` field, a panel readout, an agent refusal and its own rows. Booked and disclosed rather than smuggled into a bug-tier parcel, following this file's own `outputDir.note` precedent. THE NUMBERS ABOVE ARE THE BRIEF FOR IT."
-    },
     "BG_BAND_RESERVE": {
       "aeonValue": 80,
       "aeonSymbol": "tools/vram_map.py — `BG_BAND_RESERVE = 80`, GENERATED from games/sonic4/vram.toml's `bg_region.band_reserve` (128 before EFFECTS-W1 item 9d)",
@@ -259,14 +320,8 @@
       "newSince": "the 2026-08-22 pin",
       "auroraNeedsIt": "NO. It is the DMA destination of Waterline_Art_Update, engine-internal, with no writer obligation. It is listed because it is WHERE THE 48 TILES WENT, and because its derivation is the proof that the capacity is now the arena's real end: the strips begin exactly at `BG_TILE_BASE_VRAM + BG_TILE_CAPACITY * 32`, so a blob past the capacity sprays into them and not, as this repo's prose said for a fortnight, into the sprite attribute table."
     },
-    "default_off": {
-      "aeonValue": null,
-      "aeonSymbol": "tools/inject_editor_bg.py — a BAND KEY: `'default_off': bool(a.get('default_off', False))`, plus `validate_default_off_coherence` and the DEBUG view twins (BGANIM_VIEW_* ) it gates",
-      "newSince": "the 2026-08-22 pin",
-      "auroraNeedsIt": "PROBABLY, AND IT IS NOT LOST TODAY. aeon's shipped editor_bg_override.json carries it (`default_off: true` on its one band) and it MEANS SOMETHING TO AN AUTHOR: the act boots with BG animation OFF, and aeon emits three debug view twins beside the table for it. MEASURED 2026-09-06 rather than assumed: Aurora's codec parses that document with zero notices, validates it clean, and `serializeBgOverride` writes `default_off: true` back out - the reader does not refuse unknown band keys and the writer does not drop them, so nothing is being erased. What is missing is that it is not in `bandKeys`, so no rule here describes it and no panel surfaces it. aeon refuses `default_off` set on some-but-not-all bands, and refuses a `default_off` band whose `pattern_px` is not BGANIM_VIEW_DERIVED_PERIOD_PX (64) - two writer obligations this file does not yet state. Adding it to `bandKeys` changes `BAND_KEYS`, which is the canonical WRITE ORDER, so it is a codec change with its own rows and not a citation repair."
-    },
     "emitterInternals": {
-      "$comment": "Also new since the pin, also deliberately absent: BGANIM_COUNT_BYTES (2), BGANIM_RECORD_BYTES (44), BGANIM_BYTES_PER_SLOT (256), BGANIM_WORST_CASE_BYTES, BGANIM_SECTION_CEILINGS, BGANIM_SECTION_CEILING_RULED, and the debug view twins BGANIM_VIEW_V_DRIVER / V_RATE_SHIFT / DERIVED_PERIOD_PX / T_DRIVER / T_RATE_SHIFT / VIEW_COUNT. These describe the EMITTED ROM IMAGE and aeon's own debug scaffolding, not the input document, so no writer obligation follows from any of them ALONE. They are named because three of them are the operands of BGANIM_SECTION_CEILING above, which does bind a writer - the ceiling is not usable without them. BGANIM_PHASES (8) and BGANIM_TILE_BYTES (32) are the same two numbers this file already vendors as BGANIM_PHASE_BANKS and TILE_BYTES under the names the document uses."
+      "$comment": "SHRUNK 2026-09-06 BY THE SECTION-CEILING AMENDMENT, which took the operands this entry had listed as deliberately absent and vendored them: BGANIM_COUNT_BYTES, BGANIM_RECORD_BYTES, BGANIM_BYTES_PER_SLOT, BGANIM_VIEW_COUNT and BGANIM_VIEW_DERIVED_PERIOD_PX are all in `constants` now, beside BGANIM_SECTION_CEILING itself, because a ceiling is not usable without its operands and this entry said so. WHAT REMAINS DELIBERATELY ABSENT: BGANIM_WORST_CASE_BYTES (the largest section any legal authoring can produce; it BOUNDS the ceiling inside aeon and binds no writer), BGANIM_SECTION_CEILINGS and BGANIM_SECTION_CEILING_RULED (the per-listing-shape table and the owner's ruled figure; Aurora vendors the MINIMUM across shapes, which is what the generator enforces, so pinning the table here would make a red row out of an aeon-internal split that cannot reach a document), and the twins' own driver and rate constants BGANIM_VIEW_V_DRIVER / V_RATE_SHIFT / T_DRIVER / T_RATE_SHIFT (they decide what the DEBUG twins DO, never how many bytes they cost, and a writer authors neither). BGANIM_PHASES (8) and BGANIM_TILE_BYTES (32) are still the same two numbers this file vendors as BGANIM_PHASE_BANKS and TILE_BYTES under the names the document uses; BGANIM_BYTES_PER_SLOT is their product and is vendored under its own name because it is the emitter that multiplies them, not this codec."
     }
   },
 
@@ -281,6 +336,8 @@
     "layoutTileIndex": "layout[row*64 + col] is a nametable word whose low LAYOUT_TILE_INDEX_MASK bits are a blob-local index into `tiles` and whose remaining bits are attributes the consumer preserves — EXCEPT that a word of exactly 0 is passed through unrebased and renders VRAM tile 0 (blank) rather than tiles[0]. Adding or removing a band renumbers `tiles`, so every nonzero word must be rewritten INDEX-ONLY, and a rewrite that would produce the value 0 is unrepresentable rather than merely different.",
     "slotOrder": "WRITER OBLIGATION 1, and the consumer CANNOT CHECK IT. Band cell (c, r) is slot `slot_base + c*rows + r` on a HORIZONTAL band (column-major) and `slot_base + r*cols + c` on a VERTICAL one (ROW-major). It lives in `layout` — which cell references which slot — and the same set of slots reads as a scroll under one order and as a shimmer under the other. aeon: 'a band's slots are deduped against the static blob and appear at many cells — so nothing checks this'. Any Aurora assertion over the SET, the COUNT or a CHECKSUM of a band's slots is vacuous here by construction; only the ORDER discriminates.",
     "phaseAxis": "WRITER OBLIGATION 2. The eight phase banks must be translations ALONG THE DECLARED AXIS. aeon refuses exactly one case and admits everything else: a vertical band whose phases are exact HORIZONTAL translations of phase 0 and are not also vertical ones (`validate_band_phase_axis`) — the reachable accident of a horizontal-only shift-fill run over a band declared vertical. Composites are deliberately admitted on both axes, because the shipped horizontal bands are composites rather than pure rolls.",
+    "sectionCeiling": "THE SECOND BUDGET, AND THE TIGHTER ONE ON EVERY DOCUMENT MEASURED SO FAR. `BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES*bands + views*(BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES*bands) + total_animated_slots*BGANIM_BYTES_PER_SLOT <= BGANIM_SECTION_CEILING` (aeon `bganim_section_bytes` and `check_bganim_section_fits`). IT IS ON THE ACT'S TOTAL AND NEVER PER BAND: `BgAnim_Banks` is one blob for the whole act, and aeon's own comment records a per-band cap being tried and refuted by this zone's shipped content (32x4 + 16x4 passes any generous per-band limit while its SUM is 49,242 B). `views` is BGANIM_VIEW_COUNT or zero and is decided PER ACT, not per band — see `viewTwins`. ⚠ IT IS INDEPENDENT OF `capacity`: a document can sit far inside BG_TILE_CAPACITY and be refused here, which is exactly the state aeon's live document was in when this was found. NEVER RESTATE EITHER NUMBER: derive both and say which one binds.",
+    "viewTwins": "HOW MANY DEBUG VIEW TWINS AN ACT EMITS, and therefore an operand of `sectionCeiling`. Zero unless some band carries `default_off`; otherwise BGANIM_VIEW_COUNT, and only if the act has EXACTLY ONE BAND whose `pattern_px` is BGANIM_VIEW_DERIVED_PERIOD_PX — aeon raises on either failure rather than emitting zero twins. ⚠ BOTH REFUSALS ARE QUANTIFIED OVER THE ACT, NOT OVER THE BANDS THAT CARRY THE KEY: a two-band act in which BOTH bands are `default_off` is refused just as a mixed one is, so a validator asking 'do the bands agree?' passes a document this build rejects. See `bandKeys.default_off.writerObligations`.",
     "axisRoundTrip": "WRITER OBLIGATION 3. `axis` must survive a load / edit-something-else / save. Dropping it silently reverts the band to horizontal, and obligation 2's guard cannot see a band that no longer claims to be vertical. Absent means \"horizontal\", and Aurora never writes the default in — a save of an untouched document is not a diff."
   },
 
@@ -312,6 +369,24 @@
       ],
       "scope": "FULL SWEEP, unlike the `axis` amendment above. Every constant, every driver, every top-level and band key and every invariant in this file was re-read at this revision, not only the one that moved. ONE VALUE MOVED (BG_TILE_CAPACITY). Ten citations were repaired without their values moving — six stale line numbers (vram_map.py:26 -> :34 and :25 -> :33, constants.emp:212 -> :312, ram.emp:526 -> :697) and two quoted source lines the 2026-09-02 axis amendment had rewritten in aeon but not here (`col_bytes = rows * 32` -> `unit_bytes = unit_tiles * 32`; `assert pattern_px == cols * 8` -> `assert pattern_px == period_px`). `outputDir` was re-verified and still holds.",
       "lesson": "THE STALE CITATION AND THE STALE VALUE ARRIVED TOGETHER AND ONLY THE VALUE WAS EVER GOING TO BE NOTICED. `tools/vram_map.py:26 — BG_TILE_CAPACITY = 448` was wrong in the number AND in the coordinate, and nothing in this repo could see either: the drift gate hashes OUR copy, which equals itself by construction. That gap is now closed on the value side by test/formats/bg-override-contract-currency.test.ts, which reads aeon's authorities at origin/master and skips LOUDLY when aeon is absent. It is NOT closed on the coordinate side — a line number is still only as good as the last person who looked."
+    },
+    {
+      "id": "section-ceiling",
+      "repo": "aeon",
+      "commit": "78c994235fc51c54e2b03c075eda566123d6a02b",
+      "read": "2026-09-06",
+      "what": "THE SECOND BUDGET, IN ROM BYTES (EFFECTS-W1; the feature the 2026-09-06 capacity re-vendor booked in `notVendored.BGANIM_SECTION_CEILING.notFixedHere` and deliberately did not smuggle into a bug-tier parcel). Vendors BGANIM_SECTION_CEILING and its five operands (BGANIM_COUNT_BYTES, BGANIM_RECORD_BYTES, BGANIM_BYTES_PER_SLOT, BGANIM_VIEW_COUNT, BGANIM_VIEW_DERIVED_PERIOD_PX); promotes `default_off` from a `notVendored` disclosure to a real `bandKeys` entry, because `views_emitted` reads it and the section size cannot be computed without it; adds invariants `sectionCeiling` and `viewTwins`. The two `notVendored` entries this supersedes are DELETED rather than annotated, per this file's own rule that a disclosure must not outlive the thing it discloses.",
+      "documents": [
+        "tools/inject_editor_bg.py — THE CONSUMER and the ONLY authority for any of this: `BGANIM_SECTION_CEILING_RULED` / `BGANIM_SECTION_CEILINGS` / `BGANIM_SECTION_CEILING`, the section-layout block (`BGANIM_COUNT_BYTES`, `BGANIM_RECORD_BYTES`, `BGANIM_PHASES`, `BGANIM_TILE_BYTES`, `BGANIM_BYTES_PER_SLOT`), `views_emitted()`, `bganim_section_bytes()` and `check_bganim_section_fits()`",
+        "tools/EFFECTS_CONSUMER_CONTRACT.md §1.2 — the `default_off` row and its subsection, added 2026-09-06 in answer to this repo's disclosure; it states both writer obligations and names the quantifier trap"
+      ],
+      "notALL": "SCOPE: the BYTE BUDGET and `default_off` only. Every other constant in this file was last re-derived at the 2026-09-06 capacity amendment above (aeon f14b21a8) and was NOT re-read here; the currency gate is what watches them between amendments. `outputDir.note` still records the one disclosed, un-re-vendored drift. THE SECTION CEILING HAS NO ROW IN aeon's EFFECTS_CONSUMER_CONTRACT.md — it is vendored from the consumer's source alone, which the constant's own `notInAeonProse` field records.",
+      "correctionsToThisFile": [
+        "`notVendored.default_off.aeonSymbol` named `validate_default_off_coherence`. THERE IS NO SUCH FUNCTION at aeon 78c99423: both refusals live in `views_emitted`, and the tail-ordering assert is inline in `main()`. The currency gate did not catch it because that row greps for the DISCLOSURE'S KEY (`default_off`), which appears all over the file. The entry is deleted here, so the miscitation goes with it; the gap it exposes does not, and is recorded in the parcel packet.",
+        "`notVendored.default_off.auroraNeedsIt` said aeon 'refuses default_off set on some-but-not-all bands'. THAT IS THE TRAP AEON'S OWN CONTRACT WARNS ABOUT, restated as if it were the rule: the refusal fires whenever any band carries the key and the ACT has more than one band, so a two-band act with BOTH bands `default_off` is refused too. Corrected in `bandKeys.default_off.writerObligations` and in the `viewTwins` invariant.",
+        "`notVendored.default_off.auroraNeedsIt` also said adding the key to `bandKeys` 'changes BAND_KEYS, which is the canonical WRITE ORDER'. IT IS NOT, AND HAS NOT BEEN SINCE `canonical-json.ts` LANDED: `serializeBgOverride` sorts keys alphabetically and recursively per empyrean §5, and `BAND_KEYS` is declaration order for the reader, the validator and the drift gate. The cost of adding the key was therefore lower than the disclosure claimed."
+      ],
+      "measured": "AT THIS REVISION, ON AEON'S OWN SHIPPED DOCUMENT (games/sonic4/data/editor_bg_override.json at 78c99423): 320 tiles, one 8x4 band, `default_off` true, `pattern_px` at the derived period, so the twins ARE emitted. The tile budget leaves BG_TILE_CAPACITY minus 320 free slots; the byte budget admits fewer than half that many more animated slots. Both figures are derived by `bganimSectionBytes` in this repo's codec and asserted as a RELATION (bytes bind before tiles) rather than as literals."
     }
   ]
 }

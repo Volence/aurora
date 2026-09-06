@@ -177,7 +177,7 @@ describe('availability agrees with what the command actually does', () => {
     const d = doc();
     expect(bandBudget(d).tileSlotsRemaining).toBeGreaterThan(0);   // anti-vacuous
     expect(insertUnavailableReason(d, 2, 1)).toBeNull();
-    expect(promoteUnavailableReason(d)).toBeNull();
+    expect(promoteUnavailableReason(d, 2, 1)).toBeNull();
     expect(addBandCommand(d, { cols: 2, rows: 1 }).ok).toBe(true);
     expect(promoteBandCommand(d, bandBudget(d).firstPromotableSlot, { cols: 2, rows: 1 }).ok)
       .toBe(true);
@@ -204,7 +204,7 @@ describe('availability agrees with what the command actually does', () => {
     // The other half, and the reason the first half is not simply a dead end:
     // promotion costs no slots at any capacity.
     const d = fullDoc();
-    expect(promoteUnavailableReason(d)).toBeNull();
+    expect(promoteUnavailableReason(d, 2, 1)).toBeNull();
     const r = promoteBandCommand(d, bandBudget(d).firstPromotableSlot, { cols: 2, rows: 1 });
     expect(r.ok).toBe(true);
   });
@@ -219,7 +219,7 @@ describe('availability agrees with what the command actually does', () => {
       d = applyForTest(d, r.command);
     }
     expect(bandBudget(d).bands).toBe(BGANIM_MAX_BANDS);
-    expect(promoteUnavailableReason(d)).toMatch(new RegExp(`ceiling of ${BGANIM_MAX_BANDS}`));
+    expect(promoteUnavailableReason(d, 1, 1)).toMatch(new RegExp(`ceiling of ${BGANIM_MAX_BANDS}`));
     expect(insertUnavailableReason(d, 1, 1)).toMatch(new RegExp(`ceiling of ${BGANIM_MAX_BANDS}`));
   });
 });

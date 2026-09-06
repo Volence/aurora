@@ -24,6 +24,8 @@
 
 import {
   BgOverrideError,
+  bganimSectionBytes,
+  bgOverrideSectionIssues,
   cloneBgOverride,
   validateBgOverride,
   type BgOverrideBand,
@@ -43,12 +45,71 @@ import {
 } from '../formats/bg-override/bg-anim-band';
 import type { SetBgOverrideBandCommand } from './commands';
 
-/** Refuse against the PROJECTED document, while the caller's is still untouched. */
-function refuseIfResultInvalid(result: BgOverrideDocument, what: string): void {
-  const issues = validateBgOverride(result);
+/**
+ * Refuse against the PROJECTED document, while the caller's is still untouched.
+ *
+ * ═══ TWO KINDS OF RULE, AND THE SECOND ONE NEEDS A BEFORE ═══
+ *
+ * Everything `validateBgOverride` checks by default is about the document's own
+ * well-formedness: a violation means the file is malformed or would ship
+ * corrupt art, and the projected document either satisfies it or it does not.
+ *
+ * The ROM SECTION CEILING is not like that. It is a budget the document can
+ * ALREADY be over when Aurora opens it (this repo's own
+ * `editor_bg_override.b0e5a661.json` fixture is roughly two and a half times
+ * over), and a rule stated as "the result must fit" would then refuse the
+ * REPAIR: removing a tile animation from an over-budget act produces a document
+ * that is still over, so `demote` and `remove` would both be dead and the only
+ * way back would be hand-editing JSON.
+ *
+ * SO THE RULE IS DO NO HARM. Never grow a section that is over the ceiling, or
+ * push one over it; always allow it to shrink. That needs the document the
+ * author started from, which is why this takes two.
+ */
+function refuseIfResultInvalid(
+  before: BgOverrideDocument, result: BgOverrideDocument, what: string,
+): void {
+  const issues = validateBgOverride(result, { sectionCeiling: false });
+  const harm = sectionHarm(before, result);
+  if (harm !== null) issues.push(harm);
   if (issues.length > 0) {
     throw new BgOverrideError(`refusing to ${what}: the resulting document would not be valid`, issues);
   }
+}
+
+/**
+ * The section-budget refusal for a projected edit, or null when the edit is not
+ * a step backwards.
+ *
+ * THE COMPARISON IS THE RULE, in four cases and no fewer:
+ *
+ *   · the result has no computable size (a shape the build refuses outright,
+ *     such as a `default_off` act with more than one tile animation) — REFUSE,
+ *     unless the document was already in that state, in which case this edit is
+ *     a partial repair and blocking it helps nobody;
+ *   · the result fits — allow, which is the ordinary case;
+ *   · the result is over but no larger than what the author started from —
+ *     allow. This is the repair path, and it is the whole reason for the
+ *     `before` argument;
+ *   · the result is over AND larger — REFUSE, in the codec's own words.
+ */
+function sectionHarm(before: BgOverrideDocument, result: BgOverrideDocument): string | null {
+  const after = bgOverrideSectionIssues(result);
+  if (after.length === 0) return null;
+  const start = bgOverrideSectionIssues(before);
+  const a = sectionSizeOf(result);
+  const b = sectionSizeOf(before);
+  if (a === null) return start.length > 0 ? null : after[0];
+  if (b === null) return null;              // was worse in kind; this is not a step back
+  if (a <= b) return null;                  // shrinking or unchanged: the repair path
+  return after[0];
+}
+
+/** Emitted section size, or null when the act has no computable one. */
+function sectionSizeOf(doc: BgOverrideDocument): number | null {
+  const anims = Array.isArray(doc.anims) ? doc.anims : [];
+  const r = bganimSectionBytes(anims);
+  return r.ok ? r.value : null;
 }
 
 function command(
@@ -79,7 +140,7 @@ export function makeAddBandCommand(
   doc: BgOverrideDocument, band: BgOverrideBand, bandIndex?: number,
 ): SetBgOverrideBandCommand {
   const plan = planBandInsertion(doc, band, bandIndex);
-  refuseIfResultInvalid(insertBand(doc, plan, band), 'add a tile animation');
+  refuseIfResultInvalid(doc, insertBand(doc, plan, band), 'add a tile animation');
   return command(true, band, plan, 'Add tile animation');
 }
 
@@ -96,7 +157,7 @@ export function makeRemoveBandCommand(
 ): SetBgOverrideBandCommand {
   const plan = planBandRemoval(doc, bandIndex, options);
   const band = (doc.anims ?? [])[bandIndex];
-  refuseIfResultInvalid(removeBand(doc, plan), 'remove a tile animation');
+  refuseIfResultInvalid(doc, removeBand(doc, plan), 'remove a tile animation');
   return command(false, band, plan, 'Remove tile animation');
 }
 
@@ -119,7 +180,7 @@ export function makePromoteBandCommand(
   doc: BgOverrideDocument, band: BgOverrideBand, staticBase: number, bandIndex?: number,
 ): SetBgOverrideBandCommand {
   const plan = planBandPromotion(doc, band, staticBase, bandIndex);
-  refuseIfResultInvalid(promoteBand(doc, plan, band), 'promote static tiles to a tile animation');
+  refuseIfResultInvalid(doc, promoteBand(doc, plan, band), 'promote static tiles to a tile animation');
   return command(true, band, plan, 'Promote BG tiles to a tile animation');
 }
 
@@ -139,6 +200,6 @@ export function makeDemoteBandCommand(
 ): SetBgOverrideBandCommand {
   const plan = planBandDemotion(doc, bandIndex, staticBase);
   const band = (doc.anims ?? [])[bandIndex];
-  refuseIfResultInvalid(demoteBand(doc, plan), 'demote a tile animation to static tiles');
+  refuseIfResultInvalid(doc, demoteBand(doc, plan), 'demote a tile animation to static tiles');
   return command(false, band, plan, 'Demote tile animation to static tiles');
 }

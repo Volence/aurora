@@ -131,7 +131,11 @@ export function bandVerbs(
   return {
     promote: {
       label: `Promote from tile ${c.staticBase}`,
-      reason: promoteUnavailableReason(doc),
+      // THE GEOMETRY REACHES THE PREDICATE. A promotion does not grow the tile
+      // blob, which is why this used to be asked without one — but it does grow
+      // the ROM section, at one bank per phase, so "how big is it" is exactly
+      // the question the second budget needs answered.
+      reason: promoteUnavailableReason(doc, c.cols, c.rows),
       run: () => promoteBandCommand(doc, c.staticBase, spec),
     },
     add: {

@@ -73,12 +73,16 @@ import type { AnyCommand } from '../../core/editing/commands';
 import {
   BAND_DEFAULTS,
   BGANIM_DRIVER_NAMES,
+  BGANIM_BYTES_PER_SLOT,
   BGANIM_MAX_BANDS,
   BGANIM_PHASE_BANKS,
+  BGANIM_SECTION_CEILING,
   BG_TILE_CAPACITY,
   TILE_BYTES,
   TILE_WIDTH_PX,
   animatedSlotCount,
+  bganimSectionBytes,
+  bganimSectionSlotsAllowed,
   bandColumnBytes,
   bandPatternPx,
   bandRotationUnitBytes,
@@ -459,6 +463,37 @@ export interface BandBudget {
   tileSlotsRemaining: number;
   /** The first slot a promotion may take from: past every band's prefix. */
   firstPromotableSlot: number;
+
+  // ── THE SECOND BUDGET ───────────────────────────────────────────────────
+  // ROM bytes, not VRAM tiles, and on every document measured so far it binds
+  // FIRST. See `bganimSectionBytes` in the codec for the arithmetic.
+
+  /** Bytes the emitted section would occupy, or null when the act is refused. */
+  sectionBytes: number | null;
+  /** `BGANIM_SECTION_CEILING`. Always known: it is a constant, not a measurement. */
+  sectionCeiling: number;
+  /**
+   * Animated slots the BYTE ceiling still admits at this act's current shape,
+   * or null when the section size cannot be computed at all.
+   *
+   * ⚠ NULL IS NOT "PLENTY". It means aeon would refuse this act outright, and
+   * the only safe reading is zero — see `slotsRemaining`.
+   */
+  byteSlotsRemaining: number | null;
+  /**
+   * THE ONE AN AUTHOR MAY ACTUALLY SPEND: the tighter of the two budgets, and
+   * ZERO when the byte budget is unmeasurable.
+   *
+   * The permissive fallback is the defect this field exists to prevent. Reading
+   * "could not compute the section" as "so use the tile number" reproduces
+   * exactly the failure that put an 80-slot offer in front of a 47-slot
+   * section, one budget over.
+   */
+  slotsRemaining: number;
+  /** Which budget produced `slotsRemaining`, so a refusal can say so. */
+  binding: 'tiles' | 'bytes' | 'unmeasurable';
+  /** Why the section size has no value, or null when it has one. */
+  unmeasurable: string | null;
 }
 
 /**
@@ -476,10 +511,19 @@ export function bandBudget(doc: BgOverrideDocument | null): BandBudget {
       bands: 0, maxBands: BGANIM_MAX_BANDS, bandsRemaining: 0,
       animatedSlots: 0, tiles: 0, tileCapacity: BG_TILE_CAPACITY,
       tileSlotsRemaining: 0, firstPromotableSlot: 0,
+      sectionBytes: null, sectionCeiling: BGANIM_SECTION_CEILING,
+      byteSlotsRemaining: null, slotsRemaining: 0, binding: 'unmeasurable',
+      unmeasurable: 'this project has no editor_bg_override.json, so there is no section to size.',
     };
   }
   const bands = documentBands(doc);
   const animated = animatedSlotCount(bands);
+  const tileSlots = tileSlotsRemaining(doc);
+  const bytes = bganimSectionBytes(bands);
+  const allowed = bganimSectionSlotsAllowed(bands);
+  // BOTH ARMS COME FROM THE SAME REFUSAL, so they cannot disagree; asking twice
+  // is how a readout ends up saying "unmeasurable" beside a number.
+  const byteSlots = allowed.ok ? Math.max(0, allowed.value - animated) : null;
   return {
     bands: bands.length,
     maxBands: BGANIM_MAX_BANDS,
@@ -487,8 +531,18 @@ export function bandBudget(doc: BgOverrideDocument | null): BandBudget {
     animatedSlots: animated,
     tiles: Array.isArray(doc.tiles) ? doc.tiles.length : 0,
     tileCapacity: BG_TILE_CAPACITY,
-    tileSlotsRemaining: tileSlotsRemaining(doc),
+    tileSlotsRemaining: tileSlots,
     firstPromotableSlot: animated,
+    sectionBytes: bytes.ok ? bytes.value : null,
+    sectionCeiling: BGANIM_SECTION_CEILING,
+    byteSlotsRemaining: byteSlots,
+    // ⚠ THE DIRECTION IS THE WHOLE POINT. Unmeasurable collapses to zero, never
+    // to the looser tile number. A tie names `tiles`, which is not a lie about
+    // either: both refuse at the same slot, and the byte figure is printed
+    // beside it regardless, so nothing is hidden by the choice.
+    slotsRemaining: byteSlots === null ? 0 : Math.min(tileSlots, byteSlots),
+    binding: byteSlots === null ? 'unmeasurable' : (byteSlots < tileSlots ? 'bytes' : 'tiles'),
+    unmeasurable: bytes.ok ? null : bytes.reason,
   };
 }
 
@@ -605,25 +659,73 @@ export function insertUnavailableReason(
       + 'PROMOTE an existing static range instead: promotion moves art the document already '
       + 'carries, so it does not grow the blob and works on a full one.';
   }
+  // ── THE SECOND BUDGET, ASKED ABOUT THE POST-INSERT ACT ───────────────────
+  //
+  // NOT `n > budget.byteSlotsRemaining`. Inserting adds a BAND, and a band costs
+  // a record in the act's own table AND a record in each view twin, so the
+  // budget an insert has to fit is not the one the current act reports. Sizing
+  // the act that WOULD exist is also what makes the `default_off` trap
+  // reachable: adding a second tile animation to a default-off act is refused by
+  // the build outright, and the reason comes back in aeon's own terms rather
+  // than as a byte count that would be beside the point.
+  const after = [...documentBands(doc), { cols, rows }];
+  const bytes = bganimSectionBytes(after);
+  if (!bytes.ok) return bytes.reason;
+  if (bytes.value > budget.sectionCeiling) {
+    const allowed = bganimSectionSlotsAllowed(after);
+    const free = allowed.ok ? Math.max(0, allowed.value - budget.animatedSlots) : 0;
+    return `the blob has room, but the ROM SECTION does not. A tile animation's art is stored `
+      + `${BGANIM_PHASE_BANKS} times over (one bank per phase), so each animated slot costs `
+      + `${BGANIM_BYTES_PER_SLOT} bytes of the act's animation section. Adding ${n} would take `
+      + `it to ${bytes.value} bytes of ${budget.sectionCeiling}. At `
+      + `${after.length} tile animation(s) this act has room for ${free} more animated slot(s), `
+      + 'so use a smaller one, or PROMOTE static art into an existing tile animation instead. '
+      + 'This is a SECOND budget: the free-slot count above is about the tile blob, and the two '
+      + 'run out at different times.';
+  }
   return null;
 }
 
 /**
  * Why a PROMOTION of `cols x rows` at `staticBase` is unavailable, or null.
  *
- * Only the band ceiling and the "is there a document" question are answered
- * here. Everything about the RANGE — past the end of the blob, overlapping a
- * band's prefix, a non-integer base — is left to the command, because those
- * refusals are per-attempt rather than per-render and the codec's wording for
- * them is the wording the author needs.
+ * The band ceiling, the "is there a document" question, and the SECTION budget.
+ * Everything about the RANGE — past the end of the blob, overlapping a band's
+ * prefix, a non-integer base — is left to the command, because those refusals
+ * are per-attempt rather than per-render and the codec's wording for them is
+ * the wording the author needs.
+ *
+ * ⚠ IT TAKES A GEOMETRY NOW, AND THAT IS THE CORRECTION. "Promotion does not
+ * grow the blob" is true and was read as "promotion is free", which it is not:
+ * a promoted slot stops being static art and starts being ANIMATED art, and an
+ * animated slot is stored once per phase bank. Promotion is the door that
+ * spends the byte budget FASTEST for a given picture, because it adds both a
+ * record and its slots while the tile count does not move at all. A caller that
+ * cannot say how big the promotion is cannot be told whether it fits.
  */
-export function promoteUnavailableReason(doc: BgOverrideDocument | null): string | null {
+export function promoteUnavailableReason(
+  doc: BgOverrideDocument | null, cols: number, rows: number,
+): string | null {
   if (!doc) return 'this project has no editor_bg_override.json to promote tiles in.';
   const budget = bandBudget(doc);
   if (budget.tiles === 0) return 'the document carries no tiles, so there is nothing to promote.';
   if (budget.bandsRemaining <= 0) {
     return `the document already carries ${budget.bands} tile animation(s), which is the ceiling `
       + `of ${budget.maxBands}. Demote or remove one first.`;
+  }
+  const n = bandTileCount({ cols, rows });
+  const after = [...documentBands(doc), { cols, rows }];
+  const bytes = bganimSectionBytes(after);
+  if (!bytes.ok) return bytes.reason;
+  if (bytes.value > budget.sectionCeiling) {
+    const allowed = bganimSectionSlotsAllowed(after);
+    const free = allowed.ok ? Math.max(0, allowed.value - budget.animatedSlots) : 0;
+    return `promoting does not grow the tile blob, but it DOES grow the ROM section: a slot that `
+      + `becomes animated is stored ${BGANIM_PHASE_BANKS} times over, one bank per phase, at `
+      + `${BGANIM_BYTES_PER_SLOT} bytes a slot. Animating ${n} more would take the act's `
+      + `animation section to ${bytes.value} bytes of ${budget.sectionCeiling}. There is room `
+      + `for ${free} more animated slot(s) at ${after.length} tile animation(s). Promote a `
+      + 'smaller range, or demote something first.';
   }
   return null;
 }
