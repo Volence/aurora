@@ -265,6 +265,11 @@ async function main() {
     await c.evalExpr("window.__dbg.aeon.setLayer('fg')");
     const facet = await c.json("window.__dbg.aeon.setFacet('collision')");
     note('facet', JSON.stringify(facet));
+    // [n2] quotes a rect, and `devicePixelRatio` is not constant on this
+    // machine (1 and 1.35 both observed in one session), so the number that
+    // scales it belongs in the same run's output as the rect itself.
+    note('dpr', await c.evalExpr('String(window.devicePixelRatio) + " @ " '
+      + '+ window.innerWidth + "x" + window.innerHeight'));
 
     const poke = (s, p, i, w) => c.evalExpr(`window.__dbg.aeon.collisionPoke(${s}, '${p}', ${i}, ${w})`);
     const collAt = (s, p, i) => c.evalExpr(`window.__dbg.aeon.collisionAt(${s}, '${p}', ${i})`);
@@ -275,24 +280,26 @@ async function main() {
       return c.evalExpr('window.__dbg.aeon.activeSection()');
     };
     /**
-     * ⚠ A POKE IS NOT AN EDIT, AND THIS IS A REAL FINDING ABOUT THE INSTRUMENT.
+     * ⚠ THIS WAS A SECTION ROUND TRIP, AND ITS REMOVAL IS WHAT MAKES [n1] AND
+     * [n4] THE INSTRUMENT FOR THE HOOK'S BUMP.
      *
-     * `__dbg.aeon.collisionPoke` writes the plane word in place and does NOT
-     * bump `editorStore.liveEditVersion`, which is the app's "something
-     * changed" clock and the CollisionPalette's audit memo's only other
-     * dependency. So a poked defect is in the document and the panel has not
-     * been told. The real paint path does bump it; the backdoor does not.
+     * `__dbg.aeon.collisionPoke` used to write the plane word in place without
+     * bumping `editorStore.liveEditVersion` — the app's "something changed"
+     * clock and the CollisionPalette audit memo's only other dependency — so a
+     * poked defect sat in the document with the panel never told, and [n1]/[n4]
+     * were red on this harness's first run for that alone. The workaround was a
+     * round trip through the other section, which repaints by changing the
+     * memo's OTHER dependency; it was booked as an open item against the hook
+     * (packet 2026-09-06-loops-audit-coords §8 row 1) and the hook now calls
+     * `bumpLiveEdit()` the way `MapViewport.recordPaint` does.
      *
-     * This forces the re-render the way a person would, by looking at another
-     * section and back. It is NOT a workaround that hides the feature under
-     * test: the claim is what the sentence SAYS once rendered, and [n3] reaches
-     * the same rendering through a plain section switch with no round trip.
-     * Booked in the packet as an open item against the hook, not against this.
+     * So this is now a PLAIN SETTLE — no section change, nothing that could
+     * repaint on its own. Delete the `bumpLiveEdit()` from `collisionPoke` and
+     * [n1] and [n4] go red; that is the whole point of not putting the round
+     * trip back. [n3] still reaches the same rendering through a real section
+     * switch, so the two roads to the note are both still covered.
      */
-    const forceRepaint = async (target) => {
-      await setSection(target === SEC_A ? SEC_B : SEC_A);
-      return setSection(target);
-    };
+    const settle = async () => { await sleep(400); };
 
     // ── [c0] the note is ABSENT before anything is wrong ──────────────────
     // Without this every later row could be reading a sentence that was always
@@ -315,7 +322,7 @@ async function main() {
     const IDX_A = cellTopLeft(CC, CR);
     restore.push({ s: SEC_A, p: 'a', i: IDX_A, w: await collAt(SEC_A, 'a', IDX_A) });
     if ((await poke(SEC_A, 'a', IDX_A, SELF_A)) === null) throw new Error('collisionPoke refused');
-    await forceRepaint(SEC_A);
+    await settle();
     const n1 = await readNote();
     const want1 = `section ${SEC_A}, cell (col ${CC}, row ${CR}), left half`;
     check('n1', '⚠ THE NOTE ON SCREEN NAMES A PLACE, not an index: '
@@ -357,7 +364,7 @@ async function main() {
 
     // ── [n4] the note goes away when the defect does ──────────────────────
     await poke(SEC_B, 'a', IDX_B, restore.find((r) => r.i === IDX_B && r.s === SEC_B).w);
-    await forceRepaint(SEC_B);
+    await settle();
     const n4 = await readNote();
     check('n4', 'clearing the defect clears the note entirely (the sentence tracks the document, '
       + 'it is not a fixture)',
