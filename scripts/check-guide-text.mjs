@@ -133,6 +133,7 @@ const RENDERED = [
   { text: '?', file: `${EFFECTS}/SectionPicker.tsx` },
   { text: '✓', file: `${EFFECTS}/SectionPicker.tsx` },
   { text: '✗', file: `${EFFECTS}/SectionPicker.tsx` },
+  { text: '☐', file: `${EFFECTS}/SectionPicker.tsx` },
   { text: 'own preset', file: `${EFFECTS}/SectionPicker.tsx` },
   { text: 'threaded', file: `${EFFECTS}/SectionPicker.tsx` },
   { text: 'its channels', file: `${EFFECTS}/SectionPicker.tsx` },

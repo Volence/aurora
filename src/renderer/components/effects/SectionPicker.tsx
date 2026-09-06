@@ -80,6 +80,17 @@ import {
 } from '../../../core/formats/effects/section-wiring';
 
 /**
+ * WHAT AN UNMET CONDITION MEANS RIGHT NOW, which decides how it may be drawn.
+ *
+ * `limit`    nothing is bound to this section, so nothing is broken and nothing
+ *            will be refused. The condition states what the LEVEL DATA does not
+ *            carry yet.
+ * `refused`  this section binds a raster preset, so aeon's gate fires on exactly
+ *            this condition and the build will refuse what is here now.
+ */
+type UnmetMeaning = 'limit' | 'refused';
+
+/**
  * ONE CONDITION, ONE ROW — a mark, a name, and what the mark is about.
  *
  * ⚠ THE THIRD MARK IS NOT A FAILURE. `unknown` draws `?` in the faint tier and
@@ -87,22 +98,97 @@ import {
  * refusal turns on exactly that: a row that read `✗` because a file was missing
  * is indistinguishable, to the author, from one that reads `✗` because the thing
  * is impossible.
+ *
+ * ═══ AND THE FOURTH MARK, FOR THE SAME REASON ONE LAYER OUT (C1) ═══
+ *
+ * The cold read of 2026-09-05 opened this tab on a project it had not touched
+ * and met `✗ threaded` (C1): *"a red ✗ on an untouched document reads as 'you
+ * broke it'"*, two minutes lost before the paragraph beside it resolved it.
+ *
+ * ⚠ THE VERDICT WAS CORRECT. Section 0 genuinely cannot carry an editor-authored
+ * raster band until aeon threads it. What was wrong is that a fact about the
+ * LEVEL DATA was drawn in the vocabulary of DAMAGE: `✗` is right/wrong, and
+ * `T.warning` is the tier this app uses for something going wrong. Neither is
+ * true of a section nobody has wired yet, and nothing on the row said whose fact
+ * it was, so the only reading left was that the reader had caused it.
+ *
+ * ⚠⚠ AND THE FIX IS NOT "MAKE IT QUIETER", which would trade one wrong reading
+ * for a worse one. The distinction that has to survive is aeon's gate:
+ *
+ *   nothing bound here     an unmet condition is a LIMIT. The build is green.
+ *                          It says what you cannot author here until aeon adds
+ *                          one line. Drawn `☐` in `T.info`: an unticked box,
+ *                          the informational tier, NOT the alarm tier.
+ *   a rasterRef bound      an unmet condition is a REFUSAL. `effects_seam_gate`
+ *                          fires by name on this section. Drawn `✗` in
+ *                          `T.warning`, exactly as before.
+ *
+ * That is ONE predicate (`section.rasterRef !== null`) and it is aeon's own
+ * trigger, not a mood: the gate reads the sidecar's `rasterRef` and says nothing
+ * about a section that has none. So the alarm tier now means what it says, and
+ * the case it exists for keeps it — condition 3 can only ever read `no` when a
+ * document IS bound (with none, `sectionExtraChannelsCondition` answers `yes`),
+ * so the cold read's D-A, the ✓✓ that reached a build error, still draws `✗` in
+ * `T.warning` with no special case anywhere.
+ *
+ * ⚠ ZERO HEIGHT AND ZERO WIDTH, measured, because this strip is PERMANENT.
+ *
+ * `☐` U+2610 IS CHOSEN ON A MEASUREMENT, not on taste. None of these marks is
+ * in JetBrains Mono, so each is laid out at whatever advance its fallback face
+ * gives it, and the difference comes straight out of a detail column that is
+ * already ellipsis-clipped. Canvas `measureText` at 10px in the strip's own
+ * font stack: `✗` 6px, `☐` 6px, `✓` 6.83px, `?` 5px, and the ring `○` 10px.
+ * The first candidate WAS `○`; it cost 3.9px, which was enough to eat the `1)`
+ * off `nothing threads ojz_act1_sec_raster(sec: 1)` at the 272px width, the one
+ * part of that sentence a reader needs. `☐` is `✗`'s advance to the pixel, so
+ * nothing moves, and an unticked box says "not filled in yet" in a way a cross
+ * cannot. The alternative considered and
+ * rejected was a caption framing what the three marks ask (the guide's own
+ * "can this section carry a band?"). It is not free in either axis: measured in
+ * the running app at 1680x1050, the rows' inner width is 272px to 287px and the
+ * detail column is ALREADY ellipsis-clipped on most rows (225px wanted into
+ * 201.6px on section 1's row 3, 255px into 229.2px on section 5's row 2), so a
+ * caption gutter comes straight out of text that is truncating; and a caption
+ * LINE is ~15px of a strip that already stands at 147.53px of a 742px column.
+ * The meaning of each mark is on the mark's own `title` instead, which costs
+ * neither.
  */
-function ConditionRow({ n, label, cond, title }: {
+function ConditionRow({ n, label, cond, title, unmet }: {
   n: number; label: string; cond: WiringCondition; title: string;
+  /** What a `no` on THIS row means today. See `UnmetMeaning`. */
+  unmet: UnmetMeaning;
 }) {
-  const mark = cond.verdict === 'yes' ? '✓' : cond.verdict === 'no' ? '✗' : '?';
+  const refused = cond.verdict === 'no' && unmet === 'refused';
+  const mark = cond.verdict === 'yes' ? '✓'
+    : cond.verdict === 'unknown' ? '?'
+      : refused ? '✗' : '☐';
   const colour = cond.verdict === 'yes' ? T.success
-    : cond.verdict === 'no' ? T.warning : T.textFaint;
+    : cond.verdict === 'unknown' ? T.textFaint
+      : refused ? T.warning : T.info;
+  // WHAT THE GLYPH MEANS, ON THE GLYPH. The row's own `title` is about the
+  // CONDITION; this is about the MARK, and putting it here is the only place a
+  // reader who is puzzled by the mark will actually point at.
+  const markTitle = cond.verdict === 'yes' ? 'This condition is met.'
+    : cond.verdict === 'unknown'
+      ? 'Not a no: one of aeon\'s two files could not be read, so this condition could not be '
+        + 'answered either way. The detail says which file.'
+      : refused
+        ? 'This section BINDS a raster preset and this condition is not met, so aeon\'s build '
+          + 'refuses it by name. The paragraph below says what to ask a programmer for.'
+        : 'Not yet, and not something you did: aeon\'s level data does not carry this. Nothing '
+          + 'is bound to this section, so nothing is broken and no build is refused. It is what '
+          + 'you cannot author here until aeon adds it.';
   return (
     <div
       data-effects-wiring-condition={String(n)}
+      data-effects-wiring-verdict={refused ? 'refused' : cond.verdict}
       title={title}
       style={{
         display: 'flex', gap: T.s2, alignItems: 'baseline',
         fontSize: T.t2xs, lineHeight: 1.4, minWidth: 0,
       }}>
-      <span style={{ color: colour, fontFamily: T.fontMono, flexShrink: 0 }}>{mark}</span>
+      <span title={markTitle}
+        style={{ color: colour, fontFamily: T.fontMono, flexShrink: 0 }}>{mark}</span>
       <span style={{ color: T.textLo, flexShrink: 0 }}>{label}</span>
       <span style={{
         color: T.textFaint, fontFamily: T.fontMono, minWidth: 0,
@@ -158,6 +244,14 @@ export default function SectionPicker({ children }: {
     act.rasterWiring, activeSectionIndex, boundDoc, zoneId, act.id, boundPreset);
   const extraAdvisory = extraChannelsAdvisory(
     extra.gaps, activeSectionIndex, boundPreset, act.rasterWiring.bindings[activeSectionIndex]);
+
+  // ⚠ AEON'S OWN TRIGGER, NOT A MOOD (C1 — see ConditionRow's docblock).
+  // `effects_seam_gate` fires on a section whose sidecar names a `rasterRef`;
+  // it says nothing at all about a section that has none. So with nothing
+  // bound, an unmet condition is a LIMIT on what can be authored here, and with
+  // something bound the SAME condition is a refusal of what is here now. One
+  // predicate, read from the section rather than from which row is asking.
+  const unmet: UnmetMeaning = boundPreset === null ? 'limit' : 'refused';
 
   // Derived, per act, from aeon's own files — never a list in this repository.
   // ⚠ EACH SET IS DERIVED FROM ITS OWN CONDITION. `eligibleSections` folds in
@@ -231,19 +325,19 @@ export default function SectionPicker({ children }: {
             read's D-A. Three rows is more surface on a panel already called
             confusing, and that cost was weighed: a verdict that is wrong is
             worse than a verdict that is long. */}
-        <ConditionRow n={1} label="own preset" cond={cond.ownPreset}
+        <ConditionRow n={1} label="own preset" cond={cond.ownPreset} unmet={unmet}
           title={`CONDITION 1 of 3: a section can carry an editor-authored raster band only if it `
             + `binds a preset record NO OTHER SECTION binds. Threading a section-keyed band into a `
             + `shared record would give every section that shares it the same band, and aeon's `
             + `build refuses that by name. Read from the act descriptor on every load.`
             + (advisory ? `\n\n${advisory}` : '')} />
-        <ConditionRow n={2} label="threaded" cond={cond.threaded}
+        <ConditionRow n={2} label="threaded" cond={cond.threaded} unmet={unmet}
           title={`CONDITION 2 of 3: some preset() in the game's effects library must actually pass `
             + `${chooser}(sec: N) to its raster: channel. Without it the generator emits the binding `
             + `row and nothing reads it, which presents to the author as an assignment that did `
             + `nothing. That is one line in aeon. Read from the effects library on every load.`
             + (advisory ? `\n\n${advisory}` : '')} />
-        <ConditionRow n={3} label="its channels" cond={extra}
+        <ConditionRow n={3} label="its channels" cond={extra} unmet={unmet}
           title={`CONDITION 3 of 3: one rasterRef binds the WHOLE preset document (aeon ruling Q1), `
             + `so every OTHER key it carries (cycles, variants, patch_world_ys, patch_motion) owes `
             + `its OWN generated chooser at this section's preset(), beside the raster one. This row `
@@ -276,11 +370,22 @@ export default function SectionPicker({ children }: {
       {/* WHAT TO ASK A PROGRAMMER FOR — first in the scrolling flow, directly
           under the strip, never collapsed, and NOT sticky. It is context on a
           fact the strip already states permanently, and it is 5 lines: keeping
-          it in the sticky box cost 200px of a 742px column. */}
+          it in the sticky box cost 200px of a 742px column.
+
+          ⚠ THE SAME PREDICATE AS THE MARKS ABOVE, and it has to be, or the two
+          surfaces say different things about one fact. This paragraph is 107px
+          of arrival screen (measured, 1680x1050, section 0) and it was the
+          LOUDEST thing the cold read met: a quiet `☐` over a full-width orange
+          block is not a fix, it is a contradiction. Not one word of it changes
+          — the cold read credits this text with resolving C1 — only the tier
+          it is drawn in, which now tracks whether a build is actually refused.
+          Its `warning` tone is unchanged the moment a rasterRef is bound. */}
       {advisory !== null && (
         <div data-effects-section-advisory=""
+          data-effects-advisory-tone={state !== 'unknown' && unmet === 'refused' ? 'warning' : 'note'}
           style={{ padding: `${T.s2} ${T.s3} 0` }}>
-          <Hint tone={state === 'unknown' ? undefined : 'warning'} style={{ marginBottom: T.s2 }}>
+          <Hint tone={state !== 'unknown' && unmet === 'refused' ? 'warning' : undefined}
+            style={{ marginBottom: T.s2 }}>
             {advisory}
           </Hint>
         </div>

@@ -32,7 +32,7 @@ and the other two are not rendered at all.
 ```
 Editing   [ Section 0            ▾ ]        ← the strip: always there, never scrolls
 scene ojz_act1_start · raster hand-authored
-✓ own preset  ✓ threaded  ✗ its channels    ← can this section carry a band? §6
+✓ own preset  ☐ threaded  ✓ its channels    ← can this section carry a band? §6
 [ Parallax ][  Colour  ][ Tile anim ]       ← the three jobs
 
   Parallax                        Colour                            Tile anim
@@ -443,16 +443,31 @@ sections that share and what would happen.
 There are two further steps behind that one, and Aurora keeps all three apart
 because conflating them is how the wrong answer got published twice in one day:
 
-| condition | what it means | what clears a `✗` |
+| condition | what it means | what clears it |
 |---|---|---|
 | **1**, `own preset` | no other section binds this section's preset record | a programmer **splits a preset record** |
 | **2**, `threaded` | some `preset()` also threads the raster chooser on this index | **one line of aeon** |
 | **3**, `its channels` | the preset bound here today owes a generated chooser for every **other** key it carries (`cycles`, `variants`, the moving anchors of §5), and has one | **one line of aeon**, on a different chooser |
 
-The strip prints these as **three rows**, each with its own `✓` / `✗` / `?`, because
-which one you fail decides what you do next, and a single verdict cannot tell you
-which. In `ojz act1` today, condition 1 holds for sections 0 to 5 and condition 2
-for section 5.
+The strip prints these as **three rows**, each with its own mark, because which one
+you fail decides what you do next, and a single verdict cannot tell you which. In
+`ojz act1` today, condition 1 holds for sections 0 to 5 and condition 2 for
+section 5.
+
+**The four marks, and what each one is telling you.** A mark on this strip is a
+statement about the level data, not a report on anything you did.
+
+| mark | what it says |
+|---|---|
+| `✓` | met |
+| `☐` | **not yet.** aeon's level data does not carry this, and nothing is bound to this section, so nothing is broken and no build is refused. It is what you cannot author here until aeon adds it. |
+| `✗` | **refused.** This section binds a preset AND this condition is not met, so aeon's build refuses it by name. The paragraph under the strip says what to ask for. |
+| `?` | one of aeon's two files could not be read, so this could not be answered either way. Never a no. The mark's detail says which file. |
+
+So the same condition draws `☐` while the section is unbound and `✗` the moment you
+bind a preset to it, because that is exactly when aeon's gate starts firing on this
+section: it reads the sidecar's `rasterRef` and says nothing at all about a section
+that has none. Hovering a mark says which of the four it is.
 
 **Two ticks used to be the whole answer, and it was wrong.** Conditions 1 and 2 can
 both read `✓` while the build still refuses, because one `rasterRef` binds the
