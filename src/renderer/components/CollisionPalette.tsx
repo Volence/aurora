@@ -299,7 +299,11 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
   // stroke. `liveEditNonce` is the app's own "something changed" signal.
   const auditSection = useProjectStore((s) => getActiveLevel(s)?.sections[activeSection] ?? null);
   const audit = useMemo(
-    () => (auditSection ? auditCrossovers(auditSection.collisionEdit, auditSection.collisionEditB, SECTION_TILES_WIDE) : null),
+    // `activeSection` rather than `auditSection.index`: it is the index this
+    // panel is looking at, and it is what the section picker shows.
+    () => (auditSection
+      ? auditCrossovers(auditSection.collisionEdit, auditSection.collisionEditB, SECTION_TILES_WIDE, activeSection)
+      : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [auditSection, liveEdit],
   );

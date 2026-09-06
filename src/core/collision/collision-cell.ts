@@ -68,7 +68,13 @@ export function cellCrossoverIndices(
 
 /** Which half of a cell an 8px TILE column falls in — how the map brush turns
  *  "where the cursor is" into a span. `tileCol` is the 8px column under the
- *  cursor (`hoverInfo.col`), not the 16px cell column. */
-export function spanForTileCol(tileCol: number): CrossoverSpan {
+ *  cursor (`hoverInfo.col`), not the 16px cell column.
+ *
+ *  THE RETURN TYPE EXCLUDES `'cell'` because this function cannot produce it:
+ *  a column is in one half or the other. Narrowed 2026-09-06 so the audit's
+ *  `CrossoverLocus.half` can BE this value rather than re-deriving the parity
+ *  beside it; every existing caller wants a `CrossoverSpan` and a narrower
+ *  return is assignable to one. */
+export function spanForTileCol(tileCol: number): Exclude<CrossoverSpan, 'cell'> {
   return tileCol % CELL_SUBTILE_COLS === 0 ? 'left' : 'right';
 }

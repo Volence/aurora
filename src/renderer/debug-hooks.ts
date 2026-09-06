@@ -1337,7 +1337,9 @@ function installAeonProbe(): AeonProbeApi {
     crossoverAudit: (sectionIndex) => {
       const sec = getCurrentAct(useProjectStore.getState())?.sections[sectionIndex];
       if (!sec) return null;
-      const a = auditCrossovers(sec.collisionEdit, sec.collisionEditB, SECTION_TILES_WIDE);
+      // The section index is passed so the audit's messages can name a place.
+      // It is the caller's to supply: two flat word arrays carry no identity.
+      const a = auditCrossovers(sec.collisionEdit, sec.collisionEditB, SECTION_TILES_WIDE, sectionIndex);
       return { ...a, severity: crossoverAuditSeverity(a) };
     },
     crossoverRefusal: (plane, crossover) =>
