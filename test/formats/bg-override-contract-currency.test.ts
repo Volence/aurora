@@ -89,8 +89,20 @@ type Extractor = {
   path: string;
   /** Must capture exactly one group. Anchored to the source line, not to the digits. */
   pattern: RegExp;
-  /** Turns the captured text into the number the contract vendors. */
-  read: (m: string) => number;
+  /**
+   * Turns the captured text into the number the contract vendors.
+   *
+   * THE SECOND ARGUMENT IS THE WHOLE aeon FILE, and it exists for a shape the
+   * one-capture form cannot express: a constant aeon DERIVES rather than
+   * writes. `BGANIM_BYTES_PER_SLOT = BGANIM_PHASES * BGANIM_TILE_BYTES` has no
+   * digits on its line at all (the `# 256` beside it is a COMMENT, and reading
+   * a comment for a value is how a gate ends up measuring prose), and
+   * `BGANIM_SECTION_CEILING = min(BGANIM_SECTION_CEILINGS.values())` names a
+   * table rather than a number. Both are read by re-deriving aeon's own
+   * expression from aeon's own operands, which is the only reading that stays
+   * true if aeon changes an operand. A row that needs neither ignores it.
+   */
+  read: (m: string, text: string) => number;
   /** Printed in the failure so a reader knows what was looked at. */
   quote: string;
 };
@@ -267,6 +279,111 @@ const EXTRACTORS: Record<string, Extractor[]> = {
       quote: "the nametable rebase's `idx = word & 0xN`",
     },
   ],
+
+  // ── THE SECOND BUDGET ────────────────────────────────────────────────────
+  //
+  // ⚠ EVERY ROW BELOW READS ONE FILE, AND THAT IS NOT A SHORTCUT — it is the
+  // whole population. `tools/inject_editor_bg.py` is the ONLY authority for any
+  // of these: unlike BG_TILE_CAPACITY (a VRAM allocation with a toml authority
+  // and two generated mirrors), the section budget has no row in aeon's own
+  // EFFECTS_CONSUMER_CONTRACT.md and no `.emp` declaration. There is nothing to
+  // corroborate against, so a second row here would be decoration. The vendored
+  // constant's `notInAeonProse` field records the same fact for a reader.
+  BGANIM_SECTION_CEILING: [
+    {
+      path: 'tools/inject_editor_bg.py',
+      // THE RULED FIGURE. What the emitter enforces is the MINIMUM across the
+      // per-listing-shape table, so this row is only half the question; the row
+      // below is the other half.
+      pattern: /^BGANIM_SECTION_CEILING_RULED = (\d+)$/m,
+      read: Number,
+      quote: "the owner's ruled authoring budget `BGANIM_SECTION_CEILING_RULED = N`",
+    },
+    {
+      path: 'tools/inject_editor_bg.py',
+      // AND THE MINIMUM IS WHAT BINDS. `BGANIM_SECTION_CEILING` is
+      // `min(BGANIM_SECTION_CEILINGS.values())`, so vendoring the ruled figure
+      // is correct only while every row of that table names it. This row
+      // re-derives the `min` from aeon's own table rather than assuming it:
+      // the pattern proves the definition is still a `min` over that dict, and
+      // `read` refuses if any row is a number or another symbol. If aeon ever
+      // splits the shapes again (it did for one day in August), this fails
+      // rather than silently vendoring a ceiling no shape enforces.
+      pattern: /^BGANIM_SECTION_CEILINGS = \{\n([\s\S]*?)\n\}\nBGANIM_SECTION_CEILING = min\(BGANIM_SECTION_CEILINGS\.values\(\)\)$/m,
+      read: (m, text) => {
+        const rows = [...m.matchAll(/^\s*"[^"]+":\s*([A-Za-z_][A-Za-z0-9_]*|\d+),\s*$/gm)];
+        if (rows.length === 0) throw new Error('BGANIM_SECTION_CEILINGS has no rows this can read');
+        const named = rows.map(r => r[1]);
+        const odd = named.filter(v => v !== 'BGANIM_SECTION_CEILING_RULED');
+        if (odd.length > 0) {
+          throw new Error(
+            'BGANIM_SECTION_CEILINGS no longer maps every listing shape to '
+            + `BGANIM_SECTION_CEILING_RULED (found ${odd.join(', ')}). The vendored ceiling is `
+            + 'the ruled figure, which is only the enforced one while the table is flat. '
+            + 're-vendor the MINIMUM across shapes, and say in `amendments` which shape is now '
+            + 'the binding one.');
+        }
+        const ruled = /^BGANIM_SECTION_CEILING_RULED = (\d+)$/m.exec(text);
+        if (ruled === null) throw new Error('BGANIM_SECTION_CEILING_RULED is gone');
+        return Number(ruled[1]);
+      },
+      quote: '`BGANIM_SECTION_CEILINGS` and `BGANIM_SECTION_CEILING = min(...values())`,'
+        + ' whose rows must all name BGANIM_SECTION_CEILING_RULED for the ruled figure to be'
+        + ' the enforced one',
+    },
+  ],
+  BGANIM_COUNT_BYTES: [
+    {
+      path: 'tools/inject_editor_bg.py',
+      pattern: /^BGANIM_COUNT_BYTES = (\d+)$/m,
+      read: Number,
+      quote: 'the section-layout block: `BGANIM_COUNT_BYTES = N`',
+    },
+  ],
+  BGANIM_RECORD_BYTES: [
+    {
+      path: 'tools/inject_editor_bg.py',
+      pattern: /^BGANIM_RECORD_BYTES = (\d+)$/m,
+      read: Number,
+      quote: 'the section-layout block: `BGANIM_RECORD_BYTES = N`',
+    },
+  ],
+  BGANIM_BYTES_PER_SLOT: [
+    {
+      path: 'tools/inject_editor_bg.py',
+      // DERIVED FROM AEON'S OWN PRODUCT, never from the `# 256` beside it. A
+      // comment outbids code in a grep and is authored by nobody; the operands
+      // are the authority, and reading them is what makes this row fail if aeon
+      // changes a phase count rather than the product.
+      pattern: /^BGANIM_BYTES_PER_SLOT = (BGANIM_PHASES \* BGANIM_TILE_BYTES)\b/m,
+      read: (_m, text) => {
+        const phases = /^BGANIM_PHASES = (\d+)$/m.exec(text);
+        const bytes = /^BGANIM_TILE_BYTES = (\d+)$/m.exec(text);
+        if (phases === null || bytes === null) {
+          throw new Error('BGANIM_PHASES / BGANIM_TILE_BYTES are not both readable');
+        }
+        return Number(phases[1]) * Number(bytes[1]);
+      },
+      quote: '`BGANIM_BYTES_PER_SLOT = BGANIM_PHASES * BGANIM_TILE_BYTES`, re-derived from those'
+        + ' two literals rather than from the comment beside the product',
+    },
+  ],
+  BGANIM_VIEW_COUNT: [
+    {
+      path: 'tools/inject_editor_bg.py',
+      pattern: /^BGANIM_VIEW_COUNT = (\d+)$/m,
+      read: Number,
+      quote: '`BGANIM_VIEW_COUNT = N`, the twins a qualifying act emits',
+    },
+  ],
+  BGANIM_VIEW_DERIVED_PERIOD_PX: [
+    {
+      path: 'tools/inject_editor_bg.py',
+      pattern: /^BGANIM_VIEW_DERIVED_PERIOD_PX = (\d+)$/m,
+      read: Number,
+      quote: '`BGANIM_VIEW_DERIVED_PERIOD_PX = N`, the only period a default_off band may have',
+    },
+  ],
 };
 
 const aeon = peerRepo('aeon');
@@ -375,7 +492,7 @@ describe('CURRENCY: are the vendored contract constants still what aeon declares
         if (m === null) return;
 
         expect(
-          ex.read(m[1]),
+          ex.read(m[1], at.text),
           `${NOT_OURS}\n`
           + `  ${name} is vendored as ${CONTRACT.constants[name].value} in\n`
           + '  src/core/formats/bg-override/bganim-consumer-contract.json,\n'

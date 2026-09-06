@@ -660,6 +660,35 @@ export default function BgAnimBandPanel(): React.ReactElement {
             {budget.bandsRemaining} tile-animation slot{budget.bandsRemaining === 1 ? '' : 's'} left
           </Hint>
         )}
+        {/* ── THE SECOND BUDGET, ON SCREEN BESIDE THE FIRST ────────────────
+            The line above is about the tile BLOB. This one is about the ROM
+            SECTION the animation bakes into, and it is the one that usually
+            runs out first, because an animated slot is stored once per phase
+            bank. The panel printed only the blob line until 2026-09-06 and so
+            offered an author roughly five times the animated slots the build
+            would take. Both lines stay: the answer to "why can I not add this"
+            is which of the two is binding, and a reader cannot see that from
+            one number. */}
+        {doc !== null && budget.byteSlotsRemaining === null && (
+          <Hint tone="warning" style={{ marginTop: T.s2, marginBottom: 0 }}>
+            ROM section: cannot say. {budget.unmeasurable}
+          </Hint>
+        )}
+        {doc !== null && budget.byteSlotsRemaining !== null && (
+          <Hint style={{ marginTop: T.s2, marginBottom: 0 }}>
+            <span title={'Every animated slot is stored once per phase bank, so it costs far '
+              + 'more ROM than a static tile does. This budget and the blob budget are '
+              + 'independent, and this one is usually the tighter of the two.'}>
+              ROM section {budget.sectionBytes}/{budget.sectionCeiling} bytes
+            </span> ·{' '}
+            <strong>{budget.byteSlotsRemaining}</strong> more animated slot
+            {budget.byteSlotsRemaining === 1 ? '' : 's'} fit
+            {budget.binding === 'bytes'
+              ? <> · <strong>this is the binding budget</strong>, not the {budget.tileSlotsRemaining} free
+                blob slot{budget.tileSlotsRemaining === 1 ? '' : 's'} above</>
+              : <> · the blob budget above is the binding one</>}
+          </Hint>
+        )}
         {refusalText && (
           <Hint tone="warning" style={{ marginTop: T.s2, marginBottom: 0 }}>{refusalText}</Hint>
         )}
@@ -850,7 +879,8 @@ export default function BgAnimBandPanel(): React.ReactElement {
               min={budget.firstPromotableSlot} width={72} value={staticBase}
               onChange={(n) => setStaticBase(clampStaticBase(n, budget.firstPromotableSlot))} />
             <Chip disabled={promoteOff !== null}
-              title={promoteOff ?? 'Declare this static range animated. The blob does not grow.'}
+              title={promoteOff ?? 'Declare this static range animated. The tile blob does not '
+                + 'grow, but the ROM section does: an animated slot is stored once per phase bank.'}
               onClick={() => apply(verbs.promote.run())}>
               Promote
             </Chip>
@@ -886,9 +916,15 @@ export default function BgAnimBandPanel(): React.ReactElement {
         </Group>
 
         {/* ── Source 2: new art ─────────────────────────────────────────── */}
+        {/* The note prints THE BINDING NUMBER, not the blob one:
+            `slotsRemaining` is the tighter of the two budgets and is 0 when the
+            section cannot be sized, so it can never offer room the build
+            refuses. */}
         <Group label="From new art"
           note={<>costs {tileCount} slot{tileCount === 1 ? '' : 's'} ·{' '}
-            <strong>{budget.tileSlotsRemaining}</strong> free</>}>
+            <strong>{budget.slotsRemaining}</strong> free
+            {budget.binding === 'bytes' ? ' (ROM section is the limit)' : ''}
+            {budget.binding === 'unmeasurable' ? ' (the section cannot be sized)' : ''}</>}>
           <Field label="Blank tile animation">
             <Chip disabled={insertOff !== null}
               title={insertOff ?? `Add a blank ${cols}x${bandRowCount} tile animation (${tileCount} tiles)`}

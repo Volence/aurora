@@ -733,6 +733,16 @@ describe('coverage, derived from the vendored contract', () => {
     rate_shift: { poison: b => { b.rate_shift = -1; }, match: /rate_shift must be an integer >= 0/ },
     slot_base: { poison: b => { b.slot_base = 5; }, match: /slot_base is 5 but the running cursor is 0/ },
     phases: { poison: b => { b.phases = []; }, match: /phases has 0 banks/ },
+    // SHAPE ONLY, and that is the whole poison this key can have HERE. Both of
+    // `default_off`'s real obligations are quantified over the ACT (how many
+    // tile animations it has, and their period), so they belong to
+    // `viewsEmitted` and are exercised in bg-override-section-ceiling.test.ts.
+    // What is per-band is the TYPE: the consumer coerces with `bool(...)`, so a
+    // string bakes as something the author did not write.
+    default_off: {
+      poison: b => { (b as Record<string, unknown>).default_off = 'yes'; },
+      match: /default_off is "yes"; it must be true or false/,
+    },
   };
 
   it('has a poison for every band key the contract declares', () => {

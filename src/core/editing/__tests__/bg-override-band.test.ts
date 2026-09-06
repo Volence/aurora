@@ -42,11 +42,30 @@ import {
   tileSlotsRemaining,
 } from '../../formats/bg-override/bg-anim-band';
 import { BG_TILE_CAPACITY, cloneBgOverride } from '../../formats/bg-override/bg-override';
+import { sectionRoomyDoc } from '../../../../test/support/bg-override-fixtures';
 
 const GOLDEN_PATH = resolve(
   __dirname, '../../../../test/fixtures/bg-override/editor_bg_override.b0e5a661.json',
 );
-const GOLDEN: BgOverrideDocument = parseBgOverride(readFileSync(GOLDEN_PATH, 'utf8')).doc;
+
+/**
+ * The real b0e5a661 document, WITH ROOM IN ITS ROM SECTION.
+ *
+ * ⚠ THE FIXTURE ITSELF HAS NONE, and never did: its two tile animations cover
+ * 192 animated slots, an animated slot is stored once per phase bank, and the
+ * emitted section is about two and a half times aeon's ruled ceiling. Aurora
+ * modelled only the TILE budget until 2026-09-06, so every ADD and PROMOTE row
+ * in this file was exercising an operation aeon's build would have refused.
+ *
+ * `sectionRoomyDoc(1)` demotes the larger of the two back to static art through
+ * the codec's own demotion: the art, the blob and the 4096-word nametable are
+ * untouched, one tile animation remains, and the slots that stop being animated
+ * stop costing section bytes. Every assertion below is RELATIVE to this
+ * document, so the swap moves them with it rather than re-baselining anything.
+ * The read-side fixture rows live in `test/formats/bg-override-golden.test.ts`
+ * and still open the file as it ships.
+ */
+const GOLDEN: BgOverrideDocument = sectionRoomyDoc(1);
 const GOLDEN_BYTES = serializeBgOverride(GOLDEN);
 
 function level(doc: BgOverrideDocument = GOLDEN): S4Level {
@@ -146,7 +165,11 @@ describe('set-bg-override-band', () => {
   it('records the removed art nowhere but the command, and still rebuilds it', () => {
     const l = level();
     const h = new EditHistory();
-    const cmd = makeRemoveBandCommand(l.bgOverride!, 1, { blankReferencingCells: true });
+    // The LAST band, named by index rather than by a literal: this document
+    // carries one tile animation since the section-roomy derivation above, and
+    // a hardcoded 1 was naming the second of two.
+    const last = documentBands(l.bgOverride!).length - 1;
+    const cmd = makeRemoveBandCommand(l.bgOverride!, last, { blankReferencingCells: true });
     h.execute(cmd, l);
 
     // The document no longer holds the band's phases anywhere. The command is

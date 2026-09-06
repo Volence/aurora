@@ -22,9 +22,23 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseBgOverride, type BgOverrideDocument } from '../../../../core/formats/bg-override/bg-override';
 import { bandBudget, clampStaticBase, promoteBandCommand } from '../../../providers/bg-anim-aeon';
+import { sectionRoomyDoc } from '../../../../../test/support/bg-override-fixtures';
 
 const FIXTURE = 'test/fixtures/bg-override/editor_bg_override.b0e5a661.json';
 const doc = (): BgOverrideDocument => parseBgOverride(readFileSync(FIXTURE, 'utf8')).doc;
+/**
+ * THE SAME REAL DOCUMENT, WITH ROOM IN ITS ROM SECTION.
+ *
+ * The b0e5a661 fixture has none: its two tile animations cover 192 animated
+ * slots, an animated slot is stored once per phase bank, and the emitted
+ * section is about two and a half times aeon's ruled ceiling. Aurora modelled
+ * only the TILE budget until 2026-09-06, so rows here that PROMOTE were
+ * exercising an operation aeon's build refuses. `sectionRoomyDoc(1)` demotes
+ * the larger tile animation back to static art through the codec's own
+ * demotion: same art, same blob, same nametable, room in the section.
+ */
+const mdoc = (): BgOverrideDocument => sectionRoomyDoc(1);
+
 
 describe('clampStaticBase: the promotion base the form is allowed to hold', () => {
   const first = bandBudget(doc()).firstPromotableSlot;
@@ -69,10 +83,18 @@ describe('clampStaticBase: the promotion base the form is allowed to hold', () =
   it('refuses exactly the values the promotion command refuses', () => {
     // Bar 2e in one row: the floor is not decorative. A base one below it is a
     // promotion the codec really rejects, and the clamped base is one it takes.
+    // ON THE SECTION-ROOMY DERIVATION, because the ACCEPTING half needs a
+    // document the promote door will actually take: the fixture as it ships is
+    // over its ROM section, so every promotion on it is refused for a reason
+    // that has nothing to do with the prefix floor this row is about. The floor
+    // is read off the same document it is exercised on, so the pair still
+    // straddles exactly one boundary.
+    const d = mdoc();
+    const floor = bandBudget(d).firstPromotableSlot;
     const spec = { cols: 1, rows: 1 };
-    const below = promoteBandCommand(doc(), first - 1, spec);
+    const below = promoteBandCommand(d, floor - 1, spec);
     expect(below.ok, 'a base inside the animated prefix must be refused').toBe(false);
-    const at = promoteBandCommand(doc(), clampStaticBase(first - 1, first), spec);
+    const at = promoteBandCommand(d, clampStaticBase(floor - 1, floor), spec);
     expect(at.ok, 'the clamped base must be one the command accepts').toBe(true);
   });
 

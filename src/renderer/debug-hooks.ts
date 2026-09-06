@@ -951,11 +951,23 @@ interface AeonProbeApi {
     rateShift: number; rateShiftIsExplicit: boolean;
     slotBase: number; phaseBanks: number;
   }[];
-  /** Tile-blob and band-count budgets — the numbers the panel prints. */
+  /**
+   * Tile-blob, band-count AND ROM-SECTION budgets — the numbers the panel
+   * prints.
+   *
+   * THE SECTION HALF IS HERE BECAUSE THE SCREEN CANNOT SETTLE IT. A harness can
+   * read the readout's TEXT, which is what a person sees; what it cannot see
+   * from the DOM is whether the number in it came from the byte budget or from
+   * the tile budget, and those agree on plenty of documents. Reading the model
+   * back is what lets a row assert WHICH budget is binding.
+   */
   bandBudget(): {
     bands: number; maxBands: number; bandsRemaining: number;
     animatedSlots: number; tiles: number; tileCapacity: number;
     tileSlotsRemaining: number; firstPromotableSlot: number;
+    sectionBytes: number | null; sectionCeiling: number;
+    byteSlotsRemaining: number | null; slotsRemaining: number;
+    binding: 'tiles' | 'bytes' | 'unmeasurable'; unmeasurable: string | null;
   };
   /** Whether the file was there, and whether it parsed. Absent != unreadable. */
   bgOverrideStatus(): {

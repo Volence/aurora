@@ -6,6 +6,12 @@ import {
   at,
   BGANIM_MAX_BANDS,
   BGANIM_PHASE_BANKS,
+  BGANIM_SECTION_CEILING,
+  BGANIM_COUNT_BYTES,
+  BGANIM_RECORD_BYTES,
+  BGANIM_BYTES_PER_SLOT,
+  BGANIM_VIEW_COUNT,
+  BGANIM_VIEW_DERIVED_PERIOD_PX,
   BG_TILE_CAPACITY,
   BG_LAYOUT_WORDS,
   BG_LAYOUT_WORDS_LEGACY,
@@ -91,7 +97,7 @@ const CONTRACT_PATH = resolve(
   __dirname, '../../src/core/formats/bg-override/bganim-consumer-contract.json',
 );
 const CONTRACT_TEXT = readFileSync(CONTRACT_PATH, 'utf8');
-const CONTRACT_SHA256 = '952477debd1f9d5caa8a2f435d1766093c9261e1b8ab5fca05a70ae5ac07101c';
+const CONTRACT_SHA256 = '5c2645a046bb4738b016a7be23efb504d3a746ab16c7e6decedcf2187a5610e5';
 
 describe('the vendored contract is the one we pinned', () => {
   it('matches the pinned content hash', () => {
@@ -123,6 +129,10 @@ describe('every exported constant is READ from the contract, not typed beside it
     BGANIM_MAX_BANDS, BGANIM_PHASE_BANKS, BG_TILE_CAPACITY, TILE_BYTES, TILE_PIXELS,
     TILE_PIXEL_MAX, TILE_WIDTH_PX, BG_LAYOUT_WORDS, BG_LAYOUT_WORDS_LEGACY, LAYOUT_WORD_MAX,
     LAYOUT_TILE_INDEX_MASK,
+    // The second budget, in ROM bytes. Vendored 2026-09-06; see the
+    // `section-ceiling` amendment.
+    BGANIM_SECTION_CEILING, BGANIM_COUNT_BYTES, BGANIM_RECORD_BYTES, BGANIM_BYTES_PER_SLOT,
+    BGANIM_VIEW_COUNT, BGANIM_VIEW_DERIVED_PERIOD_PX,
   };
 
   it('every exported constant equals its contract value', () => {
@@ -219,8 +229,18 @@ describe('the contract declares a complete, well-formed key model', () => {
     expect(Object.keys(invariants).sort()).toEqual([
       'axisRoundTrip', 'bandCeiling', 'capacity', 'contiguousPacking',
       'insideTheBlob', 'layoutTileIndex', 'patternPeriod', 'phaseAxis',
-      'prefixIdentity', 'rotationUnitPowerOfTwo', 'slotOrder',
+      'prefixIdentity', 'rotationUnitPowerOfTwo', 'sectionCeiling', 'slotOrder',
+      'viewTwins',
     ]);
+    // THE SECOND BUDGET IS A SEPARATE INVARIANT FROM `capacity`, ON PURPOSE.
+    // They are two ceilings on two quantities and a document can satisfy either
+    // while violating the other; folding them into one rule is how the tighter
+    // one went unmodelled. `sectionCeiling` therefore must not be about tiles,
+    // and `capacity` must not be about bytes.
+    expect(invariants.sectionCeiling).toContain('BGANIM_SECTION_CEILING');
+    expect(invariants.sectionCeiling).toContain('NEVER PER BAND');
+    // The quantifier, stated where a reader of the contract will meet it.
+    expect(invariants.viewTwins).toContain('QUANTIFIED OVER THE ACT');
     // THE TWO RENAMES ARE PART OF THE AXIS AMENDMENT, not cosmetic: both rules
     // now read off a DIFFERENT band key per axis, so a name that says "column"
     // or "width" states the horizontal reading as if it were the only one — the

@@ -29,6 +29,10 @@ import type { S4Level } from '../../src/core/editing/commands';
 import { makeAddBandCommand } from '../../src/core/editing/bg-override-band';
 import {
   BG_TILE_CAPACITY,
+  BGANIM_BYTES_PER_SLOT,
+  BGANIM_COUNT_BYTES,
+  BGANIM_RECORD_BYTES,
+  BGANIM_SECTION_CEILING,
   BGANIM_PHASE_BANKS,
   TILE_PIXELS,
   bandTileCount,
@@ -81,10 +85,33 @@ function level(doc: BgOverrideDocument): S4Level {
  */
 const FREE = BG_TILE_CAPACITY - ROOMY.tiles.length;
 const ROWS = 4;
-const FITTING = { cols: Math.floor(FREE / ROWS), rows: ROWS };
-const OVER = { cols: Math.floor(FREE / ROWS) + 1, rows: ROWS };
+
+/**
+ * ⚠ THE FREE ROOM IS TWO NUMBERS, AND THIS FILE USED TO KNOW ONLY ONE.
+ *
+ * `FREE` above is the TILE blob's free room. There is a second, independent and
+ * on this fixture TIGHTER budget: the emitted `ojz_bg_anim` ROM section, where
+ * an animated slot costs `BGANIM_BYTES_PER_SLOT` because it is stored once per
+ * phase bank. `SECTION_FREE` is what that ceiling admits for a one-band act,
+ * derived from the vendored constants exactly as aeon derives it.
+ *
+ * THIS FIXTURE IS WHERE THE DEFECT WAS MEASURED. `FREE` is the number the panel
+ * printed and `SECTION_FREE` is the number the build would take, and the row
+ * below called "the band that spends EXACTLY the free room" built the first
+ * one: a band Aurora offered and `check_bganim_section_fits` refuses. The
+ * boundary probes are on the BINDING budget now, and the gap between the two is
+ * its own row.
+ */
+const SECTION_FREE = Math.floor(
+  (BGANIM_SECTION_CEILING - BGANIM_COUNT_BYTES - BGANIM_RECORD_BYTES) / BGANIM_BYTES_PER_SLOT);
+const BINDING_FREE = Math.min(FREE, SECTION_FREE);
+
+const FITTING = { cols: Math.floor(BINDING_FREE / ROWS), rows: ROWS };
+const OVER = { cols: Math.floor(BINDING_FREE / ROWS) + 1, rows: ROWS };
+/** The smallest band the TILE budget alone refuses. The other bound, kept. */
+const OVER_TILES = { cols: Math.floor(FREE / ROWS) + 1, rows: ROWS };
 /** A comfortable band, well inside the room, for the rows that do not probe the boundary. */
-const SMALL = { cols: Math.max(1, Math.floor(FREE / ROWS / 4)), rows: ROWS };
+const SMALL = { cols: Math.max(1, Math.floor(BINDING_FREE / ROWS / 4)), rows: ROWS };
 
 describe('the ROOMY fixture is what its provenance says', () => {
   it('is bandless, layout+tiles only, and has free room: the anti-vacuous floor', () => {
@@ -99,9 +126,16 @@ describe('the ROOMY fixture is what its provenance says', () => {
     expect(cells.filter(c => c.kind === 'tile')).toHaveLength(ROOMY.layout.length);
     expect(new Set(cells.map(c => c.kind === 'tile' ? c.pixels.join(',') : '')).size).toBeGreaterThan(1);
     // The geometry under test really is derived, and really is at the boundary.
-    expect(bandTileCount(FITTING)).toBeLessThanOrEqual(FREE);
-    expect(bandTileCount(OVER)).toBeGreaterThan(FREE);
+    expect(bandTileCount(FITTING)).toBeLessThanOrEqual(BINDING_FREE);
+    expect(bandTileCount(OVER)).toBeGreaterThan(BINDING_FREE);
     expect(bandTileCount(SMALL)).toBeLessThan(bandTileCount(FITTING));
+    // AND THE TWO BUDGETS REALLY DIVERGE ON THIS FIXTURE, which is what makes
+    // the pair of boundary rows below prove anything at all: the section admits
+    // FEWER slots than the blob, so `OVER` is a band the TILE ceiling would
+    // have waved through.
+    expect(SECTION_FREE).toBeLessThan(FREE);
+    expect(BINDING_FREE).toBe(SECTION_FREE);
+    expect(bandTileCount(OVER)).toBeLessThanOrEqual(FREE);
   });
 
   it('tileSlotsRemaining is BG_TILE_CAPACITY - tiles.length, before and after an insert', () => {
@@ -157,22 +191,47 @@ describe('INSERTING a brand-new band on the roomy document', () => {
     expect(moved).toBe(nonBlank);
   });
 
-  it('accepts the band that spends EXACTLY the free room, and one undo is byte-identical', () => {
+  it('accepts the band that spends EXACTLY the BINDING free room, and one undo is byte-identical', () => {
     const l = level(cloneBgOverride(ROOMY));
     const h = new EditHistory();
     const band = createBand(FITTING);
     expect(insertUnavailableReason(ROOMY, FITTING.cols, FITTING.rows)).toBeNull();
 
     h.execute(makeAddBandCommand(l.bgOverride!, band), l);
-    expect(l.bgOverride!.tiles).toHaveLength(BG_TILE_CAPACITY);
-    expect(tileSlotsRemaining(l.bgOverride!)).toBe(0);
+    // The blob grew by exactly the band. It does NOT reach the tile capacity,
+    // and that is the finding rather than a slack fixture: the section budget
+    // runs out first, so the last slots of the blob are unreachable for
+    // ANIMATION even though they are free for static art.
+    expect(l.bgOverride!.tiles).toHaveLength(ROOMY.tiles.length + bandTileCount(FITTING));
+    expect(tileSlotsRemaining(l.bgOverride!)).toBe(FREE - bandTileCount(FITTING));
     h.undo(l);
     expect(serializeBgOverride(l.bgOverride!)).toBe(ROOMY_BYTES);
   });
 
-  it('refuses the smallest band that does not fit, in the insert guard\'s OWN words', () => {
-    const band = createBand(OVER);
-    const n = bandTileCount(band);
+  it('⚠ REFUSES the band the TILE budget admits and the ROM SECTION does not', () => {
+    // THE DEFECT, AS A ROW. `OVER` fits the blob — the assertion above proves
+    // it — and this file's previous revision called a band of exactly this
+    // class "the band that spends EXACTLY the free room" and asserted it was
+    // ACCEPTED. It is the band Aurora offered and aeon's
+    // `check_bganim_section_fits` refuses.
+    expect(bandTileCount(OVER)).toBeLessThanOrEqual(FREE);        // anti-vacuous
+    expect(() => createBand(OVER)).toThrow(/ROM section ceiling/);
+    const reason = insertUnavailableReason(ROOMY, OVER.cols, OVER.rows);
+    expect(reason).toMatch(/ROM SECTION/);
+    expect(reason).toMatch(String(BGANIM_BYTES_PER_SLOT));
+  });
+
+  it('refuses the smallest band the BLOB cannot hold, in the insert guard\'s OWN words', () => {
+    // The other budget, unchanged and still enforced in its own words. The band
+    // is built with `phases` handed in rather than through `createBand`, whose
+    // section check would refuse it first: the point of this row is that the
+    // BLOB guard still fires, and reaching it means getting past the other one.
+    const n = bandTileCount(OVER_TILES);
+    const band = {
+      cols: OVER_TILES.cols, rows: OVER_TILES.rows, pattern_px: OVER_TILES.cols * 8,
+      phases: Array.from({ length: BGANIM_PHASE_BANKS }, () =>
+        Array.from({ length: n }, () => new Array<number>(TILE_PIXELS).fill(0))),
+    };
     // planBandInsertion's wording — not the codec's document-level capacity check
     // (bar 2c: two errors share "over the BG tile capacity", so match the half
     // only this guard says).
@@ -180,7 +239,7 @@ describe('INSERTING a brand-new band on the roomy document', () => {
       .toThrow(`the band needs ${n} slot(s) at the front of a ${ROOMY.tiles.length}-tile blob`);
     // The panel's gate, which is a different implementation of the same bound,
     // refuses too, in ITS words, and names the free count it derived.
-    const reason = insertUnavailableReason(ROOMY, OVER.cols, OVER.rows);
+    const reason = insertUnavailableReason(ROOMY, OVER_TILES.cols, OVER_TILES.rows);
     expect(reason).toMatch(`adding a tile animation puts its ${n} tile(s) INTO the blob, and the blob has ${FREE} free slot(s) of ${BG_TILE_CAPACITY}`);
   });
 });

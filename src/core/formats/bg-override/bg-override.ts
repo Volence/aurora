@@ -135,6 +135,29 @@ export const LAYOUT_WORD_MAX = constant('LAYOUT_WORD_MAX');
  */
 export const LAYOUT_TILE_INDEX_MASK = constant('LAYOUT_TILE_INDEX_MASK');
 
+// ── THE SECOND BUDGET: the emitted section, in ROM BYTES ───────────────────
+//
+// `BG_TILE_CAPACITY` above bounds the blob in VRAM TILES. These bound the
+// EMITTED `ojz_bg_anim` SECTION in ROM BYTES, and the two are INDEPENDENT: a
+// document can sit far inside the tile capacity and still be refused by aeon's
+// `check_bganim_section_fits`, which is precisely the state aeon's own live
+// document was in when this was found. See `bganimSectionBytes` for the
+// arithmetic and `invariants.sectionCeiling` in the vendored contract for the
+// rule as the consumer spells it.
+
+/** The act's whole `ojz_bg_anim` section must fit in this many ROM bytes. */
+export const BGANIM_SECTION_CEILING = constant('BGANIM_SECTION_CEILING');
+/** The u16 band count at the head of a table. Paid once per table. */
+export const BGANIM_COUNT_BYTES = constant('BGANIM_COUNT_BYTES');
+/** One `bganim_band` record. Paid per band, per table. */
+export const BGANIM_RECORD_BYTES = constant('BGANIM_RECORD_BYTES');
+/** What one ANIMATED slot costs in the shared bank blob. The expensive term. */
+export const BGANIM_BYTES_PER_SLOT = constant('BGANIM_BYTES_PER_SLOT');
+/** DEBUG view twins a qualifying act emits beside its own table. */
+export const BGANIM_VIEW_COUNT = constant('BGANIM_VIEW_COUNT');
+/** The one `pattern_px` a `default_off` band may have; anything else refuses. */
+export const BGANIM_VIEW_DERIVED_PERIOD_PX = constant('BGANIM_VIEW_DERIVED_PERIOD_PX');
+
 /** `{ camera_x: 0, camera_y: 1, timer: 2 }` — the SCALAR SOURCE, never an axis. */
 export const BGANIM_DRIVERS: Readonly<Record<string, number>> = Object.freeze(
   Object.fromEntries(
@@ -438,6 +461,163 @@ export function animatedSlotCount(bands: readonly BgOverrideBand[]): number {
   return bands.reduce((n, b) => n + bandTileCount(b), 0);
 }
 
+// ---------------------------------------------------------------------------
+// THE SECOND BUDGET — the emitted section's size in ROM bytes
+//
+// WHY THIS IS NOT THE TILE CEILING WEARING A SECOND NAME. `BG_TILE_CAPACITY`
+// is a VRAM allocation and bounds `tiles.length`. `BGANIM_SECTION_CEILING` is
+// an owner-ruled authoring budget inside the ROM room and bounds the EMITTED
+// `ojz_bg_anim` section, which is a band table plus a bank blob. The blob is
+// what makes them diverge: an animated slot costs ONE entry against the tile
+// capacity and `BGANIM_BYTES_PER_SLOT` against the section ceiling, because
+// every phase bank carries the whole slot. On aeon's own live document that is
+// the difference between the free-slot number Aurora printed and the number of
+// slots the build would actually accept, and the panel was printing the looser
+// one with nothing beside it.
+//
+// EVERY QUANTIFIER HERE IS PER-ACT. The record term is per band and the slot
+// term is per slot, but both are SUMMED over the whole act before the
+// comparison: `BgAnim_Banks` is one blob for the act, so a per-band cap is
+// unsound and aeon's own comment records that error being made and refuted by
+// this zone's shipped content. `viewsEmitted` is per-act too, and is the one
+// that catches people out — see its docblock.
+// ---------------------------------------------------------------------------
+
+/**
+ * The band shape the SIZE arithmetic needs, which is much less than a band.
+ *
+ * DELIBERATELY NOT `BgOverrideBand`. The interesting caller is an availability
+ * check asking "would a `cols x rows` band still fit?", and it has no `phases`
+ * to offer — requiring a whole band would make it synthesise 8 banks of art to
+ * ask a question about arithmetic, which is how a check ends up too expensive
+ * to run per render and then does not get run.
+ */
+export interface BgAnimBandSize {
+  cols: number;
+  rows: number;
+  /** Read only when the band is `default_off`; see `viewsEmitted`. */
+  pattern_px?: number;
+  /** Truthy means the band is not counted into the act's own table. */
+  default_off?: unknown;
+}
+
+/** Slots a size-shaped band owns. The same `cols * rows` the full codec uses. */
+function sizeSlots(b: BgAnimBandSize): number {
+  return bandTileCount({ cols: b.cols, rows: b.rows });
+}
+
+/**
+ * Is this band marked `default_off`?
+ *
+ * ⚠ THE KEY CHANGES WHAT SHIPS, NOT WHAT THE AUTHOR SEES. A band carrying it is
+ * not counted into the act's own `BgAnim_Table`, so a single-band act emits a
+ * count of zero and BG animation is off at boot in EVERY shape, release
+ * included. The DEBUG view twins are what the author gets in exchange, and they
+ * exist only in the debug ROM. Any surface that offers this key must say that
+ * first; see `bandKeys.default_off` in the vendored contract.
+ *
+ * TRUTHY, not `=== true`, because the consumer coerces (`bool(a.get(...))`). A
+ * non-boolean is refused by `validateBgOverride` rather than relied on, but the
+ * arithmetic reads it the way the consumer would so the two cannot disagree
+ * about a document that reached us from somewhere else.
+ */
+export function bandIsDefaultOff(b: BgAnimBandSize): boolean {
+  return Boolean(b.default_off);
+}
+
+/** A derived quantity, or the aeon refusal that means it has no value. */
+export type BgAnimSizeResult =
+  | { ok: true; value: number }
+  | { ok: false; reason: string };
+
+/**
+ * How many DEBUG view twins this act emits: zero, or `BGANIM_VIEW_COUNT`.
+ *
+ * ⚠ BOTH REFUSALS ARE QUANTIFIED OVER THE ACT, NOT OVER THE BANDS THAT CARRY
+ * THE KEY, and that is the trap aeon's contract names by name. The natural
+ * validator asks "is `default_off` consistent across the bands?" and passes a
+ * two-band act in which BOTH bands carry it — which aeon refuses, because the
+ * twins exist for a lab that drives ONE band and a multi-band act would need a
+ * view table per band plus a selector naming both. The constraint is on
+ * `bands.length`, so that is what this reads.
+ *
+ * A REFUSAL IS NOT ZERO TWINS. aeon raises rather than emitting none, so the
+ * section size is UNDEFINED for such an act rather than smaller. Returning
+ * `{ ok: false }` is what keeps a caller from rendering "could not compute" as
+ * a larger budget.
+ */
+export function viewsEmitted(bands: readonly BgAnimBandSize[]): BgAnimSizeResult {
+  const off = bands.filter(bandIsDefaultOff);
+  if (off.length === 0) return { ok: true, value: 0 };
+  if (bands.length !== 1) {
+    return {
+      ok: false,
+      reason:
+        `"default_off" is set on ${off.length} of ${bands.length} tile animations, and the ` +
+        'build refuses that: the debug view twins are emitted only for an act with EXACTLY ONE ' +
+        'tile animation, because the effects lab drives one. The rule is on how many tile ' +
+        'animations the ACT has, not on whether they agree, so making them all default_off does ' +
+        'not satisfy it. Clear "default_off", or keep the act to one tile animation.',
+    };
+  }
+  const period = bands[0]?.pattern_px;
+  if (period !== BGANIM_VIEW_DERIVED_PERIOD_PX) {
+    return {
+      ok: false,
+      reason:
+        `a "default_off" tile animation must have a pattern period of ` +
+        `${BGANIM_VIEW_DERIVED_PERIOD_PX} px, and this one has ` +
+        `${period === undefined ? 'none' : String(period)}. The vertical view twin's rate was ` +
+        `derived against that period; at any other one the build refuses rather than silently ` +
+        'running the twin at a different speed. Re-deriving it is an engine decision, not a ' +
+        'writer one.',
+    };
+  }
+  return { ok: true, value: BGANIM_VIEW_COUNT };
+}
+
+/**
+ * Bytes the emitted `ojz_bg_anim` section would occupy for this act.
+ *
+ * `BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES*bands`, once for the act's own
+ * table and once more per view twin, plus `BGANIM_BYTES_PER_SLOT` for every
+ * animated slot in the act. The bank blob is SHARED across the twins — every
+ * view's pointer array names the same offsets — which is why the twins are
+ * cheap and the slots are not.
+ *
+ * An empty act is the disabled stub, which is `BGANIM_COUNT_BYTES` and nothing
+ * else. That is aeon's own `n_bands == 0` case, not a special one here.
+ */
+export function bganimSectionBytes(bands: readonly BgAnimBandSize[]): BgAnimSizeResult {
+  const views = viewsEmitted(bands);
+  if (!views.ok) return views;
+  const table = BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES * bands.length;
+  const slots = bands.reduce((n, b) => n + sizeSlots(b), 0);
+  return { ok: true, value: table + views.value * table + slots * BGANIM_BYTES_PER_SLOT };
+}
+
+/**
+ * The MOST animated slots the byte ceiling admits for an act of this SHAPE —
+ * this many bands, these twins — counting the slots the act already owns.
+ *
+ * SHAPE, NOT CONTENT: only `bands.length` and whether the twins are emitted are
+ * read, so the answer is "how many slots could this act carry" rather than "how
+ * many are left". Subtract the current slot count for the second question.
+ *
+ * Floored at zero. A band count whose records alone overflow the ceiling admits
+ * no slots at all, and a negative budget is not a number to put in front of an
+ * author.
+ */
+export function bganimSectionSlotsAllowed(
+  bands: readonly BgAnimBandSize[],
+): BgAnimSizeResult {
+  const views = viewsEmitted(bands);
+  if (!views.ok) return views;
+  const table = BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES * bands.length;
+  const forSlots = BGANIM_SECTION_CEILING - table - views.value * table;
+  return { ok: true, value: Math.max(0, Math.floor(forSlots / BGANIM_BYTES_PER_SLOT)) };
+}
+
 function isPowerOfTwo(n: number): boolean {
   return Number.isInteger(n) && n > 0 && (n & (n - 1)) === 0;
 }
@@ -548,6 +728,19 @@ function validateBand(
   }
   if (b.rate_shift !== undefined && (!isInt(b.rate_shift) || b.rate_shift < 0)) {
     issues.push(`anims[${i}].rate_shift must be an integer >= 0 (default ${BAND_DEFAULTS.rate_shift})`);
+  }
+  // `default_off` — SHAPE ONLY here. Both of its real obligations are quantified
+  // over the ACT (how many bands it has, not how many carry the key), so they
+  // live in `viewsEmitted` and are reported once for the document rather than
+  // once per band. What is per-band is the TYPE: the consumer coerces with
+  // `bool(...)`, so a string or a 0 would bake as something the author did not
+  // write and nothing downstream would say so.
+  if (b.default_off !== undefined && typeof b.default_off !== 'boolean') {
+    issues.push(
+      `anims[${i}].default_off is ${JSON.stringify(b.default_off)}; it must be true or false. ` +
+      'The consumer COERCES it (`bool(...)`) rather than refusing, so a non-boolean bakes as ' +
+      'whatever Python calls truthy and the document stops meaning what it says.',
+    );
   }
 
   if (!isInt(cols) || !isInt(rows) || cols < 1 || rows < 1) return cursor; // nothing below is derivable
@@ -720,10 +913,82 @@ export function validateBgOverride(doc: unknown): string[] {
       }
       let cursor = 0;
       anims.forEach((band, i) => { cursor = validateBand(band, i, tiles, cursor, issues); });
+
+      // THE SECOND BUDGET IS DELIBERATELY NOT ASKED HERE. See
+      // `bganimSectionIssues`: it is a different question on a different clock,
+      // and folding it in would make a BUDGET failure indistinguishable from a
+      // CORRUPTION one for every caller that just wants to know whether a
+      // structural edit left the document well-formed.
     }
   }
 
   return issues;
+}
+
+/**
+ * The ROM SECTION ceiling, as validation issues — empty when the act fits.
+ *
+ * SEPARATE FROM THE REST, AND NOT BECAUSE IT IS LESS TRUE. Every other rule in
+ * `validateBgOverride` is about the document's own well-formedness: violate one
+ * and the file is malformed or ships corrupt art. THIS one is about what the
+ * BUILD would emit, and a perfectly well-formed document can be over it. That
+ * matters because such documents EXIST ON DISK — this repo's own
+ * `editor_bg_override.b0e5a661.json` fixture is aeon's historical two-band act,
+ * which is roughly two and a half times the ceiling — and Aurora is the only
+ * tool that can repair one. A codec that refused to READ them, or refused to
+ * SAVE a layout edit beside them, would leave hand-edited JSON as the only way
+ * back, which is the outcome this module's docblock names as the thing sole
+ * ownership exists to prevent.
+ *
+ * SO THE RULE IS DO NO HARM, NOT REFUSE TO TOUCH: the doors that GROW the
+ * section refuse (see `bg-override-band.ts` and `createBand`), the read path
+ * reports it as a notice, and the write path carries it through. What no door
+ * does is let an author ADD animation an over-budget act cannot afford.
+ *
+ * The geometry guard is not caution: `bandTileCount` on a non-integer `cols`
+ * gives NaN, and a band whose geometry was already reported malformed would
+ * turn one real defect into a second nonsense one.
+ */
+export function bganimSectionIssues(anims: readonly unknown[]): string[] {
+  const sizable = anims.every(
+    (b) =>
+      typeof b === 'object' && b !== null && !Array.isArray(b)
+      && isInt((b as Record<string, unknown>).cols)
+      && isInt((b as Record<string, unknown>).rows)
+      && ((b as Record<string, unknown>).cols as number) >= 1
+      && ((b as Record<string, unknown>).rows as number) >= 1,
+  );
+  if (!sizable) return [];
+  const sizes = anims as unknown as BgAnimBandSize[];
+  const bytes = bganimSectionBytes(sizes);
+  if (!bytes.ok) return [`the build refuses this act: ${bytes.reason}`];
+  if (bytes.value <= BGANIM_SECTION_CEILING) return [];
+  const allowed = bganimSectionSlotsAllowed(sizes);
+  const slots = sizes.reduce((n, b) => n + bandTileCount(b), 0);
+  return [
+    `the emitted animation section would be ${bytes.value} bytes, over the ROM section ` +
+    `ceiling of ${BGANIM_SECTION_CEILING}. THE LIMIT IS ON THE ACT'S TOTAL, NEVER PER ` +
+    `tile animation: the phase banks are one shared blob, and each animated slot costs ` +
+    `${BGANIM_BYTES_PER_SLOT} bytes of it. This act animates ${slots} slot(s) across ` +
+    `${sizes.length} tile animation(s)` +
+    (allowed.ok ? `, and at that count the ceiling allows ${allowed.value}` : '') +
+    '. This is a SECOND budget, independent of the tile capacity: a document can sit ' +
+    'well inside the blob and still not fit the ROM section. Shrink or drop tile ' +
+    'animations until the total fits.',
+  ];
+}
+
+/**
+ * The section-ceiling half of `validateBgOverride`, for a document.
+ *
+ * The convenience `bganimSectionIssues` wants when the caller has a whole
+ * document rather than a band list, and the one every DO-NO-HARM comparison
+ * goes through.
+ */
+export function bgOverrideSectionIssues(doc: unknown): string[] {
+  if (typeof doc !== 'object' || doc === null || Array.isArray(doc)) return [];
+  const anims = (doc as Record<string, unknown>).anims;
+  return Array.isArray(anims) ? bganimSectionIssues(anims) : [];
 }
 
 // ---------------------------------------------------------------------------
@@ -844,9 +1109,27 @@ export function parseBgOverride(text: string): BgOverrideParseResult {
     });
   }
 
+  // ⚠ THE SECTION CEILING IS A NOTICE HERE, NOT A REFUSAL, and the direction is
+  // deliberate. It is the one rule a document can be violating BEFORE Aurora
+  // ever touches it (this repo's `editor_bg_override.b0e5a661.json` fixture is
+  // such a document — aeon's historical two-band act, about two and a half
+  // times over), and Aurora is the only tool that can bring it back under.
+  // Refusing to open one would leave hand-editing JSON as the only recourse,
+  // which is the outcome this module exists to prevent. Loud, though: the act
+  // does not build, and an author who is not told that finds out from a build
+  // log. The doors that GROW the section are where this refuses.
   const issues = validateBgOverride(doc);
   if (issues.length > 0) {
     throw new BgOverrideError(`${BG_OVERRIDE_CONSUMER_PATH} is not a valid BG override`, issues);
+  }
+  for (const over of bgOverrideSectionIssues(doc)) {
+    notices.push({
+      severity: 'warning',
+      message:
+        `${BG_OVERRIDE_CONSUMER_PATH} does not fit its ROM section, so the build will REFUSE it ` +
+        `as it stands: ${over} Nothing has been changed or dropped on read, and Aurora will not ` +
+        'let a tile animation grow while it is over; shrinking or removing one is the way back.',
+    });
   }
   return { doc, notices };
 }
@@ -900,6 +1183,13 @@ export function serializeBgOverride(doc: BgOverrideDocument): string {
       'upgrades it to "anims" on read; a document still carrying it did not come through the reader.',
     );
   }
+  // ⚠ AND THE SECTION CEILING IS CARRIED THROUGH HERE TOO, for the reason the
+  // reader states: the document may have arrived over it. Refusing to WRITE
+  // would be worse than refusing to read, because it would block the repair —
+  // an author who removes a tile animation from a 2.4x-over act must be able to
+  // save that, and a save of an act still over the line is not Aurora making
+  // anything worse. GROWTH is what is refused, at `bg-override-band.ts`, which
+  // compares the projected document against the one the author started from.
   const issues = validateBgOverride(doc);
   if (issues.length > 0) {
     throw new BgOverrideError(`refusing to write ${BG_OVERRIDE_CONSUMER_PATH}`, issues);

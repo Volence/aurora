@@ -22,9 +22,23 @@ import {
   promoteBandCommand, promoteUnavailableReason,
 } from '../bg-anim-aeon';
 import { bandSpecOf, bandVerbs, seededStaticBase, type BandCandidate } from '../band-verbs';
+import { sectionRoomyDoc } from '../../../../test/support/bg-override-fixtures';
 
 const FIXTURE = 'test/fixtures/bg-override/editor_bg_override.b0e5a661.json';
 const doc = (): BgOverrideDocument => parseBgOverride(readFileSync(FIXTURE, 'utf8')).doc;
+/**
+ * THE SAME REAL DOCUMENT, WITH ROOM IN ITS ROM SECTION.
+ *
+ * The b0e5a661 fixture has none: its two tile animations cover 192 animated
+ * slots, an animated slot is stored once per phase bank, and the emitted
+ * section is about two and a half times aeon's ruled ceiling. Aurora modelled
+ * only the TILE budget until 2026-09-06, so rows here that PROMOTE were
+ * exercising an operation aeon's build refuses. `sectionRoomyDoc(1)` demotes
+ * the larger tile animation back to static art through the codec's own
+ * demotion: same art, same blob, same nametable, room in the section.
+ */
+const mdoc = (): BgOverrideDocument => sectionRoomyDoc(1);
+
 
 describe('bandSpecOf', () => {
   it('omits driver and rate_shift when the candidate leaves them out, and fills phaseFill with the default', () => {
@@ -40,7 +54,7 @@ describe('bandSpecOf', () => {
 describe('bandVerbs: no document', () => {
   const v = bandVerbs(null, { staticBase: 0, cols: 1, rows: 1 });
   it('disables both with the panel\'s own reasons', () => {
-    expect(v.promote.reason).toBe(promoteUnavailableReason(null));
+    expect(v.promote.reason).toBe(promoteUnavailableReason(null, 1, 1));
     expect(v.add.reason).toBe(insertUnavailableReason(null, 1, 1));
     expect(v.promote.reason).not.toBeNull();
     expect(v.add.reason).not.toBeNull();
@@ -52,7 +66,11 @@ describe('bandVerbs: no document', () => {
 });
 
 describe('bandVerbs: the fixture document', () => {
-  const d = doc();
+  // The section-roomy derivation, because these rows RUN both verbs: on the
+  // fixture as it ships, both doors are correctly shut by the ROM section
+  // budget and "both are enabled here" would be asserting a world that no
+  // longer exists. See `mdoc`.
+  const d = mdoc();
   const base = bandBudget(d).firstPromotableSlot;
   const candidate = { staticBase: base, cols: 1, rows: 1 } as const;
   const v = bandVerbs(d, candidate);
@@ -66,7 +84,7 @@ describe('bandVerbs: the fixture document', () => {
       .toBe(`Promote from tile ${base + 5}`);
   });
   it('reasons are the panel\'s predicates, verbatim', () => {
-    expect(v.promote.reason).toBe(promoteUnavailableReason(d));
+    expect(v.promote.reason).toBe(promoteUnavailableReason(d, candidate.cols, candidate.rows));
     expect(v.add.reason).toBe(insertUnavailableReason(d, 1, 1));
   });
   it('both are enabled here (anti-vacuous)', () => {
@@ -84,8 +102,12 @@ describe('bandVerbs: the fixture document', () => {
     const w = bandVerbs(d, huge);
     expect(w.add.reason).toBe(insertUnavailableReason(d, 10_000, 1));
     expect(w.add.reason).not.toBeNull();
-    // Promote is a different predicate and does not read cols — still open.
-    expect(w.promote.reason).toBe(promoteUnavailableReason(d));
+    // Promote is a different predicate, but it DOES read the geometry now: a
+    // promoted slot becomes an animated one, and an animated slot costs a whole
+    // phase bank per phase of ROM. `huge` is over the section ceiling, so this
+    // door is shut too, and by that budget rather than by the tile blob.
+    expect(w.promote.reason).toBe(promoteUnavailableReason(d, huge.cols, huge.rows));
+    expect(w.promote.reason).not.toBeNull();
   });
 });
 

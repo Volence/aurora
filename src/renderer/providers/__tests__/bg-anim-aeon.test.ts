@@ -21,6 +21,20 @@
 // these rows were written — where insertion refuses at every size and promotion
 // still works.
 //
+// ⚠ "WITH ROOM" WAS ONLY EVER ABOUT THE TILE BLOB, AND THAT IS HALF THE BUDGET.
+// The b0e5a661 fixture's two bands cover 192 animated slots, and an animated
+// slot is stored once per phase bank, so its emitted ROM section is about two
+// and a half times aeon's ruled ceiling — aeon's own source names this act when
+// it records a per-band cap being refuted, and deleted it for that reason.
+// Aurora could not see that until 2026-09-06 because it modelled one budget.
+// Now it does, and the doors that GROW a section refuse while one is over. So
+// every row here that ADDS or PROMOTES uses `sectionRoomyDoc()`: the same real
+// document with its bands demoted back to static art through the codec's own
+// demotion, which leaves the art, the blob and the nametable exactly as they
+// are and only stops the slots being animated. Rows that READ, renumber or
+// REMOVE keep the fixture untouched — none of them grow anything, and its
+// over-budget state is part of what makes it a good subject.
+//
 // NEITHER IS THE "REAL" CASE. The ceiling is real: aeon's injector asserts
 // `len(tiles) <= BG_TILE_CAPACITY` and refuses a blob past it. The SATURATION is
 // a transient property of one generator run, and the aeon lane did add a
@@ -57,9 +71,20 @@ import {
   patternPxFor, promoteBandCommand, promoteUnavailableReason, rateShiftNote,
   removeBandCommand, rowChoices, slotSpanPhrase, slotSpanDigits, NO_SLOTS_PHRASE, type BandSpec,
 } from '../bg-anim-aeon';
+import { sectionRoomyDoc } from '../../../../test/support/bg-override-fixtures';
 
 const FIXTURE = 'test/fixtures/bg-override/editor_bg_override.b0e5a661.json';
 const doc = (): BgOverrideDocument => parseBgOverride(readFileSync(FIXTURE, 'utf8')).doc;
+
+/**
+ * The same real document with ROM-SECTION room, for every row that ADDS or
+ * PROMOTES. One band is kept, so "a document that already carries bands" is
+ * still true and `firstPromotableSlot` is still past a real prefix; the larger
+ * of the fixture's two bands is demoted back to static art, which is what buys
+ * the room. See the header for why the fixture itself has none.
+ */
+const growable = (keepBands = 0): BgOverrideDocument => sectionRoomyDoc(keepBands);
+const mdoc = (): BgOverrideDocument => growable(1);
 
 /**
  * The fixture padded to capacity — the shape the LIVE document ships in.
@@ -67,9 +92,14 @@ const doc = (): BgOverrideDocument => parseBgOverride(readFileSync(FIXTURE, 'utf
  * Derived: it appends blank tiles until `tiles.length === BG_TILE_CAPACITY`,
  * reading the ceiling from the contract rather than naming it here. The
  * padding is unreferenced by any layout word, so the document stays valid.
+ *
+ * SECTION-ROOMY TOO, since 2026-09-06: the tile blob being full is the fact
+ * these rows are about, and leaving the bands on would make every one of them
+ * refuse for the OTHER budget's reason instead — which would quietly turn a
+ * capacity test into a section test that says "capacity" in its name.
  */
 function fullDoc(): BgOverrideDocument {
-  const d = doc();
+  const d = growable();
   while (d.tiles.length < BG_TILE_CAPACITY) d.tiles.push(new Array<number>(TILE_PIXELS).fill(0));
   return d;
 }
@@ -134,7 +164,7 @@ describe('the geometry pickers', () => {
 
 /** Promote a 2x1 band off the fixture and hand back the resulting document. */
 function promoteThenDescribe(cols: number): BgOverrideDocument {
-  const d = doc();
+  const d = mdoc();
   const base = bandBudget(d).firstPromotableSlot;
   const r = promoteBandCommand(d, base, { cols, rows: 1 });
   if (!r.ok) throw new Error(r.reason);
@@ -174,10 +204,11 @@ describe('availability agrees with what the command actually does', () => {
   it('on a document with room, BOTH doors are open and both commands succeed', () => {
     // The peer row. Insertion is not an exotic path reached after promotion
     // fails — on any document with slots to spare it is simply available.
-    const d = doc();
+    const d = mdoc();
     expect(bandBudget(d).tileSlotsRemaining).toBeGreaterThan(0);   // anti-vacuous
+    expect(bandBudget(d).byteSlotsRemaining).toBeGreaterThan(0);   // and the OTHER budget
     expect(insertUnavailableReason(d, 2, 1)).toBeNull();
-    expect(promoteUnavailableReason(d)).toBeNull();
+    expect(promoteUnavailableReason(d, 2, 1)).toBeNull();
     expect(addBandCommand(d, { cols: 2, rows: 1 }).ok).toBe(true);
     expect(promoteBandCommand(d, bandBudget(d).firstPromotableSlot, { cols: 2, rows: 1 }).ok)
       .toBe(true);
@@ -204,13 +235,13 @@ describe('availability agrees with what the command actually does', () => {
     // The other half, and the reason the first half is not simply a dead end:
     // promotion costs no slots at any capacity.
     const d = fullDoc();
-    expect(promoteUnavailableReason(d)).toBeNull();
+    expect(promoteUnavailableReason(d, 2, 1)).toBeNull();
     const r = promoteBandCommand(d, bandBudget(d).firstPromotableSlot, { cols: 2, rows: 1 });
     expect(r.ok).toBe(true);
   });
 
   it('at the band ceiling both doors close, and both say so', () => {
-    let d = doc();
+    let d = mdoc();
     // Grow to the ceiling through the real commands, so the state is one the app
     // can actually reach rather than one hand-assembled to look like it.
     while (bandBudget(d).bandsRemaining > 0) {
@@ -219,7 +250,7 @@ describe('availability agrees with what the command actually does', () => {
       d = applyForTest(d, r.command);
     }
     expect(bandBudget(d).bands).toBe(BGANIM_MAX_BANDS);
-    expect(promoteUnavailableReason(d)).toMatch(new RegExp(`ceiling of ${BGANIM_MAX_BANDS}`));
+    expect(promoteUnavailableReason(d, 1, 1)).toMatch(new RegExp(`ceiling of ${BGANIM_MAX_BANDS}`));
     expect(insertUnavailableReason(d, 1, 1)).toMatch(new RegExp(`ceiling of ${BGANIM_MAX_BANDS}`));
   });
 });
@@ -292,7 +323,7 @@ describe('the band rows the panel renders', () => {
   });
 
   it('a band created WITHOUT a driver reports the default and says it is not spelled', () => {
-    const d = doc();
+    const d = mdoc();
     const r = promoteBandCommand(d, bandBudget(d).firstPromotableSlot, { cols: 1, rows: 1 });
     if (!r.ok) throw new Error(r.reason);
     const next = applyForTest(d, r.command);
@@ -429,7 +460,8 @@ describe('a printed slot range names the last slot it contains', () => {
   it('the promote form\'s range is the slots the promotion would actually take', () => {
     // The panel composes `slotSpanPhrase(staticBase, tileCount)` for a candidate
     // parked at the first promotable slot — the default the panel clamps to.
-    const budget = bandBudget(doc());
+    const d = mdoc();
+    const budget = bandBudget(d);
     const spec: BandSpec = { cols: 4, rows: 2 };
     const tileCount = spec.cols * spec.rows;
     const base = budget.firstPromotableSlot;
@@ -438,9 +470,9 @@ describe('a printed slot range names the last slot it contains', () => {
     expect(phrase).not.toContain(`..${base + tileCount}`);
     // and the promotion the panel would run takes exactly those slots — the
     // command is the authority the readout has to agree with.
-    const r = promoteBandCommand(doc(), base, spec);
+    const r = promoteBandCommand(d, base, spec);
     if (!r.ok) throw new Error(r.reason);
-    const after = bandRows(applyForTest(doc(), r.command));
+    const after = bandRows(applyForTest(d, r.command));
     expect(after.at(-1)!.slotRange).toBe(phrase);
     expect(endsOf(after.at(-1)!.slotRange)!.last - base + 1).toBe(tileCount);
   });
@@ -514,14 +546,14 @@ describe('the rate control', () => {
 describe('the rate reaches the document through BOTH doors, and only when asked', () => {
   /** The raw band a spec produces at the promotion door. */
   function promoted(spec: BandSpec): BgOverrideBand {
-    const d = doc();
+    const d = mdoc();
     const r = promoteBandCommand(d, bandBudget(d).firstPromotableSlot, spec);
     if (!r.ok) throw new Error(r.reason);
     return documentBands(applyForTest(d, r.command)).at(-1)!;
   }
   /** The raw band a spec produces at the insertion door. */
   function inserted(spec: BandSpec): BgOverrideBand {
-    const d = doc();
+    const d = mdoc();
     const r = addBandCommand(d, spec);
     if (!r.ok) throw new Error(r.reason);
     return documentBands(applyForTest(d, r.command)).at(-1)!;
@@ -546,7 +578,7 @@ describe('the rate reaches the document through BOTH doors, and only when asked'
     // The read side the panel renders, not the raw band: an absent key must show
     // the contract's default AND say it is not spelled, which is what stops an
     // author from believing the file pins a rate it does not.
-    const d = doc();
+    const d = mdoc();
     const r = promoteBandCommand(d, bandBudget(d).firstPromotableSlot, {
       cols: 1, rows: 1, rateShift: DEFAULT_RATE_SHIFT + 1,
     });
@@ -555,7 +587,7 @@ describe('the rate reaches the document through BOTH doors, and only when asked'
     expect(explicit.rateShift).toBe(DEFAULT_RATE_SHIFT + 1);
     expect(explicit.rateShiftIsExplicit).toBe(true);
 
-    const d2 = doc();
+    const d2 = mdoc();
     const r2 = promoteBandCommand(d2, bandBudget(d2).firstPromotableSlot, { cols: 1, rows: 1 });
     if (!r2.ok) throw new Error(r2.reason);
     const bare = bandRows(applyForTest(d2, r2.command)).at(-1)!;

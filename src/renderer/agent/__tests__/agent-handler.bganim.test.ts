@@ -19,6 +19,14 @@
 // THE FIXTURE IS THE REAL b0e5a661 DOCUMENT, and a capacity-padded copy of it.
 // A hand-built two-tile stub would let every one of these pass while the tools
 // were useless on the only content that exists.
+//
+// ⚠ AND FOR THE ROWS THAT ADD OR PROMOTE, A SECTION-ROOMY DERIVATION OF IT.
+// The fixture's two bands cover 192 animated slots and its emitted ROM section
+// is about two and a half times aeon's ruled ceiling, so since 2026-09-06 the
+// doors that GROW a section refuse on it — correctly. `sectionRoomyDoc(1)`
+// demotes the larger band back to static art through the codec's own demotion:
+// same art, same blob, same nametable, one tile animation instead of two, and
+// room in the section. Rows that read, demote or remove keep the fixture.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -34,13 +42,16 @@ import {
   parseBgOverride, type BgOverrideDocument,
 } from '../../../core/formats/bg-override/bg-override';
 import type { BgOverrideState } from '../../../core/formats/bg-override/bg-override-io';
+import { sectionRoomyDoc } from '../../../../test/support/bg-override-fixtures';
 
 const FIXTURE = 'test/fixtures/bg-override/editor_bg_override.b0e5a661.json';
 const doc = (): BgOverrideDocument => parseBgOverride(readFileSync(FIXTURE, 'utf8')).doc;
+/** The same document with ROM-section room: ONE tile animation, not two. */
+const mdoc = (): BgOverrideDocument => sectionRoomyDoc(1);
 
 /** The fixture padded to BG_TILE_CAPACITY — the shape aeon's live file ships in. */
 function fullDoc(): BgOverrideDocument {
-  const d = doc();
+  const d = mdoc();
   while (d.tiles.length < BG_TILE_CAPACITY) d.tiles.push(new Array<number>(TILE_PIXELS).fill(0));
   return d;
 }
@@ -132,7 +143,7 @@ describe('list_bg_anim_bands', () => {
 });
 
 describe('promote_bg_anim_band', () => {
-  beforeEach(() => open(state(doc())));
+  beforeEach(() => open(state(mdoc())));
 
   it('reaches the PROJECT document and records ONE undo step on the act stack', async () => {
     const before = bandCount();
@@ -163,20 +174,20 @@ describe('promote_bg_anim_band', () => {
     open(state(fullDoc()));
     expect(held()!.tiles).toHaveLength(BG_TILE_CAPACITY);      // anti-vacuous
     await ask({ kind: 'promote-bg-anim-band', cols: 2, rows: 1, staticBase: 192 });
-    expect(bandCount()).toBe(3);
+    expect(bandCount()).toBe(2);
   });
 
   it('THROWS the codec\'s refusal for a range inside an existing band', async () => {
     await expect(ask({ kind: 'promote-bg-anim-band', cols: 1, rows: 1, staticBase: 0 }))
       .rejects.toThrow(/already belong/);
-    expect(bandCount()).toBe(2);     // and nothing was written
+    expect(bandCount()).toBe(1);     // and nothing was written
   });
 
   it("carries `phaseFill` through: 'shift' banks are the range rolled 1px per bank", async () => {
     // Deterministic, x-asymmetric art in the promoted range, planted so the
     // roll cannot be an identity by accident — and DERIVED here independently,
     // through a whole-pixel-grid roll rather than the module's per-tile math.
-    const d = doc();
+    const d = mdoc();
     d.tiles[192] = Array.from({ length: TILE_PIXELS }, (_, i) => ((i % 8) * 3 + (i >> 3)) & 0xF);
     d.tiles[193] = Array.from({ length: TILE_PIXELS }, (_, i) => ((i % 8) * 7 + (i >> 3) + 5) & 0xF);
     open(state(d));
@@ -211,10 +222,10 @@ describe('promote_bg_anim_band', () => {
 
 describe('add_bg_anim_band', () => {
   it('works where there ARE free slots, and grows the blob by exactly the band', async () => {
-    open(state(doc()));
+    open(state(mdoc()));
     const tilesBefore = held()!.tiles.length;
     await ask({ kind: 'add-bg-anim-band', cols: 2, rows: 1 });
-    expect(bandCount()).toBe(3);
+    expect(bandCount()).toBe(2);
     expect(held()!.tiles).toHaveLength(tilesBefore + 2);
   });
 
@@ -227,7 +238,7 @@ describe('add_bg_anim_band', () => {
     // said by planBandInsertion and by nothing else in the tree.
     await expect(ask({ kind: 'add-bg-anim-band', cols: 1, rows: 1 }))
       .rejects.toThrow(/slot\(s\) at the front of a \d+-tile blob/);
-    expect(bandCount()).toBe(2);
+    expect(bandCount()).toBe(1);
   });
 });
 
