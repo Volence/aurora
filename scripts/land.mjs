@@ -55,6 +55,46 @@
 // judgement, and a script that did them would invite being run without reading.
 //
 // ============================================================================
+// AND IT DELIBERATELY DOES NOT REBUILD. RULED 2026-09-06, MEASURED, NOT ARGUED.
+// ============================================================================
+//
+// The question kept coming back (booked as LANDING-LEAVES-BUILD-STALE): landing
+// leaves `dist/` describing whatever was last built, which may be neither the
+// tree that was tested nor the tree that was pushed. Should this script build?
+//
+// NO, and the reason is not "it would be slow" - a full build is ~0.6s here,
+// timed three times. Three measurements, in the order that settles it:
+//
+//   1. THE SUITE THIS SCRIPT RUNS HAS ZERO COUPLING TO `dist/`. Measured the
+//      only way worth trusting: `dist/` was MOVED AWAY ENTIRELY and `npm test`
+//      re-run. 510 files / 7421 tests passed, byte-identical totals to the run
+//      with it present. The two suite files that mention Electron build their
+//      trees with `mkdtemp` and spawn a `#!/bin/sh` stub. So a stale bundle
+//      cannot make a landing certify the wrong thing; there is no path.
+//
+//   2. `dist/` IS GITIGNORED (.gitignore:2) with zero tracked files under it,
+//      so a stale bundle is not publishable. The staleness is local, always.
+//
+//   3. ⚠ AND REBUILDING WOULD BE ACTIVELY WORSE, which is the half that turns
+//      this from "harmless either way" into a ruling. A rebuild here would run
+//      the PLAIN build, and the CDP harnesses need `VITE_AURORA_DEBUG=1`. So
+//      landing would silently swap the bundle's FLAVOUR under any session
+//      holding a debug build for a harness - and the freshness guard cannot see
+//      it. Demonstrated deliberately on the day of this ruling: with a plain
+//      build in place, `scratchpad/lib/run-root.mjs` printed
+//      `build: FRESH ... 2500s newer than the newest of 863 .ts/.tsx` and the
+//      harness then died on `window.__dbg absent`. The guard measures MTIME.
+//      Flavour is an env var that leaves no mark on the file it checks, so a
+//      wrong-flavour bundle is indistinguishable from a right one to every
+//      instrument we have. Adding a build here would fire that trap on a
+//      schedule, at the moment a session is least expecting its tree to change.
+//
+// So: not a no-op we tolerate, a rebuild we refuse. If a future session wants
+// the flavour problem solved, the fix belongs in the freshness guard (record
+// the flavour beside the bundle and compare it), NOT here - this script would
+// only be choosing which flavour to impose on everyone.
+//
+// ============================================================================
 // ⚠ WHERE THE LANE-LOG ENTRY GOES NOW, AND WHY THIS PARAGRAPH EXISTS
 // ============================================================================
 //
