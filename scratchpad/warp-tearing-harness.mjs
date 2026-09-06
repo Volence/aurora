@@ -191,7 +191,53 @@
 // NO OTHER ROW'S NUMBER MOVES. Rows 10 and 11 take no plane samples and the
 // two they replace took none either, so `diffAll`, the floor, the mailbox
 // numbers and R6's stamp set are untouched; rows 8 and 9 keep their own
-// 240-frame settle path verbatim.
+// 240-frame settle path verbatim. Checked rather than asserted: every line of
+// the run log outside rows 10 and 11 is byte-identical across the change.
+//
+// RED FIRST FOR THE 2026-09-06 PAIR, all against commit ad8d61e7 on branch
+// parcel/warp-row11, each mutation restored from that commit before the next.
+// THREE OF THE FOUR ARE MACHINE POISONS, NOT ARITHMETIC ONES: they write the
+// emulated machine (the engine's own gate byte, the overlay byte, the pad) and
+// leave every row's comparison untouched, so the row reddens because the
+// MACHINE changed. That is the distinction P1 failed on 2026-09-05 and it is
+// why these are worth more than "the poison went red".
+//
+//   P6, poisoning the ENGINE'S CHEAT GATE (`Cheat_Flags` cleared before the B
+//     press, the shape of a cheat-gate regression): the toggle goes inert
+//     exactly as Player_Main's `beq .no_toggle` says it must, debug_flag stays
+//     255 and the live half never becomes live. Row 11 RED on both live
+//     conjuncts. ROW 10 REFUSED, not passed and not failed, its detail reading
+//     "The placements themselves were all verbatim, which is a reading, not a
+//     result" - which is the whole point of the third verdict, because those
+//     twelve placements really were all verbatim.
+//   P7, poisoning the OVERLAY BYTE (`debug_flag` cleared at every restore, the
+//     shape of aeon dropping the boot entry into free flight): both regimes
+//     INVERT. The frozen half moves (y 64 -> 388) and the B press now ENTERS
+//     debug-fly, so the live half freezes. Row 11 RED naming all four wrong
+//     facts; row 10 REFUSED.
+//   P8, poisoning row 10's INPUT (one swept height moved to y=20000, outside
+//     the act): row 10 RED on the CLAMP conjunct, reporting the engine's own
+//     published landing (5920) rather than guessing. Row 11 GREEN in the same
+//     run, which is what makes them two instruments rather than one. This
+//     poison is what found the misdiagnosis the row shipped with for one
+//     commit; see the drift/clamp split.
+//   P9, poisoning the PAD (`down` held across the ack window): in debug-fly
+//     Player_DebugMove drags y while the warp is landing, so the player ends
+//     16px below the published destination. Row 10 RED on the DRIFT conjunct,
+//     6 of 12 - the frozen half only, because in physics DOWN is a duck and
+//     moves nothing. Row 11 GREEN. That is the conjunct that matters: it is
+//     the one that would have caught the pre-b3169c26 lift.
+//
+// WHAT COULD NOT BE BUILT, said plainly. P9 reddens the drift conjunct with a
+// drift this client can cause; it does NOT reproduce the aeon-side defect
+// itself. Writing the placement before Player_SetState is a change to aeon's
+// source and needs an aeon build, which is not this harness's to make. The
+// honest statement of that conjunct's production failure is therefore
+// historical rather than constructed: it HAS happened, aeon measured it (11px
+// out of debug-fly, 5px out of a curl, the same request landing at different
+// heights depending on what the player was doing), booked it and fixed it at
+// b3169c26. This row is red against the ROM of a few days ago and green
+// against this one.
 //
 // Usage: node scratchpad/warp-tearing-harness.mjs   (VERBOSE=1 for server log)
 
