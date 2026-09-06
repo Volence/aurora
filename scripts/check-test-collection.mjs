@@ -147,7 +147,7 @@ function walk(dir, out) {
     entries = readdirSync(dir, { withFileTypes: true });
   } catch (err) {
     fail(2, [
-      'check-test-collection: COULD NOT MEASURE — failed to read a directory.',
+      'check-test-collection: COULD NOT MEASURE: failed to read a directory.',
       `  ${dir}: ${err.message}`,
       '  The on-disk enumeration is incomplete, so a "no problems" result would',
       '  be a claim this run cannot support.',
@@ -193,7 +193,7 @@ function dropIgnored(candidates) {
       ? `${res.error.code ?? ''} ${res.error.message}`.trim()
       : `exit ${res.status}: ${(res.stderr || '').trim()}`;
     console.error(
-      'check-test-collection: note — `git check-ignore` unavailable ' +
+      'check-test-collection: note: `git check-ignore` unavailable ' +
         `(${why}); git-ignored paths (if any) are being kept as candidates.`,
     );
     return candidates;
@@ -226,7 +226,7 @@ function collectedByVitest() {
     cli = path.resolve(path.dirname(pkgPath), entry);
   } catch (err) {
     fail(2, [
-      'check-test-collection: COULD NOT MEASURE — cannot resolve the vitest CLI.',
+      'check-test-collection: COULD NOT MEASURE: cannot resolve the vitest CLI.',
       `  ${err.message}`,
       '  Without vitest there is no second enumeration to compare against.',
     ]);
@@ -241,18 +241,18 @@ function collectedByVitest() {
 
   if (res.error && res.error.code === 'ETIMEDOUT') {
     fail(2, [
-      `check-test-collection: COULD NOT MEASURE — \`vitest list\` timed out after ${TIMEOUT_MS}ms.`,
+      `check-test-collection: COULD NOT MEASURE: \`vitest list\` timed out after ${TIMEOUT_MS}ms.`,
     ]);
   }
   if (res.error) {
     fail(2, [
-      'check-test-collection: COULD NOT MEASURE — could not run `vitest list`.',
+      'check-test-collection: COULD NOT MEASURE: could not run `vitest list`.',
       `  ${res.error.message}`,
     ]);
   }
   if (res.status !== 0) {
     fail(2, [
-      `check-test-collection: COULD NOT MEASURE — \`vitest list --filesOnly\` exited ${res.status}.`,
+      `check-test-collection: COULD NOT MEASURE: \`vitest list --filesOnly\` exited ${res.status}.`,
       '  --- stderr ---',
       (res.stderr || '(empty)').trimEnd(),
       '  --- stdout ---',
@@ -263,7 +263,7 @@ function collectedByVitest() {
   const lines = res.stdout.split('\n').map((s) => s.trim()).filter(Boolean);
   if (lines.length === 0) {
     fail(2, [
-      'check-test-collection: COULD NOT MEASURE — `vitest list --filesOnly` reported',
+      'check-test-collection: COULD NOT MEASURE: `vitest list --filesOnly` reported',
       '  no files at all. That is either a broken config or a broken invocation;',
       '  it is NOT evidence that the tree is clean.',
       '  --- stderr ---',
@@ -277,7 +277,7 @@ function collectedByVitest() {
   const bad = lines.filter((l) => l.startsWith('-') || path.isAbsolute(l));
   if (bad.length > 0) {
     fail(2, [
-      'check-test-collection: COULD NOT MEASURE — unexpected `vitest list --filesOnly`',
+      'check-test-collection: COULD NOT MEASURE: unexpected `vitest list --filesOnly`',
       '  output; these lines are not repo-relative paths:',
       ...bad.slice(0, 10).map((l) => `    ${l}`),
     ]);
@@ -297,7 +297,7 @@ if (uncollected.length > 0 || unrecognised.length > 0) {
   const out = [];
   if (uncollected.length > 0) {
     out.push(
-      `check-test-collection: FAIL — ${uncollected.length} test-shaped file(s) on disk that vitest does not collect.`,
+      `check-test-collection: FAIL: ${uncollected.length} test-shaped file(s) on disk that vitest does not collect.`,
       '',
       'These are type-checked but never RUN. The suite total stays green while',
       'they assert nothing:',
@@ -311,7 +311,7 @@ if (uncollected.length > 0 || unrecognised.length > 0) {
   if (unrecognised.length > 0) {
     if (out.length > 0) out.push('');
     out.push(
-      `check-test-collection: FAIL — vitest collects ${unrecognised.length} file(s) this gate does not recognise as test-shaped.`,
+      `check-test-collection: FAIL: vitest collects ${unrecognised.length} file(s) this gate does not recognise as test-shaped.`,
       '',
       'The gate is measuring a narrower set than vitest runs, so its "everything',
       'is collected" verdict would not cover these:',
@@ -328,6 +328,6 @@ if (uncollected.length > 0 || unrecognised.length > 0) {
 }
 
 console.log(
-  `check-test-collection: OK — ${onDisk.size} test-shaped file(s) on disk, ` +
+  `check-test-collection: OK: ${onDisk.size} test-shaped file(s) on disk, ` +
     `all ${collected.size} collected by vitest.`,
 );
