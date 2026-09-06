@@ -73,6 +73,7 @@
     "harness:bganim-insert-roomy": "node scratchpad/bganim-insert-roomy-harness.mjs",
     "harness:bganim-motion": "node scratchpad/bganim-motion-harness.mjs",
     "harness:bganim-phase-shift": "node scratchpad/bganim-phase-shift-harness.mjs",
+    "harness:bganim-section-budget": "node scratchpad/bganim-section-budget-harness.mjs",
     "harness:bganim-rate-shift": "node scratchpad/bganim-rate-shift-harness.mjs",
     "harness:bganim-strip-range": "node scratchpad/bganim-strip-range-harness.mjs",
     "harness:bganim-tile-door": "node scratchpad/bganim-tile-door-harness.mjs",
