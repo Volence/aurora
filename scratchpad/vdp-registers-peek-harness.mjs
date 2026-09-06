@@ -25,7 +25,7 @@
 //       live state, never the retained frame's. `decoded{}` struck.
 //   * section 8 item 29, protocol.md line 2473, the peek rule.
 //
-// >>> WHY THE HASH ROW ALONE WOULD BE WORTHLESS, AND WHY THIS FILE HAS TEN
+// >>> WHY THE HASH ROW ALONE WOULD BE WORTHLESS, AND WHY THIS FILE HAS TWENTY
 // >>> OTHER ROWS.
 //
 // Item 29 states the three peek clauses and then states, in the contract's own
@@ -85,9 +85,11 @@
 // Oracle is another lane's repo and must not be written to, so no row here is
 // proven red by breaking the server. Each row says instead what was done:
 //
-//   s7  the shape validator is run over six SYNTHETIC replies (literals in this
-//       file) and must reject every one, by name. Same function as s1..s6 read
-//       the live reply through, so this is not two strings of mine agreeing.
+//   s7  the shape validator answers PER CLAUSE, and rows s1 s2 s4 s5 s6 each
+//       read one named clause. s7 poisons a synthetic reply seven ways and
+//       requires the SAME named clause to fire each time, so the red control
+//       covers the very expressions the live rows evaluate rather than merely
+//       proving that some validator somewhere can return non-empty.
 //   t2  a second ROM whose FIRST control word is replaced by two NOPs. That is
 //       precisely the machine state a toggle-clearing peek would leave, and the
 //       t1 assertion goes red on it.
@@ -333,8 +335,16 @@ const hex16 = (n) => `0x${(n & 0xFFFF).toString(16).toUpperCase().padStart(4, '0
 // ---------------------------------------------------------------------------
 // The shape validator: ONE function, read by the live rows and by s7's poisons
 // ---------------------------------------------------------------------------
-// Every clause is the catalog row's own words. It returns a list of violations
-// so a row can name what was wrong rather than printing a bare false.
+// Every clause is the catalog row's own words. It answers PER CLAUSE, each
+// entry either null (clean) or the sentence naming what was wrong.
+//
+// The per-clause shape is deliberate and is what makes s7 a red control for
+// s1..s6 and not merely for s0. Rows s1..s6 read one NAMED clause each, and
+// each poison in s7 asserts that SAME named clause fires. Written the obvious
+// way first, with the live rows testing `shaped.raw.length !== 24` inline and
+// the poisons only feeding a flat violations list, the poisons proved the
+// validator can fail and said nothing at all about the expressions the live
+// rows actually evaluate. Two functions of mine agreeing is not a control.
 const BYTE_RE = /^0x[0-9A-Fa-f]{2}$/;
 const WORD_RE = /^0x[0-9A-Fa-f]{4}$/;
 // The envelope keys every reply carries (protocol.md section 2.2 stamp and
@@ -342,32 +352,43 @@ const WORD_RE = /^0x[0-9A-Fa-f]{4}$/;
 // not be counted as extra keys.
 const ENVELOPE = new Set(['frame', 'mclk', 'running', 'droppedEvents', 'stampCached', 'stoppedAtFrame', 'stoppedAtMclk']);
 
-function shapeViolations(result) {
-  const v = [];
-  if (result === null || typeof result !== 'object') { v.push('result is not an object'); return v; }
-  if (!Array.isArray(result.raw)) v.push('raw is not an array');
-  else {
-    if (result.raw.length !== 24) v.push(`raw has ${result.raw.length} entries, the row says exactly 24`);
+const CLAUSES = ['count24', 'byteSpelling', 'statusWord', 'statusClosed', 'decodedAbsent', 'topLevelClosed'];
+
+function shapeClauses(result) {
+  const c = Object.fromEntries(CLAUSES.map((k) => [k, null]));
+  if (result === null || typeof result !== 'object') {
+    for (const k of CLAUSES) c[k] = 'result is not an object';
+    return c;
+  }
+  if (!Array.isArray(result.raw)) {
+    c.count24 = 'raw is not an array';
+    c.byteSpelling = 'raw is not an array';
+  } else {
+    if (result.raw.length !== 24) c.count24 = `raw has ${result.raw.length} entries, the row says exactly 24`;
     const bad = result.raw
       .map((e, i) => (typeof e === 'string' && BYTE_RE.test(e) ? null : `raw[${i}]=${JSON.stringify(e)}`))
       .filter(Boolean);
-    if (bad.length) v.push(`not a two-hex-digit 0x.. string: ${bad.join(' ')}`);
+    if (bad.length) c.byteSpelling = `not a two-hex-digit 0x.. string: ${bad.join(' ')}`;
   }
-  if (result.status === null || typeof result.status !== 'object' || Array.isArray(result.status)) v.push('status is not an object');
-  else {
-    if (!WORD_RE.test(String(result.status.raw))) v.push(`status.raw=${JSON.stringify(result.status.raw)} is not a four-hex-digit 0x.... string`);
+  if (result.status === null || typeof result.status !== 'object' || Array.isArray(result.status)) {
+    c.statusWord = 'status is not an object';
+    c.statusClosed = 'status is not an object';
+  } else {
+    if (!WORD_RE.test(String(result.status.raw))) c.statusWord = `status.raw=${JSON.stringify(result.status.raw)} is not a four-hex-digit 0x.... string`;
     const extra = Object.keys(result.status).filter((k) => k !== 'raw');
-    if (extra.length) v.push(`status carries key(s) beyond raw: ${extra.join(' ')}`);
+    if (extra.length) c.statusClosed = `status carries key(s) beyond raw: ${extra.join(' ')}`;
   }
-  if ('decoded' in result) v.push('decoded is present; section 11.41 M1 STRUCK it');
+  if ('decoded' in result) c.decodedAbsent = 'decoded is present; section 11.41 M1 STRUCK it';
   const extraTop = Object.keys(result).filter((k) => k !== 'raw' && k !== 'status' && !ENVELOPE.has(k));
-  if (extraTop.length) v.push(`result carries unexpected top-level key(s): ${extraTop.join(' ')}`);
-  return v;
+  if (extraTop.length) c.topLevelClosed = `result carries unexpected top-level key(s): ${extraTop.join(' ')}`;
+  return c;
 }
+const violationsOf = (result) => CLAUSES.map((k) => shapeClauses(result)[k]).filter(Boolean);
 
-// Six synthetic replies, each wrong in exactly one way the row forbids. These
-// are DATA, not server output: they exist so s7 can prove the validator above
-// is not a function that returns [] for everything.
+// Seven synthetic replies, each wrong in exactly one way the row forbids, and
+// each naming the clause the matching live row reads. These are DATA, not
+// server output: they exist so s7 can prove the validator is not a function
+// that returns clean for everything.
 function conformingSynthetic() {
   return {
     raw: Array.from({ length: 24 }, (_, i) => `0x${i.toString(16).toUpperCase().padStart(2, '0')}`),
@@ -376,12 +397,13 @@ function conformingSynthetic() {
   };
 }
 const POISONS = [
-  ['23 entries', () => { const r = conformingSynthetic(); r.raw.pop(); return r; }, /exactly 24/],
-  ['25 entries', () => { const r = conformingSynthetic(); r.raw.push('0x00'); return r; }, /exactly 24/],
-  ['an unprefixed register byte', () => { const r = conformingSynthetic(); r.raw[7] = '74'; return r; }, /two-hex-digit/],
-  ['a three-digit status word', () => { const r = conformingSynthetic(); r.status.raw = '0x2E4'; return r; }, /four-hex-digit/],
-  ['a second key in status', () => { const r = conformingSynthetic(); r.status.vblank = true; return r; }, /beyond raw/],
-  ['a resurrected decoded{}', () => { const r = conformingSynthetic(); r.decoded = { h40: true }; return r; }, /STRUCK/],
+  ['23 entries', 'count24', (r) => { r.raw.pop(); }],
+  ['25 entries', 'count24', (r) => { r.raw.push('0x00'); }],
+  ['an unprefixed register byte', 'byteSpelling', (r) => { r.raw[7] = '74'; }],
+  ['a three-digit status word', 'statusWord', (r) => { r.status.raw = '0x2E4'; }],
+  ['a second key in status', 'statusClosed', (r) => { r.status.vblank = true; }],
+  ['a resurrected decoded{}', 'decodedAbsent', (r) => { r.decoded = { h40: true }; }],
+  ['an invented top-level key', 'topLevelClosed', (r) => { r.source = 'retained'; }],
 ];
 
 // ---------------------------------------------------------------------------
@@ -415,14 +437,15 @@ async function main() {
 
     await mk.ok('emulator/run_frames', { frames: 1 });
     const shaped = await mk.ok(METHOD);
-    const viol = shapeViolations(shaped);
+    const live = shapeClauses(shaped);
+    const viol = CLAUSES.map((k) => live[k]).filter(Boolean);
 
     check('s1', 'raw[] is an array of EXACTLY 24 entries',
-      Array.isArray(shaped.raw) && shaped.raw.length === 24,
-      `length=${Array.isArray(shaped.raw) ? shaped.raw.length : 'not an array'}`);
+      live.count24 === null,
+      live.count24 ?? `length=${shaped.raw.length}`);
     check('s2', 'every entry is one register as a two-hex-digit 0x.. string',
-      Array.isArray(shaped.raw) && shaped.raw.every((e) => typeof e === 'string' && BYTE_RE.test(e)),
-      `${JSON.stringify(shaped.raw)}`);
+      live.byteSpelling === null,
+      live.byteSpelling ?? `${JSON.stringify(shaped.raw)}`);
 
     const expected = Array.from({ length: 24 }, (_, i) => `0x${marker(i).toString(16).toUpperCase().padStart(2, '0')}`);
     const got = (shaped.raw ?? []).map((e) => String(e).toUpperCase().replace('0X', '0x'));
@@ -434,25 +457,28 @@ async function main() {
         : `${mism.length} mismatch(es): ${mism.join(' · ')}`);
 
     check('s4', 'status.raw is the status word as a four-hex-digit 0x.... string',
-      WORD_RE.test(String(shaped.status?.raw)), `status.raw=${JSON.stringify(shaped.status?.raw)}`);
+      live.statusWord === null, live.statusWord ?? `status.raw=${JSON.stringify(shaped.status.raw)}`);
     check('s5', 'decoded{} is ABSENT: section 11.41 M1 struck it, so a server still sending it is a finding',
-      !('decoded' in shaped), `top-level keys: ${Object.keys(shaped).sort().join(' ')}`);
+      live.decodedAbsent === null, live.decodedAbsent ?? `top-level keys: ${Object.keys(shaped).sort().join(' ')}`);
     check('s6', 'status carries no key but raw',
-      shaped.status && typeof shaped.status === 'object' && Object.keys(shaped.status).length === 1 && 'raw' in shaped.status,
-      `status keys: ${Object.keys(shaped.status ?? {}).join(' ')}`);
-    check('s0', 'the live reply has ZERO violations against the whole row, read through one validator',
-      viol.length === 0, viol.length === 0 ? 'clean' : viol.join(' · '));
+      live.statusClosed === null, live.statusClosed ?? `status keys: ${Object.keys(shaped.status).join(' ')}`);
+    check('s0', 'the live reply violates NO clause of the row, including inventing no top-level key of its own',
+      viol.length === 0, viol.length === 0 ? `all ${CLAUSES.length} clauses clean` : viol.join(' · '));
 
-    // ---- s7: the validator can fail -------------------------------------
-    const cleanSynthetic = shapeViolations(conformingSynthetic());
-    const poisonRows = POISONS.map(([label, make, want]) => {
-      const vs = shapeViolations(make());
-      return { label, ok: vs.length > 0 && vs.some((s) => want.test(s)), vs };
+    // ---- s7: every clause a live row reads can fail ----------------------
+    const cleanSynthetic = violationsOf(conformingSynthetic());
+    const poisonRows = POISONS.map(([label, clause, poison]) => {
+      const r = conformingSynthetic();
+      poison(r);
+      const c = shapeClauses(r);
+      const others = CLAUSES.filter((k) => k !== clause && c[k] !== null);
+      return { label, clause, ok: c[clause] !== null, said: c[clause], others };
     });
-    check('s7', 'SHAPE RED CONTROL: the same validator passes a conforming synthetic and rejects six poisoned ones, each by name',
+    check('s7', 'SHAPE RED CONTROL: every clause s1 s2 s4 s5 s6 read is made to FIRE by a synthetic reply, and a conforming synthetic fires none',
       cleanSynthetic.length === 0 && poisonRows.every((r) => r.ok),
       `conforming synthetic: ${cleanSynthetic.length} violation(s)\n        `
-      + poisonRows.map((r) => `${r.ok ? 'caught' : 'MISSED'} ${r.label}: ${r.vs.join(' | ') || '(nothing)'}`).join('\n        '));
+      + poisonRows.map((r) => `${r.ok ? 'fired' : 'SILENT'} ${r.clause} on ${r.label}: ${r.said ?? '(nothing)'}`
+        + (r.others.length ? ` [also ${r.others.join(' ')}]` : '')).join('\n        '));
 
     // ---- x1: the row's params column is a dash ---------------------------
     const guessed = await mk.raw(METHOD, { reg: 4 });
@@ -611,7 +637,7 @@ async function main() {
     const running = run1.result?.running === true && run2.result?.running === true;
     const advanced = (run2.result?.frame ?? 0) > (run1.result?.frame ?? 0);
     check('f1', 'NOT REFUSED on a free-running machine, and the machine really was free-running',
-      run1.error === undefined && run2.error === undefined && running && advanced && shapeViolations(run2.result).length === 0,
+      run1.error === undefined && run2.error === undefined && running && advanced && violationsOf(run2.result).length === 0,
       `running=${run1.result?.running}/${run2.result?.running} frame ${run1.result?.frame} -> ${run2.result?.frame}`
       + ` status ${run1.result?.status?.raw} -> ${run2.result?.status?.raw}; the second reply is shape-clean too`);
 
