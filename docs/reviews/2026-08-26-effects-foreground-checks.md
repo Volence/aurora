@@ -61,6 +61,16 @@ column-after-1280x800.png` (right column crop: `column-crop-1280.png`). Column o
 unaffected (0px at both frames), so parcel D's own stated acceptance (`[H1]`) holds; the
 regression is in row 41's `[L1]`, which the parcel did not re-run.
 
+> **`column-crop-1280.png`, named in the sentence above, is EVIDENCE NOT
+> RETAINED.** The full shot beside it was promoted and is tracked at the path
+> above; the crop is absent from every checkout reachable here and no commit ever
+> touched it, because `.gitignore:10` has matched `scratchpad/shots*/` since
+> 2026-08-15. ⚠ **The harness does not remake it.**
+> `scratchpad/effects-column-harness.mjs` writes only whole-frame shots, named
+> `column-<plant>-<width>x<height>`, so `npm run harness:effects-column` gives
+> back the full picture and never the crop, which was cut by hand. **What a
+> reader can act on:** the tracked full shot, and that harness for a fresh one.
+
 ## Harness changes made (all under `scratchpad/`, untracked)
 
 - `bganim-band-lens-harness.mjs`

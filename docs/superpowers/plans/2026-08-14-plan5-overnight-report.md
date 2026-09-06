@@ -139,7 +139,15 @@ sorted by the one tool vocabulary, so `View` is first on every facet under both 
 cursor); and aeon's Palette facet gained the `PAL LINE` strip as its bottom bar.
 
 What the final pass found that is still open is in
-`…/scratchpad/shots-final/NOTES.md`. The two worth naming here: **aeon's no-act canvas
+`…/scratchpad/shots-final/NOTES.md`. **EVIDENCE NOT RETAINED, AND NO INSTRUMENT
+REBUILDS IT.** That directory is absent from every checkout reachable here and no
+commit ever touched it, because `.gitignore:10` has matched that path since
+2026-08-15. ⚠ **Unlike the other losses marked in this tree, there is no harness
+to re-run**: the 22 shots were a manual capture round and `NOTES.md` was written
+by hand beside them, so nothing regenerates either and no `npm run harness:`
+script is being offered here. **What a reader can act on:** only what this
+paragraph itself preserves, which is why it is kept verbatim. The two worth
+naming here: **aeon's no-act canvas
 says "Open a project to view sections"** when a project *is* open and only the act is
 missing (classic's equivalent copy is correct), and **classic's `TILES (965)` strip
 renders in two different palettes one tier apart** — green on the Block tier, line-0

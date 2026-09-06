@@ -53,9 +53,22 @@ baseline 0.646 → after sprite 0.646
 not reproduced
 ```
 
-`scratchpad/shots-canvas/repro-assign.png` shows GHZ chunk `$01` drawn correctly —
+`scratchpad/shots-canvas/repro-assign.png` **(EVIDENCE NOT RETAINED)** shows GHZ chunk `$01`
+drawn correctly —
 palm, flowers, grass, checkerboard dirt, grid and solidity tint all present. (The
 0.646 rather than 1.0 is the chunk's own black sky, not a partial paint.)
+
+> **EVIDENCE NOT RETAINED:** that file is absent from every checkout reachable
+> here and no commit ever touched it, because `.gitignore:10` has matched
+> `scratchpad/shots*/` since 2026-08-15. The sentence is kept so the record says
+> what was lost rather than quietly dropping it. **What a reader can act on:**
+> the instrument is tracked at `scratchpad/artmode-repro-harness.mjs`, whose
+> line 98 takes exactly this shot through the `shot` helper it imports from
+> `scratchpad/canvas-cdp-harness.mjs`, so `node scratchpad/artmode-repro-harness.mjs`
+> takes it again. ⚠ **That harness has no `npm run harness:` entry**, unlike
+> every other instrument named in a marking here, so there is no script name to
+> quote and it will not be found by reading `package.json`. New evidence goes in
+> `docs/captures/`, tracked.
 
 ### What fixed it
 

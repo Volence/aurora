@@ -57,7 +57,14 @@ notes from an entirely different measurement path, which is worth more than eith
 | 9a–9c | The overlay toggles alone: tint goes, readouts stay, and the chip takes a warning tone while hiding a real clash | border `rgb(251,191,36)` |
 | 10a–10c | One stroke adds one tile, one Ctrl+Z takes the readout back, and the canvas hash proves the pixels moved too | `4→5→4`, hash `4135154060 → 1870414279` |
 
-Screenshots in `scratchpad/shots-canvas/2b-*.png`.
+Screenshots in `scratchpad/shots-canvas/2b-*.png`. **EVIDENCE NOT RETAINED:** that
+directory still exists on the machine that made it, but not one `2b-` file is left
+in it, and no commit ever touched them because `.gitignore:10` has matched
+`scratchpad/shots*/` since 2026-08-15. **What a reader can act on:** the
+instrument is tracked at `scratchpad/constraints-cdp-harness.mjs`, which takes
+eight `2b-` shots through the helper it imports from
+`scratchpad/canvas-cdp-harness.mjs`, so `npm run harness:constraints-cdp` produces
+them again; new evidence goes in `docs/captures/`, tracked.
 
 ---
 

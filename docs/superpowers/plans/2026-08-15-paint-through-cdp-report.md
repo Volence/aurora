@@ -247,10 +247,18 @@ number.
 
 ## Screenshots
 
-`scratchpad/shots-paint/` (16 PNGs) — before/after pairs for each check: the 6px drag (01/02),
+`scratchpad/shots-paint/` (16 PNGs, **EVIDENCE NOT RETAINED**) — before/after pairs for each check: the 6px drag (01/02),
 the three-tier divergence and its undo (03-05), chunk B before/after isolate (06-08), chunk B
 after link (09/10), the A1 drag (11/12), the six-divergence pass and the GHZ Platform area
 before/after (13-15).
+
+> **EVIDENCE NOT RETAINED:** that whole directory is absent from every checkout
+> reachable here and no commit ever touched it, because `.gitignore:10` has
+> matched `scratchpad/shots*/` since 2026-08-15. The list above is kept because
+> it is the only surviving record of what the 16 shots were of. **What a reader
+> can act on:** the instrument is tracked at `scratchpad/paint-through-harness.mjs`
+> and writes to that same directory, so `npm run harness:paint-through` produces
+> the set again; new evidence goes in `docs/captures/`, tracked.
 
 ## Commit
 
