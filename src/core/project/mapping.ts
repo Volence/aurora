@@ -34,11 +34,80 @@ export interface ConfigIssue {
   message: string;
 }
 
+/**
+ * WHY the config is what it is — the three answers a sidecar read can give.
+ *
+ * ABSENT AND UNREADABLE ARE NOT THE SAME ANSWER. Folding both to `config: {}`
+ * is how a hand-written `.aurora/project.json` got destroyed at open: three
+ * distinct failures (a read failure, invalid JSON, a non-object root) all
+ * returned the same empty config the "no sidecar file" case returns, the
+ * build-field seed could not tell them apart, and it wrote a fresh 3-key
+ * document over every override in the file. Before any UI rendered, with no
+ * gesture behind it.
+ *
+ *  • 'absent'     — no file on disk. An empty config is the TRUTH; writing the
+ *                   seed creates the file, which is the whole point of it.
+ *  • 'read'       — the file parsed. `config` is what it says; `issues` may
+ *                   still name entries that were dropped from within it, and a
+ *                   readable file with one bad entry is STILL safe to write.
+ *  • 'unreadable' — the file is there and Aurora could not turn it into a
+ *                   config. The user's overrides are still on disk; Aurora just
+ *                   cannot see them, so it must not write over them.
+ *
+ * Same rule and same reason as the canvas path's `sidecarRejected`
+ * (core/art/canvas-file-format.ts, state/canvas-save.ts) and aeon's
+ * `section.unreadable` + `understood()` gate (project/aeon/save.ts): a sidecar
+ * Aurora could not READ is one it must not overwrite. This field is a three-way
+ * where canvas has a boolean because the classic sidecar's writer needs
+ * 'absent' as a POSITIVE reason to write, not merely as the absence of a
+ * rejection.
+ *
+ * The mtime guard cannot substitute for this. The file did not change on disk —
+ * Aurora simply failed to parse it — so a conflict check has nothing to catch.
+ */
+export type SidecarRead = 'absent' | 'read' | 'unreadable';
+
 /** Parsed sidecar + everything that had to be dropped to parse it. */
 export interface SidecarState {
   config: ProjectConfig;
   issues: ConfigIssue[];
+  /** See SidecarRead. Required, not optional: a producer that forgets to say
+   *  which of the three this is must fail to compile, because the default a
+   *  reader would otherwise assume ('read') is the dangerous one. */
+  read: SidecarRead;
 }
+
+/**
+ * THE WRITE GATE. Every writer of `.aurora/project.json` must pass this before
+ * serializing anything over it — see classicProjectStore's open-time seed and
+ * the Project Setup tab's Apply.
+ *
+ * Deliberately keyed on `read`, NOT on `issues.length`: a file that parsed with
+ * one dropped `paths` entry is readable, and refusing to write it would strand
+ * the seed (and Apply) for any project carrying a single typo'd override. The
+ * question is never "was anything wrong" — it is "did Aurora see what is in
+ * this file".
+ */
+export function sidecarMayBeOverwritten(state: SidecarState): boolean {
+  return state.read !== 'unreadable';
+}
+
+/**
+ * What to tell the person, when a writer refuses. One sentence, in one place,
+ * so the seed and Apply cannot drift into saying different things about the
+ * same file — and so it says what to DO, not merely that something was skipped
+ * (the canvas save toast's rule, canvas-save.ts).
+ */
+export function sidecarRefusalMessage(what: string): string {
+  return (
+    `${SIDECAR_REL_PATH} could not be read, so Aurora left it alone instead of overwriting it — ` +
+    `${what} were NOT written. Fix that file by hand (it must be a valid JSON object) ` +
+    'and reopen the project.'
+  );
+}
+
+/** The sidecar's path relative to the project root, named once. */
+export const SIDECAR_REL_PATH = '.aurora/project.json';
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -46,20 +115,33 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 
 /**
  * Lenient parse. `bytes: null` means "no sidecar file" (empty config, no
- * issues). Malformed input degrades entry-by-entry; the returned config is
- * always safe to use and to serialize back.
+ * issues, `read: 'absent'`). Malformed input degrades entry-by-entry; the
+ * returned config is always safe to USE.
+ *
+ * It is NOT always safe to serialize back — that is what `read` answers. The
+ * two whole-file failures below (invalid JSON, a non-object root) return the
+ * same empty config as the absent case and are told apart ONLY by `read`;
+ * `sidecarMayBeOverwritten` is the gate every writer must pass.
  */
 export function readProjectConfig(bytes: Uint8Array | null): SidecarState {
-  if (bytes === null) return { config: {}, issues: [] };
+  if (bytes === null) return { config: {}, issues: [], read: 'absent' };
 
   let json: unknown;
   try {
     json = JSON.parse(new TextDecoder().decode(bytes));
   } catch {
-    return { config: {}, issues: [{ where: '$', message: 'invalid JSON; ignoring the sidecar' }] };
+    return {
+      config: {},
+      issues: [{ where: '$', message: 'invalid JSON; ignoring the sidecar' }],
+      read: 'unreadable',
+    };
   }
   if (!isPlainObject(json)) {
-    return { config: {}, issues: [{ where: '$', message: 'expected a JSON object; ignoring the sidecar' }] };
+    return {
+      config: {},
+      issues: [{ where: '$', message: 'expected a JSON object; ignoring the sidecar' }],
+      read: 'unreadable',
+    };
   }
 
   const issues: ConfigIssue[] = [];
@@ -103,7 +185,9 @@ export function readProjectConfig(bytes: Uint8Array | null): SidecarState {
     }
   }
 
-  return { config: out as ProjectConfig, issues };
+  // 'read' even with issues: the FILE parsed. Per-entry drops are diagnostics
+  // about its contents, not a failure to see them — see sidecarMayBeOverwritten.
+  return { config: out as ProjectConfig, issues, read: 'read' };
 }
 
 export function serializeProjectConfig(cfg: ProjectConfig): Uint8Array {

@@ -276,7 +276,7 @@ describe('s1Adapter.open overrides', () => {
 
   it('a missing sidecar yields an empty sidecar state, not undefined', async () => {
     const handle = await s1Adapter.open(memFs(fullFake()));
-    expect(handle.sidecar).toEqual({ config: {}, issues: [] });
+    expect(handle.sidecar).toEqual({ config: {}, issues: [], read: 'absent' });
   });
 
   it('a sidecar that exists but fails to read is treated as unreadable, not a parse failure', async () => {
@@ -290,9 +290,15 @@ describe('s1Adapter.open overrides', () => {
       return realRead(rel);
     };
     const handle = await s1Adapter.open(fa);
+    // `read: 'unreadable'` is the assertion this row was NAMED for and could
+    // not make: before SidecarState carried it, the only observable difference
+    // from a missing sidecar was the issue MESSAGE, which no writer consults.
+    // The empty config below is identical to the absent case above — that
+    // identity is the defect, and `read` is what tells them apart.
     expect(handle.sidecar).toEqual({
       config: {},
       issues: [{ where: '$', message: expect.stringContaining('unreadable') }],
+      read: 'unreadable',
     });
   });
 });

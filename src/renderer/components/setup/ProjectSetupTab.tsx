@@ -14,8 +14,8 @@ import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { useProjectStore } from '../../state/projectStore';
 import { useConfirmStore } from '../../state/confirmStore';
 import { useToastStore } from '../../state/toastStore';
-import { buildSetupRows, applyPathEdits, pendingEditCount, type SetupRow } from './setup-model';
-import { serializeProjectConfig } from '../../../core/project/mapping';
+import { buildSetupRows, pendingEditCount, planSetupSidecarWrite, type SetupRow } from './setup-model';
+import { SIDECAR_REL_PATH, sidecarMayBeOverwritten } from '../../../core/project/mapping';
 import { joinPath } from '../../../core/project/join-path';
 import type { EntryStatus } from '../../../core/project/report';
 
@@ -157,6 +157,12 @@ export default function ProjectSetupTab() {
   // — a key model.unknownOverrides carries but no report row does — still
   // registers as pending and doesn't leave Apply stuck disabled.
   const pendingCount = pendingEditCount(sidecar.config, edits);
+  // A sidecar Aurora could not READ is one it must not overwrite (the canvas
+  // path's rule, canvas-save.ts:72). Apply is disabled so the refusal is
+  // visible BEFORE the click, not only after it — but the real gate is in
+  // planSetupSidecarWrite, because a guard a surface writes for itself passes
+  // whenever both the surface and the writer are wrong together.
+  const writable = sidecarMayBeOverwritten(sidecar);
 
   const apply = async () => {
     if (classicDirty) {
@@ -184,11 +190,23 @@ export default function ProjectSetupTab() {
     }
     setApplying(true);
     try {
-      const editMap: Record<string, string | null> = {};
-      for (const [k, v] of Object.entries(edits)) editMap[k] = v === '' ? null : v;
-      const next = applyPathEdits(sidecar.config, editMap);
-      const bytes = serializeProjectConfig(next);
-      await window.api.writeBinaryFile(dir, '.aurora/project.json', bytes.buffer as ArrayBuffer);
+      const plan = planSetupSidecarWrite(sidecar, edits);
+      if (plan.kind === 'refused') {
+        useToastStore.getState().addToast(plan.reason, 'error');
+        return;
+      }
+      // writeBinaryFile ANSWERS. It returns false when main refuses the path,
+      // and its own comment says the renderer treats false as a failed write
+      // and reports it — but no caller in this repo was reading it, so a
+      // refused write reported as a successful save. Booked separately as
+      // REFUSED-WRITE-REPORTED-SAVED for the other nine call sites; this one,
+      // on the path being fixed here, reads it now. Throwing routes it into
+      // the catch below, which already toasts and (crucially) skips the
+      // re-open that would otherwise claim the edits landed.
+      const wrote = await window.api.writeBinaryFile(dir, SIDECAR_REL_PATH, plan.bytes.buffer as ArrayBuffer);
+      if (wrote === false) {
+        throw new Error(`${SIDECAR_REL_PATH} was refused by the main process; nothing was written`);
+      }
       setEdits({});
       resetChecks(); // row lights fall back to the fresh report status, not stale live-check colors
       const outcome = await useClassicProjectStore.getState().openDirectory(dir);
@@ -220,6 +238,17 @@ export default function ProjectSetupTab() {
               </span>
             </div>
           </div>
+
+          {!writable && (
+            <div style={styles.issueCard}>
+              <div style={styles.issueTitle}>Aurora could not read .aurora/project.json</div>
+              <div style={styles.issueLine}>
+                The file is there and could not be parsed, so Aurora is NOT using the overrides
+                in it and will NOT overwrite it — your file is intact. Apply is disabled until
+                the file is valid JSON: fix it by hand, then reopen the project.
+              </div>
+            </div>
+          )}
 
           {sidecar.issues.length > 0 && (
             <div style={styles.issueCard}>
@@ -267,10 +296,12 @@ export default function ProjectSetupTab() {
       </div>
       <div style={styles.footer}>
         <span style={styles.footerHint}>
-          {pendingCount > 0 ? `${pendingCount} change${pendingCount === 1 ? '' : 's'} pending` : 'Edit a path to override the base profile'}
+          {!writable
+            ? 'Cannot apply: .aurora/project.json could not be read, and Aurora will not overwrite it'
+            : pendingCount > 0 ? `${pendingCount} change${pendingCount === 1 ? '' : 's'} pending` : 'Edit a path to override the base profile'}
         </span>
-        <button onClick={() => void apply()} disabled={pendingCount === 0 || applying} style={{
-          ...styles.applyButton, ...(pendingCount === 0 || applying ? styles.applyDisabled : {}),
+        <button onClick={() => void apply()} disabled={pendingCount === 0 || applying || !writable} style={{
+          ...styles.applyButton, ...(pendingCount === 0 || applying || !writable ? styles.applyDisabled : {}),
         }}>
           {applying ? 'Applying…' : 'Apply & re-validate'}
         </button>
