@@ -1292,6 +1292,18 @@ async function main() {
       // BEHAVIOUR: row 11 requires this byte to read nonzero at the checkpoint,
       // to read zero after one B press, and — in both directions — to PREDICT
       // whether y moves over 240 frames. No wrong offset does all three.
+      //
+      // CROSS-CHECKED against a second, independent producer in this repo, and
+      // it agrees on the offset AND on the mechanism:
+      // `docs/reviews/2026-09-04-loops-test-loop-witness.md` (the loop-crossover
+      // witness, four days earlier, on a different aeon build) tabulates
+      // `PlayerV.debug_flag` at `$3C` with the gloss "non-zero = free flight
+      // (skips physics)", and its driving section opens "debug-fly is armed
+      // there (CHEAT_DEBUG_FLY is set at game init in the DEBUG shape only), so
+      // B toggles free flight". Its absolute address differs from this run's
+      // ($FFFF9036 against $FFFF903A) because Player_1 itself moved between the
+      // builds — which is the reason the OFFSET is what is pinned here and the
+      // address is resolved.
       const debugFlag = async () => (await rd(playerAddr + PLAYERV_DEBUG_FLAG, 1))[0];
       // Cheat_Flags is a resolved SYMBOL, not an offset, so it is the one piece
       // of row 11's evidence that cannot be wrong about where it is looking.
