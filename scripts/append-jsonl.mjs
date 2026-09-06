@@ -44,7 +44,7 @@ let record;
 try {
   record = JSON.parse(raw);
 } catch (e) {
-  console.error(`REFUSED, file untouched: the record is not valid JSON — ${e.message}`);
+  console.error(`REFUSED, file untouched: the record is not valid JSON: ${e.message}`);
   process.exit(1);
 }
 if (record === null || typeof record !== 'object' || Array.isArray(record)) {
@@ -100,20 +100,20 @@ for (let i = 0; i < lines.length; i++) {
       lines[i] = parts.join('\n');
       writeFileSync(file, lines.join('\n'));
       console.error(`REPAIRED: ${file} line ${i + 1} was TWO records glued into one; split in place, both kept in order.`);
-      console.error('⚠ The heal step should have made this unreachable. Its arrival is evidence the heal was skipped — say so in the log entry that carries this repair.');
+      console.error('⚠ The heal step should have made this unreachable. Its arrival is evidence the heal was skipped, so say so in the log entry that carries this repair.');
       const after = readFileSync(file, 'utf8').split('\n');
       let m = 0;
       for (let j = 0; j < after.length; j++) {
         if (after[j] === '') continue;
         try { JSON.parse(after[j]); m++; } catch (e2) {
-          console.error(`STOP: re-parse after the repair still fails at line ${j + 1} — ${e2.message}`);
+          console.error(`STOP: re-parse after the repair still fails at line ${j + 1}: ${e2.message}`);
           process.exit(1);
         }
       }
       console.log(`${file}: appended, repaired one glued line, ${m} records, all parse.`);
       process.exit(0);
     }
-    console.error(`STOP: ${file} line ${i + 1} does not parse and is NOT two glued records — ${e.message}`);
+    console.error(`STOP: ${file} line ${i + 1} does not parse and is NOT two glued records: ${e.message}`);
     console.error('No repair invented. The append is on disk; do NOT commit. Read the line above.');
     process.exit(1);
   }

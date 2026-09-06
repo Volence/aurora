@@ -78,7 +78,7 @@ function testFiles() {
     try {
       if (!statSync(p).isDirectory()) throw new Error(`${p} is not a directory`);
     } catch (e) {
-      console.error(`check-pseudo-skip: COULD NOT MEASURE — cannot read ${p}: ${e.message}`);
+      console.error(`check-pseudo-skip: COULD NOT MEASURE: cannot read ${p}: ${e.message}`);
       process.exit(2);
     }
     walk(p);
@@ -152,7 +152,7 @@ const lineOf = (src, idx) => src.slice(0, idx).split('\n').length;
 const files = testFiles();
 if (files.length === 0) {
   console.error(
-    'check-pseudo-skip: COULD NOT MEASURE — no *.test.ts files were found under ' +
+    'check-pseudo-skip: COULD NOT MEASURE: no *.test.ts files were found under ' +
     ROOTS.join(', ') + '.\n' +
     '  This run says NOTHING about whether any test fakes a skip; it is not evidence that none does.',
   );
@@ -194,7 +194,7 @@ console.log(`check-pseudo-skip: scanned ${spans} test bod(y|ies) in ${files.leng
 // be non-zero is the number of BODIES, and it is checked, not merely printed.
 if (spans === 0) {
   console.error(
-    'check-pseudo-skip: COULD NOT MEASURE — found ' + files.length + ' test file(s) but not one\n' +
+    'check-pseudo-skip: COULD NOT MEASURE: found ' + files.length + ' test file(s) but not one\n' +
     '  `it(...)`/`test(...)` call inside them. Nothing was examined, so this run is\n' +
     '  NOT evidence that no test fakes a skip.',
   );
@@ -202,12 +202,12 @@ if (spans === 0) {
 }
 
 if (violations.length === 0) {
-  console.log('check-pseudo-skip: OK — no test body announces a skip and then returns.');
+  console.log('check-pseudo-skip: OK: no test body announces a skip and then returns.');
   process.exit(0);
 }
 
 console.error('');
-console.error(`check-pseudo-skip: FAIL — ${violations.length} test body/bodies RETURN instead of skipping.`);
+console.error(`check-pseudo-skip: FAIL: ${violations.length} test body/bodies RETURN instead of skipping.`);
 console.error('');
 for (const v of violations) {
   console.error(`  ${v.file}:${v.line}  [${v.rule}]`);
@@ -216,7 +216,7 @@ for (const v of violations) {
 console.error(
   '\n' +
   '  A `return` from a test body is a PASS. The row lands in the green column\n' +
-  '  having touched none of its subject, and — this is the part that matters —\n' +
+  '  having touched none of its subject and, this is the part that matters,\n' +
   '  there is then NO INPUT that can ever turn it red. A console line saying\n' +
   '  "skipped" reaches no reporter, no total and no exit code.\n' +
   '\n' +
