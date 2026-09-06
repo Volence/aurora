@@ -336,11 +336,38 @@ scroller 149.47px
 ```
 
 **The advisory already on that row is the same height and also does not fit.**
-The layer cards sit in a ~150px box (column-layout's LIST floor) and no advisory
-of this length fits it. Holding a new sentence to a bar its own neighbours miss
-would have reported a panel-wide layout property as this parcel's defect. So the
-row is now a COMPARISON ("no taller than the advisories already there") and the
-box is recorded below as an open item rather than silently absorbed.
+The layer cards sit in a ~150px box and no advisory of this length fits it.
+Holding a new sentence to a bar its own neighbours miss would have reported a
+panel-wide layout property as this parcel's defect. So the row is now a
+COMPARISON ("no taller than the advisories already there") and the box is
+recorded below as an open item rather than silently absorbed.
+
+> ⚠ **CORRECTED 2026-09-05 by EW-LAYER-CARD-SCROLLER, in two places.**
+>
+> **(a) That sentence used to end "(column-layout's LIST floor)". There is no
+> such floor.** `column-layout.tsx` declares none; its only `154` is a WIDTH, in
+> a prose comment, about a select falling to 154px against generated ladder rungs
+> needing 157px and 159px. The box is the body of the `aeon.effects.layers`
+> section and its height comes from `LIST_SECTION` in
+> `ui/CollapsibleSection.tsx`: `flex: 1 1 0`, `maxHeight: max-content`,
+> `minHeight: SECTION_LIST_MIN_HEIGHT` (160). `maxHeight: 154` on `SCENE_LIST` /
+> `PRESET_LIST` is not it either: those are the SCENE picker and the PRESET
+> picker, and neither is an ancestor of a layer card. A citation one file over is
+> how the next reader edits the wrong number.
+>
+> **(b) "no advisory of this length fits it" was read as a panel-wide property,
+> and a census refutes it.** Measured on a running app: 34 prose blocks in those
+> cards, 32 at 49.5px or 82.5px (89 to 165 chars), and TWO at 165px (333 and 355
+> chars). Both of the two are the row remap's, at twice the panel's own ordinary
+> block length, so the sample that produced the impression was one feature's. The
+> two now fold their mechanism behind the disclosure O15 already ruled for prose
+> of this shape: 165px to 119.5px and 165px to 86.5px.
+>
+> The bar is not this box either. `flex: 1 1 0` makes 149.47px a fact about one
+> window; the shell's floor minus the section's own 31px header is 129px, the
+> smallest box this list can ever be given, and that is what every block in it is
+> now held to. See `docs/reviews/2026-09-05-layer-card-height.md` and
+> `npm run harness:layer-card-height`.
 
 Two smaller traps caught in the same place, both worth the words:
 
@@ -411,11 +438,17 @@ for any future parcel quoting 68000 immediates in a `src/renderer` comment: `#22
    emulator. Whether `plane_y 96` is on OJZ's waterline is a question for the
    author looking at the rule, and whether the remap then LOOKS like water needs a
    foreground drive.
-2. **THE LAYER CARDS' SCROLLER IS TOO SHORT FOR ANY OF THEIR ADVISORIES.**
-   Measured this run: a ~149px box against a 163.5px reach sentence and a 163.5px
-   precondition hint. Every one of these sentences is read by scrolling inside a
-   scroller. That is a panel-layout parcel and not this one, but it is now a
-   number rather than an impression.
+2. ~~**THE LAYER CARDS' SCROLLER IS TOO SHORT FOR ANY OF THEIR ADVISORIES.**~~
+   **CLOSED, AND THE HEADLINE WAS WRONG.** Measured this run: a ~149px box
+   against a 163.5px reach sentence and a 163.5px precondition hint. That much
+   held. "Too short for ANY of their advisories" did not: a census of all 34
+   prose blocks in those cards found 32 of them fitting, and the two that did not
+   were both this feature's. EW-LAYER-CARD-SCROLLER measured the column (742px,
+   children summing to 742.00, no spare pixel and no cap holding the section
+   back), ruled that the box needs no new governor and the ATOM does, folded the
+   two blocks' mechanism behind O15's disclosure, and left the property gated at
+   `npm run harness:layer-card-height`. See
+   `docs/reviews/2026-09-05-layer-card-height.md`.
 3. **THE UNLOCKED CASE IS UNCHECKED, BY CONSTRUCTION**, and the panel says so.
    If a future parcel wants it, the honest shape is not an author-time span but a
    camera SWEEP: the minimum span over the camera range the act permits, which is

@@ -191,6 +191,74 @@ export function rowRemapBandSpan(scene: EffectsScene, layerIndex: number): RowRe
  * restricted check reads as coverage.
  */
 export function rowRemapReachAdvisory(scene: EffectsScene, layerIndex: number): string | null {
+  const parts = rowRemapReachAdvisoryParts(scene, layerIndex);
+  return parts === null ? null : joinReachAdvisory(parts);
+}
+
+/**
+ * The reach advisory's three jobs, separately addressable.
+ *
+ * `mechanism` is optional because one of the two arms has none to fold (see
+ * `rowRemapReachAdvisoryParts`); `diagnosis` and `remedies` are the halves an
+ * author acts on and are never optional here.
+ */
+export interface RowRemapReachParts {
+  /** What is wrong. Never behind a disclosure. */
+  diagnosis: string;
+  /** Why, in the engine's terms. The only half a disclosure may hold. */
+  mechanism?: string;
+  /** What to do next. Never behind a disclosure. */
+  remedies: string;
+}
+
+/**
+ * The parts as the one sentence they used to be, joined by single spaces.
+ *
+ * ⚠ THE ABSENT MECHANISM MUST NOT LEAVE A DOUBLE SPACE. That is the whole reason
+ * this is a filter-and-join rather than a template: `${d} ${m} ${r}` with an
+ * empty middle reads fine and compares unequal, which is exactly the kind of
+ * difference a byte-identity row exists to catch and a human reviewer does not.
+ */
+export function joinReachAdvisory(parts: RowRemapReachParts): string {
+  return [parts.diagnosis, parts.mechanism, parts.remedies]
+    .filter((p): p is string => p !== undefined).join(' ');
+}
+
+/**
+ * The same advisory in the three parts that do three different jobs, or null.
+ *
+ * ⚠ THE SPLIT IS SEMANTIC AND THE RULING IS NOT MINE. `providers/effects-aeon`'s
+ * O15 block (`docs/reviews/2026-08-30-o15-advisory-shape.md`) already decided
+ * this shape for the scene surface: DIAGNOSIS (what is wrong) and REMEDIES (what
+ * to do) are always on screen, MECHANISM (why, in the engine's terms) is the
+ * only half a disclosure may hold, and the parts are returned SEPARATELY
+ * ADDRESSABLE rather than a finished sentence being sliced downstream — because
+ * a `slice()` at a character count cannot be told which half is actionable, and
+ * the remedies are last.
+ *
+ * ⚠ THE JOIN IS BYTE-IDENTICAL TO THE OLD SENTENCE, deliberately and for the
+ * same reason O15 kept its own: every existing consumer, including this module's
+ * own rows, keeps reading exactly the words it read before. Nothing here is a
+ * shortening. `rowRemapReachAdvisory` above is that join.
+ *
+ * WHY THE LAYER CARD NEEDED IT (EW-LAYER-CARD-SCROLLER). Measured on the running
+ * app: this sentence renders at 165px inside a 149.47px box, and the box's floor
+ * — the least the column can ever squeeze that list section to — gives it 129px.
+ * A paragraph taller than its box is not a scrolling inconvenience: NO scroll
+ * position shows it whole. Of 34 prose blocks in those cards only two were over
+ * that bar, and both were this feature's, at twice the panel's own ordinary
+ * block length. So this is not the panel-wide property the first reading of the
+ * row assumed; it is these two sentences, and the fix is the shape the project
+ * already ruled for prose of exactly this shape.
+ *
+ * THE ZERO ARM KEEPS NO MECHANISM. Its "why" is one clause inside its own
+ * diagnosis ("the engine halves the span and takes its no-remap branch at
+ * zero"), and it measures under the bar as it stands; a disclosure over it would
+ * be a button with nothing behind it.
+ */
+export function rowRemapReachAdvisoryParts(
+  scene: EffectsScene, layerIndex: number,
+): RowRemapReachParts | null {
   const layer = scene.layers[layerIndex];
   if (layer === undefined) return null;
   const rr = rowRemapOf(layer.rowRemap);
@@ -205,28 +273,40 @@ export function rowRemapReachAdvisory(scene: EffectsScene, layerIndex: number): 
     + 'the next layer\'s top';
 
   // ⚠ MEASURED AGAINST THE BOX IT RENDERS IN, and shortened once because of it.
-  // The layer cards sit in a ~150px scroller (column-layout's LIST floor), and
-  // the first draft of this sentence was 229px tall in it: an advisory an author
-  // has to scroll a scroller to read is the "advisory becomes decoration"
-  // failure arriving by height instead of by count. Everything the engine's two
-  // branches decide is still here; the prose around them is not.
+  // The first draft of this sentence was 229px tall in it. The box is the body
+  // of the `aeon.effects.layers` section, a `variant="list"` section whose
+  // height is whatever the column leaves it (149.47px measured, 129px at the
+  // shell's floor) — NOT `column-layout`'s "LIST floor", which does not exist:
+  // that file declares no floor, and its only 154 is a WIDTH in a comment about
+  // a select. The floor is `SECTION_LIST_MIN_HEIGHT` in ui/CollapsibleSection.
+  // An advisory an author has to scroll a scroller to read is the "advisory
+  // becomes decoration" failure arriving by height instead of by count.
   //
-  // FINDING A subsumes finding B arithmetically, and they are still ONE sentence
+  // FINDING A subsumes finding B arithmetically, and they are still ONE advisory
   // rather than two hints, because they are one inequality at two magnitudes,
   // unlike `curveAdvisory` and `curveDescendingAdvisory` (a refusal and a
   // correlation, which are different KINDS of claim). Stacking "does nothing"
-  // under "does less than asked" would be two paragraphs of one rule.
+  // under "does less than asked" would be two paragraphs of one rule — and
+  // folding the mechanism is precisely how the height came down without doing
+  // that: one warning, one diagnosis, one remedy, and the engine's arithmetic
+  // one click away.
   if (reach === 0) {
-    return `${where}, and the remap needs 2 to move anything: the engine halves the span and `
-      + 'takes its no-remap branch at zero. This effect does nothing, at every camera position. '
-      + 'Make the band taller.';
+    return {
+      diagnosis: `${where}, and the remap needs 2 to move anything: the engine halves the span `
+        + 'and takes its no-remap branch at zero. This effect does nothing, at every camera '
+        + 'position.',
+      remedies: 'Make the band taller.',
+    };
   }
   if (reach < H - 1) {
-    return `${where}, and the remap moves at most half of them: ${reach}. height_shift `
-      + `${rr.height_shift}'s ladder steps down to ${H - 1} lines, so ${H - 1 - reach} `
-      + `step${H - 1 - reach === 1 ? ' is' : 's are'} out of reach at every camera position. The `
-      + 'cap is what keeps the remap reading inside this band, so the result is clipped rather '
-      + 'than broken. Make the band taller, or lower height_shift.';
+    return {
+      diagnosis: `${where}, and the remap moves at most half of them: ${reach}.`,
+      mechanism: `height_shift ${rr.height_shift}'s ladder steps down to ${H - 1} lines, so `
+        + `${H - 1 - reach} step${H - 1 - reach === 1 ? ' is' : 's are'} out of reach at every `
+        + 'camera position. The cap is what keeps the remap reading inside this band, so the '
+        + 'result is clipped rather than broken.',
+      remedies: 'Make the band taller, or lower height_shift.',
+    };
   }
   return null;
 }

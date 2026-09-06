@@ -612,11 +612,55 @@ export function rowRemapWithHeightShift(
  * `effectiveDsb` and not `layer.dsb`: `layer()` folds `own`'s `shift_b` over a
  * layer's `dsb` (`scene_dsl.emp:558`), so a strip with its own deform table has
  * a live amplitude its `dsb` field does not show.
+ *
+ * ONE SENTENCE, TWO PARTS. See `rowRemapPreconditionParts` below: this is the
+ * joined form, unchanged byte for byte, and the parts are what a surface with a
+ * disclosure renders.
  */
 export function rowRemapPreconditions(scene: EffectsScene, index: number): string[] {
+  return rowRemapPreconditionParts(scene, index)
+    .map((p) => `${p.diagnosis} ${p.mechanism}`);
+}
+
+/** One unmet precondition: Aurora's finding, and the generator's own words for why. */
+export interface RowRemapPreconditionParts {
+  /** What the document is missing. Never behind a disclosure. */
+  diagnosis: string;
+  /** `The contract: "…"`, the generator's sentence. The half a disclosure may hold. */
+  mechanism: string;
+}
+
+/**
+ * One unmet precondition, in the two parts it has always been made of.
+ *
+ * ⚠ THE SPLIT IS NOT A NEW EDITORIAL JUDGEMENT. Every one of these messages is
+ * already written as a finding followed by `The contract: "…"`, and the quote is
+ * the MECHANISM in O15's sense: the generator's own words for why. What changes
+ * is only that a surface can now put that half behind the disclosure instead of
+ * printing all of it always.
+ *
+ * NO REMEDIES FIELD, and that is not the inversion O15 forbids. A precondition
+ * names an input the document lacks, and the control that supplies it is the row
+ * this hint hangs off; there is no separate sentence to hide. What the ruling
+ * forbids is hiding a remedy that EXISTS.
+ *
+ * WHY IT WAS DONE (EW-LAYER-CARD-SCROLLER, measured on the running app). The
+ * "nothing to vary" message renders at 165px in a 149.47px box whose floor gives
+ * it 129px, so no scroll position shows it whole. Folding the contract quote
+ * takes the visible half to roughly a third of that. Its two siblings are under
+ * the bar already and are folded the same way on purpose: they are one family
+ * with one shape, and the quote they carry is the half that grows when aeon
+ * rewords a refusal.
+ *
+ * `rowRemapPreconditions` above is the joined form, byte for byte what it
+ * returned before, for surfaces that cannot hold two parts.
+ */
+export function rowRemapPreconditionParts(
+  scene: EffectsScene, index: number,
+): RowRemapPreconditionParts[] {
   const layer = scene.layers[index];
   if (!layer || rowRemapOf(layer.rowRemap) === null) return [];
-  const out: string[] = [];
+  const out: RowRemapPreconditionParts[] = [];
 
   const layerOff = EFFECTS_LAYER_DEFORM_BOUNDS.shift_b.max;
   const anchorOff = EFFECTS_ANCHOR_SHIFT_BOUNDS.dsb.max;
@@ -640,16 +684,20 @@ export function rowRemapPreconditions(scene: EffectsScene, index: number): strin
       : anchorLive
         ? 'the anchor\'s dsb is live but the scene has no deform_bg table'
         : `the anchor's dsb is ${anchorOff}`);
-    out.push(`nothing for the remap to vary: ${why.join('; ')}. `
-      + `The contract: "${EFFECTS_ROW_REMAP_GENERATOR_REFUSALS.vary}"`);
+    out.push({
+      diagnosis: `nothing for the remap to vary: ${why.join('; ')}.`,
+      mechanism: `The contract: "${EFFECTS_ROW_REMAP_GENERATOR_REFUSALS.vary}"`,
+    });
   }
 
   // (2) The scene must declare an anchor — the remap takes its channel from the
   //     SCENE's `anchor`, never from a per-layer field.
   if (anchor === null) {
-    out.push('this scene declares no anchor, and the remap takes its channel from the scene\'s '
-      + 'own anchor rather than from the strip. '
-      + `The contract: "${EFFECTS_ROW_REMAP_GENERATOR_REFUSALS.anchor}"`);
+    out.push({
+      diagnosis: 'this scene declares no anchor, and the remap takes its channel from the '
+        + 'scene\'s own anchor rather than from the strip.',
+      mechanism: `The contract: "${EFFECTS_ROW_REMAP_GENERATOR_REFUSALS.anchor}"`,
+    });
   }
 
   // (3) At most one remapped strip per scene — the others NAMED, so the author
@@ -658,9 +706,11 @@ export function rowRemapPreconditions(scene: EffectsScene, index: number): strin
     .map((l, i) => (i !== index && rowRemapOf(l.rowRemap) !== null ? i : -1))
     .filter((i) => i >= 0);
   if (others.length > 0) {
-    out.push(`strip${others.length > 1 ? 's' : ''} ${others.join(', ')} `
-      + `${others.length > 1 ? 'also carry' : 'also carries'} a row remap. `
-      + `The contract: "${EFFECTS_ROW_REMAP_GENERATOR_REFUSALS.single}"`);
+    out.push({
+      diagnosis: `strip${others.length > 1 ? 's' : ''} ${others.join(', ')} `
+        + `${others.length > 1 ? 'also carry' : 'also carries'} a row remap.`,
+      mechanism: `The contract: "${EFFECTS_ROW_REMAP_GENERATOR_REFUSALS.single}"`,
+    });
   }
 
   return out;
