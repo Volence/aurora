@@ -77,6 +77,7 @@ import {
   vsplitLockAdvisoryParts, sceneVsplitLockAdvisoryParts,
   layerCountLine, vFactorHint,
   sceneListEntries, resolveSelectedScene, sceneRefOptions, unassignableSceneRef,
+  sceneSelectionFollow, sceneSelectionRelation,
   sectionSceneCommand, createSceneCommand,
   addLayerCommand, removeLayerCommand, setLayerFieldCommand, setSceneFieldCommand,
   layerExtrasLine,
@@ -444,6 +445,47 @@ export default function EffectsScenePanel(): React.ReactElement {
     ? getActiveLevel(state)?.act ?? null
     : null;
   const section = act?.sections[activeSectionIndex] ?? null;
+
+  // ═══ THE SELECTION FOLLOWS THE SECTION (cold read 2026-09-05 C2) ═══
+  //
+  // `Editing Section 0` sat directly above a form for whatever scene
+  // `selectedEffectsSceneId` happened to hold, which on arrival is
+  // `resolveSelectedScene`'s `scenes[0]` fallback. Two independent selections
+  // presented as though one governed the other; the owner called it the most
+  // disorienting thing on the tab. Pick a section and the panel below is now
+  // that section's scene, which makes the inference a newcomer already draws
+  // TRUE rather than explaining it away.
+  //
+  // ⚠ IT DOES NOT PIN THE SELECTION. Scenes are free-standing documents and
+  // authoring one that no section binds yet is a legitimate act (it is what
+  // `New` does). `activeSectionIndex` and the section's own `sceneRef` are the
+  // only deps, so clicking another scene in the list below is never undone —
+  // and `sceneSelectionRelation` states the divergence for as long as it lasts.
+  //
+  // ⚠ `sceneRef` IS A DEP, not just the index: assigning this section a scene
+  // under SECTION ASSIGNMENT is the author saying which document this section
+  // uses, and leaving the form on the old one would rebuild the same defect one
+  // control over. `sceneSelectionFollow` returns null for the act default and
+  // for a ref no readable scene claims — there is nothing to move to, and
+  // inventing a target is the defect.
+  const boundSceneRef = section?.sceneRef ?? null;
+  const follow = sceneSelectionFollow(library, section);
+  React.useEffect(() => {
+    if (follow === null) return;
+    if (useEditorStore.getState().selectedEffectsSceneId === follow) return;
+    setSelectedId(follow);
+    // `follow` is derived from exactly these two and the library's id set; the
+    // library is deliberately absent, so a reload that re-parses the same
+    // scenes cannot yank a selection the author moved.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSectionIndex, boundSceneRef]);
+
+  // WHAT THE SELECTED SCENE HAS TO DO WITH THE ACTIVE SECTION. `text` is null
+  // in the state this panel arrives in and stays in — see the provider for why
+  // agreement is deliberately silent rather than a fifth restatement of it.
+  const relation = sceneSelectionRelation(
+    act?.sections ?? [], activeSectionIndex, selected?.id ?? null);
+
   // HOW FAR THE CAMERA TRAVELS ACROSS THIS ACT, which is the only thing that
   // turns a parallax factor into "the background starts over HERE" (ROADMAP
   // O21). `null` with no act open: the period a factor implies is act-
@@ -507,6 +549,30 @@ export default function EffectsScenePanel(): React.ReactElement {
               ))}
             </div>
           </div>
+        )}
+
+        {/* WHICH DOCUMENT DO MY KEYSTROKES LAND IN — the cold reader's own
+            question, answered where the selection is made and only when the
+            answer is not the obvious one.
+
+            ⚠ IT COSTS THE COLUMN NOTHING IN THE ORDINARY STATE. `text` is null
+            whenever the selected scene IS the active section's, which the
+            follow effect above makes the arrival state, so this renders no box
+            at all on a panel whose LAYERS list is fighting for every pixel. It
+            appears only after the author has selected a scene the section does
+            not use, or landed on a section that binds none.
+
+            Inside the SCENES section rather than between sections: it is a fact
+            about the SELECTION, it travels with the highlighted row it is
+            about, and the column's flex model divides DIRECT children of the
+            panel (see the file docblock) so a sibling here would take a share. */}
+        {relation.text !== null && (
+          // `testid` and NOT a `data-` attribute: Hint's own docblock records
+          // that a hyphenated JSX attribute on a COMPONENT is silently dropped,
+          // which is how a harness once read zero nodes for sentences that were
+          // on screen. This one is measured by the harness that proves the row.
+          <Hint tone="warning" style={{ marginTop: T.s3 }}
+            testid="effects-scene-relation">{relation.text}</Hint>
         )}
 
         {library.unreadable.length > 0 && (

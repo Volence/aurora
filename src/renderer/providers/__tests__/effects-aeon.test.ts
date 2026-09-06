@@ -11,6 +11,7 @@ import {
   CUSTOM_FACTOR_VALUE, factorOptions, factorSelectValue, factorFromSelect,
   clampPackedField, clampWorldY, clampVCenter, clampVOffset,
   sceneListEntries, resolveSelectedScene, sceneRefOptions, unassignableSceneRef,
+  sceneSelectionFollow, sceneSelectionRelation,
   sectionSceneCommand, createSceneCommand, deleteSceneCommand,
   addLayerCommand, removeLayerCommand, setLayerFieldCommand, setSceneFieldCommand,
   SCENE_FORM_CHOICES, layerExtras, layerExtrasLine,
@@ -391,6 +392,121 @@ describe('resolveSelectedScene: the selection the panel and the map canvas SHARE
     // (hiding a scene from the picker, say) cannot silently split them.
     const lib = library([canopy(), canyon()]);
     expect(sceneListEntries(lib).map((e) => e.id)).toEqual(lib.scenes.map((s) => s.id));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// COLD READ 2026-09-05 C2 — "Editing Section 0" sat directly above a form for a
+// scene section 0 was not bound to. `resolveSelectedScene` above is INDEPENDENT
+// of the active section and falls back to `scenes[0]`, so in any project with
+// more than one scene the panel arrived showing the wrong document under a
+// strip naming the right one. Two independent selections presented as though
+// one governed the other.
+//
+// The fix is not a caption. `sceneSelectionFollow` makes the newcomer's
+// inference true; `sceneSelectionRelation` speaks only where it cannot be made
+// true (a section binding the act default, or an author deliberately editing
+// another scene) and is SILENT otherwise, because a sentence in the agreeing
+// state is permanent furniture taken out of the LAYERS list's share.
+// ---------------------------------------------------------------------------
+
+describe('sceneSelectionFollow: picking a section picks that section\'s scene', () => {
+  const canyon = () => newEffectsScene('canyon', 'Canyon');
+  const lib = () => library([canopy(), canyon()]);
+
+  it('follows to the scene the section binds', () => {
+    expect(sceneSelectionFollow(lib(), { sceneRef: 'canyon' })).toBe('canyon');
+  });
+
+  it('is null for the act default: there is no scene document to move to', () => {
+    // `sceneRef: null` means the act's own scene, which is not in this library.
+    // Falling back to `scenes[0]` here would rebuild the exact defect.
+    expect(sceneSelectionFollow(lib(), { sceneRef: null })).toBeNull();
+  });
+
+  it('is null for a ref no READABLE scene claims', () => {
+    // A section can point at a file the parser refused; it is absent from
+    // `scenes` and there is nothing to show.
+    expect(sceneSelectionFollow(lib(), { sceneRef: 'unreadable_on_disk' })).toBeNull();
+  });
+
+  it('is null for an empty section', () => {
+    expect(sceneSelectionFollow(lib(), null)).toBeNull();
+  });
+
+  it('is null in a project with no scenes at all', () => {
+    expect(sceneSelectionFollow(library([]), { sceneRef: 'canyon' })).toBeNull();
+  });
+});
+
+describe('sceneSelectionRelation: which document do my keystrokes land in', () => {
+  const sec = (sceneRef: string | null) => ({ sceneRef });
+
+  it('SAYS NOTHING when the selected scene IS the active section\'s', () => {
+    // The state the panel arrives in and stays in. A sentence here would be
+    // permanent height in a CONTENT section, and the fact is already on screen
+    // four times (the strip, the highlighted row, the form title, SECTION
+    // ASSIGNMENT).
+    const r = sceneSelectionRelation([sec('canopy'), sec('canyon')], 0, 'canopy');
+    expect(r.text).toBeNull();
+    expect(r.users).toEqual([0]);
+  });
+
+  it('names BOTH scenes when the author has selected another one', () => {
+    // The failing state, reachable by one click on the SCENES list and by
+    // nothing else. It must name what the section uses AND what the forms
+    // below reach, because neither alone answers the cold reader's question.
+    const r = sceneSelectionRelation([sec('canopy'), sec('canyon')], 0, 'canyon');
+    expect(r.text).toBe('Section 0 uses canopy. Edits below change canyon, which section 1 uses.');
+    expect(r.users).toEqual([1]);
+  });
+
+  it('says act default rather than inventing a scene name', () => {
+    const r = sceneSelectionRelation([sec(null), sec('canyon')], 0, 'canyon');
+    expect(r.text)
+      .toBe('Section 0 uses the act default scene. Edits below change canyon, which section 1 uses.');
+  });
+
+  it('says empty for a section with no meta at all', () => {
+    const r = sceneSelectionRelation([null, sec('canyon')], 0, 'canyon');
+    expect(r.text)
+      .toBe('Section 0 is empty and binds no scene. Edits below change canyon, which section 1 uses.');
+  });
+
+  it('points a just-created scene at the control that binds it', () => {
+    // `New` selects the scene it creates, which no section uses yet — the one
+    // divergence the author is EXPECTED to be in, so the sentence carries the
+    // remedy rather than only the diagnosis.
+    const r = sceneSelectionRelation([sec('canopy')], 0, 'fresh_scene');
+    expect(r.text).toBe('Section 0 uses canopy. Edits below change fresh_scene, '
+      + 'which no section uses yet: bind it under SECTION ASSIGNMENT.');
+    expect(r.users).toEqual([]);
+  });
+
+  it('lists EVERY other section sharing the selected scene, plural verb and all', () => {
+    // Editing a shared scene changes it for all of them; a reader told only
+    // about the active section would not know that.
+    const r = sceneSelectionRelation([sec('canopy'), sec('canyon'), sec('canyon')], 0, 'canyon');
+    expect(r.text)
+      .toBe('Section 0 uses canopy. Edits below change canyon, which sections 1, 2 use.');
+    expect(r.users).toEqual([1, 2]);
+  });
+
+  it('does not list the ACTIVE section among the others when it shares too', () => {
+    // Sections 0 and 2 both bind canyon and canyon is selected: they agree, so
+    // there is nothing to say at all.
+    const r = sceneSelectionRelation([sec('canyon'), sec('canopy'), sec('canyon')], 0, 'canyon');
+    expect(r.text).toBeNull();
+    expect(r.users).toEqual([0, 2]);
+  });
+
+  it('says nothing when there is no selected scene: an empty project', () => {
+    expect(sceneSelectionRelation([sec(null)], 0, null).text).toBeNull();
+  });
+
+  it('carries no en dash or em dash: the UI string gates', () => {
+    const r = sceneSelectionRelation([sec('canopy')], 0, 'canyon');
+    expect(r.text).not.toMatch(/[–—]/);
   });
 });
 
