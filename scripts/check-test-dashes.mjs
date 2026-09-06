@@ -187,18 +187,18 @@ const ALLOWANCES = [
     produced_by: 'src/core/formats/raster-binding.ts, itself an allowed quotation in '
       + 'scripts/check-src-dashes.mjs, read from aeon tools/test_effects_seam_gate.py:758',
   },
-  {
-    file: 'test/config/skip-report-reporter.test.ts',
-    text: 'todo',
-    why: 'A DEFERRAL MARKER, not a permanent permission. The test asserts, byte for byte, a '
-      + 'line the skip reporter prints; the reporter lives in scripts/, which NO dash gate '
-      + 'covers (147 in-code dashes across 15 files, measured 2026-09-05, nearly all of it '
-      + 'gate output a person reads on a failing npm test). The rule this parcel applied to '
-      + 'coupled pairs: sweep the pair when the producer is inside the bucket (as with '
-      + 'test/support/sibling-root.mjs), allow it when the producer is outside. When scripts/ '
-      + 'is swept, this allowance goes stale and this gate FAILS, which is the reminder.',
-    produced_by: 'scripts/skip-report-reporter.mjs:195',
-  },
+  // DELETED 2026-09-05 by the scripts/ sweep (EW-DASHES-SCRIPTS). The entry here
+  // was a deferral marker for `todo <dash> declared unwritten`, the one line
+  // `test/config/skip-report-reporter.test.ts` asserts byte for byte against
+  // `scripts/skip-report-reporter.mjs`. Its author wrote "when scripts/ is swept,
+  // this allowance goes stale and this gate FAILS, which is the reminder", and
+  // that is exactly what happened: sweeping the producer left the allowance
+  // matching nothing and this gate refused with exit 1 before anything else ran.
+  // Producer and consumer were re-keyed together to `todo: declared unwritten`,
+  // and the pairing was proven live rather than assumed: with the producer swept
+  // and the consumer left at the old spelling ON DISK, that test file goes from
+  // 11 passed to 1 failed at line 155. See scripts/check-scripts-dashes.mjs,
+  // which now holds that bucket and records the coupled set it inherited.
   {
     file: 'test/formats/effects-scene-writer-originated.test.ts',
     text: 'expect(doc.name).toContain',

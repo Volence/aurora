@@ -152,7 +152,7 @@ describe('skip-report reporter: enforcement', () => {
     const { out, exitCode } = run([
       testModule('test/todo.test.ts', [{ fullName: 'r', state: 'skipped', mode: 'todo' }]),
     ]);
-    expect(out).toContain('todo — declared unwritten');
+    expect(out).toContain('todo: declared unwritten');
     expect(out).not.toContain('FAIL');
     expect(exitCode).toBeUndefined();
   });
