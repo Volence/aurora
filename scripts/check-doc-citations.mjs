@@ -205,18 +205,61 @@
 //     So the inverse rule is 4 false to 1 true, and 3 to 1 in prose, because
 //     one of the four (`docs/reviews/2026-08-27-guard-transcription.md:58`) is
 //     fenced and N1 takes it first.
-//     AND THE RATCHET INVERTS EVEN THAT, which is the reason the sub-case is
-//     declined rather than refuted. `git blame` dates all four absolute-prefix
-//     lines to 2026-08-27, before IN_FORCE, so they are grandfathered and print
-//     nothing; the genuine line is dated 2026-09-06T02:05:52Z, after it, so it
-//     is BOUND. An inverse rule shipped today would print exactly one finding
-//     and it would be the true one, costing one EXEMPT row rather than a wave
-//     of noise. THAT IS AN ARGUMENT FOR THE INVERSE RULE AND IT IS NOT THIS
-//     ONE. It is a different rule from the tracked-gated sub-case; its
-//     precision today rests entirely on a cutoff that every absolute-prefix
-//     citation written from now on walks straight past; and widening a declared
-//     decline into a rule needs its own row and its own canary, not a footnote
-//     under the decline it replaces.
+//     ─ THE INVERSE SUB-CASE, which that correction raises and which is NOW
+//     SETTLED AGAINST TOO (row CITATIONS-INVERSE-ELLIPSIS-RULE, measured
+//     2026-09-06): judge an ellipsis path whose remainder is ABSENT. Shipped
+//     today it prints exactly one finding and it is the true one, which is why
+//     the idea looks good. IT IS DECLINED ANYWAY, and NOT for the date
+//     arithmetic noted at the bottom of this entry. THE RULE IS UNDECIDABLE
+//     FROM THE TEXT.
+//     Whether the remainder resolves is the answer the rule is trying to
+//     compute, so it cannot also be the rule's input, and nothing else in the
+//     line supplies it. All five absent remainders begin with the SAME root
+//     segment, `scratchpad/`, so the root carries no signal either. Three
+//     candidate discriminators were tried against the whole corpus of 104
+//     ellipsis paths (17 rooted, 87 not), and each one fails:
+//
+//       · A PEER NAME ON THE LINE (N2) catches three of the four. It misses on
+//         the naming convention this corpus actually uses for aeon-derived
+//         throwaway trees: PEER_RE ends on a `(?![\w-])`, so `aeon-fixture`,
+//         `aeon-current` and `aeon-build-pin` are not peer names to it.
+//       · A WRITTEN ABSOLUTE PREFIX (N3) catches the fourth, which spells its
+//         session temp directory out before the ellipsis. It measures how much
+//         of the path the author chose to type, not what the path means, and
+//         this corpus writes the SAME REFERENT BOTH WAYS: with the prefix at
+//         docs/reviews/2026-08-27-screen-frame-guides.md:270, and without it at
+//         docs/reviews/2026-08-29-harness-hazards.md:51, which elides an
+//         absolute worktree path down to a bare leading ellipsis.
+//       · A REMAINDER MATCHING ONE OF THIS REPO'S OWN IGNORE PATTERNS is the
+//         strongest of the three and separates all five today, since only
+//         `scratchpad/shots-final/NOTES.md` matches .gitignore:10. It is also
+//         the one that refutes the whole idea, because AN AGENT WORKTREE OF
+//         THIS REPOSITORY HAS THE IDENTICAL INTERNAL LAYOUT, that ignore rule
+//         included. "The remainder is shaped like one of ours" is therefore
+//         fully consistent with the ellipsis eliding an absolute worktree
+//         prefix, and this corpus already elides exactly that: docs/ROADMAP.md
+//         and docs/reviews/2026-09-03-loops-say-solid-both.md both write
+//         `…/agent-` plus a worktree id, carrying no signal of any kind.
+//
+//     26 of the 104 carry none of the three signals, and THAT SET HOLDS BOTH
+//     CLASSES AT ONCE: absolute elisions (a bare `…/agent-` worktree id) and
+//     repo-relative ones (`src/renderer/` then an ellipsis then a test file,
+//     five times in docs/reviews/2026-08-30-s1disasm-test-coupling.md). Nothing
+//     a reader of the text can see tells the two apart. That is this gate's own
+//     load-bearing reason for THE TRACKED RULE, one level up: "is it on disk"
+//     has a different answer on every machine, and WHICH TREE AN ELIDED PREFIX
+//     NAMES has a different answer on every machine too. The ellipsis is the
+//     author's statement that they are not saying which. So the decline is not
+//     "not yet", it is NOT EVER FROM THE TEXT, and the way to have an ellipsis
+//     path judged is to write the path.
+//     ─ SUBORDINATE, and only an explanation of why the idea looks attractive:
+//     THE RATCHET FLATTERS IT. `git blame` dates all four absolute-prefix lines
+//     to 2026-08-27, before IN_FORCE, so they are grandfathered and print
+//     nothing, and the genuine line is dated 2026-09-06T02:05:52Z and is BOUND.
+//     That is a property of a cutoff, not of a rule. The four counterexamples
+//     are not fixed, they are merely old, and the first absolute-prefix
+//     citation written after IN_FORCE walks straight past the cutoff and prints
+//     a false finding with nothing to distinguish it from a true one.
 //  N6 A BARE BACKTICKED FILENAME, `sibling-root.mjs`, with no directory in it.
 //     A filename in prose names no location. `App.tsx` is not a path; this repo
 //     has several files by names like it, and a reader who follows the citation
@@ -954,7 +997,9 @@ console.log(
   + `actually tracks, of which ${run.stat.bareFileUnknown} match no tracked basename anywhere: a `
   + 'filename in prose names no location, and gating the shape would bury this run under a '
   + 'four-figure count. Both numbers are derived every run, so either one moves the day the '
-  + 'corpus does. Widening the gate to either shape is a separate row, not a footnote.\n'
+  + 'corpus does. THE ELLIPSIS HALF IS SETTLED, not pending: a rule that judged it would be '
+  + 'undecidable from the text, and N5 in this file carries the measurement. Widening the gate '
+  + 'to bare filenames is still a separate row.\n'
   + `${PREFIX}: ${run.stat.marked} of ${run.stat.tokens} judged citation(s) `
   + `(${pct(run.stat.marked, run.stat.tokens)}%) sit in an inline-code span or a link target. `
   + 'Backticks are NOT required, measured rather than assumed: the eight bare dangling ones are all '
