@@ -438,11 +438,47 @@ async function main() {
     if (!scenes.some((s) => s.id === SCENE_ID)) {
       throw new Error(`${SCENE_ID} absent — every row below would be vacuous`);
     }
-    await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_ID)})`);
-
     check('1c', 'the Effects facet mounts',
       (await c.evalExpr(clickByText('/^Effects$/'))) === true);
     await sleep(1400);
+
+    // ═══ SELECT AFTER THE PANEL MOUNTS, AND THEN ASSERT IT TOOK ═══
+    //
+    // THE SELECTION IS NOT THIS HARNESS'S TO KEEP. `EffectsScenePanel` carries a
+    // "the selection follows the active section" effect (aurora `4b9b3f6a`, cold
+    // read C2 — the owner called the old behaviour the most disorienting thing on
+    // the tab): on mount it calls `setSelectedEffectsSceneId(sceneSelectionFollow(
+    // library, section))`, which for section 0 of this project is
+    // `ojz_act1_start`. A `selectScene` issued BEFORE the mount is therefore
+    // OVERWRITTEN by the app, correctly and by design.
+    //
+    // ⚠ AND THE OVERWRITE IS SILENT, which is what actually cost the rows below.
+    // With the call in its old place the panel painted `ojz_act1_start`'s cards
+    // while every row here read `ojz_act1_depth` out of `scenesJson()`. The
+    // WIDGET rows ([2b], [3b], [4c], [7b]) went on passing — they read the DOM,
+    // and the DOM was a real, correct row-remap control, just for another
+    // document — while the six DOCUMENT rows ([3a], [3a2], [4a], [5a], [5c],
+    // [6c]) read a scene nothing had touched. MEASURED 2026-09-06: the write
+    // landed on `ojz_act1_start` layer 3 as `{plane_y: 112, height_shift: 4}`
+    // while this file asserted about `ojz_act1_depth` layer 3 and found nothing.
+    //
+    // So the fix is the ORDER, and [1c2] is the gate that makes a future
+    // overwrite impossible to miss: the precondition every row below rests on is
+    // now ASSERTED, in the app's own words, instead of assumed.
+    await c.evalExpr(`window.__dbg.aeon.selectScene(${JSON.stringify(SCENE_ID)})`);
+    await sleep(900);
+    const selectedNow = await c.json('window.__dbg.aeon.selectedScene()');
+    check('1c2', 'and the panel is EDITING the scene every row below asserts against',
+      selectedNow === SCENE_ID,
+      `selectedScene() = ${JSON.stringify(selectedNow)}, wanted ${JSON.stringify(SCENE_ID)}. `
+      + 'The panel follows the active section\'s sceneRef on mount (aurora 4b9b3f6a), so a '
+      + 'selection made before the mount is overwritten; every document row below would then '
+      + 'read a scene nothing on screen is editing.');
+    if (selectedNow !== SCENE_ID) {
+      throw new Error(`the panel is editing ${selectedNow}, not ${SCENE_ID} — `
+        + 'every document row below would be vacuous');
+    }
+
     const opened = await c.evalExpr(OPEN_SECTION(String.raw`/^Layers \(/`, RR_SELECT(0)));
     await sleep(900);
 
@@ -510,16 +546,43 @@ async function main() {
     await setSelect(RR_SELECT(CURVED), 'ladder');
     await sleep(800);
     const seeded = (await layerN(CURVED))?.rowRemap;
+    // ⚠ `plane_y` IS A RANGE AND `height_shift` IS A SET, AND THIS ROW MUST NOT
+    // TREAT THEM ALIKE. `HEIGHT.minimum`/`HEIGHT.maximum` are what this row used
+    // to read, and under `enum [4]` that node carries NEITHER — so the test was
+    // `4 >= undefined && 4 <= undefined`, FALSE for a perfectly legal payload,
+    // and the message printed "height_shift undefined..undefined" while pointing
+    // at the app. Membership is `SHIFTS.includes(...)`, the same rule
+    // `scene-ui.ts` states for its own bounds constant ("Nothing may test
+    // membership through this constant"), and it survives a SPARSE enum such as
+    // `[4, 7]` that a min..max pair would wrongly widen to admit 5 and 6.
     check('3a', 'switching the row on writes a payload legal on BOTH fields',
       seeded && Number.isInteger(seeded.plane_y) && Number.isInteger(seeded.height_shift)
       && seeded.plane_y >= PLANE_Y.minimum && seeded.plane_y <= PLANE_Y.maximum
-      && seeded.height_shift >= HEIGHT.minimum && seeded.height_shift <= HEIGHT.maximum,
+      && SHIFTS.includes(seeded.height_shift),
       `strip ${CURVED} rowRemap = ${JSON.stringify(seeded)}; contract plane_y `
-      + `${PLANE_Y.minimum}..${PLANE_Y.maximum}, height_shift `
-      + `${HEIGHT.minimum}..${HEIGHT.maximum}`);
-    check('3a2', 'and the seed is the shift that BUILDS — a new remap is never born unbuildable',
-      BUILDABLE === null || seeded?.height_shift === BUILDABLE,
-      `seeded shift ${seeded?.height_shift}; contract says ${BUILDABLE} builds today`);
+      + `${PLANE_Y.minimum}..${PLANE_Y.maximum}, height_shift one of {${SHIFTS.join(', ')}}`);
+    // ⚠ THIS ROW USED TO BE UNFAILABLE UNDER THE CONTRACT IT RUNS AGAINST TODAY.
+    // It read `BUILDABLE === null || seeded?.height_shift === BUILDABLE`, and
+    // `BUILDABLE` has read null since empyrean 2e5046e retired the "TODAY ONLY n
+    // BUILDS" clause — so the whole row short-circuited TRUE before looking at
+    // the seed at all, and printed "seeded shift undefined" while PASSING. A row
+    // that goes green when its subject is `undefined` is not a weak gate, it is
+    // an anti-gate: it stood beside [3a]'s red saying the seed was fine.
+    //
+    // The clause retiring is not the same event as the SEED going wrong, so the
+    // row is now two claims: the seed is ALWAYS a shift the contract admits
+    // (checkable under every contract this key has ever had, and the half that
+    // catches a `?? BOUNDS.min` fallback degrading to `undefined`), and WHERE the
+    // contract still names a buildable shift, it is that one.
+    check('3a2', 'and the seed is a shift the contract ADMITS — and, where the contract still '
+      + 'names one, the shift that BUILDS',
+      SHIFTS.includes(seeded?.height_shift)
+      && (BUILDABLE === null || seeded.height_shift === BUILDABLE),
+      `seeded shift ${JSON.stringify(seeded?.height_shift)}; the contract admits `
+      + `{${SHIFTS.join(', ')}} and `
+      + (BUILDABLE === null
+        ? 'names no shift as the one that builds, so only ADMISSION is asserted here'
+        : `says ${BUILDABLE} builds today`));
 
     const picker = await c.json(String.raw`(() => {
       const el = ${RR_HEIGHT(CURVED)};
