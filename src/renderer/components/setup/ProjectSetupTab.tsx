@@ -244,7 +244,7 @@ export default function ProjectSetupTab() {
               <div style={styles.issueTitle}>Aurora could not read .aurora/project.json</div>
               <div style={styles.issueLine}>
                 The file is there and could not be parsed, so Aurora is NOT using the overrides
-                in it and will NOT overwrite it — your file is intact. Apply is disabled until
+                in it and will NOT overwrite it. Your file is intact. Apply is disabled until
                 the file is valid JSON: fix it by hand, then reopen the project.
               </div>
             </div>
