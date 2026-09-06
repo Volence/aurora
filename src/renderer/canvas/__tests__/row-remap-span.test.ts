@@ -276,6 +276,29 @@ describe('the reach advisory in parts loses nothing and hides only the mechanism
     }
   }
 
+  it('still renders, word for word, the sentence it rendered BEFORE the split', () => {
+    // ⚠ THIS IS THE ONLY ANTI-LOSS ROW, AND THE OTHERS CANNOT STAND IN FOR IT.
+    // `rowRemapReachAdvisory` is now the join of the parts, so comparing the two
+    // is a tautology: it passes on any wording whatsoever. Every other row in
+    // this file uses `toContain`, which is blind to a dropped clause between the
+    // fragments it looks for. So the expectation is an INDEPENDENT statement of
+    // the same sentence: the clipped arm is quoted from
+    // docs/reviews/2026-09-05-plane-y-referent.md, which recorded it off a
+    // running app BEFORE this parcel existed, and the zero arm is transcribed
+    // from the pre-split source. A fold that quietly became a cut fails here.
+    const clipped = locked([layer(0), layer(84, remap(96, 4)), layer(112)]);
+    expect(rowRemapReachAdvisory(clipped, 1)).toBe(
+      '28 screen lines from this band\'s top to the next layer\'s top, and the remap moves at '
+      + 'most half of them: 14. height_shift 4\'s ladder steps down to 15 lines, so 1 step is '
+      + 'out of reach at every camera position. The cap is what keeps the remap reading inside '
+      + 'this band, so the result is clipped rather than broken. Make the band taller, or '
+      + 'lower height_shift.');
+    expect(rowRemapReachAdvisory(locked([layer(0, remap(0, 4)), layer(1)]), 0)).toBe(
+      '1 screen line from this band\'s top to the next layer\'s top, and the remap needs 2 to '
+      + 'move anything: the engine halves the span and takes its no-remap branch at zero. This '
+      + 'effect does nothing, at every camera position. Make the band taller.');
+  });
+
   it('joins back to exactly the sentence the one-string form returns, on every arm', () => {
     let fired = 0;
     for (const { s, i } of cases) {
@@ -283,6 +306,8 @@ describe('the reach advisory in parts loses nothing and hides only the mechanism
       const one = rowRemapReachAdvisory(s, i);
       if (parts === null) { expect(one).toBeNull(); continue; }
       fired++;
+      // ⚠ THIS COMPARISON IS A TAUTOLOGY BY CONSTRUCTION and is kept only for
+      // the two assertions under it. The row above is where the words are held.
       expect(joinReachAdvisory(parts)).toBe(one);
       // An absent mechanism must not leave a seam: a template with an empty
       // middle reads fine to a person and compares unequal to a machine.

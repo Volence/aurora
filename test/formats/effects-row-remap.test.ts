@@ -598,7 +598,26 @@ describe('a precondition splits into Aurora\'s finding and the contract\'s claus
     return s;
   };
 
-  it('joins back, word for word, to what the one-string form returns', () => {
+  it('still renders, word for word, the sentence it rendered BEFORE the split', () => {
+    // ⚠ THE ANTI-LOSS ROW, AND NOTHING ELSE HERE CAN BE IT. `rowRemapPreconditions`
+    // is now the join of the parts, so comparing the two passes on any wording;
+    // every other row in this file uses `toContain`, which is blind to a clause
+    // dropped between the fragments it looks for. The expectation below is an
+    // INDEPENDENT statement: the prose is transcribed from the run this file's
+    // own `console.log` printed before the split, and the quoted clause comes
+    // from the contract constant rather than being retyped.
+    const said = rowRemapPreconditions(allThreeUnmet(), 1);
+    expect(said[1]).toBe(
+      'this scene declares no anchor, and the remap takes its channel from the scene\'s own '
+      + 'anchor rather than from the strip. '
+      + `The contract: "${EFFECTS_ROW_REMAP_GENERATOR_REFUSALS.anchor}"`);
+    expect(said[0]).toBe(
+      'nothing for the remap to vary: no curve on this strip; its dsb is 4 but the scene has '
+      + 'no deform_bg table; no scene anchor. '
+      + `The contract: "${EFFECTS_ROW_REMAP_GENERATOR_REFUSALS.vary}"`);
+  });
+
+  it('partitions each sentence with no seam and no leftover', () => {
     const s = allThreeUnmet();
     const parts = rowRemapPreconditionParts(s, 1);
     const joined = rowRemapPreconditions(s, 1);
