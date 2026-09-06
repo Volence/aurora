@@ -121,16 +121,26 @@
 //     is a finding rather than noise: the off-view floor F1 measures collapsed
 //     from 219 to 0 because every disagreement between correct walks lives in
 //     the half of the plane the poisoned read could not see.
-//   P4, poisoning the ADVERTISED CEILING (`limits.maxReadLen` read as 8192 on
-//     a server whose real cap is 4096): the new R5 RED on the server's own
-//     refusal text. This is the production shape, not a contrived one - the
-//     harness derives its call count from a number the server advertises and
-//     nothing made the server prove it honours it.
-//   P5, poisoning the TRANSPORT (one chunk's reply truncated to half its
-//     bytes, the "honours less than it declares" shape): the new R5 RED, R7
-//     GREEN. R7 sums the lengths this file ASKED for, so it is structurally
-//     blind to a short delivery; R5 sums what the server RETURNED. That pair
-//     is the demonstration that R5 catches something no other row here can.
+//   P4, poisoning the ADVERTISED CEILING (`limits.maxReadLen` overwritten to
+//     8192 in the handshake, on a server whose real cap is 4096): R5 RED,
+//     reading "0xC000 asked 8192 REFUSED (`len` = 8192 is outside 1..=4096)",
+//     which is the SERVER'S OWN refusal text and not a fabricated one. The run
+//     then aborted on R5's throw, which is what exercises the abort. This is
+//     the production shape, not a contrived one: the call count here is
+//     derived from a number the server advertises, and nothing anywhere made
+//     the server prove it honours it.
+//   P5, poisoning the TRANSPORT (a shim truncating the second read_vram reply
+//     to half its bytes while leaving its declared `len` at 4096, the "honours
+//     less than it declares" shape): R5 RED at "0xD000 asked 4096 got 2048
+//     declared 4096", 6144 of 8192 bytes. R7 GREEN in the same run. R7 sums
+//     the lengths this file ASKED for, so it is structurally blind to a short
+//     delivery; R5 sums what the server RETURNED. That pair is the
+//     demonstration that R5 catches something no other row here can.
+//     R5's ABORT (not its assertion) was suppressed for that run so the run
+//     would reach R7; P4 is what exercises the abort. And row 0 passed at zero
+//     on a 6144 byte sample against an 8192 byte one, so `diffWords` narrows
+//     to the shorter buffer without saying so - which is why R5 aborts rather
+//     than merely reporting.
 //
 // AND THE HARDCODE THAT WOULD LOOK RIGHT STILL FAILS. Note first that at this
 // file's own settings a frozen `OFF_VIEW_FLOOR = 26` passes row 7 by a margin
