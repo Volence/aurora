@@ -168,19 +168,41 @@ describe('the refusals name WHICH budget is binding', () => {
     expect(promoteUnavailableReason(doc, 2, 1)).toBeNull();        // anti-vacuous
   });
 
-  it('insert into a default_off act reports the BUILD\'s refusal, not a byte count', () => {
-    // Adding a second tile animation to a default-off act is refused outright
-    // (the twins are emitted only for a single-band act), so the honest answer
-    // is aeon's rule rather than an arithmetic that does not apply.
-    const why = insertUnavailableReason(aeonLikeDoc(), 1, 1);
+  /**
+   * ⚠ INVERTED BY aeon's DECOUPLE. This row asserted that inserting into a
+   * `default_off` act reported aeon's rule rather than a byte count, because the
+   * build refused such an act outright. It does not any more (aeon `364b7bce`),
+   * so the honest answer IS the arithmetic — and the door is open.
+   *
+   * ANTI-VACUOUS BOTH WAYS: the small insert is allowed and an oversized one is
+   * still refused BY THE BYTE BUDGET, so a `insertUnavailableReason` that had
+   * stopped answering could not pass.
+   */
+  it('insert into a default_off act is ALLOWED, and answers with the byte budget when it is not', () => {
+    const doc = aeonLikeDoc();
+    expect(insertUnavailableReason(doc, 1, 1)).toBeNull();
+    const budget = bandBudget(doc);
+    const over = budget.slotsRemaining + 1;
+    const why = insertUnavailableReason(doc, over, 1);
     expect(why).not.toBeNull();
-    expect(why!).toContain('EXACTLY ONE');
+    expect(why!).not.toContain('EXACTLY ONE');
   });
 });
 
 describe('⚠ UNMEASURABLE COLLAPSES TO ZERO, NEVER TO THE LOOSER BUDGET', () => {
-  /** Two bands, both `default_off`: aeon refuses, so the section has no size. */
-  function refusedDoc(): BgOverrideDocument {
+  /**
+   * Two bands, both `default_off` — the act aeon used to refuse outright.
+   *
+   * ⚠ IT IS NO LONGER REFUSED, AND THE RULE THIS DESCRIBE HOLDS IS UNCHANGED.
+   * `viewsEmitted` was the only producer of an unmeasurable section, so since
+   * aeon's decouple the only document without a size is NO DOCUMENT. The
+   * direction — unmeasurable collapses to ZERO, never to the looser tile figure —
+   * is still the rule and is still the defect the section-ceiling parcel landed
+   * against; there is simply nothing left in a document that can trigger it. The
+   * two rows that used to drive this fixture now assert the opposite, and the
+   * no-document row below is what still holds the direction itself.
+   */
+  function onceRefusedDoc(): BgOverrideDocument {
     const cols = BGANIM_VIEW_DERIVED_PERIOD_PX / TILE_WIDTH_PX;
     return docOf(cols * 2, (blob) => [
       band(blob, 0, cols, 1, { default_off: true, pattern_px: BGANIM_VIEW_DERIVED_PERIOD_PX }),
@@ -188,21 +210,23 @@ describe('⚠ UNMEASURABLE COLLAPSES TO ZERO, NEVER TO THE LOOSER BUDGET', () =>
     ]);
   }
 
-  it('answers null for the section, zero for the budget, and says why', () => {
-    const b = bandBudget(refusedDoc());
-    expect(b.sectionBytes).toBeNull();
-    expect(b.byteSlotsRemaining).toBeNull();
-    expect(b.binding).toBe('unmeasurable');
-    expect(b.slotsRemaining).toBe(0);
-    expect(b.unmeasurable).toContain('EXACTLY ONE');
+  it('the once-refused act now has a size, a budget and a binding', () => {
+    const b = bandBudget(onceRefusedDoc());
+    expect(b.sectionBytes).not.toBeNull();
+    expect(b.byteSlotsRemaining).not.toBeNull();
+    expect(b.binding).not.toBe('unmeasurable');
+    expect(b.unmeasurable).toBeNull();
+    expect(b.slotsRemaining).toBeGreaterThan(0);
   });
 
-  it('and the tile budget it did NOT fall back to is large, which is the point', () => {
-    // Anti-vacuous. If `tileSlotsRemaining` happened to be 0 here, the row above
-    // would pass under the permissive implementation too and prove nothing.
-    const b = bandBudget(refusedDoc());
-    expect(b.tileSlotsRemaining).toBeGreaterThan(0);
-    expect(b.slotsRemaining).not.toBe(b.tileSlotsRemaining);
+  it('and its figure is the NO-TWINS one, which is the quantifier still being right', () => {
+    const b = bandBudget(onceRefusedDoc());
+    // A per-key validator ("do the bands agree?") would predict twins here and
+    // read high by their cost. Derived from the same operands the codec uses.
+    expect(b.twinsEmitted).toBe(false);
+    expect(b.viewTwinBytes).toBe(0);
+    const table = BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES * b.bands;
+    expect(b.sectionBytes).toBe(table + b.animatedSlots * BGANIM_BYTES_PER_SLOT);
   });
 
   it('with no document at all, the same direction holds', () => {

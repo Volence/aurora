@@ -19,6 +19,7 @@ import {
   bgOverrideSectionIssues,
   bganimSectionBytes,
   bganimSectionSlotsAllowed,
+  bganimViewTwinBytes,
   viewsEmitted,
   bandIsDefaultOff,
   BGANIM_SECTION_CEILING,
@@ -272,36 +273,58 @@ describe('default_off: the twins are decided PER ACT, not per band', () => {
       .toBe(BGANIM_VIEW_COUNT * (BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES));
   });
 
-  it('⚠ REFUSES a two-band act in which BOTH bands carry the key', () => {
-    // THE TRAP. A validator asking "do the bands AGREE about default_off?" says
-    // yes here and passes a document aeon refuses. The rule is on the act's band
-    // count, so this must refuse.
-    const b = {
-      cols: period, rows: 1, pattern_px: BGANIM_VIEW_DERIVED_PERIOD_PX, default_off: true,
-    };
-    const r = viewsEmitted([b, { ...b }]);
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
-    expect(r.reason).toContain('EXACTLY ONE');
-    expect(r.reason).toContain('does not satisfy it');
+  /**
+   * ⚠ THESE THREE ROWS ASSERTED A REFUSAL UNTIL aeon's DECOUPLE, AND NOW ASSERT
+   * ITS ABSENCE. Both arms were `AssertionError`s in `inject_editor_bg.py` and
+   * neither raises since aeon `364b7bce`; the same conditions decide whether the
+   * twins are EMITTED. The contract's own instruction: *"Read each item as 'if
+   * this does not hold, `views_emitted()` returns 0', never as 'the build
+   * refuses'."*
+   *
+   * A BARE `{ ok: true, value: 0 }` WOULD ALSO PASS ON A GUTTED FUNCTION, so each
+   * row is paired against the shape that must still get its twins — the two
+   * answers have to DIFFER, which a stub returning one constant cannot do.
+   */
+  const shipped = {
+    cols: period, rows: 1, pattern_px: BGANIM_VIEW_DERIVED_PERIOD_PX, default_off: true,
+  };
+
+  it('⚠ a two-band act in which BOTH bands carry the key gets NO twins, and builds', () => {
+    // THE TRAP, UNCHANGED. A validator asking "do the bands AGREE about
+    // default_off?" says yes here and predicts twins. The rule is on the act's
+    // BAND COUNT, so this must be zero — and the cost of the wrong answer is now
+    // a size error rather than a build failure.
+    expect(viewsEmitted([shipped, { ...shipped }])).toEqual({ ok: true, value: 0 });
+    expect(bganimViewTwinBytes([shipped, { ...shipped }])).toBe(0);
+    // DIFFERENTIAL: the one-band act still gets them, so nothing here is a stub.
+    expect(viewsEmitted([shipped])).toEqual({ ok: true, value: BGANIM_VIEW_COUNT });
   });
 
-  it('REFUSES a two-band act in which only one carries it, for the same reason', () => {
-    const r = viewsEmitted([
-      { cols: period, rows: 1, pattern_px: BGANIM_VIEW_DERIVED_PERIOD_PX, default_off: true },
-      { cols: 4, rows: 1 },
-    ]);
-    expect(r.ok).toBe(false);
+  it('a two-band act in which only one carries it gets no twins either', () => {
+    expect(viewsEmitted([shipped, { cols: 4, rows: 1 }])).toEqual({ ok: true, value: 0 });
   });
 
-  it('REFUSES a single default_off band at any other pattern period', () => {
+  it('a single default_off band at any other pattern period gets no twins', () => {
     const wrong = period * 2;
-    const r = viewsEmitted([
-      { cols: wrong, rows: 1, pattern_px: wrong * TILE_WIDTH_PX, default_off: true },
-    ]);
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
-    expect(r.reason).toContain(String(BGANIM_VIEW_DERIVED_PERIOD_PX));
+    const b = { cols: wrong, rows: 1, pattern_px: wrong * TILE_WIDTH_PX, default_off: true };
+    // Anti-vacuous: it really is a period the V twin's shift was not derived at.
+    expect(b.pattern_px).not.toBe(BGANIM_VIEW_DERIVED_PERIOD_PX);
+    expect(viewsEmitted([b])).toEqual({ ok: true, value: 0 });
+    expect(bganimViewTwinBytes([b])).toBe(0);
+  });
+
+  /**
+   * THE COST OF THE TWINS, AS ITS OWN DERIVATION. `bganimViewTwinBytes` is what
+   * every author-facing sentence about the debug/release difference calls, so it
+   * gets a row of its own rather than being implied by the section arithmetic.
+   */
+  it('bganimViewTwinBytes is the act table paid once per twin, and 0 when they decline', () => {
+    expect(bganimViewTwinBytes([shipped]))
+      .toBe(BGANIM_VIEW_COUNT * (BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES));
+    expect(bganimViewTwinBytes([{ cols: 4, rows: 1 }])).toBe(0);
+    // And it is exactly the gap between the two section figures for one act.
+    expect(bganimSectionBytes([shipped]))
+      .toEqual({ ok: true, value: expectedBytes(1, period, 0) + bganimViewTwinBytes([shipped]) });
   });
 
   it('reads the key the way the consumer does: truthy, not `=== true`', () => {
@@ -324,7 +347,17 @@ describe('default_off: the twins are decided PER ACT, not per band', () => {
     expect(validateBgOverride(doc).join('\n')).toContain('must be true or false');
   });
 
-  it('the act-level refusal is reported once, for the document', () => {
+  /**
+   * ⚠ THIS ROW USED TO ASSERT ONE ACT-LEVEL REFUSAL AND NOW ASSERTS SILENCE.
+   * The same document — two bands, both silenced, both at the derived period —
+   * was a document aeon refused and is now one it builds without twins. Nothing
+   * is wrong with it, so a reader must be told nothing about it.
+   *
+   * ANTI-VACUOUS: an empty issue list is what a broken `bgOverrideSectionIssues`
+   * returns too, so the row proves the function still speaks by handing it an act
+   * that IS over the ceiling and requiring the ceiling sentence back.
+   */
+  it('a two-band silenced act draws no notice at all, and the ceiling still does', () => {
     const blob = tiles(period * 2);
     const doc: BgOverrideDocument = {
       layout: Array.from({ length: BG_LAYOUT_WORDS }, () => 0),
@@ -335,31 +368,51 @@ describe('default_off: the twins are decided PER ACT, not per band', () => {
           { default_off: true, pattern_px: BGANIM_VIEW_DERIVED_PERIOD_PX }),
       ],
     };
-    const issues = bgOverrideSectionIssues(doc);
-    expect(issues).toHaveLength(1);
-    expect(issues[0]).toContain('the build refuses this act');
+    expect(bgOverrideSectionIssues(doc)).toEqual([]);
+    // The instrument is alive: an act over the byte ceiling still says so.
+    const over = tiles(BGANIM_SECTION_CEILING);
+    const big: BgOverrideDocument = {
+      layout: Array.from({ length: BG_LAYOUT_WORDS }, () => 0),
+      tiles: over,
+      anims: [band(over, 0, over.length, 1, {})],
+    };
+    expect(bgOverrideSectionIssues(big).join('\n')).toContain('over the ROM section');
   });
 });
 
 // ── Loud on unmeasurable, in the SAFE direction ─────────────────────────────
 
-describe('an act the build refuses has NO section size, and never a generous one', () => {
-  const refused = [
+describe('the act that used to have NO section size now has one, and it is smaller', () => {
+  const twoSilenced = [
     { cols: 8, rows: 1, pattern_px: BGANIM_VIEW_DERIVED_PERIOD_PX, default_off: true },
     { cols: 8, rows: 1, pattern_px: BGANIM_VIEW_DERIVED_PERIOD_PX, default_off: true },
   ];
 
-  it('bganimSectionBytes answers with the refusal, not a number', () => {
-    expect(bganimSectionBytes(refused).ok).toBe(false);
+  /**
+   * ⚠ THE SAFE-DIRECTION MACHINERY IS NOT DELETED, IT IS UNREACHABLE. `viewsEmitted`
+   * was the only thing in this codec that could make a size REFUSE, and it no
+   * longer does, so `BgAnimSizeResult`'s `ok: false` arm has no producer today.
+   * `bandBudget` still collapses an unmeasurable section to ZERO rather than to
+   * the looser tile budget — that is the defect the section-ceiling parcel landed
+   * against and it is still the rule; there is simply nothing left to trigger it
+   * from a document. Said here rather than left for a reader to infer from a
+   * describe block that quietly stopped existing.
+   */
+  it('bganimSectionBytes answers with a number for a two-band silenced act', () => {
+    const r = bganimSectionBytes(twoSilenced);
+    expect(r.ok).toBe(true);
+    // AND IT IS THE NO-TWINS FIGURE. A codec that had kept predicting twins for
+    // this shape would be exactly `bganimViewTwinBytes` of a ONE-band act higher,
+    // which is the size error aeon's contract names.
+    const slots = twoSilenced.reduce((n, b) => n + b.cols * b.rows, 0);
+    expect(r.ok && r.value).toBe(expectedBytes(twoSilenced.length, slots, 0));
+    expect(bganimViewTwinBytes(twoSilenced)).toBe(0);
   });
 
-  it('bganimSectionSlotsAllowed does too, rather than falling back to the ceiling', () => {
-    // ⚠ THE DIRECTION IS THE POINT. Answering "could not tell" with a budget
-    // would reproduce, one layer down, exactly the permissive failure this
-    // parcel exists to fix.
-    const r = bganimSectionSlotsAllowed(refused);
-    expect(r.ok).toBe(false);
-    expect(r).not.toHaveProperty('value');
+  it('bganimSectionSlotsAllowed answers too, at the two-band table size', () => {
+    const r = bganimSectionSlotsAllowed(twoSilenced);
+    expect(r.ok).toBe(true);
+    expect(r.ok && r.value).toBeGreaterThan(0);
   });
 });
 

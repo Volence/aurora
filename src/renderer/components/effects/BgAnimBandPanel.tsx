@@ -247,8 +247,8 @@ import {
   // `default_off`, exposed as a SHIPPED-BEHAVIOUR switch. Every sentence comes
   // from the provider, in aeon's own order (release-shape fact, then the two
   // obligations, then what the debug ROM gets); nothing about it is worded here.
-  shipSilentSwitch, twinCouplingApplies,
-  SHIP_SILENT_LEAD, SHIP_SILENT_OBLIGATIONS, SHIP_SILENT_EXCHANGE, TWIN_COUPLING_DISCLOSURE,
+  shipSilentSwitch,
+  SHIP_SILENT_LEAD, SHIP_SILENT_OBLIGATIONS, SHIP_SILENT_EXCHANGE,
   type BandCommandResult, type BandPhaseFill, type BgAnimBandAxis,
 } from '../../providers/bg-anim-aeon';
 // The two creation verbs — label, disabled reason, command — derived ONCE and
@@ -775,10 +775,41 @@ export default function BgAnimBandPanel(): React.ReactElement {
         )}
         {doc !== null && budget.byteSlotsRemaining !== null && (
           <Hint style={{ marginTop: T.s2, marginBottom: 0 }}>
+            {/* ── WHICH SHAPE THIS FIGURE IS FOR ───────────────────────────
+                THE ARITHMETIC WAS ALWAYS RIGHT AND THE SENTENCE WAS ALWAYS
+                AMBIGUOUS. `bganimSectionBytes` models whether the DEBUG view
+                twins are emitted, so the number is correct for the shape the
+                document is actually in — but printed bare it cannot be
+                reconciled against aeon's own `bganim_section_bytes()`, whose
+                `n_views` parameter defaults to 0 and so answers for the RELEASE
+                shape. On the shipped act the two disagree by `viewTwinBytes` and
+                aeon had to work out by hand which side was wrong. Neither was.
+                Their contract §1.2 draws the conclusion — "Say which shape any
+                figure is for" — and this clause is Aurora saying it.
+
+                ⚠ THE `false` BRANCH IS NOT "RELEASE". An act the twins decline
+                for emits none in ANY shape, so its figure is the size in every
+                ROM; calling that the release shape would name a distinction that
+                does not exist for it. Both branches say what is true of THIS
+                document rather than picking a label off a menu.
+
+                THE BYTE COUNT IS DERIVED, never typed: `viewTwinBytes` is the
+                codec's `bganimViewTwinBytes`. */}
             <span title={'Every animated slot is stored once per phase bank, so it costs far '
               + 'more ROM than a static tile does. This budget and the blob budget are '
-              + 'independent, and this one is usually the tighter of the two.'}>
-              ROM section {budget.sectionBytes}/{budget.sectionCeiling} bytes
+              + 'independent, and this one is usually the tighter of the two.'
+              + (budget.twinsEmitted
+                ? ` This act qualifies for the ${budget.viewTwinBytes} bytes of debug view twins, `
+                  + 'so the figure beside it is the DEBUG ROM\'s section and the release ROM\'s is '
+                  + `${budget.viewTwinBytes} smaller. aeon's own bganim_section_bytes() defaults to `
+                  + 'no twins, so a bare call there answers for the release shape and will differ '
+                  + 'by exactly that much. Neither is wrong; they are two questions.'
+                : ' The debug view twins are not emitted for this act, so there is no debug/release '
+                  + 'difference in this figure: it is the section size in every ROM shape.')}>
+              ROM section {budget.sectionBytes}/{budget.sectionCeiling} bytes{' '}
+              {budget.twinsEmitted
+                ? <>in the <strong>debug</strong> shape</>
+                : <>in <strong>every</strong> ROM shape</>}
             </span> ·{' '}
             <strong>{budget.byteSlotsRemaining}</strong> more animated slot
             {budget.byteSlotsRemaining === 1 ? '' : 's'} fit
@@ -798,27 +829,6 @@ export default function BgAnimBandPanel(): React.ReactElement {
           See the file docblock; the four CDP harnesses that drive it open it. */}
       <CollapsibleSection id="aeon.bganim.new" title="New tile animation" defaultCollapsed>
        <SectionBody>
-        {/* ── THE TWIN COUPLING, DISCLOSED ONCE, ABOVE BOTH DOORS ──────────
-            AURORA IS THE PERMISSIVE SIDE OF A BOUND AEON'S BUILD ENFORCES,
-            and this is the sentence that stops an author meeting the engine's
-            refusal instead of ours and concluding the engine is broken.
-
-            IT GOVERNS BOTH DOORS, SO IT SITS ABOVE BOTH. Measured on aeon's
-            live document: `promoteUnavailableReason` and
-            `insertUnavailableReason` return the SAME refusal, because both
-            project a second tile animation and both size the result. One fact,
-            one sentence, one site — the rule this panel already follows for
-            the Demote line and the preview strip.
-
-            ⚠ IT IS BUILT TO COME DOWN. aeon is decoupling the debug view twins
-            from the act's band count; when that lands, DELETE
-            `TWIN_COUPLING_DISCLOSURE` and `twinCouplingApplies` in
-            providers/bg-anim-aeon and this block. The provider's docblock
-            carries the three-step retirement and the grep that finds every
-            site. */}
-        {twinCouplingApplies(doc) && (
-          <Hint tone="warning">{TWIN_COUPLING_DISCLOSURE}</Hint>
-        )}
         {/* ONE GEOMETRY, TWO SOURCES. Cols, rows and driver describe the band
             itself and mean the same thing whichever way its art arrives, so
             they are asked once, above both actions. Duplicating them into two

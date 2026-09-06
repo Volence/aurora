@@ -4,32 +4,46 @@
  *
  * ═══ WHY THIS FILE EXISTS ═══
  *
- * Until this parcel Aurora PRESERVED this key and could not author it. aeon's
- * own contract says what that was worth, in as many words: "it holds only
- * because an author cannot currently CREATE or CHANGE the key, so the consumer
- * is PRESERVING rather than VALIDATING. The day a writer exposes it, that writer
- * can emit a document this build refuses." This is that day, so this file is
- * the check that arrives with it.
+ * Until 2026-09-06 Aurora PRESERVED this key and could not author it. aeon's own
+ * contract says what that was worth, in as many words: "it holds only because an
+ * author cannot currently CREATE or CHANGE the key, so the consumer is
+ * PRESERVING rather than VALIDATING."
+ *
+ * ═══ ⚠ AND THE TWO REFUSALS THIS FILE WAS NAMED FOR ARE GONE ═══
+ *
+ * Both were `AssertionError`s in aeon's `tools/inject_editor_bg.py` and neither
+ * raises since aeon `364b7bce` (an ancestor of `origin/master` `d070d6d7`). The
+ * SAME two conditions now decide whether the DEBUG view twins are EMITTED, and
+ * an act failing either builds without them. Their contract's instruction, read
+ * at that revision: *"Read each item as 'if this does not hold, `views_emitted()`
+ * returns 0', never as 'the build refuses'."*
+ *
+ * ⚠ SO EVERY `toThrow` ROW BELOW BECAME A `not.toThrow` ROW, AND THAT IS THE
+ * WEAKEST KIND OF ASSERTION THERE IS — a command that had stopped working
+ * entirely would satisfy it. Each one therefore ends with the CONSEQUENCE that
+ * must appear in the refusal's place: the command is executed, the document
+ * really carries the key afterwards, and the section size moves by exactly the
+ * twins' own cost.
  *
  * ═══ THE QUANTIFIER OF EVERY ROW, STATED ═══
  *
- * aeon's two obligations are NOT the same shape and reading them as one is the
- * trap their contract names by name:
+ * aeon's two conditions are NOT the same shape and reading them as one is the
+ * trap their contract names by name. What changed is only what they decide:
  *
- *   PER ACT   — the act must have exactly ONE tile animation. The constraint is
- *               on `len(anims)`, NOT on how many bands carry the key and NOT on
+ *   PER ACT   — the twins need exactly ONE tile animation. The constraint is on
+ *               `len(anims)`, NOT on how many bands carry the key and NOT on
  *               whether the bands agree about it.
  *   PER BAND  — the band the key lands on must have
  *               `pattern_px == BGANIM_VIEW_DERIVED_PERIOD_PX`.
  *   PER ACT   — and one nobody names, because it is arithmetic rather than a
- *               rule: silencing a band ADDS the DEBUG view twins to the emitted
- *               section, so it GROWS the act. Near the ceiling it is refused.
+ *               rule: silencing a QUALIFYING band adds the twins to the emitted
+ *               section, so it GROWS the act.
  *
- * ⚠ THE DISCRIMINATING ROW IS THE ONE MARKED SO BELOW. A validator asking "do
- * the tile animations AGREE about default_off?" passes a two-band act in which
- * BOTH carry the key, and that act is a document this build refuses. A test
- * that only exercises the inconsistent case cannot tell the two validators
- * apart, so it proves nothing about the one that matters.
+ * ⚠ THE DISCRIMINATING SHAPE IS UNCHANGED AND ITS CONSEQUENCE IS NOT. A
+ * validator asking "do the tile animations AGREE about default_off?" answers YES
+ * on a two-band act where both carry the key, and so predicts twins for an act
+ * that emits none. That used to be a refusal told apart from an acceptance; it is
+ * now a SIZE told apart from another size, by exactly `bganimViewTwinBytes`.
  *
  * ═══ EVERY NUMBER IS DERIVED ═══
  *
@@ -50,6 +64,8 @@ import {
 } from '../../src/core/formats/bg-override/bg-anim-band';
 import {
   bganimSectionBytes,
+  bganimViewTwinBytes,
+  viewsEmitted,
   bgOverrideSectionIssues,
   validateBgOverride,
   BGANIM_BYTES_PER_SLOT,
@@ -116,6 +132,11 @@ function doc(widths: number[], extras: Partial<BgOverrideBand>[] = []): BgOverri
 /** A one-band act at the derived period, the only shape aeon's twins accept. */
 function silenceableDoc(): BgOverrideDocument {
   return doc([PERIOD_TILES]);
+}
+
+/** The same act with the key already set — the one shape that GETS the twins. */
+function silenceableDocSilenced(): BgOverrideDocument {
+  return doc([PERIOD_TILES], [{ default_off: true }]);
 }
 
 /** The level shape `EditHistory` writes an override document back through. */
@@ -205,87 +226,92 @@ describe('makeSetBandDefaultOffCommand: what lands in the document', () => {
   });
 });
 
-// ── PER ACT: the band-count refusal, and the quantifier that decides it ─────
+// ── PER ACT: the band count, and the quantifier that decides the twins ─────
 
-describe('PER ACT: the constraint is the band COUNT, never agreement', () => {
-  it('refuses silencing band 0 of a two-band act', () => {
+describe('PER ACT: the condition is the band COUNT, never agreement', () => {
+  /**
+   * ⚠ INVERTED BY aeon's DECOUPLE. This row asserted a throw naming "EXACTLY ONE
+   * tile animation"; silencing a band of a two-band act is now a legal ship
+   * decision at any band count.
+   *
+   * NOT A BARE `not.toThrow`: the command is EXECUTED and the document is read
+   * back, so a `makeSetBandDefaultOffCommand` that had been reduced to a no-op
+   * would fail here.
+   */
+  it('ALLOWS silencing band 0 of a two-band act, and the key really lands', () => {
     const d = doc([PERIOD_TILES, PERIOD_TILES]);
-    expect(() => makeSetBandDefaultOffCommand(d, 0, true)).toThrow(/EXACTLY ONE tile animation/);
+    expect(() => makeSetBandDefaultOffCommand(d, 0, true)).not.toThrow();
+    new EditHistory().execute(makeSetBandDefaultOffCommand(d, 0, true), levelFor(d));
+    expect(documentBands(d).map(b => Boolean(b.default_off))).toEqual([true, false]);
   });
 
   /**
-   * REACHABILITY, AND IT IS NOT THE DISCRIMINATING ROW — measured, not assumed.
+   * REACHABILITY, INVERTED. The consistent two-band silenced act used to be
+   * UNREACHABLE through this command — both first steps refused, so there was no
+   * second step — and it is now built one step at a time like anything else.
    *
-   * This row says a consistent two-band silenced act cannot be BUILT through
-   * the command: both first steps are refused, so there is no second step. That
-   * is worth holding, and it is worth being honest that it does NOT tell the
-   * two validators apart. Planted the per-key validator (`off.length !==
-   * bands.length` in `viewsEmitted`) and this row STAYED GREEN, because every
-   * intermediate state is inconsistent and the wrong validator refuses those
-   * too. The rows that went red are the two marked DISCRIMINATING below and in
-   * `bg-anim-aeon.ship-silent.test.ts`, which build the consistent act directly
-   * rather than trying to reach it.
-   *
-   * Both bands are checked, not one: a validator keyed on the FIRST band, or on
-   * "the band already carrying it", would pass one of the two.
+   * Both bands are still driven, not one: a command keyed on the FIRST band or
+   * on "the band already carrying it" would pass with one of the two dead.
    */
-  it('a consistent two-band silenced act is UNREACHABLE: both first steps refuse', () => {
+  it('a consistent two-band silenced act is now REACHABLE, one step at a time', () => {
     const d = doc([PERIOD_TILES, PERIOD_TILES]);
+    const history = new EditHistory();
     for (const index of [0, 1]) {
-      let message = '';
-      try {
-        makeSetBandDefaultOffCommand(d, index, true);
-        throw new Error(`band ${index} was NOT refused`);
-      } catch (e) {
-        message = e instanceof Error ? e.message : String(e);
-      }
-      expect(message, `band ${index}`).toMatch(/EXACTLY ONE tile animation/);
-      // The refusal says WHICH quantifier, so an author cannot read it as
-      // "make them agree" and try the other band.
-      expect(message, `band ${index}`).toMatch(/not on whether they agree/);
+      expect(() => makeSetBandDefaultOffCommand(d, index, true), `band ${index}`).not.toThrow();
+      history.execute(makeSetBandDefaultOffCommand(d, index, true), levelFor(d));
     }
-    // And the state a consistency validator would have arrived at is therefore
-    // UNREACHABLE from a legal document through this command: neither first
-    // step is allowed, so there is no second step.
-    expect(documentBands(d).some(b => b.default_off)).toBe(false);
+    expect(documentBands(d).every(b => b.default_off)).toBe(true);
+    // And the shape it arrived at is a shape the build accepts, with no twins.
+    expect(bgOverrideSectionIssues(d)).toEqual([]);
+    expect(viewsEmitted(documentBands(d))).toEqual({ ok: true, value: 0 });
   });
 
   /**
-   * ⚠ THE DISCRIMINATING ROW, and it earns the name: planted the per-key
-   * validator (`off.length !== bands.length` in `viewsEmitted`) and this row
-   * went RED while every reachability row above stayed green.
+   * ⚠ THE DISCRIMINATING ROW, RE-POINTED. It used to say a CONSISTENT two-band
+   * silenced act has no computable size, because a per-key validator ("do the
+   * bands agree?") priced a document aeon refused. Both validators price it now,
+   * so the refusal can no longer tell them apart — and the SIZE still can.
    *
-   * A validator asking "do the tile animations AGREE about `default_off`?"
-   * answers YES here and computes a section size for a document the build
-   * refuses outright. The act is built DIRECTLY because that is the only way to
-   * hold this shape: the command cannot produce it (the row above), but a
-   * document arriving from disk, a hand edit or a future aeon can, and Aurora
-   * would then price and offer work on an act that will not bake.
-   *
-   * It is also why the codec answers `{ ok: false }` rather than "no twins":
-   * a refusal is not a smaller section, and a caller that read it as one would
-   * print a LARGER budget for the worst document there is.
+   * The per-key validator would emit twins here (all bands agree) and the correct
+   * one does not, so its figure would be high by the twins' own cost. Derived on
+   * both sides; nothing typed.
    */
-  it('DISCRIMINATING: a CONSISTENT two-band silenced act has no computable size', () => {
+  it('DISCRIMINATING: a CONSISTENT two-band silenced act is priced WITHOUT twins', () => {
     const d = doc([PERIOD_TILES, PERIOD_TILES], [{ default_off: true }, { default_off: true }]);
+    // Anti-vacuous: the shape really is the one a per-key validator gets wrong.
+    expect(documentBands(d).every(b => b.default_off)).toBe(true);
     const size = bganimSectionBytes(documentBands(d));
-    expect(size.ok).toBe(false);
-    expect(size.ok ? '' : size.reason).toMatch(/not on whether they agree/);
+    expect(size.ok).toBe(true);
+    expect(bganimViewTwinBytes(documentBands(d))).toBe(0);
+    // The DIFFERENTIAL a stub cannot produce: the one-band shape does get them.
+    expect(bganimViewTwinBytes(documentBands(silenceableDocSilenced())))
+      .toBe(BGANIM_VIEW_COUNT * (BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES));
   });
 });
 
 // ── PER BAND: the period refusal ────────────────────────────────────────────
 
 describe('PER BAND: the silenced band\'s pattern period', () => {
-  it('refuses a one-band act at any other period', () => {
+  /**
+   * ⚠ INVERTED BY aeon's DECOUPLE, and their contract states the reason in the
+   * item itself: *"Any other period gets no twins, so the shift is never applied
+   * to a period it was not computed for. That protection is what the old refusal
+   * was buying and it is fully intact; what the refusal was ALSO doing was
+   * failing the build on a correct ship decision."*
+   */
+  it('ALLOWS a one-band act at any other period: the twins decline instead', () => {
     // HALF the derived period, so the band is legal in every other respect: its
     // rotation unit is still a power of two and its blob still fits.
     const wrong = PERIOD_TILES / 2;
     const d = doc([wrong]);
     expect(documentBands(d)[0].pattern_px).not.toBe(BGANIM_VIEW_DERIVED_PERIOD_PX);
     expect(validateBgOverride(d), 'the fixture must be legal apart from the period').toEqual([]);
-    expect(() => makeSetBandDefaultOffCommand(d, 0, true))
-      .toThrow(new RegExp(String(BGANIM_VIEW_DERIVED_PERIOD_PX)));
+    expect(() => makeSetBandDefaultOffCommand(d, 0, true)).not.toThrow();
+    new EditHistory().execute(makeSetBandDefaultOffCommand(d, 0, true), levelFor(d));
+    expect(Boolean(documentBands(d)[0].default_off)).toBe(true);
+    // THE PROTECTION THE REFUSAL WAS BUYING, still bought: no twins run at a
+    // period their rate shift was not derived against.
+    expect(viewsEmitted(documentBands(d))).toEqual({ ok: true, value: 0 });
   });
 
   it('accepts the one period the twins were derived against', () => {
@@ -317,13 +343,49 @@ describe('PER ACT: the twins are bytes, so the ceiling is in play', () => {
       .toBe(BGANIM_VIEW_COUNT * (BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES));
   });
 
-  it('refuses to silence an act that only fits without the twins', () => {
-    const n = widestFittingWithoutTwins();
-    // `cols` must keep the band legal; a one-row band's rotation unit is
-    // `rows * TILE_BYTES`, which is a power of two at rows = 1 for any width.
-    const d = doc([n]);
-    expect(bgOverrideSectionIssues(d), 'the fixture must fit before the twins').toEqual([]);
-    expect(() => makeSetBandDefaultOffCommand(d, 0, true)).toThrow();
+  /**
+   * ⚠ THIS ROW WAS VACUOUS BEFORE THE DECOUPLE AND IT TOOK THE DECOUPLE TO SHOW
+   * IT. It was titled *"refuses to silence an act that only fits without the
+   * twins"* and it did throw — on the PERIOD, not on the ceiling. The fixture is
+   * `widestFittingWithoutTwins()` COLS wide, so its `pattern_px` is that many
+   * tiles wide and could not be the one period the twins were derived at; the
+   * ceiling arm was never reached. A row asserting the right outcome for the
+   * wrong reason, which is the shape that survives review.
+   *
+   * AND THE WINDOW IT CLAIMED IS EMPTY, derived rather than asserted: the twins
+   * cost less than ONE slot, and the ceiling's slot allowance is a floor
+   * division by the slot size, so the allowance is the SAME number with and
+   * without them. There is no one-band act that fits without the twins and not
+   * with them — which is why the row could not have been written honestly.
+   */
+  it('the twins can never push a fitting one-band act over: the allowance is unchanged', () => {
+    const table = BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES;
+    const twins = BGANIM_VIEW_COUNT * table;
+    // The twins are cheaper than one slot, which is the whole of it.
+    expect(twins).toBeLessThan(BGANIM_BYTES_PER_SLOT);
+    const without = Math.floor((BGANIM_SECTION_CEILING - table) / BGANIM_BYTES_PER_SLOT);
+    const with_ = Math.floor((BGANIM_SECTION_CEILING - table - twins) / BGANIM_BYTES_PER_SLOT);
+    expect(with_).toBe(without);
+    expect(without).toBe(widestFittingWithoutTwins());
+  });
+
+  /**
+   * WHAT THE CEILING CAN STILL REFUSE: growing an act that is ALREADY over it.
+   * Silencing a qualifying band adds the twins, and `sectionHarm`'s do-no-harm
+   * rule refuses growth on an over-budget act — the one arm of this command that
+   * the decouple left standing.
+   */
+  it('still refuses to silence an act that is ALREADY over the ceiling', () => {
+    const d = silenceableDoc();
+    // Make it over-budget without touching its band shape: the ceiling is on the
+    // act's total, and the blob is what carries the slots.
+    const over = doc([PERIOD_TILES]);
+    (over.anims as BgOverrideBand[])[0].rows = BGANIM_SECTION_CEILING;
+    expect(bgOverrideSectionIssues(over).length, 'the fixture must be over budget')
+      .toBeGreaterThan(0);
+    expect(() => makeSetBandDefaultOffCommand(over, 0, true)).toThrow();
+    // Anti-vacuous: the SAME edit on the in-budget document is allowed.
+    expect(() => makeSetBandDefaultOffCommand(d, 0, true)).not.toThrow();
   });
 
   it('CLEARING is never refused, because it always shrinks: the repair path', () => {
