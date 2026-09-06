@@ -16,7 +16,13 @@
 // would keep the blind spot.
 import { appendFileSync, readFileSync } from 'node:fs';
 
-const DASHES = /[—–]/g;
+// Built from character codes, never typed. This file is inside `scripts/`, which
+// `scripts/check-scripts-dashes.mjs` holds to the same rule it enforces, and a
+// dash spelled literally here would be a finding in the gate's own population.
+// A regex literal is neither a comment nor a string, so it was invisible to
+// every dash gate until 2026-09-05; that is why the kind is counted structurally
+// there, and why this one is assembled rather than written out.
+const DASHES = new RegExp(`[${String.fromCharCode(0x2014)}${String.fromCharCode(0x2013)}]`, 'g');
 const path = 'docs/lane-log.jsonl';
 const raw = process.argv[2];
 if (!raw) { console.error('usage: append-lane-log.mjs \'<json object>\''); process.exit(2); }
