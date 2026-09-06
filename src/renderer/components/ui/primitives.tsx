@@ -54,14 +54,29 @@ import { T } from './theme';
  * the other axis is `auto`, so the two spell the same used value here and
  * `hidden` says so plainly.
  *
- * ⚠ WHAT THIS DOES NOT CLOSE, stated so a silence is not read as coverage. A
- * `hidden` box still scrolls PROGRAMMATICALLY — `scrollLeft = n` and the inline
- * half of `scrollIntoView()` both still move it (`BgAnimBandPanel.tsx` calls
- * one, `block: 'nearest'`, whose inline default is also `nearest`). That path
- * needs TWO defects at once — a child wider than the column AND a scroll
- * targeted past its edge — and row `[9d]` measures the focus half of it. What
- * is closed is every gesture a person has: the scrollbar is gone and a wheel,
- * a trackpad swipe and a drag do nothing.
+ * ═══ AND `hidden` IS NOT ENOUGH — MEASURED 2026-09-06, THE DAY AFTER ═══
+ *
+ * The paragraph that stood here said the programmatic path "needs TWO defects
+ * at once" and left it at that, with row `[9d]` cited as measuring the focus
+ * half. `[9d]` was VACUOUS (it appended a button that wrapped onto the next
+ * line and never went off-edge, so it passed on both sides of the fix). Made
+ * to create its condition, it went RED ON THIS FIX: focusing a control past
+ * the scrollport's right edge dragged the pinned strip **511px** out of view,
+ * scrollLeft 512 — six times worse than the 89px the wheel managed, because a
+ * scroll-into-view jumps the whole distance at once.
+ *
+ * A `hidden` box still scrolls programmatically, and the browser's own
+ * scroll-into-view on focus IS that path — no author has to call anything.
+ * `Tab` is enough. So the axis is now closed a second way: `onScroll` snaps
+ * `scrollLeft` back to 0. The column has no inline scroll POSITION, not merely
+ * no inline scroll gesture, which is the invariant the sticky strip actually
+ * needs.
+ *
+ * ⚠ Kept from the old paragraph because it is still true and still the reason
+ * this is defence in depth rather than the primary fix: the hazard needs a
+ * child wider than the column before anything can be off-edge, and `[9a]` is
+ * what fails on that. This handler is what makes the strip's guarantee hold
+ * even when `[9a]`'s condition is violated.
  *
  * ⚠ CLIPPING IS QUIETER THAN SCROLLING, so the over-wide child must be caught
  * somewhere else: `[9a]` fails on any horizontal overflow in the Effects column
@@ -71,7 +86,14 @@ export function Panel({ children, width, scroll = false, style }: {
   children: React.ReactNode; width?: number; scroll?: boolean; style?: React.CSSProperties;
 }) {
   return (
-    <div style={{
+    <div
+      onScroll={scroll ? (e): void => {
+        // See "AND `hidden` IS NOT ENOUGH" above. Cheap by construction: in the
+        // ordinary case scrollLeft is already 0 and this compares two numbers.
+        const el = e.currentTarget;
+        if (el.scrollLeft !== 0) el.scrollLeft = 0;
+      } : undefined}
+      style={{
       display: 'flex', flexDirection: 'column', minHeight: 0, background: T.void,
       borderLeft: `1px solid ${T.border}`, flexShrink: 0,
       ...(width ? { width } : {}),

@@ -689,26 +689,57 @@ async function main() {
           }
           if (p) p.scrollLeft = 0; return true; })()`);
       await sleep(200);
+      // ⚠ THIS ROW ASSERTS ITS OWN PRECONDITION, and the reason is that it did
+      // not and was VACUOUS for its whole life. Until 2026-09-06 it appended a
+      // button with `margin-left: 260px` and believed the result. The plant is
+      // a BLOCK div the width of the scroller's content box (~284px) holding an
+      // unbreakable `<code>` token, so the button is inline content that simply
+      // WRAPPED to the next line and sat at x=260 — comfortably INSIDE the
+      // visible width. Nothing ever needed to scroll. Measured at C9's landing
+      // in the deliberately-reverted `overflow: auto` world, where the wheel row
+      // took scrollLeft 0 → 90: this row's focus left scrollLeft at EXACTLY 0.
+      // It passed on both sides of the fix and could not have done otherwise.
+      //
+      // So the button is now placed past the scrollport's right edge with
+      // wrapping disabled, and the row REFUSES TO REPORT rather than pass when
+      // the geometry says the condition was not created.
       const focused = await c.evalExpr(String.raw`
         (() => {
           const plant = document.getElementById('c9-plant');
-          if (!plant) return 'no-plant';
+          if (!plant) return { how: 'no-plant' };
+          let s = plant.parentElement;
           const b = document.createElement('button');
           b.id = 'c9-plant-focus';
           b.textContent = 'focus me';
-          b.style.marginLeft = '260px';
+          // nowrap on the PLANT so an inline button cannot fold onto a new
+          // line, and an offset past the scroller's own content width so the
+          // button is off-edge by construction rather than by hope.
+          plant.style.whiteSpace = 'nowrap';
+          b.style.marginLeft = (s.clientWidth + 80) + 'px';
           plant.appendChild(b);
+          const sr = s.getBoundingClientRect(), br = b.getBoundingClientRect();
+          const offEdge = br.left > sr.left + s.clientWidth;
           b.focus();
-          return document.activeElement === b ? 'ok' : 'not-focused';
+          return { how: document.activeElement === b ? 'ok' : 'not-focused',
+                   offEdge, buttonLeft: Math.round(br.left),
+                   scrollportRight: Math.round(sr.left + s.clientWidth) };
         })()`);
       await sleep(300);
       const afterFocus = await c.json(GEOM);
       note('C9 class — after focusing a control past the right edge',
-        `${focused} → ${JSON.stringify(afterFocus)}`);
-      check('9d', 'C9 class: and focusing an off-edge control cannot drag it either',
-        focused === 'ok' && Math.abs(afterFocus.shift) <= 1,
-        `focus=${focused}, strip ${afterFocus.shift}px inside the scrollport `
-        + `(scrollLeft ${afterFocus.scrollLeft})`);
+        `${JSON.stringify(focused)} → ${JSON.stringify(afterFocus)}`);
+      if (focused.how !== 'ok' || !focused.offEdge) {
+        cannotMeasure('9d', 'C9 class: and focusing an off-edge control cannot drag it either',
+          `the row did not create its own condition (${JSON.stringify(focused)}), so a green `
+          + 'here would mean "nothing was off-edge", not "the strip is immune" — which is '
+          + 'exactly what this row reported for its whole life before 2026-09-06.');
+      } else {
+        check('9d', 'C9 class: and focusing an off-edge control cannot drag it either',
+          Math.abs(afterFocus.shift) <= 1,
+          `focus=${focused.how}, button at ${focused.buttonLeft} against a scrollport right edge `
+          + `of ${focused.scrollportRight}, strip ${afterFocus.shift}px inside the scrollport `
+          + `(scrollLeft ${afterFocus.scrollLeft})`);
+      }
     }
     await c.evalExpr(`(() => { document.getElementById('c9-plant')?.remove(); return true; })()`);
     await sleep(200);
