@@ -38,6 +38,13 @@
 //   - Rows R1 to R4 assert every derived value EQUALS the literal it replaces
 //     for this ROM. That is what makes the change measurement neutral rather
 //     than a silent adoption of a new number.
+//   - Row R2H does the same for plane HEIGHT, which had no such row until
+//     2026-09-06 and is the one axis of the geometry nothing asserted. It was
+//     missed because it never was a literal here: it arrived already derived,
+//     inside the byte count. A machine decoding 64x32 passed R1, R2, R3, R4,
+//     R5 and R7 green over a read covering half the plane, which is this arc's
+//     own defect coming back through the unwatched axis. See the block at
+//     `WAS_PLANE_H`.
 //   - Row R6 reads the registers at EVERY plane sample on BOTH paths and
 //     asserts they agree. THIS WAS PREVIOUSLY UNFALSIFIABLE. If a warp had
 //     moved plane A's base or resized the plane, the old code would have
@@ -53,8 +60,8 @@
 // self-diff staying at zero with a register read now inside every sample is
 // this harness's own evidence of that.
 //
-// "WHOLE-PLANE" NOW MEANS THE WHOLE PLANE (rows R5 and R7), AND THE OFF-VIEW
-// FLOOR IS MEASURED, NOT CITED (rows F1 and F2).
+// "WHOLE-PLANE" NOW MEANS THE WHOLE PLANE (rows R2, R2H, R5 and R7), AND THE
+// OFF-VIEW FLOOR IS MEASURED, NOT CITED (rows F1 and F2).
 //
 // Two things changed on 2026-09-05, both because a number in here could not be
 // traced to anything:
@@ -64,9 +71,10 @@
 //     0 to 31 of 64. The literal sat exactly on `emulator/read_vram`'s 4096
 //     byte ceiling. It is now as many calls as the plane needs, with the count
 //     derived from the decoded plane size and from `initialize.limits`
-//     `maxReadLen` off the wire. Row R5 asserts the read length equals the
-//     derived plane; row R7 asserts the chunks tile it exactly once, checked
-//     against the addresses the SERVER echoed.
+//     `maxReadLen` off the wire. Row R7 asserts the chunks tile it exactly
+//     once, checked against the addresses the SERVER echoed; row R5 asserts
+//     the server DELIVERED every byte of it, checked against the byte counts
+//     the server actually returned and the lengths it declared.
 //   - `OFF_VIEW_FLOOR` was the constant 26 under a comment claiming it had been
 //     stated before the run. No one could produce that statement. It is now
 //     measured in every run as the largest whole-plane disagreement between the
@@ -91,6 +99,48 @@
 //   P2, poisoning the WALK (the alternate routes made far POKES instead of
 //     walks): F1 RED naming all five routes as torn on screen, F2 RED with no
 //     floor left to measure, row 7 REFUSED rather than passed. R5 and R7 green.
+//
+// P1's RESULT IS WITHDRAWN, retroactively, on 2026-09-06. It is reported
+// accurately above and it proved nothing. P1 edited `PLANE_BYTES`, which is
+// the quantity the old R5 was built out of, and the old R5's three conjuncts
+// were an identity, a second identity, and a comparison true for every legal
+// plane height. So it could only ever redden under a source mutation, and P1
+// was one. A poison IS a source mutation by definition, which is why "the
+// poison went red" cannot establish that a row has a production failure mode
+// at all. The row was vacuous in production the whole time it was green.
+//
+// RED FIRST FOR THE 2026-09-06 PAIR, against commit 20d5cbcd on branch
+// parcel/plane-height-and-r5:
+//
+//   P3, poisoning the DECODE (`planeH` forced to 32, the 64x32 machine): R2H
+//     RED and correct, naming the height and saying every byte count below is
+//     derived from it. R1, R2, R3, R4 and R7 green. THE OLD R5 WAS GREEN IN
+//     THAT RUN, under the label "the read covers the WHOLE plane, not a prefix
+//     of it", over a read covering plane rows 0 to 31 of 64. That run is the
+//     production evidence for both defects at once. Row 7 also reddened, which
+//     is a finding rather than noise: the off-view floor F1 measures collapsed
+//     from 219 to 0 because every disagreement between correct walks lives in
+//     the half of the plane the poisoned read could not see.
+//   P4, poisoning the ADVERTISED CEILING (`limits.maxReadLen` overwritten to
+//     8192 in the handshake, on a server whose real cap is 4096): R5 RED,
+//     reading "0xC000 asked 8192 REFUSED (`len` = 8192 is outside 1..=4096)",
+//     which is the SERVER'S OWN refusal text and not a fabricated one. The run
+//     then aborted on R5's throw, which is what exercises the abort. This is
+//     the production shape, not a contrived one: the call count here is
+//     derived from a number the server advertises, and nothing anywhere made
+//     the server prove it honours it.
+//   P5, poisoning the TRANSPORT (a shim truncating the second read_vram reply
+//     to half its bytes while leaving its declared `len` at 4096, the "honours
+//     less than it declares" shape): R5 RED at "0xD000 asked 4096 got 2048
+//     declared 4096", 6144 of 8192 bytes. R7 GREEN in the same run. R7 sums
+//     the lengths this file ASKED for, so it is structurally blind to a short
+//     delivery; R5 sums what the server RETURNED. That pair is the
+//     demonstration that R5 catches something no other row here can.
+//     R5's ABORT (not its assertion) was suppressed for that run so the run
+//     would reach R7; P4 is what exercises the abort. And row 0 passed at zero
+//     on a 6144 byte sample against an 8192 byte one, so `diffWords` narrows
+//     to the shorter buffer without saying so - which is why R5 aborts rather
+//     than merely reporting.
 //
 // AND THE HARDCODE THAT WOULD LOOK RIGHT STILL FAILS. Note first that at this
 // file's own settings a frozen `OFF_VIEW_FLOOR = 26` passes row 7 by a margin
@@ -307,9 +357,20 @@ async function main() {
       `(reg $02=${hx8(geom.raw.r02)}). Reading before the boot would have aimed this harness ` +
       `at VRAM ${hx(coldGeom.planeA)}.`);
 
-    // The literals these four rows replace, kept by name so the equality being
+    // The literals these rows replace, kept by name so the equality being
     // asserted is legible rather than inlined into the message.
-    const WAS_PLANE_A = 0xC000, WAS_PLANE_W = 64, WAS_VIEW_W = 40, WAS_VIEW_H = 28;
+    //
+    // WAS_PLANE_H IS NOT LIKE ITS FOUR SIBLINGS AND THE NAME SHOULD NOT HIDE
+    // THAT. The other four each pin a value that used to be a literal in this
+    // file. Plane HEIGHT never was one: it arrived on 2026-09-05 already
+    // derived, inside `PLANE_BYTES = planeW * planeH * 2`, and NOTHING
+    // ASSERTED IT. That gap is this arc's own defect with the axis swapped. A
+    // machine whose reg $10 decoded 64x32 would give PLANE_BYTES = 4096 and
+    // 32 rows, and R1, R2, R3, R4, R5 and R7 would every one of them pass over
+    // a read covering HALF the plane, which is exactly the state this arc
+    // existed to end. So 64 is pinned here the way the stride is, and R2H is
+    // the row that pins it.
+    const WAS_PLANE_A = 0xC000, WAS_PLANE_W = 64, WAS_PLANE_H = 64, WAS_VIEW_W = 40, WAS_VIEW_H = 28;
 
     const PLANE_A = geom.planeA;
     check('R1', 'plane A base derived from register $02 equals the address this harness read',
@@ -327,6 +388,29 @@ async function main() {
         : `reg $10=${hx8(geom.raw.r10)}, so HSZ=${geom.raw.r10 & 3} -> ${PLANE_W} cells wide ` +
           `and VSZ=${(geom.raw.r10 >> 4) & 3} -> ${geom.planeH} cells tall; ` +
           `the stride literal it replaces was ${WAS_PLANE_W}`);
+
+    // R2H is a NEUTRALITY row, the same kind as R1 to R4: it says the value
+    // this run derived is the value this ROM has always had, so nothing about
+    // what the harness measures moved when the derivation replaced the typing.
+    // It is NOT a production-detection row and cannot be made into one, because
+    // there is no second, independent producer of the plane height to check the
+    // registers against. Its only route to red is a machine that really does
+    // decode a different height, or a mutation of the decode. That is the
+    // point: the previous state of this file was that such a machine reddened
+    // NOTHING and quietly halved the plane.
+    const PLANE_H = geom.planeH;
+    check('R2H', 'plane height in cells derived from register $10 equals the plane depth read here',
+      PLANE_H === WAS_PLANE_H,
+      geom.planeH === null
+        ? `reg $10=${hx8(geom.raw.r10)} has VSZ code 2, which is in no permitted source; ` +
+          `no height is derivable and none is guessed`
+        : `reg $10=${hx8(geom.raw.r10)}, so VSZ=${(geom.raw.r10 >> 4) & 3} -> ${PLANE_H} cells tall; ` +
+          `the pinned height for this ROM is ${WAS_PLANE_H}, and the whole plane read below is ` +
+          `${geom.planeW} x ${PLANE_H} x 2 bytes` +
+          (PLANE_H === WAS_PLANE_H
+            ? ''
+            : `. THEY DIFFER: every byte count below is derived from this height, so the read ` +
+              `this harness calls the whole plane covers ${PLANE_H} rows, not ${WAS_PLANE_H}.`));
 
     const VIEW_W = geom.h40 ? 40 : 32;
     check('R3', 'view width in cells derived from register $0C equals the sample window width',
@@ -409,13 +493,35 @@ async function main() {
       `ceil(${PLANE_BYTES}/${MAX_READ_LEN}) = ${READ_CALLS} calls from ${hx(PLANE_A)}: plane rows 0 ` +
       `to ${ROWS_READ - 1} of ${geom.planeH}. Both numbers are read, not typed.`);
 
-    check('R5', 'the read covers the WHOLE plane, not a prefix of it',
-      PLANE_LEN === PLANE_BYTES && ROWS_READ === geom.planeH && ROWS_READ >= VIEW_H,
-      `${hx(PLANE_LEN)} bytes is ${ROWS_READ} whole plane rows of ${PLANE_W} cells against a derived ` +
-      `plane of ${geom.planeH} rows, and the window metric samples ${VIEW_H} rows` +
-      (ROWS_READ >= VIEW_H
-        ? ''
-        : `. The read is SHORTER than the view, so diffWords has been silently skipping rows.`));
+    // WHERE ROW R5 WENT, AND WHY IT IS NOT HERE ANY MORE.
+    //
+    // Until 2026-09-06 a row R5 stood at this point saying "the read covers the
+    // WHOLE plane, not a prefix of it", testing
+    // `PLANE_LEN === PLANE_BYTES && ROWS_READ === geom.planeH && ROWS_READ >= VIEW_H`.
+    // IT COULD NOT FAIL ON ANY GEOMETRY IT ACCEPTED. `PLANE_LEN` is bound to
+    // `PLANE_BYTES` one line up, so the first conjunct is an identity;
+    // `ROWS_READ` is `PLANE_LEN / (planeW * 2)`, which reduces to `planeH`, so
+    // the second is `planeH === planeH`; and `planeH` is one of 32, 64, 128
+    // while `VIEW_H` is 28 or 30, so the third is true for every legal plane.
+    // Three conjuncts, no route to red except editing the arithmetic above it.
+    //
+    // ITS POISON PASSED FOR EXACTLY THAT REASON. P1 halved `PLANE_BYTES` and
+    // reddened R5, which looked like a live row; a poison IS a source mutation
+    // by definition, so a poison going red establishes only that the row reads
+    // the thing the poison edited. It says nothing about whether any RUN can
+    // redden it. This one could not.
+    //
+    // And it was in the wrong place to ever be a production row: it stood
+    // BEFORE the first plane sample, so it could not have observed the server
+    // even if it had wanted to. R5 now sits next to R7, after the first sample,
+    // and asserts what the SERVER DELIVERED against what was derived here.
+    //
+    // The claim the old row was named for is not lost, it is redistributed onto
+    // rows that can fail:
+    //   - that the derived plane is the right SIZE   -> R2 (width) and R2H (height)
+    //   - that the read WALKS that whole address range -> R7, against echoed addresses
+    //   - that the server DELIVERED every byte of it   -> R5, below
+    // `ROWS_READ` survives only as a reporting quantity for the note above.
 
     /**
      * Every plane sample is STAMPED with the geometry it was read under, and
@@ -429,9 +535,30 @@ async function main() {
      * chunk loop that failed to advance its address would return a plausible
      * buffer of exactly the right length, and every diff built on it would be
      * comparing the first half of the plane with itself.
+     *
+     * WHAT EACH CHUNK RECORDS, AND WHY IT IS A RECORD RATHER THAN A THROW.
+     * `want` is what this loop ASKED FOR; `got` is how many bytes the server
+     * actually handed back; `echoedLen` is the length the server DECLARED in
+     * the same reply; `error` is the refusal text if the call did not answer at
+     * all. Those are the server's behaviour, and row R5 is the reader of them.
+     *
+     * Until 2026-09-06 a short chunk threw right here. That throw was correct
+     * about the hazard and wrong about where the evidence should land: it
+     * aborted the run with a stack trace, so a server delivering less than it
+     * declares produced NO ROW AT ALL, and this harness's tally could never say
+     * whether that property had been checked. R5 now says it, in the tally, on
+     * every run. The abort still happens (R5 throws once it has reported), so
+     * nothing downstream ever diffs a malformed buffer; it just happens one
+     * line later, with the finding written down.
+     *
+     * A chunk that ERRORS is recorded and the loop continues, on purpose: the
+     * full account of which chunks failed is worth more than the first one.
+     * Samples taken after R5 has reported keep the hard throw, because by then
+     * the property has an artifact and a mid-run change is a different fault.
      */
     const geomStamps = [];
     let lastChunks = null;
+    let r5Reported = false;
     const plane = async (tag) => {
       geomStamps.push({ tag, key: geomKey(decodeGeometry(await readVdpRegs())) });
       const chunks = [];
@@ -439,23 +566,32 @@ async function main() {
       for (let off = 0; off < PLANE_BYTES; off += MAX_READ_LEN) {
         const want = Math.min(MAX_READ_LEN, PLANE_BYTES - off);
         const at = PLANE_A + off;
-        const r = await call('emulator/read_vram', { addr: hx(at), len: want });
-        const buf = Buffer.from(String(r.bytes).replace(/^0x/i, ''), 'hex');
-        if (buf.length !== want) {
-          throw new Error(
-            `emulator/read_vram at ${hx(at)} asked for ${want} bytes and returned ${buf.length}; ` +
-            `a short chunk would make this sample a differently sized buffer than its peers and ` +
-            `every diff against it silently shorter.`);
+        let r = null, error = null;
+        try {
+          r = await call('emulator/read_vram', { addr: hx(at), len: want });
+        } catch (e) {
+          error = String(e?.message ?? e);
         }
-        const echoed = typeof r.addr === 'string' ? parseInt(r.addr, 16) : r.addr;
-        chunks.push({ want, at, echoed, len: r.len });
+        const buf = error === null
+          ? Buffer.from(String(r.bytes).replace(/^0x/i, ''), 'hex')
+          : Buffer.alloc(0);
+        const echoed = typeof r?.addr === 'string' ? parseInt(r.addr, 16) : r?.addr;
+        chunks.push({ want, at, echoed, echoedLen: r?.len, got: buf.length, error });
         parts.push(buf);
+        if (r5Reported && (error !== null || buf.length !== want)) {
+          throw new Error(
+            `emulator/read_vram at ${hx(at)} asked for ${want} bytes and ` +
+            `${error !== null ? `REFUSED: ${error}` : `returned ${buf.length}`}; ` +
+            `a short chunk would make this sample a differently sized buffer than its peers and ` +
+            `every diff against it silently shorter. Row R5 reported this property green on the ` +
+            `first sample, so this is a change mid-run.`);
+        }
       }
       const out = Buffer.concat(parts);
-      if (out.length !== PLANE_BYTES) {
+      lastChunks = chunks;
+      if (r5Reported && out.length !== PLANE_BYTES) {
         throw new Error(`assembled ${out.length} bytes for a ${PLANE_BYTES} byte plane`);
       }
-      lastChunks = chunks;
       return out;
     };
 
@@ -567,6 +703,68 @@ async function main() {
 
     const b1 = await runPathB();
 
+    // ── ROW R5: DID THE SERVER DELIVER THE PLANE IT WAS ASKED FOR? ─────────
+    //
+    // THIS IS A PRODUCTION ROW, not a neutrality row like R1 to R4 and R2H. It
+    // compares WHAT THE SERVER DID against what was derived here, which is the
+    // one comparison the row it replaces never made: that row compared two
+    // derived quantities and so reduced to identities.
+    //
+    // The failure mode it exists for: A SERVER THAT HONOURS LESS THAN IT
+    // DECLARES. This harness derives its call count from the ceiling the server
+    // ADVERTISES, `initialize.limits.maxReadLen`. Nothing in the protocol makes
+    // a server prove it honours that number, and nothing in this client checked
+    // it before today. Two shapes, both covered here:
+    //   - the read is REFUSED because the real ceiling is lower than the
+    //     advertised one. Measured on oracle build 6732dc4b: a `len` above its
+    //     real cap comes back as "`len` = 8192 is outside 1..=4096", an error,
+    //     not a short buffer.
+    //   - the read is TRUNCATED: fewer bytes than `len`, or a `len` echoed in
+    //     the reply that disagrees with the bytes actually sent.
+    // Either way the assembled sample is short, every later diff is quietly
+    // narrower than the plane, and the whole-plane numbers this harness
+    // publishes are over a region smaller than the one they name.
+    //
+    // WHAT IT DELIBERATELY DOES NOT ASSERT. Address coverage is R7's job and is
+    // checked there against the addresses the server ECHOED, so it is not
+    // restated here: a row that duplicates a neighbour cannot fail on its own
+    // and reads as two pieces of evidence when there is one. `READ_CALLS` is
+    // not compared to `walk.length` here for the same reason, and because that
+    // comparison is derived-versus-derived anyway.
+    //
+    // Anti-vacuous: a run whose first sample issued no read at all would have
+    // an empty chunk list and every `every()` below would be true of it, so the
+    // sample set is asserted non-empty.
+    const walk = lastChunks ?? [];
+    const refused = walk.filter((c) => c.error !== null);
+    const short = walk.filter((c) => c.error === null && c.got !== c.want);
+    const misdeclared = walk.filter((c) => c.error === null && c.echoedLen !== c.got);
+    const delivered = walk.reduce((s, c) => s + c.got, 0);
+    const r5ok = walk.length > 0 && refused.length === 0 && short.length === 0 &&
+      misdeclared.length === 0 && delivered === PLANE_BYTES;
+    check('R5', 'the server DELIVERED the whole derived plane: bytes returned equal planeW x planeH x 2',
+      r5ok,
+      walk.length === 0
+        ? `VACUOUS: the first plane sample issued no read at all, so there is no server behaviour ` +
+          `to compare against the derived ${PLANE_BYTES} bytes`
+        : `the server returned ${delivered} of the ${geom.planeW} x ${geom.planeH} x 2 = ` +
+          `${PLANE_BYTES} bytes derived from registers $10 and $02, over ${walk.length} calls ` +
+          `capped at the advertised limits.maxReadLen=${MAX_READ_LEN}: ` +
+          `${walk.map((c) => `${hx(c.at)} asked ${c.want} ` +
+            `${c.error !== null ? `REFUSED (${c.error})` : `got ${c.got} declared ${JSON.stringify(c.echoedLen)}`}`).join('; ')}` +
+          (r5ok
+            ? ''
+            : `. The server did not deliver the plane it was asked for, so this sample is ` +
+              `${PLANE_BYTES - delivered} bytes short of the region every whole-plane number below ` +
+              `claims to cover.`));
+    r5Reported = true;
+    if (!r5ok) {
+      throw new Error(
+        `row R5 is RED: the first plane sample assembled ${delivered} bytes for a ${PLANE_BYTES} ` +
+        `byte plane. Refusing to diff a malformed sample. The finding is in the tally above, which ` +
+        `is the point of the row: before 2026-09-06 this was a bare throw and no row recorded it.`);
+    }
+
     // ── ROW R7: DID THE CHUNKED READ ACTUALLY WALK THE PLANE? ──────────────
     //
     // The one way a multi-call read fails invisibly: the loop returns a buffer
@@ -577,7 +775,7 @@ async function main() {
     // contiguously, in order, with the lengths summing to the derived plane.
     // A server that echoes no `addr` fails this row rather than passing it by
     // omission: protocol.md section 6 lists `addr` in read_vram's result.
-    const walk = lastChunks ?? [];
+    // (`walk` is declared in R5's block above, off the same first sample.)
     const contiguous = walk.length === READ_CALLS && walk.every(
       (c, i) => c.echoed === c.at && c.at === PLANE_A + (i === 0 ? 0 : walk.slice(0, i).reduce((s, p) => s + p.want, 0)));
     const spanned = walk.reduce((s, c) => s + c.want, 0);
