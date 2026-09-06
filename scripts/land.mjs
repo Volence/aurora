@@ -163,17 +163,24 @@ try {
   entry = JSON.parse(lines[lines.length - 1]);
 } catch (e) { logWhy = `could not read the newest ${LOG} entry: ${e.message}`; }
 
-// The entry belongs to THIS landing only if the commit that introduced it is in
-// what was just pushed. Committer time is the cheap proxy: an entry older than
-// the tip's own commit was written for a previous landing.
+// ⚠ THE ENTRY BELONGS TO THIS LANDING ONLY IF THE COMMIT THAT LAST TOUCHED THE
+// LOG IS AMONG THE COMMITS JUST PUSHED. The first version of this used committer
+// time as a proxy and ITS VERY FIRST REAL RUN PRINTED THE PREVIOUS LANDING'S
+// HEADLINE BESIDE THIS ONE'S SHA: the landing wrote no entry at all, and the
+// previous entry was recent enough to pass a time window. A time proxy catches an
+// OLD entry and cannot catch a MISSING one, which is the likelier mistake, and
+// this comment already claimed the ancestry test before the code did it.
 let stale = '';
 if (entry) {
-  const tipTime = Number(git('show', '-s', '--format=%ct', before)) * 1000;
-  const at = Date.parse(entry.at || '');
-  if (!Number.isFinite(at)) stale = 'the newest entry has no readable `at`';
-  else if (tipTime - at > 30 * 60 * 1000) {
-    stale = `the newest entry is ${Math.round((tipTime - at) / 60000)} min older than this tip, `
-      + 'so it probably belongs to an earlier landing';
+  const logCommit = git('log', '-1', '--format=%H', '--', LOG);
+  const pushed = remoteBefore === '(none)'
+    ? git('rev-list', before)
+    : git('rev-list', `${remoteBefore}..${before}`);
+  if (!logCommit) stale = `nothing in git history has ever touched ${LOG}`;
+  else if (!pushed.split('\n').includes(logCommit)) {
+    stale = `this landing wrote no ${LOG} entry: the newest one came in at `
+      + `${logCommit.slice(0, 8)}, which is not among the ${pushed.split('\n').filter(Boolean).length} `
+      + 'commit(s) just pushed, so it belongs to an earlier landing';
   }
 }
 
