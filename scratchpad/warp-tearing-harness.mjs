@@ -74,6 +74,29 @@
 //
 // Doubling the read changes what `diffAll`, row 6 and row 7 report, on purpose.
 //
+// RED FIRST, PER CLAUSE, all against commit 451db006 (2026-09-05). The two
+// clauses are independent instruments and each poison leaves the other green,
+// which is what stops "everything went red" from being mistaken for proof that
+// the clause under test is live:
+//
+//   P1, poisoning the READ (`PLANE_BYTES` halved, the old defect restored):
+//     R5 RED. R7 stayed GREEN and correctly so, because one chunk does tile
+//     4096 bytes exactly once - R7 checks the walk, R5 checks the coverage, and
+//     they are different questions. Every walk row (0, 1, 2, 3, F1, F2) green.
+//   P2, poisoning the WALK (the alternate routes made far POKES instead of
+//     walks): F1 RED naming all five routes as torn on screen, F2 RED with no
+//     floor left to measure, row 7 REFUSED rather than passed. R5 and R7 green.
+//
+// AND THE HARDCODE THAT WOULD LOOK RIGHT STILL FAILS. Note first that at this
+// file's own settings a frozen `OFF_VIEW_FLOOR = 26` passes row 7 by a margin
+// of exactly zero: the mailbox's whole-plane diff is 26. So the canary gives
+// the derivation an input whose true answer differs from this repo's - the
+// reference route changed from 64px steps to 128px, which rows 0, 1, 6 and F1
+// all confirm is still a CORRECT walk with a clean mailbox. The derived floor
+// moves to 250 and row 7 passes on a mailbox diff of 245. Frozen at 26, the
+// same run turns row 7 RED on a mailbox every other row calls clean. A floor
+// that cannot move cannot be right for more than one pair of routes.
+//
 // Usage: node scratchpad/warp-tearing-harness.mjs   (VERBOSE=1 for server log)
 
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
@@ -598,6 +621,13 @@ async function main() {
     // itself be checked, because the bare constant at least invites the
     // question. So the number is now DERIVED FROM THIS RUN and the claim about
     // who measured the old one is deleted.
+    //
+    // AND 26 DID NOT DESCRIBE THE HALF THE OLD CODE READ EITHER. Poison run P1
+    // put the read back to one 0x1000 call and left this derivation alone: over
+    // plane rows 0 to 31 all five alternate correct walks agreed EXACTLY, so
+    // the off-view floor in the region the old harness actually sampled is 0,
+    // not 26. Whatever 26 was a measurement of, it was not this instrument's
+    // window, and the constant was never checkable against what this file read.
     //
     // THE CONSTRUCTION. Same checkpoint, same destination, same sample frame,
     // no warp and no far poke — only the step size differs, which is the walk's
