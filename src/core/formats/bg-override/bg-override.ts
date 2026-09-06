@@ -840,23 +840,7 @@ function validateBand(
  * Empty means valid. Exported so a UI can pre-check without a try/catch, and so
  * an advisory surface can show the list rather than the first line of a throw.
  */
-export interface BgOverrideValidateOptions {
-  /**
-   * Include the ROM SECTION ceiling. DEFAULT TRUE — asking "is this document
-   * valid" without qualification gets the whole truth, including the half that
-   * says it will not build.
-   *
-   * The two callers that pass `false` are the READ and the WRITE paths, and
-   * each says why at its own call site. In one line: a document can be over
-   * this ceiling and still be one Aurora must open and save, because Aurora is
-   * the only tool that can bring it back under. See `bganimSectionIssues`.
-   */
-  sectionCeiling?: boolean;
-}
-
-export function validateBgOverride(
-  doc: unknown, opts: BgOverrideValidateOptions = {},
-): string[] {
+export function validateBgOverride(doc: unknown): string[] {
   const issues: string[] = [];
   if (typeof doc !== 'object' || doc === null || Array.isArray(doc)) {
     return ['the BG override must be a JSON object'];
@@ -930,10 +914,11 @@ export function validateBgOverride(
       let cursor = 0;
       anims.forEach((band, i) => { cursor = validateBand(band, i, tiles, cursor, issues); });
 
-      // THE SECOND BUDGET. Not absolute — see `bganimSectionIssues` and the
-      // `sectionCeiling` option for why a document can be over it and still be
-      // one this codec must open and save.
-      if (opts.sectionCeiling !== false) issues.push(...bganimSectionIssues(anims));
+      // THE SECOND BUDGET IS DELIBERATELY NOT ASKED HERE. See
+      // `bganimSectionIssues`: it is a different question on a different clock,
+      // and folding it in would make a BUDGET failure indistinguishable from a
+      // CORRUPTION one for every caller that just wants to know whether a
+      // structural edit left the document well-formed.
     }
   }
 
@@ -1133,7 +1118,7 @@ export function parseBgOverride(text: string): BgOverrideParseResult {
   // which is the outcome this module exists to prevent. Loud, though: the act
   // does not build, and an author who is not told that finds out from a build
   // log. The doors that GROW the section are where this refuses.
-  const issues = validateBgOverride(doc, { sectionCeiling: false });
+  const issues = validateBgOverride(doc);
   if (issues.length > 0) {
     throw new BgOverrideError(`${BG_OVERRIDE_CONSUMER_PATH} is not a valid BG override`, issues);
   }
@@ -1205,7 +1190,7 @@ export function serializeBgOverride(doc: BgOverrideDocument): string {
   // save that, and a save of an act still over the line is not Aurora making
   // anything worse. GROWTH is what is refused, at `bg-override-band.ts`, which
   // compares the projected document against the one the author started from.
-  const issues = validateBgOverride(doc, { sectionCeiling: false });
+  const issues = validateBgOverride(doc);
   if (issues.length > 0) {
     throw new BgOverrideError(`refusing to write ${BG_OVERRIDE_CONSUMER_PATH}`, issues);
   }

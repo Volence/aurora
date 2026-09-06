@@ -69,7 +69,7 @@ import type { SetBgOverrideBandCommand } from './commands';
 function refuseIfResultInvalid(
   before: BgOverrideDocument, result: BgOverrideDocument, what: string,
 ): void {
-  const issues = validateBgOverride(result, { sectionCeiling: false });
+  const issues = validateBgOverride(result);
   const harm = sectionHarm(before, result);
   if (harm !== null) issues.push(harm);
   if (issues.length > 0) {

@@ -55,6 +55,7 @@ import {
   bandTileCount,
   cloneBgOverride,
   validateBgOverride,
+  bganimSectionIssues,
   BAND_AXIS_DEFAULT,
   type BgAnimBandAxis,
   type BgAnimDriver,
@@ -398,7 +399,20 @@ export function createBand(spec: NewBandSpec): BgOverrideBand {
   if (spec.driver !== undefined) band.driver = spec.driver;
   if (spec.rate_shift !== undefined) band.rate_shift = spec.rate_shift;
 
-  const issues = validateBandInIsolation(band);
+  const issues = [
+    ...validateBandInIsolation(band),
+    // THE ROM SECTION CEILING, asked HERE and not inside `validateBandInIsolation`.
+    //
+    // A band big enough to bust the budget on its own can never exist in any
+    // act, so CREATING one is refused — this is the door an author's "add a
+    // tile animation this big" comes through. But the isolation validator is
+    // also run on RESTORE paths (`planBandPromotion` re-admits a band the
+    // document already had), and a section rule there would refuse to put back
+    // what a demotion just took out: the undo of a legal edit, blocked by a
+    // budget the document was already over. Growth is checked against the ACT,
+    // in `bg-override-band.ts`, which has the before and the after.
+    ...bganimSectionIssues([band]),
+  ];
   if (issues.length > 0) {
     throw new BgOverrideError('refusing to create a BgAnim band', issues);
   }

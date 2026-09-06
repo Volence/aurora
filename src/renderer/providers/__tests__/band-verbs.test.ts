@@ -22,9 +22,23 @@ import {
   promoteBandCommand, promoteUnavailableReason,
 } from '../bg-anim-aeon';
 import { bandSpecOf, bandVerbs, seededStaticBase, type BandCandidate } from '../band-verbs';
+import { sectionRoomyDoc } from '../../../../test/support/bg-override-fixtures';
 
 const FIXTURE = 'test/fixtures/bg-override/editor_bg_override.b0e5a661.json';
 const doc = (): BgOverrideDocument => parseBgOverride(readFileSync(FIXTURE, 'utf8')).doc;
+/**
+ * THE SAME REAL DOCUMENT, WITH ROOM IN ITS ROM SECTION.
+ *
+ * The b0e5a661 fixture has none: its two tile animations cover 192 animated
+ * slots, an animated slot is stored once per phase bank, and the emitted
+ * section is about two and a half times aeon's ruled ceiling. Aurora modelled
+ * only the TILE budget until 2026-09-06, so rows here that PROMOTE were
+ * exercising an operation aeon's build refuses. `sectionRoomyDoc(1)` demotes
+ * the larger tile animation back to static art through the codec's own
+ * demotion: same art, same blob, same nametable, room in the section.
+ */
+const mdoc = (): BgOverrideDocument => sectionRoomyDoc(1);
+
 
 describe('bandSpecOf', () => {
   it('omits driver and rate_shift when the candidate leaves them out, and fills phaseFill with the default', () => {
@@ -52,7 +66,11 @@ describe('bandVerbs: no document', () => {
 });
 
 describe('bandVerbs: the fixture document', () => {
-  const d = doc();
+  // The section-roomy derivation, because these rows RUN both verbs: on the
+  // fixture as it ships, both doors are correctly shut by the ROM section
+  // budget and "both are enabled here" would be asserting a world that no
+  // longer exists. See `mdoc`.
+  const d = mdoc();
   const base = bandBudget(d).firstPromotableSlot;
   const candidate = { staticBase: base, cols: 1, rows: 1 } as const;
   const v = bandVerbs(d, candidate);

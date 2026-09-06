@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import { createBand } from '../../src/core/formats/bg-override/bg-anim-band';
 import {
   validateBgOverride,
+  bgOverrideSectionIssues,
   bganimSectionBytes,
   bganimSectionSlotsAllowed,
   viewsEmitted,
@@ -174,16 +176,26 @@ describe('THE LOAD-BEARING PROOF: a document between the two budgets', () => {
     // The TILE ceiling's own refusal, by its own words, must be absent. (Not
     // the phrase "tile capacity", which the SECTION refusal deliberately says
     // too, in the sentence explaining that the two budgets are different.)
-    expect(validateBgOverride(oneBandDoc(fits + 1)).join('\n'))
+    expect(bgOverrideSectionIssues(oneBandDoc(fits + 1)).join('\n'))
       .not.toContain('over the BG tile capacity');
   });
 
-  it('ACCEPTS an act at exactly the slots the section admits', () => {
+  it('BOTH documents are WELL-FORMED, which is the other half of "two questions"', () => {
+    // `validateBgOverride` answers "would this bake correct art"; the section
+    // ceiling answers "will it fit". Keeping them apart is what lets Aurora open
+    // and save a document that arrived over budget — and it is why the row below
+    // has to ask the second question by name rather than expecting the first to
+    // have grown an opinion.
     expect(validateBgOverride(oneBandDoc(fits))).toEqual([]);
+    expect(validateBgOverride(oneBandDoc(fits + 1))).toEqual([]);
+  });
+
+  it('ACCEPTS an act at exactly the slots the section admits', () => {
+    expect(bgOverrideSectionIssues(oneBandDoc(fits))).toEqual([]);
   });
 
   it('REFUSES one slot more, and says which budget and by how much', () => {
-    const issues = validateBgOverride(oneBandDoc(fits + 1));
+    const issues = bgOverrideSectionIssues(oneBandDoc(fits + 1));
     expect(issues).toHaveLength(1);
     const said = issues[0];
     // The size, the ceiling, the per-slot cost and what DOES fit: an author who
@@ -201,7 +213,15 @@ describe('THE LOAD-BEARING PROOF: a document between the two budgets', () => {
     // capacity satisfies `capacity` perfectly and is multiples over the section.
     const doc = oneBandDoc(BG_TILE_CAPACITY);
     expect((doc.tiles as number[][]).length).toBe(BG_TILE_CAPACITY);
-    expect(validateBgOverride(doc)).toHaveLength(1);
+    expect(validateBgOverride(doc)).toEqual([]);          // well-formed, and…
+    expect(bgOverrideSectionIssues(doc)).toHaveLength(1);  // …multiples over budget
+  });
+
+  it('AND THE DOOR REFUSES IT: createBand will not build a band this large', () => {
+    // The proof that matters to an author, at the surface that offers the work.
+    // At HEAD (aurora 08f5fe6b) `createBand` built both of these without a word.
+    expect(() => createBand({ cols: fits, rows: 1 })).not.toThrow();
+    expect(() => createBand({ cols: fits + 1, rows: 1 })).toThrow(/ROM section ceiling/);
   });
 });
 
@@ -281,7 +301,7 @@ describe('default_off: the twins are decided PER ACT, not per band', () => {
     expect(validateBgOverride(doc).join('\n')).toContain('must be true or false');
   });
 
-  it('validateBgOverride reports the act-level refusal, once, for the document', () => {
+  it('the act-level refusal is reported once, for the document', () => {
     const blob = tiles(period * 2);
     const doc: BgOverrideDocument = {
       layout: Array.from({ length: BG_LAYOUT_WORDS }, () => 0),
@@ -292,7 +312,7 @@ describe('default_off: the twins are decided PER ACT, not per band', () => {
           { default_off: true, pattern_px: BGANIM_VIEW_DERIVED_PERIOD_PX }),
       ],
     };
-    const issues = validateBgOverride(doc);
+    const issues = bgOverrideSectionIssues(doc);
     expect(issues).toHaveLength(1);
     expect(issues[0]).toContain('the build refuses this act');
   });

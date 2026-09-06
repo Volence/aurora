@@ -81,11 +81,28 @@ describe('the b0e5a661 fixture is what it claims to be', () => {
 });
 
 describe('the golden validates under the codec', () => {
-  it('parses with no issues and no notices', () => {
+  it('parses with no issues, and ONE notice: it does not fit its ROM section', () => {
     const { doc, notices } = parseBgOverride(GOLDEN);
     expect(validateBgOverride(doc)).toEqual([]);
     // No legacy `anim` upgrade: this revision already used the plural key.
-    expect(notices).toEqual([]);
+    //
+    // ⚠ THE ONE NOTICE IS A FACT ABOUT THIS DOCUMENT THAT NOTHING HERE COULD SEE
+    // UNTIL 2026-09-06, and it is not a regression. Its two tile animations
+    // cover 192 animated slots; an animated slot is stored once per phase bank,
+    // so the emitted `ojz_bg_anim` section is about two and a half times aeon's
+    // ruled ceiling and `check_bganim_section_fits` would refuse the build.
+    // aeon's own source names this act when it records a per-band cap being
+    // refuted, and deleted it for exactly this reason — which is why the file
+    // is a b0e5a661 RECOVERY rather than the live document.
+    //
+    // IT IS A NOTICE AND NOT A REFUSAL BY DESIGN: a document can arrive over
+    // this budget, and Aurora is the only tool that can bring it back under, so
+    // the read path says so out loud and the doors that GROW the section are
+    // where the refusal lives. See `bganimSectionIssues`.
+    expect(notices).toHaveLength(1);
+    expect(notices[0].severity).toBe('warning');
+    expect(notices[0].message).toMatch(/does not fit its ROM section/);
+    expect(notices[0].message).toMatch(/Nothing has been changed or dropped on read/);
   });
 
   /**
