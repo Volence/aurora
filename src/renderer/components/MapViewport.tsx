@@ -3848,7 +3848,12 @@ export default function MapViewport() {
       onContextMenu={handleContextMenu}
     >
       <canvas id="map-canvas" ref={canvasRef} style={styles.canvas} />
-      <canvas ref={previewCanvasRef} style={styles.previewCanvas} />
+      {/* `id` so a harness can read the GHOST'S OWN PIXELS rather than a
+          screenshot of the composite: what the hover preview draws is the only
+          evidence that the mark under the cursor is the width the click will
+          author, and a shot of the whole window cannot separate it from the map
+          underneath. Mirrors `map-canvas` above. */}
+      <canvas id="map-preview-canvas" ref={previewCanvasRef} style={styles.previewCanvas} />
       <CollisionLegend />
       <div ref={hoverBarRef} style={{ ...styles.hoverBar, display: 'none' }} />
       {ctxMenu && (
