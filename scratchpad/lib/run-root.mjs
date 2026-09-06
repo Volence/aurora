@@ -354,15 +354,48 @@ export function resolveRunRoot(here) {
  * differ and which. Zero differing files is a positive result — the borrowed
  * bundle's sources ARE this checkout's.
  *
- * ⚠ AND DRIFT IS A WARNING, NOT A REFUSAL — a deliberate ruling, recorded so a
- * later reader does not mistake it for an oversight. Borrowing is legitimate
- * (it is the whole reason this module exists: a linked worktree has no
- * `node_modules` and no `dist/`), and it is CONFORMANT while it announces
- * itself — "a derivation that legitimately differs and SAYS SO is conformant;
- * one that differs silently is the defect". Refusing on drift would make these
- * eighteen instruments unrunnable from any worktree whose branch touches
- * `src/`, which is most of them: it would replace a gate that could never be
- * green with a gate that could never be green, and call it a fix.
+ * ⚠ DRIFT WAS A WARNING AND IS NOW A REFUSAL — O52 ruled it a warning, and that
+ * ruling is OVERTURNED here (EW-WORKTREE-MOUNT, 2026-09-06) rather than quietly
+ * edited, because the reasoning it rested on is checkable and is wrong.
+ *
+ * WHAT O52 SAID: "refusing would make these instruments unrunnable from any
+ * worktree whose branch touches `src/`, replacing a gate that could never be
+ * green with a gate that could never be green."
+ *
+ * WHY THAT IS FALSE, MEASURED. The two gates are not the same shape. The old
+ * mtime expression fired on a worktree because a fresh checkout's `src/` mtimes
+ * are its CHECKOUT time — a fact about `git worktree add`, not about the code —
+ * so it fired even when the borrowed bundle carried this checkout's sources
+ * exactly. Measured from this worktree at HEAD, 2026-09-06: 863 sources here,
+ * 863 there, `differing 0 / onlyHere 0 / onlyRoot 0`. The old expression FIRES
+ * on that; a drift refusal is SILENT on it, because there is nothing to refuse.
+ * Drift is a function of the bytes the rows will measure. Checkout time is not.
+ * That is discrimination, which is the property O52 itself demanded of the
+ * freshness half one paragraph up, and it is the reason a drift refusal is
+ * escapable (build, or repoint) while the old one was not.
+ *
+ * AND THE POSITIVE ARGUMENT. `assertFreshBuild` already refuses `stale` on the
+ * stated ground that "every row the caller is about to measure would be
+ * vacuous". A drifted borrow is that same statement and strictly worse: stale
+ * means the bundle lacks SOME of this tree's edits, drifted means the bundle
+ * was built from a DIFFERENT TREE'S code and the rows would report its
+ * behaviour as this checkout's. Announcing that and proceeding is the shape
+ * this repo keeps finding: a finding computed, phrased urgently, and consumed
+ * by no decision.
+ *
+ * ⚠ THE EXEMPTION EXISTS AND IS AT THE CALL SITE, WHICH IS WHERE IT BELONGS.
+ * `scratchpad/profile-isolation-proof.mjs` deliberately does not call this at
+ * all, and says why in its own header: no row it judges reads anything the app
+ * renders, so a fortnight-stale bundle would produce identical rows. That is an
+ * argued, per-instrument opt-out — a reader of that file can see it. Softening
+ * the guard for everyone to serve one such case would hide it from the other
+ * thirty-nine. Nothing here changes that file.
+ *
+ * Borrowing itself stays legitimate and stays SILENT when it is sound: all
+ * sources byte-identical means that bundle IS this checkout's sources, and
+ * forcing a build on a worktree in that state would cost real time to establish
+ * something already established. That is the line, and it is drawn at "can this
+ * run be shown to measure this checkout's code", not at "is this borrowed".
  *
  * ── WHEN IT GENUINELY CANNOT BE EVALUATED ──────────────────────────────────
  *
@@ -371,6 +404,31 @@ export function resolveRunRoot(here) {
  * `unmeasurable`, and `assertFreshBuild` REFUSES on it, loudly, naming which of
  * the three it hit. It is never folded into `fresh`: an unanswerable question
  * does not become a pass, here as everywhere else in this repo.
+ *
+ * ⚠ AND THE FOURTH CASE, WHICH IS THE DRIFT CHECK'S OWN: `comparable:false`,
+ * meaning one of the two `src/` directories could not be read. IS THERE A
+ * LEGITIMATE CAUSE? Traced rather than assumed, and the answer is no for either
+ * operand:
+ *
+ *   `run.root/src` unreadable — UNREACHABLE from `assertFreshBuild`. The same
+ *     directory was just walked by `newestSource`, and a failure there returns
+ *     `unmeasurable`, which throws before the drift check is ever called. Only
+ *     a race between the two walks can reach it, and a race is not a licence.
+ *
+ *   `run.here/src` unreadable — reachable, and it means the caller passed a
+ *     `here` that is not an aurora checkout root. CENSUSED over the whole live
+ *     population, 2026-09-06, and the buckets sum to the population: 40 call
+ *     sites, 35 taking `AURORA_DIR`, 4 hand-rolling the same directory from
+ *     their own `import.meta.url` (`animated-art`, `priority-lens`,
+ *     `s1-layout-anim`, `s1-priority-occlusion`), and 1 taking
+ *     `dirname(dirname(…))` (`mapviewport`). All 40 are the checkout root and
+ *     every aurora checkout has a `src/`. So there is no ordinary situation in
+ *     this tree that makes the comparison impossible while leaving the run
+ *     valid.
+ *
+ * It therefore refuses, on the function's own unmeasurable principle: a run
+ * that cannot show its bundle carries this checkout's sources is a run whose
+ * every row may be measuring another tree's code.
  */
 
 /** Where the sources live, relative to a tree. One spelling, like the two above. */
@@ -495,7 +553,14 @@ export function borrowedSourceDrift(run) {
 }
 
 /** The provenance line a fresh run prints — rendered from the value, never a
- *  second derivation of it, for the same reason `describeRunRoot` is. */
+ *  second derivation of it, for the same reason `describeRunRoot` is.
+ *
+ *  ⚠ ITS TWO ⚠ BRANCHES ARE NOT DEAD, AND ARE NO LONGER REACHED FROM
+ *  `assertFreshBuild`, which throws on both before it prints. They are reached
+ *  from `scratchpad/profile-isolation-proof.mjs`, the one instrument that
+ *  declines the refusal with an argument and prints the verdict instead. Kept
+ *  wording-identical so that file's output does not change under this parcel;
+ *  the refusals below carry their own text. */
 export function describeFreshness(f, drift = null) {
   const age = (ms) => `${(ms / 1000).toFixed(0)}s`;
   let s = `build: FRESH in ${f.root} — dist/main/index.mjs is ${age(f.marginMs)} newer than the `
@@ -521,8 +586,27 @@ export function describeFreshness(f, drift = null) {
 }
 
 /**
- * REFUSE TO MEASURE A VACUOUS RUN. Throws on `stale` and on `unmeasurable`;
- * prints the verdict and, when borrowed, the drift, and returns the value.
+ * REFUSE TO MEASURE A VACUOUS RUN. It throws on FOUR conditions, and returns
+ * the value, having printed the verdict, on exactly one:
+ *
+ *   THROWS  `unmeasurable`      the bundle cannot be shown fresh at all.
+ *   THROWS  `stale`             a source under the built tree is newer than it.
+ *   THROWS  borrowed + drifted  the built tree's sources are not this
+ *                               checkout's, so the rows would measure another
+ *                               tree's code and report it as this one's.
+ *   THROWS  borrowed + the drift check could not run: same conclusion reached
+ *                               by not being able to ask.
+ *   PASSES  in-tree, or borrowed with every source byte-identical, which is the
+ *                               common worktree case and is left alone: that
+ *                               bundle IS this checkout's sources.
+ *
+ * ⚠ THE LAST TWO WERE PRINT-ONLY WARNINGS UNTIL EW-WORKTREE-MOUNT, and this
+ * docblock said "throws on `stale` and on `unmeasurable`" while the text one
+ * screen up said a drifted borrow means "THE ROWS BELOW DO NOT MEASURE THOSE
+ * EDITS". The argument for the change, and for why the byte-identical case is
+ * NOT swept in with them, is at "DRIFT WAS A WARNING AND IS NOW A REFUSAL"
+ * above; the per-instrument opt-out is `profile-isolation-proof.mjs`, which
+ * declines this call outright and says why.
  *
  * The call replaces the eighteen inline copies:  `assertFreshBuild(RUN);`
  */
@@ -540,6 +624,30 @@ export function assertFreshBuild(run, write = (s) => process.stderr.write(s)) {
       + `would measure code that is not in the bundle. Run VITE_AURORA_DEBUG=1 npm run build in `
       + `${f.root}.`);
   }
-  write(`${describeFreshness(f, run.borrowed ? borrowedSourceDrift(run) : null)}\n`);
+  const drift = run.borrowed ? borrowedSourceDrift(run) : null;
+  if (drift !== null && !drift.comparable) {
+    throw new Error('BORROWED, AND THE DRIFT CHECK COULD NOT RUN: '
+      + `${drift.why}. The run is against ${run.root}, which is not the tree this script lives in `
+      + `(${run.here}), so nothing establishes that this checkout's sources are in that bundle, `
+      + 'and every row below may be measuring another tree\'s code. That is the same unanswerable '
+      + 'question an unmeasurable bundle poses, so it refuses on the same ground. Build the tree '
+      + `this script lives in (VITE_AURORA_DEBUG=1 npm run build in ${run.here}), or point `
+      + `${AURORA_BUILT_TREE_ENV} at a tree whose src/ can be read.`);
+  }
+  if (drift !== null) {
+    const moved = drift.differing.length + drift.onlyHere.length + drift.onlyRoot.length;
+    if (moved > 0) {
+      throw new Error(`BORROWED AND DRIFTED: ${moved} source file(s) differ between this checkout `
+        + `(${run.here}) and the built tree the run is against (${run.root}). `
+        + `${drift.differing.length} changed, ${drift.onlyHere.length} only here, `
+        + `${drift.onlyRoot.length} only there, for example `
+        + `${[...drift.differing, ...drift.onlyHere, ...drift.onlyRoot].slice(0, 3).join(', ')}. `
+        + 'THE ROWS BELOW WOULD NOT MEASURE THOSE EDITS. They would measure the other tree\'s code '
+        + 'and report it as this checkout\'s, so this refuses rather than warning. Build the tree '
+        + `this script lives in (VITE_AURORA_DEBUG=1 npm run build in ${run.here}), or point `
+        + `${AURORA_BUILT_TREE_ENV} at a tree built from these sources.`);
+    }
+  }
+  write(`${describeFreshness(f, drift)}\n`);
   return f;
 }
