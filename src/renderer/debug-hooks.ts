@@ -77,6 +77,7 @@ import { SECTION_TILES_WIDE } from '../core/model/s4-types';
 import {
   PANEL_COLUMNS, PANEL_COLUMN_IDS, PANEL_COLUMN_ATTR,
 } from './components/ui/panel-columns';
+import { revealPanel } from './shell/panel-state';
 
 /**
  * Paint-through (Task 12) read-only query surface. Every function here reads
@@ -1770,6 +1771,20 @@ interface DebugApi {
    * the harness's rule and this probe cannot disagree about what counts.
    */
   panels(): PanelSweep;
+  /**
+   * OPEN EVERY SHUT CARD IN EVERY MOUNTED COLUMN, through the app's own
+   * `revealPanel` — the same write the header click performs, and the same
+   * "deterministic seam under the gesture" rationale `spritePaint` has under
+   * the canvas. A synthetic click on each header would have to find the header
+   * by its chevron's rotation and would break on the next icon change.
+   *
+   * ONE ROUND. React re-renders after this returns, so the DOM still shows the
+   * old state when it does: the caller reveals, waits, reads `panels()` again,
+   * and repeats until nothing is collapsed. Returns the ids it wrote, so a
+   * caller that keeps getting the same list knows the write is not taking
+   * rather than seeing an empty result it might read as success.
+   */
+  revealSections(): { revealed: string[] };
 }
 
 /** One scrolling column as the DOM currently has it. */
@@ -1782,6 +1797,16 @@ interface PanelMeasurement {
   overflow: number;
   /** Always 0 unless Panel's snap handler has stopped working. */
   scrollLeft: number;
+  /**
+   * THE COLUMN'S CARDS, AND WHETHER THEY ARE SHUT.
+   *
+   * A collapsed CollapsibleSection renders NO CHILDREN, so a column with its
+   * cards shut can hold a child twice its width and measure 0px of overflow.
+   * Several sections in this shell are `defaultCollapsed`. Without this a sweep
+   * would report CLEAN for a screen it never opened, which is the same defect
+   * as measuring one column and reporting on fifteen.
+   */
+  sections: { id: string; collapsed: boolean }[];
   /**
    * The DEEPEST nodes sticking out past the content edge. An overflowing child
    * makes every ancestor overflow too, so the ancestors are noise and a report
@@ -1818,11 +1843,26 @@ function measurePanelColumns(): PanelMeasurement[] {
       if (child.querySelector('*')) continue;          // ancestors are noise
       const r = child.getBoundingClientRect();
       if (r.width === 0 && r.height === 0) continue;   // display:none leaves a 0 rect at 0,0
-      if (r.right <= right + 0.5) continue;
+      // TWO WAYS TO BE THE CULPRIT, and the first cut only had one.
+      //
+      //   1. the element's own BOX sticks out past the content edge;
+      //   2. the box fits and its CONTENT does not.
+      //
+      // (2) is not a corner case, it is the common one in this shell: every
+      // section is `display: flex; flexDirection: column`, so a child of one is
+      // a flex item stretched to the column's width. A 374px unbreakable token
+      // in a 239px column leaves an element whose rect ends exactly at the edge
+      // and whose text runs 203px past it. Measured: a plant in the aeon
+      // Objects column reported `overflow 203px` with NO offender named, which
+      // is a report that says a column is broken and refuses to say where.
+      const boxOver = r.right - right;
+      const inkOver = child.scrollWidth - child.clientWidth;
+      const over = Math.max(boxOver, inkOver);
+      if (over <= 0.5) continue;
       offenders.push({
         tag: child.tagName,
-        over: Math.round((r.right - right) * 10) / 10,
-        width: Math.round(r.width),
+        over: Math.round(over * 10) / 10,
+        width: Math.round(Math.max(r.width, child.scrollWidth)),
         cls: String((child as HTMLElement).className ?? '').slice(0, 40),
         text: (child.textContent ?? '').trim().slice(0, 60),
       });
@@ -1831,6 +1871,10 @@ function measurePanelColumns(): PanelMeasurement[] {
     out.push({
       id, clientWidth: s.clientWidth, scrollWidth: s.scrollWidth,
       overflow: s.scrollWidth - s.clientWidth, scrollLeft: s.scrollLeft,
+      sections: Array.from(s.querySelectorAll('[data-section]')).map((e) => ({
+        id: e.getAttribute('data-section') ?? '(unnamed)',
+        collapsed: e.getAttribute('data-section-collapsed') === 'true',
+      })),
       offenders: offenders.slice(0, 8),
     });
   }
@@ -2007,6 +2051,20 @@ export function installDebugHooks(): void {
         strays: [...seen.keys()].filter((id) => !known.has(id)),
         duplicates: [...seen].filter(([, n]) => n > 1).map(([id]) => id),
       };
+    },
+    revealSections: () => {
+      const revealed: string[] = [];
+      if (typeof document === 'undefined') return { revealed };
+      const shut = document.querySelectorAll(
+        `[${PANEL_COLUMN_ATTR}] [data-section][data-section-collapsed="true"]`,
+      );
+      for (const e of Array.from(shut)) {
+        const id = e.getAttribute('data-section');
+        if (!id) continue;
+        revealPanel(id);
+        revealed.push(id);
+      }
+      return { revealed };
     },
   };
   (window as unknown as { __dbg: DebugApi }).__dbg = dbg;

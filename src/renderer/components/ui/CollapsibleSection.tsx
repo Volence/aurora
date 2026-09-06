@@ -90,7 +90,16 @@ export function CollapsibleSection({ id, title, right, variant = 'content', defa
   // which is case 5 of the brief ("a collapsed section gives its space back")
   // falling out of the model rather than needing a rule.
   return (
-    <div style={collapsed || variant !== 'list' ? CONTENT_SECTION : LIST_SECTION}>
+    // `data-section` / `data-section-collapsed`: A COLLAPSED SECTION RENDERS NO
+    // CHILDREN AT ALL (`{!collapsed && children}` below), so a column whose
+    // cards are shut can hold an over-wide child and still measure 0px of
+    // overflow. scratchpad/panel-overflow-harness.mjs opens every section
+    // before it measures and REFUSES to call a column clean while one is still
+    // shut; these two attributes are how it can tell, without a scan for a
+    // rotated chevron that would break on the next icon change. Two string
+    // attributes, no effect, no branch.
+    <div data-section={id} data-section-collapsed={collapsed ? 'true' : 'false'}
+      style={collapsed || variant !== 'list' ? CONTENT_SECTION : LIST_SECTION}>
       <div onClick={onHeaderClick} style={{ cursor: 'pointer' }}>
         <PanelHeader right={right}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>

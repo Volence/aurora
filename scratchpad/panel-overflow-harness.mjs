@@ -215,14 +215,54 @@ async function measure(c, id, ms = 6000) {
   return null;
 }
 
-function record(id, m, howReached) {
+/**
+ * OPEN EVERY CARD, THEN MEASURE.
+ *
+ * ⚠ THIS IS THE ROW THAT WAS VACUOUS ON ITS FIRST CUT, and it failed exactly
+ * the way `[9d]` did in the coldread harness. A plant was put in the aeon
+ * Objects column (an unbreakable path token in a `<code>`, the shape of the
+ * real 2026-09-05 defect), the app was rebuilt, and the sweep still said CLEAN.
+ * The cause is one line of CollapsibleSection: `{!collapsed && children}`. A
+ * shut card renders NO CHILDREN, so a column with its cards shut can hold a
+ * child twice its width and measure 0px. Several sections in this shell are
+ * `defaultCollapsed`, and a fresh session (which this sweep takes on purpose)
+ * gets every one of those defaults.
+ *
+ * So the condition is CREATED rather than waited for, the way `[9a]` opens the
+ * CYCLES card before it believes its own reading, and a column with a card
+ * still shut is UNMEASURABLE rather than clean. `revealSections` goes through
+ * the app's own `revealPanel`, the same write the header click performs.
+ */
+async function openAllCards(c, id) {
+  let last = [];
+  for (let round = 0; round < 8; round++) {
+    const m = await measure(c, id, 2000);
+    if (!m) return { m: null, opened: last };
+    const shut = m.sections.filter((s) => s.collapsed).map((s) => s.id);
+    if (!shut.length) return { m, opened: last };
+    const r = await c.json('window.__dbg.revealSections()');
+    last = [...new Set([...last, ...r.revealed])];
+    await sleep(500);
+  }
+  return { m: await measure(c, id, 2000), opened: last };
+}
+
+function record(id, m, howReached, opened = []) {
   if (!m) {
     setRow(id, 'UNMEASURABLE', `${howReached}, but no element carrying data-panel-column="${id}" `
       + 'ever appeared, so NOTHING about this column was measured');
     return;
   }
+  const shut = m.sections.filter((s) => s.collapsed).map((s) => s.id);
+  const cards = `${m.sections.length} card(s), ${opened.length} opened by this sweep`;
+  if (shut.length) {
+    setRow(id, 'UNMEASURABLE', `${howReached}: ${cards}, but ${shut.length} would not open `
+      + `(${JSON.stringify(shut)}). A shut card renders no children, so a reading taken now is a `
+      + 'reading of a screen this column has not got. Nothing was concluded about it.');
+    return;
+  }
   const geom = `scrollWidth ${m.scrollWidth} clientWidth ${m.clientWidth} `
-    + `overflow ${m.overflow}px scrollLeft ${m.scrollLeft} (${howReached})`;
+    + `overflow ${m.overflow}px scrollLeft ${m.scrollLeft} · ${cards} (${howReached})`;
   if (m.overflow > 0) {
     setRow(id, 'OVERFLOW', `${geom}\n        clipped past the right edge: `
       + (m.offenders.length ? JSON.stringify(m.offenders) : '(no leaf node found past the edge; the '
@@ -230,6 +270,69 @@ function record(id, m, howReached) {
   } else {
     setRow(id, 'CLEAN', geom);
   }
+}
+
+/**
+ * ⚠ EVERY RUN PLANTS A VIOLATION AND WATCHES IT CAUGHT, ON A REAL COLUMN.
+ *
+ * A sweep of fifteen columns that all measure 0px is indistinguishable from a
+ * sweep whose measurement is broken. This is the difference, and it runs on the
+ * first column that measures clean rather than on a fixture, so it exercises
+ * the same `panels()` path every row above it uses.
+ *
+ * ⚠ THE TOKEN IS UNBREAKABLE ON PURPOSE, and this is not fussiness. The first
+ * plant tried here was `data/editor/ojz_bg_ingame-forest-v15-1786630615596.bin`
+ * and the sweep stayed GREEN through a rebuild: HYPHENS ARE SOFT WRAP
+ * OPPORTUNITIES (so are slashes), so the token broke across lines and never
+ * went off the edge. That is the same shape as `[9d]` in
+ * scratchpad/coldread-fixes-harness.mjs, which passed on both sides of its own
+ * fix because its planted button wrapped. The string below is the one that
+ * column's own plant uses and is proven to overflow: its longest unbroken run
+ * is `a_preset_id_nobody_has_authored_yet`, and `_` is not a break opportunity.
+ *
+ * AND IT IS UNPLANTED AGAIN, with a second reading: a row that only ever sees
+ * the number go up cannot tell a live measurement from a stuck one.
+ */
+const PLANT_TEXT = 'data/editor/effects/presets/a_preset_id_nobody_has_authored_yet.json';
+let selfTested = false;
+
+async function selfTest(c, id) {
+  selfTested = true;
+  const plant = String.raw`
+    (() => {
+      const s = document.querySelector('[${'data-panel-column'}="${id}"]');
+      if (!s) return null;
+      document.getElementById('panel-sweep-plant')?.remove();
+      const d = document.createElement('div');
+      d.id = 'panel-sweep-plant';
+      d.style.fontSize = '11px';
+      const code = document.createElement('code');
+      code.textContent = ${JSON.stringify(PLANT_TEXT)};
+      d.appendChild(code);
+      s.appendChild(d);
+      return true;
+    })()`;
+  const ok = await c.evalExpr(plant);
+  if (!ok) {
+    rigCheck('r4', `a planted over-wide child in ${id} is CAUGHT`, false,
+      'the plant could not be attached: the column left the DOM between the reading and the plant, '
+      + 'so the instrument was NOT exercised and every clean row above is unwitnessed');
+    return;
+  }
+  await sleep(400);
+  const planted = await measure(c, id, 3000);
+  rigCheck('r4', `a planted over-wide child in ${id} is CAUGHT`,
+    planted !== null && planted.overflow > 0,
+    planted === null ? 'the column vanished' : `overflow ${planted.overflow}px `
+      + `(scrollWidth ${planted.scrollWidth} vs clientWidth ${planted.clientWidth}), offenders `
+      + `${JSON.stringify(planted.offenders.slice(0, 2))}. A 0 here means the measurement is not `
+      + 'working and every CLEAN row in the table is worthless.');
+  await c.evalExpr(`document.getElementById('panel-sweep-plant')?.remove(); 1`);
+  await sleep(400);
+  const after = await measure(c, id, 3000);
+  rigCheck('r5', 'and removing it puts the column back to clean (the reading is live, not stuck)',
+    after !== null && after.overflow <= 0,
+    after === null ? 'the column vanished' : `overflow ${after.overflow}px after the plant was removed`);
 }
 
 /** Every column whose reach is `kind`, in census order. */
@@ -250,7 +353,12 @@ async function sweepFacets(c, kind, howReached) {
       continue;
     }
     await sleep(700);
-    record(r.id, await measure(c, r.id), `${howReached}, facet ${got.facet} (tool ${got.tool})`);
+    const { m, opened } = await openAllCards(c, r.id);
+    record(r.id, m, `${howReached}, facet ${got.facet} (tool ${got.tool})`, opened);
+    // The first column that measures clean is where the instrument proves it
+    // can still see an overflow at all. Done AFTER that column is recorded, and
+    // the plant is removed again, so nothing below reads a poisoned screen.
+    if (!selfTested && rows.get(r.id).state === 'CLEAN') await selfTest(c, r.id);
   }
 }
 
@@ -332,8 +440,14 @@ async function sweepCanvas(c) {
       if (i) i.focus();
       return !!i;
     })()`);
+  // ⚠ A UNIQUE NAME PER RUN. The copy this phase writes into KEEPS the document
+  // it created, so a second run with a fixed name met the app's own duplicate
+  // refusal, the dialog stayed open, and the row reported "the Create click
+  // left no canvas document" for the second run of an identical rig. A harness
+  // that only works the first time reads as a flake in whatever it is measuring.
+  const canvasName = `panel-sweep-${Date.now().toString(36)}`;
   await sleep(200);
-  await c.send('Input.insertText', { text: 'panel-sweep-probe' });
+  await c.send('Input.insertText', { text: canvasName });
   await sleep(400);
   const named = await c.evalExpr(String.raw`
     (() => { const d = document.querySelector('[role="dialog"][aria-label="New Canvas"]');
@@ -377,7 +491,8 @@ async function sweepCanvas(c) {
       + 'Shot: shots-panel-overflow/canvas-no-doc.png');
     return;
   }
-  record('canvas-mode', await measure(c, 'canvas-mode'), `canvas document ${docs[0]} created`);
+  const canvas = await openAllCards(c, 'canvas-mode');
+  record('canvas-mode', canvas.m, `canvas document ${docs[0]} created`, canvas.opened);
   await shot(c, 'canvas-mode');
 }
 
@@ -486,7 +601,8 @@ async function main() {
           `editObjectArt(0x41) left no active sprite document (spriteState() = ${JSON.stringify(sp)}), `
           + 'so SpriteMode never mounted');
       } else {
-        record('sprite-mode', await measure(c, 'sprite-mode'), `sprite document ${sp.activeDocId} open`);
+        const sprite = await openAllCards(c, 'sprite-mode');
+        record('sprite-mode', sprite.m, `sprite document ${sp.activeDocId} open`, sprite.opened);
         await shot(c, 'sprite-mode');
       }
     } else {
@@ -522,9 +638,16 @@ async function main() {
       console.log('\nUNMEASURABLE (not a pass, not a zero):');
       for (const r of un) console.log(`  ${r.id}: ${r.detail}`);
     }
+    if (!selfTested && rows.size) {
+      // Booked BEFORE rigFails is taken, so it reaches the exit code. A sweep
+      // whose plant never ran has witnessed nothing, whatever the table says.
+      rigCheck('r4', 'a planted over-wide child is CAUGHT', false,
+        'NO column measured clean, so the plant never ran and nothing witnessed that this sweep '
+        + 'can still see an overflow. Read every row above as unproven.');
+    }
     const rigFails = rig.filter((r) => !r.ok);
     if (rigFails.length) {
-      console.log('\nRIG FAILURES (the harness could not measure anything):');
+      console.log('\nRIG FAILURES (the sweep did not witness its own instrument):');
       for (const r of rigFails) console.log(`  [${r.id}] ${r.name}: ${r.detail}`);
     }
     if (!rows.size) console.log('\nNO CENSUS WAS READ AT ALL. Every column above is missing, not clean.');
