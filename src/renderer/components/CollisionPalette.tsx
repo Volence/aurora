@@ -459,7 +459,11 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
         </>
       )}
       {variant === 'map' && auditNote && (
-        <div style={{ ...styles.hint, color: auditSeverity === 'error' ? T.error : T.warning }}>
+        // The testid is how `scratchpad/audit-coords-harness.mjs` reads this
+        // sentence off the running app. Locating it by its own text would be
+        // circular: the claim under test is what the text SAYS.
+        <div data-testid="crossover-audit-note"
+          style={{ ...styles.hint, color: auditSeverity === 'error' ? T.error : T.warning }}>
           {auditNote}
         </div>
       )}
