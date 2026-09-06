@@ -3,7 +3,10 @@ import {
   bandBudget,
   insertUnavailableReason,
   promoteUnavailableReason,
+  sectionShapeMoveNote,
+  sectionShapePhrase,
 } from '../bg-anim-aeon';
+import { documentBands } from '../../../core/formats/bg-override/bg-anim-band';
 import {
   BGANIM_SECTION_CEILING,
   BGANIM_COUNT_BYTES,
@@ -12,6 +15,7 @@ import {
   BGANIM_VIEW_COUNT,
   BGANIM_VIEW_DERIVED_PERIOD_PX,
   BGANIM_PHASE_BANKS,
+  bganimViewTwinBytes,
   BG_TILE_CAPACITY,
   BG_LAYOUT_WORDS,
   TILE_PIXELS,
@@ -234,5 +238,179 @@ describe('⚠ UNMEASURABLE COLLAPSES TO ZERO, NEVER TO THE LOOSER BUDGET', () =>
     expect(b.slotsRemaining).toBe(0);
     expect(b.binding).toBe('unmeasurable');
     expect(b.unmeasurable).not.toBeNull();
+  });
+});
+
+// ── THE SHAPE THE FIGURE IS FOR, ON THE TWO REFUSALS ───────────────────────
+
+/**
+ * ⚠ THE DISCRIMINATING CASE IS A SHAPE CHANGE, NOT A BIG DOCUMENT.
+ *
+ * `4a565908` put "in the debug shape" / "in every ROM shape" on the panel's
+ * READOUT and left the two refusals bare. On this surface that omission is
+ * worse than it was on the readout, because ADDING A BAND CAN MOVE THE ACT
+ * BETWEEN SHAPES: the debug view twins are emitted only for a single-band act
+ * at the derived period, so the second tile animation drops them. The refusal
+ * then prints an after-figure that is not commensurable with the before-figure
+ * on screen above it — they differ by the twins as well as by the slots — and an
+ * author who subtracts the two gets a per-slot cost the same sentence just told
+ * them was something else.
+ *
+ * A REFUSAL ON AN ACT WHOSE SHAPE DOES NOT MOVE PROVES NOTHING ABOUT THIS, and
+ * the `describe`s above are full of those. Every row here is built on the act
+ * where the shape MOVES, with a same-shape control at the end.
+ *
+ * NOTHING BELOW TYPES A NUMBER: both figures are re-derived from the vendored
+ * constants on aeon's own formula, never read back from the code under test.
+ */
+describe('the refusals say WHICH SHAPE their byte figure is for', () => {
+  const PERIOD_COLS = BGANIM_VIEW_DERIVED_PERIOD_PX / TILE_WIDTH_PX;
+
+  /** `table` for an act of `bands` tile animations — aeon's formula, once. */
+  function tableBytes(bands: number): number {
+    return BGANIM_COUNT_BYTES + BGANIM_RECORD_BYTES * bands;
+  }
+
+  /**
+   * THE ACT WHERE THE SHAPE MOVES: aeon's shipped shape (one silenced tile
+   * animation at the derived period, so the twins ARE emitted), sized so that
+   * ONE MORE tile animation overruns the byte ceiling.
+   *
+   * `rows` is derived, not chosen: the largest doubling that still leaves the
+   * two-band act room for at least one more slot, so the insert below is a real
+   * band rather than a number picked to make a sentence appear.
+   */
+  function twinShapedDoc(): BgOverrideDocument {
+    let rows = 1;
+    while (PERIOD_COLS * rows * 2 <= slotsAllowed(2, 0)) rows *= 2;
+    return docOf(PERIOD_COLS * rows, (blob) => [band(blob, 0, PERIOD_COLS, rows, {
+      default_off: true, pattern_px: BGANIM_VIEW_DERIVED_PERIOD_PX,
+    })]);
+  }
+
+  /** The act with no twins in either shape, for the control row. */
+  function plainDoc(): BgOverrideDocument {
+    return docOf(4, (blob) => [band(blob, 0, 2, 1)]);
+  }
+
+  it('the fixture really is a SHAPE CHANGE, and the doors really do overrun', () => {
+    // The row that makes every row below non-vacuous. Twins today, none after.
+    const doc = twinShapedDoc();
+    const b = bandBudget(doc);
+    expect(b.bands).toBe(1);
+    expect(b.twinsEmitted).toBe(true);
+    expect(b.viewTwinBytes).toBe(BGANIM_VIEW_COUNT * tableBytes(1));
+    const over = slotsAllowed(2, 0) + 1 - b.animatedSlots;
+    expect(over).toBeGreaterThan(0);
+    // The BLOB has room, so an insert reaches the section check rather than
+    // being turned away one budget earlier.
+    expect(over).toBeLessThanOrEqual(b.tileSlotsRemaining);
+    expect(bganimViewTwinBytes([...documentBands(doc), { cols: over, rows: 1 }])).toBe(0);
+  });
+
+  it('INSERT: names the after shape, and says the shape MOVED', () => {
+    const doc = twinShapedDoc();
+    const b = bandBudget(doc);
+    const over = slotsAllowed(2, 0) + 1 - b.animatedSlots;
+    const why = insertUnavailableReason(doc, over, 1);
+    expect(why).not.toBeNull();
+
+    // Both figures on aeon's formula, derived here rather than read back.
+    const beforeBytes = tableBytes(1) + BGANIM_VIEW_COUNT * tableBytes(1)
+      + b.animatedSlots * BGANIM_BYTES_PER_SLOT;
+    const afterBytes = tableBytes(2) + (b.animatedSlots + over) * BGANIM_BYTES_PER_SLOT;
+    const twins = BGANIM_VIEW_COUNT * tableBytes(1);
+    expect(b.sectionBytes).toBe(beforeBytes);       // the figure on screen above
+
+    // 1. The after figure carries its shape, in the readout's own words.
+    expect(why!).toContain(
+      `would take it to ${afterBytes} of ${BGANIM_SECTION_CEILING} bytes, in every ROM shape.`);
+    // 2. The shape MOVED, named against the current figure and the twins' cost.
+    expect(why!).toContain(
+      `DIFFERENT SHAPE from the act's current ${beforeBytes} bytes in the debug shape:`);
+    expect(why!).toContain(
+      `${twins} bytes of debug view twins are emitted in one of the two shapes and not the other`);
+    // 3. AND THE REASON THE SENTENCE IS OWED, as arithmetic: the two figures do
+    //    NOT differ by the slots the same sentence prices.
+    expect(afterBytes - beforeBytes).not.toBe(over * BGANIM_BYTES_PER_SLOT);
+    expect(afterBytes - beforeBytes)
+      .toBe(over * BGANIM_BYTES_PER_SLOT + BGANIM_RECORD_BYTES - twins);
+  });
+
+  it('PROMOTE: the same two facts, in the other door\'s words', () => {
+    const doc = twinShapedDoc();
+    const b = bandBudget(doc);
+    const over = slotsAllowed(2, 0) + 1 - b.animatedSlots;
+    const why = promoteUnavailableReason(doc, over, 1);
+    expect(why).not.toBeNull();
+    const beforeBytes = tableBytes(1) + BGANIM_VIEW_COUNT * tableBytes(1)
+      + b.animatedSlots * BGANIM_BYTES_PER_SLOT;
+    const afterBytes = tableBytes(2) + (b.animatedSlots + over) * BGANIM_BYTES_PER_SLOT;
+    expect(why!).toContain(
+      `animation section to ${afterBytes} of ${BGANIM_SECTION_CEILING} bytes, in every ROM shape.`);
+    expect(why!).toContain(
+      `DIFFERENT SHAPE from the act's current ${beforeBytes} bytes in the debug shape:`);
+    // Anti-vacuous: promotion is still ALLOWED at a size that fits.
+    expect(promoteUnavailableReason(doc, 1, 1)).toBeNull();
+  });
+
+  /**
+   * ⚠ THE CONTROL, AND IT IS THE HALF THAT KEEPS THE COPY HONEST. A refusal on
+   * an act whose shape does NOT move must still name its shape — the ruling is
+   * "say which shape any figure is for", unconditionally — and must NOT carry
+   * the shape-moved sentence, which would be a caveat in front of a control that
+   * is not true of it.
+   */
+  it('CONTROL: an act whose shape does not move names the shape and adds nothing else', () => {
+    const doc = plainDoc();
+    const b = bandBudget(doc);
+    expect(b.twinsEmitted).toBe(false);            // no twins before...
+    const over = slotsAllowed(2, 0) + 1 - b.animatedSlots;
+    const why = insertUnavailableReason(doc, over, 1);
+    expect(why).not.toBeNull();
+    expect(bganimViewTwinBytes([...documentBands(doc), { cols: over, rows: 1 }])).toBe(0);
+    const afterBytes = tableBytes(2) + (b.animatedSlots + over) * BGANIM_BYTES_PER_SLOT;
+    expect(why!).toContain(
+      `would take it to ${afterBytes} of ${BGANIM_SECTION_CEILING} bytes, in every ROM shape.`);
+    expect(why!).not.toContain('DIFFERENT SHAPE');
+    expect(why!).not.toContain('debug view twins');
+    // Here the naive subtraction IS right, which is why no sentence is owed.
+    expect(afterBytes - b.sectionBytes!)
+      .toBe(over * BGANIM_BYTES_PER_SLOT + BGANIM_RECORD_BYTES);
+  });
+
+  /**
+   * ⚠ THE BRIEF FOR THIS PARCEL SAID THE AFTER FIGURE "CAN MOVE IN THE OPPOSITE
+   * DIRECTION FROM WHAT ADDING IMPLIES". IT CANNOT, and this row says so rather
+   * than leaving a plausible sentence uncontradicted.
+   *
+   * Through these two doors the twins can only be LOST — gaining them would need
+   * the act to arrive at exactly ONE band carrying `default_off`, and neither
+   * door writes that key onto the band it appends. So the worst case is the one
+   * built here: the largest possible twin loss against the SMALLEST possible
+   * band. Even then the figure RISES, because one slot outweighs the twins.
+   */
+  it('the after figure never falls: the smallest band still outweighs the twins lost', () => {
+    const doc = twinShapedDoc();
+    const b = bandBudget(doc);
+    const smallest = tableBytes(2) + (b.animatedSlots + 1) * BGANIM_BYTES_PER_SLOT;
+    const beforeBytes = tableBytes(1) + BGANIM_VIEW_COUNT * tableBytes(1)
+      + b.animatedSlots * BGANIM_BYTES_PER_SLOT;
+    expect(smallest).toBeGreaterThan(beforeBytes);
+    // The margin, so a contract change that inverted it would fail LOUDLY here
+    // rather than quietly making the claim above false.
+    expect(smallest - beforeBytes).toBe(
+      BGANIM_BYTES_PER_SLOT + BGANIM_RECORD_BYTES - BGANIM_VIEW_COUNT * tableBytes(1));
+  });
+
+  it('the shape phrase is derived from the act, and the note is empty when it holds still', () => {
+    expect(sectionShapePhrase(documentBands(twinShapedDoc()))).toBe('in the debug shape');
+    expect(sectionShapePhrase(documentBands(plainDoc()))).toBe('in every ROM shape');
+    // EMPTY when the shape holds still — that is what keeps the unconditional
+    // label from becoming a wall of caveats.
+    const same = documentBands(plainDoc());
+    expect(sectionShapeMoveNote(same, [...same, { cols: 1, rows: 1 }])).toBe('');
+    const moves = documentBands(twinShapedDoc());
+    expect(sectionShapeMoveNote(moves, [...moves, { cols: 1, rows: 1 }])).not.toBe('');
   });
 });

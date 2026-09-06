@@ -768,6 +768,19 @@ export default function BgAnimBandPanel(): React.ReactElement {
             would take. Both lines stay: the answer to "why can I not add this"
             is which of the two is binding, and a reader cannot see that from
             one number. */}
+        {/* ⚠ THIS HINT LOOKS DEAD AND IS KEPT ON PURPOSE. `byteSlotsRemaining`
+            is null only for an unmeasurable section, and since aeon's decouple
+            no DOCUMENT produces one — `viewsEmitted` stopped refusing, and it
+            was the codec's only producer. The reasoning and the census are in
+            `BgAnimSizeResult`'s docblock; the short version is that this is
+            where the next sizing refusal surfaces, and that the safe direction
+            it belongs to (unmeasurable collapses to ZERO, never to the looser
+            blob budget) is the property the section-ceiling parcel landed for.
+            Deleting the branch because nothing reaches it today would leave the
+            next refusal to arrive as a fall-through into the wrong number.
+            NOTE the no-document case does NOT render it: the whole panel body
+            is behind `doc !== null`, so `bandBudget(null)`'s own unmeasurable
+            answer is never the one on screen. */}
         {doc !== null && budget.byteSlotsRemaining === null && (
           <Hint tone="warning" style={{ marginTop: T.s2, marginBottom: 0 }}>
             ROM section: cannot say. {budget.unmeasurable}

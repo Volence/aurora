@@ -94,6 +94,7 @@ import {
   BGANIM_BAND_AXES,
   bandTileCount,
   type BgAnimBandAxis,
+  type BgAnimBandSize,
   type BgAnimDriver,
   type BgOverrideDocument,
 } from '../../core/formats/bg-override/bg-override';
@@ -665,6 +666,80 @@ export function bandRows(doc: BgOverrideDocument | null): BandRow[] {
 }
 
 // ---------------------------------------------------------------------------
+// Which SHAPE a section figure is for
+// ---------------------------------------------------------------------------
+
+/**
+ * `"in the debug shape"` / `"in every ROM shape"` — the clause that says which
+ * ROM a section byte figure is the size of.
+ *
+ * ⚠ IT GOES ON EVERY FIGURE, NOT ONLY THE SURPRISING ONE, and that is a ruling
+ * rather than a preference. aeon's `EFFECTS_CONSUMER_CONTRACT.md` §1.2 states
+ * it in as many words — **"Say which shape any figure is for"** — after aeon
+ * had to work out by hand which of two disagreeing figures was wrong (neither
+ * was; their `bganim_section_bytes()` takes `n_views=0` by default and so
+ * answers for the RELEASE shape, while ours answers for the shape the act is
+ * actually in). `4a565908` put the clause on the panel's readout. The two
+ * refusals below are the same figure in the same units and were left bare; this
+ * is them catching up, in the readout's own words so a reader meeting both does
+ * not have to decide whether two phrasings mean the same thing.
+ *
+ * ⚠ `false` IS NOT "RELEASE". An act the twins decline for emits none in ANY
+ * shape, so its figure is the size in every ROM; naming that "the release
+ * shape" would invent a debug/release distinction the act does not have.
+ *
+ * DERIVED FROM THE FIGURE'S OWN OPERANDS: `bganimViewTwinBytes` is what
+ * `bganimSectionBytes` itself adds, so a phrase cannot name one shape while the
+ * arithmetic beside it computed the other.
+ */
+export function sectionShapePhrase(bands: readonly BgAnimBandSize[]): string {
+  return bganimViewTwinBytes(bands) > 0 ? 'in the debug shape' : 'in every ROM shape';
+}
+
+/**
+ * The sentence a refusal adds when the operation MOVES the act between shapes,
+ * and the empty string when it does not.
+ *
+ * ⚠ THIS IS THE HALF THAT IS NOT A LABEL. Adding a band changes the act's SIZE,
+ * which every reader expects — and it can also change WHICH SHAPE the act is
+ * in, which nobody does. The debug view twins are emitted only for a single-band
+ * act at the derived period, so going from one band to two DROPS them, and
+ * `bganimSectionBytes(after)` correctly stops counting them. The consequence for
+ * a reader is that the before and after figures are not commensurable: they
+ * differ by the twins as well as by the slots, so an author who subtracts them
+ * gets a per-slot cost that is not the one the sentence above quoted, and has no
+ * way to find out why. Two shape labels alone do not say it either — they say
+ * the act is in two shapes without saying the author's own edit is what moved
+ * it.
+ *
+ * IT IS CONDITIONAL ON PURPOSE. This file's controls already carry long
+ * refusals, and this repo's standing finding is that a wall of caveats in front
+ * of a control is itself a defect. So the label above is unconditional (four
+ * words, and the ruling requires it) and this sentence appears only in the case
+ * it is about — which is also why it may be blunt when it does appear.
+ *
+ * SYMMETRIC IN DIRECTION, AND DELIBERATELY. Through these two doors the twins
+ * can only be LOST (gaining them would need the act to arrive at exactly one
+ * band carrying `default_off`, and neither door writes that key), so an
+ * "arrive"/"depart" ternary would ship a branch nothing can reach. The sentence
+ * says the twins are emitted in one shape and not the other and lets the two
+ * labels say which way.
+ */
+export function sectionShapeMoveNote(
+  before: readonly BgAnimBandSize[], after: readonly BgAnimBandSize[],
+): string {
+  const twinsBefore = bganimViewTwinBytes(before);
+  const twinsAfter = bganimViewTwinBytes(after);
+  if ((twinsBefore > 0) === (twinsAfter > 0)) return '';
+  const now = bganimSectionBytes(before);
+  if (!now.ok) return '';
+  return ` ⚠ AND THAT FIGURE IS IN A DIFFERENT SHAPE from the act's current `
+    + `${now.value} bytes ${sectionShapePhrase(before)}: the `
+    + `${Math.max(twinsBefore, twinsAfter)} bytes of debug view twins are emitted in one of the `
+    + 'two shapes and not the other, so the two figures do not differ by the slots alone.';
+}
+
+// ---------------------------------------------------------------------------
 // Availability — why a control is off
 // ---------------------------------------------------------------------------
 
@@ -703,13 +778,24 @@ export function insertUnavailableReason(
   //
   // NOT `n > budget.byteSlotsRemaining`. Inserting adds a BAND, and a band costs
   // a record in the act's own table AND a record in each view twin, so the
-  // budget an insert has to fit is not the one the current act reports. Sizing
-  // the act that WOULD exist is also what makes the `default_off` trap
-  // reachable: adding a second tile animation to a default-off act is refused by
-  // the build outright, and the reason comes back in aeon's own terms rather
-  // than as a byte count that would be beside the point.
-  const after = [...documentBands(doc), { cols, rows }];
+  // budget an insert has to fit is not the one the current act reports.
+  //
+  // ⚠ AND SIZING THE ACT THAT WOULD EXIST IS ALSO A SHAPE QUESTION, which is the
+  // half this comment used to get wrong: it said adding a second tile animation
+  // to a default-off act "is refused by the build outright", and since aeon's
+  // decouple (`364b7bce`) it is not — the DEBUG VIEW TWINS DECLINE INSTEAD. So
+  // the after-act can be in a different SHAPE from the current one rather than
+  // simply larger, `bganimSectionBytes` prices that correctly, and
+  // `sectionShapeMoveNote` is what says so out loud.
+  const before = documentBands(doc);
+  const after = [...before, { cols, rows }];
   const bytes = bganimSectionBytes(after);
+  // ⚠ THIS ARM LOOKS DEAD AND IS KEPT ON PURPOSE. Nothing a document can
+  // contain reaches it — `viewsEmitted` is the codec's only producer of a
+  // refused size and it stopped refusing at aeon's decouple — so this is not
+  // a branch waiting for a bad file, it is where the NEXT sizing refusal
+  // lands. Deleting it would delete the safe direction with it. The whole
+  // argument, with the evidence, is in `BgAnimSizeResult`'s docblock.
   if (!bytes.ok) return bytes.reason;
   if (bytes.value > budget.sectionCeiling) {
     const allowed = bganimSectionSlotsAllowed(after);
@@ -717,11 +803,12 @@ export function insertUnavailableReason(
     return `the blob has room, but the ROM SECTION does not. A tile animation's art is stored `
       + `${BGANIM_PHASE_BANKS} times over (one bank per phase), so each animated slot costs `
       + `${BGANIM_BYTES_PER_SLOT} bytes of the act's animation section. Adding ${n} would take `
-      + `it to ${bytes.value} bytes of ${budget.sectionCeiling}. At `
-      + `${after.length} tile animation(s) this act has room for ${free} more animated slot(s), `
-      + 'so use a smaller one, or PROMOTE static art into an existing tile animation instead. '
-      + 'This is a SECOND budget: the free-slot count above is about the tile blob, and the two '
-      + 'run out at different times.';
+      + `it to ${bytes.value} of ${budget.sectionCeiling} bytes, ${sectionShapePhrase(after)}.`
+      + sectionShapeMoveNote(before, after)
+      + ` At ${after.length} tile animation(s) this act has room for ${free} more animated `
+      + 'slot(s), so use a smaller one, or PROMOTE static art into an existing tile animation '
+      + 'instead. This is a SECOND budget: the free-slot count above is about the tile blob, and '
+      + 'the two run out at different times.';
   }
   return null;
 }
@@ -754,8 +841,15 @@ export function promoteUnavailableReason(
       + `of ${budget.maxBands}. Demote or remove one first.`;
   }
   const n = bandTileCount({ cols, rows });
-  const after = [...documentBands(doc), { cols, rows }];
+  const before = documentBands(doc);
+  const after = [...before, { cols, rows }];
   const bytes = bganimSectionBytes(after);
+  // ⚠ THIS ARM LOOKS DEAD AND IS KEPT ON PURPOSE. Nothing a document can
+  // contain reaches it — `viewsEmitted` is the codec's only producer of a
+  // refused size and it stopped refusing at aeon's decouple — so this is not
+  // a branch waiting for a bad file, it is where the NEXT sizing refusal
+  // lands. Deleting it would delete the safe direction with it. The whole
+  // argument, with the evidence, is in `BgAnimSizeResult`'s docblock.
   if (!bytes.ok) return bytes.reason;
   if (bytes.value > budget.sectionCeiling) {
     const allowed = bganimSectionSlotsAllowed(after);
@@ -763,9 +857,11 @@ export function promoteUnavailableReason(
     return `promoting does not grow the tile blob, but it DOES grow the ROM section: a slot that `
       + `becomes animated is stored ${BGANIM_PHASE_BANKS} times over, one bank per phase, at `
       + `${BGANIM_BYTES_PER_SLOT} bytes a slot. Animating ${n} more would take the act's `
-      + `animation section to ${bytes.value} bytes of ${budget.sectionCeiling}. There is room `
-      + `for ${free} more animated slot(s) at ${after.length} tile animation(s). Promote a `
-      + 'smaller range, or demote something first.';
+      + `animation section to ${bytes.value} of ${budget.sectionCeiling} bytes, `
+      + `${sectionShapePhrase(after)}.`
+      + sectionShapeMoveNote(before, after)
+      + ` There is room for ${free} more animated slot(s) at ${after.length} tile animation(s). `
+      + 'Promote a smaller range, or demote something first.';
   }
   return null;
 }

@@ -535,7 +535,48 @@ export function bandIsDefaultOff(b: BgAnimBandSize): boolean {
   return Boolean(b.default_off);
 }
 
-/** A derived quantity, or the aeon refusal that means it has no value. */
+/**
+ * A derived quantity, or the aeon refusal that means it has no value.
+ *
+ * ═══ WHY EVERY `!ok` BRANCH IN THIS CODEC AND ITS CONSUMERS LOOKS DEAD ═══
+ *
+ * ⚠ READ THIS BEFORE DELETING ONE. The `ok: false` arm HAS NO PRODUCER TODAY,
+ * and that is a fact about aeon's build, not about this type being redundant.
+ * `viewsEmitted` is the only function in this codec that ever constructed one;
+ * at aeon's decouple (`364b7bce`) both of its refusing arms became
+ * `{ ok: true, value: 0 }` — the DEBUG VIEW TWINS DECLINE where the build used
+ * to fail — and every other producer, `bganimSectionBytes` and
+ * `bganimSectionSlotsAllowed`, only forwards what `viewsEmitted` handed it. So
+ * the arm is unreachable FROM ANY INPUT: not from the shipped document, not
+ * from a hand-edited file, not from a foreign one, because no `bands` value
+ * exists that makes `viewsEmitted` refuse. That is stronger than "no document
+ * we have reaches it", and it is checkable — `bg-override-section-ceiling`
+ * holds the census as a row.
+ *
+ * WHAT THE ARM IS FOR, GIVEN THAT. Two things, and neither is "a bad file":
+ *
+ *   1. THE SAFE DIRECTION, which is the property the section-ceiling parcel was
+ *      built around. An unmeasurable budget must collapse to ZERO and say so,
+ *      never fall through to the looser tile budget — that fallback is the
+ *      defect that put an 80-slot offer in front of a 47-slot section. The
+ *      machinery that enforces it (`bandBudget.slotsRemaining`,
+ *      `binding: 'unmeasurable'`, and the panel's two hints) is written against
+ *      THIS type. Collapse the type to a plain `number` and the direction has
+ *      nowhere to live; the next refusal then arrives as a fall-through.
+ *   2. SOMEWHERE FOR THE NEXT REFUSAL TO LAND. aeon has refused a size before
+ *      and may again — the condition `viewsEmitted` tests is UNCHANGED, only its
+ *      consequence moved — and a consumer that already handles `!ok` needs no
+ *      edit when it does.
+ *
+ * ⚠ AND THIS IS NOT AN ARGUMENT FROM CAUTION. A branch that cannot fire costs
+ * nothing at runtime; a guard deleted because it never fired is a safety
+ * property resting on an omission, which the person who later adds the missing
+ * line destroys without knowing it. The dead-looking branches are therefore
+ * KEPT AND LABELLED — `insertUnavailableReason` and `promoteUnavailableReason`
+ * in `bg-anim-aeon.ts`, `bganimSectionIssues` below, `sectionSizeOf` in
+ * `bg-override-band.ts`, and the "ROM section: cannot say" hint in
+ * `BgAnimBandPanel.tsx` — each pointing here rather than restating it.
+ */
 export type BgAnimSizeResult =
   | { ok: true; value: number }
   | { ok: false; reason: string };
@@ -1003,6 +1044,10 @@ export function bganimSectionIssues(anims: readonly unknown[]): string[] {
   if (!sizable) return [];
   const sizes = anims as unknown as BgAnimBandSize[];
   const bytes = bganimSectionBytes(sizes);
+  // ⚠ UNREACHABLE AND KEPT — see `BgAnimSizeResult`. No document can make
+  // `viewsEmitted` refuse since aeon's decouple, so this notice has no producer;
+  // it is where the next sizing refusal surfaces, not a branch waiting for a
+  // malformed file. The geometry guard above is what actually screens those.
   if (!bytes.ok) return [`the build refuses this act: ${bytes.reason}`];
   if (bytes.value <= BGANIM_SECTION_CEILING) return [];
   const allowed = bganimSectionSlotsAllowed(sizes);

@@ -105,7 +105,15 @@ function sectionHarm(before: BgOverrideDocument, result: BgOverrideDocument): st
   return after[0];
 }
 
-/** Emitted section size, or null when the act has no computable one. */
+/**
+ * Emitted section size, or null when the act has no computable one.
+ *
+ * ⚠ THE NULL ARM IS UNREACHABLE TODAY AND IS KEPT — see `BgAnimSizeResult`. It
+ * is load-bearing for `sectionHarm` above, whose whole shape is "an act with no
+ * size was worse IN KIND, so do not call a step towards one a step back"; that
+ * comparison has to exist somewhere for the next refusal, and it cannot be
+ * reconstructed from a bare number.
+ */
 function sectionSizeOf(doc: BgOverrideDocument): number | null {
   const anims = Array.isArray(doc.anims) ? doc.anims : [];
   const r = bganimSectionBytes(anims);
