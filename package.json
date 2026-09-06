@@ -219,6 +219,7 @@
     "harness:tool-keys": "node scratchpad/tool-keys-harness.mjs",
     "harness:tool-split": "node scratchpad/tool-split-harness.mjs",
     "harness:variant-cycle": "node scratchpad/variant-cycle-harness.mjs",
+    "harness:vdp-registers-peek": "node scratchpad/vdp-registers-peek-harness.mjs",
     "harness:vsplit-advisory": "node scratchpad/vsplit-advisory-harness.mjs",
     "harness:warp-tearing": "node scratchpad/warp-tearing-harness.mjs",
     "harness:window-icon": "node scratchpad/window-icon-probe.mjs",
