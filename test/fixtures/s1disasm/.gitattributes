@@ -1,2 +1,2 @@
-# The vendored bytes ARE the pin — never normalise them (see .provenance.json).
+# The vendored bytes ARE the pin; never normalise them (see .provenance.json).
 * -text

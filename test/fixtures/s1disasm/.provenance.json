@@ -23,13 +23,13 @@
       "startpos"
     ],
     "not_vendored": {
-      "_incObj": "A CURRENCY QUESTION CANNOT BE ANSWERED BY A PIN. The two rows that read this subtree (src/core/project/profiles/__tests__/s1-sync-anims.test.ts) ask whether the peer's source still holds exactly four SynchroAnimate consumers. A vendored copy holds four by construction, so those rows would pass forever and could never detect a fifth. They read ../s1disasm at a committed revision instead, and skip loudly when they cannot. 136 files, 1.32 MB — also 62% of the bytes this pin would otherwise carry."
+      "_incObj": "A CURRENCY QUESTION CANNOT BE ANSWERED BY A PIN. The two rows that read this subtree (src/core/project/profiles/__tests__/s1-sync-anims.test.ts) ask whether the peer's source still holds exactly four SynchroAnimate consumers. A vendored copy holds four by construction, so those rows would pass forever and could never detect a fifth. They read ../s1disasm at a committed revision instead, and skip loudly when they cannot. 136 files and 1.32 MB, which is also 62% of the bytes this pin would otherwise carry."
     }
   },
   "fixture": {
     "files": 595,
     "bytes": 1040794,
-    "extracted_via": "git -C <s1disasm> cat-file blob <object id> — OBJECTS, never the working tree"
+    "extracted_via": "git -C <s1disasm> cat-file blob <object id>, reading OBJECTS and never the working tree"
   },
   "re_vendor": "node scripts/vendor-s1-fixtures.mjs --rev origin/AS",
   "verify": "node scripts/vendor-s1-fixtures.mjs --check",
