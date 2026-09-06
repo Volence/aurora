@@ -197,11 +197,23 @@ export function Row({ children, style }: { children: React.ReactNode; style?: Re
  * after reading the control it explains; without it the hint is a full-width
  * paragraph, which is right for anything addressing the whole section.
  */
-export function Hint({ children, under = false, tone, style }: {
+export function Hint({ children, under = false, tone, style, testid }: {
   children: React.ReactNode; under?: boolean; tone?: 'warning'; style?: React.CSSProperties;
+  /**
+   * DECLARED, because a hyphenated JSX attribute on a COMPONENT is silently
+   * dropped and TypeScript does not catch it.
+   *
+   * That is not hypothetical here: `data-testid` was passed straight to `<Hint>`
+   * in EffectsScenePanel's row-remap block and never reached the DOM, so a
+   * harness read zero nodes for sentences that were on screen (the panel's own
+   * comment records it, and the workaround there was a wrapping `<span>`). A
+   * span marks the TEXT; this marks the BLOCK, which is what anything measuring
+   * a hint against the box it renders in has to address.
+   */
+  testid?: string;
 }) {
   return (
-    <div style={{
+    <div data-testid={testid} style={{
       ...(tone === 'warning' ? WARN : NOTE),
       marginBottom: T.s2,
       // ⚠ A HINT MUST NOT BE ABLE TO WIDEN THE COLUMN (cold read 2026-09-05,
@@ -279,28 +291,77 @@ export const WHY_THIS_HAPPENS = 'Why this happens';
  * longest block in the same panel and is clipped at the fold in the same
  * capture. It has the same shape problem and is NOT converted here — it is a
  * different sentence with a different owner, and O15's scope says so out loud.
+ *
+ * ═══ THE SCOPE WIDENED ONCE, AND ONLY WHERE A MEASUREMENT ASKED FOR IT ═══
+ * (EW-LAYER-CARD-SCROLLER, `scratchpad/layer-card-height-harness.mjs`.)
+ *
+ * O15 was ruled on the SCENE surface, where a 460px advisory pushed five
+ * controls below the fold. The layer cards have the same hazard in a much
+ * smaller box, and it has a hard edge the scene form does not: their section is
+ * `variant="list"`, so its body is only ever as tall as the column leaves it,
+ * and the shell's floor (`SECTION_LIST_MIN_HEIGHT`) is a promise that it may be
+ * squeezed that far. Floor minus that section's own header is therefore the
+ * SMALLEST box any block in it can ever be given — 129px, measured — and a
+ * paragraph taller than that is one no scroll position can show whole.
+ *
+ * Measured on the running app, 34 prose blocks in the layer cards: 32 at 49.5px
+ * or 82.5px (89..165 chars) and TWO at 165px (333 and 355 chars), both the row
+ * remap's. Those two are converted. Nothing else is, because nothing else is
+ * over the bar, and converting a block that fits would buy a disclosure button
+ * with no clipping to prevent.
+ *
+ * ═══ `mechanism` AND `remedies` ARE OPTIONAL, AND THAT IS NOT THE INVERSION ═══
+ *
+ * The O15 ruling is that a remedy which EXISTS may never be the half behind the
+ * disclosure. It does not say every advisory has one. A precondition names an
+ * input the document is missing and the control that supplies it is the row this
+ * hint hangs off, so there is no separate sentence to print; an advisory whose
+ * "why" is already inside its diagnosis has no second half to fold. Both cases
+ * used to be spelled by passing `''`, which drew an empty paragraph and, worse,
+ * a disclosure button with nothing behind it — a control that lies about having
+ * something to show. Absent means absent: no button, no empty div.
  */
-export function Advisory({ diagnosis, mechanism, remedies, under = false }: {
-  diagnosis: string; mechanism: string; remedies: string; under?: boolean;
+export function Advisory({ diagnosis, mechanism, remedies, under = false, testid }: {
+  diagnosis: string;
+  /** Why, in the engine's own terms. Omitted when the diagnosis already carries it. */
+  mechanism?: string;
+  /** What to do next. Omitted only when there is nothing to say, NEVER to shorten. */
+  remedies?: string;
+  under?: boolean;
+  /**
+   * Marks the WHOLE advisory, not one of its paragraphs.
+   *
+   * On the hint root on purpose: a harness measuring "is this advisory taller
+   * than its box" must measure the block, and a testid on the diagnosis would
+   * answer with one paragraph of it. `Hint` carries the prop for the same
+   * reason its own comment in EffectsScenePanel gives — a `data-testid` passed
+   * to a component that does not declare it is silently dropped, which is how a
+   * harness once read zero nodes for sentences that were visibly on screen.
+   */
+  testid?: string;
 }) {
   const [open, setOpen] = React.useState(false);
   return (
-    <Hint under={under} tone="warning">
+    <Hint under={under} tone="warning" testid={testid}>
       <div>{diagnosis}</div>
-      <button
-        type="button"
-        aria-expanded={open}
-        title={`${WHY_THIS_HAPPENS}: the mechanism behind this refusal`}
-        onClick={() => setOpen((v) => !v)}
-        style={WHY_BUTTON}
-      >{open ? '▾' : '▸'} {WHY_THIS_HAPPENS}</button>
-      {/*
-        `display: none`, not `{open && …}` — see the docblock. The style is on
-        the element that RENDERS the mechanism, so `checkVisibility()` on the
-        node a text search finds is the answer, with no wrapper in between.
-      */}
-      <div style={{ display: open ? 'block' : 'none', marginBottom: T.s2 }}>{mechanism}</div>
-      <div>{remedies}</div>
+      {mechanism !== undefined && (
+        <>
+          <button
+            type="button"
+            aria-expanded={open}
+            title={`${WHY_THIS_HAPPENS}: the mechanism behind this refusal`}
+            onClick={() => setOpen((v) => !v)}
+            style={WHY_BUTTON}
+          >{open ? '▾' : '▸'} {WHY_THIS_HAPPENS}</button>
+          {/*
+            `display: none`, not `{open && …}` — see the docblock. The style is on
+            the element that RENDERS the mechanism, so `checkVisibility()` on the
+            node a text search finds is the answer, with no wrapper in between.
+          */}
+          <div style={{ display: open ? 'block' : 'none', marginBottom: T.s2 }}>{mechanism}</div>
+        </>
+      )}
+      {remedies !== undefined && <div>{remedies}</div>}
     </Hint>
   );
 }

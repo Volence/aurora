@@ -18,7 +18,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  rowRemapBandSpan, rowRemapReachAdvisory, rowRemapSpanRestriction,
+  rowRemapBandSpan, rowRemapReachAdvisory, rowRemapReachAdvisoryParts, joinReachAdvisory,
+  rowRemapSpanRestriction,
 } from '../row-remap-span';
 import { planeVscroll } from '../camera-preview';
 import { ROW_REMAP_HEIGHT_OPTIONS } from '../../providers/effects-aeon';
@@ -251,5 +252,89 @@ describe('advice, not prevention, and no clearance', () => {
       const src = readFileSync(fileURLToPath(new URL(`../../../../${rel}`, import.meta.url)), 'utf8');
       expect(src, rel).not.toMatch(/rowRemapReachAdvisory|rowRemapBandSpan|rowRemapSpanRestriction/);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE THREE PARTS, AND THE ONE THING A SPLIT CAN QUIETLY DESTROY
+// ---------------------------------------------------------------------------
+// EW-LAYER-CARD-SCROLLER folded this advisory's mechanism behind a disclosure,
+// because measured on the running app it rendered at 165px inside a 149.47px
+// box whose floor gives it 129px. Nothing was deleted, and THAT is the claim
+// this block exists to hold: a fold and a cut look identical from the panel,
+// and the words that go missing are the ones nobody re-reads.
+//
+// It cannot see React, so it says nothing about whether the disclosure works.
+// `npm run harness:layer-card-height` is what measures the block against its
+// box, and this file's existence must not be read as covering that.
+describe('the reach advisory in parts loses nothing and hides only the mechanism', () => {
+  /** Every arm both branches can produce, over the same two engine lines. */
+  const cases: { s: EffectsScene; i: number }[] = [];
+  for (const shift of EFFECTS_ROW_REMAP_HEIGHT_SHIFTS) {
+    for (const span of [0, 1, 2, 3, 8, 28, 31, 32, 64, 224]) {
+      cases.push({ s: locked([layer(0, remap(0, shift)), layer(span)]), i: 0 });
+    }
+  }
+
+  it('joins back to exactly the sentence the one-string form returns, on every arm', () => {
+    let fired = 0;
+    for (const { s, i } of cases) {
+      const parts = rowRemapReachAdvisoryParts(s, i);
+      const one = rowRemapReachAdvisory(s, i);
+      if (parts === null) { expect(one).toBeNull(); continue; }
+      fired++;
+      expect(joinReachAdvisory(parts)).toBe(one);
+      // An absent mechanism must not leave a seam: a template with an empty
+      // middle reads fine to a person and compares unequal to a machine.
+      expect(one).not.toMatch(/ {2}/);
+      expect(one!.trim()).toBe(one);
+    }
+    // ANTI-VACUITY: a census over a shape that never fires would pass this row
+    // and every row below it.
+    expect(fired, 'no case produced an advisory at all').toBeGreaterThan(4);
+  });
+
+  it('never puts the remedy behind the disclosure, which is the O15 inversion', () => {
+    // The ruling in providers/effects-aeon's O15 block: diagnosis and remedies
+    // are what an author acts on and are never the hidden half. A split made by
+    // sentence POSITION rather than by job lands exactly here, because the
+    // remedies are last in the composed sentence.
+    let withMechanism = 0;
+    for (const { s, i } of cases) {
+      const parts = rowRemapReachAdvisoryParts(s, i);
+      if (parts === null) continue;
+      expect(parts.diagnosis.length, JSON.stringify(parts)).toBeGreaterThan(0);
+      expect(parts.remedies, JSON.stringify(parts)).toMatch(/^Make the band taller/);
+      if (parts.mechanism === undefined) continue;
+      withMechanism++;
+      expect(parts.mechanism, JSON.stringify(parts)).not.toContain(parts.remedies);
+      expect(parts.mechanism, JSON.stringify(parts)).not.toContain('Make the band taller');
+    }
+    expect(withMechanism, 'no arm produced a mechanism').toBeGreaterThan(0);
+  });
+
+  it('keeps the two numbers an author reads FIRST in the visible half', () => {
+    // The span and the cap are the finding; the ladder arithmetic is the why. A
+    // fold that took the finding with it would be a shorter sentence about
+    // nothing, and would still join back correctly.
+    const s = locked([layer(0), layer(84, remap(96, 4)), layer(112)]);
+    const parts = rowRemapReachAdvisoryParts(s, 1);
+    expect(parts).not.toBeNull();
+    expect(parts!.diagnosis).toContain('28 screen lines');
+    expect(parts!.diagnosis).toContain('at most half of them: 14.');
+    expect(parts!.mechanism).toBeDefined();
+    expect(parts!.mechanism).toContain('height_shift 4');
+  });
+
+  it('gives the zero arm NO mechanism, so nothing draws a disclosure over nothing', () => {
+    // Its "why" is one clause inside its own diagnosis, and a button with an
+    // empty paragraph behind it is a control that lies about having something
+    // to show. Asserted from BOTH sides: this arm has none and the clipped arm
+    // above does, so "always undefined" cannot pass the pair.
+    const zero = rowRemapReachAdvisoryParts(locked([layer(0, remap(0, 4)), layer(1)]), 0);
+    expect(zero).not.toBeNull();
+    expect(zero!.mechanism).toBeUndefined();
+    expect(zero!.diagnosis).toContain('needs 2 to move anything');
+    expect(zero!.remedies).toBe('Make the band taller.');
   });
 });

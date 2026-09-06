@@ -64,7 +64,7 @@ import type { FactorOption, FactorFieldOption } from '../../providers/effects-ae
 // its reader: see the deform row.
 import { advisoryLayerDeformConflicts } from '../../../core/formats/effects/scene';
 import { actReach, bandReach, bandReachClause, verticalWrapAdvisory } from '../../canvas/bg-wrap';
-import { rowRemapReachAdvisory, rowRemapSpanRestriction } from '../../canvas/row-remap-span';
+import { rowRemapReachAdvisoryParts, rowRemapSpanRestriction } from '../../canvas/row-remap-span';
 import {
   factorOptions, clampPackedField,
   factorFieldSelectValue, factorFieldFromSelect, NONE_FACTOR_VALUE,
@@ -121,7 +121,7 @@ import {
   reelRateWriteRefusal, reelsToggleCommand, setReelRateCommand, reelsBindingAdvisories,
   LAYER_ROW_REMAP_ROW, ROW_REMAP_HEIGHT_OPTIONS, EFFECTS_ROW_REMAP_CAPABILITY_NOTE,
   rowRemapFieldValue, rowRemapFromToggle, rowRemapWithPlaneY, rowRemapWithHeightShift,
-  rowRemapPreconditions,
+  rowRemapPreconditionParts,
   vsplitVDeformAdvisoryParts,
 } from '../../providers/effects-aeon';
 // THE ONE CROSS-DOCUMENT QUESTION THIS PANEL ASKS. Every other reading here is a
@@ -1045,7 +1045,7 @@ export default function EffectsScenePanel(): React.ReactElement {
                 const rr = rowRemapFieldValue(layer);
                 const why = planeYRefusal[i] ?? null;
                 const unbuildable = rr === null ? null : rowRemapBuildableToday(rr.height_shift);
-                const unmet = selected === null ? [] : rowRemapPreconditions(selected, i);
+                const unmet = selected === null ? [] : rowRemapPreconditionParts(selected, i);
                 // THE ONE THING ABOUT A REMAP THAT IS A FUNCTION OF THE OPEN
                 // DOCUMENT AND NOTHING ELSE. `n = min(|p|, span/2)` in
                 // parallax.emp, so a band shorter than twice the ladder's
@@ -1061,7 +1061,7 @@ export default function EffectsScenePanel(): React.ReactElement {
                 // check does not run; a panel that showed nothing would be
                 // telling the author the check ran and found nothing, which is
                 // the "partial coverage beats none at hiding" failure.
-                const reach = selected === null ? null : rowRemapReachAdvisory(selected, i);
+                const reachParts = selected === null ? null : rowRemapReachAdvisoryParts(selected, i);
                 const spanUnknown = selected === null ? null : rowRemapSpanRestriction(selected, i);
                 return (
                   <>
@@ -1114,10 +1114,22 @@ export default function EffectsScenePanel(): React.ReactElement {
                         screen: a testid that asserts nothing, found by driving
                         the app rather than by reading the source. The extras
                         line below already wraps for the same reason. */}
-                    {reach !== null && (
-                      <Hint under tone="warning">
-                        <span data-testid={`layer-${i}-rowremap-reach`}>{reach}</span>
-                      </Hint>
+                    {/* ⚠ AN ADVISORY, NOT A HINT, AND THE REASON IS MEASURED
+                        (EW-LAYER-CARD-SCROLLER). As one paragraph this rendered
+                        at 165px inside a 149.47px box, and the box's own floor
+                        gives it 129px: a block taller than its box is not a
+                        scrolling inconvenience, it is a paragraph NO scroll
+                        position shows whole. The shape is O15's, already ruled
+                        for prose of exactly this kind, so the ladder arithmetic
+                        goes behind the disclosure and the finding and the two
+                        edits stay on screen. Nothing was deleted:
+                        `rowRemapReachAdvisory` is still the same sentence, byte
+                        for byte, for anything that cannot hold three parts. */}
+                    {reachParts !== null && (
+                      <Advisory under testid={`layer-${i}-rowremap-reach`}
+                        diagnosis={reachParts.diagnosis}
+                        mechanism={reachParts.mechanism}
+                        remedies={reachParts.remedies} />
                     )}
                     {spanUnknown !== null && (
                       <Hint under>
@@ -1126,10 +1138,15 @@ export default function EffectsScenePanel(): React.ReactElement {
                         </span>
                       </Hint>
                     )}
+                    {/* The contract quote is the mechanism half of each of
+                        these and is the part that grows when aeon rewords a
+                        refusal, so it is the half the disclosure holds. No
+                        remedies: a precondition names a missing input and the
+                        control that supplies it is a row in this same card. */}
                     {unmet.map((m) => (
-                      <Hint key={m} under tone="warning">
-                        <span data-testid={`layer-${i}-rowremap-precondition`}>{m}</span>
-                      </Hint>
+                      <Advisory key={m.diagnosis} under
+                        testid={`layer-${i}-rowremap-precondition`}
+                        diagnosis={m.diagnosis} mechanism={m.mechanism} />
                     ))}
                     {rr !== null && (
                       <Hint under>{EFFECTS_ROW_REMAP_CAPABILITY_NOTE}</Hint>

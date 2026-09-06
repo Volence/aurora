@@ -32,7 +32,7 @@ import {
   rowRemapFromToggle,
   rowRemapWithPlaneY,
   rowRemapWithHeightShift,
-  rowRemapPreconditions,
+  rowRemapPreconditions, rowRemapPreconditionParts,
   layerExtras,
 } from '../../src/renderer/providers/effects-aeon';
 
@@ -570,5 +570,61 @@ describe('the row reads and writes what it says it does', () => {
       .toEqual({ plane_y: 12, height_shift: 6 });
     expect(rowRemapWithHeightShift({ plane_y: 101, height_shift: 6 }, 3))
       .toEqual({ plane_y: 101, height_shift: 3 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// EACH PRECONDITION IN ITS TWO PARTS, AND THE HALF THAT MAY BE FOLDED
+// ---------------------------------------------------------------------------
+// EW-LAYER-CARD-SCROLLER: the "nothing to vary" message rendered at 165px in a
+// 149.47px box whose floor gives it 129px, so it was one of two blocks in the
+// layer cards that no scroll position could show whole. What was already true
+// of all three of these messages is that they are a FINDING plus THE CONTRACT'S
+// OWN CLAUSE, so the fold needed no new editorial judgement. These rows hold
+// that: every word survives the split, and the clause an author acts on is
+// never the one that goes behind the disclosure.
+describe('a precondition splits into Aurora\'s finding and the contract\'s clause', () => {
+  /**
+   * ALL THREE UNMET AT ONCE, built the way the block above builds each of them
+   * singly. The golden meets all three, so a fixture that merely parsed would
+   * hand these rows two empty lists and pass while proving nothing.
+   */
+  const allThreeUnmet = (): EffectsScene => {
+    const s = parseEffectsScene(GOLDEN, 'canopy_dusk');
+    s.layers[1].curve = 'none';   // source 1
+    s.deform_bg = 'none';         // sources 2 and 3 fall together
+    s.anchor = 'none';
+    s.layers[3].rowRemap = { plane_y: 200, height_shift: 4 };
+    return s;
+  };
+
+  it('joins back, word for word, to what the one-string form returns', () => {
+    const s = allThreeUnmet();
+    const parts = rowRemapPreconditionParts(s, 1);
+    const joined = rowRemapPreconditions(s, 1);
+    expect(parts.length, 'the fixture stopped tripping every precondition').toBe(3);
+    expect(joined.length).toBe(3);
+    parts.forEach((p, i) => {
+      expect(`${p.diagnosis} ${p.mechanism}`).toBe(joined[i]);
+      expect(joined[i]).not.toMatch(/ {2}/);
+    });
+    // And the silent case stays silent through the parts form too, so "always
+    // returns three" cannot pass the pair.
+    expect(rowRemapPreconditionParts(parseEffectsScene(GOLDEN, 'canopy_dusk'), 1)).toEqual([]);
+  });
+
+  it('puts the contract quote in the mechanism and nothing of it in the diagnosis', () => {
+    // The diagnosis is Aurora's claim about THIS document; the mechanism is
+    // aeon's own sentence. Mixing them is how a reader stops being able to tell
+    // which half is a rule and which is a reading. The mechanism is also the
+    // half that GROWS when aeon rewords a refusal, which is why it is the one a
+    // disclosure may hold.
+    const parts = rowRemapPreconditionParts(allThreeUnmet(), 1);
+    expect(parts.length).toBe(3);
+    for (const p of parts) {
+      expect(p.mechanism, JSON.stringify(p)).toMatch(/^The contract: "/);
+      expect(p.diagnosis, JSON.stringify(p)).not.toContain('The contract:');
+      expect(p.diagnosis.length, JSON.stringify(p)).toBeGreaterThan(0);
+    }
   });
 });
