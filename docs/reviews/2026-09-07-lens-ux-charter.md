@@ -13,8 +13,18 @@ the ruling text and the owner's verbatim words are in the empyrean repo at `3ad4
 from `6a12740` only after reading what the two commits differ by**, never bumped to a tip on
 the strength of a message saying it moved. His words:
 *"I think it should have one right?"* and *"I think we draft it and run on oracle, aurora,
-and sigil for now"*. Roster C lands in aeon's `docs/superpowers/LENS_PROTOCOL.md`; aeon owns
-that text and this charter does not restate it — read it there.
+and sigil for now"*.
+
+**Two citations, because they are two different things.** The **ruling** — his words,
+and why the seats exist — is the empyrean amendment above. The **operative protocol text** is
+Roster C as landed in aeon `8def2240`, `aeon/docs/superpowers/LENS_PROTOCOL.md`; that is the
+revision the seats read, and aeon owns it. This charter does not restate either.
+
+Verified here rather than taken from the message announcing it: `8def2240` is an ancestor of
+aeon's `origin/master`, and all 54 non-blank lines of the amendment's paste-ready block appear
+verbatim in the landed protocol. **The protocol is the living document and will accrue
+changes; the amendment is frozen** — which is why a seat is pointed at the first and a reader
+asking *why does this panel exist* at the second.
 
 **The half that is a HUB TRANSCRIPTION, and it is anchored.** The hub (empyrean-c0) woke this
 lane quoting the owner: *"we can do the lens run for ui/ux on aurora but I don't wanna fix the
@@ -181,7 +191,7 @@ port, and its own copies of the projects.** Two seats never share one of these.
 - **THE PROOF OBLIGATION, and the one point where this rig cannot satisfy the rule's literal
   form.** Roster C's fifth seat rule (empyrean `3ad431f`) requires that every first-set-wins
   chain terminate at a seat-private value **and that the seat prove once that the unforced case
-  REFUSES rather than falls back.** Measured here rather than assumed, and **two of this repo's
+  REFUSES rather than falls back** (landed in the protocol at aeon `8def2240`). Measured here rather than assumed, and **two of this repo's
   three chains do not refuse when unforced — they fall through, which is the entire hazard**:
   `resolveSocketPath` arrives at the shared socket, and `AURORA_BUILT_TREE` unset drops to an
   independent walk that searches for a *build* and legitimately finds the main checkout's
