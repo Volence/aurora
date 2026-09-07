@@ -203,11 +203,25 @@ port, and its own copies of the projects.** Two seats never share one of these.
   `in-tree:` lines, and the app names the socket path in its own error text. That asserts the
   operand is real, rather than asserting that a guard fired; a guard that did not fire and a
   guard that fired correctly are the same silence.
-  ⚠ **Stated as a DIVERGENCE, not as compliance.** A charter that reported "fifth rule
-  satisfied" while its resolvers fall through would be the exact defect the rule was written
-  about, wearing the rule as cover. The ozone chain is the one of the three that genuinely does
-  refuse, and it is already proven, red-first, by a committed instrument
-  (`scratchpad/ozone-x11-proof.mjs`) rather than by the seat.
+  ⚠ **RULED 2026-09-07T23:09:55Z, and this paragraph is now the record of a change rather than
+  a divergence** (empyrean `ac27e90`, verified an ancestor of that repo's `origin/main` and read
+  there). The hub adopted the general form and it is in effect for every Roster C seat now:
+  *terminate the chain explicitly and prove which value was in effect; refusal is one way to
+  prove that, not the only one.* So the discharge above is **compliance** under the rule as it
+  now reads. Oracle's refusal proofs stay valid as one form of it.
+  ⚠⚠ **BUT THE PROTOCOL TEXT HAS NOT MOVED, AND IT IS THE DOCUMENT THE SEATS READ.** Checked at
+  aeon `origin/master`, which is still `8def2240`: the clause there still says *"the seat proves
+  once that the unforced case REFUSES rather than falls back"*. The replacement wording is
+  drafted and lands as the single post-pilot delta. **A seat reading only the protocol will meet
+  the superseded clause and must not act on it** — it would go looking for a refusal that
+  cannot be made to happen, or worse, manufacture one by editing code this panel does not touch.
+  Until that delta lands, **this paragraph governs for this lane's seats**, and the fact that
+  the two documents disagree is stated here rather than left for a seat to discover mid-walk.
+  *(Kept, not deleted, and this is the point: the divergence label was correct when written and
+  false ninety minutes later. Deleting it would leave a charter that looks like it always
+  agreed, and the next reader would have no way to see that the rule moved or why.)*
+  The ozone chain is the one of the three that genuinely does refuse, and it is already proven,
+  red-first, by a committed instrument (`scratchpad/ozone-x11-proof.mjs`) rather than by a seat.
 
 **Forbidden outright, and each for its own reason:**
 
