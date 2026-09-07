@@ -213,18 +213,39 @@ port, and its own copies of the projects.** Two seats never share one of these.
   the lowercase phrase returns a false zero. So the discharge above is **compliance**, and the
   protocol pin for the seats is now **aeon `82540fab`**.
 
-  ⚠ **THE LANDED TEXT IS RICHER THAN THE DRAFT, AND THE EXTRA HALF IS ADOPTED HERE.** Beyond
-  *prove which value was in effect*, it names a proof form nobody had specified: *on a green run
-  that is usually WHERE its artifacts landed — **present under the seat's own location, absent
-  from the shared default***. That is **two-sided**, and it is strictly stronger than reading a
-  forced value back out of a log, because a log line is the rig describing itself while the two
-  locations are the rig's effect on the world. **Where a chain here produces an artifact, the
-  seat proves both sides.** The display is the clean case: the seat's window is on its own Xvfb
-  **and** nothing appeared on `:0`. Where a chain produces no artifact — the socket, which
-  produces only an error — the printed form stands, and the seat says which of the two it used.
-  *(Read at the revision rather than taken from the message announcing it, which is how the extra
-  clause was noticed at all: the relay accurately described the delta as the drafted replacement,
-  and the landed text had grown a sentence past the draft.)*
+  ⚠ **THE LANDED TEXT CARRIES A SECOND PROOF FORM, AND IT IS ADOPTED HERE. It is SIGIL'S, and
+  the attribution matters more than the rule.** Beyond *prove which value was in effect*, the
+  clause says: *on a green run that is usually WHERE its artifacts landed — **present under the
+  seat's own location, absent from the shared default***. **Authored by the sigil lane** (sigil
+  `1dcaa575`, read there), drafted into the pending clause by the hub (empyrean `b298f75`),
+  landed by aeon (`82540fab`). This charter first recorded it as something *nobody* had
+  specified; that was wrong, the hub corrected it, and the correction is written here rather
+  than silently applied. **What is this lane's is narrower: the two-sided framing below, and the
+  rule that a seat must say which form it used.**
+
+  **Why sigil's form is stronger, and it is not a preference.** A printed line is the rig
+  describing itself — produced by the same code whose correctness is in question. Artifacts
+  present under the seat's own location **and absent from the shared default** is the rig's
+  effect on the world, measured at both ends, and **the absent half is the load-bearing one**:
+  it is the only part that can catch a rig which wrote to *both* places, which is exactly what a
+  silent fallback does. **So where a chain here produces an artifact, the seat proves both
+  sides.**
+
+  ⚠ **SIGIL'S SHARPER SUB-FINDING, WHICH APPLIES TO THIS RIG TOO: THE PRINTED LINE MAY NOT EXIST
+  ON THE GREEN PATH.** Their nightly scripts name their state dir only inside *failure* notes, so
+  a clean run prints nothing and a charter written on the printed form would have hunted for a
+  line that is not there — or, worse, had a lane add a print to a production script purely so a
+  seat could prove something, *which is changing the subject to suit the instrument.* Checked
+  here: `describeRunRoot` (`scratchpad/lib/run-root.mjs:249-256`) returns its `root:` and source
+  lines unconditionally, so the printed form IS available on a green run — **but only if the
+  seat's own launcher calls it and prints it, which the seat must do explicitly rather than
+  assume a harness did.**
+  **Two-sided form for the built tree, since one is available and is better:** the seat asserts
+  the running app's own main module resolves **inside its worktree** and **not** inside the main
+  checkout. That is the world, not a string the rig composed about itself.
+  Where a chain produces no artifact at all — the socket, which produces only an error — the
+  printed form stands, **and the seat states which of the two forms it used**, so a reader can
+  tell a two-sided proof from a one-sided one without re-deriving it.
 
   *(History, kept and dated rather than deleted. This paragraph read DIVERGENCE from 23:0xZ,
   when two of three chains could not perform the refusal the rule then demanded; the measurement
