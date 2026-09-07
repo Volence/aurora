@@ -8,8 +8,10 @@ before the run so the seats inherit a stated frame rather than the controller's 
 
 **The ruling is committed and was read at its revision, not from the message announcing it.**
 Owner ruling 2026-09-07T22:41:35Z, recorded at empyrean `origin/main` `docs/OVERSEER.md`;
-the ruling text and the owner's verbatim words are in the empyrean repo at `6a12740`,
-`empyrean/docs/2026-09-07-lens-ux-seat-amendment.md`, read here at that revision. His words:
+the ruling text and the owner's verbatim words are in the empyrean repo at `3ad431f`,
+`empyrean/docs/2026-09-07-lens-ux-seat-amendment.md`, read here at that revision — **re-pinned
+from `6a12740` only after reading what the two commits differ by**, never bumped to a tip on
+the strength of a message saying it moved. His words:
 *"I think it should have one right?"* and *"I think we draft it and run on oracle, aurora,
 and sigil for now"*. Roster C lands in aeon's `docs/superpowers/LENS_PROTOCOL.md`; aeon owns
 that text and this charter does not restate it — read it there.
@@ -175,6 +177,27 @@ port, and its own copies of the projects.** Two seats never share one of these.
   it is exactly what the UX panel exists to catch, so a rig built with that shape in it would
   have been measuring itself. Found by turning their sentence back on this charter after it
   was already written and pushed.
+
+- **THE PROOF OBLIGATION, and the one point where this rig cannot satisfy the rule's literal
+  form.** Roster C's fifth seat rule (empyrean `3ad431f`) requires that every first-set-wins
+  chain terminate at a seat-private value **and that the seat prove once that the unforced case
+  REFUSES rather than falls back.** Measured here rather than assumed, and **two of this repo's
+  three chains do not refuse when unforced — they fall through, which is the entire hazard**:
+  `resolveSocketPath` arrives at the shared socket, and `AURORA_BUILT_TREE` unset drops to an
+  independent walk that searches for a *build* and legitimately finds the main checkout's
+  (`scratchpad/lib/run-root.mjs:213-222`, which declares this in its own words). Neither can be
+  made to refuse without changing app and harness code, and **this panel makes no fixes.**
+  So the obligation is discharged in the form this rig can actually meet, which is the stronger
+  one anyway: **the seat proves the FORCED value is the one that was in effect**, read back
+  from the run's own output — the harness announces which tree answered on its `root:` /
+  `in-tree:` lines, and the app names the socket path in its own error text. That asserts the
+  operand is real, rather than asserting that a guard fired; a guard that did not fire and a
+  guard that fired correctly are the same silence.
+  ⚠ **Stated as a DIVERGENCE, not as compliance.** A charter that reported "fifth rule
+  satisfied" while its resolvers fall through would be the exact defect the rule was written
+  about, wearing the rule as cover. The ozone chain is the one of the three that genuinely does
+  refuse, and it is already proven, red-first, by a committed instrument
+  (`scratchpad/ozone-x11-proof.mjs`) rather than by the seat.
 
 **Forbidden outright, and each for its own reason:**
 
