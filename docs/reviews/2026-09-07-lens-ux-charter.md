@@ -14,14 +14,26 @@ the ruling text and the owner's verbatim words are in the empyrean repo at `6a12
 and sigil for now"*. Roster C lands in aeon's `docs/superpowers/LENS_PROTOCOL.md`; aeon owns
 that text and this charter does not restate it — read it there.
 
-**The half that is a RELAY and is marked as one.** The hub (empyrean-c0) woke this lane at
-2026-09-07T22:4xZ quoting the owner at ~22:43Z: *"we can do the lens run for ui/ux on aurora
-but I don't wanna fix the 79 items right noww"*. That sentence is **not committed anywhere
-this lane can read it** — it exists in the hub's message. So it is banked here as a relay,
-not as an owner act this session witnessed, per this repo's own rule that an approval is
-recorded with its granting act named. What it changes: the UX pair runs; the lens fix items
-stay held. Both are consistent with the committed amendment, which already says aurora's fix
-items stay held and that waking it for the UX pair alone is his call.
+**The half that is a HUB TRANSCRIPTION, and it is anchored.** The hub (empyrean-c0) woke this
+lane quoting the owner: *"we can do the lens run for ui/ux on aurora but I don't wanna fix the
+79 items right noww"*. That sentence **is committed**, in the empyrean repo at `2212da9`,
+`empyrean/docs/OVERSEER-LOG.md` last line, stamped 2026-09-07T22:44:41Z — verified here
+firsthand: an ancestor of that repo's `origin/main`, and the commit carries the transcription
+itself rather than being a docs commit standing in for one. It was committed **before** this
+lane was woken, so the anchor is not a record written to justify the wake afterwards.
+
+**Its class, stated rather than upgraded.** It is a **hub transcription of his words to the
+hub session** — which is the best class available for anything he says to a session, and is
+NOT the same as an act this lane witnessed. Labelled that way on purpose: this repo's rule is
+that an approval is recorded with its granting act named, and the naming is worth nothing if
+the name drifts upward each time the fact is repeated. What it changes: the UX pair runs; the
+lens fix items stay held. Both are consistent with the committed amendment, which already says
+aurora's fix items stay held and that waking it for the UX pair alone is his call.
+
+*(This paragraph replaced one asserting the sentence was committed nowhere this lane could
+read it. That was true when written and false twenty minutes later, once the hub named the
+anchor. Recorded rather than quietly rewritten, because the brief two seats will inherit is
+exactly where a label that outlived its justification does the most damage.)*
 
 **Model, as the amendment requires stated before the wake:** this session is **Opus 5**
 (`claude-opus-5`). The console's next-start model for this lane reads opus; they agree.
