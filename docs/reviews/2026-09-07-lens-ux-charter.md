@@ -188,11 +188,12 @@ port, and its own copies of the projects.** Two seats never share one of these.
   have been measuring itself. Found by turning their sentence back on this charter after it
   was already written and pushed.
 
-- **THE PROOF OBLIGATION, and the one point where this rig cannot satisfy the rule's literal
-  form.** Roster C's fifth seat rule (empyrean `3ad431f`) requires that every first-set-wins
-  chain terminate at a seat-private value **and that the seat prove once that the unforced case
-  REFUSES rather than falls back** (landed in the protocol at aeon `8def2240`). Measured here rather than assumed, and **two of this repo's
-  three chains do not refuse when unforced — they fall through, which is the entire hazard**:
+- **THE PROOF OBLIGATION, and why two of this rig's three chains prove it a different way.**
+  Roster C's fifth seat rule requires that every first-set-wins chain terminate at a
+  seat-private value **and that the seat prove once which value was in effect** (landed in the
+  protocol at aeon `82540fab`; the clause as first written demanded a demonstrated *refusal*,
+  and the history below is why it no longer does). Measured here rather than assumed, and
+  **two of this repo's three chains do not refuse when unforced — they fall through, which is the entire hazard**:
   `resolveSocketPath` arrives at the shared socket, and `AURORA_BUILT_TREE` unset drops to an
   independent walk that searches for a *build* and legitimately finds the main checkout's
   (`scratchpad/lib/run-root.mjs:213-222`, which declares this in its own words). Neither can be
@@ -203,23 +204,32 @@ port, and its own copies of the projects.** Two seats never share one of these.
   `in-tree:` lines, and the app names the socket path in its own error text. That asserts the
   operand is real, rather than asserting that a guard fired; a guard that did not fire and a
   guard that fired correctly are the same silence.
-  ⚠ **RULED 2026-09-07T23:09:55Z, and this paragraph is now the record of a change rather than
-  a divergence** (empyrean `ac27e90`, verified an ancestor of that repo's `origin/main` and read
-  there). The hub adopted the general form and it is in effect for every Roster C seat now:
-  *terminate the chain explicitly and prove which value was in effect; refusal is one way to
-  prove that, not the only one.* So the discharge above is **compliance** under the rule as it
-  now reads. Oracle's refusal proofs stay valid as one form of it.
-  ⚠⚠ **BUT THE PROTOCOL TEXT HAS NOT MOVED, AND IT IS THE DOCUMENT THE SEATS READ.** Checked at
-  aeon `origin/master`, which is still `8def2240`: the clause there still says *"the seat proves
-  once that the unforced case REFUSES rather than falls back"*. The replacement wording is
-  drafted and lands as the single post-pilot delta. **A seat reading only the protocol will meet
-  the superseded clause and must not act on it** — it would go looking for a refusal that
-  cannot be made to happen, or worse, manufacture one by editing code this panel does not touch.
-  Until that delta lands, **this paragraph governs for this lane's seats**, and the fact that
-  the two documents disagree is stated here rather than left for a seat to discover mid-walk.
-  *(Kept, not deleted, and this is the point: the divergence label was correct when written and
-  false ninety minutes later. Deleting it would leave a charter that looks like it always
-  agreed, and the next reader would have no way to see that the rule moved or why.)*
+  ⚠ **RULED 2026-09-07T23:09:55Z and NOW LANDED IN THE PROTOCOL — the two documents agree.**
+  The hub adopted the general form (empyrean `ac27e90`) and aeon landed it at `82540fab`,
+  verified here: an ancestor of aeon's `origin/master`, and on the newline-joined file the old
+  clause counts 0 while the new one counts 1. **Both counts, because one grep returning zero is
+  indistinguishable from a broken query** — and this file's clause is genuinely case-varying
+  (`WHICH VALUE WAS IN EFFECT` is capitalised in the landed text), so a case-sensitive search for
+  the lowercase phrase returns a false zero. So the discharge above is **compliance**, and the
+  protocol pin for the seats is now **aeon `82540fab`**.
+
+  ⚠ **THE LANDED TEXT IS RICHER THAN THE DRAFT, AND THE EXTRA HALF IS ADOPTED HERE.** Beyond
+  *prove which value was in effect*, it names a proof form nobody had specified: *on a green run
+  that is usually WHERE its artifacts landed — **present under the seat's own location, absent
+  from the shared default***. That is **two-sided**, and it is strictly stronger than reading a
+  forced value back out of a log, because a log line is the rig describing itself while the two
+  locations are the rig's effect on the world. **Where a chain here produces an artifact, the
+  seat proves both sides.** The display is the clean case: the seat's window is on its own Xvfb
+  **and** nothing appeared on `:0`. Where a chain produces no artifact — the socket, which
+  produces only an error — the printed form stands, and the seat says which of the two it used.
+  *(Read at the revision rather than taken from the message announcing it, which is how the extra
+  clause was noticed at all: the relay accurately described the delta as the drafted replacement,
+  and the landed text had grown a sentence past the draft.)*
+
+  *(History, kept and dated rather than deleted. This paragraph read DIVERGENCE from 23:0xZ,
+  when two of three chains could not perform the refusal the rule then demanded; the measurement
+  behind that is what moved the rule. A charter edited to look like it always agreed would hide
+  both that the rule moved and why.)*
   The ozone chain is the one of the three that genuinely does refuse, and it is already proven,
   red-first, by a committed instrument (`scratchpad/ozone-x11-proof.mjs`) rather than by a seat.
 
