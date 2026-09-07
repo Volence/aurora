@@ -153,6 +153,29 @@ port, and its own copies of the projects.** Two seats never share one of these.
   **The live sibling trees are never touched**: `../aeon` is another lane's working tree, and
   A2–A5 all write to disk.
 
+- **Socket.** Each seat exports `ORACLE_SOCKET` to a private path inside its own scratch
+  directory that **nothing listens on**. This is not belt-and-braces; it closes a hazard that
+  is reachable through the walk this charter mandates. `resolveSocketPath`
+  (`src/main/aether/socket-path.ts:35-50`) takes the first set-and-non-empty of
+  `ORACLE_SOCKET`, `EXODUS_SOCKET`, `$XDG_RUNTIME_DIR/oracle.sock`, else `/tmp/oracle.sock`,
+  and hands that one path to `net.connect` — nothing stats, nothing probes, nothing falls
+  through. **With the variable unset the chain silently reaches the shared socket, which on
+  this machine is the owner's running game window.** Aurora never connects on its own (there
+  is no mount-time connect; the door is the status badge, Build & Run, and the agent handler),
+  but **UXb is required to walk every control, and the status badge is a control** — so the
+  seat pressing it is the charter working as written, not a seat going off-piste.
+  Set the variable and the chain terminates at step one, deterministically. What the seat then
+  meets is the app's measured behaviour at a dead path: `ECONNREFUSED` at a socket file nobody
+  serves, `ENOENT` at no file, **both naming the path**
+  (`src/main/aether/__tests__/socket-dead-link.test.ts`). That is a real message the seat can
+  judge honestly against checklist item 5 without a live server existing anywhere.
+  **The general shape, oracle's framing of the two hazards this lane sent them, applied back
+  here:** *a default that fills in silently when the specific thing is absent.* It is the same
+  shape as `ELECTRON_BIN` without `AURORA_BUILT_TREE` and as an unforced ozone platform — and
+  it is exactly what the UX panel exists to catch, so a rig built with that shape in it would
+  have been measuring itself. Found by turning their sentence back on this charter after it
+  was already written and pushed.
+
 **Forbidden outright, and each for its own reason:**
 
 - **The owner's display.** He is using it.
