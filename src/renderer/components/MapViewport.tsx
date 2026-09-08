@@ -15,6 +15,7 @@ import { useAetherStore } from '../state/aetherStore';
 import { warpTargetFor } from '../../core/aether/warp-math';
 import { openDocumentGuarded } from './art/open-document';
 import { resolveEscape } from './map-escape';
+import { resolveMapChord } from './map-chords';
 import { flipAxisForKey, performMapFlip, setFlipGhostRepaint } from './map-flip';
 import { shouldMarkBand } from './map-band-mark';
 import { beginBandStamp, moveBandStamp, endBandStamp, type BandStampGesture } from './map-band-stamp';
@@ -1753,10 +1754,21 @@ export default function MapViewport() {
       // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y are NOT handled here — LevelWorkspace
       // owns the one level-undo binding for both engines (see its comment).
 
+      // ═══ EVERY BRANCH ABOVE THE HOISTED GUARD ASKS ONE QUESTION ═══
+      //
+      // `resolveMapChord` (map-chords.ts) is the ONLY statement of which
+      // modifiers each of the five dispatching branches below accepts, and its
+      // docblock carries the five separate policies it replaced. The one that
+      // mattered: Delete/Backspace tested no modifier at all, so Ctrl+Delete and
+      // Alt+Backspace destroyed the selected object 54 lines above the guard
+      // whose own comment claims it covers ALL modified keys. The guard is still
+      // below, unchanged, for everything that dispatches after this.
+      const chord = resolveMapChord(e);
+
       // Copy the marquee selection to the map clipboard. Works regardless of
       // which tool is active — the marquee tool doesn't need to stay selected
       // for a copy to land (only Escape-while-marquee-active clears it).
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+      if (chord === 'copy') {
         const marquee = useEditorStore.getState().marquee;
         if (marquee) {
           const section = act?.sections[marquee.sectionIndex];
@@ -1786,7 +1798,7 @@ export default function MapViewport() {
       // Enter paste mode (ghost preview + click-to-commit, see handleMouseDown/
       // handleMouseMove) when there's something to paste. A no-op Ctrl+V (empty
       // map clipboard) falls through, mirroring the Ctrl+C no-op above.
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+      if (chord === 'paste') {
         if (useEditorStore.getState().mapClipboard) {
           useEditorStore.getState().setPasting(true);
           e.preventDefault();
@@ -1802,7 +1814,7 @@ export default function MapViewport() {
       // active and a marquee is committed, unmodified 's' means "save as
       // chunk" instead of "switch to select" (switching tools away from
       // marquee via 's' is moot anyway — you're already using it).
-      if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey) {
+      if (chord === 'save-chunk') {
         const ed = useEditorStore.getState();
         if (ed.tool === 'marquee' && ed.marquee) {
           const marquee = ed.marquee;
@@ -1847,7 +1859,7 @@ export default function MapViewport() {
       // cell, because a warp is to a POINT, not to a tile: rounding to the tile
       // grid would put the player up to 7px from where they were told to appear,
       // and the whole feature is "put me exactly there".
-      if (e.key === 'F7') {
+      if (chord === 'warp') {
         e.preventDefault();
         const world = screenToWorld(lastMouse.current.x, lastMouse.current.y);
         // Read the act FRESH from the store rather than the closure. This
@@ -1866,7 +1878,7 @@ export default function MapViewport() {
         return;
       }
 
-      if ((e.key === 'Delete' || e.key === 'Backspace') && level) {
+      if (chord === 'delete' && level) {
         const { selection: sel } = useEditorStore.getState();
         if (sel) {
           const sec = act?.sections[sel.sectionIndex];
