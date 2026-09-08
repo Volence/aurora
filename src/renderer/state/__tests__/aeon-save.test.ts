@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { saveAeonProject } from '../aeon-save';
+import { writeProjectFile } from '../../../main/file-io';
+import { unwrapWriteOutcome } from '../../../shared/ipc-types';
 import { useProjectStore } from '../projectStore';
 import { useEditorStore } from '../editorStore';
 import { useToastStore } from '../toastStore';
@@ -54,7 +59,17 @@ function memFa(files: Map<string, Uint8Array>): FileAccess {
   };
 }
 
-/** window.api, narrowed to what the save path touches, over the same Map. */
+/**
+ * window.api, narrowed to what the save path touches, over the same Map.
+ *
+ * ITS WRITE USED TO `return true`, HARDCODED, and that is why nothing in this
+ * file could fail when the save reported a refused write as a successful one: a
+ * mock that cannot express refusal makes the refusal path unreachable. It now
+ * mirrors the real preload surface, which resolves for a write that landed and
+ * THROWS otherwise (unwrapWriteOutcome in shared/ipc-types.ts). The refusal rows
+ * below substitute a write that throws, and they build the thrown value out of
+ * the REAL main-side guard rather than typing a shape in.
+ */
 function installWindowApi(files: Map<string, Uint8Array>, written: string[]) {
   (globalThis as { window?: unknown }).window = {
     api: {
@@ -78,7 +93,6 @@ function installWindowApi(files: Map<string, Uint8Array>, written: string[]) {
       writeBinaryFile: async (_dir: string, rel: string, data: ArrayBuffer) => {
         files.set(rel, new Uint8Array(data));
         written.push(rel);
-        return true;
       },
     },
   };
@@ -135,7 +149,7 @@ describe('saveAeonProject', () => {
     // The next write re-dirties act 1, as a stroke landing mid-save would.
     let once = false;
     const api = (globalThis as unknown as { window: { api: Record<string, unknown> } }).window.api;
-    const realWrite = api.writeBinaryFile as (d: string, r: string, b: ArrayBuffer) => Promise<boolean>;
+    const realWrite = api.writeBinaryFile as (d: string, r: string, b: ArrayBuffer) => Promise<void>;
     api.writeBinaryFile = async (d: string, r: string, b: ArrayBuffer) => {
       if (!once) { once = true; dirtyAct('ojz', 'act1'); }
       return realWrite(d, r, b);
@@ -294,5 +308,92 @@ describe('saveAeonProject', () => {
     expect(last.message).toMatch(/Project saved/);
     // Nothing under export/ was written — the guard in the direction that regresses.
     expect(written.filter((p) => p.includes('export/'))).toEqual([]);
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // REFUSED-WRITE-REPORTED-SAVED — the save's verdict when main refuses.
+  //
+  // MEASURED ON 4cf66084, before the fix: with every write refused, this save
+  // returned { kind: 'saved' }, toasted "Project saved" in green, and cleared
+  // the dirty flag, so the next project switch would proceed without a confirm
+  // and the edits were gone. The refusal was the ONLY silent failure on this
+  // path: real fs errors already threw and were already handled.
+  //
+  // WHY THESE ROWS CROSS THE SEAM INSTEAD OF MOCKING IT. Every previous test
+  // here installed a `writeBinaryFile` that hardcoded success, so the seam
+  // between main's answer and the renderer's verdict had a test on each side
+  // and none across it. These rows compose the two REAL halves: main's own
+  // `writeProjectFile` produces the refusal, the preload's own
+  // `unwrapWriteOutcome` converts it, and the real saveAeonProject decides.
+  // Nothing about the refusal's shape is typed in here, so a change to either
+  // half that broke the pairing would show up as a red row rather than as a
+  // green mock agreeing with itself.
+  // ═════════════════════════════════════════════════════════════════════════
+  describe('a write the main process refuses', () => {
+    let tmp: string;
+    let outside: string;
+
+    beforeEach(() => {
+      // basePath is tmp/project; the escape target is a REAL file one level up.
+      tmp = mkdtempSync(join(tmpdir(), 'aurora-refuse-'));
+      mkdirSync(join(tmp, 'project'), { recursive: true });
+      outside = join(tmp, 'outside.bin');
+      writeFileSync(outside, Buffer.from([9, 9, 9]));
+    });
+    afterEach(() => { rmSync(tmp, { recursive: true, force: true }); });
+
+    /** The write the real preload performs, over the real main-side primitive. */
+    const bridgeWrite = async (dir: string, rel: string, data: ArrayBuffer): Promise<void> => {
+      unwrapWriteOutcome(await writeProjectFile(dir, rel, data));
+    };
+
+    it('does not report saved, keeps the act dirty, and reports the failure', async () => {
+      const base = join(tmp, 'project');
+      // The refusal is not a hand-written literal: this is what the guard in
+      // main/file-io.ts answers for a `..` path whose target really exists.
+      const refused = await writeProjectFile(base, '../outside.bin', new Uint8Array([1, 2, 3]));
+      expect(refused.ok).toBe(false);
+      // ...and it refused rather than failing: the file outside the project is
+      // untouched, which is the only assertion that separates a working guard
+      // from a write that happened to error.
+      expect([...readFileSync(outside)]).toEqual([9, 9, 9]);
+
+      const api = (globalThis as unknown as { window: { api: Record<string, unknown> } }).window.api;
+      api.writeBinaryFile = async (_d: string, rel: string, data: ArrayBuffer) =>
+        bridgeWrite(base, `../${rel}`, data);   // every path escapes, as the exploit did
+
+      dirtyAct('ojz', 'act1');
+      const result = await saveAeonProject();
+
+      expect(result.kind).toBe('error');
+      expect(result.kind === 'error' && result.message)
+        .toMatch(/write refused by the main process/);
+      // The edits are still the author's to save. Before the fix this was false.
+      expect(useEditorStore.getState().dirty).toBe(true);
+      const last = useToastStore.getState().toasts.at(-1)!;
+      expect(last.type).toBe('error');
+      expect(last.message).not.toMatch(/Project saved/);
+    });
+
+    // THE CONTROL. Same composition, a path that does not escape: the save is
+    // reported saved and the bytes are on disk. Without this row, a bridgeWrite
+    // that refused everything (or a saveAeonProject that never reported saved)
+    // would satisfy the row above for the wrong reason.
+    it('CONTROL: the same real write on a safe path is reported saved', async () => {
+      const base = join(tmp, 'project');
+      const api = (globalThis as unknown as { window: { api: Record<string, unknown> } }).window.api;
+      const landed: string[] = [];
+      api.writeBinaryFile = async (_d: string, rel: string, data: ArrayBuffer) => {
+        await bridgeWrite(base, rel, data);
+        landed.push(rel);
+      };
+
+      dirtyAct('ojz', 'act1');
+      expect((await saveAeonProject()).kind).toBe('saved');
+      expect(landed.length).toBeGreaterThan(0);
+      expect(existsSync(join(base, landed[0]))).toBe(true);
+      expect(useEditorStore.getState().dirty).toBe(false);
+      expect(useToastStore.getState().toasts.at(-1)!.message).toMatch(/Project saved/);
+    });
   });
 });

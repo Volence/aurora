@@ -178,6 +178,54 @@ export type DeleteOutcome =
   | { ok: true; deleted: boolean }
   | { ok: false; reason: string };
 
+/**
+ * What WRITE_BINARY_FILE did to one path, and WHY IT IS NOT A BOOLEAN.
+ *
+ * It was a boolean until 2026-09-08, `false` meaning "the path escapes the
+ * project and I refused to write it". Ten renderer call sites received that
+ * boolean and EIGHT of them dropped it, so a refusal reported as a successful
+ * save: the aeon save pushed the path to `written`, cleared the dirty flag and
+ * toasted "Project saved" (measured, 4 refused writes in one call). The guard
+ * exists because a sprite named `../../.ssh/authorized_keys` wrote outside the
+ * project, and the sprite exporter is one of the eight, so the exploit was
+ * blocked and reported as a successful export.
+ *
+ * Two things changed together, and the pair is the fix:
+ *
+ *  1. THE SHAPE. A refusal now carries its reason, in the same discriminated
+ *     form as DeleteOutcome, so main cannot answer a bare `false` that
+ *     typechecks and says nothing, and the preload cannot forward the answer
+ *     without narrowing `ok`.
+ *  2. THE CHANNEL. `unwrapWriteOutcome` converts a refusal into a THROW at the
+ *     preload boundary, exactly as `unwrapBinaryRead` converts a missing-file
+ *     marker back into an ENOENT. Real fs errors already threw, and every one
+ *     of the ten call sites already reports a throw (or, in the one case that
+ *     did not, now does). So the DANGEROUS DEFAULT IS GONE: a caller that
+ *     ignores the answer is now safe, rather than silently claiming success.
+ *
+ * Reading it is still allowed, and two callers do. What is no longer possible is
+ * for ignoring it to be quiet.
+ */
+export type WriteOutcome =
+  | { ok: true }
+  | { ok: false; reason: string };
+
+/**
+ * Turn a refused write into a throw. The preload applies this to every
+ * WRITE_BINARY_FILE answer (see the WriteOutcome docblock for why the refusal
+ * travels as a value and becomes an exception here rather than being rejected in
+ * main: ipcMain.handle logs every rejected invoke as a main-process error).
+ *
+ * The message names the guard that refused. It deliberately does NOT reuse the
+ * wording `deleteProjectFile` and `performGuardedWrite` share, so a test
+ * asserting on it cannot be satisfied by a different rule's refusal.
+ */
+export function unwrapWriteOutcome(outcome: WriteOutcome): void {
+  if (!outcome.ok) {
+    throw new Error(`write refused by the main process: ${outcome.reason}`);
+  }
+}
+
 export interface RecentProject {
   path: string;
   name: string;

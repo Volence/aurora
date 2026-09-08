@@ -2,10 +2,9 @@ import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { writeFileSync } from 'fs';
 import { IPC_CHANNELS } from '../shared/ipc-types';
 import type { GuardedWriteFile } from '../shared/ipc-types';
-import { readBinaryFile, readManyFiles, listProjectFiles, pathExists, listDir, fileMtime, deleteProjectFile } from './file-io';
+import { readBinaryFile, readManyFiles, listProjectFiles, pathExists, listDir, fileMtime, deleteProjectFile, writeProjectFile } from './file-io';
 import { performGuardedWrite } from './guarded-write';
 import { getRecentProjects, addRecentProject, removeRecentProject } from './recent-projects';
-import { isRelPathSafe } from '../shared/rel-path';
 
 export function registerIpcHandlers(): void {
   // Env-guarded paint instrumentation sink (AURORA_PERF=1). The renderer only
@@ -86,30 +85,13 @@ export function registerIpcHandlers(): void {
     return removeRecentProject(path);
   });
 
+  // The one writing channel. Nothing is decided here: the guard, the atomic
+  // tmp-plus-rename and the refusal shape all live in file-io.ts's
+  // writeProjectFile, which is where they can be tested without Electron (the
+  // same move guarded-write.ts made, and for the same reason). The refusal
+  // becomes a throw in the preload, via unwrapWriteOutcome.
   ipcMain.handle(IPC_CHANNELS.WRITE_BINARY_FILE, async (_event, basePath: string, relativePath: string, data: ArrayBuffer) => {
-    // THE ONE WRITE CHANNEL THAT HAD NO GUARD, while file-io.ts and
-    // guarded-write.ts have carried one since they were written. `resolve`
-    // happily walks out of the project on a `..` segment or an absolute path,
-    // and the sprite exporter feeds this a FREE-TYPED name as a path segment —
-    // so a sprite called `../../.ssh/authorized_keys` was a write outside the
-    // project the user opened. Refuse rather than throw: the renderer treats
-    // `false` as a failed write and reports it.
-    if (!isRelPathSafe(relativePath)) {
-      console.error(`[ipc] refused write to unsafe path: '${relativePath}'`);
-      return false;
-    }
-    const { resolve, dirname } = await import('path');
-    const { writeFileSync, renameSync, mkdirSync } = await import('fs');
-    const fullPath = resolve(basePath, relativePath);
-    mkdirSync(dirname(fullPath), { recursive: true });
-    // Write to a sibling .tmp file first, then atomically rename into place.
-    // On POSIX a same-directory rename is atomic, so a crash mid-write cannot
-    // corrupt the target (critical for project.json, which bricks the project
-    // if partially written).
-    const tmpPath = fullPath + '.tmp';
-    writeFileSync(tmpPath, Buffer.from(data));
-    renameSync(tmpPath, fullPath);
-    return true;
+    return writeProjectFile(basePath, relativePath, data);
   });
 
   ipcMain.handle(IPC_CHANNELS.SELECT_FILES, async (event, title: string, filters: { name: string; extensions: string[] }[]) => {

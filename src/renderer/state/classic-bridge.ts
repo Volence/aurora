@@ -60,20 +60,14 @@ export interface ClassicBridge {
 /** The real bridge: FileAccess over IPC → core openProject in the renderer. */
 export const ipcClassicBridge: ClassicBridge = {
   async writeSidecar(dir: string, bytes: Uint8Array): Promise<void> {
-    // `writeBinaryFile` returns Promise<boolean> and ANSWERS `false` when the
-    // main process refuses the path; its own contract is that the renderer
-    // treats false as a failed write and reports it. This call site ignored
-    // that answer, so a refused write was indistinguishable from a successful
-    // one. Throwing is the reporting channel the caller already has: the
-    // store's seed wraps this in a try/catch that falls back to planner
-    // defaults, which is the correct outcome for a write that did not land.
-    //
-    // This is ONE of ten call sites with the same gap; the other nine are
-    // booked separately as REFUSED-WRITE-REPORTED-SAVED and are NOT fixed here.
-    const wrote = await window.api.writeBinaryFile(dir, SIDECAR_REL_PATH, bytes.buffer as ArrayBuffer);
-    if (wrote === false) {
-      throw new Error(`${SIDECAR_REL_PATH} was refused by the main process; nothing was written`);
-    }
+    // `writeBinaryFile` used to answer `false` when the main process refused the
+    // path, and this call site read that answer while eight others dropped it.
+    // As of the REFUSED-WRITE-REPORTED-SAVED fix there is no boolean to read:
+    // the refusal arrives as a THROW from the preload, so the bare `await` below
+    // is the whole of the handling. The store's seed wraps this in a try/catch
+    // that falls back to planner defaults, which is the correct outcome for a
+    // write that did not land.
+    await window.api.writeBinaryFile(dir, SIDECAR_REL_PATH, bytes.buffer as ArrayBuffer);
   },
   async open(dir: string): Promise<ClassicOpenResult> {
     ensureAdaptersRegistered();

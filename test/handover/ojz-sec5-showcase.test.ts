@@ -330,7 +330,8 @@ function installFsWindowApi(written: string[]): void {
         mkdirSync(dirname(p), { recursive: true });
         writeFileSync(p, Buffer.from(data));
         written.push(rel);
-        return true;
+        // No `return true`: the real preload surface resolves for a write that
+        // landed and throws otherwise (unwrapWriteOutcome in shared/ipc-types).
       },
     },
   };

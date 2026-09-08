@@ -21,15 +21,20 @@
 // a sidecar Aurora could not READ is one it must not overwrite.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import {
   useClassicProjectStore,
   __setClassicBridgeForTest,
   __resetClassicBridgeForTest,
 } from '../classicProjectStore';
 import { ipcClassicBridge, type ClassicBridge } from '../classic-bridge';
+import { writeProjectFile } from '../../../main/file-io';
+import { unwrapWriteOutcome } from '../../../shared/ipc-types';
 import type { ProjectHandle, SidecarState } from '../../../core/project/adapter';
 import type { ResolutionReport } from '../../../core/project/report';
-import { CLASSIC_BUILD_SIDECAR } from '../../../core/project/mapping';
+import { CLASSIC_BUILD_SIDECAR, SIDECAR_REL_PATH } from '../../../core/project/mapping';
 import { useClassicLevelStore } from '../classicLevelStore';
 import { useToastStore } from '../toastStore';
 
@@ -219,34 +224,54 @@ describe('the open-time build-field seed still writes when it should', () => {
 // ---------------------------------------------------------------------------
 // The REAL bridge's write, not the fake one above.
 //
-// `window.api.writeBinaryFile` returns Promise<boolean> and answers `false`
-// when the main process refuses the path — its own contract says the renderer
-// treats that as a failed write and reports it. ipcClassicBridge.writeSidecar
-// assigned the result nowhere, so a refused write was indistinguishable from a
-// landed one and the seed's try/catch never fired.
+// A path the main process refuses used to arrive here as a `false` return value,
+// and eight of the ten call sites on that channel dropped it, so a refused write
+// was indistinguishable from a landed one. The REFUSED-WRITE-REPORTED-SAVED fix
+// moved the refusal into the throw channel at the preload boundary, so there is
+// no boolean left to drop; these two rows are the sidecar path's half of that.
 //
-// Booked for the other nine call sites as REFUSED-WRITE-REPORTED-SAVED; this
-// row covers the one on the path being fixed here.
+// THE HALVES ARE REAL, NOT MOCKED. The refusal is whatever main's own
+// `writeProjectFile` answers for an escaping path, converted by the preload's own
+// `unwrapWriteOutcome`. A mock that hardcoded either answer is what let the
+// defect live: it can only ever agree with itself.
 // ---------------------------------------------------------------------------
 
-describe('ipcClassicBridge.writeSidecar reads the answer the write gives', () => {
-  afterEach(() => { delete (globalThis as unknown as { window?: unknown }).window; });
-
-  it('a refused write (false) is reported, not swallowed', async () => {
-    (globalThis as unknown as { window: unknown }).window = {
-      api: { writeBinaryFile: async () => false },
-    };
-    await expect(
-      ipcClassicBridge.writeSidecar!('/proj/s1', new Uint8Array([1, 2, 3])),
-    ).rejects.toThrow(/refused by the main process/);
+describe('ipcClassicBridge.writeSidecar surfaces a write main refused', () => {
+  let tmp: string;
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), 'aurora-seed-write-'));
+    mkdirSync(join(tmp, 'project'), { recursive: true });
+    writeFileSync(join(tmp, 'outside.json'), '{"real":true}');
+  });
+  afterEach(() => {
+    delete (globalThis as unknown as { window?: unknown }).window;
+    rmSync(tmp, { recursive: true, force: true });
   });
 
-  it('an accepted write (true) resolves', async () => {
+  const installBridgeWrite = (rewrite: (rel: string) => string) => {
     (globalThis as unknown as { window: unknown }).window = {
-      api: { writeBinaryFile: async () => true },
+      api: {
+        writeBinaryFile: async (dir: string, rel: string, data: ArrayBuffer) =>
+          unwrapWriteOutcome(await writeProjectFile(dir, rewrite(rel), data)),
+      },
     };
+  };
+
+  it('a refused path is reported, not swallowed', async () => {
+    // The escape target really exists, so a refusal cannot be an ENOENT wearing
+    // the guard's costume; the assertion after it is what proves that.
+    installBridgeWrite((rel) => `../${rel.split('/').pop()}`);
     await expect(
-      ipcClassicBridge.writeSidecar!('/proj/s1', new Uint8Array([1, 2, 3])),
+      ipcClassicBridge.writeSidecar!(join(tmp, 'project'), new TextEncoder().encode('{"seeded":1}')),
+    ).rejects.toThrow(/write refused by the main process/);
+    expect(readFileSync(join(tmp, 'outside.json'), 'utf8')).toBe('{"real":true}');
+  });
+
+  it('CONTROL: the same real write on a safe path resolves and lands', async () => {
+    installBridgeWrite((rel) => rel);
+    await expect(
+      ipcClassicBridge.writeSidecar!(join(tmp, 'project'), new TextEncoder().encode('{"seeded":1}')),
     ).resolves.toBeUndefined();
+    expect(readFileSync(join(tmp, 'project', SIDECAR_REL_PATH), 'utf8')).toBe('{"seeded":1}');
   });
 });

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC_CHANNELS, unwrapBinaryRead } from '../shared/ipc-types';
+import { IPC_CHANNELS, unwrapBinaryRead, unwrapWriteOutcome } from '../shared/ipc-types';
 import type { RecentProject, GuardedWriteFile, GuardedWriteResult, ReadManyEntry, DeleteOutcome, AetherStatusPayload, AetherWarpResult, AetherBuildResult } from '../shared/ipc-types';
 import { AGENT_REQUEST_CHANNEL, AGENT_RESPONSE_CHANNEL } from '../shared/agent-protocol';
 import type { AgentRequestEnvelope, AgentResponseEnvelope } from '../shared/agent-protocol';
@@ -24,8 +24,21 @@ const api = {
   saveFile: (defaultName: string, data: ArrayBuffer): Promise<boolean> =>
     ipcRenderer.invoke(IPC_CHANNELS.SAVE_FILE, defaultName, data),
 
-  writeBinaryFile: (basePath: string, relativePath: string, data: ArrayBuffer): Promise<boolean> =>
-    ipcRenderer.invoke(IPC_CHANNELS.WRITE_BINARY_FILE, basePath, relativePath, data),
+  /**
+   * Write one project-relative file. RESOLVES when the bytes landed and THROWS
+   * otherwise, including for the deliberate refusal of a path that escapes the
+   * project -- which used to arrive as a `false` that eight of ten callers
+   * dropped. See WriteOutcome in shared/ipc-types.ts for the measurement and the
+   * argument; `unwrapWriteOutcome` is the conversion, and it is the twin of
+   * `unwrapBinaryRead` above.
+   *
+   * The return type is `void` ON PURPOSE. There is no longer a boolean to test,
+   * so a caller still holding a `=== false` branch fails to compile rather than
+   * keeping a branch that can never fire again.
+   */
+  writeBinaryFile: (basePath: string, relativePath: string, data: ArrayBuffer): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITE_BINARY_FILE, basePath, relativePath, data)
+      .then(unwrapWriteOutcome),
 
   selectFile: (title: string, filters: { name: string; extensions: string[] }[]): Promise<string | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.SELECT_FILES, title, filters),

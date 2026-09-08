@@ -195,18 +195,13 @@ export default function ProjectSetupTab() {
         useToastStore.getState().addToast(plan.reason, 'error');
         return;
       }
-      // writeBinaryFile ANSWERS. It returns false when main refuses the path,
-      // and its own comment says the renderer treats false as a failed write
-      // and reports it — but no caller in this repo was reading it, so a
-      // refused write reported as a successful save. Booked separately as
-      // REFUSED-WRITE-REPORTED-SAVED for the other nine call sites; this one,
-      // on the path being fixed here, reads it now. Throwing routes it into
-      // the catch below, which already toasts and (crucially) skips the
-      // re-open that would otherwise claim the edits landed.
-      const wrote = await window.api.writeBinaryFile(dir, SIDECAR_REL_PATH, plan.bytes.buffer as ArrayBuffer);
-      if (wrote === false) {
-        throw new Error(`${SIDECAR_REL_PATH} was refused by the main process; nothing was written`);
-      }
+      // A refused write REACHES THIS CATCH. writeBinaryFile used to answer
+      // `false` for a path main refused, and this site read that answer while
+      // eight others dropped it; the REFUSED-WRITE-REPORTED-SAVED fix moved the
+      // refusal into the throw channel, so the bare `await` is now the whole of
+      // the handling. The catch below toasts and (crucially) skips the re-open
+      // that would otherwise claim the edits landed.
+      await window.api.writeBinaryFile(dir, SIDECAR_REL_PATH, plan.bytes.buffer as ArrayBuffer);
       setEdits({});
       resetChecks(); // row lights fall back to the fresh report status, not stale live-check colors
       const outcome = await useClassicProjectStore.getState().openDirectory(dir);
