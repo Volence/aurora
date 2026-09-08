@@ -117,9 +117,18 @@ const CONTRACT_TEXT = readFileSync(CONTRACT_PATH, 'utf8');
 // capacity), plus six line numbers that drifted without their values moving. The
 // amendment's `scope` names the eight coordinates it deliberately did NOT repair.
 //
+// ⚠ AND THE AMENDMENT'S `commit` IS A TIP, NOT THE CHANGE. It records aeon's
+// `origin/master` when the values were re-derived, which is what the currency
+// gate resolves at run time — but both of the last two anchors were DOCS-CLASS
+// commits touching no code, so the entry now carries
+// `commitIsATipNotAChange` naming 917569e9 and 67458e39 as the commits that
+// actually moved the number. aeon's tip moved FOUR times during this parcel
+// (54e2be22 -> 27eb42b1 -> 8f66e233 -> 937be0f5); the ceiling was re-derived at
+// the last two and held at 376 in all three authorities.
+//
 // The previous pin, from the `section-budget-in-prose` amendment, was
 // 8f1c9e288502b000888bf94bc8d46d3a1c07b582483487c3305e5fd8e650c95b.
-const CONTRACT_SHA256 = 'bb0624d4aa61fb23f671fc8520fda77732704ca01ffd587301747d94cdde74d2';
+const CONTRACT_SHA256 = 'df180c1010d1e7ff6948f85b8e715910c100958da0c9fc5695720e30483b263f';
 
 describe('the vendored contract is the one we pinned', () => {
   it('matches the pinned content hash', () => {

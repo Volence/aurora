@@ -89,8 +89,9 @@ const ROWS = 4;
 /**
  * ⚠ THE FREE ROOM IS TWO NUMBERS, AND THIS FILE USED TO KNOW ONLY ONE.
  *
- * `FREE` above is the TILE blob's free room. There is a second, independent and
- * on this fixture TIGHTER budget: the emitted `ojz_bg_anim` ROM section, where
+ * `FREE` above is the TILE blob's free room. There is a second, independent
+ * budget — TIGHTER than the blob's on this fixture when these words were written,
+ * and no longer (see the flip recorded below): the emitted `ojz_bg_anim` ROM section, where
  * an animated slot costs `BGANIM_BYTES_PER_SLOT` because it is stored once per
  * phase bank. `SECTION_FREE` is what that ceiling admits for a one-band act,
  * derived from the vendored constants exactly as aeon derives it.
