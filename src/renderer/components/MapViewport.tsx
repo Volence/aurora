@@ -2897,10 +2897,13 @@ export default function MapViewport() {
    * a drag that outlived its act wrote act A's start coordinates into act B's
    * object through a real move command: the second half of the measured damage,
    * and the half that is on the undo stack under an innocent description. Every
-   * teardown route inherits that. So the stale check runs FIRST at the top of
-   * `finishGesture`, at the top of `handleMouseMove` (so no further pixel is
-   * written into the wrong act), and off the act itself changing (the effect
-   * below), which is the only route that needs no pointer event at all.
+   * teardown route inherits that, the UNMOUNT route included: `finishGesture`
+   * runs on unmount so a facet switch commits the stroke in flight instead of
+   * losing it, and that commit would land in act B for exactly the same reason
+   * the release did. So the stale check runs FIRST at the top of `finishGesture`,
+   * at the top of `handleMouseMove` (so no further pixel is written into the
+   * wrong act), and off the act itself changing (the effect below), which is the
+   * only route that needs no pointer event at all.
    *
    * A DROPPED GESTURE WRITES NO COMMAND. There is no way to commit one: the
    * command layer resolves `getActiveLevel()`, which is the act open now, and
@@ -3903,6 +3906,40 @@ export default function MapViewport() {
       window.removeEventListener('mousemove', onMove);
     };
   }, [finishGesture]);
+
+  /**
+   * ═══ AN UNMOUNT IS A RELEASE TOO (lens sweep UNMOUNT-DISCARDS-STROKE) ═══
+   *
+   * THE STROKE IS ALREADY IN THE DOCUMENT WHEN THIS COMPONENT GOES AWAY. A paint
+   * drag writes live and becomes ONE command on release (`endPaintStroke`), and
+   * the release used to arrive by exactly two routes, both of them pointer
+   * events. A facet switch is neither: `LevelWorkspace` renders the facet's
+   * module as `<Canvas />`, so changing facet changes the component TYPE and
+   * unmounts this one mid-stroke. The effect above removed its listeners and
+   * nothing committed, so the paint sat in the section with no command, no undo
+   * entry and nothing to undo it with. `handleMouseLeave` says this state was
+   * fixed for the leave-the-viewport route; the unmount route was never closed.
+   *
+   * Two triggers with no pointer event at all: a tab switch whose facet differs
+   * (`LevelWorkspace`'s switchFacet effect, keyed on the active tab), and this
+   * component's OWN keydown handler, where saving a marquee as a chunk calls
+   * `switchFacet(..., 'art')`.
+   *
+   * WHY A REF AND AN EMPTY DEP LIST. `finishGesture` is stable today, so
+   * `[finishGesture]` would also mean "unmount only" today. It would stop
+   * meaning that the day someone adds a dependency to it, and the failure would
+   * be a gesture COMMITTED HALFWAY on an unrelated re-render, which is far
+   * harder to see than the one being fixed. The ref makes the cleanup unmount
+   * only by construction while still calling the current body.
+   *
+   * IT IS SAFE BECAUSE `finishGesture` ASKS `abandonStaleGestures` FIRST: a
+   * teardown that follows an act switch drops the gesture and puts back what it
+   * wrote, instead of committing act A's edit against act B's level. Without
+   * that first line this fix would trade a lost stroke for a corrupted one.
+   */
+  const finishGestureRef = useRef(finishGesture);
+  finishGestureRef.current = finishGesture;
+  useEffect(() => () => { finishGestureRef.current(); }, []);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     // A guide release is not a map click. The `view`-tool branch below turns a
