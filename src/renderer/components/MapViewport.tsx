@@ -15,6 +15,8 @@ import { useAetherStore } from '../state/aetherStore';
 import { warpTargetFor } from '../../core/aether/warp-math';
 import { openDocumentGuarded } from './art/open-document';
 import { resolveEscape } from './map-escape';
+import { resolveMapChord } from './map-chords';
+import { gestureStatus, gestureStaleReason, type GestureFrame } from './map-gesture-witness';
 import { flipAxisForKey, performMapFlip, setFlipGhostRepaint } from './map-flip';
 import { shouldMarkBand } from './map-band-mark';
 import { beginBandStamp, moveBandStamp, endBandStamp, type BandStampGesture } from './map-band-stamp';
@@ -336,6 +338,15 @@ export default function MapViewport() {
    */
   const bandStamp = useRef<BandStampGesture | null>(null);
   /**
+   * WHICH BACKGROUND the stamp in flight is writing, by identity: the same
+   * (source, bgRef) pair `bgStroke` already carries, plus the override document
+   * itself. The stamp's `writeWord` closure captures that document at mousedown,
+   * so once the canvas is showing a different background the gesture goes on
+   * writing one the author cannot see. Checked on every move and on release; see
+   * `abandonStaleGestures`.
+   */
+  const bandStampBg = useRef<{ source: DisplayedBgSource; bgRef: string | null; doc: unknown } | null>(null);
+  /**
    * The FG tile / collision paint gesture in flight — same rule as bgStroke.
    *
    * A DRAG IS ONE EDIT. Each cell used to execute its own command, so a 60-cell
@@ -344,9 +355,11 @@ export default function MapViewport() {
    * Classic coalesces its equivalent correctly; this is that.
    */
   const paintStroke = useRef<
-    | { kind: 'tiles'; sectionIndex: number; entries: Map<number, { oldNt: number; newNt: number }> }
+    | { kind: 'tiles'; sectionIndex: number; actKey: string | null; section: Section;
+      entries: Map<number, { oldNt: number; newNt: number }> }
     | {
-      kind: 'collision'; sectionIndex: number; plane: 'a' | 'b'; blocks: number;
+      kind: 'collision'; sectionIndex: number; actKey: string | null; section: Section;
+      plane: 'a' | 'b'; blocks: number;
       entries: Map<number, { oldColl: number; newColl: number }>;
       /** The OTHER plane's cells, when the stroke is a "Both planes" one. Kept
        *  in the SAME stroke so the whole gesture stays one undo step — undoing
@@ -382,7 +395,9 @@ export default function MapViewport() {
   // Marquee tool: the drag-start tile + section, fixed for the whole drag so the
   // marquee always resolves against the section the drag STARTED in even if the
   // cursor wanders over another section's world space.
-  const marqueeDragStart = useRef<{ sectionIndex: number; col: number; row: number } | null>(null);
+  const marqueeDragStart = useRef<
+    { sectionIndex: number; col: number; row: number;
+      actKey: string | null; section: Section } | null>(null);
   const isMarqueeDragging = useRef(false);
   /**
    * Where the cursor was when the marquee rect was last computed, in the
@@ -421,12 +436,27 @@ export default function MapViewport() {
    */
   const pasteGhostRef = useRef<{ clip: MapClipboard; zoneId: string; canvas: HTMLCanvasElement } | null>(null);
   const lastMouse = useRef({ x: 0, y: 0 });
+  /**
+   * The object/ring drag in flight, and WHAT IT GRABBED, by identity.
+   *
+   * `sectionIndex` + `index` are a stale pair the moment the act changes under
+   * the gesture, and both still RESOLVE afterwards, so the write lands on the
+   * wrong row instead of failing. `actKey`, `section` and `subject` are the
+   * witness `map-gesture-witness.ts` compares against what is there now; its
+   * docblock carries the measured damage and the reason the witness is identity
+   * rather than a value (this drag writes live, so its subject's value changes
+   * by design). `subject` is also what lets `abandonStaleGestures` put the live
+   * writes back after the act carrying that row has been closed.
+   */
   const dragTarget = useRef<{
     type: 'object' | 'ring';
     sectionIndex: number;
     index: number;
     startX: number;
     startY: number;
+    actKey: string | null;
+    section: Section;
+    subject: ObjectPlacement | RingPlacement;
   } | null>(null);
 
   /**
@@ -1753,10 +1783,21 @@ export default function MapViewport() {
       // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y are NOT handled here — LevelWorkspace
       // owns the one level-undo binding for both engines (see its comment).
 
+      // ═══ EVERY BRANCH ABOVE THE HOISTED GUARD ASKS ONE QUESTION ═══
+      //
+      // `resolveMapChord` (map-chords.ts) is the ONLY statement of which
+      // modifiers each of the five dispatching branches below accepts, and its
+      // docblock carries the five separate policies it replaced. The one that
+      // mattered: Delete/Backspace tested no modifier at all, so Ctrl+Delete and
+      // Alt+Backspace destroyed the selected object 54 lines above the guard
+      // whose own comment claims it covers ALL modified keys. The guard is still
+      // below, unchanged, for everything that dispatches after this.
+      const chord = resolveMapChord(e);
+
       // Copy the marquee selection to the map clipboard. Works regardless of
       // which tool is active — the marquee tool doesn't need to stay selected
       // for a copy to land (only Escape-while-marquee-active clears it).
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+      if (chord === 'copy') {
         const marquee = useEditorStore.getState().marquee;
         if (marquee) {
           const section = act?.sections[marquee.sectionIndex];
@@ -1786,7 +1827,7 @@ export default function MapViewport() {
       // Enter paste mode (ghost preview + click-to-commit, see handleMouseDown/
       // handleMouseMove) when there's something to paste. A no-op Ctrl+V (empty
       // map clipboard) falls through, mirroring the Ctrl+C no-op above.
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+      if (chord === 'paste') {
         if (useEditorStore.getState().mapClipboard) {
           useEditorStore.getState().setPasting(true);
           e.preventDefault();
@@ -1802,7 +1843,7 @@ export default function MapViewport() {
       // active and a marquee is committed, unmodified 's' means "save as
       // chunk" instead of "switch to select" (switching tools away from
       // marquee via 's' is moot anyway — you're already using it).
-      if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey) {
+      if (chord === 'save-chunk') {
         const ed = useEditorStore.getState();
         if (ed.tool === 'marquee' && ed.marquee) {
           const marquee = ed.marquee;
@@ -1847,7 +1888,7 @@ export default function MapViewport() {
       // cell, because a warp is to a POINT, not to a tile: rounding to the tile
       // grid would put the player up to 7px from where they were told to appear,
       // and the whole feature is "put me exactly there".
-      if (e.key === 'F7') {
+      if (chord === 'warp') {
         e.preventDefault();
         const world = screenToWorld(lastMouse.current.x, lastMouse.current.y);
         // Read the act FRESH from the store rather than the closure. This
@@ -1866,7 +1907,7 @@ export default function MapViewport() {
         return;
       }
 
-      if ((e.key === 'Delete' || e.key === 'Backspace') && level) {
+      if (chord === 'delete' && level) {
         const { selection: sel } = useEditorStore.getState();
         if (sel) {
           const sec = act?.sections[sel.sectionIndex];
@@ -2272,6 +2313,13 @@ export default function MapViewport() {
       writeWord: (i, w) => writeBgOverrideLayoutWord(doc, i, w),
     });
     bandStamp.current = gesture;
+    // …and WHICH BACKGROUND it is writing, so a move or a release can tell that
+    // the canvas has since gone somewhere else (abandonStaleGestures).
+    bandStampBg.current = {
+      source: resolved.source,
+      bgRef: resolved.source === 'library' ? resolved.libraryId : null,
+      doc,
+    };
     sectionRenderer.markBgDirty([...gesture.applied.keys()]);
     useEditorStore.getState().markDirty();
     useEditorStore.getState().bumpLiveEdit();
@@ -2292,6 +2340,7 @@ export default function MapViewport() {
   function endBandStampGesture(): void {
     const g = bandStamp.current;
     bandStamp.current = null;
+    bandStampBg.current = null;
     bgRefusalShown.current = false;
     if (!g) return;
     const entries = endBandStamp(g);
@@ -2324,13 +2373,26 @@ export default function MapViewport() {
     otherChanges?: Array<{ index: number; oldValue: number; newValue: number }>,
   ): void {
     const cur = paintStroke.current;
+    // THE RUN IS PER SECTION OBJECT, NOT PER INDEX. `sectionIndex` alone cannot
+    // see an act switch: the same number resolves in the new act, so one command
+    // would carry two acts' cells with the other act's old values in it. The
+    // section itself is the witness (map-gesture-witness.ts), and a stroke whose
+    // section moved is reverted rather than flushed — `endPaintStroke` decides
+    // that, so the release path and this one cannot disagree.
+    const liveSection = getSectionByIndex(sectionIndex);
     const sameRun = cur && cur.kind === kind && cur.sectionIndex === sectionIndex
+      && cur.section === liveSection
       && (cur.kind !== 'collision' || cur.plane === plane);
     if (!sameRun) {
       endPaintStroke();
+      if (!liveSection) return;
+      const actKey = actKeyNow();
       paintStroke.current = kind === 'tiles'
-        ? { kind, sectionIndex, entries: new Map() }
-        : { kind, sectionIndex, plane, blocks: 0, entries: new Map(), otherEntries: new Map() };
+        ? { kind, sectionIndex, actKey, section: liveSection, entries: new Map() }
+        : {
+          kind, sectionIndex, actKey, section: liveSection, plane, blocks: 0,
+          entries: new Map(), otherEntries: new Map(),
+        };
     }
     const stroke = paintStroke.current!;
     if (stroke.kind === 'collision') stroke.blocks++;
@@ -2766,6 +2828,168 @@ export default function MapViewport() {
     return act?.sections[idx] ?? null;
   }
 
+  /**
+   * THE OPEN ACT, ZONE INCLUDED, as one string a gesture can hold.
+   *
+   * Zone and act, not the act alone: act ids are unique inside a zone and `act1`
+   * exists in every one of them, so an act id by itself cannot see a zone
+   * switch. `null` when nothing is open, which `gestureStatus` reads as
+   * `no-witness` and therefore never trusts.
+   */
+  function actKeyNow(): string | null {
+    const state = useProjectStore.getState();
+    if (!state.currentZoneId || !state.currentActId) return null;
+    return `${state.currentZoneId}/${state.currentActId}`;
+  }
+
+  /** What is at a drag's coordinates NOW, for comparison with what it grabbed. */
+  function dragFrameNow(t: NonNullable<typeof dragTarget.current>): GestureFrame {
+    const section = getSectionByIndex(t.sectionIndex);
+    const subject = section === null
+      ? null
+      : (t.type === 'object' ? section.objects[t.index] : section.rings[t.index]) ?? null;
+    return { actKey: actKeyNow(), section, subject };
+  }
+
+  /** Put a paint stroke's live writes back, into the section it actually wrote. */
+  function revertPaintStroke(stroke: NonNullable<typeof paintStroke.current>): void {
+    // `stroke.section` and not `getSectionByIndex` — the whole point is that the
+    // index now names somebody else. The stroke still holds the array it wrote
+    // to, so the revert is exact even after that act was closed.
+    if (stroke.kind === 'tiles') {
+      const nt = stroke.section.tileGrid.nametable;
+      for (const [index, e] of stroke.entries) nt[index] = e.oldNt;
+      sectionRenderer.markDirty(stroke.sectionIndex, [...stroke.entries.keys()]);
+      return;
+    }
+    const ce = stroke.plane === 'b' ? stroke.section.collisionEditB : stroke.section.collisionEdit;
+    const other = stroke.plane === 'b' ? stroke.section.collisionEdit : stroke.section.collisionEditB;
+    if (ce) for (const [index, e] of stroke.entries) ce[index] = e.oldColl;
+    if (other) for (const [index, e] of stroke.otherEntries) other[index] = e.oldColl;
+  }
+
+  /**
+   * WHICH BACKGROUND THE CANVAS IS DRAWING, by identity: the pair `bgStroke`
+   * already witnesses, plus the override document a band stamp writes through.
+   */
+  function displayedBgNow(): { source: DisplayedBgSource; bgRef: string | null; doc: unknown } | null {
+    const state = useProjectStore.getState();
+    const act = getCurrentAct(state);
+    if (!act) return null;
+    const holder = state.project?.bgOverride ?? null;
+    const resolved = resolveDisplayedBg(
+      act, state.project?.bgLibrary ?? [], useEditorStore.getState().activeSectionIndex, holder,
+    );
+    if (!resolved) return null;
+    return {
+      source: resolved.source,
+      bgRef: resolved.source === 'library' ? resolved.libraryId : null,
+      doc: resolved.source === 'override' ? holder?.doc ?? null : null,
+    };
+  }
+
+  /**
+   * DROP EVERY GESTURE WHOSE SUBJECT MOVED UNDER IT, and put back whatever it
+   * had already written. Returns true if it dropped anything.
+   *
+   * ⚠ IT RUNS BEFORE ANY COMMIT, NOT ONLY BEFORE ANY WRITE. A commit resolves
+   * its section against the act open AT COMMIT TIME, which is how the RELEASE of
+   * a drag that outlived its act wrote act A's start coordinates into act B's
+   * object through a real move command: the second half of the measured damage,
+   * and the half that is on the undo stack under an innocent description. Every
+   * teardown route inherits that, the UNMOUNT route included: `finishGesture`
+   * runs on unmount so a facet switch commits the stroke in flight instead of
+   * losing it, and that commit would land in act B for exactly the same reason
+   * the release did. So the stale check runs FIRST at the top of `finishGesture`,
+   * at the top of `handleMouseMove` (so no further pixel is written into the
+   * wrong act), and off the act itself changing (the effect below), which is the
+   * only route that needs no pointer event at all.
+   *
+   * A DROPPED GESTURE WRITES NO COMMAND. There is no way to commit one: the
+   * command layer resolves `getActiveLevel()`, which is the act open now, and
+   * executing act A's move against act B's level is the corruption, not the fix.
+   * So the honest outcome is the document as it was, and a notice saying so.
+   */
+  function abandonStaleGestures(): boolean {
+    const reasons: string[] = [];
+    const note = (reason: string | null): void => {
+      if (reason !== null && !reasons.includes(reason)) reasons.push(reason);
+    };
+
+    const drag = dragTarget.current;
+    if (drag) {
+      const status = gestureStatus(
+        { actKey: drag.actKey, section: drag.section, subject: drag.subject }, dragFrameNow(drag),
+      );
+      if (status !== 'intact') {
+        // The row it grabbed is still held by reference, so the live writes go
+        // back exactly, whichever act now owns the index.
+        drag.subject.x = drag.startX;
+        drag.subject.y = drag.startY;
+        dragTarget.current = null;
+        isDragging.current = false;
+        note(gestureStaleReason(status));
+      }
+    }
+
+    const stroke = paintStroke.current;
+    if (stroke) {
+      const status = gestureStatus(
+        { actKey: stroke.actKey, section: stroke.section, subject: null },
+        { actKey: actKeyNow(), section: getSectionByIndex(stroke.sectionIndex), subject: null },
+      );
+      if (status !== 'intact') {
+        revertPaintStroke(stroke);
+        paintStroke.current = null;
+        isPaintDragging.current = false;
+        lastPaintedCell.current = null;
+        note(gestureStaleReason(status));
+      }
+    }
+
+    const marquee = marqueeDragStart.current;
+    if (marquee) {
+      const status = gestureStatus(
+        { actKey: marquee.actKey, section: marquee.section, subject: null },
+        { actKey: actKeyNow(), section: getSectionByIndex(marquee.sectionIndex), subject: null },
+      );
+      if (status !== 'intact') {
+        // Nothing to put back: a marquee drag writes editor state, never the
+        // document. It stops extending, and the committed rect stays where the
+        // author left it.
+        marqueeDragStart.current = null;
+        marqueeDragLast.current = null;
+        isMarqueeDragging.current = false;
+        note(gestureStaleReason(status));
+      }
+    }
+
+    const stamp = bandStamp.current;
+    const stampBg = bandStampBg.current;
+    if (stamp && stampBg) {
+      const now = displayedBgNow();
+      const moved = now === null || now.source !== stampBg.source
+        || now.bgRef !== stampBg.bgRef || now.doc !== stampBg.doc;
+      if (moved) {
+        // Its own writer, backwards: the gesture holds the plane it wrote
+        // through, so every word it laid goes back to what was under it.
+        for (const [index, e] of stamp.applied) stamp.plane.writeWord(index, e.oldWord);
+        sectionRenderer.markBgDirty([...stamp.applied.keys()]);
+        bandStamp.current = null;
+        bandStampBg.current = null;
+        bgRefusalShown.current = false;
+        note('the background it was stamping is no longer the one on screen');
+      }
+    }
+
+    if (reasons.length === 0) return false;
+    useEditorStore.getState().bumpLiveEdit();
+    useToastStore.getState().addToast(
+      `Cancelled a gesture in flight: ${reasons.join(', and ')}. Nothing was written.`, 'warning',
+    );
+    return true;
+  }
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     const tool = useEditorStore.getState().tool;
 
@@ -2937,6 +3161,8 @@ export default function MapViewport() {
           dragTarget.current = {
             type: 'object', sectionIndex: secIdx, index: objIdx,
             startX: section.objects[objIdx].x, startY: section.objects[objIdx].y,
+            // The witness: what this drag grabbed, by identity.
+            actKey: actKeyNow(), section, subject: section.objects[objIdx],
           };
           isDragging.current = true;
           lastMouse.current = { x: e.clientX, y: e.clientY };
@@ -2953,6 +3179,7 @@ export default function MapViewport() {
           dragTarget.current = {
             type: 'ring', sectionIndex: secIdx, index: ringIdx,
             startX: section.rings[ringIdx].x, startY: section.rings[ringIdx].y,
+            actKey: actKeyNow(), section, subject: section.rings[ringIdx],
           };
           isDragging.current = true;
           lastMouse.current = { x: e.clientX, y: e.clientY };
@@ -3128,7 +3355,10 @@ export default function MapViewport() {
       const section = getSectionByIndex(info.sectionIndex);
       if (!section) { e.preventDefault(); return; }
 
-      marqueeDragStart.current = { sectionIndex: info.sectionIndex, col: info.col, row: info.row };
+      marqueeDragStart.current = {
+        sectionIndex: info.sectionIndex, col: info.col, row: info.row,
+        actKey: actKeyNow(), section,
+      };
       isMarqueeDragging.current = true;
       // Ctrl/Cmd read off THIS event, not off a cached key state: a press that
       // arrives while the window was unfocused (click-to-focus with the key
@@ -3200,6 +3430,16 @@ export default function MapViewport() {
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const tool = useEditorStore.getState().tool;
+
+    // ═══ FIRST, BEFORE ANY BRANCH BELOW CAN WRITE ═══
+    //
+    // A gesture whose subject moved under it (an act switch from a window
+    // keydown, an undo, a project reopen) must not write another pixel: from
+    // here on every read of the subject resolves whatever is at that index in
+    // whatever act is open NOW. `abandonStaleGestures` puts back what the
+    // gesture already wrote and drops it; the guide and frame drags below carry
+    // their own witnesses and preview through a ref, so they are untouched.
+    abandonStaleGestures();
 
     // ---- Parallax guides (ROADMAP item 43) --------------------------------
     // A DRAG IN FLIGHT PREVIEWS; IT DOES NOT EDIT. The document is untouched
@@ -3558,6 +3798,12 @@ export default function MapViewport() {
    * happens inside, and this must be harmless a second time.
    */
   const finishGesture = useCallback(() => {
+    // BEFORE ANY COMMIT. This body also runs on unmount now, and a commit
+    // resolves the section against the act open at commit time — so without this
+    // first line a teardown after an act switch would put the old act's start
+    // coordinates into the new act's object through a real move command. See
+    // `abandonStaleGestures`.
+    abandonStaleGestures();
     endGuideDrag();
     endFrameDrag();
     endBgStroke();
@@ -3614,6 +3860,19 @@ export default function MapViewport() {
     isDragging.current = false;
   }, []);
 
+  // ═══ AN ACT OR ZONE SWITCH ENDS EVERY GESTURE IT MOVED ═══
+  //
+  // `App.tsx`'s window keydown handler focuses another tab on the number keys
+  // with no pointer event in between, so a drag can be in flight when the act
+  // under it changes. Nothing else on this surface would notice until the next
+  // mousemove (which would already have written) or the release (which would
+  // already have committed), so the change itself is a teardown trigger.
+  //
+  // Not a remount: keying the level pane by act would drop this component's
+  // gestures without putting back what they wrote, and would still leave every
+  // OTHER route that moves a subject (an undo, a project reopen) uncovered.
+  useEffect(() => { abandonStaleGestures(); }, [currentZoneId, currentActId]);
+
   // Wherever the button comes up, the gesture ends there — including outside
   // this component entirely.
   //
@@ -3647,6 +3906,40 @@ export default function MapViewport() {
       window.removeEventListener('mousemove', onMove);
     };
   }, [finishGesture]);
+
+  /**
+   * ═══ AN UNMOUNT IS A RELEASE TOO (lens sweep UNMOUNT-DISCARDS-STROKE) ═══
+   *
+   * THE STROKE IS ALREADY IN THE DOCUMENT WHEN THIS COMPONENT GOES AWAY. A paint
+   * drag writes live and becomes ONE command on release (`endPaintStroke`), and
+   * the release used to arrive by exactly two routes, both of them pointer
+   * events. A facet switch is neither: `LevelWorkspace` renders the facet's
+   * module as `<Canvas />`, so changing facet changes the component TYPE and
+   * unmounts this one mid-stroke. The effect above removed its listeners and
+   * nothing committed, so the paint sat in the section with no command, no undo
+   * entry and nothing to undo it with. `handleMouseLeave` says this state was
+   * fixed for the leave-the-viewport route; the unmount route was never closed.
+   *
+   * Two triggers with no pointer event at all: a tab switch whose facet differs
+   * (`LevelWorkspace`'s switchFacet effect, keyed on the active tab), and this
+   * component's OWN keydown handler, where saving a marquee as a chunk calls
+   * `switchFacet(..., 'art')`.
+   *
+   * WHY A REF AND AN EMPTY DEP LIST. `finishGesture` is stable today, so
+   * `[finishGesture]` would also mean "unmount only" today. It would stop
+   * meaning that the day someone adds a dependency to it, and the failure would
+   * be a gesture COMMITTED HALFWAY on an unrelated re-render, which is far
+   * harder to see than the one being fixed. The ref makes the cleanup unmount
+   * only by construction while still calling the current body.
+   *
+   * IT IS SAFE BECAUSE `finishGesture` ASKS `abandonStaleGestures` FIRST: a
+   * teardown that follows an act switch drops the gesture and puts back what it
+   * wrote, instead of committing act A's edit against act B's level. Without
+   * that first line this fix would trade a lost stroke for a corrupted one.
+   */
+  const finishGestureRef = useRef(finishGesture);
+  finishGestureRef.current = finishGesture;
+  useEffect(() => () => { finishGestureRef.current(); }, []);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     // A guide release is not a map click. The `view`-tool branch below turns a
