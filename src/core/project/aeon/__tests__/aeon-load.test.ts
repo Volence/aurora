@@ -14,6 +14,33 @@ function tile(fill: number): Tile {
   return { pixels: new Uint8Array(64).fill(fill) };
 }
 
+/**
+ * The SAME fake, plus one path the probe cannot answer for: `read` fails with an
+ * EACCES rather than an ENOENT, and `exists` THROWS instead of guessing.
+ *
+ * That is the fs-backed bridge's shape for a correlated failure (a parent
+ * directory without execute permission, a disconnected volume, a symlink cycle):
+ * the read and the stat go down together, so there is no "no" available, only "I
+ * could not look". The bytes stay in the map deliberately - the file is there and
+ * intact, which is the whole hazard: Aurora cannot see it and must not write over
+ * it. Nothing here mocks markUnreadable's decision; it mocks the FileAccess
+ * contract that createIpcFileAccess implements.
+ */
+function cannotTellFa(files: Map<string, Uint8Array>, blind: string): FileAccess {
+  const base = memFa(files);
+  return {
+    ...base,
+    exists: async (rel) => {
+      if (rel === blind) throw new Error(`EACCES: permission denied, stat '${rel}'`);
+      return base.exists(rel);
+    },
+    read: async (rel) => {
+      if (rel === blind) throw new Error(`EACCES: permission denied, open '${rel}'`);
+      return base.read(rel);
+    },
+  };
+}
+
 /** In-memory FileAccess over a Map<rel, bytes>. read() throws on a miss, like the IPC bridge. */
 function memFa(files: Map<string, Uint8Array>): FileAccess {
   return {
@@ -215,6 +242,49 @@ describe('loadAeonProject', () => {
     expect(section.objects).toEqual([]);                    // nothing to show
     expect(section.unreadable).toContain('objects.json');   // but not "nothing there"
     expect(r.notices.map((x) => x.message).join(' ')).toMatch(/objects\.json exists but could not be read/);
+  });
+
+  /**
+   * R7's SECOND HALF, and the reason the first half was not enough. Every row
+   * above reaches the careful branch only because the in-memory fake's `exists`
+   * is EXACT: it answers from a Map, so a parse failure arrives with a probe that
+   * says "the file is there". Production's probe cannot do that. The fs-backed
+   * one (main/file-io.ts) stats and answers on any error, so for a failure that
+   * takes the READ and the STAT down together - a parent directory without
+   * execute permission, a volume that dropped out, a symlink cycle - the probe
+   * says "absent" and markUnreadable returns silently. The empty in-memory value
+   * is then what buildAeonSavePlan writes over the file, because `understood()`
+   * gates on a flag that was never set.
+   *
+   * These fakes therefore mirror the FIXED bridge: a probe that cannot determine
+   * the answer THROWS rather than guessing false, and markUnreadable's own catch
+   * has to resolve that to "the file may be there" rather than to "it is not".
+   */
+  it('a section file whose EXISTENCE cannot be determined is unreadable, not absent', async () => {
+    const files = fixtureFiles();
+    const blind = 'data/ojz/act1/section_0.objects.json';
+    const r = await loadAeonProject(cannotTellFa(files, blind), '/proj');
+    const section = r.project.zones[0].acts[0].sections[0]!;
+    expect(section.objects).toEqual([]);                    // nothing to show
+    expect(section.unreadable).toContain('objects.json');   // but not "nothing there"
+    expect(r.notices.map((x) => x.message).join(' ')).toMatch(/objects\.json exists but could not be read/);
+  });
+
+  it('CONTROL: a probe that answers a plain NO is still absence, and still silent', async () => {
+    // The vacuity trap for the row above: resolving every failed probe to
+    // "unreadable" would make an ordinary section with no objects file shout, on
+    // every load, for every one of the seven files a section does not have. The
+    // difference between the two rows is ONLY whether the probe could answer.
+    const files = fixtureFiles();
+    files.delete('data/ojz/act1/section_0.objects.json');
+    // The fake is CAPABLE of a blind probe, and is blind about an unrelated path,
+    // so the only thing that changed against the row above is which file the probe
+    // can answer for.
+    const r = await loadAeonProject(cannotTellFa(files, 'data/ojz/act1/section_7.tiles.bin'), '/proj');
+    const section = r.project.zones[0].acts[0].sections[0]!;
+    expect(section.objects).toEqual([]);
+    expect(section.unreadable).toBeUndefined();
+    expect(r.notices).toEqual([]);
   });
 
   it('says nothing about a section file that is simply absent', async () => {
