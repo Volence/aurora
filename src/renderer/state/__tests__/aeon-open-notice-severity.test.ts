@@ -51,7 +51,18 @@ function handleWith(notices: Notice[]) {
 }
 
 beforeEach(() => {
-  vi.stubGlobal('window', { api: { addRecentProject: vi.fn(async () => {}) } });
+  // A RecentsState, not `undefined` and not `[]`: the recents channels answer with
+  // the read state (shared/recents.ts) so the renderer can tell an empty list from
+  // a store it could not read. A stub that cannot express that answer is a stub
+  // that makes the refusal path unreachable, which is how the store's own defect
+  // survived nine green rows.
+  vi.stubGlobal('window', {
+    api: {
+      addRecentProject: vi.fn(async () => (
+        { projects: [], read: 'read', reason: null, path: '/p/recent-projects.json', dropped: 0 }
+      )),
+    },
+  });
   useToastStore.setState({ toasts: [] });
   useProjectStore.getState().reset();
   openMock.mockReset();
