@@ -112,7 +112,10 @@ function installWindowApi(
       writeBinaryFile: async (_dir: string, rel: string, data: ArrayBuffer) => {
         files.set(rel, new Uint8Array(data));
         ops.push({ kind: 'write', path: rel });
-        return true;
+        // No `return true`: the real preload surface resolves for a write that
+        // landed and throws otherwise (unwrapWriteOutcome). A mock that answered
+        // a hardcoded boolean is how REFUSED-WRITE-REPORTED-SAVED stayed
+        // invisible, so no mock in this repo speaks that dialect any more.
       },
       deleteFile: async (_dir: string, rel: string) => {
         ops.push({ kind: 'delete', path: rel });

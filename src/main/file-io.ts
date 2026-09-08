@@ -1,7 +1,52 @@
 import { readFile, readdir, stat, unlink } from 'fs/promises';
-import { resolve } from 'path';
+import { mkdirSync, renameSync, writeFileSync } from 'fs';
+import { dirname, resolve } from 'path';
 import { isRelPathSafe } from '../shared/rel-path';
-import type { DeleteOutcome } from '../shared/ipc-types';
+import type { DeleteOutcome, WriteOutcome } from '../shared/ipc-types';
+
+/**
+ * Write ONE project-relative file, atomically. The only writing primitive behind
+ * the `file:write-binary` channel.
+ *
+ * IT LIVES HERE, NOT IN THE IPC HANDLER, for the reason guarded-write.ts gives
+ * for the same move: a guard inside an `ipcMain.handle` closure cannot be
+ * imported, so it cannot be tested without Electron, and this one was tested by
+ * nothing at all. `src/main/__tests__/file-io-guards.test.ts` now drives it
+ * directly against a real temp tree.
+ *
+ * REFUSAL IS A VALUE, NOT A THROW, and the value carries its reason: see the
+ * WriteOutcome docblock in shared/ipc-types.ts for the whole argument, including
+ * why the preload turns that value back into an exception. Every other failure
+ * mode (EACCES, ENOSPC, EISDIR) still throws, which is what the caller's
+ * existing try/catch was already built for.
+ *
+ * ATOMICITY. A sibling `.tmp` in the SAME directory, then rename into place. On
+ * POSIX a same-directory rename is atomic, so a crash mid-write cannot leave a
+ * half-written target -- critical for project.json, which bricks the project if
+ * partially written.
+ */
+export async function writeProjectFile(
+  basePath: string, relativePath: string, data: ArrayBuffer | Uint8Array,
+): Promise<WriteOutcome> {
+  // THE ONE WRITE CHANNEL THAT HAD NO GUARD until 2026-08, while file-io and
+  // guarded-write had carried one since they were written. `resolve` happily
+  // walks out of the project on a `..` segment or an absolute path, and the
+  // sprite exporter feeds this a FREE-TYPED name as a path segment, so a sprite
+  // called `../../.ssh/authorized_keys` was a write outside the project the user
+  // opened.
+  if (!isRelPathSafe(relativePath)) {
+    const reason = `refused write to unsafe project-relative path (escapes root): '${relativePath}'`;
+    console.error(`[file-io] ${reason}`);
+    return { ok: false, reason };
+  }
+  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+  const fullPath = resolve(basePath, relativePath);
+  mkdirSync(dirname(fullPath), { recursive: true });
+  const tmpPath = `${fullPath}.tmp`;
+  writeFileSync(tmpPath, bytes);
+  renameSync(tmpPath, fullPath);
+  return { ok: true };
+}
 
 /**
  * Remove ONE project-relative file. The only deleting primitive in the app.

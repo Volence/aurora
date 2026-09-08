@@ -10,6 +10,7 @@ import type { ObjectListPort, ObjectRow } from '../components/shared/object-list
 import type { ObjectDef } from '../../core/model/s4-types';
 import { useProjectStore } from '../state/projectStore';
 import { useEditorStore } from '../state/editorStore';
+import { useToastStore } from '../state/toastStore';
 import { resolveObjectSprite } from '../shell/explorer-data';
 import { readObjectBindings, setObjectBinding } from '../object-previews';
 import { listSprites } from '../components/sprite/export-sprite';
@@ -96,7 +97,22 @@ export function useAeonObjectListPort(): ObjectListPort {
   const assignSprite = React.useCallback(async (spriteName: string) => {
     const id = useEditorStore.getState().selectedObjectTypeId;
     if (!id) return;
-    await setObjectBinding(id, spriteName);
+    // THE ONE CALL SITE WITH NO REPORTING CHANNEL. `setObjectBinding` persists
+    // object-bindings.json through window.api.writeBinaryFile, whose refusals
+    // and fs errors both arrive as a throw (see WriteOutcome in
+    // shared/ipc-types.ts). Its caller invokes this as `void assignSprite(...)`,
+    // so before this a failed persist was an unhandled rejection: the row below
+    // was correctly skipped, and the author was told nothing at all. Toast it,
+    // and leave the local row alone, so what the panel shows still matches disk.
+    try {
+      await setObjectBinding(id, spriteName);
+    } catch (e) {
+      useToastStore.getState().addToast(
+        `Could not save the sprite binding: ${e instanceof Error ? e.message : String(e)}`,
+        'error',
+      );
+      return;
+    }
     setBindings((b) => {
       const n = { ...b };
       if (spriteName) n[id] = spriteName; else delete n[id];
