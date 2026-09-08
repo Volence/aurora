@@ -101,10 +101,32 @@ const ROWS = 4;
  * one: a band Aurora offered and `check_bganim_section_fits` refuses. The
  * boundary probes are on the BINDING budget now, and the gap between the two is
  * its own row.
+ *
+ * ⚠ AND WHICH OF THE TWO BINDS HAS SINCE FLIPPED, WHICH IS WHY NO ROW HERE MAY
+ * NAME ONE. When this file was written `SECTION_FREE` (79) was the smaller and
+ * the whole point was that the ROM section ran out before the blob did. aeon
+ * then cut `BG_TILE_CAPACITY` twice on 2026-09-08 to pay for spring art (400 ->
+ * 388 -> 376, out of the arena's unresident `band_reserve`), and on this fixture
+ * `FREE` is now 56 against the section's 79: THE TILE CEILING IS THE TIGHTER ONE
+ * AND THE PROSE ABOVE HAD IT BACKWARDS. Two rows asserted the old ordering
+ * directly and went red at the re-vendor rather than at a code change, which is
+ * the gate working.
+ *
+ * SO THE ORDERING IS DERIVED AND ASSERTED, NEVER ASSUMED. `BINDING_FREE` is the
+ * min; `TILES_BIND` records which side won, so the boundary rows can say what
+ * they are probing; and the ROM-section refusal is proved on a document built to
+ * make the section bind (`sectionBoundDoc()`) rather than on this fixture, whose
+ * tile room the next raid on the reserve will shrink again. The capacity is a
+ * moving target with a structural cause — aeon's object tile neighbourhood is
+ * spent, so this arena's reserve is the cheapest address space on the machine —
+ * and a row that only works at one value of it is a row that breaks on aeon's
+ * schedule.
  */
 const SECTION_FREE = Math.floor(
   (BGANIM_SECTION_CEILING - BGANIM_COUNT_BYTES - BGANIM_RECORD_BYTES) / BGANIM_BYTES_PER_SLOT);
 const BINDING_FREE = Math.min(FREE, SECTION_FREE);
+/** Which budget is the binding one TODAY. Derived, so a re-vendor moves it. */
+const TILES_BIND = FREE <= SECTION_FREE;
 
 const FITTING = { cols: Math.floor(BINDING_FREE / ROWS), rows: ROWS };
 const OVER = { cols: Math.floor(BINDING_FREE / ROWS) + 1, rows: ROWS };
@@ -129,13 +151,19 @@ describe('the ROOMY fixture is what its provenance says', () => {
     expect(bandTileCount(FITTING)).toBeLessThanOrEqual(BINDING_FREE);
     expect(bandTileCount(OVER)).toBeGreaterThan(BINDING_FREE);
     expect(bandTileCount(SMALL)).toBeLessThan(bandTileCount(FITTING));
-    // AND THE TWO BUDGETS REALLY DIVERGE ON THIS FIXTURE, which is what makes
-    // the pair of boundary rows below prove anything at all: the section admits
-    // FEWER slots than the blob, so `OVER` is a band the TILE ceiling would
-    // have waved through.
-    expect(SECTION_FREE).toBeLessThan(FREE);
-    expect(BINDING_FREE).toBe(SECTION_FREE);
-    expect(bandTileCount(OVER)).toBeLessThanOrEqual(FREE);
+    // AND THE TWO BUDGETS REALLY DIVERGE ON THIS FIXTURE — which is what makes
+    // the boundary rows below prove anything at all — WITHOUT THIS ROW CLAIMING
+    // WHICH WAY. It asserted `SECTION_FREE < FREE` until aeon's 2026-09-08 cuts
+    // took the capacity to 376 and inverted it; the ordering is now derived into
+    // `TILES_BIND` and the only invariant left is that they are not equal, so
+    // one of them is strictly the gate and `OVER` is strictly over it.
+    expect(SECTION_FREE).toBeGreaterThan(0);
+    expect(SECTION_FREE).not.toBe(FREE);
+    expect(BINDING_FREE).toBe(Math.min(FREE, SECTION_FREE));
+    expect(BINDING_FREE).toBe(TILES_BIND ? FREE : SECTION_FREE);
+    // The looser budget really is looser, so a band at the binding boundary is
+    // NOT at the other one — the gap the next row walks.
+    expect(bandTileCount(FITTING)).toBeLessThan(Math.max(FREE, SECTION_FREE));
   });
 
   it('tileSlotsRemaining is BG_TILE_CAPACITY - tiles.length, before and after an insert', () => {
@@ -198,34 +226,100 @@ describe('INSERTING a brand-new band on the roomy document', () => {
     expect(insertUnavailableReason(ROOMY, FITTING.cols, FITTING.rows)).toBeNull();
 
     h.execute(makeAddBandCommand(l.bgOverride!, band), l);
-    // The blob grew by exactly the band. It does NOT reach the tile capacity,
-    // and that is the finding rather than a slack fixture: the section budget
-    // runs out first, so the last slots of the blob are unreachable for
-    // ANIMATION even though they are free for static art.
+    // The blob grew by exactly the band, up to the BINDING budget — which since
+    // aeon's 2026-09-08 capacity cuts is the TILE budget on this fixture, so the
+    // blob now lands exactly ON the capacity. While the section was the tighter
+    // one this row left slots free that were reachable for static art and not for
+    // ANIMATION. Both readings are asserted the same way, from the derived
+    // numbers, which is why the row survived the inversion that broke two others.
     expect(l.bgOverride!.tiles).toHaveLength(ROOMY.tiles.length + bandTileCount(FITTING));
     expect(tileSlotsRemaining(l.bgOverride!)).toBe(FREE - bandTileCount(FITTING));
     h.undo(l);
     expect(serializeBgOverride(l.bgOverride!)).toBe(ROOMY_BYTES);
   });
 
-  it('⚠ REFUSES the band the TILE budget admits and the ROM SECTION does not', () => {
-    // THE DEFECT, AS A ROW. `OVER` fits the blob — the assertion above proves
-    // it — and this file's previous revision called a band of exactly this
-    // class "the band that spends EXACTLY the free room" and asserted it was
-    // ACCEPTED. It is the band Aurora offered and aeon's
-    // `check_bganim_section_fits` refuses.
-    expect(bandTileCount(OVER)).toBeLessThanOrEqual(FREE);        // anti-vacuous
-    expect(() => createBand(OVER)).toThrow(/ROM section ceiling/);
+  it('refuses the band one slot over the BINDING budget, naming whichever budget binds', () => {
+    // THE BOUNDARY, ON THIS FIXTURE, WITHOUT NAMING WHICH CEILING. `OVER` is one
+    // band-column past `BINDING_FREE`, so it must be refused whichever budget is
+    // the smaller; and the refusal must be about THAT budget, because a refusal
+    // naming the wrong one sends the author to the wrong remedy (shrink the band
+    // vs. promote existing art).
+    expect(bandTileCount(OVER)).toBeGreaterThan(BINDING_FREE);    // anti-vacuous
     const reason = insertUnavailableReason(ROOMY, OVER.cols, OVER.rows);
+    expect(reason).not.toBeNull();
+    if (TILES_BIND) {
+      // The blob is the gate: aeon's capacity cuts made this the live case on
+      // 2026-09-08. `createBand` must NOT refuse — the section has room — so the
+      // blob guard is what the author meets.
+      expect(() => createBand(OVER)).not.toThrow();
+      expect(reason).toMatch(
+        `the blob has ${FREE} free slot(s) of ${BG_TILE_CAPACITY}`);
+      expect(reason).not.toMatch(/ROM SECTION/);
+    } else {
+      expect(() => createBand(OVER)).toThrow(/ROM section ceiling/);
+      expect(reason).toMatch(/ROM SECTION/);
+      expect(reason).toMatch(String(BGANIM_BYTES_PER_SLOT));
+    }
+  });
+
+  /**
+   * A bandless document with so few static tiles that the ROM SECTION is the
+   * binding budget. DERIVED, not a constant: one tile is the smallest legal blob,
+   * and the row below refuses to run vacuously if the capacity ever falls so far
+   * that the section cannot bind on ANY document.
+   */
+  function sectionBoundDoc(): BgOverrideDocument {
+    return {
+      layout: new Array<number>(ROOMY.layout.length).fill(0),
+      tiles: [new Array<number>(TILE_PIXELS).fill(0)],
+    };
+  }
+
+  it('⚠ REFUSES the band the TILE budget admits and the ROM SECTION does not', () => {
+    // THE DEFECT, AS A ROW, AND IT NO LONGER LIVES ON THE ROOMY FIXTURE. This is
+    // the case where Aurora would offer a band the build refuses: the blob has
+    // room and the emitted section does not. It USED to be constructible on
+    // ROOMY, whose free room was 80 against the section's 79; aeon's 2026-09-08
+    // capacity cuts took that to 56 and the tile ceiling became the tighter one,
+    // so the scenario moved to a document with more tile room rather than out of
+    // the suite. The section-refusal path is the one aeon's
+    // `check_bganim_section_fits` owns and it must stay covered at every value of
+    // BG_TILE_CAPACITY, not only the ones where this fixture happens to expose it.
+    const doc = sectionBoundDoc();
+    const docFree = BG_TILE_CAPACITY - doc.tiles.length;
+    // LOUD ON UNMEASURABLE: if the arena ever shrinks below the section's reach,
+    // this row proves nothing and must say so rather than pass.
+    expect(
+      docFree,
+      'BG_TILE_CAPACITY has fallen so far that the ROM section can no longer be'
+      + ` the binding budget on ANY document (blob room ${docFree} <= section room`
+      + ` ${SECTION_FREE}). This row is measuring nothing: the two budgets have`
+      + ' stopped diverging in this direction, which is itself the finding.',
+    ).toBeGreaterThan(SECTION_FREE);
+
+    const sectionOver = { cols: Math.floor(SECTION_FREE / ROWS) + 1, rows: ROWS };
+    // Anti-vacuous both ways: over the SECTION budget, comfortably inside the BLOB.
+    expect(bandTileCount(sectionOver)).toBeGreaterThan(SECTION_FREE);
+    expect(bandTileCount(sectionOver)).toBeLessThanOrEqual(docFree);
+
+    expect(() => createBand(sectionOver)).toThrow(/ROM section ceiling/);
+    const reason = insertUnavailableReason(doc, sectionOver.cols, sectionOver.rows);
     expect(reason).toMatch(/ROM SECTION/);
     expect(reason).toMatch(String(BGANIM_BYTES_PER_SLOT));
+    // ...and the discriminating half: a band inside the section budget is taken
+    // on the same document, so the refusal above is about the size and not about
+    // the document being unusable.
+    const sectionFits = { cols: Math.floor(SECTION_FREE / ROWS), rows: ROWS };
+    expect(bandTileCount(sectionFits)).toBeLessThanOrEqual(SECTION_FREE);
+    expect(insertUnavailableReason(doc, sectionFits.cols, sectionFits.rows)).toBeNull();
   });
 
   it('refuses the smallest band the BLOB cannot hold, in the insert guard\'s OWN words', () => {
-    // The other budget, unchanged and still enforced in its own words. The band
-    // is built with `phases` handed in rather than through `createBand`, whose
-    // section check would refuse it first: the point of this row is that the
-    // BLOB guard still fires, and reaching it means getting past the other one.
+    // The BLOB budget, enforced in its own words. The band is built with `phases`
+    // handed in rather than through `createBand`, so that this row reaches the
+    // blob guard whichever budget is currently the tighter: while the section was
+    // the smaller one `createBand` refused a band of this size first, and today it
+    // does not. Going round it keeps the row about the guard it names.
     const n = bandTileCount(OVER_TILES);
     const band = {
       cols: OVER_TILES.cols, rows: OVER_TILES.rows, pattern_px: OVER_TILES.cols * 8,
