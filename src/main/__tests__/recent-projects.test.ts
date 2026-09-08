@@ -17,7 +17,8 @@ vi.mock('electron', () => ({
 }));
 
 // Import AFTER the mock so the module sees the mocked `app`.
-import { getRecentProjects, addRecentProject, removeRecentProject, dedupeRecents } from '../recent-projects';
+import { readRecents, addRecentProject, removeRecentProject, dedupeRecents } from '../recent-projects';
+import { recentsMayBeOverwritten, recentsRefusalMessage } from '../../shared/recents';
 
 const storeFile = () => join(userDataDir, 'recent-projects.json');
 const seed = (entries: RecentProject[]) => writeFileSync(storeFile(), JSON.stringify(entries, null, 2));
@@ -57,14 +58,14 @@ describe('dedupeRecents (pure migration)', () => {
 });
 
 describe('store round-trip', () => {
-  it('getRecentProjects migrates a duplicate-bearing store on load and persists the collapsed shape', () => {
+  it('readRecents migrates a duplicate-bearing store on load and persists the collapsed shape', () => {
     // The owner's actual store shape: same project twice, once with a trailing slash.
     seed([
       { path: '/home/u/proj/', name: 'proj', lastOpened: 200 },
       { path: '/home/u/other', name: 'other', lastOpened: 150 },
       { path: '/home/u/proj', name: 'proj', lastOpened: 100 },
     ]);
-    const projects = getRecentProjects();
+    const projects = readRecents().projects;
     expect(projects).toEqual([
       { path: '/home/u/proj', name: 'proj', lastOpened: 200 },
       { path: '/home/u/other', name: 'other', lastOpened: 150 },
@@ -80,13 +81,13 @@ describe('store round-trip', () => {
     ];
     seed(clean);
     const before = readFileSync(storeFile(), 'utf-8');
-    expect(getRecentProjects()).toEqual(clean);
+    expect(readRecents().projects).toEqual(clean);
     expect(readFileSync(storeFile(), 'utf-8')).toBe(before);
   });
 
   it('addRecentProject normalizes on write: proj/ refreshes proj instead of duplicating it', () => {
     seed([{ path: '/home/u/proj', name: 'proj', lastOpened: 100 }]);
-    const projects = addRecentProject('/home/u/proj/', 'proj');
+    const projects = addRecentProject('/home/u/proj/', 'proj').projects;
     expect(projects).toHaveLength(1);
     expect(projects[0].path).toBe('/home/u/proj');
     expect(projects[0].lastOpened).toBeGreaterThan(100);
@@ -94,17 +95,17 @@ describe('store round-trip', () => {
 
   it('addRecentProject normalizes .. and doubled separators too', () => {
     seed([{ path: '/home/u/proj', name: 'proj', lastOpened: 100 }]);
-    expect(addRecentProject('/home/u//x/../proj', 'proj')).toHaveLength(1);
+    expect(addRecentProject('/home/u//x/../proj', 'proj').projects).toHaveLength(1);
   });
 
   it('removeRecentProject removes by any lexical spelling', () => {
     seed([{ path: '/home/u/proj', name: 'proj', lastOpened: 100 }]);
-    expect(removeRecentProject('/home/u/proj/')).toEqual([]);
+    expect(removeRecentProject('/home/u/proj/').projects).toEqual([]);
   });
 
   it('distinct projects added separately both survive (anti-vacuous)', () => {
     addRecentProject('/home/u/proj', 'proj');
-    const projects = addRecentProject('/home/u/proj2', 'proj2');
+    const projects = addRecentProject('/home/u/proj2', 'proj2').projects;
     expect(projects.map((p) => p.path)).toEqual(['/home/u/proj2', '/home/u/proj']);
   });
 });
@@ -189,6 +190,51 @@ describe('a store Aurora could not read is not a store with nothing in it', () =
     const onDisk = JSON.parse(raw()) as RecentProject[];
     expect(onDisk.map((p) => p.path)).toContain('/home/u/new');
     expect(onDisk.map((p) => p.path)).toContain('/home/u/proj');
+  });
+
+  it('says WHICH of the three answers it was, and an empty list is two different facts', () => {
+    // The row the old type could not express. `projects: []` is the answer for a
+    // first run AND for a store Aurora cannot read, so the ONLY thing that tells
+    // them apart is `read` - assert the field, not the emptiness.
+    const absent = readRecents();
+    expect(absent.read).toBe('absent');
+    expect(absent.projects).toEqual([]);
+    expect(recentsMayBeOverwritten(absent)).toBe(true);
+
+    seedRaw('{ "not": "an array" }');
+    const broken = readRecents();
+    expect(broken.read).toBe('unreadable');
+    expect(broken.projects).toEqual([]);
+    expect(recentsMayBeOverwritten(broken)).toBe(false);
+    // The reason is carried, not just logged: the sentence the user reads names it.
+    expect(broken.reason).toBeTruthy();
+    expect(broken.path).toBe(storeFile());
+
+    seed([{ path: '/home/u/proj', name: 'proj', lastOpened: 1 }]);
+    const fine = readRecents();
+    expect(fine.read).toBe('read');
+    expect(recentsMayBeOverwritten(fine)).toBe(true);
+  });
+
+  it('a row missing its name or timestamp is REPAIRED, not discarded', () => {
+    // Lenient in the direction that keeps data: `path` is the identity, and a row
+    // carrying one names a project the user really has. Dropping it would erase
+    // that project on the next write over a field the list can reconstruct.
+    seedRaw('[ { "path": "/home/u/proj" } ]');
+    const state = readRecents();
+    expect(state.read).toBe('read');
+    expect(state.dropped).toBe(0);
+    expect(state.projects).toEqual([{ path: '/home/u/proj', name: 'proj', lastOpened: 0 }]);
+  });
+
+  it('the refusal names the file, says the list is intact, and says what to do', () => {
+    // Three clauses, because a message that only says "could not read your
+    // recents" leaves the user in front of an empty list with nothing to act on.
+    seedRaw('nonsense');
+    const message = recentsRefusalMessage(readRecents());
+    expect(message).toContain(storeFile());
+    expect(message).toMatch(/has NOT been changed/);
+    expect(message).toMatch(/Fix or delete/);
   });
 
   it('CONTROL: a genuinely absent store is still created by the first project open', () => {

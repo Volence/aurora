@@ -46,6 +46,7 @@ import { registerAgentHandler } from './agent/agent-handler';
 import { installCloseGuard } from './shell/close-guard';
 import { refreshObjectPreviews } from './object-previews';
 import type { RecentProject } from '../shared/ipc-types';
+import { loadRecents } from './state/recents';
 import type { ObjectDef } from '../core/model/s4-types';
 
 // Referentially-stable fallback — see the matching constant in shell/Explorer.tsx.
@@ -180,7 +181,7 @@ export default function App() {
   const engine = useOpenEngine();
   const [recents, setRecents] = useState<RecentProject[]>([]);
   useEffect(() => {
-    if (engine === null) window.api.getRecentProjects().then(setRecents).catch(() => setRecents([]));
+    if (engine === null) loadRecents().then(setRecents).catch(() => setRecents([]));
   }, [engine]);
   const commands = useMemo(() => {
     const levelTabs = classicOpen

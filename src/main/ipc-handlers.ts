@@ -4,7 +4,7 @@ import { IPC_CHANNELS } from '../shared/ipc-types';
 import type { GuardedWriteFile } from '../shared/ipc-types';
 import { readBinaryFile, readManyFiles, listProjectFiles, pathExists, listDir, fileMtime, deleteProjectFile } from './file-io';
 import { performGuardedWrite } from './guarded-write';
-import { getRecentProjects, addRecentProject, removeRecentProject } from './recent-projects';
+import { readRecents, addRecentProject, removeRecentProject } from './recent-projects';
 import { isRelPathSafe } from '../shared/rel-path';
 
 export function registerIpcHandlers(): void {
@@ -74,8 +74,11 @@ export function registerIpcHandlers(): void {
     return result.filePaths[0];
   });
 
+  // All three recents channels answer a RecentsState, never a bare array: the
+  // renderer has to be able to tell "your list is empty" from "Aurora could not
+  // read your list and has left it alone" (see shared/recents.ts).
   ipcMain.handle(IPC_CHANNELS.GET_RECENT_PROJECTS, async () => {
-    return getRecentProjects();
+    return readRecents();
   });
 
   ipcMain.handle(IPC_CHANNELS.ADD_RECENT_PROJECT, async (_event, path: string, name: string) => {

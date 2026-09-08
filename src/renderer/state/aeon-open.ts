@@ -14,6 +14,7 @@ import { useArtStore } from './artStore';
 import { useEditorStore } from './editorStore';
 import { useViewStore } from './viewStore';
 import { useToastStore } from './toastStore';
+import { recordRecentProject } from './recents';
 
 export async function openAeonProject(dir: string): Promise<boolean> {
   const store = useProjectStore.getState();
@@ -26,7 +27,7 @@ export async function openAeonProject(dir: string): Promise<boolean> {
     // below (see the constraint comment there). Front-loading this await is also
     // strictly safer than the old ordering — if addRecentProject throws, nothing
     // has been committed (the old path could fail with config set, project null).
-    await window.api.addRecentProject(dir, aeon.config.name);
+    await recordRecentProject(dir, aeon.config.name);
     // Every aeon open starts fresh histories: the loaded project data is
     // fresh-from-disk, so pre-open histories must never be applied to it. Covers
     // the same-dir reopen case, where session-lifecycle's key-change reset never
