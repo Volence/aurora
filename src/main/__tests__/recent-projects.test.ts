@@ -5,7 +5,7 @@
 // without manual cleanup.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, chmodSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import type { RecentProject } from '../../shared/ipc-types';
@@ -106,5 +106,97 @@ describe('store round-trip', () => {
     addRecentProject('/home/u/proj', 'proj');
     const projects = addRecentProject('/home/u/proj2', 'proj2');
     expect(projects.map((p) => p.path)).toEqual(['/home/u/proj2', '/home/u/proj']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// UNREADABLE IS NOT ABSENT (lens row RECENTS-CORRUPT-ERASED)
+//
+// Every row above this line seeds a WELL-FORMED store, which is exactly why
+// eleven of them could not see the defect: getRecentProjects answers `[]` for a
+// JSON syntax error, for an EACCES and for a genuine first run alike, and
+// addRecentProject / removeRecentProject read through that and write the
+// emptiness back unconditionally. The user's list is gone, with no gesture
+// behind it and no notice in front of it.
+//
+// EVERY ROW HERE ASSERTS ON THE FILE, not on the returned value: the returned
+// value is what the old code got wrong, so asserting the bytes on disk is what
+// asks the question the user cares about.
+//
+// The two CONTROL rows at the end are the other half. A fix that simply refuses
+// to write whenever the read produced no entries satisfies every row above them
+// and breaks the store's whole job, so they are in this file on purpose.
+// ---------------------------------------------------------------------------
+
+const seedRaw = (text: string) => writeFileSync(storeFile(), text);
+const raw = () => readFileSync(storeFile(), 'utf-8');
+
+describe('a store Aurora could not read is not a store with nothing in it', () => {
+  it('a syntax error in the store survives the next project open', () => {
+    // A hand-edit, or a write interrupted by a crash. One trailing comma.
+    const corrupt = '[\n  { "path": "/home/u/proj", "name": "proj", "lastOpened": 200 },\n]';
+    seedRaw(corrupt);
+    addRecentProject('/home/u/new', 'new');
+    expect(raw()).toBe(corrupt);
+  });
+
+  it('a JSON root that is not an array survives the next project open', () => {
+    // Parses fine, is not a recents list. dedupeRecents iterating it is the
+    // failure, and the old catch spelled that failure `[]` too.
+    const wrongShape = '{ "recents": [ { "path": "/home/u/proj", "name": "proj", "lastOpened": 1 } ] }';
+    seedRaw(wrongShape);
+    addRecentProject('/home/u/new', 'new');
+    expect(raw()).toBe(wrongShape);
+  });
+
+  it('a store that cannot be READ but can be WRITTEN survives the next project open', (ctx) => {
+    // The mode bits are the point: 0o200 makes readFileSync fail EACCES while
+    // writeFileSync still succeeds, and that is the one arrangement where the
+    // old code DESTROYS rather than merely crashing on the way out. Same
+    // mechanism as an ACL, a parent directory without execute, or a volume that
+    // dropped out mid-session; this is the version a test can construct on any
+    // filesystem.
+    if (process.getuid?.() === 0) {
+      ctx.skip('running as root: mode bits do not deny root a read, so no EACCES can be constructed here');
+      return;
+    }
+    const original = '[\n  { "path": "/home/u/proj", "name": "proj", "lastOpened": 200 }\n]';
+    seedRaw(original);
+    chmodSync(storeFile(), 0o200);
+    try {
+      addRecentProject('/home/u/new', 'new');
+    } finally {
+      chmodSync(storeFile(), 0o600);
+    }
+    expect(raw()).toBe(original);
+  });
+
+  it('removeRecentProject removes NOTHING when it cannot read the store', () => {
+    // The worst intent-to-outcome gap in the file: the user asks to drop one
+    // entry and the old code drops every entry it could not see.
+    const corrupt = '[ { "path": "/home/u/proj", "name": "proj", "lastOpened": 200 }, ]';
+    seedRaw(corrupt);
+    removeRecentProject('/home/u/other');
+    expect(raw()).toBe(corrupt);
+  });
+
+  it('CONTROL: a readable store carrying one junk row is still written, and the good row survives', () => {
+    // Readability is the question, never "was anything wrong". A store with one
+    // unusable row is a store Aurora CAN see: the junk row is dropped and the
+    // write must still happen, or one bad row strands the whole list.
+    seedRaw('[ { "path": "/home/u/proj", "name": "proj", "lastOpened": 200 }, 42 ]');
+    addRecentProject('/home/u/new', 'new');
+    const onDisk = JSON.parse(raw()) as RecentProject[];
+    expect(onDisk.map((p) => p.path)).toContain('/home/u/new');
+    expect(onDisk.map((p) => p.path)).toContain('/home/u/proj');
+  });
+
+  it('CONTROL: a genuinely absent store is still created by the first project open', () => {
+    // 'absent' is a positive reason to WRITE. A fix that refused whenever the
+    // read produced no entries would leave a first run unable to record
+    // anything at all, forever.
+    addRecentProject('/home/u/proj', 'proj');
+    const onDisk = JSON.parse(raw()) as RecentProject[];
+    expect(onDisk.map((p) => p.path)).toEqual(['/home/u/proj']);
   });
 });
