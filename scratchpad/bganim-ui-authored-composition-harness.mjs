@@ -51,7 +51,9 @@
 // proving the opposite of what it claims. So the run REFUSES to reach its
 // comparison unless it has first established, on screen and in the model:
 //   * the document loaded and is at capacity (0 free; the capacity itself is
-//     read from the contract, and has been 448 and is now 400)
+//     read from the contract, and has held four different values — 448, 400,
+//     388 and lower still — which is why this line no longer names the current
+//     one and the run derives it)
 //   * zero bands existed before the click
 //   * the Promote control was enabled
 //   * the click created a band IN THE MODEL, with the geometry the form asked

@@ -59,6 +59,11 @@ import { BG_TILE_BASE_SLOT as LOADER_BG_TILE_BASE_SLOT } from '../../src/core/fo
  *           took the BG arena to 400 (EFFECTS-W1 item 9d), so Aurora accepted
  *           documents of 401..448 tiles that aeon's injector refused, and the
  *           stale entry's own citation named a line number that had also moved.
+ *           ⚠ AND THEN THE SAME THING, AT THE NEXT CEILING DOWN: aeon cut the
+ *           arena twice on 2026-09-08 and the vendored copy lagged about 18
+ *           hours, red master included. The full chain is in the re-pin comment
+ *           above `CONTRACT_SHA256` below; this paragraph is the FIRST incident
+ *           and is not the whole history.
  *           `test/formats/bg-override-contract-currency.test.ts` now reads
  *           aeon's authorities at a COMMITTED revision (`git show`, never the
  *           working tree) and skips LOUDLY when aeon is absent, which is the
@@ -97,17 +102,38 @@ const CONTRACT_PATH = resolve(
   __dirname, '../../src/core/formats/bg-override/bganim-consumer-contract.json',
 );
 const CONTRACT_TEXT = readFileSync(CONTRACT_PATH, 'utf8');
-// Re-pinned 2026-09-06 by the `section-budget-in-prose` amendment, which RETIRED
-// A CLAIM THAT HAD GONE FALSE: `BGANIM_SECTION_CEILING.notInAeonProse` said the
-// section budget had no row in aeon's own `tools/EFFECTS_CONSUMER_CONTRACT.md`,
-// which was true when written and stopped being true at aeon fe4fabf8 the same
-// day. The field is renamed `aeonProse` and rewritten, the `section-ceiling`
-// amendment's `notALL` carries a supersession pointer, and the new amendment
-// entry records the second authority. NO CONSTANT MOVED: the rows below compare
-// the module's exports to this file's own values, and every one of them is
-// unchanged. The previous pin, from the `bganim-decouple` amendment, was
-// df8fc4616147d2fa1c89477feee7b697397f3f45e444ef4368bfadb839465313.
-const CONTRACT_SHA256 = '8f1c9e288502b000888bf94bc8d46d3a1c07b582483487c3305e5fd8e650c95b';
+// Re-pinned 2026-09-08 by the `bg-capacity-376` amendment. A CONSTANT MOVED this
+// time, unlike the three re-pins before it: `BG_TILE_CAPACITY` 400 -> 376, which
+// is aeon's SECOND and THIRD cut to the same number in four days (400 -> 388 ->
+// 376, both on 2026-09-08, each paying for a spring art sheet out of the arena's
+// unresident `band_reserve`). The three currency rows for that constant were RED
+// on master until this pin moved; they are the gate that found it, and they are
+// the reason this re-pin is a re-vendor rather than a prose edit.
+//
+// ⚠ `BG_STATIC_TILE_BUDGET` DID NOT MOVE and is still 320. Every raid cut
+// `band_reserve` by exactly what it cut from `tiles`, so the STATIC importer
+// budget and the shipped background blob are untouched; what fell is the TOTAL
+// ceiling, which is the one this repo refuses at. Do not read this re-pin as the
+// background having shrunk.
+//
+// Three uninstrumented `notVendored` values moved with the ceiling and are
+// repaired in the same commit (`BG_BAND_RESERVE` 80 -> 56, and
+// `VRAM_WATERLINE_STRIPS` 45568 -> 44800 because it is DERIVED from the
+// capacity), plus six line numbers that drifted without their values moving. The
+// amendment's `scope` names the eight coordinates it deliberately did NOT repair.
+//
+// ⚠ AND THE AMENDMENT'S `commit` IS A TIP, NOT THE CHANGE. It records aeon's
+// `origin/master` when the values were re-derived, which is what the currency
+// gate resolves at run time — but both of the last two anchors were DOCS-CLASS
+// commits touching no code, so the entry now carries
+// `commitIsATipNotAChange` naming 917569e9 and 67458e39 as the commits that
+// actually moved the number. aeon's tip moved FOUR times during this parcel
+// (54e2be22 -> 27eb42b1 -> 8f66e233 -> 937be0f5); the ceiling was re-derived at
+// the last two and held at 376 in all three authorities.
+//
+// The previous pin, from the `section-budget-in-prose` amendment, was
+// 8f1c9e288502b000888bf94bc8d46d3a1c07b582483487c3305e5fd8e650c95b.
+const CONTRACT_SHA256 = 'df180c1010d1e7ff6948f85b8e715910c100958da0c9fc5695720e30483b263f';
 
 describe('the vendored contract is the one we pinned', () => {
   it('matches the pinned content hash', () => {

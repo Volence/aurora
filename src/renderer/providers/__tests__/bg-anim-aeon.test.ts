@@ -47,7 +47,9 @@
 // until 2026-09-06 ("The 448 ceiling is real and immovable"). It is a DECLARED
 // ALLOCATION in aeon's games/sonic4/vram.toml, not the hardware edge under the
 // sprite attribute table, and it went 448 -> 400 when EFFECTS-W1 item 9d
-// reassigned 48 slots to `waterline_strips`. The rows below all read
+// reassigned 48 slots to `waterline_strips` — then 400 -> 388 -> 376 on
+// 2026-09-08 for two spring art sheets, three cuts in four days, so "not
+// immovable" turned out to understate it. The rows below all read
 // BG_TILE_CAPACITY, so they were right through the change and kept passing; the
 // PROSE was the only thing that shipped the wrong fact. That is the argument for
 // deriving, made from the one direction that usually goes unrecorded.

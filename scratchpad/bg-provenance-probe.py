@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """ROADMAP item 24, deliverable 1 — WHICH bg_src PNG is the live blob made from?
 
-aeon ships two candidates in games/sonic4/data/editor/bg_src/ and a live
-editor_bg_override.json at 448/448 tiles. Run the generator on each and compare
-TILE BYTES (ordered `tiles` list and `layout`), not counts.
+aeon ships two candidates in games/sonic4/data/editor/bg_src/ and, AT THE
+REVISION PINNED BELOW, a live editor_bg_override.json at 448/448 tiles. Both
+halves of that fraction have moved since: the document was regenerated to 320
+tiles and the ceiling has been cut three times. Run the generator on each and
+compare TILE BYTES (ordered `tiles` list and `layout`), not counts.
 
 THE GATE HAS TO BE BYPASSED TO SEE THE BYTES, AND ONLY HERE. At the pinned
 revision the generator refuses both PNGs (448 unique > BG_STATIC_TILE_BUDGET),

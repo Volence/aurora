@@ -558,7 +558,10 @@ export function bandIsDefaultOff(b: BgAnimBandSize): boolean {
  *   1. THE SAFE DIRECTION, which is the property the section-ceiling parcel was
  *      built around. An unmeasurable budget must collapse to ZERO and say so,
  *      never fall through to the looser tile budget — that fallback is the
- *      defect that put an 80-slot offer in front of a 47-slot section. The
+ *      defect that put an 80-slot offer in front of a 47-slot section (the
+ *      2026-09-06 incident; both figures are that day's, and WHICH BUDGET IS
+ *      LOOSER HAS SINCE FLIPPED, so read the direction from `binding` and never
+ *      from this sentence). The
  *      machinery that enforces it (`bandBudget.slotsRemaining`,
  *      `binding: 'unmeasurable'`, and the panel's two hints) is written against
  *      THIS type. Collapse the type to a plain `number` and the direction has
@@ -1247,8 +1250,9 @@ export function parseBgOverride(text: string): BgOverrideParseResult {
  *
  * MINIFIED, deliberately, and that half did not change. §5 splits compactness
  * per document class: this is the tile-array class — `tiles` alone is up to
- * `BG_TILE_CAPACITY` arrays of 64 numbers (400 today, and it has been other
- * numbers) and one band adds 8 banks x cols*rows x 64 more, so at
+ * `BG_TILE_CAPACITY` arrays of 64 numbers (several hundred; the ceiling itself
+ * has been four different numbers and is not restated here) and one band adds
+ * 8 banks x cols*rows x 64 more, so at
  * indent 2 the file becomes tens of megabytes and hundreds of thousands of
  * lines. (Scene files are the scalar class and DO pretty-print.) Byte-identity
  * with a Python-written file is now a REACHABLE goal rather than an abandoned

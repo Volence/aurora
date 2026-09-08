@@ -759,11 +759,16 @@ export function planBandRemoval(
 //
 // ⚠ BOTH HALVES OF THAT SENTENCE HAVE SINCE MOVED, in opposite directions, and
 // they cancelled to something that still reads plausible. aeon regenerated the
-// background from a simplified source (320 tiles, one band) AND the ceiling
-// shrank 448 -> 400 when EFFECTS-W1 item 9d reassigned 48 slots to
-// `waterline_strips`. So the live document has 80 free slots, not 0 and not the
-// 128 Aurora reported while its vendored ceiling still said 448 - which is
-// exactly the range an author could have been told would fit and would not.
+// background from a simplified source (320 tiles, one band) AND the ceiling has
+// been cut three times — 448 -> 400 when EFFECTS-W1 item 9d reassigned 48 slots
+// to `waterline_strips`, then 400 -> 388 -> 376 on 2026-09-08 for two spring art
+// sheets, every cut taken out of the arena's unresident `band_reserve`. So the
+// live document has free slots rather than none, and HOW MANY IS NOT WRITTEN
+// DOWN HERE ON PURPOSE: it is `BG_TILE_CAPACITY - tiles.length`, which
+// `tileSlotsRemaining` computes and which changes under this comment every time
+// aeon raids the reserve. This paragraph said "80 free slots" and was wrong
+// within two days; before that it said 128 while the vendored ceiling still said
+// 448 — the range an author could have been told would fit and would not.
 // Insertion works on the shipped file today; promotion is no longer the only
 // door, only the one that works at ANY occupancy.
 //

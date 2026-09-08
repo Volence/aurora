@@ -35,7 +35,11 @@
 //    denied in as many words ("448 is `(0xB800-0x8000)/32` ... and it does not
 //    move"). It went 448 -> 400 at aeon EFFECTS-W1 item 9d, when 48 slots were
 //    reassigned to the `waterline_strips` region; Aurora went on telling authors
-//    that 401..448 tiles fit until 2026-09-06. It is a DECLARED ALLOCATION in
+//    that 401..448 tiles fit until 2026-09-06. IT HAS MOVED TWICE MORE SINCE, on
+//    2026-09-08, for two spring art sheets — and the count is the point rather
+//    than the values: three cuts in four days, every one taken from the arena's
+//    unresident `band_reserve` because aeon's object tile space is spent, and it
+//    stops only at their booked VRAM re-cut. It is a DECLARED ALLOCATION in
 //    games/sonic4/vram.toml, not the hardware edge under the sprite attribute
 //    table, and the two are different numbers. Never name it in prose, a test or
 //    a label: read it from the vendored contract, which every consumer in this
@@ -493,7 +497,10 @@ export interface BandBudget {
    * The permissive fallback is the defect this field exists to prevent. Reading
    * "could not compute the section" as "so use the tile number" reproduces
    * exactly the failure that put an 80-slot offer in front of a 47-slot
-   * section, one budget over.
+   * section, one budget over. BOTH FIGURES ARE THAT INCIDENT'S OWN (2026-09-06)
+   * and neither is current: the arena has been cut twice since and the section
+   * ceiling was raised, so which budget is the tighter one has actually FLIPPED.
+   * They are kept because they name the incident, not because they describe now.
    */
   slotsRemaining: number;
   /** Which budget produced `slotsRemaining`, so a refusal can say so. */

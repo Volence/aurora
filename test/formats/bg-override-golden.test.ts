@@ -134,8 +134,9 @@ describe('the golden validates under the codec', () => {
     // slots sit INSIDE a 340-entry array, and the only capacity relation is
     // len(tiles) <= BG_TILE_CAPACITY. The superseded `tiles + animated <=
     // capacity` rule would have scored this document at 532 and called it over
-    // budget - over TODAY'S 400 and over the 448 that was in force when the
-    // correction was written, which is why the rows below name neither.
+    // budget - over EVERY value BG_TILE_CAPACITY has ever held (448 when the
+    // correction was written, and three cuts lower since, the latest two on
+    // 2026-09-08), which is why the rows below name none of them.
     const doc = JSON.parse(GOLDEN) as BgOverrideDocument;
     const animated = animatedSlotCount(doc.anims!);
     expect(animated).toBe(192);
@@ -290,8 +291,10 @@ describe('poisons: the corruptions this codec exists to stop, on real data', () 
 
   it('rejects the blob GROWTH that actually happened, when bands are retained', () => {
     // The real shape of the loss at dd93a840: the tile count moved 340 -> 448,
-    // a size that is itself now over BG_TILE_CAPACITY (400 since aeon EFFECTS-W1
-    // item 9d), so this constructed document also trips the capacity rule today.
+    // a size that is itself now over BG_TILE_CAPACITY — the arena has been cut
+    // three times since (EFFECTS-W1 item 9d, then twice on 2026-09-08) and the
+    // figure is deliberately not restated here — so this constructed document
+    // also trips the capacity rule today.
     // That is incidental: the two assertions below name the PREFIX-IDENTITY
     // failures, which is the loss being reproduced.
     // so a merge preserving `anims` would not have produced subtly-stale art —
