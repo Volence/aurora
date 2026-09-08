@@ -18,15 +18,23 @@
 // A value witness would be worse than nothing here, since this gesture writes
 // live and its subject's value changes on every mousemove by design.
 //
-// THE SECOND HALF IS A SOURCE SCAN over the comment-stripped .tsx (the
-// panel-headings / panel-scrollers precedent, sharing their one reader): a pure
-// verdict nobody asks for is decoration, and the four carriers the sweep named
-// each had to start carrying a witness for the verdict to be answerable at all.
+// THE FILE HAS THREE PARTS. The pure verdict; then THE MECHANISM MEASURED
+// against the real `projectStore`, because the defect rests on a claim about the
+// artifact (after the act changes, the held index still resolves, and resolves
+// somebody else) and a claim about an artifact should be measured rather than
+// argued from reading; then A SOURCE SCAN over the comment-stripped .tsx (the
+// panel-headings / panel-scrollers precedent, sharing their one reader), because
+// a pure verdict nobody asks for is decoration, and the four carriers the sweep
+// named each had to start carrying a witness for the verdict to be answerable at
+// all.
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gestureStatus, gestureIsStale, gestureStaleReason, type GestureStatus } from '../map-gesture-witness';
+import { useProjectStore, getCurrentAct } from '../../state/projectStore';
+import { createSection } from '../../../core/model/s4-types';
+import type { ObjectPlacement } from '../../../core/model/s4-types';
 // The repo's one comment-stripping source reader; a second copy of
 // `stripComments` is the drift these scans exist to catch.
 import { code, COMPONENTS } from './helpers/section-panels';
@@ -147,6 +155,98 @@ describe('gestureStaleReason covers every status the type admits', () => {
       if (status === 'intact') expect(reason).toBe(null);
       else expect(reason, `no author-facing clause for ${status}`).toBeTruthy();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE MECHANISM, MEASURED (not argued from reading the source)
+// ---------------------------------------------------------------------------
+// The defect rests on one claim about the artifact: after the act changes, a
+// gesture's `sectionIndex` STILL RESOLVES, and it resolves something else. If
+// that read threw, or answered undefined, the drag would die loudly and there
+// would be nothing to fix. So the claim is measured here against the REAL
+// `projectStore` and the REAL `getCurrentAct`, which is the exact expression
+// `MapViewport.getSectionByIndex` evaluates.
+//
+// WHAT THIS DOES NOT REPRODUCE, stated so nobody reads more into it: the pointer
+// gesture itself. A real mousedown-switch-mousemove needs the running app under
+// CDP, and the node suite cannot mount a React component. What is measured here
+// is the resolution the gesture depends on, plus the verdict this parcel derives
+// from it.
+
+const objectAt = (x: number, y: number): ObjectPlacement => ({ x, y, typeId: 'ring-monitor', subtype: 0 });
+
+/** Two acts in one zone, each with one section carrying one object. */
+function twoActProject(): never {
+  const a = createSection(0, 'act1 sec0');
+  const b = createSection(0, 'act2 sec0');
+  a.objects.push(objectAt(100, 100));
+  b.objects.push(objectAt(700, 700));
+  return {
+    zones: [{
+      id: 'ghz',
+      name: 'GHZ',
+      tileset: { tiles: [] },
+      palette: { lines: [] },
+      acts: [
+        { id: 'act1', name: 'act1', gridWidth: 1, gridHeight: 1, sections: [a] },
+        { id: 'act2', name: 'act2', gridWidth: 1, gridHeight: 1, sections: [b] },
+      ],
+    }],
+    chunkLibrary: [],
+    bgLibrary: [],
+  } as never;
+}
+
+/** `MapViewport.getSectionByIndex`, character for character on the read path. */
+const sectionByIndex = (idx: number) => getCurrentAct(useProjectStore.getState())?.sections[idx] ?? null;
+const actKeyNow = () => {
+  const st = useProjectStore.getState();
+  return (!st.currentZoneId || !st.currentActId) ? null : `${st.currentZoneId}/${st.currentActId}`;
+};
+
+describe('the act really does move under a held index', () => {
+  it('resolves a DIFFERENT section and a DIFFERENT object at the same index, silently', () => {
+    useProjectStore.getState().reset();
+    useProjectStore.setState({ project: twoActProject() });
+    useProjectStore.getState().setCurrentAct('ghz', 'act1');
+
+    const grabbedSection = sectionByIndex(0)!;
+    const grabbedObject = grabbedSection.objects[0];
+    const witness = { actKey: actKeyNow(), section: grabbedSection, subject: grabbedObject };
+    expect(gestureStatus(witness, { actKey: actKeyNow(), section: sectionByIndex(0), subject: sectionByIndex(0)?.objects[0] }))
+      .toBe('intact');
+
+    // The act switch a window keydown performs. No pointer event, no remount.
+    useProjectStore.getState().setCurrentAct('ghz', 'act2');
+
+    // THE MEASUREMENT: the same index answers, and answers somebody else.
+    const nowSection = sectionByIndex(0);
+    expect(nowSection, 'the index still resolves after the switch: this is why the write succeeds')
+      .not.toBe(null);
+    expect(nowSection).not.toBe(grabbedSection);
+    expect(nowSection!.objects[0]).not.toBe(grabbedObject);
+    expect(nowSection!.objects[0].x).toBe(700);
+
+    // …and the verdict this parcel derives from it, which is what stops the write.
+    expect(gestureStatus(witness, {
+      actKey: actKeyNow(), section: nowSection, subject: nowSection!.objects[0],
+    })).toBe('act-changed');
+
+    // The control, and the reason the write SUCCEEDED rather than throwing: the
+    // index the gesture used to carry on its own is in range on both sides.
+    expect(grabbedSection.objects.length).toBeGreaterThan(0);
+    expect(nowSection!.objects.length).toBeGreaterThan(0);
+    // Act A's row is meanwhile untouched and still reachable through the
+    // reference the gesture holds, which is what makes a revert possible after
+    // the act carrying it has been closed.
+    expect(grabbedObject.x).toBe(100);
+    expect(gestureIsStale(
+      { actKey: witness.actKey, section: grabbedSection, subject: grabbedObject },
+      { actKey: actKeyNow(), section: nowSection, subject: nowSection!.objects[0] },
+    )).toBe(true);
+
+    useProjectStore.getState().reset();
   });
 });
 
