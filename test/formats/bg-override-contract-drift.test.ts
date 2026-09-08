@@ -97,17 +97,29 @@ const CONTRACT_PATH = resolve(
   __dirname, '../../src/core/formats/bg-override/bganim-consumer-contract.json',
 );
 const CONTRACT_TEXT = readFileSync(CONTRACT_PATH, 'utf8');
-// Re-pinned 2026-09-06 by the `section-budget-in-prose` amendment, which RETIRED
-// A CLAIM THAT HAD GONE FALSE: `BGANIM_SECTION_CEILING.notInAeonProse` said the
-// section budget had no row in aeon's own `tools/EFFECTS_CONSUMER_CONTRACT.md`,
-// which was true when written and stopped being true at aeon fe4fabf8 the same
-// day. The field is renamed `aeonProse` and rewritten, the `section-ceiling`
-// amendment's `notALL` carries a supersession pointer, and the new amendment
-// entry records the second authority. NO CONSTANT MOVED: the rows below compare
-// the module's exports to this file's own values, and every one of them is
-// unchanged. The previous pin, from the `bganim-decouple` amendment, was
-// df8fc4616147d2fa1c89477feee7b697397f3f45e444ef4368bfadb839465313.
-const CONTRACT_SHA256 = '8f1c9e288502b000888bf94bc8d46d3a1c07b582483487c3305e5fd8e650c95b';
+// Re-pinned 2026-09-08 by the `bg-capacity-376` amendment. A CONSTANT MOVED this
+// time, unlike the three re-pins before it: `BG_TILE_CAPACITY` 400 -> 376, which
+// is aeon's SECOND and THIRD cut to the same number in four days (400 -> 388 ->
+// 376, both on 2026-09-08, each paying for a spring art sheet out of the arena's
+// unresident `band_reserve`). The three currency rows for that constant were RED
+// on master until this pin moved; they are the gate that found it, and they are
+// the reason this re-pin is a re-vendor rather than a prose edit.
+//
+// ⚠ `BG_STATIC_TILE_BUDGET` DID NOT MOVE and is still 320. Every raid cut
+// `band_reserve` by exactly what it cut from `tiles`, so the STATIC importer
+// budget and the shipped background blob are untouched; what fell is the TOTAL
+// ceiling, which is the one this repo refuses at. Do not read this re-pin as the
+// background having shrunk.
+//
+// Three uninstrumented `notVendored` values moved with the ceiling and are
+// repaired in the same commit (`BG_BAND_RESERVE` 80 -> 56, and
+// `VRAM_WATERLINE_STRIPS` 45568 -> 44800 because it is DERIVED from the
+// capacity), plus six line numbers that drifted without their values moving. The
+// amendment's `scope` names the eight coordinates it deliberately did NOT repair.
+//
+// The previous pin, from the `section-budget-in-prose` amendment, was
+// 8f1c9e288502b000888bf94bc8d46d3a1c07b582483487c3305e5fd8e650c95b.
+const CONTRACT_SHA256 = 'bb0624d4aa61fb23f671fc8520fda77732704ca01ffd587301747d94cdde74d2';
 
 describe('the vendored contract is the one we pinned', () => {
   it('matches the pinned content hash', () => {
