@@ -34,7 +34,8 @@
 //    saturation, which is one generator run's property.
 //
 //    NEITHER NUMBER SURVIVED. The document was regenerated to 320 tiles, and
-//    the ceiling itself went 448 -> 400 (aeon EFFECTS-W1 item 9d). An earlier
+//    the ceiling itself went 448 -> 400 (aeon EFFECTS-W1 item 9d) and then twice
+//    more on 2026-09-08, to 388 and then 376, for spring art. An earlier
 //    revision of this comment called the ceiling "permanent" and spelled it
 //    `(0xB800-0x8000)/32`; that is the PHYSICAL run under the sprite attribute
 //    table, not the arena aeon's vram.toml declares inside it. Every check

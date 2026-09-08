@@ -13,10 +13,14 @@
 //     document aeon's own injector asserts against, so the refusal arrives at
 //     bake time or, worse, as art on top of somebody else's tiles.
 //
-//     ⚠ AND "LOOSE" IS NOT A ONE-TIME CONDITION. The ceiling is a DECLARED
-//     ALLOCATION, not a hardware edge, and it shrank 448 -> 400 on the aeon side
-//     while this repo's vendored copy still said 448 - so Aurora spent that
-//     window accepting 401..448 tiles for exactly the reason this file exists.
+//     ⚠ AND "LOOSE" IS NOT A ONE-TIME CONDITION — measured twice over now. The
+//     ceiling is a DECLARED ALLOCATION, not a hardware edge, and it shrank
+//     448 -> 400 on the aeon side while this repo's vendored copy still said 448
+//     - so Aurora spent that window accepting 401..448 tiles for exactly the
+//     reason this file exists. IT HAPPENED AGAIN on 2026-09-08, twice in eight
+//     hours, and the vendored copy lagged about 18 hours: the same permissive
+//     failure, one ceiling lower. Three cuts in four days, all out of aeon's
+//     unresident band reserve.
 //     Nothing here could have caught it: every row below derives from the
 //     contract, and a contract that is wrong is wrong in the test too. The
 //     currency question has its own instrument:

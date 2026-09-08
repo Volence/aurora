@@ -59,6 +59,11 @@ import { BG_TILE_BASE_SLOT as LOADER_BG_TILE_BASE_SLOT } from '../../src/core/fo
  *           took the BG arena to 400 (EFFECTS-W1 item 9d), so Aurora accepted
  *           documents of 401..448 tiles that aeon's injector refused, and the
  *           stale entry's own citation named a line number that had also moved.
+ *           ⚠ AND THEN THE SAME THING, AT THE NEXT CEILING DOWN: aeon cut the
+ *           arena twice on 2026-09-08 and the vendored copy lagged about 18
+ *           hours, red master included. The full chain is in the re-pin comment
+ *           above `CONTRACT_SHA256` below; this paragraph is the FIRST incident
+ *           and is not the whole history.
  *           `test/formats/bg-override-contract-currency.test.ts` now reads
  *           aeon's authorities at a COMMITTED revision (`git show`, never the
  *           working tree) and skips LOUDLY when aeon is absent, which is the

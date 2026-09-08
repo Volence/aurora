@@ -76,17 +76,26 @@ step covering both) and requires even x/y, since collision cells are
 art-only mode is a human-only shortcut).
 
 `get_bg`/`set_bg` operate on the zone-wide background (Plane B): a **64x64**
-tile nametable (4096 row-major VDP words) plus its own tile blob (max **448**
-tiles) — a separate tile space from the FG tileset. The legacy **64x32** shape
-(2048 words) is still accepted, because the engine's injector zero-pads it to
-64 rows rather than refusing; `get_bg` reports the `height` it MEASURES off the
-act's own layout (`null` when the act has no background) rather than announcing
-a fixed number, so either shape round-trips. 448 is not a policy: the BG tile
-region is VRAM `$8000..$B7FF`, and the sprite attribute table sits at `$B800`.
-Both numbers are read from the vendored aeon contract
+tile nametable (4096 row-major VDP words) plus its own tile blob, whose ceiling
+is `BG_TILE_CAPACITY` — a separate tile space from the FG tileset. The legacy
+**64x32** shape (2048 words) is still accepted, because the engine's injector
+zero-pads it to 64 rows rather than refusing; `get_bg` reports the `height` it
+MEASURES off the act's own layout (`null` when the act has no background) rather
+than announcing a fixed number, so either shape round-trips.
+
+**The tile ceiling is not a policy of this editor, and it is NOT WRITTEN DOWN
+HERE.** It is a declared VRAM allocation in aeon's `games/sonic4/vram.toml`
+(`bg_region.tiles`), not the hardware edge under the sprite attribute table —
+the physical run `$8000..$B7FF` is 448 slots and the arena owns fewer, the
+difference belonging to neighbouring regions. **It moves, often:** it has been
+cut three times, twice on 2026-09-08 alone, each cut paying for new object art
+out of the arena's unresident band reserve, and it stops only when aeon lands
+its booked VRAM re-cut. This paragraph named **448** until 2026-09-08 — while
+the real ceiling was two cuts below it — in the same breath as claiming this doc
+held no copy of its own. Both numbers are read from the vendored aeon contract
 (`src/core/formats/bg-override/bganim-consumer-contract.json`, via
-`bg-override.ts`) by the handler AND by the tool schema — neither this doc nor
-either of them holds its own copy.
+`bg-override.ts`) by the handler AND by the tool schema, and now that is true of
+this doc too: ask the tool, which reports the live ceiling in its refusal.
 
 Both directions use the LOCAL index convention (nametable tile
 indices index directly into the BG blob): engine-emitted files with

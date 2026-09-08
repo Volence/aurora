@@ -116,6 +116,17 @@ let registered = false;
 //     window accepting 401..448 tiles that aeon's injector then refused. Read
 //     BG_TILE_CAPACITY; do not name a number or an address range here, because
 //     the next reassignment will make either one false again.
+//
+//     ⚠ AND THE NEXT REASSIGNMENT CAME TWICE, WITHIN TWO DAYS, which is why that
+//     last sentence is the operative one rather than a flourish. aeon cut the
+//     arena again on 2026-09-08 — twice, eight hours apart, for two spring art
+//     sheets — each time out of its unresident band reserve, because their object
+//     tile space is spent and the reserve is the cheapest address range on the
+//     machine. The vendored copy lagged by about 18 hours and this repo's master
+//     was red for it. Three cuts in four days; it stops at aeon's booked VRAM
+//     re-cut and not before. THE VALUES ARE DELIBERATELY ABSENT FROM THIS
+//     PARAGRAPH: every figure written into this file about this ceiling has gone
+//     stale, and the refusal below reads the live one.
 const BG_ROWS = BG_LAYOUT_WORDS / BG_WIDTH;
 const BG_ROWS_LEGACY = BG_LAYOUT_WORDS_LEGACY / BG_WIDTH;
 

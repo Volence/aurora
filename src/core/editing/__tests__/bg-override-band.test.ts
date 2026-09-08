@@ -225,8 +225,10 @@ describe('set-bg-override-band', () => {
  * shape, and the one `makeAddBandCommand` provably cannot touch. Padded from the
  * real fixture rather than pinned to their tile count, so the subject is "a
  * document with no free slots" rather than a number. (The number in question
- * has since moved twice: aeon regenerated the document to 320 tiles and the
- * ceiling itself went 448 -> 400. Both rows here were untouched by either.)
+ * has since moved four times: aeon regenerated the document to 320 tiles and the
+ * ceiling itself went 448 -> 400 -> 388 -> 376, the last two on 2026-09-08. Every
+ * row here was untouched by all of them, which is the point of padding from the
+ * fixture rather than pinning a count.)
  */
 function fullBandlessDoc(): BgOverrideDocument {
   const tiles = cloneBgOverride(GOLDEN.tiles);

@@ -16,8 +16,20 @@
  * went on ACCEPTING documents of 401..448 tiles, telling an author a background
  * fits that `tools/inject_editor_bg.py` would then refuse with
  * `assert len(tiles) <= BG_TILE_CAPACITY`. The vendored entry's own citation was
- * stale in two ways at once (it quoted `tools/vram_map.py:26 = 448`; the
- * constant is 400 at line 34), which is the tell: nothing was reading it.
+ * stale in two ways at once (it quoted `tools/vram_map.py:26 = 448` when the
+ * constant was 400, at a different line), which is the tell: nothing was
+ * reading it.
+ *
+ * ⚠ AND IT HAPPENED AGAIN, WHICH IS THE ARGUMENT FOR THIS FILE RATHER THAN A
+ * FOOTNOTE TO IT. aeon cut the arena twice more on 2026-09-08 for spring art
+ * (400 -> 388 -> 376, out of its unresident `band_reserve`), and THESE THREE
+ * ROWS ARE WHAT CAUGHT IT — the vendored 400 stood against aeon's 376 and
+ * Aurora accepted 377..400-tile blobs the build refuses. aeon measured the cost
+ * on their side: this repo's master was red for about 18 hours, found only when
+ * a landing tried to push. Neither the value nor the coordinate is restated in
+ * this docblock, because both moved again within two days of being written
+ * down: the constant's line in vram_map.py has shifted twice, and a repaired
+ * coordinate goes stale on the same clock as the one it repaired.
  *
  * It obeys the same three rules `aeon-fixture-currency.test.ts` established, for
  * the same reasons, and the prose there is the fuller statement of each:

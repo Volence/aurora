@@ -18,7 +18,8 @@
 //            a blob grown by exactly cols*rows, and an unchanged picture.
 //   LIVE   — aeon's own document at the pinned revision (448/448, no bands;
 //            a RECORD of that revision, not of aeon today, whose document is
-//            320 tiles against a ceiling that has since moved to 400).
+//            320 tiles against a ceiling that has since been cut three times
+//            and is read from the contract rather than named here).
 //            "Add band" must be DISABLED with the provider's refusal on screen,
 //            and "Promote" must be enabled — the peer gesture still works.
 //
