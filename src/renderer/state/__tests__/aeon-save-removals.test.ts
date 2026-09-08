@@ -96,7 +96,9 @@ function installWindowApi(
 ) {
   (globalThis as { window?: unknown }).window = {
     api: {
-      pathExists: async (_dir: string, rel: string) => files.has(rel),
+      probePath: async (_dir: string, rel: string) => (
+        files.has(rel) ? { presence: 'present', reason: null } : { presence: 'absent', reason: null }
+      ),
       readBinaryFile: async (_dir: string, rel: string) => {
         const b = files.get(rel);
         if (!b) throw new Error(`ENOENT: ${rel}`);

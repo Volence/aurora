@@ -11,7 +11,10 @@ export const IPC_CHANNELS = {
   LIST_PROJECT_FILES: 'file:list-project-files',
   // Directory-level probes backing the classic-project FileAccess bridge (Task
   // 9). `read` reuses READ_BINARY_FILE; these cover exists/list.
-  PATH_EXISTS: 'file:path-exists',
+  // Renamed from PATH_EXISTS ('file:path-exists') when the answer stopped being a
+  // boolean: see PathProbe. The name moved with the meaning so that no caller can
+  // keep asking a yes/no question of a channel that has three answers.
+  PATH_PROBE: 'file:path-probe',
   LIST_DIR: 'file:list-dir',
   // Batch read: one IPC round-trip returns bytes + read-time mtime for many
   // project-relative files. The classic level read fans out ~18 mandatory files
@@ -233,6 +236,34 @@ export interface ReadManyEntry {
   relPath: string;
   bytes: Uint8Array | null;
   mtimeMs: number | null;
+}
+
+/**
+ * What a filesystem presence probe found. THREE ANSWERS, NOT TWO.
+ *
+ * 'unknown' is the one that had to be added. The probe behind this used to be
+ * `pathExists(): Promise<boolean>`, whose `catch { return false }` answered "not
+ * there" for an EACCES on a parent directory, for an ELOOP, for an EIO from a
+ * volume that dropped out - its own docblock named permissions as a cause. One
+ * layer up, core/project/aeon/load.ts's markUnreadable asks exactly this question
+ * to tell "the file is simply absent" from "the file is there and I could not
+ * read it", and the second answer is what stops the save path writing an empty
+ * placeholder over the user's data. For any failure that takes the read and the
+ * stat down together, the probe said "absent", markUnreadable returned silently,
+ * and a section's objects.json was replaced by `[]`. Measured, before the fix:
+ * `PROBE unreadable= undefined  notices= 0  after= []`.
+ *
+ * Same rule as SidecarRead (core/project/mapping.ts) and RecentsRead
+ * (shared/recents.ts): "I could not look" and "I looked and there is nothing" must
+ * not be the same value.
+ */
+export type PathPresence = 'present' | 'absent' | 'unknown';
+
+/** A presence answer plus, for 'unknown', why the probe could not tell. `reason`
+ *  is REQUIRED (null when there is nothing to say) so a producer states it. */
+export interface PathProbe {
+  presence: PathPresence;
+  reason: string | null;
 }
 
 export interface MissingFileMarker { __missing: string }

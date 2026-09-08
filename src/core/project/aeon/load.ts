@@ -183,7 +183,12 @@ export async function loadAeonProject(fa: FileAccess, dir: string): Promise<Aeon
  * parse failure must not lead to destroying data".
  *
  * Existence is asked of the file adapter rather than sniffed out of the error
- * message, because the message is whatever the host's fs layer chose to say.
+ * message, because the message is whatever the host's fs layer chose to say. That
+ * is still the rule, and it is only sound because the adapter can now REFUSE to
+ * answer: FileAccess.exists throws when it cannot tell (see its contract), and the
+ * catch below resolves that to "the file may be there". While the adapter answered
+ * a bare false for a stat it could not perform, asking it was strictly worse than
+ * asking the errno, because the answer was indistinguishable from a real absence.
  *
  * IT COLLECTS, IT DOES NOT TOAST. This used to push one 'error' notice per call,
  * and it is called for SEVEN files per section — tiles.bin, collattr.bin,
@@ -203,8 +208,23 @@ async function markUnreadable(
   error: unknown,
   unreadable: UnreadableItem[],
 ): Promise<void> {
-  let present = false;
-  try { present = await fa.exists(path); } catch { present = false; }
+  // A PROBE THAT COULD NOT ANSWER MEANS THE FILE MAY BE THERE, and this catch is
+  // where the whole split used to be given away. It read `catch { present = false }`
+  // — "if I could not ask, call it absent" — which is the same value the genuine
+  // absence returns, so the careful branch below was UNREACHABLE for exactly the
+  // failures that need it most: the ones that take the read and the stat down
+  // together (a parent directory without execute permission, a disconnected volume,
+  // a symlink cycle). Measured on the unfixed code, for a section whose objects.json
+  // was present and held a placement: `unreadable= undefined  notices= 0  after= []`.
+  // The file was replaced by an empty list and nobody was told.
+  //
+  // The direction of the guess is the entire content of the fix. Guessing 'absent'
+  // costs the user their data; guessing 'present' costs one notice and a file left
+  // alone, which is recoverable by reopening the project. `false` from a fixed
+  // FileAccess means KNOWN absent (see FileAccess.exists), so this catch now only
+  // fires when the answer really is unavailable.
+  let present = true;
+  try { present = await fa.exists(path); } catch { present = true; }
   if (!present) return; // simply not there — the ordinary case
 
   (section.unreadable ??= []).push(suffix);

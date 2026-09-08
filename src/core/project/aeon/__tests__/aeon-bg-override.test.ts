@@ -153,6 +153,48 @@ describe('the BG override document through loadAeonProject', () => {
     expect(plan.files.map((f) => f.path)).not.toContain(OVERRIDE_PATH);
   });
 
+  it('a file whose EXISTENCE cannot be determined is loud too, and still never a write', async () => {
+    // The row above makes the file unreadable with the PROBE still working, which
+    // is the only shape an in-memory fake produced. When the probe fails as well
+    // (the read and the stat going down together: a parent directory without
+    // execute permission, a disconnected volume), the old `catch { present = false }`
+    // returned the no-file state - no document, no `unreadable`, no notice - and an
+    // author who then created a BG override wrote it over the file that was there.
+    const files = withOverride(FIXTURE_TEXT);      // the real document, intact on disk
+    const base = memFa(files);
+    const fa: FileAccess = {
+      ...base,
+      exists: async (rel) => {
+        if (rel === OVERRIDE_PATH) throw new Error(`EACCES: permission denied, stat '${rel}'`);
+        return base.exists(rel);
+      },
+      read: async (rel) => {
+        if (rel === OVERRIDE_PATH) throw new Error(`EACCES: permission denied, open '${rel}'`);
+        return base.read(rel);
+      },
+    };
+    const r = await loadAeonProject(fa, '/p');
+
+    expect(r.project.bgOverride.doc).toBeNull();
+    expect(r.project.bgOverride.unreadable?.path).toBe(OVERRIDE_PATH);
+    expect(r.notices.some((n) => n.message.includes(OVERRIDE_PATH) && n.message.includes('will NOT overwrite')))
+      .toBe(true);
+
+    const plan = await savePlan(fa, r);
+    expect(plan.files.map((f) => f.path)).not.toContain(OVERRIDE_PATH);
+  });
+
+  it('CONTROL: a project with genuinely no override file says nothing at all', async () => {
+    // The vacuity guard: resolving every failed probe to "there and unreadable"
+    // would make every project that has never had a BG override open with an error
+    // notice and an unreadable marker.
+    const fa = memFa(fixtureFiles());
+    const r = await loadAeonProject(fa, '/p');
+    expect(r.project.bgOverride.doc).toBeNull();
+    expect(r.project.bgOverride.unreadable).toBeNull();
+    expect(r.notices.some((n) => n.message.includes(OVERRIDE_PATH))).toBe(false);
+  });
+
   it('the handle name and the model name are ONE object, not a copy', async () => {
     const fa = memFa(withOverride(FIXTURE_TEXT));
     const r = await loadAeonProject(fa, '/p');

@@ -16,7 +16,7 @@
 // of the main error log; the preload unwraps it back into a thrown ENOENT) —
 // that channel has NO main-side rel-path guard (adding one would break aeon's
 // absolute-path chunk import), so read is rel-path-safe RENDERER-SIDE ONLY, via
-// assertSafe below. exists/list use the file:path-exists / file:list-dir
+// assertSafe below. exists/list use the file:path-probe / file:list-dir
 // channels added for this bridge, which ARE guarded on the main side too — so
 // those are rejected on both ends.
 
@@ -41,9 +41,28 @@ export function createIpcFileAccess(dir: string): FileAccess {
     // root for real IPC file IO — a missing rootDir would silently resolve
     // paths against the main-process cwd (see FileAccess.rootDir in adapter.ts).
     rootDir: dir,
+    /**
+     * FALSE MEANS KNOWN ABSENT. A probe that could not determine the answer
+     * THROWS here rather than answering false, because a caller cannot tell those
+     * apart and one of them is safe while the other destroys data.
+     *
+     * This is the layer the whole MARKUNREADABLE-DEFEATED defect lived in.
+     * main's probe used to answer a bare `false` for an EACCES on a parent
+     * directory, an ELOOP or an EIO, and this method passed that straight to
+     * core, where aeon's markUnreadable reads it as "the file is simply not
+     * there", skips marking the section, and lets the next save write an empty
+     * placeholder over a file that is present and intact. The three-way probe
+     * (PathProbe) is what makes the difference sayable; this throw is what makes
+     * it unignorable, since `exists(): Promise<boolean>` has no third value to
+     * return and a caller that means to WRITE must not read a guess as a fact.
+     */
     async exists(rel: string): Promise<boolean> {
       assertSafe(rel);
-      return window.api.pathExists(dir, rel);
+      const probe = await window.api.probePath(dir, rel);
+      if (probe.presence === 'unknown') {
+        throw new Error(`cannot determine whether '${rel}' exists: ${probe.reason ?? 'unknown reason'}`);
+      }
+      return probe.presence === 'present';
     },
     async read(rel: string): Promise<Uint8Array> {
       assertSafe(rel);

@@ -27,6 +27,23 @@ import type { BgOverrideState } from '../formats/bg-override/bg-override-io';
  * owns the project root and any platform path handling.
  */
 export interface FileAccess {
+  /**
+   * Whether `rel` is there. FALSE MEANS KNOWN ABSENT, and an implementation that
+   * CANNOT DETERMINE THE ANSWER MUST THROW rather than answer false.
+   *
+   * The contract is spelled out because the alternative reading destroyed data.
+   * The fs-backed bridge used to answer false for an EACCES on a parent
+   * directory, an ELOOP or an EIO, and aeon's markUnreadable (project/aeon/load.ts)
+   * reads a false as "the file is simply not there" and stays silent — so a
+   * present, intact file was loaded as empty and the next save wrote the empty
+   * placeholder over it. `false` and "I could not look" are not the same answer,
+   * and this signature has no third value, so the third answer is a throw.
+   * See PathProbe (shared/ipc-types) for the probe that can say all three.
+   *
+   * In-memory test fakes answer from a map and are exact, so they never throw;
+   * that is precisely why a fake could not reproduce the defect, and why the fakes
+   * that DO exercise it (`cannotTellFa`) throw here on purpose.
+   */
   exists(rel: string): Promise<boolean>;
   read(rel: string): Promise<Uint8Array>;
   /** List immediate entry names under a project-relative directory. */

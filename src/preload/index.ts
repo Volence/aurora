@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS, unwrapBinaryRead } from '../shared/ipc-types';
 import type { RecentsState } from '../shared/recents';
-import type { GuardedWriteFile, GuardedWriteResult, ReadManyEntry, DeleteOutcome, AetherStatusPayload, AetherWarpResult, AetherBuildResult } from '../shared/ipc-types';
+import type { GuardedWriteFile, GuardedWriteResult, ReadManyEntry, DeleteOutcome, PathProbe, AetherStatusPayload, AetherWarpResult, AetherBuildResult } from '../shared/ipc-types';
 import { AGENT_REQUEST_CHANNEL, AGENT_RESPONSE_CHANNEL } from '../shared/agent-protocol';
 import type { AgentRequestEnvelope, AgentResponseEnvelope } from '../shared/agent-protocol';
 
@@ -38,8 +38,11 @@ const api = {
   listProjectFiles: (basePath: string): Promise<string[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.LIST_PROJECT_FILES, basePath),
 
-  pathExists: (basePath: string, relativePath: string): Promise<boolean> =>
-    ipcRenderer.invoke(IPC_CHANNELS.PATH_EXISTS, basePath, relativePath),
+  // Three answers, not two - see PathProbe. Renamed from `pathExists` with the
+  // meaning, so a caller that still wants a yes/no has to look at what it is
+  // throwing away.
+  probePath: (basePath: string, relativePath: string): Promise<PathProbe> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PATH_PROBE, basePath, relativePath),
 
   listDir: (basePath: string, relativeDir: string): Promise<string[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.LIST_DIR, basePath, relativeDir),
