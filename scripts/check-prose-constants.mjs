@@ -44,6 +44,19 @@
 //   • Non-integers, hex in prose, and compound tokens (`8x8`, `4bpp`, `16px`),
 //     which are format names rather than restated bounds.
 //   • Whether a number is WRONG. It finds re-typing, not staleness.
+//   • CONSTANTS WHOSE VALUE THE FOLD CANNOT REACH. This was a SILENT hole until
+//     2026-09-09 and it was the worst-shaped one here: the table folded a
+//     numeric literal or `constant('X')` and nothing else, which excluded every
+//     DERIVED constant — and a derived constant is precisely the kind whose
+//     value moves. `FG_PAGE_FRAMES` is declared as a call, so a hand-typed `12`
+//     sitting on top of `${FG_PAGE_FRAMES}` matched nothing and this gate
+//     printed "0 re-typed in author-facing prose" at rc 0, over a `description:`
+//     key that IS in its population. Partial coverage wearing full coverage's
+//     summary line. The fold below now reaches arithmetic, aliases and one call
+//     shape; what it still cannot reach is COUNTED ON EVERY SUMMARY LINE and
+//     named by `--blind`, so the hole can no longer close its own eyes.
+//     Measured cost of the widening, whole tree: 135 named constants -> 168,
+//     two new findings, both adjudicated in EXEMPT.
 //
 // The wider census that found the population in the first place is
 // `scratchpad/numbers-in-prose-sweep.mjs` (`npm run harness:numbers-in-prose`),
@@ -61,6 +74,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import ts from 'typescript';
+// The fold lives next door so a test can call it over source text of its own —
+// see that file's header for why the half that can fail SILENTLY is the half
+// that had to become reachable.
+import { foldTrees, namesInScope } from './prose-constant-fold.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const rel = (p) => path.relative(ROOT, p).split(path.sep).join('/');
@@ -102,6 +119,26 @@ const EXEMPT = [
     why: '"bits 15:14" is a BIT POSITION in the packed collision word, not TILE_PIXEL_MAX '
       + '(the largest 4bpp pixel value). Deriving it would name the wrong quantity.',
   },
+  // ── THE PRICE OF THE DERIVED FOLD, PAID IN FULL AND WRITTEN DOWN ──────────
+  // Both rows below are new findings that only exist because FG_PAGE_FRAMES now
+  // folds. They are the entire measured false-positive cost of widening the
+  // table over 523 files (docs/reviews/2026-09-09-prose-gate-derived-constants.md),
+  // and both are in the one module that also carries the REAL derived site — a
+  // reminder that the noise a fold makes lands where the signal is.
+  {
+    file: 'src/main/editor-methods.ts', value: 12,
+    match: /solidity 13:12/,
+    why: 'a BIT POSITION in the packed collision word ("solidity 13:12"), not FG_PAGE_FRAMES. Same '
+      + 'quantity class as the "bits 15:14" row above, and the same verdict: deriving it would name '
+      + 'the wrong thing entirely. Only became visible when the fold learned FG_PAGE_FRAMES.',
+  },
+  {
+    file: 'src/main/editor-methods.ts', value: 12,
+    match: /section 3, cell \(col 12, row 40\)/,
+    why: 'an ILLUSTRATIVE COORDINATE inside a worked example of the reply format, not FG_PAGE_FRAMES. '
+      + 'The neighbouring 3 and 40 are equally made up; interpolating a frame count into an example '
+      + 'column index would state a relationship that does not exist.',
+  },
   {
     file: 'src/main/editor-methods.ts', value: 4096,
     match: /Max 4096 cells per call/,
@@ -134,6 +171,50 @@ const EXEMPT = [
   },
 ];
 
+// ── ADJUDICATED BLIND SPOTS ──────────────────────────────────────────────────
+// A constant whose initialiser is UNMISTAKABLY NUMERIC but which the fold below
+// cannot evaluate is a name this gate CANNOT SEE: a typed twin of its value in
+// author-facing prose matches nothing and the run still prints a clean summary.
+// That is this repo's sharpest recorded defect shape — "I could not look" and "I
+// looked and found nothing" rendered as the same output — and it is exactly how
+// FG_PAGE_FRAMES came to be invisible while `description:` was in the population
+// and the site LOOKED covered (docs/reviews/2026-09-09-budget-page-unit.md §5.2).
+//
+// So the blind set is a LEDGER, not a silence. Every entry is a verdict naming
+// the constant and why folding it is not available; an unfoldable constant that
+// is NOT on this list FAILS the run, and a row that now folds fails as a stale
+// permission on the same rule as EXEMPT. The blindness therefore cannot grow
+// without an author writing down that it grew.
+const UNFOLDABLE = [
+  {
+    name: 'COLLISION_CELL_UNOWNED_MASK', file: 'src/core/editing/collision-word.ts',
+    why: '`(~COLLISION_CELL_OWNED_MASK) & 0xFFFF`, and the operand is `packCollisionCell({ shape, '
+      + 'xFlip, yFlip, solidity })`: an OBJECT-ARGUMENT call whose body shifts and ORs fields read '
+      + 'off a record. Folding it means evaluating object literals and property reads, which is a '
+      + 'general interpreter rather than the bounded arithmetic this gate does. Its value is a '
+      + '16-bit mask, so a prose restatement would be hex anyway, which this gate does not read.',
+  },
+  {
+    name: 'CROSSOVER_OVERLAP_WITH_PACKED_FIELDS', file: 'src/core/collision/layer-transition.ts',
+    why: 'ANDs CROSSOVER_BITS (which does fold) against the same packCollisionCell object-argument '
+      + 'call, so one operand is unavailable for the reason above. Also a mask.',
+  },
+  {
+    name: 'ANCHOR_TICK_HZ', file: 'src/renderer/providers/effects-preset.ts',
+    why: '`ANCHOR_PERIOD_RUNGS[0].ticks / ANCHOR_PERIOD_RUNGS[0].seconds`: an element access into '
+      + 'an array of object literals, then two property reads. WORTH KNOWING RATHER THAN WORTH '
+      + 'FOLDING: the constant exists precisely so 60 is not typed, and its own comment says so, so '
+      + 'a typed 60 beside it is the exact defect this gate is for and would not be caught.',
+  },
+  {
+    name: 'RAMP_RATE_UNIT', file: 'src/renderer/providers/effects-preset.ts',
+    why: '`1 / RAMP_RATE_UNITS_PER_PX`, whose operand is `EFFECTS_PRESET_FP16_FRAC_RANGE.max + 1`, '
+      + 'a property read off a range this repo derives from the vendored effects JSON schema at '
+      + 'module load. Nothing static evaluates it. Its value is a fraction, so the matcher below '
+      + 'would have no digit run to look for even if the fold reached it.',
+  },
+];
+
 // ── The values a name carries ────────────────────────────────────────────────
 // Read from the source that DEFINES each name, including the `constant('X')`
 // indirection into the vendored aeon contract. So this gate cannot itself be the
@@ -146,39 +227,6 @@ function contractValues() {
     if (Number.isInteger(v?.value)) out.set(k, v.value);
   }
   return out;
-}
-
-/** `export const NAME = <int>` and `export const NAME = constant('X')`, repo-wide. */
-function exportedNumbers(files, contract) {
-  const out = new Map(); // exported name -> value
-  for (const f of files) {
-    const sf = parse(f);
-    if (!sf) continue;
-    for (const stmt of sf.statements) {
-      if (!ts.isVariableStatement(stmt)) continue;
-      const exported = stmt.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword);
-      if (!exported) continue;
-      for (const d of stmt.declarationList.declarations) {
-        if (!ts.isIdentifier(d.name) || !d.initializer) continue;
-        const v = numericInit(d.initializer, contract);
-        if (v !== null) out.set(d.name.text, v);
-      }
-    }
-  }
-  return out;
-}
-
-function numericInit(init, contract) {
-  if (ts.isNumericLiteral(init)) return Number(init.text);
-  if (ts.isPrefixUnaryExpression(init) && init.operator === ts.SyntaxKind.MinusToken
-      && ts.isNumericLiteral(init.operand)) return -Number(init.operand.text);
-  if (ts.isCallExpression(init) && ts.isIdentifier(init.expression)
-      && init.expression.text === 'constant'
-      && init.arguments.length === 1 && ts.isStringLiteral(init.arguments[0])) {
-    const v = contract.get(init.arguments[0].text);
-    return v === undefined ? null : v;
-  }
-  return null;
 }
 
 // ── ENUMERATED AND PARSED ARE TWO DIFFERENT NUMBERS ──────────────────────────
@@ -235,29 +283,6 @@ function parse(f) {
 }
 
 /** Names a file can see: every import binding, plus its own const declarations. */
-function namesInScope(sf, exported, contract) {
-  const scope = new Map();
-  for (const stmt of sf.statements) {
-    if (ts.isImportDeclaration(stmt) && stmt.importClause?.namedBindings
-        && ts.isNamedImports(stmt.importClause.namedBindings)) {
-      for (const el of stmt.importClause.namedBindings.elements) {
-        // A type-only binding names no value.
-        if (el.isTypeOnly || stmt.importClause.isTypeOnly) continue;
-        const source = (el.propertyName ?? el.name).text;
-        if (exported.has(source)) scope.set(el.name.text, exported.get(source));
-      }
-    }
-    if (ts.isVariableStatement(stmt)) {
-      for (const d of stmt.declarationList.declarations) {
-        if (!ts.isIdentifier(d.name) || !d.initializer) continue;
-        const v = numericInit(d.initializer, contract);
-        if (v !== null) scope.set(d.name.text, v);
-      }
-    }
-  }
-  return scope;
-}
-
 // ── Author-facing strings (folded) ───────────────────────────────────────────
 // Folding `+` chains, template chunks and multi-line JSX whitespace is the whole
 // reason this parses instead of grepping: Aurora's prose routinely splits a
@@ -367,17 +392,65 @@ if (unparsed.length > 0) {
 }
 const parsedCount = files.filter(f => parsed.get(f) !== null).length;
 
-const exported = exportedNumbers(files, contract);
+// ── WHAT THE FOLD ABANDONED, NAMED ───────────────────────────────────────────
+// TWO TIERS, BECAUSE THEY ASK DIFFERENT THINGS OF AN AUTHOR.
+//
+//   NEAR MISS (hard). The fold ATTEMPTED this initialiser — it is arithmetic, a
+//     `constant('X')` lookup, or a call to a helper the fold recognises — and
+//     abandoned it. A small change of shape would bring it in, so an author is
+//     asked to fold it or write down why not, and an unadjudicated one is RED.
+//     There are few of these and they arrive rarely.
+//
+//   DECLARED NUMERIC (counted). The author annotated `: number`, or called a
+//     `: number` function, and nothing static can evaluate it — nearly all of
+//     these read the vendored effects JSON schema at module load. Demanding a
+//     written verdict per constant would redden the build on ordinary work in
+//     that lane, and a gate that fires on correct landings gets switched off. So
+//     these are COUNTED ON EVERY SUMMARY LINE and listed under --blind.
+//
+// NEITHER TIER CLAIMS TO BE THE WHOLE BLIND SET, and saying so is the point: a
+// constant built by a shape neither predicate recognises is invisible to this
+// census too. The bound this gate can state is "here is what it noticed it
+// could not do", never "here is everything it cannot do".
+const trees = new Map(files.map(f => [f, parse(f)]));
+const { fns, exported, nearMiss, declaredBlind: declaredBlindRows } = foldTrees(trees, contract);
+
+const declaredBlind = new Set(UNFOLDABLE.map(u => `${u.file}:${u.name}`));
+const seenBlind = new Set(nearMiss.map(b => `${b.file}:${b.name}`));
+const undeclaredBlind = nearMiss.filter(b => !declaredBlind.has(`${b.file}:${b.name}`));
+const staleBlind = UNFOLDABLE.filter(u => !seenBlind.has(`${u.file}:${u.name}`));
+
+if (process.argv.includes('--blind')) {
+  for (const b of [...nearMiss, ...declaredBlindRows]) {
+    console.log(`${b.file}:${b.line} ${b.name} = ${b.src}`);
+  }
+  console.log(`${nearMiss.length} near miss(es), ${declaredBlindRows.length} declared-numeric `
+    + 'constant(s) this gate cannot fold.');
+}
+// `--table` prints what the fold actually resolved, so a test can ask whether a
+// PARTICULAR constant is being watched rather than trusting a count. A count
+// alone cannot tell "the derived ones are in" from "thirty-three more literals
+// are in", which is the distinction this parcel turned on.
+if (process.argv.includes('--table')) {
+  for (const [name, value] of [...exported].sort((a, b) => a[0].localeCompare(b[0]))) {
+    console.log(`${name}=${value}`);
+  }
+}
 
 const findings = [];
 const usedExemptions = new Set();
 for (const f of files) {
   const sf = parse(f);
   if (!sf) continue;
-  const scope = namesInScope(sf, exported, contract);
+  const scope = namesInScope(sf, exported, contract, fns);
   if (scope.size === 0) continue;
+  // THE INTEGER FILTER LIVES HERE, not in the fold. `INT_RE` matches whole digit
+  // runs, so a constant worth 6.5 or 0.40625 has no twin for prose to re-type —
+  // it is out of the MATCHER's reach, which is a stated bound in the header, and
+  // not out of the fold's reach, which would be a coverage hole.
   const byValue = new Map();
   for (const [name, value] of scope) {
+    if (!Number.isSafeInteger(value)) continue;
     if (!byValue.has(value)) byValue.set(value, []);
     byValue.get(value).push(name);
   }
@@ -404,13 +477,34 @@ const rows = findings.filter(r => {
 
 const staleExemptions = EXEMPT.map((e, i) => [e, i]).filter(([, i]) => !usedExemptions.has(i));
 
-if (rows.length === 0 && staleExemptions.length === 0) {
+if (rows.length === 0 && staleExemptions.length === 0
+    && undeclaredBlind.length === 0 && staleBlind.length === 0) {
   // BOTH numbers, always. They are equal on every green run by construction —
   // the refusal above is what makes them equal — and printing only one is how
   // the enumerated count came to be read as a coverage claim in the first place.
+  // THE BLIND COUNT RIDES ON THE GREEN LINE TOO, for the same reason: a summary
+  // that reports only what was found reads as full coverage, and full coverage
+  // is the one thing this gate has never had.
   console.log(`check-prose-constants: ${parsedCount} of ${files.length} enumerated source files `
-    + `parsed, ${exported.size} named numeric constants, 0 re-typed in author-facing prose.`);
+    + `parsed, ${exported.size} named numeric constants, 0 re-typed in author-facing prose. `
+    + `NOT FULL COVERAGE: ${nearMiss.length} adjudicated near miss(es) and `
+    + `${declaredBlindRows.length} declared-numeric constant(s) could not be folded, so a re-typed `
+    + 'twin of any of them would match nothing here (--blind names them).');
   process.exit(0);
+}
+
+for (const b of undeclaredBlind) {
+  console.error(`${b.file}:${b.line}  export const ${b.name} = ${b.src}`);
+  console.error('  UNSEEN BY THIS GATE. The initialiser is numeric, but the fold could not '
+    + 'evaluate it, so this constant is absent from the table and a hand-typed twin of its value '
+    + 'in author-facing prose would match NOTHING and this run would still print a clean summary.');
+  console.error('  Give it a shape the fold reaches (arithmetic over named constants, or a pure '
+    + 'arithmetic helper), or add an UNFOLDABLE row naming it and why. Do not leave it silent.');
+  console.error('');
+}
+for (const u of staleBlind) {
+  console.error(`STALE UNFOLDABLE: ${u.file} ${u.name} either folds now or no longer exists. `
+    + 'A declared blind spot that is not blind overstates what this gate cannot do; delete the row.');
 }
 
 for (const r of rows) {
@@ -425,5 +519,7 @@ for (const [e] of staleExemptions) {
     + 'A permission with no live subject has outlived its reason; delete the row.');
 }
 console.error(`check-prose-constants FAILED: ${rows.length} re-typed constant(s) in author-facing prose`
-  + `${staleExemptions.length ? `, ${staleExemptions.length} stale exemption(s)` : ''}.`);
+  + `${staleExemptions.length ? `, ${staleExemptions.length} stale exemption(s)` : ''}`
+  + `${undeclaredBlind.length ? `, ${undeclaredBlind.length} unadjudicated blind spot(s)` : ''}`
+  + `${staleBlind.length ? `, ${staleBlind.length} stale UNFOLDABLE row(s)` : ''}.`);
 process.exit(1);
