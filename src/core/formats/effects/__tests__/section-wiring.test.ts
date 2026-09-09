@@ -700,3 +700,175 @@ describe('against aeon\'s real ojz/act1: the numbers as they stand today', () =>
       + 'whether it changed shape too').toEqual(nonArm);
   });
 });
+
+// ---------------------------------------------------------------------------
+// GUARD-SEAT-RESIDUE — the nine plants this file did not kill
+// ---------------------------------------------------------------------------
+//
+// docs/reviews/2026-09-09-guard-residue-scene-ui.md. Thirty mutations were
+// applied to `section-wiring.ts` one at a time, each scored against the WHOLE
+// `npm test`. Twenty-one died against the rows above. The nine below did not,
+// and they are not scattered: every one of them is a guard whose defect needs a
+// SECOND fact to be visible, and every fixture above carries only the first.
+//
+// ⚠ THE SHARPEST OF THEM IS A ROW THAT ALREADY EXISTS. "the zone key stops the
+// chooser call being read as a section record" states its own mechanism in a
+// comment — "`zzz_act1_sec_raster(sec: 5)` also matches `..._sec\(\s*sec:` if
+// the zone is not part of the pattern" — and that sentence is FALSE about this
+// fixture: `zzz_act1_sec_raster(` is `_sec_raster(`, never `_sec(`, so dropping
+// the zone id from the anchor does not make it match. The anchor is TWO clauses
+// (`${zoneId}_` in front and `_sec` immediately before the paren) and the
+// existing row only fails when BOTH are loosened at once. Each half alone
+// stayed green. A comment naming a mechanism is not a test of it.
+
+describe('GUARD-SEAT-RESIDUE: the plants the rows above survived', () => {
+  const CH = rasterChooserName('zzz', 'act1');
+
+  /** The synthetic wiring, with two paths a reader can tell apart. */
+  function named(): SectionRasterWiring {
+    return {
+      ...synthetic(),
+      descriptor: { path: 'g/data/levels/zzz/act1/act_descriptor.emp', parsed: true },
+      library: { path: 'g/data/effects/zzz_effects.emp', parsed: true },
+    };
+  }
+
+  it('the `unknown` advisory names the file that COULD NOT be read, not the one that could', () => {
+    // PLANT SW02, SURVIVED: `const which = w.descriptor` — always the
+    // descriptor. Every existing `unknown` row is built from `unknownWiring`,
+    // where BOTH sources are unparsed, so the selector had nothing to select
+    // and naming either one read as correct. Half-read is the live case: the
+    // descriptor is per act and the library is per zone, so one can be present
+    // while the other is not, and the sentence sends an author to open a file.
+    const halfRead: SectionRasterWiring = {
+      ...named(),
+      library: { path: 'g/data/effects/zzz_effects.emp', parsed: false, reason: 'ENOENT' },
+    };
+    expect(sectionRasterState(halfRead, 0)).toBe('unknown');
+    const say = sectionRasterAdvisory(halfRead, 0, CH)!;
+    expect(say).toContain('g/data/effects/zzz_effects.emp');
+    expect(say, 'the descriptor read fine; naming it sends the author to the wrong file')
+      .not.toContain('act_descriptor.emp');
+    expect(say).toContain('ENOENT');
+
+    // …and the mirror, so neither arm of the selector can be pinned by
+    // accident: descriptor unreadable, library fine.
+    const noDesc: SectionRasterWiring = {
+      ...named(),
+      descriptor: {
+        path: 'g/data/levels/zzz/act1/act_descriptor.emp', parsed: false, reason: 'EACCES',
+      },
+    };
+    const say2 = sectionRasterAdvisory(noDesc, 0, CH)!;
+    expect(say2).toContain('act_descriptor.emp');
+    expect(say2).not.toContain('zzz_effects.emp');
+    expect(say2).toContain('EACCES');
+  });
+
+  it('the split anchor is TWO clauses, and each half alone is load-bearing', () => {
+    // PLANTS SW05 and SW05b, BOTH SURVIVED. The row above kills only their
+    // conjunction. Derived from the guard's own sentence ("the section
+    // constructor is `<zone>_sec(sec: N, …)` by aeon's own convention"), which
+    // makes two separate claims about the text either side of `_sec`.
+
+    // ⚠ THESE FIXTURES ARE STANDALONE AND NOT `SYNTHETIC_DESC` PLUS A LINE, and
+    // the first draft of this row learned why the hard way: the parse has no
+    // right-hand bound either, so the LAST section's chunk runs to end of text
+    // and swallowed the appended constructor's `effects:` into section 3. That
+    // is a real property of the derivation and it is reported, not pinned —
+    // see the packet's "not fixed" section.
+
+    // CLAUSE 1, the zone prefix: another zone's section constructor in the same
+    // text must not be folded into this act's bindings.
+    const twoZones = 'zzz_sec(sec: 0, effects: ZZZ_Own)\n'
+      + 'www_sec(sec: 8, blocks: Z, effects: WWW_Preset_Sec8)\n';
+    const b1 = descriptorEffectsBindings(twoZones, 'zzz');
+    expect(b1[8], 'www_sec is another zone\'s constructor, not this act\'s').toBeUndefined();
+    expect(Object.keys(b1).map(Number).sort((x, y) => x - y)).toEqual([0]);
+    // …and the same text read AS www does find it, so the fixture is not inert.
+    expect(descriptorEffectsBindings(twoZones, 'www')[8]).toBe('WWW_Preset_Sec8');
+
+    // CLAUSE 2, the `_sec` boundary: a name that merely BEGINS with the
+    // constructor's spelling is a different symbol.
+    const helper = 'zzz_sec_defaults(sec: 9, effects: Ghost)\n'
+      + 'zzz_sec(sec: 0, effects: ZZZ_Own)\n';
+    expect(descriptorEffectsBindings(helper, 'zzz')[9],
+      'zzz_sec_defaults is not zzz_sec').toBeUndefined();
+    expect(descriptorEffectsBindings(helper, 'zzz')[0], 'the fixture is not inert')
+      .toBe('ZZZ_Own');
+  });
+
+  it('the collapsed word asks OWNERSHIP, not existence: a record threading sec 0 is not sec 0\'s', () => {
+    // PLANT SW07, SURVIVED: `Object.values(w.threadedBy).includes(sectionIndex)`.
+    // The row that exists for this ("the THIRD fact") points at section 2 —
+    // which is SHARED, so `sectionRasterState` returns 'shared' two branches
+    // earlier and its `.not.toBe('wired')` is answered by a guard that is not
+    // the one under test. Section 0 owns its preset, so the threaded branch is
+    // actually reached.
+    const w = named();
+    const elsewhere: SectionRasterWiring = { ...w, threadedBy: { ZZZ_Preset_Shared: 0 } };
+    expect(elsewhere.bindings[0], 'section 0 owns ZZZ_Preset_Sec0').toBe('ZZZ_Preset_Sec0');
+    expect(sectionRasterState(elsewhere, 0),
+      'ZZZ_Preset_Shared threads sec 0, but section 0 does not bind it').toBe('unthreaded');
+    expect(wiredSections(elsewhere, 4)).toEqual([]);
+
+    // PLANT SW09, SURVIVED: the seam's `c.threaded.record === c.ownPreset.record`
+    // clause. Condition 2 is EXISTENCE by design and says 'yes' here, so
+    // without that clause the seam calls `unthreaded` a disagreement. The
+    // existing seam rows never reach it for the same reason: their off-record
+    // threading lands on a shared section.
+    expect(sectionWiringConditions(elsewhere, 0, CH).threaded.verdict,
+      'condition 2 is existence and answers yes: that is not the defect').toBe('yes');
+    expect(sectionConditionsAgreeWithState(elsewhere, 0, CH)).toBe(true);
+  });
+
+  it('an owed channel whose array is EMPTY still owes the chooser once', () => {
+    // PLANT SW15, SURVIVED: `const want = indices`. aeon spells it
+    // `want = set(ch.indices(doc) or {0})`, and with `want` empty every
+    // `some()` is false, so a document carrying `patch_world_ys: []` ticks a
+    // condition whose chooser is threaded nowhere. Every existing condition-3
+    // fixture carries either a non-empty array or `cycles`, whose `indices` is
+    // the constant `[0]` and can never be empty.
+    const w = named();
+    const c = sectionExtraChannelsCondition(w, 0, { patch_world_ys: [] }, 'zzz', 'act1', 'mine');
+    expect(c.verdict).toBe('no');
+    expect(c.gaps.map((g) => g.channel.key)).toEqual(['patch_world_ys']);
+    expect(c.gaps[0].want, 'the empty array still reaches index 0').toEqual([0]);
+    expect(c.gaps[0].got).toEqual([]);
+  });
+
+  it('the call parse NORMALISES the indices it reports: deduplicated and in order', () => {
+    // PLANTS SW20 and SW21, BOTH SURVIVED. `got` is printed to an author
+    // (`threaded only at slot 0,1`) and compared index by index, and the only
+    // fixture reaching this function threads one index in ascending order, so
+    // neither the dedupe nor the sort was observed. A `variants:` array literal
+    // is written in the author's order, not sorted, and a record editable by
+    // hand can repeat a call.
+    const lib = `
+pub data R_Out_Of_Order: EffectsPreset = preset(
+    variants: [ zzz_act1_sec_variant(sec: 3, slot: 2, hand: A),
+                zzz_act1_sec_variant(sec: 3, slot: 0, hand: B),
+                zzz_act1_sec_variant(sec: 3, slot: 2, hand: C) ])
+`;
+    const calls = libraryChannelChooserCalls(
+      lib, channelChooserName('zzz', 'act1', 'variant'), 'slot');
+    expect(calls.R_Out_Of_Order[3], 'sorted, and slot 2 recorded once').toEqual([0, 2]);
+  });
+
+  it('the index parameter is matched BY NAME: a misspelled one is not threading', () => {
+    // PLANT SW22, SURVIVED: `\w+` in place of the channel's own index
+    // parameter. The two indexed channels use different words (`slot` for
+    // variants, `ch` for both patch arrays) and aeon's build refuses the wrong
+    // one — so reading it as threaded is Aurora ticking a condition the build
+    // will refuse, which is the one outcome condition 3 was added to stop.
+    const fn = channelChooserName('zzz', 'act1', 'patch_world_y');
+    const wrong = 'pub data R_Wrong: EffectsPreset = preset(patch_world_ys: [ '
+      + `${fn}(sec: 4, slot: 0, hand: PATCH_ANCHOR_NONE) ])`;
+    expect(libraryChannelChooserCalls(wrong, fn, 'ch'),
+      '`slot:` is not this chooser\'s index parameter').toEqual({});
+    // The control: the same record spelled correctly IS found, so the row is
+    // not merely asserting that the parse found nothing.
+    const right = wrong.replace('slot: 0', 'ch: 0');
+    expect(libraryChannelChooserCalls(right, fn, 'ch')).toEqual({ R_Wrong: { 4: [0] } });
+  });
+});
