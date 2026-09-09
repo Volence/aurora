@@ -30,8 +30,12 @@ export const IPC_CHANNELS = {
   // renderer→main invokes is ~36 serial round-trips on the act-load critical
   // path. Batching collapses that to one round-trip (main reads them
   // concurrently), which is the dominant win on any machine where IPC / fs
-  // latency is non-trivial. Rel-path-guarded per entry; a missing/unsafe path
-  // yields { bytes: null, mtimeMs: null } (no reject, no error-log spam).
+  // latency is non-trivial. Rel-path-guarded per entry; a path that produced no
+  // bytes yields `bytes: null` (no reject, no error-log spam) AND an `outcome`
+  // saying which of absent / unreadable / refused it was. That field is the fix
+  // for FABRICATED-ENOENT; this comment said only "a missing/unsafe path yields
+  // { bytes: null, mtimeMs: null }", which is exactly the conflation two
+  // consumers then reported as a nonexistent file. See ReadOutcome below.
   READ_MANY: 'file:read-many',
   // Classic guarded-save channels (Task 10). MTIME captures the read-time
   // baseline; WRITE_GUARDED performs the atomic, conflict-checked multi-file
