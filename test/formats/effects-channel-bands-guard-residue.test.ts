@@ -360,10 +360,11 @@ describe('the numbers parsed out of the fit sentence are checked, not trusted', 
     // ⚠ WHY THIS ROW EXISTS RATHER THAN A MUTATION ROW. Replacing `>>` with
     // `>>>` in `anchorTravelPx` is the one plant in this parcel that provably
     // cannot discriminate: the two operators differ only on a NEGATIVE left
-    // operand, and `TRAVEL.base` is guarded positive at load. So the claim
-    // "that plant is a control" is really a claim about this guard, and it is
-    // asserted here rather than left as an argument. If aeon's sentence ever
-    // states a negative base, this row goes red and the control stops being one.
+    // operand. `TRAVEL.base` cannot be negative twice over, and both halves are
+    // asserted below rather than argued: the sentence is parsed with a `\d+`
+    // capture, so no sign can survive it, and the load-time guard rules out the
+    // one remaining value, zero. If either ever stops holding, the claim
+    // "that plant is a control" stops being true and this row is what says so.
     const doc = realDoc();
     const m = /\((\d+) \* \((\d+) >> amp_shift\), whole pixels\)/.exec(String(doc.how_to_use));
     expect(m, 'the vendored sentence no longer states the formula this precondition is about')
@@ -694,5 +695,50 @@ describe('the values built from a good document', () => {
     // assertions above are not five readings of a value that is true of
     // everything.
     expect(Object.isFrozen({ ...band })).toBe(false);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// I. THE ONE PROPERTY NO BEHAVIOURAL ROW CAN REACH
+// ═══════════════════════════════════════════════════════════════════════════
+describe('`AnchorBandFit` has no clearance arm, at the type level', () => {
+  /**
+   * ⚠ WHY THIS ROW READS SOURCE TEXT, AND WHEN TO RETIRE IT.
+   *
+   * The module header's headline claim is that a reassuring "fits" verdict is
+   * UNREPRESENTABLE rather than merely unwritten, because a comment saying "do
+   * not add a pass" is one `||` away from being ignored. The RUN-TIME half of
+   * that is already held: adding a `fits` arm AND returning it reddens three
+   * rows in `src/renderer/providers/__tests__/effects-preset-anchors.test.ts`
+   * and one in `test/formats/effects-preset-boundary.test.ts`, measured with
+   * that exact mutation on disk.
+   *
+   * The TYPE-LEVEL half is not, and cannot be. Adding the arm to the union and
+   * returning it from nowhere left the entire suite green: no consumer switches
+   * exhaustively on `verdict`, so an unreturned arm changes no value anywhere.
+   * The failure is unobservable from behaviour in the current state, which
+   * makes the source text the honest instrument and not a lazy one.
+   *
+   * RETIRE THIS ROW when either becomes true, and do not carry it further:
+   *   1. a consumer switches exhaustively over `AnchorBandFit['verdict']`, at
+   *      which point tsc holds the property and this row is noise; or
+   *   2. aeon amends `how_to_use` to state a fit direction, at which point the
+   *      arm is legitimate and the module load guards refuse the old wording
+   *      anyway.
+   */
+  it('the union declares exactly the three verdicts the contract can support', () => {
+    const src = readFileSync(resolve(DIR, 'channel-bands.ts'), 'utf8');
+    const decl = /export type AnchorBandFit =([\s\S]*?);\n/.exec(src);
+    expect(decl, 'the `AnchorBandFit` declaration has moved or been renamed: re-point this row '
+      + 'rather than deleting it, or retire it for one of the two reasons in this block')
+      .not.toBeNull();
+    const verdicts = [...decl![1].matchAll(/verdict: '([a-z-]+)'/g)].map((m) => m[1]);
+    expect(verdicts, 'the verdict arms of `AnchorBandFit` are no longer the three the '
+      + 'one-directional contract can support')
+      .toEqual(['no-band', 'cannot-tell', 'cannot-fit']);
+    // And the negative said in its own words, because the list above could be
+    // reordered into passing while carrying a fourth.
+    expect(verdicts).not.toContain('fits');
+    expect(verdicts).toHaveLength(3);
   });
 });
