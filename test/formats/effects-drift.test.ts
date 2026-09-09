@@ -16,8 +16,8 @@ import {
   EFFECTS_LAYER_KEY_DEFAULTS,
   driftRateToPxPerFrame,
   driftPxPerFrameToRate,
-  driftRateRefusal,
-  driftPxPerFrameRefusal,
+  driftRateRefusal, driftRateRefusalParts,
+  driftPxPerFrameRefusal, driftPxPerFrameRefusalParts,
   EFFECTS_DRIFT_PX_BOUNDS,
   driftRateOf,
   cloneEffectsScene,
@@ -319,6 +319,75 @@ describe('drift refusals match the contract rather than approximating it', () =>
     expect(driftRateRefusal(0.5)).toMatch(/1\/256 px per frame/);
     expect(driftRateRefusal(EFFECTS_DRIFT_RATE_BOUNDS.max + 1)).toMatch(/TASTE bound/);
     expect(driftRateRefusal(32)).toBeNull();
+  });
+
+  /**
+   * THE HALVES AND THE ONE-STRING FORM CANNOT SAY DIFFERENT THINGS.
+   *
+   * REFUSAL-SIBLINGS-UNMEASURED split both refusals into the halves `Advisory`
+   * takes, because as one paragraph the drift block measured 215px inside a
+   * scroller the shell may squeeze to 129px (`npm run harness:refusal-box-fit`
+   * [2d]). The hazard the split introduces is the one the parcel next door named:
+   * two hand-kept copies of the same prose, a disclosure and a hint, drifting
+   * apart with NEITHER being wrong on its own.
+   *
+   * ⚠ THIS IS THE ROW THAT MAKES THAT IMPOSSIBLE, AND IT IS HERE AND NOT IN A
+   * HARNESS BECAUSE A HARNESS DOES NOT RUN IN `npm test`. The composition is
+   * asserted over the whole sample, so a future arm that returns halves the string
+   * form does not join reddens on the day it is written.
+   */
+  it('every one-string refusal is exactly its own halves joined', () => {
+    const { min, max } = EFFECTS_DRIFT_RATE_BOUNDS;
+    const wireCases = [min - 1, min, -1, EFFECTS_DRIFT_RATE_REFUSED, 1, 32, max, max + 1, 0.5];
+    const pxCases = [
+      driftRateToPxPerFrame(min) - 1, driftRateToPxPerFrame(max) + 1, 0, 0.125, 6,
+      0.1, Number.NaN, Number.POSITIVE_INFINITY,
+    ];
+    const join = (p: { diagnosis: string; mechanism?: string } | null) =>
+      (p === null ? null : (p.mechanism === undefined ? p.diagnosis : `${p.diagnosis} ${p.mechanism}`));
+    const wireRows = wireCases.map((r) => ({
+      rate: r, same: driftRateRefusal(r) === join(driftRateRefusalParts(r)),
+      refused: driftRateRefusal(r) !== null,
+    }));
+    const pxRows = pxCases.map((px) => ({
+      px, same: driftPxPerFrameRefusal(px) === join(driftPxPerFrameRefusalParts(px)),
+      refused: driftPxPerFrameRefusal(px) !== null,
+    }));
+    // ANTI-VACUOUS: both samples really do contain refusals AND acceptances, so
+    // "the strings agree" is not a statement about two nulls.
+    expect(new Set(wireRows.map((r) => r.refused)).size,
+      'every wire case has the same verdict: the sample proves nothing').toBe(2);
+    expect(new Set(pxRows.map((r) => r.refused)).size,
+      'every px case has the same verdict: the sample proves nothing').toBe(2);
+    expect(wireRows.filter((r) => !r.same), 'a wire refusal is not its halves joined').toEqual([]);
+    expect(pxRows.filter((r) => !r.same), 'a px refusal is not its halves joined').toEqual([]);
+  });
+
+  /**
+   * AND THE SPLIT PUTS THE AUTHOR'S OWN UNIT IN THE HALF THAT CANNOT FOLD.
+   *
+   * The px box is labelled px/frame and the author typed px/frame, so px/frame is
+   * the FINDING. The 1/256ths are an export detail: with them in the diagnosis the
+   * repaired block still measured 136px against a 129px box, because the bound was
+   * stated twice and the second statement was in a unit nothing on screen uses.
+   *
+   * Both bounds are DERIVED from `EFFECTS_DRIFT_RATE_BOUNDS`, so this row moves
+   * with the contract rather than pinning today's numbers into a test.
+   */
+  it('an out-of-range px/frame refusal states px/frame up front and folds the wire units', () => {
+    const { min, max } = EFFECTS_DRIFT_RATE_BOUNDS;
+    const overPx = driftRateToPxPerFrame(max) + 1;
+    const parts = driftPxPerFrameRefusalParts(overPx);
+    expect(parts, `${overPx} px/frame is past the bound and must be refused`).not.toBeNull();
+    expect(parts!.diagnosis, 'the diagnosis does not name the value in the unit the box uses')
+      .toContain(`${overPx} px/frame`);
+    expect(parts!.diagnosis, 'the diagnosis does not carry the bound in px/frame')
+      .toContain(`${driftRateToPxPerFrame(min)}..${driftRateToPxPerFrame(max)} px/frame`);
+    expect(parts!.diagnosis, 'the wire bound is in the half that cannot fold, so the block is a '
+      + 'line taller than its box for a unit nothing on screen uses')
+      .not.toContain(String(max));
+    expect(parts!.mechanism, 'the mechanism does not carry the wire bound at all, so the export '
+      + 'unit is now nowhere').toContain(String(max));
   });
 });
 

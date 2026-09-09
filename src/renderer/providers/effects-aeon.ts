@@ -56,7 +56,7 @@ import {
   bobPeakPixels, bobPeriodSeconds, bobShiftOf, bobShiftRefusal,
   cloneEffectsScene, factorLabel, isNamedFactor, newEffectsLayer, newEffectsScene,
   sceneIdRefusal, driftRateOf, driftRateToPxPerFrame, driftPxPerFrameToRate,
-  driftRateRefusal, driftPxPerFrameRefusal,
+  driftRateRefusal, driftPxPerFrameRefusal, driftPxPerFrameRefusalParts,
   EFFECTS_DRIFT_UNITS_PER_PIXEL, EFFECTS_DRIFT_PX_BOUNDS, EFFECTS_DRIFT_RATE_BOUNDS,
   EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS, EFFECTS_ROW_REMAP_HEIGHT_SHIFT_BOUNDS,
   EFFECTS_ROW_REMAP_HEIGHT_SHIFTS, EFFECTS_ROW_REMAP_BUILDABLE_SHIFT,
@@ -1778,10 +1778,10 @@ export function sceneDeformAdvisories(scene: EffectsScene): string[] {
   if (mask === 'sprite_mask') {
     out.push(
       'this scene declares left_column_mask "sprite_mask", which the build refuses in every '
-      + 'scene: the engine\'s left-column strip emission has not landed, so the declaration '
-      + 'would be accepted while the sliver stays uncovered. Declare factor0_lock or accept '
-      + `on the ${LEFT_COLUMN_MASK_ROW.label} row instead; the picker will not offer `
-      + 'sprite_mask back.',
+      + 'scene: the strip that would have covered the sliver was RULED OUT rather than deferred, '
+      + 'and the engine repairs the sliver itself, so there is nothing for a bar to cover. '
+      + `Declare factor0_lock or accept on the ${LEFT_COLUMN_MASK_ROW.label} row instead; the `
+      + 'picker will not offer sprite_mask back.',
     );
   }
   // GUARD 2's ARM IS NOT DEAD CODE NOW THAT THE TOGGLE CLEARS THE POLICY WITH
@@ -1889,10 +1889,13 @@ export function curveAnchorDeformAdvisory(scene: EffectsScene): string | null {
 //                     folds it at :558) or on the anchor, AND either
 //                     `deform_bg` or any layer's own() table (an own table
 //                     serves BOTH planes).
-//   sprite_mask   REFUSED OUTRIGHT (:1354) until the engine's left-column strip
-//                 emission lands. Aurora's schema still admits the value, so
-//                 this is a live schema-vs-engine divergence and not a UI
-//                 preference.
+//   sprite_mask   REFUSED OUTRIGHT (:1354), permanently. aeon RULED THE STRIP
+//                 OUT rather than deferring it (owner decision d-40, 2026-08-29)
+//                 and repairs the sliver in the engine instead, so nothing is
+//                 pending. Aurora's schema still admits the value, so this is a
+//                 live schema-vs-engine divergence and not a UI preference; and
+//                 aeon's own message now offers a THIRD arm, DeclineBorrow,
+//                 which Aurora's schema enum cannot spell.
 //   undeclared    the required value when there is no `v_deform`.
 //
 // ═══ TWO DESIGN FORKS, AND WHY THEY GO DIFFERENT WAYS ═══
@@ -2023,9 +2026,9 @@ export function leftColumnMaskOptions(scene: EffectsScene): LeftColumnMaskOption
         label: value,
         disabled: true,
         mark: SPRITE_MASK_MARK,
-        title: 'refused by the engine: the left-column strip emission has not landed, so the '
-          + 'declaration would be accepted while the sliver stays uncovered. Declare '
-          + 'factor0_lock or accept.',
+        title: 'refused by the engine, and not while waiting for anything: the strip that would '
+          + 'have covered the sliver was ruled out, and the engine repairs the sliver itself. '
+          + 'Declare factor0_lock or accept.',
       };
     }
     if (value === 'factor0_lock') {
@@ -2054,8 +2057,17 @@ export function leftColumnMaskOptions(scene: EffectsScene): LeftColumnMaskOption
   });
 }
 
-/** The short reason in `sprite_mask`'s own label. See `refusedOptionLabel`. */
-export const SPRITE_MASK_MARK = 'the engine cannot emit this yet';
+/**
+ * The short reason in `sprite_mask`'s own label. See `refusedOptionLabel`.
+ *
+ * ⚠ IT SAID `the engine cannot emit this yet` AND THE `yet` WAS FALSE. aeon's own
+ * assertion calls the strip emission *"cancelled, not pending"* (owner decision
+ * d-40, 2026-08-29), so a mark promising arrival tells an author to keep the
+ * value and wait. A mark has no room for the reason; what it must not do is
+ * imply a clock. `test/formats/engine-claim-register.test.ts` holds this, and
+ * anchors the expectation on aeon's sentence rather than on a vocabulary rule.
+ */
+export const SPRITE_MASK_MARK = 'ruled out, not deferred';
 
 /**
  * The policy row's permanent sentence, which now also says why `sprite_mask`
@@ -2072,9 +2084,10 @@ export const SPRITE_MASK_MARK = 'the engine cannot emit this yet';
  * screen only for the scenes that have a policy to answer for.
  */
 export function leftColumnMaskRowHint(): string {
-  return `${LEFT_COLUMN_MASK_ROW.hint}. sprite_mask is greyed: aeon has not landed the `
-    + 'left-column strip emission, so declaring it would be accepted while the sliver stays '
-    + 'uncovered. Answer with factor0_lock or accept.';
+  return `${LEFT_COLUMN_MASK_ROW.hint}. sprite_mask is greyed and will not come back: aeon `
+    + 'ruled the left-column strip out rather than deferring it, the engine repairs the sliver '
+    + 'itself, and the build refuses the declaration outright. Answer with factor0_lock or '
+    + 'accept.';
 }
 
 /** The policy this scene declares — absent reads as the schema's own default. */
@@ -4136,6 +4149,32 @@ export function setLayerShiftCommand(
  * document still saves. Silence means "nothing to say", which is the truth about
  * a strip whose planes are both off.
  */
+/**
+ * THE FLAT-PATH CLAIM, AUTHORED ONCE.
+ *
+ * ⚠ IT WAS TYPED TWICE, INDEPENDENTLY, and that is the finding
+ * `CROSS-SYSTEM-STRINGS-UNPOLICED` names. `layerShiftAdvisories` below and
+ * `anchorDeformAdvisories` at the bottom of this file both spelled out the same
+ * assertion about aeon's runtime, in their own words, with nothing comparing the
+ * two. It is the shape `scripts/check-prose-constants.mjs` refuses for numbers,
+ * for the same reason: two authors and no arbiter, rotting on separate clocks.
+ * They had already drifted in punctuation before anyone read them side by side.
+ *
+ * THE CLAIM IS AEON'S, not ours. Its precondition-1 message says it in one
+ * clause: *"A live shift with NO table is flat-pathed at runtime and does not
+ * count"* (`engine/level/scene_dsl.emp`). Because this is now standing copy
+ * rather than a sentence built inside a function, it is carried by the register
+ * in `test/formats/engine-claim-register.test.ts`, which re-reads that clause
+ * from aeon at a committed revision on every run. That is the arbiter neither
+ * copy had.
+ *
+ * It is NOT a build refusal, which is the whole reason a warning exists: the
+ * scene compiles, ships and renders a flat plane.
+ */
+export const FLAT_PATH_CLAIM =
+  'The engine flat-paths a live shift with no table: the build stays green and the plane does '
+  + 'not move.';
+
 export function layerShiftAdvisories(scene: EffectsScene, index: number): string[] {
   const layer = scene.layers[index];
   if (layer === undefined) return [];
@@ -4149,8 +4188,7 @@ export function layerShiftAdvisories(scene: EffectsScene, index: number): string
     if (shift === EFFECTS_LAYER_SHIFT_NONE) continue;
     if (anyOwn || sceneDeformValue(scene, key) !== null) continue;
     out.push(`this strip deforms ${plane} (${field} ${shift}) but the scene attaches no table `
-      + `it can sample - ${label} is off and no strip attaches its own. The engine flat-paths `
-      + 'a live shift with no table: the build stays green and the plane does not move. '
+      + `it can sample - ${label} is off and no strip attaches its own. ${FLAT_PATH_CLAIM} `
       + `Attach ${label}, or take ${plane} to off.`);
   }
   return out;
@@ -4267,7 +4305,8 @@ export {
   // hands `NumberField`'s `refuse`, and it is re-exported rather than reimplemented
   // here so the ONE source of the rules stays scene-ui's.
   EFFECTS_DRIFT_RATE_BOUNDS, EFFECTS_DRIFT_PX_BOUNDS, EFFECTS_DRIFT_UNITS_PER_PIXEL,
-  driftPxPerFrameRefusal, driftRateToPxPerFrame, driftPxPerFrameToRate, driftRateOf,
+  driftPxPerFrameRefusal, driftPxPerFrameRefusalParts,
+  driftRateToPxPerFrame, driftPxPerFrameToRate, driftRateOf,
   // §2.7's contract half, re-exported for the same reason as drift's above: the
   // ONE source of these rules is scene-ui's, and the panel hands
   // `reelRateWriteRefusal` (not `reelRateRefusal`) to the box's `refuse`,
@@ -4925,6 +4964,10 @@ export function setAnchorShiftCommand(
  * ships and renders a flat plane. Nothing else on this panel would say so,
  * because until this parcel nothing could author the shift.
  *
+ * THE CLAIM ITSELF IS `FLAT_PATH_CLAIM` and is no longer typed here. This
+ * advisory and `layerShiftAdvisories` had each spelled it out separately; see
+ * that constant's docblock for why one copy and where its arbiter is.
+ *
  * THE TABLE RULE IS THE ENGINE'S, transcribed from `scene_dsl.emp`'s own
  * comment on the left-column guard: "that plane's scene-level attachment
  * (deform_fg for A, deform_bg for B — band_table_a/b resolve exactly this
@@ -4947,9 +4990,8 @@ export function anchorDeformAdvisories(scene: EffectsScene): string[] {
     if (at[field] === EFFECTS_ANCHOR_SHIFT_BOUNDS[field].max) continue;
     if (anyOwn || sceneDeformValue(scene, key) !== null) continue;
     out.push(`the anchor deforms ${plane} (${field} ${at[field]}) but this scene attaches no `
-      + `table it can sample: ${label} is off and no strip attaches its own. The engine `
-      + 'flat-paths a live shift with no table: the build stays green and the plane does not '
-      + `move. Attach ${label}, or take ${plane} to off.`);
+      + `table it can sample: ${label} is off and no strip attaches its own. ${FLAT_PATH_CLAIM} `
+      + `Attach ${label}, or take ${plane} to off.`);
   }
   return out;
 }

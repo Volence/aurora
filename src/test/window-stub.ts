@@ -75,6 +75,21 @@ export interface WindowStub {
   /** Run the oldest queued animation-frame callback, once. Returns whether one ran. */
   frame(): boolean;
   /**
+   * Set `window.devicePixelRatio`, or take it away again with `undefined`.
+   *
+   * ⚠ IT IS NOT SET BY DEFAULT, ON PURPOSE. There is no display here, so this
+   * stub cannot honestly report one, and a default of 1 would let a surface that
+   * IGNORES the device scale pass every row -- which is exactly the state
+   * `MapViewport` was in. A row that cares about the scale factor must therefore
+   * declare one, and a row that does not gets `undefined` and exercises the
+   * component's own no-display fallback, which is the production path in this
+   * suite anyway.
+   *
+   * Pass a hostile value (NaN, 0, a string) to drive the fallback deliberately:
+   * a real host can report all three when a window is mid-move between displays.
+   */
+  setDevicePixelRatio(value: unknown): void;
+  /**
    * Put the globals back exactly as they were: a key this stub DEFINED is
    * deleted, and a key that already existed is restored to its prior value. Safe
    * to call twice.
@@ -107,7 +122,7 @@ export function installWindowStub(): WindowStub {
   let nextHandle = 1;
   let restored = false;
 
-  const windowStub = {
+  const windowStub: Record<string, unknown> = {
     addEventListener(type: string, fn: (e: unknown) => void): void {
       listeners.push({ type, fn });
     },
@@ -150,6 +165,10 @@ export function installWindowStub(): WindowStub {
       const hit = listeners.filter((l) => l.type === type);
       for (const l of hit) l.fn(event);
       return hit.length;
+    },
+    setDevicePixelRatio(value) {
+      if (value === undefined) delete windowStub.devicePixelRatio;
+      else windowStub.devicePixelRatio = value;
     },
     listenerCount: (type) => listeners.filter((l) => l.type === type).length,
     listenerTypes: () => [...new Set(listeners.map((l) => l.type))],
