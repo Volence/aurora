@@ -59,7 +59,7 @@ import { useToastStore } from '../../state/toastStore';
 import { useWorkspaceStore } from '../../workspace/workspaceStore';
 import { documentHistoryHub } from '../../state/history-hub';
 import type { ObjectPlacement, Section } from '../../../core/model/s4-types';
-import { unpackNametableWord } from '../../../core/model/s4-types';
+import { unpackNametableWord, SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../../core/model/s4-types';
 import { BG_WIDTH } from '../../../core/formats/bg-tiles';
 
 // ── the fixture ────────────────────────────────────────────────────────────────
@@ -90,13 +90,16 @@ const OBJ = (x: number, y: number): ObjectPlacement => ({ x, y, typeId: 'monitor
  * everywhere and act2's reads 0x0022, so a stroke that commits into the wrong
  * act is a WRONG VALUE and not merely a wrong array identity — the same reason
  * the two acts' objects sit at different coordinates.
+ *
+ * `BG_WIDTH` is IMPORTED, not retyped: a local 64 that drifted from the
+ * constant would make every BG row here paint out of bounds and pass by doing
+ * nothing.
  */
-// IMPORTED, not retyped. `reloadBg` derives the plane's height as
-// `layout.length / BG_WIDTH`; a local 64 that drifted from the constant would
-// make every BG row here paint out of bounds and pass by doing nothing.
 const BG_COLS = BG_WIDTH;
 const BG_ROWS = 2;
 const BG_FILL = { act1: 0x0011, act2: 0x0022 } as const;
+/** The same per-act trick on the FOREGROUND plane. See `section()`. */
+const FG_FILL = { act1: 0x0101, act2: 0x0202 } as const;
 
 /** A layout the component's `reloadBg` will hand to `SectionRenderer.loadBg`. */
 function bgLayout(fill: number): Uint16Array {
@@ -109,13 +112,32 @@ function bgTiles(): Array<{ pixels: Uint8Array }> {
   return [0, 1, 2, 3].map(() => ({ pixels: new Uint8Array(64) }));
 }
 
-/** A section with objects and nothing else, at the smallest shape `MapViewport`
- *  and the object commands both read. Nothing here draws anything real. */
-function section(objects: ObjectPlacement[]): Section {
+/**
+ * A section with objects and a FOREGROUND nametable, at the shape `MapViewport`
+ * and the tile commands both read. Nothing here draws anything real.
+ *
+ * ⚠ THE NAMETABLE IS SIZED FROM THE ENGINE CONSTANTS, and it did not used to be.
+ * `worldToSectionTile` computes `row * SECTION_TILES_WIDE + col` — 256, not the
+ * `widthTiles` this object declares — so an under-sized array takes every write
+ * past row 0 SILENTLY (an out-of-range store into a typed array is dropped, not
+ * thrown). A row that painted down a column would have watched nothing happen
+ * and passed. `widthTiles`/`heightTiles` are declared to match for the same
+ * reason: two numbers describing one array must not disagree.
+ *
+ * The fill is per-act (`0x0101` / `0x0202`) so a write into the wrong act's
+ * section is a wrong VALUE and not merely a wrong array identity, and so the
+ * `oldNt !== newNt` guard at the top of the paint branch is not sitting on the
+ * zero it would also produce for "nothing was picked".
+ */
+function section(objects: ObjectPlacement[], fgFill = 0): Section {
   return {
     index: 0,
     name: 's0',
-    tileGrid: { widthTiles: 8, heightTiles: 8, nametable: new Uint16Array(64) },
+    tileGrid: {
+      widthTiles: SECTION_TILES_WIDE,
+      heightTiles: SECTION_TILES_HIGH,
+      nametable: new Uint16Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH).fill(fgFill),
+    },
     objects,
     rings: [],
     tiles: null,
@@ -148,12 +170,12 @@ function twoActProject(): never {
       acts: [
         {
           id: 'act1', name: 'act1', gridWidth: 1, gridHeight: 1,
-          sections: [section([OBJ(64, 64)])],
+          sections: [section([OBJ(64, 64)], FG_FILL.act1)],
           bgLayout: bgLayout(BG_FILL.act1), bgTiles: bgTiles(),
         },
         {
           id: 'act2', name: 'act2', gridWidth: 1, gridHeight: 1,
-          sections: [section([OBJ(600, 400)])],
+          sections: [section([OBJ(600, 400)], FG_FILL.act2)],
           bgLayout: bgLayout(BG_FILL.act2), bgTiles: bgTiles(),
         },
       ],
@@ -1084,4 +1106,162 @@ describe('the map\'s keyboard moves the camera, and two guards stop it', () => {
   // third arm, the band lens, is gated on `inEffectsFacet()` — a facet this
   // fixture does not open. Its VERDICT is pinned in `map-escape.test.ts`; that
   // the branch acts on it is not, on this arm. Foreground follow-up.
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE FOREGROUND TILE STROKE — `recordPaint`, `endPaintStroke`,
+// `revertPaintStroke`, and the fourth gesture carrier.
+//
+// COVERAGE, not regression. The most-used tool on this surface had nothing
+// running it. `map-gesture-witness.test.ts` unit-tests the VERDICT function this
+// carrier asks; nothing ran the carrier. Its three functions are separate code
+// from the BG stroke's three — a different stroke ref, a different command
+// (`set-tiles`), a different subject (the SECTION object, not the plane array) —
+// so the BG rows above say nothing about them.
+//
+// THE SUBJECT IS THE SECTION OBJECT AND THAT IS THE WHOLE POINT. `recordPaint`
+// spells it out: `sectionIndex` alone cannot see an act switch, because the same
+// number resolves in the new act, so one command would carry two acts' cells
+// with the other act's old values in it. The fixture's two acts each have a
+// section at index 0, which is what poses that question.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('a foreground tile stroke is one command, and is dropped by an act switch', () => {
+  /** The section-0 nametable of `actId`, by reference. */
+  function nt(actId: 'act1' | 'act2'): Uint16Array {
+    const act = useProjectStore.getState().project?.zones[0]?.acts.find((a) => a.id === actId);
+    const grid = act?.sections[0]?.tileGrid;
+    if (!grid) throw new Error(`map-viewport-mounted: no tileGrid in ${actId}; the fixture moved`);
+    return grid.nametable;
+  }
+
+  /** Which cells of `actId`'s foreground are off that act's fill, and to what. */
+  function painted(actId: 'act1' | 'act2'): Array<[number, number]> {
+    const fill = FG_FILL[actId];
+    const out: Array<[number, number]> = [];
+    nt(actId).forEach((w, i) => { if (w !== fill) out.push([i, w]); });
+    return out;
+  }
+
+  beforeEach(() => {
+    useEditorStore.getState().setTool('paint-tile');
+    useEditorStore.getState().setEditingLayer('fg');
+    useEditorStore.getState().setSelectedTileIndex(5);
+  });
+
+  it('HARNESS: a press paints the cell under the cursor, with the picked tile', async () => {
+    // The liveness row. `worldToSectionTile` returns null off the section grid
+    // and the branch returns before it writes — silence, not a failure.
+    const s = await mountMap();
+    s.on().onMouseDown(mouse(0, 0));
+    expect(painted('act1'), 'nothing was painted: the press never reached a section cell')
+      .toHaveLength(1);
+    const [[index, word]] = painted('act1');
+    expect(index, 'client (0,0) is world (0,0) is section cell 0').toBe(0);
+    // DERIVED: the word must name the PICKED tile, not a literal copied from here.
+    expect(unpackNametableWord(word).tileIndex).toBe(useEditorStore.getState().selectedTileIndex);
+  });
+
+  it('a drag down a COLUMN writes every row, not just the first', async () => {
+    // ⚠ THIS IS THE ROW THE OLD 64-WORD FIXTURE COULD NOT HAVE FAILED. Row 1 is
+    // index `SECTION_TILES_WIDE` = 256, past the end of a 64-word array, and an
+    // out-of-range typed-array store is DROPPED rather than thrown. The row
+    // would have painted one cell, asserted three, and the fixture — not the
+    // component — would have been the thing that failed.
+    const s = await mountMap();
+    s.on().onMouseDown(mouse(0, 0));
+    s.on().onMouseMove(mouse(0, 8));
+    s.on().onMouseMove(mouse(0, 16));
+    expect(painted('act1').map(([i]) => i),
+      'the stroke did not reach the rows below the first')
+      .toEqual([0, SECTION_TILES_WIDE, SECTION_TILES_WIDE * 2]);
+  });
+
+  it('a drag paints live and lands exactly ONE command on release', async () => {
+    const s = await mountMap();
+    s.on().onMouseDown(mouse(0, 0));
+    s.on().onMouseMove(mouse(8, 0));
+    s.on().onMouseMove(mouse(16, 0));
+    expect(painted('act1').map(([i]) => i)).toEqual([0, 1, 2]);
+    expect(focusedHistory()?.canUndo ?? false,
+      'a stroke must not commit per cell').toBe(false);
+
+    win!.dispatch('mouseup', {});
+    expect(focusedHistory()!.canUndo, 'the release committed nothing').toBe(true);
+    focusedHistory()!.undo();
+    expect(painted('act1'), 'one undo must take the whole stroke back').toHaveLength(0);
+  });
+
+  it('the act switching under the stroke puts every painted cell back', async () => {
+    // THE CARRIER'S OWN HALF OF DRAG-SURVIVES-ACT-SWITCH. `set-tiles` names
+    // `sectionIndex`, and index 0 exists in BOTH acts, so a stroke that outlived
+    // its act would commit act1's cells and act1's old values against act2's
+    // section — losing both acts' truth in one command.
+    const s = await mountMap();
+    s.on().onMouseDown(mouse(0, 0));
+    s.on().onMouseMove(mouse(8, 0));
+    expect(painted('act1'), 'the premise: two cells are already in the document').toHaveLength(2);
+
+    const before = s.h.renders();
+    focusAct('act2');
+    expect(s.h.renders(), 'the component did not re-render on an act switch').toBeGreaterThan(before);
+
+    expect(painted('act1'), 'act1 kept the uncommitted stroke after the act changed').toHaveLength(0);
+    expect(painted('act2'), 'and act2\'s section must not have been touched').toHaveLength(0);
+    expect(focusedHistory()?.canUndo ?? false, 'a cancelled stroke writes no command').toBe(false);
+  });
+
+  it('a paint after the switch writes into NEITHER section', async () => {
+    // The consumer-side arm at the top of `handleMouseMove`, with React held
+    // back so the act-switch effect cannot do this row's work for it. This is
+    // the shape that caught the live `isPaintDragging` defect on the BG carrier.
+    const s = await mountMap();
+    s.on().onMouseDown(mouse(0, 0));
+    const held = { ...s.on() };
+    focusAct('act2');
+    held.onMouseMove(mouse(16, 0));
+    expect(painted('act1'), 'act1\'s uncommitted paint stays in the file').toHaveLength(0);
+    expect(painted('act2'), 'the cursor\'s cell was painted into the act that just opened')
+      .toHaveLength(0);
+  });
+
+  it('CONTROL: an unmount mid-stroke COMMITS it, the way a release does', async () => {
+    const s = await mountMap();
+    s.on().onMouseDown(mouse(0, 0));
+    s.on().onMouseMove(mouse(8, 0));
+    expect(focusedHistory()?.canUndo ?? false).toBe(false);
+    s.h.unmount();
+    mounted = null;
+    expect(focusedHistory()!.canUndo, 'the unmount discarded the stroke').toBe(true);
+    focusedHistory()!.undo();
+    expect(painted('act1')).toHaveLength(0);
+  });
+
+  it('CONTROL: re-painting a cell with what is already there costs no undo entry', async () => {
+    // The `oldNt !== newNt` guard at the top of the paint branch. Without it a
+    // click on a cell that ALREADY carries the picked word would open a stroke
+    // and land a command that undoes nothing — an entry the author has to press
+    // Ctrl+Z through twice to get anywhere, which is worse than no entry at all.
+    //
+    // `EditHistory` exposes no depth, so the depth is MEASURED by undoing to the
+    // floor and counting. That is also what makes the row able to fail: a
+    // `canUndo` assertion alone reads `true` for one entry and for two.
+    const s = await mountMap();
+    s.on().onMouseDown(mouse(0, 0));
+    win!.dispatch('mouseup', {});
+    expect(painted('act1'), 'the first press did not paint, so this row measures nothing')
+      .toHaveLength(1);
+    const wordThere = nt('act1')[0];
+
+    // The SAME cell, the SAME pick, a second whole press-and-release.
+    s.on().onMouseDown(mouse(0, 0));
+    win!.dispatch('mouseup', {});
+    expect(nt('act1')[0], 'a no-op press changed the cell').toBe(wordThere);
+
+    let depth = 0;
+    while (focusedHistory()!.canUndo && depth < 10) { focusedHistory()!.undo(); depth++; }
+    expect(depth, 'the no-op press put a second, empty command on the undo stack').toBe(1);
+    expect(painted('act1'), 'and that one undo must leave the section as it started')
+      .toHaveLength(0);
+  });
 });
