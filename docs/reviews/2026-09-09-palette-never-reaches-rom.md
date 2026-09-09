@@ -62,3 +62,42 @@ ROM that could never show it.
 
 **Held deliberately:** this is filed and not built, because he is recording, verifying a
 palette fix means rebuilding, and a rebuild is the churn he is filming against.
+
+---
+
+## ⚠ CORRECTION: the vehicle proposed above is WRONG, and aeon caught it
+
+**Ruled by the hub, `empyrean docs/2026-09-09-palette-binding-ruling.md` at `cb922ec`, read at
+that revision.** The section above says *"the obvious candidate is the `paletteRef` channel
+… making it mean for palettes what `sceneRef` means for scenes."* **That is refuted, and the
+reason is one I did not see.**
+
+**`paletteRef` lives in `section_N.meta.json` — one per SECTION. The palette is a single
+per-ACT artifact, bound as `zones[0].palette`.** So reusing the field imports a per-section
+binding onto a per-act resource, and it resolves only two ways: **eight sections may name
+eight different palettes — a real feature with CRAM and VRAM consequences nobody has costed —
+or seven of the eight are decorative and the first silently wins.** `sceneRef` carries no such
+problem, because a scene genuinely *is* per-section. **The symmetry I reasoned from was the
+whole error: the two fields look alike and name artifacts of different scope.**
+
+**THE RULE, which is the durable half: A REFERENCE MUST SIT AT THE SCOPE OF THE ARTIFACT IT
+NAMES.** Per-section palettes are not refused — they are a **separate feature** needing their
+own costed case, and must not arrive by reusing a field that happens to exist.
+
+**Two further rulings that change this document's scope:**
+
+- **Aeon's half does not wait.** The per-build donor copy becomes a **one-time seed**, and the
+  generated palette is generated from something authored. Correct independently of the
+  vehicle, so it lands on its own.
+- **`paletteRef` does not get to stay inert.** Aurora writes it faithfully and nothing reads
+  it. Whichever vehicle the per-act binding takes, it is **struck or given a stated meaning
+  and a consumer** — *a field that is faithfully written and never read is a promise the
+  format makes on nobody's behalf.*
+
+## And the sharper reading of "how nobody noticed", which is aeon's
+
+This document says the live push works and the build path does not. Aeon put it better:
+**the live path WORKING is what made the defect undetectable. Had the live push also failed,
+he would have found this in April.** So it is not the honest-green shape at all — it is **a
+correct component concealing a broken sibling precisely BECAUSE it is correct.** The quality
+of the preview is what hid it.
