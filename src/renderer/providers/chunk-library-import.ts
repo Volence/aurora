@@ -14,6 +14,9 @@ import { kosinskiDecompress } from '../../core/formats/kosinski';
 import { parseTiles } from '../../core/formats/tiles';
 import { migrateChunkTilesIntoTileset } from '../../core/art/atlas-migration';
 import { lookupFullBlockShape, type FullBlockShapeLookup } from '../../core/collision/full-block-shape';
+import {
+  COLLISION_TABLE_FILES, collisionTableSearchPaths,
+} from '../../core/project/aeon/load';
 import { useEditorStore } from '../state/editorStore';
 import { useProjectStore, getCurrentZone } from '../state/projectStore';
 import { useToastStore, type ToastType } from '../state/toastStore';
@@ -26,40 +29,85 @@ import { useConfirmStore } from '../state/confirmStore';
 import { isBlankChunk } from './chunk-grid-aeon';
 
 /**
- * What the author is told after an import, given what the full-block lookup
- * actually answered. Pure and exported so the three sentences can be read
- * side by side, and so a test can hold two of them up against each other: the
- * whole point of the parcel is that the two blind cases must not produce the
- * same words.
+ * The lookup answers an import is allowed to PROCEED on.
  *
- * ⚠ WHY THIS IS NOT THE ANSWER TO d-36, and must not be read as one. The open
- * question is whether Import should REFUSE when the collision shapes are not
- * loaded, or import and warn. That changes what the button does, so it is the
- * owner's call (`docs/decisions.jsonl`, `d-36-air-collision-import`, whose own
- * recommendation is `refuse`). What is fixed here is the DEFECT that stands
- * whichever way d-36 goes: the import used to claim plain success while every
- * chunk came in as air. Telling the truth about what the chunks got is the
- * floor of all three of d-36's options — under `refuse` this same sentence
- * becomes the refusal's text — so it pre-empts none of them, and it removes
- * the silent-wrong-result case in the meantime. THE REFUSAL ARM, IF IT IS
- * RULED, GOES IN `importChunkFiles` BEFORE `addChunks`, not here.
+ * ⚠ `no-profiles` IS ABSENT, AND ITS ABSENCE IS THE GUARANTEE. Decision
+ * `d-36b-air-collision-import-split-closed` (answered `refuse_a_warn_b`) rules
+ * that the blind case must stop before anything is written. Encoding that as a
+ * TYPE rather than an `if` is deliberate and follows the parcel that made the
+ * split visible in the first place: FULLBLOCK-ZERO-IS-TWO-ANSWERS deleted the
+ * conflated `0` return instead of guarding it, so the compiler now enforces the
+ * narrowing. Delete the refusal in `importChunkFiles` and this file stops
+ * compiling; a runtime guard would have let it go quietly green.
+ */
+export type ProceedingFullBlockShape = Exclude<FullBlockShapeLookup, { status: 'no-profiles' }>;
+
+/** `a.bin, b.bin and c.bin` — the tables named the way a person lists files. */
+function nameList(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/**
+ * CASE A. The project's collision shape tables never loaded, so the editor
+ * could not look — this is the editor reporting ITS OWN BLINDNESS, not a fact
+ * about anyone's bank. Decision `d-36b-air-collision-import-split-closed`:
+ * Import refuses, before writing anything, and names which tables it needs and
+ * where it looked.
+ *
+ * ⚠ WHY THE TABLES AND THE PATHS ARE PASSED IN AND NOT WRITTEN OUT HERE. Both
+ * come from `core/project/aeon/load.ts`, which is the module that actually does
+ * the looking: `COLLISION_TABLE_FILES` is the set its `Promise.all` demands
+ * together, and `collisionTableSearchPaths` is its candidate dirs expanded
+ * through its own base-then-flat probe. A refusal that says "here is where it
+ * looked" must be derived from the looker. A hand-written list would be a
+ * second opinion about a layout that has already changed once (the post-split
+ * `games/<game>/data/collision/`), and a stale one reads as a lie at exactly
+ * the moment someone is trying to follow it.
+ *
+ * `searchPaths` empty means no project config is loaded, so the locations
+ * genuinely cannot be listed; the sentence says that rather than trailing off.
+ */
+export function chunkImportBlindRefusal(
+  searchPaths: readonly string[],
+): { message: string; type: ToastType } {
+  const where = searchPaths.length > 0
+    ? `It looked in: ${searchPaths.join(', ')}`
+    : 'It cannot list where it looked, because no project configuration is loaded';
+  return {
+    message: 'Import refused: this project\'s collision shape tables did not load, so nothing '
+      + 'could be marked solid and every chunk would have come in as air. Nothing was imported '
+      + 'and the project is unchanged. Aurora needs '
+      + `${nameList(Object.values(COLLISION_TABLE_FILES))} together in one directory. ${where}.`,
+    type: 'error',
+  };
+}
+
+/**
+ * What the author is told after an import THAT HAPPENED, given what the
+ * full-block lookup answered. Pure and exported so the sentences can be read
+ * side by side, and so a test can hold them up against each other: the point of
+ * the work behind this file is that two different facts must not arrive as the
+ * same message.
+ *
+ * ⚠ CASE B LIVES HERE AND IS NOT A REFUSAL. A real bank loaded and simply holds
+ * no full-block shape. That is a true statement about a project someone
+ * authored, not a blindness, so the import PROCEEDS and says so
+ * (`d-36b-air-collision-import-split-closed`). Refusing there would turn away
+ * an author who HAS collision data and may just not have a full block yet,
+ * which is a project state we have no evidence is wrong.
+ *
+ * ⚠ THIS FUNCTION CANNOT BE HANDED THE BLIND CASE. See
+ * `ProceedingFullBlockShape`. It used to have a third arm for `no-profiles`;
+ * that arm is now `chunkImportBlindRefusal`, and the type is what keeps the
+ * refusal from being quietly bypassed back into a warning.
  */
 export function chunkImportOutcomeToast(
-  count: number, fullBlock: FullBlockShapeLookup,
+  count: number, fullBlock: ProceedingFullBlockShape,
 ): { message: string; type: ToastType } {
   switch (fullBlock.status) {
     case 'found':
       return { message: `Imported ${count} chunks -- Save to keep`, type: 'success' };
-    // "I could not look." No profile set was loaded, so nothing was searched —
-    // the project's collision tables are missing, unreadable, or not where the
-    // loader probes. The author's move is to fix the project, not the bank.
-    case 'no-profiles':
-      return {
-        message: `Imported ${count} chunks WITH NO COLLISION -- this project's collision `
-          + 'shape tables did not load, so nothing could be marked solid. The art is fine; '
-          + 'every cell came in as air. Save to keep the art.',
-        type: 'warning',
-      };
     // "I looked, and there is nothing to use." A real bank was searched and
     // holds no full block. A different fact and a different fix, which is
     // exactly why it is a different sentence.
@@ -76,14 +124,46 @@ export function chunkImportOutcomeToast(
 /**
  * Prompt for the three source files (128x128 chunk mappings, 16x16 block
  * mappings, zone art), merge the art into the zone tileset and add the chunks.
- * Resolves false when the user cancelled a dialog, true on a completed import,
- * and reports its own errors (project error + toast) exactly as before.
+ * Resolves false when the user cancelled a dialog OR when the import was
+ * refused, true on a completed import, and reports its own errors (project
+ * error + toast) exactly as before.
  *
  * ⚠ THE COLLISION LOOKUP IS OPENED, NOT SPENT. See `chunkImportOutcomeToast`
  * and ledger row FULLBLOCK-ZERO-IS-TWO-ANSWERS: this call site is the one that
  * read `findFullBlockShapeId`'s 0 as a value and toasted success over it.
  */
 export async function importChunkFiles(): Promise<boolean> {
+  // ═══ CASE A REFUSES HERE, AND "HERE" IS THE WHOLE POINT ═══
+  //
+  // Decision `d-36b-air-collision-import-split-closed`, answered
+  // `refuse_a_warn_b`. The cost recorded in ledger row
+  // FULLBLOCK-ZERO-IS-TWO-ANSWERS is not that the author was told the wrong
+  // thing: it is that the write ALREADY HAPPENED and is not recoverable by undo
+  // the way an author expects (library adds live outside undo history on
+  // purpose — see `clearChunkLibrary` below), so the chunks carry the wrong
+  // collision from that moment and the project is already marked unsaved. A
+  // refusal after `addChunks` with a rollback would be a different, weaker
+  // promise. So this stands BEFORE the first mutation and before `markDirty`.
+  //
+  // ⚠ AND BEFORE THE THREE FILE DIALOGS, deliberately. `collisionProfiles` is
+  // written only by `openLoaded` (`setCollisionProfiles` has no callers in
+  // src/), so nothing the author picks in those dialogs can turn a null profile
+  // set into a bank. Asking for three files and then refusing would spend their
+  // time for an answer that was already fixed when they clicked.
+  //
+  // ⚠ CASE B IS NOT REFUSED and must not be folded in here. A loaded bank with
+  // no full block reaches `chunkImportOutcomeToast` and imports. The two look
+  // identical downstream — both end with an all-air library — which is exactly
+  // why the discrimination has to happen on the LOOKUP STATUS and not on
+  // anything measured from the result.
+  const fullBlock = lookupFullBlockShape(useProjectStore.getState().collisionProfiles);
+  if (fullBlock.status === 'no-profiles') {
+    const raw = useProjectStore.getState().config?.raw;
+    const refusal = chunkImportBlindRefusal(raw ? collisionTableSearchPaths(raw) : []);
+    useToastStore.getState().addToast(refusal.message, refusal.type);
+    return false;
+  }
+
   try {
     const chunkPath = await window.api.selectFile(
       'Select 128x128 chunk mappings (Kosinski)', [{ name: 'Binary', extensions: ['bin'] }]);
@@ -113,7 +193,9 @@ export async function importChunkFiles(): Promise<boolean> {
     const artData = new Uint8Array(await window.api.readBinaryFile(artPath, ''));
 
     const namePrefix = chunkPath.split('/').pop()?.replace('.bin', '') ?? 'Chunk';
-    const fullBlock = lookupFullBlockShape(useProjectStore.getState().collisionProfiles);
+    // `fullBlock` was resolved and narrowed at the top of this function, above
+    // the refusal. It is not re-read here: a second lookup would be a second
+    // chance to get a different answer than the one the refusal was decided on.
     const imported = importChunks(chunkData, blockData, namePrefix, fullBlock);
 
     const artDecompressed = kosinskiDecompress(artData);
