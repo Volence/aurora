@@ -268,9 +268,27 @@ export const useAetherStore = create<AetherState>((set, get) => ({
             t.restore ? `restore ${(t.restore / 1000).toFixed(1)}s` : null,
           ].filter(Boolean).join(' · ')}`
         : '';
+      // NAME THE ROM THAT WAS RELOADED.
+      //
+      // The 2026-09-09 defect was a chain of individually honest links: the
+      // build succeeded, the reload happened, this toast said both, and the
+      // composite told the owner his edit had vanished, because the file that
+      // was reloaded came from an unrelated experiment directory. A gate in
+      // build-run.ts now refuses that pairing; naming the path is the separable
+      // half, and it is what makes the whole class readable in one glance
+      // rather than a process sweep.
+      //
+      // THE PATH, NOT THE BASENAME. Both ROMs in that incident were called
+      // `s4.debug.bin`, so a basename would have read identically on the good
+      // day and the bad one.
+      //
+      // The old wording survives as the fallback: a reload reported without a
+      // path is a bug in the main process, and "reloaded ." would be a worse
+      // way to show it than the sentence that has always been there.
+      const reloadedWhat = r.romPath ? `reloaded ${r.romPath}` : 'emulator reloaded';
       const summary = r.ok
         ? (r.reloaded
-            ? `Build succeeded (${flavour}): emulator reloaded${r.restoredTo ? `, back at (${r.restoredTo.x}, ${r.restoredTo.y})` : ''}${timing}`
+            ? `Build succeeded (${flavour}): ${reloadedWhat}${r.restoredTo ? `, back at (${r.restoredTo.x}, ${r.restoredTo.y})` : ''}${timing}`
             : r.reloadError
               ? `Build succeeded (${flavour}), but the emulator did not reload: ${r.reloadError}`
               : `Build succeeded (${flavour}): no emulator connected`)

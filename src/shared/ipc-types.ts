@@ -104,6 +104,21 @@ export interface AetherBuildResult {
   output: string[];
   reloaded: boolean;
   reloadError?: string;
+  /**
+   * WHICH ROM WAS RELOADED. Present when `reloaded` is true, and the toast
+   * names it.
+   *
+   * Carried across the boundary because it was not: the main process has known
+   * this since the reload path was written and dropped it here, so the renderer
+   * could not name what it had just reloaded even in principle. On 2026-09-09
+   * that mattered — the emulator was handed a ROM from an unrelated directory
+   * and the toast read exactly as it does on a good build. Every link in that
+   * chain was true; none of them named its object.
+   *
+   * The full path, never the basename: both ROMs in that incident were called
+   * `s4.debug.bin`.
+   */
+  romPath?: string;
   missingEnv: string[];
   command: string;
   /** Whether the DEBUG flavour was built — decides which ROM file was written. */
