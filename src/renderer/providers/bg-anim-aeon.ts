@@ -1010,12 +1010,36 @@ export function removeBandCommand(
  * the feature this key came out of were "maybe have one view for horizontal and
  * one for vertical" — which is exactly the sentence an editor renders as a
  * preview toggle. It is not one. There is no runtime flag and no engine gate:
- * the emitter writes `BgAnim_Table: u16 = 0` and `BgAnim_Update` walks a
- * zero-count table and returns, in every ROM shape including release.
+ * the emitter drops the band from `BgAnim_Table`'s count and `BgAnim_Update`
+ * never walks it, in every ROM shape including release.
+ *
+ * ═══ ⚠ THE ACT-LEVEL CLAIM THAT WAS FALSE, AND ITS QUANTIFIER ═══
+ *
+ * This sentence used to end *"so the act boots with BG animation OFF in every
+ * ROM, RELEASE INCLUDED"*, unqualified. IT IS PER BAND. aeon's emitter writes
+ * the count word as the number of tile animations NOT carrying the key:
+ *
+ *     live_bands = [b for b in bands if not b['default_off']]
+ *     pub data BgAnim_Table: u16 = {len(live_bands)}
+ *
+ * (`tools/inject_editor_bg.py`, read at `origin/master` `22cf8b37`), so the ACT
+ * boots silent only when EVERY tile animation in it is silenced. One marked and
+ * one live band boots ON, and the old sentence told that author the opposite of
+ * what their ROM does. aeon's own comment beside that write calls the earlier
+ * version of the same sentence an OVER-CLAIM, for the same reason: it was true
+ * while the key implied a single-band act, and a multi-band act can now carry it.
+ *
+ * ⚠ THE CORRECTLY-QUANTIFIED SENTENCE EXISTED THE WHOLE TIME, one file over, in
+ * `bg-override.ts`: *"a SINGLE-BAND act boots with BG animation off"*. Nothing
+ * compared the two, which is the class this is: a paraphrase that drops a
+ * quantifier reads exactly like the original to everyone but the author who acts
+ * on it. `providers/__tests__/bg-anim-aeon.ship-silent.test.ts` now compares them.
  */
 export const SHIP_SILENT_LEAD =
   'Changes what SHIPS, not what you see here. A silenced tile animation is not counted into the '
-  + 'act’s table, so the act boots with BG animation OFF in every ROM, RELEASE INCLUDED. '
+  + 'act’s table, so THIS one does not animate in the game as played, in any ROM, RELEASE '
+  + 'INCLUDED. The act as a whole boots with BG animation OFF only when every tile animation in '
+  + 'it is silenced: leave one shipping animated and the act still boots animating. '
   + 'Nothing in this editor looks different either way.';
 
 /**
@@ -1040,11 +1064,24 @@ export const SHIP_SILENT_OBLIGATIONS =
   + `${BGANIM_VIEW_DERIVED_PERIOD_PX}px. Fail either and the act builds with no twins, which `
   + `aeon announces as it builds.`;
 
-/** What the debug ROM gets in exchange, which is the reason the key is not just a delete. */
+/**
+ * What the debug ROM gets in exchange, which is the reason the key is not just a delete.
+ *
+ * ⚠ IT WAS A PROMISE AND IT IS NOW CONDITIONAL, which is the same finding as the
+ * lead's one constant over. The sentence opened *"In exchange the DEBUG ROM gets
+ * N view twins"* with no condition, and the panel's `Hint` renders LEAD +
+ * EXCHANGE and NOT `SHIP_SILENT_OBLIGATIONS` — so on any act that does not
+ * qualify, an author read a promise of three twins with the condition nowhere on
+ * screen, while `viewsEmitted` returned 0 for that very document. The qualifying
+ * shape is now named in the sentence itself rather than left to a constant the
+ * author may never see.
+ */
 export const SHIP_SILENT_EXCHANGE =
-  `In exchange the DEBUG ROM gets ${BGANIM_VIEW_COUNT} view twins over the same art `
-  + '(horizontal, vertical, timer) so perspective and timer can be compared. They exist only in '
-  + 'the debug ROM, so they are not a way to see this animation in the game as played.';
+  `A single silenced tile animation at the ${BGANIM_VIEW_DERIVED_PERIOD_PX}px pattern also buys `
+  + `the DEBUG ROM ${BGANIM_VIEW_COUNT} view twins over the same art (horizontal, vertical, `
+  + 'timer), so perspective and timer can be compared; any other shape of act gets none. They '
+  + 'exist only in the debug ROM, so they are not a way to see this animation in the game as '
+  + 'played.';
 
 // ═══ THE TWIN-COUPLING DISCLOSURE LIVED HERE AND IS RETIRED ═══
 //
@@ -1077,10 +1114,27 @@ export interface ShipSilentSwitch {
   /** PER BAND: does THIS tile animation carry `default_off` today? */
   silent: boolean;
   /**
-   * PER ACT: would the act boot with BG animation off? Today this is the same
-   * question as `silent` for the only shape aeon accepts (a silenced band
-   * forces a single-band act), and it is asked separately anyway because the
-   * two are different quantifiers and the decoupling fix will pull them apart.
+   * PER ACT: would the act boot with BG animation off?
+   *
+   * ⚠ IT IS `every`, NOT `some`, AND IT USED TO BE `some`. aeon's emitter writes
+   * `BgAnim_Table`'s count word as `len([b for b in bands if not
+   * b['default_off']])` (`tools/inject_editor_bg.py`, read at `origin/master`
+   * `22cf8b37`), so the act boots silent exactly when that count is ZERO — when
+   * EVERY tile animation carries the key. A mixed act, one silenced and one live,
+   * boots ANIMATING.
+   *
+   * WHY THE WRONG ONE SURVIVED, because it is the reason this docblock is long:
+   * the field's own comment said the two quantifiers coincided "for the only
+   * shape aeon accepts (a silenced band forces a single-band act)", and named the
+   * decoupling fix as what would pull them apart. THAT FIX LANDED on 2026-09-06
+   * and this predicate was not revisited, so a sentence describing a bound that
+   * had moved went on justifying a `some` that had become wrong. Every fixture in
+   * the suite was single-band, where `some` and `every` agree.
+   *
+   * NO SURFACE READS THIS TODAY — it is public, it is in the panel's projection,
+   * and the strings that made the same claim in prose were the HIGH finding. It
+   * is corrected rather than deleted because the question is a real one and the
+   * next consumer would have re-derived it from the same wrong comment.
    */
   actBootsSilent: boolean;
   /**
@@ -1129,7 +1183,11 @@ export function shipSilentSwitch(
   const probe = build();
   return {
     silent,
-    actBootsSilent: bands.some(bandIsDefaultOff),
+    // EVERY, not SOME: aeon's count word is the number of tile animations NOT
+    // carrying the key, and the act boots silent only when that is zero. `bands`
+    // is non-empty here — the early return above needs `bands[bandIndex]` to
+    // exist — so `every` cannot answer the vacuous true.
+    actBootsSilent: bands.every(bandIsDefaultOff),
     reason: probe.ok ? null : probe.reason,
     run: build,
   };

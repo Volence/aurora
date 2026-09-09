@@ -527,7 +527,10 @@ const EXTRACTORS: Record<string, Extractor[]> = {
       path: 'tools/inject_editor_bg.py',
       pattern: /^BGANIM_VIEW_DERIVED_PERIOD_PX = (\d+)$/m,
       read: Number,
-      quote: '`BGANIM_VIEW_DERIVED_PERIOD_PX = N`, the only period a default_off band may have',
+      // NOT "the only period a default_off band MAY HAVE", which is what this
+      // said and which aeon's decouple retired: a silenced band may have any
+      // period, and this is the only one that EARNS the debug view twins.
+      quote: '`BGANIM_VIEW_DERIVED_PERIOD_PX = N`, the only period that earns the debug view twins',
     },
     aeonContractRow('BGANIM_VIEW_DERIVED_PERIOD_PX'),
   ],

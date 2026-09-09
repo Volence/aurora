@@ -329,3 +329,156 @@ describe('the author-facing copy says the shipped-behaviour fact FIRST', () => {
     expect(SHIP_SILENT_OBLIGATIONS).toMatch(/twins are emitted/i);
   });
 });
+
+// ── THE ACT-LEVEL CLAIM, AND THE QUANTIFIER IT DROPPED ──────────────────────
+
+/**
+ * ⚠ THE HIGH FINDING THIS DESCRIBE WAS ADDED FOR: SHIP-SILENT-CLAIMS-THE-ACT.
+ *
+ * ═══ WHAT AEON'S EMITTER ACTUALLY DOES, READ AT A COMMITTED REVISION ═══
+ *
+ * aeon `tools/inject_editor_bg.py` at `origin/master` `22cf8b37`:
+ *
+ *     live_bands = [b for b in bands if not b['default_off']]
+ *     ...
+ *     f.write(f'pub data BgAnim_Table: u16 = {len(live_bands)}   // band count' ...)
+ *
+ * So the count word is the number of tile animations NOT carrying the key, and
+ * the act boots with BG animation off exactly when that count is ZERO, which is
+ * when EVERY tile animation carries it. One marked and one live band boots ON.
+ * aeon's own comment beside that write says the same, and names the class:
+ * *"THE SUFFIX IS THREE CASES, NOT TWO. It used to be 'any default_off band to
+ * the act boots with BG animation OFF', which was true while `default_off`
+ * implied a single-band act and became an OVER-CLAIM the moment a multi-band act
+ * could carry it."*
+ *
+ * ═══ WHY BOTH HALVES ARE CHECKED HERE ═══
+ *
+ * The defect existed in TWO forms and a fix to either alone leaves the other:
+ *
+ *   THE PROSE   `SHIP_SILENT_LEAD` and the panel's `ships silent` option label
+ *               both stated the act-level effect with no quantifier. A reader of
+ *               the correctly-quantified sentence in `bg-override.ts` ("a
+ *               SINGLE-BAND act boots with BG animation off") and a reader of the
+ *               option label got different facts, and nothing compared them.
+ *
+ *   THE PREDICATE  `shipSilentSwitch(...).actBootsSilent` was
+ *               `bands.some(bandIsDefaultOff)`. SOME is the dropped quantifier in
+ *               machine-readable form: it answers "does any band carry the key",
+ *               which is a different question from "does the act boot silent" on
+ *               precisely the mixed act. It had no consumer, so no surface was
+ *               wrong YET; the field is public and the next consumer would have
+ *               rendered the same falsehood the strings just lost.
+ *
+ * ⚠ THE PROSE ROWS ARE WORDING GATES AND THEIR COVERAGE IS EXACTLY THAT. They
+ * read the constants, so a sentence assembled at runtime, or one in a file not
+ * named here, is outside them. The predicate rows are the ones that measure
+ * behaviour. Both are needed: this defect shipped because only the behaviour half
+ * had ever been modelled, and the behaviour half was wrong too.
+ */
+describe('the act-level claim is quantified over ALL the tile animations', () => {
+  /**
+   * THE DISCRIMINATING SHAPE, and it is the only one that tells `some` from
+   * `every`: one silenced tile animation and one live one. Every fixture the rows
+   * above use is single-band, where the two predicates agree, which is why a
+   * suite of 8,000 rows had nothing to say about this.
+   */
+  it('actBootsSilent is FALSE on a mixed act: one silenced, one live, so it boots ON', () => {
+    const d = doc([PERIOD_TILES, PERIOD_TILES], [{ default_off: true }, {}]);
+    // Anti-vacuous: the shape really is the mixed one, in the order that makes
+    // `some` and `every` disagree.
+    expect(documentBands(d).map(b => Boolean(b.default_off))).toEqual([true, false]);
+    // The band the author is looking at IS silenced ...
+    expect(shipSilentSwitch(d, 0)!.silent).toBe(true);
+    // ... and the ACT still boots animating, because band 1 is counted.
+    expect(shipSilentSwitch(d, 0)!.actBootsSilent).toBe(false);
+    expect(shipSilentSwitch(d, 1)!.actBootsSilent).toBe(false);
+  });
+
+  it('actBootsSilent is TRUE only when EVERY tile animation carries the key', () => {
+    const all = doc([PERIOD_TILES, PERIOD_TILES],
+      [{ default_off: true }, { default_off: true }]);
+    expect(documentBands(all).every(b => Boolean(b.default_off))).toBe(true);
+    expect(shipSilentSwitch(all, 0)!.actBootsSilent).toBe(true);
+    const none = doc([PERIOD_TILES, PERIOD_TILES]);
+    expect(shipSilentSwitch(none, 0)!.actBootsSilent).toBe(false);
+  });
+
+  /**
+   * THE PREDICATE, DERIVED FROM AEON'S OWN EXPRESSION rather than restated. The
+   * emitter's count word is `len([b for b in bands if not b['default_off']])` and
+   * the act is silent when it is 0, so the row builds that count here and holds
+   * `actBootsSilent` to it across every mix of a two-band act. A `some`
+   * implementation fails the two mixed rows and passes the other two, which is
+   * exactly how it survived.
+   */
+  it('tracks aeon\'s count word across all four two-band mixes', () => {
+    for (const marks of [[false, false], [true, false], [false, true], [true, true]]) {
+      const extras = marks.map(m => (m ? { default_off: true } : {}));
+      const d = doc([PERIOD_TILES, PERIOD_TILES], extras);
+      const liveBands = documentBands(d).filter(b => !b.default_off).length;
+      expect(shipSilentSwitch(d, 0)!.actBootsSilent, `marks ${marks.join(',')}`)
+        .toBe(liveBands === 0);
+    }
+  });
+});
+
+/**
+ * THE COPY MAY NOT PROMISE AN ACT-LEVEL EFFECT IT CANNOT DELIVER.
+ *
+ * ⚠ THE OBVIOUS GATE IS VACUOUS AND WAS WRITTEN OUT ON PURPOSE. "the sentence
+ * about the act must carry an all-quantifier" PASSES ON THE FALSE SENTENCE,
+ * because that sentence already contained the word *every* -- in "in every ROM",
+ * quantifying over ROM SHAPES and not over tile animations. So the rows below
+ * require the quantifier to be spelled ON THE NOUN, and the noun is the panel's
+ * own word for the thing (`band-vocabulary.test.ts`: the tile-animation side
+ * never says "band").
+ */
+describe('no author-facing string claims an act-level effect unconditionally', () => {
+  const ACT_BOOT_CLAIM = /\bthe act\b[^.]*\bboots?\b|\bboots?\b[^.]*\bthe act\b/i;
+  const ALL_TILE_ANIMATIONS = /every tile animation|all (?:the )?tile animations/i;
+
+  function sentences(copy: string): string[] {
+    return copy.split(/(?<=[.!?])\s+/).filter(s => s.trim() !== '');
+  }
+
+  it('every sentence in the LEAD that says the ACT boots also says EVERY tile animation', () => {
+    const claims = sentences(SHIP_SILENT_LEAD).filter(s => ACT_BOOT_CLAIM.test(s));
+    // Anti-vacuous: the lead really does make an act-level boot claim. A lead
+    // rewritten to make none at all would pass the loop below by having nothing
+    // in it, and that is a legitimate fix -- but it must not pass SILENTLY,
+    // because a lead that stopped saying anything about the act is a different
+    // sentence from one that says it correctly.
+    expect(claims.length, 'the lead makes at least one act-level boot claim').toBeGreaterThan(0);
+    for (const s of claims) expect(s).toMatch(ALL_TILE_ANIMATIONS);
+  });
+
+  it('the LEAD still leads with the per-band ship fact, which is aeon\'s ordering rule', () => {
+    // The quantifier fix must not have pushed the release-ROM fact behind the
+    // act-level caveat: aeon's contract requires the ship fact FIRST. Note both
+    // operands are asserted PRESENT before they are compared, because two -1s
+    // compare as happily as two real offsets.
+    expect(SHIP_SILENT_LEAD.indexOf('SHIPS')).toBeGreaterThanOrEqual(0);
+    expect(SHIP_SILENT_LEAD.indexOf('RELEASE INCLUDED')).toBeGreaterThanOrEqual(0);
+    expect(SHIP_SILENT_LEAD.search(ACT_BOOT_CLAIM)).toBeGreaterThanOrEqual(0);
+    expect(SHIP_SILENT_LEAD.indexOf('RELEASE INCLUDED'))
+      .toBeLessThan(SHIP_SILENT_LEAD.search(ACT_BOOT_CLAIM));
+  });
+
+  /**
+   * THE EXCHANGE SENTENCE IS THE THIRD UNCONDITIONAL CLAIM, and it is the one the
+   * finding did not name. The panel's `Hint` renders LEAD + EXCHANGE and NOT the
+   * obligations, so on a mixed act an author read "the DEBUG ROM gets three view
+   * twins" with the condition nowhere on screen -- while `viewsEmitted` returns 0
+   * for that very document. Same class, one constant over.
+   */
+  it('the EXCHANGE sentence names the shape that qualifies, so it is not a promise', () => {
+    // The act that gets no twins, from the codec rather than from an assumption.
+    const mixed = documentBands(doc([PERIOD_TILES, PERIOD_TILES],
+      [{ default_off: true }, {}]));
+    expect(viewsEmitted(mixed)).toEqual({ ok: true, value: 0 });
+    // So the sentence must carry the condition. DERIVED, never typed.
+    expect(SHIP_SILENT_EXCHANGE).toContain(`${BGANIM_VIEW_DERIVED_PERIOD_PX}`);
+    expect(SHIP_SILENT_EXCHANGE).toMatch(/\bone\b|\bsingle\b/i);
+  });
+});

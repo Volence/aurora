@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { createHash } from 'crypto';
+import { execFileSync } from 'child_process';
 import { resolve } from 'path';
 import {
   at,
@@ -98,9 +99,15 @@ import { BG_TILE_BASE_SLOT as LOADER_BG_TILE_BASE_SLOT } from '../../src/core/fo
  * revision without moving in VALUE. Asserted below rather than left to prose.
  */
 
-const CONTRACT_PATH = resolve(
-  __dirname, '../../src/core/formats/bg-override/bganim-consumer-contract.json',
-);
+const CONTRACT_REL = 'src/core/formats/bg-override/bganim-consumer-contract.json';
+/**
+ * The commit the `bganim-twins-decline` amendment was written against, so the
+ * control below reads the PRE-FIX contract instead of a retyped copy of it.
+ * A fixed SHA, not `HEAD~1`: the baseline must not move when a later commit lands
+ * on top, or the control silently starts measuring something else.
+ */
+const BASELINE_REV = 'b6660f23e9536ad4570f1959f7b989f00e9e0149';
+const CONTRACT_PATH = resolve(__dirname, '../../', CONTRACT_REL);
 const CONTRACT_TEXT = readFileSync(CONTRACT_PATH, 'utf8');
 // Re-pinned 2026-09-08 by the `bg-capacity-376` amendment. A CONSTANT MOVED this
 // time, unlike the three re-pins before it: `BG_TILE_CAPACITY` 400 -> 376, which
@@ -133,7 +140,27 @@ const CONTRACT_TEXT = readFileSync(CONTRACT_PATH, 'utf8');
 //
 // The previous pin, from the `section-budget-in-prose` amendment, was
 // 8f1c9e288502b000888bf94bc8d46d3a1c07b582483487c3305e5fd8e650c95b.
-const CONTRACT_SHA256 = 'df180c1010d1e7ff6948f85b8e715910c100958da0c9fc5695720e30483b263f';
+//
+// ⚠ RE-PINNED 2026-09-09 by the `bganim-twins-decline` amendment, and NO VALUE
+// MOVED THIS TIME — the first re-pin in this file's history that is purely a
+// CONSEQUENCE repair. Three places went on asserting refusals that the
+// `bganim-decouple` amendment, three days below them in the same document, had
+// already retired: `constants.BGANIM_VIEW_DERIVED_PERIOD_PX.why` ("is REFUSED"),
+// its `authorities[1]` (citing a `raise AssertionError` at a line that no longer
+// exists), and `invariants.viewTwins`, which said aeon "raises on either failure
+// rather than emitting zero twins" — the opposite of current behaviour, twice.
+// Four line numbers were repaired as actually read at aeon 22cf8b37; the eight
+// coordinates the `bg-capacity-376` amendment booked as stale are STILL stale and
+// deliberately untouched.
+//
+// THE CURRENCY GATE COULD NOT HAVE CAUGHT ANY OF IT: it reads aeon for every
+// VALUE, and all three sentences sat beside numbers that were green. A wrong
+// consequence next to a right number is invisible to a value check, which is why
+// the self-consistency sweep at the bottom of this file exists.
+//
+// The pin before this one, from the `bg-capacity-376` amendment, was
+// df180c1010d1e7ff6948f85b8e715910c100958da0c9fc5695720e30483b263f.
+const CONTRACT_SHA256 = 'c5499af197611549a8e2df78cac9ddad1c4737dc123de9503e7a4f3c09239cec';
 
 describe('the vendored contract is the one we pinned', () => {
   it('matches the pinned content hash', () => {
@@ -393,5 +420,258 @@ describe('the contract declares a complete, well-formed key model', () => {
     // can re-derive rather than trust.
     const docs = (at(['source', 'documents']) as string[]).join('\n');
     expect(docs).toContain('tools/regenerate-level.sh');
+  });
+});
+
+/**
+ * NO PRESENT-TENSE CLAIM MAY CONTRADICT AN AMENDMENT BELOW IT.
+ *
+ * ═══ THE FINDING (CONTRACT-AUTHORITY-REFUTED-BY-OWN-AMENDMENT, medium) ═══
+ *
+ * `constants.BGANIM_VIEW_DERIVED_PERIOD_PX` cited *"the refusal in
+ * `views_emitted`: `raise AssertionError(...)`"* as its authority, and said in
+ * its `why` that a band at any other period *"is REFUSED"*. The SAME FILE's
+ * `bganim-decouple` amendment is headed *"THE TWO `default_off` OBLIGATIONS
+ * STOPPED BEING OBLIGATIONS. Both were `AssertionError`s and NEITHER RAISES ANY
+ * MORE."* Two sentences in one document contradicting each other, in the file
+ * whose entire job is to be current.
+ *
+ * The sweep for the same shape found a THIRD and worse one: `invariants.viewTwins`
+ * said *"aeon raises on either failure rather than emitting zero twins"* and
+ * *"a two-band act in which BOTH bands are `default_off` is refused"* -- the exact
+ * opposite of current behaviour, twice, and the sentence a size model would be
+ * written against.
+ *
+ * ═══ WHY THIS GATE DERIVES FROM THE FILE AND NOT FROM MY READING OF AEON ═══
+ *
+ * The authority for "neither raises" is already IN this document, as an amendment
+ * with a revision beside it. So the check is a SELF-CONSISTENCY one: no field
+ * whose job is to describe the present may assert a refusal on the twins path
+ * that the amendments have retired. That makes the gate survive the next aeon
+ * change without being re-derived -- what it enforces is that the file does not
+ * argue with itself, which is true whichever way aeon moves.
+ *
+ * ⚠ THE FIELD LIST IS ENUMERATED, AND THE EXCLUSIONS ARE THE POINT. `amendments`
+ * is EXEMPT because a point-in-time record legitimately describes the past: the
+ * `default-off-switch` amendment's `documents` entry *"both `AssertionError`s are
+ * unchanged"* was TRUE at the revision it names and must stay as written.
+ * `writerObligations` and the two `auroraStatus*` fields are exempt from the
+ * SENTENCE rule and held to a WHOLE-STRING one instead, because they are amended
+ * in place: each carries a superseded clause followed by a marked correction, and
+ * a per-sentence rule would demand the history be deleted rather than marked.
+ */
+describe('no present-tense claim contradicts the amendments below it', () => {
+  /** Words that assert a build-time refusal. */
+  const REFUSAL = /\brefus\w*|\breject\w*|\braise[sd]?\b|AssertionError/i;
+  /** The subject the `bganim-decouple` amendment retired refusals for. */
+  const TWINS_PATH = /default_off|views?_emitt|view_emission|twin/i;
+  /** Marks a refusal named as HISTORY rather than asserted as current. */
+  const RETIRED = new RegExp([
+    'NO LONGER', 'no longer', 'does not raise', 'never as', 'never raises',
+    'NEITHER RAISES', 'used to', 'stopped being', 'stopped', 'was an',
+    'HISTORY', 'until 20', 'is DISCHARGED', 'has MOVED', 'went with it',
+    'not an obligation', 'DELETED', 'decline', 'RETIRED', 'retired',
+  ].join('|'));
+
+  function sentences(s: string): string[] {
+    return s.split(/(?<=[.!?;])\s+/).filter(x => x.trim() !== '');
+  }
+
+  /**
+   * A refusal word inside a QUOTATION is a report of what a document said, not a
+   * claim that it is so -- and every correction in this file works by quoting the
+   * sentence it retires. So single- and double-quoted spans come out before the
+   * refusal test.
+   *
+   * ⚠ BACKTICKS ARE DELIBERATELY LEFT IN, and this is the load-bearing half.
+   * `views_emitted` and `default_off` are backticked wherever they appear, so
+   * stripping backticks would take the SUBJECT out of the sentence and a real
+   * offender ("`views_emitted` refuses ...") would stop being selected at all --
+   * a stripper that hides the thing it is meant to find.
+   *
+   * ⚠ AND THE LIMIT, SAID OUT LOUD: a sentence that put a live claim in quotes
+   * would escape this. That is accepted, because the four sentences this gate was
+   * written against were re-checked through the stripper on the pre-fix file and
+   * all four still fail it -- the row below this one is that control.
+   */
+  function unquoted(s: string): string {
+    return s.replace(/'[^']*'/g, ' ').replace(/"[^"]*"/g, ' ');
+  }
+
+  /** Every `path: sentence` in `entries` that asserts a live refusal. */
+  function refusalClaims(entries: [string, string][]): string[] {
+    const out: string[] = [];
+    for (const [path, text] of entries) {
+      for (const raw of sentences(text)) {
+        const s = unquoted(raw);
+        if (REFUSAL.test(s) && TWINS_PATH.test(s) && !RETIRED.test(s)) {
+          out.push(`${path}: ${raw.trim()}`);
+        }
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Every `[path, text]` pair in the file whose job is to state the PRESENT.
+   * Enumerated by field name rather than walked wholesale, so a new field cannot
+   * quietly join the exempt set by existing.
+   */
+  function presentTenseStrings(): [string, string][] {
+    const out: [string, string][] = [];
+    const constants = at(['constants']) as Record<string, Record<string, unknown>>;
+    for (const [name, entry] of Object.entries(constants)) {
+      if (name.startsWith('$')) continue;
+      for (const field of ['why', 'aeonProse', 'aeonGate'] as const) {
+        if (typeof entry[field] === 'string') {
+          out.push([`constants.${name}.${field}`, entry[field] as string]);
+        }
+      }
+      const auth = entry.authorities;
+      if (Array.isArray(auth)) {
+        auth.forEach((a, i) => out.push([`constants.${name}.authorities[${i}]`, String(a)]));
+      }
+    }
+    const inv = at(['invariants']) as Record<string, string>;
+    for (const [name, text] of Object.entries(inv)) {
+      if (name.startsWith('$')) continue;
+      out.push([`invariants.${name}`, text]);
+    }
+    for (const group of ['bandKeys', 'topLevelKeys'] as const) {
+      const keys = at([group]) as Record<string, Record<string, unknown>>;
+      for (const [name, entry] of Object.entries(keys)) {
+        if (name.startsWith('$') || typeof entry !== 'object' || entry === null) continue;
+        for (const field of ['why', 'cite', 'aeonValueForAurora'] as const) {
+          if (typeof entry[field] === 'string') {
+            out.push([`${group}.${name}.${field}`, entry[field] as string]);
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  it('the sweep really has the fields the finding was found in', () => {
+    // ANTI-VACUOUS. An empty or mis-shaped collection would make every row below
+    // pass, and this gate's whole subject is a claim that hid in one of these.
+    const paths = presentTenseStrings().map(([p]) => p);
+    expect(paths.length).toBeGreaterThan(40);
+    expect(paths).toContain('constants.BGANIM_VIEW_DERIVED_PERIOD_PX.why');
+    expect(paths).toContain('constants.BGANIM_VIEW_DERIVED_PERIOD_PX.authorities[1]');
+    expect(paths).toContain('invariants.viewTwins');
+    expect(paths).toContain('bandKeys.default_off.why');
+  });
+
+  it('the amendment this gate derives its expectation from is still in the file', () => {
+    // The authority is INTERNAL, so it has to be asserted present rather than
+    // assumed: without it the rule below has no ground to stand on.
+    const amendment = (at(['amendments']) as Record<string, unknown>[])
+      .find(a => a.id === 'bganim-decouple');
+    expect(amendment).toBeDefined();
+    expect(String(amendment!.what)).toMatch(/NEITHER RAISES ANY MORE/);
+    expect(amendment!.commit).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  it('no present-tense field asserts a refusal on the twins path', () => {
+    expect(refusalClaims(presentTenseStrings())).toEqual([]);
+  });
+
+  /**
+   * ⚠ THE CONTROL FOR THE METHOD CHANGE ABOVE. `unquoted` was added AFTER the
+   * four offenders were found, to stop the corrections that quote them from being
+   * flagged in turn -- so it is a loosening, and a loosening has to re-establish
+   * the claim the strict version made. This row re-runs the finished predicate
+   * over the PRE-FIX text of the two entries, read from git rather than retyped,
+   * and requires all four sentences to still be caught.
+   *
+   * IT SKIPS LOUDLY rather than passing when the baseline cannot be read, because
+   * "the control could not run" and "the control passed" must not look the same.
+   */
+  it('still catches all four original offenders through the quote stripper', () => {
+    const base = execFileSync('git', ['show', `${BASELINE_REV}:${CONTRACT_REL}`],
+      { cwd: resolve(__dirname, '../..'), encoding: 'utf8' });
+    const old = JSON.parse(base) as {
+      constants: Record<string, { why?: string; authorities?: string[] }>;
+      invariants: Record<string, string>;
+    };
+    const period = old.constants.BGANIM_VIEW_DERIVED_PERIOD_PX;
+    // The baseline really has the two entries this control is about. Without
+    // this, a renamed key would give the row an empty `before` and a zero count,
+    // which reads as "the stripper hid everything" instead of "I looked in the
+    // wrong place".
+    expect(period, `${BASELINE_REV} has the period constant`).toBeDefined();
+    expect(period.authorities, 'and its authorities list').toBeDefined();
+    expect(old.invariants.viewTwins, 'and the viewTwins invariant').toBeDefined();
+    const before: [string, string][] = [
+      ['constants.BGANIM_VIEW_DERIVED_PERIOD_PX.why', String(period.why)],
+      ...period.authorities!.map((a, i) =>
+        [`constants.BGANIM_VIEW_DERIVED_PERIOD_PX.authorities[${i}]`, a] as [string, string]),
+      ['invariants.viewTwins', String(old.invariants.viewTwins)],
+    ];
+    const caught = refusalClaims(before);
+    // FOUR, and they are the four the commit message names. A stripper that had
+    // hidden any of them would show up here as a smaller number.
+    expect(caught).toHaveLength(4);
+    expect(caught.filter(c => c.startsWith('invariants.viewTwins'))).toHaveLength(2);
+    expect(caught.filter(c => c.includes('.why'))).toHaveLength(1);
+    expect(caught.filter(c => c.includes('.authorities['))).toHaveLength(1);
+  });
+
+  /**
+   * The whole-string form, for the three fields that are amended IN PLACE. A
+   * superseded clause is allowed to stand there, but the correction must be in
+   * the same field: a reader who stops at the first sentence is the reader this
+   * finding was about.
+   */
+  it('the amended-in-place fields each carry their own correction', () => {
+    const dk = at(['bandKeys', 'default_off']) as Record<string, unknown>;
+    const inPlace: [string, string][] = [
+      ...(dk.writerObligations as string[])
+        .map((o, i) => [`writerObligations[${i}]`, o] as [string, string]),
+      ['auroraStatusBefore', String(dk.auroraStatusBefore)],
+      ['auroraStatusNow', String(dk.auroraStatusNow)],
+    ];
+    for (const [path, text] of inPlace) {
+      if (REFUSAL.test(text) && TWINS_PATH.test(text)) {
+        expect(text, `${path} names a refusal, so it must mark it as retired`)
+          .toMatch(RETIRED);
+      }
+    }
+  });
+
+  /**
+   * THE POSITIVE HALF. "No refusal claim" is also what a field emptied of content
+   * produces, so `viewTwins` must still say what DOES happen -- and must keep the
+   * two quantifiers apart, which is the trap the HIGH finding was about on the
+   * copy side.
+   */
+  it('viewTwins says the twins DECLINE, and keeps the ship and twins quantifiers apart', () => {
+    const inv = at(['invariants']) as Record<string, string>;
+    expect(inv.viewTwins).toMatch(/declin/i);
+    // The twins are an ACT question ...
+    expect(inv.viewTwins).toMatch(/PER ACT|ACT'S BAND COUNT|EXACTLY ONE BAND/);
+    // ... and the ship decision is a BAND one. Conflating them is the finding.
+    expect(inv.viewTwins).toMatch(/per band|PER BAND/);
+    expect(inv.viewTwins).toContain('BGANIM_VIEW_DERIVED_PERIOD_PX');
+  });
+
+  /**
+   * The period constant's authority must cite something that EXISTS. The old
+   * entry named a `raise AssertionError` in `views_emitted`; at aeon `22cf8b37`
+   * the condition lives in `view_emission`, which returns `(0, note)`.
+   */
+  it('the period constant cites the function that decides the twins today', () => {
+    const auth = (at(['constants', 'BGANIM_VIEW_DERIVED_PERIOD_PX', 'authorities']) as string[]);
+    expect(auth.join('\n')).toContain('view_emission');
+    // ⚠ NOT `not.toContain('AssertionError')`, WHICH IS WHAT THIS ROW SAID FIRST
+    // AND WAS WRONG ABOUT: the repaired citation NAMES the retired assertion, on
+    // purpose, so the next reader who greps for it finds out where it went rather
+    // than nothing at all. What must not survive is a citation ASSERTING one, and
+    // that is the sweep's job three rows up. So the rule here is the weaker,
+    // correct one: if the string mentions an AssertionError it must mark it dead.
+    for (const a of auth) {
+      expect(a).toMatch(/^aeon /);
+      if (a.includes('AssertionError')) expect(a).toMatch(RETIRED);
+    }
   });
 });

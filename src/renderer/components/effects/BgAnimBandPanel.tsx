@@ -619,7 +619,20 @@ export default function BgAnimBandPanel(): React.ReactElement {
 
                 THE LEAD SENTENCE IS aeon's, IN aeon's ORDER: the release-shape
                 fact first, then the two obligations, then what the debug ROM
-                gets in exchange. See `SHIP_SILENT_LEAD` in the provider. */}
+                gets in exchange. See `SHIP_SILENT_LEAD` in the provider.
+
+                ⚠ AND THE TWO OPTION LABELS SPEAK FOR THE BAND, NEVER FOR THE
+                ACT. The silencing one read "ships silent (the act boots with
+                BG animation off)", which is FALSE on any act that has a second
+                live tile animation: aeon's count word is the number of tile
+                animations NOT carrying `default_off`, so the act boots silent
+                only when EVERY one of them is silenced. This is a PER-BAND
+                control -- that is the argument the placement above makes -- and
+                a label has no room for the act-level quantifier, so it does not
+                make the act-level claim at all. The quantified sentence is in
+                `SHIP_SILENT_LEAD`, which is this Select's `title` and the Hint
+                below it. `__tests__/ship-silent-label-scope.test.ts` holds the
+                labels to the band; the provider's own suite holds the lead. */}
             {shipSilent !== null && (
               <Field label="In the ROM"
                 title="What this tile animation does in the BUILT ROM. Not a preview setting: it
@@ -649,7 +662,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
                   <option value={SHIP_SILENT_VALUE}
                     disabled={!shipSilent.silent && shipSilent.reason !== null}
                     title={shipSilent.reason ?? SHIP_SILENT_LEAD}>
-                    ships silent (the act boots with BG animation off)
+                    ships silent (this tile animation does not run in the game)
                   </option>
                 </Select>
               </Field>

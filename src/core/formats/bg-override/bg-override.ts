@@ -155,7 +155,13 @@ export const BGANIM_RECORD_BYTES = constant('BGANIM_RECORD_BYTES');
 export const BGANIM_BYTES_PER_SLOT = constant('BGANIM_BYTES_PER_SLOT');
 /** DEBUG view twins a qualifying act emits beside its own table. */
 export const BGANIM_VIEW_COUNT = constant('BGANIM_VIEW_COUNT');
-/** The one `pattern_px` a `default_off` band may have; anything else refuses. */
+/**
+ * The one `pattern_px` that EARNS the twins. Any other period gets none.
+ *
+ * ⚠ THIS SAID "anything else refuses" and it stopped being true at aeon's
+ * decouple: a `default_off` band may have any period, and the twins DECLINE
+ * rather than the build refusing. See `viewsEmitted` below for the whole story.
+ */
 export const BGANIM_VIEW_DERIVED_PERIOD_PX = constant('BGANIM_VIEW_DERIVED_PERIOD_PX');
 
 /** `{ camera_x: 0, camera_y: 1, timer: 2 }` — the SCALAR SOURCE, never an axis. */
@@ -342,8 +348,20 @@ export interface BgOverrideBand {
    * animation off in EVERY ROM shape, release included. Absent is the default;
    * `writeBandDefaultOff` deletes rather than writing `false` for the same
    * reason every other optional key here is left out when it is not meant.
-   * Both of aeon's obligations for it are quantified over the ACT — see
-   * `viewsEmitted`.
+   *
+   * ⚠ NOTE THE QUANTIFIER ON THAT FIRST SENTENCE — "a SINGLE-BAND act" — because
+   * it is the one the author-facing copy dropped, and this was the sentence that
+   * proved it wrong. The act boots silent only when EVERY band carries the key:
+   * aeon's count word is `len([b for b in bands if not b['default_off']])`.
+   *
+   * THE TWINS ARE A DIFFERENT QUESTION AND A DIFFERENT QUANTIFIER. Both of
+   * aeon's obligations for this key gate the DEBUG VIEW TWINS, and both are
+   * decided on the ACT: the band count must be one, and it is then THAT one
+   * band's `pattern_px` that is read (aeon's `view_emission` never looks at a
+   * second band's period, because it has already required there not to be one).
+   * `viewsEmitted` below labels the second arm PER BAND for that reason; the two
+   * descriptions are the same rule seen from either end, and neither is a claim
+   * about what SHIPS.
    */
   default_off?: boolean;
   phases: number[][][];
