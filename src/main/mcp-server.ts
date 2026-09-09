@@ -33,9 +33,39 @@ function buildServer(getWindow: () => BrowserWindow | null): McpServer {
   // MCP tools are driven from the shared registry so they never drift from the
   // Aether `editor/*` surface (single source of methods).
   for (const m of EDITOR_METHODS) {
-    const config = Object.keys(m.params).length > 0
-      ? { description: m.description, inputSchema: m.params }
-      : { description: m.description };
+    // ⚠ `inputSchema` IS REGISTERED FOR EVERY METHOD, INCLUDING THE ONES WITH NO
+    // PARAMS, AND THE `Object.keys(m.params).length > 0` CONDITIONAL THAT USED TO
+    // STAND HERE WAS THE OFF-SCHEMA ROAD TO THE AGENT HANDLER (GUARD-SEAT-RESIDUE).
+    //
+    // The SDK decides the callback's SIGNATURE from whether a tool has an input
+    // schema (`executeToolHandler` in @modelcontextprotocol/sdk server/mcp.js):
+    // with one it calls `handler(args, extra)`, and WITHOUT one it calls
+    // `handler(extra)` — so `args` below bound to the SDK's `RequestHandlerExtra`,
+    // and `{ kind, ...args }` spread THAT into the request. Measured over the real
+    // `/mcp` route, the payload reaching `requestAgent` for a zero-param tool was
+    // `kind` plus thirteen keys no schema has ever seen — `signal`, `requestId`,
+    // `requestInfo`, `sendNotification`, `sendRequest`, `taskStore`, … — two of
+    // them functions.
+    //
+    // That is not merely untidy: `webContents.send` serialises with the structured
+    // clone algorithm, which THROWS on a function, so all twelve zero-param tools
+    // (`get_project_info`, `get_palette`, `get_bg`, `list_bgs`,
+    // `list_effects_scenes`, `list_effects_presets`, `list_bg_anim_bands`,
+    // `get_project_report`, `list_classic_levels`, `save_project`,
+    // `aether_status`, `build_and_run`) could not cross the IPC hop at all. The
+    // Aether road was unaffected throughout — `adapter.ts` runs
+    // `z.object(m.params).safeParse` for every method and spreads the PARSED data,
+    // and an empty object schema strips rather than passes — which is why the road
+    // that carries most of the traffic hid this one.
+    //
+    // An empty raw shape is not a no-op registration: `z.object({})` strips every
+    // key, so the callback receives `{}` and the payload is exactly `{ kind }`.
+    // The advertised surface does not move either — the SDK already substitutes
+    // `EMPTY_OBJECT_JSON_SCHEMA` in `tools/list` for a tool with no input schema,
+    // which is what an empty shape compiles to. `agent-road-schema-gate.test.ts`
+    // asserts both halves, and asserts them over EDITOR_METHODS rather than over
+    // a list of tool names, so a method added later is covered by construction.
+    const config = { description: m.description, inputSchema: m.params };
     server.registerTool(m.name, config, async (args: Record<string, unknown> = {}) => {
       const result = await forward({ kind: m.kind, ...args } as AgentRequest);
       if (m.result === 'image') {
