@@ -15,6 +15,11 @@ import { useEditorStore } from './editorStore';
 import { useViewStore } from './viewStore';
 import { useToastStore } from './toastStore';
 import { recordRecentProject } from './recents';
+// The cause clause and the name-some-and-count shape, both imported rather than
+// worded here: core owns what a cause MEANS (bgUnresolvedCauseText) and what a
+// coalesced summary looks like (notice.ts), and this toast is one reader of each.
+import { bgUnresolvedCauseText } from '../../core/formats/bg-library';
+import { nameSome } from '../../core/project/notice';
 
 export async function openAeonProject(dir: string): Promise<boolean> {
   const store = useProjectStore.getState();
@@ -118,16 +123,25 @@ export async function openAeonProject(dir: string): Promise<boolean> {
     //
     // Names entries, not just a count: "3 backgrounds could not be opened" sends
     // the reader looking, where the ids are what they would have to find anyway.
-    // Capped, because the real number here is seventeen and a toast is not a
-    // list.
+    // Capped by `nameSome`, because the real number here is seventeen and a toast
+    // is not a list.
+    //
+    // ⚠ AND EACH NAME CARRIES ITS OWN CAUSE (ABSENT-CAUSE-MISNAMED, lens sweep).
+    // This used to end with one flat assertion for the whole list — "Their
+    // layout/tile files are not in this checkout" — which is true of the
+    // clean-clone case that motivated the toast and FALSE of every other way an
+    // entry lands here: a body that is present and too short to hold a row, one
+    // that would not parse, one behind a permissions failure, one whose path
+    // Aurora refused. For those the sentence named a cause that is not the cause
+    // and sent the author to `git status` for a file they were looking at. The
+    // cause now travels on the entry (`BgUnresolvedCause`) and is rendered per
+    // name, so the toast cannot over-claim for entries it is not about.
     const unresolved = aeon.project.bgLibraryUnresolved;
     if (unresolved.length > 0) {
-      const shown = unresolved.slice(0, 3).map((e) => e.name).join(', ');
-      const rest = unresolved.length - Math.min(3, unresolved.length);
+      const named = nameSome(unresolved.map((e) => `${e.name} (${bgUnresolvedCauseText(e.cause)})`));
       useToastStore.getState().addToast(
         `${unresolved.length} background${unresolved.length === 1 ? '' : 's'} named by this ` +
-        `zone's library could not be opened: ${shown}${rest > 0 ? `, +${rest} more` : ''}. ` +
-        'Their layout/tile files are not in this checkout; sections that reference them show ' +
+        `zone's library could not be opened: ${named}. Sections that reference them show ` +
         'the act default. Editing still works, and saving will not drop their names.',
         'warning');
     }

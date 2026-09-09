@@ -964,8 +964,13 @@ describe('a bglib manifest naming entries whose bodies are absent', () => {
     // loader that had failed on both would satisfy the second assertion alone.
     expect(r.project.bgLibrary.map((b) => b.id)).toEqual([PRESENT]);
     expect(r.project.bgLibrary[0].tiles.length).toBe(1);
-    expect(r.project.bgLibraryUnresolved)
-      .toEqual([{ id: ABSENT, name: 'In-game forest (engine v15)' }]);
+    // The CAUSE is part of the fact now (ABSENT-CAUSE-MISNAMED): this entry really
+    // is absent, so 'absent' is the one entry for which the open toast's "not in
+    // this checkout" clause is a true statement. The row below proves the other
+    // half — that a present-but-short body does NOT get that cause.
+    expect(r.project.bgLibraryUnresolved).toEqual([{
+      id: ABSENT, name: 'In-game forest (engine v15)', cause: 'absent', reason: null,
+    }]);
   });
 
   it('a whole checkout reports NOTHING unresolved: empty is the ordinary answer', async () => {
@@ -977,16 +982,38 @@ describe('a bglib manifest naming entries whose bodies are absent', () => {
     expect(r.project.bgLibraryUnresolved).toEqual([]);
   });
 
-  it('a body PRESENT but too short to hold a row is unresolved, not silently dropped', async () => {
+  it('a body PRESENT but too short to hold a row is unresolved, and NOT called absent', async () => {
     const files = bgFixture();
     // Half a row. `Math.floor(len / (BG_WIDTH*2))` is 0, which the loader used
-    // to `continue` past — indistinguishable downstream from an absent file,
-    // and that is the point: it takes the same road.
+    // to `continue` past. It takes the same ROAD as an absent body — the entry is
+    // carried, not dropped — and it must not take the same CAUSE: this file is on
+    // disk, and the open toast used to tell the author it was not in their
+    // checkout (ABSENT-CAUSE-MISNAMED). That is what the third assertion is.
     files.set(`data/editor/ojz_bg_${ABSENT}.bin`, new Uint8Array(BG_WIDTH));
     files.set(`data/editor/ojz_bg_${ABSENT}_tiles.bin`, serializeBgTiles([tile(4)]));
     const r = await loadAeonProject(memFa(files), '/proj');
     expect(r.project.bgLibrary.map((b) => b.id)).toEqual([PRESENT]);
     expect(r.project.bgLibraryUnresolved.map((e) => e.id)).toEqual([ABSENT]);
+    expect(r.project.bgLibraryUnresolved[0].cause).toBe('unusable');
+    // And the reason says which file, so the sentence is actionable.
+    expect(r.project.bgLibraryUnresolved[0].reason)
+      .toContain(`data/editor/ojz_bg_${ABSENT}.bin`);
+  });
+
+  it('a body that is THERE and cannot be read is unreadable, not absent', async () => {
+    // The third road into this list, and the one the flat toast wording was worst
+    // for: the bytes are present and intact and a permissions failure is between
+    // the author and them. `memFaDenying` answers `exists` true and throws EACCES
+    // from `read`, which is the fs-backed bridge's shape for that.
+    const files = bgFixture();
+    files.set(`data/editor/ojz_bg_${ABSENT}.bin`, bgLayoutBytes());
+    files.set(`data/editor/ojz_bg_${ABSENT}_tiles.bin`, serializeBgTiles([tile(4)]));
+    const denied = new Set([`data/editor/ojz_bg_${ABSENT}.bin`]);
+    const r = await loadAeonProject(memFaDenying(files, denied), '/proj');
+    expect(r.project.bgLibrary.map((b) => b.id)).toEqual([PRESENT]);
+    expect(r.project.bgLibraryUnresolved.map((e) => e.id)).toEqual([ABSENT]);
+    expect(r.project.bgLibraryUnresolved[0].cause).toBe('unreadable');
+    expect(r.project.bgLibraryUnresolved[0].reason).toContain('EACCES');
   });
 
   /**
