@@ -53,7 +53,7 @@ describe('explorerEmptyState: a filter narrows the TREE, never the way out of it
     expect(explorerEmptyState(0, 'zon', true).noMatches).toBe(true);
   });
 
-  it('and it is not shown when no filter is set — an empty tree is not "no matches"', () => {
+  it('and it is not shown when no filter is set: an empty tree is not "no matches"', () => {
     expect(explorerEmptyState(0, '', true).noMatches).toBe(false);
     expect(explorerEmptyState(0, '   ', true).noMatches).toBe(false);
     expect(explorerEmptyState(0, '', false).noMatches).toBe(false);

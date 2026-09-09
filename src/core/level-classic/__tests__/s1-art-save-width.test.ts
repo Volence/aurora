@@ -143,7 +143,7 @@ function buildTwoFileAct(): { fa: FileAccess; act: LevelAct; paths: ResolvedLeve
 }
 
 describe('F3 §1 · one edited tile emits every art file backing the act', () => {
-  it('GHZ really is the two-file zone, and it is the only one — from the profile, not from memory', () => {
+  it('GHZ really is the two-file zone, and it is the only one, read from the profile rather than memory', () => {
     const counts = new Map<string, number>();
     for (const zone of s1Profile.zones) {
       for (const act of zone.acts) counts.set(`${zone.id}/${act.act}`, act.tiles.length);
@@ -156,7 +156,7 @@ describe('F3 §1 · one edited tile emits every art file backing the act', () =>
     expect(multi.sort()).toEqual(['ghz/1', 'ghz/2', 'ghz/3']);
   });
 
-  it('an edit inside file A emits BOTH files — the "two files" half of F3', async () => {
+  it('an edit inside file A emits BOTH files: the "two files" half of F3', async () => {
     const { fa, act, paths } = buildTwoFileAct();
     const state = await readS1Level(act, paths, fa);
     // Tile 1 lives in file A's span (tiles 0-3); file B holds 4-7 and is untouched.
@@ -211,7 +211,7 @@ function reencode(rel: string): { onDisk: number; tiles: number; re: number } {
 }
 
 describe('F3 §2 · the +329 bytes is re-encode overhead, not drawing', () => {
-  it('tile $30 is in GHZ1 and NOT in GHZ2 — so GHZ2 was never patched', NEEDS, () => {
+  it('tile $30 is in GHZ1 and NOT in GHZ2, so GHZ2 was never patched', NEEDS, () => {
     const a = reencode(GHZ1);
     const b = reencode(GHZ2);
     // Derived from the files, not from the report: the pool is A then B.
@@ -261,7 +261,7 @@ describe('F3 §2 · the +329 bytes is re-encode overhead, not drawing', () => {
     for (const rel of [GHZ1, GHZ2]) {
       const { onDisk, re } = reencode(rel);
       expect(re / onDisk, `${rel} inflated past the golden ceiling`).toBeLessThan(1.10);
-      expect(re / onDisk, `${rel} no longer inflates — F3's cause has changed`).toBeGreaterThan(1.0);
+      expect(re / onDisk, `${rel} no longer inflates: F3's cause has changed`).toBeGreaterThan(1.0);
     }
   });
 });

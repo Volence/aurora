@@ -121,7 +121,7 @@ const RENDERER = join(SRC, 'renderer');
  */
 const DOORS: Record<string, string> = {
   'renderer/hooks/useProject.ts':
-    'THE USER ROAD. Every production entry point funnels here — the Explorer and hero '
+    'THE USER ROAD. Every production entry point funnels here: the Explorer and hero '
     + '"Open Project…" buttons and the Home "Switch project" (App.tsx passes openProject), '
     + 'the recents rows and the command palette\'s recent: commands (openProjectByPath), and '
     + 'the palette\'s open-project command (openProjectDialog). It awaits confirmProjectOpen() '
@@ -133,7 +133,7 @@ const DOORS: Record<string, string> = {
   'renderer/agent/agent-handler.ts':
     'THE AGENT DOOR. No UI to confirm through, so classic-open-project refuses outright on '
     + 'any resident dirt (unsavedAgentRefusal) rather than asking. Guarded by refusal, not '
-    + 'by dialog — see shell/__tests__/agent-open-refusal.test.ts.',
+    + 'by dialog. See shell/__tests__/agent-open-refusal.test.ts.',
   'renderer/components/setup/ProjectSetupTab.tsx':
     'RE-VALIDATE, NOT A SWITCH. It re-opens the directory that is ALREADY open, so the '
     + 'session key is unchanged and resetProjectRuntime never fires; no document session '

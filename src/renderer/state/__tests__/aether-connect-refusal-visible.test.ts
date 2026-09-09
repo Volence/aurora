@@ -61,7 +61,7 @@ describe('F4 · a refused connect produces a response a person can see', () => {
    * connected, so a refused connect walks offline → connecting → offline and
    * ends on character-for-character the label it started from.
    */
-  it('the badge state is UNCHANGED across the refusal — which is why a toast is needed', async () => {
+  it('the badge state is UNCHANGED across the refusal, which is why a toast is needed', async () => {
     stubConnect(OFFLINE);
     const before = useBusStore.getState().status;
     await useAetherStore.getState().connect();
@@ -84,8 +84,12 @@ describe('F4 · a refused connect produces a response a person can see', () => {
   it("the OTHER refusal text seat B provoked reaches it identically", async () => {
     // Its 111-byte-path message is the good one, and it must not be truncated
     // or reworded on the way through either.
+    // The offending path is stood in for rather than reproduced: seat B's real
+    // one was under an agent session's scratchpad, and check-peer-path-literals
+    // refuses those as executable lines — correctly, since a literal like that
+    // stops existing when the session does. Nothing here depends on its shape.
     const long = 'Aether socket path is 111 bytes; a unix socket path must be under 104. '
-      + 'Set ORACLE_SOCKET to something shorter. Path: /tmp/claude-1000/x/dead-uxb.sock';
+      + 'Set ORACLE_SOCKET to something shorter. Path: <the offending path, verbatim>';
     stubConnect({ status: 'disconnected', palette: false, error: long });
     await useAetherStore.getState().connect();
     expect(useToastStore.getState().toasts[0].message).toBe(`${CONNECT_FAILED_PREFIX}${long}`);
