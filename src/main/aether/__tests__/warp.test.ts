@@ -112,6 +112,38 @@ describe('warpTo', () => {
     expect(r.clamped).toBe(true);
   });
 
+  /**
+   * ONE AXIS AT A TIME, because the row above cannot tell the `||` from either
+   * of its operands: it clamps X *and* Y, so `clamped: landedX !== x` alone
+   * satisfies it. The audit measured that — narrowing the expression to the X
+   * term left the whole suite green (plant P28).
+   *
+   * Y-only is the case that actually happens. An act is far wider than it is
+   * tall, so a cursor dropped above the ceiling or below the floor clamps in Y
+   * with X landing exactly where it was asked; the user is then told the warp
+   * landed on their cursor while the player is somewhere else vertically.
+   */
+  it('reports a clamp that moved ONLY the y axis', async () => {
+    const c = fakeClient({ clampTo: { x: 2144, y: 511 } });
+    const r = await warpTo(c as never, 2144, 40000);
+
+    // Anti-vacuous: X really did land untouched, so this row is exercising the
+    // Y term and not quietly falling back on the X one.
+    expect(r.landed).toEqual({ x: 2144, y: 511 });
+    expect(r.landed?.x).toBe(2144);
+    expect(r.clamped).toBe(true);
+  });
+
+  /** The mirror, so neither term can be dropped without a row noticing. */
+  it('reports a clamp that moved ONLY the x axis', async () => {
+    const c = fakeClient({ clampTo: { x: 4095, y: 429 } });
+    const r = await warpTo(c as never, 60000, 429);
+
+    expect(r.landed).toEqual({ x: 4095, y: 429 });
+    expect(r.landed?.y).toBe(429);
+    expect(r.clamped).toBe(true);
+  });
+
   it('reports clamped=false when it landed where it asked', async () => {
     const c = fakeClient();
     const r = await warpTo(c as never, 300, 400);
