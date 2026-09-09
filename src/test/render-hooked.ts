@@ -47,7 +47,8 @@ type Cell =
   | { kind: 'state'; value: unknown }
   | { kind: 'ref'; ref: { current: unknown } }
   | { kind: 'effect'; deps: unknown[] | undefined; cleanup: (() => void) | void }
-  | { kind: 'memo'; deps: unknown[] | undefined; value: unknown };
+  | { kind: 'memo'; deps: unknown[] | undefined; value: unknown }
+  | { kind: 'store'; subscribe: unknown; unsubscribe: (() => void) | undefined };
 
 interface PendingEffect { index: number; run: () => (() => void) | void }
 
@@ -62,6 +63,29 @@ export interface Hooked<P> {
   props(): P;
   /** How many times the component body has run. Guards against a dead harness. */
   renders(): number;
+  /**
+   * TAKE THE COMPONENT DOWN, the way React does: every effect cleanup runs, in
+   * the order the effects were declared, and every external store subscription
+   * is dropped.
+   *
+   * TWO REASONS THIS EXISTS, and the first is not hygiene.
+   *
+   *  1. AN UNMOUNT IS BEHAVIOUR. `MapViewport`'s cleanup COMMITS a paint stroke
+   *     in flight, because a facet switch unmounts it mid-gesture and the
+   *     release event never comes (map-teardown.test.ts states the derivation).
+   *     A harness with no unmount cannot ask that question at all.
+   *  2. A `useSyncExternalStore` subscription outlives the test that made it.
+   *     zustand stores are module singletons here, so a harness that never
+   *     unsubscribes leaves a dead component's listener on a live store, and the
+   *     NEXT test's `setState` re-renders it. That is a cross-test coupling with
+   *     no error message.
+   *
+   * Idempotent: calling it twice runs nothing the second time, which is what
+   * React guarantees and what lets a test unmount in an `afterEach` as well as
+   * in the body. Reading the tree after it throws rather than answering with a
+   * stale render.
+   */
+  unmount(): void;
 }
 
 /**
@@ -83,6 +107,7 @@ export function renderHooked<P extends object>(
   let tree: React.ReactElement | null = null;
   let dirty = true;
   let renders = 0;
+  let unmounted = false;
 
   const nextCell = <T extends Cell>(make: () => T): T => {
     const i = cursor++;
@@ -133,6 +158,53 @@ export function renderHooked<P extends object>(
     return cell.value as T;
   };
 
+  /**
+   * WHAT ZUSTAND ACTUALLY CALLS. `useStore` (zustand/esm/react.mjs) forwards to
+   * React's `useSyncExternalStore`, so every `useEditorStore(...)` /
+   * `useProjectStore(...)` in a component under test arrives here. Without it
+   * the harness stops at the first store read, which is line 550 of
+   * MapViewport.tsx — before any of that component's own state exists.
+   *
+   * THE SNAPSHOT IS READ LIVE, EVERY RENDER, and that is the whole point: the
+   * store is the real module singleton, so a test that calls a real action sees
+   * what the component would see. No snapshot is cached, so the tearing
+   * protection React's version provides is not modelled and does not need to be
+   * — there is one synchronous renderer here and no concurrent work to tear
+   * against.
+   *
+   * A CHANGE NOTIFICATION MARKS THE TREE DIRTY rather than re-rendering
+   * immediately, so a single action that touches several stores costs one
+   * re-render at the next flush, which is React's batching outcome by a
+   * different route.
+   *
+   * A NEW `subscribe` IDENTITY RE-SUBSCRIBES, the way React's does, and this is
+   * not defensive plumbing — it is load-bearing on a real component here.
+   * zustand's own subscribe is a bound singleton method and never moves, but
+   * `useAeonHistoryVersion` (hooks/useHistoryVersion.ts) builds its subscriber
+   * with `useCallback(..., [key])` where `key` is the open zone and act. So the
+   * identity moves exactly when the act changes — which is the event half the
+   * rows on this surface exist to test. A harness that subscribed once would keep
+   * the OLD act's listener and drop the new one, and every row about an act switch
+   * would be measuring a dead component.
+   *
+   * The old listener is dropped before the new one is made, so the count of live
+   * listeners on a store is the count React would have.
+   */
+  const useSyncExternalStoreImpl = <T,>(
+    subscribe: (onChange: () => void) => () => void,
+    getSnapshot: () => T,
+  ): T => {
+    const cell = nextCell<Cell & { kind: 'store' }>(() => ({
+      kind: 'store', subscribe, unsubscribe: undefined,
+    }));
+    if (cell.unsubscribe === undefined || cell.subscribe !== subscribe) {
+      if (cell.unsubscribe !== undefined) cell.unsubscribe();
+      cell.subscribe = subscribe;
+      cell.unsubscribe = subscribe(() => { dirty = true; });
+    }
+    return getSnapshot();
+  };
+
   const unsupported = (name: string) => () => {
     throw new Error(
       `renderHooked: the component under test called ${name}, which this harness `
@@ -147,6 +219,7 @@ export function renderHooked<P extends object>(
     useLayoutEffect: useEffectImpl,
     useMemo: useMemoImpl,
     useCallback: <T,>(fn: T, deps?: unknown[]): T => useMemoImpl(() => fn, deps),
+    useSyncExternalStore: useSyncExternalStoreImpl,
     useDebugValue: () => {},
   };
   const guarded = new Proxy(dispatcher, {
@@ -188,6 +261,10 @@ export function renderHooked<P extends object>(
   };
 
   const treeNow = (): React.ReactElement => {
+    if (unmounted) {
+      throw new Error('renderHooked: the component was unmounted; there is no tree to read. '
+        + 'Read what you need before unmount(), or render again.');
+    }
     flush();
     if (tree === null) throw new Error('renderHooked: the component rendered nothing');
     return tree;
@@ -220,5 +297,20 @@ export function renderHooked<P extends object>(
     },
     props: () => current,
     renders: () => { flush(); return renders; },
+    unmount() {
+      if (unmounted) return;
+      // Settle first: an effect queued by the last state change has not run yet,
+      // and React would have run it before tearing the tree down. Unmounting
+      // without this would skip a cleanup whose effect never happened, which is
+      // the one case where the harness and a browser would disagree about
+      // whether a gesture was ever open.
+      flush();
+      unmounted = true;
+      for (const cell of cells) {
+        if (cell === undefined) continue;
+        if (cell.kind === 'effect' && typeof cell.cleanup === 'function') cell.cleanup();
+        if (cell.kind === 'store' && cell.unsubscribe !== undefined) cell.unsubscribe();
+      }
+    },
   };
 }
