@@ -25,6 +25,19 @@ export function resolveCell(set: CollisionProfileSet | null, word: number): Reso
   }
   const base = set!.profiles[c.shape];
   const flipped = flipProfile(base, c.xFlip, c.yFlip);
+  // ⚠ THE RETURNED `heights` CAN ALIAS THE SHARED BASE BANK. DO NOT MUTATE IT.
+  // `flipProfile` early-returns its argument unchanged when neither flip is set,
+  // and the spread below copies the Int8Array REFERENCE, not its bytes. So for
+  // every unflipped cell — the common case — `profile.heights` IS
+  // `set.profiles[shape].heights`, and writing through it would corrupt that
+  // shape for every cell in the project that uses it, not just this one.
+  //
+  // Deliberately NOT fixed with a defensive copy: `resolveCell` runs per cell
+  // inside the overlay render loop, so copying 16 bytes per cell per frame is a
+  // real cost paid on every frame to defend against a consumer that does not
+  // exist. Enumerated 2026-09-09 — no caller mutates `profile.heights` today.
+  // The day one needs to, it copies at ITS site, where the cost is paid once by
+  // the code that actually needs the guarantee.
   return { shape: c.shape, air: false, known: true, profile: { ...flipped, solidity: c.solidity } };
 }
 
