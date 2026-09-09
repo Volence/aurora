@@ -551,3 +551,109 @@ describe('the census of primitives is derived from the module, not from this lis
     }
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AND DOES EVERY CHANNEL ACTUALLY REACH ONE OF THOSE PRIMITIVES?
+//
+// The rows above prove each primitive guards. That is a test per component and
+// none across the seam: a handler in `ipc-handlers.ts` that takes a
+// project-relative path and does the filesystem work ITSELF is unguarded, and
+// every row above stays green while it ships. `guarded-write.ts`'s own header
+// records that shape as the reason it exists (a NEW channel with no guard), so
+// it is not hypothetical here.
+//
+// This row is what the header of `src/shared/rel-path.ts` now claims, made
+// checkable: every `ipcMain.handle` whose argument list names a project-relative
+// path delegates to a primitive that applies `isRelPathSafe`. Both halves of
+// that are DERIVED — the channel population from `ipc-handlers.ts`'s own text,
+// the guarded names from `file-io.ts` and `guarded-write.ts` — so a channel
+// added next month is classified or the row fails.
+//
+// WHAT IT IS NOT, for the same reason the census above says so: it reads for a
+// CALL, not for behaviour. A handler that calls a primitive and then does its own
+// unguarded write beside it satisfies this. The behavioural rows are above; this
+// one closes the seam between them and the channels.
+//
+// RED-FIRST: the READ_BINARY_FILE handler was rewritten on disk to read the file
+// itself instead of calling `readBinaryFile`, which is the exact defect shape.
+// Every other row in this file stayed GREEN and this one went red naming the
+// channel, which is what says it covers a seam nothing else does.
+// ═══════════════════════════════════════════════════════════════════════════
+describe('every channel that takes a project-relative path reaches a guarded primitive', () => {
+  const mainDir = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const handlersSrc = readFileSync(join(mainDir, 'ipc-handlers.ts'), 'utf8');
+  const fileIoSrc = readFileSync(join(mainDir, 'file-io.ts'), 'utf8');
+  const guardedWriteSrc = readFileSync(join(mainDir, 'guarded-write.ts'), 'utf8');
+
+  /** The primitives that apply the guard, read out of the two modules that hold it. */
+  function guardedPrimitiveNames(): Set<string> {
+    const names = new Set<string>();
+    for (const src of [fileIoSrc, guardedWriteSrc]) {
+      const starts = [...src.matchAll(/^export (?:async )?function (\w+)/gm)];
+      for (let i = 0; i < starts.length; i++) {
+        const body = src.slice(
+          starts[i].index!, i + 1 < starts.length ? starts[i + 1].index! : src.length,
+        );
+        if (body.includes('isRelPathSafe(')) names.add(starts[i][1]);
+      }
+    }
+    return names;
+  }
+
+  /** channel name -> { args, body } for each `ipcMain.handle` in the module. */
+  function handlers(): Map<string, { args: string; body: string }> {
+    const out = new Map<string, { args: string; body: string }>();
+    const starts = [...handlersSrc.matchAll(
+      /ipcMain\.handle\(IPC_CHANNELS\.(\w+), async \(([^)]*)\)/g)];
+    for (let i = 0; i < starts.length; i++) {
+      const from = starts[i].index!;
+      const to = i + 1 < starts.length ? starts[i + 1].index! : handlersSrc.length;
+      out.set(starts[i][1], { args: starts[i][2], body: handlersSrc.slice(from, to) });
+    }
+    return out;
+  }
+
+  /**
+   * The channels with no project-relative argument, and why each is out. A
+   * channel is in the population when its OWN argument list names one, so this
+   * list is a statement about the ones that do not: it is checked against the
+   * derivation below rather than trusted, and a channel that gains a relative
+   * path while sitting here fails the row.
+   */
+  const NO_RELATIVE_PATH: Record<string, string> = {
+    LIST_PROJECT_FILES: 'takes a base only; contained by construction, see the row above',
+    SELECT_DIRECTORY: 'a dialog: the user picks an absolute path, with no root to escape',
+    SELECT_FILES: 'a dialog, as above',
+    SAVE_FILE: 'a save dialog: the user picks the absolute destination',
+    GET_RECENT_PROJECTS: 'no path argument at all',
+    ADD_RECENT_PROJECT: 'an absolute project root the user already opened',
+    REMOVE_RECENT_PROJECT: 'the same absolute root, by identity',
+  };
+
+  it('classifies every handler, and each one taking a relative path delegates to a guard', () => {
+    const guarded = guardedPrimitiveNames();
+    const all = handlers();
+    // Loud rather than quietly green if either parse found nothing to measure.
+    expect(guarded.size, 'guarded primitives found by reading the two modules')
+      .toBeGreaterThan(0);
+    expect(all.size, 'ipcMain.handle channels found in ipc-handlers.ts').toBeGreaterThan(0);
+
+    const takesRelative = [...all].filter(
+      ([, h]) => /\brelative\w*\s*:/.test(h.args) || /\bfiles\s*:/.test(h.args));
+    const rest = [...all].filter(([name]) => !takesRelative.some(([n]) => n === name));
+
+    // The classifier must actually discriminate: a rule that put every channel
+    // on one side would make one of these two assertions vacuous.
+    expect(takesRelative.length, 'channels taking a project-relative path').toBeGreaterThan(0);
+    expect(rest.length, 'channels taking none').toBeGreaterThan(0);
+
+    // Every channel is accounted for, in exactly one of the two sets.
+    expect(rest.map(([n]) => n).sort()).toEqual(Object.keys(NO_RELATIVE_PATH).sort());
+
+    for (const [name, h] of takesRelative) {
+      const reached = [...guarded].filter((p) => new RegExp(`\\b${p}\\s*\\(`).test(h.body));
+      expect(reached, `${name}: delegates to a primitive that applies isRelPathSafe`)
+        .not.toEqual([]);
+    }
+  });
+});
