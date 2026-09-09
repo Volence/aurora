@@ -358,7 +358,7 @@ if (contract.size === 0) {
 // the refusal has to come before either is used, not per-file inside them.
 for (const f of files) parse(f);
 if (unparsed.length > 0) {
-  for (const u of unparsed) console.error(`  ${u.file} — ${u.why}`);
+  for (const u of unparsed) console.error(`  ${u.file} (${u.why})`);
   console.error(`check-prose-constants CANNOT RUN: ${files.length} file(s) enumerated, `
     + `${files.length - unparsed.length} parsed. The ${unparsed.length} file(s) named above `
     + 'produced no syntax tree, so this gate did not look at them and will not print a coverage '
