@@ -298,8 +298,17 @@ describe('the seam is wired to the same two channels at both ends', () => {
     // and went red on close-guard.ts's own docblock, which QUOTES the expression
     // it replaced — a comment outbidding the code in a grep, and it would equally
     // have passed on a file that reverted the code and deleted the comment.
+    //
+    // AND NOT THE OLD SPELLING. The version after that asserted the literal
+    // `window.api?.onCloseRequest?.` and stayed GREEN when the hazard was put
+    // back as `api?.onCloseRequest?.(` — hoisting the receiver into a local was
+    // enough to walk past it. What matters is that the CHANNEL is not called
+    // optionally, whatever the receiver is called, plus the positive form: an
+    // explicit `typeof … !== 'function'` refusal, which no optional chain can
+    // satisfy.
     const guard = code('../close-guard.ts');
-    expect(guard).not.toContain('window.api?.onCloseRequest?.');
+    expect(guard).not.toMatch(/onCloseRequest\s*\?\./);
+    expect(guard).toMatch(/typeof api\.onCloseRequest !== 'function'/);
     expect(guard).toContain("kind: 'drift'");
   });
 
