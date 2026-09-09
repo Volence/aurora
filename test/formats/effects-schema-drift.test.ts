@@ -208,6 +208,38 @@ function gitBlobHash(bytes: Buffer): string {
 }
 
 describe('effects scene schema: vendored copy drift gate', () => {
+  /*
+   * ⚠ THIS ROW GOES FIRST AND EVERY ROW BELOW IT DEPENDS ON IT. `gitBlobHash` is
+   * a hand-rolled reimplementation of git's object id, and a content-addressed
+   * gate whose hasher is wrong can be green for the wrong reason on every row at
+   * once, which is the one failure a mismatch cannot report. (Oracle's point,
+   * relayed 2026-09-09; their own conformance file carries the same control in
+   * the same position.)
+   *
+   * BE PRECISE ABOUT THE HAZARD, because the obvious version of it is not the
+   * real one. A wrong hasher TODAY makes this suite RED, not green: the pin was
+   * produced by real git (`git rev-parse <rev>:<path>`) while the other side is
+   * computed here, so any disagreement between our arithmetic and git's fails
+   * loudly. The gate is controlled BY CONSTRUCTION as long as those two origins
+   * differ.
+   *
+   * WHAT IS ACTUALLY UNASSERTED is that they differ. Nothing stops a future
+   * script from writing the sidecar's pin USING THIS HELPER, and on that day both
+   * sides share one bug and every row goes green together with no artifact to
+   * re-examine. This row removes the dependency on where the pin came from: the
+   * three answers below are git's own, taken from `git hash-object --stdin`, and
+   * they hold whatever anyone later does to the sidecar.
+   */
+  it('CONTROL ON THE HASHER, and nothing below it means anything without this', () => {
+    // git's object id is sha1 over "blob <bytelen>\0" + content. Three answers
+    // read out of real git, not restated from this file's own arithmetic.
+    expect(gitBlobHash(Buffer.from(''))).toBe('e69de29bb2d1d6434b8b29ae775ad8c2e48c5391');
+    expect(gitBlobHash(Buffer.from('hello'))).toBe('b6fc4c620b67d95f953a5c1c1230aaab5db5a1b0');
+    // A trailing newline, because the length prefix is where a reimplementation
+    // goes wrong and an off-by-one there is invisible on a fixed-size sample.
+    expect(gitBlobHash(Buffer.from('a\n'))).toBe('78981922613b2afb6025042ff6bd878ac1994e85');
+  });
+
   it('the vendored schema is byte-identical to the pinned contract blob', () => {
     const bytes = readFileSync(SCHEMA_PATH);
     // Anti-vacuous: we hashed a real schema, not an empty or missing file.
