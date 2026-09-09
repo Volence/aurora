@@ -200,14 +200,31 @@ not read this as an owner directive witnessed here.** Same class as the entry ab
 this file's own rule: name the granting act.
 
 **What it asks:** do not silently run down to a compaction or drift through one. When a clear
-would help, **say so in the message to the hub AND in `lane-status.json`'s `awaiting`**, with
-what a fresh session needs to resume.
+would help, **say so in the message to the hub AND in `lane-status.json`'s `awaiting`**.
 
-⚠ **THE ANCHOR IS A FILE AT A COMMITTED SHA, NEVER A SUMMARY.** A handoff summary is a claim
-nobody can check and it goes stale the moment anything lands; a path plus a SHA is re-derivable
-by whoever picks it up. This lane has paid for the difference more than once — see
-`[[bank-outbound-commitments]]`'s shape in the log: a position that lived only in a message did
-not survive a `/clear`, and the successor contradicted it an hour later.
+⚠ **AMENDED SAME DAY, oracle's form, which is better than the one first relayed and better than
+what this lane first wrote. REPORT THE MEASUREMENT, NOT A FEELING.** The risk is **not** a
+session refusing to ask out of stubbornness. It is that **a session near its limit is the least
+able to judge that it is** — so the judgement is not the lane's to make. Report two numbers and
+let him decide: **what fraction of the context window is gone, and what is unbanked.**
+
+**A lane that says "I feel fine" has produced exactly the artifact nobody can check** — the same
+defect as an `updatedAt` written from a session's own sense of the time rather than from the
+clock, and this lane wrote one of those sentences before the amendment arrived.
+
+⚠ **AND IF THE NUMBER IS NOT AVAILABLE, SAY THAT — never substitute the feeling it would have
+replaced.** Measured here 2026-09-09: the only counter this session can see **reset upward
+mid-session** (~13.65M → 15.0M), so it is **not a monotonic measure of context occupancy** and no
+honest percentage can be derived from it. The reportable half is then the other one — **what is
+unbanked** — plus the anchor. *Loud on unmeasurable*, the same bar every gate in this repo is
+held to.
+
+⚠ **THE ANCHOR IS A FILE AT A COMMITTED SHA, NEVER A SUMMARY**, and oracle's reason is the one to
+keep: **a summary is written by the session about to stop, it is the one artifact its successor
+cannot verify, and it lives only in a message where no reader can meet the contradiction.** A
+path plus a SHA is re-derivable by whoever picks it up. This lane has paid for the difference: a
+position that lived only in a message did not survive a `/clear`, and the successor contradicted
+it an hour later.
 
 **Why it is the sibling of the 05:21:01Z rule and not a new kind of thing:** that one says a
 lane going quiet must say why; this one says a lane going *stale* must say so before it does.
