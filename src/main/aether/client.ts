@@ -379,6 +379,21 @@ export class AetherClient {
   get servedMethodCount(): number { return this.methods.size; }
 
   /**
+   * THE UNIX PATH THIS CLIENT ACTUALLY HOLDS, and the only thing that says
+   * WHICH machine answered.
+   *
+   * `implementation` names a lineage, not a process: two `oracle-rs` servers on
+   * two sockets both report `oracle-rs`, so a surface showing only that cannot
+   * tell one emulator from the other. `server-identity.ts` states the same fact
+   * from the other end ("whoever holds that path first answers"), and
+   * `docs/OVERSEER.md` calls the socket chain the only arbiter. Exposed here
+   * because the status payload has to carry it out to a person: an editor
+   * window attached to the wrong emulator is indistinguishable from one
+   * attached to the right one until this reaches the screen.
+   */
+  get socketPath(): string { return this.opts.socketPath; }
+
+  /**
    * Throw the named condition if `method` is not advertised. For call sites
    * that want to refuse BEFORE building a sequence around a method — the
    * cheapest possible discrimination, and the one that never leaves a machine

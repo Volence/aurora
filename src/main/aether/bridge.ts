@@ -276,7 +276,16 @@ function statusPayload(socketPath?: string): AetherStatusPayload {
     status: client?.status ?? 'disconnected',
     serverName: client?.server.name,
     serverVersion: client?.server.version,
-    socketPath,
+    // ASK THE LIVE CLIENT FIRST, and never only the argument.
+    //
+    // `publish()` (the push every status change travels on) calls this with NO
+    // argument, so until the fallback below existed the socket path reached the
+    // renderer on exactly two payloads: the return values of the connect and
+    // disconnect IPC handlers. Every push in between carried `undefined`, which
+    // means a renderer that displayed the path would have shown it once and
+    // then watched it vanish at the first `stopped`/`resumed` event. The client
+    // holds the path it actually dialled, so the push can just ask it.
+    socketPath: socketPath ?? client?.socketPath,
     error: lastError,
     palette: paletteKind !== null,
     paletteKind: paletteKind ?? undefined,
