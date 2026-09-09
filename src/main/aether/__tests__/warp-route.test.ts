@@ -131,4 +131,39 @@ describe('warpForProject routes by the OPEN PROJECT, not by what the ROM carries
     expect(r.landed).toEqual({ x: 900, y: 901 });
     expect(r.from).toEqual({ x: 41, y: 42 });
   });
+
+  /**
+   * THE AEON HALF OF THE SAME MAPPING, and it was the unguarded one.
+   *
+   * The row above holds the classic branch's field-by-field mapping; the aeon
+   * branch has its own, three lines further down `warpForProject`, and nothing
+   * held it. Deleting `unservedMethod: r.unservedMethod` from the aeon return
+   * left the whole suite green (plant P21) while deleting `from: r.from` from
+   * the classic return was caught (P20). Two branches, one guarded.
+   *
+   * `unservedMethod` is the field that separates "this ROM is a release build,
+   * rebuild it with DEBUG" from "this server cannot do this at all" — the
+   * distinction `WarpGateReason.UnservedMethod` exists for. Losing it here
+   * leaves the UI holding a gate reason it cannot explain.
+   */
+  it('carries the aeon result\'s `unservedMethod` through to the IPC shape', async () => {
+    // Symbols resolve — a DEBUG ROM with the mailbox — but the server does not
+    // serve `pause`, so the sequence refuses on the METHOD and not on the ROM.
+    const c = {
+      status: 'connected' as const,
+      server: { name: 'oracle' },
+      hasMethod: (m: string) => m !== 'emulator/pause',
+      resolve: async (name: string) => ({
+        Warp_Req_X: 0xffe502, Warp_Req_Y: 0xffe504, Warp_Req_Flag: 0xffe506,
+      } as Record<string, number>)[name] ?? 0,
+      call: async () => ({}),
+    };
+    const r = await warpForProject(c as never, 100, 200, 'aeon', undefined);
+
+    // Anti-vacuous: it got past the symbols and refused for the server's reason.
+    expect(r.gate).toBe(WarpGateReason.UnservedMethod);
+    expect(r.warped).toBe(false);
+
+    expect(r.unservedMethod).toBe('emulator/pause');
+  });
 });

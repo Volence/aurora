@@ -146,6 +146,45 @@ function fakeEngine(opts: FakeOpts = {}) {
 const hexAddr = (n: number) => '0x' + (n >>> 0).toString(16).toUpperCase();
 
 describe('bootRestoreTo: the supported sequence', () => {
+  /**
+   * ONE AXIS AT A TIME. `clamped` is `landedX !== x || landedY !== y`, and no
+   * row here isolated either term: narrowing it to the X term alone left the
+   * whole suite green (plant P47, the twin of `warp.ts`'s P28). A rebuild that
+   * happens with the player standing above the act ceiling then reports the
+   * restore as landing exactly where it asked.
+   *
+   * The expectations are COMPUTED from the fixture's bounds, as the rest of
+   * this file does — the clamp is `Math.min`, so asking past one bound and
+   * inside the other is what produces a one-axis move.
+   */
+  it('reports a clamp that moved ONLY the y axis', async () => {
+    const { client } = fakeEngine();
+    const askX = 0x0123;                 // inside BOUND_X
+    const askY = BOUND_Y + 0x0100;       // past BOUND_Y
+    const r = await bootRestoreTo(client as never, askX, askY, { wasRunning: true });
+
+    expect(r.restored).toBe(true);
+    // Anti-vacuous: X really came back untouched, so the row is exercising the
+    // Y term rather than leaning on the X one.
+    expect(r.landed).toEqual({ x: Math.min(askX, BOUND_X), y: Math.min(askY, BOUND_Y) });
+    expect(r.landed?.x).toBe(askX);
+    expect(r.landed?.y).not.toBe(askY);
+    expect(r.clamped).toBe(true);
+  });
+
+  /** The mirror, so neither term can be dropped without a row noticing. */
+  it('reports a clamp that moved ONLY the x axis', async () => {
+    const { client } = fakeEngine();
+    const askX = BOUND_X + 0x0100;       // past BOUND_X
+    const askY = 0x0456;                 // inside BOUND_Y
+    const r = await bootRestoreTo(client as never, askX, askY, { wasRunning: true });
+
+    expect(r.restored).toBe(true);
+    expect(r.landed).toEqual({ x: Math.min(askX, BOUND_X), y: Math.min(askY, BOUND_Y) });
+    expect(r.landed?.y).toBe(askY);
+    expect(r.clamped).toBe(true);
+  });
+
   it('restores: run_to the init FIRST, then X, then Y, then the flag LAST, then continue', async () => {
     const { client, log } = fakeEngine();
     const r = await bootRestoreTo(client as never, 0x0123, 0x0456, { wasRunning: true });

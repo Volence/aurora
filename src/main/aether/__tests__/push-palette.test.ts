@@ -11,6 +11,16 @@ function fakeClient(opts: {
    * is the ONLY route that reaches the catch around symbol resolution.
    */
   lookupUnimplemented?: boolean;
+  /**
+   * Methods that are ADVERTISED and answer -32601 anyway.
+   *
+   * Distinct from dropping them out of `methods`, and the difference is the
+   * only way to reach some code: `pushPlanned` refuses an unadvertised
+   * `emulator/resume` in its pre-flight check, BEFORE the machine is paused, so
+   * a fixture built that way can never reach the `finally` where a resume the
+   * server cannot perform leaves a live machine stopped. Only this shape does.
+   */
+  unimplemented?: string[];
 } = {}) {
   const symbols = opts.symbols ?? { Pal_Base: 0xff8ad2, Pal_Base_Dirty: 0xff8ca7 };
   const calls: Array<{ method: string; params: Record<string, unknown> }> = [];
@@ -46,6 +56,9 @@ function fakeClient(opts: {
         'emulator/write_memory', 'emulator/pause', 'emulator/resume', 'emulator/lookup_symbol',
       ]).includes(method)) {
         throw new MethodNotServedError(method, 'advertised-list', 'oracle-next');
+      }
+      if ((opts.unimplemented ?? []).includes(method)) {
+        throw new MethodNotServedError(method, 'rpc-error', 'oracle-next');
       }
       if (method === 'emulator/pause') return { wasRunning: opts.wasRunning ?? true };
       return {};
@@ -283,7 +296,17 @@ describe('pushPalette and a server that does not serve what it needs', () => {
     expect(r.error).toContain('emulator/write_memory');
   });
 
-  it('reports a machine left PAUSED when resume is unserved', async () => {
+  /**
+   * RENAMED, because the old name claimed a mechanism this row cannot reach.
+   *
+   * It was called "reports a machine left PAUSED when resume is unserved", and
+   * its own anti-vacuous line says otherwise: `c.calls` is EMPTY, so no machine
+   * was ever paused and nothing was left anywhere. What it actually proves —
+   * and this is worth proving — is the PRE-FLIGHT refusal: an unadvertised
+   * `resume` is caught before the pause, which is the whole reason that check
+   * is up front. The row below is the one the old name described.
+   */
+  it('refuses BEFORE pausing when resume is not advertised', async () => {
     const c = fakeClient({ methods: ['emulator/write_memory', 'emulator/pause', 'emulator/lookup_symbol'] });
     const r = await pushPaletteLine(c as never, 1, line());
     expect(r.gate).toBe(PaletteGateReason.UnservedMethod);
@@ -291,5 +314,33 @@ describe('pushPalette and a server that does not serve what it needs', () => {
     // ANTI-VACUOUS, and the reason this gate is checked up front: refusing here
     // means the machine was never paused in the first place.
     expect(c.calls).toEqual([]);
+  });
+
+  /**
+   * THE ROW THE FILE DID NOT HAVE, and the audit measured its absence: replacing
+   * `if (isMethodNotServed(e)) resumeFailure = ...` in the `finally` with a
+   * no-op left the whole suite green (plant P35), while the IDENTICAL mechanism
+   * in `warp.ts` and `s1-warp.ts` was caught (P36, P37). One of three call sites
+   * was unguarded, and it is the one an artist meets by dragging a slider.
+   *
+   * Reaching it needs a server that ADVERTISES `emulator/resume` and answers
+   * -32601 anyway — the advertised-and-unimplemented shape this codebase
+   * documents as real, and the only route past the pre-flight check above.
+   *
+   * WHAT GOES WRONG WITHOUT IT: the push succeeds, the result says
+   * `pushed: true` with no error, and the game is frozen with no one told why.
+   */
+  it('says the machine was left PAUSED when an ADVERTISED resume answers -32601', async () => {
+    const c = fakeClient({ unimplemented: ['emulator/resume'] });
+    const r = await pushPaletteLine(c as never, 1, line());
+
+    // ANTI-VACUOUS: the sequence really ran. It paused and wrote the palette
+    // before it got as far as a resume it could not make — which is exactly why
+    // the machine is now stopped because of us.
+    expect(c.calls.map((x) => x.method)).toContain('emulator/pause');
+    expect(c.calls.filter((x) => x.method === 'emulator/write_memory').length).toBeGreaterThan(0);
+
+    expect(r.error).toContain('left PAUSED');
+    expect(r.unservedMethod).toBe('emulator/resume');
   });
 });

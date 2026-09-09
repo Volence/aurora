@@ -59,6 +59,36 @@ describe('resolveSocketPath', () => {
     expect(r.warning).toBeNull();
   });
 
+  /**
+   * THE BOUNDARY ITSELF, which neither row above touches: one uses a path far
+   * past the limit and the other one far under it, so relaxing `>=` to `>` left
+   * the whole suite green (plant P44).
+   *
+   * The lengths are DERIVED from `SOCKET_PATH_MAX`, never typed out, so this
+   * row follows the constant if the platform bound is ever revised.
+   *
+   * Which side the boundary falls on: `SOCKET_PATH_MAX` is the SIZE of
+   * `sockaddr_un.sun_path` (104 on macOS/BSD, the smaller of the two bounds),
+   * and the kernel stores the path with a terminating NUL inside it. So a path
+   * of exactly that many bytes does NOT fit and must be refused, while one byte
+   * fewer does. That is `>=`, and a path landing exactly on the limit is the
+   * only input that can tell the two spellings apart.
+   */
+  it('refuses a path of exactly SOCKET_PATH_MAX bytes, and accepts one byte fewer', () => {
+    const pathOf = (n: number) => `/${'a'.repeat(n - 1)}`;
+
+    const atLimit = pathOf(SOCKET_PATH_MAX);
+    // Anti-vacuous: the fixture really is the length this row is about.
+    expect(Buffer.byteLength(atLimit, 'utf8')).toBe(SOCKET_PATH_MAX);
+    expect(resolveSocketPath({ ORACLE_SOCKET: atLimit }).tooLong).toBe(true);
+
+    const underLimit = pathOf(SOCKET_PATH_MAX - 1);
+    expect(Buffer.byteLength(underLimit, 'utf8')).toBe(SOCKET_PATH_MAX - 1);
+    const ok = resolveSocketPath({ ORACLE_SOCKET: underLimit });
+    expect(ok.tooLong).toBe(false);
+    expect(ok.warning).toBeNull();
+  });
+
   it('reports which source won, so a wrong-socket connection is diagnosable', () => {
     expect(resolveSocketPath({ ORACLE_SOCKET: '/a' }).source).toBe('ORACLE_SOCKET');
     expect(resolveSocketPath({ EXODUS_SOCKET: '/b' }).source).toBe('EXODUS_SOCKET');
