@@ -14,6 +14,12 @@ import { useProjectStore } from '../state/projectStore';
 import { useEditorStore } from '../state/editorStore';
 import { useSpriteStore, dirtySpriteDocIds } from '../state/spriteStore';
 import { useCanvasStore, dirtyCanvasDocIds } from '../state/canvasStore';
+// The aeon composer's document store. A leaf (core types only), so no cycle —
+// the same import project-open-guard.ts already makes, and the reason this one
+// is here: that guard's snapshot has carried `artDirty` since the composer
+// joined the unsaved-work perimeter, while THIS snapshot did not, so the two
+// definitions of "dirty" disagreed about one whole document.
+import { useArtStore } from '../state/artStore';
 import { useHistoryVersion } from '../hooks/useHistoryVersion';
 import type { DirtySnapshot } from './dirty-tabs';
 
@@ -29,6 +35,9 @@ export function currentDirtySnapshot(): DirtySnapshot {
     aeonDirty: useEditorStore.getState().dirty,
     dirtySpriteDocIds: dirtySpriteDocIds(),
     dirtyCanvasDocIds: dirtyCanvasDocIds(),
+    // Read the SAME way project-open-guard's currentOpenDirtySnapshot reads it,
+    // character for character, so the two snapshots cannot drift again.
+    artDirty: useArtStore.getState().open?.dirty === true,
   };
 }
 
@@ -56,5 +65,11 @@ export function useDirtySnapshot(): DirtySnapshot {
   // mutation rebuilds the Map). The sprite store needs three because it hoists
   // its checked-out document's fields onto the store root.
   useCanvasStore((s) => s.docs);
+  // ONE subscription for the composer, and it is `open` rather than
+  // `open.dirty`: artStore keeps a single document and `markOpenDirty` replaces
+  // the whole `open` object (it spreads into a new one), so the object identity
+  // is what moves when the flag does. Subscribing to the nested boolean would
+  // read a value off an object this component is not watching.
+  useArtStore((s) => s.open);
   return currentDirtySnapshot();
 }

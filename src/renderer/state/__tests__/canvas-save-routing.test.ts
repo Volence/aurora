@@ -169,6 +169,7 @@ describe('canvas save routing', () => {
       classicOpen: false, classicRef: null, classicDirty: false,
       aeonOpen: false, aeonDirty: false,
       dirtySpriteDocIds: [], dirtyCanvasDocIds: [TAB.id],
+      artDirty: false,
     };
     expect(tabHasDirtyDot(TAB.id, 'art-doc', snap)).toBe(true);
     expect(tabHasDirtyDot(OTHER.id, 'art-doc', snap)).toBe(false);

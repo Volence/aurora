@@ -45,8 +45,18 @@
 //   • classic level tab → the classic project save
 //   • aeon level tab    → the aeon project save
 //   • Home / tool tabs  → nothing owns them: no-op
-// Per-tab dirtiness reuses the tab strip's dot rule (dirty-tabs.tabHasDirtyDot)
-// rather than inventing a second definition of "dirty".
+// Per-tab dirtiness comes from dirty-tabs (`levelDocDirty`) rather than from a
+// second definition of "dirty" invented here.
+//
+// ⚠ `levelDocDirty`, NOT `tabHasDirtyDot`, and the difference is load-bearing.
+// The two were one function while every dot on a level tab meant "Ctrl+S here
+// writes something". The aeon COMPOSER document broke that: it has no tab of its
+// own, so it dots the level tab it lives inside, while Ctrl+S on that tab runs
+// the PROJECT saver, which does not write it. Registering these scopes against
+// the dot rule would enable Save over a composer-only dirt, run
+// saveAeonProject, write nothing the author was looking at, and leave the dot
+// standing — the inert-Save shape the composer's own saver was extracted to
+// end. dirty-tabs keeps both rules side by side and names which is which.
 
 import { SaveCoordinator, type SaveAllResult } from '../../core/editing/save-coordinator';
 import { documentHistoryHub } from './history-hub';
@@ -63,7 +73,7 @@ import { saveCanvasDocument } from './canvas-save';
 import { saveAeonProject } from './aeon-save';
 import { composerSaveState, saveComposerDocument } from './art-composer-save';
 import { parseLevelTabId, parseSpriteDocTabId, parseCanvasDocTabId } from '../shell/tabs';
-import { tabHasDirtyDot } from '../shell/dirty-tabs';
+import { levelDocDirty } from '../shell/dirty-tabs';
 import { currentDirtySnapshot } from '../shell/dirty-snapshot';
 
 export const saveCoordinator = new SaveCoordinator();
@@ -204,7 +214,7 @@ export function ensureSaversRegistered(): void {
     // is all the routing needed (saveClassicProject writes the loaded act).
     scope: {
       owns: (tabId) => parseLevelTabId(tabId) !== null && openEngine() === 's1',
-      isDirty: (tabId) => tabHasDirtyDot(tabId, 'level', currentDirtySnapshot()),
+      isDirty: (tabId) => levelDocDirty(tabId, currentDirtySnapshot()),
       save: async () => { await classicImpl(); },
     },
   });
@@ -218,7 +228,7 @@ export function ensureSaversRegistered(): void {
     // Same ownership test as isDirty, narrowed to level tabs.
     scope: {
       owns: (tabId) => parseLevelTabId(tabId) !== null && openEngine() === 'aeon',
-      isDirty: (tabId) => tabHasDirtyDot(tabId, 'level', currentDirtySnapshot()),
+      isDirty: (tabId) => levelDocDirty(tabId, currentDirtySnapshot()),
       save: async () => { await aeonImpl(); },
     },
   });
