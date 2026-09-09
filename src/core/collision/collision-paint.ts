@@ -42,30 +42,38 @@ export function collisionPaintTargets(args: {
   return { primary, all: findMatchingBlockCells(nametable, cellCol, cellRow, width, cellsW, cellsH) };
 }
 
-export interface CollisionEditEntry { index: number; oldColl: number; newColl: number; }
+// ═══ THERE IS NO SINGLE-PLANE FORM, AND THAT IS THE DESIGN ══════════════════
+//
+// `paintCollisionRectEntries` and `paintCollisionCellEntries` used to sit here,
+// one per form, each returning one plane's entries. They were DELETED on
+// 2026-09-08 (lens row COLLISION-PAINT-DEAD-FUNCTIONS) because nothing in the
+// app called either: `agent-handler`'s `paint-collision` reaches
+// `paintCollisionRectBothPlanes` / `paintCollisionCellsBothPlanes` for EVERY
+// plane argument, `bothPlanes` being false for `'a'` and `'b'`, and
+// `MapViewport` calls `buildBothPlanesEntries` directly. Their only callers were
+// their own tests, and their docblocks called them "the core of the agent's
+// paint_collision tool" and "the write half of get_collision_region" IN THE
+// PRESENT TENSE, which is the defect: a comment asserting a role the code does
+// not have is believed, and it made four test files read as coverage of the
+// shipping path when they covered a branch of it that does not exist.
+//
+// ⚠ AND ONE OF THEM COULD EXPRESS STRICTLY LESS THAN THE LIVE PATH.
+// `paintCollisionCellEntries` built its cell plan with no `CrossoverSpan`, so it
+// could not author a half-width mark at all, which is the only width at which a
+// two-way pair works. Deleting them loses nothing; keeping them kept a second
+// road that had already fallen behind.
+//
+// SO IF YOU WANT ONE PLANE: call the both-planes form with `bothPlanes: false`,
+// which is what production does, and read `.aimed`. That is one road for one
+// gesture, which is this module's whole rule (see `paintCollisionRectBothPlanes`).
+// `CollisionEditEntry` went with them: it was a second, identical declaration of
+// `CollisionCellWrite` (editing/collision-word.ts), which is what the live
+// builders return.
 
-/** Build the diffed set-collision-edit entries for filling a w*h CELL rectangle
- *  (16px units, top-left at x,y) of one collision plane with a single packed
- *  word — the core of the agent's paint_collision tool. Expands each cell to
- *  its four 8px sub-tile indices via cellTileIndices (same expansion
- *  MapViewport.paintCollisionCell uses), and skips indices already equal to
- *  `word` so the emitted command only touches what actually changes. Rect
- *  bounds are pre-validated by the caller (agent-handler). */
-export function paintCollisionRectEntries(args: {
-  x: number; y: number; w: number; h: number; word: number;
-  plane: Uint16Array; tileWidth: number;
-}): CollisionEditEntry[] {
-  const { x, y, w, h, word, plane, tileWidth } = args;
-  // Same rule as the interactive stroke, and deliberately the same function:
-  // the agent surface writing a whole word where the brush owns only fourteen
-  // bits would be the identical defect on a second road.
-  return buildPlaneEntries(plane, collisionRectIndices(x, y, w, h, tileWidth), word);
-}
-
-/** Every 8px sub-tile index a w*h CELL rectangle covers, row-major. Split out of
- *  `paintCollisionRectEntries` because the "solid on both planes" road needs the
- *  SAME index set for two planes, and a second loop would be a second chance to
- *  disagree about what a rectangle covers. */
+/** Every 8px sub-tile index a w*h CELL rectangle covers, row-major. Split out
+ *  because the "solid on both planes" road needs the SAME index set for two
+ *  planes, and a second loop would be a second chance to disagree about what a
+ *  rectangle covers. */
 export function collisionRectIndices(
   x: number, y: number, w: number, h: number, tileWidth: number,
 ): number[] {
@@ -99,11 +107,15 @@ export function collisionRectCrossoverIndices(
 }
 
 /**
- * The agent's `paint_collision` when it names `plane: "both"` — the same
- * gesture the "A+B" chip drives on the human road, through the same builder.
+ * THE AGENT'S `paint_collision`, FILL FORM, FOR EVERY PLANE ARGUMENT. With
+ * `bothPlanes: true` it is `plane: "both"`, the same gesture the "A+B" chip
+ * drives on the human road through the same builder; with `bothPlanes: false` it
+ * is `plane: "a"` or `"b"` and `other` comes back empty, so the handler never
+ * branches on the mode twice. That is why there is no separate single-plane
+ * entry point: see the note above `collisionRectIndices`.
  *
  * TWO ROADS, ONE RULE. The whole point of routing this through
- * `buildBothPlanesEntries` rather than calling `paintCollisionRectEntries`
+ * `buildBothPlanesEntries` rather than calling a single-plane builder
  * twice is that the merge must happen against EACH plane's own destination
  * cell; two calls would be correct only by accident of both being written the
  * same way, and the agent road has already been the place where a second copy
@@ -134,68 +146,6 @@ export function paintCollisionRectBothPlanes(args: {
   });
 }
 
-/** `paintCollisionCellEntries`'s outcome — the writes, plus what it declined to
- *  write and why, because a silent skip in a per-cell write is indistinguishable
- *  from a cell that happened to already match. */
-export interface CollisionCellPaintPlan {
-  entries: CollisionEditEntry[];
-  /** Cells whose requested word was null ("leave this one alone"). This is the
-   *  form `get_collision_region` hands back for a cell whose four sub-tiles
-   *  DISAGREE: there is no single word to restore, so the write half refuses to
-   *  invent one, and says how often it did. */
-  skipped: number;
-}
-
-/**
- * Build the diffed entries for writing ONE WORD PER CELL over a w*h CELL
- * rectangle — the per-cell counterpart of `paintCollisionRectEntries`, and the
- * write half of `get_collision_region`.
- *
- * ⚠ THIS IS A DECIDER (docs/reviews/2026-08-28-collision-word-preservation.md §3),
- * and deliberately the SAME KIND as the fill form it sits beside. `words[i]` is
- * a packed cell word meaning shape + flips + solidity, exactly as
- * `paint_collision`'s `word` does — it is not a whole-cell transfer out of a
- * source plane the way a chunk stamp or a clipboard paste is. Two forms of one
- * tool that classified differently would be two rules for one gesture, free to
- * disagree; so this goes through `collisionPaintWord` like every other decider,
- * the brush's fields are masked to the fields it owns, and the DESTINATION
- * cell's unowned bits survive.
- *
- * The consequence is worth stating because it bounds the round trip: reading a
- * region and writing it back OVER ITSELF is exact, because each cell's unowned
- * bits are its own. Reading a region and writing it SOMEWHERE ELSE carries the
- * owned fields only — the destination keeps whatever it had in 15:14. That is
- * the rule working, not a lossy copy: a decider is not a transfer.
- *
- * ⚠ UPDATED 2026-08-29 BY THE MERGE, AND THE UPDATE IS THE SHARP EDGE.
- * Bits 15:14 are no longer "a field nothing names" — layer-transition.ts gave
- * them a name (the LOOP CROSSOVER) hours after this function was written. The
- * rule above is unchanged and still correct, but its consequence now has teeth:
- * a `words` array read out of a region carrying crossovers and written
- * ELSEWHERE arrives with NO crossovers, because the value in `words[i]`'s bits
- * 15:14 is masked off like every other unowned bit and the destination's own
- * value is kept. That is not a defect to fix here — a per-cell word is a brush
- * word, and the crossover is authored by the `crossover` PARAMETER, per plane,
- * so that a self-mark stays unreachable. But an agent cannot read this file, so
- * `paint_collision`'s description says it in those words.
- *
- * `words.length` must equal `w * h` (row-major); the caller validates that
- * along with the rectangle.
- */
-export function paintCollisionCellEntries(args: {
-  x: number; y: number; w: number; h: number; words: (number | null)[];
-  plane: Uint16Array; tileWidth: number;
-  /** The loop-crossover tri-state, and the plane it is written on. Defaults to
-   *  `keep`, which is a no-op by construction. It applies to every cell this
-   *  call WRITES; a `null` cell is skipped entirely and therefore keeps its
-   *  crossover even under `clear`. See both-planes-paint.ts. */
-  crossover?: CrossoverBrush; planeId?: CollisionPlaneId;
-}): CollisionCellPaintPlan {
-  const { x, y, w, h, words, plane, tileWidth } = args;
-  return buildPlaneCellEntries(
-    plane, collisionRectCells(x, y, w, h, tileWidth, words), args.crossover, args.planeId);
-}
-
 /** A w*h CELL rectangle paired cell-by-cell with `words`, row-major — the
  *  per-cell counterpart of `collisionRectIndices`, and split out for the same
  *  reason: the "solid on both planes" road needs the SAME cell plan for two
@@ -224,9 +174,45 @@ export function collisionRectCells(
 }
 
 /**
- * `paint_collision`'s PER-CELL form when it also names `plane: "both"` — the
- * combination the two parcels' merge had to decide
+ * `paint_collision`'s PER-CELL form, and the write half of
+ * `get_collision_region` — for one plane (`bothPlanes: false`, which is what the
+ * handler passes for `'a'` and `'b'`) and for two, the combination the two
+ * parcels' merge had to decide
  * (docs/reviews/2026-08-29-paint-collision-reconcile.md).
+ *
+ * ⚠ THIS IS A DECIDER (docs/reviews/2026-08-28-collision-word-preservation.md §3),
+ * and deliberately the SAME KIND as the fill form it sits beside. `words[i]` is
+ * a packed cell word meaning shape + flips + solidity, exactly as
+ * `paint_collision`'s `word` does — it is not a whole-cell transfer out of a
+ * source plane the way a chunk stamp or a clipboard paste is. Two forms of one
+ * tool that classified differently would be two rules for one gesture, free to
+ * disagree; so this goes through `collisionPaintWord` like every other decider,
+ * the brush's fields are masked to the fields it owns, and the DESTINATION
+ * cell's unowned bits survive. (This paragraph and the two below were the
+ * docblock of `paintCollisionCellEntries`, the single-plane form deleted on
+ * 2026-09-08 for having no caller; the rules are the live path's and are kept
+ * where the live path is.)
+ *
+ * The consequence is worth stating because it bounds the round trip: reading a
+ * region and writing it back OVER ITSELF is exact, because each cell's unowned
+ * bits are its own. Reading a region and writing it SOMEWHERE ELSE carries the
+ * owned fields only — the destination keeps whatever it had in 15:14. That is
+ * the rule working, not a lossy copy: a decider is not a transfer.
+ *
+ * ⚠ UPDATED 2026-08-29 BY THE MERGE, AND THE UPDATE IS THE SHARP EDGE.
+ * Bits 15:14 are no longer "a field nothing names" — layer-transition.ts gave
+ * them a name (the LOOP CROSSOVER). The rule above is unchanged and still
+ * correct, but its consequence has teeth: a `words` array read out of a region
+ * carrying crossovers and written ELSEWHERE arrives with NO crossovers, because
+ * the value in `words[i]`'s bits 15:14 is masked off like every other unowned
+ * bit and the destination's own value is kept. That is not a defect to fix here
+ * — a per-cell word is a brush word, and the crossover is authored by the
+ * `crossover` PARAMETER, per plane, so that a self-mark stays unreachable. But
+ * an agent cannot read this file, so `paint_collision`'s description says it in
+ * those words.
+ *
+ * `words.length` must equal `w * h` (row-major); the caller validates that
+ * along with the rectangle.
  *
  * It is implemented rather than refused because its meaning is forced, not
  * chosen: `plane: "both"` already means "write A and B in one undo step, each

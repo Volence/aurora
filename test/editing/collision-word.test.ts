@@ -28,7 +28,7 @@ import {
   clearCollisionEntries, resetToEngineEntries,
 } from '../../src/core/editing/collision-word';
 import { packCollisionCell, unpackCollisionCell } from '../../src/core/collision/collision-cell-word';
-import { paintCollisionRectEntries } from '../../src/core/collision/collision-paint';
+import { paintCollisionRectBothPlanes } from '../../src/core/collision/collision-paint';
 import { paintDocCollision } from '../../src/core/art/composer-collision';
 import type { ComposerDoc } from '../../src/core/art/composer-buffer';
 import { peerRepo, readAtRev } from '../support/peer-repo';
@@ -188,8 +188,18 @@ describe('collisionPaintWord: the brush owns its fields, the cell keeps the rest
   });
 });
 
-// ── WRITER: the agent surface (paintCollisionRectEntries) ───────────────────
-describe('paintCollisionRectEntries preserves unowned bits', () => {
+// ── WRITER: the agent surface (paintCollisionRectBothPlanes) ────────────────
+//
+// ⚠ THIS CENSUS ROW NAMED THE WRONG WRITER UNTIL 2026-09-08. It called
+// `paintCollisionRectEntries`, which the agent surface had stopped using: the
+// handler reaches `paintCollisionRectBothPlanes` for EVERY plane argument,
+// `bothPlanes` false for 'a'/'b' and true for 'both'. So the census of writers
+// that must preserve unowned bits was one writer short, and the one it was short
+// of is the only one that writes TWO destinations - the exact place
+// both-planes-paint.ts's own header says the bits can be invented from the wrong
+// cell. Re-pointed with the second plane seeded DIFFERENTLY, so a merge computed
+// once and broadcast would be visible here rather than passing.
+describe('paintCollisionRectBothPlanes preserves unowned bits, per destination', () => {
   const TILE_W = 8; // 8 tiles wide → 4 cells wide, small and exact
 
   function plane(fill: number): Uint16Array {
@@ -198,11 +208,25 @@ describe('paintCollisionRectEntries preserves unowned bits', () => {
     return p;
   }
 
+  /** The aimed plane's entries for a one-plane paint, which is what the handler
+   *  runs for `plane: 'a'`. `other` is asserted empty at every call. */
+  function aimedOnly(args: {
+    x: number; y: number; w: number; h: number; word: number;
+    plane: Uint16Array; other?: Uint16Array | null;
+  }) {
+    const plan = paintCollisionRectBothPlanes({
+      x: args.x, y: args.y, w: args.w, h: args.h, word: args.word,
+      aimedPlane: args.plane, otherPlane: args.other ?? null,
+      tileWidth: TILE_W, bothPlanes: false, aimedPlaneId: 'a',
+    });
+    expect(plan.other).toEqual([]);
+    return plan.aimed;
+  }
+
   it('a 1x1 cell paint keeps the destination cells unowned bits on all four sub-tiles', () => {
     const dest = withUnowned(OTHER, unownedAll());
     expect(unownedCollisionBits(dest)).toBe(unownedAll()); // not vacuous
-    const p = plane(dest);
-    const entries = paintCollisionRectEntries({ x: 1, y: 1, w: 1, h: 1, word: BRUSH, plane: p, tileWidth: TILE_W });
+    const entries = aimedOnly({ x: 1, y: 1, w: 1, h: 1, word: BRUSH, plane: plane(dest) });
     expect(entries.length).toBe(4); // the cell's four 8px sub-tiles
     for (const e of entries) {
       expect(unownedCollisionBits(e.newColl)).toBe(unownedAll());
@@ -213,18 +237,40 @@ describe('paintCollisionRectEntries preserves unowned bits', () => {
 
   it('CONTROL: a cell already carrying the brush word AND the unowned bits emits nothing', () => {
     const already = withUnowned(BRUSH, unownedAll());
-    const entries = paintCollisionRectEntries({
-      x: 0, y: 0, w: 2, h: 2, word: BRUSH, plane: plane(already), tileWidth: TILE_W,
-    });
-    expect(entries).toEqual([]);
+    expect(aimedOnly({ x: 0, y: 0, w: 2, h: 2, word: BRUSH, plane: plane(already) })).toEqual([]);
   });
 
   it('CONTROL: over a zero destination it writes the brush word unchanged', () => {
-    const entries = paintCollisionRectEntries({
-      x: 0, y: 0, w: 1, h: 1, word: BRUSH, plane: plane(0), tileWidth: TILE_W,
-    });
+    const entries = aimedOnly({ x: 0, y: 0, w: 1, h: 1, word: BRUSH, plane: plane(0) });
     expect(entries.length).toBe(4);
     for (const e of entries) expect(e.newColl).toBe(BRUSH);
+  });
+
+  it('a one-plane paint never reads the OTHER plane, whose unowned bits differ', () => {
+    // The aimed plane carries all the unowned bits, the other plane none. A merge
+    // computed against the wrong cell would show up as the wrong bits here.
+    const aimed = plane(withUnowned(OTHER, unownedAll()));
+    const other = plane(OTHER);
+    expect(unownedCollisionBits(other[0])).toBe(0);          // not vacuous
+    for (const e of aimedOnly({ x: 0, y: 0, w: 1, h: 1, word: BRUSH, plane: aimed, other })) {
+      expect(unownedCollisionBits(e.newColl)).toBe(unownedAll());
+    }
+  });
+
+  it('BOTH planes: each destination keeps ITS OWN unowned bits, not the aimed plane\'s', () => {
+    const aimed = plane(withUnowned(OTHER, unownedAll()));
+    const other = plane(OTHER);
+    const plan = paintCollisionRectBothPlanes({
+      x: 0, y: 0, w: 1, h: 1, word: BRUSH,
+      aimedPlane: aimed, otherPlane: other, tileWidth: TILE_W, bothPlanes: true,
+      aimedPlaneId: 'a',
+    });
+    expect(plan.aimed.length).toBe(4);
+    expect(plan.other.length).toBe(4);
+    for (const e of plan.aimed) expect(unownedCollisionBits(e.newColl)).toBe(unownedAll());
+    // THE TRAP: one merge broadcast to two planes would put the aimed plane's
+    // unowned bits here. Each destination is merged against itself, so this is 0.
+    for (const e of plan.other) expect(unownedCollisionBits(e.newColl)).toBe(0);
   });
 });
 

@@ -22,7 +22,7 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import {
-  paintCollisionCellEntries, paintCollisionCellsBothPlanes, paintCollisionRectBothPlanes,
+  paintCollisionCellsBothPlanes, paintCollisionRectBothPlanes,
 } from '../../src/core/collision/collision-paint';
 import { validateCollisionWrite, validateCollisionReadPlane } from '../../src/core/agent/validation';
 import { packCollisionCell } from '../../src/core/collision/collision-cell-word';
@@ -33,6 +33,7 @@ import {
 import {
   readCrossover, withCrossover, handOffFrom, isSelfMark, otherPlaneId,
   CROSSOVER_BITS, type CollisionPlaneId, type Crossover, type CrossoverRead,
+  type CrossoverBrush,
 } from '../../src/core/collision/layer-transition';
 import { readCollisionRegion } from '../../src/core/collision/collision-region-read';
 import { EDITOR_METHODS } from '../../src/main/editor-methods';
@@ -51,6 +52,32 @@ function cellWord(plane: Uint16Array, cc: number, cr: number): number {
 }
 function apply(plane: Uint16Array, entries: { index: number; newColl: number }[]): void {
   for (const e of entries) plane[e.index] = e.newColl;
+}
+
+/**
+ * The PER-CELL form aimed at ONE plane, through the live builder with
+ * `bothPlanes: false` — exactly what `agent-handler` runs for `plane: 'a'` and
+ * `plane: 'b'`.
+ *
+ * ⚠ These rows used to call `paintCollisionCellEntries`, a single-plane entry
+ * point NOTHING in the app called. It was deleted on 2026-09-08 (lens row
+ * COLLISION-PAINT-DEAD-FUNCTIONS) and, being older than mark widths, it could
+ * not even express a `CrossoverSpan`; the live builder can. `other` is asserted
+ * empty at every call so no row here can pass because the write went to the
+ * plane it was not aimed at.
+ */
+function cellPlan(args: {
+  x: number; y: number; w: number; h: number; words: (number | null)[];
+  plane: Uint16Array; tileWidth: number;
+  crossover?: CrossoverBrush; planeId?: CollisionPlaneId;
+}): { entries: { index: number; oldColl: number; newColl: number }[]; skipped: number } {
+  const plan = paintCollisionCellsBothPlanes({
+    x: args.x, y: args.y, w: args.w, h: args.h, words: args.words,
+    aimedPlane: args.plane, otherPlane: null, tileWidth: args.tileWidth, bothPlanes: false,
+    aimedPlaneId: args.planeId, crossover: args.crossover,
+  });
+  expect(plan.other).toEqual([]);
+  return { entries: plan.aimed, skipped: plan.skipped };
 }
 
 /**
@@ -197,7 +224,7 @@ describe('[m2] words + crossover: per cell, and only on the cells it writes', ()
       setCell(dest, 1, 0, withCrossover(solid(11), kept as 'to-a' | 'to-b'));
 
       const words = [solid(1), null, solid(3), solid(4)];
-      const plan = paintCollisionCellEntries({
+      const plan = cellPlan({
         x: 0, y: 0, w: 2, h: 2, words, plane: dest, tileWidth: width,
         crossover: 'hand-off', planeId: plane,
       });
@@ -219,7 +246,7 @@ describe('[m2] words + crossover: per cell, and only on the cells it writes', ()
   it('clear erases the crossover of every WRITTEN cell and of no skipped one', () => {
     const { a } = seedDistinguishable();
     const words = [solid(1), null, solid(3), solid(4)];
-    const plan = paintCollisionCellEntries({
+    const plan = cellPlan({
       x: 0, y: 0, w: 2, h: 2, words, plane: a, tileWidth: width,
       crossover: 'clear', planeId: 'a',
     });
@@ -237,7 +264,7 @@ describe('[m2] words + crossover: per cell, and only on the cells it writes', ()
   it('keep (and an omitted crossover) leaves every cell\'s crossover exactly as it was', () => {
     const { a } = seedDistinguishable();
     const before = Array.from(a).map(unownedCollisionBits);
-    const plan = paintCollisionCellEntries({
+    const plan = cellPlan({
       x: 0, y: 0, w: 2, h: 2, words: WORDS_2x2, plane: a, tileWidth: width,
       // crossover omitted entirely — the default must be `keep`, never `clear`.
       planeId: 'a',
@@ -328,7 +355,7 @@ describe('[m4] bits 15:14 inside a words[] value are IGNORED', () => {
     for (const [cc, cr] of CELLS) setCell(dest, cc, cr, solid(11));   // no crossover
     const carrying = withCrossover(solid(5), 'to-b');
     expect(readCrossover(carrying)).toBe('to-b');                     // anti-vacuous
-    const plan = paintCollisionCellEntries({
+    const plan = cellPlan({
       x: 0, y: 0, w: 2, h: 2, words: [carrying, carrying, carrying, carrying],
       plane: dest, tileWidth: width, planeId: 'a',
     });
@@ -352,7 +379,7 @@ describe('[m4] bits 15:14 inside a words[] value are IGNORED', () => {
       profiles: null, ascii: false,
     });
     expect(read.crossoverCells).toBe(2);                              // anti-vacuous
-    const plan = paintCollisionCellEntries({
+    const plan = cellPlan({
       x: 0, y: 0, w: 2, h: 2, words: read.words, plane: src, tileWidth: width, planeId: 'a',
     });
     apply(src, plan.entries);
@@ -369,7 +396,7 @@ describe('[m4] bits 15:14 inside a words[] value are IGNORED', () => {
       plane: 'a', planeWords: src, tileWidth: width, x: 0, y: 0, w: 2, h: 2,
       profiles: null, ascii: false,
     });
-    const plan = paintCollisionCellEntries({
+    const plan = cellPlan({
       x: 2, y: 2, w: 2, h: 2, words: read.words, plane: dst, tileWidth: width, planeId: 'a',
     });
     apply(dst, plan.entries);
@@ -380,7 +407,7 @@ describe('[m4] bits 15:14 inside a words[] value are IGNORED', () => {
     expect(readCrossover(cellWord(dst, 2, 2))).toBe('none');
     // …and `crossover: 'hand-off'` is how an agent authors it there instead.
     const dst2 = fresh();
-    const plan2 = paintCollisionCellEntries({
+    const plan2 = cellPlan({
       x: 2, y: 2, w: 2, h: 2, words: read.words, plane: dst2, tileWidth: width,
       planeId: 'a', crossover: 'hand-off',
     });

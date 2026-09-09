@@ -10,7 +10,7 @@
 // resolution — `SECTION_PLANE_WORDS = SECTION_TILES_WIDE * SECTION_TILES_HIGH`
 // (collision-cell-resolve.ts) — and a 16px cell is the 2x2 block of sub-tiles
 // `cellTileIndices` names. Every Aurora writer that means "a cell" writes all
-// four (`paintCollisionRectEntries`, `MapViewport.paintCollisionCell`,
+// four (`paintCollisionRectBothPlanes`, `MapViewport.paintCollisionCell`,
 // `buildRegionWriteCommand`), so on Aurora-authored data the four always agree.
 //
 // They are NOT guaranteed to agree, and the guarantee is not Aurora's to make:
