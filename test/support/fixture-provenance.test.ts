@@ -249,8 +249,21 @@ describe('unknown is loud, and never a blank, a zero or an omitted field', () =>
     expect(p.unknown.map((u) => u.claim).sort()).toEqual(['revision', 'worktree']);
     const text = describeFixtureProvenance(p);
     expect(text).toContain(UNKNOWN_BANNER);
-    expect(text).toContain('is not a git checkout');
     expect(text).toContain('CANNOT BE COMPARED WITH ANY OTHER RUN');
+
+    // ⚠ EACH UNKNOWN CARRIES ITS OWN REASON, asserted PER CLAIM and not over
+    // the whole block. This row used to say `text.toContain('is not a git
+    // checkout')`, which is TWO operands sharing one upstream and one
+    // assertion: deleting the reason from the revision claim's value left the
+    // row green, because the worktree claim's value still carried the same
+    // words. Measured 2026-09-09 by planting exactly that.
+    for (const label of ['revision', 'gatepeer working tree']) {
+      const claim = p.claims.find((c) => c.label === label)!;
+      expect(claim.value, `${label} did not render as an UNKNOWN`).toMatch(/^UNKNOWN: /);
+      expect(claim.value.slice('UNKNOWN: '.length).trim().length,
+        `${label} rendered UNKNOWN with no reason after it`).toBeGreaterThan(0);
+      expect(claim.value, `${label}'s UNKNOWN does not say WHY`).toContain('not a git checkout');
+    }
     // The failure mode this row exists for: a field rendered empty. Every claim
     // line must carry a value after its colon.
     for (const line of text.split('\n')) {
