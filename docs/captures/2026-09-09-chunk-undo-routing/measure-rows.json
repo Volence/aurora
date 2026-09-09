@@ -1,0 +1,314 @@
+{
+  "dpr": 1,
+  "chunkId": "OJZ_00",
+  "chunkMeta": {
+    "name": "OJZ $00",
+    "widthTiles": 16,
+    "heightTiles": 16,
+    "nonzeroTiles": 128
+  },
+  "plan": {
+    "cx": 1,
+    "cy": 0,
+    "px": 404,
+    "py": 167,
+    "dp": {
+      "px": 12,
+      "py": 4
+    },
+    "zoom": 8,
+    "rect": {
+      "x": 308,
+      "y": 135,
+      "width": 1024,
+      "height": 1024,
+      "top": 135,
+      "right": 1332,
+      "bottom": 1159,
+      "left": 308
+    },
+    "size": {
+      "w": 1024,
+      "h": 1024
+    },
+    "collIndex": 0,
+    "widthTiles": 16,
+    "heightTiles": 16
+  },
+  "zone": {
+    "start": 628154474,
+    "edit1": 218895101,
+    "edit2": 3069218194
+  },
+  "control": {
+    "zone0": 628154474,
+    "zoneAfterPencil": 1260435675,
+    "zoneAfterPencilZ": 628154474,
+    "zoneAfterColl": 628154474,
+    "zoneAfterCollZ": 628154474,
+    "pix": [
+      3069092495,
+      1417937066,
+      3069092495
+    ],
+    "docPixel": [
+      0,
+      1,
+      0
+    ],
+    "coll": [
+      0,
+      12289,
+      0
+    ],
+    "focused": "zoneart:ojz",
+    "canUndo": true,
+    "chipDisabled": false
+  },
+  "treatment": {
+    "zoneAfterPencil": 2936393219,
+    "zoneAfterPencilZ": 3069218194,
+    "zoneBeforeCollZ": 3069218194,
+    "zoneAfterCollZ": 3069218194,
+    "pix": [
+      193105295,
+      2836917162,
+      193105295
+    ],
+    "docPixel": [
+      0,
+      1,
+      0
+    ],
+    "coll": [
+      0,
+      12289,
+      0
+    ],
+    "focused": "zoneart:ojz",
+    "canUndo": true,
+    "chipDisabled": false
+  },
+  "results": [
+    {
+      "id": "0a",
+      "name": "window.__dbg exists (VITE_AURORA_DEBUG=1 build) [precondition]",
+      "ok": true
+    },
+    {
+      "id": "0b",
+      "name": "the fixture aeon project is open with sections [precondition]",
+      "ok": true
+    },
+    {
+      "id": "0c",
+      "name": "the Art facet is focused [precondition]",
+      "ok": true
+    },
+    {
+      "id": "0d",
+      "name": "the open zone has a tileset the zone-art witness can read [precondition]",
+      "ok": true
+    },
+    {
+      "id": "0e",
+      "name": "the Chunk Library panel is on screen with cells to open [precondition]",
+      "ok": true
+    },
+    {
+      "id": "nullx",
+      "name": "answered the open guard while opening the chunk",
+      "ok": null
+    },
+    {
+      "id": "C0",
+      "name": "a CHUNK document with an EMPTY, on-screen cell is open [precondition]",
+      "ok": true
+    },
+    {
+      "id": "C1",
+      "name": "the zone-art stack is EMPTY at the start of the control [precondition]",
+      "ok": true
+    },
+    {
+      "id": "C2",
+      "name": "the pencil stroke LANDS on the chunk document [precondition]",
+      "ok": true
+    },
+    {
+      "id": "C3",
+      "name": "the stroke on the EMPTY cell MATERIALISES its tile into the zone tileset (owner ruling d-37 — a chunk in the library is a nametable of atlas tiles)",
+      "ok": true
+    },
+    {
+      "id": "C3b",
+      "name": "and the cell that was EMPTY now references that appended tile [precondition]",
+      "ok": true
+    },
+    {
+      "id": "C4",
+      "name": "with an empty stack, Ctrl+Z after the stroke puts the zone art back exactly",
+      "ok": true
+    },
+    {
+      "id": "C5",
+      "name": "Ctrl+Z TAKES BACK the doc-local stroke",
+      "ok": true
+    },
+    {
+      "id": "C6",
+      "name": "the doc-local stroke ENABLES the Undo control on a stack C1 found empty",
+      "ok": true
+    },
+    {
+      "id": "C7",
+      "name": "the collision paint LANDS on the chunk document [precondition]",
+      "ok": true
+    },
+    {
+      "id": "C8",
+      "name": "the collision paint and its Ctrl+Z change NO zone art — `set-chunk` carries both collision planes and touches no tile",
+      "ok": true
+    },
+    {
+      "id": "C9",
+      "name": "Ctrl+Z TAKES BACK the collision paint",
+      "ok": true
+    },
+    {
+      "id": "Z0",
+      "name": "the tileset panel grid canvas is uniquely identifiable [precondition]",
+      "ok": true
+    },
+    {
+      "id": "Z0b",
+      "name": "answered the open guard while opening the live tile",
+      "ok": null
+    },
+    {
+      "id": "Z1",
+      "name": "a LIVE-TILE document is open (the tileset panel names the atlas tile) [precondition]",
+      "ok": true
+    },
+    {
+      "id": "Z2",
+      "name": "the live-tile composer canvas is measurable [precondition]",
+      "ok": true
+    },
+    {
+      "id": "Z3",
+      "name": "TWO real zone-art edits landed on the zone-art stack [precondition]",
+      "ok": true
+    },
+    {
+      "id": "T00x",
+      "name": "answered the open guard while opening the chunk",
+      "ok": null
+    },
+    {
+      "id": "T00",
+      "name": "re-opened the SAME chunk from its library cell (\"OJZ $00: blank (transparent) chunk; stamping it erases the area\")",
+      "ok": null
+    },
+    {
+      "id": "T0a",
+      "name": "the SAME chunk document is open again for the treatment [precondition]",
+      "ok": true
+    },
+    {
+      "id": "T0b",
+      "name": "closing the live-tile document did NOT revert the two zone-art edits [control]",
+      "ok": true
+    },
+    {
+      "id": "T0c",
+      "name": "the aimed cell is EMPTY again on the re-opened document [precondition]",
+      "ok": true
+    },
+    {
+      "id": "T0d",
+      "name": "the treatment aims at the SAME doc pixel of the SAME cell as the control [precondition]",
+      "ok": true
+    },
+    {
+      "id": "T1",
+      "name": "the zone-art stack is NOT empty at the start of the treatment [precondition]",
+      "ok": true
+    },
+    {
+      "id": "T2a",
+      "name": "the pencil stroke LANDS on the chunk document [precondition]",
+      "ok": true
+    },
+    {
+      "id": "T2b",
+      "name": "the pencil stroke moves the zone-art witness to ITS OWN new value, not to any earlier rung of the ladder [precondition]",
+      "ok": true
+    },
+    {
+      "id": "T2",
+      "name": "THE FINDING: Ctrl+Z after a DOC-LOCAL pencil stroke leaves the earlier ZONE-ART edits alone",
+      "ok": true
+    },
+    {
+      "id": "T3",
+      "name": "the doc-local stroke IS what that Ctrl+Z takes back",
+      "ok": true
+    },
+    {
+      "id": "T4",
+      "name": "the Undo control was ENABLED at the moment of the doc-local gesture (and T2/T3 are what say the control now acts HERE rather than elsewhere)",
+      "ok": true
+    },
+    {
+      "id": "T4b",
+      "name": "which document Ctrl+Z resolved to, read from the app",
+      "ok": null
+    },
+    {
+      "id": "T5a",
+      "name": "the collision paint LANDS on the chunk document [precondition]",
+      "ok": true
+    },
+    {
+      "id": "T5b",
+      "name": "the collision paint is DOC-LOCAL — it moved no zone art [precondition]",
+      "ok": true
+    },
+    {
+      "id": "T5",
+      "name": "THE FINDING, second gesture: Ctrl+Z after a DOC-LOCAL collision paint leaves the earlier ZONE-ART edits alone",
+      "ok": true
+    },
+    {
+      "id": "T6",
+      "name": "the collision paint IS what that Ctrl+Z takes back",
+      "ok": true
+    },
+    {
+      "id": "F0",
+      "name": "the options bar offers the Flip horizontal control [precondition]",
+      "ok": true
+    },
+    {
+      "id": "F1",
+      "name": "the transform LANDS on the chunk document [precondition]",
+      "ok": true
+    },
+    {
+      "id": "F2",
+      "name": "the transform leaves the zone-art witness off every rung of the ladder",
+      "ok": true
+    },
+    {
+      "id": "F3",
+      "name": "the transform ENABLES Undo, so it recorded a step",
+      "ok": true
+    },
+    {
+      "id": "F4",
+      "name": "THE ROW: Ctrl+Z takes back the TRANSFORM — the document's first row of cells is byte-for-byte what it was before it, and the zone art is back where the transform found it",
+      "ok": true
+    }
+  ]
+}
