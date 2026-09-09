@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, writeFileSync, chmodSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, chmodSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runBuild } from '../build-run';
@@ -1148,5 +1148,207 @@ describe('runBuild and a ROM that belongs to another project', () => {
       expect(r.romPath).toBe(join(dir, 's4.debug.bin'));
       expect(client.calls).toContain(`emulator/reload_rom:${join(dir, 's4.debug.bin')}`);
     } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
+
+/**
+ * §5.1 OF THE ROM-MISMATCH PACKET: THE SAME FAILURE INSIDE ONE PROJECT.
+ *
+ * `project.json` may state `buildEnv: { DEBUG: "0" }`. That is stated config,
+ * and it governs what gets BUILT, which is untouched here: the build writes
+ * `s4.bin`. But the emulator may be sitting on this project's own
+ * `s4.debug.bin`, which the family rule accepts, because it IS one of the two
+ * artifacts this plan can write. It is not one THIS build wrote.
+ *
+ * Both of the available substitutions are silent:
+ *
+ *   - reload the running `s4.debug.bin` and the emulator gets a file the build
+ *     never touched, and the game comes back byte-identical to before the
+ *     build. That is the field defect of 2026-09-09, with one project instead
+ *     of two.
+ *   - reload `s4.bin` instead and the flavour under the owner is swapped for
+ *     another behind a "Build succeeded" toast, which is precisely the
+ *     substitution the running-ROM preference was written to prevent.
+ *
+ * So: REFUSE, and name both files and both remedies. Owner's ruling,
+ * 2026-09-09. The distinction it rests on is that stated config decides what is
+ * BUILT and says nothing about which ROM the emulator should be handed; the
+ * reload target has exactly one correct value, the file this build wrote.
+ *
+ * THE DISCRIMINATOR IS NOT THE FILE NAMES. `s4.debug.bin` running against a
+ * plan whose `romPath` is `s4.bin` is the case the whole preference exists for,
+ * and it stays green below; the difference is whether the build wrote that file.
+ */
+describe('runBuild when a DECLARED flavour contradicts the running ROM', () => {
+  it('REFUSES, and touches the machine not at all', async () => {
+    const dir = scriptDir('echo "DEBUG=[$DEBUG]"; exit 0');
+    // This project's own DEBUG artifact, which the family rule accepts.
+    const client = fakeClient({ dir, romPath: join(dir, 's4.debug.bin') });
+    try {
+      const r = await runBuild({
+        basePath: dir, client: client as never, env: {},
+        raw: { buildEnv: { DEBUG: '0' } },
+      });
+
+      // STATED CONFIG STILL GOVERNS THE BUILD. Nothing about the refusal
+      // changes which file was written, and the build is not the casualty.
+      expect(r.ok).toBe(true);
+      expect(r.exitCode).toBe(0);
+      expect(r.debugBuild).toBe(false);
+      expect(r.output.join('\n')).toContain('DEBUG=[0]');
+
+      // THE STATE ROWS, which are the ones that matter. Asserting the message
+      // alone would have called "refuse loudly, then reload anyway" correct:
+      // the predecessor parcel proved exactly that by moving its refusal after
+      // the write and watching the message row stay green while four state
+      // rows went red.
+      expect(r.reloaded).toBe(false);
+      expect(r.romPath).toBeUndefined();
+      expect(client.calls.filter((c) => c.startsWith('emulator/reload_rom'))).toEqual([]);
+      expect(client.calls.filter((c) => c.startsWith('load_symbols'))).toEqual([]);
+      // Before the pause, for the reason the two refusals above it give:
+      // stopping the machine and then declining to reload leaves it frozen.
+      expect(client.calls.filter((c) => c.startsWith('emulator/pause'))).toEqual([]);
+      expect(r.reloadError).toBeTruthy();
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('names what was built, what is running, and BOTH remedies', async () => {
+    // This case looks like a bug in Aurora rather than a mismatch, because
+    // everything in sight belongs to one project. The message has to say that
+    // the project's own configuration chose the flavour that differs, or the
+    // reader has no way to see why their own tree disagrees with itself.
+    const dir = scriptDir('exit 0');
+    const client = fakeClient({ dir, romPath: join(dir, 's4.debug.bin') });
+    try {
+      const r = await runBuild({
+        basePath: dir, client: client as never, env: {},
+        raw: { buildEnv: { DEBUG: '0' } },
+      });
+      const msg = r.reloadError ?? '';
+      // What the machine is running.
+      expect(msg).toContain(join(dir, 's4.debug.bin'));
+      // What this build wrote: the RELEASE artifact, because the declaration
+      // said so.
+      expect(msg).toContain(join(dir, 's4.bin'));
+      // WHICH IS WHICH. Two paths in a sentence that does not say which is the
+      // running one and which the built one sends nobody anywhere.
+      expect(msg).toMatch(/running \S*s4\.debug\.bin/);
+      expect(msg).toMatch(/wrote \S*s4\.bin/);
+      // THE ATTRIBUTION, without which this reads as Aurora malfunctioning,
+      // and it must QUOTE THE DECLARED VALUE. A bare mention of `buildEnv.DEBUG`
+      // is not this assertion: the remedy sentence below names it too, so a
+      // `toContain('buildEnv.DEBUG')` here passes with the attribution deleted
+      // entirely. Measured, not assumed: that exact plant stayed GREEN against
+      // the first draft of this row.
+      expect(msg).toContain('buildEnv.DEBUG is "0"');
+      // BOTH remedies, neither chosen for them.
+      expect(msg).toContain('set buildEnv.DEBUG in project.json');
+      expect(msg).toContain(`load ${join(dir, 's4.bin')} in the emulator`);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('refuses the mirror case too: DEBUG=1 declared while the release ROM runs', async () => {
+    // The conflict is not about which flavour is the developer-ish one. It is
+    // about the build's own outcome, so it fires in both directions.
+    const dir = scriptDir('exit 0');
+    const client = fakeClient({ dir, romPath: join(dir, 's4.bin') });
+    try {
+      const r = await runBuild({
+        basePath: dir, client: client as never, env: {},
+        raw: { buildEnv: { DEBUG: '1' } },
+      });
+      expect(r.debugBuild).toBe(true);
+      expect(r.reloaded).toBe(false);
+      expect(client.calls.filter((c) => c.startsWith('emulator/reload_rom'))).toEqual([]);
+      expect(client.calls.filter((c) => c.startsWith('emulator/pause'))).toEqual([]);
+      expect(r.reloadError).toContain(join(dir, 's4.debug.bin'));
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  /**
+   * THE CONTROL, AND THE CASE THE PREFERENCE EXISTS FOR. Byte for byte the
+   * first fixture above minus the declaration: the plan's `romPath` is still
+   * the release name, the emulator is still on `s4.debug.bin`, and this MUST
+   * still be accepted. The running ROM legitimately selects the flavour here,
+   * and the build then writes the file that is running. A rule reading the file
+   * NAMES cannot tell these two rows apart; a rule reading the build's own
+   * outcome can, and that is why the rule is written the second way.
+   */
+  it('still reloads when the running ROM chose the flavour itself', async () => {
+    const dir = scriptDir('exit 0');
+    const client = fakeClient({ dir, romPath: join(dir, 's4.debug.bin') });
+    try {
+      const r = await runBuild({ basePath: dir, client: client as never, env: {} });
+      expect(r.debugBuild).toBe(true);
+      expect(r.reloaded).toBe(true);
+      expect(r.reloadError).toBeUndefined();
+      expect(r.romPath).toBe(join(dir, 's4.debug.bin'));
+      expect(client.calls).toContain(`emulator/reload_rom:${join(dir, 's4.debug.bin')}`);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('and reloads when the declaration AGREES with the running ROM', async () => {
+    // A declaration is not itself suspicious. Only a disagreement is.
+    const dir = scriptDir('exit 0');
+    const client = fakeClient({ dir, romPath: join(dir, 's4.debug.bin') });
+    try {
+      const r = await runBuild({
+        basePath: dir, client: client as never, env: {},
+        raw: { buildEnv: { DEBUG: '1' } },
+      });
+      expect(r.reloaded).toBe(true);
+      expect(r.reloadError).toBeUndefined();
+      expect(r.romPath).toBe(join(dir, 's4.debug.bin'));
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('leaves classic alone: it has no flavour to contradict', async () => {
+    // `build.lua` takes no switch, so `buildEnv.DEBUG` there is inert and the
+    // family has one member. A refusal here would assert a distinction that
+    // does not exist in that engine family.
+    const dir = mkdtempSync(join(tmpdir(), 'aurora-classic-build-'));
+    writeFileSync(join(dir, 'build.lua'), 'print("ok")');
+    const client = fakeClient({ dir, romPath: join(dir, 's1built.bin') });
+    try {
+      const r = await runBuild({
+        basePath: dir, projectType: 'classic', client: client as never, env: {},
+        raw: { buildEnv: { DEBUG: '0' } },
+      });
+      expect(r.reloaded).toBe(true);
+      expect(r.reloadError).toBeUndefined();
+      expect(r.romPath).toBe(join(dir, 's1built.bin'));
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  /**
+   * §5.4, the cheap half. Once the running ROM is accepted it IS the artifact
+   * this build wrote, so the reload target is a choice of SPELLING, not of
+   * file — and the two spellings are not equally trustworthy. `builtRom` is
+   * derived from `plan.cwd` and is absolute by construction; the other is
+   * whatever string the server handed back, which was passed through verbatim
+   * and would still be relative if it arrived relative.
+   *
+   * A symlinked checkout makes the two spellings differ while naming one file,
+   * which is the case the canonicaliser was written for, so it is the fixture
+   * that can see which one is sent.
+   */
+  it('reloads by the path the BUILD names, not the string the server handed back', async () => {
+    const dir = scriptDir('exit 0');
+    const link = join(mkdtempSync(join(tmpdir(), 'aurora-link-')), 'checkout');
+    symlinkSync(dir, link);
+    // The same file, reached through the symlink: accepted, because the
+    // canonicaliser resolves the directory.
+    const client = fakeClient({ dir, romPath: join(link, 's4.debug.bin') });
+    try {
+      const r = await runBuild({ basePath: dir, client: client as never, env: {} });
+      expect(r.reloaded).toBe(true);
+      expect(r.romPath).toBe(join(dir, 's4.debug.bin'));
+      expect(client.calls).toContain(`emulator/reload_rom:${join(dir, 's4.debug.bin')}`);
+      expect(client.calls.filter((c) => c.includes(link))).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(link, { force: true });
+    }
   });
 });

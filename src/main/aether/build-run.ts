@@ -329,11 +329,17 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
   // AEON ONLY. Classic has no flavour at all — `build.lua` takes no switch and
   // emits one artifact — so forcing DEBUG into its env would be noise and
   // reporting `debugBuild` would claim a distinction that does not exist there.
+  //
+  // READ BEFORE THE OVERWRITE, and kept, because the refusal below has to be
+  // able to say WHO chose the flavour. `plan.envOverrides.DEBUG` is the
+  // project's declaration on the way in and this runner's decision on the way
+  // out, and a message that reported the second as the first would tell the
+  // owner his project.json says something it does not.
+  const declaredDebug = classic ? undefined : plan.envOverrides.DEBUG;
   let wantsDebug: boolean | undefined;
   if (!classic) {
-    const explicitDebug = plan.envOverrides.DEBUG;
-    wantsDebug = explicitDebug !== undefined
-      ? explicitDebug === '1'
+    wantsDebug = declaredDebug !== undefined
+      ? declaredDebug === '1'
       : running.ours !== null
         ? canonicalPath(running.ours) === canonicalPath(family.debug ?? family.release)
         : true;
@@ -350,6 +356,43 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
   // the refusal below names, and naming the wrong one there would send the
   // owner to open a ROM that was never written.
   const builtRom = (!classic && wantsDebug) ? (family.debug ?? family.release) : family.release;
+
+  // A FAMILY MEMBER THIS BUILD DID NOT WRITE — §5.1 of the 2026-09-09 packet,
+  // and the last hole in the bound above.
+  //
+  // `classifyRunningRom` answers "is this one of the artifacts this plan CAN
+  // write". That is the right question for whose ROM it is, and it is one
+  // question short of the right question for what to reload, because a plan
+  // can write two artifacts and a build writes ONE. With
+  // `buildEnv: { DEBUG: "0" }` declared, the build writes `s4.bin` while the
+  // emulator sits on this project's own `s4.debug.bin`: accepted as ours, and
+  // never touched by this build.
+  //
+  // STATED CONFIG IS NOT OVERRIDDEN BY THIS, and the distinction is the whole
+  // of it. `buildEnv` governs what gets BUILT — `wantsDebug` above is untouched
+  // and the declaration still wins there. It says nothing about which ROM the
+  // emulator should be handed, and that has exactly one correct value: a file
+  // this build actually wrote.
+  //
+  // BOTH SUBSTITUTIONS ARE SILENT, which is why this refuses rather than
+  // picking. Reloading the running ROM hands back a file the build never
+  // touched and the game comes back byte-identical — the field defect of
+  // 2026-09-09 with one project instead of two. Reloading the built one
+  // swaps the flavour under the owner, which is the substitution the running
+  // ROM preference was written to prevent. Refusing is this file's own
+  // established answer when it cannot know, twice over already.
+  //
+  // NOT A NAME COMPARISON. `s4.debug.bin` running against a plan whose
+  // `romPath` is `s4.bin` is the single case that preference exists for, and it
+  // is accepted, because with nothing declared `wantsDebug` reads the running
+  // ROM and the build then writes exactly that file. The two cases have the
+  // same file names and differ only in the build's own outcome, so that is what
+  // this reads. In practice it can only fire on a declaration, which is why the
+  // message can name one.
+  const flavourConflict = (running.ours !== null
+    && canonicalPath(running.ours) !== canonicalPath(builtRom))
+    ? running.ours
+    : null;
 
   let output = '';
 
@@ -476,6 +519,34 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
           });
           return;
         }
+        // REFUSE THIS PROJECT'S OTHER FLAVOUR, for the reasons argued at
+        // `flavourConflict` above, and before the pause for the same reason as
+        // the two refusals above this one.
+        //
+        // THIS ONE HAS TO SAY WHOSE FAULT IT IS NOT. Everything in sight
+        // belongs to one project, so without the attribution it reads as Aurora
+        // malfunctioning rather than as a tree disagreeing with itself. And the
+        // remedy is the owner's to pick: both are named, neither is taken.
+        if (flavourConflict !== null) {
+          resolve({
+            ...base, ok: true, reloaded: false,
+            reloadError:
+              `the emulator is running ${flavourConflict}, but this build wrote ${builtRom}: ` +
+              'the same project, the other flavour. '
+              + (declaredDebug !== undefined
+                ? `This project chose that itself, in project.json: buildEnv.DEBUG is "${declaredDebug}", `
+                  + 'which outranks the flavour the running ROM would have selected. '
+                : '')
+              + 'Aurora refused to reload rather than pick for you: reloading '
+              + `${flavourConflict} would hand the emulator a file this build never touched (it `
+              + 'would come back without the change you just made, and look like the edit had '
+              + `vanished), and reloading ${builtRom} would silently swap the flavour you are `
+              + 'running, which is the substitution this preference exists to prevent. '
+              + `Either set buildEnv.DEBUG in project.json to the flavour you want to run, or `
+              + `load ${builtRom} in the emulator.`,
+          });
+          return;
+        }
         try {
           // RELOAD WHAT IS ACTUALLY LOADED, not what the config guesses.
           //
@@ -500,7 +571,20 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
           // s1built.bin's listing is sonic.lst and the derivation would hand
           // load_symbols a file that does not exist. Stated config outranks
           // anything inferred.
-          const romPath = running.ours ?? builtRom;
+          //
+          // RELOAD THE ARTIFACT THIS BUILD WROTE. Reaching this line means the
+          // running ROM is either nothing of ours or the very file `builtRom`
+          // names — a family member that is the OTHER flavour was refused just
+          // above — so the two are the same file whenever both exist, and this
+          // is the spelling to use for it. `builtRom` is derived from
+          // `plan.cwd`, so it is absolute and it is ours; `running.ours` is
+          // whatever string `emulator/status` handed back, which was trusted
+          // verbatim as the reload target until now (§5.4 of the 2026-09-09
+          // packet) and would be passed straight through if it were relative.
+          // Nothing is lost by preferring ours: the preference for the running
+          // ROM was never about the string, it was about the FLAVOUR, and that
+          // is already inside `builtRom` by this point.
+          const romPath = builtRom;
           const symbolsPath = (plan.symbolsDeclared || classic)
             ? join(plan.cwd, plan.symbolsPath)
             : romPath.endsWith('.bin')
