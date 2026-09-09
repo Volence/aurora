@@ -21,7 +21,9 @@
 import { useConfirmStore } from '../state/confirmStore';
 import { useToastStore } from '../state/toastStore';
 import { saveAllDirty } from '../state/project-runtime';
-import { planProjectOpen, currentOpenDirtySnapshot } from './project-open-guard';
+import {
+  planProjectOpen, currentOpenDirtySnapshot, unsavedDialogBody, unsavedBlockedMessage,
+} from './project-open-guard';
 
 // -- Injectable save call (test seam, same convention as project-open-guard) --
 type SaveFn = () => Promise<unknown>;
@@ -36,14 +38,20 @@ export function __resetCloseGuardSaveForTest(): void { saveImpl = saveAllDirty; 
  * left everything verifiably clean. False = cancel, or a save that did not.
  */
 export async function confirmAppClose(): Promise<boolean> {
-  if (planProjectOpen(currentOpenDirtySnapshot()).kind === 'proceed') return true;
+  const plan = planProjectOpen(currentOpenDirtySnapshot());
+  if (plan.kind === 'proceed') return true;
 
+  // The Save button is dropped when nothing dirty has a writer, and the body
+  // names what those things are — the same decision, from the same snapshot,
+  // as the project-open door. The array literal is inline because
+  // shell/__tests__/confirm-dialog-focus.test.ts walks it in the AST.
   const answer = await useConfirmStore.getState().ask({
     title: 'Unsaved changes',
-    body: 'Closing Aurora discards unsaved edits and undo history.',
+    body: unsavedDialogBody('close', plan),
     buttons: [
-      { key: 'save', label: 'Save & close', tone: 'primary' },
-      { key: 'discard', label: 'Discard & close', tone: 'danger' },
+      ...(plan.offerSave
+        ? [{ key: 'save', label: 'Save & close', tone: 'primary' as const }] : []),
+      { key: 'discard', label: 'Discard & close', tone: 'danger' as const },
       { key: 'cancel', label: 'Cancel' },
     ],
   });
@@ -54,12 +62,12 @@ export async function confirmAppClose(): Promise<boolean> {
     // anything is still dirty a saver failed (and has already toasted its own
     // reason), so stay open rather than closing over the work it was trying to
     // protect — and say so, since a window that simply refuses to close reads
-    // as a hang.
-    if (planProjectOpen(currentOpenDirtySnapshot()).kind === 'confirm') {
-      useToastStore.getState().addToast(
-        'Close cancelled: unsaved changes remain (save or discard them first).',
-        'error',
-      );
+    // as a hang. The message names WHICH work Save could not write: this door
+    // used to emit the generic sentence alone, so a close blocked by an
+    // unsavable document told the user to do the one thing that cannot work.
+    const after = currentOpenDirtySnapshot();
+    if (planProjectOpen(after).kind === 'confirm') {
+      useToastStore.getState().addToast(unsavedBlockedMessage('close', after), 'error');
       return false;
     }
     return true;

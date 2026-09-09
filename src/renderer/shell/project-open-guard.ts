@@ -25,6 +25,16 @@ import { anySpriteDocDirty, closeAllSpriteDocs } from './tab-activation';
 import { useCanvasStore, dirtyCanvasDocIds, saveableDirtyCanvasDocIds } from '../state/canvasStore';
 // The aeon composer's document. A leaf store (core types only), so no cycle.
 import { useArtStore } from '../state/artStore';
+// composerSaveState is the ONE rule for "can Save write the open composer
+// document", shared with the `art-composer` saver in project-runtime and with
+// the facet's own Save button, so this guard cannot promise a save the
+// coordinator will not perform. See state/art-composer-save.ts.
+import { composerSaveState } from '../state/art-composer-save';
+// The NARROWER set the sprite saver can actually write, for the same reason
+// saveableDirtyCanvasDocIds is imported above: `anySpriteDocDirty` counts every
+// dirty sprite document, and a dirty aeon/new sprite with no save-back file is
+// not one of them.
+import { dirtySpriteDocIds, saveableDirtySpriteDocIds } from '../state/spriteStore';
 
 export interface OpenDirtySnapshot {
   classicDirty: boolean;  // any classicLevelStore dirty domain
@@ -50,24 +60,83 @@ export interface OpenDirtySnapshot {
   // resident. Same divergence the sprite and canvas fields closed, arriving
   // through the one document store that was never joined to the perimeter.
   artDirty: boolean;
+  /**
+   * WHY SAVE CANNOT CLEAR IT — one sentence per kind of dirty work in this
+   * snapshot that no registered saver can write. Empty when Save reaches
+   * everything that is dirty.
+   *
+   * REQUIRED, not optional-defaulting-to-empty, and that is the point. A
+   * snapshot of five booleans conflated "dirty" with "dirty and savable", and
+   * the guard read the conflated value as the second: it offered Save & open as
+   * the PRIMARY button over work no saver would touch, ran the savers, saw the
+   * same dirt in the re-snapshot, and told the user to "save or discard first" —
+   * a loop whose only exit throws the work away. A producer that adds a document
+   * store now has to answer this question to compile, because the answer it
+   * would otherwise inherit by default is the dangerous one.
+   */
+  unsavable: readonly string[];
+  /**
+   * Is there at least one dirty domain a saver CAN write? Decides whether the
+   * dialog offers Save at all. Not derivable from `unsavable`: that list says
+   * what Save cannot reach, and a dialog needs to know whether it reaches
+   * anything.
+   */
+  anySavable: boolean;
 }
 
-export type ProjectOpenPlan = { kind: 'proceed' } | { kind: 'confirm' };
+export type ProjectOpenPlan =
+  | { kind: 'proceed' }
+  /** `offerSave` false ⇒ the door must not show a Save button: nothing dirty
+   *  here has a writer, so the primary would be inert by construction. */
+  | { kind: 'confirm'; offerSave: boolean; unsavable: readonly string[] };
 
 export function planProjectOpen(s: OpenDirtySnapshot): ProjectOpenPlan {
   return s.classicDirty || s.aeonDirty || s.spriteDirty || s.canvasDirty || s.artDirty
-    ? { kind: 'confirm' }
+    ? { kind: 'confirm', offerSave: s.anySavable, unsavable: s.unsavable }
     : { kind: 'proceed' };
 }
 
 /** Live snapshot helper (kept beside the planner so the two stay in lockstep). */
 export function currentOpenDirtySnapshot(): OpenDirtySnapshot {
+  const classicDirty = Object.values(useClassicLevelStore.getState().dirty).some(Boolean);
+  const aeonDirty = useEditorStore.getState().dirty;
+  const spriteDirty = anySpriteDocDirty();
+  const dirtyCanvases = dirtyCanvasDocIds();
+  const saveableCanvases = saveableDirtyCanvasDocIds();
+  const artDirty = useArtStore.getState().open?.dirty === true;
+
+  // THE GAP BETWEEN "DIRTY" AND "SAVABLE", stated once, per surface. Each of
+  // these three has a dirty predicate that is deliberately WIDER than its
+  // saver's, so each can present the guard with work Save will not write:
+  //   • canvas — dirtyCanvasDocIds vs saveableDirtyCanvasDocIds (no file target)
+  //   • sprite — anySpriteDocDirty vs saveableDirtySpriteDocIds (no save-back)
+  //   • art    — open.dirty vs composerSaveState() (see that function)
+  // The sentences are the ones the tab-close doors already use for the first two
+  // (tab-activation/canvas.ts, tab-activation/sprite.ts), so a user meets the
+  // same explanation wherever the same document blocks them.
+  const unsavable: string[] = [];
+  const noFileCanvases = dirtyCanvases.length - saveableCanvases.length;
+  if (noFileCanvases > 0) {
+    unsavable.push(`${noFileCanvases} canvas(es) have no file yet, so Save cannot write them.`);
+  }
+  const saveableSprites = saveableDirtySpriteDocIds().length;
+  const noTargetSprites = dirtySpriteDocIds().length - saveableSprites;
+  if (noTargetSprites > 0) {
+    unsavable.push(`${noTargetSprites} edited sprite(s) have no save-back file; export them `
+      + 'from the sprite editor to keep those edits.');
+  }
+  const art = composerSaveState();
+  if (art.kind === 'blocked') unsavable.push(art.why);
+
   return {
-    classicDirty: Object.values(useClassicLevelStore.getState().dirty).some(Boolean),
-    aeonDirty: useEditorStore.getState().dirty,
-    spriteDirty: anySpriteDocDirty(),
-    canvasDirty: dirtyCanvasDocIds().length > 0,
-    artDirty: useArtStore.getState().open?.dirty === true,
+    classicDirty,
+    aeonDirty,
+    spriteDirty,
+    canvasDirty: dirtyCanvases.length > 0,
+    artDirty,
+    unsavable,
+    anySavable: classicDirty || aeonDirty || saveableSprites > 0
+      || saveableCanvases.length > 0 || art.kind === 'savable',
   };
 }
 
@@ -107,26 +176,77 @@ function endDocumentSession(): void {
 }
 
 /**
- * Why the post-save re-snapshot is aborting the open.
+ * THE TWO DOORS ON THIS PERIMETER, and their copy in one place.
  *
- * The generic sentence assumes the user CAN act on "save them first". A canvas
- * with no file target cannot be saved by Ctrl+S or Save All at all — the saver
- * reads saveableDirtyCanvasDocIds, which filters it out — so it survives the
- * save, re-fails the re-snapshot, and blocks the open forever. Aborting IS the
- * right outcome (the work is real and unpersisted), but the generic copy sends
- * that user round a loop with no exit, so the case gets its own sentence naming
- * Discard as the way past. Appended, not substituted: a failed classic save and
- * an unsavable canvas can both be true at once, and both sentences are then
- * accurate. (Task 13's New Canvas flow gives a canvas its file up front, which
- * is what makes this rare rather than routine.)
+ * Project-open and window-close ask the same question of the same snapshot with
+ * the same three buttons; the only difference is the verb. Keeping the wording
+ * here rather than at each `ask()` is what stopped the close door from silently
+ * lacking a branch the open door had: `unsavedBlockedMessage` used to exist only
+ * on the open side, so a close aborted by an unsavable document got the generic
+ * "save or discard them first" — advice that cannot be followed.
  */
-function openBlockedMessage(): string {
-  const base = 'Open cancelled: unsaved changes remain (save or discard them first).';
-  const saveable = new Set(saveableDirtyCanvasDocIds());
-  const unsavable = dirtyCanvasDocIds().filter((id) => !saveable.has(id));
-  if (unsavable.length === 0) return base;
-  return `${base} ${unsavable.length} canvas(es) have no file yet, so Save cannot write them; ` +
-    'use Discard & open to drop them.';
+export type PerimeterAction = 'open' | 'close';
+
+const ACTION_COPY: Record<PerimeterAction, {
+  body: string; save: string; discard: string; cancelled: string;
+}> = {
+  open: {
+    body: 'Opening a project discards unsaved edits and undo history in the current one.',
+    save: 'Save & open',
+    discard: 'Discard & open',
+    cancelled: 'Open cancelled',
+  },
+  close: {
+    body: 'Closing Aurora discards unsaved edits and undo history.',
+    save: 'Save & close',
+    discard: 'Discard & close',
+    cancelled: 'Close cancelled',
+  },
+};
+
+/**
+ * The dialog body: the generic warning, plus every sentence naming work Save
+ * cannot write, plus what to do about it — BEFORE the user presses anything.
+ *
+ * The old dialog said only the first part, so a user with an unsavable document
+ * learned that Save could not help by pressing Save and reading a toast. When
+ * NOTHING is savable the Save button is gone entirely (see the ask sites), and
+ * the last sentence has to say so or a missing primary button reads as a bug.
+ */
+export function unsavedDialogBody(
+  action: PerimeterAction, plan: { offerSave: boolean; unsavable: readonly string[] },
+): string {
+  const copy = ACTION_COPY[action];
+  if (plan.unsavable.length === 0) return copy.body;
+  const tail = plan.offerSave
+    ? `Save cannot cover all of it, so anything left needs ${copy.discard}.`
+    : `Nothing here can be saved, so ${copy.discard} or Cancel are the only ways out.`;
+  return `${copy.body} ${plan.unsavable.join(' ')} ${tail}`;
+}
+
+/**
+ * Why the post-save re-snapshot is aborting.
+ *
+ * The generic sentence assumes the user CAN act on "save them first". Three
+ * surfaces can present dirty work no saver will write — a canvas with no file
+ * target, a sprite with no save-back file, a composer document with no writer
+ * (see currentOpenDirtySnapshot) — and each survives the save, re-fails the
+ * re-snapshot, and blocks forever. Aborting IS the right outcome (the work is
+ * real and unpersisted), but the generic copy sends that user round a loop with
+ * no exit, so the reasons are appended, naming Discard as the way past.
+ *
+ * APPENDED, NOT SUBSTITUTED: a failed classic save and an unsavable canvas can
+ * both be true at once, and both sentences are then accurate. This is reachable
+ * only in that MIXED case now — when nothing at all is savable the dialog no
+ * longer offers Save, so there is no failed save to report.
+ */
+export function unsavedBlockedMessage(
+  action: PerimeterAction, snap: OpenDirtySnapshot,
+): string {
+  const copy = ACTION_COPY[action];
+  const base = `${copy.cancelled}: unsaved changes remain (save or discard them first).`;
+  if (snap.unsavable.length === 0) return base;
+  return `${base} ${snap.unsavable.join(' ')} Use ${copy.discard} to drop them.`;
 }
 
 /**
@@ -143,17 +263,24 @@ function openBlockedMessage(): string {
  */
 export async function confirmProjectOpen(): Promise<boolean> {
   const snap = currentOpenDirtySnapshot();
-  if (planProjectOpen(snap).kind === 'proceed') {
+  const plan = planProjectOpen(snap);
+  if (plan.kind === 'proceed') {
     endDocumentSession();
     return true;
   }
 
+  // NO SAVE BUTTON WHEN NOTHING CAN BE SAVED. Same shape the two tab-close doors
+  // already use (tab-activation/canvas.ts and sprite.ts drop their Save when the
+  // document has nowhere to go), and the array literal stays inline because
+  // shell/__tests__/confirm-dialog-focus.test.ts walks these sites in the AST and
+  // expands both branches of exactly this spread.
   const answer = await useConfirmStore.getState().ask({
     title: 'Unsaved changes',
-    body: 'Opening a project discards unsaved edits and undo history in the current one.',
+    body: unsavedDialogBody('open', plan),
     buttons: [
-      { key: 'save', label: 'Save & open', tone: 'primary' },
-      { key: 'discard', label: 'Discard & open', tone: 'danger' },
+      ...(plan.offerSave
+        ? [{ key: 'save', label: 'Save & open', tone: 'primary' as const }] : []),
+      { key: 'discard', label: 'Discard & open', tone: 'danger' as const },
       { key: 'cancel', label: 'Cancel' },
     ],
   });
@@ -168,8 +295,9 @@ export async function confirmProjectOpen(): Promise<boolean> {
     // unsavedEdits, so spriteDirty goes false. It deliberately does NOT clear it
     // when an edit landed mid-write — that edit isn't on disk, so aborting here
     // is the correct outcome, not a false positive.)
-    if (planProjectOpen(currentOpenDirtySnapshot()).kind === 'confirm') {
-      useToastStore.getState().addToast(openBlockedMessage(), 'error');
+    const after = currentOpenDirtySnapshot();
+    if (planProjectOpen(after).kind === 'confirm') {
+      useToastStore.getState().addToast(unsavedBlockedMessage('open', after), 'error');
       return false;
     }
     // Everything persisted — reset the editor so no document survives into the

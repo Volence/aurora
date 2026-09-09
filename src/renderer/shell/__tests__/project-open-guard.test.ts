@@ -9,14 +9,25 @@ import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { useConfirmStore } from '../../state/confirmStore';
 import { useToastStore } from '../../state/toastStore';
 import { openCanvasDoc, useCanvasStore, type CanvasSource } from '../../state/canvasStore';
-import { resetProjectRuntime } from '../../state/project-runtime';
+import {
+  resetProjectRuntime, ensureSaversRegistered,
+  __setRuntimeSaversForTest, __resetRuntimeSaversForTest,
+} from '../../state/project-runtime';
 import { useArtStore } from '../../state/artStore';
+import { useProjectStore } from '../../state/projectStore';
+import { createSection } from '../../../core/model/s4-types';
 import { createDoc } from '../../../core/art/composer-buffer';
 import { createBuffer } from '../../../core/art/pixel-ops';
 import { canvasIndex } from '../../../core/art/canvas-doc';
 
+// `unsavable` and `anySavable` are REQUIRED fields of OpenDirtySnapshot, which is
+// why every row below has to state them: the five-boolean snapshot conflated
+// "dirty" with "dirty and savable", and the guard read it as the second — it
+// offered Save as the primary over work no saver would touch. A producer that
+// forgets now fails to compile rather than inheriting the dangerous default.
 const CLEAN = {
   classicDirty: false, aeonDirty: false, spriteDirty: false, canvasDirty: false, artDirty: false,
+  unsavable: [] as readonly string[], anySavable: false,
 };
 
 describe('planProjectOpen', () => {
@@ -24,13 +35,36 @@ describe('planProjectOpen', () => {
     expect(planProjectOpen(CLEAN)).toEqual({ kind: 'proceed' });
   });
   it.each([
-    ['classic level edits', { ...CLEAN, classicDirty: true }],
-    ['aeon project edits', { ...CLEAN, aeonDirty: true }],
-    ['a dirty sprite (unsaved edits)', { ...CLEAN, spriteDirty: true }],
-    ['a dirty canvas (unsaved pixels)', { ...CLEAN, canvasDirty: true }],
-    ['an unsaved aeon composer document', { ...CLEAN, artDirty: true }],
+    ['classic level edits', { ...CLEAN, classicDirty: true, anySavable: true }],
+    ['aeon project edits', { ...CLEAN, aeonDirty: true, anySavable: true }],
+    ['a dirty sprite (unsaved edits)', { ...CLEAN, spriteDirty: true, anySavable: true }],
+    ['a dirty canvas (unsaved pixels)', { ...CLEAN, canvasDirty: true, anySavable: true }],
+    ['an unsaved aeon composer document', { ...CLEAN, artDirty: true, anySavable: true }],
   ] as const)('asks before opening over %s', (_label, snap) => {
-    expect(planProjectOpen(snap)).toEqual({ kind: 'confirm' });
+    expect(planProjectOpen(snap)).toEqual({ kind: 'confirm', offerSave: true, unsavable: [] });
+  });
+
+  /**
+   * THE OFFER IS PART OF THE PLAN. Save-and-open was unsatisfiable for a composer
+   * drawing — no registered saver touched artStore and nothing cleared the flag —
+   * so the dialog's primary button ran the savers, the re-snapshot read the same
+   * dirt, and the guard aborted telling the user to save or discard first. The
+   * plan now has to say whether Save can do anything at all.
+   */
+  it('a confirm over work NOTHING can save does not offer Save, and carries the reason', () => {
+    const why = 'The art document "New Chunk" has no open zone and act to be saved into.';
+    expect(planProjectOpen({ ...CLEAN, artDirty: true, unsavable: [why], anySavable: false }))
+      .toEqual({ kind: 'confirm', offerSave: false, unsavable: [why] });
+  });
+
+  it('a MIXED confirm still offers Save, and still carries what Save cannot reach', () => {
+    // A savable aeon project plus an unsavable document: Save is worth pressing
+    // (it persists the project) and still cannot clear everything, so both facts
+    // have to survive into the dialog.
+    const why = 'X has no file yet, so Save cannot write it.';
+    expect(planProjectOpen({
+      ...CLEAN, aeonDirty: true, canvasDirty: true, unsavable: [why], anySavable: true,
+    })).toEqual({ kind: 'confirm', offerSave: true, unsavable: [why] });
   });
 });
 
@@ -203,6 +237,164 @@ describe('confirmProjectOpen over an unsaved aeon composer document', () => {
     dirtyComposer();
     resetProjectRuntime();
     expect(useArtStore.getState().open).toBeNull();
+  });
+});
+
+/**
+ * THE ROWS THAT ANSWER SAVE.
+ *
+ * Every art row above answers cancel or discard, and every save-branch row in
+ * this file injects a fake saver that hardcodes the clean outcome — so nine
+ * passing tests could not see that Save-and-open was UNSATISFIABLE for a
+ * composer drawing. The SaveCoordinator had four savers, none of them touched
+ * artStore, and nothing ever clears `open.dirty` on an existing entry, so
+ * pressing the primary button ran the savers, re-snapshotted the same dirt, and
+ * aborted with "save or discard them first" — advice whose only workable half
+ * throws the drawing away.
+ *
+ * These rows answer SAVE, and the satisfiable one goes through the REAL registry
+ * (`__resetOpenGuardSaveForTest` + `ensureSaversRegistered`) rather than a
+ * hardcoded clean saver, because the registry's contents were the defect.
+ */
+describe('confirmProjectOpen: SAVE over an aeon composer document', () => {
+  const KEYS = () => useConfirmStore.getState().request!.buttons.map((b) => b.key);
+
+  function dirtyComposer(name = 'New Chunk'): void {
+    useArtStore.getState().openDocument({
+      doc: createDoc(2, 2), liveTileIndex: null, chunkId: null, name, dirty: false,
+    });
+    useArtStore.getState().markOpenDirty();
+  }
+
+  /** One zone, one act — the minimum `saveComposerDocument` needs to write into. */
+  function aeonProjectOpen(): void {
+    useProjectStore.setState({
+      project: {
+        zones: [{
+          id: 'z', name: 'Z', tileset: { tiles: [] }, palette: { lines: [] },
+          acts: [{
+            id: 'a', name: 'A', gridWidth: 1, gridHeight: 1,
+            sections: [createSection(0, 'sec0')],
+          }],
+        }],
+        chunkLibrary: [],
+        bgLibrary: [],
+      } as never,
+      currentZoneId: 'z',
+      currentActId: 'a',
+    });
+  }
+
+  beforeEach(() => {
+    useArtStore.getState().closeDocument();
+    useProjectStore.getState().reset();
+    useEditorStore.getState().markClean();
+    ensureSaversRegistered();
+    __resetRuntimeSaversForTest();
+    useToastStore.setState({ toasts: [] });
+  });
+  afterEach(() => {
+    useArtStore.getState().closeDocument();
+    useProjectStore.getState().reset();
+    useEditorStore.getState().markClean();
+    __resetRuntimeSaversForTest();
+    __resetOpenGuardSaveForTest();
+    useConfirmStore.getState().answer('cancel');
+  });
+
+  it('with no project open, the dialog does not offer a Save that cannot work', async () => {
+    // saveComposerDocument returns without writing when there is no zone/act, so
+    // the primary button would be inert by construction. Offering it is the
+    // defect; the body has to say why instead.
+    dirtyComposer();
+    const p = confirmProjectOpen();
+    expect(KEYS()).toEqual(['discard', 'cancel']);
+    const body = useConfirmStore.getState().request!.body!;
+    expect(body).toMatch(/no open zone and act/i);   // WHY Save is absent
+    expect(body).toMatch(/only ways out/i);          // so a missing primary is not a bug
+    useConfirmStore.getState().answer('cancel');
+    await expect(p).resolves.toBe(false);
+    expect(useArtStore.getState().open?.dirty).toBe(true); // cancel keeps the drawing
+  });
+
+  it('SAVE on a savable drawing commits it through the real registry and proceeds', async () => {
+    aeonProjectOpen();
+    dirtyComposer();
+    // The REAL saveAllDirty over the REAL saveCoordinator. Only the aeon leaf is
+    // stubbed (it is the IPC write); `art-composer` is the saver under test.
+    __resetOpenGuardSaveForTest();
+    __setRuntimeSaversForTest({ aeon: async () => { useEditorStore.getState().markClean(); } });
+
+    const p = confirmProjectOpen();
+    expect(KEYS()).toEqual(['save', 'discard', 'cancel']); // Save is offered — it can work
+    useConfirmStore.getState().answer('save');
+    await expect(p).resolves.toBe(true);
+
+    // The drawing was COMMITTED, not thrown away: it is in the chunk library.
+    expect(useProjectStore.getState().project!.chunkLibrary.map((c) => c.name))
+      .toEqual(['New Chunk']);
+    expect(useArtStore.getState().open).toBeNull(); // endDocumentSession ran after
+  });
+
+  it('CONTROL: neuter the composer saver and the SAME flow aborts', async () => {
+    // Proves the row above measures the `art-composer` saver and not something
+    // else in the pass: with its impl replaced by a no-op the guard is back to
+    // the original defect — Save runs, the flag survives, the open aborts.
+    aeonProjectOpen();
+    dirtyComposer();
+    __resetOpenGuardSaveForTest();
+    __setRuntimeSaversForTest({
+      aeon: async () => { useEditorStore.getState().markClean(); },
+      artComposer: () => { /* the pre-fix world: nothing saves this store */ },
+    });
+
+    const p = confirmProjectOpen();
+    useConfirmStore.getState().answer('save');
+    await expect(p).resolves.toBe(false);
+    expect(useProjectStore.getState().project!.chunkLibrary).toEqual([]);
+    expect(useArtStore.getState().open?.dirty).toBe(true);
+  });
+
+  it('MIXED: Save is offered, and the abort names the part Save could not write', async () => {
+    // An aeon project Save can persist, plus a composer document it cannot. The
+    // special-case sentence used to count only CANVAS documents, so this abort
+    // fell through to the generic "save or discard them first" — which is exactly
+    // the loop the user just failed to escape.
+    dirtyComposer();                            // unsavable: no project open
+    useEditorStore.setState({ dirty: true });   // savable
+    __setOpenGuardSaveForTest(vi.fn(async () => {
+      useEditorStore.getState().markClean();
+      return { saved: ['aeon-project'], skipped: [], failed: [] };
+    }));
+
+    const p = confirmProjectOpen();
+    expect(KEYS()).toContain('save');
+    useConfirmStore.getState().answer('save');
+    await expect(p).resolves.toBe(false);
+
+    const msg = useToastStore.getState().toasts.at(-1)!.message;
+    expect(msg).toMatch(/unsaved changes remain/i);   // the generic half still applies
+    expect(msg).toMatch(/no open zone and act/i);     // only composerSaveState says this
+    expect(msg).toMatch(/Discard & open/);            // WHAT to do instead
+    expect(useArtStore.getState().open?.dirty).toBe(true);
+  });
+
+  it('a live-tile document with doc-local dirt is reported, not silently called clean', async () => {
+    // A live-tile doc writes straight to the tileset and the facet hides its Save
+    // button, but ComposerCanvas.applyTileCell marks ANY document dirty — so this
+    // state is reachable and has no writer. Calling it clean would put the
+    // perimeter back to losing work without a dialog.
+    aeonProjectOpen();
+    useArtStore.getState().openDocument({
+      doc: createDoc(1, 1), liveTileIndex: 4, chunkId: null, name: 'Tile $04', dirty: false,
+    });
+    useArtStore.getState().markOpenDirty();
+
+    const p = confirmProjectOpen();
+    expect(KEYS()).toEqual(['discard', 'cancel']);
+    expect(useConfirmStore.getState().request!.body!).toMatch(/straight to the tileset/i);
+    useConfirmStore.getState().answer('cancel');
+    await expect(p).resolves.toBe(false);
   });
 });
 
