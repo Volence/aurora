@@ -1,7 +1,10 @@
 # Witnessing a real Electron `close` event reaching the window-close guard
 
 **Row closed:** `CLOSE-GUARD-STARTS-AFTER-THE-EVENT` (medium, `docs/lens-findings.jsonl`)
-**Branch:** `parcel/close-guard-witness`, cut from `master` at `670e3821`
+**Branch:** `parcel/close-guard-witness`, cut from `master` at `670e3821`, then
+**rebased onto `master` at `093ceca0`** (master moved under a parallel lane while
+this ran; the only conflict was the append-only `docs/lens-findings.jsonl`, and
+both sides' rows were kept — see §6)
 **Date:** 2026-09-09
 
 ---
@@ -36,7 +39,9 @@ Closing the row needed a real Electron window and a real close.
 are byte-identical to `master`; they were mutated four times for the red-first
 proofs and restored from the committed baseline each time.
 
-Tip SHA at the time of writing: recorded in the landing commit below.
+Three commits: the harness, the lens row + packet + detector control, and the
+`npm test` figures. Tip SHA is recorded in the final commit's own body; run
+`git log --oneline master..parcel/close-guard-witness` for the list.
 
 ## 3. How it works — and what it refuses to do
 
@@ -211,7 +216,18 @@ registered in the *same evaluate call* as the `close` listener must have fired, 
 | | exit | Test Files | Tests |
 |---|---|---|---|
 | before (`670e3821`) | 1 | 1 failed \| 559 passed \| 3 skipped (563) | **1 failed \| 8197 passed \| 9 skipped (8207)** |
-| after (`fcdae55a`) | **0** | 560 passed \| 3 skipped (563) | **8198 passed \| 9 skipped (8207)**, 0 failed |
+| after, pre-rebase | **0** | 560 passed \| 3 skipped (563) | **8198 passed \| 9 skipped (8207)**, 0 failed |
+| after, **rebased onto `093ceca0`** | **0** | 562 passed \| 3 skipped (565) | **8232 passed \| 9 skipped (8241)**, 0 failed |
+
+The rebased row is larger because a parallel lane's tests landed on master in the
+meantime, not because anything here grew. The harness was rebuilt and re-run on
+the rebased tree: **22 rows, 0 failed, 21.9 s** (machine uptime 57.90 h), with §1
+again delivered by a real Ctrl+W.
+
+The rebase's one conflict was `docs/lens-findings.jsonl`, where both sides had
+appended to an append-only ledger. **Both sides' rows were kept**, ours last; the
+file parses as 192 rows and every id whose row either side touched still reads the
+state its author wrote.
 
 The single "before" failure is
 `src/renderer/workspace/__tests__/facet-modules.test.ts › covers all six built
