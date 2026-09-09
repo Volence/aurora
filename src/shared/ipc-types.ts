@@ -23,7 +23,11 @@ export const IPC_CHANNELS = {
   // boolean: see PathProbe. The name moved with the meaning so that no caller can
   // keep asking a yes/no question of a channel that has three answers.
   PATH_PROBE: 'file:path-probe',
-  LIST_DIR: 'file:list-dir',
+  // Renamed from LIST_DIR ('file:list-dir') when the answer stopped being a bare
+  // array: see DirListing. The name moved WITH the meaning, on PATH_PROBE's
+  // precedent above, so that no caller can keep asking "what is in this
+  // directory" of a channel whose real answer includes "I could not look".
+  DIR_PROBE: 'file:dir-probe',
   // Batch read: one IPC round-trip returns bytes + read-time mtime for many
   // project-relative files. The classic level read fans out ~18 mandatory files
   // plus its guarded-save mtime baseline; issuing those as individual
@@ -384,6 +388,52 @@ export interface PathProbe {
   presence: PathPresence;
   reason: string | null;
 }
+
+/**
+ * What a directory listing found. FOUR ANSWERS, NOT ONE ARRAY.
+ *
+ * ═══ WHAT THE BARE ARRAY COST (LISTING-SWALLOWS-FAILURE, lens sweep, fixed
+ * 2026-09-08) ══════════════════════════════════════════════════════════════
+ *
+ * `listDir` was `Promise<string[]>` and its whole failure handling was
+ * `catch { return [] }`, so an EMPTY DIRECTORY, a MISSING one, one it lacked
+ * permission to read, and a path that ESCAPED the project root were one value.
+ * This is PathProbe's defect one level up, at the listing instead of the single
+ * path, and the same sentence applies: "I could not look" and "I looked and
+ * there is nothing" must not be the same answer.
+ *
+ * Two consumers turned that `[]` into silence about the author's own files. Both
+ * effects libraries (core/formats/effects/{scene,preset}.ts) treat an absent
+ * directory as the ordinary "no scenes / no presets yet" and say NOTHING about
+ * it — correctly, by contract — so anything that degraded to "absent" degraded
+ * to silence: an unreadable `editor/effects/` opened as a project with no
+ * effects at all, and the author was not told. They also each carried
+ * `try { present = await fa.exists(dir); } catch { present = false; }`, which
+ * threw away the third answer PathProbe had just been added to give — and
+ * fixing that alone bought nothing while the listing beside it still swallowed.
+ * Both halves are closed together.
+ *
+ * `outcome` is REQUIRED so a producer must state which of the four it means, and
+ * the dangerous default (an empty listing, i.e. absence) is no longer what a
+ * forgetful one falls into. `entries` is null on every failure, so a consumer
+ * cannot iterate its way past the question.
+ *
+ *   'listed'     entries is non-null (possibly EMPTY — a real empty directory).
+ *   'absent'     ENOENT/ENOTDIR: no directory at the path. reason null.
+ *   'unreadable' something IS (or may be) there and readdir failed: EACCES,
+ *                ELOOP, EIO, EMFILE. reason carries the errno message.
+ *   'refused'    the path escaped the project root, so Aurora DECLINED TO LOOK.
+ *                Not a statement about the filesystem. reason carries the refusal.
+ */
+export type DirOutcome = 'listed' | 'absent' | 'unreadable' | 'refused';
+
+/** The three `DirOutcome`s that carry no entries — the ones a consumer must not
+ *  collapse into "the directory is empty". */
+export type DirFailureOutcome = Exclude<DirOutcome, 'listed'>;
+
+export type DirListing =
+  | { outcome: 'listed'; entries: string[]; reason: null }
+  | { outcome: DirFailureOutcome; entries: null; reason: string | null };
 
 export type { GuardConflict } from '../core/project/save-guard';
 

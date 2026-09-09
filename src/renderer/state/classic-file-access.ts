@@ -13,12 +13,19 @@
 //
 // The heavy fs work runs in the main process. `read` reuses the existing
 // file:read-binary channel (whose missing-file marker keeps optional probes out
-// of the main error log; the preload unwraps it back into a thrown ENOENT) —
-// that channel has NO main-side rel-path guard (adding one would break aeon's
-// absolute-path chunk import), so read is rel-path-safe RENDERER-SIDE ONLY, via
-// assertSafe below. exists/list use the file:path-probe / file:list-dir
-// channels added for this bridge, which ARE guarded on the main side too — so
-// those are rejected on both ends.
+// of the main error log; the preload unwraps it back into a thrown ENOENT).
+// exists/list use the file:path-probe / file:dir-probe channels added for this
+// bridge. ALL THREE ARE NOW GUARDED ON THE MAIN SIDE TOO, so `assertSafe` below
+// is defense in depth on every one of them rather than the only line on any.
+//
+// ⚠ THIS PARAGRAPH USED TO SAY the read channel had "NO main-side rel-path guard
+// (adding one would break aeon's absolute-path chunk import)", and that read is
+// therefore "rel-path-safe RENDERER-SIDE ONLY". Both halves were retired on
+// 2026-09-08: `readBinaryFile` guards (main/file-io.ts), and the chunk import it
+// named now passes its absolute path in the BASE argument with `''` as the
+// relative one — the idiom every other outside-the-project read already used,
+// which the guard does not touch. A guard on one caller of a channel is not a
+// guard on the channel, and this file's assertSafe was that caller.
 
 import type { FileAccess, ReadManyValue } from '../../core/project/adapter';
 import { isRelPathSafe } from '../../shared/rel-path';
@@ -78,9 +85,30 @@ export function createIpcFileAccess(dir: string): FileAccess {
       const buf = await window.api.readBinaryFile(dir, rel);
       return new Uint8Array(buf);
     },
+    /**
+     * `[]` MEANS KNOWN EMPTY (or known absent) AND NOTHING ELSE — the same rule
+     * `exists` above states, one level up at the listing, and for the same
+     * reason. `window.api.probeDir` used to be `listDir` and answered a bare
+     * `[]` for an EACCES and for a refused path exactly as it did for an empty
+     * directory; both effects libraries treat an absent directory as the
+     * ordinary "nothing authored yet" and say nothing about it, so every one of
+     * those failures arrived at the author as silence about their own files.
+     *
+     * `FileAccess.list` has no third value either, so — as with `exists` — the
+     * third answer is a THROW, and 'refused' throws beside 'unreadable' because
+     * declining to look is not a claim that a directory is empty.
+     */
     async list(relDir: string): Promise<string[]> {
       assertSafe(relDir);
-      return window.api.listDir(dir, relDir);
+      const listing = await window.api.probeDir(dir, relDir);
+      if (listing.outcome === 'listed') return listing.entries;
+      // Absent is DETERMINATE and is the contract's tolerant answer: nothing is
+      // there, so there is nothing to list. Callers built on that (the classic
+      // adapter's dirHasEntries, the canvas listing) are unchanged.
+      if (listing.outcome === 'absent') return [];
+      throw new Error(
+        `cannot list '${relDir}': ${listing.reason ?? `directory ${listing.outcome}`}`,
+      );
     },
     async mtime(rel: string): Promise<number | null> {
       assertSafe(rel);

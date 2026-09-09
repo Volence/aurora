@@ -18,14 +18,21 @@
 // in depth, not the only line: `saveCanvasFile` goes through
 // `window.api.writeGuarded`, whose main-process handler
 // (`src/main/guarded-write.ts`) re-checks every relPath with `isRelPathSafe`
-// and throws on an escape — so a bug here would be caught one layer down. For
-// READS it is NOT redundant: `loadCanvasFile` reads through
-// `window.api.readBinaryFile`, and per `classic-file-access.ts`'s header that
-// channel has NO main-side rel-path guard (adding one would break aeon's
-// absolute-path chunk import) — so `canvasNameIsSafe` is the only thing
+// and throws on an escape — so a bug here would be caught one layer down.
+//
+// SINCE 2026-09-08 THE SAME IS TRUE OF READS. This paragraph used to say that
+// `loadCanvasFile` reads through `window.api.readBinaryFile`, that "that channel
+// has NO main-side rel-path guard (adding one would break aeon's absolute-path
+// chunk import)", and that `canvasNameIsSafe` is therefore "the only thing
 // standing between `loadCanvasFile('../../../../etc/passwd')` and the
-// filesystem. Both call sites are pinned by name-escape tests below precisely
-// because deleting either one currently leaves the suite green.
+// filesystem". `readBinaryFile` now guards (main/file-io.ts), and the chunk
+// import that was the stated obstacle passes its absolute path in the BASE
+// argument instead. The name guard here is still not redundant — it is
+// STRICTER than rel-path safety and it also refuses names that are merely
+// unusable as a tab id or a file stem — but it is no longer alone.
+//
+// Both call sites are pinned by name-escape tests below precisely because
+// deleting either one currently leaves the suite green.
 
 import type { CanvasDoc } from '../../core/art/canvas-doc';
 import { encodeCanvasFiles, decodeCanvasFiles } from '../../core/art/canvas-file-format';
@@ -80,8 +87,21 @@ export interface CanvasListing {
   skipped: string[];
 }
 
-/** The canvases in a project. Tolerant: a missing dir lists as empty
- *  (window.api.listDir already resolves [] rather than rejecting).
+/** The canvases in a project. Tolerant of ABSENCE ONLY: a missing dir lists as
+ *  empty, and every other failure THROWS.
+ *
+ *  ⚠ THAT DISTINCTION IS LOAD-BEARING AND IT USED NOT TO EXIST
+ *  (LISTING-SWALLOWS-FAILURE, fixed 2026-09-08). This read `window.api.listDir`,
+ *  which resolved `[]` rather than rejecting — for an empty directory, a missing
+ *  one, an EACCES, and a refused path alike. `shell/new-canvas.ts` calls this to
+ *  get the names a new canvas must not collide with, and its own header calls
+ *  that "the important one": `<name>.png` IS the document, so a create that
+ *  lands on an existing name writes a blank canvas over somebody's art. An
+ *  unreadable directory answered "there are no canvases", every name passed the
+ *  collision check, and the second guard (the guarded write's expected-null
+ *  baseline) was left holding it alone. That file ALREADY wraps this call in a
+ *  try/catch that refuses with "Could not read …" — a branch nothing could reach
+ *  until now.
  *
  *  Matches the `.png` extension EXACTLY (not case-insensitively): Aurora only
  *  ever writes lowercase `.png` via `canvasPngPath`, so a case-insensitive
@@ -93,7 +113,15 @@ export interface CanvasListing {
  *  this module DOES recognise as candidate canvases but whose name it
  *  refuses). */
 export async function listCanvasNames(dir: string): Promise<CanvasListing> {
-  const entries = await window.api.listDir(dir, CANVAS_DIR);
+  const listing = await window.api.probeDir(dir, CANVAS_DIR);
+  if (listing.outcome !== 'listed' && listing.outcome !== 'absent') {
+    throw new Error(
+      `could not list ${dir}/${CANVAS_DIR}: ${listing.reason ?? `directory ${listing.outcome}`}`,
+    );
+  }
+  // 'absent' is DETERMINATE — a project with no canvases yet, which is the
+  // ordinary state and stays silent.
+  const entries = listing.entries ?? [];
   const names: string[] = [];
   const skipped: string[] = [];
   for (const e of entries) {

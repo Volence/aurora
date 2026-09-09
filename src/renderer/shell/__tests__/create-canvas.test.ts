@@ -53,7 +53,7 @@ let writeReply: () => GuardedWriteResult = okWrite;
 function stubApi(): void {
   vi.stubGlobal('window', {
     api: {
-      listDir: async () => listing.map((n) => `${n}.png`),
+      probeDir: async () => ({ outcome: 'listed', entries: listing.map((n) => `${n}.png`), reason: null }),
       writeGuarded: async (dir: string, files: GuardedWriteFile[]) => {
         writes.push({ dir, files });
         return writeReply();

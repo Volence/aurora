@@ -28,8 +28,9 @@
 // (escapes root)", so the write channel says "refused write to" first and this
 // file's write rows key on that.
 //
-// FOR THE TOLERANT PRIMITIVES there is no message at all: an escaping path
-// resolves to null/false/[] exactly as a missing file does. Those rows are
+// FOR THE TOLERANT PRIMITIVES that still answer a bare value (fileMtime's null)
+// there is no message at all: an escaping path resolves exactly as a missing file
+// does. Those rows are
 // therefore SIDE-BY-SIDE TRIPLES: the escaping path (refused), the same real
 // target reached safely from the outer base (proves it exists and is readable),
 // and a legitimate in-project path (proves the primitive works at all). Any one
@@ -45,7 +46,7 @@ import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import {
-  deleteProjectFile, fileMtime, listDir, listProjectFiles, probePath,
+  deleteProjectFile, fileMtime, probeDir, listProjectFiles, probePath,
   readBinaryFile, readManyFiles, writeProjectFile,
 } from '../file-io';
 import { isRelPathSafe } from '../../shared/rel-path';
@@ -55,7 +56,7 @@ import { isRelPathSafe } from '../../shared/rel-path';
  * pointing at nothing proves nothing:
  *
  *   <tmp>/outside.bin          3 bytes, the escape target for the file rules
- *   <tmp>/outside_dir/seen.txt a real directory, for the listDir rule
+ *   <tmp>/outside_dir/seen.txt a real directory, for the probeDir rule
  *   <tmp>/outside.asm          picked up by listProjectFiles' extension filter
  *   <tmp>/project/             the basePath every primitive is given
  *   <tmp>/project/inside.bin   a legitimate in-project file
@@ -275,48 +276,208 @@ describe('fileMtime applies the guard', () => {
   });
 });
 
-describe('listDir applies the guard', () => {
-  it('reports [] for a `..` path naming a real, non-empty directory', async () => {
-    expect(await listDir(base, '../outside_dir')).toEqual([]);
+describe('probeDir applies the guard', () => {
+  // ⚠ THESE ROWS WERE STRENGTHENED WITH THE FUNCTION, 2026-09-08
+  // (LISTING-SWALLOWS-FAILURE), on exactly the terms the probePath rows above
+  // record. They used to assert `listDir(...) === []` for an escaping path.
+  // `[]` was the SAME VALUE an empty directory, a missing one and an EACCES all
+  // produced, so the old rows could not tell a refusal from an absence, and a
+  // listing that answered "there is nothing here" about a directory it had
+  // declined to open was stating a falsehood in the caller's own vocabulary.
+  // `probeDir` has four answers and a refusal is 'refused', so these rows now
+  // assert WHICH answer, and the controls below separate them.
+  it('answers refused, not absent, for a `..` path naming a real, non-empty directory', async () => {
+    const listing = await probeDir(base, '../outside_dir');
+    expect(listing.outcome).toBe('refused');
+    expect(listing.entries).toBeNull();
+    expect(listing.reason).toContain('escapes root');
   });
 
-  it('reports [] for an absolute path naming a real, non-empty directory', async () => {
-    expect(await listDir(base, join(tmp, 'outside_dir'))).toEqual([]);
+  it('answers refused for an absolute path naming a real, non-empty directory', async () => {
+    const listing = await probeDir(base, join(tmp, 'outside_dir'));
+    expect(listing.outcome).toBe('refused');
+    expect(listing.entries).toBeNull();
   });
 
   it('CONTROL: that same directory lists from the outer base, and the project root lists', async () => {
-    expect(await listDir(tmp, 'outside_dir')).toEqual(['seen.txt']);
-    expect((await listDir(base, '')).sort()).toEqual(['inside.asm', 'inside.bin']);
+    const outer = await probeDir(tmp, 'outside_dir');
+    expect(outer.outcome).toBe('listed');
+    expect(outer.entries).toEqual(['seen.txt']);
+    const root = await probeDir(base, '');
+    expect(root.entries?.slice().sort()).toEqual(['inside.asm', 'inside.bin']);
+  });
+
+  // ═══ THE FOUR ANSWERS (LISTING-SWALLOWS-FAILURE, lens sweep, 2026-09-08) ════
+  //
+  // The same seam and the same reason as the readManyFiles rows above, one level
+  // up: `listDir` folded an ENOENT, an ENOTDIR, an EACCES, an ENOTDIR-on-a-file
+  // and a REFUSED escaping path into `[]` — the value a genuinely EMPTY
+  // directory also has. Both effects libraries treat an absent directory as the
+  // ordinary "nothing authored yet" and say nothing about it, so every one of
+  // those failures reached the author as silence.
+  //
+  // THE UNREADABLE CASE IS A REAL FILE, not a chmod, for the reason the
+  // readManyFiles row gives: `readdir` on a plain file is ENOTDIR everywhere
+  // this runs, needs no privileges, and does not go green as root. ⚠ AND IT IS
+  // CLASSIFIED 'absent', DELIBERATELY: ENOTDIR means a non-directory stands
+  // where a directory would have to be, so nothing can be under it — the same
+  // cut probePath and readManyFiles make, and this row exists so that agreement
+  // is asserted rather than assumed.
+  //
+  // The EMPTY-vs-ABSENT pair is the one the old `[]` could not express at all,
+  // and it is the pair the effects loaders turn on.
+  it('says WHICH of the four: listed (empty), listed (full), absent, refused', async () => {
+    mkdirSync(join(base, 'empty_dir'), { recursive: true });
+
+    const empty = await probeDir(base, 'empty_dir');
+    expect(empty.outcome).toBe('listed');
+    expect(empty.entries).toEqual([]);   // A REAL empty directory. Not a failure.
+    expect(empty.reason).toBeNull();
+
+    const full = await probeDir(base, '');
+    expect(full.outcome).toBe('listed');
+    expect(full.entries?.length).toBe(3); // inside.asm, inside.bin, empty_dir
+
+    const gone = await probeDir(base, 'no_such_dir');
+    expect(gone.outcome).toBe('absent');
+    expect(gone.entries).toBeNull();
+    expect(gone.reason).toBeNull();
+
+    // A plain FILE where a directory was asked for: ENOTDIR, and nothing can be
+    // under it, so 'absent' is a true statement about its contents.
+    const notADir = await probeDir(base, 'inside.bin/sub');
+    expect(notADir.outcome).toBe('absent');
+
+    const refused = await probeDir(base, '../outside_dir');
+    expect(refused.outcome).toBe('refused');
+    expect(refused.reason).toMatch(/escapes root/);
+  });
+
+  it('CONTROL: empty, absent and refused are THREE answers, so no row is asserting another', async () => {
+    mkdirSync(join(base, 'empty_dir'), { recursive: true });
+    const outcomes = await Promise.all(
+      ['empty_dir', 'no_such_dir', '../outside_dir'].map(async (d) => (await probeDir(base, d)).outcome),
+    );
+    // Before the fix this set was { [] } — one value for all three, which is
+    // why a consumer could say only one thing about them.
+    expect(new Set(outcomes).size).toBe(3);
+    expect(outcomes).toEqual(['listed', 'absent', 'refused']);
   });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// THE TWO PRIMITIVES THAT APPLY NO GUARD. They are here so the census above is
+// READBINARY-NO-PATH-GUARD (lens sweep, closed 2026-09-08). These rows REPLACE
+// a deliberate notice row that asserted the opposite — that `readBinaryFile`
+// applied no guard and would read outside the project. That row was correct
+// about the code and was written to go red the day somebody guarded it; this is
+// that day, and the census at the bottom of this file is what proves nothing
+// else moved with it.
+//
+// WHY THE EXCEPTION WAS RETIRED RATHER THAN DOCUMENTED. The reason the guard was
+// never added is stated in `deleteProjectFile`'s docblock: `file:read-binary`
+// carried an absolute-path exception for legacy callers. Those callers were
+// ENUMERATED (all 26 production call sites of `window.api.readBinaryFile` —
+// `grep -rn 'window\.api\.readBinaryFile' src` reports 30 lines, of which 4 are
+// prose in comments; the derivation is written out because a count with no unit
+// and no recipe is the kind of number that goes stale silently) and
+// every one of them either passes a PROJECT-RELATIVE path, or passes the
+// absolute path in the BASE slot with `''` as the relative one — the idiom
+// `readAbsolute` uses in export-sprite.ts and import-sheet.ts, and which
+// survives this guard untouched because `isRelPathSafe('')` is true. Exactly one
+// caller still put an absolute path in the RELATIVE slot
+// (providers/chunk-library-import.ts, three reads of a file the user picked from
+// a dialog); it was moved to the base-slot idiom in the same commit. So the
+// exception has no remaining holder.
+//
+// AND THE GUARD IS NOT COSMETIC. Three of the enumerated callers interpolate a
+// string READ OUT OF A PROJECT FILE into the relative path:
+// `object-previews.ts` (a sprite name from `object-bindings.json`),
+// `export-sprite.ts` (a sprite name from `index.json`), and both of those plus
+// several more behind `projectDataRoot(config.raw)`, which derives a path PREFIX
+// from `dataPath` in the project's own config — `dataRootOfPath` returns
+// everything up to and including a `/data/`, so a config saying
+// `../../data/foo` yields the prefix `../../data/`. The WRITE channel already
+// refuses every one of those; the read channel did not.
+//
+// THE WORDING IS THIS RULE'S ALONE. `deleteProjectFile` and `performGuardedWrite`
+// share the sentence "unsafe project-relative path (escapes root)", so this rule
+// says "refused read of" first, as the write channel says "refused write to" —
+// see this file's header. The rows below still lead with BEHAVIOUR (the bytes
+// were not returned, and the control proves they were reachable).
+// ═══════════════════════════════════════════════════════════════════════════
+describe('readBinaryFile applies the guard', () => {
+  it('refuses a `..` path whose target really exists, and returns no bytes', async () => {
+    await expect(readBinaryFile(base, '../outside.bin')).rejects.toThrow(
+      /^refused read of unsafe project-relative path \(escapes root\): '\.\.\/outside\.bin'$/,
+    );
+  });
+
+  it('refuses an absolute path to a file that really exists', async () => {
+    await expect(readBinaryFile(base, join(tmp, 'outside.bin'))).rejects.toThrow(
+      /^refused read of unsafe project-relative path \(escapes root\)/,
+    );
+  });
+
+  /**
+   * A REFUSAL MUST NOT WEAR ENOENT'S COSTUME. This is FABRICATED-ENOENT one
+   * channel over: `main/ipc-handlers.ts` converts a read failure into the
+   * MissingFileMarker — and thence into a thrown "ENOENT: no such file or
+   * directory" at the preload — ONLY under `e?.code === 'ENOENT'`. A refusal
+   * that carried that code, or that merely said ENOENT in its text, would tell
+   * the author their file does not exist when Aurora declined to look at it.
+   * So: no errno code, and the word does not appear.
+   */
+  it('the refusal is not an ENOENT, in code or in wording', async () => {
+    const err = await readBinaryFile(base, '../outside.bin').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as NodeJS.ErrnoException).code).toBeUndefined();
+    expect((err as Error).message).not.toMatch(/ENOENT/);
+  });
+
+  /**
+   * THE CONTROL THAT MAKES THE THREE ABOVE MEAN SOMETHING: the same target file,
+   * the same bytes, reached by a safe path from a base that makes it legal. It
+   * reads. So the fs was willing the whole time and the refusals above were the
+   * guard's decision, not a missing file.
+   */
+  it('CONTROL: the same real target reads through a base that makes it legal', async () => {
+    expect([...(await readBinaryFile(tmp, 'outside.bin'))]).toEqual(OUTSIDE_BYTES);
+    expect([...(await readBinaryFile(base, 'inside.bin'))]).toEqual(INSIDE_BYTES);
+  });
+
+  /**
+   * THE LEGACY IDIOM, KEPT WORKING ON PURPOSE. Every remaining caller that reads
+   * a file outside any project — a PNG the user picked from a dialog, an agent
+   * request naming an absolute path — passes it as the BASE with `''` for the
+   * relative part. `isRelPathSafe('')` is true (the empty string denotes the root
+   * itself), so the guard does not touch them. If this row ever goes red, the
+   * absolute-path callers listed in the header have lost their road and the fix
+   * is NOT to weaken the guard.
+   */
+  it('CONTROL: the absolute-path idiom (path in the base slot, "" as the rel) still reads', async () => {
+    expect([...(await readBinaryFile(join(tmp, 'outside.bin'), ''))]).toEqual(OUTSIDE_BYTES);
+  });
+
+  /**
+   * A GENUINELY MISSING FILE IS STILL AN ENOENT, and it must be, because that is
+   * the one failure `ipc-handlers.ts` converts to the missing-file marker and the
+   * preload turns back into the sentence optional-file probes match on. Without
+   * this row the guard could satisfy every row above by refusing everything.
+   */
+  it('CONTROL: a legal path that is genuinely missing still throws ENOENT', async () => {
+    const err = await readBinaryFile(base, 'no-such-file.bin').catch((e: unknown) => e);
+    expect((err as NodeJS.ErrnoException).code).toBe('ENOENT');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THE ONE PRIMITIVE THAT APPLIES NO GUARD. It is here so the census above is
 // COMPLETE rather than merely long: a reader counting rows can see that every
-// export of file-io.ts is accounted for, and that these two are absences by
+// export of file-io.ts is accounted for, and that this one is an absence by
 // design rather than the same omission the rest of this file exists to close.
 // The structural row at the bottom is what keeps that claim true over time.
 // ═══════════════════════════════════════════════════════════════════════════
 describe('the deliberately unguarded primitives', () => {
-  /**
-   * NOTICE, NOT ENDORSEMENT. `readBinaryFile` applies no rel-path guard, and
-   * deleteProjectFile's own docblock says why in passing: `file:read-binary`
-   * still carries an absolute-path exception for legacy callers, which is why
-   * the newer channels "start closed" and this one did not.
-   *
-   * What stands between it and an escaping path today is the RENDERER side:
-   * `state/classic-file-access.ts` checks isRelPathSafe before it invokes. That
-   * is a guard on one caller, not on the channel, so this row states the channel's
-   * real behaviour rather than the behaviour a reader would assume.
-   *
-   * If somebody guards it, THIS ROW GOING RED IS THE NOTICE: check the legacy
-   * absolute-path callers first, then delete the row.
-   */
-  it('readBinaryFile is NOT guarded and will read outside the project', async () => {
-    const bytes = await readBinaryFile(base, '../outside.bin');
-    expect([...bytes]).toEqual(OUTSIDE_BYTES);
-  });
-
   /**
    * `listProjectFiles` takes no project-relative path, so there is no argument
    * to guard. What it must do instead is CONTAIN: it composes its own relative
@@ -358,8 +519,8 @@ describe('the census of primitives is derived from the module, not from this lis
     readManyFiles: true,
     probePath: true,
     fileMtime: true,
-    listDir: true,
-    readBinaryFile: false,     // legacy absolute-path exception; see the row above
+    probeDir: true,
+    readBinaryFile: true,      // guarded 2026-09-08; the retired exception is above
     listProjectFiles: false,   // no project-relative argument to guard
   };
 

@@ -729,11 +729,56 @@ export async function loadEffectsSceneLibrary(
   // removal derived from this list unable to reach a file Aurora never opened.
   const loadedPaths: string[] = [];
 
-  let present = false;
-  try { present = await fa.exists(dir); } catch { present = false; }
+  // ⚠ "THERE ARE NO SCENES" AND "I COULD NOT LOOK" USED TO BE THE SAME ANSWER
+  // HERE (LISTING-SWALLOWS-FAILURE, lens sweep, fixed 2026-09-08), and the
+  // docblock above is exactly why that was expensive: an absent directory is
+  // SILENT by contract, so anything that degraded to "absent" degraded to
+  // silence — an unreadable `editor/effects/` opened as a project with no
+  // effects in it and the author was never told. Two lines led there:
+  //
+  //   `try { present = await fa.exists(dir); } catch { present = false; }`
+  //      — which threw away the third answer `FileAccess.exists` had just been
+  //        given a CONTRACT to produce (adapter.ts: an implementation that
+  //        cannot determine the answer MUST throw rather than answer false);
+  //   `(await fa.list(dir))`
+  //      — which answered `[]` for a directory it could not read, because
+  //        main/file-io.ts's listing was `catch { return [] }`.
+  //
+  // Fixing the first alone bought nothing while the second still swallowed,
+  // which is why the main-process listing gained DirListing's four answers
+  // first. Both are closed here together.
+  //
+  // A NOTICE, NOT A THROW. An author with one unreadable directory still has a
+  // project to open; what they must not have is a panel that says "no scenes"
+  // about scenes sitting on disk. `loadedPaths` stays EMPTY on this path, which
+  // is what stops the save's `removalsFor` proposing to delete anything the
+  // listing never saw (core/project/aeon/save.ts).
+  const cannotTell = (reason: unknown): EffectsSceneLibrary => {
+    const because = reason instanceof Error ? reason.message : String(reason);
+    notices.push({
+      severity: 'error',
+      message:
+        `${dir} could not be read (${because}), so Aurora is showing NO effects scenes ` +
+        'for this project. That is not the same as there being none. Nothing in that ' +
+        'directory will be written or deleted while this is true; fix the directory and reopen.',
+    });
+    return { scenes, unreadable, notices, loadedPaths };
+  };
+
+  let present: boolean;
+  try {
+    present = await fa.exists(dir);
+  } catch (e) {
+    return cannotTell(e);
+  }
   if (!present) return { scenes, unreadable, notices, loadedPaths };
 
-  const entries = (await fa.list(dir)).slice().sort();
+  let entries: string[];
+  try {
+    entries = (await fa.list(dir)).slice().sort();
+  } catch (e) {
+    return cannotTell(e);
+  }
   for (const entry of entries) {
     const stem = sceneIdFromFileName(entry);
     if (stem === null) continue; // .bin deform tables and anything else live here too

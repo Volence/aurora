@@ -2215,11 +2215,40 @@ export async function loadEffectsPresetLibrary(
   // Only a file this loop READ AS A PRESET — see the scene loader's note.
   const loadedPaths: string[] = [];
 
-  let present = false;
-  try { present = await fa.exists(dir); } catch { present = false; }
+  // ⚠ THE SAME TWO LINES, THE SAME DEFECT — LISTING-SWALLOWS-FAILURE, fixed
+  // 2026-09-08. The scene loader one file over carries the whole argument; in
+  // short, a blind `catch { present = false }` threw away the third answer
+  // `FileAccess.exists` is contracted to produce, and `fa.list` answered `[]`
+  // for a directory it could not read, so an unreadable preset directory was
+  // indistinguishable from "no authored presets yet" — which this loader is
+  // required to report SILENTLY. `loadedPaths` stays empty, so no save can
+  // propose to remove what the listing never saw.
+  const cannotTell = (reason: unknown): EffectsPresetLibrary => {
+    const because = reason instanceof Error ? reason.message : String(reason);
+    notices.push({
+      severity: 'error',
+      message:
+        `${dir} could not be read (${because}), so Aurora is showing NO raster presets ` +
+        'for this project. That is not the same as there being none. Nothing in that ' +
+        'directory will be written or deleted while this is true; fix the directory and reopen.',
+    });
+    return { presets, unreadable, notices, loadedPaths };
+  };
+
+  let present: boolean;
+  try {
+    present = await fa.exists(dir);
+  } catch (e) {
+    return cannotTell(e);
+  }
   if (!present) return { presets, unreadable, notices, loadedPaths };
 
-  const entries = (await fa.list(dir)).slice().sort();
+  let entries: string[];
+  try {
+    entries = (await fa.list(dir)).slice().sort();
+  } catch (e) {
+    return cannotTell(e);
+  }
   for (const entry of entries) {
     const stem = presetIdFromFileName(entry);
     if (stem === null) continue;

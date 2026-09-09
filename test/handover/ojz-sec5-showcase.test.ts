@@ -320,8 +320,20 @@ function installFsWindowApi(written: string[]): void {
         const b = readFileSync(join(dir, rel));
         return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
       },
-      listDir: async (dir: string, rel: string) => {
-        try { return readdirSync(join(dir, rel)); } catch { return []; }
+      // A DirListing, as the real preload answers. The `catch { return [] }`
+      // this replaces is the LISTING-SWALLOWS-FAILURE shape itself: it reported
+      // "empty" for a directory it could not read, so a fake keeping it would
+      // be a fake that cannot reproduce the defect it is standing in for.
+      probeDir: async (dir: string, rel: string) => {
+        try {
+          return { outcome: 'listed', entries: readdirSync(join(dir, rel)), reason: null };
+        } catch (e) {
+          const code = (e as NodeJS.ErrnoException).code;
+          if (code === 'ENOENT' || code === 'ENOTDIR') {
+            return { outcome: 'absent', entries: null, reason: null };
+          }
+          return { outcome: 'unreadable', entries: null, reason: (e as Error).message };
+        }
       },
       fileMtime: async (dir: string, rel: string) => {
         try { return statSync(join(dir, rel)).mtimeMs; } catch { return null; }

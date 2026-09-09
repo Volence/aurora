@@ -19,7 +19,7 @@ import {
 } from '../canvas-file';
 import { blankCanvasDoc, canvasIndex } from '../../../core/art/canvas-doc';
 import { encodeCanvasFiles } from '../../../core/art/canvas-file-format';
-import type { GuardedWriteResult } from '../../../shared/ipc-types';
+import type { DirListing, GuardedWriteResult } from '../../../shared/ipc-types';
 
 const DIR = '/home/user/s1disasm';
 
@@ -30,11 +30,24 @@ type Written = { relPath: string; bytes: Uint8Array; expectedMtimeMs: number | n
 // signature change (a renamed `conflicts` field, a new required
 // GuardedWriteResult variant). Typing it here is what makes that drift a
 // compile error instead of a silently-stale test.
-function fakeApi(files: Map<string, Uint8Array>) {
+function fakeApi(files: Map<string, Uint8Array>, dirOutcome: DirListing['outcome'] = 'listed') {
   const written: Written[] = [];
   const api = {
-    listDir: vi.fn(async (_dir: string, rel: string) =>
-      [...files.keys()].filter((k) => k.startsWith(`${rel}/`)).map((k) => k.slice(rel.length + 1))),
+    // A DirListing, as the real preload now answers. `dirOutcome` lets a row
+    // choose the failing answers, which the old bare `string[]` had no room to
+    // express — that absence IS what LISTING-SWALLOWS-FAILURE was.
+    probeDir: vi.fn(async (_dir: string, rel: string): Promise<DirListing> => {
+      if (dirOutcome !== 'listed') {
+        return { outcome: dirOutcome, entries: null, reason: 'EACCES: permission denied' };
+      }
+      const entries = [...files.keys()]
+        .filter((k) => k.startsWith(`${rel}/`)).map((k) => k.slice(rel.length + 1));
+      // A fake that answered 'listed' with no entries for a directory that is
+      // not there would be a fake behaving BETTER than production; the real
+      // probe answers 'absent'.
+      if (entries.length === 0) return { outcome: 'absent', entries: null, reason: null };
+      return { outcome: 'listed', entries, reason: null };
+    }),
     readBinaryFile: vi.fn(async (_dir: string, rel: string) => {
       const f = files.get(rel);
       if (!f) throw new Error(`ENOENT: ${rel}`);
@@ -113,11 +126,37 @@ describe('listCanvasNames', () => {
   });
 
   it('lists a missing directory as empty rather than throwing', async () => {
-    // listDir already resolves [] for a missing dir (main/file-io.ts); this
+    // 'absent' is a DETERMINATE answer (main/file-io.ts's probeDir), and this
     // pins that this module actually relies on that tolerance rather than
-    // assuming the directory always exists.
+    // assuming the directory always exists. It is also the control for the two
+    // rows below: without it, "throws on unreadable" could be satisfied by a
+    // module that throws on everything.
     fakeApi(new Map());
     expect(await listCanvasNames(DIR)).toEqual({ names: [], skipped: [] });
+  });
+
+  // ═══ LISTING-SWALLOWS-FAILURE, the consumer half (2026-09-08) ══════════════
+  //
+  // AN UNREADABLE CANVAS DIRECTORY MUST NOT LIST AS "NO CANVASES", and the
+  // reason is not tidiness. `shell/new-canvas.ts` calls this to get the names a
+  // new canvas may not collide with — its own header calls that guard "the
+  // important one", because `<name>.png` IS the document and a create that
+  // lands on an existing name writes a blank canvas over somebody's art. While
+  // `window.api.listDir` answered a bare `[]` for an EACCES, every name passed
+  // the collision check on a directory Aurora could not read.
+  //
+  // That file ALREADY wraps this call in `try { … } catch { refuse('Could not
+  // read …') }` — a branch nothing could reach, because nothing could throw.
+  // These two rows are what make it reachable, and the 'absent' row above is
+  // what keeps them from being satisfied by a blanket throw.
+  it('THROWS when the directory could not be read, rather than reporting none', async () => {
+    fakeApi(new Map(), 'unreadable');
+    await expect(listCanvasNames(DIR)).rejects.toThrow(/could not list .*EACCES/);
+  });
+
+  it('THROWS when the path was refused, which is not a claim about the disk', async () => {
+    fakeApi(new Map(), 'refused');
+    await expect(listCanvasNames(DIR)).rejects.toThrow(/could not list/);
   });
 
   it('reports an unsafe stem as skipped, not silently dropped', async () => {

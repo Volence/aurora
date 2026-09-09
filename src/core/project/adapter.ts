@@ -68,7 +68,25 @@ export interface FileAccess {
    */
   exists(rel: string): Promise<boolean>;
   read(rel: string): Promise<Uint8Array>;
-  /** List immediate entry names under a project-relative directory. */
+  /**
+   * List immediate entry names under a project-relative directory. AN EMPTY
+   * ARRAY MEANS KNOWN EMPTY (or known absent), and an implementation that
+   * CANNOT DETERMINE THE CONTENTS MUST THROW rather than answer `[]`.
+   *
+   * Same contract as `exists` above, one level up at the listing, and it is
+   * spelled out for the same reason: main/file-io.ts's listing was
+   * `catch { return [] }`, so an EACCES on the directory, an ELOOP, and a path
+   * that escaped the project root all answered "empty". Both effects libraries
+   * (core/formats/effects/{scene,preset}.ts) treat an absent directory as the
+   * ordinary "nothing authored yet" and say NOTHING about it — by contract — so
+   * every one of those failures reached the author as silence about scenes and
+   * presets that were sitting on disk. `[]` and "I could not look" are not the
+   * same answer, and this signature has no third value, so the third answer is a
+   * throw. See DirListing (shared/ipc-types) for the probe that says all four.
+   *
+   * In-memory test fakes list from a map and are exact, so they never throw;
+   * a fake that means to exercise this distinction throws here on purpose.
+   */
   list(relDir: string): Promise<string[]>;
   /**
    * The file's last-modified time in floating-point milliseconds (fs.stat's
