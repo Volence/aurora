@@ -32,7 +32,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { peerRepo, resolveRev, readAtRev, isAncestor, gitBlobSha } from '../support/peer-repo';
+import {
+  peerRepo, resolveRev, readAtRev, isAncestor, gitBlobSha, currencyBranch,
+  CURRENCY_BRANCH_SHAPE,
+} from '../support/peer-repo';
 import {
   EFFECTS_CHANNEL_BANDS, EFFECTS_CHANNEL_BANDS_GAME, anchorTravelPx,
   EFFECTS_CHANNEL_BAND_EDGE_HI, EFFECTS_CHANNEL_BAND_EDGE_LO,
@@ -47,9 +50,25 @@ const PROVENANCE_PATH = resolve(
 );
 
 const PROV = JSON.parse(readFileSync(PROVENANCE_PATH, 'utf8')) as {
-  aeon: { path: string; revision: string; blob: string; branch_that_answers_currency: string };
+  // `branch_that_answers_currency` is deliberately NOT declared here any more.
+  // A `JSON.parse` cast cannot know a field is present, and declaring it as a
+  // `string` is what made the bare property access below look safe: on a sidecar
+  // that had lost the key, `TIP` was `undefined` and the currency rows skipped
+  // blaming the peer. It is read through `currencyBranch`, which asserts; tsc now
+  // refuses any bare access that would go back to assuming.
+  aeon: { path: string; revision: string; blob: string };
   vendored: { path: string; git_blob: string; bytes: number };
 };
+
+/**
+ * The branch the CURRENCY block below steers by, read as an assertion rather
+ * than a bare property access. `TIP_DEFECT` is asserted in the peer-independent
+ * integrity row AND at the head of each currency row: without it, deleting the
+ * field from the sidecar leaves this whole file green with two loud looking
+ * skips that blame the peer checkout. See `currencyBranch` in
+ * test/support/peer-repo.ts for the measurement.
+ */
+const { tip: TIP, defect: TIP_DEFECT } = currencyBranch(PROV.aeon, PROVENANCE_PATH, 'aeon');
 
 const BYTES = readFileSync(BANDS_PATH, 'utf8');
 
@@ -69,12 +88,24 @@ describe('aeon channel bands: vendored copy drift gate', () => {
     expect(gitBlobSha(BYTES)).toBe(PROV.aeon.blob);
   });
 
+  /**
+   * IT ALSO ASSERTS THE FIELD THE CURRENCY BLOCK STEERS BY, and this row is
+   * where that assertion has to live: it needs no peer checkout, so it is the
+   * one row that still runs on a machine with no aeon beside it. Put the check
+   * only in the currency rows and a lost field would go quiet again on exactly
+   * the machines where the currency rows already skip.
+   */
   it('the provenance sidecar describes the file actually on disk', () => {
     expect(PROV.aeon.revision, 'no 40-hex aeon revision').toMatch(/^[0-9a-f]{40}$/);
     expect(PROV.aeon.path).toBe('games/sonic4/data/generated/effects_channel_bands.json');
     expect(PROV.vendored.path).toBe('src/core/formats/effects/aeon-effects-channel-bands.json');
     expect(PROV.vendored.git_blob).toBe(PROV.aeon.blob);
     expect(PROV.vendored.bytes).toBe(Buffer.byteLength(BYTES, 'utf8'));
+    // The received value IS the defect sentence, so the failure names what is
+    // wrong with which block of which file.
+    expect(TIP_DEFECT, 'the sidecar cannot say which branch answers currency').toBeNull();
+    expect(TIP, 'the branch that answers currency is not a remote-tracking ref')
+      .toMatch(CURRENCY_BRANCH_SHAPE);
   });
 
   /**
@@ -146,9 +177,19 @@ describe('aeon channel bands: vendored copy drift gate', () => {
 
 describe('CURRENCY: is the vendored channel-bands sidecar still what aeon publishes?', () => {
   const aeon = peerRepo('aeon');
-  const TIP = PROV.aeon.branch_that_answers_currency;
+  /**
+   * Assert the operand BEFORE the skip. A row that reaches
+   * `resolveRev(aeon, undefined)` skips saying the revision does not resolve,
+   * which reads as an unfetched peer and hides an Aurora-side sidecar defect
+   * behind a peer-shaped excuse. This is a FAILURE, not a skip: nothing about
+   * it is unmeasurable from here.
+   */
+  const assertSteerable = () => expect(
+    TIP_DEFECT, 'this row cannot ask its question: the sidecar names no usable currency branch',
+  ).toBeNull();
 
   it(`matches ${PROV.aeon.path} at aeon ${TIP}`, (ctx) => {
+    assertSteerable();
     if (aeon === null) {
       ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR): '
         + `CANNOT MEASURE whether the pin ${PROV.aeon.revision} for `
@@ -193,6 +234,7 @@ describe('CURRENCY: is the vendored channel-bands sidecar still what aeon publis
   });
 
   it('the pinned aeon revision is PUBLISHED, not local-only', (ctx) => {
+    assertSteerable();
     if (aeon === null) {
       ctx.skip('SKIPPED, NOT PASSED: no aeon checkout beside this repo (set AEON_DIR): '
         + `CANNOT MEASURE whether ${PROV.aeon.revision} is reachable from ${TIP}`);

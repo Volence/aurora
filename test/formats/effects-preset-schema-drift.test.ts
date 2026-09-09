@@ -31,7 +31,9 @@ import {
   EFFECTS_PRESET_RESERVED_KEYS, EFFECTS_PRESET_ROOT_KEYS, presetArmFields, presetDefFields,
   EFFECTS_PRESET_PROGRAM_ARMS, EFFECTS_PRESET_RASTER_CHANNELS,
 } from '../../src/core/formats/effects/preset';
-import { peerRepo, resolveRev, readAtRev, isAncestor } from '../support/peer-repo';
+import {
+  peerRepo, resolveRev, readAtRev, isAncestor, currencyBranch, CURRENCY_BRANCH_SHAPE,
+} from '../support/peer-repo';
 
 /*
  * ⚠ THERE IS NO `LAGGING` CONSTANT HERE, AND ITS ABSENCE IS THE ASSERTION.
@@ -59,10 +61,26 @@ const PROVENANCE_PATH = resolve(
 );
 
 const PROV = JSON.parse(readFileSync(PROVENANCE_PATH, 'utf8')) as {
-  empyrean: { path: string; revision: string; blob: string; branch_that_answers_currency: string };
+  // `branch_that_answers_currency` is deliberately NOT declared here any more.
+  // A `JSON.parse` cast cannot know a field is present, and declaring it as a
+  // `string` is what made the bare property access below look safe: on a sidecar
+  // that had lost the key, `TIP` was `undefined` and the currency rows skipped
+  // blaming the peer. It is read through `currencyBranch`, which asserts; tsc now
+  // refuses any bare access that would go back to assuming.
+  empyrean: { path: string; revision: string; blob: string };
   vendored: { git_blob: string; bytes: number };
   the_worked_example_is_not_an_authority: { page: string };
 };
+
+/**
+ * The branch the CURRENCY block below steers by, read as an assertion rather
+ * than a bare property access. `TIP_DEFECT` is asserted in the peer-independent
+ * integrity row AND at the head of each currency row: without it, deleting the
+ * field from the sidecar leaves this whole file green with two loud looking
+ * skips that blame the peer checkout. See `currencyBranch` in
+ * test/support/peer-repo.ts for the measurement.
+ */
+const { tip: TIP, defect: TIP_DEFECT } = currencyBranch(PROV.empyrean, PROVENANCE_PATH, 'empyrean');
 
 /** git's object id: sha1 over "blob <bytelen>\0" + the file's bytes. */
 function gitBlobHash(bytes: Buffer): string {
@@ -83,12 +101,24 @@ describe('raster preset schema: vendored copy drift gate', () => {
     expect(gitBlobHash(bytes)).toBe(PROV.empyrean.blob);
   });
 
+  /**
+   * IT ALSO ASSERTS THE FIELD THE CURRENCY BLOCK STEERS BY, and this row is
+   * where that assertion has to live: it needs no peer checkout, so it is the
+   * one row that still runs on a machine with no empyrean beside it. Put the
+   * check only in the currency rows and a lost field would go quiet again on
+   * exactly the machines where the currency rows already skip.
+   */
   it('the provenance sidecar describes the schema actually on disk', () => {
     const bytes = readFileSync(SCHEMA_PATH);
     expect(PROV.empyrean.revision, 'no 40-hex empyrean revision').toMatch(/^[0-9a-f]{40}$/);
     expect(PROV.empyrean.path).toBe('contract/schema/aurora-effects-preset.schema.json');
     expect(PROV.vendored.git_blob).toBe(PROV.empyrean.blob);
     expect(PROV.vendored.bytes).toBe(bytes.length);
+    // The received value IS the defect sentence, so the failure names what is
+    // wrong with which block of which file.
+    expect(TIP_DEFECT, 'the sidecar cannot say which branch answers currency').toBeNull();
+    expect(TIP, 'the branch that answers currency is not a remote-tracking ref')
+      .toMatch(CURRENCY_BRANCH_SHAPE);
   });
 
   it('the module validates against the vendored file, not a restatement', () => {
@@ -311,10 +341,20 @@ describe('raster preset schema: vendored copy drift gate', () => {
  */
 describe('CURRENCY: is the vendored preset schema still what empyrean publishes?', () => {
   const empyrean = peerRepo('empyrean');
-  const TIP = PROV.empyrean.branch_that_answers_currency;
   const NOT_OURS = 'NOT AN AURORA REGRESSION: the vendored preset contract schema is stale.';
+  /**
+   * Assert the operand BEFORE the skip. A row that reaches
+   * `resolveRev(empyrean, undefined)` skips saying the revision does not
+   * resolve, which reads as an unfetched peer and hides an Aurora-side sidecar
+   * defect behind a peer-shaped excuse. This is a FAILURE, not a skip: nothing
+   * about it is unmeasurable from here.
+   */
+  const assertSteerable = () => expect(
+    TIP_DEFECT, 'this row cannot ask its question: the sidecar names no usable currency branch',
+  ).toBeNull();
 
   it(`matches ${PROV.empyrean.path} at empyrean ${TIP}`, (ctx) => {
+    assertSteerable();
     if (empyrean === null) {
       ctx.skip('SKIPPED, NOT PASSED: no empyrean checkout beside this repo (set '
         + 'AURORA_EMPYREAN_REPO). CANNOT MEASURE whether the pin '
@@ -344,6 +384,7 @@ describe('CURRENCY: is the vendored preset schema still what empyrean publishes?
   });
 
   it('the pinned empyrean revision is PUBLISHED, not local-only', (ctx) => {
+    assertSteerable();
     if (empyrean === null) {
       ctx.skip('SKIPPED, NOT PASSED: no empyrean checkout beside this repo. CANNOT MEASURE '
         + `whether ${PROV.empyrean.revision} is reachable from ${TIP}`);
