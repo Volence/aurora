@@ -527,6 +527,124 @@ describe('§E no door in src/ asks through a native browser dialog', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// §F  Does anything still walk PAST the doors?
+// ---------------------------------------------------------------------------
+//
+// ⚠ THIS SECTION EXISTS BECAUSE A PLANT CAME BACK GREEN. With every §A-§E row in
+// the tree, `art-facet.tsx`'s stale effect was rewired from
+// `confirmStaleArtDocumentClose(target)` back to
+// `useArtStore.getState().closeDocument()` — the literal defect
+// ART-DOC-CLOSED-UNGUARDED reports — and the whole file stayed green, because the
+// node suite cannot mount the component that does the calling. Every row above
+// proves the doors BEHAVE; not one of them proved anybody USES them.
+//
+// That is the failure ROADMAP row 57 records in this repo in the other direction:
+// `openBgTileDocument` was fully covered and had zero callers for a day, and
+// about five thousand green tests said nothing about it. Coverage of a function
+// says nothing about whether anything calls it.
+//
+// So the perimeter is stated as an ALLOWLIST of the files permitted to reach
+// `artStore.openDocument` / `closeDocument` directly, each for a written reason.
+// A new bypass turns this red.
+//
+// ═══ WHAT IT DOES NOT COVER, MEASURED RATHER THAN GUESSED ═════════════════
+//
+//   • A file ALREADY on the allowlist adding a bypass. Plant P5 pointed the
+//     tileset panel's double click at `openDocument` directly; the allowlist row
+//     stayed GREEN, because that file is sanctioned for its two other calls. The
+//     last row in this section is what caught it, and that is why the row exists
+//     rather than being folded into the allowlist.
+//   • A caller that writes `useArtStore.setState({ open: … })`, bypassing both
+//     names. No file does that today; it would be a second way in.
+
+/** The direct callers of the store's own open/close, and why each is allowed. */
+const SANCTIONED_DIRECT_CALLERS: Record<string, string> = {
+  'renderer/components/art/open-document.ts':
+    'the doors themselves: this is where the store call belongs.',
+  'renderer/state/art-composer-save.ts':
+    'the save flow re-opens from the saved source; the document is clean by then, '
+    + 'and asking would put a dialog after a save that just succeeded.',
+  'renderer/state/aeon-open.ts':
+    'a project open lands on the first chunk; nothing can be dirty one statement '
+    + 'after the project was committed.',
+  'renderer/shell/project-open-guard.ts':
+    'endDocumentSession tears the whole document session down AFTER its own '
+    + 'perimeter dialog has already asked about this store.',
+  'renderer/state/project-runtime.ts':
+    'resetProjectRuntime, downstream of the same perimeter.',
+  'renderer/components/art/TilesetPanel.tsx':
+    'Duplicate and Add to tileset each resolve the CURRENT document to a live '
+    + 'atlas tile, so the document they replace is provably not dirty.',
+};
+
+describe('§F the doors are the only way to destroy the document', () => {
+  const SRC = join(__dirname, '..', '..', '..', '..');
+  const files = sourceFiles(SRC);
+
+  /** Files whose code calls the store's openDocument/closeDocument. */
+  const callers = files
+    .map((f) => ({ file: relative(SRC, f), code: codeOf(f) }))
+    .filter(({ code }) => /(^|[^A-Za-z0-9_$.])(open|close)Document\s*\(/m.test(code)
+      || /\.(open|close)Document\s*\(/.test(code))
+    .map(({ file }) => file);
+
+  it('nothing outside the sanctioned list reaches the store directly', () => {
+    // The row that would have caught ART-DOC-CLOSED-UNGUARDED at the time it
+    // landed: art-facet.tsx calling closeDocument() in an effect is a bypass, and
+    // this names it as one.
+    const bypasses = callers.filter((f) => !(f in SANCTIONED_DIRECT_CALLERS));
+    expect(bypasses, 'these files destroy or replace the composer document without '
+      + 'going through components/art/open-document.ts, so no dialog protects the '
+      + 'strokes in it. Route them through a confirm* door, or add a row to '
+      + 'SANCTIONED_DIRECT_CALLERS saying why the document is provably clean there.')
+      .toEqual([]);
+  });
+
+  it('and the list has no dead rows: every sanctioned file still calls it', () => {
+    // ⚠ THE ANTI-VACUITY HALF. A rename, or a path typo, would quietly widen the
+    // allowlist to cover a file that no longer exists while the real one became a
+    // silent bypass.
+    const missing = Object.keys(SANCTIONED_DIRECT_CALLERS).filter((f) => !callers.includes(f));
+    expect(missing, 'these are allowlisted and no longer call the store: either the '
+      + 'path is wrong, or the row is dead and should go').toEqual([]);
+  });
+
+  it('the art facet DELEGATES its stale close rather than doing it itself', () => {
+    // The exact plant: `if (target !== null) useArtStore.getState().closeDocument();`
+    // in place of the door. The row above reddens on it too; this one names the file
+    // and the two functions, so the failure says what to put back.
+    const facet = codeOf(join(SRC, 'renderer', 'workspace', 'facets', 'art-facet.tsx'));
+    expect(facet).toContain('staleTarget({');
+    expect(facet).toContain('confirmStaleArtDocumentClose(target)');
+    expect(facet).toContain('confirmArtDocumentClose()');
+  });
+
+  it('every gesture that replaces the document goes through the replace door', () => {
+    // The ten call sites, counted from source rather than from a number somebody
+    // typed once. The FLOOR is what matters: a site deleted is a feature removed
+    // (loud elsewhere), a site added that skips the door is caught by the allowlist
+    // row above, and this catches the whole set being renamed away.
+    const per = new Map<string, number>();
+    for (const f of files) {
+      const n = (codeOf(f).match(/confirmArtDocumentOpen\s*\(/g) ?? []).length;
+      if (n > 0) per.set(relative(SRC, f), n);
+    }
+    for (const f of [
+      'renderer/workspace/facets/art-facet.tsx',        // New Tile / Block / Chunk
+      'renderer/components/art/TilesetPanel.tsx',       // double click a tileset tile
+      'renderer/components/MapViewport.tsx',            // Edit Tile / Edit Block / marquee
+      'renderer/providers/chunk-grid-aeon.ts',          // double click a chunk
+      'renderer/components/ArtBrowser.tsx',             // double click a blob tile
+      'renderer/components/effects/BgAnimBandPanel.tsx',// a band's bank strip
+    ]) expect([...per.keys()], `${f} no longer opens through the guarded door`).toContain(f);
+    const total = [...per.values()].reduce((a, b) => a + b, 0);
+    // 6 files, and the door's own definition is not one of them (it is called, not
+    // calling), so the count is the call sites alone.
+    expect(total).toBeGreaterThanOrEqual(10);
+  });
+});
+
 describe('§E the guard works in a host with no window at all', () => {
   // Saved and restored rather than "deleted if it was not there", so the row
   // below asserts the absence unconditionally instead of quietly measuring
