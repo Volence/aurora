@@ -10,6 +10,12 @@ import { useEditorStore } from '../state/editorStore';
 import { useConfirmStore } from '../state/confirmStore';
 import { useToastStore } from '../state/toastStore';
 import { saveAllDirty } from '../state/project-runtime';
+// openEngine, not a local re-derivation: it is the ONE answer to "which project
+// is open" (see its header) and it is literally the classic-level and
+// aeon-project savers' `isDirty`, so this guard cannot promise a save either of
+// them will skip. A per-feature copy of that question is what open-project.ts
+// exists to prevent.
+import { openEngine } from '../state/open-project';
 // anySpriteDocDirty is the SAME predicate the tab dots use; sharing it keeps the
 // open-guard from being narrower than what the strip shows (finding 3), and it
 // now covers PARKED sprite documents too — a background sprite tab's edits die
@@ -100,32 +106,60 @@ export function planProjectOpen(s: OpenDirtySnapshot): ProjectOpenPlan {
 export function currentOpenDirtySnapshot(): OpenDirtySnapshot {
   const classicDirty = Object.values(useClassicLevelStore.getState().dirty).some(Boolean);
   const aeonDirty = useEditorStore.getState().dirty;
+  // THE ENGINE, read ONCE, because it is the classic-level and aeon-project
+  // savers' OWN `isDirty` (state/project-runtime.ts) and therefore the only
+  // honest answer to "will Save write this". Two reads could not disagree here,
+  // but one name says what the two terms below have in common.
+  const engine = openEngine();
   const spriteDirty = anySpriteDocDirty();
   const dirtyCanvases = dirtyCanvasDocIds();
   const saveableCanvases = saveableDirtyCanvasDocIds();
   const artDirty = useArtStore.getState().open?.dirty === true;
 
   // THE GAP BETWEEN "DIRTY" AND "SAVABLE", stated once, per surface. Each of
-  // these three has a dirty predicate that is deliberately WIDER than its
+  // these FIVE has a dirty predicate that is deliberately WIDER than its
   // saver's, so each can present the guard with work Save will not write:
-  //   • canvas — dirtyCanvasDocIds vs saveableDirtyCanvasDocIds (no file target)
-  //   • sprite — anySpriteDocDirty vs saveableDirtySpriteDocIds (no save-back)
-  //   • art    — open.dirty vs composerSaveState() (see that function)
+  //   • canvas  — dirtyCanvasDocIds vs saveableDirtyCanvasDocIds (no file target)
+  //   • sprite  — anySpriteDocDirty vs saveableDirtySpriteDocIds (no save-back)
+  //   • art     — open.dirty vs composerSaveState() (see that function)
+  //   • classic — classicLevelStore.dirty vs openEngine() === 's1'   (see below)
+  //   • aeon    — editorStore.dirty       vs openEngine() === 'aeon' (see below)
   // The sentences are the ones the tab-close doors already use for the first two
   // (tab-activation/canvas.ts, tab-activation/sprite.ts), so a user meets the
   // same explanation wherever the same document blocks them.
   //
-  // WHAT IS ASSUMED SAVABLE HERE, AND WHY THAT IS NOT PROVEN. `classicDirty` and
-  // `aeonDirty` are counted savable outright, but their savers do not read those
-  // flags: classic-level fires on `openEngine() === 's1'` and aeon-project on
-  // `openEngine() === 'aeon'` (state/project-runtime.ts). So a dirty
-  // classicLevelStore with no classic project resident, or a dirty editorStore
-  // with no aeon project, would be a FOURTH instance of this same defect — Save
-  // offered over work its saver will skip. Deriving these two from `openEngine()`
-  // instead would be the stricter reading, and it is deliberately not done here:
-  // no reproduction of either state was found, and tightening on an unreproduced
-  // case is not a change this file should carry. If a reproduction turns up, this
-  // is the line to change and the shape to copy.
+  // ⚠ AND THE FOURTH AND FIFTH SURFACES, WHICH USED TO BE ASSUMED SAVABLE.
+  // `classicDirty` and `aeonDirty` were counted savable outright, but their
+  // savers do not read those flags: classic-level fires on `openEngine() === 's1'`
+  // and aeon-project on `openEngine() === 'aeon'` (state/project-runtime.ts).
+  // Each is now paired with the saver's OWN predicate, which is the shape the
+  // three surfaces above already use.
+  //
+  // THE REPRODUCTION TWO EARLIER PASSES COULD NOT FIND, and what it measured
+  // (2026-09-09; project-open-guard.dirty-domains.test.ts):
+  //
+  //   `openEngine()` gives CLASSIC PRECEDENCE — `status === 'open'` wins before
+  //   `project !== null` is even read — so a classic open over a resident, dirty
+  //   AEON project leaves `aeonDirty` true and the aeon saver skipping. Driven
+  //   through `classicProjectStore.openDirectory` itself (the exact body of the
+  //   `__aurora.classic.openDir` debug hook, the only unguarded door left), the
+  //   PRE-FIX guard then offered "Save & open" as the PRIMARY, ran the savers,
+  //   watched the aeon impl never fire, re-read the same dirt and told the user
+  //   "unsaved changes remain (save or discard them first)" — the inert-Save loop
+  //   whose only exit throws the work away, in the exact form the three surfaces
+  //   above were fixed for.
+  //
+  // NOT A USER GESTURE, and that is written here rather than left implied: no
+  // production road reaches it (the census below still holds, and it is what
+  // makes this a hardening rather than a bug fix). It IS reachable in dev and by
+  // the CDP harnesses, which drive that hook every run.
+  //
+  // THE CLASSIC HALF IS DEFENSIVE ONLY — `classicDirty` implies
+  // `openEngine() === 's1'` by construction (see CLASSIC below), so its term can
+  // fire only in a state nothing constructs today. It is written the same way
+  // anyway: this snapshot's whole history is a surface that was narrower than the
+  // thing it guarded, and a term whose absence depends on a census one refactor
+  // away from being wrong is the same bet that lost four times already.
   //
   // ── WHAT THE SECOND LOOK ADDED (2026-09-09) ─────────────────────────────
   //
@@ -175,7 +209,33 @@ export function currentOpenDirtySnapshot(): OpenDirtySnapshot {
   // narrower one: with no reproduction there is nothing to verify a change
   // against, and a guard edit whose only evidence is an argument is how a
   // correct-looking rule gets applied in the wrong scope later.
+  //
+  // ── AND THAT REASON IS SPENT (2026-09-09) ────────────────────────────────
+  // There is a reproduction now, and it is verified against: the change is made,
+  // and the "would drop the Save button" risk has its own CONTROL rows in the
+  // test file — the same aeon dirt with no classic project open still offers Save
+  // and a save still clears it, and the same classic dirt with a classic project
+  // open still offers Save. That is what the two `engine ===` terms cost, stated
+  // as a measurement rather than as an argument.
   const unsavable: string[] = [];
+  // The two savers' own predicates, verbatim. A dirty domain whose saver will not
+  // fire is unsavable in exactly the sense the canvas/sprite/art terms mean.
+  const classicSavable = classicDirty && engine === 's1';
+  const aeonSavable = aeonDirty && engine === 'aeon';
+  if (classicDirty && !classicSavable) {
+    unsavable.push('Unsaved classic level edits are resident with no classic project open, '
+      + 'so Save cannot write them.');
+  }
+  if (aeonDirty && !aeonSavable) {
+    // WHY THIS ONE NAMES THE CLASSIC PROJECT: `engine` is 's1' here in every
+    // reachable case (classic precedence), and "the aeon project is not the open
+    // one" is unreadable to someone looking at a classic project on screen.
+    unsavable.push(engine === 's1'
+      ? 'Unsaved aeon project edits are resident while a CLASSIC project is open, so the '
+        + 'aeon saver skips them and Save cannot write them.'
+      : 'Unsaved aeon project edits are resident with no aeon project open, '
+        + 'so Save cannot write them.');
+  }
   const noFileCanvases = dirtyCanvases.length - saveableCanvases.length;
   if (noFileCanvases > 0) {
     unsavable.push(`${noFileCanvases} canvas(es) have no file yet, so Save cannot write them.`);
@@ -196,7 +256,7 @@ export function currentOpenDirtySnapshot(): OpenDirtySnapshot {
     canvasDirty: dirtyCanvases.length > 0,
     artDirty,
     unsavable,
-    anySavable: classicDirty || aeonDirty || saveableSprites > 0
+    anySavable: classicSavable || aeonSavable || saveableSprites > 0
       || saveableCanvases.length > 0 || art.kind === 'savable',
   };
 }
