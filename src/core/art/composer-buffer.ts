@@ -30,6 +30,25 @@ export interface ComposerDoc {
   collisionB: Uint16Array;
 }
 
+/**
+ * Every field of `ComposerCell`, as a value the comparison below can walk.
+ *
+ * `Record<keyof ComposerCell, true>` is the point: a field ADDED to the
+ * interface and not added here is a compile error, so "same cell" cannot quietly
+ * stop meaning all of it. A hand-written array of key names would have gone on
+ * type-checking while ignoring the new field, which for a comparison that gates
+ * an undo step means a real difference reading as no change at all.
+ */
+const COMPOSER_CELL_FIELDS: Record<keyof ComposerCell, true> = {
+  atlasTile: true, localId: true, pal: true, hf: true, vf: true, pri: true,
+};
+
+/** Do two cells describe the same nametable entry? */
+export function sameComposerCell(a: ComposerCell, b: ComposerCell): boolean {
+  return (Object.keys(COMPOSER_CELL_FIELDS) as (keyof ComposerCell)[])
+    .every((k) => a[k] === b[k]);
+}
+
 function emptyCell(): ComposerCell {
   return { atlasTile: null, localId: null, pal: 0, hf: false, vf: false, pri: false };
 }
@@ -43,6 +62,55 @@ export function createDoc(widthTiles: number, heightTiles: number): ComposerDoc 
     collisionA: new Uint16Array(chunkCellCount(widthTiles, heightTiles)),
     collisionB: new Uint16Array(chunkCellCount(widthTiles, heightTiles)),
   };
+}
+
+/**
+ * A deep copy of a document — every field the composer can WRITE, copied so the
+ * copy and the original share nothing.
+ *
+ * It lives here, beside `ComposerDoc` and `createDoc`, and not in the history
+ * module that needs it, for the reason `canvas-history.ts` records one field
+ * over: a snapshot that ALIASES a container the document keeps mutating restores
+ * the value it was supposed to revert. `cells` is an array of mutable objects
+ * (`applyPaletteLineToDocCell` writes `cell.pal` in place) and `localPixels` is a
+ * Map of mutable Uint8Arrays (`setPixels` writes into them), so a `slice()` of
+ * either would be exactly that bug. Keeping this next to the interface is what
+ * makes the day a field is ADDED to `ComposerDoc` a day someone reads this
+ * function — the alternative is a clone in another directory that silently drops
+ * the new field and reports "undo restored everything".
+ */
+export function cloneComposerDoc(doc: ComposerDoc): ComposerDoc {
+  return {
+    widthTiles: doc.widthTiles,
+    heightTiles: doc.heightTiles,
+    cells: doc.cells.map((c) => ({ ...c })),
+    localPixels: new Map([...doc.localPixels].map(([id, px]) => [id, new Uint8Array(px)])),
+    nextLocalId: doc.nextLocalId,
+    collisionA: new Uint16Array(doc.collisionA),
+    collisionB: new Uint16Array(doc.collisionB),
+  };
+}
+
+/**
+ * Copy `src`'s contents INTO `dest`, keeping `dest`'s object identity.
+ *
+ * Undo restores through this rather than by installing the snapshot's object,
+ * because `artStore.open.doc` is held by reference all over the composer —
+ * `ComposerCanvas` keys its "the document changed identity" effect on
+ * `open?.doc`, and a restore that swapped the object would drop the marquee and
+ * the stamp flips on every Ctrl+Z. The contents are cloned on the way in for the
+ * same aliasing reason `cloneComposerDoc` gives: the snapshot stays a snapshot
+ * and the next stroke must not write through it.
+ */
+export function restoreComposerDoc(dest: ComposerDoc, src: ComposerDoc): void {
+  const copy = cloneComposerDoc(src);
+  dest.widthTiles = copy.widthTiles;
+  dest.heightTiles = copy.heightTiles;
+  dest.cells = copy.cells;
+  dest.localPixels = copy.localPixels;
+  dest.nextLocalId = copy.nextLocalId;
+  dest.collisionA = copy.collisionA;
+  dest.collisionB = copy.collisionB;
 }
 
 export function docFromTile(tileIndex: number): ComposerDoc {

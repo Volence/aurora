@@ -682,6 +682,26 @@ export function focusedDocId(): string | null {
   // composer lives there; palette / collision keep their zone-art routing.
   if (facet === 'art' && useArtStore.getState().open?.bgOverride) return activeId;
 
+  // The art facet's composer can also be opened on a PURE DOC-LOCAL document —
+  // New Tile / New Block / New Chunk, and the map's "Edit block…" and marquee
+  // captures. That art is neither zone art nor act art: it is an unsaved buffer
+  // that is in no project document until Save, so it owns a stack of its own,
+  // keyed by the id `artStore.openDocument` minted for it (tabs.ts's
+  // `composerDocId`). Without this branch every stroke on such a document
+  // resolved to the ZONE-ART stack, which recorded nothing for it — so Ctrl+Z
+  // was not inert but AIMED ELSEWHERE, taking back an unrelated zone-art edit if
+  // the session had one.
+  //
+  // The same "one document, one stack" rule the bgOverride branch above exists
+  // for is what keeps a CHUNK document out of this: its strokes already record
+  // on the zone-art stack, and a second stack for its doc-local half would
+  // interleave two histories on one document. `isPureDocLocal` is the sole
+  // statement of the distinction and `composerDocId` is null whenever it is
+  // false, so this branch cannot fire for one. `art` only, like the branch
+  // above: the composer lives there.
+  const composerDoc = useArtStore.getState().composerDocId;
+  if (facet === 'art' && composerDoc !== null) return composerDoc;
+
   return zoneArtDocId(level.zone);
 }
 

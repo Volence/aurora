@@ -66,10 +66,11 @@ export function useDirtySnapshot(): DirtySnapshot {
   // its checked-out document's fields onto the store root.
   useCanvasStore((s) => s.docs);
   // ONE subscription for the composer, and it is `open` rather than
-  // `open.dirty`: artStore keeps a single document and `markOpenDirty` replaces
-  // the whole `open` object (it spreads into a new one), so the object identity
-  // is what moves when the flag does. Subscribing to the nested boolean would
-  // read a value off an object this component is not watching.
+  // `open.dirty`: artStore keeps a single document and BOTH writers of the flag
+  // (`markOpenDirty`, and `setOpenDirty` which an undo restores it through)
+  // replace the whole `open` object, spreading into a new one, so the object
+  // identity is what moves when the flag does. Subscribing to the nested boolean
+  // would read a value off an object this component is not watching.
   useArtStore((s) => s.open);
   return currentDirtySnapshot();
 }

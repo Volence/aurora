@@ -8,15 +8,20 @@
 // not "is the art canvas undoable" but WHICH PATH the seat's gesture took, and
 // what each of the others does under the SAME gesture.
 //
-// Rows, each a matched hash triple (before / after paint / after Ctrl+Z) taken
-// at the same coordinate in the same run:
+// Rows A and B are each a matched hash triple (before / after paint / after
+// Ctrl+Z) taken at the same coordinate in the same run; C and D extend the same
+// question to the other doc-local writer and to the other way a doc-local
+// document is created:
 //
 //   A  doc-local          New Tile 1x1 (the seat's own gesture)
 //   B  live-tile          double-click a tileset tile, then the same stroke
-//   C  doc-local, tile    the tile-STAMP tool on the same New Tile doc
-//                         (applyTileCell, a fifth writer that is not
-//                          commitWrites at all)
-//   D  control            the sprite document's bitmap canvas
+//   C  doc-local, TILE-SPACE   the COLLISION tool on a New Block — `applyTileCell`,
+//                         a writer that never reaches `commitWrites` at all, read
+//                         through the doc's own collision plane rather than a
+//                         pixel hash. Carries the DIRTY-FLAG rows too.
+//   D  doc-local, MAP CAPTURE  the map's right-click "Edit 128x128 chunk region",
+//                         which opens DIRTY on purpose — so unwinding it must end
+//                         dirty, not clean.
 //
 // B is the row that makes A a defect rather than a design: the SAME canvas
 // component, the SAME gesture, one store field apart.
@@ -26,13 +31,20 @@
 // integer through the app's own arithmetic ((client - rect.left) / zoom), then
 // printed. Nothing here compares a fractional rect to anything.
 //
-// ⚠ THIS HARNESS IS EXPECTED TO EXIT 1 TODAY, and that is the finding, not a
-// broken instrument. Rows A2 and A3 assert that a stroke on a doc-local composer
-// document can be taken back; it cannot, and the fix is PARKED on a design
-// question recorded in docs/reviews/2026-09-09-art-undo-path.md §4. The day that
-// question is answered and the fix lands, this run goes green on its own. Row B
-// (live-tile) passing is what says the instrument itself works: if B ever fails,
-// suspect the harness before believing anything A says.
+// ⚠ THIS HARNESS EXITED 1 BY DESIGN UNTIL 2026-09-09, and rows A2/A3 were the
+// finding: a stroke on a doc-local composer document recorded no undo step, and
+// the fix was PARKED on the design question in
+// docs/reviews/2026-09-09-art-undo-path.md §4. That question was answered (option
+// 1: a per-document stack for PURE doc-local documents only) and the fix landed
+// on `parcel/art-undo-fix`, so this run is now expected GREEN.
+//
+// ⚠ NOT ONE ASSERTION IN A2/A3 CHANGED WHEN IT WENT GREEN — only this header's
+// statement of what to expect, and the epilogue that named them as expected red.
+// Rows C and D were ADDED alongside, and rows B and D2 are what keep the whole
+// thing from being self-confirming: B (live-tile) passing is what says the
+// instrument itself works — if B ever fails, suspect the harness before believing
+// anything A says — and D2 asserts a dirty flag comes back TRUE, so a fix that
+// simply forced every document clean on undo would fail here.
 //
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npx electron-vite build
 // Run:                     npm run harness:art-undo-path
@@ -341,6 +353,44 @@ async function main() {
     };
 
 
+    /** Press a button by CSS selector (icon buttons have no innerText). */
+    const clickSelector = async (selector) => {
+      const p = await c.json(`(() => {
+        const b = document.querySelector(${JSON.stringify(selector)});
+        if (!b) return null;
+        b.scrollIntoView({block:'center'});
+        const r = b.getBoundingClientRect();
+        return { x: Math.round(r.left + r.width/2), y: Math.round(r.top + r.height/2),
+                 label: b.getAttribute('aria-label') || b.getAttribute('title') || '' };
+      })()`);
+      if (!p) return null;
+      await mouse(c, 'mouseMoved', p.x, p.y);
+      await mouse(c, 'mousePressed', p.x, p.y);
+      await mouse(c, 'mouseReleased', p.x, p.y);
+      await sleep(500);
+      return p;
+    };
+
+    /** Press the first element matching `selector` whose `title` matches `re`. */
+    const clickSelectorMatching = async (selector, re) => {
+      const p = await c.json(`(() => {
+        const rx = new RegExp(${JSON.stringify(re)});
+        const b = [...document.querySelectorAll(${JSON.stringify(selector)})]
+          .find(el => rx.test(el.getAttribute('title') || ''));
+        if (!b) return null;
+        b.scrollIntoView({block:'center'});
+        const r = b.getBoundingClientRect();
+        return { x: Math.round(r.left + r.width/2), y: Math.round(r.top + r.height/2),
+                 label: b.getAttribute('title') };
+      })()`);
+      if (!p) return null;
+      await mouse(c, 'mouseMoved', p.x, p.y);
+      await mouse(c, 'mousePressed', p.x, p.y);
+      await mouse(c, 'mouseReleased', p.x, p.y);
+      await sleep(500);
+      return p;
+    };
+
     // ══ ROW B — live-tile path: double-click a tileset tile ════════════════
     // The tileset panel's grid canvas, identified by TilesetPanel's OWN inline
     // style (`styles.canvas`: absolute, 100%/100%, pixelated, and — unlike the
@@ -430,6 +480,181 @@ async function main() {
       }
     }
 
+    // Close whatever is open through the facet's own "New…" control, DISCARDING
+    // if the app asks. The discard arm is not decoration: with the fix reverted
+    // row A leaves its document dirty, so the dialog is up and every row after
+    // this one would fail for the wrong reason — an instrument that only works
+    // on the green side cannot be used to show the red side.
+    const closeDocDiscarding = async (id) => {
+      await clickText('New…');
+      await sleep(400);
+      const asked = await c.json(`(() => {
+        const b = [...document.querySelectorAll('button')]
+          .find(b => /^Discard & (close|open)$/.test(b.innerText.trim()));
+        if (!b) return { dialog: false };
+        const r = b.getBoundingClientRect();
+        return { dialog: true, label: b.innerText.trim(),
+                 x: Math.round(r.left + r.width/2), y: Math.round(r.top + r.height/2) };
+      })()`);
+      if (asked.dialog) {
+        await mouse(c, 'mouseMoved', asked.x, asked.y);
+        await mouse(c, 'mousePressed', asked.x, asked.y);
+        await mouse(c, 'mouseReleased', asked.x, asked.y);
+        await sleep(700);
+      }
+      note(id, 'closed the open document through "New…"',
+        asked.dialog ? `the unsaved-strokes dialog was up; pressed "${asked.label}"`
+          : 'no dialog — the document was clean');
+    };
+
+    // ══ ROW C — P5: the TILE-SPACE writer, on a New Block ══════════════════
+    //
+    // `applyTileCell` (tile-stamp / collision / palette-apply) is not a branch of
+    // `commitWrites` — it is wired straight to the viewport's host-pointer hook,
+    // so a fix that covered only the pixel path would leave the same document
+    // half undoable. Measured through the doc's OWN collision plane
+    // (`__dbg.aeon.artDocCollisionAt`) instead of a canvas hash, because a
+    // collision word is an exact number and a hash cannot say WHICH cell moved.
+    //
+    // A New BLOCK and not a New Tile: collision is stored per 16px cell
+    // (chunkCellCount = (w>>1)*(h>>1)), so a 1x1-tile document has ZERO cells and
+    // nothing to paint. 2x2 tiles is exactly one cell, index 0.
+    await closeDocDiscarding('C00');
+    // The launcher's label is "Block 16×16 px (2×2 tiles)" — NOT "New Block".
+    // Matched on the leading word the way `clickText` matches, and asserted
+    // rather than assumed: the first version of this row typed the name the
+    // handler gives the DOCUMENT (`New Block (16×16)`) and found no button.
+    const newBlock = await clickText('Block');
+    check('C0', "the launcher's 'Block 16×16 px (2×2 tiles)' button was pressed [precondition]",
+      newBlock !== null, JSON.stringify(newBlock));
+    if (newBlock) {
+      await sleep(700);
+      // Arm the Collision tool by its accessible name — ToolButton renders an
+      // icon and an aria-label and no text, so innerText cannot find it.
+      const armed = await clickSelector('button[aria-label="Collision paint"]');
+      await sleep(400);
+      // …AND ARM A SHAPE. `selectedCollisionProfile` defaults to 0, and
+      // `selectedCollisionWord` maps shape 0 to AIR_CELL, so the default brush
+      // paints air — onto a fresh document whose cells are already air, which
+      // `paintDocCollision` correctly refuses as an unchanged write. The first
+      // version of this row skipped the palette and measured 0 -> 0, which reads
+      // exactly like "the tool-space writer does nothing" and is instead the app
+      // being right. The shape buttons carry a `title` of the form
+      // "#<shape> · <class> · <solidity>", which is how one is found here.
+      const shape = await clickSelectorMatching('button[title]', String.raw`^#\d+ `);
+      await sleep(400);
+      note('C0b', 'armed the collision tool and a real (non-air) shape',
+        JSON.stringify({ tool: armed, shape }));
+      const openC = await c.json('window.__dbg.aeon.artChunkOpen()');
+      check('C1', 'a PURE DOC-LOCAL document is open with the collision tool armed [precondition]',
+        !!openC && openC.chunkId === null && openC.tool === 'collision' && openC.dirty === false,
+        JSON.stringify(openC));
+
+      const inst = await c.json(PROBE);
+      const rect = inst.installed ? await c.json('window.__au.rect()') : null;
+      if (rect) {
+        const collAt = () => c.evalExpr(`window.__dbg.aeon.artDocCollisionAt('a', 0)`);
+        const cBefore = await collAt();
+        const ax = Math.round(rect.x) + 8, ay = Math.round(rect.y) + 8;
+        console.log(`\n  [C] TILE-SPACE path — collision paint on a New Block`);
+        console.log(`        dpr=${dpr}  rect=${JSON.stringify(rect)}  aim INTEGER (${ax},${ay})`);
+        await mouse(c, 'mouseMoved', ax, ay);
+        await mouse(c, 'mousePressed', ax, ay);
+        await sleep(60);
+        await mouse(c, 'mouseReleased', ax, ay);
+        await sleep(700);
+        const cAfter = await collAt();
+        const dirtyAfter = (await c.json('window.__dbg.aeon.artChunkOpen()'))?.dirty ?? null;
+        const canUndoAfter = await c.evalExpr('window.__dbg.aeon.canUndo()');
+        await key(c, 'z', 'KeyZ', 90, 2);
+        await sleep(1000);
+        const cZ = await collAt();
+        const dirtyZ = (await c.json('window.__dbg.aeon.artChunkOpen()'))?.dirty ?? null;
+        console.log(`        collisionA[0] ${cBefore} -> ${cAfter} -> ${cZ}   `
+          + `dirty: false -> ${dirtyAfter} -> ${dirtyZ}   canUndo(): ${canUndoAfter}`);
+        check('C2', 'a collision stroke LANDS on the doc plane (the word moved) [precondition]',
+          cBefore !== cAfter && cAfter !== null, `${cBefore} -> ${cAfter}`);
+        check('C3', 'Ctrl+Z takes back a TILE-SPACE (applyTileCell) write on a doc-local document',
+          cAfter !== cBefore && cZ === cBefore, `after Ctrl+Z collisionA[0] is ${cZ}, want ${cBefore}`);
+        check('C4', 'the Undo control offers itself after a tile-space write', canUndoAfter === true,
+          `canUndo()=${canUndoAfter}`);
+        // The save-contract half: `open.dirty` is the composer's unsaved-work
+        // flag, and undoing back to the state the document OPENED in must clear
+        // it — the same rule `markUndone` gave an act (docs/reviews/
+        // 2026-09-09-save-contract.md R5). A New Block opens CLEAN, so clean is
+        // the right answer HERE; row D2 is the other direction.
+        check('C5', 'the write marks the document dirty [precondition]', dirtyAfter === true,
+          `dirty after the stroke: ${dirtyAfter}`);
+        check('C6', 'undoing back to the start state CLEARS dirty on a document that opened clean',
+          dirtyZ === false, `dirty after Ctrl+Z: ${dirtyZ}`);
+      } else {
+        note('C2', 'TILE-SPACE row — CANNOT MEASURE: the pixel canvas is not uniquely identifiable',
+          JSON.stringify(inst));
+        fails.push('[C2] tile-space row (could not measure)');
+      }
+    }
+
+    // ══ ROW D — a MAP-CAPTURE document, which opens DIRTY ══════════════════
+    //
+    // The other way a pure doc-local document is created: right-click the map and
+    // take a 16x16-tile region into the composer. Two things make it worth its own
+    // row rather than "same as A". Its cells are ATLAS-BACKED (docFromSectionRegion
+    // carries the section's nametable words), so the stroke copies-on-write into a
+    // fresh local tile instead of painting an empty cell; and it opens with
+    // `dirty: true` ("copied off the map and not yet in the library"), so unwinding
+    // it must land on DIRTY. A fix that cleared the flag on every undo would pass
+    // C6 and fail D2 — which is why both directions are here.
+    await closeDocDiscarding('D00');
+    const mapFacet = await c.json(`window.__dbg.aeon.setFacet('map')`);
+    check('D0a', 'the Map facet is focused [precondition]', mapFacet?.facet === 'map',
+      JSON.stringify(mapFacet));
+    await sleep(900);
+    const mapPoint = await c.json(`(() => {
+      const cv = document.getElementById('map-canvas');
+      if (!cv) return null;
+      const r = cv.getBoundingClientRect();
+      if (r.width < 64 || r.height < 64) return { tooSmall: r.toJSON() };
+      return { x: Math.round(r.left + r.width/2), y: Math.round(r.top + r.height/2), rect: r.toJSON() };
+    })()`);
+    if (mapPoint && mapPoint.x !== undefined) {
+      await c.send('Input.dispatchMouseEvent', {
+        type: 'mousePressed', x: mapPoint.x, y: mapPoint.y, button: 'right', buttons: 2, clickCount: 1,
+      });
+      await c.send('Input.dispatchMouseEvent', {
+        type: 'mouseReleased', x: mapPoint.x, y: mapPoint.y, button: 'right', buttons: 0, clickCount: 1,
+      });
+      await sleep(500);
+    }
+    const capture = await clickText('Edit 128×128 chunk region');
+    check('D0b', 'the map\'s "Edit 128×128 chunk region" item was pressed [precondition]',
+      capture !== null, JSON.stringify({ capture, mapPoint }));
+    if (capture) {
+      await sleep(1200);
+      // RE-ARM THE PENCIL. The tool is store state and survives a document
+      // change, so row C leaves `collision` armed and this row's "pencil stroke"
+      // would be a collision paint that moves no pixel — which presents as
+      // "the stroke never landed" and would have been read as a defect in the
+      // capture path. Asserted below rather than assumed.
+      await clickSelector('button[aria-label^="Pencil"]');
+      await sleep(400);
+      const openD = await c.json('window.__dbg.aeon.artChunkOpen()');
+      check('D0c', 'a 16×16-tile MAP-CAPTURE document is open, DIRTY on arrival, pencil armed [precondition]',
+        !!openD && openD.chunkId === null && openD.widthTiles === 16 && openD.dirty === true
+        && openD.tool === 'pencil',
+        JSON.stringify(openD));
+      const d = await undoRow('D', 'MAP-CAPTURE path — "Edit 128×128 chunk region", pencil stroke',
+        [[12, 12], [20, 20], [28, 28], [36, 36], [44, 44], [52, 52]], { tilesX: 16 });
+      if (d) {
+        rows.push(d);
+        const dirtyZ = (await c.json('window.__dbg.aeon.artChunkOpen()'))?.dirty ?? null;
+        check('D1', 'Ctrl+Z takes back a stroke on a MAP-CAPTURE document',
+          d.undone, d.undone ? `restored to ${d.before}` : `hash after Ctrl+Z is ${d.afterZ}`);
+        check('D2', 'undoing a document that OPENED DIRTY leaves it dirty, not clean',
+          dirtyZ === true, `dirty after Ctrl+Z: ${dirtyZ}`);
+        await shot(c, 'D-map-capture-after-ctrl-z');
+      }
+    }
+
     console.log('\n══ SUMMARY ═════════════════════════════════════════════════');
     for (const r of rows) {
       console.log(`  ${r.id} ${r.label}`);
@@ -443,12 +668,16 @@ async function main() {
     const notes = results.filter((r) => r.ok === null).length;
     console.log(`\n  ${passes} pass, ${failed} fail, ${notes} note — ${results.length} rows total`);
     if (fails.length) console.log(`  FAILING: ${fails.join(', ')}`);
-    const expectedRed = ['A2', 'A3'].filter((id) =>
+    // Until 2026-09-09 A2/A3 were EXPECTED RED and this block said so. They are
+    // the fixed rows now, so the note points the other way: if they go red again
+    // the per-document composer stack has stopped being reached, and the first
+    // thing to read is `focusedDocId()`'s composer branch.
+    const regressed = ['A2', 'A3', 'C3', 'D1'].filter((id) =>
       results.some((r) => r.id === id && r.ok === false));
-    if (expectedRed.length) {
-      console.log(`  EXPECTED RED (the finding, not a broken instrument): ${expectedRed.join(', ')} `
-        + '— a doc-local composer document records no undo step. See '
-        + 'docs/reviews/2026-09-09-art-undo-path.md §4 for the parked design question.');
+    if (regressed.length) {
+      console.log(`  REGRESSION (these were fixed on parcel/art-undo-fix): ${regressed.join(', ')} `
+        + '— a pure doc-local composer document is recording no undo step again. See '
+        + 'docs/reviews/2026-09-09-art-undo-fix.md.');
     }
     console.log('HARNESS-END-MARKER');
   } finally {
