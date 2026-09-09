@@ -65,9 +65,15 @@ describe('saveClassicWriteResult', () => {
       files: [{ path: 'x.bin', bytes: new Uint8Array([0]) }],
       fileMtimes: { 'x.bin': 5 },
     };
-    const api = fakeApi(() => ({ conflicts: ['x.bin'] }));
+    const api = fakeApi(() => ({ conflicts: [{ relPath: 'x.bin', cause: 'deleted' as const, reason: null }] }));
     const out = await saveClassicWriteResult('/proj', result, api);
-    expect(out).toEqual({ kind: 'conflict', conflicts: ['x.bin'] });
+    // The CAUSE survives the hop from main into the renderer's own variant. It
+    // used to be dropped here (`conflicts: string[]`), which is why the toast
+    // below could only ever say one thing.
+    expect(out).toEqual({
+      kind: 'conflict',
+      conflicts: [{ relPath: 'x.bin', cause: 'deleted', reason: null }],
+    });
   });
 
   it('returns nothing (and never calls the api) when there are no files', async () => {
@@ -243,12 +249,42 @@ describe('saveClassicProject orchestrator', () => {
     };
     const updateMtimes = vi.fn();
     openStoreWithHandle(handleWith(async () => writeResult, updateMtimes));
-    const api = fakeApi(() => ({ conflicts: ['a.bin'] }));
+    const api = fakeApi(() => ({ conflicts: [{ relPath: 'a.bin', cause: 'deleted' as const, reason: null }] }));
 
     const out = await saveClassicProject(api, oneDirty);
-    expect(out).toEqual({ kind: 'conflict', conflicts: ['a.bin'] });
+    expect(out).toEqual({
+      kind: 'conflict',
+      conflicts: [{ relPath: 'a.bin', cause: 'deleted', reason: null }],
+    });
     expect(updateMtimes).not.toHaveBeenCalled();
-    expect(useToastStore.getState().toasts.some((t) => /changed on disk/.test(t.message))).toBe(true);
+
+    // ⚠ THIS ROW USED TO ASSERT `/changed on disk/` ON A DELETED FILE AND PASS,
+    // which is ONE-MESSAGE-FOUR-CAUSES in one line: the toast said "N file(s)
+    // changed on disk since open ... Reload project to pick up external changes"
+    // whatever the guard had found. A deleted file did not change, and reloading
+    // does not bring it back. Keying on `/changed on disk/` here is worse than
+    // vacuous: it PINNED the wrong sentence.
+    const msg = useToastStore.getState().toasts.map((t) => t.message).join('\n');
+    expect(msg).toContain('a.bin');
+    expect(msg).toMatch(/was deleted on disk/);
+    expect(msg).not.toMatch(/changed on disk/);
+    // And no instruction to reload, because reloading is not the fix for this one.
+    expect(msg).not.toMatch(/Reload the project/);
+  });
+
+  it("CONTROL: a genuinely CHANGED file still gets the reload advice, so the row above is not just 'advice deleted'", async () => {
+    const writeResult: WriteResult = {
+      written: [], skipped: [], errors: [],
+      files: [{ path: 'a.bin', bytes: new Uint8Array([1]) }],
+      fileMtimes: { 'a.bin': 5 },
+    };
+    openStoreWithHandle(handleWith(async () => writeResult, vi.fn()));
+    const api = fakeApi(() => ({ conflicts: [{ relPath: 'a.bin', cause: 'changed' as const, reason: null }] }));
+
+    await saveClassicProject(api, oneDirty);
+    const msg = useToastStore.getState().toasts.map((t) => t.message).join('\n');
+    expect(msg).toMatch(/changed on disk/);
+    expect(msg).toContain('Reload the project to pick up the external changes.');
   });
 });
 

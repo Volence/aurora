@@ -9,6 +9,8 @@
 // file's expected (read-time) mtime for the guarded write's conflict check.
 
 import type { GuardedWriteFile, GuardedWriteResult } from '../../shared/ipc-types';
+import type { GuardConflict } from '../../core/project/save-guard';
+import { saveConflictMessage } from '../../core/project/conflict-message';
 import type { WriteResult, ProjectHandle, ZoneActRef, DirtyDomains, LevelDoc } from '../../core/project/adapter';
 import { useClassicProjectStore } from './classicProjectStore';
 import { useClassicLevelStore, type DomainGen } from './classicLevelStore';
@@ -31,7 +33,7 @@ export type SaveClassicResult =
       failed: { path: string; message: string };
       unwritten: string[];
     }
-  | { kind: 'conflict'; conflicts: string[] }
+  | { kind: 'conflict'; conflicts: GuardConflict[] }
   | { kind: 'error'; errors: { path: string; message: string }[] } // pre-write self-check
   | { kind: 'channel-error'; message: string }; // the IPC call itself rejected
 
@@ -182,7 +184,7 @@ function notifyMidSaveEdits(withheld: (keyof DirtyDomains)[]): void {
 export type SaveClassicProjectResult =
   | { kind: 'nothing' }
   | { kind: 'saved'; count: number }
-  | { kind: 'conflict'; conflicts: string[] }
+  | { kind: 'conflict'; conflicts: GuardConflict[] }
   | { kind: 'partial'; failed: { path: string; message: string }; unwritten: string[] }
   | { kind: 'error' };
 
@@ -286,13 +288,23 @@ export async function saveClassicProject(
 
 /**
  * Conflict notice (spec §2.6: list the files, no merge UI). Uses the toast
- * system; the message names the files and tells the user how to recover.
+ * system; the message names the files and says what actually happened to each.
+ *
+ * ⚠ THE WORDING IS NOT OWNED HERE any more, and this is surface 1 of the five in
+ * ONE-MESSAGE-FOUR-CAUSES. It used to read "N file(s) changed on disk since open
+ * ... Reload project to pick up external changes" for all four causes the guard
+ * distinguishes -- so a file DELETED under the author was reported as changed, and
+ * the author was sent to a reload that cannot bring it back. `saveConflictMessage`
+ * (core/project/conflict-message.ts) owns every clause and decides whether the
+ * reload sentence is honest for this particular set. Read its header before
+ * touching any of the five.
  */
-export function notifyConflict(conflicts: string[]): void {
-  const list = conflicts.join(', ');
+export function notifyConflict(conflicts: GuardConflict[]): void {
   useToastStore.getState().addToast(
-    `Save aborted; ${conflicts.length} file(s) changed on disk since open: ${list}. ` +
-      `Reload project to pick up external changes.`,
+    saveConflictMessage(conflicts, {
+      lead: 'Save aborted;',
+      reload: { imperative: 'Reload the project' },
+    }),
     'error',
   );
 }

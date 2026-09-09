@@ -697,7 +697,13 @@ describe('classic-save-project', () => {
    * channel, so the failing variants take it.
    */
   it.each([
-    ['a conflict', { conflicts: ['map16/b.eni'] }, /changed on disk/],
+    // ⚠ THE MATCHER WAS `/changed on disk/` AGAINST A CAUSE-LESS LIST, which is
+    // ONE-MESSAGE-FOUR-CAUSES exactly: it pinned the single sentence the agent
+    // surface emitted for all four causes. The double now states a cause and the
+    // matcher keys on THAT cause's wording, so the row would fail if the surface
+    // went back to saying 'changed' about everything.
+    ['a conflict', { conflicts: [{ relPath: 'map16/b.eni', cause: 'deleted' as const, reason: null }] },
+      /was deleted on disk/],
     ['a partial write', { failed: { path: 'map16/b.eni', message: 'EIO' }, unwritten: [] }, /Save incomplete/],
   ])('reports %s as a tool ERROR, not a result', async (_label, extra, match) => {
     (globalThis as unknown as { window: unknown }).window = {

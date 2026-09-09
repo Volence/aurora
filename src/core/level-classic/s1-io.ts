@@ -66,6 +66,7 @@
 
 import type { FileAccess } from '../project/adapter';
 import type { DirtyDomains } from '../project/adapter';
+import { readFailureError } from '../project/read-failure';
 import type { LevelAct, PaletteComponent } from '../project/profiles/s1';
 import { nemesisCompress, nemesisDecompress } from '../compress/nemesis';
 import { enigmaCompress, enigmaDecompress } from '../formats/classic/enigma';
@@ -247,9 +248,17 @@ export async function readS1Level(
   const readBytes = async (p: string): Promise<Uint8Array> => {
     if (prefetch) {
       const e = prefetch.get(p);
-      if (!e || e.bytes === null) {
-        throw new Error(`ENOENT: no such file or directory, open '${p}'`);
+      // THIS THREW A HAND-TYPED ENOENT FOR EVERY CAUSE until 2026-09-08 (lens
+      // sweep, FABRICATED-ENOENT): a permissions failure on a tile file told the
+      // author it did not exist. The producer now states which fact it is and
+      // `readFailureMessage` owns the wording. Read core/project/read-failure.ts
+      // before adding a message here.
+      if (!e) {
+        // Not in the prefetch map at all: nobody asked for it, which is an Aurora
+        // bug and not a fact about the file. Distinct sentence on purpose.
+        throw new Error(`'${p}' was read without being requested in the batch prefetch`);
       }
+      if (e.outcome !== 'read') throw readFailureError(p, e.outcome, e.reason);
       return e.bytes;
     }
     return fa.read(p);

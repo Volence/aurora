@@ -172,7 +172,7 @@ describe('createCanvasDocument', () => {
     // The guarded write refusing an expected-null file that exists is the second
     // overwrite guard. Whatever the reason, a create that could not reach disk
     // must not leave a tab whose every later save fails the same way.
-    writeReply = () => ({ conflicts: [canvasPngPath('cliffs')] });
+    writeReply = () => ({ conflicts: [{ relPath: canvasPngPath('cliffs'), cause: 'appeared', reason: null }] });
     try {
       const r = await createCanvasDocument(INPUT);
       expect(r.ok).toBe(false);
@@ -203,7 +203,7 @@ describe('createCanvasDocument', () => {
     const alpha = canvasDocTab('alpha').id;
     expect(paneOverActiveTab()).toEqual({ kind: 'ready', docId: alpha });
 
-    writeReply = () => ({ conflicts: [canvasPngPath('beta')] });
+    writeReply = () => ({ conflicts: [{ relPath: canvasPngPath('beta'), cause: 'appeared', reason: null }] });
     try {
       expect((await createCanvasDocument({ ...INPUT, name: 'beta' })).ok).toBe(false);
     } finally {
@@ -245,7 +245,7 @@ describe('createCanvasDocument', () => {
     const chosen = canvasIndex(1, 4);
     useCanvasStore.getState().setPaintIndex(chosen);
 
-    writeReply = () => ({ conflicts: [canvasPngPath('beta')] });
+    writeReply = () => ({ conflicts: [{ relPath: canvasPngPath('beta'), cause: 'appeared', reason: null }] });
     try {
       expect((await createCanvasDocument({ ...INPUT, name: 'beta' })).ok).toBe(false);
     } finally {

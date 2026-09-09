@@ -13,6 +13,7 @@ import { assembleSprite } from '../../../core/art/sprite-decompose';
 import { writeAsmMappings, writeAsmDPLC } from '../../../core/export/sprite-asm-export';
 import { reconstructDPLCSprite, reconstructWithAdapter, reconstructFromFrames, reconstructFromTilePool, reconstructFromFramePools, composeTilePool, synthesizeGridFrames } from '../../../core/import/sprite-import';
 import { getAdapter } from '../../../core/formats/games';
+import { saveConflictMessage } from '../../../core/project/conflict-message';
 import { parseTiles } from '../../../core/formats/tiles';
 import { compressionFor } from '../../../core/compress';
 import { encodeS1ArtWriteBack, encodeS1ArtWriteBackDelta, type EditedFrame } from '../../../core/formats/games/s1-art-write';
@@ -343,7 +344,15 @@ export async function saveSpriteArt(docId?: string, report?: SaveReport): Promis
     return;
   }
   if ('conflicts' in out) {
-    toast(`Save aborted: ${src.relPath} changed on disk since it was opened. Reopen to pick up external changes.`, 'error');
+    // Surface 5 of the five in ONE-MESSAGE-FOUR-CAUSES, and the worst of them: it
+    // never looked at the conflict list AT ALL. It named its own `src.relPath` and
+    // asserted that file had CHANGED, whichever of the four causes the guard had
+    // actually found, then prescribed a reopen for all of them. The list is the
+    // only thing that knows, so it is what gets read.
+    toast(saveConflictMessage(out.conflicts, {
+      lead: 'Save aborted:',
+      reload: { imperative: 'Reopen the art file' },
+    }), 'error');
     return;
   }
   if (out.failed) { toast(`Art save failed at ${out.failed.path}: ${out.failed.message}`, 'error'); return; }

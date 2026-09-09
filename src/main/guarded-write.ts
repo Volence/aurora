@@ -8,10 +8,13 @@
 //   1. Guard EVERY relPath with isRelPathSafe. This is a NEW channel with no
 //      legacy absolute-path exception (unlike file:read-binary), so an unsafe
 //      path is a hard failure — we throw and write NOTHING.
-//   2. Stat every target's CURRENT mtime, then ask the pure planGuardedWrite
-//      (core/save-guard) whether it is safe. The CONFLICT CHECK is all-or-
-//      nothing: if ANY file conflicts → return the conflict list and write
-//      nothing. (This is the only all-or-nothing guarantee.)
+//   2. Probe every target's CURRENT state (present with an mtime / absent /
+//      unknown), then ask the pure planGuardedWrite (core/save-guard) whether it
+//      is safe. The CONFLICT CHECK is all-or-nothing: if ANY file conflicts →
+//      return the conflict list, EACH ENTRY CARRYING ITS CAUSE, and write nothing.
+//      (This is the only all-or-nothing guarantee.) The three-answer probe is
+//      what stops an unstattable file being reported to the author as deleted;
+//      see `currentMtime` below.
 //   3. Otherwise write each file atomically: a sibling `.tmp` in the SAME dir,
 //      then rename into place (a same-directory rename is atomic on POSIX, so a
 //      crash mid-write can never leave a half-written target). Return the new
@@ -33,13 +36,31 @@ import { stat, writeFile, rename, mkdir, unlink } from 'fs/promises';
 import { resolve, dirname } from 'path';
 import { isRelPathSafe } from '../shared/rel-path';
 import type { GuardedWriteFile, GuardedWriteResult } from '../shared/ipc-types';
-import { planGuardedWrite, type GuardedFileSpec } from '../core/project/save-guard';
+import { planGuardedWrite, type CurrentMtime, type GuardedFileSpec } from '../core/project/save-guard';
 
-async function currentMtime(fullPath: string): Promise<number | null> {
+/**
+ * What is at `fullPath` right now, in THREE answers.
+ *
+ * ⚠ THIS FUNCTION WAS THE FOURTH CAUSE (ONE-MESSAGE-FOUR-CAUSES, lens sweep HIGH,
+ * fixed 2026-09-08). It used to be `Promise<number | null>` with
+ * `catch { return null }` and the comment "missing (ENOENT) or otherwise
+ * unstattable → treated as absent". `null` is the value planGuardedWrite reads as
+ * DELETED EXTERNALLY, so an EACCES on a parent directory, an ELOOP or an EIO from
+ * a volume that dropped out each told the author their file had been deleted under
+ * them and to reload. It had not been, and reloading would not have helped.
+ *
+ * Same cut as probePath and readManyFiles in file-io.ts: ENOENT and ENOTDIR are
+ * the two errnos that really do mean "nothing is there". Everything else is
+ * 'unknown' WITH ITS REASON, which the guard turns into a conflict the author is
+ * told the truth about.
+ */
+async function currentMtime(fullPath: string): Promise<CurrentMtime> {
   try {
-    return (await stat(fullPath)).mtimeMs;
-  } catch {
-    return null; // missing (ENOENT) or otherwise unstattable → treated as absent
+    return { state: 'present', mtimeMs: (await stat(fullPath)).mtimeMs };
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
+    if (e?.code === 'ENOENT' || e?.code === 'ENOTDIR') return { state: 'absent' };
+    return { state: 'unknown', reason: e?.message ?? String(err) };
   }
 }
 
@@ -64,7 +85,7 @@ export async function performGuardedWrite(
 
   // 2. Conflict check across ALL files, up front, before any write (the sole
   //    all-or-nothing guarantee).
-  const currentMtimes: Record<string, number | null> = {};
+  const currentMtimes: Record<string, CurrentMtime> = {};
   await Promise.all(
     files.map(async (f) => {
       currentMtimes[f.relPath] = await currentMtime(resolve(basePath, f.relPath));

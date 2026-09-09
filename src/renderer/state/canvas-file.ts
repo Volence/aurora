@@ -31,6 +31,8 @@ import type { CanvasDoc } from '../../core/art/canvas-doc';
 import { encodeCanvasFiles, decodeCanvasFiles } from '../../core/art/canvas-file-format';
 import type { CanvasSource } from './canvasStore';
 import type { GuardedWriteFile, GuardedWriteResult } from '../../shared/ipc-types';
+import type { GuardConflict } from '../../core/project/save-guard';
+import { saveConflictCauses } from '../../core/project/conflict-message';
 import { CANVAS_NAME_PATTERN } from '../../shared/canvas-name';
 
 export const CANVAS_DIR = '.aurora/canvas';
@@ -184,9 +186,11 @@ export type SaveCanvasResult =
       ok: false;
       error: string;
       kind: 'invalid-name' | 'conflict' | 'partial' | 'channel-error';
-      /** Set only for `kind: 'conflict'` — the files main reported as changed
-       *  on disk since they were read. */
-      conflicts?: string[];
+      /** Set only for `kind: 'conflict'` — the files that blocked the write, EACH
+       *  WITH ITS CAUSE. It was `string[]` until 2026-09-08, which is what let
+       *  every caller say "changed on disk" about a file that had been deleted or
+       *  that had appeared; see GuardConflict and core/project/conflict-message.ts. */
+      conflicts?: GuardConflict[];
       /** Set only for `kind: 'partial'`: the conflict check passed and SOME
        *  files landed before an fs error interrupted the batch (per
        *  guarded-write.ts's own partial semantics — per-file rename atomicity
@@ -295,10 +299,16 @@ export async function saveCanvasFile(
   }
 
   if ('conflicts' in result) {
+    // Surface 3 of the five in ONE-MESSAGE-FOUR-CAUSES. This asserted the files
+    // had CHANGED whatever the guard had actually found, and canvas-save.ts
+    // (surface 4) then appended a reopen instruction on top of it. The cause
+    // clauses come from core/project/conflict-message.ts now; the reload advice
+    // does NOT come from here, because canvas-save.ts owns the canvas-specific
+    // reopen sentence and two copies of it would drift.
     return {
       ok: false,
       kind: 'conflict',
-      error: `${result.conflicts.join(', ')} changed on disk since it was opened; nothing was written`,
+      error: saveConflictCauses(result.conflicts, { lead: 'Save aborted;' }),
       conflicts: result.conflicts,
     };
   }

@@ -50,7 +50,7 @@ function stubWindowApi(): () => void {
       ) => {
         for (const w of writes) {
           const mt = fs.statSync(path.join(base, w.relPath)).mtimeMs;
-          if (w.expectedMtimeMs != null && mt !== w.expectedMtimeMs) return { conflicts: [w.relPath] };
+          if (w.expectedMtimeMs != null && mt !== w.expectedMtimeMs) return { conflicts: [{ relPath: w.relPath, cause: 'changed' as const, reason: null }] };
         }
         const newMtimes: Record<string, number> = {};
         const written: string[] = [];

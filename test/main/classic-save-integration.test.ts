@@ -180,7 +180,9 @@ describe('classic save integration (temp copy of real s1disasm)', () => {
         expectedMtimeMs: state.read.fileMtimes[f.path] ?? null,
       }));
       const second = await performGuardedWrite(tmp, payload2);
-      expect(second).toEqual({ conflicts: [victim] });
+      // The cause, not just the path: an externally TOUCHED file is 'changed',
+      // and this is the one cause for which the reload advice is honest.
+      expect(second).toEqual({ conflicts: [{ relPath: victim, cause: 'changed', reason: null }] });
 
       // Nothing was written on the conflicting attempt (mtime bump aside).
       for (const [rel, bytes] of before) {

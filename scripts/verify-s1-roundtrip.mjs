@@ -200,7 +200,18 @@ async function main() {
     expectedMtimeMs: writeResult.fileMtimes[f.path] ?? null,
   }));
   const gw = await performGuardedWrite(WORK, payload);
-  if (gw.conflicts) fail(`guarded write reported a conflict: ${gw.conflicts.join(', ')}`);
+  // `conflicts` entries are GuardConflict OBJECTS (relPath + cause + reason) since
+  // 2026-09-08, not bare paths: see core/project/save-guard.ts. A bare `.join(', ')`
+  // here printed "[object Object]" and named no file at all.
+  //
+  // ⚠ NOTHING WOULD HAVE CAUGHT THAT. This script is not in package.json's `test`
+  // chain and it is a .mjs, so neither `tsc --noEmit` nor `vitest run` looks at it.
+  // The type change that made every in-suite caller a compile error was invisible
+  // to exactly this file. Registering it is out of that parcel's scope and is
+  // flagged in its report.
+  if (gw.conflicts) {
+    fail(`guarded write reported a conflict: ${gw.conflicts.map((c) => `${c.relPath} (${c.cause})`).join(', ')}`);
+  }
   if (gw.failed) fail(`guarded write partial failure at ${gw.failed.path}: ${gw.failed.message}`);
   log(`    guarded write committed: ${gw.written.join(', ')}`);
 
