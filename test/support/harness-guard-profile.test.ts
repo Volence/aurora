@@ -414,6 +414,25 @@ describe('clearCallSiteCensus: derived, and NOT inflated by prose about itself',
    * rather than doing its own.
    */
   it('finds a real, non-zero population in this repo', () => {
+    // ⚠ THE BLINDNESS CHECK COMES FIRST, AND IT IS NOT DECORATION.
+    // `clearCallSiteCensus` reports "I could not look" as `sites: null` with the
+    // reason in `why` — the loud-on-unmeasurable contract this repo requires. But
+    // `typeof null === 'object'`, so asserting a NUMBER against it first renders
+    // as `TypeError: actual value must be number or bigint, received "object"`,
+    // which names neither the census, nor the directory, nor the reason. The
+    // producer reported its blindness correctly and the CONSUMER threw the report
+    // away, which is this repo's own defect class landing on its own instrument.
+    //
+    // Measured 2026-09-09: this row went red exactly that way during a full-suite
+    // run while an agent was building concurrently, and it cost five suite runs to
+    // learn what one would have said out loud. It is a resource failure (the walk
+    // could not complete), so it belongs with timeouts and would-blocks — the class
+    // that load manufactures — and NOT with assertions about the subject. That
+    // distinction is unreachable from the TypeError and obvious from `why`.
+    expect(
+      realCensus.why ?? null,
+      `the call-site census could not look, so nothing below it means anything: ${realCensus.why}`,
+    ).toBeNull();
     expect(realCensus.sites).toBeGreaterThan(50);
     expect(realCensus.files).toBeGreaterThan(50);
     expect(realCensus.sites!).toBeGreaterThanOrEqual(realCensus.files!);
