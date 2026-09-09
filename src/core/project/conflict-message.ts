@@ -219,8 +219,3 @@ function adviceFor(
   return `${parts.join('. ')}.`;
 }
 
-/** Just the paths, in the order the notice lists them. For a caller that needs the
- *  list separately from the sentence (the canvas result carries both). */
-export function conflictPaths(conflicts: GuardConflict[]): string[] {
-  return conflicts.map((c) => c.relPath);
-}

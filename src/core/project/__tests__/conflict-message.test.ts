@@ -25,7 +25,7 @@
 // `npm test`'s `vitest run`.
 import { describe, it, expect } from 'vitest';
 import {
-  conflictPaths, saveConflictAdvice, saveConflictCauses, saveConflictMessage,
+  saveConflictAdvice, saveConflictCauses, saveConflictMessage,
 } from '../conflict-message';
 import type { ConflictCause, GuardConflict } from '../save-guard';
 
@@ -182,11 +182,5 @@ describe('saveConflictMessage joins the two halves', () => {
       'Save aborted; nothing was written. This was deleted on disk after Aurora read it: gone.bin. '
       + 'Reloading will not bring back a file that was deleted.',
     );
-  });
-});
-
-describe('conflictPaths', () => {
-  it('keeps the list order the guard produced', () => {
-    expect(conflictPaths([c('a', 'changed'), c('b', 'deleted')])).toEqual(['a', 'b']);
   });
 });
