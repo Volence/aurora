@@ -89,6 +89,20 @@ describe('auditCrossovers: WARN: a loop that works in one direction', () => {
     expect(crossoverAuditSeverity(a)).toBe('warn');
     expect(crossoverAuditMessage(a)).toMatch(/ONE-WAY/);
     expect(crossoverAuditMessage(a)).toMatch(/index 1/);
+    // ⚠ AND IT SAYS WHY THAT IS A BARE INDEX AND NOT A CELL. This audit was
+    // called with no row stride, so the caveat that admits it must fire on the
+    // ONE-WAY class too and not only on the two the bake hard-errors on. A
+    // plant-and-count audit dropped `oneWay` from that condition and the whole
+    // suite stayed green (docs/reviews/2026-09-09-guard-residue-validators.md):
+    // the reader was left with a number that looks like a coordinate and no
+    // sentence saying it is not one.
+    expect(crossoverAuditMessage(a)).toMatch(/No cell coordinates above/);
+    // ...and the caveat is about the MISSING STRIDE, so an audit given one
+    // must not carry it. Without this the row above is met by a sentence that
+    // is always printed.
+    const withStride = auditCrossovers(plane(SOLID, HAND_A), plane(SOLID, SOLID), 2);
+    expect(withStride.oneWay).toBe(1);
+    expect(crossoverAuditMessage(withStride)).not.toMatch(/No cell coordinates above/);
   });
 
   it('flags it the other way round too', () => {

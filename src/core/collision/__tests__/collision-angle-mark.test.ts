@@ -480,6 +480,25 @@ describe('the size rule lives here, not at the call sites', () => {
     expect(DETAIL_CELL_PX).toBeGreaterThan(MIN_CELL_PX_FOR_MARK);
   });
 
+  /**
+   * ⚠ THE GATE IS SPELLED `!(px >= MIN)` AND NOT `px < MIN`, and the difference
+   * is only visible for a value that compares false BOTH ways. The three
+   * callers all arrive here through a multiplication by a zoom, so a NaN zoom
+   * reaches this function as a NaN cell size; under `px < MIN` that is not
+   * "off", and a mark is then drawn at a size nothing can lay out.
+   *
+   * A plant-and-count audit rewrote the gate in the other spelling and the
+   * whole suite stayed green (docs/reviews/2026-09-09-guard-residue-validators.md),
+   * so the deliberate spelling had nothing holding it.
+   */
+  it('markTier: a cell size that is not a number is off, not compact', () => {
+    expect(markTier(Number.NaN)).toBe('off');
+    // The two ordinary refusals, so this row cannot be met by a gate that
+    // answers 'off' for everything.
+    expect(markTier(MIN_CELL_PX_FOR_MARK)).toBe('compact');
+    expect(markTier(DETAIL_CELL_PX)).toBe('detail');
+  });
+
   // The picker's two surfaces, by the numbers they actually pass. A 22px
   // thumbnail is far under the threshold (its bar moves 0.3px across the whole
   // blind band); the big preview is over it.

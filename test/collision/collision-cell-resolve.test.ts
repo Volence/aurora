@@ -53,6 +53,28 @@ describe('resolveCell', () => {
     expect(r.known).toBe(false);
     expect(r.profile).toBeNull();
   });
+
+  /**
+   * ⚠ A SHAPE FAR PAST THE BANK IS THE WRONG FIXTURE ON ITS OWN. The row above
+   * uses one two hundred past the end, which any loosening of the bound still
+   * catches; loosening `<` to `<=` left the whole suite green
+   * (docs/reviews/2026-09-09-guard-residue-validators.md). The FIRST index past
+   * the bank is both the case that separates them and the one a real stale
+   * plane produces, because a bank that shrank leaves exactly that index behind.
+   */
+  it('the FIRST index past the bank is already unknown, and the last one in is known', () => {
+    const past = resolveCell(SET, packCollisionCell({
+      shape: SET.solidCount, xFlip: false, yFlip: false, solidity: 'all',
+    }));
+    expect(past.known).toBe(false);
+    expect(past.profile).toBeNull();
+    // The accepting side of the same comparison, so the row cannot be met by a
+    // bound that rejects everything.
+    const last = resolveCell(SET, packCollisionCell({
+      shape: SET.solidCount - 1, xFlip: false, yFlip: false, solidity: 'all',
+    }));
+    expect(last.known).toBe(true);
+  });
 });
 
 describe('resolvePlaneWords', () => {
