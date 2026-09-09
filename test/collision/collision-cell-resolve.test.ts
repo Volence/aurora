@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   resolveCell, resolvePlaneWords, SECTION_PLANE_WORDS, resetPlaneLengthReports,
+  ensureCollisionPlanes,
 } from '../../src/core/collision/collision-cell-resolve';
-import { packCollisionCell } from '../../src/core/collision/collision-cell-word';
+import { packCollisionCell, unpackCollisionCell } from '../../src/core/collision/collision-cell-word';
 import type { CollisionProfile, CollisionProfileSet } from '../../src/core/collision/collision-model';
 import { OverlayRenderer } from '../../src/renderer/canvas/OverlayRenderer';
 import type { OverlayOptions } from '../../src/renderer/state/viewStore';
@@ -51,6 +52,28 @@ describe('resolveCell', () => {
     expect(r.air).toBe(false);
     expect(r.known).toBe(false);
     expect(r.profile).toBeNull();
+  });
+
+  /**
+   * ⚠ A SHAPE FAR PAST THE BANK IS THE WRONG FIXTURE ON ITS OWN. The row above
+   * uses one two hundred past the end, which any loosening of the bound still
+   * catches; loosening `<` to `<=` left the whole suite green
+   * (docs/reviews/2026-09-09-guard-residue-validators.md). The FIRST index past
+   * the bank is both the case that separates them and the one a real stale
+   * plane produces, because a bank that shrank leaves exactly that index behind.
+   */
+  it('the FIRST index past the bank is already unknown, and the last one in is known', () => {
+    const past = resolveCell(SET, packCollisionCell({
+      shape: SET.solidCount, xFlip: false, yFlip: false, solidity: 'all',
+    }));
+    expect(past.known).toBe(false);
+    expect(past.profile).toBeNull();
+    // The accepting side of the same comparison, so the row cannot be met by a
+    // bound that rejects everything.
+    const last = resolveCell(SET, packCollisionCell({
+      shape: SET.solidCount - 1, xFlip: false, yFlip: false, solidity: 'all',
+    }));
+    expect(last.known).toBe(true);
   });
 });
 
@@ -155,6 +178,73 @@ describe('resolvePlaneWords length contract', () => {
     } finally { spy.mockRestore(); }
   });
 
+  /**
+   * ⚠ THE THREE ROWS ABOVE ARE ABOUT THE SHORT PLANE, and a plant-and-count
+   * audit found the reporter's other two properties unheld
+   * (docs/reviews/2026-09-09-guard-residue-validators.md). Both matter for the
+   * same reason the reporter exists at all: this is a render path that must not
+   * throw, so a console line is the ONLY signal a producer bug ever produces,
+   * and a swallowed line is indistinguishable from a healthy plane.
+   */
+  it('reports an OVER-LONG editable plane, which it hands back untouched', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const edit = new Uint16Array(9);
+      // Handing it back verbatim is correct and is the reason the report is the
+      // only signal: nothing downstream reads past `length`, so a plane sized
+      // for the wrong section looks exactly like a right one.
+      expect(resolvePlaneWords(edit, null, 8)).toBe(edit);
+      expect(spy, 'an over-long plane was accepted in silence').toHaveBeenCalledTimes(1);
+      expect(String(spy.mock.calls[0][0])).toContain('[COLLISION_PLANE_LENGTH]');
+    } finally { spy.mockRestore(); }
+  });
+
+  /**
+   * THE SENTENCE NAMES WHICH WAY THE PLANE IS WRONG, and the two consequences
+   * are opposite: a short plane renders cells that are not there as air, an
+   * over-long one carries a tail nothing will ever read. A reporter that fires
+   * on both and describes one is a reporter that sends a reader looking for
+   * missing cells in a plane that has too many.
+   */
+  it('names the RIGHT consequence for each direction', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      resolvePlaneWords(new Uint16Array(3), null, 8);
+      const shortMsg = String(spy.mock.calls[0][0]);
+      expect(shortMsg).toContain('render as air');
+      expect(shortMsg).not.toContain('unreachable');
+
+      resolvePlaneWords(new Uint16Array(9), null, 8);
+      const longMsg = String(spy.mock.calls[1][0]);
+      expect(longMsg).toContain('unreachable');
+      expect(longMsg).not.toContain('render as air');
+    } finally { spy.mockRestore(); }
+  });
+
+  /**
+   * THE ONCE-ONLY RULE IS PER FAULT, NOT PER SOURCE. The reporter deduplicates
+   * so a per-frame render path states a fault once; if that key collapsed to
+   * the source name, the SECOND distinct mismatch on the same source would be
+   * swallowed for the life of the process, and the plane that silently renders
+   * as air would be the one nobody was told about.
+   */
+  it('states a SECOND, different mismatch on the same source rather than deduplicating it away', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      resolvePlaneWords(new Uint16Array(3), null, 8);
+      expect(spy).toHaveBeenCalledTimes(1);
+      // The same fault again is correctly silent: that is the property the
+      // dedupe exists for, and asserting it here is what stops the row below
+      // from being met by a reporter that never deduplicates at all.
+      resolvePlaneWords(new Uint16Array(3), null, 8);
+      expect(spy).toHaveBeenCalledTimes(1);
+      // A DIFFERENT fault on the same source is a different fault.
+      resolvePlaneWords(new Uint16Array(4), null, 8);
+      expect(spy, 'a second, different plane-length fault was swallowed by the once-only rule')
+        .toHaveBeenCalledTimes(2);
+    } finally { spy.mockRestore(); }
+  });
+
   it('says nothing, and copies nothing, when the editable plane already matches', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
@@ -240,5 +330,43 @@ describe('OverlayRenderer.render with a mis-sized plane', () => {
       const cells = (SECTION_TILES_WIDE / 2) * (SECTION_TILES_HIGH / 2);
       expect(calls.strokeRect).toBe(cells);
     } finally { spy.mockRestore(); }
+  });
+});
+
+/**
+ * `ensureCollisionPlanes` SEEDS EACH PLANE FROM ITS OWN BASELINE, and nothing
+ * said so. A plant-and-count audit swapped plane B's source for plane A's and
+ * the whole suite stayed green (docs/reviews/2026-09-09-guard-residue-validators.md).
+ *
+ * That is the one survivor in this cluster that corrupts DATA rather than
+ * muting a report: seeding is a write path (paint, stamp, the agent's stamp
+ * handler all reach it), it is idempotent, and a plane seeded from the wrong
+ * baseline is then indistinguishable from one an author painted that way.
+ * Nothing downstream can tell, because both planes are the same SHAPE.
+ */
+describe('ensureCollisionPlanes seeds each plane from its own baseline', () => {
+  const baselines = (a: number, b: number) => ({
+    engineCollision: new Uint8Array(SECTION_PLANE_WORDS).fill(a),
+    engineCollisionB: new Uint8Array(SECTION_PLANE_WORDS).fill(b),
+  }) as unknown as Section;
+
+  it('plane B carries plane B\'s indices, not plane A\'s', () => {
+    const s = baselines(1, 2);
+    ensureCollisionPlanes(s);
+    // The two baselines are DIFFERENT before anything is compared, so a row
+    // that passes cannot be passing because both sides are the same value.
+    expect(unpackCollisionCell(s.collisionEdit![0]).shape).toBe(1);
+    expect(unpackCollisionCell(s.collisionEditB![0]).shape).toBe(2);
+    expect(s.collisionEditB!.length).toBe(SECTION_PLANE_WORDS);
+  });
+
+  it('is idempotent: a plane already seeded is left alone', () => {
+    const s = baselines(1, 2);
+    ensureCollisionPlanes(s);
+    const a = s.collisionEdit;
+    const b = s.collisionEditB;
+    ensureCollisionPlanes(s);
+    expect(s.collisionEdit).toBe(a);
+    expect(s.collisionEditB).toBe(b);
   });
 });

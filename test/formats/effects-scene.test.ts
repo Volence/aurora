@@ -593,6 +593,29 @@ describe('effects scene advisory (NOT enforcement)', () => {
     expect(findings[0].message).toMatch(/sigil refuses this at build time/);
   });
 
+  /**
+   * ONE SOURCE IS ENOUGH, and until this row nothing said so: the firing case
+   * above sets TWO of the three, so a predicate demanding two clashes before it
+   * speaks left the whole suite green (measured, and recorded in
+   * docs/reviews/2026-09-09-guard-residue-validators.md). One non-default field
+   * beside `deform.own` is the ordinary way an author reaches this defect, and
+   * it is the case sigil refuses.
+   *
+   * Each source is asserted SEPARATELY rather than as a set, because the
+   * message names which one clashed and a single sweep over all three cannot
+   * tell a list that dropped a member from one that kept it.
+   */
+  it('advises on a SINGLE non-default source, and names which one', () => {
+    for (const [key, value] of [['dsa', 4], ['dsb', 4], ['phase', 9]] as const) {
+      const findings = advisoryLayerDeformConflicts(
+        parseEffectsScene(conflicting({ [key]: value }), 'plain'),
+      );
+      expect(findings, `deform.own beside a non-default ${key} produced no advisory`)
+        .toHaveLength(1);
+      expect(findings[0].message).toContain(key);
+    }
+  });
+
   it('stays quiet when dsa/dsb/phase are absent or at the schema defaults', () => {
     expect(advisoryLayerDeformConflicts(parseEffectsScene(conflicting({}), 'plain'))).toEqual([]);
     // The defaults are read out of the schema, so this cannot drift from it.
