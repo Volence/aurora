@@ -59,3 +59,48 @@ export function filterExplorer(groups: ExplorerGroupModel[], query: string): Exp
   }
   return out;
 }
+
+/**
+ * WHAT THE EXPLORER SHOWS WHEN THE TREE IS EMPTY — and, specifically, whether
+ * the no-project call to action is on screen.
+ *
+ * UX SEAT B, FINDING F5: on the cold Home screen the sidebar's ONLY control is
+ * the `Open Project…` button in its empty state. Typing three characters into
+ * the `Filter…` box above it deleted that button and put `No matches` where it
+ * had been; the box carries no clear affordance, so getting it back cost three
+ * Backspaces on a control the filter had no business removing
+ * (docs/reviews/2026-09-07-lens-ux/uxb-audit.md, F5).
+ *
+ * THE RULE, and it is one sentence: a filter narrows the TREE, and the way out
+ * of the empty state is not part of the tree. `openProject` therefore never
+ * consults the query. The old condition did — it was
+ * `filtered.length === 0 && query.trim() === '' && noProject`, written inline in
+ * Explorer.tsx — and the `query.trim() === ''` term is the whole defect.
+ *
+ * `noMatches` is UNCHANGED and deliberately not folded into the above: when a
+ * filter is active and matched nothing, saying so is the honest report, and
+ * dropping it to make room for the button would trade one silence for another.
+ * The two are independent, so both can be true at once — and on the cold Home
+ * screen with a filter typed, both ARE.
+ *
+ * NOT DECIDED HERE, and left alone on purpose: seat B also reads `No matches` as
+ * misdescribing the no-project state ("with no project open there is nothing to
+ * match"). That is a wording call, so this changes behaviour and not one word of
+ * copy.
+ */
+export interface ExplorerEmptyState {
+  /** The active filter matched nothing. Only ever true while a filter is set. */
+  noMatches: boolean;
+  /** Offer the way out of the no-project state. NEVER suppressed by a filter. */
+  openProject: boolean;
+}
+
+export function explorerEmptyState(
+  filteredGroupCount: number, query: string, noProject: boolean,
+): ExplorerEmptyState {
+  const treeIsEmpty = filteredGroupCount === 0;
+  return {
+    noMatches: treeIsEmpty && query.trim() !== '',
+    openProject: treeIsEmpty && noProject,
+  };
+}

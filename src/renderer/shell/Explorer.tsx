@@ -15,7 +15,10 @@ import { useClassicProjectStore } from '../state/classicProjectStore';
 import { useClassicLevelStore } from '../state/classicLevelStore';
 import { useProjectStore } from '../state/projectStore';
 import { useOpenEngine } from '../state/open-project';
-import { filterExplorer, type ExplorerGroupModel, type ExplorerItemModel, countableItems } from '../../core/shell/explorer';
+import {
+  filterExplorer, explorerEmptyState,
+  type ExplorerGroupModel, type ExplorerItemModel, countableItems,
+} from '../../core/shell/explorer';
 import {
   classicExplorerGroups, aeonExplorerGroups, noProjectExplorerGroups, resolveObjectSprite,
   NEW_SPRITE_ITEM_ID, NEW_CANVAS_ITEM_ID, IMPORT_SHEET_ITEM_ID, type AeonObjectRow,
@@ -148,6 +151,9 @@ export default function Explorer({ onOpenProject, onOpenRecent, onNewCanvas, onI
   }, [classicOpen, zoneTree, classicZone, docReady, config, objectLibrary, objectBindings, recents, canvases]);
 
   const filtered = useMemo(() => filterExplorer(groups, query), [groups, query]);
+  // ONE rule, in core/shell/explorer.ts, for what an empty tree shows — see its
+  // header for seat B's F5, the filter that deleted this panel's only control.
+  const emptyState = explorerEmptyState(filtered.length, query, noProject);
 
   const activate = (item: ExplorerItemModel) => {
     if (item.disabled) return;
@@ -234,10 +240,10 @@ export default function Explorer({ onOpenProject, onOpenRecent, onNewCanvas, onI
         />
       </div>
       <div style={styles.treeScroll}>
-        {filtered.length === 0 && query.trim() !== '' && (
+        {emptyState.noMatches && (
           <div style={styles.empty}>No matches</div>
         )}
-        {filtered.length === 0 && query.trim() === '' && noProject && (
+        {emptyState.openProject && (
           <div style={styles.empty}>
             <button onClick={onOpenProject} style={styles.openButton}>Open Project…</button>
           </div>
