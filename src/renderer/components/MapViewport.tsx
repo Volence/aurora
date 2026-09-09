@@ -16,7 +16,10 @@ import { warpTargetFor } from '../../core/aether/warp-math';
 import { openDocumentGuarded } from './art/open-document';
 import { resolveEscape } from './map-escape';
 import { resolveMapChord } from './map-chords';
-import { gestureStatus, gestureStaleReason, type GestureFrame } from './map-gesture-witness';
+import {
+  gestureStatus, gestureStaleReason, type GestureFrame,
+  bgStrokeStatus, bgStrokeMustRevert, bgStrokeStaleReason, type BgStrokeFrame,
+} from './map-gesture-witness';
 import { flipAxisForKey, performMapFlip, setFlipGhostRepaint } from './map-flip';
 import { shouldMarkBand } from './map-band-mark';
 import { beginBandStamp, moveBandStamp, endBandStamp, type BandStampGesture } from './map-band-stamp';
@@ -48,6 +51,12 @@ import {
 import { documentBands, bandSlotBases } from '../../core/formats/bg-override/bg-anim-band';
 import { bandTileCount } from '../../core/formats/bg-override/bg-override';
 import { writeBgOverrideLayoutWord } from '../../core/formats/bg-override/bg-override-view';
+import type { BgOverrideDocument } from '../../core/formats/bg-override/bg-override';
+// THE REPO'S ATTACH HELPER, and this surface needs it for the reason it was
+// written: `containerRef` is CONDITIONALLY MOUNTED (this component returns the
+// "open a level" panel before the div exists), and a `useEffect(..., [])` that
+// early-returns on a null ref never runs again. See use-attached-effect.ts.
+import { useAttachedEffect } from './art-shared/use-attached-effect';
 import { LAYOUT_TILE_INDEX_MASK } from '../../core/formats/bg-override/bg-override';
 import { editorPanToCameraPx } from '../../core/formats/bg-override/bganim-preview';
 import { OverlayRenderer } from '../canvas/OverlayRenderer';
@@ -324,9 +333,22 @@ export default function MapViewport() {
    * against one background and committed against another would revert cells
    * nobody painted. A change of either field flushes the stroke and starts a new
    * one.
+   *
+   * ⚠ AND THE PAIR IS NOT ENOUGH, which is the defect BG-STROKE-WRONG-ACT.
+   * `source: 'act'` means "this act's own `bgLayout`", and every act answers that
+   * same pair — `('act', null)` — for its own different plane. So the flush check
+   * above agrees across an act switch, one stroke carries entries from two
+   * planes, and `set-bg-tiles` with a null `bgRef` resolves `level.act.bgLayout`
+   * out of `getActiveLevel()` at COMMIT time: the words land in the act that is
+   * open now. `actKey`, `layout` and `doc` are therefore witnessed beside the
+   * pair — the act it began on, and the plane it is writing through BY IDENTITY.
+   * `map-gesture-witness.ts` carries the derivation and `abandonStaleGestures`
+   * the drop; `layout` is also what makes the revert exact, since the stroke
+   * still holds the array it wrote to after that act has been closed.
    */
   const bgStroke = useRef<
     { source: DisplayedBgSource; bgRef: string | null;
+      actKey: string | null; layout: Uint16Array; doc: BgOverrideDocument | null;
       entries: Map<number, { oldNt: number; newNt: number }> } | null
   >(null);
   /** One refusal toast per gesture, not one per cell. Cleared with the stroke. */
@@ -2232,11 +2254,21 @@ export default function MapViewport() {
     // mutation outside history entirely, so the next Ctrl+Z reverted whatever
     // act-scoped command happened to precede the strokes.
     const bgRef = resolved.source === 'library' ? resolved.libraryId : null;
-    if (!bgStroke.current
-        || bgStroke.current.source !== resolved.source
-        || bgStroke.current.bgRef !== bgRef) {
+    // A FLUSH IS NOT A CANCEL, and the witness is what tells them apart. The
+    // pair moving inside ONE act is the artist's own doing (the active section
+    // now displays a different background), the entries so far belong to a plane
+    // this act still owns, and committing them is right — that is
+    // `background-switched`, and `bgStrokeMustRevert` spares it. Every other
+    // verdict means the plane moved out from under the stroke, and those are
+    // dropped by `abandonStaleGestures`, which runs at the top of
+    // `handleMouseMove` before this function can be reached. So the only thing
+    // left to decide here is "same stroke or next stroke".
+    if (bgStroke.current === null
+        || bgStrokeStatus(bgStroke.current, bgFrameNow(resolved, doc)) !== 'intact') {
       endBgStroke();
-      bgStroke.current = { source: resolved.source, bgRef, entries: new Map() };
+      bgStroke.current = {
+        source: resolved.source, bgRef, actKey: actKeyNow(),
+        layout: resolved.layout, doc, entries: new Map() };
     }
     // FIRST value wins: a stroke crossing its own path must undo to what was
     // there before the gesture, not to what the gesture itself put down.
@@ -2671,6 +2703,25 @@ export default function MapViewport() {
     if (!stroke || stroke.entries.size === 0) return;
     const level = getActiveLevel();
     if (!level) return;
+    // ⚠ THE ACT THIS IS ABOUT TO COMMIT AGAINST, asserted at the writer.
+    //
+    // `abandonStaleGestures` runs before this on all three teardown routes, so
+    // this arm is unreachable today — but that is a property of three CALLERS,
+    // and the corruption is written HERE: `level` is `getActiveLevel()`, and a
+    // `set-bg-tiles` with a null `bgRef` resolves `level.act.bgLayout`, so a
+    // stroke that outlived its act would put its words into a plane nobody
+    // painted and leave the OLD act's `oldNt` values on the undo half. This is
+    // the arm a new call site to `endBgStroke` cannot defeat. It reverts rather
+    // than dropping: the live writes are already in the document.
+    if (stroke.actKey !== actKeyNow()) {
+      revertBgStroke(stroke);
+      useEditorStore.getState().bumpLiveEdit();
+      useToastStore.getState().addToast(
+        'Cancelled a background stroke in flight: the act changed under it before it was '
+        + 'committed. Nothing was written.', 'warning',
+      );
+      return;
+    }
     const n = stroke.entries.size;
     const description = `Paint ${n} background tile${n === 1 ? '' : 's'}`;
     if (stroke.source === 'override') {
@@ -2869,6 +2920,60 @@ export default function MapViewport() {
   }
 
   /**
+   * WHAT A BG STROKE WOULD BE PAINTING NOW, for comparison with what it grabbed.
+   *
+   * Two shapes, one question. `paintBgTile` has already resolved the background
+   * for this pixel, so it hands its own `resolved`/`doc` in rather than resolving
+   * twice and risking two answers inside one call; `bgFrameFresh` below resolves
+   * from the stores for the callers that have no pixel in hand
+   * (`abandonStaleGestures`, `endBgStroke`).
+   */
+  function bgFrameNow(
+    resolved: { source: DisplayedBgSource; layout: Uint16Array; libraryId: string | null },
+    doc: BgOverrideDocument | null,
+  ): BgStrokeFrame {
+    return {
+      actKey: actKeyNow(),
+      source: resolved.source,
+      bgRef: resolved.source === 'library' ? resolved.libraryId : null,
+      layout: resolved.layout,
+      doc,
+    };
+  }
+
+  /** `bgFrameNow` from the stores. `null` when no background resolves at all. */
+  function bgFrameFresh(): BgStrokeFrame | null {
+    const state = useProjectStore.getState();
+    const act = getCurrentAct(state);
+    if (!act) return null;
+    const holder = state.project?.bgOverride ?? null;
+    const resolved = resolveDisplayedBg(
+      act, state.project?.bgLibrary ?? [], useEditorStore.getState().activeSectionIndex, holder,
+    );
+    if (!resolved) return null;
+    return bgFrameNow(resolved, resolved.source === 'override' ? holder?.doc ?? null : null);
+  }
+
+  /**
+   * Put a BG stroke's live writes back, into the plane it actually wrote.
+   *
+   * `stroke.layout` / `stroke.doc` and not a fresh resolution — the whole point is
+   * that the fresh one now names somebody else's plane, and putting the old words
+   * there is the corruption rather than the fix. The rule `revertPaintStroke`
+   * states, on the other carrier.
+   */
+  function revertBgStroke(stroke: NonNullable<typeof bgStroke.current>): void {
+    for (const [index, e] of stroke.entries) {
+      // Through the ONE writer when there is a document: the file and the
+      // canvas's mirror of it are two representations of one fact, and undoing
+      // only the mirror would leave the file carrying words nobody painted.
+      if (stroke.doc !== null) writeBgOverrideLayoutWord(stroke.doc, index, e.oldNt);
+      else if (index < stroke.layout.length) stroke.layout[index] = e.oldNt;
+    }
+    sectionRenderer.markBgDirty([...stroke.entries.keys()]);
+  }
+
+  /**
    * WHICH BACKGROUND THE CANVAS IS DRAWING, by identity: the pair `bgStroke`
    * already witnesses, plus the override document a band stamp writes through.
    */
@@ -2961,6 +3066,24 @@ export default function MapViewport() {
         marqueeDragLast.current = null;
         isMarqueeDragging.current = false;
         note(gestureStaleReason(status));
+      }
+    }
+
+    // THE BG STROKE, the fifth carrier. The four above resolve their subject
+    // through `sections[i]`; this one resolves it through `getCurrentAct()` twice
+    // over — once per painted pixel while the stroke runs, and once more when
+    // `set-bg-tiles` with a null `bgRef` reaches `level.act.bgLayout` at commit
+    // time. `background-switched` is deliberately NOT dropped here: that verdict
+    // is the artist moving to a section with a different background, and
+    // `paintBgTile` commits it (map-gesture-witness.ts states the split).
+    const bgs = bgStroke.current;
+    if (bgs) {
+      const status = bgStrokeStatus(bgs, bgFrameFresh());
+      if (bgStrokeMustRevert(status)) {
+        revertBgStroke(bgs);
+        bgStroke.current = null;
+        bgRefusalShown.current = false;
+        note(bgStrokeStaleReason(status));
       }
     }
 
@@ -3987,15 +4110,42 @@ export default function MapViewport() {
     finishGesture();
   }, [finishGesture]);
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (rect) {
-      const { zoom } = useViewStore.getState();
-      setZoom(zoom * factor, e.clientX - rect.left, e.clientY - rect.top);
-    }
-  }, [setZoom]);
+  // ═══ WHEEL ZOOM, ON A NATIVE NON-PASSIVE LISTENER ═══
+  //
+  // This was an `onWheel` prop calling `preventDefault`, and React registers root
+  // `wheel` listeners as PASSIVE, so that call did nothing at all: the browser ran
+  // its own default anyway, and over the map a ctrl+wheel zoomed the whole
+  // application window while the map zoomed underneath it (lens sweep,
+  // WHEEL-PREVENTDEFAULT-DEAD). The rule and the fix are already in this repo —
+  // `art-shared/use-anchored-zoom.ts:11-12`, which states it and attaches a
+  // native `{ passive: false }` listener — so this is that convention, not a new
+  // one.
+  //
+  // AND THROUGH `useAttachedEffect`, for the reason that helper exists
+  // (use-attached-effect.ts): this container is CONDITIONALLY MOUNTED — the
+  // component returns an "open a level" panel before the div is rendered — and a
+  // `useEffect(..., [])` that early-returns on a null ref never runs again, which
+  // is precisely how wheel zoom and drag pan died in classic's Chunk and Block
+  // tabs. A ref cannot be a dependency, so the helper compares the ELEMENT.
+  //
+  // `preventDefault` is UNCONDITIONAL, the same convention: it is the ctrl+wheel
+  // case that the user actually sees, so gating the suppression on a modifier
+  // would leave the only visible half of the defect running. Every action is read
+  // through `getState()` rather than captured, because the listener is re-attached
+  // only when the element changes and a captured `setZoom` would be the one from
+  // the render that first saw the div.
+  useAttachedEffect(containerRef, (el) => {
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const view = useViewStore.getState();
+      view.setZoom(view.zoom * factor, e.clientX - rect.left, e.clientY - rect.top);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  });
 
   // ---------- right-click context menu (Art mode entry points) ----------
 
@@ -4137,7 +4287,6 @@ export default function MapViewport() {
         if (previewHoverRef.current) { previewHoverRef.current = null; drawCollisionPreview(); }
         if (pasteHoverRef.current) { pasteHoverRef.current = null; drawCollisionPreview(); }
       }}
-      onWheel={handleWheel}
       onContextMenu={handleContextMenu}
     >
       <canvas id="map-canvas" ref={canvasRef} style={styles.canvas} />

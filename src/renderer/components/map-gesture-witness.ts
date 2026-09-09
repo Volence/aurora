@@ -115,3 +115,132 @@ export function gestureStaleReason(status: GestureStatus): string | null {
     case 'no-witness': return 'it carried no witness of what it grabbed';
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THE BACKGROUND STROKE, WHICH IS THE SAME QUESTION ABOUT A DIFFERENT CARRIER
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// A BG paint stroke was the fifth gesture on this surface and the one the drag
+// parcel above examined and left, on the reading that "its commands name their
+// own target document, so an act switch cannot redirect them". That is true of
+// TWO of its three sources and false of the third, which is the one the map
+// opens on:
+//
+//   • `override` — the command is `set-bg-override-layout`, and the document is
+//     PER-GAME (`project.bgOverride`). No act names it. Safe.
+//   • `library`  — the command is `set-bg-tiles` with a non-null `bgRef`, and
+//     `history.ts resolveBgLayout` finds it by id in `project.bgLibrary`, also
+//     per-game. Safe, and this is the case that docblock was written for.
+//   • `act`      — the command is `set-bg-tiles` with `bgRef: null`, and
+//     `resolveBgLayout` falls back to `level.act.bgLayout`. `level` is
+//     `getActiveLevel()`, rebuilt at commit time from `getCurrentAct()`. So the
+//     act default is resolved LATE, exactly like `sections[i]` is, and an act
+//     switch redirects it: the words go into the NEW act's plane at the OLD
+//     act's indices, and the undo half puts the OLD act's `oldNt` values there
+//     too. That is a write to a document nobody painted, not a misfiled entry.
+//
+// AND THE SOURCE PAIR CANNOT SEE IT. `paintBgTile` already re-checks
+// `(source, bgRef)` on every move and flushes the stroke when the pair changes.
+// Between two acts that both fall back to their own default that pair is
+// `('act', null)` on both sides, so the check agrees and the ONE stroke carries
+// entries from two different planes into one command. Two operands that both
+// degrade to the same value is how this class of check becomes decoration.
+//
+// SO THE WITNESS IS THE PLANE ITSELF, BY IDENTITY — the `Uint16Array` the stroke
+// wrote through — for the reason the identity witness above exists: a BG stroke
+// writes live, so any witness of its VALUES reports "moved under me" on the
+// first pixel. Identity distinguishes act A's `bgLayout` from act B's while
+// surviving every word the gesture itself lays down, and it is also what makes
+// the revert exact: the stroke still holds the array it wrote to, so it can put
+// back what it wrote even after the act carrying that array has been closed.
+// `doc` is witnessed beside it because the override's mirror array is rebuilt
+// when `doc.layout` is replaced (bg-override-view.ts's cache), and a band edit
+// that replaces the document mid-stroke is a real way for the plane to move.
+
+/**
+ * What a BG stroke is painting, or what the canvas is painting now.
+ *
+ * `source` and `bgRef` are kept BESIDE the plane identity rather than replaced
+ * by it, and not as a second-best test: they are what separates the two
+ * outcomes. A pair that changed inside one act is the artist's own doing (the
+ * active section now displays a different background) and the entries so far
+ * still belong to a plane this act owns, so that stroke is FLUSHED and
+ * committed. A plane that changed under an unchanged pair is the defect, and
+ * that stroke is reverted. One verdict cannot carry both, so there are two.
+ *
+ * `bgRef` and `doc` are legitimately `null` (only `library` has an id, only
+ * `override` has a document), so `null` cannot be this frame's absent-field
+ * sentinel the way it is for `GestureFrame.actKey`. `undefined` is: a field a
+ * caller forgot, or one a rename left behind.
+ */
+export interface BgStrokeFrame {
+  actKey: string | null;
+  source: string;
+  bgRef: string | null;
+  /** The `Uint16Array` the stroke writes through — the plane's identity. */
+  layout: unknown;
+  /** The override document, or `null` for the other two sources. */
+  doc: unknown;
+}
+
+export type BgStrokeStatus =
+  | 'intact'
+  | 'no-witness'
+  | 'act-changed'
+  | 'plane-replaced'
+  | 'plane-gone'
+  | 'background-switched';
+
+/**
+ * How the background moved under a stroke since it began. `now` is `null` when
+ * nothing resolves at all (no act open, no plane on it).
+ *
+ * ORDER IS INFORMATIVE, the rule `gestureStatus` states. An act switch is
+ * reported as an act switch even though it also replaces the plane, because
+ * that is the sentence a bug report needs — and because it is the verdict with
+ * the stricter outcome: committing act A's stroke while act B is open is the
+ * corruption whether or not the source pair also moved.
+ */
+export function bgStrokeStatus(was: BgStrokeFrame, now: BgStrokeFrame | null): BgStrokeStatus {
+  if (was.actKey === null || was.actKey === undefined) return 'no-witness';
+  if (was.source === undefined) return 'no-witness';
+  if (was.bgRef === undefined) return 'no-witness';
+  if (was.layout === null || was.layout === undefined) return 'no-witness';
+  if (was.doc === undefined) return 'no-witness';
+  if (now === null) return 'plane-gone';
+  if (now.layout === null || now.layout === undefined) return 'plane-gone';
+  if (now.actKey !== was.actKey) return 'act-changed';
+  if (now.source !== was.source || now.bgRef !== was.bgRef) return 'background-switched';
+  if (now.layout !== was.layout || now.doc !== was.doc) return 'plane-replaced';
+  return 'intact';
+}
+
+/**
+ * DOES THIS STROKE HAVE TO BE THROWN AWAY? — the one-bit question
+ * `abandonStaleGestures` asks.
+ *
+ * `background-switched` is deliberately NOT stale, and it is the row that makes
+ * this predicate able to fail in both directions. Reverting there would delete
+ * an edit the artist made and meant, on the act that still owns it; the caller
+ * that flushes it into a command is `paintBgTile`, and it was already right.
+ */
+export function bgStrokeMustRevert(status: BgStrokeStatus): boolean {
+  return status !== 'intact' && status !== 'background-switched';
+}
+
+/**
+ * WHY A BG STROKE WAS DROPPED, as a clause for the one cancel notice
+ * `abandonStaleGestures` builds. `null` for the two verdicts that write no
+ * cancellation — the intact one, and the switch that commits instead — so a
+ * caller cannot announce a cancellation that did not happen.
+ */
+export function bgStrokeStaleReason(status: BgStrokeStatus): string | null {
+  switch (status) {
+    case 'intact': return null;
+    case 'background-switched': return null;
+    case 'act-changed': return 'the act changed under the background it was painting';
+    case 'plane-replaced': return 'the background plane it was painting was replaced';
+    case 'plane-gone': return 'the background it was painting is no longer on screen';
+    case 'no-witness': return 'it carried no witness of which background it was painting';
+  }
+}
