@@ -132,6 +132,28 @@ export const sectionRenderer = new SectionRenderer();
  * beside it at zoom 8 — visible only in the running app, since the geometry was
  * correct and only the weight was wrong.
  */
+/**
+ * How many DEVICE pixels this display puts inside one CSS pixel, right now.
+ *
+ * ⚠ DERIVED ON EVERY CALL AND NEVER CACHED, because it MOVES: dragging the window
+ * to a display with a different scale factor changes it with no resize of the CSS
+ * box, and on the virtual display this repo's harnesses run on it has been
+ * observed at both 1 and 1.35 inside a single session. Any surface that pins
+ * today's value is wrong on the next display, and a test that asserts a
+ * particular number is measuring the machine rather than the code.
+ *
+ * ONE IS THE ANSWER FOR EVERY UNUSABLE READING, and the list is deliberate rather
+ * than a `?? 1`: no window at all (this component's own body runs in the node test
+ * suite), a non-number, a NaN from a host that computed one, an Infinity, and
+ * zero or negative -- each of which would otherwise produce a zero-sized or
+ * inverted backing store, which paints nothing and looks exactly like a broken
+ * renderer.
+ */
+function deviceScale(): number {
+  const dpr = typeof window === 'undefined' ? undefined : window.devicePixelRatio;
+  return typeof dpr === 'number' && Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+}
+
 function collisionPreviewOpts(zoom: number): ShapeDrawOpts {
   return {
     fill: COLLISION_PREVIEW_FILL,
@@ -457,7 +479,46 @@ export default function MapViewport() {
    * so identity changing is exactly "the author copied something else".
    */
   const pasteGhostRef = useRef<{ clip: MapClipboard; zoneId: string; canvas: HTMLCanvasElement } | null>(null);
-  const lastMouse = useRef({ x: 0, y: 0 });
+  /**
+   * The last client point the pointer was seen at over this surface, or `null`
+   * for NEVER SEEN.
+   *
+   * ⚠ IT WAS `{ x: 0, y: 0 }` AND THAT MADE ABSENT AND AT-THE-CORNER ONE VALUE.
+   * The initialiser was indistinguishable from a genuine hover at the top-left
+   * corner of the canvas, and F7 (play from cursor) reads this to decide where to
+   * put the player. So a warp fired before the mouse had ever entered the map
+   * warped to the world point under the canvas's own corner, confidently and with
+   * a success toast, instead of saying it had nothing to aim at. Cold F7 is not a
+   * rare path: it is exactly what a keyboard-first author does after switching to
+   * the level facet.
+   *
+   * THREE STATES, ON THIS REPO'S OWN PRECEDENT for the shape: `probePath`'s
+   * `PathProbe` (main/file-io.ts) refuses to fold "not there" into "cannot tell",
+   * and the classic mapping's `read` field is REQUIRED rather than defaulted, for
+   * the same reason -- a default that is also a legal value cannot be detected.
+   * Here the third state is `null` and every reader has to answer for it.
+   *
+   * ⚠ AND IT IS THE PAN ANCHOR, NOT THE CURSOR, which is the half the lens row
+   * understated. Every write to it is inside `handleMouseDown` or `panFromEvent`:
+   * a plain hover never touched it. So F7 was not reading "where the mouse is on
+   * the map" as its own comment claimed -- it was reading the last place a button
+   * went down, which on a freshly opened act is the origin default. The cursor is
+   * `cursorClient` below, and the two are separate refs precisely because
+   * conflating them is what made the origin default invisible: one value cannot
+   * be both a subtraction base and a position.
+   */
+  const lastMouse = useRef<{ x: number; y: number } | null>(null);
+  /**
+   * The last client point the POINTER was seen at over this surface, or `null`
+   * for never seen. Written by `handleMouseMove` before it branches, and by
+   * `handleMouseDown`, so it means the cursor and nothing else.
+   *
+   * IT IS NOT CLEARED ON MOUSE LEAVE, deliberately: F7 is a keyboard action taken
+   * while looking at the map, and the pointer having drifted off the canvas is not
+   * the author withdrawing the aim. What `null` means is that the pointer has
+   * never been over this surface at all, which is the only state with no answer.
+   */
+  const cursorClient = useRef<{ x: number; y: number } | null>(null);
   /**
    * The object/ring drag in flight, and WHAT IT GRABBED, by identity.
    *
@@ -659,11 +720,19 @@ export default function MapViewport() {
     const pcv = previewCanvasRef.current, container = containerRef.current;
     if (!pcv || !container) return;
     const rect = container.getBoundingClientRect();
-    const w = Math.floor(rect.width), h = Math.floor(rect.height);
+    // DEVICE-PIXEL BACKING STORE, CSS-PIXEL DRAWING, for the reason spelled out
+    // over the map canvas in `redraw`. This canvas is layered ON the map, so a
+    // 1x ghost over a device-resolution map would be visibly softer than the
+    // outlines it is tracing. `setTransform` unconditionally, not only when the
+    // size changed: resizing resets the context, and not resizing keeps whatever
+    // the previous call left.
+    const dpr = deviceScale();
+    const w = Math.round(rect.width * dpr), h = Math.round(rect.height * dpr);
     if (pcv.width !== w || pcv.height !== h) { pcv.width = w; pcv.height = h; }
     const ctx = pcv.getContext('2d');
     if (!ctx) return;
-    ctx.clearRect(0, 0, pcv.width, pcv.height);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w / dpr, h / dpr);
 
     // Marquee selection: drawn whenever one is committed, independent of the
     // active tool (Ctrl+C copy works without the marquee tool staying active,
@@ -1180,8 +1249,8 @@ export default function MapViewport() {
    * for the object sprites, so a window resize silently downgraded every object
    * preview to a box until the next real repaint).
    *
-   * `canvas.width = rect.width` stays the first thing it does: it is both the
-   * clear and the marker the CDP repaint harnesses count.
+   * Sizing the backing store stays the first thing it does: it is both the clear
+   * and the marker the CDP repaint harnesses count.
    */
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -1192,22 +1261,44 @@ export default function MapViewport() {
     if (!container) return;
 
     const rect = container.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
+    // ⚠ THE BACKING STORE IS IN DEVICE PIXELS AND THE DRAWING IS IN CSS PIXELS.
+    // `canvas.width = rect.width` gave this surface a CSS-sized backing store
+    // which the browser then STRETCHED to the element's device box, so on any
+    // display with a scale factor above 1 the map was resampled up from too few
+    // pixels -- the one thing a pixel-art editor must not do. `canvas.width` is
+    // an unsigned long, so it also TRUNCATED a fractional rect and stretched the
+    // remainder, which drifts the drawn image against `screenToWorld` (which
+    // reads the CSS rect) by up to a pixel at the far edge.
+    //
+    // The scale is DERIVED per draw, never pinned: it changes when a window moves
+    // between displays, and on the virtual display this repo's harnesses run on
+    // it has been observed at both 1 and 1.35 within one session. `setTransform`
+    // (not `scale`) because sizing the backing store resets the context, so this
+    // is an absolute base transform rather than a compounding one -- and every
+    // line below it goes on drawing in CSS pixels, unchanged.
+    const dpr = deviceScale();
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
+    // The CSS-pixel size of the surface, which is what everything downstream
+    // means by width and height. Derived BACK from the backing store rather than
+    // from `rect` so it is exactly the region the transform maps onto.
+    const cssWidth = canvas.width / dpr;
+    const cssHeight = canvas.height / dpr;
 
     const state = useProjectStore.getState();
     const act = getCurrentAct(state);
     if (!act) {
       ctx.fillStyle = CANVAS_VOID;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, cssWidth, cssHeight);
       return;
     }
 
     const view = useViewStore.getState();
     const ed = useEditorStore.getState();
     const overlayOpts = view.overlays;
-    const viewport = { x: view.vpX, y: view.vpY, width: canvas.width, height: canvas.height, zoom: view.zoom };
+    const viewport = { x: view.vpX, y: view.vpY, width: cssWidth, height: cssHeight, zoom: view.zoom };
 
     syncBandPreview();
 
@@ -1912,7 +2003,19 @@ export default function MapViewport() {
       // and the whole feature is "put me exactly there".
       if (chord === 'warp') {
         e.preventDefault();
-        const world = screenToWorld(lastMouse.current.x, lastMouse.current.y);
+        // NO CURSOR, NO WARP. `cursorClient` is null until the pointer has
+        // actually been over this surface, and "play from cursor" with no cursor
+        // has no answer -- so it says so rather than warping to whatever world
+        // point happens to sit under the canvas corner. See `cursorClient`, and
+        // note this READ MOVED OFF `lastMouse`, which is the pan anchor and was
+        // never the cursor.
+        const at = cursorClient.current;
+        if (at === null) {
+          useToastStore.getState().addToast(
+            'Play from cursor needs a cursor: point at the map, then press F7', 'info');
+          return;
+        }
+        const world = screenToWorld(at.x, at.y);
         // Read the act FRESH from the store rather than the closure. This
         // handler is installed by an effect keyed on [pan, setZoom, zoom], so a
         // captured `act` goes stale the moment the user switches act without
@@ -2126,10 +2229,14 @@ export default function MapViewport() {
    * a frame behind it.
    */
   function panFromEvent(clientX: number, clientY: number): void {
-    const dx = clientX - lastMouse.current.x;
-    const dy = clientY - lastMouse.current.y;
+    // NEVER-SEEN IS THE ANCHOR FRAME, NOT A ZERO DELTA FROM THE ORIGIN. A pan
+    // needs a previous point to subtract; with none, this event BECOMES the
+    // previous point and the camera does not move. Reading `null` as `{0,0}`
+    // would jump the camera by the whole cursor offset on the first move.
+    const previous = lastMouse.current;
     lastMouse.current = { x: clientX, y: clientY };
-    pan(dx, dy);
+    if (previous === null) return;
+    pan(clientX - previous.x, clientY - previous.y);
   }
 
   function screenToWorld(clientX: number, clientY: number): { x: number; y: number } {
@@ -3116,6 +3223,12 @@ export default function MapViewport() {
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     const tool = useEditorStore.getState().tool;
 
+    // A press is a cursor position too, and it is recorded here for the same
+    // reason as in the move handler: this one also returns early a dozen ways. It
+    // matters on its own because a press can arrive with no preceding move at all
+    // (a tap, or a pointer warped onto the surface by the window manager).
+    cursorClient.current = { x: e.clientX, y: e.clientY };
+
     // Right-click opens the context menu; never paint/drag from it.
     if (e.button === 2) return;
 
@@ -3553,6 +3666,15 @@ export default function MapViewport() {
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const tool = useEditorStore.getState().tool;
+
+    // WHERE THE CURSOR IS, RECORDED BEFORE ANY `return` BELOW CAN SKIP IT. This
+    // handler has a dozen early exits (guide drag, frame drag, each tool), so a
+    // tail write would record the cursor for some gestures and not others -- and
+    // the reader is F7, which must not depend on which tool was active. It is a
+    // ref, so this costs no render. NOT folded into `lastMouse`: that one is the
+    // pan anchor and `panFromEvent` subtracts from it, so writing the cursor
+    // there would make every pan delta zero.
+    cursorClient.current = { x: e.clientX, y: e.clientY };
 
     // ═══ FIRST, BEFORE ANY BRANCH BELOW CAN WRITE ═══
     //
