@@ -208,17 +208,25 @@ registered in the *same evaluate call* as the `close` listener must have fired, 
 
 ## 6. `npm test`, before and after
 
-| | Test Files | Tests |
-|---|---|---|
-| before (`670e3821`) | 1 failed \| 559 passed \| 3 skipped (563) | **1 failed \| 8197 passed \| 9 skipped (8207)** |
-| after | *see the landing commit* | *see the landing commit* |
+| | exit | Test Files | Tests |
+|---|---|---|---|
+| before (`670e3821`) | 1 | 1 failed \| 559 passed \| 3 skipped (563) | **1 failed \| 8197 passed \| 9 skipped (8207)** |
+| after (`fcdae55a`) | **0** | 560 passed \| 3 skipped (563) | **8198 passed \| 9 skipped (8207)**, 0 failed |
 
 The single "before" failure is
 `src/renderer/workspace/__tests__/facet-modules.test.ts › covers all six built
 facets`, a 5000 ms **TIMEOUT** classified by the suite's own reporter as
 load-manufactured. It was measured while this session was concurrently running
-Electron under Xvfb. It is not an assertion failure and is unrelated to this
-parcel; the after-run figure is what should be compared.
+Electron under Xvfb; it passes in the after-run, on a quiet box, and the totals
+reconcile (8197 + 1 = 8198). It is not an assertion failure and is unrelated to
+this parcel.
+
+⚠ The first "after" run failed on `check-doc-citations`, and correctly: this
+packet cites **itself** in the table in §2, and until it was committed that
+citation pointed at a file only this machine could open. Committing it is the
+fix; the figures above are the run after the commit. It is worth recording
+because a review packet that names its own path is the one document guaranteed
+to trip that gate on its first run.
 
 ## 7. A harness artifact worth keeping, because it looked like a product defect
 
