@@ -99,8 +99,18 @@ export interface DirtyLevel {
   dirty: DirtyDomains;
   /** The store's per-domain edit counters AT COLLECTION — i.e. describing the
    *  `doc` above, which is what gets written. Anything that moves before the
-   *  write lands is an edit these bytes do not contain. */
-  gen?: DomainGen;
+   *  write lands is an edit these bytes do not contain.
+   *
+   *  REQUIRED, and required is the guard (SAVE-GEN-OPTIONAL). This field and
+   *  `markDomainsClean`'s third parameter are one channel: while it was optional,
+   *  a `collect` that did not fill it in disabled the mid-save staleness check
+   *  for every domain, silently, and marked the artist's in-flight edits saved.
+   *  `collect` is an injectable parameter of `saveClassicProject`, so a second
+   *  producer costs nobody a new call site -- the fake collector in this module's
+   *  test was already one and already omitted this. An empty object is a legal
+   *  value and a safe one: it compares unequal to any moved counter, so the
+   *  domains are withheld rather than wrongly cleared. */
+  gen: DomainGen;
 }
 
 /**

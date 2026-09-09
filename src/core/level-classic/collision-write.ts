@@ -691,10 +691,19 @@ function dominantSkipWhy(skipped: { reason: CollisionSkipReason; count: number }
  * CELL, this dedupe becomes wrong and must move to a per-cell key.
  *
  * The aggregate limits live here rather than in the store because
- * `classicPaintSurface` checks NEITHER: it grows colind silently with
- * `Math.max(nextBlocks.length, src.length)` and has no ceiling check at all
- * (collision-write.test.ts's "refuses an isolate at the block ceiling" is the
- * standing note of that).
+ * `classicPaintSurface` checks neither of them: it has no block-ceiling check at
+ * all (collision-write.test.ts's "refuses an isolate at the block ceiling" is
+ * the standing note of that), and its colind growth is not a check either.
+ *
+ * The half of that sentence about growth USED TO READ "it grows colind silently
+ * with `Math.max(nextBlocks.length, src.length)`", and as of
+ * COLIND-ART-PATH-ZEROFILL that arithmetic is gone: every append path in the
+ * store goes through `appendColindEntries` (core/level-classic/colind-append.ts),
+ * which records an id only where the table can hold it and hands back the ones it
+ * skipped. So the store no longer widens the table under a plan this planner
+ * approved. It still does not REFUSE such a plan, which is why the refusals below
+ * stay where they are: this planner can say why, with an escape route, and the
+ * store can only decline to write a byte.
  *
  * THE TWO CHECKS BELOW ARE ONE QUESTION SPLIT IN TWO — "do `needed` clones fit
  * in this document at all?", which is `doc.blocks.length + needed` against BOTH

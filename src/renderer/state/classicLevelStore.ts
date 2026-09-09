@@ -32,6 +32,7 @@ import { tileLockReason } from '../../core/project/editable-tiles';
 import type { SurfaceEditPlan, PaintMode as SurfaceDivergeMode } from '../../core/art/classic-surface-plan';
 import type { BlockDef, ChunkCell, ChunkDef256 } from '../../core/level-classic/model';
 import type { CanvasCommitPlan } from '../../core/art/classic-commit-plan';
+import { appendColindEntries } from '../../core/level-classic/colind-append';
 import {
   validateLevelDoc, unpackChunkCell, chunkIndexForId, MAX_ADDRESSABLE_CHUNKS,
 } from '../../core/level-classic/model';
@@ -351,9 +352,22 @@ interface ClassicLevelState {
    * counter has moved since was edited mid-save, is not in the bytes that
    * landed, and is left dirty. Returns the domains it withheld, so the caller
    * can say so rather than reporting a clean save.
+   *
+   * `atGen` IS REQUIRED, AND THAT IS THE WHOLE GUARD (SAVE-GEN-OPTIONAL). It was
+   * `atGen?: DomainGen` read by `if (atGen && ...)`, so a caller that simply did
+   * not pass it got the pre-guard behaviour back in full silence: every domain
+   * cleared, including the one the artist had just edited while the write was in
+   * flight. Nothing marked the omission. One producer passed it and nothing made
+   * the next one -- and `saveClassicProject`'s `collect` is an INJECTABLE
+   * parameter, so a second producer needs no new call site to exist: the fake
+   * collector in classic-save.test.ts was already one, and it already omitted
+   * the counters. Requiring the argument (and `DirtyLevel.gen` with it) makes a
+   * forgetful producer a compile error instead of a silent data loss. The
+   * runtime arm below is the fail-safe for untyped JS, and it fails toward
+   * KEEPING the work.
    */
   markDomainsClean: (
-    ref: ZoneActRef, domains: (keyof DirtyDomains)[], atGen?: DomainGen,
+    ref: ZoneActRef, domains: (keyof DirtyDomains)[], atGen: DomainGen,
   ) => (keyof DirtyDomains)[];
   reset: () => void;
 }
@@ -586,10 +600,24 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
     const s = get();
     // Only touch the currently-open act (the saver clears exactly what it wrote).
     if (!s.ref || s.ref.zone !== ref.zone || s.ref.act !== ref.act) return domains;
+    // NO COUNTERS, NO CLEARING. `atGen` is a required parameter, so this arm is
+    // unreachable from anything the compiler checked; it exists for an untyped
+    // JS caller and for a `as never` cast in a test standing in for one.
+    //
+    // It withholds EVERYTHING rather than throwing, on two grounds. The contract
+    // above this one is that a save never rejects (classic-save.ts, and
+    // tab-activation.test.ts asserts it), so a throw here would turn a
+    // successful write into an unhandled failure at the Ctrl+S door. And the
+    // question this function answers is "which domains are still the ones I
+    // wrote"; with no counters the honest answer is "I cannot tell", and the
+    // side of that answer which loses no work is to leave every flag standing.
+    // The caller already reports withheld domains, so an author sees a toast
+    // rather than nothing.
+    if (!atGen) return domains;
     const dirty = { ...s.dirty };
     const withheld: (keyof DirtyDomains)[] = [];
     for (const d of domains) {
-      if (atGen && (s.domainGen[d] ?? 0) !== (atGen[d] ?? 0)) { withheld.push(d); continue; }
+      if ((s.domainGen[d] ?? 0) !== (atGen[d] ?? 0)) { withheld.push(d); continue; }
       delete dirty[d];
     }
     set({ dirty });
@@ -1032,36 +1060,37 @@ export function classicPaintSurface(plan: SurfaceEditPlan): CommandResult {
   // hardware. See SurfaceEditPlan.newBlocks for why the source id is carried.
   //
   // THE TABLE MAY START SHORTER THAN THE BLOCK LIST and that is normal, not
-  // corruption: GHZ ships 439 blocks against a 410-byte colind. Growing it to
-  // cover a new id necessarily defines the entries in between, which this fills
-  // with 0 — the same "no collision" answer Aurora's overlay already renders
-  // for them, so the game is brought into line with what the editor shows
-  // rather than left reading whatever bytes follow the file.
+  // corruption: GHZ ships more blocks than its colind has bytes. Growing it to
+  // cover a new id would necessarily define the entries in between, and this
+  // used to fill them with 0, argued as "the same no-collision answer Aurora's
+  // overlay already renders for them".
   //
-  // KNOWN OPEN QUESTION (CLASSIC-A4, seat evidence, unverified): "whatever bytes
-  // follow the file" is not nothing — the ROM resolves the overhang from the
-  // adjacent zone's table, so those blocks may have REAL collision in game that
-  // Aurora both draws as air and overwrites with zeros here. Reading it would
-  // need cross-file reach Aurora does not have, so the behaviour is left as
-  // argued above rather than changed on an unverified claim. What HAS been
-  // closed is the other direction: s1-io refuses to write a colind SHORTER than
-  // the one it read, which would move the overhang boundary silently.
+  // THAT ARGUMENT IS RETIRED (COLIND-ART-PATH-ZEROFILL / AUG-U6). The entries in
+  // between are not undefined bytes; they are the collision of REAL BLOCKS of
+  // this zone, resolved in ROM from beyond the file, and rewriting them as zero
+  // is a change the artist did not ask for to blocks they did not touch. The
+  // 2026-08-16 pass that closed the other half of this defect (s1-io refusing to
+  // write a SHORTER table) left this one open for a good reason at the time --
+  // that the ROM's resolution of the overhang was unverified seat evidence -- but
+  // the codebase has ruled three more times since, all the same way:
+  // `classicSetColind` refuses such an id, the collision planners refuse a clone
+  // that would grow across it, and the canvas commit's collision toggle skips it
+  // and counts it apart. Under an unverified claim, the answer that writes no
+  // bytes is the one to take. `appendColindEntries` is that answer, and it is now
+  // the only growth path in this file.
   for (const b of plan.newBlocks) {
     if (b.colind !== undefined && (!isInt(b.colind) || b.colind < 0 || b.colind > 255)) {
       return err(`colind override ${b.colind} out of range 0..255`);
     }
   }
-  const nextColind = plan.newBlocks.length
-    ? (() => {
-      const src = doc.collision.colind;
-      const out = new Uint8Array(Math.max(nextBlocks.length, src.length));
-      out.set(src);
-      plan.newBlocks.forEach((b, i) => {
-        out[doc.blocks.length + i] = b.colind ?? src[b.sourceBlockId] ?? 0;
-      });
-      return out;
-    })()
-    : doc.collision.colind;
+  const colindAppend = appendColindEntries(
+    doc.collision.colind,
+    plan.newBlocks.map((b, i) => ({
+      blockId: doc.blocks.length + i,
+      shape: b.colind ?? doc.collision.colind[b.sourceBlockId] ?? 0,
+    })),
+  );
+  const nextColind = colindAppend.colind;
   for (const { blockId, cellIndex, cell } of plan.blockCellEdits) {
     if (!isInt(blockId) || blockId < 0 || blockId >= nextBlocks.length) {
       return err(`block ${blockId} does not exist (0..${nextBlocks.length - 1})`);
@@ -1098,10 +1127,13 @@ export function classicPaintSurface(plan: SurfaceEditPlan): CommandResult {
   const dirtyPatch: DirtyDomains = {};
   if (plan.tileWrites.length) dirtyPatch.tiles = true;
   if (plan.newBlocks.length || plan.blockCellEdits.length) dirtyPatch.blocks = true;
-  // An appended block extends colind (above), so the collision file must be
-  // rewritten too — the writer emits it only when this domain is dirty, and a
-  // grown table nobody flags is a table that never reaches disk.
-  if (plan.newBlocks.length) dirtyPatch.colind = true;
+  // An appended block MAY extend colind (above), so the collision file may need
+  // rewriting — the writer emits it only when this domain is dirty, and a grown
+  // table nobody flags is a table that never reaches disk. Flagged from what was
+  // actually RECORDED, not from "a block was appended": in an overhang zone
+  // nothing is recorded, and flagging it there would ask the writer to emit a
+  // file no byte of which changed.
+  if (colindAppend.recorded.length) dirtyPatch.colind = true;
   if (plan.chunkCellEdits.length) dirtyPatch.chunks = true;
   if (Object.keys(dirtyPatch).length === 0) return { ok: true }; // no-op gesture
 
@@ -1176,14 +1208,20 @@ export function classicCommitCanvas(plan: CanvasCommitPlan): CommandResult {
   // Collision travels with the block, as it does for an Isolate clone — but
   // here the value is inherited positionally from the cell being displaced
   // rather than from a source block. See the plan's D3.
-  const nextColind = plan.blockWrites.length
-    ? (() => {
-      const out = new Uint8Array(Math.max(nextBlocks.length, doc.collision.colind.length));
-      out.set(doc.collision.colind);
-      for (const { blockId, colind } of plan.blockWrites) out[blockId] = colind;
-      return out;
-    })()
-    : doc.collision.colind;
+  //
+  // THE SAME GROWTH RULE AS THE PAINT PATH, and this site is the one the sweep's
+  // COLIND-ART-PATH-ZEROFILL row did not name. `withCollision`
+  // (core/art/commit-collision.ts) already declines to ASSIGN a shape to an id
+  // past the end of the table, and said in its own header that it was
+  // deliberately not widening to "the pre-existing zero-fill on save (U6 /
+  // CLASSIC-A4)" -- which is this arithmetic, one layer down, still creating the
+  // interior range whatever the toggle decided. A plan whose ids all sit inside
+  // the table is unaffected: reclaimed ids are written in place as before.
+  const colindAppend = appendColindEntries(
+    doc.collision.colind,
+    plan.blockWrites.map(({ blockId, colind }) => ({ blockId, shape: colind })),
+  );
+  const nextColind = colindAppend.colind;
 
   const nextChunks = (plan.chunkWrites.length || plan.chunkAppends.length)
     ? doc.chunks.slice() : doc.chunks;
@@ -1224,7 +1262,9 @@ export function classicCommitCanvas(plan: CanvasCommitPlan): CommandResult {
 
   const dirtyPatch: DirtyDomains = {};
   if (plan.tileWrites.length) dirtyPatch.tiles = true;
-  if (plan.blockWrites.length) { dirtyPatch.blocks = true; dirtyPatch.colind = true; }
+  if (plan.blockWrites.length) dirtyPatch.blocks = true;
+  // From what was RECORDED, not from "blocks were written": see the paint path.
+  if (colindAppend.recorded.length) dirtyPatch.colind = true;
   if (plan.chunkWrites.length || plan.chunkAppends.length) dirtyPatch.chunks = true;
   if (plan.paletteWrites?.length) dirtyPatch.palette = true;
   if (Object.keys(dirtyPatch).length === 0) return { ok: true }; // nothing to do
@@ -1376,7 +1416,12 @@ export function classicAddBlock(
    *  identical and is not solid. Omitted (New-blank) means shape 0, which is
    *  the "no collision" answer Aurora's overlay already renders for an id past
    *  the end of the table. See classicPaintSurface for the same rule on the
-   *  Isolate-clone path, and SurfaceEditPlan.newBlocks for why it matters. */
+   *  Isolate-clone path, and SurfaceEditPlan.newBlocks for why it matters.
+   *
+   *  EITHER WAY THE SHAPE IS ONLY RECORDED IF THE TABLE CAN HOLD THE NEW ID:
+   *  in a zone whose colind already stops short of its block list, the entry is
+   *  skipped rather than the table grown over other blocks' collision. See
+   *  `appendColindEntries`. */
   opts?: { sourceBlockId?: number },
 ): AddResult {
   const doc = requireDoc();
@@ -1393,24 +1438,31 @@ export function classicAddBlock(
   }
   const nextBlocks = [...doc.blocks, { cells }];
   // Grow colind to cover the new id, inheriting the source's shape (or 0 for a
-  // blank). The table can legitimately START shorter than the block list —
-  // GHZ ships 439 blocks against a 410-byte colind — so the entries in between
-  // are filled with 0 rather than left undefined.
+  // blank). The table can legitimately START shorter than the block list, and it
+  // used to be filled with 0 up to the new id -- see appendColindEntries for why
+  // that range is other blocks' collision and not spare space, and for the three
+  // other doors that already refuse it. In an overhang zone the new block keeps
+  // no entry, which is the same standing it has in the file it came from; the
+  // block itself is still appended, because the block ceiling, not the table
+  // length, is what limits blocks.
   const srcColind = doc.collision.colind;
-  const nextColind = new Uint8Array(Math.max(nextBlocks.length, srcColind.length));
-  nextColind.set(srcColind);
-  nextColind[nextBlocks.length - 1] = opts?.sourceBlockId !== undefined
-    ? (srcColind[opts.sourceBlockId] ?? 0)
-    : 0;
+  const colindAppend = appendColindEntries(srcColind, [{
+    blockId: nextBlocks.length - 1,
+    shape: opts?.sourceBlockId !== undefined ? (srcColind[opts.sourceBlockId] ?? 0) : 0,
+  }]);
   const newDoc: LevelDoc = {
     ...doc, blocks: nextBlocks,
-    collision: { ...doc.collision, colind: nextColind },
+    collision: { ...doc.collision, colind: colindAppend.colind },
   };
   const e = structuralError(newDoc);
   if (e) return err(e);
   // A brand-new block is referenced by no chunk yet → no chunk art changes; the
   // block palette re-reads on the new doc identity. No version bump needed.
-  commitArt(newDoc, { blocks: true, colind: true }, { kind: 'none' });
+  commitArt(
+    newDoc,
+    colindAppend.recorded.length ? { blocks: true, colind: true } : { blocks: true },
+    { kind: 'none' },
+  );
   return { ok: true, id: nextBlocks.length - 1 };
 }
 

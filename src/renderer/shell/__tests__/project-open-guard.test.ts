@@ -467,7 +467,12 @@ describe('confirmProjectOpen over a dirty canvas', () => {
   it("'save' that persists the canvas resolves true and then drops it", async () => {
     dirtyCanvas(true);
     const saveSpy = vi.fn(async () => {
-      useCanvasStore.getState().markSaved(CANVAS, { pngMtimeMs: 2000, sidecarMtimeMs: 2000 });
+      // `atGen` is required (CANVAS-SAVE-GEN-OPTIONAL): this fake save stands in
+      // for one that raced no edit, so it carries the counter as it stands.
+      useCanvasStore.getState().markSaved(
+        CANVAS, { pngMtimeMs: 2000, sidecarMtimeMs: 2000 },
+        useCanvasStore.getState().docs.get(CANVAS)!.editGen,
+      );
       return { saved: ['canvas-doc'], skipped: [], failed: [] };
     });
     __setOpenGuardSaveForTest(saveSpy);

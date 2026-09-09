@@ -682,6 +682,162 @@ describe('classicPaintSurface colind override', () => {
   });
 });
 
+/**
+ * COLIND-ART-PATH-ZEROFILL / AUG-U6: growing the collision table across the
+ * overhang.
+ *
+ * A zone's colind can ship SHORTER than its block list, and the ids past its end
+ * take their collision from beyond the file in ROM. Every append path grew the
+ * table with `new Uint8Array(Math.max(nextBlocks.length, src.length))` followed
+ * by `out.set(src)`, so the ids between the table's old end and the appended one
+ * were CREATED AS ZEROS: real blocks of the open zone, rewritten to "no
+ * collision" by an edit the artist made somewhere else entirely, and then written
+ * to disk because the same gesture flagged the domain dirty. Zero is a legal
+ * shape, so no later reader can tell those bytes from authored ones.
+ *
+ * Three sites did it: the paint path (Isolate clone), the canvas commit, and
+ * add-block. Each case below drives a real store command over a doc in that
+ * shape and asserts the table came out byte-identical.
+ *
+ * The controls matter as much as the cases: a fix that simply stopped touching
+ * colind would pass every assertion above and break the thing collision-travels-
+ * with-the-clone exists for. So each path is also driven over a doc whose table
+ * covers its blocks, where the entry must still be recorded.
+ */
+describe('colind growth across the overhang', () => {
+  const blockCell = (tile: number) => ({ tile, xf: false, yf: false, pal: 0, pri: false });
+  const fourCells = () => Array.from({ length: 4 }, () => blockCell(1));
+
+  /**
+   * The fixture, grown so the block list runs PAST the collision table -- the
+   * stock shape of the zones this defect corrupts. Blocks 2 and 3 are the
+   * overhang: real, referenceable blocks with no byte of their own in the table.
+   */
+  function overhangDoc() {
+    const doc = makeDoc();
+    doc.blocks.push({ cells: fourCells() }, { cells: fourCells() });
+    return doc; // 4 blocks against a 2-byte colind
+  }
+
+  const clonePlan = (): SurfaceEditPlan => ({
+    tileWrites: [],
+    newBlocks: [{ def: { cells: fourCells() }, sourceBlockId: 1 }],
+    blockCellEdits: [],
+    chunkCellEdits: [],
+    stats: { tilesClaimed: 0, blocksCloned: 1, placesAffected: 1 },
+  });
+
+  /** A commit whose block writes are exactly `ids`, each taking shape 6. */
+  const commitPlan = (ids: number[]): CanvasCommitPlan => ({
+    tileWrites: [],
+    blockWrites: ids.map((blockId) => ({
+      blockId, def: { cells: fourCells() }, colind: 6,
+    })),
+    chunkWrites: [],
+    chunkAppends: [],
+    paletteWrites: [],
+    report: {
+      tilesNew: 0, tilesReused: 0, tilesReclaimed: 0,
+      blocksNew: ids.length, blocksReused: 0, blocksReclaimed: 0, blocksZeroed: 0,
+      chunksReplaced: 0, chunksAppended: 0,
+      blocksInheritedCollision: ids.length, blocksWithoutCollision: 0,
+      cellsInheritedSolidity: 0, cellsWithoutSolidity: 0,
+      poolBefore: { tiles: TILE_COUNT, blocks: 4, chunks: 2 },
+      poolAfter: { tiles: TILE_COUNT, blocks: 5, chunks: 2 },
+      warnings: [],
+    },
+  });
+
+  it('classicPaintSurface: an Isolate clone leaves every existing byte alone', () => {
+    openReady(overhangDoc());
+    expect(st().doc!.blocks.length).toBe(4);
+    const before = Array.from(st().doc!.collision.colind);
+    expect(before).toHaveLength(2); // the table stops two ids short
+
+    expect(classicPaintSurface(clonePlan())).toEqual({ ok: true });
+
+    // The clone still happens: the block ceiling limits blocks, not this table.
+    expect(st().doc!.blocks.length).toBe(5);
+    expect(st().dirty.blocks).toBe(true);
+    // And the table did not grow, so blocks 2 and 3 keep the collision they had.
+    expect(Array.from(st().doc!.collision.colind)).toEqual(before);
+    // Nothing changed, so nothing asks the writer to emit the collision file.
+    expect(st().dirty.colind).toBeUndefined();
+  });
+
+  it('classicAddBlock: a duplicate leaves every existing byte alone', () => {
+    openReady(overhangDoc());
+    const before = Array.from(st().doc!.collision.colind);
+    const r = classicAddBlock({ cells: fourCells() }, { sourceBlockId: 1 });
+    expect(r).toEqual({ ok: true, id: 4 });
+    expect(Array.from(st().doc!.collision.colind)).toEqual(before);
+    expect(st().dirty.colind).toBeUndefined();
+    expect(st().dirty.blocks).toBe(true);
+  });
+
+  it('classicAddBlock: a New-blank leaves every existing byte alone', () => {
+    openReady(overhangDoc());
+    const before = Array.from(st().doc!.collision.colind);
+    expect(classicAddBlock()).toEqual({ ok: true, id: 4 });
+    expect(Array.from(st().doc!.collision.colind)).toEqual(before);
+    expect(st().dirty.colind).toBeUndefined();
+  });
+
+  it('classicCommitCanvas: an appended id leaves every existing byte alone', () => {
+    openReady(overhangDoc());
+    const before = Array.from(st().doc!.collision.colind);
+    expect(classicCommitCanvas(commitPlan([4]))).toEqual({ ok: true });
+    expect(st().doc!.blocks.length).toBe(5);
+    expect(Array.from(st().doc!.collision.colind)).toEqual(before);
+    expect(st().dirty.colind).toBeUndefined();
+  });
+
+  /**
+   * The refusal is PER ID, not per gesture, and this is the case that says so.
+   * A canvas commit can reclaim an id inside the table and mint another past it
+   * in one plan; treating the plan as tainted would silently drop collision the
+   * zone's own file can perfectly well hold.
+   */
+  it('classicCommitCanvas: an id INSIDE the table is still written alongside a skipped one', () => {
+    openReady(overhangDoc());
+    expect(classicCommitCanvas(commitPlan([1, 4]))).toEqual({ ok: true });
+    const after = st().doc!.collision.colind;
+    expect(after.length).toBe(2);          // no growth for id 4
+    expect(after[1]).toBe(6);              // and id 1 took its shape
+    expect(st().dirty.colind).toBe(true);  // a byte DID change, so it must be written
+  });
+
+  // --- controls: a table that covers its blocks still grows -----------------
+  //
+  // These are what stop "never touch colind" from passing as a fix. The plain
+  // fixture's table covers both its blocks, so an append extends it by exactly
+  // the id being defined and no interior byte exists to invent.
+
+  it('CONTROL: with no overhang, an Isolate clone records its inherited shape', () => {
+    openReady();
+    expect(classicSetColind([{ blockId: 1, value: 9 }]).ok).toBe(true);
+    expect(classicPaintSurface(clonePlan())).toEqual({ ok: true });
+    const after = st().doc!.collision.colind;
+    expect(after.length).toBe(3);
+    expect(after[2]).toBe(9);
+    expect(st().dirty.colind).toBe(true);
+  });
+
+  it('CONTROL: with no overhang, add-block and a commit both record theirs', () => {
+    openReady();
+    expect(classicSetColind([{ blockId: 1, value: 9 }]).ok).toBe(true);
+    expect(classicAddBlock({ cells: fourCells() }, { sourceBlockId: 1 })).toEqual({ ok: true, id: 2 });
+    expect(st().doc!.collision.colind[2]).toBe(9);
+    expect(st().dirty.colind).toBe(true);
+
+    openReady();
+    expect(classicCommitCanvas(commitPlan([2]))).toEqual({ ok: true });
+    expect(st().doc!.collision.colind.length).toBe(3);
+    expect(st().doc!.collision.colind[2]).toBe(6);
+    expect(st().dirty.colind).toBe(true);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Cross-cutting: no-level guard, triple consistency, shared timeline.
 // ---------------------------------------------------------------------------

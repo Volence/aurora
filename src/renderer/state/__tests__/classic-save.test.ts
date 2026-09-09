@@ -185,7 +185,13 @@ function handleWith(
 }
 
 const dirtyDoc = { game: 's1' } as unknown as DirtyLevel['doc'];
-const oneDirty = (): DirtyLevel[] => [{ ref: REF, doc: dirtyDoc, dirty: { start: true } }];
+// `gen` was ADDED here by the SAVE-GEN-OPTIONAL fix, and this line is that
+// finding's whole evidence: an injected collector is a second producer of
+// DirtyLevel that costs nobody a new call site, and this one had existed for as
+// long as the guard had, silently switching it off for every case that used it.
+// `{}` is honest for a store with no recorded edits, and it is the safe value
+// besides: it compares unequal to any counter that has moved.
+const oneDirty = (): DirtyLevel[] => [{ ref: REF, doc: dirtyDoc, dirty: { start: true }, gen: {} }];
 
 beforeEach(() => {
   useClassicProjectStore.getState().reset();
@@ -409,6 +415,89 @@ describe('saveClassicProject clears dirty flags on success', () => {
     const out = await saveClassicProject(api);
     expect(out).toEqual({ kind: 'saved', count: 1 });
     // `start` landed and was not touched again; `blocks` is the newer edit.
+    expect(useClassicLevelStore.getState().dirty).toEqual({ blocks: true });
+  });
+});
+
+/**
+ * SAVE-GEN-OPTIONAL. The guard the test above proves was reachable only when the
+ * caller CHOSE to arm it: `markDomainsClean`'s third parameter was optional and
+ * read `if (atGen && ...)`, so a `collect` that returned no counters got the
+ * pre-guard behaviour in full, and marked the artist's in-flight edit saved.
+ *
+ * That is now a compile error at every producer the compiler can see, and this
+ * file's own `oneDirty` was the one it found. These two cases are about the arm
+ * the compiler cannot see -- an untyped JS caller, standing in for here as a
+ * cast -- and about the control that keeps the first case honest.
+ *
+ * `mid` below is the SAME mid-save edit the R4 test above stages, so the two
+ * differ in exactly one thing: whether the collector supplied `gen`.
+ */
+describe('saveClassicProject: the mid-save guard cannot be switched off', () => {
+  const bothFiles: WriteResult = {
+    written: [], skipped: [], errors: [],
+    files: [
+      { path: 'map16/b.eni', bytes: new Uint8Array([1]) },
+      { path: 'startpos/s.bin', bytes: new Uint8Array([2]) },
+    ],
+    fileMtimes: {},
+  };
+
+  /** An api whose in-flight window paints a block, as the artist would. */
+  const paintsDuringWrite = () => fakeApi(() => {
+    const s = useClassicLevelStore.getState();
+    useClassicLevelStore.setState({
+      dirty: { ...s.dirty, blocks: true },
+      domainGen: { ...s.domainGen, blocks: (s.domainGen.blocks ?? 0) + 1 },
+    });
+    return okResult(['map16/b.eni', 'startpos/s.bin'], {});
+  });
+
+  function readyWithBothDirty(): LevelDoc {
+    const doc = docWithRefs();
+    useClassicLevelStore.setState({
+      ref: REF, doc, status: 'ready', dirty: { blocks: true, start: true }, domainGen: {},
+    });
+    openStoreWithHandle(handleWith(async () => bothFiles, vi.fn()));
+    return doc;
+  }
+
+  beforeEach(() => {
+    useClassicLevelStore.getState().reset();
+  });
+
+  it('clears NOTHING for a collector that supplies no counters, and reports it', async () => {
+    const doc = readyWithBothDirty();
+    // The shape an untyped producer has: no `gen`. Before the fix this cleared
+    // both domains, `blocks` included -- the edit made during the write, gone
+    // with no dot and no prompt.
+    const noCounters = () => [
+      { ref: REF, doc, dirty: { blocks: true, start: true } } as unknown as DirtyLevel,
+    ];
+
+    const out = await saveClassicProject(paintsDuringWrite(), noCounters);
+    expect(out).toEqual({ kind: 'saved', count: 1 });
+    expect(useClassicLevelStore.getState().dirty).toEqual({ blocks: true, start: true });
+
+    // And the author is TOLD, rather than the flags quietly standing: the same
+    // withheld-domains toast the counter-carrying path uses. Matched on the
+    // wording only this notice uses, and on both domain names being in it.
+    const notices = useToastStore.getState().toasts.map((t) => t.message);
+    const withheld = notices.filter((m) => /edits made during the save are still unsaved/.test(m));
+    expect(withheld).toHaveLength(1);
+    expect(withheld[0]).toMatch(/blocks/);
+    expect(withheld[0]).toMatch(/start/);
+  });
+
+  it('CONTROL: the same collector WITH counters clears the domain nothing touched', async () => {
+    const doc = readyWithBothDirty();
+    const withCounters = (): DirtyLevel[] => [
+      { ref: REF, doc, dirty: { blocks: true, start: true }, gen: {} },
+    ];
+
+    const out = await saveClassicProject(paintsDuringWrite(), withCounters);
+    expect(out).toEqual({ kind: 'saved', count: 1 });
+    // `start`'s counter never moved, so it clears; only the painted domain stays.
     expect(useClassicLevelStore.getState().dirty).toEqual({ blocks: true });
   });
 });
