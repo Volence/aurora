@@ -130,6 +130,27 @@ interface EditorState {
    */
   dirtyActs: Record<string, number>;
   /**
+   * WHICH acts have unsaved work an UNDO COULD NOT TAKE BACK, keyed the same
+   * way. An act listed here is dirty until a save, whatever the undo stacks do.
+   *
+   * `dirtyActs` counts edits, and `markUndone` walks that count back down so an
+   * undo to the saved point clears the dot (packet
+   * docs/reviews/2026-09-09-save-contract.md, receipt R5). That is only sound
+   * while every edit since the last clean point WAS an undo step. It is not:
+   * `markDirty()` is called from mid-gesture paths that record no command at all
+   * (a BG tile write in MapViewport, a collision stroke's other plane, a chunk
+   * library import). If those counted the same way, this sequence would report
+   * CLEAN over unsaved work — place A, save, write a BG tile directly, undo A —
+   * because the count would return to zero while the tile write is still only in
+   * memory. A false clean loses work, so the counter is not trusted alone.
+   *
+   * So `markDirty()` defaults to HARD and only the command path opts in
+   * (`markDirty({ undoable: true })` from executeCommand / executeAmbientCommand,
+   * the two functions that push onto an undo stack). Every other call site keeps
+   * exactly the behaviour it had.
+   */
+  hardDirtyActs: Record<string, boolean>;
+  /**
    * Repaint clock for level mutations that DON'T go through a command and so
    * never reach an undo stack: an object/ring drag in progress, a direct BG tile
    * write. History-driven repaint is not here — it comes from the hub, via
@@ -566,7 +587,26 @@ interface EditorState {
   setPasting: (pasting: boolean) => void;
   setStampDetached: (detached: boolean) => void;
   setLinkHover: (hover: { sectionIndex: number; placementId: number; chunkId: string } | null) => void;
-  markDirty: () => void;
+  /**
+   * The current act has unsaved work.
+   *
+   * `undoable` says whether the edit that caused this is ONE STEP on an undo
+   * stack, so that undoing it returns the document to the state this call left
+   * behind. Only executeCommand / executeAmbientCommand may pass true — see
+   * `hardDirtyActs` for what goes wrong if a mid-gesture write claims it.
+   */
+  markDirty: (opts?: { undoable?: boolean }) => void;
+  /**
+   * One undo step was reverted on the current act: walk the edit count back.
+   *
+   * Clears the act when the count reaches zero AND nothing hard-dirty happened
+   * since the last save, which is the honest reading of "the document is back to
+   * what is on disk". Deliberately allowed to go NEGATIVE: undoing past the
+   * point a save was taken leaves the document differing from disk in the other
+   * direction, and a non-zero count is exactly how that stays dirty. A redo
+   * brings it back to zero through `markDirty({ undoable: true })`.
+   */
+  markUndone: () => void;
   /** Everything clean — a discard, or a project going away. */
   markClean: () => void;
   /**
@@ -663,6 +703,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selection: null,
   dirty: false,
   dirtyActs: {},
+  hardDirtyActs: {},
   liveEditVersion: 0,
   chunkLibraryVersion: 0,
   chunkVersions: new Map<string, number>(),
@@ -823,22 +864,63 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       && prev.placementId === linkHover.placementId) return {};
     return { linkHover };
   }),
-  markDirty: () => set((s) => {
+  markDirty: (opts) => set((s) => {
     const p = useProjectStore.getState();
     if (!p.currentZoneId || !p.currentActId) return { dirty: true };
     const key = `${p.currentZoneId}/${p.currentActId}`;
-    return { dirty: true, dirtyActs: { ...s.dirtyActs, [key]: (s.dirtyActs[key] ?? 0) + 1 } };
+    // ⚠ DEFAULT HARD. `opts?.undoable` is opt-in for the two command paths; see
+    // `hardDirtyActs` in the state interface for the sequence a wrong claim here
+    // reports clean over.
+    const undoable = opts?.undoable === true;
+    const prev = s.dirtyActs[key] ?? 0;
+    // A NEGATIVE COUNT MEANS "undone past the last save", and a HARD edit on top
+    // of that must not be able to cancel it out to zero: the two are different
+    // unsaved differences, not opposite ones. So a hard edit counts up from zero
+    // at the lowest, which keeps its key present and the act dirty however the
+    // stack later moves. An undoable edit is the exact inverse of one markUndone
+    // and counts from wherever the stack actually is.
+    const next = undoable ? prev + 1 : Math.max(prev, 0) + 1;
+    const dirtyActs = { ...s.dirtyActs, [key]: next };
+    // A count that lands back on zero has to MEAN clean, so a zero is never
+    // stored as a live key. Only the undoable branch can reach it.
+    if (next === 0) delete dirtyActs[key];
+    const hardDirtyActs = undoable
+      ? s.hardDirtyActs
+      : { ...s.hardDirtyActs, [key]: true };
+    // DERIVED, not asserted: a redo that returns the count to the saved point is
+    // a markDirty call whose outcome is CLEAN, and `dirty: true` here was what
+    // kept the dot on after it.
+    return { dirty: Object.keys(dirtyActs).length > 0, dirtyActs, hardDirtyActs };
   }),
-  markClean: () => set({ dirty: false, dirtyActs: {} }),
+  markUndone: () => set((s) => {
+    const p = useProjectStore.getState();
+    if (!p.currentZoneId || !p.currentActId) return {};
+    const key = `${p.currentZoneId}/${p.currentActId}`;
+    // Something happened since the last save that no undo can revert, so the
+    // count is not the whole story and the act stays dirty. Leave BOTH maps
+    // untouched: walking the count down here would let a later undo of an
+    // undoable edit reach zero and clear an act that still holds the
+    // unrevertable write.
+    if (s.hardDirtyActs[key]) return {};
+    const dirtyActs = { ...s.dirtyActs, [key]: (s.dirtyActs[key] ?? 0) - 1 };
+    if (dirtyActs[key] === 0) delete dirtyActs[key];
+    return { dirtyActs, dirty: Object.keys(dirtyActs).length > 0 };
+  }),
+  markClean: () => set({ dirty: false, dirtyActs: {}, hardDirtyActs: {} }),
   markActsClean: (keys, atGen) => {
     const s = get();
     const next = { ...s.dirtyActs };
+    const nextHard = { ...s.hardDirtyActs };
     const withheld: string[] = [];
     for (const k of keys) {
       if ((next[k] ?? 0) !== (atGen[k] ?? 0)) { withheld.push(k); continue; }
       delete next[k];
+      // The save is this act's new clean point, so whatever could not be undone
+      // before it is now on disk. An act still WITHHELD keeps its hard flag: the
+      // edit that arrived mid-write is exactly the unrevertable kind.
+      delete nextHard[k];
     }
-    set({ dirtyActs: next, dirty: Object.keys(next).length > 0 });
+    set({ dirtyActs: next, hardDirtyActs: nextHard, dirty: Object.keys(next).length > 0 });
     return withheld;
   },
   bumpLiveEdit: () => set((s) => ({ liveEditVersion: s.liveEditVersion + 1 })),
@@ -937,7 +1019,10 @@ export function executeCommand(command: AnyCommand, level: S4Level): void {
     );
   }
   stack.execute(command, level);   // notifies notifyCommandApplied
-  useEditorStore.getState().markDirty();
+  // UNDOABLE: this edit is one step on `stack`, so undoing it returns the act to
+  // the state it was in before this call. That is what lets the dirty dot clear
+  // when the user walks all the way back (editorStore's `hardDirtyActs`).
+  useEditorStore.getState().markDirty({ undoable: true });
 }
 
 // --- Ambient (non-focused) commands ----------------------------------------
@@ -1015,5 +1100,8 @@ export function executeAmbientCommand(command: AnyCommand, level: S4Level): void
     );
   }
   stack.execute(command, level);   // notifies notifyCommandApplied
-  useEditorStore.getState().markDirty();
+  // UNDOABLE: this edit is one step on `stack`, so undoing it returns the act to
+  // the state it was in before this call. That is what lets the dirty dot clear
+  // when the user walks all the way back (editorStore's `hardDirtyActs`).
+  useEditorStore.getState().markDirty({ undoable: true });
 }

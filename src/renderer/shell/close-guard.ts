@@ -1,11 +1,25 @@
 // The window-close half of the unsaved-work perimeter.
 //
-// Every other exit door already prompts — tab close, act switch, project open,
-// Setup Apply — and closing the WINDOW, the one that takes everything at once,
-// did not. There was no `close` interception, no `before-quit` check, no
-// `beforeunload` handler and no autosave, so Ctrl+W (Electron's default menu
-// binds `close` to it, since Aurora sets no menu of its own) destroyed every
-// unsaved document in the app without a word.
+// Every other exit door already prompts — SPRITE and CANVAS tab close, act
+// switch, project open, Setup Apply — and closing the WINDOW, the one that takes
+// everything at once, did not.
+//
+// ⚠ "TAB CLOSE" USED TO BE WRITTEN HERE UNQUALIFIED AND IT WAS NOT TRUE. A
+// LEVEL tab closes without a prompt and always has. That is not the same defect
+// this file fixes, because a level close discards nothing: the act stays
+// resident with its unsaved edits (measured 2026-09-09, packet
+// docs/reviews/2026-09-09-save-contract.md receipt R4 — the tab closed, the
+// object was still there on reopen). What it DID discard was the undo history,
+// and tab-activation/dispatch.ts now keeps that for a dirty level document.
+// Whether a non-destructive close should still ASK is a look decision and is
+// parked for the owner in that packet, not settled here. The sentence is
+// corrected rather than deleted because two readers took it as a promise the
+// app was keeping.
+//
+// The window door, before this file existed: there was no `close` interception,
+// no `before-quit` check, no `beforeunload` handler and no autosave, so Ctrl+W
+// (Electron's default menu binds `close` to it, since Aurora sets no menu of its
+// own) destroyed every unsaved document in the app without a word.
 //
 // Main owns the window and cannot see what is dirty; this side can. So main
 // suspends the close and asks here — see installCloseGuard in main/index.ts —

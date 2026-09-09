@@ -13,6 +13,17 @@ import { useDirtySnapshot } from './dirty-snapshot';
 import { requestFocusTabId, requestCloseTab } from './tab-activation';
 import type { TabDescriptor } from '../../core/shell/session';
 
+/**
+ * The dirty dot's two texts, exported so a test can assert the RENDERED name
+ * against the one definition rather than against a copy of the string.
+ * `DIRTY_DOT_TITLE` is what a pointer user hovers; `DIRTY_DOT_LABEL` is the
+ * accessible name, and it is deliberately the state alone - a screen reader
+ * announces a label, and "Ctrl+S to save" read out as part of an element's
+ * NAME is instruction where a name belongs.
+ */
+export const DIRTY_DOT_LABEL = 'Unsaved changes';
+export const DIRTY_DOT_TITLE = 'Unsaved changes. Ctrl+S to save';
+
 function Tab({ tab, active, dirty }: { tab: TabDescriptor; active: boolean; dirty: boolean }) {
   const [hover, setHover] = React.useState(false);
   const closeable = tab.kind !== 'home';
@@ -30,7 +41,27 @@ function Tab({ tab, active, dirty }: { tab: TabDescriptor; active: boolean; dirt
     >
       {tab.kind === 'home' && <Icons.IconHome size={13} />}
       <span style={styles.tabTitle}>{tab.title}</span>
-      {dirty && <span style={styles.dot} title="Unsaved changes. Ctrl+S to save" />}
+      {dirty && (
+        // THE DOT IS THE ONLY PLACE THE APP SAYS "UNSAVED", so it has to be
+        // readable by something other than a hovering mouse. It was a bare
+        // 6x6 `<span>` carrying a `title` and nothing else: no text, no role,
+        // no accessible name. A screen reader walks past it, and a full-DOM
+        // scan for the state finds a decorative element. Two independent UX
+        // seats reached the same conclusion from opposite ends (packet
+        // docs/reviews/2026-09-09-save-contract.md, receipt R3).
+        //
+        // `role="img"` + `aria-label` is the minimum that gives it a name in
+        // the accessibility tree; the `title` stays because it is what a
+        // pointer user gets and it names the remedy. NOTHING VISUAL CHANGES -
+        // what a save control should LOOK like is the owner's call and is
+        // parked in that packet, not decided here.
+        <span
+          style={styles.dot}
+          role="img"
+          aria-label={DIRTY_DOT_LABEL}
+          title={DIRTY_DOT_TITLE}
+        />
+      )}
       {closeable && (
         <span
           onMouseDown={(e) => { e.stopPropagation(); if (e.button === 0) void requestCloseTab(tab.id); }}

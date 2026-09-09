@@ -73,7 +73,7 @@ import { saveCanvasDocument } from './canvas-save';
 import { saveAeonProject } from './aeon-save';
 import { composerSaveState, saveComposerDocument } from './art-composer-save';
 import { parseLevelTabId, parseSpriteDocTabId, parseCanvasDocTabId } from '../shell/tabs';
-import { levelDocDirty } from '../shell/dirty-tabs';
+import { levelDocDirty, unsavedElsewhereMessage } from '../shell/dirty-tabs';
 import { currentDirtySnapshot } from '../shell/dirty-snapshot';
 
 export const saveCoordinator = new SaveCoordinator();
@@ -265,6 +265,22 @@ export async function saveActive(tabId: string | null = activeTabId()): Promise<
   const result = await saveCoordinator.saveActive(tabId);
   for (const f of result.failed) {
     useToastStore.getState().addToast(`Save failed (${f.id}): ${f.message}`, 'error');
+  }
+  // A SAVE THAT WROTE NOTHING WHILE SOMETHING IS UNSAVED HAS TO SAY SO.
+  //
+  // The narrowness above is right and stays. What was wrong is the SILENCE:
+  // the dot on the tab strip advertises this exact gesture as the remedy
+  // ("Unsaved changes. Ctrl+S to save"), and pressing it with the focus
+  // anywhere the routing does not reach produced nothing a person could see.
+  // The message is derived from the same snapshot the dot is, so the two can
+  // never disagree about whether there is unsaved work; `unsavedElsewhereMessage`
+  // returns null when there is none, which keeps Ctrl+S on a clean app silent.
+  //
+  // AFTER the failure toasts, and only when nothing was written: a saver that
+  // failed has already said something more specific.
+  if (result.saved.length === 0 && result.failed.length === 0) {
+    const message = unsavedElsewhereMessage(currentDirtySnapshot());
+    if (message) useToastStore.getState().addToast(message, 'info');
   }
   return result;
 }
