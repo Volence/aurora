@@ -25,10 +25,13 @@ import {
   LAYOUT_WORD_MAX, TILE_PIXELS, TILE_PIXEL_MAX, TILE_BYTES, TILE_WIDTH_PX,
 } from '../core/formats/bg-override/bg-override';
 import { BG_WIDTH } from '../core/formats/bg-tiles';
-// `check_budget`'s reply carries `limit: FG_TILE_LIMIT`, so its DESCRIPTION —
-// the only place an agent learns the number before it spends the pool — reads
-// the same constant instead of restating it.
-import { FG_TILE_LIMIT } from '../core/export/vram-coloring';
+// `check_budget`'s reply carries these, so its DESCRIPTION — the only place an
+// agent learns its budget before it spends the pool — reads the same constants
+// instead of restating them. FG_PAGE_FRAMES is DERIVED from the other two in
+// vram-coloring.ts and is expected to move when aeon resizes the pool, so the
+// sentence must interpolate it: a typed twin would go stale on exactly the clock
+// that moved the constant.
+import { FG_TILE_LIMIT, FG_PAGE_TILES, FG_PAGE_FRAMES } from '../core/export/vram-coloring';
 import { BG_SECTION_BINDING_LIMIT } from '../core/formats/bg-binding';
 import { RASTER_SECTION_BINDING_LIMIT } from '../core/formats/raster-binding';
 // The layer bound an agent is TOLD about, read from the same vendored schema
@@ -126,11 +129,20 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'Decoded nametable entries (tileIndex, palette, flips, priority) for a tile-coordinate rectangle of a section.' },
   { name: 'check_budget', kind: 'check-budget', result: 'json',
     params: { section: z.number().int().min(0).optional() },
-    description: `Flip-aware unique-tile counts per section and per VRAM color group against the `
-      + `${FG_TILE_LIMIT}-tile act FG art pool (aeon's POOL_TILE_CEILING, the fg_art_pool region). `
-      + `The count sums the two VRAM color groups separately, so a tile used by both is counted `
-      + `twice: fits=true therefore has margin, and fits=false can be pessimistic rather than a `
-      + `refusal you will certainly meet.` },
+    description: `The act's FG art cost in PAGE FRAMES, which is the unit that can actually `
+      + `refuse it. aeon carves the ${FG_TILE_LIMIT}-tile fg_art_pool (POOL_TILE_CEILING) into `
+      + `${FG_PAGE_FRAMES} fixed ${FG_PAGE_TILES}-tile frames, and a half-full page still `
+      + `consumes a whole frame, so an act costs its PACKED page count, which is decided at bake time in `
+      + `aeon's tooling and not knowable here. So pageFramesAtLeast is a LOWER BOUND, `
+      + `ceil(tiles/${FG_PAGE_TILES}): the real cost is AT LEAST that and can be higher. verdict `
+      + `is 'over' (the lower bound alone exceeds the frames, so aeon will refuse the act) or `
+      + `'undetermined' (the bound fits; whether the packed count does is not measured here). `
+      + `There is deliberately no 'fits': this cannot tell you an act fits. Also returns the `
+      + `flip-aware unique-tile counts per section and per VRAM color group, and unquantified[], `
+      + `which you should read: the tile count sums the two color groups separately so a tile in `
+      + `both is counted twice (conservative by an amount nobody has measured), and frames can be `
+      + `PINNED, which leaves fewer than ${FG_PAGE_FRAMES} to cover a moving view by an amount `
+      + `aeon has not measured either.` },
   { name: 'set_palette', kind: 'set-palette', result: 'json',
     params: { line: z.number().int().min(1).max(3), colors: z.array(z.number().int()).length(16) },
     description: 'Write one palette line (1-3) as 16 Genesis CRAM words (0000BBB0GGG0RRR0, even channel values only). One undo step.' },
