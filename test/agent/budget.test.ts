@@ -1,4 +1,9 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { describe, it, expect } from 'vitest';
+
+import { AURORA_DIR } from '../support/peer-repo';
 import { canonicalTileHash, computeActBudget } from '../../src/core/agent/budget';
 // IMPORTED, NOT RETYPED. This file used to assert `budget.limit` against a
 // literal 1024, which made it a SECOND copy of a number whose whole problem was
@@ -139,29 +144,85 @@ describe('computeActBudget', () => {
     // storing it, and the engine lane has an open recommendation to shrink the
     // pool, which moves the count with it and tells this repo nothing. So a
     // number typed into one of these sentences would be wrong in exactly the
-    // moment an author read it — the `1024` defect wearing a derivation.
+    // moment an author read it: the `1024` defect wearing a derivation.
     //
-    // This asserts the PROPERTY (every multi-digit run in the prose is one of the
-    // values the module derives), not today's values, so it survives the move.
-    const sec: Section = createSection(0, 'S0');
-    const budget = computeActBudget(
-      { gridWidth: 1, gridHeight: 1, sections: [sec] }, [{ pixels: new Uint8Array(64) }],
+    // ⚠ THIS ROW READS THE SOURCE, NOT THE OUTPUT, AND THE FIRST VERSION OF IT
+    // DID NOT. It compared every multi-digit run in the RETURNED strings against
+    // the set of derived values, which is vacuous by construction: a hand-typed
+    // `12` and an interpolated `${FG_PAGE_FRAMES}` produce the SAME STRING today,
+    // so the typed twin passed the check written to forbid it. Planting it proved
+    // that (mutation M2 in docs/reviews/2026-09-09-budget-page-unit.md, applied
+    // and still green). The two are only distinguishable BEFORE evaluation, so
+    // the assertion has to be about the text of the module.
+    const src = readFileSync(
+      path.join(AURORA_DIR, 'src/core/agent/budget.ts'), 'utf8',
     );
-    const derived = new Set([
-      FG_TILE_LIMIT, FG_PAGE_TILES, FG_PAGE_FRAMES,
-      budget.tiles, budget.pageFramesAtLeast,
-    ]);
-    for (const sentence of budget.unquantified) {
-      for (const run of sentence.match(/\d{2,}/g) ?? []) {
-        expect(
-          derived.has(Number(run)),
-          `check_budget's prose types the number ${run}:\n  "${sentence}"\n`
-          + '  Interpolate the constant instead. A derived value with a hand-typed twin in the '
-          + 'sentence beside it goes stale on the clock that moved the constant, which is how '
-          + 'an author reads a wrong budget with no gate objecting.',
-        ).toBe(true);
-      }
+    const body = /function unquantified\([^)]*\): string\[\] \{([\s\S]*?)\n\}/.exec(src);
+    expect(
+      body !== null,
+      'could not find the body of unquantified() in src/core/agent/budget.ts; if it was '
+      + 'renamed or reshaped, re-point this extractor rather than deleting the row.',
+    ).toBe(true);
+    // Strip the interpolations: what is left is what an author reads that was
+    // TYPED, and no figure may survive there.
+    const typed = (body?.[1] ?? '').replace(/\$\{[^}]*\}/g, '');
+    for (const run of typed.match(/\d{2,}/g) ?? []) {
+      expect(
+        false,
+        `check_budget's prose TYPES the number ${run} instead of interpolating it.\n`
+        + '  A derived value with a hand-typed twin in the sentence beside it goes stale on '
+        + 'the clock that moved the constant, and an author reads the wrong budget with '
+        + 'nothing objecting. Interpolate FG_TILE_LIMIT / FG_PAGE_TILES / FG_PAGE_FRAMES.',
+      ).toBe(true);
     }
+    // Anti-vacuous: the extractor must actually be looking at the prose. If the
+    // strip ever ate the whole body, the loop above would have nothing to find.
+    expect(typed).toMatch(/LOWER BOUND, NOT A FIGURE/);
+    // And the module must really be deriving, so the interpolations are not
+    // decoration over constants that have drifted apart.
+    expect(FG_PAGE_FRAMES * FG_PAGE_TILES).toBe(FG_TILE_LIMIT);
+  });
+
+  it('types no figure into the check_budget TOOL DESCRIPTION either', () => {
+    // ⚠ THE REPO'S OWN PROSE GATE CANNOT COVER THIS ONE, AND THAT IS A FINDING,
+    // NOT A REASON TO SKIP IT. `scripts/check-prose-constants.mjs` polices
+    // author-facing `description:` prose against the constants a module can see,
+    // and `description:` IS in its key population, so this surface LOOKS covered.
+    // It is not: the gate builds its constant table with `numericInit`, which
+    // folds a numeric literal or `constant('X')` and nothing else. FG_PAGE_FRAMES
+    // is declared as a CALL (`deriveFgPageFrames(...)`), so it is absent from
+    // that table and a hand-typed twin of it matches no constant and is never
+    // flagged. Planted and measured, 2026-09-09: typing `12` over
+    // `${FG_PAGE_FRAMES}` in the description below leaves check-prose-constants
+    // printing "0 re-typed in author-facing prose", rc 0 (mutation M2b in
+    // docs/reviews/2026-09-09-budget-page-unit.md).
+    //
+    // THE GENERAL SHAPE IS WORSE THAN THIS ONE SITE: the constants the gate
+    // cannot fold are the DERIVED ones, and a derived constant is precisely the
+    // kind whose value moves. Widening `numericInit` is a separate parcel with a
+    // 523-file blast radius; this row covers the surface this parcel ships.
+    const src = readFileSync(
+      path.join(AURORA_DIR, 'src/main/editor-methods.ts'), 'utf8',
+    );
+    const m = /name: 'check_budget'[\s\S]*?description: ([\s\S]*?)\},\n/.exec(src);
+    expect(
+      m !== null,
+      "could not find check_budget's description in src/main/editor-methods.ts; if the "
+      + 'method table was reshaped, re-point this extractor rather than deleting the row.',
+    ).toBe(true);
+    const typed = (m?.[1] ?? '').replace(/\$\{[^}]*\}/g, '');
+    for (const run of typed.match(/\d{2,}/g) ?? []) {
+      expect(
+        false,
+        `check_budget's tool description TYPES the number ${run} instead of interpolating it.\n`
+        + '  This description is the ONLY place an agent learns its budget before it spends '
+        + 'the pool, and the pool is expected to move. Interpolate FG_TILE_LIMIT / '
+        + 'FG_PAGE_TILES / FG_PAGE_FRAMES.',
+      ).toBe(true);
+    }
+    // Anti-vacuous: the extractor must be looking at the real sentence.
+    expect(typed).toMatch(/PAGE FRAMES/);
+    expect(typed).toMatch(/LOWER BOUND/);
   });
 
   it('offers no `fits`, because Aurora cannot say an act fits', () => {

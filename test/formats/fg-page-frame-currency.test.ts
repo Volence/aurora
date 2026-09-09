@@ -176,7 +176,7 @@ describe('FG page geometry is still what aeon declares', () => {
       + `  Read it:   git -C <aeon> show ${tip}:${CONSTANTS}\n`
       + '  Aurora derives FG_PAGE_FRAMES with exactly that division. If aeon now reserves\n'
       + '  frames, or derives the count some other way, Aurora is handing an author a\n'
-      + '  capacity the engine does not have — while every constant it reads is correct.\n'
+      + '  capacity the engine does not have, while every constant it reads is correct.\n'
       + '  Re-read the engine declaration and change deriveFgPageFrames to match.',
     ).toBe(true);
 
@@ -196,7 +196,7 @@ describe('FG page geometry is still what aeon declares', () => {
       + ` ${FG_TILE_LIMIT} / ${FG_PAGE_TILES};\n`
       + `  aeon derives ${aeonFrames} from ${ceiling} / ${quantum} at ${tip}.\n`
       + `  Read it:   git -C <aeon> show ${tip}:${CONSTANTS}\n`
-      + '  THE FRAME COUNT MOVING IS EXPECTED — the engine lane has an open recommendation\n'
+      + '  THE FRAME COUNT MOVING IS EXPECTED: the engine lane has an open recommendation\n'
       + '  to shrink the pool. This row is not objecting to the move; it is saying OUR copy\n'
       + '  has not followed it. Update FG_TILE_LIMIT (and FG_PAGE_TILES if the quantum\n'
       + '  moved) in src/core/export/vram-coloring.ts; the frame count follows on its own.',
@@ -243,7 +243,7 @@ describe('Aurora derives the frame count rather than storing one', () => {
       + '  It must be derived from the two vendored constants, the way aeon derives its own\n'
       + '  PAGE_FRAMES ("NO LITERAL HERE, DELIBERATELY", engine/system/constants.emp). A\n'
       + '  literal here passes every currency row in this file on the day it is typed and is\n'
-      + '  wrong the day the pool is resized, with nothing to notice — which is exactly how\n'
+      + '  wrong the day the pool is resized, with nothing to notice, which is exactly how\n'
       + '  the FG tile ceiling came to be a third too generous.',
     ).toBe(true);
   });
