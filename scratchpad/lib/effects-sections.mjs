@@ -48,6 +48,39 @@
  * selects on prose; only the two doors are handled here. And the collapsed
  * state read here is the app's own attribute, not a measurement of visibility:
  * a section reported open can still be scrolled out of the panel.
+ *
+ * ═══ ⚠ NOT ONE OF THESE REPAIRS HAS BEEN RUN. FOREGROUND WORK, TAGGED ═══
+ *
+ * The repair landed from a background agent worktree, which has no
+ * `node_modules/.bin/electron` at all, and a harness that appears to run from
+ * one may in fact be driving the MAIN checkout's `dist/` rather than the tree
+ * under test. So every claim behind this module is STATIC: the strings and ids
+ * were read out of `src/`, `test/harness-effects-selectors.test.ts` asserts
+ * they still agree with it, and nothing was watched on screen.
+ *
+ * A foreground seat should run, against a tree built with
+ * `VITE_AURORA_DEBUG=1 npm run build`:
+ *
+ *     npm run harness:bganim-band                     (the row's named harness)
+ *     npm run harness:bganim-rate-shift
+ *     npm run harness:bganim-ui-authored-composition
+ *     npm run harness:band-art-foreground
+ *     npm run harness:bganim-insert-roomy
+ *     npm run harness:effects-column                  (its `nobands` plant)
+ *     node scratchpad/band-trunk-demo.mjs
+ *     node scratchpad/fromtile-typing-probe.mjs
+ *
+ * A PASS IS NOT "IT EXITED 0". Read the instrument-check rows: `2b` in the
+ * first three must report the panel's own headings ON SCREEN (`Tile
+ * animations`, `New tile animation`), which is the row that goes red if the
+ * door did not open; `openEffectsSection` must return `section: 'clicked'` or
+ * `'already-open'` and never `'no-section'`, and `tab` must never be
+ * `'no-tab'`. For `effects-column`, the `nobands` plant must report
+ * `planted: removed "Tile animations (n/m)"` rather than `no-bands-section` -
+ * it had been silently removing nothing, so its row was asserting against an
+ * unplanted column. `fromtile-typing-probe`'s docblock records a dead end
+ * measured while this selector was wrong; that dead end is unverified until
+ * the probe is run again.
  */
 
 /** The sub-tab that renders the tile-animation sections. `providers/effects-sub-tabs.ts`. */
