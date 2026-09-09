@@ -49,6 +49,17 @@ app.whenReady().then(() => {
     displays,
     err,
   }, null, 2));
+  // ── HOLD MODE, for the SURFACE census (surface-isolation-proof) ──────────
+  //
+  // `screen.getAllDisplays()` is the app's own report about itself. The surface
+  // check reads something the app cannot lie about — the sockets in
+  // `/proc/<pid>/fd` — and that requires the process to still EXIST when the
+  // census runs. So a caller may ask it to stay up for a bounded time after
+  // writing its report. Still no BrowserWindow: holding a compositor
+  // connection open is not presenting a surface on it, which is the whole
+  // reason this app can be run window-less against the RED shape at all.
+  const hold = Number(process.env.OZONE_PROBE_HOLD_MS || 0);
+  if (hold > 0) { setTimeout(() => app.exit(0), hold); return; }
   app.exit(0);
 }).catch((e) => {
   // A failure to become ready is itself a result — never a silent absence.
