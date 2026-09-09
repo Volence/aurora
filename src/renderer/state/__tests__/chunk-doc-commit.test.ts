@@ -252,7 +252,7 @@ const tile0 = () => Array.from(atlas()[0].pixels);
 // ---------------------------------------------------------------------------
 
 describe('one gesture, one step, on the zone-art stack', () => {
-  it('the fixture really routes to the zone-art document, so the rows below discriminate', () => {
+  it('[A1] the fixture really routes to the zone-art document, so the rows below discriminate', () => {
     expect(isChunkDocument(useArtStore.getState().open)).toBe(true);
     expect(focusedDocId()).toBe(ZONE_ART);
     expect(artStack().canUndo).toBe(false);
@@ -262,13 +262,13 @@ describe('one gesture, one step, on the zone-art stack', () => {
     expect(openDoc().cells[EMPTY_CELL].localId).toBeNull();
   });
 
-  it('a pencil on an EMPTY cell records exactly one step: the tile append, then the set-chunk', () => {
+  it('[A2] a pencil on an EMPTY cell records exactly one step: the tile append, then the set-chunk', () => {
     const steps = stepsOf(() => expect(pencilOnEmptyCell()).toBe(true));
     expect(steps.length).toBe(1);
     expect(typesOf(steps[0])).toEqual(['set-tileset-tiles', 'set-chunk']);
   });
 
-  it('the appended tile is the painted one, and the cell now points at it', () => {
+  it('[A3] the appended tile is the painted one, and the cell now points at it', () => {
     const before = atlas().length;
     const steps = stepsOf(() => pencilOnEmptyCell(5));
     const append = leaves(steps[0])[0] as SetTilesetTilesCommand;
@@ -279,7 +279,7 @@ describe('one gesture, one step, on the zone-art stack', () => {
     expect(liveChunk()!.nametable[EMPTY_CELL] & 0x7FF).toBe(before);
   });
 
-  it('a collision paint records ONE bare set-chunk: no tile is materialised', () => {
+  it('[A4] a collision paint records ONE bare set-chunk: no tile is materialised', () => {
     const steps = stepsOf(() => {
       paintDocCollision(openDoc(), 'a', 0, 0, 0x1234);
       expect(commitChunkDocStep('art: edit chunk Chunk collision')).toBe(true);
@@ -289,7 +289,7 @@ describe('one gesture, one step, on the zone-art stack', () => {
     expect(liveChunk()!.collisionA[0]).toBe(0x1234);
   });
 
-  it('a tile stamp of an art tile already in the atlas records ONE bare set-chunk', () => {
+  it('[A5] a tile stamp of an art tile already in the atlas records ONE bare set-chunk', () => {
     const before = atlas().length;
     const steps = stepsOf(() => {
       stampTile(openDoc(), 1, 0, { tile: 3, pal: 1, hf: false, vf: false, pri: 'keep' });
@@ -301,7 +301,7 @@ describe('one gesture, one step, on the zone-art stack', () => {
     expect(liveChunk()!.nametable[EMPTY_CELL] & 0x7FF).toBe(3);
   });
 
-  it('a stroke wholly on ATLAS-BACKED cells records ONE bare set-tileset-tiles: no set-chunk', () => {
+  it('[A6] a stroke wholly on ATLAS-BACKED cells records ONE bare set-tileset-tiles: no set-chunk', () => {
     // P3a. The document does not change, so there is nothing for the chunk half
     // to record -- "only where needed", read from the other side.
     const steps = stepsOf(() => {
@@ -312,7 +312,7 @@ describe('one gesture, one step, on the zone-art stack', () => {
     expect(atlas()[1].pixels[0]).toBe(9);
   });
 
-  it('a stroke crossing both kinds of cell is ONE batch, atlas edit first', () => {
+  it('[A7] a stroke crossing both kinds of cell is ONE batch, atlas edit first', () => {
     const steps = stepsOf(() => {
       paintEmptyCell(5);
       expect(commitChunkDocStep('art: edit chunk Chunk', [leadingTileEdit(1, 9)])).toBe(true);
@@ -328,7 +328,7 @@ describe('one gesture, one step, on the zone-art stack', () => {
     expect(append.at).toBe(4);
   });
 
-  it('a commit with nothing new to record records NOTHING, so a drag is not two steps', () => {
+  it('[A8] a commit with nothing new to record records NOTHING, so a drag is not two steps', () => {
     pencilOnEmptyCell();
     const steps = stepsOf(() => expect(commitChunkDocStep('art: edit chunk Chunk')).toBe(false));
     expect(steps).toEqual([]);
@@ -340,18 +340,18 @@ describe('one gesture, one step, on the zone-art stack', () => {
 // ---------------------------------------------------------------------------
 
 describe('a chunk document does not acquire a stack of its own', () => {
-  it('opening one mints no composer document id', () => {
+  it('[B1] opening one mints no composer document id', () => {
     expect(useArtStore.getState().composerDocId).toBeNull();
     expect(isPureDocLocal(useArtStore.getState().open)).toBe(false);
   });
 
-  it('the only history a gesture touches is the zone-art one', () => {
+  it('[B2] the only history a gesture touches is the zone-art one', () => {
     const seen = docIdsTouchedBy(() => pencilOnEmptyCell());
     expect(seen.length).toBeGreaterThan(0);
     expect([...new Set(seen)]).toEqual([ZONE_ART]);
   });
 
-  it('recordComposerEdit, which the allowCow tail still calls, mints nothing here', () => {
+  it('[B3] recordComposerEdit, which the allowCow tail still calls, mints nothing here', () => {
     // The two mechanisms each state the other's half in their headers; this is
     // the half a node row can hold. A snapshot stack for the doc-local writes
     // would be the second history on one document that `focusedDocId`'s
@@ -366,12 +366,12 @@ describe('a chunk document does not acquire a stack of its own', () => {
     ['a pure doc-local buffer with no chunk', { chunkId: null }],
     ['a live-tile document', { liveTileIndex: 3 }],
     ['a BG-override document', { bgOverride: { kind: 'band', index: 0 } }],
-  ])('isChunkDocument says no to %s', (_name, over) => {
+  ])('[B4] isChunkDocument says no to %s', (_name, over) => {
     const open = over === null ? null : chunkDoc(over as Partial<OpenDocument>);
     expect(isChunkDocument(open)).toBe(false);
   });
 
-  it('a pure doc-local document gets nothing from commitChunkDocStep', () => {
+  it('[B5] a pure doc-local document gets nothing from commitChunkDocStep', () => {
     useArtStore.getState().openDocument({
       doc: createDoc(2, 2), liveTileIndex: null, chunkId: null,
       name: 'New Chunk', dirty: false,
@@ -388,7 +388,7 @@ describe('a chunk document does not acquire a stack of its own', () => {
 // ---------------------------------------------------------------------------
 
 describe('undo on a chunk document means what it says', () => {
-  it('one press takes back the stroke; the earlier zone-art edit survives it', () => {
+  it('[C1] one press takes back the stroke; the earlier zone-art edit survives it', () => {
     const eaten = earlierZoneArtEdit(7);              // the edit the defect ate
     expect(tile0()).toEqual([...eaten]);
 
@@ -415,7 +415,7 @@ describe('undo on a chunk document means what it says', () => {
     expect(artStack().canUndo).toBe(false);
   });
 
-  it('the same for a collision paint, which carries no art at all', () => {
+  it('[C2] the same for a collision paint, which carries no art at all', () => {
     const eaten = earlierZoneArtEdit(7);
     paintDocCollision(openDoc(), 'a', 0, 0, 0x1234);
     paintDocCollision(openDoc(), 'b', 0, 0, 0x0678);
@@ -431,7 +431,7 @@ describe('undo on a chunk document means what it says', () => {
     expect(artStack().canUndo).toBe(true);
   });
 
-  it('redo puts the author\'s own gesture back, not somebody else\'s', () => {
+  it('[C3] redo puts the author\'s own gesture back, not somebody else\'s', () => {
     const eaten = earlierZoneArtEdit(7);
     pencilOnEmptyCell();
     const after = new Uint16Array(liveChunk()!.nametable);
@@ -449,7 +449,7 @@ describe('undo on a chunk document means what it says', () => {
 // ---------------------------------------------------------------------------
 
 describe('the composer follows the library after an undo', () => {
-  it('an undo leaves the open document STALE, and the sync is what resolves it', () => {
+  it('[D1] an undo leaves the open document STALE, and the sync is what resolves it', () => {
     pencilOnEmptyCell();
     const appended = atlas().length - 1;
     expect(openDoc().cells[EMPTY_CELL].atlasTile).toBe(appended);
@@ -467,7 +467,7 @@ describe('the composer follows the library after an undo', () => {
     expect(openDoc().cells[EMPTY_CELL].localId).toBeNull();
   });
 
-  it('WITHOUT the sync, the next gesture folds the undone stroke straight back in', () => {
+  it('[D2] WITHOUT the sync, the next gesture folds the undone stroke straight back in', () => {
     // This is the defect the effect exists to prevent, stated as a property:
     // the next commit diffs the STALE document against the reverted chunk and
     // records the undone work all over again.
@@ -481,7 +481,7 @@ describe('the composer follows the library after an undo', () => {
     expect(liveChunk()!.nametable).not.toEqual(reverted);   // the undo was undone
   });
 
-  it('WITH the sync, the same next gesture records nothing and the undo stands', () => {
+  it('[D3] WITH the sync, the same next gesture records nothing and the undo stands', () => {
     pencilOnEmptyCell();
     artStack().undo();
     const reverted = new Uint16Array(liveChunk()!.nametable);
@@ -493,7 +493,7 @@ describe('the composer follows the library after an undo', () => {
     expect(liveChunk()!.nametable).toEqual(reverted);
   });
 
-  it('it is a no-op when the two already agree, so the clock can tick freely', () => {
+  it('[D4] it is a no-op when the two already agree, so the clock can tick freely', () => {
     // The same clock ticks for every in-place atlas edit, which moves pixels
     // and no nametable word. A rebuild on every tick would be a repaint storm.
     const version = useArtStore.getState().docVersion;
@@ -501,7 +501,7 @@ describe('the composer follows the library after an undo', () => {
     expect(useArtStore.getState().docVersion).toBe(version);
   });
 
-  it('and a no-op on a document that is not a chunk document', () => {
+  it('[D5] and a no-op on a document that is not a chunk document', () => {
     useArtStore.getState().openDocument({
       doc: createDoc(2, 2), liveTileIndex: null, chunkId: null,
       name: 'New Chunk', dirty: false,
@@ -517,7 +517,7 @@ describe('the composer follows the library after an undo', () => {
 // ---------------------------------------------------------------------------
 
 describe('when the chunk half cannot be built', () => {
-  it('the atlas edits it was handed still execute, alone', () => {
+  it('[E1] the atlas edits it was handed still execute, alone', () => {
     useProjectStore.setState({
       project: { ...pstate().project!, chunkLibrary: [] } as never,
     });
@@ -530,7 +530,7 @@ describe('when the chunk half cannot be built', () => {
     expect(useToastStore.getState().toasts.length).toBeGreaterThan(0);
   });
 
-  it('and with no atlas edits to execute there is simply no step', () => {
+  it('[E2] and with no atlas edits to execute there is simply no step', () => {
     useProjectStore.setState({
       project: { ...pstate().project!, chunkLibrary: [] } as never,
     });
@@ -541,7 +541,7 @@ describe('when the chunk half cannot be built', () => {
     expect(steps).toEqual([]);
   });
 
-  it('at the tileset ceiling the stroke stays in the document, unrecorded, not thrown away', () => {
+  it('[E3] at the tileset ceiling the stroke stays in the document, unrecorded, not thrown away', () => {
     setUp(0x800);                                     // a full tileset
     paintEmptyCell(5);
     const localId = openDoc().cells[EMPTY_CELL].localId;
@@ -556,7 +556,7 @@ describe('when the chunk half cannot be built', () => {
     expect(useToastStore.getState().toasts.length).toBeGreaterThan(0);
   });
 
-  it('and the sync refuses to rebuild there too, rather than destroying the document', () => {
+  it('[E4] and the sync refuses to rebuild there too, rather than destroying the document', () => {
     setUp(0x800);
     paintEmptyCell(5);
     const before = openDoc().cells.map((c) => ({ ...c }));
@@ -579,14 +579,14 @@ describe('the call sites still exist in ComposerCanvas (source read)', () => {
   const code = () => readFileSync(
     join(SRC, 'components', 'art', 'ComposerCanvas.tsx'), 'utf8');
 
-  it('all four commit sites are present', () => {
+  it('[F1] all four commit sites are present', () => {
     // commitWrites' atlas branch, its allowCow doc-local tail, endTileGesture,
     // and the map clipboard's collision paste.
     const calls = code().match(/commitChunkDocStep\(/g) ?? [];
     expect(calls.length).toBe(4);
   });
 
-  it('the re-sync effect is present and keyed on the history clock', () => {
+  it('[F2] the re-sync effect is present and keyed on the history clock', () => {
     expect(code()).toMatch(
       /useEffect\(\(\) => \{ syncChunkDocFromLibrary\(\); \}, \[historyVersion, open\]\)/);
   });
