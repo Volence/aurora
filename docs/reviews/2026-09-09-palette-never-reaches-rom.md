@@ -101,3 +101,45 @@ This document says the live push works and the build path does not. Aeon put it 
 he would have found this in April.** So it is not the honest-green shape at all — it is **a
 correct component concealing a broken sibling precisely BECAUSE it is correct.** The quality
 of the preview is what hid it.
+
+---
+
+## ⚠ SECOND CORRECTION: my invariant was a NEAR-MISS, and aeon found the second writer
+
+The proposal above states the property it buys as: *"the file Aurora reads is the file Aurora
+writes, and no build step writes it."* **That sentence is satisfiable while one palette line
+stays unauthorable**, and aeon caught it before the parcel started.
+
+**`tools/inject_editor_bg.py:1361-1379` stamps a BG palette line directly into
+`ojz_palette.bin` AFTER `strip_gen` runs.** Its own comment says why, verbatim: *"strip_gen
+copies ojz_palette.bin from sonic_hack every build, so a palette that matches the injected art
+must be written HERE (inject runs after strip_gen) or the colours revert."*
+
+**That is not an independent feature. It is a WORKAROUND FOR THIS EXACT DEFECT** — someone hit
+the donor copy, could not stop it, and wrote a second stamp downstream to survive it. So under
+the proposal as written: the authored file becomes the source, the generator copies authored →
+generated, and **inject stamps CRAM line 2 over the top anyway.** The invariant holds *for the
+authored file* while line 2 stays owned by another mechanism — **Aurora could edit it and the
+edit would vanish on the next build, which is this bug again with a smaller blast radius.**
+
+⚠ **THE LESSON IS ABOUT THE INVARIANT'S SHAPE, NOT THE MISS.** *"No build step writes it"* is a
+claim about the file I named. The defect lives in a file I did **not** name — the generated
+one, which I had just finished demoting to an output and stopped thinking about. **An invariant
+stated over the artifact you are fixing does not constrain the artifact you are abandoning**,
+and a downstream writer of the abandoned one is invisible to it. The correct form quantifies
+over *writers*, not over *my* file: **exactly one writer of the palette, and it is the editor.**
+
+**And a third site reasons FROM the bug.** `tools/png_to_bg_override.py:270-278` argues its
+lock-mode safety from *"GEN_PALETTE, which ojz_strip_gen.py re-copies from sonic_hack on every
+build"*. When the copy stops being per-build that argument stops holding and must be
+re-derived — **not because it becomes wrong, but because its premise is the thing being
+deleted.** Cf. this repo's own *"a wrong reason on a correct rule cannot be caught by testing
+the rule"*.
+
+**Adopted from aeon, and it makes the authored path a better choice than I knew:**
+`tools/level_staleness.py`'s `editor_sources()` covers the whole `data/editor` tree, so an
+authored palette there makes the **staleness gate see a palette edit and re-bake** — correct
+behaviour, free, and unavailable anywhere else.
+
+**`paletteRef`: STRUCK**, at aeon's request and my agreement. Aurora stops writing it. *A
+reserved field is a promise on nobody's behalf.*
