@@ -395,3 +395,180 @@ describe('the contract declares a complete, well-formed key model', () => {
     expect(docs).toContain('tools/regenerate-level.sh');
   });
 });
+
+/**
+ * NO PRESENT-TENSE CLAIM MAY CONTRADICT AN AMENDMENT BELOW IT.
+ *
+ * ═══ THE FINDING (CONTRACT-AUTHORITY-REFUTED-BY-OWN-AMENDMENT, medium) ═══
+ *
+ * `constants.BGANIM_VIEW_DERIVED_PERIOD_PX` cited *"the refusal in
+ * `views_emitted`: `raise AssertionError(...)`"* as its authority, and said in
+ * its `why` that a band at any other period *"is REFUSED"*. The SAME FILE's
+ * `bganim-decouple` amendment is headed *"THE TWO `default_off` OBLIGATIONS
+ * STOPPED BEING OBLIGATIONS. Both were `AssertionError`s and NEITHER RAISES ANY
+ * MORE."* Two sentences in one document contradicting each other, in the file
+ * whose entire job is to be current.
+ *
+ * The sweep for the same shape found a THIRD and worse one: `invariants.viewTwins`
+ * said *"aeon raises on either failure rather than emitting zero twins"* and
+ * *"a two-band act in which BOTH bands are `default_off` is refused"* -- the exact
+ * opposite of current behaviour, twice, and the sentence a size model would be
+ * written against.
+ *
+ * ═══ WHY THIS GATE DERIVES FROM THE FILE AND NOT FROM MY READING OF AEON ═══
+ *
+ * The authority for "neither raises" is already IN this document, as an amendment
+ * with a revision beside it. So the check is a SELF-CONSISTENCY one: no field
+ * whose job is to describe the present may assert a refusal on the twins path
+ * that the amendments have retired. That makes the gate survive the next aeon
+ * change without being re-derived -- what it enforces is that the file does not
+ * argue with itself, which is true whichever way aeon moves.
+ *
+ * ⚠ THE FIELD LIST IS ENUMERATED, AND THE EXCLUSIONS ARE THE POINT. `amendments`
+ * is EXEMPT because a point-in-time record legitimately describes the past: the
+ * `default-off-switch` amendment's `documents` entry *"both `AssertionError`s are
+ * unchanged"* was TRUE at the revision it names and must stay as written.
+ * `writerObligations` and the two `auroraStatus*` fields are exempt from the
+ * SENTENCE rule and held to a WHOLE-STRING one instead, because they are amended
+ * in place: each carries a superseded clause followed by a marked correction, and
+ * a per-sentence rule would demand the history be deleted rather than marked.
+ */
+describe('no present-tense claim contradicts the amendments below it', () => {
+  /** Words that assert a build-time refusal. */
+  const REFUSAL = /\brefus\w*|\breject\w*|\braise[sd]?\b|AssertionError/i;
+  /** The subject the `bganim-decouple` amendment retired refusals for. */
+  const TWINS_PATH = /default_off|views?_emitt|view_emission|twin/i;
+  /** Marks a refusal named as HISTORY rather than asserted as current. */
+  const RETIRED = new RegExp([
+    'NO LONGER', 'no longer', 'does not raise', 'never as', 'never raises',
+    'used to', 'stopped being', 'stopped', 'was an', 'were `?AssertionError',
+    'HISTORY', 'until 20', 'is DISCHARGED', 'has MOVED', 'went with it',
+    'not an obligation', 'DELETED', 'decline',
+  ].join('|'));
+
+  function sentences(s: string): string[] {
+    return s.split(/(?<=[.!?;])\s+/).filter(x => x.trim() !== '');
+  }
+
+  /**
+   * Every `[path, text]` pair in the file whose job is to state the PRESENT.
+   * Enumerated by field name rather than walked wholesale, so a new field cannot
+   * quietly join the exempt set by existing.
+   */
+  function presentTenseStrings(): [string, string][] {
+    const out: [string, string][] = [];
+    const constants = at(['constants']) as Record<string, Record<string, unknown>>;
+    for (const [name, entry] of Object.entries(constants)) {
+      if (name.startsWith('$')) continue;
+      for (const field of ['why', 'aeonProse', 'aeonGate'] as const) {
+        if (typeof entry[field] === 'string') {
+          out.push([`constants.${name}.${field}`, entry[field] as string]);
+        }
+      }
+      const auth = entry.authorities;
+      if (Array.isArray(auth)) {
+        auth.forEach((a, i) => out.push([`constants.${name}.authorities[${i}]`, String(a)]));
+      }
+    }
+    const inv = at(['invariants']) as Record<string, string>;
+    for (const [name, text] of Object.entries(inv)) {
+      if (name.startsWith('$')) continue;
+      out.push([`invariants.${name}`, text]);
+    }
+    for (const group of ['bandKeys', 'topLevelKeys'] as const) {
+      const keys = at([group]) as Record<string, Record<string, unknown>>;
+      for (const [name, entry] of Object.entries(keys)) {
+        if (name.startsWith('$') || typeof entry !== 'object' || entry === null) continue;
+        for (const field of ['why', 'cite', 'aeonValueForAurora'] as const) {
+          if (typeof entry[field] === 'string') {
+            out.push([`${group}.${name}.${field}`, entry[field] as string]);
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  it('the sweep really has the fields the finding was found in', () => {
+    // ANTI-VACUOUS. An empty or mis-shaped collection would make every row below
+    // pass, and this gate's whole subject is a claim that hid in one of these.
+    const paths = presentTenseStrings().map(([p]) => p);
+    expect(paths.length).toBeGreaterThan(40);
+    expect(paths).toContain('constants.BGANIM_VIEW_DERIVED_PERIOD_PX.why');
+    expect(paths).toContain('constants.BGANIM_VIEW_DERIVED_PERIOD_PX.authorities[1]');
+    expect(paths).toContain('invariants.viewTwins');
+    expect(paths).toContain('bandKeys.default_off.why');
+  });
+
+  it('the amendment this gate derives its expectation from is still in the file', () => {
+    // The authority is INTERNAL, so it has to be asserted present rather than
+    // assumed: without it the rule below has no ground to stand on.
+    const amendment = (at(['amendments']) as Record<string, unknown>[])
+      .find(a => a.id === 'bganim-decouple');
+    expect(amendment).toBeDefined();
+    expect(String(amendment!.what)).toMatch(/NEITHER RAISES ANY MORE/);
+    expect(amendment!.commit).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  it('no present-tense field asserts a refusal on the twins path', () => {
+    const offenders: string[] = [];
+    for (const [path, text] of presentTenseStrings()) {
+      for (const s of sentences(text)) {
+        if (REFUSAL.test(s) && TWINS_PATH.test(s) && !RETIRED.test(s)) {
+          offenders.push(`${path}: ${s.trim()}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  /**
+   * The whole-string form, for the three fields that are amended IN PLACE. A
+   * superseded clause is allowed to stand there, but the correction must be in
+   * the same field: a reader who stops at the first sentence is the reader this
+   * finding was about.
+   */
+  it('the amended-in-place fields each carry their own correction', () => {
+    const dk = at(['bandKeys', 'default_off']) as Record<string, unknown>;
+    const inPlace: [string, string][] = [
+      ...(dk.writerObligations as string[])
+        .map((o, i) => [`writerObligations[${i}]`, o] as [string, string]),
+      ['auroraStatusBefore', String(dk.auroraStatusBefore)],
+      ['auroraStatusNow', String(dk.auroraStatusNow)],
+    ];
+    for (const [path, text] of inPlace) {
+      if (REFUSAL.test(text) && TWINS_PATH.test(text)) {
+        expect(text, `${path} names a refusal, so it must mark it as retired`)
+          .toMatch(RETIRED);
+      }
+    }
+  });
+
+  /**
+   * THE POSITIVE HALF. "No refusal claim" is also what a field emptied of content
+   * produces, so `viewTwins` must still say what DOES happen -- and must keep the
+   * two quantifiers apart, which is the trap the HIGH finding was about on the
+   * copy side.
+   */
+  it('viewTwins says the twins DECLINE, and keeps the ship and twins quantifiers apart', () => {
+    const inv = at(['invariants']) as Record<string, string>;
+    expect(inv.viewTwins).toMatch(/declin/i);
+    // The twins are an ACT question ...
+    expect(inv.viewTwins).toMatch(/PER ACT|ACT'S BAND COUNT|EXACTLY ONE BAND/);
+    // ... and the ship decision is a BAND one. Conflating them is the finding.
+    expect(inv.viewTwins).toMatch(/per band|PER BAND/);
+    expect(inv.viewTwins).toContain('BGANIM_VIEW_DERIVED_PERIOD_PX');
+  });
+
+  /**
+   * The period constant's authority must cite something that EXISTS. The old
+   * entry named a `raise AssertionError` in `views_emitted`; at aeon `22cf8b37`
+   * the condition lives in `view_emission`, which returns `(0, note)`.
+   */
+  it('the period constant cites the function that decides the twins today', () => {
+    const auth = (at(['constants', 'BGANIM_VIEW_DERIVED_PERIOD_PX', 'authorities']) as string[]);
+    expect(auth.join('\n')).toContain('view_emission');
+    expect(auth.join('\n')).not.toContain('AssertionError');
+    for (const a of auth) expect(a).toMatch(/^aeon /);
+  });
+});
