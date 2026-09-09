@@ -51,6 +51,32 @@ export default defineConfig({
         input: resolve(__dirname, 'src/renderer/index.html'),
       },
     },
+    // ONE REACT INSTANCE IN THE BUNDLE, STATED RATHER THAN HOPED FOR.
+    //
+    // Without this, a build of this tree here put a THIRD copy of react's
+    // module into the `project-runtime` chunk (`ReactSharedInternals =` once in
+    // `classicProjectStore`, twice in `index`, once more in `project-runtime`).
+    // App.tsx imports project-runtime at mount, so the first hook it ran came
+    // out of the copy react-dom had never installed a dispatcher on, and the
+    // renderer died before painting anything:
+    //
+    //   TypeError: Cannot read properties of null (reading 'useCallback')
+    //     at exports.useCallback (assets/project-runtime-*.js)
+    //     at useProject → at App → renderWithHooks
+    //
+    // The window comes up, `document.title` is "Aurora", `#root` is EMPTY, and
+    // there is no console line unless you attach to CDP and enable
+    // Runtime.exceptionThrown — a blank app that reads as a hung one. Measured
+    // 2026-09-09 across five consecutive builds (identical hashes each time) and
+    // at three commits (c8652263, aa64764d, 8b606f8b), so it is neither flaky
+    // nor a regression of any recent change. Adding the dedupe collapsed the
+    // extra copy and the app painted.
+    //
+    // It is a no-op wherever the bundler already resolved to one copy, which is
+    // why it is safe to state unconditionally rather than to leave to the
+    // heuristic that disagreed with itself between two machines' builds of the
+    // same source.
+    resolve: { dedupe: ['react', 'react-dom'] },
     plugins: [react(), flavourStamp()],
   },
 });
