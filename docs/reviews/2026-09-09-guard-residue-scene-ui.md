@@ -338,8 +338,22 @@ Section 0's nine void verdicts are NOT in that count and were all re-run.
 
 ## 9. Final run
 
-PENDING. This section is deliberately empty until the run that fills it has
-finished. The previous packet records an earlier draft of its own after-figures
-being written while the run was still going, both wrong, and nothing in the run
-contradicting them: an after-figure is checkable against nothing except the run
-that produced it. It is filled in by its own commit.
+`npm test` at this parcel's tip, **exit 0**, aggregate lines as printed:
+
+    check-test-collection: OK: 571 test-shaped file(s) on disk, all 571 collected by vitest.
+    Test Files  568 passed | 3 skipped (571)
+         Tests  8482 passed | 9 skipped (8491)
+    skip-report: OK. Every skip named its reason.
+    failure-class: no failures in this run (571 module(s) reported).
+
+Baseline was 8463 passed / 9 skipped in 570 files at `d9fbf105`; the tip is
+8482 / 9 in 571. **Nineteen rows added across two files** (six appended to
+`src/core/formats/effects/__tests__/section-wiring.test.ts`, thirteen in the new
+`test/formats/effects-scene-ui-guard-residue.test.ts`), and the new file is
+collected: the repo's own `check-test-collection` gate counts 571 test-shaped
+files on disk and all 571 collected, which is the same 571 the totals line
+counts. `8463 + 19 = 8482`, so nothing was displaced.
+
+This section was written from that run and not before it. Section 2 carried a
+`PENDING` marker in its place until the run finished, and that marker is in the
+history at commit `bd706c17`.
