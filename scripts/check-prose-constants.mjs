@@ -181,7 +181,36 @@ function numericInit(init, contract) {
   return null;
 }
 
+// ── ENUMERATED AND PARSED ARE TWO DIFFERENT NUMBERS ──────────────────────────
+// `git ls-files` names what this gate INTENDS to cover. Only the files that
+// produced a full syntax tree are what it ACTUALLY covered, and the difference
+// is invisible unless something prints it. This used to be `catch { sf = null }`
+// with two callers that silently `continue`d and a pass line that printed the
+// ENUMERATED count — so a tracked file deleted from the working tree, or one
+// this process could not read, fell out of both the constant table and the scan
+// while the summary claimed full coverage. Same rule as the empty-contract
+// refusal below, which already gets the shape right for its own case: a run that
+// could not look is NOT a pass, and it exits 2 rather than 1 because "the gate
+// could not run" is a different verdict from "the gate found something".
+//
+// BAD SYNTAX is the case the old catch never covered at all, and it is the
+// WEAKER half of this refusal — say so rather than overclaim it.
+// `ts.createSourceFile` does not throw on bad syntax: it returns a RECOVERED
+// tree with `parseDiagnostics` set, and the gate then reports a coverage figure
+// for a file it did not actually parse. What I could NOT show, 2026-09-09, is
+// that recovery costs a finding: with a real re-typing planted in this tree
+// (`32` beside an imported `TILE_BYTES`), three different breaks ahead of it —
+// a bare `(((`, an unclosed object literal that raised 66 diagnostics, and one
+// missing comma inside the very import that supplies the arbiter — ALL still
+// yielded the finding. TypeScript's recovery is that good. So this arm is a
+// stated bound ("a recovery is not a parse, and this gate cannot tell which
+// nodes it lost"), not a demonstrated coverage loss; the demonstrated one is the
+// read failure above. It also costs nothing: 0 of 523 enumerated files carry a
+// parse diagnostic today, and `npm run typecheck` in the same chain would fail
+// on such a file anyway — this only stops THIS gate printing a full-coverage
+// line first.
 const parsed = new Map();
+const unparsed = []; // { file, why } — enumerated, and NOT covered.
 function parse(f) {
   if (parsed.has(f)) return parsed.get(f);
   let sf = null;
@@ -189,7 +218,18 @@ function parse(f) {
     const text = readFileSync(path.join(ROOT, f), 'utf8');
     sf = ts.createSourceFile(f, text, ts.ScriptTarget.Latest, true,
       f.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-  } catch { sf = null; }
+    const d = sf.parseDiagnostics?.[0];
+    if (d) {
+      const line = sf.getLineAndCharacterOfPosition(d.start ?? 0).line + 1;
+      unparsed.push({ file: f, why: `syntax error at line ${line}: `
+        + ts.flattenDiagnosticMessageText(d.messageText, ' ')
+        + ` (${sf.parseDiagnostics.length} parse diagnostic(s) in this file)` });
+      sf = null;
+    }
+  } catch (e) {
+    unparsed.push({ file: f, why: `could not be read: ${e?.code ?? e?.message ?? e}` });
+    sf = null;
+  }
   parsed.set(f, sf);
   return sf;
 }
@@ -311,6 +351,22 @@ if (contract.size === 0) {
     + 'the gate cannot run. An empty run is NOT a pass.');
   process.exit(2);
 }
+
+// Parse EVERY enumerated file BEFORE reading anything out of any of them. A file
+// that does not parse shrinks two populations at once — the repo-wide constant
+// table `exportedNumbers` builds, and the set of modules actually scanned — so
+// the refusal has to come before either is used, not per-file inside them.
+for (const f of files) parse(f);
+if (unparsed.length > 0) {
+  for (const u of unparsed) console.error(`  ${u.file} (${u.why})`);
+  console.error(`check-prose-constants CANNOT RUN: ${files.length} file(s) enumerated, `
+    + `${files.length - unparsed.length} parsed. The ${unparsed.length} file(s) named above `
+    + 'produced no syntax tree, so this gate did not look at them and will not print a coverage '
+    + 'figure it did not earn. A partial run is NOT a pass.');
+  process.exit(2);
+}
+const parsedCount = files.filter(f => parsed.get(f) !== null).length;
+
 const exported = exportedNumbers(files, contract);
 
 const findings = [];
@@ -349,8 +405,11 @@ const rows = findings.filter(r => {
 const staleExemptions = EXEMPT.map((e, i) => [e, i]).filter(([, i]) => !usedExemptions.has(i));
 
 if (rows.length === 0 && staleExemptions.length === 0) {
-  console.log(`check-prose-constants: ${files.length} source files, `
-    + `${exported.size} named numeric constants, 0 re-typed in author-facing prose.`);
+  // BOTH numbers, always. They are equal on every green run by construction —
+  // the refusal above is what makes them equal — and printing only one is how
+  // the enumerated count came to be read as a coverage claim in the first place.
+  console.log(`check-prose-constants: ${parsedCount} of ${files.length} enumerated source files `
+    + `parsed, ${exported.size} named numeric constants, 0 re-typed in author-facing prose.`);
   process.exit(0);
 }
 
