@@ -351,9 +351,22 @@ interface ClassicLevelState {
    * counter has moved since was edited mid-save, is not in the bytes that
    * landed, and is left dirty. Returns the domains it withheld, so the caller
    * can say so rather than reporting a clean save.
+   *
+   * `atGen` IS REQUIRED, AND THAT IS THE WHOLE GUARD (SAVE-GEN-OPTIONAL). It was
+   * `atGen?: DomainGen` read by `if (atGen && ...)`, so a caller that simply did
+   * not pass it got the pre-guard behaviour back in full silence: every domain
+   * cleared, including the one the artist had just edited while the write was in
+   * flight. Nothing marked the omission. One producer passed it and nothing made
+   * the next one -- and `saveClassicProject`'s `collect` is an INJECTABLE
+   * parameter, so a second producer needs no new call site to exist: the fake
+   * collector in classic-save.test.ts was already one, and it already omitted
+   * the counters. Requiring the argument (and `DirtyLevel.gen` with it) makes a
+   * forgetful producer a compile error instead of a silent data loss. The
+   * runtime arm below is the fail-safe for untyped JS, and it fails toward
+   * KEEPING the work.
    */
   markDomainsClean: (
-    ref: ZoneActRef, domains: (keyof DirtyDomains)[], atGen?: DomainGen,
+    ref: ZoneActRef, domains: (keyof DirtyDomains)[], atGen: DomainGen,
   ) => (keyof DirtyDomains)[];
   reset: () => void;
 }
@@ -586,10 +599,24 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
     const s = get();
     // Only touch the currently-open act (the saver clears exactly what it wrote).
     if (!s.ref || s.ref.zone !== ref.zone || s.ref.act !== ref.act) return domains;
+    // NO COUNTERS, NO CLEARING. `atGen` is a required parameter, so this arm is
+    // unreachable from anything the compiler checked; it exists for an untyped
+    // JS caller and for a `as never` cast in a test standing in for one.
+    //
+    // It withholds EVERYTHING rather than throwing, on two grounds. The contract
+    // above this one is that a save never rejects (classic-save.ts, and
+    // tab-activation.test.ts asserts it), so a throw here would turn a
+    // successful write into an unhandled failure at the Ctrl+S door. And the
+    // question this function answers is "which domains are still the ones I
+    // wrote"; with no counters the honest answer is "I cannot tell", and the
+    // side of that answer which loses no work is to leave every flag standing.
+    // The caller already reports withheld domains, so an author sees a toast
+    // rather than nothing.
+    if (!atGen) return domains;
     const dirty = { ...s.dirty };
     const withheld: (keyof DirtyDomains)[] = [];
     for (const d of domains) {
-      if (atGen && (s.domainGen[d] ?? 0) !== (atGen[d] ?? 0)) { withheld.push(d); continue; }
+      if ((s.domainGen[d] ?? 0) !== (atGen[d] ?? 0)) { withheld.push(d); continue; }
       delete dirty[d];
     }
     set({ dirty });
