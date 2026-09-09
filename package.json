@@ -103,6 +103,7 @@
     "harness:canvas-cdp": "node scratchpad/canvas-cdp-harness.mjs",
     "harness:capture": "node scratchpad/capture-harness.mjs",
     "harness:chunk-links": "node scratchpad/chunk-links-harness.mjs",
+    "harness:chunk-undo-measure": "node scratchpad/chunk-undo-measure-harness.mjs",
     "harness:chunkgrid-hint": "node scratchpad/chunkgrid-hint-harness.mjs",
     "harness:classic-playtest": "node scratchpad/classic-playtest-harness.mjs",
     "harness:coldread-c1": "node scratchpad/coldread-c1-harness.mjs",
