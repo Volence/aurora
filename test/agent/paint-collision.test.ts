@@ -1,15 +1,41 @@
 import { describe, it, expect } from 'vitest';
-import { paintCollisionRectEntries } from '../../src/core/collision/collision-paint';
+import { paintCollisionRectBothPlanes } from '../../src/core/collision/collision-paint';
 import { validateChunkCollisionPlane } from '../../src/core/agent/validation';
+import type { CollisionCellWrite } from '../../src/core/editing/collision-word';
 
 // An 8-tile-wide plane (4x4 cells). Cell (cc,cr) -> tile indices via
 // cellTileIndices(cc, cr, 8): tr=2*cr, tc=2*cc -> [tr*8+tc, tr*8+tc+1, (tr+1)*8+tc, (tr+1)*8+tc+1].
 const width = 8;
 
-describe('paintCollisionRectEntries', () => {
+/**
+ * `paint_collision`'s FILL form aimed at ONE plane, which is what the handler
+ * runs for `plane: "a"` and `plane: "b"`: the both-planes builder with
+ * `bothPlanes: false`, whose `.aimed` is the aimed plane's entries.
+ *
+ * These rows used to call `paintCollisionRectEntries`, a single-plane entry point
+ * that NOTHING in the app called (deleted 2026-09-08, lens row
+ * COLLISION-PAINT-DEAD-FUNCTIONS). That is why the helper is over the live
+ * builder and not a local reimplementation: the point of the re-point is that
+ * these assertions now hold the code that ships.
+ */
+function rectEntries(a: {
+  x: number; y: number; w: number; h: number; word: number;
+  plane: Uint16Array; tileWidth: number;
+}): CollisionCellWrite[] {
+  const plan = paintCollisionRectBothPlanes({
+    x: a.x, y: a.y, w: a.w, h: a.h, word: a.word,
+    aimedPlane: a.plane, otherPlane: null, tileWidth: a.tileWidth, bothPlanes: false,
+  });
+  // Aiming at one plane writes exactly one plane. Asserted here rather than in
+  // every row, so no row below can be green because the write went elsewhere.
+  expect(plan.other).toEqual([]);
+  return plan.aimed;
+}
+
+describe('paint_collision fill form, one plane', () => {
   it('fills a 2x1 cell rect with entries covering the 8 sub-tile indices', () => {
     const plane = new Uint16Array(8 * 8);
-    const entries = paintCollisionRectEntries({ x: 0, y: 0, w: 2, h: 1, word: 0x105, plane, tileWidth: width });
+    const entries = rectEntries({ x: 0, y: 0, w: 2, h: 1, word: 0x105, plane, tileWidth: width });
     expect(entries).toHaveLength(8);
     expect(entries.every(e => e.newColl === 0x105)).toBe(true);
     expect(entries.every(e => e.oldColl === 0)).toBe(true);
@@ -21,7 +47,7 @@ describe('paintCollisionRectEntries', () => {
   it('diffing skips cells already equal to the target word', () => {
     const plane = new Uint16Array(8 * 8);
     for (const idx of [0, 1, 8, 9]) plane[idx] = 0x105; // cell (0,0) already painted
-    const entries = paintCollisionRectEntries({ x: 0, y: 0, w: 2, h: 1, word: 0x105, plane, tileWidth: width });
+    const entries = rectEntries({ x: 0, y: 0, w: 2, h: 1, word: 0x105, plane, tileWidth: width });
     expect(entries).toHaveLength(4); // only cell (1,0) changes
     for (const e of entries) {
       expect([2, 3, 10, 11]).toContain(e.index);
@@ -33,7 +59,7 @@ describe('paintCollisionRectEntries', () => {
   it('word 0 clears a solid cell back to air, emitting diffed entries', () => {
     const plane = new Uint16Array(8 * 8);
     for (const idx of [0, 1, 8, 9]) plane[idx] = 0x1105; // solid word
-    const entries = paintCollisionRectEntries({ x: 0, y: 0, w: 1, h: 1, word: 0, plane, tileWidth: width });
+    const entries = rectEntries({ x: 0, y: 0, w: 1, h: 1, word: 0, plane, tileWidth: width });
     expect(entries).toHaveLength(4);
     expect(entries.every(e => e.oldColl === 0x1105)).toBe(true);
     expect(entries.every(e => e.newColl === 0)).toBe(true);

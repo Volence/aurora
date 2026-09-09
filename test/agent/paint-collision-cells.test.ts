@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { paintCollisionCellEntries, paintCollisionRectEntries } from '../../src/core/collision/collision-paint';
+import {
+  paintCollisionCellsBothPlanes, paintCollisionRectBothPlanes,
+} from '../../src/core/collision/collision-paint';
 import { validateCollisionWrite } from '../../src/core/agent/validation';
 import { packCollisionCell } from '../../src/core/collision/collision-cell-word';
 import { cellTileIndices } from '../../src/core/collision/collision-cell';
@@ -16,6 +18,13 @@ import { readCollisionRegion } from '../../src/core/collision/collision-region-r
 // are zero everywhere, so `0` preserved and `0` truncated are the same sixteen
 // bits and a row over real data can only land heads.
 
+// ⚠ BOTH HELPERS BELOW GO THROUGH THE LIVE BUILDERS. These rows used to call
+// `paintCollisionCellEntries` / `paintCollisionRectEntries`, single-plane entry
+// points nothing in the app called; the handler reaches the both-planes builders
+// for EVERY plane argument, with `bothPlanes: false` for 'a' and 'b'. They were
+// deleted on 2026-09-08 (lens row COLLISION-PAINT-DEAD-FUNCTIONS) and these rows
+// re-pointed, so what they assert is what ships.
+
 const width = 8; // 8 tiles wide = 4x4 cells
 const solid = (shape: number) => packCollisionCell({ shape, xFlip: false, yFlip: false, solidity: 'all' });
 
@@ -25,6 +34,32 @@ function setCell(plane: Uint16Array, cc: number, cr: number, word: number): void
 }
 function apply(plane: Uint16Array, entries: { index: number; newColl: number }[]): void {
   for (const e of entries) plane[e.index] = e.newColl;
+}
+
+/** The PER-CELL form aimed at one plane: `.aimed` plus the one `skipped` count. */
+function cellPlan(args: {
+  x: number; y: number; w: number; h: number; words: (number | null)[];
+  plane: Uint16Array; tileWidth: number;
+}): { entries: { index: number; oldColl: number; newColl: number }[]; skipped: number } {
+  const plan = paintCollisionCellsBothPlanes({
+    x: args.x, y: args.y, w: args.w, h: args.h, words: args.words,
+    aimedPlane: args.plane, otherPlane: null, tileWidth: args.tileWidth, bothPlanes: false,
+  });
+  expect(plan.other).toEqual([]);
+  return { entries: plan.aimed, skipped: plan.skipped };
+}
+
+/** The FILL form aimed at one plane. */
+function rectEntries(args: {
+  x: number; y: number; w: number; h: number; word: number;
+  plane: Uint16Array; tileWidth: number;
+}): { index: number; oldColl: number; newColl: number }[] {
+  const plan = paintCollisionRectBothPlanes({
+    x: args.x, y: args.y, w: args.w, h: args.h, word: args.word,
+    aimedPlane: args.plane, otherPlane: null, tileWidth: args.tileWidth, bothPlanes: false,
+  });
+  expect(plan.other).toEqual([]);
+  return plan.aimed;
 }
 
 describe('validateCollisionWrite', () => {
@@ -61,12 +96,12 @@ describe('validateCollisionWrite', () => {
   });
 });
 
-describe('paintCollisionCellEntries', () => {
+describe('paint_collision per-cell form, one plane', () => {
   it('writes a DIFFERENT word per cell, all four sub-tiles each', () => {
     // The whole reason the entries form exists: the fill form cannot express
     // this, and a loop is never uniform.
     const plane = fresh();
-    const { entries, skipped } = paintCollisionCellEntries({
+    const { entries, skipped } = cellPlan({
       x: 0, y: 0, w: 2, h: 1, words: [solid(1), solid(2)], plane, tileWidth: width,
     });
     expect(skipped).toBe(0);
@@ -79,7 +114,7 @@ describe('paintCollisionCellEntries', () => {
   it('null skips a cell entirely and is COUNTED, not silently dropped', () => {
     const plane = fresh();
     setCell(plane, 1, 0, solid(9));
-    const { entries, skipped } = paintCollisionCellEntries({
+    const { entries, skipped } = cellPlan({
       x: 0, y: 0, w: 2, h: 1, words: [solid(1), null], plane, tileWidth: width,
     });
     expect(skipped).toBe(1);
@@ -93,7 +128,7 @@ describe('paintCollisionCellEntries', () => {
     expect(unownedCollisionBits(dest)).not.toBe(0); // the fixture is real
     const plane = fresh();
     setCell(plane, 0, 0, dest);
-    const { entries } = paintCollisionCellEntries({
+    const { entries } = cellPlan({
       x: 0, y: 0, w: 1, h: 1, words: [solid(7)], plane, tileWidth: width,
     });
     apply(plane, entries);
@@ -108,7 +143,7 @@ describe('paintCollisionCellEntries', () => {
     // them into a clean destination.
     const plane = fresh(); // destination is all zeros
     const smuggler = (solid(4) | COLLISION_CELL_UNOWNED_MASK) & 0xFFFF;
-    const { entries } = paintCollisionCellEntries({
+    const { entries } = cellPlan({
       x: 0, y: 0, w: 1, h: 1, words: [smuggler], plane, tileWidth: width,
     });
     apply(plane, entries);
@@ -121,15 +156,15 @@ describe('paintCollisionCellEntries', () => {
     const dest = (solid(3) | COLLISION_CELL_UNOWNED_MASK) & 0xFFFF;
     const a = fresh(); setCell(a, 0, 0, dest);
     const b = fresh(); setCell(b, 0, 0, dest);
-    apply(a, paintCollisionRectEntries({ x: 0, y: 0, w: 1, h: 1, word: solid(7), plane: a, tileWidth: width }));
-    apply(b, paintCollisionCellEntries({ x: 0, y: 0, w: 1, h: 1, words: [solid(7)], plane: b, tileWidth: width }).entries);
+    apply(a, rectEntries({ x: 0, y: 0, w: 1, h: 1, word: solid(7), plane: a, tileWidth: width }));
+    apply(b, cellPlan({ x: 0, y: 0, w: 1, h: 1, words: [solid(7)], plane: b, tileWidth: width }).entries);
     expect(Array.from(b)).toEqual(Array.from(a));
   });
 
   it('emits nothing for cells already holding the merged word', () => {
     const plane = fresh();
     setCell(plane, 0, 0, solid(5));
-    const { entries } = paintCollisionCellEntries({
+    const { entries } = cellPlan({
       x: 0, y: 0, w: 1, h: 1, words: [solid(5)], plane, tileWidth: width,
     });
     expect(entries).toHaveLength(0);
@@ -157,7 +192,7 @@ describe('the round trip: get_collision_region -> paint_collision', () => {
     // "was already like that".
     const dest = fresh();
     for (let i = 0; i < dest.length; i++) dest[i] = solid(99);
-    const { entries, skipped } = paintCollisionCellEntries({
+    const { entries, skipped } = cellPlan({
       x: 0, y: 0, w: 2, h: 2, words: read.words, plane: dest, tileWidth: width,
     });
     expect(skipped).toBe(0);
@@ -193,7 +228,7 @@ describe('the round trip: get_collision_region -> paint_collision', () => {
     const dest = fresh();
     const untouched = solid(77);
     setCell(dest, 1, 1, untouched);
-    const { entries, skipped } = paintCollisionCellEntries({
+    const { entries, skipped } = cellPlan({
       x: 0, y: 0, w: 2, h: 2, words: read.words, plane: dest, tileWidth: width,
     });
     expect(skipped).toBe(1);
