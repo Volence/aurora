@@ -200,12 +200,37 @@
 // harness controls or should ever have been able to see.
 //
 // ⚠ AND IT IS A SAFETY PROPERTY, NOT AN ACCURACY ONE. These harnesses DO
-// create BrowserWindows. A window-less probe was used deliberately so that
-// measuring this could not put anything on a screen the owner is using, so
-// what a *windowed* run does is INFERRED here and not measured: an Electron
-// attached to his compositor is one `show` away from his desktop. Nothing in
-// this file should be read as having tested that, and nobody should test it
-// while he is logged in.
+// create BrowserWindows, and an Electron attached to his compositor is one
+// `show` away from his desktop.
+//
+// ── THE WINDOWED CASE IS NO LONGER INFERRED (2026-09-09) ──────────────────
+//
+// This block used to end by saying that a *windowed* run was inferred here and
+// not measured, because the probe above is deliberately window-less. That gap
+// is closed, in the direction that matters, by
+// `scratchpad/surface-isolation-proof.mjs` (`npm run harness:surface-isolation`):
+//
+//   MEASURED — a real Aurora, windowed, launched through `spawnGuarded` under
+//   `xvfb-run -s '-screen 0 1001x777x24'`, is ON OUR XVFB. python-xlib on that
+//   display reports screen 1001x777 with the app's window id 2097155,
+//   1000x776+0+0, viewable, `WM_NAME` "Aurora", `WM_CLASS` electron/Electron —
+//   and the whole 11-process tree holds display-server sockets for
+//   `/tmp/.X11-unix/X101` ONLY, with no connection to `$XDG_RUNTIME_DIR/wayland-0`
+//   from any process in it.
+//
+// WHAT IS STILL NOT MEASURED, AND MUST NOT BE. The other half — what an
+// UNPINNED windowed run does — remains untested and is to stay that way while
+// he is logged in. The RED rows in that proof are window-less for exactly the
+// reason this probe is, and its [s1] row is an INTERLOCK: it checks the argv
+// about to carry a window for this flag, in the position Chromium parses, and
+// REFUSES the windowed rows rather than launching when the pin is missing.
+//
+// ⚠ AND THE ENVIRON READ IS NOT THE INSTRUMENT. `delete env.DISPLAY` is the
+// gesture this hazard is about, and the same proof's [r2] row shows why no
+// check may read the variables back: with DISPLAY *and* WAYLAND_DISPLAY both
+// deleted, an environment audit of the running app reads perfectly clean while
+// the socket census finds two live connections to the compositor. An environ
+// read states an intent; only the fd table states what took effect.
 //
 // ── HOW A HARNESS USES THIS ────────────────────────────────────────────────
 //
