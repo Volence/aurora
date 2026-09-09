@@ -18,8 +18,8 @@
 import { useClassicProjectStore } from './state/classicProjectStore';
 import { useClassicLevelStore } from './state/classicLevelStore';
 import { useClassicObjectArtStore } from './state/classicObjectArtStore';
-import { useProjectStore, getCurrentAct } from './state/projectStore';
-import { useEditorStore, focusedHistory } from './state/editorStore';
+import { useProjectStore, getCurrentAct, getCurrentZone } from './state/projectStore';
+import { useEditorStore, focusedHistory, focusedDocId } from './state/editorStore';
 import { isBlockAligned, effectiveGranularity } from '../core/editing/map-clipboard';
 import { COLLISION_CELL_OWNED_MASK, COLLISION_CELL_UNOWNED_MASK } from '../core/editing/collision-word';
 import { lastPasteGhostReport, type PasteGhostReport } from './canvas/region-preview';
@@ -72,6 +72,7 @@ import { activateLevelTarget } from './shell/tab-activation';
 import { levelDocId } from './shell/tabs';
 import { buildUsageIndex } from '../core/level-classic/usage-index';
 import { buildChunkSurface } from '../core/art/classic-surface-buffer';
+import { getPixel } from '../core/art/composer-buffer';
 import { tileLockReason } from '../core/project/editable-tiles';
 import { SECTION_TILES_WIDE } from '../core/model/s4-types';
 import {
@@ -370,6 +371,36 @@ interface AeonProbeApi {
   };
   /** Can the focused document's stack undo? Drives the "one gesture, one step" count. */
   canUndo(): boolean;
+  /**
+   * WHICH DOCUMENT Ctrl+Z WOULD REACH — `editorStore.focusedDocId()` verbatim,
+   * the app's one undo resolution, read rather than reasoned about.
+   *
+   * `canUndo()` already says whether the focused stack has anything on it, and
+   * that is precisely NOT the question when the suspicion is that a gesture and
+   * its undo are pointed at DIFFERENT documents: a `true` there is equally
+   * consistent with "your stroke is on the stack" and with "somebody else's
+   * edit is". This returns the id, so a row can say `doc:zoneart:OJZ` where it
+   * expected a composer document and have the answer be an observation instead
+   * of a source reading.
+   */
+  focusedDocId(): string | null;
+  /**
+   * FNV-1a over the WHOLE open zone's tileset pixels — the zone-art witness.
+   *
+   * A row that asks "did an earlier zone-art edit survive this Ctrl+Z" needs a
+   * reading of the zone art itself, taken while the composer is showing some
+   * OTHER document. Every canvas on screen is a picture of one document; this
+   * is the data behind the zone-art stack, so it can be sampled before an
+   * unrelated gesture and after it. Null when no zone is open.
+   */
+  zoneArtHash(): number | null;
+  /** FNV-1a over ONE zone tileset tile's 64 pixel values, so a row can name the
+   *  tile it edited rather than only saying "something in the zone moved".
+   *  Null when no zone is open or the index is out of range. */
+  zoneTileHash(index: number): number | null;
+  /** How many tiles the open zone's tileset holds — the range `zoneTileHash`
+   *  accepts, and the anti-vacuous check for a zone with no art. */
+  zoneTileCount(): number | null;
   /** One placement's live position — the drag rows read this before and after. */
   objectAt(sectionIndex: number, index: number): { x: number; y: number; typeId: string } | null;
   /** One section nametable entry — the FG paint rows. */
@@ -677,6 +708,41 @@ interface AeonProbeApi {
    * the index is out of range — never a silent 0, which is a legal word.
    */
   artDocCollisionAt(plane: 'a' | 'b', index: number): number | null;
+  /**
+   * ONE CELL OF THE OPEN COMPOSER DOCUMENT'S NAMETABLE — read-only.
+   *
+   * `commitWrites` branches on `cell.atlasTile !== null` when the open document
+   * is a chunk: an atlas-backed cell's pixels go to the ZONE-ART stack as a
+   * `set-tileset-tiles` command, an empty one's go doc-local and are recorded
+   * nowhere. So "which path did this stroke take" is decided per CELL, and a
+   * harness aiming a pencil at a chunk has no way to aim at the doc-local half
+   * without reading which cells are empty. Nothing on screen distinguishes
+   * them: an empty cell and a cell holding an all-transparent tile paint the
+   * same checker.
+   *
+   * Null when nothing is open, when the open doc is a BG-override doc, or when
+   * the cell is out of range.
+   */
+  artDocCellAt(cx: number, cy: number): {
+    atlasTile: number | null; localId: number | null;
+    pal: number; hf: boolean; vf: boolean; pri: boolean;
+  } | null;
+  /**
+   * ONE PIXEL OF THE OPEN COMPOSER DOCUMENT, through `composer-buffer.getPixel`
+   * — the document's own resolution, cell flips and all.
+   *
+   * A canvas hash CANNOT stand in for this on a chunk document, and finding that
+   * out cost a row. A chunk document's atlas-backed cells are drawn from the
+   * ZONE TILESET, so an undo that reverts a zone-art edit repaints the composer
+   * canvas even though the document itself was not touched: the hash moves, and
+   * "the undo took back my stroke" and "the undo took back somebody else's tile,
+   * which this document happens to be showing" produce the same number. Reading
+   * a doc-local pixel separates them.
+   *
+   * Null when nothing is open, when the open doc is a BG-override doc, or when
+   * the coordinate is out of range.
+   */
+  artDocPixelAt(x: number, y: number): number | null;
   /**
    * THE COLLISION WORD'S OWNERSHIP RULE, as the app itself computes it —
    * `COLLISION_CELL_OWNED_MASK` and its 16-bit complement.
@@ -1097,6 +1163,32 @@ function installAeonProbe(): AeonProbeApi {
       };
     },
     canUndo: () => focusedHistory()?.canUndo ?? false,
+    focusedDocId: () => focusedDocId(),
+    // The zone-art witness. FNV over every tile in the open zone's tileset, in
+    // pool order, so one number answers "is the zone art the same as it was".
+    // Deliberately NOT read off a canvas: the composer canvas is a picture of
+    // whatever document is open, and the whole question here is what happened
+    // to a document that is NOT open.
+    zoneArtHash: () => {
+      const zone = getCurrentZone(useProjectStore.getState());
+      if (!zone) return null;
+      let h = 0x811c9dc5;
+      for (const t of zone.tileset.tiles) {
+        for (let i = 0; i < t.pixels.length; i++) {
+          h ^= t.pixels[i] ?? 0;
+          h = Math.imul(h, 0x01000193);
+        }
+      }
+      return h >>> 0;
+    },
+    zoneTileHash: (index) => {
+      const zone = getCurrentZone(useProjectStore.getState());
+      if (!zone) return null;
+      const t = zone.tileset.tiles[index];
+      if (!t) return null;
+      return fnv1a(t.pixels, 0, t.pixels.length);
+    },
+    zoneTileCount: () => getCurrentZone(useProjectStore.getState())?.tileset.tiles.length ?? null,
     objectAt: (sectionIndex, index) => {
       const o = section(sectionIndex)?.objects[index];
       return o ? { x: o.x, y: o.y, typeId: o.typeId } : null;
@@ -1304,6 +1396,25 @@ function installAeonProbe(): AeonProbeApi {
     linkHover: () => {
       const h = useEditorStore.getState().linkHover;
       return h ? { ...h } : null;
+    },
+    artDocPixelAt: (x, y) => {
+      const o = useArtStore.getState().open;
+      if (!o || o.bgOverride) return null;
+      const doc = o.doc;
+      if (!Number.isInteger(x) || !Number.isInteger(y)) return null;
+      if (x < 0 || y < 0 || x >= doc.widthTiles * 8 || y >= doc.heightTiles * 8) return null;
+      const zone = getCurrentZone(useProjectStore.getState());
+      return getPixel(doc, zone ? zone.tileset.tiles : [], x, y);
+    },
+    artDocCellAt: (cx, cy) => {
+      const o = useArtStore.getState().open;
+      if (!o || o.bgOverride) return null;
+      const doc = o.doc;
+      if (!Number.isInteger(cx) || !Number.isInteger(cy)) return null;
+      if (cx < 0 || cx >= doc.widthTiles || cy < 0 || cy >= doc.heightTiles) return null;
+      const c = doc.cells[cy * doc.widthTiles + cx];
+      if (!c) return null;
+      return { atlasTile: c.atlasTile, localId: c.localId, pal: c.pal, hf: c.hf, vf: c.vf, pri: c.pri };
     },
     artDocCollisionAt: (planeId, index) => {
       const o = useArtStore.getState().open;
