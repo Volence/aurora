@@ -51,6 +51,37 @@ export default defineConfig({
         input: resolve(__dirname, 'src/renderer/index.html'),
       },
     },
+    // ONE REACT INSTANCE IN THE BUNDLE, STATED RATHER THAN HOPED FOR.
+    //
+    // ⚠ THIS DOES NOT FIX A DEFECT IN THE SHIPPED BUILD, AND AN EARLIER DRAFT OF
+    // THIS COMMENT SAID IT DID. Measured by the overseer at landing, in the MAIN
+    // checkout at master: a build there produces exactly TWO copies
+    // (`index`, `classicProjectStore`) both before and after this line, and the
+    // app paints. The three-copy build is reproducible only in an AGENT WORKTREE,
+    // whose `node_modules` is a different tree from the main checkout's, so react
+    // resolves differently there. The original draft cited three commits and read
+    // as "master has been crashing", which is false and is the kind of claim a
+    // build config is the worst place to carry.
+    //
+    // WHAT IT ACTUALLY BUYS, which is still worth the line: in a worktree a build
+    // put a THIRD copy of react into the `project-runtime` chunk. `App.tsx`
+    // imports that chunk at mount, so the first hook ran out of a copy react-dom
+    // had never installed a dispatcher on:
+    //
+    //   TypeError: Cannot read properties of null (reading 'useCallback')
+    //     at exports.useCallback (assets/project-runtime-*.js)
+    //     at useProject → at App → renderWithHooks
+    //
+    // The window comes up, `document.title` is "Aurora", `#root` is EMPTY, and
+    // NOTHING is logged unless you attach to CDP with `Runtime.exceptionThrown`
+    // enabled — a blank app that reads as a hung one. It cost an agent a long
+    // detour before any of its actual parcel could start, and every future agent
+    // would pay it again. So this line exists to make a WORKTREE build behave like
+    // a main-checkout build, not to repair the product.
+    //
+    // It is a no-op wherever the bundler already resolved to one copy — which is
+    // the main checkout, verified both ways at landing rather than assumed.
+    resolve: { dedupe: ['react', 'react-dom'] },
     plugins: [react(), flavourStamp()],
   },
 });

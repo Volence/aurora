@@ -104,3 +104,48 @@ export function tabHasDirtyDot(tabId: string, kind: TabKind, s: DirtySnapshot): 
   // rather than assumed: a non-level id must not pick up a dot here.
   return s.aeonOpen && !s.classicOpen && s.artDirty && parseLevelTabId(tabId) !== null;
 }
+
+/**
+ * WHAT CTRL+S SHOULD SAY WHEN IT WROTE NOTHING AND SOMETHING IS UNSAVED, or
+ * null when there is nothing to say.
+ *
+ * THE DEFECT THIS CLOSES. `saveActive` is deliberately narrow: it writes the
+ * ACTIVE tab's document and nothing else, and "a tab nothing owns (Home,
+ * Project Setup) or a clean one is a silent no-op". Silent is right for a clean
+ * app. It is wrong while the tab strip is showing a dot whose own tooltip reads
+ * "Unsaved changes. Ctrl+S to save": two independent UX seats pressed Ctrl+S on
+ * exactly that advice, got no toast, no error and no message of any kind, and
+ * both filed it (packet docs/reviews/2026-09-09-save-contract.md, receipt R2).
+ * Measured here: `dirtyActs` was ["ojz/act1"] before the keypress and
+ * ["ojz/act1"] after.
+ *
+ * SO IT SPEAKS ONLY WHEN THE SILENCE WAS MISLEADING. Nothing dirty anywhere
+ * gives null, and Ctrl+S on a clean app stays as quiet as it always was.
+ *
+ * NO NEW CONTROL, and that is deliberate: what a SAVE control should look like
+ * is the owner's call and is parked in that packet. This is the existing toast
+ * channel saying what the existing gesture did.
+ *
+ * The sentence names KINDS rather than documents. The snapshot carries ids, not
+ * titles, and a message that named `doc:canvas:sky` at a person would be worse
+ * than one that says a canvas document is unsaved.
+ */
+export function unsavedElsewhereMessage(s: DirtySnapshot): string | null {
+  const kinds: string[] = [];
+  if (s.classicOpen && s.classicDirty) kinds.push('a level');
+  if (s.aeonOpen && !s.classicOpen && s.aeonDirty) kinds.push('a level');
+  if (s.aeonOpen && !s.classicOpen && s.artDirty) kinds.push('the art composer');
+  if (s.dirtySpriteDocIds.length > 0) {
+    kinds.push(s.dirtySpriteDocIds.length === 1 ? 'a sprite document' : `${s.dirtySpriteDocIds.length} sprite documents`);
+  }
+  if (s.dirtyCanvasDocIds.length > 0) {
+    kinds.push(s.dirtyCanvasDocIds.length === 1 ? 'a canvas document' : `${s.dirtyCanvasDocIds.length} canvas documents`);
+  }
+  if (kinds.length === 0) return null;
+  // NOT "the unsaved work is elsewhere". A canvas or sprite document can be
+  // dirty on THIS tab and still have no file to write to, in which case Ctrl+S
+  // honestly wrote nothing and the work is right here. The sentence is true in
+  // both cases.
+  return `Ctrl+S wrote nothing. Unsaved work is open in: ${kinds.join(', ')}. `
+    + 'Ctrl+Shift+S saves everything that has somewhere to go.';
+}

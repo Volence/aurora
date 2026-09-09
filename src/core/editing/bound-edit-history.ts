@@ -6,6 +6,14 @@ import type { AnyCommand, S4Level } from './commands';
 import type { EditHistory } from './history';
 import type { UndoStack } from './undo-stack';
 
+/**
+ * Which way a command just moved through the history: freshly applied, reverted
+ * by an undo, or re-applied by a redo. `execute` and `redo` are NOT merged: the
+ * caller of execute already accounts for its own edit, and a redo has no such
+ * caller, so a listener has to be able to tell them apart.
+ */
+export type EditDirection = 'execute' | 'undo' | 'redo';
+
 export class BoundEditHistory implements UndoStack {
   constructor(
     private readonly history: EditHistory,
@@ -15,8 +23,18 @@ export class BoundEditHistory implements UndoStack {
      * are argument-free (the UndoStack contract), so they cannot hand the moved
      * command back to their caller — without this hook the renderer-cache
      * invalidation that repaints after an undo would simply be lost.
+     *
+     * WHICH DIRECTION, as a second argument, because the repaint does not care
+     * and the DIRTY FLAG does. A stack that only says "a command moved" cannot
+     * tell the store whether the document just gained an edit or gave one back,
+     * so the dot could only ever be turned on — undoing to the saved point left
+     * it standing (packet docs/reviews/2026-09-09-save-contract.md, receipt R5).
+     * Defaulted callers keep working; the parameter is optional on the callback
+     * so an existing `(command) => …` still type-checks.
      */
-    private readonly onCommand: (command: AnyCommand) => void = () => {},
+    private readonly onCommand: (
+      command: AnyCommand, direction: EditDirection,
+    ) => void = () => {},
   ) {}
 
   get canUndo(): boolean { return this.history.canUndo; }
@@ -26,14 +44,14 @@ export class BoundEditHistory implements UndoStack {
     const level = this.getLevel();
     if (!level) return;
     const command = this.history.undo(level);
-    if (command) this.onCommand(command);
+    if (command) this.onCommand(command, 'undo');
   }
 
   redo(): void {
     const level = this.getLevel();
     if (!level) return;
     const command = this.history.redo(level);
-    if (command) this.onCommand(command);
+    if (command) this.onCommand(command, 'redo');
   }
 
   clear(): void { this.history.clear(); }
@@ -49,6 +67,6 @@ export class BoundEditHistory implements UndoStack {
     const target = level ?? this.getLevel();
     if (!target) return;
     this.history.execute(command, target);
-    this.onCommand(command);
+    this.onCommand(command, 'execute');
   }
 }

@@ -19,7 +19,7 @@ import {
 import { readSpriteSnapshot, writeSpriteSnapshot } from './spriteStore';
 import { makeCanvasHistory } from './canvasStore';
 import { useProjectStore, getActiveLevel } from './projectStore';
-import { notifyCommandApplied } from './editorStore';
+import { notifyCommandApplied, useEditorStore } from './editorStore';
 
 /**
  * Classic and aeon share the `level:` prefix (tabs.ts) — a classic act tab is
@@ -36,11 +36,23 @@ function classicIsOpen(): boolean {
 // store hands out a fresh S4Level object on every act load. notifyCommandApplied
 // is what makes an UNDO repaint: the UndoStack contract is argument-free, so the
 // stack itself has to announce the command it just reverted.
+//
+// THE SECOND JOB OF THAT ANNOUNCEMENT IS THE DIRTY FLAG, and it needs the
+// direction the repaint does not. `executeCommand` marks its own edit dirty at
+// the call site (it is the only path that knows the command was requested rather
+// than replayed), so 'execute' is deliberately NOT counted here — counting it
+// would double every edit. A REDO has no such caller, so it is counted here; an
+// UNDO gives an edit back, and that is the whole of the fix that lets the dot
+// clear when the author walks back to the point they last saved.
 function aeonLevelHistory(): UndoStack {
   return new BoundEditHistory(
     new EditHistory(),
     () => getActiveLevel(useProjectStore.getState()),
-    notifyCommandApplied,
+    (command, direction) => {
+      notifyCommandApplied(command);
+      if (direction === 'undo') useEditorStore.getState().markUndone();
+      else if (direction === 'redo') useEditorStore.getState().markDirty({ undoable: true });
+    },
   );
 }
 

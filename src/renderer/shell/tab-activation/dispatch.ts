@@ -19,6 +19,8 @@ import { documentHistoryHub } from '../../state/history-hub';
 import {
   parseLevelTabId, isSpriteDocTabId, isCanvasDocTabId, zoneArtDocId,
 } from '../tabs';
+import { levelDocDirty } from '../dirty-tabs';
+import { currentDirtySnapshot } from '../dirty-snapshot';
 import { HOME_TAB, type TabDescriptor } from '../../../core/shell/session';
 import { activateLevelTarget } from './level';
 import { activateSpriteDocTarget, confirmCloseSpriteDoc } from './sprite';
@@ -111,12 +113,41 @@ function disposeStacksForClosedTab(id: string): void {
   if (isCanvasDocTabId(id)) { closeCanvasDoc(id); return; }
   const level = parseLevelTabId(id);
   if (!level) return;
-  documentHistoryHub.dispose(id);
+  // ⚠ A LEVEL DOCUMENT OUTLIVES ITS TAB, AND THAT BREAKS THE RULE ABOVE.
+  //
+  // The sentence this function was written on — "a closed document's stack is
+  // unreachable, and keeping it would let a reopened tab inherit the history of
+  // a document the user already threw away" — is true of a sprite and of a
+  // canvas, whose documents die with the tab (closeSpriteDoc / closeCanvasDoc,
+  // one line up). It is FALSE of a level: closing the tab unloads nothing. The
+  // act stays resident, its unsaved edits stay unsaved, and reopening the tab
+  // shows them again.
+  //
+  // So for a DIRTY level document this dispose was the one destructive thing a
+  // level close did: measured on the live app (packet
+  // docs/reviews/2026-09-09-save-contract.md, receipt R4) an object placed,
+  // the tab closed, the tab reopened — the object was still there, the act was
+  // still dirty, and Undo AND Redo were both disabled. The close kept the work
+  // and threw away the only gesture that could take it back.
+  //
+  // Keep the stack while the work it can revert is still unsaved. A CLEAN
+  // document keeps the old behaviour: there is nothing to take back, and the
+  // stack is genuinely debris.
+  const snapshot = currentDirtySnapshot();
+  if (!levelDocDirty(id, snapshot)) documentHistoryHub.dispose(id);
   const zoneStillOpen = useSessionStore.getState().tabs.some((t) => {
     const other = parseLevelTabId(t.id);
     return other !== null && other.zone === level.zone;
   });
-  if (!zoneStillOpen) documentHistoryHub.dispose(zoneArtDocId(level.zone));
+  // The zone-art document, same question one scope wider: it survives while any
+  // act tab of the zone is open, and now also while the work on it is unsaved.
+  // `levelDocDirty` is asked about the CLOSING TAB because that is the predicate
+  // the save routing uses for this act, and on the classic side (the only engine
+  // with a real zone-art document) it is true exactly when some classic domain
+  // is dirty — art included.
+  if (!zoneStillOpen && !levelDocDirty(id, snapshot)) {
+    documentHistoryHub.dispose(zoneArtDocId(level.zone));
+  }
 }
 
 /**
