@@ -311,7 +311,16 @@ async function main() {
     // ── [s1] SAFETY INTERLOCK, then the WINDOWED rows ─────────────────────
     const RUN = announceRunRoot(runTarget(ROOT));
     const winArgs = [...XVFB_ARGS, RUN.electron, RUN.main];
-    const pinnedArgs = pinOzoneToX11('/usr/bin/xvfb-run', winArgs);
+    // FORCE_UNPINNED exists so the interlock can be WATCHED REFUSING without
+    // anybody neutering the guard on disk first. Mutating `pinOzoneToX11` and
+    // then running the windowed rows would put an unpinned windowed Electron
+    // one interlock-bug away from the owner's live desktop — the interlock is
+    // the thing under test, so it cannot also be the thing relied on. This
+    // switch falsifies only the proof's own view of the argv; the guard is
+    // untouched and the refusal branch spawns nothing at all.
+    const pinnedArgs = process.env.SURFACE_PROOF_FORCE_UNPINNED
+      ? winArgs
+      : pinOzoneToX11('/usr/bin/xvfb-run', winArgs);
     const binAt = pinnedArgs.indexOf(RUN.electron);
     const flagAt = pinnedArgs.indexOf(OZONE_X11_FLAG);
     const pinIsSound = binAt !== -1 && flagAt === binAt + 1;
