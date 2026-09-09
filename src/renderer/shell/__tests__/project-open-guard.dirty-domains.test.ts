@@ -43,7 +43,7 @@ import type { ClassicBridge } from '../../state/classic-bridge';
 import type { ProjectHandle, ZoneActRef } from '../../../core/project/adapter';
 import { useConfirmStore } from '../../state/confirmStore';
 import { useToastStore } from '../../state/toastStore';
-import { useCanvasStore } from '../../state/canvasStore';
+import { openCanvasDoc, useCanvasStore, type CanvasSource } from '../../state/canvasStore';
 import { useArtStore } from '../../state/artStore';
 import { useSpriteStore } from '../../state/spriteStore';
 import {
@@ -52,8 +52,28 @@ import {
 // The saver predicates this file claims to mirror, asserted rather than quoted.
 import { openEngine } from '../../state/open-project';
 import { createSection } from '../../../core/model/s4-types';
+import { createBuffer } from '../../../core/art/pixel-ops';
+import { canvasIndex } from '../../../core/art/canvas-doc';
 
 const REF: ZoneActRef = { zone: 'ghz', act: 1, label: 'Green Hill 1', available: true };
+
+const CANVAS = 'doc:canvas:sky';
+
+/** An open canvas with unsaved pixels AND a file target, so Save All can write it
+ *  — the SAVABLE half of the mixed row below. Same fixture shape as
+ *  project-open-guard.test.ts's canvas block. */
+function dirtyCanvas(): void {
+  openCanvasDoc(CANVAS, { name: 'sky', width: 8, height: 8, profileId: 'none' });
+  useCanvasStore.getState().setSource(CANVAS, {
+    dir: '/old-project',
+    pngPath: '.aurora/canvas/sky.png',
+    sidecarPath: '.aurora/canvas/sky.canvas.json',
+    pngMtimeMs: 1000, sidecarMtimeMs: 1000, sidecarRejected: false,
+  } as CanvasSource);
+  const buf = createBuffer(8, 8);
+  buf.data[0] = canvasIndex(1, 2);
+  useCanvasStore.getState().setPixels(CANVAS, buf);
+}
 
 function fakeHandle(): ProjectHandle {
   return {
@@ -190,6 +210,59 @@ describe('DIRTY-DOMAINS-ASSUMED-SAVABLE: a dirty aeon project under an open clas
       // Cancel keeps the work, and no saver was tricked into running.
       expect(useEditorStore.getState().dirty).toBe(true);
       expect(ran).toEqual([]);
+    });
+
+  it('MIXED: Save is still offered for the savable half, and the abort NAMES the aeon half',
+    async () => {
+      // The other side of the fix, and the one that turns a loop into an exit. A
+      // savable canvas plus the unsavable aeon dirt: Save is worth pressing, it
+      // cannot clear everything, and the abort has to say WHICH part it could not
+      // write or the user is back to "save or discard them first" with no way to
+      // act on it.
+      //
+      // PRE-FIX, measured on this exact state with the terms removed: buttons
+      // ["save","discard","cancel"], body the generic sentence alone, and pressing
+      // Save ran the CLASSIC saver (a project the user never edited) while the
+      // aeon dirt survived, ending in the bare
+      // "Open cancelled: unsaved changes remain (save or discard them first)."
+      aeonResident();
+      useEditorStore.setState({ dirty: true });
+      await debugOpenClassic();
+      dirtyCanvas();
+      expect(currentOpenDirtySnapshot().anySavable).toBe(true);   // the canvas half
+
+      const ran: string[] = [];
+      __setRuntimeSaversForTest({
+        aeon: async () => { ran.push('aeon'); useEditorStore.getState().markClean(); },
+        classic: async () => { ran.push('classic'); return { written: [], skipped: [], errors: [] } as never; },
+        // `atGen` is what canvasStore.markSaved requires (CANVAS-SAVE-GEN-OPTIONAL):
+        // this stand-in save must clear the flag the way the real one does, or the
+        // row would read a save failure as this fix's refusal.
+        canvasDoc: async (docId) => {
+          ran.push('canvasDoc');
+          // `atGen` is required (CANVAS-SAVE-GEN-OPTIONAL): this stand-in raced no
+          // edit, so it carries the counter as it stands. It must clear the flag
+          // the way the real saver does, or the row would read an ordinary save
+          // failure as this fix's refusal.
+          useCanvasStore.getState().markSaved(
+            docId, { pngMtimeMs: 2000, sidecarMtimeMs: 2000 },
+            useCanvasStore.getState().docs.get(docId)!.editGen,
+          );
+          return true;
+        },
+      });
+
+      const p = confirmProjectOpen();
+      expect(KEYS()).toContain('save');
+      useConfirmStore.getState().answer('save');
+      await expect(p).resolves.toBe(false);       // the aeon dirt is real and unpersisted
+      expect(ran).toContain('canvasDoc');         // the savable half DID get written
+      expect(ran).not.toContain('aeon');          // and the aeon saver skipped, as its predicate says
+      const msg = useToastStore.getState().toasts.at(-1)!.message;
+      expect(msg).toMatch(/unsaved changes remain/);       // the generic half still applies
+      expect(msg).toMatch(/aeon saver skips them/);         // only this fix says this
+      expect(msg).toMatch(/Discard & open/);                // WHAT to do instead
+      expect(useEditorStore.getState().dirty).toBe(true);
     });
 
   it('the AGENT door gets the same verdict, in its own words', async () => {
