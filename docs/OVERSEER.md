@@ -447,8 +447,8 @@ What stays live:
   server answers. **Evidence about the CLIENT is not evidence about the SERVER** (banked by the
   hub as their bar 14, empyrean `2eb2737`); their own tell is worth keeping: *the config was easy
   to read and the behaviour was not, so the readable thing stood in for the measurable one.* **(b) A session can silently change which implementation it is talking to
-  with no config change and no signal** — the socket chain is the only arbiter. Read the
-  banner's method count, and treat it as the freshness tell it is.
+  with no config change and no signal** — the socket chain is the only arbiter. **The tell is
+  `serverBuild.id`, NOT any method count — see the REFUTED row below.**
 - **A built binary is a third enumeration parameter, and it is the one source greps cannot
   reach** *(2026-08-24, closed the same day; the two verifications and the loud-failure evidence
   are in `docs/OVERSEER-LOG.md` → *"The built-binary enumeration parameter, as it stood"*)*:
@@ -456,8 +456,31 @@ What stays live:
   predated four landed methods. Two lanes had derived the count from source by different methods
   and agreed; both were blind to the artifact. **A consumer measuring the bus against an installed
   binary gets the old answer with nothing announcing it**, so a cutover must rebuild and **verify
-  by EXECUTING, never by grepping source.** **Read the startup banner's method count, and treat it
-  as the freshness tell it is.**
+  by EXECUTING, never by grepping source.**
+  ⚠ **THE REMEDY THIS ROW USED TO GIVE — "read the startup banner's method count and treat it as
+  the freshness tell" — IS REFUTED, 2026-09-09, and the refutation is this row's own lesson
+  recurring on the consumer that wrote it.** Verified firsthand at oracle `origin/main`
+  `47dc414eb4e8870afb87b8b0d545b8fabfaa662f`: the banner (`crates/oracle-aether/src/main.rs:87-88`)
+  prints `METHODS.len()`, the **raw static table, unfiltered**, while `initialize.methods`
+  (`engine.rs:2999`) is built from `advertised_methods(config.presents_frames)`, which drops
+  `PRESENTING_ONLY` (`engine.rs:758`). **`main.rs` never sets `presents_frames`**, so it takes the
+  default — meaning **the standalone headless binary's banner is off by one about its own
+  handshake, on every connection, deterministically.** A windowed player sets it true and the two
+  agree. So this tell fires "stale binary" against a **current, correct** server, off by exactly
+  one — the most misleading magnitude there is, because it reads as a miscount rather than as two
+  honest answers to different questions.
+  **This is O26 recurring, and O26 was ours:** we pinned `methods === '35'` and threw
+  `stale oracle-aether binary` at every correct binary. That booking's durable line was **a total
+  was the wrong observable** — and pinning a peer's banner instead of a literal is the same defect
+  with a longer wire, one of their numbers against another of their numbers under different
+  definitions.
+  **USE `serverBuild.id`.** It answers *"is this the same binary I measured before?"*, which is the
+  actual question. ⚠ **Never compare it for equality to answer "does this build contain feature X?"**
+  — it moves for docs-only commits; that question is `methods` membership or `capabilities`.
+  **And the duplicate-hiding worry that made a de-duped count tempting is answered better upstream:**
+  oracle's `tests/methods.rs` asserts uniqueness, so a duplicate is caught **at source** rather than
+  inferred from a count. Oracle booked the banner's wording as their own defect (it says "advertised"
+  while counting methods **defined**).
 - **When `write_vram` is eventually built, require `bypassesVdpPort: true` in the reply**
   *(oracle's condition, recorded here because Aurora is the consumer)*. The debug read/write
   path skips the VDP port path, FIFO and DMA entirely. **The flag is what protects an agent;
@@ -620,9 +643,11 @@ is the honest limit of the fix, and it is the discipline half rather than the or
   2026-08-26 scope clause. `socket-path.ts` re-checked against §7.1 clause by clause at item 36: the
   one divergence, exported-but-empty treated as unset, is recorded in §11.19 and not ruled against.
 - Emulators: `oracle-aether <rom>` headless for harnesses; `oracle-frontend <rom>
-  --aether` when a human needs to SEE it. Its startup banner's method count is the
-  freshness tell — a mismatch between the two binaries means one is stale, not that the
-  hosted build is restricted.
+  --aether` when a human needs to SEE it. ⚠ **Its startup banner's method count is NOT a
+  freshness tell and never was — REFUTED 2026-09-09, see the row above.** The banner counts the raw
+  table and the handshake counts a config-filtered one, so headless and windowed builds differ by
+  one **by construction**. A mismatch between the two binaries' banners means they answer different
+  questions, not that either is stale. Use `serverBuild.id` for staleness.
 
 ## Quirks
 
