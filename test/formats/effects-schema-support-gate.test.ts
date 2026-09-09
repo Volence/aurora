@@ -112,10 +112,34 @@ describe('json-schema-subset: the guards that face a schema amendment', () => {
     expect(() => assertSchemaSupported(alone)).not.toThrow();
   });
 
-  it('refuses a $ref that is not a local JSON Pointer', () => {
+  /**
+   * A REMOTE $ref IS THE WRONG FIXTURE ON ITS OWN, and this row was written
+   * with only that one first. A url shares no leading character with a local
+   * pointer, so it is still refused by a guard weakened to check for the fence
+   * post alone, and the row stayed green while its subject was loosened.
+   *
+   * The case that separates them is the shape one character away: a plain-name
+   * fragment. `#anchor` is JSON Schema's `$anchor` spelling, a real amendment
+   * this evaluator does not implement, and under a guard that asks only for a
+   * leading `#` it slips past this refusal and is answered several lines later
+   * by the pointer resolver with a sentence about a schema that does not
+   * resolve. Both throw; only one of them says the true reason.
+   */
+  it('refuses a $ref that is not a local JSON Pointer, including a plain-name fragment', () => {
     const remote: JsonSchema = { properties: { a: { $ref: 'https://example.invalid/s.json' } } };
     expect(() => assertSchemaSupported(remote))
       .toThrow(/only local JSON-Pointer \$refs are implemented, got "https:\/\/example.invalid\/s.json"/);
+
+    const anchored: JsonSchema = { properties: { a: { $ref: '#anchor' } } };
+    expect(() => assertSchemaSupported(anchored))
+      .toThrow(/only local JSON-Pointer \$refs are implemented, got "#anchor"/);
+
+    // ACCEPTING CONTROL: the spelling it does implement resolves.
+    const pointer: JsonSchema = {
+      $defs: { base: { type: 'string' } },
+      properties: { a: { $ref: '#/$defs/base' } },
+    };
+    expect(() => assertSchemaSupported(pointer)).not.toThrow();
   });
 
   /**
