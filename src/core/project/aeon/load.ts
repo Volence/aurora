@@ -22,7 +22,11 @@ import { nameSome, type Notice, type UnreadableItem } from '../notice';
 import type { CollisionProfileSet } from '../../collision/collision-model';
 import { s4CollisionAdapter } from '../../collision/adapters/s4-collision-adapter';
 import { findFullBlockShapeId } from '../../collision/full-block-shape';
-import { resolvePlaneWords } from '../../collision/collision-cell-resolve';
+// SECTION_PLANE_WORDS is imported BESIDE resolvePlaneWords on purpose: it is
+// that module's stated bound for every plane its consumers index, and passing
+// anything else — least of all the bounded array's own length — is what its
+// docblock forbids. See readCollisionPlaneFile.
+import { resolvePlaneWords, SECTION_PLANE_WORDS } from '../../collision/collision-cell-resolve';
 import { migrateLegacyChunkCollision } from '../../model/chunk-migrate';
 import {
   loadS4Config,
@@ -242,6 +246,68 @@ async function markUnreadable(
 }
 
 /**
+ * One section's editable collision plane: a saved `.collattr.bin` (16-bit packed
+ * cell words) if present, else that plane's strip baseline packed into cell
+ * words (so paints don't mutate the diff baseline). ABSENT is the ordinary case
+ * and stays silent; anything else marks the file not-understood, so the save
+ * omits it — the baseline is then only ever something to DRAW.
+ *
+ * WHY THE LENGTH CHECK LIVES HERE rather than in parseCollAttr: the
+ * authoritative plane length is the section's cell count, which the codec has no
+ * way to know (it is a pure byte codec, and its unit tests parse buffers of
+ * arbitrary length). Without the check a truncated file never reaches the catch
+ * at all: parseCollAttr never throws, so it yields a SHORT plane that
+ * serializeCollAttr then writes back short, and an odd-length file loses its
+ * trailing byte to `>> 1`. Short, long and odd are all "not this section's
+ * plane", so one equality covers them.
+ *
+ * ⚠ AND THE FIGURE IS `SECTION_PLANE_WORDS`, NEVER `baseline.length`
+ * (PLANE-BOUND-FROM-OWN-DATA). Both the byte-count expectation and the fallback
+ * bound used to be derived from the baseline array itself, which is the one
+ * shape collision-cell-resolve.ts's own docblock forbids at its call sites:
+ * a bound taken from the data being bounded agrees with a SHORT plane, which is
+ * the case the bound exists for. Concretely, with `baseline.length`:
+ *   • a baseline one row short silently made the fallback plane one row short,
+ *     and consumers indexing `SECTION_PLANE_WORDS` (OverlayRenderer's collision
+ *     shading, MapViewport's hover readout) read `undefined` — which unpacks to
+ *     shape 0, so the missing region rendered as AIR with nothing said;
+ *   • `resolvePlaneWords`'s own `[COLLISION_PLANE_LENGTH]` report could never
+ *     fire on this road, because `engine.length !== length` was false by
+ *     construction — the loader was holding the instrument's mouth shut;
+ *   • a `.collattr.bin` sized for the REAL section was rejected as
+ *     wrong-length, and one sized for the short baseline accepted.
+ * Not live before the fix — the caller allocates the baseline at exactly
+ * SECTION_PLANE_WORDS ten lines up — but true for a reason the call site did not
+ * state, which is what makes it a change away from and not toward safety.
+ *
+ * Exported for the same reason: the loader cannot produce a short baseline, so
+ * the bound's INDEPENDENCE from the baseline is only measurable by handing this
+ * function one directly (aeon-load.plane-bound.test.ts).
+ */
+export async function readCollisionPlaneFile(
+  fa: FileAccess,
+  section: Section,
+  prefix: string,
+  suffix: string,
+  baseline: Uint8Array,
+  unreadable: UnreadableItem[],
+): Promise<Uint16Array> {
+  const path = `${prefix}.${suffix}`;
+  try {
+    const raw = await fa.read(path);
+    if (raw.length !== SECTION_PLANE_WORDS * 2) {
+      throw new Error(
+        `collision plane is ${raw.length} bytes; this section needs ${SECTION_PLANE_WORDS * 2}`,
+      );
+    }
+    return parseCollAttr(raw);
+  } catch (e) {
+    await markUnreadable(fa, section, path, suffix, e, unreadable);
+    return resolvePlaneWords(null, baseline, SECTION_PLANE_WORDS);
+  }
+}
+
+/**
  * One BG-library body read, WITH THE VERDICT (ABSENT-CAUSE-MISNAMED, lens sweep).
  *
  * The union is discriminated on `outcome` for the reason `ReadManyValue`'s is: the
@@ -418,8 +484,13 @@ async function loadFullProject(
               const stripRaw = await fa.read(stripFile);
               const stripData = parseStrips(stripRaw);
 
-              const engineColl = new Uint8Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);
-              const engineCollB = new Uint8Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);
+              // SECTION_PLANE_WORDS, not a second copy of the same product: it
+              // is the figure the plane's consumers index with, and it is now
+              // also the figure `readCollisionPlaneFile` bounds by, so the
+              // allocation and the bound name ONE authority rather than
+              // agreeing by arithmetic.
+              const engineColl = new Uint8Array(SECTION_PLANE_WORDS);
+              const engineCollB = new Uint8Array(SECTION_PLANE_WORDS);
               for (let row = 0; row < STRIP_ROWS; row++) {
                 for (let col = 0; col < STRIP_COLS; col++) {
                   const srcIdx = row * STRIP_COLS + col;
@@ -433,43 +504,12 @@ async function loadFullProject(
               }
               section.engineCollision = engineColl;
               section.engineCollisionB = engineCollB;
-              // Editable collision plane: a saved .collattr.bin (16-bit packed cell
-              // words) if present, else seed by packing that plane's strip
-              // baseline into cell words (so paints don't mutate the diff
-              // baseline). ABSENT is that ordinary case and stays silent;
-              // anything else marks the file not-understood, so the save omits
-              // it — the baseline below is only ever something to DRAW.
-              //
-              // The length check has to live here rather than in parseCollAttr:
-              // the authoritative plane length is the section's cell count, which
-              // the codec has no way to know (it is a pure byte codec, and its
-              // unit tests parse buffers of arbitrary length). The loader has
-              // that figure in hand — it is the same `engineColl.length` the
-              // fallback packs. Without the check a truncated file never reaches
-              // the catch at all: parseCollAttr never throws, so it yields a SHORT
-              // plane that serializeCollAttr then writes back short, and an
-              // odd-length file loses its trailing byte to `>> 1`. Short, long and
-              // odd are all "not this section's plane", so one equality covers them.
-              const readPlane = async (
-                suffix: string,
-                baseline: Uint8Array,
-              ): Promise<Uint16Array> => {
-                const path = `${prefix}.${suffix}`;
-                try {
-                  const raw = await fa.read(path);
-                  if (raw.length !== baseline.length * 2) {
-                    throw new Error(
-                      `collision plane is ${raw.length} bytes; this section needs ${baseline.length * 2}`,
-                    );
-                  }
-                  return parseCollAttr(raw);
-                } catch (e) {
-                  await markUnreadable(fa, section, path, suffix, e, unreadableFiles);
-                  return resolvePlaneWords(null, baseline, baseline.length);
-                }
-              };
-              section.collisionEdit = await readPlane('collattr.bin', engineColl);
-              section.collisionEditB = await readPlane('collattrb.bin', engineCollB);
+              section.collisionEdit = await readCollisionPlaneFile(
+                fa, section, prefix, 'collattr.bin', engineColl, unreadableFiles,
+              );
+              section.collisionEditB = await readCollisionPlaneFile(
+                fa, section, prefix, 'collattrb.bin', engineCollB, unreadableFiles,
+              );
               loaded = true;
             } catch (stripErr) {
               const msg = stripErr instanceof Error ? stripErr.message : String(stripErr);

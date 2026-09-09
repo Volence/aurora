@@ -188,6 +188,44 @@ export function validateCollisionReadPlane(plane: unknown): string | null {
   return `plane must be "a" or "b", got ${JSON.stringify(plane)}`;
 }
 
+/**
+ * `paint_collision`'s plane — THE SAME BACKSTOP AS THE READ ABOVE, on the road
+ * where getting it wrong costs data rather than a confusing answer
+ * (PAINT-PLANE-NO-BACKSTOP).
+ *
+ * WHY A HANDLER-SIDE CHECK AT ALL, when `EDITOR_METHODS`' zod enum already
+ * refuses these values on both production roads (mcp-server's tool inputSchema
+ * and aether/adapter's per-method safeParse): for exactly the reason the read's
+ * docblock gives — "for any road that reaches the handler without passing this
+ * schema". `handleAgentRequest` is exported, and the schema is not part of it.
+ *
+ * WHY THE WRITE NEEDED IT MORE, which is the finding and not a symmetry
+ * argument. A bad READ shows you something wrong; a bad WRITE changes your data.
+ * Measured on the unguarded handler, one paint per value into a seeded section:
+ *
+ *   plane "c" / "A" / "BOTH"  → PLANE A PAINTED, reply {"painted":4,
+ *                               "bothPlanes":false} — success reported for a
+ *                               destructive edit aimed at a plane nobody named
+ *   plane 1 / undefined / null → TypeError "aimedId.toUpperCase is not a
+ *                               function", nothing painted
+ *
+ * The second line is not a guard. It is `description: ...${aimedId.toUpperCase()}`
+ * — a sentence for a human throwing on a non-string by accident, one refactor
+ * away from silently painting A too. The first line is the row's threat model
+ * exactly: `req.plane === 'both' ? 'a' : req.plane` typed as `'a' | 'b'` is an
+ * assertion over a runtime value tsc never sees, and `aimedId === 'b'` is false
+ * for every value that is not literally "b".
+ *
+ * "both" IS legal here and is NOT on the read, so the two messages differ in the
+ * one way that matters and are otherwise the same shape. No prose branch for
+ * "both": there is nothing to explain, it works.
+ */
+export function validateCollisionWritePlane(plane: unknown): string | null {
+  if (plane === 'a' || plane === 'b' || plane === 'both') return null;
+  return `plane must be "a", "b" or "both" (one stroke over BOTH planes, as one `
+    + `undo step), got ${JSON.stringify(plane)}`;
+}
+
 export function validatePaintRegion(
   section: number,
   x: number, y: number, w: number, h: number,

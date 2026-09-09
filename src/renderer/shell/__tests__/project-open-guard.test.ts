@@ -360,8 +360,29 @@ describe('confirmProjectOpen: SAVE over an aeon composer document', () => {
     // special-case sentence used to count only CANVAS documents, so this abort
     // fell through to the generic "save or discard them first" — which is exactly
     // the loop the user just failed to escape.
-    dirtyComposer();                            // unsavable: no project open
-    useEditorStore.setState({ dirty: true });   // savable
+    //
+    // ⚠ THE SAVABLE HALF USED TO BE A FALSE PREMISE (DIRTY-DOMAINS-ASSUMED-SAVABLE,
+    // 2026-09-09). This row was `dirtyComposer()` + `editorStore.dirty = true`
+    // with NO project open, commented "savable" — and the aeon-project saver's own
+    // `isDirty` is `openEngine() === 'aeon'`, which is FALSE with nothing open, so
+    // no registered saver would have written that dirt. The row passed because the
+    // injected `__setOpenGuardSaveForTest` stub markCleaned the store itself: a
+    // save no coordinator performs, verifying an offer the guard should never have
+    // made. It is the FIFTH instance of this file's own class, encoded in its own
+    // suite as an expectation.
+    //
+    // Both halves are now TRUE in the state they are asserted in: the aeon project
+    // is resident (so its saver really does fire, and the stub below stands in for
+    // the IPC write rather than for the decision), and the unsavable document is a
+    // LIVE-TILE composer doc, which has no writer even with a project open — see
+    // the row below this one.
+    aeonProjectOpen();
+    useArtStore.getState().openDocument({
+      doc: createDoc(1, 1), liveTileIndex: 4, chunkId: null, name: 'Tile $04', dirty: false,
+    });
+    useArtStore.getState().markOpenDirty();     // unsavable: writes straight to the tileset
+    useEditorStore.setState({ dirty: true });   // savable: openEngine() === 'aeon'
+
     __setOpenGuardSaveForTest(vi.fn(async () => {
       useEditorStore.getState().markClean();
       return { saved: ['aeon-project'], skipped: [], failed: [] };
@@ -374,7 +395,7 @@ describe('confirmProjectOpen: SAVE over an aeon composer document', () => {
 
     const msg = useToastStore.getState().toasts.at(-1)!.message;
     expect(msg).toMatch(/unsaved changes remain/i);   // the generic half still applies
-    expect(msg).toMatch(/no open zone and act/i);     // only composerSaveState says this
+    expect(msg).toMatch(/straight to the tileset/i);  // only composerSaveState says this
     expect(msg).toMatch(/Discard & open/);            // WHAT to do instead
     expect(useArtStore.getState().open?.dirty).toBe(true);
   });
