@@ -58,6 +58,7 @@
     "harness:anchor-authoring": "node scratchpad/anchor-authoring-harness.mjs",
     "harness:animated-art": "node scratchpad/animated-art-harness.mjs",
     "harness:art-agent": "node scratchpad/art-agent-harness.mjs",
+    "harness:art-undo-path": "node scratchpad/art-undo-path-harness.mjs",
     "harness:band-art-foreground": "node scratchpad/band-art-foreground-harness.mjs",
     "harness:band-preset": "node scratchpad/band-preset-harness.mjs",
     "harness:close-guard-witness": "node scratchpad/close-guard-witness-harness.mjs",

@@ -26,8 +26,16 @@
 // integer through the app's own arithmetic ((client - rect.left) / zoom), then
 // printed. Nothing here compares a fractional rect to anything.
 //
+// ⚠ THIS HARNESS IS EXPECTED TO EXIT 1 TODAY, and that is the finding, not a
+// broken instrument. Rows A2 and A3 assert that a stroke on a doc-local composer
+// document can be taken back; it cannot, and the fix is PARKED on a design
+// question recorded in docs/reviews/2026-09-09-art-undo-path.md §4. The day that
+// question is answered and the fix lands, this run goes green on its own. Row B
+// (live-tile) passing is what says the instrument itself works: if B ever fails,
+// suspect the harness before believing anything A says.
+//
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npx electron-vite build
-// Run:                     node scratchpad/art-undo-path-harness.mjs
+// Run:                     npm run harness:art-undo-path
 
 import { AURORA_DIR, siblingPathOrUnresolved } from '../test/support/sibling-root.mjs';
 import { execFileSync } from 'node:child_process';
@@ -435,6 +443,13 @@ async function main() {
     const notes = results.filter((r) => r.ok === null).length;
     console.log(`\n  ${passes} pass, ${failed} fail, ${notes} note — ${results.length} rows total`);
     if (fails.length) console.log(`  FAILING: ${fails.join(', ')}`);
+    const expectedRed = ['A2', 'A3'].filter((id) =>
+      results.some((r) => r.id === id && r.ok === false));
+    if (expectedRed.length) {
+      console.log(`  EXPECTED RED (the finding, not a broken instrument): ${expectedRed.join(', ')} `
+        + '— a doc-local composer document records no undo step. See '
+        + 'docs/reviews/2026-09-09-art-undo-path.md §4 for the parked design question.');
+    }
     console.log('HARNESS-END-MARKER');
   } finally {
     if (c) c.close();
