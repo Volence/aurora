@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, writeFileSync, chmodSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, chmodSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runBuild } from '../build-run';
@@ -1235,10 +1235,15 @@ describe('runBuild when a DECLARED flavour contradicts the running ROM', () => {
       // running one and which the built one sends nobody anywhere.
       expect(msg).toMatch(/running \S*s4\.debug\.bin/);
       expect(msg).toMatch(/wrote \S*s4\.bin/);
-      // The attribution, without which this reads as Aurora malfunctioning.
-      expect(msg).toContain('buildEnv.DEBUG');
+      // THE ATTRIBUTION, without which this reads as Aurora malfunctioning,
+      // and it must QUOTE THE DECLARED VALUE. A bare mention of `buildEnv.DEBUG`
+      // is not this assertion: the remedy sentence below names it too, so a
+      // `toContain('buildEnv.DEBUG')` here passes with the attribution deleted
+      // entirely. Measured, not assumed: that exact plant stayed GREEN against
+      // the first draft of this row.
+      expect(msg).toContain('buildEnv.DEBUG is "0"');
       // BOTH remedies, neither chosen for them.
-      expect(msg).toContain('project.json');
+      expect(msg).toContain('set buildEnv.DEBUG in project.json');
       expect(msg).toContain(`load ${join(dir, 's4.bin')} in the emulator`);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
@@ -1314,5 +1319,36 @@ describe('runBuild when a DECLARED flavour contradicts the running ROM', () => {
       expect(r.reloadError).toBeUndefined();
       expect(r.romPath).toBe(join(dir, 's1built.bin'));
     } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  /**
+   * §5.4, the cheap half. Once the running ROM is accepted it IS the artifact
+   * this build wrote, so the reload target is a choice of SPELLING, not of
+   * file — and the two spellings are not equally trustworthy. `builtRom` is
+   * derived from `plan.cwd` and is absolute by construction; the other is
+   * whatever string the server handed back, which was passed through verbatim
+   * and would still be relative if it arrived relative.
+   *
+   * A symlinked checkout makes the two spellings differ while naming one file,
+   * which is the case the canonicaliser was written for, so it is the fixture
+   * that can see which one is sent.
+   */
+  it('reloads by the path the BUILD names, not the string the server handed back', async () => {
+    const dir = scriptDir('exit 0');
+    const link = join(mkdtempSync(join(tmpdir(), 'aurora-link-')), 'checkout');
+    symlinkSync(dir, link);
+    // The same file, reached through the symlink: accepted, because the
+    // canonicaliser resolves the directory.
+    const client = fakeClient({ dir, romPath: join(link, 's4.debug.bin') });
+    try {
+      const r = await runBuild({ basePath: dir, client: client as never, env: {} });
+      expect(r.reloaded).toBe(true);
+      expect(r.romPath).toBe(join(dir, 's4.debug.bin'));
+      expect(client.calls).toContain(`emulator/reload_rom:${join(dir, 's4.debug.bin')}`);
+      expect(client.calls.filter((c) => c.includes(link))).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(link, { force: true });
+    }
   });
 });
