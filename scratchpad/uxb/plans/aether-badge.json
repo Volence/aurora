@@ -1,0 +1,7 @@
+[
+  { "eval": "return { badgeBefore: [...document.querySelectorAll('button')].filter(b=>/Aether/.test(b.innerText)).map(b=>({t:b.innerText.trim(),title:b.title})) };" },
+  { "click": { "x": 1343, "y": 861 }, "after": 2500 },
+  { "sleep": 3000 },
+  { "eval": "return { badgeAfter: [...document.querySelectorAll('button')].filter(b=>/Aether/.test(b.innerText)).map(b=>({t:b.innerText.trim(),title:b.title})), toasts: document.body.innerText.split('\\n').filter(l=>/aether|emulat|socket|connect|fail|refus|error/i.test(l)).slice(0,12) };" },
+  { "shot": "05-aether-badge-pressed" }
+]

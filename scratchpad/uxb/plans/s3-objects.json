@@ -1,0 +1,6 @@
+[
+  { "click": { "x": 343, "y": 54 }, "after": 1800 },
+  { "sleep": 1200 },
+  { "eval": "const vis=(el)=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0&&r.bottom>0&&r.right>0&&r.top<innerHeight&&r.left<innerWidth};const L=[];for(const el of document.querySelectorAll('button,input,select,textarea,[role=tab]')){if(!vis(el))continue;const r=el.getBoundingClientRect();L.push(`${el.tagName.toLowerCase()}${el.disabled?' DIS':''} ${Math.round(r.left+r.width/2)},${Math.round(r.top+r.height/2)} ${Math.round(r.width)}x${Math.round(r.height)} :: ${((el.innerText||el.value||el.placeholder||el.title||'').trim().replace(/\\s+/g,' ')).slice(0,50)}`)}return L.join('\\n')+`\\n=== ${L.length}`;" },
+  { "shot": "13-facet-objects" }
+]

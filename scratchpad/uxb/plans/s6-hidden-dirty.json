@@ -1,0 +1,12 @@
+[
+  { "click": { "x": 520, "y": 400 }, "after": 1500 },
+  { "eval": "return { objs: document.body.innerText.match(/Objects\\n(\\d+)/)?.[1], dirty: window.__dbg.aeon.state().dirty };" },
+  { "eval": "const t=[...document.querySelectorAll('div')].find(d=>d.title==='Oracle Jungle Zone · act1'&&d.getBoundingClientRect().top<40); const c=[...t.querySelectorAll('span')].find(e=>e.getAttribute('title')==='Close tab'); const r=c.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};" },
+  { "shot": "21-dirty-before-close" },
+  { "click": { "x": 477, "y": 17 }, "after": 1800 },
+  { "sleep": 1200 },
+  { "eval": "return { tabs:[...document.querySelectorAll('div')].filter(d=>d.title&&d.getBoundingClientRect().top<40&&d.getBoundingClientRect().height>20).map(d=>({t:d.title,inner:d.innerText.replace(/\\s+/g,' ')})), storeDirty: window.__dbg.aeon.state().dirty, storeDirtyActs: window.__dbg.aeon.state().dirtyActs, screenSaysDirty: /unsaved|Unsaved|\\u25cf|\\u2022/.test(document.body.innerText), fullScreenText: document.body.innerText.replace(/\\s+/g,' ').slice(0,400) };" },
+  { "click": { "x": 278, "y": 17 }, "after": 1500 },
+  { "eval": "return { homeText: document.body.innerText.replace(/\\s+/g,' ').slice(0,500), anyDirtyMark: [...document.querySelectorAll('*')].filter(e=>/unsaved/i.test(e.getAttribute('title')||'')).length };" },
+  { "shot": "22-home-with-hidden-unsaved" }
+]

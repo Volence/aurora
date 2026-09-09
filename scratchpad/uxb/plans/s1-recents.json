@@ -1,0 +1,6 @@
+[
+  { "click": { "x": 278, "y": 17 }, "after": 1200 },
+  { "sleep": 800 },
+  { "eval": "return { body: document.body.innerText.slice(0,700) };" },
+  { "shot": "08-home-with-project" }
+]

@@ -1,0 +1,5 @@
+[
+  { "clickAt": "const d=[...document.querySelectorAll('div')].find(x=>x.title==='Oracle Jungle Zone · act1'&&x.getBoundingClientRect().top<110); const r=d.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 2500 },
+  { "sleep": 1500 },
+  { "eval": "return { aeonState: window.__dbg.aeon.state(), objs: document.body.innerText.match(/Objects\\n(\\d+)/)?.[1], tabs:[...document.querySelectorAll('div')].filter(d=>d.title&&d.getBoundingClientRect().top<110&&d.getBoundingClientRect().height>20).map(d=>d.title), spriteTabGone: ![...document.querySelectorAll('div')].some(d=>/Sprite/.test(d.title||'')) };" }
+]

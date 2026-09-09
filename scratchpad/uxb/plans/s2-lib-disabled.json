@@ -1,0 +1,7 @@
+[
+  { "eval": "const b=[...document.querySelectorAll('button')].filter(e=>e.innerText.trim()==='Spring'); return b.map(e=>({dis:e.disabled, title:e.title||null, aria:e.getAttribute('aria-disabled'), cursor:getComputedStyle(e).cursor, x:Math.round(e.getBoundingClientRect().left+e.getBoundingClientRect().width/2), y:Math.round(e.getBoundingClientRect().top+e.getBoundingClientRect().height/2)}));" },
+  { "click": { "x": 120, "y": 268 }, "after": 1200 },
+  { "sleep": 800 },
+  { "eval": "return { toolAfter: window.__dbg.aeon.state().tool, anyToast: document.body.innerText.match(/[^\\n]*(cannot|unavailable|not |use )[^\\n]*/i)?.[0] || null, sel: document.querySelectorAll('[aria-selected=true]').length };" },
+  { "shot": "14-sidebar-library-disabled" }
+]

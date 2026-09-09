@@ -1,0 +1,14 @@
+[
+  { "eval": "return { objectsBefore: window.__dbg.aeon.state().objects ?? null, state: window.__dbg.aeon.state(), props: [...document.querySelectorAll('div')].filter(d=>/^Objects$/.test(d.innerText.trim())).length };" },
+  { "click": { "x": 262, "y": 158 }, "after": 800 },
+  { "eval": "return { toolAfterPlaceClick: window.__dbg.aeon.state().tool, rightPanel: document.body.innerText.split('OBJECTS')[1]?.slice(0,300) };" },
+  { "click": { "x": 1281, "y": 310 }, "after": 900 },
+  { "eval": "return { afterPickSpring: window.__dbg.aeon.state(), panel: document.body.innerText.split('SELECTED OBJECT')[1]?.slice(0,200) };" },
+  { "shot": "15-place-armed" },
+  { "click": { "x": 520, "y": 400 }, "after": 1200 },
+  { "eval": "return { afterFirstPlace: window.__dbg.aeon.state(), undoDisabled: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Undo')?.disabled, panel: document.body.innerText.split('SELECTED OBJECT')[1]?.slice(0,240) };" },
+  { "shot": "16-after-first-place" },
+  { "click": { "x": 620, "y": 400 }, "after": 1200 },
+  { "eval": "return { afterSecondPlace: window.__dbg.aeon.state(), panel: document.body.innerText.split('SELECTED OBJECT')[1]?.slice(0,240) };" },
+  { "shot": "17-after-second-place" }
+]

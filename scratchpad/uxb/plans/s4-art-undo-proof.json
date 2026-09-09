@@ -1,0 +1,9 @@
+[
+  { "eval": "const c=document.querySelector('canvas'); const g=c.getContext('2d'); window.__px=(x,y)=>[...g.getImageData(x,y,1,1).data].join(','); return { rect: c.getBoundingClientRect().toJSON(), size:{w:c.width,h:c.height}, centrePixel: window.__px(Math.floor(c.width/2),Math.floor(c.height/2)) };" },
+  { "clickAt": "const c=document.querySelector('canvas'); const r=c.getBoundingClientRect(); return {x:Math.round(r.left+8),y:Math.round(r.top+8)};", "after": 1200 },
+  { "eval": "const c=document.querySelector('canvas'); return { painted: window.__px(2,2), status: document.body.innerText.split('\\n').slice(-3).join(' | '), undoDis: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Undo')?.disabled };" },
+  { "key": { "key": "z", "code": "KeyZ", "vk": 90, "mod": 2, "text": "z" }, "after": 1800 },
+  { "sleep": 1000 },
+  { "eval": "return { afterCtrlZ: window.__px(2,2), status: document.body.innerText.split('\\n').slice(-3).join(' | '), undoDis: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Undo')?.disabled };" },
+  { "shot": "36-art-undo-proof" }
+]

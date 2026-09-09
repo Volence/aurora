@@ -1,0 +1,7 @@
+[
+  { "eval": "const nb=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='New'); return { newBtnDisabled: nb.disabled, newBtnTitle: nb.title||null, scenes: JSON.parse(window.__dbg.aeon.scenesJson()).map(s=>s.id), selected: window.__dbg.aeon.selectedScene?.() ?? null };" },
+  { "clickAt": "const b=[...document.querySelectorAll('button')].find(e=>e.innerText.trim()==='Delete'); const r=b.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 2000 },
+  { "sleep": 1500 },
+  { "eval": "return { dialog: !!document.querySelector('[role=dialog]'), buttons: [...document.querySelectorAll('button')].map(b=>b.innerText.trim()).filter(t=>/confirm|delete|cancel|yes|no|keep/i.test(t)), scenesAfter: JSON.parse(window.__dbg.aeon.scenesJson()).map(s=>s.id), undoDisabled: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Undo')?.disabled, screen: document.body.innerText.replace(/\\s+/g,' ').slice(0,300) };" },
+  { "shot": "26-scene-delete-pressed" }
+]

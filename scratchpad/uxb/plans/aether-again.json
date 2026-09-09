@@ -1,0 +1,8 @@
+[
+  { "click": { "x": 1343, "y": 861 }, "after": 2500 },
+  { "sleep": 2500 },
+  { "eval": "const b=[...document.querySelectorAll('button')].find(x=>/Aether/.test(x.innerText)); return { visibleText: b.innerText.trim(), colour: getComputedStyle(b).color, anyDialog: !!document.querySelector('[role=dialog]'), bodyTail: document.body.innerText.slice(-200) };" },
+  { "move": { "x": 1343, "y": 861 } },
+  { "sleep": 2500 },
+  { "shot": "06-aether-hover-tooltip" }
+]

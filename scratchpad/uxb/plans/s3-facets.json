@@ -1,0 +1,5 @@
+[
+  { "click": { "x": 406, "y": 17 }, "after": 1200 },
+  { "eval": "const f=(n)=>{const b=[...document.querySelectorAll('button')].find(e=>e.innerText.trim()===n); return b?{x:Math.round(b.getBoundingClientRect().left+b.getBoundingClientRect().width/2),y:Math.round(b.getBoundingClientRect().top+b.getBoundingClientRect().height/2)}:null}; return {Layout:f('Layout'),Objects:f('Objects'),Effects:f('Effects'),Rings:f('Rings'),Collision:f('Collision'),Palette:f('Palette'),Art:f('Art')};" },
+  { "shot": "12-facet-layout" }
+]

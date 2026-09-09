@@ -1,0 +1,6 @@
+[
+  { "eval": "return { paletteText: document.body.innerText.slice(0,600) };" },
+  { "shot": "38-command-palette" },
+  { "key": { "key": "Escape", "code": "Escape", "vk": 27 }, "after": 800 },
+  { "eval": "return { afterEsc: [...document.querySelectorAll('input')].map(i=>i.placeholder).filter(Boolean) };" }
+]

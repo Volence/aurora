@@ -1,0 +1,7 @@
+[
+  { "eval": "const t=[...document.querySelectorAll('div')].find(d=>d.title==='Oracle Jungle Zone · act1'); const r=t.getBoundingClientRect(); return { tabText: t.innerText.replace(/\\s+/g,' '), rect:{x:Math.round(r.left),y:Math.round(r.top),w:Math.round(r.width),h:Math.round(r.height)}, closeBtns: [...t.querySelectorAll('*')].filter(e=>getComputedStyle(e).cursor==='pointer'&&e!==t).map(e=>{const q=e.getBoundingClientRect();return {tag:e.tagName,x:Math.round(q.left+q.width/2),y:Math.round(q.top+q.height/2),title:e.getAttribute('title')}}) };" },
+  { "click": { "x": 477, "y": 17 }, "after": 1500 },
+  { "sleep": 1200 },
+  { "eval": "return { dialogText: document.body.innerText.slice(0,600), buttons: [...document.querySelectorAll('button')].map(b=>b.innerText.trim()).filter(Boolean).slice(0,30) };" },
+  { "shot": "19-close-dirty-dialog" }
+]

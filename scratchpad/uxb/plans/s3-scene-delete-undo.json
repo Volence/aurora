@@ -1,0 +1,10 @@
+[
+  { "clickAt": "const b=[...document.querySelectorAll('button')].find(e=>e.innerText.trim()==='Delete scene'); const r=b.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 2000 },
+  { "sleep": 1500 },
+  { "eval": "return { scenesAfterDelete: JSON.parse(window.__dbg.aeon.scenesJson()).map(s=>s.id), undoDisabled: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Undo')?.disabled, screen: document.body.innerText.replace(/\\s+/g,' ').slice(0,220) };" },
+  { "shot": "27-scene-deleted" },
+  { "key": { "key": "z", "code": "KeyZ", "vk": 90, "mod": 2, "text": "z" }, "after": 2000 },
+  { "sleep": 1500 },
+  { "eval": "return { scenesAfterCtrlZ: JSON.parse(window.__dbg.aeon.scenesJson()).map(s=>s.id) };" },
+  { "shot": "28-scene-after-ctrlz" }
+]

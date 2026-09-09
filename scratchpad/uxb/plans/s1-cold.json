@@ -1,0 +1,9 @@
+[
+  { "click": { "x": 129, "y": 56 } },
+  { "key": { "key": "z", "code": "KeyZ", "vk": 90, "text": "z" } },
+  { "key": { "key": "o", "code": "KeyO", "vk": 79, "text": "o" } },
+  { "key": { "key": "n", "code": "KeyN", "vk": 78, "text": "n" } },
+  { "sleep": 600 },
+  { "eval": "const i=[...document.querySelectorAll('input')][0]; return { filterValue: i.value, sidebarText: document.body.innerText.slice(0,300) };" },
+  { "shot": "02-home-filter-typed" }
+]

@@ -1,0 +1,11 @@
+[
+  { "clickAt": "const b=[...document.querySelectorAll('button')].find(e=>e.innerText.trim()==='Objects'&&e.getBoundingClientRect().top<70); const r=b.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 2000 },
+  { "clickAt": "const b=[...document.querySelectorAll('button')].find(e=>e.title==='Place Object'); const r=b.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 900 },
+  { "click": { "x": 800, "y": 300 }, "after": 1500 },
+  { "eval": "return { step1_objs: document.body.innerText.match(/Objects\\n(\\d+)/)?.[1], step1_undoDisabled: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Undo')?.disabled };" },
+  { "clickAt": "const t=[...document.querySelectorAll('div')].find(d=>d.title==='Oracle Jungle Zone · act1'&&d.getBoundingClientRect().top<40); const c=[...t.querySelectorAll('span')].find(e=>e.getAttribute('title')==='Close tab'); const r=c.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 2000 },
+  { "clickAt": "const b=[...document.querySelectorAll('button')].find(e=>e.innerText.trim()==='Oracle Jungle Zone · act1'&&e.getBoundingClientRect().left<240); const r=b.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 3000 },
+  { "sleep": 2000 },
+  { "eval": "return { step2_objs: document.body.innerText.match(/Objects\\n(\\d+)/)?.[1], step2_undoDisabled: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Undo')?.disabled, step2_redoDisabled: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Redo')?.disabled, dirty: window.__dbg.aeon.state().dirty };" },
+  { "shot": "30-undo-stack-after-reopen" }
+]

@@ -1,0 +1,10 @@
+[
+  { "click": { "x": 120, "y": 90 }, "after": 700 },
+  { "eval": "return { afterLevels: document.querySelector('div').parentElement.innerText.slice(0,400) };" },
+  { "click": { "x": 120, "y": 115 }, "after": 700 },
+  { "click": { "x": 120, "y": 140 }, "after": 700 },
+  { "click": { "x": 120, "y": 165 }, "after": 700 },
+  { "sleep": 600 },
+  { "eval": "const s=document.body.innerText.split('Home')[0]; return { sidebar: s };" },
+  { "shot": "10-explorer-expanded" }
+]

@@ -1,0 +1,6 @@
+[
+  { "eval": "let err=null; try { await window.__dbg.openDir('/tmp/claude-1000/-home-volence-sonic-hacks-aurora/355909dc-6223-479a-bd8f-e9cfd2b0de5f/scratchpad/uxb-notaproject'); } catch(e) { err = String(e); } await new Promise(r=>setTimeout(r,3000)); return { thrown: err, body: document.body.innerText.replace(/\\s+/g,' ').slice(0,600) };" },
+  { "sleep": 2000 },
+  { "eval": "return { body: document.body.innerText.replace(/\\s+/g,' ').slice(0,700), tabs:[...document.querySelectorAll('div')].filter(d=>d.title&&d.getBoundingClientRect().top<40&&d.getBoundingClientRect().height>20).map(d=>d.title), buttons: [...document.querySelectorAll('button')].map(b=>b.innerText.trim()).filter(Boolean).slice(0,20) };" },
+  { "shot": "43-unrecognized-project" }
+]

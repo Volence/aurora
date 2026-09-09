@@ -1,0 +1,10 @@
+[
+  { "clickAt": "const b=[...document.querySelectorAll('button')].find(e=>e.innerText.trim()==='Dismiss'); if(!b) return null; const r=b.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 1200 },
+  { "clickAt": "const d=[...document.querySelectorAll('div')].find(x=>x.title==='Oracle Jungle Zone · act1'&&x.getBoundingClientRect().top<60); const r=d.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 2500 },
+  { "eval": "const g=(n)=>{const b=[...document.querySelectorAll('button')].find(e=>e.innerText.trim()===n); return b?{bg:getComputedStyle(b).backgroundColor,col:getComputedStyle(b).color}:null}; return { fgBefore:g('FG'), bgBefore:g('BG'), status: document.body.innerText.split('\\n').slice(-2).join(' | ') };" },
+  { "clickAt": "const b=[...document.querySelectorAll('button')].find(e=>e.innerText.trim()==='BG'); const r=b.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 1800 },
+  { "eval": "const g=(n)=>{const b=[...document.querySelectorAll('button')].find(e=>e.innerText.trim()===n); return b?{bg:getComputedStyle(b).backgroundColor,col:getComputedStyle(b).color}:null}; return { fgAfter:g('FG'), bgAfter:g('BG'), status: document.body.innerText.split('\\n').slice(-2).join(' | ') };" },
+  { "clickAt": "const b=[...document.querySelectorAll('button')].find(e=>/^View/.test(e.innerText.trim())&&e.getBoundingClientRect().top<70); const r=b.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 1800 },
+  { "eval": "return { viewMenuItems: [...document.querySelectorAll('label,button,div')].filter(e=>{const r=e.getBoundingClientRect(); return r.top>60&&r.top<400&&r.left>1100&&r.width>60&&r.width<260&&e.children.length<3&&e.innerText.trim()}).map(e=>e.innerText.trim().replace(/\\s+/g,' ')).slice(0,25) };" },
+  { "shot": "45-view-menu" }
+]

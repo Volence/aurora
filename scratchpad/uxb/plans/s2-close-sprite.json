@@ -1,0 +1,7 @@
+[
+  { "eval": "return { tabs:[...document.querySelectorAll('div')].filter(d=>d.title&&d.getBoundingClientRect().top<40&&d.getBoundingClientRect().height>20).map(d=>({title:d.title, x:Math.round(d.getBoundingClientRect().left+d.getBoundingClientRect().width/2), y:Math.round(d.getBoundingClientRect().top+d.getBoundingClientRect().height/2), w:Math.round(d.getBoundingClientRect().width)})) };" },
+  { "click": { "x": 723, "y": 17 }, "after": 1500 },
+  { "sleep": 1200 },
+  { "eval": "return { dialog: !!document.querySelector('[role=dialog]'), tabsNow:[...document.querySelectorAll('div')].filter(d=>d.title&&d.getBoundingClientRect().top<40&&d.getBoundingClientRect().height>20).map(d=>d.title), body: document.body.innerText.slice(0,300) };" },
+  { "shot": "11-close-untitled-sprite" }
+]

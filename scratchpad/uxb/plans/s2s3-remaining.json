@@ -1,0 +1,11 @@
+[
+  { "key": { "key": "b", "code": "KeyB", "vk": 66, "mod": 2, "text": "b" }, "after": 1200 },
+  { "eval": "return { explorerAfterCtrlB: !![...document.querySelectorAll('input')].find(i=>i.placeholder==='Filter…'&&i.getBoundingClientRect().left<240), collapseBtnTitle: [...document.querySelectorAll('button')].find(b=>/xplorer/.test(b.title||''))?.title };" },
+  { "key": { "key": "b", "code": "KeyB", "vk": 66, "mod": 2, "text": "b" }, "after": 1200 },
+  { "eval": "return { explorerBack: !![...document.querySelectorAll('input')].find(i=>i.placeholder==='Filter…'&&i.getBoundingClientRect().left<240) };" },
+  { "clickAt": "const b=[...document.querySelectorAll('button')].find(e=>e.innerText.trim()==='BG'); const r=b.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 1500 },
+  { "eval": "const fg=[...document.querySelectorAll('button')].find(e=>e.innerText.trim()==='FG'); const bg=[...document.querySelectorAll('button')].find(e=>e.innerText.trim()==='BG'); return { fgBg: {fg: getComputedStyle(fg).backgroundColor, bg: getComputedStyle(bg).backgroundColor}, status: document.body.innerText.split('\\n').slice(-4).join(' | ') };" },
+  { "clickAt": "const b=[...document.querySelectorAll('button')].find(e=>/^View/.test(e.innerText.trim())&&e.getBoundingClientRect().top<70); const r=b.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 1500 },
+  { "eval": "return { viewMenu: document.body.innerText.replace(/\\s+/g,' ').slice(0,400) };" },
+  { "shot": "44-view-menu-and-bg" }
+]
