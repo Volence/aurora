@@ -67,6 +67,7 @@ import {
   type CommandResult,
 } from '../state/classicLevelStore';
 import { saveClassicProject } from '../state/classic-save';
+import { recordRecentProject } from '../state/recents';
 import { applyCollisionShapeRect } from '../state/collision-dispatch';
 import { commitPixels } from './art-commit';
 import { loadCanvasFile } from '../state/canvas-file';
@@ -1339,8 +1340,14 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       if (outcome === 'opened') {
         // Mirror File→Open's recent-projects registration when the shell api is
         // available (absent in unit tests / headless).
-        if (typeof window !== 'undefined' && window.api?.addRecentProject) {
-          try { await window.api.addRecentProject(req.dir, s.label ?? req.dir); } catch { /* non-fatal */ }
+        // recordRecentProject, not the raw channel: it is the one place that
+        // words the refusal when the store cannot be read (state/recents.ts).
+        // `typeof ... === 'function'` rather than a bare truthiness test: the
+        // channel is DECLARED non-optional on Window, so tsc reads a bare test as
+        // "always true, did you mean to call it" (TS2774). It is only ever really
+        // absent in a unit test / headless run, which is exactly what is probed.
+        if (typeof window !== 'undefined' && typeof window.api?.addRecentProject === 'function') {
+          try { await recordRecentProject(req.dir, s.label ?? req.dir); } catch { /* non-fatal */ }
         }
         return {
           type: s.type,

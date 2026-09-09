@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS, unwrapBinaryRead, unwrapWriteOutcome } from '../shared/ipc-types';
-import type { RecentProject, GuardedWriteFile, GuardedWriteResult, ReadManyEntry, DeleteOutcome, AetherStatusPayload, AetherWarpResult, AetherBuildResult } from '../shared/ipc-types';
+import type { RecentsState } from '../shared/recents';
+import type { GuardedWriteFile, GuardedWriteResult, ReadManyEntry, DeleteOutcome, PathProbe, AetherStatusPayload, AetherWarpResult, AetherBuildResult } from '../shared/ipc-types';
 import { AGENT_REQUEST_CHANNEL, AGENT_RESPONSE_CHANNEL } from '../shared/agent-protocol';
 import type { AgentRequestEnvelope, AgentResponseEnvelope } from '../shared/agent-protocol';
 
@@ -12,13 +13,17 @@ const api = {
   selectDirectory: (): Promise<string | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.SELECT_DIRECTORY),
 
-  getRecentProjects: (): Promise<RecentProject[]> =>
+  // A RecentsState, not a bare array: an empty `projects` means opposite things
+  // depending on `read`, and the renderer is the surface that has to say so.
+  // Route these through renderer/state/recents.ts rather than calling them raw,
+  // so the refusal is worded in one place.
+  getRecentProjects: (): Promise<RecentsState> =>
     ipcRenderer.invoke(IPC_CHANNELS.GET_RECENT_PROJECTS),
 
-  addRecentProject: (path: string, name: string): Promise<RecentProject[]> =>
+  addRecentProject: (path: string, name: string): Promise<RecentsState> =>
     ipcRenderer.invoke(IPC_CHANNELS.ADD_RECENT_PROJECT, path, name),
 
-  removeRecentProject: (path: string): Promise<RecentProject[]> =>
+  removeRecentProject: (path: string): Promise<RecentsState> =>
     ipcRenderer.invoke(IPC_CHANNELS.REMOVE_RECENT_PROJECT, path),
 
   saveFile: (defaultName: string, data: ArrayBuffer): Promise<boolean> =>
@@ -46,8 +51,11 @@ const api = {
   listProjectFiles: (basePath: string): Promise<string[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.LIST_PROJECT_FILES, basePath),
 
-  pathExists: (basePath: string, relativePath: string): Promise<boolean> =>
-    ipcRenderer.invoke(IPC_CHANNELS.PATH_EXISTS, basePath, relativePath),
+  // Three answers, not two - see PathProbe. Renamed from `pathExists` with the
+  // meaning, so a caller that still wants a yes/no has to look at what it is
+  // throwing away.
+  probePath: (basePath: string, relativePath: string): Promise<PathProbe> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PATH_PROBE, basePath, relativePath),
 
   listDir: (basePath: string, relativeDir: string): Promise<string[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.LIST_DIR, basePath, relativeDir),

@@ -2,7 +2,7 @@ import { readFile, readdir, stat, unlink } from 'fs/promises';
 import { mkdirSync, renameSync, writeFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { isRelPathSafe } from '../shared/rel-path';
-import type { DeleteOutcome, WriteOutcome } from '../shared/ipc-types';
+import type { DeleteOutcome, PathProbe, WriteOutcome } from '../shared/ipc-types';
 
 /**
  * Write ONE project-relative file, atomically. The only writing primitive behind
@@ -93,7 +93,7 @@ export async function readBinaryFile(basePath: string, relativePath: string): Pr
  * ~18 mandatory files whose sequential round-trips otherwise dominate load
  * latency. Rel-path-safe per entry: an escaping/missing path yields
  * { bytes: null, mtimeMs: null } (never rejects), matching the tolerant
- * pathExists/fileMtime probes. Aligned by index to `relativePaths`.
+ * probePath/fileMtime probes. Aligned by index to `relativePaths`.
  */
 export async function readManyFiles(
   basePath: string,
@@ -114,20 +114,43 @@ export async function readManyFiles(
 }
 
 /**
- * Whether a project-relative path exists under `basePath`. Rel-path-safe: an
- * escaping (`..`/absolute) path never touches the fs and reports false. Any fs
- * error (ENOENT/ENOTDIR/permissions) resolves false rather than rejecting, so
- * the renderer FileAccess bridge (Task 9) can probe optional files without
- * spamming the main process error log — consistent with the read-binary
- * missing-file marker (see MissingFileMarker in shared/ipc-types).
+ * Whether a project-relative path exists under `basePath` — in THREE answers, not
+ * two. See PathProbe (shared/ipc-types) for the whole reason; in short:
+ *
+ * This used to be `pathExists(): Promise<boolean>` whose `catch { return false }`
+ * reported "not there" for an ENOENT, for an EACCES on a parent directory, for an
+ * ELOOP and for an EIO alike — while its own docblock named permissions as a
+ * cause. One layer up, aeon's markUnreadable asks this exact question to tell
+ * "absent" from "there and unreadable", and the second answer is the one that
+ * stops the save path writing an empty placeholder over the user's file. So a
+ * failure Aurora cannot attribute to absence is now 'unknown', and it is the
+ * caller's job to decide — which, for a would-be writer, means "assume the file is
+ * there and leave it alone".
+ *
+ * STILL NEVER REJECTS. The renderer bridge (Task 9) probes optional files, and the
+ * point of not throwing was to keep those out of the main-process error log
+ * (consistent with the read-binary missing-file marker); that is preserved. What
+ * changed is only that the tolerant answer stopped lying about which failure it was.
+ *
+ * ENOENT and ENOTDIR are the two errnos that really do mean "not there": nothing
+ * at the path, or a path component above it that is not a directory, so nothing
+ * can be at the path either. Everything else is 'unknown' WITH ITS REASON.
+ *
+ * An escaping (`..`/absolute) path is 'unknown', not 'absent': the probe REFUSED
+ * TO LOOK, which is not a statement about what is on the filesystem. Callers that
+ * are about to write treat it exactly as they treat any other "cannot tell".
  */
-export async function pathExists(basePath: string, relativePath: string): Promise<boolean> {
-  if (!isRelPathSafe(relativePath)) return false;
+export async function probePath(basePath: string, relativePath: string): Promise<PathProbe> {
+  if (!isRelPathSafe(relativePath)) {
+    return { presence: 'unknown', reason: `unsafe project-relative path (escapes root): '${relativePath}'` };
+  }
   try {
     await stat(resolve(basePath, relativePath));
-    return true;
-  } catch {
-    return false;
+    return { presence: 'present', reason: null };
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
+    if (e?.code === 'ENOENT' || e?.code === 'ENOTDIR') return { presence: 'absent', reason: null };
+    return { presence: 'unknown', reason: e?.message ?? String(err) };
   }
 }
 
@@ -135,7 +158,7 @@ export async function pathExists(basePath: string, relativePath: string): Promis
  * The last-modified time (fs.stat `mtimeMs`, float ms) of a project-relative
  * file, or null when it is missing / the path escapes the root / any stat error.
  * Rel-path-safe and never rejects — the guarded-save baseline (Task 10, spec
- * §2.6) probes optional files the same tolerant way as pathExists, keeping the
+ * §2.6) probes optional files the same tolerant way as probePath, keeping the
  * main error log clean (consistent with the 39d90e2 no-log-spam pattern).
  */
 export async function fileMtime(basePath: string, relativePath: string): Promise<number | null> {

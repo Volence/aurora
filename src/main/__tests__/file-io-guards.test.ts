@@ -45,7 +45,7 @@ import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import {
-  deleteProjectFile, fileMtime, listDir, listProjectFiles, pathExists,
+  deleteProjectFile, fileMtime, listDir, listProjectFiles, probePath,
   readBinaryFile, readManyFiles, writeProjectFile,
 } from '../file-io';
 import { isRelPathSafe } from '../../shared/rel-path';
@@ -175,21 +175,41 @@ describe('readManyFiles applies the guard per entry', () => {
   });
 });
 
-describe('pathExists applies the guard', () => {
-  it('reports false for a `..` path whose target really exists', async () => {
-    expect(await pathExists(base, '../outside.bin')).toBe(false);
+describe('probePath applies the guard', () => {
+  // ⚠ THESE ROWS WERE STRENGTHENED AT A MERGE SEAM, 2026-09-08, and the reason is
+  // the whole point of the parcel that renamed this function. They used to assert
+  // `pathExists(...) === false` on an escaping path. `false` was the SAME VALUE a
+  // genuinely missing file returned, so the old rows could not tell a refusal from
+  // an absence, and a guard that answered "not there" about a file it declined to
+  // look at was stating a falsehood in the caller's own vocabulary. `probePath`
+  // has three answers and a refusal is `unknown`, so these rows now assert WHICH
+  // answer, and the last one is the control that separates the two.
+  it('answers unknown, not absent, for a `..` path whose target really exists', async () => {
+    const probe = await probePath(base, '../outside.bin');
+    expect(probe.presence).toBe('unknown');
+    expect(probe.reason).toContain('escapes root');
   });
 
-  it('reports false for an absolute path to a file that really exists', async () => {
-    expect(await pathExists(base, join(tmp, 'outside.bin'))).toBe(false);
+  it('answers unknown for an absolute path to a file that really exists', async () => {
+    const probe = await probePath(base, join(tmp, 'outside.bin'));
+    expect(probe.presence).toBe('unknown');
+    expect(probe.reason).toContain('escapes root');
   });
 
-  // Both controls are load-bearing: the first proves the target exists and is
-  // stattable, the second proves this primitive answers true at all. Without
-  // them, a `pathExists` that always answered false would pass the rows above.
-  it('CONTROL: true for that same target from the outer base, and for an in-project file', async () => {
-    expect(await pathExists(tmp, 'outside.bin')).toBe(true);
-    expect(await pathExists(base, 'inside.bin')).toBe(true);
+  // Three controls, each load-bearing. The first proves the target exists and is
+  // stattable; the second proves this primitive answers `present` at all; the
+  // THIRD is the one the old boolean rows could not express, and it is what makes
+  // the two rows above discriminating: a legally-reachable file that is simply not
+  // there answers `absent`, so `unknown` above is a refusal and not this.
+  it('CONTROL: present for that same target from the outer base, and for an in-project file', async () => {
+    expect((await probePath(tmp, 'outside.bin')).presence).toBe('present');
+    expect((await probePath(base, 'inside.bin')).presence).toBe('present');
+  });
+
+  it('CONTROL: a legal path that is genuinely missing answers absent, never unknown', async () => {
+    const probe = await probePath(base, 'no-such-file.bin');
+    expect(probe.presence).toBe('absent');
+    expect(probe.reason).toBeNull();
   });
 });
 
@@ -289,7 +309,7 @@ describe('the census of primitives is derived from the module, not from this lis
     writeProjectFile: true,
     deleteProjectFile: true,
     readManyFiles: true,
-    pathExists: true,
+    probePath: true,
     fileMtime: true,
     listDir: true,
     readBinaryFile: false,     // legacy absolute-path exception; see the row above

@@ -1,7 +1,7 @@
 // src/renderer/components/setup/ProjectSetupTab.tsx
 // The Project Setup tab (spec §7): the Resolution Report promoted from readout
 // to editor. Each report entry is a row: status light, key, editable path
-// override. Edits live-validate via pathExists (debounced); Apply writes the
+// override. Edits live-validate via probePath (debounced); Apply writes the
 // merged .aurora/project.json and re-opens the project so resolution re-runs
 // for real. Sidecar parse issues (per-entry diagnostics from mapping.ts) and
 // overrides matching no profile entry render above the rows. Aeon shows an
@@ -38,8 +38,12 @@ function useLiveCheck(dir: string | null) {
     setChecks((c) => ({ ...c, [key]: 'pending' }));
     clearTimeout(timers.current.get(key));
     timers.current.set(key, setTimeout(() => {
-      window.api.pathExists(dir, rel)
-        .then((ok) => setChecks((c) => ({ ...c, [key]: ok })))
+      // A HINT BESIDE A TEXT FIELD, not a gate: no write consults `checks`, so
+      // folding 'unknown' in with 'absent' costs a tick mark and nothing else. It
+      // is spelled out rather than left to a truthiness test because the same
+      // flattening one layer down is what destroyed section files (see PathProbe).
+      window.api.probePath(dir, rel)
+        .then((probe) => setChecks((c) => ({ ...c, [key]: probe.presence === 'present' })))
         .catch(() => setChecks((c) => ({ ...c, [key]: false })));
     }, 300));
   };

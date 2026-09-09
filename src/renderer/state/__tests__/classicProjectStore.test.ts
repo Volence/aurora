@@ -216,7 +216,7 @@ describe('classicProjectStore', () => {
 
 describe('createIpcFileAccess rel-path safety', () => {
   const api = {
-    pathExists: vi.fn(async () => true),
+    probePath: vi.fn(async () => ({ presence: 'present', reason: null })),
     readBinaryFile: vi.fn(async () => new ArrayBuffer(4)),
     listDir: vi.fn(async () => ['a', 'b']),
   };
@@ -232,7 +232,7 @@ describe('createIpcFileAccess rel-path safety', () => {
   it('delegates safe paths to the IPC api', async () => {
     const fa = createIpcFileAccess('/root');
     expect(await fa.exists('levels/GHZ1.bin')).toBe(true);
-    expect(api.pathExists).toHaveBeenCalledWith('/root', 'levels/GHZ1.bin');
+    expect(api.probePath).toHaveBeenCalledWith('/root', 'levels/GHZ1.bin');
 
     const bytes = await fa.read('sonic.asm');
     expect(bytes).toBeInstanceOf(Uint8Array);
@@ -247,9 +247,39 @@ describe('createIpcFileAccess rel-path safety', () => {
     await expect(fa.exists('../etc/passwd')).rejects.toThrow(/escapes root/);
     await expect(fa.read('a/../../b')).rejects.toThrow(/escapes root/);
     await expect(fa.list('/abs')).rejects.toThrow(/escapes root/);
-    expect(api.pathExists).not.toHaveBeenCalled();
+    expect(api.probePath).not.toHaveBeenCalled();
     expect(api.readBinaryFile).not.toHaveBeenCalled();
     expect(api.listDir).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // exists(): FALSE MEANS KNOWN ABSENT (MARKUNREADABLE-DEFEATED)
+  //
+  // This method is where main's three-way probe used to be flattened back to a
+  // boolean. Core's only consumer that cares is aeon's markUnreadable, which
+  // reads `false` as "the file is simply not there" and stays silent - so a probe
+  // that could not stat the file (EACCES on a parent directory, ELOOP, a volume
+  // that dropped out) made a present, intact file load as empty, and the next
+  // save wrote the empty placeholder over it. `exists` has no third value to
+  // return, so the third answer is a throw.
+  // -------------------------------------------------------------------------
+  it('a probe that CANNOT TELL throws instead of answering false', async () => {
+    api.probePath.mockResolvedValueOnce(
+      { presence: 'unknown', reason: "EACCES: permission denied, stat '/root/levels/GHZ1.bin'" } as never,
+    );
+    const fa = createIpcFileAccess('/root');
+    // The reason travels: a caller that logs this has to be able to say WHY.
+    await expect(fa.exists('levels/GHZ1.bin')).rejects.toThrow(/cannot determine whether/);
+    await expect(fa.exists('levels/GHZ1.bin')).resolves.toBe(true);   // mock is once-only
+  });
+
+  it('CONTROL: a probe that answers ABSENT returns false and does not throw', async () => {
+    // The vacuity guard for the row above: a bridge that threw on anything but
+    // 'present' would satisfy it and would make every ordinary missing optional
+    // file (a section with no rings.json) an error.
+    api.probePath.mockResolvedValueOnce({ presence: 'absent', reason: null } as never);
+    const fa = createIpcFileAccess('/root');
+    expect(await fa.exists('levels/GHZ9.bin')).toBe(false);
   });
 });
 

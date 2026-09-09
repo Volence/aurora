@@ -309,7 +309,13 @@ const REV = process.env.AURORA_AEON_REV ?? HANDOVER_BASE;
 function installFsWindowApi(written: string[]): void {
   (globalThis as { window?: unknown }).window = {
     api: {
-      pathExists: async (dir: string, rel: string) => existsSync(join(dir, rel)),
+      // The three-way probe main serves (PathProbe). existsSync collapses every
+      // failure to false, which is the very flattening the real probe stopped
+      // doing; it is good enough HERE because this harness owns its own tree and
+      // nothing in it is unreadable, and saying so is cheaper than pretending.
+      probePath: async (dir: string, rel: string) => (
+        existsSync(join(dir, rel)) ? { presence: 'present', reason: null } : { presence: 'absent', reason: null }
+      ),
       readBinaryFile: async (dir: string, rel: string) => {
         const b = readFileSync(join(dir, rel));
         return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);

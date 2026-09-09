@@ -34,6 +34,29 @@ function memFa(files: Map<string, Uint8Array>): FileAccess {
   };
 }
 
+/**
+ * memFa with one path the probe cannot answer for: `read` fails EACCES and
+ * `exists` THROWS rather than guessing. The fs-backed bridge's shape for a
+ * correlated failure (a parent directory without execute permission, a volume
+ * that dropped out), where the read and the stat go down together so there is no
+ * "no" to be had - only "I could not look". The bytes stay in the map because the
+ * file is there and intact, which is the whole hazard.
+ */
+function cannotTellFa(files: Map<string, Uint8Array>, blind: string): FileAccess {
+  const base = memFa(files);
+  return {
+    ...base,
+    exists: async (rel) => {
+      if (rel === blind) throw new Error(`EACCES: permission denied, stat '${rel}'`);
+      return base.exists(rel);
+    },
+    read: async (rel) => {
+      if (rel === blind) throw new Error(`EACCES: permission denied, open '${rel}'`);
+      return base.read(rel);
+    },
+  };
+}
+
 const PROJECT_JSON = {
   name: 'Test Project',
   engine: 's4',
@@ -347,6 +370,34 @@ describe('buildAeonSavePlan', () => {
     // The section's other files are unaffected — this is one file, not a veto.
     expect(paths).toContain('data/ojz/act1/section_0.tiles.bin');
     expect(paths).toContain('data/ojz/act1/section_0.rings.json');
+  });
+
+  /**
+   * THE SAME RULE, FOR THE FAILURE THE PROBE COULD NOT SEE. The row above makes
+   * the read fail while the STAT still succeeds, which is the only shape an
+   * in-memory fake produced until now - so the omission it proves was only ever
+   * proven for a file the probe could answer for. When the read and the stat fail
+   * together (a parent directory without execute permission, a disconnected
+   * volume), production's probe answered false, markUnreadable returned silently,
+   * `understood('objects.json')` was true, and the plan wrote `[]` over every
+   * placement in the section. Measured on the BYTES, because "the plan omits it"
+   * and "the file survives" are not the same claim.
+   */
+  it('leaves a file it could not even PROBE byte-identical, placements and all', async () => {
+    const files = fixtureFiles();
+    const objects = 'data/ojz/act1/section_0.objects.json';
+    const before = files.get(objects)!;
+    expect(text(before)).toContain('o1');   // the fixture really does hold a placement
+
+    const fa = cannotTellFa(files, objects);
+    const r = await loadAeonProject(fa, '/proj');
+    expect(r.project.zones[0].acts[0].sections[0]!.unreadable).toContain('objects.json');
+
+    const after = await loadSaveApplyVia(fa, files);
+    expect(after.get(objects)).toBe(before);        // same object: nothing was planned over it
+    expect(text(after.get(objects))).toContain('o1');
+    // Not a veto over the section: everything the load DID understand still saves.
+    expect(after.has('data/ojz/act1/section_0.tiles.bin')).toBe(true);
   });
 
   /**

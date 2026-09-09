@@ -27,6 +27,7 @@ import { openProjectDir } from '../state/open-project';
 import { useSessionStore } from '../state/sessionStore';
 import { editObjectArt } from '../components/sprite/export-sprite';
 import type { RecentProject } from '../../shared/ipc-types';
+import { loadRecents } from '../state/recents';
 import type { ObjectDef } from '../../core/model/s4-types';
 
 // Referentially-stable fallback: a fresh `[]` per render would defeat the
@@ -98,7 +99,7 @@ export default function Explorer({ onOpenProject, onOpenRecent, onNewCanvas, onI
   const [recents, setRecents] = useState<RecentProject[]>([]);
   const noProject = !classicOpen && !config;
   useEffect(() => {
-    if (noProject) window.api.getRecentProjects().then(setRecents).catch(() => setRecents([]));
+    if (noProject) loadRecents().then(setRecents).catch(() => setRecents([]));
   }, [noProject]);
 
   // The canvases on disk. A canvas is a FILE, not a store entry, so this is a

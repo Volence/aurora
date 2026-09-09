@@ -646,7 +646,12 @@ describe('classic-save-project', () => {
           for (const f of files) written.push(f.relPath);
           return { written: files.map((f) => f.relPath), newMtimes: {} };
         },
-        addRecentProject: async () => [],
+        // A RecentsState, not a bare array: see shared/recents.ts. An `[]` here is
+        // the answer shape the store stopped giving, because an empty list could
+        // not say whether it was empty or unreadable.
+        addRecentProject: async () => (
+          { projects: [], read: 'read', reason: null, path: '/p/recent-projects.json', dropped: 0 }
+        ),
       },
     };
     const handle: ProjectHandle = {

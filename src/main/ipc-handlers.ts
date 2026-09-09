@@ -2,9 +2,9 @@ import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { writeFileSync } from 'fs';
 import { IPC_CHANNELS } from '../shared/ipc-types';
 import type { GuardedWriteFile } from '../shared/ipc-types';
-import { readBinaryFile, readManyFiles, listProjectFiles, pathExists, listDir, fileMtime, deleteProjectFile, writeProjectFile } from './file-io';
+import { readBinaryFile, readManyFiles, listProjectFiles, probePath, listDir, fileMtime, deleteProjectFile, writeProjectFile } from './file-io';
 import { performGuardedWrite } from './guarded-write';
-import { getRecentProjects, addRecentProject, removeRecentProject } from './recent-projects';
+import { readRecents, addRecentProject, removeRecentProject } from './recent-projects';
 
 export function registerIpcHandlers(): void {
   // Env-guarded paint instrumentation sink (AURORA_PERF=1). The renderer only
@@ -31,8 +31,8 @@ export function registerIpcHandlers(): void {
     return listProjectFiles(basePath);
   });
 
-  ipcMain.handle(IPC_CHANNELS.PATH_EXISTS, async (_event, basePath: string, relativePath: string) => {
-    return pathExists(basePath, relativePath);
+  ipcMain.handle(IPC_CHANNELS.PATH_PROBE, async (_event, basePath: string, relativePath: string) => {
+    return probePath(basePath, relativePath);
   });
 
   ipcMain.handle(IPC_CHANNELS.LIST_DIR, async (_event, basePath: string, relativeDir: string) => {
@@ -73,8 +73,11 @@ export function registerIpcHandlers(): void {
     return result.filePaths[0];
   });
 
+  // All three recents channels answer a RecentsState, never a bare array: the
+  // renderer has to be able to tell "your list is empty" from "Aurora could not
+  // read your list and has left it alone" (see shared/recents.ts).
   ipcMain.handle(IPC_CHANNELS.GET_RECENT_PROJECTS, async () => {
-    return getRecentProjects();
+    return readRecents();
   });
 
   ipcMain.handle(IPC_CHANNELS.ADD_RECENT_PROJECT, async (_event, path: string, name: string) => {

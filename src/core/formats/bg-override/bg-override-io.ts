@@ -90,8 +90,19 @@ export async function loadBgOverride(fa: FileAccess, dataRoot: string): Promise<
   const path = bgOverridePath(dataRoot);
   const state: BgOverrideState = { path, doc: null, unreadable: null, loadedText: null, notices: [] };
 
-  let present = false;
-  try { present = await fa.exists(path); } catch { present = false; }
+  // A PROBE THAT COULD NOT ANSWER MEANS THE FILE MAY BE THERE. This read
+  // `catch { present = false }`, which is the same value a genuine absence gives,
+  // so a probe that could not stat the file (EACCES on a parent directory, ELOOP,
+  // a volume that dropped out) returned the no-file state: `doc` null, `unreadable`
+  // null, no notice. Nothing is written in that state TODAY, which is why it is not
+  // a loss on its own - but the user is then looking at an editor that says this
+  // project has no BG override, and the moment they author one, `saveFileFor` sees
+  // a document with `unreadable: null` and writes it over the file that was there
+  // all along. Guessing 'present' costs one failed read, which lands in
+  // `unreadable` + `notices` two lines down and blocks exactly that write.
+  // Same reasoning, same one-line shape, as markUnreadable in project/aeon/load.ts.
+  let present = true;
+  try { present = await fa.exists(path); } catch { present = true; }
   if (!present) return state;
 
   let text: string;

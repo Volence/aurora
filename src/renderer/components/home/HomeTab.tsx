@@ -13,6 +13,7 @@ import { useProjectStore } from '../../state/projectStore';
 import { requestOpenTab } from '../../shell/tab-activation';
 import { classicLevelTab, aeonLevelTab, PROJECT_SETUP_TAB } from '../../shell/tabs';
 import type { RecentProject } from '../../../shared/ipc-types';
+import { loadRecents } from '../../state/recents';
 import { normalizeProjectPath } from '../../../shared/project-path';
 import { GUIDES } from '../guide/guides';
 import { openGuide } from '../../state/guideStore';
@@ -71,7 +72,7 @@ export default function HomeTab({ onOpenProject, onOpenRecent }: HomeTabProps) {
   useEffect(() => {
     // Fetched in both states now (not just no-project): the with-project view
     // below offers switching to a different recent project too.
-    window.api.getRecentProjects().then(setRecents).catch(() => setRecents([]));
+    loadRecents().then(setRecents).catch(() => setRecents([]));
   }, [noProject, currentPath]);
 
   if (noProject) {

@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useClassicProjectStore } from '../state/classicProjectStore';
 import { openAeonProject } from '../state/aeon-open';
 import { confirmProjectOpen } from '../shell/project-open-guard';
+import { recordRecentProject } from '../state/recents';
 
 export function useProject() {
   // Open a directory. A single project-registry fingerprint (Task 17) routes it:
@@ -22,7 +23,7 @@ export function useProject() {
       // calls addRecentProject on success). Reopening a classic recent routes
       // back through here classic-first, so it re-detects and refreshes its entry.
       const name = useClassicProjectStore.getState().label ?? dir;
-      await window.api.addRecentProject(dir, name);
+      await recordRecentProject(dir, name);
     } else if (outcome === 'not-classic') {
       await openAeonProject(dir);
     }
