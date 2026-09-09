@@ -36,7 +36,9 @@ import { packCollisionCell } from '../../src/core/collision/collision-cell-word'
 import {
   paintCollisionRectBothPlanes, paintCollisionCellsBothPlanes, collisionRectCrossoverIndices,
 } from '../../src/core/collision/collision-paint';
-import { auditCrossovers, scanCancellingRuns } from '../../src/core/collision/crossover-audit';
+import {
+  auditCrossovers, scanCancellingRuns, crossoverAuditSeverity,
+} from '../../src/core/collision/crossover-audit';
 import { peerRepo, readAtRev } from '../support/peer-repo';
 
 const W = 64;                       // a small stride; the arithmetic is stride-agnostic
@@ -223,6 +225,23 @@ describe('⚠ the cancellation: the same gesture at two widths, and only one wor
     expect(runs[0]!.pairs).toBe(CELL_SUBTILE_COLS);
     expect(runs[0]!.flipsRightward).toBe(false);
     expect(runs[0]!.flipsLeftward).toBe(false);
+
+    // ⚠ AND THE SEVERITY, WHICH NOTHING JOINED TO THE COUNT UNTIL 2026-09-09.
+    // `cancelling` was asserted here and `crossoverAuditSeverity` was asserted
+    // in crossover-audit.test.ts, and no row in either file ever asked what the
+    // predicate says about a cancelling run. Measured: deleting `a.cancelling >
+    // 0` from the warn tier left the whole 8,107-row suite green. That is the
+    // module's OWN headline defect grading as `ok` — and `severity` is what
+    // CollisionPalette colours on and what `paint_collision` returns to an
+    // agent, so nothing downstream would have said a word.
+    //
+    // THE CONTROL COMES FIRST. `oneWay` is the other arm of the same tier, so
+    // without pinning it to zero this row would stay green on a predicate that
+    // had stopped looking at `cancelling` entirely.
+    expect(audit.oneWay).toBe(0);
+    expect(audit.selfMarks).toBe(0);
+    expect(audit.reserved).toBe(0);
+    expect(crossoverAuditSeverity(audit)).toBe('warn');
   });
 
   it.each(['left', 'right'] as const)('a pair at %s HALF width FLIPS, and the audit is clean', (span) => {
@@ -231,6 +250,10 @@ describe('⚠ the cancellation: the same gesture at two widths, and only one wor
     expect(audit.cancellingMeasured).toBe(true);
     expect(audit.cancelling).toBe(0);
     expect(runs).toEqual([]);
+    // THE OTHER HALF OF THE SEVERITY SEAM, so the row above is not satisfied by
+    // a predicate that simply warns on everything: the width that WORKS grades
+    // `ok`, and it grades ok with a real two-way pair present.
+    expect(crossoverAuditSeverity(audit)).toBe('ok');
     // ⚠ THE CONTROL, AND WITHOUT IT THIS ROW IS VACUOUS. `runs` being empty is
     // also what a scanner that found nothing EVER would return. So take the
     // same painted pair, widen it by ONE adjacent column, and require the scan
