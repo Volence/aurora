@@ -213,11 +213,27 @@ defect as an `updatedAt` written from a session's own sense of the time rather t
 clock, and this lane wrote one of those sentences before the amendment arrived.
 
 ⚠ **AND IF THE NUMBER IS NOT AVAILABLE, SAY THAT — never substitute the feeling it would have
-replaced.** Measured here 2026-09-09: the only counter this session can see **reset upward
-mid-session** (~13.65M → 15.0M), so it is **not a monotonic measure of context occupancy** and no
-honest percentage can be derived from it. The reportable half is then the other one — **what is
-unbanked** — plus the anchor. *Loud on unmeasurable*, the same bar every gate in this repo is
-held to.
+replaced.** *Loud on unmeasurable*, the same bar every gate in this repo is held to.
+
+⚠ **BUT MEASURE BEFORE CLAIMING IT IS UNAVAILABLE — THE NUMBER EXISTS AND THIS LANE FOUND IT
+2026-09-09 AFTER FIRST REPORTING IT COULD NOT.** `node scratchpad/context-usage.mjs [session-id]`
+(the id is the last component of this session's scratchpad path). Every assistant turn in the
+session transcript carries a server-produced `usage` record, and
+`input_tokens + cache_read_input_tokens + cache_creation_input_tokens` **is exactly the context
+sent that turn** — a real number, produced by the server rather than by the session, monotonic
+within a window, **so a large DROP in the series IS a compaction.** That is the event this rule
+exists to stop a lane drifting through unnoticed, and it is now detectable rather than felt.
+
+⚠ **DO NOT USE THE `<total_tokens>` COUNTER FOR THIS.** Measured here: it **reset upward
+mid-session** (~13.65M → 15.0M). **It is a budget, not an occupancy**, and a percentage derived
+from it has a confident shape and no meaning. The refusal to quote it was right; the mistake was
+stopping at the refusal instead of looking for the instrument. **A missing number is a reason to
+go and measure, not a licence to say nothing** — and the reverse of this file's own bar: an
+instrument that cannot report its own blindness is broken, but a session that reports blindness
+without checking for an instrument is doing the same thing from the other side.
+
+⚠ **THE DENOMINATOR IS STILL NOT MEASURED.** The script prints the numerator and refuses to guess
+a window size. Report the absolute number unless you know the window.
 
 ⚠ **THE ANCHOR IS A FILE AT A COMMITTED SHA, NEVER A SUMMARY**, and oracle's reason is the one to
 keep: **a summary is written by the session about to stop, it is the one artifact its successor
