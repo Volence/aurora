@@ -14,7 +14,7 @@ import {
 // omitted state got answered with "off". See core/editing/brush-word.ts.
 import { brushNametableWord, brushPriorityFromOptional } from '../../core/editing/brush-word';
 import type { Tile, Zone, Act } from '../../core/model/s4-types';
-import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateEntries, validateChunkCollisionPlane, validatePaintCollisionRect, validateCollisionWrite, validateCollisionReadPlane } from '../../core/agent/validation';
+import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateEntries, validateChunkCollisionPlane, validatePaintCollisionRect, validateCollisionWrite, validateCollisionReadPlane, validateCollisionWritePlane } from '../../core/agent/validation';
 import { computeActBudget, canonicalTileHash } from '../../core/agent/budget';
 import { decodeGenesisColor, encodeGenesisColor } from '../../core/formats/palette';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
@@ -467,6 +467,15 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
 
     case 'paint-collision': {
       const ctx = requireProject();
+      // ⚠ THE PLANE FIRST, and for the reason `get-collision-region` states one
+      // line further down: a road that reaches this handler without passing the
+      // zod registry has named no plane the schema vouched for. The READ has had
+      // this backstop since the merge; the WRITE trusted the schema alone, and a
+      // write with less checking than the read beside it is the wrong way round
+      // — measured, `plane: "c"` painted plane A and reported success. See
+      // `validateCollisionWritePlane` for the readings.
+      const planeErr = validateCollisionWritePlane(req.plane);
+      if (planeErr) throw new Error(planeErr);
       const err = validatePaintCollisionRect(req.section, req.x, req.y, req.w, req.h, {
         sectionCount: ctx.act.sections.length,
         cellsW: SECTION_TILES_WIDE / 2, cellsH: SECTION_TILES_HIGH / 2,
