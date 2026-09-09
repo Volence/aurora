@@ -114,6 +114,20 @@ export function currentOpenDirtySnapshot(): OpenDirtySnapshot {
   // The sentences are the ones the tab-close doors already use for the first two
   // (tab-activation/canvas.ts, tab-activation/sprite.ts), so a user meets the
   // same explanation wherever the same document blocks them.
+  //
+  // WHAT IS ASSUMED SAVABLE HERE, AND WHY THAT IS NOT PROVEN. `classicDirty` and
+  // `aeonDirty` are counted savable outright, but their savers do not read those
+  // flags: classic-level fires on `openEngine() === 's1'` and aeon-project on
+  // `openEngine() === 'aeon'` (state/project-runtime.ts). So a dirty
+  // classicLevelStore with no classic project resident, or a dirty editorStore
+  // with no aeon project, would be a FOURTH instance of this same defect — Save
+  // offered over work its saver will skip. Deriving these two from `openEngine()`
+  // instead would be the stricter reading, and it is deliberately not done here:
+  // no reproduction of either state was found (classicProjectStore.openDirectory
+  // resets the level store on a switch, and editorStore.dirty is set by commands
+  // that need a resident project), and tightening it on an unreproduced case
+  // would drop the Save button in states this guard is right about today. If a
+  // reproduction turns up, this is the line to change and the shape to copy.
   const unsavable: string[] = [];
   const noFileCanvases = dirtyCanvases.length - saveableCanvases.length;
   if (noFileCanvases > 0) {
