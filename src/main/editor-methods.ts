@@ -126,8 +126,11 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'Decoded nametable entries (tileIndex, palette, flips, priority) for a tile-coordinate rectangle of a section.' },
   { name: 'check_budget', kind: 'check-budget', result: 'json',
     params: { section: z.number().int().min(0).optional() },
-    description: `Flip-aware unique-tile counts per section and per VRAM color group vs the `
-      + `${FG_TILE_LIMIT}-tile FG pool. fits=false means export will fail.` },
+    description: `Flip-aware unique-tile counts per section and per VRAM color group against the `
+      + `${FG_TILE_LIMIT}-tile act FG art pool (aeon's POOL_TILE_CEILING, the fg_art_pool region). `
+      + `The count sums the two VRAM color groups separately, so a tile used by both is counted `
+      + `twice: fits=true therefore has margin, and fits=false can be pessimistic rather than a `
+      + `refusal you will certainly meet.` },
   { name: 'set_palette', kind: 'set-palette', result: 'json',
     params: { line: z.number().int().min(1).max(3), colors: z.array(z.number().int()).length(16) },
     description: 'Write one palette line (1-3) as 16 Genesis CRAM words (0000BBB0GGG0RRR0, even channel values only). One undo step.' },

@@ -28,8 +28,27 @@ export function canonicalTileHash(pixels: Uint8Array): string {
 
 export interface ActBudget {
   perSection: Array<{ index: number; uniqueTiles: number }>;
-  // Counts match export exactly (both flip-aware + blank seed), so
-  // fits === !exportThrows.
+  // ⚠ THIS COMMENT USED TO READ "Counts match export exactly (both flip-aware +
+  // blank seed), so fits === !exportThrows", AND BOTH HALVES HAVE EXPIRED.
+  //
+  // There is no export to throw: the per-section VRAM-base export path was
+  // retired 2026-08-19 (see core/export/vram-coloring.ts's header), and
+  // `computeActBudget` is the last consumer of the two symbols that survived it.
+  // The equivalence therefore names a comparand that no longer exists, which is
+  // how it went on reading as a guarantee.
+  //
+  // What the numbers below ARE: `groups` still splits the act into the two
+  // checkerboard VRAM colors that scheme needed, and `fits` compares their
+  // SUMMED unions against FG_TILE_LIMIT. aeon holds act FG art in ONE
+  // globally-deduped paged pool, so a tile used by both groups is counted twice
+  // here and once there. That makes this reading CONSERVATIVE on the tile axis
+  // (fits=true has margin; fits=false can be pessimistic) and it is the honest
+  // description, not a claimed equivalence.
+  //
+  // NOT MEASURED BY ANYTHING IN THIS REPO, and open rather than closed: whether
+  // the two-group split is the right model at all now that the scheme it served
+  // is gone, and whether page-frame fragmentation can refuse an act whose raw
+  // tile count fits. See docs/reviews/2026-09-09-guard-residue-offschema.md §3.
   groups: Array<{ color: number; unionTiles: number; baseSlot: number }>;
   limit: number;
   fits: boolean;

@@ -138,7 +138,7 @@ describe('every road into the agent handler carries only what a schema declared'
   // key on a schema-BEARING method is dropped rather than forwarded.
   it('CONTROL: the harness sees the payload, and a declared method drops an undeclared key', async () => {
     await callMcp('get_tiles', { start: 0, count: 1, bogus: 'off-schema' });
-    expect(captured.length, 'nothing reached the bridge — the harness is not observing').toBe(1);
+    expect(captured.length, 'nothing reached the bridge: the harness is not observing').toBe(1);
     expect(Object.keys(captured[0] as object).sort()).toEqual(['count', 'kind', 'start']);
   });
 
