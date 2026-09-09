@@ -16,6 +16,9 @@ import type { ComposerDoc } from '../../../core/art/composer-buffer';
 import {
   recordComposerEdit, recordComposerSnapshot, takeComposerSnapshot,
 } from '../../state/composer-history';
+import {
+  commitChunkDocStep, isChunkDocument, syncChunkDocFromLibrary,
+} from '../../state/chunk-doc-commit';
 import type { ComposerSnapshot } from '../../../core/editing/composer-history';
 import { paintDocCollision, applyClipboardCollisionToDoc } from '../../../core/art/composer-collision';
 import { copyChunkToClipboard } from '../../../core/editing/map-clipboard';
@@ -180,6 +183,26 @@ export default function ComposerCanvas() {
     return cappedZoom(zoom, Math.max(doc.widthTiles, doc.heightTiles) * 8 * (repeatPreview ? 3 : 1));
   }, [open, zoom, repeatPreview]);
 
+  // ---------- the chunk document follows its library chunk ----------
+
+  /**
+   * ⚠ WHAT MAKES UNDO VISIBLE ON A CHUNK DOCUMENT, and it must run BEFORE the
+   * pixel buffer is next derived, which is why it is an effect on the same clock
+   * that buffer keys off.
+   *
+   * Since owner ruling d-37 every gesture on a chunk document records a
+   * `set-chunk` on the zone-art stack (state/chunk-doc-commit.ts). Undoing one
+   * rewrites the LIBRARY CHUNK — a project object this composer read once, at
+   * open time. Without this the canvas would keep showing the stroke that was
+   * just reverted, and the next gesture would diff against that stale document
+   * and fold the reverted stroke straight back in.
+   *
+   * A no-op whenever the document and its chunk already agree, which is the
+   * common case: this clock also ticks for every `set-tileset-tiles` on an
+   * atlas-backed cell, which moves tile pixels and no nametable word.
+   */
+  useEffect(() => { syncChunkDocFromLibrary(); }, [historyVersion, open]);
+
   // ---------- resolved render inputs ----------
 
   const buffer = useMemo<PixelBuffer>(() => {
@@ -266,7 +289,6 @@ export default function ComposerCanvas() {
           localWrites.push(w);
         }
       }
-      const level = getActiveLevel(useProjectStore.getState());
       const cmds: SetTilesetTilesCommand[] = [];
       for (const [ti, nw] of newPixels) {
         if (tilesEqual(oldPixels.get(ti)!, nw)) continue;
@@ -276,19 +298,22 @@ export default function ComposerCanvas() {
           oldTiles: [{ pixels: oldPixels.get(ti)! }], newTiles: [{ pixels: nw }],
         });
       }
-      if (cmds.length && level) {
-        const cmd: AnyCommand = cmds.length === 1 ? cmds[0]
-          : { type: 'batch', description: `art: edit ${cmds.length} tiles`, sectionIndex: -1, commands: cmds };
-        executeCommand(cmd, level);
-        warnSharedTileEdit(cmds[0].at);
-        useArtStore.getState().bumpDoc();
-      }
+      // ⚠ THE DOC-LOCAL HALF IS APPLIED FIRST AND COMMITTED IN THE SAME STEP.
+      // One stroke can cross an atlas-backed cell and an empty one, and the two
+      // halves used to leave one undoable command and one unrecorded mutation.
+      // `commitChunkDocStep` folds the atlas edits (`cmds`) and the chunk's new
+      // contents into ONE batch on the zone-art stack, so a gesture is still one
+      // Ctrl+Z — owner ruling d-37 (state/chunk-doc-commit.ts). It executes
+      // `cmds` itself, including when the chunk half cannot be built.
       if (localWrites.length) {
         adoptPaletteLineForEmptyCells(doc, localWrites, useArtStore.getState().paletteLine);
         setPixels(doc, atlas, localWrites);
         useArtStore.getState().markOpenDirty();
-        useArtStore.getState().bumpDoc();
       }
+      if (commitChunkDocStep(`art: edit chunk ${o.name}`, cmds) && cmds.length) {
+        warnSharedTileEdit(cmds[0].at);
+      }
+      useArtStore.getState().bumpDoc();
       return;
     }
 
@@ -300,11 +325,15 @@ export default function ComposerCanvas() {
     // pixel diff and so is non-empty by construction (the guard at the top of
     // this function), which is why this needs no "did it land" check. A no-op on
     // every document that is not PURE DOC-LOCAL — a chunk document reaching here
-    // through `allowCow` records nothing, deliberately (state/composer-history.ts).
+    // through `allowCow` is recorded by `commitChunkDocStep` below instead, on
+    // the zone-art stack, because it HAS a project document to write through to
+    // (owner ruling d-37; state/composer-history.ts and state/chunk-doc-commit.ts
+    // each state the other's half).
     recordComposerEdit();
     adoptPaletteLineForEmptyCells(doc, writes, useArtStore.getState().paletteLine);
     setPixels(doc, atlas, writes);
     useArtStore.getState().markOpenDirty();
+    commitChunkDocStep(`art: edit chunk ${o.name}`);
     useArtStore.getState().bumpDoc();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -435,7 +464,23 @@ export default function ComposerCanvas() {
     tileGestureRef.current = null;
     recordComposerSnapshot(snap);
   }
-  function endTileGesture() { tileGestureRef.current = null; }
+  /**
+   * ⚠ AT `up`, NOT PER CELL, and that is what makes a chunk document's tile-space
+   * drag one Ctrl+Z rather than twelve. `commitChunkDocStep` diffs the whole
+   * document against the library chunk, so it does not care how many cells the
+   * drag crossed; calling it once, when the drag ends, is both the cheap answer
+   * and the one that matches the "one gesture, one step" rule the snapshot
+   * bookkeeping above states for a pure doc-local document. Idempotent: a drag
+   * that changed nothing diffs to nothing and records nothing.
+   */
+  function endTileGesture() {
+    tileGestureRef.current = null;
+    const o = useArtStore.getState().open;
+    if (isChunkDocument(o)) {
+      commitChunkDocStep(`art: edit chunk ${o!.name}`);
+      useArtStore.getState().bumpDoc();
+    }
+  }
 
   // ---------- shared drawing engine ----------
 
@@ -810,10 +855,18 @@ export default function ComposerCanvas() {
           // whole document, so an unrecorded write in between is not merely
           // un-undoable, it is silently reverted by somebody else's Ctrl+Z. On a
           // pure doc-local document these are now the complete set of writers.
+          //
+          // On a CHUNK document the same write is recorded as a `set-chunk`
+          // instead (owner ruling d-37) — `set-chunk` carries both collision
+          // planes, so this writer needs nothing the command does not already
+          // have. `commitChunkDocStep` is a no-op on every other document kind,
+          // exactly as `recordComposerSnapshot` is on this one.
           const snap = takeComposerSnapshot();
           if (applyClipboardCollisionToDoc(doc, mapClip)) {
             if (snap) recordComposerSnapshot(snap);
             useArtStore.getState().markOpenDirty();
+            commitChunkDocStep(
+              `art: edit chunk ${useArtStore.getState().open?.name ?? ''} collision`);
             useArtStore.getState().bumpDoc();
             useToastStore.getState().addToast(
               'Pasted collision from map clipboard (art paste into chunks isn\'t supported)', 'info');

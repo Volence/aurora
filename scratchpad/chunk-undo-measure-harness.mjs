@@ -42,7 +42,41 @@
 // null; on an atlas-backed cell the same stroke IS a zone-art command (census
 // path P3a) and would push its own entry, so a Ctrl+Z taking it back would look
 // identical to the defect while being correct behaviour. The aim is therefore
-// chosen from `artDocCellAt` and C3 asserts the stroke moved NO zone art.
+// chosen from `artDocCellAt`, C0/T0c ASSERT the cell is empty, and C3/T2b say
+// what the stroke on it did to the zone art.
+//
+// ══ WHAT THE OWNER'S RULING CHANGED, AND WHICH ROWS MOVED WITH IT ═══════════
+//
+// d-37 `route_onto_zone_stack` landed (docs/reviews/2026-09-09-chunk-undo-
+// routing.md). Every gesture on a chunk document now records a `set-chunk` on
+// the SAME `zoneart:<zone>` history the atlas-backed pencil already used, so:
+//
+//   • T2 and T5 — THE FINDING — go green with their assertions UNCHANGED. The
+//     earlier zone-art edits survive the Ctrl+Z, which is what they always
+//     asserted.
+//   • SEVEN rows asserted the OLD behaviour and had to be re-aimed at the new
+//     one. Each is now a STRONGER claim than the one it replaces, and each is
+//     named here so a reader can see exactly what was changed and why:
+//
+//       C3, T2b  said "the stroke moved no zone art". A chunk in the library is
+//                a nametable of atlas tiles and nothing else, so painting an
+//                EMPTY cell has to materialise the painted tile into the zone
+//                tileset — the same `sliceForSave` Save has always run, moved to
+//                gesture time. They now assert the witness moved to a value that
+//                is NONE of the ladder rungs, which is what "this is the
+//                author's own new art, not somebody else's edit" looks like.
+//       C5, C9,  said the author's own gesture was NOT taken back by Ctrl+Z.
+//       T3, T6   That was the defect stated from the other side. They now assert
+//                it IS taken back — the whole point of the ruling.
+//       C6       said the Undo control stayed DISABLED through a doc-local
+//                gesture on an empty stack. It now asserts the opposite: the
+//                gesture ENABLES it, because it put a step on the stack.
+//
+//   • THE ONE-FIELD CONTROL IS UNTOUCHED and now pays off in the other
+//     direction: C and T are still the same document, cell, aim and session
+//     differing only in whether row Z ran, and after the fix they behave
+//     IDENTICALLY. Before it, the same two gestures destroyed two zone-art
+//     edits in T and looked inert in C.
 //
 // ⚠ dpr varies run to run on this box (seen at 1 and 1.35). Every aim below is
 // an INTEGER client pixel; the doc pixel it lands on is derived from that
@@ -50,11 +84,11 @@
 // `zoom` recovered from the element, and printed, and the cell it lands in is
 // asserted to be the cell that was aimed at.
 //
-// ⚠ RED BY DESIGN IF THE CLAIM HOLDS. Rows T2/T5 assert that the earlier
-// zone-art edit SURVIVED the Ctrl+Z. They are the finding: if they fail, a chunk
-// document's Ctrl+Z is destroying work on a document the author is not looking
-// at, and this harness goes green by itself the day that is fixed. If they PASS,
-// the derived claim is refuted and the warning on Ctrl+Z should be lifted.
+// ⚠ IT WAS RED BY DESIGN AND IS NOT ANY MORE. Rows T2/T5 assert that the
+// earlier zone-art edit SURVIVED the Ctrl+Z. They failed from 2026-09-09 until
+// the routing fix landed the same day, which is what named the defect; they pass
+// now, with the same assertions. THIS HARNESS EXITS 0 WHEN THE ROUTING IS
+// CORRECT — a non-zero exit here is a REGRESSION, not a finding.
 //
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npx electron-vite build
 // Run:                     npm run harness:chunk-undo-measure
@@ -505,6 +539,11 @@ async function main() {
     const cPixB = await canvasHash();
     const cDocB = await docPixel();
     const cZone1 = await zoneHash();
+    // ⚠ READ BEFORE THE Ctrl+Z, not after it. These two say what the STROKE did;
+    // sampled after the press they say what the UNDO did, which is C4/C5's
+    // question and reads as "the stroke changed nothing".
+    const cCellAfter = await c.json(`window.__dbg.aeon.artDocCellAt(${plan.cx}, ${plan.cy})`);
+    const cTilesAfter = await c.evalExpr('window.__dbg.aeon.zoneTileCount()');
     const cCan1 = await canUndo();
     const cChip1 = await chip();
     const cFocus1 = await focused();
@@ -521,16 +560,38 @@ async function main() {
       cDocA !== null && cDocB !== null && cDocA !== cDocB
       && cPixA !== null && cPixB !== null && cPixA !== cPixB,
       `doc pixel ${cDocA} -> ${cDocB}; canvas ${cPixA} -> ${cPixB}`);
-    check('C3', 'the pencil stroke is DOC-LOCAL — it moved no zone art (so it is not census path P3a) [precondition]',
-      cZone1 === cZone0, `zoneArtHash ${cZone0} -> ${cZone1}`);
-    check('C4', 'with an empty stack, Ctrl+Z after the stroke changes NO zone art',
+    // ⚠ RE-AIMED BY THE ROUTING FIX (d-37), and the header says why: the cell
+    // aimed at is EMPTY, so the stroke has no atlas tile to paint into and the
+    // fix MATERIALISES one — the same `sliceForSave` Save has always run, moved
+    // to gesture time. The row still discriminates census path P3a from P3b: on
+    // an atlas-backed cell the witness would move to an EDIT of an existing
+    // tile, here it moves because a tile was APPENDED, and C3b reads the cell to
+    // say which happened rather than inferring it from a hash.
+    check('C3', 'the stroke on the EMPTY cell MATERIALISES its tile into the zone tileset '
+      + '(owner ruling d-37 — a chunk in the library is a nametable of atlas tiles)',
+      cZone1 !== cZone0 && cTilesAfter === zoneTiles + 1,
+      `zoneArtHash ${cZone0} -> ${cZone1}; zoneTileCount ${zoneTiles} -> ${cTilesAfter}`);
+    check('C3b', 'and the cell that was EMPTY now references that appended tile [precondition]',
+      cCellAfter && cCellAfter.atlasTile === zoneTiles && cCellAfter.localId === null,
+      `cell (${plan.cx},${plan.cy}) after the stroke: ${JSON.stringify(cCellAfter)} `
+        + `(the tileset held ${zoneTiles} tiles before it)`);
+    check('C4', 'with an empty stack, Ctrl+Z after the stroke puts the zone art back exactly',
       cZone2 === cZone0, `zoneArtHash after Ctrl+Z: ${cZone2}, want ${cZone0}`);
-    check('C5', 'with an empty stack, Ctrl+Z does not take back the doc-local stroke either',
-      cDocC === cDocB, `doc pixel after Ctrl+Z: ${cDocC}, after the stroke: ${cDocB} `
+    // ⚠ RE-AIMED BY THE ROUTING FIX. This row asserted the defect from the other
+    // side: the author's own gesture surviving their own Ctrl+Z. It now asserts
+    // the ruling.
+    check('C5', 'Ctrl+Z TAKES BACK the doc-local stroke',
+      cDocC === cDocA && cDocC !== cDocB,
+      `doc pixel ${cDocA} -> ${cDocB} (stroke) -> ${cDocC} (Ctrl+Z) `
         + `(canvas hash ${cPixB} -> ${cPixC})`);
-    check('C6', 'the Undo control stayed DISABLED through the doc-local stroke',
-      cChip1.disabled === true && cCan1 === false,
-      `chip disabled=${cChip1.disabled}, canUndo()=${cCan1}, focusedDocId()=${cFocus1}`);
+    // ⚠ RE-AIMED BY THE ROUTING FIX. It asserted the Undo control stayed
+    // DISABLED, i.e. that the gesture recorded nothing at all. That IS the
+    // defect, so the row now asserts the gesture puts a step on a stack that was
+    // empty a moment earlier — C1 is what makes "was empty" a measurement.
+    check('C6', 'the doc-local stroke ENABLES the Undo control on a stack C1 found empty',
+      cChip1.disabled === false && cCan1 === true,
+      `chip disabled ${cChip0.disabled} -> ${cChip1.disabled}, canUndo() ${cCan0} -> ${cCan1}, `
+        + `focusedDocId()=${cFocus1}`);
 
     // C-collision, on the same document
     const cColA = await collAt(plan.collIndex);
@@ -544,10 +605,16 @@ async function main() {
     console.log(`        [C collision] zoneArtHash ${cZone2} -> ${cZone3} -> ${cZone4}`);
     check('C7', 'the collision paint LANDS on the chunk document [precondition]',
       cColA !== null && cColB !== null && cColA !== cColB, `${cColA} -> ${cColB}`);
-    check('C8', 'with an empty stack, Ctrl+Z after the collision paint changes NO zone art',
-      cZone4 === cZone0, `zoneArtHash after Ctrl+Z: ${cZone4}, want ${cZone0}`);
-    check('C9', 'with an empty stack, Ctrl+Z does not take back the collision paint either',
-      cColC === cColB, `collisionA[${plan.collIndex}] after Ctrl+Z: ${cColC}, after the paint: ${cColB}`);
+    check('C8', 'the collision paint and its Ctrl+Z change NO zone art — `set-chunk` carries '
+      + 'both collision planes and touches no tile',
+      cZone3 === cZone0 && cZone4 === cZone0,
+      `zoneArtHash ${cZone2} -> ${cZone3} (paint) -> ${cZone4} (Ctrl+Z), want ${cZone0} throughout`);
+    // ⚠ RE-AIMED BY THE ROUTING FIX, the same inversion as C5 and for the same
+    // reason: this asserted that the author's own collision paint survived their
+    // own Ctrl+Z.
+    check('C9', 'Ctrl+Z TAKES BACK the collision paint',
+      cColC === cColA && cColC !== cColB,
+      `collisionA[${plan.collIndex}] ${cColA} -> ${cColB} (paint) -> ${cColC} (Ctrl+Z)`);
     await shot(c, 'C-control-after-ctrl-z');
 
     // ══ ROW Z — SETUP: put TWO zone-art edits on the stack ══════════════════
@@ -718,8 +785,17 @@ async function main() {
     check('T2a', 'the pencil stroke LANDS on the chunk document [precondition]',
       tDocA !== null && tDocB !== null && tDocA !== tDocB && tDocB === cDocB,
       `doc pixel ${tDocA} -> ${tDocB} (the control's stroke left ${cDocB}); canvas ${tPixA} -> ${tPixB}`);
-    check('T2b', 'the pencil stroke is DOC-LOCAL — it moved no zone art [precondition]',
-      tZoneAfterStroke === ZONE_TWO, `zoneArtHash ${ZONE_TWO} -> ${tZoneAfterStroke}`);
+    // ⚠ RE-AIMED BY THE ROUTING FIX (d-37), the twin of C3. The stroke moves the
+    // witness because it materialises its own tile — and the assertion that
+    // MATTERS for this experiment is that it moves it to a value that is NONE of
+    // the ladder rungs. A move to ZONE_ONE or ZONE_START would be the stroke
+    // reaching back into another document's edits, which is the thing under test.
+    check('T2b', 'the pencil stroke moves the zone-art witness to ITS OWN new value, not to any '
+      + 'earlier rung of the ladder [precondition]',
+      tZoneAfterStroke !== ZONE_TWO && tZoneAfterStroke !== ZONE_ONE
+        && tZoneAfterStroke !== ZONE_START,
+      `zoneArtHash ${ZONE_TWO} -> ${tZoneAfterStroke} `
+        + `(ladder: start=${ZONE_START}, edit1=${ZONE_ONE}, edit2=${ZONE_TWO})`);
     check('T2', 'THE FINDING: Ctrl+Z after a DOC-LOCAL pencil stroke leaves the earlier '
       + 'ZONE-ART edits alone',
       tZoneAfterZ === ZONE_TWO,
@@ -733,12 +809,17 @@ async function main() {
     // the chunk's ATLAS-BACKED cells underneath an untouched doc-local pixel:
     // the instrument could not tell "my stroke was taken back" from "somebody
     // else's tile was, and this document is showing it".
-    check('T3', 'the doc-local stroke itself is NOT taken back by that Ctrl+Z',
-      tDocC === tDocB, `doc pixel after Ctrl+Z: ${tDocC}, after the stroke: ${tDocB} `
-        + `(the canvas hash DID move, ${tPixB} -> ${tPixC} — that is the zone-art revert `
-        + `repainting this document's atlas-backed cells, not the stroke)`);
+    // ⚠ RE-AIMED BY THE ROUTING FIX (d-37), the twin of C5. It asserted that the
+    // author's own stroke SURVIVED their own Ctrl+Z, which together with T2's
+    // failure was the whole defect: the press took back an edit on another
+    // document and left this one alone. Both halves are now the other way round,
+    // and T2 above is the half that did not have to change.
+    check('T3', 'the doc-local stroke IS what that Ctrl+Z takes back',
+      tDocC === tDocA && tDocC !== tDocB,
+      `doc pixel ${tDocA} -> ${tDocB} (stroke) -> ${tDocC} (Ctrl+Z) `
+        + `(canvas hash ${tPixB} -> ${tPixC})`);
     check('T4', 'the Undo control was ENABLED at the moment of the doc-local gesture '
-      + '(so the author is offered a control that acts elsewhere)',
+      + '(and T2/T3 are what say the control now acts HERE rather than elsewhere)',
       tChip1.disabled === false && tCan1 === true,
       `chip disabled=${tChip1.disabled}, canUndo()=${tCan1}`);
     note('T4b', 'which document Ctrl+Z resolved to, read from the app',
@@ -772,8 +853,10 @@ async function main() {
       tZoneAfterZ2 === tZoneBeforeZ2 ? `zone art unchanged at ${tZoneAfterZ2}`
         : `zoneArtHash went ${tZoneBeforeZ2} -> ${tZoneAfterZ2} `
           + `(start=${ZONE_START}, after edit1=${ZONE_ONE}, after edit2=${ZONE_TWO})`);
-    check('T6', 'the collision paint itself is NOT taken back by that Ctrl+Z',
-      tColC === tColB, `collisionA[${plan.collIndex}] after Ctrl+Z: ${tColC}, after the paint: ${tColB}`);
+    // ⚠ RE-AIMED BY THE ROUTING FIX (d-37), the twin of C9.
+    check('T6', 'the collision paint IS what that Ctrl+Z takes back',
+      tColC === tColA && tColC !== tColB,
+      `collisionA[${plan.collIndex}] ${tColA} -> ${tColB} (paint) -> ${tColC} (Ctrl+Z)`);
     await shot(c, 'T-treatment-after-collision-ctrl-z');
 
     console.log('\n══ SUMMARY ═════════════════════════════════════════════════');
@@ -806,13 +889,24 @@ async function main() {
     const notes = results.filter((r) => r.ok === null).length;
     console.log(`\n  ${passes} pass, ${failed} fail, ${notes} note — ${results.length} rows total`);
     if (fails.length) console.log(`  FAILING: ${fails.join(', ')}`);
+    // ⚠ THE EPILOGUE INVERTED WITH THE FIX. It used to announce T2/T5 as RED BY
+    // DESIGN. They are the rows the owner's ruling (d-37 `route_onto_zone_stack`,
+    // docs/reviews/2026-09-09-chunk-undo-routing.md) was taken to close, so a red
+    // one here is now a REGRESSION and says so in those words. Every other row
+    // is a control or a precondition around them.
     const finding = ['T2', 'T5'].filter((id) => results.some((r) => r.id === id && r.ok === false));
     if (finding.length) {
-      console.log(`  ⚠ RED BY DESIGN — ${finding.join(', ')} IS THE FINDING, not a broken instrument: `
-        + 'a doc-local gesture on a CHUNK document leaves Ctrl+Z pointed at the zone-art stack, '
-        + 'so pressing it destroys an earlier edit on a document the author is not looking at. '
-        + 'Lens row ART-UNDO-CHUNK-SPLIT; see docs/reviews/2026-09-09-chunk-undo-measure.md. '
-        + 'This harness goes GREEN by itself the day that is fixed.');
+      console.log(`  ⚠ REGRESSION — ${finding.join(', ')} IS THE ROW THE ROUTING FIX CLOSED: `
+        + 'a doc-local gesture on a CHUNK document has gone back to leaving Ctrl+Z pointed at the '
+        + 'zone-art stack, so pressing it destroys an earlier edit on a document the author is not '
+        + 'looking at. Lens row ART-UNDO-CHUNK-SPLIT; see '
+        + 'docs/reviews/2026-09-09-chunk-undo-routing.md and the measurement it replaced, '
+        + 'docs/reviews/2026-09-09-chunk-undo-measure.md.');
+    } else if (fails.length === 0) {
+      console.log('  GREEN — every gesture on a chunk document records one step on '
+        + 'zoneart:<zone>, Ctrl+Z takes back the AUTHOR\'S OWN gesture, and the earlier zone-art '
+        + 'edits made on another document survive it (T2, T5). Owner ruling d-37 '
+        + '`route_onto_zone_stack`; docs/reviews/2026-09-09-chunk-undo-routing.md.');
     }
     console.log('HARNESS-END-MARKER');
   } finally {
