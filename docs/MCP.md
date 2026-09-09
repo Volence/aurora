@@ -485,10 +485,31 @@ written; on a `partial` some files landed and the rest stay dirty for a retry.
 
 - Colors: Genesis 9-bit BGR, even channel values; palette line 0 rejected (sprite-reserved).
 - Tiles: 8x8, pixel values 0-15, index 0 transparent; tileset capped at 2048.
-- Budget: flip-aware unique tiles per VRAM color group must fit the 1024-tile FG pool
-  (BG region starts at slot 1024). `check_budget` and every mutation reply report it.
-- Over-budget paints are allowed and reported (`fits: false` in the reply); export is
-  where overflow hard-fails. Optimize tile reuse before exporting.
+- Budget: **the binding unit is the page frame, not the tile.** aeon carves the act FG
+  art pool into fixed-size page frames and an act's baked art is split into pages of
+  that size; a half-full page still consumes a whole frame, so an act costs its
+  **packed page count**. That packing happens at bake time in aeon's tooling, which
+  Aurora cannot run, so `check_budget` reports a **lower bound**, `pageFramesAtLeast`,
+  and never a figure. Its `verdict` is `over` (the lower bound alone exceeds the frame
+  count, so aeon will refuse the act) or `undetermined` (the bound fits; whether the
+  packed count does is not measured here). **There is deliberately no `fits`:** Aurora
+  cannot tell you an act fits.
+- **No pool size, page quantum or frame count is restated here, on purpose.** This
+  bullet used to read "must fit the 1024-tile FG pool (BG region starts at slot 1024)",
+  which was a third too generous, and it outlived the fix to the constant itself
+  because a document is a second author with no arbiter. Those values are vendored in
+  `src/core/export/vram-coloring.ts` from aeon's own declaration and held current by
+  `test/formats/fg-pool-ceiling-currency.test.ts` and
+  `test/formats/fg-page-frame-currency.test.ts`; the frame count is *derived* from them
+  and moves whenever aeon resizes the pool. Ask `check_budget`, whose description
+  interpolates the live values.
+- Over-budget paints are allowed and reported. `verdict: over` is a refusal you will
+  meet; `undetermined` is **not** a clearance. Read the reply's `unquantified[]`, which
+  says what the reading cannot tell you: the tile count sums the two VRAM color groups
+  separately so a tile in both is counted twice (conservative by an amount nobody has
+  measured), a partly-filled page wastes the rest of its frame (why the bound is a
+  bound), and page frames can be *pinned*, leaving fewer than are carved to cover a
+  moving view (also unmeasured). Optimize tile reuse before exporting.
 
 ## Aether bus
 

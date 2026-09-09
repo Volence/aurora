@@ -49,6 +49,98 @@
 export const FG_TILE_LIMIT = 768;
 
 /**
+ * Tiles per PAGE FRAME: aeon's `ART_POOL_PAGE_TILES`, spelled `quantum` in the
+ * VRAM map.
+ *
+ * ⚠ THE TILE CEILING ABOVE IS NOT THE BINDING CONSTRAINT, AND THAT IS WHAT THIS
+ * CONSTANT AND THE NEXT ONE EXIST TO SAY.
+ *
+ * aeon carves the FG art window into FIXED frames of this many tiles
+ * (`engine/level/page_cache.emp`: "The FG art window (POOL_TILE_CEILING tiles) is
+ * carved into PAGE_FRAMES fixed ... frames"). An act's art is split into pages of
+ * the same size at bake time and each page occupies one whole frame.
+ * A HALF-FULL PAGE STILL CONSUMES A WHOLE FRAME, so an act costs its PACKED PAGE
+ * COUNT, not `ceil(tiles / quantum)`. An act whose tiles would fit in some number
+ * of perfectly packed pages can need several more as actually baked.
+ *
+ * Aurora cannot compute the packed count — the packing runs in aeon's tooling at
+ * bake time, not here — so everything downstream of this constant is a LOWER
+ * BOUND and must be worded as one. See `core/agent/budget.ts`.
+ *
+ * FRAGMENTATION IS NOT THE HAZARD, AND THAT QUESTION IS CLOSED. Because the
+ * frames are fixed-size there are no variable-size holes and nothing to
+ * fragment: any free frame takes any page. The hazard is entirely the WASTE
+ * INSIDE a partly-filled page.
+ *
+ * Read at aeon commit 49a8144cc8d286483c131f69bbc4ca9f91b8bc90 (origin/master):
+ *   games/sonic4/vram.toml, blob ebbf4afba83beb8d79bd0ae74090041565684813 —
+ *     THE AUTHORITY: the `[[region]]` named "fg_art_pool", its `quantum =` key.
+ *   engine/system/constants.emp, blob 3b7f1b5fef0257b572785f858835082bf88b90ce —
+ *     `pub const ART_POOL_PAGE_TILES` (the engine-side twin), `pub const
+ *     PAGE_FRAMES = POOL_TILE_CEILING / ART_POOL_PAGE_TILES` and its `ensure`,
+ *     and `pub const POOL_TILE_CEILING`.
+ *   engine/level/page_cache.emp, blob 699f4cf2a35d658c7cf173b0bae724d09d5570ca —
+ *     the fixed-frame carve and the pinning rule quoted below.
+ *   games/sonic4/config/constants.emp, blob 3ee19baeb11762223d0fdce68bc3306746336dbf —
+ *     `ensure(POOL_TILE_CEILING == 768, "vram.toml fg_art_pool drifted from engine
+ *     POOL_TILE_CEILING ...")`, which makes toml/engine drift build-fatal on
+ *     aeon's side. Our gate is therefore about OUR copy being current, not about
+ *     policing theirs.
+ *
+ * `test/formats/fg-page-frame-currency.test.ts` re-reads the quantum and the
+ * derivation at a committed revision on every run.
+ */
+export const FG_PAGE_TILES = 64;
+
+/**
+ * Divide the FG tile window into whole page frames, refusing an inexact split.
+ *
+ * This mirrors aeon's own comptime guard rather than inventing one:
+ *
+ *   ensure(PAGE_FRAMES * ART_POOL_PAGE_TILES == POOL_TILE_CEILING,
+ *          "PAGE_FRAMES*ART_POOL_PAGE_TILES must tile the FG art window exactly")
+ *
+ * A ceiling that does not divide would otherwise yield a FRACTIONAL frame count
+ * and every reading built on it would go quietly wrong rather than loud.
+ */
+export function deriveFgPageFrames(tiles: number, tilesPerPage: number): number {
+  if (!Number.isInteger(tiles) || !Number.isInteger(tilesPerPage) || tilesPerPage <= 0) {
+    throw new Error(
+      `deriveFgPageFrames: the FG window (${tiles} tiles) and the page quantum `
+      + `(${tilesPerPage} tiles) must both be positive integers.`,
+    );
+  }
+  if (tiles % tilesPerPage !== 0) {
+    throw new Error(
+      `deriveFgPageFrames: ${tiles} tiles does not divide into whole ${tilesPerPage}-tile page `
+      + 'frames. aeon enforces this exactly (engine/system/constants.emp: '
+      + '"PAGE_FRAMES*ART_POOL_PAGE_TILES must tile the FG art window exactly"), so a remainder '
+      + 'here means one of the two vendored numbers is wrong, not that the pool has a part '
+      + 'frame. Re-read aeon\'s declaration; do not round.',
+    );
+  }
+  return tiles / tilesPerPage;
+}
+
+/**
+ * The number of page frames the FG art window is carved into: aeon's
+ * `PAGE_FRAMES`.
+ *
+ * ⚠ DERIVED, NEVER TYPED, AND THE VALUE IS EXPECTED TO MOVE. aeon does not store
+ * this number either — `engine/system/constants.emp` declares
+ * `pub const PAGE_FRAMES = POOL_TILE_CEILING / ART_POOL_PAGE_TILES` and its own
+ * comment says why: "NO LITERAL HERE, DELIBERATELY: this comment read
+ * 'POOL_TILE_CEILING(960) ... = 15 frames' for two relayouts after the value
+ * stopped being 960". The engine lane has an open recommendation to shrink the
+ * pool again, which moves this count with it and announces nothing to us. So
+ * every sentence, message and test expectation that shows this number must build
+ * it from here rather than restate it: a derived constant with a hand-typed twin
+ * in the sentence beside it is the same defect as the old bare `1024`, wearing a
+ * derivation.
+ */
+export const FG_PAGE_FRAMES = deriveFgPageFrames(FG_TILE_LIMIT, FG_PAGE_TILES);
+
+/**
  * Checkerboard coloring: active sections get (col+row)%2, inactive get -1.
  * Adjacent (H/V) sections are co-visible during teleports and must differ.
  */
