@@ -1053,22 +1053,23 @@ const PLANTS = {
   // THE BAND SUBJECT MADE INVISIBLE RATHER THAN ONE CLICK AWAY — the exact
   // failure this parcel's arrival state is one attribute away from, and the one
   // thing the owner said must not happen. The whole defence of collapsing
-  // `BG animation bands` is that its HEADER stays on screen naming the
-  // capability and counting the document's bands; delete the section and the
-  // column silently stops mentioning that this facet does bands at all. [D1]
-  // must not confuse that with "arrives closed".
+  // `Tile animations (n/m)` is that its HEADER stays on screen naming the
+  // capability and counting the document's tile animations; delete the section
+  // and the column silently stops mentioning that this facet does them at all.
+  // [D1] must not confuse that with "arrives closed".
+  //
+  // ⚠ BY SECTION ID SINCE BGANIM-HARNESS-REPAIR. This found the box by the
+  // header title `BG animation bands`, which the vocabulary rename retired, so
+  // the plant had stopped removing anything: it returned 'no-bands-section'
+  // and the row it feeds would have been asserting against an UNPLANTED
+  // column, which is the shape where a poison reports a passing gate.
   nobands: String.raw`
 (() => {
-  const isHeader = (el) => { if (el.tagName !== 'DIV') return false;
-    const cs = getComputedStyle(el);
-    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
-      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN'; };
-  const hdr = [...document.querySelectorAll('div')].filter(isHeader)
-    .filter((h) => h.getBoundingClientRect().left > 400)
-    .find((h) => /^BG animation bands/.test((h.firstElementChild.textContent || '').trim()));
-  if (!hdr) return 'no-bands-section';
-  const box = hdr.parentElement.parentElement;
-  const title = (hdr.firstElementChild.textContent || '').trim();
+  const box = document.querySelector('[data-section="aeon.bganim.bands"]');
+  if (!box) return 'no-bands-section';
+  const hdr = box.firstElementChild;
+  const title = hdr && hdr.firstElementChild
+    ? (hdr.firstElementChild.textContent || '').trim() : '(no header)';
   box.remove();
   return 'planted: removed "' + title + '" from the column';
 })()`,

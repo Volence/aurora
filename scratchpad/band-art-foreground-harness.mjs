@@ -87,7 +87,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
-import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { runTarget, announceRunRoot, assertDebugBuild } from './lib/run-root.mjs';
+import { openEffectsSection, SECTION_TILE_ANIMATIONS } from './lib/effects-sections.mjs';
 
 const PORT = Number(process.env.PORT ?? 9412);
 const ROOT = AURORA_DIR;
@@ -97,6 +98,10 @@ const ROOT = AURORA_DIR;
 // in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
 // it is not this one. See scratchpad/lib/run-root.mjs.
 const RUN = announceRunRoot(runTarget(ROOT));
+// Every row below reads `window.__dbg`, which only a debug build has
+// (BUILD-FLAVOUR-INVISIBLE). Refused here, naming the command, rather than
+// several hundred lines down on an absent hook.
+assertDebugBuild(RUN);
 const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
 const MAIN = RUN.main;
 const LIVE_AEON = siblingPathOrUnresolved('aeon');
@@ -216,23 +221,9 @@ const clickByText = (re, tag = 'button') => String.raw`
   return true;
 })()`;
 
-/** Open one CollapsibleSection by header text (bands ARRIVE collapsed, item 49). */
-const OPEN_SECTION = (re) => String.raw`
-(() => {
-  const isHeader = (el) => {
-    if (el.tagName !== 'DIV') return false;
-    const cs = getComputedStyle(el);
-    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
-      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN';
-  };
-  const hdr = [...document.querySelectorAll('div')].filter(isHeader)
-    .find((h) => ${re}.test((h.firstElementChild.textContent || '').trim()));
-  if (!hdr) return 'no-section';
-  const open = hdr.parentElement.parentElement.children.length > 1;
-  if (open) return 'already-open';
-  hdr.click();
-  return 'clicked';
-})()`;
+// The by-header-text section opener that used to live here is gone: it read a
+// TITLE, and the tile-animation titles moved (BGANIM-HARNESS-REPAIR). Sections
+// are opened through `lib/effects-sections.mjs`, by the id the app routes on.
 
 const CROSSHAIR_CANVASES = String.raw`
 (() => [...document.querySelectorAll('canvas')]
@@ -414,9 +405,13 @@ async function drive() {
     // ---- 3. THE STRIP, AND WHICH BANK IT OPENS -----------------------------
     await c.evalExpr(clickByText('/^Effects$/'));
     await sleep(1400);
-    const sect = await c.evalExpr(OPEN_SECTION('/^BG animation bands/'));
+    // BGANIM-HARNESS-REPAIR: opened by SECTION ID, and through its sub-tab.
+    // This read `/^BG animation bands/` on the arrival tab, which is neither
+    // the section's title since the vocabulary rename nor the tab that mounts
+    // it. See scratchpad/lib/effects-sections.mjs.
+    const sect = await openEffectsSection(c, SECTION_TILE_ANIMATIONS);
     await sleep(800);
-    note(`"BG animation bands" section: ${sect} (it ARRIVES collapsed — item 49)`);
+    note(`${SECTION_TILE_ANIMATIONS}: ${JSON.stringify(sect)} (it ARRIVES collapsed — item 49)`);
     const strip = await c.json(String.raw`
       (() => { const s = document.querySelector('[data-band-bank-strip="0"]'); if (!s) return null;
         return { banks: [...s.querySelectorAll('canvas[data-bank]')]
@@ -447,7 +442,7 @@ async function drive() {
     const clickBank = async (k) => {
       await c.evalExpr(clickByText('/^Effects$/'));
       await sleep(1200);
-      await c.evalExpr(OPEN_SECTION('/^BG animation bands/'));
+      await openEffectsSection(c, SECTION_TILE_ANIMATIONS);
       await sleep(600);
       const r = await c.evalExpr(
         `(() => { const cv = document.querySelector('[data-band-bank-strip="0"] canvas[data-bank="${k}"]');`
@@ -492,7 +487,7 @@ async function drive() {
     // is not mounted there (see clickBank's note).
     await c.evalExpr(clickByText('/^Effects$/'));
     await sleep(1200);
-    await c.evalExpr(OPEN_SECTION('/^BG animation bands/'));
+    await openEffectsSection(c, SECTION_TILE_ANIMATIONS);
     await sleep(600);
     const marks = await c.json(String.raw`
       (() => [...document.querySelectorAll('[data-band-bank-strip="0"] canvas[data-bank]')]

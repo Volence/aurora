@@ -482,7 +482,7 @@ async function runRoomy() {
     const promoteBtn = await c.json(CONTROL_BY_TEXT('/^Promote$/'));
     check('4d', 'PROMOTE is enabled too — the two sources are peers, neither gated on the other',
       !!promoteBtn && promoteBtn.disabled === false, JSON.stringify(promoteBtn));
-    if (!addBtn || addBtn.disabled !== false) throw new Error('Add band unavailable — cannot insert');
+    if (!addBtn || addBtn.disabled !== false) throw new Error('the Add chip is unavailable — cannot insert');
 
     const pictureBefore = await c.json(RENDER_IN_APP);
     const hash0 = await c.evalExpr('window.__dbg.aeon.bgOverrideHash()');

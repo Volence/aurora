@@ -124,7 +124,10 @@ import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
-import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { runTarget, announceRunRoot, assertDebugBuild } from './lib/run-root.mjs';
+import {
+  openEffectsSection, SECTION_TILE_ANIMATIONS, SECTION_NEW_TILE_ANIMATION,
+} from './lib/effects-sections.mjs';
 
 const PORT = Number(process.env.PORT ?? 9394);
 // ROOT defaults to the tree this harness FILE lives in, never a hardcoded path.
@@ -140,6 +143,10 @@ const ROOT = AURORA_DIR;
 // in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
 // it is not this one. See scratchpad/lib/run-root.mjs.
 const RUN = announceRunRoot(runTarget(ROOT));
+// EVERY ROW BELOW READS `window.__dbg`, WHICH ONLY A DEBUG BUILD HAS
+// (BUILD-FLAVOUR-INVISIBLE). Refused here, naming the variable and the command,
+// rather than several hundred lines down on an absent hook.
+assertDebugBuild(RUN);
 const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
 const MAIN = RUN.main;
 const AEONDIR = siblingPathOrUnresolved('aeon');
@@ -206,53 +213,23 @@ function cdp(wsUrl) {
   return { ready, send, evalExpr, json, close: () => ws.close() };
 }
 
-// ═══ "New band" ARRIVES COLLAPSED (ROADMAP item 41) ═══
-// It is a creation form and was measured as the tallest box in the effects
-// column (474px of 1229px), so the item-41 layout pass gave it
-// `defaultCollapsed`. A collapsed CollapsibleSection renders NO children at
-// all, so every control below this point would come back `null` and read as
-// "the control is missing" — which is exactly the defect these harnesses were
-// written to detect. Opened the way a human opens it: a click on its header.
-const OPEN_NEW_BAND = String.raw`
-(() => {
-  const isHeader = (el) => {
-    if (el.tagName !== 'DIV') return false;
-    const cs = getComputedStyle(el);
-    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
-      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN';
-  };
-  const hdr = [...document.querySelectorAll('div')].filter(isHeader)
-    .find((h) => (h.firstElementChild.textContent || '').trim() === 'New band');
-  if (!hdr) return 'no-section';
-  if (hdr.parentElement.parentElement.children.length > 1) return 'already-open';
-  hdr.click();
-  return 'clicked';
-})()`;
-
-// ⚠ `BG animation bands` ARRIVES COLLAPSED TOO, since ROADMAP item 45's open
-// tail (the 1280x800 parcel): the column could not reach zero at that height
-// with five sections open, and the band list is the one section in it that is
-// not about the parallax scene the facet arrives on. The same reasoning as
-// `New band` above therefore applies to it, and so does the same fix — a
-// collapsed CollapsibleSection renders NO children, so the band cards, the
-// Demote/Remove buttons and the blob-budget readout below all come back `null`
-// and read as "missing" unless this runs first. Opened by clicking its header,
-// the way a human opens it.
-const OPEN_BAND_LIST = String.raw`
-(() => {
-  const isHeader = (el) => {
-    if (el.tagName !== 'DIV') return false;
-    const cs = getComputedStyle(el);
-    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
-      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN';
-  };
-  const hdr = [...document.querySelectorAll('div')].filter(isHeader)
-    .find((h) => /^BG animation bands/.test((h.firstElementChild.textContent || '').trim()));
-  if (!hdr) return 'no-section';
-  if (hdr.parentElement.parentElement.children.length > 1) return 'already-open';
-  hdr.click();
-  return 'clicked';
-})()`;
+// ═══ BOTH TILE-ANIMATION SECTIONS ARRIVE COLLAPSED, AND BEHIND A SUB-TAB ═══
+//
+// `New tile animation` is a creation form and was measured as the tallest box
+// in the effects column (474px of 1229px), so ROADMAP item 41 gave it
+// `defaultCollapsed`; `Tile animations` joined it with item 45's open tail (the
+// 1280x800 parcel), the column being unable to reach zero at that height with
+// five sections open. A collapsed CollapsibleSection renders NO children, so
+// every control below would come back `null` and read as "the control is
+// missing" - the exact defect this harness was written to detect.
+//
+// ⚠ AND SINCE d-26b THEY ARE ON A SUB-TAB THE FACET DOES NOT ARRIVE ON, so
+// they are not in the DOM at all until it is activated. This file opened them
+// by their old titles (`BG animation bands`, `New band`), which the
+// tile-animation vocabulary rename retired, on the arrival tab, which never
+// held them: BGANIM-HARNESS-REPAIR. Both doors now go through
+// `lib/effects-sections.mjs`, which selects on the section ids the app itself
+// routes on rather than on prose that moves again next parcel.
 
 const results = [];
 const fails = [];
@@ -286,9 +263,20 @@ const SET_INPUT = (selector, value) => String.raw`
 
 // NOTE the .trim(): a concatenated haystack of "Effects " does not match an
 // anchored /^Effects$/, which once reported a PASSING feature as a failure.
-const clickByText = (re, tag = 'button') => String.raw`
+//
+// ⚠ `root` SCOPES THE SEARCH TO ONE SECTION, and it is not optional decoration
+// on this panel. The creation chip's label is the single word `Add`
+// (BgAnimBandPanel.tsx renders it as JSX text inside `<Field label="Blank tile
+// animation">`; it used to read `Add band`, which was unique on screen by
+// accident). An unscoped /^Add$/ over every button in the app can match some
+// other one-word control and report a measurement taken off the wrong element,
+// which is worse than finding nothing. Scoped to `[data-section=...]` it can
+// only find the control in the section that owns it.
+const clickByText = (re, tag = 'button', root = null) => String.raw`
 (() => {
-  const el = [...document.querySelectorAll(${JSON.stringify(tag)})]
+  const scope = ${root === null ? 'document' : `document.querySelector(${JSON.stringify(`[data-section="${root}"]`)})`};
+  if (!scope) return 'no-scope';
+  const el = [...scope.querySelectorAll(${JSON.stringify(tag)})]
     .find((e) => ${re}.test(((e.textContent || '') + ' ' + (e.getAttribute('aria-label') || '')).trim()));
   if (!el) return false;
   if (el.disabled) return 'disabled';
@@ -297,9 +285,11 @@ const clickByText = (re, tag = 'button') => String.raw`
 })()`;
 
 /** A control's disabled state and its title — "why is this off", read off screen. */
-const CONTROL_BY_TEXT = (re, tag = 'button') => String.raw`
+const CONTROL_BY_TEXT = (re, tag = 'button', root = null) => String.raw`
 (() => {
-  const el = [...document.querySelectorAll(${JSON.stringify(tag)})]
+  const scope = ${root === null ? 'document' : `document.querySelector(${JSON.stringify(`[data-section="${root}"]`)})`};
+  if (!scope) return null;
+  const el = [...scope.querySelectorAll(${JSON.stringify(tag)})]
     .find((e) => ${re}.test(((e.textContent || '') + ' ' + (e.getAttribute('aria-label') || '')).trim()));
   if (!el) return null;
   return { text: (el.textContent || '').trim(), disabled: !!el.disabled, title: el.title || '' };
@@ -310,9 +300,11 @@ const CONTROL_BY_TEXT = (re, tag = 'button') => String.raw`
  *
  * `clickByText` searches `text + ' ' + aria-label`, which is right for a Chip
  * (no aria-label) and WRONG for an `IconButton`, whose text is "Remove" and
- * whose aria-label is "Remove band 0" — the haystack is then "Remove Remove
- * band 0" and NO anchored pattern against either half matches it. That silently
- * clicked nothing twice in this file's history before being named.
+ * whose aria-label is "Remove tile animation 0" — the haystack is then "Remove
+ * Remove tile animation 0" and NO anchored pattern against either half matches
+ * it. That silently clicked nothing twice in this file's history before being
+ * named. (The label read "Remove band 0" until the vocabulary rename;
+ * BgAnimBandPanel.tsx now spells it `Remove tile animation ${b.index}`.)
  */
 const clickByAria = (re) => String.raw`
 (() => {
@@ -418,18 +410,25 @@ async function main() {
     check('2a', 'the facet bar offers an Effects pill [instrument check]', clicked === true,
       `buttons on screen: ${JSON.stringify(pills.slice(0, 25))}`);
     await sleep(1200);
-    await c.evalExpr(OPEN_BAND_LIST);
+    const openedList = await openEffectsSection(c, SECTION_TILE_ANIMATIONS);
+    if (openedList.tab === 'no-tab') {
+      throw new Error('the Effects sub-tab bar is not on screen, so the tile-animation sections '
+        + 'cannot be reached at all');
+    }
     await sleep(400);
-    const openedNewBand = await c.evalExpr(OPEN_NEW_BAND);
-    if (openedNewBand === 'no-section') throw new Error('no "New band" section on screen');
+    const openedNewBand = await openEffectsSection(c, SECTION_NEW_TILE_ANIMATION);
+    if (openedNewBand.section === 'no-section') {
+      throw new Error(`no ${SECTION_NEW_TILE_ANIMATION} section on screen `
+        + `(tab=${openedNewBand.tab}, list=${JSON.stringify(openedList)})`);
+    }
     await sleep(900);
 
     const headings = await c.json(
       `[...document.querySelectorAll('span')].map(e => (e.textContent||'').trim())
-        .filter(t => /^(BG animation bands|New band$|From existing tiles$|From new art$|Scenes$)/.test(t))`);
+        .filter(t => /^(Tile animations|New tile animation$|From existing tiles$|From new art$|Scenes$)/.test(t))`);
     check('2b', 'the BAND panel is mounted — its own headings, not the scene panel\'s [instrument check]',
-      headings.some((h) => h.startsWith('BG animation bands'))
-      && headings.includes('New band')
+      headings.some((h) => h.startsWith('Tile animations'))
+      && headings.includes('New tile animation')
       // BOTH sources named, which is what makes them peers on screen rather
       // than one control and one escape hatch.
       && headings.includes('From existing tiles') && headings.includes('From new art'),
@@ -548,10 +547,12 @@ async function main() {
       created && created.driverIsExplicit === false && DRIVERS.includes(created.driver),
       `driver=${created && created.driver} explicit=${created && created.driverIsExplicit}`);
     check('5g', 'the new band is on screen in the list, with its index',
-      // "Band N", not "#N": ROADMAP item 41 moved the band card's index into
-      // the shared label column, where it titles the card the way "Layer N"
-      // titles a layer card. The index is still what identifies the row.
-      (await c.evalExpr(`(document.body.innerText||'').includes('Band ${bands1.length - 1}')`)) === true);
+      // "Tile animation N", not "#N": ROADMAP item 41 moved the card's index
+      // into the shared label column, where it titles the card the way
+      // "Layer N" titles a layer card, and the vocabulary rename made the noun
+      // "Tile animation" (BgAnimBandPanel.tsx, `<Field label={`Tile animation
+      // ${b.index}`}>`). The index is still what identifies the row.
+      (await c.evalExpr(`(document.body.innerText||'').includes('Tile animation ${bands1.length - 1}')`)) === true);
     await shot(c, '2-after-promote');
 
     // ═══ SECTIONS 6 AND 7 NEED 5c TO HAVE LANDED ═══
@@ -587,7 +588,7 @@ async function main() {
       // 6a — the saturated state. Both controls are on screen; one is spendable
       // and the other is not, with the reason attached rather than a dead button.
       const promoteCtl0 = await c.json(CONTROL_BY_TEXT('/^Promote$/'));
-      const addCtl0 = await c.json(CONTROL_BY_TEXT('/^Add band$/'));
+      const addCtl0 = await c.json(CONTROL_BY_TEXT('/^Add$/', 'button', SECTION_NEW_TILE_ANIMATION));
       check('6a', 'on a SATURATED document both doors are on screen as peers — Promote spendable, '
         + 'Add not',
         !!promoteCtl0 && !!addCtl0 && promoteCtl0.disabled === false && addCtl0.disabled === true,
@@ -605,7 +606,7 @@ async function main() {
       // 6c — free slots by REMOVING the band, through the real two-click flow.
       // ARIA-LABEL ONLY — see clickByAria. Matching the combined text+label
       // haystack finds nothing here, silently, whichever half you anchor to.
-      const removedFirstClick = await c.evalExpr(clickByAria('/^Remove band \\d+$/'));
+      const removedFirstClick = await c.evalExpr(clickByAria('/^Remove tile animation \\d+$/'));
       await sleep(600);
       const afterFirstRemove = await c.json('window.__dbg.aeon.bands()');
       const confirmChip = await c.json(CONTROL_BY_TEXT('/^Remove and blank those cells$/'));
@@ -637,12 +638,12 @@ async function main() {
         + `${budget2.tileSlotsRemaining} (band was ${created.tileCount} slots)`);
 
       // 6e — the SAME document, now with room. Insertion is simply available.
-      const addCtl1 = await c.json(CONTROL_BY_TEXT('/^Add band$/'));
+      const addCtl1 = await c.json(CONTROL_BY_TEXT('/^Add$/', 'button', SECTION_NEW_TILE_ANIMATION));
       check('6e', 'with slots free, Add is spendable on the very same document — insertion is a '
         + 'peer, not a fallback',
         budget2.tileSlotsRemaining > 0 && !!addCtl1 && addCtl1.disabled === false,
         `free=${budget2.tileSlotsRemaining} add=${JSON.stringify(addCtl1)}`);
-      const added = await c.evalExpr(clickByText('/^Add band$/'));
+      const added = await c.evalExpr(clickByText('/^Add$/', 'button', SECTION_NEW_TILE_ANIMATION));
       await sleep(900);
       const bandsAfterAdd = await c.json('window.__dbg.aeon.bands()');
       const budget3 = await c.json('window.__dbg.aeon.bandBudget()');

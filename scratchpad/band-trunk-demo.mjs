@@ -32,7 +32,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import * as http from 'node:http';
 import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
-import { runTarget, announceRunRoot } from './lib/run-root.mjs';
+import { runTarget, announceRunRoot, assertDebugBuild } from './lib/run-root.mjs';
+import { openEffectsSection, SECTION_TILE_ANIMATIONS } from './lib/effects-sections.mjs';
 
 const PORT = Number(process.env.PORT ?? 9401);
 const ROOT = AURORA_DIR;
@@ -42,6 +43,10 @@ const ROOT = AURORA_DIR;
 // in; `announceRunRoot` prints which tree was chosen and marks it BORROWED when
 // it is not this one. See scratchpad/lib/run-root.mjs.
 const RUN = announceRunRoot(runTarget(ROOT));
+// Every row below reads `window.__dbg`, which only a debug build has
+// (BUILD-FLAVOUR-INVISIBLE). Refused here, naming the command, rather than
+// several hundred lines down on an absent hook.
+assertDebugBuild(RUN);
 const ELECTRON = RUN.electron;      // still honours ELECTRON_BIN
 const MAIN = RUN.main;
 const LIVE_AEON = siblingPathOrUnresolved('aeon');
@@ -133,23 +138,9 @@ const clickByText = (re, tag = 'button') => String.raw`
   return true;
 })()`;
 
-/** Open a collapsible section by its header text (bands arrive COLLAPSED, item 49). */
-const OPEN_SECTION = (re) => String.raw`
-(() => {
-  const isHeader = (el) => {
-    if (el.tagName !== 'DIV') return false;
-    const cs = getComputedStyle(el);
-    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
-      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN';
-  };
-  const hdr = [...document.querySelectorAll('div')].filter(isHeader)
-    .find((h) => ${re}.test((h.firstElementChild.textContent || '').trim()));
-  if (!hdr) return 'no-section';
-  const open = hdr.parentElement.parentElement.children.length > 1;
-  if (open) return 'already-open';
-  hdr.click();
-  return 'clicked';
-})()`;
+// The by-header-text section opener that used to live here is gone: it read a
+// TITLE, and the tile-animation titles moved (BGANIM-HARNESS-REPAIR). Sections
+// are opened through `lib/effects-sections.mjs`, by the id the app routes on.
 
 /** The composer canvas: crosshair cursor, aspect = cols/rows. */
 const CROSSHAIR_CANVASES = String.raw`
@@ -235,9 +226,13 @@ async function main() {
     // 1 — the Effects facet: the band card and its bank strip
     // =====================================================================
     await facet('Effects');
-    const sect = await c.evalExpr(OPEN_SECTION('/^BG animation bands/'));
+    // BGANIM-HARNESS-REPAIR: by SECTION ID, and through its sub-tab. The
+    // title this used to match (`BG animation bands`) was retired by the
+    // tile-animation vocabulary rename, and the section moved behind a sub-tab
+    // the facet does not arrive on. See scratchpad/lib/effects-sections.mjs.
+    const sect = await openEffectsSection(c, SECTION_TILE_ANIMATIONS);
     await sleep(700);
-    note(`"BG animation bands" section: ${sect} (it ARRIVES collapsed — item 49)`);
+    note(`${SECTION_TILE_ANIMATIONS}: ${JSON.stringify(sect)} (it ARRIVES collapsed — item 49)`);
     const bands = await c.json('window.__dbg.aeon.bands()');
     const band0 = bands[0];
     note(`band 0: ${band0.cols} cols x ${band0.rows} rows = ${band0.tileCount} slots, `
