@@ -1,0 +1,370 @@
+{
+  "dpr": 1,
+  "chunkId": "OJZ_00",
+  "chunkMeta": {
+    "name": "OJZ $00",
+    "widthTiles": 16,
+    "heightTiles": 16,
+    "nonzeroTiles": 128
+  },
+  "plan": {
+    "cx": 1,
+    "cy": 0,
+    "px": 404,
+    "py": 167,
+    "dp": {
+      "px": 12,
+      "py": 4
+    },
+    "collIndex": 0,
+    "empty2": {
+      "cx": 3,
+      "cy": 0,
+      "px": 532,
+      "py": 167,
+      "dp": {
+        "px": 28,
+        "py": 4
+      }
+    },
+    "atlas": {
+      "cx": 0,
+      "cy": 0,
+      "px": 340,
+      "py": 167,
+      "dp": {
+        "px": 4,
+        "py": 4
+      },
+      "atlasTile": 0
+    },
+    "zoom": 8,
+    "rect": {
+      "x": 308,
+      "y": 135,
+      "width": 1024,
+      "height": 1024,
+      "top": 135,
+      "right": 1332,
+      "bottom": 1159,
+      "left": 308
+    },
+    "size": {
+      "w": 1024,
+      "h": 1024
+    },
+    "widthTiles": 16,
+    "heightTiles": 16
+  },
+  "ladder": {
+    "start": 628154474,
+    "e1": 218895101,
+    "e2": 3069218194,
+    "e3": 3765034709
+  },
+  "redo": {
+    "zoneAfterStroke": 395238756,
+    "zoneAfterUndo1": 3765034709,
+    "zoneAfterRedo1": 395238756,
+    "chipDisabledAtUndo": false,
+    "canRedoAtUndo": true,
+    "docPixel": [
+      0,
+      1,
+      0,
+      1
+    ],
+    "canvas": [
+      3137667855,
+      1486512426,
+      3137667855,
+      1486512426
+    ],
+    "downLadder": [
+      3765034709,
+      3069218194,
+      218895101,
+      628154474
+    ],
+    "upLadder": [
+      218895101,
+      3069218194,
+      3765034709,
+      395238756
+    ],
+    "shiftDown": 3765034709,
+    "shiftUp": 395238756
+  },
+  "results": [
+    {
+      "id": "0a",
+      "name": "window.__dbg exists (VITE_AURORA_DEBUG=1 build) [precondition]",
+      "ok": true
+    },
+    {
+      "id": "0a2",
+      "name": "the read-only canRedo() hook is present in this build [precondition]",
+      "ok": true
+    },
+    {
+      "id": "0b",
+      "name": "the fixture aeon project is open with sections [precondition]",
+      "ok": true
+    },
+    {
+      "id": "0c",
+      "name": "the Art facet is focused [precondition]",
+      "ok": true
+    },
+    {
+      "id": "0d",
+      "name": "the open zone has a tileset the zone-art witness can read [precondition]",
+      "ok": true
+    },
+    {
+      "id": "0e",
+      "name": "the Chunk Library panel is on screen with cells to open [precondition]",
+      "ok": true
+    },
+    {
+      "id": "A0",
+      "name": "a CHUNK document with an EMPTY, on-screen cell is open [precondition]",
+      "ok": true
+    },
+    {
+      "id": "A0b",
+      "name": "the two further aims row X needs: a SECOND empty cell, and an ATLAS-BACKED one (census path P3a from the same document)",
+      "ok": null
+    },
+    {
+      "id": "A1",
+      "name": "BOTH history chips are present, and both are DISABLED before anything is edited [precondition]",
+      "ok": true
+    },
+    {
+      "id": "Z0",
+      "name": "the tileset panel grid canvas is uniquely identifiable AND on screen [precondition]",
+      "ok": true
+    },
+    {
+      "id": "Z0b",
+      "name": "answered the open guard while opening the live tile",
+      "ok": null
+    },
+    {
+      "id": "Z1",
+      "name": "a LIVE-TILE document is open (the tileset panel names the atlas tile) [precondition]",
+      "ok": true
+    },
+    {
+      "id": "Z2",
+      "name": "the live-tile composer canvas is measurable [precondition]",
+      "ok": true
+    },
+    {
+      "id": "Z3",
+      "name": "THREE real zone-art edits landed on the zone-art stack [precondition]",
+      "ok": true
+    },
+    {
+      "id": "Z4",
+      "name": "the four ladder values are DISTINCT, so every rung below is identifiable [precondition]",
+      "ok": true
+    },
+    {
+      "id": "Z5",
+      "name": "REDO is disabled after three fresh edits and no undo [precondition]",
+      "ok": true
+    },
+    {
+      "id": "B0x",
+      "name": "answered the open guard while opening the chunk",
+      "ok": null
+    },
+    {
+      "id": "B0",
+      "name": "re-opened the SAME chunk from its library cell (\"OJZ $00: blank (transparent) chunk; stamping it erases the area\")",
+      "ok": null
+    },
+    {
+      "id": "B1",
+      "name": "the SAME chunk document is open again [precondition]",
+      "ok": true
+    },
+    {
+      "id": "B2",
+      "name": "closing the live-tile document did NOT revert the three zone-art edits [control]",
+      "ok": true
+    },
+    {
+      "id": "B3",
+      "name": "the aimed cell is EMPTY again on the re-opened document [precondition]",
+      "ok": true
+    },
+    {
+      "id": "B4",
+      "name": "the aim still lands in the EMPTY cell it was chosen from [precondition]",
+      "ok": true
+    },
+    {
+      "id": "R0aim",
+      "name": "the Pencil is armed and its aim still lands in cell (1,0) [precondition]",
+      "ok": true
+    },
+    {
+      "id": "R0a",
+      "name": "the pencil stroke LANDS on the chunk document [precondition]",
+      "ok": true
+    },
+    {
+      "id": "R0b",
+      "name": "the pencil stroke moves the zone-art witness to ITS OWN new value, not onto any rung of the ladder [precondition]",
+      "ok": true
+    },
+    {
+      "id": "R0",
+      "name": "REDO is still disabled after the doc-local gesture and before any undo",
+      "ok": true
+    },
+    {
+      "id": "R1",
+      "name": "what the first Ctrl+Z after the doc-local gesture actually did",
+      "ok": null
+    },
+    {
+      "id": "R1v",
+      "name": "the first Ctrl+Z takes back the AUTHOR'S OWN gesture and leaves the third zone-art edit intact [precondition]",
+      "ok": true
+    },
+    {
+      "id": "R2a",
+      "name": "CELL 2 — the Redo CHIP is ENABLED at the moment the undone gesture could be re-applied",
+      "ok": true
+    },
+    {
+      "id": "R2b",
+      "name": "CELL 2 — the store agrees: focusedHistory().canRedo is true",
+      "ok": true
+    },
+    {
+      "id": "R3",
+      "name": "CELL 1 — REDO RE-APPLIES the author's own gesture, bit for bit",
+      "ok": true
+    },
+    {
+      "id": "R4",
+      "name": "CELL 3 — the two presses walk the author's own stroke out and back",
+      "ok": true
+    },
+    {
+      "id": "R4b",
+      "name": "the canvas hash across the whole press sequence, reported and asserted on NOTHING",
+      "ok": null
+    },
+    {
+      "id": "R5",
+      "name": "the undo side has DEPTH: four presses walk the zone art down the author's own gesture and then all three rungs",
+      "ok": true
+    },
+    {
+      "id": "R6",
+      "name": "at the bottom the Undo chip is DISABLED and the Redo chip is ENABLED",
+      "ok": true
+    },
+    {
+      "id": "R7",
+      "name": "CELL 4 — each further Redo press restores one more rung, in order, up to and including the author's own gesture",
+      "ok": true
+    },
+    {
+      "id": "R8",
+      "name": "after the whole round trip the zone art is INTACT and so is the doc-local stroke",
+      "ok": true
+    },
+    {
+      "id": "R9",
+      "name": "at the top the Redo chip is DISABLED again (the redo side is exhausted)",
+      "ok": true
+    },
+    {
+      "id": "R10",
+      "name": "Ctrl+Shift+Z re-applies the undone step exactly as Ctrl+Y does",
+      "ok": true
+    },
+    {
+      "id": "S0aim",
+      "name": "the Tile stamp's aim still lands in cell (1,0) after the rail scrolled to it [precondition]",
+      "ok": true
+    },
+    {
+      "id": "S0",
+      "name": "the Tile stamp tool is armed [precondition]",
+      "ok": true
+    },
+    {
+      "id": "S1",
+      "name": "the tile stamp LANDS on the chunk document [precondition]",
+      "ok": true
+    },
+    {
+      "id": "S2",
+      "name": "the tile stamp moves no zone art — a `set-chunk` carries the nametable and touches no tile [precondition]",
+      "ok": true
+    },
+    {
+      "id": "S2b",
+      "name": "the Undo control at the moment of the tile stamp",
+      "ok": null
+    },
+    {
+      "id": "S3",
+      "name": "THE FINDING, third gesture: Ctrl+Z after a TILE STAMP leaves the zone-art edits alone",
+      "ok": true
+    },
+    {
+      "id": "S3b",
+      "name": "the tile stamp IS what that Ctrl+Z takes back",
+      "ok": true
+    },
+    {
+      "id": "S4",
+      "name": "Redo puts the tile stamp back, and the zone art is still where S2 left it",
+      "ok": true
+    },
+    {
+      "id": "X0aim",
+      "name": "the Pencil is armed and its aim still lands in cell (3,0) [precondition]",
+      "ok": true
+    },
+    {
+      "id": "X0",
+      "name": "a fresh stroke LANDED on the document and left the witness off every rung of the ladder [precondition]",
+      "ok": true
+    },
+    {
+      "id": "X1",
+      "name": "the Ctrl+Z takes back the author's OWN stroke and puts the zone art back exactly where the stroke found it [precondition]",
+      "ok": true
+    },
+    {
+      "id": "X1b",
+      "name": "Redo is offered at this instant",
+      "ok": null
+    },
+    {
+      "id": "X2aim",
+      "name": "the Pencil is armed and its aim still lands in cell (0,0) [precondition]",
+      "ok": true
+    },
+    {
+      "id": "X2",
+      "name": "the stroke on the ATLAS-BACKED cell IS a real zone-art command [precondition]",
+      "ok": true
+    },
+    {
+      "id": "X3",
+      "name": "the next real edit still truncates the redo side — and after the fix the only thing on it is the author's OWN undone gesture",
+      "ok": true
+    }
+  ]
+}
