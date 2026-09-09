@@ -590,13 +590,22 @@ describe('no present-tense claim contradicts the amendments below it', () => {
   it('still catches all four original offenders through the quote stripper', () => {
     const base = execFileSync('git', ['show', `${BASELINE_REV}:${CONTRACT_REL}`],
       { cwd: resolve(__dirname, '../..'), encoding: 'utf8' });
-    const old = JSON.parse(base) as Record<string, Record<string, never>>;
+    const old = JSON.parse(base) as {
+      constants: Record<string, { why?: string; authorities?: string[] }>;
+      invariants: Record<string, string>;
+    };
+    const period = old.constants.BGANIM_VIEW_DERIVED_PERIOD_PX;
+    // The baseline really has the two entries this control is about. Without
+    // this, a renamed key would give the row an empty `before` and a zero count,
+    // which reads as "the stripper hid everything" instead of "I looked in the
+    // wrong place".
+    expect(period, `${BASELINE_REV} has the period constant`).toBeDefined();
+    expect(period.authorities, 'and its authorities list').toBeDefined();
+    expect(old.invariants.viewTwins, 'and the viewTwins invariant').toBeDefined();
     const before: [string, string][] = [
-      ['constants.BGANIM_VIEW_DERIVED_PERIOD_PX.why',
-        String(old.constants.BGANIM_VIEW_DERIVED_PERIOD_PX.why)],
-      ...(old.constants.BGANIM_VIEW_DERIVED_PERIOD_PX.authorities as unknown as string[])
-        .map((a, i) => [`constants.BGANIM_VIEW_DERIVED_PERIOD_PX.authorities[${i}]`, a] as
-          [string, string]),
+      ['constants.BGANIM_VIEW_DERIVED_PERIOD_PX.why', String(period.why)],
+      ...period.authorities!.map((a, i) =>
+        [`constants.BGANIM_VIEW_DERIVED_PERIOD_PX.authorities[${i}]`, a] as [string, string]),
       ['invariants.viewTwins', String(old.invariants.viewTwins)],
     ];
     const caught = refusalClaims(before);
