@@ -175,7 +175,7 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
       });
       return {
         ok: r.ok, exitCode: r.exitCode, output: r.output, reloaded: r.reloaded,
-        reloadError: r.reloadError, missingEnv: r.missingEnv,
+        reloadError: r.reloadError, romPath: r.romPath, missingEnv: r.missingEnv,
         command: [r.plan.command, ...r.plan.args].join(' '),
         debugBuild: r.debugBuild,
         restoredTo: r.restoredTo,

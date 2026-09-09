@@ -31,12 +31,30 @@ const SERVED = [
 ];
 
 function fakeClient(opts: {
+  /**
+   * The project directory the build runs in. REQUIRED, and it is required
+   * because it was not: every aeon row in this file used to pair a throwaway
+   * project directory with a running ROM at `/engine/s4.bin`, i.e. a ROM from
+   * a different project entirely, and all of them were green. That pairing is
+   * the exact field defect of 2026-09-09 (a fresh aeon build, and the emulator
+   * handed a ROM from an unrelated experiment directory), written into the
+   * fixtures of the very rows that were supposed to be guarding it. Making it
+   * an option with a plausible default is how it comes back.
+   */
+  dir: string;
   failOn?: string; romPath?: string; wasRunning?: boolean;
+  /**
+   * A connected server with NOTHING loaded: `emulator/status` answers without a
+   * `romPath` at all. Distinct from a foreign ROM, and the two must not share a
+   * fixture: one means "we have no information", the other "we have information
+   * about somebody else".
+   */
+  noRom?: boolean;
   /** Methods this server does NOT serve — dropped from the advertised list. */
   unserved?: string[];
   /** Methods advertised but answered with -32601, the advertised-and-unimplemented shape. */
   notFoundOn?: string[];
-} = {}) {
+}) {
   const calls: string[] = [];
   const served = SERVED.filter((m) => !(opts.unserved ?? []).includes(m));
   return {
@@ -69,7 +87,9 @@ function fakeClient(opts: {
         throw Object.assign(new Error(`no such method: ${method}`), { code: -32601, method });
       }
       if (opts.failOn === method) throw new Error('reload refused');
-      if (method === 'emulator/status') return { romPath: opts.romPath ?? '/engine/s4.bin' };
+      if (method === 'emulator/status') {
+        return opts.noRom ? {} : { romPath: opts.romPath ?? join(opts.dir, 's4.bin') };
+      }
       if (method === 'emulator/pause') return { wasRunning: opts.wasRunning ?? true };
       return {};
     },
@@ -89,7 +109,7 @@ describe('runBuild', () => {
 
   it('reports a failing build with its error output, and does NOT reload', async () => {
     const dir = scriptDir('echo "ERROR: collision gate rejected section_3" >&2; exit 1');
-    const client = fakeClient();
+    const client = fakeClient({ dir });
     try {
       const r = await runBuild({ basePath: dir, client: client as never, env: {} });
       expect(r.ok).toBe(false);
@@ -117,7 +137,7 @@ describe('runBuild', () => {
    */
   it('reloads the ROM BEFORE loading the new symbols', async () => {
     const dir = scriptDir('exit 0');
-    const client = fakeClient();
+    const client = fakeClient({ dir });
     try {
       const r = await runBuild({ basePath: dir, client: client as never, env: {} });
       expect(r.reloaded).toBe(true);
@@ -143,7 +163,7 @@ describe('runBuild', () => {
 
   it('separates a good build from a failed handoff', async () => {
     const dir = scriptDir('exit 0');
-    const client = fakeClient({ failOn: 'emulator/reload_rom' });
+    const client = fakeClient({ dir, failOn: 'emulator/reload_rom' });
     try {
       const r = await runBuild({ basePath: dir, client: client as never, env: {} });
       // "Your build is broken" and "the emulator did not pick it up" are
@@ -207,20 +227,20 @@ describe('runBuild and which ROM is actually running', () => {
    */
   it('reloads the ROM the emulator reports, not the configured default', async () => {
     const dir = scriptDir('exit 0');
-    const client = fakeClient({ romPath: '/engine/s4.debug.bin' });
+    const client = fakeClient({ dir, romPath: join(dir, 's4.debug.bin') });
     try {
       const r = await runBuild({ basePath: dir, client: client as never, env: {} });
-      expect(r.romPath).toBe('/engine/s4.debug.bin');
-      expect(client.calls).toContain('emulator/reload_rom:/engine/s4.debug.bin');
+      expect(r.romPath).toBe(join(dir, 's4.debug.bin'));
+      expect(client.calls).toContain(`emulator/reload_rom:${join(dir, 's4.debug.bin')}`);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
   it('derives the listing from that ROM so the pair cannot drift', async () => {
     const dir = scriptDir('exit 0');
-    const client = fakeClient({ romPath: '/engine/s4.debug.bin' });
+    const client = fakeClient({ dir, romPath: join(dir, 's4.debug.bin') });
     try {
       await runBuild({ basePath: dir, client: client as never, env: {} });
-      expect(client.calls).toContain('load_symbols:/engine/s4.debug.lst');
+      expect(client.calls).toContain(`load_symbols:${join(dir, 's4.debug.lst')}`);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
@@ -238,7 +258,7 @@ describe('runBuild and the build flavour', () => {
    */
   it('builds DEBUG when the emulator is running a .debug.bin', async () => {
     const dir = scriptDir('echo "DEBUG=$DEBUG"; exit 0');
-    const client = fakeClient({ romPath: '/engine/s4.debug.bin' });
+    const client = fakeClient({ dir, romPath: join(dir, 's4.debug.bin') });
     try {
       const r = await runBuild({ basePath: dir, client: client as never, env: {} });
       expect(r.debugBuild).toBe(true);
@@ -250,7 +270,7 @@ describe('runBuild and the build flavour', () => {
     // Correctness beats preference: building debug here would leave the reload
     // pointing at a file the build never touched.
     const dir = scriptDir('echo "DEBUG=[$DEBUG]"; exit 0');
-    const client = fakeClient({ romPath: '/engine/s4.bin' });
+    const client = fakeClient({ dir, romPath: join(dir, 's4.bin') });
     try {
       const r = await runBuild({ basePath: dir, client: client as never, env: {} });
       expect(r.debugBuild).toBe(false);
@@ -271,7 +291,7 @@ describe('runBuild and the build flavour', () => {
 
   it('lets project.json state the flavour explicitly, beating both', async () => {
     const dir = scriptDir('echo "DEBUG=[$DEBUG]"; exit 0');
-    const client = fakeClient({ romPath: '/engine/s4.debug.bin' });
+    const client = fakeClient({ dir, romPath: join(dir, 's4.debug.bin') });
     try {
       const r = await runBuild({
         basePath: dir, client: client as never, env: {},
@@ -294,7 +314,7 @@ describe('runBuild and the reload pause gate', () => {
    */
   it('pauses before reloading and resumes afterwards', async () => {
     const dir = scriptDir('exit 0');
-    const client = fakeClient({ wasRunning: true });
+    const client = fakeClient({ dir, wasRunning: true });
     try {
       await runBuild({ basePath: dir, client: client as never, env: {} });
       const order = client.calls.map((c) => c.split(':')[0]);
@@ -308,7 +328,7 @@ describe('runBuild and the reload pause gate', () => {
 
   it('leaves a machine that was already paused paused', async () => {
     const dir = scriptDir('exit 0');
-    const client = fakeClient({ wasRunning: false });
+    const client = fakeClient({ dir, wasRunning: false });
     try {
       await runBuild({ basePath: dir, client: client as never, env: {} });
       expect(client.calls.map((c) => c.split(':')[0])).not.toContain('emulator/resume');
@@ -317,7 +337,7 @@ describe('runBuild and the reload pause gate', () => {
 
   it('resumes even when the reload itself fails', async () => {
     const dir = scriptDir('exit 0');
-    const client = fakeClient({ wasRunning: true, failOn: 'emulator/reload_rom' });
+    const client = fakeClient({ dir, wasRunning: true, failOn: 'emulator/reload_rom' });
     try {
       const r = await runBuild({ basePath: dir, client: client as never, env: {} });
       expect(r.ok).toBe(true);
@@ -462,6 +482,8 @@ describe('runBuild and the position restore (boot override + warp fallback)', ()
   const rHex = (n: number) => '0x' + (n >>> 0).toString(16).toUpperCase();
 
   function restoreFake(opts: {
+    /** The project directory the build runs in; see fakeClient's `dir`. */
+    dir: string;
     /** Player pixel position seeded into RAM before the build (16.16 fixed). */
     playerAt: { x: number; y: number };
     /** Which symbols this ROM carries (default: all of RSYM). */
@@ -526,7 +548,7 @@ describe('runBuild and the position restore (boot override + warp fallback)', ()
           if (running) throw new Error(`${method} needs the machine paused; call emulator/pause first`);
         };
         switch (method) {
-          case 'emulator/status': return { romPath: '/engine/s4.debug.bin' };
+          case 'emulator/status': return { romPath: join(opts.dir, 's4.debug.bin') };
           case 'emulator/pause': { const was = running; running = false; return { wasRunning: was }; }
           case 'emulator/resume': running = true; tick(); return {};
           case 'emulator/reload_rom': requirePaused(); return {};
@@ -556,7 +578,7 @@ describe('runBuild and the position restore (boot override + warp fallback)', ()
   it('restores via the boot override, inside the pre-resume window', async () => {
     const dir = scriptDir('exit 0');
     const at = { x: 0x0234, y: 0x0567 }; // within the fixture bounds
-    const f = restoreFake({ playerAt: at });
+    const f = restoreFake({ dir, playerAt: at });
     try {
       const r = await runBuild({ basePath: dir, client: f.client as never, env: {} });
       expect(r.reloaded).toBe(true);
@@ -592,7 +614,7 @@ describe('runBuild and the position restore (boot override + warp fallback)', ()
     // Saved position beyond the fixture bounds -> the engine clamps and
     // publishes back; the expectation is computed with the same Math.min.
     const at = { x: R_BOUND_X + 0x100, y: R_BOUND_Y + 0x80 };
-    const f = restoreFake({ playerAt: at });
+    const f = restoreFake({ dir, playerAt: at });
     try {
       const r = await runBuild({ basePath: dir, client: f.client as never, env: {} });
       expect(r.restoredVia).toBe('boot-override');
@@ -605,7 +627,7 @@ describe('runBuild and the position restore (boot override + warp fallback)', ()
     const at = { x: 0x0234, y: 0x0567 };
     const noBoot = Object.fromEntries(Object.entries(RSYM)
       .filter(([k]) => !k.startsWith('Boot_At_')));
-    const f = restoreFake({ playerAt: at, symbols: noBoot });
+    const f = restoreFake({ dir, playerAt: at, symbols: noBoot });
     try {
       const r = await runBuild({ basePath: dir, client: f.client as never, env: {} });
       expect(r.reloaded).toBe(true);
@@ -622,6 +644,7 @@ describe('runBuild and the position restore (boot override + warp fallback)', ()
   it('restores nothing, and still succeeds, when NEITHER mailbox exists (release ROM)', async () => {
     const dir = scriptDir('exit 0');
     const f = restoreFake({
+      dir,
       playerAt: { x: 0x0100, y: 0x0100 },
       symbols: { Player_1: RSYM.Player_1 }, // position readable; no mailboxes
     });
@@ -637,7 +660,7 @@ describe('runBuild and the position restore (boot override + warp fallback)', ()
   it('leaves a machine somebody else stopped STOPPED, and still restores', async () => {
     const dir = scriptDir('exit 0');
     const at = { x: 0x0234, y: 0x0567 };
-    const f = restoreFake({ playerAt: at, running: false });
+    const f = restoreFake({ dir, playerAt: at, running: false });
     try {
       const r = await runBuild({ basePath: dir, client: f.client as never, env: {} });
       expect(r.restoredVia).toBe('boot-override');
@@ -649,7 +672,7 @@ describe('runBuild and the position restore (boot override + warp fallback)', ()
 
   it('honours restorePosition: false by never touching either mailbox', async () => {
     const dir = scriptDir('exit 0');
-    const f = restoreFake({ playerAt: { x: 0x0100, y: 0x0100 } });
+    const f = restoreFake({ dir, playerAt: { x: 0x0100, y: 0x0100 } });
     try {
       const r = await runBuild({ basePath: dir, client: f.client as never, env: {}, restorePosition: false });
       expect(r.reloaded).toBe(true);
@@ -668,7 +691,7 @@ describe('runBuild and the position restore (boot override + warp fallback)', ()
    */
   it('still reloads when the position lookup is unserved, and names it instead of losing it', async () => {
     const dir = scriptDir('exit 0');
-    const f = restoreFake({ playerAt: { x: 0x0234, y: 0x0567 }, unserved: ['emulator/lookup_symbol'] });
+    const f = restoreFake({ dir, playerAt: { x: 0x0234, y: 0x0567 }, unserved: ['emulator/lookup_symbol'] });
     try {
       const r = await runBuild({ basePath: dir, client: f.client as never, env: {} });
       expect(r.ok).toBe(true);
@@ -691,7 +714,7 @@ describe('runBuild and the position restore (boot override + warp fallback)', ()
     // version of this row left `Player_1` resolvable, which meant it never
     // reached that catch and was quietly measuring a different gate — a planted
     // violation there came back green and said so.
-    const f = restoreFake({ playerAt: { x: 0x0234, y: 0x0567 }, symbols: {} });
+    const f = restoreFake({ dir, playerAt: { x: 0x0234, y: 0x0567 }, symbols: {} });
     try {
       const r = await runBuild({ basePath: dir, client: f.client as never, env: {} });
       expect(r.reloaded).toBe(true);
@@ -715,7 +738,7 @@ describe('runBuild on a classic (S1) project', () => {
   }
 
   /** fakeClient plus a record of which symbols were resolved. */
-  function recordingClient(opts: { romPath?: string } = {}) {
+  function recordingClient(opts: { dir: string; romPath?: string }) {
     const c = fakeClient(opts);
     const resolves: string[] = [];
     return {
@@ -749,7 +772,7 @@ describe('runBuild on a classic (S1) project', () => {
     // over "s1built.lst", a file AS never writes. The listing is sonic.lst,
     // named after sonic.asm (s1disasm common.lua:773, `-L`).
     const dir = classicDir('print("ok")');
-    const client = recordingClient({ romPath: join(dir, 's1built.bin') });
+    const client = recordingClient({ dir, romPath: join(dir, 's1built.bin') });
     try {
       const r = await runBuild({ basePath: dir, projectType: 'classic', client: client as never, env: {} });
       expect(r.reloaded).toBe(true);
@@ -768,7 +791,7 @@ describe('runBuild on a classic (S1) project', () => {
   // gap left unfilled.
   it('attempts NO position restore: a reload resets S1 to the SEGA screen', async () => {
     const dir = classicDir('print("ok")');
-    const client = recordingClient({ romPath: join(dir, 's1built.bin') });
+    const client = recordingClient({ dir, romPath: join(dir, 's1built.bin') });
     try {
       const r = await runBuild({ basePath: dir, projectType: 'classic', client: client as never, env: {} });
       expect(r.ok).toBe(true);
@@ -788,7 +811,7 @@ describe('runBuild on a classic (S1) project', () => {
   it('a DECLARED symbolsPath beats the ROM-stem derivation on aeon too', async () => {
     // Same rule, other family: stated config outranks anything inferred.
     const dir = scriptDir('exit 0');
-    const client = fakeClient({ romPath: '/engine/s4.debug.bin' });
+    const client = fakeClient({ dir, romPath: join(dir, 's4.debug.bin') });
     try {
       await runBuild({
         basePath: dir, client: client as never, env: {},
@@ -803,11 +826,11 @@ describe('runBuild on a classic (S1) project', () => {
     // The behaviour the derivation exists FOR: s4.debug.bin pairs with
     // s4.debug.lst without a second config field to get out of step.
     const dir = scriptDir('exit 0');
-    const client = fakeClient({ romPath: '/engine/s4.debug.bin' });
+    const client = fakeClient({ dir, romPath: join(dir, 's4.debug.bin') });
     try {
       await runBuild({ basePath: dir, client: client as never, env: {}, restorePosition: false });
       const sym = client.calls.find((c) => c.startsWith('load_symbols:'));
-      expect(sym).toBe('load_symbols:/engine/s4.debug.lst');
+      expect(sym).toBe(`load_symbols:${join(dir, 's4.debug.lst')}`);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
@@ -828,7 +851,7 @@ describe('runBuild on a classic (S1) project', () => {
 describe('runBuild against a server that does not serve what it needs', () => {
   it('builds, then REFUSES the reload rather than guessing which ROM is loaded', async () => {
     const dir = scriptDir('echo building; exit 0');
-    const client = fakeClient({ unserved: ['emulator/status'] });
+    const client = fakeClient({ dir, unserved: ['emulator/status'] });
     try {
       const r = await runBuild({ basePath: dir, client: client as never, env: {} });
 
@@ -860,7 +883,7 @@ describe('runBuild against a server that does not serve what it needs', () => {
    */
   it('refuses the same way when status is ADVERTISED but answers -32601', async () => {
     const dir = scriptDir('exit 0');
-    const client = fakeClient({ notFoundOn: ['emulator/status'] });
+    const client = fakeClient({ dir, notFoundOn: ['emulator/status'] });
     try {
       const r = await runBuild({ basePath: dir, client: client as never, env: {} });
       // ANTI-VACUOUS: the call really was made — this is the reply route, not
@@ -893,7 +916,7 @@ describe('runBuild against a server that does not serve what it needs', () => {
 
   it('refuses BEFORE pausing when reload_rom is unserved', async () => {
     const dir = scriptDir('exit 0');
-    const client = fakeClient({ unserved: ['emulator/reload_rom'] });
+    const client = fakeClient({ dir, unserved: ['emulator/reload_rom'] });
     try {
       const r = await runBuild({ basePath: dir, client: client as never, env: {} });
       expect(r.reloaded).toBe(false);
@@ -901,6 +924,229 @@ describe('runBuild against a server that does not serve what it needs', () => {
       // Discovering the gap after `emulator/pause` would leave a live machine
       // stopped, still running the old ROM, under a "Build succeeded" toast.
       expect(client.calls.filter((c) => c.startsWith('emulator/pause'))).toEqual([]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
+
+/**
+ * THE ROM FROM ANOTHER PROJECT.
+ *
+ * Reported by the owner, 2026-09-09: Ctrl+Shift+B, "build successful", the
+ * emulator reloads, and the chunk he had just edited is not in the game. What
+ * actually happened, measured: the build SUCCEEDED and wrote a fresh, correct
+ * `aeon/s4.debug.bin` containing his chunk, and Aurora then asked the emulator
+ * to reload a completely different ROM, from an unrelated experiment directory,
+ * two and a half hours old. He got a real reload of a stale file. The position
+ * was not restored either, because that ROM is not the build whose boot
+ * override the restore keys on.
+ *
+ * The cause is not the preference for the running ROM, which is right: the
+ * plan's default is `s4.bin` and the emulator is usually on `s4.debug.bin`, so
+ * reloading the configured default would swap the debug ROM for the release one
+ * and silently remove the symbols a feature depends on. The cause is that the
+ * preference was UNBOUNDED ON A SECOND AXIS. It asks "what file is loaded" and
+ * never "is that even this project's file".
+ *
+ * So the rule is: use the running ROM when it is the ROM this build produced,
+ * or its flavour sibling in the same directory. Otherwise REFUSE and name both
+ * paths, which is this file's own established answer to "we cannot know which
+ * ROM is loaded" one gate up.
+ *
+ * WHAT THESE ROWS ASSERT. Not the refusal's wording, except in the one row that
+ * is about the wording. A message row and a "nothing was reloaded" row are
+ * different claims, and this repo has already had a mutation that moved a
+ * refusal to AFTER the write and left the message row green. Every row below
+ * reads the CALL LOG.
+ */
+describe('runBuild and a ROM that belongs to another project', () => {
+  /** A project directory that is not the one being built. */
+  function foreignDir(): string {
+    return mkdtempSync(join(tmpdir(), 'aurora-other-project-'));
+  }
+
+  it('REFUSES the reload, and touches the machine not at all', async () => {
+    const dir = scriptDir('exit 0');
+    const other = foreignDir();
+    const client = fakeClient({ dir, romPath: join(other, 's4.debug.bin') });
+    try {
+      const r = await runBuild({ basePath: dir, client: client as never, env: {} });
+
+      // The build is not the casualty; only the handoff is refused.
+      expect(r.ok).toBe(true);
+      expect(r.exitCode).toBe(0);
+
+      // THE STATE ROWS. A refusal that still reloaded would be the defect with
+      // an apology attached.
+      expect(r.reloaded).toBe(false);
+      expect(r.romPath).toBeUndefined();
+      expect(client.calls.filter((c) => c.startsWith('emulator/reload_rom'))).toEqual([]);
+      expect(client.calls.filter((c) => c.startsWith('load_symbols'))).toEqual([]);
+      // And it refused BEFORE pausing: stopping somebody else's machine and
+      // then declining to reload it is worse than doing nothing.
+      expect(client.calls.filter((c) => c.startsWith('emulator/pause'))).toEqual([]);
+      expect(r.reloadError).toBeTruthy();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(other, { recursive: true, force: true });
+    }
+  });
+
+  it('names BOTH paths in the refusal, because either alone is unactionable', async () => {
+    // "It refused" sends nobody anywhere. The running ROM says what to close;
+    // the built one says what to open, and is the file the owner spent the
+    // build waiting for.
+    const dir = scriptDir('exit 0');
+    const other = foreignDir();
+    const client = fakeClient({ dir, romPath: join(other, 's4.debug.bin') });
+    try {
+      const r = await runBuild({ basePath: dir, client: client as never, env: {} });
+      expect(r.reloadError).toContain(join(other, 's4.debug.bin'));
+      // The DEBUG flavour is what this build wrote (nothing of ours is running,
+      // so the default applies), so that is the artifact the message must name.
+      expect(r.reloadError).toContain(join(dir, 's4.debug.bin'));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(other, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * THE CASE THE PREFERENCE EXISTS FOR, and the one a fix must not break. The
+   * running ROM is the DEBUG flavour of this project's own artifact: it is
+   * accepted, reloaded by name, and its listing derived from it.
+   */
+  it('still accepts the DEBUG flavour sibling of this project ROM', async () => {
+    const dir = scriptDir('exit 0');
+    const client = fakeClient({ dir, romPath: join(dir, 's4.debug.bin') });
+    try {
+      const r = await runBuild({ basePath: dir, client: client as never, env: {} });
+      expect(r.reloaded).toBe(true);
+      expect(r.romPath).toBe(join(dir, 's4.debug.bin'));
+      expect(client.calls).toContain(`emulator/reload_rom:${join(dir, 's4.debug.bin')}`);
+      expect(client.calls).toContain(`load_symbols:${join(dir, 's4.debug.lst')}`);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('still accepts the release artifact itself', async () => {
+    const dir = scriptDir('exit 0');
+    const client = fakeClient({ dir, romPath: join(dir, 's4.bin') });
+    try {
+      const r = await runBuild({ basePath: dir, client: client as never, env: {} });
+      expect(r.reloaded).toBe(true);
+      expect(r.romPath).toBe(join(dir, 's4.bin'));
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  /**
+   * THE ROW A BARE BASENAME RULE FAILS. Two projects both have an `s4.bin`;
+   * the owner's stale ROM was called `s4.debug.bin`, exactly like the fresh one.
+   * The name is the least discriminating thing about it.
+   */
+  it('refuses a ROM with the SAME NAME in a different directory', async () => {
+    const dir = scriptDir('exit 0');
+    const other = foreignDir();
+    const client = fakeClient({ dir, romPath: join(other, 's4.bin') });
+    try {
+      const r = await runBuild({ basePath: dir, client: client as never, env: {} });
+      expect(r.reloaded).toBe(false);
+      expect(client.calls.filter((c) => c.startsWith('emulator/reload_rom'))).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(other, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * THE ROW A DIRECTORY-ONLY RULE FAILS. aeon's build.sh emits `s4.bin` AND
+   * `demo.bin` into the same tree since the engine/game split, so "beside the
+   * artifact" is not the same claim as "is the artifact".
+   */
+  it('refuses a DIFFERENT artifact sitting in the same directory', async () => {
+    const dir = scriptDir('exit 0');
+    const client = fakeClient({ dir, romPath: join(dir, 'demo.bin') });
+    try {
+      const r = await runBuild({ basePath: dir, client: client as never, env: {} });
+      expect(r.reloaded).toBe(false);
+      expect(client.calls.filter((c) => c.startsWith('emulator/reload_rom'))).toEqual([]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  /**
+   * ...and the same project having DECLARED that other artifact makes it this
+   * project's ROM. The rule is derived from the plan, not from the name `s4`.
+   */
+  it('accepts the declared artifact and its sibling when the project names one', async () => {
+    const dir = scriptDir('exit 0');
+    const client = fakeClient({ dir, romPath: join(dir, 'games/demo/demo.debug.bin') });
+    try {
+      const r = await runBuild({
+        basePath: dir, client: client as never, env: {},
+        raw: { romPath: 'games/demo/demo.bin' },
+      });
+      expect(r.reloaded).toBe(true);
+      expect(r.romPath).toBe(join(dir, 'games/demo/demo.debug.bin'));
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  /**
+   * A FOREIGN ROM MUST NOT PICK THE FLAVOUR EITHER. `wantsDebug` reads the
+   * running ROM's suffix, and reading it off someone else's ROM is the same
+   * unbounded question one step earlier: it decides which file this build
+   * WRITES. The discriminating fixture is a foreign RELEASE ROM, because that
+   * is the one whose answer (DEBUG=0) differs from the no-information default.
+   */
+  it('does not let another project ROM choose which flavour to build', async () => {
+    const dir = scriptDir('echo "DEBUG=[$DEBUG]"; exit 0');
+    const other = foreignDir();
+    const client = fakeClient({ dir, romPath: join(other, 's4.bin') });
+    try {
+      const r = await runBuild({ basePath: dir, client: client as never, env: {} });
+      expect(r.debugBuild).toBe(true);
+      expect(r.output.join('\n')).toContain('DEBUG=[1]');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(other, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * CLASSIC HAS NO FLAVOUR, so it has no sibling either. `build.lua` takes no
+   * switch and writes one artifact; an `s1built.debug.bin` is a file AS never
+   * wrote, and accepting one as "this project's ROM" would be the defect with a
+   * convention borrowed from the other engine family.
+   */
+  it('gives classic no debug sibling to be fooled by', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'aurora-classic-build-'));
+    writeFileSync(join(dir, 'build.lua'), 'print("ok")');
+    const client = fakeClient({ dir, romPath: join(dir, 's1built.debug.bin') });
+    try {
+      const r = await runBuild({
+        basePath: dir, projectType: 'classic', client: client as never, env: {},
+      });
+      expect(r.ok).toBe(true);
+      expect(r.reloaded).toBe(false);
+      expect(client.calls.filter((c) => c.startsWith('emulator/reload_rom'))).toEqual([]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  /**
+   * THE OTHER HALF OF THE SAME UNBOUNDEDNESS, found on the way in. When nothing
+   * is loaded the runner fell back to `join(cwd, plan.romPath)`, the RELEASE
+   * name, while having just built DEBUG, because DEBUG is the default with no
+   * running ROM to read. That reloads a file the build did not write, which is
+   * this parcel's defect in miniature. The fallback is now the artifact the
+   * chosen flavour actually produced.
+   */
+  it('falls back to the artifact the flavour WROTE, not to the release name', async () => {
+    const dir = scriptDir('exit 0');
+    // A connected server that reports no ROM loaded at all.
+    const client = fakeClient({ dir, noRom: true });
+    try {
+      const r = await runBuild({ basePath: dir, client: client as never, env: {} });
+      expect(r.debugBuild).toBe(true);
+      expect(r.reloaded).toBe(true);
+      expect(r.romPath).toBe(join(dir, 's4.debug.bin'));
+      expect(client.calls).toContain(`emulator/reload_rom:${join(dir, 's4.debug.bin')}`);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

@@ -24,8 +24,8 @@
  */
 
 import { spawn } from 'node:child_process';
-import { join } from 'node:path';
-import { existsSync } from 'node:fs';
+import { basename, dirname, extname, join, resolve as resolvePath } from 'node:path';
+import { existsSync, realpathSync } from 'node:fs';
 import type { AetherClient } from './client';
 import {
   buildPlanFor, summariseBuildOutput, type BuildPlan, type BuildProjectType,
@@ -53,7 +53,17 @@ export interface BuildRunResult {
   unservedMethods?: string[];
   /** True when the emulator was reloaded; false when no link was connected. */
   reloaded: boolean;
-  /** Which ROM was actually reloaded — the running one, not the configured guess. */
+  /**
+   * WHICH ROM WAS ACTUALLY RELOADED. Set only when `reloaded` is true, and it
+   * is the path the emulator was handed, never a guess about it.
+   *
+   * It is reported, and named in the toast, because the 2026-09-09 defect was a
+   * chain of individually honest links: the build succeeded, the reload
+   * happened, the toast said so, and the composite told the owner his edit had
+   * vanished. A link that names its object makes that class readable in one
+   * glance. It must be the PATH: both ROMs in that incident were called
+   * `s4.debug.bin`.
+   */
   romPath?: string;
   /** True when the build was run in DEBUG flavour to match the running ROM. */
   debugBuild?: boolean;
@@ -111,6 +121,119 @@ export interface BuildRunOptions {
   restorePosition?: boolean;
 }
 
+/**
+ * How a DEBUG artifact is named given the release one: `s4.bin` becomes
+ * `s4.debug.bin` (aeon's build.sh:37 suffixes the artifact name).
+ *
+ * ONE definition, because TWO decisions read it — which flavour to build, and
+ * which running ROM counts as this build's own — and a tree where those two
+ * disagree is this file's recurring defect seen from a new angle.
+ */
+export const DEBUG_ARTIFACT_SUFFIX = '.debug';
+
+/**
+ * The artifacts THIS project's build can write, absolute.
+ *
+ * DERIVED FROM THE PLAN, never from the literal name `s4`. A project that
+ * declares `romPath: "games/demo/demo.bin"` gets `demo.bin` and
+ * `demo.debug.bin` beside each other; a project that declares the debug
+ * artifact directly still names the same pair, because the release stem is
+ * recovered first.
+ */
+export function romFamilyFor(plan: BuildPlan): { release: string; debug: string | null } {
+  const built = resolvePath(plan.cwd, plan.romPath);
+  const ext = extname(built);
+  const stem = basename(built, ext);
+  const releaseStem = stem.endsWith(DEBUG_ARTIFACT_SUFFIX)
+    ? stem.slice(0, -DEBUG_ARTIFACT_SUFFIX.length)
+    : stem;
+  const dir = dirname(built);
+  return {
+    release: join(dir, `${releaseStem}${ext}`),
+    // CLASSIC HAS NO FLAVOUR AND SO NO SIBLING. `build.lua` takes no switch and
+    // writes one artifact; an `s1built.debug.bin` is a file AS never wrote, and
+    // admitting one to the family would let a ROM from somewhere else in on a
+    // convention borrowed from the other engine family.
+    debug: plan.projectType === 'classic'
+      ? null
+      : join(dir, `${releaseStem}${DEBUG_ARTIFACT_SUFFIX}${ext}`),
+  };
+}
+
+export interface RunningRomVerdict {
+  /** The running ROM, when it is one this project's build writes. */
+  ours: string | null;
+  /** The running ROM, when it belongs to some OTHER project. */
+  foreign: string | null;
+}
+
+/**
+ * WHOSE ROM IS THE EMULATOR RUNNING?
+ *
+ * The preference for the running ROM (see the reload block below) is right
+ * about its mechanism: the plan's default is `s4.bin`, the emulator is usually
+ * on `s4.debug.bin`, and reloading the configured default there would swap the
+ * debug ROM for the release one and silently remove the symbols a feature
+ * depends on. Ask the running machine rather than assuming.
+ *
+ * IT WAS UNBOUNDED ON A SECOND AXIS. The design means "ask which FLAVOUR you
+ * are on". The implementation asked "what file is loaded" and never checked it
+ * was even this project's file. The owner hit that on 2026-09-09: a correct
+ * fresh `aeon/s4.debug.bin` was built, and Aurora asked the emulator to reload
+ * a ROM from an unrelated experiment directory that happened to be loaded, two
+ * and a half hours old. He got a real reload of a stale file, his chunk was
+ * missing because it was a different ROM, and his position was not restored
+ * because that ROM is not the build whose boot override the restore keys on.
+ *
+ * THE RULE, and why it is this one:
+ *
+ *   • PATH IDENTITY ALONE IS TOO STRICT. It would reject `s4.debug.bin` against
+ *     a plan whose `romPath` is `s4.bin`, which is the single case the
+ *     preference exists for. So the family, not the file.
+ *   • A BARE BASENAME IS TOO LOOSE. Two projects both have an `s4.debug.bin`,
+ *     and in the incident BOTH ROMs were called exactly that. The name is the
+ *     least discriminating thing about the file.
+ *   • DIRECTORY MEMBERSHIP ALONE IS ALSO TOO LOOSE. aeon's build writes
+ *     `s4.bin` and `demo.bin` into one tree since the engine/game split, so
+ *     "beside the artifact" is not "is the artifact".
+ *
+ * So: the running ROM must BE one of the artifacts this plan's build writes,
+ * full path, and the pair is derived from `plan.cwd` + `plan.romPath` rather
+ * than from any literal. Anything else is refused by name, which is this file's
+ * own established answer to "we cannot know which ROM is loaded" one gate up.
+ *
+ * `canonical` exists so a checkout reached through a symlink is not refused for
+ * a difference nobody can see; it is injected so this stays pure and testable,
+ * the same shape `buildPlanFor` uses for `exists`.
+ */
+export function classifyRunningRom(
+  plan: BuildPlan,
+  runningRom: string | null,
+  canonical: (p: string) => string = (p) => resolvePath(p),
+): RunningRomVerdict {
+  if (runningRom === null || runningRom.length === 0) return { ours: null, foreign: null };
+  const family = romFamilyFor(plan);
+  const ours = [family.release, family.debug]
+    .filter((p): p is string => p !== null)
+    .map(canonical);
+  return ours.includes(canonical(runningRom))
+    ? { ours: runningRom, foreign: null }
+    : { ours: null, foreign: runningRom };
+}
+
+/**
+ * Compare paths without being fooled by a symlinked checkout, and without
+ * needing the file to exist: the DIRECTORY is resolved and the basename put
+ * back, so a debug sibling that was never written still compares correctly.
+ */
+function canonicalPath(p: string): string {
+  try {
+    return join(realpathSync(dirname(p)), basename(p));
+  } catch {
+    return resolvePath(p);
+  }
+}
+
 /** Spawn one command to completion, streaming its output. */
 function runOne(
   command: string,
@@ -160,7 +283,9 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
     } else {
       try {
         const status = await opts.client.call('emulator/status') as { romPath?: string };
-        runningRom = status?.romPath ?? null;
+        // `|| null`, not `?? null`: a connected server with nothing loaded can
+        // answer with an EMPTY romPath, and an empty string is not an answer.
+        runningRom = status?.romPath || null;
       } catch (e) {
         // Advertised and unimplemented is a real shape — only the reply proves
         // it, which is why this route exists alongside the check above.
@@ -178,6 +303,14 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
     exists: (rel) => existsSync(join(opts.basePath, rel)),
   });
   const classic = plan.projectType === 'classic';
+
+  // WHOSE ROM IS RUNNING — asked before the flavour, because BOTH answers below
+  // are only meaningful about THIS project. `classifyRunningRom` carries the
+  // argument for the rule; what matters here is the ordering: a foreign ROM
+  // must not pick the flavour either, since the flavour decides which file this
+  // build WRITES, and that is the same unbounded question one step earlier.
+  const family = romFamilyFor(plan);
+  const running = classifyRunningRom(plan, runningRom, canonicalPath);
 
   // DEBUG IS THE DEFAULT (owner's call, 2026-08-19). Someone driving a build
   // from the editor is developing, and the debug ROM is the one carrying the
@@ -201,11 +334,22 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
     const explicitDebug = plan.envOverrides.DEBUG;
     wantsDebug = explicitDebug !== undefined
       ? explicitDebug === '1'
-      : runningRom !== null
-        ? runningRom.endsWith('.debug.bin')
+      : running.ours !== null
+        ? canonicalPath(running.ours) === canonicalPath(family.debug ?? family.release)
         : true;
     plan.envOverrides.DEBUG = wantsDebug ? '1' : '0';
   }
+
+  // THE ARTIFACT THIS BUILD ACTUALLY WRITES, flavour included.
+  //
+  // Not `join(cwd, plan.romPath)`, which is the RELEASE name whatever ran. That
+  // was the same unboundedness in miniature: with a connected server and
+  // nothing loaded, the reload fell back to `s4.bin` while the build had just
+  // written `s4.debug.bin` (DEBUG being the default with no running ROM to
+  // read), so it reloaded a file the build did not touch. It is also the path
+  // the refusal below names, and naming the wrong one there would send the
+  // owner to open a ROM that was never written.
+  const builtRom = (!classic && wantsDebug) ? (family.debug ?? family.release) : family.release;
 
   let output = '';
 
@@ -311,6 +455,27 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
           });
           return;
         }
+        // REFUSE A ROM THAT IS NOT THIS PROJECT'S, and say which two files are
+        // in play. Same ruling as the gate above, one axis over: we know
+        // exactly which ROM is loaded and it is somebody else's, so reloading
+        // it would hand the emulator a file this build never wrote.
+        //
+        // BEFORE `emulator/pause`, deliberately, and for the reason the
+        // unserved check gives: stopping a machine and then declining to
+        // reload it leaves it frozen on someone else's ROM, which looks like a
+        // hang. Nothing below this point has touched the emulator yet.
+        if (running.foreign !== null) {
+          resolve({
+            ...base, ok: true, reloaded: false,
+            reloadError:
+              `the emulator is running ${running.foreign}, which is not a ROM this project builds. ` +
+              `This build wrote ${builtRom}. Aurora refused to reload rather than hand the emulator ` +
+              'a file this build never touched (it would come back without the change you just ' +
+              `made, and look like the edit had vanished). Load ${builtRom} in the emulator, or ` +
+              `open the project ${running.foreign} belongs to.`,
+          });
+          return;
+        }
         try {
           // RELOAD WHAT IS ACTUALLY LOADED, not what the config guesses.
           //
@@ -322,7 +487,11 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
           // "Build succeeded" toast on top.
           //
           // `emulator/status` reports `romPath`, so the running machine is
-          // asked rather than assumed. The listing is derived from it, which
+          // asked rather than assumed — but only about THIS project's ROMs.
+          // `running.ours` is null unless the loaded file is one of the two
+          // artifacts this plan writes, and a foreign one was refused above;
+          // without that bound the question "what is loaded" answers with
+          // another project's ROM and this reloads it. The listing is derived from it, which
           // keeps `s4.bin`/`s4.lst` and `s4.debug.bin`/`s4.debug.lst` paired
           // without a second config field to get out of step.
           // …EXCEPT when the project DECLARED a listing path, or is classic.
@@ -331,7 +500,7 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
           // s1built.bin's listing is sonic.lst and the derivation would hand
           // load_symbols a file that does not exist. Stated config outranks
           // anything inferred.
-          const romPath = runningRom ?? join(plan.cwd, plan.romPath);
+          const romPath = running.ours ?? builtRom;
           const symbolsPath = (plan.symbolsDeclared || classic)
             ? join(plan.cwd, plan.symbolsPath)
             : romPath.endsWith('.bin')
