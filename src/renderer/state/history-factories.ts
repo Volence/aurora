@@ -18,6 +18,7 @@ import {
 } from './classicLevelStore';
 import { readSpriteSnapshot, writeSpriteSnapshot } from './spriteStore';
 import { makeCanvasHistory } from './canvasStore';
+import { makeComposerHistory } from './composer-history';
 import { useProjectStore, getActiveLevel } from './projectStore';
 import { notifyCommandApplied, useEditorStore } from './editorStore';
 
@@ -90,4 +91,12 @@ export function registerHistoryFactories(): void {
   // dispatch — a canvas is engine-agnostic by construction (it is not yet
   // committed into anyone's pool).
   documentHistoryHub.registerFactory('doc:canvas:', (docId) => makeCanvasHistory(docId));
+
+  // One stack per PURE DOC-LOCAL art-composer document — a New Tile / Block /
+  // Chunk, or a region captured off the map. Same shape as the two above and no
+  // engine dispatch for a stronger reason than theirs: such a document is not in
+  // any project document at all until Save, so there is no engine to dispatch
+  // ON. Which documents get one is `artStore.isPureDocLocal`, and a chunk
+  // document deliberately does NOT — see core/editing/composer-history.ts.
+  documentHistoryHub.registerFactory('doc:composer:', (docId) => makeComposerHistory(docId));
 }

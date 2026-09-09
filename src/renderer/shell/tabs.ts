@@ -134,3 +134,25 @@ export function parseZoneArtDocId(id: string): { zone: string } | null {
   const zone = id.slice('zoneart:'.length);
   return zone.length > 0 ? { zone } : null;
 }
+
+// Composer doc ids — 'doc:composer:<serial>'. Like the zone-art id this is NOT a
+// tab id: the art composer's document lives inside the art facet of a level tab
+// and has no tab of its own. It gets an id at all so that a PURE DOC-LOCAL
+// document — one whose every write lands in `artStore.open.doc` and nowhere else
+// (New Tile / New Block / New Chunk, and the map's "Edit block…" and marquee
+// captures) — can own an undo stack, exactly as each sprite and canvas document
+// does. See state/composer-history.ts for what may and may not hold one.
+//
+// SERIAL, not a name: two "New Tile (1×1)" documents opened in one session are
+// different documents, and the second must not inherit the first's stack. The
+// serial is minted by `artStore.openDocument` and the previous document's stack
+// is disposed in the same call, so exactly one composer stack is ever live.
+export const COMPOSER_DOC_PREFIX = 'doc:composer:';
+
+export function composerDocId(serial: number): string {
+  return `${COMPOSER_DOC_PREFIX}${serial}`;
+}
+
+export function isComposerDocId(id: string): boolean {
+  return id.startsWith(COMPOSER_DOC_PREFIX);
+}

@@ -11,6 +11,7 @@
 //   zoneart:<zone>            zone art doc (no tab of its own; see tabs.ts)
 //   doc:sprite:<engine>:<ref> sprite doc
 //   doc:canvas:<name>         origination-canvas doc
+//   doc:composer:<serial>     art-composer doc, PURE DOC-LOCAL ONLY (tabs.ts)
 
 import type { UndoStack } from './undo-stack';
 

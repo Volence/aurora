@@ -9,10 +9,14 @@ import {
 } from '../../state/projectStore';
 import { useToastStore } from '../../state/toastStore';
 import {
-  cellAt, setPixels, docToBuffer, bufferToWrites, stampTile,
+  cellAt, setPixels, docToBuffer, bufferToWrites, stampTile, sameComposerCell,
   adoptPaletteLineForEmptyCells, docLineMap, applyPaletteLineToDocCell,
 } from '../../../core/art/composer-buffer';
 import type { ComposerDoc } from '../../../core/art/composer-buffer';
+import {
+  recordComposerEdit, recordComposerSnapshot, takeComposerSnapshot,
+} from '../../state/composer-history';
+import type { ComposerSnapshot } from '../../../core/editing/composer-history';
 import { paintDocCollision, applyClipboardCollisionToDoc } from '../../../core/art/composer-collision';
 import { copyChunkToClipboard } from '../../../core/editing/map-clipboard';
 import { selectedCollisionWord } from '../../../core/collision/collision-cell-word';
@@ -291,6 +295,13 @@ export default function ComposerCanvas() {
     // Doc-local path (new docs; and allowCow paste/move/transform on chunks,
     // which copy-on-write atlas cells into fresh local tiles). Empty cells
     // adopt the active palette line so painted colors render correctly.
+    //
+    // ONE UNDO STEP PER GESTURE, recorded BEFORE the mutation: `writes` is a
+    // pixel diff and so is non-empty by construction (the guard at the top of
+    // this function), which is why this needs no "did it land" check. A no-op on
+    // every document that is not PURE DOC-LOCAL — a chunk document reaching here
+    // through `allowCow` records nothing, deliberately (state/composer-history.ts).
+    recordComposerEdit();
     adoptPaletteLineForEmptyCells(doc, writes, useArtStore.getState().paletteLine);
     setPixels(doc, atlas, writes);
     useArtStore.getState().markOpenDirty();
@@ -353,6 +364,12 @@ export default function ComposerCanvas() {
     if (cx < 0 || cx >= doc.widthTiles || cy < 0 || cy >= doc.heightTiles) return;
     if (t === 'tile-stamp') {
       const s = useArtStore.getState();
+      // Read the cell out before the stamp overwrites it — `stampTile` REPLACES
+      // the cell object unconditionally, so "did this change anything" cannot be
+      // asked afterwards. It is asked at all only so that a stamp landing on a
+      // cell that already holds exactly that tile/palette/flips/priority does not
+      // put a do-nothing step on the undo stack.
+      const before = { ...cellAt(doc, cx, cy) };
       stampTile(doc, cx, cy, {
         tile: s.brushTile,
         pal: s.paletteLine,
@@ -372,6 +389,7 @@ export default function ComposerCanvas() {
         // artStore.stampPriority for why they are separate and what they share.
         pri: s.stampPriority,
       });
+      if (sameComposerCell(before, cellAt(doc, cx, cy))) return;
     } else if (t === 'palette-apply') {
       // Re-line an already-placed cell: same palette-line source as tile
       // placement (artStore.paletteLine). Empty cells are a no-op; unchanged
@@ -387,9 +405,37 @@ export default function ComposerCanvas() {
       });
       if (!paintDocCollision(doc, est.collisionPaintPlane, cx, cy, word)) return;
     }
+    // Past every early return, so the write LANDED: bank the drag's pre-gesture
+    // snapshot as one undo step. `commitTileGestureStep` is idempotent within a
+    // drag, so a stroke across twelve cells is ONE Ctrl+Z rather than twelve —
+    // the same "one gesture, one step" the pixel tools get from arriving here as
+    // a single batch. A no-op on any document without a stack.
+    commitTileGestureStep();
     useArtStore.getState().markOpenDirty();
     useArtStore.getState().bumpDoc();
   }
+
+  /**
+   * The tile-space tools' undo bookkeeping. `applyTileCell` is driven straight
+   * off the viewport's host-pointer hook, once per cell entered, so unlike a
+   * pixel gesture it has no natural batch — the snapshot is taken at `down` and
+   * banked by the first cell that actually changes.
+   *
+   * TAKEN AT `down` AND NOT AT THE FIRST WRITE, because by the time a write is
+   * known to have landed the document has already been mutated in place; and
+   * banked LAZILY rather than at `down`, because a drag that changes nothing
+   * (re-stamping the tile already there) must not leave a Ctrl+Z that does
+   * nothing.
+   */
+  const tileGestureRef = useRef<ComposerSnapshot | null>(null);
+  function beginTileGesture() { tileGestureRef.current = takeComposerSnapshot(); }
+  function commitTileGestureStep() {
+    const snap = tileGestureRef.current;
+    if (!snap) return;
+    tileGestureRef.current = null;
+    recordComposerSnapshot(snap);
+  }
+  function endTileGesture() { tileGestureRef.current = null; }
 
   // ---------- shared drawing engine ----------
 
@@ -475,6 +521,7 @@ export default function ComposerCanvas() {
           return;
         }
         const cx = p.x >> 3, cy = p.y >> 3;
+        beginTileGesture();
         applyTileCell(t, cx, cy);
         lastTileCellRef.current = { cx, cy };
       },
@@ -486,7 +533,7 @@ export default function ComposerCanvas() {
         for (const pt of linePoints(last.cx, last.cy, cx, cy).slice(1)) applyTileCell(t, pt.x, pt.y);
         lastTileCellRef.current = { cx, cy };
       },
-      up() { lastTileCellRef.current = null; },
+      up() { lastTileCellRef.current = null; endTileGesture(); },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tileTools, tool]);
@@ -752,7 +799,20 @@ export default function ComposerCanvas() {
         // "art" or "both" mode for a composer paste.
         const mapClip = useEditorStore.getState().mapClipboard;
         if (doc && mapClip) {
+          // Snapshot first, bank only if the paste landed — the same pattern the
+          // tile-space tools use, for the same reason: `applyClipboardCollisionToDoc`
+          // writes the planes in place and only then says whether it wrote.
+          //
+          // ⚠ THIS SITE IS NOT P4 OR P5 and is covered anyway. It is a THIRD
+          // doc-local writer (the map clipboard's collision planes pasted into
+          // the open doc), and leaving it out would have been worse than leaving
+          // it unrecorded on its own: an undo of an EARLIER step restores the
+          // whole document, so an unrecorded write in between is not merely
+          // un-undoable, it is silently reverted by somebody else's Ctrl+Z. On a
+          // pure doc-local document these are now the complete set of writers.
+          const snap = takeComposerSnapshot();
           if (applyClipboardCollisionToDoc(doc, mapClip)) {
+            if (snap) recordComposerSnapshot(snap);
             useArtStore.getState().markOpenDirty();
             useArtStore.getState().bumpDoc();
             useToastStore.getState().addToast(

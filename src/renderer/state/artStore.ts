@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import type { ComposerDoc } from '../../core/art/composer-buffer';
 import type { DitherPattern, MirrorMode } from '../../core/art/pixel-ops';
 import { DEFAULT_BRUSH_ATTRIBUTES, type BrushPriority } from '../../core/editing/brush-word';
+import { documentHistoryHub } from './history-hub';
+import { composerDocId } from '../shell/tabs';
 import { surfacePriorityLens } from './priority-lens-surface';
 
 /** An art surface whose zoom is remembered separately. See ART_TIER_DEFAULT_ZOOM. */
@@ -53,6 +55,17 @@ interface ArtState {
   /** Pixels per art pixel, PER TIER. See ART_TIER_DEFAULT_ZOOM. */
   zoomByTier: Record<ArtZoomTier, number>;
   open: OpenDocument | null;
+  /**
+   * The undo document id of the open composer document, or null when the open
+   * document is not one that may own a stack (`isPureDocLocal`).
+   *
+   * NOT part of `OpenDocument`: every opener in the app builds one of those by
+   * hand, and a field they each had to remember to fill would be null at
+   * whichever site was written next. `openDocument` derives it, which is also
+   * where the previous document's stack is disposed, so the two can never
+   * disagree about which stack is live.
+   */
+  composerDocId: string | null;
   docVersion: number;           // bump to re-render the canvas
   /** Incremented on every live palette preview tick (slider drag). Separate
    *  from the history clock (hooks/useHistoryVersion) so per-tick repaint of the
@@ -99,6 +112,18 @@ interface ArtState {
   bumpPaletteVersion: () => void;
   /** Mark the open document as having unsaved local edits. */
   markOpenDirty: () => void;
+  /**
+   * Put the open document's dirty flag back where a restored undo snapshot says
+   * it was. UNDO ONLY — `state/composer-history.ts` is the sole caller, and it
+   * passes a value it read off the document itself rather than computing one.
+   *
+   * This is the composer's half of the save contract's R5: undoing back to the
+   * state a document was opened (or last saved) in leaves nothing unsaved, so
+   * the discard dialog must stop asking. It is a SETTER and not a `markClean`
+   * because a map capture opens dirty on purpose, and unwinding to ITS start
+   * state must leave it dirty.
+   */
+  setOpenDirty: (dirty: boolean) => void;
   requestAction: (a: string) => void;
   clearAction: () => void;
   setBrushTile: (t: number) => void;
@@ -126,10 +151,47 @@ export const ART_TIER_DEFAULT_ZOOM: Record<ArtZoomTier, number> = {
 /** The active tier's zoom — what every surface and the option bar should read. */
 export const selectArtZoom = (s: ArtState): number => s.zoomByTier[s.artTier];
 
-export const useArtStore = create<ArtState>((set) => ({
+/**
+ * May this document own an undo stack of its own? True only for a PURE
+ * DOC-LOCAL document: one where every write lands in `open.doc` and nowhere
+ * else, which is New Tile / New Block / New Chunk and the map's "Edit block…"
+ * and marquee captures.
+ *
+ * THE THREE EXCLUSIONS ARE NOT SYMMETRIC and each is already undoable somewhere
+ * else, which is why excluding them costs nothing:
+ *   • `liveTileIndex` — every stroke is a `set-tileset-tiles` command on the
+ *     ZONE-ART stack.
+ *   • `bgOverride`    — every stroke is a BG-override command on the ACT stack
+ *     (see the branch in `editorStore.focusedDocId`).
+ *   • `chunkId`       — MIXED, and that is the whole reason it is excluded
+ *     rather than the reason it is not needed: a pencil stroke on an
+ *     atlas-backed cell records on the zone-art stack while empty cells and
+ *     every paste/move/transform are doc-local. See
+ *     `core/editing/composer-history.ts`'s header for why a second stack on the
+ *     same document is worse than none.
+ *
+ * Exported so a test reads THIS predicate rather than a copy of it.
+ */
+export function isPureDocLocal(open: OpenDocument | null): boolean {
+  return open !== null
+    && open.liveTileIndex === null
+    && !open.bgOverride
+    && open.chunkId === null;
+}
+
+/** Serial for `composerDocId`. Monotone for the life of the window: a reused id
+ *  would hand a fresh document the stack of a dead one. */
+let composerSerial = 0;
+
+function dropComposerStack(docId: string | null): void {
+  if (docId !== null) documentHistoryHub.dispose(docId);
+}
+
+export const useArtStore = create<ArtState>((set, get) => ({
   tool: 'pencil', brushSpace: 'pixel', selectedColor: 1, paletteLine: 1,
   ditherPattern: 'checker', ditherSecondary: 0,
   mirror: null, pixelPerfect: false, repeatPreview: false, open: null, docVersion: 0,
+  composerDocId: null,
   artTier: 'tile', zoomByTier: { ...ART_TIER_DEFAULT_ZOOM },
   paletteVersion: 0,
   pendingAction: null, brushTile: 0,
@@ -153,12 +215,28 @@ export const useArtStore = create<ArtState>((set) => ({
   setZoom: (zoom) => set((s) => ({
     zoomByTier: { ...s.zoomByTier, [s.artTier]: Math.max(2, Math.min(64, zoom)) },
   })),
-  openDocument: (open) => set({ open, docVersion: 0 }),
-  closeDocument: () => set({ open: null }),
+  // THE COMPOSER STACK'S WHOLE LIFETIME IS THESE TWO LINES, and it is the sprite
+  // and canvas documents' lifetime: minted on open, dropped on close. Disposing
+  // BEFORE minting matters — a save re-opens the same drawing as a CHUNK
+  // document (`state/art-composer-save.ts`), which is not stack-owning, so
+  // without the dispose that document's pre-save stack would sit in the hub
+  // holding a few hundred KB per entry for the rest of the session with nothing
+  // able to reach it. Project close reaches here too: `project-runtime` calls
+  // `closeDocument()`, and `hub.clearAll()` covers the same id idempotently.
+  openDocument: (open) => {
+    dropComposerStack(get().composerDocId);
+    set({ open, docVersion: 0, composerDocId: isPureDocLocal(open) ? composerDocId(++composerSerial) : null });
+  },
+  closeDocument: () => {
+    dropComposerStack(get().composerDocId);
+    set({ open: null, composerDocId: null });
+  },
   bumpDoc: () => set((s) => ({ docVersion: s.docVersion + 1 })),
   bumpPaletteVersion: () => set((s) => ({ paletteVersion: s.paletteVersion + 1 })),
   markOpenDirty: () => set((s) =>
     s.open && !s.open.dirty ? { open: { ...s.open, dirty: true } } : {}),
+  setOpenDirty: (dirty) => set((s) =>
+    s.open && s.open.dirty !== dirty ? { open: { ...s.open, dirty } } : {}),
   requestAction: (pendingAction) => set({ pendingAction }),
   clearAction: () => set({ pendingAction: null }),
   setBrushTile: (brushTile) => set({ brushTile }),
