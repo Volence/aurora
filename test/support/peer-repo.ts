@@ -158,6 +158,102 @@ export function isAncestor(repo: string, ancestor: string, descendant: string): 
   return git(repo, ['merge-base', '--is-ancestor', ancestor, descendant]) !== null;
 }
 
+/**
+ * THE BRANCH THAT ANSWERS CURRENCY, read as an ASSERTION and not as a property.
+ *
+ * Every currency gate in this repo steers by one field in a provenance sidecar,
+ * `<repo>.branch_that_answers_currency`: the published branch whose tip answers
+ * "is the vendored copy still what the peer ships". Four gates read it with a
+ * bare property access off an unchecked `JSON.parse`
+ * (effects-schema-drift, effects-preset-schema-drift, effects-channel-bands-drift
+ * and effects-preset-vectors), and the sweep at the bottom of
+ * aeon-fixture-currency reads it with a typeof check and a repo default.
+ *
+ * ⚠ WHAT LOSING IT LOOKED LIKE, measured on 2026-09-09 rather than reasoned
+ * about. Delete the line from
+ * `src/core/formats/effects/aurora-effects-scene.schema.provenance.json` and the
+ * whole `npm test` chain stays GREEN: the drift file reports 14 passed, 2
+ * skipped, and the two skips say `undefined does not resolve in <empyrean>` --
+ * a message shaped exactly like an unfetched peer. Every integrity row beside
+ * them passes, because the field is not payload to any of them. So the currency
+ * question stops being asked and the suite says nothing is wrong.
+ *
+ * BE HONEST ABOUT REACH. The re-vendor script updates this field in place and
+ * cannot drop it, so the reachable path to the loss is a HAND AUTHORED sidecar,
+ * which is how all three under `src/core/formats/effects/` were written. That is
+ * why this is a medium row and not a fire.
+ *
+ * SO THE READ IS SPLIT IN TWO. `tip` is what a caller steers by, and it is never
+ * `undefined`: an unusable field yields a placeholder that cannot resolve as a
+ * revision and that says so wherever it is printed. `defect` is the sentence a
+ * gate asserts on, in a row that needs no peer repo, so the loss is a NAMED
+ * failure rather than a degradation into a peer shaped excuse.
+ *
+ * `present` exists because the sweep legitimately falls back to a repo default
+ * for a sidecar that names no branch, and must NOT fall back for one that names
+ * a malformed branch. Absent and malformed are different answers.
+ */
+export const CURRENCY_BRANCH_KEY = 'branch_that_answers_currency';
+
+/**
+ * A remote-tracking ref, `<remote>/<name>`. The shape is the design rule, not a
+ * spelling preference: currency is answered by a ref that no local edit can
+ * move (this module's whole premise), and every value on disk today is one
+ * (`origin/main`, `origin/master`, `origin/AS`). A bare local branch name would
+ * pass a "non-empty string" check and reintroduce exactly what the PUBLISHED,
+ * not local-only rows exist to refuse.
+ */
+export const CURRENCY_BRANCH_SHAPE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._/-]+$/;
+
+/** Printed in titles and messages when the sidecar cannot say. Never resolves. */
+export const NO_CURRENCY_BRANCH = '(NO BRANCH: the provenance sidecar names none)';
+
+export type CurrencyBranch = {
+  /** The branch to steer by, or `NO_CURRENCY_BRANCH`. Never undefined. */
+  tip: string;
+  /** Whether the key was there at all, however malformed its value. */
+  present: boolean;
+  /** A sentence naming what is wrong, or null. Assert `toBeNull()` on it. */
+  defect: string | null;
+};
+
+/**
+ * Read `<block>.branch_that_answers_currency`, asserting rather than assuming.
+ * `sidecar` is an absolute path, shortened here so the caller does not restate
+ * the repo root; `repo` is the block's own key, so the message names the block
+ * that is wrong when a sidecar carries several.
+ */
+export function currencyBranch(block: unknown, sidecar: string, repo: string): CurrencyBranch {
+  const short = sidecar.startsWith(AURORA_DIR) ? sidecar.slice(AURORA_DIR.length + 1) : sidecar;
+  const where = `${short}: the "${repo}" block`;
+  const fix = `Every currency gate steers by "${CURRENCY_BRANCH_KEY}". Restore it as a `
+    + 'remote-tracking ref, for example "origin/main", or the currency question stops '
+    + 'being asked and the suite goes quiet about it.';
+  if (typeof block !== 'object' || block === null || Array.isArray(block)) {
+    return { tip: NO_CURRENCY_BRANCH, present: false, defect: `${where} is not an object. ${fix}` };
+  }
+  const raw = (block as Record<string, unknown>)[CURRENCY_BRANCH_KEY];
+  if (raw === undefined) {
+    return { tip: NO_CURRENCY_BRANCH, present: false, defect: `${where} has no "${CURRENCY_BRANCH_KEY}". ${fix}` };
+  }
+  if (typeof raw !== 'string') {
+    return {
+      tip: NO_CURRENCY_BRANCH,
+      present: true,
+      defect: `${where} spells "${CURRENCY_BRANCH_KEY}" as ${typeof raw}, not a string. ${fix}`,
+    };
+  }
+  if (!CURRENCY_BRANCH_SHAPE.test(raw)) {
+    return {
+      tip: NO_CURRENCY_BRANCH,
+      present: true,
+      defect: `${where} names "${raw}" as its ${CURRENCY_BRANCH_KEY}, which is not a `
+        + `remote-tracking ref of the form remote/name. ${fix}`,
+    };
+  }
+  return { tip: raw, present: true, defect: null };
+}
+
 /** `git hash-object`'s answer for a blob, computed here so no peer repo is needed for it. */
 export function gitBlobSha(text: string): string {
   const body = Buffer.from(text, 'utf8');
