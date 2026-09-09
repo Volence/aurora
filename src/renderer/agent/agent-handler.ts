@@ -76,7 +76,9 @@ import { sheetFromBytes, explainSheetRefusal, sheetRefusalResolution } from '../
 import type { PngImportRefusal } from '../../core/art/png-import';
 import type { ArtCommitReply } from './art-commit';
 import type { LevelDoc, LayoutGrid } from '../../core/level-classic/model';
-import { planProjectOpen, currentOpenDirtySnapshot } from '../shell/project-open-guard';
+import {
+  planProjectOpen, currentOpenDirtySnapshot, unsavedAgentRefusal,
+} from '../shell/project-open-guard';
 import { useSessionStore } from '../state/sessionStore';
 import { parseLevelTabId } from '../shell/tabs';
 import { switchFacet } from '../workspace/facet-tools';
@@ -1328,11 +1330,13 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       // open has no UI to confirm through, so — unlike useProject.openPath, which
       // offers Save & open / Discard & open / Cancel — this tool refuses outright
       // rather than silently destroying unsaved classic/aeon/sprite edits.
-      if (planProjectOpen(currentOpenDirtySnapshot()).kind === 'confirm') {
-        throw new Error(
-          'Unsaved changes present (classic/aeon/sprite). Save first (Ctrl+S / save tools) ' +
-          'or have the user discard, then retry.',
-        );
+      // The refusal's WORDING comes from project-open-guard, beside the two dialog
+      // doors', because this door had their old defect in a third form: it said
+      // "Save first" whatever the snapshot held, including when nothing dirty has a
+      // writer and saving cannot clear it. See unsavedAgentRefusal.
+      const openPlan = planProjectOpen(currentOpenDirtySnapshot());
+      if (openPlan.kind === 'confirm') {
+        throw new Error(unsavedAgentRefusal(openPlan));
       }
       // Reuse the Task-9 open bridge exactly (no duplicated open logic): the store
       // detects classic-first and, for a real aeon dir, leaves aeon untouched.

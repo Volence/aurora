@@ -264,6 +264,43 @@ export function unsavedBlockedMessage(
 }
 
 /**
+ * THE THIRD DOOR ON THIS PERIMETER, and the one with no buttons: an agent tool
+ * asking to open a project over resident unsaved work (agent/agent-handler.ts's
+ * `classic-open-project`). It refuses outright — correct, since there is no UI to
+ * confirm through — and its refusal is the only thing the caller gets to read.
+ *
+ * WHY IT IS HERE AND NOT AT THAT CALL SITE. The two dialog doors' copy was
+ * centralised for a reason recorded above: `unsavedBlockedMessage` lived only on
+ * the open side, so the close door silently lacked a branch. This door had the
+ * same hole in a third form — it told the caller unconditionally to "Save first",
+ * which is exactly the advice that cannot be followed when nothing dirty has a
+ * writer (a canvas with no file, a sprite with no save-back, a composer document
+ * with no writer — see currentOpenDirtySnapshot). An agent obeying it saves, sees
+ * the same dirt, and retries forever.
+ *
+ * SAME DECISION AS THE DIALOGS, SAME SENTENCES, DIFFERENT TAIL. `offerSave` drops
+ * the save instruction on exactly the condition that drops the Save BUTTON, and
+ * the `unsavable` sentences are the shared ones, verbatim. The tail is its own
+ * because the dialogs' tails name buttons ("Discard & open") and an agent has
+ * none: what it can do is stop and put the question to the user.
+ */
+export function unsavedAgentRefusal(
+  plan: { offerSave: boolean; unsavable: readonly string[] },
+): string {
+  // Every dirty domain the snapshot covers, not the three the old sentence named:
+  // canvas and composer documents block this door too and were unlisted, so a
+  // caller went looking through the wrong stores for what was holding it.
+  const base = 'Unsaved changes present (classic / aeon / sprite / canvas / composer).';
+  const how = plan.offerSave
+    ? 'Save first (Ctrl+S / save tools) or have the user discard, then retry.'
+    : 'None of it can be saved, so saving will not clear this: the user has to discard '
+      + 'it in the app before a retry can succeed.';
+  return plan.unsavable.length === 0
+    ? `${base} ${how}`
+    : `${base} ${plan.unsavable.join(' ')} ${how}`;
+}
+
+/**
  * Runs the full ask→save→re-snapshot guard for opening a project over
  * whatever is currently resident. Resolves true when the open may proceed
  * (nothing was dirty, the user discarded, or a chosen save left everything
