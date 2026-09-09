@@ -182,7 +182,7 @@ describe('get_collision_region: the read twin refuses the same values', () => {
     await expect(ask({ ...readBase, plane })).rejects.toThrow(/plane must be "a" or "b"/);
   });
 
-  it('and refuses "both" IN PROSE — the asymmetry the read argues for at length', async () => {
+  it('and refuses "both" IN PROSE: the asymmetry the read argues for at length', async () => {
     const why = await ask({ ...readBase, plane: 'both' }).then(() => '', (e: Error) => e.message);
     expect(why).toMatch(/reads ONE plane/);
     expect(why).toMatch(/Call it twice/);
