@@ -10,6 +10,9 @@ import { useProjectStore } from '../projectStore';
 import { useSessionStore } from '../sessionStore';
 import { useEditorStore } from '../editorStore';
 import { useSpriteStore, openSpriteDoc, patchSpriteDoc } from '../spriteStore';
+import { useArtStore } from '../artStore';
+import { createDoc } from '../../../core/art/composer-buffer';
+import { createSection } from '../../../core/model/s4-types';
 
 describe('project runtime', () => {
   beforeEach(() => {
@@ -26,12 +29,12 @@ describe('project runtime', () => {
     __resetRuntimeSaversForTest();
   });
 
-  it('registers exactly the four savers, idempotently', () => {
+  it('registers exactly the five savers, idempotently', () => {
     ensureSaversRegistered();
     ensureSaversRegistered();
     return saveAllDirty().then((r) => {
       expect([...r.saved, ...r.skipped, ...r.failed.map((f) => f.id)].sort())
-        .toEqual(['aeon-project', 'canvas-doc', 'classic-level', 'sprite-art']);
+        .toEqual(['aeon-project', 'art-composer', 'canvas-doc', 'classic-level', 'sprite-art']);
     });
   });
 
@@ -309,5 +312,120 @@ describe('project runtime', () => {
     const again = await import('../project-runtime');
     expect(again.saveCoordinator).toBe(saveCoordinator);
     expect(again.documentHistoryHub).toBe(documentHistoryHub);
+  });
+});
+
+/**
+ * THE FIFTH SAVER. `artStore.open` is on the unsaved-work perimeter — the
+ * open/close guards refuse to proceed while it is dirty — and for as long as the
+ * registry held four savers that touched it with none of them, those guards'
+ * "Save & …" button was inert by construction: it ran, the guard re-snapshotted
+ * the same dirt, and only Discard could get past. This saver is what makes the
+ * primary mean something.
+ */
+describe('art-composer saver', () => {
+  function aeonProjectOpen(): void {
+    useProjectStore.setState({
+      project: {
+        zones: [{
+          id: 'z', name: 'Z', tileset: { tiles: [] }, palette: { lines: [] },
+          acts: [{
+            id: 'a', name: 'A', gridWidth: 1, gridHeight: 1,
+            sections: [createSection(0, 'sec0')],
+          }],
+        }],
+        chunkLibrary: [],
+        bgLibrary: [],
+      } as never,
+      currentZoneId: 'z',
+      currentActId: 'a',
+    });
+  }
+
+  function dirtyComposer(over: Partial<{ liveTileIndex: number | null }> = {}): void {
+    useArtStore.getState().openDocument({
+      doc: createDoc(2, 2), liveTileIndex: null, chunkId: null, name: 'New Chunk', dirty: false,
+      ...over,
+    });
+    useArtStore.getState().markOpenDirty();
+  }
+
+  beforeEach(() => {
+    ensureSaversRegistered();
+    useClassicProjectStore.getState().reset();
+    useProjectStore.getState().reset();
+    useArtStore.getState().closeDocument();
+    useEditorStore.setState({ dirty: false });
+    __resetRuntimeSaversForTest();
+  });
+  afterEach(() => {
+    __resetRuntimeSaversForTest();
+    useArtStore.getState().closeDocument();
+    useProjectStore.getState().reset();
+  });
+
+  it('fires on a dirty composer document and commits it to the chunk library', async () => {
+    aeonProjectOpen();
+    dirtyComposer();
+    __setRuntimeSaversForTest({ aeon: async () => {} }); // the IPC leaf only
+
+    const r = await saveAllDirty();
+
+    expect(r.saved).toContain('art-composer');
+    expect(useProjectStore.getState().project!.chunkLibrary.map((c) => c.name))
+      .toEqual(['New Chunk']);
+    // The flag the perimeter guards read is now clear, which is the whole point.
+    expect(useArtStore.getState().open!.dirty).toBe(false);
+  });
+
+  it('runs BEFORE aeon-project, because the chunk it adds is what aeon writes', async () => {
+    // The new-chunk path adds a library entry and calls editorStore.markDirty();
+    // if the project save had already run, that entry would stay in memory only.
+    aeonProjectOpen();
+    dirtyComposer();
+    const log: string[] = [];
+    __setRuntimeSaversForTest({
+      artComposer: () => { log.push('art'); },
+      aeon: async () => { log.push('aeon'); },
+    });
+
+    await saveAllDirty();
+
+    expect(log).toEqual(['art', 'aeon']);
+  });
+
+  it('SKIPS a clean document, and skips when nothing is open at all', async () => {
+    aeonProjectOpen();
+    __setRuntimeSaversForTest({ aeon: async () => {} });
+    expect((await saveAllDirty()).skipped).toContain('art-composer');
+
+    useArtStore.getState().openDocument({
+      doc: createDoc(2, 2), liveTileIndex: null, chunkId: null, name: 'New Chunk', dirty: false,
+    });
+    expect((await saveAllDirty()).skipped).toContain('art-composer');
+  });
+
+  it('SKIPS a dirty document it cannot write, rather than running and changing nothing', async () => {
+    // No project ⇒ saveComposerDocument returns without writing. A saver that
+    // fired here would report `saved` for a write that did not happen, and the
+    // guard would then believe Save had cleared the flag. Both the saver and the
+    // guard read `composerSaveState`, so they cannot disagree.
+    dirtyComposer();
+    const log: string[] = [];
+    __setRuntimeSaversForTest({ artComposer: () => { log.push('art'); } });
+
+    const r = await saveAllDirty();
+
+    expect(log).toEqual([]);
+    expect(r.saved).not.toContain('art-composer');
+    expect(r.skipped).toContain('art-composer');
+  });
+
+  it('owns no tab: Ctrl+S on a level tab still routes to the project saver', async () => {
+    // A level-tab scope here would win activeSaver (first match wins) and steal
+    // Ctrl+S from aeon-project. The composer has its own Save button.
+    aeonProjectOpen();
+    dirtyComposer();
+    expect(saveCoordinator.activeSaver('level:z:1')?.id).not.toBe('art-composer');
   });
 });

@@ -14,6 +14,17 @@
 //     sprite-art and ahead of the project savers, for that same reason — these
 //     are hand-drawn pixels, and a level-save error must not be able to strand
 //     them.
+//   • art-composer: the aeon composer document (New Tile / Block / Chunk), when
+//     it is dirty AND `composerSaveState()` says a saver can actually write it.
+//     ADDED because its absence made "Save & open" / "Save & close" INERT for a
+//     composer drawing: the guards read `artStore.open.dirty`, nothing here
+//     wrote that store, and nothing else ever clears the flag on an existing
+//     entry, so pressing Save re-failed the guard's re-snapshot forever and only
+//     Discard — which throws the drawing away — could get past it. Registered
+//     BEFORE aeon-project and that ordering is load-bearing: the new-chunk path
+//     adds a library entry and calls editorStore.markDirty(), so the aeon
+//     project save has to run AFTER it in the same pass or the chunk stays in
+//     memory only.
 //   • classic-level: whenever a classic project is open (its own writer skips
 //     clean domains internally).
 //   • aeon-project: whenever an aeon project is resident AND no classic project
@@ -50,6 +61,7 @@ import { saveClassicProject } from './classic-save';
 import { saveAllSpriteArt, saveSpriteDocArt } from '../components/sprite/export-sprite';
 import { saveCanvasDocument } from './canvas-save';
 import { saveAeonProject } from './aeon-save';
+import { composerSaveState, saveComposerDocument } from './art-composer-save';
 import { parseLevelTabId, parseSpriteDocTabId, parseCanvasDocTabId } from '../shell/tabs';
 import { tabHasDirtyDot } from '../shell/dirty-tabs';
 import { currentDirtySnapshot } from '../shell/dirty-snapshot';
@@ -76,11 +88,15 @@ const canvasDocDefault: SaveDocFn = (docId, report) => saveCanvasDocument(docId,
 let canvasDocImpl: SaveDocFn = canvasDocDefault;
 let classicImpl: SaveFn = saveClassicProject;
 let aeonImpl: SaveFn = saveAeonProject;
+// The composer save is synchronous and touches no IO of its own (it writes the
+// in-memory chunk library and lets aeon-project persist it), so its seam is a
+// plain void call.
+let artComposerImpl: () => void = saveComposerDocument;
 
 export function __setRuntimeSaversForTest(
   over: {
     spriteArt?: SaveFn; spriteDoc?: SaveDocFn; canvasDoc?: SaveDocFn;
-    classic?: SaveFn; aeon?: SaveFn;
+    classic?: SaveFn; aeon?: SaveFn; artComposer?: () => void;
   },
 ): void {
   if (over.spriteArt) spriteArtImpl = over.spriteArt;
@@ -88,6 +104,7 @@ export function __setRuntimeSaversForTest(
   if (over.canvasDoc) canvasDocImpl = over.canvasDoc;
   if (over.classic) classicImpl = over.classic;
   if (over.aeon) aeonImpl = over.aeon;
+  if (over.artComposer) artComposerImpl = over.artComposer;
 }
 export function __resetRuntimeSaversForTest(): void {
   spriteArtImpl = saveAllSpriteArt;
@@ -95,6 +112,7 @@ export function __resetRuntimeSaversForTest(): void {
   canvasDocImpl = canvasDocDefault;
   classicImpl = saveClassicProject;
   aeonImpl = saveAeonProject;
+  artComposerImpl = saveComposerDocument;
 }
 
 let registered = false;
@@ -160,6 +178,22 @@ export function ensureSaversRegistered(): void {
       isDirty: (tabId) => saveableDirtyCanvasDocIds().includes(tabId),
       save: async (tabId) => { await canvasDocImpl(tabId); },
     },
+  });
+  saveCoordinator.register({
+    id: 'art-composer',
+    // `composerSaveState()` is the ONE predicate the facet's own Save button
+    // rule and this saver both derive from, so the two can never disagree about
+    // whether the open document is writable. 'blocked' documents are NOT
+    // reported dirty here: firing on one would be a saver that runs and changes
+    // nothing, which is exactly the inert-Save loop this row exists to end. The
+    // guard learns about them from the same function and drops its Save button.
+    isDirty: () => composerSaveState().kind === 'savable',
+    save: async () => { artComposerImpl(); },
+    // NO `scope`, deliberately. The composer is a facet INSIDE a level tab, so a
+    // level-tab scope here would win `activeSaver` (first match wins) and steal
+    // Ctrl+S from the classic/aeon project savers — the composer document has
+    // its own Save button in the art facet's doc header. A scopeless saver
+    // participates in saveAll() only, which is what the perimeter guards call.
   });
   saveCoordinator.register({
     id: 'classic-level',

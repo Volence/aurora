@@ -5,6 +5,7 @@ import { registerIpcHandlers } from './ipc-handlers';
 import { registerAetherBridge } from './aether/bridge';
 import { startMcpServer, stopMcpServer } from './mcp-server';
 import { IPC_CHANNELS } from '../shared/ipc-types';
+import { createCloseHandshake } from './close-handshake';
 
 // The main bundle is ESM (.mjs), where __dirname doesn't exist.
 const moduleDir = dirname(fileURLToPath(import.meta.url));
@@ -93,37 +94,35 @@ function createWindow(): BrowserWindow {
  * "close window" button of its own, it must ask through here rather than
  * calling `window.close()`, or it will walk straight past this guard.
  */
-const CLOSE_ANSWER_TIMEOUT_MS = 15_000;
-
+// THE RULES LIVE IN close-handshake.ts, not here — this file imports `electron`
+// at module scope, so nothing in the node suite can reach it, and for as long as
+// the state machine was inline all four of its guards were asserted by nothing.
+// What is left below is the Electron ADAPTER: it supplies `win`, `ipcMain` and
+// `setTimeout`, and computes the sender check. That inch is still unmeasured by
+// any behavioural test, so close-guard-seam.test.ts pins it with a source gate
+// as well as driving the extracted half end to end.
 function installCloseGuard(win: BrowserWindow): void {
-  let closing = false;   // the answer said yes; let this close through
-  let pending = false;   // a question is out; don't ask twice
+  const handshake = createCloseHandshake({
+    askRenderer: () => win.webContents.send(IPC_CHANNELS.CLOSE_REQUEST),
+    rendererGone: () => win.webContents.isDestroyed(),
+    windowGone: () => win.isDestroyed(),
+    closeWindow: () => win.close(),
+    listen: (cb) => {
+      const onAnswer = (event: Electron.IpcMainEvent, mayClose: unknown): void => {
+        cb(event.sender === win.webContents, mayClose);
+      };
+      ipcMain.on(IPC_CHANNELS.CLOSE_RESPONSE, onAnswer);
+      return () => ipcMain.removeListener(IPC_CHANNELS.CLOSE_RESPONSE, onAnswer);
+    },
+    timer: (ms, fn) => {
+      const t = setTimeout(fn, ms);
+      return { cancel: () => clearTimeout(t) };
+    },
+    warn: (message) => console.warn(message),
+  });
 
   win.on('close', (e) => {
-    if (closing) return;
-    e.preventDefault();
-    if (pending) return;
-    pending = true;
-
-    const finish = (mayClose: boolean): void => {
-      if (!pending) return;
-      pending = false;
-      clearTimeout(timer);
-      ipcMain.removeListener(IPC_CHANNELS.CLOSE_RESPONSE, onAnswer);
-      if (mayClose && !win.isDestroyed()) { closing = true; win.close(); }
-    };
-    const onAnswer = (event: Electron.IpcMainEvent, mayClose: unknown): void => {
-      if (event.sender !== win.webContents) return; // another window's answer
-      finish(mayClose === true);
-    };
-    const timer = setTimeout(() => {
-      console.warn('[close] renderer did not answer; closing anyway');
-      finish(true);
-    }, CLOSE_ANSWER_TIMEOUT_MS);
-
-    ipcMain.on(IPC_CHANNELS.CLOSE_RESPONSE, onAnswer);
-    if (win.webContents.isDestroyed()) { finish(true); return; }
-    win.webContents.send(IPC_CHANNELS.CLOSE_REQUEST);
+    if (handshake.onCloseRequested() === 'suspend') e.preventDefault();
   });
 }
 

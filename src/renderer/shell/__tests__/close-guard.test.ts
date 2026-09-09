@@ -85,4 +85,46 @@ describe('confirmAppClose', () => {
     useConfirmStore.getState().answer('cancel');
     await expect(p).resolves.toBe(false);
   });
+
+  /**
+   * ...AND THE OFFER IS SHARED TOO. This door had no equivalent of the open
+   * door's special-case copy at all: an unsavable document got "Save & close" as
+   * the primary and, when the re-snapshot re-failed, the bare generic sentence.
+   * Both halves come from the shared snapshot now.
+   */
+  it('does not offer Save & close over a drawing nothing can save, and says why', async () => {
+    useArtStore.getState().openDocument({
+      doc: createDoc(2, 2), liveTileIndex: null, chunkId: null, name: 'New Chunk', dirty: false,
+    });
+    useArtStore.getState().markOpenDirty();       // no project open ⇒ no writer
+
+    const p = confirmAppClose();
+    const req = useConfirmStore.getState().request!;
+    expect(req.buttons.map((b) => b.key)).toEqual(['discard', 'cancel']);
+    expect(req.body!).toMatch(/no open zone and act/i);
+    expect(req.body!).toMatch(/Discard & close/);
+    useConfirmStore.getState().answer('cancel');
+    await expect(p).resolves.toBe(false);
+    expect(useArtStore.getState().open?.dirty).toBe(true);
+  });
+
+  it('a MIXED save that leaves the unsavable drawing behind names it in the toast', async () => {
+    useEditorStore.setState({ dirty: true });     // savable
+    useArtStore.getState().openDocument({
+      doc: createDoc(2, 2), liveTileIndex: null, chunkId: null, name: 'New Chunk', dirty: false,
+    });
+    useArtStore.getState().markOpenDirty();       // not savable
+    useToastStore.setState({ toasts: [] });
+    __setCloseGuardSaveForTest(vi.fn(async () => { useEditorStore.getState().markClean(); }));
+
+    const p = confirmAppClose();
+    expect(useConfirmStore.getState().request!.buttons.map((b) => b.key)).toContain('save');
+    useConfirmStore.getState().answer('save');
+    await expect(p).resolves.toBe(false);
+
+    const msg = useToastStore.getState().toasts.at(-1)!.message;
+    expect(msg).toMatch(/^Close cancelled/);
+    expect(msg).toMatch(/no open zone and act/i);  // only composerSaveState says this
+    expect(msg).toMatch(/Discard & close/);        // and it names THIS door's verb
+  });
 });

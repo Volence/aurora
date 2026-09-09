@@ -316,7 +316,11 @@ describe('the panel sentence agrees with the scope', () => {
   });
 
   it('the chunk-save path asks for the out-of-act copies and reports them', () => {
-    const src = code('../../../renderer/workspace/facets/art-facet.tsx');
+    // The save path moved out of art-facet.tsx into state/art-composer-save.ts so
+    // the SaveCoordinator could reach it (the composer document is on the
+    // unsaved-work perimeter and one React button was its only writer). The rule
+    // is unchanged and re-anchored, not deleted.
+    const src = code('../../../renderer/state/art-composer-save.ts');
     // Asked for, over the whole PROJECT's zones — an act-local argument here
     // would make the report as blind as the propagation it is compensating for.
     expect(src).toContain('findOutOfActChunkCopies({');

@@ -106,7 +106,20 @@ export default function App() {
   // -- runtime wiring ------------------------------------------------------
   useEffect(() => {
     registerAgentHandler();
-    installCloseGuard();          // main asks before the window takes unsaved work with it
+    // Main asks before the window takes unsaved work with it — but only if this
+    // registration actually happened. It used to be two optional chains that
+    // silently did nothing when the channel was missing, and the cost of that
+    // silence is the whole window closing over unsaved documents fifteen seconds
+    // into main's timeout. 'no-bridge' is the documented no-op (no Electron
+    // preload); 'drift' means the bridge is here and this channel is not, which
+    // nothing else in the app would ever reveal, so it is said out loud.
+    const closeGuard = installCloseGuard();
+    if (closeGuard.kind === 'drift') {
+      console.error(`[close] guard did NOT arm: ${closeGuard.why}`);
+      useToastStore.getState().addToast(
+        'Unsaved work will not be protected when this window is closed: '
+        + 'the close-guard channel is missing from the preload bridge.', 'error');
+    }
     installAetherStatusListener(); // the outbound link's state arrives as a push, not a poll
     ensureSaversRegistered();
     registerHistoryFactories();   // must precede any edit: the hub builds no stack without it
