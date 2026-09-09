@@ -96,3 +96,11 @@ scratchpad/__pycache__/
 # by scratchpad/art-undo-path-harness.mjs. (Its screenshots land in
 # scratchpad/shots-art-undo-path/, already covered by `scratchpad/shots*/`.)
 scratchpad/fixtures/aeon-art-undo/
+
+# The chunk-undo measurement fixture: a hardlinked copy of the aeon tree.
+# Rebuilt by scratchpad/chunk-undo-measure-harness.mjs. Un-ignored it is not
+# merely noise: the aeon tree carries Python instruments with absolute sibling
+# paths in them, so check-peer-path-literals reads the copy as 33 executable
+# violations of this repo's own rule. (Its screenshots land in
+# scratchpad/shots-chunk-undo-measure/, already covered by `scratchpad/shots*/`.)
+scratchpad/fixtures/aeon-chunk-undo/
