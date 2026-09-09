@@ -596,7 +596,8 @@
         "undeclared",
         "sprite_mask",
         "factor0_lock",
-        "accept"
+        "accept",
+        "decline_borrow"
       ],
       "default": "undeclared"
     },

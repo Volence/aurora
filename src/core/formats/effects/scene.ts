@@ -355,7 +355,20 @@ export interface EffectsScene {
    */
   reels?: EffectsReels;
   anchor?: EffectsAnchor;
-  left_column_mask?: 'undeclared' | 'sprite_mask' | 'factor0_lock' | 'accept';
+  /*
+   * ⚠ FIVE ARMS SINCE 2026-09-09, and the fifth is the only one that MOVES ROM
+   * BYTES. `decline_borrow` was added to the shared contract at empyrean
+   * c58dd0ce after aeon's generator had already mapped it, so the value was
+   * spellable by the engine before it was spellable here. The other four
+   * declare a policy about a borrow that stays; this one declines it.
+   *
+   * A NOTE FOR WHOEVER BUILDS THE CONTROL, from aeon by way of the hub: the
+   * choice is a TRADE and not a preference, the author picking which plane's
+   * sixteen-pixel edge is the correct one. A fifth word in a dropdown cannot
+   * carry that, so the surface has to show the trade. No control exists yet;
+   * today the value round-trips and the advisories reason about it.
+   */
+  left_column_mask?: 'undeclared' | 'sprite_mask' | 'factor0_lock' | 'accept' | 'decline_borrow';
   /*
    * `precision?: 'cell' | 'line'` LIVED HERE until 2026-08-27 (ROADMAP row 59).
    * empyrean 0bd4753 retired it from the contract because aeon deleted the
