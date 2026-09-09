@@ -98,8 +98,15 @@ describe('a pure doc-local composer document owns one undo stack', () => {
   // must leave it dirty.
   it('leaves a document that OPENED dirty dirty when it is unwound', () => {
     useArtStore.getState().openDocument(newTileDoc(true));
+    const doc = useArtStore.getState().open!.doc;
     docLocalStroke(7);
     focusedHistory()!.undo();
+    // ⚠ THE PIXEL ASSERTION IS WHAT KEEPS THIS ROW FROM BEING VACUOUS, and it
+    // was added after a mutation run: with the `focusedDocId` branch reverted the
+    // undo reached the zone-art stack and did nothing, and "still dirty" was
+    // trivially true. It has to say the undo HAPPENED before it can say what the
+    // undo left behind.
+    expect(pixel0(doc)).toBe(-1);
     expect(useArtStore.getState().open!.dirty).toBe(true);
   });
 
@@ -108,6 +115,9 @@ describe('a pure doc-local composer document owns one undo stack', () => {
     const doc = useArtStore.getState().open!.doc;
     docLocalStroke(7);
     focusedHistory()!.undo();
+    // Same anti-vacuous rule as the row above: an undo that did nothing also
+    // leaves the object identity alone.
+    expect(pixel0(doc)).toBe(-1);
     // ComposerCanvas keys its "the document changed identity" effect on
     // `open?.doc`; a restore that swapped the object would drop the marquee and
     // the stamp flips on every Ctrl+Z.
