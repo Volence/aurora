@@ -3190,6 +3190,23 @@ export default function MapViewport() {
         revertBgStroke(bgs);
         bgStroke.current = null;
         bgRefusalShown.current = false;
+        // ⚠ AND THE DRAG ITSELF ENDS, which is what the two arms above already do
+        // (`isDragging` for the object drag, `isPaintDragging` for the FG stroke)
+        // and this one did not. Dropping `bgStroke.current` alone put the CARRIER
+        // back and left the GESTURE armed: the button is still down, so the very
+        // next mousemove fell through to the paint-drag branch, called
+        // `paintBgTile` again, and opened a BRAND-NEW stroke in the act that had
+        // just been switched to — an edit to a plane the author never pressed on,
+        // arriving immediately after a toast that says "Nothing was written".
+        // Found behaviourally by `map-viewport-mounted.test.ts` ("a paint after
+        // the switch writes into NEITHER plane"); the source scan could not see
+        // it, because every line it asserts was present and correct.
+        //
+        // Inside the `mustRevert` arm and not beside it: `background-switched`
+        // is the artist's own doing on an act they still own, `paintBgTile`
+        // flushes it into a command and the stroke CONTINUES. Ending the drag
+        // there would strand the held button mid-paint.
+        isPaintDragging.current = false;
         note(bgStrokeStaleReason(status));
       }
     }
