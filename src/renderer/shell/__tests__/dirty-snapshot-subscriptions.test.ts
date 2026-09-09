@@ -76,6 +76,10 @@ vi.mock('../../state/projectStore', async (io) => {
   const actual = await io<typeof import('../../state/projectStore')>();
   return { ...actual, useProjectStore: rec.wrap(actual.useProjectStore) };
 });
+vi.mock('../../state/artStore', async (io) => {
+  const actual = await io<typeof import('../../state/artStore')>();
+  return { ...actual, useArtStore: rec.wrap(actual.useArtStore) };
+});
 vi.mock('../../state/editorStore', async (io) => {
   const actual = await io<typeof import('../../state/editorStore')>();
   return { ...actual, useEditorStore: rec.wrap(actual.useEditorStore) };
@@ -88,6 +92,8 @@ vi.mock('../../hooks/useHistoryVersion', async (io) => {
 import { useDirtySnapshot } from '../dirty-snapshot';
 import { openCanvasDoc, useCanvasStore } from '../../state/canvasStore';
 import { useSpriteStore } from '../../state/spriteStore';
+import { useArtStore } from '../../state/artStore';
+import { createDoc } from '../../../core/art/composer-buffer';
 import { canvasDocTab } from '../tabs';
 
 const CANVAS = canvasDocTab('sky').id;
@@ -111,6 +117,7 @@ function wouldRepaint(reads: (() => unknown)[], mutate: () => void): boolean {
 beforeEach(() => {
   useCanvasStore.getState().closeAll();
   useSpriteStore.getState().setUnsavedEdits(false);
+  useArtStore.getState().closeDocument();
 });
 
 /** Flip a canvas document's `unsavedEdits` WITHOUT recording an undo entry —
@@ -156,6 +163,22 @@ describe('useDirtySnapshot subscriptions', () => {
         CANVAS, { pngMtimeMs: 1, sidecarMtimeMs: 1 },
         useCanvasStore.getState().docs.get(CANVAS)!.editGen,
       );
+    })).toBe(true);
+  });
+
+  it('the aeon composer going dirty repaints the tab strip', () => {
+    // The composer has no tab of its own, so the level tab's dot is the only
+    // place its unsaved state can appear — which makes the delivery half of
+    // that dot exactly as load-bearing as the rule half. `markOpenDirty`
+    // records no undo entry (ComposerCanvas calls it and no command), so the
+    // artStore subscription is the only candidate here, twice over: the history
+    // clock is stubbed to a constant for this whole file.
+    useArtStore.getState().openDocument({
+      doc: createDoc(2, 2), liveTileIndex: null, chunkId: null, name: 'New Chunk', dirty: false,
+    });
+    const reads = subscribedReads();
+    expect(wouldRepaint(reads, () => {
+      useArtStore.getState().markOpenDirty();
     })).toBe(true);
   });
 

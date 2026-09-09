@@ -123,11 +123,58 @@ export function currentOpenDirtySnapshot(): OpenDirtySnapshot {
   // with no aeon project, would be a FOURTH instance of this same defect — Save
   // offered over work its saver will skip. Deriving these two from `openEngine()`
   // instead would be the stricter reading, and it is deliberately not done here:
-  // no reproduction of either state was found (classicProjectStore.openDirectory
-  // resets the level store on a switch, and editorStore.dirty is set by commands
-  // that need a resident project), and tightening it on an unreproduced case
-  // would drop the Save button in states this guard is right about today. If a
-  // reproduction turns up, this is the line to change and the shape to copy.
+  // no reproduction of either state was found, and tightening on an unreproduced
+  // case is not a change this file should carry. If a reproduction turns up, this
+  // is the line to change and the shape to copy.
+  //
+  // ── WHAT THE SECOND LOOK ADDED (2026-09-09) ─────────────────────────────
+  //
+  // The paragraph above used to give its reason as "classicProjectStore
+  // .openDirectory resets the level store on a switch, and editorStore.dirty is
+  // set by commands that need a resident project". Right about the conclusion,
+  // wrong about the extent, so both halves are restated from the census rather
+  // than from the two mechanisms that came to mind first.
+  //
+  // CLASSIC. The reason is stronger than the reset. `classicLevelStore.dirty` has
+  // exactly one writer, `applyCommit`, reached only through `commitLayout` and
+  // `commitArt`, and both of those call `requireClassicHistory` FIRST, which
+  // throws unless the classic project is open. So `classicDirty` implies
+  // `openEngine() === 's1'` by construction, which also covers the case the reset
+  // alone would not: an edit that lands late, after a switch has begun.
+  //
+  // AEON. "commands that need a resident project" names two of the nine
+  // production `markDirty()` call sites (executeCommand and
+  // executeAmbientCommand). The other seven are not commands at all: chunk
+  // library import twice, the composer's new-chunk save, the marquee paste, and
+  // three gesture-time sites in MapViewport. The conclusion survives on a wider
+  // basis than the original sentence gave it: all nine sit on surfaces that mount
+  // only on the aeon branch (workspace/facet-registry.ts's mapFacet defaults are
+  // aeon-bound and all five s1 facets override Canvas with their own), and
+  // `openEngine()` can flip from 'aeon' to 's1' only through
+  // `classicProjectStore.openDirectory`, whose production callers are
+  // `useProject.openPath` (guarded by confirmProjectOpen, which markCleans on
+  // discard and refuses to proceed while the re-snapshot is dirty), the Project
+  // Setup tab's re-validate (a classic project is already open there, so the
+  // engine was already 's1'), and the agent's `classic-open-project` (which
+  // refuses outright on any dirt). `useProjectStore.reset()` has no production
+  // caller, so `project` never returns to null and `openEngine()` never falls
+  // back to null with an aeon project's dirt still resident.
+  //
+  // WHERE A REPRODUCTION WOULD COME FROM, since the state is constructible: the
+  // two DEBUG hooks that open a project with no guard at all, `__aurora.classic
+  // .openDir` and `__aurora.aeon.open` (renderer/debug-hooks.ts). Those are the
+  // only unguarded doors left, and neither is a user gesture.
+  //
+  // ⚠ AND THE STATED RISK OF TIGHTENING DID NOT SURVIVE THE LOOK EITHER, so do
+  // not quote it as the reason. "It would drop the Save button in states this
+  // guard is right about today" has no example: the classic-level saver's own
+  // `isDirty` is `openEngine() === 's1'` and does not consult `classicDirty` at
+  // all, so `classicDirty` true implies that saver fires; the aeon term would
+  // become the aeon saver's own predicate, which is the shape the canvas, sprite
+  // and composer terms already use. The honest reason to leave this alone is the
+  // narrower one: with no reproduction there is nothing to verify a change
+  // against, and a guard edit whose only evidence is an argument is how a
+  // correct-looking rule gets applied in the wrong scope later.
   const unsavable: string[] = [];
   const noFileCanvases = dirtyCanvases.length - saveableCanvases.length;
   if (noFileCanvases > 0) {

@@ -6,9 +6,22 @@
 // core/project/adapter.ts.
 import type { GuardConflict } from '../core/project/save-guard';
 
+// THERE IS NO "OPEN A PROJECT" CHANNEL, and that is the design rather than a
+// gap. `OPEN_PROJECT: 'project:open'` used to head this table and was never
+// registered with `ipcMain.handle`, never exposed on the preload bridge, and
+// never invoked: the string appeared once in the whole tree, on its own
+// declaration. Opening a project is a renderer-side composition of channels that
+// DO exist (SELECT_DIRECTORY for the dialog, then READ_BINARY_FILE / DIR_PROBE /
+// READ_MANY through the FileAccess bridge), driven by classicProjectStore's
+// openDirectory and state/aeon-open.ts, so nothing was lost by dropping it.
+// Measured before deleting: a reference to the constant typechecks at rc=0 while
+// it is declared, and fails with TS2339 naming the line once it is gone. A
+// declared-but-unregistered channel is the worse of those two, because the
+// failure it produces is an unhandled invoke at runtime rather than a compile
+// error at the call site. If project opening ever does want its own channel, it
+// gets one here WITH a handler and a preload method in the same change.
 export const IPC_CHANNELS = {
   READ_BINARY_FILE: 'file:read-binary',
-  OPEN_PROJECT: 'project:open',
   SELECT_DIRECTORY: 'dialog:select-directory',
   GET_RECENT_PROJECTS: 'projects:get-recent',
   ADD_RECENT_PROJECT: 'projects:add-recent',

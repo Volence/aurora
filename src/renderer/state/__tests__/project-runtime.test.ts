@@ -11,6 +11,8 @@ import { useSessionStore } from '../sessionStore';
 import { useEditorStore } from '../editorStore';
 import { useSpriteStore, openSpriteDoc, patchSpriteDoc } from '../spriteStore';
 import { useArtStore } from '../artStore';
+import { tabHasDirtyDot } from '../../shell/dirty-tabs';
+import { currentDirtySnapshot } from '../../shell/dirty-snapshot';
 import { createDoc } from '../../../core/art/composer-buffer';
 import { createSection } from '../../../core/model/s4-types';
 
@@ -427,5 +429,41 @@ describe('art-composer saver', () => {
     aeonProjectOpen();
     dirtyComposer();
     expect(saveCoordinator.activeSaver('level:z:1')?.id).not.toBe('art-composer');
+  });
+
+  // ── The dot/save seam (ART-DIRTY-NOT-IN-SNAPSHOT) ────────────────────────
+  //
+  // The composer now dots the level tab it lives inside, because it has no tab
+  // of its own. That dot must NOT reach the save routing: the aeon-project
+  // saver owns 'level:z:1' and does not write the composer document, so a
+  // composer-only dirt enabling Ctrl+S there would run saveAeonProject, write
+  // nothing the author was looking at, and leave the dot up. Ctrl+S therefore
+  // reads `levelDocDirty`, and the strip reads `tabHasDirtyDot`.
+  //
+  // ⚠ THIS ROW PASSES ON BOTH SIDES OF THE SPLIT AND IS A CONTROL, NOT A
+  // RED-FIRST ROW. What makes it worth its lines is that it goes red under the
+  // NAIVE version of this change — registering the two savers' scope.isDirty
+  // against `tabHasDirtyDot` after teaching that rule about the composer, which
+  // is the obvious one-line way to do it. Measured: with the scopes pointed back
+  // at `tabHasDirtyDot`, this row fails on the first expect.
+  it('the composer dot does NOT enable Ctrl+S on the level tab it dots', async () => {
+    aeonProjectOpen();
+    dirtyComposer();
+    // The dot is on…
+    expect(tabHasDirtyDot('level:z:1', 'level', currentDirtySnapshot())).toBe(true);
+    // …and Ctrl+S there has nothing to write.
+    expect(canSaveActive('level:z:1')).toBe(false);
+
+    const log: string[] = [];
+    __setRuntimeSaversForTest({ aeon: async () => { log.push('aeon'); } });
+    const r = await saveActive('level:z:1');
+    expect(log).toEqual([]);
+    expect(r.saved).toEqual([]);
+    expect(r.skipped).toContain('aeon-project');
+    // CONTROL for the control: the same tab with a genuinely dirty PROJECT does
+    // route, so the assertions above are not passing because the seam is inert.
+    useEditorStore.getState().markDirty();
+    expect(canSaveActive('level:z:1')).toBe(true);
+    expect((await saveActive('level:z:1')).saved).toEqual(['aeon-project']);
   });
 });
