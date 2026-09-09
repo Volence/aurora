@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import type { AetherStatusPayload } from '../../shared/ipc-types';
 import { useBusStore } from './busStore';
+// A leaf store (no imports of its own beyond zustand), so no cycle. It is here
+// for one reason: a connect that fails had NO visible outcome at all — see
+// CONNECT_FAILED_PREFIX below.
+import { useToastStore } from './toastStore';
 
 /**
  * The renderer's view of the outbound Aether link, and the throttle in front of
@@ -118,6 +122,15 @@ let inFlight = false;
  * queued push must land against the family it was made for even if the open
  * project changes mid-throttle.
  */
+/**
+ * Prefix of the toast a REFUSED connect raises (seat B's F4 — see `connect`).
+ *
+ * Exported so the test asserts the string the store actually emits rather than
+ * a copy of it: a row that hardcodes the prose passes forever after the prose
+ * is edited to something wrong.
+ */
+export const CONNECT_FAILED_PREFIX = 'Aether: could not connect. ';
+
 let queued = new Map<number, { words: number[]; kind: 'aeon' | 'classic' }>();
 let lastPushAt = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -162,6 +175,42 @@ export const useAetherStore = create<AetherState>((set, get) => ({
     set({ status: 'connecting', error: undefined });
     const s = await window.api.aetherConnect();
     get().apply(s);
+    // ACTING ON A CONTROL MUST PRODUCE A VISIBLE RESPONSE — UX seat B, F4.
+    //
+    // The seat pressed `Aether ◇ offline` in the status bar and waited 5.5s;
+    // the before and after screenshots were THE SAME SCREEN, down to the
+    // badge's computed colour. It pressed a second time, because the first
+    // press had produced nothing a person could see. Still nothing. It learned
+    // the connection had been refused only by reading the button's `title`
+    // attribute out of the DOM — a channel that requires you to already suspect
+    // the failure and hover on the thing you just pressed.
+    //
+    // The mechanism: a refused connect walks 'disconnected' → 'connecting' →
+    // 'disconnected', and the badge renders `status` verbatim, so the label it
+    // ends on is character-for-character the one it started from. `error` lands
+    // in this store and reaches only the tooltip. SUCCESS never had this
+    // problem — the label becomes `connected · …` — which is why the gap
+    // survived: the visible half worked on the path people test.
+    //
+    // ⚠ THE TEXT IS THE PRODUCER'S, RELAYED VERBATIM, not rewritten here. One
+    // of the two refusals seat B provoked is excellent (it names the 104-byte
+    // unix-socket limit, the remedy, and the offending path) and the other is a
+    // raw Node errno (`connect ENOENT /tmp/uxb-dead.sock`) that says nothing
+    // about what Aether is or that an emulator must be running. Improving the
+    // second is a change to the MAIN process's message and a separate call;
+    // showing either one at all is this one, and it is the half that outranks
+    // the wording — neither message was SHOWN.
+    if (get().status !== 'connected') {
+      const why = get().error;
+      useToastStore.getState().addToast(
+        // An absent reason is SAID to be absent rather than papered over with a
+        // plausible guess: this file's own badge doctrine (AetherStatus.tsx),
+        // and reporting blindness as a clean result is this repo's dominant
+        // defect class.
+        `${CONNECT_FAILED_PREFIX}${why ?? 'the main process reported no reason'}`,
+        'error',
+      );
+    }
   },
 
   disconnect: async () => {
