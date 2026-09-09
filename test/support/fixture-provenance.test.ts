@@ -91,6 +91,23 @@ afterAll(() => {
   rmSync(work, { recursive: true, force: true });
 });
 
+/**
+ * ISO timestamps blanked out.
+ *
+ * ⚠ THIS IS LOAD-BEARING AND WAS MISSING, and the plant that established these
+ * rows is what found it. The dirty-state claim renders its own capture time
+ * inside its `tracks:` sentence, on purpose, because the claims do not share a
+ * clock. Two renderings of the same repository are therefore ALWAYS unequal by
+ * a few milliseconds, so a row comparing them raw can never fail: with the mode
+ * distinction deleted from the module, "the two renderings actually differ"
+ * stayed GREEN while the row beside it went red. A vacuous green next to a real
+ * red is the failure this repo pays for most often, so the comparison is made
+ * on the text with the clock removed and the timestamp gets its own row.
+ */
+function unclocked(text: string): string {
+  return text.replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z/g, '<TIME>');
+}
+
 /** The `tracks:` sentence rendered for one claim, by label. */
 function tracksOf(text: string, label: string): string {
   const lines = text.split('\n');
@@ -164,10 +181,17 @@ describe('ONE dirty repository, read two ways, must not render one sentence', ()
     // Same directory, same commit, same dirt. If these ever render alike the
     // module has fused two claims back into one and the reader cannot tell a
     // fixture that a revision names from one it does not.
-    expect(committed).not.toBe(worktree);
-    expect(tracksOf(committed, 'revision')).not.toBe(tracksOf(worktree, 'revision'));
-    expect(tracksOf(committed, 'gatepeer working tree'))
-      .not.toBe(tracksOf(worktree, 'gatepeer working tree'));
+    expect(unclocked(committed)).not.toBe(unclocked(worktree));
+    expect(unclocked(tracksOf(committed, 'revision')))
+      .not.toBe(unclocked(tracksOf(worktree, 'revision')));
+    expect(unclocked(tracksOf(committed, 'gatepeer working tree')))
+      .not.toBe(unclocked(tracksOf(worktree, 'gatepeer working tree')));
+    // The one thing that must be IDENTICAL: the measurement itself. The modes
+    // differ in what the dirt MEANS, not in what git counted. If these ever come
+    // apart the module is deriving the dirty state twice.
+    expect(unclocked(tracksOf(committed, 'gatepeer working tree'))).not.toBe('');
+    expect(committed).toContain('DIRTY, 1 path(s) uncommitted');
+    expect(worktree).toContain('DIRTY, 1 path(s) uncommitted');
   });
 
   it('a clean tree says so rather than saying nothing', () => {
