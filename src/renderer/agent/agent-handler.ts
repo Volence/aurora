@@ -44,6 +44,7 @@ import { regenerateShiftCommand } from '../providers/bg-anim-art';
 import { BG_SECTION_BINDING_LIMIT } from '../../core/formats/bg-binding';
 import { RASTER_SECTION_BINDING_LIMIT } from '../../core/formats/raster-binding';
 import { makeSetBgOverrideTilesCommand } from '../../core/editing/bg-override-art';
+import { saveConflictMessage } from '../../core/project/conflict-message';
 import { buildStampCommand } from '../../core/editing/map-stamp';
 import { withLinkBreaks } from '../../core/editing/chunk-links';
 import { ensureCollisionPlanes } from '../../core/collision/collision-cell-resolve';
@@ -1552,10 +1553,17 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         case 'nothing':
           return result;
         case 'conflict':
-          throw new Error(
-            `Save aborted: ${result.conflicts.length} file(s) changed on disk since the act was read ` +
-            `(${result.conflicts.slice(0, 3).join(', ')}). Reopen the act to pick up the external changes.`,
-          );
+          // Surface 2 of the five in ONE-MESSAGE-FOUR-CAUSES. This said
+          // "N file(s) changed on disk ... Reopen the act to pick up the external
+          // changes" for all four causes the guard distinguishes, which told an
+          // agent a deleted file had changed and pointed it at a reopen that
+          // recovers nothing. `saveConflictMessage` (core/project/conflict-message.ts)
+          // owns the wording and decides whether the reopen advice is honest here.
+          throw new Error(saveConflictMessage(result.conflicts, {
+            lead: 'Save aborted:',
+            reload: { imperative: 'Reopen the act' },
+            maxPaths: 3,
+          }));
         case 'partial':
           throw new Error(
             `Save incomplete: the write failed at ${result.failed.path} (${result.failed.message}); ` +

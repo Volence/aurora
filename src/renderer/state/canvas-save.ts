@@ -25,6 +25,7 @@ import { canvasDocState, useCanvasStore } from './canvasStore';
 import { saveCanvasFile, type GuardedWriteApi } from './canvas-file';
 import { useToastStore } from './toastStore';
 import type { SaveReport } from './save-outcome-report';
+import { saveConflictAdvice } from '../../core/project/conflict-message';
 
 /**
  * Write a canvas document back to the pair it was loaded from.
@@ -96,16 +97,25 @@ export async function saveCanvasDocument(
       );
     }
     if (res.kind === 'conflict') {
-      // Main wrote NOTHING, so no baseline moves. Reopening is the only
-      // recovery Aurora offers in 2A (there is no merge UI), and saying so is
-      // the difference between a dead end and an instruction. Built ON TOP of
-      // `res.error` rather than restating it: canvas-file.ts already names the
-      // files and says nothing was written, and a second hand-written copy of
-      // that sentence is one that drifts.
-      throw new Error(
-        `${res.error}. Reopen the canvas to pick up the external change ` +
-        '(your unsaved edits in this tab will be lost).',
-      );
+      // Main wrote NOTHING, so no baseline moves. Built ON TOP of `res.error`
+      // rather than restating it: canvas-file.ts already names the files and says
+      // nothing was written, and a second hand-written copy of that sentence is
+      // one that drifts.
+      //
+      // Surface 4 of the five in ONE-MESSAGE-FOUR-CAUSES, and the one a grep for
+      // "changed on disk" does not find, because it contributed only the REMEDY.
+      // It appended "Reopen the canvas to pick up the external change (your
+      // unsaved edits in this tab will be lost)" unconditionally -- correct when a
+      // file changed, and wrong for the other three causes: reopening cannot
+      // restore a deleted file, and for a canvas whose png APPEARED under it the
+      // instruction would trade the author's unsaved work for a file they have
+      // never seen. `saveConflictAdvice` emits the reopen sentence only when
+      // reopening is what fixes it, and a true statement otherwise.
+      const advice = saveConflictAdvice(res.conflicts ?? [], {
+        imperative: 'Reopen the canvas',
+        caveat: 'your unsaved edits in this tab will be lost',
+      });
+      throw new Error(advice ? `${res.error} ${advice}` : res.error);
     }
     if (res.kind === 'channel-error') {
       // The disk state is UNKNOWN — the call never came back — so deliberately

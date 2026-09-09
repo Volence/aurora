@@ -67,7 +67,7 @@ describe('performGuardedWrite', () => {
       { relPath: 'a.bin', bytes: new Uint8Array([0xaa]), expectedMtimeMs: ma },
       { relPath: 'b.bin', bytes: new Uint8Array([0xbb]), expectedMtimeMs: mb - 1000 },
     ]);
-    expect(res).toEqual({ conflicts: ['b.bin'] });
+    expect(res).toEqual({ conflicts: [{ relPath: 'b.bin', cause: 'changed', reason: null }] });
     // Neither file was touched — all-or-nothing.
     expect(readBytes('a.bin')).toEqual(new Uint8Array([1]));
     expect(readBytes('b.bin')).toEqual(new Uint8Array([2]));
@@ -78,8 +78,65 @@ describe('performGuardedWrite', () => {
     const res = await performGuardedWrite(dir, [
       { relPath: 'appeared.bin', bytes: new Uint8Array([8]), expectedMtimeMs: null },
     ]);
-    expect(res).toEqual({ conflicts: ['appeared.bin'] });
+    expect(res).toEqual({ conflicts: [{ relPath: 'appeared.bin', cause: 'appeared', reason: null }] });
     expect(readBytes('appeared.bin')).toEqual(new Uint8Array([7]));
+  });
+
+  // ═══ THE FOUR CAUSES, AGAINST REAL FILESYSTEM STATES ═══════════════════════
+  //
+  // ONE-MESSAGE-FOUR-CAUSES (lens sweep HIGH, 2026-09-08). The two rows above used
+  // to assert `{ conflicts: ['b.bin'] }` and `{ conflicts: ['appeared.bin'] }`: a
+  // list of PATHS, in which "changed" and "appeared" were the SAME VALUE. That is
+  // why five author-facing surfaces could tell everyone their files had changed and
+  // to reload, and why no test noticed. They now assert the cause.
+  //
+  // The two rows below are the causes nothing here covered at all.
+
+  it("conflicts as 'deleted' when a file present at read is gone at write time", async () => {
+    fs.writeFileSync(path.join(dir, 'gone.bin'), Buffer.from([5]));
+    const m = statMtime('gone.bin');
+    fs.unlinkSync(path.join(dir, 'gone.bin'));
+
+    const res = await performGuardedWrite(dir, [
+      { relPath: 'gone.bin', bytes: new Uint8Array([6]), expectedMtimeMs: m },
+    ]);
+    // NOT 'changed'. The file did not change; it went away, and the advice for the
+    // two is not the same advice.
+    expect(res).toEqual({ conflicts: [{ relPath: 'gone.bin', cause: 'deleted', reason: null }] });
+    // The refusal did not recreate it either.
+    expect(fs.existsSync(path.join(dir, 'gone.bin'))).toBe(false);
+  });
+
+  it("conflicts as 'unknown' when the file's state CANNOT BE READ, and does not call that deleted", async () => {
+    // A SYMLINK LOOP, not a chmod: `stat` on it is ELOOP on every platform this
+    // runs on, it needs no privileges, and it does not quietly go green when the
+    // suite runs as root (which is how a chmod-000 row stops measuring). The path
+    // EXISTS as a directory entry, so 'absent' is a false statement about it, which
+    // is what makes this row a proof rather than a restatement.
+    fs.symlinkSync('loop.bin', path.join(dir, 'loop.bin'));
+
+    const res = await performGuardedWrite(dir, [
+      { relPath: 'loop.bin', bytes: new Uint8Array([1]), expectedMtimeMs: 1234 },
+    ]);
+    expect('conflicts' in res).toBe(true);
+    if (!('conflicts' in res)) throw new Error('unreachable');
+    // THE DEFECT: `catch { return null }` in guarded-write's stat helper made this
+    // 'deleted', and the author of an intact file was told it had been deleted.
+    expect(res.conflicts).toHaveLength(1);
+    expect(res.conflicts[0].relPath).toBe('loop.bin');
+    expect(res.conflicts[0].cause).toBe('unknown');
+    expect(res.conflicts[0].cause).not.toBe('deleted');
+    expect(res.conflicts[0].reason).toMatch(/ELOOP/);
+  });
+
+  it("CONTROL: absent really is 'absent' and writes, so the ELOOP row is not just 'every failure is unknown'", async () => {
+    // Same shape of call against a path where there genuinely is nothing: this is
+    // NOT a conflict at all (expected null, still absent), so the write proceeds.
+    const res = await performGuardedWrite(dir, [
+      { relPath: 'brand-new.bin', bytes: new Uint8Array([3]), expectedMtimeMs: null },
+    ]);
+    expect('conflicts' in res).toBe(false);
+    expect(readBytes('brand-new.bin')).toEqual(new Uint8Array([3]));
   });
 
   it('partial batch: an fs error mid-write reports {written,failed,unwritten}, cleans up the orphan .tmp, no reject', async () => {
@@ -126,7 +183,7 @@ describe('performGuardedWrite', () => {
       { relPath: 'x.bin', bytes: new Uint8Array([99]), expectedMtimeMs: first.newMtimes['x.bin'] },
       { relPath: 'y.bin', bytes: new Uint8Array([88]), expectedMtimeMs: first.newMtimes['y.bin'] },
     ]);
-    expect(second).toEqual({ conflicts: ['y.bin'] });
+    expect(second).toEqual({ conflicts: [{ relPath: 'y.bin', cause: 'changed', reason: null }] });
     // Nothing from the second attempt landed — x untouched despite matching mtime.
     expect(readBytes('x.bin')).toEqual(before.x);
     expect(readBytes('y.bin')).toEqual(before.y);

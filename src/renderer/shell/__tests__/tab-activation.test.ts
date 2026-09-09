@@ -97,7 +97,7 @@ describe('activateLevelTarget (executor)', () => {
   });
 
   it('save failure resolves false and does not open (edits are not discarded)', async () => {
-    __setActivationSaveForTest(async (): Promise<SaveClassicProjectResult> => ({ kind: 'conflict', conflicts: ['levels/fg.bin'] }));
+    __setActivationSaveForTest(async (): Promise<SaveClassicProjectResult> => ({ kind: 'conflict', conflicts: [{ relPath: 'levels/fg.bin', cause: 'changed', reason: null }] }));
     const p = activateLevelTarget('level:mz:2');
     useConfirmStore.getState().answer('save');
     await expect(p).resolves.toBe(false);

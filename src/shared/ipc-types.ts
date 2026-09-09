@@ -1,3 +1,11 @@
+// GuardConflict is DEFINED IN CORE (core/project/save-guard.ts) and re-exported
+// through this wire type, rather than redeclared here: the guard is the only thing
+// that can produce a cause, and two declarations of the same four-case union are
+// two things that drift. Type-only, so nothing about core is pulled into the
+// preload bundle. Same posture as ReadOutcome flowing the other way, into
+// core/project/adapter.ts.
+import type { GuardConflict } from '../core/project/save-guard';
+
 export const IPC_CHANNELS = {
   READ_BINARY_FILE: 'file:read-binary',
   OPEN_PROJECT: 'project:open',
@@ -256,9 +264,17 @@ export interface GuardedWriteFile {
  *    `unwritten` lists the files after it that were never attempted — the batch
  *    is PARTIAL (per-file rename atomicity holds; batch atomicity does not).
  *    On a fully successful batch `failed`/`unwritten` are absent.
+ *
+ * ⚠ `conflicts` CARRIES A CAUSE PER FILE (`GuardConflict`), not a bare path. It was
+ * `string[]` until 2026-09-08 and that is what ONE-MESSAGE-FOUR-CAUSES was: the
+ * guard computes 'changed' / 'deleted' / 'appeared' / 'unknown' and used to throw
+ * the answer away, so five author-facing surfaces told everyone their files had
+ * changed and to reload. Reloading is the fix for one of the four. Read
+ * core/project/conflict-message.ts before writing any sentence from this list; it
+ * owns the wording and the enumeration of the surfaces.
  */
 export type GuardedWriteResult =
-  | { conflicts: string[] }
+  | { conflicts: GuardConflict[] }
   | {
       written: string[];
       newMtimes: Record<string, number>;
@@ -364,6 +380,8 @@ export interface PathProbe {
   presence: PathPresence;
   reason: string | null;
 }
+
+export type { GuardConflict } from '../core/project/save-guard';
 
 export interface MissingFileMarker { __missing: string }
 

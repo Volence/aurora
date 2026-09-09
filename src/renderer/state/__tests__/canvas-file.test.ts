@@ -174,13 +174,21 @@ describe('save and load', () => {
 
   it('reports a conflict without claiming a save', async () => {
     const doc = blankCanvasDoc({ name: 'sky', width: 8, height: 8, profileId: 'none' });
-    const api = fakeWriteApi(async () => ({ conflicts: ['.aurora/canvas/sky.png'] }));
+    const conflict = { relPath: '.aurora/canvas/sky.png', cause: 'appeared' as const, reason: null };
+    const api = fakeWriteApi(async () => ({ conflicts: [conflict] }));
     const res = await saveCanvasFile(DIR, 'sky', doc, { pngMtimeMs: 1, sidecarMtimeMs: 1 }, false, api);
     expect(res.ok).toBe(false);
     if (!res.ok) {
       expect(res.kind).toBe('conflict');
-      expect(res.error).toMatch(/changed on disk/i);
-      expect(res.conflicts).toEqual(['.aurora/canvas/sky.png']);
+      // ⚠ THIS USED TO BE `/changed on disk/i` ON AN APPEARED FILE. A png that
+      // appeared under a canvas Aurora had never seen did not change, and the
+      // sentence asserting it had was the defect (ONE-MESSAGE-FOUR-CAUSES).
+      expect(res.error).toMatch(/appeared on disk/);
+      expect(res.error).not.toMatch(/changed on disk/);
+      // canvas-file emits the CAUSE half only; canvas-save.ts owns the reopen
+      // advice, and a copy here would be the sentence said twice.
+      expect(res.error).not.toMatch(/Reopen/);
+      expect(res.conflicts).toEqual([conflict]);
     }
   });
 

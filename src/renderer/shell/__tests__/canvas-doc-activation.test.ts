@@ -375,7 +375,7 @@ describe('confirmCloseCanvasDoc', () => {
     // saveCanvasDocument reports failure by THROWING and never toasts (its
     // callers do), so a silent catch here would look like a dead Save button —
     // and closing anyway would destroy the work Save was meant to protect.
-    stubWriteGuarded(() => ({ conflicts: [canvasPngPath('sky')] }));
+    stubWriteGuarded(() => ({ conflicts: [{ relPath: canvasPngPath('sky'), cause: 'changed', reason: null }] }));
     openCanvasDoc(TAB.id, { name: 'sky', width: 8, height: 8, profileId: 'none' });
     useCanvasStore.getState().setSource(TAB.id, sourceFor('sky'));
     paint(TAB.id);

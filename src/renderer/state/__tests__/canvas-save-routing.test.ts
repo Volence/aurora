@@ -269,11 +269,47 @@ describe('saveCanvasDocument', () => {
 
   it('a conflict throws with recovery advice, writes nothing, and stays dirty', async () => {
     dirtyCanvas(TAB.id, 'sky');
-    const { api } = fakeApi(() => ({ conflicts: [canvasPngPath('sky')] }));
+    const { api } = fakeApi(() => ({ conflicts: [{ relPath: canvasPngPath('sky'), cause: 'changed', reason: null }] }));
 
-    await expect(saveCanvasDocument(TAB.id, api)).rejects.toThrow(/changed on disk/);
+    // THE SEAM BETWEEN SURFACES 3 AND 4 (ONE-MESSAGE-FOUR-CAUSES). canvas-file.ts
+    // contributes the cause clause and canvas-save.ts the reopen sentence; this row
+    // is named for the advice and used to assert only the cause, so nothing in the
+    // suite held the half that told the artist what to do.
+    const err = await saveCanvasDocument(TAB.id, api).then(
+      () => { throw new Error('the save resolved; it was supposed to reject'); },
+      (e: unknown) => (e instanceof Error ? e.message : String(e)),
+    );
+    expect(err).toMatch(/changed on disk/);
+    expect(err).toContain('Reopen the canvas to pick up the external changes');
+    expect(err).toContain('your unsaved edits in this tab will be lost');
+    // Said ONCE. Two surfaces build this string and a copy of the advice in either
+    // one would double it.
+    expect(err.match(/Reopen the canvas/g)).toHaveLength(1);
+
     expect(useCanvasStore.getState().isDirty(TAB.id)).toBe(true);
     // Nothing landed, so no baseline may move.
+    expect(useCanvasStore.getState().sourceOf(TAB.id)!.pngMtimeMs).toBe(1000);
+  });
+
+  it('a DELETED png is not answered with "reopen the canvas", because reopening cannot bring it back', async () => {
+    // The row the old code could not have passed: it appended the reopen
+    // instruction to every conflict, so an artist whose png had been deleted under
+    // them was told to reopen (which loses their unsaved work and recovers
+    // nothing). The CONTROL is the row above, where the same call DOES advise it.
+    dirtyCanvas(TAB.id, 'sky');
+    const { api } = fakeApi(() => ({ conflicts: [{ relPath: canvasPngPath('sky'), cause: 'deleted', reason: null }] }));
+
+    const err = await saveCanvasDocument(TAB.id, api).then(
+      () => { throw new Error('the save resolved; it was supposed to reject'); },
+      (e: unknown) => (e instanceof Error ? e.message : String(e)),
+    );
+    expect(err).toMatch(/was deleted on disk/);
+    expect(err).toContain('Reloading will not bring back a file that was deleted');
+    expect(err).not.toMatch(/Reopen the canvas/);
+    expect(err).not.toMatch(/changed on disk/);
+    // Still no baseline movement and still dirty: the refusal semantics are
+    // unchanged, only what the artist is told.
+    expect(useCanvasStore.getState().isDirty(TAB.id)).toBe(true);
     expect(useCanvasStore.getState().sourceOf(TAB.id)!.pngMtimeMs).toBe(1000);
   });
 
@@ -311,7 +347,7 @@ describe('saveCanvasDocument', () => {
     dirtyCanvas(TAB.id, 'sky');
     __setRuntimeSaversForTest({
       canvasDoc: async (docId: string) => {
-        await saveCanvasDocument(docId, fakeApi(() => ({ conflicts: ['x'] })).api);
+        await saveCanvasDocument(docId, fakeApi(() => ({ conflicts: [{ relPath: 'x', cause: 'changed', reason: null }] })).api);
       },
     });
 
