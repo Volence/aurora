@@ -12,6 +12,9 @@ import {
   type ObjectSprite,
 } from '../../state/classicObjectArtStore';
 import { objectArtKey } from '../../../core/project/profiles/object-subtype-rules';
+// The repo's attach-to-the-element effect, imported rather than re-derived: see the
+// wheel listener below and use-attached-effect.ts for the trap it exists to close.
+import { useAttachedEffect } from '../art-shared/use-attached-effect';
 import { objectSpriteEpoch } from '../../../core/level-classic/object-sprite-clock';
 import { useToastStore } from '../../state/toastStore';
 import { useAetherStore } from '../../state/aetherStore';
@@ -1593,22 +1596,58 @@ export default function ClassicLevelViewport() {
     return () => window.removeEventListener('keydown', onKey);
   }, [redraw]);
 
-  const onWheel = useCallback((e: React.WheelEvent) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const cam = camRef.current;
-    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-    const newZoom = Math.max(0.125, Math.min(8, cam.zoom * factor));
-    // Zoom about the cursor: keep the world point under the pointer fixed.
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
-    const { x: worldX, y: worldY } = screenToWorld(cam, sx, sy);
-    cam.x = Math.max(0, worldX - sx / newZoom);
-    cam.y = Math.max(0, worldY - sy / newZoom);
-    cam.zoom = newZoom;
-    redraw();
-  }, [redraw]);
+  // ═══ WHEEL ZOOM, ON A NATIVE NON-PASSIVE LISTENER ═══
+  //
+  // This was an `onWheel` PROP, and React registers root `wheel` listeners as
+  // PASSIVE — so a wheel over the classic map zoomed the map AND, with a modifier
+  // held, the whole application window underneath it (lens sweep,
+  // CLASSIC-WHEEL-NO-PREVENTDEFAULT). It was worse than the same defect on aeon's
+  // map surface in one specific way: THAT one had a dead `preventDefault` call a
+  // reader could notice and doubt, and this handler had no such call at all, so
+  // nothing in the source caught the eye.
+  //
+  // THE CONVENTION IS CITED, NOT REINVENTED. `art-shared/use-anchored-zoom.ts:11-12`
+  // states the rule and attaches a native `{ passive: false }` listener; the same
+  // fix landed on `components/MapViewport.tsx` tonight. This is that shape.
+  //
+  // AND ON `canvasRef`, THROUGH `useAttachedEffect`, for the reason that helper
+  // exists (use-attached-effect.ts): this canvas is CONDITIONALLY MOUNTED — the
+  // render below puts it behind `status === 'ready' && doc`, so on an idle or
+  // loading viewport the element does not exist — and a `useEffect(..., [])` that
+  // early-returns on a null ref never runs again, which is exactly how wheel zoom
+  // and drag pan died in classic's Chunk and Block tabs. A ref cannot be a
+  // dependency (populating `.current` does not re-render), so the helper compares
+  // the ELEMENT. The canvas rather than the always-mounted container, because the
+  // canvas is the surface the prop was on and the one that fills the box when there
+  // is a level; over the "open a level" placeholder there is nothing to zoom.
+  //
+  // `preventDefault` is UNCONDITIONAL, the convention's own reading: it is the
+  // modifier+wheel case (the browser's page zoom) that the user actually sees, so
+  // gating the suppression on a modifier would leave the only visible half running.
+  //
+  // Nothing store-shaped is captured here, so MapViewport's `getState()` rule does
+  // not apply: `camRef`/`canvasRef` are refs, `screenToWorld` is a pure import, and
+  // `redraw` is a `useCallback(..., [])` whose identity never changes — the
+  // re-attach-on-element-change contract is satisfied by construction.
+  useAttachedEffect(canvasRef, (canvas) => {
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const cam = camRef.current;
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      const newZoom = Math.max(0.125, Math.min(8, cam.zoom * factor));
+      // Zoom about the cursor: keep the world point under the pointer fixed.
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      const { x: worldX, y: worldY } = screenToWorld(cam, sx, sy);
+      cam.x = Math.max(0, worldX - sx / newZoom);
+      cam.y = Math.max(0, worldY - sy / newZoom);
+      cam.zoom = newZoom;
+      redraw();
+    };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', onWheel);
+  });
 
   // ---- render --------------------------------------------------------------
   return (
@@ -1639,7 +1678,6 @@ export default function ClassicLevelViewport() {
               onMouseUp={onMouseUp}
               onMouseLeave={onMouseLeave}
               onContextMenu={onContextMenu}
-              onWheel={onWheel}
               style={{
                 position: 'absolute', inset: 0,
                 cursor: tool === 'stamp-chunk' ? 'crosshair'
