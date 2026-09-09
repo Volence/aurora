@@ -42,6 +42,7 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
 import { AURORA_DIR, siblingPath, siblingPathSource } from '../test/support/sibling-root.mjs';
+import { announceFixture, READ_MODES } from './lib/fixture-provenance.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = AURORA_DIR;
@@ -77,6 +78,27 @@ if (!AEON || !fs.existsSync(AEON)) {
     + 'the base blobs are read from it by revision and cannot be substituted');
 }
 const REV = record.base.revision;
+
+// WHICH AEON THIS RUN IS ABOUT TO READ, printed before it reads anything, and
+// before the first PASS line a person would otherwise take as the whole story.
+// Aurora's lens ledger, FIXTURE-REVISION-UNSTAMPED: a run that does not say
+// which revision produced its fixture makes a stale result indistinguishable
+// from a fresh one. Mode is COMMITTED because every base blob below comes from
+// `git show <rev>:<path>`, so aeon's working tree never reaches this gate --
+// and the stamp says that in words rather than leaving it to be inferred.
+let provenance = '';
+announceFixture(
+  { peer: 'aeon', mode: READ_MODES.COMMITTED, ref: REV, dir: AEON, dirSource: siblingPathSource('aeon') },
+  (s) => { provenance += s; },
+);
+process.stdout.write(provenance);
+// The stamp goes through `ok()` and not only through the terminal, so it is a
+// ROW and not decoration. A printed line nobody asserts on is deletable in a
+// tidy-up without anything going red, which is how the gate would quietly stop
+// saying which revision it read while continuing to say GATE GREEN.
+ok('the run stamped the aeon revision it read',
+  provenance.includes(REV) && provenance.includes('COMMITTED OBJECTS'),
+  `${REV.slice(0, 8)} from the object database`);
 
 function baseBlob(p) {
   try {

@@ -33,12 +33,48 @@ import {
   libraryChannelChooserCalls, channelChooserName, sectionExtraChannelsCondition,
   extraChannelsAdvisory, EXTRA_SECTION_CHANNELS, type SectionRasterWiring,
 } from '../section-wiring';
-import { siblingPathOrUnresolved } from '../../../../../test/support/sibling-root.mjs';
+import { siblingPathOrUnresolved, siblingPathSource } from '../../../../../test/support/sibling-root.mjs';
+import {
+  announceFixture, READ_MODES,
+} from '../../../../../scratchpad/lib/fixture-provenance.mjs';
 
 const AEON = siblingPathOrUnresolved('aeon');
 const DESC = join(AEON, 'games/sonic4/data/levels/ojz/act1/act_descriptor.emp');
 const LIB = join(AEON, 'games/sonic4/data/effects/ojz_effects.emp');
 const haveTree = existsSync(DESC) && existsSync(LIB);
+
+/**
+ * WHICH AEON THIS RUN READ, printed before the rows that read it.
+ *
+ * Aurora's lens ledger, FIXTURE-REVISION-UNSTAMPED. The describe block below is
+ * titled "the numbers as they stand today", and until this stamp existed the
+ * run never said WHICH today. These rows open aeon's files BY PATH, so their
+ * colour is decided by whatever that lane has on disk, committed or not, and a
+ * result three weeks stale looked exactly like a fresh one.
+ *
+ * The mode is WORKTREE and that is the whole point of stamping it: the block
+ * prints the checkout's HEAD, and it prints alongside it, in words, that HEAD
+ * names only the BASE and not the bytes these rows read. When that tree is
+ * dirty, no revision describes this run's input, and the reader is told so
+ * instead of being handed a SHA that looks like an identity.
+ */
+let provenance = '';
+if (haveTree) {
+  announceFixture(
+    {
+      peer: 'aeon',
+      mode: READ_MODES.WORKTREE,
+      dir: AEON,
+      dirSource: siblingPathSource('aeon') ?? 'siblingPathOrUnresolved(\'aeon\')',
+      // A checkout that is somehow not a git repository still gets read by the
+      // rows below, so this must not refuse the run. It renders a loud UNKNOWN
+      // and the row asserting on the stamp still sees it.
+      allowUnrevisioned: true,
+    },
+    (s: string) => { provenance += s; },
+  );
+  process.stderr.write(provenance);
+}
 
 // ---------------------------------------------------------------------------
 // Synthetic fixtures — the shapes the real tree cannot produce
@@ -479,6 +515,20 @@ describe('against aeon\'s real ojz/act1: the numbers as they stand today', () =>
       + 'files still parse the way this module expects.');
     return false;
   };
+
+  it('the run SAID which aeon these numbers are today, and that HEAD does not name them', (ctx) => {
+    if (!need(ctx)) return;
+    // The row this block was missing. Without it "the numbers as they stand
+    // today" is a claim about an unnamed input, and a stale reading of it is
+    // indistinguishable from a current one.
+    expect(provenance, 'these rows read aeon\'s files by path and the run printed no provenance, '
+      + 'so nothing in this result says which aeon decided it').not.toBe('');
+    expect(provenance).toContain('WORKING TREE');
+    // The load-bearing half: a HEAD is printed, and it is printed with the
+    // sentence that stops it being read as an identity for these bytes.
+    expect(provenance).toContain('does NOT name the bytes this run read');
+    expect(provenance).toMatch(/working tree +: (DIRTY, \d+ path\(s\) uncommitted|clean, nothing uncommitted|UNKNOWN: )/);
+  });
 
   it('every section 0-8 binds a preset record', (ctx) => {
     if (!need(ctx)) return;
