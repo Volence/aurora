@@ -4,10 +4,10 @@
  *
  * ═══ THE FINDING THIS FILE WAS BUILT FOR ═══
  *
- * `src/core/agent/budget.ts` answers the `check_budget` tool. It reports
- * `limit: FG_TILE_LIMIT` and a boolean `fits`, and `editor-methods.ts` puts the
- * same number in the tool's DESCRIPTION, which is the only place an agent can
- * learn its budget before spending it. That number was 1024, under the comment
+ * `src/core/agent/budget.ts` answers the `check_budget` tool, and
+ * `editor-methods.ts` puts this number in the tool's DESCRIPTION, which is the
+ * only place an agent can learn its budget before spending it. That number was
+ * 1024, under the comment
  * "BG region starts at tile slot 1024 ($400); FG group unions must fit below it."
  *
  * THE PREMISE WAS TRUE AND THE CONCLUSION WAS FALSE. aeon's BG arena does begin
@@ -44,6 +44,18 @@
  * twice here and once there. That mismatch is NOT measured by anything in this
  * repo and is not fixed by this file; see
  * docs/reviews/2026-09-09-guard-residue-offschema.md §3.
+ *
+ * ⚠ AND IT GATES THE WRONG UNIT'S DIVIDEND, WHICH IS NOT THIS FILE'S JOB TO FIX.
+ * The quantity that can actually refuse an act is its PACKED PAGE COUNT against
+ * aeon's page-frame count, not its tile count against this ceiling. This number
+ * is the DIVIDEND of that frame count rather than a budget in its own right.
+ * The unit correction and its own gate live in
+ * `fg-page-frame-currency.test.ts`; the packet is
+ * docs/reviews/2026-09-09-budget-page-unit.md. One of the two questions that
+ * review §3.3 left open (whether fragmentation can refuse an act whose tile
+ * count fits) is now ANSWERED and closed: it cannot, because the frames are
+ * fixed-size. The other (the two-group split) is still open, and answering the
+ * first did not make this reading equivalent to aeon's.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -132,9 +144,9 @@ describe('FG_TILE_LIMIT is still what aeon declares the FG art pool to be', () =
         + `  Aurora's FG_TILE_LIMIT is ${FG_TILE_LIMIT}; aeon declares ${m[1]} at ${tip}.\n`
         + `  Authority: ${a.quote} in ${a.path}.\n`
         + `  Read it:   git -C <aeon> show ${tip}:${a.path}\n`
-        + '  Aurora shows this number to an author as their FG tile budget and derives\n'
-        + '  check_budget\'s `fits` from it, so a stale one is a wrong budget on the\n'
-        + '  generous side: an act Aurora calls fitting that aeon will not take.\n'
+        + '  This is the DIVIDEND of the page-frame count check_budget shows an author\n'
+        + '  (FG_PAGE_FRAMES is derived from it), so a stale one is a wrong budget on the\n'
+        + '  generous side: an act Aurora declines to refuse that aeon will not take.\n'
         + '  Update src/core/export/vram-coloring.ts and re-read its citation block.',
       ).toBe(FG_TILE_LIMIT);
     });
