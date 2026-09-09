@@ -937,13 +937,34 @@ export const EFFECTS_PRESET_PROGRAM_ARMS: readonly string[] = (() => {
  *
  * ⚠ WHAT HAPPENS IF THIS DERIVATION GOES WRONG, because "an empty list" is the
  * shape a broken regex returns and this must not be able to pass quietly. If the
- * sentence moves, `boundary` falls back INTO `EFFECTS_PRESET_RASTER_CHANNELS`,
- * and the renderer's per-channel registries — `RASTER_CHANNEL_NOUNS`,
- * `PROGRAM_ARM_LABELS` — have module-load guards that throw on a channel with
- * no entry. So the failure surfaces as a LOUD refusal to load the panel, not as
- * a boundary document silently offered a raster editor. That is the direction
- * this file is allowed to fail in; it is asserted by a poison row in
- * test/formats/effects-preset-boundary.test.ts rather than assumed.
+ * sentence moves — or if an arm's property node carries no `description` at all,
+ * which is the input the `?? ''` below exists for — `boundary` falls back INTO
+ * `EFFECTS_PRESET_RASTER_CHANNELS`. The failure is LOUD anyway, and it is worth
+ * knowing WHICH surface makes it loud, because the answer changed:
+ *
+ *   NOT the per-channel registries any more. They were keyed by the RASTER list
+ *   and had no `boundary` entry, so a collapsed classification made the provider
+ *   refuse to load. EW-BOUNDARY-PANEL keyed them by ARM instead (which is what
+ *   lets the fourth arm be authored at all) and that consequence went away with
+ *   it; `RASTER_CHANNEL_NOUNS`, named here until 46bfbb58, no longer exists.
+ *
+ *   WHAT IS LOUD TODAY is `PROGRAM_ARM_OPTIONS` in
+ *   `src/renderer/providers/effects-preset.ts`. The dropdown LABEL is
+ *   hand-written there and says "(patched, not raster)"; this classification is
+ *   DERIVED from the schema. Two independent statements of one fact, compared in
+ *   BOTH directions at module load, so a collapsed classification throws.
+ *
+ * So the failure surfaces as a LOUD refusal to load the panel, not as a boundary
+ * document silently offered a raster editor. That is the direction this file is
+ * allowed to fail in, and BOTH inputs are asserted rather than assumed: the
+ * sentence rewritten, by the poison row in
+ * test/formats/effects-preset-boundary.test.ts; the description key ABSENT — the
+ * one that actually reaches the `?? ''` — by
+ * test/formats/effects-fallback-census.test.ts.
+ *
+ * ⚠ DO NOT restore the old reason without restoring the old mechanism. A correct
+ * rule with a stale reason cannot be caught by testing the rule, and the next
+ * reader to refactor `PROGRAM_ARM_OPTIONS` is the one who pays.
  */
 export const EFFECTS_PRESET_PATCHED_ARMS: readonly string[] = Object.freeze(
   EFFECTS_PRESET_PROGRAM_ARMS.filter((arm) => {
