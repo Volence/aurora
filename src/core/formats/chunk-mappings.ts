@@ -2,6 +2,7 @@ import { kosinskiDecompress } from './kosinski';
 import { chunkCellCount } from '../model/s4-types';
 import type { ChunkDef } from '../model/s4-types';
 import { packCollisionCell } from '../collision/collision-cell-word';
+import type { FullBlockShapeLookup } from '../collision/full-block-shape';
 
 const BLOCKS_PER_CHUNK = 8;
 const TILES_PER_BLOCK = 2;
@@ -86,14 +87,16 @@ function resolveBlock(
 
 /**
  * Convert a block ref's solidity flags into a dual-plane collision cell word,
- * using the caller-supplied full-block shape (the plain solid block in the
- * loaded profile set). fullBlockShape = 0 means profiles are unavailable —
- * seeding is impossible, so the cell stays air (0) regardless of the flags.
+ * using the caller-supplied full-block lookup (the plain solid block in the
+ * loaded profile set). Anything but `found` means there is no shape to mark a
+ * cell solid WITH, so the cell stays air (0) regardless of the flags — and the
+ * caller is the one that must tell the author which of the two blind answers it
+ * got, because from here they are indistinguishable in the output.
  */
-function blockRefToCollisionWord(ref: BlockRef, fullBlockShape: number): number {
-  if (fullBlockShape === 0 || (!ref.solidTop && !ref.solidAll)) return 0;
+function blockRefToCollisionWord(ref: BlockRef, fullBlock: FullBlockShapeLookup): number {
+  if (fullBlock.status !== 'found' || (!ref.solidTop && !ref.solidAll)) return 0;
   return packCollisionCell({
-    shape: fullBlockShape, xFlip: false, yFlip: false,
+    shape: fullBlock.shapeId, xFlip: false, yFlip: false,
     solidity: ref.solidAll ? 'all' : 'top',
   });
 }
@@ -101,17 +104,18 @@ function blockRefToCollisionWord(ref: BlockRef, fullBlockShape: number): number 
 /**
  * Import 128x128 chunk mappings and 16x16 block mappings (both Kosinski-compressed)
  * and produce an array of ChunkDef objects suitable for the editor's chunk library.
- * `fullBlockShape` is the base-bank shape id of a plain solid block (from
- * findFullBlockShapeId). Required — pass 0 explicitly for the "profiles
- * unavailable, cannot seed collision" sentinel; there's no silent default so a
- * caller that forgets to thread the profile set fails to compile instead of
- * silently importing all-air collision.
+ * `fullBlock` is `lookupFullBlockShape`'s result. Required, and a RESULT rather
+ * than a shape id: the old parameter was a bare number whose 0 meant both
+ * "profiles unavailable" and "a real bank with no full block", so a caller could
+ * import all-air collision while believing it had asked. There is still no
+ * silent default — a caller that forgets to thread the profile set fails to
+ * compile — and now a caller that threads a value it never opened fails too.
  */
 export function importChunks(
   chunkFileData: Uint8Array,
   blockFileData: Uint8Array,
   namePrefix: string = 'Chunk',
-  fullBlockShape: number,
+  fullBlock: FullBlockShapeLookup,
 ): ChunkDef[] {
   const chunkData = kosinskiDecompress(chunkFileData);
   const blockData = kosinskiDecompress(blockFileData);
@@ -144,7 +148,7 @@ export function importChunks(
         // One 16px cell per block ref (BLOCKS_PER_CHUNK == cells-per-side).
         // The donor ROM's block ref carries a single solidity flag pair with
         // no per-path split, so plane B mirrors plane A verbatim.
-        const collWord = blockRefToCollisionWord(ref, fullBlockShape);
+        const collWord = blockRefToCollisionWord(ref, fullBlock);
         collisionA[blockRow * BLOCKS_PER_CHUNK + blockCol] = collWord;
         collisionB[blockRow * BLOCKS_PER_CHUNK + blockCol] = collWord;
       }

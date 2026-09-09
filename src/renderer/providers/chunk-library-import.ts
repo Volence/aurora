@@ -13,10 +13,10 @@ import { importChunks } from '../../core/formats/chunk-mappings';
 import { kosinskiDecompress } from '../../core/formats/kosinski';
 import { parseTiles } from '../../core/formats/tiles';
 import { migrateChunkTilesIntoTileset } from '../../core/art/atlas-migration';
-import { findFullBlockShapeId } from '../../core/collision/full-block-shape';
+import { lookupFullBlockShape, type FullBlockShapeLookup } from '../../core/collision/full-block-shape';
 import { useEditorStore } from '../state/editorStore';
 import { useProjectStore, getCurrentZone } from '../state/projectStore';
-import { useToastStore } from '../state/toastStore';
+import { useToastStore, type ToastType } from '../state/toastStore';
 // The SAME promise-based confirm store the tab-close, project-open and
 // window-close doors ask through, rendered by the same shell/ConfirmDialog.
 // That reuse is load-bearing rather than convenient: d-30's third ground is
@@ -26,10 +26,62 @@ import { useConfirmStore } from '../state/confirmStore';
 import { isBlankChunk } from './chunk-grid-aeon';
 
 /**
+ * What the author is told after an import, given what the full-block lookup
+ * actually answered. Pure and exported so the three sentences can be read
+ * side by side, and so a test can hold two of them up against each other: the
+ * whole point of the parcel is that the two blind cases must not produce the
+ * same words.
+ *
+ * ⚠ WHY THIS IS NOT THE ANSWER TO d-36, and must not be read as one. The open
+ * question is whether Import should REFUSE when the collision shapes are not
+ * loaded, or import and warn. That changes what the button does, so it is the
+ * owner's call (`docs/decisions.jsonl`, `d-36-air-collision-import`, whose own
+ * recommendation is `refuse`). What is fixed here is the DEFECT that stands
+ * whichever way d-36 goes: the import used to claim plain success while every
+ * chunk came in as air. Telling the truth about what the chunks got is the
+ * floor of all three of d-36's options — under `refuse` this same sentence
+ * becomes the refusal's text — so it pre-empts none of them, and it removes
+ * the silent-wrong-result case in the meantime. THE REFUSAL ARM, IF IT IS
+ * RULED, GOES IN `importChunkFiles` BEFORE `addChunks`, not here.
+ */
+export function chunkImportOutcomeToast(
+  count: number, fullBlock: FullBlockShapeLookup,
+): { message: string; type: ToastType } {
+  switch (fullBlock.status) {
+    case 'found':
+      return { message: `Imported ${count} chunks -- Save to keep`, type: 'success' };
+    // "I could not look." No profile set was loaded, so nothing was searched —
+    // the project's collision tables are missing, unreadable, or not where the
+    // loader probes. The author's move is to fix the project, not the bank.
+    case 'no-profiles':
+      return {
+        message: `Imported ${count} chunks WITH NO COLLISION -- this project's collision `
+          + 'shape tables did not load, so nothing could be marked solid. The art is fine; '
+          + 'every cell came in as air. Save to keep the art.',
+        type: 'warning',
+      };
+    // "I looked, and there is nothing to use." A real bank was searched and
+    // holds no full block. A different fact and a different fix, which is
+    // exactly why it is a different sentence.
+    case 'no-full-block':
+      return {
+        message: `Imported ${count} chunks WITH NO COLLISION -- the project's collision bank `
+          + 'loaded but contains no full-block shape to mark cells solid with. The art is '
+          + 'fine; every cell came in as air. Save to keep the art.',
+        type: 'warning',
+      };
+  }
+}
+
+/**
  * Prompt for the three source files (128x128 chunk mappings, 16x16 block
  * mappings, zone art), merge the art into the zone tileset and add the chunks.
  * Resolves false when the user cancelled a dialog, true on a completed import,
  * and reports its own errors (project error + toast) exactly as before.
+ *
+ * ⚠ THE COLLISION LOOKUP IS OPENED, NOT SPENT. See `chunkImportOutcomeToast`
+ * and ledger row FULLBLOCK-ZERO-IS-TWO-ANSWERS: this call site is the one that
+ * read `findFullBlockShapeId`'s 0 as a value and toasted success over it.
  */
 export async function importChunkFiles(): Promise<boolean> {
   try {
@@ -61,8 +113,8 @@ export async function importChunkFiles(): Promise<boolean> {
     const artData = new Uint8Array(await window.api.readBinaryFile(artPath, ''));
 
     const namePrefix = chunkPath.split('/').pop()?.replace('.bin', '') ?? 'Chunk';
-    const fullBlockShape = findFullBlockShapeId(useProjectStore.getState().collisionProfiles);
-    const imported = importChunks(chunkData, blockData, namePrefix, fullBlockShape);
+    const fullBlock = lookupFullBlockShape(useProjectStore.getState().collisionProfiles);
+    const imported = importChunks(chunkData, blockData, namePrefix, fullBlock);
 
     const artDecompressed = kosinskiDecompress(artData);
     const artTiles = parseTiles(artDecompressed);
@@ -82,7 +134,8 @@ export async function importChunkFiles(): Promise<boolean> {
     const firstContent = imported.find((c) => !isBlankChunk(c)) ?? imported[0];
     if (firstContent) useEditorStore.getState().setSelectedChunkId(firstContent.id);
 
-    useToastStore.getState().addToast(`Imported ${imported.length} chunks -- Save to keep`, 'success');
+    const outcome = chunkImportOutcomeToast(imported.length, fullBlock);
+    useToastStore.getState().addToast(outcome.message, outcome.type);
     return true;
   } catch (err) {
     useProjectStore.getState().setError(

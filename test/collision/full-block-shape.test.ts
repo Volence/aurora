@@ -1,7 +1,7 @@
 // ⚠ THE NEAR-MISS SHAPE IN THESE FIXTURES IS ONE PIXEL SHORT, DELIBERATELY.
 //
 // Until 2026-09-09 it was EIGHT pixels short, and that is the whole of why this
-// file could not see a real defect. Relaxing `findFullBlockShapeId`'s test from
+// file could not see a real defect. Relaxing `lookupFullBlockShape`'s test from
 // `h >= 16` to `h >= 15` — the exact off-by-one a "full block" search invites —
 // left the entire 8,107-row suite green, because the only non-full shape in the
 // bank was so far from the boundary that no plausible loosening could reach it.
@@ -24,7 +24,7 @@
 // into the project as its notion of solid ground.
 
 import { describe, it, expect } from 'vitest';
-import { findFullBlockShapeId } from '../../src/core/collision/full-block-shape';
+import { lookupFullBlockShape } from '../../src/core/collision/full-block-shape';
 import { columnSolidRun } from '../../src/core/collision/collision-render';
 import type { CollisionProfile, CollisionProfileSet } from '../../src/core/collision/collision-model';
 
@@ -43,9 +43,16 @@ const nearlyFull = (col: number, short: number) => {
  *  something to walk past that is neither air nor nearly solid. */
 const slope = () => new Int8Array(Array.from({ length: 16 }, (_, c) => c + 1));
 
-describe('findFullBlockShapeId', () => {
-  it('returns 0 when no profiles are loaded', () => {
-    expect(findFullBlockShapeId(null)).toBe(0);
+describe('lookupFullBlockShape', () => {
+  // ⚠ THESE FIRST THREE ROWS ARE THE PARCEL. Until 2026-09-09 this function
+  // returned a bare number and answered 0 to BOTH of the blind cases, so the
+  // first two rows below could only have been written as the same assertion and
+  // the third could not have been written at all. Ledger row
+  // FULLBLOCK-ZERO-IS-TWO-ANSWERS; the caller that spent the collapsed 0 was
+  // `renderer/providers/chunk-library-import.ts`, which wrote the author's
+  // project and toasted success over it.
+  it('says NO-PROFILES when there is no set to search (could not look)', () => {
+    expect(lookupFullBlockShape(null)).toEqual({ status: 'no-profiles' });
   });
 
   it('finds the first shape whose 16 height columns are all full', () => {
@@ -64,7 +71,7 @@ describe('findFullBlockShapeId', () => {
         profile({ heights: fullHeights() }), // index 5 — also full, but 4 wins
       ],
     };
-    expect(findFullBlockShapeId(set)).toBe(4);
+    expect(lookupFullBlockShape(set)).toEqual({ status: 'found', shapeId: 4 });
   });
 
   it('⚠ the shape it returns is ACTUALLY full, measured through the renderer', () => {
@@ -87,12 +94,16 @@ describe('findFullBlockShapeId', () => {
     // the boundary rather than a far-away value.
     expect(columnSolidRun(set.profiles[2].heights[9])).toEqual({ y: 1, h: 15 });
 
-    const id = findFullBlockShapeId(set);
-    // LOUD ON UNMEASURABLE. 0 is this function's "cannot seed solid cells"
-    // sentinel, and the per-column loop below would pass vacuously over it
-    // (there is no shape 0 to walk). A 0 here means the search FAILED on a bank
-    // that contains a full block — not that the property holds.
-    expect(id, 'this bank contains a full block at index 4; 0 means the search missed it').not.toBe(0);
+    const found = lookupFullBlockShape(set);
+    // LOUD ON UNMEASURABLE. A blind answer carries no shape id, and the
+    // per-column loop below would pass vacuously over one (there is no shape to
+    // walk). Anything but `found` here means the search FAILED on a bank that
+    // contains a full block — not that the property holds. This assertion is
+    // also what narrows the union for the lines under it.
+    expect(found.status, 'this bank contains a full block at index 4; a blind answer means the search missed it')
+      .toBe('found');
+    if (found.status !== 'found') return; // unreachable past the assertion above
+    const id = found.shapeId;
     const heights = set.profiles[id].heights;
     for (let c = 0; c < 16; c++) {
       expect(columnSolidRun(heights[c]), `shape ${id} column ${c} does not render floor-to-ceiling`)
@@ -100,12 +111,35 @@ describe('findFullBlockShapeId', () => {
     }
   });
 
-  it('returns 0 when no shape has all-full height columns', () => {
+  it('says NO-FULL-BLOCK when a real bank was searched and holds none', () => {
     const set: CollisionProfileSet = {
       engine: 's4',
       solidCount: 3,
       profiles: [profile(), profile({ heights: new Int8Array(16) }), profile({ heights: nearlyFull(3, 15) })],
     };
-    expect(findFullBlockShapeId(set)).toBe(0);
+    expect(lookupFullBlockShape(set)).toEqual({ status: 'no-full-block' });
+  });
+
+  it('⚠ the two blind answers are NOT the same value: the defect this replaced', () => {
+    // The one row that would have been impossible to write before. Both of
+    // these used to be the number 0, which is exactly why a caller could spend
+    // one believing it was the other.
+    const emptyBank: CollisionProfileSet = {
+      engine: 's4',
+      solidCount: 3,
+      profiles: [profile(), profile({ heights: new Int8Array(16) }), profile({ heights: nearlyFull(3, 15) })],
+    };
+    const couldNotLook = lookupFullBlockShape(null);
+    const lookedAndFoundNone = lookupFullBlockShape(emptyBank);
+
+    // ASSERT THE OPERANDS ARE REAL FIRST. Two values that both degraded to
+    // `undefined` would satisfy `not.toEqual` between themselves and agree that
+    // the defect is fixed while proving nothing.
+    expect(couldNotLook.status).toBe('no-profiles');
+    expect(lookedAndFoundNone.status).toBe('no-full-block');
+    expect(couldNotLook).not.toEqual(lookedAndFoundNone);
+    // And neither carries a shape id a caller could stamp into authored data.
+    expect('shapeId' in couldNotLook).toBe(false);
+    expect('shapeId' in lookedAndFoundNone).toBe(false);
   });
 });

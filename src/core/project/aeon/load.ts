@@ -21,7 +21,7 @@ import { readFailureMessage } from '../read-failure';
 import { nameSome, type Notice, type UnreadableItem } from '../notice';
 import type { CollisionProfileSet } from '../../collision/collision-model';
 import { s4CollisionAdapter } from '../../collision/adapters/s4-collision-adapter';
-import { findFullBlockShapeId } from '../../collision/full-block-shape';
+import { lookupFullBlockShape } from '../../collision/full-block-shape';
 // SECTION_PLANE_WORDS is imported BESIDE resolvePlaneWords on purpose: it is
 // that module's stated bound for every plane its consumers index, and passing
 // anything else — least of all the bounded array's own length — is what its
@@ -830,11 +830,25 @@ async function loadFullProject(
       // array is read straight from the parsed JSON (ChunkDef no longer carries
       // it, and saves no longer write it). No-op per-chunk when the word planes
       // are already populated (see migrateLegacyChunkCollision).
-      const fullBlock = findFullBlockShapeId(collisionProfiles);
+      const fullBlock = lookupFullBlockShape(collisionProfiles);
       for (let ci = 0; ci < chunkLibrary.length; ci++) {
         if (migrateLegacyChunkCollision(chunkLibrary[ci], parsed[ci].collision, fullBlock)) {
           console.log(`[load] chunk ${chunkLibrary[ci].id}: legacy collision migrated to word planes`);
         }
+      }
+      // SAY WHICH BLINDNESS SKIPPED THE MIGRATION. This arm's behaviour is
+      // unchanged — a legacy library whose collision cannot be migrated is left
+      // alone, as before — but until 2026-09-09 the reason was a 0 that meant
+      // either "no profile set loaded" or "a real bank with no full block", and
+      // nothing said which. Diagnostic only, and deliberately console rather
+      // than a `notices` entry: the open path's user-facing behaviour is
+      // decision d-36's to change, not this parcel's. The guard is
+      // `some(c => c.collision)` so a project with NO legacy chunks stays
+      // silent — there is nothing this could have migrated.
+      if (fullBlock.status !== 'found' && parsed.some(c => c.collision && c.collision.length > 0)) {
+        console.warn(`[load] legacy chunk collision NOT migrated: ${fullBlock.status === 'no-profiles'
+          ? 'no collision profiles loaded (tables missing or unreadable), so nothing was searched'
+          : 'the loaded collision bank contains no full-block shape to migrate with'}`);
       }
     } catch {
       // no chunk library
