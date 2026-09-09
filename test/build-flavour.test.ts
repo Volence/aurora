@@ -201,6 +201,39 @@ describe('build-flavour stamp: the build records what it was', () => {
         + 'instrument then reports UNKNOWN').toBe(true);
     }
   });
+  /**
+   * ⚠ A SHEBANG IN A MODULE THE CONFIG IMPORTS BREAKS EVERY BUILD, and no row
+   * above could see it. MEASURED, not anticipated: this module was written
+   * with `#!/usr/bin/env node` on line 1 the way the rest of `scripts/` is,
+   * all twelve rows of this file passed, and `npm run build` then died with
+   *
+   *     Syntax error "!"  scripts/build-flavour-stamp.mjs:1:443
+   *     failed to load config from electron.vite.config.ts
+   *
+   * because electron-vite BUNDLES the config with esbuild: the imported module
+   * is inlined after the import statements, where a `#!` is no longer line 1
+   * of the file and is just a syntax error. Node strips a shebang from any
+   * module it loads, so `import`ing the file (which is what every other row
+   * here does) works perfectly and says nothing about whether the build works.
+   *
+   * The bound, stated: this row covers the SHEBANG, which is the one hazard
+   * measured. It does not prove the config loads. The instrument that proves
+   * that is `npm run build`, which is not in `npm test` and is tagged for the
+   * foreground instead.
+   */
+  it('no module the build config imports begins with a shebang', () => {
+    const cfg = readFileSync(BUILD_CONFIG, 'utf8');
+    const specs = [...cfg.matchAll(/from\s+'(\.[^']+)'/g)].map((m) => m[1]);
+    expect(specs.length, 'no relative import found in the build config, so this row measured '
+      + 'nothing').toBeGreaterThan(0);
+    for (const spec of specs) {
+      const path = resolve(dirname(BUILD_CONFIG), spec);
+      const head = readFileSync(path, 'utf8').slice(0, 2);
+      expect(head, `${spec} starts with a shebang. electron-vite bundles the config with `
+        + 'esbuild and inlines this module below the import statements, where a shebang is a '
+        + 'syntax error and EVERY build fails with "failed to load config"').not.toBe('#!');
+    }
+  });
 });
 
 describe('build-flavour reader: three states, and unknown is not a shade of the other two', () => {
