@@ -22,7 +22,7 @@ import { useProjectStore, getCurrentZone } from '../state/projectStore';
 import { useSessionStore } from '../state/sessionStore';
 import { switchFacet } from '../workspace/facet-tools';
 import { docFromChunk } from '../../core/art/composer-buffer';
-import { openDocumentGuarded } from '../components/art/open-document';
+import { confirmArtDocumentOpen } from '../components/art/open-document';
 import AeonChunkActions from '../components/AeonChunkActions';
 
 /** Source render resolution for one aeon chunk (16x16 tiles of 8px). */
@@ -124,10 +124,13 @@ const EMPTY_CHUNKS: ChunkDef[] = [];
 function openChunkInComposer(id: string): void {
   const chunk = useProjectStore.getState().project?.chunkLibrary.find((c) => c.id === id);
   if (!chunk) return;
-  if (!openDocumentGuarded({
+  void confirmArtDocumentOpen({
     doc: docFromChunk(chunk), liveTileIndex: null, chunkId: chunk.id, name: chunk.name, dirty: false,
-  })) return;
-  switchFacet(useSessionStore.getState().activeId, 'art');
+  }).then((opened) => {
+    // The facet switch waits on the answer, as it always did: an author who keeps
+    // the document they are drawing must not be moved off it.
+    if (opened) switchFacet(useSessionStore.getState().activeId, 'art');
+  });
 }
 
 export function useAeonChunkGridPort(): ChunkGridPort {

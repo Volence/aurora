@@ -13,7 +13,7 @@ import { levelKeysEnabled } from '../workspace/level-keys';
 import { useToastStore } from '../state/toastStore';
 import { useAetherStore } from '../state/aetherStore';
 import { warpTargetFor } from '../../core/aether/warp-math';
-import { openDocumentGuarded } from './art/open-document';
+import { confirmArtDocumentOpen } from './art/open-document';
 import { resolveEscape } from './map-escape';
 import { resolveMapChord } from './map-chords';
 import {
@@ -1888,15 +1888,15 @@ export default function MapViewport() {
             }
             const doc = docFromSectionRegion(section, marquee.col, marquee.row, marquee.w, marquee.h);
             seedDocCollisionFromSection(doc, section, marquee.col, marquee.row);
-            if (openDocumentGuarded({
+            void confirmArtDocumentOpen({
               doc,
               liveTileIndex: null,
               chunkId: null,
               name: `marquee (${marquee.col},${marquee.row})`,
               dirty: true, // copied off the map and not yet in the library
-            })) {
-              switchFacet(useSessionStore.getState().activeId, 'art');
-            }
+            }).then((opened) => {
+              if (opened) switchFacet(useSessionStore.getState().activeId, 'art');
+            });
           }
           e.preventDefault();
           return;
@@ -4190,14 +4190,15 @@ export default function MapViewport() {
     if (!section) return;
     const word = section.tileGrid.nametable[m.row * SECTION_TILES_WIDE + m.col];
     const tileIndex = unpackNametableWord(word).tileIndex;
-    if (!openDocumentGuarded({
+    void confirmArtDocumentOpen({
       doc: docFromTile(tileIndex),
       liveTileIndex: tileIndex,
       chunkId: null,
       name: `tile #${tileIndex}`,
       dirty: false,
-    })) return;
-    switchFacet(useSessionStore.getState().activeId, 'art');
+    }).then((opened) => {
+      if (opened) switchFacet(useSessionStore.getState().activeId, 'art');
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -4217,14 +4218,15 @@ export default function MapViewport() {
     // chunk — without this, capture -> save -> stamp-back would ERASE map
     // collision (chunk air is authoritative over its footprint on stamp).
     seedDocCollisionFromSection(doc, section, baseCol, baseRow);
-    if (!openDocumentGuarded({
+    void confirmArtDocumentOpen({
       doc,
       liveTileIndex: null,
       chunkId: null,
       name: `block (${bx},${by})`,
       dirty: true, // copied off the map and not yet in the library
-    })) return;
-    switchFacet(useSessionStore.getState().activeId, 'art');
+    }).then((opened) => {
+      if (opened) switchFacet(useSessionStore.getState().activeId, 'art');
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

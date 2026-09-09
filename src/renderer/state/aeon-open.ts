@@ -75,8 +75,10 @@ export async function openAeonProject(dir: string): Promise<boolean> {
     // landed in openAct: a facet-entry heal would rewrite a deliberate choice
     // (closing the document to start a new one is a real thing to want), where
     // an open-time default overrides nothing. openDocument directly, not
-    // openDocumentGuarded — nothing can be dirty one statement after the project
-    // was committed, so there is no discard to confirm.
+    // confirmArtDocumentOpen (components/art/open-document.ts) — nothing can be
+    // dirty one statement after the project was committed, so there is no discard
+    // to confirm, and that door is now async and would put a dialog in the middle
+    // of an open.
     const first = firstEditableChunk(aeon.project.chunkLibrary);
     if (first) {
       // Zoom BEFORE the open, so the facet's first paint is already the fitted

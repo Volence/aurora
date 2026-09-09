@@ -11,11 +11,13 @@
 // button could never clear its dirty flag. See that module's header.
 import React, { useState, useEffect } from 'react';
 import { useArtStore } from '../../state/artStore';
-import { openDocumentGuarded, closeDocumentGuarded } from '../../components/art/open-document';
+import {
+  confirmArtDocumentOpen, confirmArtDocumentClose, confirmStaleArtDocumentClose,
+} from '../../components/art/open-document';
+import { staleTarget } from '../../components/art/stale-document';
 import { createDoc } from '../../../core/art/composer-buffer';
 import { useProjectStore, getCurrentZone } from '../../state/projectStore';
 import { useAeonHistoryVersion } from '../../hooks/useHistoryVersion';
-import { useToastStore } from '../../state/toastStore';
 import { saveComposerDocument } from '../../state/art-composer-save';
 import { Panel, CollapsibleSection, T } from '../../components/ui';
 import ArtToolDock from '../../shell/ArtToolDock';
@@ -34,7 +36,7 @@ function clampDim(v: number): number {
 }
 
 function handleNewTile() {
-  openDocumentGuarded({
+  void confirmArtDocumentOpen({
     doc: createDoc(1, 1),
     liveTileIndex: null,
     chunkId: null,
@@ -47,7 +49,7 @@ function handleNewBlock() {
   // A block is the classic 16×16 px unit: 2×2 tiles. (Not to be confused
   // with the s4_engine's internal 128×128 "block" slicing unit — that one
   // is the editor's "chunk".)
-  openDocumentGuarded({
+  void confirmArtDocumentOpen({
     doc: createDoc(2, 2),
     liveTileIndex: null,
     chunkId: null,
@@ -57,7 +59,7 @@ function handleNewBlock() {
 }
 
 function handleNewChunk(w: number, h: number) {
-  openDocumentGuarded({
+  void confirmArtDocumentOpen({
     doc: createDoc(w, h),
     liveTileIndex: null,
     chunkId: null,
@@ -76,31 +78,36 @@ function ArtCanvas() {
   const [chunkW, setChunkW] = useState(16);
   const [chunkH, setChunkH] = useState(16);
 
-  // Close stale documents: undo can shrink the tileset below an open live
-  // tile, and the chunk library can lose the open chunk (Clear).
+  // A document whose target stopped existing: undo can shrink the tileset below
+  // an open live tile, take a band's bank with it, or remove the chunk the
+  // document came from, and Clear can empty the chunk library outright.
+  //
+  // THE RULE AND THE OUTCOME BOTH MOVED OUT OF HERE, and the reason is the whole
+  // of finding ART-DOC-CLOSED-UNGUARDED. This effect used to call
+  // `closeDocument()` at three inline sites and follow it with an info toast, so
+  // a drawing with unsaved strokes was destroyed and the author was told
+  // afterwards. `staleTarget` (components/art/stale-document.ts) is now the pure
+  // predicate, testable in a suite that cannot mount this component, and
+  // `confirmStaleArtDocumentClose` (components/art/open-document.ts) owns what
+  // happens next: still an immediate close and the same sentence when there is
+  // nothing to lose, and the app's own confirm dialog when there is.
   useEffect(() => {
     const o = useArtStore.getState().open;
     if (!o) return;
     const state = useProjectStore.getState();
     const zone = getCurrentZone(state);
-    if (o.liveTileIndex !== null && zone
-        && o.liveTileIndex >= zone.tileset.tiles.length) {
-      useArtStore.getState().closeDocument();
-      useToastStore.getState().addToast('Tile no longer exists (undone). Document closed', 'info');
-      return;
-    }
-    // A BG override document can lose its target the same way: an undone
-    // band insert takes the bank with it; an undone add shrinks the blob.
-    if (o.bgOverride && !bgArtTargetExists(state.project?.bgOverride.doc ?? null, o.bgOverride)) {
-      useArtStore.getState().closeDocument();
-      useToastStore.getState().addToast('Band art no longer exists (undone). Document closed', 'info');
-      return;
-    }
-    if (o.chunkId !== null && state.project
-        && !state.project.chunkLibrary.some((c) => c.id === o.chunkId)) {
-      useArtStore.getState().closeDocument();
-      useToastStore.getState().addToast('Chunk no longer exists. Document closed', 'info');
-    }
+    const target = staleTarget({
+      open: o,
+      tilesetLength: zone ? zone.tileset.tiles.length : null,
+      // The provider answers false for an absent document, which is what made a
+      // vanished project close a band-art document before; passed through
+      // unchanged rather than reinterpreted here (see StaleTargetInputs).
+      bgTargetExists: o.bgOverride
+        ? bgArtTargetExists(state.project?.bgOverride.doc ?? null, o.bgOverride)
+        : null,
+      chunkIds: state.project ? state.project.chunkLibrary.map((c) => c.id) : null,
+    });
+    if (target !== null) void confirmStaleArtDocumentClose(target);
   }, [historyVersion, project]);
 
   // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y are NOT bound here — LevelWorkspace, which
@@ -198,7 +205,7 @@ function ArtOptions() {
           no-document state. It used to be reachable by simply not having opened
           anything; a project open now lands on the first chunk, so without this
           button "new tile / new block / new chunk" would be unreachable. */}
-      <button style={styles.newDocButton} onClick={closeDocumentGuarded}
+      <button style={styles.newDocButton} onClick={() => { void confirmArtDocumentClose(); }}
         title="Close this document and show the New Document options">
         New…
       </button>

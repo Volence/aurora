@@ -19,7 +19,7 @@ import {
   openBgTileDocument, publishStripOpen, resolveStripOpen,
   stripOpenHint, stripOpenLabel, stripOpenSpeaks,
 } from '../providers/bg-anim-art';
-import { openDocumentGuarded } from './art/open-document';
+import { confirmArtDocumentOpen } from './art/open-document';
 import { useSessionStore } from '../state/sessionStore';
 import { switchFacet } from '../workspace/facet-tools';
 import { bandBudget } from '../providers/bg-anim-aeon';
@@ -362,8 +362,10 @@ export default function ArtBrowser() {
       const od = openBgTileDocument(doc, outcome.tileIndex);
       // The bank strip's contract, verbatim (BgAnimBandPanel's `openBank`) —
       // a second one would be free to disagree about the dirty-document guard.
-      if (od && openDocumentGuarded(od)) {
-        switchFacet(useSessionStore.getState().activeId, 'art');
+      if (od) {
+        void confirmArtDocumentOpen(od).then((opened) => {
+          if (opened) switchFacet(useSessionStore.getState().activeId, 'art');
+        });
       }
       return;
     }

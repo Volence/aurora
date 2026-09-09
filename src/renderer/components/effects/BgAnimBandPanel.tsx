@@ -263,7 +263,7 @@ import BandBankStrip from './BandBankStrip';
 import { openBandBankDocument, regenerateShiftCommand } from '../../providers/bg-anim-art';
 import { useArtStore } from '../../state/artStore';
 import { useSessionStore } from '../../state/sessionStore';
-import { openDocumentGuarded } from '../art/open-document';
+import { confirmArtDocumentOpen } from '../art/open-document';
 import { switchFacet } from '../../workspace/facet-tools';
 import { getCurrentZone } from '../../state/projectStore';
 
@@ -726,8 +726,10 @@ export default function BgAnimBandPanel(): React.ReactElement {
                   ? openBgArt.bank : null}
                 openBank={(k) => {
                   const od = openBandBankDocument(doc, b.index, k);
-                  if (!od || !openDocumentGuarded(od)) return;
-                  switchFacet(useSessionStore.getState().activeId, 'art');
+                  if (!od) return;
+                  void confirmArtDocumentOpen(od).then((opened) => {
+                    if (opened) switchFacet(useSessionStore.getState().activeId, 'art');
+                  });
                 }}
                 onShift={() => { setPendingRemoval(null); apply(regenerateShiftCommand(doc, b.index)); }} />
             )}
