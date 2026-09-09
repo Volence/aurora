@@ -21,7 +21,7 @@
 // saved" would be a lie, and a silent one, since the coordinator only ever
 // hears `ok`. See the toast below.
 
-import { canvasDocState, useCanvasStore } from './canvasStore';
+import { useCanvasStore } from './canvasStore';
 import { saveCanvasFile, type GuardedWriteApi } from './canvas-file';
 import { useToastStore } from './toastStore';
 import type { SaveReport } from './save-outcome-report';
@@ -56,13 +56,23 @@ export async function saveCanvasDocument(
   // canvas is unchanged. (The THROWING paths are untouched: they abort the loop,
   // so they were never the unbounded ones.)
   const say: SaveReport = report ?? useToastStore.getState().addToast;
-  const doc = canvasDocState(docId);
+  // ONE READ OF THE OPEN ENTRY, and the entry is where the counter lives.
+  // This was `canvasDocState(docId)` for the document plus a second, separate
+  // `docs.get(docId)?.editGen` for the counter, which typed `atGen` as
+  // `number | undefined` -- and while `markSaved`'s parameter was optional, that
+  // `undefined` was a legal argument meaning "skip the staleness check and
+  // report a clean save". The two reads cannot disagree today (same tick, and a
+  // present `doc` implies a present entry), so this is not a bug being fixed
+  // here; it is the producer being made unable to express the dangerous value
+  // now that CANVAS-SAVE-GEN-OPTIONAL has made the parameter required.
+  const entry = useCanvasStore.getState().docs.get(docId);
   const source = useCanvasStore.getState().sourceOf(docId);
-  if (!doc || !source) return; // nothing to write; not an error
+  if (!entry || !source) return; // nothing to write; not an error
+  const doc = entry.doc;
   // The counter describing THESE bytes. Read beside the document, before the
   // encode and the write, so `markSaved` can tell whether the pixels that
   // landed are still the pixels the artist has.
-  const atGen = useCanvasStore.getState().docs.get(docId)?.editGen;
+  const atGen = entry.editGen;
 
   const res = await saveCanvasFile(
     source.dir, doc.name, doc,

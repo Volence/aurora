@@ -149,7 +149,12 @@ describe('canvasStore documents', () => {
     const buf = createBuffer(8, 8);
     buf.data[0] = canvasIndex(1, 1);
     useCanvasStore.getState().setPixels(A, buf);
-    useCanvasStore.getState().markSaved(A, { pngMtimeMs: 5, sidecarMtimeMs: 6 });
+    // The counter is passed because it is REQUIRED (CANVAS-SAVE-GEN-OPTIONAL);
+    // this call used to omit it, which is exactly the shape that switched the
+    // staleness check off. Nothing has moved here, so the save is genuinely
+    // clean and this reads the counter the same way the real saver does.
+    const atGen = useCanvasStore.getState().docs.get(A)!.editGen;
+    useCanvasStore.getState().markSaved(A, { pngMtimeMs: 5, sidecarMtimeMs: 6 }, atGen);
     expect(useCanvasStore.getState().isDirty(A)).toBe(false);
     expect(canvasDocState(A)!.pixels.data[0]).toBe(canvasIndex(1, 1));
     expect(useCanvasStore.getState().sourceOf(A)?.pngMtimeMs).toBe(5);
@@ -192,6 +197,37 @@ describe('canvasStore documents', () => {
     const atGen = useCanvasStore.getState().docs.get(A)!.editGen;
     expect(useCanvasStore.getState().markSaved(A, { pngMtimeMs: 5, sidecarMtimeMs: 6 }, atGen)).toBe(true);
     expect(useCanvasStore.getState().isDirty(A)).toBe(false);
+  });
+
+  /**
+   * CANVAS-SAVE-GEN-OPTIONAL. `atGen` was optional and read as
+   * `atGen !== undefined && e.editGen !== atGen`, so a caller that passed
+   * nothing got `stale === false`: the dot came off over pixels that are not on
+   * disk, AND the function returned `true`, which is what canvas-save.ts's
+   * `if (!cleared)` notice reads. One absent argument skipped the guard and
+   * silenced the only thing that would have said so.
+   *
+   * The parameter is required now, so this case has to cast to reach the arm at
+   * all -- it is standing in for an untyped JS caller. What it pins is that the
+   * arm answers STALE rather than CLEAN: the unsafe value is no longer the
+   * quiet one.
+   */
+  it('markSaved with no counter at all answers stale, not clean', () => {
+    openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    useCanvasStore.getState().setSource(A, SOURCE);
+    const buf = createBuffer(8, 8);
+    buf.data[0] = canvasIndex(1, 1);
+    useCanvasStore.getState().setPixels(A, buf);
+
+    const cleared = useCanvasStore.getState().markSaved(
+      A, { pngMtimeMs: 5, sidecarMtimeMs: 6 }, undefined as unknown as number,
+    );
+    expect(cleared).toBe(false);
+    expect(useCanvasStore.getState().isDirty(A)).toBe(true);
+    // The pixels and the baselines are untouched by the refusal to clear: this
+    // is a flag that stays, not a save that is undone.
+    expect(canvasDocState(A)!.pixels.data[0]).toBe(canvasIndex(1, 1));
+    expect(useCanvasStore.getState().sourceOf(A)?.pngMtimeMs).toBe(5);
   });
 
   it('an undo during the write counts as an edit', () => {

@@ -217,6 +217,38 @@ describe('saveCanvasDocument', () => {
     expect(toastMessages()).toEqual([]); // a clean save says nothing
   });
 
+  /**
+   * THE SEAM CANVAS-SAVE-GEN-OPTIONAL RAN THROUGH, and nothing crossed it before
+   * this case. `canvasStore.test.ts` pins the boolean `markSaved` returns; this
+   * file pins the notices; nobody joined the two, and the defect was precisely
+   * that one absent argument set the boolean the wrong way AND therefore
+   * suppressed the notice. A per-side test each and none across the seam is how
+   * both sides stay green while the pair is broken.
+   *
+   * Not red against the shipped production caller (it passes the counter): what
+   * makes it a real check is that it goes red when the store's staleness
+   * comparison is defeated, which is the whole mechanism.
+   */
+  it('a stroke during the write keeps the dot AND reports it', async () => {
+    dirtyCanvas(TAB.id, 'sky');
+    // Paint while the guarded write is in flight, as the artist would.
+    const { api } = fakeApi((batch) => {
+      const during = createBuffer(8, 8);
+      during.data[3] = canvasIndex(2, 3);
+      useCanvasStore.getState().setPixels(TAB.id, during);
+      return okReply(batch);
+    });
+
+    await saveCanvasDocument(TAB.id, api);
+
+    expect(useCanvasStore.getState().isDirty(TAB.id)).toBe(true);
+    const said = toastMessages().filter((m) => /edits made during the save are still unsaved/.test(m));
+    expect(said).toHaveLength(1);
+    expect(said[0]).toMatch(/"sky"/);
+    // The files DID land, so the baselines move even though the dot stays.
+    expect(useCanvasStore.getState().sourceOf(TAB.id)!.pngMtimeMs).toBe(2000);
+  });
+
   it('a document that closed mid-flight is a silent no-op, not a throw', async () => {
     const { api, batches } = fakeApi(okReply);
     await expect(saveCanvasDocument('doc:canvas:gone', api)).resolves.toBeUndefined();

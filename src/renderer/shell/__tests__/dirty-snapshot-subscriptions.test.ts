@@ -149,7 +149,13 @@ describe('useDirtySnapshot subscriptions', () => {
     dirtyCanvasNoRecord(CANVAS);
     const reads = subscribedReads();
     expect(wouldRepaint(reads, () => {
-      useCanvasStore.getState().markSaved(CANVAS, { pngMtimeMs: 1, sidecarMtimeMs: 1 });
+      // `atGen` is required (CANVAS-SAVE-GEN-OPTIONAL). The current counter is
+      // what a save that raced nothing would carry, which is what this case
+      // needs: a canvas that really does go clean.
+      useCanvasStore.getState().markSaved(
+        CANVAS, { pngMtimeMs: 1, sidecarMtimeMs: 1 },
+        useCanvasStore.getState().docs.get(CANVAS)!.editGen,
+      );
     })).toBe(true);
   });
 

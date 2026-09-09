@@ -172,10 +172,17 @@ interface CanvasState {
   setProfile: (docId: string, profileId: ConstraintProfileId) => void;
   setGridOrigin: (docId: string, origin: CanvasGridOrigin) => void;
   setSource: (docId: string, source: CanvasSource | null) => void;
+  /**
+   * `atGen` is REQUIRED, and required is the guard (CANVAS-SAVE-GEN-OPTIONAL).
+   * See the implementation for what its absence used to do; the short version is
+   * that it skipped the staleness check AND told the caller the save was clean,
+   * so the one notice that would have surfaced it was suppressed by the same
+   * omission. Sibling of classicLevelStore's `markDomainsClean`.
+   */
   markSaved: (
     docId: string,
     mtimes: { pngMtimeMs: number | null; sidecarMtimeMs: number | null },
-    atGen?: number,
+    atGen: number,
   ) => boolean;
   sourceOf: (docId: string) => CanvasSource | null;
   isOpen: (docId: string) => boolean;
@@ -324,10 +331,24 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   // A counter that has moved since means the artist edited during the write,
   // those pixels are not on disk, and the flag must stay. Returns whether it
   // cleared, so the caller can say which happened.
+  //
+  // IT USED TO BE OPTIONAL, READ AS `atGen !== undefined && ...`, AND THAT COST
+  // TWICE (CANVAS-SAVE-GEN-OPTIONAL). Omitting it made `stale` false, so the
+  // document cleared over pixels that are not on disk -- and it returned TRUE,
+  // so canvas-save.ts's `if (!cleared)` never fired and the author was not even
+  // told. The guard was skipped and its own alarm was skipped with it, by one
+  // absent argument. Requiring the parameter is the fix: a producer that has no
+  // counter to give cannot compile, which is better than a producer that
+  // remembers.
+  //
+  // The untyped-JS arm needs no separate branch and gets the safe answer for
+  // free: `e.editGen !== undefined` is true for every real counter, so an
+  // omitted `atGen` now reads as STALE. The dot stays and the caller reports it,
+  // which is the exact inverse of the old silent clear.
   markSaved: (docId, mtimes, atGen) => {
     const e = get().docs.get(docId);
     if (!e) return false;
-    const stale = atGen !== undefined && e.editGen !== atGen;
+    const stale = e.editGen !== atGen;
     patch(docId, (cur) => ({
       ...cur,
       unsavedEdits: stale ? cur.unsavedEdits : false,
