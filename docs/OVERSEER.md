@@ -190,6 +190,30 @@ reports undelivered, and the owner's hedged *"1. I think so"* behind it — is i
 every other owner directive is quoted verbatim, the one establishing who directs six lanes was
 paraphrased, and nothing about it looked wrong. Ask for the quote.
 
+### Say when you need a CONTEXT CLEAR — RELAYED 2026-09-09, sibling of the report-when-you-stop rule
+
+**Relayed by the hub, transcribed:** *"Remind the agents to let us know when they need a clear."*
+⚠ **RELAY, not yet in the committed record.** Checked at `origin/main:docs/OVERSEER.md` when it
+arrived (tip `1530dd3`) and it is not there; the hub was asked to commit it. Acted on anyway
+because it costs nothing and asks for disclosure rather than for work — **but a successor must
+not read this as an owner directive witnessed here.** Same class as the entry above it, and
+this file's own rule: name the granting act.
+
+**What it asks:** do not silently run down to a compaction or drift through one. When a clear
+would help, **say so in the message to the hub AND in `lane-status.json`'s `awaiting`**, with
+what a fresh session needs to resume.
+
+⚠ **THE ANCHOR IS A FILE AT A COMMITTED SHA, NEVER A SUMMARY.** A handoff summary is a claim
+nobody can check and it goes stale the moment anything lands; a path plus a SHA is re-derivable
+by whoever picks it up. This lane has paid for the difference more than once — see
+`[[bank-outbound-commitments]]`'s shape in the log: a position that lived only in a message did
+not survive a `/clear`, and the successor contradicted it an hour later.
+
+**Why it is the sibling of the 05:21:01Z rule and not a new kind of thing:** that one says a
+lane going quiet must say why; this one says a lane going *stale* must say so before it does.
+Both are about the same failure — **the console shows a lane that looks fine right up until the
+moment its answers stop being trustworthy.**
+
 ### Push authorization — **CONFIRMED BY THE OWNER DIRECTLY 2026-08-24. The relay question is CLOSED; do not re-ask.**
 
 He answered this lane's `d-2` in session on 2026-08-24 and chose **grant**: publish this repo's own master without asking
