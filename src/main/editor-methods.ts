@@ -739,8 +739,11 @@ export const EDITOR_METHODS: EditorMethod[] = [
   // repeat that. One EDITOR_METHODS entry lights a capability up on BOTH MCP and
   // Aether, so agent parity is a property of adding it here, not a second task.
   { name: 'aether_status', kind: 'aether-status', result: 'json', params: {},
-    description: 'Is Aurora connected to a running emulator, and what can it do there? '
-      + 'Reports connection state, the server, whether live palette is available and for WHICH '
+    description: 'Is Aurora connected to a running emulator, WHICH ONE, and what can it do there? '
+      + 'Reports connection state; `implementation` (which server software answered) and '
+      + '`socketPath` (which running machine, the only field that separates two emulators of the '
+      + 'same build); `identityWarning` when that identity was not fully checked; whether live '
+      + 'palette is available and for WHICH '
       + 'engine family (`paletteKind`: aeon\'s Pal_Base pair or classic\'s v_palette_line_1..4 '
       + 'resolved; a push only lands when it matches the open project), and the last push '
       + 'error. Read this before assuming a push or warp will land.' },

@@ -1693,9 +1693,22 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         // discriminates. Aurora refuses to connect at all to a superseded or
         // unidentified one, so a non-null value here has been checked.
         implementation: s.implementation ?? null,
+        // WHICH MACHINE, which `implementation` above cannot answer. It names a
+        // LINEAGE, so two emulators of the same build report the same string
+        // and an agent driving the wrong one gets a perfectly healthy reply
+        // from a machine nobody is watching. The socket path is the only
+        // arbiter (`docs/OVERSEER.md`), it is not on the wire, and it does not
+        // need to be: this side resolved it. Null when nothing is dialled,
+        // never a plausible default.
+        socketPath: s.socketPath ?? null,
         // Provenance for a bug report. §2.1 calls it opaque: never compare it,
         // and never gate on it — it moves on a documentation commit.
         serverBuild: s.serverBuild ?? null,
+        // WHAT THE CLIENT ALREADY KNEW AND USED TO SAY NOWHERE. `identifyServer`
+        // sets this on a lineage this build has never heard of, or on a server
+        // that identified itself and sent no build. Neither is fatal, and an
+        // agent that never sees it reads an unchecked identity as a checked one.
+        identityWarning: s.identityWarning ?? null,
         // The count is a separate signal: an installed binary can advertise a
         // different count from the source tree it was built from. Read it,
         // never pin it.
@@ -1717,7 +1730,18 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       if (req.connect === false) { await s.disconnect(); }
       else { await s.connect(); }
       const now = useAetherStore.getState();
-      return { status: now.status, server: now.serverName ?? null, error: now.error ?? null };
+      // `server` is the deployment label and stays only because it is what a
+      // person named their process; the two fields that answer WHICH SOFTWARE
+      // and WHICH MACHINE ride beside it, so a caller that reads this reply
+      // instead of following up with `aether_status` is not left with a stale
+      // constant as its only handle on the emulator it just attached to.
+      return {
+        status: now.status,
+        server: now.serverName ?? null,
+        implementation: now.implementation ?? null,
+        socketPath: now.socketPath ?? null,
+        error: now.error ?? null,
+      };
     }
 
     case 'aether-push-palette': {
