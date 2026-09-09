@@ -15,7 +15,7 @@ import {
   CURVE_RATE_CLEAN_MAX, CURVE_RATE_GARBLED_MIN,
   curveShearRate, curveExcursionPx, curveRateOnsetCamX, curveRateOnsetEstimate,
 } from '../curve-rate';
-import { decodeFactorScroll } from '../factor-decode';
+import { decodeFactorScroll, factorRatio } from '../factor-decode';
 import { EFFECTS_FACTOR_NAMES } from '../scene-ui';
 import type { EffectsFactor } from '../scene';
 import { SCREEN_HEIGHT } from '../../../model/screen';
@@ -170,5 +170,123 @@ describe('the onset', () => {
   it('has no estimate when the two ends are the same ratio', () => {
     expect(curveRateOnsetEstimate('FACTOR_1_2', 'FACTOR_1_2', SCREEN_HEIGHT, 1)).toBeNull();
     expect(curveRateOnsetEstimate('FACTOR_LOCKED', 'FACTOR_0', SCREEN_HEIGHT, 1)).toBeNull();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GUARD-SEAT-RESIDUE: the seven plants this file did not catch
+//
+// Twenty mutations were applied to `curve-rate.ts` one at a time, each scored
+// against the WHOLE `npm test`, with the verdict taken from vitest's own
+// `Test Files` line rather than from the aggregate exit code. Thirteen died
+// against the rows above; seven survived, and they are closed here. Two of the
+// seven are shown not to discriminate at all and get a row that asserts their
+// precondition instead. No source line changed.
+//
+// The packet is `docs/reviews/2026-09-09-guard-residue-preset.md`.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('GUARD-SEAT-RESIDUE: the plants the rows above did not catch', () => {
+  it('PLANT CR03: a rate is a MAGNITUDE, so a descending band is not negative', () => {
+    // Dropping `Math.abs` survived: every published arm above is quoted as a
+    // positive excursion, so nothing ever handed this function the other sign.
+    // A negative rate compares below every bar, which silently clears exactly
+    // the bands whose shear runs the other way.
+    const positive = curveShearRate(176, SCREEN_HEIGHT);
+    const negative = curveShearRate(-176, SCREEN_HEIGHT);
+    expect(positive).not.toBeNull();
+    expect(negative).toBe(positive);
+    expect(negative!).toBeGreaterThan(0);
+  });
+
+  it('PLANTS CR06 and CR08, NOT DISCRIMINATING: each side of the bracket has ONE arm', () => {
+    // Reversing the extremum in either derivation survived, and no input can
+    // catch it: `reduce` over a single-element list returns that element
+    // whatever the comparator says. The PRECONDITION is the arm census. When
+    // aeon measures a third arm this row goes red, and the two extremum
+    // comparators become reachable and need a case each.
+    const clean = CURVE_RATE_ARMS.filter((a) => !a.garbled);
+    const garbled = CURVE_RATE_ARMS.filter((a) => a.garbled);
+    expect(
+      clean.length,
+      'a second CLEAN arm has landed, so CURVE_RATE_CLEAN_MAX now has a choice to make and '
+      + 'nothing asserts it takes the HIGHEST',
+    ).toBe(1);
+    expect(
+      garbled.length,
+      'a second GARBLED arm has landed, so CURVE_RATE_GARBLED_MIN now has a choice to make and '
+      + 'nothing asserts it takes the LOWEST',
+    ).toBe(1);
+    expect(CURVE_RATE_CLEAN_MAX).toBe(curveShearRate(clean[0].excursionPx, CURVE_RATE_ARM_SPAN_LINES));
+    expect(CURVE_RATE_GARBLED_MIN)
+      .toBe(curveShearRate(garbled[0].excursionPx, CURVE_RATE_ARM_SPAN_LINES));
+  });
+
+  it('PLANT CR12: the scan has no answer below two samples either', () => {
+    // Loosening `spanLines < 2` to `< 1` survived. It is not a tidy guard: with
+    // one line there are ZERO adjacent pairs, so the scan divides by zero and
+    // answers camera 0, which reads as "garbled from the very first pixel".
+    expect(curveRateOnsetCamX('FACTOR_1_8', 'FACTOR_1_2', 1, CURVE_RATE_GARBLED_MIN, 20000))
+      .toBeNull();
+    expect(curveRateOnsetCamX('FACTOR_1_8', 'FACTOR_1_2', 0, CURVE_RATE_GARBLED_MIN, 20000))
+      .toBeNull();
+    // ANTI-VACUOUS: two samples IS an answer, so the rows above are about the
+    // bound and not about this pair of factors never crossing.
+    expect(curveRateOnsetCamX('FACTOR_1_8', 'FACTOR_1_2', 2, CURVE_RATE_GARBLED_MIN, 20000))
+      .not.toBeNull();
+  });
+
+  it('PLANT CR13: the scan INCLUDES the top of the range it was given', () => {
+    // Tightening `camX <= maxCamX` to `<` survived: every existing row scans to
+    // a bound comfortably past the onset. The one camera it loses is the last
+    // one, and the caller that hands this function a bound hands it the bound
+    // it cares about.
+    const span = SCREEN_HEIGHT;
+    const onset = curveRateOnsetCamX(
+      'FACTOR_1_8', 'FACTOR_1_2', span, CURVE_RATE_GARBLED_MIN, 20000,
+    );
+    expect(onset).not.toBeNull();
+    expect(
+      curveRateOnsetCamX('FACTOR_1_8', 'FACTOR_1_2', span, CURVE_RATE_GARBLED_MIN, onset!),
+      'a scan bounded AT the onset reported that the range never reaches the bar',
+    ).toBe(onset);
+    // And one camera below it really is out of range, so the row above is about
+    // the inclusive edge rather than about a bound that was never tight.
+    expect(curveRateOnsetCamX('FACTOR_1_8', 'FACTOR_1_2', span, CURVE_RATE_GARBLED_MIN, onset! - 1))
+      .toBeNull();
+  });
+
+  it('PLANT CR16: the ESTIMATE rounds UP, so it is a camera that has REACHED the bar', () => {
+    // `Math.ceil` to `Math.floor` survived, because the only row on the
+    // estimate compares it with the scan and allows eight camera pixels of
+    // slack for the decode's per-term truncation. The property that fixes the
+    // direction is stated against the estimate's OWN exact-rational model.
+    const span = SCREEN_HEIGHT;
+    const [fb, to]: [EffectsFactor, EffectsFactor] = ['FACTOR_1_8', 'FACTOR_1_2'];
+    const f = factorRatio(fb);
+    const t = factorRatio(to);
+    const dF = Math.abs(f.num / f.den - t.num / t.den);
+    const exact = (CURVE_RATE_GARBLED_MIN * (span - 1)) / dF;
+    expect(
+      Number.isInteger(exact),
+      'the exact crossing lands on a whole camera here, so rounding up and rounding down agree '
+      + 'and this row cannot tell them apart',
+    ).toBe(false);
+
+    const est = curveRateOnsetEstimate(fb, to, span, CURVE_RATE_GARBLED_MIN);
+    expect(est).not.toBeNull();
+    expect((est! * dF) / (span - 1)).toBeGreaterThanOrEqual(CURVE_RATE_GARBLED_MIN);
+    expect((( est! - 1) * dF) / (span - 1)).toBeLessThan(CURVE_RATE_GARBLED_MIN);
+  });
+
+  it('PLANT CR19: the estimate has no answer below two samples either', () => {
+    // The same loosening as CR12, on the arm with no camera bound to scan to.
+    // With one line the estimate is `rate * 0 / dF`, which is camera ZERO: the
+    // no-act arm would tell an author the shear is already past the bar before
+    // the level starts.
+    expect(curveRateOnsetEstimate('FACTOR_1_8', 'FACTOR_1_2', 1, CURVE_RATE_GARBLED_MIN)).toBeNull();
+    expect(curveRateOnsetEstimate('FACTOR_1_8', 'FACTOR_1_2', 0, CURVE_RATE_GARBLED_MIN)).toBeNull();
+    expect(curveRateOnsetEstimate('FACTOR_1_8', 'FACTOR_1_2', 2, CURVE_RATE_GARBLED_MIN))
+      .not.toBeNull();
   });
 });
