@@ -1,9 +1,9 @@
-// THE DOORS THAT CAN DESTROY THE OPEN COMPOSER DRAWING.
+// THE THREE DOORS THAT CAN DESTROY THE OPEN COMPOSER DRAWING.
 //
 // `artStore.open.doc` is a document store on the unsaved-work perimeter: its
 // strokes live in that store alone, and replacing or closing it is the only way
-// they are ever lost. Both doors are here so that one rule, one dialog and one
-// set of words serve them:
+// they are ever lost. Three doors do that, and all three are here so that one
+// rule, one dialog and one set of words serve them:
 //
 //   • REPLACE  (`confirmArtDocumentOpen`) — every "open this in the composer"
 //     gesture in the app: the launcher's New Tile / Block / Chunk, a double click
@@ -11,10 +11,19 @@
 //     strip, and the map's right-click Edit Tile / Edit Block and marquee capture.
 //   • CLOSE    (`confirmArtDocumentClose`) — the doc header's `New...` button, the
 //     one route back to the launcher.
+//   • STALE    (`confirmStaleArtDocumentClose`) — the target the document was
+//     editing stopped existing under it (see ./stale-document.ts).
 //
-// ═══ WHY THIS FILE CHANGED ════════════════════════════════════════════════
+// ═══ WHY THIS FILE CHANGED, TWICE OVER ════════════════════════════════════
 //
-// ART-DISCARD-GUARD-UNTESTED. Both doors asked through
+// (1) ART-DOC-CLOSED-UNGUARDED. The STALE door did not exist. `art-facet.tsx`
+// called `useArtStore.getState().closeDocument()` directly at three sites and
+// followed it with an INFO TOAST, so a drawing with unsaved strokes was destroyed
+// and the author was notified after the fact. That was a defensible concession
+// once and is not one now; the evidence either way is written out at the stale
+// door below.
+//
+// (2) ART-DISCARD-GUARD-UNTESTED. The other two doors asked through
 // `window.confirm`, which was the ONLY `window.confirm` left in `src/` (measured:
 // every other door in the app asks through `state/confirmStore.ts`, rendered by
 // `shell/ConfirmDialog.tsx`). It was not a considered exception. This file was
@@ -53,9 +62,11 @@ import { useConfirmStore } from '../../state/confirmStore';
 import { useToastStore } from '../../state/toastStore';
 import { composerSaveState, saveComposerDocument } from '../../state/art-composer-save';
 import type { ComposerSaveState } from '../../state/art-composer-save';
+import { staleTargetSentence } from './stale-document';
+import type { StaleTarget } from './stale-document';
 
 /** Which door the author is standing at. Decides the verbs, nothing else. */
-export type ArtDocDoor = 'open' | 'close';
+export type ArtDocDoor = 'open' | 'close' | 'stale';
 
 export type ArtDocDiscardPlan =
   | { kind: 'proceed' }
@@ -103,6 +114,20 @@ const DOOR_COPY: Record<ArtDocDoor, {
     cancel: 'Cancel',
     cancelled: 'Close cancelled',
   },
+  stale: {
+    // The lead sentence (which target went, and why) is prepended by the caller;
+    // this half says what closing would cost, in the present tense, because at
+    // this door the document is still on screen.
+    body: 'Closing it discards the unsaved strokes it still holds.',
+    save: 'Save & close',
+    discard: 'Discard & close',
+    // NOT "Cancel", because at this door cancelling is a real outcome the author
+    // may well want: the drawing stays on screen. The KEY is still the reserved
+    // `cancel` (see components/ui/safe-focus.ts), which is what the dialog
+    // focuses and what Esc answers; only the label differs.
+    cancel: 'Keep it open',
+    cancelled: 'Document kept open',
+  },
 };
 
 /**
@@ -116,10 +141,10 @@ const DOOR_COPY: Record<ArtDocDoor, {
  * primary button reads as a bug.
  */
 export function artDocDiscardBody(
-  door: ArtDocDoor, plan: { offerSave: boolean; unsavable: string | null },
+  door: ArtDocDoor, plan: { offerSave: boolean; unsavable: string | null }, lead?: string,
 ): string {
   const copy = DOOR_COPY[door];
-  const head = copy.body;
+  const head = lead ? `${lead} ${copy.body}` : copy.body;
   if (plan.unsavable === null) return head;
   const tail = plan.offerSave
     ? `Save cannot cover all of it, so anything left needs ${copy.discard}.`
@@ -129,13 +154,13 @@ export function artDocDiscardBody(
 
 /**
  * Ask the one question, then act on the answer: the whole of the ask -> save ->
- * re-snapshot flow, shared by both doors.
+ * re-snapshot flow, shared by all three doors.
  *
  * Resolves true when the caller may destroy the document (nothing was at risk,
  * the author discarded, or a save left it verifiably clean), false when it must
  * not (cancel, dismissal, or a save that did not clear the flag).
  */
-async function askBeforeDiscard(door: ArtDocDoor): Promise<boolean> {
+async function askBeforeDiscard(door: ArtDocDoor, lead?: string): Promise<boolean> {
   const plan = planArtDocDiscard(useArtStore.getState().open, composerSaveState());
   if (plan.kind === 'proceed') return true;
   const copy = DOOR_COPY[door];
@@ -146,7 +171,7 @@ async function askBeforeDiscard(door: ArtDocDoor): Promise<boolean> {
   // button list would make this door invisible to it.
   const answer = await useConfirmStore.getState().ask({
     title: `Unsaved strokes in "${plan.name}"`,
-    body: artDocDiscardBody(door, plan),
+    body: artDocDiscardBody(door, plan, lead),
     buttons: [
       ...(plan.offerSave
         ? [{ key: 'save', label: copy.save, tone: 'primary' as const }] : []),
@@ -213,6 +238,62 @@ export async function confirmArtDocumentOpen(next: OpenDocument): Promise<boolea
 export async function confirmArtDocumentClose(): Promise<boolean> {
   if (useArtStore.getState().open === null) return true;
   if (!await askBeforeDiscard('close')) return false;
+  useArtStore.getState().closeDocument();
+  return true;
+}
+
+/**
+ * The document's target has gone (see ./stale-document.ts). Close it, asking
+ * first when it has unsaved strokes. Resolves true if it was closed.
+ *
+ * ═══ WAS THE OLD TOAST A CONCESSION OR AN OVERSIGHT? ════════════════════════
+ *
+ * A CONCESSION, and the code says so in three places. Until the composer document
+ * got a saver of its own (`state/art-composer-save.ts`, extracted 2026-09-08),
+ * NOTHING could clear `open.dirty` on an existing entry: `artStore` had
+ * `openDocument` / `closeDocument` / `markOpenDirty` and no `markOpenClean`, the
+ * SaveCoordinator had four savers and none touched this store, and the one Save
+ * button in the app lived inside the facet component. So a dialog raised here
+ * could have offered only Discard and Cancel, and Cancel would have meant
+ * "keep a document nothing in the app can ever save". Closing it and saying so
+ * was the honest end of a road with no exit. The three call sites read that way
+ * too: one shared handler, one `info` toast each, no `error` and no `warning`.
+ *
+ * WHAT MAKES IT AN OVERSIGHT NOW is not that a saver exists but that CANCEL
+ * became worth offering. A stale document left open is a safe no-op rather than a
+ * hazard, and that is measured, not assumed: `ComposerCanvas`'s `commitAtlasTile`
+ * does `const tile = atlas[tileIndex]; if (!tile) return;`, so strokes on a live
+ * tile past the end of the tileset write nothing; `bgArtCommitCommand` skips every
+ * write whose `bgArtCellAtlasIndex` is null and returns null for a band that is
+ * gone; and a chunk document whose chunk was removed still paints against the
+ * intact zone tileset. So keeping it open costs nothing and shows the author their
+ * drawing, which is strictly more than a notification that it has been deleted.
+ *
+ * ⚠ AND SAVE IS BLOCKED AT ALL THREE ARMS OF THIS DOOR TODAY, which is worth
+ * knowing before reading the Save button as this door's payoff. `composerSaveState`
+ * blocks a live-tile document and a BG-art document outright, and (as of this
+ * parcel) a chunk document whose chunk has left the library, which is precisely
+ * the set of documents that can be stale. So the dialog here offers Discard and
+ * Keep it open, and the Save arm exists because this door shares one flow with the
+ * other two and not because it can fire. Making a stale document savable again is
+ * a real follow-up and deliberately not invented here: it would mean DETACHING it
+ * (dropping `chunkId` / `liveTileIndex` / `bgOverride` so Save writes a new library
+ * chunk), and a band-art document cannot simply be detached, because its cells
+ * index the override's own atlas and would silently be reinterpreted against the
+ * zone tileset. See the report filed with this parcel.
+ */
+export async function confirmStaleArtDocumentClose(target: StaleTarget): Promise<boolean> {
+  const open = useArtStore.getState().open;
+  if (open === null) return true;
+  const lead = staleTargetSentence(target);
+  if (!open.dirty) {
+    // Nothing to lose, so nothing to ask: close it and say why it went, which is
+    // what the old code did at all three sites and is still right at this one.
+    useArtStore.getState().closeDocument();
+    useToastStore.getState().addToast(`${lead} Document closed`, 'info');
+    return true;
+  }
+  if (!await askBeforeDiscard('stale', lead)) return false;
   useArtStore.getState().closeDocument();
   return true;
 }

@@ -2,7 +2,8 @@
 // THE ONLY GUARD BETWEEN AN AUTHOR AND THE DESTRUCTION OF A COMPOSER DRAWING
 // ═══════════════════════════════════════════════════════════════════════════
 //
-// Finding ART-DISCARD-GUARD-UNTESTED (docs/lens-findings.jsonl, sweep 2026-09-06).
+// Findings ART-DISCARD-GUARD-UNTESTED and ART-DOC-CLOSED-UNGUARDED
+// (docs/lens-findings.jsonl, sweep 2026-09-06).
 //
 // ⚠ THE MEASUREMENT THAT MADE THIS FILE NECESSARY. Before it existed, deleting
 // the guard's body outright left `npm test` at exactly its baseline: 7821 passed
@@ -15,10 +16,13 @@
 // ═══ WHAT THIS FILE CAN AND CANNOT SEE ════════════════════════════════════
 //
 // The node suite has no jsdom and no testing-library, so `art-facet.tsx` cannot
-// be mounted and no dialog is ever rendered. What it CAN drive is the doors
-// themselves, which this parcel made drivable by moving them off
-// `window.confirm` and onto the app's own promise-based confirm store:
+// be mounted and no dialog is ever rendered. What it CAN drive is everything the
+// facet delegates to, and this parcel moved the deciding code out of the
+// component for exactly that reason:
 //
+//   §A  `staleTarget` — the pure predicate that used to be three inline `if`s in
+//       an effect. Total, and driven on every arm plus the three "nothing to
+//       compare against" controls that must NOT read as stale.
 //   §B  `planArtDocDiscard` / `artDocDiscardBody` — the pure decision and the
 //       pure copy, the same split as shell/project-open-guard.ts.
 //   §C  THE REAL DOORS, over the REAL `confirmStore` and the REAL `artStore`,
@@ -42,8 +46,10 @@ import { join, relative } from 'node:path';
 import ts from 'typescript';
 import {
   planArtDocDiscard, artDocDiscardBody,
-  confirmArtDocumentOpen, confirmArtDocumentClose,
+  confirmArtDocumentOpen, confirmArtDocumentClose, confirmStaleArtDocumentClose,
 } from '../open-document';
+import { staleTarget, staleTargetSentence } from '../stale-document';
+import type { StaleTargetInputs } from '../stale-document';
 import { useArtStore } from '../../../state/artStore';
 import type { OpenDocument } from '../../../state/artStore';
 import { useConfirmStore } from '../../../state/confirmStore';
@@ -65,6 +71,11 @@ function docOf(over: Partial<OpenDocument> = {}): OpenDocument {
     doc: createDoc(2, 2), liveTileIndex: null, chunkId: null,
     name: 'New Chunk (16x16)', dirty: false, ...over,
   };
+}
+
+/** The inputs with every source of staleness answering "present". */
+function freshInputs(open: OpenDocument | null): StaleTargetInputs {
+  return { open, tilesetLength: 8, bgTargetExists: open?.bgOverride ? true : null, chunkIds: ['c1'] };
 }
 
 /**
@@ -104,6 +115,72 @@ const BODY = () => useConfirmStore.getState().request!.body!;
 const LAST_TOAST = () => useToastStore.getState().toasts.at(-1) ?? null;
 
 // ---------------------------------------------------------------------------
+// §A  The pure staleness rule
+// ---------------------------------------------------------------------------
+
+describe('§A staleTarget: which of the document’s targets has gone', () => {
+  it('CONTROL: a document whose every target is present is not stale', () => {
+    expect(staleTarget(freshInputs(docOf({ chunkId: 'c1' })))).toBeNull();
+    expect(staleTarget(freshInputs(docOf({ liveTileIndex: 3 })))).toBeNull();
+    expect(staleTarget(freshInputs(docOf({ bgOverride: { kind: 'tile', tileIndex: 2 } }))))
+      .toBeNull();
+    expect(staleTarget(freshInputs(null))).toBeNull();
+  });
+
+  it('a live tile past the end of the tileset is stale, and carries the index', () => {
+    const i = { ...freshInputs(docOf({ liveTileIndex: 8 })), tilesetLength: 8 };
+    expect(staleTarget(i)).toEqual({ kind: 'live-tile', tileIndex: 8 });
+    // The boundary, both sides of it. `>= length` is the rule, so the last valid
+    // index is one less than the count, and getting that backwards is the classic
+    // way a live document is either never closed or closed while it is fine.
+    expect(staleTarget({ ...i, open: docOf({ liveTileIndex: 7 }) })).toBeNull();
+  });
+
+  it('a BG art target the override document no longer has is stale', () => {
+    const open = docOf({ bgOverride: { kind: 'bank', bandIndex: 1, bank: 3 } });
+    expect(staleTarget({ ...freshInputs(open), bgTargetExists: false }))
+      .toEqual({ kind: 'bg-art' });
+    expect(staleTarget({ ...freshInputs(open), bgTargetExists: true })).toBeNull();
+  });
+
+  it('a chunk that has left the library is stale', () => {
+    const open = docOf({ chunkId: 'gone' });
+    expect(staleTarget({ ...freshInputs(open), chunkIds: ['c1'] })).toEqual({ kind: 'chunk' });
+    expect(staleTarget({ ...freshInputs(open), chunkIds: [] })).toEqual({ kind: 'chunk' });
+    expect(staleTarget({ ...freshInputs(open), chunkIds: ['gone'] })).toBeNull();
+  });
+
+  it('NOTHING TO COMPARE AGAINST IS NOT STALENESS, on all three arms', () => {
+    // ⚠ THE ROW THAT PROTECTS EVERY OPEN DOCUMENT DURING A PROJECT OPEN. A null
+    // here means "there is no current zone / no project to ask", which is not the
+    // same fact as "the target is gone" — and reading it as the second would close
+    // every document the instant a project switch cleared the stores. The old
+    // inline code got this right through `&&` ordering; these rows make it a
+    // property instead of a side effect of expression order.
+    expect(staleTarget({ ...freshInputs(docOf({ liveTileIndex: 999 })), tilesetLength: null }))
+      .toBeNull();
+    expect(staleTarget({ ...freshInputs(docOf({ chunkId: 'gone' })), chunkIds: null }))
+      .toBeNull();
+    // And a document with no bgOverride target never consults that input at all.
+    expect(staleTarget({ ...freshInputs(docOf()), bgTargetExists: false })).toBeNull();
+  });
+
+  it('every arm has a sentence, and the live-tile one names the tile it lost', () => {
+    // Derived from the target, not typed here: the index is the only fact in these
+    // sentences that varies, and a sentence that dropped it would tell an author
+    // "a tile is gone" while three are open.
+    expect(staleTargetSentence({ kind: 'live-tile', tileIndex: 42 })).toContain('42');
+    for (const t of [
+      { kind: 'live-tile', tileIndex: 1 } as const,
+      { kind: 'bg-art' } as const,
+      { kind: 'chunk' } as const,
+    ]) {
+      expect(staleTargetSentence(t)).toMatch(/no longer exists/);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // §B  The pure plan and the pure copy
 // ---------------------------------------------------------------------------
 
@@ -129,7 +206,7 @@ describe('§B planArtDocDiscard and the words it produces', () => {
 
   it('the body states the stake, then the reason, then the way out', () => {
     const blocked = { offerSave: false, unsavable: 'BECAUSE X.' };
-    for (const door of ['open', 'close'] as const) {
+    for (const door of ['open', 'close', 'stale'] as const) {
       const body = artDocDiscardBody(door, blocked);
       expect(body, door).toContain('BECAUSE X.');
       // A missing primary button has to be explained or it reads as a bug.
@@ -144,13 +221,21 @@ describe('§B planArtDocDiscard and the words it produces', () => {
     expect(plain.length).toBeGreaterThan(20);
   });
 
+  it('the stale door leads with the reason the target went', () => {
+    const body = artDocDiscardBody(
+      'stale', { offerSave: false, unsavable: 'BECAUSE X.' }, 'THE TILE WENT.');
+    expect(body.startsWith('THE TILE WENT.')).toBe(true);
+    // and it does not claim the document is already gone, which is what the old
+    // toast said at the moment it destroyed it.
+    expect(body).toMatch(/still holds/);
+  });
 });
 
 // ---------------------------------------------------------------------------
 // §C  The real doors
 // ---------------------------------------------------------------------------
 
-describe('§C both doors, over the real confirm store', () => {
+describe('§C the three doors, over the real confirm store', () => {
   beforeEach(() => {
     useArtStore.getState().closeDocument();
     useProjectStore.getState().reset();
@@ -206,9 +291,9 @@ describe('§C both doors, over the real confirm store', () => {
 
   it('the focused button is the reserved cancel key, whatever its label says', () => {
     // d-31 (components/ui/safe-focus.ts): the dialog focuses the safe button and
-    // never the destructive one. This asserts the KEY through the real chooser
-    // rather than trusting the label, because a label is prose and a guard keyed
-    // on one silently stops covering the site that gets reworded.
+    // never the destructive one. The stale door labels its cancel "Keep it open",
+    // which is why this asserts the KEY through the real chooser rather than
+    // trusting the label.
     openDirty();
     void confirmArtDocumentClose();
     const buttons = useConfirmStore.getState().request!.buttons;
@@ -265,6 +350,55 @@ describe('§C both doors, over the real confirm store', () => {
     expect(useArtStore.getState().open).toBeNull();
   });
 
+  // ── STALE ────────────────────────────────────────────────────────────────
+
+  it('STALE and CLEAN: closed at once, with the sentence that says why', async () => {
+    // Unchanged behaviour, deliberately. There is nothing to lose, and the
+    // launcher is the honest screen for a document whose subject is gone.
+    useArtStore.getState().openDocument(docOf({ chunkId: 'gone' }));
+    await expect(confirmStaleArtDocumentClose({ kind: 'chunk' })).resolves.toBe(true);
+    expect(useConfirmStore.getState().request).toBeNull();   // no dialog
+    expect(useArtStore.getState().open).toBeNull();
+    expect(LAST_TOAST()!.message).toMatch(/no longer exists/);
+    expect(LAST_TOAST()!.message).toMatch(/Document closed/);
+    expect(LAST_TOAST()!.type).toBe('info');
+  });
+
+  it('STALE and DIRTY: ASKED, not destroyed, and keeping it is one of the answers',
+    async () => {
+      // ⚠ ART-DOC-CLOSED-UNGUARDED. Before this parcel the next two lines were the
+      // whole behaviour: closeDocument(), then an info toast telling the author
+      // their strokes had been thrown away. No question, no way back.
+      aeonProjectOpen();                       // a zone and act exist…
+      openDirty({ chunkId: 'gone', name: 'Half Drawn' });   // …but this chunk does not
+      const p = confirmStaleArtDocumentClose({ kind: 'chunk' });
+
+      expect(useConfirmStore.getState().request).not.toBeNull();
+      expect(useArtStore.getState().open!.name).toBe('Half Drawn');   // still there
+      // Save is NOT offered: the chunk it would write back to is the thing that
+      // went. That is the composerSaveState arm §D adds; without it this door
+      // would show an inert primary button.
+      expect(KEYS()).toEqual(['discard', 'cancel']);
+      expect(BODY()).toMatch(/no longer in the chunk library/);
+      expect(BODY()).toMatch(/only ways out/);
+
+      useConfirmStore.getState().answer('cancel');
+      await expect(p).resolves.toBe(false);
+      expect(useArtStore.getState().open!.name).toBe('Half Drawn');
+      expect(useArtStore.getState().open!.dirty).toBe(true);
+
+      // And discard still works, so the effect can still reach its resting state.
+      const q = confirmStaleArtDocumentClose({ kind: 'chunk' });
+      useConfirmStore.getState().answer('discard');
+      await expect(q).resolves.toBe(true);
+      expect(useArtStore.getState().open).toBeNull();
+    });
+
+  it('STALE with nothing open resolves without asking or toasting', async () => {
+    await expect(confirmStaleArtDocumentClose({ kind: 'bg-art' })).resolves.toBe(true);
+    expect(useConfirmStore.getState().request).toBeNull();
+    expect(LAST_TOAST()).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
