@@ -856,3 +856,232 @@ describe('a background stroke is one command, and does not survive an act switch
     expect(painted('act1')).toHaveLength(0);
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THE KEYBOARD THE MAP LISTENS TO — arrows, zoom, Escape, and the two guards in
+// front of all of them.
+//
+// NOT A FIX. This is the first block here that is coverage rather than
+// regression: these are paths an author uses every minute and NOTHING in the
+// suite ran them. `map-escape.test.ts` pins `resolveEscape`'s VERDICT as a pure
+// function and says in its own header that "MapViewport's Escape branch is
+// inside a React effect the node suite cannot reach" — that sentence is what
+// these rows retire. A verdict nothing acts on is a passing test and a dead key.
+//
+// ⚠ THE CAMERA IS PARKED AWAY FROM ITS BOUND, DELIBERATELY. `viewStore.pan`
+// clamps with `Math.max(0, …)`, so at the default vpX/vpY of 0 the Left and Up
+// arrows are indistinguishable from a key that does nothing at all — a control
+// standing exactly where the thing it is controlling for happens. Every
+// direction row starts at PARKED and one row keeps the bound, labelled as the
+// clamp row it is.
+//
+// ⚠ AND THE STEP IS NOT PINNED. A row asserting `vpX === 64` would be copied
+// from the source it is checking. What is asserted instead is the PROPERTY: the
+// two horizontal keys move the camera by equal and opposite amounts, and the
+// same key moves it HALF AS FAR IN WORLD SPACE at zoom 2, which is
+// `viewStore.pan`'s `dx / state.zoom` and is what makes an arrow key move a
+// constant number of SCREEN pixels at every zoom.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('the map\'s keyboard moves the camera, and two guards stop it', () => {
+  /** Off the clamp, and off it far enough that a step in any direction stays off
+   *  it. See the block header: 0 is the value `pan` saturates at. */
+  const PARKED = { vpX: 256, vpY: 256, zoom: 1 };
+
+  /** A keydown carrying a TARGET and a readable `preventDefault` — the two
+   *  fields the shared `keydown` helper fixes at `null` and a no-op. */
+  function key(k: string, over: Record<string, unknown> = {}) {
+    let prevented = false;
+    return {
+      ...keydown(k),
+      preventDefault: () => { prevented = true; },
+      wasPrevented: () => prevented,
+      ...over,
+    };
+  }
+
+  const view = () => useViewStore.getState();
+
+  beforeEach(() => { useViewStore.setState(PARKED); });
+
+  it('the four arrows move the camera, each on its own axis and its own sign', async () => {
+    await mountMap();
+    const moves: Record<string, { x: number; y: number }> = {};
+    for (const k of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']) {
+      useViewStore.setState(PARKED);
+      expect(win!.dispatch('keydown', key(k)), 'nothing was listening').toBe(1);
+      moves[k] = { x: view().vpX - PARKED.vpX, y: view().vpY - PARKED.vpY };
+    }
+    // Opposite and equal, derived rather than pinned.
+    expect(moves.ArrowLeft.x, 'Left did not move the camera at all').not.toBe(0);
+    expect(moves.ArrowRight.x).toBe(-moves.ArrowLeft.x);
+    expect(moves.ArrowUp.y, 'Up did not move the camera at all').not.toBe(0);
+    expect(moves.ArrowDown.y).toBe(-moves.ArrowUp.y);
+    // …and each key touches ONE axis. A handler that panned both would still
+    // pass every equal-and-opposite assertion above.
+    expect([moves.ArrowLeft.y, moves.ArrowRight.y], 'a horizontal key moved the camera vertically')
+      .toEqual([0, 0]);
+    expect([moves.ArrowUp.x, moves.ArrowDown.x], 'a vertical key moved the camera horizontally')
+      .toEqual([0, 0]);
+    // The direction the repo's own sign convention fixes: Right increases vpX.
+    expect(moves.ArrowRight.x, 'Right must scroll the view towards larger world X')
+      .toBeGreaterThan(0);
+  });
+
+  it('an arrow moves a constant SCREEN distance, so world distance halves at zoom 2', async () => {
+    // `viewStore.pan` divides by zoom. Without that a key would jump twice as far
+    // across the screen when zoomed in, which is the same class as the wheel
+    // anchor bug and is invisible to a row that only tests zoom 1.
+    await mountMap();
+    useViewStore.setState({ ...PARKED, zoom: 1 });
+    win!.dispatch('keydown', key('ArrowRight'));
+    const atOne = view().vpX - PARKED.vpX;
+
+    useViewStore.setState({ ...PARKED, zoom: 2 });
+    win!.dispatch('keydown', key('ArrowRight'));
+    const atTwo = view().vpX - PARKED.vpX;
+
+    expect(atOne, 'the zoom-1 control moved nothing').toBeGreaterThan(0);
+    expect(atTwo * 2, 'the pan ignored the zoom: an arrow key would jump twice as far on screen')
+      .toBe(atOne);
+  });
+
+  it('CLAMP: the camera does not travel past the origin', async () => {
+    // The bound the other rows deliberately avoid, asserted where it belongs.
+    await mountMap();
+    useViewStore.setState({ vpX: 0, vpY: 0, zoom: 1 });
+    win!.dispatch('keydown', key('ArrowLeft'));
+    win!.dispatch('keydown', key('ArrowUp'));
+    expect([view().vpX, view().vpY], 'the camera went negative').toEqual([0, 0]);
+  });
+
+  it('the zoom keys zoom in, out, and home', async () => {
+    await mountMap();
+    win!.dispatch('keydown', key('='));
+    const zoomedIn = view().zoom;
+    expect(zoomedIn, '= did not zoom in').toBeGreaterThan(PARKED.zoom);
+
+    // ⚠ A FLUSH, AND IT IS NOT HYGIENE. The keyboard effect closes over `zoom`
+    // and lists it in its deps, so the registered handler holds the zoom AS OF
+    // THE LAST RENDER. In the browser a keystroke is its own task and React has
+    // re-rendered in between; here nothing re-renders unless asked, so two
+    // dispatches in a row would both compute from the pre-press zoom and the
+    // second would look like a dead key. That is an artefact of this harness and
+    // NOT a finding — it is called out so a later reader does not file it as one.
+    mounted!.setProps({});
+    win!.dispatch('keydown', key('-'));
+    expect(view().zoom, '- did not undo the zoom in').toBeLessThan(zoomedIn);
+
+    mounted!.setProps({});
+    useViewStore.setState({ ...PARKED, zoom: 4 });
+    mounted!.setProps({});
+    win!.dispatch('keydown', key('0'));
+    expect(view().zoom, '0 must go home to 1:1, whatever the zoom was').toBe(1);
+  });
+
+  it('every key it acts on suppresses the browser default; one it ignores does not', async () => {
+    // The map lives inside a scrolling shell: an arrow key the handler acts on
+    // and does NOT swallow scrolls the pane as well as panning the camera.
+    await mountMap();
+    for (const k of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '=', '-', '0']) {
+      const e = key(k);
+      win!.dispatch('keydown', e);
+      expect(e.wasPrevented(), `${k} moved the camera without suppressing the default`).toBe(true);
+    }
+    // The control on the other side: a key with no branch must be left alone for
+    // whatever else is listening. "preventDefault everything" is the wrong rule.
+    const untouched = key('q');
+    win!.dispatch('keydown', untouched);
+    expect(untouched.wasPrevented(), 'an unbound key was swallowed anyway').toBe(false);
+  });
+
+  it('GUARD: typing in a text field does not drive the camera', async () => {
+    // The reported symptom's exact shape: a map shortcut firing from inside the
+    // command palette's search box. `isTypingTarget` is the shared rule
+    // (shell/typing-target.ts) and this is the call site that has to honour it.
+    await mountMap();
+    const before = { ...view() };
+    for (const target of [
+      { tagName: 'INPUT', type: 'text' },
+      { tagName: 'TEXTAREA', type: '' },
+      { tagName: 'DIV', isContentEditable: true },
+    ]) {
+      win!.dispatch('keydown', key('ArrowRight', { target }));
+      win!.dispatch('keydown', key('=', { target }));
+    }
+    expect([view().vpX, view().zoom],
+      'a keystroke aimed at a text field moved the map underneath it')
+      .toEqual([before.vpX, before.zoom]);
+
+    // CONTROL, and it is the half that matters: the guard has to be a filter and
+    // not an off switch. A range slider is an INPUT the shared rule deliberately
+    // does NOT count as typing — it used to, and it swallowed every map key for
+    // as long as a slider had focus.
+    win!.dispatch('keydown', key('ArrowRight', { target: { tagName: 'INPUT', type: 'range' } }));
+    expect(view().vpX, 'a focused slider is still swallowing the map\'s keys')
+      .toBeGreaterThan(before.vpX);
+  });
+
+  it('GUARD: a sprite-doc tab owns the keyboard, and the map keeps its hands off', async () => {
+    // The level pane is keep-alive (display:none) under a sprite or canvas tab,
+    // so this window handler STAYS REGISTERED while another editor is on screen.
+    // `levelKeysEnabled` is what stops it acting on a document nobody can see.
+    await mountMap();
+    const before = { ...view() };
+    for (const activeId of ['doc:sprite:untitled', 'doc:canvas:scratch']) {
+      useSessionStore.setState({ activeId });
+      win!.dispatch('keydown', key('ArrowRight'));
+      win!.dispatch('keydown', key('='));
+    }
+    expect([view().vpX, view().zoom], 'the hidden map pane acted on another editor\'s keystrokes')
+      .toEqual([before.vpX, before.zoom]);
+
+    // CONTROL: back on the level tab, the same key works. Without this the row
+    // above would pass on a handler that had simply stopped being registered.
+    focusAct('act1');
+    win!.dispatch('keydown', key('ArrowRight'));
+    expect(view().vpX).toBeGreaterThan(before.vpX);
+  });
+
+  it('Escape acts on the verdict: it drops a paste before a marquee', async () => {
+    // `map-escape.test.ts` pins what `resolveEscape` ANSWERS. Nothing until now
+    // could see whether the branch DOES anything with the answer — and its own
+    // header says this effect was out of the node suite's reach. It is not.
+    await mountMap();
+    const ed = () => useEditorStore.getState();
+    ed().setPasting(true);
+    ed().setMarquee({ sectionIndex: 0, startCol: 0, startRow: 0, endCol: 1, endRow: 1 } as never);
+
+    win!.dispatch('keydown', key('Escape'));
+    expect(ed().pasting, 'Escape did not drop the paste').toBe(false);
+    expect(ed().marquee, 'Escape took the marquee as well: the order is paste FIRST')
+      .not.toBeNull();
+
+    win!.dispatch('keydown', key('Escape'));
+    expect(ed().marquee, 'the second Escape did not drop the marquee').toBeNull();
+  });
+
+  it('CONTROL: Escape with nothing to clear leaves the camera exactly where it was', async () => {
+    // ⚠ THE CAMERA IS PARKED AWAY FROM ITS RESET VALUES, and it was not in this
+    // row's first draft. At the default zoom of 1 this row could not fail: an
+    // Escape branch that reset the view would call `setZoom(1)` on a view
+    // already at 1, and the assertion agreed. Measured — an over-application
+    // planted on the `case null` arm left all 42 rows GREEN. Off the reset
+    // values the same plant reddens this row, which is the whole point of it.
+    await mountMap();
+    useViewStore.setState({ vpX: 320, vpY: 192, zoom: 2 });
+    useEditorStore.getState().setPasting(false);
+    useEditorStore.getState().setMarquee(null);
+    const before = { ...view() };
+    win!.dispatch('keydown', key('Escape'));
+    expect(useEditorStore.getState().marquee).toBeNull();
+    expect(useEditorStore.getState().pasting).toBe(false);
+    expect([view().vpX, view().vpY, view().zoom], 'Escape moved the camera')
+      .toEqual([before.vpX, before.vpY, before.zoom]);
+  });
+
+  // NOT COVERED HERE, and named rather than left implied: `resolveEscape`'s
+  // third arm, the band lens, is gated on `inEffectsFacet()` — a facet this
+  // fixture does not open. Its VERDICT is pinned in `map-escape.test.ts`; that
+  // the branch acts on it is not, on this arm. Foreground follow-up.
+});
