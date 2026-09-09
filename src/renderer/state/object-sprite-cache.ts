@@ -16,19 +16,50 @@ interface CacheEntry<T> {
   value: T | null;
 }
 
+/**
+ * A build that THREW, handed to the cache's reporter.
+ *
+ * ⚠ WHY THIS TYPE EXISTS (SPRITE-CACHE-SILENT-SWALLOW, lens sweep 2026-09-08).
+ * `load` catches a rejection and caches it as `null` — and `null` is ALSO what a
+ * legitimate MISS returns (an id with no art link at all, which is the normal
+ * resting state for most of the S1 object table). So the two arrived at the
+ * viewport as the same value and drew the same hex-id box: a sprite whose art file
+ * is present and unreadable was indistinguishable from an id nobody has linked
+ * yet, and the improved message the builder throws (core/project/read-failure.ts)
+ * was thrown into this catch and read by nobody.
+ *
+ * The failure-caching itself is right and is unchanged; what was missing was a
+ * WITNESS. The distinction now exists as an event rather than in the value, which
+ * is why the reporter is a REQUIRED constructor parameter: a second user of this
+ * cache cannot inherit the silence by omitting it.
+ */
+export interface SpriteBuildFailure {
+  id: number;
+  zone: string;
+  variant: string;
+  epoch: number;
+  /** What the build threw, as its message. The repair hint. */
+  reason: string;
+}
+
 export class ObjectSpriteCache<T, Ctx> {
   private cache = new Map<string, CacheEntry<T>>();
   private inFlight = new Map<string, Promise<T | null>>();
 
   /**
-   * @param build   Produce the resource for (id, zone, ctx), or null on a miss.
-   *                Rejections are caught and cached as a null (failure-caching).
-   * @param dispose Release a built resource (e.g. `bitmap.close()`), called on
-   *                eviction/clear. Never called on a null entry.
+   * @param build     Produce the resource for (id, zone, ctx), or null on a miss.
+   *                  Rejections are caught and cached as a null (failure-caching).
+   * @param dispose   Release a built resource (e.g. `bitmap.close()`), called on
+   *                  eviction/clear. Never called on a null entry.
+   * @param onFailure Called ONCE per rejected build, before the null is cached.
+   *                  REQUIRED — see SpriteBuildFailure for what a default of
+   *                  silence cost. A reporter that throws would turn a failed
+   *                  sprite into a failed load, so it is called defensively.
    */
   constructor(
     private readonly build: (id: number, zone: string, variant: string, ctx: Ctx) => Promise<T | null>,
     private readonly dispose: (value: T) => void,
+    private readonly onFailure: (failure: SpriteBuildFailure) => void,
   ) {}
 
   private static key(id: number, zone: string, variant: string, epoch: number): string {
@@ -50,7 +81,24 @@ export class ObjectSpriteCache<T, Ctx> {
     const existing = this.inFlight.get(key);
     if (existing) return existing;
     const p = this.build(id, zone, variant, ctx)
-      .catch(() => null)
+      .catch((err: unknown) => {
+        // THE SWALLOW, NOW WITH A WITNESS. Still a cached null (retrying a build
+        // that threw on every repaint is the storm this cache exists to stop), but
+        // the cause leaves the building. See SpriteBuildFailure.
+        try {
+          this.onFailure({
+            id, zone, variant, epoch,
+            reason: err instanceof Error ? err.message : String(err),
+          });
+        } catch {
+          // A reporter that throws must not turn a failed sprite into a failed
+          // load: the caller's contract is "null on a miss/failure", and every
+          // consumer draws its fallback from that. Swallowing HERE is safe in the
+          // way swallowing the build was not, because the thing being dropped is
+          // the notice mechanism itself and there is nowhere further to send it.
+        }
+        return null;
+      })
       .then((value) => {
         this.cache.set(key, { epoch, value });
         this.inFlight.delete(key);

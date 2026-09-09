@@ -12,7 +12,12 @@
 //     `notices: string[]`, and the module-level `legacyAtlasMergedThisLoad`
 //     flag becomes a returned field. Store writes are the renderer glue's job.
 
-import type { FileAccess, AeonProjectData } from '../adapter';
+import type { FileAccess, AeonProjectData, ReadManyValue } from '../adapter';
+// The read layer's verdict vocabulary and the ONE place a no-bytes read becomes a
+// sentence. Imported rather than restated: the console line below and the toast on
+// open must not word the same three facts two different ways.
+import type { ReadFailureOutcome } from '../../../shared/ipc-types';
+import { readFailureMessage } from '../read-failure';
 import { nameSome, type Notice, type UnreadableItem } from '../notice';
 import type { CollisionProfileSet } from '../../collision/collision-model';
 import { s4CollisionAdapter } from '../../collision/adapters/s4-collision-adapter';
@@ -234,6 +239,69 @@ async function markUnreadable(
   // three; this is where the other sixty live, and it is written as the failure
   // happens rather than reconstructed later.
   console.warn(`[load] ${path} exists but could not be read: ${reason}`);
+}
+
+/**
+ * One BG-library body read, WITH THE VERDICT (ABSENT-CAUSE-MISNAMED, lens sweep).
+ *
+ * The union is discriminated on `outcome` for the reason `ReadManyValue`'s is: the
+ * caller has to look at the WHY to get at the bytes, so it cannot test for a null
+ * and then say whatever it likes about the cause. That is the shape the toast on
+ * open was reading through before this — an entry with no cause on it at all, under
+ * a sentence asserting one.
+ */
+type BgBodyRead =
+  | { path: string; bytes: Uint8Array; outcome: 'read'; reason: null }
+  | { path: string; bytes: null; outcome: ReadFailureOutcome; reason: string | null };
+
+/**
+ * Read one body, preferring the batch (which carries the producer's verdict).
+ *
+ * WITHOUT A BATCH — every in-memory FileAccess, and any bridge that has not
+ * implemented `readMany` — there is no verdict to carry, so one is established the
+ * only honest way available: ask the three-way probe. `exists()` answers KNOWN
+ * ABSENT or KNOWN PRESENT and THROWS when it cannot tell (FileAccess.exists), and a
+ * throw resolves to 'unreadable' on markUnreadable's rule, in the same direction and
+ * for the same reason: guessing 'absent' sends someone hunting for a file that is
+ * there, and guessing 'present' costs one honest notice.
+ */
+async function readBgBody(
+  fa: FileAccess, batch: Map<string, ReadManyValue> | null, path: string,
+): Promise<BgBodyRead> {
+  const hit = batch?.get(path);
+  if (hit) {
+    return hit.outcome === 'read'
+      ? { path, bytes: hit.bytes, outcome: 'read', reason: null }
+      : { path, bytes: null, outcome: hit.outcome, reason: hit.reason };
+  }
+  try {
+    return { path, bytes: await fa.read(path), outcome: 'read', reason: null };
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    let present = true;
+    try { present = await fa.exists(path); } catch { present = true; }
+    return present
+      ? { path, bytes: null, outcome: 'unreadable', reason }
+      // A true absence adds nothing a caller does not already know from the
+      // outcome, and `readFailureMessage` renders 'absent' without a reason.
+      : { path, bytes: null, outcome: 'absent', reason: null };
+  }
+}
+
+/**
+ * Record a manifest entry whose body did not read, with the read layer's own
+ * verdict, and put the per-file reason on the console where the other sixteen of
+ * seventeen live. The sentence comes from `readFailureMessage` so this line and the
+ * toast on open cannot word the same three facts two different ways.
+ */
+function carryBgFailure(
+  into: BgLibraryUnresolvedEntry[],
+  meta: { id: string; name: string },
+  failed: { path: string; outcome: ReadFailureOutcome; reason: string | null },
+): void {
+  into.push({ id: meta.id, name: meta.name, cause: failed.outcome, reason: failed.reason });
+  console.warn(`[load] BG library entry ${meta.id}: `
+    + readFailureMessage(failed.path, failed.outcome, failed.reason));
 }
 
 /**
@@ -604,35 +672,75 @@ async function loadFullProject(
       const dataRoot = projectDataRoot(config.raw);
       const idxRaw = await fa.read(bgLibIndexPath(dataRoot, zoneConfig.id));
       const indexEntries = parseBgLibraryIndex(new TextDecoder().decode(idxRaw));
+      // ONE batch for every body the manifest names, when the FileAccess can do
+      // one. Two reasons, and the second is the one that matters here: it is
+      // fewer round-trips on a seventeen-entry manifest, AND it is the only
+      // reader in this codebase that SAYS WHY a path produced no bytes
+      // (ReadOutcome, shared/ipc-types). `fa.read` throws an error whose cause
+      // this loop would have to sniff out of a message, which is precisely the
+      // guessing ABSENT-CAUSE-MISNAMED is about.
+      const bodyPaths = indexEntries.flatMap((m) => [
+        bgLibLayoutPath(dataRoot, zoneConfig.id, m.id),
+        bgLibTilesPath(dataRoot, zoneConfig.id, m.id),
+      ]);
+      const bodies = fa.readMany && bodyPaths.length > 0
+        ? await fa.readMany([...new Set(bodyPaths)])
+        : null;
       for (const meta of indexEntries) {
+        const layoutPath = bgLibLayoutPath(dataRoot, zoneConfig.id, meta.id);
+        const tilesPath = bgLibTilesPath(dataRoot, zoneConfig.id, meta.id);
+        const layout = await readBgBody(fa, bodies, layoutPath);
+        const tiles = await readBgBody(fa, bodies, tilesPath);
+        // NOT a `console.warn` and nothing else. The manifest is TRACKED in aeon
+        // and the two binaries per entry are NOT (a `.gitignore` rule aimed at
+        // "dead timestamped bg experiments" catches all of them), so on a clean
+        // clone this runs for EVERY entry — the library reads as empty, sections
+        // referencing it silently show the act default, and the console line is
+        // seen by nobody. The fact is carried on the project instead, and the
+        // toast on open is its human half (renderer/state/aeon-open).
+        //
+        // TWO CHECKS, NOT ONE PICKING THE FIRST FAILURE, because narrowing is the
+        // point: each branch hands `carryBgFailure` a read the compiler has
+        // already agreed carries no bytes, which is what stops a 'read' from
+        // reaching `cause`. The LAYOUT is checked first because it decides the
+        // geometry, and on a clean clone both halves are absent anyway.
+        if (layout.outcome !== 'read') {
+          carryBgFailure(bgLibraryUnresolved, meta, layout);
+          continue;
+        }
+        if (tiles.outcome !== 'read') {
+          carryBgFailure(bgLibraryUnresolved, meta, tiles);
+          continue;
+        }
+        const height = Math.floor(layout.bytes.length / (BG_WIDTH * 2));
+        // A layout too short to hold one row is a body that is PRESENT and says
+        // nothing. It takes the same road as an absent one rather than a bare
+        // `continue` — but NOT under the same cause: it is on disk, and telling
+        // the author it is not in their checkout sends them hunting for a file
+        // they are looking at (ABSENT-CAUSE-MISNAMED).
+        if (height < 1) {
+          bgLibraryUnresolved.push({
+            id: meta.id, name: meta.name, cause: 'unusable',
+            reason: `'${layoutPath}' is too short to hold one row of background layout`,
+          });
+          continue;
+        }
         try {
-          const layoutRaw = await fa.read(bgLibLayoutPath(dataRoot, zoneConfig.id, meta.id));
-          const tilesRaw = await fa.read(bgLibTilesPath(dataRoot, zoneConfig.id, meta.id));
-          const height = Math.floor(layoutRaw.length / (BG_WIDTH * 2));
-          // A layout too short to hold one row is a body that is present and
-          // says nothing — indistinguishable downstream from one that is
-          // absent, so it takes the same road rather than a bare `continue`.
-          if (height < 1) {
-            bgLibraryUnresolved.push({ id: meta.id, name: meta.name });
-            continue;
-          }
           bgLibrary.push({
             id: meta.id,
             name: meta.name,
-            layout: parseNametable(layoutRaw, BG_WIDTH, height),
-            tiles: parseBgTiles(tilesRaw),
+            layout: parseNametable(layout.bytes, BG_WIDTH, height),
+            tiles: parseBgTiles(tiles.bytes),
           });
-        } catch (entryErr) {
-          // NOT a `console.warn` and nothing else. The manifest is TRACKED in
-          // aeon and the two binaries per entry are NOT (a `.gitignore` rule
-          // aimed at "dead timestamped bg experiments" catches all of them), so
-          // on a clean clone this branch runs for EVERY entry — the library
-          // reads as empty, sections referencing it silently show the act
-          // default, and the console line is seen by nobody. The fact is
-          // carried on the project instead, and the toast on open is its human
-          // half (renderer/state/aeon-open).
-          bgLibraryUnresolved.push({ id: meta.id, name: meta.name });
-          console.warn(`[load] BG library entry ${meta.id} failed to load:`, entryErr);
+        } catch (parseErr) {
+          // Read fine, would not decode. 'unusable' for the same reason the short
+          // layout is: the bytes are there, so the repair is in the FILE and not
+          // in the checkout.
+          const why = parseErr instanceof Error ? parseErr.message : String(parseErr);
+          bgLibraryUnresolved.push({
+            id: meta.id, name: meta.name, cause: 'unusable', reason: why,
+          });
+          console.warn(`[load] BG library entry ${meta.id} did not parse:`, why);
         }
       }
     } catch {

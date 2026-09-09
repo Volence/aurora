@@ -10,6 +10,11 @@
 // first blob tile), so load(save(state)) reproduces the in-memory arrays.
 
 import { jsonFileText } from './canonical-json';
+// The read layer's verdict vocabulary, imported rather than mirrored: a second
+// declaration of the same union is two things that drift, and this one has to mean
+// exactly what `readMany` said. Type-only, so nothing about the IPC layer is pulled
+// into a codec module.
+import type { ReadFailureOutcome } from '../../shared/ipc-types';
 
 // Paths take the project's data root (projectDataRoot — 'games/<game>/data/'
 // post-split, 'data/' legacy) so the library lands inside the game's data
@@ -72,11 +77,73 @@ export function makeBgId(name: string, now: number = Date.now()): string {
  * exactly the person who could fix it, which is why the fact has to be carried
  * rather than logged.
  *
- * Structurally it is a `BgLibraryIndexEntry` — id and name and nothing else,
+ * Structurally it WAS a `BgLibraryIndexEntry` — id and name and nothing else,
  * because id and name are all the manifest ever held. The distinction from a
  * loaded `BgLibraryEntry` is precisely the missing `layout`/`tiles`.
+ *
+ * ⚠ AND WHY IT NO LONGER IS (ABSENT-CAUSE-MISNAMED, lens sweep 2026-09-08). The
+ * loader pushes here from more than one place, and they do not mean the same
+ * thing: a body that is ABSENT (the clean-clone case, and the reason this type
+ * exists) and a body that is PRESENT AND TOO SHORT TO HOLD A ROW took the same
+ * road, deliberately, because downstream could not tell them apart anyway. Then
+ * the toast on open (renderer/state/aeon-open.ts) went and named a cause for the
+ * whole list: "Their layout/tile files are not in this checkout." For the
+ * truncated entry that sentence is FALSE, and it sends the author to look in the
+ * wrong place — a `git status` for a file that is sitting right there.
+ *
+ * `cause` is REQUIRED, on the same rule as `ReadOutcome`'s (shared/ipc-types) and
+ * `PathProbe`'s: the dangerous default is absence, so absence must not be what a
+ * forgetful producer falls into. `reason` is required too, null when there is
+ * nothing to add.
  */
-export type BgLibraryUnresolvedEntry = BgLibraryIndexEntry;
+export type BgLibraryUnresolvedEntry = BgLibraryIndexEntry & {
+  cause: BgUnresolvedCause;
+  reason: string | null;
+};
+
+/**
+ * Why a manifest entry has no bytes in memory. Three of the four are the read
+ * layer's own verdicts, carried through unchanged rather than re-derived, because
+ * the read is the only thing that knows which of them it was.
+ *
+ *   'absent'      nothing at the path. The clean-clone case, and the ONLY one for
+ *                 which "not in this checkout" is a true sentence.
+ *   'unreadable'  it is (or may be) there and the read failed: EACCES, EIO, ...
+ *   'refused'     Aurora declined to resolve the path at all.
+ *   'unusable'    the bytes were READ and could not be made into a background: a
+ *                 layout too short to hold one row, or a body that did not parse.
+ *                 Distinct from the three above because the file is not the
+ *                 problem's location, its CONTENT is.
+ */
+export type BgUnresolvedCause = ReadFailureOutcome | 'unusable';
+
+/**
+ * THE ONE PLACE A CAUSE BECOMES WORDS FOR A PERSON — a short clause meant to sit
+ * after a background's name in the open toast (renderer/state/aeon-open.ts):
+ * "In-game forest (not in this checkout)".
+ *
+ * Here, beside the union, because a `switch` with no default is what makes a FIFTH
+ * cause a compile error rather than a name rendered with no explanation. And short,
+ * deliberately: the toast names up to a few entries and the per-file reason is on
+ * the console (`readFailureMessage`, via the loader's warn), which is where a long
+ * errno belongs.
+ *
+ * 'not in this checkout' survives, unchanged, for 'absent' alone. That was always
+ * the right sentence for the clean-clone case the toast was written for; the defect
+ * was applying it to the whole list.
+ */
+export function bgUnresolvedCauseText(cause: BgUnresolvedCause): string {
+  switch (cause) {
+    case 'absent': return 'not in this checkout';
+    // IT IS (OR MAY BE) THERE. Never the checkout sentence: this is the case that
+    // sent an author looking for a file that had not moved.
+    case 'unreadable': return 'on disk, could not be read';
+    case 'refused': return 'Aurora refused to read the path';
+    // Read fine, and not a background: too short to hold a row, or would not
+    // decode. The repair is in the file, not in the checkout.
+    case 'unusable': return 'on disk, not usable as a background';
+  }
+}
 
 /**
  * The index to WRITE, given what loaded and what did not.
@@ -103,7 +170,11 @@ export type BgLibraryUnresolvedEntry = BgLibraryIndexEntry;
  */
 export function mergeBgLibraryIndex(
   library: readonly BgLibraryIndexEntry[],
-  unresolved: readonly BgLibraryUnresolvedEntry[],
+  // The INDEX shape, not `BgLibraryUnresolvedEntry`: this function re-emits names,
+  // and WHY an entry did not resolve is none of the manifest's business. Asking for
+  // less than the caller has is what keeps `cause` out of the written file — and
+  // keeps a caller that only has id and name (this module's own tests) able to ask.
+  unresolved: readonly BgLibraryIndexEntry[],
 ): BgLibraryIndexEntry[] {
   const loaded = new Map(library.map((e) => [e.id, e]));
   const out: BgLibraryIndexEntry[] = [];
