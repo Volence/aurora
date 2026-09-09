@@ -13,6 +13,36 @@
 // content. "Every divergent cell is reachable from a crossover" would red the
 // build on all of it. So reachability is not what this computes.
 //
+// ═══ THE SHIPPED CORPUS ACTUALLY CARRIES MARKS — THIS FILE IS NOT VACUOUS ═══
+//
+// Measured here 2026-09-09 over aeon `origin/master` bdbf9f5d, all 18 shipped
+// `games/sonic4/data/editor/ojz/act1/section_*.collattr{,b}.bin`, 1,179,648
+// 16-bit big-endian cell words:
+//
+//   XOVER histogram over every shipped cell:  {0: 1179632, 1: 8, 2: 8}
+//
+// All 16 marks are in section 0, and they are EIGHT TWO-WAY PAIRS: plane A and
+// plane B carry a mark at the SAME eight flat indices (13455, 13711, 13967,
+// 14223, 17551, 17807, 18063, 18319), A holding 2 (go to B) and B holding 1
+// (go to A). So `pairs` has real data to count, and the preservation tests are
+// exercised by content rather than only by fixtures.
+//
+// What is NOT shipped, stated so a later reader does not infer coverage from
+// the above: zero self-marks and zero reserved 3s. R2 being unimplemented in
+// aeon's bake therefore ships nothing wrong TODAY — it is an unguarded door,
+// not a leak. Six of the eight plane-A cells are $8000: a mark with no geometry
+// at all (shape 0, SOL_NONE), which is exactly the ungated-by-solidity case
+// aeon's `bake_plane_cell` docstring describes, so that path is live content.
+//
+// ⚠ Endianness was CONTROLLED, not assumed: decoding the same bytes little-
+// endian yields 2036 marked indices on A and 2056 on B, at indices that do not
+// coincide. The big-endian read is the one that produces eight coincident
+// pairs, which is the shape a loop crossover must have.
+//
+// ⚠ THIS CONTRADICTS AEON'S OWN CONSTANT COMMENT at `tools/collision_pipeline.py`,
+// where `XOVER_NONE = 0` is annotated "the value every shipped cell holds".
+// Sixteen shipped cells do not hold it. Relayed to the aeon lane 2026-09-09.
+//
 // ═══ WHAT IT DOES COMPUTE, AND WHY EACH ITEM EARNS ITS PLACE ═══
 //
 // Three tiers, kept apart because they need different answers from the author:
@@ -261,17 +291,31 @@ export interface CrossoverAudit {
   /** Marked on exactly one plane. Legal; see the WARN tier above. */
   oneWay: number;
   /** ILLEGAL: a plane's word telling you to go to the plane you are on.
-   *  Rule R2 SPECIFIES that aeon's bake refuse these. ⚠ AS OF 2026-08-29 IT
-   *  DOES NOT — `bake_plane_cell` never reads bits 15:14 at all (measured:
-   *  docs/reviews/2026-08-29-crossover-paint-loop.md), so R2 is unimplemented
-   *  and this count is the only place a self-mark is noticed anywhere. */
+   *  Rule R2 SPECIFIES that aeon's bake refuse these, and it STILL DOES NOT —
+   *  so this count remains the only place a self-mark is noticed anywhere.
+   *
+   *  ⚠ THE REASON CHANGED, AND IT IS NOW STRUCTURAL RATHER THAN UNFINISHED.
+   *  The 2026-08-29 reason ("`bake_plane_cell` never reads bits 15:14 at all")
+   *  is DEAD — see `reserved` below; it reads them now. R2 is unimplemented
+   *  because `bake_plane_cell(cell_word, profiles, angles, attrset)` takes NO
+   *  PLANE PARAMETER, so it cannot ask whether a mark points at the plane it is
+   *  baking. A self-mark is not a property of the word; it is a property of the
+   *  word AND the plane, and only one of those is in scope there. Re-checked
+   *  against aeon `origin/master` bdbf9f5d, 2026-09-09. */
   selfMarks: number;
   /** ILLEGAL: a cell holding the reserved value 3. Rule R1 SPECIFIES a bake
-   *  hard error. ⚠ AS OF 2026-08-29 THE BAKE DOES NOT READ THE FIELD, so an act
-   *  painted entirely with value 3 bakes clean and emits a byte-identical ROM.
+   *  hard error, and ⚠ AS OF AEON 8a4313b5 (2026-09-02) IT NOW RAISES ONE —
+   *  `bake_plane_cell` reads `xover = (cell_word >> XOVER_SHIFT) & XOVER_MASK`
+   *  and raises `ValueError` on 3. The 2026-08-29 note this replaces said the
+   *  bake does not read the field and that an act painted entirely with 3 bakes
+   *  clean into a byte-identical ROM. Both halves are now FALSE: that act fails
+   *  the build. Re-checked against aeon `origin/master` bdbf9f5d, 2026-09-09.
+   *
    *  Note what this count is and is NOT: it REPORTS, it does not refuse — and
    *  Aurora cannot author a 3 in the first place (`crossoverFor` derives the
-   *  value from the brush and the plane; the brush has no such value). */
+   *  value from the brush and the plane; the brush has no such value). Aurora's
+   *  reporting is therefore no longer the LAST line of defence for R1, but it
+   *  is still the EARLIER one, which is the tier split this file exists for. */
   reserved: number;
   /** ⚠ A TWO-WAY CROSSOVER THAT NETS TO NOTHING — the defect this whole parcel
    *  exists to close, and the one an author is LEAST able to see.
