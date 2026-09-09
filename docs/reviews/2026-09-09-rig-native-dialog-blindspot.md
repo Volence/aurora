@@ -53,3 +53,69 @@ the owner's session) and the journal shows **no** FileChooser traffic during eit
 seat's run or these probes — which is evidence against the portal hypothesis and is not
 proof of the other one. **The attribution question this note answers is "is it Aurora",
 and the answer is no; "what is it instead" is open and costs nothing to leave open.**
+
+---
+
+## ⚠ AMENDMENT, same day: this note was written in the grammar that makes an exclusion go stale
+
+**Raised by the sigil lane through the hub, and it lands on this document.** Everything above
+is stated as a **permanent property of the rig**. It is not. It is **one measurement, on one
+box, on one day, of an environment nobody controls** — and an exclusion list stated as fact
+becomes the next finding factory, which is precisely the failure this note exists to prevent,
+one level up.
+
+### What is measured here, and it stands
+
+Canary behind a real `.gitignore` entry (`dist/`), aurora session, 2026-09-09:
+
+    grep -rl "$CANARY" .          → 0 hits          ← a clean, confident zero
+    command grep -rl "$CANARY" .  → 1 hit
+    type grep                     → shell function from ~/.claude/shell-snapshots/snapshot-zsh-…
+
+Independently reproduced the same night by an agent in its own shell, same numbers. **So a
+`grep -r` here can silently skip `dist/` and any other ignored path and report a zero
+indistinguishable from a real absence.**
+
+### ⚠ AND A CLAIM THIS SECTION ORIGINALLY MADE WAS FALSE — RETRACTED WITHIN THE HOUR
+
+This section first said that a peer lane had measured **the opposite** in its own shell, and
+concluded that **sessions on this machine differ in `grep` semantics**. **Both are withdrawn.**
+That lane's shell behaves as ours does; **concurrent divergence was never demonstrated** and
+must not be carried as established. I had already relayed it to two live agents, and corrected
+them.
+
+**How a false refutation passed three readers, which is the durable half.** The peer's canary
+was hidden via `.git/info/exclude`, and its control was `git check-ignore` — **which answered
+truthfully and unambiguously that GIT ignores the path.** But the instrument under test keys
+on **`.gitignore` FILES**, not on git's full ignore resolution. **The control verified a TRUE
+predicate that was not the INSTRUMENT'S predicate.** It passed while the canary stayed
+invisible to the very thing it existed to make visible.
+
+**The catching question is sharper than "did you run a control":** not *is my canary of the
+right kind* — that was asked and answered correctly — but **by what mechanism exactly is my
+canary visible to THIS instrument.** It lives in near-synonyms: *ignored-by-git* vs
+*ignored-by-a-gitignore-file*, *tracked* vs *committed*, *on-disk* vs *staged*, *installed* vs
+*on PATH*, *dirty* vs *unsaved*.
+
+**Two reasons it propagated at speed, and they indict me as much as anyone:** a refutation
+**feels like the rigorous act, so it draws less scrutiny than the claim it overturns** — I
+amended this file and messaged two agents within minutes of receiving it. And it overturned a
+rule *about false clean zeros* **using a false clean zero**, so it read as fitting the night's
+theme. ⚠ **A result that confirms the local theme is not corroborated by fitting it.**
+
+### The exclusion above is MUTABLE — and this part was never downstream of the bad number
+
+The native-dialog finding is **dated 2026-09-09** and holds **on this box, under this
+Electron, under xvfb-run**. Any of those moving can change it. **Re-measure at brief time
+rather than copying it forward**, with the probe that produced it:
+
+- 12 lines of Electron (`BrowserWindow` + `dialog.showOpenDialog`), launched through
+  `spawnGuarded` under `xvfb-run`, enumerating windows on the run's own display with
+  python-xlib. Under two minutes. **If a dialog window appears, this exclusion is retired and
+  every finding filed under it is re-openable.**
+
+**Sigil's sentence, which belongs at the top of any exclusion list including this one:** *an
+exclusion list is itself a snapshot, so a list stated as fact becomes the next finding
+factory.* Mark every value **MUTABLE with an instruction to re-measure**. **Its own grep rule
+was true all along** — what failed was a refutation of it, which is a reminder that the
+mutability discipline is about tense and re-measurement, not about distrusting the claim.
