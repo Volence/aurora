@@ -119,6 +119,7 @@ import {
   EFFECTS_LAYER_DEFORM_BOUNDS, EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS,
   LAYER_DRIFT_ROW, EFFECTS_DRIFT_PX_BOUNDS, EFFECTS_DRIFT_PX_STEP,
   driftPxFieldValue, driftFromToggle, driftFromPxPerFrame, driftPxPerFrameRefusal,
+  driftPxPerFrameRefusalParts,
   // §2.7 REELS. ⚠ `EFFECTS_REEL_RATE_BOUNDS` is WHOLE PIXELS PER FRAME and the
   // drift line above is 1/256 px. Nothing on the reels path converts anything:
   // `setReelRateCommand` stores the integer the box produced, and there is no
@@ -419,7 +420,14 @@ export default function EffectsScenePanel(): React.ReactElement {
   // mapped inline in this component and a single string would paint layer 3's
   // refusal under layer 0's box. `NumberField` clears it on focus and on any
   // value that commits, so a stale sentence cannot outlive the number beside it.
-  const [driftRefusal, setDriftRefusal] = React.useState<Record<number, string | null>>({});
+  // THE DRIFT BOXES' REFUSALS, PER STRIP — the DETAIL and not the sentence, for
+  // `planeYRefusal`'s reason two states down and on the same measurement: with
+  // NumberField's committed-drift tail this block painted at 215px inside a
+  // scroller the shell may squeeze to 129px (harness:refusal-box-fit [2d]), so it
+  // is an `Advisory` whose halves are re-derived by the functions that composed the
+  // sentence. Cutting up a finished string here is the one thing this must not do.
+  const [driftRefusal, setDriftRefusal] =
+    React.useState<Record<number, NumberFieldRefusalDetail | null>>({});
   // THE PLANE-LINE BOX'S REFUSAL, PER LAYER — same reason as the drift box's
   // above, and one field wider.
   //
@@ -1078,7 +1086,17 @@ export default function EffectsScenePanel(): React.ReactElement {
                   all" that would hide that drift is per-layer. */}
               {(() => {
                 const px = driftPxFieldValue(layer);
-                const why = driftRefusal[i] ?? null;
+                // THE REFUSAL, IN THE THREE HALVES `Advisory` TAKES — the same
+                // shape as the plane-line block below, from the same bar. Both
+                // producers are asked for their own split; nothing here decides
+                // where a sentence ends and nothing here slices one.
+                const refusedDrift = driftRefusal[i] ?? null;
+                const driftWhyParts = refusedDrift === null
+                  ? null : driftPxPerFrameRefusalParts(refusedDrift.value);
+                const driftMoved = refusedDrift === null ? null : committedDriftParts(
+                  refusedDrift.heldAtFocus, refusedDrift.holdsNow, refusedDrift.committedSinceFocus);
+                const driftMechanism = [driftWhyParts?.mechanism, driftMoved?.mechanism]
+                  .filter((s): s is string => s !== undefined).join(' ');
                 return (
                   <>
                     <Field label={LAYER_DRIFT_ROW.label} title={LAYER_DRIFT_ROW.title}>
@@ -1098,13 +1116,43 @@ export default function EffectsScenePanel(): React.ReactElement {
                           min={EFFECTS_DRIFT_PX_BOUNDS.min} max={EFFECTS_DRIFT_PX_BOUNDS.max}
                           step={EFFECTS_DRIFT_PX_STEP} width={72} value={px}
                           refuse={(n) => driftPxPerFrameRefusal(n)}
-                          onRefusal={(r) => setDriftRefusal((s) => ({ ...s, [i]: r }))}
+                          onRefusal={(r, d) => setDriftRefusal(
+                            (s) => ({ ...s, [i]: r === null ? null : d ?? null }))}
                           onChange={(n) => run(setLayerFieldCommand(
                             library, selected.id, i, 'drift', driftFromPxPerFrame(n)))} />
                       )}
                     </Field>
                     <Hint under style={{ marginBottom: 0 }}>{LAYER_DRIFT_ROW.hint}</Hint>
-                    {why !== null && <Hint under tone="warning">{why}</Hint>}
+                    {/* ⚠ AN ADVISORY, NOT A HINT, AND THE REASON IS MEASURED.
+                        REFUSAL-SIBLINGS-UNMEASURED named this block and its reel
+                        twin as the two refusals on this panel that take the same
+                        long tail into the same small box as the plane-line one
+                        and had never been measured. Measured:
+                        `npm run harness:refusal-box-fit` [2d] read this block at
+                        215px inside the layer card's scroller, 129px tall
+                        (`SECTION_LIST_MIN_HEIGHT` minus the header, the smallest
+                        box the shell may give it) — insideScroller false,
+                        tallerThanScroller true. So it gets the repair this
+                        surface already ruled for prose of exactly this kind
+                        (O15, EW-LAYER-CARD-SCROLLER): the finding an author acts
+                        on stays on screen, the contract's reasoning and the
+                        per-keystroke explanation go behind the disclosure.
+                        Nothing was deleted — `driftPxPerFrameRefusal` still
+                        returns the same one-string form for every caller with
+                        room to print one.
+
+                        The reel twin FITS and was left alone: [3c] read it at
+                        264px in a 742px scroller, and its row lives in a CONTENT
+                        section, which takes its natural height and has no floor
+                        to be squeezed to. */}
+                    {driftWhyParts !== null && (
+                      <Advisory under testid={`layer-${i}-drift-refusal`}
+                        diagnosis={driftMoved === null
+                          ? driftWhyParts.diagnosis
+                          : `${driftWhyParts.diagnosis} ${driftMoved.finding}`}
+                        mechanism={driftMechanism === '' ? undefined : driftMechanism}
+                        remedies={driftMoved?.remedies} />
+                    )}
                   </>
                 );
               })()}

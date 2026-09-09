@@ -56,7 +56,7 @@ import {
   bobPeakPixels, bobPeriodSeconds, bobShiftOf, bobShiftRefusal,
   cloneEffectsScene, factorLabel, isNamedFactor, newEffectsLayer, newEffectsScene,
   sceneIdRefusal, driftRateOf, driftRateToPxPerFrame, driftPxPerFrameToRate,
-  driftRateRefusal, driftPxPerFrameRefusal,
+  driftRateRefusal, driftPxPerFrameRefusal, driftPxPerFrameRefusalParts,
   EFFECTS_DRIFT_UNITS_PER_PIXEL, EFFECTS_DRIFT_PX_BOUNDS, EFFECTS_DRIFT_RATE_BOUNDS,
   EFFECTS_ROW_REMAP_PLANE_Y_BOUNDS, EFFECTS_ROW_REMAP_HEIGHT_SHIFT_BOUNDS,
   EFFECTS_ROW_REMAP_HEIGHT_SHIFTS, EFFECTS_ROW_REMAP_BUILDABLE_SHIFT,
@@ -4305,7 +4305,8 @@ export {
   // hands `NumberField`'s `refuse`, and it is re-exported rather than reimplemented
   // here so the ONE source of the rules stays scene-ui's.
   EFFECTS_DRIFT_RATE_BOUNDS, EFFECTS_DRIFT_PX_BOUNDS, EFFECTS_DRIFT_UNITS_PER_PIXEL,
-  driftPxPerFrameRefusal, driftRateToPxPerFrame, driftPxPerFrameToRate, driftRateOf,
+  driftPxPerFrameRefusal, driftPxPerFrameRefusalParts,
+  driftRateToPxPerFrame, driftPxPerFrameToRate, driftRateOf,
   // §2.7's contract half, re-exported for the same reason as drift's above: the
   // ONE source of these rules is scene-ui's, and the panel hands
   // `reelRateWriteRefusal` (not `reelRateRefusal`) to the box's `refuse`,

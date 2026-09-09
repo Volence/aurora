@@ -1329,22 +1329,57 @@ export function driftPxPerFrameToRate(pxPerFrame: number): number {
  * control can say WHY before it writes, in a sentence, rather than handing an
  * author a validator dump.
  */
-export function driftRateRefusal(rate: number): string | null {
+/**
+ * Why `rate` is not a legal drift rate, IN THE HALVES `Advisory` TAKES, or null.
+ *
+ * ⚠ SPLIT FOR A MEASUREMENT, NOT FOR TIDINESS, and the measurement is the sibling
+ * of the one that split `rowRemapPlaneYRefusalParts`. With `NumberField`'s
+ * committed-drift tail on it, this refusal painted as ONE paragraph of 215px
+ * inside the layer card's scroller, which the shell may squeeze to 129px
+ * (`SECTION_LIST_MIN_HEIGHT` minus the header): a paragraph no scroll position
+ * shows whole, which is exactly the bar `Advisory`'s docblock
+ * (EW-LAYER-CARD-SCROLLER) converts prose for. Measured by
+ * `npm run harness:refusal-box-fit` row [2d]; the row it is modelled on is
+ * `harness:row-remap-control` [5b2]. REFUSAL-SIBLINGS-UNMEASURED is the row that
+ * asked, and this was the sibling that turned out to be broken.
+ *
+ * ⚠ THE STRING FORM IS COMPOSED FROM THIS, NEVER TYPED TWICE. `driftRateRefusal`
+ * joins the halves with a space, so one place holds the words and a disclosure
+ * cannot drift from a hint.
+ *
+ * `mechanism` is ABSENT rather than empty when the diagnosis already carries the
+ * why: `Advisory` draws no disclosure button for an absent one, and an empty
+ * string buys a control with nothing behind it.
+ */
+export function driftRateRefusalParts(
+  rate: number,
+): { diagnosis: string; mechanism?: string } | null {
   if (!Number.isInteger(rate)) {
-    return `a drift rate is a whole number of 1/256 px per frame; ${rate} is not an integer.`;
+    return { diagnosis: `a drift rate is a whole number of 1/256 px per frame; ${rate} is not an integer.` };
   }
   if (rate === EFFECTS_DRIFT_RATE_REFUSED) {
-    return `${rate} is not a drift rate: it is indistinguishable from no drift at all in ROM, ` +
-      'and aeon refuses it at build time. A layer that should not drift spells "none".';
+    return {
+      diagnosis: `${rate} is not a drift rate. A layer that should not drift spells "none".`,
+      mechanism: 'It is indistinguishable from no drift at all in ROM, and aeon refuses it at '
+        + 'build time.',
+    };
   }
   const { min, max } = EFFECTS_DRIFT_RATE_BOUNDS;
   if (rate < min || rate > max) {
-    return `${rate} (${driftRateToPxPerFrame(rate)} px/frame) is outside the contract's ` +
-      `${min}..${max} (${driftRateToPxPerFrame(min)}..${driftRateToPxPerFrame(max)} px/frame). ` +
-      'That is a TASTE bound, not a correctness one; raise it in the contract rather than ' +
-      'working around it.';
+    return {
+      diagnosis: `${rate} (${driftRateToPxPerFrame(rate)} px/frame) is outside the contract's `
+        + `${min}..${max} (${driftRateToPxPerFrame(min)}..${driftRateToPxPerFrame(max)} px/frame).`,
+      mechanism: 'That is a TASTE bound, not a correctness one; raise it in the contract rather '
+        + 'than working around it.',
+    };
   }
   return null;
+}
+
+export function driftRateRefusal(rate: number): string | null {
+  const parts = driftRateRefusalParts(rate);
+  if (parts === null) return null;
+  return parts.mechanism === undefined ? parts.diagnosis : `${parts.diagnosis} ${parts.mechanism}`;
 }
 
 /** The rate a layer's `drift` carries, or null for `"none"` / absent. */
@@ -1392,16 +1427,55 @@ export const EFFECTS_DRIFT_PX_BOUNDS = Object.freeze({
  * zero, but it LOWERS to zero, and zero is the value aeon refuses; catching it
  * here is why the control cannot write a layer that says "drifts" and builds red.
  */
-export function driftPxPerFrameRefusal(pxPerFrame: number): string | null {
+/**
+ * The px/frame form of `driftRateRefusalParts`, in the same halves.
+ *
+ * ⚠ THE OUT-OF-RANGE ARM SPEAKS IN THE AUTHOR'S OWN UNITS AND FOLDS THE WIRE
+ * ONES, and that is what the measurement forced rather than a preference. The wire
+ * form restates the bound a SECOND time in a unit nothing on screen uses, and with
+ * both pairs in the diagnosis the repaired block still measured 136px against a
+ * 129px box (harness:refusal-box-fit [2d]): the disclosure had been applied and
+ * the paragraph was still one line too tall. The box is labelled px/frame and the
+ * author typed px/frame, so px/frame is the finding; the 1/256ths, the wire bound
+ * and the taste-bound reasoning are all the WHY, which is what O15 says may fold.
+ *
+ * THE WIRE FORM IS UNCHANGED. `driftRateRefusal` and `driftRateRefusalParts` still
+ * return exactly what they did, for every caller that speaks wire units.
+ */
+export function driftPxPerFrameRefusalParts(
+  pxPerFrame: number,
+): { diagnosis: string; mechanism?: string } | null {
   if (!Number.isFinite(pxPerFrame)) {
-    return `${pxPerFrame} is not a drift rate: type a signed number of pixels per frame.`;
+    return { diagnosis: `${pxPerFrame} is not a drift rate: type a signed number of pixels per frame.` };
   }
   const rate = driftPxPerFrameToRate(pxPerFrame);
-  const why = driftRateRefusal(rate);
-  if (why === null) return null;
-  if (driftRateToPxPerFrame(rate) === pxPerFrame) return why;
-  return `${pxPerFrame} px/frame is ${rate} in wire units `
-    + `(1 px/frame = ${EFFECTS_DRIFT_UNITS_PER_PIXEL}). ${why}`;
+  const parts = driftRateRefusalParts(rate);
+  if (parts === null) return null;
+  const { min, max } = EFFECTS_DRIFT_RATE_BOUNDS;
+  if (rate < min || rate > max) {
+    const wire = driftRateToPxPerFrame(rate) === pxPerFrame
+      ? `In the file that is ${rate}, against a ${min}..${max} bound `
+        + `(1 px/frame = ${EFFECTS_DRIFT_UNITS_PER_PIXEL}).`
+      : `${pxPerFrame} px/frame is ${rate} in wire units, against a ${min}..${max} bound `
+        + `(1 px/frame = ${EFFECTS_DRIFT_UNITS_PER_PIXEL}).`;
+    return {
+      diagnosis: `${pxPerFrame} px/frame is outside the contract's `
+        + `${driftRateToPxPerFrame(min)}..${driftRateToPxPerFrame(max)} px/frame.`,
+      mechanism: `${wire} ${parts.mechanism ?? ''}`.trim(),
+    };
+  }
+  if (driftRateToPxPerFrame(rate) === pxPerFrame) return parts;
+  return {
+    ...parts,
+    diagnosis: `${pxPerFrame} px/frame is ${rate} in wire units `
+      + `(1 px/frame = ${EFFECTS_DRIFT_UNITS_PER_PIXEL}). ${parts.diagnosis}`,
+  };
+}
+
+export function driftPxPerFrameRefusal(pxPerFrame: number): string | null {
+  const parts = driftPxPerFrameRefusalParts(pxPerFrame);
+  if (parts === null) return null;
+  return parts.mechanism === undefined ? parts.diagnosis : `${parts.diagnosis} ${parts.mechanism}`;
 }
 
 // ---------------------------------------------------------------------------
