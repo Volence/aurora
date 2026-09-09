@@ -11,11 +11,11 @@
 // button could never clear its dirty flag. See that module's header.
 import React, { useState, useEffect } from 'react';
 import { useArtStore } from '../../state/artStore';
-import { openDocumentGuarded, closeDocumentGuarded } from '../../components/art/open-document';
+import { confirmArtDocumentOpen, confirmArtDocumentClose } from '../../components/art/open-document';
+import { useToastStore } from '../../state/toastStore';
 import { createDoc } from '../../../core/art/composer-buffer';
 import { useProjectStore, getCurrentZone } from '../../state/projectStore';
 import { useAeonHistoryVersion } from '../../hooks/useHistoryVersion';
-import { useToastStore } from '../../state/toastStore';
 import { saveComposerDocument } from '../../state/art-composer-save';
 import { Panel, CollapsibleSection, T } from '../../components/ui';
 import ArtToolDock from '../../shell/ArtToolDock';
@@ -34,7 +34,7 @@ function clampDim(v: number): number {
 }
 
 function handleNewTile() {
-  openDocumentGuarded({
+  void confirmArtDocumentOpen({
     doc: createDoc(1, 1),
     liveTileIndex: null,
     chunkId: null,
@@ -47,7 +47,7 @@ function handleNewBlock() {
   // A block is the classic 16×16 px unit: 2×2 tiles. (Not to be confused
   // with the s4_engine's internal 128×128 "block" slicing unit — that one
   // is the editor's "chunk".)
-  openDocumentGuarded({
+  void confirmArtDocumentOpen({
     doc: createDoc(2, 2),
     liveTileIndex: null,
     chunkId: null,
@@ -57,7 +57,7 @@ function handleNewBlock() {
 }
 
 function handleNewChunk(w: number, h: number) {
-  openDocumentGuarded({
+  void confirmArtDocumentOpen({
     doc: createDoc(w, h),
     liveTileIndex: null,
     chunkId: null,
@@ -198,7 +198,7 @@ function ArtOptions() {
           no-document state. It used to be reachable by simply not having opened
           anything; a project open now lands on the first chunk, so without this
           button "new tile / new block / new chunk" would be unreachable. */}
-      <button style={styles.newDocButton} onClick={closeDocumentGuarded}
+      <button style={styles.newDocButton} onClick={() => { void confirmArtDocumentClose(); }}
         title="Close this document and show the New Document options">
         New…
       </button>

@@ -3,7 +3,7 @@ import { useProjectStore, getCurrentZone, getCurrentAct, getActiveLevel } from '
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useAeonHistoryVersion } from '../../hooks/useHistoryVersion';
 import { useArtStore } from '../../state/artStore';
-import { openDocumentGuarded } from './open-document';
+import { confirmArtDocumentOpen } from './open-document';
 import { useToastStore } from '../../state/toastStore';
 import { docFromTile, sliceForSave } from '../../../core/art/composer-buffer';
 import { tileUsageCounts } from '../../../core/art/usage';
@@ -214,7 +214,7 @@ export default function TilesetPanel() {
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
     const idx = tileIndexAt(e);
     if (idx < 0) return;
-    openDocumentGuarded({
+    void confirmArtDocumentOpen({
       doc: docFromTile(idx),
       liveTileIndex: idx,
       chunkId: null,

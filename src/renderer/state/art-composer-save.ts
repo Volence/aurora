@@ -70,6 +70,17 @@ export type ComposerSaveState =
  *
  *   • `saveComposerDocument` itself returns without writing anything when there
  *     is no project / current zone / current act to save into.
+ *
+ *   • ...AND when the chunk it would write back to is GONE from the library. That
+ *     fourth early return was MISSED when this function was derived, and the miss
+ *     was the very defect the function exists to prevent: a chunk document whose
+ *     chunk had been undone or cleared away reported `savable`, so the two
+ *     perimeter doors offered `Save & open` / `Save & close` as the PRIMARY button
+ *     over work that `saveComposerDocument` answers with
+ *     "Chunk no longer exists. Cannot save" and nothing else. The save then ran,
+ *     wrote nothing, the re-snapshot saw the same dirt, and the only exit left was
+ *     Discard. Reachable: open a chunk, paint it, then Clear the chunk library or
+ *     undo the add that created it.
  */
 export function composerSaveState(): ComposerSaveState {
   const o = useArtStore.getState().open;
@@ -94,6 +105,16 @@ export function composerSaveState(): ComposerSaveState {
       kind: 'blocked',
       why: `The art document "${o.name}" has no open zone and act to be saved into, `
         + 'so Save cannot write it.',
+    };
+  }
+  // The same lookup `saveComposerDocument` does before it touches history, asked
+  // BEFORE a door promises a save. Its refusal sentence is the model for this one.
+  if (o.chunkId !== null
+    && !pstate.project.chunkLibrary.some((c) => c.id === o.chunkId)) {
+    return {
+      kind: 'blocked',
+      why: `The chunk "${o.name}" is no longer in the chunk library, so Save has `
+        + 'nothing to write those strokes back to.',
     };
   }
   return { kind: 'savable' };
