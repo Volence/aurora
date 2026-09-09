@@ -290,3 +290,39 @@ did.
 **Until something lands, the standing warning is right:** `Ctrl+Z` on a chunk document is
 unsafe whenever the session has any earlier zone-art edit, and the canvas will change in a
 way that looks like it worked.
+
+---
+
+## 8. `npm test`, both ends, aggregate
+
+| | Test Files | Tests | exit |
+|---|---|---|---|
+| **base** `4e66b570` (detached checkout, same worktree, same `node_modules`) | 4 failed \| 567 passed \| 3 skipped (574) | **77 failed \| 8447 passed \| 9 skipped (8533)** | **1** |
+| **tip** `0a514b3c` (the whole chain — fourteen check scripts and a typecheck before vitest) | 4 failed \| 567 passed \| 3 skipped (574) | **77 failed \| 8447 passed \| 9 skipped (8533)** | **1** |
+
+**Byte-identical at both ends, and none of the 77 are mine.** The same four files fail at
+the base commit — `aether-badge-identity`, `classic-map-wheel`, `map-device-scale`,
+`map-viewport-mounted` — every row `TypeError: Cannot read properties of null (reading
+'useCallback')`. That is the node-suite half of the second-React-instance defect in
+`docs/reviews/2026-09-09-save-contract.md` §7, still open; `resolve.dedupe` does not reach
+vitest. This parcel adds no test, so the totals could not move: the deliverable is a
+measurement, and the instrument that carries it is the committed harness.
+
+Every check script printed `OK` at the tip, including `check-cited-paths`,
+`check-doc-citations` over this packet, `check-ledger-timestamps` over the new row, and
+`check-harness-guards` (259/259 clean, the new harness classified as guarded).
+
+## 9. One environment note for whoever runs this next
+
+**The hardlinked aeon fixture must be git-ignored, and not merely for tidiness.** The aeon
+tree carries Python instruments with absolute sibling paths inside them —
+aeon `docs/research/phase_harness/*.py` — so an un-ignored hardlink copy of it under
+this repo's scratchpad fixtures directory is read by `scripts/check-peer-path-literals.mjs` as
+**33 executable violations of this repo's own rule** — a gate that goes red on a *copy of
+another repo* and names lines nobody in this tree wrote. `.gitignore` gains the entry
+below, beside the ones the earlier harnesses' fixtures already have; with it the gate goes
+from exit 1 to exit 0.
+
+```
+scratchpad/fixtures/aeon-chunk-undo/
+```
