@@ -291,32 +291,115 @@ describe('listDir applies the guard', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// THE TWO PRIMITIVES THAT APPLY NO GUARD. They are here so the census above is
+// READBINARY-NO-PATH-GUARD (lens sweep, closed 2026-09-08). These rows REPLACE
+// a deliberate notice row that asserted the opposite — that `readBinaryFile`
+// applied no guard and would read outside the project. That row was correct
+// about the code and was written to go red the day somebody guarded it; this is
+// that day, and the census at the bottom of this file is what proves nothing
+// else moved with it.
+//
+// WHY THE EXCEPTION WAS RETIRED RATHER THAN DOCUMENTED. The reason the guard was
+// never added is stated in `deleteProjectFile`'s docblock: `file:read-binary`
+// carried an absolute-path exception for legacy callers. Those callers were
+// ENUMERATED (all 24 production call sites of `window.api.readBinaryFile`) and
+// every one of them either passes a PROJECT-RELATIVE path, or passes the
+// absolute path in the BASE slot with `''` as the relative one — the idiom
+// `readAbsolute` uses in export-sprite.ts and import-sheet.ts, and which
+// survives this guard untouched because `isRelPathSafe('')` is true. Exactly one
+// caller still put an absolute path in the RELATIVE slot
+// (providers/chunk-library-import.ts, three reads of a file the user picked from
+// a dialog); it was moved to the base-slot idiom in the same commit. So the
+// exception has no remaining holder.
+//
+// AND THE GUARD IS NOT COSMETIC. Three of the enumerated callers interpolate a
+// string READ OUT OF A PROJECT FILE into the relative path:
+// `object-previews.ts` (a sprite name from `object-bindings.json`),
+// `export-sprite.ts` (a sprite name from `index.json`), and both of those plus
+// several more behind `projectDataRoot(config.raw)`, which derives a path PREFIX
+// from `dataPath` in the project's own config — `dataRootOfPath` returns
+// everything up to and including a `/data/`, so a config saying
+// `../../data/foo` yields the prefix `../../data/`. The WRITE channel already
+// refuses every one of those; the read channel did not.
+//
+// THE WORDING IS THIS RULE'S ALONE. `deleteProjectFile` and `performGuardedWrite`
+// share the sentence "unsafe project-relative path (escapes root)", so this rule
+// says "refused read of" first, as the write channel says "refused write to" —
+// see this file's header. The rows below still lead with BEHAVIOUR (the bytes
+// were not returned, and the control proves they were reachable).
+// ═══════════════════════════════════════════════════════════════════════════
+describe('readBinaryFile applies the guard', () => {
+  it('refuses a `..` path whose target really exists, and returns no bytes', async () => {
+    await expect(readBinaryFile(base, '../outside.bin')).rejects.toThrow(
+      /^refused read of unsafe project-relative path \(escapes root\): '\.\.\/outside\.bin'$/,
+    );
+  });
+
+  it('refuses an absolute path to a file that really exists', async () => {
+    await expect(readBinaryFile(base, join(tmp, 'outside.bin'))).rejects.toThrow(
+      /^refused read of unsafe project-relative path \(escapes root\)/,
+    );
+  });
+
+  /**
+   * A REFUSAL MUST NOT WEAR ENOENT'S COSTUME. This is FABRICATED-ENOENT one
+   * channel over: `main/ipc-handlers.ts` converts a read failure into the
+   * MissingFileMarker — and thence into a thrown "ENOENT: no such file or
+   * directory" at the preload — ONLY under `e?.code === 'ENOENT'`. A refusal
+   * that carried that code, or that merely said ENOENT in its text, would tell
+   * the author their file does not exist when Aurora declined to look at it.
+   * So: no errno code, and the word does not appear.
+   */
+  it('the refusal is not an ENOENT, in code or in wording', async () => {
+    const err = await readBinaryFile(base, '../outside.bin').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as NodeJS.ErrnoException).code).toBeUndefined();
+    expect((err as Error).message).not.toMatch(/ENOENT/);
+  });
+
+  /**
+   * THE CONTROL THAT MAKES THE THREE ABOVE MEAN SOMETHING: the same target file,
+   * the same bytes, reached by a safe path from a base that makes it legal. It
+   * reads. So the fs was willing the whole time and the refusals above were the
+   * guard's decision, not a missing file.
+   */
+  it('CONTROL: the same real target reads through a base that makes it legal', async () => {
+    expect([...(await readBinaryFile(tmp, 'outside.bin'))]).toEqual(OUTSIDE_BYTES);
+    expect([...(await readBinaryFile(base, 'inside.bin'))]).toEqual(INSIDE_BYTES);
+  });
+
+  /**
+   * THE LEGACY IDIOM, KEPT WORKING ON PURPOSE. Every remaining caller that reads
+   * a file outside any project — a PNG the user picked from a dialog, an agent
+   * request naming an absolute path — passes it as the BASE with `''` for the
+   * relative part. `isRelPathSafe('')` is true (the empty string denotes the root
+   * itself), so the guard does not touch them. If this row ever goes red, the
+   * absolute-path callers listed in the header have lost their road and the fix
+   * is NOT to weaken the guard.
+   */
+  it('CONTROL: the absolute-path idiom (path in the base slot, "" as the rel) still reads', async () => {
+    expect([...(await readBinaryFile(join(tmp, 'outside.bin'), ''))]).toEqual(OUTSIDE_BYTES);
+  });
+
+  /**
+   * A GENUINELY MISSING FILE IS STILL AN ENOENT, and it must be, because that is
+   * the one failure `ipc-handlers.ts` converts to the missing-file marker and the
+   * preload turns back into the sentence optional-file probes match on. Without
+   * this row the guard could satisfy every row above by refusing everything.
+   */
+  it('CONTROL: a legal path that is genuinely missing still throws ENOENT', async () => {
+    const err = await readBinaryFile(base, 'no-such-file.bin').catch((e: unknown) => e);
+    expect((err as NodeJS.ErrnoException).code).toBe('ENOENT');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THE ONE PRIMITIVE THAT APPLIES NO GUARD. It is here so the census above is
 // COMPLETE rather than merely long: a reader counting rows can see that every
-// export of file-io.ts is accounted for, and that these two are absences by
+// export of file-io.ts is accounted for, and that this one is an absence by
 // design rather than the same omission the rest of this file exists to close.
 // The structural row at the bottom is what keeps that claim true over time.
 // ═══════════════════════════════════════════════════════════════════════════
 describe('the deliberately unguarded primitives', () => {
-  /**
-   * NOTICE, NOT ENDORSEMENT. `readBinaryFile` applies no rel-path guard, and
-   * deleteProjectFile's own docblock says why in passing: `file:read-binary`
-   * still carries an absolute-path exception for legacy callers, which is why
-   * the newer channels "start closed" and this one did not.
-   *
-   * What stands between it and an escaping path today is the RENDERER side:
-   * `state/classic-file-access.ts` checks isRelPathSafe before it invokes. That
-   * is a guard on one caller, not on the channel, so this row states the channel's
-   * real behaviour rather than the behaviour a reader would assume.
-   *
-   * If somebody guards it, THIS ROW GOING RED IS THE NOTICE: check the legacy
-   * absolute-path callers first, then delete the row.
-   */
-  it('readBinaryFile is NOT guarded and will read outside the project', async () => {
-    const bytes = await readBinaryFile(base, '../outside.bin');
-    expect([...bytes]).toEqual(OUTSIDE_BYTES);
-  });
-
   /**
    * `listProjectFiles` takes no project-relative path, so there is no argument
    * to guard. What it must do instead is CONTAIN: it composes its own relative
@@ -359,7 +442,7 @@ describe('the census of primitives is derived from the module, not from this lis
     probePath: true,
     fileMtime: true,
     listDir: true,
-    readBinaryFile: false,     // legacy absolute-path exception; see the row above
+    readBinaryFile: true,      // guarded 2026-09-08; the retired exception is above
     listProjectFiles: false,   // no project-relative argument to guard
   };
 

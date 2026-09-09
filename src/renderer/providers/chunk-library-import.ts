@@ -45,9 +45,20 @@ export async function importChunkFiles(): Promise<boolean> {
       'Select zone art tiles (Kosinski)', [{ name: 'Binary', extensions: ['bin'] }]);
     if (!artPath) return false;
 
-    const chunkData = new Uint8Array(await window.api.readBinaryFile('', chunkPath));
-    const blockData = new Uint8Array(await window.api.readBinaryFile('', blockPath));
-    const artData = new Uint8Array(await window.api.readBinaryFile('', artPath));
+    // ABSOLUTE PATHS GO IN THE BASE SLOT, `''` IN THE RELATIVE ONE. `selectFile`
+    // returns an absolute path, and these three reads used to pass it as the
+    // RELATIVE argument with an empty base — the last three call sites in Aurora
+    // doing so. `file:read-binary` gained a rel-path guard on 2026-09-08 (see
+    // `readBinaryFile` in main/file-io.ts) and an absolute path is exactly what
+    // that guard refuses, so these move to the idiom every other
+    // outside-the-project read already uses (`readAbsolute` in
+    // components/sprite/export-sprite.ts and state/import-sheet.ts, and the
+    // agent surface's `readBinaryFile(req.path, '')`). `resolve(abs, '')` is
+    // `abs`, so the bytes read are identical; what changed is which argument
+    // carries the path.
+    const chunkData = new Uint8Array(await window.api.readBinaryFile(chunkPath, ''));
+    const blockData = new Uint8Array(await window.api.readBinaryFile(blockPath, ''));
+    const artData = new Uint8Array(await window.api.readBinaryFile(artPath, ''));
 
     const namePrefix = chunkPath.split('/').pop()?.replace('.bin', '') ?? 'Chunk';
     const fullBlockShape = findFullBlockShapeId(useProjectStore.getState().collisionProfiles);

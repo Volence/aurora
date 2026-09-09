@@ -54,9 +54,13 @@ export async function writeProjectFile(
  * ⚠ WHAT THIS DOES NOT DO, all on purpose. No recursion, no directories, no
  * globs, one path per call — so the blast radius of a caller's mistake is one
  * file. `isRelPathSafe` is a HARD refusal here rather than the tolerant `false`
- * the read probes use, and there is no absolute-path exception of the kind
- * `file:read-binary` still carries for legacy callers: this channel is new, so
- * it starts closed.
+ * the read probes use: this channel is new, so it starts closed.
+ *
+ * (This sentence used to end "…and there is no absolute-path exception of the
+ * kind `file:read-binary` STILL CARRIES for legacy callers". That exception was
+ * retired on 2026-09-08 — see `readBinaryFile` below, which now guards — so the
+ * clause is gone rather than left standing as a true-sounding claim about a
+ * neighbour that has moved.)
  *
  * `deleted: false` means the path was ALREADY gone (ENOENT), which is the
  * caller's desired end state and is reported rather than raised — a save that
@@ -81,7 +85,58 @@ export async function deleteProjectFile(
   }
 }
 
+/**
+ * Read ONE file's bytes. The primitive behind the `file:read-binary` channel.
+ *
+ * ⚠ GUARDED SINCE 2026-09-08, AND IT WAS THE LAST UNGUARDED READ. Until then
+ * this resolved whatever it was given and read it: five of this module's
+ * exports checked `isRelPathSafe` and this one did not, and the only thing
+ * between the channel and an escaping path was `state/classic-file-access.ts`
+ * checking on the renderer side — a guard on ONE CALLER of a channel twenty-odd
+ * others also invoke.
+ *
+ * WHY THE EXCEPTION IS GONE. `deleteProjectFile`'s docblock, above, records the
+ * reason it was never added: this channel "still carries an absolute-path
+ * exception for legacy callers". Those callers were enumerated. Every remaining
+ * one either passes a project-relative path or passes the absolute path in the
+ * BASE slot with `''` as the relative part — `readAbsolute` in
+ * components/sprite/export-sprite.ts and state/import-sheet.ts, and the agent
+ * surface's `readBinaryFile(req.path, '')`. `isRelPathSafe('')` is TRUE (the
+ * empty string denotes the root itself), so that idiom is untouched by this
+ * guard, and it is the idiom the one remaining holder of the exception
+ * (providers/chunk-library-import.ts) was moved to.
+ *
+ * AND IT IS NOT A THEORETICAL PATH. `relativePath` is built by interpolation at
+ * several callers from strings that came OUT OF PROJECT FILES: a sprite name
+ * from `data/sprites/object-bindings.json` (renderer/object-previews.ts), a
+ * sprite name from `index.json` (export-sprite.ts's `loadSpriteByName`), and —
+ * under all of those — `projectDataRoot(config.raw)`, a path PREFIX derived from
+ * `dataPath` in the project's own config file, which `dataRootOfPath` returns
+ * verbatim up to a `/data/` segment and so happily yields `../../data/`. The
+ * write and delete channels already refuse every one of those strings.
+ *
+ * REFUSAL IS A THROW HERE, not a value, and that is not this module drifting:
+ * a read that produced no bytes has always been a rejection on this channel
+ * (`Promise<Buffer>` has no room for a second answer), every caller is built
+ * around that, and the alternative — resolving with a marker — is reserved by
+ * `ipc-handlers.ts` for the ONE failure that means absence.
+ *
+ * ⚠ AND IT IS NOT AN ENOENT. The refusal carries no errno `code` and does not
+ * say the word, because `ipc-handlers.ts` converts a read failure into the
+ * MissingFileMarker (and the preload into a thrown "ENOENT: no such file or
+ * directory") strictly under `e?.code === 'ENOENT'`. A refusal wearing that
+ * costume would tell the author their file does not exist when Aurora declined
+ * to look at it — FABRICATED-ENOENT, one channel over. The wording is this
+ * rule's alone for the reason file-io-guards.test.ts's header gives: it leads
+ * with "refused read of", as the write channel leads with "refused write to",
+ * so no test of it can be satisfied by a neighbouring rule's refusal.
+ */
 export async function readBinaryFile(basePath: string, relativePath: string): Promise<Buffer> {
+  if (!isRelPathSafe(relativePath)) {
+    const reason = `refused read of unsafe project-relative path (escapes root): '${relativePath}'`;
+    console.error(`[file-io] ${reason}`);
+    throw new Error(reason);
+  }
   const fullPath = resolve(basePath, relativePath);
   return readFile(fullPath);
 }
