@@ -376,7 +376,10 @@ describe('probeDir applies the guard', () => {
 // WHY THE EXCEPTION WAS RETIRED RATHER THAN DOCUMENTED. The reason the guard was
 // never added is stated in `deleteProjectFile`'s docblock: `file:read-binary`
 // carried an absolute-path exception for legacy callers. Those callers were
-// ENUMERATED (all 24 production call sites of `window.api.readBinaryFile`) and
+// ENUMERATED (all 26 production call sites of `window.api.readBinaryFile` —
+// `grep -rn 'window\.api\.readBinaryFile' src` reports 30 lines, of which 4 are
+// prose in comments; the derivation is written out because a count with no unit
+// and no recipe is the kind of number that goes stale silently) and
 // every one of them either passes a PROJECT-RELATIVE path, or passes the
 // absolute path in the BASE slot with `''` as the relative one — the idiom
 // `readAbsolute` uses in export-sprite.ts and import-sheet.ts, and which
