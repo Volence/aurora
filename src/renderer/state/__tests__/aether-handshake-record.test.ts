@@ -26,6 +26,8 @@ beforeEach(() => {
     status: 'disconnected', palette: false, pushing: false,
     serverName: undefined, serverVersion: undefined, methodCount: undefined,
     servedMethods: undefined, paletteUnservedMethod: undefined, paletteKind: undefined,
+    implementation: undefined, serverBuild: undefined, socketPath: undefined,
+    identityWarning: undefined,
   });
 });
 
@@ -56,6 +58,30 @@ describe('the aether store carries what answered the handshake', () => {
     expect(s.methodCount).toBe(58);
     expect(s.methodCount).not.toBe(PAYLOAD.methodCount);
     expect(s.servedMethods).toEqual(['emulator/status']);
+  });
+
+  /**
+   * WHICH MACHINE, not just which software. `implementation` names a lineage,
+   * so two Aurora windows on two separate `oracle-rs` emulators agree on every
+   * other field in this payload; the socket the main process dialled is the
+   * only one that differs. It used to stop at the IPC boundary — the store had
+   * no slot for it and nothing under `src/renderer/` mentioned it — which made
+   * the two windows indistinguishable by construction, however the badge was
+   * written.
+   */
+  it('keeps the socket path, which is the only field two identical servers differ on', () => {
+    useAetherStore.getState().apply({ ...PAYLOAD, socketPath: '/run/user/1000/oracle.sock' });
+    expect(useAetherStore.getState().socketPath).toBe('/run/user/1000/oracle.sock');
+
+    // A SECOND MACHINE READS DIFFERENTLY. Same implementation, same deployment
+    // label, same method count: if this row passed on presence alone it would
+    // pass on a store that pinned the first path forever.
+    useAetherStore.getState().apply({ ...PAYLOAD, socketPath: '/tmp/oracle.sock' });
+    expect(useAetherStore.getState().socketPath).toBe('/tmp/oracle.sock');
+
+    // And an absent path is absent, never the last one seen.
+    useAetherStore.getState().apply(PAYLOAD);
+    expect(useAetherStore.getState().socketPath).toBeUndefined();
   });
 
   it('carries the palette probe’s server gap, which `palette: false` alone cannot express', () => {

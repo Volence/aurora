@@ -1644,7 +1644,17 @@ interface DebugApi {
     disconnect(): Promise<void>;
     state(): {
       status: string; palette: boolean; paletteKind?: string;
-      serverName?: string; error?: string; pushError?: string;
+      /**
+       * ⚠ A DEPLOYMENT LABEL, NOT AN IDENTITY, and in practice a constant:
+       * nothing in oracle sets `server_name`, so every deployment sends the
+       * same hardcoded `oracle-next`. Read `implementation` for WHICH SERVER
+       * SOFTWARE and `socketPath` for WHICH RUNNING MACHINE — a harness that
+       * verified a ROM reached "the emulator" against `serverName` alone could
+       * not tell it had driven a second, private instance.
+       */
+      serverName?: string;
+      implementation?: string; socketPath?: string; identityWarning?: string;
+      error?: string; pushError?: string;
       buildState: string; buildSummary: string | null;
     };
     /** Push a line of CRAM words, exactly as the palette port does. */
@@ -1937,7 +1947,12 @@ export function installDebugHooks(): void {
         const s = useAetherStore.getState();
         return {
           status: s.status, palette: s.palette, paletteKind: s.paletteKind,
-          serverName: s.serverName, error: s.error, pushError: s.pushError,
+          serverName: s.serverName,
+          // WHICH SOFTWARE and WHICH MACHINE. `serverName` beside them answers
+          // neither; see the interface for the whole reason.
+          implementation: s.implementation, socketPath: s.socketPath,
+          identityWarning: s.identityWarning,
+          error: s.error, pushError: s.pushError,
           buildState: s.buildState, buildSummary: s.buildSummary,
         };
       },

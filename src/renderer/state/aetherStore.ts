@@ -46,6 +46,17 @@ interface AetherState {
   /** The identity check's non-fatal complaint, if it had one. */
   identityWarning?: string;
   /**
+   * THE RESOLVED UNIX PATH THIS LINK DIALLED — the only field that separates
+   * one running emulator from another.
+   *
+   * `implementation` above names a lineage, so two Aurora windows attached to
+   * two different `oracle-rs` processes read identically on it; the socket
+   * chain is what actually decides which machine answered
+   * (`docs/OVERSEER.md`), and until this reached the renderer nothing on screen
+   * could tell those two windows apart. Undefined when nothing is dialled.
+   */
+  socketPath?: string;
+  /**
    * HOW MANY METHODS THE CONNECTED SERVER SERVES, straight from `initialize`.
    * A different question from `implementation`: an installed binary can
    * advertise a different count from the source tree it was built from.
@@ -127,15 +138,23 @@ export const useAetherStore = create<AetherState>((set, get) => ({
       implementation: s.implementation,
       serverBuild: s.serverBuild,
       identityWarning: s.identityWarning,
+      socketPath: s.socketPath,
       methodCount: s.methodCount,
       servedMethods: s.servedMethods,
       paletteUnservedMethod: s.paletteUnservedMethod,
     });
     // Drive the status-bar badge, which predates this client and was written
     // waiting for it ("when the client connects it calls setBusStatus").
+    //
+    // STATUS ONLY. This call used to pass a second argument — `s.serverName ??
+    // 'oracle'` — which the badge rendered as the name of the machine it was
+    // attached to. Both halves of that were wrong: `serverName` is a deployment
+    // label its own producer says is not an identity, and the `'oracle'`
+    // fallback was a plausible-looking name manufactured out of nothing. The
+    // badge now reads `implementation`, `serverBuild` and `socketPath` off this
+    // store directly (see `busStore.ts` for the whole argument).
     useBusStore.getState().setBusStatus(
       s.status === 'connected' ? 'connected' : s.status === 'connecting' ? 'connecting' : 'offline',
-      s.status === 'connected' ? (s.serverName ?? 'oracle') : null,
     );
   },
 

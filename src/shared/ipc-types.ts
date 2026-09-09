@@ -156,6 +156,13 @@ export interface AetherStatusPayload {
   status: 'disconnected' | 'connecting' | 'connected';
   serverName?: string;
   serverVersion?: string;
+  /**
+   * WHICH MACHINE ANSWERED. `implementation` below names a LINEAGE and two
+   * separate emulators of the same lineage report the same string, so the
+   * resolved unix path is the only field that distinguishes one running server
+   * from another (`docs/OVERSEER.md`: the socket chain is the only arbiter).
+   * Absent when nothing is dialled; never substituted with a plausible default.
+   */
   socketPath?: string;
   /** Set when the last connect attempt failed — shown, not swallowed. */
   error?: string;
