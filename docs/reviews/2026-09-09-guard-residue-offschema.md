@@ -178,8 +178,8 @@ gap between that region's end and the BG arena: `spare_nametable`, `dust_puff`,
 `dust_spindash`, `ring_sparkle`, `insta_shield`, `debug_preset_readout`,
 `character_window`, `test_obj`, `ring_placeholder`, `test_marker`,
 `debug_lab_name`. aeon's generated map agrees (`POOL_TILE_CEILING = 768`, and the
-`0-767 | fg_art_pool` row of aeon `docs/generated/vram-map-sonic4.md`), and aeon
-`docs/ENGINE_ARCHITECTURE.md` names `POOL_TILE_CEILING` as the pool's ceiling.
+`0-767 | fg_art_pool` row of aeon `docs/generated/vram-map-sonic4.md`), and
+aeon `docs/ENGINE_ARCHITECTURE.md` names it as the pool's ceiling.
 
 Aurora restated the BG **base slot** as the FG **pool ceiling**, and handed an
 author 256 tiles belonging to eleven other regions: a **33% overstatement**, on
