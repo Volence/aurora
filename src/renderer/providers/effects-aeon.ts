@@ -1778,10 +1778,10 @@ export function sceneDeformAdvisories(scene: EffectsScene): string[] {
   if (mask === 'sprite_mask') {
     out.push(
       'this scene declares left_column_mask "sprite_mask", which the build refuses in every '
-      + 'scene: the engine\'s left-column strip emission has not landed, so the declaration '
-      + 'would be accepted while the sliver stays uncovered. Declare factor0_lock or accept '
-      + `on the ${LEFT_COLUMN_MASK_ROW.label} row instead; the picker will not offer `
-      + 'sprite_mask back.',
+      + 'scene: the strip that would have covered the sliver was RULED OUT rather than deferred, '
+      + 'and the engine repairs the sliver itself, so there is nothing for a bar to cover. '
+      + `Declare factor0_lock or accept on the ${LEFT_COLUMN_MASK_ROW.label} row instead; the `
+      + 'picker will not offer sprite_mask back.',
     );
   }
   // GUARD 2's ARM IS NOT DEAD CODE NOW THAT THE TOGGLE CLEARS THE POLICY WITH
@@ -1889,10 +1889,13 @@ export function curveAnchorDeformAdvisory(scene: EffectsScene): string | null {
 //                     folds it at :558) or on the anchor, AND either
 //                     `deform_bg` or any layer's own() table (an own table
 //                     serves BOTH planes).
-//   sprite_mask   REFUSED OUTRIGHT (:1354) until the engine's left-column strip
-//                 emission lands. Aurora's schema still admits the value, so
-//                 this is a live schema-vs-engine divergence and not a UI
-//                 preference.
+//   sprite_mask   REFUSED OUTRIGHT (:1354), permanently. aeon RULED THE STRIP
+//                 OUT rather than deferring it (owner decision d-40, 2026-08-29)
+//                 and repairs the sliver in the engine instead, so nothing is
+//                 pending. Aurora's schema still admits the value, so this is a
+//                 live schema-vs-engine divergence and not a UI preference; and
+//                 aeon's own message now offers a THIRD arm, DeclineBorrow,
+//                 which Aurora's schema enum cannot spell.
 //   undeclared    the required value when there is no `v_deform`.
 //
 // ═══ TWO DESIGN FORKS, AND WHY THEY GO DIFFERENT WAYS ═══
@@ -2023,9 +2026,9 @@ export function leftColumnMaskOptions(scene: EffectsScene): LeftColumnMaskOption
         label: value,
         disabled: true,
         mark: SPRITE_MASK_MARK,
-        title: 'refused by the engine: the left-column strip emission has not landed, so the '
-          + 'declaration would be accepted while the sliver stays uncovered. Declare '
-          + 'factor0_lock or accept.',
+        title: 'refused by the engine, and not while waiting for anything: the strip that would '
+          + 'have covered the sliver was ruled out, and the engine repairs the sliver itself. '
+          + 'Declare factor0_lock or accept.',
       };
     }
     if (value === 'factor0_lock') {
@@ -2054,8 +2057,17 @@ export function leftColumnMaskOptions(scene: EffectsScene): LeftColumnMaskOption
   });
 }
 
-/** The short reason in `sprite_mask`'s own label. See `refusedOptionLabel`. */
-export const SPRITE_MASK_MARK = 'the engine cannot emit this yet';
+/**
+ * The short reason in `sprite_mask`'s own label. See `refusedOptionLabel`.
+ *
+ * ⚠ IT SAID `the engine cannot emit this yet` AND THE `yet` WAS FALSE. aeon's own
+ * assertion calls the strip emission *"cancelled, not pending"* (owner decision
+ * d-40, 2026-08-29), so a mark promising arrival tells an author to keep the
+ * value and wait. A mark has no room for the reason; what it must not do is
+ * imply a clock. `test/formats/engine-claim-register.test.ts` holds this, and
+ * anchors the expectation on aeon's sentence rather than on a vocabulary rule.
+ */
+export const SPRITE_MASK_MARK = 'ruled out, not deferred';
 
 /**
  * The policy row's permanent sentence, which now also says why `sprite_mask`
@@ -2072,9 +2084,10 @@ export const SPRITE_MASK_MARK = 'the engine cannot emit this yet';
  * screen only for the scenes that have a policy to answer for.
  */
 export function leftColumnMaskRowHint(): string {
-  return `${LEFT_COLUMN_MASK_ROW.hint}. sprite_mask is greyed: aeon has not landed the `
-    + 'left-column strip emission, so declaring it would be accepted while the sliver stays '
-    + 'uncovered. Answer with factor0_lock or accept.';
+  return `${LEFT_COLUMN_MASK_ROW.hint}. sprite_mask is greyed and will not come back: aeon `
+    + 'ruled the left-column strip out rather than deferring it, the engine repairs the sliver '
+    + 'itself, and the build refuses the declaration outright. Answer with factor0_lock or '
+    + 'accept.';
 }
 
 /** The policy this scene declares — absent reads as the schema's own default. */

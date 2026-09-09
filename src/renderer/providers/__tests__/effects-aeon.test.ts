@@ -958,8 +958,11 @@ describe('curve / vsplit controls (parcel H)', () => {
     expect(hint.startsWith(LEFT_COLUMN_MASK_ROW.hint)).toBe(true);
     expect(hint).toMatch(/sprite_mask is greyed/);
     // The engine's cause, and the way out - both, or the author is told a dead
-    // end with a reason attached.
-    expect(hint).toMatch(/left-column strip emission/);
+    // end with a reason attached. The cause is that aeon RULED THE STRIP OUT,
+    // not that it has not arrived: the pending wording was wrong in direction
+    // and is held by test/formats/engine-claim-register.test.ts.
+    expect(hint).toMatch(/left-column strip out/);
+    expect(hint).not.toMatch(/has not landed/);
     expect(hint).toMatch(/factor0_lock or accept/);
     // ANTI-VACUOUS: sprite_mask really is the option this is about, and it
     // really is unconditionally disabled.
@@ -2668,7 +2671,11 @@ describe('left_column_mask: the policy, gated both ways on v_deform', () => {
     const sprite = leftColumnMaskOptions(lockedScene()).find((o) => o.value === 'sprite_mask')!;
     expect(MASK_VALUES).toContain('sprite_mask');
     expect(sprite.disabled).toBe(true);
-    expect(sprite.title).toMatch(/strip emission has not landed/);
+    // The reason is a RULING, not a wait. The tooltip said the emission "has not
+    // landed" while aeon calls it cancelled, so the pending phrasing is refused
+    // here as well as by the register gate.
+    expect(sprite.title).toMatch(/ruled out/);
+    expect(sprite.title).not.toMatch(/has not landed|yet/);
     // …and it is the ONLY disabled one. `factor0_lock` stays selectable even
     // when its precondition fails — see the provider's design-fork banner: an
     // editor that refuses what the build accepts is the worse failure, and
