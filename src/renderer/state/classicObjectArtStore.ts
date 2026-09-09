@@ -44,7 +44,13 @@ import type { Color } from '../../core/model/s4-types';
 import { createIpcFileAccess } from './classic-file-access';
 import type { ReadManyValue } from '../../core/project/adapter';
 import { readFailureError } from '../../core/project/read-failure';
-import { ObjectSpriteCache } from './object-sprite-cache';
+import { ObjectSpriteCache, type SpriteBuildFailure } from './object-sprite-cache';
+// The coalescing shape every other producer of repeated same-kind failures in this
+// repo uses: name a few, count the rest. See core/project/notice.ts for why a
+// producer that toasts once per failure is a producer that can wall the editor.
+import { nameSome } from '../../core/project/notice';
+import { s1ObjectName, s1ObjectHex } from '../../core/project/profiles/s1-objects';
+import { useToastStore } from './toastStore';
 
 /** A rendered object sprite ready to blit: an ImageBitmap + its signed origin. */
 export interface ObjectSprite {
@@ -243,6 +249,63 @@ export function __resetObjectSpriteArtForTest(): void {
   spriteCache.clear();
   cacheDir = null;
   refreshGen = 0;
+  pendingSpriteFailures.length = 0;
+  drainSuppressed = 0;
+}
+
+// ═══ SPRITE-CACHE-SILENT-SWALLOW (lens sweep, 2026-09-08) ════════════════════
+//
+// WHAT THE AUTHOR SAW BEFORE THIS. A sprite whose art file could not be read drew
+// the SAME hex-id box as an id with no art link at all (classic-overlays.ts's
+// `drawObjects` falls back to it on a null sprite, and an unlinked id is a null
+// sprite too). That box is the normal resting state for most of the S1 object
+// table, so the failure was not merely quiet: it was camouflaged as the expected
+// thing. Nothing was toasted, nothing was logged, and the message the builder
+// throws (read-failure.ts) died in `ObjectSpriteCache.load`'s catch.
+//
+// ⚠ AND WHAT WAS WRONGLY CLAIMED ABOUT IT: the row said the object "renders as
+// simply missing". It does not — it renders as its hex box. The defect is the
+// COLLISION with the unlinked case, not invisibility.
+//
+// COALESCED, NOT ONE TOAST PER SPRITE. A dir whose art tree is unreadable fails
+// every linked id in the act (32 on GHZ act 1), and an error toast dwells ten
+// seconds: notice.ts records what an unbounded wall of those costs, and `nameSome`
+// is the shape it settled on. The queue is drained by whoever asked for the
+// builds, so a whole refresh is ONE notice.
+const pendingSpriteFailures: SpriteBuildFailure[] = [];
+// > 0 while a caller is deliberately batching (refreshClassicObjectSprites), so
+// the per-sprite `loadObjectSprite` drains inside it do not each emit a notice.
+// A counter rather than a flag: nothing nests these today, and a flag would be
+// the thing that breaks silently on the day something does.
+let drainSuppressed = 0;
+
+/**
+ * Turn whatever has failed since the last drain into ONE notice.
+ *
+ * Names the objects the way the fallback box does (`s1ObjectName` falls through to
+ * `$XX` hex for an unnamed id) so the sentence and the thing on screen can be
+ * matched up, and carries ONE reason verbatim — the repair hint. Every failure's
+ * own reason still reaches the console at the moment it happens, which is the
+ * `nameSome` bargain: the named few are on screen, the rest are recoverable.
+ */
+/** How the fallback box names an object: its name, or its `$XX` hex when it has
+ *  none. The hex is appended to a NAMED object only, because `s1ObjectName` already
+ *  falls through to the hex and "$02 ($02)" reads as a bug in the message. */
+function objectLabel(id: number): string {
+  const name = s1ObjectName(id);
+  const hex = s1ObjectHex(id);
+  return name === hex ? hex : `${name} (${hex})`;
+}
+
+function drainSpriteFailures(): void {
+  if (drainSuppressed > 0 || pendingSpriteFailures.length === 0) return;
+  const failures = pendingSpriteFailures.splice(0, pendingSpriteFailures.length);
+  const labels = [...new Set(failures.map((f) => objectLabel(f.id)))];
+  const plural = labels.length === 1 ? '' : 's';
+  useToastStore.getState().addToast(
+    `${labels.length} object sprite${plural} could not be drawn and show as their id box `
+    + `instead of their art: ${nameSome(labels)}. ${failures[0].reason}`,
+    'error');
 }
 
 // The shared (id, zone, variant, epoch) cache. Static ids use variant `''` (so the
@@ -252,6 +315,14 @@ export function __resetObjectSpriteArtForTest(): void {
 const spriteCache = new ObjectSpriteCache<ObjectSprite, BuildCtx>(
   (id, zone, variant, ctx) => buildImpl(id, zone, variant, ctx),
   (sprite) => { sprite.bitmap.close(); sprite.priBitmap?.close(); },
+  (failure) => {
+    // The console line is per failure and carries ITS OWN reason: the toast names
+    // a few objects and one reason, and this is where the other reasons live.
+    console.warn(
+      `[object-art] ${objectLabel(failure.id)} in ${failure.zone} could not be drawn:`,
+      failure.reason);
+    pendingSpriteFailures.push(failure);
+  },
 );
 
 /** Cache variant (== publish-key discriminator) for a placement: '' static, subtype-string for rules. */
@@ -275,7 +346,13 @@ export async function loadObjectSprite(
   dir: string, doc: LevelDoc, id: number, zone: string, subtype: number, epoch: number,
   prefetch?: Map<string, ReadManyValue>,
 ): Promise<ObjectSprite | null> {
-  return spriteCache.load(id, zone, variantFor(id, zone, subtype), epoch, { dir, doc, prefetch });
+  const sprite = await spriteCache.load(
+    id, zone, variantFor(id, zone, subtype), epoch, { dir, doc, prefetch });
+  // The DIRECT path (a library thumbnail, an object preview, the armed placement
+  // ghost) drains here, so a failure on it is not left waiting for a refresh that
+  // may never come. Inside a refresh this is suppressed and the refresh drains once.
+  drainSpriteFailures();
+  return sprite;
 }
 
 /**
@@ -290,6 +367,22 @@ export async function loadObjectSprite(
  * (so the viewport never draws a just-closed bitmap).
  */
 export async function refreshClassicObjectSprites(
+  dir: string, doc: LevelDoc, zone: string, clocks: SpriteClocks,
+): Promise<void> {
+  // ONE notice for the whole refresh, however many sprites failed in it, and it is
+  // emitted even on the paths that return early (a superseded publish still built
+  // the sprites, and their failures are still true). The inner function is what
+  // makes the `finally` cover every one of those returns.
+  drainSuppressed++;
+  try {
+    await refreshObjectSpritesInner(dir, doc, zone, clocks);
+  } finally {
+    drainSuppressed--;
+    drainSpriteFailures();
+  }
+}
+
+async function refreshObjectSpritesInner(
   dir: string, doc: LevelDoc, zone: string, clocks: SpriteClocks,
 ): Promise<void> {
   if (dir !== cacheDir) {
