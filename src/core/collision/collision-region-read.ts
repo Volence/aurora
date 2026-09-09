@@ -183,6 +183,26 @@ export interface CollisionRegionRead {
   profilesLoaded: boolean;
   /** Present only when the request asked for it. */
   ascii?: string;
+  /**
+   * The key to `ascii`, and it ships WITH it.
+   *
+   * ⚠ FOUND WHILE FIXING THE RULER, AND IT IS THE SAME DEFECT ONE LAYER OUT.
+   * `editor/get_collision_region`'s own parameter text promises "a glyph grid
+   * with a legend" (`src/main/editor-methods.ts`), and until this parcel
+   * `COLLISION_ASCII_LEGEND` was exported and read by NOTHING: the reply carried
+   * the grid and no key, so a caller was told how to interpret the picture by a
+   * sentence that was never sent. One tool's description asserting what another
+   * tool does not do is the class this repo keeps paying for, and it is worse
+   * here than a missing feature would be, because the promise stops a reader
+   * asking.
+   *
+   * It is carried on the reply rather than pasted into the method description so
+   * that the glyph rules and the ruler rule have ONE author: the ordered rules
+   * in `collisionCellGlyph` and the digit ruler in `renderCollisionAscii` are
+   * beside it in this file, and a second copy in the tool schema is how a picker
+   * and a map came to disagree once already.
+   */
+  legend?: string;
 }
 
 // ── the glyphs ─────────────────────────────────────────────────────────────
@@ -206,7 +226,10 @@ export const GLYPH_FLOOR = '_';
 const SLOPE_THRESHOLD_PX = 4;
 
 export const COLLISION_ASCII_LEGEND =
-  `${GLYPH_AIR} air   ${GLYPH_INERT} shape present but solidity=none (stops nothing)   `
+  'Column ruler: one line per DIGIT, most significant first, read DOWNWARD under a column; '
+  + 'a blank is a leading zero. Row labels are absolute cell rows. Both axes are absolute '
+  + '16px CELL coordinates, the same units this method was called with.\n'
+  + `${GLYPH_AIR} air   ${GLYPH_INERT} shape present but solidity=none (stops nothing)   `
   + `${GLYPH_UNKNOWN} shape index not in the loaded tables\n`
   + `${GLYPH_MIXED} MIXED: this cell's four 8px sub-tiles disagree; read cells[][].sub\n`
   + `${GLYPH_FULL} full block   ${GLYPH_WALL} vertical face   ${GLYPH_CEILING} hangs from the top   `
@@ -271,6 +294,31 @@ export function collisionCellGlyph(cell: CollisionCellRead, profiles: CollisionP
  * a grid whose axes started at 0 would be a second coordinate system for the
  * reader to convert out of, and converting it back is the step that gets
  * skipped.
+ *
+ * ═══ THE COLUMN RULER IS AS MANY LINES AS THE WIDEST LABEL NEEDS ═══
+ *
+ * ⚠ IT USED TO BE TWO AT MOST, AND THAT MADE COLUMN 100 IDENTICAL TO COLUMN 0.
+ * The old code wrote `Math.floor((x + c) / 10) % 10` on the upper line and
+ * blanked a zero, so 100 printed a blank tens digit over a `0` ones digit, which
+ * is exactly what column 0 prints. A section is `SECTION_CELLS_WIDE` cells
+ * across and `get_collision_region` accepts a cell column anywhere in it, so a
+ * three-digit column is an ordinary request, not an edge: on the surface whose stated
+ * purpose is that an agent reads data rather than guessing from a picture, the
+ * axis was wrong in exactly the way the surface exists to prevent, and it was
+ * wrong SILENTLY (a plausible grid with a plausible ruler).
+ *
+ * THE WIDTH IS DERIVED FROM THE DATA, never chosen: `String(x + w - 1).length`,
+ * which is the same rule `rowLabelWidth` on the line below already uses for the
+ * row axis. So the two axes cannot disagree about how a coordinate is written,
+ * and a wider section widens the ruler with no edit here.
+ *
+ * A DIGIT IS BLANK ONLY WHERE IT WOULD BE A LEADING ZERO, taken off the label's
+ * own decimal string rather than from arithmetic on the place value. That is a
+ * strict generalisation of the old rule (a tens digit is 0 exactly when the
+ * label is a single digit), so a two-digit window renders byte for byte as
+ * before; and it is what keeps 105 readable as `1`,`0`,`5` while 5 stays a bare
+ * `5`. An all-blank line is dropped, so a window inside one decade still has one
+ * ruler line and not three.
  */
 export function renderCollisionAscii(
   cells: CollisionCellRead[][], profiles: CollisionProfileSet | null,
@@ -280,16 +328,19 @@ export function renderCollisionAscii(
   const pad = (n: number) => String(n).padStart(rowLabelWidth, ' ');
   const gutter = ' '.repeat(rowLabelWidth) + ' ';
   const w = cells[0]?.length ?? 0;
-  // Two ruler lines when the window spans a tens boundary, one when it does not:
-  // '10' cannot be written under a single column.
-  const tens = gutter + Array.from({ length: w }, (_, c) => {
-    const v = Math.floor((x + c) / 10) % 10;
-    return v === 0 ? ' ' : String(v);
-  }).join('');
-  const ones = gutter + Array.from({ length: w }, (_, c) => String((x + c) % 10)).join('');
+  const colLabelWidth = w > 0 ? String(x + w - 1).length : 1;
   const lines: string[] = [];
-  if (tens.trim().length > 0) lines.push(tens);
-  lines.push(ones);
+  for (let place = colLabelWidth - 1; place >= 0; place--) {
+    const line = gutter + Array.from({ length: w }, (_, c) => {
+      const label = String(x + c);
+      const at = label.length - 1 - place;
+      return at < 0 ? ' ' : label[at];
+    }).join('');
+    // The last place always prints: every label has a final digit, and an empty
+    // window must still render the same shape it always has rather than nothing.
+    // So this drops only the higher places no label in the window reaches.
+    if (place === 0 || line.trim().length > 0) lines.push(line);
+  }
   for (let r = 0; r < cells.length; r++) {
     lines.push(`${pad(y + r)} ${cells[r].map((cell) => collisionCellGlyph(cell, profiles)).join('')}`);
   }
@@ -375,6 +426,11 @@ export function readCollisionRegion(args: {
     plane, x, y, w, h, cells, words, mixedCells, cellsWithUnownedBits, crossoverCells,
     profilesLoaded: profiles !== null,
   };
-  if (ascii) out.ascii = renderCollisionAscii(cells, profiles, x, y);
+  if (ascii) {
+    out.ascii = renderCollisionAscii(cells, profiles, x, y);
+    // The grid and its key travel together or the key is not delivered at all.
+    // See `legend` on the interface for the promise this makes true.
+    out.legend = COLLISION_ASCII_LEGEND;
+  }
   return out;
 }
