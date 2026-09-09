@@ -469,6 +469,63 @@ describe('effects scene library', () => {
     expect(lib).toEqual({ scenes: [], unreadable: [], notices: [], loadedPaths: [] });
   });
 
+  // ═══ LISTING-SWALLOWS-FAILURE (lens sweep, closed 2026-09-08) ══════════════
+  //
+  // "THERE ARE NO SCENES" AND "I COULD NOT LOOK" WERE THE SAME ANSWER HERE, and
+  // the row above is why that mattered: an absent directory is SILENT by
+  // contract (§2), so anything that degrades to "absent" degrades to silence.
+  // Two doors led there and this loader held both open:
+  //
+  //   1. `try { present = await fa.exists(dir); } catch { present = false; }`
+  //      — the blind-probe line. FileAccess.exists' own contract (adapter.ts)
+  //      says an implementation that CANNOT DETERMINE the answer MUST THROW
+  //      rather than answer false, precisely so a caller can tell the two
+  //      apart; this caught that throw and answered false anyway.
+  //   2. `fa.list(dir)` answered `[]` for a directory it could not read, exactly
+  //      as it did for an empty one — main/file-io.ts's `catch { return [] }`.
+  //
+  // Closing (1) alone buys nothing while (2) still swallows, which is why the
+  // main-process listing had to gain its third answer first. Both rows below
+  // were RED before that landed: the first returned a silent empty library, the
+  // second threw out of the loader and took the whole project open with it.
+  //
+  // THE FIX IS A NOTICE, NOT A THROW. An author with one unreadable directory
+  // still has a project to open; what they must not have is a scene panel that
+  // says "none" about scenes that are sitting on disk. `loadedPaths` stays empty
+  // on this path, which is what stops the save's `removalsFor` from proposing to
+  // delete anything it could not see (see core/project/aeon/save.ts).
+  /** A FileAccess that cannot answer for the directory — the `cannotTellFa`
+   *  shape adapter.ts names, i.e. what the IPC bridge does on an EACCES. */
+  function cannotTellFs(where: 'exists' | 'list'): FileAccess {
+    const boom = () => { throw new Error("EACCES: permission denied, scandir 'editor/effects'"); };
+    const base = memFs({});
+    return {
+      ...base,
+      exists: where === 'exists' ? async () => boom() : async () => true,
+      list: where === 'list' ? async () => boom() : base.list,
+    };
+  }
+
+  it('says so when it could not determine whether the directory is there', async () => {
+    const lib = await loadEffectsSceneLibrary(cannotTellFs('exists'), ROOT);
+    expect(lib.scenes).toEqual([]);
+    // NOT silence. The absent-directory row above proves silence is what this
+    // used to be, so a notice here is the whole discrimination.
+    expect(lib.notices.map(n => n.severity)).toEqual(['error']);
+    expect(lib.notices[0].message).toMatch(/could not be read/);
+    expect(lib.notices[0].message).toMatch(/EACCES/);
+    // Nothing may be removed on the strength of a listing that did not happen.
+    expect(lib.loadedPaths).toEqual([]);
+  });
+
+  it('says so when the directory is there and the listing failed', async () => {
+    const lib = await loadEffectsSceneLibrary(cannotTellFs('list'), ROOT);
+    expect(lib.scenes).toEqual([]);
+    expect(lib.notices.map(n => n.severity)).toEqual(['error']);
+    expect(lib.notices[0].message).toMatch(/EACCES/);
+    expect(lib.loadedPaths).toEqual([]);
+  });
+
   it('loads every scene in the directory, sorted, ignoring non-json entries', async () => {
     const scene = (id: string) => withDoc(d => { d.id = id; });
     const lib = await loadEffectsSceneLibrary(memFs({

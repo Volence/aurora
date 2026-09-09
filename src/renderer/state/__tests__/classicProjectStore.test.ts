@@ -218,7 +218,7 @@ describe('createIpcFileAccess rel-path safety', () => {
   const api = {
     probePath: vi.fn(async () => ({ presence: 'present', reason: null })),
     readBinaryFile: vi.fn(async () => new ArrayBuffer(4)),
-    listDir: vi.fn(async () => ['a', 'b']),
+    probeDir: vi.fn(async () => ({ outcome: 'listed', entries: ['a', 'b'], reason: null })),
   };
 
   beforeEach(() => {
@@ -239,7 +239,7 @@ describe('createIpcFileAccess rel-path safety', () => {
     expect(api.readBinaryFile).toHaveBeenCalledWith('/root', 'sonic.asm');
 
     expect(await fa.list('artnem')).toEqual(['a', 'b']);
-    expect(api.listDir).toHaveBeenCalledWith('/root', 'artnem');
+    expect(api.probeDir).toHaveBeenCalledWith('/root', 'artnem');
   });
 
   it('rejects escaping paths without hitting IPC', async () => {
@@ -249,7 +249,7 @@ describe('createIpcFileAccess rel-path safety', () => {
     await expect(fa.list('/abs')).rejects.toThrow(/escapes root/);
     expect(api.probePath).not.toHaveBeenCalled();
     expect(api.readBinaryFile).not.toHaveBeenCalled();
-    expect(api.listDir).not.toHaveBeenCalled();
+    expect(api.probeDir).not.toHaveBeenCalled();
   });
 
   // -------------------------------------------------------------------------

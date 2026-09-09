@@ -81,7 +81,7 @@ function installWindowApi(files: Map<string, Uint8Array>, written: string[]) {
         if (!b) throw new Error(`ENOENT: ${rel}`);
         return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
       },
-      listDir: async () => [],
+      probeDir: async () => ({ outcome: 'absent', entries: null, reason: null }),
       fileMtime: async () => null,
       // The save skips writes whose bytes already match on disk (so an
       // untouched file's mtime does not mark aeon's level tree stale and force

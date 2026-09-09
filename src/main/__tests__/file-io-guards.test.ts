@@ -28,8 +28,9 @@
 // (escapes root)", so the write channel says "refused write to" first and this
 // file's write rows key on that.
 //
-// FOR THE TOLERANT PRIMITIVES there is no message at all: an escaping path
-// resolves to null/false/[] exactly as a missing file does. Those rows are
+// FOR THE TOLERANT PRIMITIVES that still answer a bare value (fileMtime's null)
+// there is no message at all: an escaping path resolves exactly as a missing file
+// does. Those rows are
 // therefore SIDE-BY-SIDE TRIPLES: the escaping path (refused), the same real
 // target reached safely from the outer base (proves it exists and is readable),
 // and a legitimate in-project path (proves the primitive works at all). Any one
@@ -45,7 +46,7 @@ import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import {
-  deleteProjectFile, fileMtime, listDir, listProjectFiles, probePath,
+  deleteProjectFile, fileMtime, probeDir, listProjectFiles, probePath,
   readBinaryFile, readManyFiles, writeProjectFile,
 } from '../file-io';
 import { isRelPathSafe } from '../../shared/rel-path';
@@ -55,7 +56,7 @@ import { isRelPathSafe } from '../../shared/rel-path';
  * pointing at nothing proves nothing:
  *
  *   <tmp>/outside.bin          3 bytes, the escape target for the file rules
- *   <tmp>/outside_dir/seen.txt a real directory, for the listDir rule
+ *   <tmp>/outside_dir/seen.txt a real directory, for the probeDir rule
  *   <tmp>/outside.asm          picked up by listProjectFiles' extension filter
  *   <tmp>/project/             the basePath every primitive is given
  *   <tmp>/project/inside.bin   a legitimate in-project file
@@ -275,18 +276,92 @@ describe('fileMtime applies the guard', () => {
   });
 });
 
-describe('listDir applies the guard', () => {
-  it('reports [] for a `..` path naming a real, non-empty directory', async () => {
-    expect(await listDir(base, '../outside_dir')).toEqual([]);
+describe('probeDir applies the guard', () => {
+  // ⚠ THESE ROWS WERE STRENGTHENED WITH THE FUNCTION, 2026-09-08
+  // (LISTING-SWALLOWS-FAILURE), on exactly the terms the probePath rows above
+  // record. They used to assert `listDir(...) === []` for an escaping path.
+  // `[]` was the SAME VALUE an empty directory, a missing one and an EACCES all
+  // produced, so the old rows could not tell a refusal from an absence, and a
+  // listing that answered "there is nothing here" about a directory it had
+  // declined to open was stating a falsehood in the caller's own vocabulary.
+  // `probeDir` has four answers and a refusal is 'refused', so these rows now
+  // assert WHICH answer, and the controls below separate them.
+  it('answers refused, not absent, for a `..` path naming a real, non-empty directory', async () => {
+    const listing = await probeDir(base, '../outside_dir');
+    expect(listing.outcome).toBe('refused');
+    expect(listing.entries).toBeNull();
+    expect(listing.reason).toContain('escapes root');
   });
 
-  it('reports [] for an absolute path naming a real, non-empty directory', async () => {
-    expect(await listDir(base, join(tmp, 'outside_dir'))).toEqual([]);
+  it('answers refused for an absolute path naming a real, non-empty directory', async () => {
+    const listing = await probeDir(base, join(tmp, 'outside_dir'));
+    expect(listing.outcome).toBe('refused');
+    expect(listing.entries).toBeNull();
   });
 
   it('CONTROL: that same directory lists from the outer base, and the project root lists', async () => {
-    expect(await listDir(tmp, 'outside_dir')).toEqual(['seen.txt']);
-    expect((await listDir(base, '')).sort()).toEqual(['inside.asm', 'inside.bin']);
+    const outer = await probeDir(tmp, 'outside_dir');
+    expect(outer.outcome).toBe('listed');
+    expect(outer.entries).toEqual(['seen.txt']);
+    const root = await probeDir(base, '');
+    expect(root.entries?.slice().sort()).toEqual(['inside.asm', 'inside.bin']);
+  });
+
+  // ═══ THE FOUR ANSWERS (LISTING-SWALLOWS-FAILURE, lens sweep, 2026-09-08) ════
+  //
+  // The same seam and the same reason as the readManyFiles rows above, one level
+  // up: `listDir` folded an ENOENT, an ENOTDIR, an EACCES, an ENOTDIR-on-a-file
+  // and a REFUSED escaping path into `[]` — the value a genuinely EMPTY
+  // directory also has. Both effects libraries treat an absent directory as the
+  // ordinary "nothing authored yet" and say nothing about it, so every one of
+  // those failures reached the author as silence.
+  //
+  // THE UNREADABLE CASE IS A REAL FILE, not a chmod, for the reason the
+  // readManyFiles row gives: `readdir` on a plain file is ENOTDIR everywhere
+  // this runs, needs no privileges, and does not go green as root. ⚠ AND IT IS
+  // CLASSIFIED 'absent', DELIBERATELY: ENOTDIR means a non-directory stands
+  // where a directory would have to be, so nothing can be under it — the same
+  // cut probePath and readManyFiles make, and this row exists so that agreement
+  // is asserted rather than assumed.
+  //
+  // The EMPTY-vs-ABSENT pair is the one the old `[]` could not express at all,
+  // and it is the pair the effects loaders turn on.
+  it('says WHICH of the four: listed (empty), listed (full), absent, refused', async () => {
+    mkdirSync(join(base, 'empty_dir'), { recursive: true });
+
+    const empty = await probeDir(base, 'empty_dir');
+    expect(empty.outcome).toBe('listed');
+    expect(empty.entries).toEqual([]);   // A REAL empty directory. Not a failure.
+    expect(empty.reason).toBeNull();
+
+    const full = await probeDir(base, '');
+    expect(full.outcome).toBe('listed');
+    expect(full.entries?.length).toBe(3); // inside.asm, inside.bin, empty_dir
+
+    const gone = await probeDir(base, 'no_such_dir');
+    expect(gone.outcome).toBe('absent');
+    expect(gone.entries).toBeNull();
+    expect(gone.reason).toBeNull();
+
+    // A plain FILE where a directory was asked for: ENOTDIR, and nothing can be
+    // under it, so 'absent' is a true statement about its contents.
+    const notADir = await probeDir(base, 'inside.bin/sub');
+    expect(notADir.outcome).toBe('absent');
+
+    const refused = await probeDir(base, '../outside_dir');
+    expect(refused.outcome).toBe('refused');
+    expect(refused.reason).toMatch(/escapes root/);
+  });
+
+  it('CONTROL: empty, absent and refused are THREE answers, so no row is asserting another', async () => {
+    mkdirSync(join(base, 'empty_dir'), { recursive: true });
+    const outcomes = await Promise.all(
+      ['empty_dir', 'no_such_dir', '../outside_dir'].map(async (d) => (await probeDir(base, d)).outcome),
+    );
+    // Before the fix this set was { [] } — one value for all three, which is
+    // why a consumer could say only one thing about them.
+    expect(new Set(outcomes).size).toBe(3);
+    expect(outcomes).toEqual(['listed', 'absent', 'refused']);
   });
 });
 
@@ -441,7 +516,7 @@ describe('the census of primitives is derived from the module, not from this lis
     readManyFiles: true,
     probePath: true,
     fileMtime: true,
-    listDir: true,
+    probeDir: true,
     readBinaryFile: true,      // guarded 2026-09-08; the retired exception is above
     listProjectFiles: false,   // no project-relative argument to guard
   };

@@ -2,7 +2,7 @@ import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { writeFileSync } from 'fs';
 import { IPC_CHANNELS } from '../shared/ipc-types';
 import type { GuardedWriteFile } from '../shared/ipc-types';
-import { readBinaryFile, readManyFiles, listProjectFiles, probePath, listDir, fileMtime, deleteProjectFile, writeProjectFile } from './file-io';
+import { readBinaryFile, readManyFiles, listProjectFiles, probePath, probeDir, fileMtime, deleteProjectFile, writeProjectFile } from './file-io';
 import { performGuardedWrite } from './guarded-write';
 import { readRecents, addRecentProject, removeRecentProject } from './recent-projects';
 
@@ -35,8 +35,8 @@ export function registerIpcHandlers(): void {
     return probePath(basePath, relativePath);
   });
 
-  ipcMain.handle(IPC_CHANNELS.LIST_DIR, async (_event, basePath: string, relativeDir: string) => {
-    return listDir(basePath, relativeDir);
+  ipcMain.handle(IPC_CHANNELS.DIR_PROBE, async (_event, basePath: string, relativeDir: string) => {
+    return probeDir(basePath, relativeDir);
   });
 
   ipcMain.handle(IPC_CHANNELS.FILE_MTIME, async (_event, basePath: string, relativePath: string) => {

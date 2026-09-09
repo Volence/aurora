@@ -364,6 +364,44 @@ describe('the preset library', () => {
     expect(lib.notices).toEqual([]);
   });
 
+  // ═══ LISTING-SWALLOWS-FAILURE (lens sweep, closed 2026-09-08) ══════════════
+  //
+  // The scene loader one file over carries the whole argument; this is the same
+  // defect in the same two lines, and the pair is why it was worth doing. The
+  // row directly above is the reason it mattered: an absent directory is SILENT,
+  // so a "could not tell" that degraded to "absent" degraded to silence — the
+  // author's authored presets simply not there, with nothing said.
+  //
+  // Both rows below were RED before the main-process listing gained its third
+  // answer: the first returned a silent empty library (the `catch { present =
+  // false }` blind probe), the second threw out of the loader entirely.
+  function cannotTellFs(where: 'exists' | 'list'): FileAccess {
+    const boom = () => { throw new Error("EACCES: permission denied, scandir 'presets'"); };
+    const base = memFs({});
+    return {
+      ...base,
+      exists: where === 'exists' ? async () => boom() : async () => true,
+      list: where === 'list' ? async () => boom() : base.list,
+    };
+  }
+
+  it('says so when it could not determine whether the directory is there', async () => {
+    const lib = await loadEffectsPresetLibrary(cannotTellFs('exists'), ROOT);
+    expect(lib.presets).toEqual([]);
+    expect(lib.notices.map(n => n.severity)).toEqual(['error']);
+    expect(lib.notices[0].message).toMatch(/could not be read/);
+    expect(lib.notices[0].message).toMatch(/EACCES/);
+    expect(lib.loadedPaths).toEqual([]);
+  });
+
+  it('says so when the directory is there and the listing failed', async () => {
+    const lib = await loadEffectsPresetLibrary(cannotTellFs('list'), ROOT);
+    expect(lib.presets).toEqual([]);
+    expect(lib.notices.map(n => n.severity)).toEqual(['error']);
+    expect(lib.notices[0].message).toMatch(/EACCES/);
+    expect(lib.loadedPaths).toEqual([]);
+  });
+
   it('loads every .json and skips everything else', async () => {
     const lib = await loadEffectsPresetLibrary(memFs({
       [`${DIR}authored_probe.json`]: AUTHORED_PROBE,

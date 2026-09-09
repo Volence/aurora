@@ -26,7 +26,7 @@ export function openEngine(): OpenEngine | null {
 
 /**
  * The open project's ROOT DIRECTORY — the base every per-project relative path
- * resolves under (guarded writes, readBinaryFile, listDir). Null when no project
+ * resolves under (guarded writes, readBinaryFile, probeDir). Null when no project
  * is open.
  *
  * Lives here for the reason in the header: four call sites deriving "which

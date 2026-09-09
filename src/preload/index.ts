@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS, unwrapBinaryRead, unwrapWriteOutcome } from '../shared/ipc-types';
 import type { RecentsState } from '../shared/recents';
-import type { GuardedWriteFile, GuardedWriteResult, ReadManyEntry, DeleteOutcome, PathProbe, AetherStatusPayload, AetherWarpResult, AetherBuildResult } from '../shared/ipc-types';
+import type { GuardedWriteFile, GuardedWriteResult, ReadManyEntry, DeleteOutcome, DirListing, PathProbe, AetherStatusPayload, AetherWarpResult, AetherBuildResult } from '../shared/ipc-types';
 import { AGENT_REQUEST_CHANNEL, AGENT_RESPONSE_CHANNEL } from '../shared/agent-protocol';
 import type { AgentRequestEnvelope, AgentResponseEnvelope } from '../shared/agent-protocol';
 
@@ -57,8 +57,14 @@ const api = {
   probePath: (basePath: string, relativePath: string): Promise<PathProbe> =>
     ipcRenderer.invoke(IPC_CHANNELS.PATH_PROBE, basePath, relativePath),
 
-  listDir: (basePath: string, relativeDir: string): Promise<string[]> =>
-    ipcRenderer.invoke(IPC_CHANNELS.LIST_DIR, basePath, relativeDir),
+  // A DirListing, not a bare `string[]`. Renamed from `listDir` with the meaning
+  // (the same move `probePath` above made when it stopped being `pathExists`):
+  // an empty array used to mean "the directory is empty", "there is no such
+  // directory", "I could not read it" and "I refused to look at that path"
+  // alike, and both effects libraries answered every one of those with the
+  // silence they reserve for the first two. See DirListing in shared/ipc-types.
+  probeDir: (basePath: string, relativeDir: string): Promise<DirListing> =>
+    ipcRenderer.invoke(IPC_CHANNELS.DIR_PROBE, basePath, relativeDir),
 
   fileMtime: (basePath: string, relativePath: string): Promise<number | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.FILE_MTIME, basePath, relativePath),

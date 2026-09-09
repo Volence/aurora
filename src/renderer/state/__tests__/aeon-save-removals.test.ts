@@ -104,7 +104,7 @@ function installWindowApi(
         if (!b) throw new Error(`ENOENT: ${rel}`);
         return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
       },
-      listDir: async () => [],
+      probeDir: async () => ({ outcome: 'absent', entries: null, reason: null }),
       fileMtime: async () => null,
       readManyFiles: async (_dir: string, rels: string[]) =>
         rels.map((rel) => {

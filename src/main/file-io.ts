@@ -2,7 +2,7 @@ import { readFile, readdir, stat, unlink } from 'fs/promises';
 import { mkdirSync, renameSync, writeFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { isRelPathSafe } from '../shared/rel-path';
-import type { DeleteOutcome, PathProbe, ReadManyEntry, WriteOutcome } from '../shared/ipc-types';
+import type { DeleteOutcome, DirListing, PathProbe, ReadManyEntry, WriteOutcome } from '../shared/ipc-types';
 
 /**
  * Write ONE project-relative file, atomically. The only writing primitive behind
@@ -249,17 +249,50 @@ export async function fileMtime(basePath: string, relativePath: string): Promise
 }
 
 /**
- * List the immediate entry names under a project-relative directory. Rel-path-
- * safe; a missing dir / non-directory / escaping path resolves to `[]` (never
- * rejects), matching the FileAccess.list contract's tolerant callers
- * (s1Adapter.detect's dirHasEntries catches emptiness, not throws).
+ * The immediate entry names under a project-relative directory — in FOUR
+ * answers, not one array. See DirListing (shared/ipc-types) for the whole
+ * reason; in short:
+ *
+ * This used to be `listDir(): Promise<string[]>` whose `catch { return [] }`
+ * reported the same value for an EMPTY directory, a MISSING one, an EACCES on it
+ * or a parent, and a path that escaped the root and was never looked at. That is
+ * exactly the defect `probePath` above was rewritten to remove, one level up: at
+ * the listing instead of at the single path. Its own docblock even named the
+ * tolerance as deliberate ("matching the FileAccess.list contract's tolerant
+ * callers"), which was true of the ABSENT case and quietly untrue of the other
+ * two.
+ *
+ * ONE LAYER UP, both effects libraries (core/formats/effects/{scene,preset}.ts)
+ * treat an absent directory as the ordinary "nothing authored yet" and say
+ * NOTHING — so every failure that arrived as `[]` arrived as silence, and an
+ * unreadable `editor/effects/` opened as a project with no effects in it.
+ *
+ * STILL NEVER REJECTS, for probePath's reason: the renderer bridge lists
+ * optional directories and a rejected `ipcMain.handle` invoke is logged as a
+ * main-process error. What changed is only that the tolerant answer stopped
+ * lying about which failure it was.
+ *
+ * ENOENT and ENOTDIR are 'absent' — nothing at the path, or a non-directory
+ * above it so nothing can be. Everything else is 'unreadable' WITH ITS REASON.
+ * An escaping path is 'refused', not 'absent': the probe DECLINED TO LOOK, which
+ * is not a statement about what is on the filesystem — probePath's rule, for
+ * probePath's reason.
  */
-export async function listDir(basePath: string, relativeDir: string): Promise<string[]> {
-  if (!isRelPathSafe(relativeDir)) return [];
+export async function probeDir(basePath: string, relativeDir: string): Promise<DirListing> {
+  if (!isRelPathSafe(relativeDir)) {
+    return {
+      outcome: 'refused', entries: null,
+      reason: `unsafe project-relative path (escapes root): '${relativeDir}'`,
+    };
+  }
   try {
-    return await readdir(resolve(basePath, relativeDir));
-  } catch {
-    return [];
+    return { outcome: 'listed', entries: await readdir(resolve(basePath, relativeDir)), reason: null };
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
+    if (e?.code === 'ENOENT' || e?.code === 'ENOTDIR') {
+      return { outcome: 'absent', entries: null, reason: null };
+    }
+    return { outcome: 'unreadable', entries: null, reason: e?.message ?? String(err) };
   }
 }
 
