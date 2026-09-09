@@ -5,6 +5,7 @@ import AetherStatus, { IDENTITY_ABSENT, SOCKET_ABSENT, shortSocketLabel } from '
 import { useAetherStore } from '../../state/aetherStore';
 import { useBusStore } from '../../state/busStore';
 import type { AetherStatusPayload } from '../../../shared/ipc-types';
+import { SUPPORTED_IMPLEMENTATION, SUPERSEDED_IMPLEMENTATIONS } from '../../../main/aether/server-identity';
 
 /**
  * THE BADGE MUST NOT SPELL A CONSTANT WHERE A READER EXPECTS AN IDENTITY.
@@ -215,6 +216,26 @@ describe('the bus badge displays an identity, not a deployment label', () => {
     expect(s.text).toContain('offline');
     expect(s.text).not.toContain('oracle');
     expect(s.text).not.toContain(IDENTITY_ABSENT);
+  });
+});
+
+describe('the words standing in for an absent field', () => {
+  /**
+   * THE PLACEHOLDER ITSELF MUST NOT BE A PLAUSIBLE VALUE, or the surface is
+   * back to reporting its own blindness as a clean result under a new spelling.
+   * The bar is derived from the PRODUCER: `implementation` is a single-token
+   * registry value (`server-identity.ts` holds the registry), and a socket path
+   * always contains a separator. A row that only checked "the placeholder is
+   * displayed" would pass on `'oracle'`, which is exactly the string this
+   * parcel deleted.
+   */
+  it('cannot be mistaken for the field it stands in for', () => {
+    for (const v of [SUPPORTED_IMPLEMENTATION, ...Object.keys(SUPERSEDED_IMPLEMENTATIONS)]) {
+      expect(IDENTITY_ABSENT).not.toBe(v);
+    }
+    expect(IDENTITY_ABSENT).toContain(' ');       // every registry value is one token
+    expect(SOCKET_ABSENT).toContain(' ');
+    expect(SOCKET_ABSENT).not.toContain('/');     // every real socket path has one
   });
 });
 
