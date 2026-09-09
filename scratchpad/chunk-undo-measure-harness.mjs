@@ -36,6 +36,11 @@
 //                 the composer is showing some other document.
 //   T   TREATMENT the same chunk document and the same two gestures with those
 //                 two entries on the stack.
+//   F   ADDED BY THE ROUTING PARCEL — one TRANSFORM (Flip horizontal) on the
+//                 same document, because it is the only one of the three
+//                 doc-local writers that no row drove: `commitWrites`' `allowCow`
+//                 tail, which paste, cut, selection move and all seven
+//                 transforms share. It is not part of the C/T control pair.
 //
 // ⚠ ROW C's C3 IS THE ANTI-VACUOUS CONTROL THE WHOLE THING RESTS ON. A pencil
 // stroke on a chunk document is doc-local ONLY on a cell whose `atlasTile` is
@@ -858,6 +863,71 @@ async function main() {
       tColC === tColA && tColC !== tColB,
       `collisionA[${plan.collIndex}] ${tColA} -> ${tColB} (paint) -> ${tColC} (Ctrl+Z)`);
     await shot(c, 'T-treatment-after-collision-ctrl-z');
+
+    // ══ ROW F — A TRANSFORM, THE THIRD CALL SITE ════════════════════════════
+    //
+    // ADDED BY THE ROUTING PARCEL (d-37). The two gestures above drive two of
+    // the three doc-local writers on a chunk document:
+    //
+    //   commitWrites' chunk branch, empty-cell tail   — rows C/T pencil
+    //   applyTileCell                                  — rows C/T collision
+    //                                                    (and the redo harness's
+    //                                                    tile stamp, row S)
+    //   commitWrites' `allowCow` DOC-LOCAL TAIL        — NOTHING drove it
+    //
+    // The third is the one PASTE, CUT, SELECTION MOVE and all SEVEN TRANSFORMS
+    // share: every one of them calls `commitWrites(writes, true)` and lands in
+    // the same tail. `Flip horizontal` is driven here because it is the cheapest
+    // to dispatch as a REAL gesture — one click on the options bar's own button,
+    // through the app's `pendingAction` handler — and needs no clipboard, no
+    // marquee and no second document to be set up first. The other six
+    // transforms, paste, cut and selection move stay DERIVED, and the packet
+    // says so rather than reading this row as covering them.
+    //
+    // ⚠ THE WITNESS IS THE DOCUMENT'S FIRST ROW OF CELLS, not a canvas hash and
+    // not one pixel. A horizontal flip MOVES art across cells, so a single
+    // sampled pixel can come back to the same value by coincidence; and the
+    // canvas is a picture of a document whose atlas-backed cells are drawn from
+    // the zone tileset, which is the instrument trap both earlier packets hit.
+    console.log('\n══ ROW F — a TRANSFORM (Flip horizontal): the allowCow doc-local tail ══');
+    const docRow = () => c.json('(() => Array.from({ length: '
+      + `${plan.widthTiles} }, (_, i) => window.__dbg.aeon.artDocCellAt(i, 0)))()`);
+    const fRow0 = await docRow();
+    const fZone0 = await zoneHash();
+    const fBtn = await clickSelector('button[title="Flip horizontal"]');
+    await sleep(900);
+    await park(c);
+    const fRow1 = await docRow();
+    const fZone1 = await zoneHash();
+    const fChip = await chip();
+    console.log(`        [F] first row of cells changed: ${JSON.stringify(fRow0) !== JSON.stringify(fRow1)}`);
+    console.log(`        [F] zoneArtHash ${fZone0} -> ${fZone1}`);
+    check('F0', 'the options bar offers the Flip horizontal control [precondition]',
+      fBtn !== null, `button[title="Flip horizontal"] -> ${JSON.stringify(fBtn)}`);
+    check('F1', 'the transform LANDS on the chunk document [precondition]',
+      JSON.stringify(fRow0) !== JSON.stringify(fRow1),
+      `cells (0..${plan.widthTiles - 1},0) before: ${JSON.stringify(fRow0).slice(0, 160)}…\n`
+      + `        after:  ${JSON.stringify(fRow1).slice(0, 160)}…`);
+    check('F2', 'the transform leaves the zone-art witness off every rung of the ladder',
+      ![ZONE_START, ZONE_ONE, ZONE_TWO].includes(fZone1),
+      `zoneArtHash ${fZone0} -> ${fZone1} `
+      + `(ladder start=${ZONE_START}, edit1=${ZONE_ONE}, edit2=${ZONE_TWO}); `
+      + `${fZone1 === fZone0 ? 'UNMOVED — every flipped tile deduped flip-aware against the atlas'
+        : 'moved — tiles were appended'}`);
+    check('F3', 'the transform ENABLES Undo, so it recorded a step',
+      fChip.disabled === false, `Undo chip disabled=${fChip.disabled}, canUndo()=${await canUndo()}`);
+    await ctrlZ();
+    const fRow2 = await docRow();
+    const fZone2 = await zoneHash();
+    console.log(`        [F] Ctrl+Z -> first row restored: ${JSON.stringify(fRow2) === JSON.stringify(fRow0)}`
+      + `   zoneArtHash ${fZone1} -> ${fZone2}`);
+    check('F4', 'THE ROW: Ctrl+Z takes back the TRANSFORM — the document\'s first row of cells '
+      + 'is byte-for-byte what it was before it, and the zone art is back where the transform '
+      + 'found it',
+      JSON.stringify(fRow2) === JSON.stringify(fRow0) && fZone2 === fZone0,
+      `first row restored: ${JSON.stringify(fRow2) === JSON.stringify(fRow0)}; `
+      + `zoneArtHash ${fZone1} -> ${fZone2}, want ${fZone0}`);
+    await shot(c, 'F-transform-after-ctrl-z');
 
     console.log('\n══ SUMMARY ═════════════════════════════════════════════════');
     console.log(`  chunk under test: ${CHUNK_ID} (${chunkMeta?.name}), `
