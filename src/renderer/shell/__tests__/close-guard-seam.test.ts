@@ -210,7 +210,7 @@ describe('the window-close seam, both halves joined', () => {
     expect(useEditorStore.getState().dirty).toBe(true);     // the work was never saved
   });
 
-  it('CONTROL: no bridge at all is the documented no-op, not drift — and does not throw', () => {
+  it('CONTROL: no bridge at all is the documented no-op, not drift, and does not throw', () => {
     // The node suite and any non-Electron host. Reporting this as drift would
     // make the loud case indistinguishable from the ordinary one. (The old code
     // claimed to no-op here and would have thrown: `window` is undefined in this
