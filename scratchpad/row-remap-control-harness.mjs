@@ -485,10 +485,10 @@ const PRECONDITIONS = (layer) => String.raw`
  * these returning a button count: they say whether the click LANDED, so a red
  * row that never opened can be told from a red row whose sentence is gone.
  */
-const EXPAND_WHYS = (layer) => String.raw`
+const EXPAND_WHYS = (layer, kind = 'precondition') => String.raw`
 (() => {
-  const cards = [...document.querySelectorAll(
-    '[data-testid="layer-' + ${layer} + '-rowremap-precondition"]')];
+  const cards = [...document.querySelectorAll(${JSON.stringify(`[data-testid$="-rowremap-${kind}"]`)})]
+    .filter((c) => c.getAttribute('data-testid').startsWith('layer-' + ${layer} + '-'));
   const buttons = cards.flatMap((c) => [...c.querySelectorAll('button[aria-expanded]')]);
   let clicked = 0;
   for (const b of buttons) {
@@ -497,16 +497,53 @@ const EXPAND_WHYS = (layer) => String.raw`
   return { cards: cards.length, buttons: buttons.length, clicked };
 })()`;
 
-/** What the disclosures on one strip's preconditions say AFTER the re-render. */
-const WHY_STATE = (layer) => String.raw`
+/** What the disclosures of one kind on one strip say AFTER the re-render. */
+const WHY_STATE = (layer, kind = 'precondition') => String.raw`
 (() => {
-  const buttons = [...document.querySelectorAll(
-    '[data-testid="layer-' + ${layer} + '-rowremap-precondition"]')]
+  const buttons = [...document.querySelectorAll(${JSON.stringify(`[data-testid$="-rowremap-${kind}"]`)})]
+    .filter((c) => c.getAttribute('data-testid').startsWith('layer-' + ${layer} + '-'))
     .flatMap((c) => [...c.querySelectorAll('button[aria-expanded]')]);
   return {
     buttons: buttons.length,
     expanded: buttons.map((b) => b.getAttribute('aria-expanded')),
     allOpen: buttons.length > 0 && buttons.every((b) => b.getAttribute('aria-expanded') === 'true'),
+  };
+})()`;
+
+/**
+ * THE SHAPE OF ONE WHOLE PROSE BLOCK, found by its own testid.
+ *
+ * ⚠ WHY NOT `PAINTED_LEAF`. That one finds the deepest node carrying a NEEDLE,
+ * which is the right subject for "are these words on screen" and the wrong one
+ * for "does this block fit in its box": a block split into a diagnosis, a
+ * disclosure button and a remedy has no single leaf holding all of it, so a leaf
+ * measurement would report one paragraph of a block and call it the block. Row
+ * [5b2] asks about the BLOCK, so it measures the advisory root — the node
+ * `Advisory` puts its testid on, for the reason its own prop comment gives.
+ *
+ * `found` is reported rather than assumed. A block that is not on the page has
+ * no height and would satisfy every containment test ever written, so the row
+ * that uses this gates on `found === 1` and the words are [5b]'s to prove.
+ */
+const BLOCK_SHAPE = (testid) => String.raw`
+(() => {
+  const nodes = [...document.querySelectorAll(${JSON.stringify(`[data-testid="${testid}"]`)})];
+  if (nodes.length !== 1) return { found: nodes.length };
+  const el = nodes[0];
+  el.scrollIntoView({ block: 'center' });
+  let sc = el.parentElement;
+  while (sc && !(sc.scrollHeight > sc.clientHeight + 1)) sc = sc.parentElement;
+  const b = el.getBoundingClientRect();
+  const cb = sc ? sc.getBoundingClientRect() : null;
+  const hit = document.elementFromPoint(
+    Math.round(b.left + b.width / 2), Math.round(b.top + b.height / 2));
+  return {
+    found: 1, text: (el.innerText || '').trim(),
+    rect: { top: Math.round(b.top), bottom: Math.round(b.bottom) },
+    scroller: cb ? { top: Math.round(cb.top), bottom: Math.round(cb.bottom) } : null,
+    insideScroller: !!(cb && b.top >= cb.top - 1 && b.bottom <= cb.bottom + 1),
+    tallerThanScroller: !!(cb && (b.bottom - b.top) > (cb.bottom - cb.top)),
+    hitInside: !!(hit && (hit === el || el.contains(hit) || hit.contains(el))),
   };
 })()`;
 
@@ -903,55 +940,99 @@ async function main() {
     // the old row asked — the sentence must still carry the ceiling, and must now
     // also name the second enforcer, so an app that quietly drops the second
     // enforcer from the sentence reddens this row.
+    //
+    // ⚠ AND IT NOW LEARNS TO CLICK, FOR [6a]'S RULED REASON AND NOT TO BE
+    // SATISFIED. The mechanism half of this refusal moved behind the same
+    // "Why this happens" disclosure the preconditions use, because as ONE
+    // paragraph the block did not fit its box — that is [5b2] below, and the
+    // fix for it. So the pair is the same discriminating one [6a] runs:
+    //
+    //   (1) the DIAGNOSIS is painted under the control, unclicked, carrying the
+    //       contract's own range;
+    //   (2) the ENFORCEMENTS clause is NOT painted while the disclosure is shut
+    //       — `hitInside`, never `leaf`: `innerText` on a `display:none` node
+    //       falls back to `textContent`, so the folded sentence is findable by
+    //       text while invisible;
+    //   (3) after the click it IS painted, naming the other enforcer.
+    //
+    // Read together these cannot be satisfied by finding a container: (2) fails
+    // if the clause was on screen all along, (3) fails if it never arrives, and
+    // both needles are still DERIVED from the vendored contract.
+    //
+    // ⚠ EVERY SHUT MEASUREMENT IS TAKEN BEFORE THE CLICK, INCLUDING [5b2]'S,
+    // which is printed after this row but measured above it. A block measured
+    // after its own disclosure was opened is a different block.
+    const overShape = await c.json(BLOCK_SHAPE(`layer-${CURVED}-rowremap-planey-refusal`));
+    const overDiag = await c.json(
+      PAINTED_LEAF(`${PLANE_Y.minimum}..${PLANE_Y.maximum}`, RR_BOX(CURVED)));
+    const overShut = await c.json(PAINTED_LEAF(CEILING_ENFORCEMENTS, RR_BOX(CURVED), { ci: true }));
+    const overClicked = await c.json(EXPAND_WHYS(CURVED, 'planey-refusal'));
+    await sleep(350);
+    const overOpened = { ...overClicked, ...(await c.json(WHY_STATE(CURVED, 'planey-refusal'))) };
     const overWhy = await c.json(PAINTED_LEAF(CEILING_ENFORCEMENTS, RR_BOX(CURVED), { ci: true }));
     const overWhyText = (overWhy.text ?? '').toLowerCase();
     check('5b', `and the PAINTED reason says this bound is ${CEILING_ENFORCEMENTS} of the ceiling, `
-      + `naming ${OTHER_ENFORCER.actor}'s ${OTHER_ENFORCER.qualifier} guard as the other`,
-      overWhy.leaf === true && overWhy.centreInScroller === true && overWhy.hitInside === true
+      + `naming ${OTHER_ENFORCER.actor}'s ${OTHER_ENFORCER.qualifier} guard as the other `
+      + '— the range on screen, the enforcements behind the disclosure: shut, then open',
+      overDiag.leaf === true && overDiag.centreInScroller === true
+      && overDiag.hitInside === true && overDiag.afterControl === true
+      && overShut.hitInside === false
+      && overOpened.allOpen === true
+      && overWhy.leaf === true && overWhy.centreInScroller === true && overWhy.hitInside === true
       && overWhy.afterControl === true
-      && overWhy.text.includes(String(PLANE_Y.maximum))
       && overWhyText.includes(OTHER_ENFORCER.actor.toLowerCase())
       && overWhyText.includes(OTHER_ENFORCER.qualifier.toLowerCase()),
-      `${JSON.stringify(overWhy)}\n        wanted, ALL DERIVED FROM THE VENDORED CONTRACT: the `
-      + `phrase "${CEILING_ENFORCEMENTS}", the ceiling ${PLANE_Y.maximum}, and the other `
-      + `enforcer named by owner ("${OTHER_ENFORCER.actor}") and place `
-      + `("${OTHER_ENFORCER.qualifier}") — the contract's own second member is `
-      + `"${OTHER_ENFORCER.clause}"`);
+      `(1) range on screen, unclicked: ${JSON.stringify(overDiag)}`
+      + `\n        (2) enforcements SHUT (findable by text, NOT painted): ${JSON.stringify(overShut)}`
+      + `\n        (3) disclosure: ${JSON.stringify(overOpened)}`
+      + `\n            enforcements OPEN: ${JSON.stringify(overWhy)}`
+      + '\n        wanted, ALL DERIVED FROM THE VENDORED CONTRACT: the range '
+      + `${PLANE_Y.minimum}..${PLANE_Y.maximum} on screen, and behind the disclosure the phrase `
+      + `"${CEILING_ENFORCEMENTS}" with the other enforcer named by owner `
+      + `("${OTHER_ENFORCER.actor}") and place ("${OTHER_ENFORCER.qualifier}") — the contract's `
+      + `own second member is "${OTHER_ENFORCER.clause}"`);
 
     // ⚠ THE OTHER HALF [5b] USED TO CARRY SILENTLY, NOW A ROW OF ITS OWN — AND
-    // IT IS AN APP FINDING, LEFT RED ON PURPOSE.
+    // THE APP FINDING IT WAS LEFT RED FOR IS FIXED.
     //
     // Strict containment was one clause among five in [5b], so when this block
     // grew taller than its own box the row went red beside four green clauses
     // and read as "the sentence is wrong". It is not: the words are right (the
-    // row above measures them). The BLOCK does not fit. Recorded once before, at
-    // f872db04, as a rect 504..735 in a scroller 545..694 and never booked;
-    // measured again here, and the numbers this row prints are its evidence.
+    // row above measures them). The BLOCK did not fit. Recorded once at
+    // f872db04 as a rect 504..735 in a scroller 545..694 and never booked, then
+    // measured again at 280px in a scroller 129px tall and booked as an app
+    // change out of that parcel's scope.
     //
-    // It is over the app's OWN bar. `Advisory`'s docblock (EW-LAYER-CARD-SCROLLER)
+    // The bar is the app's OWN. `Advisory`'s docblock (EW-LAYER-CARD-SCROLLER)
     // rules that a prose block in a layer card taller than the section's floor —
-    // 129px, floor minus header, the smallest box the shell may ever give it — is
+    // floor minus header, the smallest box the shell may ever give it — is
     // "a paragraph no scroll position shows whole", and converted the two blocks
-    // it measured at 165px. This one is not a standing block so a static census
-    // would not have seen it: it is composed at refusal time by `NumberField`,
+    // it measured for it. This one was not a standing block so a static census
+    // could not have seen it: it is composed at refusal time by `NumberField`,
     // which appends the ALREADY-MOVED warning to the provider's refusal — and
     // EVERY refusal here carries that tail, because every prefix of a number past
     // the ceiling is itself a legal plane line and commits on the way.
     //
-    // ⚠ FIXING IT IS AN APP CHANGE AND IS OUT OF THIS PARCEL. Booked, not
-    // quietly satisfied: the row stays red and says what it is.
-    check('5b2', 'APP FINDING, LEFT RED: and that reason FITS IN THE BOX it is painted in',
-      overWhy.insideScroller === true && overWhy.tallerThanScroller === false,
-      (overWhy.leaf !== true
-        ? 'NO LEAF — the sentence was not found at all, so this row is reporting [5b]\'s subject '
-          + 'and not its own. Read [5b] first: a missing sentence is not a shape defect.'
-        : `leaf ${overWhy.rect.bottom - overWhy.rect.top}px in a scroller `
-          + `${overWhy.scroller ? overWhy.scroller.bottom - overWhy.scroller.top : '?'}px tall `
-          + `(${JSON.stringify(overWhy.rect)} vs ${JSON.stringify(overWhy.scroller)}). This says `
-          + 'NOTHING about the sentence\'s words — [5b] is the row that measures those, and this '
-          + 'one is about the BLOCK being taller than the smallest box the shell may give it. '
-          + 'That is the bar Advisory\'s own docblock sets (EW-LAYER-CARD-SCROLLER) and the two '
-          + '165px row-remap blocks were converted for. An APP change, out of this parcel.'));
+    // ⚠ THE SUBJECT IS THE BLOCK, SO THE MEASUREMENT IS THE BLOCK'S OWN ROOT and
+    // not a leaf inside it: split across a diagnosis, a disclosure button and a
+    // remedy, no single leaf holds the whole advisory, and a leaf reading would
+    // report one paragraph and call it the block. `found === 1` is a gate and not
+    // a note — an advisory that is not on the page fits every box there is.
+    check('5b2', 'and that reason FITS IN THE BOX it is painted in',
+      overShape.found === 1
+      && overShape.insideScroller === true && overShape.tallerThanScroller === false,
+      (overShape.found !== 1
+        ? `NO BLOCK: ${overShape.found} node(s) carry the advisory's testid, so this row is `
+          + 'reporting its own absence and not its subject. The advisory is only mounted while a '
+          + 'value stands refused; read [5a] and [5b] first, because a block that is not there '
+          + 'fits every box there is.'
+        : `block ${overShape.rect.bottom - overShape.rect.top}px in a scroller `
+          + `${overShape.scroller ? overShape.scroller.bottom - overShape.scroller.top : '?'}px `
+          + `tall (${JSON.stringify(overShape.rect)} vs ${JSON.stringify(overShape.scroller)}), `
+          + `measured SHUT. This says NOTHING about the sentence's words — [5b] is the row that `
+          + 'measures those, and this one is about the BLOCK against the smallest box the shell '
+          + 'may give it. That is the bar Advisory\'s own docblock sets '
+          + `(EW-LAYER-CARD-SCROLLER).\n        text, shut: ${JSON.stringify(overShape.text)}`));
 
     // ANTI-VACUOUS FLOOR: without this every refusal row above is satisfied by
     // a box that accepts nothing at all.
