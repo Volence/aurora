@@ -200,12 +200,37 @@
 // harness controls or should ever have been able to see.
 //
 // ⚠ AND IT IS A SAFETY PROPERTY, NOT AN ACCURACY ONE. These harnesses DO
-// create BrowserWindows. A window-less probe was used deliberately so that
-// measuring this could not put anything on a screen the owner is using, so
-// what a *windowed* run does is INFERRED here and not measured: an Electron
-// attached to his compositor is one `show` away from his desktop. Nothing in
-// this file should be read as having tested that, and nobody should test it
-// while he is logged in.
+// create BrowserWindows, and an Electron attached to his compositor is one
+// `show` away from his desktop.
+//
+// ── THE WINDOWED CASE IS NO LONGER INFERRED (2026-09-09) ──────────────────
+//
+// This block used to end by saying that a *windowed* run was inferred here and
+// not measured, because the probe above is deliberately window-less. That gap
+// is closed, in the direction that matters, by
+// `scratchpad/surface-isolation-proof.mjs` (`npm run harness:surface-isolation`):
+//
+//   MEASURED — a real Aurora, windowed, launched through `spawnGuarded` under
+//   `xvfb-run -s '-screen 0 1001x777x24'`, is ON OUR XVFB. python-xlib on that
+//   display reports screen 1001x777 with the app's window id 2097155,
+//   1000x776+0+0, viewable, `WM_NAME` "Aurora", `WM_CLASS` electron/Electron —
+//   and the whole 11-process tree holds display-server sockets for
+//   `/tmp/.X11-unix/X101` ONLY, with no connection to `$XDG_RUNTIME_DIR/wayland-0`
+//   from any process in it.
+//
+// WHAT IS STILL NOT MEASURED, AND MUST NOT BE. The other half — what an
+// UNPINNED windowed run does — remains untested and is to stay that way while
+// he is logged in. The RED rows in that proof are window-less for exactly the
+// reason this probe is, and its [s1] row is an INTERLOCK: it checks the argv
+// about to carry a window for this flag, in the position Chromium parses, and
+// REFUSES the windowed rows rather than launching when the pin is missing.
+//
+// ⚠ AND THE ENVIRON READ IS NOT THE INSTRUMENT. `delete env.DISPLAY` is the
+// gesture this hazard is about, and the same proof's [r2] row shows why no
+// check may read the variables back: with DISPLAY *and* WAYLAND_DISPLAY both
+// deleted, an environment audit of the running app reads perfectly clean while
+// the socket census finds two live connections to the compositor. An environ
+// read states an intent; only the fd table states what took effect.
 //
 // ── HOW A HARNESS USES THIS ────────────────────────────────────────────────
 //
@@ -223,9 +248,11 @@
 // `finally` is still worth writing: it is graceful (SIGTERM, grace, SIGKILL),
 // where the exit-handler net has to be synchronous and blunt.
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { readdirSync, readFileSync, writeFileSync, rmSync, existsSync, mkdirSync } from 'node:fs';
+import {
+  readdirSync, readFileSync, readlinkSync, writeFileSync, rmSync, existsSync, mkdirSync,
+} from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -590,15 +617,320 @@ function stillRunningAs(pid, argv) {
  * `:0` anyway. Bar 2d cause (ii) — two code paths, one observable.
  */
 export function boundSocketPaths(path = '/proc/net/unix') {
+  const t = unixSocketTable(path);
+  return t === null ? null : t.paths;       // UNKNOWN propagates. Never an empty Set.
+}
+
+/**
+ * ONE READER, TWO VIEWS. `/proc/net/unix` parsed once, into both the shape the
+ * X reaper wants (a Set of bound paths) and the shape the SURFACE check wants
+ * (inode -> path), because a second reader is a second place for the
+ * fail-open bug above to come back. Returns `null` — never an empty table —
+ * when the file cannot be read, and `boundSocketPaths` inherits that.
+ *
+ * ⚠ WHICH SIDE OF A CONNECTION CARRIES THE PATH — AND THE FIRST ANSWER WAS
+ * BACKWARDS, WHICH IS WHY IT IS WRITTEN OUT HERE. A node server bound to a
+ * scratch path, with one client connected, puts THREE rows in this table:
+ *
+ *     St 01 inode A  /…/probe.sock     the LISTENING socket
+ *     St 03 inode B  (no path)         one end
+ *     St 03 inode C  /…/probe.sock     the other end
+ *
+ * Read off inode ORDER, B looked like the accepted end and C like the client,
+ * so a first draft of the surface check concluded "a client keeps the path it
+ * connected to" and resolved fds straight out of this table. IT IS THE OTHER
+ * WAY ROUND. `unix_stream_connect` copies the LISTENER's address onto the
+ * newly ACCEPTED socket; the connecting client's own socket is never bound and
+ * carries no address at all.
+ *
+ * MEASURED, 2026-09-09, on the real thing rather than on the toy: a window-less
+ * Electron launched the pre-2026-08-30 way put two fresh
+ * `/run/user/1000/wayland-0` rows in this table — and NOT ONE fd anywhere in
+ * our own process tree pointed at either of them, on eight samples over 20
+ * seconds. Those two rows are the COMPOSITOR's accepted ends. The escaping
+ * app's own fds were `St 03` rows with no path, indistinguishable from the
+ * dozen mojo socketpairs beside them.
+ *
+ * ⚠ SO A CHECK BUILT ON THIS TABLE ALONE GOES GREEN OVER AN ESCAPED APP. That
+ * is the fail-open shape this module is named after, one level along: not "I
+ * could not look" reported as "nothing there", but "I looked at the wrong end
+ * of the connection" reported as "nothing there". `unixPeerMap` below is the
+ * missing half, and `surfaceCensus` refuses to answer without it.
+ */
+export function unixSocketTable(path = '/proc/net/unix') {
   let text;
   try { text = readFileSync(path, 'utf8'); }
-  catch { return null; }                    // UNKNOWN. Never an empty Set.
-  const out = new Set();
+  catch { return null; }                    // UNKNOWN. Never an empty table.
+  const paths = new Set();
+  const byInode = new Map();
   for (const line of text.split('\n')) {
-    const p = line.trim().split(/\s+/)[7];
-    if (p) out.add(p.replace(/^@/, ''));
+    const f = line.trim().split(/\s+/);
+    const inode = f[6];
+    if (!/^\d+$/.test(inode ?? '')) continue;   // header, or a short line
+    const p = f[7];
+    // EVERY unix socket gets an entry, pathless ones included (`''`). "this
+    // inode is a unix socket with no path" and "this inode is not a unix
+    // socket at all" are different answers and a caller needs to tell them
+    // apart — the same failure-state/success-state rule as the `null` above,
+    // one level down.
+    const clean = p ? p.replace(/^@/, '') : '';
+    byInode.set(inode, clean);
+    if (clean) paths.add(clean);
   }
-  return out;
+  return { paths, byInode };
+}
+
+/**
+ * inode -> PEER inode, for every unix socket on the box, from `ss -x -a -n`
+ * (the kernel's `unix_diag` netlink table). Returns `null` — never an empty
+ * Map — when `ss` is missing or fails.
+ *
+ * WHY A SECOND READER EXISTS AT ALL, having just said one reader is the rule.
+ * `/proc/net/unix` publishes the ADDRESS of each socket and nothing about who
+ * it is joined to, and the docstring above measures why that is not enough: the
+ * connecting end of a unix stream has no address, so the only way from "this
+ * app holds fd 41" to "…and fd 41 is a connection to the compositor" is the
+ * PEER. `/proc` does not expose it; `unix_diag` does, and `ss` is its reader.
+ * The path itself still comes from `unixSocketTable` — this map answers one
+ * question only, so there is no second place where a path can be spelled
+ * differently.
+ *
+ * We read a kernel table. Nothing here opens, signals, stats or enumerates
+ * anything belonging to the owner's session: the compositor's accepted socket
+ * appears in it the same way our own do, as a number in a list.
+ */
+export function unixPeerMap() {
+  let r;
+  try {
+    r = spawnSync('ss', ['-x', '-a', '-n'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  } catch { return null; }
+  if (r.error || r.status !== 0 || typeof r.stdout !== 'string') return null;
+  const m = new Map();
+  for (const line of r.stdout.split('\n').slice(1)) {
+    const f = line.trim().split(/\s+/);
+    if (f.length < 8) continue;
+    const [li, pi] = [f[5], f[7]];
+    if (/^\d+$/.test(li) && /^\d+$/.test(pi) && pi !== '0') m.set(li, pi);
+  }
+  return m.size ? m : null;      // a parse that matched nothing is a FAILURE to read
+}
+
+/**
+ * The unix-socket paths a Wayland client on THIS box would connect to.
+ *
+ * ⚠ DERIVED FROM OUR OWN INHERITED ENVIRONMENT, AND FROM NOTHING ELSE. The
+ * owner's compositor is on the other side of the boundary this whole module
+ * defends, so the path is learned the one way that stays on our side: the
+ * `XDG_RUNTIME_DIR` and `WAYLAND_DISPLAY` that `{ ...process.env }` already
+ * copied into every harness. His runtime directory is never listed, globbed or
+ * stat'd to find sockets we were not already told about.
+ *
+ * BOTH the variable and the literal, because HAZARD 5 measured that hiding the
+ * variable hides nothing: libwayland's `wl_display_connect(NULL)` falls back to
+ * the literal name `wayland-0` under `$XDG_RUNTIME_DIR`. A check that only
+ * knew `$WAYLAND_DISPLAY` would go clean against exactly the fallback the
+ * hazard note exists to warn about.
+ *
+ * Returns `[]` when there is no runtime dir to join against — and a caller must
+ * treat that as "I have no compositor path to test for", NOT as "clean".
+ */
+export function compositorSocketPaths(env = process.env) {
+  const dir = env.XDG_RUNTIME_DIR;
+  const names = new Set(['wayland-0']);           // the libwayland fallback, always
+  const wd = env.WAYLAND_DISPLAY;
+  if (wd && wd.startsWith('/')) return [wd, ...(dir ? [join(dir, 'wayland-0')] : [])];
+  if (wd) names.add(wd);
+  if (!dir) return [];
+  return [...names].map((n) => join(dir, n));
+}
+
+// ── HAZARD 5b: ISOLATE THE SURFACE, NOT THE PROCESS ────────────────────────
+//
+// The suite's shared isolation proof asks *"is there nothing on `:0`?"* On a
+// Wayland desktop that reads CLEAN during the exact escape it is meant to
+// catch: the oracle lane's 2026-08-29 record has `DISPLAY=:91` set, the window
+// ON THE OWNER'S REAL SCREEN, a log line saying `Wayland window`, and
+// python-xlib finding ZERO windows on the Xvfb — all four at once. "Nothing on
+// :0" was true and meant nothing, because the escape route was not X11.
+//
+// So the question these three functions answer is not "which display variable
+// did we set" but **"which display-server sockets is this process tree actually
+// holding open right now"**. An environ read is a statement of INTENT; it
+// cannot distinguish "I set this" from "this took effect", and HAZARD 5 is
+// precisely a case where the two came apart.
+
+/**
+ * Every unix-socket path held open by the process tree under `rootPid`,
+ * per process, resolved through `/proc/<pid>/fd` -> inode -> `/proc/net/unix`.
+ *
+ * ⚠ IT REPORTS ITS OWN BLINDNESS, and that is the point of the shape rather
+ * than a courtesy. `boundSocketPaths` once returned an empty Set for "I could
+ * not read the table", so "I could not look" and "I looked and found nothing"
+ * were the same value and a refusal silently inverted into a permission. The
+ * same inversion is available here twice over — an unreadable socket table, and
+ * an unreadable `/proc/<pid>/fd` — and both would look exactly like an app
+ * holding no compositor connection, i.e. like a PASS. So:
+ *
+ *   · `table === null`            -> `blind`, with a reason. Never an empty census.
+ *   · `/proc/<pid>/fd` EACCES     -> `blind`, naming the pid.
+ *   · `/proc/<pid>` gone entirely -> `vanished`, which is NOT blindness: a pid
+ *                                    that exited holds nothing, and that is an
+ *                                    answer rather than a failure to look.
+ *
+ * An fd whose inode is absent from the unix table is recorded as `unresolved`
+ * and is NOT blindness either: it is the ordinary shape of a TCP socket (the
+ * CDP port, for one), a netlink socket or an eventfd-ish socket that never had
+ * a unix row. A unix socket CONNECTED TO A PATHNAME always carries that path in
+ * its own row — measured, see `unixSocketTable` — so an unresolved inode cannot
+ * be a hidden compositor connection.
+ */
+export function surfaceCensus(rootPid, {
+  table = unixSocketTable(),
+  peers = unixPeerMap(),
+  // INJECTABLE so a proof can drive the EACCES branch below for real, on a
+  // path that genuinely refuses us, instead of asserting it from a hand-built
+  // census. A gate nobody has watched fire is not evidence — the same reason
+  // `reapDisplays` takes its `bound` set.
+  readFds = (pid) => readdirSync(`/proc/${pid}/fd`),
+} = {}) {
+  const processes = [];
+  const blindReasons = [];
+  const out = (extra = {}) => ({ blind: true, blindReasons, processes, pids: [], unresolved: 0, ...extra });
+  if (table === null) {
+    blindReasons.push('/proc/net/unix could not be read, so no socket inode can be given a path '
+      + 'and "holds no compositor connection" has NO ANSWER here');
+    return out();
+  }
+  if (peers === null) {
+    blindReasons.push('the unix_diag peer table could not be read (`ss -x -a -n`), and WITHOUT IT '
+      + 'A CONNECTED CLIENT IS INVISIBLE: the connecting end of a unix stream carries no address, '
+      + 'so an escaped app would look exactly like a clean one. Refusing to answer');
+    return out();
+  }
+  if (!Number.isInteger(rootPid)) {
+    blindReasons.push('no root pid was given, so there is no tree to walk');
+    return out();
+  }
+  const pids = descendants(rootPid);
+  let unresolved = 0;
+  for (const pid of pids) {
+    if (pid === process.pid) continue;         // the harness is not the app
+    const entry = { pid, argv: cmdlineOf(pid), sockets: [], vanished: false, unreadableFd: null };
+    let fds;
+    try { fds = readFds(pid); }
+    catch (e) {
+      if (!existsSync(`/proc/${pid}`)) { entry.vanished = true; processes.push(entry); continue; }
+      entry.unreadableFd = String(e?.code ?? e);
+      blindReasons.push(`/proc/${pid}/fd is unreadable (${entry.unreadableFd}) while /proc/${pid} `
+        + 'still exists, so what that process holds open is UNKNOWN, not empty');
+      processes.push(entry);
+      continue;
+    }
+    for (const fd of fds) {
+      let link;
+      try { link = readlinkSync(`/proc/${pid}/fd/${fd}`); }
+      catch { continue; }                      // fd closed between readdir and readlink
+      const m = /^socket:\[(\d+)\]$/.exec(link);
+      if (!m) continue;
+      const inode = m[1];
+      // TWO WAYS A PATH CAN BE OURS, and the second one is the whole point:
+      //   direct — we are the listener or the accepted end, so our own row
+      //            carries the address (this is how the Xvfb shows up);
+      //   peer   — we are the CONNECTING end, whose row has no address at all,
+      //            so the address is on the socket we are joined to (this is
+      //            how an escaped Electron shows up, and the only way it does).
+      const direct = table.byInode.get(inode);
+      const peerInode = peers.get(inode);
+      const viaPeer = peerInode ? table.byInode.get(peerInode) : undefined;
+      const path = (direct || '') || (viaPeer || '');
+      if (!path) {
+        // In the table with no address at either end (a socketpair), or not a
+        // unix socket at all (TCP, netlink). Neither can be a path connection.
+        if (direct === undefined && viaPeer === undefined) unresolved++;
+        continue;
+      }
+      entry.sockets.push({ fd, inode, path, via: direct ? 'direct' : 'peer', peerInode: peerInode ?? null });
+    }
+    processes.push(entry);
+  }
+  return { blind: blindReasons.length > 0, blindReasons, processes, pids, unresolved };
+}
+
+/** Is this process the X server we started, rather than a client of it? */
+export const isXvfbProcess = (argv) => /(^|\/)Xvfb( |$)/.test(argv ?? '');
+
+/** `/tmp/.X11-unix/X<n>` — the socket an X client on display `:n` holds. */
+export const xSocketPath = (n) => `/tmp/.X11-unix/X${n}`;
+
+/**
+ * Turn a census into a verdict about the SURFACE: is every display-server
+ * socket this tree holds one we started?
+ *
+ * Three outcomes and they are three, not two:
+ *
+ *   ISOLATED  every display-server socket held is `xSocketPath(ourDisplay)`,
+ *             and A PROCESS THAT IS NOT THE X SERVER ITSELF holds one.
+ *             Presence is required, and the exclusion is not pedantry: the
+ *             Xvfb we launched is inside our own tree and holds its own
+ *             listening socket, so a verdict that counted it went green over a
+ *             run in which the APP attached to the compositor and never spoke
+ *             to the Xvfb at all — which is exactly what the RED run does.
+ *   ESCAPED   some process holds a compositor socket, or an X socket for a
+ *             display we did not start. Loud, with pid and path.
+ *   UNKNOWN   the census is blind, or `ourDisplay` is unknown, or there is no
+ *             compositor path to test against (no XDG_RUNTIME_DIR). NEVER a
+ *             pass. An unanswerable question does not become a clean one.
+ */
+export function surfaceVerdict(census, {
+  ourDisplay = null,
+  compositor = compositorSocketPaths(),
+} = {}) {
+  const reasons = [];
+  const escapes = [];
+  const ours = [];
+  if (census.blind) reasons.push(...census.blindReasons);
+  if (!Number.isInteger(ourDisplay)) {
+    reasons.push('the display number of our own Xvfb is unknown, so "the only X socket held is '
+      + 'ours" cannot be evaluated — an unattributed socket is not a safe one');
+  }
+  if (compositor.length === 0) {
+    reasons.push('no compositor socket path could be derived from XDG_RUNTIME_DIR/WAYLAND_DISPLAY, '
+      + 'so "holds no compositor connection" was never actually tested');
+  }
+  const ourSock = Number.isInteger(ourDisplay) ? xSocketPath(ourDisplay) : null;
+  const comp = new Set(compositor);
+  for (const p of census.processes) {
+    for (const s of p.sockets) {
+      if (comp.has(s.path)) {
+        escapes.push({ pid: p.pid, path: s.path, kind: 'COMPOSITOR', argv: p.argv });
+      } else if (/^\/tmp\/\.X11-unix\/X\d+$/.test(s.path)) {
+        if (ourSock && s.path === ourSock) {
+          ours.push({ pid: p.pid, path: s.path, server: isXvfbProcess(p.argv), via: s.via });
+        } else {
+          escapes.push({ pid: p.pid, path: s.path, kind: 'FOREIGN X DISPLAY', argv: p.argv });
+        }
+      }
+    }
+  }
+  const clients = ours.filter((o) => !o.server);
+  if (escapes.length) return { verdict: 'ESCAPED', escapes, ours, clients, reasons };
+  if (reasons.length) return { verdict: 'UNKNOWN', escapes, ours, clients, reasons };
+  if (clients.length === 0) {
+    return {
+      verdict: 'UNKNOWN',
+      escapes,
+      ours,
+      clients,
+      reasons: [ours.length
+        ? 'the only holder of our X socket is the X SERVER WE STARTED — no client in the tree is '
+          + 'attached to it. An Xvfb holding its own listening socket is not evidence that the app '
+          + 'went there, and this is precisely the shape the RED run takes'
+        : 'the tree holds NO display-server socket at all — not even ours. An app that never '
+          + 'attached to anything is not an isolated app, it is an app that did not start, and a '
+          + 'clean absence here would be the vacuous pass this whole file is about'],
+    };
+  }
+  return { verdict: 'ISOLATED', escapes, ours, clients, reasons };
 }
 
 /**
