@@ -1,0 +1,129 @@
+{
+  "dpr": 1,
+  "rows": [
+    {
+      "id": "B",
+      "label": "LIVE-TILE path — atlas tile opened in place, pencil stroke",
+      "before": 1523021819,
+      "afterPaint": 3126058246,
+      "afterZ": 1523021819,
+      "undone": true,
+      "chipBefore": {
+        "present": true,
+        "disabled": true
+      },
+      "chipAfter": {
+        "present": true,
+        "disabled": false
+      },
+      "chipZ": {
+        "present": true,
+        "disabled": true
+      },
+      "canUndoBefore": false,
+      "canUndoAfter": true,
+      "aimed": {
+        "ax": 702,
+        "ay": 457,
+        "dp": {
+          "px": 1,
+          "py": 1
+        }
+      },
+      "zoom": 8
+    },
+    {
+      "id": "A",
+      "label": "DOC-LOCAL path — New Tile 1x1, pencil stroke",
+      "before": 1523021819,
+      "afterPaint": 524852502,
+      "afterZ": 524852502,
+      "undone": false,
+      "chipBefore": {
+        "present": true,
+        "disabled": true
+      },
+      "chipAfter": {
+        "present": true,
+        "disabled": true
+      },
+      "chipZ": {
+        "present": true,
+        "disabled": true
+      },
+      "canUndoBefore": false,
+      "canUndoAfter": false,
+      "aimed": {
+        "ax": 702,
+        "ay": 457,
+        "dp": {
+          "px": 1,
+          "py": 1
+        }
+      },
+      "zoom": 8
+    }
+  ],
+  "results": [
+    {
+      "id": "0a",
+      "name": "window.__dbg exists (VITE_AURORA_DEBUG=1 build) [precondition]",
+      "ok": true
+    },
+    {
+      "id": "0b",
+      "name": "the fixture aeon project is open with sections [precondition]",
+      "ok": true
+    },
+    {
+      "id": "0c",
+      "name": "the Art facet is focused [precondition]",
+      "ok": true
+    },
+    {
+      "id": "B0",
+      "name": "a LIVE-TILE document is open (the tileset panel names the atlas tile) [precondition]",
+      "ok": true
+    },
+    {
+      "id": "B1",
+      "name": "a stroke on a live-tile document LANDS (hash moved) [precondition]",
+      "ok": true
+    },
+    {
+      "id": "B2",
+      "name": "Ctrl+Z takes back a stroke on a LIVE-TILE document (the in-canvas control)",
+      "ok": true
+    },
+    {
+      "id": "B3",
+      "name": "the Undo control offers itself after a stroke on a live-tile document",
+      "ok": true
+    },
+    {
+      "id": "A00",
+      "name": "closed row B's document through the facet's own \"New…\" control",
+      "ok": null
+    },
+    {
+      "id": "A0",
+      "name": "the 'New Tile 1x1 (8px)' button was pressed (the seat's own entry) [precondition]",
+      "ok": true
+    },
+    {
+      "id": "A1",
+      "name": "a stroke on a New Tile document LANDS (hash moved) [precondition]",
+      "ok": true
+    },
+    {
+      "id": "A2",
+      "name": "Ctrl+Z takes back a stroke on a New Tile document",
+      "ok": false
+    },
+    {
+      "id": "A3",
+      "name": "the Undo control offers itself after a stroke on a New Tile document",
+      "ok": false
+    }
+  ]
+}
