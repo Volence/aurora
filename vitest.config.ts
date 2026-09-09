@@ -20,6 +20,13 @@ export default defineConfig({
       // is grepping. See test/config/fixtures/reporter-canary.ts for why the
       // fixture is not named `.test.ts`.
       ...(process.env.AURORA_REPORTER_CANARY ? ['test/config/fixtures/reporter-canary.ts'] : []),
+      // The failure-class reporter's subject, on the same terms and for the same
+      // reasons (test/config/failure-class-reporter.test.ts). This one is even
+      // more emphatically off by default: its rows FAIL ON PURPOSE, one of each
+      // class, so a main-suite run that collected it would go red by design.
+      ...(process.env.AURORA_FAILURE_CLASS_CANARY
+        ? ['test/config/fixtures/failure-class-canary.ts']
+        : []),
     ],
     // THE LINE BELOW IS LOAD-BEARING FOR TWO SEPARATE PROPERTIES. Both are
     // invisible when broken — no test fails, the suite stays green, and the
@@ -44,12 +51,30 @@ export default defineConfig({
     //    never fires. `process.stderr.write` survives either way, which is why
     //    the muting is easy to miss.
     //
+    // 3. FAILURE CLASS. The third reporter separates the failures that are
+    //    FINDINGS (assertions, which load cannot fake) from the ones that are
+    //    LOAD-MANUFACTURED UNTIL PROVEN OTHERWISE (timeouts and would-blocks),
+    //    and counts anything it cannot classify rather than folding it into
+    //    either. It changes no exit code; a timeout still fails the suite. It
+    //    exists because a merged-tree run came back with four failures, one
+    //    assertion and three timeouts, and it cost FIVE full suite runs to
+    //    learn that, since the output presented all four identically.
+    //
     // Declared HERE rather than in the `npm test` script so a bare
-    // `npx vitest run` is covered too. Two guards watch it:
+    // `npx vitest run` is covered too, and so `scripts/land.mjs` (which runs
+    // `npm test`) gets the classification without that script being touched.
+    // Four guards watch this line:
     // `test/config/skip-report-wiring.test.ts` reads this file as text and fails
     // if the line is dropped or reordered; `test/config/reporter-visibility.test.ts`
-    // proves the console output actually still comes out.
-    reporters: ['default', './scripts/skip-report-reporter.mjs'],
+    // proves the console output actually still comes out;
+    // `test/config/failure-class-wiring.test.ts` and
+    // `test/config/failure-class-reporter.test.ts` do the same pair of jobs for
+    // the third reporter, the second by provoking a real failure of each class.
+    reporters: [
+      'default',
+      './scripts/skip-report-reporter.mjs',
+      './scripts/failure-class-reporter.mjs',
+    ],
     // Node-env global stubs for renderer modules that construct canvases at
     // import time (see the file header). Guarded to only define missing globals.
     setupFiles: [
