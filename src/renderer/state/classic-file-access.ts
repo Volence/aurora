@@ -20,8 +20,15 @@
 // channels added for this bridge, which ARE guarded on the main side too — so
 // those are rejected on both ends.
 
-import type { FileAccess } from '../../core/project/adapter';
+import type { FileAccess, ReadManyValue } from '../../core/project/adapter';
 import { isRelPathSafe } from '../../shared/rel-path';
+import type { ReadOutcome } from '../../shared/ipc-types';
+
+/** The four `ReadOutcome`s, as a runtime set: this bridge validates what comes
+ *  back over IPC, which no type can do for it. Derived from the type by the
+ *  `satisfies` below, so a fifth outcome added to ReadOutcome and not added here
+ *  fails to compile. */
+const READ_OUTCOMES = new Set(['read', 'absent', 'unreadable', 'refused'] satisfies ReadOutcome[]);
 
 function assertSafe(rel: string): void {
   if (!isRelPathSafe(rel)) {
@@ -84,14 +91,42 @@ export function createIpcFileAccess(dir: string): FileAccess {
     // Batch read: one round-trip returns bytes + read-time mtime for many files.
     // The classic level read fans out ~18 mandatory files whose per-file awaits
     // are otherwise ~18 serial renderer→main round-trips on the act-load critical
-    // path; s1-io calls this to collapse that to one. A missing/unsafe entry
-    // resolves with bytes null (the caller decides whether that is fatal).
-    async readMany(rels: string[]): Promise<Map<string, { bytes: Uint8Array | null; mtime: number | null }>> {
+    // path; s1-io calls this to collapse that to one. An entry that produced no
+    // bytes resolves with bytes null (the caller decides whether that is fatal)
+    // AND CARRIES main's `outcome` VERBATIM, which is the field that separates
+    // absence from a permissions failure from a refusal. Dropping it here was
+    // half of FABRICATED-ENOENT: see ReadOutcome in shared/ipc-types.
+    //
+    // Note the `assertSafe` loop above pre-empts main's own 'refused' answer for
+    // callers of THIS bridge (it throws before the IPC), so 'refused' arrives here
+    // only if that guard is ever relaxed. It is still carried and still rendered,
+    // because a value whose producer can emit it and whose consumer cannot say it
+    // is how the first version of this went wrong.
+    async readMany(rels: string[]): Promise<Map<string, ReadManyValue>> {
       for (const rel of rels) assertSafe(rel);
       const entries = await window.api.readManyFiles(dir, rels);
-      const out = new Map<string, { bytes: Uint8Array | null; mtime: number | null }>();
+      const out = new Map<string, ReadManyValue>();
       for (const e of entries) {
-        out.set(e.relPath, { bytes: e.bytes ? new Uint8Array(e.bytes) : null, mtime: e.mtimeMs });
+        // LOUD ABOUT AN ENTRY WITH NO VERDICT, because the compiler cannot be
+        // here. `window.api` is injected, so a test double or an out-of-date
+        // preload that still returns the pre-2026-09-08 `{relPath, bytes,
+        // mtimeMs}` shape typechecks fine and would arrive with `outcome`
+        // undefined — which would fall into the failure branch and render a
+        // sentence for a cause nobody stated. That is the same class of silence
+        // the whole fix is about, so it fails here by name instead.
+        if (!READ_OUTCOMES.has(e.outcome)) {
+          throw new Error(
+            `file:read-many returned an entry for '${e.relPath}' with no outcome `
+            + `(got ${JSON.stringify(e.outcome)}). Expected one of `
+            + `${[...READ_OUTCOMES].join(', ')}; see ReadOutcome in shared/ipc-types.`,
+          );
+        }
+        // Branched, not spread: the union is discriminated on `outcome`, so an
+        // object literal carrying a nullable `bytes` fits neither member. The
+        // friction is the feature (it is what a consumer inherits).
+        out.set(e.relPath, e.outcome === 'read'
+          ? { bytes: new Uint8Array(e.bytes), mtime: e.mtimeMs, outcome: 'read', reason: null }
+          : { bytes: null, mtime: null, outcome: e.outcome, reason: e.reason });
       }
       return out;
     },

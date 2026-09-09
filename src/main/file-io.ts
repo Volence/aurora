@@ -2,7 +2,7 @@ import { readFile, readdir, stat, unlink } from 'fs/promises';
 import { mkdirSync, renameSync, writeFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { isRelPathSafe } from '../shared/rel-path';
-import type { DeleteOutcome, PathProbe, WriteOutcome } from '../shared/ipc-types';
+import type { DeleteOutcome, PathProbe, ReadManyEntry, WriteOutcome } from '../shared/ipc-types';
 
 /**
  * Write ONE project-relative file, atomically. The only writing primitive behind
@@ -92,22 +92,45 @@ export async function readBinaryFile(basePath: string, relativePath: string): Pr
  * one IPC round-trip instead of one per file — the classic act-load read fans out
  * ~18 mandatory files whose sequential round-trips otherwise dominate load
  * latency. Rel-path-safe per entry: an escaping/missing path yields
- * { bytes: null, mtimeMs: null } (never rejects), matching the tolerant
- * probePath/fileMtime probes. Aligned by index to `relativePaths`.
+ * `bytes: null` (never rejects), matching the tolerant probePath/fileMtime
+ * probes. Aligned by index to `relativePaths`.
+ *
+ * ⚠ A NULL SAYS WHY IT IS NULL. `outcome` (required, see ReadOutcome in
+ * shared/ipc-types) separates 'absent' from 'unreadable' from 'refused', because
+ * until 2026-09-08 this function's `catch { return ... null }` was the whole
+ * distinction and two consumers turned it into a hand-typed
+ * "ENOENT: no such file or directory" for all of them. `probePath` above had the
+ * same defect and the same fix; this is the batch-read half of it. ONLY 'absent'
+ * licenses the ENOENT sentence.
  */
 export async function readManyFiles(
   basePath: string,
   relativePaths: string[],
-): Promise<{ relPath: string; bytes: Buffer | null; mtimeMs: number | null }[]> {
+): Promise<ReadManyEntry[]> {
   return Promise.all(
-    relativePaths.map(async (relPath) => {
-      if (!isRelPathSafe(relPath)) return { relPath, bytes: null, mtimeMs: null };
+    relativePaths.map(async (relPath): Promise<ReadManyEntry> => {
+      if (!isRelPathSafe(relPath)) {
+        return {
+          relPath, bytes: null, mtimeMs: null, outcome: 'refused',
+          reason: `unsafe project-relative path (escapes root): '${relPath}'`,
+        };
+      }
       const full = resolve(basePath, relPath);
       try {
         const [bytes, st] = await Promise.all([readFile(full), stat(full)]);
-        return { relPath, bytes, mtimeMs: st.mtimeMs };
-      } catch {
-        return { relPath, bytes: null, mtimeMs: null };
+        return { relPath, bytes, mtimeMs: st.mtimeMs, outcome: 'read', reason: null };
+      } catch (err) {
+        // ENOENT and ENOTDIR are the two errnos that really do mean "not there":
+        // nothing at the path, or a non-directory above it so nothing can be.
+        // Same cut probePath makes, for the same reason.
+        const e = err as NodeJS.ErrnoException;
+        if (e?.code === 'ENOENT' || e?.code === 'ENOTDIR') {
+          return { relPath, bytes: null, mtimeMs: null, outcome: 'absent', reason: null };
+        }
+        return {
+          relPath, bytes: null, mtimeMs: null, outcome: 'unreadable',
+          reason: e?.message ?? String(err),
+        };
       }
     }),
   );

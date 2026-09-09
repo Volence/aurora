@@ -42,6 +42,8 @@ import { objectSpriteEpoch, type SpriteClocks } from '../../core/level-classic/o
 import type { LevelDoc } from '../../core/level-classic/model';
 import type { Color } from '../../core/model/s4-types';
 import { createIpcFileAccess } from './classic-file-access';
+import type { ReadManyValue } from '../../core/project/adapter';
+import { readFailureError } from '../../core/project/read-failure';
 import { ObjectSpriteCache } from './object-sprite-cache';
 
 /** A rendered object sprite ready to blit: an ImageBitmap + its signed origin. */
@@ -111,13 +113,20 @@ interface BuildCtx {
    * mappings for every id in a refresh). When present the builder reads from it
    * instead of issuing two per-sprite IPC reads — collapsing ~2×N sprite reads
    * into a single round-trip. A missing entry falls back to a direct read.
+   *
+   * ⚠ IT HOLDS THE WHOLE `ReadManyValue`, NOT JUST THE BYTES, and that is the fix
+   * for the second half of FABRICATED-ENOENT (lens sweep, 2026-09-08). It used to
+   * be `Map<string, Uint8Array | null>`: the outcome was thrown away at the
+   * `readMany` call and `readOne` below then threw a hand-typed
+   * "ENOENT: no such file or directory" for a permissions failure on a sprite's
+   * art file. See ReadOutcome in shared/ipc-types and read-failure.ts in core.
    */
-  prefetch?: Map<string, Uint8Array | null>;
+  prefetch?: Map<string, ReadManyValue>;
 }
 
 async function buildSpriteFromFiles(
   dir: string, doc: LevelDoc, id: number, zone: string, subtype: number,
-  base: ObjectArtLink, prefetch?: Map<string, Uint8Array | null>,
+  base: ObjectArtLink, prefetch?: Map<string, ReadManyValue>,
 ): Promise<ObjectSprite | null> {
   // Resolve the EFFECTIVE link FIRST: a subtype rule can override the art file,
   // mappings, compression, and palette line (Spring $41 horizontal → Spring
@@ -127,10 +136,14 @@ async function buildSpriteFromFiles(
   const { link: effLink, pieces } = resolveEffectiveObjectArt(id, zone, subtype, base);
   const fa = createIpcFileAccess(dir);
   const readOne = async (p: string): Promise<Uint8Array> => {
-    if (prefetch && prefetch.has(p)) {
-      const b = prefetch.get(p);
-      if (b === null || b === undefined) throw new Error(`ENOENT: no such file or directory, open '${p}'`);
-      return b;
+    const hit = prefetch?.get(p);
+    if (hit) {
+      // Narrowed on the OUTCOME, not on a null: that is what makes the failure
+      // branch state the real cause (read-failure.ts owns every one of the three
+      // sentences) instead of the ENOENT this line used to fabricate for all of
+      // them, permissions failures included.
+      if (hit.outcome !== 'read') throw readFailureError(p, hit.outcome, hit.reason);
+      return hit.bytes;
     }
     return fa.read(p);
   };
@@ -201,6 +214,25 @@ const defaultBuilder: SpriteBuilder = (id, zone, variant, ctx) => {
 };
 let buildImpl: SpriteBuilder = defaultBuilder;
 
+/**
+ * The REAL (file IO + canvas) builder, exposed for tests only.
+ *
+ * WHY IT HAD TO BE EXPOSED (FABRICATED-ENOENT, 2026-09-08): `readOne` inside it is
+ * the second site that fabricated an ENOENT for every batch-read failure, and it
+ * is unreachable from every other seam in this module. `__setObjectSpriteBuilderForTest`
+ * REPLACES this function, so a test using that seam cannot exercise it, and
+ * `loadObjectSprite` runs it behind `ObjectSpriteCache.load`'s `.catch(() => null)`,
+ * which swallows the message whole. A row that goes through the cache can only
+ * observe "null", i.e. exactly nothing about what the message says.
+ *
+ * ⚠ AND NOTE WHAT THAT SWALLOW MEANS, because it bounds the claim this parcel
+ * makes about this site: a sprite whose art file is present but unreadable does
+ * not surface a message to ANYONE today. It renders as a missing object, silently.
+ * Fixing the wording here makes the thrown Error correct; it does not make it
+ * visible. The notice is a separate question and is tagged for the owner.
+ */
+export const __buildSpriteFromFilesForTest = buildSpriteFromFiles;
+
 /** Replace the sprite builder with a canvas-free fake (tests only). */
 export function __setObjectSpriteBuilderForTest(fn: SpriteBuilder): void {
   buildImpl = fn;
@@ -241,7 +273,7 @@ let refreshGen = 0;
  */
 export async function loadObjectSprite(
   dir: string, doc: LevelDoc, id: number, zone: string, subtype: number, epoch: number,
-  prefetch?: Map<string, Uint8Array | null>,
+  prefetch?: Map<string, ReadManyValue>,
 ): Promise<ObjectSprite | null> {
   return spriteCache.load(id, zone, variantFor(id, zone, subtype), epoch, { dir, doc, prefetch });
 }
@@ -286,7 +318,7 @@ export async function refreshClassicObjectSprites(
   // tile edit leaves all file-backed sprites cached, and this loop then asks for
   // (usually) nothing at all.
   const fa = createIpcFileAccess(dir);
-  let prefetch: Map<string, Uint8Array | null> | undefined;
+  let prefetch: Map<string, ReadManyValue> | undefined;
   if (fa.readMany) {
     const wanted = new Set<string>();
     for (const { id, subtype } of wantKeys.values()) {
@@ -307,8 +339,9 @@ export async function refreshClassicObjectSprites(
     }
     if (wanted.size > 0) {
       const got = await fa.readMany([...wanted]);
-      prefetch = new Map();
-      for (const [p, e] of got) prefetch.set(p, e.bytes);
+      // The WHOLE value, outcome included. Keeping only `e.bytes` here is what
+      // left `readOne` with nothing to say but a fabricated ENOENT.
+      prefetch = new Map(got);
     }
   }
   // Each sprite is loaded at ITS OWN epoch, so file-backed sprites survive a tile

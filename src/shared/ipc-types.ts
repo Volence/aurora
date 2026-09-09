@@ -275,16 +275,67 @@ export type GuardedWriteResult =
  * into a thrown ENOENT so renderer callers keep their try/catch semantics.
  */
 /**
- * One entry of a READ_MANY response, aligned by index to the requested paths.
- * `bytes` survives structured-clone as a typed array; null means the file was
- * missing or its path was unsafe. `mtimeMs` is the read-time fs.stat mtime (the
- * guarded-save baseline), null when unavailable.
+ * How a batch read of one file turned out. FOUR ANSWERS, NOT ONE, and the reason
+ * is the same one PathPresence gives one type down: "I could not look", "I looked
+ * and there is nothing" and "it is there and I could not read it" are three
+ * different facts, and a single null told all of them.
+ *
+ * WHAT THE SINGLE NULL COST (FABRICATED-ENOENT, found by the lens sweep and fixed
+ * 2026-09-08). `readManyFiles` folded an ENOENT, an EACCES, an EISDIR, an EIO and
+ * a REFUSED escaping path into `bytes: null`. Two consumers of that null then threw
+ * a message they had typed out by hand:
+ *
+ *     throw new Error(`ENOENT: no such file or directory, open '${p}'`)
+ *
+ * (core/level-classic/s1-io.ts's `readBytes`, and renderer/state/classicObjectArtStore's
+ * `readOne`). So a permissions failure on a level's own tile file, and a path Aurora
+ * had REFUSED to look at, both told the author their file did not exist. Both sites
+ * had copied that sentence from `unwrapBinaryRead` below, where it is CORRECT because
+ * ipc-handlers.ts gates it on `e?.code === 'ENOENT'`; the copies dropped the gate.
+ *
+ * ⚠ AND WHY THE SUITE WAS GREEN OVER IT: `readMany` is OPTIONAL on FileAccess, so
+ * every in-memory test fake fell through to per-file `read`, which PROPAGATES the
+ * real error. The fabricated string existed only on the path production takes. A
+ * fake that behaves better than production is not a test of production.
+ *
+ * `outcome` is REQUIRED so a producer has to state which of the four it means; the
+ * dangerous default (absence) is no longer what a forgetful producer falls into.
+ * `reason` is REQUIRED too, null when there is nothing to say, on PathProbe's rule.
+ *
+ *   'read'       bytes is non-null. reason null.
+ *   'absent'     ENOENT/ENOTDIR: nothing at the path. reason null. This is the ONLY
+ *                outcome for which the ENOENT sentence is a true statement.
+ *   'unreadable' something IS (or may be) there and the read failed: EACCES, EISDIR,
+ *                ELOOP, EIO, EMFILE. reason carries the errno message.
+ *   'refused'    the path escaped the project root, so Aurora DECLINED TO LOOK. That
+ *                is not a statement about the filesystem at all. reason carries the
+ *                refusal.
  */
-export interface ReadManyEntry {
-  relPath: string;
-  bytes: Uint8Array | null;
-  mtimeMs: number | null;
-}
+export type ReadOutcome = 'read' | 'absent' | 'unreadable' | 'refused';
+
+/** The three `ReadOutcome`s that carry no bytes. A consumer building an error for a
+ *  null read narrows to this, which is what stops it from writing one sentence for
+ *  all of them. */
+export type ReadFailureOutcome = Exclude<ReadOutcome, 'read'>;
+
+/**
+ * One entry of a READ_MANY response, aligned by index to the requested paths.
+ * `bytes` survives structured-clone as a typed array. `mtimeMs` is the read-time
+ * fs.stat mtime (the guarded-save baseline).
+ *
+ * A UNION DISCRIMINATED ON `outcome`, not an interface with a nullable `bytes`,
+ * so that `if (e.outcome !== 'read')` both (a) hands the failure branch a
+ * `ReadFailureOutcome` the message builder will accept and (b) leaves `bytes`
+ * non-null on the other side. The old shape let a consumer test `bytes === null`
+ * and then say whatever it liked about why; this one makes the WHY the thing you
+ * have to look at to get at the bytes.
+ */
+export type ReadManyEntry =
+  | { relPath: string; bytes: Uint8Array; mtimeMs: number; outcome: 'read'; reason: null }
+  | {
+      relPath: string; bytes: null; mtimeMs: null;
+      outcome: ReadFailureOutcome; reason: string | null;
+    };
 
 /**
  * What a filesystem presence probe found. THREE ANSWERS, NOT TWO.

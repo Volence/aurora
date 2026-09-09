@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { FileAccess } from '../../project/adapter';
+import type { FileAccess, ReadManyValue } from '../../project/adapter';
+import type { ReadFailureOutcome } from '../../../shared/ipc-types';
 import { s1Profile, type LevelAct } from '../../project/profiles/s1';
 import {
   readS1Level,
@@ -33,6 +34,17 @@ function memFs(files: Record<string, Uint8Array>): FileAccess {
       return [];
     },
   };
+}
+
+// A `readMany` value in the shape PRODUCTION returns. Two constructors rather
+// than one object literal because `ReadManyValue` is discriminated on `outcome`:
+// a fake cannot express "no bytes" without saying which of the three no-bytes
+// facts it means, which is exactly the property FABRICATED-ENOENT was missing.
+function readOk(bytes: Uint8Array, mtime: number | null = null): ReadManyValue {
+  return { bytes, mtime, outcome: 'read', reason: null };
+}
+function readFailed(outcome: ReadFailureOutcome, reason: string | null = null): ReadManyValue {
+  return { bytes: null, mtime: null, outcome, reason };
 }
 
 /** memFs plus an mtime provider driven by a path→mtimeMs table (missing → null). */
@@ -559,8 +571,12 @@ describe('s1-io (e) synthetic round-trip with a mutation', () => {
       async read(rel) { readCalls++; return base.read(rel); },
       async readMany(rels) {
         readManyCalls++; batchSize = rels.length;
-        const out = new Map<string, { bytes: Uint8Array | null; mtime: number | null }>();
-        for (const r of rels) out.set(r, { bytes: files[r] ?? null, mtime: r in mtimes ? mtimes[r] : null });
+        const out = new Map<string, ReadManyValue>();
+        for (const r of rels) {
+          out.set(r, r in files
+            ? readOk(files[r], r in mtimes ? mtimes[r] : null)
+            : readFailed('absent'));
+        }
         return out;
       },
     };
@@ -588,17 +604,143 @@ describe('s1-io (e) synthetic round-trip with a mutation', () => {
     expect(state.read.fileMtimes['palette/Zone.bin']).toBe(mtimes['palette/Zone.bin']);
   });
 
-  it('readMany that reports a mandatory file missing throws (ENOENT parity with per-file read)', async () => {
-    const { act, paths, files } = buildSynthetic();
-    const fa: FileAccess = {
-      ...memFs(files),
-      async readMany(rels) {
-        const out = new Map<string, { bytes: Uint8Array | null; mtime: number | null }>();
-        for (const r of rels) out.set(r, { bytes: r === paths.blocks ? null : (files[r] ?? null), mtime: null });
-        return out;
-      },
-    };
-    await expect(readS1Level(act, paths, fa)).rejects.toThrow(/ENOENT|no such file/i);
+  // ═══ FABRICATED-ENOENT (lens sweep HIGH, fixed 2026-09-08) ═══════════════════
+  //
+  // `readBytes` inside `readS1Level` used to throw a HAND-TYPED
+  // `ENOENT: no such file or directory, open '<p>'` for every reason a batch entry
+  // could arrive with no bytes: absent, EACCES, EISDIR, EIO, and a path Aurora had
+  // refused to resolve. So an unreadable tile file told the author it did not
+  // exist. Fixed by making the producer state its `outcome` (ReadOutcome,
+  // shared/ipc-types) and routing every message through `readFailureMessage`
+  // (core/project/read-failure.ts).
+  //
+  // ⚠ WHY THE ROW THAT USED TO LIVE HERE COULD NOT SEE IT, which is the reason the
+  // rows below are shaped the way they are. It asserted
+  // `rejects.toThrow(/ENOENT|no such file/i)` against a fake whose batch entry was
+  // a bare `bytes: null`. That matcher is satisfied by the fabricated sentence, so
+  // it passed for a permissions failure as happily as for a real absence; and
+  // `memFs`'s own per-file `read` throws "no such file: <rel>", so the same matcher
+  // would ALSO have passed with the batch path deleted entirely. Two ways to be
+  // vacuous in one line.
+  //
+  // Each row below therefore (a) keys on wording only ITS branch of
+  // `readFailureMessage` emits, (b) asserts the OTHER branches' wording is absent,
+  // and (c) asserts `readCalls === 0`, which is what proves the message came from
+  // the batch path under test rather than from the fallback `fa.read`.
+  //
+  // RED-FIRST: proven by restoring the single fabricated `throw` on disk in
+  // s1-io.ts (the mutation is in the parcel's report). Runner:
+  // `npx vitest run src/core/level-classic/__tests__/s1-io.test.ts`, inside
+  // `npm test`'s `vitest run`.
+  describe('a batch entry with no bytes reports the cause it actually had', () => {
+    /** memFs + a readMany that fails exactly `paths.blocks`, with the given cause,
+     *  and counts any fall-through to the per-file `read`. */
+    function faFailingBlocks(
+      files: Record<string, Uint8Array>, blocksPath: string,
+      outcome: ReadFailureOutcome, reason: string | null,
+    ): { fa: FileAccess; readCalls: () => number } {
+      const base = memFs(files);
+      let calls = 0;
+      const fa: FileAccess = {
+        ...base,
+        async read(rel) { calls++; return base.read(rel); },
+        async readMany(rels) {
+          const out = new Map<string, ReadManyValue>();
+          for (const r of rels) {
+            if (r === blocksPath) out.set(r, readFailed(outcome, reason));
+            else out.set(r, r in files ? readOk(files[r]) : readFailed('absent'));
+          }
+          return out;
+        },
+      };
+      return { fa, readCalls: () => calls };
+    }
+
+    it("'absent' still throws the real ENOENT sentence (the one case where it is true)", async () => {
+      const { act, paths, files } = buildSynthetic();
+      const { fa, readCalls } = faFailingBlocks(files, paths.blocks, 'absent', null);
+
+      await expect(readS1Level(act, paths, fa))
+        .rejects.toThrow(`ENOENT: no such file or directory, open '${paths.blocks}'`);
+      // The batch path is the one that spoke. Without this the row could be
+      // satisfied by memFs's fallback "no such file: <rel>".
+      expect(readCalls()).toBe(0);
+    });
+
+    it("'unreadable' says it could not be read, and NEVER that it does not exist", async () => {
+      const { act, paths, files } = buildSynthetic();
+      const denied = `EACCES: permission denied, open '${paths.blocks}'`;
+      const { fa, readCalls } = faFailingBlocks(files, paths.blocks, 'unreadable', denied);
+
+      let msg = '';
+      await readS1Level(act, paths, fa).then(
+        () => { throw new Error('the read resolved; it was supposed to reject'); },
+        (e: unknown) => { msg = e instanceof Error ? e.message : String(e); },
+      );
+
+      // Wording only the 'unreadable' branch emits, plus the errno the producer
+      // handed over (which the fabricated sentence had no room for at all).
+      expect(msg).toContain(`'${paths.blocks}' could not be read`);
+      expect(msg).toContain('EACCES: permission denied');
+      // THE ASSERTION THE OLD ROW WAS MISSING. This is the defect itself: the
+      // author of an intact-but-unreadable file was told it was not there.
+      expect(msg).not.toMatch(/no such file or directory/);
+      expect(msg).not.toMatch(/ENOENT/);
+      expect(readCalls()).toBe(0);
+    });
+
+    it("'refused' says Aurora declined to look, which is not a claim about the disk", async () => {
+      const { act, paths, files } = buildSynthetic();
+      const why = `unsafe project-relative path (escapes root): '${paths.blocks}'`;
+      const { fa, readCalls } = faFailingBlocks(files, paths.blocks, 'refused', why);
+
+      let msg = '';
+      await readS1Level(act, paths, fa).then(
+        () => { throw new Error('the read resolved; it was supposed to reject'); },
+        (e: unknown) => { msg = e instanceof Error ? e.message : String(e); },
+      );
+
+      expect(msg).toContain(`refused to read '${paths.blocks}'`);
+      expect(msg).toContain('escapes root');
+      expect(msg).not.toMatch(/no such file or directory/);
+      expect(msg).not.toMatch(/could not be read/);
+      expect(readCalls()).toBe(0);
+    });
+
+    it('CONTROL: the three causes produce three different sentences for the same path', async () => {
+      const { act, paths, files } = buildSynthetic();
+      const say = async (outcome: ReadFailureOutcome, reason: string | null) => {
+        const { fa } = faFailingBlocks(files, paths.blocks, outcome, reason);
+        try { await readS1Level(act, paths, fa); return 'RESOLVED'; }
+        catch (e) { return e instanceof Error ? e.message : String(e); }
+      };
+      const msgs = [
+        await say('absent', null),
+        await say('unreadable', 'EIO: i/o error'),
+        await say('refused', 'escapes root'),
+      ];
+      // The whole defect in one assertion: before the fix this set had size 1.
+      expect(new Set(msgs).size).toBe(3);
+      expect(msgs).not.toContain('RESOLVED');
+    });
+
+    it('CONTROL: the same fake with bytes present reads the act, so the rows above are refusals and not a broken fake', async () => {
+      const { act, paths, files } = buildSynthetic();
+      const base = memFs(files);
+      let calls = 0;
+      const fa: FileAccess = {
+        ...base,
+        async read(rel) { calls++; return base.read(rel); },
+        async readMany(rels) {
+          const out = new Map<string, ReadManyValue>();
+          for (const r of rels) out.set(r, r in files ? readOk(files[r]) : readFailed('absent'));
+          return out;
+        },
+      };
+      const state = await readS1Level(act, paths, fa);
+      expect(state.doc.blocks.length).toBeGreaterThan(0);
+      expect(calls).toBe(0);
+    });
   });
 
   it('sorts objects by X at write time (out-of-order doc → sorted on disk)', async () => {

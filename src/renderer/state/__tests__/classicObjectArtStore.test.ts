@@ -41,16 +41,22 @@ const levelArtDoc = (marker: number): LevelDoc =>
 const fileBackedDoc = (): LevelDoc =>
   ({ objects: [{ id: 0x1f, subtype: 0 }], tiles: new Uint8Array([1]) }) as unknown as LevelDoc;
 
-/** Linked ids make refresh reach the Electron-only readMany bridge — stub it. */
+/** Linked ids make refresh reach the Electron-only readMany bridge — stub it.
+ *
+ *  ⚠ THE STUB CARRIES `outcome`, and it has to. `window.api` is injected, so this
+ *  double is not typechecked against the preload; a stub still returning the
+ *  pre-2026-09-08 `{relPath, bytes, mtimeMs}` shape would reach the bridge with no
+ *  verdict at all, and the bridge now throws by name rather than rendering a
+ *  message for a cause nobody stated (FABRICATED-ENOENT; see ReadOutcome in
+ *  shared/ipc-types). 'absent' is what these rows mean: the faked sprite builder
+ *  never looks at the bytes. */
+function readManyStub(rels: string[]) {
+  return rels.map((r) => ({ relPath: r, bytes: null, mtimeMs: null, outcome: 'absent', reason: null }));
+}
 function stubReadMany(): () => void {
   const g = globalThis as unknown as { window?: unknown };
   const prev = g.window;
-  g.window = {
-    api: {
-      readManyFiles: async (_d: string, rels: string[]) =>
-        rels.map((r) => ({ relPath: r, bytes: null, mtimeMs: null })),
-    },
-  };
+  g.window = { api: { readManyFiles: async (_d: string, rels: string[]) => readManyStub(rels) } };
   return () => { g.window = prev; };
 }
 
@@ -211,7 +217,7 @@ describe('refreshClassicObjectSprites: lifecycle guards', () => {
     // readMany bridge; stub it (the faked builder ignores the returned bytes).
     const g = globalThis as unknown as { window?: unknown };
     const prevWindow = g.window;
-    g.window = { api: { readManyFiles: async (_d: string, rels: string[]) => rels.map((r) => ({ relPath: r, bytes: null, mtimeMs: null })) } };
+    g.window = { api: { readManyFiles: async (_d: string, rels: string[]) => readManyStub(rels) } };
     const doc = {
       objects: [
         { id: 0x26, subtype: 0 }, { id: 0x26, subtype: 6 }, { id: 0x26, subtype: 6 }, // two distinct monitor subtypes

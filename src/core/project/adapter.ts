@@ -20,6 +20,28 @@ import type { CollisionProfileSet } from '../collision/collision-model';
 import type { EffectsSceneLibrary } from '../formats/effects/scene';
 import type { EffectsPresetLibrary } from '../formats/effects/preset';
 import type { BgOverrideState } from '../formats/bg-override/bg-override-io';
+// TYPE-ONLY, and erased at build: the batch-read outcome vocabulary is the same
+// on both sides of the IPC seam, and one definition beats two that can drift
+// (core/agent/validation.ts type-imports from shared for the same reason). Core
+// stays fs-free and Electron-free; nothing here is a runtime import.
+import type { ReadFailureOutcome } from '../../shared/ipc-types';
+
+/**
+ * One file's worth of a `FileAccess.readMany` answer, discriminated on `outcome`.
+ * `bytes`/`mtime` are null together whenever `outcome` is not 'read'; `outcome`
+ * says which of the three no-bytes facts it is and `reason` carries the
+ * errno/refusal text (null when there is nothing to say).
+ *
+ * TEST THE OUTCOME, NOT THE NULL: `if (v.outcome !== 'read')` narrows to the
+ * failure member (whose `outcome` the message builder accepts) and leaves `bytes`
+ * non-null on the other branch, so a consumer cannot reach the bytes without
+ * having said what it does about each failure. See ReadOutcome in
+ * shared/ipc-types for why this is four answers and not one, and
+ * `readFailureMessage` in ./read-failure for the one place it becomes a sentence.
+ */
+export type ReadManyValue =
+  | { bytes: Uint8Array; mtime: number | null; outcome: 'read'; reason: null }
+  | { bytes: null; mtime: null; outcome: ReadFailureOutcome; reason: string | null };
 
 /**
  * The narrow file-system view core code is allowed to use. Paths are always
@@ -62,10 +84,23 @@ export interface FileAccess {
    * file's bytes and read-time mtime. OPTIONAL and additive: the fs/IPC-backed
    * bridge supplies it so a level read (which fans out ~18 mandatory files) pays
    * one round-trip instead of ~18 sequential ones. When absent (in-memory test
-   * fakes), callers fall back to per-file `read` + `mtime`. A missing/unsafe path
-   * resolves with `bytes: null` (the caller decides whether that is fatal).
+   * fakes), callers fall back to per-file `read` + `mtime`. A path that produced
+   * no bytes resolves with `bytes: null` (the caller decides whether that is
+   * fatal) AND WITH `outcome` SAYING WHY.
+   *
+   * ⚠ `outcome` is the field FABRICATED-ENOENT was missing (fixed 2026-09-08; the
+   * whole argument is in ReadOutcome's docblock in shared/ipc-types). It is
+   * required, not optional, because both consumers of the old bare null had
+   * hand-typed "ENOENT: no such file or directory" for a permissions failure and
+   * for a refused path alike, and an optional field is one a producer forgets.
+   *
+   * ⚠ THIS IS THE OPTIONALITY THAT HID THE DEFECT. Because `readMany` may be
+   * absent, every in-memory fake fell through to `read`, which propagates the real
+   * error, and the fabricated sentence lived only on the production path. A fake
+   * that means to exercise the batch path must IMPLEMENT this method and return
+   * the outcome production would return.
    */
-  readMany?(rels: string[]): Promise<Map<string, { bytes: Uint8Array | null; mtime: number | null }>>;
+  readMany?(rels: string[]): Promise<Map<string, ReadManyValue>>;
   /** Absolute directory this FileAccess is rooted at, when known. aeon open
    *  records it as config.basePath, which the renderer later uses as the root
    *  for real IPC file IO — a missing rootDir there would make path resolution

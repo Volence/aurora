@@ -173,6 +173,53 @@ describe('readManyFiles applies the guard per entry', () => {
     expect(out[0].bytes && [...out[0].bytes]).toEqual(OUTSIDE_BYTES);
     expect(out[0].mtimeMs).toBeTypeOf('number');
   });
+
+  // ═══ THE FOUR ANSWERS (FABRICATED-ENOENT, lens sweep HIGH, 2026-09-08) ═══════
+  //
+  // Same seam and same reason as the probePath rows below. `readManyFiles` folded
+  // an ENOENT, an EACCES, an EISDIR, an EIO and a REFUSED escaping path into one
+  // `bytes: null`, and its two consumers turned that into a hand-typed
+  // `ENOENT: no such file or directory` for all of them. The rows above can still
+  // only see the null; these say WHICH ANSWER, which is the whole distinction.
+  //
+  // THE UNREADABLE CASE IS A REAL DIRECTORY, not a chmod: `readFile` on a
+  // directory is EISDIR on every platform this runs on, it needs no privileges,
+  // and it does not go green when the suite runs as root (which is how a chmod
+  // 000 row quietly stops measuring). It is genuinely present, so 'absent' would
+  // be a false statement about it, which is what makes the row a proof.
+  it('says WHICH of the four: read, absent, unreadable, refused', async () => {
+    mkdirSync(join(base, 'a_directory'), { recursive: true });
+    const out = await readManyFiles(
+      base, ['inside.bin', 'nowhere.bin', 'a_directory', '../outside.bin'],
+    );
+    const by = (rel: string) => out.find((e) => e.relPath === rel)!;
+
+    expect(by('inside.bin').outcome).toBe('read');
+    expect(by('inside.bin').reason).toBeNull();
+
+    // Nothing at the path: the ONE case that licenses the ENOENT sentence.
+    expect(by('nowhere.bin').outcome).toBe('absent');
+    expect(by('nowhere.bin').reason).toBeNull();
+
+    // Present and unreadable. `absent` here is the defect, verbatim.
+    expect(by('a_directory').outcome).toBe('unreadable');
+    expect(by('a_directory').reason).toMatch(/EISDIR/);
+    expect(existsSync(join(base, 'a_directory'))).toBe(true);
+
+    // Declined to look. Not a statement about the filesystem, and the CONTROL
+    // above proves this target reads fine through a base that makes it legal.
+    expect(by('../outside.bin').outcome).toBe('refused');
+    expect(by('../outside.bin').reason).toMatch(/escapes root/);
+  });
+
+  it('CONTROL: absent and unreadable are DIFFERENT answers, so neither row is asserting the other', async () => {
+    mkdirSync(join(base, 'a_directory'), { recursive: true });
+    const out = await readManyFiles(base, ['nowhere.bin', 'a_directory', '../outside.bin']);
+    // Four requests, three distinct no-bytes answers. Before the fix this set was
+    // { null }, which is why a consumer could say only one thing about all three.
+    expect(new Set(out.map((e) => e.outcome)).size).toBe(3);
+    expect(out.every((e) => e.bytes === null)).toBe(true);
+  });
 });
 
 describe('probePath applies the guard', () => {
