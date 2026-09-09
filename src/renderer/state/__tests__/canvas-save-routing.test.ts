@@ -110,8 +110,15 @@ describe('canvas save routing', () => {
     // This is what makes the sprite/canvas split safe (first-match-wins gives
     // sprite tabs to sprite-art) and what keeps pixel edits from being stranded
     // behind a level-save error.
+    //
+    // `art-composer` sits between canvas-doc and the project savers, and its
+    // position is load-bearing for its own reason: saving a NEW composer document
+    // adds a chunk-library entry and marks the aeon project dirty, so the project
+    // save has to run AFTER it in the same pass or the entry stays in memory only.
     return saveAllDirty().then((r) => {
-      expect(r.skipped).toEqual(['sprite-art', 'canvas-doc', 'classic-level', 'aeon-project']);
+      expect(r.skipped).toEqual([
+        'sprite-art', 'canvas-doc', 'art-composer', 'classic-level', 'aeon-project',
+      ]);
     });
   });
 
