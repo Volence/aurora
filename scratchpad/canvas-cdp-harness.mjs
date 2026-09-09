@@ -116,11 +116,23 @@ const MAIN = RUN.main;
 //
 // WHY IT IS SCOPED TO AN ENTRY-POINT LIST RATHER THAN APPLIED AT IMPORT.
 // This file is TWO things. It is the harness `harness:canvas-cdp` runs, which
-// writes and deletes; and it is the shared library 17 other instruments import
+// writes and deletes; and it is the shared library other instruments import
 // for `session()` / `openProjectAndAct()`, which only OPEN a peer tree. d-28
 // fixes the write-capable half and explicitly DEFERS the read-only half, so an
-// unconditional top-level throw would convert 12 read-only sites this ruling
-// leaves alone. The five entry points below are the ones that reach the write
+// unconditional top-level throw would convert the read-only sites this ruling
+// leaves alone.
+//
+// ⚠ THE TWO COUNTS THAT USED TO BE TYPED HERE (17 importers, 12 read-only sites)
+// ARE GONE, NOT UPDATED. Re-derived 2026-09-08 they were 19 and 15, so both had
+// drifted, and a hand-kept census in a comment is a number nobody re-measures
+// before quoting it. The population is one command, and the `CANVAS_WRITERS` set
+// below is the part that has to be right:
+//
+//   grep -rl "canvas-cdp-harness.mjs" --include='*.mjs' scratchpad/
+//
+// (read-only sites are that list minus this file and minus `CANVAS_WRITERS`).
+//
+// The five entry points below are the ones that reach the write
 // surface — this file plus the four that import `CANVAS_DIR` and delete inside
 // it — derived by the sweep in
 // docs/reviews/2026-09-03-canvas-harness-live-tree-delete.md §4, and policed by
@@ -1091,13 +1103,77 @@ async function storedSessions(c) {
     return out; })()`);
 }
 
-/** Open s1disasm and load GHZ act 1 — the same real data phase 1 used. */
+/**
+ * AWAIT A LONG-RUNNING PAGE PROMISE WITHOUT LETTING CHROMIUM COLLECT IT.
+ *
+ * ═══ THE DEFECT ═══
+ *
+ * `Runtime.evaluate { awaitPromise: true }` on an expression whose VALUE is a
+ * promise nothing in the page holds fails, part-way through the wait, with
+ *
+ *   Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}
+ *
+ * MEASURED FROM AN AGENT WORKTREE, 3 RUNS OF 3, on `npm run harness:tier-zoom`:
+ * every run died there and printed NO ROW AT ALL, so what a session sees is a
+ * harness that produced nothing rather than a helper that broke. It was first
+ * hit by `classic-wheel-passive-harness.mjs`, which worked around it inline and
+ * booked the shared helper for someone with the mandate to touch it.
+ *
+ * ═══ WHY IT HAPPENS, AND WHY A CONTINUATION FIXES IT ═══
+ *
+ * The inspector's handler for an awaited promise holds it WEAKLY. `openDir(...)`
+ * returns a fresh promise that nothing in the page references, so while the long
+ * load runs there is no strong referrer and a GC in the middle of the wait is
+ * free to take it. Attaching `.then(…)` IN THE PAGE before the await is what
+ * supplies one: the reaction record lives on the ORIGINAL promise, which the
+ * in-flight load keeps alive, and it holds the DERIVED promise strongly — and the
+ * derived one is what the await now holds. Neither is collectable while the work
+ * is running.
+ *
+ * ═══ WHY NOT WRAP `evalExpr` FOR EVERYONE ═══
+ *
+ * Because it would not be the same function afterwards. `evalExpr` is called with
+ * STATEMENTS as well as expressions (`'localStorage.clear(); 1'` is one of its own
+ * call sites), and `Promise.resolve(localStorage.clear(); 1)` is a syntax error.
+ * Routing every call through an `eval()` to recover the completion value would
+ * change scoping and strictness for more than a hundred call sites across 19
+ * importers to fix a hazard that only appears on a promise that stays pending for
+ * seconds. So the repair is applied where the wait is long, and `evalExpr` is
+ * untouched.
+ *
+ * ⚠ A REJECTION IS STILL A THROW HERE. The continuation turns one into a string,
+ * which would otherwise convert a genuinely failed open into a silent success —
+ * the exact degradation this file exists to refuse. It is re-thrown, naming which
+ * of the two calls it was, which is strictly better than what the plain form gave:
+ * `eval threw:` from somewhere inside `openProjectAndAct`.
+ */
+async function settledInPage(c, expr, what) {
+  const r = await c.evalExpr(
+    `Promise.resolve(${expr}).then(() => 'ok', (e) => 'THREW: ' + ((e && e.message) || String(e)))`);
+  if (typeof r === 'string' && r.startsWith('THREW: ')) {
+    throw new Error(`${what} rejected in the page: ${r.slice('THREW: '.length)}`);
+  }
+  return r;
+}
+
+/**
+ * Open s1disasm and load GHZ act 1 — the same real data phase 1 used.
+ *
+ * ⚠ THE TWO LONG WAITS GO THROUGH `settledInPage`, NOT `evalExpr` — see its
+ * docblock. Called plainly, this function failed 3 runs of 3 from a worktree
+ * before printing anything. Signature, options and return value are unchanged.
+ *
+ * The other `openDir` in this file (`restartAndRestore`'s) is deliberately NOT
+ * routed through it: that one already discards its own rejection and then POLLS
+ * for the open, so a collected promise there is swallowed and recovered from
+ * rather than fatal. Changing it would move no outcome.
+ */
 async function openProjectAndAct(c, { clearStorage = true, act = true } = {}) {
   if (clearStorage) { await c.evalExpr('localStorage.clear(); 1'); }
-  await c.evalExpr(`window.__dbg.openDir(${JSON.stringify(S1DIR)})`);
+  await settledInPage(c, `window.__dbg.openDir(${JSON.stringify(S1DIR)})`, 'openDir');
   await sleep(2000);
   if (act) {
-    await c.evalExpr('window.__dbg.activate("ghz", 1)');
+    await settledInPage(c, 'window.__dbg.activate("ghz", 1)', 'activate');
     await sleep(4000);
   }
   await c.evalExpr(INSTALL);
@@ -1168,6 +1244,10 @@ async function fillDialog(c, { name, width, height, profile }) {
 // a fresh reimplementation starts by re-earning trust this code already has.
 export {
   session, openProjectAndAct, openNewCanvasDialog, fillDialog,
+  // Exported so a harness that opens its own way (a different tree, a different
+  // act) gets the collected-promise repair too, instead of re-deriving the
+  // `.then()` workaround from a comment in whichever file hit it last.
+  settledInPage,
   INSTALL, sleep, mouse, key, enter, escape, ctrlK, typeText, clickEl,
   drawArt, clickArt, focusTab, closeTab, shot, drain,
   ROOT, S1DIR, CANVAS_DIR, SHOTS,

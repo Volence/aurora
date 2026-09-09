@@ -53,16 +53,25 @@
 // writes, saves, or deletes, so the live tree is safe to read. This entry point is
 // deliberately NOT in the harness's CANVAS_WRITERS list.
 //
-// ⚠ THE OPEN IS INLINED RATHER THAN `openProjectAndAct(c)`, AND THAT IS A FINDING,
+// ⚠ THE OPEN IS INLINED RATHER THAN `openProjectAndAct(c)`, AND THAT WAS A FINDING,
 // not a preference. Called from this worktree, the shared helper failed 3 runs of 3
 // with `Runtime.evaluate: {"code":-32000,"message":"Promise was collected"}` before
 // printing anything — Chromium collected the long-running `window.__dbg.openDir(...)`
 // promise while `awaitPromise: true` was waiting on it. The sequence below is the
 // same three calls with a `.then(ok, err)` attached before the await, which held 2
 // runs of 2, and it also PRINTS whether the open or the activate threw instead of
-// failing far away. Not diagnosed further and not fixed in the shared helper: 17
-// importers depend on it and this parcel is not about the harness. Tagged for the
-// owner.
+// failing far away. It was tagged rather than fixed because the shared helper has
+// many importers and that parcel was not about the harness.
+//
+// FIXED IN THE SHARED HELPER 2026-09-08: `settledInPage` in
+// `canvas-cdp-harness.mjs` carries this repair, with the reason and the measurement
+// in its docblock, and `openProjectAndAct` goes through it (3 red runs before, 3
+// green after, on `harness:tier-zoom`). The sequence below is left INLINE on
+// purpose: it names which of the two calls threw on its own output line, which the
+// shared helper does not, and rewriting a passing measurement to use a helper it
+// does not need is a change with no reading. A harness that wants the repair for an
+// open of its own imports `settledInPage` rather than copying the `.then` out of
+// this comment.
 import { session, S1DIR, INSTALL, sleep, drain, RUN } from './canvas-cdp-harness.mjs';
 
 const rows = [];
