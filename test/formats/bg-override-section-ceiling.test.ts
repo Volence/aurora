@@ -443,7 +443,28 @@ describe('the act that used to have NO section size now has one, and it is small
    * dead-branch labels pointing at it have to come down, not that the new
    * refusal is wrong.
    */
-  it('NO input refuses a size: the census behind the unreachable !ok arm', () => {
+  /*
+   * TIMEOUT RAISED 2026-09-08, and the number is DERIVED rather than picked.
+   *
+   * This row is an exhaustive census, so its cost is real work rather than a
+   * wait, and its duration therefore scales with how busy the machine is. It
+   * runs in ~1.8s on an idle box and was measured at 6.0s with one agent
+   * building concurrently, which is over vitest's 5s default. So it failed a
+   * landing twice in a row for a reason that has nothing to do with the code it
+   * guards, and BOTH TIMES IT LOOKED EXACTLY LIKE A REAL RED: a named row in a
+   * failing file, with a merge sitting on the tree.
+   *
+   * A load-dependent limit makes a gate that reddens a landing at random, which
+   * is worse than a slow gate: a red nobody can attribute teaches people to
+   * re-run rather than to read. 30s is about five times the loaded measurement,
+   * which leaves headroom for a busier box without letting a genuine hang sit
+   * for a minute.
+   *
+   * ⚠ IF THIS ROW EVER TIMES OUT AT 30s, DO NOT RAISE IT AGAIN. At that point
+   * the census has grown or something in it has become genuinely slow, and the
+   * answer is to measure what changed, not to buy another multiple.
+   */
+  it('NO input refuses a size: the census behind the unreachable !ok arm', { timeout: 30_000 }, () => {
     const periods = [BGANIM_VIEW_DERIVED_PERIOD_PX, BGANIM_VIEW_DERIVED_PERIOD_PX + 1, undefined];
     const offs: unknown[] = [undefined, true, false];
     let checked = 0;
