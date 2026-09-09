@@ -6,11 +6,14 @@
 unenumerated"* through five parcels. Nothing forced it: no file owned it and no
 parcel closed it. This is the enumeration.
 
-**The headline.** 27 `??`/`??=` operators. **One** meets the definition of
-CONFLATING (`preset.ts:979`), and its consequence is loud on a guard this parcel
-**measured** rather than read. **Zero** sites need a code fix. The one repair
-made is to a **docblock** that justified a fallback by naming a registry deleted
-in the same commit that deleted it.
+**The headline.** 27 `??`/`??=` operators: **21 BENIGN, 5 LOAD-BEARING, 1
+CONFLATING**. The one CONFLATING site (`preset.ts:979`) has a loud consequence on
+a guard this parcel **measured** rather than read. **Zero** sites need a code
+fix. The one repair made is to a **docblock** that justified a fallback by naming
+a registry deleted in the same commit that deleted it.
+
+(That tally is the §2 tables counted by program, not by eye: 27 rows, summing
+21 / 5 / 1.)
 
 That is a weaker-sounding result than "N findings", and it is the honest one.
 The effects tree already carries absence on a **separate channel** from value —
