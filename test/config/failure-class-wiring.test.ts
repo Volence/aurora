@@ -25,10 +25,17 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
+import {
+  CLASS_ASSERTION,
+  CLASS_TIMEOUT,
+  CLASS_UNCLASSIFIED,
+  PREFIX,
+} from '../../scripts/failure-class-reporter.mjs';
 import { CANARY_ENV_FLAG, CANARY_FIXTURE_REL } from './fixtures/failure-class-markers';
 
 const REPO = resolve(__dirname, '../..');
 const CONFIG = resolve(REPO, 'vitest.config.ts');
+const LAND = resolve(REPO, 'scripts/land.mjs');
 const REPORTER_REL = 'scripts/failure-class-reporter.mjs';
 
 /** Every `./...`-style reporter path named in the config's `reporters` array. */
@@ -98,6 +105,77 @@ describe('the config still reaches the failure-class canary\'s fixture', () => {
       `${CANARY_FIXTURE_REL} must appear only behind a ${CANARY_ENV_FLAG} check in ` +
         'vitest.config.ts: its rows fail on purpose',
     ).toMatch(gated);
+  });
+});
+
+describe('the landing refusal points at the classification, and cannot drift from it', () => {
+  // `scripts/land.mjs` REFUSES to push when the suite fails, and its refusal is
+  // the last line a reader sees. Anyone tailing that output misses the
+  // `failure-class:` block entirely and then re-runs the suite hoping the red
+  // goes away, which is right for a timeout and wrong for an assertion.
+  //
+  // ⚠ land.mjs SPELLS the strings rather than importing them, on purpose: an
+  // import would let a deleted reporter break every landing at startup, and a
+  // cosmetic pointer must never be able to do that. This file is the price of
+  // that choice. It reads land.mjs as text and compares it against the
+  // reporter's OWN exported constants, so a rename reddens here rather than
+  // leaving the landing script quoting a vocabulary nothing prints any more.
+  //
+  // ⚠ AND IT READS THE REFUSAL LITERAL, NOT THE FILE. The first version of these
+  // rows searched the whole of land.mjs and STAYED GREEN when the prefix was
+  // deleted from the refusal, because the COMMENT above that refusal explains
+  // what the pointer is for and mentions the prefix too. A comment outbids code
+  // in a grep, and the version of this file that searched the whole source was
+  // asserting that land.mjs still had a comment about the reporter.
+  const source = readFileSync(LAND, 'utf8');
+
+  /**
+   * Just the argument to the `die()` that fires on a failed suite. Anchored on
+   * the sentence the anti-vacuous row below proves is still there, and cut at
+   * the call's close, so comments (which precede the call) are outside it.
+   */
+  function suiteFailureRefusal(text: string): string {
+    const anchor = "die('the suite failed on the tree you were about to push";
+    const start = text.indexOf(anchor);
+    if (start === -1) return '';
+    const end = text.indexOf(');', start);
+    return end === -1 ? '' : text.slice(start, end);
+  }
+
+  const refusal = suiteFailureRefusal(source);
+
+  it('ANTI-VACUOUS: land.mjs still refuses on a failed suite, and the refusal was found', () => {
+    // Two things at once, both load-bearing: that the refusal still exists, and
+    // that the extractor above still locates it. If it stopped locating it, every
+    // row below would be asserting over an empty string and could only fail,
+    // which is the safe direction but a confusing one, so it is named here.
+    expect(source, 'scripts/land.mjs no longer refuses when the suite fails').toContain(
+      'the suite failed on the tree you were about to push',
+    );
+    expect(
+      refusal,
+      'the extractor in this file could not isolate that refusal\'s text, so the rows below ' +
+        'would be reading an empty string rather than the message a person sees',
+    ).not.toHaveLength(0);
+  });
+
+  it('the refusal ITSELF names the reporter\'s output prefix', () => {
+    expect(
+      refusal,
+      `land.mjs's suite-failure refusal does not mention "${PREFIX}:". That refusal is the last ` +
+        'thing a reader sees, and the block it points at is the one that says whether re-running ' +
+        'is even the right move. A mention in a nearby COMMENT does not count: nobody reads the ' +
+        'source at the moment a landing is refused.',
+    ).toContain(`${PREFIX}:`);
+  });
+
+  it('the refusal names all three classes, so it says what to do with each', () => {
+    // Derived from the reporter's exports. Naming two of three would leave the
+    // reader with nowhere to put the bucket that exists precisely because it
+    // needs a human.
+    for (const cls of [CLASS_ASSERTION, CLASS_TIMEOUT, CLASS_UNCLASSIFIED]) {
+      expect(refusal, `land.mjs's suite-failure refusal does not mention ${cls}`).toContain(cls);
+    }
   });
 });
 
