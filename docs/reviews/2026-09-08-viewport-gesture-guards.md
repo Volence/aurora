@@ -160,3 +160,40 @@ the drift I measured was drift my own edit had just caused. The only coarse
 citation is `App.tsx:312`, which lands on the CanvasMode block's opening comment;
 the `key={canvasPane.docId}` it is pointing at is at `:332` and the sentence
 naming in-flight gestures at `:327`. The claim holds.
+
+---
+
+## ⚠ CORRECTION, 2026-09-08, appended not edited: the bgStroke residue above is REFUTED
+
+**This packet's prose is left exactly as written.** It was accurate about everything it
+measured and its residue bullet reasoned from a real reading; appending is the right
+shape because rewriting a dated record launders the history of what was believed and
+when. Two claims in it are now false, both established by the parcel that landed at
+merge `74db1d9a`:
+
+**1. The bgStroke residue bullet is wrong, and the defect it dismissed is WORSE than the
+sweep's own description rather than narrower.** The bullet says the stroke's commands
+"name their own target document, so an act switch cannot redirect them", leaving only a
+misfiled undo entry. **It counted COMMANDS when the discriminator is a FIELD inside one
+of them.** There are two command types but three sources: an override and a library
+reference each name a per-game document and are safe as the bullet says; the **act
+default carries a NULL reference**, and `resolveBgLayout` (`src/core/editing/history.ts`,
+read at `611412b9`) returns `level.act.bgLayout` for a null ref, with `level` rebuilt
+from the active act at commit time. So the third source is resolved late by exactly the
+mechanism this packet's own critical was fixed for. Worse, the paint re-resolves the
+plane per pixel, so every mousemove after a switch writes into the new act's plane with
+no command at all. That is live document corruption outside undo.
+
+**2. The row table says "witnesses on four carriers". It is five now**, the fifth being
+the bgStroke witness with the plane's identity added, since the two acts answer an
+identical source pair for their own different planes and the old check therefore could
+not discriminate.
+
+**Why this correction is worth reading rather than just noting:** nothing here was
+careless. The bullet's author examined the code, formed a specific mechanical claim, and
+recorded it as residue rather than staying silent, which is what made it checkable at
+all. The controller relayed it into a merge message **marked as unverified**, and the
+next parcel was briefed to re-measure it rather than trust it. That chain is what caught
+it. A confident residue bullet with no re-measurement instruction would have closed the
+question permanently, because a row dismissed by a named mechanism is the one nobody
+re-opens.
