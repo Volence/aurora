@@ -357,15 +357,21 @@ happens *before* Save, not of any edit to Save.
 
 ---
 
-## 9. `npm test`, both ends, aggregate
+## 9. `npm test`, both ends, aggregate — three runs
 
 | | Test Files | Tests | exit | `failure-class` verdict |
 |---|---|---|---|---|
 | **base** `bbff194b` (detached checkout, same worktree, same `node_modules`) | 4 failed \| 568 passed \| 3 skipped (575) | **77 failed \| 8452 passed \| 9 skipped (8538)** | **1** | ASSERTION 0, TIMEOUT 0, UNCLASSIFIED 77 |
-| **tip** `bc2b3489` | 7 failed \| 565 passed \| 3 skipped (575) | **79 failed \| 8431 passed \| 28 skipped (8538)** | **1** | ASSERTION 0, **TIMEOUT 3**, UNCLASSIFIED 77 |
+| **tip** `bc2b3489` (the source + harness tip, run before the packet existed) | 7 failed \| 565 passed \| 3 skipped (575) | **79 failed \| 8431 passed \| 28 skipped (8538)** | **1** | ASSERTION 0, **TIMEOUT 3**, UNCLASSIFIED 77 |
+| **tip** `ff9ea472` (the whole chain over this packet too) | 4 failed \| 568 passed \| 3 skipped (575) | **77 failed \| 8452 passed \| 9 skipped (8538)** | **1** | ASSERTION 0, TIMEOUT 0, UNCLASSIFIED 77 |
 
-**Zero assertion failures at either end, and this parcel adds no test**, so the totals could
-not move: 8538 rows both ends.
+**Zero assertion failures at every end, and this parcel adds no test**, so the totals could
+not move: 8538 rows in all three runs. The final tip is **byte-identical to the base**.
+
+Every check script printed `OK` at the final tip, including `check-cited-paths`,
+`check-doc-citations` over this packet, `check-ledger-timestamps` over the new lens row,
+`check-prose-constants` and `check-harness-guards` (**261 clean / 261 classified, 0
+failures**, both harnesses classified `LAUNCHER (guarded)`), and `npm run typecheck`.
 
 - **The 77 UNCLASSIFIED are the same four files at both ends** — `aether-badge-identity`,
   `classic-map-wheel`, `map-device-scale`, `map-viewport-mounted` — every row
@@ -373,7 +379,9 @@ not move: 8538 rows both ends.
   node-suite half of the second-React-instance defect in
   `docs/reviews/2026-09-09-save-contract.md` §7, still open; `resolve.dedupe` does not reach
   vitest.
-- **The 3 TIMEOUTs at the tip are load, and were checked rather than assumed.** They are
+- **The 3 TIMEOUTs in the middle run were load, and were checked rather than assumed —
+  and then vanished on the third run, which is the same verdict from the other side.** They
+  were
   `art-discard-guard`, `prose-constant-fold` and `harness-guard-profile` — the same
   load-sensitive set `docs/reviews/2026-09-09-art-undo-fix.md` §4.5 recorded. Run together
   in isolation: **3 files, 70 tests, 0 failures, 5.19s**, and the repo's own reporter says
