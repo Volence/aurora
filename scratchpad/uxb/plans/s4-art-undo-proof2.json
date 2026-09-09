@@ -1,0 +1,8 @@
+[
+  { "eval": "const c=document.querySelector('canvas'); const g=c.getContext('2d'); window.__c=c; window.__g=g; window.__probe=()=>{const r=c.getBoundingClientRect(); const sx=Math.round((28-r.left)+r.left-r.left); return null;}; window.__sample=()=>{const d=g.getImageData(0,0,c.width,c.height).data; let h=0; for(let i=0;i<d.length;i+=4){h=(h*31 + d[i]+d[i+1]*3+d[i+2]*7)>>>0;} return h;}; return { before: window.__sample(), rect: c.getBoundingClientRect().toJSON() };" },
+  { "clickAt": "const r=window.__c.getBoundingClientRect(); return {x:Math.round(r.left+28),y:Math.round(r.top+28)};", "after": 1500 },
+  { "eval": "return { afterPaint: window.__sample(), status: document.body.innerText.split('\\n').slice(-3).join(' | '), undoDis: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Undo')?.disabled, undoTitle: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Undo')?.title || null };" },
+  { "key": { "key": "z", "code": "KeyZ", "vk": 90, "mod": 2, "text": "z" }, "after": 2000 },
+  { "sleep": 1200 },
+  { "eval": "return { afterCtrlZ: window.__sample(), undoDis: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Undo')?.disabled };" }
+]

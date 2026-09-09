@@ -1,0 +1,11 @@
+[
+  { "key": { "key": "Backspace", "code": "Backspace", "vk": 8 } },
+  { "key": { "key": "Backspace", "code": "Backspace", "vk": 8 } },
+  { "key": { "key": "Backspace", "code": "Backspace", "vk": 8 } },
+  { "sleep": 500 },
+  { "eval": "return { sidebarBack: document.body.innerText.slice(0,80) };" },
+  { "click": { "x": 585, "y": 277 } },
+  { "sleep": 1200 },
+  { "eval": "return { tabs: [...document.querySelectorAll('div')].filter(d=>d.title&&d.getBoundingClientRect().top<40&&d.getBoundingClientRect().height>20).map(d=>({t:(d.innerText||'').trim().slice(0,40),title:d.title})), body: document.body.innerText.slice(0,400) };" },
+  { "shot": "03-guide-opened" }
+]

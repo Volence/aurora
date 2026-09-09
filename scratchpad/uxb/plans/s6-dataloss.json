@@ -1,0 +1,7 @@
+[
+  { "eval": "return { tabsNow:[...document.querySelectorAll('div')].filter(d=>d.title&&d.getBoundingClientRect().top<40&&d.getBoundingClientRect().height>20).map(d=>d.title), dirty: window.__dbg.aeon.state().dirty, dirtyActs: window.__dbg.aeon.state().dirtyActs };" },
+  { "click": { "x": 120, "y": 114 }, "after": 2000 },
+  { "sleep": 1500 },
+  { "eval": "return { reopened: window.__dbg.aeon.state(), objs: document.body.innerText.match(/Objects\\n(\\d+)/)?.[1] };" },
+  { "shot": "20-reopened-after-silent-close" }
+]

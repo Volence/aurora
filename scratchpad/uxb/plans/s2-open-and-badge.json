@@ -1,0 +1,9 @@
+[
+  { "eval": "return { badgeOnHome: [...document.querySelectorAll('button')].filter(b=>/Aether/.test(b.innerText)).length, home: document.body.innerText.slice(0,200) };" },
+  { "eval": "window.__UXB_AEON='/tmp/claude-1000/-home-volence-sonic-hacks-aurora/355909dc-6223-479a-bd8f-e9cfd2b0de5f/scratchpad/uxrig/uxb/aeon'; await window.__dbg.aeon.open(window.__UXB_AEON); for(let i=0;i<60;i++){const s=window.__dbg.aeon.state(); if(s&&s.open) return {opened:true,...s}; await new Promise(r=>setTimeout(r,300));} return {opened:false};" },
+  { "sleep": 2000 },
+  { "click": { "x": 1343, "y": 861 }, "after": 3000 },
+  { "sleep": 3000 },
+  { "eval": "const b=[...document.querySelectorAll('button')].find(x=>/Aether/.test(x.innerText)); return { text: b.innerText.trim(), title: b.title, colour: getComputedStyle(b).color };" },
+  { "shot": "07-aether-deadpath-short" }
+]

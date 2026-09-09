@@ -1,0 +1,8 @@
+[
+  { "eval": "const cs=[...document.querySelectorAll('canvas')].map(c=>({w:c.width,h:c.height,r:c.getBoundingClientRect().toJSON()})); const big=[...document.querySelectorAll('canvas')].sort((a,b)=>b.getBoundingClientRect().width-a.getBoundingClientRect().width)[0]; window.__sc=big; const g=big.getContext('2d'); window.__hash=()=>{const d=g.getImageData(0,0,big.width,big.height).data; let h=0; for(let i=0;i<d.length;i+=4){h=(h*31+d[i]+d[i+1]*3+d[i+2]*7)>>>0;} return h;}; return { canvases: cs.length, chosen: big.getBoundingClientRect().toJSON(), before: window.__hash() };" },
+  { "clickAt": "const r=window.__sc.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 1500 },
+  { "eval": "return { afterPaint: window.__hash(), undoDis: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Undo')?.disabled, saveDis: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Save')?.disabled };" },
+  { "key": { "key": "z", "code": "KeyZ", "vk": 90, "mod": 2, "text": "z" }, "after": 1800 },
+  { "eval": "return { afterCtrlZ: window.__hash(), undoDis: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Undo')?.disabled };" },
+  { "shot": "40-sprite-paint-undo" }
+]

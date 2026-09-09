@@ -1,0 +1,6 @@
+[
+  { "click": { "x": 585, "y": 288 }, "after": 1500 },
+  { "sleep": 1000 },
+  { "eval": "return { tabs: [...document.querySelectorAll('div')].filter(d=>d.title&&d.getBoundingClientRect().top<40&&d.getBoundingClientRect().height>20).map(d=>d.title), body: document.body.innerText.slice(0,900) };" },
+  { "shot": "09-project-setup" }
+]

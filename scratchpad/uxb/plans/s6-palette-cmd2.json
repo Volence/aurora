@@ -1,0 +1,8 @@
+[
+  { "key": { "key": "k", "code": "KeyK", "vk": 75, "mod": 2, "text": "k" }, "after": 1200 },
+  { "eval": "return { ctrlK: [...document.querySelectorAll('input')].map(i=>i.placeholder).filter(Boolean) };" },
+  { "key": { "key": "F1", "code": "F1", "vk": 112 }, "after": 1200 },
+  { "eval": "return { f1: [...document.querySelectorAll('input')].map(i=>i.placeholder).filter(Boolean) };" },
+  { "key": { "key": "p", "code": "KeyP", "vk": 80, "mod": 4, "text": "p" }, "after": 1200 },
+  { "eval": "return { altP: [...document.querySelectorAll('input')].map(i=>i.placeholder).filter(Boolean), anyOverlay: document.querySelectorAll('[style*=\"position: fixed\"]').length };" }
+]

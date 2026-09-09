@@ -1,0 +1,8 @@
+[
+  { "eval": "return { tabs:[...document.querySelectorAll('div')].filter(d=>d.title&&d.getBoundingClientRect().top<40&&d.getBoundingClientRect().height>20).map(d=>d.title), dirtyBefore: window.__dbg.aeon.state().dirtyActs, active: document.activeElement?.tagName };" },
+  { "click": { "x": 700, "y": 500 }, "after": 400 },
+  { "key": { "key": "s", "code": "KeyS", "vk": 83, "mod": 2, "text": "s" }, "after": 2500 },
+  { "sleep": 2500 },
+  { "eval": "return { dirtyAfter: window.__dbg.aeon.state().dirtyActs, dirty: window.__dbg.aeon.state().dirty, toastish: document.body.innerText.replace(/\\s+/g,' ').slice(0,300) };" },
+  { "shot": "24-ctrl-s-from-home" }
+]

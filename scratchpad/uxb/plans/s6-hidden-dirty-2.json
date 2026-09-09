@@ -1,0 +1,7 @@
+[
+  { "eval": "return { tabs:[...document.querySelectorAll('div')].filter(d=>d.title&&d.getBoundingClientRect().top<40&&d.getBoundingClientRect().height>20).map(d=>d.title), dirty: window.__dbg.aeon.state().dirty, objs: document.body.innerText.match(/Objects\\n(\\d+)/)?.[1] };" },
+  { "clickAt": "const t=[...document.querySelectorAll('div')].find(d=>d.title==='Oracle Jungle Zone · act1'&&d.getBoundingClientRect().top<40); const c=[...t.querySelectorAll('span')].find(e=>e.getAttribute('title')==='Close tab'); const r=c.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 2000 },
+  { "sleep": 1200 },
+  { "eval": "return { dialogOpen: !!document.querySelector('[role=dialog]'), tabs:[...document.querySelectorAll('div')].filter(d=>d.title&&d.getBoundingClientRect().top<40&&d.getBoundingClientRect().height>20).map(d=>d.title), storeDirty: window.__dbg.aeon.state().dirty, storeDirtyActs: window.__dbg.aeon.state().dirtyActs, unsavedTitles: [...document.querySelectorAll('*')].filter(e=>/unsaved/i.test(e.getAttribute('title')||'')).map(e=>e.getAttribute('title')), screenText: document.body.innerText.replace(/\\s+/g,' ').slice(0,400) };" },
+  { "shot": "23-tab-closed-while-dirty" }
+]

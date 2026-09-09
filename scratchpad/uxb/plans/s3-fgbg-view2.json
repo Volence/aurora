@@ -1,0 +1,9 @@
+[
+  { "clickAt": "const b=[...document.querySelectorAll('button')].find(e=>e.innerText.trim()==='Layout'&&e.getBoundingClientRect().top<70); const r=b.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 2500 },
+  { "eval": "const g=(n)=>{const b=[...document.querySelectorAll('button')].find(e=>e.innerText.trim()===n); return b?{bg:getComputedStyle(b).backgroundColor}:null}; return { fg:g('FG'), bg:g('BG'), status: document.body.innerText.split('\\n').slice(-2).join(' | ') };" },
+  { "clickAt": "const b=[...document.querySelectorAll('button')].find(e=>e.innerText.trim()==='BG'); const r=b.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 2000 },
+  { "eval": "const g=(n)=>{const b=[...document.querySelectorAll('button')].find(e=>e.innerText.trim()===n); return b?{bg:getComputedStyle(b).backgroundColor}:null}; return { fgAfter:g('FG'), bgAfter:g('BG'), status: document.body.innerText.split('\\n').slice(-2).join(' | ') };" },
+  { "clickAt": "const b=[...document.querySelectorAll('button')].find(e=>/^View/.test(e.innerText.trim())&&e.getBoundingClientRect().top<70&&e.getBoundingClientRect().left>1200); const r=b.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 2000 },
+  { "eval": "return { menu: [...document.querySelectorAll('*')].filter(e=>{const r=e.getBoundingClientRect(); return r.top>65&&r.top<420&&r.left>1150&&r.width>80&&r.width<300&&e.children.length===0&&e.textContent.trim()}).map(e=>e.textContent.trim()).slice(0,30) };" },
+  { "shot": "46-fgbg-view-menu" }
+]

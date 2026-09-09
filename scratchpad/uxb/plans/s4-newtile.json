@@ -1,0 +1,10 @@
+[
+  { "click": { "x": 262, "y": 126 }, "after": 900 },
+  { "eval": "return { statusAfterPencilNoDoc: document.body.innerText.split('\\n').slice(-3).join(' | '), canvasPresent: !!document.querySelector('canvas') };" },
+  { "click": { "x": 700, "y": 300 }, "after": 900 },
+  { "eval": "return { afterCanvasClickNoDoc: document.body.innerText.split('\\n').slice(-3).join(' | ') };" },
+  { "clickAt": "const b=[...document.querySelectorAll('button')].find(e=>/New Tile/.test(e.innerText)); const r=b.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 2500 },
+  { "sleep": 1500 },
+  { "eval": "return { status: document.body.innerText.split('\\n').slice(-3).join(' | '), tabs:[...document.querySelectorAll('div')].filter(d=>d.title&&d.getBoundingClientRect().top<40&&d.getBoundingClientRect().height>20).map(d=>d.title), undoDis: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Undo')?.disabled };" },
+  { "shot": "34-art-new-tile" }
+]

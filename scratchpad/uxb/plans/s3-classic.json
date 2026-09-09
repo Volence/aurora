@@ -1,0 +1,7 @@
+[
+  { "eval": "return { aeonDirtyBefore: window.__dbg.aeon.state().dirtyActs, tabs:[...document.querySelectorAll('div')].filter(d=>d.title&&d.getBoundingClientRect().top<40&&d.getBoundingClientRect().height>20).map(d=>d.title) };" },
+  { "eval": "await window.__dbg.openDir('/tmp/claude-1000/-home-volence-sonic-hacks-aurora/355909dc-6223-479a-bd8f-e9cfd2b0de5f/scratchpad/uxrig/uxb/s1disasm'); await new Promise(r=>setTimeout(r,4000)); return { classic: typeof window.__dbg.classic?.state==='function' ? window.__dbg.classic.state() : 'no classic.state', body: document.body.innerText.replace(/\\s+/g,' ').slice(0,400) };" },
+  { "sleep": 3000 },
+  { "eval": "return { body: document.body.innerText.replace(/\\s+/g,' ').slice(0,500), tabs:[...document.querySelectorAll('div')].filter(d=>d.title&&d.getBoundingClientRect().top<40&&d.getBoundingClientRect().height>20).map(d=>d.title), warned: /unsaved|discard|lose/i.test(document.body.innerText) };" },
+  { "shot": "41-classic-opened" }
+]

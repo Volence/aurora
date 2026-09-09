@@ -1,0 +1,8 @@
+[
+  { "eval": "return { objs: document.body.innerText.match(/Objects\\n(\\d+)/)?.[1], dirty: window.__dbg.aeon.state().dirty };" },
+  { "click": { "x": 1315, "y": 54 }, "after": 1200 },
+  { "eval": "return { afterUndo1: document.body.innerText.match(/Objects\\n(\\d+)/)?.[1], redoDis: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Redo')?.disabled };" },
+  { "click": { "x": 1315, "y": 54 }, "after": 1200 },
+  { "eval": "return { afterUndo2: document.body.innerText.match(/Objects\\n(\\d+)/)?.[1], dirty: window.__dbg.aeon.state().dirty, dirtyActs: window.__dbg.aeon.state().dirtyActs };" },
+  { "shot": "18-after-two-undos" }
+]

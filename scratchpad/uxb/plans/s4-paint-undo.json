@@ -1,0 +1,10 @@
+[
+  { "eval": "const c=document.querySelector('canvas'); const r=c.getBoundingClientRect(); return { canvasRect: {x:Math.round(r.left),y:Math.round(r.top),w:Math.round(r.width),h:Math.round(r.height)}, mid:{x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)} };" },
+  { "clickAt": "const c=document.querySelector('canvas'); const r=c.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 1200 },
+  { "eval": "return { status: document.body.innerText.split('\\n').slice(-3).join(' | '), undoDis: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Undo')?.disabled, tabDot: [...document.querySelectorAll('div')].find(d=>d.title==='Oracle Jungle Zone · act1'&&d.getBoundingClientRect().top<40)?.innerText.replace(/\\s+/g,' ') };" },
+  { "clickAt": "const b=[...document.querySelectorAll('button')].find(e=>e.innerText.trim()==='Undo'); const r=b.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 1500 },
+  { "eval": "return { afterUndo: { undoDis: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Undo')?.disabled, redoDis: [...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='Redo')?.disabled } };" },
+  { "clickAt": "const b=[...document.querySelectorAll('button')].find(e=>/New Chunk/.test(e.innerText)); if(!b) return {none:true}; const r=b.getBoundingClientRect(); return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)};", "after": 2000 },
+  { "eval": "return { statusNow: document.body.innerText.split('\\n').slice(-3).join(' | ') };" },
+  { "shot": "35-art-after-paint-undo" }
+]

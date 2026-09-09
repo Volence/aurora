@@ -1,0 +1,4 @@
+[
+  { "eval": "const vis=(el)=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0&&r.bottom>0&&r.right>0&&r.top<innerHeight&&r.left<innerWidth};const L=[];for(const el of document.querySelectorAll('button,input,select,textarea')){if(!vis(el))continue;const r=el.getBoundingClientRect();L.push(`${el.tagName.toLowerCase()}${el.disabled?' DIS':''} ${Math.round(r.left+r.width/2)},${Math.round(r.top+r.height/2)} :: ${((el.innerText||el.value||el.placeholder||el.title||'').trim().replace(/\\s+/g,' ')).slice(0,40)}`)}return L.slice(0,60).join('\\n')+`\\n=== ${L.length}`;" },
+  { "shot": "42-classic-level" }
+]

@@ -1,0 +1,9 @@
+[
+  { "click": { "x": 700, "y": 700 }, "after": 400 },
+  { "key": { "key": "p", "code": "KeyP", "vk": 80, "mod": 2, "text": "p" }, "after": 1500 },
+  { "eval": "return { afterCtrlP: { overlay: !!document.querySelector('[role=dialog]'), inputs: [...document.querySelectorAll('input')].map(i=>i.placeholder).filter(Boolean), body: document.body.innerText.slice(0,160) } };" },
+  { "key": { "key": "P", "code": "KeyP", "vk": 80, "mod": 10, "text": "P" }, "after": 1500 },
+  { "sleep": 800 },
+  { "eval": "return { afterCtrlShiftP: { inputs: [...document.querySelectorAll('input')].map(i=>i.placeholder).filter(Boolean), body: document.body.innerText.slice(0,300) } };" },
+  { "shot": "37-command-palette-attempt" }
+]
