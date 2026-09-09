@@ -104,3 +104,7 @@ scratchpad/fixtures/aeon-art-undo/
 # violations of this repo's own rule. (Its screenshots land in
 # scratchpad/shots-chunk-undo-measure/, already covered by `scratchpad/shots*/`.)
 scratchpad/fixtures/aeon-chunk-undo/
+# Same fixture, same reason, for the Redo follow-up
+# (scratchpad/chunk-undo-redo-harness.mjs). A separate directory so the two
+# harnesses can never be running against one tree at once.
+scratchpad/fixtures/aeon-chunk-undo-redo/
